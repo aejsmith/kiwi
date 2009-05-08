@@ -1,0 +1,186 @@
+diff -urN gcc-4.4.0.orig/config.sub gcc-4.4.0/config.sub
+--- gcc-4.4.0.orig/config.sub	2008-12-18 03:27:27.000000000 +0000
++++ gcc-4.4.0/config.sub	2009-05-06 07:54:18.751063914 +0100
+@@ -1276,7 +1276,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -kiwi*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi32.h gcc-4.4.0/gcc/config/i386/kiwi32.h
+--- gcc-4.4.0.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.0/gcc/config/i386/kiwi32.h	2009-05-06 18:43:08.285468910 +0100
+@@ -0,0 +1,29 @@
++/* Definitions for Kiwi i386 targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#undef  TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (i386 Kiwi/ELF)");
++
++#undef  LINK_SPEC
++#define LINK_SPEC "%{m64:-m elf_x86_64} %{!m64:-m elf_i386} \
++  %{shared:-shared} \
++  %{!shared: \
++    %{!static: \
++      %{rdynamic:-export-dynamic} \
++    %{static:-static}}"
+diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi64.h gcc-4.4.0/gcc/config/i386/kiwi64.h
+--- gcc-4.4.0.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.0/gcc/config/i386/kiwi64.h	2009-05-06 18:44:35.288643915 +0100
+@@ -0,0 +1,29 @@
++/* Definitions for Kiwi x86-64 targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#undef  TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (x86-64 Kiwi/ELF)");
++
++#undef  LINK_SPEC
++#define LINK_SPEC "%{!m32:-m elf_x86_64} %{m32:-m elf_i386} \
++  %{shared:-shared} \
++  %{!shared: \
++    %{!static: \
++      %{rdynamic:-export-dynamic} \
++    %{static:-static}}"
+diff -urN gcc-4.4.0.orig/gcc/config/i386/t-kiwi64 gcc-4.4.0/gcc/config/i386/t-kiwi64
+--- gcc-4.4.0.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.0/gcc/config/i386/t-kiwi64	2009-05-06 18:41:00.874061290 +0100
+@@ -0,0 +1,17 @@
++MULTILIB_OPTIONS = m64/m32
++MULTILIB_DIRNAMES = 64 32
++MULTILIB_OSDIRNAMES = ../lib ../lib32
++
++LIBGCC = stmp-multilib
++INSTALL_LIBGCC = install-multilib
++   
++EXTRA_MULTILIB_PARTS=crtbegin.o crtend.o
++
++# The pushl in CTOR initialization interferes with frame pointer elimination.
++# crtend*.o cannot be compiled without -fno-asynchronous-unwind-tables,
++# because then __FRAME_END__ might not be the last thing in .eh_frame
++# section.
++CRTSTUFF_T_CFLAGS = -fno-omit-frame-pointer -fno-asynchronous-unwind-tables
++
++# Compile libgcc2.a with pic.
++TARGET_LIBGCC2_CFLAGS = -fPIC
+diff -urN gcc-4.4.0.orig/gcc/config/kiwi.h gcc-4.4.0/gcc/config/kiwi.h
+--- gcc-4.4.0.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.0/gcc/config/kiwi.h	2009-05-06 18:36:30.118468712 +0100
+@@ -0,0 +1,36 @@
++/* Definitions for Kiwi targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Specify predefined symbols in preprocessor.  */
++#undef  TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()		\
++	do {					\
++		builtin_define ("__Kiwi__");	\
++	} while (0)
++
++/* Borrowed from gcc/config/linux.h */
++#undef  STARTFILE_SPEC
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p|profile:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}} \
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++
++#undef  ENDFILE_SPEC
++#define ENDFILE_SPEC \
++  "%{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
+diff -urN gcc-4.4.0.orig/gcc/config.gcc gcc-4.4.0/gcc/config.gcc
+--- gcc-4.4.0.orig/gcc/config.gcc	2009-04-17 12:58:41.000000000 +0100
++++ gcc-4.4.0/gcc/config.gcc	2009-05-06 08:02:24.350683618 +0100
+@@ -588,6 +588,14 @@
+   # Assume that newlib is being used and so __cxa_atexit is provided.
+   default_use_cxa_atexit=yes
+   ;;
++*-*-kiwi*)
++   extra_parts="crtbegin.o crtend.o crtbeginS.o crtbeginT.o crtendS.o"
++   gas=yes
++   gnu_ld=yes
++   default_use_cxa_atexit=yes
++   tmake_file="t-svr4"
++   tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h kiwi.h"
++   ;;
+ esac
+ 
+ case ${target} in
+@@ -1308,6 +1316,14 @@
+ 		tm_file="${tm_file} dbxcoff.h"
+ 	fi
+ 	;;
++i[34567]86-*-kiwi*)
++	tm_file="${tm_file} i386/kiwi32.h"
++	tmake_file="${tmake_file} i386/t-crtstuff"
++	;;
++x86_64-*-kiwi*)
++	tm_file="${tm_file} i386/x86-64.h i386/kiwi64.h"
++	tmake_file="${tmake_file} i386/t-kiwi64"
++	;;
+ ia64*-*-elf*)
+ 	tm_file="${tm_file} dbxelf.h elfos.h ia64/sysv4.h ia64/elf.h"
+ 	tmake_file="ia64/t-ia64"
+diff -urN gcc-4.4.0.orig/libgcc/config.host gcc-4.4.0/libgcc/config.host
+--- gcc-4.4.0.orig/libgcc/config.host	2009-04-17 12:58:41.000000000 +0100
++++ gcc-4.4.0/libgcc/config.host	2009-05-06 18:46:20.680663658 +0100
+@@ -275,6 +275,10 @@
+ 	;;
+ x86_64-*-elf*)
+ 	;;
++i[34567]86-*-kiwi*)
++       ;;
++x86_64-*-kiwi*)
++       ;;
+ i[34567]86-*-aout*)
+ 	;;
+ i[34567]86-*-freebsd*)
