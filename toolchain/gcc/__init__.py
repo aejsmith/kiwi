@@ -13,7 +13,7 @@
 # for complete terms.
 
 import os
-from toolchain.component import ToolchainComponent
+from component import ToolchainComponent
 
 class GCCComponent(ToolchainComponent):
 	name = 'gcc'

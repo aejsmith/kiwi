@@ -58,9 +58,13 @@ with open('build.conf') as f:
 # Toolchain configuration. #
 ############################
 
-from toolchain.manager import ToolchainManager
-
-ToolchainManager(config, verbose, colour).update()
+if os.system('toolchain/build.py --check') != 0:
+	if colour:
+		sys.stdout.write('\033[1;31mWARNING:\033[0m ')
+	else:
+		sys.stdout.write('WARNING: ')
+	print "Your toolchain is out of date. Please ensure that build.conf is"
+	print "         correct and update it by running toolchain/build.py"
 
 #######################
 # Build environments. #

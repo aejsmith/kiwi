@@ -15,15 +15,13 @@
 import os
 import sys
 
-from toolchain.binutils import BinutilsComponent
-from toolchain.gcc import GCCComponent
+from binutils import BinutilsComponent
+from gcc import GCCComponent
 
 # Class to manage building and updating the toolchain.
 class ToolchainManager:
-	def __init__(self, config, verbose, colour):
+	def __init__(self, config):
 		self.config = config
-		self.verbose = verbose
-		self.colour = colour
 		self.parentdir = config['TOOLCHAIN_DIR']
 		self.destdir = os.path.join(config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'])
 		self.builddir = os.path.join(self.destdir, 'build-tmp')
@@ -39,10 +37,7 @@ class ToolchainManager:
 
 	# Write a status message.
 	def msg(self, msg):
-		if self.colour:
-			print '\033[1;34m>>>\033[0;1m %s\033[0m' % (msg)
-		else:
-			print '>>> %s' % (msg)
+		print '\033[1;34m>>>\033[0;1m %s\033[0m' % (msg)
 
 	# Check whether any dependencies of a component have changed.
 	def checkdeps(self, c):
@@ -79,6 +74,14 @@ class ToolchainManager:
 		# Change to the old directory and clean up the build directory.
 		os.chdir(olddir)
 		self.cleanup()
+
+	# Check if an update is required.
+	def check(self):
+		for c in self.components:
+			if self.checkdeps(c) or c.check():
+				return 1
+		self.repair()
+		return 0
 
 	# Rebuilds any components of the toolchain that are out of date.
 	def update(self):

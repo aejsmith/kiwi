@@ -1,4 +1,6 @@
-# Kiwi build system
+#!/usr/bin/env python
+
+# Kiwi toolchain build script
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,18 +17,21 @@
 import os
 import sys
 
-Import("config", "envmgr")
+from manager import ToolchainManager
 
-# Create the build configuration header.
-with open('config.h', 'w') as f:
-	f.write('/* This file is automatically-generated. Modify build.conf instead. */\n\n')
-	for (k, v) in config.items():
-		if isinstance(v, str):
-			f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
-		elif isinstance(v, bool) or isinstance(v, int):
-			f.write("#define CONFIG_%s %d\n" % (k, int(v)))
-		else:
-			raise Exception, "Unsupported type %s in build.conf" % (type(v))
+if not os.path.exists('build.conf'):
+	print 'Please run this script from the root of the source tree'
+	sys.exit(1)
 
-# Visit subdirectories.
-#SConscript(dirs=['source'])
+# Read in the configuration.
+with open('build.conf') as f:
+	exec f
+
+def main():
+	if len(sys.argv) > 1 and sys.argv[1] == '--check':
+		return ToolchainManager(config).check()
+	else:
+		return ToolchainManager(config).update()
+
+if __name__ == '__main__':
+	sys.exit(main())
