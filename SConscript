@@ -17,8 +17,16 @@ import sys
 
 Import("config", "envmgr")
 
-env = envmgr.Create("kernel")
-env.Program("foo.c")
+# Create the build configuration header.
+with open('config.h', 'w') as f:
+	f.write('/* This file is automatically-generated. Modify build.conf instead. */\n\n')
+	for (k, v) in config.items():
+		if isinstance(v, str):
+			f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
+		elif isinstance(v, bool) or isinstance(v, int):
+			f.write("#define CONFIG_%s %d\n" % (k, int(v)))
+		else:
+			raise Exception, "Unsupported type %s in build.conf" % (type(v))
 
 """subdirs = ["kernel", "drivers", "uspace"]
 

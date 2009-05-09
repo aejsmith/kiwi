@@ -150,7 +150,7 @@ envmgr = EnvironmentManager(verbose, colour)
 # Main build. #
 ###############
 
-build_dir = config['BUILD_DIR']
+build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM']))
 exports = ['envmgr', 'config']
 
 SConscript('SConscript', build_dir=build_dir, exports=exports)
