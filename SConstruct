@@ -112,15 +112,15 @@ class EnvironmentManager(UserDict):
 		self.base['ASCOM']    = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
 
 		# Make the build quiet if we haven't been told to make it verbose.
-		self.base['ARCOMSTR']     = self.get_compile_str('Creating archive: $TARGET')
-		self.base['ASCOMSTR']     = self.get_compile_str('Compiling ASM source: $SOURCE')
-		self.base['ASPPCOMSTR']   = self.get_compile_str('Compiling ASM source: $SOURCE')
-		self.base['CCCOMSTR']     = self.get_compile_str('Compiling C source: $SOURCE')
-		self.base['CXXCOMSTR']    = self.get_compile_str('Compiling C++ source: $SOURCE')
-		self.base['LINKCOMSTR']   = self.get_compile_str('Linking: $TARGET')
-		self.base['RANLIBCOMSTR'] = self.get_compile_str('Indexing archive: $TARGET')
-		self.base['GENCOMSTR']    = self.get_compile_str('Generating: $TARGET')
-		self.base['STRIPCOMSTR']  = self.get_compile_str('Stripping: $TARGET')
+		self.base['ARCOMSTR']     = self.get_compile_str('Creating archive:', '$TARGET')
+		self.base['ASCOMSTR']     = self.get_compile_str('Compiling ASM source:', '$SOURCE')
+		self.base['ASPPCOMSTR']   = self.get_compile_str('Compiling ASM source:', '$SOURCE')
+		self.base['CCCOMSTR']     = self.get_compile_str('Compiling C source:', '$SOURCE')
+		self.base['CXXCOMSTR']    = self.get_compile_str('Compiling C++ source:', '$SOURCE')
+		self.base['LINKCOMSTR']   = self.get_compile_str('Linking:', '$TARGET')
+		self.base['RANLIBCOMSTR'] = self.get_compile_str('Indexing archive:', '$TARGET')
+		self.base['GENCOMSTR']    = self.get_compile_str('Generating:', '$TARGET')
+		self.base['STRIPCOMSTR']  = self.get_compile_str('Stripping:', '$TARGET')
 
 		# Import version information.
 		for k, v in version.items():
@@ -133,12 +133,12 @@ class EnvironmentManager(UserDict):
 		                    config['TOOLCHAIN_TARGET'] + "-" + name)
 
 	# Get a string to use for a compilation string.
-	def get_compile_str(self, msg):
+	def get_compile_str(self, msg, name):
 		if not self.verbose:
 			if self.colour:
-				return '\033[1;34m>>>\033[0;1m %s\033[0m' % (msg)
+				return '\033[1;34m>>>\033[0;1m %-21s %s\033[0m' % (msg, name)
 			else:
-				return '>>> %s' % (msg)
+				return '>>> %-21s %s' % (msg, name)
 		else:
 			return None
 
@@ -154,7 +154,5 @@ envmgr = EnvironmentManager(verbose, colour)
 # Main build. #
 ###############
 
-build_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM']))
-exports = ['envmgr', 'config']
-
-SConscript('SConscript', build_dir=build_dir, exports=exports)
+Export('envmgr', 'config')
+SConscript('SConscript', build_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))

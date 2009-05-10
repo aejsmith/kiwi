@@ -1,0 +1,89 @@
+# Kiwi build system
+# Copyright (C) 2009 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+import os
+import sys
+
+Import('config', 'envmgr')
+
+####################################
+# Kernel build environment set-up. #
+####################################
+
+# Set up include directory links.
+Dir('include').link(Dir('generic/include'), 1)
+Dir('include/arch').link(Dir('arch/%s/include' % (config['ARCH'])), 1)
+Dir('include/platform').link(Dir('platform/%s/include' % (config['PLATFORM'])), 1)
+if config.has_key('SUBARCH'):
+	Dir('include/arch/subarch').link(Dir('arch/%s/%s/include' % (config['ARCH'], config['SUBARCH'])), 1)
+
+# Create the kernel environment.
+env = envmgr.Create('kernel')
+env['CPPPATH']  = Dir('include')
+env['CCFLAGS']  = '-nostdlib -nostdinc -ffreestanding -fno-stack-protector ' + \
+                  '-include build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
+env['ASFLAGS']  = '-nostdinc -D__ASM__'
+env['LDFLAGS']  = ''
+env['LDSCRIPT'] = File('arch/%s/link.ld' % (config['ARCH']))
+
+# Get the list of source files.
+env['SRCFILES'] = []
+SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'generic'],
+           exports=['env'])
+env['OBJFILES'] = map(env.Object, env['SRCFILES'])
+
+###################
+# Kernel linking. #
+###################
+
+# Create a fake symbol table used for the first linking stage.
+def fake_symtab_func(target, source, env):
+	with open(str(target[0]), 'w') as f:
+		f.write('/* This file is auto-generated, changes will be overwritten. */\n')
+		f.write('#include <symtab.h>\n')
+		f.write('SymbolTable::Symbol __kernel_syms[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
+		f.write('size_t __kernel_syms_count = 1;\n')
+	return None
+
+# Link the first kernel image using a fake symbol table.
+env.Command('fake-symtab.cpp', [], Action(fake_symtab_func, '$GENCOMSTR'))
+env.Object('fake-symtab.o', 'fake-symtab.cpp')
+env.Command('kiwi-pass1.elf', [env['LDSCRIPT'], env['OBJFILES'], 'fake-symtab.o'],
+            Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("fake-symtab.o")} $LDFLAGS',
+                   '$LINKCOMSTR'))
+
+# Generate the first real symbol table and relink the kernel with it.
+env.Command('symtab-pass1.cpp', ['kiwi-pass1.elf', '#utilities/gensymtab.py'],
+            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py __kernel_syms > $TARGET', '$GENCOMSTR'))
+env.Object('symtab-pass1.o', 'symtab-pass1.cpp')
+env.Command('kiwi-pass2.elf', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass1.o'],
+            Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("symtab-pass1.o")} $LDFLAGS',
+                   '$LINKCOMSTR'))
+
+# Generate the final symbol table with correct symbol addresses.
+env.Command('symtab-pass2.cpp', ['kiwi-pass2.elf', '#utilities/gensymtab.py'],
+            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py __kernel_syms > $TARGET', '$GENCOMSTR'))
+env.Object('symtab-pass2.o', 'symtab-pass2.cpp')
+env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
+            Action('$LINK -T $LDSCRIPT -o $TARGET -Map ${File("kiwi.map")} ' + \
+                   '$OBJFILES ${File("symtab-pass2.o")} $LDFLAGS',
+                   '$LINKCOMSTR'))
+
+# Generate various information files and the stripped kernel image.
+env.Command('kiwi.lst', 'kiwi.debug', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('kiwi.rde', 'kiwi.debug', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('kiwi.sym', 'kiwi.debug', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
+env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP $SOURCE -o $TARGET', '$GENCOMSTR'))
+
+Default(Alias('kernel', ['kiwi.lst', 'kiwi.rde', 'kiwi.sym', 'kiwi.elf']))
