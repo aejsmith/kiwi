@@ -364,7 +364,7 @@ magic_err_str:		.asciz "Multiboot magic number is invalid."
 cpuid_err_str:		.asciz "CPU does not support CPUID."
 pae_err_str:		.asciz "CPU does not support PAE."
 pge_err_str:		.asciz "CPU does not support PGE."
-lmode_err_str:		.asciz "CPU does not support long mode. Use a 32-bit version of Exclaim."
+lmode_err_str:		.asciz "CPU does not support long mode. Use a 32-bit version of Kiwi."
 
 .section .bss, "aw", @nobits
 
