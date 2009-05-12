@@ -22,11 +22,9 @@ Import('config', 'envmgr')
 ####################################
 
 # Set up include directory links.
-Dir('include').link(Dir('generic/include'), 1)
-Dir('include/arch').link(Dir('arch/%s/include' % (config['ARCH'])), 1)
-Dir('include/platform').link(Dir('platform/%s/include' % (config['PLATFORM'])), 1)
-if config.has_key('SUBARCH'):
-	Dir('include/arch/subarch').link(Dir('arch/%s/%s/include' % (config['ARCH'], config['SUBARCH'])), 1)
+Dir('include').link(Dir('#source/kernel/generic/include'), 1)
+Dir('include/arch').link(Dir('#source/kernel/arch/%s/include' % (config['ARCH'])), 1)
+Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config['PLATFORM'])), 1)
 
 # Create the kernel environment.
 env = envmgr.Create('kernel')
@@ -84,6 +82,9 @@ env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
 env.Command('kiwi.lst', 'kiwi.debug', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
 env.Command('kiwi.rde', 'kiwi.debug', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
 env.Command('kiwi.sym', 'kiwi.debug', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
-env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP $SOURCE -o $TARGET', '$GENCOMSTR'))
+elf = env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP $SOURCE -o $TARGET', '$GENCOMSTR'))
+Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
 
-Default(Alias('kernel', ['kiwi.lst', 'kiwi.rde', 'kiwi.sym', 'kiwi.elf']))
+envmgr['dist']['KERNEL'] = File('kiwi.elf')
+
+Default(Alias('kernel', File('kiwi.elf')))

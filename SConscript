@@ -28,5 +28,12 @@ with open('config.h', 'w') as f:
 		else:
 			raise Exception, "Unsupported type %s in build.conf" % (type(v))
 
+# Create the distribution environment.
+dist = envmgr.Create('dist')
+
 # Visit subdirectories.
 SConscript(dirs=['source'])
+
+# Create the ISO image.
+iso = Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
+Depends(iso, dist['KERNEL'])
