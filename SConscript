@@ -37,3 +37,8 @@ SConscript(dirs=['source'])
 # Create the ISO image.
 iso = Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 Depends(iso, dist['KERNEL'])
+
+# Run generated ISO image in QEMU.
+dist.Alias('qtest', dist.Command('qtest', ['cdrom.iso'],
+           Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE -serial stdio ' + \
+                  config['QEMU_OPTS'], None)))
