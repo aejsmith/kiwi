@@ -16,10 +16,7 @@
 #ifndef __SYMTAB_H
 #define __SYMTAB_H
 
-//#include <types.h>
-
-typedef unsigned long ptr_t;
-typedef unsigned long size_t;
+#include <types.h>
 
 /** Class declaring a symbol table. */
 class SymbolTable {
