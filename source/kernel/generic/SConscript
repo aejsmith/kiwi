@@ -17,4 +17,6 @@ import sys
 
 Import('env')
 
-#env['SRCFILES'] += []
+env['SRCFILES'] += [
+	File('main.cpp'),
+]

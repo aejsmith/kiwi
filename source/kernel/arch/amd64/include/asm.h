@@ -241,7 +241,7 @@ static inline void ltr(uint32_t sel) {
  * @param base		Virtual address of GDT.
  * @param limit		Size of GDT. */
 static inline void lgdt(ptr_t base, uint16_t limit) {
-	gdt_ptr_t gdtp;
+	gdt_pointer gdtp;
 
 	gdtp.limit = limit;
 	gdtp.base = base;
@@ -253,7 +253,7 @@ static inline void lgdt(ptr_t base, uint16_t limit) {
  * @param base		Base address of IDT.
  * @param limit		Size of IDT. */
 static inline void lidt(ptr_t base, uint16_t limit) {
-	idt_ptr_t idtp;
+	idt_pointer idtp;
 
 	idtp.limit = limit;
 	idtp.base = base;

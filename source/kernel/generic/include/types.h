@@ -27,6 +27,7 @@
 
 /** C standard types. */
 typedef __SIZE_TYPE__ size_t;		/**< Type to represent the size of an object. */
+typedef _Bool bool;			/**< Boolean type. */
 
 /** Kiwi-specific types. */
 typedef uint32_t process_id_t;		/**< Type used to store a process ID. */
@@ -38,6 +39,8 @@ typedef uint64_t key_t;			/**< Type used to identify something. */
 #define PRIo		PRId64		/**< Format character for offset_t. */
 
 /** Various definitions. */
+#define false		0		/**< False boolean value. */
+#define true		1		/**< True boolean value. */
 #define NULL		0		/**< NULL value for a pointer. */
 
 /** Gets the offset of a member in a type. */

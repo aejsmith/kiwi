@@ -101,12 +101,12 @@ class EnvironmentManager(UserDict):
 		self.base['RANLIB']  = self.get_tool_path('ranlib')
 
 		# Set compilation flags.
-		self.base['CCFLAGS']  = '-Wall -Wextra -Werror -std=gnu99 ' + \
+		self.base['CCFLAGS']  = '-Wall -Wextra -Werror ' + \
 		          '-Wcast-align -Wno-variadic-macros ' + \
 		          '-Wno-unused-parameter -Wwrite-strings ' + \
 		          '-Wmissing-declarations -Wredundant-decls ' + \
 		          '-Wno-format -g ' + config['EXTRA_CCFLAGS']
-		self.base['CFLAGS']   = config['EXTRA_CFLAGS']
+		self.base['CFLAGS']   = '-std=gnu99 ' + config['EXTRA_CFLAGS']
 		self.base['CXXFLAGS'] = config['EXTRA_CXXFLAGS']
 
 		# Override the default assembler - it uses as directly, we want to use GCC.

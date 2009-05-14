@@ -26,7 +26,7 @@ print '/* This file is auto-generated, changes will be overwritten. */'
 print
 print '#include <symtab.h>'
 print
-print 'SymbolTable::Symbol %s[] = {' % (sys.argv[1])
+print 'symbol_table::symbol %s[] = {' % (sys.argv[1])
 
 count = 0
 

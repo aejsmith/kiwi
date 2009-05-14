@@ -207,7 +207,7 @@ __kernel_entry:
 	movl	(__mb_info), %edi
 
 	/* Call C main function. */
-	//call	kmain_bsp
+	call	kmain_bsp
 
 	/* If we got here something has gone wrong. */
 1:	//ud2a

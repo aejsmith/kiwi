@@ -56,7 +56,7 @@
 #include <types.h>
 
 /** Multiboot information structure provided by bootloader. */
-struct multiboot_info_t {
+struct multiboot_info {
 	uint32_t flags;				/**< Flags. */
 	uint32_t mem_lower;			/**< Bytes of lower memory. */
 	uint32_t mem_upper;			/**< Bytes of upper memory. */
@@ -81,7 +81,7 @@ struct multiboot_info_t {
 } __packed;
 
 /** Multiboot module information structure. */
-struct multiboot_module_t {
+struct multiboot_module {
 	uint32_t mod_start;			/**< Address of module. */
 	uint32_t mod_end;			/**< End address of module. */
 	uint32_t string;			/**< Name of module. */
@@ -89,7 +89,7 @@ struct multiboot_module_t {
 } __packed;
 
 /** Multiboot memory map structure. */
-struct multiboot_memory_map_t {
+struct multiboot_memory_map {
 	uint32_t size;				/**< Size of entry. */
 	uint64_t base_addr;			/**< Address. */
 	uint64_t length;			/**< Length. */

@@ -18,6 +18,7 @@ import sys
 Import('env')
 
 env['SRCFILES'] += [
-	File('gdt.cpp'),
 	File('boot.S')
+	File('console.cpp'),
+	File('gdt.cpp'),
 ]

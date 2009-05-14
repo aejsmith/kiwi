@@ -28,12 +28,13 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 
 # Create the kernel environment.
 env = envmgr.Create('kernel')
-env['CPPPATH']  = Dir('include')
-env['CCFLAGS']  = '-nostdlib -nostdinc -ffreestanding -fno-stack-protector ' + \
-                  '-include build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
-env['ASFLAGS']  = '-nostdinc -D__ASM__'
-env['LDFLAGS']  = ''
-env['LDSCRIPT'] = File('arch/%s/link.ld' % (config['ARCH']))
+env['CPPPATH']   = Dir('include')
+env['CCFLAGS']  += ' -nostdlib -nostdinc -ffreestanding -fno-stack-protector ' + \
+                   '-include build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
+env['CXXFLAGS'] += ' -fno-exceptions -fno-rtti'
+env['ASFLAGS']   = '-nostdinc -D__ASM__'
+env['LDFLAGS']   = ''
+env['LDSCRIPT']  = File('arch/%s/link.ld' % (config['ARCH']))
 
 # Get the list of source files.
 env['SRCFILES'] = []
@@ -50,7 +51,7 @@ def fake_symtab_func(target, source, env):
 	with open(str(target[0]), 'w') as f:
 		f.write('/* This file is auto-generated, changes will be overwritten. */\n')
 		f.write('#include <symtab.h>\n')
-		f.write('SymbolTable::Symbol __kernel_syms[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
+		f.write('symbol_table::symbol __kernel_syms[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
 		f.write('size_t __kernel_syms_count = 1;\n')
 	return None
 
