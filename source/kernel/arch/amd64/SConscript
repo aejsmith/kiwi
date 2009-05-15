@@ -15,10 +15,52 @@
 import os
 import sys
 
-Import('env')
+Import('env', 'config')
 
-env['SRCFILES'] += [
-	File('boot.S')
-	File('console.cpp'),
-	File('gdt.cpp'),
+# Set build flags, prevent FPU code generation.
+env['ASFLAGS'] += '-m64'
+env['CCFLAGS'] += '-m64 -mno-sse -mno-mmx -mno-sse2 -mno-3dnow ' + \
+                  '-mcmodel=kernel -mno-red-zone -fno-omit-frame-pointer'
+env['LDFLAGS'] += '-A x86_64 -m elf_x86_64'
+
+# Add source files.
+env['OBJFILES'] += [
+	env.Object('acpi.c'),
+	env.Object('apic.c'),
+	env.Object('aspace.c'),
+	env.Object('boot.S'),
+	env.Object('console.c'),
+	env.Object('context.c'),
+	env.Object('cpu.c'),
+	env.Object('entry.S'),
+	env.Object('gdt.c'),
+	env.Object('init.c'),
+	env.Object('intr.c'),
+	env.Object('kdbg.c'),
+	env.Object('page.c'),
+	env.Object('pagefault.c'),
+	env.Object('pic.c'),
+	env.Object('pit.c'),
+	env.Object('pmm.c'),
+	env.Object('string.c'),
+	env.Object('switch.S'),
 ]
+
+# Generate the AP boot code.
+if config['SMP']:
+	def gen_inc_s(target, source, env):
+		f = open(str(target[0]), 'w')
+		f.write('.section .init.trampoline, "ax", @progbits\n')
+		f.write('.incbin "ap_boot.bin"\n')
+		f.close()
+	env.Object('ap_boot.bin.o', 'ap_boot.S')
+	env.Command('ap_boot.bin.elf', 'ap_boot.bin.o',
+	            Action('$LINK -Ttext=0 -o $TARGET $SOURCE', None))
+	env.Command('ap_boot.bin', 'ap_boot.bin.elf',
+	            Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
+	env.Command('ap_boot.bin.S', 'ap_boot.bin',
+	            Action(gen_inc_s, None))
+	env.Command('ap_boot.o', ['ap_boot.bin.S'],
+	            Action('$CC $ASFLAGS -c -o $TARGET $SOURCE -Wa,-I%s' %
+	                       (os.path.abspath(str(File('ap_boot.bin').dir))), None))
+	env['OBJFILES'].append(File('ap_boot.o'))

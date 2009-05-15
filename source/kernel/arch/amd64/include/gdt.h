@@ -18,8 +18,8 @@
  * @brief		AMD64 segment definitions.
  */
 
-#ifndef __ARCH_SEGMENT_H
-#define __ARCH_SEGMENT_H
+#ifndef __ARCH_GDT_H
+#define __ARCH_GDT_H
 
 /** Total number of GDT descriptors. */
 #define GDT_SEG_COUNT	9
@@ -33,4 +33,16 @@
 #define SEG_K_DS32	0x30		/**< 32-bit kernel data segment. */
 #define SEG_TSS		0x38		/**< TSS segment. */
 
-#endif /* __ARCH_SEGMENT_H */
+#ifndef __ASM__
+
+#include <types.h>
+
+extern gdt_pointer_t __boot_gdtp;
+
+extern void gdt_set_base(int sel, ptr_t base);
+extern void gdt_set_limit(int sel, size_t limit);
+
+extern void gdt_init(void);
+
+#endif /* __ASM__ */
+#endif /* __ARCH_GDT_H */

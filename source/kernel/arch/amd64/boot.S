@@ -19,10 +19,10 @@
  */
 
 #include <arch/defs.h>
+#include <arch/gdt.h>
 #include <arch/mem.h>
 #include <arch/multiboot.h>
 #include <arch/page.h>
-#include <arch/segment.h>
 
 /** Macro to define a variable. */
 .macro .defvar name, len, global, align

@@ -39,11 +39,6 @@ SECTIONS {
 		__data_start = .;
 		*(.data)
 		*(.data.*)
-
-		__ctors_start = .;
-		*(.ctors)
-		__ctors_end = .;
-
 		. = ALIGN(0x1000);
 		__data_end = .;
 	}

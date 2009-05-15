@@ -30,17 +30,16 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 env = envmgr.Create('kernel')
 env['CPPPATH']   = Dir('include')
 env['CCFLAGS']  += ' -nostdlib -nostdinc -ffreestanding -fno-stack-protector ' + \
-                   '-include build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
-env['CXXFLAGS'] += ' -fno-exceptions -fno-rtti'
-env['ASFLAGS']   = '-nostdinc -D__ASM__'
+                   '-include build/%s-%s/config.h ' % (config['ARCH'], config['PLATFORM'])
+env['CXXFLAGS'] += ' -fno-exceptions -fno-rtti '
+env['ASFLAGS']   = '-nostdinc -D__ASM__ -include build/%s-%s/config.h ' % (config['ARCH'], config['PLATFORM'])
 env['LDFLAGS']   = ''
 env['LDSCRIPT']  = File('arch/%s/link.ld' % (config['ARCH']))
 
 # Get the list of source files.
-env['SRCFILES'] = []
+env['OBJFILES'] = []
 SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'generic'],
            exports=['env'])
-env['OBJFILES'] = map(env.Object, env['SRCFILES'])
 
 ###################
 # Kernel linking. #
@@ -50,30 +49,30 @@ env['OBJFILES'] = map(env.Object, env['SRCFILES'])
 def fake_symtab_func(target, source, env):
 	with open(str(target[0]), 'w') as f:
 		f.write('/* This file is auto-generated, changes will be overwritten. */\n')
-		f.write('#include <symtab.h>\n')
-		f.write('symbol_table::symbol __kernel_syms[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
-		f.write('size_t __kernel_syms_count = 1;\n')
+		f.write('#include <ksym.h>\n')
+		f.write('static ksym_t kernel_symtab_array[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
+		f.write('ksym_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
 	return None
 
 # Link the first kernel image using a fake symbol table.
-env.Command('fake-symtab.cpp', [], Action(fake_symtab_func, '$GENCOMSTR'))
-env.Object('fake-symtab.o', 'fake-symtab.cpp')
+env.Command('fake-symtab.c', [], Action(fake_symtab_func, '$GENCOMSTR'))
+env.Object('fake-symtab.o', 'fake-symtab.c')
 env.Command('kiwi-pass1.elf', [env['LDSCRIPT'], env['OBJFILES'], 'fake-symtab.o'],
             Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("fake-symtab.o")} $LDFLAGS',
                    '$LINKCOMSTR'))
 
 # Generate the first real symbol table and relink the kernel with it.
-env.Command('symtab-pass1.cpp', ['kiwi-pass1.elf', '#utilities/gensymtab.py'],
-            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py __kernel_syms > $TARGET', '$GENCOMSTR'))
-env.Object('symtab-pass1.o', 'symtab-pass1.cpp')
+env.Command('symtab-pass1.c', ['kiwi-pass1.elf', '#utilities/gensymtab.py'],
+            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py kernel_symtab > $TARGET', '$GENCOMSTR'))
+env.Object('symtab-pass1.o', 'symtab-pass1.c')
 env.Command('kiwi-pass2.elf', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass1.o'],
             Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("symtab-pass1.o")} $LDFLAGS',
                    '$LINKCOMSTR'))
 
 # Generate the final symbol table with correct symbol addresses.
-env.Command('symtab-pass2.cpp', ['kiwi-pass2.elf', '#utilities/gensymtab.py'],
-            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py __kernel_syms > $TARGET', '$GENCOMSTR'))
-env.Object('symtab-pass2.o', 'symtab-pass2.cpp')
+env.Command('symtab-pass2.c', ['kiwi-pass2.elf', '#utilities/gensymtab.py'],
+            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py kernel_symtab > $TARGET', '$GENCOMSTR'))
+env.Object('symtab-pass2.o', 'symtab-pass2.c')
 env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
             Action('$LINK -T $LDSCRIPT -o $TARGET -Map ${File("kiwi.map")} ' + \
                    '$OBJFILES ${File("symtab-pass2.o")} $LDFLAGS',

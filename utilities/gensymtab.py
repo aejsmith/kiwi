@@ -3,18 +3,16 @@
 # Kiwi symbol table generator
 # Copyright (C) 2009 Alex Smith
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of version 2 of the GNU General Public License
-# as published by the Free Software Foundation.
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
 
 import sys
 
@@ -24,9 +22,9 @@ if len(sys.argv) != 2:
 
 print '/* This file is auto-generated, changes will be overwritten. */'
 print
-print '#include <symtab.h>'
+print '#include <ksym.h>'
 print
-print 'symbol_table::symbol %s[] = {' % (sys.argv[1])
+print 'static ksym_t %s_array[] = {' % (sys.argv[1])
 
 count = 0
 
@@ -44,4 +42,4 @@ for line in sys.stdin.readlines():
 		count += 1
 
 print '};'
-print 'size_t %s_count = %d;' % (sys.argv[1], count)
+print "ksym_table_t %s = { .symbols = %s_array, .count = %d };" % (sys.argv[1], sys.argv[1], count)

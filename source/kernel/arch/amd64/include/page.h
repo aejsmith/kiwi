@@ -42,4 +42,22 @@
 # define PG_NOEXEC	(1<<63)			/**< Page is not executable (requires NX support). */
 #endif
 
+#ifndef __ASM__
+
+#include <sync/mutex.h>
+
+#include <types.h>
+
+/** Architecture-specific page map structure. */
+typedef struct page_map {
+	mutex_t lock;			/**< Lock to protect page map. */
+	phys_ptr_t pml4;		/**< Physical address of PML4. */
+	bool user;			/**< Whether pages mapped should be userspace accessible. */
+
+	/** Range covered by page map. */
+	ptr_t first;			/**< First allowed page. */
+	ptr_t last;			/**< Last allowed page. */
+} page_map_t;
+
+#endif /* __ASM__ */
 #endif /* __ARCH_PAGE_H */

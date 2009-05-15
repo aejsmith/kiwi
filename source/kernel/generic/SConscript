@@ -15,8 +15,62 @@
 import os
 import sys
 
-Import('env')
+Import('env', 'config')
 
-env['SRCFILES'] += [
-	File('main.cpp'),
+# Generate the version information file. Thanks to the use of MD5 file
+# checksums, this won't automatically be rebuilt!
+def gen_version_c(target, source, env):
+	f = open(str(target[0]), 'w')
+	f.write('int kiwi_ver_release = %d;\n' % (env['KIWI_VER_RELEASE']))
+	f.write('int kiwi_ver_update = %d;\n' % (env['KIWI_VER_UPDATE']))
+	f.write('int kiwi_ver_revision = %d;\n' % (env['KIWI_VER_REVISION']))
+	f.write('const char *kiwi_ver_codename = "%s";\n' % (env['KIWI_VER_CODENAME']))
+	f.write('const char *kiwi_ver_string = "%d.%d.%d";\n'
+	        % (env['KIWI_VER_RELEASE'], env['KIWI_VER_UPDATE'], env['KIWI_VER_REVISION']))
+	f.close()
+env.Command('version.c', [], env.Action(gen_version_c, None))
+
+env['OBJFILES'] += [
+	env.Object('console/console.c'),
+	env.Object('console/kprintf.c'),
+
+	env.Object('cpu/cpu.c'),
+	env.Object('cpu/intr.c'),
+	env.Object('cpu/irq.c'),
+
+	env.Object('lib/do_printf.c'),
+	env.Object('lib/sprintf.c'),
+	env.Object('lib/string.c'),
+
+	env.Object('mm/aspace.c'),
+	env.Object('mm/aspace_anon.c'),
+	env.Object('mm/kheap.c'),
+	env.Object('mm/malloc.c'),
+	env.Object('mm/pmm.c'),
+	env.Object('mm/slab.c'),
+	env.Object('mm/vmem.c'),
+
+	env.Object('proc/process.c'),
+	env.Object('proc/sched.c'),
+	env.Object('proc/thread.c'),
+
+	env.Object('sync/mutex.c'),
+	env.Object('sync/semaphore.c'),
+	env.Object('sync/spinlock.c'),
+	env.Object('sync/waitq.c'),
+
+	env.Object('time/timer.c'),
+
+	env.Object('types/avltree.c'),
+	env.Object('types/hash.c'),
+
+	env.Object('fatal.c'),
+	env.Object('kdbg.c'),
+	env.Object('ksym.c'),
+	env.Object('main.c'),
+
+	env.Object('version.c'),
 ]
+
+if config['SMP']:
+	env['OBJFILES'].append(env.Object('mm/tlb.c'))

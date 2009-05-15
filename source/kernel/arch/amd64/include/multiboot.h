@@ -56,7 +56,7 @@
 #include <types.h>
 
 /** Multiboot information structure provided by bootloader. */
-struct multiboot_info {
+typedef struct multiboot_info {
 	uint32_t flags;				/**< Flags. */
 	uint32_t mem_lower;			/**< Bytes of lower memory. */
 	uint32_t mem_upper;			/**< Bytes of upper memory. */
@@ -78,23 +78,23 @@ struct multiboot_info {
 	uint16_t vbe_interface_seg;		/**< VBE interface segment. */
 	uint16_t vbe_interface_off;		/**< VBE interface offset. */
 	uint16_t vbe_interface_len;		/**< VBE interface length. */
-} __packed;
+} __packed multiboot_info_t;
 
 /** Multiboot module information structure. */
-struct multiboot_module {
+typedef struct multiboot_module {
 	uint32_t mod_start;			/**< Address of module. */
 	uint32_t mod_end;			/**< End address of module. */
 	uint32_t string;			/**< Name of module. */
 	uint32_t reserved;			/**< Reserved. */
-} __packed;
+} __packed multiboot_module_t;
 
 /** Multiboot memory map structure. */
-struct multiboot_memory_map {
+typedef struct multiboot_memmap {
 	uint32_t size;				/**< Size of entry. */
 	uint64_t base_addr;			/**< Address. */
 	uint64_t length;			/**< Length. */
 	uint32_t type;				/**< Type of entry. */
-} __packed;
+} __packed multiboot_memmap_t;
 
 #endif /* __ASM__ */
 #endif /* __ARCH_MULTIBOOT_H */

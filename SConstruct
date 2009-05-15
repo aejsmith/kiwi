@@ -99,6 +99,7 @@ class EnvironmentManager(UserDict):
 		self.base['STRIP']   = self.get_tool_path('strip')
 		self.base['AR']      = self.get_tool_path('ar')
 		self.base['RANLIB']  = self.get_tool_path('ranlib')
+		self.base['OBJCOPY'] = self.get_tool_path('objcopy')
 
 		# Set compilation flags.
 		self.base['CCFLAGS']  = '-Wall -Wextra -Werror ' + \
@@ -143,9 +144,11 @@ class EnvironmentManager(UserDict):
 		else:
 			return None
 
-	# Create a new environment based on the base environment.
-	def Create(self, name):
-		self[name] = self.base.Clone()
+	# Create a new environment based on an existing environment.
+	def Create(self, name, base=None):
+		if not base:
+			base = self.base
+		self[name] = base.Clone()
 		return self[name]
 
 # Create the environment manager instance.

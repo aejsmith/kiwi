@@ -1,0 +1,34 @@
+/* Kiwi memory allocation functions
+ * Copyright (C) 2009 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		Memory allocation functions.
+ */
+
+#ifndef __MM_MALLOC_H
+#define __MM_MALLOC_H
+
+#include <mm/flags.h>
+#include <types.h>
+
+extern void *kmalloc(size_t size, int kmflag) __malloc;
+extern void *kcalloc(size_t nmemb, size_t size, int kmflag) __malloc;
+extern void *krealloc(void *addr, size_t size, int kmflag) __malloc;
+extern void kfree(void *addr);
+
+extern void malloc_init(void);
+
+#endif /* __MM_MALLOC_H */
