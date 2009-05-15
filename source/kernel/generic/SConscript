@@ -28,7 +28,7 @@ def gen_version_c(target, source, env):
 	f.write('const char *kiwi_ver_string = "%d.%d.%d";\n'
 	        % (env['KIWI_VER_RELEASE'], env['KIWI_VER_UPDATE'], env['KIWI_VER_REVISION']))
 	f.close()
-env.Command('version.c', [], env.Action(gen_version_c, None))
+AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
 env['OBJFILES'] += [
 	env.Object('console/console.c'),
