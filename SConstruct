@@ -138,7 +138,7 @@ class EnvironmentManager(UserDict):
 	def get_compile_str(self, msg, name):
 		if not self.verbose:
 			if self.colour:
-				return '\033[1;34m>>>\033[0;1m %-21s %s\033[0m' % (msg, name)
+				return '\033[0;32m>>>\033[0;1m %-21s %s\033[0m' % (msg, name)
 			else:
 				return '>>> %-21s %s' % (msg, name)
 		else:
