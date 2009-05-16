@@ -18,7 +18,6 @@
  * @brief		AMD64 architecture core code.
  */
 
-#include <arch/apic.h>
 #include <arch/arch.h>
 #include <arch/asm.h>
 #include <arch/defs.h>
@@ -26,21 +25,15 @@
 #include <arch/gdt.h>
 #include <arch/intr.h>
 #include <arch/io.h>
-#include <arch/pic.h>
-
-#include <console/kprintf.h>
+#include <arch/lapic.h>
 
 #include <cpu/cpu.h>
-
-#include <time/timer.h>
 
 #include <fatal.h>
 
 /** External initialization functions. */
 extern void page_init(void);
 extern void page_late_init(void);
-
-extern clock_source_t pit_clock_source;
 
 /** X86 architecture startup code.
  *
@@ -68,12 +61,7 @@ void arch_premm_init(void *data) {
  * allocation subsystem is set up.
  */
 void arch_postmm_init(void) {
-	pic_init();
-	if(!apic_local_init()) {
-		if(clock_source_set(&pit_clock_source) != 0) {
-			fatal("Could not set PIT clock source");
-		}
-	}
+	lapic_init();
 }
 
 /** X86 architecture startup code.
@@ -97,9 +85,9 @@ void arch_ap_init(void) {
 		fninit();
         }
 
-	/* Initialize the APIC. */
-	if(!apic_local_init()) {
-		fatal("APIC initialization failed for CPU %" PRIu32 "\n", curr_cpu->id);
+	/* Initialize the LAPIC. */
+	if(!lapic_init()) {
+		fatal("LAPIC initialization failed for CPU %" PRIu32 "\n", curr_cpu->id);
 	}
 }
 #endif

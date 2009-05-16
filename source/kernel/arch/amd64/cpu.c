@@ -18,11 +18,10 @@
  * @brief		x86 CPU management.
  */
 
-#include <arch/apic.h>
 #include <arch/asm.h>
 #include <arch/defs.h>
 #include <arch/features.h>
-#include <arch/mps.h>
+#include <arch/lapic.h>
 
 #include <console/kprintf.h>
 
@@ -33,8 +32,6 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
-
-#include <platform/acpi.h>
 
 #include <time/timer.h>
 
@@ -56,50 +53,6 @@ void *ap_stack_ptr = 0;
 /** Waiting variable for cpu_boot_delay(). */
 static atomic_t cpu_boot_delay_wait = 0;
 
-/** Checksum a memory range.
- * @param start		Start of range to check.
- * @param size		Size of range to check.
- * @return		True if checksum is correct, false if not. */
-static bool cpu_mps_checksum(uint8_t *range, size_t size) {
-	uint8_t checksum = 0;
-	size_t i;
-
-	for(i = 0; i < size; i++) {
-		checksum += range[i];
-	}
-
-	return (checksum == 0);
-}
-
-/** Search for the MP Floating Pointer in a given range.
- * @param start		Start of range to check.
- * @param size		Size of range to check.
- * @return		Pointer to FP if found, NULL if not. */
-static mp_fptr_t *cpu_mps_find_fp(phys_ptr_t start, size_t size) {
-	mp_fptr_t *fp;
-	size_t i;
-
-	assert(!(start % 16));
-	assert(!(size % 16));
-
-	/* Search through the range on 16-byte boundaries. */
-	for(i = 0; i < size; i += 16) {
-		fp = (mp_fptr_t *)((ptr_t)start + i);
-
-		/* Check if the signature and checksum are correct. */
-		if(strncmp(fp->signature, "_MP_", 4) != 0) {
-			continue;
-		} else if(!cpu_mps_checksum((uint8_t *)fp, (fp->length * 16))) {
-			continue;
-		}
-
-		kprintf(LOG_DEBUG, "cpu: found MPFP at 0x%" PRIpp " (revision: %" PRIu8 ")\n", start + i, fp->spec_rev);
-		return fp;
-	}
-
-	return NULL;
-}
-
 /** CPU boot delay timer handler. */
 static bool cpu_boot_delay_func(void) {
 	atomic_set(&cpu_boot_delay_wait, 1);
@@ -119,103 +72,6 @@ static void cpu_boot_delay(uint64_t us) {
 
 	while(atomic_get(&cpu_boot_delay_wait) == 0);
 	intr_disable();
-}
-
-/** Detect CPUs using ACPI.
- * @return		True if succeeded, false if not. */
-static bool cpu_detect_acpi(void) {
-	acpi_madt_lapic_t *lapic;
-	acpi_madt_t *madt;
-	size_t i, length;
-
-	madt = (acpi_madt_t *)acpi_table_find(ACPI_MADT_SIGNATURE);
-	if(madt == NULL) {
-		return false;
-	}
-
-	length = madt->header.length - sizeof(acpi_madt_t);
-	for(i = 0; i < length; i += lapic->length) {
-		lapic = (acpi_madt_lapic_t *)(madt->apic_structures + i);
-
-		if(lapic->type != ACPI_MADT_LAPIC) {
-			continue;
-		} else if(!(lapic->flags & (1<<0))) {
-			/* Ignore disabled processors. */
-			continue;
-		} else if(lapic->lapic_id == apic_local_id()) {
-			continue;
-		}
-
-		/* Add and boot the CPU. */
-		cpu_add((cpu_id_t)lapic->lapic_id, CPU_DOWN);
-	}
-	
-	return true;
-}
-
-/** Detect CPUs using the MPS tables.
- * @return		True if succeeded, false if not. */
-static bool cpu_detect_mps(void) {
-	ptr_t ebda, entry;
-	mp_config_t *cfg;
-	mp_fptr_t *fp;
-	mp_cpu_t *cpu;
-	size_t i;
-
-	/* Get the base address of the Extended BIOS Data Area (EBDA). */
-	ebda = (ptr_t)(*(uint16_t *)0x40e << 4);
-
-	/* Search for the MPFP structure. */
-	if(!(fp = cpu_mps_find_fp(ebda, 0x400)) && !(fp = cpu_mps_find_fp(0xE0000, 0x20000))) {
-		return false;
-	}
-
-	/* Check whether a MP Configuration Table was provided. */
-	if(fp->phys_addr_ptr == 0) {
-		kprintf(LOG_DEBUG, "cpu: no config table provided by MPFP table\n");
-		return false;
-	}
-
-	/* Map the config table onto the kernel heap. */
-	cfg = page_phys_map(fp->phys_addr_ptr, PAGE_SIZE, MM_FATAL);
-
-	/* Check that it is valid. */
-	if(strncmp(cfg->signature, "PCMP", 4) != 0) {
-		page_phys_unmap(cfg, PAGE_SIZE);
-		return false;
-	} else if(!cpu_mps_checksum((uint8_t *)cfg, cfg->length)) {
-		page_phys_unmap(cfg, PAGE_SIZE);
-		return false;
-	}
-
-	kprintf(LOG_DEBUG, "cpu: config table 0x%" PRIx32 " revision %" PRIu8 " (%.6s %.12s)\n",
-		fp->phys_addr_ptr, cfg->spec_rev, cfg->oemid, cfg->productid);
-
-	/* Handle each entry following the table. */
-	for(i = 0, entry = (ptr_t)&cfg[1]; i < cfg->entry_count; i++) {
-		switch(*(uint8_t *)entry) {
-		case MP_CONFIG_CPU:
-			cpu = (mp_cpu_t *)entry;
-			entry += 20;
-
-			/* Ignore disabled CPUs. */
-			if(!(cpu->cpu_flags & 1)) {
-				break;
-			} else if(cpu->cpu_flags & 2) {
-				/* This is the BSP, do a sanity check. */
-				if(cpu->lapic_id != apic_local_id()) {
-					fatal("BSP entry does not match current CPU ID");
-				}
-				break;
-			}
-
-			cpu_add((cpu_id_t)cpu->lapic_id, CPU_DOWN);
-			break;
-		}
-	}
-
-	page_phys_unmap(cfg, PAGE_SIZE);
-	return true;
 }
 
 /** Boot a CPU.
@@ -246,7 +102,7 @@ void cpu_boot(cpu_t *cpu) {
 	ap_stack_ptr = stack + KSTACK_SIZE;
 
 	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
-	apic_ipi(IPI_DEST_SINGLE, cpu->id, APIC_IPI_INIT, 0x00);
+	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
 	cpu_boot_delay(10000);
 
 	/* Send a SIPI. The 0x07 argument specifies where to look for the
@@ -256,7 +112,7 @@ void cpu_boot(cpu_t *cpu) {
 	 * halted (even by the 'hlt' instruction) then it can accept SIPIs.
 	 * If the CPU reaches the idle loop before the second SIPI is sent, it
 	 * will fault. */
-	apic_ipi(IPI_DEST_SINGLE, cpu->id, APIC_IPI_SIPI, 0x07);
+	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
 	cpu_boot_delay(10000);
 
 	/* If the CPU is up, then return. */
@@ -266,7 +122,7 @@ void cpu_boot(cpu_t *cpu) {
 
 	/* Send a second SIPI and then check in 10ms intervals to see if it
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
-	apic_ipi(IPI_DEST_SINGLE, cpu->id, APIC_IPI_SIPI, 0x07);
+	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
 	while(delay < 5000000) {
 		if(atomic_get(&ap_boot_wait)) {
 			return;
@@ -276,28 +132,6 @@ void cpu_boot(cpu_t *cpu) {
 	}
 
 	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
-}
-
-/** Detect secondary CPUs.
- *
- * Detects all secondary CPUs in the current system, using the ACPI tables
- * where possible. Falls back on the MP tables if ACPI is unavailable.
- */
-void cpu_detect(void) {
-	/* If there is no APIC, do not do anything. */
-	if(!apic_supported) {
-		return;
-	}
-
-	/* Use ACPI where supported. */
-	if(!acpi_supported || !cpu_detect_acpi()) {
-		if(!cpu_detect_mps()) {
-			kprintf(LOG_DEBUG, "cpu: neither ACPI or MPS are available for CPU detection\n");
-			return;
-		}
-	}
-
-	kprintf(LOG_DEBUG, "cpu: detected %" PRIs " CPU(s)\n", cpu_count);
 }
 
 /** Send an IPI.
@@ -310,21 +144,21 @@ void cpu_detect(void) {
  */
 void cpu_ipi(uint8_t dest, cpu_id_t id, uint8_t vector) {
 	if(vector == IPI_KDBG || vector == IPI_FATAL) {
-		apic_ipi(dest, id, APIC_IPI_NMI, 0);
+		lapic_ipi(dest, id, LAPIC_IPI_NMI, 0);
 	} else {
-		apic_ipi(dest, id, APIC_IPI_FIXED, vector);
+		lapic_ipi(dest, id, LAPIC_IPI_FIXED, vector);
 	}
 }
 #endif /* CONFIG_SMP */
 
 /** Get current CPU ID.
- *
+ * 
  * Gets the ID of the CPU that the function executes on.
  *
- * @return		Current CPU ID.
+ * @return              Current CPU ID.
  */
 cpu_id_t cpu_current_id(void) {
-	return (cpu_id_t)apic_local_id();
+        return (cpu_id_t)lapic_id();
 }
 
 /** Initialize an x86 CPU information structure.

@@ -1,4 +1,4 @@
-/* Kiwi x86 Programmable Interval Timer code
+/* Kiwi PC Programmable Interval Timer code
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,12 +15,14 @@
 
 /**
  * @file
- * @brief		Programmable Interval Timer code.
+ * @brief		PC Programmable Interval Timer code.
  */
 
 #include <arch/io.h>
 
 #include <cpu/irq.h>
+
+#include <platform/pit.h>
 
 #include <time/timer.h>
 
@@ -37,7 +39,7 @@ static void pit_enable(void) {
 	uint16_t base;
 
 	/* Set frequency (1000Hz) */
-	base = 1193182L / 1000;
+	base = 1193182L / PIT_FREQUENCY;
 	out8(0x43, 0x36);
 	out8(0x40, base & 0xFF);
 	out8(0x40, base >> 8);

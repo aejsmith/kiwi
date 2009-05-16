@@ -15,11 +15,16 @@
 import os
 import sys
 
-Import('env')
+Import('env', 'config')
 
 env['OBJFILES'] += [
 	env.Object('acpi.c'),
 	env.Object('console.c'),
 	env.Object('multiboot.c'),
+	env.Object('pic.c'),
+	env.Object('pit.c'),
 	env.Object('platform.c'),
 ]
+
+if config['SMP']:
+	env['OBJFILES'].append(env.Object('cpu.c'))

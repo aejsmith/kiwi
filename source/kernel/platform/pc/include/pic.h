@@ -1,4 +1,4 @@
-/* Kiwi x86 PIC code
+/* Kiwi Programmable Interrupt Controller code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Programmable Interrupt Controller (i8259) code.
+ * @brief		Programmable Interrupt Controller code.
  */
 
-#ifndef __ARCH_PIC_H
-#define __ARCH_PIC_H
+#ifndef __PLATFORM_PIC_H
+#define __PLATFORM_PIC_H
 
 /** PIC port definitions. */
 #define PIC_MASTER_COMMAND	0x20	/**< Comand port (Master). */
@@ -40,4 +40,4 @@
 
 extern void pic_init(void);
 
-#endif /* __ARCH_PIC_H */
+#endif /* __PLATFORM_PIC_H */

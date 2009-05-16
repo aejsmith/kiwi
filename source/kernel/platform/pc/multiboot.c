@@ -19,12 +19,12 @@
  */
 
 #include <arch/mem.h>
-#include <arch/page.h>
 
 #include <console/kprintf.h>
 
 #include <lib/utility.h>
 
+#include <mm/page.h>
 #include <mm/pmm.h>
 
 #include <platform/multiboot.h>

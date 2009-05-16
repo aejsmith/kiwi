@@ -1,4 +1,4 @@
-/* Kiwi x86 APIC definitions
+/* Kiwi local APIC definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		APIC definitions.
+ * @brief		Local APIC definitions.
  */
 
-#ifndef __ARCH_APIC_H
-#define __ARCH_APIC_H
+#ifndef __ARCH_LAPIC_H
+#define __ARCH_LAPIC_H
 
 #include <types.h>
 
@@ -85,16 +85,16 @@
 #define LAPIC_VECT_SPURIOUS		0xf1	/**< Spurious. */
 
 /** IPI delivery modes. */
-#define APIC_IPI_FIXED			0x00	/**< Fixed (vector specified). */
-#define APIC_IPI_NMI			0x04	/**< NMI. */
-#define APIC_IPI_INIT			0x05	/**< INIT. */
-#define APIC_IPI_SIPI			0x06	/**< Start-Up (SIPI). */
+#define LAPIC_IPI_FIXED			0x00	/**< Fixed (vector specified). */
+#define LAPIC_IPI_NMI			0x04	/**< NMI. */
+#define LAPIC_IPI_INIT			0x05	/**< INIT. */
+#define LAPIC_IPI_SIPI			0x06	/**< Start-Up (SIPI). */
 
-extern bool apic_supported;
+extern bool lapic_enabled;
 
-extern uint32_t apic_local_id(void);
-extern void apic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
+extern uint32_t lapic_id(void);
+extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
-extern bool apic_local_init(void);
+extern bool lapic_init(void);
 
-#endif /* __ARCH_APIC_H */
+#endif /* __ARCH_LAPIC_H */

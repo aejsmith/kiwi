@@ -19,12 +19,13 @@
  */
 
 #include <arch/intr.h>
-#include <arch/pic.h>
 #include <arch/io.h>
 
 #include <console/kprintf.h>
 
 #include <cpu/irq.h>
+
+#include <platform/pic.h>
 
 #include <fatal.h>
 #include <kdbg.h>

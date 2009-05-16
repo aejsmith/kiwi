@@ -1,4 +1,4 @@
-/* Kiwi x86 MultiProcessor Specification structures
+/* Kiwi Multiprocessor Specification structures
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		x86 MultiProcessor Specification structures.
+ * @brief		Multiprocessor Specification structures.
  */
 
-#ifndef __ARCH_MPS_H
-#define __ARCH_MPS_H
+#ifndef __PLATFORM_MPS_H
+#define __PLATFORM_MPS_H
 
 #include <types.h>
 
@@ -70,4 +70,4 @@ typedef struct mp_cpu {
 #define MP_CONFIG_IO_INTR		3	/**< I/O Interrupt Assignment. */
 #define MP_CONFIG_LOCAL_INTR		4	/**< Local Interrupt Assignment. */
 
-#endif /* __ARCH_MPS_H */
+#endif /* __PLATFORM_MPS_H */

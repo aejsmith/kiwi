@@ -18,9 +18,19 @@
  * @brief		PC platform core code.
  */
 
+#include <arch/lapic.h>
+
+#include <cpu/cpu.h>
+
 #include <platform/acpi.h>
 #include <platform/multiboot.h>
+#include <platform/pic.h>
+#include <platform/pit.h>
 #include <platform/platform.h>
+
+#include <time/timer.h>
+
+#include <fatal.h>
 
 /** External initialization functions. */
 extern void console_late_init(void);
@@ -34,6 +44,7 @@ extern void console_late_init(void);
  */
 void platform_premm_init(void *data) {
 	multiboot_premm_init((multiboot_info_t *)data);
+	pic_init();
 }
 
 /** PC platform startup code.
@@ -45,4 +56,11 @@ void platform_postmm_init(void) {
 	acpi_init();
 	multiboot_postmm_init();
 	console_late_init();
+
+	/* Initialize interrupt handling and the timer. */
+	if(!lapic_enabled) {
+		if(clock_source_set(&pit_clock_source) != 0) {
+			fatal("Could not set PIT clock source");
+		}
+	}
 }

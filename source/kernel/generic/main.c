@@ -134,6 +134,7 @@ void kmain_ap(void) {
 	list_append(&cpus_running, &curr_cpu->header);
 
 	arch_ap_init();
+	platform_ap_init();
 	sched_init();
 
 	atomic_set(&ap_boot_wait, 1);

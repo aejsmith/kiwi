@@ -1,4 +1,4 @@
-/* Kiwi PC platform header
+/* Kiwi PC Programmable Interval Timer code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,16 +15,17 @@
 
 /**
  * @file
- * @brief		PC platform header.
+ * @brief		PC Programmable Interval Timer code.
  */
 
-#ifndef __PLATFORM_PLATFORM_H
-#define __PLATFORM_PLATFORM_H
+#ifndef __PLATFORM_PIT_H
+#define __PLATFORM_PIT_H
 
-extern void platform_premm_init(void *data);
-extern void platform_postmm_init(void);
+#include <time/timer.h>
 
-/** Not required on this platform. */
-#define platform_ap_init()	
+/** Frequency to use for PIT (in Hz). */
+#define PIT_FREQUENCY		1000
 
-#endif /* __PLATFORM_PLATFORM_H */
+extern clock_source_t pit_clock_source;
+
+#endif /* __PLATFORM_PIT_H */
