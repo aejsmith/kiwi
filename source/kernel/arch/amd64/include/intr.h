@@ -25,6 +25,7 @@
 
 /** Various definitions. */
 #define INTR_COUNT	256		/**< Total number of interrupts. */
+#define FAULT_COUNT	32		/**< Total number of exceptions. */
 #define IRQ_COUNT	16		/**< Total number of IRQs. */
 #define IRQ_BASE	32		/**< IRQ number base. */
 

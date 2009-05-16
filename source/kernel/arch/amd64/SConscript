@@ -31,12 +31,12 @@ env['OBJFILES'] += [
 	env.Object('context.c'),
 	env.Object('cpu.c'),
 	env.Object('entry.S'),
+	env.Object('fault.c'),
 	env.Object('gdt.c'),
 	env.Object('intr.c'),
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),
 	env.Object('page.c'),
-	env.Object('pagefault.c'),
 	env.Object('string.c'),
 	env.Object('switch.S'),
 ]
