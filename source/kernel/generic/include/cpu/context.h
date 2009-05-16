@@ -18,8 +18,8 @@
  * @brief		CPU context functions.
  */
 
-#ifndef __CONTEXT_H
-#define __CONTEXT_H
+#ifndef __CPU_CONTEXT_H
+#define __CPU_CONTEXT_H
 
 #include <arch/context.h>
 
@@ -29,4 +29,4 @@ extern int context_save(context_t *ctx);
 extern void context_restore(context_t *ctx) __noreturn;
 extern void context_restore_frame(context_t *ctx, intr_frame_t *frame);
 
-#endif /* __CONTEXT_H */
+#endif /* __CPU_CONTEXT_H */

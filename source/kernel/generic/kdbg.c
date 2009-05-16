@@ -20,6 +20,7 @@
 
 #include <console/console.h>
 
+#include <cpu/context.h>
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
@@ -34,7 +35,6 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
-#include <context.h>
 #include <kdbg.h>
 #include <ksym.h>
 

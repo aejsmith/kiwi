@@ -21,13 +21,12 @@
 #ifndef __PROC_THREAD_H
 #define __PROC_THREAD_H
 
+#include <cpu/context.h>
 #include <cpu/cpu.h>
 
 #include <sync/spinlock.h>
 
 #include <types/list.h>
-
-#include <context.h>
 
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32
