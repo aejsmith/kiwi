@@ -37,8 +37,6 @@
 # define dprintf(fmt...)	
 #endif
 
-extern void pmm_arch_init(void *data);
-
 /** Vmem arena used for page allocations. */
 static vmem_t pmm_arena;
 
@@ -143,12 +141,12 @@ void pmm_mark_reserved(phys_ptr_t start, phys_ptr_t size) {
 }
 
 /** Initialize the physical memory manager. */
-void pmm_init(void *data) {
+void pmm_init(void) {
 	vmem_early_create(&pmm_arena, "pmm_arena", 0, 0, PAGE_SIZE, NULL, NULL, NULL, 0, MM_FATAL);
 
-	/* Get the architecture to do any initialization it requires and add
-	 * in the memory regions that we can use. */
-	pmm_arch_init(data);
+	/* Populate the arena with memory regions. This function is
+	 * implemented by the architecture or platform. */
+	pmm_populate();
 }
 
 /** Reclaim memory no longer needed after kernel initialization. */

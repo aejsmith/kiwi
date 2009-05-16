@@ -18,7 +18,6 @@
  * @brief		x86 CPU management.
  */
 
-#include <arch/acpi.h>
 #include <arch/apic.h>
 #include <arch/asm.h>
 #include <arch/defs.h>
@@ -34,6 +33,8 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
+
+#include <platform/acpi.h>
 
 #include <time/timer.h>
 

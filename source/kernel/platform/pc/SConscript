@@ -17,4 +17,9 @@ import sys
 
 Import('env')
 
-#env['SRCFILES'] += []
+env['OBJFILES'] += [
+	env.Object('acpi.c'),
+	env.Object('console.c'),
+	env.Object('multiboot.c'),
+	env.Object('platform.c'),
+]

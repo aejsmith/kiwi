@@ -18,8 +18,8 @@
  * @brief		Multiboot header.
  */
 
-#ifndef __ARCH_MULTIBOOT_H
-#define __ARCH_MULTIBOOT_H
+#ifndef __PLATFORM_MULTIBOOT_H
+#define __PLATFORM_MULTIBOOT_H
 
 /** Flags for the multiboot header. */
 #define MB_HFLAG_MODALIGN	(1<<0)		/**< Align loaded modules on page boundaries. */
@@ -96,5 +96,8 @@ typedef struct multiboot_memmap {
 	uint32_t type;				/**< Type of entry. */
 } __packed multiboot_memmap_t;
 
+extern void multiboot_premm_init(multiboot_info_t *info);
+extern void multiboot_postmm_init(void);
+
 #endif /* __ASM__ */
-#endif /* __ARCH_MULTIBOOT_H */
+#endif /* __PLATFORM_MULTIBOOT_H */

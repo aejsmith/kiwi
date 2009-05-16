@@ -18,6 +18,8 @@
  * @brief		Kernel initialization code.
  */
 
+#include <arch/arch.h>
+
 #include <console/kprintf.h>
 
 #include <cpu/cpu.h>
@@ -30,6 +32,8 @@
 #include <mm/pmm.h>
 #include <mm/slab.h>
 
+#include <platform/platform.h>
+
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -37,45 +41,12 @@
 #include <time/timer.h>
 
 #include <fatal.h>
-#include <kdbg.h>
-
-extern void arch_premm_init(void *data);
-extern void arch_postmm_init(void *data);
-extern void arch_final_init(void *data);
-extern void arch_ap_init(void);
+#include <version.h>
 
 extern void kmain_bsp(void *data);
 extern void kmain_ap(void);
 
 extern atomic_t ap_boot_wait;
-
-extern const char *kiwi_ver_string;
-extern const char *kiwi_ver_codename;
-
-static void as_test_thread(void *arg) {
-	aspace_source_t *source;
-	ptr_t addr = 0;
-
-	aspace_anon_create(&source);
-	
-	kprintf(LOG_DEBUG, "as: 0x%p source: 0x%p\n", curr_aspace, source);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-	aspace_alloc(curr_aspace, 0x4000, AS_REGION_READ | AS_REGION_WRITE, source, &addr);
-
-	*(uint32_t *)addr = 1234;
-	*(uint32_t *)(addr + 0x1000) = 1234;
-	*(uint32_t *)(addr + 0x2000) = 1234;
-	*(uint32_t *)(addr + 0x3000) = 1234;
-	while(1);
-}
 
 /** Second-stage intialization thread.
  * @param arg		Architecture initialization data. */
@@ -88,13 +59,6 @@ static void kinit_thread(void *data) {
 #endif
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
-
-	process_t *process;
-	thread_t *thread;
-
-	process_create("test", kernel_proc, PRIORITY_USER, 0, &process);
-	thread_create("test", process, 0, as_test_thread, NULL, &thread);
-	thread_run(thread);
 
 	while(true) {
 		timer_sleep(1);
@@ -119,22 +83,24 @@ void kmain_bsp(void *data) {
 	        kiwi_ver_string, kiwi_ver_codename, CONFIG_ARCH, CONFIG_PLATFORM);
 	kprintf(LOG_NORMAL, "Copyright (C) 2007-2009 Kiwi Developers\n\n");
 
-	/* Perform early architecture initialization. */
+	/* Perform early architecture/platform initialization. */
 	arch_premm_init(data);
+	platform_premm_init(data);
 
 	/* Initialize all of the other memory management subsystems. */
 	vmem_early_init();
 	kheap_early_init();
 	vmem_init();
-	pmm_init(data);
+	pmm_init();
 	page_init();
 	slab_init();
 	kheap_init();
 	malloc_init();
 	aspace_init();
 
-	/* Perform second stage architecture initialization. */
-	arch_postmm_init(data);
+	/* Perform second stage architecture/platform initialization. */
+	arch_postmm_init();
+	platform_postmm_init();
 
 	/* Detect secondary CPUs. */
 	cpu_init();
@@ -144,8 +110,8 @@ void kmain_bsp(void *data) {
 	thread_init();
 	sched_init();
 
-	/* Perform final architecture initialization. */
-	arch_final_init(data);
+	/* Perform final rchitecture initialization. */
+	arch_final_init();
 
 	/* Create the second stage initialization thread. */
 	if(thread_create("kinit", kernel_proc, 0, kinit_thread, data, &thread) != 0) {
