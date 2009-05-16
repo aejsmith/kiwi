@@ -202,11 +202,7 @@ static console_t serial_console = {
  * Main functions.
  */
 
-/** Set up the console.
- *
- * Registers the framebuffer or VGA console with the console manager, and the
- * debug console if debugging output is enabled.
- */
+/** Set up the console. */
 void console_early_init(void) {
 #if CONFIG_DEBUG
 	uint8_t status = in8(CONFIG_X86_DEBUG_PORT + 6);

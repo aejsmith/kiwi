@@ -25,23 +25,20 @@ env['LDFLAGS'] += '-A x86_64 -m elf_x86_64'
 
 # Add source files.
 env['OBJFILES'] += [
-	env.Object('acpi.c'),
 	env.Object('apic.c'),
+	env.Object('arch.c'),
 	env.Object('aspace.c'),
 	env.Object('boot.S'),
-	env.Object('console.c'),
 	env.Object('context.c'),
 	env.Object('cpu.c'),
 	env.Object('entry.S'),
 	env.Object('gdt.c'),
-	env.Object('init.c'),
 	env.Object('intr.c'),
 	env.Object('kdbg.c'),
 	env.Object('page.c'),
 	env.Object('pagefault.c'),
 	env.Object('pic.c'),
 	env.Object('pit.c'),
-	env.Object('pmm.c'),
 	env.Object('string.c'),
 	env.Object('switch.S'),
 ]

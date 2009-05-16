@@ -1,4 +1,4 @@
-/* Kiwi AMD64 startup code.
+/* Kiwi AMD64 boot code.
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,14 +15,15 @@
 
 /**
  * @file
- * @brief		AMD64 startup code.
+ * @brief		AMD64 boot code.
  */
 
 #include <arch/defs.h>
 #include <arch/gdt.h>
 #include <arch/mem.h>
-#include <arch/multiboot.h>
 #include <arch/page.h>
+
+#include <platform/multiboot.h>
 
 /** Macro to define a variable. */
 .macro .defvar name, len, global, align
@@ -202,7 +203,7 @@ __kernel_entry:
 	/* Clear the stack frame. */
 	xorq	%rbp, %rbp
 
-	/* Get the Multiboot info structure pointer. */
+	/* Get the Multiboot information pointer. */
 	xorq	%rdi, %rdi
 	movl	(__mb_info), %edi
 
@@ -210,7 +211,7 @@ __kernel_entry:
 	call	kmain_bsp
 
 	/* If we got here something has gone wrong. */
-1:	//ud2a
+1:	ud2a
 	jmp	1b
 .size __kernel_entry, .-__kernel_entry
 

@@ -35,7 +35,8 @@ extern void pmm_add(phys_ptr_t start, phys_ptr_t end);
 extern void pmm_mark_reclaimable(phys_ptr_t start, phys_ptr_t end);
 extern void pmm_mark_reserved(phys_ptr_t start, phys_ptr_t end);
 
-extern void pmm_init(void *data);
+extern void pmm_populate(void);
+extern void pmm_init(void);
 extern void pmm_init_reclaim(void);
 
 #endif /* __MM_PMM_H */

@@ -28,8 +28,7 @@
 
 #include <fatal.h>
 #include <kdbg.h>
-
-extern const char *kiwi_ver_string;
+#include <version.h>
 
 /** Atomic variable to protect against nested calls to _fatal(). */
 atomic_t fatal_protect = 0;

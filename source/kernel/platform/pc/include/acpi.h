@@ -1,4 +1,4 @@
-/* Kiwi x86 ACPI structures/definitions
+/* Kiwi ACPI structures/definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		x86 ACPI structures/definitions.
+ * @brief		ACPI structures/definitions.
  */
 
-#ifndef __ARCH_ACPI_H
-#define __ARCH_ACPI_H
+#ifndef __PLATFORM_ACPI_H
+#define __PLATFORM_ACPI_H
 
 #include <compiler.h>
 #include <types.h>
@@ -103,4 +103,4 @@ extern bool acpi_supported;
 extern acpi_header_t *acpi_table_find(const char *signature);
 extern void acpi_init(void);
 
-#endif /* __ARCH_ACPI_H */
+#endif /* __PLATFORM_ACPI_H */

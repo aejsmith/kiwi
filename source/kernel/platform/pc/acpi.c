@@ -18,8 +18,6 @@
  * @brief		x86 ACPI functions.
  */
 
-#include <arch/acpi.h>
-#include <arch/features.h>
 #include <arch/mem.h>
 
 #include <console/kprintf.h>
@@ -28,6 +26,8 @@
 
 #include <mm/malloc.h>
 #include <mm/page.h>
+
+#include <platform/acpi.h>
 
 #include <assert.h>
 #include <fatal.h>
