@@ -44,7 +44,7 @@ typedef struct tlb_shootdown {
 
 extern void tlb_shootdown_initiator(tlb_shootdown_t *msg, aspace_t *as, ptr_t start, ptr_t end);
 extern void tlb_shootdown_finalize(tlb_shootdown_t *msg);
-extern bool tlb_shootdown_responder(unative_t num, intr_frame_t *regs);
+extern bool tlb_shootdown_responder(unative_t num, intr_frame_t *frame);
 
 #endif /* CONFIG_SMP */
 

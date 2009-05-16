@@ -33,8 +33,8 @@
 #include <fatal.h>
 #include <kdbg.h>
 
-extern bool kdbg_int1_handler(unative_t num, intr_frame_t *regs);
-extern bool pagefault_handler(unative_t num, intr_frame_t *regs);
+extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern bool pagefault_handler(unative_t num, intr_frame_t *frame);
 
 /** ISR array in entry.S. Each handler is aligned to 16 bytes. */
 extern uint8_t __isr_array[INTR_COUNT][16];
@@ -58,11 +58,11 @@ static const char *intr_except_strs[] = {
 
 /** Handler for exceptions.
  * @param num		CPU interrupt number.
- * @param regs		Register dump.
+ * @param frame		Interrupt stack frame.
  * @return		True if preemption required, false if not. */
-static bool intr_except_handler(unative_t num, intr_frame_t *regs) {
+static bool intr_except_handler(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(num, intr_except_strs[num], regs);
+		kdbg_except_handler(num, intr_except_strs[num], frame);
 		return false;
 	} else if(num == 2) {
 		/* Non-Maskable Interrupt. If currently in fatal(), assume that
@@ -78,18 +78,18 @@ static bool intr_except_handler(unative_t num, intr_frame_t *regs) {
 		}
 	}
 
-	_fatal(regs, "Unhandled kernel exception %" PRIun " (%s)", num, intr_except_strs[num]);
+	_fatal(frame, "Unhandled kernel exception %" PRIun " (%s)", num, intr_except_strs[num]);
 }
 
 /** Handler for double faults.
  * @param num		CPU interrupt number.
- * @param regs		Register dump.
+ * @param frame		Interrupt stack frame.
  * @return		Doesn't return. */
-static bool intr_doublefault_handler(unative_t num, intr_frame_t *regs) {
+static bool intr_doublefault_handler(unative_t num, intr_frame_t *frame) {
 	/* Disable KDBG. */
 	atomic_set(&kdbg_running, 3);
 
-	_fatal(regs, "Double Fault (0x%p)", regs->ip);
+	_fatal(frame, "Double Fault (0x%p)", frame->ip);
 	while(true) {
 		idle();
 	}

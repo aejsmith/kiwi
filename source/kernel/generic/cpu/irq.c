@@ -90,11 +90,11 @@ int irq_unmask(unative_t num) {
  * Handles an IRQ from a device.
  *
  * @param num		Interrupt number.
- * @param regs		Pointer to CPU register structure.
+ * @param frame		Interrupt stack frame.
  *
  * @return		Whether the current thread should be preempted.
  */
-bool irq_handler(unative_t num, intr_frame_t *regs) {
+bool irq_handler(unative_t num, intr_frame_t *frame) {
 	bool ret = false;
 
 	assert(irq_ops);
@@ -105,13 +105,13 @@ bool irq_handler(unative_t num, intr_frame_t *regs) {
 
 	/* Execute any pre-handling function - on x86 this checks for
 	 * spurious IRQs, etc. */
-	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, regs)) {
+	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
 		return false;
 	}
 
 	/* Dispatch the IRQ - TODO. */
 	if(irq_handlers[num]) {
-		ret = irq_handlers[num](num, regs);
+		ret = irq_handlers[num](num, frame);
 	} else {
 		kprintf(LOG_DEBUG, "irq: received unknown IRQ%" PRIun "\n", num);
 	}
@@ -119,7 +119,7 @@ bool irq_handler(unative_t num, intr_frame_t *regs) {
 	/* Perform post-handling actions (i.e. send an EOI to the interrupt
 	 * controller). */
 	if(irq_ops->post_handle) {
-		irq_ops->post_handle(num, regs);
+		irq_ops->post_handle(num, frame);
 	}
 
 	return ret;

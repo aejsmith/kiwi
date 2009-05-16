@@ -31,7 +31,7 @@
 #include <ksym.h>
 #include <kdbg.h>
 
-extern bool kdbg_int1_handler(unative_t num, intr_frame_t *regs);
+extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
@@ -99,11 +99,11 @@ static inline void kdbg_setup_dreg(void) {
  * calling KDBG.
  *
  * @param num		Interrupt number.
- * @param regs		Registers structure.
+ * @param frame		Interrupt stack frame.
  *
  * @return		Whether the current thread should be preempted.
  */
-bool kdbg_int1_handler(unative_t num, intr_frame_t *regs) {
+bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	static bool bp_resume = false;
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
@@ -114,14 +114,14 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *regs) {
 	if(!(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3 | X86_DR6_BD | X86_DR6_BS | X86_DR6_BT))) {
 		/* No bits set, assume this came from from kdbg_enter(), in
 		 * which case the reason will be in EAX. */
-		reason = (unative_t)regs->ax;
+		reason = (unative_t)frame->ax;
 	} else {
 		if(dr6 & X86_DR6_BS) {
 			/* See comment later on about QEMU/Resume Flag. */
 			if(bp_resume) {
 				bp_resume = false;
 				kdbg_setup_dreg();
-				regs->flags &= ~X86_FLAGS_TF;
+				frame->flags &= ~X86_FLAGS_TF;
 				write_dr6(0);
 				return false;
 			}
@@ -130,14 +130,14 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *regs) {
 		} else if(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3)) {
 			reason = KDBG_ENTRY_BREAK;
 			for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
-				if(regs->ip == kdbg_breakpoints[i].addr) {
+				if(frame->ip == kdbg_breakpoints[i].addr) {
 					break;
 				}
 			}
 		}
 	}
 
-	kdbg_enter(reason, regs);
+	kdbg_enter(reason, frame);
 
 	/* Clear the Debug Status Register (DR6). */
 	write_dr6(0);
@@ -153,9 +153,9 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *regs) {
 		write_dr7(read_dr7() & ~(1<<i));
 
 		/* Prevent a requested step from actually continuing. */
-		if(!(regs->flags & X86_FLAGS_TF)) {
+		if(!(frame->flags & X86_FLAGS_TF)) {
 			bp_resume = true;
-			regs->flags |= X86_FLAGS_TF;
+			frame->flags |= X86_FLAGS_TF;
 		}
 	}
 
@@ -169,10 +169,10 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *regs) {
  * generate a register structure and enter KDBG.
  *
  * @param reason	KDBG entry reason.
- * @param regs		Registers structure (if NULL will generate one).
+ * @param frame		Interrupt stakc frame. (if NULL will generate one).
  */
-void kdbg_enter(int reason, intr_frame_t *regs) {
-	if(regs == NULL) {
+void kdbg_enter(int reason, intr_frame_t *frame) {
+	if(frame == NULL) {
 		/* Raise a debug interrupt so we can get into the debugger
 		 * with an interrupt frame. Store the entry reason in EAX. */
 		__asm__ volatile("int $1" :: "a"((unative_t)reason));
@@ -182,10 +182,10 @@ void kdbg_enter(int reason, intr_frame_t *regs) {
 	/* Disable breakpoints while KDBG is running. */
 	write_dr7(0);
 
-	if(kdbg_main(reason, regs) == KDBG_STEP) {
-		regs->flags |= X86_FLAGS_TF;
+	if(kdbg_main(reason, frame) == KDBG_STEP) {
+		frame->flags |= X86_FLAGS_TF;
 	} else {
-		regs->flags &= ~X86_FLAGS_TF;
+		frame->flags &= ~X86_FLAGS_TF;
 	}
 
 	/* Work out a new Debug Control Register value. */

@@ -30,7 +30,7 @@
 #include <fatal.h>
 #include <kdbg.h>
 
-extern bool pagefault_handler(unative_t num, intr_frame_t *regs);
+extern bool pagefault_handler(unative_t num, intr_frame_t *frame);
 
 /** Get string representation of a fault reason.
  * @param reason	Fault reason.
@@ -63,18 +63,18 @@ static inline const char *pagefault_access(int access) {
  * address space manager to handle the fault.
  *
  * @param num		Interrupt number.
- * @param regs		Pointer to interrupt frame.
+ * @param frame		Interrupt stack frame.
  *
  * @return		Whether the current thread should be preempted.
  */
-bool pagefault_handler(unative_t num, intr_frame_t *regs) {
-	int reason = (regs->err_code & (1<<0)) ? PF_REASON_PROT : PF_REASON_NPRES;
-	int access = (regs->err_code & (1<<1)) ? PF_ACCESS_WRITE : PF_ACCESS_READ;
+bool pagefault_handler(unative_t num, intr_frame_t *frame) {
+	int reason = (frame->err_code & (1<<0)) ? PF_REASON_PROT : PF_REASON_NPRES;
+	int access = (frame->err_code & (1<<1)) ? PF_ACCESS_WRITE : PF_ACCESS_READ;
 	ptr_t addr = read_cr2();
 
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */
-	if(CPU_HAS_XD(curr_cpu) && regs->err_code & (1<<4)) {
+	if(CPU_HAS_XD(curr_cpu) && frame->err_code & (1<<4)) {
 		reason = PF_ACCESS_EXEC;
 	}
 #endif
@@ -82,7 +82,7 @@ bool pagefault_handler(unative_t num, intr_frame_t *regs) {
 	/* Handle exceptions during KDBG execution. We should not call into
 	 * the address space manager if we are in KDBG. */
 	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(num, "Page Fault", regs);
+		kdbg_except_handler(num, "Page Fault", frame);
 		return false;
 	}
 
@@ -95,11 +95,11 @@ bool pagefault_handler(unative_t num, intr_frame_t *regs) {
 	}
 
 	/* Nothing could handle this fault, drop dead. */
-	_fatal(regs, "Unhandled %s-mode pagefault exception (0x%p)\n"
-	             "%s | %s %s %s",
-	             (regs->err_code & (1<<2)) ? "user" : "kernel", addr,
-	             (regs->err_code & (1<<0)) ? "Protection" : "Not-present",
-	             (regs->err_code & (1<<1)) ? "Write" : "Read",
-	             (regs->err_code & (1<<3)) ? " | Reserved-bit" : "",
-	             (regs->err_code & (1<<4)) ? " | Execute" : "");
+	_fatal(frame, "Unhandled %s-mode pagefault exception (0x%p)\n"
+	              "%s | %s %s %s",
+	              (frame->err_code & (1<<2)) ? "user" : "kernel", addr,
+	              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
+	              (frame->err_code & (1<<1)) ? "Write" : "Read",
+	              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
+	              (frame->err_code & (1<<4)) ? " | Execute" : "");
 }

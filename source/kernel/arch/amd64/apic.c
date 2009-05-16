@@ -39,7 +39,7 @@
 #include <fatal.h>
 #include <kdbg.h>
 
-extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *regs);
+extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame);
 
 /** Whether APIC is supported. */
 bool apic_supported = false;
@@ -72,9 +72,9 @@ static inline void apic_local_eoi(void) {
 
 /** Spurious interrupt handler.
  * @param num		Interrupt number.
- * @param regs		Interrupt stack frame.
+ * @param frame		Interrupt stack frame.
  * @return		Always returns false. */
-static bool apic_spurious_handler(unative_t num, intr_frame_t *regs) {
+static bool apic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "apic: received spurious interrupt\n");
 	return false;
 }
@@ -82,19 +82,19 @@ static bool apic_spurious_handler(unative_t num, intr_frame_t *regs) {
 #if CONFIG_SMP
 /** Reschedule interrupt handler.
  * @param num		Interrupt number.
- * @param regs		Interrupt stack frame.
+ * @param frame		Interrupt stack frame.
  * @return		True if current thread should be preempted. */
-static bool apic_schedule_handler(unative_t num, intr_frame_t *regs) {
+static bool apic_schedule_handler(unative_t num, intr_frame_t *frame) {
 	apic_local_eoi();
-	return cpu_ipi_schedule_handler(num, regs);
+	return cpu_ipi_schedule_handler(num, frame);
 }
 
 /** TLB shootdown interrupt handler.
  * @param num		Interrupt number.
- * @param regs		Interrupt stack frame.
+ * @param frame		Interrupt stack frame.
  * @return		True if current thread should be preempted. */
-static bool apic_tlb_shootdown_handler(unative_t num, intr_frame_t *regs) {
-	bool ret = tlb_shootdown_responder(num, regs);
+static bool apic_tlb_shootdown_handler(unative_t num, intr_frame_t *frame) {
+	bool ret = tlb_shootdown_responder(num, frame);
 	apic_local_eoi();
 	return ret;
 }
@@ -147,9 +147,9 @@ static clock_source_t apic_clock_source = {
 
 /** Timer interrupt handler.
  * @param num		Interrupt number.
- * @param regs		Interrupt stack frame.
+ * @param frame		Interrupt stack frame.
  * @return		Value from clock_tick(). */
-static bool apic_timer_handler(unative_t num, intr_frame_t *regs) {
+static bool apic_timer_handler(unative_t num, intr_frame_t *frame) {
 	bool ret = clock_tick();
 
 	apic_local_eoi();
@@ -190,7 +190,7 @@ void apic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 static volatile uint32_t freq_tick_count = 0;
 
 /** PIT handler for bus frequency calculation. */
-static bool apic_pit_handler(unative_t irq, intr_frame_t *regs) {
+static bool apic_pit_handler(unative_t irq, intr_frame_t *frame) {
 	freq_tick_count++;
 	return false;
 }

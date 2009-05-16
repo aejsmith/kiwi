@@ -26,9 +26,9 @@
 
 /** Handle a PIT tick.
  * @param num		IRQ number.
- * @param regs		Register dump.
+ * @param frame		Interrupt stack frame.
  * @return		Value from clock_tick(). */
-static bool pit_handler(unative_t num, intr_frame_t *regs) {
+static bool pit_handler(unative_t num, intr_frame_t *frame) {
 	return clock_tick();
 }
 

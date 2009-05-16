@@ -27,11 +27,11 @@
 
 /** Interrupt handler routine type.
  * @return		True if the current thread should be preempted. */
-typedef bool (*intr_handler_t)(unative_t num, intr_frame_t *regs);
+typedef bool (*intr_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern intr_handler_t intr_register(unative_t num, intr_handler_t handler);
 extern void intr_remove(unative_t num);
 
-extern void intr_handler(unative_t num, intr_frame_t *regs);
+extern void intr_handler(unative_t num, intr_frame_t *frame);
 
 #endif /* __CPU_INTR_H */

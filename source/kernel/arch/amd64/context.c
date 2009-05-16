@@ -65,21 +65,21 @@ void context_destroy(context_t *ctx) {
  * set to return to CPL0 - if it is not, a fatal error will be raised.
  *
  * @param ctx		Context structure to restore.
- * @param regs		Interrupt frame to modify.
+ * @param frame		Interrupt frame to modify.
  */
-void context_restore_r(context_t *ctx, intr_frame_t *regs) {
-	assert((regs->cs & 3) == 0);
+void context_restore_frame(context_t *ctx, intr_frame_t *frame) {
+	assert((frame->cs & 3) == 0);
 
 #if CONFIG_ARCH_64BIT
-	regs->ip = (unative_t)context_restore;
-	regs->di = (unative_t)ctx;
+	frame->ip = (unative_t)context_restore;
+	frame->di = (unative_t)ctx;
 #else
 	/* Nasty stuff... if an interrupt occurs without a privelege level
-	 * change then the stack pointer/segment will not be pushed/restored.
+	 * change then the stacka pointer/segment will not be pushed/restored.
 	 * To get the stack pointer set correctly we must return to a
 	 * temporary function that restores the context properly. This deserves
 	 * a massive "F*CK YOU" to Intel. */
-	regs->ip = (unative_t)__context_restore_r;
-	regs->dx = (unative_t)ctx;
+	frame->ip = (unative_t)__context_restore_r;
+	frame->dx = (unative_t)ctx;
 #endif
 }

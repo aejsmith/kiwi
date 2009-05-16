@@ -642,11 +642,12 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
  *
  * @param num		Interrupt number.
  * @param name		String representation of exception.
- * @param regs		Registers structure.
+ * @param frame		Interrupt stack frame.
  */
-void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *regs) {
-	kprintf(LOG_KDBG, "KDBG: Exception %" PRIun " (%s) occurred during command (%p)\n", num, name, regs->ip);
-	context_restore_r(&kdbg_fault_context, regs);
+void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
+	kprintf(LOG_KDBG, "KDBG: Exception %" PRIun " (%s) occurred during command (%p)\n",
+	                  num, name, frame->ip);
+	context_restore_frame(&kdbg_fault_context, frame);
 }
 
 /** Debugger main function.
@@ -655,11 +656,11 @@ void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *regs) {
  * directly. Use kdbg_enter() instead.
  *
  * @param reason	Reason for entry to KDBG.
- * @param regs		Register dump from the interrupt.
+ * @param frame		Interrupt stack frame.
  *
  * @return		Return status.
  */
-int kdbg_main(int reason, intr_frame_t *regs) {
+int kdbg_main(int reason, intr_frame_t *frame) {
 	bool state = intr_disable();
 	static int pcount = 0;
 	ksym_t *sym;
@@ -668,7 +669,7 @@ int kdbg_main(int reason, intr_frame_t *regs) {
 	int ret;
 
 	/* Double check that we have a registers structure. */
-	if(!regs) {
+	if(!frame) {
 		kprintf(LOG_KDBG, "KDBG: Error: No registers structure provided\n");
 		intr_restore(state);
 		return KDBG_FAIL;
@@ -704,15 +705,15 @@ int kdbg_main(int reason, intr_frame_t *regs) {
 	/* Ask all other CPUs to pause execution. */
 	cpu_ipi(IPI_DEST_ALL, 0, IPI_KDBG);
 #endif
-	curr_kdbg_frame = regs;
+	curr_kdbg_frame = frame;
 
-	sym = ksym_lookup_addr(&kernel_symtab, regs->ip, &off);
+	sym = ksym_lookup_addr(&kernel_symtab, frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
-		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%p\n", regs->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else if(reason == KDBG_ENTRY_STEPPED) {
-		kprintf(LOG_KDBG, "Stepped to [%p] %s+0x%p\n", regs->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "Stepped to [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else {
-		kprintf(LOG_KDBG, "\nEntered KDBG from [%p] %s+0x%p\n", regs->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "\nEntered KDBG from [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
 	}
 
 	/* Main loop - print a prompt, get a command and process it. */

@@ -27,9 +27,9 @@
 typedef struct irq_ops {
 	/** Pre-handling function.
 	 * @return	True if IRQ should be handled. */
-	bool (*pre_handle)(unative_t num, intr_frame_t *regs);
+	bool (*pre_handle)(unative_t num, intr_frame_t *frame);
 	/** Post-handling function. */
-	void (*post_handle)(unative_t num, intr_frame_t *regs);
+	void (*post_handle)(unative_t num, intr_frame_t *frame);
 	/** IRQ mask function. */
 	void (*mask)(unative_t num);
 	/** IRQ unmask function. */
@@ -38,7 +38,7 @@ typedef struct irq_ops {
 
 /** IRQ handler routine type.
  * @return		True if the current thread should be preempted. */
-typedef bool (*irq_handler_t)(unative_t num, intr_frame_t *regs);
+typedef bool (*irq_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern irq_ops_t *irq_ops;
 
@@ -47,6 +47,6 @@ extern int irq_remove(unative_t num);
 extern int irq_mask(unative_t num);
 extern int irq_unmask(unative_t num);
 
-extern bool irq_handler(unative_t num, intr_frame_t *regs);
+extern bool irq_handler(unative_t num, intr_frame_t *frame);
 
 #endif /* __CPU_IRQ_H */

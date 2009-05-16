@@ -51,13 +51,13 @@ cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). *
 /** Variable used by an AP to signal that it has booted. */
 atomic_t ap_boot_wait = 0;
 
-extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *regs);
+extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame);
 
 /** Handler for a reschedule IPI.
  * @param num		Interrupt vector number.
- * @param regs		Interrupt register frame.
+ * @param frame		Interrupt stack frame.
  * @return		Always returns false. */
-bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *regs) {
+bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame) {
 	sched_yield();
 	return false;
 }

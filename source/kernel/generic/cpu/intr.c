@@ -80,15 +80,15 @@ void intr_remove(unative_t num) {
  * table and calling it.
  *
  * @param num		Interrupt number.
- * @param regs		Pointer to CPU register structure.
+ * @param frame		Interrupt stack frame.
  */
-void intr_handler(unative_t num, intr_frame_t *regs) {
+void intr_handler(unative_t num, intr_frame_t *frame) {
 	intr_handler_t handler = intr_handlers[num];
 
 	if(unlikely(handler == NULL)) {
-		_fatal(regs, "Recieved unknown interrupt %" PRIun, num);
+		_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
 	} else {
-		if(handler(num, regs)) {
+		if(handler(num, frame)) {
 			sched_preempt();
 		}
 	}

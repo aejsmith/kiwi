@@ -80,6 +80,6 @@ void tlb_shootdown_finalize(tlb_shootdown_t *msg) {
 
 }
 
-bool tlb_shootdown_responder(unative_t num, intr_frame_t *regs) {
+bool tlb_shootdown_responder(unative_t num, intr_frame_t *frame) {
 	return false;
 }

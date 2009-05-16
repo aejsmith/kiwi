@@ -35,9 +35,9 @@ static uint8_t pic_mask_slave = 0xFF;
 
 /** Pre-handling function - checks for spurious interrupts.
  * @param num		IRQ number.
- * @param regs		Register dump.
+ * @param frame		Interrupt stack frame.
  * @return		True if IRQ should be handled. */
-static bool pic_pre_handle(unative_t num, intr_frame_t *regs) {
+static bool pic_pre_handle(unative_t num, intr_frame_t *frame) {
 	/* Check for spurious IRQs. */
 	if(num == 7) {
 		/* Read the In-Service Register, check the high bit. */
@@ -60,8 +60,8 @@ static bool pic_pre_handle(unative_t num, intr_frame_t *regs) {
 
 /** Post-handling function - sends an EOI.
  * @param num		IRQ number.
- * @param regs		Register dump. */
-static void pic_post_handle(unative_t num, intr_frame_t *regs) {
+ * @param frame		Interrupt stack frame. */
+static void pic_post_handle(unative_t num, intr_frame_t *frame) {
 	/* Acknowledge the IRQ by sending an EOI. IRQ >= 8 == slave. */
 	if(num >= 8) {
 		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);

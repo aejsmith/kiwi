@@ -57,11 +57,11 @@ static void fatal_printf(const char *format, ...) {
  * Prints a formatted error message to the screen, along with a stack trace,
  * then halts the kernel.
  *
- * @param regs		Register dump from an exception.
+ * @param frame		Interrupt stack frame (if any).
  * @param format	The format string for the message.
  * @param ...		The arguments to be used in the formatted message.
  */
-void _fatal(intr_frame_t *regs, const char *format, ...) {
+void _fatal(intr_frame_t *frame, const char *format, ...) {
 	va_list args;
 
 	intr_disable();
@@ -82,7 +82,7 @@ void _fatal(intr_frame_t *regs, const char *format, ...) {
 		do_printf(fatal_printf_helper, NULL, format, args);
 		console_putch(LOG_FATAL, '\n');
 
-		kdbg_enter(KDBG_ENTRY_FATAL, regs);
+		kdbg_enter(KDBG_ENTRY_FATAL, frame);
 	}
 
 	while(1) {

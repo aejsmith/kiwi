@@ -27,6 +27,6 @@ extern void context_init(context_t *ctx, ptr_t ip, unative_t *stack);
 extern void context_destroy(context_t *ctx);
 extern int context_save(context_t *ctx);
 extern void context_restore(context_t *ctx) __noreturn;
-extern void context_restore_r(context_t *ctx, intr_frame_t *regs);
+extern void context_restore_frame(context_t *ctx, intr_frame_t *frame);
 
 #endif /* __CONTEXT_H */
