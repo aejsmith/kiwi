@@ -119,12 +119,8 @@ void kmain_bsp(void *data) {
 	}
 	thread_run(thread);
 
-	/* We now become the idle thread. */
-	intr_enable();
-	while(1) {
-		sched_yield();
-		idle();
-	}
+	/* We now become the boot CPU's idle thread. */
+	sched_idle();
 }
 
 #if CONFIG_SMP
@@ -139,11 +135,7 @@ void kmain_ap(void) {
 
 	atomic_set(&ap_boot_wait, 1);
 
-	/* We now become the idle thread. */
-	intr_enable();
-	while(1) {
-		sched_yield();
-		idle();
-	}
+	/* We now become this CPU's idle thread. */
+	sched_idle();
 }
 #endif /* CONFIG_SMP */

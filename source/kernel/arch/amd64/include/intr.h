@@ -50,7 +50,7 @@ static inline bool intr_disable(void) {
  * @param state		State to restore. */
 static inline void intr_restore(bool state) {
 	if(state) {
-		__asm__ volatile("sti; nop");
+		__asm__ volatile("sti");
 	} else {
 		__asm__ volatile("cli");
 	}

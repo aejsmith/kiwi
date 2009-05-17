@@ -45,6 +45,8 @@
  * average, then its load balancer pulls threads from overloaded CPUs.
  */
 
+#include <arch/asm.h>
+
 #include <console/kprintf.h>
 
 #include <cpu/cpu.h>
@@ -545,6 +547,17 @@ void sched_preempt_enable(void) {
 		} else {
 			spinlock_unlock(&curr_thread->lock);
 		}
+	}
+}
+
+/** Scheduler idle loop. */
+void sched_idle(void) {
+	/* Interrupts should be disabled here. */
+	assert(intr_state() == false);
+
+	while(true) {
+		sched_yield();
+		idle();
 	}
 }
 

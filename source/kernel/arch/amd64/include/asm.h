@@ -226,9 +226,9 @@ static inline void spin_loop_hint(void) {
 	__asm__ volatile("pause");
 }
 
-/** Make the CPU idle until an interrupt. */
+/** Place the CPU in an idle state until an interrupt occurs. */
 static inline void idle(void) {
-	__asm__ volatile("hlt");
+	__asm__ volatile("sti; hlt; cli");
 }
 
 /** Load a value into TR (Task Register).

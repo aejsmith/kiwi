@@ -35,6 +35,8 @@ extern void sched_preempt(void);
 extern void sched_preempt_disable(void);
 extern void sched_preempt_enable(void);
 
+extern void sched_idle(void);
+
 extern void sched_init(void);
 
 #endif /* __PROC_SCHED_H */
