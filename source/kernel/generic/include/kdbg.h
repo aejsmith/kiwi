@@ -49,7 +49,7 @@
 extern atomic_t kdbg_running;
 extern intr_frame_t *curr_kdbg_frame;
 
-/* Implemented by the architecture. */
+/* Implemented by the architecture/platform. */
 extern void kdbg_enter(int reason, intr_frame_t *frame);
 extern unsigned char kdbg_get_char(void);
 extern int kdbg_register_value(const char *name, size_t len, unative_t *regp);

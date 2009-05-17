@@ -20,6 +20,7 @@ Import('env', 'config')
 env['OBJFILES'] += [
 	env.Object('acpi.c'),
 	env.Object('console.c'),
+	env.Object('kdbg.c'),
 	env.Object('multiboot.c'),
 	env.Object('pic.c'),
 	env.Object('pit.c'),

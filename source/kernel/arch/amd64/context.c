@@ -29,8 +29,6 @@
 #include <assert.h>
 #include <fatal.h>
 
-extern void __context_restore_r(void);
-
 /** Initialize a CPU context structure.
  *
  * Initializes a CPU context structure so that its instruction pointer points
@@ -71,16 +69,6 @@ void context_destroy(context_t *ctx) {
 void context_restore_frame(context_t *ctx, intr_frame_t *frame) {
 	assert((frame->cs & 3) == 0);
 
-#if CONFIG_ARCH_64BIT
 	frame->ip = (unative_t)context_restore;
 	frame->di = (unative_t)ctx;
-#else
-	/* Nasty stuff... if an interrupt occurs without a privelege level
-	 * change then the stacka pointer/segment will not be pushed/restored.
-	 * To get the stack pointer set correctly we must return to a
-	 * temporary function that restores the context properly. This deserves
-	 * a massive "F*CK YOU" to Intel. */
-	frame->ip = (unative_t)__context_restore_r;
-	frame->dx = (unative_t)ctx;
-#endif
 }
