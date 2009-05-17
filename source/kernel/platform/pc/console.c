@@ -1,4 +1,4 @@
-/* Kiwi x86 console code
+/* Kiwi PC console code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,78 +15,190 @@
 
 /**
  * @file
- * @brief		x86 console code.
+ * @brief		PC console code.
  */
 
 #include <arch/io.h>
 #include <arch/mem.h>
 
-#include <console/console.h>
-
 #include <mm/page.h>
+
+#include <platform/console.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <fatal.h>
 
-extern void console_late_init(void);
-
 /*
  * VGA console functions.
  */
 
-/** Set attributes of a character (white on black). */
-#define ATTRIB(ch)	((uint16_t)ch | ((uint16_t)0x0F << 8))
-
-/** VGA console size definitions. */
-#define VGA_COLS	80	/**< Number of columns on the VGA console. */
-#define VGA_ROWS	25	/**< Number of rows on the VGA console. */
+/** Puts a character into the VGA memory. */
+#define VGA_WRITE_WORD(idx, ch)		\
+	{ vga_mapping[idx] = ((uint16_t)ch | VGA_ATTRIB); }
 
 /** Pointer to VGA mapping. */
-static uint16_t *vga_mapping = (uint16_t *)0xB8000;
+static uint16_t *vga_mapping = (uint16_t *)VGA_MEM_PHYS;
 
 /** VGA cursor position variables. */
 static int vga_x = 0;		/**< X position of the cursor. */
 static int vga_y = 0;		/**< Y position of the cursor. */
 
-/** Scroll the VGA console.
- *
- * Moves the contents of the VGA console up by one line.
- */
+/** VGA registers to apply for 80x50 text mode. */
+static unsigned char vga_regs_80x50[VGA_NUM_REGS] = {
+	/* MISC. */
+	0x67,
+
+	/* SEQ. */
+	0x03, 0x00, 0x03, 0x00, 0x02,
+
+	/* CRTC. */
+	0x5F, 0x4F, 0x50, 0x82, 0x55, 0x81, 0xBF, 0x1F, 0x00, 0x47, 0x06, 0x07,
+	0x00, 0x00, 0x01, 0x40, 0x9C, 0x0E, 0x8F, 0x28, 0x1F, 0x96, 0xB9, 0xA3,
+	0xFF,
+
+	/* GC. */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0E, 0x00, 0xFF,
+
+	/* AC. */
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 0x38, 0x39, 0x3A, 0x3B,
+	0x3C, 0x3D, 0x3E, 0x3F, 0x0C, 0x00, 0x0F, 0x08, 0x00,
+};
+
+/* Set the plane we're reading and writing to/from. */
+static void vga_set_plane(uint32_t p) {
+	unsigned char pmask;
+
+	p &= 3;
+	pmask = 1 << p;
+
+	/* Set read plane, then write plane. */
+	out8(VGA_GC_INDEX, 4);
+	out8(VGA_GC_DATA, p);
+	out8(VGA_SEQ_INDEX, 2);
+	out8(VGA_SEQ_DATA, pmask);
+}
+
+
+/* Change the console font */
+static void vga_write_font(unsigned char *buf, unsigned int height) {
+	unsigned char seq2, seq4, gc4, gc5, gc6;
+	uint32_t i;
+
+	/* Save registers that we're going to modify - vga_set_plane()
+	 * modifies GC 4 and SEQ 2, so they must also be saved. */
+	out8(VGA_SEQ_INDEX, 2);
+	seq2 = in8(VGA_SEQ_DATA);
+	out8(VGA_SEQ_INDEX, 4);
+	seq4 = in8(VGA_SEQ_DATA);
+	out8(VGA_GC_INDEX, 4);
+	gc4 = in8(VGA_GC_DATA);
+	out8(VGA_GC_INDEX, 5);
+	gc5 = in8(VGA_GC_DATA);
+	out8(VGA_GC_INDEX, 6);
+	gc6 = in8(VGA_GC_DATA);
+
+	/* Turn off even-odd addressing (set flat addressing). */
+	out8(VGA_SEQ_INDEX, 4);
+	out8(VGA_SEQ_DATA, seq4 | 0x04);
+	out8(VGA_GC_INDEX, 5);
+	out8(VGA_GC_DATA, gc5 & ~0x10);
+	out8(VGA_GC_INDEX, 6);
+	out8(VGA_GC_DATA, gc6 & ~0x02);
+
+	/* Write font to plane P4. */
+	vga_set_plane(2);
+
+	/* Write the font. */
+	for(i = 0; i < 256; i++) {
+		memcpy((char *)((ptr_t)vga_mapping + (i * 32)), &buf[i * height], height);
+	}
+
+	/* Restore modified registers. */
+	out8(VGA_SEQ_INDEX, 2);
+	out8(VGA_SEQ_DATA, seq2);
+	out8(VGA_SEQ_INDEX, 4);
+	out8(VGA_SEQ_DATA, seq4);
+	out8(VGA_GC_INDEX, 4);
+	out8(VGA_GC_DATA, gc4);
+	out8(VGA_GC_INDEX, 5);
+	out8(VGA_GC_DATA, gc5);
+	out8(VGA_GC_INDEX, 6);
+	out8(VGA_GC_DATA, gc6);
+}
+
+/* Write a VGA register array to the VGA registers. */
+static void vga_write_regs(unsigned char *regs) {
+	uint32_t i, off = 0;
+
+	/* Write MISC register. */
+	out8(VGA_MISC_WRITE, regs[off++]);
+
+	/* Write SEQ registers. */
+	for(i = 0; i < VGA_NUM_SEQ_REGS; i++) {
+		out8(VGA_SEQ_INDEX, i);
+		out8(VGA_SEQ_DATA, regs[off++]);
+	}
+
+	/* Unlock CRTC registers. */
+	out8(VGA_CRTC_INDEX, 0x03);
+	out8(VGA_CRTC_DATA, in8(VGA_CRTC_DATA) | 0x80);
+	out8(VGA_CRTC_INDEX, 0x11);
+	out8(VGA_CRTC_DATA, in8(VGA_CRTC_DATA) & ~0x80);
+
+	/* Write CRTC registers. */
+	for(i = 0; i < VGA_NUM_CRTC_REGS; i++) {
+		out8(VGA_CRTC_INDEX, i);
+		out8(VGA_CRTC_DATA, regs[off++]);
+	}
+
+	/* Write GC registers. */
+	for(i = 0; i < VGA_NUM_GC_REGS; i++) {
+		out8(VGA_GC_INDEX, i);
+		out8(VGA_GC_DATA, regs[off++]);
+	}
+
+	/* Write AC registers. */
+	for(i = 0; i < VGA_NUM_AC_REGS; i++) {
+		in8(VGA_INSTAT_READ);
+		out8(VGA_AC_INDEX, i);
+		out8(VGA_AC_WRITE, regs[off++]);
+	}
+
+	/* Lock 16-color palette and unblank display. */
+	in8(VGA_INSTAT_READ);
+	out8(VGA_AC_INDEX, 0x20);
+}
+
+/** Scroll the VGA console. */
 static void vga_console_scroll(void) {
 	int i;
 
-	memmove(vga_mapping, vga_mapping + VGA_COLS, (VGA_ROWS - 1) * VGA_COLS * 2);
+	memmove(vga_mapping, vga_mapping + VGA_CONSOLE_COLS, (VGA_CONSOLE_ROWS - 1) * VGA_CONSOLE_COLS * 2);
 
-	for(i = 0; i < VGA_COLS; i++) {
-		vga_mapping[((VGA_ROWS - 1) * VGA_COLS) + i] = ATTRIB(' ');
+	for(i = 0; i < VGA_CONSOLE_COLS; i++) {
+		VGA_WRITE_WORD(((VGA_CONSOLE_ROWS - 1) * VGA_CONSOLE_COLS) + i, ' ');
 	}
 
-	vga_y = VGA_ROWS - 1;
+	vga_y = VGA_CONSOLE_ROWS - 1;
 }
 
-/** Move the VGA cursor.
- *
- * Moves the VGA cursor to a new position.
- */
+/** Move the VGA cursor. */
 static void vga_console_move_csr(void) {
-	out8(0x3D4, 14);
-	out8(0x3D5, ((vga_y * VGA_COLS) + vga_x) >> 8);
-	out8(0x3D4, 15);
-	out8(0x3D5, (vga_y * VGA_COLS) + vga_x);
+	out8(VGA_CRTC_INDEX, 14);
+	out8(VGA_CRTC_DATA, ((vga_y * VGA_CONSOLE_COLS) + vga_x) >> 8);
+	out8(VGA_CRTC_INDEX, 15);
+	out8(VGA_CRTC_DATA, (vga_y * VGA_CONSOLE_COLS) + vga_x);
 }
 
-/** Clears the VGA console.
- *
- * Clears the contents of the VGA console.
- */
+/** Clears the VGA console. */
 static void vga_console_clear(void) {
 	int i, j;
 
-	for(i = 0; i < VGA_ROWS; i++) {
-		for(j = 0; j < VGA_COLS; j++) {
-			vga_mapping[(i * VGA_COLS) + j] = ATTRIB(' ');
+	for(i = 0; i < VGA_CONSOLE_ROWS; i++) {
+		for(j = 0; j < VGA_CONSOLE_COLS; j++) {
+			VGA_WRITE_WORD((i * VGA_CONSOLE_COLS) + j, ' ');
 		}
 	}
 
@@ -97,11 +209,7 @@ static void vga_console_clear(void) {
 }
 
 /** Write a character to the VGA console.
- *
- * Writes a character to the VGA console at the current X/Y position.
- *
- * @param ch		Character to print.
- */
+ * @param ch		Character to print. */
 static void vga_console_putch(unsigned char ch) {
 	switch(ch) {
 	case '\b':
@@ -109,7 +217,7 @@ static void vga_console_putch(unsigned char ch) {
 		if(vga_x != 0) {
 			vga_x--;
 		} else {
-			vga_x = VGA_COLS - 1;
+			vga_x = VGA_CONSOLE_COLS - 1;
 			vga_y--;
 		}
 		break;
@@ -131,19 +239,19 @@ static void vga_console_putch(unsigned char ch) {
 			break;
 		}
 
-		vga_mapping[(vga_y * VGA_COLS) + vga_x] = ATTRIB(ch);
+		VGA_WRITE_WORD((vga_y * VGA_CONSOLE_COLS) + vga_x, ch);
 		vga_x++;
 		break;
 	}
 
 	/* If we have reached the edge of the screen insert a new line. */
-	if(vga_x >= VGA_COLS) {
+	if(vga_x >= VGA_CONSOLE_COLS) {
 		vga_x = 0;
 		vga_y++;
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
-	if(vga_y >= VGA_ROWS) {
+	if(vga_y >= VGA_CONSOLE_ROWS) {
 		vga_console_scroll();
 	}
 
@@ -151,10 +259,18 @@ static void vga_console_putch(unsigned char ch) {
 	vga_console_move_csr();
 }
 
+/** Initialize the VGA console. */
+static void vga_console_init(void) {
+	vga_write_regs(vga_regs_80x50);
+	vga_write_font(console_font_8x8, 8);
+	vga_console_clear();
+}
+
+/** VGA console operations structure. */
 static console_t vga_console = {
 	.debug = false,
-	.init = vga_console_clear,
 	.putch = vga_console_putch,
+	.init = vga_console_init,
 };
 
 /*
@@ -162,10 +278,17 @@ static console_t vga_console = {
  */
 
 #if CONFIG_DEBUG
-/** Initialize the serial console.
- *
- * Initialization function for the serial port console.
- */
+/** Print a character to the serial console.
+ * @param ch		Character to print. */
+static void serial_console_putch(unsigned char ch) {
+	while(!(in8(CONFIG_X86_DEBUG_PORT + 5) & 0x20));
+	if(ch == '\n') {
+		serial_console_putch('\r');
+	}
+	out8(CONFIG_X86_DEBUG_PORT, ch);
+}
+
+/** Initialize the serial console. */
 static void serial_console_init(void) {
         out8(CONFIG_X86_DEBUG_PORT + 1, 0x00);  /* Disable all interrupts */
         out8(CONFIG_X86_DEBUG_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
@@ -174,20 +297,6 @@ static void serial_console_init(void) {
         out8(CONFIG_X86_DEBUG_PORT + 3, 0x03);  /* 8 bits, no parity, one stop bit */
         out8(CONFIG_X86_DEBUG_PORT + 2, 0xC7);  /* Enable FIFO, clear them, with 14-byte threshold */
         out8(CONFIG_X86_DEBUG_PORT + 4, 0x0B);  /* IRQs enabled, RTS/DSR set */
-}
-
-/** Print a character to the serial console.
- *
- * Prints a character on the serial port console.
- *
- * @param ch		Character to print.
- */
-static void serial_console_putch(unsigned char ch) {
-	while(!(in8(CONFIG_X86_DEBUG_PORT + 5) & 0x20));
-	if(ch == '\n') {
-		serial_console_putch('\r');
-	}
-	out8(CONFIG_X86_DEBUG_PORT, ch);
 }
 
 /** Serial port console. */
@@ -219,7 +328,7 @@ void console_early_init(void) {
 void console_late_init(void) {
 	void *addr;
 
-	addr = page_phys_map(0xB8000, VGA_COLS * VGA_ROWS * 2, 0);
+	addr = page_phys_map(VGA_MEM_PHYS, VGA_CONSOLE_COLS * VGA_CONSOLE_ROWS * 2, 0);
 	if(addr == NULL) {
 		fatal("Could not map VGA memory");
 	}

@@ -1,5 +1,5 @@
-/* Kiwi x86 PIC code
- * Copyright (C) 2008-2009 Alex Smith
+/* Kiwi Programmable Interrupt Controller code
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Programmable Interrupt Controller (i8259) code.
+ * @brief		Programmable Interrupt Controller code.
  */
 
 #include <arch/intr.h>

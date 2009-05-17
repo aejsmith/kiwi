@@ -23,6 +23,7 @@
 #include <cpu/cpu.h>
 
 #include <platform/acpi.h>
+#include <platform/console.h>
 #include <platform/multiboot.h>
 #include <platform/pic.h>
 #include <platform/pit.h>
@@ -31,9 +32,6 @@
 #include <time/timer.h>
 
 #include <fatal.h>
-
-/** External initialization functions. */
-extern void console_late_init(void);
 
 /** PC platform startup code.
  *

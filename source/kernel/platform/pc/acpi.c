@@ -1,4 +1,4 @@
-/* Kiwi x86 ACPI code
+/* Kiwi PC ACPI code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		x86 ACPI functions.
+ * @brief		PC ACPI functions.
  */
 
 #include <arch/mem.h>
