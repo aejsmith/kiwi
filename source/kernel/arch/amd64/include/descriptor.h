@@ -1,4 +1,4 @@
-/* Kiwi AMD64 segment definitions
+/* Kiwi AMD64 descriptor table functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,14 +15,17 @@
 
 /**
  * @file
- * @brief		AMD64 segment definitions.
+ * @brief		AMD64 descriptor table functions.
  */
 
-#ifndef __ARCH_GDT_H
-#define __ARCH_GDT_H
+#ifndef __ARCH_DESCRIPTOR_H
+#define __ARCH_DESCRIPTOR_H
 
 /** Total number of GDT descriptors. */
-#define GDT_SEG_COUNT	9
+#define GDT_ENTRY_COUNT	9
+
+/** Total number of IDT descriptors. */
+#define IDT_ENTRY_COUNT	256
 
 /** Segment definitions. Do not change without looking at SYSCALL stuff. */
 #define SEG_K_CS	0x08		/**< Kernel code segment. */
@@ -39,10 +42,8 @@
 
 extern gdt_pointer_t __boot_gdtp;
 
-extern void gdt_set_base(int sel, ptr_t base);
-extern void gdt_set_limit(int sel, size_t limit);
-
-extern void gdt_init(void);
+extern void descriptor_init(void);
+extern void descriptor_ap_init(void);
 
 #endif /* __ASM__ */
-#endif /* __ARCH_GDT_H */
+#endif /* __ARCH_DESCRIPTOR_H */

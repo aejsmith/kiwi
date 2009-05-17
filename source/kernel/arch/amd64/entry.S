@@ -18,7 +18,7 @@
  * @brief		AMD64 kernel entry points.
  */
 
-#include <arch/gdt.h>
+#include <arch/descriptor.h>
 
 /** Push registers onto the stack.
  *

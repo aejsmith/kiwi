@@ -22,7 +22,7 @@
 #define __ARCH_CPU_H
 
 #include <arch/asm.h>
-#include <arch/gdt.h>
+#include <arch/descriptor.h>
 #include <arch/mem.h>
 
 #include <types.h>
@@ -44,7 +44,7 @@ typedef struct cpu_features {
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
 	/** Per-CPU CPU structures. */
-	gdt_entry_t gdt[GDT_SEG_COUNT];		/**< Array of GDT descriptors. */
+	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
 	tss_t tss;				/**< Task State Segment (TSS). */
 
 	/** Per-CPU information. */

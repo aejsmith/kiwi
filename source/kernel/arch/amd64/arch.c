@@ -21,9 +21,8 @@
 #include <arch/arch.h>
 #include <arch/asm.h>
 #include <arch/defs.h>
+#include <arch/descriptor.h>
 #include <arch/features.h>
-#include <arch/gdt.h>
-#include <arch/intr.h>
 #include <arch/io.h>
 #include <arch/lapic.h>
 
@@ -43,8 +42,7 @@ extern void page_late_init(void);
  * @param data		Multiboot information pointer.
  */
 void arch_premm_init(void *data) {
-	gdt_init();
-	intr_init();
+	descriptor_init();
 	cpu_arch_init(&curr_cpu->arch);
 
 	/* Enable OSFXSR early because memcpy/memset use it on machines that
@@ -76,8 +74,7 @@ void arch_final_init(void) {
 #if CONFIG_SMP
 /** Architecture initialization for an AP. */
 void arch_ap_init(void) {
-	gdt_init();
-	intr_ap_init();
+	descriptor_ap_init();
 	cpu_arch_init(&curr_cpu->arch);
 
 	if(CPU_HAS_FXSR(curr_cpu)) {

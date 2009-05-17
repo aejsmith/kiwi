@@ -1,4 +1,4 @@
-/* Kiwi x86 memory barrier functions
+/* Kiwi AMD64 memory barrier functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		x86 memory barrier functions.
+ * @brief		AMD64 memory barrier functions.
  */
 
 #ifndef __ARCH_BARRIER_H
@@ -32,15 +32,13 @@
 /** Barrier for critical section leave. */
 #define leave_cs_barrier()	__asm__ volatile("" ::: "memory")
 
-/* TODO: Use MFENCE and friends where possible for IA32. */
-#if CONFIG_ARCH_64BIT
-# define memory_barrier()	__asm__ volatile("mfence" ::: "memory")
-# define read_barrier()		__asm__ volatile("lfence" ::: "memory")
-# define write_barrier()	__asm__ volatile("sfence" ::: "memory")
-#else
-# define memory_barrier()	__asm__ volatile("lock addl $0, 0(%%esp)" ::: "memory")
-# define read_barrier()		__asm__ volatile("lock addl $0, 0(%%esp)" ::: "memory")
-# define write_barrier()	__asm__ volatile("lock addl $0, 0(%%esp)" ::: "memory")
-#endif
+/** Read/write barrier. */
+#define memory_barrier()	__asm__ volatile("mfence" ::: "memory")
+
+/** Read barrier. */
+#define read_barrier()		__asm__ volatile("lfence" ::: "memory")
+
+/** Write barrier. */
+#define write_barrier()		__asm__ volatile("sfence" ::: "memory")
 
 #endif /* __ARCH_BARRIER_H */

@@ -20,7 +20,6 @@
 
 #include <arch/asm.h>
 #include <arch/defs.h>
-#include <arch/intr.h>
 #include <arch/mem.h>
 #include <arch/page.h>
 

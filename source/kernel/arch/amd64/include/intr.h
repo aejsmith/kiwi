@@ -25,7 +25,6 @@
 
 /** Various definitions. */
 #define INTR_COUNT	256		/**< Total number of interrupts. */
-#define FAULT_COUNT	32		/**< Total number of exceptions. */
 #define IRQ_COUNT	16		/**< Total number of IRQs. */
 #define IRQ_BASE	32		/**< IRQ number base. */
 
@@ -65,8 +64,5 @@ static inline bool intr_state(void) {
 	__asm__ volatile("pushf; pop %0" : "=r"(flags));
 	return (flags & (1<<9)) ? true : false;
 }
-
-extern void intr_init(void);
-extern void intr_ap_init(void);
 
 #endif /* __ARCH_INTR_H */

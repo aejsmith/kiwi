@@ -19,7 +19,7 @@
  */
 
 #include <arch/defs.h>
-#include <arch/gdt.h>
+#include <arch/descriptor.h>
 #include <arch/mem.h>
 #include <arch/page.h>
 
