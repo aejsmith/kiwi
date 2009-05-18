@@ -52,7 +52,7 @@
 /** VGA console properties. */
 #define VGA_CONSOLE_COLS	80	/**< Number of columns on the VGA console. */
 #define VGA_CONSOLE_ROWS	50	/**< Number of rows on the VGA console. */
-#define VGA_CONSOLE_FG		0x7	/**< Foreground colour (white). */
+#define VGA_CONSOLE_FG		0xF	/**< Foreground colour (grey). */
 #define VGA_CONSOLE_BG		0x0	/**< Background colour (black). */
 
 /** VGA attribute byte. */
