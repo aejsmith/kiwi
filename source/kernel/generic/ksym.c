@@ -34,7 +34,7 @@
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, ptr_t *off) {
+ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off) {
 	ptr_t end;
 	size_t i;
 
@@ -49,7 +49,7 @@ ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, ptr_t *off) {
 
 		if(addr >= table->symbols[i].addr && addr < end) {
 			if(off != NULL) {
-				*off = addr - table->symbols[i].addr;
+				*off = (size_t)(addr - table->symbols[i].addr);
 			}
 			return &table->symbols[i];
 		}

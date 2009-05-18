@@ -665,7 +665,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	static int pcount = 0;
 	ksym_t *sym;
 	char *input;
-	ptr_t off;
+	size_t off;
 	int ret;
 
 	/* Double check that we have a registers structure. */
@@ -694,7 +694,8 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 				return KDBG_STEP;
 			}
 		} else {
-			kprintf(LOG_KDBG, "KDBG: Warning: Entered for non-step reason with %" PRIs " steps remaining\n", kdbg_step_count);
+			kprintf(LOG_KDBG, "KDBG: Warning: Non-step entry with %" PRIs " steps remaining\n",
+			        kdbg_step_count);
 			kdbg_step_count = 0;
 			pcount = 0;
 		}
@@ -709,11 +710,14 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	sym = ksym_lookup_addr(&kernel_symtab, frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
-		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
+		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else if(reason == KDBG_ENTRY_STEPPED) {
-		kprintf(LOG_KDBG, "Stepped to [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "Stepped to [%p] %s+0x%" PRIxs "\n",
+		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else {
-		kprintf(LOG_KDBG, "\nEntered KDBG from [%p] %s+0x%p\n", frame->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "\nEntered KDBG from [%p] %s+0x%" PRIxs "\n",
+		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	}
 
 	/* Main loop - print a prompt, get a command and process it. */

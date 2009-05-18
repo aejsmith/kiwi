@@ -247,8 +247,9 @@ int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
  */
 int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
-	ptr_t page, off;
 	ksym_t *sym;
+	size_t off;
+	ptr_t page;
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
@@ -265,12 +266,14 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	/* Print out the address of where the exception occurred. */
 	sym = ksym_lookup_addr(&kernel_symtab, curr_kdbg_frame->ip, &off);
 	kprintf(LOG_KDBG, "--- Interrupt ---\n");
-	kprintf(LOG_KDBG, "[%p] %s+0x%p\n", curr_kdbg_frame->ip, (sym) ? sym->name : "<unknown>", off);
+	kprintf(LOG_KDBG, "[%p] %s+0x%" PRIxs "\n", curr_kdbg_frame->ip,
+	        (sym) ? sym->name : "<unknown>", off);
 
 	kprintf(LOG_KDBG, "--- Stacktrace ---\n");
 	while(frame && ((ptr_t)frame & PAGE_MASK) == page) {
 		sym = ksym_lookup_addr(&kernel_symtab, frame->addr, &off);
-		kprintf(LOG_KDBG, "[%p] %s+0x%p\n", frame->addr, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_KDBG, "[%p] %s+0x%" PRIxs "\n", frame->addr,
+		        (sym) ? sym->name : "<unknown>", off);
 		frame = frame->next;
 	}
 
@@ -387,9 +390,8 @@ int kdbg_cmd_benable(int argc, char **argv) {
  */
 int kdbg_cmd_break(int argc, char **argv) {
 	unative_t addr;
+	size_t i, off;
 	ksym_t *sym;
-	ptr_t off;
-	size_t i;
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_KDBG, "Usage: %s [address]\n\n", argv[0]);
@@ -409,7 +411,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 				continue;
 			}
 			sym = ksym_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_KDBG, "Breakpoint %" PRIs ": [%p] %s+0x%p (%s)\n", i,
+			kprintf(LOG_KDBG, "Breakpoint %" PRIs ": [%p] %s+0x%" PRIxs " (%s)\n", i,
 			            kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
 			            off, (kdbg_breakpoints[i].enabled) ? "enabled" : "disabled");
 		}
@@ -434,8 +436,8 @@ int kdbg_cmd_break(int argc, char **argv) {
 			kdbg_breakpoints[i].addr = (ptr_t)addr;
 
 			sym = ksym_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_KDBG, "Created breakpoint %" PRIs ": [%p] %s+0x%p\n", i, addr,
-			            (sym) ? sym->name : "<unknown>", off);
+			kprintf(LOG_KDBG, "Created breakpoint %" PRIs ": [%p] %s+0x%" PRIxs "\n",
+			        i, addr, (sym) ? sym->name : "<unknown>", off);
 			return KDBG_OK;
 		}
 

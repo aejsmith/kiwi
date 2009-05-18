@@ -46,6 +46,7 @@
 #define PRIon		"lo"		/**< Format for (u)native_t (octal). */
 #define PRIpp		"llx"		/**< Format for phys_ptr_t. */
 #define PRIs		"lu"		/**< Format for size_t. */
+#define PRIxs		"lx"		/**< Format for size_t (hexadecimal). */
 
 /** Unsigned data types. */
 typedef unsigned char uint8_t;		/**< Unsigned 8-bit. */

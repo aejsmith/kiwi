@@ -41,7 +41,7 @@ typedef struct ksym_table {
 /** Kernel symbol table. */
 extern ksym_table_t kernel_symtab;
 
-extern ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, ptr_t *off);
+extern ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off);
 extern ksym_t *ksym_lookup_name(ksym_table_t *table, const char *name, bool global, bool exported);
 
 #endif /* __KSYM_H */
