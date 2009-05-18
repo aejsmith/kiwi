@@ -18,13 +18,15 @@
  * @brief		Assertion function.
  */
 
+#ifndef __ASSERT_H
+#define __ASSERT_H
+
 #include <fatal.h>
 
-/* Assert should be redefined according to NDEBUG each time the header is
- * included. */
-#undef assert
-#ifdef NDEBUG
-# define assert(cond)		((void)0)
+#ifdef CONFIG_DEBUG
+# define assert(cond)	if(!(cond)) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
 #else
-# define assert(cond)		if(!(cond)) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
+# define assert(cond)	((void)0)
 #endif
+
+#endif /* __ASSERT_H */
