@@ -44,13 +44,6 @@ extern void page_late_init(void);
 void arch_premm_init(void *data) {
 	descriptor_init();
 	cpu_arch_init(&curr_cpu->arch);
-
-	/* Enable OSFXSR early because memcpy/memset use it on machines that
-	 * support it. */
-	if(CPU_HAS_FXSR(curr_cpu)) {
-		write_cr4(read_cr4() | X86_CR4_OSFXSR);
-		fninit();
-        }
 }
 
 /** X86 architecture startup code.
@@ -76,11 +69,6 @@ void arch_final_init(void) {
 void arch_ap_init(void) {
 	descriptor_ap_init();
 	cpu_arch_init(&curr_cpu->arch);
-
-	if(CPU_HAS_FXSR(curr_cpu)) {
-		write_cr4(read_cr4() | X86_CR4_OSFXSR);
-		fninit();
-        }
 
 	/* Initialize the LAPIC. */
 	if(!lapic_init()) {

@@ -105,13 +105,15 @@ __kernel_entry:
 	cmp	%eax, %ebx
 	jz	.Lcpuid_err
 
-	/* Check for PAE/PGE support. */
+	/* Check for PAE/PGE/FXSR support. */
 	movl	$CPUID_FEATURE_INFO, %eax
 	cpuid
 	bt	$6, %edx
 	jnc	.Lpae_err
 	bt	$13, %edx
 	jnc	.Lpge_err
+	bt	$24, %edx
+	jnc	.Lfxsr_err
 
 	/* Check for long mode support. */
 	movl	$CPUID_EXT_FEATURE, %eax
@@ -129,10 +131,13 @@ __kernel_entry:
 	incl    %edx
 	loop    2b
 
-	/* Enable PAE/PGE (CR4.PAE, bit 5/CR4.PGE, bit 7). */
+	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
-	orl	$(X86_CR4_PAE | X86_CR4_PGE), %eax
+	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
+
+	/* Initialise the FPU. */
+	fninit
 
 	/* Point CR3 to the boot PML4. */
 	movl	$KA2PA(__boot_pml4), %eax
@@ -153,42 +158,41 @@ __kernel_entry:
 	/* Jump into the 64-bit code segment. */
 	ljmp	$SEG_K_CS, $KA2PA(.Llmode)
 .Lmagic_err:
-	movl	$0xB8000, %edi
 	movl	$KA2PA(magic_err_str), %esi
 	jmp	.Learly_die
 .Lcpuid_err:
-	movl	$0xB8000, %edi
 	movl	$KA2PA(cpuid_err_str), %esi
 	jmp	.Learly_die
 .Lpae_err:
-	movl	$0xB8000, %edi
 	movl	$KA2PA(pae_err_str), %esi
 	jmp	.Learly_die
 .Lpge_err:
-	movl	$0xB8000, %edi
 	movl	$KA2PA(pge_err_str), %esi
 	jmp	.Learly_die
+.Lfxsr_err:
+	movl	$KA2PA(fxsr_err_str), %esi
+	jmp	.Learly_die
 .Llmode_err:
-	movl	$0xB8000, %edi
 	movl	$KA2PA(lmode_err_str), %esi
 	jmp	.Learly_die
 .Learly_die:
 	/* Print an error message. String address should be in %esi. */
-	xorl	%eax, %eax
+	movl	$0xB8000, %edi
+3:	xorl	%eax, %eax
 	lodsb
 	test	%al, %al
-	jz	1f
+	jz	4f
 	or	$0xD00, %ax
 	stosw
-	jmp	.Learly_die
-1:	jmp	1b
+	jmp	3b
+4:	jmp	4b
 .align 8
 .code64
 .Llmode:
 	/* Jump to the virtual location of the kernel. */
-	leaq	2f, %rax
+	leaq	5f, %rax
 	jmp	*%rax
-2:
+5:
 	/* Set data segments. */
 	mov	$SEG_K_DS, %ax
 	mov	%ax, %ds
@@ -211,8 +215,8 @@ __kernel_entry:
 	call	kmain_bsp
 
 	/* If we got here something has gone wrong. */
-1:	ud2a
-	jmp	1b
+6:	ud2a
+	jmp	6b
 .size __kernel_entry, .-__kernel_entry
 
 #if CONFIG_SMP
@@ -239,10 +243,13 @@ __kernel_ap_entry:
 	mov	%ax, %ss
 	ljmp	$SEG_K_CS32, $KA2PA(1f)
 1:
-	/* Enable PAE/PGE (CR4.PAE, bit 5/CR4.PGE, bit 7). */
+	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
-	orl	$(X86_CR4_PAE | X86_CR4_PGE), %eax
+	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
+
+	/* Initialise the FPU. */
+	fninit
 
 	/* Create temporary identity mapping. */
 	movl	$KA2PA(__kernel_pdp) + (PG_PRESENT | PG_WRITE), KA2PA(__boot_pml4)
@@ -365,6 +372,7 @@ magic_err_str:		.asciz "Multiboot magic number is invalid."
 cpuid_err_str:		.asciz "CPU does not support CPUID."
 pae_err_str:		.asciz "CPU does not support PAE."
 pge_err_str:		.asciz "CPU does not support PGE."
+fxsr_err_str:		.asciz "CPU does not support FXSR."
 lmode_err_str:		.asciz "CPU does not support long mode. Use a 32-bit version of Kiwi."
 
 .section .bss, "aw", @nobits
