@@ -59,13 +59,15 @@ with open('build.conf') as f:
 ############################
 
 if os.system('toolchain/build.py --check') != 0:
+	msg = GetOption('help') and "WARNING" or "ERROR"
 	if colour:
-		sys.stdout.write('\033[1;31mERROR:\033[0m ')
+		sys.stdout.write('\033[1;31m%s:\033[0m ' % (msg))
 	else:
-		sys.stdout.write('ERROR: ')
+		sys.stdout.write('%s: ' % (msg))
 	print "Your toolchain is out of date. Please ensure that build.conf is"
 	print "         correct and update it by running toolchain/build.py"
-	Exit(1)
+	if not GetOption('help'):
+		Exit(1)
 
 #######################
 # Build environments. #
