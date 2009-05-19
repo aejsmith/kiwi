@@ -1,4 +1,4 @@
-/* Kiwi kernel symbol manager
+/* Kiwi symbol table manager
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,33 +15,33 @@
 
 /**
  * @file
- * @brief		Kernel symbol manager.
+ * @brief		Symbol table manager.
  */
 
-#ifndef __KSYM_H
-#define __KSYM_H
+#ifndef __SYMTAB_H
+#define __SYMTAB_H
 
 #include <types.h>
 
 /** Information about a symbol in the kernel or a module. */
-typedef struct ksym {
+typedef struct symbol {
 	ptr_t addr;		/**< Address that the symbol points to. */
 	size_t size;		/**< Size of symbol. */
 	const char *name;	/**< Name of the symbol. */
 	bool global;		/**< Whether the symbol is global. */
 	bool exported;		/**< Whether the symbol has been exported for modules to link to. */
-} ksym_t;
+} symbol_t;
 
-/** Table of symbols. */
-typedef struct ksym_table {
-	ksym_t *symbols;	/**< Array of symbols. */
+/** Structure containing a symbol table. */
+typedef struct symtab {
+	symbol_t *symbols;	/**< Array of symbols. */
 	size_t count;		/**< Number of symbols in the table. */
-} ksym_table_t;
+} symtab_t;
 
 /** Kernel symbol table. */
-extern ksym_table_t kernel_symtab;
+extern symtab_t kernel_symtab;
 
-extern ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off);
-extern ksym_t *ksym_lookup_name(ksym_table_t *table, const char *name, bool global, bool exported);
+extern symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp);
+extern symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, bool exported);
 
-#endif /* __KSYM_H */
+#endif /* __SYMTAB_H */

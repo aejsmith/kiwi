@@ -36,7 +36,7 @@
 #include <proc/thread.h>
 
 #include <kdbg.h>
-#include <ksym.h>
+#include <symtab.h>
 
 /* Please, keep this code safe! Specifically, make sure it doesn't:
  * - Use any allocators.
@@ -546,7 +546,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 	static char namebuf[64];
 	unative_t val = 0, temp;
 	char operator = 0;
-	ksym_t *sym;
+	symbol_t *sym;
 	size_t len;
 
 	/* Check for a string. */
@@ -598,7 +598,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 			strncpy(namebuf, exp + 1, len - 1);
 			namebuf[len - 1] = 0;
 
-			sym = ksym_lookup_name(&kernel_symtab, namebuf, false, false);
+			sym = symtab_lookup_name(&kernel_symtab, namebuf, false, false);
 			if(sym == NULL) {
 				kprintf(LOG_KDBG, "KDBG: Symbol '%s' not found\n", namebuf);
 				return KDBG_FAIL;
@@ -663,7 +663,7 @@ void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
 int kdbg_main(int reason, intr_frame_t *frame) {
 	bool state = intr_disable();
 	static int pcount = 0;
-	ksym_t *sym;
+	symbol_t *sym;
 	char *input;
 	size_t off;
 	int ret;
@@ -708,7 +708,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 #endif
 	curr_kdbg_frame = frame;
 
-	sym = ksym_lookup_addr(&kernel_symtab, frame->ip, &off);
+	sym = symtab_lookup_addr(&kernel_symtab, frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
 		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);

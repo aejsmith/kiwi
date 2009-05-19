@@ -49,9 +49,9 @@ SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'ge
 def fake_symtab_func(target, source, env):
 	with open(str(target[0]), 'w') as f:
 		f.write('/* This file is auto-generated, changes will be overwritten. */\n')
-		f.write('#include <ksym.h>\n')
-		f.write('static ksym_t kernel_symtab_array[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
-		f.write('ksym_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
+		f.write('#include <symtab.h>\n')
+		f.write('static symbol_t kernel_symtab_array[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
+		f.write('symtab_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
 	return None
 
 # Link the first kernel image using a fake symbol table.

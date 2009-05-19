@@ -1,4 +1,4 @@
-/* Kiwi kernel symbol manager
+/* Kiwi symbol table manager
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,13 +15,13 @@
 
 /**
  * @file
- * @brief		Kernel symbol manager.
+ * @brief		Symbol table manager.
  */
 
 #include <lib/string.h>
 
 #include <assert.h>
-#include <ksym.h>
+#include <symtab.h>
 
 /** Look up symbol from address.
  *
@@ -30,11 +30,11 @@
  *
  * @param table		Symbol table to look in.
  * @param addr		Address to lookup.
- * @param off		Where to store symbol offset (can be NULL).
+ * @param offp		Where to store symbol offset (can be NULL).
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off) {
+symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp) {
 	ptr_t end;
 	size_t i;
 
@@ -48,15 +48,15 @@ ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off) {
 		end = table->symbols[i].addr + table->symbols[i].size;
 
 		if(addr >= table->symbols[i].addr && addr < end) {
-			if(off != NULL) {
-				*off = (size_t)(addr - table->symbols[i].addr);
+			if(offp != NULL) {
+				*offp = (size_t)(addr - table->symbols[i].addr);
 			}
 			return &table->symbols[i];
 		}
 	}
 
-	if(off != NULL) {
-		*off = 0;
+	if(offp != NULL) {
+		*offp = 0;
 	}
 	return NULL;
 }
@@ -69,11 +69,11 @@ ksym_t *ksym_lookup_addr(ksym_table_t *table, ptr_t addr, size_t *off) {
  * @param table		Symbol table to look in.
  * @param name		Name to lookup.
  * @param global	Whether to only look up global symbols.
- * @param exported	Whether to only look up exported symbols
+ * @param exported	Whether to only look up exported symbols.
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-ksym_t *ksym_lookup_name(ksym_table_t *table, const char *name, bool global, bool exported) {
+symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, bool exported) {
 	size_t i;
 
 	assert(table);
