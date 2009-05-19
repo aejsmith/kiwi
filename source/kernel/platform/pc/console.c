@@ -45,17 +45,17 @@ static uint16_t *vga_mapping = (uint16_t *)VGA_MEM_PHYS;
 static int vga_x = 0;		/**< X position of the cursor. */
 static int vga_y = 0;		/**< Y position of the cursor. */
 
-/** VGA registers to apply for 80x50 text mode. */
-static unsigned char vga_regs_80x50[VGA_NUM_REGS] = {
+/** VGA registers to apply for 80x60 text mode. */
+static unsigned char vga_regs_80x60[VGA_NUM_REGS] = {
 	/* MISC. */
-	0x67,
+	0xE7,
 
 	/* SEQ. */
-	0x03, 0x00, 0x03, 0x00, 0x02,
+	0x03, 0x01, 0x03, 0x00, 0x02,
 
 	/* CRTC. */
-	0x5F, 0x4F, 0x50, 0x82, 0x55, 0x81, 0xBF, 0x1F, 0x00, 0x47, 0x06, 0x07,
-	0x00, 0x00, 0x01, 0x40, 0x9C, 0x0E, 0x8F, 0x28, 0x1F, 0x96, 0xB9, 0xA3,
+	0x6B, 0x4F, 0x50, 0x82, 0x55, 0x81, 0x0B, 0x3E, 0x00, 0x47, 0x06, 0x07,
+	0x00, 0x00, 0x01, 0x40, 0xEA, 0x0C, 0xDF, 0x28, 0x1F, 0xE7, 0x04, 0xA3,
 	0xFF,
 
 	/* GC. */
@@ -66,7 +66,7 @@ static unsigned char vga_regs_80x50[VGA_NUM_REGS] = {
 	0x3C, 0x3D, 0x3E, 0x3F, 0x0C, 0x00, 0x0F, 0x08, 0x00,
 };
 
-/* Set the plane we're reading and writing to/from. */
+/** Set the plane we're reading and writing to/from. */
 static void vga_set_plane(uint32_t p) {
 	unsigned char pmask;
 
@@ -80,8 +80,7 @@ static void vga_set_plane(uint32_t p) {
 	out8(VGA_SEQ_DATA, pmask);
 }
 
-
-/* Change the console font */
+/** Change the console font. */
 static void vga_write_font(unsigned char *buf, unsigned int height) {
 	unsigned char seq2, seq4, gc4, gc5, gc6;
 	uint32_t i;
@@ -128,7 +127,7 @@ static void vga_write_font(unsigned char *buf, unsigned int height) {
 	out8(VGA_GC_DATA, gc6);
 }
 
-/* Write a VGA register array to the VGA registers. */
+/** Write a VGA register array to the VGA registers. */
 static void vga_write_regs(unsigned char *regs) {
 	uint32_t i, off = 0;
 
@@ -261,7 +260,7 @@ static void vga_console_putch(unsigned char ch) {
 
 /** Initialize the VGA console. */
 static void vga_console_init(void) {
-	vga_write_regs(vga_regs_80x50);
+	vga_write_regs(vga_regs_80x60);
 	vga_write_font(console_font_8x8, 8);
 	vga_console_clear();
 }
