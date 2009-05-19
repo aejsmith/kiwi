@@ -103,7 +103,8 @@ static bool lapic_tlb_shootdown_handler(unative_t num, intr_frame_t *frame) {
 /** Prepare local APIC timer tick.
  * @param ns		Number of nanoseconds to tick in. */
 static void lapic_timer_prep(uint64_t ns) {
-	lapic_write(LAPIC_REG_TIMER_INITIAL, (uint32_t)((curr_cpu->arch.lapic_freq * ns) >> 32));
+	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_freq * ns) >> 32);
+	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && ns != 0) ? 1 : count);
 }
 
 /** Enable the local APIC timer. */
