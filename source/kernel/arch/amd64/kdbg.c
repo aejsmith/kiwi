@@ -71,7 +71,7 @@ static inline void kdbg_setup_dreg(void) {
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  *
- * @return		Whether the current thread should be preempted.
+ * @return		True if handled, false if not.
  */
 bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	static bool bp_resume = false;
@@ -93,7 +93,7 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 				kdbg_setup_dreg();
 				frame->flags &= ~X86_FLAGS_TF;
 				write_dr6(0);
-				return false;
+				return true;
 			}
 
 			reason = KDBG_ENTRY_STEPPED;
@@ -117,7 +117,7 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	 * and then re-enable after the step. */
 	if(reason == KDBG_ENTRY_BREAK) {
 		if(i >= 4 || !kdbg_breakpoints[i].enabled) {
-			return false;
+			return true;
 		}
 
 		write_dr7(read_dr7() & ~(1<<i));
@@ -129,7 +129,7 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
-	return false;
+	return true;
 }
 
 /** Call KDBG.
