@@ -152,7 +152,8 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 	slab_bufctl_t *bufctl;
 
 	if(unlikely(slab->refcount != 0)) {
-		fatal("Slab (%s) has %" PRIs " references while destructing", cache->name, slab->refcount);
+		fatal("Slab (%s) has %" PRIs " references while destructing",
+		      cache->name, slab->refcount);
 	}
 
 	list_remove(&slab->header);
@@ -189,7 +190,8 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		/* Handle MM_FATAL ourselves rather than converting to vmflag
 		 * so that we get a more accurate error message. */
 		if(kmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (1)", cache, cache->name);
+			fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (1)",
+			      cache, cache->name);
 		}
 		return NULL;
 	}
@@ -200,7 +202,8 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		if(unlikely(slab == NULL)) {
 			/* Same as above. */
 			if(kmflag & MM_FATAL) {
-				fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (2)", cache, cache->name);
+				fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (2)",
+				      cache, cache->name);
 			}
 
 			vmem_free(cache->source, addr, cache->slab_size);
@@ -224,7 +227,8 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 			if(unlikely(bufctl == NULL)) {
 				/* Same as above. */
 				if(kmflag & MM_FATAL) {
-					fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (3)", cache, cache->name);
+					fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (3)",
+					      cache, cache->name);
 				}
 
 				slab_destroy(cache, slab);

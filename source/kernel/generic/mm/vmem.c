@@ -219,7 +219,6 @@ static inline bool vmem_span_overlaps(vmem_t *vmem, vmem_resource_t base, vmem_r
 static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, bool imported, int vmflag) {
 	vmem_btag_t *span;
 
-	assert(base != 0);
 	assert(!(base % vmem->quantum));
 	assert(!(size % vmem->quantum));
 
@@ -335,6 +334,7 @@ found:
 			split1->type = VMEM_BTAG_FREE;
 
 			seg->base = minaddr;
+			seg->size -= split1->size;
 			list_add_before(&seg->header, &split1->header);
 			vmem_freelist_insert(vmem, split1);
 			split1 = NULL;
@@ -829,6 +829,9 @@ qcache_fail:
 		}
 	}
 
+	if(vmflag & MM_FATAL) {
+		fatal("Could not initialize required arena %s", vmem->name);
+	}
 	return -ERR_NO_MEMORY;	
 }
 
