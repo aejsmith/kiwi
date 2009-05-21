@@ -18,8 +18,8 @@
  * @brief		x86 CPU definitions.
  */
 
-#ifndef __ARCH_DEFS_H
-#define __ARCH_DEFS_H
+#ifndef __ARCH_X86_DEFS_H
+#define __ARCH_X86_DEFS_H
 
 /*
  * FLAGS register.
@@ -140,4 +140,4 @@
 #define CPUID_ADVANCED_PM	0x80000007		/**< Advanced Power Management. */
 #define CPUID_ADDRESS_SIZE	0x80000008		/**< Virtual/Physical Address Sizes. */
 
-#endif /* __ARCH_DEFS_H */
+#endif /* __ARCH_X86_DEFS_H */

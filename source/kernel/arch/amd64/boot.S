@@ -18,10 +18,10 @@
  * @brief		AMD64 boot code.
  */
 
-#include <arch/defs.h>
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/x86/defs.h>
 
 #include <platform/multiboot.h>
 

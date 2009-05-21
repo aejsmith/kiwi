@@ -25,10 +25,10 @@
  * process should be preempted.
  */
 
-#include <arch/fault.h>
-#include <arch/features.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/x86/fault.h>
+#include <arch/x86/features.h>
 
 #include <console/kprintf.h>
 
@@ -118,7 +118,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 
 	/* Try the address space manager if the fault occurred at a userspace
 	 * address. */
-	if(addr < (USPACE_BASE + USPACE_SIZE)) {
+	if(addr < (ASPACE_BASE + ASPACE_SIZE)) {
 		if(aspace_pagefault(addr, reason, access) == PF_STATUS_OK) {
 			return true;
 		}

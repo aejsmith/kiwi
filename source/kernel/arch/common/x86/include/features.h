@@ -18,8 +18,8 @@
  * @brief		x86 CPU feature check macros.
  */
 
-#ifndef __ARCH_FEATURES_H
-#define __ARCH_FEATURES_H
+#ifndef __ARCH_X86_FEATURES_H
+#define __ARCH_X86_FEATURES_H
 
 #include <cpu/cpu.h>
 
@@ -95,4 +95,4 @@
 /** Feature check macros - Extended CPUID Features (ECX). */
 #define CPU_HAS_LAHF(c)		CPU_FEAT_EXT_ECX(c, 0)	/**< LAHF/SAHF. */
 
-#endif /* __ARCH_FEATURES_H */
+#endif /* __ARCH_X86_FEATURES_H */

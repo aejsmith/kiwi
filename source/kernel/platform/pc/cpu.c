@@ -23,7 +23,7 @@
  * boot code is implemented by the architecture in use.
  */
 
-#include <arch/lapic.h>
+#include <arch/x86/lapic.h>
 
 #include <console/kprintf.h>
 

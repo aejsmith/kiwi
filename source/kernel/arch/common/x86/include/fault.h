@@ -18,8 +18,8 @@
  * @brief		x86 fault handling functions.
  */
 
-#ifndef __ARCH_FAULT_H
-#define __ARCH_FAULT_H
+#ifndef __ARCH_X86_FAULT_H
+#define __ARCH_X86_FAULT_H
 
 #include <types.h>
 
@@ -46,4 +46,4 @@
 
 extern bool fault_handler(unative_t num, intr_frame_t *frame);
 
-#endif /* __ARCH_FAULT_H */
+#endif /* __ARCH_X86_FAULT_H */

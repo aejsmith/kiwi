@@ -19,9 +19,9 @@
  */
 
 #include <arch/asm.h>
-#include <arch/defs.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/x86/defs.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>

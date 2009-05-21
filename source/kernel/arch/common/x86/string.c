@@ -20,7 +20,7 @@
 
 #include <arch/asm.h>
 #include <arch/barrier.h>
-#include <arch/features.h>
+#include <arch/x86/features.h>
 
 #include <lib/string.h>
 

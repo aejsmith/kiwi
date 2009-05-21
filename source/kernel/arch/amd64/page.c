@@ -20,9 +20,9 @@
 
 #include <arch/asm.h>
 #include <arch/barrier.h>
-#include <arch/defs.h>
-#include <arch/features.h>
 #include <arch/memmap.h>
+#include <arch/x86/defs.h>
+#include <arch/x86/features.h>
 
 #include <console/kprintf.h>
 
@@ -297,8 +297,8 @@ int page_map_init(page_map_t *map) {
 	mutex_init(&map->lock, "page_map_lock");
 	map->pml4 = pmm_alloc(1, MM_SLEEP | PM_ZERO);
 	map->user = true;
-	map->first = USPACE_BASE;
-	map->last = (USPACE_BASE + USPACE_SIZE) - PAGE_SIZE;
+	map->first = ASPACE_BASE;
+	map->last = (ASPACE_BASE + ASPACE_SIZE) - PAGE_SIZE;
 
 	/* Get the kernel mappings into the new PML4. */
 	pml4 = page_phys_map(map->pml4, PAGE_SIZE, MM_SLEEP);

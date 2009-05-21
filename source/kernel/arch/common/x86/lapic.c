@@ -15,14 +15,14 @@
 
 /**
  * @file
- * @brief		Local APIC code.
+ * @brief		x86 local APIC code.
  */
 
 #include <arch/asm.h>
-#include <arch/defs.h>
-#include <arch/features.h>
 #include <arch/io.h>
-#include <arch/lapic.h>
+#include <arch/x86/defs.h>
+#include <arch/x86/features.h>
+#include <arch/x86/lapic.h>
 
 #include <console/kprintf.h>
 

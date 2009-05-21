@@ -21,7 +21,7 @@
 #ifndef __MM_ASPACE_H
 #define __MM_ASPACE_H
 
-#include <arch/aspace.h>
+#include <arch/memmap.h>
 
 #include <cpu/cpu.h>
 

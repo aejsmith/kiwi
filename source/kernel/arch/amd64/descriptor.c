@@ -20,8 +20,8 @@
 
 #include <arch/asm.h>
 #include <arch/descriptor.h>
-#include <arch/fault.h>
 #include <arch/memmap.h>
+#include <arch/x86/fault.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

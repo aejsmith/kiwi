@@ -1,4 +1,4 @@
-/* Kiwi local APIC definitions
+/* Kiwi x86 local APIC definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Local APIC definitions.
+ * @brief		x86 local APIC definitions.
  */
 
-#ifndef __ARCH_LAPIC_H
-#define __ARCH_LAPIC_H
+#ifndef __ARCH_X86_LAPIC_H
+#define __ARCH_X86_LAPIC_H
 
 #include <types.h>
 
@@ -97,4 +97,4 @@ extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
 extern bool lapic_init(void);
 
-#endif /* __ARCH_LAPIC_H */
+#endif /* __ARCH_X86_LAPIC_H */

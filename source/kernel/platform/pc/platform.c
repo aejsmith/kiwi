@@ -19,7 +19,7 @@
  */
 
 #include <arch/io.h>
-#include <arch/lapic.h>
+#include <arch/x86/lapic.h>
 
 #include <cpu/cpu.h>
 #include <cpu/irq.h>

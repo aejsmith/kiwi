@@ -18,7 +18,7 @@
  * @brief		AMD64 AP boostrap code.
  */
 
-#include <arch/defs.h>
+#include <arch/x86/defs.h>
 
 .code16
 

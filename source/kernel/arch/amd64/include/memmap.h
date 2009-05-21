@@ -37,8 +37,8 @@
  */
 
 /** Memory layout definitions. */
-#define USPACE_BASE		0x0000000000000000	/**< User memory base. */
-#define USPACE_SIZE		0x0000800000000000	/**< User memory size (128TB). */
+#define ASPACE_BASE		0x0000000000000000	/**< User memory base. */
+#define ASPACE_SIZE		0x0000800000000000	/**< User memory size (128TB). */
 #define KERNEL_PMAP_BASE	0xFFFFFF8000000000	/**< Physical map area base. */
 #define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
 #define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
