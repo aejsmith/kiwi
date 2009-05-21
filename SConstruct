@@ -104,13 +104,21 @@ class EnvironmentManager(UserDict):
 		self.base['OBJCOPY'] = self.get_tool_path('objcopy')
 
 		# Set compilation flags.
-		self.base['CCFLAGS']  = '-Wall -Wextra -Werror ' + \
-		          '-Wcast-align -Wno-variadic-macros ' + \
-		          '-Wno-unused-parameter -Wwrite-strings ' + \
-		          '-Wmissing-declarations -Wredundant-decls ' + \
-		          '-Wno-format -g ' + config['EXTRA_CCFLAGS']
-		self.base['CFLAGS']   = '-std=gnu99 ' + config['EXTRA_CFLAGS']
-		self.base['CXXFLAGS'] = config['EXTRA_CXXFLAGS']
+		self.base['CCFLAGS']  = [
+			'-Wall', '-Wextra', '-Werror', '-Wcast-align',
+			'-Wno-variadic-macros', '-Wno-unused-parameter',
+			'-Wwrite-strings', '-Wmissing-declarations',
+			'-Wredundant-decls', '-Wno-format', '-g'
+		]
+		self.base['CFLAGS']   = ['-std=gnu99']
+		self.base['CXXFLAGS'] = []
+		self.base['ASFLAGS']  = ['-D__ASM__']
+		self.base['LDFLAGS']  = []
+
+		# Add in extra compilation flags from the configuration.
+		self.base['CCFLAGS']  += config['EXTRA_CCFLAGS'].split()
+		self.base['CFLAGS']   += config['EXTRA_CFLAGS'].split()
+		self.base['CXXFLAGS'] += config['EXTRA_CXXFLAGS'].split()
 
 		# Override the default assembler - it uses as directly, we want to use GCC.
 		self.base['ASCOM']    = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'

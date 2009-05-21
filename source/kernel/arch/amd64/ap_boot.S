@@ -1,4 +1,4 @@
-/* Kiwi x86 AP boostrap code
+/* Kiwi AMD64 AP boostrap code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		x86 AP boostrap code.
+ * @brief		AMD64 AP boostrap code.
  */
 
 #include <arch/defs.h>

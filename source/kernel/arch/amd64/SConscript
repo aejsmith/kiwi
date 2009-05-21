@@ -17,26 +17,23 @@ import sys
 
 Import('env', 'config')
 
-# Set build flags, prevent FPU code generation.
-env['ASFLAGS'] += '-m64'
-env['CCFLAGS'] += '-m64 -mno-sse -mno-mmx -mno-sse2 -mno-3dnow ' + \
-                  '-mcmodel=kernel -mno-red-zone -fno-omit-frame-pointer'
-env['LDFLAGS'] += '-A x86_64 -m elf_x86_64'
+# Set AMD64-specific compilation flags.
+env['ASFLAGS'] += ['-m64']
+env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone', '-fno-omit-frame-pointer']
+env['LDFLAGS'] += ['-A', 'x86_64', '-m', 'elf_x86_64']
+
+# Pull in x86 common code.
+SConscript(dirs=['x86'], exports=['env'])
 
 # Add source files.
 env['OBJFILES'] += [
 	env.Object('arch.c'),
-	env.Object('aspace.c'),
 	env.Object('boot.S'),
 	env.Object('context.c'),
-	env.Object('cpu.c'),
 	env.Object('descriptor.c'),
 	env.Object('entry.S'),
-	env.Object('fault.c'),
 	env.Object('kdbg.c'),
-	env.Object('lapic.c'),
 	env.Object('page.c'),
-	env.Object('string.c'),
 	env.Object('switch.S'),
 ]
 

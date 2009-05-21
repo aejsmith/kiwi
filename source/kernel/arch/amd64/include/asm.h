@@ -21,7 +21,7 @@
 #ifndef __ARCH_ASM_H
 #define __ARCH_ASM_H
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <types.h>
 

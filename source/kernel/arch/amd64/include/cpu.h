@@ -23,7 +23,7 @@
 
 #include <arch/asm.h>
 #include <arch/descriptor.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <types.h>
 

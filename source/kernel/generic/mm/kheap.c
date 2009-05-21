@@ -38,7 +38,7 @@
  * kheap_init() is called which sets up kheap_va_arena and kheap_arena.
  */
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 #include <arch/page.h>
 
 #include <console/kprintf.h>

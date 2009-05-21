@@ -59,5 +59,7 @@ typedef struct page_map {
 	ptr_t last;			/**< Last allowed page. */
 } page_map_t;
 
+extern void page_late_init(void);
+
 #endif /* __ASM__ */
 #endif /* __ARCH_PAGE_H */

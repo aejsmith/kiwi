@@ -47,7 +47,7 @@
  * consistency.
  */
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <cpu/intr.h>
 

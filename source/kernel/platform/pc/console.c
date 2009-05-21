@@ -19,7 +19,7 @@
  */
 
 #include <arch/io.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <mm/page.h>
 

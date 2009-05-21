@@ -22,7 +22,7 @@
 #include <arch/barrier.h>
 #include <arch/defs.h>
 #include <arch/features.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <console/kprintf.h>
 
@@ -34,9 +34,6 @@
 
 #include <assert.h>
 #include <fatal.h>
-
-/** Function declarations. */
-extern void page_late_init(void);
 
 /** Kernel paging structures. */
 extern uint64_t __boot_pml4[];

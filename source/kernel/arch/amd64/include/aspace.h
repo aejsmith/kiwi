@@ -21,7 +21,7 @@
 #ifndef __ARCH_ASPACE_H
 #define __ARCH_ASPACE_H
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 /** Address space size definitions. */
 #define ASPACE_BASE		USPACE_BASE	/**< Start of userspace memory. */

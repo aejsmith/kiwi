@@ -18,7 +18,7 @@
  * @brief		Multiboot specification functions.
  */
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <console/kprintf.h>
 

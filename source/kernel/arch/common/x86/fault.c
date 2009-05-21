@@ -27,7 +27,7 @@
 
 #include <arch/fault.h>
 #include <arch/features.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 #include <arch/page.h>
 
 #include <console/kprintf.h>

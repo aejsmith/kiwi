@@ -20,7 +20,7 @@
 
 #include <arch/defs.h>
 #include <arch/descriptor.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 #include <arch/page.h>
 
 #include <platform/multiboot.h>

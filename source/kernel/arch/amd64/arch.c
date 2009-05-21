@@ -25,18 +25,15 @@
 #include <arch/features.h>
 #include <arch/io.h>
 #include <arch/lapic.h>
+#include <arch/page.h>
 
 #include <cpu/cpu.h>
 
 #include <fatal.h>
 
-/** External initialization functions. */
-extern void page_init(void);
-extern void page_late_init(void);
-
-/** X86 architecture startup code.
+/** AMD64 architecture startup code.
  *
- * Initial startup code for the X86 architecture, run before the memory
+ * Initial startup code for the AMD64 architecture, run before the memory
  * management subsystem is set up.
  *
  * @param data		Multiboot information pointer.
@@ -46,18 +43,18 @@ void arch_premm_init(void *data) {
 	cpu_arch_init(&curr_cpu->arch);
 }
 
-/** X86 architecture startup code.
+/** AMD64 architecture startup code.
  *
- * Second stage startup code for the X86 architecture, run after the memory
+ * Second stage startup code for the AMD64 architecture, run after the memory
  * allocation subsystem is set up.
  */
 void arch_postmm_init(void) {
 	lapic_init();
 }
 
-/** X86 architecture startup code.
+/** AMD64 architecture startup code.
  *
- * Third stage startup code for the X86 architecture, unmaps the temporary
+ * Third stage startup code for the AMD64 architecture, unmaps the temporary
  * identity mapping used during boot.
  */
 void arch_final_init(void) {

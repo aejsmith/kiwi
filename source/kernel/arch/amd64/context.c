@@ -1,4 +1,4 @@
-/* Kiwi x86 CPU context functions
+/* Kiwi AMD64 CPU context functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,10 +15,10 @@
 
 /**
  * @file
- * @brief		x86 CPU context functions.
+ * @brief		AMD64 CPU context functions.
  */
 
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <console/kprintf.h>
 

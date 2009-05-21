@@ -18,8 +18,8 @@
  * @brief		AMD64 memory layout definitions.
  */
 
-#ifndef __ARCH_MEM_H
-#define __ARCH_MEM_H
+#ifndef __ARCH_MEMMAP_H
+#define __ARCH_MEMMAP_H
 
 #include <arch/page.h>
 
@@ -53,4 +53,4 @@
 # define KA2PA(a)		(((a) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE)
 #endif
 
-#endif /* __ARCH_MEM_H */
+#endif /* __ARCH_MEMMAP_H */

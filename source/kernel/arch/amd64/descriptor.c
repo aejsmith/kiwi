@@ -21,7 +21,7 @@
 #include <arch/asm.h>
 #include <arch/descriptor.h>
 #include <arch/fault.h>
-#include <arch/mem.h>
+#include <arch/memmap.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
