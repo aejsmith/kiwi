@@ -60,7 +60,9 @@ void console_putch(unsigned char level, char ch) {
 		return;
 	}
 #endif
-	spinlock_lock(&console_lock, 0);
+	if(level != LOG_KDBG && level != LOG_FATAL) {
+		spinlock_lock(&console_lock, 0);
+	}
 
 	LIST_FOREACH(&console_list, iter) {
 		cons = list_entry(iter, console_t, header);
@@ -85,7 +87,9 @@ void console_putch(unsigned char level, char ch) {
 		}
 	}
 
-	spinlock_unlock(&console_lock);
+	if(level != LOG_KDBG && level != LOG_FATAL) {
+		spinlock_unlock(&console_lock);
+	}
 }
 
 /** Register a console.
@@ -107,13 +111,4 @@ void console_register(console_t *cons) {
 	}
 
 	spinlock_unlock(&console_lock);
-}
-
-/** Force unlock of console_lock.
- *
- * Forces the console lock to be unlocked. For use during _fatal() calls to
- * ensure that it does not break due to nested locking.
- */
-void console_unlock(void) {
-	atomic_set(&console_lock.locked, 0);
 }

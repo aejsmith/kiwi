@@ -18,9 +18,11 @@
  * @brief		PC platform core code.
  */
 
+#include <arch/io.h>
 #include <arch/lapic.h>
 
 #include <cpu/cpu.h>
+#include <cpu/irq.h>
 
 #include <platform/acpi.h>
 #include <platform/console.h>
@@ -32,6 +34,33 @@
 #include <time/timer.h>
 
 #include <fatal.h>
+#include <kdbg.h>
+
+/** Temporary i8042 hook to enter into KDBG. */
+static bool i8042_handler(unative_t num, intr_frame_t *frame) {
+	uint8_t code = in8(0x60);
+	switch(code) {
+	case 59:
+		/* F1 - Enter KDBG. */
+		kdbg_enter(KDBG_ENTRY_USER, frame);
+		break;
+	case 60:
+		/* F2 - Call fatal(). */
+		fatal("User requested fatal error");
+		break;
+	case 61:
+		/* F3 - Crash (Invalid Opcode). */
+		kprintf(LOG_DEBUG, "platform: crashing by invalid opcode...\n");
+		__asm__ volatile("ud2a");
+		break;
+	case 62:
+		/* F4 - Crash (Double Fault). */
+		kprintf(LOG_DEBUG, "platform: crashing by double fault...\n");
+		__asm__ volatile("movq $0, %rsp; ud2a");
+		break;
+	}
+	return false;
+}
 
 /** PC platform startup code.
  *
@@ -61,4 +90,8 @@ void platform_postmm_init(void) {
 			fatal("Could not set PIT clock source");
 		}
 	}
+
+	/* Install the temporary i8042 hook. */
+	irq_register(1, i8042_handler);
+	irq_unmask(1);
 }

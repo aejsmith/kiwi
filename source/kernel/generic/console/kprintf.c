@@ -54,9 +54,13 @@ static void kvprintf_helper(char ch, int *total, void *data) {
 int kvprintf(int level, const char *format, va_list args) {
 	int ret;
 
-	spinlock_lock(&kprintf_lock, 0);
-	ret = do_printf(kvprintf_helper, &level, format, args);
-	spinlock_unlock(&kprintf_lock);
+	if(level != LOG_KDBG && level != LOG_FATAL) {
+		spinlock_lock(&kprintf_lock, 0);
+		ret = do_printf(kvprintf_helper, &level, format, args);
+		spinlock_unlock(&kprintf_lock);
+	} else {
+		ret = do_printf(kvprintf_helper, &level, format, args);
+	}
 
 	return ret;
 }
@@ -79,9 +83,4 @@ int kprintf(int level, const char *format, ...) {
 	va_end(args);
 
 	return ret;
-}
-
-/** Force an unlock of the kprintf() lock. */
-void kprintf_unlock(void) {
-	atomic_set(&kprintf_lock.locked, 0);
 }

@@ -45,8 +45,6 @@ typedef struct console {
 extern void console_putch(unsigned char level, char ch);
 extern void console_register(console_t *cons);
 
-extern void console_unlock(void);
-
 extern void console_early_init(void);
 
 #endif /* __CONSOLE_CONSOLE_H */

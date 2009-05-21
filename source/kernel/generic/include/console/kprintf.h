@@ -28,6 +28,4 @@
 extern int kvprintf(int level, const char *format, va_list args);
 extern int kprintf(int level, const char *format, ...) __printf(2, 3);
 
-extern void kprintf_unlock(void);
-
 #endif /* __CONSOLE_KPRINTF_H */

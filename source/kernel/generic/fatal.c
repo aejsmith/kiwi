@@ -72,11 +72,6 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 		/* Send an IPI to all other CPUs to halt them. */
 		cpu_ipi(IPI_DEST_ALL, 0, IPI_FATAL);
 #endif
-		/* Force an unlock so we don't deadlock/fatal from nested
-		 * locking. */
-		kprintf_unlock();
-		console_unlock();
-
 		console_putch(LOG_FATAL, '\n');
 		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_current_id(), kiwi_ver_string);
 		do_printf(fatal_printf_helper, NULL, format, args);
