@@ -50,12 +50,12 @@ static bool i8042_handler(unative_t num, intr_frame_t *frame) {
 		break;
 	case 61:
 		/* F3 - Crash (Invalid Opcode). */
-		kprintf(LOG_DEBUG, "platform: crashing by invalid opcode...\n");
+		kprintf(LOG_NORMAL, "platform: crashing by invalid opcode...\n");
 		__asm__ volatile("ud2a");
 		break;
 	case 62:
 		/* F4 - Crash (Double Fault). */
-		kprintf(LOG_DEBUG, "platform: crashing by double fault...\n");
+		kprintf(LOG_NORMAL, "platform: crashing by double fault...\n");
 		__asm__ volatile("movq $0, %rsp; ud2a");
 		break;
 	}

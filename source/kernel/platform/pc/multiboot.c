@@ -84,8 +84,8 @@ void pmm_populate(void) {
 		dprintf(" 0x%016" PRIx64 " - 0x%016" PRIx64 " (%" PRIu32 ")\n",
 		        map->base_addr, map->base_addr + map->length, map->type);
 
-		/* We only want to add free and reclaimable regions. FIXME */
-		if(map->type != E820_TYPE_FREE/* && map->type != E820_TYPE_ACPI_RECLAIM*/) {
+		/* We only want to add free and reclaimable regions. */
+		if(map->type != E820_TYPE_FREE && map->type != E820_TYPE_ACPI_RECLAIM) {
 			goto cont;
 		}
 
@@ -98,9 +98,10 @@ void pmm_populate(void) {
 		 * then we ignore it. */
 		start = ROUND_UP(map->base_addr, PAGE_SIZE);
 		end = ROUND_DOWN(map->base_addr + map->length, PAGE_SIZE);
-		// FIXME temporary
-		if(start < KA2PA((ptr_t)__end)) {
-			start = KA2PA((ptr_t)__end);
+
+		/* For now we will ignore this... */
+		if(start == 0) {
+			goto cont;
 		}
 
 		/* What we did above may have made the region too small, warn

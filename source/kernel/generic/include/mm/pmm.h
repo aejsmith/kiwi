@@ -28,6 +28,11 @@
 /** Flags to modify allocation behaviour. */
 #define PM_ZERO		(1<<10)		/**< Clear the page contents before returning. */
 
+extern phys_ptr_t pmm_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
+                             phys_ptr_t nocross, phys_ptr_t minaddr,
+                             phys_ptr_t maxaddr, int pmflag);
+extern void pmm_xfree(phys_ptr_t base, size_t count);
+
 extern phys_ptr_t pmm_alloc(size_t count, int pmflag);
 extern void pmm_free(phys_ptr_t base, size_t count);
 
