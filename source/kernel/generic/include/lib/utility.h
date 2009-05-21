@@ -61,7 +61,7 @@
 /** Get log base 2 (high bit) of a value.
  * @param val		Value to get high bit from.
  * @return		High bit + 1. */
-static inline unative_t log2(unative_t val) {
+static inline uint64_t log2(uint64_t val) {
 	unative_t r = 0;
 
 	while((val >> r) != 0) {
