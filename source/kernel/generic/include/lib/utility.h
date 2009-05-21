@@ -62,7 +62,7 @@
  * @param val		Value to get high bit from.
  * @return		High bit + 1. */
 static inline uint64_t log2(uint64_t val) {
-	unative_t r = 0;
+	uint64_t r = 0;
 
 	while((val >> r) != 0) {
 		r++;

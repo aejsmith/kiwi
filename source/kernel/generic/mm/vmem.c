@@ -249,9 +249,8 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
                                       vmem_resource_t minaddr, vmem_resource_t maxaddr,
                                       int vmflag) {
-	vmem_resource_t list = log2(size) - 1, i;
+	vmem_resource_t list = log2(size) - 1, start, end, i;
 	vmem_btag_t *seg, *split1 = NULL, *split2 = NULL;
-	vmem_resource_t start, end;
 
 	assert(size);
 
@@ -499,6 +498,13 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 	if(align != 0 || phase != 0 || nocross != 0) {
 		fatal("Laziness has prevented implementation of these constraints. Sorry!");
+	}
+
+	/* Don't perform an instant fit allocation if we have specific
+	 * constraints (this is necessary for minaddr/maxaddr, not sure about
+	 * others...). */
+	if(align != 0 || phase != 0 || nocross != 0 || minaddr != 0 || maxaddr != 0) {
+		vmflag |= VM_BESTFIT;
 	}
 
 	/* Find a free segment and import one if we could not find one. */

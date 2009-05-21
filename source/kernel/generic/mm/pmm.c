@@ -216,14 +216,12 @@ void pmm_mark_reclaimable(phys_ptr_t start, phys_ptr_t end) {
 	phys_ptr_t ret;
 
 	/* Mark the pages covering the range as in-use. */
-	ret = vmem_xalloc(&pmm_arena, (size_t)(end - start), 0, 0, 0,
+	ret = vmem_xalloc(&pmm_arena, (vmem_resource_t)(end - start), 0, 0, 0,
 	                  (vmem_resource_t)start, (vmem_resource_t)end, 0);
-	if(ret == 0) {
-		fatal("Could not mark region [0x%" PRIpp ", 0x%" PRIpp ") as reclaimable",
+	if(ret != start) {
+		fatal("Couldn't mark [0x%" PRIpp ", 0x%" PRIpp ") as reclaimable (%" PRIpp ")",
 		      start, end);
 	}
-
-	assert(ret == start);
 
 	/* Record the reclaimable region. */
 	if(pmm_reclaim_count > ARRAYSZ(pmm_reclaim_ranges)) {
@@ -247,12 +245,10 @@ void pmm_mark_reserved(phys_ptr_t start, phys_ptr_t end) {
 	/* Mark the pages covering the range as in-use. */
 	ret = vmem_xalloc(&pmm_arena, (size_t)(end - start), 0, 0, 0,
 	                  (vmem_resource_t)start, (vmem_resource_t)end, 0);
-	if(ret == 0) {
+	if(ret != start) {
 		fatal("Could not mark region [0x%" PRIpp ", 0x%" PRIpp ") as reserved",
 		      start, end);
 	}
-
-	assert(ret == start);
 }
 
 /** Initialize the physical memory manager. */
