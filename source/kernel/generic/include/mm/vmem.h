@@ -108,10 +108,17 @@ typedef struct vmem {
 } vmem_t;
 
 /** Flags for Vmem functions. */
-#define VM_BESTFIT		(1<<10)		/**< Search for the smallest free segment suitable for the allocation. */
+#define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
+
+extern vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
+                                   vmem_resource_t align, vmem_resource_t phase,
+                                   vmem_resource_t nocross, vmem_resource_t minaddr,
+                                   vmem_resource_t maxaddr, int vmflag);
+extern void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
 
 extern vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag);
 extern void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
+
 extern int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
 
 extern int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,

@@ -80,60 +80,62 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 	vmem_resource_t addr;
 	vmem_btag_t *tag;
 	size_t i;
-retry:
-	mutex_lock(&vmem_lock, 0);
 
-	/* If there are more tags than the refill threshold or we are
-	 * refilling the tag list at the moment then take a tag from the
-	 * list. */
-	if(vmem_btag_count) {
-		if(vmflag & VM_REFILLING || vmem_btag_count > VMEM_REFILL_THRESHOLD) {
-			assert(!list_empty(&vmem_btags));
+	while(true) {
+		mutex_lock(&vmem_lock, 0);
 
-			tag = list_entry(vmem_btags.next, vmem_btag_t, header);
-			list_remove(&tag->header);
-			vmem_btag_count--;
+		/* If there are more tags than the refill threshold or we are
+		 * refilling the tag list at the moment then take a tag from
+		 * the list. */
+		if(vmem_btag_count) {
+			if(vmflag & VM_REFILLING || vmem_btag_count > VMEM_REFILL_THRESHOLD) {
+				assert(!list_empty(&vmem_btags));
 
-			mutex_unlock(&vmem_lock);
-			return tag;
+				tag = list_entry(vmem_btags.next, vmem_btag_t, header);
+				list_remove(&tag->header);
+				vmem_btag_count--;
+
+				mutex_unlock(&vmem_lock);
+				return tag;
+			}
+		} else if(vmflag & VM_REFILLING) {
+			fatal("Exhausted free boundary tags while refilling");
 		}
-	} else if(vmflag & VM_REFILLING) {
-		fatal("Exhausted free boundary tags while refilling");
-	}
 
-	mutex_unlock(&vmem_lock);
+		mutex_unlock(&vmem_lock);
 
-	/* Take the refill lock, and then check again if a refill is necessary.
-	 * This is to prevent unnecessary allocations of new tags if multiple
-	 * threads try to refill at the same time. */
-	mutex_lock(&vmem_refill_lock, 0);
-	if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
+		/* Take the refill lock, and then check again if a refill is
+		 * necessary. This is to prevent unnecessary allocations of
+		 * new tags if multiple threads try to refill at the same
+		 * time. */
+		mutex_lock(&vmem_refill_lock, 0);
+		if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
+			mutex_unlock(&vmem_refill_lock);
+			continue;
+		}
+
+		/* Allocate a page from the tag arena and split it up into tags. */
+		mutex_unlock(&vmem->lock);
+		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
+		mutex_lock(&vmem->lock, 0);
+		if(addr == 0) {
+			mutex_unlock(&vmem_refill_lock);
+			return NULL;
+		}
+
+		mutex_lock(&vmem_lock, 0);
+
+		tag = (vmem_btag_t *)((ptr_t)addr);
+		for(i = 0; i < (PAGE_SIZE / sizeof(vmem_btag_t)); i++) {
+			list_init(&tag[i].header);
+			list_init(&tag[i].s_link);
+			list_append(&vmem_btags, &tag[i].header);
+			vmem_btag_count++;
+		}
+
+		mutex_unlock(&vmem_lock);
 		mutex_unlock(&vmem_refill_lock);
-		goto retry;
 	}
-
-	/* Allocate a page from the tag arena and split it up into tags. */
-	mutex_unlock(&vmem->lock);
-	addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
-	mutex_lock(&vmem->lock, 0);
-	if(addr == 0) {
-		mutex_unlock(&vmem_refill_lock);
-		return NULL;
-	}
-
-	mutex_lock(&vmem_lock, 0);
-
-	tag = (vmem_btag_t *)((ptr_t)addr);
-	for(i = 0; i < (PAGE_SIZE / sizeof(vmem_btag_t)); i++) {
-		list_init(&tag[i].header);
-		list_init(&tag[i].s_link);
-		list_append(&vmem_btags, &tag[i].header);
-		vmem_btag_count++;
-	}
-
-	mutex_unlock(&vmem_lock);
-	mutex_unlock(&vmem_refill_lock);
-	goto retry;
 }
 
 /** Free a boundary tag structure.
@@ -146,25 +148,38 @@ static void vmem_btag_free(vmem_btag_t *tag) {
 	mutex_unlock(&vmem_lock);
 }
 
+/** Check if a freelist is empty.
+ * @param vmem		Arena to check in.
+ * @param list		List number.
+ * @return		True if empty, false if not. */
+static bool vmem_freelist_empty(vmem_t *vmem, vmem_resource_t list) {
+	if(!(vmem->freemap & ((vmem_resource_t)1 << list))) {
+		return true;
+	}
+
+	assert(!list_empty(&vmem->free[list]));
+	return false;
+}
+
 /** Add a segment to an arena's freelist.
  * @param vmem		Arena to modify.
  * @param tag		Segment to add. */
 static void vmem_freelist_insert(vmem_t *vmem, vmem_btag_t *tag) {
-	size_t list = log2(tag->size) - 1;
+	vmem_resource_t list = log2(tag->size) - 1;
 
 	list_append(&vmem->free[list], &tag->s_link);
-	vmem->freemap |= (1 << list);
+	vmem->freemap |= ((vmem_resource_t)1 << list);
 }
 
 /** Remove a segment from its freelist.
  * @param vmem		Arena to modify.
  * @param tag		Segment to remove. */
 static void vmem_freelist_remove(vmem_t *vmem, vmem_btag_t *tag) {
-	size_t list = log2(tag->size) - 1;
+	vmem_resource_t list = log2(tag->size) - 1;
 
 	list_remove(&tag->s_link);
 	if(list_empty(&vmem->free[list])) {
-		vmem->freemap &= ~(1 << list);
+		vmem->freemap &= ~((vmem_resource_t)1 << list);
 	}
 }
 
@@ -228,15 +243,19 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 /** Find a free segment large enough for the given allocation.
  * @param vmem		Arena to search in.
  * @param size		Size of segment required.
+ * @param minaddr	Minimum address of the allocation.
+ * @param maxaddr	Maximum address of the end of the allocation.
  * @param vmflag	Allocation flags.
  * @return		Pointer to segment tag if found, false if not. */
-static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size, int vmflag) {
-	size_t list = log2(size) - 1, i;
-	vmem_btag_t *seg, *split = NULL;
+static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
+                                      vmem_resource_t minaddr, vmem_resource_t maxaddr,
+                                      int vmflag) {
+	vmem_resource_t list = log2(size) - 1, i;
+	vmem_btag_t *seg, *split1 = NULL, *split2 = NULL;
+	vmem_resource_t start, end;
 
 	assert(size);
 
-retry:
 	/* Special behaviour for instant-fit allocations. */
 	if(!(vmflag & VM_BESTFIT)) {
 		/* If the size is exactly a power of 2, then segments on
@@ -249,57 +268,102 @@ retry:
 		}
 	}
 
-	/* Search through all the freelists large enough. */
-	for(i = list; i < VMEM_FREELISTS; i++) {
-		if(!(vmem->freemap & (1<<i))) {
+	while(true) {
+		/* Search through all the freelists large enough. */
+		for(i = list; i < VMEM_FREELISTS; i++) {
+			if(vmem_freelist_empty(vmem, i)) {
+				continue;
+			}
+
+			/* Take the next tag off the list. */
+			LIST_FOREACH(&vmem->free[i], iter) {
+				seg = list_entry(iter, vmem_btag_t, s_link);
+				end = seg->base + seg->size;
+
+				/* Ensure that the segment satisfies the
+				 * allocation constraints. */
+				if(seg->size < size) {
+					continue;
+				} else if((end - 1) < minaddr) {
+					continue;
+				} else if(seg->base > (maxaddr - 1)) {
+					continue;
+				}
+
+				/* Make sure we can actually fit. */
+				start = MAX(seg->base, minaddr);
+				end = MIN(end - 1, maxaddr - 1) + 1;
+				if(size > (end - start)) {
+					continue;
+				}
+				goto found;
+			}
+		}
+
+		return NULL;
+found:
+		/* If splitting is necessary, then get hold of tags for us
+		 * to use. Refilling the tag list can cause the arena layout
+		 * to change, so we have to reattempt the allocation after
+		 * this. */
+		if(seg->base < minaddr && split1 == NULL) {
+			split1 = vmem_btag_alloc(vmem, vmflag);
+			if(split1 == NULL) {
+				if(split2 != NULL) {
+					vmem_btag_free(split2);
+				}
+				return NULL;
+			}
+			continue;
+		}
+		if(seg->size > size && split2 == NULL) {
+			split2 = vmem_btag_alloc(vmem, vmflag);
+			if(split2 == NULL) {
+				if(split1 != NULL) {
+					vmem_btag_free(split1);
+				}
+				return NULL;
+			}
 			continue;
 		}
 
-		assert(!list_empty(&vmem->free[i]));
+		/* We have all the tags required, perform any splits needed. */
+		if(seg->base < minaddr) {
+			split1->base = seg->base;
+			split1->size = minaddr - seg->base;
+			split1->span = seg->span;
+			split1->type = VMEM_BTAG_FREE;
 
-		/* Take the next tag off the list. */
-		LIST_FOREACH(&vmem->free[i], iter) {
-			seg = list_entry(iter, vmem_btag_t, s_link);
-
-			if(seg->size < size) {
-				continue;
-			}
-			goto found;
+			seg->base = minaddr;
+			list_add_before(&seg->header, &split1->header);
+			vmem_freelist_insert(vmem, split1);
+			split1 = NULL;
 		}
-	}
+		if(seg->size > size) {
+			split2->base = seg->base + size;
+			split2->size = seg->size - size;
+			split2->span = seg->span;
+			split2->type = VMEM_BTAG_FREE;
 
-	return NULL;
-found:
-	/* Split the tag if necessary. */
-	if(seg->size > size) {
-		if(split == NULL) {
-			split = vmem_btag_alloc(vmem, vmflag);
-			if(split == NULL) {
-				return NULL;
-			}
-
-			/* Refilling can cause the layout of the arena to
-			 * change, retry. */
-			goto retry;
+			seg->size = size;
+			list_add_after(&seg->header, &split2->header);
+			vmem_freelist_insert(vmem, split2);
+			split2 = NULL;
 		}
 
-		split->base = seg->base + size;
-		split->size = seg->size - size;
-		split->span = seg->span;
-		split->type = VMEM_BTAG_FREE;
-
-		seg->size = size;
-		list_add_after(&seg->header, &split->header);
-
-		vmem_freelist_insert(vmem, split);
-	} else if(split) {
-		/* Split not needed, free. */
-		vmem_btag_free(split);
+		/* Free tags that may no longer be needed - we could have
+		 * allocated too many if a tag refill caused a layout change
+		 * and made splitting no longer necessary. */
+		if(split1 != NULL) {
+			vmem_btag_free(split1);
+		}
+		if(split2 != NULL) {
+			vmem_btag_free(split2);
+		}
+		vmem_freelist_remove(vmem, seg);
+		seg->type = VMEM_BTAG_ALLOC;
+		return seg;
 	}
-
-	vmem_freelist_remove(vmem, seg);
-	seg->type = VMEM_BTAG_ALLOC;
-	return seg;
 }
 
 /** Attempt to import a span from the source arena.
@@ -388,47 +452,75 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
  *
  * Allocates a segment from a Vmem arena, importing a new span from the
  * source if necessary. The allocation behaviour can be modified by specifying
- * certain behaviour flags.
+ * certain behaviour flags. The allocation is made to satisfy the specified
+ * constraints. Because of this, it cannot use the quantum caches for the
+ * arena, so they are bypassed. For this reason, allocations made with this
+ * function MUST be freed using vmem_xfree(), which also bypasses the quantum
+ * caches. If you do not have any special allocation constraints, you should
+ * use vmem_alloc() to ensure that quantum caches will be used where
+ * necessary.
+ *
+ * @todo		Implement the align, phase and nocross constraints.
+ *
+ * @note		One thing I'm not entirely sure on in this function
+ *			is how minaddr/maxaddr are handled when it is necessary
+ *			to import from the source arena. I have currently
+ *			implemented it how Solaris' implementation does it -
+ *			if a minaddr/maxaddr are specified, do not import from
+ *			the source at all. However, this seems just a little
+ *			bit odd to me. Actually attempting to handle it would
+ *			be difficult, too...
  *
  * @param vmem		Arena to allocate from.
  * @param size		Size of the segment to allocate.
+ * @param align		Alignment of allocation.
+ * @param phase		Offset from alignment boundary.
+ * @param nocross	Alignment boundary the allocation should not go across.
+ * @param minaddr	Minimum start address of the allocation.
+ * @param maxaddr	Highest end address of the allocation.
  * @param vmflag	Allocation flags.
  *
  * @return		Address of the allocation, or NULL on failure.
  */
-vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag) {
+vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
+                            vmem_resource_t align, vmem_resource_t phase,
+                            vmem_resource_t nocross, vmem_resource_t minaddr,
+                            vmem_resource_t maxaddr, int vmflag) {
 	vmem_resource_t hash;
 	vmem_btag_t *seg;
 
 	assert(vmem);
 	assert(size > 0);
 	assert(!(size % vmem->quantum));
-
-	/* Use the quantum caches if possible. */
-	if(size <= vmem->qcache_max) {
-		return (vmem_resource_t)((ptr_t)slab_cache_alloc(vmem->qcache[(size - 1) >> vmem->qshift], vmflag & MM_FLAG_MASK));
-	}
+	assert(!(minaddr % vmem->quantum));
+	assert(!(maxaddr % vmem->quantum));
 
 	mutex_lock(&vmem->lock, 0);
 
+	if(align != 0 || phase != 0 || nocross != 0) {
+		fatal("Laziness has prevented implementation of these constraints. Sorry!");
+	}
+
 	/* Find a free segment and import one if we could not find one. */
-	seg = vmem_find_segment(vmem, size, vmflag);
+	seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag);
 	if(seg == NULL) {
-		if(vmem->source) {
+		if(vmem->source && minaddr == 0 && maxaddr == 0) {
 			/* Don't need to bother waiting if we cannot import from the
 			 * source - the allocation flags get passed down so waiting
 			 * should take place there. */
 			seg = vmem_import(vmem, size, vmflag);
 			if(seg == NULL) {
 				if(vmflag & MM_FATAL) {
-					fatal("Could not perform mandatory allocation on arena 0x%p(%s)", vmem, vmem->name);
+					fatal("Could not perform mandatory allocation on arena 0x%p(%s)",
+					      vmem, vmem->name);
 				}
 				mutex_unlock(&vmem->lock);
 				return 0;
 			}
 		} else {
 			if(vmflag & MM_FATAL) {
-				fatal("Could not perform mandatory allocation on arena 0x%p(%s)", vmem, vmem->name);
+				fatal("Could not perform mandatory allocation on arena 0x%p(%s)",
+				      vmem, vmem->name);
 			} else if(vmflag & MM_SLEEP) {
 				fatal("Waiting for Vmem allocations not implemented");
 			}
@@ -451,23 +543,20 @@ vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag) {
 
 /** Free a segment to a Vmem arena.
  *
- * Frees a previously allocated segment in a Vmem arena.
+ * Frees a previously allocated segment in a Vmem arena, bypassing the
+ * quantum caches. If the allocation was originally made using vmem_alloc(),
+ * use vmem_free() instead.
  *
  * @param vmem		Arena to allocate from.
  * @param addr		Address of the allocation to free.
  * @param size		Size of the segment to allocate.
  */
-void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
+void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	vmem_btag_t *tag, *exist;
 	uint32_t hash;
 
 	assert(vmem);
 	assert((size % vmem->quantum) == 0);
-
-	if(size <= vmem->qcache_max) {
-		slab_cache_free(vmem->qcache[(size - 1) >> vmem->qshift], (void *)((ptr_t)addr));
-		return;
-	}
 
 	mutex_lock(&vmem->lock, 0);
 
@@ -482,7 +571,8 @@ void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		if(tag->base != addr) {
 			continue;
 		} else if(tag->size != size) {
-			fatal("Bad Vmem 0x%p(%s) free: size: %" PRIu64 ", segment: %" PRIu64, vmem, vmem->name, size, tag->size);
+			fatal("Bad Vmem 0x%p(%s) free: size: %" PRIu64 ", segment: %" PRIu64,
+			      vmem, vmem->name, size, tag->size);
 		}
 
 		tag->type = VMEM_BTAG_FREE;
@@ -522,6 +612,53 @@ void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	}
 
 	fatal("Bad Vmem 0x%p(%s) free: cannot find segment 0x%" PRIx64, vmem, vmem->name, addr);
+}
+
+/** Allocate a segment from a Vmem arena.
+ *
+ * Allocates a segment from a Vmem arena, importing a new span from the
+ * source if necessary. The allocation behaviour can be modified by specifying
+ * certain behaviour flags.
+ *
+ * @param vmem		Arena to allocate from.
+ * @param size		Size of the segment to allocate.
+ * @param vmflag	Allocation flags.
+ *
+ * @return		Address of the allocation, or NULL on failure.
+ */
+vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag) {
+	assert(vmem);
+	assert(size > 0);
+	assert(!(size % vmem->quantum));
+
+	/* Use the quantum caches if possible. */
+	if(size <= vmem->qcache_max) {
+		return (vmem_resource_t)((ptr_t)slab_cache_alloc(vmem->qcache[(size - 1) >> vmem->qshift],
+		                                                 vmflag & MM_FLAG_MASK));
+	}
+
+	return vmem_xalloc(vmem, size, 0, 0, 0, 0, 0, vmflag);
+}
+
+/** Free a segment to a Vmem arena.
+ *
+ * Frees a previously allocated segment in a Vmem arena. If the allocation was
+ * originally made using vmem_xalloc(), use vmem_xfree() instead.
+ *
+ * @param vmem		Arena to allocate from.
+ * @param addr		Address of the allocation to free.
+ * @param size		Size of the segment to allocate.
+ */
+void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
+	assert(vmem);
+	assert((size % vmem->quantum) == 0);
+
+	if(size <= vmem->qcache_max) {
+		slab_cache_free(vmem->qcache[(size - 1) >> vmem->qshift], (void *)((ptr_t)addr));
+		return;
+	}
+
+	vmem_xfree(vmem, addr, size);
 }
 
 /** Add a new span to an arena.
@@ -571,7 +708,8 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	list_add_after(&span->header, &seg->header);
 	vmem_freelist_insert(vmem, seg);
 
-	dprintf("vmem: added span [0x%" PRIx64 ", 0x%" PRIx64 ") to 0x%p(%s)\n", base, base + size, vmem, vmem->name);
+	dprintf("vmem: added span [0x%" PRIx64 ", 0x%" PRIx64 ") to 0x%p(%s)\n",
+	        base, base + size, vmem, vmem->name);
 	mutex_unlock(&vmem->lock);
 	return 0;
 }
