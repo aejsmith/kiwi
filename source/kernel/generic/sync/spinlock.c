@@ -18,8 +18,8 @@
  * @brief		Spinlock implementation.
  */
 
-#include <arch/asm.h>
 #include <arch/barrier.h>
+#include <arch/spinlock.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -62,7 +62,7 @@ int spinlock_lock(spinlock_t *lock, int flags) {
 			}
 		} else {
 			while(!atomic_cmp_set(&lock->locked, 0, 1)) {
-				spin_loop_hint();
+				spinlock_loop_hint();
 			}
 		}
 	} else {
@@ -108,7 +108,7 @@ int spinlock_lock_ni(spinlock_t *lock, int flags) {
 			}
 		} else {
 			while(!atomic_cmp_set(&lock->locked, 0, 1)) {
-				spin_loop_hint();
+				spinlock_loop_hint();
 			}
 		}
 	} else {

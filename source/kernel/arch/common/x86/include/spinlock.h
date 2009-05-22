@@ -1,5 +1,5 @@
-/* Kiwi AMD64 miscellaneous ASM functions
- * Copyright (C) 2007-2009 Alex Smith
+/* Kiwi x86 spinlock helper functions
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,20 +15,19 @@
 
 /**
  * @file
- * @brief		AMD64 miscellaneous ASM functions.
+ * @brief		x86 spinlock helper functions.
+ *
+ * See PAUSE instruction in Intel 64 and IA-32 Architectures Software
+ * Developer's Manual, Volume 2B: Instruction Set Reference N-Z for more
+ * information as to why this function is necessary.
  */
 
-#ifndef __ARCH_ASM_H
-#define __ARCH_ASM_H
+#ifndef __ARCH_X86_SPINLOCK_H
+#define __ARCH_X86_SPINLOCK_H
 
-#include <types.h>
-
-/** Spin loop hint using the PAUSE instruction to be more friendly to certain
- * CPUs (Pentium 4 and Xeon, mostly) in terms of performance and energy
- * consumption - see PAUSE instruction in Intel Instruction Set Reference N-Z
- * manual for more information. */
-static inline void spin_loop_hint(void) {
-	__asm__ volatile("pause");
+/** Spinlock loop hint using the PAUSE instruction. */
+static inline void spinlock_loop_hint(void) {
+	__asm__ volatile("ud2a");
 }
 
-#endif /* __ARCH_ASM_H */
+#endif /* __ARCH_X86_SPINLOCK_H */
