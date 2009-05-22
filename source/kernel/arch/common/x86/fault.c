@@ -25,11 +25,11 @@
  * process should be preempted.
  */
 
-#include <arch/asm.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
 #include <arch/x86/fault.h>
 #include <arch/x86/features.h>
+#include <arch/x86/sysreg.h>
 
 #include <console/kprintf.h>
 
@@ -66,10 +66,7 @@ static bool fault_handle_nmi(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&fatal_protect) != 0) {
 		/* A CPU is currently in fatal(), this means we're being
 		 * asked to halt by that CPU. */
-		intr_disable();
-		while(true) {
-			idle();
-		}
+		cpu_halt();
 	} else if(atomic_get(&kdbg_running)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
@@ -89,9 +86,7 @@ static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
 	atomic_set(&kdbg_running, 3);
 
 	_fatal(frame, "Double Fault (0x%p)", frame->ip);
-	while(true) {
-		idle();
-	}
+	cpu_halt();
 }
 
 /** Handler for page faults.
@@ -101,7 +96,7 @@ static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
 static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	int reason = (frame->err_code & (1<<0)) ? PF_REASON_PROT : PF_REASON_NPRES;
 	int access = (frame->err_code & (1<<1)) ? PF_ACCESS_WRITE : PF_ACCESS_READ;
-	ptr_t addr = read_cr2();
+	ptr_t addr = sysreg_cr2_read();
 
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */

@@ -18,8 +18,6 @@
  * @brief		Error handling functions.
  */
 
-#include <arch/asm.h>
-
 #include <console/console.h>
 #include <console/kprintf.h>
 
@@ -82,7 +80,6 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 		kdbg_enter(KDBG_ENTRY_FATAL, frame);
 	}
 
-	while(1) {
-		idle();
-	}
+	/* Halt the current CPU. */
+	cpu_halt();
 }

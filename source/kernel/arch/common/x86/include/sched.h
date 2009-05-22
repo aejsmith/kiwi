@@ -1,4 +1,4 @@
-/* Kiwi x86 TLB invalidation functions
+/* Kiwi x86 scheduler functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,27 +15,15 @@
 
 /**
  * @file
- * @brief		x86 TLB invalidation functions.
+ * @brief		x86 scheduler functions.
  */
 
-#ifndef __ARCH_X86_TLB_H
-#define __ARCH_X86_TLB_H
+#ifndef __ARCH_X86_SCHED_H
+#define __ARCH_X86_SCHED_H
 
-#include <arch/asm.h>
-#include <arch/x86/sysreg.h>
-
-/** Invalidate TLB entries for an address range.
- * @param start		Start of range to invalidate.
- * @param end		End of range to invalidate. */
-static inline void tlb_invalidate(ptr_t start, ptr_t end) {
-	for(; start < end; start += PAGE_SIZE) {
-		invlpg(start);
-	}
+/** Place the CPU in an idle state until an interrupt occurs. */
+static inline void sched_cpu_idle(void) {
+	__asm__ volatile("sti; hlt; cli");
 }
 
-/** Invalidate the entire TLB. */
-static inline void tlb_invalidate_all(void) {
-	sysreg_cr3_write(sysreg_cr3_read());
-}
-
-#endif /* __ARCH_X86_TLB_H */
+#endif /* __ARCH_X86_SCHED_H */

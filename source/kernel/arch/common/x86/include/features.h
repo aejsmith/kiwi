@@ -21,6 +21,31 @@
 #ifndef __ARCH_X86_FEATURES_H
 #define __ARCH_X86_FEATURES_H
 
+/** Standard CPUID function definitions. */
+#define CPUID_VENDOR_ID		0x00000000		/**< Vendor ID/Highest Standard Function. */
+#define CPUID_FEATURE_INFO	0x00000001		/**< Feature Information. */
+#define CPUID_CACHE_DESC	0x00000002		/**< Cache Descriptors. */
+#define CPUID_SERIAL_NUM	0x00000003		/**< Processor Serial Number. */
+#define CPUID_CACHE_PARMS	0x00000004		/**< Deterministic Cache Parameters. */
+#define CPUID_MONITOR_MWAIT	0x00000005		/**< MONITOR/MWAIT Parameters. */
+#define CPUID_DTS_POWER		0x00000006		/**< Digital Thermal Sensor and Power Management Parameters. */
+#define CPUID_DCA		0x00000009		/**< Direct Cache Access (DCA) Parameters. */
+#define CPUID_PERFMON		0x0000000A		/**< Architectural Performance Monitor Features. */
+#define CPUID_X2APIC		0x0000000B		/**< x2APIC Features/Processor Topology. */
+#define CPUID_XSAVE		0x0000000D		/**< XSAVE Features. */
+
+/** Extended CPUID function definitions. */
+#define CPUID_EXT_MAX		0x80000000		/**< Largest Extended Function. */
+#define CPUID_EXT_FEATURE	0x80000001		/**< Extended Feature Bits. */
+#define CPUID_BRAND_STRING1	0x80000002		/**< Processor Name/Brand String (Part 1). */
+#define CPUID_BRAND_STRING2	0x80000003		/**< Processor Name/Brand String (Part 2). */
+#define CPUID_BRAND_STRING3	0x80000004		/**< Processor Name/Brand String (Part 3). */
+#define CPUID_L2_CACHE		0x80000006		/**< Extended L2 Cache Features. */
+#define CPUID_ADVANCED_PM	0x80000007		/**< Advanced Power Management. */
+#define CPUID_ADDRESS_SIZE	0x80000008		/**< Virtual/Physical Address Sizes. */
+
+#ifndef __ASM__
+
 #include <cpu/cpu.h>
 
 /** Check for a standard feature (ECX). */
@@ -95,4 +120,15 @@
 /** Feature check macros - Extended CPUID Features (ECX). */
 #define CPU_HAS_LAHF(c)		CPU_FEAT_EXT_ECX(c, 0)	/**< LAHF/SAHF. */
 
+/** Execute the CPUID instruction.
+ * @param level		CPUID level.
+ * @param a		Where to store EAX value.
+ * @param b		Where to store EBX value.
+ * @param c		Where to store ECX value.
+ * @param d		Where to store EDX value. */
+static inline void cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
+	__asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "0"(level));
+}
+
+#endif /* __ASM__ */
 #endif /* __ARCH_X86_FEATURES_H */

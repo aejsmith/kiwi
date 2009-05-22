@@ -20,9 +20,9 @@
 
 #include <arch/asm.h>
 #include <arch/io.h>
-#include <arch/x86/defs.h>
 #include <arch/x86/features.h>
 #include <arch/x86/lapic.h>
+#include <arch/x86/sysreg.h>
 
 #include <console/kprintf.h>
 
@@ -256,7 +256,7 @@ bool lapic_init(void) {
 		return false;
 	}
 
-	base = rdmsr(X86_MSR_IA32_APIC_BASE);
+	base = sysreg_msr_read(SYSREG_MSR_APIC_BASE);
 
 	/* If bit 11 is 0, the APIC is disabled (see above todo). */
 	if(!(base & (1<<11))) {

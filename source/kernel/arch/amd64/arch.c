@@ -23,8 +23,6 @@
 #include <arch/descriptor.h>
 #include <arch/io.h>
 #include <arch/page.h>
-#include <arch/x86/defs.h>
-#include <arch/x86/features.h>
 #include <arch/x86/lapic.h>
 
 #include <cpu/cpu.h>

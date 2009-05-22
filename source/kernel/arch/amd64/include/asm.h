@@ -26,143 +26,6 @@
 #include <types.h>
 
 /*
- * Control/debug register functions.
- */
-
-/** Macro to define a control/debug register read function. */
-#define READ_CD_REG(name, type)		\
-	static inline type read_ ## name(void) { \
-		type r; \
-		__asm__ volatile("mov %%" #name ", %0" : "=r"(r)); \
-		return r; \
-	}
-
-/** Macro to define a control/debug register read function. */
-#define WRITE_CD_REG(name, type)	\
-	static inline void write_ ## name(type val) { \
-		__asm__ volatile("mov %0, %%" #name :: "r"(val)); \
-	}
-
-/** Read the CR0 register.
- * @return		Value of the CR0 register. */
-READ_CD_REG(cr0, unative_t);
-
-/** Read the CR2 register.
- * @return		Value of the CR2 register. */
-READ_CD_REG(cr2, unative_t);
-
-/** Read the CR3 register.
- * @return		Value of the CR3 register. */
-READ_CD_REG(cr3, unative_t);
-
-/** Read the CR4 register.
- * @return		Value of the CR4 register. */
-READ_CD_REG(cr4, unative_t);
-
-/** Write the CR0 register.
- * @param val		New value of the CR0 register. */
-WRITE_CD_REG(cr0, unative_t);
-
-/** Write the CR3 register.
- * @param val		New value of the CR3 register. */
-WRITE_CD_REG(cr3, unative_t);
-
-/** Write the CR4 register.
- * @param val		New value of the CR4 register. */
-WRITE_CD_REG(cr4, unative_t);
-
-/** Read the DR0 register.
- * @return		Value of the DR0 register. */
-READ_CD_REG(dr0, unative_t);
-
-/** Read the DR1 register.
- * @return		Value of the DR1 register. */
-READ_CD_REG(dr1, unative_t);
-
-/** Read the DR2 register.
- * @return		Value of the DR2 register. */
-READ_CD_REG(dr2, unative_t);
-
-/** Read the DR3 register.
- * @return		Value of the DR3 register. */
-READ_CD_REG(dr3, unative_t);
-
-/** Read the DR6 register.
- * @return		Value of the DR6 register. */
-READ_CD_REG(dr6, unative_t);
-
-/** Read the DR7 register.
- * @return		Value of the DR7 register. */
-READ_CD_REG(dr7, unative_t);
-
-/** Write the DR0 register.
- * @param val		New value of the DR0 register. */
-WRITE_CD_REG(dr0, unative_t);
-
-/** Write the DR1 register.
- * @param val		New value of the DR1 register. */
-WRITE_CD_REG(dr1, unative_t);
-
-/** Write the DR2 register.
- * @param val		New value of the DR2 register. */
-WRITE_CD_REG(dr2, unative_t);
-
-/** Write the DR3 register.
- * @param val		New value of the DR3 register. */
-WRITE_CD_REG(dr3, unative_t);
-
-/** Write the DR6 register.
- * @param val		New value of the DR6 register. */
-WRITE_CD_REG(dr6, unative_t);
-
-/** Write the DR7 register.
- * @param val		New value of the DR7 register. */
-WRITE_CD_REG(dr7, unative_t);
-
-#undef READ_CD_REG
-#undef WRITE_CD_REG
-
-/*
- * Model specific register functions.
- */
-
-/** Write an MSR.
- * @param msr		MSR to write to.
- * @param value		Value to write. */
-static inline void wrmsr(int msr, uint64_t value) {
-	__asm__ volatile("wrmsr" :: "a"((uint32_t)value), "d"((uint32_t)(value >> 32)), "c"(msr));
-}
-
-/** Read an MSR.
- * @param msr		MSR to read.
- * @return		Value read. */
-static inline uint64_t rdmsr(int msr) {
-	uint32_t low, high;
-
-	__asm__ volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
-	return (((uint64_t)high) << 32) | low;
-}
-
-/*
- * Flags functions.
- */
-
-/** Get EFLAGS.
- * @return		Current value of EFLAGS. */
-static inline unative_t get_flags(void) {
-	unative_t flags;
-
-	__asm__ volatile("pushf; pop %0" : "=rm"(flags));
-	return flags;
-}
-
-/** Set EFLAGS.
- * @param flags		New value for EFLAGS. */
-static inline void set_flags(unative_t flags) {
-	__asm__ volatile("push %0; popf" :: "rm"(flags));
-}
-
-/*
  * x87 FPU functions.
  */
 
@@ -207,11 +70,6 @@ static inline void spin_loop_hint(void) {
 	__asm__ volatile("pause");
 }
 
-/** Place the CPU in an idle state until an interrupt occurs. */
-static inline void idle(void) {
-	__asm__ volatile("sti; hlt; cli");
-}
-
 /** Invalidate a TLB entry.
  * @param addr		Address to invalidate. */
 static inline void invlpg(ptr_t addr) {
@@ -222,16 +80,6 @@ static inline void invlpg(ptr_t addr) {
  * @param sel		Selector to set. */
 static inline void set_gs(uint32_t sel) {
 	__asm__ volatile("mov %%ax, %%gs" :: "a"(sel));
-}
-
-/** Execute the CPUID instruction.
- * @param level		CPUID level.
- * @param a		Where to store EAX value.
- * @param b		Where to store EBX value.
- * @param c		Where to store ECX value.
- * @param d		Where to store EDX value. */
-static inline void cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
-	__asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "0"(level));
 }
 
 /** Execute the SWAPGS instruction. */

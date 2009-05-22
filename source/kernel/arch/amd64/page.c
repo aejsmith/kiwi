@@ -21,8 +21,8 @@
 #include <arch/asm.h>
 #include <arch/barrier.h>
 #include <arch/memmap.h>
-#include <arch/x86/defs.h>
 #include <arch/x86/features.h>
+#include <arch/x86/sysreg.h>
 
 #include <console/kprintf.h>
 
@@ -280,7 +280,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
  * @param map		Page map to switch to.
  */
 void page_map_switch(page_map_t *map) {
-	write_cr3(map->pml4);
+	sysreg_cr3_write(map->pml4);
 }
 
 /** Initialize a page map structure.
@@ -461,7 +461,7 @@ void page_init(void) {
 	/* Enable NX/XD if supported. */
 	if(CPU_HAS_XD(curr_cpu)) {
 		kprintf(LOG_NORMAL, "page: CPU supports NX/XD, enabling...\n");
-		wrmsr(X86_MSR_IA32_EFER, rdmsr(X86_MSR_IA32_EFER) | X86_EFER_NXE);
+		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
 	}
 #endif
 }
@@ -491,6 +491,6 @@ void page_late_init(void) {
 
 	/* Force a complete TLB wipe - the global flag is set on pages on the
 	 * identity mapping because we use the kernel PDP for it. */
-	write_cr4(read_cr4() & ~X86_CR4_PGE);
-	write_cr4(read_cr4() | X86_CR4_PGE);
+	sysreg_cr4_write(sysreg_cr4_read() & ~SYSREG_CR4_PGE);
+	sysreg_cr4_write(sysreg_cr4_read() | SYSREG_CR4_PGE);
 }

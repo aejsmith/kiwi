@@ -18,10 +18,9 @@
  * @brief		x86 kernel debugger functions.
  */
 
-#include <arch/asm.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
-#include <arch/x86/defs.h>
+#include <arch/x86/sysreg.h>
 
 #include <cpu/intr.h>
 
@@ -51,10 +50,10 @@ static inline void kdbg_setup_dreg(void) {
 	unative_t dr7 = 0;
 	size_t i;
 
-	write_dr0(kdbg_breakpoints[0].addr);
-	write_dr1(kdbg_breakpoints[1].addr);
-	write_dr2(kdbg_breakpoints[2].addr);
-	write_dr3(kdbg_breakpoints[3].addr);
+	sysreg_dr0_write(kdbg_breakpoints[0].addr);
+	sysreg_dr1_write(kdbg_breakpoints[1].addr);
+	sysreg_dr2_write(kdbg_breakpoints[2].addr);
+	sysreg_dr3_write(kdbg_breakpoints[3].addr);
 
 	for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
 		if(kdbg_breakpoints[i].enabled) {
@@ -62,7 +61,7 @@ static inline void kdbg_setup_dreg(void) {
 		}
 	}
 
-	write_dr7(dr7);
+	sysreg_dr7_write(dr7);
 }
 
 /** Debug exception handler.
@@ -82,24 +81,26 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	size_t i = 0;
 
 	/* Work out the reason. */
-	dr6 = read_dr6();
-	if(!(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3 | X86_DR6_BD | X86_DR6_BS | X86_DR6_BT))) {
+	dr6 = sysreg_dr6_read();
+	if(!(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 |
+	            SYSREG_DR6_B3 | SYSREG_DR6_BD | SYSREG_DR6_BS |
+	            SYSREG_DR6_BT))) {
 		/* No bits set, assume this came from from kdbg_enter(), in
 		 * which case the reason will be in EAX. */
 		reason = (unative_t)frame->ax;
 	} else {
-		if(dr6 & X86_DR6_BS) {
+		if(dr6 & SYSREG_DR6_BS) {
 			/* See comment later on about QEMU/Resume Flag. */
 			if(bp_resume) {
 				bp_resume = false;
 				kdbg_setup_dreg();
-				frame->flags &= ~X86_FLAGS_TF;
-				write_dr6(0);
+				frame->flags &= ~SYSREG_FLAGS_TF;
+				sysreg_dr6_write(0);
 				return true;
 			}
 
 			reason = KDBG_ENTRY_STEPPED;
-		} else if(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3)) {
+		} else if(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 | SYSREG_DR6_B3)) {
 			reason = KDBG_ENTRY_BREAK;
 			for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
 				if(frame->ip == kdbg_breakpoints[i].addr) {
@@ -112,7 +113,7 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	kdbg_enter(reason, frame);
 
 	/* Clear the Debug Status Register (DR6). */
-	write_dr6(0);
+	sysreg_dr6_write(0);
 
 	/* So this nasty load of crap is to hack past QEMU's lack of Resume
 	 * Flag support. Disable the breakpoint temporarily, set single step
@@ -122,12 +123,12 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 			return true;
 		}
 
-		write_dr7(read_dr7() & ~(1<<i));
+		sysreg_dr7_write(sysreg_dr7_read() & ~(1<<i));
 
 		/* Prevent a requested step from actually continuing. */
-		if(!(frame->flags & X86_FLAGS_TF)) {
+		if(!(frame->flags & SYSREG_FLAGS_TF)) {
 			bp_resume = true;
-			frame->flags |= X86_FLAGS_TF;
+			frame->flags |= SYSREG_FLAGS_TF;
 		}
 	}
 
@@ -152,12 +153,12 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
 	}
 
 	/* Disable breakpoints while KDBG is running. */
-	write_dr7(0);
+	sysreg_dr7_write(0);
 
 	if(kdbg_main(reason, frame) == KDBG_STEP) {
-		frame->flags |= X86_FLAGS_TF;
+		frame->flags |= SYSREG_FLAGS_TF;
 	} else {
-		frame->flags &= ~X86_FLAGS_TF;
+		frame->flags &= ~SYSREG_FLAGS_TF;
 	}
 
 	/* Work out a new Debug Control Register value. */

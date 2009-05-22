@@ -18,7 +18,7 @@
  * @brief		AMD64 AP boostrap code.
  */
 
-#include <arch/x86/defs.h>
+#include <arch/x86/sysreg.h>
 
 .code16
 
@@ -49,7 +49,7 @@ __ap_boot:
 
 	/* Enable protected mode. */
 	movl	%cr0, %eax
-	orl	$X86_CR0_PE, %eax
+	orl	$SYSREG_CR0_PE, %eax
 	movl	%eax, %cr0
 
 	/* Fix the jump address. */

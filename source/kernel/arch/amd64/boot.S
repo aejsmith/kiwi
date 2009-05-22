@@ -22,7 +22,8 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 #include <arch/stack.h>
-#include <arch/x86/defs.h>
+#include <arch/x86/features.h>
+#include <arch/x86/sysreg.h>
 
 #include <platform/multiboot.h>
 
@@ -98,7 +99,7 @@ __kernel_entry:
 	pushf
 	pop	%eax
 	mov	%eax, %ebx
-	xor	$X86_FLAGS_ID, %eax
+	xor	$SYSREG_FLAGS_ID, %eax
 	push	%eax
 	popf
 	pushf
@@ -134,7 +135,7 @@ __kernel_entry:
 
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
-	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR), %eax
+	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
 	/* Initialise the FPU. */
@@ -145,15 +146,15 @@ __kernel_entry:
 	movl	%eax, %cr3
 
 	/* Enable long mode by setting EFER.LME. */
-	movl	$X86_MSR_IA32_EFER, %ecx
+	movl	$SYSREG_MSR_EFER, %ecx
 	rdmsr
-	orl	$X86_EFER_LME, %eax
+	orl	$SYSREG_EFER_LME, %eax
 	wrmsr
 
 	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
 	 * Monitor Coprocessor). Paging will put us in compatibility mode. */
 	movl	%cr0, %ecx
-	orl	$(X86_CR0_PG | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
@@ -246,7 +247,7 @@ __kernel_ap_entry:
 1:
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
-	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR), %eax
+	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
 	/* Initialise the FPU. */
@@ -260,9 +261,9 @@ __kernel_ap_entry:
 	movl	%eax, %cr3
 
 	/* Enable long mode by setting EFER.LME. */
-	movl	$X86_MSR_IA32_EFER, %ecx
+	movl	$SYSREG_MSR_EFER, %ecx
 	rdmsr
-	orl	$X86_EFER_LME, %eax
+	orl	$SYSREG_EFER_LME, %eax
 	wrmsr
 #if CONFIG_X86_NX
 	/* Check for NX support and enable it if necessary. */
@@ -270,16 +271,16 @@ __kernel_ap_entry:
 	cpuid
 	bt	$20, %edx
 	jnc	2f
-	movl	$X86_MSR_IA32_EFER, %ecx
+	movl	$SYSREG_MSR_EFER, %ecx
 	rdmsr
-	orl	$X86_EFER_NXE, %eax
+	orl	$SYSREG_EFER_NXE, %eax
 	wrmsr
 2:
 #endif
 	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
 	 * Monitor Coprocessor). Paging will put us in compatibility mode. */
 	movl	%cr0, %ecx
-	orl	$(X86_CR0_PG | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */

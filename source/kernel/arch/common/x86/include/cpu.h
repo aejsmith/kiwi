@@ -81,6 +81,13 @@ static inline void cpu_set_pointer(ptr_t addr) {
 	*(ptr_t *)stack_get_base() = addr;
 }
 
+/** Halt the current CPU. */
+static inline __noreturn void cpu_halt(void) {
+	while(true) {
+		__asm__ volatile("cli; hlt");
+	}
+}
+
 extern void cpu_arch_init(cpu_arch_t *cpu);
 
 #endif /* __ARCH_X86_CPU_H */

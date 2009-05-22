@@ -45,7 +45,7 @@
  * average, then its load balancer pulls threads from overloaded CPUs.
  */
 
-#include <arch/asm.h>
+#include <arch/sched.h>
 #include <arch/stack.h>
 
 #include <console/kprintf.h>
@@ -558,7 +558,7 @@ void sched_idle(void) {
 
 	while(true) {
 		sched_yield();
-		idle();
+		sched_cpu_idle();
 	}
 }
 
