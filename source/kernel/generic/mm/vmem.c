@@ -216,7 +216,8 @@ static inline bool vmem_span_overlaps(vmem_t *vmem, vmem_resource_t base, vmem_r
  * @param imported	Whether the span is imported.
  * @param vmflag	Allocation flags.
  * @return		Pointer to boundary tag on success, NULL on failure. */
-static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, bool imported, int vmflag) {
+static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size,
+                                  bool imported, int vmflag) {
 	vmem_btag_t *span;
 
 	assert(!(base % vmem->quantum));
@@ -325,6 +326,10 @@ found:
 			continue;
 		}
 
+		/* Take the tag off the freelist before any splitting to ensure
+		 * we do not cause any inconsistencies. */
+		vmem_freelist_remove(vmem, seg);
+
 		/* We have all the tags required, perform any splits needed. */
 		if(seg->base < minaddr) {
 			split1->base = seg->base;
@@ -359,7 +364,6 @@ found:
 		if(split2 != NULL) {
 			vmem_btag_free(split2);
 		}
-		vmem_freelist_remove(vmem, seg);
 		seg->type = VMEM_BTAG_ALLOC;
 		return seg;
 	}
