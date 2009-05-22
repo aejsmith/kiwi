@@ -44,6 +44,8 @@
 #define FAULT_MCE		18	/**< Machine Check. */
 #define FAULT_SIMD		19	/**< SIMD Floating-Point. */
 
-extern bool fault_handler(unative_t num, intr_frame_t *frame);
+struct intr_frame;
+
+extern bool fault_handler(unative_t num, struct intr_frame *frame);
 
 #endif /* __ARCH_X86_FAULT_H */

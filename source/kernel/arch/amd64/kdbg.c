@@ -22,6 +22,8 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 
+#include <cpu/intr.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 

@@ -23,7 +23,9 @@
 
 #include <types.h>
 
-extern void _fatal(intr_frame_t *frame, const char *format, ...) __noreturn __printf(2, 3);
+struct intr_frame;
+
+extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn __printf(2, 3);
 
 /** Print an error message and halt the kernel.
  *

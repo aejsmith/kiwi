@@ -20,11 +20,7 @@
 
 #include <arch/descriptor.h>
 
-/** Push registers onto the stack.
- *
- * Pushes registers onto the stack in the correct order to construct a intr_frame_t
- * structure.
- */
+/** Push registers onto the stack. */
 .macro PUSH_REGS
 	push	%rax
 	push	%rbx
@@ -48,11 +44,7 @@
 	andl	$0xFFFF, (%rsp)
 .endm
 
-/** Pop registers from the stack.
- *
- * Pops registers from the stack in the order they are contained in a intr_frame_t
- * structure.
- */
+/** Pop registers from the stack. */
 .macro POP_REGS
 	pop	%gs
 	pop	%fs
@@ -153,7 +145,7 @@ __isr_array:
 /** Common ISR handling code. */
 .type __isr_common, @function
 __isr_common:
-	/* Create the intr_frame_t structure on the stack. */
+	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
 	/* Set sane segment descriptors. */

@@ -46,11 +46,13 @@
 #define KDBG_HELP(ac, av)	\
 	((ac) > 1 && strcmp((av)[1], "--help") == 0)
 
-extern atomic_t kdbg_running;
-extern intr_frame_t *curr_kdbg_frame;
+struct intr_frame;
 
-/* Implemented by the architecture/platform. */
-extern void kdbg_enter(int reason, intr_frame_t *frame);
+extern atomic_t kdbg_running;
+extern struct intr_frame *curr_kdbg_frame;
+
+/** Functions implemented by the architecture/platform. */
+extern void kdbg_enter(int reason, struct intr_frame *frame);
 extern unsigned char kdbg_get_char(void);
 extern int kdbg_register_value(const char *name, size_t len, unative_t *regp);
 extern int kdbg_cmd_backtrace(int argc, char **argv);
@@ -61,7 +63,7 @@ extern int kdbg_cmd_break(int argc, char **argv);
 extern int kdbg_cmd_regs(int argc, char **argv);
 
 extern int kdbg_parse_expression(char *exp, unative_t *valp, char **strp);
-extern void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame);
-extern int kdbg_main(int reason, intr_frame_t *frame);
+extern void kdbg_except_handler(unative_t num, const char *name, struct intr_frame *frame);
+extern int kdbg_main(int reason, struct intr_frame *frame);
 
-#endif /* __DEBUG_KDBG_H */
+#endif /* __KDBG_H */

@@ -212,36 +212,6 @@ static inline void idle(void) {
 	__asm__ volatile("sti; hlt; cli");
 }
 
-/** Load a value into TR (Task Register).
- * @param sel		Selector to load. */
-static inline void ltr(uint32_t sel) {
-	__asm__ volatile("ltr %%ax" :: "a"(sel));
-}
-
-/** Set the GDTR register.
- * @param base		Virtual address of GDT.
- * @param limit		Size of GDT. */
-static inline void lgdt(ptr_t base, uint16_t limit) {
-	gdt_pointer_t gdtp;
-
-	gdtp.limit = limit;
-	gdtp.base = base;
-
-	__asm__ volatile("lgdt %0" :: "m"(gdtp));
-}
-
-/** Set the IDTR register.
- * @param base		Base address of IDT.
- * @param limit		Size of IDT. */
-static inline void lidt(ptr_t base, uint16_t limit) {
-	idt_pointer_t idtp;
-
-	idtp.limit = limit;
-	idtp.base = base;
-
-	__asm__ volatile("lidt %0" :: "m"(idtp));
-}
-
 /** Invalidate a TLB entry.
  * @param addr		Address to invalidate. */
 static inline void invlpg(ptr_t addr) {

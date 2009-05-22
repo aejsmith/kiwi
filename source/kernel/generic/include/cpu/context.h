@@ -23,10 +23,12 @@
 
 #include <arch/context.h>
 
+struct intr_frame;
+
 extern void context_init(context_t *ctx, ptr_t ip, unative_t *stack);
 extern void context_destroy(context_t *ctx);
 extern int context_save(context_t *ctx);
 extern void context_restore(context_t *ctx) __noreturn;
-extern void context_restore_frame(context_t *ctx, intr_frame_t *frame);
+extern void context_restore_frame(context_t *ctx, struct intr_frame *frame);
 
 #endif /* __CPU_CONTEXT_H */

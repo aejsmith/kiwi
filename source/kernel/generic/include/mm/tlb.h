@@ -33,6 +33,8 @@
 
 #include <types.h>
 
+struct intr_frame;
+
 /** TLB shootdown message structure. */
 typedef struct tlb_shootdown {
 	aspace_t *as;			/**< Address space (NULL implies kernel address space). */
@@ -44,8 +46,7 @@ typedef struct tlb_shootdown {
 
 extern void tlb_shootdown_initiator(tlb_shootdown_t *msg, aspace_t *as, ptr_t start, ptr_t end);
 extern void tlb_shootdown_finalize(tlb_shootdown_t *msg);
-extern bool tlb_shootdown_responder(unative_t num, intr_frame_t *frame);
+extern bool tlb_shootdown_responder(unative_t num, struct intr_frame *frame);
 
 #endif /* CONFIG_SMP */
-
 #endif /* __MM_TLB_H */

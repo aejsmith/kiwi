@@ -23,6 +23,8 @@
 #include <arch/page.h>
 #include <arch/x86/defs.h>
 
+#include <cpu/intr.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 

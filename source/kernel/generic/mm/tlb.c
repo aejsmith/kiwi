@@ -22,6 +22,8 @@
  *   http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.92.1801
  */
 
+#include <cpu/intr.h>
+
 #include <mm/aspace.h>
 #include <mm/tlb.h>
 

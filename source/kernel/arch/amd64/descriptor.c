@@ -18,7 +18,6 @@
  * @brief		AMD64 descriptor table functions.
  */
 
-#include <arch/asm.h>
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/x86/fault.h>

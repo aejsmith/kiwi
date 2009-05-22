@@ -21,6 +21,8 @@
 #ifndef __CPU_IRQ_H
 #define __CPU_IRQ_H
 
+#include <arch/intr.h>
+
 #include <types.h>
 
 /** IRQ management operations. */

@@ -23,6 +23,7 @@
 #include <console/kprintf.h>
 
 #include <cpu/context.h>
+#include <cpu/intr.h>
 
 #include <lib/string.h>
 
