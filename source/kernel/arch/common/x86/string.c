@@ -18,7 +18,6 @@
  * @brief		x86 optimized string functions.
  */
 
-#include <arch/asm.h>
 #include <arch/barrier.h>
 #include <arch/x86/features.h>
 

@@ -21,7 +21,6 @@
 #ifndef __ARCH_X86_TLB_H
 #define __ARCH_X86_TLB_H
 
-#include <arch/asm.h>
 #include <arch/x86/sysreg.h>
 
 /** Invalidate TLB entries for an address range.
@@ -29,7 +28,7 @@
  * @param end		End of range to invalidate. */
 static inline void tlb_invalidate(ptr_t start, ptr_t end) {
 	for(; start < end; start += PAGE_SIZE) {
-		invlpg(start);
+		__asm__ volatile("invlpg (%0)" :: "r"(start));
 	}
 }
 

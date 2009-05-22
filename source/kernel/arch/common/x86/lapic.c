@@ -18,7 +18,6 @@
  * @brief		x86 local APIC code.
  */
 
-#include <arch/asm.h>
 #include <arch/io.h>
 #include <arch/x86/features.h>
 #include <arch/x86/lapic.h>

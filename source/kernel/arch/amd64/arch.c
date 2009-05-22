@@ -19,7 +19,6 @@
  */
 
 #include <arch/arch.h>
-#include <arch/asm.h>
 #include <arch/descriptor.h>
 #include <arch/io.h>
 #include <arch/page.h>
@@ -79,7 +78,7 @@ void arch_reboot(void) {
 	/* Try the keyboard controller. */
 	out8(0x64, 0xfe);
 	for(i = 0; i < 10000000; i++) {
-		spin_loop_hint();
+		__asm__ volatile("pause");
 	}
 
 	/* Fall back on a triple fault. */

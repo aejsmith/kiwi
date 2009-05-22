@@ -18,7 +18,6 @@
  * @brief		AMD64 kernel debugger functions.
  */
 
-#include <arch/asm.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
 

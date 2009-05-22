@@ -18,7 +18,6 @@
  * @brief		AMD64 paging functions.
  */
 
-#include <arch/asm.h>
 #include <arch/barrier.h>
 #include <arch/memmap.h>
 #include <arch/x86/features.h>
@@ -42,6 +41,12 @@ extern pte_t __kernel_pdp[];
 /** Symbols defined by the linker script. */
 extern char __text_start[], __text_end[], __rodata_start[], __rodata_end[];
 extern char __bss_end[], __end[];
+
+/** Invalidate a TLB entry. TODO: Get rid of this
+ * @param addr		Address to invalidate. */
+static inline void invlpg(ptr_t addr) {
+	__asm__ volatile("invlpg (%0)" :: "r"(addr));
+}
 
 /*
  * Page map functions.

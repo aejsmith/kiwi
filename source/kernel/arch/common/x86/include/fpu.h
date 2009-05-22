@@ -1,5 +1,5 @@
-/* Kiwi AMD64 miscellaneous ASM functions
- * Copyright (C) 2007-2009 Alex Smith
+/* Kiwi x86 FPU functions
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,20 +15,29 @@
 
 /**
  * @file
- * @brief		AMD64 miscellaneous ASM functions.
+ * @brief		x86 FPU functions.
  */
 
-#ifndef __ARCH_ASM_H
-#define __ARCH_ASM_H
+#ifndef __ARCH_X86_FPU_H
+#define __ARCH_X86_FPU_H
 
 #include <types.h>
 
-/** Spin loop hint using the PAUSE instruction to be more friendly to certain
- * CPUs (Pentium 4 and Xeon, mostly) in terms of performance and energy
- * consumption - see PAUSE instruction in Intel Instruction Set Reference N-Z
- * manual for more information. */
-static inline void spin_loop_hint(void) {
-	__asm__ volatile("pause");
+/** Initialize FPU state. */
+static inline void fpu_state_init(void) {
+	__asm__ volatile("fninit");
 }
 
-#endif /* __ARCH_ASM_H */
+/** Save FPU state.
+ * @param area		Area to save to. */
+static inline void fpu_state_save(char *area) {
+	__asm__ volatile("fxsave %0" :: "m"(*area));
+}
+
+/** Restore FPU state.
+ * @param area		Area to restore from. */
+static inline void fpu_state_restore(char *area) {
+	__asm__ volatile("fxrstor %0" :: "m"(*area));
+}
+
+#endif /* __ARCH_X86_FPU_H */
