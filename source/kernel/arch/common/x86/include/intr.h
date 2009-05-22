@@ -28,34 +28,6 @@
 #define IRQ_COUNT	16		/**< Total number of IRQs. */
 #define IRQ_BASE	32		/**< IRQ number base. */
 
-/** Structure defining an interrupt stack frame. */
-typedef struct intr_frame {
-	unative_t gs;			/**< GS. */
-	unative_t fs;			/**< FS. */
-	unative_t r15;			/**< R15. */
-	unative_t r14;			/**< R14. */
-	unative_t r13;			/**< R13. */
-	unative_t r12;			/**< R12. */
-	unative_t r11;			/**< R11. */
-	unative_t r10;			/**< R10. */
-	unative_t r9;			/**< R9. */
-	unative_t r8;			/**< R8. */
-	unative_t bp;			/**< RBP. */
-	unative_t si;			/**< RSI. */
-	unative_t di;			/**< RDI. */
-	unative_t dx;			/**< RDX. */
-	unative_t cx;			/**< RCX. */
-	unative_t bx;			/**< RBX. */
-	unative_t ax;			/**< RAX. */
-	unative_t int_no;		/**< Interrupt number. */
-	unative_t err_code;		/**< Error code (if applicable). */
-	unative_t ip;			/**< RIP. */
-	unative_t cs;			/**< CS. */
-	unative_t flags;		/**< RFLAGS. */
-	unative_t sp;			/**< RSP. */
-	unative_t ss;			/**< SS. */
-} __packed intr_frame_t;
-
 /** Enable interrupts.
  * @return		Previous interrupt state. */
 static inline bool intr_enable(void) {
