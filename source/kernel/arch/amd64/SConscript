@@ -23,7 +23,7 @@ env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone', '-fno-omit-frame-
 env['LDFLAGS'] += ['-A', 'x86_64', '-m', 'elf_x86_64']
 
 # Pull in x86 common code.
-SConscript(dirs=['x86'], exports=['env'])
+SConscript(dirs=['../common/x86'], exports=['env'])
 
 # Add source files.
 env['OBJFILES'] += [
