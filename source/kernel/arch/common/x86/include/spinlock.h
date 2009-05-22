@@ -27,7 +27,7 @@
 
 /** Spinlock loop hint using the PAUSE instruction. */
 static inline void spinlock_loop_hint(void) {
-	__asm__ volatile("ud2a");
+	__asm__ volatile("pause");
 }
 
 #endif /* __ARCH_X86_SPINLOCK_H */
