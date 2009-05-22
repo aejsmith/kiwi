@@ -21,9 +21,9 @@
 #ifndef __ARCH_CPU_H
 #define __ARCH_CPU_H
 
-#include <arch/asm.h>
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
+#include <arch/stack.h>
 
 #include <types.h>
 
@@ -72,15 +72,13 @@ typedef struct cpu_arch {
 /** Get the current CPU structure pointer from the base of the stack.
  * @return		Pointer to current CPU structure. */
 static inline ptr_t cpu_get_pointer(void) {
-	/* Assume that stack is aligned on a page boundary and is KSTACK_SIZE
-	 * bytes long. */
-	return *(ptr_t *)(read_sp() & ~(KSTACK_SIZE - 1));
+	return *(ptr_t *)stack_get_base();
 }
 
 /** Set the current CPU structure pointer at the base of the stack.
  * @param addr		Pointer to new CPU structure. */
 static inline void cpu_set_pointer(ptr_t addr) {
-	*(ptr_t *)(read_sp() & ~(KSTACK_SIZE - 1)) = addr;
+	*(ptr_t *)stack_get_base() = addr;
 }
 
 extern void cpu_arch_init(cpu_arch_t *cpu);

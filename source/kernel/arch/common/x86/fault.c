@@ -25,6 +25,7 @@
  * process should be preempted.
  */
 
+#include <arch/asm.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
 #include <arch/x86/fault.h>

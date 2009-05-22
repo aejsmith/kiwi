@@ -46,6 +46,7 @@
  */
 
 #include <arch/asm.h>
+#include <arch/stack.h>
 
 #include <console/kprintf.h>
 
@@ -582,7 +583,7 @@ void sched_init(void) {
 	 * allocated for it and point it at the current stack. We also set the
 	 * current state to running and point the current thread to it. */
 	kheap_free(curr_cpu->sched->idle_thread->kstack, KSTACK_SIZE);
-	curr_cpu->sched->idle_thread->kstack = get_stack_base();
+	curr_cpu->sched->idle_thread->kstack = stack_get_base();
 	curr_cpu->sched->idle_thread->cpu = curr_cpu;
 	curr_cpu->sched->idle_thread->state = THREAD_RUNNING;
 	curr_cpu->thread = curr_cpu->sched->idle_thread;

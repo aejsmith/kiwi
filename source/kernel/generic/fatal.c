@@ -18,6 +18,8 @@
  * @brief		Error handling functions.
  */
 
+#include <arch/asm.h>
+
 #include <console/console.h>
 #include <console/kprintf.h>
 

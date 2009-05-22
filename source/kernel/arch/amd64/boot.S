@@ -21,6 +21,7 @@
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/stack.h>
 #include <arch/x86/defs.h>
 
 #include <platform/multiboot.h>

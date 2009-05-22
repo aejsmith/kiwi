@@ -49,5 +49,4 @@ typedef struct context {
 } context_t;
 
 #endif /* __ASM__ */
-
 #endif /* __ARCH_CONTEXT_H */

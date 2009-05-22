@@ -18,7 +18,7 @@
  * @brief		AMD64 CPU context functions.
  */
 
-#include <arch/memmap.h>
+#include <arch/stack.h>
 
 #include <console/kprintf.h>
 
@@ -43,6 +43,8 @@ void context_init(context_t *ctx, ptr_t ip, unative_t *stack) {
 	/* Ensure that everything is cleared to 0. */
 	memset(ctx, 0, sizeof(context_t));
 
+	/* Reserve 8 bytes for the return address to be placed on the stack
+	 * by context_restore(). */
 	ctx->sp = ((ptr_t)stack + KSTACK_SIZE) - STACK_DELTA;
 	ctx->ip = ip;
 }

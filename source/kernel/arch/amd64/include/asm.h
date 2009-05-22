@@ -144,25 +144,6 @@ static inline uint64_t rdmsr(int msr) {
 }
 
 /*
- * Stack functions.
- */
-
-/** Get the current stack pointer.
- * @return		Current stack pointer. */
-static inline ptr_t read_sp(void) {
-	ptr_t ret;
-
-	__asm__ volatile("movq %%rsp, %0" : "=r"(ret));
-	return ret;
-}
-
-/** Get the base of the current stack.
- * @return		Base of current stack. */
-static inline unative_t *get_stack_base(void) {
-	return (unative_t *)(read_sp() & ~(KSTACK_SIZE - 1));
-}
-
-/*
  * Flags functions.
  */
 

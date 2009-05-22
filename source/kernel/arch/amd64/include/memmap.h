@@ -23,11 +23,6 @@
 
 #include <arch/page.h>
 
-/** Stack size definitions. */
-#define KSTACK_SIZE	PAGE_SIZE			/**< Kernel stack size. */
-#define USTACK_SIZE	0x400000			/**< Userspace stack size. */
-#define STACK_DELTA	16				/**< Stack delta. */
-
 /* Memory layout looks like this:
  *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - Userspace memory.
  *  0x0000800000000000-0xFFFFFF7FFFFFFFFF - Unused/unusable (not canonical).

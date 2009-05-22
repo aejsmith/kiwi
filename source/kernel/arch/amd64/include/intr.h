@@ -1,5 +1,5 @@
-/* Kiwi x86 low-level interrupt functions
- * Copyright (C) 2008-2009 Alex Smith
+/* Kiwi AMD64 interrupt definitions
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,54 +15,12 @@
 
 /**
  * @file
- * @brief		Low-level interrupt functions.
+ * @brief		AMD64 interrupt definitions.
  */
 
 #ifndef __ARCH_INTR_H
 #define __ARCH_INTR_H
 
-#include <types.h>
-
-/** Various definitions. */
-#define INTR_COUNT	256		/**< Total number of interrupts. */
-#define IRQ_COUNT	16		/**< Total number of IRQs. */
-#define IRQ_BASE	32		/**< IRQ number base. */
-
-/** Enable interrupts.
- * @return		Previous interrupt state. */
-static inline bool intr_enable(void) {
-	unative_t flags;
-
-	__asm__ volatile("pushf; sti; pop %0" : "=r"(flags));
-	return (flags & (1<<9)) ? true : false;
-}
-
-/** Disable interrupts.
- * @return		Previous interrupt state. */
-static inline bool intr_disable(void) {
-	unative_t flags;
-
-	__asm__ volatile("pushf; cli; pop %0" : "=r"(flags));
-	return (flags & (1<<9)) ? true : false;
-}
-
-/** Restore saved interrupt state.
- * @param state		State to restore. */
-static inline void intr_restore(bool state) {
-	if(state) {
-		__asm__ volatile("sti");
-	} else {
-		__asm__ volatile("cli");
-	}
-}
-
-/** Get interrupt state.
- * @return		Current interrupt state. */
-static inline bool intr_state(void) {
-	unative_t flags;
-
-	__asm__ volatile("pushf; pop %0" : "=r"(flags));
-	return (flags & (1<<9)) ? true : false;
-}
+#include <arch/x86/intr.h>
 
 #endif /* __ARCH_INTR_H */
