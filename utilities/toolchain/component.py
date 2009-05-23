@@ -22,7 +22,7 @@ class ToolchainComponent:
 	def __init__(self, manager):
 		self.manager = manager
 		self.changed = False
-		self.srcdir = os.path.join(os.getcwd(), 'toolchain', self.name)
+		self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain', self.name)
 		self.dldir = self.manager.parentdir
 
 	# Check if the component requires updating.

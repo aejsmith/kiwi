@@ -15,8 +15,10 @@
 import os
 import sys
 
-from binutils import BinutilsComponent
-from gcc import GCCComponent
+from utilities.toolchain.binutils import BinutilsComponent
+from utilities.toolchain.gcc import GCCComponent
+
+from SCons.Script import *
 
 # Class to manage building and updating the toolchain.
 class ToolchainManager:
@@ -84,7 +86,7 @@ class ToolchainManager:
 		return 0
 
 	# Rebuilds any components of the toolchain that are out of date.
-	def update(self):
+	def update(self, target, source, env):
 		# Remove any existing build directory and create the target
 		# directory if required.
 		self.cleanup()

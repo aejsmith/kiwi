@@ -13,7 +13,7 @@
 # for complete terms.
 
 import os
-from component import ToolchainComponent
+from utilities.toolchain.component import ToolchainComponent
 
 class BinutilsComponent(ToolchainComponent):
 	name = 'binutils'
