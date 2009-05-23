@@ -21,8 +21,6 @@
 #ifndef __ARCH_MEMMAP_H
 #define __ARCH_MEMMAP_H
 
-#include <arch/page.h>
-
 /* Memory layout looks like this:
  *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - Userspace memory.
  *  0x0000800000000000-0xFFFFFF7FFFFFFFFF - Unused/unusable (not canonical).
