@@ -20,6 +20,7 @@
 
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
+#include <arch/page.h>
 #include <arch/x86/fault.h>
 
 #include <cpu/cpu.h>
