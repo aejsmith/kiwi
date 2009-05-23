@@ -19,15 +19,25 @@ Import('env', 'config')
 
 # Set IA32-specific compilation flags.
 env['ASFLAGS'] += ['-m32']
-env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer']
+env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer', '-march=i686']
 env['LDFLAGS'] += ['-b', 'elf32-i386', '-m', 'elf_i386']
+
+# We need to link the kernel with libgcc.
+env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % env['CC']).read()]
 
 # Pull in x86 common code.
 SConscript(dirs=['../common/x86'], exports=['env'])
 
 # Add source files.
 env['OBJFILES'] += [
+	env.Object('arch.c'),
 	env.Object('boot.S'),
+	env.Object('context.c'),
+	env.Object('descriptor.c'),
+	env.Object('entry.S'),
+	env.Object('kdbg.c'),
+	env.Object('page.c'),
+	env.Object('switch.S'),
 ]
 
 # Generate the AP boot code.
