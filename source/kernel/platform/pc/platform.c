@@ -36,6 +36,8 @@
 #include <fatal.h>
 #include <kdbg.h>
 
+extern void arch_reboot(void);
+
 /** Temporary i8042 hook to enter into KDBG. */
 static bool i8042_handler(unative_t num, intr_frame_t *frame) {
 	uint8_t code = in8(0x60);
@@ -61,6 +63,10 @@ static bool i8042_handler(unative_t num, intr_frame_t *frame) {
 #else
 		__asm__ volatile("movl $0, %esp; ud2a");
 #endif
+		break;
+	case 63:
+		/* F5 - Reboot. */
+		arch_reboot();
 		break;
 	}
 	return false;
