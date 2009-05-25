@@ -23,7 +23,7 @@
 
 #include <fatal.h>
 
-#ifdef CONFIG_DEBUG
+#if CONFIG_DEBUG
 # define assert(cond)	if(!(cond)) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
 #else
 # define assert(cond)	((void)0)

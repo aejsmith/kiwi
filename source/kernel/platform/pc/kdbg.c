@@ -20,6 +20,8 @@
 
 #include <arch/io.h>
 
+#include <platform/console.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -68,10 +70,10 @@ unsigned char kdbg_get_char(void) {
 
 	while(1) {
 		/* Check for serial port data if it is present. */
-		code = in8(CONFIG_X86_DEBUG_PORT + 6);
+		code = in8(SERIAL_PORT + 6);
 		if((code & ((1<<4) | (1<<5))) && code != 0xFF) {
-			if(in8(CONFIG_X86_DEBUG_PORT + 5) & 0x01) {
-				code = in8(CONFIG_X86_DEBUG_PORT);
+			if(in8(SERIAL_PORT + 5) & 0x01) {
+				code = in8(SERIAL_PORT);
 
 				/* Convert CR to NL, and DEL to Backspace. */
 				if(code == '\r') {

@@ -45,28 +45,40 @@ try:
 except:
 	pass
 
-###################
-# Utility set-up. #
-###################
-
-# Import the build configuration.
-config = ConfigManager('build.conf')
-
-# Create the toolchain manager instance.
-toolchain = ToolchainManager(config)
-
-# Create the environment manager instance.
-envmgr = EnvironmentManager(config, version)
+# Set the version string representation.
+version['KIWI_VER_STRING'] = '%d.%d.%d' % (version['KIWI_VER_RELEASE'],
+                                           version['KIWI_VER_UPDATE'],
+                                           version['KIWI_VER_REVISION'])
 
 ###############
 # Main build. #
 ###############
 
-# If the toolchain is out of date, only allow the toolchain to be built.
-if toolchain.check() != 0:
-	if not 'toolchain' in COMMAND_LINE_TARGETS and not GetOption('help'):
-		raise SCons.Errors.StopError("Toolchain is out of date. Update using the 'toolchain' target.")
+# Raise an error if a certain target is not specified.
+def RequireTarget(target, error):
+	if GetOption('help') or target in COMMAND_LINE_TARGETS:
+		return
+	raise SCons.Errors.StopError(error)
+
+# Import the build configuration.
+config = ConfigManager('config.tpl', '.config', version)
+Alias('config', Command('config', [], Action(config.configure, None)))
+
+# Only do the rest of the build if the configuration exists.
+if config.configured() and not 'config' in COMMAND_LINE_TARGETS:
+	# Initialize the toolchain manager and add the toolchain build target.
+	toolchain = ToolchainManager(config)
 	Alias('toolchain', Command('toolchain', [], Action(toolchain.update, None)))
+
+	# Create the environment manager instance.
+	envmgr = EnvironmentManager(config, version)
+
+	# If the toolchain is out of date, only allow it to be built.
+	if toolchain.check() != 0:
+		RequireTarget('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
+	else:
+		Export('envmgr', 'config')
+		SConscript('SConscript', build_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
 else:
-	Export('envmgr', 'config')
-	SConscript('SConscript', build_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
+	# Configuration does not exist. All we can do is configure.
+	RequireTarget('config', "Build configuration doesn't exist. Please create using 'config' target.")

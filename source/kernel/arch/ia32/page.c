@@ -529,7 +529,7 @@ void page_init(void) {
 	/* Enable NX/XD if supported. */
 	if(CPU_HAS_XD(curr_cpu)) {
 		kprintf(LOG_NORMAL, "page: CPU supports NX/XD, enabling...\n");
-		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_mst_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
+		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
 	}
 #endif
 }

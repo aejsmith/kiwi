@@ -280,22 +280,22 @@ static console_t vga_console = {
 /** Print a character to the serial console.
  * @param ch		Character to print. */
 static void serial_console_putch(unsigned char ch) {
-	while(!(in8(CONFIG_X86_DEBUG_PORT + 5) & 0x20));
+	while(!(in8(SERIAL_PORT + 5) & 0x20));
 	if(ch == '\n') {
 		serial_console_putch('\r');
 	}
-	out8(CONFIG_X86_DEBUG_PORT, ch);
+	out8(SERIAL_PORT, ch);
 }
 
 /** Initialize the serial console. */
 static void serial_console_init(void) {
-        out8(CONFIG_X86_DEBUG_PORT + 1, 0x00);  /* Disable all interrupts */
-        out8(CONFIG_X86_DEBUG_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
-        out8(CONFIG_X86_DEBUG_PORT + 0, 0x03);  /* Set divisor to 3 (lo byte) 38400 baud */
-        out8(CONFIG_X86_DEBUG_PORT + 1, 0x00);  /*                  (hi byte) */
-        out8(CONFIG_X86_DEBUG_PORT + 3, 0x03);  /* 8 bits, no parity, one stop bit */
-        out8(CONFIG_X86_DEBUG_PORT + 2, 0xC7);  /* Enable FIFO, clear them, with 14-byte threshold */
-        out8(CONFIG_X86_DEBUG_PORT + 4, 0x0B);  /* IRQs enabled, RTS/DSR set */
+        out8(SERIAL_PORT + 1, 0x00);  /* Disable all interrupts */
+        out8(SERIAL_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
+        out8(SERIAL_PORT + 0, 0x03);  /* Set divisor to 3 (lo byte) 38400 baud */
+        out8(SERIAL_PORT + 1, 0x00);  /*                  (hi byte) */
+        out8(SERIAL_PORT + 3, 0x03);  /* 8 bits, no parity, one stop bit */
+        out8(SERIAL_PORT + 2, 0xC7);  /* Enable FIFO, clear them, with 14-byte threshold */
+        out8(SERIAL_PORT + 4, 0x0B);  /* IRQs enabled, RTS/DSR set */
 }
 
 /** Serial port console. */
@@ -313,7 +313,7 @@ static console_t serial_console = {
 /** Set up the console. */
 void console_early_init(void) {
 #if CONFIG_DEBUG
-	uint8_t status = in8(CONFIG_X86_DEBUG_PORT + 6);
+	uint8_t status = in8(SERIAL_PORT + 6);
 
 	/* Only add the serial device when it is present. */
 	if((status & ((1<<4) | (1<<5))) && status != 0xFF) {
