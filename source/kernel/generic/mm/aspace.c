@@ -54,6 +54,7 @@
 #include <lib/string.h>
 
 #include <mm/aspace.h>
+#include <mm/malloc.h>
 #include <mm/slab.h>
 #include <mm/tlb.h>
 
@@ -294,6 +295,7 @@ static void aspace_region_destroy(aspace_t *as, aspace_region_t *region) {
 		if(region->source->backend->destroy) {
 			region->source->backend->destroy(region->source);
 		}
+		kfree(region->source->name);
 		slab_cache_free(aspace_source_cache, region->source);
 	}
 
@@ -417,13 +419,16 @@ static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
  * Allocates a new address space source structure and initializes parts of
  * it.
  *
- * @param kmflag	Allocation flags.
+ * @param name		Name for the source.
  *
  * @return		Pointer to source.
  */
-aspace_source_t *aspace_source_alloc(void) {
+aspace_source_t *aspace_source_alloc(const char *name) {
 	aspace_source_t *source = slab_cache_alloc(aspace_source_cache, MM_SLEEP);
 
+	assert(name);
+
+	source->name = kstrdup(name, MM_SLEEP);
 	refcount_set(&source->count, 0);
 	return source;
 }
@@ -747,15 +752,16 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	as = (aspace_t *)addr;
 
-	kprintf(LOG_KDBG, "Base               End                Flags  Source             Offset\n");
-	kprintf(LOG_KDBG, "====               ===                =====  ======             ======\n");
+	kprintf(LOG_KDBG, "Base               End                Flags  Source\n");
+	kprintf(LOG_KDBG, "====               ===                =====  ======\n");
 
 	AVLTREE_FOREACH(&as->regions, iter) {
 		region = avltree_entry(iter, aspace_region_t);
 
-		kprintf(LOG_KDBG, "0x%-16p 0x%-16p %-6d 0x%-16p %" PRIo "\n",
+		kprintf(LOG_KDBG, "0x%-16p 0x%-16p %-6d 0x%p+%" PRIo " %s\n",
 		        region->start, region->end, region->flags,
-		        region->source, region->offset);
+		        region->source, region->offset,
+			(region->source) ? region->source->name : "");
 	}
 
 	return KDBG_OK;

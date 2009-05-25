@@ -69,7 +69,7 @@ static aspace_backend_t aspace_anon_backend = {
  * @return		0 on success, negative error code on failure.
  */
 int aspace_anon_create(aspace_source_t **sourcep) {
-	aspace_source_t *source = aspace_source_alloc();
+	aspace_source_t *source = aspace_source_alloc("[anon]");
 
 	assert(sourcep);
 

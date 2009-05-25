@@ -64,6 +64,7 @@ typedef struct aspace_source {
 	void *data;			/**< Data for the backend. */
 	offset_t offset;		/**< Offset into the data source. */
 	refcount_t count;		/**< Count of regions using the source. */
+	char *name;			/**< Name of the source. */
 } aspace_source_t;
 
 /** Address space region structure. */
@@ -123,7 +124,7 @@ typedef struct aspace {
 extern int aspace_arch_create(aspace_t *as);
 
 /** Helper functions. */
-extern aspace_source_t *aspace_source_alloc(void);
+extern aspace_source_t *aspace_source_alloc(const char *name);
 
 /** Anonymous backend functions. */
 extern int aspace_anon_create(aspace_source_t **sourcep);
