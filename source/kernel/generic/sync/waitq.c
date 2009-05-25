@@ -114,11 +114,13 @@ bool wait_queue_wake(wait_queue_t *waitq) {
 
 		assert(thread->state == THREAD_SLEEPING);
 
-		thread->state = THREAD_READY;
-		sched_thread_insert(thread);
-
+		/* Remove the thread from the queue and wake it up. */
+		list_remove(&thread->waitq_link);
 		thread->waitq = NULL;
 		thread->interruptible = false;
+
+		thread->state = THREAD_READY;
+		sched_thread_insert(thread);
 
 		spinlock_unlock(&thread->lock);
 		spinlock_unlock(&waitq->lock);

@@ -278,7 +278,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 	if(thread->timeslice != 0) {
 		if(thread->priority > thread->owner->priority) {
 			thread->priority--;
-			dprintf("sched: thread %" PRIu32 " bonus (process: %" PRIu32 ", new: %" PRIs ", max: %" PRIs ")\n",
+			dprintf("sched: thread %" PRIu32 " (" PRIu32 ") bonus (new: %" PRIs ", max: %" PRIs ")\n",
 				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
 		}
 
@@ -303,7 +303,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 		if(cpu->count[i] > 0) {
 			thread->priority++;
 
-			dprintf("sched: thread %" PRIu32 " penalty (process: %" PRIu32 ", new: %" PRIs ", max: %" PRIs ")\n",
+			dprintf("sched: thread %" PRIu32 " (" PRIu32 ") penalty (new: %" PRIs ", max: %" PRIs ")\n",
 				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
 			return;
 		}		
