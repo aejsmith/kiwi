@@ -19,7 +19,7 @@ Import('config', 'envmgr')
 
 # Create the build configuration header.
 with open('config.h', 'w') as f:
-	f.write('/* This file is automatically-generated. Modify build.conf instead. */\n\n')
+	f.write('/* This file is automatically-generated, do not edit. */\n\n')
 	for (k, v) in config.items():
 		if isinstance(v, str):
 			f.write("#define CONFIG_%s \"%s\"\n" % (k, v))

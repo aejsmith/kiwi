@@ -22,6 +22,7 @@
 #define __COMPILER_H
 
 #ifdef __GNUC__
+# define __unused		__attribute__((unused))
 # define __packed		__attribute__((packed))
 # define __aligned(a)		__attribute__((aligned(a)))
 # define __noreturn		__attribute__((noreturn))

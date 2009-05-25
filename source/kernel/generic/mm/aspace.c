@@ -91,7 +91,7 @@ static int aspace_cache_ctor(void *obj, void *data, int kmflag) {
  * @param obj		Pointer to object.
  * @param data		Ignored. */
 static void aspace_cache_dtor(void *obj, void *data) {
-	aspace_t *aspace = (aspace_t *)obj;
+	aspace_t *aspace __unused = (aspace_t *)obj;
 
 	assert(avltree_empty(&aspace->regions));
 }
