@@ -29,7 +29,7 @@ class ConfigTextUI:
 	def option_menu(self, entry):
 		# Create the entry window.
 		(button, values) = snack.EntryWindow(
-					self.screen, entry.name, '',
+					self.screen, entry.name, 'Current value: %s' % (entry.get()) ,
 					[('New value:', str(entry.get()))],
 					buttons=[('OK', True), ('Cancel', False)],
 					entryWidth=self.maxwidth - 20,
