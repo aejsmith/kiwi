@@ -30,7 +30,7 @@ class ConfigTextUI:
 		# Create the entry window.
 		(button, values) = snack.EntryWindow(
 					self.screen, entry.name, 'Current value: %s' % (entry.get()) ,
-					[('New value:', str(entry.get()))],
+					[('New value:    ', str(entry.get()))],
 					buttons=[('OK', True), ('Cancel', False)],
 					entryWidth=self.maxwidth - 20,
 					width=self.maxwidth)
