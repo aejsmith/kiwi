@@ -92,33 +92,6 @@ void *memmove(void *dest, const void *src, size_t count) {
 }
 #endif
 
-#if 0
-/** Duplicate memory.
- *
- * Allocates a block of memory big enough and copies the source to it.
- *
- * @param src		Memory to duplicate.
- * @param count		Number of bytes to duplicate.
- *
- * @return		Pointer to duplicated memory.
- */
-void *memdup(const void *src, size_t count) {
-	char *dest;
-
-	if(count == 0) {
-		return NULL;
-	}
-
-	dest = kmalloc(count);
-	if(dest == NULL) {
-		return NULL;
-	}
-
-	memcpy(dest, src, count);
-	return dest;
-}
-#endif
-
 /** Get length of string.
  *
  * Gets the length of the string specified. The length is the number of
@@ -384,62 +357,6 @@ char *strncpy(char *dest, const char *src, size_t count) {
 	return dest;
 }
 
-#if 0
-/** Duplicate a string.
- *
- * Allocates a buffer big enough to hold the given string and copies the
- * string to it. The pointer returned should be freed with kfree.
- *
- * @param s		Pointer to the source buffer.
- * 
- * @return		Pointer to the allocated buffer containing the string.
- */
-char *strdup(const char *s) {
-	char *dup;
-	size_t len = strlen(s) + 1;
-
-	dup = kmalloc(len);
-	if(dup == NULL) {
-		return NULL;
-	}
-
-	memcpy(dup, s, len);
-	return dup;
-}
-
-/** Duplicate a string with a length limit.
- *
- * Allocates a buffer either as big as the string or the maximum length
- * given, and then copies at most the number of bytes specified of the string
- * to it. If the string is longer than the limit, a null byte will be added
- * to the end of the duplicate. The pointer returned should be freed with
- * kfree.
- *
- * @param s		Pointer to the source buffer.
- * @param n		Maximum number of bytes to copy.
- * 
- * @return		Pointer to the allocated buffer containing the string.
- */
-char *strndup(const char *s, size_t n) {
-	size_t len;
-	char *dup;
-
-	len = strlen(s);
-	if(n < len) {
-		len = n;
-	}
-
-	dup = kmalloc(len + 1);
-	if(dup == NULL) {
-		return NULL;
-	}
-
-	memcpy(dup, s, len);
-	dup[len] = '\0';
-	return dup;
-}
-#endif
-
 /** Convert string to integer.
  *
  * Converts the string specified to an integer. If a part of the string is
@@ -471,6 +388,88 @@ int atoi(const char *s) {
 	}
 	
 	return (sign == -1)? -v:v;
+}
+
+/** Duplicate memory.
+ *
+ * Allocates a block of memory big enough and copies the source to it.
+ *
+ * @param src		Memory to duplicate.
+ * @param count		Number of bytes to duplicate.
+ * @param kmflag	Allocation flags for kmalloc().
+ *
+ * @return		Pointer to duplicated memory.
+ */
+void *kmemdup(const void *src, size_t count, int kmflag) {
+	char *dest;
+
+	if(count == 0) {
+		return NULL;
+	}
+
+	dest = kmalloc(count, kmflag);
+	if(dest == NULL) {
+		return NULL;
+	}
+
+	memcpy(dest, src, count);
+	return dest;
+}
+
+/** Duplicate a string.
+ *
+ * Allocates a buffer big enough to hold the given string and copies the
+ * string to it. The pointer returned should be freed with kfree().
+ *
+ * @param src		Pointer to the source buffer.
+ * @param kmflag	Allocation flags for kmalloc().
+ * 
+ * @return		Pointer to the allocated buffer containing the string.
+ */
+char *kstrdup(const char *src, int kmflag) {
+	size_t len = strlen(src) + 1;
+	char *dup;
+
+	dup = kmalloc(len, kmflag);
+	if(dup == NULL) {
+		return NULL;
+	}
+
+	memcpy(dup, src, len);
+	return dup;
+}
+
+/** Duplicate a string with a length limit.
+ *
+ * Allocates a buffer either as big as the string or the maximum length
+ * given, and then copies at most the number of bytes specified of the string
+ * to it. If the string is longer than the limit, a null byte will be added
+ * to the end of the duplicate. The pointer returned should be freed with
+ * kfree().
+ *
+ * @param src		Pointer to the source buffer.
+ * @param n		Maximum number of bytes to copy.
+ * @param kmflag	Allocation flags for kmalloc().
+ * 
+ * @return		Pointer to the allocated buffer containing the string.
+ */
+char *kstrndup(const char *src, size_t n, int kmflag) {
+	size_t len;
+	char *dup;
+
+	len = strlen(src);
+	if(n < len) {
+		len = n;
+	}
+
+	dup = kmalloc(len + 1, kmflag);
+	if(dup == NULL) {
+		return NULL;
+	}
+
+	memcpy(dup, src, len);
+	dup[len] = '\0';
+	return dup;
 }
 
 /*

@@ -28,7 +28,6 @@
 extern void *memcpy(void *dest, const void *src, size_t count);
 extern void *memset(void *dest, int val, size_t count);
 extern void *memmove(void *dest, const void *src, size_t count);
-//extern void *memdup(const void *src, size_t count);
 extern size_t strlen(const char *str);
 extern size_t strnlen(const char *str, size_t count);
 extern int strcmp(const char *s1, const char *s2);
@@ -40,11 +39,12 @@ extern char *strchr(const char *s, int c);
 extern char *strrchr(const char *s, int c);
 extern char *strcpy(char *dest, const char *src);
 extern char *strncpy(char *dest, const char *src, size_t count);
-//extern char *strdup(const char *s);
-//extern char *strndup(const char *s, size_t n);
 extern int atoi(const char *s);
-extern char *basename(char *path);
-extern char *dirname(char *path);
+
+extern void *kmemdup(const void *src, size_t count, int kmflag);
+extern char *kstrdup(const char *s, int kmflag);
+extern char *kstrndup(const char *s, size_t n, int kmflag);
+
 extern unsigned long strtoul(const char *cp, char **endp, unsigned int base);
 extern long strtol(const char *cp,char **endp,unsigned int base);
 extern unsigned long long strtoull(const char *cp, char **endp, unsigned int base);
