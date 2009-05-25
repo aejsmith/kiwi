@@ -21,7 +21,7 @@ Option('EXTRA_CFLAGS', 'Extra compiler options for C sources.', '')
 Option('EXTRA_CXXFLAGS', 'Extra compiler options for C++ sources.', '')
 
 Option('QEMU_BINARY', 'Path to QEMU binary to use for the qtest target.', 'qemu')
-Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-vga std')
+Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-serial stdio -vga std')
 
 Option('TOOLCHAIN_DIR', 'Directory to store toolchain builds in.', '/please/change/me')
 Option('TOOLCHAIN_MAKE_JOBS', 'Argument to pass to -j for make when building toolchain.', 1)

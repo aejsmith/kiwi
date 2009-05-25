@@ -40,5 +40,5 @@ Default(iso)
 
 # Run generated ISO image in QEMU.
 dist.Alias('qtest', dist.Command('qtest', ['cdrom.iso'],
-           Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE -serial stdio ' + \
+           Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE ' + \
                   config['QEMU_OPTS'], None)))
