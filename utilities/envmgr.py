@@ -54,7 +54,7 @@ class EnvironmentManager(UserDict):
 			'-Wall', '-Wextra', '-Werror', '-Wcast-align',
 			'-Wno-variadic-macros', '-Wno-unused-parameter',
 			'-Wwrite-strings', '-Wmissing-declarations',
-			'-Wredundant-decls', '-Wno-format', '-g'
+			'-Wredundant-decls', '-Wno-format', '-g', '-pipe'
 		]
 		self.base['CFLAGS'] = ['-std=gnu99']
 		self.base['CXXFLAGS'] = []
