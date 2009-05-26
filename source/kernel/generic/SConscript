@@ -61,6 +61,7 @@ env['OBJFILES'] += [
 	env.Object('time/timer.c'),
 
 	env.Object('types/avltree.c'),
+	env.Object('types/bitmap.c'),
 	env.Object('types/hash.c'),
 
 	env.Object('fatal.c'),

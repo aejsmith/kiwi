@@ -21,6 +21,8 @@
 #ifndef __LIB_STRING_H
 #define __LIB_STRING_H
 
+#include <mm/flags.h>
+
 #include <types/vararg.h>
 
 #include <types.h>
