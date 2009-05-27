@@ -39,7 +39,7 @@ def iso_image_func(target, source, env):
 	f = open(os.path.join(tmpdir, 'boot', 'grub', 'menu.lst'), 'w')
 	f.write('default 0\n')
 	f.write('timeout 5\n\n')
-	f.write('title Kiwi (%s)\n' % (config['ARCH']))
+	f.write('title Kiwi v%s (%s-%s)\n' % (env['KIWI_VER_STRING'], config['ARCH'], config['PLATFORM']))
 	f.write('	kernel /kernel/%s\n' % (os.path.basename(kernel)))
 	f.close()
 
