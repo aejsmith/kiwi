@@ -183,6 +183,7 @@ class ConfigTextUI:
 	# should be saved, False if not.
 	def run(self):
 		self.screen = snack.SnackScreen()
+		self.screen.drawRootText(0, 0, 'Kiwi v%s Configuration' % (self.manager.version['KIWI_VER_STRING']))
 		try:
 			# Main loop for the UI, will run until a button is
 			# pressed on the main menu.
