@@ -117,6 +117,26 @@ static void ipi_message_release(ipi_message_t *message) {
 	spinlock_unlock(&ipi_message_lock);
 }
 
+/** Queue an IPI to a CPU and send an IPI if required.
+ * @param message	Message to queue.
+ * @param cpu		CPU to queue in. */
+static void ipi_message_queue(ipi_message_t *message, cpu_t *cpu) {
+	spinlock_lock(&cpu->ipi_lock, 0);
+
+	list_append(&cpu->ipi_queue, &message->cpu_link);
+
+	/* We don't send the CPU an IPI if it's already been sent an IPI that
+	 * it hasn't finished handling yet to improve performance a little bit.
+	 * The locking interaction with ipi_process_pending() ensures that this
+	 * message will get processed even if we do not send an IPI. */
+	if(!cpu->ipi_sent) {
+		cpu->ipi_sent = true;
+		ipi_send_interrupt(cpu->id);
+	}
+
+	spinlock_unlock(&cpu->ipi_lock);
+}
+
 /** Process pending IPI messages to the current CPU. */
 void ipi_process_pending(void) {
 	ipi_message_t *message;
@@ -193,6 +213,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 
 	/* Don't do anything if the IPI system isn't enabled. */
 	if(!ipi_enabled) {
+		intr_restore(state);
 		return 0;
 	}
 
@@ -202,27 +223,16 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 		return -ERR_DEST_UNKNOWN;
 	}
 
+	/* Get a message structure for the message. */
 	message = ipi_message_get();
 	message->handler = handler;
 	message->data1 = data1;
 	message->data2 = data2;
 	message->data3 = data3;
 	message->data4 = data4;
-	message->status = 0;
 
-	/* Queue the message in the target CPU's message queue and send it
-	 * an IPI if necessary. We don't send it an IPI if it's already been
-	 * sent an IPI that it hasn't finished handling yet to improve
-	 * performance a little bit. The locking interaction with
-	 * ipi_process_pending() ensures that this message will get processed
-	 * even if we do not send an IPI. */
-	spinlock_lock(&cpus[dest]->ipi_lock, 0);
-	list_append(&cpus[dest]->ipi_queue, &message->cpu_link);
-	if(!cpus[dest]->ipi_sent) {
-		cpus[dest]->ipi_sent = true;
-		ipi_send_interrupt(dest);
-	}
-	spinlock_unlock(&cpus[dest]->ipi_lock);
+	/* Queue the message in the CPU's message queue and send it an IPI. */
+	ipi_message_queue(message, cpus[dest]);
 
 	if(flags & IPI_SEND_SYNC) {
 		/* Synchronous, wait for the message to be acknowledged. */
@@ -266,10 +276,16 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
  */
 void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
                    unative_t data3, unative_t data4, int flags) {
-	//bool state = intr_disable();
-	//ipi_message_t *message;
+	bool state = intr_disable();
+	ipi_message_t *message;
 	list_t sent_list;
 	cpu_t *cpu;
+
+	/* Don't do anything if the IPI system isn't enabled. */
+	if(!ipi_enabled) {
+		intr_restore(state);
+		return;
+	}
 
 	/* Initialize the list we use to store all the messages that were
 	 * sent, for tracking synchronous messages. */
@@ -278,7 +294,50 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
 	/* Loop through all running CPUs, excluding ourselves. */
 	LIST_FOREACH(&cpus_running, iter) {
 		cpu = list_entry(iter, cpu_t, header);
+		if(cpu == curr_cpu) {
+			continue;
+		}
+
+		/* Get a message structure to send to the CPU. */
+		message = ipi_message_get();
+		message->handler = handler;
+		message->data1 = data1;
+		message->data2 = data2;
+		message->data3 = data3;
+		message->data4 = data4;
+
+		/* Queue the message in the CPU's message queue and send it an IPI. */
+		ipi_message_queue(message, cpu);
+
+		/* If we're sending synchronously, record the message.
+		 * Otherwise drop the count and do no more with it. */
+		if(flags & IPI_SEND_SYNC) {
+			list_append(&sent_list, &message->header);
+		} else {
+			ipi_message_release(message);
+		}
 	}
+
+	/* If sending synchronously, wait for all the sent messages to be
+	 * acknowledged. */
+	if(flags & IPI_SEND_SYNC) {
+		do {
+			LIST_FOREACH_SAFE(&sent_list, iter) {
+				message = list_entry(iter, ipi_message_t, header);
+
+				if(atomic_get(&message->acked) == 0) {
+					continue;
+				}
+
+				list_remove(&message->header);
+				ipi_message_release(message);
+			}
+
+			ipi_process_pending();
+		} while(!list_empty(&sent_list));
+	}
+
+	intr_restore(state);
 }
 
 /** Acknowledge a message.

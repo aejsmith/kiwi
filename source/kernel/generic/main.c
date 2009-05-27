@@ -48,11 +48,6 @@
 extern void kmain_bsp(void *data);
 extern void kmain_ap(void);
 
-static int ipi_func(void *msg, unative_t data1, unative_t data2, unative_t data3, unative_t data4) {
-	kprintf(LOG_NORMAL, "Receiver %u! %u %u %u %u\n", curr_cpu->id, data1, data2, data3, data4);
-	return 42;
-}
-
 /** Second-stage intialization thread.
  * @param arg		Architecture initialization data. */
 static void kinit_thread(void *data) {
@@ -63,9 +58,6 @@ static void kinit_thread(void *data) {
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
-
-	int ret = ipi_send(3, ipi_func, 1, 3, 3, 7, IPI_SEND_SYNC);
-	kprintf(LOG_NORMAL, "Sender %u! %d\n", curr_cpu->id, ret);
 
 	while(true) {
 		timer_sleep(1);
