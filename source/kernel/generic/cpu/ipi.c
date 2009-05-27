@@ -18,4 +18,5 @@
  * @brief		Inter-Processor Interrupt functions.
  */
 
-
+#include <cpu/cpu.h>
+#include <cpu/ipi.h>

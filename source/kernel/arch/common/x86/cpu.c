@@ -29,6 +29,45 @@
 
 #include <kdbg.h>
 
+#if CONFIG_SMP
+/** Atomic variable for paused CPUs to wait on. */
+atomic_t cpu_pause_wait = 0;
+
+/** Whether cpu_halt_all() has been called. */
+atomic_t cpu_halting_all = 0;
+
+/** Pause execution of other CPUs.
+ *
+ * Pauses execution of all CPUs other than the CPU that calls the function.
+ * This is done using an NMI, so CPUs will be paused even if they have
+ * interrupts disabled. Use cpu_resume_all() to resume CPUs after using this
+ * function.
+ */
+void cpu_pause_all(void) {
+	atomic_set(&cpu_pause_wait, 1);
+	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+}
+
+/** Resume paused CPUs.
+ *
+ * Resumes execution of all other CPUs that have been paused using
+ * cpu_pause_all().
+ */
+void cpu_resume_all(void) {
+	atomic_set(&cpu_pause_wait, 0);
+}
+
+/** Halt all other CPUs.
+ *
+ * Halts execution of all other CPUs other than the CPU that calls the
+ * function. The CPUs will not be able to resume after being halted.
+ */
+void cpu_halt_all(void) {
+	atomic_set(&cpu_halting_all, 1);
+	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+}
+#endif
+
 /** Get current CPU ID.
  * 
  * Gets the ID of the CPU that the function executes on. This function should

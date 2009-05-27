@@ -702,10 +702,10 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	} else if(reason == KDBG_ENTRY_STEPPED) {
 		kprintf(LOG_KDBG, "KDBG: Warning: Stepped but no step in progress?\n");
 	}
-#if CONFIG_SMP
+
 	/* Ask all other CPUs to pause execution. */
-	cpu_ipi(IPI_DEST_ALL, 0, IPI_KDBG);
-#endif
+	cpu_pause_all();
+
 	curr_kdbg_frame = frame;
 
 	sym = symtab_lookup_addr(&kernel_symtab, frame->ip, &off);
@@ -747,6 +747,9 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 			}
 		}
 	}
+
+	/* Resume other CPUs. */
+	cpu_resume_all();
 
 	atomic_set(&kdbg_running, 0);
 	intr_restore(state);

@@ -51,6 +51,13 @@ typedef struct cpu {
 	struct aspace *aspace;		/**< Address space currently in use. */
 	bool idle;			/**< Whether the CPU is idle. */
 
+#if CONFIG_SMP
+	/** IPI information. */
+	list_t ipi_queue;		/**< List of IPI messages sent to this CPU. */
+	bool ipi_sent;			/**< Whether it is necessary to send an IPI. */
+	spinlock_t ipi_lock;		/**< Lock to protect IPI queue. */
+#endif
+
 	/** Timer information. */
 	uint64_t tick_len;		/**< Current tick length. */
 	list_t timer_list;		/**< List of active timers. */
@@ -66,6 +73,16 @@ extern list_t cpus_running;
 extern cpu_t **cpus;
 
 extern cpu_id_t cpu_current_id(void);
+
+#if CONFIG_SMP
+extern void cpu_pause_all(void);
+extern void cpu_resume_all(void);
+extern void cpu_halt_all(void);
+#else
+#define cpu_pause_all()
+#define cpu_resume_all()
+#define cpu_halt_all()
+#endif
 
 extern cpu_t *cpu_add(cpu_id_t id, int state);
 extern void cpu_init(void);

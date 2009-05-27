@@ -90,6 +90,11 @@
 #define LAPIC_IPI_INIT			0x05	/**< INIT. */
 #define LAPIC_IPI_SIPI			0x06	/**< Start-Up (SIPI). */
 
+/** IPI destination shorthands. */
+#define LAPIC_IPI_DEST_SINGLE		0x00	/**< Send to a single CPU (destination ID specified). */
+#define LAPIC_IPI_DEST_ALL		0x03	/**< All, excluding self. */
+#define LAPIC_IPI_DEST_ALL_INCL		0x02	/**< All, including self. */
+
 extern bool lapic_enabled;
 
 extern uint32_t lapic_id(void);

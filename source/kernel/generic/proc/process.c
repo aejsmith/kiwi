@@ -170,11 +170,11 @@ void process_init(void) {
 	                                  process_cache_ctor, NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Create the kernel process. */
-	ret = process_create("Kernel", NULL, PRIORITY_KERNEL,
+	ret = process_create("[kernel]", NULL, PRIORITY_KERNEL,
 	                     PROCESS_CRITICAL | PROCESS_FIXEDPRIO | PROCESS_NOASPACE,
 	                     &kernel_proc);
 	if(ret != 0) {
-		fatal("Could not initialize Kernel process: %d", ret);
+		fatal("Could not initialize kernel process: %d", ret);
 	}
 }
 

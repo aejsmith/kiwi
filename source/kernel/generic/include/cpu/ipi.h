@@ -21,6 +21,10 @@
 #ifndef __CPI_IPI_H
 #define __CPI_IPI_H
 
-
+#if CONFIG_SMP
+extern void ipi_init(void);
+#else
+#define ipi_init()	
+#endif
 
 #endif /* __CPI_IPI_H */

@@ -94,7 +94,7 @@ static void smp_boot(cpu_t *cpu) {
 	ap_stack_ptr = stack + KSTACK_SIZE;
 
 	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
-	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
 	smp_boot_delay(10000);
 
 	/* Send a SIPI. The 0x07 argument specifies where to look for the
@@ -104,7 +104,7 @@ static void smp_boot(cpu_t *cpu) {
 	 * halted (even by the 'hlt' instruction) then it can accept SIPIs.
 	 * If the CPU reaches the idle loop before the second SIPI is sent, it
 	 * will fault. */
-	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
 	smp_boot_delay(10000);
 
 	/* If the CPU is up, then return. */
@@ -114,7 +114,7 @@ static void smp_boot(cpu_t *cpu) {
 
 	/* Send a second SIPI and then check in 10ms intervals to see if it
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
-	lapic_ipi(IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
 	while(delay < 5000000) {
 		if(atomic_get(&ap_boot_wait)) {
 			return;

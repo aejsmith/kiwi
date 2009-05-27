@@ -31,7 +31,7 @@
 #include <version.h>
 
 /** Atomic variable to protect against nested calls to _fatal(). */
-atomic_t fatal_protect = 0;
+static atomic_t fatal_protect = 0;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, int *total, void *data) {
@@ -68,10 +68,10 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 
 	if(atomic_cmp_set(&fatal_protect, 0, 1)) {
 		va_start(args, format);
-#if CONFIG_SMP
-		/* Send an IPI to all other CPUs to halt them. */
-		cpu_ipi(IPI_DEST_ALL, 0, IPI_FATAL);
-#endif
+
+		/* Halt all other CPUs. */
+		cpu_halt_all();
+
 		console_putch(LOG_FATAL, '\n');
 		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_current_id(), kiwi_ver_string);
 		do_printf(fatal_printf_helper, NULL, format, args);

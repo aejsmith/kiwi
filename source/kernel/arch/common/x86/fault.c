@@ -43,8 +43,6 @@
 
 extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 
-extern atomic_t fatal_protect;
-
 /** String names for CPU exceptions. */
 static const char *fault_names[] = {
 	"Divide Error", "Debug", "Non-Maskable Interrupt", "Breakpoint",
@@ -58,24 +56,27 @@ static const char *fault_names[] = {
 	"Reserved", "Reserved", "Reserved",
 };
 
+#if CONFIG_SMP
+extern atomic_t cpu_pause_wait;
+extern atomic_t cpu_halting_all;
+
 /** Handler for NMIs.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		True if handled, false if not. */
 static bool fault_handle_nmi(unative_t num, intr_frame_t *frame) {
-	if(atomic_get(&fatal_protect) != 0) {
-		/* A CPU is currently in fatal(), this means we're being
-		 * asked to halt by that CPU. */
+	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
-	} else if(atomic_get(&kdbg_running)) {
+	} else if(atomic_get(&cpu_pause_wait)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
-		while(atomic_get(&kdbg_running));
+		while(atomic_get(&cpu_pause_wait));
 		return true;
 	}
 
 	return false;
 }
+#endif
 
 /** Handler for double faults.
  * @param num		CPU interrupt number.
@@ -133,7 +134,9 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 /** Table of special fault handlers. */
 static intr_handler_t fault_handler_table[] = {
 	[FAULT_DEBUG] = kdbg_int1_handler,
+#if CONFIG_SMP
 	[FAULT_NMI] = fault_handle_nmi,
+#endif
 	[FAULT_DOUBLE] = fault_handle_doublefault,
 	[FAULT_PAGE] = fault_handle_pagefault,
 };
