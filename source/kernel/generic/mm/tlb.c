@@ -24,8 +24,6 @@
 
 #include <arch/spinlock.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/ipi.h>
 
 #include <mm/aspace.h>
@@ -48,8 +46,6 @@ static int tlb_shootdown_responder(void *msg, unative_t data1, unative_t data2,
 	ptr_t start = (ptr_t)data2;
 	ptr_t end = (ptr_t)data3;
 	page_map_t *pmap;
-
-	kprintf(LOG_NORMAL, "performing tlb invalidation on %u (0x%p-0x%p)\n", curr_cpu->id, start, end);
 
 	/* Acknowledge receipt of the message. */
 	ipi_acknowledge(msg, 0);
@@ -104,8 +100,6 @@ void tlb_shootdown(aspace_t *as, ptr_t start, ptr_t end) {
 	if(cpu_count < 2 || (as != NULL && refcount_get(&as->count) == ((as == curr_aspace) ? 1 : 0))) {
 		return;
 	}
-
-	kprintf(LOG_NORMAL, "cpu %u shooting 0x%p-0x%p\n", curr_cpu->id, start, end);
 
 	/* There are other users of the address space. Need to deliver a TLB
 	 * shootdown request to them. */
