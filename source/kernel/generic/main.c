@@ -49,7 +49,7 @@ extern void kmain_bsp(void *data);
 extern void kmain_ap(void);
 
 /** Second-stage intialization thread.
- * @param arg		Architecture initialization data. */
+ * @param arg		Thread argument (unused). */
 static void kinit_thread(void *data) {
 	uint64_t count = 0;
 
@@ -119,7 +119,7 @@ void kmain_bsp(void *data) {
 	arch_final_init();
 
 	/* Create the second stage initialization thread. */
-	if(thread_create("kinit", kernel_proc, 0, kinit_thread, data, &thread) != 0) {
+	if(thread_create("kinit", kernel_proc, 0, kinit_thread, NULL, &thread) != 0) {
 		fatal("Could not create initialization thread");
 	}
 	thread_run(thread);
