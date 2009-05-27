@@ -22,6 +22,9 @@
  * Each kernel stack has a pointer to the CPU structure of the CPU it's being
  * used on at the bottom of it. The curr_cpu macro expands to the value of this
  * pointer, using cpu_get_pointer() to get its value.
+ *
+ * The functions in this file are used to manage information about CPUs, and
+ * the cpu_t structures for them.
  */
 
 #include <console/kprintf.h>
@@ -32,7 +35,6 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
-#include <mm/slab.h>
 
 #include <proc/sched.h>
 
@@ -49,9 +51,6 @@ LIST_DECLARE(cpus_running);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
 #if CONFIG_SMP
-/** Variable used by an AP to signal that it has booted. */
-atomic_t ap_boot_wait = 0;
-
 extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame);
 
 /** Handler for a reschedule IPI.
@@ -62,6 +61,7 @@ bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame) {
 	sched_yield();
 	return false;
 }
+#endif /* CONFIG_SMP */
 
 /** Add a new CPU.
  *
@@ -101,19 +101,7 @@ cpu_t *cpu_add(cpu_id_t id, int state) {
 	return cpus[id];
 }
 
-/** Boot all detected secondary CPUs. */
-void cpu_boot_all(void) {
-	size_t i;
-
-	for(i = 0; i <= cpu_id_max; i++) {
-		if(cpus[i]->state == CPU_DOWN) {
-			cpu_boot(cpus[i]);
-		}
-	}
-}
-#endif /* CONFIG_SMP */
-
-/** Properly initialize the CPU subsystem and detect secondary CPUs. */
+/** Properly initialize the CPU subsystem. */
 void cpu_init(void) {
 	/* First get the real ID of the boot CPU. */
 	boot_cpu.id = cpu_id_max = cpu_current_id();
@@ -122,13 +110,6 @@ void cpu_init(void) {
 	/* Now create the initial CPU array and add the boot CPU to it. */
 	cpus = kcalloc(cpu_id_max + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
-#if CONFIG_SMP
-	/* Detect secondary CPUs. */
-	cpu_detect();
-#endif
-	/* Now that we know the CPU count, we can enable the magazine layer
-	 * in the slab allocator. */
-	slab_enable_cpu_cache();
 }
 
 /** Set up the boot CPU structure and the current CPU pointer. */

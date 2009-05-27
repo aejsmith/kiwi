@@ -24,6 +24,7 @@
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
+#include <cpu/smp.h>
 
 #include <mm/aspace.h>
 #include <mm/kheap.h>
@@ -46,17 +47,14 @@
 extern void kmain_bsp(void *data);
 extern void kmain_ap(void);
 
-extern atomic_t ap_boot_wait;
-
 /** Second-stage intialization thread.
  * @param arg		Architecture initialization data. */
 static void kinit_thread(void *data) {
 	uint64_t count = 0;
 
-#if CONFIG_SMP
 	/* Bring up secondary CPUs. */
-	cpu_boot_all();
-#endif
+	smp_boot_cpus();
+
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
 
@@ -104,13 +102,18 @@ void kmain_bsp(void *data) {
 
 	/* Detect secondary CPUs. */
 	cpu_init();
+	smp_detect_cpus();
+
+	/* Now that we know the CPU count, we can enable the magazine layer
+	 * in the slab allocator. */
+	slab_enable_cpu_cache();
 
 	/* Bring up the scheduler and friends. */
 	process_init();
 	thread_init();
 	sched_init();
 
-	/* Perform final rchitecture initialization. */
+	/* Perform final architecture initialization. */
 	arch_final_init();
 
 	/* Create the second stage initialization thread. */

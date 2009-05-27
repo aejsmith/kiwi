@@ -1,4 +1,4 @@
-/* Kiwi PC CPU detection
+/* Kiwi PC secondary CPU detection
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		PC CPU detection.
+ * @brief		PC secondary CPU detection.
  *
  * The functions in this file are used to detect CPUs in the system the kernel
  * is running it. ACPI is used to perform detection on systems that support
@@ -28,7 +28,7 @@
 #include <console/kprintf.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 
@@ -45,7 +45,7 @@
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		True if checksum is correct, false if not. */
-static bool cpu_mps_checksum(uint8_t *range, size_t size) {
+static bool smp_mps_checksum(uint8_t *range, size_t size) {
 	uint8_t checksum = 0;
 	size_t i;
 
@@ -60,7 +60,7 @@ static bool cpu_mps_checksum(uint8_t *range, size_t size) {
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		Pointer to FP if found, NULL if not. */
-static mp_fptr_t *cpu_mps_find_fp(phys_ptr_t start, size_t size) {
+static mp_fptr_t *smp_mps_find_fp(phys_ptr_t start, size_t size) {
 	mp_fptr_t *fp;
 	size_t i;
 
@@ -74,11 +74,12 @@ static mp_fptr_t *cpu_mps_find_fp(phys_ptr_t start, size_t size) {
 		/* Check if the signature and checksum are correct. */
 		if(strncmp(fp->signature, "_MP_", 4) != 0) {
 			continue;
-		} else if(!cpu_mps_checksum((uint8_t *)fp, (fp->length * 16))) {
+		} else if(!smp_mps_checksum((uint8_t *)fp, (fp->length * 16))) {
 			continue;
 		}
 
-		kprintf(LOG_DEBUG, "cpu: found MPFP at 0x%" PRIpp " (revision: %" PRIu8 ")\n", start + i, fp->spec_rev);
+		kprintf(LOG_DEBUG, "cpu: found MPFP at 0x%" PRIpp " (revision: %" PRIu8 ")\n",
+		        start + i, fp->spec_rev);
 		return fp;
 	}
 
@@ -87,7 +88,7 @@ static mp_fptr_t *cpu_mps_find_fp(phys_ptr_t start, size_t size) {
 
 /** Detect CPUs using the MPS tables.
  * @return		True if succeeded, false if not. */
-static bool cpu_detect_mps(void) {
+static bool smp_detect_mps(void) {
 	ptr_t ebda, entry;
 	mp_config_t *cfg;
 	mp_fptr_t *fp;
@@ -98,7 +99,7 @@ static bool cpu_detect_mps(void) {
 	ebda = (ptr_t)(*(uint16_t *)0x40e << 4);
 
 	/* Search for the MPFP structure. */
-	if(!(fp = cpu_mps_find_fp(ebda, 0x400)) && !(fp = cpu_mps_find_fp(0xE0000, 0x20000))) {
+	if(!(fp = smp_mps_find_fp(ebda, 0x400)) && !(fp = smp_mps_find_fp(0xE0000, 0x20000))) {
 		return false;
 	}
 
@@ -115,7 +116,7 @@ static bool cpu_detect_mps(void) {
 	if(strncmp(cfg->signature, "PCMP", 4) != 0) {
 		page_phys_unmap(cfg, PAGE_SIZE);
 		return false;
-	} else if(!cpu_mps_checksum((uint8_t *)cfg, cfg->length)) {
+	} else if(!smp_mps_checksum((uint8_t *)cfg, cfg->length)) {
 		page_phys_unmap(cfg, PAGE_SIZE);
 		return false;
 	}
@@ -135,7 +136,7 @@ static bool cpu_detect_mps(void) {
 				break;
 			} else if(cpu->cpu_flags & 2) {
 				/* This is the BSP, do a sanity check. */
-				if(cpu->lapic_id != lapic_id()) {
+				if(cpu->lapic_id != cpu_current_id()) {
 					fatal("BSP entry does not match current CPU ID");
 				}
 				break;
@@ -152,7 +153,7 @@ static bool cpu_detect_mps(void) {
 
 /** Detect CPUs using ACPI.
  * @return		True if succeeded, false if not. */
-static bool cpu_detect_acpi(void) {
+static bool smp_detect_acpi(void) {
 	acpi_madt_lapic_t *lapic;
 	acpi_madt_t *madt;
 	size_t i, length;
@@ -171,7 +172,7 @@ static bool cpu_detect_acpi(void) {
 		} else if(!(lapic->flags & (1<<0))) {
 			/* Ignore disabled processors. */
 			continue;
-		} else if(lapic->lapic_id == lapic_id()) {
+		} else if(lapic->lapic_id == cpu_current_id()) {
 			continue;
 		}
 
@@ -187,19 +188,19 @@ static bool cpu_detect_acpi(void) {
  * Detects all secondary CPUs in the current system, using the ACPI tables
  * where possible. Falls back on the MP tables if ACPI is unavailable.
  */
-void cpu_detect(void) {
+void smp_detect_cpus(void) {
 	/* Do not do anything if we do not have a local APIC on the BSP. */
 	if(!lapic_enabled) {
 		return;
 	}
 
 	/* Use ACPI where supported. */
-	if(!acpi_supported || !cpu_detect_acpi()) {
-		if(!cpu_detect_mps()) {
-			kprintf(LOG_DEBUG, "cpu: neither ACPI or MPS are available for CPU detection\n");
+	if(!acpi_supported || !smp_detect_acpi()) {
+		if(!smp_detect_mps()) {
+			kprintf(LOG_DEBUG, "smp: neither ACPI or MPS are available for CPU detection\n");
 			return;
 		}
 	}
 
-	kprintf(LOG_DEBUG, "cpu: detected %" PRIs " CPU(s)\n", cpu_count);
+	kprintf(LOG_DEBUG, "smp: detected %" PRIs " CPU(s)\n", cpu_count);
 }

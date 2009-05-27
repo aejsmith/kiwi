@@ -32,15 +32,24 @@ AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 env['OBJFILES'] += [
 	env.Object('console/console.c'),
 	env.Object('console/kprintf.c'),
+]
 
+env['OBJFILES'] += [
 	env.Object('cpu/cpu.c'),
 	env.Object('cpu/intr.c'),
 	env.Object('cpu/irq.c'),
+]
 
+if config['SMP']:
+	env['OBJFILES'].append(env.Object('cpu/ipi.c'))
+
+env['OBJFILES'] += [
 	env.Object('lib/do_printf.c'),
 	env.Object('lib/sprintf.c'),
 	env.Object('lib/string.c'),
+]
 
+env['OBJFILES'] += [
 	env.Object('mm/aspace.c'),
 	env.Object('mm/aspace_anon.c'),
 	env.Object('mm/kheap.c'),
@@ -48,29 +57,38 @@ env['OBJFILES'] += [
 	env.Object('mm/pmm.c'),
 	env.Object('mm/slab.c'),
 	env.Object('mm/vmem.c'),
-
-	env.Object('proc/process.c'),
-	env.Object('proc/sched.c'),
-	env.Object('proc/thread.c'),
-
-	env.Object('sync/mutex.c'),
-	env.Object('sync/semaphore.c'),
-	env.Object('sync/spinlock.c'),
-	env.Object('sync/waitq.c'),
-
-	env.Object('time/timer.c'),
-
-	env.Object('types/avltree.c'),
-	env.Object('types/bitmap.c'),
-	env.Object('types/hash.c'),
-
-	env.Object('fatal.c'),
-	env.Object('kdbg.c'),
-	env.Object('main.c'),
-	env.Object('symtab.c'),
-
-	env.Object('version.c'),
 ]
 
 if config['SMP']:
 	env['OBJFILES'].append(env.Object('mm/tlb.c'))
+
+env['OBJFILES'] += [
+	env.Object('proc/process.c'),
+	env.Object('proc/sched.c'),
+	env.Object('proc/thread.c'),
+]
+
+env['OBJFILES'] += [
+	env.Object('sync/mutex.c'),
+	env.Object('sync/semaphore.c'),
+	env.Object('sync/spinlock.c'),
+	env.Object('sync/waitq.c'),
+]
+
+env['OBJFILES'] += [
+	env.Object('time/timer.c'),
+]
+
+env['OBJFILES'] += [
+	env.Object('types/avltree.c'),
+	env.Object('types/bitmap.c'),
+	env.Object('types/hash.c'),
+]
+
+env['OBJFILES'] += [
+	env.Object('fatal.c'),
+	env.Object('kdbg.c'),
+	env.Object('main.c'),
+	env.Object('symtab.c'),
+	env.Object('version.c'),
+]
