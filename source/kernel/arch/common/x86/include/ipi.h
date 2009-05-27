@@ -1,4 +1,4 @@
-/* Kiwi error number definitions
+/* Kiwi x86 IPI functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,17 +15,19 @@
 
 /**
  * @file
- * @brief		Error number definitions.
+ * @brief		x86 IPI functions.
  */
 
-#ifndef __ERRORS_H
-#define __ERRORS_H
+#ifndef __ARCH_X86_IPI_H
+#define __ARCH_X86_IPI_H
 
-#define ERR_NO_MEMORY		1	/**< No memory available. */
-#define ERR_PARAM_INVAL		2	/**< Invalid parameter. */
-#define ERR_WOULD_BLOCK		3	/**< Operation would block. */
-#define ERR_INTERRUPTED		4	/**< Interrupted while blocking. */
-#define ERR_NOT_IMPLEMENTED	5	/**< Function not implemented. */
-#define ERR_DEST_UNKNOWN	6	/**< Could not find destination. */
+#include <arch/x86/lapic.h>
+#include <arch/x86/cpu.h>
 
-#endif /* __ERRORS_H */
+/** Send an IPI interrupt to a single CPU.
+ * @param dest		Destination CPU ID. */
+static inline void ipi_send_interrupt(cpu_id_t dest) {
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
+}
+
+#endif /* __ARCH_X86_IPI_H */

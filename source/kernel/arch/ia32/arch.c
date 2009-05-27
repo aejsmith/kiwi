@@ -58,7 +58,6 @@ void arch_final_init(void) {
 	page_late_init();
 }
 
-#if CONFIG_SMP
 /** Architecture initialization for an AP. */
 void arch_ap_init(void) {
 	descriptor_ap_init();
@@ -69,7 +68,6 @@ void arch_ap_init(void) {
 		fatal("LAPIC initialization failed for CPU %" PRIu32 "\n", curr_cpu->id);
 	}
 }
-#endif
 
 /** Reboot the system. */
 void arch_reboot(void) {

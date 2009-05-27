@@ -99,7 +99,6 @@ extern void sched_thread_insert(thread_t *thread);
 /** Total runnable threads across all CPUs. */
 static atomic_t threads_runnable = 0;
 
-#if CONFIG_SMP
 /** Migrate a thread from another CPU to current CPU.
  * @param cpu		Source CPU's scheduler structure (should be locked).
  * @param thread	Thread to migrate.
@@ -265,7 +264,6 @@ static void sched_balancer_thread(void *arg) {
 		continue;
 	}
 }
-#endif /* CONFIG_SMP */
 
 /** Tweak priority of a thread being stored.
  * @param cpu		Per-CPU scheduler information structure.
@@ -483,11 +481,10 @@ void sched_thread_insert(thread_t *thread) {
 	sched_queue_store(thread->cpu->sched, thread);
 	spinlock_unlock(&thread->cpu->sched->lock);
 
-#if CONFIG_SMP
 	if(thread->cpu != curr_cpu && thread->cpu->idle) {
-		cpu_ipi(IPI_DEST_SINGLE, thread->cpu->id, IPI_SCHEDULE);
+		// FIXME
+		//cpu_ipi(IPI_DEST_SINGLE, thread->cpu->id, IPI_SCHEDULE);
 	}
-#endif
 }
 
 /** Switch to another thread.
@@ -597,7 +594,7 @@ void sched_init(void) {
 		list_init(&curr_cpu->sched->queues[i]);
 		curr_cpu->sched->count[i] = 0;
 	}
-#if CONFIG_SMP
+
 	/* Create the load-balancing thread if we have more than one CPU. */
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
@@ -607,5 +604,4 @@ void sched_init(void) {
 		}
 		thread_run(curr_cpu->sched->balancer_thread);
 	}
-#endif
 }

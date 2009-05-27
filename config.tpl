@@ -53,10 +53,10 @@ Choice('X86_DEBUG_PORT', 'Serial port to use for debug output.', (
 Option('X86_NX', 'Use No-Execute/Execute-Disable support.', True)
 
 #######
-Section('Kernel feature configuration')
+#Section('Kernel feature configuration')
 #######
 
-Option('SMP', 'Symmetric Multiprocessing (SMP) support.', True)
+#Option('SMP', 'Symmetric Multiprocessing (SMP) support.', True)
 
 #######
 Section('Kernel debug output')

@@ -21,10 +21,20 @@
 #ifndef __CPI_IPI_H
 #define __CPI_IPI_H
 
-#if CONFIG_SMP
+#include <types.h>
+
+/** Flags to modify IPI sending behaviour. */
+#define IPI_SEND_SYNC		(1<<0)	/**< Send message synchronously rather than asynchronously. */
+
+/** Type of a function to handle an IPI. */
+typedef int (*ipi_handler_t)(void *, unative_t, unative_t, unative_t, unative_t);
+
+extern int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
+                    unative_t data3, unative_t data4, int flags);
+extern void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
+                          unative_t data3, unative_t data4, int flags);
+extern void ipi_acknowledge(void *message, int status);
+
 extern void ipi_init(void);
-#else
-#define ipi_init()	
-#endif
 
 #endif /* __CPI_IPI_H */

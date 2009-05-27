@@ -50,19 +50,6 @@ size_t cpu_count = 0;			/**< Number of all CPUs. */
 LIST_DECLARE(cpus_running);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
-#if CONFIG_SMP
-extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame);
-
-/** Handler for a reschedule IPI.
- * @param num		Interrupt vector number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame) {
-	sched_yield();
-	return false;
-}
-#endif /* CONFIG_SMP */
-
 /** Add a new CPU.
  *
  * Adds a new CPU to the CPU array.
@@ -75,14 +62,16 @@ bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame) {
 cpu_t *cpu_add(cpu_id_t id, int state) {
 	assert(id != cpu_current_id());
 
+	/* If the ID is higher than the maximum ID currently in the array,
+	 * resize it. */
 	if(id > cpu_id_max) {
-		/* Resize the CPU array. */
 		cpus = krealloc(cpus, sizeof(cpu_t *) * (id + 1), MM_FATAL);
 		memset(&cpus[cpu_id_max + 1], 0, (id - cpu_id_max) * sizeof(cpu_t *));
 
 		cpu_id_max = id;
 	}
 
+	/* Allocate a new CPU structure to track the CPU. */
 	cpus[id] = kcalloc(1, sizeof(cpu_t), MM_FATAL);
 	cpus[id]->id = id;
 	cpus[id]->state = state;
@@ -91,6 +80,10 @@ cpu_t *cpu_add(cpu_id_t id, int state) {
 	if(state == CPU_RUNNING) {
 		list_append(&cpus_running, &cpus[id]->header);
 	}
+
+	/* Initialize IPI information. */
+	list_init(&cpus[id]->ipi_queue);
+	spinlock_init(&cpus[id]->ipi_lock, "ipi_lock");
 
 	/* Initialize timer information. */
 	list_init(&cpus[id]->timer_list);
@@ -124,6 +117,11 @@ void cpu_early_init(void) {
 	list_init(&boot_cpu.header);
 	list_append(&cpus_running, &boot_cpu.header);
 
+	/* Initialize IPI information. */
+	list_init(&boot_cpu.ipi_queue);
+	spinlock_init(&boot_cpu.ipi_lock, "ipi_lock");
+
+	/* Initialize timer information. */
 	list_init(&boot_cpu.timer_list);
 	spinlock_init(&boot_cpu.timer_lock, "timer_lock");
 	boot_cpu.tick_len = 0;

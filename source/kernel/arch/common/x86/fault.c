@@ -41,6 +41,9 @@
 #include <fatal.h>
 #include <kdbg.h>
 
+extern atomic_t cpu_pause_wait;
+extern atomic_t cpu_halting_all;
+
 extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 
 /** String names for CPU exceptions. */
@@ -55,10 +58,6 @@ static const char *fault_names[] = {
 	"Reserved", "Reserved", "Reserved", "Reserved", "Reserved",
 	"Reserved", "Reserved", "Reserved",
 };
-
-#if CONFIG_SMP
-extern atomic_t cpu_pause_wait;
-extern atomic_t cpu_halting_all;
 
 /** Handler for NMIs.
  * @param num		CPU interrupt number.
@@ -76,7 +75,6 @@ static bool fault_handle_nmi(unative_t num, intr_frame_t *frame) {
 
 	return false;
 }
-#endif
 
 /** Handler for double faults.
  * @param num		CPU interrupt number.
@@ -134,9 +132,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 /** Table of special fault handlers. */
 static intr_handler_t fault_handler_table[] = {
 	[FAULT_DEBUG] = kdbg_int1_handler,
-#if CONFIG_SMP
 	[FAULT_NMI] = fault_handle_nmi,
-#endif
 	[FAULT_DOUBLE] = fault_handle_doublefault,
 	[FAULT_PAGE] = fault_handle_pagefault,
 };

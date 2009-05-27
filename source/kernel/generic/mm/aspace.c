@@ -186,7 +186,7 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
  * @param start		Start of range to unmap.
  * @param end		End of range to unmap. */
 static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t start, ptr_t end) {
-	tlb_shootdown_t msg;
+	//tlb_shootdown_t msg;
 	offset_t offset;
 	ptr_t addr;
 
@@ -199,7 +199,7 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 
 	/* Begin the TLB shootdown process. If we're not on an SMP system,
 	 * this will only invalidate the range on the current CPU. */
-	tlb_shootdown_initiator(&msg, as, start, end);
+	//tlb_shootdown_initiator(&msg, as, start, end);
 
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		if(!page_map_remove(&as->pmap, addr, NULL)) {
@@ -211,7 +211,8 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 		region->source->backend->release(region->source, offset);
 	}
 
-	tlb_shootdown_finalize(&msg);
+	tlb_invalidate(start, end);
+	//tlb_shootdown_finalize(&msg);
 }
 
 /** Resize a region. Cannot decrease the start address or increase end address.

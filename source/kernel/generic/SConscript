@@ -37,11 +37,9 @@ env['OBJFILES'] += [
 env['OBJFILES'] += [
 	env.Object('cpu/cpu.c'),
 	env.Object('cpu/intr.c'),
+	env.Object('cpu/ipi.c'),
 	env.Object('cpu/irq.c'),
 ]
-
-if config['SMP']:
-	env['OBJFILES'].append(env.Object('cpu/ipi.c'))
 
 env['OBJFILES'] += [
 	env.Object('lib/do_printf.c'),
@@ -56,11 +54,9 @@ env['OBJFILES'] += [
 	env.Object('mm/malloc.c'),
 	env.Object('mm/pmm.c'),
 	env.Object('mm/slab.c'),
+	env.Object('mm/tlb.c'),
 	env.Object('mm/vmem.c'),
 ]
-
-if config['SMP']:
-	env['OBJFILES'].append(env.Object('mm/tlb.c'))
 
 env['OBJFILES'] += [
 	env.Object('proc/process.c'),

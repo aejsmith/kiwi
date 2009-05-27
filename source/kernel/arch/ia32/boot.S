@@ -189,7 +189,6 @@ __kernel_entry:
 5:	jmp	5b
 .size __kernel_entry, .-__kernel_entry
 
-#if CONFIG_SMP
 /** Kernel entry point (AP).
  *
  * Main entry point of the kernel for an AP. When this function is called, the
@@ -269,7 +268,6 @@ __kernel_ap_entry:
 4:	ud2a
 	jmp	4b
 .size __kernel_ap_entry, .-__kernel_ap_entry
-#endif
 
 .section .init.data, "aw", @progbits
 

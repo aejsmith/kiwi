@@ -83,6 +83,7 @@
 /** Local APIC interrupt vectors. */
 #define LAPIC_VECT_TIMER		0xf0	/**< Timer. */
 #define LAPIC_VECT_SPURIOUS		0xf1	/**< Spurious. */
+#define LAPIC_VECT_IPI			0xf2	/**< IPI message. */
 
 /** IPI delivery modes. */
 #define LAPIC_IPI_FIXED			0x00	/**< Fixed (vector specified). */

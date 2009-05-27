@@ -24,6 +24,7 @@
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
+#include <cpu/ipi.h>
 #include <cpu/smp.h>
 
 #include <mm/aspace.h>
@@ -47,6 +48,11 @@
 extern void kmain_bsp(void *data);
 extern void kmain_ap(void);
 
+static int ipi_func(void *msg, unative_t data1, unative_t data2, unative_t data3, unative_t data4) {
+	kprintf(LOG_NORMAL, "Receiver %u! %u %u %u %u\n", curr_cpu->id, data1, data2, data3, data4);
+	return 42;
+}
+
 /** Second-stage intialization thread.
  * @param arg		Architecture initialization data. */
 static void kinit_thread(void *data) {
@@ -57,6 +63,9 @@ static void kinit_thread(void *data) {
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
+
+	int ret = ipi_send(3, ipi_func, 1, 3, 3, 7, IPI_SEND_SYNC);
+	kprintf(LOG_NORMAL, "Sender %u! %d\n", curr_cpu->id, ret);
 
 	while(true) {
 		timer_sleep(1);
@@ -103,6 +112,7 @@ void kmain_bsp(void *data) {
 	/* Detect secondary CPUs. */
 	cpu_init();
 	smp_detect_cpus();
+	ipi_init();
 
 	/* Now that we know the CPU count, we can enable the magazine layer
 	 * in the slab allocator. */
@@ -126,7 +136,6 @@ void kmain_bsp(void *data) {
 	sched_idle();
 }
 
-#if CONFIG_SMP
 /** AP kernel initialization function. */
 void kmain_ap(void) {
 	curr_cpu->state = CPU_RUNNING;
@@ -141,4 +150,3 @@ void kmain_ap(void) {
 	/* We now become this CPU's idle thread. */
 	sched_idle();
 }
-#endif /* CONFIG_SMP */

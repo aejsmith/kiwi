@@ -29,7 +29,6 @@
 
 #include <kdbg.h>
 
-#if CONFIG_SMP
 /** Atomic variable for paused CPUs to wait on. */
 atomic_t cpu_pause_wait = 0;
 
@@ -66,7 +65,6 @@ void cpu_halt_all(void) {
 	atomic_set(&cpu_halting_all, 1);
 	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
 }
-#endif
 
 /** Get current CPU ID.
  * 

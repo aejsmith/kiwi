@@ -26,7 +26,5 @@ env['OBJFILES'] += [
 	env.Object('pic.c'),
 	env.Object('pit.c'),
 	env.Object('platform.c'),
+	env.Object('smp.c'),
 ]
-
-if config['SMP']:
-	env['OBJFILES'].append(env.Object('smp.c'))

@@ -38,7 +38,7 @@
 #include <fatal.h>
 #include <kdbg.h>
 
-extern bool cpu_ipi_schedule_handler(unative_t num, intr_frame_t *frame);
+extern void ipi_process_pending(void);
 
 /** Whether the local APIC is present and enabled. */
 bool lapic_enabled = false;
@@ -74,26 +74,15 @@ static bool lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	return false;
 }
 
-#if CONFIG_SMP
-/** Reschedule interrupt handler.
+/** IPI message interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		True if current thread should be preempted. */
-static bool lapic_schedule_handler(unative_t num, intr_frame_t *frame) {
+static bool lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
+	ipi_process_pending();
 	lapic_eoi();
-	return cpu_ipi_schedule_handler(num, frame);
+	return false;
 }
-
-/** TLB shootdown interrupt handler.
- * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		True if current thread should be preempted. */
-static bool lapic_tlb_shootdown_handler(unative_t num, intr_frame_t *frame) {
-	bool ret = tlb_shootdown_responder(num, frame);
-	lapic_eoi();
-	return ret;
-}
-#endif
 
 /*
  * Local APIC timer functions.
@@ -271,10 +260,7 @@ bool lapic_init(void) {
 		/* Grab interrupt vectors. */
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
-#if CONFIG_SMP
-		intr_register(IPI_SCHEDULE, lapic_schedule_handler);
-		intr_register(IPI_TLB_SHOOTDOWN, lapic_tlb_shootdown_handler);
-#endif
+		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
 	}
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt

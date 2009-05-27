@@ -27,8 +27,6 @@ env['OBJFILES'] += [
 	env.Object('fault.c'),
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),
+	env.Object('smp.c'),
 	env.Object('string.c'),
 ]
-
-if config['SMP']:
-	env['OBJFILES'].append(env.Object('smp.c'))

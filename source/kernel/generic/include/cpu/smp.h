@@ -21,14 +21,9 @@
 #ifndef __CPU_SMP_H
 #define __CPU_SMP_H
 
-#if CONFIG_SMP
 extern atomic_t ap_boot_wait;
 
 extern void smp_boot_cpus(void);
 extern void smp_detect_cpus(void);
-#else
-#define smp_boot_cpus()		
-#define smp_detect_cpus()	
-#endif
 
 #endif /* __CPU_SMP_H */

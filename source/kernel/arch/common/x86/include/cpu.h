@@ -58,12 +58,6 @@ typedef struct cpu_arch {
 	uint8_t stepping;			/**< CPU stepping. */
 } cpu_arch_t;
 
-/** IPI vectors. */
-#define IPI_KDBG			0x00	/**< Halt CPU while KDBG is executing. */
-#define IPI_FATAL			0x01	/**< Halt CPU due to fatal error. */
-#define IPI_SCHEDULE			0xf2	/**< Switch to a different thread. */
-#define IPI_TLB_SHOOTDOWN		0xf3	/**< Perform a TLB shootdown. */
-
 /** Get the current CPU structure pointer from the base of the stack.
  * @return		Pointer to current CPU structure. */
 static inline ptr_t cpu_get_pointer(void) {

@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <errors.h>
 
+#if 0
 /** Begin TLB shootdown.
  *
  * Starts the TLB shootdown process. First invalidates the TLB on the current
@@ -85,3 +86,4 @@ void tlb_shootdown_finalize(tlb_shootdown_t *msg) {
 bool tlb_shootdown_responder(unative_t num, intr_frame_t *frame) {
 	return false;
 }
+#endif
