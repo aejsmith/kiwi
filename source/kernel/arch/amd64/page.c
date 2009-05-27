@@ -42,12 +42,6 @@ extern pte_t __kernel_pdp[];
 extern char __text_start[], __text_end[], __rodata_start[], __rodata_end[];
 extern char __bss_end[], __end[];
 
-/** Invalidate a TLB entry. TODO: Get rid of this
- * @param addr		Address to invalidate. */
-static inline void invlpg(ptr_t addr) {
-	__asm__ volatile("invlpg (%0)" :: "r"(addr));
-}
-
 /*
  * Page map functions.
  */
@@ -153,10 +147,9 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	pte_t *ptbl;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
-
-	mutex_lock(&map->lock, 0);
 
 	/* Check that we can map here. */
 	if(virt < map->first || virt > map->last) {
@@ -166,7 +159,6 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
 	if(ptbl == NULL) {
-		mutex_unlock(&map->lock);
 		return false;
 	}
 
@@ -182,11 +174,6 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 		ptbl[pte].noexec = (!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? 1 : 0;
 #endif
 		ptbl[pte].present = 1;
-
-		/* TODO: proper TLB handling. */
-		invlpg(virt);
-
-		mutex_unlock(&map->lock);
 		return true;
 	}
 }
@@ -207,9 +194,8 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	pte_t *ptbl;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
-
-	mutex_lock(&map->lock, 0);
 
 	/* Check that we can map here. */
 	if(virt < map->first || virt > map->last) {
@@ -219,7 +205,6 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
 	if(ptbl == NULL) {
-		mutex_unlock(&map->lock);
 		return false;
 	}
 
@@ -232,14 +217,8 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 		/* Clear the entry. */
 		SIMPLE_CLEAR_PTE(ptbl, pte);
-
-		/* TODO: proper TLB handling. */
-		invlpg(virt);
-
 		ret = true;
 	}
-
-	mutex_unlock(&map->lock);
 	return ret;
 }
 
@@ -259,10 +238,9 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	pte_t *ptbl;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
-
-	mutex_lock(&map->lock, 0);
 
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
@@ -274,8 +252,42 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		}
 	}
 
-	mutex_unlock(&map->lock);
 	return ret;
+}
+
+/** Lock a page map.
+ *
+ * Locks a page map's lock.
+ *
+ * @param map		Page map to lock.
+ * @param flags		Synchronization flags (see sync/flags.h).
+ *
+ * @return		Same as return value from mutex_lock().
+ */
+int page_map_lock(page_map_t *map, int flags) {
+	return mutex_lock(&map->lock, flags);
+}
+
+/** Unlock a page map.
+ *
+ * Unlocks the specified page map.
+ *
+ * @param map		Page map to unlock.
+ */
+void page_map_unlock(page_map_t *map) {
+	mutex_unlock(&map->lock);
+}
+
+/** Check whether a page map is locked.
+ *
+ * Checks whether a page map's lock is currently held.
+ *
+ * @param map		Page map to check.
+ *
+ * @return		Whether the lock is held.
+ */
+bool page_map_locked(page_map_t *map) {
+	return mutex_held(&map->lock);
 }
 
 /** Switch to a different page map.
@@ -364,6 +376,12 @@ void page_phys_unmap(void *addr, size_t size) {
 /*
  * Paging initialization functions.
  */
+
+/** Invalidate a TLB entry.
+ * @param addr		Address to invalidate. */
+static inline void invlpg(ptr_t addr) {
+	__asm__ volatile("invlpg (%0)" :: "r"(addr));
+}
 
 /** Convert a large page to a page table if necessary.
  * @param virt		Virtual address to check. */

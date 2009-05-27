@@ -21,6 +21,8 @@
 #ifndef __CPI_IPI_H
 #define __CPI_IPI_H
 
+#include <cpu/cpu.h>
+
 #include <types.h>
 
 /** Flags to modify IPI sending behaviour. */

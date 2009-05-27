@@ -42,6 +42,13 @@ typedef struct mutex {
 #define MUTEX_DECLARE(_var)			\
 	mutex_t _var = MUTEX_INITIALIZER(_var, #_var)
 
+/** Check whether a mutex is held.
+ * @param mutex		Mutex to check.
+ * @return		Whether the mutex is held. */
+static inline bool mutex_held(mutex_t *mutex) {
+	return atomic_get(&mutex->locked);
+}
+
 extern int mutex_lock(mutex_t *mutex, int flags);
 extern void mutex_unlock(mutex_t *mutex);
 extern void mutex_init(mutex_t *mutex, const char *name);

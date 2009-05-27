@@ -22,23 +22,68 @@
  *   http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.92.1801
  */
 
-#include <cpu/intr.h>
+#include <arch/spinlock.h>
+
+#include <console/kprintf.h>
+
+#include <cpu/ipi.h>
 
 #include <mm/aspace.h>
+#include <mm/page.h>
 #include <mm/tlb.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <fatal.h>
 
-#if 0
+/** TLB shootdown responder.
+ * @param msg		IPI message structure.
+ * @param data1		Address of address space.
+ * @param data2		Start of range to invalidate.
+ * @param data3		End of range to invalidate.
+ * @param data4		Unused.
+ * @return		Always returns 0. */
+static int tlb_shootdown_responder(void *msg, unative_t data1, unative_t data2,
+                                   unative_t data3, unative_t data4) {
+	aspace_t *as = (aspace_t *)data1;
+	ptr_t start = (ptr_t)data2;
+	ptr_t end = (ptr_t)data3;
+	page_map_t *pmap;
+
+	kprintf(LOG_NORMAL, "performing tlb invalidation on %u (0x%p-0x%p)\n", curr_cpu->id, start, end);
+
+	/* Acknowledge receipt of the message. */
+	ipi_acknowledge(msg, 0);
+
+	/* We may have changed address space between the IPI being sent and
+	 * receiving it, check if we need to do anything. */
+	if(as != NULL && as != curr_aspace) {
+		return 0;
+	}
+
+	/* Wait for the page map to become unlocked. */
+	pmap = (as != NULL) ? &as->pmap : &kernel_page_map;
+	while(page_map_locked(pmap)) {
+		spinlock_loop_hint();
+	}
+
+	/* Perform the required action. */
+	tlb_invalidate(start, end);
+	return 0;
+}
+
 /** Begin TLB shootdown.
  *
  * Starts the TLB shootdown process. First invalidates the TLB on the current
- * CPU if required, and then interrupts all other CPUs using the address space
- * to cause them to enter tlb_shootdown_responder(). If the address space is
- * specified as NULL, then the TLB will be invalidated on every CPU (i.e.
- * when operating on the kernel page map). This function should be called
- * before making any changes to a page map on SMP systems.
+ * CPU if required, and then sends an IPI to all other CPUs using the address
+ * space to cause them to enter tlb_shootdown_responder(). If the address space
+ * is specified as NULL, then the TLB will be invalidated on every CPU (i.e.
+ * when operating on the kernel page map).
+ *
+ * The CPUs, after acknowledging receipt of the IPI, will spin waiting for
+ * the page map lock to be released before return
+ *
+ * @todo		Would it be better to do like ipi_broadcast() but to
+ *			only the CPUs we want?
  *
  * @param msg		Message structure to use, should later be passed to
  *			tlb_shootdown_finalise().
@@ -46,7 +91,7 @@
  * @param start		Start of address range to invalidate.
  * @param end		End of address range to invalidate.
  */
-void tlb_shootdown_initiator(tlb_shootdown_t *msg, aspace_t *as, ptr_t start, ptr_t end) {
+void tlb_shootdown(aspace_t *as, ptr_t start, ptr_t end) {
 	cpu_t *cpu;
 
 	/* Invalidate on the calling CPU if required. */
@@ -56,34 +101,25 @@ void tlb_shootdown_initiator(tlb_shootdown_t *msg, aspace_t *as, ptr_t start, pt
 
 	/* Quick check to see if we need to do anything, without going through
 	 * the loop. */
-	if(as != NULL) {
-		if(refcount_get(&as->count) == ((as == curr_aspace) ? 1 : 0)) {
-			return;
-		}
+	if(cpu_count < 2 || (as != NULL && refcount_get(&as->count) == ((as == curr_aspace) ? 1 : 0))) {
+		return;
 	}
 
-	msg->as = as;
-	msg->start = start;
-	msg->end = end;
+	kprintf(LOG_NORMAL, "cpu %u shooting 0x%p-0x%p\n", curr_cpu->id, start, end);
 
 	/* There are other users of the address space. Need to deliver a TLB
 	 * shootdown request to them. */
 	LIST_FOREACH(&cpus_running, iter) {
 		cpu = list_entry(iter, cpu_t, header);
-
-		if(as != NULL && cpu->aspace != as) {
+		if(cpu == curr_cpu || (as != NULL && cpu->aspace != as)) {
 			continue;
 		}
 
 		/* CPU is using this address space. */
+		if(ipi_send(cpu->id, tlb_shootdown_responder, (unative_t)as,
+		            (unative_t)start, (unative_t)end, 0,
+		            IPI_SEND_SYNC) != 0) {
+			fatal("Could not send TLB shootdown IPI");
+		}
 	}
 }
-
-void tlb_shootdown_finalize(tlb_shootdown_t *msg) {
-
-}
-
-bool tlb_shootdown_responder(unative_t num, intr_frame_t *frame) {
-	return false;
-}
-#endif

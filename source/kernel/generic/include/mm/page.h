@@ -18,13 +18,18 @@
  * @brief		Page mapping functions.
  *
  * This header file just contains the definition of the page map interface,
- * the actual implementation is made by the architecture.
+ * the actual implementation is made by the architecture. When modifying
+ * page maps, you must lock/unlock the page map yourself using page_map_lock()
+ * and page_map_unlock(). The locking is done like this because the TLB
+ * management code uses the page map lock to synchronize the other CPUs.
  */
 
 #ifndef __MM_PAGE_H
 #define __MM_PAGE_H
 
 #include <arch/page.h>
+
+#include <sync/flags.h>
 
 #include <mm/flags.h>
 
@@ -39,8 +44,15 @@ extern page_map_t kernel_page_map;
 extern bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int mmflag);
 extern bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp);
 extern bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp);
+
+/** Page map locking functions. */
+extern int page_map_lock(page_map_t *map, int flags);
+extern void page_map_unlock(page_map_t *map);
+extern bool page_map_locked(page_map_t *map);
+
+/** Other page map functions. */
 extern void page_map_switch(page_map_t *map);
-extern int  page_map_init(page_map_t *map);
+extern int page_map_init(page_map_t *map);
 extern void page_map_destroy(page_map_t *map);
 
 /** Physical memory access functions. */

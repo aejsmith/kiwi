@@ -186,7 +186,6 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
  * @param start		Start of range to unmap.
  * @param end		End of range to unmap. */
 static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t start, ptr_t end) {
-	//tlb_shootdown_t msg;
 	offset_t offset;
 	ptr_t addr;
 
@@ -197,9 +196,12 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 	assert(start >= region->start);
 	assert(end <= region->end);
 
-	/* Begin the TLB shootdown process. If we're not on an SMP system,
-	 * this will only invalidate the range on the current CPU. */
-	//tlb_shootdown_initiator(&msg, as, start, end);
+	/* Lock the page map. */
+	page_map_lock(&as->pmap, 0);
+
+	/* Begin the TLB shootdown process, and invalidate the range on the
+	 * current CPU. */
+	tlb_shootdown(as, start, end);
 
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		if(!page_map_remove(&as->pmap, addr, NULL)) {
@@ -211,8 +213,9 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 		region->source->backend->release(region->source, offset);
 	}
 
-	tlb_invalidate(start, end);
-	//tlb_shootdown_finalize(&msg);
+	/* Unlock the page map. This will let other CPUs that were waiting
+	 * to perform TLB invalidation continue. */
+	page_map_unlock(&as->pmap);
 }
 
 /** Resize a region. Cannot decrease the start address or increase end address.
@@ -650,13 +653,17 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Map the page in to the address space. */
+	page_map_lock(&as->pmap, 0);
 	if(!page_map_insert(&as->pmap, (addr & PAGE_MASK), page, aspace_flags_to_page(region->flags), MM_SLEEP)) {
+		page_map_unlock(&as->pmap);
+
 		region->source->backend->release(region->source, offset);
 
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
 
+	page_map_unlock(&as->pmap);
 	mutex_unlock(&as->lock);
 	dprintf("aspace: fault at 0x%p in 0x%p: 0x%" PRIpp " -> 0x%p\n",
 		addr, as, page, (addr & PAGE_MASK));
