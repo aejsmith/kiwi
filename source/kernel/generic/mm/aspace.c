@@ -624,10 +624,10 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	/* Find the region that the fault occurred in - if its a reserved
 	 * region, the memory is unmapped so treat it as though no region is
 	 * there. */
-	if(!(region = aspace_region_find(as, addr, NULL))) {
+	if(unlikely(!(region = aspace_region_find(as, addr, NULL)))) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
-	} else if(region->flags & AS_REGION_RESERVED) {
+	} else if(unlikely(region->flags & AS_REGION_RESERVED)) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
@@ -647,7 +647,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	offset = (offset_t)((addr & PAGE_MASK) - region->start) + region->offset + region->source->offset;
 
 	/* Get the page from the source. */
-	if(!region->source->backend->get(region->source, offset, &page)) {
+	if(unlikely(!region->source->backend->get(region->source, offset, &page))) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
