@@ -84,6 +84,15 @@ static intr_result_t lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 	return INTR_HANDLED;
 }
 
+/** Reschedule IPI interrupt handler.
+ * @param num		Interrupt number.
+ * @param frame		Interrupt stack frame.
+ * @return		Always returns INTR_RESCHEDULE. */
+static intr_result_t lapic_reschedule_handler(unative_t num, intr_frame_t *frame) {
+	lapic_eoi();
+	return INTR_RESCHEDULE;
+}
+
 /*
  * Local APIC timer functions.
  */
@@ -260,6 +269,7 @@ bool lapic_init(void) {
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
 		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
+		intr_register(LAPIC_VECT_RESCHEDULE, lapic_reschedule_handler);
 	}
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt

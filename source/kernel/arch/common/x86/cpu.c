@@ -66,6 +66,16 @@ void cpu_halt_all(void) {
 	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
 }
 
+/** Cause a CPU to reschedule.
+ *
+ * Causes the specified CPU to perform a thread switch.
+ *
+ * @param cpu		CPU to reschedule.
+ */
+void cpu_reschedule(cpu_t *cpu) {
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_FIXED, LAPIC_VECT_RESCHEDULE);
+}
+
 /** Get current CPU ID.
  * 
  * Gets the ID of the CPU that the function executes on. This function should

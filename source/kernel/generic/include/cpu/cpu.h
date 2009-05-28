@@ -74,6 +74,8 @@ extern void cpu_pause_all(void);
 extern void cpu_resume_all(void);
 extern void cpu_halt_all(void);
 
+extern void cpu_reschedule(cpu_t *cpu);
+
 extern cpu_id_t cpu_current_id(void);
 
 extern cpu_t *cpu_add(cpu_id_t id, int state);

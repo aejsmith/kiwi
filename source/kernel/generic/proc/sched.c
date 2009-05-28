@@ -492,8 +492,7 @@ void sched_thread_insert(thread_t *thread) {
 	spinlock_unlock(&thread->cpu->sched->lock);
 
 	if(thread->cpu != curr_cpu && thread->cpu->idle) {
-		// FIXME
-		//cpu_ipi(IPI_DEST_SINGLE, thread->cpu->id, IPI_SCHEDULE);
+		cpu_reschedule(thread->cpu);
 	}
 }
 
