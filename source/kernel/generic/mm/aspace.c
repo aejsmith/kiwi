@@ -604,6 +604,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	aspace_region_t *region;
 	phys_ptr_t page;
 	offset_t offset;
+	int ret;
 
 	/* If we don't currently have an address space then we can't handle
 	 * anything... */
@@ -647,7 +648,9 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	offset = (offset_t)((addr & PAGE_MASK) - region->start) + region->offset + region->source->offset;
 
 	/* Get the page from the source. */
-	if(unlikely(!region->source->backend->get(region->source, offset, &page))) {
+	ret = region->source->backend->get(region->source, offset, &page);
+	if(unlikely(ret != 0)) {
+		dprintf("aspace: failed to get page for 0x%p in 0x%p: %d\n", addr, as, ret);
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}

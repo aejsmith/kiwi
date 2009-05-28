@@ -41,10 +41,10 @@ typedef struct aspace_backend {
 	 *			3 offsets - the offset into the region the
 	 *			fault occurred at, the offset of the region
 	 *			into its source, and the offset specified in
-	 *			the source.
+	 *			the source).
 	 * @param addrp		Where to store address of page obtained.
-	 * @return		True on success, False on failure. */
-	bool (*get)(struct aspace_source *source, offset_t offset, phys_ptr_t *addrp);
+	 * @return		0 on success, negative error code on failure. */
+	int (*get)(struct aspace_source *source, offset_t offset, phys_ptr_t *addrp);
 
 	/** Release a page.
 	 * @param source	Source page was from.

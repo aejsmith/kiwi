@@ -24,49 +24,62 @@
 #include <sync/mutex.h>
 
 #include <types/avltree.h>
+#include <types/list.h>
 #include <types/refcount.h>
 
-struct page;
-struct page_cache;
+struct cache;
 
 /** Page cache operations structure. */
-typedef struct page_cache_ops {
+typedef struct cache_ops {
 	/** Get a missing page from a cache.
 	 * @param cache		Cache to get page from.
-	 * @param pagep		Where to store pointer to page obtained.
-	 * @return		1 if page obtained and should be cached,
-	 *			0 if page obtained but should not be cached,
-	 *			negative error code on failure. */
-	int (*get_page)(struct page_cache *cache, offset_t offset, struct page **pagep);
+	 * @param offset	Offset of page in data source.
+	 * @param addrp		Where to store address of page obtained.
+	 * @return		0 on success, negative error code on failure. */
+	int (*get_page)(struct cache *cache, offset_t offset, phys_ptr_t *addrp);
 
 	/** Flush changes to a page to the source.
 	 * @param cache		Cache that the page is in.
-	 * @param page		Page to flush.
+	 * @param page		Address of page to flush.
+	 * @param offset	Offset of page in data source.
 	 * @return		0 on success, negative error code on failure. */
-	int (*flush_page)(struct page_cache *cache, struct page *page, offset_t offset);
+	int (*flush_page)(struct cache *cache, phys_ptr_t page, offset_t offset);
 
 	/** Free a page from a cache (page will have been flushed).
 	 * @param cache		Cache that the page is in.
-	 * @param page		Page to free. */
-	void (*free_page)(struct page_cache *cache, struct page *page, offset_t offset);
+	 * @param page		Address of page to free.
+	 * @param offset	Offset of page in data source. */
+	void (*free_page)(struct cache *cache, phys_ptr_t page, offset_t offset);
 
 	/** Clean up any data associated with a cache (after pages are freed).
 	 * @param cache		Cache being destroyed. */
-	void (*destroy_cache)(struct page_cache *cache);
-} page_cache_ops_t;
+	void (*destroy)(struct cache *cache);
+} cache_ops_t;
+
+/** Structure representing a page in a cache. */
+typedef struct cache_page {
+	phys_ptr_t address;		/**< Physical address of the page. */
+	offset_t offset;		/**< Offset of the page in the cache. */
+	refcount_t count;		/**< Reference count. */
+} cache_page_t;
 
 /** Page cache structure. */
-typedef struct page_cache {
+typedef struct cache {
+	list_t header;			/**< Link to cache list. */
+
 	mutex_t lock;			/**< Lock to protect the cache. */
 
 	avltree_t pages;		/**< Tree of pages stored in the cache. */
-	page_cache_ops_t *ops;		/**< Cache operations. */
+	cache_ops_t *ops;		/**< Cache operations. */
 	void *data;			/**< Data used by the cache backend. */
+} cache_t;
 
-	refcount_t count;		/**< Reference count. */
-} page_cache_t;
+extern int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp);
+extern void cache_release(cache_t *cache, offset_t offset);
 
-extern page_cache_t *page_cache_create(page_cache_ops_t *ops, void *data);
-extern bool page_cache_destroy(page_cache_t *cache);
+extern cache_t *cache_create(cache_ops_t *ops, void *data);
+extern int cache_destroy(cache_t *cache);
+
+extern void cache_init(void);
 
 #endif /* __MM_CACHE_H */

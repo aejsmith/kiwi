@@ -28,6 +28,7 @@
 #include <cpu/smp.h>
 
 #include <mm/aspace.h>
+#include <mm/cache.h>
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
@@ -95,6 +96,7 @@ void kmain_bsp(void *data) {
 	slab_init();
 	kheap_init();
 	malloc_init();
+	cache_init();
 	aspace_init();
 
 	/* Perform second stage architecture/platform initialization. */

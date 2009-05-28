@@ -19,22 +19,45 @@
  */
 
 #include <mm/aspace.h>
+#include <mm/cache.h>
 #include <mm/malloc.h>
 #include <mm/pmm.h>
 
 #include <assert.h>
 #include <errors.h>
+#include <fatal.h>
+
+/** Get a missing page from an anonymous cache.
+ * @param cache		Cache to get page from.
+ * @param offset	Offset of page in data source.
+ * @param addrp		Where to store address of page obtained.
+ * @return		0 on success, negative error code on failure. */
+static int aspace_anon_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
+	*addrp = pmm_alloc(1, MM_SLEEP | PM_ZERO);
+	return 0;
+}
+
+/** Free a page from an anonymouse cache.
+ * @param cache		Cache that the page is in.
+ * @param page		Address of page to free.
+ * @param offset	Offset of page in data source. */
+static void aspace_anon_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
+	pmm_free(page, 1);
+}
+
+/** Anonymous page cache operations. */
+static cache_ops_t aspace_anon_cache_ops = {
+	.get_page = aspace_anon_cache_get_page,
+	.free_page = aspace_anon_cache_free_page,
+};
 
 /** Get a page from an anonymous source.
  * @param source	Source to get page from.
  * @param offset	Offset into the source.
  * @param addrp		Where to store address of page.
- * @return		True on success, False on failure. */
-static bool aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
-	phys_ptr_t page = pmm_alloc(1, MM_SLEEP);
-
-	*addrp = page;
-	return true; 
+ * @return		0 on success, negative error code on failure. */
+static int aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
+	return cache_get(source->data, offset, addrp);
 }
 
 /** Release a page in an anonymous source.
@@ -42,14 +65,16 @@ static bool aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t
  * @param offset	Offset into the source.
  * @return		Pointer to page allocated, or NULL on failure. */
 static void aspace_anon_release(aspace_source_t *source, offset_t offset) {
-	/* TODO */
-	return;
+	cache_release(source->data, offset);
 }
 
 /** Destroy data in an anonymous source.
  * @param source	Source to destroy. */
 static void aspace_anon_destroy(aspace_source_t *source) {
-	return;
+	if(cache_destroy(source->data) != 0) {
+		/* Shouldn't happen as we don't do any page flushing. */
+		fatal("Failed to destroy anonymous cache");
+	}
 }
 
 /** Anonymous address space backend structure. */
@@ -74,7 +99,7 @@ int aspace_anon_create(aspace_source_t **sourcep) {
 	assert(sourcep);
 
 	source->backend = &aspace_anon_backend;
-	source->data = NULL;
+	source->data = cache_create(&aspace_anon_cache_ops, NULL);
 	source->offset = 0;
 
 	*sourcep = source;
