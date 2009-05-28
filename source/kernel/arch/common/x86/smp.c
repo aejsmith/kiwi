@@ -63,11 +63,9 @@ static void smp_boot_delay(uint64_t us) {
 	atomic_set(&smp_boot_delay_wait, 0);
 
 	timer_init(&timer, TIMER_FUNCTION, smp_boot_delay_handler);
-	intr_enable();
 	timer_start(&timer, us * 1000);
 
 	while(atomic_get(&smp_boot_delay_wait) == 0);
-	intr_disable();
 }
 
 /** Boot a secondary CPU.
