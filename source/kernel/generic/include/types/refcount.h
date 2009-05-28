@@ -18,8 +18,8 @@
  * @brief		Reference counting functions.
  */
 
-#ifndef __LIB_REFCOUNT_H
-#define __LIB_REFCOUNT_H
+#ifndef __TYPES_REFCOUNT_H
+#define __TYPES_REFCOUNT_H
 
 #include <types/atomic.h>
 
@@ -96,7 +96,9 @@ static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *))
  *
  * @return		The value of the count.
  */
-#define refcount_get(ref)	atomic_get((ref))
+static inline int refcount_get(refcount_t *ref) {
+	return atomic_get(ref);
+}
 
 /** Set the value of a reference count.
  *
@@ -105,6 +107,8 @@ static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *))
  * @param ref		Reference count to set.
  * @param val		Value to set to.
  */
-#define refcount_set(ref, val)	atomic_set((ref), (val))
+static inline void refcount_set(refcount_t *ref, int val) {
+	atomic_set(ref, val);
+}
 
-#endif /* __LIB_REFCOUNT_H */
+#endif /* __TYPES_REFCOUNT_H */

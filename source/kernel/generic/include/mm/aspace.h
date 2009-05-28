@@ -25,11 +25,10 @@
 
 #include <cpu/cpu.h>
 
-#include <lib/refcount.h>
-
 #include <mm/page.h>
 
 #include <types/avltree.h>
+#include <types/refcount.h>
 
 struct aspace_source;
 

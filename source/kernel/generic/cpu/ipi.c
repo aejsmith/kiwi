@@ -27,9 +27,9 @@
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
 
-#include <lib/refcount.h>
-
 #include <mm/malloc.h>
+
+#include <types/refcount.h>
 
 #include <assert.h>
 #include <errors.h>

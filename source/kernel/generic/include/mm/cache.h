@@ -21,11 +21,10 @@
 #ifndef __MM_CACHE_H
 #define __MM_CACHE_H
 
-#include <lib/refcount.h>
-
 #include <sync/mutex.h>
 
 #include <types/avltree.h>
+#include <types/refcount.h>
 
 struct page;
 struct page_cache;
