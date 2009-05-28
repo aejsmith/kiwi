@@ -25,9 +25,15 @@
 
 #include <types.h>
 
+/** Interrupt handler return status. */
+typedef enum intr_result {
+	INTR_HANDLED,		/**< Interrupt was handled, no extra action required. */
+	INTR_RESCHEDULE,	/**< A thread switch should be performed. */
+} intr_result_t;
+
 /** Interrupt handler routine type.
- * @return		True if the current thread should be preempted. */
-typedef bool (*intr_handler_t)(unative_t num, intr_frame_t *frame);
+ * @return		Interrupt status code (see above). */
+typedef intr_result_t (*intr_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern intr_handler_t intr_register(unative_t num, intr_handler_t handler);
 extern void intr_remove(unative_t num);

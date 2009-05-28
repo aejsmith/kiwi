@@ -21,9 +21,9 @@
 #ifndef __TIME_TIMER_H
 #define __TIME_TIMER_H
 
-#include <sync/waitq.h>
+#include <cpu/intr.h>
 
-#include <types/list.h>
+#include <sync/waitq.h>
 
 #include <types.h>
 
@@ -46,7 +46,8 @@ typedef struct clock_source {
 	void (*disable)(void);		/**< Disables the source (stops ticks from being received). */
 } clock_source_t;
 
-/** Function type for TIMER_FUNCTION timers. */
+/** Function type for TIMER_FUNCTION timers.
+ * @return		Whether to reschedule after handling. */
 typedef bool (*timer_func_t)(void);
 
 /** Structure containing details of a timer. */
@@ -55,7 +56,7 @@ typedef struct timer {
 
 	/** Action to perform when timer expires. */
 	enum {
-		TIMER_PREEMPT,		/**< Preempt the current thread. */
+		TIMER_RESCHEDULE,	/**< Perform a thread switch. */
 		TIMER_FUNCTION,		/**< Call the function specified in the timer. */
 		TIMER_WAKE,		/**< Wake the thread that started the timer. */
 	} action;
@@ -87,7 +88,7 @@ typedef struct timer {
 #define timer_sleep(s)		timer_nsleep((uint64_t)(s) * 1000000000)
 
 extern int clock_source_set(clock_source_t *source);
-extern bool clock_tick(void);
+extern intr_result_t clock_tick(void);
 
 extern void timer_init(timer_t *timer, int action, timer_func_t func);
 extern int timer_start(timer_t *timer, uint64_t length);

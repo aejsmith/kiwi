@@ -19,10 +19,7 @@
  *
  * The functions in this file are used to handle CPU exceptions. There is a
  * wrapper handler, fault_handler(), that gets called for all exceptions. If
- * a specific handler is specified in the table, then it will be called. It
- * should be noted that the return value for these functions are used to
- * specify whether the fault was handled successfully, NOT whether the current
- * process should be preempted.
+ * a specific handler is specified in the table, then it will be called.
  */
 
 #include <arch/memmap.h>
@@ -130,7 +127,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 }
 
 /** Table of special fault handlers. */
-static intr_handler_t fault_handler_table[] = {
+static bool (*fault_handler_table[])(unative_t, intr_frame_t *) = {
 	[FAULT_DEBUG] = kdbg_int1_handler,
 	[FAULT_NMI] = fault_handle_nmi,
 	[FAULT_DOUBLE] = fault_handle_doublefault,
@@ -145,20 +142,20 @@ static intr_handler_t fault_handler_table[] = {
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  *
- * @return		Whether the current process should be preeempted.
+ * @return		Interrupt status code.
  */
-bool fault_handler(unative_t num, intr_frame_t *frame) {
+intr_result_t fault_handler(unative_t num, intr_frame_t *frame) {
 	/* KDBG is fully running on this CPU (or at least we hope so...).
 	 * Have it handle the fault itself. */
 	if(atomic_get(&kdbg_running) == 2) {
 		kdbg_except_handler(num, fault_names[num], frame);
-		return false;
+		return INTR_HANDLED;
 	}
 
 	/* If there is a special handler for this fault run it. */
 	if(fault_handler_table[num]) {
 		if(fault_handler_table[num](num, frame)) {
-			return false;
+			return INTR_HANDLED;
 		}
 	}
 

@@ -68,20 +68,20 @@ static inline void lapic_eoi(void) {
 /** Spurious interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-static bool lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
+ * @return		Interrupt status code. */
+static intr_result_t lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
-	return false;
+	return INTR_HANDLED;
 }
 
 /** IPI message interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		True if current thread should be preempted. */
-static bool lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
+ * @return		Interrupt status code. */
+static intr_result_t lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 	ipi_process_pending();
 	lapic_eoi();
-	return false;
+	return INTR_HANDLED;
 }
 
 /*
@@ -120,10 +120,9 @@ static clock_source_t lapic_clock_source = {
 /** Timer interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Value from clock_tick(). */
-static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
-	bool ret = clock_tick();
-
+ * @return		Return value from clock_tick(). */
+static intr_result_t lapic_timer_handler(unative_t num, intr_frame_t *frame) {
+	intr_result_t ret = clock_tick();
 	lapic_eoi();
 	return ret;
 }
@@ -136,9 +135,9 @@ static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
 static volatile uint32_t freq_tick_count = 0;
 
 /** PIT handler for bus frequency calculation. */
-static bool lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
+static intr_result_t lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
 	freq_tick_count++;
-	return false;
+	return INTR_HANDLED;
 }
 
 /** Find out the CPU bus frequency.

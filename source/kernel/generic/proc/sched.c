@@ -369,10 +369,20 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
  */
 
 /** Scheduler timer handler function.
- * @return		True to preempt the current thread. */
+ * @return		Whether to perform a thread switch. */
 static bool sched_timer_handler(void) {
+	bool ret = true;
+
+	spinlock_lock(&curr_thread->lock, 0);
+
 	curr_thread->timeslice = 0;
-	return true;
+	if(curr_thread->preempt_off > 0) {
+		curr_thread->preempt_missed = true;
+		ret = false;
+	}
+
+	spinlock_unlock(&curr_thread->lock);
+	return ret;
 }
 
 /** Internal part of the thread scheduler. Expects current thread to be locked.
@@ -497,21 +507,6 @@ void sched_yield(void) {
 
 	spinlock_lock_ni(&curr_thread->lock, 0);
 	sched_internal(state);
-}
-
-/** Preempt the current thread. */
-void sched_preempt(void) {
-	bool state = intr_disable();
-
-	spinlock_lock_ni(&curr_thread->lock, 0);
-
-	if(curr_thread->preempt_off > 0) {
-		curr_thread->preempt_missed = true;
-		spinlock_unlock_ni(&curr_thread->lock);
-		intr_restore(state);
-	} else {
-		sched_internal(state);
-	}
 }
 
 /** Disable preemption.

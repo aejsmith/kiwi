@@ -79,11 +79,10 @@ int clock_source_set(clock_source_t *source) {
  * Function called by a clock source when a clock tick occurs. Goes through
  * all enabled timers for the current CPU and checks if any have expired.
  *
- * @return		True if the current thread should be preempted
- *			by the low-level interrupt code, false if not.
+ * @return		Interrupt status code.
  */
-bool clock_tick(void) {
-	bool preempt = false;
+intr_result_t clock_tick(void) {
+	intr_result_t ret = INTR_HANDLED;
 	timer_t *timer;
 
 	assert(curr_clock);
@@ -105,19 +104,14 @@ bool clock_tick(void) {
 		timer->cpu = NULL;
 
 		switch(timer->action) {
-		case TIMER_PREEMPT:
-			preempt = true;
+		case TIMER_RESCHEDULE:
+			ret = INTR_RESCHEDULE;
 			break;
 		case TIMER_FUNCTION:
 			if(timer->func == NULL) {
 				fatal("Timer 0x%p has invalid function");
-			}
-
-			/* This check is done because if multiple timers have
-			 * expired, and one needs to preempt, we don't want
-			 * another to stop that preemption. */
-			if(timer->func()) {
-				preempt = true;
+			} else if(timer->func()) {
+				ret = INTR_RESCHEDULE;
 			}
 			break;
 		case TIMER_WAKE:
@@ -137,7 +131,7 @@ bool clock_tick(void) {
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
-	return preempt;
+	return ret;
 }
 
 /** Initialize a timer structure.

@@ -84,12 +84,14 @@ void intr_remove(unative_t num) {
  */
 void intr_handler(unative_t num, intr_frame_t *frame) {
 	intr_handler_t handler = intr_handlers[num];
+	intr_result_t ret;
 
 	if(unlikely(handler == NULL)) {
 		_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
 	} else {
-		if(handler(num, frame)) {
-			sched_preempt();
+		ret = handler(num, frame);
+		if(ret == INTR_RESCHEDULE) {
+			sched_yield();
 		}
 	}
 }

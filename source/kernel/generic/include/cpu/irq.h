@@ -21,7 +21,7 @@
 #ifndef __CPU_IRQ_H
 #define __CPU_IRQ_H
 
-#include <arch/intr.h>
+#include <cpu/intr.h>
 
 #include <types.h>
 
@@ -39,8 +39,8 @@ typedef struct irq_ops {
 } irq_ops_t;
 
 /** IRQ handler routine type.
- * @return		True if the current thread should be preempted. */
-typedef bool (*irq_handler_t)(unative_t num, intr_frame_t *frame);
+ * @return		Interrupt status code. */
+typedef intr_result_t (*irq_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern irq_ops_t *irq_ops;
 
@@ -49,6 +49,6 @@ extern int irq_remove(unative_t num);
 extern int irq_mask(unative_t num);
 extern int irq_unmask(unative_t num);
 
-extern bool irq_handler(unative_t num, intr_frame_t *frame);
+extern intr_result_t irq_handler(unative_t num, intr_frame_t *frame);
 
 #endif /* __CPU_IRQ_H */

@@ -30,7 +30,6 @@
 #define PRIORITY_USER		3		/**< User process. */
 
 extern void sched_yield(void);
-extern void sched_preempt(void);
 
 extern void sched_preempt_disable(void);
 extern void sched_preempt_enable(void);

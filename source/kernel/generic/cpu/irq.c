@@ -92,10 +92,10 @@ int irq_unmask(unative_t num) {
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  *
- * @return		Whether the current thread should be preempted.
+ * @return		Interrupt status code.
  */
-bool irq_handler(unative_t num, intr_frame_t *frame) {
-	bool ret = false;
+intr_result_t irq_handler(unative_t num, intr_frame_t *frame) {
+	intr_result_t ret = INTR_HANDLED;
 
 	assert(irq_ops);
 
@@ -106,7 +106,7 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 	/* Execute any pre-handling function - on x86 this checks for
 	 * spurious IRQs, etc. */
 	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
-		return false;
+		return INTR_HANDLED;
 	}
 
 	/* Dispatch the IRQ - TODO. */
