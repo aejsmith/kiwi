@@ -44,19 +44,14 @@ Choice('PLATFORM', 'Platform to compile for.', (
 Section('IA32/AMD64-specific options', {'ARCH': lambda x: x in ['ia32', 'amd64']})
 #######
 
-Choice('X86_DEBUG_PORT', 'Serial port to use for debug output.', (
+Choice('X86_SERIAL_PORT', 'Serial port to use for log output.', (
+	(0, 'Disabled.'),
 	(1, 'COM1.'),
 	(2, 'COM2.'),
 	(3, 'COM3.'),
 	(4, 'COM4.'),
 ), 1)
 Option('X86_NX', 'Use No-Execute/Execute-Disable support.', True)
-
-#######
-#Section('Kernel feature configuration')
-#######
-
-#Option('SMP', 'Symmetric Multiprocessing (SMP) support.', True)
 
 #######
 Section('Kernel debug output')

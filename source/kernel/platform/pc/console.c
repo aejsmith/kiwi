@@ -267,7 +267,6 @@ static void vga_console_init(void) {
 
 /** VGA console operations structure. */
 static console_t vga_console = {
-	.debug = false,
 	.putch = vga_console_putch,
 	.init = vga_console_init,
 };
@@ -276,7 +275,7 @@ static console_t vga_console = {
  * Serial console functions.
  */
 
-#if CONFIG_DEBUG
+#ifdef SERIAL_PORT
 /** Print a character to the serial console.
  * @param ch		Character to print. */
 static void serial_console_putch(unsigned char ch) {
@@ -300,7 +299,9 @@ static void serial_console_init(void) {
 
 /** Serial port console. */
 static console_t serial_console = {
+#if CONFIG_DEBUG
 	.debug = true,
+#endif
 	.init = serial_console_init,
 	.putch = serial_console_putch,
 };
@@ -312,7 +313,7 @@ static console_t serial_console = {
 
 /** Set up the console. */
 void console_early_init(void) {
-#if CONFIG_DEBUG
+#ifdef SERIAL_PORT
 	uint8_t status = in8(SERIAL_PORT + 6);
 
 	/* Only add the serial device when it is present. */
