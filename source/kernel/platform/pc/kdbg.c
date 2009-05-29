@@ -69,6 +69,7 @@ unsigned char kdbg_get_char(void) {
 	unsigned char code, ret;
 
 	while(1) {
+#ifdef SERIAL_PORT
 		/* Check for serial port data if it is present. */
 		code = in8(SERIAL_PORT + 6);
 		if((code & ((1<<4) | (1<<5))) && code != 0xFF) {
@@ -84,6 +85,7 @@ unsigned char kdbg_get_char(void) {
 				return code;
 			}
 		}
+#endif
 
 		/* Check for keyboard data. */
 		code = in8(0x64);
