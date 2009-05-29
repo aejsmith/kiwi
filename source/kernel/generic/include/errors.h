@@ -21,11 +21,13 @@
 #ifndef __ERRORS_H
 #define __ERRORS_H
 
+/** Definitions of error codes returned by kernel functions. */
 #define ERR_NO_MEMORY		1	/**< No memory available. */
 #define ERR_PARAM_INVAL		2	/**< Invalid parameter. */
 #define ERR_WOULD_BLOCK		3	/**< Operation would block. */
 #define ERR_INTERRUPTED		4	/**< Interrupted while blocking. */
 #define ERR_NOT_IMPLEMENTED	5	/**< Function not implemented. */
 #define ERR_DEST_UNKNOWN	6	/**< Could not find destination. */
+#define ERR_DEP_MISSING		7	/**< Required dependency not found. */
 
 #endif /* __ERRORS_H */

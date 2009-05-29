@@ -36,6 +36,7 @@
 #include <proc/thread.h>
 
 #include <kdbg.h>
+#include <module.h>
 #include <symtab.h>
 
 /* Please, keep this code safe! Specifically, make sure it doesn't:
@@ -86,6 +87,7 @@ static struct {
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
+	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },
 	{ "reboot",	"Reboot the system.",				kdbg_cmd_reboot },

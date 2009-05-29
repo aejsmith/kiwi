@@ -23,6 +23,8 @@
 
 #include <console/kprintf.h>
 
+#include <lib/string.h>
+
 #include <types/atomic.h>
 
 #include <types.h>

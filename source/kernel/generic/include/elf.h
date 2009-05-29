@@ -491,4 +491,7 @@ typedef struct {
 	} a_un;
 } __packed Elf64_Auxv;
 
+/** Pull in architecture definitions of the types to use. */
+#include <arch/elf.h>
+
 #endif /* __ELF_H */

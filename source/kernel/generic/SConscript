@@ -86,6 +86,7 @@ env['OBJFILES'] += [
 	env.Object('fatal.c'),
 	env.Object('kdbg.c'),
 	env.Object('main.c'),
+	env.Object('module.c'),
 	env.Object('symtab.c'),
 	env.Object('version.c'),
 ]
