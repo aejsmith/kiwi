@@ -940,19 +940,19 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	slab_cache_t *cache;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints a list of all active slab caches and some statistics about them.\n");
+		kprintf(LOG_NONE, "Prints a list of all active slab caches and some statistics about them.\n");
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_KDBG, "Name                      Align    Object Size Slab Size Flags Allocations\n");
-	kprintf(LOG_KDBG, "====                      =====    =========== ========= ===== ===========\n");
+	kprintf(LOG_NONE, "Name                      Align    Object Size Slab Size Flags Allocations\n");
+	kprintf(LOG_NONE, "====                      =====    =========== ========= ===== ===========\n");
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
-		kprintf(LOG_KDBG, "%-*s %-8" PRIs " %-11" PRIs " %-9" PRIs " %-5d %d\n",
+		kprintf(LOG_NONE, "%-*s %-8" PRIs " %-11" PRIs " %-9" PRIs " %-5d %d\n",
 		            SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
 		            cache->slab_size, cache->flags, atomic_get(&cache->alloc_count));
 	}

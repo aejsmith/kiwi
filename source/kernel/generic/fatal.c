@@ -35,10 +35,10 @@ static atomic_t fatal_protect = 0;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, int *total, void *data) {
-	console_putch(LOG_FATAL, ch);
+	console_putch(LOG_NONE, ch);
 	if(ch == '\n') {
-		console_putch(LOG_FATAL, ' ');
-		console_putch(LOG_FATAL, ' ');
+		console_putch(LOG_NONE, ' ');
+		console_putch(LOG_NONE, ' ');
 	}
 	*total = *total + 1;
 }
@@ -72,10 +72,10 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 		/* Halt all other CPUs. */
 		cpu_halt_all();
 
-		console_putch(LOG_FATAL, '\n');
+		console_putch(LOG_NONE, '\n');
 		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_current_id(), kiwi_ver_string);
 		do_printf(fatal_printf_helper, NULL, format, args);
-		console_putch(LOG_FATAL, '\n');
+		console_putch(LOG_NONE, '\n');
 
 		kdbg_enter(KDBG_ENTRY_FATAL, frame);
 	}

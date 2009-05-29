@@ -37,10 +37,9 @@ typedef struct console {
 } console_t;
 
 /** Console log levels. */
-#define LOG_DEBUG	0		/**< Debug message. */
-#define LOG_NORMAL	1		/**< Normal message. */
-#define LOG_FATAL	2		/**< Special value for _fatal() - will not be logged. */
-#define LOG_KDBG	3		/**< For use within KDBG (same as LOG_FATAL). */
+#define LOG_NONE	0		/**< Do not log the message. */
+#define LOG_DEBUG	1		/**< Debug message. */
+#define LOG_NORMAL	2		/**< Normal message. */
 
 extern void console_putch(unsigned char level, char ch);
 extern void console_register(console_t *cons);

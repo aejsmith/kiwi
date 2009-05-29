@@ -747,13 +747,13 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	aspace_t *as;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s <address>\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Dumps out the address space at the specified address. This address\n");
-		kprintf(LOG_KDBG, "is given as an expression.\n");
+		kprintf(LOG_NONE, "Dumps out the address space at the specified address. This address\n");
+		kprintf(LOG_NONE, "is given as an expression.\n");
 		return KDBG_OK;
 	} else if(argc != 2) {
-		kprintf(LOG_KDBG, "Expression expected. See 'help %s' for help.\n", argv[0]);
+		kprintf(LOG_NONE, "Expression expected. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
 	}
 
@@ -763,13 +763,13 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	as = (aspace_t *)addr;
 
-	kprintf(LOG_KDBG, "Base               End                Flags  Source\n");
-	kprintf(LOG_KDBG, "====               ===                =====  ======\n");
+	kprintf(LOG_NONE, "Base               End                Flags  Source\n");
+	kprintf(LOG_NONE, "====               ===                =====  ======\n");
 
 	AVLTREE_FOREACH(&as->regions, iter) {
 		region = avltree_entry(iter, aspace_region_t);
 
-		kprintf(LOG_KDBG, "0x%-16p 0x%-16p %-6d 0x%p+%" PRIo " %s\n",
+		kprintf(LOG_NONE, "0x%-16p 0x%-16p %-6d 0x%p+%" PRIo " %s\n",
 		        region->start, region->end, region->flags,
 		        region->source, region->offset,
 			(region->source) ? region->source->name : "");

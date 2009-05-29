@@ -71,7 +71,7 @@ int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
 	KDBG_REGISTER_CHECK(name, len, regp, "rflags", 6, curr_kdbg_frame->flags);
 	KDBG_REGISTER_CHECK(name, len, regp, "rsp", 3, curr_kdbg_frame->sp);
 	KDBG_REGISTER_CHECK(name, len, regp, "ss", 2, curr_kdbg_frame->ss);
-	kprintf(LOG_KDBG, "KDBG: Invalid register name '%.*s'\n", len, name);
+	kprintf(LOG_NONE, "KDBG: Invalid register name '%.*s'\n", len, name);
 	return KDBG_FAIL;
 }
 
@@ -86,29 +86,29 @@ int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
  */
 int kdbg_cmd_regs(int argc, char **argv) {
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints out the values contained in the current CPU register set. If you wish\n");
-		kprintf(LOG_KDBG, "to get the value of a single register, use the 'print' command instead.\n");
+		kprintf(LOG_NONE, "Prints out the values contained in the current CPU register set. If you wish\n");
+		kprintf(LOG_NONE, "to get the value of a single register, use the 'print' command instead.\n");
 
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_KDBG, "cs: 0x%04" PRIxn "  ss: 0x%04" PRIxn "  gs: 0x%04" PRIxn "  fs: 0x%04" PRIxn "\n",
+	kprintf(LOG_NONE, "cs: 0x%04" PRIxn "  ss: 0x%04" PRIxn "  gs: 0x%04" PRIxn "  fs: 0x%04" PRIxn "\n",
 	            curr_kdbg_frame->cs, curr_kdbg_frame->ss, curr_kdbg_frame->gs, curr_kdbg_frame->fs);
-	kprintf(LOG_KDBG, "int_no: %" PRIun "  err_code: %" PRIun "  rflags: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "int_no: %" PRIun "  err_code: %" PRIun "  rflags: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->int_no, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
-	kprintf(LOG_KDBG, "rax: 0x%016" PRIxn "  rbx: 0x%016" PRIxn "  rcx: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rax: 0x%016" PRIxn "  rbx: 0x%016" PRIxn "  rcx: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->ax, curr_kdbg_frame->bx, curr_kdbg_frame->cx);
-	kprintf(LOG_KDBG, "rdx: 0x%016" PRIxn "  rdi: 0x%016" PRIxn "  rsi: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rdx: 0x%016" PRIxn "  rdi: 0x%016" PRIxn "  rsi: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->dx, curr_kdbg_frame->di, curr_kdbg_frame->si);
-	kprintf(LOG_KDBG, "rbp: 0x%016" PRIxn "  r8:  0x%016" PRIxn "  r9:  0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rbp: 0x%016" PRIxn "  r8:  0x%016" PRIxn "  r9:  0x%016" PRIxn "\n",
 	            curr_kdbg_frame->bp, curr_kdbg_frame->r8, curr_kdbg_frame->r9);
-	kprintf(LOG_KDBG, "r10: 0x%016" PRIxn "  r11: 0x%016" PRIxn "  r12: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "r10: 0x%016" PRIxn "  r11: 0x%016" PRIxn "  r12: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->r10, curr_kdbg_frame->r11, curr_kdbg_frame->r12);
-	kprintf(LOG_KDBG, "r13: 0x%016" PRIxn "  r14: 0x%016" PRIxn "  r15: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "r13: 0x%016" PRIxn "  r14: 0x%016" PRIxn "  r15: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->r13, curr_kdbg_frame->r14, curr_kdbg_frame->r15);
-	kprintf(LOG_KDBG, "rip: 0x%016" PRIxn "  rsp: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rip: 0x%016" PRIxn "  rsp: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->ip, curr_kdbg_frame->sp);
 	return KDBG_OK;
 }

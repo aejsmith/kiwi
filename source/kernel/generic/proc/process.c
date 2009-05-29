@@ -191,19 +191,19 @@ int kdbg_cmd_process(int argc, char **argv) {
 	process_t *process;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints a list of all running processes.\n");
+		kprintf(LOG_NONE, "Prints a list of all running processes.\n");
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_KDBG, "ID    Priority Flags Threads  AS                 Name\n");
-	kprintf(LOG_KDBG, "==    ======== ===== =======  ==                 ====\n");
+	kprintf(LOG_NONE, "ID    Priority Flags Threads  AS                 Name\n");
+	kprintf(LOG_NONE, "==    ======== ===== =======  ==                 ====\n");
 
 	AVLTREE_FOREACH(&process_tree, iter) {
 		process = avltree_entry(iter, process_t);
 
-		kprintf(LOG_KDBG, "%-5" PRIu32 " %-8d %-5d %-8" PRIs " 0x%-16p %s\n",
+		kprintf(LOG_NONE, "%-5" PRIu32 " %-8d %-5d %-8" PRIs " 0x%-16p %s\n",
 			process->id, process->priority, process->flags,
 			process->num_threads, process->aspace, process->name);
 	}

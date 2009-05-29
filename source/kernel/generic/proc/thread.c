@@ -297,36 +297,36 @@ int kdbg_cmd_thread(int argc, char **argv) {
 	unative_t pid;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s [<process ID>]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [<process ID>]\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints a list of all threads, or a list of threads within a process\n");
-		kprintf(LOG_KDBG, "if given a process ID. The ID is given as an expression.\n");
+		kprintf(LOG_NONE, "Prints a list of all threads, or a list of threads within a process\n");
+		kprintf(LOG_NONE, "if given a process ID. The ID is given as an expression.\n");
 		return KDBG_OK;
 	} else if(argc != 1 && argc != 2) {
-		kprintf(LOG_KDBG, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_KDBG, "ID    Owner State    CPU  Prio Flags WaitQ                Name\n");
-	kprintf(LOG_KDBG, "==    ===== =====    ===  ==== ===== =====                ====\n");
+	kprintf(LOG_NONE, "ID    Owner State    CPU  Prio Flags WaitQ                Name\n");
+	kprintf(LOG_NONE, "==    ===== =====    ===  ==== ===== =====                ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */
 		if(kdbg_parse_expression(argv[1], &pid, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		} else if(!(process = process_lookup(pid))) {
-			kprintf(LOG_KDBG, "Invalid process ID.\n");
+			kprintf(LOG_NONE, "Invalid process ID.\n");
 			return KDBG_FAIL;
 		}
 
 		LIST_FOREACH(&process->threads, iter) {
 			thread = list_entry(iter, thread_t, owner_link);
-			thread_dump(thread, LOG_KDBG);
+			thread_dump(thread, LOG_NONE);
 		}
 	} else {
 		AVLTREE_FOREACH(&thread_tree, iter) {
 			thread = avltree_entry(iter, thread_t);
-			thread_dump(thread, LOG_KDBG);
+			thread_dump(thread, LOG_NONE);
 		}
 	}
 

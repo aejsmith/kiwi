@@ -54,7 +54,7 @@ static void kvprintf_helper(char ch, int *total, void *data) {
 int kvprintf(int level, const char *format, va_list args) {
 	int ret;
 
-	if(level != LOG_KDBG && level != LOG_FATAL) {
+	if(level != LOG_NONE) {
 		spinlock_lock(&kprintf_lock, 0);
 		ret = do_printf(kvprintf_helper, &level, format, args);
 		spinlock_unlock(&kprintf_lock);

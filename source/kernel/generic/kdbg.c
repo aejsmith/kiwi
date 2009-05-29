@@ -106,9 +106,9 @@ static struct {
  * @return		KDBG_CONTINUE. */
 static int kdbg_cmd_continue(int argc, char **argv) {
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Leaves KDBG and resumes normal execution. This is not possible if KDBG was\n");
-		kprintf(LOG_KDBG, "entered due to a fatal error.\n");
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Leaves KDBG and resumes normal execution. This is not possible if KDBG was\n");
+		kprintf(LOG_NONE, "entered due to a fatal error.\n");
 		return KDBG_OK;
 	}
 	return KDBG_CONTINUE;
@@ -127,30 +127,30 @@ static int kdbg_cmd_examine(int argc, char **argv) {
 	ptr_t addr;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s [/format] expression\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [/format] expression\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints out memory content according to the specified format. The format string\n");
-		kprintf(LOG_KDBG, "is made up of an optional count followed by any of the following arguments:\n");
-		kprintf(LOG_KDBG, "  Format modifiers\n");
-		kprintf(LOG_KDBG, "    x    Hexadecimal (base 16) (default).\n");
-		kprintf(LOG_KDBG, "    i    Signed decimal (base 10).\n");
-		kprintf(LOG_KDBG, "    u    Unsigned decimal (base 10).\n");
-		kprintf(LOG_KDBG, "    o    Octal (base 8).\n");
-		kprintf(LOG_KDBG, "    s    Character string.\n");
-		kprintf(LOG_KDBG, "  Size specifiers:\n");
-		kprintf(LOG_KDBG, "    b    Byte (8-bit).\n");
-		kprintf(LOG_KDBG, "    w    Word (16-bit).\n");
-		kprintf(LOG_KDBG, "    d    Double-word (32-bit).\n");
-		kprintf(LOG_KDBG, "    q    Quad-word (64-bit).\n");
-		kprintf(LOG_KDBG, "The count specifies the number of entries to print, each of the size given by\n");
-		kprintf(LOG_KDBG, "the size specifier. The value of the expression is used as the start address.\n");
-		kprintf(LOG_KDBG, "For help on what can be included in expressions, use 'help print'.\n");
-		kprintf(LOG_KDBG, "If the memory address is invalid, then a fault will occur, in which case the\n");
-		kprintf(LOG_KDBG, "command will fail.\n");
+		kprintf(LOG_NONE, "Prints out memory content according to the specified format. The format string\n");
+		kprintf(LOG_NONE, "is made up of an optional count followed by any of the following arguments:\n");
+		kprintf(LOG_NONE, "  Format modifiers\n");
+		kprintf(LOG_NONE, "    x    Hexadecimal (base 16) (default).\n");
+		kprintf(LOG_NONE, "    i    Signed decimal (base 10).\n");
+		kprintf(LOG_NONE, "    u    Unsigned decimal (base 10).\n");
+		kprintf(LOG_NONE, "    o    Octal (base 8).\n");
+		kprintf(LOG_NONE, "    s    Character string.\n");
+		kprintf(LOG_NONE, "  Size specifiers:\n");
+		kprintf(LOG_NONE, "    b    Byte (8-bit).\n");
+		kprintf(LOG_NONE, "    w    Word (16-bit).\n");
+		kprintf(LOG_NONE, "    d    Double-word (32-bit).\n");
+		kprintf(LOG_NONE, "    q    Quad-word (64-bit).\n");
+		kprintf(LOG_NONE, "The count specifies the number of entries to print, each of the size given by\n");
+		kprintf(LOG_NONE, "the size specifier. The value of the expression is used as the start address.\n");
+		kprintf(LOG_NONE, "For help on what can be included in expressions, use 'help print'.\n");
+		kprintf(LOG_NONE, "If the memory address is invalid, then a fault will occur, in which case the\n");
+		kprintf(LOG_NONE, "command will fail.\n");
 
 		return KDBG_OK;
 	} else if(argc < 2 || (argv[1][0] == '/' && argc < 3)) {
-		kprintf(LOG_KDBG, "Expression expected. See 'help %s' for help.\n", argv[0]);
+		kprintf(LOG_NONE, "Expression expected. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
 	}
 
@@ -174,7 +174,7 @@ static int kdbg_cmd_examine(int argc, char **argv) {
 			case 'd': size = 4; break;
 			case 'q': size = 8; break;
 			default:
-				kprintf(LOG_KDBG, "Unknown format character '%c'\n", *argv[1]);
+				kprintf(LOG_NONE, "Unknown format character '%c'\n", *argv[1]);
 				return KDBG_FAIL;
 			}
 			argv[1]++;
@@ -205,11 +205,11 @@ static int kdbg_cmd_examine(int argc, char **argv) {
 		/* Print it out. Don't put a newline between each value for
 		 * strings. */
 		switch(fmt) {
-		case 'x':	kprintf(LOG_KDBG, "0x%p: 0x%" PRIx64 "\n", addr, val); break;
-		case 'i':	kprintf(LOG_KDBG, "0x%p: %"   PRId64 "\n", addr, val); break;
-		case 'o':	kprintf(LOG_KDBG, "0x%p: 0%"  PRIo64 "\n", addr, val); break;
-		case 'u':	kprintf(LOG_KDBG, "0x%p: %"   PRIu64 "\n", addr, val); break;
-		case 's':	kprintf(LOG_KDBG, "%c", (uint8_t)val); break;
+		case 'x':	kprintf(LOG_NONE, "0x%p: 0x%" PRIx64 "\n", addr, val); break;
+		case 'i':	kprintf(LOG_NONE, "0x%p: %"   PRId64 "\n", addr, val); break;
+		case 'o':	kprintf(LOG_NONE, "0x%p: 0%"  PRIo64 "\n", addr, val); break;
+		case 'u':	kprintf(LOG_NONE, "0x%p: %"   PRIu64 "\n", addr, val); break;
+		case 's':	kprintf(LOG_NONE, "%c", (uint8_t)val); break;
 		}
 
 		addr += size;
@@ -217,7 +217,7 @@ static int kdbg_cmd_examine(int argc, char **argv) {
 
 	/* Print a newline if we've just printed a string. */
 	if(fmt == 's') {
-		kprintf(LOG_KDBG, "\n");
+		kprintf(LOG_NONE, "\n");
 	}
 	return KDBG_OK;
 }
@@ -240,18 +240,18 @@ static int kdbg_cmd_help(int argc, char **argv) {
 			}
 		}
 
-		kprintf(LOG_KDBG, "Requested help on invalid command '%s'\n", argv[1]);
+		kprintf(LOG_NONE, "Requested help on invalid command '%s'\n", argv[1]);
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_KDBG, "%-12s  %s\n", "Command", "Info");
-	kprintf(LOG_KDBG, "%-12s  %s\n", "=======", "====");
+	kprintf(LOG_NONE, "%-12s  %s\n", "Command", "Info");
+	kprintf(LOG_NONE, "%-12s  %s\n", "=======", "====");
 
 	for(i = 0; i < ARRAYSZ(kdbg_commands); i++) {
-		kprintf(LOG_KDBG, "%-12s  %s\n", kdbg_commands[i].command, kdbg_commands[i].description);
+		kprintf(LOG_NONE, "%-12s  %s\n", kdbg_commands[i].command, kdbg_commands[i].description);
 	}
 
-	kprintf(LOG_KDBG, "\nFor help on a specific command, type \"help <command>\".\n");
+	kprintf(LOG_NONE, "\nFor help on a specific command, type \"help <command>\".\n");
 	return KDBG_OK;
 }
 
@@ -265,21 +265,21 @@ static int kdbg_cmd_print(int argc, char **argv) {
 	int exp = 1;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s [/format] expression\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [/format] expression\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints the value of an expression in the specified format. Possible formats are:\n");
-		kprintf(LOG_KDBG, "  x    Hexadecimal (base 16).\n");
-		kprintf(LOG_KDBG, "  i    Signed decimal (base 10) (default).\n");
-		kprintf(LOG_KDBG, "  u    Unsigned decimal (base 10).\n");
-		kprintf(LOG_KDBG, "  o    Octal (base 8).\n");
-		kprintf(LOG_KDBG, "The expression can be made up of constant values, registers and symbol\n");
-		kprintf(LOG_KDBG, "addresses. It can also contain basic arithmetic operations (+-*/). To use the\n");
-		kprintf(LOG_KDBG, "value contained in a register, prefix the name with a %% character. To use a\n");
-		kprintf(LOG_KDBG, "symbol address, prefix its name with an & character.\n");
+		kprintf(LOG_NONE, "Prints the value of an expression in the specified format. Possible formats are:\n");
+		kprintf(LOG_NONE, "  x    Hexadecimal (base 16).\n");
+		kprintf(LOG_NONE, "  i    Signed decimal (base 10) (default).\n");
+		kprintf(LOG_NONE, "  u    Unsigned decimal (base 10).\n");
+		kprintf(LOG_NONE, "  o    Octal (base 8).\n");
+		kprintf(LOG_NONE, "The expression can be made up of constant values, registers and symbol\n");
+		kprintf(LOG_NONE, "addresses. It can also contain basic arithmetic operations (+-*/). To use the\n");
+		kprintf(LOG_NONE, "value contained in a register, prefix the name with a %% character. To use a\n");
+		kprintf(LOG_NONE, "symbol address, prefix its name with an & character.\n");
 
 		return KDBG_OK;
 	} else if(argc < 2 || (argv[1][0] == '/' && argc < 3)) {
-		kprintf(LOG_KDBG, "Expression expected. See 'help %s' for help.\n", argv[0]);
+		kprintf(LOG_NONE, "Expression expected. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
 	}
 
@@ -291,7 +291,7 @@ static int kdbg_cmd_print(int argc, char **argv) {
 			fmt = argv[1][1];
 			break;
 		default:
-			kprintf(LOG_KDBG, "Unknown format character '%c'\n", argv[1][1]);
+			kprintf(LOG_NONE, "Unknown format character '%c'\n", argv[1][1]);
 			return KDBG_FAIL;
 		}
 	}
@@ -302,10 +302,10 @@ static int kdbg_cmd_print(int argc, char **argv) {
 	}
 
 	switch(fmt) {
-	case 'x':	kprintf(LOG_KDBG, "0x%" PRIxn "\n", value); break;
-	case 'i':	kprintf(LOG_KDBG, "%" PRIdn "\n", value); break;
-	case 'o':	kprintf(LOG_KDBG, "0%" PRIon "\n", value); break;
-	case 'u':	kprintf(LOG_KDBG, "%" PRIun "\n", value); break;
+	case 'x':	kprintf(LOG_NONE, "0x%" PRIxn "\n", value); break;
+	case 'i':	kprintf(LOG_NONE, "%" PRIdn "\n", value); break;
+	case 'o':	kprintf(LOG_NONE, "0%" PRIon "\n", value); break;
+	case 'u':	kprintf(LOG_NONE, "%" PRIun "\n", value); break;
 	}
 	return KDBG_OK;
 }
@@ -316,8 +316,8 @@ static int kdbg_cmd_print(int argc, char **argv) {
  * @return		Doesn't return on success, KDBG_FAIL on failure. */
 static int kdbg_cmd_reboot(int argc, char **argv) {
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Reboots the system.\n");
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Reboots the system.\n");
 		return KDBG_OK;
 	}
 
@@ -333,11 +333,11 @@ static int kdbg_cmd_step(int argc, char **argv) {
 	unative_t value = 1;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s [count]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [count]\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Steps the given number of CPU instructions and breaks into KDBG again. If\n");
-		kprintf(LOG_KDBG, "no instruction count is specified, then will step one instruction. The\n");
-		kprintf(LOG_KDBG, "instruction count is given as an expression.\n");
+		kprintf(LOG_NONE, "Steps the given number of CPU instructions and breaks into KDBG again. If\n");
+		kprintf(LOG_NONE, "no instruction count is specified, then will step one instruction. The\n");
+		kprintf(LOG_NONE, "instruction count is given as an expression.\n");
 
 		return KDBG_OK;
 	}
@@ -347,7 +347,7 @@ static int kdbg_cmd_step(int argc, char **argv) {
 		if(kdbg_parse_expression(argv[1], &value, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		} else if(!value) {
-			kprintf(LOG_KDBG, "Instruction count must be non-zero\n");
+			kprintf(LOG_NONE, "Instruction count must be non-zero\n");
 			return KDBG_FAIL;
 		}
 	}
@@ -392,14 +392,14 @@ static bool kdbg_tab_complete(size_t *lenp) {
 			}
 
 			strcpy(kdbg_in_buffer + len, kdbg_commands[i].command + len);
-			kprintf(LOG_KDBG, "%s ", kdbg_commands[i].command + len);
+			kprintf(LOG_NONE, "%s ", kdbg_commands[i].command + len);
 			*lenp = len + strlen(kdbg_commands[i].command + len) + 1;
 			kdbg_in_buffer[*lenp - 1] = ' ';
 		}
 
 		return false;
 	} else if(matches > 1) {
-		kprintf(LOG_KDBG, "\n");
+		kprintf(LOG_NONE, "\n");
 		for(i = 0; i < ARRAYSZ(kdbg_commands); i++) {
 			if(len >= strlen(kdbg_commands[i].command)) {
 				continue;
@@ -408,14 +408,14 @@ static bool kdbg_tab_complete(size_t *lenp) {
 			}
 
 			if(printed >= 5) {
-				kprintf(LOG_KDBG, "\n");
+				kprintf(LOG_NONE, "\n");
 				printed = 0;
 			}
-			kprintf(LOG_KDBG, "%-12s ", kdbg_commands[i].command);
+			kprintf(LOG_NONE, "%-12s ", kdbg_commands[i].command);
 			printed++;
 		}
 
-		kprintf(LOG_KDBG, "\n");
+		kprintf(LOG_NONE, "\n");
 		return true;
 	}
 
@@ -429,14 +429,14 @@ static char *kdbg_get_input(int count) {
 	size_t len = 0, spaces = 0;
 	unsigned char ch;
 
-	kprintf(LOG_KDBG, "KDBG:%03d> ", count);
+	kprintf(LOG_NONE, "KDBG:%03d> ", count);
 
 	memset(kdbg_in_buffer, 0, sizeof(kdbg_in_buffer));
 
 	while(1) {
 		ch = kdbg_get_char();
 		if(ch == '\n') {
-			kprintf(LOG_KDBG, "%c", ch);
+			kprintf(LOG_NONE, "%c", ch);
 			break;
 		} else if(ch == '\b') {
 			if(len > 0) {
@@ -445,7 +445,7 @@ static char *kdbg_get_input(int count) {
 				}
 
 				kdbg_in_buffer[--len] = 0;
-				kprintf(LOG_KDBG, "\b \b");
+				kprintf(LOG_NONE, "\b \b");
 			}
 		} else if(len < (KDBG_INPUT_BUF_SIZE - 1)) {
 			if(ch == '\t') {
@@ -454,10 +454,10 @@ static char *kdbg_get_input(int count) {
 				/* Handle tab completion and reprint the line
 				 * if needed. */
 				if(kdbg_tab_complete(&len)) {
-					kprintf(LOG_KDBG, "KDBG:%03d> %s", count, kdbg_in_buffer);
+					kprintf(LOG_NONE, "KDBG:%03d> %s", count, kdbg_in_buffer);
 				}
 			} else {
-				kprintf(LOG_KDBG, "%c", ch);
+				kprintf(LOG_NONE, "%c", ch);
 				kdbg_in_buffer[len++] = ch;
 				if(ch == ' ') {
 					spaces++;
@@ -491,7 +491,7 @@ static int kdbg_process_input(char *input) {
 
 		argv[argc++] = cur;
 		if(argc >= 16) {
-			kprintf(LOG_KDBG, "KDBG: Error: Too many arguments, only 16 allowed\n");
+			kprintf(LOG_NONE, "KDBG: Error: Too many arguments, only 16 allowed\n");
 			return KDBG_FAIL;
 		}
 	}
@@ -519,7 +519,7 @@ static int kdbg_process_input(char *input) {
 		return ret;
 	}
 
-	kprintf(LOG_KDBG, "KDBG: Unknown command '%s'\n", argv[0]);
+	kprintf(LOG_NONE, "KDBG: Unknown command '%s'\n", argv[0]);
 	return KDBG_FAIL;
 }
 
@@ -552,10 +552,10 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 	/* Check for a string. */
 	if(exp[0] == '"') {
 		if(strp == NULL) {
-			kprintf(LOG_KDBG, "KDBG: Unexpected string expression\n");
+			kprintf(LOG_NONE, "KDBG: Unexpected string expression\n");
 			return KDBG_FAIL;
 		} else if(strlen(exp) < 2 || exp[strlen(exp) - 1] != '"') {
-			kprintf(LOG_KDBG, "KDBG: Missing \" while parsing string expression\n");
+			kprintf(LOG_NONE, "KDBG: Missing \" while parsing string expression\n");
 			return KDBG_FAIL;
 		}
 
@@ -569,7 +569,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 	 * digit. */
 	while(*exp) {
 		if(!isdigit(exp[0]) && exp[0] != '%' && exp[0] != '&') {
-			kprintf(LOG_KDBG, "KDBG: Syntax error in expression\n");
+			kprintf(LOG_NONE, "KDBG: Syntax error in expression\n");
 			return KDBG_FAIL;
 		}
 
@@ -582,7 +582,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 		if(exp[0] == '%') {
 			/* Register name. */
 			if((len - 1) == 0) {
-				kprintf(LOG_KDBG, "KDBG: Expected register name after '%'\n");
+				kprintf(LOG_NONE, "KDBG: Expected register name after '%'\n");
 				return KDBG_FAIL;
 			}
 
@@ -591,7 +591,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 			}
 		} else if(exp[0] == '&') {
 			if((len - 1) >= 64) {
-				kprintf(LOG_KDBG, "KDBG: Symbol name too long\n");
+				kprintf(LOG_NONE, "KDBG: Symbol name too long\n");
 				return KDBG_FAIL;
 			}
 
@@ -600,7 +600,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 
 			sym = symtab_lookup_name(&kernel_symtab, namebuf, false, false);
 			if(sym == NULL) {
-				kprintf(LOG_KDBG, "KDBG: Symbol '%s' not found\n", namebuf);
+				kprintf(LOG_NONE, "KDBG: Symbol '%s' not found\n", namebuf);
 				return KDBG_FAIL;
 			}
 
@@ -625,7 +625,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 		if(isoperator(exp[0])) {
 			operator = *(exp++);
 			if(exp[0] == 0) {
-				kprintf(LOG_KDBG, "KDBG: Expected operand after operator\n");
+				kprintf(LOG_NONE, "KDBG: Expected operand after operator\n");
 				return KDBG_FAIL;
 			}
 		}
@@ -645,7 +645,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
  * @param frame		Interrupt stack frame.
  */
 void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
-	kprintf(LOG_KDBG, "KDBG: Exception %" PRIun " (%s) occurred during command (%p)\n",
+	kprintf(LOG_NONE, "KDBG: Exception %" PRIun " (%s) occurred during command (%p)\n",
 	                  num, name, frame->ip);
 	context_restore_frame(&kdbg_fault_context, frame);
 }
@@ -670,7 +670,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	/* Double check that we have a registers structure. */
 	if(!frame) {
-		kprintf(LOG_KDBG, "KDBG: Error: No registers structure provided\n");
+		kprintf(LOG_NONE, "KDBG: Error: No registers structure provided\n");
 		intr_restore(state);
 		return KDBG_FAIL;
 	}
@@ -679,7 +679,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	if(!atomic_cmp_set(&kdbg_running, 0, 1)) {
 		/* A value of 3 means KDBG is disabled. */
 		if(atomic_get(&kdbg_running) != 3) {
-			kprintf(LOG_KDBG, "KDBG: Error: Multiple entries to KDBG!\n");
+			kprintf(LOG_NONE, "KDBG: Error: Multiple entries to KDBG!\n");
 		}
 		intr_restore(state);
 		return KDBG_FAIL;
@@ -694,13 +694,13 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 				return KDBG_STEP;
 			}
 		} else {
-			kprintf(LOG_KDBG, "KDBG: Warning: Non-step entry with %" PRIs " steps remaining\n",
+			kprintf(LOG_NONE, "KDBG: Warning: Non-step entry with %" PRIs " steps remaining\n",
 			        kdbg_step_count);
 			kdbg_step_count = 0;
 			pcount = 0;
 		}
 	} else if(reason == KDBG_ENTRY_STEPPED) {
-		kprintf(LOG_KDBG, "KDBG: Warning: Stepped but no step in progress?\n");
+		kprintf(LOG_NONE, "KDBG: Warning: Stepped but no step in progress?\n");
 	}
 
 	/* Ask all other CPUs to pause execution. */
@@ -710,13 +710,13 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	sym = symtab_lookup_addr(&kernel_symtab, frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
-		kprintf(LOG_KDBG, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else if(reason == KDBG_ENTRY_STEPPED) {
-		kprintf(LOG_KDBG, "Stepped to [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "Stepped to [%p] %s+0x%" PRIxs "\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else {
-		kprintf(LOG_KDBG, "\nEntered KDBG from [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "\nEntered KDBG from [%p] %s+0x%" PRIxs "\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	}
 
@@ -724,7 +724,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	while(1) {
 		input = kdbg_get_input(pcount++);
 		if(strlen(input) == 0) {
-			kprintf(LOG_KDBG, "KDBG: Please enter a command.\n");
+			kprintf(LOG_NONE, "KDBG: Please enter a command.\n");
 			continue;
 		}
 
@@ -732,16 +732,16 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 		if(ret == KDBG_CONTINUE) {
 			/* If we've come from fatal(), we cannot continue. */
 			if(reason == KDBG_ENTRY_FATAL) {
-				kprintf(LOG_KDBG, "KDBG: Continuing is not possible.\n");
+				kprintf(LOG_NONE, "KDBG: Continuing is not possible.\n");
 			} else {
-				kprintf(LOG_KDBG, "Continuing execution...\n");
+				kprintf(LOG_NONE, "Continuing execution...\n");
 				pcount = 0;
 				ret = KDBG_OK;
 				break;
 			}
 		} else if(ret == KDBG_STEP) {
 			if(reason == KDBG_ENTRY_FATAL) {
-				kprintf(LOG_KDBG, "KDBG: Single-step is not possible.\n");
+				kprintf(LOG_NONE, "KDBG: Single-step is not possible.\n");
 			} else {
 				break;
 			}

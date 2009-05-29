@@ -60,7 +60,7 @@ void console_putch(unsigned char level, char ch) {
 		return;
 	}
 #endif
-	if(level != LOG_KDBG && level != LOG_FATAL) {
+	if(level != LOG_NONE) {
 		spinlock_lock(&console_lock, 0);
 	}
 
@@ -76,8 +76,8 @@ void console_putch(unsigned char level, char ch) {
 		cons->putch((unsigned char)ch);
 	}
 
-	/* Store in the log buffer. */
-	if(level != LOG_FATAL) {
+	/* Store in the log buffer and unlock. */
+	if(level != LOG_NONE) {
 		klog_buffer[(klog_start + klog_length) % KLOG_SIZE].level = level;
 		klog_buffer[(klog_start + klog_length) % KLOG_SIZE].ch = (unsigned char)ch;
 		if(klog_length < KLOG_SIZE) {
@@ -85,9 +85,7 @@ void console_putch(unsigned char level, char ch) {
 		} else {
 			klog_start = (klog_start + 1) % KLOG_SIZE;
 		}
-	}
 
-	if(level != LOG_KDBG && level != LOG_FATAL) {
 		spinlock_unlock(&console_lock);
 	}
 }

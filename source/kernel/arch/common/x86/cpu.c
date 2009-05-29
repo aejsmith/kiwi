@@ -160,28 +160,28 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 	size_t i;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Prints a list of all CPUs and information about them.\n");
+		kprintf(LOG_NONE, "Prints a list of all CPUs and information about them.\n");
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_KDBG, "ID   State    Model Name\n");
-	kprintf(LOG_KDBG, "==   =====    ==========\n");
+	kprintf(LOG_NONE, "ID   State    Model Name\n");
+	kprintf(LOG_NONE, "==   =====    ==========\n");
 
 	for(i = 0; i <= cpu_id_max; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}
 
-		kprintf(LOG_KDBG, "%-4" PRIu32 " ", cpus[i]->id);
+		kprintf(LOG_NONE, "%-4" PRIu32 " ", cpus[i]->id);
 		switch(cpus[i]->state) {
-		case CPU_DISABLED:	kprintf(LOG_KDBG, "Disabled "); break;
-		case CPU_DOWN:		kprintf(LOG_KDBG, "Down     "); break;
-		case CPU_RUNNING:	kprintf(LOG_KDBG, "Running  "); break;
-		default:		kprintf(LOG_KDBG, "Bad      "); break;
+		case CPU_DISABLED:	kprintf(LOG_NONE, "Disabled "); break;
+		case CPU_DOWN:		kprintf(LOG_NONE, "Down     "); break;
+		case CPU_RUNNING:	kprintf(LOG_NONE, "Running  "); break;
+		default:		kprintf(LOG_NONE, "Bad      "); break;
 		}
-		kprintf(LOG_KDBG, "%s\n", (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
+		kprintf(LOG_NONE, "%s\n", (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
 	}
 
 	return KDBG_OK;

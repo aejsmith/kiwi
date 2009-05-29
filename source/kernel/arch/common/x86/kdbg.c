@@ -186,8 +186,8 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	ptr_t page;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Prints out a backtrace.\n");
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "Prints out a backtrace.\n");
 		return KDBG_OK;
 	}
 
@@ -199,14 +199,14 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 
 	/* Print out the address of where the exception occurred. */
 	sym = symtab_lookup_addr(&kernel_symtab, curr_kdbg_frame->ip, &off);
-	kprintf(LOG_KDBG, "--- Interrupt ---\n");
-	kprintf(LOG_KDBG, "[%p] %s+0x%" PRIxs "\n", curr_kdbg_frame->ip,
+	kprintf(LOG_NONE, "--- Interrupt ---\n");
+	kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", curr_kdbg_frame->ip,
 	        (sym) ? sym->name : "<unknown>", off);
 
-	kprintf(LOG_KDBG, "--- Stacktrace ---\n");
+	kprintf(LOG_NONE, "--- Stacktrace ---\n");
 	while(frame && ((ptr_t)frame & PAGE_MASK) == page) {
 		sym = symtab_lookup_addr(&kernel_symtab, frame->addr, &off);
-		kprintf(LOG_KDBG, "[%p] %s+0x%" PRIxs "\n", frame->addr,
+		kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", frame->addr,
 		        (sym) ? sym->name : "<unknown>", off);
 		frame = frame->next;
 	}
@@ -227,18 +227,18 @@ int kdbg_cmd_bdelete(int argc, char **argv) {
 	size_t num;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Deletes the breakpoint with the given ID.\n");
+		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
+		kprintf(LOG_NONE, "Deletes the breakpoint with the given ID.\n");
 		return KDBG_OK;
 	} else if(argc < 2) {
-		kprintf(LOG_KDBG, "Breakpoint ID expected.\n");
+		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
 		return KDBG_FAIL;
 	}
 
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_KDBG, "Breakpoint number %" PRIs " invalid\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -261,18 +261,18 @@ int kdbg_cmd_bdisable(int argc, char **argv) {
 	size_t num;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Disables the breakpoint with the given ID.\n");
+		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
+		kprintf(LOG_NONE, "Disables the breakpoint with the given ID.\n");
 		return KDBG_OK;
 	} else if(argc < 2) {
-		kprintf(LOG_KDBG, "Breakpoint ID expected.\n");
+		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
 		return KDBG_FAIL;
 	}
 
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_KDBG, "Breakpoint number %" PRIs " invalid.\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid.\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -293,18 +293,18 @@ int kdbg_cmd_benable(int argc, char **argv) {
 	size_t num;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_KDBG, "Enables the breakpoint with the given ID.\n");
+		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
+		kprintf(LOG_NONE, "Enables the breakpoint with the given ID.\n");
 		return KDBG_OK;
 	} else if(argc < 2) {
-		kprintf(LOG_KDBG, "Breakpoint ID expected.\n");
+		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
 		return KDBG_FAIL;
 	}
 
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_KDBG, "Breakpoint number %" PRIs " invalid\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -328,13 +328,13 @@ int kdbg_cmd_break(int argc, char **argv) {
 	symbol_t *sym;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_KDBG, "Usage: %s [address]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [address]\n\n", argv[0]);
 
-		kprintf(LOG_KDBG, "Creates a new breakpoint at the given address. The address is treated as an\n");
-		kprintf(LOG_KDBG, "expression. If no arguments are given, will list all current breakpoints.\n");
-		kprintf(LOG_KDBG, "New breakpoints default to being enabled. It should be noted that breakpoints\n");
-		kprintf(LOG_KDBG, "do not work on older versions of QEMU (0.9.1 or earlier) - it only gained\n");
-		kprintf(LOG_KDBG, "support for hardware breakpoints in revision 5747.\n");
+		kprintf(LOG_NONE, "Creates a new breakpoint at the given address. The address is treated as an\n");
+		kprintf(LOG_NONE, "expression. If no arguments are given, will list all current breakpoints.\n");
+		kprintf(LOG_NONE, "New breakpoints default to being enabled. It should be noted that breakpoints\n");
+		kprintf(LOG_NONE, "do not work on older versions of QEMU (0.9.1 or earlier) - it only gained\n");
+		kprintf(LOG_NONE, "support for hardware breakpoints in revision 5747.\n");
 
 		return KDBG_OK;
 	}
@@ -345,7 +345,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 				continue;
 			}
 			sym = symtab_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_KDBG, "Breakpoint %" PRIs ": [%p] %s+0x%" PRIxs " (%s)\n", i,
+			kprintf(LOG_NONE, "Breakpoint %" PRIs ": [%p] %s+0x%" PRIxs " (%s)\n", i,
 			            kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
 			            off, (kdbg_breakpoints[i].enabled) ? "enabled" : "disabled");
 		}
@@ -355,7 +355,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 		if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		} else if(addr < KERNEL_VIRT_BASE) {
-			kprintf(LOG_KDBG, "Cannot set breakpoint outside of kernel code.\n");
+			kprintf(LOG_NONE, "Cannot set breakpoint outside of kernel code.\n");
 			return KDBG_FAIL;
 		}
 
@@ -370,12 +370,12 @@ int kdbg_cmd_break(int argc, char **argv) {
 			kdbg_breakpoints[i].addr = (ptr_t)addr;
 
 			sym = symtab_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_KDBG, "Created breakpoint %" PRIs ": [%p] %s+0x%" PRIxs "\n",
+			kprintf(LOG_NONE, "Created breakpoint %" PRIs ": [%p] %s+0x%" PRIxs "\n",
 			        i, addr, (sym) ? sym->name : "<unknown>", off);
 			return KDBG_OK;
 		}
 
-		kprintf(LOG_KDBG, "No free breakpoint slots.\n");
+		kprintf(LOG_NONE, "No free breakpoint slots.\n");
 		return KDBG_FAIL;
 	}
 }
