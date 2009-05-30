@@ -47,11 +47,12 @@ SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'ge
 
 # Create a fake symbol table used for the first linking stage.
 def fake_symtab_func(target, source, env):
-	with open(str(target[0]), 'w') as f:
-		f.write('/* This file is auto-generated, changes will be overwritten. */\n')
-		f.write('#include <symtab.h>\n')
-		f.write('static symbol_t kernel_symtab_array[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
-		f.write('symtab_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
+	f = open(str(target[0]), 'w')
+	f.write('/* This file is auto-generated, changes will be overwritten. */\n')
+	f.write('#include <symtab.h>\n')
+	f.write('static symbol_t kernel_symtab_array[] = { { 0x0, 0x0, "dummy", 0, false } };\n')
+	f.write('symtab_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
+	f.close()
 	return None
 
 # Link the first kernel image using a fake symbol table.
@@ -88,3 +89,27 @@ Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
 envmgr['dist']['KERNEL'] = File('kiwi.elf')
 
 Default(Alias('kernel', File('kiwi.elf')))
+
+##############################
+# Module environment set-up. #
+##############################
+
+env = envmgr.Create('module', env)
+env['MODULES'] = []
+
+# Not sure if this is the right way to do this (add any modules to the module
+# list in the environment), but an emitter seems to work...
+def module_emitter(target, source, env):
+	env['MODULES'].append(target[0])
+	return target, source
+env['BUILDERS']['Module'] = Builder(
+	action=Action('$LINK -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
+	suffix='.mod',
+	src_suffix='$OBJSUFFIX',
+	src_builder='Object',
+	emitter=module_emitter)
+
+SConscript(dirs=['modules'], exports=['env'])
+
+envmgr['dist']['MODULES'] = env['MODULES']
+Default(Alias('modules', env['MODULES']))

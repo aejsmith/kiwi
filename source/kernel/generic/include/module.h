@@ -52,6 +52,7 @@ typedef struct module {
 	size_t load_size;		/**< Size of allocation module is loaded to. */
 } module_t;
 
+extern bool module_check(void *image, size_t size);
 extern int module_load(void *image, size_t size, char *dep);
 
 extern int kdbg_cmd_modules(int argc, char **argv);

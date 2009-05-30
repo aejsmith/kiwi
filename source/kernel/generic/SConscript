@@ -83,6 +83,7 @@ env['OBJFILES'] += [
 ]
 
 env['OBJFILES'] += [
+	env.Object('bootmod.c'),
 	env.Object('fatal.c'),
 	env.Object('kdbg.c'),
 	env.Object('main.c'),

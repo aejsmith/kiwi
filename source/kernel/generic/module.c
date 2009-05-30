@@ -30,6 +30,20 @@
 static LIST_DECLARE(module_list);
 static MUTEX_DECLARE(module_list_lock);
 
+/** Check whether a module is valid.
+ *
+ * Checks whether the supplied memory buffer points to a valid kernel module
+ * image.
+ *
+ * @param image		Pointer to memory buffer.
+ * @param size		Size of buffer.
+ *
+ * @return		True if module is valid, false if not.
+ */
+bool module_check(void *image, size_t size) {
+	return true;
+}
+
 /** Load a kernel module.
  *
  * Loads a kernel module from a memory buffer. The buffer should contain a

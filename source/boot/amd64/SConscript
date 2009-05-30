@@ -30,10 +30,13 @@ def iso_image_func(target, source, env):
 	tmpdir = tempfile.mkdtemp('.kiwiiso')
 	os.makedirs(os.path.join(tmpdir, 'boot', 'grub'))
 	os.makedirs(os.path.join(tmpdir, 'kernel'))
+	os.makedirs(os.path.join(tmpdir, 'modules'))
 
 	# Copy stuff into it.
 	shutil.copy(os.path.join(grubdir, 'stage2_eltorito'), os.path.join(tmpdir, 'boot', 'grub'))
 	shutil.copy(kernel, os.path.join(tmpdir, 'kernel'))
+	for module in env['MODULES']:
+		shutil.copy(str(module), os.path.join(tmpdir, 'modules'))
 
 	# Create the GRUB menu.lst.
 	f = open(os.path.join(tmpdir, 'boot', 'grub', 'menu.lst'), 'w')
@@ -41,6 +44,8 @@ def iso_image_func(target, source, env):
 	f.write('timeout 5\n\n')
 	f.write('title Kiwi v%s (%s-%s)\n' % (env['KIWI_VER_STRING'], config['ARCH'], config['PLATFORM']))
 	f.write('	kernel /kernel/%s\n' % (os.path.basename(kernel)))
+	for module in env['MODULES']:
+		f.write('	module /modules/%s\n' % (os.path.basename(str(module))))
 	f.close()
 
 	# Create the ISO.

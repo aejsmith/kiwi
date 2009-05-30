@@ -43,6 +43,7 @@
 
 #include <time/timer.h>
 
+#include <bootmod.h>
 #include <fatal.h>
 #include <version.h>
 
@@ -56,6 +57,9 @@ static void kinit_thread(void *data) {
 
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
+
+	/* Load modules provided at boot. */
+	bootmod_load();
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();

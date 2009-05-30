@@ -22,14 +22,17 @@
 
 #include <console/kprintf.h>
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/pmm.h>
 
 #include <platform/multiboot.h>
 
 #include <assert.h>
+#include <bootmod.h>
 #include <fatal.h>
 
 #if CONFIG_PMM_DEBUG
@@ -48,6 +51,10 @@ extern char __init_start[], __init_end[], __end[];
 
 /** Pointer to Multiboot information structure. */
 static multiboot_info_t *mb_info;
+
+/** Multiboot module information. */
+static bootmod_t *mb_modules;
+static size_t mb_module_count;
 
 /** Populate the PMM with memory regions.
  *
@@ -137,6 +144,20 @@ void pmm_populate(void) {
 	}
 }
 
+/** Get an array of boot modules.
+ *
+ * Gets an array of structures representing each module provided by the
+ * bootloader to the kernel. The returned array should be freed with kfree().
+ *
+ * @param arrp		Where to store pointer to module array.
+ *
+ * @return		Number of modules in array.
+ */
+size_t bootmod_get(bootmod_t **arrp) {
+	*arrp = mb_modules;
+	return mb_module_count;
+}
+
 /** Check and store Multiboot information.
  *
  * Checks the provided Multiboot information structure and stores a pointer
@@ -148,7 +169,6 @@ void multiboot_premm_init(multiboot_info_t *info) {
 	/* Check for required Multiboot flags. */
 	CHECK_MB_FLAG(info, MB_FLAG_MEMINFO);
 	CHECK_MB_FLAG(info, MB_FLAG_MMAP);
-	//CHECK_MB_FLAG(info, MB_FLAG_MODULES);
 	CHECK_MB_FLAG(info, MB_FLAG_CMDLINE);
 
 	/* Store a pointer to the structure for later use. */
@@ -163,5 +183,35 @@ void multiboot_premm_init(multiboot_info_t *info) {
  * reclaimed by the PMM.
  */
 void multiboot_postmm_init(void) {
-	/* TODO. */
+	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
+	char *name, *tmp;
+	size_t i;
+
+	if(mb_info->mods_count == 0) {
+		return;
+	}
+
+	/* Save a copy of all modules - convert multiboot_module_t
+	 * structures to bootmod_t. */
+	mb_module_count = mb_info->mods_count;
+	mb_modules = kcalloc(mb_module_count, sizeof(bootmod_t), MM_FATAL);
+	for(i = 0; i < mb_module_count; i++) {
+		/* We only want the base name, take off any path strings. */
+		name = strrchr((char *)((ptr_t)mods[i].string), '/');
+		if(name == NULL) {
+			name = (char *)((ptr_t)mods[i].string);
+		} else {
+			/* Point past the /. */
+			name += 1;
+		}
+
+		/* Split off arguments to the module. */
+		tmp = name;
+		strsep(&tmp, " ");
+
+		/* Duplicate the name string and the module data. */
+		mb_modules[i].name = kstrdup(name, MM_FATAL);
+		mb_modules[i].size = mods[i].mod_end - mods[i].mod_start;
+		mb_modules[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start), mb_modules[i].size, MM_FATAL);
+	}
 }
