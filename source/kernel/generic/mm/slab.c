@@ -607,6 +607,12 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 
 	dprintf("slab: reclaiming memory from cache 0x%p(%s)...\n", cache, cache->name);
 
+	/* Run the cache's reclaim callback (if any) before attempting to
+	 * destroy magazines. */
+	if(cache->reclaim) {
+		cache->reclaim(cache->data);
+	}
+
 	mutex_lock(&cache->depot_lock, 0);
 
 	/* Destroy empty magazines. */
@@ -701,6 +707,8 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
+ * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
+ *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
@@ -709,8 +717,8 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  * @return		0 on success, negative error code on failure.
  */
 static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
-                           slab_ctor_t ctor, slab_dtor_t dtor, void *data, vmem_t *source,
-                           int flags) {
+                           slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
+                           void *data, vmem_t *source, int flags) {
 	assert(cache);
 	assert(size);
 	assert(source);
@@ -732,6 +740,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	cache->ctor = ctor;
 	cache->dtor = dtor;
+	cache->reclaim = reclaim;
 	cache->data = data;
 	cache->source = source;
 
@@ -800,6 +809,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
+ * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
+ *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
@@ -810,8 +821,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
  *			failure.
  */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-                                slab_ctor_t ctor, slab_dtor_t dtor, void *data,
-                                vmem_t *source, int flags, int kmflag) {
+                                slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
+                                void *data, vmem_t *source, int flags, int kmflag) {
 	slab_cache_t *cache;
 
 	/* Use the kernel heap if no specific source is provided. */
@@ -824,7 +835,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 		return cache;
 	}
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, data, source, flags) != 0) {
+	if(slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data, source, flags) != 0) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -913,16 +924,16 @@ void slab_init(void) {
 
 	/* Initialize statically allocated internal caches. */
 	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0,
-	                   NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
+	                   NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialize slab_cache_cache");
 	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0,
-	                          NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
+	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialize slab_bufctl_cache");
 	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0,
-	                          NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
+	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialize slab_slab_cache");
 	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0,
-	                          NULL, NULL, NULL, &slab_metadata_arena, SLAB_CACHE_NOMAG) != 0) {
+	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, SLAB_CACHE_NOMAG) != 0) {
 		fatal("Could not initialize slab_mag_cache");
 	}
 }

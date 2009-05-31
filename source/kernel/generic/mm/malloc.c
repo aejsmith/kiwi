@@ -195,7 +195,8 @@ void malloc_init(void) {
 		snprintf(name, SLAB_NAME_MAX, "kmalloc_%" PRIs, size);
 		name[SLAB_NAME_MAX - 1] = 0;
 
-		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL, NULL, NULL, 0, 0);
+		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
+		                                      NULL, NULL, NULL, 0, 0);
 		if(kmalloc_caches[i] == NULL) {
 			fatal("Could not create malloc cache: %s", name);
 		}

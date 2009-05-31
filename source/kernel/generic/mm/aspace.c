@@ -725,11 +725,11 @@ aspace_t *aspace_create(void) {
 void aspace_init(void) {
 	aspace_cache = slab_cache_create("aspace_cache", sizeof(aspace_t), 0,
 	                                 aspace_cache_ctor, aspace_cache_dtor,
-	                                 NULL, NULL, 0, MM_FATAL);
+	                                 NULL, NULL, NULL, 0, MM_FATAL);
 	aspace_region_cache = slab_cache_create("aspace_region_cache", sizeof(aspace_region_t), 0,
-	                                        NULL, NULL, NULL, NULL, 0, MM_FATAL);
+	                                        NULL, NULL, NULL, NULL, NULL, 0, MM_FATAL);
 	aspace_source_cache = slab_cache_create("aspace_source_cache", sizeof(aspace_source_t), 0,
-	                                        NULL, NULL, NULL, NULL, 0, MM_FATAL);
+	                                        NULL, NULL, NULL, NULL, NULL, 0, MM_FATAL);
 }
 
 /** Dump an address space.

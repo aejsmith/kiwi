@@ -48,6 +48,9 @@ typedef int (*slab_ctor_t)(void *obj, void *data, int kmflag);
 /** Slab destructor callback function. */
 typedef void (*slab_dtor_t)(void *obj, void *data);
 
+/** Slab reclaim callback function. */
+typedef void (*slab_reclaim_t)(void *data);
+
 /** Slab cache structure. */
 typedef struct slab_cache {
 	/** Magazine layer structures. */
@@ -75,9 +78,10 @@ typedef struct slab_cache {
 	size_t obj_count;			/**< Number of objects per slab. */
 	size_t align;				/**< Required alignment of each object. */
 
-	/** Things related to slab allocation/destruction. */
+	/** Callback functions. */
 	slab_ctor_t ctor;			/**< Object constructor function. */
 	slab_dtor_t dtor;			/**< Object destructor function. */
+	slab_reclaim_t reclaim;			/**< Memory reclaim function. */
 	void *data;				/**< Data to pass to helper functions. */
 	struct vmem *source;			/**< Vmem arena to use for memory allocation. */
 
@@ -96,7 +100,8 @@ extern void *slab_cache_alloc(slab_cache_t *cache, int kmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
 extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-                                       slab_ctor_t ctor, slab_dtor_t dtor, void *data,
+                                       slab_ctor_t ctor, slab_dtor_t dtor,
+                                       slab_reclaim_t reclaim, void *data,
                                        struct vmem *source, int flags, int kmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 

@@ -259,7 +259,7 @@ void thread_init(void) {
 	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, MM_FATAL);
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
 	                                 thread_cache_ctor, thread_cache_dtor,
-	                                 NULL, NULL, 0, MM_FATAL);
+	                                 NULL, NULL, NULL, 0, MM_FATAL);
 }
 
 /** Print information about a thread.

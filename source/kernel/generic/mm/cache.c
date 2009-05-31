@@ -236,7 +236,9 @@ int cache_destroy(cache_t *cache) {
 /** Initialize the cache subsystem. */
 void cache_init(void) {
 	cache_cache = slab_cache_create("cache_cache", sizeof(cache_t), 0,
-	                                cache_ctor, NULL, NULL, NULL, 0, MM_FATAL);
-	cache_page_cache = slab_cache_create("cache_page_cache", sizeof(cache_page_t), 0,
-	                                     cache_page_ctor, NULL, NULL, NULL, 0, MM_FATAL);
+	                                cache_ctor, NULL, NULL, NULL, NULL,
+	                                0, MM_FATAL);
+	cache_page_cache = slab_cache_create("cache_page_cache", sizeof(cache_page_t),
+	                                     0, cache_page_ctor, NULL, NULL, NULL,
+	                                     NULL, 0, MM_FATAL);
 }
