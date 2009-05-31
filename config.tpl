@@ -66,6 +66,7 @@ Option('ASPACE_DEBUG', 'Address space manager debug output.', False, {'DEBUG': l
 Option('PROC_DEBUG', 'Process/thread management debug output.', False, {'DEBUG': lambda x: x})
 Option('SCHED_DEBUG', 'Scheduler debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('CACHE_DEBUG', 'Page cache debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
+Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
 
 #####################################
 # Configuration validation function #

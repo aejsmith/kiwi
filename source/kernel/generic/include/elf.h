@@ -23,19 +23,28 @@
 
 #include <types.h>
 
+/** Basic 32-bit ELF types. */
 typedef uint32_t Elf32_Addr;
 typedef uint32_t Elf32_Off;
 typedef uint16_t Elf32_Half;
 typedef uint32_t Elf32_Word;
-typedef int32_t Elf32_Sword;
+typedef int32_t  Elf32_Sword;
 
+/** Basic 64-bit ELF types. */
 typedef uint64_t Elf64_Addr;
 typedef uint64_t Elf64_Off;
 typedef uint16_t Elf64_Half;
 typedef uint32_t Elf64_Word;
-typedef int32_t Elf64_Sword;
+typedef int32_t  Elf64_Sword;
 typedef uint64_t Elf64_Xword;
-typedef int64_t Elf64_Sxword;
+typedef int64_t  Elf64_Sxword;
+
+/** ELF magic number definitions. */
+#define ELF_MAGIC		"\177ELF"
+#define ELF_MAG0		0x7f		/**< Magic number byte 0. */
+#define ELF_MAG1		'E'		/**< Magic number byte 1. */
+#define ELF_MAG2		'L'		/**< Magic number byte 2. */
+#define ELF_MAG3		'F'		/**< Magic number byte 3. */
 
 /** ELF types. */
 #define ELF_ET_NONE		0		/**< No ﬁle type. */
@@ -493,5 +502,40 @@ typedef struct {
 
 /** Pull in architecture definitions of the types to use. */
 #include <arch/elf.h>
+
+/*
+ * Utility functions.
+ */
+
+#include <lib/string.h>
+
+/** Check whether a memory buffer contains a valid ELF header.
+ * @param image		Pointer to image.
+ * @param size		Size of memory image.
+ * @param type		Required ELF binary type.
+ * @return		True if valid, false if not. */
+static inline bool elf_check(void *image, size_t size, int type) {
+	elf_ehdr_t *ehdr = image;
+
+	/* Reject images that are too small. */
+	if(size < sizeof(elf_ehdr_t)) {
+		return false;
+	}
+
+	/* Check the magic number and version. */
+	if(strncmp((const char *)ehdr->e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
+		return false;
+	} else if(ehdr->e_ident[6] != 1 || ehdr->e_version != 1) {
+		return false;
+	}
+
+	/* Check whether it matches the architecture we're running on. */
+	if(ehdr->e_ident[4] != ELF_CLASS || ehdr->e_ident[5] != ELF_ENDIAN || ehdr->e_machine != ELF_MACHINE) {
+		return false;
+	}
+
+	/* Finally check type of binary. */
+	return (ehdr->e_type == type);
+}
 
 #endif /* __ELF_H */

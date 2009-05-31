@@ -18,10 +18,22 @@
  * @brief		Symbol table manager.
  */
 
+#include <lib/qsort.h>
 #include <lib/string.h>
+
+#include <mm/malloc.h>
 
 #include <assert.h>
 #include <symtab.h>
+
+/** Comparison function for symbol sorting.
+ * @param _sym1		First symbol.
+ * @param _sym2		Second symbol.
+ * @return		Address difference. */
+static int symtab_qsort_compare(const void *_sym1, const void *_sym2) {
+	symbol_t *sym1 = (symbol_t *)_sym1, *sym2 = (symbol_t *)_sym2;
+	return sym1->addr - sym2->addr;
+}
 
 /** Look up symbol from address.
  *
@@ -92,4 +104,46 @@ symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, boo
 	}
 
 	return NULL;
+}
+
+/** Initialize a symbol table.
+ *
+ * Initializes a symbol table structure.
+ *
+ * @param table		Table to initialize.
+ */
+void symtab_init(symtab_t *table) {
+	table->symbols = NULL;
+	table->count = 0;
+}
+
+/** Insert a symbol into a symbol table.
+ *
+ * Inserts a symbol into a symbol table and then sorts the symbol table to
+ * keep it ordered by address.
+ *
+ * @param table		Table to insert into.
+ * @param name		Name of symbol.
+ * @param addr		Address symbol maps to.
+ * @param size		Size of the symbol.
+ * @param global	Whether the symbol is a global symbol.
+ * @param exported	Whether the symbol is exported to kernel modules.
+ */
+void symtab_insert(symtab_t *table, const char *name, ptr_t addr, size_t size,
+                   bool global, bool exported) {
+	size_t i = table->count;
+
+	/* Resize the symbol table so we can fit the symbol in. */
+	table->count++;
+	table->symbols = krealloc(table->symbols, table->count * sizeof(symbol_t), MM_SLEEP);
+
+	/* Fill in the symbol information. */
+	table->symbols[i].name = name;
+	table->symbols[i].addr = addr;
+	table->symbols[i].size = size;
+	table->symbols[i].global = global;
+	table->symbols[i].exported = exported;
+
+	/* Re-sort the table. */
+	qsort(table->symbols, table->count, sizeof(symbol_t), symtab_qsort_compare);
 }

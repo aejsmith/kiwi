@@ -23,6 +23,7 @@
 
 #ifdef __GNUC__
 # define __unused		__attribute__((unused))
+# define __used			__attribute__((used))
 # define __packed		__attribute__((packed))
 # define __aligned(a)		__attribute__((aligned(a)))
 # define __noreturn		__attribute__((noreturn))
@@ -31,6 +32,7 @@
 # define __deprecated		__attribute__((deprecated))
 # define __init_text		__attribute__((section(".init.text")))
 # define __init_data		__attribute__((section(".init.data")))
+# define __section(s)		__attribute__((section(s)))
 # define likely(x)		__builtin_expect(!!(x), 1)
 # define unlikely(x)		__builtin_expect(!!(x), 0)
 #else

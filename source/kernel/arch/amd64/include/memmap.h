@@ -37,6 +37,8 @@
 #define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
 #define KERNEL_HEAP_SIZE	0x0000003F80000000	/**< Kernel heap size (254GB). */
 #define KERNEL_VIRT_BASE	0xFFFFFFFF80000000	/**< Kernel virtual base address. */
+#define KERNEL_MODULE_BASE	0xFFFFFFFFC0000000	/**< Module area base. */
+#define KERNEL_MODULE_SIZE	0x0000000040000000	/**< Module area size. */
 #define KERNEL_PHYS_BASE	0x0000000000200000	/**< Kernel physical base address. */
 
 /** Convert a kernel address to the equivalent physical address. */

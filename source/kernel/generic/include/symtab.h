@@ -44,4 +44,8 @@ extern symtab_t kernel_symtab;
 extern symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp);
 extern symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, bool exported);
 
+extern void symtab_init(symtab_t *table);
+extern void symtab_insert(symtab_t *table, const char *name, ptr_t addr, size_t size,
+                          bool global, bool exported);
+
 #endif /* __SYMTAB_H */

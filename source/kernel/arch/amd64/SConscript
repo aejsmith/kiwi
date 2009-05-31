@@ -48,6 +48,7 @@ env['OBJFILES'] += [
 	env.Object('descriptor.c'),
 	env.Object('entry.S'),
 	env.Object('kdbg.c'),
+	env.Object('module.c'),
 	env.Object('page.c'),
 	env.Object('switch.S'),
 ]
