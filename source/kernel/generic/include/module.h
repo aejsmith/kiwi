@@ -58,6 +58,10 @@ typedef struct module {
 	size_t load_size;		/**< Size of allocation module is loaded to. */
 } module_t;
 
+/** Get a section header from a module structure. */
+#define MODULE_ELF_SECT(m, i)		\
+	((elf_shdr_t *)(((ptr_t)((m)->shdrs)) + (m)->ehdr.e_shentsize * (i)))
+
 /** Set the name of a module. */
 #define MODULE_NAME(mname)		\
 	static const char * __used __module_name = mname
@@ -84,7 +88,10 @@ typedef struct module {
                 __section(".modexports") __used = #msym
 
 extern bool module_check(void *image, size_t size);
-extern int module_load(void *image, size_t size, char *dep);
+extern int module_load(void *image, size_t size, char *depbuf);
+
+extern symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp);
+extern symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported);
 
 extern int kdbg_cmd_modules(int argc, char **argv);
 

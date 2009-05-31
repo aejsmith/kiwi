@@ -30,5 +30,6 @@
 #define ERR_DEST_UNKNOWN	6	/**< Could not find destination. */
 #define ERR_DEP_MISSING		7	/**< Required dependency not found. */
 #define ERR_BAD_EXEC		8	/**< Executable file format invalid. */
+#define ERR_OBJ_EXISTS		9	/**< Object already exists. */
 
 #endif /* __ERRORS_H */

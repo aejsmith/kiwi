@@ -24,6 +24,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
+#include <module.h>
 #include <symbol.h>
 
 /** Comparison function for symbol sorting.
@@ -117,6 +118,18 @@ void symbol_table_init(symbol_table_t *table) {
 	table->count = 0;
 }
 
+/** Destroy a symbol table.
+ *
+ * Frees any memory allocated for a symbol table.
+ *
+ * @param table		Table to destroy.
+ */
+void symbol_table_destroy(symbol_table_t *table) {
+	if(table->symbols) {
+		kfree(table->symbols);
+	}
+}
+
 /** Insert a symbol into a symbol table.
  *
  * Inserts a symbol into a symbol table and then sorts the symbol table to
@@ -167,7 +180,7 @@ symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
 		return sym;
 	}
 
-	return NULL;
+	return module_symbol_lookup_addr(addr, offp);
 }
 
 /** Look up symbol from name.
@@ -190,5 +203,5 @@ symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
 		return sym;
 	}
 
-	return NULL;
+	return module_symbol_lookup_name(name, global, exported);
 }

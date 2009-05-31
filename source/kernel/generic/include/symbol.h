@@ -45,6 +45,7 @@ extern symbol_table_t kernel_symtab;
 extern symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *offp);
 extern symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool global, bool exported);
 extern void symbol_table_init(symbol_table_t *table);
+extern void symbol_table_destroy(symbol_table_t *table);
 extern void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr,
                                 size_t size, bool global, bool exported);
 

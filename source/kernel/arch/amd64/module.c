@@ -18,13 +18,11 @@
  * @brief		AMD64 module loading functions.
  */
 
-#include <arch/memmap.h>
-
 #include <console/kprintf.h>
 
-#include <mm/kheap.h>
-#include <mm/vmem.h>
+#include <lib/utility.h>
 
+#include <errors.h>
 #include <module.h>
 
 #if CONFIG_MODULE_DEBUG
@@ -33,34 +31,77 @@
 # define dprintf(fmt...)	
 #endif
 
-extern void *module_mem_alloc(size_t size, int mmflag);
-extern void module_mem_free(void *base, size_t size);
+extern int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
+                               int (*get_sym)(module_t *, size_t, bool, elf_addr_t *));
 
-/** Arenas used for allocating memory for kernel modules. */
-static vmem_t *module_raw_arena;
-static vmem_t *module_arena;
+/** Perform relocations for an ELF module.
+ * @param module	Module to relocate.
+ * @param image		Module image read from disk.
+ * @param size		Size of the module image.
+ * @param external	Whether to handle external or internal symbols.
+ * @param get_sym	Helper function to do symbol lookup.
+ * @return		0 on success, negative error code on failure. */
+int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
+                        int (*get_sym)(module_t *, size_t, bool, elf_addr_t *)) {
+	Elf64_Addr *where64, val = 0;
+	Elf64_Shdr *sect, *targ;
+	Elf32_Addr *where32;
+	Elf64_Rela *rel;
+	size_t i, r;
+	int ret;
 
-/** Allocate memory suitable to hold a kernel module.
- * @param size		Size of the allocation.
- * @param mmflag	Allocation flags.
- * @return		Address allocated or NULL if no available memory. */
-void *module_mem_alloc(size_t size, int mmflag) {
-	/* Create the arenas if they have not been created. */
-	if(!module_raw_arena) {
-		module_raw_arena = vmem_create("module_raw_arena", KERNEL_MODULE_BASE,
-		                               KERNEL_MODULE_SIZE, PAGE_SIZE, NULL,
-		                               NULL, NULL, 0, MM_FATAL);
-		module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
-		                           kheap_anon_afunc, kheap_anon_ffunc,
-		                           module_raw_arena, 0, MM_FATAL);
+	/* Look for relocation sections in the module. */
+	for(i = 0; i < module->ehdr.e_shnum; i++) {
+		sect = MODULE_ELF_SECT(module, i);
+		if(sect->sh_type != ELF_SHT_RELA) {
+			if(sect->sh_type == ELF_SHT_REL) {
+				dprintf("module: ELF_SHT_REL relocation section unsupported\n");
+				return -ERR_NOT_IMPLEMENTED;
+			}
+			continue;
+		}
+
+		/* Get the relocation target section. */
+		targ = MODULE_ELF_SECT(module, sect->sh_info);
+
+		/* Loop through all the relocations. */
+		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
+			rel = (Elf64_Rela *)(image + sect->sh_offset + (r * sect->sh_entsize));
+
+			/* Get the location of the relocation. */
+			where64 = (Elf64_Addr *)(targ->sh_addr + rel->r_offset);
+			where32 = (Elf32_Addr *)(targ->sh_addr + rel->r_offset);
+
+			ret = get_sym(module, ELF64_R_SYM(rel->r_info), external, &val);
+			if(ret < 0) {
+				return ret;
+			} else if(ret == 0) {
+				continue;
+			}
+
+			/* Perform the actual relocation. */
+			switch(ELF64_R_TYPE(rel->r_info)) {
+			case ELF_R_X86_64_NONE:
+				break;
+			case ELF_R_X86_64_32:
+				*where32 = val + rel->r_addend;
+				break;
+			case ELF_R_X86_64_64:
+				*where64 = val + rel->r_addend;
+				break;
+			case ELF_R_X86_64_PC32:
+				*where32 = (val + rel->r_addend) - (ptr_t)where32;
+				break;
+			case ELF_R_X86_64_32S:
+				*where32 = val + rel->r_addend;
+				break;
+			default:
+				dprintf("module: encountered unknown relocation type: %lu\n",
+				        ELF64_R_TYPE(rel->r_info));
+				return -ERR_BAD_EXEC;
+			}
+		}
 	}
 
-	return (void *)((ptr_t)vmem_alloc(module_arena, size, mmflag));
-}
-
-/** Free memory holding a module.
- * @param base		Base of the allocation.
- * @param size		Size of the allocation. */
-void module_mem_free(void *base, size_t size) {
-	vmem_free(module_arena, (vmem_resource_t)((ptr_t)base), size);
+	return 0;
 }

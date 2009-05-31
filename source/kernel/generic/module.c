@@ -18,9 +18,13 @@
  * @brief		Kernel module loader.
  */
 
+#include <arch/memmap.h>
+
 #include <console/kprintf.h>
 
+#include <mm/kheap.h>
 #include <mm/malloc.h>
+#include <mm/vmem.h>
 
 #include <sync/mutex.h>
 
@@ -34,12 +38,9 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Architecture memory allocation functions. */
-extern void *module_mem_alloc(size_t size, int mmflag);
-extern void module_mem_free(void *base, size_t size);
-
 /** Architecture ELF loading functions. */
-extern int module_elf_relocate(module_t *module, void *image, size_t size, bool external);
+extern int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
+                               int (*get_sym)(module_t *, size_t, bool, elf_addr_t *));
 
 /** List of loaded modules. */
 static LIST_DECLARE(module_list);
@@ -48,13 +49,83 @@ static LIST_DECLARE(module_list);
 static MUTEX_DECLARE(module_lock);
 
 /*
+ * Module memory allocation functions.
+ */
+
+#ifdef KERNEL_MODULE_BASE
+/** Arenas used for allocating memory for kernel modules. */
+static vmem_t *module_raw_arena;
+static vmem_t *module_arena;
+
+/** Initialize the kernel module allocation arena. */
+static void module_mem_init(void) {
+	/* This architecture requires a specific range for module allocations,
+	 * create our own arenas. */
+	module_raw_arena = vmem_create("module_raw_arena", KERNEL_MODULE_BASE,
+	                               KERNEL_MODULE_SIZE, PAGE_SIZE, NULL,
+	                               NULL, NULL, 0, MM_FATAL);
+	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
+	                           kheap_anon_afunc, kheap_anon_ffunc,
+	                           module_raw_arena, 0, MM_FATAL);
+}
+#else
+/** Arena used for allocating memory for kernel modules. */
+static vmem_t *module_arena;
+
+/** Initialize the kernel module allocation arena. */
+static void module_mem_init(void) {
+	/* This architecture has no specific location requirements for modules,
+	 * have the module arena inherit from the kernel heap. */
+	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
+	                           kheap_anon_afunc, kheap_anon_ffunc,
+	                           &kheap_va_arena, 0, MM_FATAL);
+}
+#endif
+
+/** Allocate memory suitable to hold a kernel module.
+ * @param size		Size of the allocation.
+ * @param mmflag	Allocation flags.
+ * @return		Address allocated or NULL if no available memory. */
+static void *module_mem_alloc(size_t size, int mmflag) {
+	/* Create the arenas if they have not been created. */
+	if(!module_arena) {
+		module_mem_init();
+	}
+
+	return (void *)((ptr_t)vmem_alloc(module_arena, ROUND_UP(size, PAGE_SIZE), mmflag));
+}
+
+/** Free memory holding a module.
+ * @param base		Base of the allocation.
+ * @param size		Size of the allocation. */
+static void module_mem_free(void *base, size_t size) {
+	vmem_free(module_arena, (vmem_resource_t)((ptr_t)base), ROUND_UP(size, PAGE_SIZE));
+}
+
+/*
  * Internal ELF loader.
  */
 
-/** Get a section header from a module structure. */
-#define GET_SECT(m, i)	((elf_shdr_t *)(((ptr_t)((m)->shdrs)) + (m)->ehdr.e_shentsize * (i)))
+/** Find a section in an ELF module.
+ * @param module	Module to find in.
+ * @param name		Name of section to find.
+ * @return		Pointer to section or NULL if not found. */
+static elf_shdr_t *module_elf_find_section(module_t *module, const char *name) {
+	const char *strtab;
+	elf_shdr_t *sect;
+	size_t i;
 
-#if 0
+	strtab = (const char *)MODULE_ELF_SECT(module, module->ehdr.e_shstrndx)->sh_addr;
+	for(i = 0; i < module->ehdr.e_shnum; i++) {
+		sect = MODULE_ELF_SECT(module, i);
+		if(strcmp(strtab + sect->sh_name, name) == 0) {
+			return sect;
+		}
+	}
+
+	return NULL;
+}
+
 /** Get value of a symbol from a symbol number in a module.
  * @param module	Module to get value from.
  * @param num		Number of the symbol.
@@ -62,34 +133,31 @@ static MUTEX_DECLARE(module_lock);
  * @param valp		Where to store symbol value.
  * @return		1 on success, 0 if lookup not done, negative error
  *			code on failure. */
-static int module_elf_get_sym(elf_module_t *module, size_t num, bool external, ElfW(Addr) *valp) {
-	ElfW(Shdr) *symtab;
-	ElfW(Sym) *sym;
+static int module_elf_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp) {
 	const char *strtab;
-	ksym_t *ksym;
+	elf_shdr_t *symtab;
+	elf_sym_t *sym;
+	symbol_t *ksym;
 
-	symtab = elf_module_find_section(module, ".symtab");
+	symtab = module_elf_find_section(module, ".symtab");
 	if(symtab == NULL) {
-		return -ENOEXEC;
+		return -ERR_BAD_EXEC;
+	} else if(num >= (symtab->sh_size / symtab->sh_entsize)) {
+		return -ERR_BAD_EXEC;
 	}
 
-	strtab = (const char *)GET_SECT(module, symtab->sh_link)->sh_addr;
-
-	if(num >= symtab->sh_size / symtab->sh_entsize) {
-		return -EINVAL;
-	}
-
-	sym = (ElfW(Sym) *)(symtab->sh_addr + (symtab->sh_entsize * num));
+	strtab = (const char *)MODULE_ELF_SECT(module, symtab->sh_link)->sh_addr;
+	sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * num));
 	if(sym->st_shndx == 0) {
 		if(!external) {
 			return 0;
 		}
 
-		/* External symbol, look up in the kernel symbol table. */
-		ksym = ksym_lookup_name(strtab + sym->st_name, true, true);
+		/* External symbol, look up in the kernel and other modules. */
+		ksym = symbol_lookup_name(strtab + sym->st_name, true, true);
 		if(ksym == NULL) {
-			dprintf("elf: module symbol '%s' undefined\n", strtab + sym->st_name);
-			return -ENOEXEC;
+			dprintf("elf: module references undefined symbol: %s\n", strtab + sym->st_name);
+			return -ERR_BAD_EXEC;
 		}
 
 		*valp = ksym->addr;
@@ -104,27 +172,6 @@ static int module_elf_get_sym(elf_module_t *module, size_t num, bool external, E
 
 	return 1;
 }
-#endif
-
-/** Find a section in an ELF module.
- * @param module	Module to find in.
- * @param name		Name of section to find.
- * @return		Pointer to section or NULL if not found. */
-static elf_shdr_t *module_elf_find_section(module_t *module, const char *name) {
-	const char *strtab;
-	elf_shdr_t *sect;
-	size_t i;
-
-	strtab = (const char *)GET_SECT(module, module->ehdr.e_shstrndx)->sh_addr;
-	for(i = 0; i < module->ehdr.e_shnum; i++) {
-		sect = GET_SECT(module, i);
-		if(strcmp(strtab + sect->sh_name, name) == 0) {
-			return sect;
-		}
-	}
-
-	return NULL;
-}
 
 /** Allocate memory for and load all sections.
  * @param module	Module structure.
@@ -138,7 +185,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 
 	/* Calculate the total size. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
-		sect = GET_SECT(module, i);
+		sect = MODULE_ELF_SECT(module, i);
 
 		if(sect->sh_type == ELF_SHT_PROGBITS || sect->sh_type == ELF_SHT_NOBITS ||
 		   sect->sh_type == ELF_SHT_STRTAB || sect->sh_type == ELF_SHT_SYMTAB) {
@@ -156,7 +203,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 
 	/* Now for each section copy the data into the allocated area. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
-		sect = GET_SECT(module, i);
+		sect = MODULE_ELF_SECT(module, i);
 
 		if(sect->sh_type == ELF_SHT_PROGBITS || sect->sh_type == ELF_SHT_NOBITS ||
 		   sect->sh_type == ELF_SHT_STRTAB || sect->sh_type == ELF_SHT_SYMTAB) {
@@ -200,7 +247,7 @@ static int module_elf_load_symbols(module_t *module) {
 	}
 
 	/* Iterate over each symbol in the section. */
-	strtab = (const char *)GET_SECT(module, symtab->sh_link)->sh_addr;
+	strtab = (const char *)MODULE_ELF_SECT(module, symtab->sh_link)->sh_addr;
 	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
 		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
 		if(sym->st_shndx == 0 || sym->st_shndx > module->ehdr.e_shnum) {
@@ -208,7 +255,7 @@ static int module_elf_load_symbols(module_t *module) {
 		}
 
 		/* Get the section that the symbol corresponds to. */
-		sect = GET_SECT(module, sym->st_shndx);
+		sect = MODULE_ELF_SECT(module, sym->st_shndx);
 		if((sect->sh_flags & ELF_SHF_ALLOC) == 0) {
 			continue;
 		}
@@ -255,7 +302,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 	/* Calculate the size of the section headers and ensure that we have
 	 * the data available. */
 	sh_size = module->ehdr.e_shnum * module->ehdr.e_shentsize;
-	if((module->ehdr.e_shoff + size) > sh_size) {
+	if((module->ehdr.e_shoff + sh_size) > size) {
 		return -ERR_BAD_EXEC;
 	}
 
@@ -275,7 +322,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 	}
 
 	/* Perform relocations. */
-	ret = module_elf_relocate(module, image, size, false);
+	ret = module_elf_relocate(module, image, size, false, module_elf_get_sym);
 	if(ret != 0) {
 		return ret;
 	}
@@ -294,14 +341,14 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 			/* Find the symbol and mark it as exported. */
 			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
 			if(sym == NULL) {
-				dprintf("elf: exported symbol %s in module 0x%p cannot be found\n",
+				dprintf("module: exported symbol %s in module 0x%p cannot be found\n",
 				        export, module);
 				return -ERR_BAD_EXEC;
 			}
 
 			sym->exported = true;
 
-			dprintf("elf: exported symbol %s in module 0x%p\n", export, module);
+			dprintf("module: exported symbol %s in module 0x%p\n", export, module);
 		}
 	}
 
@@ -309,8 +356,86 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 }
 
 /*
- * Public functions.
+ * Main functions.
  */
+
+/** Find a module in the module list.
+ * @param name		Name of module to find.
+ * @return		Pointer to module structure, NULL if not found. */
+static module_t *module_find(const char *name) {
+	module_t *module;
+
+	LIST_FOREACH(&module_list, iter) {
+		module = list_entry(iter, module_t, header);
+
+		if(strcmp(module->name, name) == 0) {
+			return module;
+		}
+	}
+
+	return NULL;
+}
+
+/** Get the value of a pointer in a module.
+ * @param module	Module to look in.
+ * @param name		Name of pointer symbol. */
+static void *module_lookup_pointer(module_t *module, const char *name) {
+	symbol_t *sym;
+
+	sym = symbol_table_lookup_name(&module->symtab, name, false, false);
+	return (sym) ? (void *)(*(ptr_t *)sym->addr) : NULL;
+}
+
+/** Check module dependencies.
+ * @param module	Module to check.
+ * @param depbuf	Buffer to store name of missing dependency in.
+ * @return		1 if dependencies satisfied, 0 if not, negative error
+ *			code on failure. */
+static int module_check_deps(module_t *module, char *depbuf) {
+	module_t *dep;
+	symbol_t *sym;
+	int i;
+
+	/* No dependencies symbol means no dependencies. */
+	sym = symbol_table_lookup_name(&module->symtab, "__module_deps", false, false);
+	if(sym == NULL) {
+		module->deps = NULL;
+		return 1;
+	}
+
+	module->deps = (const char **)sym->addr;
+
+	/* Loop through each dependency. */
+	for(i = 0; module->deps[i] != NULL; i++) {
+		if(strnlen(module->deps[i], MODULE_NAME_MAX) == MODULE_NAME_MAX) {
+			/* Meh, ignore it. */
+			continue;
+		} else if(strcmp(module->deps[i], module->name) == 0) {
+			dprintf("module: module 0x%p(%s) depends on itself\n", module, module->name);
+			return -ERR_BAD_EXEC;
+		}
+
+		dep = module_find(module->deps[i]);
+		if(dep == NULL) {
+			/* Unloaded dependency, store it in depbuf and return
+			 * error. */
+			if(depbuf != NULL) {
+				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX);
+			}
+			return 0;
+		}
+	}
+
+	/* All dependencies are loaded, go through and reference them. We do
+	 * this here rather than in the previous loop so that if we have to
+	 * return error we don't have to go and remove the reference on
+	 * everything we've checked already. */
+	for(i = 0; module->deps[i] != NULL; i++) {
+		refcount_inc(&(module_find(module->deps[i]))->count);
+	}
+
+	return 1;
+}
 
 /** Check whether a module is valid.
  *
@@ -344,10 +469,15 @@ bool module_check(void *image, size_t size) {
  *			required dependency is not loaded, the ERR_DEP_MISSING
  *			error code is returned.
  */
-int module_load(void *image, size_t size, char *dep) {
+int module_load(void *image, size_t size, char *depbuf) {
 	module_t *module;
 	int ret;
 
+	if(!image || size == 0 || depbuf == NULL) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Check if this is a valid module. */
 	if(!module_check(image, size)) {
 		return -ERR_BAD_EXEC;
 	}
@@ -361,12 +491,65 @@ int module_load(void *image, size_t size, char *dep) {
 	module->load_base = NULL;
 	module->load_size = 0;
 
+	/* Take the module lock in order to serialize module loading. */
+	mutex_lock(&module_lock, 0);
+
 	/* Perform first stage of loading the module. */
 	ret = module_elf_load(module, image, size);
 	if(ret != 0) {
 		goto fail;
 	}
 
+	/* Retrieve the module information. */
+	module->name = module_lookup_pointer(module, "__module_name");
+	module->description = module_lookup_pointer(module, "__module_desc");
+	module->init = module_lookup_pointer(module, "__module_init");
+	module->unload = module_lookup_pointer(module, "__module_unload");
+	if(!module->name || !module->description || !module->init || !module->unload) {
+		dprintf("module: information for module 0x%p is invalid\n", module);
+		ret = -ERR_BAD_EXEC;
+		goto fail;
+	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
+		dprintf("module: name of module 0x%p is too long\n", module);
+		ret = -ERR_BAD_EXEC;
+		goto fail;
+	}
+
+	/* Check if a module with this name already exists. */
+	if(module_find(module->name) != NULL) {
+		ret = -ERR_OBJ_EXISTS;
+		goto fail;
+	}
+
+	/* Check whether the module's dependencies are loaded. */
+	ret = module_check_deps(module, depbuf);
+	if(ret != 1) {
+		ret = (ret < 0) ? ret : 1;
+		goto fail;
+	}
+
+	/* Perform external relocations on the module. At this point all
+	 * dependencies are loaded, so assuming the module's dependencies are
+	 * correct, external symbol lookups can be done. */
+	ret = module_elf_relocate(module, image, size, true, module_elf_get_sym);
+	if(ret != 0) {
+		goto fail;
+	}
+
+	/* Call the module initialization function. */
+	dprintf("module: calling init function 0x%p for module 0x%p(%s)...\n",
+		module->init, module, module->name);
+	ret = module->init();
+	if(ret != 0) {
+		/* FIXME: Leaves a reference on the module's dependencies. */
+		goto fail;
+	}
+
+	/* Add the module to the modules list. */
+	list_append(&module_list, &module->header);
+
+	dprintf("module: successfully loaded module 0x%p(%s)\n", module, module->name);
+	mutex_unlock(&module_lock);
 	return 0;
 fail:
 	if(module->load_base) {
@@ -375,8 +558,64 @@ fail:
 	if(module->shdrs) {
 		kfree(module->shdrs);
 	}
+	symbol_table_destroy(&module->symtab);
 	kfree(module);
+
+	mutex_unlock(&module_lock);
 	return ret;
+}
+
+/** Look up symbol from address.
+ *
+ * Looks for the symbol corresponding to an address in all module symbol
+ * tables, and gets the offset of the address in the symbol.
+ *
+ * @param addr		Address to lookup.
+ * @param offp		Where to store symbol offset (can be NULL).
+ *
+ * @return		Pointer to the symbol structure, or NULL if not found.
+ */
+symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp) {
+	module_t *module;
+	symbol_t *sym;
+
+	LIST_FOREACH(&module_list, iter) {
+		module = list_entry(iter, module_t, header);
+
+		sym = symbol_table_lookup_addr(&module->symtab, addr, offp);
+		if(sym) {
+			return sym;
+		}
+	}
+
+	return NULL;
+}
+
+/** Look up symbol from name.
+ *
+ * Looks for a symbol with the name specified in all module symbol tables. If
+ * specified, will only look for global and/or exported symbols.
+ *
+ * @param name		Name to lookup.
+ * @param global	Whether to only look up global symbols.
+ * @param exported	Whether to only look up exported symbols.
+ *
+ * @return		Pointer to the symbol structure, or NULL if not found.
+ */
+symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported) {
+	module_t *module;
+	symbol_t *sym;
+
+	LIST_FOREACH(&module_list, iter) {
+		module = list_entry(iter, module_t, header);
+
+		sym = symbol_table_lookup_name(&module->symtab, name, global, exported);
+		if(sym) {
+			return sym;
+		}
+	}
+
+	return NULL;
 }
 
 /** Print a list of loaded kernel modules.
