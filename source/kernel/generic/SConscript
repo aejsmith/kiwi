@@ -43,6 +43,7 @@ env['OBJFILES'] += [
 
 env['OBJFILES'] += [
 	env.Object('lib/do_printf.c'),
+	env.Object('lib/qsort.c'),
 	env.Object('lib/sprintf.c'),
 	env.Object('lib/string.c'),
 ]
