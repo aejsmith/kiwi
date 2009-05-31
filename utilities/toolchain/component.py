@@ -87,5 +87,6 @@ class ToolchainComponent:
 
 		# Signify that we've updated this.
 		self.changed = True
-		with open(os.path.join(self.manager.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w') as f:
-			f.write('')
+		f = open(os.path.join(self.manager.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w')
+		f.write('')
+		f.close()

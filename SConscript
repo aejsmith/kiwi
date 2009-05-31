@@ -18,15 +18,16 @@ import sys
 Import('config', 'envmgr')
 
 # Create the build configuration header.
-with open('config.h', 'w') as f:
-	f.write('/* This file is automatically-generated, do not edit. */\n\n')
-	for (k, v) in config.items():
-		if isinstance(v, str):
-			f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
-		elif isinstance(v, bool) or isinstance(v, int):
-			f.write("#define CONFIG_%s %d\n" % (k, int(v)))
-		else:
-			raise Exception, "Unsupported type %s in build.conf" % (type(v))
+f = open('config.h', 'w')
+f.write('/* This file is automatically-generated, do not edit. */\n\n')
+for (k, v) in config.items():
+	if isinstance(v, str):
+		f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
+	elif isinstance(v, bool) or isinstance(v, int):
+		f.write("#define CONFIG_%s %d\n" % (k, int(v)))
+	else:
+		raise Exception, "Unsupported type %s in build.conf" % (type(v))
+f.close()
 
 # Create the distribution environment.
 dist = envmgr.Create('dist')
