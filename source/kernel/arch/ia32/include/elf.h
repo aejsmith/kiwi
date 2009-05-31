@@ -35,5 +35,6 @@ typedef Elf32_Ehdr elf_ehdr_t;		/**< ELF executable header. */
 typedef Elf32_Phdr elf_phdr_t;		/**< ELF program header. */
 typedef Elf32_Shdr elf_shdr_t;		/**< ELF section header. */
 typedef Elf32_Sym  elf_sym_t;		/**< ELF symbol structure. */
+typedef Elf32_Addr elf_addr_t;		/**< ELF address type. */
 
 #endif /* __ARCH_ELF_H */
