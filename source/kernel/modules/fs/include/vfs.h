@@ -1,4 +1,4 @@
-/* Kiwi test module
+/* Kiwi virtual filesystem
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,27 +15,12 @@
 
 /**
  * @file
- * @brief		Test module.
+ * @brief		Virtual filesystem.
  */
 
-#include <console/kprintf.h>
+#ifndef __VFS_H
+#define __VFS_H
 
-#include <errors.h>
-#include <module.h>
 
-/** Initialization function for test module.
- * @return		0 on success, negative error code on failure. */
-static int foo_init(void) {
-	kprintf(LOG_NORMAL, "foo: test module is running!\n");
-	return 0;
-}
 
-/** Unloading funtion for test module.
- * @return		0 on success, negative error code on failure. */
-static int foo_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
-}
-
-MODULE_NAME("foo");
-MODULE_DESC("Test kernel module.");
-MODULE_FUNCS(foo_init, foo_unload);
+#endif /* __VFS_H */

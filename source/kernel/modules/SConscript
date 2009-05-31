@@ -12,11 +12,44 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
+Import('envmgr', 'config')
 
-sources = [
-	'foo.c',
-]
+###############################
+# Subdirectory configuration. #
+###############################
 
-env.Module(sources)
-#SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel'])
+subdirs = ['fs']
+
+##############################
+# Module environment set-up. #
+##############################
+
+env = envmgr.Create('module', envmgr['kernel'])
+env['MODULES'] = []
+env['INCDIRS'] = {}
+
+# Not sure if this is the right way to do this (add any modules to the module
+# list in the environment), but an emitter seems to work...
+def module_emitter(target, source, env):
+	env['MODULES'].append(target[0])
+	return target, source
+env['BUILDERS']['Module'] = Builder(
+	action=Action('$LINK -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
+	suffix='.mod',
+	src_suffix='$OBJSUFFIX',
+	src_builder='Object',
+	emitter=module_emitter)
+
+# Get all of the modules and include directories into the array.
+SConscript(dirs=subdirs, exports=['env'])
+
+# Set up the module include directory.
+#Execute(Mkdir('modules/include'))
+for (k, v) in env['INCDIRS'].items():
+	Dir('include/%s' % (k)).link(v, 1)
+env['CPPPATH'].append(Dir('include'))
+
+# Let the distribution environment know where the modules are.
+envmgr['dist']['MODULES'] = env['MODULES']
+
+Default(Alias('modules', env['MODULES']))

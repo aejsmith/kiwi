@@ -29,7 +29,7 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 # Create the kernel environment.
 env = envmgr.Create('kernel')
 env['LDSCRIPT']  = File('arch/%s/link.ld' % (config['ARCH']))
-env['CPPPATH']   = Dir('include')
+env['CPPPATH']   = [Dir('include')]
 env['CCFLAGS']  += ['-nostdlib', '-nostdinc', '-ffreestanding', 
                     '-fno-stack-protector', '-include',
                     'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
@@ -86,30 +86,13 @@ env.Command('kiwi.sym', 'kiwi.debug', Action('$NM -C $SOURCE | sort > $TARGET', 
 elf = env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP $SOURCE -o $TARGET', '$GENCOMSTR'))
 Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
 
+# Let the distribution environment know where the kernel is.
 envmgr['dist']['KERNEL'] = File('kiwi.elf')
 
 Default(Alias('kernel', File('kiwi.elf')))
 
-##############################
-# Module environment set-up. #
-##############################
+###########
+# Modules #
+###########
 
-env = envmgr.Create('module', env)
-env['MODULES'] = []
-
-# Not sure if this is the right way to do this (add any modules to the module
-# list in the environment), but an emitter seems to work...
-def module_emitter(target, source, env):
-	env['MODULES'].append(target[0])
-	return target, source
-env['BUILDERS']['Module'] = Builder(
-	action=Action('$LINK -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
-	suffix='.mod',
-	src_suffix='$OBJSUFFIX',
-	src_builder='Object',
-	emitter=module_emitter)
-
-SConscript(dirs=['modules'], exports=['env'])
-
-envmgr['dist']['MODULES'] = env['MODULES']
-Default(Alias('modules', env['MODULES']))
+SConscript(dirs=['modules'])
