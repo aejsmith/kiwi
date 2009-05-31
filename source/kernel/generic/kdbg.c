@@ -37,7 +37,7 @@
 
 #include <kdbg.h>
 #include <module.h>
-#include <symtab.h>
+#include <symbol.h>
 
 /* Please, keep this code safe! Specifically, make sure it doesn't:
  * - Use any allocators.
@@ -600,7 +600,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 			strncpy(namebuf, exp + 1, len - 1);
 			namebuf[len - 1] = 0;
 
-			sym = symtab_lookup_name(&kernel_symtab, namebuf, false, false);
+			sym = symbol_lookup_name(namebuf, false, false);
 			if(sym == NULL) {
 				kprintf(LOG_NONE, "KDBG: Symbol '%s' not found\n", namebuf);
 				return KDBG_FAIL;
@@ -710,7 +710,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	curr_kdbg_frame = frame;
 
-	sym = symtab_lookup_addr(&kernel_symtab, frame->ip, &off);
+	sym = symbol_lookup_addr(frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
 		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);

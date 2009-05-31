@@ -27,7 +27,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <symtab.h>
+#include <symbol.h>
 #include <kdbg.h>
 
 extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
@@ -198,14 +198,14 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	page = (ptr_t)frame & PAGE_MASK;
 
 	/* Print out the address of where the exception occurred. */
-	sym = symtab_lookup_addr(&kernel_symtab, curr_kdbg_frame->ip, &off);
+	sym = symbol_lookup_addr(curr_kdbg_frame->ip, &off);
 	kprintf(LOG_NONE, "--- Interrupt ---\n");
 	kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", curr_kdbg_frame->ip,
 	        (sym) ? sym->name : "<unknown>", off);
 
 	kprintf(LOG_NONE, "--- Stacktrace ---\n");
 	while(frame && ((ptr_t)frame & PAGE_MASK) == page) {
-		sym = symtab_lookup_addr(&kernel_symtab, frame->addr, &off);
+		sym = symbol_lookup_addr(frame->addr, &off);
 		kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", frame->addr,
 		        (sym) ? sym->name : "<unknown>", off);
 		frame = frame->next;
@@ -344,7 +344,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 			if(!kdbg_breakpoints[i].used) {
 				continue;
 			}
-			sym = symtab_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
+			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
 			kprintf(LOG_NONE, "Breakpoint %" PRIs ": [%p] %s+0x%" PRIxs " (%s)\n", i,
 			            kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
 			            off, (kdbg_breakpoints[i].enabled) ? "enabled" : "disabled");
@@ -369,7 +369,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 			kdbg_breakpoints[i].enabled = true;
 			kdbg_breakpoints[i].addr = (ptr_t)addr;
 
-			sym = symtab_lookup_addr(&kernel_symtab, kdbg_breakpoints[i].addr, &off);
+			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
 			kprintf(LOG_NONE, "Created breakpoint %" PRIs ": [%p] %s+0x%" PRIxs "\n",
 			        i, addr, (sym) ? sym->name : "<unknown>", off);
 			return KDBG_OK;

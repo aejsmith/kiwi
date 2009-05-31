@@ -22,7 +22,7 @@ if len(sys.argv) != 2:
 
 print '/* This file is auto-generated, changes will be overwritten. */'
 print
-print '#include <symtab.h>'
+print '#include <symbol.h>'
 print
 print 'static symbol_t %s_array[] = {' % (sys.argv[1])
 
@@ -42,4 +42,4 @@ for line in sys.stdin.readlines():
 		count += 1
 
 print '};'
-print "symtab_t %s = { .symbols = %s_array, .count = %d };" % (sys.argv[1], sys.argv[1], count)
+print "symbol_table_t %s = { .symbols = %s_array, .count = %d };" % (sys.argv[1], sys.argv[1], count)

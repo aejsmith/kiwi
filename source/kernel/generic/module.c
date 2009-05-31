@@ -225,9 +225,9 @@ static int module_elf_load_symbols(module_t *module) {
 		}
 
 		/* Don't mark as exported yet, we handle exports later. */
-		symtab_insert(&module->symtab, strtab + sym->st_name, sym->st_value,
-		              sym->st_size, (ELF_ST_BIND(sym->st_info)) ? true : false,
-		              false);
+		symbol_table_insert(&module->symtab, strtab + sym->st_name, sym->st_value,
+		                    sym->st_size, (ELF_ST_BIND(sym->st_info)) ? true : false,
+		                    false);
 
 		dprintf("module: added symbol %s to module 0x%p (addr: 0x%p, size: 0x%p)\n",
 			strtab + sym->st_name, module, sym->st_value, sym->st_size);
@@ -292,7 +292,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 			}
 
 			/* Find the symbol and mark it as exported. */
-			sym = symtab_lookup_name(&module->symtab, export, true, false);
+			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
 			if(sym == NULL) {
 				dprintf("elf: exported symbol %s in module 0x%p cannot be found\n",
 				        export, module);
@@ -356,7 +356,7 @@ int module_load(void *image, size_t size, char *dep) {
 	module = kmalloc(sizeof(module_t), MM_SLEEP);
 	list_init(&module->header);
 	refcount_set(&module->count, 0);
-	symtab_init(&module->symtab);
+	symbol_table_init(&module->symtab);
 	module->shdrs = NULL;
 	module->load_base = NULL;
 	module->load_size = 0;

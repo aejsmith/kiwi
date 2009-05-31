@@ -33,19 +33,23 @@ typedef struct symbol {
 } symbol_t;
 
 /** Structure containing a symbol table. */
-typedef struct symtab {
+typedef struct symbol_table {
 	symbol_t *symbols;	/**< Array of symbols. */
 	size_t count;		/**< Number of symbols in the table. */
-} symtab_t;
+} symbol_table_t;
 
 /** Kernel symbol table. */
-extern symtab_t kernel_symtab;
+extern symbol_table_t kernel_symtab;
 
-extern symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp);
-extern symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, bool exported);
+/** Symbol table functions. */
+extern symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *offp);
+extern symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool global, bool exported);
+extern void symbol_table_init(symbol_table_t *table);
+extern void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr,
+                                size_t size, bool global, bool exported);
 
-extern void symtab_init(symtab_t *table);
-extern void symtab_insert(symtab_t *table, const char *name, ptr_t addr, size_t size,
-                          bool global, bool exported);
+/** Kernel symbol lookup functions. */
+extern symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp);
+extern symbol_t *symbol_lookup_name(const char *name, bool global, bool exported);
 
 #endif /* __SYMTAB_H */

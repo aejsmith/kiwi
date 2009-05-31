@@ -24,13 +24,13 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <symtab.h>
+#include <symbol.h>
 
 /** Comparison function for symbol sorting.
  * @param _sym1		First symbol.
  * @param _sym2		Second symbol.
  * @return		Address difference. */
-static int symtab_qsort_compare(const void *_sym1, const void *_sym2) {
+static int symbol_table_qsort_compare(const void *_sym1, const void *_sym2) {
 	symbol_t *sym1 = (symbol_t *)_sym1, *sym2 = (symbol_t *)_sym2;
 	return sym1->addr - sym2->addr;
 }
@@ -46,7 +46,7 @@ static int symtab_qsort_compare(const void *_sym1, const void *_sym2) {
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp) {
+symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *offp) {
 	ptr_t end;
 	size_t i;
 
@@ -85,7 +85,7 @@ symbol_t *symtab_lookup_addr(symtab_t *table, ptr_t addr, size_t *offp) {
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, bool exported) {
+symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool global, bool exported) {
 	size_t i;
 
 	assert(table);
@@ -112,7 +112,7 @@ symbol_t *symtab_lookup_name(symtab_t *table, const char *name, bool global, boo
  *
  * @param table		Table to initialize.
  */
-void symtab_init(symtab_t *table) {
+void symbol_table_init(symbol_table_t *table) {
 	table->symbols = NULL;
 	table->count = 0;
 }
@@ -129,8 +129,8 @@ void symtab_init(symtab_t *table) {
  * @param global	Whether the symbol is a global symbol.
  * @param exported	Whether the symbol is exported to kernel modules.
  */
-void symtab_insert(symtab_t *table, const char *name, ptr_t addr, size_t size,
-                   bool global, bool exported) {
+void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr, size_t size,
+                         bool global, bool exported) {
 	size_t i = table->count;
 
 	/* Resize the symbol table so we can fit the symbol in. */
@@ -145,5 +145,50 @@ void symtab_insert(symtab_t *table, const char *name, ptr_t addr, size_t size,
 	table->symbols[i].exported = exported;
 
 	/* Re-sort the table. */
-	qsort(table->symbols, table->count, sizeof(symbol_t), symtab_qsort_compare);
+	qsort(table->symbols, table->count, sizeof(symbol_t), symbol_table_qsort_compare);
+}
+
+/** Look up symbol from address.
+ *
+ * Looks for the symbol corresponding to an address in the kernel symbol table
+ * and all module symbol tables, and gets the offset of the address in the
+ * symbol.
+ *
+ * @param addr		Address to lookup.
+ * @param offp		Where to store symbol offset (can be NULL).
+ *
+ * @return		Pointer to the symbol structure, or NULL if not found.
+ */
+symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
+	symbol_t *sym;
+
+	sym = symbol_table_lookup_addr(&kernel_symtab, addr, offp);
+	if(sym) {
+		return sym;
+	}
+
+	return NULL;
+}
+
+/** Look up symbol from name.
+ *
+ * Looks for a symbol with the name specified in the kernel symbol table and
+ * all module symbol tables. If specified, will only look for global and/or
+ * exported symbols.
+ *
+ * @param name		Name to lookup.
+ * @param global	Whether to only look up global symbols.
+ * @param exported	Whether to only look up exported symbols.
+ *
+ * @return		Pointer to the symbol structure, or NULL if not found.
+ */
+symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
+	symbol_t *sym;
+
+	sym = symbol_table_lookup_name(&kernel_symtab, name, global, exported);
+	if(sym) {
+		return sym;
+	}
+
+	return NULL;
 }

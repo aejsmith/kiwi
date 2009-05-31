@@ -25,7 +25,7 @@
 #include <types/refcount.h>
 
 #include <elf.h>
-#include <symtab.h>
+#include <symbol.h>
 
 /** Maximum length of a module name. */
 #define MODULE_NAME_MAX		16
@@ -41,7 +41,7 @@ typedef struct module {
 	list_t header;			/**< Link to loaded modules list. */
 
 	/** Internally-used information. */
-	symtab_t symtab;		/**< Symbol table for the module. */
+	symbol_table_t symtab;		/**< Symbol table for the module. */
 	refcount_t count;		/**< Count of modules depending on this module. */
 
 	/** Module information. */

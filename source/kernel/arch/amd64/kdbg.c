@@ -26,7 +26,6 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <symtab.h>
 #include <kdbg.h>
 
 /** Helper macro for kdbg_register_value(). */
