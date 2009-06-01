@@ -81,6 +81,7 @@ env['OBJFILES'] += [
 	env.Object('types/avltree.c'),
 	env.Object('types/bitmap.c'),
 	env.Object('types/hash.c'),
+	env.Object('types/radix.c'),
 ]
 
 env['OBJFILES'] += [
