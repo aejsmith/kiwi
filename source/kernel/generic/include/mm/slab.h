@@ -60,7 +60,8 @@ typedef struct slab_cache {
 	list_t magazine_empty;			/**< List of empty magazines. */
 
 	/** Statistics. */
-	atomic_t alloc_count;			/**< Total number of allocations that have been made. */
+	atomic_t alloc_total;			/**< Total number of allocations that have been made. */
+	atomic_t alloc_current;			/**< Number of currently allocated objects. */
 
 	/** Slab lists/cache colouring settings. */
 	mutex_t slab_lock;			/**< Lock to protect slab lists. */

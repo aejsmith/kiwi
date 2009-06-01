@@ -657,7 +657,8 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_cpu_obj_alloc(cache);
 		if(likely(ret != NULL)) {
-			atomic_inc(&cache->alloc_count);
+			atomic_inc(&cache->alloc_total);
+			atomic_inc(&cache->alloc_current);
 			dprintf("slab: allocated 0x%p from cache 0x%p(%s) (magazine)\n", ret, cache, cache->name);
 			return ret;
 		}
@@ -666,7 +667,8 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	/* Cannot allocate from magazine layer, allocate from slab layer. */
 	ret = slab_obj_alloc(cache, kmflag);
 	if(likely(ret != NULL)) {
-		atomic_inc(&cache->alloc_count);
+		atomic_inc(&cache->alloc_total);
+		atomic_inc(&cache->alloc_current);
 		dprintf("slab: allocated 0x%p from cache 0x%p(%s) (slab)\n", ret, cache, cache->name);
 	}
 
@@ -685,6 +687,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		if(likely(slab_cpu_obj_free(cache, obj))) {
+			atomic_dec(&cache->alloc_current);
 			dprintf("slab: freed 0x%p to cache 0x%p(%s) (magazine)\n", obj, cache, cache->name);
 			return;
 		}
@@ -692,6 +695,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	/* Cannot free to magazine layer, free to slab layer. */
 	slab_obj_free(cache, obj);
+	atomic_dec(&cache->alloc_current);
 	dprintf("slab: freed 0x%p to cache 0x%p(%s) (slab)\n", obj, cache, cache->name);
 }
 
@@ -734,7 +738,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	list_init(&cache->slab_full);
 	list_init(&cache->header);
 
-	atomic_set(&cache->alloc_count, 0);
+	atomic_set(&cache->alloc_total, 0);
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
 
@@ -957,15 +961,16 @@ int kdbg_cmd_slab(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "Name                      Align    Object Size Slab Size Flags Allocations\n");
-	kprintf(LOG_NONE, "====                      =====    =========== ========= ===== ===========\n");
+	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Current Total\n");
+	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ======= =====\n");
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
-		kprintf(LOG_NONE, "%-*s %-8" PRIs " %-11" PRIs " %-9" PRIs " %-5d %d\n",
-		            SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-		            cache->slab_size, cache->flags, atomic_get(&cache->alloc_count));
+		kprintf(LOG_NONE, "%-*s %-6" PRIs " %-8" PRIs " %-9" PRIs " %-5d %-7d %d\n",
+		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+		        cache->slab_size, cache->flags, atomic_get(&cache->alloc_current),
+		        atomic_get(&cache->alloc_total));
 	}
 
 	return KDBG_OK;
