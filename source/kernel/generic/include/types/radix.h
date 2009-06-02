@@ -57,6 +57,7 @@ extern void radix_tree_remove(radix_tree_t *tree, const char *key);
 extern void *radix_tree_lookup(radix_tree_t *tree, const char *key);
 
 extern void radix_tree_init(radix_tree_t *tree);
+extern void radix_tree_clear(radix_tree_t *tree);
 extern void radix_tree_destroy(radix_tree_t *tree);
 
 #endif /* __TYPES_RADIX_H */

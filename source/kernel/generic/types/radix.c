@@ -159,6 +159,31 @@ static void radix_tree_node_destroy(radix_tree_node_t *node) {
 	kfree(node);
 }
 
+/** Clears all child nodes.
+ * @param node		Node to clear. */
+static void radix_tree_node_clear(radix_tree_node_t *node) {
+	radix_tree_node_t *child;
+	size_t i, j;
+
+	for(i = 0; i < ARRAYSZ(node->children); i++) {
+		if(!node->children[i]) {
+			continue;
+		}
+
+		for(j = 0; j < ARRAYSZ(node->children[i]->nodes); j++) {
+			if(node->children[i]->nodes[j]) {
+				child = node->children[i]->nodes[j];
+				radix_tree_node_clear(child);
+				radix_tree_node_remove_child(node, child);
+				radix_tree_node_destroy(child);
+				if(!node->children[i]) {
+					break;
+				}
+			}
+		}
+	}
+}
+
 /** Check whether a node's key matches the given string.
  * @param node		Node to match against.
  * @param key		Key to check.
@@ -413,6 +438,16 @@ void *radix_tree_lookup(radix_tree_t *tree, const char *key) {
 void radix_tree_init(radix_tree_t *tree) {
 	/* Clear the root node. */
 	memset(&tree->root, 0, sizeof(tree->root));
+}
+
+/** Clear a radix tree.
+ *
+ * Clears out the contents of a radix tree.
+ *
+ * @param tree		Tree to clear.
+ */
+void radix_tree_clear(radix_tree_t *tree) {
+	radix_tree_node_clear(&tree->root);
 }
 
 /** Destroy a radix tree.
