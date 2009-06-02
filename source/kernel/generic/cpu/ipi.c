@@ -21,8 +21,6 @@
 #include <arch/ipi.h>
 #include <arch/spinlock.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
@@ -393,6 +391,5 @@ void ipi_init(void) {
 		atomic_inc(&ipi_message_count);
 	}
 
-	kprintf(LOG_DEBUG, "ipi: added %" PRIs " message structures to pool\n", count);
 	ipi_enabled = true;
 }
