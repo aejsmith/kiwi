@@ -23,6 +23,17 @@
 
 #include <types.h>
 
+struct radix_tree_node;
+
+/** Radix tree node pointer structure. */
+typedef struct radix_tree_node_ptr {
+	/** Array of nodes. */
+	struct radix_tree_node *nodes[16];
+
+	/** Count of nodes. */
+	size_t count;
+} radix_tree_node_ptr_t;
+
 /** Radix tree node structure. */
 typedef struct radix_tree_node {
 	unsigned char *key;		/**< Key for this node. */
@@ -32,8 +43,8 @@ typedef struct radix_tree_node {
 	/** Pointer to parent node. */
 	struct radix_tree_node *parent;
 
-	/** Array of child nodes. Big enough to store all values of char. */
-	struct radix_tree_node *children[256];
+	/** Two-level array of child nodes (each level has 16 entries). */
+	radix_tree_node_ptr_t *children[16];
 } radix_tree_node_t;
 
 /** Radix tree structure. */
@@ -47,7 +58,5 @@ extern void *radix_tree_lookup(radix_tree_t *tree, const char *key);
 
 extern void radix_tree_init(radix_tree_t *tree);
 extern void radix_tree_destroy(radix_tree_t *tree);
-
-extern void radix_tree_dump(radix_tree_t *tree);
 
 #endif /* __TYPES_RADIX_H */
