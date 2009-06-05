@@ -385,8 +385,8 @@ static void *module_lookup_pointer(module_t *module, const char *name) {
 /** Check module dependencies.
  * @param module	Module to check.
  * @param depbuf	Buffer to store name of missing dependency in.
- * @return		1 if dependencies satisfied, 0 if not, negative error
- *			code on failure. */
+ * @return		0 if dependencies satisfied, negative error code
+ *			on failure. */
 static int module_check_deps(module_t *module, char *depbuf) {
 	module_t *dep;
 	symbol_t *sym;
@@ -396,7 +396,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 	sym = symbol_table_lookup_name(&module->symtab, "__module_deps", false, false);
 	if(sym == NULL) {
 		module->deps = NULL;
-		return 1;
+		return 0;
 	}
 
 	module->deps = (const char **)sym->addr;
@@ -418,7 +418,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			if(depbuf != NULL) {
 				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX);
 			}
-			return 0;
+			return -ERR_DEP_MISSING;
 		}
 	}
 
@@ -430,7 +430,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 		refcount_inc(&(module_find(module->deps[i]))->count);
 	}
 
-	return 1;
+	return 0;
 }
 
 /** Check whether a module is valid.
@@ -519,8 +519,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 
 	/* Check whether the module's dependencies are loaded. */
 	ret = module_check_deps(module, depbuf);
-	if(ret != 1) {
-		ret = (ret < 0) ? ret : 1;
+	if(ret != 0) {
 		goto fail;
 	}
 
@@ -544,7 +543,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 	/* Add the module to the modules list. */
 	list_append(&module_list, &module->header);
 
-	dprintf("module: successfully loaded module 0x%p(%s)\n", module, module->name);
+	kprintf(LOG_DEBUG, "module: successfully loaded module 0x%p(%s)\n", module, module->name);
 	mutex_unlock(&module_lock);
 	return 0;
 fail:
