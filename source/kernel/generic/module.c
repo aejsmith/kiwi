@@ -333,10 +333,6 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 	if(exports != NULL) {
 		for(i = 0; i < exports->sh_size; i += sizeof(const char *)) {
 			export = (const char *)(*(ptr_t *)(exports->sh_addr + i));
-			if((ptr_t)export < (ptr_t)image || (ptr_t)export >= ((ptr_t)image + size)) {
-				dprintf("module: export string in module 0x%p is invalid\n", module);
-				return -ERR_BAD_EXEC;
-			}
 
 			/* Find the symbol and mark it as exported. */
 			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
