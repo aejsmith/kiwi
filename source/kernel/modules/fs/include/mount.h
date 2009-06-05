@@ -1,4 +1,4 @@
-/* Kiwi virtual filesystem
+/* Kiwi VFS filesystem mounting functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,12 +15,20 @@
 
 /**
  * @file
- * @brief		Virtual filesystem.
+ * @brief		VFS filesystem mounting functions
  */
 
-#ifndef __VFS_H
-#define __VFS_H
+#ifndef __FS_MOUNT_H
+#define __FS_MOUNT_H
 
+#include <fs/filesystem.h>
+#include <fs/node.h>
 
+/** Mount description structure. */
+typedef struct vfs_mount {
+	vfs_filesystem_t *fs;		/**< Filesystem this mountpoint is for. */
+	vfs_node_t *mountpoint;		/**< Directory that this mount is mounted on. */
+	struct vfs_mount *parent;	/**< Parent mount. */
+} vfs_mount_t;
 
-#endif /* __VFS_H */
+#endif /* __FS_MOUNT_H */

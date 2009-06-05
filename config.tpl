@@ -68,6 +68,12 @@ Option('SCHED_DEBUG', 'Scheduler debug output (VERY excessive).', False, {'DEBUG
 Option('CACHE_DEBUG', 'Page cache debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
 
+#######
+Section('Module configuration')
+#######
+
+Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
+
 #####################################
 # Configuration validation function #
 #####################################
