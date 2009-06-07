@@ -501,7 +501,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 	module->description = module_lookup_pointer(module, "__module_desc");
 	module->init = module_lookup_pointer(module, "__module_init");
 	module->unload = module_lookup_pointer(module, "__module_unload");
-	if(!module->name || !module->description || !module->init || !module->unload) {
+	if(!module->name || !module->description || !module->init) {
 		dprintf("module: information for module 0x%p is invalid\n", module);
 		ret = -ERR_BAD_EXEC;
 		goto fail;
