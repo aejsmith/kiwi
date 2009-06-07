@@ -267,7 +267,7 @@ static int module_elf_load_symbols(module_t *module) {
 		 * module export symbols. */
 		if(ELF_ST_TYPE(sym->st_info) == ELF_STT_SECTION || ELF_ST_TYPE(sym->st_info) == ELF_STT_FILE) {
 			continue;
-		} else if(strncmp(strtab + sym->st_name, "__modexport_", 12) == 0) {
+		} else if(strncmp(strtab + sym->st_name, "__module_export_", 12) == 0) {
 			continue;
 		}
 
