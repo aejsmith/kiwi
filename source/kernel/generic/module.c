@@ -148,7 +148,7 @@ static int module_elf_get_sym(module_t *module, size_t num, bool external, elf_a
 
 	strtab = (const char *)MODULE_ELF_SECT(module, symtab->sh_link)->sh_addr;
 	sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * num));
-	if(sym->st_shndx == 0) {
+	if(sym->st_shndx == ELF_SHN_UNDEF) {
 		if(!external) {
 			return 0;
 		}
@@ -250,7 +250,7 @@ static int module_elf_load_symbols(module_t *module) {
 	strtab = (const char *)MODULE_ELF_SECT(module, symtab->sh_link)->sh_addr;
 	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
 		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
-		if(sym->st_shndx == 0 || sym->st_shndx > module->ehdr.e_shnum) {
+		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > module->ehdr.e_shnum) {
 			continue;
 		}
 
@@ -531,17 +531,20 @@ int module_load(void *image, size_t size, char *depbuf) {
 		goto fail;
 	}
 
+	/* Add the module to the modules list. Do this before calling the
+	 * initialization function so backtraces will have the correct symbols
+	 * if the call ends up inside KDBG. */
+	list_append(&module_list, &module->header);
+
 	/* Call the module initialization function. */
 	dprintf("module: calling init function 0x%p for module 0x%p(%s)...\n",
 		module->init, module, module->name);
 	ret = module->init();
 	if(ret != 0) {
+		list_remove(&module->header);
 		/* FIXME: Leaves a reference on the module's dependencies. */
 		goto fail;
 	}
-
-	/* Add the module to the modules list. */
-	list_append(&module_list, &module->header);
 
 	kprintf(LOG_DEBUG, "module: successfully loaded module 0x%p(%s)\n", module, module->name);
 	mutex_unlock(&module_lock);
