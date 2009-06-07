@@ -636,14 +636,15 @@ int kdbg_cmd_modules(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "Name             Count Description\n");
-	kprintf(LOG_NONE, "====             ===== ===========\n");
+	kprintf(LOG_NONE, "Name             Count Size     Description\n");
+	kprintf(LOG_NONE, "====             ===== ====     ===========\n");
 
 	LIST_FOREACH(&module_list, iter) {
 		module = list_entry(iter, module_t, header);
 
-		kprintf(LOG_NONE, "%-16s %-5d %s\n", module->name,
-		        refcount_get(&module->count), module->description);
+		kprintf(LOG_NONE, "%-16s %-5d %-8" PRIs " %s\n", module->name,
+		        refcount_get(&module->count), module->load_size,
+		        module->description);
 	}
 
 	return KDBG_OK;
