@@ -52,6 +52,13 @@ typedef struct radix_tree {
 	radix_tree_node_t root;		/**< Root node. */
 } radix_tree_t;
 
+/** Check if a radix tree is empty.
+ * @param tree		Tree to check.
+ * @return		True if empty, false if not. */
+static inline bool radix_tree_empty(radix_tree_t *tree) {
+	return (tree->root.child_count == 0);
+}
+
 extern void radix_tree_insert(radix_tree_t *tree, const char *key, void *value);
 extern void radix_tree_remove(radix_tree_t *tree, const char *key);
 extern void *radix_tree_lookup(radix_tree_t *tree, const char *key);
