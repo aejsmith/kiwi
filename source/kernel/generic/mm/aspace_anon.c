@@ -65,7 +65,7 @@ static int aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t 
  * @param offset	Offset into the source.
  * @return		Pointer to page allocated, or NULL on failure. */
 static void aspace_anon_release(aspace_source_t *source, offset_t offset) {
-	cache_release(source->data, offset);
+	cache_release(source->data, offset, true);
 }
 
 /** Destroy data in an anonymous source.

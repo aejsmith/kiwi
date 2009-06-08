@@ -19,6 +19,9 @@
  *
  * @todo		Implement cache_reclaim() to reclaim unused cached
  *			pages.
+ * @todo		Use a readers-writer lock - exclusive access is not
+ *			needed when performing a lookup on a page already in
+ *			the cache, only when inserting a new page.
  */
 
 #include <console/kprintf.h>
@@ -132,8 +135,9 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
  *
  * @param cache		Cache to release page in.
  * @param offset	Offset of page to release.
+ * @param dirty		Whether the page has been dirtied.
  */
-void cache_release(cache_t *cache, offset_t offset) {
+void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 	cache_page_t *page;
 
 	mutex_lock(&cache->lock, 0);
@@ -141,6 +145,11 @@ void cache_release(cache_t *cache, offset_t offset) {
 	page = avltree_lookup(&cache->pages, (key_t)offset);
 	if(page == NULL) {
 		fatal("Tried to release page outside of cache");
+	}
+
+	/* Dirty the page if required. */
+	if(dirty) {
+		page->dirty = true;
 	}
 
 	refcount_dec(&page->count);
@@ -203,8 +212,9 @@ int cache_destroy(cache_t *cache) {
 			fatal("Attempted to destroy cache still in use");
 		}
 
-		/* Flush the page if the cache wants us to. */
-		if(cache->ops->flush_page != NULL) {
+		/* Flush the page if the cache wants us to and the page has
+		 * been dirtied. */
+		if(cache->ops->flush_page != NULL && page->dirty) {
 			ret = cache->ops->flush_page(cache, page->address, page->offset);
 			if(ret != 0) {
 				dprintf("cache: failed to flush entry %" PRIo " (0x%" PRIpp ") in 0x%p: %d\n",

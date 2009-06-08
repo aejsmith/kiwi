@@ -61,6 +61,7 @@ typedef struct cache_page {
 	phys_ptr_t address;		/**< Physical address of the page. */
 	offset_t offset;		/**< Offset of the page in the cache. */
 	refcount_t count;		/**< Reference count. */
+	bool dirty;			/**< Whether the page has been dirtied. */
 } cache_page_t;
 
 /** Page cache structure. */
@@ -75,7 +76,7 @@ typedef struct cache {
 } cache_t;
 
 extern int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp);
-extern void cache_release(cache_t *cache, offset_t offset);
+extern void cache_release(cache_t *cache, offset_t offset, bool dirty);
 
 extern cache_t *cache_create(cache_ops_t *ops, void *data);
 extern int cache_destroy(cache_t *cache);
