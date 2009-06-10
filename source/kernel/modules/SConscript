@@ -18,7 +18,7 @@ Import('envmgr', 'config')
 # Subdirectory configuration. #
 ###############################
 
-subdirs = ['fs']
+subdirs = ['fs', 'uinit']
 
 ##############################
 # Module environment set-up. #
