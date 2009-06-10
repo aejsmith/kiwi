@@ -18,20 +18,12 @@
  * @brief		Virtual filesystem.
  */
 
-#include <console/kprintf.h>
-
-#include <fs/type.h>
-
 #include <lib/string.h>
 
 #include <errors.h>
 #include <module.h>
 
-#if CONFIG_VFS_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
+#include "vfs_priv.h"
 
 /** List of registered VFS types. */
 static LIST_DECLARE(vfs_type_list);
@@ -55,20 +47,20 @@ static vfs_type_t *vfs_type_lookup_internal(const char *name) {
 }
 
 /** Look up a filesystem type.
- *
- * Looks up a filesystem type in the filesystem types list.
- *
  * @param name		Name of filesystem type to look up.
- *
- * @return		Pointer to type structure if found, NULL if not.
- */
-vfs_type_t *vfs_type_lookup(const char *name) {
+ * @param ref		Whether to add a reference to the type.
+ * @return		Pointer to type structure if found, NULL if not. */
+vfs_type_t *vfs_type_lookup(const char *name, bool ref) {
 	vfs_type_t *type;
 
 	mutex_lock(&vfs_type_list_lock, 0);
-	type = vfs_type_lookup_internal(name);
-	mutex_unlock(&vfs_type_list_lock);
 
+	type = vfs_type_lookup_internal(name);
+	if(type && ref) {
+		refcount_inc(&type->count);
+	}
+
+	mutex_unlock(&vfs_type_list_lock);
 	return type;
 }
 
@@ -95,6 +87,7 @@ int vfs_type_register(vfs_type_t *type) {
 	mutex_unlock(&vfs_type_list_lock);
 	return 0;
 }
+MODULE_EXPORT(vfs_type_register);
 
 /** Remove a filesystem type.
  *
@@ -108,10 +101,12 @@ int vfs_type_register(vfs_type_t *type) {
 int vfs_type_unregister(vfs_type_t *type) {
 	return -ERR_NOT_IMPLEMENTED;
 }
+MODULE_EXPORT(vfs_type_unregister);
 
 /** Initialization function for VFS.
  * @return		0 on success, negative error code on failure. */
 static int vfs_init(void) {
+	vfs_node_cache_init();
 	return 0;
 }
 
@@ -122,9 +117,5 @@ static int vfs_unload(void) {
 }
 
 MODULE_NAME("vfs");
-MODULE_DESC("Virtual Filesystem (VFS) manager.");
+MODULE_DESC("Virtual filesystem (VFS) manager.");
 MODULE_FUNCS(vfs_init, vfs_unload);
-
-MODULE_EXPORT(vfs_type_lookup);
-MODULE_EXPORT(vfs_type_register);
-MODULE_EXPORT(vfs_type_unregister);

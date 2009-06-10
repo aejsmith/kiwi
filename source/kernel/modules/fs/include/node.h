@@ -21,7 +21,7 @@
 #ifndef __FS_NODE_H
 #define __FS_NODE_H
 
-#include <fs/filesystem.h>
+#include <fs/mount.h>
 
 #include <sync/mutex.h>
 
@@ -44,19 +44,37 @@ typedef enum vfs_node_type {
 
 /** Structure describing a single node in a filesystem. */
 typedef struct vfs_node {
+	list_t header;			/**< Link to node lists. */
+
 	/** Basic node information. */
 	char *name;			/**< Name of the node. */
 	vfs_node_type_t type;		/**< Type of the node. */
-	vfs_filesystem_t *fs;		/**< Filesystem the node resides on. */
+	vfs_mount_t *mount;		/**< Mount that the node resides on. */
+	int flags;			/**< Behaviour flags for the node. */
 
-	/** Synchronization variables. */
+	/** Node data information. */
+	struct cache *cache;		/**< Cache containing node data. */
+	file_size_t size;		/**< Total size of node data. */
+	bool dirty;			/**< Whether any part of the node's data is dirty. */
+
+	/** Synchronization information. */
 	mutex_t lock;			/**< Lock to protect the node. */
 	refcount_t count;		/**< Reference count to track users of the node. */
 
 	/** Node tree information. */
 	struct vfs_node *parent;	/**< Parent node (NULL if node is root of FS). */
 	radix_tree_t children;		/**< Tree of child nodes. */
-	size_t child_count;		/**< Number of child nodes. */
 } vfs_node_t;
+
+/** Filesystem node behaviour flags. */
+#define VFS_NODE_PERSISTENT	(1<<0)	/**< Node should stay in memory until the FS is destroyed. */
+
+extern int vfs_node_lookup(vfs_node_t *from, const char *path, vfs_node_t **nodep);
+extern void vfs_node_get(vfs_node_t *node);
+extern void vfs_node_release(vfs_node_t *node);
+
+extern int vfs_node_create(vfs_node_t *parent, const char *name, vfs_node_type_t type, vfs_node_t **nodep);
+extern int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset, size_t *bytesp);
+extern int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t offset, size_t *bytesp);
 
 #endif /* __FS_NODE_H */

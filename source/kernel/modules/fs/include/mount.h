@@ -15,20 +15,41 @@
 
 /**
  * @file
- * @brief		VFS filesystem mounting functions
+ * @brief		VFS filesystem mounting functions.
  */
 
 #ifndef __FS_MOUNT_H
 #define __FS_MOUNT_H
 
-#include <fs/filesystem.h>
-#include <fs/node.h>
+#include <sync/mutex.h>
+
+#include <types/list.h>
+
+struct vfs_node;
+struct vfs_type;
 
 /** Mount description structure. */
 typedef struct vfs_mount {
-	vfs_filesystem_t *fs;		/**< Filesystem this mountpoint is for. */
-	vfs_node_t *mountpoint;		/**< Directory that this mount is mounted on. */
-	struct vfs_mount *parent;	/**< Parent mount. */
+	list_t header;			/**< Link to mount list. */
+
+	struct vfs_type *type;		/**< Filesystem type. */
+	void *data;			/**< Filesystem driver data. */
+	int flags;			/**< Flags for the mount. */
+
+	struct vfs_node *root;		/**< Root node for the mount. */
+	struct vfs_node *mountpoint;	/**< Directory that this mount is mounted on. */
+
+	mutex_t lock;			/**< Lock to protect node lists. */
+	list_t dirty_nodes;		/**< List of unused but dirty nodes. */
+	list_t unused_nodes;		/**< List of unused nodes. */
 } vfs_mount_t;
+
+/** Mount behaviour flags. */
+#define VFS_MOUNT_RDONLY	(1<<0)	/**< Mount is read-only. */
+
+extern vfs_mount_t *vfs_root_mount;
+
+extern int vfs_mount_create(const char *type, int flags, vfs_mount_t **mountp);
+extern int vfs_mount_attach(vfs_mount_t *mount, struct vfs_node *node);
 
 #endif /* __FS_MOUNT_H */

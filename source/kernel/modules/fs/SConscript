@@ -18,7 +18,9 @@ Import('env', 'config')
 env['INCDIRS']['fs'] = Dir('include')
 
 # Build rule for the core VFS.
-env.Module([
+env.Module('vfs.mod', [
+	'mount.c',
+	'node.c',
 	'vfs.c',
 ])
 

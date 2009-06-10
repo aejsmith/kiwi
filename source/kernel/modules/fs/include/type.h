@@ -21,7 +21,7 @@
 #ifndef __FS_TYPE_H
 #define __FS_TYPE_H
 
-#include <fs/filesystem.h>
+#include <fs/mount.h>
 #include <fs/node.h>
 
 #include <mm/flags.h>
@@ -29,7 +29,9 @@
 #include <types/list.h>
 #include <types/refcount.h>
 
-/** Filesystem type description structure. */
+/** Filesystem type description structure.
+ * @note		When adding new required operations to this structure,
+ *			add a check to vfs_type_register(). */
 typedef struct vfs_type {
 	list_t header;			/**< Link to types list. */
 
@@ -50,22 +52,20 @@ typedef struct vfs_type {
 	 *			false if not. */
 	//bool (*check)(device_t *dev);
 
-	/** Set up an instance of this filesystem.
+	/** Mount a filesystem of this type.
 	 * @note		It is guaranteed that the device will contain
 	 *			the correct FS type when this is called, as
 	 *			the check operation is called prior to this.
-	 * @param fs		Filesystem structure for the FS. This structure
+	 * @param mount		Mount structure for the mount. This structure
 	 *			will contain a pointer to the device the FS
 	 *			resides on (will be NULL if no source).
 	 * @return		0 on success, negative error code on failure. */
-	int (*create)(vfs_filesystem_t *fs);
+	int (*mount)(vfs_mount_t *mount);
 
-	/** Destroy an instance of this filesystem.
-	 * @note		To filesystem driver writers: this does not
-	 *			mean literally destroy the filesystem.
-	 * @param fs		Filesystem structure being deleted.
+	/** Unmount a filesystem of this type.
+	 * @param mount		Mount being unmounted.
 	 * @return		0 on success, negative error code on failure. */
-	int (*destroy)(vfs_filesystem_t *fs);
+	int (*unmount)(vfs_mount_t *mount);
 
 	/**
 	 * Page manipulation functions.
@@ -73,25 +73,25 @@ typedef struct vfs_type {
 
 	/** Get a page to use for a node's data.
 	 * @note		If this operation is not provided, then the
-	 *			VFS will allocate an anonymous, zeroed page
-	 *			to use for node data.
+	 *			VFS will allocate an anonymous, zeroed page via
+	 *			pmm_alloc() to use for node data.
 	 * @param node		Node to get page for.
 	 * @param offset	Offset within the node the page is for.
 	 * @param mmflag	Allocation flags.
 	 * @param physp		Where to store address of page obtained.
 	 * @return		0 on success, negative error code on failure. */
-	int (*get_page)(vfs_node_t *node, offset_t offset, int mmflag, phys_ptr_t *physp);
+	int (*page_get)(vfs_node_t *node, offset_t offset, int mmflag, phys_ptr_t *physp);
 
 	/** Read a page from a node.
 	 * @note		If the page straddles across the end of the
 	 *			file, then only the part of the file that
-	 *			exists will be read.
+	 *			exists should be read.
 	 * @note		If this operation is not provided by a FS
 	 *			type, then it is assumed that the page given
-	 *			by the get_page operation already contains the
+	 *			by the page_get operation already contains the
 	 *			correct data. The reason this operation is
 	 *			provided rather than just having data read
-	 *			in by the get_page operation is so that the
+	 *			in by the page_get operation is so that the
 	 *			FS implementation does not always have to deal
 	 *			with mapping and unmapping physical memory.
 	 * @param node		Node being read from.
@@ -99,14 +99,14 @@ typedef struct vfs_type {
 	 * @param offset	Offset within the file to read from.
 	 * @param nonblock	Whether the read is required to not block.
 	 * @return		0 on success, negative error code on failure. */
-	int (*read_page)(vfs_node_t *node, void *page, offset_t offset, bool nonblock);
+	int (*page_read)(vfs_node_t *node, void *page, offset_t offset, bool nonblock);
 
 	/** Flush changes to a page within a node.
 	 * @note		If the page straddles across the end of the
 	 *			file, then only the part of the file that
-	 *			exists will be written back. If it is desired
-	 *			to resize the file, the resize operation must
-	 *			be called.
+	 *			exists should be written back. If it is desired
+	 *			to resize the file, the node_resize operation
+	 *			must be called.
 	 * @note		If this operation is not provided, then it
 	 *			is assumed that modified pages should always
 	 *			remain in the cache until its destruction (for
@@ -116,22 +116,18 @@ typedef struct vfs_type {
 	 * @param offset	Offset within the file to write to.
 	 * @param nonblock	Whether the write is required to not block.
 	 * @return		0 on success, negative error code on failure. */
-	int (*flush_page)(vfs_node_t *node, void *page, offset_t offset, bool nonblock);
+	int (*page_flush)(vfs_node_t *node, void *page, offset_t offset, bool nonblock);
 
 	/** Free a page previously obtained via get_page.
+	 * @note		If this is not provided, then the VFS will
+	 *			free the page via pmm_free().
 	 * @param node		Node that page was used for.
 	 * @param page		Address of page to free. */
-	int (*free_page)(vfs_node_t *node, phys_ptr_t page);
+	int (*page_free)(vfs_node_t *node, phys_ptr_t page);
 
 	/**
 	 * Node modification functions.
 	 */
-
-	/** Modify the size of a node.
-	 * @param node		Node being resized.
-	 * @param size		New size of the file.
-	 * @return		0 on success, negative error code on failure. */
-	int (*resize)(vfs_node_t *node, file_size_t size);
 
 	/** Find a child node.
 	 * @param parent	Node to search under.
@@ -140,17 +136,29 @@ typedef struct vfs_type {
 	 *			stored in this structure when this function is
 	 *			called.
 	 * @return		0 on success, negative error code on failure. */
-	int (*find_node)(vfs_node_t *parent, vfs_node_t *node);
+	int (*node_find)(vfs_node_t *parent, vfs_node_t *node);
 
 	/** Clean up data associated with a node.
 	 * @param node		Node to clean up. */
-	void (*free_node)(vfs_node_t *node);
+	void (*node_free)(vfs_node_t *node);
+
+	/** Create a new filesystem node.
+	 * @param parent	Parent directory of the node.
+	 * @param node		Node structure describing the node being
+	 *			created.
+	 * @return		0 on success, negative error code on failure. */
+	int (*node_create)(vfs_node_t *parent, vfs_node_t *node);
+
+	/** Modify the size of a node.
+	 * @param node		Node being resized.
+	 * @param size		New size of the node.
+	 * @return		0 on success, negative error code on failure. */
+	int (*node_resize)(vfs_node_t *node, file_size_t size);
 } vfs_type_t;
 
 /** Filesystem trait flags. */
 #define VFS_TYPE_RDONLY		(1<<0)	/**< Filesystem type is read-only. */
 
-extern vfs_type_t *vfs_type_lookup(const char *name);
 extern int vfs_type_register(vfs_type_t *type);
 extern int vfs_type_unregister(vfs_type_t *type);
 
