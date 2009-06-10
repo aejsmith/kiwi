@@ -27,9 +27,13 @@
 #define ERR_WOULD_BLOCK		3	/**< Operation would block. */
 #define ERR_INTERRUPTED		4	/**< Interrupted while blocking. */
 #define ERR_NOT_IMPLEMENTED	5	/**< Function not implemented. */
-#define ERR_DEST_UNKNOWN	6	/**< Could not find destination. */
-#define ERR_DEP_MISSING		7	/**< Required dependency not found. */
-#define ERR_BAD_EXEC		8	/**< Executable file format invalid. */
-#define ERR_OBJ_EXISTS		9	/**< Object already exists. */
+#define ERR_NOT_SUPPORTED	6	/**< Function not implemented. */
+#define ERR_DEST_UNKNOWN	7	/**< Could not find destination. */
+#define ERR_DEP_MISSING		8	/**< Required dependency not found. */
+#define ERR_BAD_EXEC		9	/**< Executable file format invalid. */
+#define ERR_OBJ_EXISTS		10	/**< Object already exists. */
+#define ERR_OBJ_NOT_FOUND	11	/**< Requested object not found. */
+#define ERR_OBJ_TYPE_INVAL	12	/**< Object type is invalid. */
+#define ERR_OBJ_READ_ONLY	13	/**< Object cannot be modified. */
 
 #endif /* __ERRORS_H */

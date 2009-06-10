@@ -216,7 +216,7 @@ int cache_destroy(cache_t *cache) {
 		 * been dirtied. */
 		if(cache->ops->flush_page != NULL && page->dirty) {
 			ret = cache->ops->flush_page(cache, page->address, page->offset);
-			if(ret != 0) {
+			if(ret != 0 && ret != 1) {
 				dprintf("cache: failed to flush entry %" PRIo " (0x%" PRIpp ") in 0x%p: %d\n",
 				        page->offset, page->address, cache, ret);
 				mutex_unlock(&cache->lock);

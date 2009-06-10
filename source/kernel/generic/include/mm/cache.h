@@ -42,7 +42,8 @@ typedef struct cache_ops {
 	 * @param cache		Cache that the page is in.
 	 * @param page		Address of page to flush.
 	 * @param offset	Offset of page in data source.
-	 * @return		0 on success, negative error code on failure. */
+	 * @return		0 on success, 1 if page has no source to flush
+	 *			to, negative error code on failure. */
 	int (*flush_page)(struct cache *cache, phys_ptr_t page, offset_t offset);
 
 	/** Free a page from a cache (page will have been flushed).
