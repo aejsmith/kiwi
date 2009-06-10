@@ -738,6 +738,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	list_init(&cache->slab_full);
 	list_init(&cache->header);
 
+	atomic_set(&cache->alloc_current, 0);
 	atomic_set(&cache->alloc_total, 0);
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
