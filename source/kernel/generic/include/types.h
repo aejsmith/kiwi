@@ -27,6 +27,7 @@
 
 /** C standard types. */
 typedef __SIZE_TYPE__ size_t;		/**< Type to represent the size of an object. */
+typedef __PTRDIFF_TYPE__ ptrdiff_t;	/**< Type to store the difference between two pointers. */
 typedef _Bool bool;			/**< Boolean type. */
 
 /** Kiwi-specific types. */
