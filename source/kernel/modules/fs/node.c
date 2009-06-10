@@ -61,6 +61,7 @@ static int vfs_node_ctor(void *obj, void *data, int kmflag) {
 /** VFS node cache reclaim callback.
  * @param data		Cache data (unused). */
 static void vfs_node_cache_reclaim(void *data) {
+	dprintf("vfs: performing reclaim of unused nodes...\n");
 	vfs_mount_reclaim_nodes();
 }
 
@@ -525,6 +526,8 @@ void vfs_node_release(vfs_node_t *node) {
 	mutex_lock(&node->mount->lock, 0);
 	list_append((node->dirty) ? &node->mount->dirty_nodes : &node->mount->unused_nodes, &node->header);
 	mutex_unlock(&node->mount->lock);
+
+	dprintf("vfs: node 0x%p(%s) is now unused, released\n", node, (node->name) ? node->name : "");
 }
 MODULE_EXPORT(vfs_node_release);
 
