@@ -31,6 +31,7 @@
 #include <types.h>
 
 struct aspace;
+struct subsystem;
 
 /** Maximum length of a process name. */
 #define PROC_NAME_MAX		32
@@ -41,6 +42,10 @@ typedef struct process {
 	struct aspace *aspace;		/**< Process' address space. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
+
+	/** Subsystem information. */
+	struct subsystem *subsystem;	/**< Subsystem that the process is running under. */
+	void *data;			/**< Subsystem data pointer. */
 
 	/** Thread information. */
 	list_t threads;			/**< List of threads. */
@@ -70,7 +75,8 @@ typedef struct process {
 extern process_t *kernel_proc;
 
 extern process_t *process_lookup(process_id_t id);
-extern int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp);
+extern int process_create(const char *name, process_t *parent, int priority,
+                          int flags, struct subsystem *subsystem, process_t **procp);
 
 extern void process_init(void);
 

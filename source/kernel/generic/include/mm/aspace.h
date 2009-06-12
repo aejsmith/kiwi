@@ -137,6 +137,7 @@ extern int aspace_free(aspace_t *as, ptr_t start, size_t size);
 extern int aspace_pagefault(ptr_t addr, int reason, int access);
 extern void aspace_switch(aspace_t *as);
 extern aspace_t *aspace_create(void);
+extern void aspace_destroy(aspace_t *as);
 
 extern void aspace_init(void);
 

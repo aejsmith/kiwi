@@ -16,6 +16,8 @@
 /**
  * @file
  * @brief		AMD64 paging functions.
+ *
+ * @todo		Free up page tables properly.
  */
 
 #include <arch/barrier.h>

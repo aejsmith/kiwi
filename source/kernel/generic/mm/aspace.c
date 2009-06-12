@@ -721,6 +721,34 @@ aspace_t *aspace_create(void) {
 	return as;
 }
 
+/** Destroy an address space.
+ *
+ * Removes all memory mappings in an address space and frees it. This must
+ * not be called if the address space is in use on any CPU. There should also
+ * be no references to it in any processes, to ensure that nothing will attempt
+ * to access it while it is being destroyed.
+ *
+ * @param as		Address space to destroy.
+ */
+void aspace_destroy(aspace_t *as) {
+	avltree_node_t *node;
+
+	if(refcount_get(&as->count) > 0) {
+		fatal("Destroying in-use address space");
+	}
+
+	/* Unmap and destroy each region. Do not use the AVL tree iterator
+	 * here as it is not safe to do so when modifying the tree. */
+	while((node = avltree_node_first(&as->regions))) {
+		aspace_region_destroy(as, avltree_entry(node, aspace_region_t));
+	}
+
+	/* Destroy the page map. */
+	page_map_destroy(&as->pmap);
+
+	slab_cache_free(aspace_cache, as);
+}
+
 /** Initialize the address space caches. */
 void aspace_init(void) {
 	aspace_cache = slab_cache_create("aspace_cache", sizeof(aspace_t), 0,

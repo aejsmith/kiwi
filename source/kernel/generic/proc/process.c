@@ -28,6 +28,7 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
+#include <proc/subsystem.h>
 #include <proc/thread.h>
 
 #include <types/avltree.h>
@@ -50,16 +51,6 @@ static AVLTREE_DECLARE(process_tree);		/**< Tree of all processes. */
 static SPINLOCK_DECLARE(process_tree_lock);	/**< Lock for process AVL tree. */
 static vmem_t *process_id_arena;		/**< Process ID Vmem arena. */
 static slab_cache_t *process_cache;		/**< Cache for process structures. */
-
-/** Allocate a new ID for a process.
- * @return		Allocated ID. */
-static process_id_t process_id_alloc(void) {
-	if(kernel_proc == NULL) {
-		return 0;
-	}
-
-	return (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP);
-}
 
 /** Constructor for process objects.
  * @param obj		Pointer to object.
@@ -103,12 +94,15 @@ process_t *process_lookup(process_id_t id) {
  * @param parent	Parent of the process.
  * @param priority	Priority for the process.
  * @param flags		Behaviour flags for the process.
+ * @param subsystem	Subsystem that the process will run under.
  * @param procp		Where to store pointer to new process.
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp) {
+int process_create(const char *name, process_t *parent, int priority, int flags,
+                   subsystem_t *subsystem, process_t **procp) {
 	process_t *process;
+	int ret;
 
 	if(name == NULL || (parent == NULL && kernel_proc != NULL) || procp == NULL) {
 		return -ERR_PARAM_INVAL;
@@ -133,13 +127,24 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	}
 
 	/* Allocate an ID for the process. */
-	process->id = process_id_alloc();
+	process->id = (kernel_proc) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : 0;
 
 	process->flags = flags;
 	process->priority = priority;
 	process->num_threads = 0;
 	process->state = PROC_RUNNING;
 	process->parent = parent;
+
+	/* Perform subsystem initialization, if any. */
+	process->subsystem = subsystem;
+	if(process->subsystem && process->subsystem->process_init) {
+		ret = process->subsystem->process_init(process);
+		if(ret != 0) {
+			vmem_free(process_id_arena, (unative_t)process->id, 1);
+			slab_cache_free(process_cache, process);
+			return ret;
+		}
+	}
 
 	/* Add to the parent's process list. */
 	if(parent != NULL) {
@@ -173,7 +178,7 @@ void process_init(void) {
 	/* Create the kernel process. */
 	ret = process_create("[kernel]", NULL, PRIORITY_KERNEL,
 	                     PROCESS_CRITICAL | PROCESS_FIXEDPRIO | PROCESS_NOASPACE,
-	                     &kernel_proc);
+	                     NULL, &kernel_proc);
 	if(ret != 0) {
 		fatal("Could not initialize kernel process: %d", ret);
 	}
