@@ -45,16 +45,15 @@
 
 #include <bootmod.h>
 #include <fatal.h>
+#include <init.h>
 #include <version.h>
 
-extern void kmain_bsp(void *data);
-extern void kmain_ap(void);
+/** Callback list for initialization completion. */
+CALLBACK_LIST_DECLARE(init_completion_cb_list);
 
 /** Second-stage intialization thread.
  * @param arg		Thread argument (unused). */
-static void kinit_thread(void *data) {
-	uint64_t count = 0;
-
+static void init_thread(void *data) {
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
 
@@ -64,11 +63,10 @@ static void kinit_thread(void *data) {
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
 
-	while(true) {
-		timer_sleep(1);
-		count++;
-		kprintf(LOG_NORMAL, "%" PRIu64 " second(s)...\n", count);
-	}
+	/* Run all callbacks that modules may have added for initialization
+	 * completion and terminate. One of these callbacks should actually
+	 * make the kernel do something useful. :) */
+	callback_list_run(&init_completion_cb_list, NULL);
 }
 
 /** Kernel initialization function.
@@ -77,7 +75,7 @@ static void kinit_thread(void *data) {
  *
  * @param data		Data to pass into the architecture setup code.
  */
-void kmain_bsp(void *data) {
+void init_bsp(void *data) {
 	thread_t *thread;
 
 	cpu_early_init();
@@ -125,8 +123,8 @@ void kmain_bsp(void *data) {
 	arch_final_init();
 
 	/* Create the second stage initialization thread. */
-	if(thread_create("kinit", kernel_proc, 0, kinit_thread, NULL, &thread) != 0) {
-		fatal("Could not create initialization thread");
+	if(thread_create("init", kernel_proc, 0, init_thread, NULL, &thread) != 0) {
+		fatal("Could not create second-stage initialization thread");
 	}
 	thread_run(thread);
 
@@ -135,7 +133,7 @@ void kmain_bsp(void *data) {
 }
 
 /** AP kernel initialization function. */
-void kmain_ap(void) {
+void init_ap(void) {
 	curr_cpu->state = CPU_RUNNING;
 	list_append(&cpus_running, &curr_cpu->header);
 

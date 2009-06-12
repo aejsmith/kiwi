@@ -156,7 +156,7 @@ __kernel_entry:
 
 	/* Call C main function. */
 	push	%edi
-	call	kmain_bsp
+	call	init_bsp
 
 	/* If we got here something has gone wrong. */
 3:	ud2a
@@ -262,7 +262,7 @@ __kernel_ap_entry:
 	xorl	%ebp, %ebp
 
 	/* Call C main function. */
-	call	kmain_ap
+	call	init_ap
 
 	/* If we got here something has gone wrong. */
 4:	ud2a

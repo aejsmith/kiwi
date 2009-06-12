@@ -214,7 +214,7 @@ __kernel_entry:
 	movl	(__mb_info), %edi
 
 	/* Call C main function. */
-	call	kmain_bsp
+	call	init_bsp
 
 	/* If we got here something has gone wrong. */
 6:	ud2a
@@ -315,7 +315,7 @@ __kernel_ap_entry:
 	xorq	%rbp, %rbp
 
 	/* Call C main function. */
-	call	kmain_ap
+	call	init_ap
 
 	/* If we got here something has gone wrong. */
 1:	ud2a
