@@ -47,8 +47,6 @@ typedef struct vfs_mount {
 /** Mount behaviour flags. */
 #define VFS_MOUNT_RDONLY	(1<<0)	/**< Mount is read-only. */
 
-extern vfs_mount_t *vfs_root_mount;
-
 extern int vfs_mount_create(const char *type, int flags, vfs_mount_t **mountp);
 extern int vfs_mount_attach(vfs_mount_t *mount, struct vfs_node *node);
 

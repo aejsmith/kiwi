@@ -12,6 +12,9 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config')
+Import('config', 'envmgr')
 
-SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'subsystems'])
+# Build rule for kernel component of POSIX subsystem.
+envmgr['module'].Module('posix', [
+	'posix.c',
+])

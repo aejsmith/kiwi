@@ -24,7 +24,6 @@
 
 /** Pointer to mount at root of the filesystem. */
 vfs_mount_t *vfs_root_mount = NULL;
-MODULE_EXPORT(vfs_root_mount);
 
 /** List of all mounts. */
 static LIST_DECLARE(vfs_mount_list);
@@ -67,6 +66,18 @@ void vfs_mount_reclaim_nodes(void) {
 	}
 
 	mutex_unlock(&vfs_mount_list_lock);
+}
+
+/** Mount the root filesystem.
+ * @param data1		First callback data (ignored).
+ * @param data2		Second callback data (ignored). */
+void vfs_mount_root(void *data1, void *data2) {
+	int ret;
+
+	ret = vfs_mount_create("ramfs", 0, &vfs_root_mount);
+	if(ret != 0) {
+		fatal("Failed to mount root filesystem: %d", ret);
+	}
 }
 
 /** Create a new mount.
