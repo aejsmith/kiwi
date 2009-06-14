@@ -1,4 +1,4 @@
-/* Kiwi TLB invalidation/shootdown functions
+/* Kiwi TLB invalidation functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		TLB invalidation/shootdown functions.
+ * @brief		TLB invalidation functions.
  */
 
 #ifndef __MM_TLB_H
@@ -25,6 +25,6 @@
 
 #include <mm/aspace.h>
 
-extern void tlb_shootdown(aspace_t *as, ptr_t start, ptr_t end);
+extern void tlb_invalidate(aspace_t *as, ptr_t start, ptr_t end);
 
 #endif /* __MM_TLB_H */

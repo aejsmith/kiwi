@@ -199,10 +199,6 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 	/* Lock the page map. */
 	page_map_lock(&as->pmap, 0);
 
-	/* Begin the TLB shootdown process, and invalidate the range on the
-	 * current CPU. */
-	tlb_shootdown(as, start, end);
-
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		if(!page_map_remove(&as->pmap, addr, NULL)) {
 			continue;
@@ -213,8 +209,9 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 		region->source->backend->release(region->source, offset);
 	}
 
-	/* Unlock the page map. This will let other CPUs that were waiting
-	 * to perform TLB invalidation continue. */
+	/* Invalidate the necessary TLB entries on all CPUs using the address
+	 * space, and drop the page map lock. */
+	tlb_invalidate(as, start, end);
 	page_map_unlock(&as->pmap);
 }
 

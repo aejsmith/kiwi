@@ -275,8 +275,8 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
                    unative_t data3, unative_t data4, int flags) {
 	bool state = intr_disable();
+	LIST_DECLARE(sent_list);
 	ipi_message_t *message;
-	list_t sent_list;
 	cpu_t *cpu;
 
 	/* Don't do anything if the IPI system isn't enabled. */
@@ -284,10 +284,6 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
 		intr_restore(state);
 		return;
 	}
-
-	/* Initialize the list we use to store all the messages that were
-	 * sent, for tracking synchronous messages. */
-	list_init(&sent_list);
 
 	/* Loop through all running CPUs, excluding ourselves. */
 	LIST_FOREACH(&cpus_running, iter) {
@@ -342,9 +338,7 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
  *
  * Acknowledges an IPI message and sets its return code to the given value.
  * This function is only of use when the IPI is sent synchronously, and the
- * handler needs to acknowledge the message early. For example, during TLB
- * shootdown the message is acknowledged prior to the handler function
- * waiting for the page map changes to be completed. If this function is not
+ * handler needs to acknowledge the message early. If this function is not
  * called by the handler function, then the message is instead acknowledged
  * immediately after its return, with the function's return value as the
  * status code.

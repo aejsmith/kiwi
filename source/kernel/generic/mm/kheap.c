@@ -72,9 +72,7 @@ vmem_t kheap_arena;			/**< Heap arena that backs allocated ranges with anonymous
 static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 	phys_ptr_t page;
 
-	/* Lock page map and begin TLB shootdown. */
 	page_map_lock(&kernel_page_map, 0);
-	tlb_shootdown(NULL, start, end);
 
 	for(; start < end; start += PAGE_SIZE) {
 		if(!page_map_remove(&kernel_page_map, start, &page)) {
@@ -87,6 +85,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 		dprintf("kheap: unmapped page 0x%" PRIpp " from 0x%p\n", page, start);
 	}
 
+	tlb_invalidate(NULL, start, end);
 	page_map_unlock(&kernel_page_map);
 }
 

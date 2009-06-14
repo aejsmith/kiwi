@@ -26,14 +26,14 @@
 /** Invalidate TLB entries for an address range.
  * @param start		Start of range to invalidate.
  * @param end		End of range to invalidate. */
-static inline void tlb_invalidate(ptr_t start, ptr_t end) {
+static inline void tlb_arch_invalidate(ptr_t start, ptr_t end) {
 	for(; start < end; start += PAGE_SIZE) {
 		__asm__ volatile("invlpg (%0)" :: "r"(start));
 	}
 }
 
 /** Invalidate the entire TLB. */
-static inline void tlb_invalidate_all(void) {
+static inline void tlb_arch_invalidate_all(void) {
 	sysreg_cr3_write(sysreg_cr3_read());
 }
 
