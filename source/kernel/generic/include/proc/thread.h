@@ -90,7 +90,8 @@ typedef struct thread {
 
 extern thread_t *thread_lookup(thread_id_t id);
 extern void thread_run(thread_t *thread);
-extern int thread_create(const char *name, struct process *owner, int flags, thread_func_t entry, void *arg, thread_t **threadp);
+extern int thread_create(const char *name, struct process *owner, int flags,
+                         thread_func_t entry, void *arg, thread_t **threadp);
 extern void thread_destroy(thread_t *thread);
 extern void thread_exit(void);
 

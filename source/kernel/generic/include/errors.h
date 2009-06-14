@@ -30,7 +30,7 @@
 #define ERR_NOT_SUPPORTED	6	/**< Function not implemented. */
 #define ERR_DEST_UNKNOWN	7	/**< Could not find destination. */
 #define ERR_DEP_MISSING		8	/**< Required dependency not found. */
-#define ERR_BAD_EXEC		9	/**< Executable file format invalid. */
+#define ERR_OBJ_FORMAT_BAD	9	/**< Object's format is incorrect. */
 #define ERR_OBJ_EXISTS		10	/**< Object already exists. */
 #define ERR_OBJ_NOT_FOUND	11	/**< Requested object not found. */
 #define ERR_OBJ_TYPE_INVAL	12	/**< Object type is invalid. */

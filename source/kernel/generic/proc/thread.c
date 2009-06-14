@@ -159,7 +159,8 @@ void thread_run(thread_t *thread) {
  *
  * @return		0 on success, a negative error code on failure.
  */
-int thread_create(const char *name, process_t *owner, int flags, thread_func_t entry, void *arg, thread_t **threadp) {
+int thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
+                  void *arg, thread_t **threadp) {
 	thread_t *thread;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {

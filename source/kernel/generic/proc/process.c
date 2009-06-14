@@ -93,7 +93,7 @@ process_t *process_lookup(process_id_t id) {
  * @param name		Name to give the process.
  * @param parent	Parent of the process.
  * @param priority	Priority for the process.
- * @param flags		Behaviour flags for the process.
+ * @param flags		Behaviour/creation flags for the process.
  * @param subsystem	Subsystem that the process will run under.
  * @param procp		Where to store pointer to new process.
  *
@@ -123,6 +123,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 			return -ERR_NO_MEMORY;
 		}
 	} else {
+		flags &= ~PROCESS_NOASPACE;
 		process->aspace = NULL;
 	}
 

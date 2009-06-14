@@ -72,7 +72,6 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_EM_MIPS		8		/**< MIPS R3000 big-endian. */
 #define ELF_EM_S370		9		/**< IBM System/370. */
 #define ELF_EM_MIPS_RS3_LE	10		/**< MIPS R3000 little-endian. */
-
 #define ELF_EM_PARISC		15		/**< HPPA. */
 #define ELF_EM_VPP500		17		/**< Fujitsu VPP500. */
 #define ELF_EM_SPARC32PLUS	18		/**< Sun's "v8plus". */
@@ -80,7 +79,6 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_EM_PPC		20		/**< PowerPC. */
 #define ELF_EM_PPC64		21		/**< PowerPC 64-bit. */
 #define ELF_EM_S390		22		/**< IBM S390. */
-
 #define ELF_EM_V800		36		/**< NEC V800 series. */
 #define ELF_EM_FR20		37		/**< Fujitsu FR20. */
 #define ELF_EM_RH32		38		/**< TRW RH-32. */
@@ -109,7 +107,6 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_EM_TINYJ		61		/**< Advanced Logic Corp. Tinyj emb.fam. */
 #define ELF_EM_X86_64		62		/**< AMD x86-64 architecture. */
 #define ELF_EM_PDSP		63		/**< Sony DSP Processor. */
-
 #define ELF_EM_FX66		66		/**< Siemens FX66 microcontroller. */
 #define ELF_EM_ST9PLUS		67		/**< STMicroelectronics ST9+ 8/16 mc. */
 #define ELF_EM_ST7		68		/**< STmicroelectronics ST7 8 bit mc. */
@@ -140,6 +137,22 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_EM_ARC_A5		93		/**< ARC Cores Tangent-A5. */
 #define ELF_EM_XTENSA		94		/**< Tensilica Xtensa Architecture. */
 #define ELF_EM_NUM		95
+
+/** ELF OS/ABI types. */
+#define ELFOSABI_NONE		0		/**< UNIX System V ABI. */
+#define ELFOSABI_SYSV		0		/**< Alias. */
+#define ELFOSABI_HPUX		1		/**< HP-UX. */
+#define ELFOSABI_NETBSD		2		/**< NetBSD. */
+#define ELFOSABI_LINUX		3		/**< Linux. */
+#define ELFOSABI_SOLARIS	6		/**< Sun Solaris. */
+#define ELFOSABI_AIX		7		/**< IBM AIX. */
+#define ELFOSABI_IRIX		8		/**< SGI Irix. */
+#define ELFOSABI_FREEBSD	9		/**< FreeBSD. */
+#define ELFOSABI_TRU64		10		/**< Compaq TRU64 UNIX. */
+#define ELFOSABI_MODESTO	11		/**< Novell Modesto. */
+#define ELFOSABI_OPENBSD	12		/**< OpenBSD. */
+#define ELFOSABI_ARM		97		/**< ARM. */
+#define ELFOSABI_STANDALONE	255		/**< Standalone (embedded) application. */
 
 /** Phdr types. */
 #define ELF_PT_NULL		0		/**< Unused entry. */
@@ -412,6 +425,12 @@ typedef struct {
 	} a_un;
 } __packed Elf32_Auxv;
 
+typedef struct {
+	Elf32_Word n_namesz;			/**< Length of the note's name. */
+	Elf32_Word n_descsz;			/**< Length of the note's descriptor. */
+	Elf32_Word n_type;			/**< Type of the note. */
+} __packed Elf32_Nhdr;
+
 /*
  * ELF64 structures
  */
@@ -499,6 +518,12 @@ typedef struct {
 		void (*a_fnc)(void);
 	} a_un;
 } __packed Elf64_Auxv;
+
+typedef struct {
+	Elf64_Word n_namesz;			/**< Length of the note's name. */
+	Elf64_Word n_descsz;			/**< Length of the note's descriptor. */
+	Elf64_Word n_type;			/**< Type of the note. */
+} __packed Elf64_Nhdr;
 
 /** Pull in architecture definitions of the types to use. */
 #include <arch/elf.h>
