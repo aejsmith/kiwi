@@ -475,7 +475,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 
 	/* Check if this is a valid module. */
 	if(!module_check(image, size)) {
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_OBJ_TYPE_INVAL;
 	}
 
 	/* Create a module structure for the module. */
