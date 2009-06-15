@@ -27,6 +27,8 @@
 
 #include <mm/page.h>
 
+#include <sync/mutex.h>
+
 #include <types/avltree.h>
 #include <types/refcount.h>
 

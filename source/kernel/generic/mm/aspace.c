@@ -196,9 +196,6 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 	assert(start >= region->start);
 	assert(end <= region->end);
 
-	/* Lock the page map. */
-	page_map_lock(&as->pmap, 0);
-
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		if(!page_map_remove(&as->pmap, addr, NULL)) {
 			continue;
@@ -212,7 +209,6 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 	/* Invalidate the necessary TLB entries on all CPUs using the address
 	 * space, and drop the page map lock. */
 	tlb_invalidate(as, start, end);
-	page_map_unlock(&as->pmap);
 }
 
 /** Resize a region. Cannot decrease the start address or increase end address.
@@ -653,17 +649,13 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Map the page in to the address space. */
-	page_map_lock(&as->pmap, 0);
 	if(!page_map_insert(&as->pmap, (addr & PAGE_MASK), page, aspace_flags_to_page(region->flags), MM_SLEEP)) {
-		page_map_unlock(&as->pmap);
-
 		region->source->backend->release(region->source, offset);
 
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
 
-	page_map_unlock(&as->pmap);
 	mutex_unlock(&as->lock);
 	dprintf("aspace: fault at 0x%p in 0x%p: 0x%" PRIpp " -> 0x%p\n",
 		addr, as, page, (addr & PAGE_MASK));

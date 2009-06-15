@@ -149,7 +149,6 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	pte_t *ptbl;
 	int pte;
 
-	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
 
@@ -196,7 +195,6 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	pte_t *ptbl;
 	int pte;
 
-	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 
 	/* Check that we can map here. */
@@ -240,7 +238,6 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	pte_t *ptbl;
 	int pte;
 
-	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
@@ -255,41 +252,6 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	}
 
 	return ret;
-}
-
-/** Lock a page map.
- *
- * Locks a page map's lock.
- *
- * @param map		Page map to lock.
- * @param flags		Synchronization flags (see sync/flags.h).
- *
- * @return		Same as return value from mutex_lock().
- */
-int page_map_lock(page_map_t *map, int flags) {
-	return mutex_lock(&map->lock, flags);
-}
-
-/** Unlock a page map.
- *
- * Unlocks the specified page map.
- *
- * @param map		Page map to unlock.
- */
-void page_map_unlock(page_map_t *map) {
-	mutex_unlock(&map->lock);
-}
-
-/** Check whether a page map is locked.
- *
- * Checks whether a page map's lock is currently held.
- *
- * @param map		Page map to check.
- *
- * @return		Whether the lock is held.
- */
-bool page_map_locked(page_map_t *map) {
-	return mutex_held(&map->lock);
 }
 
 /** Switch to a different page map.
@@ -313,7 +275,6 @@ void page_map_switch(page_map_t *map) {
 int page_map_init(page_map_t *map) {
 	pte_t *pml4;
 
-	mutex_init(&map->lock, "page_map_lock");
 	map->pml4 = pmm_alloc(1, MM_SLEEP | PM_ZERO);
 	map->user = true;
 	map->first = ASPACE_BASE;
@@ -475,7 +436,6 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 
 /** Set up the kernel page map. */
 void page_init(void) {
-	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock");
 	kernel_page_map.pml4 = KA2PA(__boot_pml4);
 	kernel_page_map.user = false;
 	kernel_page_map.first = KERNEL_HEAP_BASE;

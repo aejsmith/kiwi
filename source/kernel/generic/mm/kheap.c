@@ -72,8 +72,6 @@ vmem_t kheap_arena;			/**< Heap arena that backs allocated ranges with anonymous
 static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 	phys_ptr_t page;
 
-	page_map_lock(&kernel_page_map, 0);
-
 	for(; start < end; start += PAGE_SIZE) {
 		if(!page_map_remove(&kernel_page_map, start, &page)) {
 			fatal("Address 0x%p was not mapped while freeing", start);
@@ -86,13 +84,13 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 	}
 
 	tlb_invalidate(NULL, start, end);
-	page_map_unlock(&kernel_page_map);
 }
 
 /** Kernel heap arena allocation function.
  *
- * Allocates a range from the given source arena and backs it with
- * anonymous pages.
+ * Allocates a range from the given source arena and backs it with anonymous
+ * pages. This function has special handling for VM_REFILLING with regard to
+ * the page map lock as it is used within the 
  *
  * @param source	Source arena.
  * @param size		Size of range to allocate.
@@ -125,16 +123,13 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		}
 
 		/* Map the page into the kernel address space. */
-		page_map_lock(&kernel_page_map, 0);
 		if(!page_map_insert(&kernel_page_map, ret + i, page,
 		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
 		                    vmflag & MM_FLAG_MASK)) {
-			page_map_unlock(&kernel_page_map);
 			dprintf("kheap: failed to map page 0x%" PRIpp " to 0x%p\n", page, ret + i);
 			pmm_free(page, 1);
 			goto fail;
 		}
-		page_map_unlock(&kernel_page_map);
 
 		dprintf("kheap: mapped page 0x%" PRIpp " at 0x%p\n", page, ret + i);
 	}
@@ -214,25 +209,27 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 		return 0;
 	}
 
+	mutex_lock(&kheap_va_arena.lock, 0);
+
 	/* Back the allocation with the required page range. */
-	page_map_lock(&kernel_page_map, 0);
 	for(i = 0; i < size; i += PAGE_SIZE, base += PAGE_SIZE) {
 		if(!page_map_insert(&kernel_page_map, ret + i, base,
 		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
 		                    vmflag & MM_FLAG_MASK)) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to 0x%p\n", base, ret + i);
-			page_map_unlock(&kernel_page_map);
 			goto fail;
 		}
 
 		dprintf("kheap: mapped page 0x%" PRIpp " at 0x%p\n", base, ret + i);
 	}
 
-	page_map_unlock(&kernel_page_map);
+	mutex_unlock(&kheap_va_arena.lock);
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true);
+	mutex_unlock(&kheap_va_arena.lock);
+
 	vmem_free(&kheap_va_arena, (vmem_resource_t)ret, size);
 	return NULL;
 }
@@ -248,7 +245,10 @@ fail:
  * @param size		Size of range to unmap (must be multiple of PAGE_SIZE).
  */
 void kheap_unmap_range(void *addr, size_t size) {
+	mutex_lock(&kheap_va_arena.lock, 0);
 	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + size, false);
+	mutex_unlock(&kheap_va_arena.lock);
+
 	vmem_free(&kheap_va_arena, (vmem_resource_t)((ptr_t)addr), size);
 }
 
