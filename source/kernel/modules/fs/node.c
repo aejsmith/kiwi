@@ -193,7 +193,7 @@ static int vfs_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp
 	int ret;
 
 	/* First try to allocate a page to use. */
-	if(node->mount->type->page_get) {
+	if(node->mount && node->mount->type->page_get) {
 		ret = node->mount->type->page_get(node, offset, MM_SLEEP, &page);
 		if(ret != 0) {
 			return ret;
@@ -203,7 +203,7 @@ static int vfs_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp
 	}
 
 	/* Now try to fill it in, if an operation is provided to do so. */
-	if(node->mount->type->page_read) {
+	if(node->mount && node->mount->type->page_read) {
 		mapping = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
 		ret = node->mount->type->page_read(node, mapping, offset, false);
 
@@ -230,7 +230,7 @@ static int vfs_cache_flush_page(cache_t *cache, phys_ptr_t page, offset_t offset
 	void *mapping;
 	int ret;
 
-	if(node->mount->type->page_flush) {
+	if(node->mount && node->mount->type->page_flush) {
 		mapping = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
 		ret = node->mount->type->page_flush(node, mapping, offset, false);
 		page_phys_unmap(mapping, PAGE_SIZE);
@@ -248,7 +248,7 @@ static int vfs_cache_flush_page(cache_t *cache, phys_ptr_t page, offset_t offset
 static void vfs_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
 	vfs_node_t *node = cache->data;
 
-	if(node->mount->type->page_free) {
+	if(node->mount && node->mount->type->page_free) {
 		node->mount->type->page_free(node, page);
 	} else {
 		pmm_free(page, 1);
@@ -522,12 +522,18 @@ void vfs_node_release(vfs_node_t *node) {
 		return;
 	}
 
-	/* Add the node to the appropriate unused list. */
-	mutex_lock(&node->mount->lock, 0);
-	list_append((node->dirty) ? &node->mount->dirty_nodes : &node->mount->unused_nodes, &node->header);
-	mutex_unlock(&node->mount->lock);
-
 	dprintf("vfs: node 0x%p(%s) is now unused, released\n", node, (node->name) ? node->name : "");
+
+	if(node->mount) {
+		/* Add the node to the appropriate unused list. */
+		mutex_lock(&node->mount->lock, 0);
+		list_append((node->dirty) ? &node->mount->dirty_nodes : &node->mount->unused_nodes, &node->header);
+		mutex_unlock(&node->mount->lock);
+	} else {
+		/* Node is not attached anywhere, free it up. */
+		assert(!node->parent);
+		vfs_node_free(node, true);
+	}
 }
 MODULE_EXPORT(vfs_node_release);
 
@@ -755,7 +761,7 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 	if(node->type != VFS_NODE_REGULAR) {
 		ret = -ERR_OBJ_TYPE_INVAL;
 		goto out;
-	} else if(node->mount->flags & VFS_MOUNT_RDONLY) {
+	} else if(node->mount && node->mount->flags & VFS_MOUNT_RDONLY) {
 		ret = -ERR_OBJ_READ_ONLY;
 		goto out;
 	}
@@ -764,7 +770,7 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 	if((offset + (offset_t)count) > (offset_t)node->size) {
 		/* If the resize operation is not provided, we can only write
 		 * within the space that we have. */
-		if(!node->mount->type->node_resize) {
+		if(!node->mount || !node->mount->type->node_resize) {
 			if(offset > (offset_t)node->size) {
 				ret = 0;
 				goto out;
@@ -837,3 +843,51 @@ out:
 	return ret;
 }
 MODULE_EXPORT(vfs_node_write);
+
+/*
+ * Special node types.
+ */
+
+/** Create a special node backed by a chunk of memory.
+ *
+ * Creates a special VFS node structure that is backed by the specified chunk
+ * of memory. This is useful to pass data stored in memory to code that expects
+ * to be operating on filesystem nodes, such as the program loader module.
+ *
+ * When the node is created, the data in the given memory area is duplicated
+ * into the node's data cache, so updates to the memory area after this
+ * function has be called will not show on reads from the node. Similarly,
+ * writes to the node will not be written back to the memory area.
+ *
+ * The node is not attached anywhere in the filesystem, and therefore once its
+ * reference count reaches 0, it will be immediately destroyed.
+ *
+ * @param memory	Pointer to memory area to use.
+ * @param size		Size of memory area.
+ * @param nodep		Where to store pointer to created node.
+ *
+ * @return		0 on success, negative error code on failure.
+ */ 
+int vfs_node_create_from_memory(const void *memory, size_t size, vfs_node_t **nodep) {
+	vfs_node_t *node;
+	int ret;
+
+	if(!memory || !size || !nodep) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	node = vfs_node_alloc("[memory]", NULL, MM_SLEEP);
+	node->type = VFS_NODE_REGULAR;
+	node->size = size;
+	node->cache = cache_create(&vfs_cache_ops, node);
+
+	/* Write the data into the node. */
+	ret = vfs_node_write(node, memory, size, 0, NULL);
+	if(ret != 0) {
+		vfs_node_release(node);
+		return ret;
+	}
+
+	*nodep = node;
+	return 0;
+}
