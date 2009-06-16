@@ -20,17 +20,39 @@
 
 #include <console/kprintf.h>
 
+#include <loader/elf.h>
+
 #include <errors.h>
 #include <fatal.h>
 #include <module.h>
 
+/** POSIX subsystem information structure. */
+static subsystem_t posix_subsystem = {
+	.name = "POSIX",
+};
+
+/** POSIX ELF ABI definition structure. */
+static loader_elf_abi_t posix_elf_abi = {
+	.string = "POSIX",
+	.num = ELFOSABI_NONE,
+	.subsystem = &posix_subsystem,
+};
+
 /** POSIX module initialization function.
  * @return		0 on success, negative error code on failure. */
 static int posix_init(void) {
+	/* Register the ELF ABI that we use (SVR4). */
+	return loader_elf_abi_register(&posix_elf_abi);
+}
+
+/** POSIX module unload function.
+ * @return		0 on success, negative error code on failure. */
+static int posix_unload(void) {
+	loader_elf_abi_unregister(&posix_elf_abi);
 	return 0;
 }
 
 MODULE_NAME("posix");
 MODULE_DESC("POSIX subsystem kernel-mode component.");
-MODULE_FUNCS(posix_init, NULL);
+MODULE_FUNCS(posix_init, posix_unload);
 MODULE_DEPS("loader", "vfs");
