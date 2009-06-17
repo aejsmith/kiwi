@@ -60,11 +60,11 @@ static void acpi_table_copy(phys_ptr_t addr) {
 	acpi_header_t *source;
 
 	/* Map the table on the heap. */
-	source = page_phys_map(addr, PAGE_SIZE, MM_FATAL);
+	source = page_phys_map(addr, PAGE_SIZE * 2, MM_FATAL);
 
 	/* Check the checksum of the table. */
 	if(!acpi_checksum((ptr_t)source, source->length)) {
-		page_phys_unmap(source, PAGE_SIZE);
+		page_phys_unmap(source, PAGE_SIZE * 2);
 		return;
 	}
 
@@ -79,7 +79,7 @@ static void acpi_table_copy(phys_ptr_t addr) {
 	acpi_tables[acpi_table_count - 1] = kmalloc(source->length, MM_FATAL);
 	memcpy(acpi_tables[acpi_table_count - 1], source, source->length);
 
-	page_phys_unmap(source, PAGE_SIZE);
+	page_phys_unmap(source, PAGE_SIZE * 2);
 }
 
 /** Look for the ACPI RSDP in a specific memory range.
