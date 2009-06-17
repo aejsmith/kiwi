@@ -83,9 +83,11 @@ int mutex_lock(mutex_t *mutex, int flags) {
  */
 void mutex_unlock(mutex_t *mutex) {
 	if(atomic_get(&mutex->locked) == 0) {
-		fatal("Attempted unlock of unlocked mutex 0x%p(%s)", mutex, mutex->queue.name);
+		fatal("Unlock of unlocked mutex 0x%p(%s)", mutex, mutex->queue.name);
 	} else if(mutex->holder != curr_thread) {
-		fatal("Attempted unlock of mutex 0x%p(%s) from incorrect thread", mutex, mutex->queue.name);
+		fatal("Unlock of mutex 0x%p(%s) from incorrect thread\n"
+		      "Holder: 0x%p  Current: 0x%p",
+		      mutex, mutex->queue.name, mutex->holder, curr_thread);
 	}
 
 	mutex->holder = NULL;
