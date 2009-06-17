@@ -21,7 +21,6 @@
 #include <lib/string.h>
 
 #include <errors.h>
-#include <init.h>
 #include <module.h>
 
 #include "vfs_priv.h"

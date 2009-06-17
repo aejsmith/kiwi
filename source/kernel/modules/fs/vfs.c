@@ -19,22 +19,15 @@
  */
 
 #include <errors.h>
-#include <init.h>
 #include <module.h>
 
 #include "vfs_priv.h"
-
-/** Initialization callback to mount the root filesystem. */
-static CALLBACK_DECLARE(vfs_mount_root_callback, vfs_mount_root, NULL);
 
 /** Initialization function for VFS.
  * @return		0 on success, negative error code on failure. */
 static int vfs_init(void) {
 	/* Initialize the node slab cache. */
 	vfs_node_cache_init();
-
-	/* Add an initialization callback function. */
-	callback_add(&init_completion_cb_list, &vfs_mount_root_callback);
 	return 0;
 }
 

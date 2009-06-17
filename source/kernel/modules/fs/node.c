@@ -891,3 +891,4 @@ int vfs_node_create_from_memory(const void *memory, size_t size, vfs_node_t **no
 	*nodep = node;
 	return 0;
 }
+MODULE_EXPORT(vfs_node_create_from_memory);

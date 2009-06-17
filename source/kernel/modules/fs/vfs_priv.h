@@ -50,6 +50,5 @@ extern void vfs_node_cache_init(void);
 
 /** Filesystem mount functions/variables. */
 extern void vfs_mount_reclaim_nodes(void);
-extern void vfs_mount_root(void *data1, void *data2);
 
 #endif /* __VFS_PRIV_H */

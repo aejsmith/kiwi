@@ -14,6 +14,6 @@
 
 Import('env', 'config')
 
-env.Module([
+env.Module('ramfs', [
 	'ramfs.c',
 ])
