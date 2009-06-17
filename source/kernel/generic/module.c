@@ -156,7 +156,7 @@ static int module_elf_get_sym(module_t *module, size_t num, bool external, elf_a
 		/* External symbol, look up in the kernel and other modules. */
 		ksym = symbol_lookup_name(strtab + sym->st_name, true, true);
 		if(ksym == NULL) {
-			dprintf("elf: module references undefined symbol: %s\n", strtab + sym->st_name);
+			kprintf(LOG_DEBUG, "module: module references undefined symbol: %s\n", strtab + sym->st_name);
 			return -ERR_OBJ_FORMAT_BAD;
 		}
 
@@ -189,6 +189,9 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 
 		if(sect->sh_type == ELF_SHT_PROGBITS || sect->sh_type == ELF_SHT_NOBITS ||
 		   sect->sh_type == ELF_SHT_STRTAB || sect->sh_type == ELF_SHT_SYMTAB) {
+			if(sect->sh_addralign) {
+				module->load_size = ROUND_UP(module->load_size, sect->sh_addralign);
+			}
 			module->load_size += sect->sh_size;
 		}
 	}
@@ -207,6 +210,9 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 
 		if(sect->sh_type == ELF_SHT_PROGBITS || sect->sh_type == ELF_SHT_NOBITS ||
 		   sect->sh_type == ELF_SHT_STRTAB || sect->sh_type == ELF_SHT_SYMTAB) {
+			if(sect->sh_addralign) {
+				dest = (void *)ROUND_UP((ptr_t)dest, sect->sh_addralign);
+			}
 			sect->sh_addr = (elf_addr_t)dest;
 
 			dprintf("module: loading data for section %u to 0x%p (size: %u, type: %u)\n",
@@ -337,7 +343,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 			/* Find the symbol and mark it as exported. */
 			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
 			if(sym == NULL) {
-				dprintf("module: exported symbol %s in module 0x%p cannot be found\n",
+				dprintf("module: exported symbol 0x%p in module 0x%p cannot be found\n",
 				        export, module);
 				return -ERR_OBJ_FORMAT_BAD;
 			}
@@ -407,7 +413,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			/* Meh, ignore it. */
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
-			dprintf("module: module 0x%p(%s) depends on itself\n", module, module->name);
+			kprintf(LOG_DEBUG, "module: module 0x%p(%s) depends on itself\n", module, module->name);
 			return -ERR_OBJ_FORMAT_BAD;
 		}
 
@@ -502,11 +508,11 @@ int module_load(void *image, size_t size, char *depbuf) {
 	module->init = module_lookup_pointer(module, "__module_init");
 	module->unload = module_lookup_pointer(module, "__module_unload");
 	if(!module->name || !module->description || !module->init) {
-		dprintf("module: information for module 0x%p is invalid\n", module);
+		kprintf(LOG_DEBUG, "module: information for module 0x%p is invalid\n", module);
 		ret = -ERR_OBJ_FORMAT_BAD;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
-		dprintf("module: name of module 0x%p is too long\n", module);
+		kprintf(LOG_DEBUG, "module: name of module 0x%p is too long\n", module);
 		ret = -ERR_OBJ_FORMAT_BAD;
 		goto fail;
 	}
