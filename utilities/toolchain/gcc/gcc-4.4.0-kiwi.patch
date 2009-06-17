@@ -1,6 +1,6 @@
 diff -urN gcc-4.4.0.orig/config.sub gcc-4.4.0/config.sub
---- gcc-4.4.0.orig/config.sub	2008-12-18 03:27:27.000000000 +0000
-+++ gcc-4.4.0/config.sub	2009-05-06 07:54:18.751063914 +0100
+--- gcc-4.4.0.orig/config.sub	2009-06-17 17:09:19.986615166 +0100
++++ gcc-4.4.0/config.sub	2009-06-17 17:09:32.505001477 +0100
 @@ -1276,7 +1276,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -12,7 +12,7 @@ diff -urN gcc-4.4.0.orig/config.sub gcc-4.4.0/config.sub
  	-qnx*)
 diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi32.h gcc-4.4.0/gcc/config/i386/kiwi32.h
 --- gcc-4.4.0.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/kiwi32.h	2009-05-06 18:43:08.285468910 +0100
++++ gcc-4.4.0/gcc/config/i386/kiwi32.h	2009-06-17 17:13:50.922654153 +0100
 @@ -0,0 +1,29 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -41,11 +41,11 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi32.h gcc-4.4.0/gcc/config/i386/kiwi
 +  %{shared:-shared} \
 +  %{!shared: \
 +    %{!static: \
-+      %{rdynamic:-export-dynamic} \
++      %{rdynamic:-export-dynamic}} \
 +    %{static:-static}}"
 diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi64.h gcc-4.4.0/gcc/config/i386/kiwi64.h
 --- gcc-4.4.0.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/kiwi64.h	2009-05-06 18:44:35.288643915 +0100
++++ gcc-4.4.0/gcc/config/i386/kiwi64.h	2009-06-17 17:13:27.002751409 +0100
 @@ -0,0 +1,29 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -74,11 +74,11 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi64.h gcc-4.4.0/gcc/config/i386/kiwi
 +  %{shared:-shared} \
 +  %{!shared: \
 +    %{!static: \
-+      %{rdynamic:-export-dynamic} \
-+    %{static:-static}}"
++      %{rdynamic:-export-dynamic}} \
++    %{static:-static}}"	
 diff -urN gcc-4.4.0.orig/gcc/config/i386/t-kiwi64 gcc-4.4.0/gcc/config/i386/t-kiwi64
 --- gcc-4.4.0.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/t-kiwi64	2009-05-06 18:41:00.874061290 +0100
++++ gcc-4.4.0/gcc/config/i386/t-kiwi64	2009-06-17 17:09:32.505995370 +0100
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -99,7 +99,7 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/t-kiwi64 gcc-4.4.0/gcc/config/i386/t-ki
 +TARGET_LIBGCC2_CFLAGS = -fPIC
 diff -urN gcc-4.4.0.orig/gcc/config/kiwi.h gcc-4.4.0/gcc/config/kiwi.h
 --- gcc-4.4.0.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/kiwi.h	2009-05-06 18:36:30.118468712 +0100
++++ gcc-4.4.0/gcc/config/kiwi.h	2009-06-17 17:09:32.505995370 +0100
 @@ -0,0 +1,36 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -138,8 +138,8 @@ diff -urN gcc-4.4.0.orig/gcc/config/kiwi.h gcc-4.4.0/gcc/config/kiwi.h
 +  "%{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
 +
 diff -urN gcc-4.4.0.orig/gcc/config.gcc gcc-4.4.0/gcc/config.gcc
---- gcc-4.4.0.orig/gcc/config.gcc	2009-04-17 12:58:41.000000000 +0100
-+++ gcc-4.4.0/gcc/config.gcc	2009-05-06 08:02:24.350683618 +0100
+--- gcc-4.4.0.orig/gcc/config.gcc	2009-06-17 17:09:20.882615236 +0100
++++ gcc-4.4.0/gcc/config.gcc	2009-06-17 17:09:32.506990244 +0100
 @@ -588,6 +588,14 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
@@ -171,8 +171,8 @@ diff -urN gcc-4.4.0.orig/gcc/config.gcc gcc-4.4.0/gcc/config.gcc
  	tm_file="${tm_file} dbxelf.h elfos.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
 diff -urN gcc-4.4.0.orig/libgcc/config.host gcc-4.4.0/libgcc/config.host
---- gcc-4.4.0.orig/libgcc/config.host	2009-04-17 12:58:41.000000000 +0100
-+++ gcc-4.4.0/libgcc/config.host	2009-05-06 18:46:20.680663658 +0100
+--- gcc-4.4.0.orig/libgcc/config.host	2009-06-17 17:09:20.672615227 +0100
++++ gcc-4.4.0/libgcc/config.host	2009-06-17 17:09:32.507720836 +0100
 @@ -275,6 +275,10 @@
  	;;
  x86_64-*-elf*)
