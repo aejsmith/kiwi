@@ -38,7 +38,7 @@
 
 /** Kernel paging structures. */
 extern uint64_t __boot_pml4[];
-extern pte_t __kernel_pdp[];
+extern uint64_t __kernel_pdp[];
 
 /** Symbols defined by the linker script. */
 extern char __text_start[], __text_end[], __rodata_start[], __rodata_end[];
@@ -47,12 +47,6 @@ extern char __bss_end[], __end[];
 /*
  * Page map functions.
  */
-
-/** Helper macro to clear a page table entry. */
-#define SIMPLE_CLEAR_PTE(ptbl, i)	(((pte_simple_t *)(ptbl))[(i)] = 0)
-
-/** Helper macro to set a page table entry. */
-#define SIMPLE_SET_PTE(ptbl, i, v)	(((pte_simple_t *)(ptbl))[(i)] = (v))
 
 /** Kernel page map. */
 page_map_t kernel_page_map;
@@ -63,8 +57,8 @@ page_map_t kernel_page_map;
  * @param alloc		Whether to allocate structures if not found.
  * @param mmflag	Allocation flags.
  * @return		Virtual address of page table. */
-static pte_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag) {
-	pte_t *pml4, *pdp, *pdir, *ptbl;
+static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag) {
+	uint64_t *pml4, *pdp, *pdir;
 	int pml4e, pdpe, pde;
 	phys_ptr_t page;
 
@@ -74,62 +68,83 @@ static pte_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmf
 
 	/* Get the page directory pointer number. A PDP covers 512GB. */
 	pml4e = (virt & 0x0000FFFFFFFFF000) / 0x8000000000;
-	if(!pml4[pml4e].present) {
+	if(!(pml4[pml4e] & PG_PRESENT)) {
 		/* Allocate a new PDP if required. Safe to use PM_ZERO because
 		 * our implementation of page_phys_map() doesn't touch the
-		 * heap. */
-		if(!alloc || !(page = pmm_alloc(1, mmflag | PM_ZERO))) {
+		 * heap. Allocating a page can cause page mappings to be
+		 * modified (if a Vmem boundary tag refill occurs), handle
+		 * this possibility. */
+		if(alloc) {
+			page = pmm_alloc(1, mmflag | PM_ZERO);
+			if(pml4[pml4e] & PG_PRESENT) {
+				if(page) {
+					pmm_free(page, 1);
+				}
+			} else {
+				if(!page) {
+					return NULL;
+				}
+
+				/* Map it into the PML4. */
+				pml4[pml4e] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+			}
+		} else {
 			return NULL;
 		}
-
-		/* Map it into the PML4. */
-		pdp = page_phys_map(page, PAGE_SIZE, mmflag);
-		pml4[pml4e].address = page >> PAGE_WIDTH;
-		pml4[pml4e].writable = 1;
-		pml4[pml4e].user = map->user;
-		pml4[pml4e].present = 1;
-	} else {
-		pdp = page_phys_map((phys_ptr_t)pml4[pml4e].address << PAGE_WIDTH, PAGE_SIZE, mmflag);
 	}
+
+	pdp = page_phys_map((phys_ptr_t)(pml4[pml4e] & PAGE_MASK), PAGE_SIZE, mmflag);
 
 	/* Get the page directory number. A page directory covers 1GB. */
 	pdpe = (virt % 0x8000000000) / 0x40000000;
-	if(!pdp[pdpe].present) {
+	if(!(pdp[pdpe] & PG_PRESENT)) {
 		/* Allocate a new page directory if required. */
-		if(!alloc || !(page = pmm_alloc(1, mmflag | PM_ZERO))) {
+		if(alloc) {
+			page = pmm_alloc(1, mmflag | PM_ZERO);
+			if(pdp[pdpe] & PG_PRESENT) {
+				if(page) {
+					pmm_free(page, 1);
+				}
+			} else {
+				if(!page) {
+					return NULL;
+				}
+
+				/* Map it into the PDP. */
+				pdp[pdpe] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+			}
+		} else {
 			return NULL;
 		}
-
-		/* Map it into the PDP. */
-		pdir = page_phys_map(page, PAGE_SIZE, mmflag);
-		pdp[pdpe].address = page >> PAGE_WIDTH;
-		pdp[pdpe].writable = 1;
-		pdp[pdpe].user = map->user;
-		pdp[pdpe].present = 1;
-	} else {
-		pdir = page_phys_map((phys_ptr_t)pdp[pdpe].address << PAGE_WIDTH, PAGE_SIZE, mmflag);
 	}
+
+	pdir = page_phys_map((phys_ptr_t)(pdp[pdpe] & PAGE_MASK), PAGE_SIZE, mmflag);
 
 	/* Get the page table number. A page table covers 2MB. */
 	pde = (virt % 0x40000000) / 0x200000;
-	if(!pdir[pde].present) {
+	if(!(pdir[pde] & PG_PRESENT)) {
 		/* Allocate a new page table if required. */
-		if(!alloc || !(page = pmm_alloc(1, mmflag | PM_ZERO))) {
+		if(alloc) {
+			page = pmm_alloc(1, mmflag | PM_ZERO);
+			if(pdir[pde] & PG_PRESENT) {
+				if(page) {
+					pmm_free(page, 1);
+				}
+			} else {
+				if(!page) {
+					return NULL;
+				}
+
+				/* Map it into the page directory. */
+				pdir[pde] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+			}
+		} else {
 			return NULL;
 		}
-
-		/* Map it into the page directory. */
-		ptbl = page_phys_map(page, PAGE_SIZE, mmflag);
-		pdir[pde].address = page >> PAGE_WIDTH;
-		pdir[pde].writable = 1;
-		pdir[pde].user = map->user;
-		pdir[pde].present = 1;
-	} else {
-		assert(!pdir[pde].large);
-		ptbl = page_phys_map((phys_ptr_t)pdir[pde].address << PAGE_WIDTH, PAGE_SIZE, mmflag);
 	}
 
-	return ptbl;
+	assert(!(pdir[pde] & PG_LARGE));
+	return page_phys_map((phys_ptr_t)(pdir[pde] & PAGE_MASK), PAGE_SIZE, mmflag);
 }
 
 /** Insert a mapping in a page map.
@@ -146,11 +161,13 @@ static pte_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmf
  * @return		True if operation succeeded, false if not.
  */
 bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int mmflag) {
-	pte_t *ptbl;
+	uint64_t *ptbl, val;
 	int pte;
 
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
+
+	recursive_lock_acquire(&map->lock, 0);
 
 	/* Check that we can map here. */
 	if(virt < map->first || virt > map->last) {
@@ -160,23 +177,26 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
 	if(ptbl == NULL) {
+		recursive_lock_release(&map->lock);
 		return false;
 	}
 
 	pte = (virt % 0x200000) / PAGE_SIZE;
-	if(ptbl[pte].present) {
+	if(ptbl[pte] & PG_PRESENT) {
 		fatal("Mapping 0x%p which is already mapped", virt);
-	} else {
-		ptbl[pte].address = phys >> PAGE_WIDTH;
-		ptbl[pte].writable = (prot & PAGE_MAP_WRITE) ? 1 : 0;
-		ptbl[pte].user = map->user;
-		ptbl[pte].global = !map->user;
-#if CONFIG_X86_NX
-		ptbl[pte].noexec = (!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? 1 : 0;
-#endif
-		ptbl[pte].present = 1;
-		return true;
 	}
+
+	val = phys | PG_PRESENT;
+	val |= ((map->user) ? PG_USER : PG_GLOBAL);
+	val |= ((prot & PAGE_MAP_WRITE) ? PG_WRITE : 0);
+#if CONFIG_X86_NX
+	val |= ((!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? PG_NOEXEC : 0);
+#endif
+	ptbl[pte] = val;
+
+	memory_barrier();
+	recursive_lock_release(&map->lock);
+	return true;
 }
 
 /** Remove a mapping from a page map.
@@ -191,13 +211,14 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
  * @return		True if operation succeeded, false if not.
  */
 bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
-	bool ret = false;
-	pte_t *ptbl;
+	uint64_t *ptbl;
 	int pte;
 
 	assert(!(virt % PAGE_SIZE));
 
-	/* Check that we can map here. */
+	recursive_lock_acquire(&map->lock, 0);
+
+	/* Check that we can unmap here. */
 	if(virt < map->first || virt > map->last) {
 		fatal("Unmap on 0x%p outside allowed area", map);
 	}
@@ -205,21 +226,26 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
 	if(ptbl == NULL) {
+		recursive_lock_release(&map->lock);
 		return false;
 	}
 
 	pte = (virt % 0x200000) / PAGE_SIZE;
-	if(ptbl[pte].present) {
+	if(ptbl[pte] & PG_PRESENT) {
 		/* Store the physical address if required. */
 		if(physp != NULL) {
-			*physp = ptbl[pte].address << PAGE_WIDTH;
+			*physp = ptbl[pte] & PAGE_MASK;
 		}
 
 		/* Clear the entry. */
-		SIMPLE_CLEAR_PTE(ptbl, pte);
-		ret = true;
+		ptbl[pte] = 0;
+		memory_barrier();
+		recursive_lock_release(&map->lock);
+		return true;
+	} else {
+		recursive_lock_release(&map->lock);
+		return false;
 	}
-	return ret;
 }
 
 /** Get the value of a mapping in a page map.
@@ -234,24 +260,27 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
  * @return		True if mapping is present, false if not.
  */
 bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
-	bool ret = false;
-	pte_t *ptbl;
+	uint64_t *ptbl;
 	int pte;
 
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
+	recursive_lock_acquire(&map->lock, 0);
+
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
 	if(ptbl != NULL) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
-		if(ptbl[pte].present) {
-			*physp = ptbl[pte].address << PAGE_WIDTH;
-			ret = true;
+		if(ptbl[pte] & PG_PRESENT) {
+			*physp = ptbl[pte] & PAGE_MASK;
+			recursive_lock_release(&map->lock);
+			return true;
 		}
 	}
 
-	return ret;
+	recursive_lock_release(&map->lock);
+	return false;
 }
 
 /** Switch to a different page map.
@@ -273,8 +302,9 @@ void page_map_switch(page_map_t *map) {
  * @return		0 on success, negative error code on failure.
  */
 int page_map_init(page_map_t *map) {
-	pte_t *pml4;
+	uint64_t *pml4;
 
+	recursive_lock_init(&map->lock, "page_map_lock");
 	map->pml4 = pmm_alloc(1, MM_SLEEP | PM_ZERO);
 	map->user = true;
 	map->first = ASPACE_BASE;
@@ -282,11 +312,7 @@ int page_map_init(page_map_t *map) {
 
 	/* Get the kernel mappings into the new PML4. */
 	pml4 = page_phys_map(map->pml4, PAGE_SIZE, MM_SLEEP);
-	pml4[511].present = 1;
-	pml4[511].writable = 1;
-	pml4[511].user = 0;
-	pml4[511].address = (KA2PA(__kernel_pdp)) >> PAGE_WIDTH;
-
+	pml4[511] = __boot_pml4[511] & ~PG_ACCESSED;
 	return 0;
 }
 
@@ -349,35 +375,30 @@ static inline void invlpg(ptr_t addr) {
 /** Convert a large page to a page table if necessary.
  * @param virt		Virtual address to check. */
 static void page_large_to_ptbl(ptr_t virt) {
-	pte_t *pdir, *ptbl;
+	uint64_t *pdir, *ptbl;
 	int pdpe, pde, i;
 	phys_ptr_t page;
 
 	pdpe = (virt % 0x8000000000) / 0x40000000;
-	if(!__kernel_pdp[pdpe].present) {
+	if(!(__kernel_pdp[pdpe] & PG_PRESENT)) {
 		return;
 	}
 
-	pdir = page_phys_map((phys_ptr_t)__kernel_pdp[pdpe].address << PAGE_WIDTH, PAGE_SIZE, MM_FATAL);
+	pdir = page_phys_map((phys_ptr_t)(__kernel_pdp[pdpe] & PAGE_MASK), PAGE_SIZE, MM_FATAL);
 
 	pde = (virt % 0x40000000) / 0x200000;
-	if(pdir[pde].large) {
+	if(pdir[pde] & PG_LARGE) {
 		page = pmm_alloc(1, MM_FATAL);
 		ptbl = page_phys_map(page, PAGE_SIZE, MM_FATAL);
 		memset(ptbl, 0, PAGE_SIZE);
 
 		/* Set pages and copy all flags from the PDE. */
 		for(i = 0; i < 512; i++) {
-			ptbl[i].present = 1;
-			ptbl[i].writable = pdir[pde].writable;
-			ptbl[i].user = 0;
-			ptbl[i].global = pdir[pde].global;
-			ptbl[i].address = pdir[pde].address + i;
-			ptbl[i].noexec = pdir[pde].noexec;
+			ptbl[i] = (pdir[pde] & ~(PG_LARGE | PG_ACCESSED)) + (i * PAGE_SIZE);
 		}
 
 		/* Replace the large page in the page directory. */
-		SIMPLE_SET_PTE(pdir, pde, page | PG_PRESENT | PG_WRITE);
+		pdir[pde] = page | PG_PRESENT | PG_WRITE;
 		invlpg(ROUND_DOWN(virt, 0x200000));
 	}
 }
@@ -388,7 +409,7 @@ static void page_large_to_ptbl(ptr_t virt) {
  * @param start		Start virtual address.
  * @param end		End virtual address.  */
 static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
-	pte_simple_t *ptbl;
+	uint64_t *ptbl;
 	ptr_t i;
 
 	assert(start >= KERNEL_VIRT_BASE);
@@ -398,7 +419,7 @@ static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	for(i = start; i < end; i += PAGE_SIZE) {
 		page_large_to_ptbl(i);
 
-		ptbl = (pte_simple_t *)page_map_get_ptbl(&kernel_page_map, i, false, 0);
+		ptbl = page_map_get_ptbl(&kernel_page_map, i, false, 0);
 		if(ptbl == NULL) {
 			fatal("Could not get kernel page table");
 		}
@@ -414,7 +435,7 @@ static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
  * @param start		Start virtual address.
  * @param end		End virtual address.  */
 static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
-	pte_simple_t *ptbl;
+	uint64_t *ptbl;
 	ptr_t i;
 
 	assert(start >= KERNEL_VIRT_BASE);
@@ -424,7 +445,7 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	for(i = start; i < end; i += PAGE_SIZE) {
 		page_large_to_ptbl(i);
 
-		ptbl = (pte_simple_t *)page_map_get_ptbl(&kernel_page_map, i, false, 0);
+		ptbl = page_map_get_ptbl(&kernel_page_map, i, false, 0);
 		if(ptbl == NULL) {
 			fatal("Could not get kernel page table");
 		}
@@ -436,6 +457,7 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 
 /** Set up the kernel page map. */
 void page_init(void) {
+	recursive_lock_init(&kernel_page_map.lock, "kernel_page_map_lock");
 	kernel_page_map.pml4 = KA2PA(__boot_pml4);
 	kernel_page_map.user = false;
 	kernel_page_map.first = KERNEL_HEAP_BASE;
@@ -471,7 +493,7 @@ void page_late_init(void) {
 #endif
 
 	/* Clear identity mapping. */
-	SIMPLE_CLEAR_PTE(__boot_pml4, 0);
+	__boot_pml4[0] = 0;
 	memory_barrier();
 
 	/* Force a complete TLB wipe - the global flag is set on pages on the
