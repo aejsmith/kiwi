@@ -91,16 +91,14 @@ static void thread_cache_dtor(void *obj, void *data) {
  * because when real_schedule() switches to a newly-created thread, it will
  * return to this function and sched_post() does not get called by the
  * scheduler, so this function must do that.
- *
- * @param arg		Argument to pass to entry function.
  */
-static void thread_trampoline(void *arg) {
+static void thread_trampoline(void) {
 	sched_post_switch(true);
 
 	dprintf("thread: entered thread %" PRIu32 "(%s) on CPU %" PRIu32 "\n",
 		curr_thread->id, curr_thread->name, curr_cpu->id);
 
-	curr_thread->entry(curr_thread->arg);
+	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
 	thread_exit();
 	while(1) {
 		sched_yield();
@@ -155,12 +153,15 @@ void thread_run(thread_t *thread) {
  * @param name		Name to give the thread.
  * @param owner		Process that the thread should belong to.
  * @param flags		Flags for the thread.
+ * @param entry		Entry function for the thread.
+ * @param arg1		First argument to pass to entry function.
+ * @param arg2		Second argument to pass to entry function.
  * @param threadp	Where to store pointer to thread structure.
  *
  * @return		0 on success, a negative error code on failure.
  */
 int thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
-                  void *arg, thread_t **threadp) {
+                  void *arg1, void *arg2, thread_t **threadp) {
 	thread_t *thread;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {
@@ -193,7 +194,8 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->interruptible = false;
 	thread->state = THREAD_CREATED;
 	thread->entry = entry;
-	thread->arg = arg;
+	thread->arg1 = arg1;
+	thread->arg2 = arg2;
 	thread->owner = owner;
 
 	/* Add the thread to the owner. */

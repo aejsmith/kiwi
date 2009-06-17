@@ -45,15 +45,15 @@
 
 #include <bootmod.h>
 #include <fatal.h>
-#include <init.h>
 #include <version.h>
 
-/** Callback list for initialization completion. */
-CALLBACK_LIST_DECLARE(init_completion_cb_list);
+extern void init_bsp(void *data);
+extern void init_ap(void);
 
 /** Second-stage intialization thread.
- * @param arg		Thread argument (unused). */
-static void init_thread(void *data) {
+ * @param arg1		Thread argument (unused).
+ * @param arg2		Thread argument (unused). */
+static void init_thread(void *arg1, void *arg2) {
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
 
@@ -62,11 +62,6 @@ static void init_thread(void *data) {
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
-
-	/* Run all callbacks that modules may have added for initialization
-	 * completion and terminate. One of these callbacks should actually
-	 * make the kernel do something useful. :) */
-	callback_list_run(&init_completion_cb_list, NULL);
 }
 
 /** Kernel initialization function.
@@ -123,7 +118,7 @@ void init_bsp(void *data) {
 	arch_final_init();
 
 	/* Create the second stage initialization thread. */
-	if(thread_create("init", kernel_proc, 0, init_thread, NULL, &thread) != 0) {
+	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {
 		fatal("Could not create second-stage initialization thread");
 	}
 	thread_run(thread);

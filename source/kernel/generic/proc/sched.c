@@ -212,8 +212,9 @@ static inline int sched_migrate_priority(int average, int priority, int max) {
 }
 
 /** Per-CPU load balancing thread.
- * @param arg		Thread argument. */
-static void sched_balancer_thread(void *arg) {
+ * @param arg1		First thread argument.
+ * @param arg2		Second thread argument. */
+static void sched_balancer_thread(void *arg1, void *arg2) {
 	int total, load, average, count, i;
 
 	while(true) {
@@ -566,7 +567,7 @@ void sched_init(void) {
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
 	if(thread_create(name, kernel_proc, THREAD_UNMOVABLE | THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
-	                 NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
+	                 NULL, NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
 		fatal("Could not create idle thread for %" PRIu32, curr_cpu->id);
 	}
 
@@ -593,7 +594,7 @@ void sched_init(void) {
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
 		if(thread_create(name, kernel_proc, THREAD_UNMOVABLE | THREAD_UNPREEMPTABLE,
-		                 sched_balancer_thread, NULL, &curr_cpu->sched->balancer_thread) != 0) {
+		                 sched_balancer_thread, NULL, NULL, &curr_cpu->sched->balancer_thread) != 0) {
 			fatal("Could not create load balancer thread for %" PRIu32, curr_cpu->id);
 		}
 		thread_run(curr_cpu->sched->balancer_thread);

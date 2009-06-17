@@ -35,7 +35,7 @@ struct process;
 struct wait_queue;
 
 /** Entry function for a thread. */
-typedef void (*thread_func_t)(void *);
+typedef void (*thread_func_t)(void *, void *);
 
 /** Definition of a thread. */
 typedef struct thread {
@@ -71,7 +71,8 @@ typedef struct thread {
 
 	/** Thread entry function. */
 	thread_func_t entry;		/**< Entry function for the thread. */
-	void *arg;			/**< Argument to thread entry function. */
+	void *arg1;			/**< First argument to thread entry function. */
+	void *arg2;			/**< Second argument to thread entry function. */
 
 	/** Other thread information. */
 	thread_id_t id;			/**< ID of the thread. */
@@ -91,7 +92,7 @@ typedef struct thread {
 extern thread_t *thread_lookup(thread_id_t id);
 extern void thread_run(thread_t *thread);
 extern int thread_create(const char *name, struct process *owner, int flags,
-                         thread_func_t entry, void *arg, thread_t **threadp);
+                         thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
 extern void thread_destroy(thread_t *thread);
 extern void thread_exit(void);
 
