@@ -205,6 +205,9 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 
 	kprintf(LOG_NONE, "--- Stacktrace ---\n");
 	while(frame && ((ptr_t)frame & PAGE_MASK) == page) {
+		if((((ptr_t)frame + sizeof(stack_frame_t) - 1) & PAGE_MASK) != page) {
+			break;
+		}
 		sym = symbol_lookup_addr(frame->addr, &off);
 		kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", frame->addr,
 		        (sym) ? sym->name : "<unknown>", off);
