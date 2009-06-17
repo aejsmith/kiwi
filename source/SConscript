@@ -14,4 +14,4 @@
 
 Import('config')
 
-SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'subsystems'])
+SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'subsystems', 'uspace'])

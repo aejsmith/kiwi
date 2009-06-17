@@ -17,4 +17,12 @@ Import('config', 'envmgr')
 # Build rule for kernel component of POSIX subsystem.
 envmgr['module'].Module('posix', [
 	'posix.c',
-])
+], CPPPATH=envmgr['module']['CPPPATH'] + [Dir('include')])
+
+# Set up the POSIX userspace build environment.
+env = envmgr.Create('posix')
+env['CPPPATH'] = Dir('include')
+
+# FIXME: Temporary.
+env['LINKFLAGS'] = '-static -nostdlib'
+env['CCFLAGS'] = '-nostdlib'

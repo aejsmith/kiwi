@@ -862,13 +862,14 @@ MODULE_EXPORT(vfs_node_write);
  * The node is not attached anywhere in the filesystem, and therefore once its
  * reference count reaches 0, it will be immediately destroyed.
  *
+ * @param name		Name to give node.
  * @param memory	Pointer to memory area to use.
  * @param size		Size of memory area.
  * @param nodep		Where to store pointer to created node.
  *
  * @return		0 on success, negative error code on failure.
  */ 
-int vfs_node_create_from_memory(const void *memory, size_t size, vfs_node_t **nodep) {
+int vfs_node_create_from_memory(const char *name, const void *memory, size_t size, vfs_node_t **nodep) {
 	vfs_node_t *node;
 	int ret;
 
@@ -876,7 +877,7 @@ int vfs_node_create_from_memory(const void *memory, size_t size, vfs_node_t **no
 		return -ERR_PARAM_INVAL;
 	}
 
-	node = vfs_node_alloc("[memory]", NULL, MM_SLEEP);
+	node = vfs_node_alloc(name, NULL, MM_SLEEP);
 	node->type = VFS_NODE_REGULAR;
 	node->size = size;
 	node->cache = cache_create(&vfs_cache_ops, node);

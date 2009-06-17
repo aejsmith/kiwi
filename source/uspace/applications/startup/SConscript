@@ -12,4 +12,8 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-SConscript(dirs=['posix'])
+Import('envmgr', 'config')
+
+envmgr['dist']['BOOTAPPS'] += envmgr['posix'].Program('startup', [
+	'main.c',
+])

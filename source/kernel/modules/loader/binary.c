@@ -43,9 +43,9 @@
  * @param node		Node referring to the binary to load.
  * @param args		Arguments to pass to the new process (how these are
  *			passed in, or whether they are passed at all, are
- *			dependent on the subsystem in use).
+ *			dependent on the subsystem in use). This can be NULL.
  * @param environ	Environment variables for the new process (same rules
- *			apply as for arguments).
+ *			apply as for arguments). This can be NULL.
  * @param sem		If this argument is not NULL, it should point to a
  *			semaphore that will be upped if this function is
  *			successful, just before it enters the new program.
@@ -72,3 +72,4 @@ int loader_binary_load(vfs_node_t *node, const char **args, const char **environ
 
 	return -ERR_NOT_IMPLEMENTED;
 }
+MODULE_EXPORT(loader_binary_load);

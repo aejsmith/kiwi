@@ -31,12 +31,15 @@ def iso_image_func(target, source, env):
 	os.makedirs(os.path.join(tmpdir, 'boot', 'grub'))
 	os.makedirs(os.path.join(tmpdir, 'kernel'))
 	os.makedirs(os.path.join(tmpdir, 'modules'))
+	os.makedirs(os.path.join(tmpdir, 'applications'))
 
 	# Copy stuff into it.
 	shutil.copy(os.path.join(grubdir, 'stage2_eltorito'), os.path.join(tmpdir, 'boot', 'grub'))
 	shutil.copy(kernel, os.path.join(tmpdir, 'kernel'))
 	for module in env['MODULES']:
 		shutil.copy(str(module), os.path.join(tmpdir, 'modules'))
+	for app in env['BOOTAPPS']:
+		shutil.copy(str(app), os.path.join(tmpdir, 'applications'))
 
 	# Create the GRUB menu.lst.
 	f = open(os.path.join(tmpdir, 'boot', 'grub', 'menu.lst'), 'w')
@@ -46,6 +49,8 @@ def iso_image_func(target, source, env):
 	f.write('	kernel /kernel/%s\n' % (os.path.basename(kernel)))
 	for module in env['MODULES']:
 		f.write('	module /modules/%s\n' % (os.path.basename(str(module))))
+	for app in env['BOOTAPPS']:
+		f.write('	module /applications/%s\n' % (os.path.basename(str(app))))
 	f.close()
 
 	# Create the ISO.

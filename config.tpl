@@ -73,6 +73,7 @@ Section('Module configuration')
 #######
 
 Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
+Option('LOADER_DEBUG', 'Executable loader debugging output.', False, {'DEBUG': lambda x: x})
 
 #####################################
 # Configuration validation function #

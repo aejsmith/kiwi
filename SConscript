@@ -36,7 +36,7 @@ dist = envmgr.Create('dist')
 SConscript(dirs=['source'])
 
 # Create the ISO image.
-iso = Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL']] + dist['MODULES']))
+iso = Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL']] + dist['MODULES'] + dist['BOOTAPPS']))
 Default(iso)
 
 # Run generated ISO image in QEMU.

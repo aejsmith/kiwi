@@ -18,55 +18,69 @@
  * @brief		Program loader/dynamic linker.
  */
 
+#include <fs/node.h>
+
 #include <proc/process.h>
 #include <proc/thread.h>
 
+#include <bootmod.h>
 #include <fatal.h>
-#include <init.h>
 
 #include "loader_priv.h"
 
-/** Thread to load initial userspace program.
- * @param arg		Pointer to waiting semaphore. */
-static void loader_init_thread(void *arg) {
-	vfs_node_t *node;
+/** Thread to load a binary provided at boot.
+ * @param arg1		Pointer to VFS node for binary.
+ * @param arg2		Pointer to semaphore to up upon successful load. */
+static void loader_bootmod_thread(void *arg1, void *arg2) {
+	semaphore_t *sem = arg2;
+	vfs_node_t *node = arg1;
 	int ret;
 
-	/* TODO: Get path from configuration system. */
-	ret = vfs_node_lookup(NULL, "init", &node);
-	if(ret != 0) {
-		fatal("Could not find initialization program");
-	}
-
-	ret = loader_binary_load(node, NULL, NULL, (semaphore_t *)arg);
-	fatal("Could not load initialization program");
+	ret = loader_binary_load(node, NULL, NULL, sem);
+	fatal("Failed to load binary '%s' (%d)", node->name, ret);
 }
 
-/** Initialization callback to load the initial userspace program.
- * @param data1		First callback data argument (ignored).
- * @param data2		Second callback data argument (ignored). */
-static void loader_load_init(void *data1, void *data2) {
+/** Executable boot module handler.
+ * @param mod		Boot module structure.
+ * @return		1 if loaded, 0 if module valid but cannot be loaded
+ *			yet (dependencies, etc), -1 if module not this type. */
+static int loader_bootmod_handler(bootmod_t *mod) {
 	SEMAPHORE_DECLARE(semaphore, 0);
-	process_t *process;
+	vfs_node_t *node;
 	thread_t *thread;
+	process_t *proc;
 	int ret;
 
-	ret = process_create("init", kernel_proc, PRIORITY_SYSTEM, PROCESS_CRITICAL, NULL, &process);
+	/* Create a node from the module's data. */
+	ret = vfs_node_create_from_memory(mod->name, (const void *)mod->addr, mod->size, &node);
 	if(ret != 0) {
-		fatal("Could not create userspace initialization process");
+		fatal("Could not create VFS node from module data (%d)", ret);
 	}
 
-	ret = thread_create("init", process, 0, loader_init_thread, &semaphore, &thread);
+	/* Attempt to match the node to a type. */
+	if(!loader_type_match(node)) {
+		vfs_node_release(node);
+		return -1;
+	}
+
+	/* Create process to load the binary. Does not require an address space
+	 * to begin with as loader_binary_load() will create one. */
+	ret = process_create(mod->name, kernel_proc, PRIORITY_SYSTEM, PROCESS_NOASPACE, NULL, &proc);
 	if(ret != 0) {
-		fatal("Could not create userspace initialization thread");
+		fatal("Could not create process to load binary (%d)", ret);
+	}
+
+	ret = thread_create(mod->name, proc, 0, loader_bootmod_thread, node, &semaphore, &thread);
+	if(ret != 0) {
+		fatal("Could not create thread to load binary (%d)", ret);
 	}
 	thread_run(thread);
 
-	/* Wait for completion of the process. */
+	/* Wait for the binary to load. The node is released for us by
+	 * loader_binary_load(). */
 	semaphore_down(&semaphore, 0);
+	return 1;
 }
-
-CALLBACK_DECLARE(loader_load_init_callback, loader_load_init, NULL);
 
 /** Program loader initialization function.
  * @return		0 on success, negative error code on failure. */
@@ -76,9 +90,8 @@ static int loader_init(void) {
 		fatal("Could not register built-in executable types");
 	}
 
-	/* Register an initialization callback to load the first userspace
-	 * binary. */
-	callback_add(&init_completion_cb_list, &loader_load_init_callback);
+	/* Register a boot module handler to run binaries. */
+	bootmod_handler_register(loader_bootmod_handler);
 	return 0;
 }
 
