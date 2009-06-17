@@ -40,7 +40,6 @@ class EnvironmentManager(UserDict):
 		self.base['CC'] = self.get_tool_path('gcc')
 		self.base['CXX'] = self.get_tool_path('g++')
 		self.base['AS'] = self.get_tool_path('as')
-		self.base['LINK'] = self.get_tool_path('ld')
 		self.base['OBJDUMP'] = self.get_tool_path('objdump')
 		self.base['READELF'] = self.get_tool_path('readelf')
 		self.base['NM'] = self.get_tool_path('nm')
@@ -59,7 +58,6 @@ class EnvironmentManager(UserDict):
 		self.base['CFLAGS'] = ['-std=gnu99']
 		self.base['CXXFLAGS'] = []
 		self.base['ASFLAGS'] = ['-D__ASM__']
-		self.base['LDFLAGS'] = []
 
 		# Add in extra compilation flags from the configuration.
 		self.base['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()

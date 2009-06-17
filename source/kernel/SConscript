@@ -28,6 +28,8 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 
 # Create the kernel environment.
 env = envmgr.Create('kernel')
+env['LINK']      = envmgr.get_tool_path('ld')
+env['LDFLAGS']   = []
 env['LDSCRIPT']  = File('arch/%s/link.ld' % (config['ARCH']))
 env['CPPPATH']   = [Dir('include')]
 env['CCFLAGS']  += ['-nostdlib', '-nostdinc', '-ffreestanding', 
