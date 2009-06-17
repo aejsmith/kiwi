@@ -44,7 +44,6 @@ env['BUILDERS']['Module'] = Builder(
 SConscript(dirs=subdirs, exports=['env'])
 
 # Set up the module include directory.
-#Execute(Mkdir('modules/include'))
 for (k, v) in env['INCDIRS'].items():
 	Dir('include/%s' % (k)).link(v, 1)
 env['CPPPATH'].append(Dir('include'))
