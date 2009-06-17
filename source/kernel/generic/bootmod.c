@@ -29,14 +29,60 @@
 #include <fatal.h>
 #include <module.h>
 
-/** Array of boot modules. */
-static bootmod_t *bootmod_array;
-static size_t bootmod_count;
+/** Array of modules provided by the bootloader. */
+bootmod_t *bootmod_array;
+
+/** Number of modules in the boot module array. */
+size_t bootmod_count;
+
+/** Array of boot module handlers. */
+static bootmod_handler_t bootmod_handlers[8];
+static size_t bootmod_handler_count = 0;
+
+/** Load a boot kernel module.
+ * @param mod		Pointer to module structure.
+ * @return		1 if loaded, 0 if module valid but cannot be loaded
+ *			yet (dependencies, etc), -1 if module not this type. */
+static int bootmod_kmod_handler(bootmod_t *mod) {
+	char depbuf[MODULE_NAME_MAX + strlen(MODULE_EXTENSION) + 1];
+	bootmod_t *dep;
+	int ret;
+
+	/* Check if this is a kernel module. */
+	if(!module_check(mod->addr, mod->size)) {
+		return -1;
+	}
+
+	/* Try to load the module and all dependencies. */
+	ret = module_load(mod->addr, mod->size, depbuf);
+	if(ret == 0) {
+		return 1;
+	} else if(ret != -ERR_DEP_MISSING) {
+		fatal("Could not load kernel module %s (%d)", mod->name, ret);
+	}
+
+	/* We have a missing dependency, work out its name and check if we have
+	 * it. */
+	strcpy(depbuf + strlen(depbuf), MODULE_EXTENSION);
+	dep = bootmod_lookup(depbuf);
+	if(dep == NULL || !module_check(dep->addr, dep->size)) {
+		fatal("Module %s depends on missing/invalid module %s", mod->name, depbuf);
+	}
+
+	return 0;
+}
 
 /** Find a module in the boot module array.
+ *
+ * Finds a module with the given name in the bood module array. This can be
+ * used by, for example, the kernel module handler to check if a required
+ * dependency actually exists.
+ *
  * @param name		Name to look for.
- * @return		Pointer to module, or NULL if not found. */
-static bootmod_t *bootmod_lookup(const char *name) {
+ *
+ * @return		Pointer to module, or NULL if not found.
+ */
+bootmod_t *bootmod_lookup(const char *name) {
 	size_t i;
 
 	for(i = 0; i < bootmod_count; i++) {
@@ -48,74 +94,85 @@ static bootmod_t *bootmod_lookup(const char *name) {
 	return NULL;
 }
 
-/** Load a boot kernel module and any dependencies.
- * @param mod		Pointer to module structure.
- * @return		True if module was a kernel module, false if not. */
-static bool bootmod_load_kmod(bootmod_t *mod) {
-	char depbuf[MODULE_NAME_MAX + strlen(MODULE_EXTENSION) + 1];
-	bootmod_t *dep;
-	int ret;
-
-	/* Check if this is a kernel module. */
-	if(!module_check(mod->addr, mod->size)) {
-		return false;
+/** Register a boot module handler.
+ *
+ * Registers a handler function for a certain type of boot module.
+ *
+ * @param handler	Handler to register.
+ */
+void bootmod_handler_register(bootmod_handler_t handler) {
+	if(bootmod_handler_count >= 8) {
+		fatal("Too many boot module handlers");
 	}
 
-	/* Try to load the module and all dependencies. */
-	while(true) {
-		ret = module_load(mod->addr, mod->size, depbuf);
-		if(ret == 0) {
-			kprintf(LOG_DEBUG, "bootmod: loaded module %s (addr: 0x%p, size: %u)\n",
-				mod->name, mod->addr, mod->size);
-			mod->loaded = true;
-			return true;
-		} else if(ret != -ERR_DEP_MISSING) {
-			fatal("Could not load module %s: %d", mod->name, ret);
-		}
-
-		/* We have a missing dependency, work out its name, check if
-		 * we have it and attempt to load it. */
-		strcpy(depbuf + strlen(depbuf), MODULE_EXTENSION);
-		dep = bootmod_lookup(depbuf);
-		if(dep == NULL) {
-			fatal("Module %s depends on missing module %s", mod->name, depbuf);
-		}
-
-		/* Attempt to load the dependency. Recursion! */
-		if(!bootmod_load_kmod(dep)) {
-			fatal("Dependency %s of %s is not a kernel module", depbuf, mod->name);
-		}
-	}
+	bootmod_handlers[bootmod_handler_count++] = handler;
 }
 
-/** Load all kernel modules provided at boot. */
+/** Load all modules provided by the bootloader.
+ *
+ * Loads all modules provided by the bootloader. By the time this function
+ * is called, the architecture or platform should have set the array pointer
+ * and module count. This function keeps on looping over modules that it is
+ * provided, attempting to load anything that hasn't already been succesfully
+ * loaded, until it can do no more. This lets two things happen: first, it
+ * allows kernel modules to be loaded in dependency order. Secondly, it lets
+ * kernel modules register handlers for other types of modules that may be
+ * passed to the kernel, and ensures these handlers will get called on things
+ * that haven't been loaded.
+ */
 void bootmod_load(void) {
-	size_t i;
+	size_t i, j, count;
+	int ret;
 
-	/* Ask the architecture/platform to give us all the modules it has. */
-	bootmod_count = bootmod_get(&bootmod_array);
+	/* Check that we have any modules. The kernel cannot do anything
+	 * without modules, so there must be some. */
 	if(bootmod_count == 0) {
 		fatal("No modules were provided, cannot continue");
 	}
 
-	/* Load all the modules. */
-	for(i = 0; i < bootmod_count; i++) {
-		/* Ignore already loaded modules (may be already loaded due
-		 * to dependency loading for another module). */
-		if(bootmod_array[i].loaded) {
-			continue;
+	/* Add the kernel module handler. */
+	bootmod_handler_register(bootmod_kmod_handler);
+
+	/* Keep on looping over the modules we have until nothing else can be
+	 * done. */
+	while(true) {
+		count = 0;
+
+		/* Loop through all modules that haven't been loaded. */
+		for(i = 0; i < bootmod_count; i++) {
+			if(bootmod_array[i].loaded) {
+				continue;
+			}
+
+			/* For each handler check if we can do something. */
+			for(j = 0; j < bootmod_handler_count; j++) {
+				ret = bootmod_handlers[j](&bootmod_array[i]);
+				if(ret == 1) {
+					kprintf(LOG_DEBUG, "bootmod: loaded module %s (addr: 0x%p, size: %u)\n",
+					        bootmod_array[i].name, bootmod_array[i].addr,
+					        bootmod_array[i].size);
+					bootmod_array[i].loaded = true;
+					count++;
+					break;
+				} else if(ret == 0) {
+					break;
+				}
+			}
 		}
 
-		/* First check if this is a kernel module. */
-		if(bootmod_load_kmod(&bootmod_array[i])) {
-			continue;
-		} else {
-			fatal("Unknown module: %s", bootmod_array[i].name);
+		/* If nothing was done in this iteration, we can finish now. */
+		if(count == 0) {
+			break;
 		}
 	}
 
+
 	/* Free the data for the modules. */
 	for(i = 0; i < bootmod_count; i++) {
+		if(!bootmod_array[i].loaded) {
+			kprintf(LOG_NORMAL, "bootmod: warning: module %s was not handled\n",
+			        bootmod_array[i].name);
+		}
 		kfree(bootmod_array[i].name);
 		kfree(bootmod_array[i].addr);
 	}

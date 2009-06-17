@@ -23,9 +23,6 @@
 
 #include <types.h>
 
-/** Filename extension of kernel modules. */
-#define MODULE_EXTENSION	".mod"
-
 /** Structure defining a module loaded at boot-time. */
 typedef struct bootmod {
 	char *name;		/**< Name of the module. */
@@ -34,8 +31,17 @@ typedef struct bootmod {
 	bool loaded;		/**< Whether the module has been loaded. */
 } bootmod_t;
 
-extern size_t bootmod_get(bootmod_t **arrp);
+/** Boot module handler function.
+ * @param mod		Module to load.
+ * @return		1 if loaded, 0 if module valid but cannot be loaded
+ *			yet (dependencies, etc), -1 if module not this type. */
+typedef int (*bootmod_handler_t)(bootmod_t *mod);
 
+extern bootmod_t *bootmod_array;
+extern size_t bootmod_count;
+
+extern bootmod_t *bootmod_lookup(const char *name);
+extern void bootmod_handler_register(bootmod_handler_t handler);
 extern void bootmod_load(void);
 
 #endif /* __BOOTMOD_H */

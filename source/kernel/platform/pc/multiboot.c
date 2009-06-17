@@ -52,10 +52,6 @@ extern char __init_start[], __init_end[], __end[];
 /** Pointer to Multiboot information structure. */
 static multiboot_info_t *mb_info;
 
-/** Multiboot module information. */
-static bootmod_t *mb_modules;
-static size_t mb_module_count;
-
 /** Populate the PMM with memory regions.
  *
  * Uses the memory map provided by the bootloader to set up the physical
@@ -144,20 +140,6 @@ void pmm_populate(void) {
 	}
 }
 
-/** Get an array of boot modules.
- *
- * Gets an array of structures representing each module provided by the
- * bootloader to the kernel. The returned array should be freed with kfree().
- *
- * @param arrp		Where to store pointer to module array.
- *
- * @return		Number of modules in array.
- */
-size_t bootmod_get(bootmod_t **arrp) {
-	*arrp = mb_modules;
-	return mb_module_count;
-}
-
 /** Check and store Multiboot information.
  *
  * Checks the provided Multiboot information structure and stores a pointer
@@ -193,9 +175,9 @@ void multiboot_postmm_init(void) {
 
 	/* Save a copy of all modules - convert multiboot_module_t
 	 * structures to bootmod_t. */
-	mb_module_count = mb_info->mods_count;
-	mb_modules = kcalloc(mb_module_count, sizeof(bootmod_t), MM_FATAL);
-	for(i = 0; i < mb_module_count; i++) {
+	bootmod_count = mb_info->mods_count;
+	bootmod_array = kcalloc(bootmod_count, sizeof(bootmod_t), MM_FATAL);
+	for(i = 0; i < bootmod_count; i++) {
 		/* We only want the base name, take off any path strings. */
 		name = strrchr((char *)((ptr_t)mods[i].string), '/');
 		if(name == NULL) {
@@ -210,8 +192,8 @@ void multiboot_postmm_init(void) {
 		strsep(&tmp, " ");
 
 		/* Duplicate the name string and the module data. */
-		mb_modules[i].name = kstrdup(name, MM_FATAL);
-		mb_modules[i].size = mods[i].mod_end - mods[i].mod_start;
-		mb_modules[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start), mb_modules[i].size, MM_FATAL);
+		bootmod_array[i].name = kstrdup(name, MM_FATAL);
+		bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
+		bootmod_array[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start), bootmod_array[i].size, MM_FATAL);
 	}
 }

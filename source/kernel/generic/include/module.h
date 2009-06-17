@@ -27,6 +27,9 @@
 #include <elf.h>
 #include <symbol.h>
 
+/** Filename extension of kernel modules. */
+#define MODULE_EXTENSION	".mod"
+
 /** Maximum length of a module name. */
 #define MODULE_NAME_MAX		16
 
