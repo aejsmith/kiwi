@@ -753,6 +753,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	assert(!(base % quantum));
 	assert(!(size % quantum));
 	assert(!(qcache_max % quantum));
+	assert(source != vmem);
 
 	/* Impose a limit on the number of quantum caches. */
 	if(qcache_max > (quantum * VMEM_QCACHE_MAX)) {
