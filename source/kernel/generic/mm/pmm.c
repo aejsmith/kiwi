@@ -31,7 +31,7 @@
 #include <assert.h>
 #include <fatal.h>
 
-#if CONFIG_PAGE_DEBUG
+#if CONFIG_PMM_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
