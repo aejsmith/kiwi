@@ -42,9 +42,7 @@
  *
  * An address space is a higher-level system built on top of a page map. The
  * page map is used to perform the actual mapping of virtual addresses to
- * physical address provided by the various address space backends. It also
- * handles the TLB, so none of this code has to deal with maintaining TLB
- * consistency.
+ * physical addresses provided by the various address space backends.
  */
 
 #include <arch/memmap.h>
@@ -285,10 +283,13 @@ static void aspace_region_split(aspace_t *as, aspace_region_t *region, ptr_t end
  * @param as		Address space region belongs to.
  * @param region	Region to destroy. */
 static void aspace_region_destroy(aspace_t *as, aspace_region_t *region) {
-	aspace_region_unmap(as, region, region->start, region->end);
+	if(!(region->flags & AS_REGION_RESERVED)) {
+		aspace_region_unmap(as, region, region->start, region->end);
+	}
+
 	avltree_remove(&as->regions, region->start);
 
-	if(refcount_dec(&region->source->count) == 0) {
+	if(region->source && refcount_dec(&region->source->count) == 0) {
 		if(region->source->backend->destroy) {
 			region->source->backend->destroy(region->source);
 		}
