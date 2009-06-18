@@ -35,6 +35,8 @@ typedef Elf64_Ehdr elf_ehdr_t;		/**< ELF executable header. */
 typedef Elf64_Phdr elf_phdr_t;		/**< ELF program header. */
 typedef Elf64_Shdr elf_shdr_t;		/**< ELF section header. */
 typedef Elf64_Sym  elf_sym_t;		/**< ELF symbol structure. */
+typedef Elf64_Auxv elf_auxv_t;		/**< ELF auxilary information structure. */
+typedef Elf64_Note elf_note_t;		/**< ELF note structure. */
 typedef Elf64_Addr elf_addr_t;		/**< ELF address type. */
 
 #endif /* __ARCH_ELF_H */

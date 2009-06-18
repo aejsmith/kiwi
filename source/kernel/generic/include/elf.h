@@ -46,6 +46,12 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_MAG2		'L'		/**< Magic number byte 2. */
 #define ELF_MAG3		'F'		/**< Magic number byte 3. */
 
+/** Identification array indices. */
+#define ELF_EI_CLASS		4		/**< Class. */
+#define ELF_EI_DATA		5		/**< Data encoding. */
+#define ELF_EI_VERSION		6		/**< Version. */
+#define ELF_EI_OSABI		7		/**< OS/ABI. */
+
 /** ELF types. */
 #define ELF_ET_NONE		0		/**< No ﬁle type. */
 #define ELF_ET_REL		1		/**< Relocatable object ﬁle. */
@@ -429,7 +435,7 @@ typedef struct {
 	Elf32_Word n_namesz;			/**< Length of the note's name. */
 	Elf32_Word n_descsz;			/**< Length of the note's descriptor. */
 	Elf32_Word n_type;			/**< Type of the note. */
-} __packed Elf32_Nhdr;
+} __packed Elf32_Note;
 
 /*
  * ELF64 structures
@@ -523,7 +529,7 @@ typedef struct {
 	Elf64_Word n_namesz;			/**< Length of the note's name. */
 	Elf64_Word n_descsz;			/**< Length of the note's descriptor. */
 	Elf64_Word n_type;			/**< Type of the note. */
-} __packed Elf64_Nhdr;
+} __packed Elf64_Note;
 
 /** Pull in architecture definitions of the types to use. */
 #include <arch/elf.h>
@@ -550,12 +556,13 @@ static inline bool elf_check(void *image, size_t size, int type) {
 	/* Check the magic number and version. */
 	if(strncmp((const char *)ehdr->e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
 		return false;
-	} else if(ehdr->e_ident[6] != 1 || ehdr->e_version != 1) {
+	} else if(ehdr->e_ident[ELF_EI_VERSION] != 1 || ehdr->e_version != 1) {
 		return false;
 	}
 
 	/* Check whether it matches the architecture we're running on. */
-	if(ehdr->e_ident[4] != ELF_CLASS || ehdr->e_ident[5] != ELF_ENDIAN || ehdr->e_machine != ELF_MACHINE) {
+	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS || ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
+	   ehdr->e_machine != ELF_MACHINE) {
 		return false;
 	}
 
