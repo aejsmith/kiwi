@@ -52,6 +52,7 @@ Choice('X86_SERIAL_PORT', 'Serial port to use for log output.', (
 	(4, 'COM4.'),
 ), 1)
 Option('X86_NX', 'Use No-Execute/Execute-Disable support.', True)
+Option('X86_OPTIM_STR', 'Use optimized string functions.', True)
 
 #######
 Section('Kernel debug output')
@@ -90,6 +91,7 @@ def PostConfigFunc(config):
 			config['ARCH_64BIT'] = True
 
 		config['ARCH_LITTLE_ENDIAN'] = True
-		config['ARCH_HAS_MEMCPY'] = True
-		config['ARCH_HAS_MEMSET'] = True
-		config['ARCH_HAS_MEMMOVE'] = True
+		if config['X86_OPTIM_STR']:
+			config['ARCH_HAS_MEMCPY'] = True
+			config['ARCH_HAS_MEMSET'] = True
+			config['ARCH_HAS_MEMMOVE'] = True

@@ -28,5 +28,7 @@ env['OBJFILES'] += [
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),
 	env.Object('smp.c'),
-	env.Object('string.c'),
 ]
+
+if config['X86_OPTIM_STR']:
+	env['OBJFILES'].append(env.Object('string.c'))
