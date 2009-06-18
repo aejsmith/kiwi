@@ -291,11 +291,7 @@ static void aspace_region_destroy(aspace_t *as, aspace_region_t *region) {
 	avltree_remove(&as->regions, region->start);
 
 	if(region->source && refcount_dec(&region->source->count) == 0) {
-		if(region->source->backend->destroy) {
-			region->source->backend->destroy(region->source);
-		}
-		kfree(region->source->name);
-		slab_cache_free(aspace_source_cache, region->source);
+		aspace_source_destroy(region->source);
 	}
 
 	if(region == as->find_cache) {
@@ -443,6 +439,23 @@ aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag) {
 	refcount_set(&source->count, 0);
 	source->flags = flags;
 	return source;
+}
+
+/** Destroy an address space source structure.
+ *
+ * Destroys an address space source structure. Its reference count should be
+ * zero.
+ *
+ * @param source	Source to destroy.
+ */
+void aspace_source_destroy(aspace_source_t *source) {
+	assert(refcount_get(&source->count) == 0);
+
+	if(source->backend->destroy) {
+		source->backend->destroy(source);
+	}
+	kfree(source->name);
+	slab_cache_free(aspace_source_cache, source);
 }
 
 /** Allocate space in an address space.

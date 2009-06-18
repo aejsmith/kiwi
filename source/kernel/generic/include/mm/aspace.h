@@ -134,6 +134,7 @@ extern int aspace_arch_create(aspace_t *as);
 
 /** Helper functions. */
 extern aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag);
+extern void aspace_source_destroy(aspace_source_t *source);
 
 /** Anonymous backend functions. */
 extern int aspace_anon_create(int flags, aspace_source_t **sourcep);
