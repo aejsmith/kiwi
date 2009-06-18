@@ -39,6 +39,8 @@ typedef struct cache_ops {
 	int (*get_page)(struct cache *cache, offset_t offset, phys_ptr_t *addrp);
 
 	/** Flush changes to a page to the source.
+	 * @note		If this operation is not provided, then it is
+	 *			assumed there is no source to flush to.
 	 * @param cache		Cache that the page is in.
 	 * @param page		Address of page to flush.
 	 * @param offset	Offset of page in data source.

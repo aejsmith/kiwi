@@ -894,3 +894,187 @@ int vfs_node_create_from_memory(const char *name, const void *memory, size_t siz
 	return 0;
 }
 MODULE_EXPORT(vfs_node_create_from_memory);
+
+/*
+ * Address space backends.
+ */
+
+/** Get a missing page from a private VFS cache.
+ * @param cache		Cache to get page from.
+ * @param offset	Offset of page in data source.
+ * @param addrp		Where to store address of page obtained.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_aspace_private_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
+	vfs_node_t *node = cache->data;
+	void *source, *dest;
+	phys_ptr_t page;
+	int ret;
+
+	/* Get the source page from the node's cache. */
+	ret = vfs_node_page_get(node, offset, &source);
+	if(ret != 0) {
+		return ret;
+	}
+
+	/* Allocate a page, map it in and copy the data across. */
+	page = pmm_alloc(1, MM_SLEEP);
+	dest = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
+	memcpy(dest, source, PAGE_SIZE);
+	page_phys_unmap(dest, PAGE_SIZE);
+	vfs_node_page_release(node, source, offset, false);
+
+	*addrp = page;
+	return 0;
+}
+
+/** Free a page from a private VFS cache.
+ * @param cache		Cache that the page is in.
+ * @param page		Address of page to free.
+ * @param offset	Offset of page in data source. */
+static void vfs_aspace_private_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
+	pmm_free(page, 1);
+}
+
+/** Clean up any data associated with a private VFS cache.
+ * @param cache		Cache being destroyed. */
+static void vfs_aspace_private_cache_destroy(cache_t *cache) {
+	vfs_node_release(cache->data);
+}
+
+/** VFS private page cache operations. */
+static cache_ops_t vfs_aspace_private_cache_ops = {
+	.get_page = vfs_aspace_private_cache_get_page,
+	.free_page = vfs_aspace_private_cache_free_page,
+	.destroy = vfs_aspace_private_cache_destroy,
+};
+
+/** Get a page from a private VFS source.
+ * @param source	Source to get page from.
+ * @param offset	Offset into the source.
+ * @param addrp		Where to store address of page.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_aspace_private_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
+	return cache_get(source->data, offset, addrp);
+}
+
+/** Release a page in a private VFS source.
+ * @param source	Source to release page in.
+ * @param offset	Offset into the source.
+ * @return		Pointer to page allocated, or NULL on failure. */
+static void vfs_aspace_private_release(aspace_source_t *source, offset_t offset) {
+	cache_release(source->data, offset, true);
+}
+
+/** Destroy data in a private VFS source.
+ * @param source	Source to destroy. */
+static void vfs_aspace_private_destroy(aspace_source_t *source) {
+	if(cache_destroy(source->data) != 0) {
+		/* Shouldn't happen as we don't do any page flushing. */
+		fatal("Failed to destroy private VFS cache");
+	}
+}
+
+/** VFS private address space backend structure. */
+static aspace_backend_t vfs_aspace_private_backend = {
+	.get = vfs_aspace_private_get,
+	.release = vfs_aspace_private_release,
+	.destroy = vfs_aspace_private_destroy,
+};
+
+/** Check whether a source can be mapped using the given parameters.
+ * @param source	Source being mapped.
+ * @param offset	Offset of the mapping in the source.
+ * @param size		Size of the mapping.
+ * @param flags		Flags the mapping is being created with.
+ * @return		0 if mapping allowed, negative error code explaining
+ *			why it is not allowed if not. */
+static int vfs_aspace_shared_map(aspace_source_t *source, offset_t offset, size_t size, int flags) {
+	vfs_node_t *node = source->data;
+
+	if(flags & AS_REGION_WRITE && node->mount->flags & VFS_MOUNT_RDONLY) {
+		return -ERR_OBJ_READ_ONLY;
+	}
+
+	return 0;
+}
+
+/** Get a page from a shared VFS source.
+ * @param source	Source to get page from.
+ * @param offset	Offset into the source.
+ * @param addrp		Where to store address of page.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_aspace_shared_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
+	vfs_node_t *node = source->data;
+
+	assert(node->cache);
+	return cache_get(node->cache, offset, addrp);
+}
+
+/** Release a page in a shared VFS source.
+ * @param source	Source to release page in.
+ * @param offset	Offset into the source.
+ * @return		Pointer to page allocated, or NULL on failure. */
+static void vfs_aspace_shared_release(aspace_source_t *source, offset_t offset) {
+	vfs_node_t *node = source->data;
+
+	assert(node->cache);
+	cache_release(node->cache, offset, true);
+}
+
+/** Destroy data in a shared VFS source.
+ * @param source	Source to destroy. */
+static void vfs_aspace_shared_destroy(aspace_source_t *source) {
+	vfs_node_release(source->data);
+}
+
+/** VFS shared address space backend structure. */
+static aspace_backend_t vfs_aspace_shared_backend = {
+	.map = vfs_aspace_shared_map,
+	.get = vfs_aspace_shared_get,
+	.release = vfs_aspace_shared_release,
+	.destroy = vfs_aspace_shared_destroy,
+};
+
+/** Create an address space source for a VFS node.
+ *
+ * Creates an address space source for a VFS node. If the AS_SOURCE_PRIVATE
+ * flag is specified, modifications made to pages from the source will not be
+ * propagated to other sources for the node, or to the file itself. Otherwise,
+ * modifications made to pages from the source will be propagated back to the
+ * file and other non-private sources.
+ *
+ * @param node		Node to create source for.
+ * @param flags		Behaviour flags for the source.
+ * @param sourcep	Where to store pointer to source.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_node_aspace_create(vfs_node_t *node, int flags, aspace_source_t **sourcep) {
+	aspace_source_t *source;
+
+	if(!node || !sourcep) {
+		return -ERR_PARAM_INVAL;
+	} else if(node->type != VFS_NODE_REGULAR) {
+		return -ERR_OBJ_TYPE_INVAL;
+	}
+
+	/* Node should have a cache if it is a regular file. */
+	assert(node->cache);
+
+	/* Reference the node to ensure it does not get freed while the
+	 * source is in existence. */
+	vfs_node_get(node);
+
+	source = aspace_source_alloc(node->name, flags, MM_SLEEP);
+	if(flags & AS_SOURCE_PRIVATE) {
+		source->backend = &vfs_aspace_private_backend;
+		source->data = cache_create(&vfs_aspace_private_cache_ops, node);
+	} else {
+		source->backend = &vfs_aspace_shared_backend;
+		source->data = node;
+	}
+
+	*sourcep = source;
+	return 0;
+}
+MODULE_EXPORT(vfs_node_aspace_create);

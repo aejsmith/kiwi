@@ -71,6 +71,7 @@ typedef struct aspace_source {
 	void *data;			/**< Data for the backend. */
 	refcount_t count;		/**< Count of regions using the source. */
 	char *name;			/**< Name of the source. */
+	int flags;			/**< Behaviour flags for the source. */
 } aspace_source_t;
 
 /** Address space region structure. */
@@ -103,8 +104,10 @@ typedef struct aspace {
 #define AS_REGION_READ		(1<<0)	/**< Mapping should be readable. */
 #define AS_REGION_WRITE		(1<<1)	/**< Mapping should be writable. */
 #define AS_REGION_EXEC		(1<<2)	/**< Mapping should be executable. */
-#define AS_REGION_PRIVATE	(1<<3)	/**< Mapping should be private and never shared. */
-#define AS_REGION_RESERVED	(1<<4)	/**< Region is reserved and should never be allocated. */
+#define AS_REGION_RESERVED	(1<<3)	/**< Region is reserved and should never be allocated. */
+
+/** Address space source flags. */
+#define AS_SOURCE_PRIVATE	(1<<0)	/**< Source should be private and never shared between address spaces. */
 
 /** Page fault reason codes. */
 #define PF_REASON_NPRES		1	/**< Fault caused by a not present page. */
@@ -130,10 +133,10 @@ typedef struct aspace {
 extern int aspace_arch_create(aspace_t *as);
 
 /** Helper functions. */
-extern aspace_source_t *aspace_source_alloc(const char *name);
+extern aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag);
 
 /** Anonymous backend functions. */
-extern int aspace_anon_create(aspace_source_t **sourcep);
+extern int aspace_anon_create(int flags, aspace_source_t **sourcep);
 
 /** Address space manipulation functions. */
 extern int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, offset_t offset, ptr_t *addrp);

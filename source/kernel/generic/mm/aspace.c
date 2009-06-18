@@ -419,16 +419,29 @@ static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
  * it.
  *
  * @param name		Name for the source.
+ * @param flags		Behaviour flags for the source.
+ * @param mmflag	Allocation flags to use.
  *
  * @return		Pointer to source.
  */
-aspace_source_t *aspace_source_alloc(const char *name) {
-	aspace_source_t *source = slab_cache_alloc(aspace_source_cache, MM_SLEEP);
+aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag) {
+	aspace_source_t *source;
 
 	assert(name);
 
-	source->name = kstrdup(name, MM_SLEEP);
+	source = slab_cache_alloc(aspace_source_cache, mmflag);
+	if(!source) {
+		return NULL;
+	}
+
+	source->name = kstrdup(name, mmflag);
+	if(!source->name) {
+		slab_cache_free(aspace_source_cache, source);
+		return NULL;
+	}
+
 	refcount_set(&source->count, 0);
+	source->flags = flags;
 	return source;
 }
 

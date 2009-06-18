@@ -23,6 +23,8 @@
 
 #include <fs/mount.h>
 
+#include <mm/aspace.h>
+
 #include <sync/mutex.h>
 
 #include <types/radix.h>
@@ -78,5 +80,7 @@ extern int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t 
 extern int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t offset, size_t *bytesp);
 
 extern int vfs_node_create_from_memory(const char *name, const void *memory, size_t size, vfs_node_t **nodep);
+
+extern int vfs_node_aspace_create(vfs_node_t *node, int flags, aspace_source_t **sourcep);
 
 #endif /* __FS_NODE_H */

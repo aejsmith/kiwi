@@ -61,7 +61,7 @@ static int aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t 
 }
 
 /** Release a page in an anonymous source.
- * @param source	Source to get page from.
+ * @param source	Source to release page in.
  * @param offset	Offset into the source.
  * @return		Pointer to page allocated, or NULL on failure. */
 static void aspace_anon_release(aspace_source_t *source, offset_t offset) {
@@ -89,18 +89,19 @@ static aspace_backend_t aspace_anon_backend = {
  * Creates a new anonymous page source to use to back an address space region.
  * The structure returned can be passed to aspace_insert() and aspace_alloc().
  *
+ * @param flags		Behaviour flags for the source.
  * @param sourcep	Where to store pointer to source structure.
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_anon_create(aspace_source_t **sourcep) {
+int aspace_anon_create(int flags, aspace_source_t **sourcep) {
 	aspace_source_t *source;
 
 	if(!sourcep) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	source = aspace_source_alloc("[anon]");
+	source = aspace_source_alloc("[anon]", flags, MM_SLEEP);
 	source->backend = &aspace_anon_backend;
 	source->data = cache_create(&aspace_anon_cache_ops, NULL);
 
