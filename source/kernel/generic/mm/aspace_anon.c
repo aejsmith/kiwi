@@ -94,13 +94,15 @@ static aspace_backend_t aspace_anon_backend = {
  * @return		0 on success, negative error code on failure.
  */
 int aspace_anon_create(aspace_source_t **sourcep) {
-	aspace_source_t *source = aspace_source_alloc("[anon]");
+	aspace_source_t *source;
 
-	assert(sourcep);
+	if(!sourcep) {
+		return -ERR_PARAM_INVAL;
+	}
 
+	source = aspace_source_alloc("[anon]");
 	source->backend = &aspace_anon_backend;
 	source->data = cache_create(&aspace_anon_cache_ops, NULL);
-	source->offset = 0;
 
 	*sourcep = source;
 	return 0;

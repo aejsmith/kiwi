@@ -36,14 +36,20 @@ struct aspace_source;
 
 /** Address space region backend structure. */
 typedef struct aspace_backend {
-	/** Get a page from the given source. Multiple calls to this function
-	 * should return the same page each time.
+	/** Check whether a source can be mapped using the given parameters.
+	 * @param source	Source being mapped.
+	 * @param offset	Offset of the mapping in the source.
+	 * @param size		Size of the mapping.
+	 * @param flags		Flags the mapping is being created with.
+	 * @return		0 if mapping allowed, negative error code
+	 *			explaining why it is not allowed if not. */
+	int (*map)(struct aspace_source *source, offset_t offset, size_t size, int flags);
+
+	/** Get a page from the given source.
 	 * @param source	Source to get page from.
-	 * @param offset	Offset to get page from (computed by combining
-	 *			3 offsets - the offset into the region the
-	 *			fault occurred at, the offset of the region
-	 *			into its source, and the offset specified in
-	 *			the source).
+	 * @param offset	Offset to get page from (the offset into the
+	 *			region the fault occurred at, plus the offset
+	 *			of the region into its source).
 	 * @param addrp		Where to store address of page obtained.
 	 * @return		0 on success, negative error code on failure. */
 	int (*get)(struct aspace_source *source, offset_t offset, phys_ptr_t *addrp);
@@ -63,7 +69,6 @@ typedef struct aspace_backend {
 typedef struct aspace_source {
 	aspace_backend_t *backend;	/**< Backend for the region. */
 	void *data;			/**< Data for the backend. */
-	offset_t offset;		/**< Offset into the data source. */
 	refcount_t count;		/**< Count of regions using the source. */
 	char *name;			/**< Name of the source. */
 } aspace_source_t;
@@ -131,8 +136,8 @@ extern aspace_source_t *aspace_source_alloc(const char *name);
 extern int aspace_anon_create(aspace_source_t **sourcep);
 
 /** Address space manipulation functions. */
-extern int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, ptr_t *addrp);
-extern int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source);
+extern int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, offset_t offset, ptr_t *addrp);
+extern int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source, offset_t offset);
 extern int aspace_free(aspace_t *as, ptr_t start, size_t size);
 
 /** Core functions. */

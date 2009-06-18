@@ -20,16 +20,14 @@
  * The address space manager handles the creation and manipulation of
  * per-process address spaces. An address space is made up of several parts:
  *
- * At the top level, there is collection of mapped/reserved memory regions.
+ * At the top level, there is a collection of mapped/reserved memory regions.
  * These represent the memory mappings within the address space. Underneath
  * a mapped region is a page source. A page source can be shared between
- * mulitple regions (sharing occurs when a region has to be split for whatever
- * reason). It can also be shared across address spaces when cloning an address
- * space if a mapping using it is mapped as shared. A page source has a backend
- * behind it that is used to actually get pages. This backend can be a cache,
- * physical memory, etc. The backend part was introduced rather than using a
- * cache directly to facilitate physical memory mappings - use of a cache here
- * would be pointless.
+ * mulitple regions - sharing occurs implicitly when a region has to be split
+ * for whatever reason. It can also be shared across address spaces when
+ * cloning an address space if a mapping using it is mapped as shared. A page
+ * source has a backend behind it that is used to actually get pages. This
+ * backend can be a cache, physical memory, etc.
  *
  * A page source backend has 2 main operations: Get and Release. The Get
  * operation is used to get a page for a region when a fault occurs on it.
@@ -38,7 +36,10 @@
  * a pointer to the page structure itself. This is to prevent the need for
  * regions to track pages that have been mapped into them. It is up to the
  * backend to find the page corresponding to the offset and decrease its
- * reference count or whatever it needs to do.
+ * reference count or whatever it needs to do. A page source backend also
+ * has a few other operations, for example the Map operation that is called
+ * whenever a source using the backend is mapped into an address space, to
+ * ensure that the protection flags are valid, etc.
  *
  * An address space is a higher-level system built on top of a page map. The
  * page map is used to perform the actual mapping of virtual addresses to
@@ -111,13 +112,14 @@ static int aspace_flags_to_page(int flags) {
 /** Create a new address space region structure.
  * @param flags		Flags for the region.
  * @param source	Page source for the region.
+ * @param offset	Offset into the source.
  * @return		Pointer to region structure. */
-static aspace_region_t *aspace_region_create(int flags, aspace_source_t *source) {
+static aspace_region_t *aspace_region_create(int flags, aspace_source_t *source, offset_t offset) {
 	aspace_region_t *region = slab_cache_alloc(aspace_region_cache, MM_SLEEP);
 
 	region->flags = flags;
 	region->source = source;
-	region->offset = 0;
+	region->offset = offset;
 
 	return region;
 }
@@ -200,7 +202,7 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 		}
 
 		/* Release the page just unmapped. */
-		offset = (offset_t)(addr - region->start) + region->offset + region->source->offset;
+		offset = (offset_t)(addr - region->start) + region->offset;
 		region->source->backend->release(region->source, offset);
 	}
 
@@ -263,10 +265,9 @@ static void aspace_region_split(aspace_t *as, aspace_region_t *region, ptr_t end
 	refcount_inc(&region->source->count);
 
 	/* Create the split region. */
-	split = aspace_region_create(region->flags, region->source);
+	split = aspace_region_create(region->flags, region->source, region->offset + (start - region->start));
 	split->start = start;
 	split->end = region->end; 
-	split->offset = region->offset + (start - region->start);
 
 	/* Unmap the gap between the regions if necessary. */
 	if(end != start) {
@@ -442,12 +443,14 @@ aspace_source_t *aspace_source_alloc(const char *name) {
  *			the system page size).
  * @param flags		Protection/behaviour flags for the region.
  * @param source	Page source to use for the region.
+ * @param offset	Offset in the source the region should point to.
  * @param addrp		Where to store address allocated.
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, ptr_t *addrp) {
+int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, offset_t offset, ptr_t *addrp) {
 	aspace_region_t *region;
+	int ret;
 
 	if(flags & AS_REGION_RESERVED || source == NULL || addrp == NULL) {
 		return -ERR_PARAM_INVAL;
@@ -455,8 +458,16 @@ int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, 
 		return -ERR_PARAM_INVAL;
 	}
 
+	/* Check if the source allows what we've been given. */
+	if(source->backend->map) {
+		ret = source->backend->map(source, offset, size, flags);
+		if(ret != 0) {
+			return ret;
+		}
+	}
+
 	/* Create the region structure and fill it in. */
-	region = aspace_region_create(flags, source);
+	region = aspace_region_create(flags, source, offset);
 
 	mutex_lock(&as->lock, 0);
 
@@ -500,7 +511,7 @@ int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, 
  *
  * Creates a new region with the given backend and inserts it into an address
  * space at the location specified. If AS_REGION_RESERVED is specified, a
- * backend is not required.
+ * source should not be given.
  *
  * @param as		Address space to insert into.
  * @param start		Address to insert region at (must be a multiple of the
@@ -509,13 +520,17 @@ int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, 
  *			system page size).
  * @param flags		Protection/behaviour flags for the region.
  * @param source	Page source to use for the region.
+ * @param offset	Offset in the source the region should point to.
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source) {
+int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source, offset_t offset) {
 	aspace_region_t *region;
+	int ret;
 
 	if(!(flags & AS_REGION_RESERVED) && source == NULL) {
+		return -ERR_PARAM_INVAL;
+	} else if(flags & AS_REGION_RESERVED && source) {
 		return -ERR_PARAM_INVAL;
 	} else if(start % PAGE_SIZE || size % PAGE_SIZE) {
 		return -ERR_PARAM_INVAL;
@@ -523,8 +538,16 @@ int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_sour
 		return -ERR_PARAM_INVAL;
 	}
 
+	/* Check if the source allows what we've been given. */
+	if(source && source->backend->map) {
+		ret = source->backend->map(source, offset, size, flags);
+		if(ret != 0) {
+			return ret;
+		}
+	}
+
 	/* Create the region structure and fill it in. */
-	region = aspace_region_create(flags, source);
+	region = aspace_region_create(flags, source, offset);
 	region->start = start;
 	region->end = start + size;
 
@@ -639,7 +662,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Work out the offset to pass into the fault handler. */
-	offset = (offset_t)((addr & PAGE_MASK) - region->start) + region->offset + region->source->offset;
+	offset = (offset_t)((addr & PAGE_MASK) - region->start) + region->offset;
 
 	/* Get the page from the source. */
 	ret = region->source->backend->get(region->source, offset, &page);

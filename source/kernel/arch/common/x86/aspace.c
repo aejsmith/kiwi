@@ -32,7 +32,7 @@
 int aspace_arch_create(aspace_t *as) {
 	int ret;
 
-	if((ret = aspace_insert(as, 0x0, PAGE_SIZE, AS_REGION_RESERVED, NULL)) != 0) {
+	if((ret = aspace_insert(as, 0x0, PAGE_SIZE, AS_REGION_RESERVED, NULL, 0)) != 0) {
 		return ret;
 	}
 
