@@ -165,6 +165,7 @@ int vfs_node_free(vfs_node_t *node, bool destroy) {
 		node->name = NULL;
 	}
 
+	mutex_unlock(&node->lock);
 	slab_cache_free(vfs_node_cache, node);
 	return 0;
 }

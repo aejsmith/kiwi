@@ -239,6 +239,7 @@ int cache_destroy(cache_t *cache) {
 	list_remove(&cache->header);
 	mutex_unlock(&cache_list_lock);
 
+	mutex_unlock(&cache->lock);
 	slab_cache_free(cache_cache, cache);
 	return 0;
 }
