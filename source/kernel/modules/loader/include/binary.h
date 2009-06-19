@@ -42,10 +42,10 @@ typedef struct loader_binary {
 	ptr_t entry;			/**< Entry point for the binary. */
 	subsystem_t *subsystem;		/**< Subsystem the binary will run under. */
 
-	const char **args;		/**< Argument array. */
-	const char **environ;		/**< Environment variable array. */
+	char **args;			/**< Argument array. */
+	char **environ;			/**< Environment variable array. */
 } loader_binary_t;
 
-extern int loader_binary_load(vfs_node_t *node, const char **args, const char **environ, semaphore_t *sem);
+extern int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_t *sem);
 
 #endif /* __LOADER_BINARY_H */

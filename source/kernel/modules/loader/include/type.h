@@ -36,18 +36,28 @@ typedef struct loader_type {
 	bool (*check)(vfs_node_t *node);
 
 	/** Load a binary into an address space.
-	 * @param data		Binary loader data structure.
+	 * @note		This should also set the subsystem and entry
+	 *			pointers in the binary structure.
+	 * @param binary	Binary loader data structure.
 	 * @return		0 on success, negative error code on failure. */
-	int (*load)(loader_binary_t *data);
+	int (*load)(loader_binary_t *binary);
 
 	/** Finish binary loading, after address space is switched.
-	 * @param data		Binary loader data structure.
+	 * @note		It is the job of this function to copy
+	 *			arguments and environment to the stack (the
+	 *			stack pointer is set in the binary structure
+	 *			when this is called).
+	 * @param binary	Binary loader data structure.
 	 * @return		0 on success, negative error code on failure.
 	 *			Be warned that returning a failure at this
 	 *			point in the execution process will result
 	 *			in the process being terminated if the
 	 *			execution is replacing an existing process. */
-	int (*finish)(loader_binary_t *data);
+	int (*finish)(loader_binary_t *binary);
+
+	/** Clean up data stored in a binary structure.
+	 * @param binary	Binary loader data structure. */
+	void (*cleanup)(loader_binary_t *binary);
 } loader_type_t;
 
 extern int loader_type_register(loader_type_t *type);

@@ -54,7 +54,7 @@ loader_type_t *loader_type_match(vfs_node_t *node) {
  * @param type		Executable type to add.
  */
 int loader_type_register(loader_type_t *type) {
-	if(!type->name || !type->check || !type->load || !type->finish) {
+	if(!type->name || !type->check || !type->load || !type->finish || !type->cleanup) {
 		return -ERR_PARAM_INVAL;
 	}
 
