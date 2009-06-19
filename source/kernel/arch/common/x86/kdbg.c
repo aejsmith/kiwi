@@ -181,8 +181,8 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
  */
 int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
+	size_t off = 0;
 	symbol_t *sym;
-	size_t off;
 	ptr_t page;
 
 	if(KDBG_HELP(argc, argv)) {
@@ -326,8 +326,8 @@ int kdbg_cmd_benable(int argc, char **argv) {
  * @return		KDBG_OK on success, KDBG_FAIL on failure.
  */
 int kdbg_cmd_break(int argc, char **argv) {
+	size_t i, off = 0;
 	unative_t addr;
-	size_t i, off;
 	symbol_t *sym;
 
 	if(KDBG_HELP(argc, argv)) {

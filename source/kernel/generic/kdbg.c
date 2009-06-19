@@ -665,9 +665,9 @@ void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
 int kdbg_main(int reason, intr_frame_t *frame) {
 	bool state = intr_disable();
 	static int pcount = 0;
+	size_t off = 0;
 	symbol_t *sym;
 	char *input;
-	size_t off;
 	int ret;
 
 	/* Double check that we have a registers structure. */
