@@ -75,8 +75,10 @@ typedef struct process {
 extern process_t *kernel_proc;
 
 extern process_t *process_lookup(process_id_t id);
-extern int process_create(const char *name, process_t *parent, int priority,
-                          int flags, struct subsystem *subsystem, process_t **procp);
+extern int process_create(const char *name, process_t *parent, int priority, int flags,
+                          struct subsystem *subsystem, process_t **procp);
+extern int process_reset(process_t *process, const char *name, struct aspace *aspace,
+                         struct subsystem *subsystem);
 
 extern void process_init(void);
 

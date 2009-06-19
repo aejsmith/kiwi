@@ -166,6 +166,105 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	return 0;
 }
 
+/** Reset the specified process.
+ *
+ * Resets the state of the specified process. If the process is the current
+ * process, then all threads in the process will be terminated other than the
+ * current. Otherwise, all threads will be terminated. The name of the process
+ * will then be changed to the given name and its address space will be set to
+ * the given address space (the old one will be destroyed, if any). If the
+ * process' subsystem is the same as the new subsystem, then the subsystem's
+ * reset callback will be called. Otherwise, the current subsystem's
+ * destruction callback will be called (if there is a current subsystem),
+ * and the new subsystem's initialization callback will be called (if there
+ * is a new subsystem).
+ *
+ * The only two reasons for this function to fail are if the new subsystem
+ * differs from the old system and the new subsystem's initialization callback
+ * fails, or if invalid parameters are passed. It is up to the caller to handle
+ * failures - the best thing to do in this case would be to terminate the
+ * process.
+ *
+ * If the process is the current process, and the old address space set in the
+ * process is the current address space, then this function will switch to the
+ * new address space.
+ *
+ * @todo		The functionality to kill threads is not yet
+ *			implemented. This means that it cannot be used on
+ *			the current process if it has threads other than the
+ *			current, or on other processes that have threads.
+ *
+ * @param process	Process to reset. Must not be the kernel process.
+ * @param name		New name to give the process (must not be zero-length).
+ * @param aspace	Address space for the process (can be NULL).
+ * @param subsystem	New subsystem for the process (can be NULL).
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int process_reset(process_t *process, const char *name, aspace_t *aspace, subsystem_t *subsystem) {
+	subsystem_t *prev_subsys;
+	aspace_t *prev_as;
+	int ret;
+
+	if(!process || process == kernel_proc || !name || !name[0]) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	spinlock_lock(&process->lock, 0);
+
+	/* TODO: Implement these. */
+	if((process == curr_proc && process->num_threads > 1) || (process != curr_proc && process->num_threads)) {
+		fatal("TODO: Implement process_reset for extra threads");
+	}
+
+	/* Reset the process' name. */
+	strncpy(process->name, name, PROC_NAME_MAX);
+	process->name[PROC_NAME_MAX - 1] = 0;
+
+	/* Replace the address space, and switch to the new one. */
+	prev_as = process->aspace;
+	process->aspace = aspace;
+	if(prev_as == curr_aspace) {
+		aspace_switch(aspace);
+	}
+
+	/* Swap the subsystem pointers. */
+	prev_subsys = process->subsystem;
+	process->subsystem = subsystem;
+
+	spinlock_unlock(&process->lock);
+
+	/* Now that we're unlocked we can destroy the old address space. */
+	if(prev_as) {
+		aspace_destroy(prev_as);
+	}
+
+	/* If the previous subsystem is the same as the old subsystem, we use
+	 * the process_reset callback. Otherwise, destroy the old subsystem,
+	 * and initialize the new one. */
+	if(subsystem && subsystem == prev_subsys) {
+		if(subsystem->process_reset) {
+			subsystem->process_reset(process);
+		}
+	} else {
+		if(prev_subsys && prev_subsys->process_destroy) {
+			prev_subsys->process_destroy(process);
+		}
+
+		/* Initialize the new subsystem. If it fails, set subsystem
+		 * to NULL. */
+		if(subsystem && subsystem->process_init) {
+			ret = process->subsystem->process_init(process);
+			if(ret != 0) {
+				process->subsystem = NULL;
+				return ret;
+			}
+		}
+	}
+
+	return 0;
+}
+
 /** Initialize the process table and slab cache. */
 void process_init(void) {
 	int ret;

@@ -142,6 +142,20 @@ void thread_run(thread_t *thread) {
 	spinlock_unlock(&thread->lock);
 }
 
+/** Rename a thread.
+ *
+ * Changes the name of a thread.
+ *
+ * @param thread	Thread to rename.
+ * @param name		New name for the thread.
+ */
+void thread_rename(thread_t *thread, const char *name) {
+	spinlock_lock(&thread->lock, 0);
+	strncpy(thread->name, name, THREAD_NAME_MAX);
+	thread->name[THREAD_NAME_MAX - 1] = 0;
+	spinlock_unlock(&thread->lock);
+}
+
 /** Create a new thread.
  *
  * Creates a new thread that will begin execution at the given function and
