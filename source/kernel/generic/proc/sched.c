@@ -450,10 +450,10 @@ void sched_internal(bool state) {
 	 * handler in wait_queue_sleep(), so put anything to do after a switch
 	 * in sched_post_switch(). */
 	if(curr_thread != cpu->prev_thread) {
-		/* Switch the address space if required. */
-		if(curr_thread->owner->aspace) {
-			aspace_switch(curr_thread->owner->aspace);
-		}
+		/* Switch the address space. If the new process' addres space
+		 * is set to NULL then aspace_switch() will just switch to
+		 * the kernel address space. */
+		aspace_switch(curr_thread->owner->aspace);
 
 		if(context_save(&cpu->prev_thread->context) == 0) {
 			context_restore(&curr_thread->context);
@@ -468,6 +468,9 @@ void sched_internal(bool state) {
 void sched_post_switch(bool state) {
 	/* Set the current CPU pointer. */
 	cpu_set_pointer((ptr_t)cpus[cpu_current_id()]);
+
+	/* Do architecture-specific post-switch tasks. */
+	sched_arch_post_switch();
 
 	spinlock_unlock_ni(&curr_thread->lock);
 	if(curr_thread != curr_cpu->sched->prev_thread) {

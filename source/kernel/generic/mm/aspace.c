@@ -715,19 +715,27 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 /** Switch to another address space.
  *
  * Switches to a different address space. Does not take address space lock
- * because it is used during scheduling.
+ * because this function is used during rescheduling.
  *
- * @param as		Address space to switch to.
+ * @param as		Address space to switch to (if NULL, then will switch
+ *			to the kernel address space).
  */
 void aspace_switch(aspace_t *as) {
 	bool state = intr_disable();
 
+	/* Decrease reference count on the old address space if there is one. */
 	if(curr_aspace) {
 		refcount_dec(&curr_aspace->count);
 	}
 
-	refcount_inc(&as->count);
-	page_map_switch(&as->pmap);
+	/* If NULL, switch to kernel address space. */
+	if(as) {
+		refcount_inc(&as->count);
+		page_map_switch(&as->pmap);
+	} else {
+		page_map_switch(&kernel_page_map);
+	}
+
 	curr_aspace = as;
 
 	intr_restore(state);
@@ -771,6 +779,8 @@ aspace_t *aspace_create(void) {
  */
 void aspace_destroy(aspace_t *as) {
 	avltree_node_t *node;
+
+	assert(as);
 
 	if(refcount_get(&as->count) > 0) {
 		fatal("Destroying in-use address space");

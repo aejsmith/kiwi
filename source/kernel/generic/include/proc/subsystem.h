@@ -34,6 +34,14 @@ typedef struct subsystem {
 	 * @return		0 on success, negative error code on failure. */
 	int (*process_init)(process_t *process);
 
+	/** Reset a process using this subsystem.
+	 * @param process	Process to reset. */
+	void (*process_reset)(process_t *process);
+
+	/** Destroy a process using this subsystem.
+	 * @param process	Process to destroy. */
+	void (*process_destroy)(process_t *process);
+
 	/** Handle an exception caused in a thread on this subsystem.
 	 * @note		If this returns, it means execution should
 	 *			continue. If it is desired to kill the process
