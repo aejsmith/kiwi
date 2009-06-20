@@ -160,5 +160,6 @@ intr_result_t fault_handler(unative_t num, intr_frame_t *frame) {
 	}
 
 	/* No specific handler or the handler did not handle the fault. */
-	_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)", num, fault_names[num]);
+	_fatal(frame, "Unhandled %s-mode exception %" PRIun " (%s)",
+	       (frame->cs & 3) ? "user" : "kernel", num, fault_names[num]);
 }
