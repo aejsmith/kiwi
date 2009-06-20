@@ -28,15 +28,11 @@ struct vsnprintf_data {
 	size_t off;			/**< Current number of bytes written. */
 };
 
-/** Helper for vsnprintf.
- *
- * Places the given character in a buffer.
- *
+/** Helper for vsnprintf().
  * @param ch		Character to place in buffer.
- * @param total		Pointer to total character count.
  * @param _data		Data.
- */
-static void vsnprintf_helper(char ch, int *total, void *_data) {
+ * @param total		Pointer to total character count. */
+static void vsnprintf_helper(char ch, void *_data, int *total) {
 	struct vsnprintf_data *data = _data;
 
 	if(data->off < data->size) {

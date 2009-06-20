@@ -27,14 +27,10 @@
 static SPINLOCK_DECLARE(kprintf_lock);
 
 /** Helper for kvprintf().
- *
- * Helper function for kvprintf(). Outputs a character to the console.
- *
  * @param ch		Character to display.
- * @param total		Pointer to total character count.
  * @param data		Pointer to output level integer.
- */
-static void kvprintf_helper(char ch, int *total, void *data) {
+ * @param total		Pointer to total character count. */
+static void kvprintf_helper(char ch, void *data, int *total) {
 	int level = *(int *)data;
 
 	console_putch(level, ch);

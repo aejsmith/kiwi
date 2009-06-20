@@ -23,6 +23,9 @@
 
 #include <types/vararg.h>
 
-extern int do_printf(void (*helper)(char, int *, void *), void *data, const char *fmt, va_list args);
+/** Type for a do_printf() helper function. */
+typedef void (*printf_helper_t)(char, void *, int *);
+
+extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args);
 
 #endif /* __LIB_DO_PRINTF_H */

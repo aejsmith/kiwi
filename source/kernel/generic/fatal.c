@@ -34,7 +34,7 @@
 static atomic_t fatal_protect = 0;
 
 /** Helper for fatal_printf(). */
-static void fatal_printf_helper(char ch, int *total, void *data) {
+static void fatal_printf_helper(char ch, void *data, int *total) {
 	console_putch(LOG_NONE, ch);
 	if(ch == '\n') {
 		console_putch(LOG_NONE, ' ');
