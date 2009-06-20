@@ -472,11 +472,36 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
 	return dup;
 }
 
-/*
- *  From linux/lib/vsprintf.c
- *
- *  Copyright (C) 1991, 1992  Linus Torvalds
- */
+/** Macro to implement strtoul() and strtoull(). */
+#define __strtoux(type, cp, endp, base)		\
+	__extension__ \
+	({ \
+		type result = 0, value; \
+		if(!base) { \
+			if(*cp == '0') { \
+				if((tolower(*(++cp)) == 'x') && isxdigit(cp[1])) { \
+					cp++; \
+					base = 16; \
+				} else { \
+					base = 8; \
+				} \
+			} else { \
+				base = 10; \
+			} \
+		} else if(base == 16) { \
+			if(cp[0] == '0' && tolower(cp[1]) == 'x') { \
+				cp += 2; \
+			} \
+		} \
+		while(isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : tolower(*cp) - 'a' + 10) < base) { \
+			result = result * base + value; \
+			cp++; \
+		} \
+		if(endp) { \
+			*endp = (char *)cp; \
+		} \
+		result; \
+	})
 
 /** Convert a string to an unsigned long.
  *
@@ -484,36 +509,12 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
  *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
- * @param base		The number base to use.
+ * @param base		The number base to use (if zero will guess).
  *
  * @return		Converted value.
  */
 unsigned long strtoul(const char *cp, char **endp, unsigned int base) {
-	unsigned long result = 0, value;
-
-	if(!base) {
-		base = 10;
-		if(*cp == '0') {
-			base = 8;
-			cp++;
-			if((tolower(*cp) == 'x') && isxdigit(cp[1])) {
-				cp++;
-				base = 16;
-			}
-		}
-	} else if(base == 16) {
-		if(cp[0] == '0' && tolower(cp[1]) == 'x') {
-			cp += 2;
-		}
-	}
-	while(isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : tolower(*cp) - 'a' + 10) < base) {
-		result = result * base + value;
-		cp++;
-	}
-	if(endp) {
-		*endp = (char *)cp;
-	}
-	return result;
+	return __strtoux(unsigned long, cp, endp, base);
 }
 
 /** Convert a string to a signed long.
@@ -544,31 +545,7 @@ long strtol(const char *cp, char **endp, unsigned int base) {
  * @return		Converted value.
  */
 unsigned long long strtoull(const char *cp, char **endp, unsigned int base) {
-	unsigned long long result = 0, value;
-
-	if(!base) {
-		base = 10;
-		if(*cp == '0') {
-			base = 8;
-			cp++;
-			if((tolower(*cp) == 'x') && isxdigit(cp[1])) {
-				cp++;
-				base = 16;
-			}
-		}
-	} else if(base == 16) {
-		if(cp[0] == '0' && tolower(cp[1]) == 'x') {
-			cp += 2;
-		}
-	}
-	while(isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : tolower(*cp) - 'a' + 10) < base) {
-		result = result*base + value;
-		cp++;
-	}
-	if(endp) {
-		*endp = (char *)cp;
-	}
-	return result;
+	return __strtoux(unsigned long long, cp, endp, base);
 }
 
 /** Convert a string to an signed long long.
