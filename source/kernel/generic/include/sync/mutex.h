@@ -21,36 +21,34 @@
 #ifndef __SYNC_MUTEX_H
 #define __SYNC_MUTEX_H
 
-#include <sync/waitq.h>
+#include <sync/semaphore.h>
 
 /** Structure containing a mutex. */
 typedef struct mutex {
-	wait_queue_t queue;		/**< Queue of waiting threads. */
-	atomic_t locked;		/**< Whether the lock is held. */
+	semaphore_t sem;		/**< Semaphore for threads to wait on. */
+	int flags;			/**< Behaviour flags for the mutex. */
 	struct thread *holder;		/**< Thread holding the lock. */
+	int recursion;			/**< Recursion count. */
 } mutex_t;
 
 /** Initializes a statically declared mutex. */
-#define MUTEX_INITIALIZER(_var, _name)		\
+#define MUTEX_INITIALIZER(_var, _name, _flags)	\
 	{ \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name, 0, 0), \
-		.locked = 0, \
+		.sem = SEMAPHORE_INITIALIZER(_var.sem, _name, 1), \
+		.flags = _flags, \
 		.holder = NULL, \
+		.recursion = 0, \
 	}
 
 /** Statically declares a new mutex. */
-#define MUTEX_DECLARE(_var)			\
-	mutex_t _var = MUTEX_INITIALIZER(_var, #_var)
+#define MUTEX_DECLARE(_var, _flags)		\
+	mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
 
-/** Check whether a mutex is held.
- * @param mutex		Mutex to check.
- * @return		Whether the mutex is held. */
-static inline bool mutex_held(mutex_t *mutex) {
-	return atomic_get(&mutex->locked);
-}
+/** Mutex behaviour flags. */
+#define MUTEX_RECURSIVE		(1<<0)	/**< Allow recursive locking by a thread. */
 
-extern int mutex_lock(mutex_t *mutex, int flags);
-extern void mutex_unlock(mutex_t *mutex);
-extern void mutex_init(mutex_t *mutex, const char *name);
+extern int mutex_lock(mutex_t *lock, int flags);
+extern void mutex_unlock(mutex_t *lock);
+extern void mutex_init(mutex_t *lock, const char *name, int flags);
 
 #endif /* __SYNC_MUTEX_H */

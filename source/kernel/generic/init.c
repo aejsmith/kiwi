@@ -41,8 +41,6 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <time/timer.h>
-
 #include <bootmod.h>
 #include <fatal.h>
 #include <version.h>

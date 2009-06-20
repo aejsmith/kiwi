@@ -22,89 +22,85 @@
 
 #include <sync/mutex.h>
 
+#include <assert.h>
 #include <errors.h>
 #include <fatal.h>
-
-/** Internal part of mutex_lock().
- * @param mutex		Mutex to lock.
- * @return		True if locked, false if not. */
-static inline bool mutex_try_lock(mutex_t *mutex) {
-	if(!atomic_cmp_set(&mutex->locked, 0, 1)) {
-		if(mutex->holder == curr_thread) {
-			fatal("Nested locking of mutex 0x%p(%s) by %" PRIu32 "(%s)",
-			      mutex, mutex->queue.name, mutex->holder->id,
-			      mutex->holder->name);
-		}
-		return false;
-	}
-
-	mutex->holder = curr_thread;
-	return true;
-}
 
 /** Lock a mutex.
  *
  * Attempts to lock a mutex. If SYNC_NONBLOCK is specified, the function will
  * return if it is unable to take the lock immediately, otherwise it will block
- * until it is able to do so.
+ * until it is able to do so. If the mutex is recursive, and the calling thread
+ * already holds the lock, then its recursion count will be increased and the
+ * function will return immediately.
  *
- * @param mutex		Mutex to lock.
+ * @param lock		Mutex to lock.
  * @param flags		Synchronization flags.
  *
  * @return		0 if succeeded (always the case if SYNC_NONBLOCK is
  *			not specified), negative error code on failure.
  */
-int mutex_lock(mutex_t *mutex, int flags) {
+int mutex_lock(mutex_t *lock, int flags) {
 	int ret;
 
-	while(!mutex_try_lock(mutex)) {
-		if(flags & SYNC_NONBLOCK) {
-			return -ERR_WOULD_BLOCK;
-		}
-
-		ret = wait_queue_sleep(&mutex->queue, flags);
+	if(lock->holder != curr_thread) {
+		ret = semaphore_down(&lock->sem, flags);
 		if(ret != 0) {
 			return ret;
 		}
+
+		assert(!lock->recursion);
+		lock->holder = curr_thread;
+	} else if(curr_thread && !(lock->flags & MUTEX_RECURSIVE)) {
+		fatal("Nested locking of mutex 0x%p(%s) by %" PRIu32 "(%s)",
+		      lock, lock->sem.queue.name, lock->holder->id,
+		      lock->holder->name);
 	}
 
+	lock->recursion++;
 	return 0;
 }
 
 /** Unlock a mutex.
  *
  * Unlocks a mutex. Must be held by the current thread else a fatal error
- * will occur. It is also invalid to unlock an already unlocked mutex.
+ * will occur. It is also invalid to unlock an already unlocked mutex. If
+ * the mutex is recursive, and the recursion count is greater than 1 at the
+ * time this function is called, then the mutex will remain held.
  *
- * @todo		Transfer lock ownership to a waiting thread if there
- *			is one.
- *
- * @param mutex		Mutex to unlock.
+ * @param lock		Mutex to unlock.
  */
-void mutex_unlock(mutex_t *mutex) {
-	if(atomic_get(&mutex->locked) == 0) {
-		fatal("Unlock of unlocked mutex 0x%p(%s)", mutex, mutex->queue.name);
-	} else if(mutex->holder != curr_thread) {
+void mutex_unlock(mutex_t *lock) {
+	if(!lock->recursion) {
+		fatal("Unlock of unheld mutex 0x%p(%s)", lock, lock->sem.queue.name);
+	} else if(lock->holder != curr_thread) {
 		fatal("Unlock of mutex 0x%p(%s) from incorrect thread\n"
 		      "Holder: 0x%p  Current: 0x%p",
-		      mutex, mutex->queue.name, mutex->holder, curr_thread);
+		      lock, lock->sem.queue.name, lock->holder, curr_thread);
 	}
 
-	mutex->holder = NULL;
-	atomic_set(&mutex->locked, 0);
-	wait_queue_wake(&mutex->queue);
+	assert(lock->recursion <= 1 || lock->flags & MUTEX_RECURSIVE);
+
+	/* Check that holder is NULL because mutexes can be used when the
+	 * scheduler is not up. In this case, mutex_lock() does not down the
+	 * semaphore. */
+	if(--lock->recursion == 0 && lock->holder) {
+		lock->holder = NULL;
+		semaphore_up(&lock->sem);
+	}
 }
 
 /** Initialize a mutex.
  *
  * Initializes the given mutex structure.
  *
- * @param mutex		Mutex to initialize.
+ * @param lock		Mutex to initialize.
  * @param name		Name to give the mutex.
+ * @param flags		Behaviour flags for the mutex.
  */
-void mutex_init(mutex_t *mutex, const char *name) {
-	wait_queue_init(&mutex->queue, name, 0);
-	atomic_set(&mutex->locked, 0);
-
-	mutex->holder = NULL;
+void mutex_init(mutex_t *lock, const char *name, int flags) {
+	semaphore_init(&lock->sem, name, 1);
+	lock->flags = flags;
+	lock->holder = NULL;
+	lock->recursion = 0;
 }

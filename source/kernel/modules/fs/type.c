@@ -27,7 +27,7 @@
 
 /** List of registered VFS types. */
 static LIST_DECLARE(vfs_type_list);
-static MUTEX_DECLARE(vfs_type_list_lock);
+static MUTEX_DECLARE(vfs_type_list_lock, 0);
 
 /** Look up a filesystem type with lock already held.
  * @param name		Name of filesystem type to look up.

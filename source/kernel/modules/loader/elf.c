@@ -36,7 +36,7 @@ typedef struct elf_binary {
 
 /** List of known ELF ABI types. */
 static LIST_DECLARE(elf_abi_list);
-static MUTEX_DECLARE(elf_abi_list_lock);
+static MUTEX_DECLARE(elf_abi_list_lock, 0);
 
 /** Work out the ABI type of an ELF binary.
  * @param data		ELF binary structure.

@@ -110,7 +110,7 @@ static vmem_t slab_metadata_arena;
 
 /** List of all slab caches. */
 static LIST_DECLARE(slab_caches);
-static MUTEX_DECLARE(slab_caches_lock);
+static MUTEX_DECLARE(slab_caches_lock, 0);
 
 /*
  * Helper functions.
@@ -587,7 +587,7 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
 
 	/* Initialize the cache structures. */
 	for(i = 0; i <= cpu_id_max; i++) {
-		mutex_init(&cache->cpu_caches[i].lock, "cpu_cache_lock");
+		mutex_init(&cache->cpu_caches[i].lock, "cpu_cache_lock", 0);
 	}
 
 	return 0;
@@ -730,8 +730,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	assert(align == 0 || !(align & (align - 1)));
 	assert(!(flags & SLAB_CACHE_LATEMAG));
 
-	mutex_init(&cache->depot_lock, "slab_depot_lock");
-	mutex_init(&cache->slab_lock, "slab_slab_lock");
+	mutex_init(&cache->depot_lock, "slab_depot_lock", 0);
+	mutex_init(&cache->slab_lock, "slab_slab_lock", 0);
 	list_init(&cache->magazine_full);
 	list_init(&cache->magazine_empty);
 	list_init(&cache->slab_partial);

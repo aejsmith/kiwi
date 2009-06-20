@@ -46,7 +46,7 @@ extern int module_elf_relocate(module_t *module, void *image, size_t size, bool 
 static LIST_DECLARE(module_list);
 
 /** Lock to serialize module loading. */
-static MUTEX_DECLARE(module_lock);
+static MUTEX_DECLARE(module_lock, 0);
 
 /*
  * Module memory allocation functions.

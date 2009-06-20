@@ -51,7 +51,7 @@ static int vfs_node_ctor(void *obj, void *data, int kmflag) {
 	vfs_node_t *node = (vfs_node_t *)obj;
 
 	list_init(&node->header);
-	mutex_init(&node->lock, "vfs_node_lock");
+	mutex_init(&node->lock, "vfs_node_lock", 0);
 	refcount_set(&node->count, 0);
 	radix_tree_init(&node->children);
 

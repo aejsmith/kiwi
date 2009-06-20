@@ -61,11 +61,11 @@
 #endif
 
 static LIST_DECLARE(vmem_arenas);		/**< List of all Vmem arenas. */
-static MUTEX_DECLARE(vmem_lock);		/**< Lock to protect global Vmem information. */
+static MUTEX_DECLARE(vmem_lock, 0);		/**< Lock to protect global Vmem information. */
 
 /** Boundary tag allocation information. */
 static LIST_DECLARE(vmem_btags);		/**< Free boundary tag list. */
-static MUTEX_DECLARE(vmem_refill_lock);		/**< Lock to prevent multiple threads attempting to refill. */
+static MUTEX_DECLARE(vmem_refill_lock, 0);	/**< Lock to prevent multiple threads attempting to refill. */
 static size_t vmem_btag_count;			/**< Number of boundary tags available. */
 static vmem_t vmem_btag_arena;			/**< Internal arena for boundary tag allocation. */
 
@@ -763,7 +763,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	list_init(&vmem->header);
 	list_init(&vmem->children);
 	list_init(&vmem->btags);
-	mutex_init(&vmem->lock, "vmem_arena_lock");
+	mutex_init(&vmem->lock, "vmem_arena_lock", 0);
 
 	/* Initialize freelists and the allocation hash table. */
 	for(i = 0; i < VMEM_FREELISTS; i++) {

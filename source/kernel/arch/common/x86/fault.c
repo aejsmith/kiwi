@@ -118,7 +118,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 
 	/* Nothing could handle this fault, drop dead. */
 	_fatal(frame, "Unhandled %s-mode pagefault exception (0x%p)\n"
-	              "%s | %s %s %s",
+	              "%s | %s%s%s",
 	              (frame->err_code & (1<<2)) ? "user" : "kernel", addr,
 	              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
 	              (frame->err_code & (1<<1)) ? "Write" : "Read",

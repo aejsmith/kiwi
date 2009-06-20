@@ -80,7 +80,7 @@ static slab_cache_t *aspace_source_cache;	/**< Cache of page source structures. 
 static int aspace_cache_ctor(void *obj, void *data, int kmflag) {
 	aspace_t *aspace = (aspace_t *)obj;
 
-	mutex_init(&aspace->lock, "aspace_lock");
+	mutex_init(&aspace->lock, "aspace_lock", 0);
 	refcount_set(&aspace->count, 0);
 	avltree_init(&aspace->regions);
 

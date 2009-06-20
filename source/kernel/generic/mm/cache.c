@@ -40,7 +40,7 @@
 
 /** List of all page caches. */
 static LIST_DECLARE(cache_list);
-static MUTEX_DECLARE(cache_list_lock);
+static MUTEX_DECLARE(cache_list_lock, 0);
 
 /** Slab caches for cache/cache page structures. */
 static slab_cache_t *cache_cache;
@@ -55,7 +55,7 @@ static int cache_ctor(void *obj, void *data, int kmflag) {
 	cache_t *cache = obj;
 
 	list_init(&cache->header);
-	mutex_init(&cache->lock, "cache_lock");
+	mutex_init(&cache->lock, "cache_lock", 0);
 	avltree_init(&cache->pages);
 	return 0;
 }

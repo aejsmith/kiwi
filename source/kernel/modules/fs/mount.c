@@ -27,7 +27,7 @@ vfs_mount_t *vfs_root_mount = NULL;
 
 /** List of all mounts. */
 static LIST_DECLARE(vfs_mount_list);
-static MUTEX_DECLARE(vfs_mount_list_lock);
+static MUTEX_DECLARE(vfs_mount_list_lock, 0);
 
 /** Free all nodes on the given list.
  * @param list		List to reclaim from.
@@ -94,7 +94,7 @@ int vfs_mount_create(const char *type, int flags, vfs_mount_t **mountp) {
 	list_init(&mount->header);
 	list_init(&mount->dirty_nodes);
 	list_init(&mount->unused_nodes);
-	mutex_init(&mount->lock, "vfs_mount_lock");
+	mutex_init(&mount->lock, "vfs_mount_lock", 0);
 
 	/* Look up the filesystem type. */
 	mount->type = vfs_type_lookup(type, true);

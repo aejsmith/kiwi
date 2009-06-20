@@ -24,7 +24,7 @@
 
 /** List of known executable types. */
 static LIST_DECLARE(exec_type_list);
-static MUTEX_DECLARE(exec_type_list_lock);
+static MUTEX_DECLARE(exec_type_list_lock, 0);
 
 /** Match a binary to an executable type.
  * @param node		VFS node for the binary.
