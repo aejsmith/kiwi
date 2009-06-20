@@ -167,7 +167,7 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
 
-	recursive_lock_acquire(&map->lock, 0);
+	mutex_lock(&map->lock, 0);
 
 	/* Check that we can map here. */
 	if(virt < map->first || virt > map->last) {
@@ -177,7 +177,7 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
 	if(ptbl == NULL) {
-		recursive_lock_release(&map->lock);
+		mutex_unlock(&map->lock);
 		return false;
 	}
 
@@ -195,7 +195,7 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	ptbl[pte] = val;
 
 	memory_barrier();
-	recursive_lock_release(&map->lock);
+	mutex_unlock(&map->lock);
 	return true;
 }
 
@@ -216,7 +216,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 	assert(!(virt % PAGE_SIZE));
 
-	recursive_lock_acquire(&map->lock, 0);
+	mutex_lock(&map->lock, 0);
 
 	/* Check that we can unmap here. */
 	if(virt < map->first || virt > map->last) {
@@ -226,7 +226,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
 	if(ptbl == NULL) {
-		recursive_lock_release(&map->lock);
+		mutex_unlock(&map->lock);
 		return false;
 	}
 
@@ -240,10 +240,10 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		/* Clear the entry. */
 		ptbl[pte] = 0;
 		memory_barrier();
-		recursive_lock_release(&map->lock);
+		mutex_unlock(&map->lock);
 		return true;
 	} else {
-		recursive_lock_release(&map->lock);
+		mutex_unlock(&map->lock);
 		return false;
 	}
 }
@@ -266,7 +266,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
-	recursive_lock_acquire(&map->lock, 0);
+	mutex_lock(&map->lock, 0);
 
 	/* Find the page table for the entry. */
 	ptbl = page_map_get_ptbl(map, virt, false, 0);
@@ -274,12 +274,12 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;
-			recursive_lock_release(&map->lock);
+			mutex_unlock(&map->lock);
 			return true;
 		}
 	}
 
-	recursive_lock_release(&map->lock);
+	mutex_unlock(&map->lock);
 	return false;
 }
 
@@ -304,7 +304,7 @@ void page_map_switch(page_map_t *map) {
 int page_map_init(page_map_t *map) {
 	uint64_t *pml4;
 
-	recursive_lock_init(&map->lock, "page_map_lock");
+	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
 	map->pml4 = pmm_alloc(1, MM_SLEEP | PM_ZERO);
 	map->user = true;
 	map->first = ASPACE_BASE;
@@ -457,7 +457,7 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 
 /** Set up the kernel page map. */
 void page_init(void) {
-	recursive_lock_init(&kernel_page_map.lock, "kernel_page_map_lock");
+	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
 	kernel_page_map.pml4 = KA2PA(__boot_pml4);
 	kernel_page_map.user = false;
 	kernel_page_map.first = KERNEL_HEAP_BASE;

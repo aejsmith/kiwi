@@ -44,13 +44,13 @@
 
 #ifndef __ASM__
 
-#include <sync/recursive.h>
+#include <sync/mutex.h>
 
 #include <types.h>
 
 /** Architecture-specific page map structure. */
 typedef struct page_map {
-	recursive_lock_t lock;		/**< Lock to protect page map. */
+	mutex_t lock;			/**< Lock to protect page map. */
 	phys_ptr_t pml4;		/**< Physical address of PML4. */
 	bool user;			/**< Whether pages mapped should be userspace accessible. */
 

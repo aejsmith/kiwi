@@ -69,7 +69,6 @@ env['OBJFILES'] += [
 
 env['OBJFILES'] += [
 	env.Object('sync/mutex.c'),
-	env.Object('sync/recursive.c'),
 	env.Object('sync/semaphore.c'),
 	env.Object('sync/spinlock.c'),
 	env.Object('sync/waitq.c'),
