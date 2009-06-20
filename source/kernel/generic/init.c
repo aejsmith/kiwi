@@ -57,11 +57,11 @@ static void init_thread(void *arg1, void *arg2) {
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
 
-	/* Load modules provided at boot. */
-	bootmod_load();
-
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
+
+	/* Load modules provided at boot. */
+	bootmod_load();
 }
 
 /** Kernel initialization function.
