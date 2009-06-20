@@ -170,3 +170,76 @@ __isr_common:
 	addq	$16, %rsp
 	iretq
 .size __isr_common, .-__isr_common
+
+/** SYSCALL entry point. */
+.global __syscall_entry
+.type __syscall_entry, @function
+__syscall_entry:
+	/* Switch to the kernel mode stack. The GS_BASE MSR points to the
+	 * thread's architecture-specific data. Use the SWAPGS instruction
+	 * to get at it, so we can get our stack pointer. The userspace RSP
+	 * field is not used in returning - it is merely a temporary scratch
+	 * space we use before we push it onto the stack for the system call
+	 * frame. */
+	swapgs
+	movq	%rsp, %gs:8
+	movq	%gs:0, %rsp
+
+	/* Get back the userspace stack pointer from the temporary scratch
+	 * space and put it onto the kernel stack (at the top of the system
+	 * call frame). */
+	push	%gs:8
+
+	/* Return to the previous GS value. */
+	swapgs
+
+	/* We now have a stack pointer set up, push information SYSCALL saved
+	 * for us (RAX = return IP, R11 = original RFLAGS). */
+	push	%rcx
+	push	%r11
+
+	/* Push the callee-save registers. We must push callee-save registers
+	 * despite the fact that they are not modified by this function, as it
+	 * must be possible to duplicate a thread using a system call frame,
+	 * i.e. to implement fork() in the POSIX subsystem. */
+	push	%r12
+	push	%r13
+	push	%r14
+	push	%r15
+	push	%rbx
+	push	%rbp
+
+	/* Push arguments. R10 is used over RCX for the fourth argument, as
+	 * RCX is used by SYSCALL to store the return address. */
+	push	%r9
+	push	%r8
+	push	%r10
+	push	%rdx
+	push	%rsi
+	push	%rdi
+
+	/* Push system call ID. */
+	push	%rax
+
+	/* Now that our stack frame is set up we can enable interrupts - they
+	 * do not need to be off across a system call. */
+	sti
+
+	/* Store a pointer to the system call frame as the first argument
+	 * and call the system call dispatcher. */
+	movq	%rsp, %rdi
+	call	syscall_handler
+
+	/* Disable interrupts and restore saved state. Do not need to restore
+	 * callee-save registers as they are preserved across the call to
+	 * syscall_handler() - see comment above about why they are saved in
+	 * the first place. */
+	cli
+	addq	$104, %rsp
+	pop	%r11
+	pop	%rcx
+	pop	%rsp
+
+	/* Return to user-mode. */
+	sysretq
+.size __syscall_entry, .-__syscall_entry

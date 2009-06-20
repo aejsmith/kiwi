@@ -204,6 +204,7 @@ static inline void sysreg_flags_write(unative_t val) {
 #define SYSREG_MSR_LSTAR	0xc0000082	/**< 64-bit System Call Target Address. */
 #define SYSREG_MSR_FMASK	0xc0000084	/**< System Call Flag Mask. */
 #define SYSREG_MSR_GS_BASE	0xc0000101	/**< GS segment base register. */
+#define SYSREG_MSR_K_GS_BASE	0xc0000102	/**< GS base to switch to with SWAPGS. */
 
 /** EFER MSR flags. */
 #define SYSREG_EFER_SCE		(1<<0)		/**< System Call Enable. */

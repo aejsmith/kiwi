@@ -21,6 +21,8 @@
 #ifndef __PROC_THREAD_H
 #define __PROC_THREAD_H
 
+#include <arch/thread.h>
+
 #include <cpu/context.h>
 #include <cpu/cpu.h>
 
@@ -44,6 +46,7 @@ typedef struct thread {
 	/** Main thread information. */
 	spinlock_t lock;		/**< Protects the thread's internals. */
 	context_t context;		/**< CPU context. */
+	thread_arch_t arch;		/**< Architecture thread data. */
 	unative_t *kstack;		/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
 	cpu_t *cpu;			/**< CPU that the thread runs on. */

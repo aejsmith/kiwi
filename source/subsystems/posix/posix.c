@@ -20,22 +20,35 @@
 
 #include <console/kprintf.h>
 
+#include <lib/utility.h>
+
 #include <loader/elf.h>
 
-#include <errors.h>
 #include <fatal.h>
 #include <module.h>
 
-/** POSIX subsystem information structure. */
-static subsystem_t posix_subsystem = {
-	.name = "POSIX",
+/** Test system call.
+ * @param num		Test number.
+ * @return		0. */
+static int posix_test(int num) {
+	kprintf(LOG_NORMAL, "POSIX: Received test syscall, parameter %d\n", num);
+	return 0;
+}
+
+/** POSIX system call list. */
+static syscall_handler_t posix_syscalls[] = {
+	(syscall_handler_t)posix_test,
 };
 
 /** POSIX ELF ABI definition structure. */
 static loader_elf_abi_t posix_elf_abi = {
 	.string = "POSIX",
 	.num = ELFOSABI_NONE,
-	.subsystem = &posix_subsystem,
+	.subsystem = {
+		.name = "POSIX",
+		.syscalls = posix_syscalls,
+		.syscall_count = ARRAYSZ(posix_syscalls),
+	},
 };
 
 /** POSIX module initialization function.

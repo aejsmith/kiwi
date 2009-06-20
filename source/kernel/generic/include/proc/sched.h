@@ -29,8 +29,6 @@
 #define PRIORITY_SYSTEM		1		/**< System process. */
 #define PRIORITY_USER		3		/**< User process. */
 
-extern void sched_arch_post_switch(void);
-
 extern void sched_yield(void);
 
 extern void sched_preempt_disable(void);

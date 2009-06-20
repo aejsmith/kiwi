@@ -33,7 +33,7 @@ typedef struct loader_elf_abi {
 
 	const char *string;		/**< ABI type name to look for. */
 	int num;			/**< EI_OSABI value to fall back on if no ABI note. */
-	subsystem_t *subsystem;		/**< Subsystem to use for this ABI type. */
+	subsystem_t subsystem;		/**< Subsystem to use for this ABI type. */
 } loader_elf_abi_t;
 
 extern int loader_elf_abi_register(loader_elf_abi_t *abi);

@@ -63,6 +63,7 @@ env['OBJFILES'] += [
 env['OBJFILES'] += [
 	env.Object('proc/process.c'),
 	env.Object('proc/sched.c'),
+	env.Object('proc/syscall.c'),
 	env.Object('proc/thread.c'),
 ]
 

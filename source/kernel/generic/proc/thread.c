@@ -177,6 +177,7 @@ void thread_rename(thread_t *thread, const char *name) {
 int thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
                   void *arg1, void *arg2, thread_t **threadp) {
 	thread_t *thread;
+	int ret;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {
 		return -ERR_PARAM_INVAL;
@@ -188,6 +189,13 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	strncpy(thread->name, name, THREAD_NAME_MAX);
 	thread->name[THREAD_NAME_MAX - 1] = 0;
+
+	/* Initialize architecture-specific data. */
+	ret = thread_arch_init(thread);
+	if(ret != 0) {
+		slab_cache_free(thread_cache, thread);
+		return ret;
+	}
 
 	/* Allocate an ID for the thread. */
 	thread->id = (thread_id_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
@@ -257,6 +265,7 @@ void thread_destroy(thread_t *thread) {
 
 	/* Now clean up the thread. */
 	context_destroy(&thread->context);
+	thread_arch_destroy(thread);
 
 	/* Deallocate the thread ID. */
 	vmem_free(thread_id_arena, (unative_t)thread->id, 1);

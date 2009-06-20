@@ -249,7 +249,7 @@ static int loader_elf_load(loader_binary_t *binary) {
 	}
 
 	binary->data = data;
-	binary->subsystem = data->abi->subsystem;
+	binary->subsystem = &data->abi->subsystem;
 	binary->entry = (ptr_t)data->ehdr.e_entry;
 	return 0;
 fail:
@@ -302,7 +302,7 @@ loader_type_t loader_elf_type = {
 int loader_elf_abi_register(loader_elf_abi_t *abi) {
 	loader_elf_abi_t *exist;
 
-	if(!abi->string || !abi->subsystem) {
+	if(!abi->string) {
 		return -ERR_PARAM_INVAL;
 	}
 

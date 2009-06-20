@@ -22,12 +22,15 @@
 #define __PROC_SUBSYSTEM_H
 
 #include <proc/process.h>
+#include <proc/syscall.h>
 
 #include <types.h>
 
 /** Structure defining an application subsystem. */
 typedef struct subsystem {
 	const char *name;		/**< Name of subsystem (for debugging purposes). */
+	syscall_handler_t *syscalls;	/**< Array of system call handlers. */
+	size_t syscall_count;		/**< Number of system call handlers. */
 
 	/** Initialize a process using this subsystem.
 	 * @param process	Process to initialize.

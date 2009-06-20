@@ -1,4 +1,4 @@
-/* Kiwi AMD64 scheduler functions
+/* Kiwi AMD64 thread functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,8 +15,10 @@
 
 /**
  * @file
- * @brief		AMD64 scheduler functions.
+ * @brief		AMD64 thread functions.
  */
+
+#include <arch/x86/sysreg.h>
 
 #include <cpu/cpu.h>
 
@@ -24,8 +26,27 @@
 #include <proc/thread.h>
 
 /** AMD64-specific post-thread switch function. */
-void sched_arch_post_switch(void) {
+void thread_arch_post_switch(thread_t *thread) {
 	/* Set the RSP0 field in the TSS to point to the new thread's
 	 * kernel stack. */
-	curr_cpu->arch.tss.rsp0 = (ptr_t)curr_thread->kstack + KSTACK_SIZE;
+	thread->cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
+
+	/* Store the address of the thread's architecture data in the
+	 * KERNEL_GS_BASE MSR for the SYSCALL handler to use. */
+        sysreg_msr_write(SYSREG_MSR_K_GS_BASE, (ptr_t)&thread->arch);
+}
+
+/** Initialize AMD64-specific thread data.
+ * @param thread	Thread to initialize.
+ * @return		Always returns 0. */
+int thread_arch_init(thread_t *thread) {
+	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
+	thread->arch.user_rsp = 0;
+	return 0;
+}
+
+/** Clean up AMD64-specific thread data.
+ * @param thread	Thread to clean up. */
+void thread_arch_destroy(thread_t *thread) {
+	/* Nothing happens. */
 }

@@ -1,4 +1,4 @@
-/* Kiwi userspace startup application
+/* Kiwi system call dispatcher
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,13 +15,19 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		System call dispatcher.
  */
 
-/** Startup application main function.
- * @param argc		Argument count.
- * @param argv		Argument array.
- * @return		0 on success, negative error code on failure. */
-int _start(int argc, char **argv) {
-	while(1);
-}
+#ifndef __PROC_SYSCALL_H
+#define __PROC_SYSCALL_H
+
+#include <types.h>
+
+struct syscall_frame;
+
+/** Function type for a system call handler. */
+typedef unative_t (*syscall_handler_t)(unative_t, unative_t, unative_t, unative_t, unative_t, unative_t);
+
+extern unative_t syscall_handler(struct syscall_frame *frame);
+
+#endif /* __PROC_SYSCALL_H */

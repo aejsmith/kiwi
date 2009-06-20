@@ -50,7 +50,7 @@ env['OBJFILES'] += [
 	env.Object('kdbg.c'),
 	env.Object('module.c'),
 	env.Object('page.c'),
-	env.Object('sched.c'),
 	env.Object('switch.S'),
+	env.Object('thread.c'),
 	env.Object('uspace.S'),
 ]

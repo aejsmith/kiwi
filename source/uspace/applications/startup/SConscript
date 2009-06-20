@@ -15,5 +15,5 @@
 Import('envmgr', 'config')
 
 envmgr['dist']['BOOTAPPS'] += envmgr['posix'].Program('startup', [
-	'main.c',
+	'main.S',
 ])

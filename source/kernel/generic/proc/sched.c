@@ -470,7 +470,7 @@ void sched_post_switch(bool state) {
 	cpu_set_pointer((ptr_t)cpus[cpu_current_id()]);
 
 	/* Do architecture-specific post-switch tasks. */
-	sched_arch_post_switch();
+	thread_arch_post_switch(curr_thread);
 
 	spinlock_unlock_ni(&curr_thread->lock);
 	if(curr_thread != curr_cpu->sched->prev_thread) {
