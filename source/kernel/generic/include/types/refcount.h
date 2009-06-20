@@ -61,7 +61,7 @@ static inline int refcount_dec(refcount_t *ref) {
 	int val = atomic_dec(ref) - 1;
 
 	if(unlikely(val < 0)) {
-		fatal("Reference count 0x%p went negative", ref);
+		fatal("Reference count %p went negative", ref);
 	}
 
 	return val;

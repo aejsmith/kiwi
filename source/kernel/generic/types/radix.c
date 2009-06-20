@@ -461,7 +461,7 @@ void radix_tree_destroy(radix_tree_t *tree) {
 
 	for(i = 0; i < ARRAYSZ(tree->root.children); i++) {
 		if(tree->root.children[i] != NULL) {
-			fatal("Destroying non-empty radix tree 0x%p", tree);
+			fatal("Destroying non-empty radix tree %p", tree);
 		}
 	}
 }

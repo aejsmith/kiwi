@@ -171,7 +171,7 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 
 	/* Check that we can map here. */
 	if(virt < map->first || virt > map->last) {
-		fatal("Map on 0x%p outside allowed area", map);
+		fatal("Map on %p outside allowed area", map);
 	}
 
 	/* Find the page table for the entry. */
@@ -183,7 +183,7 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 
 	pte = (virt % 0x200000) / PAGE_SIZE;
 	if(ptbl[pte] & PG_PRESENT) {
-		fatal("Mapping 0x%p which is already mapped", virt);
+		fatal("Mapping %p which is already mapped", virt);
 	}
 
 	val = phys | PG_PRESENT;
@@ -220,7 +220,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 	/* Check that we can unmap here. */
 	if(virt < map->first || virt > map->last) {
-		fatal("Unmap on 0x%p outside allowed area", map);
+		fatal("Unmap on %p outside allowed area", map);
 	}
 
 	/* Find the page table for the entry. */

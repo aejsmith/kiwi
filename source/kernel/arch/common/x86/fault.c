@@ -81,7 +81,7 @@ static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
 	/* Disable KDBG. */
 	atomic_set(&kdbg_running, 3);
 
-	_fatal(frame, "Double Fault (0x%p)", frame->ip);
+	_fatal(frame, "Double Fault (%p)", frame->ip);
 	cpu_halt();
 }
 
@@ -117,7 +117,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	}
 
 	/* Nothing could handle this fault, drop dead. */
-	_fatal(frame, "Unhandled %s-mode pagefault exception (0x%p)\n"
+	_fatal(frame, "Unhandled %s-mode pagefault exception (%p)\n"
 	              "%s | %s%s%s",
 	              (frame->err_code & (1<<2)) ? "user" : "kernel", addr,
 	              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",

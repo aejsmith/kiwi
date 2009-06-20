@@ -67,7 +67,7 @@ int spinlock_lock(spinlock_t *lock, int flags) {
 		}
 	} else {
 		if(unlikely(!atomic_cmp_set(&lock->locked, 0, 1))) {
-			fatal("Nested locking of spinlock 0x%p (%s)", lock, lock->name);
+			fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
 		}
 	}
 
@@ -113,7 +113,7 @@ int spinlock_lock_ni(spinlock_t *lock, int flags) {
 		}
 	} else {
 		if(unlikely(!atomic_cmp_set(&lock->locked, 0, 1))) {
-			fatal("Nested locking of spinlock 0x%p (%s)", lock, lock->name);
+			fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
 		}
 	}
 
@@ -132,7 +132,7 @@ void spinlock_unlock(spinlock_t *lock) {
 	int state;
 
 	if(unlikely(!spinlock_held(lock))) {
-		fatal("Unlock of already unlocked spinlock 0x%p (%s)", lock, lock->name);
+		fatal("Unlock of already unlocked spinlock %p (%s)", lock, lock->name);
 	}
 
 	/* Save state before unlocking in case it is overwritten by another
@@ -155,7 +155,7 @@ void spinlock_unlock(spinlock_t *lock) {
  */
 void spinlock_unlock_ni(spinlock_t *lock) {
 	if(unlikely(!spinlock_held(lock))) {
-		fatal("Unlock of already unlocked spinlock 0x%p (%s)", lock, lock->name);
+		fatal("Unlock of already unlocked spinlock %p (%s)", lock, lock->name);
 	}
 
 	leave_cs_barrier();

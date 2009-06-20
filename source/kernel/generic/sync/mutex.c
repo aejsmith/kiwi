@@ -52,7 +52,7 @@ int mutex_lock(mutex_t *lock, int flags) {
 		assert(!lock->recursion);
 		lock->holder = curr_thread;
 	} else if(curr_thread && !(lock->flags & MUTEX_RECURSIVE)) {
-		fatal("Nested locking of mutex 0x%p(%s) by %" PRIu32 "(%s)",
+		fatal("Nested locking of mutex %p(%s) by %" PRIu32 "(%s)",
 		      lock, lock->sem.queue.name, lock->holder->id,
 		      lock->holder->name);
 	}
@@ -72,10 +72,10 @@ int mutex_lock(mutex_t *lock, int flags) {
  */
 void mutex_unlock(mutex_t *lock) {
 	if(!lock->recursion) {
-		fatal("Unlock of unheld mutex 0x%p(%s)", lock, lock->sem.queue.name);
+		fatal("Unlock of unheld mutex %p(%s)", lock, lock->sem.queue.name);
 	} else if(lock->holder != curr_thread) {
-		fatal("Unlock of mutex 0x%p(%s) from incorrect thread\n"
-		      "Holder: 0x%p  Current: 0x%p",
+		fatal("Unlock of mutex %p(%s) from incorrect thread\n"
+		      "Holder: %p  Current: %p",
 		      lock, lock->sem.queue.name, lock->holder, curr_thread);
 	}
 
