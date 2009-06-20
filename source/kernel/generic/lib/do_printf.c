@@ -180,7 +180,7 @@ int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args)
 	unsigned char ch;
 	const char *str;
 	uint64_t num;
-	uint32_t len;
+	int32_t len;
 
 	for(; *fmt; fmt++) {
 		if(*fmt != '%') {
