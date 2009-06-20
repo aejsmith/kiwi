@@ -32,6 +32,7 @@ uspace_entry:
 	/* Set up a stack frame for IRET:
 	 *  - SS.
 	 *  - RSP.
+	 *  - RFLAGS.
 	 *  - CS.
 	 *  - RIP. */
 	push	$(SEG_U_DS | 0x03)
