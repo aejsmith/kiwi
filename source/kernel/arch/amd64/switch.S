@@ -20,9 +20,6 @@
 
 #include <arch/context.h>
 
-.global context_save
-.global context_restore
-
 /** Save a context structure.
  *
  * Saves the current CPU context to the given context structure. Only the
@@ -33,6 +30,8 @@
  * @return		0 if returning from context_save(), 1 if returning
  *			from context_restore().
  */
+.global context_save
+.type context_save, @function
 context_save:
 	/* Save instruction/stack pointers. */
 	movq	(%rsp), %rax
@@ -61,6 +60,8 @@ context_save:
  *
  * @param ctx		Context structure to restore.
  */
+.global context_restore
+.type context_restore, @function
 context_restore:
 	/* Restore new callee-save registers. */
 	movq	CONTEXT_OFF_R15(%rdi), %r15
