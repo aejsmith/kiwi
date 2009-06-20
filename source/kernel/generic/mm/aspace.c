@@ -527,7 +527,7 @@ int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, 
 	/* Place a reference on the source to show we're using it. */
 	refcount_inc(&source->count);
 
-	dprintf("aspace: allocated region [0x%p,0x%p) (as: 0x%p)\n", region->start, region->end, as);
+	dprintf("aspace: allocated region [%p,%p) (as: %p)\n", region->start, region->end, as);
 	*addrp = region->start;
 	mutex_unlock(&as->lock);
 	return 0;
@@ -596,7 +596,7 @@ int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_sour
 		refcount_inc(&source->count);
 	}
 
-	dprintf("aspace: inserted region [0x%p,0x%p) (as: 0x%p)\n", region->start, region->end, as);
+	dprintf("aspace: inserted region [%p,%p) (as: %p)\n", region->start, region->end, as);
 	mutex_unlock(&as->lock);
 	return 0;
 }
@@ -626,7 +626,7 @@ int aspace_free(aspace_t *as, ptr_t start, size_t size) {
 		aspace_do_free(as, start, start + size);
 	}
 
-	dprintf("aspace: freed region [0x%p,0x%p) (as: 0x%p)\n", start, start + size, as);
+	dprintf("aspace: freed region [%p,%p) (as: %p)\n", start, start + size, as);
 	mutex_unlock(&as->lock);
 	return 0;
 }
@@ -693,7 +693,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	/* Get the page from the source. */
 	ret = region->source->backend->get(region->source, offset, &page);
 	if(unlikely(ret != 0)) {
-		dprintf("aspace: failed to get page for 0x%p in 0x%p: %d\n", addr, as, ret);
+		dprintf("aspace: failed to get page for %p in %p: %d\n", addr, as, ret);
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
@@ -707,7 +707,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	}
 
 	mutex_unlock(&as->lock);
-	dprintf("aspace: fault at 0x%p in 0x%p: 0x%" PRIpp " -> 0x%p\n",
+	dprintf("aspace: fault at %p in %p: 0x%" PRIpp " -> %p\n",
 		addr, as, page, (addr & PAGE_MASK));
 	return PF_STATUS_OK;
 }
@@ -846,7 +846,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	AVLTREE_FOREACH(&as->regions, iter) {
 		region = avltree_entry(iter, aspace_region_t);
 
-		kprintf(LOG_NONE, "0x%-16p 0x%-16p %-6d 0x%p+%" PRIo " %s\n",
+		kprintf(LOG_NONE, "%-16p %-16p %-6d %p+%" PRIo " %s\n",
 		        region->start, region->end, region->flags,
 		        region->source, region->offset,
 			(region->source) ? region->source->name : "");

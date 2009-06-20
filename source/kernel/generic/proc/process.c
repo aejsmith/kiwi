@@ -161,7 +161,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 
 	*procp = process;
 
-	dprintf("proc: created process %" PRIu32 "(%s) (proc: 0x%p, parent: 0x%p)\n",
+	dprintf("proc: created process %" PRIu32 "(%s) (proc: %p, parent: %p)\n",
 		process->id, process->name, process, parent);
 	return 0;
 }
@@ -309,7 +309,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 	AVLTREE_FOREACH(&process_tree, iter) {
 		process = avltree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7" PRIs " 0x%-16p %-9s %s\n",
+		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7" PRIs " %-16p %-9s %s\n",
 			process->id, process->priority, process->flags,
 			process->num_threads, process->aspace,
 		        (process->subsystem) ? process->subsystem->name : "None",

@@ -207,10 +207,10 @@ static int kdbg_cmd_examine(int argc, char **argv) {
 		/* Print it out. Don't put a newline between each value for
 		 * strings. */
 		switch(fmt) {
-		case 'x':	kprintf(LOG_NONE, "0x%p: 0x%" PRIx64 "\n", addr, val); break;
-		case 'i':	kprintf(LOG_NONE, "0x%p: %"   PRId64 "\n", addr, val); break;
-		case 'o':	kprintf(LOG_NONE, "0x%p: 0%"  PRIo64 "\n", addr, val); break;
-		case 'u':	kprintf(LOG_NONE, "0x%p: %"   PRIu64 "\n", addr, val); break;
+		case 'x':	kprintf(LOG_NONE, "%p: 0x%" PRIx64 "\n", addr, val); break;
+		case 'i':	kprintf(LOG_NONE, "%p: %"   PRId64 "\n", addr, val); break;
+		case 'o':	kprintf(LOG_NONE, "%p: 0%"  PRIo64 "\n", addr, val); break;
+		case 'u':	kprintf(LOG_NONE, "%p: %"   PRIu64 "\n", addr, val); break;
 		case 's':	kprintf(LOG_NONE, "%c", (uint8_t)val); break;
 		}
 

@@ -209,7 +209,7 @@ void acpi_init(void) {
 	/* Get the base address of the Extended BIOS Data Area (EBDA). */
 	ebda = (ptr_t)(*(uint16_t *)0x40e << 4);
 
-	kprintf(LOG_DEBUG, "acpi: searching for RSDP (ebda: 0x%p)...\n", ebda);
+	kprintf(LOG_DEBUG, "acpi: searching for RSDP (ebda: %p)...\n", ebda);
 	if(!(rsdp = acpi_rsdp_find(ebda, 0x400)) && !(rsdp = acpi_rsdp_find(0xE0000, 0x20000))) {
 		kprintf(LOG_DEBUG, "acpi: cannot find RSDP, not using ACPI\n");
 		return;

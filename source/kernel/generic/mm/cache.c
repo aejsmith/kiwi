@@ -98,7 +98,7 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
 		refcount_inc(&page->count);
 		*addrp = page->address;
 
-		dprintf("cache: retreived cached page 0x%" PRIpp " from 0x%p:%" PRIo "\n",
+		dprintf("cache: retreived cached page 0x%" PRIpp " from %p:%" PRIo "\n",
 		        page->address, cache, offset);
 		mutex_unlock(&cache->lock);
 		return 0;
@@ -121,7 +121,7 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
 	avltree_insert(&cache->pages, (key_t)offset, page, NULL);
 	*addrp = page->address;
 
-	dprintf("cache: cached new page 0x%" PRIpp " in 0x%p:%" PRIo "\n",
+	dprintf("cache: cached new page 0x%" PRIpp " in %p:%" PRIo "\n",
 	        page->address, cache, offset);
 	mutex_unlock(&cache->lock);
 	return 0;
@@ -154,7 +154,7 @@ void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 
 	refcount_dec(&page->count);
 
-	dprintf("cache: released page 0x%" PRIpp " at 0x%p:%" PRIo "\n",
+	dprintf("cache: released page 0x%" PRIpp " at %p:%" PRIo "\n",
 	        page->address, cache, offset);
 	mutex_unlock(&cache->lock);
 }
@@ -217,7 +217,7 @@ int cache_destroy(cache_t *cache) {
 		if(cache->ops->flush_page != NULL && page->dirty) {
 			ret = cache->ops->flush_page(cache, page->address, page->offset);
 			if(ret != 0 && ret != 1) {
-				dprintf("cache: failed to flush entry %" PRIo " (0x%" PRIpp ") in 0x%p: %d\n",
+				dprintf("cache: failed to flush entry %" PRIo " (0x%" PRIpp ") in %p: %d\n",
 				        page->offset, page->address, cache, ret);
 				mutex_unlock(&cache->lock);
 				return ret;

@@ -75,13 +75,13 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 
 	for(i = start; i < end; i += PAGE_SIZE) {
 		if(!page_map_remove(&kernel_page_map, i, &page)) {
-			fatal("Address 0x%p was not mapped while freeing", i);
+			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
 			pmm_free(page, 1);
 		}
 
-		dprintf("kheap: unmapped page 0x%" PRIpp " from 0x%p\n", page, i);
+		dprintf("kheap: unmapped page 0x%" PRIpp " from %p\n", page, i);
 	}
 
 	tlb_invalidate(NULL, start, end);
@@ -126,12 +126,12 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		if(!page_map_insert(&kernel_page_map, ret + i, page,
 		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
 		                    vmflag & MM_FLAG_MASK)) {
-			dprintf("kheap: failed to map page 0x%" PRIpp " to 0x%p\n", page, ret + i);
+			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", page, ret + i);
 			pmm_free(page, 1);
 			goto fail;
 		}
 
-		dprintf("kheap: mapped page 0x%" PRIpp " at 0x%p\n", page, ret + i);
+		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", page, ret + i);
 	}
 
 	memset((void *)ret, 0, (size_t)size);
@@ -217,11 +217,11 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 		if(!page_map_insert(&kernel_page_map, ret + i, base,
 		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
 		                    vmflag & MM_FLAG_MASK)) {
-			dprintf("kheap: failed to map page 0x%" PRIpp " to 0x%p\n", base, ret + i);
+			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", base, ret + i);
 			goto fail;
 		}
 
-		dprintf("kheap: mapped page 0x%" PRIpp " at 0x%p\n", base, ret + i);
+		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", base, ret + i);
 	}
 
 	mutex_unlock(&kheap_va_arena.lock);

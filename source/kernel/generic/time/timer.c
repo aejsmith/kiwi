@@ -70,7 +70,7 @@ int clock_source_set(clock_source_t *source) {
 		curr_clock->prep(curr_cpu->tick_len);
 	}
 
-	kprintf(LOG_DEBUG, "timer: activated clock source %s (source: 0x%p)\n", source->name, source);
+	kprintf(LOG_DEBUG, "timer: activated clock source %s (source: %p)\n", source->name, source);
 	return 0;
 }
 
@@ -109,7 +109,7 @@ intr_result_t clock_tick(void) {
 			break;
 		case TIMER_FUNCTION:
 			if(timer->func == NULL) {
-				fatal("Timer 0x%p has invalid function");
+				fatal("Timer %p has invalid function");
 			} else if(timer->func()) {
 				ret = INTR_RESCHEDULE;
 			}
@@ -118,7 +118,7 @@ intr_result_t clock_tick(void) {
 			wait_queue_wake(&timer->queue);
 			break;
 		default:
-			fatal("Bad timer action %d on 0x%p", timer->action, timer);
+			fatal("Bad timer action %d on %p", timer->action, timer);
 			break;
 		}
 	}
@@ -168,7 +168,7 @@ int timer_start(timer_t *timer, uint64_t length) {
 	bool state;
 
 	if(length <= 0) {
-		kprintf(LOG_DEBUG, "timer: attempted to start timer 0x%p with zero length\n", timer);
+		kprintf(LOG_DEBUG, "timer: attempted to start timer %p with zero length\n", timer);
 		return -ERR_PARAM_INVAL;
 	}
 

@@ -190,7 +190,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		/* Handle MM_FATAL ourselves rather than converting to vmflag
 		 * so that we get a more accurate error message. */
 		if(kmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (1)",
+			fatal("Could not perform mandatory allocation on object cache %p(%s) (1)",
 			      cache, cache->name);
 		}
 		return NULL;
@@ -202,7 +202,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		if(unlikely(slab == NULL)) {
 			/* Same as above. */
 			if(kmflag & MM_FATAL) {
-				fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (2)",
+				fatal("Could not perform mandatory allocation on object cache %p(%s) (2)",
 				      cache, cache->name);
 			}
 
@@ -227,7 +227,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 			if(unlikely(bufctl == NULL)) {
 				/* Same as above. */
 				if(kmflag & MM_FATAL) {
-					fatal("Could not perform mandatory allocation on object cache 0x%p(%s) (3)",
+					fatal("Could not perform mandatory allocation on object cache %p(%s) (3)",
 					      cache, cache->name);
 				}
 
@@ -282,7 +282,7 @@ static void slab_obj_free_internal(slab_cache_t *cache, void *obj) {
 		}
 
 		if(unlikely(bufctl == NULL)) {
-			fatal("Free(%s): object 0x%p not found in hash table", cache->name, obj);
+			fatal("Free(%s): object %p not found in hash table", cache->name, obj);
 		}
 
 		slab = bufctl->parent;
@@ -301,7 +301,7 @@ static void slab_obj_free_internal(slab_cache_t *cache, void *obj) {
 		 * will be at the end of the slab. */
 		slab = (slab_t *)(ROUND_DOWN((ptr_t)obj, cache->slab_size) + (cache->slab_size - sizeof(slab_t)));
 		if(unlikely(slab->parent != cache)) {
-			fatal("Free(%s): slab structure for 0x%p invalid (0x%p)", cache->name, obj, slab->parent);
+			fatal("Free(%s): slab structure for %p invalid (%p)", cache->name, obj, slab->parent);
 		}
 	}
 
@@ -605,7 +605,7 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	bool destroyed = false;
 	slab_magazine_t *mag;
 
-	dprintf("slab: reclaiming memory from cache 0x%p(%s)...\n", cache, cache->name);
+	dprintf("slab: reclaiming memory from cache %p(%s)...\n", cache, cache->name);
 
 	/* Run the cache's reclaim callback (if any) before attempting to
 	 * destroy magazines. */
@@ -659,7 +659,7 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 		if(likely(ret != NULL)) {
 			atomic_inc(&cache->alloc_total);
 			atomic_inc(&cache->alloc_current);
-			dprintf("slab: allocated 0x%p from cache 0x%p(%s) (magazine)\n", ret, cache, cache->name);
+			dprintf("slab: allocated %p from cache %p(%s) (magazine)\n", ret, cache, cache->name);
 			return ret;
 		}
 	}
@@ -669,7 +669,7 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	if(likely(ret != NULL)) {
 		atomic_inc(&cache->alloc_total);
 		atomic_inc(&cache->alloc_current);
-		dprintf("slab: allocated 0x%p from cache 0x%p(%s) (slab)\n", ret, cache, cache->name);
+		dprintf("slab: allocated %p from cache %p(%s) (slab)\n", ret, cache, cache->name);
 	}
 
 	return ret;
@@ -688,7 +688,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		if(likely(slab_cpu_obj_free(cache, obj))) {
 			atomic_dec(&cache->alloc_current);
-			dprintf("slab: freed 0x%p to cache 0x%p(%s) (magazine)\n", obj, cache, cache->name);
+			dprintf("slab: freed %p to cache %p(%s) (magazine)\n", obj, cache, cache->name);
 			return;
 		}
 	}
@@ -696,7 +696,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 	/* Cannot free to magazine layer, free to slab layer. */
 	slab_obj_free(cache, obj);
 	atomic_dec(&cache->alloc_current);
-	dprintf("slab: freed 0x%p to cache 0x%p(%s) (slab)\n", obj, cache, cache->name);
+	dprintf("slab: freed %p to cache %p(%s) (slab)\n", obj, cache, cache->name);
 }
 
 /** Initialize a slab cache.
@@ -798,7 +798,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	list_append(&slab_caches, &cache->header);
 	mutex_unlock(&slab_caches_lock);
 
-	dprintf("slab: created slab cache 0x%p(%s) (objsize: %u, slabsize: %u, align: %u)\n",
+	dprintf("slab: created slab cache %p(%s) (objsize: %u, slabsize: %u, align: %u)\n",
 		cache, cache->name, cache->obj_size, cache->slab_size, cache->align);
 	return 0;
 }

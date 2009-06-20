@@ -128,7 +128,7 @@ int vfs_mount_create(const char *type, int flags, vfs_mount_t **mountp) {
 	list_append(&vfs_mount_list, &mount->header);
 	mutex_unlock(&vfs_mount_list_lock);
 
-	dprintf("vfs: mounted filesystem 0x%p(%s) (mount: 0x%p, root: 0x%p)\n",
+	dprintf("vfs: mounted filesystem %p(%s) (mount: %p, root: %p)\n",
 	        mount->type, mount->type->name, mount, mount->root);
 	*mountp = mount;
 	return 0;

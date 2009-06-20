@@ -138,7 +138,7 @@ int vfs_node_free(vfs_node_t *node, bool destroy) {
 	if(node->cache != NULL) {
 		ret = cache_destroy(node->cache);
 		if(ret != 0) {
-			kprintf(LOG_NORMAL,"vfs: warning: failed to destroy node cache for 0x%p(%s): %d\n",
+			kprintf(LOG_NORMAL,"vfs: warning: failed to destroy node cache for %p(%s): %d\n",
 			        node, node->name, ret);
 			return ret;
 		}
@@ -156,7 +156,7 @@ int vfs_node_free(vfs_node_t *node, bool destroy) {
 		mutex_unlock(&node->parent->lock);
 	}
 
-	dprintf("vfs: freed node 0x%p(%s) (parent: 0x%p, mount: 0x%p)\n", node, node->name,
+	dprintf("vfs: freed node %p(%s) (parent: %p, mount: %p)\n", node, node->name,
 		node->parent, node->mount);
 
 	/* Free any name string. */
@@ -523,7 +523,7 @@ void vfs_node_release(vfs_node_t *node) {
 		return;
 	}
 
-	dprintf("vfs: node 0x%p(%s) is now unused, released\n", node, (node->name) ? node->name : "");
+	dprintf("vfs: node %p(%s) is now unused, released\n", node, (node->name) ? node->name : "");
 
 	if(node->mount) {
 		/* Add the node to the appropriate unused list. */
@@ -612,7 +612,7 @@ int vfs_node_create(vfs_node_t *parent, const char *name, vfs_node_type_t type, 
 
 	mutex_unlock(&parent->lock);
 
-	dprintf("vfs: created node 0x%p(%s) under 0x%p(%s) (type: %d)\n",
+	dprintf("vfs: created node %p(%s) under %p(%s) (type: %d)\n",
 	        node, node->name, parent, (parent->name) ? parent->name : "", type);
 
 	/* Store pointer to child if required. */
@@ -720,7 +720,7 @@ int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset,
 		total += count;
 	}
 
-	dprintf("vfs: read %" PRIs " bytes from offset 0x%" PRIx64 " in 0x%p(%s)\n",
+	dprintf("vfs: read %" PRIs " bytes from offset 0x%" PRIx64 " in %p(%s)\n",
 	        total, offset, node, node->name);
 	ret = 0;
 out:
@@ -833,7 +833,7 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 		total += count;
 	}
 
-	dprintf("vfs: wrote %" PRIs " bytes to offset 0x%" PRIx64 " in 0x%p(%s)\n",
+	dprintf("vfs: wrote %" PRIs " bytes to offset 0x%" PRIx64 " in %p(%s)\n",
 	        total, offset, node, node->name);
 	ret = 0;
 out:

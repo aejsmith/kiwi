@@ -233,7 +233,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	*threadp = thread;
 
-	dprintf("thread: created thread %" PRIu32 "(%s) (thread: 0x%p, owner: 0x%p)\n",
+	dprintf("thread: created thread %" PRIu32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
 	return 0;
 }
@@ -247,7 +247,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 void thread_destroy(thread_t *thread) {
 	spinlock_lock(&thread->lock, 0);
 
-	dprintf("thread: destroying thread %" PRIu32 "(%s) (thread: 0x%p, owner: %" PRIu32 ")\n",
+	dprintf("thread: destroying thread %" PRIu32 "(%s) (thread: %p, owner: %" PRIu32 ")\n",
 		thread->id, thread->name, thread, thread->owner->id);
 
 	assert(list_empty(&thread->header));

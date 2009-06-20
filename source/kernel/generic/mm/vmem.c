@@ -414,7 +414,7 @@ static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) 
 	/* Insert the segment after the span. */
 	list_add_after(&span->header, &seg->header);
 
-	dprintf("vmem: imported span [0x%" PRIx64 ", 0x%" PRIx64 ") to 0x%p(%s) from 0x%p(%s)\n",
+	dprintf("vmem: imported span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p(%s) from %p(%s)\n",
 		ret, ret + size, vmem, vmem->name, vmem->source, vmem->source->name);
 	return seg;
 }
@@ -447,7 +447,7 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 	vmem->ffunc(vmem->source, span->base, span->size);
 	mutex_lock(&vmem->lock, 0);
 
-	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") from 0x%p(%s) to 0x%p(%s)\n",
+	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") from %p(%s) to %p(%s)\n",
 		span->base, span->base + span->size, vmem, vmem->name, vmem->source, vmem->source->name);
 }
 
@@ -521,7 +521,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			seg = vmem_import(vmem, size, vmflag);
 			if(seg == NULL) {
 				if(vmflag & MM_FATAL) {
-					fatal("Could not perform mandatory allocation on arena 0x%p(%s)",
+					fatal("Could not perform mandatory allocation on arena %p(%s)",
 					      vmem, vmem->name);
 				}
 				mutex_unlock(&vmem->lock);
@@ -529,7 +529,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			}
 		} else {
 			if(vmflag & MM_FATAL) {
-				fatal("Could not perform mandatory allocation on arena 0x%p(%s)",
+				fatal("Could not perform mandatory allocation on arena %p(%s)",
 				      vmem, vmem->name);
 			} else if(vmflag & MM_SLEEP) {
 				fatal("Waiting for Vmem allocations not implemented");
@@ -581,7 +581,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		if(tag->base != addr) {
 			continue;
 		} else if(tag->size != size) {
-			fatal("Bad Vmem 0x%p(%s) free: size: %" PRIu64 ", segment: %" PRIu64,
+			fatal("Bad Vmem %p(%s) free: size: %" PRIu64 ", segment: %" PRIu64,
 			      vmem, vmem->name, size, tag->size);
 		}
 
@@ -621,7 +621,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		return;
 	}
 
-	fatal("Bad Vmem 0x%p(%s) free: cannot find segment 0x%" PRIx64, vmem, vmem->name, addr);
+	fatal("Bad Vmem %p(%s) free: cannot find segment 0x%" PRIx64, vmem, vmem->name, addr);
 }
 
 /** Allocate a segment from a Vmem arena.
@@ -690,7 +690,7 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 
 	/* The new span should not overlap an existing span. */
 	if(vmem_span_overlaps(vmem, base, base + size)) {
-		fatal("Tried to add overlapping span [0x%" PRIx64 ", 0x%" PRIx64 ") to 0x%p",
+		fatal("Tried to add overlapping span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p",
 			base, base + size, vmem);
 	}
 
@@ -718,7 +718,7 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	list_add_after(&span->header, &seg->header);
 	vmem_freelist_insert(vmem, seg);
 
-	dprintf("vmem: added span [0x%" PRIx64 ", 0x%" PRIx64 ") to 0x%p(%s)\n",
+	dprintf("vmem: added span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p(%s)\n",
 	        base, base + size, vmem, vmem->name);
 	mutex_unlock(&vmem->lock);
 	return 0;
@@ -829,7 +829,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 		mutex_unlock(&vmem_lock);
 	}
 
-	dprintf("vmem: created arena 0x%p(%s) (quantum: %" PRIs ", source: 0x%p)\n",
+	dprintf("vmem: created arena %p(%s) (quantum: %" PRIs ", source: %p)\n",
 		vmem, vmem->name, quantum, source);
 	return 0;
 qcache_fail:
@@ -996,12 +996,12 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	}
 
 	/* Print out basic information. */
-	kprintf(LOG_NONE, "Arena 0x%p: %s\n", vmem, vmem->name);
+	kprintf(LOG_NONE, "Arena %p: %s\n", vmem, vmem->name);
 	kprintf(LOG_NONE, "============================================================\n");
 	kprintf(LOG_NONE, "Quantum: %" PRIs "  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %" PRIs "\n",
 	            vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
 	if(vmem->source) {
-		kprintf(LOG_NONE, "Source: 0x%p(%s)  Imported: %" PRIu64 "\n\n",
+		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",
 		            vmem->source, vmem->source->name, vmem->imported_size);
 	} else {
 		kprintf(LOG_NONE, "\n");

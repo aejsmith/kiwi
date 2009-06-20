@@ -83,7 +83,7 @@ int vfs_type_register(vfs_type_t *type) {
 	list_init(&type->header);
 	list_append(&vfs_type_list, &type->header);
 
-	dprintf("vfs: registered filesystem type 0x%p(%s)\n", type, type->name);
+	dprintf("vfs: registered filesystem type %p(%s)\n", type, type->name);
 	mutex_unlock(&vfs_type_list_lock);
 	return 0;
 }

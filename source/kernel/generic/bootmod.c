@@ -148,7 +148,7 @@ void bootmod_load(void) {
 			for(j = 0; j < bootmod_handler_count; j++) {
 				ret = bootmod_handlers[j](&bootmod_array[i]);
 				if(ret == 1) {
-					kprintf(LOG_DEBUG, "bootmod: loaded module %s (addr: 0x%p, size: %u)\n",
+					kprintf(LOG_DEBUG, "bootmod: loaded module %s (addr: %p, size: %u)\n",
 					        bootmod_array[i].name, bootmod_array[i].addr,
 					        bootmod_array[i].size);
 					bootmod_array[i].loaded = true;

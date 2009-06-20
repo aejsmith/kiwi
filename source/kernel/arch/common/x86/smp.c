@@ -76,7 +76,7 @@ static void smp_boot(cpu_t *cpu) {
 	size_t size;
 	void *stack;
 
-	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 " (0x%p)...\n", cpu->id, cpu);
+	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 " (%p)...\n", cpu->id, cpu);
 	atomic_set(&ap_boot_wait, 0);
 
 	/* Copy the trampoline code to 0x7000 and set the entry point address. */

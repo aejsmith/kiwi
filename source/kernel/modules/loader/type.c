@@ -64,7 +64,7 @@ int loader_type_register(loader_type_t *type) {
 	list_append(&exec_type_list, &type->header);
 	mutex_unlock(&exec_type_list_lock);
 
-	dprintf("loader: registered executable type 0x%p(%s)\n", type, type->name);
+	dprintf("loader: registered executable type %p(%s)\n", type, type->name);
 	return 0;
 }
 MODULE_EXPORT(loader_type_register);

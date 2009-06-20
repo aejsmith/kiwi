@@ -170,7 +170,7 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 	}
 
 	/* To userspace, and beyond! */
-	dprintf("loader: entering userspace (entry: 0x%p, stack: 0x%p)\n", entry, stack);
+	dprintf("loader: entering userspace (entry: %p, stack: %p)\n", entry, stack);
 	uspace_entry(entry, stack);
 	fatal("Returned from uspace_entry!");
 fail:

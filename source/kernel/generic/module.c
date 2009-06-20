@@ -197,7 +197,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 	}
 
 	if(module->load_size == 0) {
-		dprintf("module: no loadable sections in module 0x%p\n", module);
+		dprintf("module: no loadable sections in module %p\n", module);
 		return -ERR_OBJ_FORMAT_BAD;
 	}
 
@@ -215,7 +215,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 			}
 			sect->sh_addr = (elf_addr_t)dest;
 
-			dprintf("module: loading data for section %u to 0x%p (size: %u, type: %u)\n",
+			dprintf("module: loading data for section %u to %p (size: %u, type: %u)\n",
 			        i, dest, sect->sh_size, sect->sh_type);
 
 			if(sect->sh_type == ELF_SHT_NOBITS) {
@@ -282,7 +282,7 @@ static int module_elf_load_symbols(module_t *module) {
 		                    sym->st_size, (ELF_ST_BIND(sym->st_info)) ? true : false,
 		                    false);
 
-		dprintf("module: added symbol %s to module 0x%p (addr: 0x%p, size: 0x%p)\n",
+		dprintf("module: added symbol %s to module %p (addr: %p, size: %p)\n",
 			strtab + sym->st_name, module, sym->st_value, sym->st_size);
 	}
 
@@ -343,14 +343,14 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 			/* Find the symbol and mark it as exported. */
 			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
 			if(sym == NULL) {
-				dprintf("module: exported symbol 0x%p in module 0x%p cannot be found\n",
+				dprintf("module: exported symbol %p in module %p cannot be found\n",
 				        export, module);
 				return -ERR_OBJ_FORMAT_BAD;
 			}
 
 			sym->exported = true;
 
-			dprintf("module: exported symbol %s in module 0x%p\n", export, module);
+			dprintf("module: exported symbol %s in module %p\n", export, module);
 		}
 	}
 
@@ -413,7 +413,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			/* Meh, ignore it. */
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
-			kprintf(LOG_DEBUG, "module: module 0x%p(%s) depends on itself\n", module, module->name);
+			kprintf(LOG_DEBUG, "module: module %p(%s) depends on itself\n", module, module->name);
 			return -ERR_OBJ_FORMAT_BAD;
 		}
 
@@ -508,11 +508,11 @@ int module_load(void *image, size_t size, char *depbuf) {
 	module->init = module_lookup_pointer(module, "__module_init");
 	module->unload = module_lookup_pointer(module, "__module_unload");
 	if(!module->name || !module->description || !module->init) {
-		kprintf(LOG_DEBUG, "module: information for module 0x%p is invalid\n", module);
+		kprintf(LOG_DEBUG, "module: information for module %p is invalid\n", module);
 		ret = -ERR_OBJ_FORMAT_BAD;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
-		kprintf(LOG_DEBUG, "module: name of module 0x%p is too long\n", module);
+		kprintf(LOG_DEBUG, "module: name of module %p is too long\n", module);
 		ret = -ERR_OBJ_FORMAT_BAD;
 		goto fail;
 	}
@@ -543,7 +543,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 	list_append(&module_list, &module->header);
 
 	/* Call the module initialization function. */
-	dprintf("module: calling init function 0x%p for module 0x%p(%s)...\n",
+	dprintf("module: calling init function %p for module %p(%s)...\n",
 		module->init, module, module->name);
 	ret = module->init();
 	if(ret != 0) {
@@ -552,7 +552,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 		goto fail;
 	}
 
-	kprintf(LOG_DEBUG, "module: successfully loaded module 0x%p(%s)\n", module, module->name);
+	kprintf(LOG_DEBUG, "module: successfully loaded module %p(%s)\n", module, module->name);
 	mutex_unlock(&module_lock);
 	return 0;
 fail:

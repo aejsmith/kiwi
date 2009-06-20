@@ -101,7 +101,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 		end = ROUND_UP(data->phdrs[i].p_vaddr + data->phdrs[i].p_memsz, PAGE_SIZE);
 		size = end - start;
 
-		dprintf("loader: loading BSS for %" PRIs " to 0x%p (size: %" PRIs ")\n", i, start, size);
+		dprintf("loader: loading BSS for %" PRIs " to %p (size: %" PRIs ")\n", i, start, size);
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
@@ -134,7 +134,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	size = end - start;
 	offset = ROUND_DOWN(data->phdrs[i].p_offset, PAGE_SIZE);
 
-	dprintf("elf: loading PHDR %" PRIs " to 0x%p (size: %" PRIs ")\n", i, start, size);
+	dprintf("elf: loading PHDR %" PRIs " to %p (size: %" PRIs ")\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - aspace_insert() will reject the call if they
@@ -324,7 +324,7 @@ int loader_elf_abi_register(loader_elf_abi_t *abi) {
 	list_init(&abi->header);
 	list_append(&elf_abi_list, &abi->header);
 
-	dprintf("loader: registered ELF ABI type 0x%p(%s:%d)\n", abi, abi->string, abi->num);
+	dprintf("loader: registered ELF ABI type %p(%s:%d)\n", abi, abi->string, abi->num);
 	mutex_unlock(&elf_abi_list_lock);
 	return 0;
 }
