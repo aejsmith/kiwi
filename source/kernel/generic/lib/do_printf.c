@@ -307,6 +307,9 @@ int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args)
 		case 'p':
 			/* Print lower-case and as though # was specified. */
 			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX);
+			if(precision == -1) {
+				precision = 1;
+			}
 
 			/* Pointers should not go through number conversion. */
 			printf_number_helper((ptr_t)va_arg(args, void *),
