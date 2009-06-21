@@ -309,7 +309,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 	AVLTREE_FOREACH(&process_tree, iter) {
 		process = avltree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7" PRIs " %-18p %-9s %s\n",
+		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7zu %-18p %-9s %s\n",
 			process->id, process->priority, process->flags,
 			process->num_threads, process->aspace,
 		        (process->subsystem) ? process->subsystem->name : "None",

@@ -96,7 +96,7 @@ void *kmalloc(size_t size, int kmflag) {
 	addr = kheap_alloc(ROUND_UP(total, PAGE_SIZE), (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(addr == NULL) {
 		if(kmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation (%" PRIs " bytes)", size);
+			fatal("Could not perform mandatory allocation (%zu bytes)", size);
 		}
 		return NULL;
 	}
@@ -192,7 +192,7 @@ void malloc_init(void) {
 	for(i = 0; i < ARRAYSZ(kmalloc_caches); i++) {
 		size = (1 << (i + KMALLOC_CACHE_MIN));
 
-		snprintf(name, SLAB_NAME_MAX, "kmalloc_%" PRIs, size);
+		snprintf(name, SLAB_NAME_MAX, "kmalloc_%zu", size);
 		name[SLAB_NAME_MAX - 1] = 0;
 
 		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,

@@ -720,7 +720,7 @@ int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset,
 		total += count;
 	}
 
-	dprintf("vfs: read %" PRIs " bytes from offset 0x%" PRIx64 " in %p(%s)\n",
+	dprintf("vfs: read %zu bytes from offset 0x%" PRIx64 " in %p(%s)\n",
 	        total, offset, node, node->name);
 	ret = 0;
 out:
@@ -833,7 +833,7 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 		total += count;
 	}
 
-	dprintf("vfs: wrote %" PRIs " bytes to offset 0x%" PRIx64 " in %p(%s)\n",
+	dprintf("vfs: wrote %zu bytes to offset 0x%" PRIx64 " in %p(%s)\n",
 	        total, offset, node, node->name);
 	ret = 0;
 out:

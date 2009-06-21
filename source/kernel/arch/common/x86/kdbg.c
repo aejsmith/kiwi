@@ -200,7 +200,7 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	/* Print out the address of where the exception occurred. */
 	sym = symbol_lookup_addr(curr_kdbg_frame->ip, &off);
 	kprintf(LOG_NONE, "--- Interrupt ---\n");
-	kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", curr_kdbg_frame->ip,
+	kprintf(LOG_NONE, "[%p] %s+0x%zx\n", curr_kdbg_frame->ip,
 	        (sym) ? sym->name : "<unknown>", off);
 
 	kprintf(LOG_NONE, "--- Stacktrace ---\n");
@@ -209,7 +209,7 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 			break;
 		}
 		sym = symbol_lookup_addr(frame->addr, &off);
-		kprintf(LOG_NONE, "[%p] %s+0x%" PRIxs "\n", frame->addr,
+		kprintf(LOG_NONE, "[%p] %s+0x%zx\n", frame->addr,
 		        (sym) ? sym->name : "<unknown>", off);
 		frame = frame->next;
 	}
@@ -241,7 +241,7 @@ int kdbg_cmd_bdelete(int argc, char **argv) {
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %zu invalid\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -275,7 +275,7 @@ int kdbg_cmd_bdisable(int argc, char **argv) {
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid.\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %zu invalid.\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -307,7 +307,7 @@ int kdbg_cmd_benable(int argc, char **argv) {
 	num = strtoul(argv[1], NULL, 0);
 
 	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %" PRIs " invalid\n", num);
+		kprintf(LOG_NONE, "Breakpoint number %zu invalid\n", num);
 		return KDBG_FAIL;
 	}
 
@@ -348,7 +348,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 				continue;
 			}
 			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_NONE, "Breakpoint %" PRIs ": [%p] %s+0x%" PRIxs " (%s)\n", i,
+			kprintf(LOG_NONE, "Breakpoint %zu: [%p] %s+0x%zx (%s)\n", i,
 			            kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
 			            off, (kdbg_breakpoints[i].enabled) ? "enabled" : "disabled");
 		}
@@ -373,7 +373,7 @@ int kdbg_cmd_break(int argc, char **argv) {
 			kdbg_breakpoints[i].addr = (ptr_t)addr;
 
 			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_NONE, "Created breakpoint %" PRIs ": [%p] %s+0x%" PRIxs "\n",
+			kprintf(LOG_NONE, "Created breakpoint %zu: [%p] %s+0x%zx\n",
 			        i, addr, (sym) ? sym->name : "<unknown>", off);
 			return KDBG_OK;
 		}

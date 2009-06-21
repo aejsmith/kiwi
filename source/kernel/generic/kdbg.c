@@ -696,7 +696,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 				return KDBG_STEP;
 			}
 		} else {
-			kprintf(LOG_NONE, "KDBG: Warning: Non-step entry with %" PRIs " steps remaining\n",
+			kprintf(LOG_NONE, "KDBG: Warning: Non-step entry with %zu steps remaining\n",
 			        kdbg_step_count);
 			kdbg_step_count = 0;
 			pcount = 0;
@@ -712,13 +712,13 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	sym = symbol_lookup_addr(frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
-		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%zx\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else if(reason == KDBG_ENTRY_STEPPED) {
-		kprintf(LOG_NONE, "Stepped to [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "Stepped to [%p] %s+0x%zx\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	} else {
-		kprintf(LOG_NONE, "\nEntered KDBG from [%p] %s+0x%" PRIxs "\n",
+		kprintf(LOG_NONE, "\nEntered KDBG from [%p] %s+0x%zx\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
 	}
 

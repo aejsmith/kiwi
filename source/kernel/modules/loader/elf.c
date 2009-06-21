@@ -91,7 +91,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? AS_REGION_WRITE : 0);
 	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? AS_REGION_READ  : 0);
 	if(flags == 0) {
-		dprintf("loader: PHDR %" PRIs " has no protection flags set\n", i);
+		dprintf("loader: PHDR %zu has no protection flags set\n", i);
 		return -ERR_OBJ_FORMAT_BAD;
 	}
 
@@ -101,12 +101,12 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 		end = ROUND_UP(data->phdrs[i].p_vaddr + data->phdrs[i].p_memsz, PAGE_SIZE);
 		size = end - start;
 
-		dprintf("loader: loading BSS for %" PRIs " to %p (size: %" PRIs ")\n", i, start, size);
+		dprintf("loader: loading BSS for %zu to %p (size: %zu)\n", i, start, size);
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
 		if((flags & AS_REGION_WRITE) == 0) {
-			dprintf("loader: PHDR %" PRIs " should be writeable\n", i);
+			dprintf("loader: PHDR %zu should be writeable\n", i);
 			return -ERR_OBJ_FORMAT_BAD;
 		}
 
@@ -134,7 +134,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	size = end - start;
 	offset = ROUND_DOWN(data->phdrs[i].p_offset, PAGE_SIZE);
 
-	dprintf("elf: loading PHDR %" PRIs " to %p (size: %" PRIs ")\n", i, start, size);
+	dprintf("elf: loading PHDR %zu to %p (size: %zu)\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - aspace_insert() will reject the call if they

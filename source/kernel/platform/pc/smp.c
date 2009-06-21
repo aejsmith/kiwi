@@ -202,5 +202,5 @@ void smp_detect_cpus(void) {
 		}
 	}
 
-	kprintf(LOG_DEBUG, "smp: detected %" PRIs " CPU(s)\n", cpu_count);
+	kprintf(LOG_DEBUG, "smp: detected %zu CPU(s)\n", cpu_count);
 }

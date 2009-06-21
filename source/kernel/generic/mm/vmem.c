@@ -794,7 +794,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	if(vmem->qcache_max) {
 		memset(vmem->qcache, 0, sizeof(vmem->qcache));
 		for(i = 0; i < (vmem->qcache_max / vmem->quantum); i++) {
-			snprintf(qcname, SLAB_NAME_MAX, "%s_%" PRIs, vmem->name, (i + 1) * vmem->quantum);
+			snprintf(qcname, SLAB_NAME_MAX, "%s_%zu", vmem->name, (i + 1) * vmem->quantum);
 			qcname[SLAB_NAME_MAX - 1] = 0;
 
 			vmem->qcache[i] = slab_cache_create(qcname, (i + 1) * vmem->quantum,
@@ -829,7 +829,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 		mutex_unlock(&vmem_lock);
 	}
 
-	dprintf("vmem: created arena %p(%s) (quantum: %" PRIs ", source: %p)\n",
+	dprintf("vmem: created arena %p(%s) (quantum: %zu, source: %p)\n",
 		vmem, vmem->name, quantum, source);
 	return 0;
 qcache_fail:
@@ -937,7 +937,7 @@ static void vmem_dump_list(list_t *header, int indent) {
 	LIST_FOREACH(header, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
-		kprintf(LOG_NONE, "%*s%-*s %-16" PRIu64 " %-16" PRIu64 " %" PRIs "\n",
+		kprintf(LOG_NONE, "%*s%-*s %-16" PRIu64 " %-16" PRIu64 " %zu\n",
 		            indent, "", VMEM_NAME_MAX - indent, vmem->name,
 		            vmem->total_size, vmem->used_size, vmem->alloc_count);
 		vmem_dump_list(&vmem->children, indent + 2);
@@ -998,7 +998,7 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	/* Print out basic information. */
 	kprintf(LOG_NONE, "Arena %p: %s\n", vmem, vmem->name);
 	kprintf(LOG_NONE, "============================================================\n");
-	kprintf(LOG_NONE, "Quantum: %" PRIs "  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %" PRIs "\n",
+	kprintf(LOG_NONE, "Quantum: %zu  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %zu\n",
 	            vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
 	if(vmem->source) {
 		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",

@@ -152,7 +152,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 	slab_bufctl_t *bufctl;
 
 	if(unlikely(slab->refcount != 0)) {
-		fatal("Slab (%s) has %" PRIs " references while destructing",
+		fatal("Slab (%s) has %zu references while destructing",
 		      cache->name, slab->refcount);
 	}
 
@@ -968,7 +968,7 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
-		kprintf(LOG_NONE, "%-*s %-6" PRIs " %-8" PRIs " %-9" PRIs " %-5d %-7d %d\n",
+		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-7d %d\n",
 		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
 		        cache->slab_size, cache->flags, atomic_get(&cache->alloc_current),
 		        atomic_get(&cache->alloc_total));

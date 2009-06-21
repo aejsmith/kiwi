@@ -303,7 +303,7 @@ static inline void thread_dump(thread_t *thread, int level) {
 	default:		kprintf(level, "Bad      "); break;
 	}
 
-	kprintf(level, "%-4" PRIu32 " %-4" PRIs " %-5d %-20s %s\n", (thread->cpu) ? thread->cpu->id : 0,
+	kprintf(level, "%-4" PRIu32 " %-4zu %-5d %-20s %s\n", (thread->cpu) ? thread->cpu->id : 0,
 		thread->priority, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
 		thread->name);
 }

@@ -55,7 +55,7 @@ static bool pmm_zero_range(phys_ptr_t base, size_t count, int pmflag) {
 	mapping = page_phys_map(base, (count * PAGE_SIZE), (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(mapping == NULL) {
 		if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %" PRIs " pages (2)", count);
+			fatal("Could not perform mandatory allocation of %zu pages (2)", count);
 		}
 		return false;
 	}
@@ -98,7 +98,7 @@ phys_ptr_t pmm_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 		if(slab_reclaim()) {
 			continue;
 		} else if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %" PRIs " pages (1)", count);
+			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		} else {
 			return 0;
 		}
@@ -156,7 +156,7 @@ phys_ptr_t pmm_alloc(size_t count, int pmflag) {
 		if(slab_reclaim()) {
 			continue;
 		} else if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %" PRIs " pages (1)", count);
+			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		} else {
 			return 0;
 		}
@@ -275,5 +275,5 @@ void pmm_init_reclaim(void) {
 		reclaimed += size;
 	}
 
-	kprintf(LOG_DEBUG, "pmm: reclaimed %" PRIs " KiB unused kernel memory\n", (reclaimed / 1024));
+	kprintf(LOG_DEBUG, "pmm: reclaimed %zu KiB unused kernel memory\n", (reclaimed / 1024));
 }
