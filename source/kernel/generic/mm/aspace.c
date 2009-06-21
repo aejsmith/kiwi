@@ -846,7 +846,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	AVLTREE_FOREACH(&as->regions, iter) {
 		region = avltree_entry(iter, aspace_region_t);
 
-		kprintf(LOG_NONE, "%-16p %-16p %-6d %p+%" PRIo " %s\n",
+		kprintf(LOG_NONE, "%-18p %-18p %-6d %p+%" PRIo " %s\n",
 		        region->start, region->end, region->flags,
 		        region->source, region->offset,
 			(region->source) ? region->source->name : "");
