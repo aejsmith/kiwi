@@ -1,4 +1,4 @@
-/* Kiwi userspace startup application
+/* Kiwi IA32-specific thread structure
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,24 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		IA32-specific thread structure.
  */
 
-.global _start
-.type _start, @function
-_start:
-#if __amd64__
-	movq	$0, %rax
-	movq	$1337, %rdi
-	syscall
-	movq	$0, %rax
-	movq	$42, %rdi
-	syscall
-1:	jmp	1b
-#else
-1:	jmp	1b
-#endif
-.size _start, .-_start
+#ifndef __ARCH_THREAD_H
+#define __ARCH_THREAD_H
+
+#include <types.h>
+
+struct thread;
+
+/** IA32-specific thread structure. */
+typedef struct thread_arch {
+	/* Nothing happens. */
+} __packed thread_arch_t;
+
+extern void thread_arch_post_switch(struct thread *thread);
+
+extern int thread_arch_init(struct thread *thread);
+extern void thread_arch_destroy(struct thread *thread);
+
+#endif /* __ARCH_THREAD_H */

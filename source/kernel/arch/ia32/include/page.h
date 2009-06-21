@@ -44,10 +44,13 @@
 
 #ifndef __ASM__
 
+#include <sync/mutex.h>
+
 #include <types.h>
 
 /** Architecture-specific page map structure. */
 typedef struct page_map {
+	mutex_t lock;			/**< Lock to protect page map. */
 	phys_ptr_t pdp;			/**< Physical address of PDP. */
 	bool user;			/**< Whether pages mapped should be userspace accessible. */
 
@@ -55,26 +58,6 @@ typedef struct page_map {
 	ptr_t first;			/**< First allowed page. */
 	ptr_t last;			/**< Last allowed page. */
 } page_map_t;
-
-/** Structure of a page table entry. */
-typedef struct pte {
-	unsigned present : 1;		/**< Present (P) flag. */
-	unsigned writable : 1;		/**< Read/write (R/W) flag. */
-	unsigned user : 1;		/**< User/supervisor (U/S) flag. */
-	unsigned pwt : 1;		/**< Page-level write through (PWT) flag. */
-	unsigned pcd : 1;		/**< Page-level cache disable (PCD) flag. */
-	unsigned accessed : 1;		/**< Accessed (A) flag. */
-	unsigned dirty : 1;		/**< Dirty (D) flag. */
-	unsigned large : 1;		/**< Page size (PS) flag (page directory). */
-	unsigned global : 1;		/**< Global (G) flag. */
-	unsigned avail : 3;		/**< Available for use. */
-	unsigned address : 24;		/**< Page base address. */
-	unsigned reserved: 27;		/**< Reserved. */
-	unsigned noexec : 1;		/**< No-Execute (NX) flag. */
-} __packed pte_t;
-
-/** Type that allows a page table entry to be accessed as a single value. */
-typedef uint64_t pte_simple_t;
 
 extern void page_late_init(void);
 
