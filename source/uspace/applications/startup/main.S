@@ -30,6 +30,12 @@ _start:
 	syscall
 1:	jmp	1b
 #else
+	movl	$0, %eax
+	movl	$1337, %edi
+	int	$0x80
+	movl	$0, %eax
+	movl	$42, %edi
+	int	$0x80
 1:	jmp	1b
 #endif
 .size _start, .-_start

@@ -211,7 +211,6 @@ __syscall_entry:
 
 	/* Push arguments. R10 is used over RCX for the fourth argument, as
 	 * RCX is used by SYSCALL to store the return address. */
-	push	%r9
 	push	%r8
 	push	%r10
 	push	%rdx
@@ -235,7 +234,7 @@ __syscall_entry:
 	 * syscall_handler() - see comment above about why they are saved in
 	 * the first place. */
 	cli
-	addq	$104, %rsp
+	addq	$96, %rsp
 	pop	%r11
 	pop	%rcx
 	pop	%rsp

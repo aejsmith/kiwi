@@ -22,11 +22,29 @@
 #include <arch/descriptor.h>
 #include <arch/io.h>
 #include <arch/page.h>
+#include <arch/syscall.h>
 #include <arch/x86/lapic.h>
 
 #include <cpu/cpu.h>
+#include <cpu/intr.h>
+
+#include <proc/syscall.h>
 
 #include <fatal.h>
+
+/** System call handler function.
+ * @param num		Interrupt number.
+ * @param frame		Interrupt stack frame.
+ * @return		Always returns INTR_HANDLED. */
+static intr_result_t syscall_intr_handler(unative_t num, intr_frame_t *frame) {
+	frame->ax = syscall_handler((syscall_frame_t *)frame);
+	return INTR_HANDLED;
+}
+
+/** Set up the system call interrupt handler. */
+static void syscall_init(void) {
+	intr_register(SYSCALL_INT_NO, syscall_intr_handler);
+}
 
 /** IA32 architecture startup code.
  *
@@ -47,6 +65,7 @@ void arch_premm_init(void *data) {
  */
 void arch_postmm_init(void) {
 	lapic_init();
+	syscall_init();
 }
 
 /** IA32 architecture startup code.

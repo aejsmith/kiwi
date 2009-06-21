@@ -55,5 +55,5 @@ unative_t syscall_handler(syscall_frame_t *frame) {
 	}
 
 	return subsystem->syscalls[frame->id](frame->p1, frame->p2, frame->p3,
-	                                      frame->p4, frame->p5, frame->p6);
+	                                      frame->p4, frame->p5);
 }

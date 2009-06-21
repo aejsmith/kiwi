@@ -21,6 +21,7 @@
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/syscall.h>
 #include <arch/x86/fault.h>
 #include <arch/x86/sysreg.h>
 
@@ -133,6 +134,10 @@ static void idt_init(void) {
 	idt[FAULT_DOUBLE].sel = SEG_DF_TSS;
 	idt[FAULT_DOUBLE].base0 = 0;
 	idt[FAULT_DOUBLE].base1 = 0;
+
+	/* Modify the system call entry's DPL to be 3. The system call handler
+	 * is added in arch.c. */
+	idt[SYSCALL_INT_NO].flags |= 0x60;
 
 	/* Now we can fill out the interrupt handler table. Entries 0-31 are
 	 * exceptions. */
