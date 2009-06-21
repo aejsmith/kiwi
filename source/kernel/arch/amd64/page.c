@@ -181,11 +181,13 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 		return false;
 	}
 
+	/* Check that the mapping doesn't already exist. */
 	pte = (virt % 0x200000) / PAGE_SIZE;
 	if(ptbl[pte] & PG_PRESENT) {
 		fatal("Mapping %p which is already mapped", virt);
 	}
 
+	/* Map the address in. */
 	val = phys | PG_PRESENT;
 	val |= ((map->user) ? PG_USER : PG_GLOBAL);
 	val |= ((prot & PAGE_MAP_WRITE) ? PG_WRITE : 0);
