@@ -305,10 +305,12 @@ int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args)
 			base = 8;
 			break;
 		case 'p':
-			/* Print lower-case and as though # was specified. */
-			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX);
-			if(precision == -1) {
-				precision = 1;
+			/* Print lower-case and as though # was specified.
+			 * Also zero pad up to the width of a pointer, because
+			 * I like it like that. */
+			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX | PRINTF_ZERO_PAD);
+			if(width == -1) {
+				width = (sizeof(void *) * 2) + 2;
 			}
 
 			/* Pointers should not go through number conversion. */
