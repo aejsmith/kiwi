@@ -1,4 +1,4 @@
-/* Kiwi userspace startup application
+/* Kiwi safe user memory access functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,32 +15,22 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Safe user memory access functions.
  */
 
-.global _start
-.type _start, @function
-_start:
-#if __amd64__
-	movq	$0, %rax
-	movq	$message1, %rdi
-	syscall
-	movq	$0, %rax
-	movq	$message2, %rdi
-	syscall
-1:	jmp	1b
-#else
-	movl	$0, %eax
-	movl	$1337, %edi
-	int	$0x80
-	movl	$0, %eax
-	movl	$42, %edi
-	int	$0x80
-1:	jmp	1b
-#endif
-.size _start, .-_start
+#ifndef __MM_SAFE_H
+#define __MM_SAFE_H
 
-.section .data
+#include <mm/flags.h>
 
-message1:	.asciz "Hello from userspace!"
-message2:	.asciz "This is another message."
+#include <types.h>
+
+extern int memcpy_from_user(void *dest, const void *src, size_t count);
+extern int memcpy_to_user(void *dest, const void *src, size_t count);
+extern int memset_user(void *dest, int val, size_t count);
+extern int strlen_user(const char *str, size_t *lenp);
+extern int strcpy_from_user(char *dest, const char *src);
+
+extern int strdup_from_user(const void *src, int mmflag, char **destp);
+
+#endif /* __MM_SAFE_H */

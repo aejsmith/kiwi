@@ -34,6 +34,8 @@
 
 #include <mm/aspace.h>
 
+#include <proc/thread.h>
+
 #include <assert.h>
 #include <fatal.h>
 #include <kdbg.h>
@@ -112,6 +114,10 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	 * address. */
 	if(addr < (ASPACE_BASE + ASPACE_SIZE)) {
 		if(aspace_pagefault(addr, reason, access) == PF_STATUS_OK) {
+			return true;
+		} else if(atomic_get(&curr_thread->in_usermem)) {
+			kprintf(LOG_DEBUG, "arch: pagefault in usermem at 0x%p (ip: 0x%p)\n", addr, frame->ip);
+			context_restore_frame(&curr_thread->usermem_context, frame);
 			return true;
 		}
 	}

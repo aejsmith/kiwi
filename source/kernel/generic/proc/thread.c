@@ -203,6 +203,8 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	/* Initialize the thread context. */
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
+	atomic_set(&thread->in_usermem, 0);
+
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;

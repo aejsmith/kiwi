@@ -72,6 +72,10 @@ typedef struct thread {
 		THREAD_DEAD,		/**< Thread is dead and awaiting cleanup. */
 	} state;
 
+	/** Information used by user memory functions. */
+	atomic_t in_usermem;		/**< Whether the thread is in the user memory access functions. */
+	context_t usermem_context;	/**< Context to restore upon user memory access fault. */
+
 	/** Thread entry function. */
 	thread_func_t entry;		/**< Entry function for the thread. */
 	void *arg1;			/**< First argument to thread entry function. */

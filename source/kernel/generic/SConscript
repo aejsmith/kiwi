@@ -55,6 +55,7 @@ env['OBJFILES'] += [
 	env.Object('mm/kheap.c'),
 	env.Object('mm/malloc.c'),
 	env.Object('mm/pmm.c'),
+	env.Object('mm/safe.c'),
 	env.Object('mm/slab.c'),
 	env.Object('mm/tlb.c'),
 	env.Object('mm/vmem.c'),

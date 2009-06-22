@@ -24,20 +24,32 @@
 
 #include <loader/elf.h>
 
+#include <mm/malloc.h>
+#include <mm/safe.h>
+
 #include <fatal.h>
 #include <module.h>
 
-/** Test system call.
- * @param num		Test number.
- * @return		0. */
-static int posix_test(int num) {
-	kprintf(LOG_NORMAL, "POSIX: Received test syscall, parameter %d\n", num);
+/** Print a message to the console.
+ * @param addr		Pointer to string to write.
+ * @return		Always returns 0. */
+static int posix_message(const char *addr) {
+	char *str;
+	int ret;
+
+	ret = strdup_from_user(addr, MM_SLEEP, &str);
+	if(ret != 0) {
+		return ret;
+	}
+
+	kprintf(LOG_NORMAL, "posix_print(%p): %s\n", addr, str);
+	kfree(str);
 	return 0;
 }
 
 /** POSIX system call list. */
 static syscall_handler_t posix_syscalls[] = {
-	(syscall_handler_t)posix_test,
+	(syscall_handler_t)posix_message,
 };
 
 /** POSIX ELF ABI definition structure. */

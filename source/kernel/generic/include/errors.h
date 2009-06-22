@@ -35,5 +35,6 @@
 #define ERR_OBJ_NOT_FOUND	11	/**< Requested object not found. */
 #define ERR_OBJ_TYPE_INVAL	12	/**< Object type is invalid. */
 #define ERR_OBJ_READ_ONLY	13	/**< Object cannot be modified. */
+#define ERR_ADDR_INVAL		14	/**< A bad memory location was specified. */
 
 #endif /* __ERRORS_H */
