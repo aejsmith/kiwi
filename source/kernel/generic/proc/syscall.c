@@ -23,7 +23,6 @@
 #include <console/kprintf.h>
 
 #include <proc/process.h>
-#include <proc/subsystem.h>
 #include <proc/syscall.h>
 
 #include <fatal.h>
@@ -38,6 +37,7 @@
  * @return		Return value of the system call.
  */
 unative_t syscall_handler(syscall_frame_t *frame) {
+#if 0
 	subsystem_t *subsystem = curr_proc->subsystem;
 
 	/* Shouldn't receive system calls from processes with no subsystem. */
@@ -56,4 +56,8 @@ unative_t syscall_handler(syscall_frame_t *frame) {
 
 	return subsystem->syscalls[frame->id](frame->p1, frame->p2, frame->p3,
 	                                      frame->p4, frame->p5);
+#endif
+	kprintf(LOG_NORMAL, "Syscall %" PRIun " (%" PRIun ", %" PRIun ", %" PRIun ", %" PRIun ", %" PRIun ")\n",
+	        frame->id, frame->p1, frame->p2, frame->p3, frame->p4, frame->p5);
+	return 0;
 }

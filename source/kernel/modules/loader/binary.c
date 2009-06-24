@@ -22,6 +22,7 @@
 
 #include <mm/malloc.h>
 
+#include <proc/process.h>
 #include <proc/uspace.h>
 
 #include <assert.h>
@@ -48,12 +49,7 @@ static void array_free(char **array) {
  *  - Terminate all threads except the current thread.
  *  - Replace the current address space with the new one.
  *  - Begin executing the new binary.
- * To perform the second and third steps, process_reset() is called. If the
- * new binary runs under the same subsystem as the old binary, then this will
- * call the process_reset callback for the subsystem. Otherwise, it calls
- * process_destroy for the old subsystem, and process_init for the new one.
- * This allows, for example, the POSIX subsystem to preserve file descriptors
- * across an execve() call for another POSIX binary.
+ * To perform the second and third steps, process_reset() is called.
  *
  * When successful, this function does not return to the calling kernel
  * function. This means that several assumptions must be made about the
@@ -63,11 +59,8 @@ static void array_free(char **array) {
  * free the arrays.
  *
  * @param node		Node referring to the binary to load.
- * @param args		Arguments to pass to the new process (how these are
- *			passed in, or whether they are passed at all, are
- *			dependent on the subsystem in use). This can be NULL.
- * @param environ	Environment variables for the new process (same rules
- *			apply as for arguments). This can be NULL.
+ * @param args		Arguments to pass to the new process. Can be NULL.
+ * @param environ	Environment variables for the new process. Can be NULL.
  * @param sem		If this argument is not NULL, it should point to a
  *			semaphore that will be upped if this function is
  *			successful, just before it enters the new program.
@@ -111,14 +104,13 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 	}	
 
 	/* Now get the binary type to map the binary's data into the address
-	 * space. This should also get us the subsystem and entry pointers. */
+	 * space. This should also get us the entry pointers. */
 	ret = binary->type->load(binary);
 	if(ret != 0) {
 		goto fail;
 	}
 
 	assert(binary->entry);
-	assert(binary->subsystem);
 
 	/* Create a userspace stack. Do this now because after this is done we
 	 * don't want to fail. */
@@ -137,7 +129,7 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 
 	/* OK, take the plunge and start messing with the process. If we fail
 	 * after this point, then we're done for. */
-	ret = process_reset(curr_proc, binary->node->name, binary->aspace, binary->subsystem);
+	ret = process_reset(curr_proc, binary->node->name, binary->aspace);
 	if(ret != 0) {
 		/* TODO: Proper handling here. */
 		fatal("Failed to reset process");

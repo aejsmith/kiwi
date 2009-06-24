@@ -25,8 +25,6 @@
 
 #include <mm/aspace.h>
 
-#include <proc/subsystem.h>
-
 #include <sync/semaphore.h>
 
 struct loader_type;
@@ -40,7 +38,6 @@ typedef struct loader_binary {
 	aspace_t *aspace;		/**< Address space that the binary is being loaded into. */
 	ptr_t stack;			/**< Stack pointer for the initial thread. */
 	ptr_t entry;			/**< Entry point for the binary. */
-	subsystem_t *subsystem;		/**< Subsystem the binary will run under. */
 
 	char **args;			/**< Argument array. */
 	char **environ;			/**< Environment variable array. */

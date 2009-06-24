@@ -200,8 +200,7 @@ __syscall_entry:
 
 	/* Push the callee-save registers. We must push callee-save registers
 	 * despite the fact that they are not modified by this function, as it
-	 * must be possible to duplicate a thread using a system call frame,
-	 * i.e. to implement fork() in the POSIX subsystem. */
+	 * must be possible to duplicate a thread using a system call frame. */
 	push	%r12
 	push	%r13
 	push	%r14
@@ -211,6 +210,7 @@ __syscall_entry:
 
 	/* Push arguments. R10 is used over RCX for the fourth argument, as
 	 * RCX is used by SYSCALL to store the return address. */
+	push	%r9
 	push	%r8
 	push	%r10
 	push	%rdx
@@ -229,12 +229,25 @@ __syscall_entry:
 	movq	%rsp, %rdi
 	call	syscall_handler
 
-	/* Disable interrupts and restore saved state. Do not need to restore
-	 * callee-save registers as they are preserved across the call to
-	 * syscall_handler() - see comment above about why they are saved in
-	 * the first place. */
+	/* Disable interrupts and restore saved state. Restore arguments as
+	 * they are not callee-save, and we do not want to leak values stored
+	 * by the kernel back to userspace. */
 	cli
-	addq	$96, %rsp
+	addq	$8, %rsp
+	pop	%rdi
+	pop	%rsi
+	pop	%rdx
+	pop	%r10
+	pop	%r8
+	pop	%r9
+
+	/* Do not need to restore callee-save registers as they are preserved
+	 * across the call to syscall_handler() - see comment above about why
+	 * they are saved in the first place. */
+	addq	$48, %rsp
+
+	/* Restore RFLAGS and RIP for SYSRET to use, as well as the stack
+	 * pointer. */
 	pop	%r11
 	pop	%rcx
 	pop	%rsp

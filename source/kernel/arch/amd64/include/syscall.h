@@ -32,6 +32,7 @@ typedef struct syscall_frame {
 	unative_t p3;		/**< Third parameter (RDX). */
 	unative_t p4;		/**< Fourth parameter (R10 - RCX used by SYSCALL). */
 	unative_t p5;		/**< Fifth parameter (R8). */
+	unative_t p6;		/**< Sixth parameter (R9) - not actually used. */
 
 	/** AMD64-specific values - callee-save registers, etc. */
 	unative_t rbp;		/**< RBP. */

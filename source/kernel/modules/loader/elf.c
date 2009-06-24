@@ -23,57 +23,17 @@
 
 #include <mm/malloc.h>
 
+#include <elf.h>
+
 #include "loader_priv.h"
 
 /** ELF loader binary data structure. */
 typedef struct elf_binary {
 	elf_ehdr_t ehdr;		/**< ELF executable header. */
 	elf_phdr_t *phdrs;		/**< Program headers. */
-	loader_elf_abi_t *abi;		/**< ABI of the binary. */
 
 	loader_binary_t *binary;	/**< Pointer back to the loader's binary structure. */
 } elf_binary_t;
-
-/** List of known ELF ABI types. */
-static LIST_DECLARE(elf_abi_list);
-static MUTEX_DECLARE(elf_abi_list_lock, 0);
-
-/** Work out the ABI type of an ELF binary.
- * @param data		ELF binary structure.
- * @return		Pointer to ABI type structure (NULL if ABI unknown). */
-static loader_elf_abi_t *loader_elf_abi_match(elf_binary_t *data) {
-	loader_elf_abi_t *abi;
-	size_t i;
-
-	mutex_lock(&elf_abi_list_lock, 0);
-
-	/* First see if we have an ABI note. */
-	for(i = 0; i < data->ehdr.e_phnum; i++) {
-		if(data->phdrs[i].p_type != ELF_PT_NOTE) {
-			continue;
-		}
-
-		fatal("TODO: Note ABI identification");
-		/* Read in the note data. */
-		
-		/* Check if this note is labelled Kiwi, type 1. */
-	}
-
-	/* No note was found, fallback on the OSABI field. */
-	LIST_FOREACH(&elf_abi_list, iter) {
-		abi = list_entry(iter, loader_elf_abi_t, header);
-
-		if(abi->num >= 0 && data->ehdr.e_ident[ELF_EI_OSABI] == (unsigned char)abi->num) {
-			dprintf("loader: matched binary '%s' to ABI type %s (%d)\n",
-			        data->binary->node->name, abi->string, abi->num);
-			mutex_unlock(&elf_abi_list_lock);
-			return abi;
-		}
-	}
-
-	mutex_unlock(&elf_abi_list_lock);
-	return NULL;
-}
 
 /** Handle an ELF_PT_LOAD program header.
  * @param data		ELF binary data structure.
@@ -213,14 +173,6 @@ static int loader_elf_load(loader_binary_t *binary) {
 		goto fail;
 	}
 
-	/* We now have enough information to work out the binary's ABI. */
-	data->abi = loader_elf_abi_match(data);
-	if(!data->abi) {
-		kprintf(LOG_DEBUG, "loader: unknown ELF ABI type for binary '%s'\n", binary->node->name);
-		ret = -ERR_OBJ_FORMAT_BAD;
-		goto fail;
-	}
-
 	/* Handle all the program headers. */
 	for(i = 0; i < data->ehdr.e_phnum; i++) {
 		switch(data->phdrs[i].p_type) {
@@ -249,7 +201,6 @@ static int loader_elf_load(loader_binary_t *binary) {
 	}
 
 	binary->data = data;
-	binary->subsystem = &data->abi->subsystem;
 	binary->entry = (ptr_t)data->ehdr.e_entry;
 	return 0;
 fail:
@@ -285,60 +236,3 @@ loader_type_t loader_elf_type = {
 	.finish = loader_elf_finish,
 	.cleanup = loader_elf_cleanup,
 };
-
-/** Register an ELF ABI type.
- *
- * Registers an ELF ABI type with the loader. This system allows for multiple
- * subsystems based on ELF, and makes it easy to choose which subsystem to
- * run a binary on. There are two methods for matching a binary to an ABI. If
- * a binary provides a note (name Kiwi, type 1), then the note specifies the
- * name of an ABI to use. If a note is not specified, then the loader will
- * attempt to match the binary's OS/ABI field in the ELF header to an ABI.
- *
- * @param abi		ABI to register.
- *
- * @return		0 on success, negative error code on failure.
- */
-int loader_elf_abi_register(loader_elf_abi_t *abi) {
-	loader_elf_abi_t *exist;
-
-	if(!abi->string) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	mutex_lock(&elf_abi_list_lock, 0);
-
-	/* Check if the ABI already exists. */
-	LIST_FOREACH(&elf_abi_list, iter) {
-		exist = list_entry(iter, loader_elf_abi_t, header);
-
-		if(exist->string && abi->string && (strcmp(exist->string, abi->string) == 0)) {
-			mutex_unlock(&elf_abi_list_lock);
-			return -ERR_OBJ_EXISTS;
-		} else if(exist->num != -1 && exist->num == abi->num) {
-			mutex_unlock(&elf_abi_list_lock);
-			return -ERR_OBJ_EXISTS;
-		}
-	}
-
-	list_init(&abi->header);
-	list_append(&elf_abi_list, &abi->header);
-
-	dprintf("loader: registered ELF ABI type %p(%s:%d)\n", abi, abi->string, abi->num);
-	mutex_unlock(&elf_abi_list_lock);
-	return 0;
-}
-MODULE_EXPORT(loader_elf_abi_register);
-
-/** Remove an ELF ABI type.
- *
- * Removes an ELF ABI type from the ABI type list.
- *
- * @param abi		ABI to remove.
- */
-void loader_elf_abi_unregister(loader_elf_abi_t *abi) {
-	mutex_lock(&elf_abi_list_lock, 0);
-	list_remove(&abi->header);
-	mutex_unlock(&elf_abi_list_lock);
-}
-MODULE_EXPORT(loader_elf_abi_unregister);

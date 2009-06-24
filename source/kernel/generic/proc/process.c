@@ -28,7 +28,6 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
-#include <proc/subsystem.h>
 #include <proc/thread.h>
 
 #include <types/avltree.h>
@@ -94,15 +93,12 @@ process_t *process_lookup(process_id_t id) {
  * @param parent	Parent of the process.
  * @param priority	Priority for the process.
  * @param flags		Behaviour/creation flags for the process.
- * @param subsystem	Subsystem that the process will run under.
  * @param procp		Where to store pointer to new process.
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_create(const char *name, process_t *parent, int priority, int flags,
-                   subsystem_t *subsystem, process_t **procp) {
+int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp) {
 	process_t *process;
-	int ret;
 
 	if(name == NULL || (parent == NULL && kernel_proc != NULL) || procp == NULL) {
 		return -ERR_PARAM_INVAL;
@@ -136,17 +132,6 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	process->state = PROC_RUNNING;
 	process->parent = parent;
 
-	/* Perform subsystem initialization, if any. */
-	process->subsystem = subsystem;
-	if(process->subsystem && process->subsystem->process_init) {
-		ret = process->subsystem->process_init(process);
-		if(ret != 0) {
-			vmem_free(process_id_arena, (unative_t)process->id, 1);
-			slab_cache_free(process_cache, process);
-			return ret;
-		}
-	}
-
 	/* Add to the parent's process list. */
 	if(parent != NULL) {
 		spinlock_lock(&parent->lock, 0);
@@ -172,18 +157,11 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
  * process, then all threads in the process will be terminated other than the
  * current. Otherwise, all threads will be terminated. The name of the process
  * will then be changed to the given name and its address space will be set to
- * the given address space (the old one will be destroyed, if any). If the
- * process' subsystem is the same as the new subsystem, then the subsystem's
- * reset callback will be called. Otherwise, the current subsystem's
- * destruction callback will be called (if there is a current subsystem),
- * and the new subsystem's initialization callback will be called (if there
- * is a new subsystem).
+ * the given address space (the old one will be destroyed, if any).
  *
- * The only two reasons for this function to fail are if the new subsystem
- * differs from the old system and the new subsystem's initialization callback
- * fails, or if invalid parameters are passed. It is up to the caller to handle
- * failures - the best thing to do in this case would be to terminate the
- * process.
+ * The only reason for this function to fail is if invalid parameters are
+ * passed. It is up to the caller to handle failures - the best thing to do in
+ * this case would be to terminate the process.
  *
  * If the process is the current process, and the old address space set in the
  * process is the current address space, then this function will switch to the
@@ -197,14 +175,11 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
  * @param process	Process to reset. Must not be the kernel process.
  * @param name		New name to give the process (must not be zero-length).
  * @param aspace	Address space for the process (can be NULL).
- * @param subsystem	New subsystem for the process (can be NULL).
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_reset(process_t *process, const char *name, aspace_t *aspace, subsystem_t *subsystem) {
-	subsystem_t *prev_subsys;
-	aspace_t *prev_as;
-	int ret;
+int process_reset(process_t *process, const char *name, aspace_t *aspace) {
+	aspace_t *prev;
 
 	if(!process || process == kernel_proc || !name || !name[0]) {
 		return -ERR_PARAM_INVAL;
@@ -222,44 +197,17 @@ int process_reset(process_t *process, const char *name, aspace_t *aspace, subsys
 	process->name[PROC_NAME_MAX - 1] = 0;
 
 	/* Replace the address space, and switch to the new one. */
-	prev_as = process->aspace;
+	prev = process->aspace;
 	process->aspace = aspace;
-	if(prev_as == curr_aspace) {
+	if(prev == curr_aspace) {
 		aspace_switch(aspace);
 	}
-
-	/* Swap the subsystem pointers. */
-	prev_subsys = process->subsystem;
-	process->subsystem = subsystem;
 
 	spinlock_unlock(&process->lock);
 
 	/* Now that we're unlocked we can destroy the old address space. */
-	if(prev_as) {
-		aspace_destroy(prev_as);
-	}
-
-	/* If the previous subsystem is the same as the old subsystem, we use
-	 * the process_reset callback. Otherwise, destroy the old subsystem,
-	 * and initialize the new one. */
-	if(subsystem && subsystem == prev_subsys) {
-		if(subsystem->process_reset) {
-			subsystem->process_reset(process);
-		}
-	} else {
-		if(prev_subsys && prev_subsys->process_destroy) {
-			prev_subsys->process_destroy(process);
-		}
-
-		/* Initialize the new subsystem. If it fails, set subsystem
-		 * to NULL. */
-		if(subsystem && subsystem->process_init) {
-			ret = process->subsystem->process_init(process);
-			if(ret != 0) {
-				process->subsystem = NULL;
-				return ret;
-			}
-		}
+	if(prev) {
+		aspace_destroy(prev);
 	}
 
 	return 0;
@@ -278,7 +226,7 @@ void process_init(void) {
 	/* Create the kernel process. */
 	ret = process_create("[kernel]", NULL, PRIORITY_KERNEL,
 	                     PROCESS_CRITICAL | PROCESS_FIXEDPRIO | PROCESS_NOASPACE,
-	                     NULL, &kernel_proc);
+	                     &kernel_proc);
 	if(ret != 0) {
 		fatal("Could not initialize kernel process: %d", ret);
 	}
@@ -303,17 +251,15 @@ int kdbg_cmd_process(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID    Prio Flags Threads Aspace             Subsystem Name\n");
-	kprintf(LOG_NONE, "==    ==== ===== ======= ======             ========= ====\n");
+	kprintf(LOG_NONE, "ID    Prio Flags Threads Aspace             Name\n");
+	kprintf(LOG_NONE, "==    ==== ===== ======= ======             ====\n");
 
 	AVLTREE_FOREACH(&process_tree, iter) {
 		process = avltree_entry(iter, process_t);
 
 		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7zu %-18p %-9s %s\n",
 			process->id, process->priority, process->flags,
-			process->num_threads, process->aspace,
-		        (process->subsystem) ? process->subsystem->name : "None",
-		        process->name);
+			process->num_threads, process->aspace, process->name);
 	}
 
 	return KDBG_OK;

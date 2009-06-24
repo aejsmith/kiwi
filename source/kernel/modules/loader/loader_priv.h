@@ -24,7 +24,6 @@
 #include <console/kprintf.h>
 
 #include <loader/binary.h>
-#include <loader/elf.h>
 #include <loader/type.h>
 
 #include <errors.h>

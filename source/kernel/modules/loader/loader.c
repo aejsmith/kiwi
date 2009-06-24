@@ -65,7 +65,7 @@ static int loader_bootmod_handler(bootmod_t *mod) {
 
 	/* Create process to load the binary. Does not require an address space
 	 * to begin with as loader_binary_load() will create one. */
-	ret = process_create(mod->name, kernel_proc, PRIORITY_SYSTEM, PROCESS_NOASPACE, NULL, &proc);
+	ret = process_create(mod->name, kernel_proc, PRIORITY_SYSTEM, PROCESS_NOASPACE, &proc);
 	if(ret != 0) {
 		fatal("Could not create process to load binary (%d)", ret);
 	}

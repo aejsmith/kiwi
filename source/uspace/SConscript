@@ -14,6 +14,18 @@
 
 Import('envmgr', 'config')
 
-envmgr['dist']['BOOTAPPS'] = []
+# Set up the userspace build environment.
+env = envmgr.Create('uspace')
+env['APPS'] = []
+env['BOOTAPPS'] = []
+env['CPPPATH'] = Dir('include')
+env['LIBPATH'] = Dir('libraries')
 
-SConscript(dirs=['applications'])
+# FIXME: Temporary.
+env['LINKFLAGS'] = ['-static', '-nostdlib']
+env['CCFLAGS'] = ['-nostdlib']
+
+SConscript(dirs=['applications'], exports=['env'])
+
+# Create arrays that we use in the distribution environment.
+envmgr['dist']['BOOTAPPS'] = env['BOOTAPPS']

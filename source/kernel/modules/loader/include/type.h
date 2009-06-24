@@ -36,8 +36,8 @@ typedef struct loader_type {
 	bool (*check)(vfs_node_t *node);
 
 	/** Load a binary into an address space.
-	 * @note		This should also set the subsystem and entry
-	 *			pointers in the binary structure.
+	 * @note		This should also set the entry pointer in the
+	 *			binary structure.
 	 * @param binary	Binary loader data structure.
 	 * @return		0 on success, negative error code on failure. */
 	int (*load)(loader_binary_t *binary);
