@@ -38,7 +38,7 @@ typedef struct syscall_frame {
 	unative_t ds;			/**< DS. */
 	unative_t p1;			/**< First parameter (EDI). */
 	unative_t p2;			/**< Second parameter (ESI). */
-	unative_t bp;			/**< EBP. */
+	unative_t p6;			/**< Sixth parameter (EBP). */
 	unative_t ksp;			/**< ESP (kernel). */
 	unative_t p5;			/**< Fifth parameter (EBX). */
 	unative_t p3;			/**< Third parameter (EDX). */

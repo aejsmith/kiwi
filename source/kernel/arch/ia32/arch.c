@@ -37,13 +37,11 @@
  * @param frame		Interrupt stack frame.
  * @return		Always returns INTR_HANDLED. */
 static intr_result_t syscall_intr_handler(unative_t num, intr_frame_t *frame) {
-	frame->ax = syscall_handler((syscall_frame_t *)frame);
-	return INTR_HANDLED;
-}
+	bool state = intr_disable();
 
-/** Set up the system call interrupt handler. */
-static void syscall_init(void) {
-	intr_register(SYSCALL_INT_NO, syscall_intr_handler);
+	frame->ax = syscall_handler((syscall_frame_t *)frame);
+	intr_restore(state);
+	return INTR_HANDLED;
 }
 
 /** IA32 architecture startup code.
@@ -65,7 +63,7 @@ void arch_premm_init(void *data) {
  */
 void arch_postmm_init(void) {
 	lapic_init();
-	syscall_init();
+	intr_register(SYSCALL_INT_NO, syscall_intr_handler);
 }
 
 /** IA32 architecture startup code.
