@@ -1,4 +1,4 @@
-/* Kiwi system call dispatcher
+/* Kiwi C library - Initialization code.
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,19 +15,14 @@
 
 /**
  * @file
- * @brief		System call dispatcher.
+ * @brief		Initialization code.
  */
 
-#ifndef __PROC_SYSCALL_H
-#define __PROC_SYSCALL_H
+extern void __libc_init(void);
+extern int main(int argc, char **argv);
 
-#include <types.h>
-
-struct syscall_frame;
-
-/** Function type for a system call handler. */
-typedef unative_t (*syscall_handler_t)(unative_t, unative_t, unative_t, unative_t, unative_t, unative_t);
-
-extern unative_t syscall_handler(struct syscall_frame *frame);
-
-#endif /* __PROC_SYSCALL_H */
+/** C library initialization function. */
+void __libc_init(void) {
+	main(1, (void *)0);
+	while(1);
+}

@@ -18,9 +18,9 @@
  * @brief		Userspace startup application.
  */
 
-.global _start
-.type _start, @function
-_start:
+.global main
+.type main, @function
+main:
 #if __amd64__
 	movq	$0, %rax
 	movq	$message1, %rdi
@@ -38,7 +38,7 @@ _start:
 	int	$0x80
 1:	jmp	1b
 #endif
-.size _start, .-_start
+.size main, .-main
 
 .section .data
 

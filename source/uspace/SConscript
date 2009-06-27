@@ -14,18 +14,49 @@
 
 Import('envmgr', 'config')
 
-# Set up the userspace build environment.
+# Set up the userspace build environment. Always build static binaries until
+# we have shared library support.
 env = envmgr.Create('uspace')
-env['APPS'] = []
-env['BOOTAPPS'] = []
 env['CPPPATH'] = Dir('include')
 env['LIBPATH'] = Dir('libraries')
+env['LINKFLAGS'] = ['-static']
 
-# FIXME: Temporary.
-env['LINKFLAGS'] = ['-static', '-nostdlib']
-env['CCFLAGS'] = ['-nostdlib']
+# Set up arrays used to track stuff built. Use LIBRARIES rather than LIBS
+# as LIBS is a special SCons variable.
+env['LIBRARIES'] = []
+env['APPS'] = []
+env['BOOTAPPS'] = []
 
-SConscript(dirs=['applications'], exports=['env'])
+# Set the directory that we want all libraries to be placed in.
+env['LIBOUTDIR'] = Dir('libraries')
 
-# Create arrays that we use in the distribution environment.
+# Set up library emitters to modify the target path to get libraries placed
+# in the correct location and to add the library to the libraries array.
+def library_emitter(target, source, env):
+	target[0] = File('%s/%s' % (str(env['LIBOUTDIR']), str(target[0])))
+	env['LIBRARIES'].append(target[0])
+	return target, source
+env.Append(LIBEMITTER=[library_emitter])
+env.Append(SHLIBEMITTER=[library_emitter])
+
+# Set up a program emitter to add programs to the apps array.
+def program_emitter(target, source, env):
+	env['APPS'].append(target[0])
+	return target, source
+env.Append(PROGEMITTER=[program_emitter])
+
+# Build libraries before applications because they're required for applications
+# to build.
+SConscript(dirs=['libraries', 'applications'], exports=['env'])
+
+# Have all applications depend on the C library and C runtime files.
+for app in env['APPS']:
+	Depends(app, Glob('libraries/*crt*.o'))
+	Depends(app, File('libraries/libc.a'))
+
+# Set arrays needed in the distribution environment.
 envmgr['dist']['BOOTAPPS'] = env['BOOTAPPS']
+
+# Set build defaults.
+Default(Alias('libraries', env['LIBRARIES']))
+Default(Alias('applications', env['APPS']))

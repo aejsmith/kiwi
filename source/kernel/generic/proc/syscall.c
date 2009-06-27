@@ -22,10 +22,38 @@
 
 #include <console/kprintf.h>
 
+#include <lib/utility.h>
+
+#include <mm/malloc.h>
+#include <mm/safe.h>
+
 #include <proc/process.h>
 #include <proc/syscall.h>
 
+#include <errors.h>
 #include <fatal.h>
+
+/** Print a message to the screen.
+ * @param msg		Pointer to message to print.
+ * @return		0 on success, negative error code on failure. */
+static int sys_message(const char *msg) {
+	char *dup;
+	int ret;
+
+	ret = strdup_from_user(msg, MM_SLEEP, &dup);
+	if(ret != 0) {
+		return ret;
+	}
+
+	kprintf(LOG_NORMAL, "sys_message(%p): %s\n", msg, dup);
+	kfree(dup);
+	return 0;
+}
+
+/** Table of system calls. */
+static syscall_handler_t syscall_table[] = {
+	(syscall_handler_t)sys_message,
+};
 
 /** System call dispatcher.
  *
@@ -37,27 +65,11 @@
  * @return		Return value of the system call.
  */
 unative_t syscall_handler(syscall_frame_t *frame) {
-#if 0
-	subsystem_t *subsystem = curr_proc->subsystem;
-
-	/* Shouldn't receive system calls from processes with no subsystem. */
-	if(!subsystem) {
-		fatal("Received system call from process with no subsystem");
-	} else if(!subsystem->syscalls) {
-		fatal("Subsystem %s has no system calls", subsystem->name);
+	if(frame->id >= ARRAYSZ(syscall_table)) {
+		/* TODO: Kill the process. */
+		fatal("Invalid system call. TODO: Kill process");
 	}
 
-	/* If the system call doesn't exist, raise an exception in the
-	 * subsystem. */
-	if(frame->id >= subsystem->syscall_count || !subsystem->syscalls[frame->id]) {
-		/* TODO. */
-		fatal("Meh, invalid syscall");
-	}
-
-	return subsystem->syscalls[frame->id](frame->p1, frame->p2, frame->p3,
-	                                      frame->p4, frame->p5);
-#endif
-	kprintf(LOG_NORMAL, "Syscall %" PRIun " (%" PRIun ", %" PRIun ", %" PRIun ", %" PRIun ", %" PRIun ")\n",
-	        frame->id, frame->p1, frame->p2, frame->p3, frame->p4, frame->p5);
-	return 0;
+	return syscall_table[frame->id](frame->p1, frame->p2, frame->p3,
+	                                frame->p4, frame->p5, frame->p6);
 }

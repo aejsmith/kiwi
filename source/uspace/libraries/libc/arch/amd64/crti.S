@@ -1,4 +1,4 @@
-/* Kiwi system call dispatcher
+/* Kiwi AMD64 C runtime
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,19 +15,17 @@
 
 /**
  * @file
- * @brief		System call dispatcher.
+ * @brief		AMD64 C runtime.
  */
 
-#ifndef __PROC_SYSCALL_H
-#define __PROC_SYSCALL_H
+.section .init
+.global _init
+.type _init, @function
+_init:
+	subq    $8, %rsp
 
-#include <types.h>
-
-struct syscall_frame;
-
-/** Function type for a system call handler. */
-typedef unative_t (*syscall_handler_t)(unative_t, unative_t, unative_t, unative_t, unative_t, unative_t);
-
-extern unative_t syscall_handler(struct syscall_frame *frame);
-
-#endif /* __PROC_SYSCALL_H */
+.section .fini
+.global _fini
+.type _fini, @function
+_fini:
+	subq    $8, %rsp

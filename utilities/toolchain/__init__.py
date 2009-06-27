@@ -51,17 +51,34 @@ class ToolchainManager:
 
 	# Repairs any links within the toolchain directory.
 	def repair(self):
-		pass
+		# Remove existing stuff.
+		self.remove('%s/%s/include' % (self.destdir, self.target))
+		self.remove('%s/%s/lib' % (self.destdir, self.target))
 
-	# Clean up build directory.
-	def cleanup(self):
-		if os.path.exists(self.builddir):
-			for root, dirs, files in os.walk(self.builddir, topdown=False):
+		# Link into the source tree.
+		os.symlink('%s/build/%s-%s/source/uspace/include' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
+		           '%s/%s/include' % (self.destdir, self.target))
+		os.symlink('%s/build/%s-%s/source/uspace/libraries' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
+		           '%s/%s/lib' % (self.destdir, self.target))
+
+	# Remove a file, symbolic link or directory tree.
+	def remove(self, path):
+		if not os.path.lexists(path):
+			return
+
+		# Handle symbolic links first as isfile() and isdir() follow
+		# links.
+		if os.path.islink(path) or os.path.isfile(path):
+			os.remove(path)
+		elif os.path.isdir(path):
+			for root, dirs, files in os.walk(path, topdown=False):
 				for name in files:
 					os.remove(os.path.join(root, name))
 				for name in dirs:
 					os.rmdir(os.path.join(root, name))
-			os.rmdir(self.builddir)
+			os.rmdir(path)
+		else:
+			raise Exception, "Unhandled type during remove (%s)" % (path)
 
 	# Build a component.
 	def build(self, c):
@@ -75,7 +92,7 @@ class ToolchainManager:
 
 		# Change to the old directory and clean up the build directory.
 		os.chdir(olddir)
-		self.cleanup()
+		self.remove(self.builddir)
 
 	# Check if an update is required.
 	def check(self):
@@ -88,10 +105,14 @@ class ToolchainManager:
 	# Rebuilds any components of the toolchain that are out of date.
 	def update(self, target, source, env):
 		# Remove any existing build directory and create the target
-		# directory if required.
-		self.cleanup()
+		# directory if required. Also remove symlinks while building
+		# as it interferes with build.
+		self.remove(self.builddir)
 		if not os.path.exists(self.destdir):
 			os.makedirs(self.destdir)
+		else:
+			self.remove('%s/%s/include' % (self.destdir, self.target))
+			self.remove('%s/%s/lib' % (self.destdir, self.target))
 
 		# Build necessary components.
 		for c in self.components:
