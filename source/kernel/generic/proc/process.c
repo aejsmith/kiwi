@@ -75,7 +75,7 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
  *
  * @return		Pointer to process found, or NULL if not found.
  */
-process_t *process_lookup(process_id_t id) {
+process_t *process_lookup(identifier_t id) {
 	process_t *process;
 
 	spinlock_lock(&process_tree_lock, 0);
@@ -124,7 +124,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	}
 
 	/* Allocate an ID for the process. */
-	process->id = (kernel_proc) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : 0;
+	process->id = (kernel_proc) ? (identifier_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : 0;
 
 	process->flags = flags;
 	process->priority = priority;

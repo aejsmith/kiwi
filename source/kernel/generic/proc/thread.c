@@ -113,7 +113,7 @@ static void thread_trampoline(void) {
  *
  * @return		Pointer to thread found, or NULL if not found.
  */
-thread_t *thread_lookup(thread_id_t id) {
+thread_t *thread_lookup(identifier_t id) {
 	thread_t *thread;
 
 	spinlock_lock(&thread_tree_lock, 0);
@@ -198,7 +198,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	}
 
 	/* Allocate an ID for the thread. */
-	thread->id = (thread_id_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
+	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
 	/* Initialize the thread context. */
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);

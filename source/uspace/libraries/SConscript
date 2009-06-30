@@ -21,6 +21,7 @@ os.remove('ldscripts')
 os.symlink('%s/%s/%s/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
            'ldscripts')
 
+# Build all the libraries.
 SConscript(dirs=[
 	'libc',
 ], exports=['env'])

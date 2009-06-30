@@ -82,7 +82,7 @@ typedef struct thread {
 	void *arg2;			/**< Second argument to thread entry function. */
 
 	/** Other thread information. */
-	thread_id_t id;			/**< ID of the thread. */
+	identifier_t id;			/**< ID of the thread. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
@@ -96,7 +96,7 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern thread_t *thread_lookup(thread_id_t id);
+extern thread_t *thread_lookup(identifier_t id);
 extern void thread_run(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 extern int thread_create(const char *name, struct process *owner, int flags,

@@ -31,8 +31,7 @@ typedef __PTRDIFF_TYPE__ ptrdiff_t;	/**< Type to store the difference between tw
 typedef _Bool bool;			/**< Boolean type. */
 
 /** Kiwi-specific types. */
-typedef uint32_t process_id_t;		/**< Type used to store a process ID. */
-typedef uint32_t thread_id_t;		/**< Type used to store a thread ID. */
+typedef uint32_t identifier_t;		/**< Type used to store an object identifier. */
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t key_t;			/**< Type used to identify something. */
 

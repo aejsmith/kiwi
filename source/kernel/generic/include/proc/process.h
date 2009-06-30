@@ -52,7 +52,7 @@ typedef struct process {
 	} state;
 
 	/** Other information about the process. */
-	process_id_t id;		/**< ID of the process. */
+	identifier_t id;		/**< ID of the process. */
 	char name[PROC_NAME_MAX];	/**< Name of the process. */
 	struct process *parent;		/**< Pointer to parent process. */
 	list_t children;		/**< List of child processes. */
@@ -69,7 +69,7 @@ typedef struct process {
 
 extern process_t *kernel_proc;
 
-extern process_t *process_lookup(process_id_t id);
+extern process_t *process_lookup(identifier_t id);
 extern int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp);
 extern int process_reset(process_t *process, const char *name, struct aspace *aspace);
 
