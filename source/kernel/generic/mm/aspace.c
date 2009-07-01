@@ -840,13 +840,13 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	as = (aspace_t *)addr;
 
-	kprintf(LOG_NONE, "Base               End                Flags  Source\n");
-	kprintf(LOG_NONE, "====               ===                =====  ======\n");
+	kprintf(LOG_NONE, "Base               End                Flags Source\n");
+	kprintf(LOG_NONE, "====               ===                ===== ======\n");
 
 	AVLTREE_FOREACH(&as->regions, iter) {
 		region = avltree_entry(iter, aspace_region_t);
 
-		kprintf(LOG_NONE, "%-18p %-18p %-6d %p+%" PRIo " %s\n",
+		kprintf(LOG_NONE, "%-18p %-18p %-5d %p+%" PRIo ": %s\n",
 		        region->start, region->end, region->flags,
 		        region->source, region->offset,
 			(region->source) ? region->source->name : "");

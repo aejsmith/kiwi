@@ -134,7 +134,7 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
 	}
 
 	/* Do zero padding. */
-	if(!(flags & PRINTF_LEFT_JUSTIFY) && flags & PRINTF_ZERO_PAD) {
+	if(flags & PRINTF_ZERO_PAD) {
 		while(--width >= 0) {
 			helper('0', data, total);
 		}
@@ -309,6 +309,9 @@ int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args)
 			 * Also zero pad up to the width of a pointer, because
 			 * I like it like that. */
 			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX | PRINTF_ZERO_PAD);
+			if(precision == -1) {
+				precision = 1;
+			}
 			if(width == -1) {
 				width = (sizeof(void *) * 2) + 2;
 			}
