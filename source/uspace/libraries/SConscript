@@ -17,7 +17,8 @@ import os
 Import('env', 'config')
 
 # Create a link to the toolchain's linker script directory.
-os.remove('ldscripts')
+if os.path.exists('ldscripts'):
+	os.remove('ldscripts')
 os.symlink('%s/%s/%s/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
            'ldscripts')
 
