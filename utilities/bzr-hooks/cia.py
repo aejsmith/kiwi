@@ -106,7 +106,7 @@ class CIASubmitter:
 			except self.CIADeliverError, (error, ):
 				warning("Unable to submit revision %d to CIA: %s" % (revno, error))
 		else:
-			print msg
+			info(msg)
 
 def cia_hook_change_tip(params):
 	config = params.branch.get_config()
