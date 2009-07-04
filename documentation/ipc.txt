@@ -1,0 +1,348 @@
+Kiwi IPC
+========
+
+License
+-------
+
+This document is distributed under the terms of the [Creative Commons
+Attribution-Noncommercial-Share Alike 3.0 Unported](http://creativecommons.org/
+licenses/by-nc-sa/3.0/) license.
+
+Introduction
+------------
+
+The purpose of this document is to explain how the IPC system used in Kiwi
+works. This IPC system is capable of sending messages to both kernel-mode
+and user-mode services, thus allowing kernel and userspace services to be
+accessed through a similar interface.
+
+There are 3 main concepts within the IPC system:
+
+ * _Service_
+
+   A service is a name that a process or kernel module can register to allow
+   connections to be made to it.
+
+ * _Connection_
+
+   A connection is a bi-directional communication channel between a client
+   and a service. Each end of the connection has an 'endpoint' which the
+   client/service can use to send messages.
+
+ * _Message_
+
+   A message is the actual data transferred through a connection.
+
+The APIs for the IPC system in the kernel and in userspace are not the same.
+They are fairly similar, however there are differences to make them more
+suitable for where they are used. For example, the kernel API automatically
+handles connections and spawns a seperate thread for each connection (thus
+removing the need for kernel-mode services to spawn their own threads to listen
+out for connections), whereas the userspace API delegates the handling of
+connections to the service.
+
+Services
+--------
+
+Service names should be in reversed domain name style, for example
+"org.kiwi.gui-server". A process/kernel module can register multiple services.
+For userspace services, a number can be associated with a service name which
+can be used internally by the process to determine which service a connection
+is being made to. For kernel modules, each service can either use a different
+connection handler function, or have a different data parameter passed to a
+single connection handler function.
+
+Connections
+-----------
+
+A connection can only be opened to a registered service; it is not possible for
+a process to open a connection to another process that has not specified that
+it wants to be connected to.
+
+When a client attempts to open a connection, the open call blocks until the
+service accepts the connection. If the service is in the kernel, it will be
+accepted immediately and a connection handler thread will be spawned for it.
+If the service is in userspace, the open call will block until the service
+makes an `ipc_connection_wait` call.
+
+How connections are accessed depends on whether the client/service is in
+the kernel or in userspace. Userspace clients and services are assigned a
+connection ID which refers to their end of the connection, which can be used
+to send and receive messages. Kernel clients and services are given a pointer
+to an endpoint structure for their end of the connection which can be passed
+to the kernel IPC functions.
+
+Messages
+--------
+
+Every message has a 'command' - this is a service-defined number used by the
+recipient to work out what to do with the message. There are two types of
+message: short messages and long messages. A short message can have 4 data
+values (of type unative_t), which can all be passed into the kernel via CPU
+registers. A long message can pass any amount of data, however it must be the
+same size as what the recipient expects.
+
+Messages are queued to their destination in a FIFO fashion. Messages are sent
+asynchronously - if expecting a reply to a message, a sender must attempt to
+receive it itself. There is a limit on the number of messages that can be
+queued at any one time - if an attempt to send a message is made and the
+destination's message queue is full, then the send call will block until
+there is space in the queue.
+
+When receiving a message, the receiver must specify exactly what it is
+expecting (type of message, and for long messages, length of message).
+If the next received message is not as expected, then the receive call will
+discard the message and return an error, and it is up to the reciever to notify
+the sender of the error.
+
+Kernel API
+----------
+
+### Services - `ipc/service.h`
+
+The following types are defined in this header.
+
+    typedef struct ipc_service {
+    	const char *name;
+    	void (*handler)(ipc_endpoint_t *, void *);
+    	void *data;
+    } ipc_service_t;
+
+The following functions are provided in the kernel for adding and removing
+services.
+
+    int ipc_service_register(ipc_service_t *service);
+
+The `ipc_service_register` function is used to register a new service. The
+service argument should point to a service structure that contains the name
+of the service, a handler function for connections to the service, and a data
+argument to point to the handler function.
+
+    int ipc_service_unregister(ipc_service_t *service);
+
+The `ipc_service_unregister` function is used to unregister a service. This
+will cause all handler threads currently running for the service to close
+their connections and terminate.
+
+### Connections - `ipc/connection.h`
+
+The following functions are provided in the kernel for connecting to services.
+
+    int ipc_connection_open(const char *name, uint32_t timeout, int flags,
+                            ipc_endpoint_t **endp);
+
+The `ipc_connection_open` function opens a connection to a service. In the
+kernel, connections are not given IDs, as they should be usable across the
+entire kernel, which spans all processes. Instead, a pointer to an endpoint
+structure for the caller's end of the connection is provided which can be
+passed to other IPC functions. This function will block until either the
+connection is accepted, or until the timeout expires, in which case it will
+return an error (the timeout is specified in microseconds - see `time/timer.h`
+for macros to convert other units of time to microseconds). The timeout can be
+specified as 0, in which case the function will block indefinitely until the
+connection is accepted. It is not recommended that this be done in the kernel,
+however. If the IPC_NONBLOCK flag is specified, then regardless of the
+timeout the function will return immediately if the service is not waiting for
+a connection to be made to it.
+
+    int ipc_connection_close(ipc_endpoint_t *conn);
+
+The `ipc_connection_close` function closes the connection referred to by the
+given pointer. Any messages queued to the caller's end of the connection will
+be discarded, and attempts to send messages on the connection by the other end
+will automatically close the connection and return an error (this will happen
+immediately if the other end is currently blocked waiting for a message to be
+sent).
+
+### Messages - `ipc/message.h`
+
+The following types are defined in this header.
+
+    typedef struct ipc_message_vector {
+    	enum {
+    		IPC_MESSAGE_SHORT,
+    		IPC_MESSAGE_LONG,
+    	} type;
+    	unative_t command;
+    	union {
+    		struct {
+    			unative_t arg1;
+    			unative_t arg2;
+    			unative_t arg3;
+    			unative_t arg4;
+    		} short;
+    		struct {
+    			void *buf;
+    			size_t size;
+    		} long;
+    	};
+    } ipc_message_vector_t;
+
+The following functions are provided in the kernel to send messages through
+a connection.
+
+    int ipc_message_send_short(ipc_endpoint_t *conn, unative_t command,
+                               unative_t arg1, unative_t arg2, unative_t arg3,
+                               unative_t arg4);
+    
+    int ipc_message_send_long(ipc_endpoint_t *conn, unative_t command,
+                              void *data, size_t size);
+
+The `ipc_message_send_short` and `ipc_message_send_long` functions
+asynchronously send a short/long message through a connection and queue it at
+the other end.
+
+    int ipc_message_send_vector(ipc_endpoint_t *conn, ipc_message_vector_t *vec,
+                                size_t count);
+
+The `ipc_message_send_vector` function is capable of sending multiple messages
+on a single call. The call should be provided with a pointer to an array of
+`ipc_message_vector_t` structures, which describe the messages to send. The
+messages are sent in the order that they are in the array. The operation is
+atomic: the receiver will not receive any of the messages until all have been
+sent, and if a failure occurs, it will receive none of the messages.
+
+The following functions are provided in the kernel to receive messages from
+a connection.
+
+    int ipc_message_receive_short(ipc_endpoint_t *conn, unative_t *command,
+                                  unative_t *args);
+
+    int ipc_message_receive_long(ipc_endpoint_t *conn, unative_t *command,
+                                 void *buf, size_t size);
+
+The `ipc_message_receive_short` and `ipc_message_receive_long` functions
+attempt to receive a message of a specified type from a connection. For
+`ipc_message_receive_short`, the `args` argument points to space for the 4
+unative_t arguments of the message to be written to. If the message is not the
+type (or, for long messages, size) expected, then the message will be discarded
+and an error will be returned. In this case, it is up to the caller to notify
+the sender of the error.
+
+Userspace API
+-------------
+
+In the userspace IPC API, all functions, structures and definitions are
+contained in a single header, `kiwi/ipc.h`.
+
+### Services
+
+The following functions related to registering and unregistering services are
+provided.
+
+    int ipc_service_register(const char *name, int num);
+
+The `ipc_service_register` function is used to register a new service. The name
+is the name the service will be accessible under, and should be in the format
+described in the _Services_ section. The number, as described previously, is
+a number that can be used internally by the process to identify which service
+is being connected to.
+
+    int ipc_service_unregister(const char *name);
+
+The `ipc_service_unregister` function is used to unregister the service with
+the given name. This function will only allow services registered by the
+calling process to be unregistered.
+
+### Connections
+
+The following functions are provided for connecting to services.
+
+    int ipc_connection_open(const char *name, uint32_t usec, int flags);
+
+The `ipc_connection_open` function opens a connection to a service. Upon
+success, this function returns a connection ID referring to the caller's end
+of the connection. The function will block until either the connection is
+accepted, or until the timeout expires, in which case it will return an
+error (the timeout is specified in microseconds - see `time/timer.h` for macros
+to convert other units of time to microseconds). The timeout can be specified
+as 0, in which case the function will block indefinitely until the connection
+is accepted. If the `IPC_NONBLOCK` flag is specified, then regardless of the
+timeout the function will return immediately if the service is not waiting for
+a connection to be made to it.
+
+    int ipc_connection_close(int id);
+
+The `ipc_connection_close` function closes the connection referred to by the
+given ID. Any messages queued to the caller's end of the connection will be
+discarded, and attempts to send messages on the connection by the other end
+will automatically close the connection and return an error (this will happen
+immediately if the other end is currently blocked waiting for a message to be
+sent).
+
+    int ipc_connection_wait(uint32_t usec, int flags, int *servicep);
+
+The `ipc_connection_wait` function waits for a connection to be made to the
+calling process. The timeout on this function behaves the same as for
+`ipc_connection_open`. Upon success, an ID referring to the service's end of
+the connection will be returned, and the number that has been associated with
+the service will be stored in `servicep`. This function will return an error
+if it is called by a process that has not registered any services.
+
+### Messages
+
+The following types are defined related to messages.
+
+    typedef struct ipc_message_vector {
+    	enum {
+    		IPC_MESSAGE_SHORT,
+    		IPC_MESSAGE_LONG,
+    	} type;
+    	unative_t command;
+    	union {
+    		struct {
+    			unative_t arg1;
+    			unative_t arg2;
+    			unative_t arg3;
+    			unative_t arg4;
+    		} short;
+    		struct {
+    			void *buf;
+    			size_t size;
+    		} long;
+    	};
+    } ipc_message_vector_t;
+
+The following functions are provided to send messages through a connection.
+
+    int ipc_message_send_short(int id, unative_t command, unative_t arg1,
+                               unative_t arg2, unative_t arg3, unative_t arg4);
+    
+    int ipc_message_send_long(int id, unative_t command, void *data,
+                              size_t size);
+
+The `ipc_message_send_short` and `ipc_message_send_long` functions
+asynchronously send a short/long message through a connection and queue it at
+the other end. For short messages, all of the data arguments can be passed
+via CPU registers (as system call arguments), meaning a data copy from
+userspace memory is not necessary.
+
+    int ipc_message_send_vector(int id, ipc_message_vector_t *vec,
+                                size_t count);
+
+The `ipc_message_send_vector` function is capable of sending multiple messages
+on a single call. The call should be provided with a pointer to an array of
+`ipc_message_vector_t` structures, which describe the messages to send. The
+messages are sent in the order that they are in the array. The operation is
+atomic: the receiver will not receive any of the messages until all have been
+sent, and if a failure occurs, it will receive none of the messages.
+
+The following functions are provided to receive messages from a connection.
+
+    int ipc_message_receive_short(int id, unative_t *command, unative_t *args);
+
+    int ipc_message_receive_long(int id, unative_t *command, void *buf,
+                                 size_t size);
+
+The `ipc_message_receive_short` and `ipc_message_receive_long` functions
+attempt to receive a message of a specified type from a connection. For
+`ipc_message_receive_short`, the `args` argument points to space for the 4
+unative_t arguments of the message to be written to. If the message is not the
+type (or, for long messages, size) expected, then the message will be discarded
+and an error will be returned. In this case, it is up to the caller to notify
+the sender of the error.
+
+C++ Wrapper Class
+-----------------
+
+TODO.
