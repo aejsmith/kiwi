@@ -2,3 +2,4 @@
 .sconsign.dblite
 ./build
 .config
+documentation/markdown/output/*.html

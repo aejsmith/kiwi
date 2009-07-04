@@ -102,23 +102,23 @@ Kernel API
 
 The following types are defined in this header.
 
-    typedef struct ipc_service {
+    typedef struct ipc_service_info {
     	const char *name;
     	void (*handler)(ipc_endpoint_t *, void *);
     	void *data;
-    } ipc_service_t;
+    } ipc_service_info_t;
 
 The following functions are provided in the kernel for adding and removing
 services.
 
-    int ipc_service_register(ipc_service_t *service);
+    int ipc_service_register(ipc_service_info_t *info);
 
 The `ipc_service_register` function is used to register a new service. The
-service argument should point to a service structure that contains the name
-of the service, a handler function for connections to the service, and a data
-argument to point to the handler function.
+info argument should point to a service information structure that contains
+the name of the service, a handler function for connections to the service, and
+a data argument to pass to the handler function.
 
-    int ipc_service_unregister(ipc_service_t *service);
+    int ipc_service_unregister(const char *name);
 
 The `ipc_service_unregister` function is used to unregister a service. This
 will cause all handler threads currently running for the service to close
@@ -128,7 +128,7 @@ their connections and terminate.
 
 The following functions are provided in the kernel for connecting to services.
 
-    int ipc_connection_open(const char *name, uint32_t timeout, int flags,
+    int ipc_connection_open(const char *name, uint32_t usec, int flags,
                             ipc_endpoint_t **endp);
 
 The `ipc_connection_open` function opens a connection to a service. In the
@@ -248,7 +248,8 @@ calling process to be unregistered.
 
 The following functions are provided for connecting to services.
 
-    int ipc_connection_open(const char *name, uint32_t usec, int flags);
+    identifier_t ipc_connection_open(const char *name, uint32_t usec,
+                                     int flags);
 
 The `ipc_connection_open` function opens a connection to a service. Upon
 success, this function returns a connection ID referring to the caller's end
@@ -261,7 +262,7 @@ is accepted. If the `IPC_NONBLOCK` flag is specified, then regardless of the
 timeout the function will return immediately if the service is not waiting for
 a connection to be made to it.
 
-    int ipc_connection_close(int id);
+    int ipc_connection_close(identifier_t id);
 
 The `ipc_connection_close` function closes the connection referred to by the
 given ID. Any messages queued to the caller's end of the connection will be
@@ -270,14 +271,17 @@ will automatically close the connection and return an error (this will happen
 immediately if the other end is currently blocked waiting for a message to be
 sent).
 
-    int ipc_connection_wait(uint32_t usec, int flags, int *servicep);
+    int ipc_connection_wait(uint32_t usec, int flags, identifier_t *pidp,
+                            int *servicep);
 
 The `ipc_connection_wait` function waits for a connection to be made to the
 calling process. The timeout on this function behaves the same as for
 `ipc_connection_open`. Upon success, an ID referring to the service's end of
 the connection will be returned, and the number that has been associated with
-the service will be stored in `servicep`. This function will return an error
-if it is called by a process that has not registered any services.
+the service will be stored in `servicep`, as well as the process ID of the
+connector in `pidp` (note that if the connection is from the kernel, the
+process ID will be -1). This function will return an error if it is called by
+a process that has not registered any services.
 
 ### Messages
 
