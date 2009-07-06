@@ -24,6 +24,7 @@
  */
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <mm/cache.h>
 #include <mm/malloc.h>
@@ -678,8 +679,8 @@ int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset,
 	/* Now work out the start page and the end page. Subtract one from
 	 * count to prevent end from going onto the next page when the offset
 	 * plus the count is an exact multiple of PAGE_SIZE. */
-	start = (offset / PAGE_SIZE);
-	end = ((offset + (count - 1)) / PAGE_SIZE);
+	start = ROUND_DOWN(offset, PAGE_SIZE);
+	end = ROUND_DOWN((offset + (count - 1)), PAGE_SIZE);
 
 	/* If we're not starting on a page boundary, we need to do a partial
 	 * transfer on the initial page to get us up to a page boundary. 
@@ -693,12 +694,12 @@ int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset,
 		size = (start == end) ? count : (size_t)PAGE_SIZE - (size_t)(offset % PAGE_SIZE);
 		memcpy(buffer, mapping + (offset % PAGE_SIZE), size);
 		vfs_node_page_release(node, mapping, start, false);
-		total += size; buffer += size; count -= size; start++;
+		total += size; buffer += size; count -= size; start += PAGE_SIZE;
 	}
 
 	/* Handle any full pages. */
 	size = count / PAGE_SIZE;
-	for(i = 0; i < size; i++, total += PAGE_SIZE, buffer += PAGE_SIZE, count -= PAGE_SIZE, start++) {
+	for(i = 0; i < size; i++, total += PAGE_SIZE, buffer += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
 		ret = vfs_node_page_get(node, start, &mapping);
 		if(ret != 0) {
 			goto out;
@@ -791,8 +792,8 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 	/* Now work out the start page and the end page. Subtract one from
 	 * count to prevent end from going onto the next page when the offset
 	 * plus the count is an exact multiple of PAGE_SIZE. */
-	start = (offset / PAGE_SIZE);
-	end = ((offset + (count - 1)) / PAGE_SIZE);
+	start = ROUND_DOWN(offset, PAGE_SIZE);
+	end = ROUND_DOWN((offset + (count - 1)), PAGE_SIZE);
 
 	/* If we're not starting on a page boundary, we need to do a partial
 	 * transfer on the initial page to get us up to a page boundary. 
@@ -806,12 +807,12 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 		size = (start == end) ? count : (size_t)PAGE_SIZE - (size_t)(offset % PAGE_SIZE);
 		memcpy(mapping + (offset % PAGE_SIZE), buffer, size);
 		vfs_node_page_release(node, mapping, start, true);
-		total += size; buffer += size; count -= size; start++;
+		total += size; buffer += size; count -= size; start += PAGE_SIZE;
 	}
 
 	/* Handle any full pages. */
 	size = count / PAGE_SIZE;
-	for(i = 0; i < size; i++, total += PAGE_SIZE, buffer += PAGE_SIZE, count -= PAGE_SIZE, start++) {
+	for(i = 0; i < size; i++, total += PAGE_SIZE, buffer += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
 		ret = vfs_node_page_get(node, start, &mapping);
 		if(ret != 0) {
 			goto out;

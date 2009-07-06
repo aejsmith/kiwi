@@ -89,6 +89,7 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
 	int ret;
 
 	assert(addrp);
+	assert(!(offset % PAGE_SIZE));
 
 	mutex_lock(&cache->lock, 0);
 
@@ -139,6 +140,8 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
  */
 void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 	cache_page_t *page;
+
+	assert(!(offset % PAGE_SIZE));
 
 	mutex_lock(&cache->lock, 0);
 
