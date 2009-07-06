@@ -15,5 +15,5 @@
 Import('env', 'config')
 
 env['BOOTAPPS'] += env.Program('startup', [
-	'main.S',
+	'main.c',
 ])

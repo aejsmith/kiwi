@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi <description>
+ * Copyright (C) <years> <author>
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,32 +15,12 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		<Description>.
  */
 
-.global main
-.type main, @function
-main:
-#if __amd64__
-	movq	$0, %rax
-	movq	$message1, %rdi
-	syscall
-	movq	$0, %rax
-	movq	$message2, %rdi
-	syscall
-1:	jmp	1b
-#else
-	movl	$0, %eax
-	movl	$1337, %edi
-	int	$0x80
-	movl	$0, %eax
-	movl	$42, %edi
-	int	$0x80
-1:	jmp	1b
-#endif
-.size main, .-main
+#ifndef
+#define
 
-.section .data
 
-message1:	.asciz "Hello from userspace!"
-message2:	.asciz "This is another message."
+
+#endif /*  */

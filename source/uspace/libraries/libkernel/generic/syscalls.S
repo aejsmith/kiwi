@@ -1,4 +1,4 @@
-/* Kiwi C library - Initialization code.
+/* Kiwi system call wrappers
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,16 +15,14 @@
 
 /**
  * @file
- * @brief		Initialization code.
+ * @brief		System call wrappers.
  */
 
-extern void __libc_init(void);
-extern int main(int argc, char **argv);
+/** Get the architecture wrappers. */
+#if CONFIG_ARCH_AMD64
+# include "../arch/amd64/syscalls.S.inc"
+#else
+# error "Unknown system call architecture!"
+#endif
 
-extern void message(const char *foo);
-
-/** C library initialization function. */
-void __libc_init(void) {
-	main(1, (void *)0);
-	while(1);
-}
+SYSCALL1(message, 0)

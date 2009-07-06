@@ -49,10 +49,12 @@ env.Append(PROGEMITTER=[program_emitter])
 # to build.
 SConscript(dirs=['libraries', 'applications'], exports=['env'])
 
-# Have all applications depend on the C library and C runtime files.
+# Have all applications depend on the kernel library, C library and C runtime
+# files.
 for app in env['APPS']:
 	Depends(app, Glob('libraries/*crt*.o'))
 	Depends(app, File('libraries/libc.a'))
+	Depends(app, File('libraries/libkernel.a'))
 
 # Set arrays needed in the distribution environment.
 envmgr['dist']['BOOTAPPS'] = env['BOOTAPPS']

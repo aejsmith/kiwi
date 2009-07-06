@@ -1,4 +1,4 @@
-/* Kiwi C library - Initialization code.
+/* Kiwi userspace startup application
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,16 +15,13 @@
 
 /**
  * @file
- * @brief		Initialization code.
+ * @brief		Userspace startup application.
  */
-
-extern void __libc_init(void);
-extern int main(int argc, char **argv);
 
 extern void message(const char *foo);
 
-/** C library initialization function. */
-void __libc_init(void) {
-	main(1, (void *)0);
+int main(int argc, char **argv) {
+	message("Hello from C userspace!");
+	message("This is a message!");
 	while(1);
 }
