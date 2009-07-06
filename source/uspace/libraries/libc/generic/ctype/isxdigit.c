@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi C library - Character type functions
+ * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,14 +15,19 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Character type functions.
  */
 
-#include <stdio.h>
+#include <ctype.h>
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
-
-	while(1);
+/** Test if character is a hexadecimal digit.
+ *
+ * Tests that the given character is a hexadecimal digit.
+ *
+ * @param ch		Character to test.
+ *
+ * @return		Non-zero if is alphabetic, zero if not.
+ */
+int isxdigit(int ch) {
+	return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
 }

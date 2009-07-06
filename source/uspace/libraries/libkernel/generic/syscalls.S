@@ -18,6 +18,8 @@
  * @brief		System call wrappers.
  */
 
+#include <kernel/syscall.h>
+
 /** Get the architecture wrappers. */
 #if CONFIG_ARCH_AMD64
 # include "../arch/amd64/syscalls.S.inc"
@@ -25,4 +27,4 @@
 # error "Unknown system call architecture!"
 #endif
 
-SYSCALL1(message, 0)
+SYSCALL1(__SYS_PUTCH, putch)

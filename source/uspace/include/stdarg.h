@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi C library - Variable argument functions
+ * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,14 +15,24 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Variable argument functions.
  */
 
-#include <stdio.h>
+#ifndef __STDARG_H
+#define __STDARG_H
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-	while(1);
+typedef __builtin_va_list va_list;
+
+#define va_start(a,b)	__builtin_va_start(a,b)
+#define va_end(a)	__builtin_va_end(a)
+#define va_arg(a,b)	__builtin_va_arg(a,b)
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* __STDARG_H */

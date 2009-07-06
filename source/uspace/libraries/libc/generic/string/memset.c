@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi C library - memset function
+ * Copyright (C) 2007-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,14 +15,21 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Memory setting function.
  */
 
-#include <stdio.h>
+#include <string.h>
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
-
-	while(1);
+/** Fill a memory area.
+ *
+ * Fills a memory area with the value specified.
+ *
+ * @param dest		The memory area to fill.
+ * @param val		The value to fill with.
+ * @param count		The number of bytes to fill.
+ */
+void *memset(void *dest, int val, size_t count) {
+	char *temp = (char *)dest;
+	for(; count != 0; count--) *temp++ = val;
+	return dest;
 }

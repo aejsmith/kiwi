@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi C library - Character type functions
+ * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,14 +15,23 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Character type functions.
  */
 
-#include <stdio.h>
+#include <ctype.h>
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
-
-	while(1);
+/** Convert character to lower-case.
+ *
+ * Converts the given character to lower case.
+ *
+ * @param ch		Character to convert.
+ *
+ * @return		Converted character.
+ */
+int tolower(int ch) {
+	if(isupper(ch)) {
+		return ch | 0x20;
+	} else {
+		return ch;
+	}
 }

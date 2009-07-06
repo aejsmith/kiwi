@@ -1,4 +1,4 @@
-/* Kiwi userspace startup application
+/* Kiwi system call number definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,14 +15,13 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		System call number definitions.
  */
 
-#include <stdio.h>
+#ifndef __KERNEL_SYSCALL_H
+#define __KERNEL_SYSCALL_H
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
+/** System call number definitions. */
+#define __SYS_PUTCH			0
 
-	while(1);
-}
+#endif /* __KERNEL_SYSCALL_H */

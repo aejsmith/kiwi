@@ -24,35 +24,23 @@
 
 #include <lib/utility.h>
 
-#include <mm/malloc.h>
-#include <mm/safe.h>
-
 #include <proc/process.h>
 #include <proc/syscall.h>
 
 #include <errors.h>
 #include <fatal.h>
 
-/** Print a message to the screen.
- * @param msg		Pointer to message to print.
+/** Print a character to the screen.
+ * @param ch		Character to print.
  * @return		0 on success, negative error code on failure. */
-static int sys_message(const char *msg) {
-	char *dup;
-	int ret;
-
-	ret = strdup_from_user(msg, MM_SLEEP, &dup);
-	if(ret != 0) {
-		return ret;
-	}
-
-	kprintf(LOG_NORMAL, "sys_message(%p): %s\n", msg, dup);
-	kfree(dup);
+static int sys_putch(char ch) {
+	kprintf(LOG_NORMAL, "%c", ch);
 	return 0;
 }
 
 /** Table of system calls. */
 static syscall_handler_t syscall_table[] = {
-	(syscall_handler_t)sys_message,
+	(syscall_handler_t)sys_putch,
 };
 
 /** System call dispatcher.

@@ -19,7 +19,7 @@
  */
 
 /** Macro to define a system call. */
-.macro __syscall name, num
+.macro __syscall num, name
 .global \name
 .type \name, @function
 \name:
@@ -31,10 +31,10 @@
 .endm
 
 /** Wrappers for above macro expected by generic code. */
-#define SYSCALL0(name, num)	__syscall name, num
-#define SYSCALL1(name, num)	__syscall name, num
-#define SYSCALL2(name, num)	__syscall name, num
-#define SYSCALL3(name, num)	__syscall name, num
-#define SYSCALL4(name, num)	__syscall name, num
-#define SYSCALL5(name, num)	__syscall name, num
-#define SYSCALL6(name, num)	__syscall name, num
+#define SYSCALL0(num, name)	__syscall num, name
+#define SYSCALL1(num, name)	__syscall num, name
+#define SYSCALL2(num, name)	__syscall num, name
+#define SYSCALL3(num, name)	__syscall num, name
+#define SYSCALL4(num, name)	__syscall num, name
+#define SYSCALL5(num, name)	__syscall num, name
+#define SYSCALL6(num, name)	__syscall num, name

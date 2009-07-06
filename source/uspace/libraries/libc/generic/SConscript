@@ -15,5 +15,55 @@
 Import('sources')
 
 sources += [
+	File('ctype/isalnum.c'),
+	File('ctype/isalpha.c'),
+	File('ctype/isascii.c'),
+	File('ctype/isblank.c'),
+	File('ctype/iscntrl.c'),
+	File('ctype/isdigit.c'),
+	File('ctype/isgraph.c'),
+	File('ctype/islower.c'),
+	File('ctype/isprint.c'),
+	File('ctype/ispunct.c'),
+	File('ctype/isspace.c'),
+	File('ctype/isupper.c'),
+	File('ctype/isxdigit.c'),
+	File('ctype/toascii.c'),
+	File('ctype/tolower.c'),
+	File('ctype/toupper.c'),
+]
+
+sources += [
+	File('stdio/do_printf.c'),
+	File('stdio/fputs.c'),
+	File('stdio/vfprintf.c'),
+	File('stdio/vsnprintf.c'),
+]
+
+sources += [
+	File('stdlib/strtoul.c'),
+]
+
+sources += [
+	File('string/memchr.c'),
+	File('string/memcmp.c'),
+	File('string/memcpy.c'),
+	File('string/memmove.c'),
+	File('string/memset.c'),
+	File('string/strcasecmp.c'),
+	File('string/strcat.c'),
+	File('string/strchr.c'),
+	File('string/strcmp.c'),
+	File('string/strcpy.c'),
+	File('string/strcspn.c'),
+	#File('string/strdup.c'),
+	File('string/strlen.c'),
+	File('string/strpbrk.c'),
+	File('string/strsep.c'),
+	File('string/strstr.c'),
+	File('string/strtok.c'),
+]
+
+sources += [
 	File('init.c'),
 ]

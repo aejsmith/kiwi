@@ -1,5 +1,5 @@
-/* Kiwi userspace startup application
- * Copyright (C) 2009 Alex Smith
+/* Kiwi C library - Character type functions
+ * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,14 +15,19 @@
 
 /**
  * @file
- * @brief		Userspace startup application.
+ * @brief		Character type functions.
  */
 
-#include <stdio.h>
+#include <ctype.h>
 
-int main(int argc, char **argv) {
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
-
-	while(1);
+/** Test if character is control character.
+ *
+ * Tests that the given character is a control character.
+ *
+ * @param ch		Character to test.
+ *
+ * @return		Non-zero if is control character, zero if not.
+ */
+int iscntrl(int ch) {
+	return ((unsigned int)ch < 32u || ch == 127);
 }

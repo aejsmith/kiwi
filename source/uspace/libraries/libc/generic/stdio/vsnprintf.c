@@ -1,5 +1,5 @@
-/* Kiwi string formatting functions
- * Copyright (C) 2008 Alex Smith
+/* Kiwi C library - String formatting functions
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,8 +18,7 @@
  * @brief		String formatting functions.
  */
 
-#include <lib/do_printf.h>
-#include <lib/string.h>
+#include "stdio_priv.h"
 
 /** Data used by vsnprintf_helper(). */
 struct vsnprintf_data {
