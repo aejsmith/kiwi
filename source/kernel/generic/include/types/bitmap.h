@@ -30,18 +30,20 @@
 /** Structure containing a bitmap. */
 typedef struct bitmap {
 	uint8_t *data;		/**< Bitmap data. */
-	size_t count;		/**< Number of bits in the bitmap. */
+	int count;		/**< Number of bits in the bitmap. */
 	bool allocated;		/**< Whether data was allocated by bitmap_init(). */
 } bitmap_t;
 
 /** Get the number of bytes required for a bitmap. */
 #define BITMAP_BYTES(bits)	(ROUND_UP(bits, 8) / 8)
 
-extern int bitmap_init(bitmap_t *bitmap, size_t bits, uint8_t *data, int kmflag);
+extern int bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int kmflag);
 extern void bitmap_destroy(bitmap_t *bitmap);
 
-extern void bitmap_set(bitmap_t *bitmap, size_t bit);
-extern void bitmap_clear(bitmap_t *bitmap, size_t bit);
-extern bool bitmap_test(bitmap_t *bitmap, size_t bit);
+extern void bitmap_set(bitmap_t *bitmap, int bit);
+extern void bitmap_clear(bitmap_t *bitmap, int bit);
+extern bool bitmap_test(bitmap_t *bitmap, int bit);
+extern int bitmap_ffs(bitmap_t *bitmap);
+extern int bitmap_ffz(bitmap_t *bitmap);
 
 #endif /* __BITMAP_H */

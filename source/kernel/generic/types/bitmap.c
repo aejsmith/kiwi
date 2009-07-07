@@ -18,6 +18,11 @@
  * @brief		Bitmap data type.
  */
 
+#include <arch/bitops.h>
+
+#include <lib/string.h>
+#include <lib/utility.h>
+
 #include <mm/malloc.h>
 
 #include <types/bitmap.h>
@@ -42,7 +47,7 @@
  * @return		0 on success, negative error code on failure (always
  *			succeeds if using preallocated memory).
  */
-int bitmap_init(bitmap_t *bitmap, size_t bits, uint8_t *data, int kmflag) {
+int bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int kmflag) {
 	if(data) {
 		bitmap->allocated = false;
 		bitmap->data = data;
@@ -52,6 +57,8 @@ int bitmap_init(bitmap_t *bitmap, size_t bits, uint8_t *data, int kmflag) {
 		if(bitmap->data == NULL) {
 			return -ERR_NO_MEMORY;
 		}
+
+		memset(bitmap->data, 0, BITMAP_BYTES(bits));
 	}
 
 	bitmap->count = bits;
@@ -79,7 +86,7 @@ void bitmap_destroy(bitmap_t *bitmap) {
  * @param bitmap	Bitmap to set in.
  * @param bit		Number of the bit to set.
  */
-void bitmap_set(bitmap_t *bitmap, size_t bit) {
+void bitmap_set(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	bitmap->data[bit / 8] |= (1 << (bit % 8));
 }
@@ -91,7 +98,7 @@ void bitmap_set(bitmap_t *bitmap, size_t bit) {
  * @param bitmap	Bitmap to clear in.
  * @param bit		Number of the bit to clear.
  */
-void bitmap_clear(bitmap_t *bitmap, size_t bit) {
+void bitmap_clear(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	bitmap->data[bit / 8] &= ~(1 << (bit % 8));
 }
@@ -105,7 +112,79 @@ void bitmap_clear(bitmap_t *bitmap, size_t bit) {
  *
  * @return		True if bit set, false if not.
  */
-bool bitmap_test(bitmap_t *bitmap, size_t bit) {
+bool bitmap_test(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	return bitmap->data[bit / 8] & (1 << (bit % 8));
+}
+
+/** Find first set bit in a bitmap.
+ *
+ * Finds the first bit set in a bitmap.
+ *
+ * @param bitmap	Bitmap to test in.
+ *
+ * @return		Position of first set bit, -1 if none set.
+ */
+int bitmap_ffs(bitmap_t *bitmap) {
+	size_t total = bitmap->count;
+	unative_t value;
+	int result = 0;
+
+	while(total >= BITS(unative_t)) {
+		value = ((unative_t *)bitmap->data)[result / BITS(unative_t)];
+		if(value) {
+			return result + bitops_ffs(value);
+		}
+
+		total -= BITS(unative_t);
+		result += BITS(unative_t);
+	}
+
+	/* Probably could be done faster... */
+	while(total) {
+		if(bitmap_test(bitmap, result)) {
+			return result;
+		}
+
+		total--;
+		result++;
+	}
+
+	return -1;
+}
+
+/** Find first zero bit in a bitmap.
+ *
+ * Finds the first zero bit in a bitmap.
+ *
+ * @param bitmap	Bitmap to test in.
+ *
+ * @return		Position of first zero bit, -1 if all set.
+ */
+int bitmap_ffz(bitmap_t *bitmap) {
+	size_t total = bitmap->count;
+	unative_t value;
+	int result = 0;
+
+	while(total >= BITS(unative_t)) {
+		value = ((unative_t *)bitmap->data)[result / BITS(unative_t)];
+		if(value != ~((unative_t)0)) {
+			return result + bitops_ffz(value);
+		}
+
+		total -= BITS(unative_t);
+		result += BITS(unative_t);
+	}
+
+	/* Probably could be done faster... */
+	while(total) {
+		if(!bitmap_test(bitmap, result)) {
+			return result;
+		}
+
+		total--;
+		result++;
+	}
+
+	return -1;
 }
