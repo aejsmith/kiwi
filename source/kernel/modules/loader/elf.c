@@ -52,7 +52,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? AS_REGION_READ  : 0);
 	if(flags == 0) {
 		dprintf("loader: PHDR %zu has no protection flags set\n", i);
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	}
 
 	/* Map the BSS if required. */
@@ -67,7 +67,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 		 * later on. */
 		if((flags & AS_REGION_WRITE) == 0) {
 			dprintf("loader: PHDR %zu should be writeable\n", i);
-			return -ERR_OBJ_FORMAT_BAD;
+			return -ERR_FORMAT_INVAL;
 		}
 
 		/* Create an anonymous memory region for it. */
@@ -152,13 +152,13 @@ static int loader_elf_load(loader_binary_t *binary) {
 	} else if(!elf_check(&data->ehdr, bytes, ELF_ET_EXEC)) {
 		/* This can happen if some sneaky bugger changes the file
 		 * between checking it and getting here. */
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Check that program headers are the right size... */
 	if(data->ehdr.e_phentsize != sizeof(elf_phdr_t)) {
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
@@ -169,7 +169,7 @@ static int loader_elf_load(loader_binary_t *binary) {
 	if(ret != 0) {
 		goto fail;
 	} else if(bytes != size) {
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
@@ -196,7 +196,7 @@ static int loader_elf_load(loader_binary_t *binary) {
 	if(!load_count) {
 		dprintf("loader: ELF binary '%s' did not have any loadable program headers\n",
 		        binary->node->name);
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 

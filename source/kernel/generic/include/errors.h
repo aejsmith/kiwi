@@ -23,18 +23,18 @@
 
 /** Definitions of error codes returned by kernel functions. */
 #define ERR_NO_MEMORY		1	/**< No memory available. */
-#define ERR_PARAM_INVAL		2	/**< Invalid parameter. */
+#define ERR_PARAM_INVAL		2	/**< Invalid parameter specified. */
 #define ERR_WOULD_BLOCK		3	/**< Operation would block. */
 #define ERR_INTERRUPTED		4	/**< Interrupted while blocking. */
-#define ERR_NOT_IMPLEMENTED	5	/**< Function not implemented. */
-#define ERR_NOT_SUPPORTED	6	/**< Function not implemented. */
+#define ERR_NOT_IMPLEMENTED	5	/**< Operation not implemented. */
+#define ERR_NOT_SUPPORTED	6	/**< Operation not supported. */
 #define ERR_DEST_UNKNOWN	7	/**< Could not find destination. */
 #define ERR_DEP_MISSING		8	/**< Required dependency not found. */
-#define ERR_OBJ_FORMAT_BAD	9	/**< Object's format is incorrect. */
-#define ERR_OBJ_EXISTS		10	/**< Object already exists. */
-#define ERR_OBJ_NOT_FOUND	11	/**< Requested object not found. */
-#define ERR_OBJ_TYPE_INVAL	12	/**< Object type is invalid. */
-#define ERR_OBJ_READ_ONLY	13	/**< Object cannot be modified. */
+#define ERR_FORMAT_INVAL	9	/**< Object's format is incorrect. */
+#define ERR_ALREADY_EXISTS	10	/**< Object already exists. */
+#define ERR_NOT_FOUND		11	/**< Requested object not found. */
+#define ERR_TYPE_INVAL		12	/**< Object type is invalid. */
+#define ERR_READ_ONLY		13	/**< Object cannot be modified. */
 #define ERR_ADDR_INVAL		14	/**< A bad memory location was specified. */
 #define ERR_NO_HANDLES		15	/**< Handle table is full. */
 

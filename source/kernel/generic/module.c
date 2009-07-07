@@ -141,9 +141,9 @@ static int module_elf_get_sym(module_t *module, size_t num, bool external, elf_a
 
 	symtab = module_elf_find_section(module, ".symtab");
 	if(symtab == NULL) {
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	} else if(num >= (symtab->sh_size / symtab->sh_entsize)) {
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	}
 
 	strtab = (const char *)MODULE_ELF_SECT(module, symtab->sh_link)->sh_addr;
@@ -157,7 +157,7 @@ static int module_elf_get_sym(module_t *module, size_t num, bool external, elf_a
 		ksym = symbol_lookup_name(strtab + sym->st_name, true, true);
 		if(ksym == NULL) {
 			kprintf(LOG_DEBUG, "module: module references undefined symbol: %s\n", strtab + sym->st_name);
-			return -ERR_OBJ_FORMAT_BAD;
+			return -ERR_FORMAT_INVAL;
 		}
 
 		*valp = ksym->addr;
@@ -198,7 +198,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 
 	if(module->load_size == 0) {
 		dprintf("module: no loadable sections in module %p\n", module);
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	}
 
 	/* Allocate space to load the module into. */
@@ -223,7 +223,7 @@ static int module_elf_load_sections(module_t *module, void *image, size_t size) 
 			} else {
 				/* Check that the data is within the image. */
 				if((sect->sh_offset + sect->sh_size) > size) {
-					return -ERR_OBJ_FORMAT_BAD;
+					return -ERR_FORMAT_INVAL;
 				}
 
 				memcpy(dest, image + sect->sh_offset, sect->sh_size);
@@ -249,7 +249,7 @@ static int module_elf_load_symbols(module_t *module) {
 	symtab = module_elf_find_section(module, ".symtab");
 	if(symtab == NULL) {
 		dprintf("module: module does not contain a symbol table\n");
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	}
 
 	/* Iterate over each symbol in the section. */
@@ -309,7 +309,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 	 * the data available. */
 	sh_size = module->ehdr.e_shnum * module->ehdr.e_shentsize;
 	if((module->ehdr.e_shoff + sh_size) > size) {
-		return -ERR_OBJ_FORMAT_BAD;
+		return -ERR_FORMAT_INVAL;
 	}
 
 	/* Make a copy of the section headers. */
@@ -345,7 +345,7 @@ static int module_elf_load(module_t *module, void *image, size_t size) {
 			if(sym == NULL) {
 				dprintf("module: exported symbol %p in module %p cannot be found\n",
 				        export, module);
-				return -ERR_OBJ_FORMAT_BAD;
+				return -ERR_FORMAT_INVAL;
 			}
 
 			sym->exported = true;
@@ -414,7 +414,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
 			kprintf(LOG_DEBUG, "module: module %p(%s) depends on itself\n", module, module->name);
-			return -ERR_OBJ_FORMAT_BAD;
+			return -ERR_FORMAT_INVAL;
 		}
 
 		dep = module_find(module->deps[i]);
@@ -481,7 +481,7 @@ int module_load(void *image, size_t size, char *depbuf) {
 
 	/* Check if this is a valid module. */
 	if(!module_check(image, size)) {
-		return -ERR_OBJ_TYPE_INVAL;
+		return -ERR_TYPE_INVAL;
 	}
 
 	/* Create a module structure for the module. */
@@ -509,17 +509,17 @@ int module_load(void *image, size_t size, char *depbuf) {
 	module->unload = module_lookup_pointer(module, "__module_unload");
 	if(!module->name || !module->description || !module->init) {
 		kprintf(LOG_DEBUG, "module: information for module %p is invalid\n", module);
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
 		kprintf(LOG_DEBUG, "module: name of module %p is too long\n", module);
-		ret = -ERR_OBJ_FORMAT_BAD;
+		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Check if a module with this name already exists. */
 	if(module_find(module->name) != NULL) {
-		ret = -ERR_OBJ_EXISTS;
+		ret = -ERR_ALREADY_EXISTS;
 		goto fail;
 	}
 

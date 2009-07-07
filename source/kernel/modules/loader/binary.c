@@ -92,7 +92,7 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 	/* Attempt to match the binary to a type. */
 	binary->type = loader_type_match(node);
 	if(binary->type == NULL) {
-		ret = -ERR_OBJ_TYPE_INVAL;
+		ret = -ERR_TYPE_INVAL;
 		goto fail;
 	}
 

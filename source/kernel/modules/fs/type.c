@@ -77,7 +77,7 @@ int vfs_type_register(vfs_type_t *type) {
 
 	/* Check if this type already exists. */
 	if(vfs_type_lookup_internal(type->name) != NULL) {
-		return -ERR_OBJ_EXISTS;
+		return -ERR_ALREADY_EXISTS;
 	}
 
 	list_init(&type->header);

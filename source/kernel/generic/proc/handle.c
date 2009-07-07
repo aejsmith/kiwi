@@ -132,7 +132,7 @@ int handle_get(process_t *process, handle_t handle, handle_ops_t *ops, handle_in
 	info = avltree_lookup(&process->handles.tree, (key_t)handle);
 	if(!info) {
 		mutex_unlock(&process->handles.lock);
-		return -ERR_OBJ_NOT_FOUND;
+		return -ERR_NOT_FOUND;
 	}
 
 	mutex_lock(&info->lock, 0);
@@ -140,7 +140,7 @@ int handle_get(process_t *process, handle_t handle, handle_ops_t *ops, handle_in
 	if(info->ops != ops) {
 		mutex_unlock(&info->lock);
 		mutex_unlock(&process->handles.lock);
-		return -ERR_OBJ_TYPE_INVAL;
+		return -ERR_TYPE_INVAL;
 	}
 
 	mutex_unlock(&process->handles.lock);
@@ -178,7 +178,7 @@ int handle_close(process_t *process, handle_t handle) {
 	info = avltree_lookup(&process->handles.tree, (key_t)handle);
 	if(!info) {
 		mutex_unlock(&process->handles.lock);
-		return -ERR_OBJ_NOT_FOUND;
+		return -ERR_NOT_FOUND;
 	}
 
 	mutex_lock(&info->lock, 0);

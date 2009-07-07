@@ -98,7 +98,7 @@ int module_elf_relocate(module_t *module, void *image, size_t size, bool externa
 			default:
 				dprintf("module: encountered unknown relocation type: %lu\n",
 				        ELF64_R_TYPE(rel->r_info));
-				return -ERR_OBJ_FORMAT_BAD;
+				return -ERR_FORMAT_INVAL;
 			}
 		}
 	}

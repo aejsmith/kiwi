@@ -327,7 +327,7 @@ static int vfs_node_child_find(vfs_node_t *parent, const char *name, vfs_node_t 
 	 * get the node. If the type does not provide a lookup operation,
 	 * then we have nothing more to do. */
 	if(!parent->mount->type->node_find) {
-		return -ERR_OBJ_NOT_FOUND;
+		return -ERR_NOT_FOUND;
 	}
 
 	/* Allocate a new node structure. */
@@ -388,7 +388,7 @@ static int vfs_node_lookup_internal(vfs_node_t *from, char *path, vfs_node_t **n
 			/* The previous token was not a directory: this means
 			 * the path is trying to treat a non-directory as a
 			 * directory. Reject this. */
-			ret = -ERR_OBJ_TYPE_INVAL;
+			ret = -ERR_TYPE_INVAL;
 			goto fail;
 		} else if(tok[0] == '.' && tok[1] == '.' && tok[2] == 0) {
 			/* Move up to the parent node, if any. If the parent
@@ -471,7 +471,7 @@ int vfs_node_lookup(vfs_node_t *from, const char *path, vfs_node_t **nodep) {
 
 		if(from->type != VFS_NODE_DIR) {
 			mutex_unlock(&from->lock);
-			return -ERR_OBJ_TYPE_INVAL;
+			return -ERR_TYPE_INVAL;
 		}
 
 		/* Increase the reference count to ensure that the node does
@@ -567,7 +567,7 @@ int vfs_node_create(vfs_node_t *parent, const char *name, vfs_node_type_t type, 
 	 * the filesystem type does not allow creation of new nodes. */
 	if(parent->type != VFS_NODE_DIR) {
 		mutex_unlock(&parent->lock);
-		return -ERR_OBJ_TYPE_INVAL;
+		return -ERR_TYPE_INVAL;
 	} else if(!parent->mount->type->node_create) {
 		mutex_unlock(&parent->lock);
 		return -ERR_NOT_SUPPORTED;
@@ -575,12 +575,12 @@ int vfs_node_create(vfs_node_t *parent, const char *name, vfs_node_type_t type, 
 
 	/* Now find out if a node with the given name already exists. */
 	ret = vfs_node_child_find(parent, name, &node);
-	if(ret != -ERR_OBJ_NOT_FOUND) {
+	if(ret != -ERR_NOT_FOUND) {
 		if(ret == 0) {
 			/* Node was found. Must free it up again. */
 			mutex_unlock(&node->lock);
 			vfs_node_release(node);
-			return -ERR_OBJ_EXISTS;
+			return -ERR_ALREADY_EXISTS;
 		} else {
 			return ret;
 		}
@@ -656,7 +656,7 @@ int vfs_node_read(vfs_node_t *node, void *buffer, size_t count, offset_t offset,
 
 	/* Check if the node is a suitable type. */
 	if(node->type != VFS_NODE_REGULAR) {
-		ret = -ERR_OBJ_TYPE_INVAL;
+		ret = -ERR_TYPE_INVAL;
 		goto out;
 	}
 
@@ -761,10 +761,10 @@ int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, offset_t 
 	/* Check if the node is a suitable type, and if it's on a writeable
 	 * filesystem. */
 	if(node->type != VFS_NODE_REGULAR) {
-		ret = -ERR_OBJ_TYPE_INVAL;
+		ret = -ERR_TYPE_INVAL;
 		goto out;
 	} else if(node->mount && node->mount->flags & VFS_MOUNT_RDONLY) {
-		ret = -ERR_OBJ_READ_ONLY;
+		ret = -ERR_READ_ONLY;
 		goto out;
 	}
 
@@ -993,7 +993,7 @@ static int vfs_aspace_shared_map(aspace_source_t *source, offset_t offset, size_
 	vfs_node_t *node = source->data;
 
 	if(flags & AS_REGION_WRITE && node->mount->flags & VFS_MOUNT_RDONLY) {
-		return -ERR_OBJ_READ_ONLY;
+		return -ERR_READ_ONLY;
 	}
 
 	return 0;
@@ -1056,7 +1056,7 @@ int vfs_node_aspace_create(vfs_node_t *node, int flags, aspace_source_t **source
 	if(!node || !sourcep) {
 		return -ERR_PARAM_INVAL;
 	} else if(node->type != VFS_NODE_REGULAR) {
-		return -ERR_OBJ_TYPE_INVAL;
+		return -ERR_TYPE_INVAL;
 	}
 
 	/* Node should have a cache if it is a regular file. */
