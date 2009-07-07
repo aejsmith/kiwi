@@ -82,6 +82,7 @@ Option('LOADER_DEBUG', 'Executable loader debugging output.', False, {'DEBUG': l
 
 @PostConfig
 def PostConfigFunc(config):
+	config['ARCH_%s' % config['ARCH'].upper()] = True
 	if config['ARCH'] == 'ia32' or config['ARCH'] == 'amd64':
 		if config['ARCH'] == 'ia32':
 			config['TOOLCHAIN_TARGET'] = 'i686-kiwi'
