@@ -55,6 +55,12 @@ Option('X86_NX', 'Use No-Execute/Execute-Disable support.', True)
 Option('X86_OPTIM_STR', 'Use optimized string functions.', True)
 
 #######
+Section('Kernel configuration')
+#######
+
+Option('HANDLE_MAX', 'Maximum number of open handles for a process.', 1024)
+
+#######
 Section('Kernel debug output')
 #######
 
@@ -68,6 +74,7 @@ Option('PROC_DEBUG', 'Process/thread management debug output.', False, {'DEBUG':
 Option('SCHED_DEBUG', 'Scheduler debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('CACHE_DEBUG', 'Page cache debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
+Option('HANDLE_DEBUG', 'Handle manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 
 #######
 Section('Module configuration')

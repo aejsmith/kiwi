@@ -270,7 +270,7 @@ void thread_destroy(thread_t *thread) {
 	thread_arch_destroy(thread);
 
 	/* Deallocate the thread ID. */
-	vmem_free(thread_id_arena, (unative_t)thread->id, 1);
+	vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
 
 	spinlock_unlock(&thread->lock);
 	slab_cache_free(thread_cache, thread);

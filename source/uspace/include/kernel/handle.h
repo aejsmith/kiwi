@@ -1,4 +1,4 @@
-/* Kiwi system call number definitions
+/* Kiwi handle functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,14 +15,14 @@
 
 /**
  * @file
- * @brief		System call number definitions.
+ * @brief		Handle functions.
  */
 
-#ifndef __KERNEL_SYSCALL_H
-#define __KERNEL_SYSCALL_H
+#ifndef __KERNEL_HANDLE_H
+#define __KERNEL_HANDLE_H
 
-/** System call number definitions. */
-#define __SYS_PUTCH			0
-#define __SYS_HANDLE_CLOSE		1
+#include <kernel/types.h>
 
-#endif /* __KERNEL_SYSCALL_H */
+extern int handle_close(handle_t handle);
+
+#endif /* __KERNEL_HANDLE_H */

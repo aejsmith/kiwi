@@ -37,6 +37,7 @@
 
 #include <platform/platform.h>
 
+#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -111,6 +112,9 @@ void init_bsp(void *data) {
 	process_init();
 	thread_init();
 	sched_init();
+
+	/* Do other bits of initialization. TODO: Initcalls */
+	handle_init();
 
 	/* Perform final architecture initialization. */
 	arch_final_init();

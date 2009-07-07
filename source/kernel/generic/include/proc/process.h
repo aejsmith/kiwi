@@ -21,6 +21,7 @@
 #ifndef __PROC_PROCESS_H
 #define __PROC_PROCESS_H
 
+#include <proc/handle.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
 
@@ -50,6 +51,9 @@ typedef struct process {
 	enum {
 		PROC_RUNNING,		/**< Process is running. */
 	} state;
+
+	/** Handle information. */
+	handle_table_t handles;		/**< Table of open handles. */
 
 	/** Other information about the process. */
 	identifier_t id;		/**< ID of the process. */

@@ -99,6 +99,7 @@ process_t *process_lookup(identifier_t id) {
  */
 int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp) {
 	process_t *process;
+	int ret;
 
 	if(name == NULL || (parent == NULL && kernel_proc != NULL) || procp == NULL) {
 		return -ERR_PARAM_INVAL;
@@ -131,6 +132,14 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	process->num_threads = 0;
 	process->state = PROC_RUNNING;
 	process->parent = parent;
+
+	/* Initialize the process' handle table. */
+	ret = handle_table_init(&process->handles, (parent) ? &parent->handles : NULL);
+	if(ret != 0) {
+		vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
+		slab_cache_free(process_cache, process);
+		return ret;
+	}
 
 	/* Add to the parent's process list. */
 	if(parent != NULL) {

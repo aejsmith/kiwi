@@ -28,3 +28,4 @@
 #endif
 
 SYSCALL1(__SYS_PUTCH, putch)
+SYSCALL1(__SYS_HANDLE_CLOSE, handle_close)

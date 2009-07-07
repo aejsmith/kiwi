@@ -36,5 +36,6 @@
 #define ERR_OBJ_TYPE_INVAL	12	/**< Object type is invalid. */
 #define ERR_OBJ_READ_ONLY	13	/**< Object cannot be modified. */
 #define ERR_ADDR_INVAL		14	/**< A bad memory location was specified. */
+#define ERR_NO_HANDLES		15	/**< Handle table is full. */
 
 #endif /* __ERRORS_H */
