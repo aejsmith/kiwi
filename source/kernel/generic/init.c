@@ -1,4 +1,4 @@
-/* Kiwi kernel initialization code
+/* Kiwi kernel initialization functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Kernel initialization code.
+ * @brief		Kernel initialization functions.
  */
 
 #include <arch/arch.h>
@@ -44,17 +44,29 @@
 
 #include <bootmod.h>
 #include <fatal.h>
+#include <init.h>
 #include <version.h>
 
 extern void init_bsp(void *data);
 extern void init_ap(void);
 
+extern initcall_t __initcall_start[];
+extern initcall_t __initcall_end[];
+
 /** Second-stage intialization thread.
  * @param arg1		Thread argument (unused).
  * @param arg2		Thread argument (unused). */
 static void init_thread(void *arg1, void *arg2) {
+	initcall_t *initcall;
+
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
+
+	/* Call initialziation functions. */
+	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
+		kprintf(LOG_DEBUG, "%p %p\n", initcall, (*initcall));
+		(*initcall)();
+	}
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	pmm_init_reclaim();
@@ -112,9 +124,6 @@ void init_bsp(void *data) {
 	process_init();
 	thread_init();
 	sched_init();
-
-	/* Do other bits of initialization. TODO: Initcalls */
-	handle_init();
 
 	/* Perform final architecture initialization. */
 	arch_final_init();

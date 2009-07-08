@@ -34,6 +34,7 @@
 #include <proc/process.h>
 
 #include <errors.h>
+#include <init.h>
 
 #if CONFIG_HANDLE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -263,11 +264,12 @@ void handle_table_destroy(handle_table_t *table) {
 }
 
 /** Initialize the handle slab cache. */
-void handle_init(void) {
+static void __init_text handle_init(void) {
 	handle_info_cache = slab_cache_create("handle_info_cache", sizeof(handle_info_t), 0,
 	                                      handle_info_cache_ctor, NULL, NULL, NULL, NULL,
 	                                      0, MM_FATAL);
 }
+INITCALL(handle_init);
 
 #if 0
 # pragma mark System calls.

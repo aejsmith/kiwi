@@ -63,8 +63,6 @@ extern void handle_release(handle_info_t *info);
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
 
-extern void handle_init(void);
-
 extern int sys_handle_close(handle_t handle);
 
 #endif /* __PROC_HANDLE_H */
