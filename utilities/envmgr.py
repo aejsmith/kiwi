@@ -47,6 +47,10 @@ class EnvironmentManager(UserDict):
 		self.base['RANLIB'] = self.get_tool_path('ranlib')
 		self.base['OBJCOPY'] = self.get_tool_path('objcopy')
 
+		# Set paths to build utilities.
+		self.base['SYSGEN'] = os.path.join(os.getcwd(), 'utilities', 'sysgen.py')
+		self.base['GENSYMTAB'] = os.path.join(os.getcwd(), 'utilities', 'gensymtab.py')
+
 		# Set compilation flags.
 		self.base['CCFLAGS'] = [
 			'-Wall', '-Wextra', '-Werror', '-Wcast-align',

@@ -18,8 +18,6 @@
  * @brief		Program loader/dynamic linker.
  */
 
-#include <fs/node.h>
-
 #include <proc/process.h>
 #include <proc/thread.h>
 
@@ -104,4 +102,3 @@ static int loader_unload(void) {
 MODULE_NAME("loader");
 MODULE_DESC("Program loader and dynamic linker.");
 MODULE_FUNCS(loader_init, loader_unload);
-MODULE_DEPS("vfs");

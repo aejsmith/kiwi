@@ -31,20 +31,14 @@ sources += [
 	File('ctype/toascii.c'),
 	File('ctype/tolower.c'),
 	File('ctype/toupper.c'),
-]
 
-sources += [
 	File('stdio/do_printf.c'),
 	File('stdio/fputs.c'),
 	File('stdio/vfprintf.c'),
 	File('stdio/vsnprintf.c'),
-]
 
-sources += [
 	File('stdlib/strtoul.c'),
-]
 
-sources += [
 	File('string/memchr.c'),
 	File('string/memcmp.c'),
 	File('string/memcpy.c'),

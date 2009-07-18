@@ -18,7 +18,7 @@ import sys
 Import('env', 'config')
 
 # Generate the version information file. Thanks to the use of MD5 file
-# checksums, this won't automatically be rebuilt!
+# checksums, this won't be rebuilt unless the version info changes!
 def gen_version_c(target, source, env):
 	f = open(str(target[0]), 'w')
 	f.write('int kiwi_ver_release = %d;\n' % (env['KIWI_VER_RELEASE']))
@@ -32,23 +32,20 @@ AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 env['OBJFILES'] += [
 	env.Object('console/console.c'),
 	env.Object('console/kprintf.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('cpu/cpu.c'),
 	env.Object('cpu/intr.c'),
 	env.Object('cpu/ipi.c'),
 	env.Object('cpu/irq.c'),
-]
 
-env['OBJFILES'] += [
+	env.Object('fs/syscall.c'),
+	env.Object('fs/vfs.c'),
+
 	env.Object('lib/do_printf.c'),
 	env.Object('lib/qsort.c'),
 	env.Object('lib/sprintf.c'),
 	env.Object('lib/string.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('mm/aspace.c'),
 	env.Object('mm/aspace_anon.c'),
 	env.Object('mm/cache.c'),
@@ -59,35 +56,25 @@ env['OBJFILES'] += [
 	env.Object('mm/slab.c'),
 	env.Object('mm/tlb.c'),
 	env.Object('mm/vmem.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('proc/handle.c'),
 	env.Object('proc/process.c'),
 	env.Object('proc/sched.c'),
 	env.Object('proc/syscall.c'),
 	env.Object('proc/thread.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('sync/mutex.c'),
 	env.Object('sync/semaphore.c'),
 	env.Object('sync/spinlock.c'),
 	env.Object('sync/waitq.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('time/timer.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('types/avltree.c'),
 	env.Object('types/bitmap.c'),
 	env.Object('types/hash.c'),
 	env.Object('types/radix.c'),
-]
 
-env['OBJFILES'] += [
 	env.Object('bootmod.c'),
 	env.Object('fatal.c'),
 	env.Object('init.c'),

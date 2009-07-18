@@ -18,7 +18,7 @@
  * @brief		RAM-based temporary filesystem.
  */
 
-#include <fs/type.h>
+#include <fs/vfs.h>
 
 #include <errors.h>
 #include <module.h>
@@ -64,4 +64,3 @@ static int ramfs_unload(void) {
 MODULE_NAME("ramfs");
 MODULE_DESC("RAM-based temporary filesystem driver.");
 MODULE_FUNCS(ramfs_init, ramfs_unload);
-MODULE_DEPS("vfs");

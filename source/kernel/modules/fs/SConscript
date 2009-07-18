@@ -14,21 +14,11 @@
 
 Import('env', 'config')
 
-# Add the include directory to the include list.
-env['INCDIRS']['fs'] = Dir('include')
+# Work out the modules to build.
+dirs = [
+	(None, 'ramfs'),
+#	('MODULE_FS_EXT2', 'ext2'),
+#	('MODULE_FS_ISO9660', 'iso9660'),
+]
 
-# Build rule for the core VFS.
-env.Module('vfs', [
-	'mount.c',
-	'node.c',
-	'type.c',
-	'vfs.c',
-])
-
-# Build other filesystem modules.
-dirs = ['ramfs']
-#if config['MODULE_FS_EXT2']:
-#	dirs.append('ext2')
-#if config['MODULE_FS_ISO9660']:
-#	dirs.append('iso9660')
-SConscript(dirs=dirs, exports=['env'])
+SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])

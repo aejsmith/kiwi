@@ -99,7 +99,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - aspace_insert() will reject the call if they
 	 * are. */
-	ret = vfs_node_aspace_create(data->binary->node, AS_SOURCE_PRIVATE, &source);
+	ret = vfs_aspace_source_create(data->binary->node, AS_SOURCE_PRIVATE, &source);
 	if(ret != 0) {
 		return ret;
 	}

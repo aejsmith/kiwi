@@ -21,7 +21,7 @@
 #ifndef	__LOADER_BINARY_H
 #define __LOADER_BINARY_H
 
-#include <fs/node.h>
+#include <fs/vfs.h>
 
 #include <mm/aspace.h>
 

@@ -22,8 +22,11 @@
 
 #include <console/kprintf.h>
 
+#include <fs/syscall.h>
+
 #include <lib/utility.h>
 
+#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/syscall.h>
 
@@ -41,6 +44,32 @@ static int sys_putch(char ch) {
 /** Table of system calls. */
 static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_putch,
+
+	/** Handle system calls. */
+	(syscall_handler_t)sys_handle_close,
+
+	/** Filesystem system calls. */
+	(syscall_handler_t)sys_fs_file_create,
+	(syscall_handler_t)sys_fs_file_path,
+	(syscall_handler_t)sys_fs_file_open,
+	(syscall_handler_t)sys_fs_file_read,
+	(syscall_handler_t)sys_fs_file_write,
+	(syscall_handler_t)sys_fs_file_truncate,
+	(syscall_handler_t)sys_fs_file_seek,
+	(syscall_handler_t)sys_fs_file_map,
+	(syscall_handler_t)sys_fs_dir_create,
+	(syscall_handler_t)sys_fs_dir_open,
+	(syscall_handler_t)sys_fs_dir_read,
+	(syscall_handler_t)sys_fs_symlink_create,
+	(syscall_handler_t)sys_fs_symlink_read,
+	(syscall_handler_t)sys_fs_info,
+	(syscall_handler_t)sys_fs_link,
+	(syscall_handler_t)sys_fs_unlink,
+	(syscall_handler_t)sys_fs_rename,
+	(syscall_handler_t)sys_fs_getcwd,
+	(syscall_handler_t)sys_fs_setcwd,
+	(syscall_handler_t)sys_fs_mount,
+	(syscall_handler_t)sys_fs_unmount,
 };
 
 /** System call dispatcher.

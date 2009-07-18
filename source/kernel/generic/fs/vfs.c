@@ -1,4 +1,4 @@
-/* Kiwi VFS node functions
+/* Kiwi virtual filesystem
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,13 +15,12 @@
 
 /**
  * @file
- * @brief		VFS node functions.
- *
- * This file contains the bulk of the interface that the VFS exposes to other
- * modules. This includes functions for looking up nodes on the filesystem,
- * and reading/modifying those nodes, as well as for creating new filesystem
- * nodes.
+ * @brief		Virtual filesystem (VFS).
  */
+
+#include <console/kprintf.h>
+
+#include <fs/vfs.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -33,15 +32,35 @@
 #include <mm/slab.h>
 
 #include <assert.h>
+#include <errors.h>
+#include <init.h>
 
-#include "vfs_priv.h"
+#if CONFIG_VFS_DEBUG
+# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#else
+# define dprintf(fmt...)	
+#endif
 
-/*
- * Node cache functions.
- */
+/** List of all mounts. */
+static LIST_DECLARE(vfs_mount_list);
+static MUTEX_DECLARE(vfs_mount_list_lock, 0);
+
+/** List of registered FS types. */
+static LIST_DECLARE(vfs_type_list);
+static MUTEX_DECLARE(vfs_type_list_lock, 0);
 
 /** Filesystem node slab cache. */
 static slab_cache_t *vfs_node_cache;
+
+/** Pointer to mount at root of the filesystem. */
+vfs_mount_t *vfs_root_mount;
+
+/** Forward declarations. */
+static vfs_type_t *vfs_type_lookup(const char *name, bool ref);
+
+#if 0
+# pragma mark FS node functions.
+#endif
 
 /** VFS node object constructor.
  * @param obj		Object to construct.
@@ -59,20 +78,13 @@ static int vfs_node_ctor(void *obj, void *data, int kmflag) {
 	return 0;
 }
 
-/** VFS node cache reclaim callback.
- * @param data		Cache data (unused). */
-static void vfs_node_cache_reclaim(void *data) {
-	dprintf("vfs: performing reclaim of unused nodes...\n");
-	vfs_mount_reclaim_nodes();
-}
-
 /** Allocate a node structure and set one reference on it.
  * @param name		Name to give the node (can be NULL).
  * @param mount		Mount that the node resides on.
  * @param mmflag	Allocation flags.
  * @return		Pointer to node on success, NULL on failure (always
  *			succeeds if MM_SLEEP is specified). */
-vfs_node_t *vfs_node_alloc(const char *name, vfs_mount_t *mount, int mmflag) {
+static vfs_node_t *vfs_node_alloc(const char *name, vfs_mount_t *mount, int mmflag) {
 	vfs_node_t *node;
 
 	node = slab_cache_alloc(vfs_node_cache, mmflag);
@@ -109,7 +121,7 @@ vfs_node_t *vfs_node_alloc(const char *name, vfs_mount_t *mount, int mmflag) {
  * @return		0 on success, 1 if node persistent, negative error
  *			code on failure (this can happen, for example, if an
  *			error occurs flushing the node data). */
-int vfs_node_free(vfs_node_t *node, bool destroy) {
+static int vfs_node_free(vfs_node_t *node, bool destroy) {
 	int ret;
 
 	/* Lock the parent first, so we ensure that the node is not
@@ -171,11 +183,76 @@ int vfs_node_free(vfs_node_t *node, bool destroy) {
 	return 0;
 }
 
-/** Initialize the filesystem node cache. */
-void vfs_node_cache_init(void) {
-	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t),
-	                                   0, vfs_node_ctor, NULL, vfs_node_cache_reclaim,
-	                                   NULL, NULL, 0, MM_SLEEP);
+/** Free all nodes on the given list.
+ * @param list		List to reclaim from.
+ * @return		Number of nodes reclaimed. */
+static size_t vfs_node_reclaim_internal(list_t *list) {
+	vfs_node_t *node;
+	size_t num = 0;
+
+	/* Keep on looping through the lists until we can do nothing else. */
+	LIST_FOREACH_SAFE(list, iter) {
+		node = list_entry(iter, vfs_node_t, header);
+
+		if(vfs_node_free(node, false) == 0) {
+			num++;
+		}
+	}
+
+	return num;
+}
+
+/** VFS node cache reclaim callback.
+ * @param data		Cache data (unused). */
+static void vfs_node_reclaim(void *data) {
+	size_t ret, total, dirty;
+	vfs_mount_t *mount;
+
+	dprintf("vfs: performing reclaim of unused nodes...\n");
+
+	mutex_lock(&vfs_mount_list_lock, 0);
+
+	/* For each mount, keep on looping over it, freeing each node that we
+	 * come to, until nothing else can be done. */
+	LIST_FOREACH(&vfs_mount_list, iter) {
+		mount = list_entry(iter, vfs_mount_t, header);
+		total = dirty = 0;
+
+		mutex_lock(&mount->lock, 0);
+
+		dprintf("vfs: reclaiming unused nodes from mount %p...\n", mount);
+
+		/* Repeatedly attempt to free unused nodes. */
+		while(true) {
+			/* Prefer nodes that have not been dirtied (as it is
+			 * more time-consuming to flush dirty nodes to their
+			 * source - we want this to be done as quickly as
+			 * possible). */
+			if((ret = vfs_node_reclaim_internal(&mount->unused_nodes))) {
+				total += ret;
+				continue;
+			} else if(total) {
+				/* We have reclaimed some untouched nodes,
+				 * break out the loop. */
+				break;
+			}
+
+			/* Nothing at all was reclaimed from the untouched node
+			 * list, move on to dirty nodes. */
+			if((ret = vfs_node_reclaim_internal(&mount->dirty_nodes))) {
+				total += ret; dirty += ret;
+				continue;
+			}
+
+			break;
+		}
+
+		dprintf("vfs: reclaimed %zu nodes from %p (dirty: %u, unmodified: %u)\n",
+		        total, mount, dirty, total - dirty);
+		mutex_unlock(&mount->lock);
+	}
+
+	mutex_unlock(&vfs_mount_list_lock);
 }
 
 /*
@@ -493,7 +570,6 @@ int vfs_node_lookup(vfs_node_t *from, const char *path, vfs_node_t **nodep) {
 	kfree(dup);
 	return ret;
 }
-MODULE_EXPORT(vfs_node_lookup);
 
 /** Place a reference on a node.
  *
@@ -509,7 +585,6 @@ void vfs_node_get(vfs_node_t *node) {
 
 	refcount_inc(&node->count);
 }
-MODULE_EXPORT(vfs_node_get);
 
 /** Remove a reference from a node.
  *
@@ -537,7 +612,6 @@ void vfs_node_release(vfs_node_t *node) {
 		vfs_node_free(node, true);
 	}
 }
-MODULE_EXPORT(vfs_node_release);
 
 /** Create a new node on the filesystem.
  *
@@ -625,7 +699,6 @@ int vfs_node_create(vfs_node_t *parent, const char *name, vfs_node_type_t type, 
 	mutex_unlock(&node->lock);
 	return 0;
 }
-MODULE_EXPORT(vfs_node_create);
 
 /** Read from a filesystem node.
  *
@@ -731,7 +804,6 @@ out:
 	}
 	return ret;
 }
-MODULE_EXPORT(vfs_node_read);
 
 /** Write to a filesystem node.
  *
@@ -844,11 +916,6 @@ out:
 	}
 	return ret;
 }
-MODULE_EXPORT(vfs_node_write);
-
-/*
- * Special node types.
- */
 
 /** Create a special node backed by a chunk of memory.
  *
@@ -894,11 +961,10 @@ int vfs_node_create_from_memory(const char *name, const void *memory, size_t siz
 	*nodep = node;
 	return 0;
 }
-MODULE_EXPORT(vfs_node_create_from_memory);
 
-/*
- * Address space backends.
- */
+#if 0
+# pragma mark Address space functions.
+#endif
 
 /** Get a missing page from a private VFS cache.
  * @param cache		Cache to get page from.
@@ -1050,7 +1116,7 @@ static aspace_backend_t vfs_aspace_shared_backend = {
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_node_aspace_create(vfs_node_t *node, int flags, aspace_source_t **sourcep) {
+int vfs_aspace_source_create(vfs_node_t *node, int flags, aspace_source_t **sourcep) {
 	aspace_source_t *source;
 
 	if(!node || !sourcep) {
@@ -1078,4 +1144,176 @@ int vfs_node_aspace_create(vfs_node_t *node, int flags, aspace_source_t **source
 	*sourcep = source;
 	return 0;
 }
-MODULE_EXPORT(vfs_node_aspace_create);
+
+#if 0
+# pragma mark Mount functions.
+#endif
+
+/** Create a new mount.
+ *
+ * Mounts a filesystem and creates a a mount structure for it.
+ *
+ * @param type		Name of filesystem type.
+ * @param flags		Behaviour flags for the mount.
+ * @param mountp	Where to store pointer to mount structure.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_mount_create(const char *type, int flags, vfs_mount_t **mountp) {
+	vfs_mount_t *mount;
+	int ret;
+
+	if(mountp == NULL) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Create a mount structure for the mount. */
+	mount = kmalloc(sizeof(vfs_mount_t), MM_SLEEP);
+	mount->flags = NULL;
+	mount->mountpoint = NULL;
+
+	list_init(&mount->header);
+	list_init(&mount->dirty_nodes);
+	list_init(&mount->unused_nodes);
+	mutex_init(&mount->lock, "vfs_mount_lock", 0);
+
+	/* Look up the filesystem type. */
+	mount->type = vfs_type_lookup(type, true);
+	if(mount->type == NULL) {
+		kfree(mount);
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* If the type is read-only, set read-only in the mount flags. */
+	if(mount->type->flags & VFS_TYPE_RDONLY) {
+		mount->flags |= VFS_MOUNT_RDONLY;
+	}
+
+	/* Create the root node for the filesystem. */
+	mount->root = vfs_node_alloc(NULL, mount, MM_SLEEP);
+
+	/* Call the filesystem's mount operation. */
+	if(mount->type->mount) {
+		ret = mount->type->mount(mount);
+		if(ret != 0) {
+			vfs_node_release(mount->root);
+			vfs_node_free(mount->root, true);
+			refcount_dec(&mount->type->count);
+			kfree(mount);
+			return ret;
+		}
+	}
+
+	/* Store mount in mounts list. */
+	mutex_lock(&vfs_mount_list_lock, 0);
+	list_append(&vfs_mount_list, &mount->header);
+	mutex_unlock(&vfs_mount_list_lock);
+
+	dprintf("vfs: mounted filesystem %p(%s) (mount: %p, root: %p)\n",
+	        mount->type, mount->type->name, mount, mount->root);
+	*mountp = mount;
+	return 0;
+}
+
+/** Attach a mount to a filesystem node.
+ *
+ * Attaches a mount created with vfs_mount_create() to an existing node within
+ * the filesystem.
+ *
+ * @param mount		Mount to attach.
+ * @param node		Node to attach mount to. Must be a directory.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_mount_attach(vfs_mount_t *mount, vfs_node_t *node) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
+#if 0
+# pragma mark FS type functions.
+#endif
+
+/** Look up a filesystem type with lock already held.
+ * @param name		Name of filesystem type to look up.
+ * @return		Pointer to type structure if found, NULL if not. */
+static vfs_type_t *vfs_type_lookup_internal(const char *name) {
+	vfs_type_t *type;
+
+	LIST_FOREACH(&vfs_type_list, iter) {
+		type = list_entry(iter, vfs_type_t, header);
+
+		if(strcmp(type->name, name) == 0) {
+			return type;
+		}
+	}
+
+	return NULL;
+}
+
+/** Look up a filesystem type.
+ * @param name		Name of filesystem type to look up.
+ * @param ref		Whether to add a reference to the type.
+ * @return		Pointer to type structure if found, NULL if not. */
+static vfs_type_t *vfs_type_lookup(const char *name, bool ref) {
+	vfs_type_t *type;
+
+	mutex_lock(&vfs_type_list_lock, 0);
+
+	type = vfs_type_lookup_internal(name);
+	if(type && ref) {
+		refcount_inc(&type->count);
+	}
+
+	mutex_unlock(&vfs_type_list_lock);
+	return type;
+}
+
+/** Register a new filesystem type.
+ *
+ * Registers a new filesystem type with the VFS.
+ *
+ * @param type		Pointer to type structure to register.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_type_register(vfs_type_t *type) {
+	mutex_lock(&vfs_type_list_lock, 0);
+
+	/* Check if this type already exists. */
+	if(vfs_type_lookup_internal(type->name) != NULL) {
+		return -ERR_ALREADY_EXISTS;
+	}
+
+	list_init(&type->header);
+	list_append(&vfs_type_list, &type->header);
+
+	dprintf("vfs: registered filesystem type %p(%s)\n", type, type->name);
+	mutex_unlock(&vfs_type_list_lock);
+	return 0;
+}
+
+/** Remove a filesystem type.
+ *
+ * Removes a previously registered filesystem type from the list of
+ * filesystem types.
+ *
+ * @param type		Type to remove.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_type_unregister(vfs_type_t *type) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
+#if 0
+# pragma mark Initialization functions.
+#endif
+
+/** Initialization function for the VFS. */
+static void __init_text vfs_init(void) {
+	/* Initialize the node slab cache. */
+	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
+	                                   vfs_node_ctor, NULL, vfs_node_reclaim,
+	                                   NULL, NULL, 0, MM_FATAL);
+}
+INITCALL(vfs_init);

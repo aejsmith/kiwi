@@ -65,16 +65,16 @@ env.Command('kiwi-pass1.elf', [env['LDSCRIPT'], env['OBJFILES'], 'fake-symtab.o'
                    '$LINKCOMSTR'))
 
 # Generate the first real symbol table and relink the kernel with it.
-env.Command('symtab-pass1.c', ['kiwi-pass1.elf', '#utilities/gensymtab.py'],
-            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py kernel_symtab > $TARGET', '$GENCOMSTR'))
+env.Command('symtab-pass1.c', ['kiwi-pass1.elf'],
+            Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Object('symtab-pass1.o', 'symtab-pass1.c')
 env.Command('kiwi-pass2.elf', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass1.o'],
             Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("symtab-pass1.o")} $LDFLAGS',
                    '$LINKCOMSTR'))
 
 # Generate the final symbol table with correct symbol addresses.
-env.Command('symtab-pass2.c', ['kiwi-pass2.elf', '#utilities/gensymtab.py'],
-            Action('$NM -S $SOURCE | sort | utilities/gensymtab.py kernel_symtab > $TARGET', '$GENCOMSTR'))
+env.Command('symtab-pass2.c', ['kiwi-pass2.elf'],
+            Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Object('symtab-pass2.o', 'symtab-pass2.c')
 env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
             Action('$LINK -T $LDSCRIPT -o $TARGET -Map ${File("kiwi.map")} ' + \
