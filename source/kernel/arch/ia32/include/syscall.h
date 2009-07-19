@@ -36,13 +36,13 @@ typedef struct syscall_frame {
 	unative_t fs;			/**< FS. */
 	unative_t es;			/**< ES. */
 	unative_t ds;			/**< DS. */
-	unative_t p1;			/**< First parameter (EDI). */
-	unative_t p2;			/**< Second parameter (ESI). */
+	unative_t p3;			/**< Third parameter (EDI). */
+	unative_t p4;			/**< Fourth parameter (ESI). */
 	unative_t p6;			/**< Sixth parameter (EBP). */
 	unative_t ksp;			/**< ESP (kernel). */
 	unative_t p5;			/**< Fifth parameter (EBX). */
-	unative_t p3;			/**< Third parameter (EDX). */
-	unative_t p4;			/**< Fourth parameter (ECX). */
+	unative_t p1;			/**< First parameter (EDX). */
+	unative_t p2;			/**< Second parameter (ECX). */
 	unative_t id;			/**< System call ID (EAX). */
 	unative_t int_no;		/**< Interrupt number. */
 	unative_t err_code;		/**< Error code (if applicable). */

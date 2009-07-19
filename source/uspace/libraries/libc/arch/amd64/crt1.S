@@ -1,4 +1,4 @@
-/* Kiwi C library - AMD64 startup code
+/* Kiwi AMD64 application startup code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		AMD64 startup code.
+ * @brief		AMD64 application startup code.
  */
 
 .section .text

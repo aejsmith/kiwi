@@ -20,6 +20,11 @@ SECTIONS {
 		*(.init.data)
 		*(.init.text)
 
+		. = ALIGN(32);
+		__initcall_start = .;
+		*(.init.initcalls)
+		__initcall_end = .;
+
 		__ap_trampoline_start = .;
 		*(.init.trampoline)
 		__ap_trampoline_end = .;

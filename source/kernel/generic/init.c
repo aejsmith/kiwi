@@ -64,7 +64,6 @@ static void init_thread(void *arg1, void *arg2) {
 
 	/* Call initialziation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
-		kprintf(LOG_DEBUG, "%p %p\n", initcall, (*initcall));
 		(*initcall)();
 	}
 
