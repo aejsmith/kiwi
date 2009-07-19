@@ -58,6 +58,7 @@ env['OBJFILES'] += [
 	env.Object('mm/vmem.c'),
 
 	env.Object('proc/handle.c'),
+	env.Object('proc/loader.c'),
 	env.Object('proc/process.c'),
 	env.Object('proc/sched.c'),
 	env.Object('proc/syscall.c'),
@@ -76,6 +77,7 @@ env['OBJFILES'] += [
 	env.Object('types/radix.c'),
 
 	env.Object('bootmod.c'),
+	env.Object('elf.c'),
 	env.Object('fatal.c'),
 	env.Object('init.c'),
 	env.Object('kdbg.c'),

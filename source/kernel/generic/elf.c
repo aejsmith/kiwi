@@ -1,4 +1,4 @@
-/* Kiwi ELF executable loader
+/* Kiwi ELF binary loader
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,17 +15,32 @@
 
 /**
  * @file
- * @brief		ELF executable loader.
+ * @brief		ELF binary loader.
  */
+
+#include <console/kprintf.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
 
-#include <elf.h>
+#include <proc/loader.h>
 
-#include "loader_priv.h"
+#include <elf.h>
+#include <errors.h>
+#include <fatal.h>
+#include <init.h>
+
+#if 0
+# pragma mark Executable loader type.
+#endif
+
+#if CONFIG_LOADER_DEBUG
+# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#else
+# define dprintf(fmt...)	
+#endif
 
 /** ELF loader binary data structure. */
 typedef struct elf_binary {
@@ -39,7 +54,7 @@ typedef struct elf_binary {
  * @param data		ELF binary data structure.
  * @param i		Index of program header.
  * @return		0 on success, negative error code on failure. */
-static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
+static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 	aspace_source_t *source;
 	int ret, flags = 0;
 	ptr_t start, end;
@@ -51,7 +66,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? AS_REGION_WRITE : 0);
 	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? AS_REGION_READ  : 0);
 	if(flags == 0) {
-		dprintf("loader: PHDR %zu has no protection flags set\n", i);
+		dprintf("elf: PHDR %zu has no protection flags set\n", i);
 		return -ERR_FORMAT_INVAL;
 	}
 
@@ -61,12 +76,12 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 		end = ROUND_UP(data->phdrs[i].p_vaddr + data->phdrs[i].p_memsz, PAGE_SIZE);
 		size = end - start;
 
-		dprintf("loader: loading BSS for %zu to %p (size: %zu)\n", i, start, size);
+		dprintf("elf: loading BSS for %zu to %p (size: %zu)\n", i, start, size);
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
 		if((flags & AS_REGION_WRITE) == 0) {
-			dprintf("loader: PHDR %zu should be writeable\n", i);
+			dprintf("elf: PHDR %zu should be writeable\n", i);
 			return -ERR_FORMAT_INVAL;
 		}
 
@@ -116,7 +131,7 @@ static int loader_elf_phdr_load(elf_binary_t *data, size_t i) {
 /** Check whether a binary is an ELF binary.
  * @param node		Filesystem node referring to the binary.
  * @return		Whether the binary is an ELF file. */
-static bool loader_elf_check(vfs_node_t *node) {
+static bool elf_binary_check(vfs_node_t *node) {
 	elf_ehdr_t ehdr;
 	size_t bytes;
 	int ret;
@@ -135,7 +150,7 @@ static bool loader_elf_check(vfs_node_t *node) {
 /** Load an ELF binary into an address space.
  * @param binary	Binary loader data structure.
  * @return		0 on success, negative error code on failure. */
-static int loader_elf_load(loader_binary_t *binary) {
+static int elf_binary_load(loader_binary_t *binary) {
 	size_t bytes, size, i, load_count = 0;
 	elf_binary_t *data;
 	int ret;
@@ -177,7 +192,7 @@ static int loader_elf_load(loader_binary_t *binary) {
 	for(i = 0; i < data->ehdr.e_phnum; i++) {
 		switch(data->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			ret = loader_elf_phdr_load(data, i);
+			ret = elf_binary_phdr_load(data, i);
 			if(ret != 0) {
 				goto fail;
 			}
@@ -187,14 +202,14 @@ static int loader_elf_load(loader_binary_t *binary) {
 			/* These can be ignored without warning. */
 			break;
 		default:
-			dprintf("loader: unknown ELF PHDR type %u, ignoring\n", data->phdrs[i].p_type);
+			dprintf("elf: unknown PHDR type %u, ignoring\n", data->phdrs[i].p_type);
 			break;
 		}
 	}
 
 	/* Check if we actually loaded anything. */
 	if(!load_count) {
-		dprintf("loader: ELF binary '%s' did not have any loadable program headers\n",
+		dprintf("elf: binary '%s' did not have any loadable program headers\n",
 		        binary->node->name);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
@@ -215,24 +230,66 @@ fail:
 /** Finish binary loading, after address space is switched.
  * @param binary	Binary loader data structure.
  * @return		0 on success, negative error code on failure. */
-static int loader_elf_finish(loader_binary_t *binary) {
+static int elf_binary_finish(loader_binary_t *binary) {
 	return 0;
 }
 
 /** Clean up ELF loader data.
  * @param binary	Binary loader data structure. */
-static void loader_elf_cleanup(loader_binary_t *binary) {
+static void elf_binary_cleanup(loader_binary_t *binary) {
 	elf_binary_t *data = binary->data;
 
 	kfree(data->phdrs);
 	kfree(data);
 }
 
-/** ELF executable loader type. */
-loader_type_t loader_elf_type = {
+/** ELF binary type structure. */
+static loader_type_t elf_binary_type = {
 	.name = "ELF",
-	.check = loader_elf_check,
-	.load = loader_elf_load,
-	.finish = loader_elf_finish,
-	.cleanup = loader_elf_cleanup,
+	.check = elf_binary_check,
+	.load = elf_binary_load,
+	.finish = elf_binary_finish,
+	.cleanup = elf_binary_cleanup,
 };
+
+/** Initialization function to register the ELF binary type. */
+static void __init_text elf_init(void) {
+	if(loader_type_register(&elf_binary_type) != 0) {
+		fatal("Could not register ELF binary type");
+	}
+}
+INITCALL(elf_init);
+
+#if 0
+# pragma mark Utility functions.
+#endif
+
+/** Check whether a memory buffer contains a valid ELF header.
+ * @param image		Pointer to image.
+ * @param size		Size of memory image.
+ * @param type		Required ELF binary type.
+ * @return		True if valid, false if not. */
+bool elf_check(void *image, size_t size, int type) {
+	elf_ehdr_t *ehdr = image;
+
+	/* Reject images that are too small. */
+	if(size < sizeof(elf_ehdr_t)) {
+		return false;
+	}
+
+	/* Check the magic number and version. */
+	if(strncmp((const char *)ehdr->e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
+		return false;
+	} else if(ehdr->e_ident[ELF_EI_VERSION] != 1 || ehdr->e_version != 1) {
+		return false;
+	}
+
+	/* Check whether it matches the architecture we're running on. */
+	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS || ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
+	   ehdr->e_machine != ELF_MACHINE) {
+		return false;
+	}
+
+	/* Finally check type of binary. */
+	return (ehdr->e_type == type);
+}

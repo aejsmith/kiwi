@@ -20,14 +20,81 @@
 
 #include <arch/stack.h>
 
+#include <console/kprintf.h>
+
 #include <mm/malloc.h>
 
+#include <proc/loader.h>
 #include <proc/process.h>
+#include <proc/thread.h>
 #include <proc/uspace.h>
 
-#include <assert.h>
+#include <sync/mutex.h>
 
-#include "loader_priv.h"
+#include <assert.h>
+#include <bootmod.h>
+#include <errors.h>
+#include <init.h>
+
+#if CONFIG_LOADER_DEBUG
+# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#else
+# define dprintf(fmt...)	
+#endif
+
+/** List of known binary types. */
+static LIST_DECLARE(loader_type_list);
+static MUTEX_DECLARE(loader_type_list_lock, 0);
+
+#if 0
+# pragma mark Executable type management functions.
+#endif
+
+/** Match a binary to a type.
+ * @param node		VFS node for the binary.
+ * @return		Pointer to type if matched, NULL if not. */
+static loader_type_t *loader_type_match(vfs_node_t *node) {
+	loader_type_t *type;
+
+	mutex_lock(&loader_type_list_lock, 0);
+
+	LIST_FOREACH(&loader_type_list, iter) {
+		type = list_entry(iter, loader_type_t, header);
+
+		if(type->check(node)) {
+			mutex_unlock(&loader_type_list_lock);
+			return type;
+		}
+	}
+
+	mutex_unlock(&loader_type_list_lock);
+	return NULL;
+}
+
+/** Register a binary type.
+ *
+ * Registers a binary type with the program loader.
+ *
+ * @param type		Binary type to add.
+ */
+int loader_type_register(loader_type_t *type) {
+	if(!type->name || !type->check || !type->load || !type->finish || !type->cleanup) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	list_init(&type->header);
+
+	mutex_lock(&loader_type_list_lock, 0);
+	list_append(&loader_type_list, &type->header);
+	mutex_unlock(&loader_type_list_lock);
+
+	dprintf("loader: registered binary type %p(%s)\n", type, type->name);
+	return 0;
+}
+
+#if 0
+# pragma mark Executable loading functions.
+#endif
 
 /** Free an array of strings. Assumes array is NULL-terminated.
  * @param array		Array to free. */
@@ -174,4 +241,67 @@ fail:
 	}
 	return ret;
 }
-MODULE_EXPORT(loader_binary_load);
+
+#if 0
+# pragma mark Core functions.
+#endif
+
+/** Thread to load a binary provided at boot.
+ * @param arg1		Pointer to VFS node for binary.
+ * @param arg2		Pointer to semaphore to up upon successful load. */
+static void loader_bootmod_thread(void *arg1, void *arg2) {
+	semaphore_t *sem = arg2;
+	vfs_node_t *node = arg1;
+	int ret;
+
+	ret = loader_binary_load(node, NULL, NULL, sem);
+	fatal("Failed to load binary '%s' (%d)", node->name, ret);
+}
+
+/** Executable boot module handler.
+ * @param mod		Boot module structure.
+ * @return		1 if loaded, 0 if module valid but cannot be loaded
+ *			yet (dependencies, etc), -1 if module not this type. */
+static int loader_bootmod_handler(bootmod_t *mod) {
+	SEMAPHORE_DECLARE(semaphore, 0);
+	vfs_node_t *node;
+	thread_t *thread;
+	process_t *proc;
+	int ret;
+
+	/* Create a node from the module's data. */
+	ret = vfs_node_create_from_memory(mod->name, (const void *)mod->addr, mod->size, &node);
+	if(ret != 0) {
+		fatal("Could not create VFS node from module data (%d)", ret);
+	}
+
+	/* Attempt to match the node to a type. */
+	if(!loader_type_match(node)) {
+		vfs_node_release(node);
+		return -1;
+	}
+
+	/* Create process to load the binary. Does not require an address space
+	 * to begin with as loader_binary_load() will create one. */
+	ret = process_create(mod->name, kernel_proc, PRIORITY_SYSTEM, PROCESS_NOASPACE, &proc);
+	if(ret != 0) {
+		fatal("Could not create process to load binary (%d)", ret);
+	}
+
+	ret = thread_create(mod->name, proc, 0, loader_bootmod_thread, node, &semaphore, &thread);
+	if(ret != 0) {
+		fatal("Could not create thread to load binary (%d)", ret);
+	}
+	thread_run(thread);
+
+	/* Wait for the binary to load. The node is released for us by
+	 * loader_binary_load(). */
+	semaphore_down(&semaphore, 0);
+	return 1;
+}
+
+/** Initialization function to register a boot module handler. */
+static void __init_text loader_init(void) {
+	bootmod_handler_register(loader_bootmod_handler);
+}
+INITCALL(loader_init);

@@ -534,40 +534,6 @@ typedef struct {
 /** Pull in architecture definitions of the types to use. */
 #include <arch/elf.h>
 
-/*
- * Utility functions.
- */
-
-#include <lib/string.h>
-
-/** Check whether a memory buffer contains a valid ELF header.
- * @param image		Pointer to image.
- * @param size		Size of memory image.
- * @param type		Required ELF binary type.
- * @return		True if valid, false if not. */
-static inline bool elf_check(void *image, size_t size, int type) {
-	elf_ehdr_t *ehdr = image;
-
-	/* Reject images that are too small. */
-	if(size < sizeof(elf_ehdr_t)) {
-		return false;
-	}
-
-	/* Check the magic number and version. */
-	if(strncmp((const char *)ehdr->e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
-		return false;
-	} else if(ehdr->e_ident[ELF_EI_VERSION] != 1 || ehdr->e_version != 1) {
-		return false;
-	}
-
-	/* Check whether it matches the architecture we're running on. */
-	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS || ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
-	   ehdr->e_machine != ELF_MACHINE) {
-		return false;
-	}
-
-	/* Finally check type of binary. */
-	return (ehdr->e_type == type);
-}
+extern bool elf_check(void *image, size_t size, int type);
 
 #endif /* __ELF_H */

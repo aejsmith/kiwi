@@ -1,4 +1,4 @@
-/* Kiwi executable type manager
+/* Kiwi executable loader
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,15 +15,35 @@
 
 /**
  * @file
- * @brief		Executable type manager.
+ * @brief		Executable loader.
  */
 
-#ifndef __LOADER_TYPE_H
-#define __LOADER_TYPE_H
+#ifndef	__PROC_LOADER_H
+#define __PROC_LOADER_H
 
-#include <loader/binary.h>
+#include <fs/vfs.h>
+
+#include <mm/aspace.h>
 
 #include <types/list.h>
+
+#include <sync/semaphore.h>
+
+struct loader_type;
+
+/** Structure storing data used by the executable loader. */
+typedef struct loader_binary {
+	vfs_node_t *node;		/**< Filesystem node referring to the binary. */
+	struct loader_type *type;	/**< Pointer to executable type. */
+	void *data;			/**< Data used by the executable type. */
+
+	aspace_t *aspace;		/**< Address space that the binary is being loaded into. */
+	ptr_t stack;			/**< Stack pointer for the initial thread. */
+	ptr_t entry;			/**< Entry point for the binary. */
+
+	char **args;			/**< Argument array. */
+	char **environ;			/**< Environment variable array. */
+} loader_binary_t;
 
 /** Executable loader type definition structure. */
 typedef struct loader_type {
@@ -60,6 +80,8 @@ typedef struct loader_type {
 	void (*cleanup)(loader_binary_t *binary);
 } loader_type_t;
 
+extern int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_t *sem);
+
 extern int loader_type_register(loader_type_t *type);
 
-#endif /* __LOADER_TYPE_H */
+#endif /* __PROC_LOADER_H */

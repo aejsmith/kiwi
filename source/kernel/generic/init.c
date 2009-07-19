@@ -86,8 +86,8 @@ void init_bsp(void *data) {
 	cpu_early_init();
 	console_early_init();
 
-	kprintf(LOG_NORMAL, "\nKiwi v%s (%s) - built for %s-%s\n",
-	        kiwi_ver_string, kiwi_ver_codename, CONFIG_ARCH, CONFIG_PLATFORM);
+	kprintf(LOG_NORMAL, "\nKiwi v%s - built for %s-%s\n",
+	        kiwi_ver_string, CONFIG_ARCH, CONFIG_PLATFORM);
 	kprintf(LOG_NORMAL, "Copyright (C) 2007-2009 Kiwi Developers\n\n");
 
 	/* Perform early architecture/platform initialization. */

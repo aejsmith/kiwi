@@ -76,12 +76,11 @@ Option('CACHE_DEBUG', 'Page cache debug output (VERY excessive).', False, {'DEBU
 Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
 Option('HANDLE_DEBUG', 'Handle manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
-
-#######
-Section('Module configuration')
-#######
-
 Option('LOADER_DEBUG', 'Executable loader debugging output.', False, {'DEBUG': lambda x: x})
+
+#######
+#Section('Module configuration')
+#######
 
 #####################################
 # Configuration validation function #
