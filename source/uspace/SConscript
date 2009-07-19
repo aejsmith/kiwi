@@ -20,6 +20,8 @@ env = envmgr.Create('uspace')
 env['CPPPATH'] = Dir('include')
 env['LIBPATH'] = Dir('libraries')
 env['LINKFLAGS'] = ['-static']
+env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
+env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 
 # Set up arrays used to track stuff built. Use LIBRARIES rather than LIBS
 # as LIBS is a special SCons variable.
@@ -44,6 +46,13 @@ def program_emitter(target, source, env):
 	env['APPS'].append(target[0])
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
+
+# Add a builder to generate system call functions.
+env['SYSINC'] = File('libraries/libkernel/arch/%s/syscalls.inc' % (config['ARCH']))
+def sysgen_emitter(target, source, env):
+	source.insert(0, env['SYSINC'])
+	return target, source
+env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
 
 # Build libraries before applications because they're required for applications
 # to build.

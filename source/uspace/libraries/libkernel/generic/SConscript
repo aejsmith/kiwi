@@ -12,7 +12,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('sources')
+Import('env', 'sources')
+
+# Generate the system call functions.
+env.Sysgen('syscalls.S', 'syscalls.def')
 
 sources += [
 	File('syscalls.S'),

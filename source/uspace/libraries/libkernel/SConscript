@@ -19,5 +19,4 @@ sources = []
 SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
 
 # Build the library from this.
-env.Library('kernel', sources,
-            ASFLAGS = env['ASFLAGS'] + ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])])
+env.Library('kernel', sources)
