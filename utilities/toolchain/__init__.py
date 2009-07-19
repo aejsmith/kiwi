@@ -39,7 +39,7 @@ class ToolchainManager:
 
 	# Write a status message.
 	def msg(self, msg):
-		print '\033[1;34m>>>\033[0;1m %s\033[0m' % (msg)
+		print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
 
 	# Check whether any dependencies of a component have changed.
 	def checkdeps(self, c):
@@ -88,11 +88,12 @@ class ToolchainManager:
 		os.chdir(self.builddir)
 
 		# Perform the actual build.
-		c._build()
-
-		# Change to the old directory and clean up the build directory.
-		os.chdir(olddir)
-		self.remove(self.builddir)
+		try:
+			c._build()
+		finally:
+			# Change to the old directory and clean up the build directory.
+			os.chdir(olddir)
+			self.remove(self.builddir)
 
 	# Check if an update is required.
 	def check(self):
@@ -115,11 +116,13 @@ class ToolchainManager:
 			self.remove('%s/%s/lib' % (self.destdir, self.target))
 
 		# Build necessary components.
-		for c in self.components:
-			if self.checkdeps(c) or c.check():
-				self.build(c)
-
-		self.repair()
-
-		if self.totaltime != 0:
-			self.msg('Toolchain updated in %d seconds' % (self.totaltime))
+		try:
+			for c in self.components:
+				if self.checkdeps(c) or c.check():
+					self.build(c)
+		except Exception as e:
+			self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
+		else:
+			self.repair()
+			if self.totaltime != 0:
+				self.msg('Toolchain updated in %d seconds' % (self.totaltime))
