@@ -18,11 +18,23 @@
  * @brief		Userspace startup application.
  */
 
+#include <kernel/aspace.h>
+
 #include <stdio.h>
 
 int main(int argc, char **argv) {
+	void *addr;
+	int ret;
+
 	printf("Hello from C userspace!\n");
 	printf("This is a message!\n");
 
+	ret = aspace_map_anon(NULL, 0x4000, ASPACE_MAP_READ | ASPACE_MAP_WRITE, &addr);
+	printf("Map returned %d (%p)\n", ret, addr);
+	if(ret == 0) {
+		printf("Writing... 1234\n");
+		*(int *)addr = 1234;
+		printf("Reading... %d\n", *(int *)addr);
+	}
 	while(1);
 }

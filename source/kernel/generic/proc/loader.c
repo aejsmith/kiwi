@@ -140,7 +140,6 @@ static void array_free(char **array) {
  *			be a negative error code.
  */
 int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_t *sem) {
-	aspace_source_t *source;
 	loader_binary_t *binary;
 	ptr_t stack, entry;
 	int ret;
@@ -181,14 +180,10 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 
 	/* Create a userspace stack. Do this now because after this is done we
 	 * don't want to fail. */
-	ret = aspace_anon_create(AS_SOURCE_PRIVATE, &source);
+	ret = aspace_map_anon(binary->aspace, 0, USTACK_SIZE,
+	                      ASPACE_MAP_READ | ASPACE_MAP_WRITE | ASPACE_MAP_PRIVATE,
+	                      &stack);
 	if(ret != 0) {
-		goto fail;
-	}
-
-	ret = aspace_alloc(binary->aspace, USTACK_SIZE, AS_REGION_READ | AS_REGION_WRITE, source, 0, &stack);
-	if(ret != 0) {
-		aspace_source_destroy(source);
 		goto fail;
 	}
 

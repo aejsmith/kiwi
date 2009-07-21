@@ -21,7 +21,7 @@
 #ifndef __FS_VFS_H
 #define __FS_VFS_H
 
-#include <mm/aspace.h>
+#include <mm/cache.h>
 
 #include <sync/mutex.h>
 
@@ -58,7 +58,7 @@ typedef struct vfs_node {
 	int flags;			/**< Behaviour flags for the node. */
 
 	/** Node data information. */
-	struct cache *cache;		/**< Cache containing node data. */
+	cache_t *cache;			/**< Cache containing node data. */
 	file_size_t size;		/**< Total size of node data. */
 	bool dirty;			/**< Whether any part of the node's data is dirty. */
 
@@ -74,6 +74,9 @@ typedef struct vfs_node {
 /** Filesystem node behaviour flags. */
 #define VFS_NODE_PERSISTENT	(1<<0)	/**< Node should stay in memory until the FS is destroyed. */
 
+/** Macro to check if a node is read-only. */
+#define VFS_NODE_RDONLY(node)	((node)->mount->flags & VFS_MOUNT_RDONLY)
+
 extern int vfs_node_lookup(vfs_node_t *from, const char *path, vfs_node_t **nodep);
 extern void vfs_node_get(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
@@ -84,11 +87,8 @@ extern int vfs_node_write(vfs_node_t *node, const void *buffer, size_t count, of
 
 extern int vfs_node_create_from_memory(const char *name, const void *memory, size_t size, vfs_node_t **nodep);
 
-#if 0
-# pragma mark Address space functions.
-#endif
-
-extern int vfs_aspace_source_create(vfs_node_t *node, int flags, aspace_source_t **sourcep);
+extern int vfs_node_cache_get(vfs_node_t *node, bool priv, cache_t **cachep);
+extern void vfs_node_cache_release(cache_t *cache);
 
 #if 0
 # pragma mark Mount functions/definitions.

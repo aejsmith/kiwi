@@ -55,10 +55,6 @@ int sys_fs_file_seek(handle_t handle, int how, offset_t offset) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
-int sys_fs_file_map(fs_file_map_args_t *args) {
-	return -ERR_NOT_IMPLEMENTED;
-}
-
 #if 0
 # pragma mark Directory-related calls.
 #endif

@@ -33,16 +33,6 @@ typedef struct fs_dir_entry {
 	int meow;
 } fs_dir_entry_t;
 
-/** Structure containing arguments for sys_fs_file_map(). */
-typedef struct fs_file_map_args {
-	handle_t handle;		/**< Handle for file to map. */
-	void *addr;			/**< Address to map at (if not AS_REGION_FIXED). */
-	size_t size;			/**< Size of area to map (multiple of page size). */
-	offset_t offset;		/**< Offset in the file to map from. */
-	int flags;			/**< Flags controlling the mapping. */
-	void **addrp;			/**< Where to store address mapped to. */
-} fs_file_map_args_t;
-
 extern int sys_fs_file_create(const char *path);
 extern int sys_fs_file_path(char *buf, size_t size);
 extern handle_t sys_fs_file_open(const char *path, int flags);
@@ -50,7 +40,6 @@ extern int sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *by
 extern int sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_t *bytesp);
 extern int sys_fs_file_truncate(handle_t handle, file_size_t size);
 extern int sys_fs_file_seek(handle_t handle, int how, offset_t offset);
-extern int sys_fs_file_map(fs_file_map_args_t *args);
 
 extern int sys_fs_dir_create(const char *path);
 extern handle_t sys_fs_dir_open(const char *path, int flags);

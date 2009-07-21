@@ -55,20 +55,23 @@ typedef struct elf_binary {
  * @param i		Index of program header.
  * @return		0 on success, negative error code on failure. */
 static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
-	aspace_source_t *source;
 	int ret, flags = 0;
 	ptr_t start, end;
 	offset_t offset;
 	size_t size;
 
 	/* Work out the protection flags to use. */
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_X) ? AS_REGION_EXEC : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? AS_REGION_WRITE : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? AS_REGION_READ  : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_X) ? ASPACE_MAP_EXEC : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? ASPACE_MAP_WRITE : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? ASPACE_MAP_READ  : 0);
 	if(flags == 0) {
-		dprintf("elf: PHDR %zu has no protection flags set\n", i);
+		dprintf("elf: program header %zu has no protection flags set\n", i);
 		return -ERR_FORMAT_INVAL;
 	}
+
+	/* Set the private and fixed flags - we always want to insert at the
+	 * position we say, and not share stuff. */
+	flags |= ASPACE_MAP_FIXED | ASPACE_MAP_PRIVATE;
 
 	/* Map the BSS if required. */
 	if(data->phdrs[i].p_filesz != data->phdrs[i].p_memsz) {
@@ -80,20 +83,14 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
-		if((flags & AS_REGION_WRITE) == 0) {
-			dprintf("elf: PHDR %zu should be writeable\n", i);
+		if((flags & ASPACE_MAP_WRITE) == 0) {
+			dprintf("elf: program header %zu should be writeable\n", i);
 			return -ERR_FORMAT_INVAL;
 		}
 
 		/* Create an anonymous memory region for it. */
-		ret = aspace_anon_create(AS_SOURCE_PRIVATE, &source);
+		ret = aspace_map_anon(data->binary->aspace, start, size, flags, NULL);
 		if(ret != 0) {
-			return ret;
-		}
-
-		ret = aspace_insert(data->binary->aspace, start, size, flags, source, 0);
-		if(ret != 0) {
-			aspace_source_destroy(source);
 			return ret;
 		}
 	}
@@ -112,20 +109,9 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 	dprintf("elf: loading PHDR %zu to %p (size: %zu)\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
-	 * addresses are valid - aspace_insert() will reject the call if they
+	 * addresses are valid - aspace_map_file() will reject the call if they
 	 * are. */
-	ret = vfs_aspace_source_create(data->binary->node, AS_SOURCE_PRIVATE, &source);
-	if(ret != 0) {
-		return ret;
-	}
-
-	ret = aspace_insert(data->binary->aspace, start, size, flags, source, offset);
-	if(ret != 0) {
-		aspace_source_destroy(source);
-		return ret;
-	}
-
-	return 0;
+	return aspace_map_file(data->binary->aspace, start, size, flags, data->binary->node, offset, NULL);
 }
 
 /** Check whether a binary is an ELF binary.

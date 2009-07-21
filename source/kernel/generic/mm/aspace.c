@@ -25,8 +25,8 @@
  * a mapped region is a page source. A page source can be shared between
  * mulitple regions - sharing occurs implicitly when a region has to be split
  * for whatever reason. It can also be shared across address spaces when
- * cloning an address space if a mapping using it is mapped as shared. A page
- * source has a backend behind it that is used to actually get pages. This
+ * cloning an address space if the source does not have the private flag set. A
+ * page source has a backend behind it that is used to actually get pages. This
  * backend can be a cache, physical memory, etc.
  *
  * A page source backend has 2 main operations: Get and Release. The Get
@@ -50,12 +50,20 @@
 
 #include <cpu/intr.h>
 
+#include <fs/vfs.h>
+
 #include <lib/string.h>
 
 #include <mm/aspace.h>
+#include <mm/cache.h>
 #include <mm/malloc.h>
+#include <mm/pmm.h>
+#include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/tlb.h>
+
+#include <proc/process.h>
+#include <proc/thread.h>
 
 #include <assert.h>
 #include <errors.h>
@@ -96,27 +104,70 @@ static void aspace_cache_dtor(void *obj, void *data) {
 	assert(avltree_empty(&aspace->regions));
 }
 
+/** Allocate a new address space source structure.
+ * @param name		Name for the source.
+ * @param flags		Behaviour flags for the source.
+ * @param mmflag	Allocation flags to use.
+ * @return		Pointer to source structure. */
+static aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag) {
+	aspace_source_t *source;
+
+	assert(name);
+
+	source = slab_cache_alloc(aspace_source_cache, mmflag);
+	if(!source) {
+		return NULL;
+	}
+
+	source->name = kstrdup(name, mmflag);
+	if(!source->name) {
+		slab_cache_free(aspace_source_cache, source);
+		return NULL;
+	}
+
+	refcount_set(&source->count, 0);
+	source->flags = flags;
+	return source;
+}
+
+/** Destroy an address space source structure.
+ * @note		The reference count should be 0.
+ * @param source	Source to destroy. */
+static void aspace_source_destroy(aspace_source_t *source) {
+	assert(refcount_get(&source->count) == 0);
+
+	if(source->backend->destroy) {
+		source->backend->destroy(source);
+	}
+	kfree(source->name);
+	slab_cache_free(aspace_source_cache, source);
+}
+
 /** Convert region flags to page map flags.
  * @param flags		Flags to convert.
  * @return		Page map flags. */
-static int aspace_flags_to_page(int flags) {
+static inline int aspace_region_flags_to_page(int flags) {
 	int ret = 0;
 
-	ret |= ((flags & AS_REGION_READ) ? PAGE_MAP_READ : 0);
-	ret |= ((flags & AS_REGION_WRITE) ? PAGE_MAP_WRITE : 0);
-	ret |= ((flags & AS_REGION_EXEC) ? PAGE_MAP_EXEC : 0);
+	ret |= ((flags & ASPACE_REGION_READ) ? PAGE_MAP_READ : 0);
+	ret |= ((flags & ASPACE_REGION_WRITE) ? PAGE_MAP_WRITE : 0);
+	ret |= ((flags & ASPACE_REGION_EXEC) ? PAGE_MAP_EXEC : 0);
 
 	return ret;
 }
 
-/** Create a new address space region structure.
+/** Allocate a new address space region structure.
+ * @param start		Start address of the region.
+ * @param end		End address of the region.
  * @param flags		Flags for the region.
  * @param source	Page source for the region.
  * @param offset	Offset into the source.
  * @return		Pointer to region structure. */
-static aspace_region_t *aspace_region_create(int flags, aspace_source_t *source, offset_t offset) {
+static aspace_region_t *aspace_region_alloc(ptr_t start, ptr_t end, int flags, aspace_source_t *source, offset_t offset) {
 	aspace_region_t *region = slab_cache_alloc(aspace_region_cache, MM_SLEEP);
 
+	region->start = start;
+	region->end = end;
 	region->flags = flags;
 	region->source = source;
 	region->offset = offset;
@@ -180,6 +231,16 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
 	}
 }
 
+/** Insert a region into an address space.
+ * @note		There should be a hole in the address space for the
+ *			region - this will not create one, or check if there
+ *			actually is one.
+ * @param as		Address space to insert into.
+ * @param region	Region to insert. */
+static void aspace_region_insert(aspace_t *as, aspace_region_t *region) {
+	avltree_insert(&as->regions, region->start, region, &region->node);
+}
+
 /** Unmap pages covering part or all of a region.
  * @param as		Address space to unmap from.
  * @param region	Region being unmapped.
@@ -191,7 +252,7 @@ static void aspace_region_unmap(aspace_t *as, aspace_region_t *region, ptr_t sta
 
 	assert(!(start % PAGE_SIZE));
 	assert(!(end % PAGE_SIZE));
-	assert(!(region->flags & AS_REGION_RESERVED));
+	assert(!(region->flags & ASPACE_REGION_RESERVED));
 	assert(start < end);
 	assert(start >= region->start);
 	assert(end <= region->end);
@@ -222,7 +283,7 @@ static void aspace_region_resize(aspace_t *as, aspace_region_t *region, ptr_t st
 	assert(start >= region->start);
 	assert(end <= region->end);
 
-	if(!(region->flags & AS_REGION_RESERVED)) {
+	if(!(region->flags & ASPACE_REGION_RESERVED)) {
 		if(start - region->start) {
 			aspace_region_unmap(as, region, region->start, start);
 		}
@@ -265,9 +326,8 @@ static void aspace_region_split(aspace_t *as, aspace_region_t *region, ptr_t end
 	refcount_inc(&region->source->count);
 
 	/* Create the split region. */
-	split = aspace_region_create(region->flags, region->source, region->offset + (start - region->start));
-	split->start = start;
-	split->end = region->end; 
+	split = aspace_region_alloc(start, region->end, region->flags, region->source,
+	                             region->offset + (start - region->start));
 
 	/* Unmap the gap between the regions if necessary. */
 	if(end != start) {
@@ -284,7 +344,7 @@ static void aspace_region_split(aspace_t *as, aspace_region_t *region, ptr_t end
  * @param as		Address space region belongs to.
  * @param region	Region to destroy. */
 static void aspace_region_destroy(aspace_t *as, aspace_region_t *region) {
-	if(!(region->flags & AS_REGION_RESERVED)) {
+	if(!(region->flags & ASPACE_REGION_RESERVED)) {
 		aspace_region_unmap(as, region, region->start, region->end);
 	}
 
@@ -368,9 +428,17 @@ static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
 	aspace_region_t *region, *prev = NULL;
 	avltree_node_t *node;
 
-	/* Should only be called if the address space is not empty. */
-	assert(!avltree_empty(&as->regions));
 	assert(size);
+
+	/* Handle case of address space being empty. */
+	if(unlikely(avltree_empty(&as->regions))) {
+		if(size > ASPACE_SIZE) {
+			return false;
+		}
+
+		*addrp = ASPACE_BASE;
+		return true;
+	}
 
 	/* Iterate over all regions in order to find the first suitable hole. */
 	for(node = avltree_node_first(&as->regions); ; node = avltree_node_next(node)) {
@@ -409,202 +477,332 @@ static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
 	return false;
 }
 
-/** Allocate a new address space source structure.
- *
- * Allocates a new address space source structure and initializes parts of
- * it.
- *
- * @param name		Name for the source.
- * @param flags		Behaviour flags for the source.
- * @param mmflag	Allocation flags to use.
- *
- * @return		Pointer to source.
- */
-aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag) {
-	aspace_source_t *source;
-
-	assert(name);
-
-	source = slab_cache_alloc(aspace_source_cache, mmflag);
-	if(!source) {
-		return NULL;
-	}
-
-	source->name = kstrdup(name, mmflag);
-	if(!source->name) {
-		slab_cache_free(aspace_source_cache, source);
-		return NULL;
-	}
-
-	refcount_set(&source->count, 0);
-	source->flags = flags;
-	return source;
-}
-
-/** Destroy an address space source structure.
- *
- * Destroys an address space source structure. Its reference count should be
- * zero.
- *
- * @param source	Source to destroy.
- */
-void aspace_source_destroy(aspace_source_t *source) {
-	assert(refcount_get(&source->count) == 0);
-
-	if(source->backend->destroy) {
-		source->backend->destroy(source);
-	}
-	kfree(source->name);
-	slab_cache_free(aspace_source_cache, source);
-}
-
-/** Allocate space in an address space.
- *
- * Allocates space within an address space and creates a new region with
- * the given backend in it. It is invalid to specify AS_REGION_RESERVED as
- * an argument to this function.
- *
- * @param as		Address space to allocate in.
- * @param size		Size of the region to allocate (must be a multiple of
- *			the system page size).
- * @param flags		Protection/behaviour flags for the region.
- * @param source	Page source to use for the region.
- * @param offset	Offset in the source the region should point to.
- * @param addrp		Where to store address allocated.
- *
- * @return		0 on success, negative error code on failure.
- */
-int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, offset_t offset, ptr_t *addrp) {
+/** Perform the actual work of mapping a region.
+ * @param as		Address space to map into.
+ * @param start		Start address to map at (if not ASPACE_MAP_FIXED).
+ * @param size		Size of the region to map.
+ * @param flags		Mapping behaviour flags.
+ * @param source	Source backing the region.
+ * @param offset	Offset into the source the region should start at.
+ * @param addrp		Where to store allocated address (if not
+ *			ASPACE_MAP_FIXED).
+ * @return		0 on success, negative error code on failure. */
+static int aspace_do_map(aspace_t *as, ptr_t start, size_t size, int flags,
+                         aspace_source_t *source, offset_t offset, ptr_t *addrp) {
 	aspace_region_t *region;
-	int ret;
+	int ret, rflags;
 
-	if(flags & AS_REGION_RESERVED || source == NULL || addrp == NULL) {
-		return -ERR_PARAM_INVAL;
-	} else if(size == 0 || size % PAGE_SIZE) {
-		return -ERR_PARAM_INVAL;
+	assert(source);
+
+	/* Check arguments. */
+	if(flags & ASPACE_MAP_FIXED) {
+		if(start % PAGE_SIZE || size % PAGE_SIZE) {
+			return -ERR_PARAM_INVAL;
+		} else if(!size || !aspace_region_fits(start, size)) {
+			return -ERR_PARAM_INVAL;
+		}
+	} else {
+		if(!size || !addrp || size % PAGE_SIZE) {
+			return -ERR_PARAM_INVAL;
+		}
 	}
+
+	/* Convert mapping flags to region flags. */
+	rflags = flags & (ASPACE_MAP_READ | ASPACE_MAP_WRITE | ASPACE_MAP_EXEC);
 
 	/* Check if the source allows what we've been given. */
 	if(source->backend->map) {
-		ret = source->backend->map(source, offset, size, flags);
+		ret = source->backend->map(source, offset, size, rflags);
 		if(ret != 0) {
 			return ret;
 		}
 	}
 
-	/* Create the region structure and fill it in. */
-	region = aspace_region_create(flags, source, offset);
-
-	mutex_lock(&as->lock, 0);
-
-	/* Now find a sufficient range of free space for us to place the
-	 * region in. If there are no regions in the address space we just
-	 * need to check if the region fits and then stick it in to the tree. */
-	if(unlikely(avltree_empty(&as->regions))) {
-		if(size > ASPACE_SIZE) {
-			slab_cache_free(aspace_region_cache, region);
-			mutex_unlock(&as->lock);
+	/* If allocating space, we must now find some. Otherwise, we free up
+	 * anything in the location we want to insert to. */
+	if(!(flags & ASPACE_MAP_FIXED)) {
+		if(!aspace_find_free(as, size, &start)) {
 			return -ERR_NO_MEMORY;
 		}
 
-		region->start = ASPACE_BASE;
-		region->end = ASPACE_BASE + size;
-
-		avltree_insert(&as->regions, region->start, region, &region->node);
+		*addrp = start;
 	} else {
-		/* Look for a suitable hole for a region. */
-		if(!aspace_find_free(as, size, &region->start)) {
-			slab_cache_free(aspace_region_cache, region);
-			mutex_unlock(&as->lock);
-			return -ERR_NO_MEMORY;
-		}
-
-		region->end = region->start + size;
-
-		avltree_insert(&as->regions, region->start, region, &region->node);
+		aspace_do_free(as, start, start + size);
 	}
+
+	/* Create the region structure and insert it. */
+	region = aspace_region_alloc(start, start + size, rflags, source, offset);
+	aspace_region_insert(as, region);
 
 	/* Place a reference on the source to show we're using it. */
 	refcount_inc(&source->count);
 
-	dprintf("aspace: allocated region [%p,%p) (as: %p)\n", region->start, region->end, as);
-	*addrp = region->start;
-	mutex_unlock(&as->lock);
+	dprintf("aspace: mapped region [%p,%p) (as: %p, source: %s, flags(m/r): %d/%d)\n",
+	        region->start, region->end, as, source->name, flags, rflags);
 	return 0;
 }
 
-/** Insert a region into an address space.
+#if 0
+# pragma mark Anonymous backend.
+#endif
+
+/** Get a missing page from an anonymous cache.
+ * @param cache		Cache to get page from.
+ * @param offset	Offset of page in data source.
+ * @param addrp		Where to store address of page obtained.
+ * @return		0 on success, negative error code on failure. */
+static int aspace_anon_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
+	*addrp = pmm_alloc(1, MM_SLEEP | PM_ZERO);
+	return 0;
+}
+
+/** Free a page from an anonymouse cache.
+ * @param cache		Cache that the page is in.
+ * @param page		Address of page to free.
+ * @param offset	Offset of page in data source. */
+static void aspace_anon_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
+	pmm_free(page, 1);
+}
+
+/** Anonymous page cache operations. */
+static cache_ops_t aspace_anon_cache_ops = {
+	.get_page = aspace_anon_cache_get_page,
+	.free_page = aspace_anon_cache_free_page,
+};
+
+/** Get a page from an anonymous source.
+ * @param source	Source to get page from.
+ * @param offset	Offset into the source.
+ * @param addrp		Where to store address of page.
+ * @return		0 on success, negative error code on failure. */
+static int aspace_anon_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
+	return cache_get(source->data, offset, addrp);
+}
+
+/** Release a page in an anonymous source.
+ * @param source	Source to release page in.
+ * @param offset	Offset into the source.
+ * @return		Pointer to page allocated, or NULL on failure. */
+static void aspace_anon_release(aspace_source_t *source, offset_t offset) {
+	cache_release(source->data, offset, true);
+}
+
+/** Destroy data in an anonymous source.
+ * @param source	Source to destroy. */
+static void aspace_anon_destroy(aspace_source_t *source) {
+	if(cache_destroy(source->data) != 0) {
+		/* Shouldn't happen as we don't do any page flushing. */
+		fatal("Failed to destroy anonymous cache");
+	}
+}
+
+/** Anonymous address space backend structure. */
+static aspace_backend_t aspace_anon_backend = {
+	.get = aspace_anon_get,
+	.release = aspace_anon_release,
+	.destroy = aspace_anon_destroy,
+};
+
+#if 0
+# pragma mark VFS backends.
+#endif
+
+/** Get a page from a VFS source.
+ * @param source	Source to get page from.
+ * @param offset	Offset into the source.
+ * @param addrp		Where to store address of page.
+ * @return		0 on success, negative error code on failure. */
+static int aspace_file_get(aspace_source_t *source, offset_t offset, phys_ptr_t *addrp) {
+	return cache_get(source->data, offset, addrp);
+}
+
+/** Release a page in a VFS source.
+ * @param source	Source to release page in.
+ * @param offset	Offset into the source.
+ * @return		Pointer to page allocated, or NULL on failure. */
+static void aspace_file_release(aspace_source_t *source, offset_t offset) {
+	cache_release(source->data, offset, true);
+}
+
+/** Destroy a VFS source.
+ * @param source	Source to destroy. */
+static void aspace_file_destroy(aspace_source_t *source) {
+	vfs_node_cache_release(source->data);
+}
+
+/** VFS private address space backend structure. */
+static aspace_backend_t aspace_file_private_backend = {
+	.get = aspace_file_get,
+	.release = aspace_file_release,
+	.destroy = aspace_file_destroy,
+};
+
+/** Check whether the source can be mapped using the given parameters.
+ * @param source	Source being mapped.
+ * @param offset	Offset of the mapping in the source.
+ * @param size		Size of the mapping.
+ * @param flags		Flags the mapping is being created with.
+ * @return		0 if mapping allowed, negative error code explaining
+ *			why it is not allowed if not. */
+static int aspace_file_shared_map(aspace_source_t *source, offset_t offset, size_t size, int flags) {
+	vfs_node_t *node = ((cache_t *)source->data)->data;
+
+	/* Shared sources can only be mapped as writeable if the underlying
+	 * file is writeable. For private sources it is OK to write read-only
+	 * files, because modifications don't go back to the file. */
+	return (flags & ASPACE_MAP_WRITE && VFS_NODE_RDONLY(node)) ? -ERR_READ_ONLY : 0;
+}
+
+/** VFS shared address space backend structure. */
+static aspace_backend_t aspace_file_shared_backend = {
+	.get = aspace_file_get,
+	.release = aspace_file_release,
+	.destroy = aspace_file_destroy,
+
+	.map = aspace_file_shared_map,
+};
+
+#if 0
+# pragma mark Public interface.
+#endif
+
+/** Mark a region as reserved.
  *
- * Creates a new region with the given backend and inserts it into an address
- * space at the location specified. If AS_REGION_RESERVED is specified, a
- * source should not be given.
+ * Marks a region of memory in an address space as reserved. Reserved regions
+ * will never be allocated from if mapping without ASPACE_MAP_FIXED, but they
+ * can be overwritten with ASPACE_MAP_FIXED mappings or removed byusing
+ * aspace_unmap() on the region.
  *
- * @param as		Address space to insert into.
- * @param start		Address to insert region at (must be a multiple of the
- *			system page size).
- * @param size		Size of the region to create (must be a multiple of the
- *			system page size).
- * @param flags		Protection/behaviour flags for the region.
- * @param source	Page source to use for the region.
- * @param offset	Offset in the source the region should point to.
+ * @param as		Address space to reserve in.
+ * @param start		Start of region to reserve.
+ * @param size		Size of region to reserve.
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source, offset_t offset) {
+int aspace_reserve(aspace_t *as, ptr_t start, size_t size) {
 	aspace_region_t *region;
-	int ret;
 
-	if(!(flags & AS_REGION_RESERVED) && source == NULL) {
-		return -ERR_PARAM_INVAL;
-	} else if(flags & AS_REGION_RESERVED && source) {
-		return -ERR_PARAM_INVAL;
-	} else if(start % PAGE_SIZE || size % PAGE_SIZE) {
+	if(start % PAGE_SIZE || size % PAGE_SIZE) {
 		return -ERR_PARAM_INVAL;
 	} else if(size == 0 || !aspace_region_fits(start, size)) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Check if the source allows what we've been given. */
-	if(source && source->backend->map) {
-		ret = source->backend->map(source, offset, size, flags);
+	/* Allocate the region structure. */
+	region = aspace_region_alloc(start, start + size, ASPACE_REGION_RESERVED, NULL, 0);
+
+	/* Insert it into the address space. */
+	mutex_lock(&as->lock, 0);
+	aspace_region_insert(as, region);
+	mutex_unlock(&as->lock);
+
+	return 0;
+}
+
+/** Map a region of anonymous memory.
+ *
+ * Maps a region of anonymous memory (i.e. not backed by any data source) into
+ * an address space. If the ASPACE_MAP_FIXED flag is specified, then the region
+ * will be mapped at the location specified. Otherwise, a region of unused
+ * space will be allocated for the mapping.
+ *
+ * @param as		Address space to map in.
+ * @param start		Start address of region (if ASPACE_MAP_FIXED).
+ * @param size		Size of region to map (multiple of page size).
+ * @param flags		Flags to control mapping behaviour (ASPACE_MAP_*).
+ * @param addrp		Where to store address of mapping.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int aspace_map_anon(aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *addrp) {
+	aspace_source_t *source;
+	int ret, sflags;
+
+	/* Create the source and cache for the region. */
+	sflags = (flags & ASPACE_MAP_PRIVATE) ? ASPACE_SOURCE_PRIVATE : 0;
+	source = aspace_source_alloc("[anon]", sflags, MM_SLEEP);
+	source->backend = &aspace_anon_backend;
+	source->data = cache_create(&aspace_anon_cache_ops, NULL);
+
+	mutex_lock(&as->lock, 0);
+
+	/* Attempt to map the region in. */
+	ret = aspace_do_map(as, start, size, flags, source, 0, addrp);
+	if(ret != 0) {
+		aspace_source_destroy(source);
+	}
+
+	mutex_unlock(&as->lock);
+	return ret;
+}
+
+/** Map a file into an address space.
+ *
+ * Maps part of a file into an address space. If the ASPACE_MAP_FIXED flag is
+ * specified, then the region will be mapped at the location specified.
+ * Otherwise, a region of unused space will be allocated for the mapping. If
+ * the ASPACE_MAP_PRIVATE flag is specified, then changes made to the mapped
+ * data will not be made in the underlying file, and will not be visible to
+ * other regions mapping the file. Also, changes made to the file's data after
+ * the mapping has been accessing it may not be visible in the mapping. If the
+ * ASPACE_MAP_PRIVATE flag is not specified, then changes to the mapped data
+ * will be made in the underlying file, and will be visible to other regions
+ * mapping the file.
+ *
+ * @param as		Address space to map in.
+ * @param start		Start address of region (if ASPACE_MAP_FIXED).
+ * @param size		Size of region to map (multiple of page size).
+ * @param flags		Flags to control mapping behaviour (ASPACE_MAP_*).
+ * @param node		Filesystem node to map. Must be a file.
+ * @param offset	Offset in the file to start mapping at (multiple of
+ *			page size).
+ * @param addrp		Where to store address of mapping.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int aspace_map_file(aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t *node, offset_t offset, ptr_t *addrp) {
+	aspace_source_t *source;
+	int ret;
+
+	/* Create the source using the correct backend. */
+	if(flags & ASPACE_MAP_PRIVATE) {
+		source = aspace_source_alloc(node->name, ASPACE_SOURCE_PRIVATE, MM_SLEEP);
+		source->backend = &aspace_file_private_backend;
+
+		ret = vfs_node_cache_get(node, true, (cache_t **)&source->data);
 		if(ret != 0) {
+			kfree(source->name);
+			slab_cache_free(aspace_source_cache, source);
+			return ret;
+		}
+	} else {
+		source = aspace_source_alloc(node->name, 0, MM_SLEEP);
+		source->backend = &aspace_file_shared_backend;
+
+		ret = vfs_node_cache_get(node, false, (cache_t **)&source->data);
+		if(ret != 0) {
+			kfree(source->name);
+			slab_cache_free(aspace_source_cache, source);
 			return ret;
 		}
 	}
 
-	/* Create the region structure and fill it in. */
-	region = aspace_region_create(flags, source, offset);
-	region->start = start;
-	region->end = start + size;
-
 	mutex_lock(&as->lock, 0);
 
-	/* Do the dirty work of inserting the region. */
-	if(unlikely(avltree_empty(&as->regions))) {
-		/* Empty, just stick the region in as-is. */
-		avltree_insert(&as->regions, region->start, region, &region->node);
-	} else {
-		/* Ok, need to free up space to place this region in. */
-		aspace_do_free(as, region->start, region->end);
-
-		/* Now have a free hole for the region, put it in. */
-		avltree_insert(&as->regions, region->start, region, &region->node);
+	/* Attempt to map the region in. */
+	ret = aspace_do_map(as, start, size, flags, source, 0, addrp);
+	if(ret != 0) {
+		aspace_source_destroy(source);
 	}
 
-	/* Place a reference on the source to show we're using it. */
-	if(source != NULL) {
-		refcount_inc(&source->count);
-	}
-
-	dprintf("aspace: inserted region [%p,%p) (as: %p)\n", region->start, region->end, as);
 	mutex_unlock(&as->lock);
-	return 0;
+	return ret;
 }
 
-/** Marks a region as unused in an address space.
+/** Unmaps a region in an address space.
  *
- * Marks the specified address range as free and unmaps all pages that may
- * be mapped there.
+ * Marks the specified address range in an address space as free and unmaps all
+ * pages that may be mapped there.
  *
  * @param as		Address space to free in.
  * @param start		Start of region to free.
@@ -612,7 +810,7 @@ int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_sour
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_free(aspace_t *as, ptr_t start, size_t size) {
+int aspace_unmap(aspace_t *as, ptr_t start, size_t size) {
 	if(start % PAGE_SIZE || size % PAGE_SIZE) {
 		return -ERR_PARAM_INVAL;
 	} else if(size == 0 || !aspace_region_fits(start, size)) {
@@ -671,7 +869,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	if(unlikely(!(region = aspace_region_find(as, addr, NULL)))) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
-	} else if(unlikely(region->flags & AS_REGION_RESERVED)) {
+	} else if(unlikely(region->flags & ASPACE_REGION_RESERVED)) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
@@ -680,9 +878,9 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	assert(region->source->backend->get);
 
 	/* Check protection flags. */
-	if((access == PF_ACCESS_READ && !(region->flags & AS_REGION_READ)) ||
-	   (access == PF_ACCESS_WRITE && !(region->flags & AS_REGION_WRITE)) ||
-	   (access == PF_ACCESS_EXEC && !(region->flags & AS_REGION_EXEC))) {
+	if((access == PF_ACCESS_READ && !(region->flags & ASPACE_REGION_READ)) ||
+	   (access == PF_ACCESS_WRITE && !(region->flags & ASPACE_REGION_WRITE)) ||
+	   (access == PF_ACCESS_EXEC && !(region->flags & ASPACE_REGION_EXEC))) {
 		mutex_unlock(&as->lock);
 		return PF_STATUS_FAULT;
 	}
@@ -699,7 +897,7 @@ int aspace_pagefault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Map the page in to the address space. */
-	if(!page_map_insert(&as->pmap, (addr & PAGE_MASK), page, aspace_flags_to_page(region->flags), MM_SLEEP)) {
+	if(!page_map_insert(&as->pmap, (addr & PAGE_MASK), page, aspace_region_flags_to_page(region->flags), MM_SLEEP)) {
 		region->source->backend->release(region->source, offset);
 
 		mutex_unlock(&as->lock);
@@ -809,6 +1007,10 @@ void aspace_init(void) {
 	                                        NULL, NULL, NULL, NULL, NULL, 0, MM_FATAL);
 }
 
+#if 0
+# pragma mark Debugger commands.
+#endif
+
 /** Dump an address space.
  *
  * Dumps out a list of all regions held in an address space.
@@ -853,4 +1055,75 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+#if 0
+# pragma mark System calls.
+#endif
+
+/** Map a region of anonymous memory.
+ *
+ * Maps a region of anonymous memory (i.e. not backed by any data source) into
+ * the calling process' address space. If the ASPACE_MAP_FIXED flag is
+ * specified, then the region will be mapped at the location specified.
+ * Otherwise, a region of unused space will be allocated for the mapping.
+ *
+ * @param start		Start address of region (if ASPACE_MAP_FIXED).
+ * @param size		Size of region to map (multiple of page size).
+ * @param flags		Flags to control mapping behaviour (ASPACE_MAP_*).
+ * @param addrp		Where to store address of mapping.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_aspace_map_anon(void *start, size_t size, int flags, void **addrp) {
+	ptr_t addr;
+	int ret;
+
+	ret = aspace_map_anon(curr_proc->aspace, (ptr_t)start, size, flags, &addr);
+	if(ret != 0) {
+		return ret;
+	}
+
+	/* TODO: Better write functions for integer values. */
+	ret = memcpy_to_user(addrp, &addr, sizeof(void *));
+	if(ret != 0) {
+		return ret;
+	}
+
+	return 0;
+}
+
+/** Map a file into memory.
+ *
+ * Maps part of a file into the calling process' address space. If the
+ * ASPACE_MAP_FIXED flag is specified, then the region will be mapped at the
+ * location specified. Otherwise, a region of unused space will be allocated
+ * for the mapping. If the ASPACE_MAP_PRIVATE flag is specified, then changes
+ * made to the mapped data will not be made in the underlying file, and will
+ * not be visible to other regions mapping the file. Also, changes made to the
+ * file's data after the mapping has been accessing it may not be visible in
+ * the mapping. If the ASPACE_MAP_PRIVATE flag is not specified, then changes
+ * to the mapped data will be made in the underlying file, and will be visible
+ * to other regions mapping the file.
+ *
+ * @param args		Pointer to arguments structure.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_aspace_map_file(aspace_map_file_args_t *args) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
+/** Unmaps a region of memory.
+ *
+ * Marks the specified address range in the calling process' address space as
+ * free and unmaps all pages that may be mapped there.
+ *
+ * @param start		Start of region to free.
+ * @param size		Size of region to free.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_aspace_unmap(void *start, size_t size) {
+	return aspace_unmap(curr_proc->aspace, (ptr_t)start, size);
 }

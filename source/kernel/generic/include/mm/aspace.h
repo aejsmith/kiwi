@@ -33,6 +33,7 @@
 #include <types/refcount.h>
 
 struct aspace_source;
+struct vfs_node;
 
 /** Address space region backend structure. */
 typedef struct aspace_backend {
@@ -40,7 +41,7 @@ typedef struct aspace_backend {
 	 * @param source	Source being mapped.
 	 * @param offset	Offset of the mapping in the source.
 	 * @param size		Size of the mapping.
-	 * @param flags		Flags the mapping is being created with.
+	 * @param flags		Mapping behaviour flags (ASPACE_MAP_*).
 	 * @return		0 if mapping allowed, negative error code
 	 *			explaining why it is not allowed if not. */
 	int (*map)(struct aspace_source *source, offset_t offset, size_t size, int flags);
@@ -101,13 +102,21 @@ typedef struct aspace {
 #define curr_aspace		(curr_cpu->aspace)
 
 /** Address space region flags. */
-#define AS_REGION_READ		(1<<0)	/**< Mapping should be readable. */
-#define AS_REGION_WRITE		(1<<1)	/**< Mapping should be writable. */
-#define AS_REGION_EXEC		(1<<2)	/**< Mapping should be executable. */
-#define AS_REGION_RESERVED	(1<<3)	/**< Region is reserved and should never be allocated. */
+#define ASPACE_REGION_READ	(1<<0)	/**< Region is readable. */
+#define ASPACE_REGION_WRITE	(1<<1)	/**< Region is writable. */
+#define ASPACE_REGION_EXEC	(1<<2)	/**< Region is executable. */
+#define ASPACE_REGION_RESERVED	(1<<3)	/**< Region is reserved and should never be allocated. */
 
 /** Address space source flags. */
-#define AS_SOURCE_PRIVATE	(1<<0)	/**< Source should be private and never shared between address spaces. */
+#define ASPACE_SOURCE_PRIVATE	(1<<0)	/**< Source should be private and never shared between address spaces. */
+
+/** Address space mapping flags.
+ * @note		Protection flags are same as region protection flags. */
+#define ASPACE_MAP_READ		(1<<0)	/**< Mapping should be readable. */
+#define ASPACE_MAP_WRITE	(1<<1)	/**< Mapping should be writable. */
+#define ASPACE_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
+#define ASPACE_MAP_FIXED	(1<<3)	/**< Mapping should be placed at the exact location specified. */
+#define ASPACE_MAP_PRIVATE	(1<<4)	/**< Mapping should never be shared between address spaces. */
 
 /** Page fault reason codes. */
 #define PF_REASON_NPRES		1	/**< Fault caused by a not present page. */
@@ -129,29 +138,33 @@ typedef struct aspace {
 # define aspace_region_fits(start, size) ((start) >= ASPACE_BASE && ((start) + (size)) <= (ASPACE_BASE + ASPACE_SIZE))
 #endif
 
-/** Architecture functions. */
 extern int aspace_arch_create(aspace_t *as);
 
-/** Helper functions. */
-extern aspace_source_t *aspace_source_alloc(const char *name, int flags, int mmflag);
-extern void aspace_source_destroy(aspace_source_t *source);
+extern int aspace_reserve(aspace_t *as, ptr_t start, size_t size);
+extern int aspace_map_anon(aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *addrp);
+extern int aspace_map_file(aspace_t *as, ptr_t start, size_t size, int flags, struct vfs_node *node, offset_t offset, ptr_t *addrp);
+extern int aspace_unmap(aspace_t *as, ptr_t start, size_t size);
 
-/** Anonymous backend functions. */
-extern int aspace_anon_create(int flags, aspace_source_t **sourcep);
-
-/** Address space manipulation functions. */
-extern int aspace_alloc(aspace_t *as, size_t size, int flags, aspace_source_t *source, offset_t offset, ptr_t *addrp);
-extern int aspace_insert(aspace_t *as, ptr_t start, size_t size, int flags, aspace_source_t *source, offset_t offset);
-extern int aspace_free(aspace_t *as, ptr_t start, size_t size);
-
-/** Core functions. */
 extern int aspace_pagefault(ptr_t addr, int reason, int access);
 extern void aspace_switch(aspace_t *as);
 extern aspace_t *aspace_create(void);
 extern void aspace_destroy(aspace_t *as);
-
 extern void aspace_init(void);
 
 extern int kdbg_cmd_aspace(int argc, char **argv);
+
+/** Structure containing arguments for sys_aspace_map_file(). */
+typedef struct aspace_map_file_args {
+	void *start;			/**< Address to map at (if not AS_REGION_FIXED). */
+	size_t size;			/**< Size of area to map (multiple of page size). */
+	int flags;			/**< Flags controlling the mapping. */
+	handle_t handle;		/**< Handle for file to map. */
+	offset_t offset;		/**< Offset in the file to map from. */
+	void **addrp;			/**< Where to store address mapped to. */
+} aspace_map_file_args_t;
+
+extern int sys_aspace_map_anon(void *start, size_t size, int flags, void **addrp);
+extern int sys_aspace_map_file(aspace_map_file_args_t *args);
+extern int sys_aspace_unmap(void *start, size_t size);
 
 #endif /* __MM_ASPACE_H */

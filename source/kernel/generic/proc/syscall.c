@@ -24,6 +24,8 @@
 
 #include <fs/syscall.h>
 
+#include <mm/aspace.h>
+
 #include <lib/utility.h>
 
 #include <proc/handle.h>
@@ -56,7 +58,6 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_file_write,
 	(syscall_handler_t)sys_fs_file_truncate,
 	(syscall_handler_t)sys_fs_file_seek,
-	(syscall_handler_t)sys_fs_file_map,
 	(syscall_handler_t)sys_fs_dir_create,
 	(syscall_handler_t)sys_fs_dir_open,
 	(syscall_handler_t)sys_fs_dir_read,
@@ -70,6 +71,11 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_setcwd,
 	(syscall_handler_t)sys_fs_mount,
 	(syscall_handler_t)sys_fs_unmount,
+
+	/** Address space system calls. */
+	(syscall_handler_t)sys_aspace_map_anon,
+	(syscall_handler_t)sys_aspace_map_file,
+	(syscall_handler_t)sys_aspace_unmap,
 };
 
 /** System call dispatcher.

@@ -47,7 +47,6 @@ env['OBJFILES'] += [
 	env.Object('lib/string.c'),
 
 	env.Object('mm/aspace.c'),
-	env.Object('mm/aspace_anon.c'),
 	env.Object('mm/cache.c'),
 	env.Object('mm/kheap.c'),
 	env.Object('mm/malloc.c'),
