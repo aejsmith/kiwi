@@ -37,6 +37,7 @@ sources += [
 	File('stdio/vfprintf.c'),
 	File('stdio/vsnprintf.c'),
 
+	File('stdlib/malloc.c'),
 	File('stdlib/strtoul.c'),
 
 	File('string/memchr.c'),

@@ -21,6 +21,7 @@
 #include <kernel/aspace.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv) {
 	void *addr;
@@ -36,5 +37,14 @@ int main(int argc, char **argv) {
 		*(int *)addr = 1234;
 		printf("Reading... %d\n", *(int *)addr);
 	}
+
+	addr = malloc(4322);
+	printf("Malloc returned %p\n", addr);
+	if(addr) {
+		printf("Writing... 1337\n");
+		*(int *)addr = 1337;
+		printf("Reading... %d\n", *(int *)addr);
+	}
+
 	while(1);
 }

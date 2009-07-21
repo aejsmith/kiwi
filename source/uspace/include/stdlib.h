@@ -47,16 +47,16 @@ extern "C" {
 //extern long atol(const char *s);
 //extern long long atoll(const char *s);
 //extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
-//extern void *calloc(size_t nmemb, size_t size);
+extern void *calloc(size_t nmemb, size_t size);
 /* div_t         div(int, int); */
 //extern void exit(int status) __attribute__((noreturn));
-//extern void free(void *ptr);
+extern void free(void *ptr);
 //extern char *getenv(const char *name);
 //extern long labs(long j);
 /* ldiv_t        ldiv(long, long); */
 //extern long long llabs(long long j);
 /* lldiv_t       lldiv(long long, long long); */
-//extern void *malloc(size_t size);
+extern void *malloc(size_t size);
 /* int           mblen(const char *, size_t); */
 /* size_t        mbstowcs(wchar_t *restrict, const char *restrict, size_t); */
 /* int           mbtowc(wchar_t *restrict, const char *restrict, size_t); */
@@ -71,7 +71,7 @@ extern "C" {
 //extern void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
 //extern int rand(void);
 //extern int rand_r(unsigned int *seed);
-//extern void *realloc(void *ptr, size_t size);
+extern void *realloc(void *ptr, size_t size);
 //extern int setenv(const char *name, const char *value, int overwrite);
 //extern void srand(unsigned int seed);
 
