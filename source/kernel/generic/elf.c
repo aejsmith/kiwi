@@ -24,6 +24,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/safe.h>
 
 #include <proc/loader.h>
 
@@ -106,7 +107,7 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 	size = end - start;
 	offset = ROUND_DOWN(data->phdrs[i].p_offset, PAGE_SIZE);
 
-	dprintf("elf: loading PHDR %zu to %p (size: %zu)\n", i, start, size);
+	dprintf("elf: loading program header %zu to %p (size: %zu)\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - aspace_map_file() will reject the call if they
@@ -188,7 +189,7 @@ static int elf_binary_load(loader_binary_t *binary) {
 			/* These can be ignored without warning. */
 			break;
 		default:
-			dprintf("elf: unknown PHDR type %u, ignoring\n", data->phdrs[i].p_type);
+			dprintf("elf: unknown program header type %u, ignoring\n", data->phdrs[i].p_type);
 			break;
 		}
 	}
@@ -217,6 +218,29 @@ fail:
  * @param binary	Binary loader data structure.
  * @return		0 on success, negative error code on failure. */
 static int elf_binary_finish(loader_binary_t *binary) {
+	elf_binary_t *data = (elf_binary_t *)binary->data;
+	void *base;
+	size_t i;
+	int ret;
+
+	for(i = 0; i < data->ehdr.e_phnum; i++) {
+		switch(data->phdrs[i].p_type) {
+		case ELF_PT_LOAD:
+			if(data->phdrs[i].p_filesz >= data->phdrs[i].p_memsz) {
+				break;
+			}
+
+			base = (void *)(data->phdrs[i].p_vaddr + data->phdrs[i].p_filesz);
+			dprintf("elf: clearing BSS for program header %zu at 0x%p\n", i, base);
+			ret = memset_user(base, 0, data->phdrs[i].p_memsz - data->phdrs[i].p_filesz);
+			if(ret != 0) {
+				return ret;
+			}
+
+			break;
+		}
+	}
+
 	return 0;
 }
 
