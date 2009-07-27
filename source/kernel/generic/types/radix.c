@@ -29,6 +29,8 @@
  *   http://en.wikipedia.org/wiki/Radix_tree
  */
 
+#include <console/kprintf.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -135,6 +137,50 @@ static radix_tree_node_t *radix_tree_node_find_child(radix_tree_node_t *parent, 
 	return (parent->children[high]) ? parent->children[high]->nodes[low] : NULL;
 }
 
+/** Get first child of a radix tree node.
+ * @param node		Node to get first child of.
+ * @return		Pointer to child, or NULL if no children. */
+static radix_tree_node_t *radix_tree_node_first_child(radix_tree_node_t *node) {
+	size_t i, j;
+
+	if(node->child_count) {
+		for(i = 0; i < ARRAYSZ(node->children); i++) {
+			if(!node->children[i] || !node->children[i]->count) {
+				continue;
+			}
+			for(j = 0; j < ARRAYSZ(node->children[i]->nodes); j++) {
+				if(node->children[i]->nodes[j]) {
+					return node->children[i]->nodes[j];
+				}
+			}
+		}
+	}
+
+	return NULL;
+}
+
+/** Get the next sibling of a node.
+ * @param node		Node to get next sibling of.
+ * @return		Pointer to sibling, or NULL if there isn't one. */
+static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) {
+	size_t high = (node->key[0] >> 4) & 0xF, low = node->key[0] & 0xF;
+	radix_tree_node_t *parent = node->parent;
+	size_t i, j;
+
+	for(i = high; i < ARRAYSZ(parent->children); i++) {
+		if(!parent->children[i] || !parent->children[i]->count) {
+			continue;
+		}
+		for(j = (i == high) ? (low + 1) : 0; j < ARRAYSZ(parent->children[i]->nodes); j++) {
+			if(parent->children[i]->nodes[j]) {
+				return parent->children[i]->nodes[j];
+			}
+		}
+	}
+
+	return NULL;
+}
+
 /** Create a new node and adds it to its parent.
  * @param parent	Parent of new node.
  * @param key		Key for new node (should be dynamically allocated).
@@ -160,26 +206,30 @@ static void radix_tree_node_destroy(radix_tree_node_t *node) {
 }
 
 /** Clears all child nodes.
- * @param node		Node to clear. */
-static void radix_tree_node_clear(radix_tree_node_t *node) {
+ * @param node		Node to clear.
+ * @param helper	Function to call on non-NULL values (can be NULL). */
+static void radix_tree_node_clear(radix_tree_node_t *node, radix_tree_clear_helper_t helper) {
 	radix_tree_node_t *child;
 	size_t i, j;
 
 	for(i = 0; i < ARRAYSZ(node->children); i++) {
-		if(!node->children[i]) {
-			continue;
-		}
-
-		for(j = 0; j < ARRAYSZ(node->children[i]->nodes); j++) {
-			if(node->children[i]->nodes[j]) {
-				child = node->children[i]->nodes[j];
-				radix_tree_node_clear(child);
-				radix_tree_node_remove_child(node, child);
-				radix_tree_node_destroy(child);
-				if(!node->children[i]) {
-					break;
-				}
+		/* Test the child array on each iteration - it may be freed
+		 * automatically by radix_tree_node_remove_child() within the
+		 * loop. */
+		for(j = 0; node->children[i] && j < ARRAYSZ(node->children[i]->nodes); j++) {
+			if(!(child = node->children[i]->nodes[j])) {
+				continue;
 			}
+
+			/* Recurse onto the child. */
+			radix_tree_node_clear(child, helper);
+
+			/* Detach from the tree and destroy it. */
+			radix_tree_node_remove_child(node, child);
+			if(helper && child->value != NULL) {
+				helper(child->value);
+			}
+			radix_tree_node_destroy(child);
 		}
 	}
 }
@@ -224,7 +274,7 @@ static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned ch
 	int ret;
 
 	/* No zero-length keys. */
-	if(key[0] == 0) {
+	if(!key || !key[0]) {
 		return NULL;
 	}
 
@@ -445,9 +495,11 @@ void radix_tree_init(radix_tree_t *tree) {
  * Clears out the contents of a radix tree.
  *
  * @param tree		Tree to clear.
+ * @param helper	Helper function that gets called on all non-NULL values
+ *			found in the tree (can be NULL).
  */
-void radix_tree_clear(radix_tree_t *tree) {
-	radix_tree_node_clear(&tree->root);
+void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helper) {
+	radix_tree_node_clear(&tree->root, helper);
 }
 
 /** Destroy a radix tree.
@@ -464,4 +516,40 @@ void radix_tree_destroy(radix_tree_t *tree) {
 			fatal("Destroying non-empty radix tree %p", tree);
 		}
 	}
+}
+
+/** Get the node following a node in a radix tree.
+ *
+ * Gets the node with a key that follows another node's key in a radix tree.
+ *
+ * @param node		Node to get following node of.
+ * 
+ * @return		Following node or NULL if none found.
+ */
+radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node) {
+	radix_tree_node_t *orig = node, *tmp;
+
+	while(node == orig || node->value == NULL) {
+		/* Check if we have a child we can use. */
+		if((tmp = radix_tree_node_first_child(node))) {
+			node = tmp;
+			continue;
+		}
+
+		/* Go up until we find a parent with a sibling after us. */
+		while(node->parent) {
+			if((tmp = radix_tree_node_next_sibling(node))) {
+				node = tmp;
+				break;
+			}
+			node = node->parent;
+		}
+
+		/* If we're now at the top then we didn't find any siblings. */
+		if(!node->parent) {
+			return NULL;
+		}		
+	}
+
+	return node;
 }

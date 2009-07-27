@@ -52,6 +52,19 @@ typedef struct radix_tree {
 	radix_tree_node_t root;		/**< Root node. */
 } radix_tree_t;
 
+/** Iterates over all nodes with non-NULL values in a radix tree, setting iter
+ *  to the node on each iteration. */
+#define RADIX_TREE_FOREACH(tree, iter)		\
+	for(radix_tree_node_t *iter = radix_tree_node_next(&(tree)->root); iter != NULL; \
+	    iter = radix_tree_node_next(iter))
+
+/** Gets a radix tree node's data pointer and casts it to a certain type. */
+#define radix_tree_entry(node, type)		\
+	((node) ? (type *)(node->value) : NULL)
+
+/** Helper for radix_tree_clear() that is called on all non-NULL values. */
+typedef void (*radix_tree_clear_helper_t)(void *);
+
 /** Check if a radix tree is empty.
  * @param tree		Tree to check.
  * @return		True if empty, false if not. */
@@ -64,7 +77,9 @@ extern void radix_tree_remove(radix_tree_t *tree, const char *key);
 extern void *radix_tree_lookup(radix_tree_t *tree, const char *key);
 
 extern void radix_tree_init(radix_tree_t *tree);
-extern void radix_tree_clear(radix_tree_t *tree);
+extern void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helper);
 extern void radix_tree_destroy(radix_tree_t *tree);
+
+extern radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node);
 
 #endif /* __TYPES_RADIX_H */
