@@ -141,6 +141,15 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 		return ret;
 	}
 
+	/** Initialize the I/O context. */
+	ret = io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	if(ret != 0) {
+		handle_table_destroy(&process->handles);
+		vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
+		slab_cache_free(process_cache, process);
+		return ret;
+	}
+
 	/* Add to the parent's process list. */
 	if(parent != NULL) {
 		spinlock_lock(&parent->lock, 0);
@@ -155,7 +164,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 
 	*procp = process;
 
-	dprintf("proc: created process %" PRIu32 "(%s) (proc: %p, parent: %p)\n",
+	dprintf("proc: created process %" PRId32 "(%s) (proc: %p, parent: %p)\n",
 		process->id, process->name, process, parent);
 	return 0;
 }
@@ -266,7 +275,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 	AVLTREE_FOREACH(&process_tree, iter) {
 		process = avltree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRIu32 " %-4d %-5d %-7zu %-18p %s\n",
+		kprintf(LOG_NONE, "%-5" PRId32 " %-4d %-5d %-7zu %-18p %s\n",
 			process->id, process->priority, process->flags,
 			process->num_threads, process->aspace, process->name);
 	}

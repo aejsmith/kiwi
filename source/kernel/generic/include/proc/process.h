@@ -21,6 +21,8 @@
 #ifndef __PROC_PROCESS_H
 #define __PROC_PROCESS_H
 
+#include <io/context.h>
+
 #include <proc/handle.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -52,8 +54,9 @@ typedef struct process {
 		PROC_RUNNING,		/**< Process is running. */
 	} state;
 
-	/** Handle information. */
+	/** Data associated with the process. */
 	handle_table_t handles;		/**< Table of open handles. */
+	io_context_t ioctx;		/**< I/O context structure. */
 
 	/** Other information about the process. */
 	identifier_t id;		/**< ID of the process. */

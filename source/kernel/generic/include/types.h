@@ -50,4 +50,18 @@ typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 #define offsetof(type, member)		\
 	__builtin_offsetof(type, member)
 
+/** Type limit macros. */
+#define INT8_MIN	(-0x80)
+#define INT8_MAX	0x7F
+#define UINT8_MAX	0xFFu
+#define INT16_MIN	(-0x8000)
+#define INT16_MAX	0x7FFF
+#define UINT16_MAX	0xFFFFu
+#define INT32_MIN	(-0x80000000)
+#define INT32_MAX	0x7FFFFFFF
+#define UINT32_MAX	0xFFFFFFFFu
+#define INT64_MIN	(-0x8000000000000000ll)
+#define INT64_MAX	0x7FFFFFFFFFFFFFFFll
+#define UINT64_MAX	0xFFFFFFFFFFFFFFFFull
+
 #endif /* __TYPES_H */

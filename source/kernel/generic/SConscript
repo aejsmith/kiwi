@@ -38,8 +38,8 @@ env['OBJFILES'] += [
 	env.Object('cpu/ipi.c'),
 	env.Object('cpu/irq.c'),
 
-	env.Object('fs/syscall.c'),
-	env.Object('fs/vfs.c'),
+	env.Object('io/context.c'),
+	env.Object('io/vfs.c'),
 
 	env.Object('lib/do_printf.c'),
 	env.Object('lib/qsort.c'),

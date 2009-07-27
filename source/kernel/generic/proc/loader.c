@@ -190,14 +190,14 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 	binary->stack = stack + USTACK_SIZE;
 
 	/* OK, take the plunge and start messing with the process. If we fail
-	 * after this point, then we're done for. */
-	ret = process_reset(curr_proc, binary->node->name, binary->aspace);
+	 * after this point, then we're done for. TODO: Name. */
+	ret = process_reset(curr_proc, "process", binary->aspace);
 	if(ret != 0) {
 		/* TODO: Proper handling here. */
 		fatal("Failed to reset process");
 	}
 
-	thread_rename(curr_thread, binary->node->name);
+	thread_rename(curr_thread, "thread");
 
 	/* Get the binary type to do anything it needs to do once the address
 	 * space has been switched (such as copying arguments). */
@@ -250,7 +250,7 @@ static void loader_bootmod_thread(void *arg1, void *arg2) {
 	int ret;
 
 	ret = loader_binary_load(node, NULL, NULL, sem);
-	fatal("Failed to load binary '%s' (%d)", node->name, ret);
+	fatal("Failed to load binary %p (%d)", node, ret);
 }
 
 /** Executable boot module handler.
@@ -265,7 +265,7 @@ static int loader_bootmod_handler(bootmod_t *mod) {
 	int ret;
 
 	/* Create a node from the module's data. */
-	ret = vfs_node_create_from_memory(mod->name, (const void *)mod->addr, mod->size, &node);
+	ret = vfs_file_from_memory((const void *)mod->addr, mod->size, &node);
 	if(ret != 0) {
 		fatal("Could not create VFS node from module data (%d)", ret);
 	}

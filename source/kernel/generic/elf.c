@@ -124,7 +124,7 @@ static bool elf_binary_check(vfs_node_t *node) {
 	int ret;
 
 	/* Read the ELF header in from the file. */
-	ret = vfs_node_read(node, &ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = vfs_file_read(node, &ehdr, sizeof(elf_ehdr_t), 0, &bytes);
 	if(ret != 0) {
 		return false;
 	}
@@ -148,7 +148,7 @@ static int elf_binary_load(loader_binary_t *binary) {
 	data->binary = binary;
 
 	/* Read in the ELF header. */
-	ret = vfs_node_read(binary->node, &data->ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = vfs_file_read(binary->node, &data->ehdr, sizeof(elf_ehdr_t), 0, &bytes);
 	if(ret != 0) {
 		goto fail;
 	} else if(!elf_check(&data->ehdr, bytes, ELF_ET_EXEC)) {
@@ -167,7 +167,7 @@ static int elf_binary_load(loader_binary_t *binary) {
 	/* Allocate some memory for the program headers and load them too. */
 	size = data->ehdr.e_phnum * data->ehdr.e_phentsize;
 	data->phdrs = kmalloc(size, MM_SLEEP);
-	ret = vfs_node_read(binary->node, data->phdrs, size, data->ehdr.e_phoff, &bytes);
+	ret = vfs_file_read(binary->node, data->phdrs, size, data->ehdr.e_phoff, &bytes);
 	if(ret != 0) {
 		goto fail;
 	} else if(bytes != size) {
@@ -196,8 +196,8 @@ static int elf_binary_load(loader_binary_t *binary) {
 
 	/* Check if we actually loaded anything. */
 	if(!load_count) {
-		dprintf("elf: binary '%s' did not have any loadable program headers\n",
-		        binary->node->name);
+		dprintf("elf: binary %p did not have any loadable program headers\n",
+		        binary->node);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}

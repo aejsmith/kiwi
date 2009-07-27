@@ -95,7 +95,7 @@ static void thread_cache_dtor(void *obj, void *data) {
 static void thread_trampoline(void) {
 	sched_post_switch(true);
 
-	dprintf("thread: entered thread %" PRIu32 "(%s) on CPU %" PRIu32 "\n",
+	dprintf("thread: entered thread %" PRId32 "(%s) on CPU %" PRIu32 "\n",
 		curr_thread->id, curr_thread->name, curr_cpu->id);
 
 	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
@@ -235,7 +235,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	*threadp = thread;
 
-	dprintf("thread: created thread %" PRIu32 "(%s) (thread: %p, owner: %p)\n",
+	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
 	return 0;
 }
@@ -249,7 +249,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 void thread_destroy(thread_t *thread) {
 	spinlock_lock(&thread->lock, 0);
 
-	dprintf("thread: destroying thread %" PRIu32 "(%s) (thread: %p, owner: %" PRIu32 ")\n",
+	dprintf("thread: destroying thread %" PRId32 "(%s) (thread: %p, owner: %" PRId32 ")\n",
 		thread->id, thread->name, thread, thread->owner->id);
 
 	assert(list_empty(&thread->header));
@@ -294,7 +294,7 @@ void thread_init(void) {
  * @param thread	Thread to print.
  * @param level		Log level. */
 static inline void thread_dump(thread_t *thread, int level) {
-	kprintf(level, "%-5" PRIu32 " %-5" PRIu32 " ", thread->id, thread->owner->id);
+	kprintf(level, "%-5" PRId32 " %-5" PRId32 " ", thread->id, thread->owner->id);
 
 	switch(thread->state) {
 	case THREAD_CREATED:	kprintf(level, "Created  "); break;

@@ -33,5 +33,6 @@ typedef int32_t handle_t;		/**< Type used to store a handle to a per-process obj
 typedef uint32_t timeout_t;		/**< Type used to store a timeout for an operation. */
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t key_t;			/**< Type used to identify something. */
+typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
 #endif /* __KERNEL_TYPES_H */

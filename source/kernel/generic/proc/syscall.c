@@ -22,7 +22,7 @@
 
 #include <console/kprintf.h>
 
-#include <fs/syscall.h>
+#include <io/vfs.h>
 
 #include <mm/aspace.h>
 
@@ -52,25 +52,24 @@ static syscall_handler_t syscall_table[] = {
 
 	/** Filesystem system calls. */
 	(syscall_handler_t)sys_fs_file_create,
-	(syscall_handler_t)sys_fs_file_path,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,
 	(syscall_handler_t)sys_fs_file_write,
-	(syscall_handler_t)sys_fs_file_truncate,
+	(syscall_handler_t)sys_fs_file_resize,
 	(syscall_handler_t)sys_fs_file_seek,
 	(syscall_handler_t)sys_fs_dir_create,
 	(syscall_handler_t)sys_fs_dir_open,
 	(syscall_handler_t)sys_fs_dir_read,
 	(syscall_handler_t)sys_fs_symlink_create,
 	(syscall_handler_t)sys_fs_symlink_read,
+	(syscall_handler_t)sys_fs_mount,
+	(syscall_handler_t)sys_fs_unmount,
+	(syscall_handler_t)sys_fs_getcwd,
+	(syscall_handler_t)sys_fs_setcwd,
 	(syscall_handler_t)sys_fs_info,
 	(syscall_handler_t)sys_fs_link,
 	(syscall_handler_t)sys_fs_unlink,
 	(syscall_handler_t)sys_fs_rename,
-	(syscall_handler_t)sys_fs_getcwd,
-	(syscall_handler_t)sys_fs_setcwd,
-	(syscall_handler_t)sys_fs_mount,
-	(syscall_handler_t)sys_fs_unmount,
 
 	/** Address space system calls. */
 	(syscall_handler_t)sys_aspace_map_anon,

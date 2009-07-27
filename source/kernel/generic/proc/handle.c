@@ -199,7 +199,7 @@ int handle_close(process_t *process, handle_t handle) {
 	avltree_remove(&process->handles.tree, (key_t)handle);
 	bitmap_clear(&process->handles.bitmap, handle);
 
-	dprintf("handle: closed handle %" PRIu32 " in process %p(%s)\n", handle,
+	dprintf("handle: closed handle %" PRId32 " in process %p(%s)\n", handle,
 	        process, process->name);
 out:
 	mutex_unlock(&info->lock);

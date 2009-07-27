@@ -115,7 +115,7 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 		return 0;
 	}
 
-	dprintf("sched: migrating thread %" PRIu32 "(%s) to CPU %" PRIu32 " from CPU %" PRIu32 "\n",
+	dprintf("sched: migrating thread %" PRId32 "(%s) to CPU %" PRIu32 " from CPU %" PRIu32 "\n",
 		thread->id, thread->name, curr_cpu->id, thread->cpu->id);
 
 	/* Remove the thread from its old CPU. */
@@ -277,7 +277,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 	if(thread->timeslice != 0) {
 		if(thread->priority > thread->owner->priority) {
 			thread->priority--;
-			dprintf("sched: thread %" PRIu32 " (" PRIu32 ") bonus (new: %zu, max: %zu)\n",
+			dprintf("sched: thread %" PRId32 " (" PRIu32 ") bonus (new: %zu, max: %zu)\n",
 				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
 		}
 
@@ -302,7 +302,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 		if(cpu->count[i] > 0) {
 			thread->priority++;
 
-			dprintf("sched: thread %" PRIu32 " (" PRIu32 ") penalty (new: %zu, max: %zu)\n",
+			dprintf("sched: thread %" PRId32 " (" PRIu32 ") penalty (new: %zu, max: %zu)\n",
 				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
 			return;
 		}		
@@ -433,7 +433,7 @@ void sched_internal(bool state) {
 	spinlock_unlock_ni(&cpu->lock);
 
 #if SCHED_OVERKILL_DEBUG
-	kprintf(LOG_DEBUG, "sched: switching to thread %" PRIu32 "(%s) (process: %" PRIu32 ", cpu: %" PRIu32 ")\n",
+	kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
 		curr_thread->id, curr_thread->name, curr_thread->owner->id, curr_cpu->id);
 #endif
 

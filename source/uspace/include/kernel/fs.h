@@ -1,0 +1,71 @@
+/* Kiwi filesystem functions
+ * Copyright (C) 2009 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		Filesystem functions.
+ */
+
+#ifndef __KERNEL_FS_H
+#define __KERNEL_FS_H
+
+#include <kernel/types.h>
+
+#include <stdbool.h>
+
+/** Directory entry information structure. */
+typedef struct fs_dir_entry {
+	size_t length;			/**< Length of this structure including name. */
+	identifier_t id;		/**< ID of the node for the entry. */
+	char name[];			/**< Name of entry. */
+} fs_dir_entry_t;
+
+/** Filesystem node information structure. */
+typedef struct fs_info {
+	int meow;
+} fs_info_t;
+
+/** Mount behaviour flags. */
+#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
+
+/** Operations for fs_file_seek(). */
+#define FS_FILE_SEEK_SET	1	/**< Set the offset to the exact position specified. */
+#define FS_FILE_SEEK_ADD	2	/**< Add the supplied value to the current offset. */
+#define FS_FILE_SEEK_END	3	/**< Set the offset to the end of the file plus the supplied value. */
+
+extern int fs_file_create(const char *path);
+extern handle_t fs_file_open(const char *path, int flags);
+extern int fs_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp);
+extern int fs_file_write(handle_t handle, const void *buf, size_t count, size_t *bytesp);
+extern int fs_file_resize(handle_t handle, file_size_t size);
+extern int fs_file_seek(handle_t handle, int how, offset_t offset, offset_t *newp);
+
+extern int fs_dir_create(const char *path);
+extern handle_t fs_dir_open(const char *path, int flags);
+extern int fs_dir_read(handle_t handle, fs_dir_entry_t *entry, size_t size);
+
+extern int fs_symlink_create(const char *path, const char *target);
+extern int fs_symlink_read(const char *path, char *buf, size_t size);
+
+extern int fs_mount(const char *dev, const char *path, const char *type, int flags);
+extern int fs_unmount(const char *path);
+extern int fs_getcwd(char *buf, size_t size);
+extern int fs_setcwd(const char *path);
+extern int fs_info(const char *path, handle_t handle, bool follow, fs_info_t *infop);
+extern int fs_link(const char *source, const char *dest);
+extern int fs_unlink(const char *path);
+extern int fs_rename(const char *source, const char *dest);
+
+#endif /* __KERNEL_FS_H */

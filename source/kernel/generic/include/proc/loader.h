@@ -21,7 +21,7 @@
 #ifndef	__PROC_LOADER_H
 #define __PROC_LOADER_H
 
-#include <fs/vfs.h>
+#include <io/vfs.h>
 
 #include <mm/aspace.h>
 

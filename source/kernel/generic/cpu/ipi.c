@@ -198,7 +198,7 @@ void ipi_process_pending(void) {
  * @param flags		Behaviour flags.
  *
  * @return		The only error code that this function can return is
- *			ERR_DEST_UNKNOWN. Otherwise, the return value depends
+ *			ERR_NOT_FOUND. Otherwise, the return value depends
  *			on the behaviour flags: if IPI_SEND_SYNC was specified,
  *			then the return value is the return value passed to
  *			ipi_acknowledge(). Otherwise, it is 0.
@@ -218,7 +218,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 	/* Check if the destination exists. */
 	if(dest > cpu_id_max || !cpus[dest] || cpus[dest]->state == CPU_DOWN) {
 		intr_restore(state);
-		return -ERR_DEST_UNKNOWN;
+		return -ERR_NOT_FOUND;
 	}
 
 	/* Get a message structure for the message. */

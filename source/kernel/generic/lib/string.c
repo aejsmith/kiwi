@@ -472,6 +472,108 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
 	return dup;
 }
 
+/** Get last component of a path.
+ *
+ * Returns an allocated string buffer containing the last component of the
+ * given path.
+ *
+ * @param path		Pathname to parse.
+ * @param kmflag	Allocation flags.
+ *
+ * @return		Pointer to string containing last component of path.
+ *			The string returned is allocated via kmalloc(), so
+ *			should be freed using kfree().
+ */
+char *kbasename(const char *path, int kmflag) {
+	char *ptr, *dup, *ret;
+	size_t len;
+
+	if(path == NULL || path[0] == 0 || (path[0] == '.' && path[1] == 0)) {
+		return kstrdup(".", kmflag);
+	} else if(path[0] == '.' && path[1] == '.' && path[2] == 0) {
+		return kstrdup("..", kmflag);
+	}
+
+	if(!(dup = kstrdup(path, kmflag))) {
+		return NULL;
+	}
+
+	/* Strip off trailing '/' characters. */
+	len = strlen(dup);
+	while(len && dup[len - 1] == '/') {
+		dup[--len] = 0;
+	}
+
+	/* If length is now 0, the entire string was '/' characters. */
+	if(!len) {
+		kfree(dup);
+		return kstrdup("/", kmflag);
+	}
+
+	if(!(ptr = strrchr(dup, '/'))) {
+		/* No '/' character in the string, that means what we have is
+		 * correct. Resize the allocation to the new length. */
+		if(!(ret = krealloc(dup, len + 1, kmflag))) {
+			kfree(dup);
+		}
+		return ret;
+	} else {
+		ret = kstrdup(ptr + 1, kmflag);
+		kfree(dup);
+		return ret;
+	}
+}
+
+/** Get part of a path preceding the last /.
+ *
+ * Returns an allocated string buffer containing everything preceding the last
+ * component of the given path.
+ *
+ * @param path		Pathname to parse.
+ * @param kmflag	Allocation flags.
+ *
+ * @return		Pointer to string. The string returned is allocated via
+ *			kmalloc(), so should be freed using kfree().
+ */
+char *kdirname(const char *path, int kmflag) {
+	char *ptr, *dup, *ret;
+	size_t len;
+
+	if(path == NULL || path[0] == 0 || (path[0] == '.' && path[1] == 0)) {
+		return kstrdup(".", kmflag);
+	} else if(path[0] == '.' && path[1] == '.' && path[2] == 0) {
+		return kstrdup(".", kmflag);
+	}
+
+	/* Duplicate string to modify it. */
+	if(!(dup = kstrdup(path, kmflag))) {
+		return NULL;
+	}
+
+	/* Look for last '/' character. */
+	if(!(ptr = strrchr(dup, '/'))) {
+		kfree(dup);
+		return kstrdup(".", kmflag);
+	}
+
+	/* Strip off the character and any extras. */
+	len = (ptr - dup) + 1;
+	while(len && dup[len - 1] == '/') {
+		dup[--len] = 0;
+	}
+
+	/* If length is now 0, the entire string was '/' characters. */
+	if(!len) {
+		kfree(dup);
+		return kstrdup("/", kmflag);
+	}
+
+	if(!(ret = krealloc(dup, len + 1, kmflag))) {
+		kfree(dup);
+	}
+	return ret;
+}
+
 /** Macro to implement strtoul() and strtoull(). */
 #define __strtoux(type, cp, endp, base)		\
 	__extension__ \

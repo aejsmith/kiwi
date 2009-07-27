@@ -24,6 +24,8 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
+#include <io/vfs.h>
+
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/do_printf.h>
@@ -86,6 +88,9 @@ static struct {
 	{ "continue",	"Exit KDBG and continue execution.",		kdbg_cmd_continue },
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
+	{ "fs_mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_fs_mounts },
+	{ "fs_nodes",	"Print a list of nodes on a mount.",		kdbg_cmd_fs_nodes },
+	{ "fs_node",	"Print information about a filesystem node.",	kdbg_cmd_fs_node },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },

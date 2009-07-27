@@ -46,6 +46,8 @@ extern int atoi(const char *s);
 extern void *kmemdup(const void *src, size_t count, int kmflag);
 extern char *kstrdup(const char *s, int kmflag);
 extern char *kstrndup(const char *s, size_t n, int kmflag);
+extern char *kbasename(const char *path, int kmflag);
+extern char *kdirname(const char *path, int kmflag);
 
 extern unsigned long strtoul(const char *cp, char **endp, unsigned int base);
 extern long strtol(const char *cp,char **endp,unsigned int base);

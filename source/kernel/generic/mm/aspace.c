@@ -50,7 +50,7 @@
 
 #include <cpu/intr.h>
 
-#include <fs/vfs.h>
+#include <io/vfs.h>
 
 #include <lib/string.h>
 
@@ -627,7 +627,7 @@ static void aspace_file_release(aspace_source_t *source, offset_t offset) {
 /** Destroy a VFS source.
  * @param source	Source to destroy. */
 static void aspace_file_destroy(aspace_source_t *source) {
-	vfs_node_cache_release(source->data);
+	vfs_file_cache_release(source->data);
 }
 
 /** VFS private address space backend structure. */
@@ -650,7 +650,7 @@ static int aspace_file_shared_map(aspace_source_t *source, offset_t offset, size
 	/* Shared sources can only be mapped as writeable if the underlying
 	 * file is writeable. For private sources it is OK to write read-only
 	 * files, because modifications don't go back to the file. */
-	return (flags & ASPACE_MAP_WRITE && VFS_NODE_RDONLY(node)) ? -ERR_READ_ONLY : 0;
+	return (flags & ASPACE_MAP_WRITE && VFS_NODE_IS_RDONLY(node)) ? -ERR_READ_ONLY : 0;
 }
 
 /** VFS shared address space backend structure. */
@@ -766,20 +766,21 @@ int aspace_map_file(aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_
 
 	/* Create the source using the correct backend. */
 	if(flags & ASPACE_MAP_PRIVATE) {
-		source = aspace_source_alloc(node->name, ASPACE_SOURCE_PRIVATE, MM_SLEEP);
+		/* TODO: Name. */
+		source = aspace_source_alloc("[file]", ASPACE_SOURCE_PRIVATE, MM_SLEEP);
 		source->backend = &aspace_file_private_backend;
 
-		ret = vfs_node_cache_get(node, true, (cache_t **)&source->data);
+		ret = vfs_file_cache_get(node, true, (cache_t **)&source->data);
 		if(ret != 0) {
 			kfree(source->name);
 			slab_cache_free(aspace_source_cache, source);
 			return ret;
 		}
 	} else {
-		source = aspace_source_alloc(node->name, 0, MM_SLEEP);
+		source = aspace_source_alloc("[file]", 0, MM_SLEEP);
 		source->backend = &aspace_file_shared_backend;
 
-		ret = vfs_node_cache_get(node, false, (cache_t **)&source->data);
+		ret = vfs_file_cache_get(node, false, (cache_t **)&source->data);
 		if(ret != 0) {
 			kfree(source->name);
 			slab_cache_free(aspace_source_cache, source);
@@ -1028,7 +1029,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Dumps out the address space at the specified address. This address\n");
+		kprintf(LOG_NONE, "Prints the contents of the address space at the specified address. This address\n");
 		kprintf(LOG_NONE, "is given as an expression.\n");
 		return KDBG_OK;
 	} else if(argc != 2) {

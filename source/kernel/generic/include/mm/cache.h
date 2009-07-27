@@ -72,14 +72,16 @@ typedef struct cache {
 	list_t header;			/**< Link to cache list. */
 
 	mutex_t lock;			/**< Lock to protect the cache. */
-
 	avltree_t pages;		/**< Tree of pages stored in the cache. */
+	size_t dirty_count;		/**< Count of dirty pages. */
+
 	cache_ops_t *ops;		/**< Cache operations. */
 	void *data;			/**< Data used by the cache backend. */
 } cache_t;
 
 extern int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp);
 extern void cache_release(cache_t *cache, offset_t offset, bool dirty);
+extern bool cache_dirty(cache_t *cache);
 
 extern cache_t *cache_create(cache_ops_t *ops, void *data);
 extern int cache_destroy(cache_t *cache);

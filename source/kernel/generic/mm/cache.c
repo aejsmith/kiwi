@@ -27,6 +27,7 @@
 #include <console/kprintf.h>
 
 #include <mm/cache.h>
+#include <mm/malloc.h>
 #include <mm/slab.h>
 
 #include <assert.h>
@@ -42,23 +43,8 @@
 static LIST_DECLARE(cache_list);
 static MUTEX_DECLARE(cache_list_lock, 0);
 
-/** Slab caches for cache/cache page structures. */
-static slab_cache_t *cache_cache;
+/** Slab caches for cache page structures. */
 static slab_cache_t *cache_page_cache;
-
-/** Constructor for cache structures.
- * @param obj		Object to construct.
- * @param data		Slab cache data (unused).
- * @param kmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-static int cache_ctor(void *obj, void *data, int kmflag) {
-	cache_t *cache = obj;
-
-	list_init(&cache->header);
-	mutex_init(&cache->lock, "cache_lock", 0);
-	avltree_init(&cache->pages);
-	return 0;
-}
 
 /** Constructor for cache page structures.
  * @param obj		Object to construct.
@@ -152,6 +138,10 @@ void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 
 	/* Dirty the page if required. */
 	if(dirty) {
+		/* Increase dirty page count if not already dirty. */
+		if(!page->dirty) {
+			cache->dirty_count++;
+		}
 		page->dirty = true;
 	}
 
@@ -160,6 +150,18 @@ void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 	dprintf("cache: released page 0x%" PRIpp " at %p:%" PRIo "\n",
 	        page->address, cache, offset);
 	mutex_unlock(&cache->lock);
+}
+
+/** Check if a cache is dirty.
+ *
+ * Checks if any part of a cache's data has been marked as dirty.
+ *
+ * @param cache		Cache to check.
+ *
+ * @return		True if dirty, false if not.
+ */
+bool cache_dirty(cache_t *cache) {
+	return (cache->dirty_count > 0);
 }
 
 /** Create a new page cache.
@@ -173,11 +175,16 @@ void cache_release(cache_t *cache, offset_t offset, bool dirty) {
  * @return		Pointer to cache structure allocated.
  */
 cache_t *cache_create(cache_ops_t *ops, void *data) {
-	cache_t *cache = slab_cache_alloc(cache_cache, MM_SLEEP);
+	cache_t *cache = kmalloc(sizeof(cache_t), MM_SLEEP);
 
 	assert(ops->get_page);
 	assert(ops->free_page);
 
+	list_init(&cache->header);
+	mutex_init(&cache->lock, "cache_lock", 0);
+	avltree_init(&cache->pages);
+
+	cache->dirty_count = 0;
 	cache->ops = ops;
 	cache->data = data;
 
@@ -225,6 +232,8 @@ int cache_destroy(cache_t *cache) {
 				mutex_unlock(&cache->lock);
 				return ret;
 			}
+
+			cache->dirty_count--;
 		}
 
 		/* Free the page. */
@@ -243,15 +252,12 @@ int cache_destroy(cache_t *cache) {
 	mutex_unlock(&cache_list_lock);
 
 	mutex_unlock(&cache->lock);
-	slab_cache_free(cache_cache, cache);
+	kfree(cache);
 	return 0;
 }
 
 /** Initialize the cache subsystem. */
 void cache_init(void) {
-	cache_cache = slab_cache_create("cache_cache", sizeof(cache_t), 0,
-	                                cache_ctor, NULL, NULL, NULL, NULL,
-	                                0, MM_FATAL);
 	cache_page_cache = slab_cache_create("cache_page_cache", sizeof(cache_page_t),
 	                                     0, cache_page_ctor, NULL, NULL, NULL,
 	                                     NULL, 0, MM_FATAL);
