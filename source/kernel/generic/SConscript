@@ -64,6 +64,7 @@ env['OBJFILES'] += [
 	env.Object('proc/thread.c'),
 
 	env.Object('sync/mutex.c'),
+	env.Object('sync/rwlock.c'),
 	env.Object('sync/semaphore.c'),
 	env.Object('sync/spinlock.c'),
 	env.Object('sync/waitq.c'),

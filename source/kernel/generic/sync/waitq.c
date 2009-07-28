@@ -31,6 +31,21 @@
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
+extern void wait_queue_do_wake(thread_t *thread);
+
+/** Wake up a single thread. Thread and queue should be locked.
+ * @param thread	Thread to wake up. */
+void wait_queue_do_wake(thread_t *thread) {
+	assert(thread->state == THREAD_SLEEPING);
+
+	/* Remove the thread from the queue and wake it up. */
+	list_remove(&thread->waitq_link);
+	thread->waitq = NULL;
+	thread->interruptible = false;
+
+	thread->state = THREAD_READY;
+	sched_thread_insert(thread);
+}
 
 /** Sleep on a wait queue.
  *
@@ -115,12 +130,7 @@ bool wait_queue_wake(wait_queue_t *waitq) {
 		assert(thread->state == THREAD_SLEEPING);
 
 		/* Remove the thread from the queue and wake it up. */
-		list_remove(&thread->waitq_link);
-		thread->waitq = NULL;
-		thread->interruptible = false;
-
-		thread->state = THREAD_READY;
-		sched_thread_insert(thread);
+		wait_queue_do_wake(thread);
 
 		spinlock_unlock(&thread->lock);
 		spinlock_unlock(&waitq->lock);

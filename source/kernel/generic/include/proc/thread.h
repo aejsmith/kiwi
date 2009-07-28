@@ -62,6 +62,7 @@ typedef struct thread {
 	struct wait_queue *waitq;	/**< Wait queue that the thread is sleeping on. */
 	bool interruptible;		/**< Whether the sleep can be interrupted. */
 	context_t sleep_context;	/**< Context to restore upon sleep interruption. */
+	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
 
 	/** State of the thread. */
 	enum {
