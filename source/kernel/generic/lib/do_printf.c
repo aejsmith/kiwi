@@ -306,14 +306,16 @@ int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args)
 			break;
 		case 'p':
 			/* Print lower-case and as though # was specified.
-			 * Also zero pad up to the width of a pointer, because
-			 * I like it like that. */
-			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX | PRINTF_ZERO_PAD);
+			 * Also zero pad up to the width of a pointer if a
+			 * width was not specified, because I like it like
+			 * that. */
+			flags |= (PRINTF_LOW_CASE | PRINTF_PREFIX);
 			if(precision == -1) {
 				precision = 1;
 			}
 			if(width == -1) {
 				width = (sizeof(void *) * 2) + 2;
+				flags |= PRINTF_ZERO_PAD;
 			}
 
 			/* Pointers should not go through number conversion. */

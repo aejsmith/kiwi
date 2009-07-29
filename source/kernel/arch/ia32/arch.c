@@ -37,7 +37,7 @@
  * @param frame		Interrupt stack frame.
  * @return		Always returns INTR_HANDLED. */
 static intr_result_t syscall_intr_handler(unative_t num, intr_frame_t *frame) {
-	bool state = intr_disable();
+	bool state = intr_enable();
 
 	frame->ax = syscall_handler((syscall_frame_t *)frame);
 	intr_restore(state);
