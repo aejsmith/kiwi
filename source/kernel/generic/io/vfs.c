@@ -1459,18 +1459,35 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 	mutex_lock(&node->mount->lock, 0);
 	mutex_lock(&node->lock, 0);
 
-	/* Now we must fix up the entry - if it refers to a mountpoint, we need
-	 * to change the node ID to be the node ID of the mount root, rather
-	 * than the mountpoint. If the node it currently points to is not in
-	 * the cache, then it won't be a mountpoint (mountpoints are always in
-	 * the cache), so nothing will need to be done. */
-	if((child = avltree_lookup(&node->mount->nodes, (key_t)buf->id))) {
-		if(child != node) {
-			mutex_lock(&child->lock, 0);
-			if(child->type == VFS_NODE_DIR && child->mounted) {
-				buf->id = child->mounted->root->id;
+	/* Fix up the entry. */
+	if(node == node->mount->root && strcmp(entry->name, "..") == 0) {
+		/* This is the '..' entry, and the node is the root of its
+		 * mount. Change the node ID to be the ID of the mountpoint,
+		 * if any. */
+		if(node->mount->mountpoint) {
+			mutex_lock(&node->mount->mountpoint->lock, 0);
+			if((buf->id = vfs_dir_entry_get(node->mount->mountpoint, "..")) < 0) {
+				mutex_unlock(&node->mount->mountpoint->lock);
+				mutex_unlock(&node->mount->lock);
+				mutex_unlock(&node->lock);
+				return (int)buf->id;
 			}
-			mutex_unlock(&child->lock);
+			mutex_unlock(&node->mount->mountpoint->lock);
+		}
+	} else {
+		/* Check if the entry refers to a mountpoint. In this case we
+		 * need to change the node ID to be the node ID of the mount
+		 * root, rather than the mountpoint. If the node the entry
+		 * currently points to is not in the cache, then it won't be a
+		 * mountpoint (mountpoints are always in the cache). */
+		if((child = avltree_lookup(&node->mount->nodes, (key_t)buf->id))) {
+			if(child != node) {
+				mutex_lock(&child->lock, 0);
+				if(child->type == VFS_NODE_DIR && child->mounted) {
+					buf->id = child->mounted->root->id;
+				}
+				mutex_unlock(&child->lock);
+			}
 		}
 	}
 
