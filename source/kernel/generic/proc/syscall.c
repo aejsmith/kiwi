@@ -49,6 +49,7 @@ static syscall_handler_t syscall_table[] = {
 
 	/** Handle system calls. */
 	(syscall_handler_t)sys_handle_close,
+	(syscall_handler_t)sys_handle_type,
 
 	/** Filesystem system calls. */
 	(syscall_handler_t)sys_fs_file_create,
@@ -56,10 +57,11 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_file_read,
 	(syscall_handler_t)sys_fs_file_write,
 	(syscall_handler_t)sys_fs_file_resize,
-	(syscall_handler_t)sys_fs_file_seek,
 	(syscall_handler_t)sys_fs_dir_create,
 	(syscall_handler_t)sys_fs_dir_open,
 	(syscall_handler_t)sys_fs_dir_read,
+	(syscall_handler_t)sys_fs_handle_seek,
+	(syscall_handler_t)sys_fs_handle_info,
 	(syscall_handler_t)sys_fs_symlink_create,
 	(syscall_handler_t)sys_fs_symlink_read,
 	(syscall_handler_t)sys_fs_mount,

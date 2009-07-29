@@ -177,7 +177,7 @@ int strcpy_from_user(char *dest, const char *src) {
 
 /** Duplicate string from userspace.
  *
- * Allocates a buffer big enough and copies across a string from userspace.
+ * Allocates a buffer large enough and copies across a string from userspace.
  *
  * @param src		Location to copy from.
  * @param mmflag	Allocation flags.
@@ -196,6 +196,50 @@ int strdup_from_user(const void *src, int mmflag, char **destp) {
 		return ret;
 	} else if(len == 0) {
 		return -ERR_PARAM_INVAL;
+	}
+
+	d = kmalloc(len + 1, mmflag);
+	if(d == NULL) {
+		return -ERR_NO_MEMORY;
+	}
+
+	ret = memcpy_from_user(d, src, len);
+	if(ret != 0) {
+		kfree(d);
+		return ret;
+	}
+	d[len] = 0;
+
+	*destp = d;
+	return 0;
+}
+
+/** Duplicate string from userspace.
+ *
+ * Allocates a buffer large enough and copies across a string from userspace.
+ * If the string is longer than the maximum length, then an error will be
+ * returned.
+ *
+ * @param src		Location to copy from.
+ * @param max		Maximum length allowed.
+ * @param mmflag	Allocation flags.
+ * @param destp		Pointer to buffer in which to store destination.
+ *
+ * @return		0 on success, negative error code on failure.
+ *			Returns -ERR_PARAM_INVAL if the string is zero-length.
+ */
+int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
+	size_t len;
+	char *d;
+	int ret;
+
+	ret = strlen_user(src, &len);
+	if(ret != 0) {
+		return ret;
+	} else if(len == 0) {
+		return -ERR_PARAM_INVAL;
+	} else if(len > max) {
+		return -ERR_STR_TOO_LONG;
 	}
 
 	d = kmalloc(len + 1, mmflag);

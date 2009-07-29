@@ -20,8 +20,10 @@
 
 #include <kernel/aspace.h>
 #include <kernel/fs.h>
+#include <kernel/handle.h>
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
 static inline void mount(const char *dev, const char *path, const char *type, int flags) {
@@ -48,7 +50,73 @@ static inline void file_create(const char *path) {
 	printf("%d\n", ret);
 }
 
+static void dump_tree(char *name, int indent) {
+	fs_dir_entry_t *entry;
+	handle_t handle;
+	int ret;
+
+	if(name) {
+		ret = fs_setcwd(name);
+		if(ret != 0) {
+			if(ret != -11) {
+				printf("Setcwd failed: %d\n", ret);
+				while(1);
+			}
+			return;
+		}
+	}
+
+	handle = fs_dir_open(".", 0);
+	if(handle < 0) {
+		printf("Failed to open: %d\n", handle);
+		while(1);
+	}
+
+	entry = malloc(4096);
+	if(!entry) {
+		printf("Malloc failed\n");
+		while(1);
+	}
+
+	while(true) {
+		ret = fs_dir_read(handle, entry, 4096, -1);
+		if(ret != 0) {
+			if(ret != -10) {
+				printf("Read failed: %d\n", ret);
+				while(1);
+			}
+			free(entry);
+			if(name) {
+				ret = fs_setcwd("..");
+				if(ret != 0) {
+					printf("Setcwd .. failed: %d", ret);
+					while(1);
+				}
+			}
+			handle_close(handle);
+			return;
+		}
+
+		printf("%-2d - %*s%s\n", entry->id, indent, "", entry->name);
+		if(strcmp(entry->name, ".") != 0 && strcmp(entry->name, "..") != 0) {
+			dump_tree(entry->name, indent + 2);
+		}
+	}
+}
+
+static char array[512];
+
+extern void putch(char ch);
+
+static __attribute__((used)) int putchar(int ch) {
+	putch((char)ch);
+	return ch;
+}
+
 int main(int argc, char **argv) {
+	char buf[] = { 'a', 'b', 'c', 'd' };
+	handle_t handle;
+	size_t bytes;
 	void *addr;
 	int ret;
 
@@ -72,6 +140,8 @@ int main(int argc, char **argv) {
 	}
 
 	mount(NULL, "/", "ramfs", 0);
+	ret = fs_setcwd("/");
+	printf("Set directory returned %d\n", ret);
 	dir_create("/foo");
 	file_create("/foo/bar.txt");
 	file_create("/foo/../meow.txt");
@@ -83,5 +153,28 @@ int main(int argc, char **argv) {
 	file_create("/foo/bar/zoop.txt");
 	dir_create("/foo/bar/meow");
 	file_create("/foo/bar/meow/ohai.txt");
+
+	handle = fs_file_open("/foo/bar.txt", FS_FILE_READ | FS_FILE_WRITE);
+	printf("Got handle %d\n", handle);
+	if(handle >= 0) {
+		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
+		printf("Write returned %d (%zu)\n", ret, bytes);
+		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
+		printf("Write returned %d (%zu)\n", ret, bytes);
+		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
+		printf("Write returned %d (%zu)\n", ret, bytes);
+
+		ret = fs_handle_seek(handle, FS_HANDLE_SEEK_SET, 0, NULL);
+		printf("Seek returned %d\n", ret);
+		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
+		printf("Read returned %d (%zu)\n", ret, bytes);
+		if(ret == 0) {
+			array[bytes] = 0;
+			printf("Got string '%s'\n", array);
+		}
+	}
+
+	printf("Directory tree:\n");
+	dump_tree(NULL, 0);
 	while(1);
 }

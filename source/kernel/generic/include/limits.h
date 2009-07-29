@@ -1,4 +1,4 @@
-/* Kiwi handle functions
+/* Kiwi limit definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,15 +15,13 @@
 
 /**
  * @file
- * @brief		Handle functions.
+ * @brief		Limit definitions.
  */
 
-#ifndef __KERNEL_HANDLE_H
-#define __KERNEL_HANDLE_H
+#ifndef __LIMITS_H
+#define __LIMITS_H
 
-#include <kernel/types.h>
+/** Kernel limit definitions. */
+#define PATH_MAX		4096	/**< Maximum length of a path string. */
 
-extern int handle_close(handle_t handle);
-extern int handle_type(handle_t handle);
-
-#endif /* __KERNEL_HANDLE_H */
+#endif /* __LIMITS_H */

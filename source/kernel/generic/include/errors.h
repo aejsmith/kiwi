@@ -38,5 +38,7 @@
 #define ERR_NO_HANDLES		14	/**< Handle table is full. */
 #define ERR_IN_USE		15	/**< Object is in use. */
 #define ERR_NO_SPACE		16	/**< No space is available. */
+#define ERR_PERM_DENIED		17	/**< Permission denied. */
+#define ERR_STR_TOO_LONG	18	/**< String is too long. */
 
 #endif /* __ERRORS_H */

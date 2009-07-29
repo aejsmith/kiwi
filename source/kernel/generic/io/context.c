@@ -124,6 +124,8 @@ int io_context_setcwd(io_context_t *context, vfs_node_t *node) {
 	context->curr_dir = node;
 	mutex_unlock(&context->lock);
 
-	vfs_node_release(old);
+	if(old) {
+		vfs_node_release(old);
+	}
 	return 0;
 }
