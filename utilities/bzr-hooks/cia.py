@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""Hook to submit pushed commits to CIA (http://cia.navi.cx/)
+"""Hook to submit pushed commits to CIA (http://cia.vc/)
 
 This is a modification of the original CIA bzr plugin by Jelmer Vernooij
 that functions as a post_change_branch_tip hook, allowing it to be set up on
@@ -28,18 +28,27 @@ inside the repository.
 """
 
 from xml.sax import saxutils
-import socket, xmlrpclib, bzrlib
-from bzrlib.branch import Branch
+import socket, xmlrpclib, bzrlib, sys
+from bzrlib.branch import Branch, ChangeBranchTipParams
 from bzrlib.commands import Command, register_command
 from bzrlib.option import Option
-from bzrlib.trace import info, warning
+
+if __name__ == '__main__':
+	def info(msg):
+		print '[INFO] %s' % (msg)
+	def warning(msg):
+		print '[INFO] %s' % (msg)
+else:
+	from bzrlib.trace import info, warning
 
 class CIASubmitter:
 	"""Class for submitting branch changes to CIA."""
 
 	class CIADeliverError(Exception):
 		def __init__(self, message):
-			self.message = message
+			self.value = message
+		def __str__(self):
+			return repr(self.value)
 
 	def __init__(self, branch, project):
 		self.branch = branch
@@ -87,11 +96,11 @@ class CIASubmitter:
 		try:
 			server.hub.deliver(msg)
 		except xmlrpclib.ProtocolError, e:
-			raise CIADeliverError(e.errmsg)
+			raise self.CIADeliverError(e.errmsg)
 		except socket.gaierror, (_, errmsg):
-			raise CIADeliverError(errmsg)
+			raise self.CIADeliverError(errmsg)
 		except socket.error, (_, errmsg):
-			raise CIADeliverError(errmsg)
+			raise self.CIADeliverError(errmsg)
 
 	def submit(self, revid, revno, dry_run):
 		info("Submitting revision %d to CIA." % (revno))
@@ -102,8 +111,8 @@ class CIASubmitter:
 		# If dry run, just print it, else submit.
 		if not dry_run:
 			try:
-				self.deliver(xmlrpclib.ServerProxy('http://cia.navi.cx'), msg)
-			except self.CIADeliverError, (error, ):
+				self.deliver(xmlrpclib.ServerProxy('http://cia.vc'), msg)
+			except self.CIADeliverError as error:
 				warning("Unable to submit revision %d to CIA: %s" % (revno, error))
 		else:
 			info(msg)
@@ -160,3 +169,24 @@ class cmd_cia_project(Command):
 			print config.get_user_option('cia_project')
 
 register_command(cmd_cia_project)
+
+if __name__ == '__main__':
+	if len(sys.argv) != 4:
+		print "Usage: %s <path> <start num> <end num>" % (sys.argv[0])
+		print "Submits all revisions from <start num> to <end num>, inclusive."
+		sys.exit(1)
+
+	branch = Branch.open(sys.argv[1])
+	old_revno = int(sys.argv[2]) - 1
+	new_revno = int(sys.argv[3])
+
+	params = ChangeBranchTipParams(
+		branch,
+		old_revno,
+		new_revno,
+		branch.get_rev_id(old_revno),
+		branch.get_rev_id(new_revno)
+	)
+
+	cia_hook_change_tip(params)
+	sys.exit(0)
