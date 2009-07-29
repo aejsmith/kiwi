@@ -86,11 +86,16 @@ static void gdt_init(void) {
 
 /** Set up the TSS for the current CPU. */
 static void tss_init(void) {
+	ptr_t stack = (ptr_t)__doublefault_stack;
+
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
 	memset(&curr_cpu->arch.tss, 0, sizeof(tss_t));
-	curr_cpu->arch.tss.ist1 = ((ptr_t)__doublefault_stack + KSTACK_SIZE) - STACK_DELTA;
+	curr_cpu->arch.tss.ist1 = (stack + KSTACK_SIZE) - STACK_DELTA;
 	curr_cpu->arch.tss.io_bitmap = 104;
+
+	/* Set CPU pointer on doublefault stack. */
+	*(ptr_t *)stack = cpu_get_pointer();
 
 	/* Load the TSS segment into TR. */
 	ltr(SEG_TSS);

@@ -55,15 +55,6 @@ static intr_result_t i8042_handler(unative_t num, intr_frame_t *frame) {
 		kprintf(LOG_NORMAL, "platform: crashing by invalid opcode...\n");
 		__asm__ volatile("ud2a");
 		break;
-	case 62:
-		/* F4 - Crash (Double Fault). */
-		kprintf(LOG_NORMAL, "platform: crashing by double fault...\n");
-#if CONFIG_ARCH_64BIT
-		__asm__ volatile("movq $0, %rsp; ud2a");
-#else
-		__asm__ volatile("movl $0, %esp; ud2a");
-#endif
-		break;
 	case 63:
 		/* F5 - Reboot. */
 		arch_reboot();

@@ -32,6 +32,8 @@
 
 #include <cpu/intr.h>
 
+#include <lib/utility.h>
+
 #include <mm/aspace.h>
 
 #include <proc/thread.h>
@@ -83,6 +85,9 @@ static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
 	/* Disable KDBG. */
 	atomic_set(&kdbg_running, 3);
 
+	/* Crappy workaround, using MMX memcpy() from the console code seems
+	 * to cause nasty problems. */
+	curr_cpu->arch.features.feat_edx &= ~(1<<23);
 	_fatal(frame, "Double Fault (%p)", frame->ip);
 	cpu_halt();
 }
@@ -159,7 +164,7 @@ intr_result_t fault_handler(unative_t num, intr_frame_t *frame) {
 	}
 
 	/* If there is a special handler for this fault run it. */
-	if(fault_handler_table[num]) {
+	if(num < ARRAYSZ(fault_handler_table) && fault_handler_table[num]) {
 		if(fault_handler_table[num](num, frame)) {
 			return INTR_HANDLED;
 		}

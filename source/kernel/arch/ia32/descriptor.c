@@ -94,20 +94,26 @@ static void gdt_init(void) {
 
 /** Set up the TSS for the current CPU. */
 static void tss_init(void) {
+	ptr_t stack;
+
 	/* Set up the contents of the TSS. */
 	memset(&curr_cpu->arch.tss, 0, sizeof(tss_t));
 	curr_cpu->arch.tss.ss0 = SEG_K_DS;
 	curr_cpu->arch.tss.io_bitmap = 104;
 
 	/* Set up the doublefault TSS. */
+	stack = (ptr_t)__doublefault_stack;
 	__doublefault_tss.cr3 = sysreg_cr3_read();
 	__doublefault_tss.eip = (ptr_t)&__isr_array[FAULT_DOUBLE];
 	__doublefault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
-	__doublefault_tss.esp = ((ptr_t)__doublefault_stack + KSTACK_SIZE) - STACK_DELTA;
+	__doublefault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
 	__doublefault_tss.es = SEG_K_DS;
 	__doublefault_tss.cs = SEG_K_CS;
 	__doublefault_tss.ss = SEG_K_DS;
 	__doublefault_tss.ds = SEG_K_DS;
+
+	/* Set CPU pointer on doublefault stack. */
+	*(ptr_t *)stack = cpu_get_pointer();
 
 	/* Load the TSS segment into TR. */
 	ltr(SEG_TSS);
@@ -130,7 +136,7 @@ static void idt_init(void) {
 
 	/* Modify the double fault entry to become a task gate using the
 	 * doublefault TSS. */
-	idt[FAULT_DOUBLE].flags = 0x85;
+	idt[FAULT_DOUBLE].flags = 0xE5;
 	idt[FAULT_DOUBLE].sel = SEG_DF_TSS;
 	idt[FAULT_DOUBLE].base0 = 0;
 	idt[FAULT_DOUBLE].base1 = 0;
