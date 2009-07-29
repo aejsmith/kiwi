@@ -22,47 +22,55 @@
 #define __PROC_HANDLE_H
 
 #include <sync/mutex.h>
+#include <sync/rwlock.h>
 
 #include <types/avltree.h>
 #include <types/bitmap.h>
 #include <types/refcount.h>
 
 struct handle_info;
-struct process;
 
 /** Structure for storing information about a process' handles. */
 typedef struct handle_table {
 	avltree_t tree;			/**< Tree of ID to handle structure mappings. */
-	bitmap_t bitmap;		/**< Bitmap for tracking free handles. */
+	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 	mutex_t lock;			/**< Lock to protect table. */
 } handle_table_t;
 
-/** Structure containing certain operations for a handle. */
-typedef struct handle_ops {
+/** Structure defining a handle type. */
+typedef struct handle_type {
+	int id;				/**< ID of the handle type. */
+
 	/** Close a handle.
 	 * @param info		Pointer to handle structure being closed.
 	 * @return		0 if handle can be closed, negative error code
 	 *			if not. */
 	int (*close)(struct handle_info *info);
-} handle_ops_t;
+} handle_type_t;
 
 /** Structure containing information of a handle. */
 typedef struct handle_info {
-	handle_ops_t *ops;		/**< Operations structure for the handle. */
+	handle_type_t *type;		/**< Type of the handle. */
 	void *data;			/**< Data for the handle. */
 	refcount_t count;		/**< Reference count for the handle. */
-	mutex_t lock;			/**< Lock to protect the handle. */
+	rwlock_t lock;			/**< Lock to protect the handle. */
 } handle_info_t;
 
-extern handle_t handle_create(struct process *process, handle_ops_t *ops, void *data);
-extern int handle_close(struct process *process, handle_t handle);
+/** Handle type ID definitions. */
+#define HANDLE_TYPE_FILE	1	/**< File. */
+#define HANDLE_TYPE_DIR		2	/**< Directory. */
 
-extern int handle_get(struct process *process, handle_t handle, handle_ops_t *ops, handle_info_t **infop);
+extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data);
+extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);
 extern void handle_release(handle_info_t *info);
+extern int handle_close(handle_table_t *table, handle_t handle);
 
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
 
+extern int kdbg_cmd_handles(int argc, char **argv);
+
 extern int sys_handle_close(handle_t handle);
+extern int sys_handle_type(handle_t handle);
 
 #endif /* __PROC_HANDLE_H */

@@ -34,6 +34,7 @@
 #include <mm/slab.h>
 #include <mm/vmem.h>
 
+#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/thread.h>
 
@@ -91,6 +92,7 @@ static struct {
 	{ "fs_mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_fs_mounts },
 	{ "fs_nodes",	"Print a list of nodes on a mount.",		kdbg_cmd_fs_nodes },
 	{ "fs_node",	"Print information about a filesystem node.",	kdbg_cmd_fs_node },
+	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },

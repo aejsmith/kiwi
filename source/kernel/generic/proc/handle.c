@@ -16,14 +16,6 @@
 /**
  * @file
  * @brief		Per-process object manager.
- *
- * @todo		Use a readers-writer lock on handles and have all gets
- *			use read access, and operations like closing use write
- *			access - this would allow multiple things to use a
- *			handle at a time (and have proper synchronization
- *			implemented by the user of the handle), while ensuring
- *			that a handle will not be closed while it is being
- *			used.
  */
 
 #include <console/kprintf.h>
@@ -33,8 +25,10 @@
 #include <proc/handle.h>
 #include <proc/process.h>
 
+#include <assert.h>
 #include <errors.h>
 #include <init.h>
+#include <kdbg.h>
 
 #if CONFIG_HANDLE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -54,97 +48,101 @@ static int handle_info_cache_ctor(void *obj, void *data, int kmflag) {
 	handle_info_t *info = obj;
 
 	refcount_set(&info->count, 0);
-	mutex_init(&info->lock, "handle_lock", 0);
+	rwlock_init(&info->lock, "handle_lock");
 	return 0;
 }
 
-/** Create a new handle in a process.
+/** Create a new handle.
  *
- * Allocates a new handle in a process' handle table and sets its data to the
- * given pointer.
+ * Allocates a new handle in a handle table.
  *
- * @param process	Process to allocate in.
- * @param ops		Operations for the handle.
+ * @param table		Table to allocate in.
+ * @param type		Type structure for the handle.
  * @param data		Data to associate with the handle.
  *
  * @return		Handle ID on success, negative error code on failure.
  */
-handle_t handle_create(process_t *process, handle_ops_t *ops, void *data) {
+handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data) {
 	handle_info_t *info;
 	int ret;
 
 	/* Require that data be set because there's no point having a handle
 	 * with no associated data. */
-	if(!process || !ops || !data) {
+	if(!table || !type || !data) {
 		return -ERR_PARAM_INVAL;
 	}
 
 	/* Allocate the handle information structure. */
 	info = slab_cache_alloc(handle_info_cache, MM_SLEEP);
-	info->ops = ops;
+	info->type = type;
 	info->data = data;
 
-	mutex_lock(&process->handles.lock, 0);
+	mutex_lock(&table->lock, 0);
 
 	/* Find a handle ID in the table. */
-	ret = bitmap_ffz(&process->handles.bitmap);
-	if(ret == -1) {
-		mutex_unlock(&process->handles.lock);
+	if((ret = bitmap_ffz(&table->bitmap)) == -1) {
+		mutex_unlock(&table->lock);
 		slab_cache_free(handle_info_cache, info);
 		return -ERR_NO_HANDLES;
 	}
 
 	/* Set the bit and add the handle to the tree. */
-	bitmap_set(&process->handles.bitmap, ret);
-	avltree_insert(&process->handles.tree, (key_t)ret, info, NULL);
+	bitmap_set(&table->bitmap, ret);
+	avltree_insert(&table->tree, (key_t)ret, info, NULL);
 
 	/* Add a reference. */
 	refcount_set(&info->count, 1);
 
-	dprintf("handle: allocated handle %d in process %p(%s) (data: %p)\n",
-	        ret, process, process->name, data);
-	mutex_unlock(&process->handles.lock);
+	dprintf("handle: allocated handle %d in table %p (data: %p)\n",
+	        ret, table, data);
+	mutex_unlock(&table->lock);
 	return (handle_t)ret;
 }
 
-/** Look up a handle in a process.
+/** Look up a handle in a table.
  *
- * Looks up the handle with the given ID in a process' handle table, ensuring
- * that the handle is the correct type. The operations structure address is
- * used to identify a handle type - if the handle's operations structure
- * pointer is the same as the one provided to this function, then it is assumed
- * to be the correct type. The returned handle structure is locked; when it is
- * no longer needed, it should be released with handle_release().
+ * Looks up the handle with the given ID in a handle table, ensuring that the
+ * handle is the correct type. The returned handle structure is locked for
+ * reading (with a readers/writer lock) - this ensures that nothing will
+ * attempt to close the handle while it is in use, but allows multiple threads
+ * to access the handle at a time. Note that it is up to the code that manages
+ * the handle (e.g. the VFS) to implement proper synchronization for the data
+ * it associates with the handle. When the handle is no longer needed, it
+ * should be released with handle_release().
  *
- * @param process	Process to look up in.
+ * @param table		Table to look up in.
  * @param handle	Handle ID to look up.
- * @param ops		Operations structure for checking handle type.
- * @param infop		Where to store handle structure pointer.
+ * @param type		ID of wanted type (if negative, no type checking will
+ *			be performed).
+ * @param infop		Where to store handle information structure pointer.
  *
- * @return		0 on success, with handle data pointer stored in datap,
- *			negative error code on failure.
+ * @return		0 on success, negative error code on failure.
  */
-int handle_get(process_t *process, handle_t handle, handle_ops_t *ops, handle_info_t **infop) {
+int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop) {
 	handle_info_t *info;
 
-	mutex_lock(&process->handles.lock, 0);
+	if(!table || !infop) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	mutex_lock(&table->lock, 0);
 
 	/* Look up the handle in the tree. */
-	info = avltree_lookup(&process->handles.tree, (key_t)handle);
-	if(!info) {
-		mutex_unlock(&process->handles.lock);
+	if(!(info = avltree_lookup(&table->tree, (key_t)handle))) {
+		mutex_unlock(&table->lock);
 		return -ERR_NOT_FOUND;
 	}
 
-	mutex_lock(&info->lock, 0);
+	rwlock_read_lock(&info->lock, 0);
 
-	if(info->ops != ops) {
-		mutex_unlock(&info->lock);
-		mutex_unlock(&process->handles.lock);
+	/* Check if the type is the type the caller wants. */
+	if(type >= 0 && info->type->id != type) {
+		rwlock_unlock(&info->lock);
+		mutex_unlock(&table->lock);
 		return -ERR_TYPE_INVAL;
 	}
 
-	mutex_unlock(&process->handles.lock);
+	mutex_unlock(&table->lock);
 	*infop = info;
 	return 0;
 }
@@ -156,37 +154,43 @@ int handle_get(process_t *process, handle_t handle, handle_ops_t *ops, handle_in
  * @param info		Handle to release.
  */
 void handle_release(handle_info_t *info) {
-	mutex_unlock(&info->lock);
+	assert(info->lock.readers);
+	rwlock_unlock(&info->lock);
 }
 
 /** Close a handle.
  *
- * Closes a handle in a process.
+ * Closes a handle in a handle table.
  *
- * @param process	Process to close handle in.
+ * @param table		Table to close handle in.
  * @param handle	Handle ID to close.
  *
  * @return		0 on success, negative error code on failure.
  */
-int handle_close(process_t *process, handle_t handle) {
+int handle_close(handle_table_t *table, handle_t handle) {
 	handle_info_t *info;
 	bool free = false;
 	int ret = 0;
 
-	mutex_lock(&process->handles.lock, 0);
+	if(!table) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	mutex_lock(&table->lock, 0);
 
 	/* Look up the handle in the tree. */
-	info = avltree_lookup(&process->handles.tree, (key_t)handle);
-	if(!info) {
-		mutex_unlock(&process->handles.lock);
+	if(!(info = avltree_lookup(&table->tree, (key_t)handle))) {
+		mutex_unlock(&table->lock);
 		return -ERR_NOT_FOUND;
 	}
 
-	mutex_lock(&info->lock, 0);
+	/* Closing the handle requires exclusive access (ensures that the
+	 * handle is not currently in use). */
+	rwlock_write_lock(&info->lock, 0);
 
 	/* If there are no more references we can close it. */
 	if(refcount_dec(&info->count) == 0) {
-		if(info->ops->close && (ret = info->ops->close(info->data)) != 0) {
+		if(info->type->close && (ret = info->type->close(info)) != 0) {
 			/* Failed, return the reference and return an error. */
 			refcount_inc(&info->count);
 			goto out;
@@ -196,14 +200,13 @@ int handle_close(process_t *process, handle_t handle) {
 	}
 
 	/* Remove from the tree and mark the ID as free. */
-	avltree_remove(&process->handles.tree, (key_t)handle);
-	bitmap_clear(&process->handles.bitmap, handle);
+	avltree_remove(&table->tree, (key_t)handle);
+	bitmap_clear(&table->bitmap, handle);
 
-	dprintf("handle: closed handle %" PRId32 " in process %p(%s)\n", handle,
-	        process, process->name);
+	dprintf("handle: closed handle %" PRId32 " in table %p\n", handle, table);
 out:
-	mutex_unlock(&info->lock);
-	mutex_unlock(&process->handles.lock);
+	rwlock_unlock(&info->lock);
+	mutex_unlock(&table->lock);
 
 	/* Free the structure if necessary. */
 	if(free) {
@@ -243,19 +246,25 @@ void handle_table_destroy(handle_table_t *table) {
 
 	mutex_lock(&table->lock, 0);
 
-	/* Close all handles in the table. */
+	/* Close all handles in the table - cannot use tree iterator here
+	 * because removing makes the current node invalid. */
 	while((node = avltree_node_first(&table->tree))) {
 		info = avltree_entry(node, handle_info_t);
 
 		avltree_remove(&table->tree, node->key);
 
+		rwlock_write_lock(&info->lock, 0);
+
 		if(refcount_dec(&info->count) == 0) {
-			if(info->ops->close && (ret = info->ops->close(info->data)) != 0) {
-				kprintf(LOG_DEBUG, "handle: failed to destroy handle %" PRIu64 "(%p) (%d)\n",
+			if(info->type->close && (ret = info->type->close(info)) != 0) {
+				kprintf(LOG_NORMAL, "handle: failed to destroy handle %" PRIu64 "(%p) (%d)\n",
 				        node->key, info, ret);
 			}
 
+			rwlock_unlock(&info->lock);
 			slab_cache_free(handle_info_cache, info);
+		} else {
+			rwlock_unlock(&info->lock);
 		}
 	}
 
@@ -272,6 +281,55 @@ static void __init_text handle_init(void) {
 INITCALL(handle_init);
 
 #if 0
+# pragma mark Debugger functions.
+#endif
+
+/** Print a list of handles for a process.
+ *
+ * Prints out a list of all currently open handles in a process.
+ *
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ *
+ * @return		KDBG_OK on success, KDBG_FAIL on failure.
+ */
+int kdbg_cmd_handles(int argc, char **argv) {
+	handle_info_t *handle;
+	process_t *process;
+	unative_t id;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s <process ID>\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints out a list of all currently open handles in a process.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(kdbg_parse_expression(argv[1], &id, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	} else if(!(process = process_lookup(id))) {
+		kprintf(LOG_NONE, "Invalid process ID.\n");
+		return KDBG_FAIL;
+	}
+
+	kprintf(LOG_NONE, "ID    Type                   Count  Data\n");
+	kprintf(LOG_NONE, "==    ====                   =====  ====\n");
+
+	AVLTREE_FOREACH(&process->handles.tree, iter) {
+		handle = avltree_entry(iter, handle_info_t);
+
+		kprintf(LOG_NONE, "%-5" PRIu64 " %-2d(%-18p) %-6d %p\n",
+		        iter->key, handle->type->id, handle->type,
+		        refcount_get(&handle->count), handle->data);
+	}
+
+	return KDBG_OK;
+}
+
+#if 0
 # pragma mark System calls.
 #endif
 
@@ -284,5 +342,27 @@ INITCALL(handle_init);
  * @return		0 on success, negative error code on failure.
  */
 int sys_handle_close(handle_t handle) {
-	return handle_close(curr_thread->owner, handle);
+	return handle_close(&curr_proc->handles, handle);
+}
+
+/** Get the type of a handle.
+ *
+ * Gets the type ID of the specified handle in the current process.
+ *
+ * @param handle	Handle to get type of.
+ *
+ * @return		Type ID (positive value) on success, negative error
+ *			code on failure.
+ */
+int sys_handle_type(handle_t handle) {
+	handle_info_t *info;
+	int ret;
+
+	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+		return ret;
+	}
+
+	ret = info->type->id;
+	handle_release(info);
+	return ret;
 }
