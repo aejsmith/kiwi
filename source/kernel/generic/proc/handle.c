@@ -321,7 +321,7 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	AVLTREE_FOREACH(&process->handles.tree, iter) {
 		handle = avltree_entry(iter, handle_info_t);
 
-		kprintf(LOG_NONE, "%-5" PRIu64 " %-2d(%-18p) %-6d %p\n",
+		kprintf(LOG_NONE, "%-5" PRIu64 " %d - %-18p %-6d %p\n",
 		        iter->key, handle->type->id, handle->type,
 		        refcount_get(&handle->count), handle->data);
 	}

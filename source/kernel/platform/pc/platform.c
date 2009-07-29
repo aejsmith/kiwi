@@ -55,8 +55,8 @@ static intr_result_t i8042_handler(unative_t num, intr_frame_t *frame) {
 		kprintf(LOG_NORMAL, "platform: crashing by invalid opcode...\n");
 		__asm__ volatile("ud2a");
 		break;
-	case 63:
-		/* F5 - Reboot. */
+	case 62:
+		/* F4 - Reboot. */
 		arch_reboot();
 		break;
 	}

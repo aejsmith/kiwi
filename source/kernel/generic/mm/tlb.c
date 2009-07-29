@@ -18,8 +18,6 @@
  * @brief		TLB invalidation functions.
  */
 
-#include <console/kprintf.h>
-
 #include <cpu/ipi.h>
 
 #include <mm/aspace.h>
@@ -74,25 +72,32 @@ void tlb_invalidate(aspace_t *as, ptr_t start, ptr_t end) {
 		tlb_arch_invalidate(start, end);
 	}
 
-	/* Quick check to see if we need to do anything, without going through
-	 * the loop. */
-	if(cpu_count < 2 || (as != NULL && refcount_get(&as->count) == ((as == curr_aspace) ? 1 : 0))) {
+	/* Don't need to do anything with 1 CPU. */
+	if(cpu_count < 2) {
 		return;
 	}
 
-	/* There are other users of the address space. Need to deliver a TLB
-	 * invalidation request to them. */
-	LIST_FOREACH(&cpus_running, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu == curr_cpu || (as != NULL && cpu->aspace != as)) {
-			continue;
+	if(as != NULL) {
+		if(refcount_get(&as->count) == ((as == curr_aspace) ? 1 : 0)) {
+			return;
 		}
 
-		/* CPU is using this address space. */
-		if(ipi_send(cpu->id, tlb_invalidate_handler, (unative_t)as,
-		            (unative_t)start, (unative_t)end, 0,
-		            IPI_SEND_SYNC) != 0) {
-			fatal("Could not send TLB invalidation IPI");
+		/* There are other users of the address space. Need to deliver a TLB
+		 * invalidation request to them. */
+		LIST_FOREACH(&cpus_running, iter) {
+			cpu = list_entry(iter, cpu_t, header);
+			if(cpu == curr_cpu || (as != NULL && cpu->aspace != as)) {
+				continue;
+			}
+
+			/* CPU is using this address space. */
+			if(ipi_send(cpu->id, tlb_invalidate_handler, (unative_t)as,
+			            (unative_t)start, (unative_t)end, 0,
+			            IPI_SEND_SYNC) != 0) {
+				fatal("Could not send TLB invalidation IPI");
+			}
 		}
+	} else {
+		ipi_broadcast(tlb_invalidate_handler, 0, (unative_t)start, (unative_t)end, 0, IPI_SEND_SYNC);
 	}
 }
