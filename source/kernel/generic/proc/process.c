@@ -30,7 +30,7 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 
 #include <assert.h>
 #include <errors.h>
@@ -46,7 +46,7 @@
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
 
-static AVLTREE_DECLARE(process_tree);		/**< Tree of all processes. */
+static AVL_TREE_DECLARE(process_tree);		/**< Tree of all processes. */
 static SPINLOCK_DECLARE(process_tree_lock);	/**< Lock for process AVL tree. */
 static vmem_t *process_id_arena;		/**< Process ID Vmem arena. */
 static slab_cache_t *process_cache;		/**< Cache for process structures. */
@@ -79,7 +79,7 @@ process_t *process_lookup(identifier_t id) {
 	process_t *process;
 
 	spinlock_lock(&process_tree_lock, 0);
-	process = avltree_lookup(&process_tree, (key_t)id);
+	process = avl_tree_lookup(&process_tree, (key_t)id);
 	spinlock_unlock(&process_tree_lock);
 
 	return process;
@@ -159,7 +159,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 
 	/* Add to the process tree. */
 	spinlock_lock(&process_tree_lock, 0);
-	avltree_insert(&process_tree, (key_t)process->id, process, NULL);
+	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
 	spinlock_unlock(&process_tree_lock);
 
 	*procp = process;
@@ -272,8 +272,8 @@ int kdbg_cmd_process(int argc, char **argv) {
 	kprintf(LOG_NONE, "ID    Prio Flags Threads Aspace             Name\n");
 	kprintf(LOG_NONE, "==    ==== ===== ======= ======             ====\n");
 
-	AVLTREE_FOREACH(&process_tree, iter) {
-		process = avltree_entry(iter, process_t);
+	AVL_TREE_FOREACH(&process_tree, iter) {
+		process = avl_tree_entry(iter, process_t);
 
 		kprintf(LOG_NONE, "%-5" PRId32 " %-4d %-5d %-7zu %-18p %s\n",
 			process->id, process->priority, process->flags,

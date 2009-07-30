@@ -24,7 +24,7 @@
 #include <sync/mutex.h>
 #include <sync/rwlock.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 #include <types/bitmap.h>
 #include <types/refcount.h>
 
@@ -32,7 +32,7 @@ struct handle_info;
 
 /** Structure for storing information about a process' handles. */
 typedef struct handle_table {
-	avltree_t tree;			/**< Tree of ID to handle structure mappings. */
+	avl_tree_t tree;		/**< Tree of ID to handle structure mappings. */
 	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 	mutex_t lock;			/**< Lock to protect table. */
 } handle_table_t;

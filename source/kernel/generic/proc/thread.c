@@ -33,7 +33,7 @@
 
 #include <sync/waitq.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 
 #include <assert.h>
 #include <errors.h>
@@ -49,7 +49,7 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 
-static AVLTREE_DECLARE(thread_tree);		/**< Tree of all threads. */
+static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
 static SPINLOCK_DECLARE(thread_tree_lock);	/**< Lock for thread AVL tree. */
 static vmem_t *thread_id_arena;			/**< Thread ID Vmem arena. */
 static slab_cache_t *thread_cache;		/**< Cache for thread structures. */
@@ -117,7 +117,7 @@ thread_t *thread_lookup(identifier_t id) {
 	thread_t *thread;
 
 	spinlock_lock(&thread_tree_lock, 0);
-	thread = avltree_lookup(&thread_tree, (key_t)id);
+	thread = avl_tree_lookup(&thread_tree, (key_t)id);
 	spinlock_unlock(&thread_tree_lock);
 
 	return thread;
@@ -230,7 +230,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	/* Add to the thread tree. */
 	spinlock_lock(&thread_tree_lock, 0);
-	avltree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
+	avl_tree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
 	spinlock_unlock(&thread_tree_lock);
 
 	*threadp = thread;
@@ -262,7 +262,7 @@ void thread_destroy(thread_t *thread) {
 
 	/* Remove from thread tree. */
 	spinlock_lock(&thread_tree_lock, 0);
-	avltree_remove(&thread_tree, (key_t)thread->id);
+	avl_tree_remove(&thread_tree, (key_t)thread->id);
 	spinlock_unlock(&thread_tree_lock);
 
 	/* Now clean up the thread. */
@@ -352,8 +352,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 			thread_dump(thread, LOG_NONE);
 		}
 	} else {
-		AVLTREE_FOREACH(&thread_tree, iter) {
-			thread = avltree_entry(iter, thread_t);
+		AVL_TREE_FOREACH(&thread_tree, iter) {
+			thread = avl_tree_entry(iter, thread_t);
 			thread_dump(thread, LOG_NONE);
 		}
 	}

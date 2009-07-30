@@ -23,7 +23,7 @@
 
 #include <sync/mutex.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 #include <types/list.h>
 #include <types/refcount.h>
 
@@ -72,7 +72,7 @@ typedef struct cache {
 	list_t header;			/**< Link to cache list. */
 
 	mutex_t lock;			/**< Lock to protect the cache. */
-	avltree_t pages;		/**< Tree of pages stored in the cache. */
+	avl_tree_t pages;		/**< Tree of pages stored in the cache. */
 	size_t dirty_count;		/**< Count of dirty pages. */
 
 	cache_ops_t *ops;		/**< Cache operations. */

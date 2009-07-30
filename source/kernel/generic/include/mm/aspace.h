@@ -29,7 +29,7 @@
 
 #include <sync/mutex.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 #include <types/refcount.h>
 
 struct aspace_source;
@@ -84,7 +84,7 @@ typedef struct aspace_region {
 	aspace_source_t *source;	/**< Source of pages. */
 	offset_t offset;		/**< Offset into the page source. */
 
-	avltree_node_t *node;		/**< AVL tree node for the region. */
+	avl_tree_node_t *node;		/**< AVL tree node for the region. */
 } aspace_region_t;
 
 /** Address space structure. */
@@ -93,7 +93,7 @@ typedef struct aspace {
 	refcount_t count;		/**< Reference count of CPUs using address space. */
 
 	page_map_t pmap;		/**< Underlying page map for address space. */
-	avltree_t regions;		/**< Tree of memory regions. */
+	avl_tree_t regions;		/**< Tree of memory regions. */
 
 	aspace_region_t *find_cache;	/**< Cached pointer to last region searched for. */
 } aspace_t;

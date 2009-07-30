@@ -88,7 +88,7 @@ handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data) {
 
 	/* Set the bit and add the handle to the tree. */
 	bitmap_set(&table->bitmap, ret);
-	avltree_insert(&table->tree, (key_t)ret, info, NULL);
+	avl_tree_insert(&table->tree, (key_t)ret, info, NULL);
 
 	/* Add a reference. */
 	refcount_set(&info->count, 1);
@@ -128,7 +128,7 @@ int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t *
 	mutex_lock(&table->lock, 0);
 
 	/* Look up the handle in the tree. */
-	if(!(info = avltree_lookup(&table->tree, (key_t)handle))) {
+	if(!(info = avl_tree_lookup(&table->tree, (key_t)handle))) {
 		mutex_unlock(&table->lock);
 		return -ERR_NOT_FOUND;
 	}
@@ -179,7 +179,7 @@ int handle_close(handle_table_t *table, handle_t handle) {
 	mutex_lock(&table->lock, 0);
 
 	/* Look up the handle in the tree. */
-	if(!(info = avltree_lookup(&table->tree, (key_t)handle))) {
+	if(!(info = avl_tree_lookup(&table->tree, (key_t)handle))) {
 		mutex_unlock(&table->lock);
 		return -ERR_NOT_FOUND;
 	}
@@ -200,7 +200,7 @@ int handle_close(handle_table_t *table, handle_t handle) {
 	}
 
 	/* Remove from the tree and mark the ID as free. */
-	avltree_remove(&table->tree, (key_t)handle);
+	avl_tree_remove(&table->tree, (key_t)handle);
 	bitmap_clear(&table->bitmap, handle);
 
 	dprintf("handle: closed handle %" PRId32 " in table %p\n", handle, table);
@@ -226,7 +226,7 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int handle_table_init(handle_table_t *table, handle_table_t *parent) {
-	avltree_init(&table->tree);
+	avl_tree_init(&table->tree);
 	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
 	mutex_init(&table->lock, "handle_table_lock", 0);
 	return 0;
@@ -240,7 +240,7 @@ int handle_table_init(handle_table_t *table, handle_table_t *parent) {
  * @param table		Table to destroy.
  */
 void handle_table_destroy(handle_table_t *table) {
-	avltree_node_t *node;
+	avl_tree_node_t *node;
 	handle_info_t *info;
 	int ret;
 
@@ -248,10 +248,10 @@ void handle_table_destroy(handle_table_t *table) {
 
 	/* Close all handles in the table - cannot use tree iterator here
 	 * because removing makes the current node invalid. */
-	while((node = avltree_node_first(&table->tree))) {
-		info = avltree_entry(node, handle_info_t);
+	while((node = avl_tree_node_first(&table->tree))) {
+		info = avl_tree_entry(node, handle_info_t);
 
-		avltree_remove(&table->tree, node->key);
+		avl_tree_remove(&table->tree, node->key);
 
 		rwlock_write_lock(&info->lock, 0);
 
@@ -318,8 +318,8 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	kprintf(LOG_NONE, "ID    Type                   Count  Data\n");
 	kprintf(LOG_NONE, "==    ====                   =====  ====\n");
 
-	AVLTREE_FOREACH(&process->handles.tree, iter) {
-		handle = avltree_entry(iter, handle_info_t);
+	AVL_TREE_FOREACH(&process->handles.tree, iter) {
+		handle = avl_tree_entry(iter, handle_info_t);
 
 		kprintf(LOG_NONE, "%-5" PRIu64 " %d - %-18p %-6d %p\n",
 		        iter->key, handle->type->id, handle->type,

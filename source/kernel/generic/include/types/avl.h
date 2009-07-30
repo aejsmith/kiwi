@@ -24,59 +24,59 @@
 #include <types.h>
 
 /** AVL tree node structure. */
-typedef struct avltree_node {
-	struct avltree_node *parent;	/**< Parent node. */
-	struct avltree_node *left;	/**< Left-hand child node. */
-	struct avltree_node *right;	/**< Right-hand child node. */
+typedef struct avl_tree_node {
+	struct avl_tree_node *parent;	/**< Parent node. */
+	struct avl_tree_node *left;	/**< Left-hand child node. */
+	struct avl_tree_node *right;	/**< Right-hand child node. */
 
 	int height;			/**< Height of the node. */
 
 	key_t key;			/**< Key for the node. */
 	void *value;			/**< Value associated with the node. */
-} avltree_node_t;
+} avl_tree_node_t;
 
 /** AVL tree structure. */
-typedef struct avltree {
-	avltree_node_t *root;		/**< Root of the tree. */
-} avltree_t;
+typedef struct avl_tree {
+	avl_tree_node_t *root;		/**< Root of the tree. */
+} avl_tree_t;
 
 /** Iterates over an AVL tree, setting iter to the node on each iteration. */
-#define AVLTREE_FOREACH(tree, iter)		\
-	for(avltree_node_t *iter = avltree_node_first((tree)); iter != NULL; iter = avltree_node_next(iter))
+#define AVL_TREE_FOREACH(tree, iter)		\
+	for(avl_tree_node_t *iter = avl_tree_node_first((tree)); iter != NULL; iter = avl_tree_node_next(iter))
 
 /** Initializes a statically declared AVL tree. */
-#define AVLTREE_INITIALIZER()			\
+#define AVL_TREE_INITIALIZER()			\
 	{ \
 		.root = NULL, \
 	}
 
 /** Statically declares a new AVL tree. */
-#define AVLTREE_DECLARE(_var)			\
-	avltree_t _var = AVLTREE_INITIALIZER()
+#define AVL_TREE_DECLARE(_var)			\
+	avl_tree_t _var = AVL_TREE_INITIALIZER()
 
 /** Gets an AVL tree node's data pointer and casts it to a certain type. */
-#define avltree_entry(node, type)		\
+#define avl_tree_entry(node, type)		\
 	((node) ? (type *)(node->value) : NULL)
 
 /** Checks whether the given AVL tree is empty. */
-#define avltree_empty(tree) 			\
+#define avl_tree_empty(tree) 			\
 	((tree)->root == NULL)
 
 /** Initialize an AVL tree.
  * @param tree		Tree to initialize. */
-static inline void avltree_init(avltree_t *tree) {
+static inline void avl_tree_init(avl_tree_t *tree) {
 	tree->root = NULL;
 }
 
 /** Main operations. */
-extern void avltree_insert(avltree_t *tree, key_t key, void *value, avltree_node_t **nodep);
-extern void avltree_remove(avltree_t *tree, key_t key);
-extern void *avltree_lookup(avltree_t *tree, key_t key);
+extern void avl_tree_insert(avl_tree_t *tree, key_t key, void *value, avl_tree_node_t **nodep);
+extern void avl_tree_remove(avl_tree_t *tree, key_t key);
+extern void *avl_tree_lookup(avl_tree_t *tree, key_t key);
 
 /** Iterator helper functions. */
-extern avltree_node_t *avltree_node_first(avltree_t *tree);
-extern avltree_node_t *avltree_node_last(avltree_t *tree);
-extern avltree_node_t *avltree_node_prev(avltree_node_t *node);
-extern avltree_node_t *avltree_node_next(avltree_node_t *node);
+extern avl_tree_node_t *avl_tree_node_first(avl_tree_t *tree);
+extern avl_tree_node_t *avl_tree_node_last(avl_tree_t *tree);
+extern avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node);
+extern avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node);
 
 #endif /* __TYPES_AVL_H */

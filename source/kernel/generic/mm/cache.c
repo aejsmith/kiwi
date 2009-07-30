@@ -80,7 +80,7 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
 	mutex_lock(&cache->lock, 0);
 
 	/* Attempt to look the page up in the cache. */
-	page = avltree_lookup(&cache->pages, (key_t)offset);
+	page = avl_tree_lookup(&cache->pages, (key_t)offset);
 	if(likely(page != NULL)) {
 		refcount_inc(&page->count);
 		*addrp = page->address;
@@ -105,7 +105,7 @@ int cache_get(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
 	refcount_inc(&page->count);
 
 	/* Insert it into the tree and finish. */
-	avltree_insert(&cache->pages, (key_t)offset, page, NULL);
+	avl_tree_insert(&cache->pages, (key_t)offset, page, NULL);
 	*addrp = page->address;
 
 	dprintf("cache: cached new page 0x%" PRIpp " in %p:%" PRIo "\n",
@@ -131,7 +131,7 @@ void cache_release(cache_t *cache, offset_t offset, bool dirty) {
 
 	mutex_lock(&cache->lock, 0);
 
-	page = avltree_lookup(&cache->pages, (key_t)offset);
+	page = avl_tree_lookup(&cache->pages, (key_t)offset);
 	if(page == NULL) {
 		fatal("Tried to release page outside of cache");
 	}
@@ -182,7 +182,7 @@ cache_t *cache_create(cache_ops_t *ops, void *data) {
 
 	list_init(&cache->header);
 	mutex_init(&cache->lock, "cache_lock", 0);
-	avltree_init(&cache->pages);
+	avl_tree_init(&cache->pages);
 
 	cache->dirty_count = 0;
 	cache->ops = ops;
@@ -207,16 +207,16 @@ cache_t *cache_create(cache_ops_t *ops, void *data) {
  * @return		0 on success, negative error code on failure.
  */
 int cache_destroy(cache_t *cache) {
-	avltree_node_t *iter;
+	avl_tree_node_t *iter;
 	cache_page_t *page;
 	int ret;
 
 	mutex_lock(&cache->lock, 0);
 
-	/* Flush and free all pages in the cache. The AVLTREE_FOREACH iterator
+	/* Flush and free all pages in the cache. The AVL_TREE_FOREACH iterator
 	 * is not safe to use when removing entries from the tree. */
-	while((iter = avltree_node_first(&cache->pages)) != NULL) {
-		page = avltree_entry(iter, cache_page_t);
+	while((iter = avl_tree_node_first(&cache->pages)) != NULL) {
+		page = avl_tree_entry(iter, cache_page_t);
 
 		if(refcount_get(&page->count) != 0) {
 			fatal("Attempted to destroy cache still in use");
@@ -238,7 +238,7 @@ int cache_destroy(cache_t *cache) {
 
 		/* Free the page. */
 		cache->ops->free_page(cache, page->address, page->offset);
-		avltree_remove(&cache->pages, (key_t)page->offset);
+		avl_tree_remove(&cache->pages, (key_t)page->offset);
 		slab_cache_free(cache_page_cache, page);
 	}
 

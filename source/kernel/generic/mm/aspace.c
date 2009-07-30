@@ -90,7 +90,7 @@ static int aspace_cache_ctor(void *obj, void *data, int kmflag) {
 
 	mutex_init(&aspace->lock, "aspace_lock", 0);
 	refcount_set(&aspace->count, 0);
-	avltree_init(&aspace->regions);
+	avl_tree_init(&aspace->regions);
 
 	return 0;
 }
@@ -101,7 +101,7 @@ static int aspace_cache_ctor(void *obj, void *data, int kmflag) {
 static void aspace_cache_dtor(void *obj, void *data) {
 	aspace_t *aspace __unused = (aspace_t *)obj;
 
-	assert(avltree_empty(&aspace->regions));
+	assert(avl_tree_empty(&aspace->regions));
 }
 
 /** Allocate a new address space source structure.
@@ -179,14 +179,14 @@ static aspace_region_t *aspace_region_alloc(ptr_t start, ptr_t end, int flags, a
  * @param region	Current region.
  * @return		Pointer to next region. */
 static aspace_region_t *aspace_region_next(aspace_region_t *region) {
-	avltree_node_t *node;
+	avl_tree_node_t *node;
 
-	node = avltree_node_next(region->node);
+	node = avl_tree_node_next(region->node);
 	if(node == NULL) {
 		return NULL;
 	}
 
-	return avltree_entry(node, aspace_region_t);
+	return avl_tree_entry(node, aspace_region_t);
 }
 
 /** Searches for a region containing a certain address.
@@ -196,7 +196,7 @@ static aspace_region_t *aspace_region_next(aspace_region_t *region) {
  *			than the address if no exact region match is found.
  * @return		Pointer to region if found, false if not. */
 static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_region_t **nearp) {
-	avltree_node_t *node, *near = NULL;
+	avl_tree_node_t *node, *near = NULL;
 	aspace_region_t *region;
 
 	if(as->find_cache && as->find_cache->start <= addr && as->find_cache->end > addr) {
@@ -209,7 +209,7 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
 		/* Fall back on searching through the AVL tree. */
 		node = as->regions.root;
 		while(node) {
-			region = avltree_entry(node, aspace_region_t);
+			region = avl_tree_entry(node, aspace_region_t);
 			if(addr >= region->start) {
 				if(addr < region->end) {
 					as->find_cache = region;
@@ -225,7 +225,7 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
 		}
 
 		if(nearp) {
-			*nearp = (near) ? avltree_entry(near, aspace_region_t) : NULL;
+			*nearp = (near) ? avl_tree_entry(near, aspace_region_t) : NULL;
 		}
 		return NULL;
 	}
@@ -238,7 +238,7 @@ static aspace_region_t *aspace_region_find(aspace_t *as, ptr_t addr, aspace_regi
  * @param as		Address space to insert into.
  * @param region	Region to insert. */
 static void aspace_region_insert(aspace_t *as, aspace_region_t *region) {
-	avltree_insert(&as->regions, region->start, region, &region->node);
+	avl_tree_insert(&as->regions, region->start, region, &region->node);
 }
 
 /** Unmap pages covering part or all of a region.
@@ -295,13 +295,13 @@ static void aspace_region_resize(aspace_t *as, aspace_region_t *region, ptr_t st
 
 	if(start != region->start) {
 		/* Remove the region because we're changing the key. */
-		avltree_remove(&as->regions, (key_t)region->start);
+		avl_tree_remove(&as->regions, (key_t)region->start);
 
 		region->start = start;
 		region->end = end;
 
 		/* Reinsert with the new key. */
-		avltree_insert(&as->regions, (key_t)region->start, region, &region->node);
+		avl_tree_insert(&as->regions, (key_t)region->start, region, &region->node);
 	} else {
 		region->start = start;
 		region->end = end;
@@ -337,7 +337,7 @@ static void aspace_region_split(aspace_t *as, aspace_region_t *region, ptr_t end
 	region->end = end;
 
 	/* Insert the split region. */
-	avltree_insert(&as->regions, (key_t)split->start, split, &split->node);
+	avl_tree_insert(&as->regions, (key_t)split->start, split, &split->node);
 }
 
 /** Destroy a region.
@@ -348,7 +348,7 @@ static void aspace_region_destroy(aspace_t *as, aspace_region_t *region) {
 		aspace_region_unmap(as, region, region->start, region->end);
 	}
 
-	avltree_remove(&as->regions, region->start);
+	avl_tree_remove(&as->regions, region->start);
 
 	if(region->source && refcount_dec(&region->source->count) == 0) {
 		aspace_source_destroy(region->source);
@@ -426,12 +426,12 @@ static void aspace_do_free(aspace_t *as, ptr_t start, ptr_t end) {
  * @return		True if space found, false if not. */
 static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
 	aspace_region_t *region, *prev = NULL;
-	avltree_node_t *node;
+	avl_tree_node_t *node;
 
 	assert(size);
 
 	/* Handle case of address space being empty. */
-	if(unlikely(avltree_empty(&as->regions))) {
+	if(unlikely(avl_tree_empty(&as->regions))) {
 		if(size > ASPACE_SIZE) {
 			return false;
 		}
@@ -441,8 +441,8 @@ static bool aspace_find_free(aspace_t *as, size_t size, ptr_t *addrp) {
 	}
 
 	/* Iterate over all regions in order to find the first suitable hole. */
-	for(node = avltree_node_first(&as->regions); ; node = avltree_node_next(node)) {
-		region = avltree_entry(node, aspace_region_t);
+	for(node = avl_tree_node_first(&as->regions); ; node = avl_tree_node_next(node)) {
+		region = avl_tree_entry(node, aspace_region_t);
 		if(region == NULL) {
 			/* Reached the end of the address space, see if we
 			 * have space following the previous entry. */
@@ -821,7 +821,7 @@ int aspace_unmap(aspace_t *as, ptr_t start, size_t size) {
 	mutex_lock(&as->lock, 0);
 
 	/* Only bother doing anything if the tree isn't empty. */
-	if(likely(!avltree_empty(&as->regions))) {
+	if(likely(!avl_tree_empty(&as->regions))) {
 		aspace_do_free(as, start, start + size);
 	}
 
@@ -977,7 +977,7 @@ aspace_t *aspace_create(void) {
  * @param as		Address space to destroy.
  */
 void aspace_destroy(aspace_t *as) {
-	avltree_node_t *node;
+	avl_tree_node_t *node;
 
 	assert(as);
 
@@ -987,8 +987,8 @@ void aspace_destroy(aspace_t *as) {
 
 	/* Unmap and destroy each region. Do not use the AVL tree iterator
 	 * here as it is not safe to do so when modifying the tree. */
-	while((node = avltree_node_first(&as->regions))) {
-		aspace_region_destroy(as, avltree_entry(node, aspace_region_t));
+	while((node = avl_tree_node_first(&as->regions))) {
+		aspace_region_destroy(as, avl_tree_entry(node, aspace_region_t));
 	}
 
 	/* Destroy the page map. */
@@ -1046,8 +1046,8 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	kprintf(LOG_NONE, "Base               End                Flags Source\n");
 	kprintf(LOG_NONE, "====               ===                ===== ======\n");
 
-	AVLTREE_FOREACH(&as->regions, iter) {
-		region = avltree_entry(iter, aspace_region_t);
+	AVL_TREE_FOREACH(&as->regions, iter) {
+		region = avl_tree_entry(iter, aspace_region_t);
 
 		kprintf(LOG_NONE, "%-18p %-18p %-5d %p+%" PRIo ": %s\n",
 		        region->start, region->end, region->flags,

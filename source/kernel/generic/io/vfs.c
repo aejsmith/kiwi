@@ -263,7 +263,7 @@ static int vfs_node_free(vfs_node_t *node) {
 		}
 
 		/* Detach it from the node tree/list. */
-		avltree_remove(&node->mount->nodes, (key_t)node->id);
+		avl_tree_remove(&node->mount->nodes, (key_t)node->id);
 		list_remove(&node->header);
 
 		/* Call the node free operation if any. */
@@ -385,7 +385,7 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
 
 		/* Check if the node is cached in the mount. */
 		dprintf("vfs: looking for node %" PRId32 " in cache for mount %" PRId32 "\n", id, mount->id);
-		node = avltree_lookup(&mount->nodes, (key_t)id);
+		node = avl_tree_lookup(&mount->nodes, (key_t)id);
 		if(node) {
 			assert(node->mount == mount);
 
@@ -433,7 +433,7 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
 			}
 
 			/* Attach the node to the node tree and used list. */
-			avltree_insert(&mount->nodes, (key_t)id, node, NULL);
+			avl_tree_insert(&mount->nodes, (key_t)id, node, NULL);
 			list_append(&mount->used_nodes, &node->header);
 			mutex_unlock(&mount->lock);
 		}
@@ -625,7 +625,7 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 	}
 
 	/* Attach the node to the node tree and used list. */
-	avltree_insert(&node->mount->nodes, (key_t)node->id, node, NULL);
+	avl_tree_insert(&node->mount->nodes, (key_t)node->id, node, NULL);
 	list_append(&node->mount->used_nodes, &node->header);
 
 	/* Insert the node into the parent's entry cache. */
@@ -1480,7 +1480,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		 * root, rather than the mountpoint. If the node the entry
 		 * currently points to is not in the cache, then it won't be a
 		 * mountpoint (mountpoints are always in the cache). */
-		if((child = avltree_lookup(&node->mount->nodes, (key_t)buf->id))) {
+		if((child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id))) {
 			if(child != node) {
 				mutex_lock(&child->lock, 0);
 				if(child->type == VFS_NODE_DIR && child->mounted) {
@@ -1610,7 +1610,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	list_init(&mount->header);
 	list_init(&mount->used_nodes);
 	list_init(&mount->unused_nodes);
-	avltree_init(&mount->nodes);
+	avl_tree_init(&mount->nodes);
 	mutex_init(&mount->lock, "vfs_mount_lock", 0);
 	mount->type = NULL;
 	mount->root = NULL;
@@ -1649,7 +1649,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	}
 
 	/* Put the root node into the node tree/used list. */
-	avltree_insert(&mount->nodes, (key_t)mount->root->id, mount->root, NULL);
+	avl_tree_insert(&mount->nodes, (key_t)mount->root->id, mount->root, NULL);
 	list_append(&mount->used_nodes, &mount->root->header);
 
 	/* Make the mount point point to the new mount. */
@@ -1793,8 +1793,8 @@ int kdbg_cmd_fs_nodes(int argc, char **argv) {
 			        node->type, node->size, node->mount);
 		}
 	} else {
-		AVLTREE_FOREACH(&mount->nodes, iter) {
-			node = avltree_entry(iter, vfs_node_t);
+		AVL_TREE_FOREACH(&mount->nodes, iter) {
+			node = avl_tree_entry(iter, vfs_node_t);
 
 			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-4d %-12" PRIu64 " %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
@@ -1842,7 +1842,7 @@ int kdbg_cmd_fs_node(int argc, char **argv) {
 		if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		}
-		if(!(node = avltree_lookup(&mount->nodes, (key_t)val))) {
+		if(!(node = avl_tree_lookup(&mount->nodes, (key_t)val))) {
 			kprintf(LOG_NONE, "Unknown node ID %" PRId32 ".\n", val);
 			return KDBG_FAIL;
 		}

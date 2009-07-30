@@ -34,7 +34,7 @@
 
 #include <mm/malloc.h>
 
-#include <types/avltree.h>
+#include <types/avl.h>
 
 #include <assert.h>
 #include <errors.h>
@@ -42,7 +42,7 @@
 /** Get the height of a subtree. Assumes that child heights are up-to-date.
  * @param node		Root node of subtree.
  * @return		Height of the subtree. */
-static inline int avltree_subtree_height(avltree_node_t *node) {
+static inline int avl_tree_subtree_height(avl_tree_node_t *node) {
 	int left, right;
 
 	if(node == NULL) {
@@ -62,14 +62,14 @@ static inline int avltree_subtree_height(avltree_node_t *node) {
 /** Get the balance factor of a node.
  * @param node		Node to get balance factor of.
  * @return		Balance factor of node. */
-static inline int avltree_balance_factor(avltree_node_t *node) {
-	return avltree_subtree_height(node->right) - avltree_subtree_height(node->left);
+static inline int avl_tree_balance_factor(avl_tree_node_t *node) {
+	return avl_tree_subtree_height(node->right) - avl_tree_subtree_height(node->left);
 }
 
 /** Perform a left rotation.
  * @param node		Root node of the rotation. */
-static inline void avltree_rotate_left(avltree_t *tree, avltree_node_t *node) {
-	avltree_node_t *child;
+static inline void avl_tree_rotate_left(avl_tree_t *tree, avl_tree_node_t *node) {
+	avl_tree_node_t *child;
 
 	/* Store the node's current right child. */
 	child = node->right;
@@ -101,8 +101,8 @@ static inline void avltree_rotate_left(avltree_t *tree, avltree_node_t *node) {
 
 /** Perform a right rotation.
  * @param node		Root node of the rotation. */
-static inline void avltree_rotate_right(avltree_t *tree, avltree_node_t *node) {
-	avltree_node_t *child;
+static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node) {
+	avl_tree_node_t *child;
 
 	/* Store the node's current left child. */
 	child = node->left;
@@ -135,30 +135,30 @@ static inline void avltree_rotate_right(avltree_t *tree, avltree_node_t *node) {
 /** Balance a node after an insertion.
  * @param node		Node to balance.
  * @param balance	Balance factor of node. */
-static inline void avltree_balance_node(avltree_t *tree, avltree_node_t *node, int balance) {
+static inline void avl_tree_balance_node(avl_tree_t *tree, avl_tree_node_t *node, int balance) {
 	/* See "AVL Tree Rotations Tutorial" (in Reference at top of file). */
 	if(balance > 1) {
 		/* Tree is right-heavy, check whether a LR rotation is
 		 * necessary (if the right subtree is left-heavy). Note that if
 		 * the tree is right-heavy, then node->right is guaranteed not
 		 * to be a null pointer. */
-		if(avltree_balance_factor(node->right) < 0) {
+		if(avl_tree_balance_factor(node->right) < 0) {
 			/* LR rotation. Perform a right rotation of the right
 			 * subtree. */
-			avltree_rotate_right(tree, node->right);
+			avl_tree_rotate_right(tree, node->right);
 		}
 
-		avltree_rotate_left(tree, node);
+		avl_tree_rotate_left(tree, node);
 	} else if(balance < -1) {
 		/* Tree is left-heavy, check whether a RL rotation is
 		 * necessary (if the left subtree is right-heavy). */
-		if(avltree_balance_factor(node->left) > 0) {
+		if(avl_tree_balance_factor(node->left) > 0) {
 			/* RL rotation. Perform a left rotation of the left
 			 * subtree. */
-			avltree_rotate_left(tree, node->left);
+			avl_tree_rotate_left(tree, node->left);
 		}
 
-		avltree_rotate_right(tree, node);
+		avl_tree_rotate_right(tree, node);
 	}
 }
 
@@ -166,8 +166,8 @@ static inline void avltree_balance_node(avltree_t *tree, avltree_node_t *node, i
  * @param tree		Tree to look up in.
  * @param key		Key to look for.
  * @return		Pointer to node if found, NULL if not. */
-static avltree_node_t *avltree_lookup_internal(avltree_t *tree, key_t key) {
-	avltree_node_t *node = tree->root;
+static avl_tree_node_t *avl_tree_lookup_internal(avl_tree_t *tree, key_t key) {
+	avl_tree_node_t *node = tree->root;
 
 	/* Descend down the tree to find the required node. */
 	while(node != NULL) {
@@ -193,17 +193,17 @@ static avltree_node_t *avltree_lookup_internal(avltree_t *tree, key_t key) {
  * @param value		Value the key is associated with.
  * @param nodep		Where to store pointer to node if required.
  */
-void avltree_insert(avltree_t *tree, key_t key, void *value, avltree_node_t **nodep) {
-	avltree_node_t **next, *curr = NULL, *node;
+void avl_tree_insert(avl_tree_t *tree, key_t key, void *value, avl_tree_node_t **nodep) {
+	avl_tree_node_t **next, *curr = NULL, *node;
 	int balance;
 
 	/* Check if the key is unique. */
-	if(avltree_lookup(tree, key) != NULL) {
+	if(avl_tree_lookup(tree, key) != NULL) {
 		fatal("Attempted to insert duplicate key into AVL tree");
 	}
 
 	/* Create and set up the node. */
-	node = kmalloc(sizeof(avltree_node_t), MM_SLEEP);
+	node = kmalloc(sizeof(avl_tree_node_t), MM_SLEEP);
 	node->parent = NULL;
 	node->left = NULL;
 	node->right = NULL;
@@ -243,9 +243,9 @@ void avltree_insert(avltree_t *tree, key_t key, void *value, avltree_node_t **no
 
 	/* Now go back up the tree and check its balance. */
 	while(curr != NULL) {
-		balance = avltree_balance_factor(curr);
+		balance = avl_tree_balance_factor(curr);
 		if(balance < -1 || balance > 1) {
-			avltree_balance_node(tree, curr, balance);
+			avl_tree_balance_node(tree, curr, balance);
 		}
 		curr = curr->parent;
 	}
@@ -260,12 +260,12 @@ void avltree_insert(avltree_t *tree, key_t key, void *value, avltree_node_t **no
  * @param tree		Tree to remove from.
  * @param node		Node to remove.
  */
-void avltree_remove(avltree_t *tree, key_t key) {
-	avltree_node_t *child, *start, *node;
+void avl_tree_remove(avl_tree_t *tree, key_t key) {
+	avl_tree_node_t *child, *start, *node;
 	int balance;
 
 	/* Find the node. */
-	node = avltree_lookup_internal(tree, key);
+	node = avl_tree_lookup_internal(tree, key);
 	if(node == NULL) {
 		return;
 	}
@@ -358,9 +358,9 @@ void avltree_remove(avltree_t *tree, key_t key) {
 
 	/* Start now points to where we want to start rebalancing from. */
 	while(start != NULL) {
-		balance = avltree_balance_factor(start);
+		balance = avl_tree_balance_factor(start);
 		if(balance < -1 || balance > 1) {
-			avltree_balance_node(tree, start, balance);
+			avl_tree_balance_node(tree, start, balance);
 		}
 		start = start->parent;
 	}
@@ -375,8 +375,8 @@ void avltree_remove(avltree_t *tree, key_t key) {
  *
  * @return		Node's value if found, NULL if not.
  */
-void *avltree_lookup(avltree_t *tree, key_t key) {
-	avltree_node_t *node = avltree_lookup_internal(tree, key);
+void *avl_tree_lookup(avl_tree_t *tree, key_t key) {
+	avl_tree_node_t *node = avl_tree_lookup_internal(tree, key);
 
 	return (node != NULL) ? node->value : NULL;
 }
@@ -390,8 +390,8 @@ void *avltree_lookup(avltree_t *tree, key_t key) {
  *
  * @return		Pointer to node, or NULL if tree empty.
  */
-avltree_node_t *avltree_node_first(avltree_t *tree) {
-	avltree_node_t *node = tree->root;
+avl_tree_node_t *avl_tree_node_first(avl_tree_t *tree) {
+	avl_tree_node_t *node = tree->root;
 
 	/* If the tree is empty return now. */
 	if(node == NULL) {
@@ -416,8 +416,8 @@ avltree_node_t *avltree_node_first(avltree_t *tree) {
  *
  * @return		Pointer to node, or NULL if tree empty.
  */
-avltree_node_t *avltree_node_last(avltree_t *tree) {
-	avltree_node_t *node = tree->root;
+avl_tree_node_t *avl_tree_node_last(avl_tree_t *tree) {
+	avl_tree_node_t *node = tree->root;
 
 	/* If the tree is empty return now. */
 	if(node == NULL) {
@@ -442,7 +442,7 @@ avltree_node_t *avltree_node_last(avltree_t *tree) {
  * 
  * @return		Preceding node or NULL if none found.
  */
-avltree_node_t *avltree_node_prev(avltree_node_t *node) {
+avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
 	/* If there's a left-hand child, move onto it and then go as far
 	 * right as we can. */
 	if(node->left != NULL) {
@@ -474,7 +474,7 @@ avltree_node_t *avltree_node_prev(avltree_node_t *node) {
  * 
  * @return		Following node or NULL if none found.
  */
-avltree_node_t *avltree_node_next(avltree_node_t *node) {
+avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
 	/* If there's a right-hand child, move onto it and then go as far
 	 * left as we can. */
 	if(node->right != NULL) {

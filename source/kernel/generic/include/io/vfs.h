@@ -25,6 +25,7 @@
 
 #include <sync/mutex.h>
 
+#include <types/avl.h>
 #include <types/radix.h>
 #include <types/refcount.h>
 
@@ -243,7 +244,7 @@ typedef struct vfs_mount {
 	struct vfs_node *root;		/**< Root node for the mount. */
 	struct vfs_node *mountpoint;	/**< Directory that this mount is mounted on. */
 
-	avltree_t nodes;		/**< Tree mapping node IDs to node structures. */
+	avl_tree_t nodes;		/**< Tree mapping node IDs to node structures. */
 	list_t used_nodes;		/**< List of in-use nodes. */
 	list_t unused_nodes;		/**< List of unused nodes (in LRU order). */
 } vfs_mount_t;
