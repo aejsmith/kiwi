@@ -240,7 +240,7 @@ static int vfs_node_free(vfs_node_t *node) {
 	/* Flush and destroy the cache if there is one. */
 	if(node->cache) {
 		if((ret = cache_destroy(node->cache)) != 0) {
-			kprintf(LOG_NORMAL, "vfs: warning: failed to destroy data cache for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
+			kprintf(LOG_WARN, "vfs: warning: failed to destroy data cache for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
 			        node, (node->mount) ? node->mount->id : -1, node->id, ret);
 			mutex_unlock(&node->lock);
 			if(node->mount) {
@@ -255,7 +255,7 @@ static int vfs_node_free(vfs_node_t *node) {
 	if(node->mount) {
 		/* Attempt to flush metadata. */
 		if(node->mount->type->node_flush && (ret = node->mount->type->node_flush(node) != 0)) {
-			kprintf(LOG_NORMAL, "vfs: warning: failed to flush metadata for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
+			kprintf(LOG_WARN, "vfs: warning: failed to flush metadata for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
 			        node, (node->mount) ? node->mount->id : -1, node->id, ret);
 			mutex_unlock(&node->lock);
 			mutex_unlock(&node->mount->lock);
@@ -1296,7 +1296,7 @@ static int vfs_dir_cache_entries(vfs_node_t *node) {
 	 * '..' entries. */
 	if(radix_tree_empty(&node->dir_entries)) {
 		if(!node->mount->type->dir_cache) {
-			kprintf(LOG_NORMAL, "vfs: entry cache empty, but filesystem %p lacks dir_cache!\n",
+			kprintf(LOG_WARN, "vfs: entry cache empty, but filesystem %p lacks dir_cache!\n",
 			        node->mount->type);
 			ret = -ERR_NOT_FOUND;
 		} else {

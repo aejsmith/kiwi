@@ -257,7 +257,7 @@ void handle_table_destroy(handle_table_t *table) {
 
 		if(refcount_dec(&info->count) == 0) {
 			if(info->type->close && (ret = info->type->close(info)) != 0) {
-				kprintf(LOG_NORMAL, "handle: failed to destroy handle %" PRIu64 "(%p) (%d)\n",
+				kprintf(LOG_WARN, "handle: failed to destroy handle %" PRIu64 "(%p) (%d)\n",
 				        node->key, info, ret);
 			}
 

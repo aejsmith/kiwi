@@ -110,7 +110,7 @@ void pmm_populate(void) {
 		/* What we did above may have made the region too small, warn
 		 * and ignore it if this is the case. */
 		if(end <= start) {
-			kprintf(LOG_NORMAL, "pmm: broken memory map entry: [0x%" PRIx64 ",0x%" PRIx64 ") (%" PRIu32 ")\n",
+			kprintf(LOG_WARN, "pmm: broken memory map entry: [0x%" PRIx64 ",0x%" PRIx64 ") (%" PRIu32 ")\n",
 				map->base_addr, map->base_addr + map->length, map->type);
 			goto cont;
 		}
