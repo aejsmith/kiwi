@@ -62,26 +62,12 @@ static slab_cache_t *thread_cache;		/**< Cache for thread structures. */
 static int thread_cache_ctor(void *obj, void *data, int kmflag) {
 	thread_t *thread = (thread_t *)obj;
 
-	thread->kstack = kheap_alloc(KSTACK_SIZE, kmflag & MM_FLAG_MASK);
-	if(thread->kstack == NULL) {
-		return -1;
-	}
-
 	spinlock_init(&thread->lock, "thread_lock");
 	list_init(&thread->header);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
 
 	return 0;
-}
-
-/** Destructor for thread objects.
- * @param obj		Pointer to object.
- * @param data		Ignored. */
-static void thread_cache_dtor(void *obj, void *data) {
-	thread_t *thread = (thread_t *)obj;
-
-	kheap_free(thread->kstack, KSTACK_SIZE);
 }
 
 /** Thread entry point.
@@ -200,7 +186,8 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	/* Allocate an ID for the thread. */
 	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
-	/* Initialize the thread context. */
+	/* Allocate a kernel stack and initialize the thread context. */
+	thread->kstack = kheap_alloc(KSTACK_SIZE, MM_SLEEP);
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
 	atomic_set(&thread->in_usermem, 0);
@@ -266,6 +253,7 @@ void thread_destroy(thread_t *thread) {
 	spinlock_unlock(&thread_tree_lock);
 
 	/* Now clean up the thread. */
+	kheap_free(thread->kstack, KSTACK_SIZE);
 	context_destroy(&thread->context);
 	thread_arch_destroy(thread);
 
@@ -286,8 +274,8 @@ void thread_exit(void) {
 void thread_init(void) {
 	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, MM_FATAL);
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
-	                                 thread_cache_ctor, thread_cache_dtor,
-	                                 NULL, NULL, NULL, 0, MM_FATAL);
+	                                 thread_cache_ctor, NULL, NULL, NULL,
+	                                 NULL, 0, MM_FATAL);
 }
 
 /** Print information about a thread.
