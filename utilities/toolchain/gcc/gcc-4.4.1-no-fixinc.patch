@@ -1,7 +1,7 @@
-diff -urN gcc-4.4.0.orig/gcc/Makefile.in gcc-4.4.0/gcc/Makefile.in
---- gcc-4.4.0.orig/gcc/Makefile.in	2009-05-08 21:16:10.716960432 +0100
-+++ gcc-4.4.0/gcc/Makefile.in	2009-05-08 21:16:59.306597758 +0100
-@@ -3700,7 +3700,7 @@
+diff -urN gcc-4.4.1.orig/gcc/Makefile.in gcc-4.4.1/gcc/Makefile.in
+--- gcc-4.4.1.orig/gcc/Makefile.in	2009-08-03 11:35:07.437123814 +0100
++++ gcc-4.4.1/gcc/Makefile.in	2009-08-03 11:43:33.373998739 +0100
+@@ -3701,7 +3701,7 @@
  	      SHELL='$(SHELL)'; MACRO_LIST=`${PWD_COMMAND}`/macro_list ; \
  	      export TARGET_MACHINE srcdir SHELL MACRO_LIST && \
  	      cd $(build_objdir)/fixincludes && \

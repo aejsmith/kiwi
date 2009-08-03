@@ -17,7 +17,7 @@ from utilities.toolchain.component import ToolchainComponent
 
 class GCCComponent(ToolchainComponent):
 	name = 'gcc'
-	version = '4.4.0'
+	version = '4.4.1'
 	depends = ['binutils']
 	source = [
 		'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-core-' + version + '.tar.bz2',
