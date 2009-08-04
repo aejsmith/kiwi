@@ -18,9 +18,9 @@
  * @brief		Userspace startup application.
  */
 
-#include <kernel/aspace.h>
 #include <kernel/fs.h>
 #include <kernel/handle.h>
+#include <kernel/vm.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -123,12 +123,14 @@ int main(int argc, char **argv) {
 	printf("Hello from C userspace!\n");
 	printf("This is a message!\n");
 
-	ret = aspace_map_anon(NULL, 0x4000, ASPACE_MAP_READ | ASPACE_MAP_WRITE, &addr);
+	ret = vm_map_anon(NULL, 0x4000, VM_MAP_READ | VM_MAP_WRITE, &addr);
 	printf("Map returned %d (%p)\n", ret, addr);
 	if(ret == 0) {
 		printf("Writing... 1234\n");
 		*(int *)addr = 1234;
 		printf("Reading... %d\n", *(int *)addr);
+		memset(addr, 0, 0x4000);
+		vm_unmap(addr, 0x4000);
 	}
 
 	addr = malloc(4322);

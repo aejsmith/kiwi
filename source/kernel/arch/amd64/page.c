@@ -31,9 +31,9 @@
 #include <lib/utility.h>
 
 #include <mm/page.h>
-#include <mm/pmm.h>
 
 #include <assert.h>
+#include <errors.h>
 #include <fatal.h>
 
 /** Kernel paging structures. */
@@ -44,20 +44,34 @@ extern uint64_t __kernel_pdp[];
 extern char __text_start[], __text_end[], __rodata_start[], __rodata_end[];
 extern char __bss_end[], __end[];
 
-/*
- * Page map functions.
- */
+#if 0
+# pragma mark Page map functions.
+#endif
 
 /** Kernel page map. */
 page_map_t kernel_page_map;
+
+/** Convert page map flags to PTE flags.
+ * @param flags		Flags to convert.
+ * @return		Converted flags. */
+static inline uint64_t page_map_flags_to_pte(int prot) {
+	uint64_t ret = 0;
+
+	ret |= ((prot & PAGE_MAP_WRITE) ? PG_WRITE : 0);
+#if CONFIG_X86_NX
+	ret |= ((!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? PG_NOEXEC : 0);
+#endif
+	return ret;
+}
 
 /** Get the page table containing an address.
  * @param map		Page map to get from.
  * @param virt		Address to get page table for.
  * @param alloc		Whether to allocate structures if not found.
  * @param mmflag	Allocation flags.
- * @return		Virtual address of page table. */
-static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag) {
+ * @param ptblp		Where to store (virtual) pointer to page table.
+ * @return		0 on success, negative error code on failure. */
+static int page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag, uint64_t **ptblp) {
 	uint64_t *pml4, *pdp, *pdir;
 	int pml4e, pdpe, pde;
 	phys_ptr_t page;
@@ -75,21 +89,21 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 		 * modified (if a Vmem boundary tag refill occurs), handle
 		 * this possibility. */
 		if(alloc) {
-			page = pmm_alloc(1, mmflag | PM_ZERO);
+			page = page_alloc(1, mmflag | PM_ZERO);
 			if(pml4[pml4e] & PG_PRESENT) {
 				if(page) {
-					pmm_free(page, 1);
+					page_free(page, 1);
 				}
 			} else {
 				if(!page) {
-					return NULL;
+					return -ERR_NO_MEMORY;
 				}
 
 				/* Map it into the PML4. */
 				pml4[pml4e] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
 			}
 		} else {
-			return NULL;
+			return -ERR_NOT_FOUND;
 		}
 	}
 
@@ -100,21 +114,21 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	if(!(pdp[pdpe] & PG_PRESENT)) {
 		/* Allocate a new page directory if required. */
 		if(alloc) {
-			page = pmm_alloc(1, mmflag | PM_ZERO);
+			page = page_alloc(1, mmflag | PM_ZERO);
 			if(pdp[pdpe] & PG_PRESENT) {
 				if(page) {
-					pmm_free(page, 1);
+					page_free(page, 1);
 				}
 			} else {
 				if(!page) {
-					return NULL;
+					return -ERR_NO_MEMORY;
 				}
 
 				/* Map it into the PDP. */
 				pdp[pdpe] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
 			}
 		} else {
-			return NULL;
+			return -ERR_NOT_FOUND;
 		}
 	}
 
@@ -125,26 +139,27 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	if(!(pdir[pde] & PG_PRESENT)) {
 		/* Allocate a new page table if required. */
 		if(alloc) {
-			page = pmm_alloc(1, mmflag | PM_ZERO);
+			page = page_alloc(1, mmflag | PM_ZERO);
 			if(pdir[pde] & PG_PRESENT) {
 				if(page) {
-					pmm_free(page, 1);
+					page_free(page, 1);
 				}
 			} else {
 				if(!page) {
-					return NULL;
+					return -ERR_NO_MEMORY;
 				}
 
 				/* Map it into the page directory. */
 				pdir[pde] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
 			}
 		} else {
-			return NULL;
+			return -ERR_NOT_FOUND;
 		}
 	}
 
 	assert(!(pdir[pde] & PG_LARGE));
-	return page_phys_map((phys_ptr_t)(pdir[pde] & PAGE_MASK), PAGE_SIZE, mmflag);
+	*ptblp = page_phys_map((phys_ptr_t)(pdir[pde] & PAGE_MASK), PAGE_SIZE, mmflag);
+	return 0;
 }
 
 /** Insert a mapping in a page map.
@@ -158,11 +173,12 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
  * @param prot		Protection flags.
  * @param mmflag	Page allocation flags.
  *
- * @return		True if operation succeeded, false if not.
+ * @return		0 on success, negative error code on failure. Can only
+ *			fail if MM_SLEEP is not set.
  */
-bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int mmflag) {
-	uint64_t *ptbl, val;
-	int pte;
+int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int mmflag) {
+	uint64_t *ptbl;
+	int pte, ret;
 
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
@@ -175,10 +191,9 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	}
 
 	/* Find the page table for the entry. */
-	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
-	if(ptbl == NULL) {
+	if((ret = page_map_get_ptbl(map, virt, true, mmflag, &ptbl)) != 0) {
 		mutex_unlock(&map->lock);
-		return false;
+		return ret;
 	}
 
 	/* Check that the mapping doesn't already exist. */
@@ -188,17 +203,10 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
 	}
 
 	/* Map the address in. */
-	val = phys | PG_PRESENT;
-	val |= ((map->user) ? PG_USER : PG_GLOBAL);
-	val |= ((prot & PAGE_MAP_WRITE) ? PG_WRITE : 0);
-#if CONFIG_X86_NX
-	val |= ((!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? PG_NOEXEC : 0);
-#endif
-	ptbl[pte] = val;
-
+	ptbl[pte] = phys | PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL) | page_map_flags_to_pte(prot);
 	memory_barrier();
 	mutex_unlock(&map->lock);
-	return true;
+	return 0;
 }
 
 /** Remove a mapping from a page map.
@@ -210,11 +218,11 @@ bool page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int
  * @param physp		Where to store mapping's physical address prior to
  *			unmapping (can be NULL).
  *
- * @return		True if operation succeeded, false if not.
+ * @return		0 on success, -ERR_NOT_FOUND if mapping missing.
  */
-bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
+int page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	uint64_t *ptbl;
-	int pte;
+	int pte, ret;
 
 	assert(!(virt % PAGE_SIZE));
 
@@ -226,10 +234,9 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	}
 
 	/* Find the page table for the entry. */
-	ptbl = page_map_get_ptbl(map, virt, false, 0);
-	if(ptbl == NULL) {
+	if((ret = page_map_get_ptbl(map, virt, false, 0, &ptbl)) != 0) {
 		mutex_unlock(&map->lock);
-		return false;
+		return ret;
 	}
 
 	pte = (virt % 0x200000) / PAGE_SIZE;
@@ -243,10 +250,10 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		ptbl[pte] = 0;
 		memory_barrier();
 		mutex_unlock(&map->lock);
-		return true;
+		return 0;
 	} else {
 		mutex_unlock(&map->lock);
-		return false;
+		return -ERR_NOT_FOUND;
 	}
 }
 
@@ -271,8 +278,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	mutex_lock(&map->lock, 0);
 
 	/* Find the page table for the entry. */
-	ptbl = page_map_get_ptbl(map, virt, false, 0);
-	if(ptbl != NULL) {
+	if(page_map_get_ptbl(map, virt, false, 0, &ptbl) == 0) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;
@@ -283,6 +289,44 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 	mutex_unlock(&map->lock);
 	return false;
+}
+
+/** Modify protection flags of a range.
+ *
+ * Modifies the protection flags of a range of pages in a page map. If any of
+ * the pages in the range are not mapped, then the function will ignore it and
+ * move on to the next.
+ *
+ * @param map		Map to modify in.
+ * @param start		Start of page range.
+ * @param end		End of page range.
+ * @param prot		New protection flags.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int page_map_protect(page_map_t *map, ptr_t start, ptr_t end, int prot) {
+	uint64_t *ptbl;
+	ptr_t i;
+	int pte;
+
+	assert(!(start % PAGE_SIZE));
+	assert(!(end % PAGE_SIZE));
+
+	mutex_lock(&map->lock, 0);
+
+	for(i = start; i < end; i++) {
+		pte = (i % 0x200000) / PAGE_SIZE;
+
+		if(page_map_get_ptbl(map, i, false, 0, &ptbl) != 0 || !(ptbl[pte] & PG_PRESENT)) {
+			continue;
+		}
+
+		/* Clear out original flags, and set the new flags. */
+		ptbl[pte] = (ptbl[pte] & ~(PG_WRITE | PG_NOEXEC)) | page_map_flags_to_pte(prot);
+	}
+
+	mutex_unlock(&map->lock);
+	return 0;
 }
 
 /** Switch to a different page map.
@@ -307,7 +351,7 @@ int page_map_init(page_map_t *map) {
 	uint64_t *pml4;
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
-	map->pml4 = pmm_alloc(1, MM_SLEEP | PM_ZERO);
+	map->pml4 = page_alloc(1, MM_SLEEP | PM_ZERO);
 	map->user = true;
 	map->first = ASPACE_BASE;
 	map->last = (ASPACE_BASE + ASPACE_SIZE) - PAGE_SIZE;
@@ -327,12 +371,12 @@ int page_map_init(page_map_t *map) {
  * @param map		Page map to destroy.
  */
 void page_map_destroy(page_map_t *map) {
-	pmm_free(map->pml4, 1);
+	page_free(map->pml4, 1);
 }
 
-/*
- * Physical memory access functions.
- */
+#if 0
+# pragma mark Physical memory access functions.
+#endif
 
 /** Map physical memory into the kernel address space.
  *
@@ -364,15 +408,9 @@ void page_phys_unmap(void *addr, size_t size) {
 	/* Nothing happens. */
 }
 
-/*
- * Paging initialization functions.
- */
-
-/** Invalidate a TLB entry.
- * @param addr		Address to invalidate. */
-static inline void invlpg(ptr_t addr) {
-	__asm__ volatile("invlpg (%0)" :: "r"(addr));
-}
+#if 0
+# pragma mark Initialization functions.
+#endif
 
 /** Convert a large page to a page table if necessary.
  * @param virt		Virtual address to check. */
@@ -390,7 +428,7 @@ static void page_large_to_ptbl(ptr_t virt) {
 
 	pde = (virt % 0x40000000) / 0x200000;
 	if(pdir[pde] & PG_LARGE) {
-		page = pmm_alloc(1, MM_FATAL);
+		page = page_alloc(1, MM_FATAL);
 		ptbl = page_phys_map(page, PAGE_SIZE, MM_FATAL);
 		memset(ptbl, 0, PAGE_SIZE);
 
@@ -401,7 +439,7 @@ static void page_large_to_ptbl(ptr_t virt) {
 
 		/* Replace the large page in the page directory. */
 		pdir[pde] = page | PG_PRESENT | PG_WRITE;
-		invlpg(ROUND_DOWN(virt, 0x200000));
+		__asm__ volatile("invlpg (%0)" :: "r"(ROUND_DOWN(virt, 0x200000)));
 	}
 }
 
@@ -413,6 +451,7 @@ static void page_large_to_ptbl(ptr_t virt) {
 static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	uint64_t *ptbl;
 	ptr_t i;
+	int ret;
 
 	assert(start >= KERNEL_VIRT_BASE);
 	assert((start % PAGE_SIZE) == 0);
@@ -421,13 +460,12 @@ static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	for(i = start; i < end; i += PAGE_SIZE) {
 		page_large_to_ptbl(i);
 
-		ptbl = page_map_get_ptbl(&kernel_page_map, i, false, 0);
-		if(ptbl == NULL) {
-			fatal("Could not get kernel page table");
+		if((ret = page_map_get_ptbl(&kernel_page_map, i, false, 0, &ptbl)) != 0) {
+			fatal("Could not get kernel page table (%d)", ret);
 		}
 
 		ptbl[(i % 0x200000) / PAGE_SIZE] |= flag;
-		invlpg(i);
+		__asm__ volatile("invlpg (%0)" :: "r"(i));
 	}
 }
 #endif
@@ -439,6 +477,7 @@ static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
 static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	uint64_t *ptbl;
 	ptr_t i;
+	int ret;
 
 	assert(start >= KERNEL_VIRT_BASE);
 	assert((start % PAGE_SIZE) == 0);
@@ -447,18 +486,17 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	for(i = start; i < end; i += PAGE_SIZE) {
 		page_large_to_ptbl(i);
 
-		ptbl = page_map_get_ptbl(&kernel_page_map, i, false, 0);
-		if(ptbl == NULL) {
-			fatal("Could not get kernel page table");
+		if((ret = page_map_get_ptbl(&kernel_page_map, i, false, 0, &ptbl)) != 0) {
+			fatal("Could not get kernel page table (%d)", ret);
 		}
 
 		ptbl[(i % 0x200000) / PAGE_SIZE] &= ~flag;
-		invlpg(i);
+		__asm__ volatile("invlpg (%0)" :: "r"(i));
 	}
 }
 
 /** Set up the kernel page map. */
-void page_init(void) {
+void page_arch_init(void) {
 	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
 	kernel_page_map.pml4 = KA2PA(__boot_pml4);
 	kernel_page_map.user = false;

@@ -30,8 +30,8 @@
 #include <lib/string.h>
 #include <lib/do_printf.h>
 
-#include <mm/aspace.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 #include <mm/vmem.h>
 
 #include <proc/handle.h>
@@ -80,7 +80,7 @@ static struct {
 	const char *description;
 	int (*function)(int, char **);
 } kdbg_commands[] = {
-	{ "aspace",	"Dump out an address space.",			kdbg_cmd_aspace },
+	{ "aspace",	"Print the contents of an address space.",	kdbg_cmd_aspace },
 	{ "backtrace",	"Print a backtrace.",				kdbg_cmd_backtrace },
 	{ "bdelete",	"Delete a breakpoint.",				kdbg_cmd_bdelete },
 	{ "bdisable",	"Disable a breakpoint.",			kdbg_cmd_bdisable },
@@ -89,12 +89,10 @@ static struct {
 	{ "continue",	"Exit KDBG and continue execution.",		kdbg_cmd_continue },
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
-	{ "fs_mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_fs_mounts },
-	{ "fs_nodes",	"Print a list of nodes on a mount.",		kdbg_cmd_fs_nodes },
-	{ "fs_node",	"Print information about a filesystem node.",	kdbg_cmd_fs_node },
 	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
+	{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },
 	{ "reboot",	"Reboot the system.",				kdbg_cmd_reboot },
@@ -103,6 +101,8 @@ static struct {
 	{ "step",	"Step a certain number of instructions.",	kdbg_cmd_step },
 	{ "thread",	"Print a list of threads.",			kdbg_cmd_thread },
 	{ "vmem",	"Show information about Vmem arenas.",		kdbg_cmd_vmem },
+	{ "vnodes",	"Print a list of nodes on a mount.",		kdbg_cmd_vnodes },
+	{ "vnode",	"Print information about a filesystem node.",	kdbg_cmd_vnode },
 };
 
 /*

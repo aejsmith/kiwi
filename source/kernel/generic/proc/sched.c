@@ -55,9 +55,9 @@
 
 #include <lib/string.h>
 
-#include <mm/aspace.h>
 #include <mm/kheap.h>
 #include <mm/malloc.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 #include <proc/sched.h>
@@ -451,9 +451,9 @@ void sched_internal(bool state) {
 	 * in sched_post_switch(). */
 	if(curr_thread != cpu->prev_thread) {
 		/* Switch the address space. If the new process' addres space
-		 * is set to NULL then aspace_switch() will just switch to
+		 * is set to NULL then vm_aspace_switch() will just switch to
 		 * the kernel address space. */
-		aspace_switch(curr_thread->owner->aspace);
+		vm_aspace_switch(curr_thread->owner->aspace);
 
 		if(context_save(&cpu->prev_thread->context) == 0) {
 			context_restore(&curr_thread->context);

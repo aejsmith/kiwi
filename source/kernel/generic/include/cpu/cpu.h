@@ -27,7 +27,7 @@
 
 #include <types/list.h>
 
-struct aspace;
+struct vm_aspace;
 struct sched_cpu;
 struct thread;
 
@@ -48,7 +48,7 @@ typedef struct cpu {
 	/** Scheduler information. */
 	struct sched_cpu *sched;	/**< Scheduler run queues/timers. */
 	struct thread *thread;		/**< Currently executing thread. */
-	struct aspace *aspace;		/**< Address space currently in use. */
+	struct vm_aspace *aspace;	/**< Address space currently in use. */
 	bool idle;			/**< Whether the CPU is idle. */
 
 	/** IPI information. */

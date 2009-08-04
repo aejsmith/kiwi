@@ -23,7 +23,7 @@
 
 #include <io/vfs.h>
 
-#include <mm/aspace.h>
+#include <mm/vm.h>
 
 #include <types/list.h>
 
@@ -37,7 +37,7 @@ typedef struct loader_binary {
 	struct loader_type *type;	/**< Pointer to executable type. */
 	void *data;			/**< Data used by the executable type. */
 
-	aspace_t *aspace;		/**< Address space that the binary is being loaded into. */
+	vm_aspace_t *aspace;		/**< Address space that the binary is being loaded into. */
 	ptr_t stack;			/**< Stack pointer for the initial thread. */
 	ptr_t entry;			/**< Entry point for the binary. */
 

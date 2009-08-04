@@ -27,13 +27,11 @@
 #include <cpu/ipi.h>
 #include <cpu/smp.h>
 
-#include <mm/aspace.h>
-#include <mm/cache.h>
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
-#include <mm/pmm.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 
 #include <platform/platform.h>
 
@@ -68,7 +66,7 @@ static void init_thread(void *arg1, void *arg2) {
 	}
 
 	/* Reclaim memory taken up by temporary initialization code/data. */
-	pmm_init_reclaim();
+	page_init_reclaim();
 
 	/* Load modules provided at boot. */
 	bootmod_load();
@@ -98,13 +96,11 @@ void init_bsp(void *data) {
 	vmem_early_init();
 	kheap_early_init();
 	vmem_init();
-	pmm_init();
 	page_init();
 	slab_init();
 	kheap_init();
 	malloc_init();
-	cache_init();
-	aspace_init();
+	vm_init();
 
 	/* Perform second stage architecture/platform initialization. */
 	arch_postmm_init();

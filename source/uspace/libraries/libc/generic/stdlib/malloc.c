@@ -1,4 +1,4 @@
-#include <kernel/aspace.h>
+#include <kernel/vm.h>
 #include <stddef.h>
 
 #define LACKS_SYS_PARAM_H
@@ -33,7 +33,7 @@ static inline void *mmap_wrapper(size_t size) {
 	void *addr;
 	int ret;
 
-	ret = aspace_map_anon(NULL, size, ASPACE_MAP_READ | ASPACE_MAP_WRITE | ASPACE_MAP_PRIVATE, &addr);
+	ret = vm_map_anon(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &addr);
 	if(ret != 0) {
 		return (void *)-1;
 	}
@@ -43,7 +43,7 @@ static inline void *mmap_wrapper(size_t size) {
 
 /** Wrapper for freeing. */
 static inline int munmap_wrapper(void *start, size_t length) {
-	return aspace_unmap(start, length);
+	return vm_unmap(start, length);
 }
 
 /* To stop it defining dev_zero_fd. */

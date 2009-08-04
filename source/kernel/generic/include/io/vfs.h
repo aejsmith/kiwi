@@ -21,7 +21,7 @@
 #ifndef __IO_VFS_H
 #define __IO_VFS_H
 
-#include <mm/cache.h>
+#include <mm/vm.h>
 
 #include <sync/mutex.h>
 
@@ -84,29 +84,12 @@ typedef struct vfs_type {
 	 * Data modification functions.
 	 */
 
-	/** Get a page to use for a node's data.
-	 * @note		If this operation is not provided, then an
-	 *			anonymous, zeroed page will be allocated via
-	 *			pmm_alloc() to use for node data.
-	 * @param node		Node to get page for.
-	 * @param offset	Offset within the node the page is for.
-	 * @param mmflag	Allocation flags.
-	 * @param physp		Where to store address of page obtained.
-	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct vfs_node *node, offset_t offset, int mmflag, phys_ptr_t *physp);
-
 	/** Read a page of data from a node.
 	 * @note		If the page straddles across the end of the
 	 *			file, then only the part of the file that
 	 *			exists should be read.
-	 * @note		If this operation is not provided by a FS
-	 *			type, then it is assumed that the page given
-	 *			by the page_get operation already contains the
-	 *			correct data. The reason this operation is
-	 *			provided rather than just having data read
-	 *			in by the page_get operation is so that the
-	 *			FS implementation does not always have to deal
-	 *			with mapping and unmapping physical memory.
+	 * @note		If not provided, then pages will be filled with
+	 *			zeros.
 	 * @param node		Node to read data read from.
 	 * @param page		Pointer to mapped page to read into.
 	 * @param offset	Offset within the file to read from (multiple
@@ -131,13 +114,6 @@ typedef struct vfs_type {
 	 * @param nonblock	Whether the write is required to not block.
 	 * @return		0 on success, negative error code on failure. */
 	int (*page_flush)(struct vfs_node *node, void *page, offset_t offset, bool nonblock);
-
-	/** Free a page previously obtained via page_get.
-	 * @note		If this is not provided, then the page will be
-	 *			freed via pmm_free().
-	 * @param node		Node that page was used for.
-	 * @param page		Address of page to free. */
-	int (*page_free)(struct vfs_node *node, phys_ptr_t page);
 
 	/**
 	 * Node manipulation functions.
@@ -251,6 +227,7 @@ typedef struct vfs_mount {
 
 /** Structure describing a node in the filesystem. */
 typedef struct vfs_node {
+	vm_object_t vobj;		/**< VM object header. */
 	list_t header;			/**< Link to mount's node lists. */
 
 	mutex_t lock;			/**< Lock to protect the node. */
@@ -259,6 +236,7 @@ typedef struct vfs_node {
 	vfs_mount_t *mount;		/**< Mount that the node resides on. */
 	void *data;			/**< Internal data pointer for filesystem type. */
 	int flags;			/**< Behaviour flags for the node. */
+	vfs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 
 	/** Type of the node. */
 	enum {
@@ -271,11 +249,10 @@ typedef struct vfs_node {
 		VFS_NODE_SOCK,		/**< Socket. */
 	} type;
 
-	cache_t *cache;			/**< Cache containing node data (VFS_NODE_FILE). */
+	avl_tree_t pages;		/**< Tree of cached data pages (VFS_NODE_FILE). */
 	radix_tree_t dir_entries;	/**< Tree of cached directory entries (VFS_NODE_DIR). */
 	file_size_t size;		/**< Total size of node data/number of cached directory entries. */
 	char *link_dest;		/**< Cached symlink destination (VFS_NODE_SYMLINK). */
-	vfs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 } vfs_node_t;
 
 /** Directory entry information structure. */
@@ -309,8 +286,6 @@ extern void vfs_node_release(vfs_node_t *node);
 extern int vfs_node_info(vfs_node_t *node, vfs_info_t *infop);
 extern int vfs_node_unlink(vfs_node_t *node);
 
-extern int vfs_file_cache_get(vfs_node_t *node, bool priv, cache_t **cachep);
-extern void vfs_file_cache_release(cache_t *cache);
 extern int vfs_file_create(const char *path, vfs_node_t **nodep);
 extern int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep);
 extern int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, size_t *bytesp);
@@ -331,9 +306,9 @@ extern int vfs_unmount(const char *path);
 # pragma mark Debugger commands.
 #endif
 
-extern int kdbg_cmd_fs_mounts(int argc, char **argv);
-extern int kdbg_cmd_fs_nodes(int argc, char **argv);
-extern int kdbg_cmd_fs_node(int argc, char **argv);
+extern int kdbg_cmd_mounts(int argc, char **argv);
+extern int kdbg_cmd_vnodes(int argc, char **argv);
+extern int kdbg_cmd_vnode(int argc, char **argv);
 
 #if 0
 # pragma mark System calls.

@@ -20,9 +20,9 @@
 
 #include <cpu/ipi.h>
 
-#include <mm/aspace.h>
 #include <mm/page.h>
 #include <mm/tlb.h>
+#include <mm/vm.h>
 
 #include <assert.h>
 #include <fatal.h>
@@ -36,7 +36,7 @@
  * @return		Always returns 0. */
 static int tlb_invalidate_handler(void *msg, unative_t data1, unative_t data2,
                                   unative_t data3, unative_t data4) {
-	aspace_t *as = (aspace_t *)data1;
+	vm_aspace_t *as = (vm_aspace_t *)((ptr_t)data1);
 	ptr_t start = (ptr_t)data2;
 	ptr_t end = (ptr_t)data3;
 
@@ -64,7 +64,7 @@ static int tlb_invalidate_handler(void *msg, unative_t data1, unative_t data2,
  * @param start		Start of address range to invalidate.
  * @param end		End of address range to invalidate.
  */
-void tlb_invalidate(aspace_t *as, ptr_t start, ptr_t end) {
+void tlb_invalidate(vm_aspace_t *as, ptr_t start, ptr_t end) {
 	cpu_t *cpu;
 
 	/* Invalidate on the calling CPU if required. */

@@ -27,7 +27,6 @@
 
 #include <mm/malloc.h>
 #include <mm/page.h>
-#include <mm/pmm.h>
 
 #include <platform/multiboot.h>
 
@@ -61,9 +60,9 @@ static multiboot_info_t *mb_info;
  * @todo		Check that addresses are within the physical address
  *			size supported by the processor.
  */
-void pmm_populate(void) {
-	multiboot_memmap_t *map = (multiboot_memmap_t *)((ptr_t)mb_info->mmap_addr);
+void page_platform_init(void) {
 	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
+	multiboot_memmap_t *map = (multiboot_memmap_t *)((ptr_t)mb_info->mmap_addr);
 	phys_ptr_t start, end;
 	size_t i;
 
@@ -71,7 +70,7 @@ void pmm_populate(void) {
 	assert(((ptr_t)__init_end % PAGE_SIZE) == 0);
 	assert(((ptr_t)__end % PAGE_SIZE) == 0);
 
-	dprintf("pmm: adding E820 memory map entries...\n");
+	dprintf("page: adding E820 memory map entries...\n");
 
 	/* Go through the Multiboot memory map and add everything in it. We
 	 * can safely access the memory map because of the temporary
@@ -110,15 +109,15 @@ void pmm_populate(void) {
 		/* What we did above may have made the region too small, warn
 		 * and ignore it if this is the case. */
 		if(end <= start) {
-			kprintf(LOG_WARN, "pmm: broken memory map entry: [0x%" PRIx64 ",0x%" PRIx64 ") (%" PRIu32 ")\n",
+			kprintf(LOG_WARN, "page: broken memory map entry: [0x%" PRIx64 ",0x%" PRIx64 ") (%" PRIu32 ")\n",
 				map->base_addr, map->base_addr + map->length, map->type);
 			goto cont;
 		}
 
 		/* Add the range and mark as reclaimable if necessary. */
-		pmm_add(start, end);
+		page_range_add(start, end);
 		if(map->type == E820_TYPE_ACPI_RECLAIM) {
-			pmm_mark_reclaimable(start, end);
+			page_range_mark_reclaimable(start, end);
 		}
 	cont:
 		map = (multiboot_memmap_t *)(((ptr_t)map) + map->size + 4);
@@ -126,9 +125,9 @@ void pmm_populate(void) {
 
 	/* Mark the kernel as reserved and initialization code/data as
 	 * reclaimable. */
-	pmm_mark_reserved(KERNEL_PHYS_BASE, KA2PA((ptr_t)__init_start));
-	pmm_mark_reclaimable(KA2PA((ptr_t)__init_start), KA2PA((ptr_t)__init_end));
-	pmm_mark_reserved(KA2PA((ptr_t)__init_end), KA2PA((ptr_t)__end));
+	page_range_mark_reserved(KERNEL_PHYS_BASE, KA2PA((ptr_t)__init_start));
+	page_range_mark_reclaimable(KA2PA((ptr_t)__init_start), KA2PA((ptr_t)__init_end));
+	page_range_mark_reserved(KA2PA((ptr_t)__init_end), KA2PA((ptr_t)__end));
 
 	/* Mark all the Multiboot modules as reclaimable. Start addresses
 	 * should be page-aligned because we specify we want that to be the
@@ -136,7 +135,7 @@ void pmm_populate(void) {
 	for(i = 0; i < mb_info->mods_count; i++) {
 		assert(!(mods[i].mod_start % PAGE_SIZE));
 
-		pmm_mark_reclaimable(mods[i].mod_start, ROUND_UP(mods[i].mod_end, PAGE_SIZE));
+		page_range_mark_reclaimable(mods[i].mod_start, ROUND_UP(mods[i].mod_end, PAGE_SIZE));
 	}
 }
 

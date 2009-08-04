@@ -21,10 +21,11 @@
 #ifndef __ASSERT_H
 #define __ASSERT_H
 
+#include <compiler.h>
 #include <fatal.h>
 
 #if CONFIG_DEBUG
-# define assert(cond)	if(!(cond)) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
+# define assert(cond)	if(unlikely(!(cond))) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
 #else
 # define assert(cond)	((void)0)
 #endif

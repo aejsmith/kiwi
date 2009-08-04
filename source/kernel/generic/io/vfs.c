@@ -34,10 +34,8 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/cache.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
-#include <mm/pmm.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 
@@ -81,6 +79,8 @@ static slab_cache_t *vfs_node_cache;
 static vfs_mount_t *vfs_root_mount = NULL;
 
 /** Forward declarations. */
+static vm_object_ops_t vfs_vm_object_ops;
+static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
 static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
 
 #if 0
@@ -107,7 +107,7 @@ static vfs_type_t *vfs_type_lookup_internal(const char *name) {
 /** Look up a filesystem type and reference it.
  * @param name		Name of filesystem type to look up.
  * @return		Pointer to type structure if found, NULL if not. */
-static __unused vfs_type_t *vfs_type_lookup(const char *name) {
+static vfs_type_t *vfs_type_lookup(const char *name) {
 	vfs_type_t *type;
 
 	mutex_lock(&vfs_type_list_lock, 0);
@@ -185,12 +185,23 @@ int vfs_type_unregister(vfs_type_t *type) {
 static int vfs_node_cache_ctor(void *obj, void *data, int kmflag) {
 	vfs_node_t *node = (vfs_node_t *)obj;
 
+	vm_object_init(&node->vobj, &vfs_vm_object_ops);
 	list_init(&node->header);
 	mutex_init(&node->lock, "vfs_node_lock", 0);
 	refcount_set(&node->count, 0);
+	avl_tree_init(&node->pages);
 	radix_tree_init(&node->dir_entries);
 
 	return 0;
+}
+
+/** VFS node object destructor.
+ * @param obj		Object to destruct.
+ * @param data		Cache data (unused). */
+static void vfs_node_cache_dtor(void *obj, void *data) {
+	vfs_node_t *node = (vfs_node_t *)obj;
+
+	vm_object_destroy(&node->vobj);
 }
 
 /** Allocate a node structure and set one reference on it.
@@ -211,13 +222,67 @@ static vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, int mmflag) {
 	node->mount = mount;
 	node->flags = 0;
 	node->type = VFS_NODE_FILE;
-	node->cache = NULL;
 	node->size = 0;
 	node->link_dest = NULL;
 	node->mounted = NULL;
 
 	refcount_inc(&node->count);
 	return node;
+}
+
+/** Flush all changes to a node.
+ * @param node		Node to free. Both the node and its mount should be
+ *			locked.
+ * @param destroy	Whether to remove cached pages from the cache after
+ *			flushing. If any pages are still in use when this is
+ *			specified, fatal() will be called.
+ * @return		0 on success, negative error code on failure. If a
+ *			failure occurs while flushing page data when destroying
+ *			an error is returned immediately. Otherwise, it
+ *			carries on attempting to flush other pages, but still
+ *			returns an error. If multiple errors occur, it is the
+ *			most recent that is returned. */
+static int vfs_node_flush(vfs_node_t *node, bool destroy) {
+	avl_tree_node_t *iter = NULL;
+	int ret = 0, err;
+	vm_page_t *page;
+
+	if(node->type == VFS_NODE_FILE) {
+		/* If we're destroying, we have to use avl_tree_node_first() on
+		 * every iteration rather than just the first, because iter
+		 * becomes invalid after removing the entry. */
+		while((iter = (destroy || !iter) ? avl_tree_node_first(&node->pages) : avl_tree_node_next(iter))) {
+			page = avl_tree_entry(iter, vm_page_t);
+
+			/* Check reference count. If destroying, shouldn't be used. */
+			if(destroy && refcount_get(&page->count) != 0) {
+				fatal("Node page still in use while destroying");
+			}
+
+			/* Flush the page data. See function documentation about how
+			 * failure is handled. */
+			if((err = vfs_file_page_flush(node, page)) != 0) {
+				if(destroy) {
+					return err;
+				}
+				ret = err;
+			}
+
+			/* Destroy the page if required. */
+			if(destroy) {
+				avl_tree_remove(&node->pages, (key_t)page->offset);
+				vm_page_free(page);
+			}
+		}
+	}
+
+	/* Flush node metadata. */
+	if(node->mount && node->mount->type->node_flush) {
+		if((err = node->mount->type->node_flush(node)) != 0) {
+			ret = err;
+		}
+	}
+	return ret;
 }
 
 /** Flush changes to a node and free it.
@@ -237,36 +302,22 @@ static int vfs_node_free(vfs_node_t *node) {
 
 	assert(refcount_get(&node->count) == 0);
 
-	/* Flush and destroy the cache if there is one. */
-	if(node->cache) {
-		if((ret = cache_destroy(node->cache)) != 0) {
-			kprintf(LOG_WARN, "vfs: warning: failed to destroy data cache for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
-			        node, (node->mount) ? node->mount->id : -1, node->id, ret);
-			mutex_unlock(&node->lock);
-			if(node->mount) {
-				mutex_unlock(&node->mount->lock);
-			}
-			return ret;
+	/* Flush cached data and metadata. */
+	if((ret = vfs_node_flush(node, true)) != 0) {
+		kprintf(LOG_WARN, "vfs: warning: failed to flush data for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
+		        node, (node->mount) ? node->mount->id : -1, node->id, ret);
+		mutex_unlock(&node->lock);
+		if(node->mount) {
+			mutex_unlock(&node->mount->lock);
 		}
+		return ret;
 	}
 
-	/* If the node has a mount, then attempt to flush its metadata, and
-	 * then detach it from the mount. */
+	/* If the node has a mount, detach it from the node tree/list and call
+	 * the mount's node_free operation (if any). */
 	if(node->mount) {
-		/* Attempt to flush metadata. */
-		if(node->mount->type->node_flush && (ret = node->mount->type->node_flush(node) != 0)) {
-			kprintf(LOG_WARN, "vfs: warning: failed to flush metadata for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
-			        node, (node->mount) ? node->mount->id : -1, node->id, ret);
-			mutex_unlock(&node->lock);
-			mutex_unlock(&node->mount->lock);
-			return ret;
-		}
-
-		/* Detach it from the node tree/list. */
 		avl_tree_remove(&node->mount->nodes, (key_t)node->id);
 		list_remove(&node->header);
-
-		/* Call the node free operation if any. */
 		if(node->mount->type->node_free) {
 			node->mount->type->node_free(node);
 		}
@@ -684,91 +735,196 @@ int vfs_node_unlink(vfs_node_t *node) {
 # pragma mark Regular file operations.
 #endif
 
-/** Get a missing page from a cache.
- * @todo		Nonblocking reads. Needs a change to the cache layer.
- * @param cache		Cache to get page from.
- * @param offset	Offset of page in data source.
- * @param addrp		Where to store address of page obtained.
+/** Get a page from a file's cache.
+ * @note		Should not be passed both mappingp and pagep.
+ * @param node		Node to get page from.
+ * @param offset	Offset of page to get.
+ * @param overwrite	If true, then the page's data will not be read in from
+ *			the filesystem if it is not in the cache, it will only
+ *			allocate a page - useful if the caller is about to
+ *			overwrite the page data.
+ * @param pagep		Where to store pointer to page structure.
+ * @param mappingp	Where to store address of virtual mapping.
  * @return		0 on success, negative error code on failure. */
-static int vfs_file_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
-	vfs_node_t *node = cache->data;
-	phys_ptr_t page;
-	void *mapping;
+static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool overwrite, vm_page_t **pagep, void **mappingp) {
+	void *mapping = NULL;
+	vm_page_t *page;
 	int ret;
 
-	/* First try to allocate a page to use. */
-	if(node->mount && node->mount->type->page_get) {
-		if((ret = node->mount->type->page_get(node, offset, MM_SLEEP, &page)) != 0) {
-			return ret;
+	assert(node->type == VFS_NODE_FILE);
+	assert((pagep && !mappingp) || (mappingp && !pagep));
+
+	mutex_lock(&node->lock, 0);
+
+	/* Check if we have it cached. */
+	if((page = avl_tree_lookup(&node->pages, (key_t)offset))) {
+		refcount_inc(&page->count);
+		mutex_unlock(&node->lock);
+
+		/* Map it in if required. */
+		if(mappingp) {
+			*mappingp = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+		} else {
+			*pagep = page;
+		}
+
+		dprintf("vfs: retreived cached page 0x%" PRIpp " from offset %" PRIo " in %p\n",
+		        page->addr, offset, node);
+		return 0;
+	}
+
+	/* Need to read the page in. If a read operation is provided and we're
+	 * not about to overwrite, read the page data into an unzeroed page.
+	 * If we're about to overwrite, allocate a page without zeroing.
+	 * Otherwise, allocate a zeroed page. */
+	if(!overwrite) {
+		if(node->mount && node->mount->type->page_read) {
+			page = vm_page_alloc(MM_SLEEP);
+			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+
+			ret = node->mount->type->page_read(node, mapping, offset, false);
+			if(ret != 0) {
+				page_phys_unmap(mapping, PAGE_SIZE);
+				refcount_dec(&page->count);
+				vm_page_free(page);
+				mutex_unlock(&node->lock);
+				return ret;
+			}
+		} else {
+			page = vm_page_alloc(MM_SLEEP | PM_ZERO);
 		}
 	} else {
-		page = pmm_alloc(1, MM_SLEEP | PM_ZERO);
+		page = vm_page_alloc(MM_SLEEP);
 	}
 
-	/* Now try to fill it in, if an operation is provided to do so. */
-	if(node->mount && node->mount->type->page_read) {
-		mapping = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
-		ret = node->mount->type->page_read(node, mapping, offset, false);
+	/* Cache the page and unlock. */
+	page->offset = offset;
+	avl_tree_insert(&node->pages, (key_t)offset, page, NULL);
+	mutex_unlock(&node->lock);
 
-		/* Unmap immediately before handling failure. */
-		page_phys_unmap(mapping, PAGE_SIZE);
+	dprintf("vfs: cached new page 0x%" PRIpp " at offset %" PRIo " in %p\n",
+	        page->addr, offset, node);
 
-		if(ret != 0) {
-			return ret;
+	/* Map it in if required. If we had to read page data in, reuse the
+	 * mapping created for that. */
+	if(mappingp) {
+		if(!mapping) {
+			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 		}
+		*mappingp = mapping;
+	} else {
+		if(mapping) {
+			page_phys_unmap(mapping, PAGE_SIZE);
+		}
+		*pagep = page;
 	}
-
-	*addrp = page;
 	return 0;
 }
 
-/** Flush changes to a page to the filesystem.
- * @param cache		Cache that the page is in.
- * @param page		Address of page to flush.
- * @param offset	Offset of page in data source.
- * @return		0 on success, 1 if page has no source to flush to,
- *			negative error code on failure. */
-static int vfs_file_cache_flush_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
-	vfs_node_t *node = cache->data;
-	void *mapping;
-	int ret;
+/** Release a page from a file.
+ * @param node		Node that the page belongs to.
+ * @param offset	Offset of page to release.
+ * @param dirty		Whether the page has been dirtied. */
+static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bool dirty) {
+	vm_page_t *page;
 
-	/* FIXME: Workaround because vfs_file_truncate() does not shrink the
-	 * cache upon shrinking a file. */
-	if((file_size_t)offset >= node->size) {
+	assert(node->type == VFS_NODE_FILE);
+
+	mutex_lock(&node->lock, 0);
+
+	if(!(page = avl_tree_lookup(&node->pages, (key_t)offset))) {
+		fatal("Tried to release page that isn't cached");
+	}
+
+	dprintf("vfs: released page 0x%" PRIpp " at offset %" PRIo " in %p\n",
+	        page->addr, offset, node);
+
+	/* Mark as dirty if requested. */
+	if(dirty) {
+		page->flags |= VM_PAGE_DIRTY;
+	}
+
+	/* Decrease the reference count. If it reaches 0, and the page is
+	 * outside the node's size (i.e. file has been truncated with pages in
+	 * use), discard it. */
+	if(refcount_dec(&page->count) == 0 && (file_size_t)offset >= node->size) {
+		vm_page_free(page);
+	}
+
+	mutex_unlock(&node->lock);
+}
+
+/** Flush a page from a file.
+ * @param node		Node of page to flush. Should be locked.
+ * @param page		Page to flush.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
+	void *mapping;
+	int ret = 0;
+
+	/* If the page is outside of the file, it may be there because the file
+	 * was truncated but with the page in use. Ignore this. Also ignore
+	 * pages that aren't dirty. */
+	if((file_size_t)page->offset >= node->size || !(page->flags & VM_PAGE_DIRTY)) {
 		return 0;
 	}
 
 	if(node->mount && node->mount->type->page_flush) {
-		mapping = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
-		ret = node->mount->type->page_flush(node, mapping, offset, false);
+		mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+
+		if((ret = node->mount->type->page_flush(node, mapping, page->offset, false)) == 0) {
+			/* Clear dirty flag if the page reference count is
+			 * zero. This is because a page may be mapped into an
+			 * address space as read-write, but has not yet been
+			 * written to. */
+			if(refcount_get(&page->count) == 0) {
+				page->flags &= ~VM_PAGE_DIRTY;
+			}
+		}
+
 		page_phys_unmap(mapping, PAGE_SIZE);
-
-		return ret;
-	} else {
-		return 1;
 	}
+
+	return ret;
 }
 
-/** Free a page from a VFS cache (page will have been flushed).
- * @param cache		Cache that the page is in.
- * @param page		Address of page to free.
- * @param offset	Offset of page in data source. */
-static void vfs_file_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
-	vfs_node_t *node = cache->data;
-
-	if(node->mount && node->mount->type->page_free) {
-		node->mount->type->page_free(node, page);
-	} else {
-		pmm_free(page, 1);
-	}
+/** Increase the reference count of a file VM object.
+ * @param obj		Object to reference.
+ * @param region	Region referencing the object. */
+static void vfs_vm_object_get(vm_object_t *obj, vm_region_t *region) {
+	vfs_node_get((vfs_node_t *)obj);
 }
 
-/** File data cache operations. */
-static cache_ops_t vfs_file_cache_ops = {
-	.get_page = vfs_file_cache_get_page,
-	.flush_page = vfs_file_cache_flush_page,
-	.free_page = vfs_file_cache_free_page,
+/** Decrease the reference count of a file VM object.
+ * @param obj		Object to decrease count of.
+ * @param region	Region to detach. */
+static void vfs_vm_object_release(vm_object_t *obj, vm_region_t *region) {
+	vfs_node_release((vfs_node_t *)obj);
+}
+
+/** Get a page from a file VM object.
+ * @param obj		Object to get page from.
+ * @param offset	Offset of page to get.
+ * @param pagep		Where to store pointer to page structure.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_vm_object_page_get(vm_object_t *obj, offset_t offset, vm_page_t **pagep) {
+	return vfs_file_page_get_internal((vfs_node_t *)obj, offset, false, pagep, NULL);
+}
+
+/** Release a page from a file VM object.
+ * @param obj		Object that the page belongs to.
+ * @param offset	Offset of page to release.
+ * @param paddr		Physical address of page that was unmapped. */
+static void vfs_vm_object_page_release(vm_object_t *obj, offset_t offset, phys_ptr_t paddr) {
+	vfs_file_page_release_internal((vfs_node_t *)obj, offset, false);
+}
+
+/** File VM object operations. */
+static vm_object_ops_t vfs_vm_object_ops = {
+	.get = vfs_vm_object_get,
+	.release = vfs_vm_object_release,
+	.page_get = vfs_vm_object_page_get,
+	.page_release = vfs_vm_object_page_release,
 };
 
 /** Get and map a page from a file's data cache.
@@ -776,138 +932,23 @@ static cache_ops_t vfs_file_cache_ops = {
  *			exist.
  * @param node		Node to get page from.
  * @param offset	Offset of page to get.
+ * @param overwrite	If true, then the page's data will not be read in from
+ *			the filesystem if it is not in the cache - useful if
+ *			the caller is about to overwrite the page data.
  * @param addrp		Where to store address of mapping.
  * @return		0 on success, negative error code on failure. */
-static int vfs_file_page_map(vfs_node_t *node, offset_t offset, void **addrp) {
-	phys_ptr_t page;
-	int ret;
-
-	assert(node->cache);
-
-	ret = cache_get(node->cache, offset, &page);
-	if(ret != 0) {
-		return ret;
-	}
-
-	*addrp = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
-	return 0;
+static int vfs_file_page_map(vfs_node_t *node, offset_t offset, bool overwrite, void **addrp) {
+	return vfs_file_page_get_internal(node, offset, overwrite, NULL, addrp);
 }
 
 /** Unmap and release a page from a node's data cache.
  * @param node		Node to release page in.
- * @param addr		Address of mapping.
+ * @param mapping	Address of mapping.
  * @param offset	Offset of page to release.
  * @param dirty		Whether the page has been dirtied. */
-static void vfs_file_page_unmap(vfs_node_t *node, void *addr, offset_t offset, bool dirty) {
-	page_phys_unmap(addr, PAGE_SIZE);
-	cache_release(node->cache, offset, dirty);
-}
-
-/** Get a missing page from a private VFS cache.
- * @param cache		Cache to get page from.
- * @param offset	Offset of page in data source.
- * @param addrp		Where to store address of page obtained.
- * @return		0 on success, negative error code on failure. */
-static int vfs_file_private_cache_get_page(cache_t *cache, offset_t offset, phys_ptr_t *addrp) {
-	vfs_node_t *node = cache->data;
-	void *source, *dest;
-	phys_ptr_t page;
-	int ret;
-
-	/* Get the source page from the node's cache. */
-	if((ret = vfs_file_page_map(node, offset, &source)) != 0) {
-		return ret;
-	}
-
-	/* Allocate a page, map it in and copy the data across. */
-	page = pmm_alloc(1, MM_SLEEP);
-	dest = page_phys_map(page, PAGE_SIZE, MM_SLEEP);
-	memcpy(dest, source, PAGE_SIZE);
-	page_phys_unmap(dest, PAGE_SIZE);
-	vfs_file_page_unmap(node, source, offset, false);
-
-	*addrp = page;
-	return 0;
-}
-
-/** Free a page from a private VFS cache.
- * @param cache		Cache that the page is in.
- * @param page		Address of page to free.
- * @param offset	Offset of page in data source. */
-static void vfs_file_private_cache_free_page(cache_t *cache, phys_ptr_t page, offset_t offset) {
-	pmm_free(page, 1);
-}
-
-/** Clean up any data associated with a private VFS cache.
- * @param cache		Cache being destroyed. */
-static void vfs_file_private_cache_destroy(cache_t *cache) {
-	vfs_node_release(cache->data);
-}
-
-/** VFS private page cache operations. */
-static cache_ops_t vfs_file_private_cache_ops = {
-	.get_page = vfs_file_private_cache_get_page,
-	.free_page = vfs_file_private_cache_free_page,
-	.destroy = vfs_file_private_cache_destroy,
-};
-
-/** Get a data cache for a file.
- *
- * Gets a data cache for a filesystem node. If requested, a private cache will
- * be created - this is a cache on top of the node's actual data cache in which
- * modifications to pages will not be propagated back to the file itself, nor
- * will they be visible to any other private caches. Changes made to the
- * underlying file may or may not be visible to the cache, depending on whether
- * the pages of the file changed have been pulled in to this cache. Otherwise,
- * a pointer to the node's main data cache will be returned - changes to it
- * will be made visible in the underlying file.
- *
- * @param node		Node to get cache for (must be VFS_NODE_FILE).
- * @param priv		Whether to create a private cache.
- * @param cachep	Where to store pointer to cache.
- *
- * @return		0 on success, negative error code on failure.
- */
-int vfs_file_cache_get(vfs_node_t *node, bool priv, cache_t **cachep) {
-	if(!node) {
-		return -ERR_PARAM_INVAL;
-	} else if(node->type != VFS_NODE_FILE) {
-		return -ERR_TYPE_INVAL;
-	}
-
-	/* Reference node to ensure it exists while the cache is in use. */
-	vfs_node_get(node);
-
-	/* Check that we have the node cache. */
-	mutex_lock(&node->lock, 0);
-	if(!node->cache) {
-		node->cache = cache_create(&vfs_file_cache_ops, node);
-	}
-	mutex_unlock(&node->lock);
-
-	*cachep = (priv) ? cache_create(&vfs_file_private_cache_ops, node) : node->cache;
-	return 0;
-}
-
-/** Releases a file cache.
- *
- * Releases a file's data cache previously obtained via vfs_file_cache_get().
- * The reference count of the node the cache is for is decreased, and if the
- * cache is a private cache, it is destroyed.
- *
- * @param cache		Cache to release.
- */
-void vfs_file_cache_release(cache_t *cache) {
-	if(cache->ops == &vfs_file_private_cache_ops) {
-		if(cache_destroy(cache) != 0) {
-			/* Shouldn't happen as we don't do any page flushing. */
-			fatal("Failed to destroy private VFS cache");
-		}
-	} else if(cache->ops == &vfs_file_cache_ops) {
-		vfs_node_release(cache->data);
-	} else {
-		fatal("Non-VFS cache passed to vfs_file_cache_release");
-	}
+static void vfs_file_page_unmap(vfs_node_t *node, void *mapping, offset_t offset, bool dirty) {
+	page_phys_unmap(mapping, PAGE_SIZE);
+	vfs_file_page_release_internal(node, offset, dirty);
 }
 
 /** Create a file in the file system.
@@ -975,8 +1016,7 @@ int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep) {
 	node->size = size;
 
 	/* Write the data into the node. */
-	ret = vfs_file_write(node, buf, size, 0, NULL);
-	if(ret != 0) {
+	if((ret = vfs_file_write(node, buf, size, 0, NULL)) != 0) {
 		vfs_node_release(node);
 		return ret;
 	}
@@ -1037,13 +1077,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 		goto out;
 	}
 
-	/* Create the cache if it does not exist. */
-	if(!node->cache) {
-		node->cache = cache_create(&vfs_file_cache_ops, node);
-	}
-
-	/* Exclusive access no longer required, we only need it to ensure that
-	 * multiple things don't try to create the cache at the same time. */
+	/* Exclusive access no longer required. */
 	mutex_unlock(&node->lock);
 
 	/* Now work out the start page and the end page. Subtract one from
@@ -1056,7 +1090,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1069,7 +1103,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 	/* Handle any full pages. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1079,7 +1113,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1159,14 +1193,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 		}
 	}
 
-	/* Create the cache if it does not exist. */
-	if(!node->cache) {
-		node->cache = cache_create(&vfs_file_cache_ops, node);
-	}
-
-	/* Exclusive access no longer required, we only need it to ensure that
-	 * multiple things don't try to modify the node size or create the
-	 * cache at the same time. */
+	/* Exclusive access no longer required. */
 	mutex_unlock(&node->lock);
 
 	/* Now work out the start page and the end page. Subtract one from
@@ -1179,7 +1206,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1189,10 +1216,13 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 		total += size; buf += size; count -= size; start += PAGE_SIZE;
 	}
 
-	/* Handle any full pages. */
+	/* Handle any full pages. We pass the overwrite parameter as true to
+	 * vfs_file_page_map() here, so that if the page is not in the cache,
+	 * its data will not be read in - we're about to overwrite it, so it
+	 * would not be necessary. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, true, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1202,7 +1232,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vfs_file_page_map(node, start, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
 			goto out;
 		}
 
@@ -1714,7 +1744,7 @@ int vfs_unmount(const char *path) {
  *
  * @return		Always returns KDBG_OK.
  */
-int kdbg_cmd_fs_mounts(int argc, char **argv) {
+int kdbg_cmd_mounts(int argc, char **argv) {
 	vfs_mount_t *mount;
 
 	if(KDBG_HELP(argc, argv)) {
@@ -1747,7 +1777,7 @@ int kdbg_cmd_fs_mounts(int argc, char **argv) {
  *
  * @return		KDBG_OK on success, KDBG_FAIL on failure.
  */
-int kdbg_cmd_fs_nodes(int argc, char **argv) {
+int kdbg_cmd_vnodes(int argc, char **argv) {
 	vfs_mount_t *mount;
 	vfs_node_t *node;
 	unative_t id;
@@ -1813,10 +1843,11 @@ int kdbg_cmd_fs_nodes(int argc, char **argv) {
  *
  * @return		KDBG_OK on success, KDBG_FAIL on failure.
  */
-int kdbg_cmd_fs_node(int argc, char **argv) {
+int kdbg_cmd_vnode(int argc, char **argv) {
 	vfs_dir_entry_t *entry;
 	vfs_mount_t *mount;
 	vfs_node_t *node;
+	vm_page_t *page;
 	unative_t val;
 
 	if(KDBG_HELP(argc, argv)) {
@@ -1869,8 +1900,7 @@ int kdbg_cmd_fs_node(int argc, char **argv) {
 	kprintf(LOG_NONE, "Flags:        %d\n", node->flags);
 	kprintf(LOG_NONE, "Type:         %d\n", node->type);
 	if(node->type == VFS_NODE_FILE) {
-		kprintf(LOG_NONE, "Cache:        %p\n", node->cache);
-		kprintf(LOG_NONE, "Size:         %" PRIu64 "\n", node->size);
+		kprintf(LOG_NONE, "Data Size:    %" PRIu64 "\n", node->size);
 	}
 	if(node->type == VFS_NODE_SYMLINK) {
 		kprintf(LOG_NONE, "Destination:  %p(%s)\n", node->link_dest,
@@ -1881,15 +1911,25 @@ int kdbg_cmd_fs_node(int argc, char **argv) {
 		        node->mounted->id);
 	}
 
-	/* If it is a directory, print out a list of cached entries. */
+	/* If it is a directory, print out a list of cached entries. If it is
+	 * a file, print out a list of cached pages. */
 	if(node->type == VFS_NODE_DIR) {
 		kprintf(LOG_NONE, "\nCached directory entries:\n");
 
 		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
 			entry = radix_tree_entry(iter, vfs_dir_entry_t);
 
-			kprintf(LOG_NONE, "  Entry %" PRId32 "(%s) (%p)\n",
+			kprintf(LOG_NONE, "  Entry %p - %" PRId32 "(%s)\n",
 			        entry->id, entry->name, entry);
+		}
+	} else if(node->type == VFS_NODE_FILE) {
+		kprintf(LOG_NONE, "\nCached pages:\n");
+
+		AVL_TREE_FOREACH(&node->pages, iter) {
+			page = avl_tree_entry(iter, vm_page_t);
+
+			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRIo " Flags: %d\n",
+			        page->addr, page->offset, page->flags);
 		}
 	}
 
@@ -1904,8 +1944,8 @@ int kdbg_cmd_fs_node(int argc, char **argv) {
 static void __init_text vfs_init(void) {
 	/* Initialize the node slab cache. */
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
-	                                   vfs_node_cache_ctor, NULL, NULL,
-	                                   NULL, NULL, 0, MM_FATAL);
+	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
+	                                   NULL, NULL, NULL, 0, MM_FATAL);
 }
 INITCALL(vfs_init);
 

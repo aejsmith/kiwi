@@ -24,7 +24,7 @@
 
 #include <io/vfs.h>
 
-#include <mm/aspace.h>
+#include <mm/vm.h>
 
 #include <lib/utility.h>
 
@@ -73,10 +73,10 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_unlink,
 	(syscall_handler_t)sys_fs_rename,
 
-	/** Address space system calls. */
-	(syscall_handler_t)sys_aspace_map_anon,
-	(syscall_handler_t)sys_aspace_map_file,
-	(syscall_handler_t)sys_aspace_unmap,
+	/** VM system calls. */
+	(syscall_handler_t)sys_vm_map_anon,
+	(syscall_handler_t)sys_vm_map_file,
+	(syscall_handler_t)sys_vm_unmap,
 };
 
 /** System call dispatcher.

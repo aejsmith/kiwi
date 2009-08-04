@@ -34,7 +34,7 @@
 
 #include <lib/utility.h>
 
-#include <mm/aspace.h>
+#include <mm/vm.h>
 
 #include <proc/thread.h>
 
@@ -82,8 +82,10 @@ static bool fault_handle_nmi(unative_t num, intr_frame_t *frame) {
  * @param frame		Interrupt stack frame.
  * @return		Doesn't return. */
 static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
-	/* Disable KDBG. */
+#if !CONFIG_ARCH_AMD64
+	/* Disable KDBG on IA32. */
 	atomic_set(&kdbg_running, 3);
+#endif
 
 	/* Crappy workaround, using MMX memcpy() from the console code seems
 	 * to cause nasty problems. */
@@ -97,28 +99,28 @@ static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
  * @param frame		Interrupt stack frame.
  * @return		Always returns true. */
 static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
-	int reason = (frame->err_code & (1<<0)) ? PF_REASON_PROT : PF_REASON_NPRES;
-	int access = (frame->err_code & (1<<1)) ? PF_ACCESS_WRITE : PF_ACCESS_READ;
+	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
+	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
 	ptr_t addr = sysreg_cr2_read();
 
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */
 	if(CPU_HAS_XD(curr_cpu) && frame->err_code & (1<<4)) {
-		reason = PF_ACCESS_EXEC;
+		access = VM_FAULT_EXEC;
 	}
 #endif
 
 	/* Handle exceptions during KDBG execution. We should not call into
-	 * the address space manager if we are in KDBG. */
+	 * the virtual memory manager if we are in KDBG. */
 	if(atomic_get(&kdbg_running) == 2) {
 		kdbg_except_handler(num, "Page Fault", frame);
 		return true;
 	}
 
-	/* Try the address space manager if the fault occurred at a userspace
+	/* Try the virtual memory manager if the fault occurred at a userspace
 	 * address. */
 	if(addr < (ASPACE_BASE + ASPACE_SIZE)) {
-		if(aspace_pagefault(addr, reason, access) == PF_STATUS_OK) {
+		if(vm_fault(addr, reason, access) == VM_FAULT_HANDLED) {
 			return true;
 		} else if(atomic_get(&curr_thread->in_usermem)) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at 0x%p (ip: 0x%p)\n", addr, frame->ip);

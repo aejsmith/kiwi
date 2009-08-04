@@ -47,7 +47,6 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
-#include <mm/pmm.h>
 #include <mm/tlb.h>
 #include <mm/vmem.h>
 
@@ -74,11 +73,11 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 	ptr_t i;
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(!page_map_remove(&kernel_page_map, i, &page)) {
+		if(page_map_remove(&kernel_page_map, i, &page) != 0) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
-			pmm_free(page, 1);
+			page_free(page, 1);
 		}
 
 		dprintf("kheap: unmapped page 0x%" PRIpp " from %p\n", page, i);
@@ -116,18 +115,18 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		/* Don't use PM_ZERO - this may cause the page to be
 		 * mapped on the kernel heap to zero it, and we can just do
 		 * this ourselves. */
-		page = pmm_alloc(1, vmflag & MM_FLAG_MASK);
+		page = page_alloc(1, vmflag & MM_FLAG_MASK);
 		if(page == 0) {
 			dprintf("kheap: unable to allocate pages to back allocation\n");
 			goto fail;
 		}
 
 		/* Map the page into the kernel address space. */
-		if(!page_map_insert(&kernel_page_map, ret + i, page,
-		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
-		                    vmflag & MM_FLAG_MASK)) {
+		if(page_map_insert(&kernel_page_map, ret + i, page,
+		                   PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
+		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", page, ret + i);
-			pmm_free(page, 1);
+			page_free(page, 1);
 			goto fail;
 		}
 
@@ -214,9 +213,9 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE, base += PAGE_SIZE) {
-		if(!page_map_insert(&kernel_page_map, ret + i, base,
-		                    PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
-		                    vmflag & MM_FLAG_MASK)) {
+		if(page_map_insert(&kernel_page_map, ret + i, base,
+		                   PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
+		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", base, ret + i);
 			goto fail;
 		}

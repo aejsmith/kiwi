@@ -46,14 +46,15 @@ env['OBJFILES'] += [
 	env.Object('lib/sprintf.c'),
 	env.Object('lib/string.c'),
 
-	env.Object('mm/aspace.c'),
-	env.Object('mm/cache.c'),
 	env.Object('mm/kheap.c'),
 	env.Object('mm/malloc.c'),
-	env.Object('mm/pmm.c'),
+	env.Object('mm/page.c'),
 	env.Object('mm/safe.c'),
 	env.Object('mm/slab.c'),
 	env.Object('mm/tlb.c'),
+	env.Object('mm/vm/anon.c'),
+	env.Object('mm/vm/page.c'),
+	env.Object('mm/vm/vm.c'),
 	env.Object('mm/vmem.c'),
 
 	env.Object('proc/handle.c'),

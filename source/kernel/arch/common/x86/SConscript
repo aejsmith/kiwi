@@ -22,12 +22,12 @@ env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 
 # Add source files.
 env['OBJFILES'] += [
-	env.Object('aspace.c'),
 	env.Object('cpu.c'),
 	env.Object('fault.c'),
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),
 	env.Object('smp.c'),
+	env.Object('vm.c'),
 ]
 
 if config['X86_OPTIM_STR']:

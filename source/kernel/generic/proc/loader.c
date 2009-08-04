@@ -162,8 +162,8 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 		goto fail;
 	}
 
-	/* Create a new address space for the binary-> */
-	binary->aspace = aspace_create();
+	/* Create a new address space for the binary */
+	binary->aspace = vm_aspace_create();
 	if(binary->aspace == NULL) {
 		ret = -ERR_NO_MEMORY;
 		goto fail;
@@ -180,9 +180,9 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 
 	/* Create a userspace stack. Do this now because after this is done we
 	 * don't want to fail. */
-	ret = aspace_map_anon(binary->aspace, 0, USTACK_SIZE,
-	                      ASPACE_MAP_READ | ASPACE_MAP_WRITE | ASPACE_MAP_PRIVATE,
-	                      &stack);
+	ret = vm_map_anon(binary->aspace, 0, USTACK_SIZE,
+	                  VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	                  &stack);
 	if(ret != 0) {
 		goto fail;
 	}
@@ -232,7 +232,7 @@ fail:
 		binary->type->cleanup(binary);
 	}
 	if(binary->aspace) {
-		aspace_destroy(binary->aspace);
+		vm_aspace_destroy(binary->aspace);
 	}
 	return ret;
 }

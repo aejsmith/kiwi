@@ -1,4 +1,4 @@
-/* Kiwi x86 address space functions
+/* Kiwi x86 virtual memory manager functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,12 +15,12 @@
 
 /**
  * @file
- * @brief		x86 address space functions.
+ * @brief		x86 virtual memory manager functions.
  */
 
-#include <mm/aspace.h>
+#include "../../../generic/mm/vm/vm_priv.h"
 
-/** X86 address space creation function.
+/** X86-specific address space initialization function.
  *
  * Marks certain regions as reserved in a new address space, such as the
  * page at 0x0.
@@ -29,12 +29,6 @@
  *
  * @return		0 on success, negative error code on failure.
  */
-int aspace_arch_create(aspace_t *as) {
-	int ret;
-
-	if((ret = aspace_reserve(as, 0x0, PAGE_SIZE)) != 0) {
-		return ret;
-	}
-
-	return 0;
+int vm_aspace_arch_init(vm_aspace_t *as) {
+	return vm_reserve(as, 0x0, PAGE_SIZE);
 }

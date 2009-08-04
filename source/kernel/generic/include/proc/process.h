@@ -33,7 +33,7 @@
 
 #include <types.h>
 
-struct aspace;
+struct vm_aspace;
 
 /** Maximum length of a process name. */
 #define PROC_NAME_MAX		32
@@ -41,7 +41,7 @@ struct aspace;
 /** Structure containing details about a process. */
 typedef struct process {
 	spinlock_t lock;		/**< Lock to protect data in structure. */
-	struct aspace *aspace;		/**< Process' address space. */
+	struct vm_aspace *aspace;	/**< Process' address space. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
 
@@ -78,7 +78,7 @@ extern process_t *kernel_proc;
 
 extern process_t *process_lookup(identifier_t id);
 extern int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp);
-extern int process_reset(process_t *process, const char *name, struct aspace *aspace);
+extern int process_reset(process_t *process, const char *name, struct vm_aspace *aspace);
 
 extern void process_init(void);
 

@@ -23,6 +23,8 @@
 
 #include <kernel/types.h>
 
+#define __need_size_t
+#include <stddef.h>
 #include <stdbool.h>
 
 /** Directory entry information structure. */

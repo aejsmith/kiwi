@@ -62,9 +62,9 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 	size_t size;
 
 	/* Work out the protection flags to use. */
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_X) ? ASPACE_MAP_EXEC : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? ASPACE_MAP_WRITE : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? ASPACE_MAP_READ  : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
+	flags |= ((data->phdrs[i].p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
 	if(flags == 0) {
 		dprintf("elf: program header %zu has no protection flags set\n", i);
 		return -ERR_FORMAT_INVAL;
@@ -72,7 +72,7 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 
 	/* Set the private and fixed flags - we always want to insert at the
 	 * position we say, and not share stuff. */
-	flags |= ASPACE_MAP_FIXED | ASPACE_MAP_PRIVATE;
+	flags |= VM_MAP_FIXED | VM_MAP_PRIVATE;
 
 	/* Map the BSS if required. */
 	if(data->phdrs[i].p_filesz != data->phdrs[i].p_memsz) {
@@ -84,13 +84,13 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 
 		/* We have to have it writeable for us to be able to clear it
 		 * later on. */
-		if((flags & ASPACE_MAP_WRITE) == 0) {
+		if((flags & VM_MAP_WRITE) == 0) {
 			dprintf("elf: program header %zu should be writeable\n", i);
 			return -ERR_FORMAT_INVAL;
 		}
 
 		/* Create an anonymous memory region for it. */
-		ret = aspace_map_anon(data->binary->aspace, start, size, flags, NULL);
+		ret = vm_map_anon(data->binary->aspace, start, size, flags, NULL);
 		if(ret != 0) {
 			return ret;
 		}
@@ -112,7 +112,7 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - aspace_map_file() will reject the call if they
 	 * are. */
-	return aspace_map_file(data->binary->aspace, start, size, flags, data->binary->node, offset, NULL);
+	return vm_map_file(data->binary->aspace, start, size, flags, data->binary->node, offset, NULL);
 }
 
 /** Check whether a binary is an ELF binary.

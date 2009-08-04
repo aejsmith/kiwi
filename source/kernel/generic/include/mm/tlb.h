@@ -23,8 +23,8 @@
 
 #include <arch/tlb.h>
 
-#include <mm/aspace.h>
+struct vm_aspace;
 
-extern void tlb_invalidate(aspace_t *as, ptr_t start, ptr_t end);
+extern void tlb_invalidate(struct vm_aspace *as, ptr_t start, ptr_t end);
 
 #endif /* __MM_TLB_H */

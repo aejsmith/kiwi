@@ -22,8 +22,8 @@
 
 #include <lib/string.h>
 
-#include <mm/aspace.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 #include <mm/vmem.h>
 
 #include <proc/process.h>
@@ -115,7 +115,7 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 
 	/* Create the address space. */
 	if(!(flags & PROCESS_NOASPACE)) {
-		if(!(process->aspace = aspace_create())) {
+		if(!(process->aspace = vm_aspace_create())) {
 			slab_cache_free(process_cache, process);
 			return -ERR_NO_MEMORY;
 		}
@@ -196,8 +196,8 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_reset(process_t *process, const char *name, aspace_t *aspace) {
-	aspace_t *prev;
+int process_reset(process_t *process, const char *name, vm_aspace_t *aspace) {
+	vm_aspace_t *prev;
 
 	if(!process || process == kernel_proc || !name || !name[0]) {
 		return -ERR_PARAM_INVAL;
@@ -218,14 +218,14 @@ int process_reset(process_t *process, const char *name, aspace_t *aspace) {
 	prev = process->aspace;
 	process->aspace = aspace;
 	if(prev == curr_aspace) {
-		aspace_switch(aspace);
+		vm_aspace_switch(aspace);
 	}
 
 	spinlock_unlock(&process->lock);
 
 	/* Now that we're unlocked we can destroy the old address space. */
 	if(prev) {
-		aspace_destroy(prev);
+		vm_aspace_destroy(prev);
 	}
 
 	return 0;
