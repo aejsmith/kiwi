@@ -176,19 +176,20 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	strncpy(thread->name, name, THREAD_NAME_MAX);
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
+	/* Allocate a kernel stack and initialize the thread context. */
+	thread->kstack = kheap_alloc(KSTACK_SIZE, MM_SLEEP);
+	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
+
 	/* Initialize architecture-specific data. */
 	ret = thread_arch_init(thread);
 	if(ret != 0) {
+		kheap_free(thread->kstack, KSTACK_SIZE);
 		slab_cache_free(thread_cache, thread);
 		return ret;
 	}
 
 	/* Allocate an ID for the thread. */
 	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
-
-	/* Allocate a kernel stack and initialize the thread context. */
-	thread->kstack = kheap_alloc(KSTACK_SIZE, MM_SLEEP);
-	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
 	atomic_set(&thread->in_usermem, 0);
 
