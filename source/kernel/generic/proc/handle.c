@@ -240,25 +240,21 @@ int handle_table_init(handle_table_t *table, handle_table_t *parent) {
  * @param table		Table to destroy.
  */
 void handle_table_destroy(handle_table_t *table) {
-	avl_tree_node_t *node;
 	handle_info_t *info;
 	int ret;
 
 	mutex_lock(&table->lock, 0);
 
-	/* Close all handles in the table - cannot use tree iterator here
-	 * because removing makes the current node invalid. */
-	while((node = avl_tree_node_first(&table->tree))) {
-		info = avl_tree_entry(node, handle_info_t);
-
-		avl_tree_remove(&table->tree, node->key);
+	/* Close all handles in the table. */
+	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
+		info = avl_tree_entry(iter, handle_info_t);
 
 		rwlock_write_lock(&info->lock, 0);
 
 		if(refcount_dec(&info->count) == 0) {
 			if(info->type->close && (ret = info->type->close(info)) != 0) {
 				kprintf(LOG_WARN, "handle: failed to destroy handle %" PRIu64 "(%p) (%d)\n",
-				        node->key, info, ret);
+				        iter->key, info, ret);
 			}
 
 			rwlock_unlock(&info->lock);
@@ -266,6 +262,8 @@ void handle_table_destroy(handle_table_t *table) {
 		} else {
 			rwlock_unlock(&info->lock);
 		}
+
+		avl_tree_remove(&table->tree, iter->key);
 	}
 
 	bitmap_destroy(&table->bitmap);

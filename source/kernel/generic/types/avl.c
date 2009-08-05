@@ -443,6 +443,10 @@ avl_tree_node_t *avl_tree_node_last(avl_tree_t *tree) {
  * @return		Preceding node or NULL if none found.
  */
 avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
+	if(!node) {
+		return NULL;
+	}
+
 	/* If there's a left-hand child, move onto it and then go as far
 	 * right as we can. */
 	if(node->left != NULL) {
@@ -475,6 +479,10 @@ avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
  * @return		Following node or NULL if none found.
  */
 avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
+	if(!node) {
+		return NULL;
+	}
+
 	/* If there's a right-hand child, move onto it and then go as far
 	 * left as we can. */
 	if(node->right != NULL) {

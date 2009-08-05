@@ -243,15 +243,11 @@ static vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, int mmflag) {
  *			returns an error. If multiple errors occur, it is the
  *			most recent that is returned. */
 static int vfs_node_flush(vfs_node_t *node, bool destroy) {
-	avl_tree_node_t *iter = NULL;
 	int ret = 0, err;
 	vm_page_t *page;
 
 	if(node->type == VFS_NODE_FILE) {
-		/* If we're destroying, we have to use avl_tree_node_first() on
-		 * every iteration rather than just the first, because iter
-		 * becomes invalid after removing the entry. */
-		while((iter = (destroy || !iter) ? avl_tree_node_first(&node->pages) : avl_tree_node_next(iter))) {
+		AVL_TREE_FOREACH_SAFE(&node->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
 			/* Check reference count. If destroying, shouldn't be used. */
@@ -756,6 +752,11 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 
 	mutex_lock(&node->lock, 0);
 
+	/* Check whether it is within the size of the node. */
+	if((file_size_t)offset >= node->size) {
+		return -ERR_NOT_FOUND;
+	}
+
 	/* Check if we have it cached. */
 	if((page = avl_tree_lookup(&node->pages, (key_t)offset))) {
 		refcount_inc(&page->count);
@@ -848,6 +849,7 @@ static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bo
 	 * outside the node's size (i.e. file has been truncated with pages in
 	 * use), discard it. */
 	if(refcount_dec(&page->count) == 0 && (file_size_t)offset >= node->size) {
+		avl_tree_remove(&node->pages, (key_t)offset);
 		vm_page_free(page);
 	}
 
@@ -928,8 +930,6 @@ static vm_object_ops_t vfs_vm_object_ops = {
 };
 
 /** Get and map a page from a file's data cache.
- * @note		The caller should create the cache if it does not
- *			exist.
  * @param node		Node to get page from.
  * @param offset	Offset of page to get.
  * @param overwrite	If true, then the page's data will not be read in from
@@ -1258,14 +1258,13 @@ out:
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @todo		Shrink the cache!
- *
  * @param node		Node to resize.
  * @param size		New size of the file.
  *
  * @return		0 on success, negative error code on failure.
  */
 int vfs_file_resize(vfs_node_t *node, file_size_t size) {
+	vm_page_t *page;
 	int ret;
 
 	if(!node) {
@@ -1283,12 +1282,27 @@ int vfs_file_resize(vfs_node_t *node, file_size_t size) {
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	if((ret = node->mount->type->file_resize(node, size)) == 0) {
-		node->size = (file_size_t)size;
+	if((ret = node->mount->type->file_resize(node, size)) != 0) {
+		mutex_unlock(&node->lock);
+		return ret;
 	}
 
+	/* Shrink the cache if the new size is smaller. If any pages are in use
+	 * they will get freed once they are released. */
+	if(size < node->size) {
+		AVL_TREE_FOREACH(&node->pages, iter) {
+			page = avl_tree_entry(iter, vm_page_t);
+
+			if((file_size_t)page->offset >= size && refcount_get(&page->count) == 0) {
+				avl_tree_remove(&node->pages, (key_t)page->offset);
+				vm_page_free(page);
+			}
+		}
+	}
+
+	node->size = (file_size_t)size;
 	mutex_unlock(&node->lock);
-	return ret;
+	return 0;
 }
 
 /** Closes a handle to a regular file.

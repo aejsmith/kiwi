@@ -334,13 +334,12 @@ static void vm_unmap_internal(vm_aspace_t *as, ptr_t start, ptr_t end) {
  * @return		True if space found, false if not. */
 static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
 	vm_region_t *region, *prev = NULL;
-	avl_tree_node_t *node;
 
 	assert(size);
 
 	/* Iterate over all regions to find the first suitable hole. */
-	for(node = avl_tree_node_first(&as->regions); node; node = avl_tree_node_next(node)) {
-		region = avl_tree_entry(node, vm_region_t);
+	AVL_TREE_FOREACH(&as->regions, iter) {
+		region = avl_tree_entry(iter, vm_region_t);
 
 		if(prev == NULL) {
 			/* First region, check if there is a hole preceding it
@@ -824,18 +823,15 @@ vm_aspace_t *vm_aspace_create(void) {
  * @param as		Address space to destroy.
  */
 void vm_aspace_destroy(vm_aspace_t *as) {
-	avl_tree_node_t *node;
-
 	assert(as);
 
 	if(refcount_get(&as->count) > 0) {
 		fatal("Destroying in-use address space");
 	}
 
-	/* Unmap and destroy each region. Do not use the AVL tree iterator
-	 * here as it is not safe to do so when modifying the tree. */
-	while((node = avl_tree_node_first(&as->regions))) {
-		vm_region_destroy(avl_tree_entry(node, vm_region_t));
+	/* Unmap and destroy each region. */
+	AVL_TREE_FOREACH_SAFE(&as->regions, iter) {
+		vm_region_destroy(avl_tree_entry(iter, vm_region_t));
 	}
 
 	/* Destroy the page map. */
