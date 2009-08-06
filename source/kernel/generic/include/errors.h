@@ -40,5 +40,6 @@
 #define ERR_NO_SPACE		16	/**< No space is available. */
 #define ERR_PERM_DENIED		17	/**< Permission denied. */
 #define ERR_STR_TOO_LONG	18	/**< String is too long. */
+#define ERR_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
 
 #endif /* __ERRORS_H */

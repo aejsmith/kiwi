@@ -78,10 +78,11 @@ static slab_cache_t *vfs_node_cache;
 /** Pointer to mount at root of the filesystem. */
 static vfs_mount_t *vfs_root_mount = NULL;
 
-/** Forward declarations. */
 static vm_object_ops_t vfs_vm_object_ops;
+
 static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
 static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
+static int vfs_symlink_cache_dest(vfs_node_t *node);
 
 #if 0
 # pragma mark Filesystem type functions.
@@ -334,19 +335,57 @@ static int vfs_node_free(vfs_node_t *node) {
 	return 0;
 }
 
-/** Look up a node relative to the given node.
+/** Look up a node in the filesystem.
+ * @param path		Path string to look up.
  * @param node		Node to begin lookup at (locked and referenced).
- * @param path		Relative path string to look up.
+ *			Does not have to be set if path is absolute.
  * @param follow	Whether to follow last path component if it is a
  *			symbolic link.
- * @param nodep		Where to store pointer to node found.
+ * @param nest		Symbolic link nesting count.
+ * @param nodep		Where to store pointer to node found (referenced and
+ *			locked).
  * @return		0 on success, negative error code on failure. */
-static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, vfs_node_t **nodep) {
+static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, int nest, vfs_node_t **nodep) {
+	vfs_node_t *prev = NULL, *tmp;
 	vfs_mount_t *mount;
-	vfs_node_t *prev;
+	char *tok, *link;
 	identifier_t id;
-	char *tok;
 	int ret;
+
+	if(path[0] == '/') {
+		/* Drop the node we were provided, if any. */
+		if(node != NULL) {
+			mutex_unlock(&node->lock);
+			vfs_node_release(node);
+		}
+
+		/* Strip off all '/' characters at the start of the path. */
+		while(path[0] == '/') {
+                        path++;
+                }
+
+		/* Check whether we actually have a root filesystem. */
+		if(!vfs_root_mount) {
+			return -ERR_NOT_FOUND;
+		}
+
+		/* Do not need to take mount lock or check if reference count
+		 * was zero here - once mounted, the root filesystem cannot be
+		 * unmounted, and mount roots always have at least 1 reference
+		 * until the mount is unmounted. */
+		mutex_lock(&vfs_root_mount->root->lock, 0);
+		vfs_node_get(vfs_root_mount->root);
+		node = vfs_root_mount->root;
+
+		/* If we have already reached the end of the path string,
+		 * return the root node. */
+		if(!path[0]) {
+			*nodep = node;
+			return 0;
+		}
+	}
+
+	assert(node->type == VFS_NODE_DIR);
 
 	/* Loop through each element of the path string. */
 	while(true) {
@@ -355,16 +394,64 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
 		/* If the node is a symlink and this is not the last element
 		 * of the path, or the caller wishes to follow the link, follow
 		 * it. */
-		if(node->type == VFS_NODE_SYMLINK) {
-			mutex_unlock(&node->lock);
-			vfs_node_release(node);
-			return -ERR_NOT_IMPLEMENTED;
+		if(node->type == VFS_NODE_SYMLINK && (tok || follow)) {
+			/* The previous node should be the link's parent. */
+			assert(prev);
+			assert(prev->type == VFS_NODE_DIR);
+
+			/* Check whether we have exceeded the maximum nesting
+			 * count (TODO: This should be in limits.h). */
+			if(++nest > 16) {
+				mutex_unlock(&node->lock);
+				vfs_node_release(prev);
+				vfs_node_release(node);
+				return -ERR_LINK_LIMIT;
+			}
+
+			/* Ensure that the link destination is cached. */
+			if((ret = vfs_symlink_cache_dest(node)) != 0) {
+				mutex_unlock(&node->lock);
+				vfs_node_release(prev);
+				vfs_node_release(node);
+				return ret;
+			}
+
+			dprintf("vfs: following symbolic link %" PRId32 ":%" PRId32 " to %s\n",
+			        node->mount->id, node->id, node->link_dest);
+
+			/* Duplicate the link destination as the lookup needs
+			 * to modify it. */
+			link = kstrdup(node->link_dest, MM_SLEEP);
+
+			/* Move up to the parent node. The previous iteration
+			 * of the loop left a reference on previous for us. */
+			tmp = node; node = prev; prev = tmp;
+			mutex_unlock(&prev->lock);
+			mutex_lock(&node->lock, 0);
+
+			/* Recurse to find the link destination. The check
+			 * above ensures we do not infinitely recurse. */
+			if((ret = vfs_node_lookup_internal(link, node, true, nest, &node)) != 0) {
+				vfs_node_release(prev);
+				kfree(link);
+				return ret;
+			}
+
+			dprintf("vfs: followed %s to %" PRId32 ":%" PRId32 "\n",
+			        prev->link_dest, node->mount->id, node->id);
+			kfree(link);
+
+			vfs_node_release(prev);
+		} else if(node->type == VFS_NODE_SYMLINK) {
+			/* The new node is a symbolic link but we do not want
+			 * to follow it. We must release the previous node. */
+			assert(prev != node);
+			vfs_node_release(prev);
 		}
 
 		if(tok == NULL) {
 			/* The last token was the last element of the path
 			 * string, return the node we're currently on. */
-			mutex_unlock(&node->lock);
 			*nodep = node;
 			return 0;
 		} else if(node->type != VFS_NODE_DIR) {
@@ -431,7 +518,7 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
 		prev = node;
 
 		/* Check if the node is cached in the mount. */
-		dprintf("vfs: looking for node %" PRId32 " in cache for mount %" PRId32 "\n", id, mount->id);
+		dprintf("vfs: looking for node %" PRId32 " in cache for mount %" PRId32 " (%s)\n", id, mount->id, tok);
 		node = avl_tree_lookup(&mount->nodes, (key_t)id);
 		if(node) {
 			assert(node->mount == mount);
@@ -485,8 +572,11 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
 			mutex_unlock(&mount->lock);
 		}
 
-		/* Release the previous node. */
-		vfs_node_release(prev);
+		/* Do not release the previous node if the current node is a
+		 * symbolic link, as the symbolic link code requires it. */
+		if(node->type != VFS_NODE_SYMLINK) {
+			vfs_node_release(prev);
+		}
 	}
 }
 
@@ -502,12 +592,13 @@ static int vfs_node_lookup_internal(vfs_node_t *node, char *path, bool follow, v
  * @param follow	If the last path component refers to a symbolic link,
  *			specified whether to follow the link or return the node
  *			of the link itself.
- * @param nodep		Where to store pointer to node found.
+ * @param nodep		Where to store pointer to node found (referenced,
+ *			unlocked).
  *
  * @return		0 on success, negative error code on failure.
  */
 int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep) {
-	vfs_node_t *node;
+	vfs_node_t *node = NULL;
 	char *dup;
 	int ret;
 
@@ -515,47 +606,22 @@ int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Figure out where to start the lookup from. */
-	if(path[0] == '/') {
-		/* Strip off all '/' characters at the start of the path. */
-		while(path[0] == '/') {
-                        path++;
-                }
-
-		/* Check whether we actually have a root filesystem. */
-		if(!vfs_root_mount) {
-			return -ERR_NOT_FOUND;
-		}
-
-		/* Do not need to take mount lock or check if reference count
-		 * was zero here - once mounted, the root filesystem cannot be
-		 * unmounted, and mount roots always have at least 1 reference
-		 * until the mount is unmounted. */
-		mutex_lock(&vfs_root_mount->root->lock, 0);
-		vfs_node_get(vfs_root_mount->root);
-		node = vfs_root_mount->root;
-
-		/* If we have already reached the end of the path string,
-		 * return the root node. */
-		if(!path[0]) {
-			mutex_unlock(&node->lock);
-			*nodep = node;
-			return 0;
-		}
-	} else {
-		/* Get the current process' I/O context's current directory. */
+	/* Start from the current process' current directory if the path is
+	 * relative. */
+	if(path[0] != '/') {
 		if(!(node = io_context_getcwd(&curr_proc->ioctx))) {
 			dprintf("vfs: current I/O context does not have a current directory\n");
 			return -ERR_NOT_FOUND;
 		}
 	}
 
-	/* Path will now be relative to node. Duplicate the string so that
-	 * vfs_node_lookup_internal() can modify it. */
+	/* Duplicate path so that vfs_node_lookup_internal() can modify it. */
 	dup = kstrdup(path, MM_SLEEP);
 
-	/* Look up the rest of the path string. */
-	ret = vfs_node_lookup_internal(node, dup, follow, nodep);
+	/* Look up the path string. */
+	if((ret = vfs_node_lookup_internal(dup, node, follow, 0, nodep)) == 0) {
+		mutex_unlock(&(*nodep)->lock);
+	}
 	kfree(dup);
 	return ret;
 }
@@ -572,7 +638,8 @@ void vfs_node_get(vfs_node_t *node) {
 	int val = refcount_inc(&node->count);
 
 	if(val == 1) {
-		fatal("Called vfs_node_get on unused node");
+		fatal("Called vfs_node_get on unused node %" PRId32 ":%" PRId32,
+		      (node->mount) ? node->mount->id : -1, node->id);
 	}
 }
 
@@ -590,6 +657,8 @@ void vfs_node_release(vfs_node_t *node) {
 	int ret;
 
 	if(refcount_dec(&node->count) == 0) {
+		assert(!node->mounted);
+
 		/* Node has no references remaining, move it to its mount's
 		 * unused list if it has a mount. If the node is not attached
 		 * to anything, then destroy it immediately. */
@@ -1564,12 +1633,104 @@ static handle_type_t vfs_dir_handle_type = {
 # pragma mark Symbolic link operations.
 #endif
 
-int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep) {
-	return -ERR_NOT_IMPLEMENTED;
+/** Ensure that a symbolic link's destination is cached.
+ * @param node		Node of link (should be locked).
+ * @return		0 on success, negative error code on failure. */
+static int vfs_symlink_cache_dest(vfs_node_t *node) {
+	int ret;
+
+	assert(node->type == VFS_NODE_SYMLINK);
+
+	if(!node->link_dest) {
+		/* Assume that if the node is a symbolic link and it does not
+		 * have its destination cached its mount has a read link
+		 * operation. Only check this if there is no destination, for
+		 * example to allow RamFS to have the destination permanently
+		 * cached without the operation implemented. */
+		assert(node->mount->type->symlink_read);
+
+		if((ret = node->mount->type->symlink_read(node, &node->link_dest)) != 0) {
+			return ret;
+		}
+
+		assert(node->link_dest);
+	}
+
+	return 0;
 }
 
+/** Create a symbolic link.
+ *
+ * Creates a new symbolic link in the filesystem.
+ *
+ * @param path		Path to symbolic link to create.
+ * @param target	Target for the symbolic link (does not have to exist).
+ *			If the path is relative, it is relative to the
+ *			directory containing the link.
+ * @param nodep		Where to store pointer to node for link (optional).
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep) {
+	vfs_node_t *node;
+	int ret;
+
+	/* Allocate a new node and fill in some details. */
+	node = vfs_node_alloc(NULL, MM_SLEEP);
+	node->type = VFS_NODE_SYMLINK;
+	node->link_dest = kstrdup(target, MM_SLEEP);
+
+	/* Call the common creation code. */
+	if((ret = vfs_node_create(path, node)) != 0) {
+		/* This will free the link destination. */
+		vfs_node_release(node);
+		return ret;
+	}
+
+	/* Store a pointer to the node or release it if it is not wanted. */
+	if(nodep) {
+		*nodep = node;
+	} else {
+		vfs_node_release(node);
+	}
+	return 0;
+}
+
+/** Get the destination of a symbolic link.
+ *
+ * Reads the destination of a symbolic link into a buffer. A NULL byte will
+ * be placed at the end of the buffer, unless the buffer is too small.
+ *
+ * @param node		Node of symbolic link.
+ * @param buf		Buffer to read into.
+ * @param size		Size of buffer (destination will be truncated if buffer
+ *			is too small).
+ *
+ * @return		Number of bytes read on success, negative error code
+ *			on failure.
+ */
 int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
-	return -ERR_NOT_IMPLEMENTED;
+	size_t len;
+	int ret;
+
+	if(!node || !buf || !size) {
+		return -ERR_PARAM_INVAL;
+	} else if(node->type != VFS_NODE_SYMLINK) {
+		return -ERR_TYPE_INVAL;
+	}
+
+	mutex_lock(&node->lock, 0);
+
+	/* Ensure destination is cached. */
+	if((ret = vfs_symlink_cache_dest(node)) != 0) {
+		mutex_unlock(&node->lock);
+		return ret;
+	}
+
+	len = ((len = strlen(node->link_dest) + 1) > size) ? size : len;
+	memcpy(buf, node->link_dest, len);
+	mutex_unlock(&node->lock);
+	return (int)len;
 }
 
 #if 0
@@ -1934,7 +2095,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 			entry = radix_tree_entry(iter, vfs_dir_entry_t);
 
 			kprintf(LOG_NONE, "  Entry %p - %" PRId32 "(%s)\n",
-			        entry->id, entry->name, entry);
+			        entry, entry->id, entry->name);
 		}
 	} else if(node->type == VFS_NODE_FILE) {
 		kprintf(LOG_NONE, "\nCached pages:\n");
@@ -2253,8 +2414,38 @@ out:
 	return ret;
 }
 
+/** Modify the size of a file.
+ *
+ * Modifies the size of a file in the file system. If the new size is smaller
+ * than the previous size of the file, then the extra data is discarded. If
+ * it is larger than the previous size, then the extended space will be filled
+ * with zero bytes.
+ *
+ * @param handle	Handle to file to resize.
+ * @param size		New size of the file.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_file_resize(handle_t handle, file_size_t size) {
-	return -ERR_NOT_IMPLEMENTED;
+	handle_info_t *info;
+	vfs_handle_t *file;
+	int ret;
+
+	/* Look up the file handle. */
+	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_FILE, &info)) != 0) {
+		return ret;
+	}
+	file = info->data;
+
+	/* Check if the handle is open for writing. */
+	if(!(file->flags & FS_FILE_WRITE)) {
+		handle_release(info);
+		return -ERR_PERM_DENIED;
+	}
+
+	ret = vfs_file_resize(file->node, size);
+	handle_release(info);
+	return ret;
 }
 
 /** Create a directory in the file system.
@@ -2491,12 +2682,82 @@ int sys_fs_handle_info(handle_t handle, vfs_info_t *infop) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
+/** Create a symbolic link.
+ *
+ * Creates a new symbolic link in the filesystem.
+ *
+ * @param path		Path to symbolic link to create.
+ * @param target	Target for the symbolic link (does not have to exist).
+ *			If the path is relative, it is relative to the
+ *			directory containing the link.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_symlink_create(const char *path, const char *target) {
-	return -ERR_NOT_IMPLEMENTED;
+	char *kpath, *ktarget;
+	int ret;
+
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	} else if((ret = strndup_from_user(target, PATH_MAX, MM_SLEEP, &ktarget)) != 0) {
+		kfree(kpath);
+		return ret;
+	}
+
+	ret = vfs_symlink_create(kpath, ktarget, NULL);
+	kfree(ktarget);
+	kfree(kpath);
+	return ret;
 }
 
+/** Get the destination of a symbolic link.
+ *
+ * Reads the destination of a symbolic link into a buffer. A NULL byte will
+ * be placed at the end of the buffer, unless the buffer is too small.
+ *
+ * @param path		Path to symbolic link.
+ * @param buf		Buffer to read into.
+ * @param size		Size of buffer (destination will be truncated if buffer
+ *			is too small).
+ *
+ * @return		Number of bytes read on success, negative error code
+ *			on failure.
+ */
 int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
-	return -ERR_NOT_IMPLEMENTED;
+	char *kpath, *kbuf;
+	vfs_node_t *node;
+	int ret, err;
+
+	/* Copy the path across. */
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	}
+
+	/* Look up the filesystem node. No need to check here whether it is
+	 * suitable, vfs_symlink_read() does that. */
+	if((ret = vfs_node_lookup(kpath, false, &node)) != 0) {
+		kfree(kpath);
+		return ret;
+	}
+
+	/* Allocate a buffer to read into. See comment in sys_fs_file_read()
+	 * about not using MM_SLEEP. */
+	if(!(kbuf = kmalloc(size, 0))) {
+		vfs_node_release(node);
+		kfree(kpath);
+		return -ERR_NO_MEMORY;
+	}
+
+	ret = vfs_symlink_read(node, kbuf, size);
+	if(ret > 0) {
+		if((err = memcpy_to_user(buf, kbuf, size)) != 0) {
+			ret = err;
+		}
+	}
+
+	vfs_node_release(node);
+	kfree(kpath);
+	return ret;
 }
 
 /** Mount a filesystem.
@@ -2571,11 +2832,10 @@ int sys_fs_setcwd(const char *path) {
 	}
 
 	/* Attempt to set. If the node is the wrong type, it will be picked
-	 * up by io_context_setcwd(). */
-	if((ret = io_context_setcwd(&curr_proc->ioctx, node)) != 0) {
-		vfs_node_release(node);
-	}
-
+	 * up by io_context_setcwd(). Release the node no matter what, as upon
+	 * success it is referenced by io_context_setcwd(). */
+	ret = io_context_setcwd(&curr_proc->ioctx, node);
+	vfs_node_release(node);
 	kfree(kpath);
 	return ret;
 }

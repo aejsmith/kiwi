@@ -23,7 +23,7 @@
 
 /** Stack size definitions. */
 #define KSTACK_SIZE	0x1000		/**< Kernel stack size (4KB). */
-#define USTACK_SIZE	0x400000	/**< Userspace stack size (4MB). */
+#define USTACK_SIZE	0x200000	/**< Userspace stack size (2MB). */
 #define STACK_DELTA	8		/**< Stack delta. */
 
 #ifndef __ASM__

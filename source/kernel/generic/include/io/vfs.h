@@ -146,7 +146,9 @@ typedef struct vfs_type {
 	 * @param parent	Parent directory of the node.
 	 * @param name		Name to give node in the parent directory.
 	 * @param node		Node structure describing the node being
-	 *			created.
+	 *			created. For symbolic links, the link_dest
+	 *			pointer in the node will point to a string
+	 *			containing the link destination.
 	 * @return		0 on success, negative error code on failure. */
 	int (*node_create)(struct vfs_node *parent, const char *name, struct vfs_node *node);
 

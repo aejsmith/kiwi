@@ -50,8 +50,17 @@ static inline void file_create(const char *path) {
 	printf("%d\n", ret);
 }
 
+static inline void symlink_create(const char *path, const char *target) {
+	int ret;
+
+	printf("Creating symbolic link %s -> %s... ", path, target);
+	ret = fs_symlink_create(path, target);
+	printf("%d\n", ret);
+}
+
 static void dump_tree(char *name, int indent) {
 	fs_dir_entry_t *entry;
+	char link[4096];
 	handle_t handle;
 	int ret;
 
@@ -97,9 +106,14 @@ static void dump_tree(char *name, int indent) {
 			return;
 		}
 
-		printf("%-2d - %*s%s\n", entry->id, indent, "", entry->name);
-		if(strcmp(entry->name, ".") != 0 && strcmp(entry->name, "..") != 0) {
-			dump_tree(entry->name, indent + 2);
+		ret = fs_symlink_read(entry->name, link, 4096);
+		if(ret > 0) {
+			printf("%-2d - %*s%s -> %s\n", entry->id, indent, "", entry->name, link);
+		} else {
+			printf("%-2d - %*s%s\n", entry->id, indent, "", entry->name);
+			if(strcmp(entry->name, ".") != 0 && strcmp(entry->name, "..") != 0) {
+				dump_tree(entry->name, indent + 2);
+			}
 		}
 	}
 }
@@ -174,9 +188,40 @@ int main(int argc, char **argv) {
 			array[bytes] = 0;
 			printf("Got string '%s'\n", array);
 		}
+
+		handle_close(handle);
 	}
 
-	printf("Directory tree:\n");
+	symlink_create("/foo/bar/link.txt", "/foo/bar.txt");
+	symlink_create("/foo/bar/linkdir", "./..///../..////./foo/bar/../");
+
+	handle = fs_file_open("/foo/bar/link.txt", FS_FILE_READ);
+	printf("Got handle %d\n", handle);
+	if(handle >= 0) {
+		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
+		printf("Read returned %d (%zu)\n", ret, bytes);
+		if(ret == 0) {
+			array[bytes] = 0;
+			printf("Got string '%s'\n", array);
+		}
+
+		handle_close(handle);
+	}
+
+	handle = fs_file_open("/foo/bar/linkdir/bar.txt", FS_FILE_READ);
+	printf("Got handle %d\n", handle);
+	if(handle >= 0) {
+		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
+		printf("Read returned %d (%zu)\n", ret, bytes);
+		if(ret == 0) {
+			array[bytes] = 0;
+			printf("Got string '%s'\n", array);
+		}
+
+		handle_close(handle);
+	}
+
+	printf("\nDirectory tree:\n");
 	dump_tree(NULL, 0);
 	while(1);
 }
