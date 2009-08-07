@@ -155,9 +155,6 @@ int main(int argc, char **argv) {
 		printf("Reading... %d\n", *(int *)addr);
 	}
 
-	mount(NULL, "/", "ramfs", 0);
-	ret = fs_setcwd("/");
-	printf("Set directory returned %d\n", ret);
 	dir_create("/foo");
 	file_create("/foo/bar.txt");
 	file_create("/foo/../meow.txt");
@@ -223,5 +220,15 @@ int main(int argc, char **argv) {
 
 	printf("\nDirectory tree:\n");
 	dump_tree(NULL, 0);
+
+	printf("\nSetting root to /foo... ");
+	ret = fs_setroot("/foo");
+	printf("%d\n", ret);
+
+	fs_setcwd("/");
+	fs_setcwd("..");
+	printf("\nDirectory tree:\n");
+	dump_tree(NULL, 0);
+
 	while(1);
 }

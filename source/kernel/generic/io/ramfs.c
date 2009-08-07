@@ -23,12 +23,13 @@
 #include <mm/malloc.h>
 
 #include <errors.h>
-#include <module.h>
 
 /** RamFS mount information structure. */
 typedef struct ramfs_mount {
 	identifier_t next_id;		/**< Next node ID. */
 } ramfs_mount_t;
+
+extern vfs_type_t ramfs_fs_type;
 
 /** Mount a RamFS.
  * @param mount		Mount structure for the FS.
@@ -92,7 +93,7 @@ static int ramfs_file_resize(vfs_node_t *node, file_size_t size) {
 }
 
 /** RamFS filesystem type structure */
-static vfs_type_t ramfs_fs_type = {
+vfs_type_t ramfs_fs_type = {
 	.name = "ramfs",
 	.flags = VFS_TYPE_CACHE_BASED,
 
@@ -101,19 +102,3 @@ static vfs_type_t ramfs_fs_type = {
 	.node_create = ramfs_node_create,
 	.file_resize = ramfs_file_resize,
 };
-
-/** Initialization function for RamFS.
- * @return		0 on success, negative error code on failure. */
-static int ramfs_init(void) {
-	return vfs_type_register(&ramfs_fs_type);
-}
-
-/** Unloading function for RamFS module.
- * @return		0 on success, negative error code on failure. */
-static int ramfs_unload(void) {
-	return vfs_type_unregister(&ramfs_fs_type);
-}
-
-MODULE_NAME("ramfs");
-MODULE_DESC("RAM-based temporary filesystem driver.");
-MODULE_FUNCS(ramfs_init, ramfs_unload);

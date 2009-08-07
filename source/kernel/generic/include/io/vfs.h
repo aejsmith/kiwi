@@ -279,6 +279,8 @@ typedef struct vfs_info {
 /** Macro to check if a node is read-only. */
 #define VFS_NODE_IS_RDONLY(node)	((node)->mount->flags & VFS_MOUNT_RDONLY)
 
+extern vfs_mount_t *vfs_root_mount;
+
 extern int vfs_type_register(vfs_type_t *type);
 extern int vfs_type_unregister(vfs_type_t *type);
 
@@ -350,6 +352,7 @@ extern int sys_fs_mount(const char *dev, const char *path, const char *type, int
 extern int sys_fs_unmount(const char *path);
 extern int sys_fs_getcwd(char *buf, size_t size);
 extern int sys_fs_setcwd(const char *path);
+extern int sys_fs_setroot(const char *path);
 extern int sys_fs_info(const char *path, bool follow, vfs_info_t *infop);
 extern int sys_fs_link(const char *source, const char *dest);
 extern int sys_fs_unlink(const char *path);

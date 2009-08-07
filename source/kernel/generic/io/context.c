@@ -20,6 +20,9 @@
 
 #include <io/context.h>
 
+#include <proc/process.h>
+
+#include <assert.h>
 #include <errors.h>
 
 /** Initialize an I/O context.
@@ -39,25 +42,30 @@ int io_context_init(io_context_t *context, io_context_t *parent) {
 	mutex_init(&context->lock, "io_context_lock", 0);
 	list_init(&context->async_requests);
 	context->curr_dir = NULL;
+	context->root_dir = NULL;
 
-	/* Inherit parent's current directory if possible. If we have a parent
-	 * context, it may not have a working directory - this is because when
-	 * the kernel process is initialized, the VFS is not initialized and
-	 * the root filesystem has not been mounted. In this case, we attempt
-	 * to get the root of the filesystem again. */
+	/* Inherit parent's current/root directories if possible. */
 	if(parent) {
 		mutex_lock(&parent->lock, 0);
-		if(parent->curr_dir) {
-			vfs_node_get(parent->curr_dir);
-			context->curr_dir = parent->curr_dir;
-		}
-		mutex_unlock(&parent->lock);
-	}
 
-	/* Fall back on getting the root of the FS if we don't have a current
-	 * directory now (this may still fail). */
-	if(!context->curr_dir) {
-		vfs_node_lookup("/", true, &context->curr_dir);
+		assert(parent->root_dir);
+		assert(parent->curr_dir);
+
+		vfs_node_get(parent->root_dir);
+		context->root_dir = parent->root_dir;
+		vfs_node_get(parent->curr_dir);
+		context->curr_dir = parent->curr_dir;
+
+		mutex_unlock(&parent->lock);
+	} else if(vfs_root_mount) {
+		vfs_node_get(vfs_root_mount->root);
+		context->root_dir = vfs_root_mount->root;
+		vfs_node_get(vfs_root_mount->root);
+		context->curr_dir = vfs_root_mount->root;
+	} else {
+		/* This should only be the case when the kernel process is
+		 * being created. */
+		assert(!kernel_proc);
 	}
 
 	return 0;
@@ -74,32 +82,7 @@ void io_context_destroy(io_context_t *context) {
 	vfs_node_release(context->curr_dir);
 }
 
-/** Get current directory of an I/O context.
- *
- * Gets a pointer to the node for the current directory of an I/O context.
- * The node will be locked and have an extra reference set on it - when it is
- * no longer required by the caller, it should be unlocked and released.
- *
- * @param context	Context to get directory from.
- *
- * @return		Pointer to locked and referenced node, or NULL if the
- *			context does not have a current directory.
- */
-vfs_node_t *io_context_getcwd(io_context_t *context) {
-	vfs_node_t *node;
-
-	mutex_lock(&context->lock, 0);
-
-	if((node = context->curr_dir)) {
-		mutex_lock(&node->lock, 0);
-		vfs_node_get(node);
-	}
-
-	mutex_unlock(&context->lock);
-	return node;
-}
-
-/** Set current directory in an I/O context.
+/** Set the current directory of an I/O context.
  *
  * Sets the current directory of an I/O context to the specified filesystem
  * node. The previous working directory node will be released, and the supplied
@@ -124,8 +107,39 @@ int io_context_setcwd(io_context_t *context, vfs_node_t *node) {
 	context->curr_dir = node;
 	mutex_unlock(&context->lock);
 
-	if(old) {
-		vfs_node_release(old);
+	vfs_node_release(old);
+	return 0;
+}
+
+/** Set the root directory of an I/O context.
+ *
+ * Sets both the root directory and current directory of an I/O context to
+ * the specified directory.
+ *
+ * @param context	Context to set in.
+ * @param node		Node to set to.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int io_context_setroot(io_context_t *context, vfs_node_t *node) {
+	vfs_node_t *oldr, *oldc;
+
+	if(node->type != VFS_NODE_DIR) {
+		return -ERR_TYPE_INVAL;
 	}
+
+	/* Get twice: one for root, one for current. */
+	vfs_node_get(node);
+	vfs_node_get(node);
+
+	mutex_lock(&context->lock, 0);
+	oldc = context->curr_dir;
+	context->curr_dir = node;
+	oldr = context->root_dir;
+	context->root_dir = node;
+	mutex_unlock(&context->lock);
+
+	vfs_node_release(oldc);
+	vfs_node_release(oldr);
 	return 0;
 }

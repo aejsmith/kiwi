@@ -39,6 +39,7 @@ env['OBJFILES'] += [
 	env.Object('cpu/irq.c'),
 
 	env.Object('io/context.c'),
+	env.Object('io/ramfs.c'),
 	env.Object('io/vfs.c'),
 
 	env.Object('lib/do_printf.c'),

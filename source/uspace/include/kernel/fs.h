@@ -70,6 +70,7 @@ extern int fs_mount(const char *dev, const char *path, const char *type, int fla
 extern int fs_unmount(const char *path);
 extern int fs_getcwd(char *buf, size_t size);
 extern int fs_setcwd(const char *path);
+extern int fs_setroot(const char *path);
 extern int fs_info(const char *path, bool follow, fs_info_t *infop);
 extern int fs_link(const char *source, const char *dest);
 extern int fs_unlink(const char *path);

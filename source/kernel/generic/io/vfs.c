@@ -63,6 +63,8 @@ typedef struct vfs_handle {
 	int flags;			/**< Flags the file was opened with. */
 } vfs_handle_t;
 
+extern vfs_type_t ramfs_fs_type;
+
 /** List of all mounts. */
 static identifier_t vfs_next_mount_id = 0;
 static LIST_DECLARE(vfs_mount_list);
@@ -76,7 +78,7 @@ static MUTEX_DECLARE(vfs_type_list_lock, 0);
 static slab_cache_t *vfs_node_cache;
 
 /** Pointer to mount at root of the filesystem. */
-static vfs_mount_t *vfs_root_mount = NULL;
+vfs_mount_t *vfs_root_mount = NULL;
 
 static vm_object_ops_t vfs_vm_object_ops;
 
@@ -352,6 +354,9 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 	identifier_t id;
 	int ret;
 
+	/* Handle absolute paths here rather than in vfs_node_lookup() because
+	 * the symbolic link resolution code below calls this function directly
+	 * rather than vfs_node_lookup(). */
 	if(path[0] == '/') {
 		/* Drop the node we were provided, if any. */
 		if(node != NULL) {
@@ -364,18 +369,11 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
                         path++;
                 }
 
-		/* Check whether we actually have a root filesystem. */
-		if(!vfs_root_mount) {
-			return -ERR_NOT_FOUND;
-		}
+		assert(curr_proc->ioctx.root_dir);
 
-		/* Do not need to take mount lock or check if reference count
-		 * was zero here - once mounted, the root filesystem cannot be
-		 * unmounted, and mount roots always have at least 1 reference
-		 * until the mount is unmounted. */
-		mutex_lock(&vfs_root_mount->root->lock, 0);
-		vfs_node_get(vfs_root_mount->root);
-		node = vfs_root_mount->root;
+		node = curr_proc->ioctx.root_dir;
+		mutex_lock(&node->lock, 0);
+		vfs_node_get(node);
 
 		/* If we have already reached the end of the path string,
 		 * return the root node. */
@@ -464,36 +462,35 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		} else if(!tok[0]) {
 			/* Zero-length path component, do nothing. */
 			continue;
-		} else if(node == node->mount->root && tok[0] == '.' && tok[1] == '.' && !tok[2]) {
-			/* We're at the root of the mount, and the path wants
-			 * to move to the parent. Using the .. directory entry
-			 * in the filesystem won't work in this case - we must
-			 * handle it ourselves. Note that the above check did
-			 * not check whether the mount pointer is set - if a
-			 * node is in the filesystem, it should have a mount.
-			 * Only special nodes do not have mounts. */
-			if(node->mount == vfs_root_mount) {
-				/* Nothing needs to be done here, as we cannot
-				 * ascend past the root of the filesystem. */
+		} else if(tok[0] == '.' && tok[1] == '.' && !tok[2]) {
+			if(node == curr_proc->ioctx.root_dir) {
+				/* Do not allow the lookup to ascend past the
+				 * process' root directory. */
 				continue;
 			}
 
-			/* All mounts other than the root mount must have a
-			 * mountpoint. */
-			assert(node->mount->mountpoint);
-			assert(node->mount->mountpoint->type == VFS_NODE_DIR);
+			assert(node != vfs_root_mount->root);
 
-			/* Switch node to point to the mountpoint of the mount
-			 * and then go through the normal lookup mechanism to
-			 * get the parent of the mountpoint. It is safe to use
-			 * vfs_node_get() here - mountpoints will always have
-			 * at least one reference. */
-			prev = node;
-			node = prev->mount->mountpoint;
-			vfs_node_get(node);
-			mutex_unlock(&prev->lock);
-			vfs_node_release(prev);
-			mutex_lock(&node->lock, 0);
+			if(node == node->mount->root) {
+				assert(node->mount->mountpoint);
+				assert(node->mount->mountpoint->type == VFS_NODE_DIR);
+
+				/* We're at the root of the mount, and the path
+				 * wants to move to the parent. Using the '..'
+				 * directory entry in the filesystem won't work
+				 * in this case. Switch node to point to the
+				 * mountpoint of the mount and then go through
+				 * the normal lookup mechanism to get the '..'
+				 * entry of the mountpoint. It is safe to use
+				 * vfs_node_get() here - mountpoints will
+				 * always have at least one reference. */
+				prev = node;
+				node = prev->mount->mountpoint;
+				vfs_node_get(node);
+				mutex_unlock(&prev->lock);
+				vfs_node_release(prev);
+				mutex_lock(&node->lock, 0);
+			}
 		}
 
 		/* Look up this name within the directory entry cache. */
@@ -586,7 +583,13 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
  * does not begin with a '/' character), then it will be looked up relative to
  * the current directory in the current process' I/O context. Otherwise, the
  * starting '/' character will be taken off and the path will be looked up
- * relative to the root of the filesystem.
+ * relative to the current I/O context's root.
+ *
+ * @todo		We currently hold the I/O context lock across the
+ *			entire lookup to prevent another thread from messing
+ *			with the context's root directory while the lookup
+ *			is being performed. This could possibly be done in a
+ *			better way.
  *
  * @param path		Path string to look up.
  * @param follow	If the last path component refers to a symbolic link,
@@ -606,22 +609,27 @@ int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Start from the current process' current directory if the path is
-	 * relative. */
+	mutex_lock(&curr_proc->ioctx.lock, 0);
+
+	/* Start from the current directory if the path is relative. */
 	if(path[0] != '/') {
-		if(!(node = io_context_getcwd(&curr_proc->ioctx))) {
-			dprintf("vfs: current I/O context does not have a current directory\n");
-			return -ERR_NOT_FOUND;
-		}
+		assert(curr_proc->ioctx.curr_dir);
+
+		node = curr_proc->ioctx.curr_dir;
+		mutex_lock(&node->lock, 0);
+		vfs_node_get(node);
 	}
 
 	/* Duplicate path so that vfs_node_lookup_internal() can modify it. */
 	dup = kstrdup(path, MM_SLEEP);
 
 	/* Look up the path string. */
-	if((ret = vfs_node_lookup_internal(dup, node, follow, 0, nodep)) == 0) {
-		mutex_unlock(&(*nodep)->lock);
+	if((ret = vfs_node_lookup_internal(dup, node, follow, 0, &node)) == 0) {
+		mutex_unlock(&node->lock);
+		*nodep = node;
 	}
+
+	mutex_unlock(&curr_proc->ioctx.lock);
 	kfree(dup);
 	return ret;
 }
@@ -2117,10 +2125,25 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 
 /** Initialization function for the VFS. */
 static void __init_text vfs_init(void) {
+	int ret;
+
 	/* Initialize the node slab cache. */
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
 	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
 	                                   NULL, NULL, NULL, 0, MM_FATAL);
+
+	/* Register RamFS and mount it as the root. */
+	if((ret = vfs_type_register(&ramfs_fs_type)) != 0) {
+		fatal("Could not register RamFS filesystem type (%d)", ret);
+	} else if((ret = vfs_mount(NULL, "/", "ramfs", 0)) != 0) {
+		fatal("Could not mount RamFS at root (%d)", ret);
+	}
+
+	/* Give the kernel process a correct current/root directory. */
+	vfs_node_get(vfs_root_mount->root);
+	curr_proc->ioctx.root_dir = vfs_root_mount->root;
+	vfs_node_get(vfs_root_mount->root);
+	curr_proc->ioctx.curr_dir = vfs_root_mount->root;
 }
 INITCALL(vfs_init);
 
@@ -2835,6 +2858,42 @@ int sys_fs_setcwd(const char *path) {
 	 * up by io_context_setcwd(). Release the node no matter what, as upon
 	 * success it is referenced by io_context_setcwd(). */
 	ret = io_context_setcwd(&curr_proc->ioctx, node);
+	vfs_node_release(node);
+	kfree(kpath);
+	return ret;
+}
+
+/** Set the root directory.
+ *
+ * Sets both the current directory and the root directory for the calling
+ * process to the directory specified. Any processes spawned by the process
+ * after this call will also have the same root directory. Note that this
+ * function is not entirely the same as chroot() on a UNIX system: it enforces
+ * the new root by changing the current directory to it, and then does not let
+ * the process ascend out of it using '..' in a path. On UNIX systems, however,
+ * the root user is allowed to ascend out via '..'.
+ *
+ * @param path		Path to directory to change to.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_fs_setroot(const char *path) {
+	vfs_node_t *node;
+	char *kpath;
+	int ret;
+
+	/* Get the path and look it up. */
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	} else if((ret = vfs_node_lookup(kpath, true, &node)) != 0) {
+		kfree(kpath);
+		return ret;
+	}
+
+	/* Attempt to set. If the node is the wrong type, it will be picked
+	 * up by io_context_setroot(). Release the node no matter what, as upon
+	 * success it is referenced by io_context_setroot(). */
+	ret = io_context_setroot(&curr_proc->ioctx, node);
 	vfs_node_release(node);
 	kfree(kpath);
 	return ret;

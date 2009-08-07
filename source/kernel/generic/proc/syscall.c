@@ -68,6 +68,7 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_unmount,
 	(syscall_handler_t)sys_fs_getcwd,
 	(syscall_handler_t)sys_fs_setcwd,
+	(syscall_handler_t)sys_fs_setroot,
 	(syscall_handler_t)sys_fs_info,
 	(syscall_handler_t)sys_fs_link,
 	(syscall_handler_t)sys_fs_unlink,
