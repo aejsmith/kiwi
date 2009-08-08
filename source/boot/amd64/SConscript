@@ -25,47 +25,35 @@ dist = envmgr['dist']
 def iso_image_func(target, source, env):
 	grubdir = str(env['GRUBDIR'])
 	kernel = str(env['KERNEL'])
+	bootimg = str(env['BOOTIMG'])
 
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwiiso')
 	os.makedirs(os.path.join(tmpdir, 'boot', 'grub'))
-	os.makedirs(os.path.join(tmpdir, 'kernel'))
-	os.makedirs(os.path.join(tmpdir, 'modules'))
-	os.makedirs(os.path.join(tmpdir, 'applications'))
 
 	# Copy stuff into it.
 	shutil.copy(os.path.join(grubdir, 'stage2_eltorito'), os.path.join(tmpdir, 'boot', 'grub'))
-	shutil.copy(kernel, os.path.join(tmpdir, 'kernel'))
-	for module in env['MODULES']:
-		shutil.copy(str(module), os.path.join(tmpdir, 'modules'))
-	for app in env['BOOTAPPS']:
-		shutil.copy(str(app), os.path.join(tmpdir, 'applications'))
+	shutil.copy(kernel, tmpdir)
+	shutil.copy(bootimg, tmpdir)
 
 	# Create the GRUB menu.lst.
 	f = open(os.path.join(tmpdir, 'boot', 'grub', 'menu.lst'), 'w')
 	f.write('default 0\n')
 	f.write('timeout 5\n\n')
 	f.write('title Kiwi v%s (%s-%s)\n' % (env['KIWI_VER_STRING'], config['ARCH'], config['PLATFORM']))
-	f.write('	kernel /kernel/%s\n' % (os.path.basename(kernel)))
-	for module in env['MODULES']:
-		f.write('	module /modules/%s\n' % (os.path.basename(str(module))))
-	for app in env['BOOTAPPS']:
-		f.write('	module /applications/%s\n' % (os.path.basename(str(app))))
+	f.write('	kernel /%s\n' % (os.path.basename(kernel)))
+	f.write('	module /%s\n' % (os.path.basename(bootimg)))
 	f.close()
 
 	# Create the ISO.
-	if envmgr.verbose:
-		verbose = ''
-	else:
-		verbose = '>> /dev/null 2>&1'
+	verbose = envmgr.verbose and '' or '>> /dev/null 2>&1'
 	ret = os.system('mkisofs -J -R -l -b boot/grub/stage2_eltorito ' + \
 	                '-boot-load-size 4 -boot-info-table -no-emul-boot ' + \
 	                '-o %s %s %s' % (target[0], tmpdir, verbose))
-	if ret != 0:
-		return ret
 
 	# Clean up.
 	shutil.rmtree(tmpdir)
+	return ret
 
 dist['GRUBDIR'] = Dir('#source/boot/%s/grub' % (config['ARCH']))
 dist['BUILDERS']['ISOImage'] = Builder(action=Action(iso_image_func, '$GENCOMSTR'))

@@ -31,7 +31,7 @@
 #include <platform/multiboot.h>
 
 #include <assert.h>
-#include <bootmod.h>
+#include <bootimg.h>
 #include <fatal.h>
 
 #if CONFIG_PMM_DEBUG
@@ -158,41 +158,20 @@ void multiboot_premm_init(multiboot_info_t *info) {
 
 /** Save a copy of all required Multiboot information.
  *
- * Saves a copy of all required Multiboot information such as modules and
- * kernel command line. This is done because their virtual addresses get
- * unmapped by the architecture, and their current physical location is
+ * Saves a copy of all required Multiboot information such as the boot image
+ * and the kernel command line. This is done because their virtual addresses
+ * get unmapped by the architecture, and their current physical location is
  * reclaimed by the PMM.
  */
 void multiboot_postmm_init(void) {
 	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
-	char *name, *tmp;
-	size_t i;
 
 	if(mb_info->mods_count == 0) {
-		return;
+		fatal("No boot image provided, cannot continue");
+	} else if(mb_info->mods_count > 1) {
+		kprintf(LOG_WARN, "platform: multiple modules were loaded, assuming first is boot image\n");
 	}
 
-	/* Save a copy of all modules - convert multiboot_module_t
-	 * structures to bootmod_t. */
-	bootmod_count = mb_info->mods_count;
-	bootmod_array = kcalloc(bootmod_count, sizeof(bootmod_t), MM_FATAL);
-	for(i = 0; i < bootmod_count; i++) {
-		/* We only want the base name, take off any path strings. */
-		name = strrchr((char *)((ptr_t)mods[i].string), '/');
-		if(name == NULL) {
-			name = (char *)((ptr_t)mods[i].string);
-		} else {
-			/* Point past the /. */
-			name += 1;
-		}
-
-		/* Split off arguments to the module. */
-		tmp = name;
-		strsep(&tmp, " ");
-
-		/* Duplicate the name string and the module data. */
-		bootmod_array[i].name = kstrdup(name, MM_FATAL);
-		bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
-		bootmod_array[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start), bootmod_array[i].size, MM_FATAL);
-	}
+	bootimg_size = mods[0].mod_end - mods[0].mod_start;
+	bootimg_addr = (ptr_t)kmemdup((void *)((ptr_t)mods[0].mod_start), bootimg_size, MM_FATAL);
 }

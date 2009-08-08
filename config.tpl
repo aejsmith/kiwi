@@ -44,7 +44,7 @@ Choice('PLATFORM', 'Platform to compile for.', (
 Section('IA32/AMD64-specific options', {'ARCH': lambda x: x in ['ia32', 'amd64']})
 #######
 
-Choice('X86_SERIAL_PORT', 'Serial port to use for log output.', (
+Choice('X86_SERIAL_PORT', 'Serial port to use for kernel console output.', (
 	(0, 'Disabled.'),
 	(1, 'COM1.'),
 	(2, 'COM2.'),

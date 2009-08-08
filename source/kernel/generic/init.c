@@ -40,7 +40,7 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <bootmod.h>
+#include <bootimg.h>
 #include <fatal.h>
 #include <init.h>
 #include <version.h>
@@ -68,8 +68,8 @@ static void init_thread(void *arg1, void *arg2) {
 	/* Reclaim memory taken up by temporary initialization code/data. */
 	page_init_reclaim();
 
-	/* Load modules provided at boot. */
-	bootmod_load();
+	/* Load the boot image. */
+	bootimg_load();
 }
 
 /** Kernel initialization function.

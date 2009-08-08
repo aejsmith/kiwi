@@ -12,8 +12,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env', 'config', 'envmgr')
 
-env['BOOTAPPS'] += env.Program('startup', [
+env.Program('startup', [
 	'main.c',
 ])
+
+envmgr['dist']['STARTUP'] = File('startup')
