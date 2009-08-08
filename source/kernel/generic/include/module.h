@@ -21,14 +21,13 @@
 #ifndef __MODULE_H
 #define __MODULE_H
 
+#include <io/vfs.h>
+
 #include <types/list.h>
 #include <types/refcount.h>
 
 #include <elf.h>
 #include <symbol.h>
-
-/** Filename extension of kernel modules. */
-#define MODULE_EXTENSION	".mod"
 
 /** Maximum length of a module name. */
 #define MODULE_NAME_MAX		16
@@ -46,6 +45,7 @@ typedef struct module {
 	/** Internally-used information. */
 	symbol_table_t symtab;		/**< Symbol table for the module. */
 	refcount_t count;		/**< Count of modules depending on this module. */
+	vfs_node_t *node;		/**< Node for the module (only valid while loading). */
 
 	/** Module information. */
 	const char *name;		/**< Name of module. */
@@ -90,12 +90,13 @@ typedef struct module {
         static const char *__module_export_##msym \
                 __section(".modexports") __used = #msym
 
-extern bool module_check(void *image, size_t size);
-extern int module_load(void *image, size_t size, char *depbuf);
+extern int module_load(const char *path, char *depbuf);
 
 extern symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp);
 extern symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported);
 
 extern int kdbg_cmd_modules(int argc, char **argv);
+
+extern int sys_module_load(const char *path, char *depbuf);
 
 #endif /* __MODULE_H */

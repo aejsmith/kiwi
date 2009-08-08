@@ -531,9 +531,6 @@ typedef struct {
 	Elf64_Word n_type;			/**< Type of the note. */
 } __packed Elf64_Note;
 
-/** Pull in architecture definitions of the types to use. */
 #include <arch/elf.h>
-
-extern bool elf_check(void *image, size_t size, int type);
 
 #endif /* __ELF_H */

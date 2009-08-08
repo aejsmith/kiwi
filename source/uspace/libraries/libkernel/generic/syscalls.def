@@ -16,6 +16,8 @@ Service(0)
 
 Syscall('putch',		['char'])
 
+Syscall('module_load',		['ptr_t', 'ptr_t'])
+
 Syscall('handle_close',		['handle_t'])
 Syscall('handle_type',		['handle_t'])
 

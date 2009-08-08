@@ -35,7 +35,7 @@ def module_emitter(target, source, env):
 	return target, source
 env['BUILDERS']['Module'] = Builder(
 	action=Action('$LINK -r -o $TARGET $SOURCES', '$LINKCOMSTR'),
-	suffix='.mod',
+	suffix='.kmod',
 	src_suffix='$OBJSUFFIX',
 	src_builder='Object',
 	emitter=module_emitter)
