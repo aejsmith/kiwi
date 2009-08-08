@@ -120,7 +120,7 @@ class ToolchainManager:
 			for c in self.components:
 				if self.checkdeps(c) or c.check():
 					self.build(c)
-		except Exception as e:
+		except Exception, e:
 			self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
 		else:
 			self.repair()
