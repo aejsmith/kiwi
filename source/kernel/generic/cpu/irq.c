@@ -33,15 +33,19 @@
 irq_ops_t *irq_ops;
 
 /** Array of IRQ handling routines. */
-static irq_handler_t irq_handlers[IRQ_COUNT] __aligned(8);
+static struct {
+	irq_handler_t handler;		/**< Handler for the IRQ. */
+	bool preack;			/**< Whether to acknowledge before handling. */
+} irq_handlers[IRQ_COUNT];
 
 /** Registers an IRQ handler. */
-int irq_register(unative_t num, irq_handler_t handler) {
+int irq_register(unative_t num, irq_handler_t handler, bool preack) {
 	if(num >= IRQ_COUNT) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	irq_handlers[num] = handler;
+	irq_handlers[num].handler = handler;
+	irq_handlers[num].preack = preack;
 	return 0;
 }
 
@@ -51,7 +55,7 @@ int irq_remove(unative_t num) {
 	}
 
 	irq_ops->mask(num);
-	irq_handlers[num] = NULL;
+	irq_handlers[num].handler = NULL;
 	return 0;
 }
 
@@ -103,21 +107,29 @@ intr_result_t irq_handler(unative_t num, intr_frame_t *frame) {
 	num -= IRQ_BASE;
 	assert(num < IRQ_COUNT);
 
-	/* Execute any pre-handling function - on x86 this checks for
-	 * spurious IRQs, etc. */
+	/* Execute any pre-handling function. */
 	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
 		return INTR_HANDLED;
 	}
 
-	/* Dispatch the IRQ - TODO. */
-	if(irq_handlers[num]) {
-		ret = irq_handlers[num](num, frame);
+	/* Acknowledge the IRQ before handling if required. */
+	if(irq_ops->ack && irq_handlers[num].preack) {
+		irq_ops->ack(num);
+	}
+
+	/* Dispatch the IRQ. */
+	if(irq_handlers[num].handler) {
+		ret = irq_handlers[num].handler(num, frame);
 	} else {
 		kprintf(LOG_DEBUG, "irq: received unknown IRQ%" PRIun "\n", num);
 	}
 
-	/* Perform post-handling actions (i.e. send an EOI to the interrupt
-	 * controller). */
+	/* Acknowledge the IRQ after handling if required. */
+	if(irq_ops->ack && !irq_handlers[num].preack) {
+		irq_ops->ack(num);
+	}
+
+	/* Perform post-handling actions. */
 	if(irq_ops->post_handle) {
 		irq_ops->post_handle(num, frame);
 	}

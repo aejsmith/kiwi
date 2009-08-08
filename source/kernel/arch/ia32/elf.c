@@ -1,4 +1,4 @@
-/* Kiwi AMD64 module loading functions
+/* Kiwi IA32 ELF helper functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,13 +15,14 @@
 
 /**
  * @file
- * @brief		AMD64 module loading functions.
+ * @brief		IA32 ELF helper functions.
  */
 
 #include <console/kprintf.h>
 
 #include <lib/utility.h>
 
+#include <elf.h>
 #include <errors.h>
 #include <module.h>
 
@@ -31,33 +32,25 @@
 # define dprintf(fmt...)	
 #endif
 
-extern int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
-                               int (*get_sym)(module_t *, size_t, bool, elf_addr_t *));
+extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
+extern int elf_module_relocate(module_t *module, bool external);
 
 /** Perform relocations for an ELF module.
  * @param module	Module to relocate.
- * @param image		Module image read from disk.
- * @param size		Size of the module image.
  * @param external	Whether to handle external or internal symbols.
- * @param get_sym	Helper function to do symbol lookup.
  * @return		0 on success, negative error code on failure. */
-int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
-                        int (*get_sym)(module_t *, size_t, bool, elf_addr_t *)) {
-	Elf64_Addr *where64, val = 0;
-	Elf64_Shdr *sect, *targ;
-	Elf32_Addr *where32;
-	Elf64_Rela *rel;
-	size_t i, r;
+int elf_module_relocate(module_t *module, bool external) {
+	Elf32_Addr *where32, val = 0;
+	size_t i, r, bytes, size;
+	Elf32_Shdr *sect, *targ;
+	offset_t offset;
+	Elf32_Rel rel;
 	int ret;
 
 	/* Look for relocation sections in the module. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
 		sect = MODULE_ELF_SECT(module, i);
-		if(sect->sh_type != ELF_SHT_RELA) {
-			if(sect->sh_type == ELF_SHT_REL) {
-				dprintf("module: ELF_SHT_REL relocation section unsupported\n");
-				return -ERR_NOT_IMPLEMENTED;
-			}
+		if(sect->sh_type != ELF_SHT_REL && sect->sh_type != ELF_SHT_RELA) {
 			continue;
 		}
 
@@ -66,13 +59,18 @@ int module_elf_relocate(module_t *module, void *image, size_t size, bool externa
 
 		/* Loop through all the relocations. */
 		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
-			rel = (Elf64_Rela *)(image + sect->sh_offset + (r * sect->sh_entsize));
+			offset = (offset_t)sect->sh_offset + (r * sect->sh_entsize);
+			size = (sect->sh_type == ELF_SHT_RELA) ? sizeof(Elf32_Rela) : sizeof(Elf32_Rel);
+			if((ret = vfs_file_read(module->node, &rel, size, offset, &bytes)) != 0) {
+				return ret;
+			} else if(bytes != size) {
+				return -ERR_FORMAT_INVAL;
+			}
 
 			/* Get the location of the relocation. */
-			where64 = (Elf64_Addr *)(targ->sh_addr + rel->r_offset);
-			where32 = (Elf32_Addr *)(targ->sh_addr + rel->r_offset);
+			where32 = (Elf32_Addr *)(targ->sh_addr + rel.r_offset);
 
-			ret = get_sym(module, ELF64_R_SYM(rel->r_info), external, &val);
+			ret = elf_module_get_sym(module, ELF32_R_SYM(rel.r_info), external, &val);
 			if(ret < 0) {
 				return ret;
 			} else if(ret == 0) {
@@ -80,24 +78,18 @@ int module_elf_relocate(module_t *module, void *image, size_t size, bool externa
 			}
 
 			/* Perform the actual relocation. */
-			switch(ELF64_R_TYPE(rel->r_info)) {
-			case ELF_R_X86_64_NONE:
+			switch(ELF32_R_TYPE(rel.r_info)) {
+			case ELF_R_386_NONE:
 				break;
-			case ELF_R_X86_64_32:
-				*where32 = val + rel->r_addend;
+			case ELF_R_386_32:
+				*where32 = val + *where32;
 				break;
-			case ELF_R_X86_64_64:
-				*where64 = val + rel->r_addend;
-				break;
-			case ELF_R_X86_64_PC32:
-				*where32 = (val + rel->r_addend) - (ptr_t)where32;
-				break;
-			case ELF_R_X86_64_32S:
-				*where32 = val + rel->r_addend;
+			case ELF_R_386_PC32:
+				*where32 = val + *where32 - (uint32_t)where32;
 				break;
 			default:
 				dprintf("module: encountered unknown relocation type: %lu\n",
-				        ELF64_R_TYPE(rel->r_info));
+				        ELF32_R_TYPE(rel.r_info));
 				return -ERR_FORMAT_INVAL;
 			}
 		}

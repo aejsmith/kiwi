@@ -166,7 +166,7 @@ static uint64_t __init_text lapic_get_freq(void) {
 	out8(0x40, base >> 8);
 
 	/* Set our temporary PIT handler. */
-	if(irq_register(0, lapic_pit_handler) != 0 || irq_unmask(0)) {
+	if(irq_register(0, lapic_pit_handler, true) != 0 || irq_unmask(0)) {
 		fatal("APIC could not grab PIT");
 	}
 

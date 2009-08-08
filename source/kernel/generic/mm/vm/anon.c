@@ -494,7 +494,7 @@ vm_object_t *vm_anon_object_create(size_t size, vm_object_t *source, offset_t of
 		source->ops->get(source, NULL);
 	}
 
-	dprintf("vm: created anonymous object %p (size: %zu, pages: %zu, source: %p, offset: %" PRIo ")\n",
+	dprintf("vm: created anonymous object %p (size: %zu, pages: %zu, source: %p, offset: %" PRId64 ")\n",
 	        obj, size, obj->max_size, source, offset);
 	return &obj->header;
 }

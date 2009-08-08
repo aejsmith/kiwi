@@ -846,7 +846,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 			*pagep = page;
 		}
 
-		dprintf("vfs: retreived cached page 0x%" PRIpp " from offset %" PRIo " in %p\n",
+		dprintf("vfs: retreived cached page 0x%" PRIpp " from offset %" PRId64 " in %p\n",
 		        page->addr, offset, node);
 		return 0;
 	}
@@ -880,7 +880,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 	avl_tree_insert(&node->pages, (key_t)offset, page, NULL);
 	mutex_unlock(&node->lock);
 
-	dprintf("vfs: cached new page 0x%" PRIpp " at offset %" PRIo " in %p\n",
+	dprintf("vfs: cached new page 0x%" PRIpp " at offset %" PRId64 " in %p\n",
 	        page->addr, offset, node);
 
 	/* Map it in if required. If we had to read page data in, reuse the
@@ -914,7 +914,7 @@ static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bo
 		fatal("Tried to release page that isn't cached");
 	}
 
-	dprintf("vfs: released page 0x%" PRIpp " at offset %" PRIo " in %p\n",
+	dprintf("vfs: released page 0x%" PRIpp " at offset %" PRId64 " in %p\n",
 	        page->addr, offset, node);
 
 	/* Mark as dirty if requested. */
@@ -2111,7 +2111,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		AVL_TREE_FOREACH(&node->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
-			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRIo " Flags: %d\n",
+			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRId64 " Flags: %d\n",
 			        page->addr, page->offset, page->flags);
 		}
 	}

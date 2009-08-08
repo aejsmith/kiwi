@@ -34,6 +34,7 @@
 
 #include <errors.h>
 #include <fatal.h>
+#include <module.h>
 
 /** Print a character to the screen.
  * @param ch		Character to print.
@@ -46,6 +47,9 @@ static int sys_putch(char ch) {
 /** Table of system calls. */
 static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_putch,
+
+	/** Module loader system calls. */
+	(syscall_handler_t)sys_module_load,
 
 	/** Handle system calls. */
 	(syscall_handler_t)sys_handle_close,

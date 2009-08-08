@@ -1,4 +1,4 @@
-/* Kiwi IA32 module loading functions
+/* Kiwi AMD64 ELF helper functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,13 +15,14 @@
 
 /**
  * @file
- * @brief		IA32 module loading functions.
+ * @brief		AMD64 ELF helper functions.
  */
 
 #include <console/kprintf.h>
 
 #include <lib/utility.h>
 
+#include <elf.h>
 #include <errors.h>
 #include <module.h>
 
@@ -31,28 +32,30 @@
 # define dprintf(fmt...)	
 #endif
 
-extern int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
-                               int (*get_sym)(module_t *, size_t, bool, elf_addr_t *));
+extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
+extern int elf_module_relocate(module_t *module, bool external);
 
 /** Perform relocations for an ELF module.
  * @param module	Module to relocate.
- * @param image		Module image read from disk.
- * @param size		Size of the module image.
  * @param external	Whether to handle external or internal symbols.
- * @param get_sym	Helper function to do symbol lookup.
  * @return		0 on success, negative error code on failure. */
-int module_elf_relocate(module_t *module, void *image, size_t size, bool external,
-                        int (*get_sym)(module_t *, size_t, bool, elf_addr_t *)) {
-	Elf32_Addr *where32, val = 0;
-	Elf32_Shdr *sect, *targ;
-	Elf32_Rel *rel;
-	size_t i, r;
+int elf_module_relocate(module_t *module, bool external) {
+	Elf64_Addr *where64, val = 0;
+	Elf64_Shdr *sect, *targ;
+	Elf32_Addr *where32;
+	size_t i, r, bytes;
+	offset_t offset;
+	Elf64_Rela rel;
 	int ret;
 
 	/* Look for relocation sections in the module. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
 		sect = MODULE_ELF_SECT(module, i);
-		if(sect->sh_type != ELF_SHT_REL && sect->sh_type != ELF_SHT_RELA) {
+		if(sect->sh_type != ELF_SHT_RELA) {
+			if(sect->sh_type == ELF_SHT_REL) {
+				dprintf("elf: ELF_SHT_REL relocation section unsupported\n");
+				return -ERR_NOT_IMPLEMENTED;
+			}
 			continue;
 		}
 
@@ -61,12 +64,18 @@ int module_elf_relocate(module_t *module, void *image, size_t size, bool externa
 
 		/* Loop through all the relocations. */
 		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
-			rel = (Elf32_Rel *)(image + sect->sh_offset + (r * sect->sh_entsize));
+			offset = (offset_t)sect->sh_offset + (r * sect->sh_entsize);
+			if((ret = vfs_file_read(module->node, &rel, sizeof(Elf64_Rela), offset, &bytes)) != 0) {
+				return ret;
+			} else if(bytes != sizeof(Elf64_Rela)) {
+				return -ERR_FORMAT_INVAL;
+			}
 
 			/* Get the location of the relocation. */
-			where32 = (Elf32_Addr *)(targ->sh_addr + rel->r_offset);
+			where64 = (Elf64_Addr *)(targ->sh_addr + rel.r_offset);
+			where32 = (Elf32_Addr *)(targ->sh_addr + rel.r_offset);
 
-			ret = get_sym(module, ELF32_R_SYM(rel->r_info), external, &val);
+			ret = elf_module_get_sym(module, ELF64_R_SYM(rel.r_info), external, &val);
 			if(ret < 0) {
 				return ret;
 			} else if(ret == 0) {
@@ -74,18 +83,24 @@ int module_elf_relocate(module_t *module, void *image, size_t size, bool externa
 			}
 
 			/* Perform the actual relocation. */
-			switch(ELF32_R_TYPE(rel->r_info)) {
-			case ELF_R_386_NONE:
+			switch(ELF64_R_TYPE(rel.r_info)) {
+			case ELF_R_X86_64_NONE:
 				break;
-			case ELF_R_386_32:
-				*where32 = val + *where32;
+			case ELF_R_X86_64_32:
+				*where32 = val + rel.r_addend;
 				break;
-			case ELF_R_386_PC32:
-				*where32 = val + *where32 - (uint32_t)where32;
+			case ELF_R_X86_64_64:
+				*where64 = val + rel.r_addend;
+				break;
+			case ELF_R_X86_64_PC32:
+				*where32 = (val + rel.r_addend) - (ptr_t)where32;
+				break;
+			case ELF_R_X86_64_32S:
+				*where32 = val + rel.r_addend;
 				break;
 			default:
 				dprintf("module: encountered unknown relocation type: %lu\n",
-				        ELF32_R_TYPE(rel->r_info));
+				        ELF64_R_TYPE(rel.r_info));
 				return -ERR_FORMAT_INVAL;
 			}
 		}

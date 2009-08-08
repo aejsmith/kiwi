@@ -44,7 +44,7 @@ static void pit_enable(void) {
 	out8(0x40, base & 0xFF);
 	out8(0x40, base >> 8);
 
-	irq_register(0, pit_handler);
+	irq_register(0, pit_handler, true);
 	irq_unmask(0);
 }
 

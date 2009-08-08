@@ -28,13 +28,26 @@
 /** IRQ management operations. */
 typedef struct irq_ops {
 	/** Pre-handling function.
-	 * @return	True if IRQ should be handled. */
+	 * @param num		IRQ number.
+	 * @param frame		Interrupt frame.
+	 * @return		True if IRQ should be handled. */
 	bool (*pre_handle)(unative_t num, intr_frame_t *frame);
-	/** Post-handling function. */
+
+	/** Post-handling function.
+	 * @param num		IRQ number.
+	 * @param frame		Interrupt frame. */
 	void (*post_handle)(unative_t num, intr_frame_t *frame);
-	/** IRQ mask function. */
+
+	/** Acknowledge IRQ function.
+	 * @param num		IRQ number. */
+	void (*ack)(unative_t num);
+
+	/** IRQ mask function.
+	 * @param num		IRQ number. */
 	void (*mask)(unative_t num);
-	/** IRQ unmask function. */
+
+	/** IRQ unmask function.
+	 * @param num		IRQ number. */
 	void (*unmask)(unative_t num);
 } irq_ops_t;
 
@@ -44,7 +57,7 @@ typedef intr_result_t (*irq_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern irq_ops_t *irq_ops;
 
-extern int irq_register(unative_t num, irq_handler_t handler);
+extern int irq_register(unative_t num, irq_handler_t handler, bool preack);
 extern int irq_remove(unative_t num);
 extern int irq_mask(unative_t num);
 extern int irq_unmask(unative_t num);
