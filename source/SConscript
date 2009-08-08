@@ -34,8 +34,11 @@ def boot_image_func(target, source, env):
 
 	# Create the TAR file.
 	tar = tarfile.open(str(target[0]), 'w:gz')
-	for f in glob.glob(os.path.join(tmpdir, '*')):
-		tar.add(f, os.path.relpath(f, tmpdir))
+	cwd = os.getcwd()
+	os.chdir(tmpdir)
+	for f in glob.glob('*'):
+		tar.add(f)
+	os.chdir(cwd)
 	tar.close()
 
 	# Clean up.
