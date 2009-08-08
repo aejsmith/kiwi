@@ -38,9 +38,6 @@ typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t key_t;			/**< Type used to identify something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
-/** Format definitions for Kiwi-specific types. */
-#define PRIo		PRId64		/**< Format character for offset_t. */
-
 /** Various definitions. */
 #define false		0		/**< False boolean value. */
 #define true		1		/**< True boolean value. */

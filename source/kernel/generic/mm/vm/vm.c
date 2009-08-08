@@ -911,7 +911,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	AVL_TREE_FOREACH(&as->regions, iter) {
 		region = avl_tree_entry(iter, vm_region_t);
 
-		kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %" PRIo "\n",
+		kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %" PRId64 "\n",
 		        region->start, region->end, region->flags,
 		        region->object, region->offset);
 	}
