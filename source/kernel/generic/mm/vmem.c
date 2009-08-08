@@ -882,7 +882,7 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 }
 
 /** Add the initial tags to the boundary tag list. */
-void vmem_early_init(void) {
+void __init_text vmem_early_init(void) {
 	size_t i;
 
 	for(i = 0; i < VMEM_BOOT_TAG_COUNT; i++) {
@@ -894,7 +894,7 @@ void vmem_early_init(void) {
 }
 
 /** Create the boundary tag arena. */
-void vmem_init(void) {
+void __init_text vmem_init(void) {
 	/* Create the boundary tag arena. */
 	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,

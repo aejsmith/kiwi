@@ -141,10 +141,10 @@ static intr_result_t lapic_timer_handler(unative_t num, intr_frame_t *frame) {
  */
 
 /** Tick count used during CPU bus frequency calculation. */
-static volatile uint32_t freq_tick_count = 0;
+static volatile uint32_t freq_tick_count __init_data = 0;
 
 /** PIT handler for bus frequency calculation. */
-static intr_result_t lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
+static intr_result_t __init_text lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
 	freq_tick_count++;
 	return INTR_HANDLED;
 }
@@ -152,7 +152,7 @@ static intr_result_t lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
 /** Find out the CPU bus frequency.
  * @todo		This shouldn't depend on platform-specific stuff.
  * @return		CPU bus frequency. */
-static uint64_t lapic_get_freq(void) {
+static uint64_t __init_text lapic_get_freq(void) {
 	uint64_t current;
 	uint16_t base;
 	uint32_t old;
@@ -245,7 +245,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
  *
  * @return		Whether initialization succeeded.
  */
-bool lapic_init(void) {
+bool __init_text lapic_init(void) {
 	phys_ptr_t base;
 
 	if(!CPU_HAS_APIC(curr_cpu)) {

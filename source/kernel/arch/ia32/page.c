@@ -490,7 +490,7 @@ void page_phys_unmap(void *addr, size_t size) {
 
 /** Convert a large page to a page table if necessary.
  * @param virt		Virtual address to check. */
-static void page_large_to_ptbl(ptr_t virt) {
+static void __init_text page_large_to_ptbl(ptr_t virt) {
 	int pde = (virt % 0x40000000) / 0x200000, i;
 	phys_ptr_t page;
 	uint64_t *ptbl;
@@ -520,7 +520,7 @@ static void page_large_to_ptbl(ptr_t virt) {
  * @param flag		Flag to set.
  * @param start		Start virtual address.
  * @param end		End virtual address.  */
-static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
+static inline void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	uint64_t *ptbl;
 	ptr_t i;
 	int ret;
@@ -546,7 +546,7 @@ static void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
  * @param flag		Flag to set.
  * @param start		Start virtual address.
  * @param end		End virtual address.  */
-static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
+static void __init_text page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 	uint64_t *ptbl;
 	ptr_t i;
 	int ret;
@@ -568,7 +568,7 @@ static void page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
 }
 
 /** Set up the kernel page map. */
-void page_arch_init(void) {
+void __init_text page_arch_init(void) {
 	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
 	kernel_page_map.pdp = KA2PA(__boot_pdp);
 	kernel_page_map.user = false;
@@ -586,7 +586,7 @@ void page_arch_init(void) {
 }
 
 /** Mark kernel sections as read-only/no-execute and unmap identity mapping. */
-void page_late_init(void) {
+void __init_text page_late_init(void) {
 	/* Mark .text and .rodata as read-only. OK to round down - __text_start
 	 * is only non-aligned because of the SIZEOF_HEADERS in the linker
 	 * script. */

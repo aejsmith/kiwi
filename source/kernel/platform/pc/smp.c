@@ -45,7 +45,7 @@
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		True if checksum is correct, false if not. */
-static bool smp_mps_checksum(uint8_t *range, size_t size) {
+static inline bool smp_mps_checksum(uint8_t *range, size_t size) {
 	uint8_t checksum = 0;
 	size_t i;
 
@@ -60,7 +60,7 @@ static bool smp_mps_checksum(uint8_t *range, size_t size) {
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		Pointer to FP if found, NULL if not. */
-static mp_fptr_t *smp_mps_find_fp(phys_ptr_t start, size_t size) {
+static inline mp_fptr_t *smp_mps_find_fp(phys_ptr_t start, size_t size) {
 	mp_fptr_t *fp;
 	size_t i;
 
@@ -88,7 +88,7 @@ static mp_fptr_t *smp_mps_find_fp(phys_ptr_t start, size_t size) {
 
 /** Detect CPUs using the MPS tables.
  * @return		True if succeeded, false if not. */
-static bool smp_detect_mps(void) {
+static inline bool smp_detect_mps(void) {
 	ptr_t ebda, entry;
 	mp_config_t *cfg;
 	mp_fptr_t *fp;
@@ -153,7 +153,7 @@ static bool smp_detect_mps(void) {
 
 /** Detect CPUs using ACPI.
  * @return		True if succeeded, false if not. */
-static bool smp_detect_acpi(void) {
+static inline bool smp_detect_acpi(void) {
 	acpi_madt_lapic_t *lapic;
 	acpi_madt_t *madt;
 	size_t i, length;
@@ -188,7 +188,7 @@ static bool smp_detect_acpi(void) {
  * Detects all secondary CPUs in the current system, using the ACPI tables
  * where possible. Falls back on the MP tables if ACPI is unavailable.
  */
-void smp_detect_cpus(void) {
+void __init_text smp_detect_cpus(void) {
 	/* Do not do anything if we do not have a local APIC on the BSP. */
 	if(!lapic_enabled) {
 		return;

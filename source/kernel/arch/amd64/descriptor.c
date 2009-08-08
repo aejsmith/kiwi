@@ -58,7 +58,7 @@ gdt_pointer_t __boot_gdtp = {
 };
 
 /** Set up the GDT for the current CPU. */
-static void gdt_init(void) {
+static void __init_text gdt_init(void) {
 	gdt_tss_entry_t *desc;
 	size_t size;
 	ptr_t base;
@@ -85,7 +85,7 @@ static void gdt_init(void) {
 }
 
 /** Set up the TSS for the current CPU. */
-static void tss_init(void) {
+static void __init_text tss_init(void) {
 	ptr_t stack = (ptr_t)__doublefault_stack;
 
 	/* Set up the contents of the TSS. Point the first IST entry at the
@@ -102,7 +102,7 @@ static void tss_init(void) {
 }
 
 /** Initialize the IDT shared by all CPUs. */
-static void idt_init(void) {
+static inline void idt_init(void) {
 	unative_t i;
 	ptr_t addr;
 
@@ -136,7 +136,7 @@ static void idt_init(void) {
 }
 
 /** Initialize descriptor tables for the boot CPU. */
-void descriptor_init(void) {
+void __init_text descriptor_init(void) {
 	gdt_init();
 	tss_init();
 
@@ -149,7 +149,7 @@ void descriptor_init(void) {
 }
 
 /** Initialize descriptor tables for an application CPU. */
-void descriptor_ap_init(void) {
+void __init_text descriptor_ap_init(void) {
 	/* The GDT/TSS setup procedures are the same on both the BSP and APs,
 	 * so just call the functions for them. */
 	gdt_init();

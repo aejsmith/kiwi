@@ -51,7 +51,7 @@ static intr_result_t syscall_intr_handler(unative_t num, intr_frame_t *frame) {
  *
  * @param data		Multiboot information pointer.
  */
-void arch_premm_init(void *data) {
+void __init_text arch_premm_init(void *data) {
 	descriptor_init();
 	cpu_arch_init(&curr_cpu->arch);
 }
@@ -61,7 +61,7 @@ void arch_premm_init(void *data) {
  * Second stage startup code for the IA32 architecture, run after the memory
  * allocation subsystem is set up.
  */
-void arch_postmm_init(void) {
+void __init_text arch_postmm_init(void) {
 	lapic_init();
 	intr_register(SYSCALL_INT_NO, syscall_intr_handler);
 }
@@ -71,12 +71,12 @@ void arch_postmm_init(void) {
  * Third stage startup code for the IA32 architecture, unmaps the temporary
  * identity mapping used during boot.
  */
-void arch_final_init(void) {
+void __init_text arch_final_init(void) {
 	page_late_init();
 }
 
 /** Architecture initialization for an AP. */
-void arch_ap_init(void) {
+void __init_text arch_ap_init(void) {
 	descriptor_ap_init();
 	cpu_arch_init(&curr_cpu->arch);
 

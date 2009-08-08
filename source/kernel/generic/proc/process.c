@@ -232,7 +232,7 @@ int process_reset(process_t *process, const char *name, vm_aspace_t *aspace) {
 }
 
 /** Initialize the process table and slab cache. */
-void process_init(void) {
+void __init_text process_init(void) {
 	int ret;
 
 	/* Create the process slab cache and ID Vmem arena. */

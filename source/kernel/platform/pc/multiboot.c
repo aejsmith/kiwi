@@ -60,7 +60,7 @@ static multiboot_info_t *mb_info;
  * @todo		Check that addresses are within the physical address
  *			size supported by the processor.
  */
-void page_platform_init(void) {
+void __init_text page_platform_init(void) {
 	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
 	multiboot_memmap_t *map = (multiboot_memmap_t *)((ptr_t)mb_info->mmap_addr);
 	phys_ptr_t start, end;
@@ -146,7 +146,7 @@ void page_platform_init(void) {
  *
  * @param info		Multiboot information pointer.
  */
-void multiboot_premm_init(multiboot_info_t *info) {
+void __init_text multiboot_premm_init(multiboot_info_t *info) {
 	/* Check for required Multiboot flags. */
 	CHECK_MB_FLAG(info, MB_FLAG_MEMINFO);
 	CHECK_MB_FLAG(info, MB_FLAG_MMAP);
@@ -163,7 +163,7 @@ void multiboot_premm_init(multiboot_info_t *info) {
  * get unmapped by the architecture, and their current physical location is
  * reclaimed by the PMM.
  */
-void multiboot_postmm_init(void) {
+void __init_text multiboot_postmm_init(void) {
 	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
 
 	if(mb_info->mods_count == 0) {

@@ -43,7 +43,7 @@ static size_t acpi_table_count = 0;
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		True if checksum is correct, false if not. */
-static bool acpi_checksum(ptr_t range, size_t size) {
+static inline bool acpi_checksum(ptr_t range, size_t size) {
 	uint8_t checksum = 0;
 	size_t i;
 
@@ -56,7 +56,7 @@ static bool acpi_checksum(ptr_t range, size_t size) {
 
 /** Map a table, copy it and add it to the table array.
  * @param addr		Address of table. */
-static void acpi_table_copy(phys_ptr_t addr) {
+static void __init_text acpi_table_copy(phys_ptr_t addr) {
 	acpi_header_t *source;
 
 	/* Map the table on the heap. */
@@ -86,7 +86,7 @@ static void acpi_table_copy(phys_ptr_t addr) {
  * @param start		Start of range to check.
  * @param size		Size of range to check.
  * @return		Pointer to RSDP if found, NULL if not. */
-static acpi_rsdp_t *acpi_rsdp_find(phys_ptr_t start, size_t size) {
+static inline acpi_rsdp_t *acpi_rsdp_find(phys_ptr_t start, size_t size) {
 	acpi_rsdp_t *rsdp;
 	size_t i;
 
@@ -122,7 +122,7 @@ static acpi_rsdp_t *acpi_rsdp_find(phys_ptr_t start, size_t size) {
 /** Parse the XSDT and create a copy of all its tables.
  * @param addr		Address of XSDT.
  * @return		True if succeeded, false if not. */
-static bool acpi_parse_xsdt(uint32_t addr) {
+static inline bool acpi_parse_xsdt(uint32_t addr) {
 	acpi_xsdt_t *source;
 	size_t i, count;
 
@@ -152,7 +152,7 @@ static bool acpi_parse_xsdt(uint32_t addr) {
 /** Parse the RSDT and create a copy of all its tables.
  * @param addr		Address of RSDT.
  * @return		True if succeeded, false if not. */
-static bool acpi_parse_rsdt(uint32_t addr) {
+static inline bool acpi_parse_rsdt(uint32_t addr) {
 	acpi_rsdt_t *source;
 	size_t i, count;
 
@@ -202,7 +202,7 @@ acpi_header_t *acpi_table_find(const char *signature) {
 }
 
 /** Detect ACPI presence and find needed tables. */
-void acpi_init(void) {
+void __init_text acpi_init(void) {
 	acpi_rsdp_t *rsdp;
 	ptr_t ebda;
 

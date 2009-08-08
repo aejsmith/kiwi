@@ -95,7 +95,7 @@ cpu_id_t cpu_current_id(void) {
  *
  * @param cpu		CPU information structure to fill in.
  */
-void cpu_arch_init(cpu_arch_t *cpu) {
+void __init_text cpu_arch_init(cpu_arch_t *cpu) {
 	uint32_t eax, ebx, ecx, edx;
 	size_t i = 0, j = 0;
 	uint32_t *ptr;

@@ -312,7 +312,7 @@ static console_t serial_console = {
  */
 
 /** Set up the console. */
-void console_early_init(void) {
+void __init_text console_early_init(void) {
 #ifdef SERIAL_PORT
 	uint8_t status = in8(SERIAL_PORT + 6);
 
@@ -325,7 +325,7 @@ void console_early_init(void) {
 }
 
 /** Relocate the VGA memory mapping. */
-void console_late_init(void) {
+void __init_text console_late_init(void) {
 	void *addr;
 
 	addr = page_phys_map(VGA_MEM_PHYS, VGA_CONSOLE_COLS * VGA_CONSOLE_ROWS * 2, 0);

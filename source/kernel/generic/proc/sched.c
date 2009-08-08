@@ -558,7 +558,7 @@ void sched_idle(void) {
 }
 
 /** Initialize the scheduler for the current CPU. */
-void sched_init(void) {
+void __init_text sched_init(void) {
 	char name[THREAD_NAME_MAX];
 	int i;
 

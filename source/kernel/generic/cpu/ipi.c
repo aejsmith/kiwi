@@ -364,7 +364,7 @@ void ipi_acknowledge(void *ptr, int status) {
 }
 
 /** Initialize the IPI message pool.  */
-void ipi_init(void) {
+void __init_text ipi_init(void) {
 	size_t i, count = cpu_count * IPI_MESSAGES_PER_CPU;
 	ipi_message_t *messages;
 

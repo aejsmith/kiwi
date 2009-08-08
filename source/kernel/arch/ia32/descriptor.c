@@ -63,7 +63,7 @@ gdt_pointer_t __boot_gdtp = {
 /** Set the base address of a segment.
  * @param sel		Segment to modify.
  * @param base		New base address of the segment. */
-static void gdt_set_base(int sel, ptr_t base) {
+static inline void gdt_set_base(int sel, ptr_t base) {
 	curr_cpu->arch.gdt[sel / 0x08].base0 = (base & 0xFFFF);
 	curr_cpu->arch.gdt[sel / 0x08].base1 = (base >> 16) & 0xFF;
 	curr_cpu->arch.gdt[sel / 0x08].base2 = (base >> 24) & 0xFF;
@@ -72,13 +72,13 @@ static void gdt_set_base(int sel, ptr_t base) {
 /** Set the limit of a segment.
  * @param sel		Segment to modify.
  * @param limit		New limit of the segment. */
-static void gdt_set_limit(int sel, size_t limit) {
+static inline void gdt_set_limit(int sel, size_t limit) {
 	curr_cpu->arch.gdt[sel / 0x08].limit0 = (limit & 0xFFFF);
 	curr_cpu->arch.gdt[sel / 0x08].limit1 = (limit >> 16) & 0xF;
 }
 
 /** Set up the GDT for the current CPU. */
-static void gdt_init(void) {
+static void __init_text gdt_init(void) {
 	/* Create a copy of the statically allocated GDT. */
 	memcpy(curr_cpu->arch.gdt, __initial_gdt, sizeof(__initial_gdt));
 
@@ -93,7 +93,7 @@ static void gdt_init(void) {
 }
 
 /** Set up the TSS for the current CPU. */
-static void tss_init(void) {
+static void __init_text tss_init(void) {
 	ptr_t stack;
 
 	/* Set up the contents of the TSS. */
@@ -120,7 +120,7 @@ static void tss_init(void) {
 }
 
 /** Initialize the IDT shared by all CPUs. */
-static void idt_init(void) {
+static inline void idt_init(void) {
 	unative_t i;
 	ptr_t addr;
 
@@ -158,7 +158,7 @@ static void idt_init(void) {
 }
 
 /** Initialize descriptor tables for the boot CPU. */
-void descriptor_init(void) {
+void __init_text descriptor_init(void) {
 	gdt_init();
 	tss_init();
 
@@ -171,7 +171,7 @@ void descriptor_init(void) {
 }
 
 /** Initialize descriptor tables for an application CPU. */
-void descriptor_ap_init(void) {
+void __init_text descriptor_ap_init(void) {
 	/* The GDT/TSS setup procedures are the same on both the BSP and APs,
 	 * so just call the functions for them. */
 	gdt_init();

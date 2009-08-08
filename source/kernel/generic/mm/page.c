@@ -292,7 +292,7 @@ void page_range_mark_reserved(phys_ptr_t start, phys_ptr_t end) {
 }
 
 /** Initialize the physical memory manager. */
-void page_init(void) {
+void __init_text page_init(void) {
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Populate the arena with memory regions, and perform other

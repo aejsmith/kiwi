@@ -70,7 +70,7 @@ static intr_result_t i8042_handler(unative_t num, intr_frame_t *frame) {
  *
  * @param data		Multiboot information pointer.
  */
-void platform_premm_init(void *data) {
+void __init_text platform_premm_init(void *data) {
 	multiboot_premm_init((multiboot_info_t *)data);
 	pic_init();
 }
@@ -80,7 +80,7 @@ void platform_premm_init(void *data) {
  * Second stage startup code for the PC platform, run after the memory
  * management subsystem is set up.
  */
-void platform_postmm_init(void) {
+void __init_text platform_postmm_init(void) {
 	acpi_init();
 	multiboot_postmm_init();
 	console_late_init();

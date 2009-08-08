@@ -898,7 +898,7 @@ bool slab_reclaim(void) {
 }
 
 /** Enable magazine layer on all cache's that require it. */
-void slab_enable_cpu_cache(void) {
+void __init_text slab_enable_cpu_cache(void) {
 	slab_cache_t *cache;
 
 	mutex_lock(&slab_caches_lock, 0);
@@ -921,7 +921,7 @@ void slab_enable_cpu_cache(void) {
 }
 
 /** Initialize the slab allocator. */
-void slab_init(void) {
+void __init_text slab_init(void) {
 	/* Initialize the metadata arena. */
 	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,

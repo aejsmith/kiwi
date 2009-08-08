@@ -50,14 +50,14 @@ atomic_t ap_boot_wait = 0;
 static atomic_t smp_boot_delay_wait = 0;
 
 /** CPU boot delay timer handler. */
-static bool smp_boot_delay_handler(void) {
+static bool __init_text smp_boot_delay_handler(void) {
 	atomic_set(&smp_boot_delay_wait, 1);
 	return false;
 }
 
 /** Delay for a number of µseconds during CPU startup.
  * @param us		Number of µseconds to wait. */
-static void smp_boot_delay(uint64_t us) {
+static inline void smp_boot_delay(uint64_t us) {
 	timer_t timer;
 
 	atomic_set(&smp_boot_delay_wait, 0);
@@ -70,7 +70,7 @@ static void smp_boot_delay(uint64_t us) {
 
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
-static void smp_boot(cpu_t *cpu) {
+static inline void smp_boot(cpu_t *cpu) {
 	uint32_t delay = 0;
 	uint32_t *dest;
 	size_t size;
@@ -125,7 +125,7 @@ static void smp_boot(cpu_t *cpu) {
 }
 
 /** Boots all detected secondary CPUs. */
-void smp_boot_cpus(void) {
+void __init_text smp_boot_cpus(void) {
 	size_t i;
 
 	for(i = 0; i <= cpu_id_max; i++) {

@@ -95,7 +95,7 @@ cpu_t *cpu_add(cpu_id_t id, int state) {
 }
 
 /** Properly initialize the CPU subsystem. */
-void cpu_init(void) {
+void __init_text cpu_init(void) {
 	/* First get the real ID of the boot CPU. */
 	boot_cpu.id = cpu_id_max = cpu_current_id();
 	cpu_count = 1;
@@ -106,7 +106,7 @@ void cpu_init(void) {
 }
 
 /** Set up the boot CPU structure and the current CPU pointer. */
-void cpu_early_init(void) {
+void __init_text cpu_early_init(void) {
 	/* Set to 0 until we know the real ID. */
 	boot_cpu.id = 0;
 	boot_cpu.state = CPU_RUNNING;
