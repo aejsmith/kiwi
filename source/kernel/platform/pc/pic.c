@@ -59,10 +59,9 @@ static bool pic_pre_handle(unative_t num, intr_frame_t *frame) {
 	return true;
 }
 
-/** Post-handling function - sends an EOI.
- * @param num		IRQ number.
- * @param frame		Interrupt stack frame. */
-static void pic_post_handle(unative_t num, intr_frame_t *frame) {
+/** Acknowledge a PIC interrupt.
+ * @param num		IRQ number. */
+static void pic_ack(unative_t num) {
 	/* Acknowledge the IRQ by sending an EOI. IRQ >= 8 == slave. */
 	if(num >= 8) {
 		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
@@ -99,7 +98,7 @@ static void pic_unmask(unative_t num) {
 /** PIC IRQ operations. */
 static irq_ops_t pic_irq_ops = {
 	.pre_handle = pic_pre_handle,
-	.post_handle = pic_post_handle,
+	.ack = pic_ack,
 	.mask = pic_mask,
 	.unmask = pic_unmask,
 };

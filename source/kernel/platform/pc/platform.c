@@ -93,6 +93,6 @@ void __init_text platform_postmm_init(void) {
 	}
 
 	/* Install the temporary i8042 hook. */
-	irq_register(1, i8042_handler);
+	irq_register(1, i8042_handler, true);
 	irq_unmask(1);
 }
