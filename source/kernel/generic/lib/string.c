@@ -550,6 +550,12 @@ char *kdirname(const char *path, int kmflag) {
 		return NULL;
 	}
 
+	/* Strip off trailing '/' characters. */
+	len = strlen(dup);
+	while(len && dup[len - 1] == '/') {
+		dup[--len] = 0;
+	}
+
 	/* Look for last '/' character. */
 	if(!(ptr = strrchr(dup, '/'))) {
 		kfree(dup);
@@ -562,13 +568,10 @@ char *kdirname(const char *path, int kmflag) {
 		dup[--len] = 0;
 	}
 
-	/* If length is now 0, the entire string was '/' characters. */
 	if(!len) {
 		kfree(dup);
 		return kstrdup("/", kmflag);
-	}
-
-	if(!(ret = krealloc(dup, len + 1, kmflag))) {
+	} else if(!(ret = krealloc(dup, len + 1, kmflag))) {
 		kfree(dup);
 	}
 	return ret;
