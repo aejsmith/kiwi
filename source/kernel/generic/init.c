@@ -92,7 +92,7 @@ void init_bsp(void *data) {
 	arch_premm_init(data);
 	platform_premm_init(data);
 
-	/* Initialize all of the other memory management subsystems. */
+	/* Initialize other memory management subsystems. */
 	vmem_early_init();
 	kheap_early_init();
 	vmem_init();
@@ -119,6 +119,7 @@ void init_bsp(void *data) {
 	process_init();
 	thread_init();
 	sched_init();
+	thread_reaper_init();
 
 	/* Perform final architecture initialization. */
 	arch_final_init();

@@ -95,6 +95,7 @@ typedef struct sched_cpu {
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
+extern void thread_destroy(thread_t *thread);
 
 /** Total runnable threads across all CPUs. */
 static atomic_t threads_runnable = 0;
@@ -365,9 +366,9 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 	atomic_inc(&threads_runnable);
 }
 
-/*
- * Generic scheduler functions.
- */
+#if 0
+# pragma mark Public scheduler interface.
+#endif
 
 /** Scheduler timer handler function.
  * @return		Whether to perform a thread switch. */

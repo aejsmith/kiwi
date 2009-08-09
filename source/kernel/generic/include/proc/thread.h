@@ -83,7 +83,7 @@ typedef struct thread {
 	void *arg2;			/**< Second argument to thread entry function. */
 
 	/** Other thread information. */
-	identifier_t id;			/**< ID of the thread. */
+	identifier_t id;		/**< ID of the thread. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
@@ -102,10 +102,10 @@ extern void thread_run(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 extern int thread_create(const char *name, struct process *owner, int flags,
                          thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
-extern void thread_destroy(thread_t *thread);
 extern void thread_exit(void);
 
 extern void thread_init(void);
+extern void thread_reaper_init(void);
 
 extern int kdbg_cmd_thread(int argc, char **argv);
 

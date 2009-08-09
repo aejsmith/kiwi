@@ -31,6 +31,8 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <sync/mutex.h>
+#include <sync/semaphore.h>
 #include <sync/waitq.h>
 
 #include <types/avl.h>
@@ -48,11 +50,17 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
+extern void thread_destroy(thread_t *thread);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
-static SPINLOCK_DECLARE(thread_tree_lock);	/**< Lock for thread AVL tree. */
+static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
 static vmem_t *thread_id_arena;			/**< Thread ID Vmem arena. */
 static slab_cache_t *thread_cache;		/**< Cache for thread structures. */
+
+/** Dead thread queue information. */
+static LIST_DECLARE(dead_threads);
+static SPINLOCK_DECLARE(dead_thread_lock);
+static SEMAPHORE_DECLARE(dead_thread_sem, 0);
 
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
@@ -91,6 +99,79 @@ static void thread_trampoline(void) {
 	}
 }
 
+/** Dead thread reaper.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void thread_reaper(void *arg1, void *arg2) {
+	thread_t *thread;
+
+	while(true) {
+		semaphore_down(&dead_thread_sem, 0);
+
+		/* Take the next thread off the list. */
+		spinlock_lock(&dead_thread_lock, 0);
+		assert(!list_empty(&dead_threads));
+		thread = list_entry(dead_threads.next, thread_t, header);
+		list_remove(&thread->header);
+		spinlock_unlock(&dead_thread_lock);
+
+		/* Remove from thread tree. */
+		mutex_lock(&thread_tree_lock, 0);
+		avl_tree_remove(&thread_tree, (key_t)thread->id);
+		mutex_unlock(&thread_tree_lock);
+
+		/* Now clean up the thread. */
+		kheap_free(thread->kstack, KSTACK_SIZE);
+		context_destroy(&thread->context);
+		thread_arch_destroy(thread);
+
+		/* Deallocate the thread ID. */
+		vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
+
+		dprintf("thread: destroyed thread %" PRId32 "(%s) (thread: %p)\n",
+			thread->id, thread->name, thread);
+
+		slab_cache_free(thread_cache, thread);
+	}
+}
+
+/** Destroy a thread.
+ *
+ * Queues a thread for deletion by the thread reaper. The thread should not be
+ * attached to any scheduler queues. Should only be called by the scheduler.
+ *
+ * @note		Because avl_tree_remove() uses kfree(), we cannot
+ *			remove the thread from the thread tree here. To prevent
+ *			the thread from being searched for we check the thread
+ *			state in thread_lookup(), and return NULL if the thread
+ *			found is dead.
+ *
+ * @param thread	Thread to destroy.
+ */
+void thread_destroy(thread_t *thread) {
+	spinlock_lock(&thread->lock, 0);
+
+	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
+		thread->id, thread->name, thread->owner->id);
+
+	assert(list_empty(&thread->header));
+	assert(thread->state == THREAD_DEAD);
+
+	/* Detach from its owner. */
+	spinlock_lock(&thread->owner->lock, 0);
+	list_remove(&thread->owner_link);
+	thread->owner->num_threads--;
+	spinlock_unlock(&thread->owner->lock);
+
+	/* Queue for deletion by the thread reaper. */
+	spinlock_lock(&dead_thread_lock, 0);
+	list_append(&dead_threads, &thread->header);
+	semaphore_up(&dead_thread_sem);
+	spinlock_unlock(&dead_thread_lock);
+
+	spinlock_unlock(&thread->lock);
+}
+
 /** Lookup a thread.
  *
  * Looks for a thread with the specified id in the thread tree.
@@ -102,10 +183,14 @@ static void thread_trampoline(void) {
 thread_t *thread_lookup(identifier_t id) {
 	thread_t *thread;
 
-	spinlock_lock(&thread_tree_lock, 0);
-	thread = avl_tree_lookup(&thread_tree, (key_t)id);
-	spinlock_unlock(&thread_tree_lock);
+	mutex_lock(&thread_tree_lock, 0);
 
+	thread = avl_tree_lookup(&thread_tree, (key_t)id);
+	if(thread && thread->state == THREAD_DEAD) {
+		thread = NULL;
+	}
+
+	mutex_unlock(&thread_tree_lock);
 	return thread;
 }
 
@@ -217,52 +302,15 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	spinlock_unlock(&owner->lock);
 
 	/* Add to the thread tree. */
-	spinlock_lock(&thread_tree_lock, 0);
+	mutex_lock(&thread_tree_lock, 0);
 	avl_tree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
-	spinlock_unlock(&thread_tree_lock);
+	mutex_unlock(&thread_tree_lock);
 
 	*threadp = thread;
 
 	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
 	return 0;
-}
-
-/** Destroy a thread.
- *
- * Detaches the given thread from its owner and destroys it.
- *
- * @param thread	Thread to destroy.
- */
-void thread_destroy(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
-
-	dprintf("thread: destroying thread %" PRId32 "(%s) (thread: %p, owner: %" PRId32 ")\n",
-		thread->id, thread->name, thread, thread->owner->id);
-
-	assert(list_empty(&thread->header));
-
-	/* Detach from its owner. */
-	spinlock_lock(&thread->owner->lock, 0);
-	list_remove(&thread->owner_link);
-	thread->owner->num_threads--;
-	spinlock_unlock(&thread->owner->lock);
-
-	/* Remove from thread tree. */
-	spinlock_lock(&thread_tree_lock, 0);
-	avl_tree_remove(&thread_tree, (key_t)thread->id);
-	spinlock_unlock(&thread_tree_lock);
-
-	/* Now clean up the thread. */
-	kheap_free(thread->kstack, KSTACK_SIZE);
-	context_destroy(&thread->context);
-	thread_arch_destroy(thread);
-
-	/* Deallocate the thread ID. */
-	vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
-
-	spinlock_unlock(&thread->lock);
-	slab_cache_free(thread_cache, thread);
 }
 
 /** Terminate the current thread. */
@@ -277,6 +325,16 @@ void __init_text thread_init(void) {
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
 	                                 thread_cache_ctor, NULL, NULL, NULL,
 	                                 NULL, 0, MM_FATAL);
+}
+
+/** Create the thread reaper. */
+void __init_text thread_reaper_init(void) {
+	thread_t *thread;
+
+	if(thread_create("reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread) != 0) {
+		fatal("Could not create thread reaper");
+	}
+	thread_run(thread);
 }
 
 /** Print information about a thread.

@@ -22,6 +22,7 @@
 
 #include <lib/string.h>
 
+#include <mm/malloc.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 #include <mm/vmem.h>
@@ -29,6 +30,8 @@
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
+
+#include <sync/mutex.h>
 
 #include <types/avl.h>
 
@@ -47,7 +50,7 @@
 process_t *kernel_proc;
 
 static AVL_TREE_DECLARE(process_tree);		/**< Tree of all processes. */
-static SPINLOCK_DECLARE(process_tree_lock);	/**< Lock for process AVL tree. */
+static MUTEX_DECLARE(process_tree_lock, 0);	/**< Lock for process AVL tree. */
 static vmem_t *process_id_arena;		/**< Process ID Vmem arena. */
 static slab_cache_t *process_cache;		/**< Cache for process structures. */
 
@@ -78,9 +81,14 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
 process_t *process_lookup(identifier_t id) {
 	process_t *process;
 
-	spinlock_lock(&process_tree_lock, 0);
-	process = avl_tree_lookup(&process_tree, (key_t)id);
-	spinlock_unlock(&process_tree_lock);
+	/* Small hack so that KDBG functions can use this. */
+	if(atomic_get(&kdbg_running)) {
+		process = avl_tree_lookup(&process_tree, (key_t)id);
+	} else {
+		mutex_lock(&process_tree_lock, 0);
+		process = avl_tree_lookup(&process_tree, (key_t)id);
+		mutex_unlock(&process_tree_lock);
+	}
 
 	return process;
 }
@@ -107,11 +115,9 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Allocate a process structure from the cache. */
+	/* Allocate a process structure from the cache and set its name. */
 	process = slab_cache_alloc(process_cache, MM_SLEEP);
-
-	strncpy(process->name, name, PROC_NAME_MAX);
-	process->name[PROC_NAME_MAX - 1] = 0;
+	process->name = kstrdup(name, MM_SLEEP);
 
 	/* Create the address space. */
 	if(!(flags & PROCESS_NOASPACE)) {
@@ -158,9 +164,9 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
 	}
 
 	/* Add to the process tree. */
-	spinlock_lock(&process_tree_lock, 0);
+	mutex_lock(&process_tree_lock, 0);
 	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
-	spinlock_unlock(&process_tree_lock);
+	mutex_unlock(&process_tree_lock);
 
 	*procp = process;
 
@@ -211,8 +217,8 @@ int process_reset(process_t *process, const char *name, vm_aspace_t *aspace) {
 	}
 
 	/* Reset the process' name. */
-	strncpy(process->name, name, PROC_NAME_MAX);
-	process->name[PROC_NAME_MAX - 1] = 0;
+	kfree(process->name);
+	process->name = kstrdup(name, MM_SLEEP);
 
 	/* Replace the address space, and switch to the new one. */
 	prev = process->aspace;

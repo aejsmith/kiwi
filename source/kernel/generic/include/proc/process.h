@@ -35,9 +35,6 @@
 
 struct vm_aspace;
 
-/** Maximum length of a process name. */
-#define PROC_NAME_MAX		32
-
 /** Structure containing details about a process. */
 typedef struct process {
 	spinlock_t lock;		/**< Lock to protect data in structure. */
@@ -60,7 +57,7 @@ typedef struct process {
 
 	/** Other information about the process. */
 	identifier_t id;		/**< ID of the process. */
-	char name[PROC_NAME_MAX];	/**< Name of the process. */
+	char *name;			/**< Name of the process. */
 	struct process *parent;		/**< Pointer to parent process. */
 	list_t children;		/**< List of child processes. */
 	list_t parent_link;		/**< Link to parent process child list. */
