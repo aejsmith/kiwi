@@ -27,6 +27,8 @@
 #include <cpu/ipi.h>
 #include <cpu/smp.h>
 
+#include <io/vfs.h>
+
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
@@ -59,6 +61,10 @@ static void init_thread(void *arg1, void *arg2) {
 
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
+
+	/* Call initialization functions that must be called before any
+	 * initcalls. */
+	vfs_init();
 
 	/* Call initialziation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {

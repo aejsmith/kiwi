@@ -710,6 +710,8 @@ int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t
 		return ret;
 	} else if(node->type != VFS_NODE_FILE) {
 		return -ERR_TYPE_INVAL;
+	} else if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && VFS_NODE_IS_RDONLY(node)) {
+		return -ERR_READ_ONLY;
 	}
 
 	/* If this is a private mapping, we must create an anonymous object

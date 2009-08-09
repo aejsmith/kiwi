@@ -400,8 +400,9 @@ void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
  *
  * @param tree		Tree to remove from.
  * @param key		Key to remove.
+ * @param helper	Helper function to free entry data (can be NULL).
  */
-void radix_tree_remove(radix_tree_t *tree, const char *key) {
+void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_helper_t helper) {
 	radix_tree_node_t *node, *child, *parent;
 	unsigned char *concat;
 	size_t i, j;
@@ -412,7 +413,9 @@ void radix_tree_remove(radix_tree_t *tree, const char *key) {
 		return;
 	}
 
-	/* We have the node we wish to remove. Set the value to NULL. */
+	if(helper && node->value) {
+		helper(node->value);
+	}
 	node->value = NULL;
 
 	/* Now, go up the tree to optimize it. */

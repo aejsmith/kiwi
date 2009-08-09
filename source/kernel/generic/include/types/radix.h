@@ -73,7 +73,7 @@ static inline bool radix_tree_empty(radix_tree_t *tree) {
 }
 
 extern void radix_tree_insert(radix_tree_t *tree, const char *key, void *value);
-extern void radix_tree_remove(radix_tree_t *tree, const char *key);
+extern void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_helper_t helper);
 extern void *radix_tree_lookup(radix_tree_t *tree, const char *key);
 
 extern void radix_tree_init(radix_tree_t *tree);

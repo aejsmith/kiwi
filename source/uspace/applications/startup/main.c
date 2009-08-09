@@ -218,6 +218,11 @@ int main(int argc, char **argv) {
 		handle_close(handle);
 	}
 
+	handle = fs_file_open("/meow.txt", FS_FILE_READ);
+	fs_unlink("/meow.txt");
+	printf("Unlinked, closing...\n");
+	handle_close(handle);
+
 	printf("\nDirectory tree:\n");
 	dump_tree(NULL, 0);
 

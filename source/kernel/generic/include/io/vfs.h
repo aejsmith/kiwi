@@ -131,6 +131,8 @@ typedef struct vfs_type {
 	int (*node_flush)(struct vfs_node *node);
 
 	/** Clean up data associated with a node structure.
+	 * @note		This should remove the node from the filesystem
+	 *			if the link count is 0.
 	 * @param node		Node to clean up. */
 	void (*node_free)(struct vfs_node *node);
 
@@ -152,6 +154,23 @@ typedef struct vfs_type {
 	 * @return		0 on success, negative error code on failure. */
 	int (*node_create)(struct vfs_node *parent, const char *name, struct vfs_node *node);
 
+	/** Decrease the link count of a filesystem node.
+	 * @note		If the count reaches 0, this should set the
+	 *			VFS_NODE_REMOVED flag on the node, but not
+	 *			remove it from the filesystem, as it may still
+	 *			be in use. This flag will cause the node to be
+	 *			freed immediately when the reference count
+	 *			reaches 0 - it is up to the node_free operation
+	 *			to remove the node from the FS if necessary.
+	 *			Also note that if the VFS_NODE_REMOVED flag is
+	 *			set, then the node's metadata and cached data
+	 *			will NOT be flushed when the node is freed.
+	 * @param parent	Directory containing the node.
+	 * @param name		Name of the node in the directory.
+	 * @param node		Node being unlinked.
+	 * @return		0 on success, negative error code on failure. */
+	int (*node_unlink)(struct vfs_node *parent, const char *name, struct vfs_node *node);
+	
 	/**
 	 * Regular file functions.
 	 */
@@ -269,15 +288,18 @@ typedef struct vfs_info {
 	int meow;
 } vfs_info_t;
 
-/** Mount behaviour flags. */
-#define VFS_MOUNT_RDONLY	(1<<0)	/**< Mount is read-only. */
-
 /** Filesystem type trait flags. */
 #define VFS_TYPE_RDONLY		(1<<0)	/**< Filesystem type is read-only. */
 #define VFS_TYPE_CACHE_BASED	(1<<1)	/**< Filesystem type is cache-based - all nodes will remain in memory. */
 
+/** Mount behaviour flags. */
+#define VFS_MOUNT_RDONLY	(1<<0)	/**< Mount is read-only. */
+
+/** Node behaviour flags. */
+#define VFS_NODE_REMOVED	(1<<0)	/**< Node should be freed immediately when its reference count reaches 0. */
+
 /** Macro to check if a node is read-only. */
-#define VFS_NODE_IS_RDONLY(node)	((node)->mount->flags & VFS_MOUNT_RDONLY)
+#define VFS_NODE_IS_RDONLY(node)	((node)->mount && (node)->mount->flags & VFS_MOUNT_RDONLY)
 
 extern vfs_mount_t *vfs_root_mount;
 
@@ -288,7 +310,6 @@ extern int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep);
 extern void vfs_node_get(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
 extern int vfs_node_info(vfs_node_t *node, vfs_info_t *infop);
-extern int vfs_node_unlink(vfs_node_t *node);
 
 extern int vfs_file_create(const char *path, vfs_node_t **nodep);
 extern int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep);
@@ -305,6 +326,9 @@ extern int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size);
 
 extern int vfs_mount(const char *dev, const char *path, const char *type, int flags);
 extern int vfs_unmount(const char *path);
+extern int vfs_unlink(const char *path);
+
+extern void vfs_init(void);
 
 #if 0
 # pragma mark Debugger commands.

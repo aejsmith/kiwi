@@ -45,7 +45,6 @@
 #include <assert.h>
 #include <errors.h>
 #include <fatal.h>
-#include <init.h>
 #include <kdbg.h>
 
 #if CONFIG_VFS_DEBUG
@@ -194,7 +193,6 @@ static int vfs_node_cache_ctor(void *obj, void *data, int kmflag) {
 	refcount_set(&node->count, 0);
 	avl_tree_init(&node->pages);
 	radix_tree_init(&node->dir_entries);
-
 	return 0;
 }
 
@@ -285,19 +283,15 @@ static int vfs_node_flush(vfs_node_t *node, bool destroy) {
 }
 
 /** Flush changes to a node and free it.
+ * @note		Never call this function. Use vfs_node_release().
+ * @note		Mount lock (if there is a mount) and node lock must be
+ *			held.
  * @param node		Node to free. Should be unused (zero reference count).
  * @return		0 on success, negative error code on failure (this can
  *			happen, for example, if an error occurs flushing the
  *			node data). */
 static int vfs_node_free(vfs_node_t *node) {
 	int ret;
-
-	/* Acquire mount lock then node lock. See note in file header about
-	 * locking order. */
-	if(node->mount) {
-		mutex_lock(&node->mount->lock, 0);
-	}
-	mutex_lock(&node->lock, 0);
 
 	assert(refcount_get(&node->count) == 0);
 
@@ -312,7 +306,7 @@ static int vfs_node_free(vfs_node_t *node) {
 		return ret;
 	}
 
-	/* If the node has a mount, detach it from the node tree/list and call
+	/* If the node has a mount, detach it from the node tree/lists and call
 	 * the mount's node_free operation (if any). */
 	if(node->mount) {
 		avl_tree_remove(&node->mount->nodes, (key_t)node->id);
@@ -664,28 +658,39 @@ void vfs_node_get(vfs_node_t *node) {
 void vfs_node_release(vfs_node_t *node) {
 	int ret;
 
+	/* Acquire mount lock then node lock. See note in file header about
+	 * locking order. */
+	if(node->mount) {
+		mutex_lock(&node->mount->lock, 0);
+	}
+	mutex_lock(&node->lock, 0);
+
 	if(refcount_dec(&node->count) == 0) {
 		assert(!node->mounted);
 
 		/* Node has no references remaining, move it to its mount's
 		 * unused list if it has a mount. If the node is not attached
 		 * to anything, then destroy it immediately. */
-		if(node->mount) {
-			/* No need to take the node lock; the list header is
-			 * protected by the mount lock. */
-			mutex_lock(&node->mount->lock, 0);
+		if(node->mount && !(node->flags & VFS_NODE_REMOVED)) {
 			list_append(&node->mount->unused_nodes, &node->header);
-			mutex_unlock(&node->mount->lock);
-
 			dprintf("vfs: transferred node %p to unused list (mount: %p)\n", node, node->mount);
+			mutex_unlock(&node->lock);
+			mutex_unlock(&node->mount->lock);
 		} else {
 			/* This shouldn't fail - the only things that can fail
 			 * in vfs_node_free() are cache flushing and metadata
 			 * flushing. Since this node has no source to flush to,
-			 * there should be nothing to fail. */
+			 * or has been removed, this should not fail. */
 			if((ret = vfs_node_free(node)) != 0) {
-				fatal("Could not destroy node with no mount (%d)", ret);
+				fatal("Could not destroy %s (%d)",
+				      (node->mount) ? "removed node" : "node with no mount",
+				      ret);
 			}
+		}
+	} else {
+		mutex_unlock(&node->lock);
+		if(node->mount) {
+			mutex_unlock(&node->mount->lock);
 		}
 	}
 }
@@ -723,11 +728,11 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 	mutex_lock(&parent->lock, 0);
 
 	/* Ensure that we have a directory, are on a writeable filesystem, and
-	 *  that the FS supports node creation. */
+	 * that the FS supports node creation. */
 	if(parent->type != VFS_NODE_DIR) {
 		ret = -ERR_TYPE_INVAL;
 		goto out;
-	} else if(parent->mount->flags & VFS_MOUNT_RDONLY) {
+	} else if(VFS_NODE_IS_RDONLY(parent)) {
 		ret = -ERR_READ_ONLY;
 		goto out;
 	} else if(!parent->mount->type->node_create) {
@@ -786,21 +791,6 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int vfs_node_info(vfs_node_t *node, vfs_info_t *infop) {
-	return -ERR_NOT_IMPLEMENTED;
-}
-
-/** Decrease the link count of a filesystem node.
- *
- * Decreases the link count of a filesystem node. If the link count becomes 0,
- * then the node will be removed from the filesystem once the node's reference
- * count becomes 0. If the given node is a directory, then the directory should
- * be empty.
- *
- * @param node		Node to decrease link count of.
- *
- * @return		0 on success, negative error code on failure.
- */
-int vfs_node_unlink(vfs_node_t *node) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
@@ -1242,7 +1232,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 		ret = -ERR_TYPE_INVAL;
 		mutex_unlock(&node->lock);
 		goto out;
-	} else if(node->mount && node->mount->flags & VFS_MOUNT_RDONLY) {
+	} else if(VFS_NODE_IS_RDONLY(node)) {
 		ret = -ERR_READ_ONLY;
 		mutex_unlock(&node->lock);
 		goto out;
@@ -1477,6 +1467,14 @@ void vfs_dir_entry_add(vfs_node_t *node, identifier_t id, const char *name) {
 
 	/* Increase count. */
 	node->size++;
+}
+
+/** Remove an entry from a directory's entry cache.
+ * @param node		Node to remove entry from.
+ * @param name		Name of entry to remove. */
+static void vfs_dir_entry_remove(vfs_node_t *node, const char *name) {
+	radix_tree_remove(&node->dir_entries, name, kfree);
+	node->size--;
 }
 
 /** Create a directory in the file system.
@@ -1915,6 +1913,75 @@ int vfs_unmount(const char *path) {
 }
 
 #if 0
+# pragma mark Other functions.
+#endif
+
+/** Decrease the link count of a filesystem node.
+ *
+ * Decreases the link count of a filesystem node, and removes the directory
+ * entry for it. If the link count becomes 0, then the node will be removed
+ * from the filesystem once the node's reference count becomes 0. If the given
+ * node is a directory, then the directory should be empty.
+ *
+ * @param path		Path to node to decrease link count of.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_unlink(const char *path) {
+	vfs_node_t *parent = NULL, *node = NULL;
+	char *dir, *name;
+	int ret;
+
+	/* Split path into directory/name. */
+	dir = kdirname(path, MM_SLEEP);
+	name = kbasename(path, MM_SLEEP);
+
+	dprintf("vfs: unlink(%s) - dirname is '%s', basename is '%s'\n", path, dir, name);
+
+	/* Look up the parent node and the node to unlink. */
+	if((ret = vfs_node_lookup(dir, true, &parent)) != 0) {
+		goto out;
+	} else if((ret = vfs_node_lookup(path, false, &node)) != 0) {
+		goto out;
+	}
+
+	mutex_lock(&parent->lock, 0);
+	mutex_lock(&node->lock, 0);
+
+	/* If looking up the node succeeded, the parent must be a directory. */
+	assert(parent->type == VFS_NODE_DIR);
+
+	if(parent->mount != node->mount) {
+		ret = -ERR_IN_USE;
+		goto out;
+	} else if(VFS_NODE_IS_RDONLY(node)) {
+		ret = -ERR_READ_ONLY;
+		goto out;
+	} else if(!node->mount->type->node_unlink) {
+		ret = -ERR_NOT_SUPPORTED;
+		goto out;
+	}
+
+	/* Call the filesystem's unlink operation. */
+	if((ret = node->mount->type->node_unlink(parent, name, node)) == 0) {
+		/* Update the directory entry cache. */
+		vfs_dir_entry_remove(parent, name);
+	}
+out:
+	if(node) {
+		mutex_unlock(&node->lock);
+		mutex_unlock(&parent->lock);
+		vfs_node_release(node);
+		vfs_node_release(parent);
+	} else if(parent) {
+		vfs_node_release(parent);
+	}
+	kfree(dir);
+	kfree(name);
+	return ret;
+}
+
+#if 0
 # pragma mark Debugger commands.
 #endif
 
@@ -2124,7 +2191,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 #endif
 
 /** Initialization function for the VFS. */
-static void __init_text vfs_init(void) {
+void __init_text vfs_init(void) {
 	int ret;
 
 	/* Initialize the node slab cache. */
@@ -2145,7 +2212,6 @@ static void __init_text vfs_init(void) {
 	vfs_node_get(vfs_root_mount->root);
 	curr_proc->ioctx.curr_dir = vfs_root_mount->root;
 }
-INITCALL(vfs_init);
 
 #if 0
 # pragma mark System calls.
@@ -2210,7 +2276,7 @@ handle_t sys_fs_file_open(const char *path, int flags) {
 	} else if(data->node->type != VFS_NODE_FILE) {
 		ret = -ERR_TYPE_INVAL;
 		goto fail;
-	} else if(flags & FS_FILE_WRITE && data->node->mount->flags & VFS_MOUNT_RDONLY) {
+	} else if(flags & FS_FILE_WRITE && VFS_NODE_IS_RDONLY(data->node)) {
 		ret = -ERR_READ_ONLY;
 		goto fail;
 	}
@@ -2907,8 +2973,28 @@ int sys_fs_link(const char *source, const char *dest) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
+/** Decrease the link count of a filesystem node.
+ *
+ * Decreases the link count of a filesystem node, and removes the directory
+ * entry for it. If the link count becomes 0, then the node will be removed
+ * from the filesystem once the node's reference count becomes 0. If the given
+ * node is a directory, then the directory should be empty.
+ *
+ * @param path		Path to node to decrease link count of.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_unlink(const char *path) {
-	return -ERR_NOT_IMPLEMENTED;
+	char *kpath;
+	int ret;
+
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	}
+
+	ret = vfs_unlink(kpath);
+	kfree(kpath);
+	return ret;
 }
 
 int sys_fs_rename(const char *source, const char *dest) {
