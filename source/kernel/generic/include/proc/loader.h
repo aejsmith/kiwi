@@ -80,8 +80,7 @@ typedef struct loader_type {
 	void (*cleanup)(loader_binary_t *binary);
 } loader_type_t;
 
-extern int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_t *sem);
-
 extern int loader_type_register(loader_type_t *type);
+extern int loader_binary_load(char *path, char **args, char **environ, semaphore_t *sem);
 
 #endif /* __PROC_LOADER_H */

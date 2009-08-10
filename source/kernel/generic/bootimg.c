@@ -25,6 +25,8 @@
 
 #include <io/vfs.h>
 
+#include <mm/malloc.h>
+
 #include <proc/loader.h>
 #include <proc/process.h>
 #include <proc/thread.h>
@@ -78,13 +80,20 @@ typedef struct tar_header {
 } tar_header_t;
 
 /** Thread to load the startup binary.
- * @param arg1		Pointer to VFS node for binary.
+ * @param arg1		Unused.
  * @param arg2		Unused. */
 static void bootimg_startup_thread(void *arg1, void *arg2) {
-	vfs_node_t *node = arg1;
+	char **args, **env;
 	int ret;
 
-	ret = loader_binary_load(node, NULL, NULL, NULL);
+	/* Create the argument/environment arrays. */
+	args    = kcalloc(2, sizeof(char *), MM_FATAL);
+	args[0] = kstrdup("/startup", MM_FATAL);
+	args[1] = NULL;
+	env     = kcalloc(1, sizeof(char *), MM_FATAL);
+	env[0]  = NULL;
+
+	ret = loader_binary_load(kstrdup("/startup", MM_FATAL), args, env, NULL);
 	fatal("Failed to load startup binary (%d)", ret);
 }
 
@@ -97,18 +106,21 @@ static void bootimg_startup_thread(void *arg1, void *arg2) {
  * @note		Assumes the current directory is the root of the FS.
  */
 void bootimg_load(void) {
-	vfs_node_t *node, *startup = NULL;
 	ptr_t addr = bootimg_addr;
 	tar_header_t *hdr;
+	vfs_node_t *node;
 	thread_t *thread;
 	process_t *proc;
 	int64_t size;
 	size_t bytes;
 	int ret;
 
-	hdr = (tar_header_t *)bootimg_addr;
+	if(!bootimg_addr || !bootimg_size) {
+		fatal("No boot image was provided");
+	}
 
 	/* Loop until we encounter two null bytes (EOF). */
+	hdr = (tar_header_t *)bootimg_addr;
 	while(hdr->name[0] && hdr->name[1]) {
 		if(strncmp(hdr->magic, "ustar", 5) != 0) {
 			fatal("Boot image format is incorrect");
@@ -133,11 +145,7 @@ void bootimg_load(void) {
 			}
 
 			dprintf("bootimg: extracted regular file %s (%lld bytes)\n", hdr->name, size);
-			if(strcmp(hdr->name, "startup") == 0) {
-				startup = node;
-			} else {
-				vfs_node_release(node);
-			}
+			vfs_node_release(node);
 			break;
 		case DIRTYPE:
 			if((ret = vfs_dir_create(hdr->name, NULL)) != 0) {
@@ -163,11 +171,6 @@ void bootimg_load(void) {
 		hdr = (tar_header_t *)addr;
 	}
 
-	/* Check if we have a startup binary. */
-	if(!startup) {
-		fatal("No startup binary found in boot image");
-	}
-
 	/* Create process to load the startup binary. Does not require an
 	 * address space to begin with as loader_binary_load() will create
 	 * one. */
@@ -175,7 +178,7 @@ void bootimg_load(void) {
 		fatal("Could not create process to load startup (%d)", ret);
 	}
 
-	if((ret = thread_create("startup", proc, 0, bootimg_startup_thread, startup, NULL, &thread)) != 0) {
+	if((ret = thread_create("main", proc, 0, bootimg_startup_thread, NULL, NULL, &thread)) != 0) {
 		fatal("Could not create thread to load startup (%d)", ret);
 	}
 	thread_run(thread);

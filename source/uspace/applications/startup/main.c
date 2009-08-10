@@ -132,10 +132,15 @@ int main(int argc, char **argv) {
 	handle_t handle;
 	size_t bytes;
 	void *addr;
-	int ret;
+	int ret, i;
 
 	printf("Hello from C userspace!\n");
 	printf("This is a message!\n");
+
+	printf("My arguments are:\n");
+	for(i = 0; i < argc; i++) {
+		printf(" argv[%d] = '%s'\n", i, argv[i]);
+	}
 
 	ret = vm_map_anon(NULL, 0x4000, VM_MAP_READ | VM_MAP_WRITE, &addr);
 	printf("Map returned %d (%p)\n", ret, addr);

@@ -533,4 +533,14 @@ typedef struct {
 
 #include <arch/elf.h>
 
+struct loader_binary;
+
+/** ELF loader binary data structure. */
+typedef struct elf_binary {
+	elf_ehdr_t ehdr;		/**< ELF executable header. */
+	elf_phdr_t *phdrs;		/**< Program headers. */
+
+	struct loader_binary *binary;	/**< Pointer back to the loader's binary structure. */
+} elf_binary_t;
+
 #endif /* __ELF_H */

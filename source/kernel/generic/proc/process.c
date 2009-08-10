@@ -181,15 +181,10 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
  * process, then all threads in the process will be terminated other than the
  * current. Otherwise, all threads will be terminated. The name of the process
  * will then be changed to the given name and its address space will be set to
- * the given address space (the old one will be destroyed, if any).
- *
- * The only reason for this function to fail is if invalid parameters are
- * passed. It is up to the caller to handle failures - the best thing to do in
- * this case would be to terminate the process.
- *
- * If the process is the current process, and the old address space set in the
- * process is the current address space, then this function will switch to the
- * new address space.
+ * the given address space (the old one, if any, will be destroyed). If the
+ * process is the current process, and the old address space set in the process
+ * is the current address space, then this function will switch to the new
+ * address space.
  *
  * @todo		The functionality to kill threads is not yet
  *			implemented. This means that it cannot be used on
@@ -198,16 +193,23 @@ int process_create(const char *name, process_t *parent, int priority, int flags,
  *
  * @param process	Process to reset. Must not be the kernel process.
  * @param name		New name to give the process (must not be zero-length).
- * @param aspace	Address space for the process (can be NULL).
+ * @param as		Address space for the process (can be NULL).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		0 on success, negative error code on failure. The only
+ *			reason for the function to fail is if it is passed
+ *			invalid parameters.
  */
-int process_reset(process_t *process, const char *name, vm_aspace_t *aspace) {
-	vm_aspace_t *prev;
+int process_reset(process_t *process, const char *name, vm_aspace_t *as) {
+	char *dup, *pname;
+	vm_aspace_t *pas;
 
 	if(!process || process == kernel_proc || !name || !name[0]) {
 		return -ERR_PARAM_INVAL;
 	}
+
+	/* Create a duplicate of the name before taking the process' lock, as
+	 * we should not use allocators while a spinlock is held. */
+	dup = kstrdup(name, MM_SLEEP);
 
 	spinlock_lock(&process->lock, 0);
 
@@ -217,21 +219,24 @@ int process_reset(process_t *process, const char *name, vm_aspace_t *aspace) {
 	}
 
 	/* Reset the process' name. */
-	kfree(process->name);
-	process->name = kstrdup(name, MM_SLEEP);
+	pname = process->name;
+	process->name = dup;
 
-	/* Replace the address space, and switch to the new one. */
-	prev = process->aspace;
-	process->aspace = aspace;
-	if(prev == curr_aspace) {
-		vm_aspace_switch(aspace);
+	/* Replace the address space, and switch to the new one. If the new
+	 * address space is NULL vm_aspace_switch() will switch to the kernel
+	 * addres space. */
+	pas = process->aspace;
+	process->aspace = as;
+	if(pas == curr_aspace) {
+		vm_aspace_switch(as);
 	}
 
 	spinlock_unlock(&process->lock);
 
-	/* Now that we're unlocked we can destroy the old address space. */
-	if(prev) {
-		vm_aspace_destroy(prev);
+	/* Now that the lock is no longer held, free up old data. */
+	kfree(pname);
+	if(pas) {
+		vm_aspace_destroy(pas);
 	}
 
 	return 0;

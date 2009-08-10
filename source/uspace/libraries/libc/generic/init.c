@@ -18,13 +18,28 @@
  * @brief		Initialization code.
  */
 
-extern void __libc_init(void);
-extern int main(int argc, char **argv);
+#define __need_NULL
+#include <stddef.h>
 
-extern void message(const char *foo);
+extern void __libc_init(int argc, char **argv, char **environ, void *auxv);
+extern int main(int argc, char **argv, char **envp);
+extern void __register_frame_info(void *begin, void *ob);
+extern void *__deregister_frame_info(void *begin);
+
+char **environ;
 
 /** C library initialization function. */
-void __libc_init(void) {
-	main(1, (void *)0);
+void __libc_init(int argc, char **argv, char **envp, void *auxv) {
+	environ = envp;
+
+	main(argc, argv, envp);
 	while(1);
+}
+
+void __register_frame_info(void *begin, void *ob) {
+        return;
+}
+
+void *__deregister_frame_info(void *begin) {
+        return NULL;
 }

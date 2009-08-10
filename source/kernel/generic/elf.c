@@ -34,12 +34,6 @@
 #include <init.h>
 #include <module.h>
 
-extern bool elf_module_check(vfs_node_t *node);
-extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
-extern int elf_module_load(module_t *module);
-extern int elf_module_relocate(module_t *module, bool external);
-extern void *module_mem_alloc(size_t size, int mmflag);
-
 /** Check whether an FS node contains a valid ELF header.
  * @param node		Filesystem node.
  * @param type		Required ELF type.
@@ -84,13 +78,7 @@ static bool elf_check(vfs_node_t *node, int type) {
 # define dprintf(fmt...)	
 #endif
 
-/** ELF loader binary data structure. */
-typedef struct elf_binary {
-	elf_ehdr_t ehdr;		/**< ELF executable header. */
-	elf_phdr_t *phdrs;		/**< Program headers. */
-
-	loader_binary_t *binary;	/**< Pointer back to the loader's binary structure. */
-} elf_binary_t;
+extern void elf_binary_copy_data(elf_binary_t *data);
 
 /** Handle an ELF_PT_LOAD program header.
  * @param data		ELF binary data structure.
@@ -267,6 +255,8 @@ static int elf_binary_finish(loader_binary_t *binary) {
 		}
 	}
 
+	/* Copy arguments/environment. */
+	elf_binary_copy_data(data);
 	return 0;
 }
 
@@ -306,6 +296,12 @@ INITCALL(elf_init);
 #else
 # define dprintf(fmt...)	
 #endif
+
+extern bool elf_module_check(vfs_node_t *node);
+extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
+extern int elf_module_load(module_t *module);
+extern int elf_module_relocate(module_t *module, bool external);
+extern void *module_mem_alloc(size_t size, int mmflag);
 
 /** Check whether a file is an ELF module.
  * @param node		Filesystem node referring to the binary.

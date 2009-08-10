@@ -33,19 +33,24 @@
 .global _start
 .type _start, @function
 _start:
-#if 0
-	movl	4(%esp), %edi		/* Argument count. */
-	leal	8(%esp), %esi		/* Find argument vector. */
+	/* Get argument count and start of argument array. */
+	movl	4(%esp), %edi
+	leal	8(%esp), %esi
 
-	movl	%edi, %edx		/* Work out the beginning of the */
-	addl	$1, %edx		/* environment using the above */
-	imul	$4, %edx		/* formula, and store the result */
-	addl	%esi, %edx		/* in %edx. */
+	/* Work out the beginning of the environment array using the formula
+	 * described above. */
+	movl	%edi, %edx
+	addl	$1, %edx
+	imul	$4, %edx
+	addl	%esi, %edx
 
-	movl	%edx, %ecx		/* Find the end of the environment */
-1:	addl	$8, %ecx		/* array using the NULL-terminator. */
-	cmpl	$0, (%ecx)		/* The auxilary information is after */
-	jne	1b			/* this. Store the result in %rcx. */
+	/* Find the end of the environment array using the NULL terminator. */
+	movl	%edx, %ecx
+1:	addl	$4, %ecx
+	cmpl	$0, (%ecx)
+	jne	1b
+
+	/* Auxilary information is stored after the NULL terminator. */
 	leal	4(%ecx), %ecx
 
 	/* Push arguments to __libc_init and call it. This will set up
@@ -55,7 +60,6 @@ _start:
 	push	%edx
 	push	%esi
 	push	%edi
-#endif
 	call	__libc_init
 
 	/* If we got here then something has broken (we should have exited).

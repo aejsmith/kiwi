@@ -23,6 +23,7 @@ env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 # Add source files.
 env['OBJFILES'] += [
 	env.Object('cpu.c'),
+	env.Object('elf.c'),
 	env.Object('fault.c'),
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),

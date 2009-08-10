@@ -109,23 +109,20 @@ static void array_free(char **array) {
 /** Replace the current process with a new binary.
  *
  * Replaces the current process with a new binary. This is done in several
- * steps.
+ * steps:
  *  - Load the binary into a new address space.
- *  - Terminate all threads except the current thread.
+ *  - Terminate all threads in the process except the current thread.
  *  - Replace the current address space with the new one.
  *  - Begin executing the new binary.
- * To perform the second and third steps, process_reset() is called.
- *
  * When successful, this function does not return to the calling kernel
  * function. This means that several assumptions must be made about the
- * arguments it is passed. It will release the filesystem node given, and both
+ * arguments it is passed. It will free the path string given, and both the
  * the contents of the arrays given and the arrays themselves will be freed.
- * If it is not successful, it is up to the caller to release the node and
- * free the arrays.
+ * If it is not successful, it is up to the caller to free the path and arrays.
  *
- * @param node		Node referring to the binary to load.
- * @param args		Arguments to pass to the new process. Can be NULL.
- * @param environ	Environment variables for the new process. Can be NULL.
+ * @param path		Path to the binary to load.
+ * @param args		Arguments to pass to the new process.
+ * @param environ	Environment variables for the new process.
  * @param sem		If this argument is not NULL, it should point to a
  *			semaphore that will be upped if this function is
  *			successful, just before it enters the new program.
@@ -137,47 +134,46 @@ static void array_free(char **array) {
  *			be for a failure, in which case the return value will
  *			be a negative error code.
  */
-int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_t *sem) {
+int loader_binary_load(char *path, char **args, char **environ, semaphore_t *sem) {
 	loader_binary_t *binary;
 	ptr_t stack, entry;
 	int ret;
 
-	if(!node) {
+	if(!path || !args || !environ) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Initialize the loader data structure. Use kcalloc() because we
-	 * want stuff we don't set here to be zero. */
 	binary = kcalloc(1, sizeof(loader_binary_t), MM_SLEEP);
-	binary->node = node;
 	binary->args = args;
 	binary->environ = environ;
 
-	/* Attempt to match the binary to a type. */
-	binary->type = loader_type_match(node);
-	if(binary->type == NULL) {
+	/* Look up the node on the filesystem. */
+	if((ret = vfs_node_lookup(path, true, &binary->node)) != 0) {
+		goto fail;
+	} else if(binary->node->type != VFS_NODE_FILE) {
 		ret = -ERR_TYPE_INVAL;
 		goto fail;
 	}
 
-	/* Create a new address space for the binary */
-	binary->aspace = vm_aspace_create();
-	if(binary->aspace == NULL) {
+	/* Attempt to match the binary to a type. */
+	if(!(binary->type = loader_type_match(binary->node))) {
+		ret = -ERR_FORMAT_INVAL;
+		goto fail;
+	}
+
+	/* Create a new address space for the binary. */
+	if(!(binary->aspace = vm_aspace_create())) {
 		ret = -ERR_NO_MEMORY;
 		goto fail;
 	}	
 
-	/* Now get the binary type to map the binary's data into the address
-	 * space. This should also get us the entry pointers. */
-	ret = binary->type->load(binary);
-	if(ret != 0) {
+	/* Get the binary type to map the binary's data into the address space.
+	 * This should set the entry address pointer also get us the entry pointers. */
+	if((ret = binary->type->load(binary)) != 0) {
 		goto fail;
 	}
 
-	assert(binary->entry);
-
-	/* Create a userspace stack. Do this now because after this is done we
-	 * don't want to fail. */
+	/* Create a userspace stack. */
 	ret = vm_map_anon(binary->aspace, 0, USTACK_SIZE,
 	                  VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
 	                  &stack);
@@ -187,15 +183,12 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 
 	binary->stack = stack + USTACK_SIZE;
 
-	/* OK, take the plunge and start messing with the process. If we fail
-	 * after this point, then we're done for. TODO: Name. */
-	ret = process_reset(curr_proc, "process", binary->aspace);
-	if(ret != 0) {
-		/* TODO: Proper handling here. */
-		fatal("Failed to reset process");
+	/* Take the plunge and start messing with the process. */
+	if((ret = process_reset(curr_proc, path, binary->aspace)) != 0) {
+		goto fail;
 	}
 
-	thread_rename(curr_thread, "thread");
+	thread_rename(curr_thread, "main");
 
 	/* Get the binary type to do anything it needs to do once the address
 	 * space has been switched (such as copying arguments). */
@@ -207,16 +200,13 @@ int loader_binary_load(vfs_node_t *node, char **args, char **environ, semaphore_
 
 	/* Clean up state data. */
 	binary->type->cleanup(binary);
+	vfs_node_release(binary->node);
 	kfree(binary);
-	if(args) {
-		array_free(args);
-	}
-	if(environ) {
-		array_free(environ);
-	}
-	vfs_node_release(node);
+	array_free(args);
+	array_free(environ);
+	kfree(path);
 
-	/* Wake up the semaphore if the caller asked us to. */
+	/* If the caller provided a semaphore, wake it up. */
 	if(sem) {
 		semaphore_up(sem);
 	}
@@ -232,5 +222,9 @@ fail:
 	if(binary->aspace) {
 		vm_aspace_destroy(binary->aspace);
 	}
+	if(binary->node) {
+		vfs_node_release(binary->node);
+	}
+	kfree(binary);
 	return ret;
 }

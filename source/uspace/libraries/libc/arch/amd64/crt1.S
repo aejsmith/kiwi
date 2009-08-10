@@ -33,19 +33,24 @@
 .global _start
 .type _start, @function
 _start:
-#if 0
-	movq	8(%rsp), %rdi		/* Argument count. */
-	leaq	16(%rsp), %rsi		/* Find argument vector. */
+	/* Get argument count and start of argument array. */
+	movq	8(%rsp), %rdi
+	leaq	16(%rsp), %rsi
 
-	movq	%rdi, %rdx		/* Work out the beginning of the */
-	addq	$1, %rdx		/* environment using the above */
-	imul	$8, %rdx		/* formula, and store the result */
-	addq	%rsi, %rdx		/* in %rdx. */
+	/* Work out the beginning of the environment array using the formula
+	 * described above. */
+	movq	%rdi, %rdx
+	addq	$1, %rdx
+	imul	$8, %rdx
+	addq	%rsi, %rdx
 
-	movq	%rdx, %rcx		/* Find the end of the environment */
-1:	addq	$8, %rcx		/* array using the NULL-terminator. */
-	cmpq	$0, (%rcx)		/* The auxilary information is after */
-	jne	1b			/* this. Store the result in %rcx. */
+	/* Find the end of the environment array using the NULL terminator. */
+	movq	%rdx, %rcx
+1:	addq	$8, %rcx
+	cmpq	$0, (%rcx)
+	jne	1b
+
+	/* Auxilary information is stored after the NULL terminator. */
 	leaq	8(%rcx), %rcx
 
 	/* Arguments are all in the correct position:
@@ -53,7 +58,6 @@ _start:
 	 * Go ahead and call into the C library to do the dirty work of
 	 * setting up the environment. This will also call the main function
 	 * and exit with it's return code. */
-#endif
 	callq	__libc_init
 
 	/* If we got here then something has broken (we should have exited).
