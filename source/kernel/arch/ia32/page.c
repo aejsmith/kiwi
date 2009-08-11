@@ -152,12 +152,12 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 		page = mapping[pdpe] & PAGE_MASK;
 	}
 
-	/* Unmap PDP and map page directory. */
-	page_phys_unmap(mapping, PAGE_SIZE);
-	mapping = page_phys_map(page, PAGE_SIZE, mmflag);
-	if(mapping == NULL) {
-		return -ERR_NO_MEMORY;
-	}
+	/* Unmap PDP and map page directory. Fiddle with mappings directly to
+	 * speed things up a bit. Do not need to worry about invalidating the
+	 * TLB on other CPUs because nothing else knows about this mapping. */
+	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
+	__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)mapping));
+	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
 
 	/* Get the page table number. A page table covers 2MB. */
 	pde = (virt % 0x40000000) / 0x200000;
@@ -176,8 +176,10 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 	}
 
 	/* Unmap page directory and map page table. */
-	page_phys_unmap(mapping, PAGE_SIZE);
-	*ptblp = page_phys_map(page, PAGE_SIZE, mmflag);
+	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
+	__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)mapping));
+	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
+	*ptblp = mapping;
 	return 0;
 }
 
