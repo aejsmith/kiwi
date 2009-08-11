@@ -46,10 +46,11 @@ _start:
 
 	/* Find the end of the environment array using the NULL terminator. */
 	movq	%rdx, %rcx
-1:	addq	$8, %rcx
-	cmpq	$0, (%rcx)
-	jne	1b
-
+1:	cmpq	$0, (%rcx)
+	je	2f
+	addq	$8, %rcx
+	jmp	1b
+2:
 	/* Auxilary information is stored after the NULL terminator. */
 	leaq	8(%rcx), %rcx
 

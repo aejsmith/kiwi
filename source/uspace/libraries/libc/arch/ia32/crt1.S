@@ -46,10 +46,11 @@ _start:
 
 	/* Find the end of the environment array using the NULL terminator. */
 	movl	%edx, %ecx
-1:	addl	$4, %ecx
-	cmpl	$0, (%ecx)
-	jne	1b
-
+1:	cmpl	$0, (%ecx)
+	je	2f
+	addl	$4, %ecx
+	jmp	1b
+2:
 	/* Auxilary information is stored after the NULL terminator. */
 	leal	4(%ecx), %ecx
 
