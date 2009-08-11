@@ -189,7 +189,9 @@ static uint64_t __init_text lapic_get_freq(void) {
 
 	/* Stop the PIT. */
 	intr_disable();
-	assert(irq_remove(0) == 0);
+	if(irq_remove(0) != 0) {
+		fatal("Could not remove PIT IRQ handler");
+	}
 
 	/* Frequency is the difference between initial and current multiplied
 	 * by the PIT frequency. */
