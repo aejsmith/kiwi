@@ -23,15 +23,19 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
+#include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 #include <mm/vmem.h>
 
+#include <proc/handle.h>
+#include <proc/loader.h>
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <sync/mutex.h>
+#include <sync/semaphore.h>
 
 #include <types/avl.h>
 
@@ -280,16 +284,283 @@ int kdbg_cmd_process(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID    Prio Flags Threads Aspace             Name\n");
-	kprintf(LOG_NONE, "==    ==== ===== ======= ======             ====\n");
+	kprintf(LOG_NONE, "ID     Prio Flags Threads Aspace             Name\n");
+	kprintf(LOG_NONE, "==     ==== ===== ======= ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRId32 " %-4d %-5d %-7zu %-18p %s\n",
-			process->id, process->priority, process->flags,
-			process->num_threads, process->aspace, process->name);
+		kprintf(LOG_NONE, "%-5" PRId32 "%s %-4d %-5d %-7zu %-18p %s\n",
+			process->id, (process == curr_proc) ? "*" : " ",
+		        process->priority, process->flags, process->num_threads,
+			process->aspace, process->name);
 	}
 
 	return KDBG_OK;
+}
+
+#if 0
+# pragma mark Process handle functions.
+#endif
+
+/** Closes a handle to a process.
+ * @param info		Handle information structure.
+ * @return		0 on success, negative error code on failure. */
+static int process_handle_close(handle_info_t *info) {
+	//process_t *process = info->data;
+
+	/* FIXME. */
+	return 0;
+}
+
+/** Process handle operations. */
+static handle_type_t process_handle_type = {
+	.id = HANDLE_TYPE_PROCESS,
+	.close = process_handle_close,
+};
+
+#if 0
+# pragma mark System calls.
+#endif
+
+/** Helper to copy information from userspace.
+ * @param path		Path to copy.
+ * @param args		Argument array to copy.
+ * @param environ	Environment array to copy.
+ * @param kpathp	Where to store kernel address of path.
+ * @param kargsp	Where to store kernel address of argument array.
+ * @param kenvp		Where to store kernel address of environment array.
+ * @return		0 on success, negative error code on failure. */
+static int sys_process_arg_copy(const char *path, char *const args[], char *const environ[],
+                                char **kpathp, char ***kargsp, char ***kenvp) {
+	char *kpath = NULL, **kargs = NULL, **kenv = NULL;
+	int ret;
+
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	} else if((ret = arrcpy_from_user(args, &kargs)) != 0) {
+		kfree(kpath);
+		return ret;
+	} else if((ret = arrcpy_from_user(environ, &kenv)) != 0) {
+		for(int i = 0; kargs[i] != NULL; i++) {
+			kfree(kargs[i]);
+		}
+
+		kfree(kargs);
+		kfree(kpath);
+		return ret;
+	}
+
+	*kpathp = kpath;
+	*kargsp = kargs;
+	*kenvp = kenv;
+	return 0;
+}
+
+/** Helper to free information copied from userspace.
+ * @param path		Path to free.
+ * @param args		Argument array to free.
+ * @param environ	Environment array to free. */
+static void sys_process_arg_free(char *path, char **args, char **environ) {
+	for(int i = 0; args[i] != NULL; i++) {
+		kfree(args[i]);
+	}
+	for(int i = 0; environ[i] != NULL; i++) {
+		kfree(environ[i]);
+	}
+	kfree(path);
+	kfree(args);
+	kfree(environ);
+}
+
+/** Structure containing information for sys_process_create(). */
+struct process_create_info {
+	char *path;		/**< Path to binary. */
+	char **args;		/**< Argument array. */
+	char **environ;		/**< Environment array. */
+	bool inherit;		/**< Whether to inherit handles. */
+	semaphore_t sem;	/**< Semaphore to wake upon completion. */
+	int ret;		/**< Return code. */
+};
+
+/** Main thread for sys_process_create().
+ * @param arg1		Pointer to information structure.
+ * @param arg2		Unused. */
+static void sys_process_create_thread(void *arg1, void *arg2) {
+	struct process_create_info *info = arg1;
+
+	info->ret = loader_binary_load(info->path, info->args, info->environ, &info->sem);
+
+	/* Must have failed. Notify caller ourselves, which will pick up the
+	 * error code. */
+	assert(info->ret != 0);
+	semaphore_up(&info->sem);
+
+	kprintf(LOG_WARN, "Meep, process_create failed. Process stuck\n");
+}
+
+/** Create a new process.
+ *
+ * Creates a new process and executes a program within it. If specified,
+ * handles marked as inheritable in the calling process will be inherited by
+ * the new process (with the same IDs).
+ *
+ * @todo		Inheriting.
+ *
+ * @param path		Path to executable for new process.
+ * @param args		Argument array (with NULL terminator).
+ * @param environ	Environment array (with NULL terminator).
+ * @param inherit	Whether to inherit inheritable handles.
+ *
+ * @return		Handle to new process (greater than or equal to 0),
+ *			negative error code on failure.
+ */
+handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit) {
+	struct process_create_info info;
+	process_t *process = NULL;
+	thread_t *thread = NULL;
+	handle_t handle = -1;
+	int ret;
+
+	if((ret = sys_process_arg_copy(path, args, environ, &info.path, &info.args, &info.environ)) != 0) {
+		return ret;
+	} else if(!info.path[0]) {
+		ret = -ERR_PARAM_INVAL;
+		goto fail;
+	}
+
+	/* Create the new process structure. */
+	if((ret = process_create("[creating...]", curr_proc, PRIORITY_USER, PROCESS_NOASPACE, &process)) != 0) {
+		goto fail;
+	}
+
+	/* Try to create the handle for the process. This should not be left
+	 * until after the process has begun running, because it could fail and
+	 * leave the new process running, but make the caller think it isn't
+	 * running. */
+	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
+		ret = (int)handle;
+		goto fail;
+	}
+
+	/* Fill in the information structure to pass to the main thread. */
+	semaphore_init(&info.sem, "process_create_sem", 0);
+	info.inherit = inherit;
+	info.ret = 0;
+
+	/* Create the main thread for the process. */
+	if((ret = thread_create("main", process, 0, sys_process_create_thread, &info, NULL, &thread)) != 0) {
+		goto fail;
+	}
+	thread_run(thread);
+
+	/* Wait for completion, and then check the return code. */
+	semaphore_down(&info.sem, 0);
+	if((ret = info.ret) != 0) {
+		goto fail;
+	}
+
+	return handle;
+fail:
+	if(process || thread) {
+		kprintf(LOG_WARN, "FIXME: Destroy process/thread on failure\n");
+	}
+	if(handle >= 0) {
+		handle_close(&curr_proc->handles, handle);
+	}
+	sys_process_arg_free(info.path, info.args, info.environ);
+	return (handle_t)ret;
+}
+
+/** Replace the current process.
+ *
+ * Replaces the current process with a new program. All threads in the process
+ * other than the calling thread will be terminated. If specified, handles
+ * marked as inheritable in the process will remain open in the new process,
+ * and others will be closed. Otherwise, all handles will be closed.
+ *
+ * @todo		Inheriting.
+ *
+ * @param path		Path to executable for new process.
+ * @param args		Argument array (with NULL terminator).
+ * @param environ	Environment array (with NULL terminator).
+ * @param inherit	Whether to inherit inheritable handles.
+ *
+ * @return		Does not return on success, returns negative error code
+ *			on failure.
+ */
+int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit) {
+	char *kpath, **kargs, **kenv;
+	int ret;
+
+	if((ret = sys_process_arg_copy(path, args, environ, &kpath, &kargs, &kenv)) != 0) {
+		return ret;
+	} else if(!kpath[0]) {
+		sys_process_arg_free(kpath, kargs, kenv);
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* If this returns it has failed. */
+	ret = loader_binary_load(kpath, kargs, kenv, NULL);
+	assert(ret != 0);
+	sys_process_arg_free(kpath, kargs, kenv);
+	return ret;
+}
+
+/** Create a duplicate of the calling process.
+ *
+ * Creates a new process that is a duplicate of the calling process. Any shared
+ * memory regions in the parent's address space are shared between the parent
+ * and the child. Private regions are made copy-on-write in the parent and the
+ * child, so they both share the pages in the regions until either of them
+ * write to them. Note that use of this function is not allowed if the calling
+ * process has more than 1 thread.
+ *
+ * @param handlep	On success, a handle to the created process will be
+ *			stored here in the parent.
+ *
+ * @return		Upon success, 0 will be returned in the parent (with
+ *			a handle to the process stored in handlep), and 1 will
+ *			be returned in the child. Upon failure no child process
+ *			will be created and a negative error code will be
+ *			returned.
+ */
+int sys_process_duplicate(handle_t *handlep) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
+/** Open a handle to a process.
+ *
+ * Opens a handle to a process in order to perform other operations on it.
+ *
+ * @param id		Global ID of the process to open.
+ */
+handle_t sys_process_open(identifier_t id) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
+/** Get the ID of a process.
+ *
+ * Gets the ID of the process referred to by a handle. If the handle is
+ * specified as -1, then the ID of the calling process will be returned.
+ *
+ * @param handle	Handle for process to get ID of.
+ *
+ * @return		Process ID on success (greater than or equal to zero),
+ *			negative error code on failure.
+ */
+identifier_t sys_process_id(handle_t handle) {
+	handle_info_t *info;
+	process_t *process;
+	identifier_t id;
+
+	if(handle == -1) {
+		id = curr_proc->id;
+	} else if(!(id = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_PROCESS, &info))) {
+		process = info->data;
+		id = process->id;
+		handle_release(info);
+	}
+
+	return id;
 }

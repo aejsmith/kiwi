@@ -220,6 +220,8 @@ out:
  * Initializes a process' handle table structure and duplicates handles
  * from its parent if required.
  *
+ * @todo		Duplicate handles.
+ *
  * @param table		Table to initialize.
  * @param parent	Parent process' handle table.
  *

@@ -24,6 +24,7 @@ Type('size_t', 1)
 Type('handle_t', 1)
 Type('offset_t', 1)
 Type('file_size_t', 1)
+Type('identifier_t', 1)
 
 # System call function generator.
 @SyscallGenerator

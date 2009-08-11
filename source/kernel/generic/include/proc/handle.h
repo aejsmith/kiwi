@@ -59,6 +59,8 @@ typedef struct handle_info {
 /** Handle type ID definitions. */
 #define HANDLE_TYPE_FILE	1	/**< File. */
 #define HANDLE_TYPE_DIR		2	/**< Directory. */
+#define HANDLE_TYPE_PROCESS	3	/**< Process. */
+#define HANDLE_TYPE_THREAD	4	/**< Thread. */
 
 extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data);
 extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);

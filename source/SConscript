@@ -25,12 +25,14 @@ def boot_image_func(target, source, env):
 	os.makedirs(os.path.join(tmpdir, 'applications'))
 	os.makedirs(os.path.join(tmpdir, 'modules'))
 
-	# Copy the startup binary, modules and other boot apps into it.
-	shutil.copy(str(env['STARTUP']), tmpdir)
+	# Copy the modules and other boot apps into it.
 	for module in env['MODULES']:
 		shutil.copy(str(module), os.path.join(tmpdir, 'modules'))
 	for app in env['BOOTAPPS']:
 		shutil.copy(str(app), os.path.join(tmpdir, 'applications'))
+
+	# Create the startup symbolic link.
+	os.symlink('applications/startup', os.path.join(tmpdir, 'startup'))
 
 	# Create the TAR file.
 	tar = tarfile.open(str(target[0]), 'w:gz')
@@ -47,6 +49,6 @@ def boot_image_func(target, source, env):
 dist = envmgr['dist']
 dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMSTR'))
 
-dist.BootImage('bootimg.tar.gz', [dist['STARTUP']] + dist['MODULES'] + dist['BOOTAPPS'])
+dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTAPPS'])
 dist['BOOTIMG'] = File('bootimg.tar.gz')
 Default(Alias('bootimg', dist['BOOTIMG']))

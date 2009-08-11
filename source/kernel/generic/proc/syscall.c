@@ -82,6 +82,13 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_vm_map_anon,
 	(syscall_handler_t)sys_vm_map_file,
 	(syscall_handler_t)sys_vm_unmap,
+
+	/** Process system calls. */
+	(syscall_handler_t)sys_process_create,
+	(syscall_handler_t)sys_process_replace,
+	(syscall_handler_t)sys_process_duplicate,
+	(syscall_handler_t)sys_process_open,
+	(syscall_handler_t)sys_process_id,
 };
 
 /** System call dispatcher.

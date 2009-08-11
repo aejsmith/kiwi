@@ -21,6 +21,9 @@
 #ifndef __KERNEL_TYPES_H
 #define __KERNEL_TYPES_H
 
+#define __need_size_t
+#include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 /** Native-sized types. FIXME: Need architecture definitions of these! */

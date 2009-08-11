@@ -81,4 +81,10 @@ extern void process_init(void);
 
 extern int kdbg_cmd_process(int argc, char **argv);
 
+extern handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit);
+extern int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit);
+extern int sys_process_duplicate(handle_t *handlep);
+extern handle_t sys_process_open(identifier_t id);
+extern identifier_t sys_process_id(handle_t handle);
+
 #endif /* __PROC_PROCESS_H */

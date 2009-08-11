@@ -341,7 +341,8 @@ void __init_text thread_reaper_init(void) {
  * @param thread	Thread to print.
  * @param level		Log level. */
 static inline void thread_dump(thread_t *thread, int level) {
-	kprintf(level, "%-5" PRId32 " %-5" PRId32 " ", thread->id, thread->owner->id);
+	kprintf(level, "%-5" PRId32 "%s ", thread->id,
+	        (thread == curr_thread) ? "*" : " ");
 
 	switch(thread->state) {
 	case THREAD_CREATED:	kprintf(level, "Created  "); break;
@@ -352,9 +353,9 @@ static inline void thread_dump(thread_t *thread, int level) {
 	default:		kprintf(level, "Bad      "); break;
 	}
 
-	kprintf(level, "%-4" PRIu32 " %-4zu %-5d %-20s %s\n", (thread->cpu) ? thread->cpu->id : 0,
-		thread->priority, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
-		thread->name);
+	kprintf(level, "%-4" PRIu32 " %-4zu %-5d %-20s %-5" PRId32 " %s\n", (thread->cpu) ? thread->cpu->id : 0,
+	        thread->priority, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
+	        thread->owner->id, thread->name);
 }
 
 /** Dump a list of threads.
@@ -382,8 +383,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID    Owner State    CPU  Prio Flags WaitQ                Name\n");
-	kprintf(LOG_NONE, "==    ===== =====    ===  ==== ===== =====                ====\n");
+	kprintf(LOG_NONE, "ID     State    CPU  Prio Flags WaitQ                Owner Name\n");
+	kprintf(LOG_NONE, "==     =====    ===  ==== ===== =====                ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */

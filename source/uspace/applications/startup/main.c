@@ -20,7 +20,7 @@
 
 #include <kernel/fs.h>
 #include <kernel/handle.h>
-#include <kernel/vm.h>
+#include <kernel/process.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -29,33 +29,33 @@
 static inline void mount(const char *dev, const char *path, const char *type, int flags) {
 	int ret;
 
-	printf("Mounting %s on %s... ", type, path);
-	ret = fs_mount(dev, path, type, 0);
-	printf("%d\n", ret);
+	if((ret = fs_mount(dev, path, type, 0)) != 0) {
+		printf("Mount %s on %s failed (%d)\n", type, path, ret);
+	}
 }
 
 static inline void dir_create(const char *path) {
 	int ret;
 
-	printf("Creating directory %s... ", path);
-	ret = fs_dir_create(path);
-	printf("%d\n", ret);
+	if((ret = fs_dir_create(path)) != 0) {
+		printf("Create directory %s failed (%d)\n", path, ret);
+	}
 }
 
 static inline void file_create(const char *path) {
 	int ret;
 
-	printf("Creating file %s... ", path);
-	ret = fs_file_create(path);
-	printf("%d\n", ret);
+	if((ret = fs_file_create(path)) != 0) {
+		printf("Create file %s failed (%d)\n", path, ret);
+	}
 }
 
 static inline void symlink_create(const char *path, const char *target) {
 	int ret;
 
-	printf("Creating symbolic link %s -> %s... ", path, target);
-	ret = fs_symlink_create(path, target);
-	printf("%d\n", ret);
+	if((ret = fs_symlink_create(path, target)) != 0) {
+		printf("Create symbolic link %s -> %s failed(%d)\n", path, target, ret);
+	}
 }
 
 static void dump_tree(char *name, int indent) {
@@ -127,37 +127,18 @@ static __attribute__((used)) int putchar(int ch) {
 	return ch;
 }
 
+extern char **environ;
+
 int main(int argc, char **argv) {
+	char *nargs[] = { (char *)"/applications/hello", (char *)"--hello", (char *)"world", NULL };
 	char buf[] = { 'a', 'b', 'c', 'd' };
 	handle_t handle;
 	size_t bytes;
-	void *addr;
 	int ret, i;
 
-	printf("Hello from C userspace!\n");
-	printf("This is a message!\n");
-
-	printf("My arguments are:\n");
+	printf("I'm process %d! My arguments are:\n", process_id(-1));
 	for(i = 0; i < argc; i++) {
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
-	}
-
-	ret = vm_map_anon(NULL, 0x4000, VM_MAP_READ | VM_MAP_WRITE, &addr);
-	printf("Map returned %d (%p)\n", ret, addr);
-	if(ret == 0) {
-		printf("Writing... 1234\n");
-		*(int *)addr = 1234;
-		printf("Reading... %d\n", *(int *)addr);
-		memset(addr, 0, 0x4000);
-		vm_unmap(addr, 0x4000);
-	}
-
-	addr = malloc(4322);
-	printf("Malloc returned %p\n", addr);
-	if(addr) {
-		printf("Writing... 1337\n");
-		*(int *)addr = 1337;
-		printf("Reading... %d\n", *(int *)addr);
 	}
 
 	dir_create("/foo");
@@ -173,22 +154,18 @@ int main(int argc, char **argv) {
 	file_create("/foo/bar/meow/ohai.txt");
 
 	handle = fs_file_open("/foo/bar.txt", FS_FILE_READ | FS_FILE_WRITE);
-	printf("Got handle %d\n", handle);
 	if(handle >= 0) {
 		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
-		printf("Write returned %d (%zu)\n", ret, bytes);
 		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
-		printf("Write returned %d (%zu)\n", ret, bytes);
 		ret = fs_file_write(handle, buf, sizeof(buf), -1, &bytes);
-		printf("Write returned %d (%zu)\n", ret, bytes);
 
-		ret = fs_handle_seek(handle, FS_HANDLE_SEEK_SET, 0, NULL);
-		printf("Seek returned %d\n", ret);
-		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
-		printf("Read returned %d (%zu)\n", ret, bytes);
-		if(ret == 0) {
+		if((ret = fs_handle_seek(handle, FS_HANDLE_SEEK_SET, 0, NULL)) != 0) {
+			printf("Seek(%d) failed (%d)\n", handle, ret);
+		} else if((ret = fs_file_read(handle, array, sizeof(array), -1, &bytes)) == 0) {
 			array[bytes] = 0;
-			printf("Got string '%s'\n", array);
+			printf("Read(%d) returned %d (%zu): '%s'\n", handle, ret, bytes, array);
+		} else {
+			printf("Read(%d) failed %d (%zu)\n", handle, ret, bytes);
 		}
 
 		handle_close(handle);
@@ -198,29 +175,31 @@ int main(int argc, char **argv) {
 	symlink_create("/foo/bar/linkdir", "./..///../..////./foo/bar/../");
 
 	handle = fs_file_open("/foo/bar/link.txt", FS_FILE_READ);
-	printf("Got handle %d\n", handle);
 	if(handle >= 0) {
-		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
-		printf("Read returned %d (%zu)\n", ret, bytes);
-		if(ret == 0) {
+		if((ret = fs_file_read(handle, array, sizeof(array), -1, &bytes)) == 0) {
 			array[bytes] = 0;
-			printf("Got string '%s'\n", array);
+			printf("Read(%d) returned %d (%zu): '%s'\n", handle, ret, bytes, array);
+		} else {
+			printf("Read(%d) failed %d (%zu)\n", handle, ret, bytes);
 		}
 
 		handle_close(handle);
+	} else {
+		printf("Failed to open: %d\n", handle);
 	}
 
 	handle = fs_file_open("/foo/bar/linkdir/bar.txt", FS_FILE_READ);
-	printf("Got handle %d\n", handle);
 	if(handle >= 0) {
-		ret = fs_file_read(handle, array, sizeof(array), -1, &bytes);
-		printf("Read returned %d (%zu)\n", ret, bytes);
-		if(ret == 0) {
+		if((ret = fs_file_read(handle, array, sizeof(array), -1, &bytes)) == 0) {
 			array[bytes] = 0;
-			printf("Got string '%s'\n", array);
+			printf("Handle %d, read returned %d (%zu): '%s'\n", handle, ret, bytes, array);
+		} else {
+			printf("Handle %d, read failed %d (%zu)\n", handle, ret, bytes);
 		}
 
 		handle_close(handle);
+	} else {
+		printf("Failed to open: %d\n", handle);
 	}
 
 	handle = fs_file_open("/meow.txt", FS_FILE_READ);
@@ -228,17 +207,9 @@ int main(int argc, char **argv) {
 	printf("Unlinked, closing...\n");
 	handle_close(handle);
 
-	printf("\nDirectory tree:\n");
+	printf("Directory tree:\n");
 	dump_tree(NULL, 0);
 
-	printf("\nSetting root to /foo... ");
-	ret = fs_setroot("/foo");
-	printf("%d\n", ret);
-
-	fs_setcwd("/");
-	fs_setcwd("..");
-	printf("\nDirectory tree:\n");
-	dump_tree(NULL, 0);
-
-	while(1);
+	handle = process_create(nargs[0], nargs, environ, true);
+	printf("Create process returned %d (%d)\n", handle, process_id(handle));
 }

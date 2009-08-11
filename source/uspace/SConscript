@@ -27,7 +27,6 @@ env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config[
 # as LIBS is a special SCons variable.
 env['LIBRARIES'] = []
 env['APPS'] = []
-env['BOOTAPPS'] = []
 
 # Set the directory that we want all libraries to be placed in.
 env['LIBOUTDIR'] = Dir('libraries')
@@ -66,7 +65,8 @@ for app in env['APPS']:
 	Depends(app, File('libraries/libkernel.a'))
 
 # Set arrays needed in the distribution environment.
-envmgr['dist']['BOOTAPPS'] = env['BOOTAPPS']
+# FIXME: Eventually we shouldn't put everything in the boot image.
+envmgr['dist']['BOOTAPPS'] = env['APPS']
 
 # Set build defaults.
 Default(Alias('libraries', env['LIBRARIES']))

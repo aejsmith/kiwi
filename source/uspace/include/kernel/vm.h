@@ -23,9 +23,6 @@
 
 #include <kernel/types.h>
 
-#define __need_size_t
-#include <stddef.h>
-
 /** Behaviour flags for vm_map_* functions. */
 #define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */

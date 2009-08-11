@@ -258,3 +258,53 @@ int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
 	*destp = d;
 	return 0;
 }
+
+/** Copy a NULL-terminated array of strings from userspace.
+ *
+ * Copies a NULL-terminated array of strings from userspace. The array
+ * itself and each array entry must be freed with kfree() once no longer
+ * needed.
+ *
+ * @param src		Array to copy.
+ * @param arrayp	Pointer to set to new array location.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int arrcpy_from_user(char *const src[], char ***arrayp) {
+	char **array = NULL, **narr;
+	int ret, i;
+
+	/* Copy the arrays across. */
+	for(i = 0; ; i++) {
+		if(!(narr = krealloc(array, sizeof(char *) * (i + 1), 0))) {
+			goto fail;
+		}
+
+		array = narr;
+		array[i] = NULL;
+
+		if((ret = memcpy_from_user(&array[i], &src[i], sizeof(char *))) != 0) {
+			array[i] = NULL;
+			goto fail;
+		} else if(array[i] == NULL) {
+			break;
+		}
+
+		if((ret = strdup_from_user(array[i], 0, &array[i])) != 0) {
+			array[i] = NULL;
+			goto fail;
+		}
+	}
+
+	*arrayp = array;
+	return 0;
+fail:
+	if(array) {
+		for(i = 0; array[i] != NULL; i++) {
+			kfree(array[i]);
+		}
+
+		kfree(array);
+	}
+	return ret;
+}

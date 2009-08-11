@@ -17,5 +17,3 @@ Import('env', 'config', 'envmgr')
 env.Program('startup', [
 	'main.c',
 ])
-
-envmgr['dist']['STARTUP'] = File('startup')
