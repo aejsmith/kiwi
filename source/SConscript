@@ -23,13 +23,16 @@ def boot_image_func(target, source, env):
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwibootimg')
 	os.makedirs(os.path.join(tmpdir, 'applications'))
+	os.makedirs(os.path.join(tmpdir, 'libraries'))
 	os.makedirs(os.path.join(tmpdir, 'modules'))
 
-	# Copy the modules and other boot apps into it.
-	for module in env['MODULES']:
-		shutil.copy(str(module), os.path.join(tmpdir, 'modules'))
+	# Copy everything needed into it.
 	for app in env['BOOTAPPS']:
 		shutil.copy(str(app), os.path.join(tmpdir, 'applications'))
+	for lib in env['BOOTLIBS']:
+		shutil.copy(str(lib), os.path.join(tmpdir, 'libraries'))
+	for mod in env['MODULES']:
+		shutil.copy(str(mod), os.path.join(tmpdir, 'modules'))
 
 	# Create the startup symbolic link.
 	os.symlink('applications/startup', os.path.join(tmpdir, 'startup'))
@@ -49,6 +52,6 @@ def boot_image_func(target, source, env):
 dist = envmgr['dist']
 dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMSTR'))
 
-dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTAPPS'])
+dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTAPPS'] + dist['BOOTLIBS'])
 dist['BOOTIMG'] = File('bootimg.tar.gz')
 Default(Alias('bootimg', dist['BOOTIMG']))

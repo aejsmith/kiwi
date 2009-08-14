@@ -30,7 +30,7 @@ typedef struct vm_map_file_args {
 	void **addrp;			/**< Where to store address mapped to. */
 } vm_map_file_args_t;
 
-extern int __vm_map_file(vm_map_file_args_t *args);
+extern int _vm_map_file(vm_map_file_args_t *args);
 
 /** Map a file into memory.
  *
@@ -67,5 +67,5 @@ int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t o
 	args.offset = offset;
 	args.addrp = addrp;
 
-	return __vm_map_file(&args);
+	return _vm_map_file(&args);
 }

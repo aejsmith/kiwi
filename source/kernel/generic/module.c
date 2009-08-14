@@ -43,12 +43,6 @@
 static LIST_DECLARE(module_list);
 static MUTEX_DECLARE(module_lock, 0);
 
-extern bool elf_module_check(vfs_node_t *node);
-extern int elf_module_load(module_t *module);
-extern int elf_module_relocate(module_t *module, bool external);
-
-extern void *module_mem_alloc(size_t size, int mmflag);
-
 /** Arena used for allocating memory for kernel modules. */
 static vmem_t *module_arena;
 #ifdef KERNEL_MODULE_BASE

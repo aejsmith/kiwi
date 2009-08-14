@@ -67,6 +67,9 @@ class EnvironmentManager(UserDict):
 		self.base['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
 		self.base['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
 
+		# Set shared library compilation flags.
+		self.base['SHCCFLAGS'] = '$CCFLAGS -fPIC -DSHARED'
+
 		# Override the default assembler - it uses as directly, we want to use GCC.
 		self.base['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
 
@@ -75,8 +78,11 @@ class EnvironmentManager(UserDict):
 		self.base['ASCOMSTR'] = self.get_compile_str('Compiling ASM source:', '$SOURCE')
 		self.base['ASPPCOMSTR'] = self.get_compile_str('Compiling ASM source:', '$SOURCE')
 		self.base['CCCOMSTR'] = self.get_compile_str('Compiling C source:', '$SOURCE')
+		self.base['SHCCCOMSTR'] = self.get_compile_str('Compiling C source:', '$SOURCE')
 		self.base['CXXCOMSTR'] = self.get_compile_str('Compiling C++ source:', '$SOURCE')
+		self.base['SHCXXCOMSTR'] = self.get_compile_str('Compiling C++ source:', '$SOURCE')
 		self.base['LINKCOMSTR'] = self.get_compile_str('Linking:', '$TARGET')
+		self.base['SHLINKCOMSTR'] = self.get_compile_str('Linking (shared):', '$TARGET')
 		self.base['RANLIBCOMSTR'] = self.get_compile_str('Indexing archive:', '$TARGET')
 		self.base['GENCOMSTR'] = self.get_compile_str('Generating:', '$TARGET')
 		self.base['STRIPCOMSTR'] = self.get_compile_str('Stripping:', '$TARGET')

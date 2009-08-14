@@ -74,7 +74,6 @@ static int thread_cache_ctor(void *obj, void *data, int kmflag) {
 	list_init(&thread->header);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
-
 	return 0;
 }
 
@@ -103,6 +102,7 @@ static void thread_trampoline(void) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void thread_reaper(void *arg1, void *arg2) {
+	process_t *del = NULL;
 	thread_t *thread;
 
 	while(true) {
@@ -120,6 +120,14 @@ static void thread_reaper(void *arg1, void *arg2) {
 		avl_tree_remove(&thread_tree, (key_t)thread->id);
 		mutex_unlock(&thread_tree_lock);
 
+		/* Detach from its owner. */
+		spinlock_lock(&thread->owner->lock, 0);
+		list_remove(&thread->owner_link);
+		if(refcount_dec(&thread->owner->count) == 0) {
+			del = thread->owner;
+		}
+		spinlock_unlock(&thread->owner->lock);
+
 		/* Now clean up the thread. */
 		kheap_free(thread->kstack, KSTACK_SIZE);
 		context_destroy(&thread->context);
@@ -132,6 +140,12 @@ static void thread_reaper(void *arg1, void *arg2) {
 			thread->id, thread->name, thread);
 
 		slab_cache_free(thread_cache, thread);
+
+		/* Delete the owner if required. */
+		if(del) {
+			//process_destroy(del);
+			del = NULL;
+		}
 	}
 }
 
@@ -156,12 +170,6 @@ void thread_destroy(thread_t *thread) {
 
 	assert(list_empty(&thread->header));
 	assert(thread->state == THREAD_DEAD);
-
-	/* Detach from its owner. */
-	spinlock_lock(&thread->owner->lock, 0);
-	list_remove(&thread->owner_link);
-	thread->owner->num_threads--;
-	spinlock_unlock(&thread->owner->lock);
 
 	/* Queue for deletion by the thread reaper. */
 	spinlock_lock(&dead_thread_lock, 0);
@@ -298,7 +306,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	/* Add the thread to the owner. */
 	spinlock_lock(&owner->lock, 0);
 	list_append(&owner->threads, &thread->owner_link);
-	owner->num_threads++;
+	refcount_inc(&owner->count);
 	spinlock_unlock(&owner->lock);
 
 	/* Add to the thread tree. */

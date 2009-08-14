@@ -90,6 +90,8 @@ typedef struct module {
         static const char *__module_export_##msym \
                 __section(".modexports") __used = #msym
 
+extern void *module_mem_alloc(size_t size, int mmflag);
+
 extern int module_load(const char *path, char *depbuf);
 
 extern symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp);

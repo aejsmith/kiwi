@@ -19,6 +19,8 @@
  */
 
 #include <arch/descriptor.h>
+#include <arch/x86/sysreg.h>
+#include <arch/stack.h>
 
 /** Push registers onto the stack. */
 .macro PUSH_REGS
@@ -255,3 +257,49 @@ __syscall_entry:
 	/* Return to user-mode. */
 	sysretq
 .size __syscall_entry, .-__syscall_entry
+
+/** Userspace entry function. */
+.global thread_arch_enter_userspace
+thread_arch_enter_userspace:
+	/* Push a zero return address so the userspace program will not fault
+	 * if it inadvertently returns from its entry function. */
+	subq	$STACK_DELTA, %rsi
+	movq	$0, (%rsi)
+
+	/* Set up a stack frame for IRET:
+	 *  - SS.
+	 *  - RSP.
+	 *  - RFLAGS.
+	 *  - CS.
+	 *  - RIP. */
+	push	$(SEG_U_DS | 0x03)
+	push	%rsi
+	push	$(SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1)
+	push	$(SEG_U_CS | 0x03)
+	push	%rdi
+	
+	/* Set other segment registers. */
+	mov	$(SEG_U_DS | 0x03), %ax
+	mov	%ax, %ds
+	mov	%ax, %es
+	
+	/* Clear general purpose registers. */
+	xorq	%rax, %rax
+	xorq	%rbx, %rbx
+	xorq	%rcx, %rcx
+	xorq	%rdx, %rdx
+	xorq	%rsi, %rsi
+	xorq	%rdi, %rdi
+	xorq	%rbp, %rbp
+	xorq	%r8, %r8
+	xorq	%r9, %r9
+	xorq	%r10, %r10
+	xorq	%r11, %r11
+	xorq	%r12, %r12
+	xorq	%r13, %r13
+	xorq	%r14, %r14
+	xorq	%r15, %r15
+
+	/* Enter userspace. */
+	iretq
+.size thread_arch_enter_userspace, .-thread_arch_enter_userspace

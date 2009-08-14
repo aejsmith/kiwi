@@ -33,7 +33,6 @@
 #endif
 
 extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
-extern int elf_module_relocate(module_t *module, bool external);
 
 /** Perform relocations for an ELF module.
  * @param module	Module to relocate.

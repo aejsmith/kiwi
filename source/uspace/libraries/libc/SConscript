@@ -19,4 +19,4 @@ sources = []
 SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
 
 # Build the library from this.
-env.Library('c', sources)
+env.SharedLibrary('c', sources)

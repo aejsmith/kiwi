@@ -101,13 +101,18 @@ class SyscallParser:
 		self.curr_num = 0
 
 	# Define a system call in the current service.
-	def SyscallDirective(self, name, args):
+	def SyscallDirective(self, name, args, num=None):
 		if type(name) != str or type(args) != list:
 			raise Exception, 'Invalid argument type to Syscall.'
 		elif self.curr_service == None:
 			raise Exception, "Attempt to define system call '%s' outside of Service." % (name)
-		self.syscalls.append(((self.curr_service << 16) + self.curr_num, name, args))
-		self.curr_num += 1
+
+		if num:
+			self.syscalls.append(((self.curr_service << 16) + num, name, args))
+			self.curr_num = num + 1
+		else:
+			self.syscalls.append(((self.curr_service << 16) + self.curr_num, name, args))
+			self.curr_num += 1
 
 # Main function for the system call parser.
 def main():

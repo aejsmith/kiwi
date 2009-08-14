@@ -52,5 +52,4 @@ env['OBJFILES'] += [
 	env.Object('page.c'),
 	env.Object('switch.S'),
 	env.Object('thread.c'),
-	env.Object('uspace.S'),
 ]

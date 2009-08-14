@@ -47,15 +47,9 @@ static int sys_putch(char ch) {
 /** Table of system calls. */
 static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_putch,
-
-	/** Module loader system calls. */
 	(syscall_handler_t)sys_module_load,
-
-	/** Handle system calls. */
 	(syscall_handler_t)sys_handle_close,
 	(syscall_handler_t)sys_handle_type,
-
-	/** Filesystem system calls. */
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,
@@ -77,13 +71,9 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_fs_link,
 	(syscall_handler_t)sys_fs_unlink,
 	(syscall_handler_t)sys_fs_rename,
-
-	/** VM system calls. */
 	(syscall_handler_t)sys_vm_map_anon,
 	(syscall_handler_t)sys_vm_map_file,
 	(syscall_handler_t)sys_vm_unmap,
-
-	/** Process system calls. */
 	(syscall_handler_t)sys_process_create,
 	(syscall_handler_t)sys_process_replace,
 	(syscall_handler_t)sys_process_duplicate,

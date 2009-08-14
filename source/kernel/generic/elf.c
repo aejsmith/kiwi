@@ -26,19 +26,41 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
-#include <proc/loader.h>
+#include <proc/process.h>
 
 #include <elf.h>
 #include <errors.h>
 #include <fatal.h>
-#include <init.h>
 #include <module.h>
+
+/** Check whether an ELF header is valid.
+ * @param ehdr		Executable header.
+ * @param type		Required ELF type.
+ * @return		True if valid, false if not. */
+static bool elf_check_ehdr(elf_ehdr_t *ehdr, int type) {
+	/* Check the magic number and version. */
+	if(strncmp((const char *)ehdr->e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
+		return false;
+	} else if(ehdr->e_ident[ELF_EI_VERSION] != 1 || ehdr->e_version != 1) {
+		return false;
+	}
+
+	/* Check whether it matches the architecture we're running on. */
+	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS ||
+           ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
+	   ehdr->e_machine != ELF_MACHINE) {
+		return false;
+	}
+
+	/* Finally check type of binary. */
+	return (ehdr->e_type == type);
+}
 
 /** Check whether an FS node contains a valid ELF header.
  * @param node		Filesystem node.
  * @param type		Required ELF type.
  * @return		True if valid, false if not. */
-static bool elf_check(vfs_node_t *node, int type) {
+static bool elf_check_node(vfs_node_t *node, int type) {
 	elf_ehdr_t ehdr;
 	size_t bytes;
 	int ret;
@@ -50,50 +72,42 @@ static bool elf_check(vfs_node_t *node, int type) {
 		return false;
 	}
 
-	/* Check the magic number and version. */
-	if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, strlen(ELF_MAGIC)) != 0) {
-		return false;
-	} else if(ehdr.e_ident[ELF_EI_VERSION] != 1 || ehdr.e_version != 1) {
-		return false;
-	}
-
-	/* Check whether it matches the architecture we're running on. */
-	if(ehdr.e_ident[ELF_EI_CLASS] != ELF_CLASS ||
-           ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
-	   ehdr.e_machine != ELF_MACHINE) {
-		return false;
-	}
-
-	/* Finally check type of binary. */
-	return (ehdr.e_type == type);
+	return elf_check_ehdr(&ehdr, type);
 }
 
 #if 0
 # pragma mark ELF executable loader.
 #endif
 
-#if CONFIG_LOADER_DEBUG
+#if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
 #endif
 
-extern void elf_binary_copy_data(elf_binary_t *data);
+/** ELF loader binary data structure. */
+typedef struct elf_binary {
+	elf_ehdr_t ehdr;		/**< Executable header. */
+	elf_phdr_t *phdrs;		/**< Program headers. */
+	vfs_node_t *node;		/**< Node being loaded. */
+	vm_aspace_t *as;		/**< Address space to map in to. */
+} elf_binary_t;
 
 /** Handle an ELF_PT_LOAD program header.
- * @param data		ELF binary data structure.
+ * @param binary	ELF binary data structure.
+ * @param phdr		Program header to load.
  * @param i		Index of program header.
  * @return		0 on success, negative error code on failure. */
-static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
+static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i) {
 	int ret, flags = 0;
 	ptr_t start, end;
 	offset_t offset;
 	size_t size;
 
 	/* Work out the protection flags to use. */
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
-	flags |= ((data->phdrs[i].p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
+	flags |= ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
+	flags |= ((phdr->p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
+	flags |= ((phdr->p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
 	if(flags == 0) {
 		dprintf("elf: program header %zu has no protection flags set\n", i);
 		return -ERR_FORMAT_INVAL;
@@ -101,12 +115,12 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 
 	/* Set the private and fixed flags - we always want to insert at the
 	 * position we say, and not share stuff. */
-	flags |= VM_MAP_FIXED | VM_MAP_PRIVATE;
+	flags |= (VM_MAP_FIXED | VM_MAP_PRIVATE);
 
-	/* Map the BSS if required. */
-	if(data->phdrs[i].p_filesz != data->phdrs[i].p_memsz) {
-		start = ROUND_DOWN(data->phdrs[i].p_vaddr + data->phdrs[i].p_filesz, PAGE_SIZE);
-		end = ROUND_UP(data->phdrs[i].p_vaddr + data->phdrs[i].p_memsz, PAGE_SIZE);
+	/* Map an anonymous region if memory size is greater than file size. */
+	if(phdr->p_memsz > phdr->p_filesz) {
+		start = ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+		end = ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
 		size = end - start;
 
 		dprintf("elf: loading BSS for %zu to %p (size: %zu)\n", i, start, size);
@@ -119,195 +133,227 @@ static int elf_binary_phdr_load(elf_binary_t *data, size_t i) {
 		}
 
 		/* Create an anonymous memory region for it. */
-		ret = vm_map_anon(data->binary->aspace, start, size, flags, NULL);
-		if(ret != 0) {
+		if((ret = vm_map_anon(binary->as, start, size, flags, NULL)) != 0) {
 			return ret;
 		}
 	}
 
 	/* If file size is zero then this header is just uninitialized data. */
-	if(data->phdrs[i].p_filesz == 0) {
+	if(phdr->p_filesz == 0) {
 		return 0;
 	}
 
 	/* Work out the address to map to and the offset in the file. */
-	start = ROUND_DOWN(data->phdrs[i].p_vaddr, PAGE_SIZE);
-	end = ROUND_UP(data->phdrs[i].p_vaddr + data->phdrs[i].p_filesz, PAGE_SIZE);
+	start = ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
+	end = ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
 	size = end - start;
-	offset = ROUND_DOWN(data->phdrs[i].p_offset, PAGE_SIZE);
+	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
 
 	dprintf("elf: loading program header %zu to %p (size: %zu)\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
-	 * addresses are valid - aspace_map_file() will reject the call if they
+	 * addresses are valid - vm_map_file() will reject the call if they
 	 * are. */
-	return vm_map_file(data->binary->aspace, start, size, flags, data->binary->node, offset, NULL);
+	return vm_map_file(binary->as, start, size, flags, binary->node, offset, NULL);
 }
 
 /** Check whether a binary is an ELF binary.
  * @param node		Filesystem node referring to the binary.
  * @return		Whether the binary is an ELF binary. */
-static bool elf_binary_check(vfs_node_t *node) {
-	return elf_check(node, ELF_ET_EXEC);
+bool elf_binary_check(vfs_node_t *node) {
+	return elf_check_node(node, ELF_ET_EXEC);
 }
 
 /** Load an ELF binary into an address space.
- * @param binary	Binary loader data structure.
+ * @param node		Filesystem node being loaded.
+ * @param as		Address space to load into.
+ * @param interp	Whether this binary is an interpreter (to prevent an
+ *			interpreter requiring an interpreter).
+ * @param datap		Where to store data pointer to pass to other functions.
  * @return		0 on success, negative error code on failure. */
-static int elf_binary_load(loader_binary_t *binary) {
-	size_t bytes, size, i, load_count = 0;
-	elf_binary_t *data;
+static int elf_binary_load_internal(vfs_node_t *node, vm_aspace_t *as, bool interp, void **datap) {
+	size_t bytes, i, size, load_count = 0;
+	elf_binary_t *binary;
+	char *path;
 	int ret;
 
 	/* Allocate a structure to store data about the binary. */
-	data = kmalloc(sizeof(elf_binary_t), MM_SLEEP);
-	data->phdrs = NULL;
-	data->binary = binary;
+	binary = kmalloc(sizeof(elf_binary_t), MM_SLEEP);
+	binary->phdrs = NULL;
+	binary->node = node;
+	binary->as = as;
 
-	/* Read in the ELF header. */
-	if((ret = vfs_file_read(binary->node, &data->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
+	/* Read in the ELF header and check it. */
+	if((ret = vfs_file_read(node, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
+		ret = -ERR_FORMAT_INVAL;
+		goto fail;
+	} else if(!elf_check_ehdr(&binary->ehdr, ELF_ET_EXEC)) {
+		if(interp) {
+			dprintf("elf: interpreter %p is not valid ELF file\n", node);
+		}
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Check that program headers are the right size... */
-	if(data->ehdr.e_phentsize != sizeof(elf_phdr_t)) {
+	if(binary->ehdr.e_phentsize != sizeof(elf_phdr_t)) {
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Allocate some memory for the program headers and load them too. */
-	size = data->ehdr.e_phnum * data->ehdr.e_phentsize;
-	data->phdrs = kmalloc(size, MM_SLEEP);
-	ret = vfs_file_read(binary->node, data->phdrs, size, data->ehdr.e_phoff, &bytes);
-	if(ret != 0) {
+	size = binary->ehdr.e_phnum * binary->ehdr.e_phentsize;
+	binary->phdrs = kmalloc(size, MM_SLEEP);
+	if((ret = vfs_file_read(node, binary->phdrs, size, binary->ehdr.e_phoff, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != size) {
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
+	/* Look for an interpreter header, and load the interpreter instead if
+	 * there is one. */
+	for(i = 0; i < binary->ehdr.e_phnum; i++) {
+		if(binary->phdrs[i].p_type != ELF_PT_INTERP) {
+			continue;
+		} else if(interp) {
+			dprintf("elf: interpreter %p requires an interpreter\n", node);
+			ret = -ERR_FORMAT_INVAL;
+			goto fail;
+		}
+
+		/* Read in the interpreter path. */
+		path = kmalloc(binary->phdrs[i].p_filesz, MM_SLEEP);
+		if((ret = vfs_file_read(node, path, binary->phdrs[i].p_filesz, binary->phdrs[i].p_offset, &bytes)) != 0) {
+			kfree(path);
+			goto fail;
+		} else if(bytes != binary->phdrs[i].p_filesz) {
+			kfree(path);
+			ret = -ERR_FORMAT_INVAL;
+			goto fail;
+		}
+		dprintf("elf: %p has interpreter %s\n", node, path);
+
+		/* Clean up old state data. */
+		kfree(binary->phdrs);
+		kfree(binary);
+
+		/* Look up the interpreter on the FS. */
+		ret = vfs_node_lookup(path, true, &node);
+		kfree(path);
+		if(ret != 0) {
+			return ret;
+		} else if(node->type != VFS_NODE_FILE) {
+			vfs_node_release(node);
+			return -ERR_TYPE_INVAL;
+		}
+
+		ret = elf_binary_load_internal(node, as, true, datap);
+		vfs_node_release(node);
+		return 0;
+	}
+
 	/* Handle all the program headers. */
-	for(i = 0; i < data->ehdr.e_phnum; i++) {
-		switch(data->phdrs[i].p_type) {
+	for(i = 0; i < binary->ehdr.e_phnum; i++) {
+		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			ret = elf_binary_phdr_load(data, i);
-			if(ret != 0) {
+			if((ret = elf_binary_phdr_load(binary, &binary->phdrs[i], i)) != 0) {
 				goto fail;
 			}
 			load_count++;
 			break;
+		case ELF_PT_DYNAMIC:
+		case ELF_PT_PHDR:
 		case ELF_PT_NOTE:
 			/* These can be ignored without warning. */
 			break;
 		default:
-			dprintf("elf: unknown program header type %u, ignoring\n", data->phdrs[i].p_type);
+			dprintf("elf: unknown program header type %u, ignoring\n", binary->phdrs[i].p_type);
 			break;
 		}
 	}
 
 	/* Check if we actually loaded anything. */
 	if(!load_count) {
-		dprintf("elf: binary %p did not have any loadable program headers\n",
-		        binary->node);
+		dprintf("elf: binary %p did not have any loadable program headers\n", node);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
-	binary->data = data;
-	binary->entry = (ptr_t)data->ehdr.e_entry;
+	*datap = binary;
 	return 0;
 fail:
-	if(data->phdrs) {
-		kfree(data->phdrs);
+	if(binary->phdrs) {
+		kfree(binary->phdrs);
 	}
-	kfree(data);
-
+	kfree(binary);
 	return ret;
 }
 
-/** Finish binary loading, after address space is switched.
- * @param binary	Binary loader data structure.
+/** Load an ELF binary into an address space.
+ * @param node		Filesystem node being loaded.
+ * @param as		Address space to load into.
+ * @param datap		Where to store data pointer to pass to other functions.
  * @return		0 on success, negative error code on failure. */
-static int elf_binary_finish(loader_binary_t *binary) {
-	elf_binary_t *data = (elf_binary_t *)binary->data;
+int elf_binary_load(vfs_node_t *node, vm_aspace_t *as, void **datap) {
+	return elf_binary_load_internal(node, as, false, datap);
+}
+
+/** Finish binary loading, after address space is switched.
+ * @param data		Data pointer returned from elf_binary_load().
+ * @return		Address of program entry point. */
+ptr_t elf_binary_finish(void *data) {
+	elf_binary_t *binary = (elf_binary_t *)data;
 	void *base;
 	size_t i;
-	int ret;
 
-	for(i = 0; i < data->ehdr.e_phnum; i++) {
-		switch(data->phdrs[i].p_type) {
+	/* Clear the BSS sections. */
+	for(i = 0; i < binary->ehdr.e_phnum; i++) {
+		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			if(data->phdrs[i].p_filesz >= data->phdrs[i].p_memsz) {
+			if(binary->phdrs[i].p_filesz >= binary->phdrs[i].p_memsz) {
 				break;
 			}
 
-			base = (void *)(data->phdrs[i].p_vaddr + data->phdrs[i].p_filesz);
-			dprintf("elf: clearing BSS for program header %zu at 0x%p\n", i, base);
-			ret = memset_user(base, 0, data->phdrs[i].p_memsz - data->phdrs[i].p_filesz);
-			if(ret != 0) {
-				return ret;
-			}
-
+			base = (void *)(binary->phdrs[i].p_vaddr + binary->phdrs[i].p_filesz);
+			dprintf("elf: clearing BSS for program header %zu at %p\n", i, base);
+			memset(base, 0, binary->phdrs[i].p_memsz - binary->phdrs[i].p_filesz);
 			break;
 		}
 	}
 
-	/* Copy arguments/environment. */
-	elf_binary_copy_data(data);
-	return 0;
+	return (ptr_t)binary->ehdr.e_entry;
 }
 
 /** Clean up ELF loader data.
- * @param binary	Binary loader data structure. */
-static void elf_binary_cleanup(loader_binary_t *binary) {
-	elf_binary_t *data = binary->data;
+ * @param data		Data pointer returned from elf_binary_load(). */
+void elf_binary_cleanup(void *data) {
+	elf_binary_t *binary = data;
 
-	kfree(data->phdrs);
-	kfree(data);
+	kfree(binary->phdrs);
+	kfree(binary);
 }
-
-/** ELF binary type structure. */
-static loader_type_t elf_binary_type = {
-	.name = "ELF",
-	.check = elf_binary_check,
-	.load = elf_binary_load,
-	.finish = elf_binary_finish,
-	.cleanup = elf_binary_cleanup,
-};
-
-/** Initialization function to register the ELF binary type. */
-static void __init_text elf_init(void) {
-	if(loader_type_register(&elf_binary_type) != 0) {
-		fatal("Could not register ELF binary type");
-	}
-}
-INITCALL(elf_init);
 
 #if 0
 # pragma mark ELF module loader.
 #endif
 
 #undef dprintf
-#if CONFIG_LOADER_DEBUG
+#if CONFIG_MODULE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
 # define dprintf(fmt...)	
 #endif
 
-extern bool elf_module_check(vfs_node_t *node);
 extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
-extern int elf_module_load(module_t *module);
-extern int elf_module_relocate(module_t *module, bool external);
-extern void *module_mem_alloc(size_t size, int mmflag);
 
 /** Check whether a file is an ELF module.
  * @param node		Filesystem node referring to the binary.
  * @return		Whether the file is an ELF module. */
 bool elf_module_check(vfs_node_t *node) {
-	return elf_check(node, ELF_ET_REL);
+	return elf_check_node(node, ELF_ET_REL);
 }
 
 /** Find a section in an ELF module.
@@ -515,6 +561,8 @@ int elf_module_load(module_t *module) {
 	if((ret = vfs_file_read(module->node, &module->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
 		return ret;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
+		return -ERR_FORMAT_INVAL;
+	} else if(!elf_check_ehdr(&module->ehdr, ELF_ET_EXEC)) {
 		return -ERR_FORMAT_INVAL;
 	}
 

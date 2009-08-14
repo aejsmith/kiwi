@@ -57,8 +57,6 @@ sources += [
 	File('string/strsep.c'),
 	File('string/strstr.c'),
 	File('string/strtok.c'),
-]
 
-sources += [
 	File('init.c'),
 ]

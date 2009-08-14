@@ -15,10 +15,6 @@
 Import('env', 'sources')
 
 # Build rule to create required CRT files.
-env['LIBRARIES'] += env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
-env['LIBRARIES'] += env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
-env['LIBRARIES'] += env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])
-
-#sources += [
-#	File('start.S'),
-#]
+env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
+env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
+env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])

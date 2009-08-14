@@ -30,34 +30,36 @@
 #include <sync/spinlock.h>
 
 #include <types/list.h>
+#include <types/refcount.h>
 
-#include <types.h>
-
+struct vfs_node;
 struct vm_aspace;
+
+/** Process arguments structure. */
+typedef struct process_args {
+	char **args;			/**< Argument array (path to program should be first entry). */
+	char **env;			/**< Environment variable array. */
+	int args_count;			/**< Number of entries in argument array (excluding NULL-terminator). */
+	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
+} process_args_t;
 
 /** Structure containing details about a process. */
 typedef struct process {
+	/** Information about the process. */
 	spinlock_t lock;		/**< Lock to protect data in structure. */
-	struct vm_aspace *aspace;	/**< Process' address space. */
+	identifier_t id;		/**< ID of the process. */
+	char *name;			/**< Name of the process. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
-
-	/** Thread information. */
-	list_t threads;			/**< List of threads. */
-	size_t num_threads;		/**< Number of threads. */
-
-	/** State of the process. */
-	enum {
-		PROC_RUNNING,		/**< Process is running. */
-	} state;
+	refcount_t count;		/**< Number of handles/threads open to the process. */
 
 	/** Data associated with the process. */
+	struct vm_aspace *aspace;	/**< Process' address space. */
+	list_t threads;			/**< List of threads. */
 	handle_table_t handles;		/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
 
-	/** Other information about the process. */
-	identifier_t id;		/**< ID of the process. */
-	char *name;			/**< Name of the process. */
+	/** Links to parent/children. */
 	struct process *parent;		/**< Pointer to parent process. */
 	list_t children;		/**< List of child processes. */
 	list_t parent_link;		/**< Link to parent process child list. */
@@ -66,23 +68,21 @@ typedef struct process {
 /** Process flag definitions */
 #define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */
 #define PROCESS_FIXEDPRIO	(1<<1)	/**< Process' priority is fixed and should not be changed. */
-#define PROCESS_NOASPACE	(1<<2)	/**< Process does not require a seperate address space. */
 
 /** Macro that expands to a pointer to the current process. */
 #define curr_proc		(curr_thread->owner)
 
 extern process_t *kernel_proc;
 
+extern int process_create(const char **args, const char **environ, int flags, int priority, process_t **procp);
 extern process_t *process_lookup(identifier_t id);
-extern int process_create(const char *name, process_t *parent, int priority, int flags, process_t **procp);
-extern int process_reset(process_t *process, const char *name, struct vm_aspace *aspace);
 
 extern void process_init(void);
 
 extern int kdbg_cmd_process(int argc, char **argv);
 
-extern handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit);
-extern int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit);
+extern handle_t sys_process_create(char *const args[], char *const environ[], bool inherit);
+extern int sys_process_replace(char *const args[], char *const environ[], bool inherit);
 extern int sys_process_duplicate(handle_t *handlep);
 extern handle_t sys_process_open(identifier_t id);
 extern identifier_t sys_process_id(handle_t handle);

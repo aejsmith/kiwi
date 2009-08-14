@@ -210,24 +210,6 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_PF_W		0x2		/**< Write permission. */
 #define ELF_PF_R		0x4		/**< Read permission. */
 
-/** Standard ELF auxilary vector types. */
-#define ELF_AT_NULL		0		/**< End of vector. */
-#define ELF_AT_IGNORE		1		/**< Entry should be ignored. */
-#define ELF_AT_EXECFD		2		/**< File descriptor of program. */
-#define ELF_AT_PHDR		3		/**< Program headers for program. */
-#define ELF_AT_PHENT		4		/**< Size of program header entry. */
-#define ELF_AT_PHNUM		5		/**< Number of program headers. */
-#define ELF_AT_PAGESZ		6		/**< System page size. */
-#define ELF_AT_BASE		7		/**< Base address of interpreter. */
-#define ELF_AT_FLAGS		8		/**< Flags. */
-#define ELF_AT_ENTRY		9		/**< Entry point of program. */
-#define ELF_AT_NOTELF		10		/**< Program is not ELF. */
-#define ELF_AT_UID		11		/**< Real UID. */
-#define ELF_AT_EUID		12		/**< Effective UID. */
-#define ELF_AT_GID		13		/**< Real GID. */
-#define ELF_AT_EGID		14		/**< Effective GID. */
-#define ELF_AT_CLKTCK		17		/**< Frequency of times(). */
-
 /** Dynamic entry types. */
 #define ELF_DT_NULL		0		/**< Marks end of dynamic section. */
 #define ELF_DT_NEEDED		1		/**< Name of needed library. */
@@ -420,17 +402,6 @@ typedef struct {
 	} d_un;
 } __packed Elf32_Dyn;
 
-/** ELF32 auxilary information structure. */
-typedef struct {
-	uint32_t a_type;
-
-	union {
-		uint32_t a_val;
-		void *a_ptr;
-		void (*a_fnc)(void);
-	} a_un;
-} __packed Elf32_Auxv;
-
 typedef struct {
 	Elf32_Word n_namesz;			/**< Length of the note's name. */
 	Elf32_Word n_descsz;			/**< Length of the note's descriptor. */
@@ -514,17 +485,6 @@ typedef struct {
 	} d_un;
 } __packed Elf64_Dyn;
 
-/** ELF64 auxilary information structure. */
-typedef struct {
-	uint64_t a_type;
-
-	union {
-		uint64_t a_val;
-		void *a_ptr;
-		void (*a_fnc)(void);
-	} a_un;
-} __packed Elf64_Auxv;
-
 typedef struct {
 	Elf64_Word n_namesz;			/**< Length of the note's name. */
 	Elf64_Word n_descsz;			/**< Length of the note's descriptor. */
@@ -533,14 +493,17 @@ typedef struct {
 
 #include <arch/elf.h>
 
-struct loader_binary;
+struct module;
+struct vfs_node;
+struct vm_aspace;
 
-/** ELF loader binary data structure. */
-typedef struct elf_binary {
-	elf_ehdr_t ehdr;		/**< ELF executable header. */
-	elf_phdr_t *phdrs;		/**< Program headers. */
+extern bool elf_binary_check(struct vfs_node *node);
+extern int elf_binary_load(struct vfs_node *node, struct vm_aspace *as, void **datap);
+extern ptr_t elf_binary_finish(void *data);
+extern void elf_binary_cleanup(void *data);
 
-	struct loader_binary *binary;	/**< Pointer back to the loader's binary structure. */
-} elf_binary_t;
+extern bool elf_module_check(struct vfs_node *node);
+extern int elf_module_load(struct module *module);
+extern int elf_module_relocate(struct module *module, bool external);
 
 #endif /* __ELF_H */

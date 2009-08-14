@@ -14,18 +14,17 @@
 
 Import('envmgr', 'config')
 
-# Set up the userspace build environment. Always build static binaries until
-# we have shared library support.
+# Set up the userspace build environment.
 env = envmgr.Create('uspace')
 env['CPPPATH'] = Dir('include')
 env['LIBPATH'] = Dir('libraries')
-env['LINKFLAGS'] = ['-static']
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 
 # Set up arrays used to track stuff built. Use LIBRARIES rather than LIBS
 # as LIBS is a special SCons variable.
 env['LIBRARIES'] = []
+env['SHLIBS'] = []
 env['APPS'] = []
 
 # Set the directory that we want all libraries to be placed in.
@@ -33,12 +32,16 @@ env['LIBOUTDIR'] = Dir('libraries')
 
 # Set up library emitters to modify the target path to get libraries placed
 # in the correct location and to add the library to the libraries array.
-def library_emitter(target, source, env):
+def lib_emitter(target, source, env):
 	target[0] = File('%s/%s' % (str(env['LIBOUTDIR']), str(target[0])))
 	env['LIBRARIES'].append(target[0])
 	return target, source
-env.Append(LIBEMITTER=[library_emitter])
-env.Append(SHLIBEMITTER=[library_emitter])
+def shlib_emitter(target, source, env):
+	lib_emitter(target, source, env)
+	env['SHLIBS'].append(target[0])
+	return target, source
+env.Append(LIBEMITTER=[lib_emitter])
+env.Append(SHLIBEMITTER=[shlib_emitter])
 
 # Set up a program emitter to add programs to the apps array.
 def program_emitter(target, source, env):
@@ -58,15 +61,18 @@ env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$
 SConscript(dirs=['libraries', 'applications'], exports=['env'])
 
 # Have all applications depend on the kernel library, C library and C runtime
-# files.
+# files, and all shared libraries depend on the C runtime files.
 for app in env['APPS']:
 	Depends(app, Glob('libraries/*crt*.o'))
-	Depends(app, File('libraries/libc.a'))
-	Depends(app, File('libraries/libkernel.a'))
+	Depends(app, File('libraries/libc.so'))
+	Depends(app, File('libraries/libkernel.so'))
+for lib in env['SHLIBS']:
+	Depends(lib, Glob('libraries/*crt*.o'))
 
 # Set arrays needed in the distribution environment.
 # FIXME: Eventually we shouldn't put everything in the boot image.
 envmgr['dist']['BOOTAPPS'] = env['APPS']
+envmgr['dist']['BOOTLIBS'] = env['LIBRARIES']
 
 # Set build defaults.
 Default(Alias('libraries', env['LIBRARIES']))

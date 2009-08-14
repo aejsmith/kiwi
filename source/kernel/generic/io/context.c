@@ -35,10 +35,8 @@
  *
  * @param context	Context to initialize.
  * @param parent	Parent context (can be NULL).
- *
- * @return		0 on success, negative error code on failure.
  */
-int io_context_init(io_context_t *context, io_context_t *parent) {
+void io_context_init(io_context_t *context, io_context_t *parent) {
 	mutex_init(&context->lock, "io_context_lock", 0);
 	list_init(&context->async_requests);
 	context->curr_dir = NULL;
@@ -67,8 +65,6 @@ int io_context_init(io_context_t *context, io_context_t *parent) {
 		 * being created. */
 		assert(!kernel_proc);
 	}
-
-	return 0;
 }
 
 /** Destroy an I/O context.

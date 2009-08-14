@@ -27,14 +27,11 @@
 
 #include <mm/malloc.h>
 
-#include <proc/loader.h>
 #include <proc/process.h>
-#include <proc/thread.h>
 
 #include <bootimg.h>
 #include <errors.h>
 #include <fatal.h>
-#include <module.h>
 
 #if CONFIG_VFS_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -79,24 +76,6 @@ typedef struct tar_header {
 	char prefix[155];	/**< Prefix. */
 } tar_header_t;
 
-/** Thread to load the startup binary.
- * @param arg1		Unused.
- * @param arg2		Unused. */
-static void bootimg_startup_thread(void *arg1, void *arg2) {
-	char **args, **env;
-	int ret;
-
-	/* Create the argument/environment arrays. */
-	args    = kcalloc(2, sizeof(char *), MM_FATAL);
-	args[0] = kstrdup("/startup", MM_FATAL);
-	args[1] = NULL;
-	env     = kcalloc(1, sizeof(char *), MM_FATAL);
-	env[0]  = NULL;
-
-	ret = loader_binary_load(kstrdup("/startup", MM_FATAL), args, env, NULL);
-	fatal("Failed to load startup binary (%d)", ret);
-}
-
 /** Extract the boot image.
  *
  * Extracts the boot image to the root filesystem (the RamFS mounted by the
@@ -106,21 +85,20 @@ static void bootimg_startup_thread(void *arg1, void *arg2) {
  * @note		Assumes the current directory is the root of the FS.
  */
 void bootimg_load(void) {
+	const char *args[] = { "/startup", NULL }, *env[] = { NULL };
 	ptr_t addr = bootimg_addr;
 	tar_header_t *hdr;
 	vfs_node_t *node;
-	thread_t *thread;
-	process_t *proc;
 	int64_t size;
 	size_t bytes;
 	int ret;
 
-	if(!bootimg_addr || !bootimg_size) {
+	if(!addr || !bootimg_size) {
 		fatal("No boot image was provided");
 	}
 
 	/* Loop until we encounter two null bytes (EOF). */
-	hdr = (tar_header_t *)bootimg_addr;
+	hdr = (tar_header_t *)addr;
 	while(hdr->name[0] && hdr->name[1]) {
 		if(strncmp(hdr->magic, "ustar", 5) != 0) {
 			fatal("Boot image format is incorrect");
@@ -171,15 +149,8 @@ void bootimg_load(void) {
 		hdr = (tar_header_t *)addr;
 	}
 
-	/* Create process to load the startup binary. Does not require an
-	 * address space to begin with as loader_binary_load() will create
-	 * one. */
-	if((ret = process_create("startup", kernel_proc, PRIORITY_SYSTEM, PROCESS_NOASPACE, &proc)) != 0) {
-		fatal("Could not create process to load startup (%d)", ret);
+	/* Spawn the startup process. */
+	if((ret = process_create(args, env, PROCESS_CRITICAL, PRIORITY_SYSTEM, NULL)) != 0) {
+		fatal("Could not create startup process (%d)", ret);
 	}
-
-	if((ret = thread_create("main", proc, 0, bootimg_startup_thread, NULL, NULL, &thread)) != 0) {
-		fatal("Could not create thread to load startup (%d)", ret);
-	}
-	thread_run(thread);
 }

@@ -15,12 +15,9 @@
 Service(0)
 
 Syscall('putch',		['char'])
-
 Syscall('module_load',		['ptr_t', 'ptr_t'])
-
 Syscall('handle_close',		['handle_t'])
 Syscall('handle_type',		['handle_t'])
-
 Syscall('fs_file_create',	['ptr_t'])
 Syscall('fs_file_open',		['ptr_t', 'int'])
 Syscall('fs_file_read',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
@@ -42,11 +39,9 @@ Syscall('fs_info',		['ptr_t', 'bool', 'ptr_t'])
 Syscall('fs_link',		['ptr_t', 'ptr_t'])
 Syscall('fs_unlink',		['ptr_t'])
 Syscall('fs_rename',		['ptr_t', 'ptr_t'])
-
 Syscall('vm_map_anon',		['ptr_t', 'size_t', 'int', 'ptr_t'])
-Syscall('__vm_map_file',	['ptr_t'])
+Syscall('_vm_map_file',		['ptr_t'])
 Syscall('vm_unmap',		['ptr_t', 'size_t'])
-
 Syscall('process_create',	['ptr_t', 'ptr_t', 'ptr_t', 'bool'])
 Syscall('process_replace',	['ptr_t', 'ptr_t', 'ptr_t', 'bool'])
 Syscall('process_duplicate',	['ptr_t'])

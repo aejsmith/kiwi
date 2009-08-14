@@ -59,7 +59,6 @@ env['OBJFILES'] += [
 	env.Object('mm/vmem.c'),
 
 	env.Object('proc/handle.c'),
-	env.Object('proc/loader.c'),
 	env.Object('proc/process.c'),
 	env.Object('proc/sched.c'),
 	env.Object('proc/syscall.c'),

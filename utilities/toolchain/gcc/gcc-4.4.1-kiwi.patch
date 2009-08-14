@@ -1,6 +1,6 @@
-diff -urN gcc-4.4.0.orig/config.sub gcc-4.4.0/config.sub
---- gcc-4.4.0.orig/config.sub	2009-07-06 08:52:12.629412678 +0100
-+++ gcc-4.4.0/config.sub	2009-07-06 09:16:45.688455454 +0100
+diff -urN gcc-4.4.1.orig/config.sub gcc-4.4.1/config.sub
+--- gcc-4.4.1.orig/config.sub	2009-08-14 09:05:25.737617552 +0100
++++ gcc-4.4.1/config.sub	2009-08-14 09:05:35.990939014 +0100
 @@ -1276,7 +1276,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -10,10 +10,10 @@ diff -urN gcc-4.4.0.orig/config.sub gcc-4.4.0/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
-diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi32.h gcc-4.4.0/gcc/config/i386/kiwi32.h
---- gcc-4.4.0.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/kiwi32.h	2009-07-06 09:16:45.689421443 +0100
-@@ -0,0 +1,29 @@
+diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi32.h gcc-4.4.1/gcc/config/i386/kiwi32.h
+--- gcc-4.4.1.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.1/gcc/config/i386/kiwi32.h	2009-08-14 09:06:45.047795559 +0100
+@@ -0,0 +1,33 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
 +
@@ -36,17 +36,21 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi32.h gcc-4.4.0/gcc/config/i386/kiwi
 +#undef  TARGET_VERSION
 +#define TARGET_VERSION fprintf (stderr, " (i386 Kiwi/ELF)");
 +
++    %{static:-static}}"
++
 +#undef  LINK_SPEC
 +#define LINK_SPEC "%{m64:-m elf_x86_64} %{!m64:-m elf_i386} \
 +  %{shared:-shared} \
 +  %{!shared: \
 +    %{!static: \
-+      %{rdynamic:-export-dynamic}} \
++      %{rdynamic:-export-dynamic} \
++      %{m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
++      %{!m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
 +    %{static:-static}}"
-diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi64.h gcc-4.4.0/gcc/config/i386/kiwi64.h
---- gcc-4.4.0.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/kiwi64.h	2009-07-06 09:16:45.689421443 +0100
-@@ -0,0 +1,29 @@
+diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi64.h gcc-4.4.1/gcc/config/i386/kiwi64.h
+--- gcc-4.4.1.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.1/gcc/config/i386/kiwi64.h	2009-08-14 09:06:55.872665808 +0100
+@@ -0,0 +1,31 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
 +
@@ -74,11 +78,13 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/kiwi64.h gcc-4.4.0/gcc/config/i386/kiwi
 +  %{shared:-shared} \
 +  %{!shared: \
 +    %{!static: \
-+      %{rdynamic:-export-dynamic}} \
-+    %{static:-static}}"	
-diff -urN gcc-4.4.0.orig/gcc/config/i386/t-kiwi64 gcc-4.4.0/gcc/config/i386/t-kiwi64
---- gcc-4.4.0.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/i386/t-kiwi64	2009-07-06 09:16:45.689421443 +0100
++      %{rdynamic:-export-dynamic} \
++      %{!m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
++      %{m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
++    %{static:-static}}"
+diff -urN gcc-4.4.1.orig/gcc/config/i386/t-kiwi64 gcc-4.4.1/gcc/config/i386/t-kiwi64
+--- gcc-4.4.1.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.1/gcc/config/i386/t-kiwi64	2009-08-14 09:05:35.994342315 +0100
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -97,10 +103,10 @@ diff -urN gcc-4.4.0.orig/gcc/config/i386/t-kiwi64 gcc-4.4.0/gcc/config/i386/t-ki
 +
 +# Compile libgcc2.a with pic.
 +TARGET_LIBGCC2_CFLAGS = -fPIC
-diff -urN gcc-4.4.0.orig/gcc/config/kiwi.h gcc-4.4.0/gcc/config/kiwi.h
---- gcc-4.4.0.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.0/gcc/config/kiwi.h	2009-07-06 09:21:58.619797486 +0100
-@@ -0,0 +1,40 @@
+diff -urN gcc-4.4.1.orig/gcc/config/kiwi.h gcc-4.4.1/gcc/config/kiwi.h
+--- gcc-4.4.1.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.1/gcc/config/kiwi.h	2009-08-14 09:05:35.994342315 +0100
+@@ -0,0 +1,39 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
 +
@@ -139,11 +145,10 @@ diff -urN gcc-4.4.0.orig/gcc/config/kiwi.h gcc-4.4.0/gcc/config/kiwi.h
 +
 +/* Define default libraries to link to. */
 +#undef  LIB_SPEC
-+#define LIB_SPEC "-lc -lkernel"
-+
-diff -urN gcc-4.4.0.orig/gcc/config.gcc gcc-4.4.0/gcc/config.gcc
---- gcc-4.4.0.orig/gcc/config.gcc	2009-07-06 08:52:17.644426107 +0100
-+++ gcc-4.4.0/gcc/config.gcc	2009-07-06 09:16:45.690537430 +0100
++#define LIB_SPEC "%{!shared:-lc -lkernel}"
+diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
+--- gcc-4.4.1.orig/gcc/config.gcc	2009-08-14 09:05:25.938024037 +0100
++++ gcc-4.4.1/gcc/config.gcc	2009-08-14 09:05:35.994342315 +0100
 @@ -588,6 +588,14 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
@@ -174,9 +179,9 @@ diff -urN gcc-4.4.0.orig/gcc/config.gcc gcc-4.4.0/gcc/config.gcc
  ia64*-*-elf*)
  	tm_file="${tm_file} dbxelf.h elfos.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
-diff -urN gcc-4.4.0.orig/libgcc/config.host gcc-4.4.0/libgcc/config.host
---- gcc-4.4.0.orig/libgcc/config.host	2009-07-06 08:52:14.262683425 +0100
-+++ gcc-4.4.0/libgcc/config.host	2009-07-06 09:16:45.701966716 +0100
+diff -urN gcc-4.4.1.orig/libgcc/config.host gcc-4.4.1/libgcc/config.host
+--- gcc-4.4.1.orig/libgcc/config.host	2009-08-14 09:05:25.981358421 +0100
++++ gcc-4.4.1/libgcc/config.host	2009-08-14 09:05:35.998496770 +0100
 @@ -275,6 +275,10 @@
  	;;
  x86_64-*-elf*)
