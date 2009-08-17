@@ -34,8 +34,7 @@ char **environ;
 void __libc_init(process_args_t *args) {
 	environ = args->env;
 
-	main(args->args_count, args->args, args->env);
-	while(1);
+	process_exit(main(args->args_count, args->args, args->env));
 }
 
 void __register_frame_info(void *begin, void *ob) {

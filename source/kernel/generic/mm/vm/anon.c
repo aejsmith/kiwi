@@ -517,6 +517,7 @@ void vm_anon_object_destroy(vm_object_t *_obj) {
 		obj->source->ops->release(obj->source, NULL);
 	}
 
+	dprintf("vm: destroyed anonymous object %p (source: %p)\n", obj, obj->source);
 	kfree(obj->rref);
 	kfree(obj->pages);
 	slab_cache_free(vm_anon_object_cache, obj);

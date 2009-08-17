@@ -54,10 +54,11 @@
 typedef struct process_create_info {
 	const char **args;	/**< Argument array. */
 	const char **environ;	/**< Environment array. */
-	bool inherit;		/**< Whether to inherit handles. */
 	semaphore_t sem;	/**< Semaphore to wake upon completion. */
 	int ret;		/**< Return code. */
 } process_create_info_t;
+
+extern void process_destroy(process_t *process);
 
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
@@ -78,8 +79,6 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
 	spinlock_init(&process->lock, "process_lock");
 	refcount_set(&process->count, 0);
 	list_init(&process->threads);
-	list_init(&process->children);
-	list_init(&process->parent_link);
 	return 0;
 }
 
@@ -88,7 +87,7 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
  * @param id		ID for the process (if negative, one will be allocated).
  * @param flags		Flags for the process.
  * @param priority	Priority to give the process.
- * @param parent	Parent of the process.
+ * @param parent	Process to inherit information from.
  * @param aspace	Whether to give the structure an address space.
  * @param inherit	Whether to inherit handles from the parent.
  * @param procp		Where to store pointer to structure.
@@ -129,14 +128,6 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	process->name = kstrdup(name, MM_SLEEP);
 	process->flags = flags;
 	process->priority = priority;
-	process->parent = parent;
-
-	/* Add to the parent's process list. */
-	if(parent) {
-		spinlock_lock(&parent->lock, 0);
-		list_append(&parent->children, &process->parent_link);
-		spinlock_unlock(&parent->lock);
-	}
 
 	/* Add to the process tree. */
 	mutex_lock(&process_tree_lock, 0);
@@ -145,8 +136,8 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 
 	*procp = process;
 
-	dprintf("proc: created process %" PRId32 "(%s) (proc: %p, parent: %p)\n",
-		process->id, process->name, process, parent);
+	dprintf("process: created process %" PRId32 "(%s) (proc: %p)\n",
+		process->id, process->name, process);
 	return 0;
 }
 
@@ -260,7 +251,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 	semaphore_up(&info->sem);
 
 	/* To userspace, and beyond! */
-	dprintf("proc: entering userspace in new process (entry: %p, stack: %p)\n", entry, stack);
+	dprintf("process: entering userspace in new process (entry: %p, stack: %p)\n", entry, stack);
 	thread_arch_enter_userspace(entry, stack);
 	fatal("Failed to enter userspace!");
 fail:
@@ -302,13 +293,12 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	semaphore_init(&info.sem, "process_create_sem", 0);
 	info.args = args;
 	info.environ = environ;
-	info.inherit = false;
 	info.ret = 0;
 
 	if((ret = process_alloc(args[0], -1, flags, priority, curr_proc, true, false, &process)) != 0) {
 		return ret;
 	} else if((ret = thread_create("main", process, 0, process_create_thread, &info, NULL, &thread)) != 0) {
-		//process_destroy(process);
+		process_destroy(process);
 		return ret;
 	}
 	thread_run(thread);
@@ -342,74 +332,39 @@ process_t *process_lookup(identifier_t id) {
 	return process;
 }
 
-#if 0
-/** Reset the specified process.
+/** Destroy a process.
  *
- * Resets the state of the specified process. If the process is the current
- * process, then all threads in the process will be terminated other than the
- * current. Otherwise, all threads will be terminated. The name of the process
- * will then be changed to the given name and its address space will be set to
- * the given address space (the old one, if any, will be destroyed). If the
- * process is the current process, and the old address space set in the process
- * is the current address space, then this function will switch to the new
- * address space.
+ * Destroys a process structure. The reference count of the process must be 0.
+ * This should only be called from the thread destruction code and from the
+ * process handle management code.
  *
- * @todo		The functionality to kill threads is not yet
- *			implemented. This means that it cannot be used on
- *			the current process if it has threads other than the
- *			current, or on other processes that have threads.
- *
- * @param process	Process to reset. Must not be the kernel process.
- * @param name		New name to give the process (must not be zero-length).
- * @param as		Address space for the process (can be NULL).
- *
- * @return		0 on success, negative error code on failure. The only
- *			reason for the function to fail is if it is passed
- *			invalid parameters.
+ * @param process	Process to destroy.
  */
-int process_reset(process_t *process, const char *name, vm_aspace_t *as) {
-	char *dup, *pname;
-	vm_aspace_t *pas;
+void process_destroy(process_t *process) {
+	assert(refcount_get(&process->count) == 0);
+	assert(list_empty(&process->threads));
 
-	if(!process || process == kernel_proc || !name || !name[0]) {
-		return -ERR_PARAM_INVAL;
+	if(process->flags & PROCESS_CRITICAL) {
+		fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
 	}
 
-	/* Create a duplicate of the name before taking the process' lock, as
-	 * we should not use allocators while a spinlock is held. */
-	dup = kstrdup(name, MM_SLEEP);
+	mutex_lock(&process_tree_lock, 0);
+	avl_tree_remove(&process_tree, (key_t)process->id);
+	mutex_unlock(&process_tree_lock);
 
-	spinlock_lock(&process->lock, 0);
-
-	/* TODO: Implement these. */
-	if((process == curr_proc && process->num_threads > 1) || (process != curr_proc && process->num_threads)) {
-		fatal("TODO: Implement process_reset for extra threads");
+	if(process->aspace) {
+		vm_aspace_destroy(process->aspace);
 	}
+	handle_table_destroy(&process->handles);
+	io_context_destroy(&process->ioctx);
 
-	/* Reset the process' name. */
-	pname = process->name;
-	process->name = dup;
+	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
+		process->id, process->name, process, process->status);
 
-	/* Replace the address space, and switch to the new one. If the new
-	 * address space is NULL vm_aspace_switch() will switch to the kernel
-	 * addres space. */
-	pas = process->aspace;
-	process->aspace = as;
-	if(pas == curr_aspace) {
-		vm_aspace_switch(as);
-	}
-
-	spinlock_unlock(&process->lock);
-
-	/* Now that the lock is no longer held, free up old data. */
-	kfree(pname);
-	if(pas) {
-		vm_aspace_destroy(pas);
-	}
-
-	return 0;
+	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
+	kfree(process->name);
+	slab_cache_free(process_cache, process);
 }
-#endif
 
 /** Initialize the process table and slab cache. */
 void __init_text process_init(void) {
@@ -467,15 +422,15 @@ int kdbg_cmd_process(int argc, char **argv) {
 # pragma mark Process handle functions.
 #endif
 
-#if 0
-
 /** Closes a handle to a process.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
 static int process_handle_close(handle_info_t *info) {
-	//process_t *process = info->data;
+	process_t *process = info->data;
 
-	/* FIXME. */
+	if(refcount_dec(&process->count) == 0) {
+		process_destroy(process);
+	}
 	return 0;
 }
 
@@ -484,30 +439,23 @@ static handle_type_t process_handle_type = {
 	.id = HANDLE_TYPE_PROCESS,
 	.close = process_handle_close,
 };
-#endif
 
 #if 0
 # pragma mark System calls.
 #endif
 
-#if 0
 /** Helper to copy information from userspace.
- * @param path		Path to copy.
  * @param args		Argument array to copy.
  * @param environ	Environment array to copy.
- * @param kpathp	Where to store kernel address of path.
  * @param kargsp	Where to store kernel address of argument array.
  * @param kenvp		Where to store kernel address of environment array.
  * @return		0 on success, negative error code on failure. */
-static int sys_process_arg_copy(const char *path, char *const args[], char *const environ[],
-                                char **kpathp, char ***kargsp, char ***kenvp) {
-	char *kpath = NULL, **kargs = NULL, **kenv = NULL;
+static int sys_process_arg_copy(char *const args[], char *const environ[],
+                                const char ***kargsp, const char ***kenvp) {
+	char **kargs = NULL, **kenv = NULL;
 	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
-		return ret;
-	} else if((ret = arrcpy_from_user(args, &kargs)) != 0) {
-		kfree(kpath);
+	if((ret = arrcpy_from_user(args, &kargs)) != 0) {
 		return ret;
 	} else if((ret = arrcpy_from_user(environ, &kenv)) != 0) {
 		for(int i = 0; kargs[i] != NULL; i++) {
@@ -515,32 +463,27 @@ static int sys_process_arg_copy(const char *path, char *const args[], char *cons
 		}
 
 		kfree(kargs);
-		kfree(kpath);
 		return ret;
 	}
 
-	*kpathp = kpath;
-	*kargsp = kargs;
-	*kenvp = kenv;
+	*kargsp = (const char **)kargs;
+	*kenvp = (const char **)kenv;
 	return 0;
 }
 
 /** Helper to free information copied from userspace.
- * @param path		Path to free.
  * @param args		Argument array to free.
  * @param environ	Environment array to free. */
-static void sys_process_arg_free(char *path, char **args, char **environ) {
+static void sys_process_arg_free(const char **args, const char **environ) {
 	for(int i = 0; args[i] != NULL; i++) {
-		kfree(args[i]);
+		kfree((char *)args[i]);
 	}
 	for(int i = 0; environ[i] != NULL; i++) {
-		kfree(environ[i]);
+		kfree((char *)environ[i]);
 	}
-	kfree(path);
 	kfree(args);
 	kfree(environ);
 }
-#endif
 
 /** Create a new process.
  *
@@ -559,22 +502,21 @@ static void sys_process_arg_free(char *path, char **args, char **environ) {
  *			negative error code on failure.
  */
 handle_t sys_process_create(char *const args[], char *const environ[], bool inherit) {
-#if 0
-	struct process_create_info info;
+	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread = NULL;
 	handle_t handle = -1;
 	int ret;
 
-	if((ret = sys_process_arg_copy(path, args, environ, &info.path, &info.args, &info.environ)) != 0) {
+	if((ret = sys_process_arg_copy(args, environ, &info.args, &info.environ)) != 0) {
 		return ret;
-	} else if(!info.path[0]) {
+	} else if(!info.args[0]) {
 		ret = -ERR_PARAM_INVAL;
 		goto fail;
 	}
 
-	/* Create the new process structure. */
-	if((ret = process_create("[creating...]", curr_proc, PRIORITY_USER, PROCESS_NOASPACE, &process)) != 0) {
+	/* Create a structure for the process. */
+	if((ret = process_alloc(args[0], -1, 0, PRIORITY_USER, curr_proc, true, inherit, &process)) != 0) {
 		goto fail;
 	}
 
@@ -586,36 +528,33 @@ handle_t sys_process_create(char *const args[], char *const environ[], bool inhe
 		ret = (int)handle;
 		goto fail;
 	}
+	refcount_inc(&process->count);
 
-	/* Fill in the information structure to pass to the main thread. */
+	/* Fill in the information structure to pass information into the main
+	 * thread of the new process. */
 	semaphore_init(&info.sem, "process_create_sem", 0);
-	info.inherit = inherit;
 	info.ret = 0;
 
-	/* Create the main thread for the process. */
-	if((ret = thread_create("main", process, 0, sys_process_create_thread, &info, NULL, &thread)) != 0) {
+	if((ret = thread_create("main", process, 0, process_create_thread, &info, NULL, &thread)) != 0) {
 		goto fail;
 	}
 	thread_run(thread);
 
-	/* Wait for completion, and then check the return code. */
+	/* Wait for completion and check the return code. */
 	semaphore_down(&info.sem, 0);
 	if((ret = info.ret) != 0) {
 		goto fail;
 	}
 
+	sys_process_arg_free(info.args, info.environ);
 	return handle;
 fail:
-	if(process || thread) {
-		kprintf(LOG_WARN, "FIXME: Destroy process/thread on failure\n");
-	}
 	if(handle >= 0) {
+		/* This will handle process destruction. */
 		handle_close(&curr_proc->handles, handle);
 	}
-	sys_process_arg_free(info.path, info.args, info.environ);
+	sys_process_arg_free(info.args, info.environ);
 	return (handle_t)ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Replace the current process.
@@ -626,6 +565,7 @@ fail:
  * and others will be closed. Otherwise, all handles will be closed.
  *
  * @todo		Inheriting.
+ * @todo		Bit of code duplication here between process_create().
  *
  * @param args		Argument array (with NULL terminator). First argument
  *			should be path to binary to execute.
@@ -636,24 +576,99 @@ fail:
  *			on failure.
  */
 int sys_process_replace(char *const args[], char *const environ[], bool inherit) {
-#if 0
-	char *kpath, **kargs, **kenv;
+	vm_aspace_t *as = NULL, *old;
+	const char **kargs, **kenv;
+	ptr_t stack, entry, uargs;
+	vfs_node_t *node = NULL;
+	void *data = NULL;
+	char *dup, *name;
 	int ret;
 
-	if((ret = sys_process_arg_copy(path, args, environ, &kpath, &kargs, &kenv)) != 0) {
+	if((ret = sys_process_arg_copy(args, environ, &kargs, &kenv)) != 0) {
 		return ret;
-	} else if(!kpath[0]) {
-		sys_process_arg_free(kpath, kargs, kenv);
-		return -ERR_PARAM_INVAL;
+	} else if(!kargs[0]) {
+		ret = -ERR_PARAM_INVAL;
+		goto fail;
+	} else if(curr_proc->threads.next->next != &curr_proc->threads) {
+		kprintf(LOG_WARN, "TODO: Terminate other threads\n");
+		ret = -ERR_NOT_IMPLEMENTED;
+		goto fail;
 	}
 
-	/* If this returns it has failed. */
-	ret = loader_binary_load(kpath, kargs, kenv, NULL);
-	assert(ret != 0);
-	sys_process_arg_free(kpath, kargs, kenv);
+	/* Look up the node on the filesystem. */
+	if((ret = vfs_node_lookup(kargs[0], true, &node)) != 0) {
+		goto fail;
+	} else if(node->type != VFS_NODE_FILE) {
+		ret = -ERR_TYPE_INVAL;
+		goto fail;
+	}
+
+	/* Create a new address space to load the binary into. */
+	if(!(as = vm_aspace_create())) {
+		ret = -ERR_NO_MEMORY;
+		goto fail;
+	}
+
+	/* Get the ELF loader to do the main work of loading the binary. */
+	if((ret = elf_binary_load(node, as, &data)) != 0) {
+		goto fail;
+	}
+
+	/* Create a duplicate of the name before taking the process' lock, as
+	 * we should not use allocators while a spinlock is held. */
+	dup = kstrdup(kargs[0], MM_SLEEP);
+
+	/* Set the new name and address space. */
+	spinlock_lock(&curr_proc->lock, 0);
+	name = curr_proc->name;
+	curr_proc->name = dup;
+	old = curr_proc->aspace;
+	curr_proc->aspace = as;
+	vm_aspace_switch(as);
+	spinlock_unlock(&curr_proc->lock);
+
+	/* Now that the lock is no longer held, free up old data. */
+	kfree(name);
+	vm_aspace_destroy(old);
+
+	/* Copy arguments to the process' address space. TODO: Better failure
+	 * handling here. */
+	if((ret = process_copy_args(kargs, kenv, &uargs)) != 0) {
+		fatal("Meep, need to handle this (%d)", ret);
+	}
+
+	/* Create a userspace stack and place the argument block address on it.
+	 * TODO: Stack direction! */
+	if((ret = vm_map_anon(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &stack)) != 0) {
+		fatal("Meep, need to handle this too (%d)", ret);
+	}
+	stack += (USTACK_SIZE - STACK_DELTA);
+	*(unative_t *)stack = uargs;
+
+	/* Get the ELF loader to clear BSS and get the entry pointer. */
+	entry = elf_binary_finish(data);
+
+	/* Clean up our mess. */
+	elf_binary_cleanup(data);
+	vfs_node_release(node);
+	sys_process_arg_free(kargs, kenv);
+
+	/* To userspace, and beyond! */
+	dprintf("process: entering userspace in process %" PRId32 " (entry: %p, stack: %p)\n", curr_proc->id, entry, stack);
+	thread_arch_enter_userspace(entry, stack);
+	fatal("Failed to enter userspace!");
+fail:
+	if(data) {
+		elf_binary_cleanup(data);
+	}
+	if(as) {
+		vm_aspace_destroy(as);
+	}
+	if(node) {
+		vfs_node_release(node);
+	}
+	sys_process_arg_free(kargs, kenv);
 	return ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Create a duplicate of the calling process.
@@ -685,7 +700,26 @@ int sys_process_duplicate(handle_t *handlep) {
  * @param id		Global ID of the process to open.
  */
 handle_t sys_process_open(identifier_t id) {
-	return -ERR_NOT_IMPLEMENTED;
+	process_t *process;
+	handle_t handle;
+
+	mutex_lock(&process_tree_lock, 0);
+
+	if(!(process = avl_tree_lookup(&process_tree, (key_t)id)) || list_empty(&process->threads)) {
+		mutex_unlock(&process_tree_lock);
+		return -ERR_NOT_FOUND;
+	}
+
+	refcount_inc(&process->count);
+	mutex_unlock(&process_tree_lock);
+
+	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
+		if(refcount_dec(&process->count) == 0) {
+			process_destroy(process);
+		}
+	}
+
+	return handle;
 }
 
 /** Get the ID of a process.
@@ -712,4 +746,21 @@ identifier_t sys_process_id(handle_t handle) {
 	}
 
 	return id;
+}
+
+/** Terminate the calling process.
+ *
+ * Terminates the calling process. All threads in the process will also be
+ * terminated. The status code given can be retrieved by any processes with a
+ * handle to the process.
+ *
+ * @param status	Exit status code.
+ */
+void sys_process_exit(int status) {
+	if(curr_proc->threads.next->next != &curr_proc->threads) {
+		fatal("TODO: Terminate other threads!");
+	}
+
+	curr_proc->status = status;
+	thread_exit();
 }

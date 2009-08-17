@@ -45,24 +45,17 @@ typedef struct process_args {
 
 /** Structure containing details about a process. */
 typedef struct process {
-	/** Information about the process. */
 	spinlock_t lock;		/**< Lock to protect data in structure. */
 	identifier_t id;		/**< ID of the process. */
 	char *name;			/**< Name of the process. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
 	refcount_t count;		/**< Number of handles/threads open to the process. */
-
-	/** Data associated with the process. */
+	int status;			/**< Exit status of the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	list_t threads;			/**< List of threads. */
 	handle_table_t handles;		/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
-
-	/** Links to parent/children. */
-	struct process *parent;		/**< Pointer to parent process. */
-	list_t children;		/**< List of child processes. */
-	list_t parent_link;		/**< Link to parent process child list. */
 } process_t;
 
 /** Process flag definitions */
@@ -86,5 +79,6 @@ extern int sys_process_replace(char *const args[], char *const environ[], bool i
 extern int sys_process_duplicate(handle_t *handlep);
 extern handle_t sys_process_open(identifier_t id);
 extern identifier_t sys_process_id(handle_t handle);
+extern void sys_process_exit(int status);
 
 #endif /* __PROC_PROCESS_H */

@@ -79,6 +79,7 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_process_duplicate,
 	(syscall_handler_t)sys_process_open,
 	(syscall_handler_t)sys_process_id,
+	(syscall_handler_t)sys_process_exit,
 };
 
 /** System call dispatcher.

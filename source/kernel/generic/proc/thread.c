@@ -51,6 +51,7 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_destroy(thread_t *thread);
+extern void process_destroy(process_t *process);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
 static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
@@ -143,7 +144,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 
 		/* Delete the owner if required. */
 		if(del) {
-			//process_destroy(del);
+			process_destroy(del);
 			del = NULL;
 		}
 	}

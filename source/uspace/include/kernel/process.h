@@ -31,10 +31,11 @@ typedef struct process_args {
 	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
 } process_args_t;
 
-extern handle_t process_create(const char *path, char *const args[], char *const environ[], bool inherit);
-extern int process_replace(const char *path, char *const args[], char *const environ[], bool inherit);
+extern handle_t process_create(char *const args[], char *const environ[], bool inherit);
+extern int process_replace(char *const args[], char *const environ[], bool inherit);
 extern int process_duplicate(handle_t *handlep);
 extern handle_t process_open(identifier_t id);
 extern identifier_t process_id(handle_t handle);
+extern int process_exit(int status);
 
 #endif /* __KERNEL_PROCESS_H */

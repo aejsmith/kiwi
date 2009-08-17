@@ -210,6 +210,8 @@ int main(int argc, char **argv) {
 	printf("Directory tree:\n");
 	dump_tree(NULL, 0);
 
-	handle = process_create(nargs[0], nargs, environ, true);
+	handle = process_create(nargs, environ, true);
 	printf("Create process returned %d (%d)\n", handle, process_id(handle));
+	handle_close(handle);
+	while(1);
 }
