@@ -276,6 +276,14 @@ typedef struct vfs_node {
 	char *link_dest;		/**< Cached symlink destination (VFS_NODE_SYMLINK). */
 } vfs_node_t;
 
+/** Data for a VFS handle (both handle types need the same data). */
+typedef struct vfs_handle {
+	mutex_t lock;			/**< Lock to protect offset. */
+	vfs_node_t *node;		/**< Node that the handle refers to. */
+	offset_t offset;		/**< Current file offset. */
+	int flags;			/**< Flags the file was opened with. */
+} vfs_handle_t;
+
 /** Directory entry information structure. */
 typedef struct vfs_dir_entry {
 	size_t length;			/**< Length of this structure including name. */

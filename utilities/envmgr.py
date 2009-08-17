@@ -33,7 +33,7 @@ class EnvironmentManager(UserDict):
 		self.colour = ARGUMENTS.get('NO_COLOUR') != '1'
 
 		# Create the base environment.
-		self.base = Environment(ENV = os.environ)
+		self.base = Environment(platform='posix', ENV=os.environ)
 
 		# Set paths to toolchain components.
 		self.base['CC'] = self.get_tool_path('gcc')
@@ -69,6 +69,7 @@ class EnvironmentManager(UserDict):
 
 		# Set shared library compilation flags.
 		self.base['SHCCFLAGS'] = '$CCFLAGS -fPIC -DSHARED'
+		self.base['SHLINKFLAGS'] = '$LINKFLAGS -shared -Wl,-soname,${TARGET.name}'
 
 		# Override the default assembler - it uses as directly, we want to use GCC.
 		self.base['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'

@@ -123,7 +123,7 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 		if(vm_fault(addr, reason, access) == VM_FAULT_HANDLED) {
 			return true;
 		} else if(atomic_get(&curr_thread->in_usermem)) {
-			kprintf(LOG_DEBUG, "arch: pagefault in usermem at 0x%p (ip: 0x%p)\n", addr, frame->ip);
+			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			context_restore_frame(&curr_thread->usermem_context, frame);
 			return true;
 		}

@@ -1,4 +1,4 @@
-/* Kiwi AMD64 application startup code
+/* Kiwi RTLD argument functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,20 @@
 
 /**
  * @file
- * @brief		AMD64 application startup code.
+ * @brief		RTLD argument functions.
  */
 
-.section .text
+#ifndef __RTLD_ARGS_H
+#define __RTLD_ARGS_H
 
-/** Main program entry point. */
-.global _start
-.type _start, @function
-_start:
-	/* The pointer to the process_args_t structure is on the stack. */
-	movq	8(%rsp), %rdi
+#include <stdbool.h>
 
-	/* Call into the C library to do the dirty work of setting up the
-	 * environment. This will also call the main function and exit with
-	 * it's return code. */
-	callq	__libc_init
+struct process_args;
 
-	/* If we got here then something has broken (we should have exited).
-	 * Die horribly. */
-	movq	$0xDEADBEEF, %rax
-	ud2a
-1:	jmp	1b
-.size _start, .-_start
+/** Variables containing parsed arguments. */
+extern bool rtld_debug;			/**< Whether debug output is enabled. */
+extern bool rtld_dryrun;		/**< Whether in dry-run mode. */
+
+extern void rtld_args_init(struct process_args *args);
+
+#endif /* __RTLD_ARGS_H */

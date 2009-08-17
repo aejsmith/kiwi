@@ -130,7 +130,7 @@ static __attribute__((used)) int putchar(int ch) {
 extern char **environ;
 
 int main(int argc, char **argv) {
-	char *nargs[] = { (char *)"/applications/hello", (char *)"--hello", (char *)"world", NULL };
+	char *nargs[] = { (char *)"/system/binaries/hello", (char *)"--hello", (char *)"world", NULL };
 	char buf[] = { 'a', 'b', 'c', 'd' };
 	handle_t handle;
 	size_t bytes;

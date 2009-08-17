@@ -53,15 +53,6 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Structure containing data for a VFS handle (both handle types have the
- *  same content). */
-typedef struct vfs_handle {
-	mutex_t lock;			/**< Lock to protect offset. */
-	vfs_node_t *node;		/**< Node that the handle refers to. */
-	offset_t offset;		/**< Current file offset. */
-	int flags;			/**< Flags the file was opened with. */
-} vfs_handle_t;
-
 extern vfs_type_t ramfs_fs_type;
 
 /** List of all mounts. */

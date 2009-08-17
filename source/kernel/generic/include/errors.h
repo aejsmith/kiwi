@@ -18,8 +18,8 @@
  * @brief		Error number definitions.
  */
 
-#ifndef __ERRORS_H
-#define __ERRORS_H
+#ifndef __KERNEL_ERRORS_H
+#define __KERNEL_ERRORS_H
 
 /** Definitions of error codes returned by kernel functions. */
 #define ERR_NO_MEMORY		1	/**< No memory available. */
@@ -42,4 +42,4 @@
 #define ERR_STR_TOO_LONG	18	/**< String is too long. */
 #define ERR_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
 
-#endif /* __ERRORS_H */
+#endif /* __KERNEL_ERRORS_H */

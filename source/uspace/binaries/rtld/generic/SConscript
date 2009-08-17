@@ -12,11 +12,16 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env', 'sources')
 
-# Get a list of source files.
-sources = []
-SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
+# Generate the system call functions.
+env.Sysgen('syscalls.S', 'syscalls.def')
 
-# Build the library from this.
-env.SharedLibrary('c', sources, SHLIBVER='1.0.%s' % (env['KIWI_VER_REVISION']), LIBS=['kernel'])
+sources += [
+	File('args.c'),
+	File('image.c'),
+	File('main.c'),
+	File('symbol.c'),
+	File('syscalls.S'),
+	File('utility.c'),
+]

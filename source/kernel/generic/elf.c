@@ -93,6 +93,31 @@ typedef struct elf_binary {
 	vm_aspace_t *as;		/**< Address space to map in to. */
 } elf_binary_t;
 
+/** Reserve space for a binary in an address space.
+ * @param binary	Binary to reserve space for.
+ * @return		0 on success, negative error code on failure. */
+static int elf_binary_reserve_space(elf_binary_t *binary) {
+	ptr_t start, end;
+	size_t i, size;
+	int ret;
+
+	for(i = 0; i < binary->ehdr.e_phnum; i++) {
+		if(binary->phdrs[i].p_type != ELF_PT_LOAD) {
+			continue;
+		}
+
+		start = ROUND_DOWN(binary->phdrs[i].p_vaddr, PAGE_SIZE);
+		end = ROUND_UP(binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz, PAGE_SIZE);
+		size = end - start;
+
+		if((ret = vm_reserve(binary->as, start, size)) != 0) {
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 /** Handle an ELF_PT_LOAD program header.
  * @param binary	ELF binary data structure.
  * @param phdr		Program header to load.
@@ -235,6 +260,14 @@ static int elf_binary_load_internal(vfs_node_t *node, vm_aspace_t *as, bool inte
 			goto fail;
 		}
 		dprintf("elf: %p has interpreter %s\n", node, path);
+
+		/* Reserve space for the real binary to be loaded into, so that
+		 * the VM system doesn't put the stack or argument block where
+		 * the binary needs to go. */
+		if((ret = elf_binary_reserve_space(binary)) != 0) {
+			kfree(path);
+			goto fail;
+		}
 
 		/* Clean up old state data. */
 		kfree(binary->phdrs);

@@ -22,20 +22,20 @@ SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'uspace'])
 def boot_image_func(target, source, env):
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwibootimg')
-	os.makedirs(os.path.join(tmpdir, 'applications'))
-	os.makedirs(os.path.join(tmpdir, 'libraries'))
-	os.makedirs(os.path.join(tmpdir, 'modules'))
+	os.makedirs(os.path.join(tmpdir, 'system', 'binaries'))
+	os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
+	os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
 
 	# Copy everything needed into it.
-	for app in env['BOOTAPPS']:
-		shutil.copy(str(app), os.path.join(tmpdir, 'applications'))
+	for bin in env['BOOTBINS']:
+		shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
 	for lib in env['BOOTLIBS']:
-		shutil.copy(str(lib), os.path.join(tmpdir, 'libraries'))
+		shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
 	for mod in env['MODULES']:
-		shutil.copy(str(mod), os.path.join(tmpdir, 'modules'))
+		shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
 
 	# Create the startup symbolic link.
-	os.symlink('applications/startup', os.path.join(tmpdir, 'startup'))
+	os.symlink('system/binaries/startup', os.path.join(tmpdir, 'startup'))
 
 	# Create the TAR file.
 	tar = tarfile.open(str(target[0]), 'w:gz')
@@ -52,6 +52,6 @@ def boot_image_func(target, source, env):
 dist = envmgr['dist']
 dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMSTR'))
 
-dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTAPPS'] + dist['BOOTLIBS'])
+dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTBINS'] + dist['BOOTLIBS'])
 dist['BOOTIMG'] = File('bootimg.tar.gz')
 Default(Alias('bootimg', dist['BOOTIMG']))

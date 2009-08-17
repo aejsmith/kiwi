@@ -1,4 +1,4 @@
-/* Kiwi AMD64 application startup code
+/* Kiwi AMD64 RTLD startup function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,19 @@
 
 /**
  * @file
- * @brief		AMD64 application startup code.
+ * @brief		AMD64 RTLD startup function.
  */
 
 .section .text
 
-/** Main program entry point. */
-.global _start
-.type _start, @function
-_start:
-	/* The pointer to the process_args_t structure is on the stack. */
+/** Entry point for the RTLD. */
+.global __rtld_entry
+.type __rtld_entry, @function
+__rtld_entry:
+	/* Get pointer to arguments structure and call the main function. */
 	movq	8(%rsp), %rdi
+	callq	rtld_main
 
-	/* Call into the C library to do the dirty work of setting up the
-	 * environment. This will also call the main function and exit with
-	 * it's return code. */
-	callq	__libc_init
-
-	/* If we got here then something has broken (we should have exited).
-	 * Die horribly. */
-	movq	$0xDEADBEEF, %rax
-	ud2a
-1:	jmp	1b
-.size _start, .-_start
+	/* Entry address is now in %rax, jump to it. */
+	jmp	*%rax
+.size __rtld_entry, .-__rtld_entry

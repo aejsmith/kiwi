@@ -184,8 +184,8 @@ static int process_copy_args(const char **kargs, const char **kenv, ptr_t *addrp
 
 	/* Get the number of entries and the total size required. */
 	size = sizeof(process_args_t) + (sizeof(char *) * 2);
-	for(argc = 0; kargs[argc] != NULL; size += (strlen(kargs[argc++]) + sizeof(char *)));
-	for(envc = 0; kenv[envc] != NULL; size += (strlen(kenv[envc++]) + sizeof(char *)));
+	for(argc = 0; kargs[argc]; size += (strlen(kargs[argc++]) + sizeof(char *)));
+	for(envc = 0; kenv[envc]; size += (strlen(kenv[envc++]) + sizeof(char *)));
 	size = ROUND_UP(size, PAGE_SIZE);
 
 	/* Allocate a chunk of memory for the data. */
@@ -206,7 +206,7 @@ static int process_copy_args(const char **kargs, const char **kenv, ptr_t *addrp
 
 	/* Copy actual data for the arrays. */
 	addr += process_copy_args_data(uargs->args, kargs, argc, addr);
-	addr += process_copy_args_data(uargs->env, kenv, argc, addr);
+	addr += process_copy_args_data(uargs->env, kenv, envc, addr);
 	return 0;
 }
 

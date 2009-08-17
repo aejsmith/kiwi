@@ -18,10 +18,12 @@
  * @brief		Initialization code.
  */
 
+#include <kernel/process.h>
+
 #define __need_NULL
 #include <stddef.h>
 
-extern void __libc_init(int argc, char **argv, char **environ, void *auxv);
+extern void __libc_init(process_args_t *args);
 extern int main(int argc, char **argv, char **envp);
 extern void __register_frame_info(void *begin, void *ob);
 extern void *__deregister_frame_info(void *begin);
@@ -29,10 +31,10 @@ extern void *__deregister_frame_info(void *begin);
 char **environ;
 
 /** C library initialization function. */
-void __libc_init(int argc, char **argv, char **envp, void *auxv) {
-	environ = envp;
+void __libc_init(process_args_t *args) {
+	environ = args->env;
 
-	main(argc, argv, envp);
+	main(args->args_count, args->args, args->env);
 	while(1);
 }
 

@@ -51,7 +51,7 @@ sources += [
 	File('string/strcmp.c'),
 	File('string/strcpy.c'),
 	File('string/strcspn.c'),
-	#File('string/strdup.c'),
+	File('string/strdup.c'),
 	File('string/strlen.c'),
 	File('string/strpbrk.c'),
 	File('string/strsep.c'),

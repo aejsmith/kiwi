@@ -16,8 +16,8 @@ Import('envmgr', 'config')
 
 # Set up the userspace build environment.
 env = envmgr.Create('uspace')
-env['CPPPATH'] = Dir('include')
-env['LIBPATH'] = Dir('libraries')
+env['CPPPATH'] = [Dir('include')]
+env['LIBPATH'] = [Dir('libraries')]
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 
@@ -25,7 +25,7 @@ env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config[
 # as LIBS is a special SCons variable.
 env['LIBRARIES'] = []
 env['SHLIBS'] = []
-env['APPS'] = []
+env['BINS'] = []
 
 # Set the directory that we want all libraries to be placed in.
 env['LIBOUTDIR'] = Dir('libraries')
@@ -43,9 +43,9 @@ def shlib_emitter(target, source, env):
 env.Append(LIBEMITTER=[lib_emitter])
 env.Append(SHLIBEMITTER=[shlib_emitter])
 
-# Set up a program emitter to add programs to the apps array.
+# Set up a program emitter to add binaries to the binaries array.
 def program_emitter(target, source, env):
-	env['APPS'].append(target[0])
+	env['BINS'].append(target[0])
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 
@@ -58,11 +58,11 @@ env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$
 
 # Build libraries before applications because they're required for applications
 # to build.
-SConscript(dirs=['libraries', 'applications'], exports=['env'])
+SConscript(dirs=['libraries', 'binaries'], exports=['env'])
 
-# Have all applications depend on the kernel library, C library and C runtime
+# Have all binaries depend on the kernel library, C library and C runtime
 # files, and all shared libraries depend on the C runtime files.
-for app in env['APPS']:
+for app in env['BINS']:
 	Depends(app, Glob('libraries/*crt*.o'))
 	Depends(app, File('libraries/libc.so'))
 	Depends(app, File('libraries/libkernel.so'))
@@ -71,9 +71,9 @@ for lib in env['SHLIBS']:
 
 # Set arrays needed in the distribution environment.
 # FIXME: Eventually we shouldn't put everything in the boot image.
-envmgr['dist']['BOOTAPPS'] = env['APPS']
+envmgr['dist']['BOOTBINS'] = env['BINS']
 envmgr['dist']['BOOTLIBS'] = env['LIBRARIES']
 
 # Set build defaults.
 Default(Alias('libraries', env['LIBRARIES']))
-Default(Alias('applications', env['APPS']))
+Default(Alias('binaries', env['BINS']))

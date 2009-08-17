@@ -23,6 +23,16 @@
 
 #include <kernel/types.h>
 
+/** Structure containing arguments for _vm_map_file(). */
+typedef struct vm_map_file_args {
+	void *start;			/**< Address to map at (if not AS_REGION_FIXED). */
+	size_t size;			/**< Size of area to map (multiple of page size). */
+	int flags;			/**< Flags controlling the mapping. */
+	handle_t handle;		/**< Handle for file to map. */
+	offset_t offset;		/**< Offset in the file to map from. */
+	void **addrp;			/**< Where to store address mapped to. */
+} vm_map_file_args_t;
+
 /** Behaviour flags for vm_map_* functions. */
 #define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */

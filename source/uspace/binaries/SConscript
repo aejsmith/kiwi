@@ -12,11 +12,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env')
 
-# Get a list of source files.
-sources = []
-SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
-
-# Build the library from this.
-env.SharedLibrary('c', sources, SHLIBVER='1.0.%s' % (env['KIWI_VER_REVISION']), LIBS=['kernel'])
+SConscript(dirs=[
+	'hello',
+	'rtld',
+	'startup',
+], exports=['env'])

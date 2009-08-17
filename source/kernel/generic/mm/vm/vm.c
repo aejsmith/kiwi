@@ -44,6 +44,7 @@
 #include <mm/slab.h>
 #include <mm/tlb.h>
 
+#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/thread.h>
 
@@ -628,6 +629,8 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	/* Create a hole and insert it into the address space. */
 	vm_unmap_internal(as, start, start + size);
 	avl_tree_insert(&as->regions, (key_t)region->start, region, &region->node);
+
+	dprintf("vm: reserved region [%p,%p) (as: %p)\n",region->start, region->end, as);
 	mutex_unlock(&as->lock);
 	return 0;
 }
@@ -949,12 +952,18 @@ int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp) {
 	ptr_t addr;
 	int ret;
 
+	if(!(flags & VM_MAP_FIXED) && !addrp) {
+		return -ERR_PARAM_INVAL;
+	}
+
 	if((ret = vm_map_anon(curr_proc->aspace, (ptr_t)start, size, flags, &addr)) != 0) {
+		return ret;
+	} else if(addrp && (ret = memcpy_to_user(addrp, &addr, sizeof(void *))) != 0) {
+		vm_unmap(curr_proc->aspace, addr, size);
 		return ret;
 	}
 
-	/* TODO: Better write functions for integer values. */
-	return memcpy_to_user(addrp, &addr, sizeof(void *));
+	return 0;
 }
 
 /** Map a file into memory.
@@ -978,7 +987,44 @@ int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp) {
  * @return		0 on success, negative error code on failure.
  */
 int sys_vm_map_file(vm_map_file_args_t *args) {
-	return -ERR_NOT_IMPLEMENTED;
+	vm_map_file_args_t kargs;
+	handle_info_t *info;
+	vfs_handle_t *file;
+	int ret, err;
+	ptr_t addr;
+
+	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_file_args_t))) != 0) {
+		return ret;
+	}
+
+	if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Look up the handle. */
+	if((ret = handle_get(&curr_proc->handles, kargs.handle, HANDLE_TYPE_FILE, &info)) != 0) {
+		return ret;
+	}
+	file = info->data;
+
+	/* If shared write access is required, ensure that the handle flags
+	 * allow this. */
+	if(!(kargs.flags & VM_MAP_PRIVATE) && kargs.flags & VM_MAP_WRITE && !(file->flags & FS_FILE_WRITE)) {
+		handle_release(info);
+		return -ERR_PERM_DENIED;
+	}
+
+	ret = vm_map_file(curr_proc->aspace, (ptr_t)kargs.start, kargs.size,
+	                  kargs.flags, file->node, kargs.offset, &addr);
+	if(ret == 0 && kargs.addrp) {
+		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
+			vm_unmap(curr_proc->aspace, addr, kargs.size);
+			ret = err;
+		}
+	}
+
+	handle_release(info);
+	return ret;
 }
 
 /** Unmaps a region of memory.
