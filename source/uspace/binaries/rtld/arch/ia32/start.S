@@ -1,4 +1,4 @@
-/* Kiwi IA32 application startup code
+/* Kiwi IA32 RTLD startup function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,28 +15,21 @@
 
 /**
  * @file
- * @brief		IA32 application startup code.
+ * @brief		IA32 RTLD startup function.
  */
 
 .section .text
 
-/** Main program entry point. */
-.global _start
-.type _start, @function
-_start:
-	/* The pointer to the process_args_t structure is on the stack. */
+/** Entry point for the RTLD. */
+.global __rtld_entry
+.type __rtld_entry, @function
+__rtld_entry:
+	/* Get pointer to arguments structure and call the main function. */
 	movl	4(%esp), %eax
-
-	/* Call into the C library to do the dirty work of setting up the
-	 * environment. This will also call the main function and exit with
-	 * it's return code. */
 	push	%eax
-	call	__libc_init
+	call	rtld_main
 	addl	$4, %esp
 
-	/* If we got here then something has broken (we should have exited).
-	 * Die horribly. */
-	movl	$0xDEADBEEF, %eax
-	ud2a
-1:	jmp	1b
-.size _start, .-_start
+	/* Entry address is now in %eax, jump to it. */
+	jmp	*%eax
+.size __rtld_entry, .-__rtld_entry

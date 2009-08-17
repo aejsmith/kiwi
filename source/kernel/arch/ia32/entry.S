@@ -19,6 +19,8 @@
  */
 
 #include <arch/descriptor.h>
+#include <arch/x86/sysreg.h>
+#include <arch/stack.h>
 
 /** Push registers onto the stack. */
 .macro PUSH_REGS
@@ -152,3 +154,45 @@ __isr_common:
 	addl	$8, %esp
 	iret
 .size __isr_common, .-__isr_common
+
+/** Userspace entry function. */
+.global thread_arch_enter_userspace
+thread_arch_enter_userspace:
+	/* Get arguments. */
+	movl	4(%esp), %edi
+	movl	8(%esp), %esi
+
+	/* Push a zero return address so the userspace program will not fault
+	 * if it inadvertently returns from its entry function. */
+	subl	$STACK_DELTA, %esi
+	movl	$0, (%esi)
+
+	/* Set up a stack frame for IRET:
+	 *  - SS.
+	 *  - ESP.
+	 *  - EFLAGS.
+	 *  - CS.
+	 *  - EIP. */
+	push	$(SEG_U_DS | 0x03)
+	push	%esi
+	push	$(SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1)
+	push	$(SEG_U_CS | 0x03)
+	push	%edi
+	
+	/* Set other segment registers. */
+	mov	$(SEG_U_DS | 0x03), %ax
+	mov	%ax, %ds
+	mov	%ax, %es
+	
+	/* Clear general purpose registers. */
+	xorl	%eax, %eax
+	xorl	%ebx, %ebx
+	xorl	%ecx, %ecx
+	xorl	%edx, %edx
+	xorl	%esi, %esi
+	xorl	%edi, %edi
+	xorl	%ebp, %ebp
+
+	/* Enter userspace. */
+	iret
+.size thread_arch_enter_userspace, .-thread_arch_enter_userspace

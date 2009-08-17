@@ -41,9 +41,9 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 
 	/* First perform RELA relocations. */
 	for(i = 0; i < size / sizeof(ElfW(ELF_REL_TYPE)); i++) {
-		type   = ELF64_R_TYPE(relocs[i].r_info);
+		type   = ELF32_R_TYPE(relocs[i].r_info);
 		addr   = (ElfW(Addr) *)(image->load_base + relocs[i].r_offset);
-		symidx = ELF64_R_SYM(relocs[i].r_info);
+		symidx = ELF32_R_SYM(relocs[i].r_info);
 		name   = strtab + symtab[symidx].st_name;
 		bind   = ELF_ST_BIND(symtab[symidx].st_info);
 		sym_addr = 0;
@@ -57,22 +57,22 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 
 		/* Perform the actual relocation. */
 		switch(type) {
-		case ELF_R_X86_64_NONE:
+		case ELF_R_386_NONE:
 			break;
-		case ELF_R_X86_64_64:
-			*addr = sym_addr + relocs[i].r_addend;
+		case ELF_R_386_32:
+			*addr += sym_addr;
 			break;
-		case ELF_R_X86_64_PC32:
-			*addr = sym_addr + relocs[i].r_addend - relocs[i].r_offset;
+		case ELF_R_386_PC32:
+			*addr += sym_addr - (ElfW(Addr))addr;
 			break;
-		case ELF_R_X86_64_GLOB_DAT:
-		case ELF_R_X86_64_JUMP_SLOT:
-			*addr = sym_addr + relocs[i].r_addend;
+		case ELF_R_386_GLOB_DAT:
+		case ELF_R_386_JMP_SLOT:
+			*addr = sym_addr;
 			break;
-		case ELF_R_X86_64_RELATIVE:
-			*addr = (ElfW(Addr))image->load_base + relocs[i].r_addend;
+		case ELF_R_386_RELATIVE:
+			*addr += (ElfW(Addr))image->load_base;
 			break;
-		case ELF_R_X86_64_COPY:
+		case ELF_R_386_COPY:
 			if(sym_addr) {
 				memcpy((char *)addr, (char *)sym_addr, symtab[symidx].st_size);
 			}

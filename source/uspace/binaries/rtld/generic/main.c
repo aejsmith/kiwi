@@ -37,7 +37,7 @@ void *rtld_main(process_args_t *args) {
 
 	rtld_args_init(args);
 
-	/* Load the binary and all its dependencies. */
+	/* Load the binary and all its dependencies. FIXME: Exit */
 	dprintf("RTLD: Loading binary: %s\n", args->args[0]);
 	if((ret = rtld_image_load(args->args[0], NULL, ELF_ET_EXEC, &entry)) != 0) {
 		dprintf("RTLD: Failed to load binary (%d)\n", ret);
@@ -67,6 +67,11 @@ void *rtld_main(process_args_t *args) {
 				printf("  %s (%p)\n", image->name, image->load_base);
 			}
 		}
+	}
+
+	if(rtld_dryrun) {
+		/* FIXME: Exit. */
+		while(1);
 	}
 
 	/* Return the program entry point for the startup code to call. */

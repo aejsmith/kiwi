@@ -35,4 +35,6 @@ extern void thread_arch_post_switch(struct thread *thread);
 extern int thread_arch_init(struct thread *thread);
 extern void thread_arch_destroy(struct thread *thread);
 
+extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack);
+
 #endif /* __ARCH_THREAD_H */
