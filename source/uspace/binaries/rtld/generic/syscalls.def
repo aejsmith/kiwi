@@ -21,3 +21,4 @@ Syscall('fs_file_read',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'], 6
 Syscall('vm_map_anon',		['ptr_t', 'size_t', 'int', 'ptr_t'], 25)
 Syscall('_vm_map_file',		['ptr_t'], 26)
 Syscall('vm_unmap',		['ptr_t', 'size_t'], 27)
+Syscall('process_exit',		['int'], 33)

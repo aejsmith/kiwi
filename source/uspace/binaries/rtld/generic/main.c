@@ -37,11 +37,11 @@ void *rtld_main(process_args_t *args) {
 
 	rtld_args_init(args);
 
-	/* Load the binary and all its dependencies. FIXME: Exit */
+	/* Load the binary and all its dependencies. */
 	dprintf("RTLD: Loading binary: %s\n", args->args[0]);
 	if((ret = rtld_image_load(args->args[0], NULL, ELF_ET_EXEC, &entry)) != 0) {
 		dprintf("RTLD: Failed to load binary (%d)\n", ret);
-		while(1);
+		process_exit(-ret);
 	}
 
 	/* Call INIT functions for loaded images. */
@@ -69,9 +69,10 @@ void *rtld_main(process_args_t *args) {
 		}
 	}
 
+	/* If doing a dry run all we want to know is the final list, don't want
+	 * to actually run the program. */
 	if(rtld_dryrun) {
-		/* FIXME: Exit. */
-		while(1);
+		process_exit(0);
 	}
 
 	/* Return the program entry point for the startup code to call. */
