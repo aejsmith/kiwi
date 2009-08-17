@@ -189,9 +189,9 @@ int module_load(const char *path, char *depbuf) {
 	}
 
 	/* Look up the node and check it is the correct type. */
-	if((ret = vfs_node_lookup(path, true, &node)) != 0) {
+	if((ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node)) != 0) {
 		return ret;
-	} else if(node->type != VFS_NODE_FILE || !elf_module_check(node)) {
+	} else if(!elf_module_check(node)) {
 		vfs_node_release(node);
 		return -ERR_TYPE_INVAL;
 	}

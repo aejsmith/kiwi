@@ -314,7 +314,7 @@ extern vfs_mount_t *vfs_root_mount;
 extern int vfs_type_register(vfs_type_t *type);
 extern int vfs_type_unregister(vfs_type_t *type);
 
-extern int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep);
+extern int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep);
 extern void vfs_node_get(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
 extern int vfs_node_info(vfs_node_t *node, vfs_info_t *infop);

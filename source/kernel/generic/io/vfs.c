@@ -580,12 +580,13 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
  * @param follow	If the last path component refers to a symbolic link,
  *			specified whether to follow the link or return the node
  *			of the link itself.
+ * @param type		Required node type (negative will not check the type).
  * @param nodep		Where to store pointer to node found (referenced,
  *			unlocked).
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep) {
+int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep) {
 	vfs_node_t *node = NULL;
 	char *dup;
 	int ret;
@@ -610,8 +611,14 @@ int vfs_node_lookup(const char *path, bool follow, vfs_node_t **nodep) {
 
 	/* Look up the path string. */
 	if((ret = vfs_node_lookup_internal(dup, node, follow, 0, &node)) == 0) {
-		mutex_unlock(&node->lock);
-		*nodep = node;
+		if(type >= 0 && node->type != (unsigned int)type) {
+			ret = -ERR_TYPE_INVAL;
+			mutex_unlock(&node->lock);
+			vfs_node_release(node);
+		} else {
+			*nodep = node;
+			mutex_unlock(&node->lock);
+		}
 	}
 
 	mutex_unlock(&curr_proc->ioctx.lock);
@@ -711,19 +718,16 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
         }
 
 	/* Look up the parent node. */
-	if((ret = vfs_node_lookup(dir, true, &parent)) != 0) {
+	if((ret = vfs_node_lookup(dir, true, VFS_NODE_DIR, &parent)) != 0) {
 		goto out;
 	}
 
 	mutex_lock(&parent->mount->lock, 0);
 	mutex_lock(&parent->lock, 0);
 
-	/* Ensure that we have a directory, are on a writeable filesystem, and
-	 * that the FS supports node creation. */
-	if(parent->type != VFS_NODE_DIR) {
-		ret = -ERR_TYPE_INVAL;
-		goto out;
-	} else if(VFS_NODE_IS_RDONLY(parent)) {
+	/* Ensure that we are on a writable filesystem, and that the FS
+	 * supports node creation. */
+	if(VFS_NODE_IS_RDONLY(parent)) {
 		ret = -ERR_READ_ONLY;
 		goto out;
 	} else if(!parent->mount->type->node_create) {
@@ -1790,18 +1794,14 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		}
 	} else {
 		/* Look up the destination directory. */
-		if((ret = vfs_node_lookup(path, true, &node)) != 0) {
+		if((ret = vfs_node_lookup(path, true, VFS_NODE_DIR, &node)) != 0) {
 			goto fail;
 		}
 
 		mutex_lock(&node->lock, 0);
 
-		/* Check that the node is a directory, and that it is not being
-		 * used as a mount point already. */
-		if(node->type != VFS_NODE_DIR) {
-			ret = -ERR_TYPE_INVAL;
-			goto fail;
-		} else if(node->mount->root == node) {
+		/* Check that it is not being used as a mount point already. */
+		if(node->mount->root == node) {
 			ret = -ERR_IN_USE;
 			goto fail;
 		}
@@ -1930,17 +1930,14 @@ int vfs_unlink(const char *path) {
 	dprintf("vfs: unlink(%s) - dirname is '%s', basename is '%s'\n", path, dir, name);
 
 	/* Look up the parent node and the node to unlink. */
-	if((ret = vfs_node_lookup(dir, true, &parent)) != 0) {
+	if((ret = vfs_node_lookup(dir, true, VFS_NODE_DIR, &parent)) != 0) {
 		goto out;
-	} else if((ret = vfs_node_lookup(path, false, &node)) != 0) {
+	} else if((ret = vfs_node_lookup(path, false, -1, &node)) != 0) {
 		goto out;
 	}
 
 	mutex_lock(&parent->lock, 0);
 	mutex_lock(&node->lock, 0);
-
-	/* If looking up the node succeeded, the parent must be a directory. */
-	assert(parent->type == VFS_NODE_DIR);
 
 	if(parent->mount != node->mount) {
 		ret = -ERR_IN_USE;
@@ -2262,10 +2259,7 @@ handle_t sys_fs_file_open(const char *path, int flags) {
 	data->flags = flags;
 
 	/* Look up the filesystem node and check if it is suitable. */
-	if((ret = vfs_node_lookup(kpath, true, &data->node)) != 0) {
-		goto fail;
-	} else if(data->node->type != VFS_NODE_FILE) {
-		ret = -ERR_TYPE_INVAL;
+	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_FILE, &data->node)) != 0) {
 		goto fail;
 	} else if(flags & FS_FILE_WRITE && VFS_NODE_IS_RDONLY(data->node)) {
 		ret = -ERR_READ_ONLY;
@@ -2582,10 +2576,7 @@ handle_t sys_fs_dir_open(const char *path, int flags) {
 	data->flags = flags;
 
 	/* Look up the filesystem node and check if it is suitable. */
-	if((ret = vfs_node_lookup(kpath, true, &data->node)) != 0) {
-		goto fail;
-	} else if(data->node->type != VFS_NODE_DIR) {
-		ret = -ERR_TYPE_INVAL;
+	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_DIR, &data->node)) != 0) {
 		goto fail;
 	}
 
@@ -2813,9 +2804,8 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 		return ret;
 	}
 
-	/* Look up the filesystem node. No need to check here whether it is
-	 * suitable, vfs_symlink_read() does that. */
-	if((ret = vfs_node_lookup(kpath, false, &node)) != 0) {
+	/* Look up the filesystem node. */
+	if((ret = vfs_node_lookup(kpath, false, VFS_NODE_SYMLINK, &node)) != 0) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2906,14 +2896,13 @@ int sys_fs_setcwd(const char *path) {
 	/* Get the path and look it up. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
 		return ret;
-	} else if((ret = vfs_node_lookup(kpath, true, &node)) != 0) {
+	} else if((ret = vfs_node_lookup(kpath, true, VFS_NODE_DIR, &node)) != 0) {
 		kfree(kpath);
 		return ret;
 	}
 
-	/* Attempt to set. If the node is the wrong type, it will be picked
-	 * up by io_context_setcwd(). Release the node no matter what, as upon
-	 * success it is referenced by io_context_setcwd(). */
+	/* Attempt to set. Release the node no matter what, as upon success it
+	 * is referenced by io_context_setcwd(). */
 	ret = io_context_setcwd(&curr_proc->ioctx, node);
 	vfs_node_release(node);
 	kfree(kpath);
@@ -2942,14 +2931,13 @@ int sys_fs_setroot(const char *path) {
 	/* Get the path and look it up. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
 		return ret;
-	} else if((ret = vfs_node_lookup(kpath, true, &node)) != 0) {
+	} else if((ret = vfs_node_lookup(kpath, true, VFS_NODE_DIR, &node)) != 0) {
 		kfree(kpath);
 		return ret;
 	}
 
-	/* Attempt to set. If the node is the wrong type, it will be picked
-	 * up by io_context_setroot(). Release the node no matter what, as upon
-	 * success it is referenced by io_context_setroot(). */
+	/* Attempt to set. Release the node no matter what, as upon success it
+	 * is referenced by io_context_setroot(). */
 	ret = io_context_setroot(&curr_proc->ioctx, node);
 	vfs_node_release(node);
 	kfree(kpath);

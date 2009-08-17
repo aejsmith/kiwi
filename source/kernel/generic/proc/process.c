@@ -217,10 +217,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 	assert(curr_proc->aspace == curr_aspace);
 
 	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(info->args[0], true, &node)) != 0) {
-		goto fail;
-	} else if(node->type != VFS_NODE_FILE) {
-		ret = -ERR_TYPE_INVAL;
+	if((ret = vfs_node_lookup(info->args[0], true, VFS_NODE_FILE, &node)) != 0) {
 		goto fail;
 	}
 
@@ -596,10 +593,7 @@ int sys_process_replace(char *const args[], char *const environ[], bool inherit)
 	}
 
 	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(kargs[0], true, &node)) != 0) {
-		goto fail;
-	} else if(node->type != VFS_NODE_FILE) {
-		ret = -ERR_TYPE_INVAL;
+	if((ret = vfs_node_lookup(kargs[0], true, VFS_NODE_FILE, &node)) != 0) {
 		goto fail;
 	}
 

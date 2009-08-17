@@ -274,13 +274,10 @@ static int elf_binary_load_internal(vfs_node_t *node, vm_aspace_t *as, bool inte
 		kfree(binary);
 
 		/* Look up the interpreter on the FS. */
-		ret = vfs_node_lookup(path, true, &node);
+		ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node);
 		kfree(path);
 		if(ret != 0) {
 			return ret;
-		} else if(node->type != VFS_NODE_FILE) {
-			vfs_node_release(node);
-			return -ERR_TYPE_INVAL;
 		}
 
 		ret = elf_binary_load_internal(node, as, true, datap);
