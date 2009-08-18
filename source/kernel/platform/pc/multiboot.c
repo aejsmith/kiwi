@@ -172,6 +172,5 @@ void __init_text multiboot_postmm_init(void) {
 		kprintf(LOG_WARN, "platform: multiple modules were loaded, assuming first is boot image\n");
 	}
 
-	bootimg_size = mods[0].mod_end - mods[0].mod_start;
-	bootimg_addr = (ptr_t)kmemdup((void *)((ptr_t)mods[0].mod_start), bootimg_size, MM_FATAL);
+	bootimg_set((void *)((ptr_t)mods[0].mod_start), mods[0].mod_end - mods[0].mod_start);
 }

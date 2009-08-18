@@ -23,9 +23,7 @@
 
 #include <types.h>
 
-extern ptr_t bootimg_addr;
-extern size_t bootimg_size;
-
 extern void bootimg_load(void);
+extern void bootimg_set(void *addr, size_t size);
 
 #endif /* __BOOTIMG_H */

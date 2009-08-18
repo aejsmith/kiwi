@@ -414,8 +414,8 @@ static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) 
 	/* Insert the segment after the span. */
 	list_add_after(&span->header, &seg->header);
 
-	dprintf("vmem: imported span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p(%s) from %p(%s)\n",
-		ret, ret + size, vmem, vmem->name, vmem->source, vmem->source->name);
+	dprintf("vmem: imported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
+		ret, ret + size, vmem->name, vmem->source->name);
 	return seg;
 }
 
@@ -447,8 +447,8 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 	vmem->ffunc(vmem->source, span->base, span->size);
 	mutex_lock(&vmem->lock, 0);
 
-	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") from %p(%s) to %p(%s)\n",
-		span->base, span->base + span->size, vmem, vmem->name, vmem->source, vmem->source->name);
+	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
+		span->base, span->base + span->size, vmem->name, vmem->source->name);
 }
 
 /** Allocate a segment from a Vmem arena.
@@ -515,9 +515,9 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag);
 	if(seg == NULL) {
 		if(vmem->source && minaddr == 0 && maxaddr == 0) {
-			/* Don't need to bother waiting if we cannot import from the
-			 * source - the allocation flags get passed down so waiting
-			 * should take place there. */
+			/* Don't need to bother waiting if we cannot import
+			 * from the source - the allocation flags get passed
+			 * down so waiting should take place there. */
 			seg = vmem_import(vmem, size, vmflag);
 			if(seg == NULL) {
 				if(vmflag & MM_FATAL) {

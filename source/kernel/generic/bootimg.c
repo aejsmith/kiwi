@@ -29,6 +29,7 @@
 
 #include <proc/process.h>
 
+#include <assert.h>
 #include <bootimg.h>
 #include <errors.h>
 #include <fatal.h>
@@ -39,11 +40,9 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Address of boot image provided by the boot loader. */
-ptr_t bootimg_addr;
-
-/** Size of boot image. */
-size_t bootimg_size;
+/** Address and size of boot image. */
+static void *bootimg_addr;
+static size_t bootimg_size;
 
 /** Tar entry types. */
 #define REGTYPE		'0'	/**< Regular file (preferred code). */
@@ -86,7 +85,7 @@ typedef struct tar_header {
  */
 void bootimg_load(void) {
 	const char *args[] = { "/startup", NULL }, *env[] = { NULL };
-	ptr_t addr = bootimg_addr;
+	ptr_t addr = (ptr_t)bootimg_addr;
 	tar_header_t *hdr;
 	vfs_node_t *node;
 	int64_t size;
@@ -149,8 +148,27 @@ void bootimg_load(void) {
 		hdr = (tar_header_t *)addr;
 	}
 
+	/* Free the boot image, it is no longer required. */
+	kfree(bootimg_addr);
+
 	/* Spawn the startup process. */
 	if((ret = process_create(args, env, PROCESS_CRITICAL, PRIORITY_SYSTEM, NULL)) != 0) {
 		fatal("Could not create startup process (%d)", ret);
 	}
+}
+
+/** Set the address of the boot image.
+ *
+ * Sets the address and size of the boot image. This memory will be copied, so
+ * the space it takes up can be freed by the platform/architecture code.
+ *
+ * @param addr		Address of boot image.
+ * @param size		Size of boot image.
+ */
+void bootimg_set(void *addr, size_t size) {
+	assert(!bootimg_addr);
+	assert(size);
+
+	bootimg_addr = kmemdup(addr, size, MM_FATAL);
+	bootimg_size = size;
 }
