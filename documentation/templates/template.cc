@@ -1,5 +1,5 @@
-/* Kiwi handle functions
- * Copyright (C) 2009 Alex Smith
+/* Kiwi <description>
+ * Copyright (C) <years> <author>
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,7 @@
 
 /**
  * @file
- * @brief		Handle functions.
+ * @brief		<Description>.
  */
 
-#ifndef __KERNEL_HANDLE_H
-#define __KERNEL_HANDLE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <kernel/types.h>
-
-extern int handle_close(handle_t handle);
-extern int handle_type(handle_t handle);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __KERNEL_HANDLE_H */

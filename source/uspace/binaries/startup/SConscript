@@ -15,5 +15,5 @@
 Import('env', 'config', 'envmgr')
 
 env.Program('startup', [
-	'main.c',
+	'main.cc',
 ])

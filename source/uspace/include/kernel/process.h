@@ -21,6 +21,10 @@
 #ifndef __KERNEL_PROCESS_H
 #define __KERNEL_PROCESS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <kernel/types.h>
 
 /** Process arguments structure. */
@@ -37,5 +41,9 @@ extern int process_duplicate(handle_t *handlep);
 extern handle_t process_open(identifier_t id);
 extern identifier_t process_id(handle_t handle);
 extern int process_exit(int status);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __KERNEL_PROCESS_H */

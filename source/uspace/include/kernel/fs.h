@@ -21,6 +21,10 @@
 #ifndef __KERNEL_FS_H
 #define __KERNEL_FS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <kernel/types.h>
 
 /** Directory entry information structure. */
@@ -71,5 +75,9 @@ extern int fs_info(const char *path, bool follow, fs_info_t *infop);
 extern int fs_link(const char *source, const char *dest);
 extern int fs_unlink(const char *path);
 extern int fs_rename(const char *source, const char *dest);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __KERNEL_FS_H */

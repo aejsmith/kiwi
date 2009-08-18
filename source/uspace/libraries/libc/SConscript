@@ -19,4 +19,4 @@ sources = []
 SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
 
 # Build the library from this.
-env.SharedLibrary('c', sources, SHLIBVER='1.0.%s' % (env['KIWI_VER_REVISION']), LIBS=['kernel'])
+env.SharedLibrary('c', sources, LINKFLAGS='-nodefaultlibs', LIBS=['kernel'])

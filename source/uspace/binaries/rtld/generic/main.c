@@ -18,6 +18,7 @@
  * @brief		RTLD main function.
  */
 
+#include <kernel/errors.h>
 #include <kernel/process.h>
 
 #include <rtld/args.h>
@@ -36,6 +37,12 @@ void *rtld_main(process_args_t *args) {
 	int ret;
 
 	rtld_args_init(args);
+
+	/* Check that we're not attempting to load ourselves. */
+	if(strcmp(args->args[0], "/system/binaries/rtld-" CONFIG_ARCH) == 0) {
+		printf("RTLD: Should not be invoked directly!\n");
+		process_exit(ERR_PARAM_INVAL);
+	}
 
 	/* Load the binary and all its dependencies. */
 	dprintf("RTLD: Loading binary: %s\n", args->args[0]);

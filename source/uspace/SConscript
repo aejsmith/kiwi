@@ -16,7 +16,7 @@ Import('envmgr', 'config')
 
 # Set up the userspace build environment.
 env = envmgr.Create('uspace')
-env['CPPPATH'] = [Dir('include')]
+env['CPPPATH'] = [Dir('include'), Dir('include/c++')]
 env['LIBPATH'] = [Dir('libraries')]
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
@@ -60,13 +60,17 @@ env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$
 # to build.
 SConscript(dirs=['libraries', 'binaries'], exports=['env'])
 
-# Have all binaries depend on the kernel library, C library and C runtime
-# files, and all shared libraries depend on the C runtime files.
+# Have all binaries depend on base libraries and C runtime files, and all
+# shared libraries depend on the C runtime files.
 for app in env['BINS']:
-	Depends(app, Glob('libraries/*crt*.o'))
-	Depends(app, File('libraries/libc.so'))
-	Depends(app, File('libraries/libkernel.so'))
+	if app.name != 'rtld-%s' % (config['ARCH']):
+		Depends(app, File('libraries/libc.so'))
+		Depends(app, File('libraries/libstdc++.so'))
 for lib in env['SHLIBS']:
+	if lib.name != 'libkernel.so':
+		Depends(lib, Glob('libraries/libkernel.so'))
+		if lib.name != 'libc.so':
+			Depends(lib, Glob('libraries/libc.so'))
 	Depends(lib, Glob('libraries/*crt*.o'))
 
 # Set arrays needed in the distribution environment.

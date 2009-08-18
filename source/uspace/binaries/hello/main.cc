@@ -1,4 +1,4 @@
-/* Kiwi handle functions
+/* Kiwi C++ test application
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,23 +15,39 @@
 
 /**
  * @file
- * @brief		Handle functions.
+ * @brief		C++ test application.
  */
 
-#ifndef __KERNEL_HANDLE_H
-#define __KERNEL_HANDLE_H
+#include <kernel/process.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstdio>
 
-#include <kernel/types.h>
+class Hello {
+public:
+	Hello();
+	void hello(void);
+private:
+	int foobar;
+};
 
-extern int handle_close(handle_t handle);
-extern int handle_type(handle_t handle);
-
-#ifdef __cplusplus
+Hello::Hello() : foobar(1337) {
+	printf("Constructing Hello!\n");
 }
-#endif
 
-#endif /* __KERNEL_HANDLE_H */
+void Hello::hello(void) {
+	printf("My value is %d\n", 1337);
+}
+
+Hello myhello;
+
+int main(int argc, char **argv) {
+	int i;
+
+	printf("Hello! I'm process %d! My arguments are:\n", process_id(-1));
+	for(i = 0; i < argc; i++) {
+		printf(" argv[%d] = '%s'\n", i, argv[i]);
+	}
+
+	myhello.hello();
+	return 1;
+}

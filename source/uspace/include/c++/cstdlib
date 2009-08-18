@@ -1,0 +1,78 @@
+/* Kiwi C++ library - C standard library functions
+ * Copyright (C) 2009 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		C standard library functions.
+ */
+
+#ifndef __CSTDLIB
+#define __CSTDLIB
+
+#include <stdlib.h>
+
+namespace std {
+	//using ::_Exit;
+	//using ::a64l;
+	//using ::abort;
+	//using ::abs;
+	//using ::atexit;
+	//using ::atof;
+	//using ::atoi;
+	//using ::atol;
+	//using ::atoll;
+	//using ::bsearch;
+	using ::calloc;
+	//using ::div;
+	//using ::exit;
+	using ::free;
+	//using ::getenv;
+	//using ::labs;
+	//using ::ldiv;
+	//using ::llabs;
+	//using ::lldiv;
+	using ::malloc;
+	//using ::mblen;
+	//using ::mbstowcs;
+	//using ::mbtowc;
+	//using ::mktemp;
+	//using ::mkstemp;
+	//using ::mrand48;
+	//using ::nrand48;
+	//using ::posix_memalign;
+	//using ::posix_openpt;
+	//using ::ptsname;
+	//using ::putenv;
+	//using ::qsort;
+	//using ::rand;
+	//using ::rand_r;
+	using ::realloc;
+	//using ::setenv;
+	//using ::srand;
+	//using ::strtod;
+	//using ::strtof;
+	using ::strtol;
+	//using ::double;
+	using ::strtoll;
+	using ::strtoul;
+	using ::strtoull;
+	//using ::system;
+	//using ::unlockpt;
+	//using ::unsetenv;
+	//using ::wcstombs;
+	//using ::wctomb;
+};
+
+#endif /* __CSTDLIB */

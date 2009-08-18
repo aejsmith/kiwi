@@ -30,18 +30,16 @@ class GCCComponent(ToolchainComponent):
 
 	def build(self):
 		os.mkdir('gcc-build')
-		
+
+		# Work out configure options to use.
+		confopts  = '--prefix=%s ' % (self.manager.destdir)
+		confopts += '--target=%s ' % (self.manager.target)
+		confopts += '--enable-languages=c,c++ '
+		confopts += '--with-gxx-include-dir=%s/%s/include/c++ ' % (self.manager.destdir, self.manager.target)
 		if os.uname()[0] == 'Darwin':
-			darwin_conf = ' --with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local '
-		else:
-			darwin_conf = ''
-			
+			confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'
+
 		# Build and install it.
-		self.execute(
-			'../gcc-%s/configure --prefix=%s --target=%s ' \
-			'--enable-languages=c,c++ %s' \
-			% (self.version, self.manager.destdir, self.manager.target, darwin_conf),
-			'gcc-build'
-		)
+		self.execute('../gcc-%s/configure %s' % (self.version, confopts), 'gcc-build')
 		self.execute('make -j%d all-gcc all-target-libgcc' % (self.manager.makejobs), 'gcc-build')
 		self.execute('make install-gcc install-target-libgcc', 'gcc-build')

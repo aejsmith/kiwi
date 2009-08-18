@@ -16,7 +16,7 @@ Import('env', 'config')
 
 # Get a list of source files.
 sources = []
-SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
+SConscript(dirs=['generic'], exports=['env', 'sources'])
 
 # Build the library from this.
-env.SharedLibrary('kernel', sources, LINKFLAGS='-nodefaultlibs')
+env.SharedLibrary('m', sources)

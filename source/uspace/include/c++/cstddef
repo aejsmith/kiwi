@@ -1,4 +1,4 @@
-/* Kiwi test application
+/* Kiwi C++ library - C standard definitions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,20 +15,17 @@
 
 /**
  * @file
- * @brief		Test application.
+ * @brief		C standard definitions.
  */
 
-#include <kernel/process.h>
+#ifndef __CSTDDEF
+#define __CSTDDEF
 
-#include <stdio.h>
+#include <stddef.h>
 
-int main(int argc, char **argv) {
-	int i;
+namespace std {
+	using ::ptrdiff_t;
+	using ::size_t;
+};
 
-	printf("Hello! I'm process %d! My arguments are:\n", process_id(-1));
-	for(i = 0; i < argc; i++) {
-		printf(" argv[%d] = '%s'\n", i, argv[i]);
-	}
-
-	return 1;
-}
+#endif /* __CSTDDEF */

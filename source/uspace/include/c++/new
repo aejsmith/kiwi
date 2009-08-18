@@ -1,4 +1,4 @@
-/* Kiwi handle functions
+/* Kiwi C++ library - Dynamic memory allocation functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,23 +15,28 @@
 
 /**
  * @file
- * @brief		Handle functions.
+ * @brief		Dynamic memory allocation functions.
  */
 
-#ifndef __KERNEL_HANDLE_H
-#define __KERNEL_HANDLE_H
+#ifndef __NEW
+#define __NEW
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstddef>
 
-#include <kernel/types.h>
+extern void *operator new(std::size_t);
+extern void *operator new[](std::size_t);
+extern void operator delete(void *);
+extern void operator delete[](void *);
 
-extern int handle_close(handle_t handle);
-extern int handle_type(handle_t handle);
-
-#ifdef __cplusplus
+inline void *operator new(std::size_t, void *addr) {
+	return addr;
 }
-#endif
 
-#endif /* __KERNEL_HANDLE_H */
+inline void *operator new[](std::size_t, void *addr) {
+	return addr;
+}
+
+inline void operator delete(void *, void *) {}
+inline void operator delete[](void *, void *) {}
+
+#endif /* __NEW */

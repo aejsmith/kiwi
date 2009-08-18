@@ -21,6 +21,10 @@
 #ifndef __KERNEL_VM_H
 #define __KERNEL_VM_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <kernel/types.h>
 
 /** Structure containing arguments for _vm_map_file(). */
@@ -43,5 +47,9 @@ typedef struct vm_map_file_args {
 extern int vm_map_anon(void *start, size_t size, int flags, void **addrp);
 extern int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
 extern int vm_unmap(void *start, size_t size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __KERNEL_VM_H */
