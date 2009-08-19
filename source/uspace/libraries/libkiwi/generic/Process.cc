@@ -34,47 +34,79 @@ extern char **environ;
 # pragma mark Object creation functions.
 #endif
 
-/** Create a new process.
- * @param process	Pointer to store object pointer in.
- * @param args		NULL-terminated argument array (first entry should be
- *			the path to the program to run).
- * @param env		NULL-terminated environment variable array. A NULL
- *			value for this argument will result in the new process
- *			inheriting the current environment. This is the default.
- * @param inherit	Whether the new process should inherit handles that are
- *			marked as inheritable; defaults to true.
- * @return		0 on success, negative error code on failure. */
-int Process::create(Process *&process, char **args, char **env, bool inherit) {
-	handle_t ret;
+/* FIXME. */
+#define PATH_MAX 4096
 
-	/* NULL value for env means to use current environment. */
-	if(!env) {
-		env = environ;
-	}
+/** Create a new process. */
+int Process::create(Process *&process, char **args, char **env, bool inherit, bool usepath) {
+	char buf[PATH_MAX];
+	const char *path;
+	char *cur, *next;
+	handle_t ret;
+	size_t len;
 
 	if(!(process = new Process)) {
 		return -ERR_NO_MEMORY;
-	} else if((ret = process_create(args, env, inherit)) < 0) {
-		delete process;
-		return ret;
 	}
 
-	process->m_handle = ret;
-	return 0;
+	if(usepath && !strchr(args[0], '/')) {
+		if(!(path = getenv("PATH"))) {
+			path = "/system/binaries";
+		}
+
+		for(cur = (char *)path; cur; cur = next) {
+			if(!(next = strchr(cur, ':'))) {
+				next = cur + strlen(cur);
+			}
+
+			if(next == cur) {
+				buf[0] = '.';
+				cur--;
+			} else {
+				if((next - cur) >= (PATH_MAX - 3)) {
+					return -ERR_PARAM_INVAL;
+				}
+
+				memcpy(buf, cur, (size_t)(next - cur));
+			}
+
+			buf[next - cur] = '/';
+			len = strlen(args[0]);
+			if(len + (next - cur) >= (PATH_MAX - 2)) {
+				return -ERR_PARAM_INVAL;
+			}
+
+			memcpy(&buf[next - cur + 1], args[0], len + 1);
+
+			if((ret = process_create(buf, args, (env) ? env : environ, inherit)) >= 0) {
+				process->m_handle = ret;
+				return 0;
+			} else if(ret != -ERR_NOT_FOUND) {
+				delete process;
+				return ret;
+			}
+
+			if(*next == 0) {
+				break;
+			}
+			next++;
+		}
+
+		delete process;
+		return -ERR_NOT_FOUND;
+	} else {
+		if((ret = process_create(args[0], args, (env) ? env : environ, inherit)) < 0) {
+			delete process;
+			return ret;
+		}
+
+		process->m_handle = ret;
+		return 0;
+	}
 }
 
-/** Create a new process.
- * @param process	Pointer to store object pointer in.
- * @param cmdline	Command line string, each argument seperated by spaces.
- *			First part of the string should be the path to the
- *			program to run.
- * @param env		NULL-terminated environment variable array. A NULL
- *			value for this argument will result in the new process
- *			inheriting the current environment. This is the default.
- * @param inherit	Whether the new process should inherit handles that are
- *			marked as inheritable; defaults to true.
- * @return		0 on success, negative error code on failure. */
-int Process::create(Process *&process, const char *cmdline, char **env, bool inherit) {
+/** Create a new process. */
+int Process::create(Process *&process, const char *cmdline, char **env, bool inherit, bool usepath) {
 	char **args = NULL, **tmp, *tok, *dup, *orig;
 	size_t count = 0;
 	int ret;
@@ -116,10 +148,7 @@ int Process::create(Process *&process, const char *cmdline, char **env, bool inh
 	return ret;
 }
 
-/** Open an existing process.
- * @param process	Pointer to store object pointer in.
- * @param id		ID of the process to open.
- * @return		0 on success, negative error code on failure. */
+/** Open an existing process. */
 int Process::open(Process *&process, identifier_t id) {
 	handle_t ret;
 

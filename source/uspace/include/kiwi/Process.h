@@ -30,8 +30,8 @@ class Process : Handle {
 public:
 	/** Create a new process.
 	 * @param process	Pointer to store object pointer in.
-	 * @param args		NULL-terminated argument array (first entry
-	 *			should be the path to the program to run).
+	 * @param args		NULL-terminated argument array. First entry
+	 *			should be the path to the program to run.
 	 * @param env		NULL-terminated environment variable array. A
 	 *			NULL value for this argument will result in the
 	 *			new process inheriting the current environment.
@@ -39,14 +39,22 @@ public:
 	 * @param inherit	Whether the new process should inherit handles
 	 *			that are marked as inheritable; defaults to
 	 *			true.
+	 * @param usepath	If true, and the program path does not contain
+	 *			a '/' character, then it will be looked up in
+	 *			all directories listed in the PATH environment
+	 *			variable. The first match will be executed. The
+	 *			default value for this is true.
 	 * @return		0 on success, negative error code on failure. */
-	static int create(Process *&process, char **args, char **env = 0, bool inherit = true);
+	static int create(Process *&process, char **args, char **env = 0, bool inherit = true, bool usepath = true);
 
 	/** Create a new process.
 	 * @param process	Pointer to store object pointer in.
 	 * @param cmdline	Command line string, each argument seperated by
 	 *			spaces. First part of the string should be the
-	 *			path to the program to run.
+	 *			path to the program to run. If this first
+	 *			argument does not contain a '/' character, then
+	 *			the name will be looked up inthe directories listed in the PATH environment
+	 *			variable, and the first match will be executed.
 	 * @param env		NULL-terminated environment variable array. A
 	 *			NULL value for this argument will result in the
 	 *			new process inheriting the current environment.
@@ -54,8 +62,13 @@ public:
 	 * @param inherit	Whether the new process should inherit handles
 	 *			that are marked as inheritable; defaults to
 	 *			true.
+	 * @param usepath	If true, and the program path does not contain
+	 *			a '/' character, then it will be looked up in
+	 *			all directories listed in the PATH environment
+	 *			variable. The first match will be executed. The
+	 *			default value for this is true.
 	 * @return		0 on success, negative error code on failure. */
-	static int create(Process *&process, const char *cmdline, char **env = 0, bool inherit = true);
+	static int create(Process *&process, const char *cmdline, char **env = 0, bool inherit = true, bool usepath = true);
 
 	/** Open an existing process.
 	 * @param process	Pointer to store object pointer in.

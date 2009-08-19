@@ -52,6 +52,7 @@
 
 /** Structure to pass information into the main thread of a new process. */
 typedef struct process_create_info {
+	const char *path;	/**< Path to program. */
 	const char **args;	/**< Argument array. */
 	const char **environ;	/**< Environment array. */
 	semaphore_t sem;	/**< Semaphore to wake upon completion. */
@@ -162,11 +163,12 @@ static size_t process_copy_args_data(char **dest, const char **source, size_t co
 }
 
 /** Create the argument block for the current process.
+ * @param kpath		Path string.
  * @param kargs		Argument array.
  * @param kenv		Environment array.
  * @param addrp		Where to store address of argument block.
  * @return		0 on success, negative error code on failure. */
-static int process_copy_args(const char **kargs, const char **kenv, ptr_t *addrp) {
+static int process_copy_args(const char *kpath, const char **kargs, const char **kenv, ptr_t *addrp) {
 	process_args_t *uargs;
 	int argc, envc;
 	size_t size;
@@ -188,12 +190,17 @@ static int process_copy_args(const char **kargs, const char **kenv, ptr_t *addrp
 	/* Fill out the structure with addresses for the arrays. */
 	uargs = (process_args_t *)addr;
 	addr += sizeof(process_args_t);
+	uargs->path = (char *)addr;
+	addr += strlen(kpath) + 1;
 	uargs->args = (char **)addr;
 	addr += (argc + 1) * sizeof(char *);
 	uargs->env = (char **)addr;
 	addr += (envc + 1) * sizeof(char *);
 	uargs->args_count = argc;
 	uargs->env_count = envc;
+
+	/* Copy path string. */
+	strcpy(uargs->path, kpath);
 
 	/* Copy actual data for the arrays. */
 	addr += process_copy_args_data(uargs->args, kargs, argc, addr);
@@ -211,13 +218,13 @@ static void process_create_thread(void *arg1, void *arg2) {
 	void *data = NULL;
 	int ret;
 
+	assert(info->path);
 	assert(info->args);
-	assert(info->args[0]);
 	assert(info->environ);
 	assert(curr_proc->aspace == curr_aspace);
 
 	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(info->args[0], true, VFS_NODE_FILE, &node)) != 0) {
+	if((ret = vfs_node_lookup(info->path, true, VFS_NODE_FILE, &node)) != 0) {
 		goto fail;
 	}
 
@@ -227,7 +234,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 	}
 
 	/* Copy arguments to the process' address space. */
-	if((ret = process_copy_args(info->args, info->environ, &uargs)) != 0) {
+	if((ret = process_copy_args(info->path, info->args, info->environ, &uargs)) != 0) {
 		goto fail;
 	}
 
@@ -288,6 +295,7 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	/* Fill in the information structure to pass information into the
 	 * main thread of the new process. */
 	semaphore_init(&info.sem, "process_create_sem", 0);
+	info.path = args[0];
 	info.args = args;
 	info.environ = environ;
 	info.ret = 0;
@@ -442,17 +450,22 @@ static handle_type_t process_handle_type = {
 #endif
 
 /** Helper to copy information from userspace.
+ * @param path		Path to copy.
  * @param args		Argument array to copy.
  * @param environ	Environment array to copy.
+ * @param kpathp	Where to store kernel address of path.
  * @param kargsp	Where to store kernel address of argument array.
  * @param kenvp		Where to store kernel address of environment array.
  * @return		0 on success, negative error code on failure. */
-static int sys_process_arg_copy(char *const args[], char *const environ[],
-                                const char ***kargsp, const char ***kenvp) {
-	char **kargs = NULL, **kenv = NULL;
+static int sys_process_arg_copy(const char *path, char *const args[], char *const environ[],
+                                const char **kpathp, const char ***kargsp, const char ***kenvp) {
+	char **kargs, **kenv, *kpath;
 	int ret;
 
-	if((ret = arrcpy_from_user(args, &kargs)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	} else if((ret = arrcpy_from_user(args, &kargs)) != 0) {
+		kfree(kpath);
 		return ret;
 	} else if((ret = arrcpy_from_user(environ, &kenv)) != 0) {
 		for(int i = 0; kargs[i] != NULL; i++) {
@@ -460,24 +473,28 @@ static int sys_process_arg_copy(char *const args[], char *const environ[],
 		}
 
 		kfree(kargs);
+		kfree(kpath);
 		return ret;
 	}
 
+	*kpathp = (const char *)kpath;
 	*kargsp = (const char **)kargs;
 	*kenvp = (const char **)kenv;
 	return 0;
 }
 
 /** Helper to free information copied from userspace.
+ * @param path		Path to free.
  * @param args		Argument array to free.
  * @param environ	Environment array to free. */
-static void sys_process_arg_free(const char **args, const char **environ) {
+static void sys_process_arg_free(const char *path, const char **args, const char **environ) {
 	for(int i = 0; args[i] != NULL; i++) {
 		kfree((char *)args[i]);
 	}
 	for(int i = 0; environ[i] != NULL; i++) {
 		kfree((char *)environ[i]);
 	}
+	kfree((char *)path);
 	kfree(args);
 	kfree(environ);
 }
@@ -490,30 +507,27 @@ static void sys_process_arg_free(const char **args, const char **environ) {
  *
  * @todo		Inheriting.
  *
- * @param args		Argument array (with NULL terminator). First argument
- *			should be path to binary to execute.
+ * @param path		Path to program to execute.
+ * @param args		Argument array (with NULL terminator).
  * @param environ	Environment array (with NULL terminator).
  * @param inherit	Whether to inherit inheritable handles.
  *
  * @return		Handle to new process (greater than or equal to 0),
  *			negative error code on failure.
  */
-handle_t sys_process_create(char *const args[], char *const environ[], bool inherit) {
+handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit) {
 	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread = NULL;
 	handle_t handle = -1;
 	int ret;
 
-	if((ret = sys_process_arg_copy(args, environ, &info.args, &info.environ)) != 0) {
+	if((ret = sys_process_arg_copy(path, args, environ, &info.path, &info.args, &info.environ)) != 0) {
 		return ret;
-	} else if(!info.args[0]) {
-		ret = -ERR_PARAM_INVAL;
-		goto fail;
 	}
 
 	/* Create a structure for the process. */
-	if((ret = process_alloc(args[0], -1, 0, PRIORITY_USER, curr_proc, true, inherit, &process)) != 0) {
+	if((ret = process_alloc(info.path, -1, 0, PRIORITY_USER, curr_proc, true, inherit, &process)) != 0) {
 		goto fail;
 	}
 
@@ -543,14 +557,14 @@ handle_t sys_process_create(char *const args[], char *const environ[], bool inhe
 		goto fail;
 	}
 
-	sys_process_arg_free(info.args, info.environ);
+	sys_process_arg_free(info.path, info.args, info.environ);
 	return handle;
 fail:
 	if(handle >= 0) {
 		/* This will handle process destruction. */
 		handle_close(&curr_proc->handles, handle);
 	}
-	sys_process_arg_free(info.args, info.environ);
+	sys_process_arg_free(info.path, info.args, info.environ);
 	return (handle_t)ret;
 }
 
@@ -564,24 +578,24 @@ fail:
  * @todo		Inheriting.
  * @todo		Bit of code duplication here between process_create().
  *
- * @param args		Argument array (with NULL terminator). First argument
- *			should be path to binary to execute.
+ * @param path		Path to program to execute.
+ * @param args		Argument array (with NULL terminator).
  * @param environ	Environment array (with NULL terminator).
  * @param inherit	Whether to inherit inheritable handles.
  *
  * @return		Does not return on success, returns negative error code
  *			on failure.
  */
-int sys_process_replace(char *const args[], char *const environ[], bool inherit) {
+int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit) {
+	const char **kargs, **kenv, *kpath;
 	vm_aspace_t *as = NULL, *old;
-	const char **kargs, **kenv;
 	ptr_t stack, entry, uargs;
 	vfs_node_t *node = NULL;
 	void *data = NULL;
 	char *dup, *name;
 	int ret;
 
-	if((ret = sys_process_arg_copy(args, environ, &kargs, &kenv)) != 0) {
+	if((ret = sys_process_arg_copy(path, args, environ, &kpath, &kargs, &kenv)) != 0) {
 		return ret;
 	} else if(!kargs[0]) {
 		ret = -ERR_PARAM_INVAL;
@@ -593,7 +607,7 @@ int sys_process_replace(char *const args[], char *const environ[], bool inherit)
 	}
 
 	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(kargs[0], true, VFS_NODE_FILE, &node)) != 0) {
+	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_FILE, &node)) != 0) {
 		goto fail;
 	}
 
@@ -610,7 +624,7 @@ int sys_process_replace(char *const args[], char *const environ[], bool inherit)
 
 	/* Create a duplicate of the name before taking the process' lock, as
 	 * we should not use allocators while a spinlock is held. */
-	dup = kstrdup(kargs[0], MM_SLEEP);
+	dup = kstrdup(kpath, MM_SLEEP);
 
 	/* Set the new name and address space. */
 	spinlock_lock(&curr_proc->lock, 0);
@@ -627,7 +641,7 @@ int sys_process_replace(char *const args[], char *const environ[], bool inherit)
 
 	/* Copy arguments to the process' address space. TODO: Better failure
 	 * handling here. */
-	if((ret = process_copy_args(kargs, kenv, &uargs)) != 0) {
+	if((ret = process_copy_args(kpath, kargs, kenv, &uargs)) != 0) {
 		fatal("Meep, need to handle this (%d)", ret);
 	}
 
@@ -645,7 +659,7 @@ int sys_process_replace(char *const args[], char *const environ[], bool inherit)
 	/* Clean up our mess. */
 	elf_binary_cleanup(data);
 	vfs_node_release(node);
-	sys_process_arg_free(kargs, kenv);
+	sys_process_arg_free(kpath, kargs, kenv);
 
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in process %" PRId32 " (entry: %p, stack: %p)\n", curr_proc->id, entry, stack);
@@ -661,7 +675,7 @@ fail:
 	if(node) {
 		vfs_node_release(node);
 	}
-	sys_process_arg_free(kargs, kenv);
+	sys_process_arg_free(kpath, kargs, kenv);
 	return ret;
 }
 

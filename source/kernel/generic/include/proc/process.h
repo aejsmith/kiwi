@@ -37,7 +37,8 @@ struct vm_aspace;
 
 /** Process arguments structure. */
 typedef struct process_args {
-	char **args;			/**< Argument array (path to program should be first entry). */
+	char *path;			/**< Path to program. */
+	char **args;			/**< Argument array. */
 	char **env;			/**< Environment variable array. */
 	int args_count;			/**< Number of entries in argument array (excluding NULL-terminator). */
 	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
@@ -74,8 +75,8 @@ extern void process_init(void);
 
 extern int kdbg_cmd_process(int argc, char **argv);
 
-extern handle_t sys_process_create(char *const args[], char *const environ[], bool inherit);
-extern int sys_process_replace(char *const args[], char *const environ[], bool inherit);
+extern handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit);
+extern int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit);
 extern int sys_process_duplicate(handle_t *handlep);
 extern handle_t sys_process_open(identifier_t id);
 extern identifier_t sys_process_id(handle_t handle);

@@ -51,7 +51,7 @@ extern void *calloc(size_t nmemb, size_t size);
 /* div_t         div(int, int); */
 extern void exit(int status) __attribute__((noreturn));
 extern void free(void *ptr);
-//extern char *getenv(const char *name);
+extern char *getenv(const char *name);
 //extern long labs(long j);
 /* ldiv_t        ldiv(long, long); */
 //extern long long llabs(long long j);

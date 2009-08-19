@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
 	printf("Directory tree:\n");
 	printer.print("/");
 
-	ret = Process::create(proc, "/system/binaries/hello --hello world");
+	ret = Process::create(proc, "hello --hello world");
 	printf("Create process returned %d (%d)\n", ret, (ret == 0) ? proc->get_id() : -1);
 	delete proc;
 	while(1);

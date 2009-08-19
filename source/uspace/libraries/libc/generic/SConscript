@@ -38,6 +38,7 @@ sources += [
 	File('stdio/vsnprintf.c'),
 
 	File('stdlib/abort.c'),
+	File('stdlib/environ.c'),
 	File('stdlib/exit.c'),
 	File('stdlib/malloc.c'),
 	File('stdlib/strtoul.c'),

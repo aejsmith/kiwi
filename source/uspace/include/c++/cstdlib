@@ -38,7 +38,7 @@ namespace std {
 	//using ::div;
 	using ::exit;
 	using ::free;
-	//using ::getenv;
+	using ::getenv;
 	//using ::labs;
 	//using ::ldiv;
 	//using ::llabs;
@@ -64,7 +64,7 @@ namespace std {
 	//using ::strtod;
 	//using ::strtof;
 	using ::strtol;
-	//using ::double;
+	//using ::strtold;
 	using ::strtoll;
 	using ::strtoul;
 	using ::strtoull;

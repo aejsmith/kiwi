@@ -27,7 +27,7 @@ extern void __libc_init(process_args_t *args);
 extern int main(int argc, char **argv, char **envp);
 extern void *__gxx_personality_v0;
 
-char **environ;
+extern char **environ;
 
 /** C library initialization function. */
 void __libc_init(process_args_t *args) {
