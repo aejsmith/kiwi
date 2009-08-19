@@ -1,4 +1,4 @@
-/* Kiwi C++ test application
+/* Kiwi C library - Abort function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,41 +15,16 @@
 
 /**
  * @file
- * @brief		C++ test application.
+ * @brief		Abort function.
  */
 
-#include <kiwi/Process.h>
+#include <kernel/process.h>
 
-#include <cstdio>
+#include <stdio.h>
+#include <stdlib.h>
 
-using namespace kiwi;
-
-class Hello {
-public:
-	Hello();
-	void hello(void);
-private:
-	int foobar;
-};
-
-Hello::Hello() : foobar(1337) {
-	printf("Constructing Hello!\n");
-}
-
-void Hello::hello(void) {
-	printf("My value is %d\n", 1337);
-}
-
-Hello myhello;
-
-int main(int argc, char **argv) {
-	int i;
-
-	printf("Hello! I'm process %d! My arguments are:\n", Process::get_current_id());
-	for(i = 0; i < argc; i++) {
-		printf(" argv[%d] = '%s'\n", i, argv[i]);
-	}
-
-	myhello.hello();
-	return 1;
+/** Abort program execution. */
+void abort(void) {
+	printf("Process %d aborting!\n", process_id(-1));
+	process_exit(255);
 }

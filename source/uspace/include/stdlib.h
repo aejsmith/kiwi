@@ -37,11 +37,11 @@ extern "C" {
 
 #define MB_CUR_MAX	1
 
-//extern void _Exit(int status);
+extern void _Exit(int status) __attribute__((noreturn));
 /* long a64l(const char *); */
-//extern void abort(void);
+extern void abort(void);
 //extern int abs(int j);
-//extern int atexit(void (*function)(void));
+extern int atexit(void (*function)(void));
 //extern double atof(const char *s);
 //extern int atoi(const char *s);
 //extern long atol(const char *s);
@@ -49,7 +49,7 @@ extern "C" {
 //extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
 extern void *calloc(size_t nmemb, size_t size);
 /* div_t         div(int, int); */
-//extern void exit(int status) __attribute__((noreturn));
+extern void exit(int status) __attribute__((noreturn));
 extern void free(void *ptr);
 //extern char *getenv(const char *name);
 //extern long labs(long j);

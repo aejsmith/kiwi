@@ -40,7 +40,7 @@ extern int process_replace(char *const args[], char *const environ[], bool inher
 extern int process_duplicate(handle_t *handlep);
 extern handle_t process_open(identifier_t id);
 extern identifier_t process_id(handle_t handle);
-extern int process_exit(int status);
+extern int process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
 }

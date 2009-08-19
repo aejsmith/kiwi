@@ -21,13 +21,15 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 #include <kernel/handle.h>
-#include <kernel/process.h>
+
+#include <kiwi/Process.h>
 
 #include <string.h>
-#include <stdlib.h>
 
 #include <cstdio>
-#include <new>
+#include <cstdlib>
+
+using namespace kiwi;
 
 /** Class to print a directory tree. */
 class DirTreePrinter {
@@ -107,15 +109,12 @@ private:
 	int m_indent;
 };
 
-extern char **environ;
-
 int main(int argc, char **argv) {
-	char *nargs[] = { (char *)"/system/binaries/hello", (char *)"--hello", (char *)"world", NULL };
 	DirTreePrinter printer;
-	handle_t handle;
-	int i;
+	Process *proc;
+	int i, ret;
 
-	printf("I'm process %d! My arguments are:\n", process_id(-1));
+	printf("I'm process %d! My arguments are:\n", Process::get_current_id());
 	for(i = 0; i < argc; i++) {
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
 	}
@@ -123,8 +122,8 @@ int main(int argc, char **argv) {
 	printf("Directory tree:\n");
 	printer.print("/");
 
-	handle = process_create(nargs, environ, true);
-	printf("Create process returned %d (%d)\n", handle, process_id(handle));
-	handle_close(handle);
+	ret = Process::create(proc, "/system/binaries/hello --hello world");
+	printf("Create process returned %d (%d)\n", ret, (ret == 0) ? proc->get_id() : -1);
+	delete proc;
 	while(1);
 }

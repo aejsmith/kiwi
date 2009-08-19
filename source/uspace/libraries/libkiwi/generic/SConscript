@@ -12,8 +12,9 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config', 'envmgr')
+Import('sources')
 
-env.Program('startup', [
-	'main.cc',
-], LIBS=['kiwi'])
+sources += [
+	File('Handle.cc'),
+	File('Process.cc'),
+]

@@ -25,8 +25,6 @@
 
 extern void __libc_init(process_args_t *args);
 extern int main(int argc, char **argv, char **envp);
-extern void __register_frame_info(void *begin, void *ob);
-extern void *__deregister_frame_info(void *begin);
 extern void *__gxx_personality_v0;
 
 char **environ;
@@ -36,14 +34,6 @@ void __libc_init(process_args_t *args) {
 	environ = args->env;
 
 	process_exit(main(args->args_count, args->args, args->env));
-}
-
-void __register_frame_info(void *begin, void *ob) {
-        return;
-}
-
-void *__deregister_frame_info(void *begin) {
-        return NULL;
 }
 
 void *__gxx_personality_v0 = NULL;

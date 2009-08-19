@@ -16,4 +16,4 @@ Import('env', 'config', 'envmgr')
 
 env.Program('hello', [
 	'main.cc',
-])
+], LIBS=['kiwi'])

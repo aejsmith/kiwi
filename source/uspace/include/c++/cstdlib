@@ -24,11 +24,11 @@
 #include <stdlib.h>
 
 namespace std {
-	//using ::_Exit;
+	using ::_Exit;
 	//using ::a64l;
-	//using ::abort;
+	using ::abort;
 	//using ::abs;
-	//using ::atexit;
+	using ::atexit;
 	//using ::atof;
 	//using ::atoi;
 	//using ::atol;
@@ -36,7 +36,7 @@ namespace std {
 	//using ::bsearch;
 	using ::calloc;
 	//using ::div;
-	//using ::exit;
+	using ::exit;
 	using ::free;
 	//using ::getenv;
 	//using ::labs;
