@@ -2339,15 +2339,13 @@ int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, 
 	}
 	file = info->data;
 
-	/* Check if the handle is open for reading. */
-	if(!(file->flags & FS_FILE_READ)) {
-		ret = -ERR_PERM_DENIED;
+	if(count == 0) {
 		goto out;
 	}
 
-	/* Check if count is 0 before checking other parameters so an error is
-	 * returned if necessary. */
-	if(count == 0) {
+	/* Check if the handle is open for reading. */
+	if(!(file->flags & FS_FILE_READ)) {
+		ret = -ERR_PERM_DENIED;
 		goto out;
 	}
 
@@ -2436,15 +2434,13 @@ int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t o
 	}
 	file = info->data;
 
-	/* Check if the handle is open for writing. */
-	if(!(file->flags & FS_FILE_WRITE)) {
-		ret = -ERR_PERM_DENIED;
+	if(count == 0) {
 		goto out;
 	}
 
-	/* Check if count is 0 before checking other parameters so an error is
-	 * returned if necessary. */
-	if(count == 0) {
+	/* Check if the handle is open for writing. */
+	if(!(file->flags & FS_FILE_WRITE)) {
+		ret = -ERR_PERM_DENIED;
 		goto out;
 	}
 

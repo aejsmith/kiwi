@@ -938,8 +938,8 @@ static void vmem_dump_list(list_t *header, int indent) {
 		vmem = list_entry(iter, vmem_t, header);
 
 		kprintf(LOG_NONE, "%*s%-*s %-16" PRIu64 " %-16" PRIu64 " %zu\n",
-		            indent, "", VMEM_NAME_MAX - indent, vmem->name,
-		            vmem->total_size, vmem->used_size, vmem->alloc_count);
+		        indent, "", VMEM_NAME_MAX - indent, vmem->name,
+		        vmem->total_size, vmem->used_size, vmem->alloc_count);
 		vmem_dump_list(&vmem->children, indent + 2);
 	}
 }

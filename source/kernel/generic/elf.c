@@ -592,7 +592,7 @@ int elf_module_load(module_t *module) {
 		return ret;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
 		return -ERR_FORMAT_INVAL;
-	} else if(!elf_check_ehdr(&module->ehdr, ELF_ET_EXEC)) {
+	} else if(!elf_check_ehdr(&module->ehdr, ELF_ET_REL)) {
 		return -ERR_FORMAT_INVAL;
 	}
 
