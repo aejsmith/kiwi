@@ -21,14 +21,8 @@
 #ifndef __KIWI_INTERNAL_H
 #define __KIWI_INTERNAL_H
 
-/** Namespace definitions. */
-#define KIWI_BEGIN_NAMESPACE		namespace kiwi {
-#define KIWI_BEGIN_MODULE(x)		namespace x {
-#define KIWI_END_MODULE			};
-#define KIWI_END_NAMESPACE		};
-
-KIWI_BEGIN_NAMESPACE
-KIWI_BEGIN_MODULE(internal)
+namespace kiwi {
+namespace internal {
 
 /** Base class that prevents copying of derived classes. */
 class Noncopyable {
@@ -40,7 +34,7 @@ private:
 	const Noncopyable &operator=(const Noncopyable &);
 };
 
-KIWI_END_MODULE
-KIWI_END_NAMESPACE
+};
+};
 
 #endif /* __KIWI_INTERNAL_H */

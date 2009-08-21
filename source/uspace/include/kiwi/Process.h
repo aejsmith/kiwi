@@ -23,10 +23,10 @@
 
 #include <kiwi/Handle.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Class providing functionality to create and manipulate other processes. */
-class Process : Handle {
+class Process : public Handle {
 public:
 	/** Create a new process.
 	 * @param process	Pointer to store object pointer in.
@@ -88,6 +88,6 @@ protected:
 	Process() {}
 };
 
-KIWI_END_NAMESPACE
+};
 
 #endif /* __KIWI_PROCESS_H */

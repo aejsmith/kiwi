@@ -709,6 +709,13 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 	dir = kdirname(path, MM_SLEEP);
 	name = kbasename(path, MM_SLEEP);
 
+	/* It is possible for kbasename() to return a string with a '/'
+	 * character if the path refers to the root of the FS. */
+	if(strchr(name, '/')) {
+		ret = -ERR_ALREADY_EXISTS;
+		goto out;
+	}
+
 	dprintf("vfs: create(%s) - dirname is '%s', basename is '%s'\n", path, dir, name);
 
 	/* Check for disallowed names. */

@@ -25,7 +25,7 @@
 
 #include <kiwi/internal.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Base class for all objects represented by a handle. */
 class Handle : internal::Noncopyable {
@@ -45,6 +45,6 @@ protected:
 	handle_t m_handle;		/**< Handle ID for the process. */
 };
 
-KIWI_END_NAMESPACE
+};
 
 #endif /* __KIWI_HANDLE_H */
