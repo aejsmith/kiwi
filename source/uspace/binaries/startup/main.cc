@@ -31,6 +31,8 @@
 
 using namespace kiwi;
 
+extern "C" int module_load(const char *path, char *depbuf);
+
 /** Class to print a directory tree. */
 class DirTreePrinter {
 public:
@@ -118,6 +120,9 @@ int main(int argc, char **argv) {
 	for(i = 0; i < argc; i++) {
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
 	}
+
+	ret = module_load("/system/modules/i8042.kmod", (char *)0x1234);
+	printf("Module load returned %d\n", ret);
 
 	printf("Directory tree:\n");
 	printer.print("/");

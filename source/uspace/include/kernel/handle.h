@@ -27,6 +27,13 @@ extern "C" {
 
 #include <kernel/types.h>
 
+/** Handle type ID definitions. */
+#define HANDLE_TYPE_FILE	1	/**< File. */
+#define HANDLE_TYPE_DIR		2	/**< Directory. */
+#define HANDLE_TYPE_PROCESS	3	/**< Process. */
+#define HANDLE_TYPE_THREAD	4	/**< Thread. */
+#define HANDLE_TYPE_DEVICE	5	/**< Device. */
+
 extern int handle_close(handle_t handle);
 extern int handle_type(handle_t handle);
 

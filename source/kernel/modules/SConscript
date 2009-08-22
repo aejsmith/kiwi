@@ -43,6 +43,8 @@ env['BUILDERS']['Module'] = Builder(
 # Get all of the modules and include directories into the array.
 SConscript(dirs=subdirs, exports=['env'])
 
+env.Module('i8042', ['i8042.c'])
+
 # Set up the module include directory.
 for (k, v) in env['INCDIRS'].items():
 	Dir('include/%s' % (k)).link(v, 1)

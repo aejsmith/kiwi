@@ -28,15 +28,16 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 
 # Create the kernel environment.
 env = envmgr.Create('kernel')
-env['LINK']      = envmgr.get_tool_path('ld')
-env['LDFLAGS']   = []
-env['LDSCRIPT']  = File('arch/%s/link.ld' % (config['ARCH']))
-env['CPPPATH']   = [Dir('include')]
-env['CCFLAGS']  += ['-nostdlib', '-nostdinc', '-ffreestanding', 
-                    '-fno-stack-protector', '-include',
-                    'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
+env['LINK'] = envmgr.get_tool_path('ld')
+env['LDFLAGS'] = []
+env['LDSCRIPT'] = File('arch/%s/link.ld' % (config['ARCH']))
+env['CPPPATH'] = [Dir('include')]
+env['CCFLAGS'] += ['-nostdlib', '-nostdinc', '-ffreestanding', 
+                   '-fno-stack-protector', '-include',
+                   'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CXXFLAGS'] += ['-fno-exceptions', '-fno-rtti']
-env['ASFLAGS']  += ['-nostdinc', '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
+env['ASFLAGS'] += ['-nostdinc', '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
+env['CPPDEFINES'] = {'KERNEL': None}
 
 # Get the list of source files.
 env['OBJFILES'] = []

@@ -18,6 +18,7 @@ Import('env', 'sources')
 env.Sysgen('syscalls.S', 'syscalls.def')
 
 sources += [
+	File('device.c'),
 	File('syscalls.S'),
 	File('vm.c'),
 ]

@@ -22,6 +22,7 @@
 
 #include <console/kprintf.h>
 
+#include <io/device.h>
 #include <io/vfs.h>
 
 #include <mm/vm.h>
@@ -80,6 +81,11 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_process_open,
 	(syscall_handler_t)sys_process_id,
 	(syscall_handler_t)sys_process_exit,
+	(syscall_handler_t)sys_device_open,
+	(syscall_handler_t)sys_device_type,
+	(syscall_handler_t)sys_device_read,
+	(syscall_handler_t)sys_device_write,
+	(syscall_handler_t)sys_device_request,
 };
 
 /** System call dispatcher.

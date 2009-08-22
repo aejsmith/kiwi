@@ -18,6 +18,8 @@
  * @brief		C++ test application.
  */
 
+#include <kernel/device.h>
+
 #include <kiwi/Process.h>
 
 #include <cstdio>
@@ -42,8 +44,12 @@ void Hello::hello(void) {
 
 Hello myhello;
 
+extern "C" void putch(char ch);
+
 int main(int argc, char **argv) {
-	int i;
+	handle_t handle;
+	int i, ret;
+	char ch;
 
 	printf("Hello! I'm process %d! My arguments are:\n", Process::get_current_id());
 	for(i = 0; i < argc; i++) {
@@ -51,5 +57,20 @@ int main(int argc, char **argv) {
 	}
 
 	myhello.hello();
-	return 1;
+
+	handle = device_open("/input/keyboard");
+	if(handle < 0) {
+		printf("Device open failed: %d\n", handle);
+		return 1;
+	}
+
+	while(true) {
+		ret = device_read(handle, &ch, 1, 0, NULL);
+		if(ret != 0) {
+			printf("Read failed: %d\n", ret);
+			return 1;
+		}
+
+		putch(ch);
+	}
 }

@@ -75,6 +75,7 @@ Option('SCHED_DEBUG', 'Scheduler debug output (VERY excessive).', False, {'DEBUG
 Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
 Option('HANDLE_DEBUG', 'Handle manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
+Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
 
 #######
 #Section('Module configuration')

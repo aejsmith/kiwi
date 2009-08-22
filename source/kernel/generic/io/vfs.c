@@ -2326,7 +2326,7 @@ fail:
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info;
+	handle_info_t *info = NULL;
 	bool update = false;
 	vfs_handle_t *file;
 	size_t bytes = 0;
@@ -2421,7 +2421,7 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info;
+	handle_info_t *info = NULL;
 	bool update = false;
 	vfs_handle_t *file;
 	void *kbuf = NULL;

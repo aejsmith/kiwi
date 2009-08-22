@@ -41,5 +41,6 @@
 #define ERR_PERM_DENIED		17	/**< Permission denied. */
 #define ERR_STR_TOO_LONG	18	/**< String is too long. */
 #define ERR_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
+#define ERR_BUF_TOO_SMALL	20	/**< Provided buffer is too small. */
 
 #endif /* __KERNEL_ERRORS_H */
