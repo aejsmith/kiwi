@@ -18,6 +18,7 @@
  * @brief		RTLD argument functions.
  */
 
+#include <kernel/errors.h>
 #include <kernel/process.h>
 
 #include <rtld/args.h>
@@ -29,6 +30,33 @@
 /** Argument variables. */
 bool rtld_debug = false;
 bool rtld_dryrun = false;
+char *rtld_extra_libpaths[16];
+
+/** Parse an argument containing a list of paths.
+ * @param str		String to parse.
+ * @param arr		Array to store paths in.
+ * @param max		Number of entries in array. */
+static void rtld_args_parse_pathlist(const char *str, char **arr, size_t max) {
+	size_t count = 0;
+	char *dup, *tok;
+
+	if(strlen(str) == 0) {
+		return;
+	} else if(!(dup = strdup(str))) {
+		process_exit(ERR_NO_MEMORY);
+	}
+
+	while((tok = strsep(&dup, ":"))) {
+		if(!tok[0]) {
+			continue;
+		} else if((count + 1) >= max) {
+			return;
+		}
+
+		arr[count++] = tok;
+		arr[count] = NULL;
+	}
+}
 
 /** Parse arguments specified in the environment.
  * @param args		Arguments structure from kernel. */
@@ -51,6 +79,8 @@ void rtld_args_init(process_args_t *args) {
 			rtld_debug = true;
 		} else if(strcmp(arg, "RTLD_DRYRUN") == 0) {
 			rtld_dryrun = true;
+		} else if(strcmp(arg, "RTLD_LIBPATH") == 0) {
+			rtld_args_parse_pathlist(ptr + 1, rtld_extra_libpaths, 16);
 		}
 	}
 

@@ -28,6 +28,7 @@ struct process_args;
 /** Variables containing parsed arguments. */
 extern bool rtld_debug;			/**< Whether debug output is enabled. */
 extern bool rtld_dryrun;		/**< Whether in dry-run mode. */
+extern char *rtld_extra_libpaths[];	/**< Extra library search paths. */
 
 extern void rtld_args_init(struct process_args *args);
 

@@ -23,17 +23,18 @@
 #include <kernel/handle.h>
 #include <kernel/vm.h>
 
+#include <rtld/args.h>
 #include <rtld/image.h>
 #include <rtld/utility.h>
 
 /** List of loaded images. */
 LIST_DECLARE(rtld_loaded_images);
 
-/** Array of directories to search for libraries in.
- * @note		Must have / characters at the end. */
+/** Array of directories to search for libraries in. */
 static const char *rtld_library_dirs[] = {
-	"./",
-	"/system/libraries/",
+	".",
+	"/system/libraries",
+	NULL
 };
 
 /** Load an image into memory.
@@ -307,6 +308,25 @@ fail:
 	return ret;
 }
 
+/** Check if a library exists.
+ * @param path		Path to check.
+ * @return		True if exists, false if not. */
+static bool rtld_library_exists(const char *path) {
+	handle_t handle;
+
+	dprintf("  Trying %s... ", path);
+
+	/* Attempt to open it to see if it is there. */
+	if((handle = fs_file_open(path, FS_FILE_READ)) < 0) {
+		dprintf("returned %d\n", handle);
+		return false;
+	}
+
+	dprintf("success!\n");
+	handle_close(handle);
+	return true;
+}
+
 /** Search for a library and then load it.
  * @todo		Use PATH_MAX for buffer size.
  * @param name		Name of library to load.
@@ -314,7 +334,6 @@ fail:
  * @return		0 on success, negative error code on failure. */
 int rtld_library_load(const char *name, rtld_image_t *req) {
 	rtld_image_t *exist;
-	handle_t handle;
 	char buf[4096];
 	size_t i;
 
@@ -335,20 +354,21 @@ int rtld_library_load(const char *name, rtld_image_t *req) {
 	}
 
 	/* Look for the library in the search paths. */
-	for(i = 0; i < ARRAYSZ(rtld_library_dirs); i++) {
-		strcpy(buf, rtld_library_dirs[i]);
+	for(i = 0; rtld_extra_libpaths[i]; i++) {
+		strcpy(buf, rtld_extra_libpaths[i]);
+		strcat(buf, "/");
 		strcat(buf, name);
-		dprintf("  Trying %s... ", buf);
-
-		/* Attempt to open it to see if it is there. */
-		if((handle = fs_file_open(buf, FS_FILE_READ)) < 0) {
-			dprintf("returned %d\n", handle);
-			continue;
+		if(rtld_library_exists(buf)) {
+			return rtld_image_load(buf, req, ELF_ET_DYN, NULL);
 		}
-		dprintf("success!\n");
-		handle_close(handle);
-
-		return rtld_image_load(buf, req, ELF_ET_DYN, NULL);
+	}
+	for(i = 0; rtld_library_dirs[i]; i++) {
+		strcpy(buf, rtld_library_dirs[i]);
+		strcat(buf, "/");
+		strcat(buf, name);
+		if(rtld_library_exists(buf)) {
+			return rtld_image_load(buf, req, ELF_ET_DYN, NULL);
+		}
 	}
 
 	printf("RTLD: Could not find required library: %s\n", name);
