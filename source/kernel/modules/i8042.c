@@ -23,7 +23,7 @@
 
 #include <console/kprintf.h>
 
-#include <cpu/irq.h>
+#include <cpu/intr.h>
 
 #include <lib/utility.h>
 
@@ -57,33 +57,13 @@ static SPINLOCK_DECLARE(i8042_lock);
  * @param num		IRQ number.
  * @param frame		Interrupt stack frame.
  * @return		Always returns INTR_HANDLED. */
-static intr_result_t i8042_irq_handler(unative_t num, intr_frame_t *frame) {
+static intr_result_t i8042_irq_handler(unative_t num, void *data, intr_frame_t *frame) {
 	uint8_t code = in8(0x60);
 
 	/* For now we ignore the extended code, we don't have any use for
 	 * it right now. */
 	if(code >= 0xe0) {
 		return INTR_HANDLED;
-	}
-
-	switch(code) {
-	case 59:
-		/* F1 - Enter KDBG. */
-		kdbg_enter(KDBG_ENTRY_USER, frame);
-		break;
-	case 60:
-		/* F2 - Call fatal(). */
-		fatal("Meow");
-		break;
-	case 61:
-		/* F3 - Crash (Invalid Opcode). */
-		kprintf(LOG_NORMAL, "platform: crashing by invalid opcode...\n");
-		__asm__ volatile("ud2a");
-		break;
-	case 62:
-		/* F4 - Reboot. */
-		arch_reboot();
-		break;
 	}
 
 	if(code < ARRAYSZ(i8042_kbd_layout)) {
@@ -127,18 +107,16 @@ static int i8042_init(void) {
 	device_t *dev;
 	int ret;
 
-	/* Grab the interrupts but don't unmask until the devices are created,
-	 * so we don't end up sending events to a non-existant device. */
-	if((ret = irq_register(1, i8042_irq_handler, true)) != 0) {
+	if((ret = irq_register(1, i8042_irq_handler, NULL)) != 0) {
 		return ret;
 	}
 
 	/* Register devices with the input device layer. */
 	if((ret = device_dir_create("/input", &dir)) != 0) {
-		irq_remove(1);
+		irq_unregister(1, i8042_irq_handler, NULL);
 		return ret;
 	} else if((ret = device_create("keyboard", dir, DEVICE_TYPE_INPUT, &i8042_device_ops, NULL, &dev)) != 0) {
-		irq_remove(1);
+		irq_unregister(1, i8042_irq_handler, NULL);
 		return ret;
 	}
 
@@ -149,8 +127,6 @@ static int i8042_init(void) {
 		in8(0x60);
 	}
 
-	/* Everything's set up OK, enable the IRQs. */
-	irq_unmask(1);
 	return 0;
 }
 

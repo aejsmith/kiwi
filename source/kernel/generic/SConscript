@@ -36,7 +36,6 @@ env['OBJFILES'] += [
 	env.Object('cpu/cpu.c'),
 	env.Object('cpu/intr.c'),
 	env.Object('cpu/ipi.c'),
-	env.Object('cpu/irq.c'),
 
 	env.Object('io/context.c'),
 	env.Object('io/device.c'),

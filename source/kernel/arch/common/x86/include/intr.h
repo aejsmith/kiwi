@@ -23,10 +23,31 @@
 
 #include <types.h>
 
+/** Definitions for fault numbers. */
+#define FAULT_DIVIDE		0	/**< Divide Error. */
+#define FAULT_DEBUG		1	/**< Debug. */
+#define FAULT_NMI		2	/**< Non-Maskable Interrupt. */
+#define FAULT_BREAKPOINT	3	/**< Breakpoint. */
+#define FAULT_OVERFLOW		4	/**< Overflow. */
+#define FAULT_BOUND		5	/**< BOUND Range Exceeded. */
+#define FAULT_INVALID_OPCODE	6	/**< Invalid Opcode. */
+#define FAULT_DEVICE_NOT_AVAIL	7	/**< Device Not Available. */
+#define FAULT_DOUBLE		8	/**< Double Fault. */
+#define FAULT_COPROC_OVERRUN	9	/**< Coprocessor Segment Overrun. */
+#define FAULT_INVALID_TSS	10	/**< Invalid TSS. */
+#define FAULT_SEGMENT_NOT_PRES	11	/**< Segment Not Present. */
+#define FAULT_STACK		12	/**< Stack Fault. */
+#define FAULT_GP		13	/**< General Protection Fault. */
+#define FAULT_PAGE		14	/**< Page Fault. */
+#define FAULT_FPU		16	/**< x87 FPU Floating-Point Error. */
+#define FAULT_ALIGNMENT		17	/**< Alignment Check. */
+#define FAULT_MCE		18	/**< Machine Check. */
+#define FAULT_SIMD		19	/**< SIMD Floating-Point. */
+
 /** Various definitions. */
-#define INTR_COUNT	256		/**< Total number of interrupts. */
-#define IRQ_COUNT	16		/**< Total number of IRQs. */
-#define IRQ_BASE	32		/**< IRQ number base. */
+#define INTR_COUNT		256	/**< Total number of interrupts. */
+#define IRQ_COUNT		16	/**< Total number of IRQs. */
+#define IRQ_BASE		32	/**< IRQ number base. */
 
 /** Enable interrupts.
  * @return		Previous interrupt state. */
@@ -64,5 +85,16 @@ static inline bool intr_state(void) {
 	__asm__ volatile("pushf; pop %0" : "=r"(flags));
 	return (flags & (1<<9)) ? true : false;
 }
+
+struct intr_frame;
+enum intr_result;
+
+/** Interrupt handler routine type.
+ * @return		Interrupt status code. */
+typedef enum intr_result (*intr_handler_t)(unative_t num, struct intr_frame *frame);
+
+extern void intr_register(unative_t num, intr_handler_t handler);
+extern void intr_remove(unative_t num);
+extern void intr_init(void);
 
 #endif /* __ARCH_X86_INTR_H */

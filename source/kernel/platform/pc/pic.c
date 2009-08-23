@@ -18,12 +18,11 @@
  * @brief		Programmable Interrupt Controller code.
  */
 
-#include <arch/intr.h>
 #include <arch/io.h>
 
 #include <console/kprintf.h>
 
-#include <cpu/irq.h>
+#include <cpu/intr.h>
 
 #include <platform/pic.h>
 
@@ -34,7 +33,21 @@
 static uint8_t pic_mask_master = 0xFB;
 static uint8_t pic_mask_slave = 0xFF;
 
-/** Pre-handling function - checks for spurious interrupts.
+/** Level-triggered interrupts. */
+static uint16_t pic_level_triggered = 0;
+
+/** Acknowledge a PIC interrupt.
+ * @param num		IRQ number. */
+static void pic_eoi(unative_t num) {
+	if(num >= 8) {
+		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
+	}
+
+	/* Must always send the EOI to the master controller. */
+	out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
+}
+
+/** Pre-handling function.
  * @param num		IRQ number.
  * @param frame		Interrupt stack frame.
  * @return		True if IRQ should be handled. */
@@ -56,36 +69,32 @@ static bool pic_pre_handle(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
+	if(!(pic_level_triggered & (1<<num))) {
+		pic_eoi(num);
+	}
 	return true;
 }
 
-/** Acknowledge a PIC interrupt.
- * @param num		IRQ number. */
-static void pic_ack(unative_t num) {
-	/* Acknowledge the IRQ by sending an EOI. IRQ >= 8 == slave. */
-	if(num >= 8) {
-		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
-	}
-
-	/* Must always send the EOI to the master controller. */
-	out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
-}
-
-/** IRQ mask function.
- * @param num		IRQ to mask. */
-static void pic_mask(unative_t num) {
-	if(num >= 8) {
-		pic_mask_slave |= (1<<(num - 8));
-		out8(PIC_SLAVE_DATA, pic_mask_slave);
-	} else {
-		pic_mask_master |= (1<<num);
-		out8(PIC_MASTER_DATA, pic_mask_master);
+/** Post-handling function.
+ * @param num		IRQ number.
+ * @param frame		Interrupt stack frame. */
+static void pic_post_handle(unative_t num, intr_frame_t *frame) {
+	if(pic_level_triggered & (1<<num)) {
+		pic_eoi(num);
 	}
 }
 
-/** IRQ unmask function.
- * @param num		IRQ to unmask. */
-static void pic_unmask(unative_t num) {
+/** Trigger mode function.
+ * @param num		IRQ number.
+ * @param frame		Interrupt stack frame.
+ * @return		True if level-triggered, false if edge-triggered. */
+static bool pic_mode(unative_t num, intr_frame_t *frame) {
+	return (pic_level_triggered & (1<<num));
+}
+
+/** IRQ enable function.
+ * @param num		IRQ to enable. */
+static void pic_enable(unative_t num) {
 	if(num >= 8) {
 		pic_mask_slave &= ~(1<<(num - 8));
 		out8(PIC_SLAVE_DATA, pic_mask_slave);
@@ -95,12 +104,25 @@ static void pic_unmask(unative_t num) {
 	}
 }
 
+/** IRQ disable function.
+ * @param num		IRQ to disable. */
+static void pic_disable(unative_t num) {
+	if(num >= 8) {
+		pic_mask_slave |= (1<<(num - 8));
+		out8(PIC_SLAVE_DATA, pic_mask_slave);
+	} else {
+		pic_mask_master |= (1<<num);
+		out8(PIC_MASTER_DATA, pic_mask_master);
+	}
+}
+
 /** PIC IRQ operations. */
 static irq_ops_t pic_irq_ops = {
 	.pre_handle = pic_pre_handle,
-	.ack = pic_ack,
-	.mask = pic_mask,
-	.unmask = pic_unmask,
+	.post_handle = pic_post_handle,
+	.mode = pic_mode,
+	.enable = pic_enable,
+	.disable = pic_disable,
 };
 
 /** Initialize the PIC. */
@@ -124,6 +146,9 @@ void __init_text pic_init(void) {
 	/* Set IRQ masks. */
 	out8(PIC_MASTER_DATA, pic_mask_master);
 	out8(PIC_SLAVE_DATA, pic_mask_slave);
+
+	/* Get the trigger modes. */
+	pic_level_triggered = (in8(PIC_SLAVE_ELCR) << 8) | in8(PIC_MASTER_ELCR);
 
 	/* Set the IRQ operations structure. */
 	irq_ops = &pic_irq_ops;

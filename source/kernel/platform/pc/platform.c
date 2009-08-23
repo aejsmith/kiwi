@@ -22,7 +22,7 @@
 #include <arch/x86/lapic.h>
 
 #include <cpu/cpu.h>
-#include <cpu/irq.h>
+#include <cpu/intr.h>
 
 #include <platform/acpi.h>
 #include <platform/console.h>
@@ -39,7 +39,7 @@
 extern void arch_reboot(void);
 
 /** Temporary i8042 hook to enter into KDBG. */
-static intr_result_t i8042_handler(unative_t num, intr_frame_t *frame) {
+static intr_result_t i8042_handler(unative_t num, void *data, intr_frame_t *frame) {
 	uint8_t code = in8(0x60);
 	switch(code) {
 	case 59:
@@ -93,6 +93,5 @@ void __init_text platform_postmm_init(void) {
 	}
 
 	/* Install the temporary i8042 hook. */
-	irq_register(1, i8042_handler, true);
-	irq_unmask(1);
+	irq_register(1, i8042_handler, NULL);
 }

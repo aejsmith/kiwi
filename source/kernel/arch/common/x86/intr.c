@@ -1,4 +1,4 @@
-/* Kiwi x86 fault handling functions
+/* Kiwi x86 interrupt functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,16 +15,11 @@
 
 /**
  * @file
- * @brief		x86 fault handling functions.
- *
- * The functions in this file are used to handle CPU exceptions. There is a
- * wrapper handler, fault_handler(), that gets called for all exceptions. If
- * a specific handler is specified in the table, then it will be called.
+ * @brief		x86 interrupt functions.
  */
 
 #include <arch/memmap.h>
 #include <arch/page.h>
-#include <arch/x86/fault.h>
 #include <arch/x86/features.h>
 #include <arch/x86/sysreg.h>
 
@@ -36,6 +31,7 @@
 
 #include <mm/vm.h>
 
+#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -45,7 +41,11 @@
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 
-extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern void intr_handler(unative_t num, intr_frame_t *frame);
+
+/** Array of interrupt handling routines. */
+static intr_handler_t intr_handlers[INTR_COUNT];
 
 /** String names for CPU exceptions. */
 static const char *fault_names[] = {
@@ -64,41 +64,24 @@ static const char *fault_names[] = {
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		True if handled, false if not. */
-static bool fault_handle_nmi(unative_t num, intr_frame_t *frame) {
+static intr_result_t intr_handle_nmi(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
 		while(atomic_get(&cpu_pause_wait));
-		return true;
+		return INTR_HANDLED;
 	}
 
-	return false;
-}
-
-/** Handler for double faults.
- * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Doesn't return. */
-static bool fault_handle_doublefault(unative_t num, intr_frame_t *frame) {
-#if !CONFIG_ARCH_AMD64
-	/* Disable KDBG on IA32. */
-	atomic_set(&kdbg_running, 3);
-#endif
-
-	/* Crappy workaround, using MMX memcpy() from the console code seems
-	 * to cause nasty problems. */
-	curr_cpu->arch.features.feat_edx &= ~(1<<23);
-	_fatal(frame, "Double Fault (%p)", frame->ip);
-	cpu_halt();
+	_fatal(frame, "Received unexpected NMI");
 }
 
 /** Handler for page faults.
- * @param num		CPU Interrupt number.
+ * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Always returns true. */
-static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
+ * @return		Interrupt status code. */
+static intr_result_t intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
 	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
 	ptr_t addr = sysreg_cr2_read();
@@ -109,13 +92,6 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 		access = VM_FAULT_EXEC;
 	}
 #endif
-
-	/* Handle exceptions during KDBG execution. We should not call into
-	 * the virtual memory manager if we are in KDBG. */
-	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(num, "Page Fault", frame);
-		return true;
-	}
 
 	/* Try the virtual memory manager if the fault occurred at a userspace
 	 * address. */
@@ -139,40 +115,90 @@ static bool fault_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	              (frame->err_code & (1<<4)) ? " | Execute" : "");
 }
 
-/** Table of special fault handlers. */
-static bool (*fault_handler_table[])(unative_t, intr_frame_t *) = {
-	[FAULT_DEBUG] = kdbg_int1_handler,
-	[FAULT_NMI] = fault_handle_nmi,
-	[FAULT_DOUBLE] = fault_handle_doublefault,
-	[FAULT_PAGE] = fault_handle_pagefault,
-};
+/** Handler for double faults.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame.
+ * @return		Doesn't return. */
+static intr_result_t intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
+#if !CONFIG_ARCH_AMD64
+	/* Disable KDBG on IA32. */
+	atomic_set(&kdbg_running, 3);
+#endif
 
-/** Handle a CPU exception.
+	/* Crappy workaround, using MMX memcpy() from the console code seems
+	 * to cause nasty problems. */
+	curr_cpu->arch.features.feat_edx &= ~(1<<23);
+	_fatal(frame, "Double Fault (%p)", frame->ip);
+	cpu_halt();
+}
+
+/** Register an interrupt handler.
  *
- * Handler for all CPU exceptions. If there is a specific handler for the
- * exception, it is called, else the standard action is performed.
+ * Registers a handler to be called upon receipt of a certain interrupt. If
+ * a handler exists for the interrupt then it will be overwritten.
+ *
+ * @param num		Interrupt number.
+ * @param handler	Function pointer to handler routine.
+ */
+void intr_register(unative_t num, intr_handler_t handler) {
+	assert(num < INTR_COUNT);
+	intr_handlers[num] = handler;
+}
+
+/** Remove an interrupt handler.
+ *
+ * Unregisters an interrupt handler.
+ *
+ * @param num		Interrupt number.
+ */
+void intr_remove(unative_t num) {
+	assert(num < INTR_COUNT);
+	intr_handlers[num] = NULL;
+}
+
+/** Interrupt handler routine.
+ *
+ * Handles a CPU interrupt by looking up the handler routine in the handler
+ * table and calling it.
  *
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- *
- * @return		Interrupt status code.
  */
-intr_result_t fault_handler(unative_t num, intr_frame_t *frame) {
-	/* KDBG is fully running on this CPU (or at least we hope so...).
-	 * Have it handle the fault itself. */
-	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(num, fault_names[num], frame);
-		return INTR_HANDLED;
-	}
+void intr_handler(unative_t num, intr_frame_t *frame) {
+	intr_handler_t handler = intr_handlers[num];
 
-	/* If there is a special handler for this fault run it. */
-	if(num < ARRAYSZ(fault_handler_table) && fault_handler_table[num]) {
-		if(fault_handler_table[num](num, frame)) {
-			return INTR_HANDLED;
+	if(num < 32 && unlikely(atomic_get(&kdbg_running) == 2)) {
+		kdbg_except_handler(num, fault_names[num], frame);
+		return;
+	} else if(unlikely(!handler)) {
+		if(num < 32) {
+			_fatal(frame, "Unhandled %s-mode exception %" PRIun " (%s)",
+			       (frame->cs & 3) ? "user" : "kernel", num,
+			       fault_names[num]);
+		} else {
+			_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
 		}
 	}
 
-	/* No specific handler or the handler did not handle the fault. */
-	_fatal(frame, "Unhandled %s-mode exception %" PRIun " (%s)",
-	       (frame->cs & 3) ? "user" : "kernel", num, fault_names[num]);
+	if(handler(num, frame) == INTR_RESCHEDULE) {
+		sched_yield();
+	}
+}
+
+/** Initialize the interrupt handling code. */
+void intr_init(void) {
+	int i;
+
+	/* Set handlers for faults that require specific handling. */
+	intr_register(FAULT_DEBUG, kdbg_int1_handler);
+	intr_register(FAULT_NMI, intr_handle_nmi);
+	intr_register(FAULT_DOUBLE, intr_handle_doublefault);
+	intr_register(FAULT_PAGE, intr_handle_pagefault);
+
+	/* Entries 32-47 are IRQs, 48 onwards are unrecognised for now. */
+	for(i = 32; i <= 47; i++) {
+		intr_register(i, irq_handler);
+	}
+
+	irq_init();
 }

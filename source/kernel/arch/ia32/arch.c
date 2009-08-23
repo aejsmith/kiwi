@@ -53,6 +53,7 @@ static intr_result_t syscall_intr_handler(unative_t num, intr_frame_t *frame) {
  */
 void __init_text arch_premm_init(void *data) {
 	descriptor_init();
+	intr_init();
 	cpu_arch_init(&curr_cpu->arch);
 }
 

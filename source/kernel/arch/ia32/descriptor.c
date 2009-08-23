@@ -22,12 +22,10 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 #include <arch/syscall.h>
-#include <arch/x86/fault.h>
 #include <arch/x86/sysreg.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
-#include <cpu/irq.h>
 
 #include <lib/string.h>
 
@@ -144,17 +142,6 @@ static inline void idt_init(void) {
 	/* Modify the system call entry's DPL to be 3. The system call handler
 	 * is added in arch.c. */
 	idt[SYSCALL_INT_NO].flags |= 0x60;
-
-	/* Now we can fill out the interrupt handler table. Entries 0-31 are
-	 * exceptions. */
-	for(i = 0; i < 32; i++) {
-		intr_register(i, fault_handler);
-	}
-
-	/* Entries 32-47 are IRQs, 48 onwards are unrecognised for now. */
-	for(i = 32; i <= 47; i++) {
-		intr_register(i, irq_handler);
-	}
 }
 
 /** Initialize descriptor tables for the boot CPU. */

@@ -22,10 +22,12 @@
 #define __PLATFORM_PIC_H
 
 /** PIC port definitions. */
-#define PIC_MASTER_COMMAND	0x20	/**< Comand port (Master). */
-#define PIC_MASTER_DATA		0x21	/**< Comand port (Master). */
-#define PIC_SLAVE_COMMAND	0xA0	/**< Comand port (Master). */
-#define PIC_SLAVE_DATA		0xA1	/**< Comand port (Master). */
+#define PIC_MASTER_COMMAND	0x20	/**< Command port (Master). */
+#define PIC_MASTER_DATA		0x21	/**< Data port (Master). */
+#define PIC_MASTER_ELCR		0x4D0	/**< Edge/Level Control Register (Master). */
+#define PIC_SLAVE_COMMAND	0xA0	/**< Command port (Slave). */
+#define PIC_SLAVE_DATA		0xA1	/**< Data port (Slave). */
+#define PIC_SLAVE_ELCR		0x4D1	/**< Edge/Level Control Register (Slave). */
 
 /** PIC command definitions. */
 #define PIC_COMMAND_EOI		0x20	/**< End-of-Interrupt. */

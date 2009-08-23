@@ -1,4 +1,4 @@
-/* Kiwi interrupt handling code
+/* Kiwi hardware interrupt handling code
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,83 +15,197 @@
 
 /**
  * @file
- * @brief		Interrupt handling code.
+ * @brief		Hardware interrupt handling code.
  */
 
 #include <console/kprintf.h>
 
 #include <cpu/intr.h>
 
-#include <proc/sched.h>
+#include <mm/malloc.h>
 
 #include <sync/spinlock.h>
 
+#include <types/list.h>
+
 #include <assert.h>
+#include <errors.h>
 #include <fatal.h>
 
-/** Array of interrupt handling routines. This will be initialized to 0 so
- * any interrupts that do not have a handler registered will get picked up
- * by intr_handler(). */
-static intr_handler_t intr_handlers[INTR_COUNT] __aligned(8);
+/** Structure describing a handler for an IRQ. */
+typedef struct irq_handler {
+	list_t header;			/**< List header. */
+	irq_func_t func;		/**< Function to call. */
+	void *data;			/**< Argument to pass to handler. */
+} irq_handler_t;
 
-/** Lock to protect handler array. */
-static SPINLOCK_DECLARE(intr_handlers_lock);
+/** An entry in the IRQ table. */
+typedef struct irq {
+	spinlock_t lock;		/**< Lock to protect handler list. */
+	list_t handlers;		/**< List of handler structures. */
+} irq_t;
 
-/** Register an interrupt handler.
+/** Array of IRQ structures. */
+static irq_t irq_table[IRQ_COUNT];
+
+/** IRQ handling operations provided by architecture/platform. */
+irq_ops_t *irq_ops;
+
+/** Registers an IRQ handler.
  *
- * Registers a handler to be called upon receipt of a certain interrupt. If
- * a handler exists for the interrupt then it will be overwritten.
+ * Registers a handler for an IRQ. The new handler will be appended to the
+ * list of IRQ handlers (IRQ handlers are called in the order they are
+ * registered in.
  *
- * @param num		Interrupt number.
- * @param handler	Function pointer to handler routine.
+ * @param num		IRQ number.
+ * @param func		Function to call when IRQ is received.
+ * @param data		Data argument to pass to the handler.
  *
- * @return		Old handler address.
+ * @return		0 on success, negative error code on failure.
  */
-intr_handler_t intr_register(unative_t num, intr_handler_t handler) {
-	intr_handler_t old;
+int irq_register(unative_t num, irq_func_t func, void *data) {
+	irq_handler_t *handler, *exist;
+	bool enable;
 
-	assert(num < INTR_COUNT);
+	if(num >= IRQ_COUNT) {
+		return -ERR_PARAM_INVAL;
+	}
 
-	spinlock_lock(&intr_handlers_lock, 0);
-	old = intr_handlers[num];
-	intr_handlers[num] = handler;
-	spinlock_unlock(&intr_handlers_lock);
+	handler = kmalloc(sizeof(irq_handler_t), MM_SLEEP);
+	list_init(&handler->header);
+	handler->func = func;
+	handler->data = data;
 
-	return old;
+	spinlock_lock(&irq_table[num].lock, 0);
+
+	/* Check if a handler exists with the same function/data. */
+	LIST_FOREACH(&irq_table[num].handlers, iter) {
+		exist = list_entry(iter, irq_handler_t, header);
+
+		if(exist->func == func && exist->data == data) {
+			spinlock_unlock(&irq_table[num].lock);
+			kfree(handler);
+			return -ERR_ALREADY_EXISTS;
+		}
+	}
+
+	enable = list_empty(&irq_table[num].handlers);
+	list_append(&irq_table[num].handlers, &handler->header);
+
+	/* Enable it if the list was empty before. */
+	if(enable && irq_ops->enable) {
+		irq_ops->enable(num);
+	}
+
+	spinlock_unlock(&irq_table[num].lock);
+	return 0;
 }
 
-/** Remove an interrupt handler.
+/** Removes an IRQ handler.
  *
- * Unregisters an interrupt handler.
+ * Removes a previously added handler for an IRQ. This function must be passed
+ * the handler function and data argument the handler was originally registered
+ * with in order to be able to find the correct handler to remove.
  *
- * @param num		Interrupt number.
+ * @param num		IRQ number.
+ * @param func		Function handler was registered with.
+ * @param data		Data argument handler was registered with.
+ *
+ * @return		0 on success, negative error code on failure.
  */
-void intr_remove(unative_t num) {
-	assert(num < INTR_COUNT);
+int irq_unregister(unative_t num, irq_func_t func, void *data) {
+	irq_handler_t *handler;
 
-	spinlock_lock(&intr_handlers_lock, 0);
-	intr_handlers[num] = NULL;
-	spinlock_unlock(&intr_handlers_lock);
+	if(num >= IRQ_COUNT) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	spinlock_lock(&irq_table[num].lock, 0);
+
+	LIST_FOREACH(&irq_table[num].handlers, iter) {
+		handler = list_entry(iter, irq_handler_t, header);
+
+		if(handler->func == func && handler->data == data) {
+			list_remove(&handler->header);
+
+			/* Disable if list now empty. */
+			if(list_empty(&irq_table[num].handlers) && irq_ops->disable) {
+				irq_ops->disable(num);
+			}
+
+			spinlock_unlock(&irq_table[num].lock);
+			kfree(handler);
+			return 0;
+		}
+	}
+
+	spinlock_unlock(&irq_table[num].lock);
+	return -ERR_NOT_FOUND;
 }
 
-/** Interrupt handler routine.
+/** Hardware interrupt handler.
  *
- * Handles a CPU interrupt by looking up the handler routine in the handler
- * table and calling it.
+ * Handles a hardware interrupt by running necessary handlers for it.
  *
- * @param num		Interrupt number.
+ * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
+ *
+ * @return		Interrupt status code.
  */
-void intr_handler(unative_t num, intr_frame_t *frame) {
-	intr_handler_t handler = intr_handlers[num];
+intr_result_t irq_handler(unative_t num, intr_frame_t *frame) {
+	bool level, handled = false, schedule = false;
+	irq_handler_t *handler;
 	intr_result_t ret;
 
-	if(unlikely(handler == NULL)) {
-		_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
-	} else {
-		ret = handler(num, frame);
-		if(ret == INTR_RESCHEDULE) {
-			sched_yield();
+	assert(irq_ops);
+	assert(irq_ops->mode);
+
+	/* Work out the IRQ number. */
+	num -= IRQ_BASE;
+	assert(num < IRQ_COUNT);
+
+	/* Execute any pre-handling function. */
+	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
+		return INTR_HANDLED;
+	}
+
+	/* Get the trigger mode. */
+	level = irq_ops->mode(num, frame);
+
+	/* Call handlers for the IRQ. */
+	LIST_FOREACH_SAFE(&irq_table[num].handlers, iter) {
+		handler = list_entry(iter, irq_handler_t, header);
+
+		ret = handler->func(num, handler->data, frame);
+
+		if(ret == INTR_HANDLED) {
+			handled = true;
+		} else if(ret == INTR_RESCHEDULE) {
+			schedule = true;
 		}
+
+		/* For edge-triggered interrupts we must invoke all handlers,
+		 * because interrupt pulses from multiple devices can be merged
+		 * if they occur close together. */
+		if(level && ret != INTR_UNHANDLED) {
+			break;
+		}
+	}
+
+	/* Perform post-handling actions. */
+	if(irq_ops->post_handle) {
+		irq_ops->post_handle(num, frame);
+	}
+
+	return (schedule) ? INTR_RESCHEDULE : ((handled) ? INTR_HANDLED : INTR_UNHANDLED);
+}
+
+/** Initialize the IRQ handling system. */
+void irq_init(void) {
+	size_t i;
+
+	for(i = 0; i < IRQ_COUNT; i++) {
+		spinlock_init(&irq_table[i].lock, "irq_lock");
+		list_init(&irq_table[i].handlers);
 	}
 }

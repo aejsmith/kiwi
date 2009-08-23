@@ -20,7 +20,7 @@
 
 #include <arch/io.h>
 
-#include <cpu/irq.h>
+#include <cpu/intr.h>
 
 #include <platform/pit.h>
 
@@ -28,9 +28,10 @@
 
 /** Handle a PIT tick.
  * @param num		IRQ number.
+ * @param data		Data associated with IRQ (unused).
  * @param frame		Interrupt stack frame.
  * @return		Value from clock_tick(). */
-static intr_result_t pit_handler(unative_t num, intr_frame_t *frame) {
+static intr_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
 	return clock_tick();
 }
 
@@ -44,14 +45,12 @@ static void pit_enable(void) {
 	out8(0x40, base & 0xFF);
 	out8(0x40, base >> 8);
 
-	irq_register(0, pit_handler, true);
-	irq_unmask(0);
+	irq_register(0, pit_handler, NULL);
 }
 
 /** Disable the PIT. */
 static void pit_disable(void) {
-	irq_mask(0);
-	irq_remove(0);
+	irq_unregister(0, pit_handler, NULL);
 }
 
 /** PIT clock source. */

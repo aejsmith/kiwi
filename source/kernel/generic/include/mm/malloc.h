@@ -22,6 +22,7 @@
 #define __MM_MALLOC_H
 
 #include <mm/flags.h>
+
 #include <types.h>
 
 extern void *kmalloc(size_t size, int kmflag) __malloc;

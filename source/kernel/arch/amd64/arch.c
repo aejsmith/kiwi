@@ -28,6 +28,7 @@
 #include <console/kprintf.h>
 
 #include <cpu/cpu.h>
+#include <cpu/intr.h>
 
 #include <fatal.h>
 
@@ -81,6 +82,7 @@ static void __init_text syscall_init(void) {
  */
 void __init_text arch_premm_init(void *data) {
 	descriptor_init();
+	intr_init();
 	cpu_arch_init(&curr_cpu->arch);
 }
 

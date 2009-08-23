@@ -27,17 +27,50 @@
 
 /** Interrupt handler return status. */
 typedef enum intr_result {
-	INTR_HANDLED,		/**< Interrupt was handled, no extra action required. */
+	INTR_UNHANDLED,		/**< Interrupt not handled, invoke next handler. */
+	INTR_HANDLED,		/**< Interrupt was handled, should not invoke next handler. */
 	INTR_RESCHEDULE,	/**< A thread switch should be performed. */
 } intr_result_t;
 
-/** Interrupt handler routine type.
- * @return		Interrupt status code (see above). */
-typedef intr_result_t (*intr_handler_t)(unative_t num, intr_frame_t *frame);
+/** IRQ management operations. */
+typedef struct irq_ops {
+	/** Pre-handling function.
+	 * @param num		IRQ number.
+	 * @param frame		Interrupt frame.
+	 * @return		True if IRQ should be handled. */
+	bool (*pre_handle)(unative_t num, intr_frame_t *frame);
 
-extern intr_handler_t intr_register(unative_t num, intr_handler_t handler);
-extern void intr_remove(unative_t num);
+	/** Post-handling function.
+	 * @param num		IRQ number.
+	 * @param frame		Interrupt frame. */
+	void (*post_handle)(unative_t num, intr_frame_t *frame);
 
-extern void intr_handler(unative_t num, intr_frame_t *frame);
+	/** Get trigger mode function.
+	 * @param num		IRQ number.
+	 * @param frame		Interrupt frame.
+	 * @return		True if level-triggered, false if edge. */
+	bool (*mode)(unative_t num, intr_frame_t *frame);
+
+	/** IRQ enable function.
+	 * @param num		IRQ number. */
+	void (*enable)(unative_t num);
+
+	/** IRQ disable function.
+	 * @param num		IRQ number. */
+	void (*disable)(unative_t num);
+} irq_ops_t;
+
+/** IRQ handler routine type.
+ * @return		Interrupt status code. */
+typedef intr_result_t (*irq_func_t)(unative_t num, void *data, intr_frame_t *frame);
+
+extern irq_ops_t *irq_ops;
+
+extern int irq_register(unative_t num, irq_func_t handler, void *data);
+extern int irq_unregister(unative_t num, irq_func_t handler, void *data);
+
+extern intr_result_t irq_handler(unative_t num, intr_frame_t *frame);
+
+extern void irq_init(void);
 
 #endif /* __CPU_INTR_H */

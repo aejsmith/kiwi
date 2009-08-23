@@ -68,13 +68,9 @@
 .endm
 
 /** Macro to define an ISR.
- *
- * Defines an ISR handler which pushes the interrupt number and a fake error
- * code to the stack. Aligned to 16 bytes because the IDT initialization
- * code wants each handler to be 16 bytes in size.
- *
- * @param nr		Interrupt vector number.
- */
+ * @note		Aligned to 16 bytes because the IDT initialization
+ *			code requires each handler to be 16 bytes.
+ * @param nr		Interrupt vector number. */
 .macro ISR nr
 .align 16
 	push	$0
@@ -82,15 +78,10 @@
 	jmp	__isr_common
 .endm
 
-/** Macro to define an ISR (with error code).
- *
- * Defines an ISR handler which pushes the interrupt numberto the stack. For
- * interrupts defined using this macro, the CPU should have pushed an error
- * code to the stack. Aligned to 16 bytes because the IDT initialization
- * code wants each handler to be 16 bytes in size.
- *
- * @param nr		Interrupt vector number.
- */
+/** Macro to define an ISR with an error code.
+ * @note		Aligned to 16 bytes because the IDT initialization
+ *			code requires each handler to be 16 bytes.
+ * @param nr		Interrupt vector number. */
 .macro ISR_E nr
 .align 16
 	push	$\nr

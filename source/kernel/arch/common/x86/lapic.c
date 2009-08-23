@@ -27,7 +27,6 @@
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
-#include <cpu/irq.h>
 
 #include <mm/page.h>
 #include <mm/tlb.h>
@@ -144,7 +143,7 @@ static intr_result_t lapic_timer_handler(unative_t num, intr_frame_t *frame) {
 static volatile uint32_t freq_tick_count __init_data = 0;
 
 /** PIT handler for bus frequency calculation. */
-static intr_result_t __init_text lapic_pit_handler(unative_t irq, intr_frame_t *frame) {
+static intr_result_t __init_text lapic_pit_handler(unative_t irq, void *data, intr_frame_t *frame) {
 	freq_tick_count++;
 	return INTR_HANDLED;
 }
@@ -166,7 +165,7 @@ static uint64_t __init_text lapic_get_freq(void) {
 	out8(0x40, base >> 8);
 
 	/* Set our temporary PIT handler. */
-	if(irq_register(0, lapic_pit_handler, true) != 0 || irq_unmask(0)) {
+	if(irq_register(0, lapic_pit_handler, NULL) != 0) {
 		fatal("APIC could not grab PIT");
 	}
 
@@ -189,7 +188,7 @@ static uint64_t __init_text lapic_get_freq(void) {
 
 	/* Stop the PIT. */
 	intr_disable();
-	if(irq_remove(0) != 0) {
+	if(irq_unregister(0, lapic_pit_handler, NULL) != 0) {
 		fatal("Could not remove PIT IRQ handler");
 	}
 
