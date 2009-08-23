@@ -32,11 +32,10 @@
 
 #include <fatal.h>
 
-/** Entry function for SYSCALL. */
 extern void __syscall_entry(void);
 
 /** Set up SYSCALL/SYSRET support for AMD64. */
-static void __init_text syscall_init(void) {
+static void __init_text syscall_arch_init(void) {
 	uint64_t fmask, lstar, star;
 
 	/* Set System Call Enable (SCE) flag in EFER. */
@@ -67,7 +66,7 @@ static void __init_text syscall_init(void) {
 	sysreg_msr_write(SYSREG_MSR_LSTAR, lstar);
 	sysreg_msr_write(SYSREG_MSR_STAR, star);
 
-	kprintf(LOG_DEBUG, "syscall: set up SYSCALL MSRs:\n");
+	kprintf(LOG_DEBUG, "syscall: set up SYSCALL MSRs on CPU %" PRIu32 ":\n", curr_cpu->id);
 	kprintf(LOG_DEBUG, "  FMASK: 0x%" PRIx64 "\n", fmask);
 	kprintf(LOG_DEBUG, "  LSTAR: 0x%" PRIx64 "\n", lstar);
 	kprintf(LOG_DEBUG, "  STAR:  0x%" PRIx64 "\n", star);
@@ -93,7 +92,7 @@ void __init_text arch_premm_init(void *data) {
  */
 void __init_text arch_postmm_init(void) {
 	lapic_init();
-	syscall_init();
+	syscall_arch_init();
 }
 
 /** AMD64 architecture startup code.
@@ -114,6 +113,8 @@ void __init_text arch_ap_init(void) {
 	if(!lapic_init()) {
 		fatal("LAPIC initialization failed for CPU %" PRIu32 "\n", curr_cpu->id);
 	}
+
+	syscall_arch_init();
 }
 
 /** Reboot the system. */
