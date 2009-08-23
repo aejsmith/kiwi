@@ -28,6 +28,13 @@ struct syscall_frame;
 /** Function type for a system call handler. */
 typedef unative_t (*syscall_handler_t)(unative_t, unative_t, unative_t, unative_t, unative_t, unative_t);
 
+/** System call service definition structure. */
+typedef struct syscall_service {
+	syscall_handler_t *table;	/**< Handler table. */
+	size_t size;			/**< Size of handler array. */
+} syscall_service_t;
+
 extern unative_t syscall_handler(struct syscall_frame *frame);
+extern int syscall_service_register(uint16_t num, syscall_service_t *service);
 
 #endif /* __PROC_SYSCALL_H */

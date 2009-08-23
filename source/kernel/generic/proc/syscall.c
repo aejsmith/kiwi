@@ -25,17 +25,27 @@
 #include <io/device.h>
 #include <io/vfs.h>
 
+#include <mm/malloc.h>
 #include <mm/vm.h>
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
 #include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/syscall.h>
 
+#include <sync/mutex.h>
+
 #include <errors.h>
 #include <fatal.h>
+#include <init.h>
 #include <module.h>
+
+/** Array of system call services. */
+static syscall_service_t **syscall_services = NULL;
+static size_t syscall_service_max = 0;
+static MUTEX_DECLARE(syscall_services_lock, 0);
 
 /** Print a character to the screen.
  * @param ch		Character to print.
@@ -45,8 +55,8 @@ static int sys_putch(char ch) {
 	return 0;
 }
 
-/** Table of system calls. */
-static syscall_handler_t syscall_table[] = {
+/** Main kernel system call table. */
+static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_putch,
 	(syscall_handler_t)sys_module_load,
 	(syscall_handler_t)sys_handle_close,
@@ -88,6 +98,12 @@ static syscall_handler_t syscall_table[] = {
 	(syscall_handler_t)sys_device_request,
 };
 
+/** Main kernel system call service. */
+static syscall_service_t kernel_syscall_service = {
+	.table = kernel_syscall_table,
+	.size = ARRAYSZ(kernel_syscall_table),
+};
+
 /** System call dispatcher.
  *
  * Handles a system call from a userspace process. It simply forwards the call
@@ -98,11 +114,56 @@ static syscall_handler_t syscall_table[] = {
  * @return		Return value of the system call.
  */
 unative_t syscall_handler(syscall_frame_t *frame) {
-	if(frame->id >= ARRAYSZ(syscall_table)) {
-		/* TODO: Kill the process. */
-		fatal("Invalid system call. TODO: Kill process");
+	syscall_service_t *service;
+	uint16_t num;
+
+	num = (frame->id >> 16) & 0xFFFF;
+	if(num > syscall_service_max) {
+		return -ERR_SYSCALL_INVAL;
 	}
 
-	return syscall_table[frame->id](frame->p1, frame->p2, frame->p3,
-	                                frame->p4, frame->p5, frame->p6);
+	service = syscall_services[num];
+	num = frame->id & 0xFFFF;
+	if(!service || num >= service->size) {
+		return -ERR_SYSCALL_INVAL;
+	}
+
+	return service->table[num](frame->p1, frame->p2, frame->p3, frame->p4, frame->p5, frame->p6);
 }
+
+/** Register a system call service.
+ *
+ * Registers a new system call service.
+ *
+ * @param num		Service number.
+ * @param service	Service structure describing the service.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int syscall_service_register(uint16_t num, syscall_service_t *service) {
+	mutex_lock(&syscall_services_lock, 0);
+
+	/* Resize the table if necessary. */
+	if(num > syscall_service_max || !syscall_services) {
+		syscall_services = krealloc(syscall_services, sizeof(ptr_t) * (num + 1), MM_SLEEP);
+		memset(&syscall_services[syscall_service_max + 1], 0, (num - syscall_service_max) * sizeof(ptr_t *));
+
+		syscall_service_max = num;
+	} else if(syscall_services[num] != NULL) {
+		mutex_unlock(&syscall_services_lock);
+		return -ERR_ALREADY_EXISTS;
+	}
+
+	syscall_services[num] = service;
+	kprintf(LOG_DEBUG, "syscall: registered system call service %" PRIu16 "(%p)\n", num, service);
+	mutex_unlock(&syscall_services_lock);
+	return 0;
+}
+
+/** Initialize the system call handling code. */
+static void __init_text syscall_init(void) {
+	if(syscall_service_register(0, &kernel_syscall_service) != 0) {
+		fatal("Could not register kernel system call service");
+	}
+}
+INITCALL(syscall_init);
