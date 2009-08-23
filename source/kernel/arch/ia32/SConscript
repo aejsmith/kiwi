@@ -28,23 +28,8 @@ env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % env['CC']).read()]
 # Pull in x86 common code.
 SConscript(dirs=['../common/x86'], exports=['env'])
 
-# Generate the AP boot code.
-def gen_inc_s(target, source, env):
-	f = open(str(target[0]), 'w')
-	f.write('.section .init.trampoline, "ax", @progbits\n')
-	f.write('.incbin "ap_boot.bin"\n')
-	f.close()
-env.Object('ap_boot.bin.o', 'ap_boot.S')
-env.Command('ap_boot.bin.elf', 'ap_boot.bin.o', Action('$LINK -Ttext=0 -o $TARGET $SOURCE', None))
-env.Command('ap_boot.bin', 'ap_boot.bin.elf', Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
-env.Command('ap_boot.bin.S', 'ap_boot.bin', Action(gen_inc_s, None))
-env.Command('ap_boot.o', ['ap_boot.bin.S'], Action('$CC $ASFLAGS -c -o $TARGET $SOURCE -Wa,-I%s' %
-            (os.path.abspath(str(File('ap_boot.bin').dir))), None))
-
 # Add source files.
 env['OBJFILES'] += [
-	File('ap_boot.o'),
-
 	env.Object('arch.c'),
 	env.Object('boot.S'),
 	env.Object('context.c'),
