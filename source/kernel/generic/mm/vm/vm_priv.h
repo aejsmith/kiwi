@@ -39,18 +39,6 @@
 # define vm_region_fits(start, size)	((start) >= ASPACE_BASE && ((start) + (size)) <= (ASPACE_BASE + ASPACE_SIZE))
 #endif
 
-/** Convert region flags to page map flags.
- * @param flags         Flags to convert.
- * @return              Page map flags. */
-static inline int vm_region_flags_to_page(int flags) {
-        int ret = 0;
-
-        ret |= ((flags & VM_REGION_READ) ? PAGE_MAP_READ : 0);
-        ret |= ((flags & VM_REGION_WRITE) ? PAGE_MAP_WRITE : 0);
-       	ret |= ((flags & VM_REGION_EXEC) ? PAGE_MAP_EXEC : 0);
-        return ret;
-}
-
 /** Architecture hooks. */
 extern int vm_aspace_arch_init(vm_aspace_t *as);
 

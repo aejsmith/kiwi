@@ -27,15 +27,15 @@ extern "C" {
 
 #include <kernel/types.h>
 
-/** Structure containing arguments for _vm_map_file(). */
-typedef struct vm_map_file_args {
+/** Structure containing arguments for _vm_map_file()/_vm_map_device(). */
+typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not AS_REGION_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
 	int flags;			/**< Flags controlling the mapping. */
 	handle_t handle;		/**< Handle for file to map. */
 	offset_t offset;		/**< Offset in the file to map from. */
 	void **addrp;			/**< Where to store address mapped to. */
-} vm_map_file_args_t;
+} vm_map_args_t;
 
 /** Behaviour flags for vm_map_* functions. */
 #define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
@@ -46,6 +46,7 @@ typedef struct vm_map_file_args {
 
 extern int vm_map_anon(void *start, size_t size, int flags, void **addrp);
 extern int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
+extern int vm_map_device(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
 extern int vm_unmap(void *start, size_t size);
 
 #ifdef __cplusplus

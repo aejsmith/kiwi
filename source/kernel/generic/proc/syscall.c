@@ -84,6 +84,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_fs_rename,
 	(syscall_handler_t)sys_vm_map_anon,
 	(syscall_handler_t)sys_vm_map_file,
+	(syscall_handler_t)sys_vm_map_device,
 	(syscall_handler_t)sys_vm_unmap,
 	(syscall_handler_t)sys_process_create,
 	(syscall_handler_t)sys_process_replace,

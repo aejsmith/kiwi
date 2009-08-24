@@ -34,6 +34,7 @@
 
 #include <cpu/intr.h>
 
+#include <io/device.h>
 #include <io/vfs.h>
 
 #include <lib/string.h>
@@ -705,7 +706,8 @@ int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *add
  *
  * @return		0 on success, negative error code on failure.
  */
-int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t *node, offset_t offset, ptr_t *addrp) {
+int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t *node,
+                offset_t offset, ptr_t *addrp) {
 	vm_object_t *object;
 	int ret;
 
@@ -735,6 +737,46 @@ int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t
 		}
 	}
 
+	mutex_unlock(&as->lock);
+	return ret;
+}
+
+/** Map a device into memory.
+ *
+ * Maps all or part of a device's memory into the calling process' address
+ * space. If the VM_MAP_FIXED flag is specified, then the region will be mapped
+ * at the exact location specified, and any existing mappings in the same
+ * region will be overwritten. Otherwise, a region of unused space will be
+ * allocated for the mapping. The VM_MAP_PRIVATE flag must not be specified. An
+ * error will be returned if the device does not support memory mapping.
+ *
+ * @param as		Address space to map in.
+ * @param start		Start address of region (if VM_MAP_FIXED).
+ * @param size		Size of region to map (multiple of system page size).
+ * @param flags		Flags to control mapping behaviour (VM_MAP_*).
+ * @param node		Device to map in (will have an extra reference on if
+ *			function succeeds).
+ * @param offset	Offset into device to map from.
+ * @param addrp		Where to store address of mapping.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vm_map_device(vm_aspace_t *as, ptr_t start, size_t size, int flags, device_t *device,
+                  offset_t offset, ptr_t *addrp) {
+	int ret;
+
+	if((ret = vm_map_check_args(start, size, flags, offset, addrp)) != 0) {
+		return ret;
+	} else if(flags & VM_MAP_PRIVATE) {
+		return -ERR_PARAM_INVAL;
+	} else if(!device->ops || !device->ops->fault) {
+		return -ERR_NOT_SUPPORTED;
+	}
+
+	mutex_lock(&as->lock, 0);
+
+	/* Attempt to map the region in. */
+	ret = vm_map_internal(as, start, size, flags, &device->vobj, offset, addrp);
 	mutex_unlock(&as->lock);
 	return ret;
 }
@@ -986,14 +1028,14 @@ int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_vm_map_file(vm_map_file_args_t *args) {
-	vm_map_file_args_t kargs;
+int sys_vm_map_file(vm_map_args_t *args) {
+	vm_map_args_t kargs;
 	handle_info_t *info;
 	vfs_handle_t *file;
 	int ret, err;
 	ptr_t addr;
 
-	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_file_args_t))) != 0) {
+	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_args_t))) != 0) {
 		return ret;
 	}
 
@@ -1016,6 +1058,53 @@ int sys_vm_map_file(vm_map_file_args_t *args) {
 
 	ret = vm_map_file(curr_proc->aspace, (ptr_t)kargs.start, kargs.size,
 	                  kargs.flags, file->node, kargs.offset, &addr);
+	if(ret == 0 && kargs.addrp) {
+		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
+			vm_unmap(curr_proc->aspace, addr, kargs.size);
+			ret = err;
+		}
+	}
+
+	handle_release(info);
+	return ret;
+}
+
+/** Map a device into memory.
+ *
+ * Maps all or part of a device's memory into the calling process' address
+ * space. If the VM_MAP_FIXED flag is specified, then the region will be mapped
+ * at the exact location specified, and any existing mappings in the same
+ * region will be overwritten. Otherwise, a region of unused space will be
+ * allocated for the mapping. The VM_MAP_PRIVATE flag must not be specified. An
+ * error will be returned if the device does not support memory mapping.
+ *
+ * @param args		Pointer to arguments structure.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_vm_map_device(vm_map_args_t *args) {
+	vm_map_args_t kargs;
+	handle_info_t *info;
+	device_t *device;
+	int ret, err;
+	ptr_t addr;
+
+	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_args_t))) != 0) {
+		return ret;
+	}
+
+	if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Look up the handle. */
+	if((ret = handle_get(&curr_proc->handles, kargs.handle, HANDLE_TYPE_DEVICE, &info)) != 0) {
+		return ret;
+	}
+	device = info->data;
+
+	ret = vm_map_device(curr_proc->aspace, (ptr_t)kargs.start, kargs.size,
+	                  kargs.flags, device, kargs.offset, &addr);
 	if(ret == 0 && kargs.addrp) {
 		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
 			vm_unmap(curr_proc->aspace, addr, kargs.size);

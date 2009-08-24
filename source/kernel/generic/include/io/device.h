@@ -21,6 +21,8 @@
 #ifndef __IO_DEVICE_H
 #define __IO_DEVICE_H
 
+#include <mm/vm.h>
+
 #include <sync/mutex.h>
 
 #include <types/list.h>
@@ -69,6 +71,16 @@ typedef struct device_ops {
 	 * @return		0 on success, negative error code on failure. */
 	int (*write)(struct device *device, const void *buf, size_t count, offset_t offset, size_t *bytesp);
 
+	/** Fault handler for memory regions mapping the device.
+	 * @note		If this operation is not specified then the
+	 *			device won't be allowed to be memory-mapped.
+	 * @param device	Device fault occurred on.
+	 * @param offset	Offset into device fault occurred at (page
+	 *			aligned).
+	 * @param physp		Where to store address of page to map.
+	 * @return		0 on success, negative error code on failure. */
+	int (*fault)(struct device *device, offset_t offset, phys_ptr_t *physp);
+
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.
 	 * @param request	Request number.
@@ -106,6 +118,8 @@ typedef struct device_attr {
 
 /** Structure describing an entry in the device tree. */
 typedef struct device {
+	vm_object_t vobj;		/**< VM object header. */
+
 	char *name;			/**< Name of the device. */
 	mutex_t lock;			/**< Lock to protect structure. */
 	refcount_t count;		/**< Number of users of the device. */

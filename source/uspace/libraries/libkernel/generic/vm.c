@@ -20,7 +20,8 @@
 
 #include <kernel/vm.h>
 
-extern int _vm_map_file(vm_map_file_args_t *args);
+extern int _vm_map_file(vm_map_args_t *args);
+extern int _vm_map_device(vm_map_args_t *args);
 
 /** Map a file into memory.
  *
@@ -48,7 +49,7 @@ extern int _vm_map_file(vm_map_file_args_t *args);
  * @return		0 on success, negative error code on failure.
  */
 int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
-	vm_map_file_args_t args;
+	vm_map_args_t args;
 
 	args.start = start;
 	args.size = size;
@@ -58,4 +59,35 @@ int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t o
 	args.addrp = addrp;
 
 	return _vm_map_file(&args);
+}
+
+/** Map a device into memory.
+ *
+ * Maps all or part of a device's memory into the calling process' address
+ * space. If the VM_MAP_FIXED flag is specified, then the region will be mapped
+ * at the exact location specified, and any existing mappings in the same
+ * region will be overwritten. Otherwise, a region of unused space will be
+ * allocated for the mapping. The VM_MAP_PRIVATE flag must not be specified. An
+ * error will be returned if the device does not support memory mapping.
+ *
+ * @param start		Start address of region (if VM_MAP_FIXED).
+ * @param size		Size of region to map (multiple of system page size).
+ * @param flags		Flags to control mapping behaviour (VM_MAP_*).
+ * @param handle	Handle to device to map in.
+ * @param offset	Offset into device to map from.
+ * @param addrp		Where to store address of mapping.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vm_map_device(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
+	vm_map_args_t args;
+
+	args.start = start;
+	args.size = size;
+	args.flags = flags;
+	args.handle = handle;
+	args.offset = offset;
+	args.addrp = addrp;
+
+	return _vm_map_device(&args);
 }

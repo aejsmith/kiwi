@@ -45,6 +45,60 @@
 /** Root of the device tree. */
 device_t *device_tree_root;
 
+/** Increase the reference count of a device VM object.
+ * @param obj		Object to reference.
+ * @param region	Region referencing the object. */
+static void device_vm_object_get(vm_object_t *obj, vm_region_t *region) {
+	device_t *device = (device_t *)obj;
+
+	assert(device->ops && device->ops->fault);
+	refcount_inc(&device->count);
+}
+
+/** Decrease the reference count of a device VM object.
+ * @param obj		Object to decrease count of.
+ * @param region	Region to detach. */
+static void device_vm_object_release(vm_object_t *obj, vm_region_t *region) {
+	device_t *device = (device_t *)obj;
+	refcount_dec(&device->count);
+}
+
+/** Handle a page fault on a device-backed region.
+ * @param region	Region fault occurred in.
+ * @param addr		Virtual address of fault (rounded down to base of page).
+ * @param reason	Reason for the fault.
+ * @param access	Type of access that caused the fault.
+ * @return		Fault status code. */
+static int device_vm_object_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
+	offset_t offset = region->offset + (addr - region->start);
+	device_t *device = (device_t *)region->object;
+	phys_ptr_t page;
+	int ret;
+
+	assert(device->ops && device->ops->fault);
+
+	/* Ask the device for a page. */
+	if((ret = device->ops->fault(device, offset, &page)) != 0) {
+		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
+		        offset, device, device->name, ret);
+		return VM_FAULT_UNHANDLED;
+	}
+
+	/* Insert into page map. */
+	if(unlikely(page_map_insert(&region->as->pmap, addr, page, vm_region_flags_to_page(region->flags), MM_SLEEP) != 0)) {
+		fatal("Failed to insert page map entry for %p", addr);
+	}
+
+	return VM_FAULT_HANDLED;
+}
+
+/** Device VM object operations. */
+static vm_object_ops_t device_vm_object_ops = {
+	.get = device_vm_object_get,
+	.release = device_vm_object_release,
+	.fault = device_vm_object_fault,
+};
+
 /** Create a new device tree node.
  *
  * Creates a new node in the device tree. The device created will not have a
@@ -80,6 +134,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	}
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
+	vm_object_init(&device->vobj, &device_vm_object_ops);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -167,6 +222,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	refcount_inc(&dest->count);
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
+	vm_object_init(&device->vobj, &device_vm_object_ops);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -235,6 +291,7 @@ int device_destroy(device_t *device) {
 	}
 
 	dprintf("device: destroyed device %p(%s) (parent: %p)\n", device, device->name, device->parent);
+	vm_object_destroy(&device->vobj);
 	kfree(device->name);
 	kfree(device);
 	return 0;

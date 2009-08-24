@@ -32,6 +32,7 @@
 #include <types/avl.h>
 #include <types/refcount.h>
 
+struct device;
 struct vfs_node;
 struct vm_aspace;
 struct vm_object;
@@ -209,6 +210,18 @@ typedef struct vm_aspace {
 #define VM_FAULT_HANDLED	1	/**< Fault was handled and execution can resume. */
 #define VM_FAULT_UNHANDLED	2	/**< Fault could not be handled. */
 
+/** Convert region flags to page map flags.
+ * @param flags         Flags to convert.
+ * @return              Page map flags. */
+static inline int vm_region_flags_to_page(int flags) {
+        int ret = 0;
+
+        ret |= ((flags & VM_REGION_READ) ? PAGE_MAP_READ : 0);
+        ret |= ((flags & VM_REGION_WRITE) ? PAGE_MAP_WRITE : 0);
+       	ret |= ((flags & VM_REGION_EXEC) ? PAGE_MAP_EXEC : 0);
+        return ret;
+}
+
 extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
 extern vm_page_t *vm_page_alloc(int pmflag);
 extern void vm_page_free(vm_page_t *page);
@@ -224,7 +237,10 @@ extern int vm_fault(ptr_t addr, int reason, int access);
 
 extern int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 extern int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *addrp);
-extern int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct vfs_node *node, offset_t offset, ptr_t *addrp);
+extern int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct vfs_node *node,
+                       offset_t offset, ptr_t *addrp);
+extern int vm_map_device(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct device *device,
+                         offset_t offset, ptr_t *addrp);
 extern int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);
@@ -239,18 +255,19 @@ extern int kdbg_cmd_aspace(int argc, char **argv);
 # pragma mark System calls.
 #endif
 
-/** Structure containing arguments for sys_vm_map_file(). */
-typedef struct vm_map_file_args {
+/** Structure containing arguments for sys_vm_map_file()/sys_vm_map_device(). */
+typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
 	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for file to map. */
-	offset_t offset;		/**< Offset in the file to map from. */
+	handle_t handle;		/**< Handle for file/device to map. */
+	offset_t offset;		/**< Offset in the file/device to map from. */
 	void **addrp;			/**< Where to store address mapped to. */
-} vm_map_file_args_t;
+} vm_map_args_t;
 
 extern int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp);
-extern int sys_vm_map_file(vm_map_file_args_t *args);
+extern int sys_vm_map_file(vm_map_args_t *args);
+extern int sys_vm_map_device(vm_map_args_t *args);
 extern int sys_vm_unmap(void *start, size_t size);
 
 #endif /* __MM_VM_H */

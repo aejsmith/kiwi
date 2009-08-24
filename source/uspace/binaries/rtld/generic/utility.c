@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-extern int _vm_map_file(vm_map_file_args_t *args);
+extern int _vm_map_file(vm_map_args_t *args);
 extern int putch(char ch);
 
 #if 0
@@ -43,7 +43,7 @@ extern int putch(char ch);
  * @param addrp		Where to store address of mapping.
  * @return		0 on success, negative error code on failure. */
 int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
-	vm_map_file_args_t args;
+	vm_map_args_t args;
 
 	args.start = start;
 	args.size = size;
