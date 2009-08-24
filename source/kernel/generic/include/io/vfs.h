@@ -60,7 +60,7 @@ typedef struct vfs_type {
 	 * @param dev		Device to check.
 	 * @return		True if the device contains a FS of this type,
 	 *			false if not. */
-	//bool (*probe)(device_t *dev);
+	bool (*probe)(struct device *dev);
 
 	/** Mount an instance of this filesystem type.
 	 * @note		It is guaranteed that the device will contain

@@ -115,6 +115,33 @@ static vfs_type_t *vfs_type_lookup(const char *name) {
 	return type;
 }
 
+/** Determine which filesystem type a device contains.
+ * @param device	Device to probe.
+ * @return		Pointer to type structure, or NULL if filesystem type
+ *			not recognized. If found, type will be referenced. */
+static vfs_type_t *vfs_type_probe(device_t *device) {
+	vfs_type_t *type;
+
+	assert(device);
+
+	mutex_lock(&vfs_type_list_lock, 0);
+
+	LIST_FOREACH(&vfs_type_list, iter) {
+		type = list_entry(iter, vfs_type_t, header);
+
+		if(!type->probe) {
+			continue;
+		} else if(type->probe(device)) {
+			refcount_inc(&type->count);
+			mutex_unlock(&vfs_type_list_lock);
+			return type;
+		}
+	}
+
+	mutex_unlock(&vfs_type_list_lock);
+	return NULL;
+}
+
 /** Register a new filesystem type.
  *
  * Registers a new filesystem type with the VFS.
@@ -1775,7 +1802,9 @@ static vfs_mount_t *vfs_mount_lookup(identifier_t id) {
  * @param dev		Device path for backing device for mount (can be NULL
  *			if the filesystem does not require a backing device).
  * @param path		Path to directory to mount on.
- * @param type		Name of filesystem type.
+ * @param type		Name of filesystem type (if not specified, device will
+ *			be probed to determine the correct type - in this case,
+ *			a device must be specified).
  * @param flags		Flags to specify mount behaviour.
  *
  * @return		0 on success, negative error code on failure.
@@ -1783,10 +1812,9 @@ static vfs_mount_t *vfs_mount_lookup(identifier_t id) {
 int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	vfs_mount_t *mount = NULL;
 	vfs_node_t *node = NULL;
-	device_t *device = NULL;
 	int ret;
 
-	if(!path || !type) {
+	if(!path || (!dev && !type)) {
 		return -ERR_PARAM_INVAL;
 	}
 
@@ -1816,13 +1844,6 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		}
 	}
 
-	/* Look up the device, if any. */
-	if(dev) {
-		if((ret = device_get(dev, &device)) != 0) {
-			goto fail;
-		}
-	}
-
 	/* Initialize the mount structure. */
 	mount = kmalloc(sizeof(vfs_mount_t), MM_SLEEP);
 	list_init(&mount->header);
@@ -1831,10 +1852,37 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	avl_tree_init(&mount->nodes);
 	mutex_init(&mount->lock, "vfs_mount_lock", 0);
 	mount->type = NULL;
-	mount->device = device;
+	mount->device = NULL;
 	mount->root = NULL;
 	mount->flags = NULL;
 	mount->mountpoint = node;
+
+	/* Look up the device, if any. */
+	if(dev) {
+		if((ret = device_get(dev, &mount->device)) != 0) {
+			goto fail;
+		}
+	}
+
+	/* Look up the filesystem type. If there is not a type specified, probe
+	 * for one. */
+	if(!type) {
+		if(!(mount->type = vfs_type_probe(mount->device))) {
+			ret = -ERR_PARAM_INVAL;
+			goto fail;
+		}
+	} else {
+		if(!(mount->type = vfs_type_lookup(type))) {
+			ret = -ERR_PARAM_INVAL;
+			goto fail;
+		}
+
+		/* Release the device if it is not needed. */
+		if(!mount->type->probe && mount->device) {
+			device_release(mount->device);
+			mount->device = NULL;
+		}
+	}
 
 	/* Allocate a mount ID. */
 	if(vfs_next_mount_id == INT32_MAX) {
@@ -1842,13 +1890,6 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		goto fail;
 	}
 	mount->id = vfs_next_mount_id++;
-
-	/* Look up the filesystem type. */
-	mount->type = vfs_type_lookup(type);
-	if(mount->type == NULL) {
-		ret = -ERR_PARAM_INVAL;
-		goto fail;
-	}
 
 	/* If the type is read-only, set read-only in the mount flags. */
 	if(mount->type->flags & VFS_TYPE_RDONLY) {
@@ -1890,6 +1931,9 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	return 0;
 fail:
 	if(mount) {
+		if(mount->device) {
+			device_release(mount->device);
+		}
 		if(mount->root) {
 			slab_cache_free(vfs_node_cache, mount->root);
 		}
@@ -1897,9 +1941,6 @@ fail:
 			refcount_dec(&mount->type->count);
 		}
 		kfree(mount);
-	}
-	if(device) {
-		device_release(device);
 	}
 	if(node) {
 		mutex_unlock(&node->lock);
@@ -2875,8 +2916,10 @@ int sys_fs_mount(const char *dev, const char *path, const char *type, int flags)
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
 		goto out;
 	}
-	if((ret = strndup_from_user(type, PATH_MAX, MM_SLEEP, &ktype)) != 0) {
-		goto out;
+	if(type) {
+		if((ret = strndup_from_user(type, PATH_MAX, MM_SLEEP, &ktype)) != 0) {
+			goto out;
+		}
 	}
 
 	ret = vfs_mount(kdev, kpath, ktype, flags);
