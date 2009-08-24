@@ -45,6 +45,9 @@
 /** Root of the device tree. */
 device_t *device_tree_root;
 
+/** Standard device directories. */
+device_t *device_bus_dir;
+
 /** Increase the reference count of a device VM object.
  * @param obj		Object to reference.
  * @param region	Region referencing the object. */
@@ -579,6 +582,10 @@ static void __init_text device_init(void) {
 	refcount_set(&device_tree_root->count, 0);
 	radix_tree_init(&device_tree_root->children);
 	device_tree_root->name = (char *)"<root>";
+
+	if(device_create("bus", device_tree_root, NULL, NULL, NULL, 0, &device_bus_dir) != 0) {
+		fatal("Could not create bus directory in device tree");
+	}
 }
 INITCALL(device_init);
 

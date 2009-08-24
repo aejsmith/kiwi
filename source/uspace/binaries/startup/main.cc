@@ -111,6 +111,60 @@ private:
 	int m_indent;
 };
 
+/** Load a module in a directory. */
+static int load_module(const char *dir, const char *name) {
+	char path[4096], depbuf[64];
+	int ret;
+
+	strcpy(path, dir);
+	strcat(path, "/");
+	strcat(path, name);
+
+	printf("Loading module %s...\n", path);
+
+	while((ret = module_load(path, depbuf)) == -ERR_DEP_MISSING) {
+		strcat(depbuf, ".mod");
+		load_module(dir, depbuf);
+	}
+
+	if(ret != 0) {
+		printf("Load %s failed (%d)\n", path, ret);
+	}
+	return ret;
+}
+
+/** Load all modules in the modules directory. */
+static int load_modules(const char *dir) {
+	fs_dir_entry_t *entry;
+	handle_t handle;
+	int ret;
+
+	if((handle = fs_dir_open(dir, 0)) < 0) {
+		printf("Failed to open module directory (%d)\n", handle);
+		return handle;
+	} else if(!(entry = reinterpret_cast<fs_dir_entry_t *>(malloc(4096)))) {
+		printf("Failed to allocate directory entry buffer\n");
+		return -ERR_NO_MEMORY;
+	}
+
+	while(true) {
+		if((ret = fs_dir_read(handle, entry, 4096, -1)) != 0) {
+			if(ret != -ERR_NOT_FOUND) {
+				printf("Read module directory failed (%d)\n", ret);
+				return ret;
+			}
+
+			free(entry);
+			handle_close(handle);
+			return 0;
+		} else if(strcmp(entry->name, ".") == 0 || strcmp(entry->name, "..") == 0) {
+			continue;
+		}
+
+		load_module(dir, entry->name);
+	}
+}
+
 int main(int argc, char **argv) {
 	DirTreePrinter printer;
 	Process *proc;
@@ -121,8 +175,9 @@ int main(int argc, char **argv) {
 		printf(" argv[%d] = '%s'\n", i, argv[i]);
 	}
 
-	ret = module_load("/system/modules/i8042.kmod", (char *)0x1234);
-	printf("Module load returned %d\n", ret);
+	if((ret = load_modules("/system/modules")) != 0) {
+		return -ret;
+	}
 
 	printf("Directory tree:\n");
 	printer.print("/");

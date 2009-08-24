@@ -135,6 +135,7 @@ typedef struct device {
 } device_t;
 
 extern device_t *device_tree_root;
+extern device_t *device_bus_dir;
 
 extern int device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
                          device_attr_t *attrs, size_t count, device_t **devicep);

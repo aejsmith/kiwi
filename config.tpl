@@ -78,8 +78,10 @@ Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
 Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
 
 #######
-#Section('Module configuration')
+Section('Module configuration')
 #######
+
+Option('MODULE_BUS_PCI', 'PCI bus module.', True)
 
 #####################################
 # Configuration validation function #

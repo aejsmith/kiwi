@@ -104,8 +104,8 @@ static device_ops_t i8042_device_ops = {
  * @return		0 on success, negative error code on failure. */
 static int i8042_init(void) {
 	device_attr_t attrs[] = {
-		{ "input/type", DEVICE_ATTR_STRING, {string: "keyboard"} },
-		{ "input/protocol", DEVICE_ATTR_STRING, {string: "at"} },
+		{ "input.type", DEVICE_ATTR_STRING, {string: "keyboard"} },
+		{ "input.protocol", DEVICE_ATTR_STRING, {string: "at"} },
 	};
 	device_t *dev, *dir;
 	int ret;
