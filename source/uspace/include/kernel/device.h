@@ -39,7 +39,6 @@ typedef struct device_request_args {
 } device_request_args_t;
 
 extern handle_t device_open(const char *path);
-extern int device_type(handle_t handle);
 extern int device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int device_request(handle_t handle, int request, void *in, size_t insz, void *out, size_t outsz, size_t *bytesp);

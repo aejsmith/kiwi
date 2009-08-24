@@ -43,192 +43,155 @@
 #endif
 
 /** Root of the device tree. */
-static device_dir_t *device_tree_root;
+device_t *device_tree_root;
 
-/** Create a child in a device directory.
- * @param dir		Directory to create in (should be locked).
- * @param name		Name for child (will be duplicated).
- * @return		Pointer to child structure (locked). */
-static device_dir_t *device_dir_child_create(device_dir_t *dir, const char *name) {
-	device_dir_t *child = kmalloc(sizeof(device_dir_t), MM_SLEEP);
-
-	mutex_init(&child->lock, "device_dir_lock", 0);
-	mutex_lock(&child->lock, 0);
-	radix_tree_init(&child->children);
-	child->header = DEVICE_TREE_DIR;
-	child->parent = dir;
-	child->name = kstrdup(name, MM_SLEEP);
-
-	radix_tree_insert(&dir->children, child->name, child);
-	dprintf("device: created directory %p(%s) under %p(%s)\n", child, name, dir, dir->name);
-	return child;
-}
-
-/** Create a directory in the device tree.
+/** Create a new device tree node.
  *
- * Creates a directory under an existing directory in the device tree.
+ * Creates a new node in the device tree. The device created will not have a
+ * reference on it. The device can have no operations, in which case it will
+ * simply act as a container for other devices.
  *
- * @param name		Name to give directory.
- * @param parent	Directory to create under.
- * @param dirp		Where to store pointer to directory structure.
+ * @param name		Name of device to create (will be duplicated).
+ * @param parent	Parent device.
+ * @param ops		Operations for the device (can be NULL).
+ * @param data		Data used by the device operations.
+ * @param attrs		Optional array of attributes for the device (will be
+ *			duplicated).
+ * @param count		Number of attributes.
+ * @param devicep	Where to store pointer to device structure.
  *
  * @return		0 on success, negative error code on failure.
  */
-int device_dir_create_in(const char *name, device_dir_t *parent, device_dir_t **dirp) {
-	device_dir_t *dir;
+int device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
+                  device_attr_t *attrs, size_t count, device_t **devicep) {
+	device_t *device = NULL;
+	size_t i;
+	int ret;
 
-	if(!name || !parent || !dirp) {
+	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !devicep) {
 		return -ERR_PARAM_INVAL;
 	}
 
+	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock, 0);
+	if(radix_tree_lookup(&parent->children, name)) {
+		ret = -ERR_ALREADY_EXISTS;
+		goto fail;
+	}
 
+	device = kmalloc(sizeof(device_t), MM_SLEEP);
+	mutex_init(&device->lock, "device_lock", 0);
+	refcount_set(&device->count, 0);
+	radix_tree_init(&device->children);
+	device->name = kstrdup(name, MM_SLEEP);
+	device->parent = parent;
+	device->dest = NULL;
+	device->ops = ops;
+	device->data = data;
+
+	if(attrs) {
+		/* Ensure the attribute structures are valid. Do validity
+		 * checking before allocating anything to make it easier to
+		 * clean up if an invalid structure is found. */
+		for(i = 0; i < count; i++) {
+			if(!attrs[i].name || strlen(attrs[i].name) >= DEVICE_NAME_MAX) {
+				ret = -ERR_PARAM_INVAL;
+				goto fail;
+			} else if(attrs[i].type == DEVICE_ATTR_STRING) {
+				if(!attrs[i].value.string || strlen(attrs[i].value.string) >= DEVICE_ATTR_MAX) {
+					ret = -ERR_PARAM_INVAL;
+					goto fail;
+				}
+			}
+		}
+
+		/* Duplicate the structures, then fix up the data. */
+		device->attrs = kmemdup(attrs, sizeof(device_attr_t) * count, MM_SLEEP);
+		device->attr_count = count;
+		for(i = 0; i < device->attr_count; i++) {
+			device->attrs[i].name = kstrdup(device->attrs[i].name, MM_SLEEP);
+			if(device->attrs[i].type == DEVICE_ATTR_STRING) {
+				device->attrs[i].value.string = kstrdup(device->attrs[i].value.string, MM_SLEEP);
+			}
+		}
+	} else {
+		device->attrs = NULL;
+		device->attr_count = 0;
+	}
+
+	/* Attach to the parent. */
+	refcount_inc(&parent->count);
+	radix_tree_insert(&parent->children, device->name, device);
+	mutex_unlock(&parent->lock);
+
+	dprintf("device: created device %p(%s) under %p(%s) (ops: %p, data: %p)\n",
+	        device, device->name, parent, parent->name, ops, data);
+	*devicep = device;
+	return 0;
+fail:
+	if(device) {
+		kfree(device->name);
+		kfree(device);
+	}
+	mutex_unlock(&parent->lock);
+	return ret;
+}
+
+/** Create an alias for a device.
+ *
+ * Creates an alias for another device in the device tree. Any attempts to get
+ * the alias will return the device it is an alias for. Any aliases created
+ * for a device should be destroyed before destroying the device itself.
+ *
+ * @param name		Name to give alias.
+ * @param parent	Device to create alias under.
+ * @param dest		Destination device.
+ * @param devicep	Where to store pointer to alias structure.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
+	device_t *device;
+
+	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest || !devicep) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Check if a child already exists with this name. */
+	mutex_lock(&parent->lock, 0);
 	if(radix_tree_lookup(&parent->children, name)) {
 		mutex_unlock(&parent->lock);
 		return -ERR_ALREADY_EXISTS;
 	}
 
-	dir = device_dir_child_create(parent, name);
-	mutex_unlock(&dir->lock);
-	mutex_unlock(&parent->lock);
-	*dirp = dir;
-	return 0;
-}
-
-/** Create a directory in the device tree.
- *
- * Creates a directory in the device tree, and all directories leading to the
- * directory if they do not already exist. If the directory itself already
- * exists, an error is returned.
- *
- * @param path		Path to directory to create.
- * @param dirp		Where to store pointer to directory structure.
- *
- * @return		0 on success, negative error code on failure.
- */
-int device_dir_create(const char *path, device_dir_t **dirp) {
-	device_dir_t *curr = device_tree_root, *child;
-	char *dir, *orig, *name, *tok;
-	int ret;
-
-	if(!path || !path[0] || path[0] != '/' || !dirp) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	/* Split into directory/name. */
-	dir = orig = kdirname(path, MM_SLEEP);
-	name = kbasename(path, MM_SLEEP);
-	if(strchr(name, '/')) {
-		ret = -ERR_ALREADY_EXISTS;
-		goto out;
-	}
-
-	/* Create non-existant parent directories. */
-	mutex_lock(&curr->lock, 0);
-	while((tok = strsep(&dir, "/"))) {
-		if(!tok[0]) {
-			continue;
-		} else if((child = radix_tree_lookup(&curr->children, tok))) {
-			if(child->header != DEVICE_TREE_DIR) {
-				mutex_unlock(&curr->lock);
-				ret = -ERR_TYPE_INVAL;
-				goto out;
-			}
-
-			mutex_lock(&child->lock, 0);
-			mutex_unlock(&curr->lock);
-			curr = child;
-			continue;
-		}
-
-		/* Does not exist, create. */
-		child = device_dir_child_create(curr, tok);
-		mutex_unlock(&curr->lock);
-		curr = child;
-	}
-
-	child = device_dir_child_create(curr, name);
-	mutex_unlock(&child->lock);
-	mutex_unlock(&curr->lock);
-	*dirp = child;
-	ret = 0;
-out:
-	kfree(orig);
-	kfree(name);
-	return ret;
-}
-
-/** Delete a device tree directory.
- *
- * Deletes a directory in the device tree referred to by the provided
- * structure. The directory must be empty.
- *
- * @param dir		Directory to delete.
- *
- * @return		0 on success, negative error code on failure.
- */
-int device_dir_destroy(device_dir_t *dir) {
-	assert(dir->parent);
-
-	mutex_lock(&dir->parent->lock, 0);
-	mutex_lock(&dir->lock, 0);
-
-	if(!radix_tree_empty(&dir->children)) {
-		return -ERR_IN_USE;
-	}
-
-	radix_tree_remove(&dir->parent->children, dir->name, NULL);
-	mutex_unlock(&dir->parent->lock);
-	mutex_unlock(&dir->lock);
-
-	kfree(dir->name);
-	kfree(dir);
-	return 0;
-}
-
-/** Create a new device.
- *
- * Creates a new device and inserts it into the device tree. The device created
- * will not have a reference on it.
- *
- * @param name		Name of device to create.
- * @param parent	Parent directory.
- * @param type		Device type ID.
- * @param ops		Operations for the device.
- * @param data		Data used by the device's creator.
- * @param devicep	Where to store pointer to device structure.
- *
- * @return		0 on success, negative error code on failure.
- */
-int device_create(const char *name, device_dir_t *parent, int type, device_ops_t *ops, void *data, device_t **devicep) {
-	device_t *device;
-
-	if(!name || !parent || !ops || !devicep) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	mutex_lock(&parent->lock, 0);
+	refcount_inc(&dest->count);
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
+	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
-	device->header = DEVICE_TREE_DEVICE;
-	device->parent = parent;
+	radix_tree_init(&device->children);
 	device->name = kstrdup(name, MM_SLEEP);
-	device->type = type;
-	device->ops = ops;
-	device->data = data;
+	device->parent = parent;
+	device->dest = dest;
+	device->ops = NULL;
+	device->data = NULL;
+	device->attrs = NULL;
+	device->attr_count = 0;
 
+	refcount_inc(&parent->count);
 	radix_tree_insert(&parent->children, device->name, device);
-	dprintf("device: created device %p(%s) under %p(%s) (type: %d, ops: %p)\n",
-	        device, device->name, parent, parent->name, type, ops);
 	mutex_unlock(&parent->lock);
+
+	dprintf("device: created alias %p(%s) under %p(%s) (dest: %p)\n",
+	        device, device->name, parent, parent->name, dest);
 	*devicep = device;
 	return 0;
 }
 
 /** Remove a device from the device tree.
  *
- * Removes a device from the device tree. The device must have no users.
+ * Removes a device from the device tree. The device must have no users. All
+ * aliases of the device should be destroyed before the device itself.
  *
  * @todo		Sometime we'll need to allow devices to be removed when
  *			they have users, for example for hotplugging.
@@ -238,21 +201,40 @@ int device_create(const char *name, device_dir_t *parent, int type, device_ops_t
  * @return		0 on success, negative error code on failure.
  */
 int device_destroy(device_t *device) {
-	/* Obtain the parent's lock. By doing so before checking the reference
-	 * count of the device, we guarantee that the reference count will not
-	 * change after it has been checked, because the parent must be locked
-	 * to increase a device's reference count. */
+	size_t i;
+
+	assert(device->parent);
+
 	mutex_lock(&device->parent->lock, 0);
+	mutex_lock(&device->lock, 0);
 
 	if(refcount_get(&device->count) != 0) {
+		mutex_unlock(&device->lock);
 		mutex_unlock(&device->parent->lock);
 		return -ERR_IN_USE;
 	}
 
 	radix_tree_remove(&device->parent->children, device->name, NULL);
+	refcount_dec(&device->parent->count);
 	mutex_unlock(&device->parent->lock);
 
-	dprintf("device: destroyed device %p(%s)\n", device, device->name);
+	if(device->dest) {
+		refcount_dec(&device->dest->count);
+	}
+
+	/* Free up attributes if any. */
+	if(device->attrs) {
+		for(i = 0; i < device->attr_count; i++) {
+			kfree((char *)device->attrs[i].name);
+			if(device->attrs[i].type == DEVICE_ATTR_STRING) {
+				kfree((char *)device->attrs[i].value.string);
+			}
+		}
+
+		kfree(device->attrs);
+	}
+
+	dprintf("device: destroyed device %p(%s) (parent: %p)\n", device, device->name, device->parent);
 	kfree(device->name);
 	kfree(device);
 	return 0;
@@ -260,17 +242,15 @@ int device_destroy(device_t *device) {
 
 /** Look up a device.
  *
- * Looks up a device in the device tree and increases its reference count.
- * Once the device is no longer required it should be released with
- * device_release().
+ * Looks up an entry in the device tree and increases its reference count. Once
+ * the device is no longer needed it should be released with device_release().
  *
  * @param path		Path to device.
  * @param devicep	Where to store pointer to device structure.
  */
 int device_get(const char *path, device_t **devicep) {
-	device_dir_t *curr = device_tree_root, *child;
+	device_t *device = device_tree_root, *child;
 	char *dup, *orig, *tok;
-	device_t *device;
 	int ret;
 
 	if(!path || !path[0] || path[0] != '/' || !devicep) {
@@ -279,40 +259,35 @@ int device_get(const char *path, device_t **devicep) {
 
 	dup = orig = kstrdup(path, MM_SLEEP);
 
-	mutex_lock(&curr->lock, 0);
-	while(true) {
-		tok = strsep(&dup, "/");
-
+	mutex_lock(&device->lock, 0);
+	while((tok = strsep(&dup, "/"))) {
 		if(!tok[0]) {
 			continue;
-		} else if(!(child = radix_tree_lookup(&curr->children, tok))) {
-			mutex_unlock(&curr->lock);
+		} else if(!(child = radix_tree_lookup(&device->children, tok))) {
+			mutex_unlock(&device->lock);
 			kfree(orig);
 			return -ERR_NOT_FOUND;
-		} else if(child->header == DEVICE_TREE_DEVICE) {
-			if((tok = strsep(&dup, "/"))) {
-				mutex_unlock(&curr->lock);
-				kfree(orig);
-				return -ERR_TYPE_INVAL;
-			}
-
-			device = (device_t *)child;
-			refcount_inc(&device->count);
-			mutex_unlock(&curr->lock);
-
-			if(device->ops->get && (ret = device->ops->get(device)) != 0) {
-				refcount_dec(&device->count);
-				return ret;
-			}
-
-			*devicep = device;
-			return 0;
-		} else {
-			mutex_lock(&child->lock, 0);
-			mutex_unlock(&curr->lock);
-			curr = child;
 		}
+
+		/* Move down to the device and then iterate through until we
+		 * reach an entry that isn't an alias. */
+		do {
+			mutex_lock(&child->lock, 0);
+			mutex_unlock(&device->lock);
+			device = child;
+		} while((child = device->dest));
 	}
+
+	refcount_inc(&device->count);
+
+	if(device->ops && device->ops->get && (ret = device->ops->get(device)) != 0) {
+		refcount_dec(&device->count);
+		return ret;
+	}
+
+	mutex_unlock(&device->lock);
+	*devicep = device;
+	return 0;
 }
 
 /** Read from a device.
@@ -333,13 +308,13 @@ int device_get(const char *path, device_t **devicep) {
 int device_read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	if(!device || !buf || offset < 0) {
 		return -ERR_PARAM_INVAL;
+	} else if(!device->ops || !device->ops->read) {
+		return -ERR_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
 			*bytesp = 0;
 		}
 		return 0;
-	} else if(!device->ops->read) {
-		return -ERR_NOT_SUPPORTED;
 	}
 
 	assert(refcount_get(&device->count));
@@ -365,13 +340,13 @@ int device_read(device_t *device, void *buf, size_t count, offset_t offset, size
 int device_write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	if(!device || !buf || offset < 0) {
 		return -ERR_PARAM_INVAL;
+	} else if(!device->ops || !device->ops->write) {
+		return -ERR_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
 			*bytesp = 0;
 		}
 		return 0;
-	} else if(!device->ops->write) {
-		return -ERR_NOT_SUPPORTED;
 	}
 
 	assert(refcount_get(&device->count));
@@ -398,7 +373,7 @@ int device_write(device_t *device, const void *buf, size_t count, offset_t offse
 int device_request(device_t *device, int request, void *in, size_t insz, void **outp, size_t *outszp) {
 	if(!device) {
 		return -ERR_PARAM_INVAL;
-	} else if(!device->ops->request) {
+	} else if(!device->ops || !device->ops->request) {
 		return -ERR_NOT_SUPPORTED;
 	}
 
@@ -415,37 +390,29 @@ int device_request(device_t *device, int request, void *in, size_t insz, void **
  * @param device	Device to release.
  */
 void device_release(device_t *device) {
-	if(device->ops->release) {
+	mutex_lock(&device->lock, 0);
+
+	if(device->ops && device->ops->release) {
 		device->ops->release(device);
 	}
+
 	refcount_dec(&device->count);
+	mutex_unlock(&device->lock);
 }
 
-/** Print out a device directory's children.
+/** Print out a device's children.
  * @param tree		Radix tree to print.
  * @param indent	Indentation level. */
-static void device_dir_dump(radix_tree_t *tree, int indent) {
-	device_dir_t *dir;
-	uint32_t *header;
+static void device_dump_children(radix_tree_t *tree, int indent) {
 	device_t *device;
 
 	RADIX_TREE_FOREACH(tree, iter) {
-		header = radix_tree_entry(iter, uint32_t);
+		device = radix_tree_entry(iter, device_t);
 
-		if(*header == DEVICE_TREE_DIR) {
-			dir = radix_tree_entry(iter, device_dir_t);
-
-			kprintf(LOG_NONE, "%*s%-*s %-18p\n", indent, "",
-			        24 - indent, dir->name, dir->parent);
-			device_dir_dump(&dir->children, indent + 2);
-		} else {
-			device = radix_tree_entry(iter, device_t);
-
-			kprintf(LOG_NONE, "%*s%-*s %-18p %-4d %-5d %p\n", indent, "",
-			        24 - indent, device->name, device->parent,
-			        device->type, refcount_get(&device->count),
-			        device->data);
-		}
+		kprintf(LOG_NONE, "%*s%-*s %-18p %-18p %d\n", indent, "",
+		        24 - indent, device->name, device, device->parent,
+		        refcount_get(&device->count));
+		device_dump_children(&device->children, indent + 2);
 	}
 }
 
@@ -466,20 +433,94 @@ int kdbg_cmd_devices(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "Name                     Parent             Type Count Data\n");
-	kprintf(LOG_NONE, "====                     ======             ==== ===== ====\n");
+	kprintf(LOG_NONE, "Name                     Address            Parent             Count\n");
+	kprintf(LOG_NONE, "====                     =======            ======             =====\n");
 
-	device_dir_dump(&device_tree_root->children, 0);
+	device_dump_children(&device_tree_root->children, 0);
+	return KDBG_OK;
+}
+
+/** Print out a device.
+ *
+ * Prints out information about a single device.
+ *
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ *
+ * @return		Always returns KDBG_OK.
+ */
+int kdbg_cmd_device(int argc, char **argv) {
+	device_t *device;
+	unative_t val;
+	size_t i;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s <addr>\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints out information about a single device.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	} else if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	}
+
+	device = (device_t *)((ptr_t)val);
+
+	/* Print out basic node information. */
+	kprintf(LOG_NONE, "Device %p(%s)\n", device, device->name);
+	kprintf(LOG_NONE, "=================================================\n");
+	kprintf(LOG_NONE, "Count:       %d\n", refcount_get(&device->count));
+	kprintf(LOG_NONE, "Parent:      %p\n", device->parent);
+	if(device->dest) {
+		kprintf(LOG_NONE, "Destination: %p(%s)\n", device->dest, device->dest->name);
+	}
+	kprintf(LOG_NONE, "Ops:         %p\n", device->ops);
+	kprintf(LOG_NONE, "Data:        %p\n", device->data);
+
+	if(!device->attrs) {
+		return KDBG_OK;
+	}
+
+	kprintf(LOG_NONE, "\nAttributes:\n");
+
+	for(i = 0; i < device->attr_count; i++) {
+		kprintf(LOG_NONE, "  %s - ", device->attrs[i].name);
+		switch(device->attrs[i].type) {
+		case DEVICE_ATTR_UINT8:
+			kprintf(LOG_NONE, "uint8: %" PRIu8 " (0x%" PRIx8 ")\n",
+			        device->attrs[i].value.uint8, device->attrs[i].value.uint8);
+			break;
+		case DEVICE_ATTR_UINT16:
+			kprintf(LOG_NONE, "uint16: %" PRIu16 " (0x%" PRIx16 ")\n",
+			        device->attrs[i].value.uint16, device->attrs[i].value.uint16);
+			break;
+		case DEVICE_ATTR_UINT32:
+			kprintf(LOG_NONE, "uint32: %" PRIu32 " (0x%" PRIx32 ")\n",
+			        device->attrs[i].value.uint32, device->attrs[i].value.uint32);
+			break;
+		case DEVICE_ATTR_UINT64:
+			kprintf(LOG_NONE, "uint64: %" PRIu64 " (0x%" PRIx64 ")\n",
+			        device->attrs[i].value.uint64, device->attrs[i].value.uint64);
+			break;
+		case DEVICE_ATTR_STRING:
+			kprintf(LOG_NONE, "string: '%s'\n", device->attrs[i].value.string);
+			break;
+		default:
+			kprintf(LOG_NONE, "Invalid!\n");
+			break;
+		}
+	}
 	return KDBG_OK;
 }
 
 /** Initialize the device manager. */
 static void __init_text device_init(void) {
-	device_tree_root = kmalloc(sizeof(device_dir_t), MM_FATAL);
-	mutex_init(&device_tree_root->lock, "device_tree_root_lock", 0);
+	device_tree_root = kcalloc(1, sizeof(device_t), MM_FATAL);
+	mutex_init(&device_tree_root->lock, "device_root_lock", 0);
+	refcount_set(&device_tree_root->count, 0);
 	radix_tree_init(&device_tree_root->children);
-	device_tree_root->header = DEVICE_TREE_DIR;
-	device_tree_root->parent = NULL;
 	device_tree_root->name = (char *)"<root>";
 }
 INITCALL(device_init);
@@ -522,28 +563,6 @@ handle_t sys_device_open(const char *path) {
 		return ret;
 	} else if((ret = handle_create(&curr_proc->handles, &device_handle_type, device)) < 0) {
 		device_release(device);
-	}
-
-	return ret;
-}
-
-/** Get the type of a device.
- *
- * Returns the type ID of the device referred to by a handle.
- *
- * @param handle	Handle to device to query.
- *
- * @return		Type ID on success, negative error code on failure.
- */
-int sys_device_type(handle_t handle) {
-	handle_info_t *info;
-	device_t *device;
-	int ret;
-
-	if(!(ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_DEVICE, &info))) {
-		device = info->data;
-		ret = device->type;
-		handle_release(info);
 	}
 
 	return ret;

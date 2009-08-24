@@ -103,8 +103,11 @@ static device_ops_t i8042_device_ops = {
 /** Initialize the i8042 port driver.
  * @return		0 on success, negative error code on failure. */
 static int i8042_init(void) {
-	device_dir_t *dir;
-	device_t *dev;
+	device_attr_t attrs[] = {
+		{ "input/type", DEVICE_ATTR_STRING, {string: "keyboard"} },
+		{ "input/protocol", DEVICE_ATTR_STRING, {string: "at"} },
+	};
+	device_t *dev, *dir;
 	int ret;
 
 	if((ret = irq_register(1, i8042_irq_handler, NULL)) != 0) {
@@ -112,10 +115,10 @@ static int i8042_init(void) {
 	}
 
 	/* Register devices with the input device layer. */
-	if((ret = device_dir_create("/input", &dir)) != 0) {
+	if((ret = device_create("input", device_tree_root, NULL, NULL, NULL, 0, &dir)) != 0) {
 		irq_unregister(1, i8042_irq_handler, NULL);
 		return ret;
-	} else if((ret = device_create("keyboard", dir, DEVICE_TYPE_INPUT, &i8042_device_ops, NULL, &dev)) != 0) {
+	} else if((ret = device_create("keyboard", dir, &i8042_device_ops, NULL, attrs, ARRAYSZ(attrs), &dev)) != 0) {
 		irq_unregister(1, i8042_irq_handler, NULL);
 		return ret;
 	}

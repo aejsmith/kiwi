@@ -90,6 +90,7 @@ static struct {
 	{ "continue",	"Exit KDBG and continue execution.",		kdbg_cmd_continue },
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "devices",	"Print out the device tree.",			kdbg_cmd_devices },
+	{ "device",	"Print out information about a device.",	kdbg_cmd_device },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
 	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
