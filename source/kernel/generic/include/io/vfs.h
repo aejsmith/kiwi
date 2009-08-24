@@ -31,6 +31,7 @@
 
 #include <limits.h>
 
+struct device;
 struct vfs_mount;
 struct vfs_node;
 
@@ -235,7 +236,7 @@ typedef struct vfs_mount {
 	identifier_t id;		/**< Mount ID. */
 	vfs_type_t *type;		/**< Filesystem type. */
 	void *data;			/**< Filesystem type data. */
-	//device_t *device;		/**< Device that the filesystem resides on. */
+	struct device *device;		/**< Device that the filesystem resides on. */
 	int flags;			/**< Flags for the mount. */
 
 	struct vfs_node *root;		/**< Root node for the mount. */

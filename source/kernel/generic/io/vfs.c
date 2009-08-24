@@ -29,6 +29,7 @@
 #include <console/kprintf.h>
 
 #include <io/context.h>
+#include <io/device.h>
 #include <io/vfs.h>
 
 #include <lib/string.h>
@@ -1782,6 +1783,7 @@ static vfs_mount_t *vfs_mount_lookup(identifier_t id) {
 int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	vfs_mount_t *mount = NULL;
 	vfs_node_t *node = NULL;
+	device_t *device = NULL;
 	int ret;
 
 	if(!path || !type) {
@@ -1814,6 +1816,13 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		}
 	}
 
+	/* Look up the device, if any. */
+	if(dev) {
+		if((ret = device_get(dev, &device)) != 0) {
+			goto fail;
+		}
+	}
+
 	/* Initialize the mount structure. */
 	mount = kmalloc(sizeof(vfs_mount_t), MM_SLEEP);
 	list_init(&mount->header);
@@ -1822,6 +1831,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	avl_tree_init(&mount->nodes);
 	mutex_init(&mount->lock, "vfs_mount_lock", 0);
 	mount->type = NULL;
+	mount->device = device;
 	mount->root = NULL;
 	mount->flags = NULL;
 	mount->mountpoint = node;
@@ -1887,6 +1897,9 @@ fail:
 			refcount_dec(&mount->type->count);
 		}
 		kfree(mount);
+	}
+	if(device) {
+		device_release(device);
 	}
 	if(node) {
 		mutex_unlock(&node->lock);
@@ -2855,10 +2868,9 @@ int sys_fs_mount(const char *dev, const char *path, const char *type, int flags)
 
 	/* Copy string arguments across from userspace. */
 	if(dev) {
-		//if((ret = strndup_from_user(dev, 0, &kdev)) != 0) {
-		//	goto out;
-		//}
-		return -ERR_NOT_IMPLEMENTED;
+		if((ret = strndup_from_user(dev, PATH_MAX, MM_SLEEP, &kdev)) != 0) {
+			goto out;
+		}
 	}
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
 		goto out;
