@@ -51,6 +51,7 @@ int mutex_lock(mutex_t *lock, int flags) {
 
 		assert(!lock->recursion);
 		lock->holder = curr_thread;
+		lock->caller = (ptr_t)__builtin_return_address(0);
 	} else if(curr_thread && !(lock->flags & MUTEX_RECURSIVE)) {
 		fatal("Nested locking of mutex %p(%s) by %" PRIu32 "(%s)",
 		      lock, lock->sem.queue.name, lock->holder->id,
@@ -85,6 +86,7 @@ void mutex_unlock(mutex_t *lock) {
 	 * scheduler is not up. In this case, mutex_lock() does not down the
 	 * semaphore. */
 	if(--lock->recursion == 0 && lock->holder) {
+		lock->caller = 0;
 		lock->holder = NULL;
 		semaphore_up(&lock->sem);
 	}

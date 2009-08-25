@@ -29,6 +29,7 @@ typedef struct mutex {
 	int flags;			/**< Behaviour flags for the mutex. */
 	struct thread *holder;		/**< Thread holding the lock. */
 	int recursion;			/**< Recursion count. */
+	ptr_t caller;			/**< Return address of call that first locked. */
 } mutex_t;
 
 /** Initializes a statically declared mutex. */
