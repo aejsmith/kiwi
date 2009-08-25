@@ -27,6 +27,8 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <proc/thread.h>
+
 #include <symbol.h>
 #include <kdbg.h>
 
@@ -181,27 +183,45 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
  */
 int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
+	thread_t *thread;
 	size_t off = 0;
+	ptr_t page, ip;
+	unative_t tid;
 	symbol_t *sym;
-	ptr_t page;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
-		kprintf(LOG_NONE, "Prints out a backtrace.\n");
+		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Prints out a backtrace for a thread, or the current kernel stack if no\n");
+		kprintf(LOG_NONE, "thread specified.\n");
 		return KDBG_OK;
+	} else if(argc != 1 && argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
+		return KDBG_FAIL;
 	}
 
 	/* Get the stack frame. */
-	frame = (stack_frame_t *)curr_kdbg_frame->bp;
+	if(argc == 2) {
+		if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
+			return KDBG_FAIL;
+		} else if(!(thread = thread_lookup(tid))) {
+			kprintf(LOG_NONE, "Invalid thread ID.\n");
+			return KDBG_FAIL;
+		}
+
+		frame = (stack_frame_t *)thread->context.bp;
+		ip = thread->context.ip;
+	} else {
+		frame = (stack_frame_t *)curr_kdbg_frame->bp;
+		ip = curr_kdbg_frame->ip;
+	}
 
 	/* Make sure we stay on the same page. */
 	page = (ptr_t)frame & PAGE_MASK;
 
 	/* Print out the address of where the exception occurred. */
-	sym = symbol_lookup_addr(curr_kdbg_frame->ip, &off);
+	sym = symbol_lookup_addr(ip, &off);
 	kprintf(LOG_NONE, "--- Interrupt ---\n");
-	kprintf(LOG_NONE, "[%p] %s+0x%zx\n", curr_kdbg_frame->ip,
-	        (sym) ? sym->name : "<unknown>", off);
+	kprintf(LOG_NONE, "[%p] %s+0x%zx\n", ip, (sym) ? sym->name : "<unknown>", off);
 
 	kprintf(LOG_NONE, "--- Stacktrace ---\n");
 	while(frame && ((ptr_t)frame & PAGE_MASK) == page) {

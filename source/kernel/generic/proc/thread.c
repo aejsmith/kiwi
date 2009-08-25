@@ -192,14 +192,17 @@ void thread_destroy(thread_t *thread) {
 thread_t *thread_lookup(identifier_t id) {
 	thread_t *thread;
 
-	mutex_lock(&thread_tree_lock, 0);
+	if(atomic_get(&kdbg_running)) {
+		thread = avl_tree_lookup(&thread_tree, (key_t)id);
+	} else {
+		mutex_lock(&thread_tree_lock, 0);
+		thread = avl_tree_lookup(&thread_tree, (key_t)id);
+		mutex_unlock(&thread_tree_lock);
+	}
 
-	thread = avl_tree_lookup(&thread_tree, (key_t)id);
 	if(thread && thread->state == THREAD_DEAD) {
 		thread = NULL;
 	}
-
-	mutex_unlock(&thread_tree_lock);
 	return thread;
 }
 
