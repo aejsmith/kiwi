@@ -452,12 +452,16 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 			        prev->link_dest, node->mount->id, node->id);
 			kfree(link);
 
+			mutex_unlock(&node->lock);
 			vfs_node_release(prev);
+			mutex_lock(&node->lock, 0);
 		} else if(node->type == VFS_NODE_SYMLINK) {
 			/* The new node is a symbolic link but we do not want
 			 * to follow it. We must release the previous node. */
 			assert(prev != node);
+			mutex_unlock(&node->lock);
 			vfs_node_release(prev);
+			mutex_lock(&node->lock, 0);
 		}
 
 		if(tok == NULL) {
@@ -543,7 +547,6 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				 * have at least one reference because of the
 				 * mount on it. */
 				refcount_inc(&node->count);
-				mutex_lock(&node->lock, 0);
 				mutex_unlock(&mount->lock);
 			} else {
 				/* Reference the node and lock it, and move it
@@ -552,7 +555,6 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 					list_append(&mount->used_nodes, &node->header);
 				}
 
-				mutex_lock(&node->lock, 0);
 				mutex_unlock(&mount->lock);
 			}
 		} else {
@@ -587,6 +589,9 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		if(node->type != VFS_NODE_SYMLINK) {
 			vfs_node_release(prev);
 		}
+
+		/* Lock the new node. */
+		mutex_lock(&node->lock, 0);
 	}
 }
 
@@ -851,6 +856,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 
 	/* Check whether it is within the size of the node. */
 	if((file_size_t)offset >= node->size) {
+		mutex_unlock(&node->lock);
 		return -ERR_NOT_FOUND;
 	}
 
@@ -2108,8 +2114,8 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID       Flags Count Type Size         Mount\n");
-	kprintf(LOG_NONE, "==       ===== ===== ==== ====         =====\n");
+	kprintf(LOG_NONE, "ID       Flags Count Locked Type Size         Mount\n");
+	kprintf(LOG_NONE, "==       ===== ===== ====== ==== ====         =====\n");
 
 	if(argc == 3) {
 		list = (strcmp(argv[1], "--unused") == 0) ? &mount->unused_nodes : &mount->used_nodes;
@@ -2117,17 +2123,17 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		LIST_FOREACH(list, iter) {
 			node = list_entry(iter, vfs_node_t, header);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-4d %-12" PRIu64 " %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->type, node->size, node->mount);
+			        node->lock.recursion, node->type, node->size, node->mount);
 		}
 	} else {
 		AVL_TREE_FOREACH(&mount->nodes, iter) {
 			node = avl_tree_entry(iter, vfs_node_t);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-4d %-12" PRIu64 " %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->type, node->size, node->mount);
+			        node->lock.recursion, node->type, node->size, node->mount);
 		}
 	}
 	return KDBG_FAIL;
@@ -2194,7 +2200,15 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 	kprintf(LOG_NONE, "=================================================\n");
 
 	kprintf(LOG_NONE, "Count:        %d\n", refcount_get(&node->count));
-	kprintf(LOG_NONE, "Mount:        %p\n", node->mount);
+	kprintf(LOG_NONE, "Locked:       %d (%p) (%" PRId32 ")\n", node->lock.recursion,
+	        node->lock.caller, (node->lock.holder) ? node->lock.holder->id : -1);
+	if(node->mount) {
+		kprintf(LOG_NONE, "Mount:        %p (Locked: %d (%p) (%" PRId32 "))\n", node->mount,
+		        node->mount->lock.recursion, node->mount->lock.caller,
+		        (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
+	} else {
+		kprintf(LOG_NONE, "Mount:        %p\n", node->mount);
+	}
 	kprintf(LOG_NONE, "Data:         %p\n", node->data);
 	kprintf(LOG_NONE, "Flags:        %d\n", node->flags);
 	kprintf(LOG_NONE, "Type:         %d\n", node->type);
