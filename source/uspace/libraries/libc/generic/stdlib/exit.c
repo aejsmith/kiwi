@@ -16,15 +16,35 @@
 /**
  * @file
  * @brief		Exit functions.
+ *
+ * @todo		Need locking on the atexit array.
  */
 
 #include <kernel/process.h>
 
 #include <stdlib.h>
 
-typedef void (*atexit_t)(void);
+extern int __cxa_atexit(void (*func)(void *), void *arg, void *dso);
 
-static atexit_t atexit_functions[ATEXIT_MAX];
+/** Array of at-exit functions. */
+static struct {
+	enum {
+		ATEXIT_STANDARD,
+		ATEXIT_CXA,
+	} type;
+
+	union {
+		struct {
+			void (*func)(void);
+		} standard;
+		struct {
+			void (*func)(void *);
+			void *arg;
+		} cxa;
+	};
+} atexit_functions[ATEXIT_MAX];
+
+/** Number of at-exit functions registered. */
 static int atexit_count = 0;
 
 /** Define a function to run at process exit.
@@ -43,7 +63,26 @@ int atexit(void (*function)(void)) {
 		return -1;
 	}
 
-	atexit_functions[atexit_count++] = function;
+	atexit_functions[atexit_count].type = ATEXIT_STANDARD;
+	atexit_functions[atexit_count].standard.func = function;
+	atexit_count++;
+	return 0;
+}
+
+/** Register a C++ cleanup function.
+ * @param func		Function to call.
+ * @param arg		Argument.
+ * @param dso		DSO handle.
+ * @return		0 on success, -1 on failure. */
+int __cxa_atexit(void (*func)(void *), void *arg, void *dso) {
+	if(atexit_count >= ATEXIT_MAX) {
+		return -1;
+	}
+
+	atexit_functions[atexit_count].type = ATEXIT_CXA;
+	atexit_functions[atexit_count].cxa.func = func;
+	atexit_functions[atexit_count].cxa.arg = arg;
+	atexit_count++;
 	return 0;
 }
 
@@ -57,11 +96,17 @@ int atexit(void (*function)(void)) {
  * @return		Does not return.
  */
 void exit(int status) {
-	int i;
-
-	/* Run atexit functions */
-	for(i = 0; i < atexit_count; i++) {
-		atexit_functions[i]();
+	/* Run atexit functions in reverse. */
+	while(atexit_count) {
+		atexit_count--;
+		switch(atexit_functions[atexit_count].type) {
+		case ATEXIT_STANDARD:
+			atexit_functions[atexit_count].standard.func();
+			break;
+		case ATEXIT_CXA:
+			atexit_functions[atexit_count].cxa.func(atexit_functions[atexit_count].cxa.arg);
+			break;
+		}
 	}
 
 	process_exit(status);

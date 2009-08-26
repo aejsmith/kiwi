@@ -16,4 +16,5 @@ Import('sources')
 
 sources += [
 	File('new.cc'),
+	File('pure.cc'),
 ]
