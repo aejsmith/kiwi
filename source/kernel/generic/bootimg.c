@@ -152,7 +152,7 @@ void bootimg_load(void) {
 	kfree(bootimg_addr);
 
 	/* Spawn the startup process. */
-	if((ret = process_create(args, env, PROCESS_CRITICAL, PRIORITY_SYSTEM, NULL)) != 0) {
+	if((ret = process_create(args, env, PROCESS_CRITICAL, PRIORITY_SYSTEM, kernel_proc, NULL)) != 0) {
 		fatal("Could not create startup process (%d)", ret);
 	}
 }

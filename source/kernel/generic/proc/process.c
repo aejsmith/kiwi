@@ -278,11 +278,13 @@ fail:
  * @param environ	Environment to pass to process (NULL-terminated array).
  * @param flags		Behaviour flags for the process.
  * @param priority	Priority for the process.
+ * @param parent	Parent for the process.
  * @param procp		Where to store pointer to new process.
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_create(const char **args, const char **environ, int flags, int priority, process_t **procp) {
+int process_create(const char **args, const char **environ, int flags, int priority,
+                   process_t *parent, process_t **procp) {
 	process_create_info_t info;
 	process_t *process;
 	thread_t *thread;
@@ -300,7 +302,7 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	info.environ = environ;
 	info.ret = 0;
 
-	if((ret = process_alloc(args[0], -1, flags, priority, curr_proc, true, false, &process)) != 0) {
+	if((ret = process_alloc(args[0], -1, flags, priority, parent, true, false, &process)) != 0) {
 		return ret;
 	} else if((ret = thread_create("main", process, 0, process_create_thread, &info, NULL, &thread)) != 0) {
 		process_destroy(process);
@@ -311,6 +313,9 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	/* Wait for completion, and return. No cleanup is necessary as the
 	 * process/thread will be cleaned up by the normal mechanism. */
 	semaphore_down(&info.sem, 0);
+	if(info.ret == 0 && procp) {
+		*procp = process;
+	}
 	return info.ret;
 }
 
