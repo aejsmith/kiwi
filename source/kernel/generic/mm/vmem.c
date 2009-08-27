@@ -45,6 +45,8 @@
 #include <mm/slab.h>
 #include <mm/vmem.h>
 
+#include <proc/thread.h>
+
 #include <sync/spinlock.h>
 
 #include <types/hash.h>
@@ -73,6 +75,8 @@ static vmem_t vmem_btag_arena;			/**< Internal arena for boundary tag allocation
 static vmem_btag_t vmem_boot_tags[VMEM_BOOT_TAG_COUNT];
 
 /** Allocate a new boundary tag structure.
+ * @note		It is possible for this function to change the arena
+ *			layout!
  * @param vmem		Arena that wants to allocate a tag.
  * @param vmflag	Allocation flags.
  * @return		Pointer to tag structure or NULL if cannot allocate. */
@@ -103,6 +107,7 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		}
 
 		mutex_unlock(&vmem_lock);
+		mutex_unlock(&vmem->lock);
 
 		/* Take the refill lock, and then check again if a refill is
 		 * necessary. This is to prevent unnecessary allocations of
@@ -111,11 +116,11 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		mutex_lock(&vmem_refill_lock, 0);
 		if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
 			mutex_unlock(&vmem_refill_lock);
+			mutex_lock(&vmem->lock, 0);
 			continue;
 		}
 
 		/* Allocate a page from the tag arena and split it up into tags. */
-		mutex_unlock(&vmem->lock);
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
 		mutex_lock(&vmem->lock, 0);
 		if(addr == 0) {
@@ -1000,6 +1005,8 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	kprintf(LOG_NONE, "============================================================\n");
 	kprintf(LOG_NONE, "Quantum: %zu  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %zu\n",
 	            vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
+	kprintf(LOG_NONE, "Locked: %d (%p) (%" PRId32 ")\n", vmem->lock.recursion,
+	        vmem->lock.caller, (vmem->lock.holder) ? vmem->lock.holder->id : -1);
 	if(vmem->source) {
 		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",
 		            vmem->source, vmem->source->name, vmem->imported_size);
