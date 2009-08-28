@@ -26,7 +26,7 @@
 
 /** Structure containing a semaphore. */
 typedef struct semaphore {
-	wait_queue_t queue;		/**< Wait queue implementing the semaphore. */
+	waitq_t queue;			/**< Wait queue implementing the semaphore. */
 } semaphore_t;
 
 /** Initializes a statically declared semaphore. */

@@ -43,6 +43,7 @@ env['OBJFILES'] += [
 	env.Object('io/vfs.c'),
 
 	env.Object('lib/do_printf.c'),
+	env.Object('lib/notifier.c'),
 	env.Object('lib/qsort.c'),
 	env.Object('lib/sprintf.c'),
 	env.Object('lib/string.c'),
@@ -64,6 +65,7 @@ env['OBJFILES'] += [
 	env.Object('proc/syscall.c'),
 	env.Object('proc/thread.c'),
 
+	env.Object('sync/condvar.c'),
 	env.Object('sync/mutex.c'),
 	env.Object('sync/rwlock.c'),
 	env.Object('sync/semaphore.c'),

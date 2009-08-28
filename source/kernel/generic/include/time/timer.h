@@ -64,7 +64,7 @@ typedef struct timer {
 	uint64_t length;		/**< Nanoseconds until the timer expires. */
 	struct cpu *cpu;		/**< CPU that the timer was started on. */
 	timer_func_t func;		/**< Function to call upon expiry. */
-	wait_queue_t queue;		/**< Wait queue for TIMER_WAKE timers. */
+	waitq_t queue;			/**< Wait queue for TIMER_WAKE timers. */
 } timer_t;
 
 /** Initializes a statically-declared timer. */

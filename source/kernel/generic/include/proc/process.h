@@ -23,6 +23,8 @@
 
 #include <io/context.h>
 
+#include <lib/notifier.h>
+
 #include <proc/handle.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -53,10 +55,13 @@ typedef struct process {
 	size_t priority;		/**< Priority of the process. */
 	refcount_t count;		/**< Number of handles/threads open to the process. */
 	int status;			/**< Exit status of the process. */
+
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	list_t threads;			/**< List of threads. */
 	handle_table_t handles;		/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
+
+	notifier_t death_notifier;	/**< Notifier called when process dies. */
 } process_t;
 
 /** Process flag definitions */

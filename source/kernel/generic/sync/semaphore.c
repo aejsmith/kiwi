@@ -31,11 +31,12 @@
  * @param sem		Semaphore to down.
  * @param flags		Synchronization flags.
  *
- * @return		0 if succeeded (always the case if SYNC_NONBLOCK is
- *			not specified), negative error code on failure.
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
  */
 int semaphore_down(semaphore_t *sem, int flags) {
-	return wait_queue_sleep(&sem->queue, flags);
+	return waitq_sleep(&sem->queue, NULL, flags);
 }
 
 /** Up a semaphore.
@@ -46,7 +47,7 @@ int semaphore_down(semaphore_t *sem, int flags) {
  * @param sem		Semaphore to up.
  */
 void semaphore_up(semaphore_t *sem) {
-	wait_queue_wake(&sem->queue);
+	waitq_wake(&sem->queue, false);
 }
 
 /** Initialize a semaphore structure.
@@ -61,6 +62,6 @@ void semaphore_up(semaphore_t *sem) {
  * @return		True if attempt to down succeeds, false otherwise.
  */
 void semaphore_init(semaphore_t *sem, const char *name, unsigned int initial) {
-	wait_queue_init(&sem->queue, name, WAITQ_COUNT_MISSED);
+	waitq_init(&sem->queue, name, WAITQ_COUNT_MISSED);
 	sem->queue.missed = initial;
 }

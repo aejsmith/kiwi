@@ -26,21 +26,22 @@
 
 #include <types/list.h>
 
+struct mutex;
 struct thread;
 
 /** Structure containing a thread wait queue. */
-typedef struct wait_queue {
+typedef struct waitq {
 	spinlock_t lock;		/**< Lock to protect the queue. */
 	list_t threads;			/**< List of threads on the queue. */
 	int flags;			/**< Flags for the wait queue. */
 	unsigned int missed;		/**< Number of missed wakeups. */
 	const char *name;		/**< Name of wait queue. */
-} wait_queue_t;
+} waitq_t;
 
 /** Initializes a statically declared wait queue. */
 #define WAITQ_INITIALIZER(_var, _name, _flags, _missed)	\
 	{ \
-		.lock = SPINLOCK_INITIALIZER("wait_queue_lock"), \
+		.lock = SPINLOCK_INITIALIZER("waitq_lock"), \
 		.threads = LIST_INITIALIZER(_var.threads), \
 		.flags = _flags, \
 		.missed = _missed, \
@@ -49,17 +50,17 @@ typedef struct wait_queue {
 
 /** Statically declares a new wait queue. */
 #define WAITQ_DECLARE(_var, _flags, _missed)		\
-	wait_queue_t _var = WAITQ_INITIALIZER(_var, #_var, _flags, _missed)
+	waitq_t _var = WAITQ_INITIALIZER(_var, #_var, _flags, _missed)
 
 /** Wait queue behaviour flags. */
 #define WAITQ_COUNT_MISSED	(1<<0)	/**< Count missed wakeups. */
 
-extern int wait_queue_sleep(wait_queue_t *waitq, int flags);
-extern bool wait_queue_wake(wait_queue_t *waitq);
-extern void wait_queue_interrupt(struct thread *thread);
+extern int waitq_sleep(waitq_t *waitq, struct mutex *mtx, int flags);
+extern bool waitq_wake(waitq_t *waitq, bool all);
+extern void waitq_interrupt(struct thread *thread);
 
-extern bool wait_queue_empty(wait_queue_t *waitq);
+extern bool waitq_empty(waitq_t *waitq);
 
-extern void wait_queue_init(wait_queue_t *waitq, const char *name, int flags);
+extern void waitq_init(waitq_t *waitq, const char *name, int flags);
 
 #endif /* __SYNC_WAITQ_H */

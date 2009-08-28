@@ -34,7 +34,7 @@
 #define THREAD_NAME_MAX		32
 
 struct process;
-struct wait_queue;
+struct waitq;
 
 /** Entry function for a thread. */
 typedef void (*thread_func_t)(void *, void *);
@@ -59,7 +59,7 @@ typedef struct thread {
 
 	/** Sleeping information. */
 	list_t waitq_link;		/**< Link to wait queue. */
-	struct wait_queue *waitq;	/**< Wait queue that the thread is sleeping on. */
+	struct waitq *waitq;		/**< Wait queue that the thread is sleeping on. */
 	bool interruptible;		/**< Whether the sleep can be interrupted. */
 	context_t sleep_context;	/**< Context to restore upon sleep interruption. */
 	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */

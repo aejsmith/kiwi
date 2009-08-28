@@ -115,7 +115,7 @@ intr_result_t clock_tick(void) {
 			}
 			break;
 		case TIMER_WAKE:
-			wait_queue_wake(&timer->queue);
+			waitq_wake(&timer->queue, true);
 			break;
 		default:
 			fatal("Bad timer action %d on %p", timer->action, timer);
@@ -144,7 +144,7 @@ intr_result_t clock_tick(void) {
  */
 void timer_init(timer_t *timer, int action, timer_func_t func) {
 	list_init(&timer->header);
-	wait_queue_init(&timer->queue, "timer_queue", 0);
+	waitq_init(&timer->queue, "timer_queue", 0);
 
 	timer->action = action;
 	timer->length = 0;
@@ -207,7 +207,7 @@ int timer_start(timer_t *timer, uint64_t length) {
 
 	/* If we're a TIMER_WAKE timer, sleep now. */
 	if(timer->action == TIMER_WAKE) {
-		wait_queue_sleep(&timer->queue, 0);
+		waitq_sleep(&timer->queue, NULL, 0);
 	}
 
 	intr_restore(state);

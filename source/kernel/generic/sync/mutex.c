@@ -37,8 +37,9 @@
  * @param lock		Mutex to lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 if succeeded (always the case if SYNC_NONBLOCK is
- *			not specified), negative error code on failure.
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
  */
 int mutex_lock(mutex_t *lock, int flags) {
 	int ret;

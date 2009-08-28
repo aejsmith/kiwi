@@ -448,8 +448,8 @@ void sched_internal(bool state) {
 
 	/* Only bother with this stuff if the new thread is different.
 	 * The switch may return to thread_trampoline() or to the interruption
-	 * handler in wait_queue_sleep(), so put anything to do after a switch
-	 * in sched_post_switch(). */
+	 * handler in waitq_sleep(), so put anything to do after a switch in
+	 * sched_post_switch(). */
 	if(curr_thread != cpu->prev_thread) {
 		/* Switch the address space. If the new process' addres space
 		 * is set to NULL then vm_aspace_switch() will just switch to

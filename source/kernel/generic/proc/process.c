@@ -125,6 +125,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	/* Initialize other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (identifier_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
 	process->flags = flags;
@@ -361,6 +362,10 @@ void process_destroy(process_t *process) {
 	mutex_lock(&process_tree_lock, 0);
 	avl_tree_remove(&process_tree, (key_t)process->id);
 	mutex_unlock(&process_tree_lock);
+
+	/* Run and destroy the death notifier list. */
+	notifier_run(&process->death_notifier, NULL);
+	notifier_destroy(&process->death_notifier);
 
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);

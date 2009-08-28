@@ -25,14 +25,14 @@
 
 #include <sync/rwlock.h>
 
-extern void wait_queue_do_wake(thread_t *thread);
+extern void waitq_do_wake(thread_t *thread);
 
 /** Transfer lock ownership to waiting writer or waiting readers.
  * @note		Spinlock should be held.
  * @param lock		Lock to transfer ownership of. */
 static void rwlock_transfer_ownership(rwlock_t *lock) {
-	wait_queue_t *queue;
 	thread_t *thread;
+	waitq_t *queue;
 
 	/* Meh, take a copy of it just to make the code a bit nicer. */
 	queue = &lock->exclusive.queue;
@@ -66,7 +66,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 			spinlock_unlock(&thread->lock);
 			break;
 		} else {
-			wait_queue_do_wake(thread);
+			waitq_do_wake(thread);
 			if(thread->rwlock_writer) {
 				spinlock_unlock(&thread->lock);
 				break;
@@ -92,8 +92,9 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  * @param lock		Lock to acquire.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if SYNC_NONBLOCK is not
- *			specified), negative error code on failure.
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
  */
 int rwlock_read_lock(rwlock_t *lock, int flags) {
 	int ret;
@@ -107,7 +108,7 @@ int rwlock_read_lock(rwlock_t *lock, int flags) {
 		/* Lock is held, check if its held by readers. If it is, and
 		 * there's something else blocked on the lock, we wait anyway.
 		 * This is to prevent starvation of writers. */
-		if(!lock->readers || !wait_queue_empty(&lock->exclusive.queue)) {
+		if(!lock->readers || !waitq_empty(&lock->exclusive.queue)) {
 			spinlock_unlock(&lock->lock);
 			if((ret = semaphore_down(&lock->exclusive, flags)) != 0) {
 				return ret;
@@ -133,8 +134,9 @@ int rwlock_read_lock(rwlock_t *lock, int flags) {
  * @param lock		Lock to acquire.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if SYNC_NONBLOCK is not
- *			specified), negative error code on failure.
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
  */
 int rwlock_write_lock(rwlock_t *lock, int flags) {
 	int ret;
