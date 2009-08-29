@@ -16,7 +16,7 @@ import tarfile, glob, os, tempfile, shutil
 
 Import('config', 'envmgr')
 
-SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'uspace'])
+SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'drivers', 'uspace'])
 
 # Create a TAR archive containing kernel modules, drivers and startup binaries.
 def boot_image_func(target, source, env):
@@ -54,4 +54,3 @@ dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMS
 
 dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTBINS'] + dist['BOOTLIBS'])
 dist['BOOTIMG'] = File('bootimg.tar.gz')
-Default(Alias('bootimg', dist['BOOTIMG']))

@@ -74,7 +74,3 @@ SConscript(dirs=['libraries', 'binaries'], exports=['env'])
 # FIXME: Eventually we shouldn't put everything in the boot image.
 envmgr['dist']['BOOTBINS'] = env['BINS']
 envmgr['dist']['BOOTLIBS'] = env['SHLIBS']
-
-# Set build defaults.
-Default(Alias('libraries', env['LIBRARIES']))
-Default(Alias('binaries', env['BINS']))

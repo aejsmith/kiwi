@@ -109,7 +109,7 @@ static vm_object_ops_t device_vm_object_ops = {
  * simply act as a container for other devices.
  *
  * @param name		Name of device to create (will be duplicated).
- * @param parent	Parent device.
+ * @param parent	Parent device. Must not be an alias.
  * @param ops		Operations for the device (can be NULL).
  * @param data		Data used by the device operations.
  * @param attrs		Optional array of attributes for the device (will be
@@ -125,7 +125,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	size_t i;
 	int ret;
 
-	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !devicep) {
+	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest || !devicep) {
 		return -ERR_PARAM_INVAL;
 	}
 
@@ -206,7 +206,8 @@ fail:
  * @param dest		Destination device.
  * @param devicep	Where to store pointer to alias structure.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		0 on success, negative error code on failure. Can only
+ *			fail if device name already exists.
  */
 int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
 	device_t *device;
@@ -257,7 +258,8 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
  *
  * @param device	Device to remove.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		0 on success, negative error code on failure. Cannot
+ *			fail for aliases.
  */
 int device_destroy(device_t *device) {
 	size_t i;
@@ -366,6 +368,9 @@ int device_get(const char *path, device_t **devicep) {
  * @return		0 on success, negative error code on failure.
  */
 int device_read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	size_t bytes;
+	int ret;
+
 	if(!device || !buf || offset < 0) {
 		return -ERR_PARAM_INVAL;
 	} else if(!device->ops || !device->ops->read) {
@@ -379,7 +384,11 @@ int device_read(device_t *device, void *buf, size_t count, offset_t offset, size
 
 	assert(refcount_get(&device->count));
 
-	return device->ops->read(device, buf, count, offset, bytesp);
+	ret = device->ops->read(device, buf, count, offset, &bytes);
+	if(bytesp) {
+		*bytesp = bytes;
+	}
+	return ret;
 }
 
 /** Write to a device.
@@ -398,6 +407,9 @@ int device_read(device_t *device, void *buf, size_t count, offset_t offset, size
  * @return		0 on success, negative error code on failure.
  */
 int device_write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	size_t bytes;
+	int ret;
+
 	if(!device || !buf || offset < 0) {
 		return -ERR_PARAM_INVAL;
 	} else if(!device->ops || !device->ops->write) {
@@ -411,7 +423,11 @@ int device_write(device_t *device, const void *buf, size_t count, offset_t offse
 
 	assert(refcount_get(&device->count));
 
-	return device->ops->write(device, buf, count, offset, bytesp);
+	ret = device->ops->write(device, buf, count, offset, &bytes);
+	if(bytesp) {
+		*bytesp = bytes;
+	}
+	return ret;
 }
 
 /** Perform a device-specific operation.

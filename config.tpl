@@ -78,10 +78,11 @@ Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
 Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
 
 #######
-Section('Module configuration')
+Section('Driver configuration')
 #######
 
-Option('MODULE_BUS_PCI', 'PCI bus module.', True)
+Option('DRIVER_BUS_PCI', 'PCI bus manager.', True)
+Option('DRIVER_INPUT_I8042', 'i8042 keyboard/mouse port driver.', True)
 
 #####################################
 # Configuration validation function #

@@ -27,7 +27,7 @@
 
 #include <arch/io.h>
 
-#include <bus/pci/pci.h>
+#include <drivers/pci.h>
 
 #include <sync/spinlock.h>
 

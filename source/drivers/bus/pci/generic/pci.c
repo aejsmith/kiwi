@@ -30,7 +30,7 @@
 
 #include <console/kprintf.h>
 
-#include <bus/pci/pci.h>
+#include <drivers/pci.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -227,5 +227,5 @@ static int pci_unload(void) {
 }
 
 MODULE_NAME("pci");
-MODULE_DESC("Peripheral Component Interconnect bus manager");
+MODULE_DESC("PCI bus manager");
 MODULE_FUNCS(pci_init, pci_unload);

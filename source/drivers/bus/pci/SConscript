@@ -14,9 +14,10 @@
 
 Import('env', 'config')
 
-# Work out the modules to build.
-dirs = [
-	('MODULE_BUS_PCI', 'pci'),
-]
+# Get the list of source files.
+sources = []
+if config['ARCH'] == 'amd64' or config['ARCH'] == 'ia32':
+	SConscript(dirs=['arch/x86'], exports=['env', 'sources'])
+SConscript(dirs=['generic'], exports=['env', 'sources'])
 
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+env.Module('pci', sources)

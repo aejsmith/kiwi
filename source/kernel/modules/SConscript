@@ -18,7 +18,7 @@ Import('envmgr', 'config')
 # Subdirectory configuration. #
 ###############################
 
-subdirs = ['bus', 'fs']
+subdirs = ['fs']
 
 ##############################
 # Module environment set-up. #
@@ -57,5 +57,3 @@ SConscript(dirs=subdirs, exports=['env'])
 
 # Let the distribution environment know where the modules are.
 envmgr['dist']['MODULES'] = env['MODULES']
-
-Default(Alias('modules', env['MODULES']))

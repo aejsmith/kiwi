@@ -35,9 +35,15 @@ dist = envmgr.Create('dist')
 # Visit subdirectories.
 SConscript(dirs=['source'])
 
+# Set build defaults.
+Default(Alias('kernel', dist['KERNEL']))
+Default(Alias('modules', envmgr['module']['MODULES']))
+Default(Alias('libraries', envmgr['uspace']['LIBRARIES']))
+Default(Alias('binaries', envmgr['uspace']['BINS']))
+Default(Alias('bootimg', dist['BOOTIMG']))
+
 # Create the ISO image.
-iso = Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL'], dist['BOOTIMG']]))
-Default(iso)
+Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL'], dist['BOOTIMG']])))
 
 # Run generated ISO image in QEMU.
 dist.Alias('qtest', dist.Command('qtest', ['cdrom.iso'],

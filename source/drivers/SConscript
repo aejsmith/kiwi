@@ -12,14 +12,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('config', 'envmgr')
 
-env['INCDIRS']['bus/pci'] = Dir('generic/include')
+# Get environment and add driver include directory.
+env = envmgr['module']
+env['INCDIRS']['drivers'] = Dir('include')
 
-# Get the list of source files.
-sources = []
-if config['ARCH'] == 'amd64' or config['ARCH'] == 'ia32':
-	SConscript(dirs=['arch/x86'], exports=['env', 'sources'])
-SConscript(dirs=['generic'], exports=['env', 'sources'])
-
-env.Module('pci', sources)
+SConscript(dirs=['bus', 'input'], exports=['env'])

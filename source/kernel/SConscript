@@ -92,8 +92,6 @@ Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
 # Let the distribution environment know where the kernel is.
 envmgr['dist']['KERNEL'] = File('kiwi.elf')
 
-Default(Alias('kernel', File('kiwi.elf')))
-
 ###########
 # Modules #
 ###########

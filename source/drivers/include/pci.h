@@ -18,8 +18,8 @@
  * @brief		PCI bus module.
  */
 
-#ifndef __BUS_PCI_PCI_H
-#define __BUS_PCI_PCI_H
+#ifndef __DRIVERS_PCI_H
+#define __DRIVERS_PCI_H
 
 #include <types/list.h>
 
@@ -61,4 +61,4 @@ extern uint8_t pci_device_read8(struct device *dev, uint8_t reg);
 extern uint16_t pci_device_read16(struct device *dev, uint8_t reg);
 extern uint32_t pci_device_read32(struct device *dev, uint8_t reg);
 
-#endif /* __BUS_PCI_PCI_H */
+#endif /* __DRIVERS_PCI_H */
