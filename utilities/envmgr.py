@@ -15,7 +15,6 @@
 import os
 import sys
 
-from UserDict import UserDict
 from SCons.Script import *
 
 # This is a pretty funky way of doing things, but hey, it works and I like it.
@@ -23,10 +22,10 @@ from SCons.Script import *
 # one for drivers, one for the kernel and its modules, etc. we have an
 # EnvironmentManager class that manages the creation of new environments from
 # the base environment and also acts as a dictionary of environments.
-class EnvironmentManager(UserDict):
+class EnvironmentManager(dict):
 	# Create the base environment that others are based off.
 	def __init__(self, config, version):
-		UserDict.__init__(self)
+		dict.__init__(self)
 
 		self.config = config
 		self.verbose = ARGUMENTS.get('V') == '1'

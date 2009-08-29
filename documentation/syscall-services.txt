@@ -7,7 +7,6 @@ the main kernel system call interface. The following service numbers are
 currently defined:
 
     0     - Kernel
-    1     - KDF
 
 If you're writing a module that needs its own system call interface, you
 should ask Alex to assign a service number that you can use.

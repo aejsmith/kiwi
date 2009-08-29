@@ -31,7 +31,8 @@ env['BINS'] = []
 env['LIBOUTDIR'] = Dir('libraries')
 
 # Set up library emitters to modify the target path to get libraries placed
-# in the correct location and to add the library to the libraries array.
+# in the correct location, add the library to the libraries array, and set
+# dependencies for default libraries.
 def lib_emitter(target, source, env):
 	target[0] = File('%s/%s' % (str(env['LIBOUTDIR']), str(target[0])))
 	env['LIBRARIES'].append(target[0])
@@ -39,13 +40,24 @@ def lib_emitter(target, source, env):
 def shlib_emitter(target, source, env):
 	lib_emitter(target, source, env)
 	env['SHLIBS'].append(target[0])
+	Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+	if target[0].name != 'libkernel.so':
+		Depends(target[0], env['LIBOUTDIR'].File('libkernel.so'))
+		if target[0].name != 'libc.so':
+			Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
 	return target, source
 env.Append(LIBEMITTER=[lib_emitter])
 env.Append(SHLIBEMITTER=[shlib_emitter])
 
-# Set up a program emitter to add binaries to the binaries array.
+# Set up a program emitter to add binaries to the binaries array and set
+# up library dependencies for compiler default libraries (SCons doesn't pick
+# these up).
 def program_emitter(target, source, env):
 	env['BINS'].append(target[0])
+	if target[0].name != 'rtld-%s' % (config['ARCH']):
+		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+		if env['SMARTLINK'](source, target, env, None) == '$CXX':
+			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 
@@ -56,27 +68,12 @@ def sysgen_emitter(target, source, env):
 	return target, source
 env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
 
-# Build libraries before applications because they're required for applications
-# to build.
 SConscript(dirs=['libraries', 'binaries'], exports=['env'])
-
-# Have all binaries depend on base libraries and C runtime files, and all
-# shared libraries depend on the C runtime files.
-for app in env['BINS']:
-	if app.name != 'rtld-%s' % (config['ARCH']):
-		Depends(app, File('libraries/libc.so'))
-		Depends(app, File('libraries/libstdc++.so'))
-for lib in env['SHLIBS']:
-	if lib.name != 'libkernel.so':
-		Depends(lib, File('libraries/libkernel.so'))
-		if lib.name != 'libc.so':
-			Depends(lib, File('libraries/libc.so'))
-	Depends(lib, Glob('libraries/*crt*.o'))
 
 # Set arrays needed in the distribution environment.
 # FIXME: Eventually we shouldn't put everything in the boot image.
 envmgr['dist']['BOOTBINS'] = env['BINS']
-envmgr['dist']['BOOTLIBS'] = env['LIBRARIES']
+envmgr['dist']['BOOTLIBS'] = env['SHLIBS']
 
 # Set build defaults.
 Default(Alias('libraries', env['LIBRARIES']))

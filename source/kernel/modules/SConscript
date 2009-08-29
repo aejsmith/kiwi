@@ -24,9 +24,21 @@ subdirs = ['bus', 'fs']
 # Module environment set-up. #
 ##############################
 
+# Dictionary class that sets up an include directory link whenever an item is
+# added to it.
+class IncludeDict(dict):
+	def __init__(self, env):
+		dict.__init__(self)
+		self.env = env
+	def __setitem__(self, key, value):
+		dict.__setitem__(self, key, value)
+		self.env['MODINCDIR'].Dir(key).link(value, 1)
+
 env = envmgr.Create('module', envmgr['kernel'])
 env['MODULES'] = []
-env['INCDIRS'] = {}
+env['MODINCDIR'] = Dir('include')
+env['INCDIRS'] = IncludeDict(env)
+env['CPPPATH'].append(Dir('include'))
 
 # Not sure if this is the right way to do this (add any modules to the module
 # list in the environment), but an emitter seems to work...
@@ -42,11 +54,6 @@ env['BUILDERS']['Module'] = Builder(
 
 # Get all of the modules and include directories into the array.
 SConscript(dirs=subdirs, exports=['env'])
-
-# Set up the module include directory.
-for (k, v) in env['INCDIRS'].items():
-	Dir('include/%s' % (k)).link(v, 1)
-env['CPPPATH'].append(Dir('include'))
 
 # Let the distribution environment know where the modules are.
 envmgr['dist']['MODULES'] = env['MODULES']
