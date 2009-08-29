@@ -30,9 +30,9 @@
  * @param num		IRQ number.
  * @param data		Data associated with IRQ (unused).
  * @param frame		Interrupt stack frame.
- * @return		Value from clock_tick(). */
-static intr_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
-	return clock_tick();
+ * @return		IRQ status code. */
+static irq_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
+	return (clock_tick()) ? IRQ_RESCHEDULE : IRQ_HANDLED;
 }
 
 /** Enable the PIT. */
@@ -45,12 +45,12 @@ static void pit_enable(void) {
 	out8(0x40, base & 0xFF);
 	out8(0x40, base >> 8);
 
-	irq_register(0, pit_handler, NULL);
+	irq_register(0, pit_handler, NULL, NULL);
 }
 
 /** Disable the PIT. */
 static void pit_disable(void) {
-	irq_unregister(0, pit_handler, NULL);
+	irq_unregister(0, pit_handler, NULL, NULL);
 }
 
 /** PIT clock source. */

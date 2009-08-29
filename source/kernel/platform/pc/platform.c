@@ -39,7 +39,7 @@
 extern void arch_reboot(void);
 
 /** Temporary i8042 hook to enter into KDBG. */
-static intr_result_t i8042_handler(unative_t num, void *data, intr_frame_t *frame) {
+static irq_result_t i8042_handler(unative_t num, void *data, intr_frame_t *frame) {
 	uint8_t code = in8(0x60);
 	switch(code) {
 	case 59:
@@ -60,7 +60,7 @@ static intr_result_t i8042_handler(unative_t num, void *data, intr_frame_t *fram
 		arch_reboot();
 		break;
 	}
-	return INTR_HANDLED;
+	return false;
 }
 
 /** PC platform startup code.
@@ -93,5 +93,5 @@ void __init_text platform_postmm_init(void) {
 	}
 
 	/* Install the temporary i8042 hook. */
-	irq_register(1, i8042_handler, NULL);
+	irq_register(1, i8042_handler, NULL, NULL);
 }

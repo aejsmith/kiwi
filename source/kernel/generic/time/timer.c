@@ -79,10 +79,10 @@ int clock_source_set(clock_source_t *source) {
  * Function called by a clock source when a clock tick occurs. Goes through
  * all enabled timers for the current CPU and checks if any have expired.
  *
- * @return		Interrupt status code.
+ * @return		Whether to reschedule.
  */
-intr_result_t clock_tick(void) {
-	intr_result_t ret = INTR_HANDLED;
+bool clock_tick(void) {
+	bool resched = false;
 	timer_t *timer;
 
 	assert(curr_clock);
@@ -105,13 +105,13 @@ intr_result_t clock_tick(void) {
 
 		switch(timer->action) {
 		case TIMER_RESCHEDULE:
-			ret = INTR_RESCHEDULE;
+			resched = true;
 			break;
 		case TIMER_FUNCTION:
 			if(timer->func == NULL) {
 				fatal("Timer %p has invalid function");
 			} else if(timer->func()) {
-				ret = INTR_RESCHEDULE;
+				resched = true;
 			}
 			break;
 		case TIMER_WAKE:
@@ -131,7 +131,7 @@ intr_result_t clock_tick(void) {
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
-	return ret;
+	return resched;
 }
 
 /** Initialize a timer structure.

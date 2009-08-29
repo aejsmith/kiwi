@@ -26,5 +26,6 @@ extern void platform_postmm_init(void);
 
 /** Not required on this platform. */
 #define platform_ap_init()	
+#define platform_final_init()	
 
 #endif /* __PLATFORM_PLATFORM_H */

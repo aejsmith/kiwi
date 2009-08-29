@@ -43,5 +43,6 @@
 #define ERR_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
 #define ERR_BUF_TOO_SMALL	20	/**< Provided buffer is too small. */
 #define ERR_SYSCALL_INVAL	21	/**< Invalid system call number. */
+#define ERR_DEST_UNREACHABLE	22	/**< Cannot reach destination. */
 
 #endif /* __KERNEL_ERRORS_H */

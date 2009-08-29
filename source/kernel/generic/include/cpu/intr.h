@@ -26,11 +26,12 @@
 #include <types.h>
 
 /** Interrupt handler return status. */
-typedef enum intr_result {
-	INTR_UNHANDLED,		/**< Interrupt not handled, invoke next handler. */
-	INTR_HANDLED,		/**< Interrupt was handled, should not invoke next handler. */
-	INTR_RESCHEDULE,	/**< A thread switch should be performed. */
-} intr_result_t;
+typedef enum irq_result {
+	IRQ_UNHANDLED,		/**< Interrupt was not handled. */
+	IRQ_HANDLED,		/**< Interrupt was handled. */
+	IRQ_RESCHEDULE,		/**< Interrupt was handled, and a thread switch should be performed. */
+	IRQ_RUN_THREAD,		/**< Interrupt was handled, and the threaded handler should be run. */
+} irq_result_t;
 
 /** IRQ management operations. */
 typedef struct irq_ops {
@@ -60,16 +61,20 @@ typedef struct irq_ops {
 	void (*disable)(unative_t num);
 } irq_ops_t;
 
-/** IRQ handler routine type.
+/** IRQ top-half handler function type.
  * @return		Interrupt status code. */
-typedef intr_result_t (*irq_func_t)(unative_t num, void *data, intr_frame_t *frame);
+typedef irq_result_t (*irq_top_t)(unative_t num, void *data, intr_frame_t *frame);
+
+/** IRQ bottom-half handler function type.
+ * @return		Interrupt status code. */
+typedef void (*irq_bottom_t)(unative_t num, void *data);
 
 extern irq_ops_t *irq_ops;
 
-extern int irq_register(unative_t num, irq_func_t handler, void *data);
-extern int irq_unregister(unative_t num, irq_func_t handler, void *data);
+extern int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
+extern int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
 
-extern intr_result_t irq_handler(unative_t num, intr_frame_t *frame);
+extern bool irq_handler(unative_t num, intr_frame_t *frame);
 
 extern void irq_init(void);
 

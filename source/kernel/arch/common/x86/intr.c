@@ -41,7 +41,7 @@
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 
-extern intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 extern void intr_handler(unative_t num, intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
@@ -63,15 +63,15 @@ static const char *fault_names[] = {
 /** Handler for NMIs.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		True if handled, false if not. */
-static intr_result_t intr_handle_nmi(unative_t num, intr_frame_t *frame) {
+ * @return		Always returns false. */
+static bool intr_handle_nmi(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
 		while(atomic_get(&cpu_pause_wait));
-		return INTR_HANDLED;
+		return false;
 	}
 
 	_fatal(frame, "Received unexpected NMI");
@@ -80,8 +80,8 @@ static intr_result_t intr_handle_nmi(unative_t num, intr_frame_t *frame) {
 /** Handler for page faults.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Interrupt status code. */
-static intr_result_t intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
+ * @return		Whether to reschedule. */
+static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
 	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
 	ptr_t addr = sysreg_cr2_read();
@@ -97,11 +97,11 @@ static intr_result_t intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	 * address. */
 	if(addr < (ASPACE_BASE + ASPACE_SIZE)) {
 		if(vm_fault(addr, reason, access) == VM_FAULT_HANDLED) {
-			return true;
+			return false;
 		} else if(atomic_get(&curr_thread->in_usermem)) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			context_restore_frame(&curr_thread->usermem_context, frame);
-			return true;
+			return false;
 		}
 	}
 
@@ -119,7 +119,7 @@ static intr_result_t intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		Doesn't return. */
-static intr_result_t intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
+static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
 #if !CONFIG_ARCH_AMD64
 	/* Disable KDBG on IA32. */
 	atomic_set(&kdbg_running, 3);
@@ -180,7 +180,7 @@ void intr_handler(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
-	if(handler(num, frame) == INTR_RESCHEDULE) {
+	if(handler(num, frame)) {
 		sched_yield();
 	}
 }

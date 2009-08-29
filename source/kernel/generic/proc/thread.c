@@ -50,7 +50,6 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void thread_destroy(thread_t *thread);
 extern void process_destroy(process_t *process);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
@@ -153,7 +152,8 @@ static void thread_reaper(void *arg1, void *arg2) {
 /** Destroy a thread.
  *
  * Queues a thread for deletion by the thread reaper. The thread should not be
- * attached to any scheduler queues. Should only be called by the scheduler.
+ * attached to any scheduler queues - should be in either the THREAD_CREATED
+ * or THREAD_DEAD state.
  *
  * @note		Because avl_tree_remove() uses kfree(), we cannot
  *			remove the thread from the thread tree here. To prevent
@@ -170,7 +170,7 @@ void thread_destroy(thread_t *thread) {
 		thread->id, thread->name, thread->owner->id);
 
 	assert(list_empty(&thread->header));
-	assert(thread->state == THREAD_DEAD);
+	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
 
 	/* Queue for deletion by the thread reaper. */
 	spinlock_lock(&dead_thread_lock, 0);

@@ -67,29 +67,29 @@ static inline void lapic_eoi(void) {
 /** Spurious interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Interrupt status code. */
-static intr_result_t lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
+ * @return		Always returns false. */
+static bool lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
-	return INTR_HANDLED;
+	return false;
 }
 
 /** IPI message interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Interrupt status code. */
-static intr_result_t lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
+ * @return		Always returns false. */
+static bool lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 	ipi_process_pending();
 	lapic_eoi();
-	return INTR_HANDLED;
+	return false;
 }
 
 /** Reschedule IPI interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- * @return		Always returns INTR_RESCHEDULE. */
-static intr_result_t lapic_reschedule_handler(unative_t num, intr_frame_t *frame) {
+ * @return		Always returns true. */
+static bool lapic_reschedule_handler(unative_t num, intr_frame_t *frame) {
 	lapic_eoi();
-	return INTR_RESCHEDULE;
+	return true;
 }
 
 /*
@@ -129,8 +129,8 @@ static clock_source_t lapic_clock_source = {
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		Return value from clock_tick(). */
-static intr_result_t lapic_timer_handler(unative_t num, intr_frame_t *frame) {
-	intr_result_t ret = clock_tick();
+static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
+	bool ret = clock_tick();
 	lapic_eoi();
 	return ret;
 }
@@ -143,9 +143,9 @@ static intr_result_t lapic_timer_handler(unative_t num, intr_frame_t *frame) {
 static volatile uint32_t freq_tick_count __init_data = 0;
 
 /** PIT handler for bus frequency calculation. */
-static intr_result_t __init_text lapic_pit_handler(unative_t irq, void *data, intr_frame_t *frame) {
+static irq_result_t __init_text lapic_pit_handler(unative_t irq, void *data, intr_frame_t *frame) {
 	freq_tick_count++;
-	return INTR_HANDLED;
+	return IRQ_HANDLED;
 }
 
 /** Find out the CPU bus frequency.
@@ -165,7 +165,7 @@ static uint64_t __init_text lapic_get_freq(void) {
 	out8(0x40, base >> 8);
 
 	/* Set our temporary PIT handler. */
-	if(irq_register(0, lapic_pit_handler, NULL) != 0) {
+	if(irq_register(0, lapic_pit_handler, NULL, NULL) != 0) {
 		fatal("APIC could not grab PIT");
 	}
 
@@ -188,7 +188,7 @@ static uint64_t __init_text lapic_get_freq(void) {
 
 	/* Stop the PIT. */
 	intr_disable();
-	if(irq_unregister(0, lapic_pit_handler, NULL) != 0) {
+	if(irq_unregister(0, lapic_pit_handler, NULL, NULL) != 0) {
 		fatal("Could not remove PIT IRQ handler");
 	}
 

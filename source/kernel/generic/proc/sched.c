@@ -95,7 +95,6 @@ typedef struct sched_cpu {
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void thread_destroy(thread_t *thread);
 
 /** Total runnable threads across all CPUs. */
 static atomic_t threads_runnable = 0;

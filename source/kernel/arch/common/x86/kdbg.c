@@ -32,7 +32,7 @@
 #include <symbol.h>
 #include <kdbg.h>
 
-extern intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
@@ -74,9 +74,9 @@ static inline void kdbg_setup_dreg(void) {
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
  *
- * @return		Interrupt status.
+ * @return		Always returns false.
  */
-intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
+bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	static bool bp_resume = false;
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
@@ -98,7 +98,7 @@ intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 				kdbg_setup_dreg();
 				frame->flags &= ~SYSREG_FLAGS_TF;
 				sysreg_dr6_write(0);
-				return INTR_HANDLED;
+				return false;
 			}
 
 			reason = KDBG_ENTRY_STEPPED;
@@ -122,7 +122,7 @@ intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	 * and then re-enable after the step. */
 	if(reason == KDBG_ENTRY_BREAK) {
 		if(i >= 4 || !kdbg_breakpoints[i].enabled) {
-			return INTR_HANDLED;
+			return false;
 		}
 
 		sysreg_dr7_write(sysreg_dr7_read() & ~(1<<i));
@@ -134,7 +134,7 @@ intr_result_t kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
-	return INTR_HANDLED;
+	return false;
 }
 
 /** Call KDBG.

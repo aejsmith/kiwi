@@ -21,8 +21,6 @@
 #ifndef __TIME_TIMER_H
 #define __TIME_TIMER_H
 
-#include <cpu/intr.h>
-
 #include <sync/waitq.h>
 
 #include <types.h>
@@ -88,7 +86,7 @@ typedef struct timer {
 #define timer_sleep(s)		timer_nsleep((uint64_t)(s) * 1000000000)
 
 extern int clock_source_set(clock_source_t *source);
-extern intr_result_t clock_tick(void);
+extern bool clock_tick(void);
 
 extern void timer_init(timer_t *timer, int action, timer_func_t func);
 extern int timer_start(timer_t *timer, uint64_t length);

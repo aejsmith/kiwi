@@ -87,11 +87,10 @@ static inline bool intr_state(void) {
 }
 
 struct intr_frame;
-enum intr_result;
 
 /** Interrupt handler routine type.
- * @return		Interrupt status code. */
-typedef enum intr_result (*intr_handler_t)(unative_t num, struct intr_frame *frame);
+ * @return		Whether to reschedule. */
+typedef bool (*intr_handler_t)(unative_t num, struct intr_frame *frame);
 
 extern void intr_register(unative_t num, intr_handler_t handler);
 extern void intr_remove(unative_t num);

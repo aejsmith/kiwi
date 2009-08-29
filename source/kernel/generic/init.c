@@ -127,8 +127,9 @@ void init_bsp(void *data) {
 	sched_init();
 	thread_reaper_init();
 
-	/* Perform final architecture initialization. */
+	/* Perform final architecture/platform initialization. */
 	arch_final_init();
+	platform_final_init();
 
 	/* Create the second stage initialization thread. */
 	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {
