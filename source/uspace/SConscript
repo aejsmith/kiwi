@@ -68,9 +68,9 @@ for app in env['BINS']:
 		Depends(app, File('libraries/libstdc++.so'))
 for lib in env['SHLIBS']:
 	if lib.name != 'libkernel.so':
-		Depends(lib, Glob('libraries/libkernel.so'))
+		Depends(lib, File('libraries/libkernel.so'))
 		if lib.name != 'libc.so':
-			Depends(lib, Glob('libraries/libc.so'))
+			Depends(lib, File('libraries/libc.so'))
 	Depends(lib, Glob('libraries/*crt*.o'))
 
 # Set arrays needed in the distribution environment.

@@ -120,15 +120,19 @@ static int load_module(const char *dir, const char *name) {
 	strcat(path, "/");
 	strcat(path, name);
 
-	printf("Loading module %s...\n", path);
-
 	while((ret = module_load(path, depbuf)) == -ERR_DEP_MISSING) {
-		strcat(depbuf, ".mod");
-		load_module(dir, depbuf);
+		strcat(depbuf, ".kmod");
+		if((ret = load_module(dir, depbuf)) != 0) {
+			return ret;
+		}
 	}
 
 	if(ret != 0) {
-		printf("Load %s failed (%d)\n", path, ret);
+		if(ret != -ERR_ALREADY_EXISTS) {
+			printf("Load %s failed (%d)\n", path, ret);
+		}
+	} else {
+		printf("Loaded module %s\n", path);
 	}
 	return ret;
 }

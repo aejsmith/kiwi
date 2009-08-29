@@ -20,7 +20,7 @@ from SCons.Script import *
 
 # This is a pretty funky way of doing things, but hey, it works and I like it.
 # Because we require several different build environments - one for userspace,
-# ene for drivers, one for the kernel and its modules, etc. we have an
+# one for drivers, one for the kernel and its modules, etc. we have an
 # EnvironmentManager class that manages the creation of new environments from
 # the base environment and also acts as a dictionary of environments.
 class EnvironmentManager(UserDict):

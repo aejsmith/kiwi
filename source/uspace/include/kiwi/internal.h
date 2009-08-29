@@ -31,7 +31,7 @@ protected:
 	~Noncopyable() {}
 private:
 	Noncopyable(const Noncopyable &);
-	const Noncopyable &operator=(const Noncopyable &);
+	const Noncopyable &operator =(const Noncopyable &);
 };
 
 };
