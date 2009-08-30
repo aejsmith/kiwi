@@ -134,6 +134,13 @@ typedef struct device {
 	size_t attr_count;		/**< Number of attributes. */
 } device_t;
 
+/** Device tree iteration callback.
+ * @param device	Device currently on.
+ * @param data		Iteration data.
+ * @return		0 if should finish iteration, 1 if should visit
+ *			children, 2 if should return to parent. */
+typedef int (*device_iterate_t)(device_t *device, void *data);
+
 extern device_t *device_tree_root;
 extern device_t *device_bus_dir;
 
@@ -142,11 +149,13 @@ extern int device_create(const char *name, device_t *parent, device_ops_t *ops, 
 extern int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep);
 extern int device_destroy(device_t *device);
 
+extern void device_iterate(device_t *start, device_iterate_t func, void *data);
+
 extern int device_get(const char *path, device_t **devicep);
 extern int device_read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int device_write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int device_request(device_t *device, int request, void *in, size_t insz, void **outp, size_t *outszp);
-extern device_attr_t *device_attr(device_t *device, const char *name);
+extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern void device_release(device_t *device);
 
 extern int kdbg_cmd_devices(int argc, char **argv);

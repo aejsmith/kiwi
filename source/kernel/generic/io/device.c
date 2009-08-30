@@ -302,6 +302,47 @@ int device_destroy(device_t *device) {
 	return 0;
 }
 
+/** Internal iteration function.
+ * @param device	Device we're currently on.
+ * @param func		Function to call on devices.
+ * @param data		Data argument to pass to function.
+ * @return		Whether to continue lookup. */
+static bool device_iterate_internal(device_t *device, device_iterate_t func, void *data) {
+	device_t *child;
+	int ret;
+
+	if((ret = func(device, data)) != 1) {
+		return (ret == 0) ? false : true;
+	}
+
+	RADIX_TREE_FOREACH(&device->children, iter) {
+		child = radix_tree_entry(iter, device_t);
+
+		if(!device_iterate_internal(child, func, data)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/** Iterate through the device tree.
+ *
+ * Calls the specified function on a device and all its children (and all their
+ * children, etc).
+ *
+ * @todo		Meep, we have small kernel stacks. Recursive lookup
+ *			probably isn't a very good idea. Then again, the device
+ *			tree shouldn't go *too* deep.
+ *
+ * @param start		Starting device.
+ * @param func		Function to call on devices.
+ * @param data		Data argument to pass to function.
+ */
+void device_iterate(device_t *start, device_iterate_t func, void *data) {
+	device_iterate_internal(start, func, data);
+}
+
 /** Look up a device.
  *
  * Looks up an entry in the device tree and increases its reference count. Once
@@ -456,6 +497,32 @@ int device_request(device_t *device, int request, void *in, size_t insz, void **
 	assert(refcount_get(&device->count));
 
 	return device->ops->request(device, request, in, insz, outp, outszp);
+}
+
+/** Get a device attribute.
+ *
+ * Gets an attribute from a device, and optionally checks that it is the
+ * required type. Returned structure must NOT be modified.
+ *
+ * @param device	Device to get from.
+ * @param name		Attribute name.
+ * @param type		Required type (if -1 will not check).
+ *
+ * @return		Pointer to attribute structure if found, NULL if not.
+ */
+device_attr_t *device_attr(device_t *device, const char *name, int type) {
+	size_t i;
+
+	for(i = 0; i < device->attr_count; i++) {
+		if(strcmp(device->attrs[i].name, name) == 0) {
+			if(type != -1 && (int)device->attrs[i].type != type) {
+				return NULL;
+			}
+			return &device->attrs[i];
+		}
+	}
+
+	return NULL;
 }
 
 /** Release a device.

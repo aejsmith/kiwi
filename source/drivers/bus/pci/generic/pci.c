@@ -162,10 +162,16 @@ static int pci_bus_scan(int id) {
  * @param device	Device to read from.
  * @param reg		Register to read.
  *
- * @return		Value read.
+ * @return		Value read, or 0 if device was not a PCI device.
  */
-uint8_t pci_device_read8(device_t *dev, uint8_t reg) {
-	pci_device_t *info = dev->data;
+uint8_t pci_device_read8(device_t *device, uint8_t reg) {
+	pci_device_t *info = device->data;
+	device_attr_t *attr;
+
+	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+		return 0;
+	}
+
 	return pci_config_read8(info->bus, info->dev, info->func, reg);
 }
 MODULE_EXPORT(pci_device_read8);
@@ -177,10 +183,17 @@ MODULE_EXPORT(pci_device_read8);
  * @param device	Device to read from.
  * @param reg		Register to read.
  *
- * @return		Value read (converted to correct endianness).
+ * @return		Value read (converted to correct endianness), or 0 if
+ *			device was not a PCI device.
  */
-uint16_t pci_device_read16(device_t *dev, uint8_t reg) {
-	pci_device_t *info = dev->data;
+uint16_t pci_device_read16(device_t *device, uint8_t reg) {
+	pci_device_t *info = device->data;
+	device_attr_t *attr;
+
+	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+		return 0;
+	}
+
 	return pci_config_read16(info->bus, info->dev, info->func, reg);
 }
 MODULE_EXPORT(pci_device_read16);
@@ -192,13 +205,106 @@ MODULE_EXPORT(pci_device_read16);
  * @param device	Device to read from.
  * @param reg		Register to read.
  *
- * @return		Value read (converted to correct endianness).
+ * @return		Value read (converted to correct endianness), or 0 if
+ *			device was not a PCI device.
  */
-uint32_t pci_device_read32(device_t *dev, uint8_t reg) {
-	pci_device_t *info = dev->data;
+uint32_t pci_device_read32(device_t *device, uint8_t reg) {
+	pci_device_t *info = device->data;
+	device_attr_t *attr;
+
+	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+		return 0;
+	}
+
 	return pci_config_read32(info->bus, info->dev, info->func, reg);
 }
 MODULE_EXPORT(pci_device_read32);
+
+/** PCI lookup state structure. */
+typedef struct pci_lookup_state {
+	pci_device_id_t *ids;		/**< ID structures. */
+	size_t count;			/**< Number of ID structures. */
+	pci_lookup_t cb;		/**< Callback function. */
+	size_t matched;			/**< Number of devices matched. */
+} pci_lookup_state_t;
+
+/** Device tree iteration callback for PCI lookup.
+ * @param device	Device iteration is currently at.
+ * @param data		State structure pointer.
+ * @return		0 if should finish iteration, 1 if should visit
+ *			children, 2 if should return to parent. */
+static int pci_device_lookup_func(device_t *device, void *data) {
+	pci_lookup_state_t *state = data;
+	device_attr_t *attr;
+	uint16_t vid, did;
+	uint8_t base, sub;
+	size_t i;
+
+	if(device == pci_bus_dir) {
+		return 1;
+	} else if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING))) {
+		/* We don't visit device children so this won't be triggered
+		 * by other drivers not putting a type attribute on. */
+		fatal("Missing type attribute in PCI tree (%p)", device);
+	} else if(strcmp(attr->value.string, "pci-bus") == 0) {
+		/* For buses, just visit children. */
+		return 1;
+	} else if(strcmp(attr->value.string, "pci-device") != 0) {
+		/* Shouldn't happen, we don't visit children of pci-device's. */
+		fatal("Non-PCI device found (%p)", device);
+	}
+
+	/* Get device information. */
+	vid = pci_device_read16(device, PCI_DEVICE_VENDOR_ID);
+	did = pci_device_read16(device, PCI_DEVICE_DEVICE_ID);
+	base = pci_device_read8(device, PCI_DEVICE_BASE_CLASS);
+	sub = pci_device_read8(device, PCI_DEVICE_SUB_CLASS);
+
+	for(i = 0; i < state->count; i++) {
+		if(state->ids[i].vendor != PCI_ANY_ID && state->ids[i].vendor != vid) {
+			continue;
+		} else if(state->ids[i].device != PCI_ANY_ID && state->ids[i].device != did) {
+			continue;
+		} else if(state->ids[i].base_class != PCI_ANY_ID && state->ids[i].base_class != base) {
+			continue;
+		} else if(state->ids[i].sub_class != PCI_ANY_ID && state->ids[i].sub_class != sub) {
+			continue;
+		}
+
+		state->matched = true;
+		if(state->cb(device, &state->ids[i])) {
+			return 2;
+		} else {
+			return 0;
+		}
+	}
+
+	return 2;
+}
+
+/** Look up PCI devices.
+ *
+ * Iterates through the PCI device tree and calls the provided function on any
+ * devices that match any of the structures in the provided array.
+ *
+ * @param ids		Array of ID structures to match against.
+ * @param count		Number of entries in array.
+ * @param cb		Function to call on matching devices.
+ *
+ * @return		Whether any devices matched.
+ */
+bool pci_device_lookup(pci_device_id_t *ids, size_t count, pci_lookup_t cb) {
+	pci_lookup_state_t state;
+
+	state.ids = ids;
+	state.count = count;
+	state.cb = cb;
+	state.matched = 0;
+
+	device_iterate(pci_bus_dir, pci_device_lookup_func, &state);
+	return (state.matched != 0);
+}
+MODULE_EXPORT(pci_device_lookup);
 
 /** Initialization function for the PCI module.
  * @return		0 on success, negative error code on failure. */

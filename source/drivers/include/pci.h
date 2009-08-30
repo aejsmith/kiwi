@@ -53,12 +53,32 @@ struct device;
 #define PCI_DEVICE_MIN_GRANT		0x3E	/**< Min grant        - 8-bit.  */
 #define PCI_DEVICE_MAX_LATENCY		0x3F	/**< Max latency      - 8-bit.  */
 
+/** Value to match any ID in the structure below. */
+#define PCI_ANY_ID			(~((uint32_t)0))
+
+/** Structure describing PCI device IDs to look up. */
+typedef struct pci_device_id {
+	uint32_t vendor;			/**< Vendor ID. */
+	uint32_t device;			/**< Device ID. */
+	uint32_t base_class;			/**< Base class. */
+	uint32_t sub_class;			/**< Sub class. */
+	void *data;				/**< Driver data. */
+} pci_device_id_t;
+
+/** PCI device lookup callback function.
+ * @param dev		Device that matched.
+ * @param id		ID structure the device matches.
+ * @return		Whether to continue lookup. */
+typedef bool (*pci_lookup_t)(struct device *dev, pci_device_id_t *id);
+
 extern uint8_t pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
 extern uint16_t pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
 extern uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
 
-extern uint8_t pci_device_read8(struct device *dev, uint8_t reg);
-extern uint16_t pci_device_read16(struct device *dev, uint8_t reg);
-extern uint32_t pci_device_read32(struct device *dev, uint8_t reg);
+extern uint8_t pci_device_read8(struct device *device, uint8_t reg);
+extern uint16_t pci_device_read16(struct device *device, uint8_t reg);
+extern uint32_t pci_device_read32(struct device *device, uint8_t reg);
+
+extern bool pci_device_lookup(pci_device_id_t *ids, size_t count, pci_lookup_t cb);
 
 #endif /* __DRIVERS_PCI_H */
