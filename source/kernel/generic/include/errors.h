@@ -44,5 +44,7 @@
 #define ERR_BUF_TOO_SMALL	20	/**< Provided buffer is too small. */
 #define ERR_SYSCALL_INVAL	21	/**< Invalid system call number. */
 #define ERR_DEST_UNREACHABLE	22	/**< Cannot reach destination. */
+#define ERR_TIMED_OUT		23	/**< Timed out while waiting. */
+#define ERR_DEVICE_ERROR	24	/**< There was an error on the device. */
 
 #endif /* __KERNEL_ERRORS_H */

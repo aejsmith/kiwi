@@ -33,6 +33,9 @@
 #define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */
 #define DEVICE_ATTR_MAX		256	/**< Maximum length of a device attribute string value. */
 
+/** Start of driver-specific request numbers. */
+#define DEVICE_CUSTOM_REQUEST_START	1024
+
 struct device;
 
 /** Structure containing device operations. */
@@ -158,7 +161,6 @@ extern int device_request(device_t *device, int request, void *in, size_t insz, 
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern void device_release(device_t *device);
 
-extern int kdbg_cmd_devices(int argc, char **argv);
 extern int kdbg_cmd_device(int argc, char **argv);
 
 /** Arguments for sys_device_request(). */

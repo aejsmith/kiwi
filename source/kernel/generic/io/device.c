@@ -559,33 +559,9 @@ static void device_dump_children(radix_tree_t *tree, int indent) {
 	}
 }
 
-/** Dump the device tree.
+/** Print out device information.
  *
- * Prints out the contents of the device tree.
- *
- * @param argc		Argument count.
- * @param argv		Argument array.
- *
- * @return		Always returns KDBG_OK.
- */
-int kdbg_cmd_devices(int argc, char **argv) {
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n", argv[0]);
-
-		kprintf(LOG_NONE, "Prints out the contents of the device tree.\n");
-		return KDBG_OK;
-	}
-
-	kprintf(LOG_NONE, "Name                     Address            Parent             Count\n");
-	kprintf(LOG_NONE, "====                     =======            ======             =====\n");
-
-	device_dump_children(&device_tree_root->children, 0);
-	return KDBG_OK;
-}
-
-/** Print out a device.
- *
- * Prints out information about a single device.
+ * Prints out information about devices.
  *
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -598,14 +574,25 @@ int kdbg_cmd_device(int argc, char **argv) {
 	size_t i;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s <addr>\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [<addr>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out information about a single device.\n");
+		kprintf(LOG_NONE, "If no arguments are given, shows the contents of the device tree. Otherwise\n");
+		kprintf(LOG_NONE, "shows information about a single device.\n");
 		return KDBG_OK;
-	} else if(argc != 2) {
+	} else if(argc != 1 && argc != 2) {
 		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
-	} else if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
+	}
+
+	if(argc == 1) {
+		kprintf(LOG_NONE, "Name                     Address            Parent             Count\n");
+		kprintf(LOG_NONE, "====                     =======            ======             =====\n");
+
+		device_dump_children(&device_tree_root->children, 0);
+		return KDBG_OK;
+	}
+
+	if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 		return KDBG_FAIL;
 	}
 

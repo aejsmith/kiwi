@@ -62,12 +62,17 @@ void waitq_do_wake(thread_t *thread) {
  *			is specified. The mutex will always be locked when the
  *			function returns - the flags specified will not be
  *			passed to mutex_lock() when relocking.
+ * @param sl		Same as mtx but for a spinlock. You must not specify
+ *			both a spinlock and a mutex.
  * @param flags		Synchronization flags (see sync/flags.h)
  *
  * @return		0 on success, negative error code on failure.
  */
-int waitq_sleep(waitq_t *waitq, mutex_t *mtx, int flags) {
+int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 	bool state = intr_disable();
+	int ret = 0;
+
+	assert(!(mtx && sl));
 
 	spinlock_lock_ni(&waitq->lock, 0);
 
@@ -87,6 +92,8 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, int flags) {
 
 	if(mtx) {
 		mutex_unlock(mtx);
+	} else if(sl) {
+		spinlock_unlock(sl);
 	}
 
 	spinlock_lock_ni(&curr_thread->lock, 0);
@@ -102,10 +109,8 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, int flags) {
 
 		if(context_save(&curr_thread->sleep_context) != 0) {
 			sched_post_switch(state);
-			if(mtx) {
-				mutex_lock(mtx, 0);
-			}
-			return -ERR_INTERRUPTED;
+			ret = -ERR_INTERRUPTED;
+			goto relock;
 		}
 	} else {
 		curr_thread->interruptible = false;
@@ -119,10 +124,13 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, int flags) {
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
 	sched_internal(state);
+relock:
 	if(mtx) {
 		mutex_lock(mtx, 0);
+	} else if(sl) {
+		spinlock_lock(sl, 0);
 	}
-	return 0;
+	return ret;
 }
 
 /** Wake up threads on a wait queue.

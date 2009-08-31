@@ -36,7 +36,7 @@
  *			code on failure.
  */
 int semaphore_down(semaphore_t *sem, int flags) {
-	return waitq_sleep(&sem->queue, NULL, flags);
+	return waitq_sleep(&sem->queue, NULL, NULL, flags);
 }
 
 /** Up a semaphore.

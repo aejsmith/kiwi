@@ -207,7 +207,7 @@ int timer_start(timer_t *timer, uint64_t length) {
 
 	/* If we're a TIMER_WAKE timer, sleep now. */
 	if(timer->action == TIMER_WAKE) {
-		waitq_sleep(&timer->queue, NULL, 0);
+		waitq_sleep(&timer->queue, NULL, NULL, 0);
 	}
 
 	intr_restore(state);
