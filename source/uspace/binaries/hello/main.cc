@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
 
 	myhello.hello();
 
-	handle = device_open("/input/keyboard");
+	handle = device_open("/input/input0");
 	if(handle < 0) {
 		printf("Device open failed: %d\n", handle);
 		return 1;

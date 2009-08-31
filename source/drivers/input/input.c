@@ -1,4 +1,4 @@
-/* Kiwi input device class
+/* Kiwi input device manager
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Input device class.
+ * @brief		Input device manager.
  *
  * The kernel side of input handling is very simple - most of the work is
  * offloaded to userspace. All we do is publish a device with attributes to
@@ -85,6 +85,9 @@ static int input_keyboard_request(input_device_t *device, int request, void *in,
 		ops->set_leds(device, in);
 		return 0;
 	default:
+		if(request >= DEVICE_CUSTOM_REQUEST_START && ops->request) {
+			return ops->request(device, request, in, insz, outp, outszp);
+		}
 		return -ERR_PARAM_INVAL;
 	}
 }
@@ -107,8 +110,15 @@ static input_type_t input_keyboard_type = {
  * @param outszp	Where to store output buffer size.
  * @return		0 value on success, negative error code on failure. */
 static int input_mouse_request(input_device_t *device, int request, void *in, size_t insz, void **outp, size_t *outszp) {
-	/* None at the moment. */
-	return -ERR_PARAM_INVAL;
+	input_mouse_ops_t *ops = device->ops;
+
+	switch(request) {
+	default:
+		if(request >= DEVICE_CUSTOM_REQUEST_START && ops->request) {
+			return ops->request(device, request, in, insz, outp, outszp);
+		}
+		return -ERR_PARAM_INVAL;
+	}
 }
 
 /** Keyboard device type structure. */
@@ -189,13 +199,8 @@ static int input_device_read(device_t *_dev, void *_buf, size_t count, offset_t 
  *			failure. */
 static int input_device_request(device_t *_dev, int request, void *in, size_t insz, void **outp, size_t *outszp) {
 	input_device_t *device = _dev->data;
-	int ret = -ERR_PARAM_INVAL;
 
-	if(device->type->request) {
-		ret = device->type->request(device, request, in, insz, outp, outszp);
-	}
-
-	return ret;
+	return device->type->request(device, request, in, insz, outp, outszp);
 }
 
 /** Input device operations. */
@@ -284,7 +289,7 @@ int input_device_create(uint8_t type, uint8_t protocol, void *ops, void *data,
 	}
 
 	/* Create the device tree node. */
-	sprintf(name, "input%d", device->id);
+	sprintf(name, "input%" PRId32, device->id);
 	if((ret = device_create(name, (parent) ? parent : input_device_dir, &input_device_ops,
 	                        device, attrs, ARRAYSZ(attrs), &device->device)) != 0) {
 		kfree(device);

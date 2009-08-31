@@ -12,10 +12,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+Import('env')
 
-# Get environment and add driver include directory.
-env = envmgr['module']
-env['INCDIRS']['drivers'] = Dir('include')
-
-SConscript(dirs=['bus', 'disk', 'input'], exports=['env'])
+env.Module('ata', [
+	'ata.c',
+	'controller.c',
+	'device.c',
+])

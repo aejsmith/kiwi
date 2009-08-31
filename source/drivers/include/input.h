@@ -60,12 +60,9 @@ struct input_type;
 /** Keyboard device operations structure. */
 typedef struct input_kb_ops {
 	/** Handler for device-specific requests.
-	 * @note		This is called when a device request is made
-	 *			that is not recognized by the input device
-	 *			manager. If it is not provided, unrecognized
-	 *			requests will generate an error. If a request
-	 *			is not recognized by this function, it should
-	 *			return an error.
+	 * @note		This is called when a device request ID is
+	 *			received that is greater than or equal to
+	 *			DEVICE_CUSTOM_REQUEST_START.
 	 * @param device	Device request is being made on.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
@@ -85,12 +82,9 @@ typedef struct input_kb_ops {
 /** Mouse device operations structure. */
 typedef struct input_mouse_ops {
 	/** Handler for device-specific requests.
-	 * @note		This is called when a device request is made
-	 *			that is not recognized by the input device
-	 *			manager. If it is not provided, unrecognized
-	 *			requests will generate an error. If a request
-	 *			is not recognized by this function, it should
-	 *			return an error.
+	 * @note		This is called when a device request ID is
+	 *			received that is greater than or equal to
+	 *			DEVICE_CUSTOM_REQUEST_START.
 	 * @param device	Device request is being made on.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
@@ -104,7 +98,7 @@ typedef struct input_mouse_ops {
 
 /** Input device structure. */
 typedef struct input_device {
-	int id;				/**< Device ID. */
+	identifier_t id;		/**< Device ID. */
 	device_t *device;		/**< Device tree entry. */
 	device_t *alias;		/**< Alias if main device is under a different directory. */
 	struct input_type *type;	/**< Input device type. */

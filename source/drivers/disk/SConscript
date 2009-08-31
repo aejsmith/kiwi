@@ -12,10 +12,18 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+Import('env', 'config')
 
-# Get environment and add driver include directory.
-env = envmgr['module']
-env['INCDIRS']['drivers'] = Dir('include')
+# Work out the drivers to build.
+dirs = [
+	('DRIVER_DISK_ATA', 'ata'),
+]
 
-SConscript(dirs=['bus', 'disk', 'input'], exports=['env'])
+SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+
+# Build the disk device manager.
+env.Module('disk', [
+	'disk.c',
+	'part-msdos.c',
+	'partition.c',
+])

@@ -47,4 +47,4 @@ Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL'], dist['BOOTIMG
 
 # Run generated ISO image in QEMU.
 dist.Alias('qtest', dist.Command('qtest', ['cdrom.iso'],
-           Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE ' + config['QEMU_OPTS'], None)))
+           Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'], None)))

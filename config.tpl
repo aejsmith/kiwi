@@ -82,6 +82,7 @@ Section('Driver configuration')
 #######
 
 Option('DRIVER_BUS_PCI', 'PCI bus manager.', True)
+Option('DRIVER_DISK_ATA', 'Generic ATA device driver.', True, {'DRIVER_BUS_PCI': lambda x: x})
 Option('DRIVER_INPUT_I8042', 'i8042 keyboard/mouse port driver.', True)
 
 #####################################

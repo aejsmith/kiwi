@@ -121,7 +121,7 @@ static int load_module(const char *dir, const char *name) {
 	strcat(path, name);
 
 	while((ret = module_load(path, depbuf)) == -ERR_DEP_MISSING) {
-		strcat(depbuf, ".kmod");
+		strcat(depbuf, ".km");
 		if((ret = load_module(dir, depbuf)) != 0) {
 			return ret;
 		}
