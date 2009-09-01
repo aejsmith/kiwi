@@ -555,7 +555,11 @@ static void device_dump_children(radix_tree_t *tree, int indent) {
 		kprintf(LOG_NONE, "%*s%-*s %-18p %-18p %d\n", indent, "",
 		        24 - indent, device->name, device, device->parent,
 		        refcount_get(&device->count));
-		device_dump_children(&device->children, indent + 2);
+		if(device->dest) {
+			device_dump_children(&device->dest->children, indent + 2);
+		} else {
+			device_dump_children(&device->children, indent + 2);
+		}
 	}
 }
 

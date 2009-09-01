@@ -91,8 +91,8 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 	/* Now work out the start page and the end block. Subtract one from
 	 * count to prevent end from going onto the next block when the offset
 	 * plus the count is an exact multiple of the block size. */
-	start = ROUND_DOWN(offset, blksize);
-	end = ROUND_DOWN((offset + (count - 1)), blksize);
+	start = offset / blksize;
+	end = (offset + (count - 1)) / blksize;
 
 	/* If we're not starting on a block boundary, we need to do a partial
 	 * transfer on the initial block to get up to a block boundary. 
@@ -103,14 +103,14 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 			goto out;
 		}
 
-		size = (start == end) ? count : (size_t)blksize - (size_t)(offset % blksize);
+		size = (start == end) ? count : blksize - (size_t)(offset % blksize);
 		memcpy(buf, block + (offset % blksize), size);
-		total += size; buf += size; count -= size; start += blksize;
+		total += size; buf += size; count -= size; start++;
 	}
 
 	/* Handle any full blocks. */
 	size = count / blksize;
-	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start += blksize) {
+	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start++) {
 		/* Read directly into the destination buffer. */
 		if((ret = device->ops->block_read(device, buf, start)) != 1) {
 			goto out;
@@ -163,8 +163,8 @@ int disk_device_write(disk_device_t *device, const void *buf, size_t count, offs
 	/* Now work out the start page and the end block. Subtract one from
 	 * count to prevent end from going onto the next block when the offset
 	 * plus the count is an exact multiple of the block size. */
-	start = ROUND_DOWN(offset, blksize);
-	end = ROUND_DOWN((offset + (count - 1)), blksize);
+	start = offset / blksize;
+	end = (offset + (count - 1)) / blksize;
 
 	/* If we're not starting on a block boundary, we need to do a partial
 	 * transfer on the initial block to get up to a block boundary. 
@@ -176,19 +176,19 @@ int disk_device_write(disk_device_t *device, const void *buf, size_t count, offs
 			goto out;
 		}
 
-		size = (start == end) ? count : (size_t)blksize - (size_t)(offset % blksize);
+		size = (start == end) ? count : blksize - (size_t)(offset % blksize);
 		memcpy(block + (offset % blksize), buf, size);
 
 		if((ret = device->ops->block_write(device, block, start)) != 1) {
 			goto out;
 		}
 
-		total += size; buf += size; count -= size; start += blksize;
+		total += size; buf += size; count -= size; start++;
 	}
 
 	/* Handle any full blocks. */
 	size = count / blksize;
-	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start += blksize) {
+	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start++) {
 		if((ret = device->ops->block_write(device, buf, start)) != 1) {
 			goto out;
 		}

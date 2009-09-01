@@ -57,10 +57,10 @@ typedef struct vfs_type {
 	 * @note		If a filesystem type does not provide this
 	 *			function, then it is assumed that the FS does
 	 *			not use a backing device (e.g. RamFS).
-	 * @param dev		Device to check.
+	 * @param device	Device to check.
 	 * @return		True if the device contains a FS of this type,
 	 *			false if not. */
-	bool (*probe)(struct device *dev);
+	bool (*probe)(struct device *device);
 
 	/** Mount an instance of this filesystem type.
 	 * @note		It is guaranteed that the device will contain

@@ -586,8 +586,8 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		if(tag->base != addr) {
 			continue;
 		} else if(tag->size != size) {
-			fatal("Bad Vmem %p(%s) free: size: %" PRIu64 ", segment: %" PRIu64,
-			      vmem, vmem->name, size, tag->size);
+			fatal("Bad vmem_xfree(%s): size: %" PRIu64 ", segment: %" PRIu64,
+			      vmem->name, size, tag->size);
 		}
 
 		tag->type = VMEM_BTAG_FREE;
@@ -626,7 +626,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		return;
 	}
 
-	fatal("Bad Vmem %p(%s) free: cannot find segment 0x%" PRIx64, vmem, vmem->name, addr);
+	fatal("Bad vmem_free(%s): cannot find segment 0x%" PRIx64, vmem->name, addr);
 }
 
 /** Allocate a segment from a Vmem arena.

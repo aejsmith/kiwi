@@ -12,12 +12,11 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env')
 
-# Work out the modules to build.
-dirs = [
-	('MODULE_FS_EXT2', 'ext2'),
-#	('MODULE_FS_ISO9660', 'iso9660'),
-]
-
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+env.Module('ext2', [
+	'block.c',
+	'dir.c',
+	'ext2.c',
+	'inode.c',
+])

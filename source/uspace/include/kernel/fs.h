@@ -50,6 +50,9 @@ typedef struct fs_info {
 #define FS_HANDLE_SEEK_ADD	2	/**< Add the supplied value to the current offset. */
 #define FS_HANDLE_SEEK_END	3	/**< Set the offset to the end of the file plus the supplied value. */
 
+/** Mount behaviour flags. */
+#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
+
 extern int fs_file_create(const char *path);
 extern handle_t fs_file_open(const char *path, int flags);
 extern int fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);

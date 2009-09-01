@@ -78,6 +78,16 @@ Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
 Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
 
 #######
+Section('Module configuration')
+#######
+
+Option('MODULE_FS_EXT2', 'Ext2 filesystem module.', True)
+Option('MODULE_FS_EXT2_DEBUG', 'Debugging output from the Ext2 driver.', False, {
+	'DEBUG': lambda x: x,
+	'MODULE_FS_EXT2': lambda x: x,
+})
+
+#######
 Section('Driver configuration')
 #######
 

@@ -2,4 +2,6 @@
 .sconsign.dblite
 ./build
 .config
-documentation/markdown/output/*.html
+./documentation/markdown/output/*.html
+./hd.img
+./mnt

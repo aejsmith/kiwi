@@ -1860,7 +1860,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	mount->type = NULL;
 	mount->device = NULL;
 	mount->root = NULL;
-	mount->flags = NULL;
+	mount->flags = flags;
 	mount->mountpoint = node;
 
 	/* Look up the device, if any. */
@@ -1874,7 +1874,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	 * for one. */
 	if(!type) {
 		if(!(mount->type = vfs_type_probe(mount->device))) {
-			ret = -ERR_PARAM_INVAL;
+			ret = -ERR_FORMAT_INVAL;
 			goto fail;
 		}
 	} else {
@@ -1883,10 +1883,19 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 			goto fail;
 		}
 
-		/* Release the device if it is not needed. */
-		if(!mount->type->probe && mount->device) {
-			device_release(mount->device);
-			mount->device = NULL;
+		/* Release the device if it is not needed, and check if the
+		 * device contains the FS type. */
+		if(!mount->type->probe) {
+			if(mount->device) {
+				device_release(mount->device);
+				mount->device = NULL;
+			}
+		} else if(!dev) {
+			ret = -ERR_PARAM_INVAL;
+			goto fail;
+		} else if(!mount->type->probe(mount->device)) {
+			ret = -ERR_FORMAT_INVAL;
+			goto fail;
 		}
 	}
 
