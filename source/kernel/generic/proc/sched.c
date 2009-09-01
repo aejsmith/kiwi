@@ -109,8 +109,8 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 	assert(thread->cpu->sched == cpu);
 	assert(thread->state == THREAD_READY);
 
-	/* Don't move unmovable threads. */
-	if(thread->flags & THREAD_UNMOVABLE) {
+	/* Don't move wired threads. */
+	if(thread->wire_count) {
 		spinlock_unlock_ni(&thread->lock);
 		return 0;
 	}
@@ -569,10 +569,11 @@ void __init_text sched_init(void) {
 
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-	if(thread_create(name, kernel_proc, THREAD_UNMOVABLE | THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
+	if(thread_create(name, kernel_proc, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
 	                 NULL, NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
 		fatal("Could not create idle thread for %" PRIu32, curr_cpu->id);
 	}
+	thread_wire(curr_cpu->sched->idle_thread);
 
 	/* The boot code becomes the idle thread, so free the stack that was
 	 * allocated for it and point it at the current stack. We also set the
@@ -596,10 +597,11 @@ void __init_text sched_init(void) {
 	/* Create the load-balancing thread if we have more than one CPU. */
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
-		if(thread_create(name, kernel_proc, THREAD_UNMOVABLE | THREAD_UNPREEMPTABLE,
-		                 sched_balancer_thread, NULL, NULL, &curr_cpu->sched->balancer_thread) != 0) {
+		if(thread_create(name, kernel_proc,THREAD_UNPREEMPTABLE, sched_balancer_thread,
+		                 NULL, NULL, &curr_cpu->sched->balancer_thread) != 0) {
 			fatal("Could not create load balancer thread for %" PRIu32, curr_cpu->id);
 		}
+		thread_wire(curr_cpu->sched->balancer_thread);
 		thread_run(curr_cpu->sched->balancer_thread);
 	}
 }

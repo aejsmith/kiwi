@@ -842,9 +842,14 @@ int vfs_node_info(vfs_node_t *node, vfs_info_t *infop) {
  *			allocate a page - useful if the caller is about to
  *			overwrite the page data.
  * @param pagep		Where to store pointer to page structure.
- * @param mappingp	Where to store address of virtual mapping.
+ * @param mappingp	Where to store address of virtual mapping. If this is
+ *			set the calling thread will be wired to its CPU when
+ *			the function returns.
+ * @param sharedp	Where to store value stating whether a mapping had to
+ *			be shared. Only used if mappingp is set.
  * @return		0 on success, negative error code on failure. */
-static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool overwrite, vm_page_t **pagep, void **mappingp) {
+static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool overwrite,
+                                      vm_page_t **pagep, void **mappingp, bool *sharedp) {
 	void *mapping = NULL;
 	vm_page_t *page;
 	int ret;
@@ -865,9 +870,16 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 		refcount_inc(&page->count);
 		mutex_unlock(&node->lock);
 
-		/* Map it in if required. */
+		/* Map it in if required. Wire the thread to the current CPU
+		 * and specify that the mapping is not being shared - the
+		 * mapping will only be accessed by this thread, so we can
+		 * save having to do an expensive remote TLB invalidation. */
 		if(mappingp) {
+			assert(sharedp);
+
+			thread_wire(curr_thread);
 			*mappingp = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			*sharedp = false;
 		} else {
 			*pagep = page;
 		}
@@ -877,18 +889,21 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 		return 0;
 	}
 
-	/* Need to read the page in. If a read operation is provided and we're
-	 * not about to overwrite, read the page data into an unzeroed page.
-	 * If we're about to overwrite, allocate a page without zeroing.
-	 * Otherwise, allocate a zeroed page. */
+	/* Need to read the page in if not about to completely overwrite it. */
 	if(!overwrite) {
+		/* If a read operation is provided, read the page data into an
+		 * unzeroed page. Otherwise get a zeroed page. */
 		if(node->mount && node->mount->type->page_read) {
 			page = vm_page_alloc(MM_SLEEP);
+
+			/* When reading in page data we cannot guarantee that
+			 * the mapping won't be shared, because it's possible
+			 * that a device driver will do work in another thread,
+			 * which may be on another CPU. */
 			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 
-			ret = node->mount->type->page_read(node, mapping, offset, false);
-			if(ret != 0) {
-				page_phys_unmap(mapping, PAGE_SIZE);
+			if((ret = node->mount->type->page_read(node, mapping, offset, false)) != 0) {
+				page_phys_unmap(mapping, PAGE_SIZE, true);
 				refcount_dec(&page->count);
 				vm_page_free(page);
 				mutex_unlock(&node->lock);
@@ -898,6 +913,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 			page = vm_page_alloc(MM_SLEEP | PM_ZERO);
 		}
 	} else {
+		/* Overwriting - allocate a new page, don't have to zero. */
 		page = vm_page_alloc(MM_SLEEP);
 	}
 
@@ -909,16 +925,24 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 	dprintf("vfs: cached new page 0x%" PRIpp " at offset %" PRId64 " in %p\n",
 	        page->addr, offset, node);
 
-	/* Map it in if required. If we had to read page data in, reuse the
-	 * mapping created for that. */
 	if(mappingp) {
+		/* If we had to read page data in, reuse the mapping created,
+		 * and specify that it may be shared across CPUs (see comment
+		 * above). Otherwise wire the thread and specify that it won't
+		 * be shared. */
+		assert(sharedp);
 		if(!mapping) {
+			thread_wire(curr_thread);
 			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			*sharedp = false;
+		} else {
+			*sharedp = true;
 		}
 		*mappingp = mapping;
 	} else {
+		/* Page mapping is not required, get rid of it. */
 		if(mapping) {
-			page_phys_unmap(mapping, PAGE_SIZE);
+			page_phys_unmap(mapping, PAGE_SIZE, true);
 		}
 		*pagep = page;
 	}
@@ -987,7 +1011,7 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 			}
 		}
 
-		page_phys_unmap(mapping, PAGE_SIZE);
+		page_phys_unmap(mapping, PAGE_SIZE, true);
 	}
 
 	return ret;
@@ -1013,7 +1037,7 @@ static void vfs_vm_object_release(vm_object_t *obj, vm_region_t *region) {
  * @param pagep		Where to store pointer to page structure.
  * @return		0 on success, negative error code on failure. */
 static int vfs_vm_object_page_get(vm_object_t *obj, offset_t offset, vm_page_t **pagep) {
-	return vfs_file_page_get_internal((vfs_node_t *)obj, offset, false, pagep, NULL);
+	return vfs_file_page_get_internal((vfs_node_t *)obj, offset, false, pagep, NULL, NULL);
 }
 
 /** Release a page from a file VM object.
@@ -1039,18 +1063,25 @@ static vm_object_ops_t vfs_vm_object_ops = {
  *			the filesystem if it is not in the cache - useful if
  *			the caller is about to overwrite the page data.
  * @param addrp		Where to store address of mapping.
+ * @param sharedp	Where to store value stating whether a mapping had to
+ *			be shared.
  * @return		0 on success, negative error code on failure. */
-static int vfs_file_page_map(vfs_node_t *node, offset_t offset, bool overwrite, void **addrp) {
-	return vfs_file_page_get_internal(node, offset, overwrite, NULL, addrp);
+static int vfs_file_page_map(vfs_node_t *node, offset_t offset, bool overwrite, void **addrp, bool *sharedp) {
+	assert(addrp && sharedp);
+	return vfs_file_page_get_internal(node, offset, overwrite, NULL, addrp, sharedp);
 }
 
 /** Unmap and release a page from a node's data cache.
  * @param node		Node to release page in.
  * @param mapping	Address of mapping.
  * @param offset	Offset of page to release.
- * @param dirty		Whether the page has been dirtied. */
-static void vfs_file_page_unmap(vfs_node_t *node, void *mapping, offset_t offset, bool dirty) {
-	page_phys_unmap(mapping, PAGE_SIZE);
+ * @param dirty		Whether the page has been dirtied.
+ * @param shared	Shared value returned from vfs_file_page_map(). */
+static void vfs_file_page_unmap(vfs_node_t *node, void *mapping, offset_t offset, bool dirty, bool shared) {
+	page_phys_unmap(mapping, PAGE_SIZE, shared);
+	if(!shared) {
+		thread_unwire(curr_thread);
+	}
 	vfs_file_page_release_internal(node, offset, dirty);
 }
 
@@ -1147,6 +1178,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 	offset_t start, end, i, size;
 	size_t total = 0;
 	void *mapping;
+	bool shared;
 	int ret;
 
 	if(!node || !buf || offset < 0) {
@@ -1193,35 +1225,35 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		size = (start == end) ? count : (size_t)PAGE_SIZE - (size_t)(offset % PAGE_SIZE);
 		memcpy(buf, mapping + (offset % PAGE_SIZE), size);
-		vfs_file_page_unmap(node, mapping, start, false);
+		vfs_file_page_unmap(node, mapping, start, false, shared);
 		total += size; buf += size; count -= size; start += PAGE_SIZE;
 	}
 
 	/* Handle any full pages. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		memcpy(buf, mapping, PAGE_SIZE);
-		vfs_file_page_unmap(node, mapping, start, false);
+		vfs_file_page_unmap(node, mapping, start, false, shared);
 	}
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		memcpy(buf, mapping, count);
-		vfs_file_page_unmap(node, mapping, start, false);
+		vfs_file_page_unmap(node, mapping, start, false, shared);
 		total += count;
 	}
 
@@ -1254,6 +1286,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 	offset_t start, end, i, size;
 	size_t total = 0;
 	void *mapping;
+	bool shared;
 	int ret;
 
 	if(!node || !buf || offset < 0) {
@@ -1309,13 +1342,13 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		size = (start == end) ? count : (size_t)PAGE_SIZE - (size_t)(offset % PAGE_SIZE);
 		memcpy(mapping + (offset % PAGE_SIZE), buf, size);
-		vfs_file_page_unmap(node, mapping, start, true);
+		vfs_file_page_unmap(node, mapping, start, true, shared);
 		total += size; buf += size; count -= size; start += PAGE_SIZE;
 	}
 
@@ -1325,22 +1358,22 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 	 * would not be necessary. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vfs_file_page_map(node, start, true, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, true, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		memcpy(mapping, buf, PAGE_SIZE);
-		vfs_file_page_unmap(node, mapping, start, true);
+		vfs_file_page_unmap(node, mapping, start, true, shared);
 	}
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vfs_file_page_map(node, start, false, &mapping)) != 0) {
+		if((ret = vfs_file_page_map(node, start, false, &mapping, &shared)) != 0) {
 			goto out;
 		}
 
 		memcpy(mapping, buf, count);
-		vfs_file_page_unmap(node, mapping, start, true);
+		vfs_file_page_unmap(node, mapping, start, true, shared);
 		total += count;
 	}
 

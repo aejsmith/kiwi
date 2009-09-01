@@ -67,8 +67,9 @@ vmem_t kheap_arena;			/**< Heap arena that backs allocated ranges with anonymous
 /** Unmap a range on the kernel heap.
  * @param start		Start of range.
  * @param end		End of range.
- * @param free		Whether to free the pages. */
-static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
+ * @param free		Whether to free the pages.
+ * @param shared	Whether the mapping was shared with other CPUs. */
+static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 	phys_ptr_t page;
 	ptr_t i;
 
@@ -83,7 +84,11 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free) {
 		dprintf("kheap: unmapped page 0x%" PRIpp " from %p\n", page, i);
 	}
 
-	tlb_invalidate(NULL, start, end);
+	if(shared) {
+		tlb_invalidate(NULL, start, end);
+	} else {
+		tlb_arch_invalidate(start, end);
+	}
 }
 
 /** Kernel heap arena allocation function.
@@ -137,7 +142,7 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 	return ret;
 fail:
 	/* Go back and reverse what we have done. */
-	kheap_do_unmap(ret, ret + i, true);
+	kheap_do_unmap(ret, ret + i, true, true);
 	vmem_free(source, (vmem_resource_t)ret, size);
 	return 0;
 }
@@ -154,7 +159,7 @@ void kheap_anon_ffunc(vmem_t *source, vmem_resource_t addr, vmem_resource_t size
 	assert(!(size % PAGE_SIZE));
 
 	/* Unmap pages covering the range and free back to the source. */
-	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + (ptr_t)size, true);
+	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + (ptr_t)size, true, true);
 	vmem_free(source, addr, size);
 }
 
@@ -227,7 +232,7 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
-	kheap_do_unmap(ret, ret + i, true);
+	kheap_do_unmap(ret, ret + i, true, true);
 	mutex_unlock(&kheap_va_arena.lock);
 
 	vmem_free(&kheap_va_arena, (vmem_resource_t)ret, size);
@@ -243,10 +248,14 @@ fail:
  *
  * @param addr		Address to free.
  * @param size		Size of range to unmap (must be multiple of PAGE_SIZE).
+ * @param shared	Whether the mapping was used by any other CPUs. This
+ *			is used as an optimization to reduce the number of
+ *			remote TLB invalidations we have to do when doing
+ *			physical mappings.
  */
-void kheap_unmap_range(void *addr, size_t size) {
+void kheap_unmap_range(void *addr, size_t size, bool shared) {
 	mutex_lock(&kheap_va_arena.lock, 0);
-	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + size, false);
+	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + size, false, shared);
 	mutex_unlock(&kheap_va_arena.lock);
 
 	vmem_free(&kheap_va_arena, (vmem_resource_t)((ptr_t)addr), size);

@@ -230,7 +230,7 @@ static void vga_console_putch(unsigned char ch) {
 		vga_y++;
 		break;
 	case '\t':
-		vga_x = (vga_x + 8) % 8;
+		vga_x += 8 - (vga_x % 8);
 		break;
 	default:
 		/* If it is a non-printing character, ignore it. */

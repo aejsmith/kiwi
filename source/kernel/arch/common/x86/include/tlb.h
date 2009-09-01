@@ -21,6 +21,7 @@
 #ifndef __ARCH_X86_TLB_H
 #define __ARCH_X86_TLB_H
 
+#include <arch/page.h>
 #include <arch/x86/sysreg.h>
 
 /** Invalidate TLB entries for an address range.

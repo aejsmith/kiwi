@@ -36,7 +36,7 @@ static int partition_device_read(device_t *device, void *buf, size_t count, offs
 	partition_t *part = device->data;
 	disk_device_t *disk = part->parent;
 
-	if((offset + count) >= (part->size * disk->blksize)) {
+	if((uint64_t)(offset + count) >= (part->size * disk->blksize)) {
 		*bytesp = 0;
 		return 0;
 	}
@@ -55,7 +55,7 @@ static int partition_device_write(device_t *device, const void *buf, size_t coun
 	partition_t *part = device->data;
 	disk_device_t *disk = part->parent;
 
-	if((offset + count) >= (part->size * disk->blksize)) {
+	if((uint64_t)(offset + count) >= (part->size * disk->blksize)) {
 		*bytesp = 0;
 		return 0;
 	}

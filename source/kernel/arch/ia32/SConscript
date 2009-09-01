@@ -22,8 +22,10 @@ env['ASFLAGS'] += ['-m32']
 env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer', '-march=i686']
 env['LDFLAGS'] += ['-b', 'elf32-i386', '-m', 'elf_i386']
 
-# We need to link the kernel with libgcc.
-env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % env['CC']).read()]
+# We need to link the kernel with libgcc, and force some symbols from it to be
+# linked in.
+env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % env['CC']).read().strip()]
+env['LDFLAGS'] += ['--undefined=__moddi3', '--undefined=__divdi3']
 
 # Pull in x86 common code.
 SConscript(dirs=['../common/x86'], exports=['env'])

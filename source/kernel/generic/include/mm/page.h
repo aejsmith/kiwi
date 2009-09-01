@@ -51,7 +51,7 @@ extern void page_map_destroy(page_map_t *map);
 #endif
 
 extern void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag);
-extern void page_phys_unmap(void *addr, size_t size);
+extern void page_phys_unmap(void *addr, size_t size, bool shared);
 
 #if 0
 # pragma mark Page allocation functions.

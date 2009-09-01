@@ -149,34 +149,53 @@ static void thread_reaper(void *arg1, void *arg2) {
 	}
 }
 
-/** Destroy a thread.
+/** Wire a thread to its current CPU.
  *
- * Queues a thread for deletion by the thread reaper. The thread should not be
- * attached to any scheduler queues - should be in either the THREAD_CREATED
- * or THREAD_DEAD state.
+ * Increases the wire count of a thread to ensure that it will not be
+ * migrated to another CPU.
  *
- * @note		Because avl_tree_remove() uses kfree(), we cannot
- *			remove the thread from the thread tree here. To prevent
- *			the thread from being searched for we check the thread
- *			state in thread_lookup(), and return NULL if the thread
- *			found is dead.
- *
- * @param thread	Thread to destroy.
+ * @param thread	Thread to wire.
  */
-void thread_destroy(thread_t *thread) {
+void thread_wire(thread_t *thread) {
+	if(thread) {
+		spinlock_lock(&thread->lock, 0);
+		thread->wire_count++;
+		spinlock_unlock(&thread->lock);
+	}
+}
+
+/** Unwire a thread.
+ *
+ * Decreases the wire count of a thread.
+ *
+ * @param thread	Thread to unwire.
+ */
+void thread_unwire(thread_t *thread) {
+	if(thread) {
+		spinlock_lock(&thread->lock, 0);
+		if(thread->wire_count == 0) {
+			fatal("Calling unwire when thread already unwired");
+		}
+		thread->wire_count--;
+		spinlock_unlock(&thread->lock);
+	}
+}
+
+/** Run a newly-created thread.
+ *
+ * Moves a newly created thread into the Ready state and places it on the
+ * run queues to be scheduled.
+ *
+ * @param thread	Thread to run.
+ */
+void thread_run(thread_t *thread) {
 	spinlock_lock(&thread->lock, 0);
 
-	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
-		thread->id, thread->name, thread->owner->id);
+	assert(thread->state == THREAD_CREATED);
 
-	assert(list_empty(&thread->header));
-	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
-
-	/* Queue for deletion by the thread reaper. */
-	spinlock_lock(&dead_thread_lock, 0);
-	list_append(&dead_threads, &thread->header);
-	semaphore_up(&dead_thread_sem);
-	spinlock_unlock(&dead_thread_lock);
+	thread->state = THREAD_READY;
+	thread->cpu = curr_cpu;
+	sched_thread_insert(thread);
 
 	spinlock_unlock(&thread->lock);
 }
@@ -204,25 +223,6 @@ thread_t *thread_lookup(identifier_t id) {
 		thread = NULL;
 	}
 	return thread;
-}
-
-/** Run a newly-created thread.
- *
- * Moves a newly created thread into the Ready state and places it on the
- * run queues to be scheduled.
- *
- * @param thread	Thread to run.
- */
-void thread_run(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
-
-	assert(thread->state == THREAD_CREATED);
-
-	thread->state = THREAD_READY;
-	thread->cpu = curr_cpu;
-	sched_thread_insert(thread);
-
-	spinlock_unlock(&thread->lock);
 }
 
 /** Rename a thread.
@@ -293,7 +293,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
-
+	thread->wire_count = 0;
 	thread->flags = flags;
 	thread->priority = 0;
 	thread->timeslice = 0;
@@ -329,6 +329,39 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 void thread_exit(void) {
 	curr_thread->state = THREAD_DEAD;
 	sched_yield();
+	fatal("Shouldn't get here");
+}
+
+/** Destroy a thread.
+ *
+ * Queues a thread for deletion by the thread reaper. The thread should not be
+ * attached to any scheduler queues - should be in either the THREAD_CREATED
+ * or THREAD_DEAD state.
+ *
+ * @note		Because avl_tree_remove() uses kfree(), we cannot
+ *			remove the thread from the thread tree here. To prevent
+ *			the thread from being searched for we check the thread
+ *			state in thread_lookup(), and return NULL if the thread
+ *			found is dead.
+ *
+ * @param thread	Thread to destroy.
+ */
+void thread_destroy(thread_t *thread) {
+	spinlock_lock(&thread->lock, 0);
+
+	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
+		thread->id, thread->name, thread->owner->id);
+
+	assert(list_empty(&thread->header));
+	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
+
+	/* Queue for deletion by the thread reaper. */
+	spinlock_lock(&dead_thread_lock, 0);
+	list_append(&dead_threads, &thread->header);
+	semaphore_up(&dead_thread_sem);
+	spinlock_unlock(&dead_thread_lock);
+
+	spinlock_unlock(&thread->lock);
 }
 
 /** Initialize the thread cache. */
@@ -365,8 +398,9 @@ static inline void thread_dump(thread_t *thread, int level) {
 	default:		kprintf(level, "Bad      "); break;
 	}
 
-	kprintf(level, "%-4" PRIu32 " %-4zu %-5d %-20s %-5" PRId32 " %s\n", (thread->cpu) ? thread->cpu->id : 0,
-	        thread->priority, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
+	kprintf(level, "%-4" PRIu32 " %-4d %-4zu %-5d %-20s %-5" PRId32 " %s\n",
+	        (thread->cpu) ? thread->cpu->id : 0, thread->wire_count, thread->priority,
+	        thread->flags, (thread->waitq) ? thread->waitq->name : "None",
 	        thread->owner->id, thread->name);
 }
 
@@ -395,8 +429,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID     State    CPU  Prio Flags WaitQ                Owner Name\n");
-	kprintf(LOG_NONE, "==     =====    ===  ==== ===== =====                ===== ====\n");
+	kprintf(LOG_NONE, "ID     State    CPU  Wire Prio Flags WaitQ                Owner Name\n");
+	kprintf(LOG_NONE, "==     =====    ===  ==== ==== ===== =====                ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */

@@ -27,6 +27,8 @@
 #include <mm/slab.h>
 #include <mm/vmem.h>
 
+#include <proc/thread.h>
+
 #include <assert.h>
 #include <errors.h>
 #include <fatal.h>
@@ -52,16 +54,20 @@ static vmem_t page_arena;
 static bool page_range_zero(phys_ptr_t base, size_t count, int pmflag) {
 	void *mapping;
 
+	thread_wire(curr_thread);
+
 	mapping = page_phys_map(base, (count * PAGE_SIZE), (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(mapping == NULL) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (2)", count);
 		}
+		thread_unwire(curr_thread);
 		return false;
 	}
 
 	memset(mapping, 0, (count * PAGE_SIZE));
-	page_phys_unmap(mapping, (count * PAGE_SIZE));
+	page_phys_unmap(mapping, (count * PAGE_SIZE), false);
+	thread_unwire(curr_thread);
 	return true;
 }
 
@@ -206,12 +212,16 @@ void page_free(phys_ptr_t base, size_t count) {
 int page_zero(phys_ptr_t addr, int mmflag) {
 	void *mapping;
 
+	thread_wire(curr_thread);
+
 	if(!(mapping = page_phys_map(addr, PAGE_SIZE, mmflag))) {
+		thread_unwire(curr_thread);
 		return -ERR_NO_MEMORY;
 	}
 
 	memset(mapping, 0, PAGE_SIZE);
-	page_phys_unmap(mapping, PAGE_SIZE);
+	page_phys_unmap(mapping, PAGE_SIZE, false);
+	thread_unwire(curr_thread);
 	return 0;
 }
 
@@ -230,16 +240,21 @@ int page_zero(phys_ptr_t addr, int mmflag) {
 int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 	void *mdest, *msrc;
 
+	thread_wire(curr_thread);
+
 	if(!(mdest = page_phys_map(dest, PAGE_SIZE, mmflag))) {
+		thread_unwire(curr_thread);
 		return -ERR_NO_MEMORY;
 	} else if(!(msrc = page_phys_map(source, PAGE_SIZE, mmflag))) {
-		page_phys_unmap(mdest, PAGE_SIZE);
+		thread_unwire(curr_thread);
+		page_phys_unmap(mdest, PAGE_SIZE, false);
 		return -ERR_NO_MEMORY;
 	}
 
 	memcpy(mdest, msrc, PAGE_SIZE);
-	page_phys_unmap(msrc, PAGE_SIZE);
-	page_phys_unmap(mdest, PAGE_SIZE);
+	page_phys_unmap(msrc, PAGE_SIZE, false);
+	page_phys_unmap(mdest, PAGE_SIZE, false);
+	thread_unwire(curr_thread);
 	return 0;
 
 }

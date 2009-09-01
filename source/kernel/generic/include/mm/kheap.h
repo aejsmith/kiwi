@@ -38,7 +38,7 @@ extern void *kheap_alloc(size_t size, int vmflag);
 extern void kheap_free(void *addr, size_t size);
 
 extern void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag);
-extern void kheap_unmap_range(void *addr, size_t size);
+extern void kheap_unmap_range(void *addr, size_t size, bool shared);
 
 extern void kheap_early_init(void);
 extern void kheap_init(void);

@@ -86,7 +86,7 @@ env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
 env.Command('kiwi.lst', 'kiwi.debug', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
 env.Command('kiwi.rde', 'kiwi.debug', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
 env.Command('kiwi.sym', 'kiwi.debug', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
-elf = env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP $SOURCE -o $TARGET', '$GENCOMSTR'))
+elf = env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP --strip-debug $SOURCE -o $TARGET', '$GENCOMSTR'))
 Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
 
 # Let the distribution environment know where the kernel is.

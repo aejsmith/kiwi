@@ -114,10 +114,10 @@ static inline bool smp_detect_mps(void) {
 
 	/* Check that it is valid. */
 	if(strncmp(cfg->signature, "PCMP", 4) != 0) {
-		page_phys_unmap(cfg, PAGE_SIZE);
+		page_phys_unmap(cfg, PAGE_SIZE, true);
 		return false;
 	} else if(!smp_mps_checksum((uint8_t *)cfg, cfg->length)) {
-		page_phys_unmap(cfg, PAGE_SIZE);
+		page_phys_unmap(cfg, PAGE_SIZE, true);
 		return false;
 	}
 
@@ -147,7 +147,7 @@ static inline bool smp_detect_mps(void) {
 		}
 	}
 
-	page_phys_unmap(cfg, PAGE_SIZE);
+	page_phys_unmap(cfg, PAGE_SIZE, true);
 	return true;
 }
 

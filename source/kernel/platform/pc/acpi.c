@@ -64,7 +64,7 @@ static void __init_text acpi_table_copy(phys_ptr_t addr) {
 
 	/* Check the checksum of the table. */
 	if(!acpi_checksum((ptr_t)source, source->length)) {
-		page_phys_unmap(source, PAGE_SIZE * 2);
+		page_phys_unmap(source, PAGE_SIZE * 2, true);
 		return;
 	}
 
@@ -79,7 +79,7 @@ static void __init_text acpi_table_copy(phys_ptr_t addr) {
 	acpi_tables[acpi_table_count - 1] = kmalloc(source->length, MM_FATAL);
 	memcpy(acpi_tables[acpi_table_count - 1], source, source->length);
 
-	page_phys_unmap(source, PAGE_SIZE * 2);
+	page_phys_unmap(source, PAGE_SIZE * 2, true);
 }
 
 /** Look for the ACPI RSDP in a specific memory range.
@@ -131,11 +131,11 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
 	/* Check signature and checksum. */
 	if(strncmp((char *)source->header.signature, ACPI_XSDT_SIGNATURE, 4) != 0) {
 		kprintf(LOG_DEBUG, "acpi: XSDT signature does not match expected signature\n");
-		page_phys_unmap(source, PAGE_SIZE);
+		page_phys_unmap(source, PAGE_SIZE, true);
 		return false;
 	} else if(!acpi_checksum((ptr_t)source, source->header.length)) {
 		kprintf(LOG_DEBUG, "acpi: XSDT checksum is incorrect\n");
-		page_phys_unmap(source, PAGE_SIZE);
+		page_phys_unmap(source, PAGE_SIZE, true);
 		return false;
 	}
 
@@ -145,7 +145,7 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
 		acpi_table_copy((phys_ptr_t)source->entry[i]);
 	}
 
-	page_phys_unmap(source, PAGE_SIZE);
+	page_phys_unmap(source, PAGE_SIZE, true);
 	return true;
 }
 
@@ -161,11 +161,11 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
 	/* Check signature and checksum. */
 	if(strncmp((char *)source->header.signature, ACPI_RSDT_SIGNATURE, 4) != 0) {
 		kprintf(LOG_DEBUG, "acpi: RSDT signature does not match expected signature\n");
-		page_phys_unmap(source, PAGE_SIZE);
+		page_phys_unmap(source, PAGE_SIZE, true);
 		return false;
 	} else if(!acpi_checksum((ptr_t)source, source->header.length)) {
 		kprintf(LOG_DEBUG, "acpi: RSDT checksum is incorrect\n");
-		page_phys_unmap(source, PAGE_SIZE);
+		page_phys_unmap(source, PAGE_SIZE, true);
 		return false;
 	}
 
@@ -175,7 +175,7 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
 		acpi_table_copy((phys_ptr_t)source->entry[i]);
 	}
 
-	page_phys_unmap(source, PAGE_SIZE);
+	page_phys_unmap(source, PAGE_SIZE, true);
 	return true;
 }
 

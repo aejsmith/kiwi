@@ -50,6 +50,7 @@ typedef struct thread {
 	unative_t *kstack;		/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
 	cpu_t *cpu;			/**< CPU that the thread runs on. */
+	int wire_count;			/**< How many calls to thread_wire() have been made. */
 
 	/** Scheduling information. */
 	size_t priority;		/**< Current scheduling priority. */
@@ -90,20 +91,22 @@ typedef struct thread {
 } thread_t;
 
 /** Thread flag definitions. */
-#define THREAD_UNMOVABLE	(1<<0)	/**< Thread is tied to the CPU it is running on. */
 #define THREAD_UNQUEUEABLE	(1<<1)	/**< Thread cannot be queued in the run queue. */
 #define THREAD_UNPREEMPTABLE	(1<<2)	/**< Thread will not be preempted. */
 
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern void thread_destroy(thread_t *thread);
-extern thread_t *thread_lookup(identifier_t id);
+extern void thread_wire(thread_t *thread);
+extern void thread_unwire(thread_t *thread);
 extern void thread_run(thread_t *thread);
+
+extern thread_t *thread_lookup(identifier_t id);
 extern void thread_rename(thread_t *thread, const char *name);
 extern int thread_create(const char *name, struct process *owner, int flags,
                          thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
-extern void thread_exit(void);
+extern void thread_exit(void) __noreturn;
+extern void thread_destroy(thread_t *thread);
 
 extern void thread_init(void);
 extern void thread_reaper_init(void);

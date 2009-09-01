@@ -403,8 +403,9 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
  *
  * @param addr		Virtual address returned from page_phys_map().
  * @param size		Size of original mapping.
+ * @param shared	Whether this mapping was used by any other CPUs.
  */
-void page_phys_unmap(void *addr, size_t size) {
+void page_phys_unmap(void *addr, size_t size, bool shared) {
 	/* Nothing happens. */
 }
 

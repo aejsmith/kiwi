@@ -20,6 +20,7 @@
 
 #include <arch/barrier.h>
 #include <arch/memmap.h>
+#include <arch/tlb.h>
 #include <arch/x86/features.h>
 #include <arch/x86/sysreg.h>
 
@@ -30,6 +31,8 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
+
+#include <proc/thread.h>
 
 #include <assert.h>
 #include <errors.h>
@@ -124,9 +127,13 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 	phys_ptr_t page;
 	int pdpe, pde;
 
+	/* Wire to CPU so we do not have to do remote TLB invalidations. */
+	thread_wire(curr_thread);
+
 	/* Map PDP into the virtual address space. */
 	mapping = page_phys_map(map->pdp, PAGE_SIZE, mmflag);
 	if(mapping == NULL) {
+		thread_unwire(curr_thread);
 		return -ERR_NO_MEMORY;
 	}
 
@@ -135,7 +142,8 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 	if(!(mapping[pdpe] & PG_PRESENT)) {
 		/* Allocate a new page directory if required. */
 		if(!alloc || !(page = page_alloc(1, mmflag | PM_ZERO))) {
-			page_phys_unmap(mapping, PAGE_SIZE);
+			page_phys_unmap(mapping, PAGE_SIZE, false);
+			thread_unwire(curr_thread);
 			return (!alloc) ? -ERR_NOT_FOUND : -ERR_NO_MEMORY;
 		}
 
@@ -156,7 +164,7 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 	 * speed things up a bit. Do not need to worry about invalidating the
 	 * TLB on other CPUs because nothing else knows about this mapping. */
 	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
-	__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)mapping));
+	tlb_arch_invalidate((ptr_t)mapping, (ptr_t)mapping + PAGE_SIZE);
 	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
 
 	/* Get the page table number. A page table covers 2MB. */
@@ -164,7 +172,8 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 	if(!(mapping[pde] & PG_PRESENT)) {
 		/* Allocate a new page table if required. */
 		if(!alloc || !(page = page_alloc(1, mmflag | PM_ZERO))) {
-			page_phys_unmap(mapping, PAGE_SIZE);
+			page_phys_unmap(mapping, PAGE_SIZE, false);
+			thread_unwire(curr_thread);
 			return (!alloc) ? -ERR_NOT_FOUND : -ERR_NO_MEMORY;
 		}
 
@@ -177,7 +186,7 @@ static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int m
 
 	/* Unmap page directory and map page table. */
 	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
-	__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)mapping));
+	tlb_arch_invalidate((ptr_t)mapping, (ptr_t)mapping + PAGE_SIZE);
 	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
 	*ptblp = mapping;
 	return 0;
@@ -206,7 +215,8 @@ static int page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag
  * @param ptbl		Page table to unmap. */
 static void page_map_release_ptbl(page_map_t *map, uint64_t *ptbl) {
 	if(map->user) {
-		page_phys_unmap(ptbl, PAGE_SIZE);
+		page_phys_unmap(ptbl, PAGE_SIZE, false);
+		thread_unwire(curr_thread);
 	}
 }
 
@@ -414,9 +424,11 @@ int page_map_init(page_map_t *map) {
 	map->last = (ASPACE_BASE + ASPACE_SIZE) - PAGE_SIZE;
 
 	/* Get the kernel mappings into the new PDP. */
+	thread_wire(curr_thread);
 	pdp = page_phys_map(map->pdp, PAGE_SIZE, MM_SLEEP);
 	pdp[3] = KA2PA(__kernel_pdir) | PG_PRESENT;
-	page_phys_unmap(pdp, PAGE_SIZE);
+	page_phys_unmap(pdp, PAGE_SIZE, false);
+	thread_unwire(curr_thread);
 	return 0;
 }
 
@@ -475,15 +487,19 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
  *
  * @param addr		Virtual address returned from page_phys_map().
  * @param size		Size of original mapping.
+ * @param shared	Whether the mapping was used by any other CPUs. This
+ *			is used as an optimization to reduce the number of
+ *			remote TLB invalidations we have to do when doing
+ *			physical mappings.
  */
-void page_phys_unmap(void *addr, size_t size) {
+void page_phys_unmap(void *addr, size_t size, bool shared) {
 	ptr_t base, end;
 
 	/* Work out the base of the allocation and its real original size. */
 	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
 	end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
 
-	kheap_unmap_range((void *)base, end - base);
+	kheap_unmap_range((void *)base, end - base, shared);
 }
 
 #if 0
@@ -513,7 +529,7 @@ static void __init_text page_large_to_ptbl(ptr_t virt) {
 		__asm__ volatile("invlpg (%0)" :: "r"(ROUND_DOWN(virt, 0x200000)));
 		__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)KERNEL_PTBL_ADDR(pde)));
 
-		page_phys_unmap(ptbl, PAGE_SIZE);
+		page_phys_unmap(ptbl, PAGE_SIZE, false);
 	}
 }
 

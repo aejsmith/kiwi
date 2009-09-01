@@ -84,7 +84,7 @@ static inline void smp_boot(cpu_t *cpu) {
 	dest = page_phys_map(0x7000, size, MM_FATAL);
 	memcpy(dest, (void *)__ap_trampoline_start, size);
 	dest[1] = (uint32_t)KA2PA(__kernel_ap_entry);
-	page_phys_unmap(dest, size);
+	page_phys_unmap(dest, size, true);
 
 	/* Allocate a new stack and set the CPU structure pointer. */
 	stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
