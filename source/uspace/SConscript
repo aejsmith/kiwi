@@ -21,6 +21,9 @@ env['LIBPATH'] = [Dir('libraries')]
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 
+# Temporary.
+env['CXXFLAGS'] += ['-fno-rtti', '-fno-exceptions']
+
 # Set up arrays used to track stuff built. Use LIBRARIES rather than LIBS
 # as LIBS is a special SCons variable.
 env['LIBRARIES'] = []

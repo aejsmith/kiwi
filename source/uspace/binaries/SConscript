@@ -15,7 +15,7 @@
 Import('env')
 
 SConscript(dirs=[
-	'hello',
+	'failshell',
 	'rtld',
 	'startup',
 ], exports=['env'])

@@ -64,7 +64,7 @@ namespace std {
 	//using ::popen;
 	using ::printf;
 	//using ::putc;
-	//using ::putchar;
+	using ::putchar;
 	//using ::putc_unlocked;
 	//using ::putchar_unlocked;
 	using ::puts;

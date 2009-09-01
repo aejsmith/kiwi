@@ -104,7 +104,7 @@ extern FILE *stderr;
 /* FILE    *popen(const char *, const char *); */
 extern int printf(const char *fmt, ...);
 //extern int putc(int ch, FILE *stream);
-//extern int putchar(int ch);
+extern int putchar(int ch);
 /* int putc_unlocked(int, FILE *); */
 /* int putchar_unlocked(int); */
 extern int puts(const char *s);

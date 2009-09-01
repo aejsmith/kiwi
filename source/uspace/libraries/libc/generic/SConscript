@@ -33,6 +33,7 @@ sources += [
 	File('ctype/toupper.c'),
 
 	File('stdio/do_printf.c'),
+	File('stdio/fputc.c'),
 	File('stdio/fputs.c'),
 	File('stdio/vfprintf.c'),
 	File('stdio/vsnprintf.c'),

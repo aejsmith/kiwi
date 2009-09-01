@@ -14,6 +14,14 @@
 
 Import('env', 'config', 'envmgr')
 
-env.Program('hello', [
+env.Program('failshell', [
+	'commands/cat.cc',
+	'commands/cd.cc',
+	'commands/ls.cc',
+	'commands/mkdir.cc',
+	'commands/mount.cc',
+	'commands/symlink.cc',
+
+	'input.cc',
 	'main.cc',
 ], LIBS=['kiwi'])

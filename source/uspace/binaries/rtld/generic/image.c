@@ -298,6 +298,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	if(entryp) {
 		*entryp = (void *)ehdr.e_entry;
 	}
+	handle_close(handle);
 	return 0;
 fail:
 	if(image) {
