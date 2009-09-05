@@ -25,7 +25,7 @@
 .type _start, @function
 _start:
 	/* The pointer to the process_args_t structure is on the stack. */
-	movl	4(%esp), %eax
+	movl	8(%esp), %eax
 
 	/* Call into the C library to do the dirty work of setting up the
 	 * environment. This will also call the main function and exit with

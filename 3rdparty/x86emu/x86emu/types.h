@@ -69,31 +69,16 @@
 #define __HAS_LONG_LONG__
 #endif
 
-/* Taken from Xmd.h */
-#undef NUM32
-#if defined (_LP64) || \
-    defined(__alpha) || defined(__alpha__) || \
-    defined(__ia64__) || defined(ia64) || \
-    defined(__sparc64__) || \
-    defined(__s390x__) || \
-    (defined(__hppa__) && defined(__LP64)) || \
-    defined(__amd64__) || defined(amd64) || \
-    (defined(__sgi) && (_MIPS_SZLONG == 64))
-#define NUM32 int
-#else
-#define NUM32 long
-#endif
-
 typedef unsigned char 		u8;
 typedef unsigned short 		u16;
-typedef unsigned NUM32 		u32;
+typedef unsigned int 		u32;
 #ifdef __HAS_LONG_LONG__
 typedef unsigned long long 	u64;
 #endif
 
 typedef char 				s8;
 typedef short 				s16;
-typedef NUM32 				s32;
+typedef int 				s32;
 #ifdef __HAS_LONG_LONG__
 typedef long long 			s64;
 #endif
@@ -102,7 +87,5 @@ typedef unsigned int			uint;
 typedef int 				sint;
 
 typedef u16 X86EMU_pioAddr;
-
-#undef NUM32
 
 #endif	/* __X86EMU_TYPES_H */

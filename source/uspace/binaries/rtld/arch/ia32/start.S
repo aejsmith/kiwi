@@ -25,7 +25,7 @@
 .type __rtld_entry, @function
 __rtld_entry:
 	/* Get pointer to arguments structure and call the main function. */
-	movl	4(%esp), %eax
+	movl	8(%esp), %eax
 	push	%eax
 	call	rtld_main
 	addl	$4, %esp
