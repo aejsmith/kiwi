@@ -84,7 +84,7 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp
 			}
 
 			/* Cannot look up non-global symbols. */
-			if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL) {
+			if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL && ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
 				break;
 			}
 
