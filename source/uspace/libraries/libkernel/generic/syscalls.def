@@ -14,7 +14,7 @@
 
 Service(0)
 
-Syscall('putch',		['char'])
+Syscall('kputch',		['char'])
 Syscall('module_load',		['ptr_t', 'ptr_t'])
 Syscall('handle_close',		['handle_t'])
 Syscall('handle_type',		['handle_t'])
@@ -53,3 +53,7 @@ Syscall('device_open',		['ptr_t'])
 Syscall('device_read',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
 Syscall('device_write',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
 Syscall('_device_request',	['ptr_t'])
+Syscall('thread_create',	['ptr_t', 'ptr_t', 'size_t', 'ptr_t', 'ptr_t'])
+Syscall('thread_open',		['identifier_t'])
+Syscall('thread_id',		['handle_t'])
+Syscall('thread_exit',		['int'])

@@ -40,7 +40,7 @@ typedef struct semaphore {
 	semaphore_t _var = SEMAPHORE_INITIALIZER(_var, #_var, _initial)
 
 extern int semaphore_down(semaphore_t *sem, int flags);
-extern void semaphore_up(semaphore_t *sem);
+extern void semaphore_up(semaphore_t *sem, size_t count);
 extern void semaphore_init(semaphore_t *sem, const char *name, unsigned int initial);
 
 #endif /* __SYNC_SEMAPHORE_H */

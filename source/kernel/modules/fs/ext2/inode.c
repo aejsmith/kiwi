@@ -238,5 +238,6 @@ int ext2_inode_read(ext2_inode_t *inode, void *buf, uint32_t block, size_t count
 		}
 	}
 
+	rwlock_unlock(&inode->lock);
 	return i;
 }

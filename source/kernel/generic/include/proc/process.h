@@ -53,7 +53,7 @@ typedef struct process {
 	char *name;			/**< Name of the process. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
-	refcount_t count;		/**< Number of handles/threads open to the process. */
+	refcount_t count;		/**< Number of handles open to and threads in the process. */
 	int status;			/**< Exit status of the process. */
 
 	struct vm_aspace *aspace;	/**< Process' address space. */

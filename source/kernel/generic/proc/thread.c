@@ -24,8 +24,10 @@
 
 #include <lib/string.h>
 
-#include <mm/slab.h>
 #include <mm/kheap.h>
+#include <mm/malloc.h>
+#include <mm/safe.h>
+#include <mm/slab.h>
 
 #include <proc/process.h>
 #include <proc/sched.h>
@@ -202,7 +204,8 @@ void thread_run(thread_t *thread) {
 
 /** Lookup a thread.
  *
- * Looks for a thread with the specified id in the thread tree.
+ * Looks for a thread with the specified id in the thread tree. Created/dead
+ * threads cannot be looked up.
  *
  * @param id		ID of the thread to find.
  *
@@ -219,7 +222,7 @@ thread_t *thread_lookup(identifier_t id) {
 		mutex_unlock(&thread_tree_lock);
 	}
 
-	if(thread && thread->state == THREAD_DEAD) {
+	if(thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) {
 		thread = NULL;
 	}
 	return thread;
@@ -289,6 +292,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
 	atomic_set(&thread->in_usermem, 0);
+	refcount_set(&thread->count, 1);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
@@ -334,20 +338,25 @@ void thread_exit(void) {
 
 /** Destroy a thread.
  *
- * Queues a thread for deletion by the thread reaper. The thread should not be
- * attached to any scheduler queues - should be in either the THREAD_CREATED
- * or THREAD_DEAD state.
+ * Decreases the reference count of a thread, and queues it for deletion if it
+ * reaches 0.
  *
  * @note		Because avl_tree_remove() uses kfree(), we cannot
- *			remove the thread from the thread tree here. To prevent
- *			the thread from being searched for we check the thread
- *			state in thread_lookup(), and return NULL if the thread
- *			found is dead.
+ *			remove the thread from the thread tree here as it can
+ *			be called by the scheduler. To prevent the thread from
+ *			being searched for we check the thread state in
+ *			thread_lookup(), and return NULL if the thread found is
+ *			not running.
  *
  * @param thread	Thread to destroy.
  */
 void thread_destroy(thread_t *thread) {
 	spinlock_lock(&thread->lock, 0);
+
+	if(refcount_dec(&thread->count) > 0) {
+		spinlock_unlock(&thread->lock);
+		return;
+	}
 
 	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
 		thread->id, thread->name, thread->owner->id);
@@ -358,7 +367,7 @@ void thread_destroy(thread_t *thread) {
 	/* Queue for deletion by the thread reaper. */
 	spinlock_lock(&dead_thread_lock, 0);
 	list_append(&dead_threads, &thread->header);
-	semaphore_up(&dead_thread_sem);
+	semaphore_up(&dead_thread_sem, 1);
 	spinlock_unlock(&dead_thread_lock);
 
 	spinlock_unlock(&thread->lock);
@@ -453,4 +462,184 @@ int kdbg_cmd_thread(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+#if 0
+# pragma mark Process handle functions.
+#endif
+
+/** Closes a handle to a thread.
+ * @param info		Handle information structure.
+ * @return		0 on success, negative error code on failure. */
+static int thread_handle_close(handle_info_t *info) {
+	thread_destroy(info->data);
+	return 0;
+}
+
+/** Thread handle operations. */
+static handle_type_t thread_handle_type = {
+	.id = HANDLE_TYPE_THREAD,
+	.close = thread_handle_close,
+};
+
+#if 0
+# pragma mark System calls.
+#endif
+
+/** Thread creation arguments structure. */
+typedef struct sys_thread_args {
+	ptr_t sp;			/**< Stack pointer. */
+	ptr_t entry;			/**< Entry point address. */
+	ptr_t arg;			/**< Argument. */
+} sys_thread_args_t;
+
+/** Entry function for a userspace thread.
+ * @param _args		Argument structure address.
+ * @param arg2		Unused. */
+static void sys_thread_create_entry(void *_args, void *arg2) {
+	sys_thread_args_t *args = _args;
+	ptr_t entry, sp, arg;
+
+	entry = args->entry;
+	sp = args->sp;
+	arg = args->arg;
+	kfree(args);
+
+	thread_arch_enter_userspace(entry, sp, arg);
+}
+
+/** Create a new thread.
+ *
+ * Creates a new userspace thread under the calling process.
+ *
+ * @param name		Name of the thread to create.
+ * @param stack		Pointer to base of stack to use for thread. If NULL,
+ *			then a new stack will be allocated.
+ * @param stacksz	Size of stack. If a stack is provided, then this should
+ *			be the size of that stack. Otherwise, it is used as the
+ *			size of the stack to create - if it is zero then a
+ *			stack of the default size will be allocated.
+ * @param func		Function to execute.
+ * @param arg		Argument to pass to thread.
+ */
+handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
+	sys_thread_args_t *args;
+	thread_t *thread = NULL;
+	handle_t handle = -1;
+	char *kname;
+	int ret;
+
+	if(stack && (stacksz < STACK_DELTA)) {
+		return -ERR_PARAM_INVAL;
+	} else if((ret = strndup_from_user(name, THREAD_NAME_MAX, MM_SLEEP, &kname)) != 0) {
+		return ret;
+	}
+
+	/* Create arguments structure. */
+	args = kmalloc(sizeof(sys_thread_args_t), MM_SLEEP);
+	args->entry = (ptr_t)func;
+	args->arg = (ptr_t)arg;
+
+	/* Create the thread, but do not run it yet. */
+	if((ret = thread_create(kname, curr_proc, 0, sys_thread_create_entry, args, NULL, &thread)) != 0) {
+		goto fail;
+	}
+
+	/* Try to create the handle for the thread. */
+	if((handle = handle_create(&curr_proc->handles, &thread_handle_type, thread)) < 0) {
+		ret = (int)handle;
+		goto fail;
+	}
+	refcount_inc(&thread->count);
+
+	/* Create a userspace stack. TODO: Stack direction! */
+	if(stack) {
+		args->sp = (ptr_t)stack + (stacksz - STACK_DELTA);
+	} else {
+		if(stacksz) {
+			stacksz = ROUND_UP(stacksz, PAGE_SIZE);
+		} else {
+			stacksz = USTACK_SIZE;
+		}
+
+		if((ret = vm_map_anon(curr_proc->aspace, 0, stacksz, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &args->sp)) != 0) {
+			goto fail;
+		}
+		args->sp += (stacksz - STACK_DELTA);
+	}
+
+	kfree(kname);
+	thread_run(thread);
+	return handle;
+fail:
+	if(handle >= 0) {
+		handle_close(&curr_proc->handles, handle);
+	}
+	if(thread) {
+		thread_destroy(thread);
+	}
+	kfree(args);
+	kfree(kname);
+	return (handle_t)ret;
+}
+
+/** Open a handle to a thread.
+ *
+ * Opens a handle to a thread in order to perform other operations on it.
+ *
+ * @param id		Global ID of the thread to open.
+ */
+handle_t sys_thread_open(identifier_t id) {
+	thread_t *thread;
+	handle_t handle;
+
+	if(!(thread = thread_lookup(id))) {
+		return -ERR_NOT_FOUND;
+	}
+
+	refcount_inc(&thread->count);
+
+	if((handle = handle_create(&curr_proc->handles, &thread_handle_type, thread)) < 0) {
+		thread_destroy(thread);
+	}
+
+	return handle;
+}
+
+/** Get the ID of a thread.
+ *
+ * Gets the ID of the thread referred to by a handle. If the handle is
+ * specified as -1, then the ID of the calling thread will be returned.
+ *
+ * @param handle	Handle for thread to get ID of.
+ *
+ * @return		Thread ID on success (greater than or equal to zero),
+ *			negative error code on failure.
+ */
+identifier_t sys_thread_id(handle_t handle) {
+	handle_info_t *info;
+	thread_t *thread;
+	identifier_t id;
+
+	if(handle == -1) {
+		id = curr_thread->id;
+	} else if(!(id = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_THREAD, &info))) {
+		thread = info->data;
+		id = thread->id;
+		handle_release(info);
+	}
+
+	return id;
+}
+
+/** Terminate the calling thread.
+ *
+ * Terminates execution of the calling thread.
+ *
+ * @todo		Status.
+ *
+ * @param status	Exit status code.
+ */
+void sys_thread_exit(int status) {
+	thread_exit();
 }

@@ -39,6 +39,7 @@ env['OBJFILES'] += [
 
 	env.Object('io/context.c'),
 	env.Object('io/device.c'),
+	env.Object('io/pipe.c'),
 	env.Object('io/ramfs.c'),
 	env.Object('io/vfs.c'),
 

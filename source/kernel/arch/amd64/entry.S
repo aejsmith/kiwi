@@ -273,14 +273,16 @@ thread_arch_enter_userspace:
 	mov	$(SEG_U_DS | 0x03), %ax
 	mov	%ax, %ds
 	mov	%ax, %es
+
+	/* Move argument to RDI. */
+	movq	%rdx, %rdi
 	
-	/* Clear general purpose registers. */
+	/* Clear general purpose registers (except RDI). */
 	xorq	%rax, %rax
 	xorq	%rbx, %rbx
 	xorq	%rcx, %rcx
 	xorq	%rdx, %rdx
 	xorq	%rsi, %rsi
-	xorq	%rdi, %rdi
 	xorq	%rbp, %rbp
 	xorq	%r8, %r8
 	xorq	%r9, %r9

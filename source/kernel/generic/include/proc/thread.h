@@ -29,6 +29,7 @@
 #include <sync/spinlock.h>
 
 #include <types/list.h>
+#include <types/refcount.h>
 
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32
@@ -51,6 +52,7 @@ typedef struct thread {
 	int flags;			/**< Flags for the thread. */
 	cpu_t *cpu;			/**< CPU that the thread runs on. */
 	int wire_count;			/**< How many calls to thread_wire() have been made. */
+	refcount_t count;		/**< Number of handles to the thread. */
 
 	/** Scheduling information. */
 	size_t priority;		/**< Current scheduling priority. */
@@ -112,5 +114,10 @@ extern void thread_init(void);
 extern void thread_reaper_init(void);
 
 extern int kdbg_cmd_thread(int argc, char **argv);
+
+extern handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
+extern handle_t sys_thread_open(identifier_t id);
+extern identifier_t sys_thread_id(handle_t handle);
+extern void sys_thread_exit(int status);
 
 #endif /* __PROC_THREAD_H */

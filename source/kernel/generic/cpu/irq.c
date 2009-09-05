@@ -206,7 +206,7 @@ int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data
 		 * header is attached each time it is woken to determine if it
 		 * should exit. */
 		if(handler->thread) {
-			semaphore_up(&handler->sem);
+			semaphore_up(&handler->sem, 1);
 		} else {
 			kfree(handler);
 		}
@@ -256,7 +256,7 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 				schedule = true;
 			} else if(ret == IRQ_RUN_THREAD) {
 				assert(handler->thread);
-				semaphore_up(&handler->sem);
+				semaphore_up(&handler->sem, 1);
 				schedule = true;
 			}
 
@@ -276,7 +276,7 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 
 		if(!handler->top) {
 			assert(handler->thread);
-			semaphore_up(&handler->sem);
+			semaphore_up(&handler->sem, 1);
 			schedule = true;
 		}
 	}

@@ -161,6 +161,11 @@ thread_arch_enter_userspace:
 	/* Get arguments. */
 	movl	4(%esp), %edi
 	movl	8(%esp), %esi
+	movl	12(%esp), %eax
+
+	/* Push argument. */
+	subl	$STACK_DELTA, %esi
+	movl	%eax, (%esi)
 
 	/* Push a zero return address so the userspace program will not fault
 	 * if it inadvertently returns from its entry function. */

@@ -89,7 +89,7 @@ void mutex_unlock(mutex_t *lock) {
 	if(--lock->recursion == 0 && lock->holder) {
 		lock->caller = 0;
 		lock->holder = NULL;
-		semaphore_up(&lock->sem);
+		semaphore_up(&lock->sem, 1);
 	}
 }
 

@@ -171,7 +171,7 @@ typedef struct device_request_args {
 	size_t insz;			/**< Input buffer size. */
 	void *out;			/**< Output buffer. */
 	size_t outsz;			/**< Output buffer size. */
-	size_t *bytesp;			/**< Where to store number of bytes written. */
+	size_t *bytesp;			/**< Where to store number of bytes returned. */
 } device_request_args_t;
 
 extern handle_t sys_device_open(const char *path);

@@ -1,4 +1,4 @@
-/* Kiwi IA32-specific thread structure
+/* Kiwi thread functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,25 @@
 
 /**
  * @file
- * @brief		IA32-specific thread structure.
+ * @brief		Thread functions.
  */
 
-#ifndef __ARCH_THREAD_H
-#define __ARCH_THREAD_H
+#ifndef __KERNEL_THREAD_H
+#define __KERNEL_THREAD_H
 
-#include <types.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-struct thread;
+#include <kernel/types.h>
 
-/** IA32-specific thread structure. */
-typedef struct thread_arch {
-	/* Nothing happens. */
-} __packed thread_arch_t;
+extern handle_t thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
+extern handle_t thread_open(identifier_t id);
+extern identifier_t thread_id(handle_t handle);
+extern void thread_exit(int status) __attribute__((noreturn));
 
-extern void thread_arch_post_switch(struct thread *thread);
+#ifdef __cplusplus
+}
+#endif
 
-extern int thread_arch_init(struct thread *thread);
-extern void thread_arch_destroy(struct thread *thread);
-
-extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
-
-#endif /* __ARCH_THREAD_H */
+#endif /* __KERNEL_THREAD_H */

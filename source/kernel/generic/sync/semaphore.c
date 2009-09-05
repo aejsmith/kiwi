@@ -41,13 +41,16 @@ int semaphore_down(semaphore_t *sem, int flags) {
 
 /** Up a semaphore.
  *
- * Ups (increases the value of) a semaphore, and unblocks the next thread
- * waiting for it.
+ * Ups (increases the value of) a semaphore, and unblocks threads waiting if
+ * necessary.
  *
  * @param sem		Semaphore to up.
+ * @param count		Value to increment by.
  */
-void semaphore_up(semaphore_t *sem) {
-	waitq_wake(&sem->queue, false);
+void semaphore_up(semaphore_t *sem, size_t count) {
+	for(size_t i = 0; i < count; i++) {
+		waitq_wake(&sem->queue, false);
+	}
 }
 
 /** Initialize a semaphore structure.

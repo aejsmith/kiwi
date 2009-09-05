@@ -253,11 +253,11 @@ static void process_create_thread(void *arg1, void *arg2) {
 	/* Clean up our mess and wake up the caller. */
 	elf_binary_cleanup(data);
 	vfs_node_release(node);
-	semaphore_up(&info->sem);
+	semaphore_up(&info->sem, 1);
 
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in new process (entry: %p, stack: %p)\n", entry, stack);
-	thread_arch_enter_userspace(entry, stack);
+	thread_arch_enter_userspace(entry, stack, 0);
 	fatal("Failed to enter userspace!");
 fail:
 	if(data) {
@@ -267,7 +267,7 @@ fail:
 		vfs_node_release(node);
 	}
 	info->ret = ret;
-	semaphore_up(&info->sem);
+	semaphore_up(&info->sem, 1);
 }
 
 /** Execute a new process.
@@ -673,7 +673,7 @@ int sys_process_replace(const char *path, char *const args[], char *const enviro
 
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in process %" PRId32 " (entry: %p, stack: %p)\n", curr_proc->id, entry, stack);
-	thread_arch_enter_userspace(entry, stack);
+	thread_arch_enter_userspace(entry, stack, 0);
 	fatal("Failed to enter userspace!");
 fail:
 	if(data) {

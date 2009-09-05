@@ -269,6 +269,52 @@ static void ext2_node_free(vfs_node_t *node) {
 	ext2_inode_release(node->data);
 }
 
+/** Get the destination of a symbolic link.
+ * @param node		Symbolic link to get destination of.
+ * @param bufp		Where to store pointer to string containing
+ *			link destination.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
+	ext2_inode_t *inode = (ext2_inode_t *)node->data;
+	char *buf, *tmp;
+	int ret, count;
+	size_t size;
+
+	/* Ok to lock it here despite the fact that ext2_inode_read() does:
+	 * multiple read locks can be done on a rwlock by a thread. */
+	rwlock_read_lock(&inode->lock, 0);
+
+	size = le32_to_cpu(inode->disk.i_size);
+	if(le32_to_cpu(inode->disk.i_blocks) == 0) {
+		buf = kmalloc(size + 1, MM_SLEEP);
+		memcpy(buf, inode->disk.i_block, size);
+		buf[size] = 0;
+	} else {
+		if(!(buf = kmalloc(ROUND_UP(size, inode->mount->blk_size) + 1, 0))) {
+			rwlock_unlock(&inode->lock);
+			return -ERR_NO_MEMORY;
+		}
+
+		count = ROUND_UP(size, inode->mount->blk_size) / inode->mount->blk_size;
+		if((ret = ext2_inode_read(inode, buf, 0, count)) != count) {
+			kfree(buf);
+			rwlock_unlock(&inode->lock);
+			return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		}
+
+		buf[size] = 0;
+		if(!(tmp = krealloc(buf, size + 1, 0))) {
+			kfree(buf);
+			rwlock_unlock(&inode->lock);
+			return -ERR_NO_MEMORY;
+		}
+	}
+
+	rwlock_unlock(&inode->lock);
+	*bufp = buf;
+	return 0;
+}
+
 /** Ext2 filesystem type structure. */
 static vfs_type_t ext2_fs_type = {
 	.name = "ext2",
@@ -281,6 +327,7 @@ static vfs_type_t ext2_fs_type = {
 	.node_flush = ext2_node_flush,
 	.node_free = ext2_node_free,
 	.dir_cache = ext2_dir_cache,
+	.symlink_read = ext2_symlink_read,
 };
 
 /** Initialization function for the Ext2 module.

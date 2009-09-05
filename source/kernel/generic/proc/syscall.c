@@ -96,6 +96,10 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_device_read,
 	(syscall_handler_t)sys_device_write,
 	(syscall_handler_t)sys_device_request,
+	(syscall_handler_t)sys_thread_create,
+	(syscall_handler_t)sys_thread_open,
+	(syscall_handler_t)sys_thread_id,
+	(syscall_handler_t)sys_thread_exit,
 };
 
 /** Main kernel system call service. */
