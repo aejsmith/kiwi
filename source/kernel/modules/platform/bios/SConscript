@@ -12,10 +12,16 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+Import('env')
 
-# Get environment and add driver include directory.
-env = envmgr['module']
-env['INCDIRS']['drivers'] = Dir('include')
+env['INCDIRS']['platform'] = Dir('include')
 
-SConscript(dirs=['bus', 'console', 'disk', 'display', 'input'], exports=['env'])
+env.Module('bios', [
+	'x86emu/decode.c',
+	'x86emu/fpu.c',
+	'x86emu/ops.c',
+	'x86emu/ops2.c',
+	'x86emu/prim_ops.c',
+	'x86emu/sys.c',
+	'bios.c'
+], CPPDEFINES=dict(env['CPPDEFINES'].items() + [('NO_SYS_HEADERS', None)]))

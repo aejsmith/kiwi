@@ -283,7 +283,7 @@ int disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 	/* Probe for partitions on the device. */
 	disk_partition_probe(device);
 
-	*devicep = NULL;
+	*devicep = device;
 	return 0;
 }
 MODULE_EXPORT(disk_device_create);
@@ -311,7 +311,7 @@ static int disk_init(void) {
 /** Unloading function for the disk module.
  * @return		0 on success, negative error code on failure. */
 static int disk_unload(void) {
-	return 0;
+	return -ERR_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("disk");

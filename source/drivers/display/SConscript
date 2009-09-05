@@ -12,10 +12,14 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+Import('env', 'config')
 
-# Get environment and add driver include directory.
-env = envmgr['module']
-env['INCDIRS']['drivers'] = Dir('include')
+# Work out the drivers to build.
+dirs = [
+	('DRIVER_DISPLAY_VBE', 'vbe'),
+]
 
-SConscript(dirs=['bus', 'console', 'disk', 'display', 'input'], exports=['env'])
+SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
+
+# Build the display device manager.
+env.Module('display', ['display.c'])

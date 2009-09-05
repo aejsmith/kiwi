@@ -18,20 +18,18 @@ Import('envmgr', 'config')
 # Subdirectory configuration. #
 ###############################
 
-subdirs = ['fs']
+subdirs = ['fs', 'platform']
 
 ##############################
 # Module environment set-up. #
 ##############################
 
-# Dictionary class that sets up an include directory link whenever an item is
-# added to it.
-class IncludeDict(dict):
+# Dictionary-like class that sets up an include directory link whenever an
+# item is added to it.
+class IncludeDict:
 	def __init__(self, env):
-		dict.__init__(self)
 		self.env = env
 	def __setitem__(self, key, value):
-		dict.__setitem__(self, key, value)
 		self.env['MODINCDIR'].Dir(key).link(value, 1)
 
 env = envmgr.Create('module', envmgr['kernel'])
@@ -39,6 +37,9 @@ env['MODULES'] = []
 env['MODINCDIR'] = Dir('include')
 env['INCDIRS'] = IncludeDict(env)
 env['CPPPATH'].append(Dir('include'))
+
+# Do not emit common symbols.
+env['CCFLAGS'] += ['-fno-common']
 
 # Not sure if this is the right way to do this (add any modules to the module
 # list in the environment), but an emitter seems to work...

@@ -86,6 +86,7 @@ Option('MODULE_FS_EXT2_DEBUG', 'Debugging output from the Ext2 driver.', False, 
 	'DEBUG': lambda x: x,
 	'MODULE_FS_EXT2': lambda x: x,
 })
+Option('MODULE_PLATFORM_BIOS', 'PC BIOS interrupt interface.', True, {'PLATFORM': lambda x: x in ['pc']})
 
 #######
 Section('Driver configuration')
@@ -93,6 +94,7 @@ Section('Driver configuration')
 
 Option('DRIVER_BUS_PCI', 'PCI bus manager.', True)
 Option('DRIVER_DISK_ATA', 'Generic ATA device driver.', True, {'DRIVER_BUS_PCI': lambda x: x})
+Option('DRIVER_DISPLAY_VBE', 'VBE display device driver.', True, {'MODULE_PLATFORM_BIOS': lambda x: x})
 Option('DRIVER_INPUT_I8042', 'i8042 keyboard/mouse port driver.', True)
 
 #####################################

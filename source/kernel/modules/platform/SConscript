@@ -12,10 +12,11 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+Import('env', 'config')
 
-# Get environment and add driver include directory.
-env = envmgr['module']
-env['INCDIRS']['drivers'] = Dir('include')
+# Work out the modules to build.
+dirs = [
+	('MODULE_PLATFORM_BIOS', 'bios'),
+]
 
-SConscript(dirs=['bus', 'console', 'disk', 'display', 'input'], exports=['env'])
+SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])

@@ -229,7 +229,7 @@ void input_device_input(input_device_t *device, uint8_t value) {
 	}
 
 	device->buffer[(device->start + device->size++) % INPUT_BUFFER_SIZE] = value;
-	semaphore_up(&device->sem);
+	semaphore_up(&device->sem, 1);
 	spinlock_unlock(&device->lock);
 }
 MODULE_EXPORT(input_device_input);
