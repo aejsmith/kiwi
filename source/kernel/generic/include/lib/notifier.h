@@ -32,8 +32,21 @@ typedef struct notifier {
 	void *data;			/**< Data to pass to functions. */
 } notifier_t;
 
+/** Initializes a statically declared notifier. */
+#define NOTIFIER_INITIALIZER(_var, _data)	\
+	{ \
+		.lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", 0), \
+		.functions = LIST_INITIALIZER(_var.functions), \
+		.data = _data, \
+	}
+
+/** Statically declares a new notifier. */
+#define NOTIFIER_DECLARE(_var, _data)		\
+	notifier_t _var = NOTIFIER_INITIALIZER(_var, _data)
+
 extern void notifier_init(notifier_t *notif, void *data);
 extern void notifier_destroy(notifier_t *notif);
+extern void notifier_run_unlocked(notifier_t *notif, void *data);
 extern void notifier_run(notifier_t *notif, void *data);
 extern void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data);
 extern void notifier_unregister(notifier_t *notif, void (*func)(void *, void *, void *), void *data);

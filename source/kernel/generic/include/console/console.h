@@ -42,8 +42,16 @@ typedef struct console {
 #define LOG_NORMAL	2		/**< Normal message. */
 #define LOG_WARN	3		/**< Warning message. */
 
+/** Font definitions. */
+#define FONT_WIDTH		8
+#define FONT_HEIGHT		8
+#define FONT_DATA		console_font_8x8
+
+extern unsigned char console_font_8x8[2048];
+
 extern void console_putch(unsigned char level, char ch);
 extern void console_register(console_t *cons);
+extern void console_unregister(console_t *cons);
 
 extern void console_early_init(void);
 

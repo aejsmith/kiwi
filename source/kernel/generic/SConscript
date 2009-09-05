@@ -31,6 +31,7 @@ AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
 env['OBJFILES'] += [
 	env.Object('console/console.c'),
+	env.Object('console/font_8x8.c'),
 	env.Object('console/kprintf.c'),
 
 	env.Object('cpu/cpu.c'),

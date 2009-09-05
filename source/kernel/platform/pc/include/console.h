@@ -69,8 +69,6 @@
 /** VGA attribute byte. */
 #define VGA_ATTRIB		((uint16_t)((VGA_CONSOLE_BG << 4) | VGA_CONSOLE_FG) << 8)
 
-extern unsigned char console_font_8x8[2048];
-
 extern void console_late_init(void);
 
 #endif /* __PLATFORM_CONSOLE_H */

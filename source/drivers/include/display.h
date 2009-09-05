@@ -84,6 +84,7 @@ typedef struct display_ops {
 
 /** Structure describing a display device. */
 typedef struct display_device {
+	mutex_t lock;			/**< Lock to protect device. */
 	identifier_t id;		/**< Device ID. */
 	device_t *device;		/**< Device tree node. */
 	device_t *alias;		/**< Alias if main device under different directory. */
@@ -93,6 +94,10 @@ typedef struct display_device {
 
 	display_mode_t *modes;		/**< Array of mode structures. */
 	size_t count;			/**< Number of modes. */
+
+	display_mode_t *curr_mode;	/**< Current mode. */
+	void *fb;			/**< Framebuffer mapping. */
+	size_t fb_size;			/**< Framebuffer mapping size. */
 } display_device_t;
 
 extern int display_device_create(const char *name, device_t *parent, display_ops_t *ops,

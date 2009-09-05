@@ -20,7 +20,6 @@ Import('env', 'config')
 env['OBJFILES'] += [
 	env.Object('acpi.c'),
 	env.Object('console.c'),
-	env.Object('font_8x8.c'),
 	env.Object('kdbg.c'),
 	env.Object('multiboot.c'),
 	env.Object('pic.c'),

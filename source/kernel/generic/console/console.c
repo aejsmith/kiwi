@@ -92,9 +92,7 @@ void console_putch(unsigned char level, char ch) {
 
 /** Register a console.
  *
- * Registers a console to be outputted to upon a console_putch() call. The
- * current contents of the kernel log buffer will be outputted to this console
- * after it has been initialized.
+ * Registers a console to be outputted to upon a console_putch() call.
  *
  * @param cons		Console to register.
  */
@@ -108,5 +106,17 @@ void console_register(console_t *cons) {
 		cons->init();
 	}
 
+	spinlock_unlock(&console_lock);
+}
+
+/** Unregister a console.
+ *
+ * Unregisters a console.
+ *
+ * @param cons		Console to register.
+ */
+void console_unregister(console_t *cons) {
+	spinlock_lock(&console_lock, 0);
+	list_remove(&cons->header);
 	spinlock_unlock(&console_lock);
 }

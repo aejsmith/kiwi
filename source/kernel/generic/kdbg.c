@@ -16,6 +16,17 @@
 /**
  * @file
  * @brief		Kernel debugger.
+ *
+ * Please, keep this code safe! Specifically, make sure it doesn't:
+ * - Use any allocators.
+ * - Prod at pointers without CHECKING them (this is sort-of OK to do within
+ *   commands because commands have a failure mechanism which causes them to
+ *   fail if a fault occurs during their execution).
+ * - Use interrupts.
+ * - Use anything related to the scheduler (including any form of
+ *   synchronization based on it).
+ * This code and all the commands should use as little external code as
+ * possible.
  */
 
 #include <console/console.h>
@@ -43,19 +54,11 @@
 #include <module.h>
 #include <symbol.h>
 
-/* Please, keep this code safe! Specifically, make sure it doesn't:
- * - Use any allocators.
- * - Prod at pointers without CHECKING them (this is sort-of OK to do within
- *   commands because commands have a failure mechanism which causes them to
- *   fail if a fault occurs during their execution).
- * - Use interrupts.
- * - Use anything related to the scheduler (including any form of
- *   synchronization based on it).
- * This code and all the commands should use as little external code as
- * possible.
- */
-
 extern void arch_reboot(void);
+
+/** Notifier to be called when entering/exiting KDBG. */
+NOTIFIER_DECLARE(kdbg_entry_notifier, NULL);
+NOTIFIER_DECLARE(kdbg_exit_notifier, NULL);
 
 /** Whether KDBG is currently running on any CPU. */
 atomic_t kdbg_running = 0;
@@ -719,6 +722,9 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	curr_kdbg_frame = frame;
 
+	/* Run entry notifiers. */
+	notifier_run_unlocked(&kdbg_entry_notifier, NULL);
+
 	sym = symbol_lookup_addr(frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
 		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%zx\n",
@@ -758,6 +764,9 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 			}
 		}
 	}
+
+	/* Run exit notifiers. */
+	notifier_run_unlocked(&kdbg_exit_notifier, NULL);
 
 	/* Resume other CPUs. */
 	cpu_resume_all();

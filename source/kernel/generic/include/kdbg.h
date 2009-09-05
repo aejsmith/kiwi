@@ -23,6 +23,7 @@
 
 #include <console/kprintf.h>
 
+#include <lib/notifier.h>
 #include <lib/string.h>
 
 #include <types/atomic.h>
@@ -52,6 +53,8 @@ struct intr_frame;
 
 extern atomic_t kdbg_running;
 extern struct intr_frame *curr_kdbg_frame;
+extern notifier_t kdbg_entry_notifier;
+extern notifier_t kdbg_exit_notifier;
 
 /** Functions implemented by the architecture/platform. */
 extern void kdbg_enter(int reason, struct intr_frame *frame);

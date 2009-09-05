@@ -30,6 +30,9 @@
 #include <kdbg.h>
 #include <version.h>
 
+/** Notifier to be called when a fatal error occurs. */
+NOTIFIER_DECLARE(fatal_notifier, NULL);
+
 /** Atomic variable to protect against nested calls to _fatal(). */
 static atomic_t fatal_protect = 0;
 
@@ -67,14 +70,17 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 	intr_disable();
 
 	if(atomic_cmp_set(&fatal_protect, 0, 1)) {
-		va_start(args, format);
-
 		/* Halt all other CPUs. */
 		cpu_halt_all();
 
+		/* Run callback functions registered. */
+		notifier_run_unlocked(&fatal_notifier, NULL);
+
 		console_putch(LOG_NONE, '\n');
 		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_current_id(), kiwi_ver_string);
+		va_start(args, format);
 		do_printf(fatal_printf_helper, NULL, format, args);
+		va_end(args);
 		console_putch(LOG_NONE, '\n');
 
 		kdbg_enter(KDBG_ENTRY_FATAL, frame);

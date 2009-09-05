@@ -62,11 +62,13 @@ static int vbe_display_mode_set(display_device_t *_dev, display_mode_t *mode) {
 
 	memset(&regs, 0, sizeof(bios_regs_t));
 
-	kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: 0x%p)\n", mode->id, mode);
+	if(mode) {
+		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: 0x%p)\n", mode->id, mode);
+	}
 
 	/* Set bit 14 in the mode register to use linear framebuffer model. */
 	regs.eax = VBE_FUNCTION_SET_MODE;
-	regs.ebx = mode->id | (1<<14);
+	regs.ebx = (mode) ? (mode->id | (1<<14)) : 3;
 	if((ret = bios_interrupt(0x10, &regs)) != 0) {
 		return ret;
 	} else if((regs.eax & 0xFF00) != 0) {

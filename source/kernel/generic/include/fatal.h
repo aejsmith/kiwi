@@ -21,9 +21,13 @@
 #ifndef __FATAL_H
 #define __FATAL_H
 
+#include <lib/notifier.h>
+
 #include <types.h>
 
 struct intr_frame;
+
+extern notifier_t fatal_notifier;
 
 extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn __printf(2, 3);
 
