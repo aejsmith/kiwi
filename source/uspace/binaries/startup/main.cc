@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
 		return -ret;
 	}
 
-	ret = Process::create(proc, "failshell");
+	ret = Process::create(proc, "console");
 	if(ret != 0) {
 		printf("Failed to create process (%d)\n", ret);
 	} else {

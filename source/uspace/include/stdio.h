@@ -30,12 +30,19 @@ extern "C" {
 #include <stddef.h>
 #include <stdarg.h>
 
-#if 0
 struct __libc_fstream;
 
 /** Type describing an open file stream. */
 typedef struct __libc_fstream FILE;
 
+/** End of file return value. */
+#define EOF		(-1)
+
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
+
+#if 0
 /** Type describing a file offset. */
 typedef off_t fpos_t;
 
@@ -46,9 +53,6 @@ typedef off_t fpos_t;
 #define _IOFBF		0		/**< Input/output fully buffered. */
 #define _IOLBF		1		/**< Input/output line buffered. */
 #define _IONBF		2		/**< Input/output unbuffered. */
-
-/** End of file return value. */
-#define EOF		(-1)
 
 /** Minimum number of unique files from tmpnam() and friends. */
 #define TMP_MAX		10000
@@ -61,30 +65,25 @@ typedef off_t fpos_t;
 
 /** Directory usable for creating temporary files. */
 //#define P_tmpdir	"/System/Temp"
-
-extern FILE *stdin;
-extern FILE *stdout;
-extern FILE *stderr;
 #endif
 
-//extern void clearerr(FILE *stream);
+extern void clearerr(FILE *stream);
 /* char *ctermid(char *); */
-//extern int fclose(FILE *stream);
-//extern FILE *fdopen(int fd, const char *mode);
-//extern int feof(FILE *stream);
-//extern int ferror(FILE *stream);
+extern int fclose(FILE *stream);
+extern int feof(FILE *stream);
+extern int ferror(FILE *stream);
 //extern int fflush(FILE *stream);
-//extern int fgetc(FILE *stream);
+extern int fgetc(FILE *stream);
 /* int fgetpos(FILE *, fpos_t *); */
-//extern char *fgets(char *s, int size, FILE *stream);
+extern char *fgets(char *s, int size, FILE *stream);
 //extern int fileno(FILE *stream);
 /* void flockfile(FILE *); */
-//extern FILE *fopen(const char *path, const char *mode);
-//extern int fprintf(FILE *stream, const char *fmt, ...);
-//extern int fputc(int ch, FILE *stream);
-//extern int fputs(const char *s, FILE *stream);
-//extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-//extern FILE *freopen(const char *path, const char *mode, FILE *stream);
+extern FILE *fopen(const char *path, const char *mode);
+extern int fprintf(FILE *stream, const char *fmt, ...);
+extern int fputc(int ch, FILE *stream);
+extern int fputs(const char *s, FILE *stream);
+extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+extern FILE *freopen(const char *path, const char *mode, FILE *stream);
 //extern int fscanf(FILE *stream, const char *fmt, ...);
 //extern int fseek(FILE *stream, long off, int act);
 //extern int fseeko(FILE *stream, off_t off, int act);
@@ -93,17 +92,17 @@ extern FILE *stderr;
 //extern off_t ftello(FILE *stream);
 /* int ftrylockfile(FILE *); */
 /* void funlockfile(FILE *); */
-//extern size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
-//extern int getc(FILE *stream);
-//extern int getchar(void);
+extern size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+extern int getc(FILE *stream);
+extern int getchar(void);
 /* int getc_unlocked(FILE *); */
 /* int getchar_unlocked(void); */
-//extern char *gets(char *s);
+extern char *gets(char *s);
 /* int      pclose(FILE *); */
 //extern void perror(const char *s);
 /* FILE    *popen(const char *, const char *); */
 extern int printf(const char *fmt, ...);
-//extern int putc(int ch, FILE *stream);
+extern int putc(int ch, FILE *stream);
 extern int putchar(int ch);
 /* int putc_unlocked(int, FILE *); */
 /* int putchar_unlocked(int); */
@@ -121,7 +120,7 @@ extern int sprintf(char *buf, const char *fmt, ...);
 /* FILE *tmpfile(void); */
 /* char *tmpnam(char *); */
 //extern int ungetc(int ch, FILE *stream);
-//extern int vfprintf(FILE *stream, const char *fmt, va_list args);
+extern int vfprintf(FILE *stream, const char *fmt, va_list args);
 //extern int vfscanf(FILE *stream, const char *fmt, va_list args);
 extern int vprintf(const char *fmt, va_list args);
 //extern int vscanf(const char *fmt, va_list args);

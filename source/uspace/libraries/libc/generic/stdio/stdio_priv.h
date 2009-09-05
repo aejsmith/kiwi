@@ -21,24 +21,26 @@
 #ifndef __STDIO_PRIV_H
 #define __STDIO_PRIV_H
 
+#include <kernel/handle.h>
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 
 /** Internal structure of an I/O stream (FILE). */
-#if 0
 struct __libc_fstream {
-        int fd;				/**< File descriptor backing the stream. */
-        int err;			/**< Error indicator. */
-        int eof;			/**< End of file indicator. */
-	int buf_mode;			/**< Buffering mode. */
-	char *buf;			/**< Input/output buffer. */
-	size_t buf_size;		/**< Size of the buffer. */
-	int pushback_ch;		/**< Character pushed back with ungetc(). */
-	bool have_pushback;		/**< Set to true if there is a pushed back character. */
+	/** Stream type. */
+	enum {
+		STREAM_TYPE_KCONSOLE,	/**< Kernel console. */
+		STREAM_TYPE_FILE,	/**< File. */
+		STREAM_TYPE_DEVICE,	/**< Device. */
+	} type;
+
+	handle_t handle;		/**< Handle for file/device streams. */
+	bool err;			/**< Error indicator. */
+	bool eof;			/**< End of file indicator. */
 };
-#endif
 
 #if 0
 /** Arguments to do_scanf. */
@@ -54,5 +56,10 @@ typedef void (*printf_helper_t)(char, void *, int *);
 
 extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args);
 //extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
+
+extern int fclose_internal(FILE *stream);
+extern FILE *fopen_handle(handle_t handle);
+extern FILE *fopen_device(const char *path);
+extern FILE *fopen_kconsole(void);
 
 #endif /* __STDIO_PRIV_H */

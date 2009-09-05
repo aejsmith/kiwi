@@ -20,14 +20,13 @@
 
 #include "stdio_priv.h"
 
-#if 0
 /** Helper for vfprintf().
  * @param ch		Character to print.
  * @param data		Pointer to file stream.
  * @param total		Pointer to total character count. */
 static void vfprintf_helper(char ch, void *data, int *total) {
-	fputc(ch, (FILE *)data->data);
-	data->total++;
+	fputc(ch, (FILE *)data);
+	*total = *total + 1;
 }
 
 /** Output a formatted message to a file stream.
@@ -41,8 +40,7 @@ static void vfprintf_helper(char ch, void *data, int *total) {
  * @return		Number of characters printed.
  */
 int vfprintf(FILE *stream, const char *fmt, va_list args) {
-	struct printf_args data = { vfprintf_helper, stream, 0 };
-	return do_printf(&data, fmt, args);
+	return do_printf(vfprintf_helper, stream, fmt, args);
 }
 
 /** Output a formatted message to a file stream.
@@ -56,26 +54,14 @@ int vfprintf(FILE *stream, const char *fmt, va_list args) {
  * @return		Number of characters printed.
  */
 int fprintf(FILE *stream, const char *fmt, ...) {
-	int ret;
 	va_list args;
+	int ret;
 
 	va_start(args, fmt);
 	ret = vfprintf(stream, fmt, args);
 	va_end(args);
 
 	return ret;
-}
-#endif
-
-extern void putch(char ch);
-
-/** Helper for vprintf().
- * @param ch		Character to print.
- * @param data		Pointer to file stream.
- * @param total		Pointer to total character count. */
-static void vprintf_helper(char ch, void *data, int *total) {
-	putch(ch);
-	*total = *total + 1;
 }
 
 /** Output a formatted message.
@@ -88,8 +74,7 @@ static void vprintf_helper(char ch, void *data, int *total) {
  * @return		Number of characters printed.
  */
 int vprintf(const char *fmt, va_list args) {
-	return do_printf(vprintf_helper, NULL, fmt, args);
-//	return vfprintf(stdout, fmt, args);
+	return vfprintf(stdout, fmt, args);
 }
 
 /** Output a formatted message.
@@ -102,8 +87,8 @@ int vprintf(const char *fmt, va_list args) {
  * @return		Number of characters printed.
  */
 int printf(const char *fmt, ...) {
-	int ret;
 	va_list args;
+	int ret;
 
 	va_start(args, fmt);
 	ret = vprintf(fmt, args);

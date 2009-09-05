@@ -18,12 +18,16 @@
  * @brief		Put character functions.
  */
 
+#include <kernel/device.h>
+#include <kernel/fs.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "stdio_priv.h"
 
-#if 0
+extern void kputch(char ch);
+
 /** Write character to a stream.
  *
  * Writes a character to a file stream.
@@ -35,15 +39,31 @@
  */
 int fputc(int ch, FILE *stream) {
 	unsigned char val = (unsigned char)ch;
-	ssize_t ret;
+	size_t bytes;
+	int ret;
 
-	ret = write(stream->fd, &val, 1);
-	if(ret < 0) {
-		stream->err = 1;
-		return EOF;
-	} else if(ret < 1) {
-		stream->eof = 1;
-		return EOF;
+	switch(stream->type) {
+	case STREAM_TYPE_FILE:
+		if((ret = fs_file_write(stream->handle, &val, 1, -1, &bytes)) != 0) {
+			stream->err = true;
+			return EOF;
+		} else if(bytes != 1) {
+			stream->eof = true;
+			return EOF;
+		}
+		break;
+	case STREAM_TYPE_DEVICE:
+		if((ret = device_write(stream->handle, &val, 1, 0, &bytes)) != 0) {
+			stream->err = true;
+			return EOF;
+		} else if(bytes != 1) {
+			stream->eof = true;
+			return EOF;
+		}
+		break;
+	case STREAM_TYPE_KCONSOLE:
+		kputch(ch);
+		break;
 	}
 
 	return (int)val;
@@ -61,9 +81,6 @@ int fputc(int ch, FILE *stream) {
 int putc(int ch, FILE *stream) {
 	return fputc(ch, stream);
 }
-#endif
-
-extern void putch(char ch);
 
 /** Write character to standard output.
  *
@@ -74,7 +91,5 @@ extern void putch(char ch);
  * @return		EOF on failure, character written on success.
  */
 int putchar(int ch) {
-	//return fputc(ch, stdout);
-	putch((char)ch);
-	return ch;
+	return fputc(ch, stdout);
 }

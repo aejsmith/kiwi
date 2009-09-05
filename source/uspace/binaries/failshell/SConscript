@@ -21,7 +21,5 @@ env.Program('failshell', [
 	'commands/mkdir.cc',
 	'commands/mount.cc',
 	'commands/symlink.cc',
-
-	'input.cc',
 	'main.cc',
 ], LIBS=['kiwi'])

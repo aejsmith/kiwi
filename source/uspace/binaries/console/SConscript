@@ -12,11 +12,17 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
+Import('env', 'config', 'envmgr')
 
-SConscript(dirs=[
-	'console',
-	'failshell',
-	'rtld',
-	'startup',
-], exports=['env'])
+# Compile in the logo image.
+env.Command('logo.c', ['logo.ppm'], Action('$BIN2HEX logo_ppm $SOURCE > $TARGET', '$GENCOMSTR'))
+
+env.Program('console', [
+	'console.cc',
+	'fb.cc',
+	'font.c',
+	'input.cc',
+	'logo.c',
+	'main.cc',
+	'ppm.cc',
+], LIBS=['kiwi'])

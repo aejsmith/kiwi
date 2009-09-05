@@ -23,28 +23,8 @@
 
 #include <kernel/types.h>
 
+#include <stdio.h>
 #include <string.h>
-
-/** Input device class. */
-class InputDevice {
-public:
-	/** Constructor.
-	 * @param device	Device path to use. */
-	InputDevice(const char *path);
-
-	/** Get an input character.
-	 * @return		Character read. */
-	unsigned char getchar(void);
-private:
-	static const unsigned char m_keymap[];
-	static const unsigned char m_keymap_shift[];
-	static const unsigned char m_keymap_caps[];
-	handle_t m_handle;
-	bool m_caps;
-	bool m_ctrl;
-	bool m_alt;
-	bool m_shift;
-};
 
 /** Shell class. */
 class Shell {
@@ -90,7 +70,7 @@ public:
 	static void add_command(Command *cmd);
 
 	/** Constructor. */
-	Shell(InputDevice &input) : m_input(&input), m_exit(false) {}
+	Shell(FILE *input) : m_input(input), m_exit(false) {}
 
 	/** Main loop for the shell.
 	 * @return		Process exit code. */
@@ -115,7 +95,7 @@ private:
 	 * @param argv		Argument array. */
 	void do_command(int argc, char **argv);
 
-	InputDevice *m_input;		/**< Input device. */
+	FILE *m_input;			/**< Input stream. */
 	bool m_exit;			/**< Whether to exit the shell after the current command. */
 
 	static Command **m_commands;	/**< Array of commands. */

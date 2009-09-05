@@ -1,4 +1,4 @@
-/* Kiwi shell input handling
+/* Kiwi console input handling
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,17 +15,21 @@
 
 /**
  * @file
- * @brief		Input handling.
+ * @brief		Console input handling.
  */
 
 #include <kernel/device.h>
+#include <kernel/handle.h>
+#include <kernel/thread.h>
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "failshell.h"
+#include "console.h"
+#include "input.h"
 
+/** Definition of some keys. */
 #define	L_CTRL		0x1D
 #define	R_CTRL		0x1D
 #define	L_ALT		0x38
@@ -34,6 +38,7 @@
 #define	R_SHIFT		0x36
 #define	CAPS		0x3A
 
+/** Normal keyboard map. */
 const unsigned char InputDevice::m_keymap[] = {
 	0, 0x1B, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
 	'\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 0,
@@ -43,6 +48,7 @@ const unsigned char InputDevice::m_keymap[] = {
 	0, 0, '+', 0, 0, 0, 0, 0, 0, 0, '\\', 0, 0
 };
 
+/** Shift keyboard map. */
 const unsigned char InputDevice::m_keymap_shift[] = {
 	0, 0x1B, '!', '"', 156, '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',
 	'\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0,
@@ -52,6 +58,7 @@ const unsigned char InputDevice::m_keymap_shift[] = {
 	0, 0, '+', 0, 0, 0, 0, 0, 0, 0, '|', 0, 0
 };
 
+/** Caps keyboard map. */
 const unsigned char InputDevice::m_keymap_caps[] = {
 	0, 0x1B, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
 	'\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\n', 0,
@@ -63,24 +70,47 @@ const unsigned char InputDevice::m_keymap_caps[] = {
 
 /** Constructor for an input device.
  * @param device	Device tree path to input device. */
-InputDevice::InputDevice(const char *path) : m_caps(false), m_ctrl(false), m_alt(false), m_shift(false) {
-	if((m_handle = device_open(path)) < 0) {
-		printf("Could not open input device (%d)\n", m_handle);
-		exit(1);
+InputDevice::InputDevice(const char *path) :
+		m_init_status(0), m_device(-1), m_thread(-1), m_caps(false),
+		m_ctrl(false), m_alt(false), m_shift(false) {
+	/* Open the input device. */
+	if((m_device = device_open(path)) < 0) {
+		m_init_status = m_device;
+		return;
+	}
+
+	/* Create a thread to handle input. */
+	if((m_thread = thread_create("input", NULL, 0, _ThreadEntry, this)) < 0) {
+		m_init_status = m_thread;
+		handle_close(m_device);
+		return;
 	}
 }
 
-/** Get an input character.
- * @return		Character read. */
-unsigned char InputDevice::getchar(void) {
+/** Destructor for an input device. */
+InputDevice::~InputDevice() {
+	if(m_thread >= 0) {
+		/* FIXME: Gotta kill the thread. */
+		handle_close(m_thread);
+	}
+	if(m_device >= 0) {
+		handle_close(m_device);
+	}
+}
+
+/** Thread function.
+ * @param arg		Thread argument (device object pointer). */
+void InputDevice::_ThreadEntry(void *arg) {
+	InputDevice *device = reinterpret_cast<InputDevice *>(arg);
+	unsigned char ch;
 	uint8_t code;
 	size_t bytes;
 	int ret;
 
 	while(true) {
-		if((ret = device_read(m_handle, &code, 1, 0, &bytes)) != 0) {
+		if((ret = device_read(device->m_device, &code, 1, 0, &bytes)) != 0) {
 			printf("Failed to read input (%d)\n", ret);
-			exit(1);
+			continue;
 		} else if(bytes != 1) {
 			continue;
 		} else if(code >= 0xe0) {
@@ -90,29 +120,35 @@ unsigned char InputDevice::getchar(void) {
 		if(code & 0x80) {
 			code &= 0x7F;
 			if(code == L_SHIFT || code == R_SHIFT) {
-				m_shift = false;
+				device->m_shift = false;
 			} else if(code == L_CTRL || code == R_CTRL) {
-				m_ctrl = false;
+				device->m_ctrl = false;
 			} else if(code == L_ALT || code == R_ALT) {
-				m_alt = 0;
+				device->m_alt = 0;
 			}
 			continue;
 		} else if(code == L_ALT || code == R_ALT) {
-			m_alt = true;
+			device->m_alt = true;
+			continue;
 		} else if(code == L_CTRL || code == R_CTRL) {
-			m_ctrl = true;
+			device->m_ctrl = true;
+			continue;
 		} else if(code == L_SHIFT || code == R_SHIFT) {
-			m_shift = true;
+			device->m_shift = true;
+			continue;
 		} else if(code == CAPS) {
-			m_caps = !m_caps;
-		} else {
-			if(m_shift) {
-				return m_keymap_shift[code];
-			} else if(m_caps) {
-				return m_keymap_caps[code];
-			} else {
-				return m_keymap[code];
-			}
+			device->m_caps = !device->m_caps;
+			continue;
 		}
+
+		if(device->m_shift) {
+			ch = m_keymap_shift[code];
+		} else if(device->m_caps) {
+			ch = m_keymap_caps[code];
+		} else {
+			ch = m_keymap[code];
+		}
+
+		Console::GetActive()->Input(ch);
 	}
 }

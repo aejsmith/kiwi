@@ -23,7 +23,6 @@
 
 #include "stdio_priv.h"
 
-#if 0
 /** Write string to a stream.
  *
  * Writes the contents of a string into a file stream.
@@ -40,9 +39,6 @@ int fputs(const char *s, FILE *stream) {
 
 	return 0;
 }
-#endif
-
-extern void putch(char ch);
 
 /** Write string to standard output.
  *
@@ -53,7 +49,6 @@ extern void putch(char ch);
  * @return		0 on success, EOF on failure or EOF.
  */
 int puts(const char *s) {
-#if 0
 	if(fputs(s, stdout) != 0) {
 		return EOF;
 	}
@@ -61,12 +56,6 @@ int puts(const char *s) {
 	if(fputc('\n', stdout) != '\n') {
 		return EOF;
 	}
-#endif
-	while(*s) {
-		putch(*s);
-		s++;
-	}
 
-	putch('\n');
 	return 0;
 }

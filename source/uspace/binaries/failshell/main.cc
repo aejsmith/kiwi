@@ -151,12 +151,14 @@ int Shell::run(void) {
  * @return		Pointer to buffer, or NULL if out of memory. */
 char *Shell::readline(void) {
 	char *buf = NULL, *tmp;
-	unsigned char ch;
 	size_t count = 0;
+	int ch;
 
 	do {
-		ch = m_input->getchar();
-		if(!(tmp = reinterpret_cast<char *>(realloc(buf, count + 1)))) {
+		if((ch = fgetc(m_input)) == EOF) {
+			free(buf);
+			return NULL;
+		} else if(!(tmp = reinterpret_cast<char *>(realloc(buf, count + 1)))) {
 			free(buf);
 			return NULL;
 		}
@@ -170,7 +172,7 @@ char *Shell::readline(void) {
 				putchar(ch);
 			}
 		} else {
-			buf[count++] = (ch == '\n') ? 0 : ch;
+			buf[count++] = (ch == '\n') ? 0 : (unsigned char)ch;
 			putchar(ch);
 		}
 	} while(ch != '\n');
@@ -239,8 +241,7 @@ void Shell::do_command(int argc, char **argv) {
  * @param argv		Argument array.
  * @return		Process exit code. */
 int main(int argc, char **argv) {
-	InputDevice input("/input/input0");
-	Shell shell(input);
+	Shell shell(stdin);
 
 	printf("\n");
 	printf("Welcome to FailShell! (process %d)\n", Process::get_current_id());
