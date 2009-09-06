@@ -29,15 +29,15 @@ typedef struct condvar {
 	waitq_t queue;			/**< Wait queue implementing the condition variable. */
 } condvar_t;
 
-/** Initializes a statically declared condition variable. */
-#define CONDVAR_INITIALIZER(_var, _name)	\
+/** Initialises a statically declared condition variable. */
+#define CONDVAR_INITIALISER(_var, _name)	\
 	{ \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name, 0, 0), \
+		.queue = WAITQ_INITIALISER(_var.queue, _name, 0, 0), \
 	}
 
 /** Statically declares a new condition variable. */
 #define CONDVAR_DECLARE(_var)			\
-	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
+	condvar_t _var = CONDVAR_INITIALISER(_var, #_var)
 
 extern int condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, int flags);
 extern bool condvar_signal(condvar_t *cv);

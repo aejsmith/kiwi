@@ -71,12 +71,12 @@ static irq_result_t i8042_kbd_handler(unative_t num, void *_dev, intr_frame_t *f
 	return IRQ_HANDLED;
 }
 
-/** Initialization function for the i8042 driver.
+/** Initialisation function for the i8042 driver.
  * @return		0 on success, negative error code on failure. */
 static int i8042_init(void) {
 	int ret;
 
-	if((ret = input_device_create(NULL, NULL, INPUT_TYPE_KEYBOARD, INPUT_PROTOCOL_PS2,
+	if((ret = input_device_create(NULL, NULL, INPUT_TYPE_KEYBOARD, INPUT_PROTOCOL_AT,
 	                              NULL, NULL, &i8042_kbd_dev)) != 0) {
 		return ret;
 	}

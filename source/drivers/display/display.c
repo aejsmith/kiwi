@@ -461,7 +461,7 @@ int display_device_destroy(display_device_t *device) {
 }
 MODULE_EXPORT(display_device_destroy);
 
-/** Initialization function for the display module.
+/** Initialisation function for the display module.
  * @return		0 on success, negative error code on failure. */
 static int display_init(void) {
 	list_init(&display_console.header);

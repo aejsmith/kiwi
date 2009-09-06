@@ -289,7 +289,7 @@ out:
 	return schedule;
 }
 
-/** Initialize the IRQ handling system. */
+/** Initialise the IRQ handling system. */
 void irq_init(void) {
 	size_t i;
 

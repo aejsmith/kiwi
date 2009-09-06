@@ -53,12 +53,12 @@ void semaphore_up(semaphore_t *sem, size_t count) {
 	}
 }
 
-/** Initialize a semaphore structure.
+/** Initialise a semaphore structure.
  *
- * Initializes a semaphore structure and sets its initial count to the
+ * Initialises a semaphore structure and sets its initial count to the
  * value specified.
  *
- * @param sem		Semaphore to initialize.
+ * @param sem		Semaphore to initialise.
  * @param name		Name of the semaphore, for debugging purposes.
  * @param initial	Initial value of the semaphore.
  *

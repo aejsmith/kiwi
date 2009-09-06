@@ -38,11 +38,11 @@ typedef struct waitq {
 	const char *name;		/**< Name of wait queue. */
 } waitq_t;
 
-/** Initializes a statically declared wait queue. */
-#define WAITQ_INITIALIZER(_var, _name, _flags, _missed)	\
+/** Initialises a statically declared wait queue. */
+#define WAITQ_INITIALISER(_var, _name, _flags, _missed)	\
 	{ \
-		.lock = SPINLOCK_INITIALIZER("waitq_lock"), \
-		.threads = LIST_INITIALIZER(_var.threads), \
+		.lock = SPINLOCK_INITIALISER("waitq_lock"), \
+		.threads = LIST_INITIALISER(_var.threads), \
 		.flags = _flags, \
 		.missed = _missed, \
 		.name = _name, \
@@ -50,7 +50,7 @@ typedef struct waitq {
 
 /** Statically declares a new wait queue. */
 #define WAITQ_DECLARE(_var, _flags, _missed)		\
-	waitq_t _var = WAITQ_INITIALIZER(_var, #_var, _flags, _missed)
+	waitq_t _var = WAITQ_INITIALISER(_var, #_var, _flags, _missed)
 
 /** Wait queue behaviour flags. */
 #define WAITQ_COUNT_MISSED	(1<<0)	/**< Count missed wakeups. */

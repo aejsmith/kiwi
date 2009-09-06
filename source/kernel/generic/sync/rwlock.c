@@ -176,11 +176,11 @@ void rwlock_unlock(rwlock_t *lock) {
 	spinlock_unlock(&lock->lock);
 }
 
-/** Initialize a readers-writer lock.
+/** Initialise a readers-writer lock.
  *
- * Initializes a readers-writer lock structure.
+ * Initialises a readers-writer lock structure.
  *
- * @param lock		Lock to initialize.
+ * @param lock		Lock to initialise.
  * @param name		Name to give lock.
  */
 void rwlock_init(rwlock_t *lock, const char *name) {

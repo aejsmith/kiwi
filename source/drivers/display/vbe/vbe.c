@@ -85,7 +85,7 @@ static display_ops_t vbe_display_ops = {
 	.mode_set = vbe_display_mode_set,
 };
 
-/** Initialization function for the VBE driver.
+/** Initialisation function for the VBE driver.
  * @return		0 on success, negative error code on failure. */
 static int vbe_init(void) {
 	vbe_device_t *device = kmalloc(sizeof(vbe_device_t), MM_SLEEP);

@@ -301,7 +301,7 @@ int disk_device_destroy(disk_device_t *device) {
 }
 MODULE_EXPORT(disk_device_destroy);
 
-/** Initialization function for the disk module.
+/** Initialisation function for the disk module.
  * @return		0 on success, negative error code on failure. */
 static int disk_init(void) {
 	/* Create the disk device directory. */

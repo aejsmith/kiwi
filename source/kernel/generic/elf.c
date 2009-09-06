@@ -163,7 +163,7 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 		}
 	}
 
-	/* If file size is zero then this header is just uninitialized data. */
+	/* If file size is zero then this header is just uninitialised data. */
 	if(phdr->p_filesz == 0) {
 		return 0;
 	}

@@ -32,7 +32,7 @@
  * kheap_arena that bypasses kheap_va_arena and thus the quantum caching it
  * provides.
  *
- * To initialize the heap allocator, we must first initialize the raw heap
+ * To initialise the heap allocator, we must first initialise the raw heap
  * arena, which is performed in kheap_early_init(). Then, slab_init() is
  * called to set up the slab allocator's internal arenas and caches. Finally,
  * kheap_init() is called which sets up kheap_va_arena and kheap_arena.
@@ -261,13 +261,13 @@ void kheap_unmap_range(void *addr, size_t size, bool shared) {
 	vmem_free(&kheap_va_arena, (vmem_resource_t)((ptr_t)addr), size);
 }
 
-/** First part of kernel heap initialization. */
+/** First part of kernel heap initialisation. */
 void __init_text kheap_early_init(void) {
 	vmem_early_create(&kheap_raw_arena, "kheap_raw_arena", KERNEL_HEAP_BASE, KERNEL_HEAP_SIZE,
 	                  PAGE_SIZE, NULL, NULL, NULL, 0, MM_FATAL);
 }
 
-/** Second part of heap initialization. */
+/** Second part of heap initialisation. */
 void __init_text kheap_init(void) {
 	vmem_early_create(&kheap_va_arena, "kheap_va_arena", 0, 0, PAGE_SIZE,
 	                  vmem_alloc, vmem_free, &kheap_raw_arena, PAGE_SIZE * 8,

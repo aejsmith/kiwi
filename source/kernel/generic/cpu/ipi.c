@@ -91,7 +91,7 @@ static ipi_message_t *ipi_message_get(void) {
 		spinlock_unlock(&ipi_message_lock);
 	}
 
-	/* Initialize the structure. The reference count is set to 2 to
+	/* Initialise the structure. The reference count is set to 2 to
 	 * account for both the destination and the sender. */
 	atomic_set(&message->acked, 0);
 	refcount_set(&message->count, 2);
@@ -363,7 +363,7 @@ void ipi_acknowledge(void *ptr, int status) {
 	atomic_inc(&message->acked);
 }
 
-/** Initialize the IPI message pool.  */
+/** Initialise the IPI message pool.  */
 void __init_text ipi_init(void) {
 	size_t i, count = cpu_count * IPI_MESSAGES_PER_CPU;
 	ipi_message_t *messages;
@@ -376,7 +376,7 @@ void __init_text ipi_init(void) {
 	/* Allocate message structures based on the total CPU count. */
 	messages = kcalloc(count, sizeof(ipi_message_t), MM_FATAL);
 
-	/* Initialize each structure and add it to the pool. */
+	/* Initialise each structure and add it to the pool. */
 	for(i = 0; i < count; i++) {
 		list_init(&messages[i].header);
 		list_init(&messages[i].cpu_link);

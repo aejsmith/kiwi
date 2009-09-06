@@ -1,4 +1,4 @@
-/* Kiwi kernel initialization functions
+/* Kiwi kernel initialisation functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Kernel initialization functions.
+ * @brief		Kernel initialisation functions.
  */
 
 #include <arch/arch.h>
@@ -62,7 +62,7 @@ static void init_thread(void *arg1, void *arg2) {
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
 
-	/* Call initialization functions that must be called before any
+	/* Call initialisation functions that must be called before any
 	 * initcalls. */
 	vfs_init();
 
@@ -71,16 +71,16 @@ static void init_thread(void *arg1, void *arg2) {
 		(*initcall)();
 	}
 
-	/* Reclaim memory taken up by temporary initialization code/data. */
+	/* Reclaim memory taken up by temporary initialisation code/data. */
 	page_init_reclaim();
 
 	/* Load the boot image. */
 	bootimg_load();
 }
 
-/** Kernel initialization function.
+/** Kernel initialisation function.
  *
- * Kernel initialization function for the boot CPU.
+ * Kernel initialisation function for the boot CPU.
  *
  * @param data		Data to pass into the architecture setup code.
  */
@@ -94,11 +94,11 @@ void init_bsp(void *data) {
 	        kiwi_ver_string, CONFIG_ARCH, CONFIG_PLATFORM);
 	kprintf(LOG_NORMAL, "Copyright (C) 2007-2009 Kiwi Developers\n\n");
 
-	/* Perform early architecture/platform initialization. */
+	/* Perform early architecture/platform initialisation. */
 	arch_premm_init(data);
 	platform_premm_init(data);
 
-	/* Initialize other memory management subsystems. */
+	/* Initialise other memory management subsystems. */
 	vmem_early_init();
 	kheap_early_init();
 	vmem_init();
@@ -108,7 +108,7 @@ void init_bsp(void *data) {
 	malloc_init();
 	vm_init();
 
-	/* Perform second stage architecture/platform initialization. */
+	/* Perform second stage architecture/platform initialisation. */
 	arch_postmm_init();
 	platform_postmm_init();
 
@@ -127,13 +127,13 @@ void init_bsp(void *data) {
 	sched_init();
 	thread_reaper_init();
 
-	/* Perform final architecture/platform initialization. */
+	/* Perform final architecture/platform initialisation. */
 	arch_final_init();
 	platform_final_init();
 
-	/* Create the second stage initialization thread. */
+	/* Create the second stage initialisation thread. */
 	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {
-		fatal("Could not create second-stage initialization thread");
+		fatal("Could not create second-stage initialisation thread");
 	}
 	thread_run(thread);
 
@@ -141,7 +141,7 @@ void init_bsp(void *data) {
 	sched_idle();
 }
 
-/** AP kernel initialization function. */
+/** AP kernel initialisation function. */
 void init_ap(void) {
 	curr_cpu->state = CPU_RUNNING;
 	list_append(&cpus_running, &curr_cpu->header);

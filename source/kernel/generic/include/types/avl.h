@@ -50,15 +50,15 @@ typedef struct avl_tree {
 	for(avl_tree_node_t *iter = avl_tree_node_first((tree)), *_##iter = avl_tree_node_next(iter); \
 	    iter != NULL; iter = _##iter, _##iter = avl_tree_node_next(iter))
 
-/** Initializes a statically declared AVL tree. */
-#define AVL_TREE_INITIALIZER()			\
+/** Initialises a statically declared AVL tree. */
+#define AVL_TREE_INITIALISER()			\
 	{ \
 		.root = NULL, \
 	}
 
 /** Statically declares a new AVL tree. */
 #define AVL_TREE_DECLARE(_var)			\
-	avl_tree_t _var = AVL_TREE_INITIALIZER()
+	avl_tree_t _var = AVL_TREE_INITIALISER()
 
 /** Gets an AVL tree node's data pointer and casts it to a certain type. */
 #define avl_tree_entry(node, type)		\
@@ -68,8 +68,8 @@ typedef struct avl_tree {
 #define avl_tree_empty(tree) 			\
 	((tree)->root == NULL)
 
-/** Initialize an AVL tree.
- * @param tree		Tree to initialize. */
+/** Initialise an AVL tree.
+ * @param tree		Tree to initialise. */
 static inline void avl_tree_init(avl_tree_t *tree) {
 	tree->root = NULL;
 }

@@ -51,8 +51,8 @@ typedef struct list {
 	for(list_t *iter = (list)->prev, *_##iter = iter->prev; \
 	    iter != (list); iter = _##iter, _##iter = _##iter->prev)
 
-/** Initializes a statically declared linked list. */
-#define LIST_INITIALIZER(_var)			\
+/** Initialises a statically declared linked list. */
+#define LIST_INITIALISER(_var)			\
 	{ \
 		.prev = &_var, \
 		.next = &_var, \
@@ -60,7 +60,7 @@ typedef struct list {
 
 /** Statically declares a new linked list. */
 #define LIST_DECLARE(_var)			\
-	list_t _var = LIST_INITIALIZER(_var)
+	list_t _var = LIST_INITIALISER(_var)
 
 /** Gets a pointer to the structure containing a list header, given the
  *  structure type and the member name of the list header. */
@@ -77,11 +77,11 @@ static inline void list_real_remove(list_t *entry) {
 	entry->next->prev = entry->prev;
 }
 
-/** Initializes a linked list.
+/** Initialises a linked list.
  *
- * Initializes the given linked list header structure.
+ * Initialises the given linked list header structure.
  *
- * @param list		List to initialize.
+ * @param list		List to initialise.
  */
 static inline void list_init(list_t *list) {
 	list->prev = list->next = list;

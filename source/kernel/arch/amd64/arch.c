@@ -104,14 +104,14 @@ void __init_text arch_final_init(void) {
 	page_late_init();
 }
 
-/** Architecture initialization for an AP. */
+/** Architecture initialisation for an AP. */
 void __init_text arch_ap_init(void) {
 	descriptor_ap_init();
 	cpu_arch_init(&curr_cpu->arch);
 
-	/* Initialize the LAPIC. */
+	/* Initialise the LAPIC. */
 	if(!lapic_init()) {
-		fatal("LAPIC initialization failed for CPU %" PRIu32 "\n", curr_cpu->id);
+		fatal("LAPIC initialisation failed for CPU %" PRIu32 "\n", curr_cpu->id);
 	}
 
 	syscall_arch_init();

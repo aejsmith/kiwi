@@ -32,7 +32,7 @@ FILE *stdin = NULL;
 FILE *stdout = NULL;
 FILE *stderr = NULL;
 
-/** Userspace application initialization function.
+/** Userspace application initialisation function.
  * @param args		Process arguments structure. */
 void __libsystem_init(process_args_t *args) {
 	const char *console;

@@ -73,11 +73,11 @@ bool condvar_broadcast(condvar_t *cv) {
 	return waitq_wake(&cv->queue, true);
 }
 
-/** Initialize a condition variable.
+/** Initialise a condition variable.
  *
- * Initializes the given condition variable structure.
+ * Initialises the given condition variable structure.
  *
- * @param cv		Condition variable to initialize.
+ * @param cv		Condition variable to initialise.
  * @param name		Name to give the condition variable.
  */
 void condvar_init(condvar_t *cv, const char *name) {

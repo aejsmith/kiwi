@@ -330,7 +330,7 @@ static vfs_type_t ext2_fs_type = {
 	.symlink_read = ext2_symlink_read,
 };
 
-/** Initialization function for the Ext2 module.
+/** Initialisation function for the Ext2 module.
  * @return		0 on success, negative error code on failure. */
 static int ext2_init(void) {
 	return vfs_type_register(&ext2_fs_type);

@@ -107,11 +107,11 @@ symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool
 	return NULL;
 }
 
-/** Initialize a symbol table.
+/** Initialise a symbol table.
  *
- * Initializes a symbol table structure.
+ * Initialises a symbol table structure.
  *
- * @param table		Table to initialize.
+ * @param table		Table to initialise.
  */
 void symbol_table_init(symbol_table_t *table) {
 	table->symbols = NULL;

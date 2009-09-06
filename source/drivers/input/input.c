@@ -347,7 +347,7 @@ int input_device_destroy(input_device_t *device) {
 }
 MODULE_EXPORT(input_device_destroy);
 
-/** Initialization function for the input module.
+/** Initialisation function for the input module.
  * @return		0 on success, negative error code on failure. */
 static int input_init(void) {
 	/* Create the input device directory. */

@@ -29,15 +29,15 @@ typedef struct semaphore {
 	waitq_t queue;			/**< Wait queue implementing the semaphore. */
 } semaphore_t;
 
-/** Initializes a statically declared semaphore. */
-#define SEMAPHORE_INITIALIZER(_var, _name, _initial)	\
+/** Initialises a statically declared semaphore. */
+#define SEMAPHORE_INITIALISER(_var, _name, _initial)	\
 	{ \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name, WAITQ_COUNT_MISSED, _initial), \
+		.queue = WAITQ_INITIALISER(_var.queue, _name, WAITQ_COUNT_MISSED, _initial), \
 	}
 
 /** Statically declares a new semaphore. */
 #define SEMAPHORE_DECLARE(_var, _initial)		\
-	semaphore_t _var = SEMAPHORE_INITIALIZER(_var, #_var, _initial)
+	semaphore_t _var = SEMAPHORE_INITIALISER(_var, #_var, _initial)
 
 extern int semaphore_down(semaphore_t *sem, int flags);
 extern void semaphore_up(semaphore_t *sem, size_t count);

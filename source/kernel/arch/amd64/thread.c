@@ -36,8 +36,8 @@ void thread_arch_post_switch(thread_t *thread) {
         sysreg_msr_write(SYSREG_MSR_K_GS_BASE, (ptr_t)&thread->arch);
 }
 
-/** Initialize AMD64-specific thread data.
- * @param thread	Thread to initialize.
+/** Initialise AMD64-specific thread data.
+ * @param thread	Thread to initialise.
  * @return		Always returns 0. */
 int thread_arch_init(thread_t *thread) {
 	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;

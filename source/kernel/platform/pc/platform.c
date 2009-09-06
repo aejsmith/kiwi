@@ -55,7 +55,7 @@ void __init_text platform_postmm_init(void) {
 	multiboot_postmm_init();
 	console_late_init();
 
-	/* Initialize interrupt handling and the timer. */
+	/* Initialise interrupt handling and the timer. */
 	if(!lapic_enabled) {
 		if(clock_source_set(&pit_clock_source) != 0) {
 			fatal("Could not set PIT clock source");

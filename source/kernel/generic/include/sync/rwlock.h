@@ -33,17 +33,17 @@ typedef struct rwlock {
 	size_t readers;			/**< Number of readers of the lock. */
 } rwlock_t;
 
-/** Initializes a statically declared readers-writer lock. */
-#define RWLOCK_INITIALIZER(_var, _name)		\
+/** Initialises a statically declared readers-writer lock. */
+#define RWLOCK_INITIALISER(_var, _name)		\
 	{ \
-		.lock = SPINLOCK_INITIALIZER("rwlock_lock"), \
-		.exclusive = SEMAPHORE_INITIALIZER(_var.exclusive, _name, 1), \
+		.lock = SPINLOCK_INITIALISER("rwlock_lock"), \
+		.exclusive = SEMAPHORE_INITIALISER(_var.exclusive, _name, 1), \
 		.readers = 0, \
 	}
 
 /** Statically declares a new readers-writer lock. */
 #define RWLOCK_DECLARE(_var)			\
-	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
+	rwlock_t _var = RWLOCK_INITIALISER(_var, #_var)
 
 extern int rwlock_read_lock(rwlock_t *lock, int flags);
 extern int rwlock_write_lock(rwlock_t *lock, int flags);

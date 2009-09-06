@@ -197,7 +197,7 @@ static device_ops_t console_manager_ops = {
 	.request = console_manager_request,
 };
 
-/** Initialization function for the console driver.
+/** Initialisation function for the console driver.
  * @return		0 on success, negative error code on failure. */
 static int console_init(void) {
 	int ret;

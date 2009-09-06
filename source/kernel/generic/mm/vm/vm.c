@@ -455,12 +455,12 @@ static int vm_map_internal(vm_aspace_t *as, ptr_t start, size_t size, int flags,
 	return 0;
 }
 
-/** Initialize a VM object structure.
+/** Initialise a VM object structure.
  *
- * Initializes a VM object structure and sets it to use the specified object
+ * Initialises a VM object structure and sets it to use the specified object
  * operations structure.
  *
- * @param object	Object to initialize.
+ * @param object	Object to initialise.
  * @param ops		Operations to use for the object.
  */
 void vm_object_init(vm_object_t *object, vm_object_ops_t *ops) {
@@ -835,7 +835,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 
 /** Create a new address space.
  *
- * Allocates a new address space structure and initializes it.
+ * Allocates a new address space structure and initialises it.
  *
  * @return		Pointer to address space structure, NULL on failure.
  */
@@ -850,7 +850,7 @@ vm_aspace_t *vm_aspace_create(void) {
 
 	as->find_cache = NULL;
 
-	/* Do architecture-specific initialization. */
+	/* Do architecture-specific initialisation. */
 	if(vm_aspace_arch_init(as) != 0) {
 		page_map_destroy(&as->pmap);
 		slab_cache_free(vm_aspace_cache, as);
@@ -887,7 +887,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	slab_cache_free(vm_aspace_cache, as);
 }
 
-/** Initialize the address space caches. */
+/** Initialise the address space caches. */
 void __init_text vm_init(void) {
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
 	                                    0, vm_aspace_ctor, NULL, NULL, NULL,
@@ -896,7 +896,7 @@ void __init_text vm_init(void) {
 	                                    0, NULL, NULL, NULL, NULL, NULL, 0,
 	                                    MM_FATAL);
 
-	/* Initialize other parts of the VM system. */
+	/* Initialise other parts of the VM system. */
 	vm_anon_init();
 	vm_page_init();
 }

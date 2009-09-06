@@ -185,7 +185,7 @@ void intr_handler(unative_t num, intr_frame_t *frame) {
 	}
 }
 
-/** Initialize the interrupt handling code. */
+/** Initialise the interrupt handling code. */
 void intr_init(void) {
 	int i;
 

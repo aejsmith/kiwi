@@ -557,7 +557,7 @@ void sched_idle(void) {
 	}
 }
 
-/** Initialize the scheduler for the current CPU. */
+/** Initialise the scheduler for the current CPU. */
 void __init_text sched_init(void) {
 	char name[THREAD_NAME_MAX];
 	int i;
@@ -588,7 +588,7 @@ void __init_text sched_init(void) {
 	/* Create the preemption timer. */
 	timer_init(&curr_cpu->sched->timer, TIMER_FUNCTION, sched_timer_handler);
 
-	/* Initialize run queues. */
+	/* Initialise run queues. */
 	for(i = 0; i < PRIORITY_MAX; i++) {
 		list_init(&curr_cpu->sched->queues[i]);
 		curr_cpu->sched->count[i] = 0;

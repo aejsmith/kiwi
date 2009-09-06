@@ -65,17 +65,17 @@ typedef struct timer {
 	waitq_t queue;			/**< Wait queue for TIMER_WAKE timers. */
 } timer_t;
 
-/** Initializes a statically-declared timer. */
-#define TIMER_INITIALIZER(_name, _action, _func)	\
+/** Initialises a statically-declared timer. */
+#define TIMER_INITIALISER(_name, _action, _func)	\
 	{ \
-		.header = LIST_INITIALIZER(_name.header), \
+		.header = LIST_INITIALISER(_name.header), \
 		.action = _action, \
 		.func   = _func, \
 	}
 
 /** Statically declares a timer structure. */
 #define TIMER_DECLARE(_name, _action, _func)		\
-	timer_t _name = TIMER_INITIALIZER(_name, _action, _func)
+	timer_t _name = TIMER_INITIALISER(_name, _action, _func)
 
 /** Sleep for a certain number of microseconds.
  * @param us		Microseconds to sleep for. */

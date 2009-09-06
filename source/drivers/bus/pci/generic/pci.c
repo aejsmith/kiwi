@@ -306,7 +306,7 @@ bool pci_device_lookup(pci_device_id_t *ids, size_t count, pci_lookup_t cb) {
 }
 MODULE_EXPORT(pci_device_lookup);
 
-/** Initialization function for the PCI module.
+/** Initialisation function for the PCI module.
  * @return		0 on success, negative error code on failure. */
 static int pci_init(void) {
 	int ret;

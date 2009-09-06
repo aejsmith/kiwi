@@ -164,7 +164,7 @@ int syscall_service_register(uint16_t num, syscall_service_t *service) {
 	return 0;
 }
 
-/** Initialize the system call handling code. */
+/** Initialise the system call handling code. */
 static void __init_text syscall_init(void) {
 	if(syscall_service_register(0, &kernel_syscall_service) != 0) {
 		fatal("Could not register kernel system call service");

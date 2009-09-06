@@ -32,8 +32,8 @@ void thread_arch_post_switch(thread_t *thread) {
 	thread->cpu->arch.tss.esp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
 }
 
-/** Initialize IA32-specific thread data.
- * @param thread	Thread to initialize.
+/** Initialise IA32-specific thread data.
+ * @param thread	Thread to initialise.
  * @return		Always returns 0. */
 int thread_arch_init(thread_t *thread) {
 	/* Nothing happens. */

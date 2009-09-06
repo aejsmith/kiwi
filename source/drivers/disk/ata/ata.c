@@ -90,7 +90,7 @@ static pci_device_id_t ata_pci_ids[] = {
 	{ PCI_ANY_ID, PCI_ANY_ID, 0x01, 0x01, NULL },
 };
 
-/** Initialization function for the ATA driver.
+/** Initialisation function for the ATA driver.
  * @return		0 on success, negative error code on failure. */
 static int ata_init(void) {
 	/* Scan for devices. */

@@ -23,7 +23,7 @@
 
 #include <types.h>
 
-/** Initialize FPU state. */
+/** Initialise FPU state. */
 static inline void fpu_state_init(void) {
 	__asm__ volatile("fninit");
 }

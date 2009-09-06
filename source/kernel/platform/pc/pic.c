@@ -125,9 +125,9 @@ static irq_ops_t pic_irq_ops = {
 	.disable = pic_disable,
 };
 
-/** Initialize the PIC. */
+/** Initialise the PIC. */
 void __init_text pic_init(void) {
-	/* Send an initialization command to both PICs (ICW1). */
+	/* Send an initialisation command to both PICs (ICW1). */
 	out8(PIC_MASTER_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 	out8(PIC_SLAVE_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 

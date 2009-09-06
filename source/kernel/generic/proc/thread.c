@@ -276,11 +276,11 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	strncpy(thread->name, name, THREAD_NAME_MAX);
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
-	/* Allocate a kernel stack and initialize the thread context. */
+	/* Allocate a kernel stack and initialise the thread context. */
 	thread->kstack = kheap_alloc(KSTACK_SIZE, MM_SLEEP);
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
-	/* Initialize architecture-specific data. */
+	/* Initialise architecture-specific data. */
 	ret = thread_arch_init(thread);
 	if(ret != 0) {
 		kheap_free(thread->kstack, KSTACK_SIZE);
@@ -373,7 +373,7 @@ void thread_destroy(thread_t *thread) {
 	spinlock_unlock(&thread->lock);
 }
 
-/** Initialize the thread cache. */
+/** Initialise the thread cache. */
 void __init_text thread_init(void) {
 	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, MM_FATAL);
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,

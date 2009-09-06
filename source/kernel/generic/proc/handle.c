@@ -215,14 +215,14 @@ out:
 	return 0;
 }
 
-/** Initializes a process' handle table.
+/** Initialises a process' handle table.
  *
- * Initializes a process' handle table structure and duplicates handles
+ * Initialises a process' handle table structure and duplicates handles
  * from its parent if required.
  *
  * @todo		Duplicate handles.
  *
- * @param table		Table to initialize.
+ * @param table		Table to initialise.
  * @param parent	Parent process' handle table.
  *
  * @return		0 on success, negative error code on failure.
@@ -272,7 +272,7 @@ void handle_table_destroy(handle_table_t *table) {
 	mutex_unlock(&table->lock);
 }
 
-/** Initialize the handle slab cache. */
+/** Initialise the handle slab cache. */
 static void __init_text handle_init(void) {
 	handle_info_cache = slab_cache_create("handle_info_cache", sizeof(handle_info_t), 0,
 	                                      handle_info_cache_ctor, NULL, NULL, NULL, NULL,

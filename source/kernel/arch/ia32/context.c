@@ -32,13 +32,13 @@
 
 extern void __context_restore_frame(void);
 
-/** Initialize a CPU context structure.
+/** Initialise a CPU context structure.
  *
- * Initializes a CPU context structure so that its instruction pointer points
+ * Initialises a CPU context structure so that its instruction pointer points
  * to the given value and its stack pointer points to the top of the given
  * stack - assumes that the stack is KSTACK_SIZE bytes.
  *
- * @param ctx		Context to initialize.
+ * @param ctx		Context to initialise.
  * @param ip		Instruction pointer.
  * @param stack		Base of stack.
  */

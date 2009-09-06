@@ -142,7 +142,7 @@ void vm_page_free(vm_page_t *page) {
 	slab_cache_free(vm_page_cache, page);
 }
 
-/** Initialize the VM page allocator. */
+/** Initialise the VM page allocator. */
 void __init_text vm_page_init(void) {
 	vm_page_cache = slab_cache_create("vm_page_cache", sizeof(vm_page_t),
 	                                  0, vm_page_ctor, vm_page_dtor, NULL,

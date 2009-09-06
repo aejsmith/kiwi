@@ -24,7 +24,7 @@
 /** Variadic argument list. */
 typedef __builtin_va_list va_list;
 
-/** Initializes a va_list. */
+/** Initialises a va_list. */
 #define va_start(a,b)		__builtin_va_start(a,b)
 
 /** Ends use of a va_list. */

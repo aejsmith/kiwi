@@ -1883,7 +1883,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		}
 	}
 
-	/* Initialize the mount structure. */
+	/* Initialise the mount structure. */
 	mount = kmalloc(sizeof(vfs_mount_t), MM_SLEEP);
 	list_init(&mount->header);
 	list_init(&mount->used_nodes);
@@ -2292,14 +2292,14 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 }
 
 #if 0
-# pragma mark Initialization functions.
+# pragma mark Initialisation functions.
 #endif
 
-/** Initialization function for the VFS. */
+/** Initialisation function for the VFS. */
 void __init_text vfs_init(void) {
 	int ret;
 
-	/* Initialize the node slab cache. */
+	/* Initialise the node slab cache. */
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
 	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
 	                                   NULL, NULL, NULL, 0, MM_FATAL);

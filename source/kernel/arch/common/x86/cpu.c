@@ -88,7 +88,7 @@ cpu_id_t cpu_current_id(void) {
         return (cpu_id_t)lapic_id();
 }
 
-/** Initialize an x86 CPU information structure.
+/** Initialise an x86 CPU information structure.
  *
  * Fills in the given x86 CPU information structure with information about
  * the current CPU.

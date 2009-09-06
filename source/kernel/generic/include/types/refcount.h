@@ -29,12 +29,12 @@
 /** Type containing a reference count */
 typedef atomic_t refcount_t;
 
-/** Initializes a statically declared reference count. */
-#define REFCOUNT_INITIALIZER(_initial)		_initial
+/** Initialises a statically declared reference count. */
+#define REFCOUNT_INITIALISER(_initial)		_initial
 
 /** Statically declares a new reference count. */
 #define REFCOUNT_DECLARE(_var, _initial)	\
-	refcount_t _var = REFCOUNT_INITIALIZER(_initial)
+	refcount_t _var = REFCOUNT_INITIALISER(_initial)
 
 /** Increase a reference count.
  *

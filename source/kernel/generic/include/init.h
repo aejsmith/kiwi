@@ -1,4 +1,4 @@
-/* Kiwi kernel initialization functions
+/* Kiwi kernel initialisation functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Kernel initialization functions.
+ * @brief		Kernel initialisation functions.
  */
 
 #ifndef __INIT_H
@@ -26,8 +26,8 @@
 /** Type of an initcall function. */
 typedef void (*initcall_t)(void);
 
-/** Macro to declare an initialization function.
- * @note		Initcalls are called in the initialization thread,
+/** Macro to declare an initialisation function.
+ * @note		Initcalls are called in the initialisation thread,
  *			after other CPUs have been booted. They are called in
  *			the order that they are in the initcall section. */
 #define INITCALL(func)	\

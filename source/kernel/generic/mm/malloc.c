@@ -183,7 +183,7 @@ void kfree(void *addr) {
 	slab_cache_free(btag->cache, btag);
 }
 
-/** Initialize the allocator caches. */
+/** Initialise the allocator caches. */
 void __init_text malloc_init(void) {
 	char name[SLAB_NAME_MAX];
 	size_t i, size;

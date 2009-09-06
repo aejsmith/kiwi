@@ -221,7 +221,7 @@ uint32_t lapic_id(void) {
  */
 void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	/* Must perform this check to prevent problems if fatal() is called
-	 * before we've initialized the LAPIC. */
+	 * before we've initialised the LAPIC. */
 	if(!lapic_enabled || !lapic_mapping) {
 		return;
 	}
@@ -236,15 +236,15 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	lapic_write(LAPIC_REG_ICR0, (1<<14) | (dest << 18) | (mode << 8) | vector);
 }
 
-/** Initialize the local APIC.
+/** Initialise the local APIC.
  *
- * Maps the local APIC if it has not already been mapped and initializes the
+ * Maps the local APIC if it has not already been mapped and initialises the
  * current CPU's local APIC.
  *
  * @todo		If APIC is disabled in MSR, enable it if the APIC is
  *			not based on the APIC bus.
  *
- * @return		Whether initialization succeeded.
+ * @return		Whether initialisation succeeded.
  */
 bool __init_text lapic_init(void) {
 	phys_ptr_t base;

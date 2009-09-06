@@ -729,12 +729,12 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	return 0;
 }
 
-/** Initialize a Vmem arena.
+/** Initialise a Vmem arena.
  *
- * Initializes a Vmem arena and creates an initial span/free segment if the
+ * Initialises a Vmem arena and creates an initial span/free segment if the
  * given size is non-zero.
  *
- * @param vmem		Arena to initialize.
+ * @param vmem		Arena to initialise.
  * @param name		Name of the arena for debugging purposes.
  * @param base		Start of the initial span.
  * @param size		Size of the initial span.
@@ -770,7 +770,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	list_init(&vmem->btags);
 	mutex_init(&vmem->lock, "vmem_arena_lock", 0);
 
-	/* Initialize freelists and the allocation hash table. */
+	/* Initialise freelists and the allocation hash table. */
 	for(i = 0; i < VMEM_FREELISTS; i++) {
 		list_init(&vmem->free[i]);
 	}
@@ -815,7 +815,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	if(size > 0) {
 		if(vmem_add(vmem, base, size, vmflag) != 0) {
 			if(vmflag & MM_FATAL) {
-				fatal("Could not initialize required arena %s", vmem->name);
+				fatal("Could not initialise required arena %s", vmem->name);
 			}
 			return -ERR_NO_MEMORY;
 		}
@@ -846,12 +846,12 @@ qcache_fail:
 	}
 
 	if(vmflag & MM_FATAL) {
-		fatal("Could not initialize required arena %s", vmem->name);
+		fatal("Could not initialise required arena %s", vmem->name);
 	}
 	return -ERR_NO_MEMORY;	
 }
 
-/** Allocate and initialize a Vmem arena.
+/** Allocate and initialise a Vmem arena.
  *
  * Allocates a new Vmem arena and creates an initial span/free segment if the
  * given size is non-zero.

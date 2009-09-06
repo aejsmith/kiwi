@@ -99,7 +99,7 @@ static void __init_text tss_init(void) {
 	ltr(SEG_TSS);
 }
 
-/** Initialize the IDT shared by all CPUs. */
+/** Initialise the IDT shared by all CPUs. */
 static inline void idt_init(void) {
 	unative_t i;
 	ptr_t addr;
@@ -122,12 +122,12 @@ static inline void idt_init(void) {
 	idt[FAULT_DOUBLE].ist = 1;
 }
 
-/** Initialize descriptor tables for the boot CPU. */
+/** Initialise descriptor tables for the boot CPU. */
 void __init_text descriptor_init(void) {
 	gdt_init();
 	tss_init();
 
-	/* The IDT only needs to be initialized once. Do that now as we are on
+	/* The IDT only needs to be initialised once. Do that now as we are on
 	 * the boot CPU. */
 	idt_init();
 
@@ -135,7 +135,7 @@ void __init_text descriptor_init(void) {
 	lidt((ptr_t)&idt, (sizeof(idt) - 1));
 }
 
-/** Initialize descriptor tables for an application CPU. */
+/** Initialise descriptor tables for an application CPU. */
 void __init_text descriptor_ap_init(void) {
 	/* The GDT/TSS setup procedures are the same on both the BSP and APs,
 	 * so just call the functions for them. */

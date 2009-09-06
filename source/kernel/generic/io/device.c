@@ -649,7 +649,7 @@ int kdbg_cmd_device(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Initialize the device manager. */
+/** Initialise the device manager. */
 static void __init_text device_init(void) {
 	device_tree_root = kcalloc(1, sizeof(device_t), MM_FATAL);
 	mutex_init(&device_tree_root->lock, "device_root_lock", 0);

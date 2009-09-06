@@ -134,11 +134,11 @@ bool clock_tick(void) {
 	return resched;
 }
 
-/** Initialize a timer structure.
+/** Initialise a timer structure.
  *
- * Initializes a timer structure to contain the given settings.
+ * Initialises a timer structure to contain the given settings.
  *
- * @param timer		Timer to initialize.
+ * @param timer		Timer to initialise.
  * @param action	Action to perform when timer expires.
  * @param func		Function to call (for TIMER_FUNCTION).
  */

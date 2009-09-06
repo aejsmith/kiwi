@@ -45,6 +45,131 @@ static uint16_t *vga_mapping = (uint16_t *)VGA_MEM_PHYS;
 static int vga_x = 0;		/**< X position of the cursor. */
 static int vga_y = 0;		/**< Y position of the cursor. */
 
+/** VGA registers to apply for 80x50 text mode. */
+static unsigned char vga_regs_80x50[VGA_NUM_REGS] = {
+	/* MISC. */
+	0x67,
+
+	/* SEQ. */
+	0x03, 0x00, 0x03, 0x00, 0x02,
+
+	/* CRTC. */
+	0x5F, 0x4F, 0x50, 0x82, 0x55, 0x81, 0xBF, 0x1F, 0x00, 0x47, 0x06, 0x07,
+	0x00, 0x00, 0x01, 0x40, 0x9C, 0x8E, 0x8F, 0x28, 0x1F, 0x96, 0xB9, 0xA3,
+	0xFF,
+
+	/* GC. */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0E, 0x00, 0xFF,
+
+	/* AC. */
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 0x38, 0x39, 0x3A, 0x3B,
+	0x3C, 0x3D, 0x3E, 0x3F, 0x0C, 0x00, 0x0F, 0x08, 0x00,
+};
+
+/** Set the plane we're reading and writing to/from. */
+static void vga_set_plane(uint32_t p) {
+	unsigned char pmask;
+
+	p &= 3;
+	pmask = 1 << p;
+
+	/* Set read plane, then write plane. */
+	out8(VGA_GC_INDEX, 4);
+	out8(VGA_GC_DATA, p);
+	out8(VGA_SEQ_INDEX, 2);
+	out8(VGA_SEQ_DATA, pmask);
+}
+
+/** Change the console font. */
+static void vga_write_font(unsigned char *buf, unsigned int height) {
+	unsigned char seq2, seq4, gc4, gc5, gc6;
+	uint32_t i;
+
+	/* Save registers that we're going to modify - vga_set_plane()
+	 * modifies GC 4 and SEQ 2, so they must also be saved. */
+	out8(VGA_SEQ_INDEX, 2);
+	seq2 = in8(VGA_SEQ_DATA);
+	out8(VGA_SEQ_INDEX, 4);
+	seq4 = in8(VGA_SEQ_DATA);
+	out8(VGA_GC_INDEX, 4);
+	gc4 = in8(VGA_GC_DATA);
+	out8(VGA_GC_INDEX, 5);
+	gc5 = in8(VGA_GC_DATA);
+	out8(VGA_GC_INDEX, 6);
+	gc6 = in8(VGA_GC_DATA);
+
+	/* Turn off even-odd addressing (set flat addressing). */
+	out8(VGA_SEQ_INDEX, 4);
+	out8(VGA_SEQ_DATA, seq4 | 0x04);
+	out8(VGA_GC_INDEX, 5);
+	out8(VGA_GC_DATA, gc5 & ~0x10);
+	out8(VGA_GC_INDEX, 6);
+	out8(VGA_GC_DATA, gc6 & ~0x02);
+
+	/* Write font to plane P4. */
+	vga_set_plane(2);
+
+	/* Write the font. */
+	for(i = 0; i < 256; i++) {
+		memcpy((char *)((ptr_t)vga_mapping + (i * 32)), &buf[i * height], height);
+	}
+
+	/* Restore modified registers. */
+	out8(VGA_SEQ_INDEX, 2);
+	out8(VGA_SEQ_DATA, seq2);
+	out8(VGA_SEQ_INDEX, 4);
+	out8(VGA_SEQ_DATA, seq4);
+	out8(VGA_GC_INDEX, 4);
+	out8(VGA_GC_DATA, gc4);
+	out8(VGA_GC_INDEX, 5);
+	out8(VGA_GC_DATA, gc5);
+	out8(VGA_GC_INDEX, 6);
+	out8(VGA_GC_DATA, gc6);
+}
+
+/** Write a VGA register array to the VGA registers. */
+static void vga_write_regs(unsigned char *regs) {
+	uint32_t i, off = 0;
+
+	/* Write MISC register. */
+	out8(VGA_MISC_WRITE, regs[off++]);
+
+	/* Write SEQ registers. */
+	for(i = 0; i < VGA_NUM_SEQ_REGS; i++) {
+		out8(VGA_SEQ_INDEX, i);
+		out8(VGA_SEQ_DATA, regs[off++]);
+	}
+
+	/* Unlock CRTC registers. */
+	out8(VGA_CRTC_INDEX, 0x03);
+	out8(VGA_CRTC_DATA, in8(VGA_CRTC_DATA) | 0x80);
+	out8(VGA_CRTC_INDEX, 0x11);
+	out8(VGA_CRTC_DATA, in8(VGA_CRTC_DATA) & ~0x80);
+
+	/* Write CRTC registers. */
+	for(i = 0; i < VGA_NUM_CRTC_REGS; i++) {
+		out8(VGA_CRTC_INDEX, i);
+		out8(VGA_CRTC_DATA, regs[off++]);
+	}
+
+	/* Write GC registers. */
+	for(i = 0; i < VGA_NUM_GC_REGS; i++) {
+		out8(VGA_GC_INDEX, i);
+		out8(VGA_GC_DATA, regs[off++]);
+	}
+
+	/* Write AC registers. */
+	for(i = 0; i < VGA_NUM_AC_REGS; i++) {
+		in8(VGA_INSTAT_READ);
+		out8(VGA_AC_INDEX, i);
+		out8(VGA_AC_WRITE, regs[off++]);
+	}
+
+	/* Lock 16-color palette and unblank display. */
+	in8(VGA_INSTAT_READ);
+	out8(VGA_AC_INDEX, 0x20);
+}
+
 /** Scroll the VGA console. */
 static void vga_console_scroll(void) {
 	int i;
@@ -117,9 +242,12 @@ static void vga_console_putch(unsigned char ch) {
 	vga_console_move_csr();
 }
 
-/** Initialize the VGA console. */
+/** Initialise the VGA console. */
 static void vga_console_init(void) {
 	int i, j;
+
+	vga_write_regs(vga_regs_80x50);
+	vga_write_font(console_font_8x8, 8);
 
 	/* Clear console. */
 	for(i = 0; i < VGA_CONSOLE_ROWS; i++) {
@@ -156,7 +284,7 @@ static void serial_console_putch(unsigned char ch) {
 	out8(SERIAL_PORT, ch);
 }
 
-/** Initialize the serial console. */
+/** Initialise the serial console. */
 static void serial_console_init(void) {
         out8(SERIAL_PORT + 1, 0x00);  /* Disable all interrupts */
         out8(SERIAL_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */

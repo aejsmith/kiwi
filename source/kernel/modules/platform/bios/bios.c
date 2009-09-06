@@ -427,7 +427,7 @@ int bios_interrupt(uint8_t num, bios_regs_t *regs) {
 }
 MODULE_EXPORT(bios_interrupt);
 
-/** Initialization function for the BIOS driver.
+/** Initialisation function for the BIOS driver.
  * @return		0 on success, negative error code on failure. */
 static int bios_init(void) {
 	int ret;
@@ -437,11 +437,11 @@ static int bios_init(void) {
 		return ret;
 	}
 
-	/* Initialize BIOS memory allocator. */
+	/* Initialise BIOS memory allocator. */
 	bios_mem_arena = vmem_create("bios_mem_arena", BIOS_MEM_BASE, BIOS_MEM_SIZE,
 	                             1, NULL, NULL, NULL, 0, MM_SLEEP);
 
-	/* Initialize the I/O and memory functions for X86EMU. */
+	/* Initialise the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);
 	X86EMU_setupMemFuncs(&x86emu_mem_funcs);
 

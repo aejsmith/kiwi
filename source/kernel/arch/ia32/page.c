@@ -406,11 +406,11 @@ void page_map_switch(page_map_t *map) {
 	sysreg_cr3_write(map->pdp);
 }
 
-/** Initialize a page map structure.
+/** Initialise a page map structure.
  *
- * Initializes a userspace page map structure.
+ * Initialises a userspace page map structure.
  *
- * @param map		Page map to initialize.
+ * @param map		Page map to initialise.
  *
  * @return		0 on success, negative error code on failure.
  */
@@ -503,7 +503,7 @@ void page_phys_unmap(void *addr, size_t size, bool shared) {
 }
 
 #if 0
-# pragma mark Initialization functions.
+# pragma mark Initialisation functions.
 #endif
 
 /** Convert a large page to a page table if necessary.
@@ -593,7 +593,7 @@ void __init_text page_arch_init(void) {
 	kernel_page_map.first = KERNEL_HEAP_BASE;
 	kernel_page_map.last = (ptr_t)-PAGE_SIZE;
 
-	kprintf(LOG_DEBUG, "page: initialized kernel page map (pdp: 0x%" PRIpp ")\n", kernel_page_map.pdp);
+	kprintf(LOG_DEBUG, "page: initialised kernel page map (pdp: 0x%" PRIpp ")\n", kernel_page_map.pdp);
 #if CONFIG_X86_NX
 	/* Enable NX/XD if supported. */
 	if(CPU_HAS_XD(curr_cpu)) {

@@ -32,12 +32,12 @@
 /** PIC command definitions. */
 #define PIC_COMMAND_EOI		0x20	/**< End-of-Interrupt. */
 
-/** ICW1 (Initialization Control Word 1) bits. */
-#define PIC_ICW1_ICW4		(1<<0)	/**< Will receive ICW4 during initialization. */
+/** ICW1 (Initialisation Control Word 1) bits. */
+#define PIC_ICW1_ICW4		(1<<0)	/**< Will receive ICW4 during initialisation. */
 #define PIC_ICW1_SINGLE		(1<<1)	/**< If set, there is only one PIC in the system. */
-#define PIC_ICW1_INIT		(1<<4)	/**< PIC is being initialized. */
+#define PIC_ICW1_INIT		(1<<4)	/**< PIC is being initialised. */
 
-/** ICW4 (Initialization Control Word 4) bits. */
+/** ICW4 (Initialisation Control Word 4) bits. */
 #define PIC_ICW4_8086		(1<<0)	/**< Should operate in 80x86 mode. */
 
 extern void pic_init(void);

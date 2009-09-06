@@ -93,11 +93,11 @@ void mutex_unlock(mutex_t *lock) {
 	}
 }
 
-/** Initialize a mutex.
+/** Initialise a mutex.
  *
- * Initializes the given mutex structure.
+ * Initialises the given mutex structure.
  *
- * @param lock		Mutex to initialize.
+ * @param lock		Mutex to initialise.
  * @param name		Name to give the mutex.
  * @param flags		Behaviour flags for the mutex.
  */

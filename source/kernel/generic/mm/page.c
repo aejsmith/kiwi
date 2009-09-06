@@ -306,17 +306,17 @@ void page_range_mark_reserved(phys_ptr_t start, phys_ptr_t end) {
 	            (vmem_resource_t)start, (vmem_resource_t)end, MM_FATAL);
 }
 
-/** Initialize the physical memory manager. */
+/** Initialise the physical memory manager. */
 void __init_text page_init(void) {
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Populate the arena with memory regions, and perform other
-	 * architecture/platform initialization tasks. */
+	 * architecture/platform initialisation tasks. */
 	page_platform_init();
 	page_arch_init();
 }
 
-/** Reclaim memory no longer in use after kernel initialization.
+/** Reclaim memory no longer in use after kernel initialisation.
  * @note		It is OK for this function to clear regions despite
  *			the reclaim information structures being there because
  *			nothing should make any allocations while this is

@@ -25,15 +25,15 @@
 #include <assert.h>
 #include <errors.h>
 
-/** Initialize an I/O context.
+/** Initialise an I/O context.
  *
- * Initializes an I/O context structure. If a parent context is provided, then
+ * Initialises an I/O context structure. If a parent context is provided, then
  * the new context will inherit parts of the parent context such as current
  * working directory. In-progress asynchronous I/O requests are not inherited.
  * If no parent is specified, the working directory will be set to the root of
  * the filesystem.
  *
- * @param context	Context to initialize.
+ * @param context	Context to initialise.
  * @param parent	Parent context (can be NULL).
  */
 void io_context_init(io_context_t *context, io_context_t *parent) {

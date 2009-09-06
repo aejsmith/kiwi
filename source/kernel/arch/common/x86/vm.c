@@ -20,7 +20,7 @@
 
 #include "../../../generic/mm/vm/vm_priv.h"
 
-/** X86-specific address space initialization function.
+/** X86-specific address space initialisation function.
  *
  * Marks certain regions as reserved in a new address space, such as the
  * page at 0x0.

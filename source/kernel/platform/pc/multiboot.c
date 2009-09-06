@@ -123,7 +123,7 @@ void __init_text page_platform_init(void) {
 		map = (multiboot_memmap_t *)(((ptr_t)map) + map->size + 4);
 	}
 
-	/* Mark the kernel as reserved and initialization code/data as
+	/* Mark the kernel as reserved and initialisation code/data as
 	 * reclaimable. */
 	page_range_mark_reserved(KERNEL_PHYS_BASE, KA2PA((ptr_t)__init_start));
 	page_range_mark_reclaimable(KA2PA((ptr_t)__init_start), KA2PA((ptr_t)__init_end));

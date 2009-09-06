@@ -223,11 +223,11 @@ bool waitq_empty(waitq_t *waitq) {
 	return ret;
 }
 
-/** Initialize a wait queue.
+/** Initialise a wait queue.
  *
- * Initializes the specified wait queue structure.
+ * Initialises the specified wait queue structure.
  *
- * @param waitq		Wait queue to initialize.
+ * @param waitq		Wait queue to initialise.
  * @param name		Name of wait queue.
  * @param flags		Flags for the queue.
  */

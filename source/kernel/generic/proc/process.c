@@ -83,7 +83,7 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
 	return 0;
 }
 
-/** Allocate a process structure and initialize it.
+/** Allocate a process structure and initialise it.
  * @param name		Name to give the process.
  * @param id		ID for the process (if negative, one will be allocated).
  * @param flags		Flags for the process.
@@ -113,7 +113,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 		process->aspace = NULL;
 	}
 
-	/* Initialize the process' handle table. */
+	/* Initialise the process' handle table. */
 	if((ret = handle_table_init(&process->handles, (parent && inherit) ? &parent->handles : NULL)) != 0) {
 		if(process->aspace) {
 			vm_aspace_destroy(process->aspace);
@@ -122,7 +122,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 		return ret;
 	}
 
-	/* Initialize other information for the process. Do this after all the
+	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
@@ -381,7 +381,7 @@ void process_destroy(process_t *process) {
 	slab_cache_free(process_cache, process);
 }
 
-/** Initialize the process table and slab cache. */
+/** Initialise the process table and slab cache. */
 void __init_text process_init(void) {
 	int ret;
 
@@ -395,7 +395,7 @@ void __init_text process_init(void) {
 	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
 	                        PRIORITY_KERNEL, NULL, false, false,
 	                        &kernel_proc)) != 0) {
-		fatal("Could not initialize kernel process (%d)", ret);
+		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
 

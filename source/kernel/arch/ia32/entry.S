@@ -49,7 +49,7 @@
 /** Macro to define an ISR.
  *
  * Defines an ISR handler which pushes the interrupt number and a fake error
- * code to the stack. Aligned to 16 bytes because the IDT initialization
+ * code to the stack. Aligned to 16 bytes because the IDT initialisation
  * code wants each handler to be 16 bytes in size.
  *
  * @param nr		Interrupt vector number.
@@ -65,7 +65,7 @@
  *
  * Defines an ISR handler which pushes the interrupt numberto the stack. For
  * interrupts defined using this macro, the CPU should have pushed an error
- * code to the stack. Aligned to 16 bytes because the IDT initialization
+ * code to the stack. Aligned to 16 bytes because the IDT initialisation
  * code wants each handler to be 16 bytes in size.
  *
  * @param nr		Interrupt vector number.

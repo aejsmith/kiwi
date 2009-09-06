@@ -179,7 +179,7 @@ typedef int64_t  Elf64_Sxword;
 #define ELF_SHT_HASH		5		/**< Contains a symbol hash table. */
 #define ELF_SHT_DYNAMIC		6		/**< Contains dynamic linking tables. */
 #define ELF_SHT_NOTE		7		/**< Contains note information. */
-#define ELF_SHT_NOBITS		8		/**< Contains uninitialized space; does not occupy any space in the ﬁle. */
+#define ELF_SHT_NOBITS		8		/**< Contains uninitialised space; does not occupy any space in the ﬁle. */
 #define ELF_SHT_REL		9		/**< Contains "Rel" type relocation entries. */
 #define ELF_SHT_SHLIB		10		/**< Reserved. */
 #define ELF_SHT_DYNSYM		11		/**< Contains a dynamic loader symbol table. */

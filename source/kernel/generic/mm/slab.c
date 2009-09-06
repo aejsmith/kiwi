@@ -585,7 +585,7 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
 		return -ERR_NO_MEMORY;
 	}
 
-	/* Initialize the cache structures. */
+	/* Initialise the cache structures. */
 	for(i = 0; i <= cpu_id_max; i++) {
 		mutex_init(&cache->cpu_caches[i].lock, "cpu_cache_lock", 0);
 	}
@@ -699,15 +699,15 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 	dprintf("slab: freed %p to cache %p(%s) (slab)\n", obj, cache, cache->name);
 }
 
-/** Initialize a slab cache.
+/** Initialise a slab cache.
  *
- * Initializes a pre-allocated slab cache structure.
+ * Initialises a pre-allocated slab cache structure.
  *
- * @param cache		Cache to initialize.
+ * @param cache		Cache to initialise.
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
- * @param ctor		Constructor callback - performs one-time initialization
+ * @param ctor		Constructor callback - performs one-time initialisation
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
@@ -805,12 +805,12 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 /** Create a slab cache.
  *
- * Allocates and initializes a new slab cache.
+ * Allocates and initialises a new slab cache.
  *
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
- * @param ctor		Constructor callback - performs one-time initialization
+ * @param ctor		Constructor callback - performs one-time initialisation
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
@@ -920,26 +920,26 @@ void __init_text slab_enable_cpu_cache(void) {
 	mutex_unlock(&slab_caches_lock);
 }
 
-/** Initialize the slab allocator. */
+/** Initialise the slab allocator. */
 void __init_text slab_init(void) {
-	/* Initialize the metadata arena. */
+	/* Initialise the metadata arena. */
 	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
 	                  MM_FATAL);
 
-	/* Initialize statically allocated internal caches. */
+	/* Initialise statically allocated internal caches. */
 	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0,
 	                   NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialize slab_cache_cache");
+		fatal("Could not initialise slab_cache_cache");
 	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0,
 	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialize slab_bufctl_cache");
+		fatal("Could not initialise slab_bufctl_cache");
 	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0,
 	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialize slab_slab_cache");
+		fatal("Could not initialise slab_slab_cache");
 	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0,
 	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, SLAB_CACHE_NOMAG) != 0) {
-		fatal("Could not initialize slab_mag_cache");
+		fatal("Could not initialise slab_mag_cache");
 	}
 }
 

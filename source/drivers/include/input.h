@@ -32,7 +32,7 @@
 #define INPUT_TYPE_MOUSE	1	/**< Mouse. */
 
 /** Input device protocol attribute values. */
-#define INPUT_PROTOCOL_PS2	0	/**< PS/2 keyboard/mouse. */
+#define INPUT_PROTOCOL_AT	0	/**< AT keyboard. */
 
 /** Input device request codes. */
 #define INPUT_KB_SET_LEDS	0	/**< Set keyboard LED state. */

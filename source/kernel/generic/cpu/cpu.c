@@ -81,11 +81,11 @@ cpu_t *cpu_add(cpu_id_t id, int state) {
 		list_append(&cpus_running, &cpus[id]->header);
 	}
 
-	/* Initialize IPI information. */
+	/* Initialise IPI information. */
 	list_init(&cpus[id]->ipi_queue);
 	spinlock_init(&cpus[id]->ipi_lock, "ipi_lock");
 
-	/* Initialize timer information. */
+	/* Initialise timer information. */
 	list_init(&cpus[id]->timer_list);
 	spinlock_init(&cpus[id]->timer_lock, "timer_lock");
 	cpus[id]->tick_len = 0;
@@ -94,7 +94,7 @@ cpu_t *cpu_add(cpu_id_t id, int state) {
 	return cpus[id];
 }
 
-/** Properly initialize the CPU subsystem. */
+/** Properly initialise the CPU subsystem. */
 void __init_text cpu_init(void) {
 	/* First get the real ID of the boot CPU. */
 	boot_cpu.id = cpu_id_max = cpu_current_id();
@@ -117,11 +117,11 @@ void __init_text cpu_early_init(void) {
 	list_init(&boot_cpu.header);
 	list_append(&cpus_running, &boot_cpu.header);
 
-	/* Initialize IPI information. */
+	/* Initialise IPI information. */
 	list_init(&boot_cpu.ipi_queue);
 	spinlock_init(&boot_cpu.ipi_lock, "ipi_lock");
 
-	/* Initialize timer information. */
+	/* Initialise timer information. */
 	list_init(&boot_cpu.timer_list);
 	spinlock_init(&boot_cpu.timer_lock, "timer_lock");
 	boot_cpu.tick_len = 0;

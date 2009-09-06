@@ -32,10 +32,10 @@ typedef struct mutex {
 	ptr_t caller;			/**< Return address of call that first locked. */
 } mutex_t;
 
-/** Initializes a statically declared mutex. */
-#define MUTEX_INITIALIZER(_var, _name, _flags)	\
+/** Initialises a statically declared mutex. */
+#define MUTEX_INITIALISER(_var, _name, _flags)	\
 	{ \
-		.sem = SEMAPHORE_INITIALIZER(_var.sem, _name, 1), \
+		.sem = SEMAPHORE_INITIALISER(_var.sem, _name, 1), \
 		.flags = _flags, \
 		.holder = NULL, \
 		.recursion = 0, \
@@ -43,7 +43,7 @@ typedef struct mutex {
 
 /** Statically declares a new mutex. */
 #define MUTEX_DECLARE(_var, _flags)		\
-	mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
+	mutex_t _var = MUTEX_INITIALISER(_var, #_var, _flags)
 
 /** Mutex behaviour flags. */
 #define MUTEX_RECURSIVE		(1<<0)	/**< Allow recursive locking by a thread. */

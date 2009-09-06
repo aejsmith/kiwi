@@ -46,7 +46,7 @@ extern int vm_aspace_arch_init(vm_aspace_t *as);
 extern vm_object_t *vm_anon_object_create(size_t size, vm_object_t *source, offset_t offset);
 extern void vm_anon_object_destroy(vm_object_t *obj);
 
-/** Initialization functions. */
+/** Initialisation functions. */
 extern void vm_anon_init(void);
 extern void vm_page_init(void);
 

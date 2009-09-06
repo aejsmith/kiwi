@@ -523,7 +523,7 @@ void vm_anon_object_destroy(vm_object_t *_obj) {
 	slab_cache_free(vm_anon_object_cache, obj);
 }
 
-/** Initialize the anonymous object cache. */
+/** Initialise the anonymous object cache. */
 void __init_text vm_anon_init(void) {
 	vm_anon_object_cache = slab_cache_create("vm_anon_object_cache", sizeof(vm_anon_object_t),
 	                                         0, vm_anon_object_ctor, NULL, NULL,

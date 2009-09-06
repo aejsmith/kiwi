@@ -49,7 +49,7 @@ static vmem_t *module_arena;
 static vmem_t *module_raw_arena;
 #endif
 
-/** Initialize the kernel module allocation arena. */
+/** Initialise the kernel module allocation arena. */
 static void module_mem_init(void) {
 #ifdef KERNEL_MODULE_BASE
 	module_raw_arena = vmem_create("module_raw_arena", KERNEL_MODULE_BASE,
@@ -248,11 +248,11 @@ int module_load(const char *path, char *depbuf) {
 	}
 
 	/* Add the module to the modules list. Do this before calling the
-	 * initialization function so backtraces will have the correct symbols
+	 * initialisation function so backtraces will have the correct symbols
 	 * if the call ends up inside KDBG. */
 	list_append(&module_list, &module->header);
 
-	/* Call the module initialization function. */
+	/* Call the module initialisation function. */
 	dprintf("module: calling init function %p for module %p(%s)...\n",
 		module->init, module, module->name);
 	ret = module->init();

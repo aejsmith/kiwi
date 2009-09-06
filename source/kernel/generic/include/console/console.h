@@ -29,7 +29,7 @@ typedef struct console {
 
 	int min_level;			/**< Console will not receive output less than this level. */
 
-	/** Initialize the console. */
+	/** Initialise the console. */
 	void (*init)(void);
 
 	/** Write a character to the console. */

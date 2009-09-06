@@ -32,7 +32,7 @@
 /** Maximum length of a module name. */
 #define MODULE_NAME_MAX		16
 
-/** Module initialization function type. */
+/** Module initialisation function type. */
 typedef int (*module_init_t)(void);
 
 /** Module unload function type. */
@@ -51,7 +51,7 @@ typedef struct module {
 	const char *name;		/**< Name of module. */
 	const char *description;	/**< Description of the module. */
 	const char **deps;		/**< Module dependencies. */
-	module_init_t init;		/**< Module initialization function. */
+	module_init_t init;		/**< Module initialisation function. */
 	module_unload_t unload;		/**< Module unload function. */
 
 	/** ELF loader information. */

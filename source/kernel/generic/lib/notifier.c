@@ -30,11 +30,11 @@ typedef struct notifier_func {
 	void *data;				/**< Third data argument for function. */
 } notifier_func_t;
 
-/** Initialize a notifier.
+/** Initialise a notifier.
  *
- * Initializes a notifier structure.
+ * Initialises a notifier structure.
  *
- * @param notif		Notifier to initialize.
+ * @param notif		Notifier to initialise.
  * @param data		Pointer to pass as first argument to functions.
  */
 void notifier_init(notifier_t *notif, void *data) {
