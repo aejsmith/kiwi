@@ -44,10 +44,8 @@ def shlib_emitter(target, source, env):
 	lib_emitter(target, source, env)
 	env['SHLIBS'].append(target[0])
 	Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
-	if target[0].name != 'libkernel.so':
-		Depends(target[0], env['LIBOUTDIR'].File('libkernel.so'))
-		if target[0].name != 'libc.so':
-			Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+	if target[0].name != 'libsystem.so':
+		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
 	return target, source
 env.Append(LIBEMITTER=[lib_emitter])
 env.Append(SHLIBEMITTER=[shlib_emitter])
@@ -58,14 +56,14 @@ env.Append(SHLIBEMITTER=[shlib_emitter])
 def program_emitter(target, source, env):
 	env['BINS'].append(target[0])
 	if target[0].name != 'rtld-%s' % (config['ARCH']):
-		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
 		if env['SMARTLINK'](source, target, env, None) == '$CXX':
 			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 
 # Add a builder to generate system call functions.
-env['SYSINC'] = File('libraries/libkernel/arch/%s/syscalls.inc' % (config['ARCH']))
+env['SYSINC'] = File('libraries/libsystem/arch/%s/syscalls.inc' % (config['ARCH']))
 def sysgen_emitter(target, source, env):
 	source.insert(0, env['SYSINC'])
 	return target, source

@@ -1,4 +1,4 @@
-/* Automatically freed allocation function
+/* Character type functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,21 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Character type functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <ctype.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Convert a character to ASCII.
+ *
+ * Converts a character to a 7-bit value that fits into the ASCII character
+ * set. Using this function will upset people, as it converts accented
+ * characters into random characters.
+ *
+ * @param ch		Character to convert.
+ *
+ * @return		Converted value.
+ */
+int toascii(int ch) {
+	return (ch & 0x7F);
 }
-#endif
-
-#endif /* __ALLOCA_H */

@@ -1,4 +1,4 @@
-/* Automatically freed allocation function
+/* strstr function
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,27 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		String searching functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/** Find a string within a string.
+ *
+ * Finds the first occurrence of a string within the specified string.
+ *
+ * @param haystack	Pointer to the string to search.
+ * @param needle	String to search for.
+ * 
+ * @return		NULL if token not found, otherwise pointer to string.
+ */
+char *strstr(const char *haystack, const char *needle) {
+	while(*haystack) {
+		if(strncmp(haystack, needle, strlen(needle)) == 0) {
+			return (char *)haystack;
+		}
+		haystack++;
+	}
 
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+	return NULL;
 }
-#endif
-
-#endif /* __ALLOCA_H */

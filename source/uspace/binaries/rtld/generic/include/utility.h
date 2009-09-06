@@ -17,9 +17,9 @@
  * @file
  * @brief		RTLD utility functions.
  *
- * The RTLD implements a small set of functions from the C library that are
- * needed by it. If a function that's in the C library is required, a copy of
- * it should be placed in utility.c. However, in order to keep the code small,
+ * The RTLD implements a small set of functions from libsystem that are
+ * needed by it. If a function that's in libsystem is required, a copy of it
+ * should be placed in utility.c. However, in order to keep the code small,
  * this should be avoided where possible. 
  */
 

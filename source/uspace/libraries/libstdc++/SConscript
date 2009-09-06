@@ -19,4 +19,4 @@ sources = []
 SConscript(dirs=['generic'], exports=['env', 'sources'])
 
 # Build the library from this.
-env.SharedLibrary('stdc++', sources, LINKFLAGS='-nodefaultlibs', LIBS=['c', 'm'])
+env.SharedLibrary('stdc++', sources, LINKFLAGS='-nodefaultlibs', LIBS=['system', 'm'])

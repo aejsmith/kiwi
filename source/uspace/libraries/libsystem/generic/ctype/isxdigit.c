@@ -1,4 +1,4 @@
-/* Automatically freed allocation function
+/* Character type functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,19 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Character type functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <ctype.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Test if character is a hexadecimal digit.
+ *
+ * Tests that the given character is a hexadecimal digit.
+ *
+ * @param ch		Character to test.
+ *
+ * @return		Non-zero if is alphabetic, zero if not.
+ */
+int isxdigit(int ch) {
+	return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
 }
-#endif
-
-#endif /* __ALLOCA_H */

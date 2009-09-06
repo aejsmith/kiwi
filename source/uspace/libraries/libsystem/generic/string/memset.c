@@ -1,5 +1,5 @@
-/* Automatically freed allocation function
- * Copyright (C) 2008-2009 Alex Smith
+/* memset function
+ * Copyright (C) 2007-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,21 +15,21 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Memory setting function.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Fill a memory area.
+ *
+ * Fills a memory area with the value specified.
+ *
+ * @param dest		The memory area to fill.
+ * @param val		The value to fill with.
+ * @param count		The number of bytes to fill.
+ */
+void *memset(void *dest, int val, size_t count) {
+	char *temp = (char *)dest;
+	for(; count != 0; count--) *temp++ = val;
+	return dest;
 }
-#endif
-
-#endif /* __ALLOCA_H */

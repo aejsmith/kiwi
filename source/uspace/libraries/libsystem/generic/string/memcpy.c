@@ -1,5 +1,5 @@
-/* Automatically freed allocation function
- * Copyright (C) 2008-2009 Alex Smith
+/* memcpy function
+ * Copyright (C) 2007-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,21 +15,28 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Memory copying function.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/** Copy data in memory.
+ *
+ * Copies bytes from a source memory area to a destination memory area,
+ * where both areas may not overlap.
+ *
+ * @param dest		The memory area to copy to.
+ * @param src		The memory area to copy from.
+ * @param count		The number of bytes to copy.
+ */
+void *memcpy(void *dest, const void *src, size_t count) {
+	char *d = (char *)dest;
+	const char *s = (const char *)src;
+	size_t i;
 
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
+	for(i = 0; i < count; i++) {
+		*d++ = *s++;
+	}
 
-#ifdef __cplusplus
+	return dest;
 }
-#endif
-
-#endif /* __ALLOCA_H */

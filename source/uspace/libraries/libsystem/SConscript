@@ -12,20 +12,11 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-
 Import('env', 'config')
 
-# Create a link to the toolchain's linker script directory.
-if os.path.exists('ldscripts'):
-	os.remove('ldscripts')
-os.symlink('%s/%s/%s/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
-           'ldscripts')
+# Get a list of source files.
+sources = []
+SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
 
-# Build all the libraries.
-SConscript(dirs=[
-	'libkiwi',
-	'libm',
-	'libstdc++',
-	'libsystem',
-], exports=['env'])
+# Build the library from this.
+env.SharedLibrary('system', sources, LINKFLAGS='-nodefaultlibs')

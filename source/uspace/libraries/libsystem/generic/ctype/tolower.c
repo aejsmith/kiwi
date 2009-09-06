@@ -1,4 +1,4 @@
-/* Automatically freed allocation function
+/* Character type functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,23 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Character type functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <ctype.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Convert character to lower-case.
+ *
+ * Converts the given character to lower case.
+ *
+ * @param ch		Character to convert.
+ *
+ * @return		Converted character.
+ */
+int tolower(int ch) {
+	if(isupper(ch)) {
+		return ch | 0x20;
+	} else {
+		return ch;
+	}
 }
-#endif
-
-#endif /* __ALLOCA_H */

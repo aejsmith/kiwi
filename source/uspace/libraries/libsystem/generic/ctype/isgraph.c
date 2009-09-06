@@ -1,4 +1,4 @@
-/* Automatically freed allocation function
+/* Character type functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,21 +15,22 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Character type functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <ctype.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Check for any printable character except space.
+ *
+ * Same as isprint() except doesn't include space.
+ *
+ * @param ch		Character to test.
+ *
+ * @return		Non-zero if check passed, zero if not.
+ */
+int isgraph(int ch) {
+	if(ch == ' ') {
+		return 0;
+	}
+	return isprint(ch);
 }
-#endif
-
-#endif /* __ALLOCA_H */

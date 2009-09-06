@@ -1,5 +1,5 @@
-/* Automatically freed allocation function
- * Copyright (C) 2008-2009 Alex Smith
+/* Internal libsystem functions
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,21 +15,25 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Internal libsystem functions.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#ifndef __LIBSYSTEM_H
+#define __LIBSYSTEM_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <kernel/process.h>
 
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
+#define __need_size_t
+#define __need_NULL
+#include <stddef.h>
 
-#ifdef __cplusplus
-}
-#endif
+extern char **environ;
 
-#endif /* __ALLOCA_H */
+extern void kputch(char ch);
+
+extern void __libsystem_init(process_args_t *args);
+extern void __libsystem_fatal(const char *fmt, ...);
+
+extern int main(int argc, char **argv, char **envp);
+
+#endif /* __LIBSYSTEM_H */

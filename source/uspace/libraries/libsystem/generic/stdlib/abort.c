@@ -1,5 +1,5 @@
-/* Automatically freed allocation function
- * Copyright (C) 2008-2009 Alex Smith
+/* Abort function
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,21 +15,16 @@
 
 /**
  * @file
- * @brief		Automatically freed allocation function.
+ * @brief		Abort function.
  */
 
-#ifndef __ALLOCA_H
-#define __ALLOCA_H
+#include <kernel/process.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdio.h>
+#include <stdlib.h>
 
-#undef alloca
-#define alloca(size)	__builtin_alloca (size)
-
-#ifdef __cplusplus
+/** Abort program execution. */
+void abort(void) {
+	printf("Process %d aborting!\n", process_id(-1));
+	process_exit(255);
 }
-#endif
-
-#endif /* __ALLOCA_H */

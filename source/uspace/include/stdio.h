@@ -1,4 +1,4 @@
-/* Kiwi C library - Standard I/O functions
+/* Standard I/O functions
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -30,10 +30,10 @@ extern "C" {
 #include <stddef.h>
 #include <stdarg.h>
 
-struct __libc_fstream;
+struct __fstream_internal;
 
 /** Type describing an open file stream. */
-typedef struct __libc_fstream FILE;
+typedef struct __fstream_internal FILE;
 
 /** End of file return value. */
 #define EOF		(-1)

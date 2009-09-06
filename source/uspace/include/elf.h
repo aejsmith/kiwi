@@ -1,4 +1,4 @@
-/* Kiwi C library - ELF types/definitions
+/* ELF types/definitions
  * Copyright (C) 2007-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
