@@ -95,6 +95,11 @@ int main(int argc, char **argv) {
 	Process *proc;
 	int ret;
 
+	if(Process::get_current_id() != 1) {
+		printf("startup: not process 1, exiting...\n");
+		return 0;
+	}
+
 	if((ret = load_modules("/system/modules")) != 0) {
 		return -ret;
 	}

@@ -206,6 +206,7 @@ static void display_console_register(void *arg1, void *arg2, void *_dev) {
  * @param _dev		Device pointer. */
 static void display_console_unregister(void *arg1, void *arg2, void *_dev) {
 	console_unregister(&display_console);
+	condvar_broadcast(&display_console_device->redraw);
 }
 
 /** Open a display device.
@@ -348,6 +349,13 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 
 		mutex_unlock(&device->lock);
 		return 0;
+	case DISPLAY_REDRAW_WAIT:
+		/* FIXME: This should be done by a handle event or something
+		 * after I've implemented handle waiting. */
+		mutex_lock(&device->lock, 0);
+		condvar_wait(&device->redraw, &device->lock, NULL, 0);
+		mutex_unlock(&device->lock);
+		return 0;
 	default:
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->ops->request) {
 			mutex_lock(&device->lock, 0);
@@ -401,6 +409,7 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
 	device = kmalloc(sizeof(display_device_t), MM_SLEEP);
 	mutex_init(&device->lock, "display_device_lock", 0);
 	atomic_set(&device->open, 0);
+	condvar_init(&device->redraw, "display_redraw");
 	device->id = atomic_inc(&display_next_id);
 	device->ops = ops;
 	device->data = data;

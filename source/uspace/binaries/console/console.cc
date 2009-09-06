@@ -55,8 +55,8 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 		m_height_px(height), m_cursor_x(0), m_cursor_y(0),
 		m_cols(width / FONT_WIDTH), m_rows(height / FONT_HEIGHT),
 		m_scroll_start(0), m_scroll_end(m_rows - 1) {
-	char path[1024];
 	handle_t handle;
+	char buf[1024];
 
 	/* Open the console manager and request a console. */
 	if((handle = device_open("/console/manager")) < 0) {
@@ -71,8 +71,8 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	handle_close(handle);
 
 	/* Open the console master. */
-	sprintf(path, "/console/%d/master", m_id);
-	if((m_master = device_open(path)) < 0) {
+	sprintf(buf, "/console/%d/master", m_id);
+	if((m_master = device_open(buf)) < 0) {
 		printf("Failed to open console master (%d)\n", m_master);
 		m_init_status = m_master;
 		return;
@@ -82,7 +82,8 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	m_buffer = new RGB[m_width_px * m_height_px];
 
 	/* Create a thread to receive output. */
-	if((m_thread = thread_create("output", NULL, 0, _ThreadEntry, this)) < 0) {
+	sprintf(buf, "output-%d", m_id);
+	if((m_thread = thread_create(buf, NULL, 0, _ThreadEntry, this)) < 0) {
 		m_init_status = m_thread;
 		return;
 	}
@@ -144,6 +145,13 @@ void Console::Input(unsigned char ch) {
 void Console::Output(unsigned char ch) {
 	/* No output processing yet. */
 	PutChar(ch);
+}
+
+/** Redraw the console. */
+void Console::Redraw(void) {
+	if(m_active) {
+		m_fb->DrawRect(m_fb_x, m_fb_y, m_width_px, m_height_px, m_buffer);
+	}
 }
 
 /** Invert the cursor state at the current position. */
@@ -296,13 +304,6 @@ void Console::ScrollDown(void) {
 	}
 
 	Redraw();
-}
-
-/** Redraw the console. */
-void Console::Redraw(void) {
-	if(m_active) {
-		m_fb->DrawRect(m_fb_x, m_fb_y, m_width_px, m_height_px, m_buffer);
-	}
 }
 
 /** Output thread function.

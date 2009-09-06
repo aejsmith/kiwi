@@ -43,10 +43,13 @@ typedef struct display_mode {
 #define DISPLAY_MODE_COUNT	0	/**< Get the number of display modes. */
 #define DISPLAY_MODE_GET	1	/**< Get an array of display modes. */
 #define DISPLAY_MODE_SET	2	/**< Set the display mode. */
+#define DISPLAY_REDRAW_WAIT	3	/**< Wait until a redraw is required (temporary). */
 
 #ifdef KERNEL
 
 #include <io/device.h>
+
+#include <sync/condvar.h>
 
 struct display_device;
 
@@ -98,6 +101,7 @@ typedef struct display_device {
 	display_mode_t *curr_mode;	/**< Current mode. */
 	void *fb;			/**< Framebuffer mapping. */
 	size_t fb_size;			/**< Framebuffer mapping size. */
+	condvar_t redraw;		/**< Whether a redraw is required. */
 } display_device_t;
 
 extern int display_device_create(const char *name, device_t *parent, display_ops_t *ops,

@@ -425,7 +425,7 @@ static void vm_anon_object_page_release(vm_object_t *_obj, offset_t offset, phys
 	assert(obj->source);
 	assert(obj->source->ops->page_release);
 
-	obj->source->ops->page_release(obj->source, offset, paddr);
+	obj->source->ops->page_release(obj->source, offset + obj->offset, paddr);
 }
 
 /** Anonymous object operations. */

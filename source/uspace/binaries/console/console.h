@@ -53,6 +53,9 @@ public:
 	 * @param ch		Output character. */
 	void Output(unsigned char ch);
 
+	/** Redraw the console. */
+	void Redraw(void);
+
 	/** Get the active console.
 	 * @return		Pointer to active console. */
 	static Console *GetActive(void) { return m_active; }
@@ -72,9 +75,6 @@ private:
 
 	/** Scroll down one line. */
 	void ScrollDown(void);
-
-	/** Redraw the console. */
-	void Redraw(void);
 
 	/** Thread function.
 	 * @param arg		Thread argument (console object pointer). */

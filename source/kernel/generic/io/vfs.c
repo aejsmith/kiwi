@@ -2283,8 +2283,8 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		AVL_TREE_FOREACH(&node->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
-			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRId64 " Flags: %d\n",
-			        page->addr, page->offset, page->flags);
+			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRId64 " Flags: %-4d Count: %d\n",
+			        page->addr, page->offset, page->flags, refcount_get(&page->count));
 		}
 	}
 

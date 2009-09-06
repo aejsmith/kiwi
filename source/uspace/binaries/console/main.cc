@@ -36,6 +36,21 @@
 #define MODE_HEIGHT	768
 #define MODE_DEPTH	16
 
+/** Draw the header.
+ * @param fb		Framebuffer to draw to.
+ * @param ppm		Logo PPM. */
+static void header_draw(Framebuffer *fb, PPM &logo) {
+	RGB grey = { 0x55, 0x55, 0x55 }, black = { 0, 0, 0 };
+
+	fb->FillRect(0, 0, MODE_WIDTH, logo.Height(), black);
+
+	/* Write the logo to the framebuffer. */
+	logo.Draw(fb, 0, 0);
+
+	/* Draw a line under the logo. */
+	fb->FillRect(0, logo.Height(), MODE_WIDTH, 1, grey);
+}
+
 /** Find a display mode.
  * @param modes		Mode list.
  * @param count		Mode count.
@@ -62,13 +77,13 @@ static display_mode_t *display_mode_find(display_mode_t *modes, size_t count, si
  * @param argv		Argument array.
  * @return		Process exit code. */
 int main(int argc, char **argv) {
+	PPM logo(logo_ppm, logo_ppm_size);
 	display_mode_t *modes, *mode;
-	size_t count = 0, height;
 	InputDevice *input;
 	Console *console;
+	size_t count = 0;
 	Framebuffer *fb;
 	handle_t handle;
-	RGB colour;
 	int ret;
 
 	if((handle = device_open("/display/0")) < 0) {
@@ -105,20 +120,12 @@ int main(int argc, char **argv) {
 		delete fb;
 		return -ret;
 	}
+	delete[] modes;
 
-	/* Write the logo to the framebuffer. */
-	{
-		PPM ppm(logo_ppm, logo_ppm_size);
-		ppm.Draw(fb, 0, 0);
-		height = ppm.Height();
-	}
-
-	/* Draw a line under the logo. */
-	colour.r = colour.g = colour.b = 0x55;
-	fb->FillRect(0, height + 1, MODE_WIDTH, 1, colour);
+	header_draw(fb, logo);
 
 	/* Create the console. */
-	console = new Console(fb, 0, height + 2, MODE_WIDTH, MODE_HEIGHT - (height + 3));
+	console = new Console(fb, 0, logo.Height() + 1, MODE_WIDTH, MODE_HEIGHT - (logo.Height() + 3));
 	if((ret = console->InitCheck()) != 0) {
 		delete console;
 		delete fb;
@@ -136,7 +143,10 @@ int main(int argc, char **argv) {
 
 	console->Run("failshell");
 
-	/* This thread is not needed any more. */
-	delete[] modes;
-	thread_exit(0);
+	/* Wait for redraw events. */
+	while(true) {
+		device_request(handle, DISPLAY_REDRAW_WAIT, 0, 0, 0, 0, 0);
+		header_draw(fb, logo);
+		Console::GetActive()->Redraw();
+	}
 }
