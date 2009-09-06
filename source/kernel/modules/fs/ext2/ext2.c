@@ -165,10 +165,9 @@ fail:
 }
 
 /** Unmount an Ext2 filesystem.
- * @param mount		Mount being unmounted.
- * @return		0 on success, negative error code on failure. */
-static int ext2_unmount(vfs_mount_t *mount) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @param mount		Mount being unmounted. */
+static void ext2_unmount(vfs_mount_t *mount) {
+
 }
 
 /** Read a page of data from an Ext2 node.

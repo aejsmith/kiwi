@@ -54,11 +54,9 @@ static int ramfs_mount(vfs_mount_t *mount) {
 }
 
 /** Unmount a RamFS.
- * @param mount		Mount that's being unmounted.
- * @return		0 on success, negative error code on failure. */
-static int ramfs_unmount(vfs_mount_t *mount) {
+ * @param mount		Mount that's being unmounted. */
+static void ramfs_unmount(vfs_mount_t *mount) {
 	kfree(mount->data);
-	return 0;
 }
 
 /** Create a RamFS filesystem node.

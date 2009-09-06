@@ -77,9 +77,8 @@ typedef struct vfs_type {
 	int (*mount)(struct vfs_mount *mount);
 
 	/** Unmount an instance of this filesystem.
-	 * @param mount		Mount that's being unmounted.
-	 * @return		0 on success, negative error code on failure. */
-	int (*unmount)(struct vfs_mount *mount);
+	 * @param mount		Mount that's being unmounted. */
+	void (*unmount)(struct vfs_mount *mount);
 
 	/**
 	 * Data modification functions.

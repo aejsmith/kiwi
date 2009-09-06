@@ -275,8 +275,8 @@ static int vfs_node_flush(vfs_node_t *node, bool destroy) {
 				fatal("Node page still in use while destroying");
 			}
 
-			/* Flush the page data. See function documentation about how
-			 * failure is handled. */
+			/* Flush the page data. See function documentation
+			 * about how failure is handled. */
 			if((err = vfs_file_page_flush(node, page)) != 0) {
 				if(destroy) {
 					return err;
@@ -293,7 +293,7 @@ static int vfs_node_flush(vfs_node_t *node, bool destroy) {
 	}
 
 	/* Flush node metadata. */
-	if(node->mount && node->mount->type->node_flush) {
+	if(!VFS_NODE_IS_RDONLY(node) && node->mount && node->mount->type->node_flush) {
 		if((err = node->mount->type->node_flush(node)) != 0) {
 			ret = err;
 		}
@@ -304,7 +304,8 @@ static int vfs_node_flush(vfs_node_t *node, bool destroy) {
 /** Flush changes to a node and free it.
  * @note		Never call this function. Use vfs_node_release().
  * @note		Mount lock (if there is a mount) and node lock must be
- *			held.
+ *			held. Mount lock will still be locked when the function
+ *			returns.
  * @param node		Node to free. Should be unused (zero reference count).
  * @return		0 on success, negative error code on failure (this can
  *			happen, for example, if an error occurs flushing the
@@ -333,8 +334,6 @@ static int vfs_node_free(vfs_node_t *node) {
 		if(node->mount->type->node_free) {
 			node->mount->type->node_free(node);
 		}
-
-		mutex_unlock(&node->mount->lock);
 	}
 
 	/* Free up other cached bits of data.*/
@@ -687,12 +686,14 @@ void vfs_node_get(vfs_node_t *node) {
  * @param node		Node to decrease reference count of.
  */
 void vfs_node_release(vfs_node_t *node) {
+	vfs_mount_t *mount = NULL;
 	int ret;
 
 	/* Acquire mount lock then node lock. See note in file header about
 	 * locking order. */
 	if(node->mount) {
 		mutex_lock(&node->mount->lock, 0);
+		mount = node->mount;
 	}
 	mutex_lock(&node->lock, 0);
 
@@ -702,11 +703,11 @@ void vfs_node_release(vfs_node_t *node) {
 		/* Node has no references remaining, move it to its mount's
 		 * unused list if it has a mount. If the node is not attached
 		 * to anything, then destroy it immediately. */
-		if(node->mount && !(node->flags & VFS_NODE_REMOVED)) {
+		if(mount && !(node->flags & VFS_NODE_REMOVED)) {
 			list_append(&node->mount->unused_nodes, &node->header);
 			dprintf("vfs: transferred node %p to unused list (mount: %p)\n", node, node->mount);
 			mutex_unlock(&node->lock);
-			mutex_unlock(&node->mount->lock);
+			mutex_unlock(&mount->lock);
 		} else {
 			/* This shouldn't fail - the only things that can fail
 			 * in vfs_node_free() are cache flushing and metadata
@@ -714,14 +715,17 @@ void vfs_node_release(vfs_node_t *node) {
 			 * or has been removed, this should not fail. */
 			if((ret = vfs_node_free(node)) != 0) {
 				fatal("Could not destroy %s (%d)",
-				      (node->mount) ? "removed node" : "node with no mount",
+				      (mount) ? "removed node" : "node with no mount",
 				      ret);
+			}
+			if(mount) {
+				mutex_unlock(&mount->lock);
 			}
 		}
 	} else {
 		mutex_unlock(&node->lock);
-		if(node->mount) {
-			mutex_unlock(&node->mount->lock);
+		if(mount) {
+			mutex_unlock(&mount->lock);
 		}
 	}
 }
@@ -997,6 +1001,9 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 	if((file_size_t)page->offset >= node->size || !(page->flags & VM_PAGE_DIRTY)) {
 		return 0;
 	}
+
+	/* Page shouldn't be dirty if mount read only. */
+	assert(!VFS_NODE_IS_RDONLY(node));
 
 	if(node->mount && node->mount->type->page_flush) {
 		mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
@@ -2009,7 +2016,96 @@ fail:
  * @return		0 on success, negative error code on failure.
  */
 int vfs_unmount(const char *path) {
-	return -ERR_NOT_IMPLEMENTED;
+	vfs_node_t *node = NULL, *child;
+	vfs_mount_t *mount = NULL;
+	int ret;
+
+	if(!path) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Serialise mount/unmount operations. */
+	mutex_lock(&vfs_mount_lock, 0);
+
+	/* Look up the destination directory. */
+	if((ret = vfs_node_lookup(path, true, VFS_NODE_DIR, &node)) != 0) {
+		goto fail;
+	} else if(!node->mount->mountpoint) {
+		ret = -ERR_IN_USE;
+		goto fail;
+	} else if(node != node->mount->root) {
+		ret = -ERR_PARAM_INVAL;
+		goto fail;
+	}
+
+	/* Lock parent mount to ensure that the mount does not get looked up
+	 * while we are unmounting. */
+	mount = node->mount;
+	mutex_lock(&mount->mountpoint->mount->lock, 0);
+	mutex_lock(&mount->lock, 0);
+	mutex_lock(&node->lock, 0);
+
+	/* Get rid of the reference the lookup added, and check if any nodes
+	 * on the mount are in use. */
+	if(refcount_dec(&node->count) != 1) {
+		ret = -ERR_IN_USE;
+		goto fail;
+	} else if(node->header.next != &mount->used_nodes || node->header.prev != &mount->used_nodes) {
+		ret = -ERR_IN_USE;
+		goto fail;
+	}
+
+	/* Flush all child nodes. */
+	LIST_FOREACH_SAFE(&mount->unused_nodes, iter) {
+		child = list_entry(iter, vfs_node_t, header);
+
+		/* On success, the child is unlocked by vfs_node_free(). */
+		mutex_lock(&child->lock, 0);
+		if((ret = vfs_node_free(child)) != 0) {
+			mutex_unlock(&child->lock);
+			goto fail;
+		}
+	}
+
+	/* Free the root node itself. */
+	refcount_dec(&node->count);
+	if((ret = vfs_node_free(node)) != 0) {
+		refcount_inc(&node->count);
+		goto fail;
+	}
+
+	/* Detach from the mountpoint. */
+	mount->mountpoint->mounted = NULL;
+	mutex_unlock(&mount->mountpoint->mount->lock);
+	vfs_node_release(mount->mountpoint);
+
+	/* Call unmount operation and release device/type. */
+	if(mount->type->unmount) {
+		mount->type->unmount(mount);
+	}
+	if(mount->device) {
+		device_release(mount->device);
+	}
+	refcount_dec(&mount->type->count);
+
+	list_remove(&mount->header);
+	mutex_unlock(&vfs_mount_lock);
+	mutex_unlock(&mount->lock);
+	kfree(mount);
+
+	return 0;
+fail:
+	if(node) {
+		if(mount) {
+			mutex_unlock(&node->lock);
+			mutex_unlock(&mount->lock);
+			mutex_unlock(&mount->mountpoint->mount->lock);
+		} else {
+			vfs_node_release(node);
+		}
+	}
+	mutex_unlock(&vfs_mount_lock);
+	return ret;
 }
 
 #if 0
@@ -2986,8 +3082,27 @@ out:
 	return ret;
 }
 
+/** Unmounts a filesystem.
+ *
+ * Flushes all modifications to a filesystem if it is not read-only and
+ * unmounts it. If any nodes in the filesystem are busy, then the operation
+ * will fail.
+ *
+ * @param path		Path to mount point of filesystem.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_unmount(const char *path) {
-	return -ERR_NOT_IMPLEMENTED;
+	char *kpath;
+	int ret;
+
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	}
+
+	ret = vfs_unmount(kpath);
+	kfree(kpath);
+	return ret;
 }
 
 int sys_fs_getcwd(char *buf, size_t size) {

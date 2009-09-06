@@ -41,7 +41,9 @@ static void __libsystem_fatal_helper(char ch, void *data, int *total) {
 void __libsystem_fatal(const char *fmt, ...) {
 	va_list args;
 
+	va_start(args, fmt);
 	do_printf(__libsystem_fatal_helper, stderr, "*** libsystem fatal: ", args);
+	va_end(args);
 
 	va_start(args, fmt);
 	do_printf(__libsystem_fatal_helper, stderr, fmt, args);
