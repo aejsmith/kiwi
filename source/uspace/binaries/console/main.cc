@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
 	}
 
 	/* Finally create the input device. */
-	input = new InputDevice("/input/input0");
+	input = new InputDevice("/input/0");
 	if((ret = input->InitCheck()) != 0) {
 		delete input;
 		delete console;

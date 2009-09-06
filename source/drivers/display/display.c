@@ -178,6 +178,7 @@ static void display_console_putch(unsigned char ch) {
 
 /** Display device console operations structure. */
 static console_t display_console = {
+	.min_level = LOG_NONE,
 	.putch = display_console_putch,
 };
 

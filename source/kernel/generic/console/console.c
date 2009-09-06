@@ -67,7 +67,7 @@ void console_putch(unsigned char level, char ch) {
 	LIST_FOREACH(&console_list, iter) {
 		cons = list_entry(iter, console_t, header);
 
-		if((level == LOG_DEBUG && !cons->debug)) {
+		if(level < cons->min_level) {
 			continue;
 		} else if(unlikely(!cons->putch)) {
 			continue;

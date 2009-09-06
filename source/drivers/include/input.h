@@ -117,8 +117,9 @@ typedef struct input_device {
 
 extern void input_device_input(input_device_t *device, uint8_t value);
 
-extern int input_device_create(uint8_t type, uint8_t protocol, void *ops, void *data,
-                               device_t *parent, input_device_t **devicep);
+extern int input_device_create(const char *name, device_t *parent, uint8_t type,
+                               uint8_t protocol, void *ops, void *data,
+                               input_device_t **devicep);
 extern int input_device_destroy(input_device_t *device);
 
 #endif /* KERNEL */

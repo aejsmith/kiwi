@@ -263,30 +263,19 @@ void Console::Clear(void) {
 
 /** Scroll up one line. */
 void Console::ScrollUp(void) {
-#if 0
-	size_t size, row;
-	uint32_t *d, *s;
-	int j, k;
+	size_t row, pixels;
+	int i;
 
-	/* Get the size of one row. */
-	row = (dev->curr_mode->width * curr_font->height) * BPP_TO_BYTES(dev->curr_mode);
+	row = m_width_px * FONT_HEIGHT;
+	pixels = (m_width_px * FONT_HEIGHT) * (m_scroll_end - m_scroll_start);
+	memmove(&m_buffer[row * (m_scroll_start + 1)], &m_buffer[row * m_scroll_start], pixels * sizeof(RGB));
 
-	/* Size to copy. */
-	size = row * (cons->scroll_end - cons->scroll_start);
-
-	d = (uint32_t *)(dev->fb_mapping + (row * (cons->scroll_start + 1)));
-	s = (uint32_t *)(dev->fb_mapping + (row * cons->scroll_start));
-
-	/* Copy the data */
-	memmove(d, s, size);
-
-	/* Fill the top row with blanks. */
-	for(j = 0; j < curr_font->height; j++) {
-		for(k = 0; k < dev->curr_mode->width; k++) {
-			video_console_putpixel(dev, bg, k, (cons->scroll_start * curr_font->height) + j);
-		}
+	/* Fill the first row with blanks. */
+	for(i = 0; i < (FONT_HEIGHT * m_width_px); i++) {
+		m_buffer[(m_scroll_start * row) + i] = m_bg_colour;
 	}
-#endif
+
+	Redraw();
 }
 
 /** Scroll down one line. */

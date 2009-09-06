@@ -241,6 +241,10 @@ MODULE_EXPORT(input_device_input);
  * under the input device tree. Otherwise, the main device will be placed in
  * the input device tree.
  *
+ * @param name		Name to give device. Only used if parent is specified.
+ * @param parent	Optional parent node. If not provided, then the main
+ *			device will be created under the input device
+ *			container.
  * @param type		Input device type.
  * @param protocol	Device protocol.
  * @param ops		Pointer to operations structure for device type.
@@ -250,18 +254,19 @@ MODULE_EXPORT(input_device_input);
  *
  * @return		0 on success, negative error code on failure.
  */
-int input_device_create(uint8_t type, uint8_t protocol, void *ops, void *data,
-                        device_t *parent, input_device_t **devicep) {
+int input_device_create(const char *name, device_t *parent, uint8_t type,
+                        uint8_t protocol, void *ops, void *data,
+                        input_device_t **devicep) {
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, {string: "input"} },
 		{ "input.type", DEVICE_ATTR_UINT8, {uint8: type} },
 		{ "input.protocol", DEVICE_ATTR_UINT8, {uint8: protocol} },
 	};
-	char name[DEVICE_NAME_MAX];
+	char dname[DEVICE_NAME_MAX];
 	input_device_t *device;
 	int ret;
 
-	if(!devicep) {
+	if((parent && !name) || (name && !parent) || !devicep) {
 		return -ERR_PARAM_INVAL;
 	}
 
@@ -289,16 +294,13 @@ int input_device_create(uint8_t type, uint8_t protocol, void *ops, void *data,
 	}
 
 	/* Create the device tree node. */
-	sprintf(name, "input%" PRId32, device->id);
-	if((ret = device_create(name, (parent) ? parent : input_device_dir, &input_device_ops,
-	                        device, attrs, ARRAYSZ(attrs), &device->device)) != 0) {
-		kfree(device);
-		return ret;
-	}
-
-	/* Create an alias if needed. */
+	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
-		if((ret = device_alias(name, input_device_dir, device->device, &device->alias)) != 0) {
+		if((ret = device_create(name, parent, &input_device_ops, device, attrs,
+	                                ARRAYSZ(attrs), &device->device)) != 0) {
+			kfree(device);
+			return ret;
+		} else if((ret = device_alias(dname, input_device_dir, device->device, &device->alias)) != 0) {
 			/* Should not fail - only possible failure is if name
 			 * already exists, and ID should be unique. Note that
 			 * with current ID allocation implementation this can
@@ -306,6 +308,11 @@ int input_device_create(uint8_t type, uint8_t protocol, void *ops, void *data,
 			fatal("Could not create device alias");
 		}
 	} else {
+		if((ret = device_create(dname, input_device_dir, &input_device_ops, device, attrs,
+	                                ARRAYSZ(attrs), &device->device)) != 0) {
+			kfree(device);
+			return ret;
+		}
 		device->alias = NULL;
 	}
 

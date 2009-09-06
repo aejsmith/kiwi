@@ -258,7 +258,7 @@ int disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 	device->blksize = blksize;
 
 	/* Create the device tree node. */
-	sprintf(dname, "disk%" PRId32, device->id);
+	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
 		if((ret = device_create(name, parent, &disk_device_ops, device, attrs,
 	                                ARRAYSZ(attrs), &device->device)) != 0) {

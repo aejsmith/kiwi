@@ -76,7 +76,8 @@ static irq_result_t i8042_kbd_handler(unative_t num, void *_dev, intr_frame_t *f
 static int i8042_init(void) {
 	int ret;
 
-	if((ret = input_device_create(INPUT_TYPE_KEYBOARD, INPUT_PROTOCOL_PS2, NULL, NULL, NULL, &i8042_kbd_dev)) != 0) {
+	if((ret = input_device_create(NULL, NULL, INPUT_TYPE_KEYBOARD, INPUT_PROTOCOL_PS2,
+	                              NULL, NULL, &i8042_kbd_dev)) != 0) {
 		return ret;
 	}
 
