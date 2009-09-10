@@ -259,7 +259,7 @@ typedef struct ext2_mount {
 /** In-memory inode structure. */
 typedef struct ext2_inode {
 	rwlock_t lock;				/**< Lock to protect the inode and its data. */
-	identifier_t num;			/**< Inode number. */
+	uint32_t num;				/**< Inode number. */
 	bool dirty;				/**< Whether the structure is dirty. */
 	size_t size;				/**< Size of the inode structure on disk. */
 	offset_t offset;			/**< Offset into the device. */
@@ -267,11 +267,17 @@ typedef struct ext2_inode {
 	ext2_disk_inode_t disk;			/**< On-disk inode structure. */
 } ext2_inode_t;
 
+/** Macros to increment/decrement i_blocks. */
+#define I_BLOCKS_INC(i)			\
+	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) + ((i)->mount->blk_size / 512)))
+#define I_BLOCKS_DEC(i)			\
+	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) - ((i)->mount->blk_size / 512)))
+
 /** Convert an inode type to a directory entry type.
- * @param type		Inode's mode value.
+ * @param mode		Inode's mode value.
  * @return		Directory entry type code. */
-static inline uint8_t ext2_type_to_dirent(uint32_t type) {
-	switch(type & EXT2_S_IFMT) {
+static inline uint8_t ext2_type_to_dirent(uint16_t mode) {
+	switch(mode & EXT2_S_IFMT) {
 	case EXT2_S_IFSOCK:	return EXT2_FT_SOCK;
 	case EXT2_S_IFLNK:	return EXT2_FT_SYMLINK;
 	case EXT2_S_IFREG:	return EXT2_FT_REG_FILE;
@@ -283,40 +289,25 @@ static inline uint8_t ext2_type_to_dirent(uint32_t type) {
 	}
 }
 
-extern int ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t block);
-extern int ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block);
+extern int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp);
+extern int ext2_block_free(ext2_mount_t *mount, uint32_t num);
+extern int ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t block, bool nonblock);
+extern int ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block, bool nonblock);
 
 extern int ext2_dir_cache(vfs_node_t *node);
+extern int ext2_dir_insert(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
+extern int ext2_dir_remove(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
+extern bool ext2_dir_empty(ext2_inode_t *dir);
 
-extern int ext2_inode_get(ext2_mount_t *mount, identifier_t num, ext2_inode_t **inodep);
+extern int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, ext2_inode_t **inodep);
+extern int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode);
+extern int ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep);
 extern int ext2_inode_flush(ext2_inode_t *inode);
 extern void ext2_inode_release(ext2_inode_t *inode);
-extern int ext2_inode_read(ext2_inode_t *inode, void *buf, uint32_t block, size_t count);
+extern int ext2_inode_read(ext2_inode_t *inode, void *buf, uint32_t block, size_t count, bool nonblock);
+extern int ext2_inode_write(ext2_inode_t *inode, const void *buf, uint32_t block, size_t count, bool nonblock);
+extern int ext2_inode_resize(ext2_inode_t *inode, file_size_t size);
 
-#if 0
-
-
-int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp);
-int ext2_block_free(ext2_mount_t *mount, uint32_t num, bool nonblock);
-
-/* dirent.c */
-int ext2_dirent_iterate(ext2_inode_t *inode, ext2_dirent_cb_t cb, void *data, off_t offset);
-int ext2_dirent_insert(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
-int ext2_dirent_remove(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
-bool ext2_dirent_empty(ext2_inode_t *dir);
-
-/* ext2.c */
-void ext2_mount_flush(ext2_mount_t *mount);
-
-/* inode.c */
-int ext2_inode_alloc(ext2_mount_t *mount, mode_t mode, bool nonblock, ext2_inode_t **inodep);
-int ext2_inode_free(ext2_mount_t *mount, uint32_t num, mode_t mode, bool nonblock);
-ssize_t ext2_inode_read(ext2_inode_t *inode, void *buf, size_t count, off_t off, bool nonblock);
-ssize_t ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, off_t off, bool nonblock);
-int ext2_inode_truncate(ext2_inode_t *inode);
-int ext2_inode_get(ext2_mount_t *mount, uint32_t num, bool nonblock, ext2_inode_t **inodep);
-void ext2_inode_flush(ext2_inode_t *inode);
-void ext2_inode_release(ext2_inode_t *inode);
-#endif
+extern void ext2_mount_flush(ext2_mount_t *mount);
 
 #endif /* __EXT2_PRIV_H */

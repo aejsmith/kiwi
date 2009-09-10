@@ -32,6 +32,29 @@
 
 static int ext2_node_get(vfs_node_t *node, identifier_t id);
 
+/** Flush data for an Ext2 mount to disk.
+ * @note		Should not be called if mount is read-only.
+ * @note		Mount should be write locked.
+ * @param mount         Mount to flush. */
+void ext2_mount_flush(ext2_mount_t *mount) {
+	size_t bytes;
+	int ret;
+
+	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
+
+	ret = device_write(mount->device, &mount->sb, sizeof(ext2_superblock_t), 1024, &bytes);
+	if(ret != 0 || bytes != sizeof(ext2_superblock_t)) {
+		kprintf(LOG_WARN, "ext2: warning: could not write back superblock during flush (%d %zu)\n",
+		        ret, bytes);
+	}
+
+	ret = device_write(mount->device, mount->group_tbl, mount->group_tbl_size, mount->group_tbl_off, &bytes);
+	if(ret != 0 || bytes != mount->group_tbl_size) {
+		kprintf(LOG_WARN, "ext2: warning: could not write back group table during flush (%d %zu)\n",
+		        ret, bytes);
+	}
+}
+
 /** Check whether a device contains an Ext2 filesystem.
  * @param device	Device to check.
  * @return		Whether if the device contains an Ext2 FS. */
@@ -165,14 +188,18 @@ fail:
 }
 
 /** Unmount an Ext2 filesystem.
- * @param mount		Mount being unmounted. */
-static void ext2_unmount(vfs_mount_t *mount) {
+ * @param _mount	Mount being unmounted. */
+static void ext2_unmount(vfs_mount_t *_mount) {
+	ext2_mount_t *mount = _mount->data;
 
+	if(!(_mount->flags & VFS_MOUNT_RDONLY)) {
+		mount->sb.s_state = cpu_to_le16(EXT2_VALID_FS);
+		ext2_mount_flush(mount);
+	}
 }
 
 /** Read a page of data from an Ext2 node.
- * @todo		Nonblocking.
- * @param node		Node to read data read from.
+ * @param node		Node to read data from.
  * @param page		Pointer to mapped page to read into.
  * @param offset	Offset within the file to read from (multiple of
  *			PAGE_SIZE).
@@ -186,7 +213,30 @@ static int ext2_page_read(vfs_node_t *node, void *page, offset_t offset, bool no
 	assert(inode->mount->blk_size <= PAGE_SIZE);
 	assert(!(offset % inode->mount->blk_size));
 
-	ret = ext2_inode_read(inode, page, offset / inode->mount->blk_size, PAGE_SIZE / inode->mount->blk_size);
+	rwlock_read_lock(&inode->lock, 0);
+	ret = ext2_inode_read(inode, page, offset / inode->mount->blk_size, PAGE_SIZE / inode->mount->blk_size, nonblock);
+	rwlock_unlock(&inode->lock);
+	return (ret < 0) ? ret : 0;
+}
+
+/** Write a page of data to an Ext2 node.
+ * @param node		Node to write data to.
+ * @param page		Pointer to mapped page to write from.
+ * @param offset	Offset within the file to write to (multiple of
+ *			PAGE_SIZE).
+ * @param nonblock	Whether the write is required to not block.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_page_flush(vfs_node_t *node, const void *page, offset_t offset, bool nonblock) {
+	ext2_inode_t *inode = node->data;
+	int ret;
+
+	assert(node->type == VFS_NODE_FILE);
+	assert(inode->mount->blk_size <= PAGE_SIZE);
+	assert(!(offset % inode->mount->blk_size));
+
+	rwlock_write_lock(&inode->lock, 0);
+	ret = ext2_inode_write(inode, page, offset / inode->mount->blk_size, PAGE_SIZE / inode->mount->blk_size, nonblock);
+	rwlock_unlock(&inode->lock);
 	return (ret < 0) ? ret : 0;
 }
 
@@ -268,19 +318,164 @@ static void ext2_node_free(vfs_node_t *node) {
 	ext2_inode_release(node->data);
 }
 
+/** Create a new filesystem node.
+ * @param _parent	Parent directory of the node.
+ * @param name		Name to give node in the parent directory.
+ * @param node		Node structure describing the node being created.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_create(vfs_node_t *_parent, const char *name, vfs_node_t *node) {
+	ext2_inode_t *parent = _parent->data, *inode;
+	int ret, count;
+	uint16_t mode;
+	size_t len;
+	void *buf;
+
+	/* Work out the mode. */
+	mode = (node->type == VFS_NODE_DIR) ? 0755 : 0644;
+	switch(node->type) {
+	case VFS_NODE_FILE:
+		mode |= EXT2_S_IFREG;
+		break;
+	case VFS_NODE_DIR:
+		mode |= EXT2_S_IFDIR;
+		break;
+	case VFS_NODE_SYMLINK:
+		mode |= EXT2_S_IFLNK;
+		break;
+	default:
+		return -ERR_NOT_SUPPORTED;
+	}
+
+	/* Allocate the inode. */
+	if((ret = ext2_inode_alloc(parent->mount, mode, &inode)) != 0) {
+		return ret;
+	}
+	rwlock_write_lock(&inode->lock, 0);
+	rwlock_write_lock(&parent->lock, 0);
+
+	/* Fill in node structure. */
+	node->id = inode->num;
+	node->data = inode;
+	node->size = 0;
+
+	/* Add the . and .. entries when creating a directory, and fill in
+	 * link destination when creating a symbolic link. */
+	if(node->type == VFS_NODE_DIR) {
+		if((ret = ext2_dir_insert(inode, inode, ".")) != 0) {
+			goto fail;
+		} else if((ret = ext2_dir_insert(inode, parent, "..")) != 0) {
+			goto fail;
+		}
+	} else if(node->type == VFS_NODE_SYMLINK) {
+		assert(node->link_dest);
+		len = strlen(node->link_dest);
+
+		inode->disk.i_size = cpu_to_le32(len);
+		node->size = len;
+		if(len <= sizeof(inode->disk.i_block)) {
+			memcpy(inode->disk.i_block, node->link_dest, len);
+			//inode->disk.i_mtime = time_get_current();
+		} else {
+			buf = kmalloc(inode->mount->blk_size, MM_SLEEP);
+			memcpy(buf, node->link_dest, len);
+			count = ROUND_UP(len, inode->mount->blk_size) / inode->mount->blk_size;
+			if((ret = ext2_inode_write(inode, buf, 0, count, false)) != count) {
+				ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+				kfree(buf);
+				goto fail;
+			}
+			kfree(buf);
+			ret = 0;
+		}
+	}
+
+	/* Add entry to parent. */
+	if((ret = ext2_dir_insert(parent, inode, name)) != 0) {
+		goto fail;
+	}
+
+	rwlock_unlock(&inode->lock);
+	rwlock_unlock(&parent->lock);
+	return 0;
+fail:
+	rwlock_unlock(&parent->lock);
+	rwlock_unlock(&inode->lock);
+	ext2_inode_release(inode);
+	return ret;
+}
+
+/** Decrease the link count of a filesystem node.
+ * @param _parent	Directory containing the node.
+ * @param name		Name of the node in the directory.
+ * @param node		Node being unlinked.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *node) {
+	ext2_inode_t *parent = _parent->data, *inode = node->data;
+	int ret;
+
+	assert(parent);
+	assert(inode);
+
+	rwlock_write_lock(&parent->lock, 0);
+	rwlock_write_lock(&inode->lock, 0);
+
+	if(node->type == VFS_NODE_DIR) {
+		if(!ext2_dir_empty(inode)) {
+			rwlock_unlock(&inode->lock);
+			rwlock_unlock(&parent->lock);
+			return -ERR_IN_USE;
+		}
+
+		/* Remove the . and .. entries. */
+		if((ret = ext2_dir_remove(inode, inode, ".")) != 0) {
+			rwlock_unlock(&inode->lock);
+			rwlock_unlock(&parent->lock);
+			return ret;
+		} else if((ret = ext2_dir_remove(inode, parent, "..")) != 0) {
+			rwlock_unlock(&inode->lock);
+			rwlock_unlock(&parent->lock);
+			return ret;
+		}
+	}
+
+	/* This will decrease link counts as required. The actual removal
+	 * will take place when the ext2_node_free() is called on the node. */
+	if((ret = ext2_dir_remove(parent, inode, name)) == 0) {
+		if(le16_to_cpu(inode->disk.i_links_count) == 0) {
+			node->flags |= VFS_NODE_REMOVED;
+		}
+	}
+
+	rwlock_unlock(&inode->lock);
+	rwlock_unlock(&parent->lock);
+	return ret;
+}
+
+/** Resize an Ext2 file.
+ * @param node		Node to resize.
+ * @param size		New size of the node.
+ * @return		Always returns 0. */
+static int ext2_file_resize(vfs_node_t *node, file_size_t size) {
+	ext2_inode_t *inode = node->data;
+	int ret;
+
+	rwlock_write_lock(&inode->lock, 0);
+	ret = ext2_inode_resize(inode, size);
+	rwlock_unlock(&inode->lock);
+	return ret;
+}
+
 /** Get the destination of a symbolic link.
  * @param node		Symbolic link to get destination of.
  * @param bufp		Where to store pointer to string containing
  *			link destination.
  * @return		0 on success, negative error code on failure. */
 static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
-	ext2_inode_t *inode = (ext2_inode_t *)node->data;
+	ext2_inode_t *inode = node->data;
 	char *buf, *tmp;
 	int ret, count;
 	size_t size;
 
-	/* Ok to lock it here despite the fact that ext2_inode_read() does:
-	 * multiple read locks can be done on a rwlock by a thread. */
 	rwlock_read_lock(&inode->lock, 0);
 
 	size = le32_to_cpu(inode->disk.i_size);
@@ -295,7 +490,7 @@ static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
 		}
 
 		count = ROUND_UP(size, inode->mount->blk_size) / inode->mount->blk_size;
-		if((ret = ext2_inode_read(inode, buf, 0, count)) != count) {
+		if((ret = ext2_inode_read(inode, buf, 0, count, false)) != count) {
 			kfree(buf);
 			rwlock_unlock(&inode->lock);
 			return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
@@ -317,14 +512,17 @@ static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
 /** Ext2 filesystem type structure. */
 static vfs_type_t ext2_fs_type = {
 	.name = "ext2",
-	.flags = VFS_TYPE_RDONLY,
 	.probe = ext2_probe,
 	.mount = ext2_mount,
 	.unmount = ext2_unmount,
 	.page_read = ext2_page_read,
+	.page_flush = ext2_page_flush,
 	.node_get = ext2_node_get,
 	.node_flush = ext2_node_flush,
 	.node_free = ext2_node_free,
+	.node_create = ext2_node_create,
+	.node_unlink = ext2_node_unlink,
+	.file_resize = ext2_file_resize,
 	.dir_cache = ext2_dir_cache,
 	.symlink_read = ext2_symlink_read,
 };

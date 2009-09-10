@@ -113,7 +113,7 @@ typedef struct vfs_type {
 	 * @param offset	Offset within the file to write to.
 	 * @param nonblock	Whether the write is required to not block.
 	 * @return		0 on success, negative error code on failure. */
-	int (*page_flush)(struct vfs_node *node, void *page, offset_t offset, bool nonblock);
+	int (*page_flush)(struct vfs_node *node, const void *page, offset_t offset, bool nonblock);
 
 	/**
 	 * Node manipulation functions.
