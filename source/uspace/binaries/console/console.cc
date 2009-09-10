@@ -33,12 +33,12 @@
 
 using namespace kiwi;
 
-extern unsigned char console_font_8x8[2048];
+extern unsigned char console_font_6x12[];
 
 /** Font information. */
-#define FONT_DATA	console_font_8x8
-#define FONT_WIDTH	8
-#define FONT_HEIGHT	8
+#define FONT_DATA	console_font_6x12
+#define FONT_WIDTH	6
+#define FONT_HEIGHT	12
 
 /** Current active console. */
 Console *Console::m_active = 0;
