@@ -52,7 +52,7 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void process_destroy(process_t *process);
+extern void process_release(process_t *process);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
 static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
@@ -104,7 +104,6 @@ static void thread_trampoline(void) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void thread_reaper(void *arg1, void *arg2) {
-	process_t *del = NULL;
 	thread_t *thread;
 
 	while(true) {
@@ -125,10 +124,8 @@ static void thread_reaper(void *arg1, void *arg2) {
 		/* Detach from its owner. */
 		spinlock_lock(&thread->owner->lock, 0);
 		list_remove(&thread->owner_link);
-		if(refcount_dec(&thread->owner->count) == 0) {
-			del = thread->owner;
-		}
 		spinlock_unlock(&thread->owner->lock);
+		process_release(thread->owner);
 
 		/* Now clean up the thread. */
 		kheap_free(thread->kstack, KSTACK_SIZE);
@@ -142,12 +139,6 @@ static void thread_reaper(void *arg1, void *arg2) {
 			thread->id, thread->name, thread);
 
 		slab_cache_free(thread_cache, thread);
-
-		/* Delete the owner if required. */
-		if(del) {
-			process_destroy(del);
-			del = NULL;
-		}
 	}
 }
 

@@ -36,6 +36,8 @@ extern "C" {
 
 extern int handle_close(handle_t handle);
 extern int handle_type(handle_t handle);
+extern int handle_wait(handle_t handle, int event, timeout_t timeout);
+extern int handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout);
 
 #ifdef __cplusplus
 }

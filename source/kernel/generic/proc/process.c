@@ -60,6 +60,7 @@ typedef struct process_create_info {
 } process_create_info_t;
 
 extern void process_destroy(process_t *process);
+extern void process_release(process_t *process);
 
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
@@ -346,8 +347,6 @@ process_t *process_lookup(identifier_t id) {
 /** Destroy a process.
  *
  * Destroys a process structure. The reference count of the process must be 0.
- * This should only be called from the thread destruction code and from the
- * process handle management code.
  *
  * @param process	Process to destroy.
  */
@@ -363,10 +362,6 @@ void process_destroy(process_t *process) {
 	avl_tree_remove(&process_tree, (key_t)process->id);
 	mutex_unlock(&process_tree_lock);
 
-	/* Run and destroy the death notifier list. */
-	notifier_run(&process->death_notifier, NULL);
-	notifier_destroy(&process->death_notifier);
-
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
 	}
@@ -379,6 +374,32 @@ void process_destroy(process_t *process) {
 	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
 	kfree(process->name);
 	slab_cache_free(process_cache, process);
+}
+
+/** Decrease a process' reference count.
+ *
+ * Decreases a process' reference count and destroys it if it reaches 0. This
+ * should only be called from the thread destruction code and from the process
+ * handle management code.
+ *
+ * @param process	Process to release.
+ */
+void process_release(process_t *process) {
+	bool empty;
+	int new;
+
+	spinlock_lock(&process->lock, 0);
+	new = refcount_dec(&process->count);
+	empty = list_empty(&process->threads);
+	spinlock_unlock(&process->lock);
+
+	if(empty) {
+		/* Protected by notifier mutex. */
+		notifier_run(&process->death_notifier, NULL, true);
+	}
+	if(new == 0) {
+		process_destroy(process);
+	}
 }
 
 /** Initialise the process table and slab cache. */
@@ -437,21 +458,64 @@ int kdbg_cmd_process(int argc, char **argv) {
 # pragma mark Process handle functions.
 #endif
 
+/** Notifier function for PROCESS_EVENT_DEATH waiting.
+ * @param arg1		Pointer to process.
+ * @param arg2		Unused.
+ * @param arg3		Wait structure pointer. */
+static void process_handle_death_notifier(void *arg1, void *arg2, void *arg3) {
+	handle_wait_t *wait = arg3;
+
+	assert(wait->info->data == arg1);
+	wait->cb(wait);
+}
+
+/** Signal that a process is being waited for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int process_handle_wait(handle_wait_t *wait) {
+	process_t *process = wait->info->data;
+
+	switch(wait->event) {
+	case PROCESS_EVENT_DEATH:
+		spinlock_lock(&process->lock, 0);
+		if(list_empty(&process->threads)) {
+			wait->cb(wait);
+			spinlock_unlock(&process->lock);
+			return 0;
+		}
+		spinlock_unlock(&process->lock);
+
+		notifier_register(&process->death_notifier, process_handle_death_notifier, wait);
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Stop waiting for a process.
+ * @param wait		Wait information structure. */
+static void process_handle_unwait(handle_wait_t *wait) {
+	process_t *process = wait->info->data;
+
+	switch(wait->event) {
+	case PROCESS_EVENT_DEATH:
+		notifier_unregister(&process->death_notifier, process_handle_death_notifier, wait);
+	}
+}
+
 /** Closes a handle to a process.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
 static int process_handle_close(handle_info_t *info) {
-	process_t *process = info->data;
-
-	if(refcount_dec(&process->count) == 0) {
-		process_destroy(process);
-	}
+	process_release(info->data);
 	return 0;
 }
 
 /** Process handle operations. */
 static handle_type_t process_handle_type = {
 	.id = HANDLE_TYPE_PROCESS,
+	.wait = process_handle_wait,
+	.unwait = process_handle_unwait,
 	.close = process_handle_close,
 };
 
@@ -732,9 +796,7 @@ handle_t sys_process_open(identifier_t id) {
 	mutex_unlock(&process_tree_lock);
 
 	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
-		if(refcount_dec(&process->count) == 0) {
-			process_destroy(process);
-		}
+		process_release(process);
 	}
 
 	return handle;

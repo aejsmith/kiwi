@@ -61,8 +61,11 @@ typedef struct process {
 	handle_table_t handles;		/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
 
-	notifier_t death_notifier;	/**< Notifier called when process dies. */
+	notifier_t death_notifier;	/**< Notifier for process death (do NOT add to when already dead). */
 } process_t;
+
+/** Process handle events. */
+#define PROCESS_EVENT_DEATH	1	/**< Wait for process death. */
 
 /** Process flag definitions */
 #define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */

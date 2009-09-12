@@ -427,7 +427,7 @@ int bios_interrupt(uint8_t num, bios_regs_t *regs) {
 }
 MODULE_EXPORT(bios_interrupt);
 
-/** Initialisation function for the BIOS driver.
+/** Initialisation function for the BIOS module.
  * @return		0 on success, negative error code on failure. */
 static int bios_init(void) {
 	int ret;
@@ -454,7 +454,7 @@ static int bios_init(void) {
 	return 0;
 }
 
-/** Unloading function for the BIOS driver.
+/** Unloading function for the BIOS module.
  * @return		0 on success, negative error code on failure. */
 static int bios_unload(void) {
 	return -ERR_NOT_IMPLEMENTED;

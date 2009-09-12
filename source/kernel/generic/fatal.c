@@ -74,7 +74,7 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 		cpu_halt_all();
 
 		/* Run callback functions registered. */
-		notifier_run_unlocked(&fatal_notifier, NULL);
+		notifier_run_unlocked(&fatal_notifier, NULL, false);
 
 		console_putch(LOG_NONE, '\n');
 		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_current_id(), kiwi_ver_string);

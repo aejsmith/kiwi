@@ -36,6 +36,9 @@ typedef struct process_args {
 	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
 } process_args_t;
 
+/** Process handle events. */
+#define PROCESS_EVENT_DEATH	1	/**< Wait for process death. */
+
 extern handle_t process_create(const char *path, char *const args[], char *const environ[], bool inherit);
 extern int process_replace(const char *path, char *const args[], char *const environ[], bool inherit);
 extern int process_duplicate(handle_t *handlep);

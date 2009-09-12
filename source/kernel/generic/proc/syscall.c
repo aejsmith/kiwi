@@ -61,6 +61,8 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_module_load,
 	(syscall_handler_t)sys_handle_close,
 	(syscall_handler_t)sys_handle_type,
+	(syscall_handler_t)sys_handle_wait,
+	(syscall_handler_t)sys_handle_wait_multiple,
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,

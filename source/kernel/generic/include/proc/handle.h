@@ -29,6 +29,7 @@
 #include <types/refcount.h>
 
 struct handle_info;
+struct handle_wait;
 
 /** Structure for storing information about a process' handles. */
 typedef struct handle_table {
@@ -40,6 +41,18 @@ typedef struct handle_table {
 /** Structure defining a handle type. */
 typedef struct handle_type {
 	int id;				/**< ID of the handle type. */
+
+	/** Signal that a handle is being waited for.
+	 * @note		If the event being waited for has occurred
+	 *			already, this function should call the callback
+	 *			function and return success.
+	 * @param wait		Wait information structure.
+	 * @return		0 on success, negative error code on failure. */
+	int (*wait)(struct handle_wait *wait);
+
+	/** Stop waiting for a handle.
+	 * @param wait		Wait information structure. */
+	void (*unwait)(struct handle_wait *wait);
 
 	/** Close a handle.
 	 * @param info		Pointer to handle structure being closed.
@@ -56,6 +69,18 @@ typedef struct handle_info {
 	rwlock_t lock;			/**< Lock to protect the handle. */
 } handle_info_t;
 
+/** Handle waiting information structure. */
+typedef struct handle_wait {
+	list_t header;			/**< Link to list for handle_wait_multiple(). */
+	handle_info_t *info;		/**< Handle being waited for. */
+	int event;			/**< Event ID being waited for. */
+	void *data;			/**< Internal implementation data pointer. */
+
+	/** Callback function for an event occurring.
+	 * @param wait		Wait structure. */
+	void (*cb)(struct handle_wait *wait);
+} handle_wait_t;
+
 /** Handle type ID definitions. */
 #define HANDLE_TYPE_FILE	1	/**< File. */
 #define HANDLE_TYPE_DIR		2	/**< Directory. */
@@ -67,6 +92,8 @@ extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *
 extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);
 extern void handle_release(handle_info_t *info);
 extern int handle_close(handle_table_t *table, handle_t handle);
+extern int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t timeout);
+extern int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, timeout_t timeout);
 
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
@@ -75,5 +102,7 @@ extern int kdbg_cmd_handles(int argc, char **argv);
 
 extern int sys_handle_close(handle_t handle);
 extern int sys_handle_type(handle_t handle);
+extern int sys_handle_wait(handle_t handle, int event, timeout_t timeout);
+extern int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout);
 
 #endif /* __PROC_HANDLE_H */

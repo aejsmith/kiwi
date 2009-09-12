@@ -21,6 +21,7 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 #include <kernel/handle.h>
+#include <kernel/process.h>
 
 #include <kiwi/Process.h>
 
@@ -107,8 +108,8 @@ int main(int argc, char **argv) {
 	ret = Process::create(proc, "console");
 	if(ret != 0) {
 		printf("Failed to create process (%d)\n", ret);
-	} else {
-		delete proc;
 	}
+	handle_wait(proc->get_handle_id(), PROCESS_EVENT_DEATH, 0);
+	delete proc;
 	while(1);
 }

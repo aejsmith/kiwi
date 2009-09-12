@@ -723,7 +723,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	curr_kdbg_frame = frame;
 
 	/* Run entry notifiers. */
-	notifier_run_unlocked(&kdbg_entry_notifier, NULL);
+	notifier_run_unlocked(&kdbg_entry_notifier, NULL, false);
 
 	sym = symbol_lookup_addr(frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
@@ -766,7 +766,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	}
 
 	/* Run exit notifiers. */
-	notifier_run_unlocked(&kdbg_exit_notifier, NULL);
+	notifier_run_unlocked(&kdbg_exit_notifier, NULL, false);
 
 	/* Resume other CPUs. */
 	cpu_resume_all();

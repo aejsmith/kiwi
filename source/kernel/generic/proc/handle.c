@@ -36,6 +36,12 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Handle waiting synchronization information structure. */
+typedef struct handle_wait_sync {
+	semaphore_t sem;		/**< Semaphore counting events. */
+	handle_wait_t *event;		/**< Handle that received first event (atomically set). */
+} handle_wait_sync_t;
+
 /** Slab cache for allocating handle information structures. */
 static slab_cache_t *handle_info_cache;
 
@@ -215,6 +221,92 @@ out:
 	return 0;
 }
 
+/** Handle waiting callback function.
+ * @param wait		Wait information structure. */
+static void handle_wait_cb(handle_wait_t *wait) {
+	handle_wait_sync_t *sync = wait->data;
+
+	__sync_bool_compare_and_swap(&sync->event, NULL, wait);
+	semaphore_up(&sync->sem, 1);
+}
+
+/** Wait for an event to happen on an object.
+ *
+ * Waits for the specified event to happen on an object referred to by a
+ * handle.
+ *
+ * @todo		Timeout.
+ *
+ * @param table		Table containing the handle.
+ * @param handle	Handle ID to wait on.
+ * @param event		Event ID to wait for (specific to object type).
+ * @param timeout	Maximum time to wait in microseconds. A value of 0
+ *			will wait indefinitely until an event occurs, and a
+ *			value of -1 will return immediately if the event has
+ *			not happened.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t timeout) {
+	handle_wait_sync_t sync;
+	handle_info_t *info;
+	handle_wait_t wait;
+	int ret;
+
+	if((ret = handle_get(table, handle, -1, &info)) != 0) {
+		return ret;
+	} else if(!info->type->wait || !info->type->unwait) {
+		handle_release(info);
+		return -ERR_NOT_SUPPORTED;
+	}
+
+	semaphore_init(&sync.sem, "handle_wait_sem", 0);
+	sync.event = NULL;
+	wait.info = info;
+	wait.event = event;
+	wait.data = &sync;
+	wait.cb = handle_wait_cb;
+
+	if((ret = info->type->wait(&wait)) != 0) {
+		handle_release(info);
+		return ret;
+	} else if((ret = semaphore_down(&sync.sem, (timeout < 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
+		info->type->unwait(&wait);
+		handle_release(info);
+		return ret;
+	}
+
+	info->type->unwait(&wait);
+	handle_release(info);
+	return 0;
+}
+
+/** Wait for events to happen on multiple objects.
+ *
+ * Waits for the one of the specified events to happen on an object.
+ *
+ * @param table		Table containing the handles.
+ * @param handles	Array of handle IDs to wait for.
+ * @param event		Array of event IDs to wait for (specific to object
+ *			type). The index into the array selects the handle the
+ *			event is for - for example, specifying 1 as the event
+ *			at index 1 will wait for event 1 on the handle at index
+ *			1 in the handle array. If you wish to wait for multiple
+ *			events on one handle, specify the handle multiple times
+ *			in the arrays.
+ * @param count		Number of handles.
+ * @param timeout	Maximum time to wait in microseconds. A value of 0
+ *			will wait indefinitely until an event occurs, and a
+ *			value of -1 will return immediately if the event has
+ *			not happened.
+ *
+ * @return		Index of handle that had the first event on success,
+ *			negative error code on failure.
+ */
+int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, timeout_t timeout) {
+	return -ERR_NOT_IMPLEMENTED;
+}
+
 /** Initialises a process' handle table.
  *
  * Initialises a process' handle table structure and duplicates handles
@@ -365,4 +457,47 @@ int sys_handle_type(handle_t handle) {
 	ret = info->type->id;
 	handle_release(info);
 	return ret;
+}
+
+/** Wait for an event to happen on an object.
+ *
+ * Waits for the specified event to happen on an object referred to by a
+ * handle.
+ *
+ * @param handle	Handle ID to wait on.
+ * @param event		Event ID to wait for (specific to object type).
+ * @param timeout	Maximum time to wait in microseconds. A value of 0
+ *			will wait indefinitely until an event occurs, and a
+ *			value of -1 will return immediately if the event has
+ *			not happened.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_handle_wait(handle_t handle, int event, timeout_t timeout) {
+	return handle_wait(&curr_proc->handles, handle, event, timeout);
+}
+
+/** Wait for events to happen on multiple objects.
+ *
+ * Waits for the one of the specified events to happen on an object.
+ *
+ * @param handles	Array of handle IDs to wait for.
+ * @param event		Array of event IDs to wait for (specific to object
+ *			type). The index into the array selects the handle the
+ *			event is for - for example, specifying 1 as the event
+ *			at index 1 will wait for event 1 on the handle at index
+ *			1 in the handle array. If you wish to wait for multiple
+ *			events on one handle, specify the handle multiple times
+ *			in the arrays.
+ * @param count		Number of handles.
+ * @param timeout	Maximum time to wait in microseconds. A value of 0
+ *			will wait indefinitely until an event occurs, and a
+ *			value of -1 will return immediately if the event has
+ *			not happened.
+ *
+ * @return		Index of handle that had the first event on success,
+ *			negative error code on failure.
+ */
+int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout) {
+	return -ERR_NOT_IMPLEMENTED;
 }

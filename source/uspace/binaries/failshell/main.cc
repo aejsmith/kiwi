@@ -18,6 +18,9 @@
  * @brief		Kiwi shell.
  */
 
+#include <kernel/handle.h>
+#include <kernel/process.h>
+
 #include <kiwi/Process.h>
 
 #include <stdio.h>
@@ -231,7 +234,7 @@ void Shell::do_command(int argc, char **argv) {
 	if((ret = Process::create(process, argv)) != 0) {
 		printf("Failed to run command '%s' (%d)\n", argv[0], ret);
 	} else {
-		/* TODO: Wait for process. Need to implement handle waiting. */
+		handle_wait(process->get_handle_id(), PROCESS_EVENT_DEATH, 0);
 		delete process;
 	}
 }
