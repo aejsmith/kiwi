@@ -56,9 +56,6 @@ extern size_t strspn(const char *s, const char *accept);
 extern char *strtok(char *str, const char *delim);
 extern char *strtok_r(char *str, const char *delim, char **saveptr);
 /* size_t strxfrm(char *, const char *, size_t); */
-
-/* Some stuff relies on these being defined here, even though they aren't
- * supposed to be... */
 extern int strcasecmp(const char *s1, const char *s2);
 extern int strncasecmp(const char *s1, const char *s2, size_t n);
 

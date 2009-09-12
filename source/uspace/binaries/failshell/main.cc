@@ -55,7 +55,7 @@ public:
 		if(argc > 1 && !SHELL_HELP(argc, argv)) {
 			nargs[0] = argv[1];
 			for(i = 0; i < Shell::m_command_count; i++) {
-				if(strcmp(argv[1], Shell::m_commands[i]->name()) == 0) {
+				if(strcmp(argv[1], Shell::m_commands[i]->Name()) == 0) {
 					(*Shell::m_commands[i])(shell, 2, const_cast<char **>(nargs));
 					return 0;
 				}
@@ -69,7 +69,7 @@ public:
 		printf("=======       ====\n");
 
 		for(i = 0; i < Shell::m_command_count; i++) {
-			printf("%-12s  %s\n", Shell::m_commands[i]->name(), Shell::m_commands[i]->description());
+			printf("%-12s  %s\n", Shell::m_commands[i]->Name(), Shell::m_commands[i]->Description());
 		}
 
 		return 0;
@@ -96,7 +96,7 @@ public:
 			return 0;
 		}
 
-		shell->exit();
+		shell->Exit();
 		return 0;
 	}
 };
@@ -106,7 +106,7 @@ static ExitCommand exit_command;
 
 /** Add a command to the shell.
  * @param cmd		Command to add. */
-void Shell::add_command(Command *cmd) {
+void Shell::AddCommand(Command *cmd) {
 	m_commands = reinterpret_cast<Command **>(realloc(m_commands, (m_command_count + 1) * sizeof(Command *)));
 	if(m_commands == NULL) {
 		printf("Could not add commands!");
@@ -118,20 +118,20 @@ void Shell::add_command(Command *cmd) {
 
 /** Main loop for the shell.
  * @return		Process exit code. */
-int Shell::run(void) {
+int Shell::Run(void) {
 	char **argv, *line;
 	int argc;
 
 	while(true) {
 		/* Print a prompt and read in the line. */
 		printf("Kiwi> ");
-		if(!(line = readline())) {
+		if(!(line = ReadLine())) {
 			printf("\nOut of memory\n");
 			return 1;
 		}
 
 		/* Split the string up. */
-		if(!splitline(line, argc, argv)) {
+		if(!SplitLine(line, argc, argv)) {
 			printf("Out of memory\n");
 			return 1;
 		} else if(!argc) {
@@ -139,7 +139,7 @@ int Shell::run(void) {
 			continue;
 		}
 
-		do_command(argc, argv);
+		RunCommand(argc, argv);
 		free(line);
 		free(argv);
 
@@ -152,7 +152,7 @@ int Shell::run(void) {
 
 /** Get a line of input.
  * @return		Pointer to buffer, or NULL if out of memory. */
-char *Shell::readline(void) {
+char *Shell::ReadLine(void) {
 	char *buf = NULL, *tmp;
 	size_t count = 0;
 	int ch;
@@ -188,7 +188,7 @@ char *Shell::readline(void) {
  * @param argc		Where to store argument count.
  * @param argv		Where to store argument array.
  * @return		True on success, false on failure. */
-bool Shell::splitline(char *line, int &argc, char **&argv) {
+bool Shell::SplitLine(char *line, int &argc, char **&argv) {
 	char **tmp, *tok;
 
 	argc = 0;
@@ -216,14 +216,14 @@ bool Shell::splitline(char *line, int &argc, char **&argv) {
 /** Run a command.
  * @param argc		Argument count.
  * @param argv		Argument array. */
-void Shell::do_command(int argc, char **argv) {
+void Shell::RunCommand(int argc, char **argv) {
 	Process *process;
 	size_t i;
 	int ret;
 
 	/* Try to match it against a built-in command. */
 	for(i = 0; i < m_command_count; i++) {
-		if(strcmp(argv[0], m_commands[i]->name()) == 0) {
+		if(strcmp(argv[0], m_commands[i]->Name()) == 0) {
 			if((ret = (*m_commands[i])(this, argc, argv)) != 0) {
 				printf("Command returned error status %d\n", ret);
 			}
@@ -248,5 +248,5 @@ int main(int argc, char **argv) {
 
 	printf("\n");
 	printf("Welcome to FailShell! (process %d)\n", Process::get_current_id());
-	return shell.run();
+	return shell.Run();
 }

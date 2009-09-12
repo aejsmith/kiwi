@@ -24,27 +24,27 @@
 #include <stdio.h>
 
 namespace std {
-	//using ::FILE;
+	using ::FILE;
 	//using ::fpos_t;
 
-	//using ::clearerr;
+	using ::clearerr;
 	//using ::ctermid;
-	//using ::fclose;
+	using ::fclose;
 	//using ::fdopen;
-	//using ::feof;
-	//using ::ferror;
+	using ::feof;
+	using ::ferror;
 	//using ::fflush;
-	//using ::fgetc;
+	using ::fgetc;
 	//using ::fgetpos;
-	//using ::fgets;
+	using ::fgets;
 	//using ::fileno;
 	//using ::flockfile;
-	//using ::fopen;
-	//using ::fprintf;
-	//using ::fputc;
-	//using ::fputs;
-	//using ::fread;
-	//using ::freopen;
+	using ::fopen;
+	using ::fprintf;
+	using ::fputc;
+	using ::fputs;
+	using ::fread;
+	using ::freopen;
 	//using ::fscanf;
 	//using ::fseek;
 	//using ::fseeko;
@@ -53,17 +53,17 @@ namespace std {
 	//using ::ftello;
 	//using ::ftrylockfile;
 	//using ::funlockfile;
-	//using ::fwrite;
-	//using ::getc;
-	//using ::getchar;
+	using ::fwrite;
+	using ::getc;
+	using ::getchar;
 	//using ::getc_unlocked;
 	//using ::getchar_unlocked;
-	//using ::gets;
+	using ::gets;
 	//using ::pclose;
 	//using ::perror;
 	//using ::popen;
 	using ::printf;
-	//using ::putc;
+	using ::putc;
 	using ::putchar;
 	//using ::putc_unlocked;
 	//using ::putchar_unlocked;
@@ -81,7 +81,7 @@ namespace std {
 	//using ::tmpfile;
 	//using ::tmpnam;
 	//using ::ungetc;
-	//using ::vfprintf;
+	using ::vfprintf;
 	//using ::vfscanf;
 	using ::vprintf;
 	//using ::vscanf;

@@ -37,16 +37,16 @@ public:
 		 * @param description	Command description. */
 		Command(const char *name, const char *description) :
 				m_name(name), m_description(description) {
-			Shell::add_command(this);
+			Shell::AddCommand(this);
 		}
 
 		/** Get the command name.
 		 * @return		Name of command. */
-		const char *name(void) { return m_name; }
+		const char *Name(void) { return m_name; }
 
 		/** Get the command description.
 		 * @return		Description of command. */
-		const char *description(void) { return m_description; }
+		const char *Description(void) { return m_description; }
 
 		/** Implementation of the command.
 		 * @param argc		Argument count.
@@ -67,33 +67,33 @@ public:
 
 	/** Add a command to the shell.
 	 * @param cmd		Command to add. */
-	static void add_command(Command *cmd);
+	static void AddCommand(Command *cmd);
 
 	/** Constructor. */
 	Shell(FILE *input) : m_input(input), m_exit(false) {}
 
 	/** Main loop for the shell.
 	 * @return		Process exit code. */
-	int run(void);
+	int Run(void);
 
 	/** Exit the shell after the current command finishes. */
-	void exit(void) { m_exit = true; }
+	void Exit(void) { m_exit = true; }
 private:
 	/** Get a line of input.
 	 * @return		Pointer to buffer. */
-	char *readline(void);
+	char *ReadLine(void);
 
 	/** Split a line into arguments/count.
 	 * @param line		Line to split (will be modified).
 	 * @param argc		Where to store argument count.
 	 * @param argv		Where to store argument array.
 	 * @return		True on success, false on failure. */
-	bool splitline(char *line, int &argc, char **&argv);
+	bool SplitLine(char *line, int &argc, char **&argv);
 
 	/** Run a command.
 	 * @param argc		Argument count.
 	 * @param argv		Argument array. */
-	void do_command(int argc, char **argv);
+	void RunCommand(int argc, char **argv);
 
 	FILE *m_input;			/**< Input stream. */
 	bool m_exit;			/**< Whether to exit the shell after the current command. */

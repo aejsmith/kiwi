@@ -44,7 +44,7 @@ extern FILE *stderr;
 
 #if 0
 /** Type describing a file offset. */
-typedef off_t fpos_t;
+typedef offset_t fpos_t;
 
 /** Size of buffers for IO streams. */
 #define BUFSIZ		2048

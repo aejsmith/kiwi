@@ -62,5 +62,5 @@ void __libsystem_init(process_args_t *args) {
                 __libsystem_fatal("Could not open stdio streams");
         }
 
-	process_exit(main(args->args_count, args->args, args->env));
+	exit(main(args->args_count, args->args, args->env));
 }

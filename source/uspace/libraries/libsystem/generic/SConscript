@@ -53,9 +53,12 @@ sources += [
 	File('stdio/vsnprintf.c'),
 
 	File('stdlib/abort.c'),
+	File('stdlib/abs.c'),
+	File('stdlib/bsearch.c'),
 	File('stdlib/environ.c'),
 	File('stdlib/exit.c'),
 	File('stdlib/malloc.c'),
+	File('stdlib/qsort.c'),
 	File('stdlib/strtoul.c'),
 
 	File('string/memchr.c'),
