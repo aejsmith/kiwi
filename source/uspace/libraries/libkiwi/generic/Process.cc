@@ -23,31 +23,26 @@
 
 #include <kiwi/Process.h>
 
-#include <cstdlib>
+#include <stdlib.h>
 #include <string.h>
 
 using namespace kiwi;
 
 extern char **environ;
 
-#if 0
-# pragma mark Object creation functions.
-#endif
-
 /* FIXME. */
 #define PATH_MAX 4096
 
-/** Create a new process. */
-int Process::create(Process *&process, char **args, char **env, bool inherit, bool usepath) {
+/** Internal creation function.
+ * @param args		NULL-terminated argument array.
+ * @param env		NULL-terminated environment variable array.
+ * @param inherit	Whether the new process should inherit handles.
+ * @param usepath	Whether to use the PATH environment variable. */
+void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
-	handle_t ret;
 	size_t len;
-
-	if(!(process = new Process)) {
-		return -ERR_NO_MEMORY;
-	}
 
 	if(usepath && !strchr(args[0], '/')) {
 		if(!(path = getenv("PATH"))) {
@@ -64,7 +59,8 @@ int Process::create(Process *&process, char **args, char **env, bool inherit, bo
 				cur--;
 			} else {
 				if((next - cur) >= (PATH_MAX - 3)) {
-					return -ERR_PARAM_INVAL;
+					m_init_status = ERR_PARAM_INVAL;
+					return;
 				}
 
 				memcpy(buf, cur, (size_t)(next - cur));
@@ -73,17 +69,17 @@ int Process::create(Process *&process, char **args, char **env, bool inherit, bo
 			buf[next - cur] = '/';
 			len = strlen(args[0]);
 			if(len + (next - cur) >= (PATH_MAX - 2)) {
-				return -ERR_PARAM_INVAL;
+				m_init_status = ERR_PARAM_INVAL;
+				return;
 			}
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			if((ret = process_create(buf, args, (env) ? env : environ, inherit)) >= 0) {
-				process->m_handle = ret;
-				return 0;
-			} else if(ret != -ERR_NOT_FOUND) {
-				delete process;
-				return ret;
+			if((m_handle = process_create(buf, args, (env) ? env : environ, inherit)) >= 0) {
+				return;
+			} else if(m_handle != -ERR_NOT_FOUND) {
+				m_init_status = -m_handle;
+				return;
 			}
 
 			if(*next == 0) {
@@ -92,28 +88,37 @@ int Process::create(Process *&process, char **args, char **env, bool inherit, bo
 			next++;
 		}
 
-		delete process;
-		return -ERR_NOT_FOUND;
+		m_init_status = ERR_NOT_FOUND;
+		return;
 	} else {
-		if((ret = process_create(args[0], args, (env) ? env : environ, inherit)) < 0) {
-			delete process;
-			return ret;
+		if((m_handle = process_create(args[0], args, (env) ? env : environ, inherit)) < 0) {
+			m_init_status = -m_handle;
 		}
-
-		process->m_handle = ret;
-		return 0;
 	}
 }
 
-/** Create a new process. */
-int Process::create(Process *&process, const char *cmdline, char **env, bool inherit, bool usepath) {
+/** Create a new process.
+ * @param args		NULL-terminated argument array.
+ * @param env		NULL-terminated environment variable array.
+ * @param inherit	Whether the new process should inherit handles.
+ * @param usepath	Whether to use the PATH environment variable. */
+Process::Process(char **args, char **env, bool inherit, bool usepath) : m_init_status(0)  {
+	_Init(args, env, inherit, usepath);
+}
+
+/** Create a new process.
+ * @param cmdline	Command line string.
+ * @param env		NULL-terminated environment variable array.
+ * @param inherit	Whether the new process should inherit handles.
+ * @param usepath	Whether to use the PATH environment variable. */
+Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) : m_init_status(0)  {
 	char **args = NULL, **tmp, *tok, *dup, *orig;
 	size_t count = 0;
-	int ret;
 
 	/* Duplicate the command line string so we can modify it. */
 	if(!(orig = strdup(cmdline))) {
-		return -ERR_NO_MEMORY;
+		m_init_status = ERR_NO_MEMORY;
+		return;
 	}
 	dup = orig;
 
@@ -127,7 +132,8 @@ int Process::create(Process *&process, const char *cmdline, char **env, bool inh
 		if(!(tmp = reinterpret_cast<char **>(realloc(args, (count + 2) * sizeof(char *))))) {
 			free(orig);
 			free(args);
-			return -ERR_NO_MEMORY;
+			m_init_status = ERR_NO_MEMORY;
+			return;
 		}
 		args = tmp;
 
@@ -139,42 +145,53 @@ int Process::create(Process *&process, const char *cmdline, char **env, bool inh
 	}
 
 	if(!count) {
-		return -ERR_PARAM_INVAL;
+		m_init_status = ERR_PARAM_INVAL;
+		return;
 	}
 
-	ret = create(process, args, env, inherit);
+	_Init(args, env, inherit, usepath);
 	free(args);
 	free(orig);
-	return ret;
 }
 
-/** Open an existing process. */
-int Process::open(Process *&process, identifier_t id) {
-	handle_t ret;
-
-	if(!(process = new Process)) {
-		return -ERR_NO_MEMORY;
-	} else if((ret = process_open(id)) < 0) {
-		delete process;
-		return ret;
+/** Open an existing process.
+ * @param id		ID of the process to open. */
+Process::Process(identifier_t id) : m_init_status(0) {
+	if((m_handle = process_open(id)) < 0) {
+		m_init_status = -m_handle;
 	}
-
-	process->m_handle = ret;
-	return 0;
 }
 
-#if 0
-# pragma mark Object manipulation functions.
-#endif
+/** Check whether initialisation was successful.
+ * @param status	Optional pointer to integer to store error code in if
+ *			not successful.
+ * @return		True if successful, false if not. */
+bool Process::Initialised(int *status) const {
+	if(m_init_status != 0) {
+		if(status) {
+			*status = m_init_status;
+		}
+		return false;
+	} else {
+		return true;
+	}
+}
 
-/** Get the ID of the process this object refers to.
+/** Wait for the process to die.
+ * @param timeout	Timeout in microseconds.
+ * @return		0 on success, error code on failure. */
+int Process::WaitTerminate(timeout_t timeout) const {
+	return Wait(PROCESS_EVENT_DEATH, timeout);
+}
+
+/** Get the ID of the process.
  * @return		ID of the process. */
-identifier_t Process::get_id(void) {
+identifier_t Process::GetID(void) const {
 	return process_id(m_handle);
 }
 
 /** Get the ID of the current process.
  * @return		ID of the current process. */
-identifier_t Process::get_current_id(void) {
+identifier_t Process::GetCurrentID(void) {
 	return process_id(-1);
 }

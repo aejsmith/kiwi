@@ -82,8 +82,8 @@ void tlb_invalidate(vm_aspace_t *as, ptr_t start, ptr_t end) {
 			return;
 		}
 
-		/* There are other users of the address space. Need to deliver a TLB
-		 * invalidation request to them. */
+		/* There are other users of the address space. Need to deliver
+		 * a TLB invalidation request to them. */
 		LIST_FOREACH(&cpus_running, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu == curr_cpu || (as != NULL && cpu->aspace != as)) {

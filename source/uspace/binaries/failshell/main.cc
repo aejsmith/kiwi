@@ -217,7 +217,6 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
  * @param argc		Argument count.
  * @param argv		Argument array. */
 void Shell::RunCommand(int argc, char **argv) {
-	Process *process;
 	size_t i;
 	int ret;
 
@@ -231,12 +230,11 @@ void Shell::RunCommand(int argc, char **argv) {
 		}
 	}
 
-	if((ret = Process::create(process, argv)) != 0) {
+	Process proc(argv);
+	if(!proc.Initialised(&ret)) {
 		printf("Failed to run command '%s' (%d)\n", argv[0], ret);
-	} else {
-		handle_wait(process->get_handle_id(), PROCESS_EVENT_DEATH, 0);
-		delete process;
 	}
+	proc.WaitTerminate();
 }
 
 /** Main function for FailShell.
@@ -247,6 +245,6 @@ int main(int argc, char **argv) {
 	Shell shell(stdin);
 
 	printf("\n");
-	printf("Welcome to FailShell! (process %d)\n", Process::get_current_id());
+	printf("Welcome to FailShell! (process %d)\n", Process::GetCurrentID());
 	return shell.Run();
 }

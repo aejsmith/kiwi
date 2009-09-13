@@ -22,11 +22,30 @@
 
 #include <kiwi/Handle.h>
 
+#include <stdlib.h>
+
 using namespace kiwi;
+
+/** Handle constructor. */
+Handle::Handle() : m_handle(-1) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
 	if(m_handle >= 0) {
 		handle_close(m_handle);
 	}
+}
+
+/** Wait for a handle event.
+ * @param event		Event to wait for.
+ * @param timeout	Timeout in microseconds.
+ * @return		0 on success, error code on failure. */
+int Handle::Wait(int event, timeout_t timeout) const {
+	return abs(handle_wait(m_handle, event, timeout));
+}
+
+/** Get the ID of the handle.
+ * @return		ID of the handle. */
+handle_t Handle::GetHandleID(void) const {
+	return m_handle;
 }

@@ -121,16 +121,14 @@ Console::~Console() {
 int Console::Run(const char *cmdline) {
 	char buf[1024];
 	char *env[] = { const_cast<char *>("PATH=/system/binaries"), buf, NULL };
-	Process *proc;
 	int ret;
 
 	sprintf(buf, "CONSOLE=/console/%d/slave", m_id);
 
-	if((ret = Process::create(proc, cmdline, env, false, true)) != 0) {
+	Process proc(cmdline, env, false, true);
+	if(!proc.Initialised(&ret)) {
 		return ret;
 	}
-
-	delete proc;
 	return 0;
 }
 

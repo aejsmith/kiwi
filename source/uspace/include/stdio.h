@@ -67,12 +67,17 @@ typedef offset_t fpos_t;
 //#define P_tmpdir	"/System/Temp"
 #endif
 
+/** Actions for fseek(). */
+#define SEEK_SET	1	/**< Set the offset to the exact position specified. */
+#define SEEK_CUR	2	/**< Add the supplied value to the current offset. */
+#define SEEK_END	3	/**< Set the offset to the end of the file plus the supplied value. */
+
 extern void clearerr(FILE *stream);
 /* char *ctermid(char *); */
 extern int fclose(FILE *stream);
 extern int feof(FILE *stream);
 extern int ferror(FILE *stream);
-//extern int fflush(FILE *stream);
+extern int fflush(FILE *stream);
 extern int fgetc(FILE *stream);
 /* int fgetpos(FILE *, fpos_t *); */
 extern char *fgets(char *s, int size, FILE *stream);
@@ -85,11 +90,9 @@ extern int fputs(const char *s, FILE *stream);
 extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 extern FILE *freopen(const char *path, const char *mode, FILE *stream);
 //extern int fscanf(FILE *stream, const char *fmt, ...);
-//extern int fseek(FILE *stream, long off, int act);
-//extern int fseeko(FILE *stream, off_t off, int act);
+extern int fseek(FILE *stream, long off, int act);
 /* int fsetpos(FILE *, const fpos_t *); */
-//extern long ftell(FILE *stream);
-//extern off_t ftello(FILE *stream);
+extern long ftell(FILE *stream);
 /* int ftrylockfile(FILE *); */
 /* void funlockfile(FILE *); */
 extern size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
@@ -109,7 +112,7 @@ extern int putchar(int ch);
 extern int puts(const char *s);
 //extern int remove(const char *path);
 //extern int rename(const char *source, const char *dest);
-//extern void rewind(FILE *stream);
+extern void rewind(FILE *stream);
 //extern int scanf(const char *fmt, ...);
 /* void setbuf(FILE *, char *); */
 /* int setvbuf(FILE *, char *, int, size_t); */

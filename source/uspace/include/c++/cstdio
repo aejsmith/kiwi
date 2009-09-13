@@ -30,10 +30,9 @@ namespace std {
 	using ::clearerr;
 	//using ::ctermid;
 	using ::fclose;
-	//using ::fdopen;
 	using ::feof;
 	using ::ferror;
-	//using ::fflush;
+	using ::fflush;
 	using ::fgetc;
 	//using ::fgetpos;
 	using ::fgets;
@@ -46,11 +45,9 @@ namespace std {
 	using ::fread;
 	using ::freopen;
 	//using ::fscanf;
-	//using ::fseek;
-	//using ::fseeko;
+	using ::fseek;
 	//using ::fsetpos;
-	//using ::ftell;
-	//using ::ftello;
+	using ::ftell;
 	//using ::ftrylockfile;
 	//using ::funlockfile;
 	using ::fwrite;
@@ -70,7 +67,7 @@ namespace std {
 	using ::puts;
 	//using ::remove;
 	//using ::rename;
-	//using ::rewind;
+	using ::rewind;
 	//using ::scanf;
 	//using ::setbuf;
 	//using ::setvbuf;

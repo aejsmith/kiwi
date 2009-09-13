@@ -96,20 +96,22 @@ int main(int argc, char **argv) {
 	Process *proc;
 	int ret;
 
-	if(Process::get_current_id() != 1) {
+	if(Process::GetCurrentID() != 1) {
 		printf("startup: not process 1, exiting...\n");
-		return 0;
+		return 1;
 	}
 
 	if((ret = load_modules("/system/modules")) != 0) {
-		return -ret;
+		return 1;
 	}
 
-	ret = Process::create(proc, "console");
-	if(ret != 0) {
+	proc = new Process("/system/binaries/console");
+	if(!proc->Initialised(&ret)) {
 		printf("Failed to create process (%d)\n", ret);
+		delete proc;
+		return 1;
 	}
-	handle_wait(proc->get_handle_id(), PROCESS_EVENT_DEATH, 0);
+	proc->WaitTerminate();
 	delete proc;
 	while(1);
 }

@@ -329,7 +329,7 @@ static thread_t *sched_queue_pick(sched_cpu_t *cpu) {
 		cpu->count[i]--;
 
 		atomic_dec(&threads_runnable);
-		atomic_dec(&curr_cpu->sched->runnable);
+		atomic_dec(&cpu->runnable);
 
 		/* Only lock the new thread if it isn't the current - the
 		 * current gets locked by sched_internal(). */
@@ -361,7 +361,7 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 	cpu->count[thread->priority]++;
 	list_append(&cpu->queues[thread->priority], &thread->header);
 
-	atomic_inc(&curr_cpu->sched->runnable);
+	atomic_inc(&cpu->runnable);
 	atomic_inc(&threads_runnable);
 }
 

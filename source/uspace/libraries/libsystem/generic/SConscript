@@ -41,12 +41,14 @@ sources += [
 
 	File('stdio/do_printf.c'),
 	File('stdio/fclose.c'),
+	File('stdio/fflush.c'),
 	File('stdio/fgetc.c'),
 	File('stdio/fgets.c'),
 	File('stdio/fopen.c'),
 	File('stdio/fputc.c'),
 	File('stdio/fputs.c'),
 	File('stdio/fread.c'),
+	File('stdio/fseek.c'),
 	File('stdio/fstatus.c'),
 	File('stdio/fwrite.c'),
 	File('stdio/vfprintf.c'),
@@ -59,6 +61,7 @@ sources += [
 	File('stdlib/exit.c'),
 	File('stdlib/malloc.c'),
 	File('stdlib/qsort.c'),
+	File('stdlib/rand.c'),
 	File('stdlib/strtoul.c'),
 
 	File('string/memchr.c'),

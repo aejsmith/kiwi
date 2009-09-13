@@ -240,10 +240,10 @@ static void handle_wait_cb(handle_wait_t *wait) {
  * @param table		Table containing the handle.
  * @param handle	Handle ID to wait on.
  * @param event		Event ID to wait for (specific to object type).
- * @param timeout	Maximum time to wait in microseconds. A value of 0
- *			will wait indefinitely until an event occurs, and a
- *			value of -1 will return immediately if the event has
- *			not happened.
+ * @param timeout	Maximum time to wait in microseconds. A value of 0 will
+ *			return immediately if the event has not happened, and
+ *			a value of -1 will block indefinitely until the event
+ *			happens.
  *
  * @return		0 on success, negative error code on failure.
  */
@@ -270,7 +270,7 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
 	if((ret = info->type->wait(&wait)) != 0) {
 		handle_release(info);
 		return ret;
-	} else if((ret = semaphore_down(&sync.sem, (timeout < 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
+	} else if((ret = semaphore_down(&sync.sem, (timeout == 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
 		info->type->unwait(&wait);
 		handle_release(info);
 		return ret;
@@ -295,10 +295,10 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
  *			events on one handle, specify the handle multiple times
  *			in the arrays.
  * @param count		Number of handles.
- * @param timeout	Maximum time to wait in microseconds. A value of 0
- *			will wait indefinitely until an event occurs, and a
- *			value of -1 will return immediately if the event has
- *			not happened.
+ * @param timeout	Maximum time to wait in microseconds. A value of 0 will
+ *			return immediately if none of the events have happened,
+ *			and a  value of -1 will block indefinitely until one of
+ *			the events happen.
  *
  * @return		Index of handle that had the first event on success,
  *			negative error code on failure.

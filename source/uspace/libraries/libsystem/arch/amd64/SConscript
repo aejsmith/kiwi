@@ -18,3 +18,7 @@ Import('env', 'sources')
 env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
 env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
 env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])
+
+sources += [
+	File('setjmp.S'),
+]

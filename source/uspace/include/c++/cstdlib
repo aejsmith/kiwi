@@ -50,11 +50,11 @@ namespace std {
 	//using ::mkstemp;
 	//using ::putenv;
 	using ::qsort;
-	//using ::rand;
-	//using ::rand_r;
+	using ::rand;
+	using ::rand_r;
 	using ::realloc;
 	//using ::setenv;
-	//using ::srand;
+	using ::srand;
 	//using ::strtod;
 	//using ::strtof;
 	using ::strtol;

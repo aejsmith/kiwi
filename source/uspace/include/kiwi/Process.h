@@ -25,11 +25,13 @@
 
 namespace kiwi {
 
-/** Class providing functionality to create and manipulate other processes. */
+/** Class providing functionality to create and manipulate processes. */
 class Process : public Handle {
 public:
 	/** Create a new process.
-	 * @param process	Pointer to store object pointer in.
+	 * @note		After creating the object you should call
+	 *			Initialised() to check if initialisation
+	 *			succeeded.
 	 * @param args		NULL-terminated argument array. First entry
 	 *			should be the path to the program to run.
 	 * @param env		NULL-terminated environment variable array. A
@@ -43,12 +45,13 @@ public:
 	 *			a '/' character, then it will be looked up in
 	 *			all directories listed in the PATH environment
 	 *			variable. The first match will be executed. The
-	 *			default value for this is true.
-	 * @return		0 on success, negative error code on failure. */
-	static int create(Process *&process, char **args, char **env = 0, bool inherit = true, bool usepath = true);
+	 *			default value for this is true. */
+	Process(char **args, char **env = 0, bool inherit = true, bool usepath = true);
 
 	/** Create a new process.
-	 * @param process	Pointer to store object pointer in.
+	 * @note		After creating the object you should call
+	 *			Initialised() to check if initialisation
+	 *			succeeded.
 	 * @param cmdline	Command line string, each argument seperated by
 	 *			spaces. First part of the string should be the
 	 *			path to the program to run. If this first
@@ -66,26 +69,47 @@ public:
 	 *			a '/' character, then it will be looked up in
 	 *			all directories listed in the PATH environment
 	 *			variable. The first match will be executed. The
-	 *			default value for this is true.
-	 * @return		0 on success, negative error code on failure. */
-	static int create(Process *&process, const char *cmdline, char **env = 0, bool inherit = true, bool usepath = true);
+	 *			default value for this is true. */
+	Process(const char *cmdline, char **env = 0, bool inherit = true, bool usepath = true);
 
 	/** Open an existing process.
-	 * @param process	Pointer to store object pointer in.
-	 * @param id		ID of the process to open.
-	 * @return		0 on success, negative error code on failure. */
-	static int open(Process *&process, identifier_t id);
+	 * @note		After creating the object you should call
+	 *			Initialised() to check if initialisation
+	 *			succeeded.
+	 * @param id		ID of the process to open. */
+	Process(identifier_t id);
 
-	/** Get the ID of the process this object refers to.
+	/** Check whether initialisation was successful.
+	 * @param status	Optional pointer to integer to store error
+	 *			code in if not successful.
+	 * @return		True if successful, false if not. */
+	bool Initialised(int *status = 0) const;
+
+	/** Wait for the process to die.
+	 * @param timeout	Timeout in microseconds. A value of 0 will
+	 *			return an error immediately if the process has
+	 *			not already terminated, and a value of -1 (the
+	 *			default) will block indefinitely until the
+	 *			process terminates.
+	 * @return		0 on success, error code on failure. */
+	int WaitTerminate(timeout_t timeout = -1) const;
+
+	/** Get the ID of the process.
 	 * @return		ID of the process. */
-	identifier_t get_id(void);
+	identifier_t GetID(void) const;
 
 	/** Get the ID of the current process.
 	 * @return		ID of the current process. */
-	static identifier_t get_current_id(void);
-protected:
-	/** Process objects must be created via the create/open functions. */
-	Process() {}
+	static identifier_t GetCurrentID(void);
+private:
+	/** Internal creation function.
+	 * @param args		NULL-terminated argument array.
+	 * @param env		NULL-terminated environment variable array.
+	 * @param inherit	Whether the new process should inherit handles.
+	 * @param usepath	Whether to use the PATH environment variable. */
+	void _Init(char **args, char **env, bool inherit, bool usepath);
+
+	int m_init_status;		/**< Initialisation status. */
 };
 
 };

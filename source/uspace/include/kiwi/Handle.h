@@ -33,14 +33,26 @@ public:
 	/** Destructor to close the handle. */
 	~Handle();
 
-	/** Get the ID of this handle.
+	/** Wait for a handle event.
+	 * @note		Derived classes should implement their own
+	 *			functions to wait for events on top of this
+	 *			function, which should be used rather than
+	 *			using this function directly.
+	 * @param event		Event to wait for (specific to handle type).
+	 * @param timeout	Timeout in microseconds. A value of 0 will
+	 *			return an error immediately if the event has
+	 *			not already happened, and a value of -1 (the
+	 *			default) will block indefinitely until the
+	 *			event happens.
+	 * @return		0 on success, error code on failure. */
+	int Wait(int event, timeout_t timeout = -1) const;
+
+	/** Get the ID of the handle.
 	 * @return		ID of the handle. */
-	handle_t get_handle_id(void) {
-		return m_handle;
-	}
+	handle_t GetHandleID(void) const;
 protected:
 	/** Handle class cannot be instantiated directly. */
-	Handle() : m_handle(-1) {}
+	Handle();
 
 	handle_t m_handle;		/**< Handle ID for the process. */
 };
