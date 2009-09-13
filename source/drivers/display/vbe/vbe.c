@@ -189,10 +189,6 @@ static int vbe_init(void) {
 		modes[count].height = minfo->y_resolution;
 		modes[count].bpp = minfo->bits_per_pixel;
 		modes[count].offset = minfo->phys_base_ptr;
-		kprintf(LOG_DEBUG, "vbe: detected mode 0x%" PRIx16 " 0x%" PRIx32 " (%dx%dx%d)\n",
-			modes[count].id, modes[count].offset, modes[count].width, modes[count].height,
-			modes[count].bpp);
-
 		count++;
 
 		/* Try to guess the memory address. */
