@@ -175,36 +175,6 @@ bool waitq_wake(waitq_t *waitq, bool all) {
 	return woken;
 }
 
-/** Interrupt a sleeping thread.
- *
- * Interrupts a thread that is sleeping on a wait queue if possible.
- *
- * @param thread	Thread to interrupt.
- */
-void waitq_interrupt(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
-
-	assert(thread->state == THREAD_SLEEPING);
-	assert(thread->waitq);
-
-	if(thread->interruptible) {
-		spinlock_lock(&thread->waitq->lock, 0);
-		list_remove(&thread->waitq_link);
-		spinlock_unlock(&thread->waitq->lock);
-
-		/* Restore the interruption context. */
-		thread->context = thread->sleep_context;
-
-		thread->state = THREAD_READY;
-		sched_thread_insert(thread);
-
-		thread->waitq = NULL;
-		thread->interruptible = false;
-	}
-
-	spinlock_unlock(&thread->lock);
-}
-
 /** Check if a wait queue is empty.
  *
  * Checks if a wait queue is empty.

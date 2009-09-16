@@ -193,6 +193,38 @@ void thread_run(thread_t *thread) {
 	spinlock_unlock(&thread->lock);
 }
 
+/** Interrupt a sleeping thread.
+ *
+ * Interrupts a thread that is sleeping on a wait queue if possible. Should
+ * only be called by wait queue code, as it does not take the wait queue lock.
+ *
+ * @param thread	Thread to interrupt.
+ *
+ * @return		Whether the thread was interrupted.
+ */
+bool thread_interrupt(thread_t *thread) {
+	bool ret;
+
+	spinlock_lock(&thread->lock, 0);
+
+	assert(thread->state == THREAD_SLEEPING);
+	assert(thread->waitq);
+
+	if((ret = thread->interruptible)) {
+		list_remove(&thread->waitq_link);
+
+		/* Restore the interruption context and queue it to run. */
+		thread->context = thread->sleep_context;
+		thread->waitq = NULL;
+		thread->interruptible = false;
+		thread->state = THREAD_READY;
+		sched_thread_insert(thread);
+	}
+
+	spinlock_unlock(&thread->lock);
+	return ret;
+}
+
 /** Lookup a thread.
  *
  * Looks for a thread with the specified id in the thread tree. Created/dead

@@ -102,6 +102,7 @@ typedef struct thread {
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern void thread_run(thread_t *thread);
+extern bool thread_interrupt(thread_t *thread);
 
 extern thread_t *thread_lookup(identifier_t id);
 extern void thread_rename(thread_t *thread, const char *name);

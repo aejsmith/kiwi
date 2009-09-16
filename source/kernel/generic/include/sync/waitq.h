@@ -27,7 +27,6 @@
 #include <types/list.h>
 
 struct mutex;
-struct thread;
 
 /** Structure containing a thread wait queue. */
 typedef struct waitq {
@@ -57,7 +56,6 @@ typedef struct waitq {
 
 extern int waitq_sleep(waitq_t *waitq, struct mutex *mtx, spinlock_t *sl, int flags);
 extern bool waitq_wake(waitq_t *waitq, bool all);
-extern void waitq_interrupt(struct thread *thread);
 
 extern bool waitq_empty(waitq_t *waitq);
 
