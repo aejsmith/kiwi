@@ -60,6 +60,8 @@ typedef struct process {
 	list_t threads;			/**< List of threads. */
 	handle_table_t handles;		/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
+	semaphore_t conn_sem;		/**< IPC connection semaphore. */
+	list_t connections;		/**< In-progress IPC connection queue. */
 
 	notifier_t death_notifier;	/**< Notifier for process death (do NOT add to when already dead). */
 } process_t;

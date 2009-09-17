@@ -54,7 +54,7 @@ typedef struct handle_type {
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct handle_wait *wait);
 
-	/** Close a handle.
+	/** Close a handle when all references to it are gone.
 	 * @param info		Pointer to handle structure being closed.
 	 * @return		0 if handle can be closed, negative error code
 	 *			if not. */
@@ -87,6 +87,7 @@ typedef struct handle_wait {
 #define HANDLE_TYPE_PROCESS	3	/**< Process. */
 #define HANDLE_TYPE_THREAD	4	/**< Thread. */
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
+#define HANDLE_TYPE_IPC		6	/**< IPC connection. */
 
 extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data);
 extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);

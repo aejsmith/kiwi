@@ -1,0 +1,134 @@
+Kiwi IPC
+========
+
+License
+-------
+
+This document is distributed under the terms of the [Creative Commons
+Attribution-Noncommercial-Share Alike 3.0 Unported](http://creativecommons.org/
+licenses/by-nc-sa/3.0/) license.
+
+Introduction
+------------
+
+The purpose of this document is to explain how the IPC system used in Kiwi
+works.
+
+There are 2 main concepts within the IPC system:
+
+ * _Connection_
+
+   A connection is a bi-directional communication channel between two
+   processes.
+
+ * _Message_
+
+   A message is the data transferred through a connection.
+
+Connections
+-----------
+
+A process creates a connection by calling `ipc_connection_open` with the ID of
+the process it wishes to connect to. The call will block either until the
+specified timeout passes, or until the process accepts the connection. This
+means that attempting to connect to a process that is not accepting connections
+will just block. When a connection is established, the processes are given a
+handle referring to their end of the connection, which can be used to send
+and receive messages.
+
+Messages
+--------
+
+A message consists of a type (a 32-bit integer that can be used by the
+recipient to determine what the message contains) and a variable-length data
+buffer.
+
+Messages are sent asynchronously, and are queued to their destination in a FIFO
+fashion. There is a limit on the number of messages that can be queued at any
+one time - if an attempt to send a message is made and the destination's
+message queue is full, then the send call will block until there is space in
+the queue.
+
+API
+---
+
+The following section describes the system call API for the IPC system. All
+functions and types are defined in the header file `kernel/ipc.h`.
+
+### Connections
+
+The following functions are provided for connecting to services.
+
+    handle_t ipc_connection_open(identifier_t id, timeout_t timeout);
+
+The `ipc_connection_open` function opens a connection to a process. Upon
+success, this function returns a handle referring to the caller's end of the
+connection. The function will block until either the connection is accepted,
+or until the timeout expires, in which case it will return an error. The
+timeout is specified in microseconds. If the timeout is specified as -1,
+the function will block indefinitely until the connection can be made.
+
+When the connection is no longer required, the handle should be closed with
+`handle_close`. Doing so will discard all messages queued on the caller's end
+of the connection, and attempts to send messages by the other end of the
+connection after the connection has been closed will return an error.
+
+    handle_t ipc_connection_listen(timeout_t timeout, identifier_t *pidp);
+
+The `ipc_connection_listen` function waits for a connection to be made to the
+calling process. The `timeout` argument for this function behaves the same as
+for `ipc_connection_open`. Upon success, a handle referring to the caller's end
+of the connection will be returned, and the ID of the process that made the
+connection will be placed in `pidp`.
+
+### Messages
+
+The following types are defined related to messages.
+
+    typedef struct ipc_message_vector {
+    	uint32_t type;
+    	void *buf;
+    	size_t size;
+    } ipc_message_vector_t;
+
+The following functions are provided to send and receive messages.
+
+    int ipc_message_send(handle_t handle, uint32_t type, void *buf,
+                         size_t size);
+
+The `ipc_message_send` function asynchronously sends a message through a
+connection, and queues it at the other end. If the remote message queue is
+full, then the caller will block until space is available.
+
+    int ipc_message_send_vector(handle_t handle, ipc_message_vector_t *vec,
+                                size_t count);
+
+The `ipc_message_send_vector` function is capable of sending multiple messages
+on a single call. The call should be provided with a pointer to an array of
+`ipc_message_vector_t` structures, which describe the messages to send. The
+messages are sent in the order that they are in the array. The operation is
+atomic: the destination will not receive any of the messages until all have
+been successfully queued, and if a failure occurs, it will receive none of the
+messages.
+
+    int ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
+                            void *buf, size_t *size);
+
+The `ipc_message_receive` function attempts to receive a message from a
+connection. The function will block until either a message is available to
+receive, or until the timeout expires, in which case it will return an error.
+The timeout is specified in microseconds. If the timeout is specified as -1,
+the function will block indefinitely until a message is received.
+
+Since the caller may not know the size of the message it is receiving, the
+function can be called with a NULL buffer pointer. When this is done, the type
+and size of the message will be returned, but the message will remain queued
+on the connection. This allows a process to wait for a message, allocate a
+buffer large enough to store it, and then receive it. It is highly recommended
+that this be done, rather than just passing a buffer and hoping that it is the
+correct size - you cannot be certain that the process you are connected to will
+send a message the size you expect.
+
+If the function is called with `type`, `buf` and `size` set to NULL, the next
+message received will be discarded. This may need to be done if, for example,
+a buffer big enough for a queued message cannot be allocated.

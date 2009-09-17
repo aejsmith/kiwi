@@ -50,7 +50,7 @@ void notifier_init(notifier_t *notif, void *data) {
  *
  * @param notif		Notifier to destroy.
  */
-void notifier_destroy(notifier_t *notif) {
+void notifier_empty(notifier_t *notif) {
 	notifier_func_t *nf;
 
 	mutex_lock(&notif->lock, 0);

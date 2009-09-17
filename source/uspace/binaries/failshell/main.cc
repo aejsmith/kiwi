@@ -170,13 +170,9 @@ char *Shell::ReadLine(void) {
 		if(ch == '\b') {
 			if(count > 0) {
 				buf[--count] = 0;
-				putchar(ch);
-				putchar(' ');
-				putchar(ch);
 			}
 		} else {
 			buf[count++] = (ch == '\n') ? 0 : (unsigned char)ch;
-			putchar(ch);
 		}
 	} while(ch != '\n');
 

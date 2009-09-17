@@ -12,13 +12,8 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
+Import('env', 'config', 'envmgr')
 
-SConscript(dirs=[
-	'console',
-	'failshell',
-	'ping',
-	'pong',
-	'rtld',
-	'startup',
-], exports=['env'])
+env.Program('ping', [
+	'main.cc',
+])

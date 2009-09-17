@@ -33,6 +33,7 @@ extern "C" {
 #define HANDLE_TYPE_PROCESS	3	/**< Process. */
 #define HANDLE_TYPE_THREAD	4	/**< Thread. */
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
+#define HANDLE_TYPE_IPC		6	/**< IPC connection. */
 
 extern int handle_close(handle_t handle);
 extern int handle_type(handle_t handle);

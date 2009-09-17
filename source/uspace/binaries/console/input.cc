@@ -149,6 +149,11 @@ void InputDevice::_ThreadEntry(void *arg) {
 			ch = m_keymap[code];
 		}
 
+		Console::GetActive()->Output(ch);
+		if(ch == '\b') {
+			Console::GetActive()->Output(' ');
+			Console::GetActive()->Output('\b');
+		}
 		Console::GetActive()->Input(ch);
 	}
 }

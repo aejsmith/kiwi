@@ -30,7 +30,7 @@
  * @return		Pointer to character found, or NULL if none found.
  */
 char *strpbrk(const char *s, const char *accept) {
-	const char *c;
+	const char *c = NULL;
 
 	if(!*s) {
 		return NULL;

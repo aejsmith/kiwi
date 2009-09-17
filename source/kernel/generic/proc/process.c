@@ -22,6 +22,8 @@
 
 #include <lib/string.h>
 
+#include <ipc/ipc.h>
+
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -126,6 +128,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	ipc_process_init(process);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (identifier_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
@@ -365,6 +368,7 @@ void process_destroy(process_t *process) {
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
 	}
+	ipc_process_destroy(process);
 	handle_table_destroy(&process->handles);
 	io_context_destroy(&process->ioctx);
 
@@ -393,6 +397,9 @@ void process_release(process_t *process) {
 	empty = list_empty(&process->threads);
 	spinlock_unlock(&process->lock);
 
+	/* Should only fire once because this empties the notifier list and
+	 * process_handle_wait() does not add a new notifier if thread list
+	 * empty. */
 	if(empty) {
 		/* Protected by notifier mutex. */
 		notifier_run(&process->death_notifier, NULL, true);
@@ -500,6 +507,7 @@ static void process_handle_unwait(handle_wait_t *wait) {
 	switch(wait->event) {
 	case PROCESS_EVENT_DEATH:
 		notifier_unregister(&process->death_notifier, process_handle_death_notifier, wait);
+		break;
 	}
 }
 

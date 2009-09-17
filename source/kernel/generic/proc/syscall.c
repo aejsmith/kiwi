@@ -25,6 +25,8 @@
 #include <io/device.h>
 #include <io/vfs.h>
 
+#include <ipc/ipc.h>
+
 #include <mm/malloc.h>
 #include <mm/vm.h>
 
@@ -102,6 +104,11 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_thread_open,
 	(syscall_handler_t)sys_thread_id,
 	(syscall_handler_t)sys_thread_exit,
+	(syscall_handler_t)sys_ipc_connection_open,
+	(syscall_handler_t)sys_ipc_connection_listen,
+	(syscall_handler_t)sys_ipc_message_send,
+	(syscall_handler_t)sys_ipc_message_send_vector,
+	(syscall_handler_t)sys_ipc_message_receive,
 };
 
 /** Main kernel system call service. */

@@ -45,7 +45,7 @@ typedef struct notifier {
 	notifier_t _var = NOTIFIER_INITIALISER(_var, _data)
 
 extern void notifier_init(notifier_t *notif, void *data);
-extern void notifier_destroy(notifier_t *notif);
+extern void notifier_empty(notifier_t *notif);
 extern void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy);
 extern void notifier_run(notifier_t *notif, void *data, bool destroy);
 extern void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data);
