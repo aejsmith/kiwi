@@ -51,9 +51,9 @@ void __init_text platform_premm_init(void *data) {
  * management subsystem is set up.
  */
 void __init_text platform_postmm_init(void) {
-	acpi_init();
 	multiboot_postmm_init();
 	console_late_init();
+	acpi_init();
 
 	/* Initialise interrupt handling and the timer. */
 	if(!lapic_enabled) {

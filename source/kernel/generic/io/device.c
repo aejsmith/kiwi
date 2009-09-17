@@ -599,10 +599,8 @@ int kdbg_cmd_device(int argc, char **argv) {
 	if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 		return KDBG_FAIL;
 	}
-
 	device = (device_t *)((ptr_t)val);
 
-	/* Print out basic node information. */
 	kprintf(LOG_NONE, "Device %p(%s)\n", device, device->name);
 	kprintf(LOG_NONE, "=================================================\n");
 	kprintf(LOG_NONE, "Count:       %d\n", refcount_get(&device->count));

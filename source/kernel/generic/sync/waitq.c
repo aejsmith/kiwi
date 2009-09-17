@@ -93,7 +93,8 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 	if(mtx) {
 		mutex_unlock(mtx);
 	} else if(sl) {
-		spinlock_unlock(sl);
+		assert(!state);
+		spinlock_unlock_ni(sl);
 	}
 
 	spinlock_lock_ni(&curr_thread->lock, 0);
@@ -128,7 +129,8 @@ relock:
 	if(mtx) {
 		mutex_lock(mtx, 0);
 	} else if(sl) {
-		spinlock_lock(sl, 0);
+		assert(!intr_state());
+		spinlock_lock_ni(sl, 0);
 	}
 	return ret;
 }
