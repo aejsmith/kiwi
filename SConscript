@@ -31,6 +31,7 @@ f.close()
 
 # Create the distribution environment.
 dist = envmgr.Create('dist')
+dist['BOOTDATA'] = {}
 
 # Visit subdirectories.
 SConscript(dirs=['source'])

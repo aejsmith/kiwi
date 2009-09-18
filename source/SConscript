@@ -23,6 +23,7 @@ def boot_image_func(target, source, env):
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwibootimg')
 	os.makedirs(os.path.join(tmpdir, 'system', 'binaries'))
+	os.makedirs(os.path.join(tmpdir, 'system', 'data'))
 	os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
 	os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
 
@@ -33,6 +34,10 @@ def boot_image_func(target, source, env):
 		shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
 	for mod in env['MODULES']:
 		shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
+	for app, files in env['BOOTDATA'].items():
+		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
+		for f in files:
+			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
 
 	# Create the startup symbolic link.
 	os.symlink('system/binaries/startup', os.path.join(tmpdir, 'startup'))

@@ -1,0 +1,75 @@
+# Kiwi build system
+# Copyright (C) 2009 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'config', 'envmgr')
+
+# Definitions controlling features.
+defines = {
+	'MORE_24': None,
+	#'ALLOW_GDT': None,
+	'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
+}
+
+# Override build flags - it won't compile with our warning flags.
+flags = [
+	'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
+	'-Wno-redundant-decls', '-Wno-unused-variable',
+]
+
+# Build the data file.
+env.Command('dtextc.dat', ['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
+            Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR'))
+
+# Build the program itself.
+target = env.Program('dungeon', [
+	'actors.c',
+	'ballop.c',
+	'clockr.c',
+	'demons.c',
+	'dgame.c',
+	'dinit.c',
+	'dmain.c',
+	'dso1.c',
+	'dso2.c',
+	'dso3.c',
+	'dso4.c',
+	'dso5.c',
+	'dso6.c',
+	'dso7.c',
+	'dsub.c',
+	'dverb1.c',
+	'dverb2.c',
+	'gdt.c',
+	'lightp.c',
+	'local.c',
+	'nobjs.c',
+	'np.c',
+	'np1.c',
+	'np2.c',
+	'np3.c',
+	'nrooms.c',
+	'objcts.c',
+	'rooms.c',
+	'sobjs.c',
+	'supp.c',
+	'sverbs.c',
+	'verbs.c',
+	'villns.c',
+], CPPDEFINES=defines, CCFLAGS=flags)
+
+# Depend on the data file.
+Depends(target, File('dtextc.dat'))
+
+# Add the data file to the boot image.
+envmgr['dist']['BOOTDATA']['dungeon'] = [File('dtextc.dat')]

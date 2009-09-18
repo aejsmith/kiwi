@@ -16,6 +16,7 @@ Import('env')
 
 SConscript(dirs=[
 	'console',
+	'dungeon',
 	'failshell',
 	'ping',
 	'pong',
