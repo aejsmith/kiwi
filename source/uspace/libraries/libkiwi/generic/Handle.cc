@@ -37,8 +37,14 @@ Handle::~Handle() {
 }
 
 /** Wait for a handle event.
- * @param event		Event to wait for.
- * @param timeout	Timeout in microseconds.
+ * @note		Derived classes should implement their own functions to
+ *			wait for events on top of this function, which should
+ *			be used rather than using this function directly.
+ * @param event		Event to wait for (specific to handle type).
+ * @param timeout	Timeout in microseconds. A value of 0 will return an
+ *			error immediately if the event has not already
+ *			happened, and a value of -1 (the default) will block
+ *			indefinitely until the event happens.
  * @return		0 on success, error code on failure. */
 int Handle::Wait(int event, timeout_t timeout) const {
 	return abs(handle_wait(m_handle, event, timeout));
@@ -46,6 +52,6 @@ int Handle::Wait(int event, timeout_t timeout) const {
 
 /** Get the ID of the handle.
  * @return		ID of the handle. */
-handle_t Handle::GetHandleID(void) const {
+handle_t Handle::GetHandle(void) const {
 	return m_handle;
 }

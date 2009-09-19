@@ -26,37 +26,18 @@
 #include <kiwi/internal.h>
 
 namespace kiwi {
+	/** Base class for all objects represented by a handle. */
+	class Handle : public internal::Noncopyable {
+	public:
+		~Handle();
 
-/** Base class for all objects represented by a handle. */
-class Handle : internal::Noncopyable {
-public:
-	/** Destructor to close the handle. */
-	~Handle();
+		int Wait(int event, timeout_t timeout = -1) const;
+		handle_t GetHandle(void) const;
+	protected:
+		Handle();
 
-	/** Wait for a handle event.
-	 * @note		Derived classes should implement their own
-	 *			functions to wait for events on top of this
-	 *			function, which should be used rather than
-	 *			using this function directly.
-	 * @param event		Event to wait for (specific to handle type).
-	 * @param timeout	Timeout in microseconds. A value of 0 will
-	 *			return an error immediately if the event has
-	 *			not already happened, and a value of -1 (the
-	 *			default) will block indefinitely until the
-	 *			event happens.
-	 * @return		0 on success, error code on failure. */
-	int Wait(int event, timeout_t timeout = -1) const;
-
-	/** Get the ID of the handle.
-	 * @return		ID of the handle. */
-	handle_t GetHandleID(void) const;
-protected:
-	/** Handle class cannot be instantiated directly. */
-	Handle();
-
-	handle_t m_handle;		/**< Handle ID for the process. */
-};
-
+		handle_t m_handle;		/**< Handle ID. */
+	};
 };
 
 #endif /* __KIWI_HANDLE_H */

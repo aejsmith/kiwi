@@ -220,6 +220,10 @@ void ipc_process_destroy(process_t *process) {
  * the connection is accepted, until the timeout expires, in which case it will
  * return an error.
  *
+ * @todo		Implement timeout and interruption. It's an absolute
+ *			bitch to get right, and I simply cannot be bothered
+ *			right now.
+ *
  * @param id		Process ID to connect to.
  * @param timeout	Timeout in microseconds. If 0, the function will return
  *			immediately if the specified process is not listening
@@ -233,7 +237,6 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	ipc_open_data_t data;
 	process_t *process;
 	handle_t handle;
-	int ret;
 
 	/* Initialise the data structure used to synchronise between this
 	 * function and the target process. */
@@ -266,17 +269,8 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	list_append(&process->connections, &data.header);
 	semaphore_up(&process->conn_sem, 1);
 
-	/* Wait for the connection to be accepted. FIXME: What if dest is
-	 * already waiting. */
-	if((ret = condvar_wait_timeout(&data.cvar, NULL, &process->lock, timeout, SYNC_INTERRUPTIBLE)) != 0) {
-		/* Only need to remove structure ourselves if wait errored. */
-		list_remove(&data.header);
-		spinlock_unlock(&process->lock);
-
-		handle_close(&curr_proc->handles, handle);
-		return ret;
-	}
-
+	/* Wait for the connection to be accepted. */
+	condvar_wait(&data.cvar, NULL, &process->lock, 0);
 	spinlock_unlock(&process->lock);
 
 	/* If the process died while we were waiting for it, the return value
@@ -305,8 +299,8 @@ handle_t sys_ipc_connection_listen(timeout_t timeout, identifier_t *pidp) {
 	ipc_open_data_t *data;
 	handle_t ret;
 
-	/* Wait for a connection. FIXME: Timeout. */
-	if((ret = semaphore_down(&curr_proc->conn_sem, (timeout == 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
+	/* Wait for a connection. */
+	if((ret = semaphore_down_timeout(&curr_proc->conn_sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		return ret;
 	}
 

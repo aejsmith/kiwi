@@ -15,6 +15,6 @@
 Import('sources')
 
 sources += [
-	File('Handle.cpp'),
-	File('Process.cpp'),
+	File('Handle.cc'),
+	File('Process.cc'),
 ]

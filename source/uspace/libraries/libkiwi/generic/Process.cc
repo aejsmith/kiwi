@@ -59,7 +59,7 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 				cur--;
 			} else {
 				if((next - cur) >= (PATH_MAX - 3)) {
-					m_init_status = ERR_PARAM_INVAL;
+					m_init_status = -ERR_PARAM_INVAL;
 					return;
 				}
 
@@ -69,7 +69,7 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 			buf[next - cur] = '/';
 			len = strlen(args[0]);
 			if(len + (next - cur) >= (PATH_MAX - 2)) {
-				m_init_status = ERR_PARAM_INVAL;
+				m_init_status = -ERR_PARAM_INVAL;
 				return;
 			}
 
@@ -78,7 +78,7 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 			if((m_handle = process_create(buf, args, (env) ? env : environ, inherit)) >= 0) {
 				return;
 			} else if(m_handle != -ERR_NOT_FOUND) {
-				m_init_status = -m_handle;
+				m_init_status = m_handle;
 				return;
 			}
 
@@ -88,36 +88,59 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 			next++;
 		}
 
-		m_init_status = ERR_NOT_FOUND;
+		m_init_status = -ERR_NOT_FOUND;
 		return;
 	} else {
 		if((m_handle = process_create(args[0], args, (env) ? env : environ, inherit)) < 0) {
-			m_init_status = -m_handle;
+			m_init_status = m_handle;
 		}
 	}
 }
 
 /** Create a new process.
- * @param args		NULL-terminated argument array.
- * @param env		NULL-terminated environment variable array.
- * @param inherit	Whether the new process should inherit handles.
- * @param usepath	Whether to use the PATH environment variable. */
-Process::Process(char **args, char **env, bool inherit, bool usepath) : m_init_status(0)  {
+ * @note		After creating the object you should call Initialised()
+ *			to check if initialisation succeeded.
+ * @param args		NULL-terminated argument array. First entry should be
+ *			the path to the program to run.
+ * @param env		NULL-terminated environment variable array. A NULL
+ *			value for this argument will result in the new process
+ *			inheriting the current environment (the default).
+ * @param inherit	Whether the new process should inherit handles that are
+ *			marked as inheritable (defaults to true).
+ * @param usepath	If true, and the program path does not contain a '/'
+ *			character, then it will be looked up in all directories
+ *			listed in the PATH environment variable. The first
+ *			match will be executed (defaults to true). */
+Process::Process(char **args, char **env, bool inherit, bool usepath) :
+	m_init_status(0)
+{
 	_Init(args, env, inherit, usepath);
 }
 
 /** Create a new process.
- * @param cmdline	Command line string.
- * @param env		NULL-terminated environment variable array.
- * @param inherit	Whether the new process should inherit handles.
- * @param usepath	Whether to use the PATH environment variable. */
-Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) : m_init_status(0)  {
+ * @note		After creating the object you should call Initialised()
+ *			to check if initialisation succeeded.
+ * @param cmdline	Command line string, each argument seperated by a
+ *			space character. First part of the string should be the
+ *			path to the program to run.
+ * @param env		NULL-terminated environment variable array. A NULL
+ *			value for this argument will result in the new process
+ *			inheriting the current environment (the default).
+ * @param inherit	Whether the new process should inherit handles that are
+ *			marked as inheritable (defaults to true).
+ * @param usepath	If true, and the program path does not contain a '/'
+ *			character, then it will be looked up in all directories
+ *			listed in the PATH environment variable. The first
+ *			match will be executed (defaults to true). */
+Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) :
+	m_init_status(0)
+{
 	char **args = NULL, **tmp, *tok, *dup, *orig;
 	size_t count = 0;
 
 	/* Duplicate the command line string so we can modify it. */
 	if(!(orig = strdup(cmdline))) {
-		m_init_status = ERR_NO_MEMORY;
+		m_init_status = -ERR_NO_MEMORY;
 		return;
 	}
 	dup = orig;
@@ -132,7 +155,7 @@ Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) : 
 		if(!(tmp = reinterpret_cast<char **>(realloc(args, (count + 2) * sizeof(char *))))) {
 			free(orig);
 			free(args);
-			m_init_status = ERR_NO_MEMORY;
+			m_init_status = -ERR_NO_MEMORY;
 			return;
 		}
 		args = tmp;
@@ -145,7 +168,7 @@ Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) : 
 	}
 
 	if(!count) {
-		m_init_status = ERR_PARAM_INVAL;
+		m_init_status = -ERR_PARAM_INVAL;
 		return;
 	}
 
@@ -155,21 +178,25 @@ Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) : 
 }
 
 /** Open an existing process.
+ * @note		After creating the object you should call Initialised()
+ *			to check if initialisation succeeded.
  * @param id		ID of the process to open. */
-Process::Process(identifier_t id) : m_init_status(0) {
+Process::Process(identifier_t id) :
+	m_init_status(0)
+{
 	if((m_handle = process_open(id)) < 0) {
-		m_init_status = -m_handle;
+		m_init_status = m_handle;
 	}
 }
 
 /** Check whether initialisation was successful.
- * @param status	Optional pointer to integer to store error code in if
- *			not successful.
+ * @param status	Pointer to integer to store error code in if not
+ *			successful.
  * @return		True if successful, false if not. */
 bool Process::Initialised(int *status) const {
 	if(m_init_status != 0) {
 		if(status) {
-			*status = m_init_status;
+			*status = abs(m_init_status);
 		}
 		return false;
 	} else {
@@ -178,7 +205,10 @@ bool Process::Initialised(int *status) const {
 }
 
 /** Wait for the process to die.
- * @param timeout	Timeout in microseconds.
+ * @param timeout	Timeout in microseconds. A value of 0 will return an
+ *			error immediately if the process has not already
+ *			terminated, and a value of -1 (the default) will block
+ *			indefinitely until the process terminates.
  * @return		0 on success, error code on failure. */
 int Process::WaitTerminate(timeout_t timeout) const {
 	return Wait(PROCESS_EVENT_DEATH, timeout);
