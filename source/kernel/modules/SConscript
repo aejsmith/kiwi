@@ -47,7 +47,7 @@ def module_emitter(target, source, env):
 	env['MODULES'].append(target[0])
 	return target, source
 env['BUILDERS']['Module'] = Builder(
-	action=Action('$LINK -r -o $TARGET $SOURCES && strip --strip-debug $TARGET', '$LINKCOMSTR'),
+	action=Action('$LINK -r -o $TARGET $SOURCES && $STRIP --strip-debug $TARGET', '$LINKCOMSTR'),
 	suffix='.km',
 	src_suffix='$OBJSUFFIX',
 	src_builder='Object',
