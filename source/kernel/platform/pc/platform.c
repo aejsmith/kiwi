@@ -57,8 +57,6 @@ void __init_text platform_postmm_init(void) {
 
 	/* Initialise interrupt handling and the timer. */
 	if(!lapic_enabled) {
-		if(clock_source_set(&pit_clock_source) != 0) {
-			fatal("Could not set PIT clock source");
-		}
+		timer_device_set(&pit_timer_device);
 	}
 }

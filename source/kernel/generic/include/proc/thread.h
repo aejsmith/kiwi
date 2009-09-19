@@ -28,6 +28,8 @@
 
 #include <sync/spinlock.h>
 
+#include <time/timer.h>
+
 #include <types/list.h>
 #include <types/refcount.h>
 
@@ -64,7 +66,9 @@ typedef struct thread {
 	list_t waitq_link;		/**< Link to wait queue. */
 	struct waitq *waitq;		/**< Wait queue that the thread is sleeping on. */
 	bool interruptible;		/**< Whether the sleep can be interrupted. */
-	context_t sleep_context;	/**< Context to restore upon sleep interruption. */
+	context_t sleep_context;	/**< Context to restore upon sleep interruption/timeout. */
+	timer_t sleep_timer;		/**< Timer for sleep timeout. */
+	bool timed_out;			/**< Whether the sleep timed out. */
 	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
 
 	/** State of the thread. */

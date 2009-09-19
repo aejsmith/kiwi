@@ -26,6 +26,8 @@
 #include <sync/mutex.h>
 #include <sync/waitq.h>
 
+#include <time/timer.h>
+
 #include <assert.h>
 #include <errors.h>
 
@@ -34,10 +36,30 @@ extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void waitq_do_wake(thread_t *thread);
 
+/** Handle a timeout on a wait queue.
+ * @param _thread	Pointer to thread that timed out.
+ * @return		Whether to reschedule. */
+static bool waitq_timer_handler(void *_thread) {
+	thread_t *thread = _thread;
+
+	spinlock_lock(&thread->lock, 0);
+
+	/* Restore the interruption context and queue it to run. */
+	thread->timed_out = true;
+	thread->context = thread->sleep_context;
+	waitq_do_wake(thread);
+
+	spinlock_unlock(&thread->lock);
+	return false;
+}
+
 /** Wake up a single thread. Thread and queue should be locked.
  * @param thread	Thread to wake up. */
 void waitq_do_wake(thread_t *thread) {
 	assert(thread->state == THREAD_SLEEPING);
+
+	/* Stop the timer. */
+	timer_stop(&thread->sleep_timer);
 
 	/* Remove the thread from the queue and wake it up. */
 	list_remove(&thread->waitq_link);
@@ -64,11 +86,17 @@ void waitq_do_wake(thread_t *thread) {
  *			passed to mutex_lock() when relocking.
  * @param sl		Same as mtx but for a spinlock. You must not specify
  *			both a spinlock and a mutex.
+ * @param timeout	Timeout in microseconds. A timeout of 0 has the same
+ *			effect as SYNC_NONBLOCK (the reason both are provided
+ *			is to let non-blocking mode be set for higher-level
+ *			functions that don't allow a timeout parameter), and a
+ *			timeout of -1 will sleep forever until the thread is
+ *			woken.
  * @param flags		Synchronization flags (see sync/flags.h)
  *
  * @return		0 on success, negative error code on failure.
  */
-int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
+int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
 	bool state = intr_disable();
 	int ret = 0;
 
@@ -76,6 +104,7 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 
 	spinlock_lock_ni(&waitq->lock, 0);
 
+	/* Check if any missed wakeups are available. */
 	if(waitq->flags & WAITQ_COUNT_MISSED) {
 		if(waitq->missed > 0) {
 			waitq->missed--;
@@ -83,13 +112,15 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 			spinlock_unlock_ni(&waitq->lock);
 			intr_restore(state);
 			return 0;
-		} else if(flags & SYNC_NONBLOCK) {
+		} else if(flags & SYNC_NONBLOCK || timeout == 0) {
 			spinlock_unlock_ni(&waitq->lock);
 			intr_restore(state);
 			return -ERR_WOULD_BLOCK;
 		}
 	}
 
+	/* We're going to sleep, now that the wait queue lock is held we can
+	 * drop any locks we've been asked to drop. */
 	if(mtx) {
 		mutex_unlock(mtx);
 	} else if(sl) {
@@ -100,21 +131,24 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 	spinlock_lock_ni(&curr_thread->lock, 0);
 
 	curr_thread->waitq = waitq;
+	curr_thread->timed_out = false;
 
-	/* Set up interruption context if required. OK for this to be done
-	 * with thread locked: restoring this context will be performed by
-	 * the thread switch code, and the thread will be locked when it is
-	 * restored. */
-	if(flags & SYNC_INTERRUPTIBLE) {
-		curr_thread->interruptible = true;
-
+	/* Set up interruption/timeout context if required. */
+	if(flags & SYNC_INTERRUPTIBLE || timeout > 0) {
 		if(context_save(&curr_thread->sleep_context) != 0) {
+			ret = (curr_thread->timed_out) ? -ERR_TIMED_OUT : -ERR_INTERRUPTED;
 			sched_post_switch(state);
-			ret = -ERR_INTERRUPTED;
-			goto relock;
+			goto out;
 		}
-	} else {
-		curr_thread->interruptible = false;
+	}
+
+	/* Set whether we're interruptible, and set up a timeout if needed.
+	 * Always initialise the timer structure as it gets checked in the
+	 * wakeup functions. */
+	curr_thread->interruptible = ((flags & SYNC_INTERRUPTIBLE) != 0);
+	timer_init(&curr_thread->sleep_timer, waitq_timer_handler, curr_thread);
+	if(timeout > 0) {
+		timer_start(&curr_thread->sleep_timer, timeout);
 	}
 
 	/* Add the thread to the queue and unlock it. */
@@ -125,7 +159,7 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, int flags) {
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
 	sched_internal(state);
-relock:
+out:
 	if(mtx) {
 		mutex_lock(mtx, 0);
 	} else if(sl) {

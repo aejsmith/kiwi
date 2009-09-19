@@ -266,9 +266,9 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	list_append(&process->connections, &data.header);
 	semaphore_up(&process->conn_sem, 1);
 
-	/* Wait for the connection to be accepted. FIXME: Timeout. */
-	if((ret = condvar_wait(&data.cvar, NULL, &process->lock,
-	                       (timeout == 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
+	/* Wait for the connection to be accepted. FIXME: What if dest is
+	 * already waiting. */
+	if((ret = condvar_wait_timeout(&data.cvar, NULL, &process->lock, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		/* Only need to remove structure ourselves if wait errored. */
 		list_remove(&data.header);
 		spinlock_unlock(&process->lock);
@@ -392,7 +392,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, void *buf, size_t size)
 	 * FIXME: Should integrate this in the semaphore API. */
 	if(endpoint->remote) {
 		if((ret = waitq_sleep(&endpoint->remote->space_sem.queue, &endpoint->conn->lock,
-		                      NULL, SYNC_INTERRUPTIBLE)) != 0) {
+		                      NULL, -1, SYNC_INTERRUPTIBLE)) != 0) {
 			goto fail;
 		}
 	}
@@ -487,7 +487,7 @@ int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type, 
 	/* Wait for data in our message queue. The unlock/wait needs to be
 	 * atomic in order to interact properly with ipc_handle_close(). */
 	if((ret = waitq_sleep(&endpoint->data_sem.queue, &endpoint->conn->lock,
-	                      NULL, SYNC_INTERRUPTIBLE)) != 0) {
+	                      NULL, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		goto fail;
 	}
 

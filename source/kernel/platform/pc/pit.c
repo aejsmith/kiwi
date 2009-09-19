@@ -32,7 +32,7 @@
  * @param frame		Interrupt stack frame.
  * @return		IRQ status code. */
 static irq_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
-	return (clock_tick()) ? IRQ_RESCHEDULE : IRQ_HANDLED;
+	return (timer_tick()) ? IRQ_RESCHEDULE : IRQ_HANDLED;
 }
 
 /** Enable the PIT. */
@@ -54,11 +54,10 @@ static void pit_disable(void) {
 }
 
 /** PIT clock source. */
-clock_source_t pit_clock_source = {
+timer_device_t pit_timer_device = {
 	.name = "PIT",
-	.len = 1000000000 / 1000,
-	.type = CLOCK_PERIODIC,
-
+	.len = 1000000 / 1000,
+	.type = TIMER_DEVICE_PERIODIC,
 	.enable = pit_enable,
 	.disable = pit_disable,
 };

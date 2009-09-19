@@ -36,6 +36,33 @@
  * @param mtx		Mutex to unlock/relock.
  * @param sl		Spinlock to unlock/relock. Must not specify both mutex
  *			and spinlock.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the condition is signaled.
+ * @param flags		Synchronization flags.
+ *
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
+ */
+int condvar_wait_timeout(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
+	assert(!!mtx ^ !!sl);
+	return waitq_sleep(&cv->queue, mtx, sl, timeout, flags);
+}
+
+/** Wait for a condition to become true.
+ *
+ * Atomically unlocks a mutex or spinlock and then blocks until a condition
+ * becomes true. The specified mutex/spinlock should be held by the calling
+ * thread. When the function returns (upon both failure and success) the
+ * mutex/spinlock will be held again by the calling thread. A condition becomes
+ * true when either condvar_signal() or condvar_broadcast() is called on it. It
+ * is pointless to specify the SYNC_NONBLOCK flag - the call will always return
+ * an error if it is set.
+ *
+ * @param cv		Condition variable to wait on.
+ * @param mtx		Mutex to unlock/relock.
+ * @param sl		Spinlock to unlock/relock. Must not specify both mutex
+ *			and spinlock.
  * @param flags		Synchronization flags.
  *
  * @return		0 on success (always the case if neither SYNC_NONBLOCK
@@ -43,8 +70,7 @@
  *			code on failure.
  */
 int condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, int flags) {
-	assert(!!mtx ^ !!sl);
-	return waitq_sleep(&cv->queue, mtx, sl, flags);
+	return condvar_wait_timeout(cv, mtx, sl, -1, flags);
 }
 
 /** Signal that a condition has become true.

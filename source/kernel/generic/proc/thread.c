@@ -53,6 +53,7 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void process_release(process_t *process);
+extern void waitq_do_wake(thread_t *thread);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
 static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
@@ -211,14 +212,9 @@ bool thread_interrupt(thread_t *thread) {
 	assert(thread->waitq);
 
 	if((ret = thread->interruptible)) {
-		list_remove(&thread->waitq_link);
-
 		/* Restore the interruption context and queue it to run. */
 		thread->context = thread->sleep_context;
-		thread->waitq = NULL;
-		thread->interruptible = false;
-		thread->state = THREAD_READY;
-		sched_thread_insert(thread);
+		waitq_do_wake(thread);
 	}
 
 	spinlock_unlock(&thread->lock);

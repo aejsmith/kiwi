@@ -16,6 +16,14 @@
 /**
  * @file
  * @brief		Timer management.
+ *
+ * @todo		The way the time until the next tick is set is not
+ *			correct with one-shot devices. Using extreme values to
+ *			show why, say a timer is set for 50 seconds and it is
+ *			the only timer in the list. After 49 seconds, a 49
+ *			second timer is set. Because it is placed before the
+ *			50 second timer in the list, another 50 seconds will
+ *			pass before the 50 second timer fires.
  */
 
 #include <console/kprintf.h>
@@ -28,64 +36,68 @@
 #include <assert.h>
 #include <errors.h>
 
-static clock_source_t *curr_clock = NULL;
+/** Current timer device. */
+static timer_device_t *curr_timer_device = NULL;
 
-/** Prepares next clock tick.
- * @param ns		Nanoseconds until next tick. */
-static void clock_prep(uint64_t ns) {
-	assert(curr_clock);
+/** Prepares next timer tick.
+ * @param ns		Microseconds until next tick. */
+static void timer_tick_prepare(uint64_t us) {
+	assert(curr_timer_device);
 
-	/* Only one-shot sources need to be prepared. For periodic sources,
-	 * curr_ticklen is set when the source is enabled. */
-	if(curr_clock->type != CLOCK_ONESHOT) {
+	/* Only one-shot devices need to be prepared. For periodic devices,
+	 * the current tick length is set when the device is enabled. */
+	if(curr_timer_device->type != TIMER_DEVICE_ONESHOT) {
 		return;
 	}
 
-	curr_cpu->tick_len = ns;
-	curr_clock->prep(ns);
+	curr_cpu->tick_len = us;
+	curr_timer_device->prepare(us);
 }
 
-/** Set the current clock source.
+/** Set the current timer device.
  *
- * Sets the current clock source to the given source.
+ * Sets the device that will provide timer ticks. The previous device will
+ * be disabled.
  *
- * @param source	Source to set.
- *
- * @return		0 on success, negative error code on failure.
+ * @param device	Device to set.
  */
-int clock_source_set(clock_source_t *source) {
-	/* Deactivate the old source. */
-	if(curr_clock != NULL) {
-		curr_clock->disable();
+void timer_device_set(timer_device_t *device) {
+	/* Deactivate the old device. */
+	if(curr_timer_device) {
+		curr_timer_device->disable();
 	}
 
-	curr_clock = source;
+	curr_timer_device = device;
 
 	/* Enable the new source. */
-	if(curr_clock->type == CLOCK_PERIODIC) {
-		curr_cpu->tick_len = curr_clock->len;
-		curr_clock->enable();
-	} else if(curr_clock->type == CLOCK_ONESHOT) {
-		curr_clock->enable();
-		curr_clock->prep(curr_cpu->tick_len);
+	switch(device->type) {
+	case TIMER_DEVICE_PERIODIC:
+		curr_cpu->tick_len = device->len;
+		device->enable();
+		break;
+	case TIMER_DEVICE_ONESHOT:
+		device->enable();
+		device->prepare(curr_cpu->tick_len);
+		break;
+	default:
+		fatal("Invalid timer device type (%d)\n", device->type);
 	}
 
-	kprintf(LOG_DEBUG, "timer: activated clock source %s (source: %p)\n", source->name, source);
-	return 0;
+	kprintf(LOG_DEBUG, "timer: activated timer device %p(%s)\n", device, device->name);
 }
 
-/** Handles a clock tick.
+/** Handles a timer tick.
  *
- * Function called by a clock source when a clock tick occurs. Goes through
- * all enabled timers for the current CPU and checks if any have expired.
+ * Function called by a timer device when a tick occurs. Goes through all
+ * enabled timers for the current CPU and checks if any have expired.
  *
  * @return		Whether to reschedule.
  */
-bool clock_tick(void) {
-	bool resched = false;
+bool timer_tick(void) {
+	bool schedule = false;
 	timer_t *timer;
 
-	assert(curr_clock);
+	assert(curr_timer_device);
 
 	spinlock_lock(&curr_cpu->timer_lock, 0);
 
@@ -103,23 +115,10 @@ bool clock_tick(void) {
 		timer->length = 0;
 		timer->cpu = NULL;
 
-		switch(timer->action) {
-		case TIMER_RESCHEDULE:
-			resched = true;
-			break;
-		case TIMER_FUNCTION:
-			if(timer->func == NULL) {
-				fatal("Timer %p has invalid function");
-			} else if(timer->func()) {
-				resched = true;
-			}
-			break;
-		case TIMER_WAKE:
-			waitq_wake(&timer->queue, true);
-			break;
-		default:
-			fatal("Bad timer action %d on %p", timer->action, timer);
-			break;
+		if(timer->func == NULL) {
+			fatal("Timer %p has invalid function");
+		} else if(timer->func(timer->data)) {
+			schedule = true;
 		}
 	}
 
@@ -127,11 +126,11 @@ bool clock_tick(void) {
 	if(!list_empty(&curr_cpu->timer_list)) {
 		timer = list_entry(curr_cpu->timer_list.next, timer_t, header);
 		assert(timer->length > 0);
-		clock_prep(timer->length);
+		timer_tick_prepare(timer->length);
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
-	return resched;
+	return schedule;
 }
 
 /** Initialise a timer structure.
@@ -139,49 +138,37 @@ bool clock_tick(void) {
  * Initialises a timer structure to contain the given settings.
  *
  * @param timer		Timer to initialise.
- * @param action	Action to perform when timer expires.
- * @param func		Function to call (for TIMER_FUNCTION).
+ * @param func		Function to call when timer fires.
+ * @param data		Data to pass to function.
  */
-void timer_init(timer_t *timer, int action, timer_func_t func) {
+void timer_init(timer_t *timer, timer_func_t func, void *data) {
 	list_init(&timer->header);
-	waitq_init(&timer->queue, "timer_queue", 0);
-
-	timer->action = action;
 	timer->length = 0;
 	timer->cpu = NULL;
 	timer->func = func;
+	timer->data = data;
 }
 
 /** Start a timer.
  *
- * Starts a timer to expire after the amount of time specified. If the timer
- * is a TIMER_WAKE timer, then the timer will have expired when the function
- * returns.
+ * Starts a timer to expire after the amount of time specified.
  *
  * @param timer		Timer to start.
- * @param length	Nanoseconds to run the timer for.
- *
- * @return		0 on success, negative error code on failure.
+ * @param length	Microseconds to run the timer for.
  */
-int timer_start(timer_t *timer, uint64_t length) {
+void timer_start(timer_t *timer, timeout_t length) {
 	timer_t *exist;
-	bool state;
 
 	if(length <= 0) {
-		kprintf(LOG_DEBUG, "timer: attempted to start timer %p with zero length\n", timer);
-		return -ERR_PARAM_INVAL;
+		return;
 	}
 
-	state = intr_disable();
-	spinlock_lock_ni(&curr_cpu->timer_lock, 0);
-
-	/* Remove the timer from any list it may be contained in. */
-	list_remove(&timer->header);
+	spinlock_lock(&curr_cpu->timer_lock, 0);
 
 	timer->length = length;
 	timer->cpu = curr_cpu;
 
-	/* Stick the timer at the end of the list to begin with, and then
+	/* Place the timer at the end of the list to begin with, and then
 	 * go through the list to see if we need to move it down before
 	 * another one (the list is maintained in shortest to longest order) */
 	list_append(&curr_cpu->timer_list, &timer->header);
@@ -200,18 +187,10 @@ int timer_start(timer_t *timer, uint64_t length) {
 	 * to tick after that amount of time. */
 	exist = list_entry(curr_cpu->timer_list.next, timer_t, header);
 	if(exist == timer) {
-		clock_prep(timer->length);
+		timer_tick_prepare(timer->length);
 	}
 
-	spinlock_unlock_ni(&curr_cpu->timer_lock);
-
-	/* If we're a TIMER_WAKE timer, sleep now. */
-	if(timer->action == TIMER_WAKE) {
-		waitq_sleep(&timer->queue, NULL, NULL, 0);
-	}
-
-	intr_restore(state);
-	return 0;
+	spinlock_unlock(&curr_cpu->timer_lock);
 }
 
 /** Cancel a timer.
@@ -221,28 +200,36 @@ int timer_start(timer_t *timer, uint64_t length) {
  * @param timer		Timer to stop.
  */
 void timer_stop(timer_t *timer) {
+	timer_t *next;
+
 	if(!list_empty(&timer->header)) {
 		assert(timer->cpu);
-		if(list_entry(timer->cpu->timer_list.next, timer_t, header) == timer &&
-		   timer->header.next != &timer->cpu->timer_list) {
-			clock_prep((list_entry(timer->header.next, timer_t, header))->length);
+
+		/* Readjust the tick length if required. */
+		next = list_entry(timer->cpu->timer_list.next, timer_t, header);
+		if(next == timer && timer->header.next != &timer->cpu->timer_list) {
+			next = list_entry(timer->header.next, timer_t, header);
+			timer_tick_prepare(next->length);
 		}
+
+		list_remove(&timer->header);
 	}
 
-	list_remove(&timer->header);
 	timer->length = 0;
 	timer->cpu = NULL;
 }
 
 /** Sleep for a certain time period.
  *
- * Sends the current thread to sleep for the specified number of nanoseconds.
+ * Sends the current thread to sleep for the specified number of microseconds.
  *
- * @param ns		Nanoseconds to sleep for.
+ * @param us		Microseconds to sleep for. Must be greater than 0.
  */
-void timer_nsleep(uint64_t ns) {
-	timer_t timer;
+void timer_usleep(timeout_t us) {
+	waitq_t queue;
 
-	timer_init(&timer, TIMER_WAKE, NULL);
-	timer_start(&timer, ns);
+	assert(us > 0);
+
+	waitq_init(&queue, "timer_queue", 0);
+	waitq_sleep(&queue, NULL, NULL, us, 0);
 }

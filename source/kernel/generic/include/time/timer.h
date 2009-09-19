@@ -21,52 +21,51 @@
 #ifndef __TIME_TIMER_H
 #define __TIME_TIMER_H
 
-#include <sync/waitq.h>
-
-#include <types.h>
+#include <types/list.h>
 
 struct cpu;
 
-/** Structure containing details of a clock source. */
-typedef struct clock_source {
-	const char *name;		/**< Name of the clock source. */
-	uint64_t len;			/**< Length of a tick (for periodic sources). */
+/** Structure containing details of a hardware timer. */
+typedef struct timer_device {
+	const char *name;		/**< Name of the timer. */
+	uint64_t len;			/**< Length of a tick (for periodic timer). */
 
-	/** Type of the source. */
+	/** How the device fires. */
 	enum {
-		CLOCK_PERIODIC,		/**< Clock ticks periodically. */
-		CLOCK_ONESHOT,		/**< Clock is configured to tick once after a certain time. */
+		TIMER_DEVICE_PERIODIC,	/**< Timer fires periodically. */
+		TIMER_DEVICE_ONESHOT,	/**< Timer fires after the period specified. */
 	} type;
 
-	/** Clock operations. */
-	void (*prep)(uint64_t ns);	/**< Prepares the next tick (for one-shot sources). */
-	void (*enable)(void);		/**< Enables the clock. */
-	void (*disable)(void);		/**< Disables the source (stops ticks from being received). */
-} clock_source_t;
+	/** Enable the device. */
+	void (*enable)(void);
 
-/** Function type for TIMER_FUNCTION timers.
+	/** Disable the device (stops it from firing ticks). */
+	void (*disable)(void);
+
+	/** Set up the next tick (for one-shot devices).
+	 * @param us		Microseconds to fire in. */
+	void (*prepare)(timeout_t us);
+} timer_device_t;
+
+/** Callback function for timers.
+ * @note		This function is called with a spinlock held in
+ *			interrupt context! Be careful!
+ * @param data		Data argument from timer creator.
  * @return		Whether to reschedule after handling. */
-typedef bool (*timer_func_t)(void);
+typedef bool (*timer_func_t)(void *data);
 
 /** Structure containing details of a timer. */
 typedef struct timer {
 	list_t header;			/**< Link to timers list. */
 
-	/** Action to perform when timer expires. */
-	enum {
-		TIMER_RESCHEDULE,	/**< Perform a thread switch. */
-		TIMER_FUNCTION,		/**< Call the function specified in the timer. */
-		TIMER_WAKE,		/**< Wake the thread that started the timer. */
-	} action;
-
-	uint64_t length;		/**< Nanoseconds until the timer expires. */
+	timeout_t length;		/**< Microseconds until the timer fires. */
 	struct cpu *cpu;		/**< CPU that the timer was started on. */
-	timer_func_t func;		/**< Function to call upon expiry. */
-	waitq_t queue;			/**< Wait queue for TIMER_WAKE timers. */
+	timer_func_t func;		/**< Function to call when the timer expires. */
+	void *data;			/**< Data to pass to timer handler. */
 } timer_t;
 
 /** Initialises a statically-declared timer. */
-#define TIMER_INITIALISER(_name, _action, _func)	\
+#define TIMER_INITIALISER(_name, _func)	\
 	{ \
 		.header = LIST_INITIALISER(_name.header), \
 		.action = _action, \
@@ -77,21 +76,21 @@ typedef struct timer {
 #define TIMER_DECLARE(_name, _action, _func)		\
 	timer_t _name = TIMER_INITIALISER(_name, _action, _func)
 
-/** Sleep for a certain number of microseconds.
- * @param us		Microseconds to sleep for. */
-#define timer_usleep(us)	timer_nsleep((uint64_t)(us) * 1000)
+/** Sleep for a certain number of milliseconds.
+ * @param ms		Milliseconds to sleep for. */
+#define timer_msleep(s)		timer_usleep((timeout_t)(s) * 1000)
 
 /** Sleep for a certain number of seconds.
  * @param s		Seconds to sleep for. */
-#define timer_sleep(s)		timer_nsleep((uint64_t)(s) * 1000000000)
+#define timer_sleep(s)		timer_usleep((timeout_t)(s) * 1000000)
 
-extern int clock_source_set(clock_source_t *source);
-extern bool clock_tick(void);
+extern void timer_device_set(timer_device_t *device);
+extern bool timer_tick(void);
 
-extern void timer_init(timer_t *timer, int action, timer_func_t func);
-extern int timer_start(timer_t *timer, uint64_t length);
+extern void timer_init(timer_t *timer, timer_func_t func, void *data);
+extern void timer_start(timer_t *timer, timeout_t length);
 extern void timer_stop(timer_t *timer);
 
-extern void timer_nsleep(uint64_t ns);
+extern void timer_usleep(timeout_t us);
 
 #endif /* __TIME_TIMER_H */

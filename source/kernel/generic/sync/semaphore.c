@@ -29,6 +29,26 @@
  * it will block until it is able to perform the down.
  *
  * @param sem		Semaphore to down.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the semaphore is downed, and a timeout of
+ *			0 is equivalent to SYNC_NONBLOCK.
+ * @param flags		Synchronization flags.
+ *
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
+ */
+int semaphore_down_timeout(semaphore_t *sem, timeout_t timeout, int flags) {
+	return waitq_sleep(&sem->queue, NULL, NULL, timeout, flags);
+}
+
+/** Down a semaphore.
+ *
+ * Attempts to down (decrease the value of) a semaphore. If SYNC_NONBLOCK is
+ * specified, the function will return if it is unable to down, otherwise
+ * it will block until it is able to perform the down.
+ *
+ * @param sem		Semaphore to down.
  * @param flags		Synchronization flags.
  *
  * @return		0 on success (always the case if neither SYNC_NONBLOCK
@@ -36,7 +56,7 @@
  *			code on failure.
  */
 int semaphore_down(semaphore_t *sem, int flags) {
-	return waitq_sleep(&sem->queue, NULL, NULL, flags);
+	return semaphore_down_timeout(sem, -1, flags);
 }
 
 /** Up a semaphore.

@@ -235,8 +235,6 @@ static void handle_wait_cb(handle_wait_t *wait) {
  * Waits for the specified event to happen on an object referred to by a
  * handle.
  *
- * @todo		Timeout.
- *
  * @param table		Table containing the handle.
  * @param handle	Handle ID to wait on.
  * @param event		Event ID to wait for (specific to object type).
@@ -270,7 +268,7 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
 	if((ret = info->type->wait(&wait)) != 0) {
 		handle_release(info);
 		return ret;
-	} else if((ret = semaphore_down(&sync.sem, (timeout == 0) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE)) != 0) {
+	} else if((ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		info->type->unwait(&wait);
 		handle_release(info);
 		return ret;

@@ -54,7 +54,7 @@ typedef struct waitq {
 /** Wait queue behaviour flags. */
 #define WAITQ_COUNT_MISSED	(1<<0)	/**< Count missed wakeups. */
 
-extern int waitq_sleep(waitq_t *waitq, struct mutex *mtx, spinlock_t *sl, int flags);
+extern int waitq_sleep(waitq_t *waitq, struct mutex *mtx, spinlock_t *sl, timeout_t timeout, int flags);
 extern bool waitq_wake(waitq_t *waitq, bool all);
 
 extern bool waitq_empty(waitq_t *waitq);

@@ -339,7 +339,7 @@ static thread_t *sched_queue_pick(sched_cpu_t *cpu) {
 
 		/* Calculate a new timeslice for the thread using the algorithm
 		 * described at the top of the file. */
-		thread->timeslice = ((thread->priority + 1) * 1000000);
+		thread->timeslice = ((thread->priority + 1) * 1000);
 
 		return thread;
 	}
@@ -370,8 +370,9 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 #endif
 
 /** Scheduler timer handler function.
+ * @param data		Data argument (unused).
  * @return		Whether to perform a thread switch. */
-static bool sched_timer_handler(void) {
+static bool sched_timer_handler(void *data) {
 	bool ret = true;
 
 	spinlock_lock(&curr_thread->lock, 0);
@@ -440,9 +441,7 @@ void sched_internal(bool state) {
 	/* Set off the timer if necessary. */
 	if(!(curr_thread->flags & THREAD_UNPREEMPTABLE)) {
 		assert(curr_thread->timeslice > 0);
-		if(timer_start(&cpu->timer, curr_thread->timeslice) != 0) {
-			fatal("Could not set scheduler timer for %" PRIu32, curr_cpu->id);
-		}
+		timer_start(&cpu->timer, curr_thread->timeslice);
 	}
 
 	/* Only bother with this stuff if the new thread is different.
@@ -586,7 +585,7 @@ void __init_text sched_init(void) {
 	curr_cpu->idle = true;
 
 	/* Create the preemption timer. */
-	timer_init(&curr_cpu->sched->timer, TIMER_FUNCTION, sched_timer_handler);
+	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL);
 
 	/* Initialise run queues. */
 	for(i = 0; i < PRIORITY_MAX; i++) {

@@ -39,6 +39,7 @@ typedef struct semaphore {
 #define SEMAPHORE_DECLARE(_var, _initial)		\
 	semaphore_t _var = SEMAPHORE_INITIALISER(_var, #_var, _initial)
 
+extern int semaphore_down_timeout(semaphore_t *sem, timeout_t timeout, int flags);
 extern int semaphore_down(semaphore_t *sem, int flags);
 extern void semaphore_up(semaphore_t *sem, size_t count);
 extern void semaphore_init(semaphore_t *sem, const char *name, unsigned int initial);

@@ -49,8 +49,10 @@ atomic_t ap_boot_wait = 0;
 /** Waiting variable for smp_boot_delay(). */
 static atomic_t smp_boot_delay_wait = 0;
 
-/** CPU boot delay timer handler. */
-static bool __init_text smp_boot_delay_handler(void) {
+/** CPU boot delay timer handler.
+ * @param data		Data parameter (unused).
+ * @return		Whether to perform a thread switch. */
+static bool __init_text smp_boot_delay_handler(void *val) {
 	atomic_set(&smp_boot_delay_wait, 1);
 	return false;
 }
@@ -62,8 +64,8 @@ static inline void smp_boot_delay(uint64_t us) {
 
 	atomic_set(&smp_boot_delay_wait, 0);
 
-	timer_init(&timer, TIMER_FUNCTION, smp_boot_delay_handler);
-	timer_start(&timer, us * 1000);
+	timer_init(&timer, smp_boot_delay_handler, NULL);
+	timer_start(&timer, us);
 
 	while(atomic_get(&smp_boot_delay_wait) == 0);
 }

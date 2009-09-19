@@ -35,17 +35,20 @@
  * function will return immediately.
  *
  * @param lock		Mutex to lock.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the lock is acquired, and a timeout of 0
+ *			is equivalent to SYNC_NONBLOCK.
  * @param flags		Synchronization flags.
  *
  * @return		0 on success (always the case if neither SYNC_NONBLOCK
  *			or SYNC_INTERRUPTIBLE are specified), negative error
  *			code on failure.
  */
-int mutex_lock(mutex_t *lock, int flags) {
+int mutex_lock_timeout(mutex_t *lock, timeout_t timeout, int flags) {
 	int ret;
 
 	if(lock->holder != curr_thread) {
-		ret = semaphore_down(&lock->sem, flags);
+		ret = semaphore_down_timeout(&lock->sem, timeout, flags);
 		if(ret != 0) {
 			return ret;
 		}
@@ -61,6 +64,25 @@ int mutex_lock(mutex_t *lock, int flags) {
 
 	lock->recursion++;
 	return 0;
+}
+
+/** Lock a mutex.
+ *
+ * Attempts to lock a mutex. If SYNC_NONBLOCK is specified, the function will
+ * return if it is unable to take the lock immediately, otherwise it will block
+ * until it is able to do so. If the mutex is recursive, and the calling thread
+ * already holds the lock, then its recursion count will be increased and the
+ * function will return immediately.
+ *
+ * @param lock		Mutex to lock.
+ * @param flags		Synchronization flags.
+ *
+ * @return		0 on success (always the case if neither SYNC_NONBLOCK
+ *			or SYNC_INTERRUPTIBLE are specified), negative error
+ *			code on failure.
+ */
+int mutex_lock(mutex_t *lock, int flags) {
+	return mutex_lock_timeout(lock, -1, flags);
 }
 
 /** Unlock a mutex.

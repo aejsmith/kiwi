@@ -26,6 +26,6 @@
 /** Frequency to use for PIT (in Hz). */
 #define PIT_FREQUENCY		1000
 
-extern clock_source_t pit_clock_source;
+extern timer_device_t pit_timer_device;
 
 #endif /* __PLATFORM_PIT_H */

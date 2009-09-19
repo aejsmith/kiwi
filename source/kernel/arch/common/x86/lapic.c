@@ -92,16 +92,9 @@ static bool lapic_reschedule_handler(unative_t num, intr_frame_t *frame) {
 	return true;
 }
 
-/*
- * Local APIC timer functions.
- */
-
-/** Prepare local APIC timer tick.
- * @param ns		Number of nanoseconds to tick in. */
-static void lapic_timer_prep(uint64_t ns) {
-	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_freq * ns) >> 32);
-	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && ns != 0) ? 1 : count);
-}
+#if 0
+# pragma mark Local APIC timer functions.
+#endif
 
 /** Enable the local APIC timer. */
 static void lapic_timer_enable(void) {
@@ -115,14 +108,20 @@ static void lapic_timer_disable(void) {
 	lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_VECT_TIMER | (1<<16));
 }
 
-/** Local APIC clock source. */
-static clock_source_t lapic_clock_source = {
-	.name = "LAPIC",
-	.type = CLOCK_ONESHOT,
+/** Prepare local APIC timer tick.
+ * @param us		Number of microseconds to tick in. */
+static void lapic_timer_prepare(timeout_t us) {
+	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_freq * us) >> 32);
+	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && us != 0) ? 1 : count);
+}
 
-	.prep = lapic_timer_prep,
+/** Local APIC timer device. */
+static timer_device_t lapic_timer_device = {
+	.name = "LAPIC",
+	.type = TIMER_DEVICE_ONESHOT,
 	.enable = lapic_timer_enable,
 	.disable = lapic_timer_disable,
+	.prepare = lapic_timer_prepare,
 };
 
 /** Timer interrupt handler.
@@ -130,14 +129,14 @@ static clock_source_t lapic_clock_source = {
  * @param frame		Interrupt stack frame.
  * @return		Return value from clock_tick(). */
 static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
-	bool ret = clock_tick();
+	bool ret = timer_tick();
 	lapic_eoi();
 	return ret;
 }
 
-/*
- * Main functions.
- */
+#if 0
+# pragma mark -
+#endif
 
 /** Tick count used during CPU bus frequency calculation. */
 static volatile uint32_t freq_tick_count __init_data = 0;
@@ -279,12 +278,10 @@ bool __init_text lapic_init(void) {
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
 	/* Figure out the CPU bus frequency. */
-	curr_cpu->arch.lapic_freq = ((lapic_get_freq() / 8) << 32) / 1000000000;
+	curr_cpu->arch.lapic_freq = ((lapic_get_freq() / 8) << 32) / 1000000;
 
-	/* Set the clock source. */
-	if(clock_source_set(&lapic_clock_source) != 0) {
-		fatal("Could not set LAPIC clock source");
-	}
+	/* Set the timer device. */
+	timer_device_set(&lapic_timer_device);
 
 	lapic_enabled = true;
 	return true;
