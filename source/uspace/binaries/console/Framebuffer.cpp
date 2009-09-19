@@ -24,7 +24,7 @@
 
 #include <string.h>
 
-#include "fb.h"
+#include "Framebuffer.h"
 
 #if 0
 # pragma mark Get/Set helpers.

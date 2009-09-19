@@ -18,8 +18,8 @@
  * @brief		Console input handling.
  */
 
-#ifndef __INPUT_H
-#define __INPUT_H
+#ifndef __INPUTDEVICE_H
+#define __INPUTDEVICE_H
 
 #include <kernel/handle.h>
 
@@ -52,4 +52,4 @@ private:
 	bool m_shift;			/**< Whether Shift is held. */
 };
 
-#endif /* __INPUT_H */
+#endif /* __INPUTDEVICE_H */

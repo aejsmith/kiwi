@@ -27,9 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "console.h"
-#include "input.h"
-#include "ppm.h"
+#include "Console.h"
+#include "InputDevice.h"
+#include "PPM.h"
 
 /** Mode to use. */
 #define MODE_WIDTH	1024

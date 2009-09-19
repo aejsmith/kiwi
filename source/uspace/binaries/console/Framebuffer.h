@@ -18,8 +18,8 @@
  * @brief		Framebuffer class.
  */
 
-#ifndef __FB_H
-#define __FB_H
+#ifndef __FRAMEBUFFER_H
+#define __FRAMEBUFFER_H
 
 #include <drivers/display.h>
 
@@ -80,4 +80,4 @@ private:
 	size_t m_depth;			/**< Display depth. */
 };
 
-#endif /* __FB_H */
+#endif /* __FRAMEBUFFER_H */

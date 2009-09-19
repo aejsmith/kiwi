@@ -15,6 +15,6 @@
 Import('sources')
 
 sources += [
-	File('new.cc'),
-	File('pure.cc'),
+	File('new.cpp'),
+	File('pure.cpp'),
 ]

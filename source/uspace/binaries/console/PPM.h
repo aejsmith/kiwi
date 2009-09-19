@@ -21,7 +21,7 @@
 #ifndef __PPM_H
 #define __PPM_H
 
-#include "fb.h"
+#include "Framebuffer.h"
 
 /** Class implementing a PPM image reader. */
 class PPM {

@@ -15,5 +15,5 @@
 Import('env', 'config', 'envmgr')
 
 env.Program('ping', [
-	'main.cc',
+	'main.cpp',
 ])

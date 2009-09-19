@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ppm.h"
+#include "PPM.h"
 
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.

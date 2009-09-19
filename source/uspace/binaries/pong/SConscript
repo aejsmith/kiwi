@@ -15,5 +15,5 @@
 Import('env', 'config', 'envmgr')
 
 env.Program('pong', [
-	'main.cc',
+	'main.cpp',
 ])

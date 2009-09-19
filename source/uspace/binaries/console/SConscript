@@ -18,11 +18,11 @@ Import('env', 'config', 'envmgr')
 env.Command('logo.c', ['logo.ppm'], Action('$BIN2HEX logo_ppm $SOURCE > $TARGET', '$GENCOMSTR'))
 
 env.Program('console', [
-	'console.cc',
-	'fb.cc',
+	'Console.cpp',
+	'Framebuffer.cpp',
+	'InputDevice.cpp',
+	'PPM.cpp',
 	'font.c',
-	'input.cc',
 	'logo.c',
-	'main.cc',
-	'ppm.cc',
+	'main.cpp',
 ], LIBS=['kiwi'])
