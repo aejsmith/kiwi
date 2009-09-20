@@ -128,20 +128,35 @@ static syscall_service_t kernel_syscall_service = {
  */
 unative_t syscall_handler(syscall_frame_t *frame) {
 	syscall_service_t *service;
+	unative_t ret;
 	uint16_t num;
 
+	/* Kill the thread now if required. */
+	if(curr_thread->killed) {
+		thread_exit();
+	}
+
+	/* Get the service number. */
 	num = (frame->id >> 16) & 0xFFFF;
 	if(num > syscall_service_max) {
 		return -ERR_SYSCALL_INVAL;
 	}
-
 	service = syscall_services[num];
+
+	/* Get the call number. */
 	num = frame->id & 0xFFFF;
 	if(!service || num >= service->size) {
 		return -ERR_SYSCALL_INVAL;
 	}
 
-	return service->table[num](frame->p1, frame->p2, frame->p3, frame->p4, frame->p5, frame->p6);
+	ret = service->table[num](frame->p1, frame->p2, frame->p3, frame->p4, frame->p5, frame->p6);
+
+	/* Check again if the thread has been killed. */
+	if(curr_thread->killed) {
+		thread_exit();
+	}
+
+	return ret;
 }
 
 /** Register a system call service.

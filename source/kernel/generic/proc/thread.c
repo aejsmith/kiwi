@@ -21,6 +21,7 @@
 #include <console/kprintf.h>
 
 #include <cpu/cpu.h>
+#include <cpu/ipi.h>
 
 #include <lib/string.h>
 
@@ -143,6 +144,25 @@ static void thread_reaper(void *arg1, void *arg2) {
 	}
 }
 
+/** Run a newly-created thread.
+ *
+ * Moves a newly created thread into the Ready state and places it on the
+ * run queue of the current CPU.
+ *
+ * @param thread	Thread to run.
+ */
+void thread_run(thread_t *thread) {
+	spinlock_lock(&thread->lock, 0);
+
+	assert(thread->state == THREAD_CREATED);
+
+	thread->state = THREAD_READY;
+	thread->cpu = curr_cpu;
+	sched_thread_insert(thread);
+
+	spinlock_unlock(&thread->lock);
+}
+
 /** Wire a thread to its current CPU.
  *
  * Increases the wire count of a thread to ensure that it will not be
@@ -175,25 +195,6 @@ void thread_unwire(thread_t *thread) {
 	}
 }
 
-/** Run a newly-created thread.
- *
- * Moves a newly created thread into the Ready state and places it on the
- * run queues to be scheduled.
- *
- * @param thread	Thread to run.
- */
-void thread_run(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
-
-	assert(thread->state == THREAD_CREATED);
-
-	thread->state = THREAD_READY;
-	thread->cpu = curr_cpu;
-	sched_thread_insert(thread);
-
-	spinlock_unlock(&thread->lock);
-}
-
 /** Interrupt a sleeping thread.
  *
  * Interrupts a thread that is sleeping on a wait queue if possible. Should
@@ -221,6 +222,68 @@ bool thread_interrupt(thread_t *thread) {
 	return ret;
 }
 
+/** Handler for a thread kill IPI.
+ * @note		Does not actually do anything, simply serves as an
+ *			interruption in case the thread is in userspace, so
+ *			that it gets killed when returning from the interrupt.
+ * @param msg		IPI message structure.
+ * @param data1		Unused.
+ * @param data2		Unused.
+ * @param data3		Unused.
+ * @param data4		Unused.
+ * @return		Always returns 0. */
+static int thread_kill_handler(void *msg, unative_t data1, unative_t data2,
+                               unative_t data3, unative_t data4) {
+	return 0;
+}
+
+/** Request that a thread terminates.
+ *
+ * Ask a userspace thread to terminate as soon as possible (upon next exit from
+ * the kernel). If the thread is currently in interruptible sleep, it will be
+ * interrupted. You cannot make a kernel thread terminate.
+ *
+ * @param thread	Thread to kill.
+ */
+void thread_kill(thread_t *thread) {
+	spinlock_lock(&thread->lock, 0);
+
+	thread->killed = true;
+	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
+		thread->context = thread->sleep_context;
+		waitq_do_wake(thread);
+	}
+
+	/* If the thread is on a different CPU, send the CPU an IPI. */
+	if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
+		ipi_send(thread->cpu->id, thread_kill_handler, 0, 0, 0, 0, 0);
+	}
+
+	spinlock_unlock(&thread->lock);
+}
+
+/** Terminate the current thread.
+ * @note		Does not return. */
+void thread_exit(void) {
+	curr_thread->state = THREAD_DEAD;
+	sched_yield();
+	fatal("Shouldn't get here");
+}
+
+/** Rename a thread.
+ *
+ * Changes the name of a thread.
+ *
+ * @param thread	Thread to rename.
+ * @param name		New name for the thread.
+ */
+void thread_rename(thread_t *thread, const char *name) {
+	spinlock_lock(&thread->lock, 0);
+	strncpy(thread->name, name, THREAD_NAME_MAX);
+	thread->name[THREAD_NAME_MAX - 1] = 0;
+	spinlock_unlock(&thread->lock);
+}
+
 /** Lookup a thread.
  *
  * Looks for a thread with the specified id in the thread tree. Created/dead
@@ -245,20 +308,6 @@ thread_t *thread_lookup(identifier_t id) {
 		thread = NULL;
 	}
 	return thread;
-}
-
-/** Rename a thread.
- *
- * Changes the name of a thread.
- *
- * @param thread	Thread to rename.
- * @param name		New name for the thread.
- */
-void thread_rename(thread_t *thread, const char *name) {
-	spinlock_lock(&thread->lock, 0);
-	strncpy(thread->name, name, THREAD_NAME_MAX);
-	thread->name[THREAD_NAME_MAX - 1] = 0;
-	spinlock_unlock(&thread->lock);
 }
 
 /** Create a new thread.
@@ -317,6 +366,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 	thread->wire_count = 0;
+	thread->killed = false;
 	thread->flags = flags;
 	thread->priority = 0;
 	thread->timeslice = 0;
@@ -346,13 +396,6 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
 	return 0;
-}
-
-/** Terminate the current thread. */
-void thread_exit(void) {
-	curr_thread->state = THREAD_DEAD;
-	sched_yield();
-	fatal("Shouldn't get here");
 }
 
 /** Destroy a thread.

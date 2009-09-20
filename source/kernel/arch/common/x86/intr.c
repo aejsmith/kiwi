@@ -31,6 +31,7 @@
 
 #include <mm/vm.h>
 
+#include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
 
@@ -105,14 +106,25 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
-	/* Nothing could handle this fault, drop dead. */
-	_fatal(frame, "Unhandled %s-mode pagefault exception (%p)\n"
-	              "%s | %s%s%s",
-	              (frame->err_code & (1<<2)) ? "user" : "kernel", addr,
-	              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
-	              (frame->err_code & (1<<1)) ? "Write" : "Read",
-	              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
-	              (frame->err_code & (1<<4)) ? " | Execute" : "");
+	/* Nothing could handle this fault. If it happened in the kernel,
+	 * die, otherwise just kill the process. */
+	if(frame->err_code & (1<<2)) {
+		kprintf(LOG_DEBUG, "arch: killing process %" PRId32 " due to unhandled pagefault (%p)\n",
+		        curr_proc->id, addr);
+		kprintf(LOG_DEBUG, "arch:  %s | %s%s%s\n",
+		        (frame->err_code & (1<<0)) ? "protection" : "not-present",
+		        (frame->err_code & (1<<1)) ? "write" : "read",
+		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
+		        (frame->err_code & (1<<4)) ? " | execute" : "");
+		process_exit(255);
+	} else {
+		_fatal(frame, "Unhandled kernel-mode pagefault exception (%p)\n"
+		              "%s | %s%s%s", addr,
+		              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
+		              (frame->err_code & (1<<1)) ? "Write" : "Read",
+		              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
+		              (frame->err_code & (1<<4)) ? " | Execute" : "");
+	}
 }
 
 /** Handler for double faults.
@@ -166,21 +178,33 @@ void intr_remove(unative_t num) {
  */
 void intr_handler(unative_t num, intr_frame_t *frame) {
 	intr_handler_t handler = intr_handlers[num];
+	bool schedule;
 
 	if(num < 32 && unlikely(atomic_get(&kdbg_running) == 2)) {
 		kdbg_except_handler(num, fault_names[num], frame);
 		return;
 	} else if(unlikely(!handler)) {
 		if(num < 32) {
-			_fatal(frame, "Unhandled %s-mode exception %" PRIun " (%s)",
-			       (frame->cs & 3) ? "user" : "kernel", num,
-			       fault_names[num]);
+			/* Fatal if in kernel-mode, exit if in user-mode. */
+			if(frame->cs & 3) {
+				kprintf(LOG_DEBUG, "arch: killing process %" PRId32 " due to exception %" PRIun "\n",
+				        curr_proc->id, num);
+				process_exit(255);
+			} else {
+				_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)",
+				       num, fault_names[num]);
+			}
 		} else {
 			_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
 		}
 	}
 
-	if(handler(num, frame)) {
+	schedule = handler(num, frame);
+
+	/* If thread is killed and we're returning to userspace, exit now. */
+	if(curr_thread->killed && frame->cs & 3) {
+		thread_exit();
+	} else if(schedule) {
 		sched_yield();
 	}
 }

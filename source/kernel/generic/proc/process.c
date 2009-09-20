@@ -274,6 +274,29 @@ fail:
 	semaphore_up(&info->sem, 1);
 }
 
+/** Lookup a process.
+ *
+ * Looks for a process with the specified ID in the process tree.
+ *
+ * @param id		ID of the process to find.
+ *
+ * @return		Pointer to process found, or NULL if not found.
+ */
+process_t *process_lookup(identifier_t id) {
+	process_t *process;
+
+	/* Small hack so that KDBG functions can use this. */
+	if(atomic_get(&kdbg_running)) {
+		process = avl_tree_lookup(&process_tree, (key_t)id);
+	} else {
+		mutex_lock(&process_tree_lock, 0);
+		process = avl_tree_lookup(&process_tree, (key_t)id);
+		mutex_unlock(&process_tree_lock);
+	}
+
+	return process;
+}
+
 /** Execute a new process.
  *
  * Creates a new process and runs a program within it. The path to the process
@@ -324,27 +347,31 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	return info.ret;
 }
 
-/** Lookup a process.
+/** Terminate the calling process.
  *
- * Looks for a process with the specified ID in the process tree.
+ * Terminates the calling process. All threads in the process will also be
+ * terminated. The status code given can be retrieved by any processes with a
+ * handle to the process.
  *
- * @param id		ID of the process to find.
- *
- * @return		Pointer to process found, or NULL if not found.
+ * @param status	Exit status code.
  */
-process_t *process_lookup(identifier_t id) {
-	process_t *process;
+void process_exit(int status) {
+	thread_t *thread;
 
-	/* Small hack so that KDBG functions can use this. */
-	if(atomic_get(&kdbg_running)) {
-		process = avl_tree_lookup(&process_tree, (key_t)id);
-	} else {
-		mutex_lock(&process_tree_lock, 0);
-		process = avl_tree_lookup(&process_tree, (key_t)id);
-		mutex_unlock(&process_tree_lock);
+	spinlock_lock(&curr_proc->lock, 0);
+
+	LIST_FOREACH(&curr_proc->threads, iter) {
+		thread = list_entry(iter, thread_t, header);
+
+		if(thread != curr_thread) {
+			thread_kill(thread);
+		}
 	}
 
-	return process;
+	curr_proc->status = status;
+	spinlock_unlock(&curr_proc->lock);
+
+	thread_exit();
 }
 
 /** Destroy a process.
@@ -356,10 +383,6 @@ process_t *process_lookup(identifier_t id) {
 void process_destroy(process_t *process) {
 	assert(refcount_get(&process->count) == 0);
 	assert(list_empty(&process->threads));
-
-	if(process->flags & PROCESS_CRITICAL) {
-		fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
-	}
 
 	mutex_lock(&process_tree_lock, 0);
 	avl_tree_remove(&process_tree, (key_t)process->id);
@@ -401,7 +424,10 @@ void process_release(process_t *process) {
 	 * process_handle_wait() does not add a new notifier if thread list
 	 * empty. */
 	if(empty) {
-		/* Protected by notifier mutex. */
+		if(process->flags & PROCESS_CRITICAL) {
+			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
+		}
+
 		notifier_run(&process->death_notifier, NULL, true);
 	}
 	if(new == 0) {
@@ -834,10 +860,5 @@ identifier_t sys_process_id(handle_t handle) {
  * @param status	Exit status code.
  */
 void sys_process_exit(int status) {
-	if(curr_proc->threads.next->next != &curr_proc->threads) {
-		fatal("TODO: Terminate other threads!");
-	}
-
-	curr_proc->status = status;
-	thread_exit();
+	process_exit(status);
 }
