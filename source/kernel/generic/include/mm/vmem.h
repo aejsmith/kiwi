@@ -25,6 +25,7 @@
 
 #include <mm/flags.h>
 
+#include <sync/condvar.h>
 #include <sync/mutex.h>
 
 #include <types/list.h>
@@ -38,6 +39,8 @@ struct vmem;
 #define VMEM_QCACHE_MAX		16		/**< Maximum number of quantum caches. */
 #define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
 #define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
+#define VMEM_RETRY_INTERVAL	1000000		/**< Interval between retries when sleeping for space (in µs). */
+#define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
 
 /** Number of free lists to use. */
 #define VMEM_FREELISTS		BITS(vmem_resource_t)
@@ -78,6 +81,7 @@ typedef struct vmem {
 	size_t quantum;				/**< Quantum (size of each allocation). */
 	size_t qcache_max;			/**< Maximum size to cache. */
 	size_t qshift;				/**< log2(quantum). */
+	int flags;				/**< Arena behaviour flags. */
 
 	/** Quantum cache array. */
 	struct slab_cache *qcache[VMEM_QCACHE_MAX];
@@ -89,6 +93,7 @@ typedef struct vmem {
 	list_t *alloc;				/**< Allocation hash table. */
 	size_t htbl_size;			/**< Current size of allocation hash table. */
 	list_t btags;				/**< List of boundary tags. */
+	condvar_t space_cvar;			/**< Condition variable to wait for space on. */
 
 	/** Source information. */
 	vmem_afunc_t afunc;			/**< Allocation function. */
@@ -107,6 +112,9 @@ typedef struct vmem {
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
 
+/** Flags for Vmem arenas. */
+#define VMEM_RECLAIM		(1<<0)		/**< Reclaim from slab when no space available. */
+
 /** Flags for Vmem functions. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
 
@@ -123,10 +131,10 @@ extern int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, in
 
 extern int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
-                             vmem_t *source, size_t qcache_max, int vmflag);
+                             vmem_t *source, size_t qcache_max, int flags, int vmflag);
 extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                            vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                           size_t qcache_max, int vmflag);
+                           size_t qcache_max, int flags, int vmflag);
 
 extern void vmem_early_init(void);
 extern void vmem_init(void);

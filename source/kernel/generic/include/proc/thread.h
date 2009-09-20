@@ -118,10 +118,10 @@ extern int thread_create(const char *name, struct process *owner, int flags,
                          thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
 extern void thread_destroy(thread_t *thread);
 
+extern int kdbg_cmd_thread(int argc, char **argv);
+
 extern void thread_init(void);
 extern void thread_reaper_init(void);
-
-extern int kdbg_cmd_thread(int argc, char **argv);
 
 extern handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
 extern handle_t sys_thread_open(identifier_t id);

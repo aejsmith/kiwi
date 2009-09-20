@@ -57,9 +57,9 @@ int mutex_lock_timeout(mutex_t *lock, timeout_t timeout, int flags) {
 		lock->holder = curr_thread;
 		lock->caller = (ptr_t)__builtin_return_address(0);
 	} else if(curr_thread && !(lock->flags & MUTEX_RECURSIVE)) {
-		fatal("Nested locking of mutex %p(%s) by %" PRIu32 "(%s)",
+		fatal("Nested locking of mutex %p(%s)\nThread: %" PRIu32 "(%s) Caller: %p",
 		      lock, lock->sem.queue.name, lock->holder->id,
-		      lock->holder->name);
+		      lock->holder->name, lock->caller);
 	}
 
 	lock->recursion++;

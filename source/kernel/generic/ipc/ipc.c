@@ -91,7 +91,7 @@ static int ipc_handle_wait(handle_wait_t *wait) {
 	ipc_endpoint_t *endpoint = wait->info->data;
 
 	switch(wait->event) {
-	case IPC_EVENT_MESSAGE:
+	case HANDLE_EVENT_READ:
 		if(endpoint->data_sem.queue.missed) {
 			wait->cb(wait);
 		} else {
@@ -116,7 +116,7 @@ static void ipc_handle_unwait(handle_wait_t *wait) {
 	ipc_endpoint_t *endpoint = wait->info->data;
 
 	switch(wait->event) {
-	case IPC_EVENT_MESSAGE:
+	case HANDLE_EVENT_READ:
 		notifier_unregister(&endpoint->msg_notifier, handle_wait_notifier, wait);
 		break;
 	case IPC_EVENT_HANGUP:
@@ -579,6 +579,7 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 static void __init_text ipc_init(void) {
 	ipc_connection_cache = slab_cache_create("ipc_connection_cache", sizeof(ipc_connection_t),
 	                                         0, ipc_connection_cache_ctor, NULL,
-	                                         NULL, NULL, NULL, 0, MM_FATAL);
+	                                         NULL, NULL, SLAB_DEFAULT_PRIORITY,
+	                                         NULL, 0, MM_FATAL);
 }
 INITCALL(ipc_init);

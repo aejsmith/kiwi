@@ -40,7 +40,10 @@
 #endif
 
 /** Array of boot-reclaimable ranges. */
-static struct { phys_ptr_t start; phys_ptr_t end; } page_reclaim_ranges[64] __init_data;
+static struct {
+	phys_ptr_t start;
+	phys_ptr_t end;
+} page_reclaim_ranges[64] __init_data;
 static size_t page_reclaim_count __init_data = 0;
 
 /** Vmem arena used for page allocations. */
@@ -97,17 +100,14 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 
 	/* First allocate the range from Vmem and try to reclaim from slab
 	 * if unable to allocate. */
-	while(!(base = (phys_ptr_t)vmem_xalloc(&page_arena, size, (vmem_resource_t)align,
-	                                       (vmem_resource_t)phase, (vmem_resource_t)nocross,
-	                                       (vmem_resource_t)minaddr, (vmem_resource_t)maxaddr,
-                                               (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
-		if(slab_reclaim()) {
-			continue;
-		} else if(pmflag & MM_FATAL) {
+	if(!(base = (phys_ptr_t)vmem_xalloc(&page_arena, size, (vmem_resource_t)align,
+	                                    (vmem_resource_t)phase, (vmem_resource_t)nocross,
+	                                    (vmem_resource_t)minaddr, (vmem_resource_t)maxaddr,
+	                                    (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
-		} else {
-			return 0;
 		}
+		return 0;
 	}
 
 	/* Handle zeroing requests. */
@@ -158,14 +158,11 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 
 	/* First allocate the range from Vmem and try to reclaim from slab
 	 * if unable to allocate. */
-	while(!(base = (phys_ptr_t)vmem_alloc(&page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
-		if(slab_reclaim()) {
-			continue;
-		} else if(pmflag & MM_FATAL) {
+	if(!(base = (phys_ptr_t)vmem_alloc(&page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
-		} else {
-			return 0;
 		}
+		return 0;
 	}
 
 	/* Handle zeroing requests. */
@@ -308,7 +305,8 @@ void page_range_mark_reserved(phys_ptr_t start, phys_ptr_t end) {
 
 /** Initialise the physical memory manager. */
 void __init_text page_init(void) {
-	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL, NULL, 0, MM_FATAL);
+	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
+	                  NULL, 0, VMEM_RECLAIM, MM_FATAL);
 
 	/* Populate the arena with memory regions, and perform other
 	 * architecture/platform initialisation tasks. */

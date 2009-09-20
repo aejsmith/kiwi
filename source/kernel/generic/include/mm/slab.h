@@ -42,6 +42,9 @@ struct slab_bufctl;
 #define SLAB_LARGE_FRACTION	8		/**< Minimum fraction of the source quantum for large objects. */
 #define SLAB_WASTE_FRACTION	8		/**< Maximum fraction of a slab that should be wasted. */
 
+/** Reclaim priority to set if no special priority. */
+#define SLAB_DEFAULT_PRIORITY	100
+
 /** Slab constructor callback function. */
 typedef int (*slab_ctor_t)(void *obj, void *data, int kmflag);
 
@@ -49,7 +52,7 @@ typedef int (*slab_ctor_t)(void *obj, void *data, int kmflag);
 typedef void (*slab_dtor_t)(void *obj, void *data);
 
 /** Slab reclaim callback function. */
-typedef void (*slab_reclaim_t)(void *data);
+typedef void (*slab_reclaim_t)(void *data, bool force);
 
 /** Slab cache structure. */
 typedef struct slab_cache {
@@ -62,6 +65,7 @@ typedef struct slab_cache {
 	/** Statistics. */
 	atomic_t alloc_total;			/**< Total number of allocations that have been made. */
 	atomic_t alloc_current;			/**< Number of currently allocated objects. */
+	atomic_t slab_count;			/**< Number of allocated slabs. */
 
 	/** Slab lists/cache colouring settings. */
 	mutex_t slab_lock;			/**< Lock to protect slab lists. */
@@ -69,6 +73,7 @@ typedef struct slab_cache {
 	list_t slab_full;			/**< List of fully allocated slabs. */
 	size_t colour_next;			/**< Next cache colour. */
 	size_t colour_max;			/**< Maximum cache colour. */
+
 	/** Allocation hash table for no-touch caches. */
 	struct slab_bufctl *bufctl_hash[SLAB_HASH_SIZE];
 
@@ -78,13 +83,14 @@ typedef struct slab_cache {
 	size_t obj_size;			/**< Size of an object. */
 	size_t obj_count;			/**< Number of objects per slab. */
 	size_t align;				/**< Required alignment of each object. */
+	struct vmem *source;			/**< Vmem arena to use for memory allocation. */
 
 	/** Callback functions. */
 	slab_ctor_t ctor;			/**< Object constructor function. */
 	slab_dtor_t dtor;			/**< Object destructor function. */
 	slab_reclaim_t reclaim;			/**< Memory reclaim function. */
 	void *data;				/**< Data to pass to helper functions. */
-	struct vmem *source;			/**< Vmem arena to use for memory allocation. */
+	int priority;				/**< Reclaim priority. */
 
 	/** Debugging information. */
 	list_t header;				/**< List to slab cache list. */
@@ -103,13 +109,15 @@ extern void slab_cache_free(slab_cache_t *cache, void *obj);
 extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
                                        slab_ctor_t ctor, slab_dtor_t dtor,
                                        slab_reclaim_t reclaim, void *data,
-                                       struct vmem *source, int flags, int kmflag);
+                                       int priority, struct vmem *source, int flags,
+                                       int kmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
-extern bool slab_reclaim(void);
-extern void slab_enable_cpu_cache(void);
-extern void slab_init(void);
+extern void slab_reclaim(void);
 
 extern int kdbg_cmd_slab(int argc, char **argv);
+
+extern void slab_late_init(void);
+extern void slab_init(void);
 
 #endif /* __MM_SLAB_H */

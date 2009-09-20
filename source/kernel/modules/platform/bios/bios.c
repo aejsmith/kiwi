@@ -439,7 +439,7 @@ static int bios_init(void) {
 
 	/* Initialise BIOS memory allocator. */
 	bios_mem_arena = vmem_create("bios_mem_arena", BIOS_MEM_BASE, BIOS_MEM_SIZE,
-	                             1, NULL, NULL, NULL, 0, MM_SLEEP);
+	                             1, NULL, NULL, NULL, 0, 0, MM_SLEEP);
 
 	/* Initialise the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);

@@ -435,24 +435,6 @@ void thread_destroy(thread_t *thread) {
 	spinlock_unlock(&thread->lock);
 }
 
-/** Initialise the thread cache. */
-void __init_text thread_init(void) {
-	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, MM_FATAL);
-	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
-	                                 thread_cache_ctor, NULL, NULL, NULL,
-	                                 NULL, 0, MM_FATAL);
-}
-
-/** Create the thread reaper. */
-void __init_text thread_reaper_init(void) {
-	thread_t *thread;
-
-	if(thread_create("reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread) != 0) {
-		fatal("Could not create thread reaper");
-	}
-	thread_run(thread);
-}
-
 /** Print information about a thread.
  * @param thread	Thread to print.
  * @param level		Log level. */
@@ -524,6 +506,24 @@ int kdbg_cmd_thread(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+/** Initialise the thread cache. */
+void __init_text thread_init(void) {
+	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
+	                                 thread_cache_ctor, NULL, NULL, NULL,
+	                                 SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+}
+
+/** Create the thread reaper. */
+void __init_text thread_reaper_init(void) {
+	thread_t *thread;
+
+	if(thread_create("reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread) != 0) {
+		fatal("Could not create thread reaper");
+	}
+	thread_run(thread);
 }
 
 #if 0

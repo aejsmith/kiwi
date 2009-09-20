@@ -47,6 +47,11 @@
 #include <mm/slab.h>
 #include <mm/vmem.h>
 
+#include <proc/process.h>
+#include <proc/thread.h>
+
+#include <sync/condvar.h>
+
 #include <types/hash.h>
 
 #include <assert.h>
@@ -112,9 +117,15 @@ static vmem_t slab_metadata_arena;
 static LIST_DECLARE(slab_caches);
 static MUTEX_DECLARE(slab_caches_lock, 0);
 
-/*
- * Helper functions.
- */
+/** Reclaim thread. */
+static thread_t *slab_reclaim_thread = NULL;
+static CONDVAR_DECLARE(slab_reclaim_request);
+static CONDVAR_DECLARE(slab_reclaim_response);
+static MUTEX_DECLARE(slab_reclaim_lock, 0);
+
+#if 0
+# pragma mark Helper functions.
+#endif
 
 /** Work out the optimal slab size for a cache.
  * @todo		Better implementation.
@@ -140,9 +151,9 @@ static inline size_t slab_get_slabsize(slab_cache_t *cache) {
 	return size;
 }
 
-/*
- * Slab layer functions.
- */
+#if 0
+# pragma mark Slab layer functions.
+#endif
 
 /** Destroy a slab.
  * @param cache		Cache to destroy in.
@@ -171,6 +182,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 		slab_cache_free(&slab_slab_cache, slab);
 	}
 
+	atomic_dec(&cache->slab_count);
 	vmem_free(cache->source, addr, cache->slab_size);
 }
 
@@ -212,6 +224,8 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	} else {
 		slab = (slab_t *)((addr + cache->slab_size) - sizeof(slab_t));
 	}
+
+	atomic_inc(&cache->slab_count);
 
 	list_init(&slab->header);
 	slab->base = (void *)addr;
@@ -398,9 +412,9 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 	mutex_unlock(&cache->slab_lock);
 }
 
-/*
- * Magazine layer functions.
- */
+#if 0
+# pragma mark Magazine layer functions.
+#endif
 
 /** Get a full magazine from a cache's depot.
  * @param cache		Cache to get from.
@@ -474,7 +488,9 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 
 	/* Free all rounds within the magazine, if any. */
 	for(i = 0; i < mag->rounds; i++) {
-		slab_obj_free(cache, mag->objects[i]);
+		if(mag->objects[i]) {
+			slab_obj_free(cache, mag->objects[i]);
+		}
 	}
 
 	slab_cache_free(&slab_mag_cache, mag);
@@ -499,15 +515,17 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	mutex_lock(&cc->lock, 0);
 
 	/* Check if we have a magazine to allocate from. */
-	if(likely(cc->loaded != NULL)) {
+	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds) {
 			ret = cc->loaded->objects[--cc->loaded->rounds];
+			cc->loaded->objects[cc->loaded->rounds] = NULL;
 			goto out;
 		} else if(cc->previous && cc->previous->rounds) {
 			/* Previous has rounds, exchange loaded with previous
 			 * and allocate from it. */
 			slab_cpu_reload(cc, cc->previous);
 			ret = cc->loaded->objects[--cc->loaded->rounds];
+			cc->loaded->objects[cc->loaded->rounds] = NULL;
 			goto out;
 		}
 	}
@@ -522,6 +540,7 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 
 		slab_cpu_reload(cc, mag);
 		ret = cc->loaded->objects[--cc->loaded->rounds];
+		cc->loaded->objects[cc->loaded->rounds] = NULL;
 	}
 out:
 	mutex_unlock(&cc->lock);
@@ -593,50 +612,53 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
 	return 0;
 }
 
-/*
- * Slab cache functions.
- */
+#if 0
+# pragma mark Slab cache functions.
+#endif
 
 /** Reclaim memory from a slab cache.
+ * @todo		Should we reclaim partial magazines too, somehow?
  * @param cache		Cache to reclaim from.
- * @param force		Whether to reclaim everything.
- * @return		True if anything was reclaimed. */
+ * @param force		Whether to force reclaim of everything.
+ * @return		Whether any slabs were freed. */
 static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
-	bool destroyed = false;
-	slab_magazine_t *mag;
+	bool ret = false;
+	int count;
 
-	dprintf("slab: reclaiming memory from cache %p(%s)...\n", cache, cache->name);
+	kprintf(LOG_DEBUG, "slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
 
 	/* Run the cache's reclaim callback (if any) before attempting to
 	 * destroy magazines. */
 	if(cache->reclaim) {
-		cache->reclaim(cache->data);
+		cache->reclaim(cache->data, force);
 	}
 
 	mutex_lock(&cache->depot_lock, 0);
 
 	/* Destroy empty magazines. */
 	LIST_FOREACH_SAFE(&cache->magazine_empty, iter) {
-		mag = list_entry(iter, slab_magazine_t, header);
-
-		slab_magazine_destroy(cache, mag);
-		destroyed = true;
+		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
 	}
 
-	/* If something's been destroyed, we can return now so the page
-	 * allocator will try again. */
-	if(!destroyed || force) {
-		/* Destroy full magazines. */
-		LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
-			mag = list_entry(iter, slab_magazine_t, header);
+	/* Get the slab count before destroying. */
+	if(!(count = atomic_get(&cache->slab_count))) {
+		mutex_unlock(&cache->depot_lock);
+		return false;
+	}
 
-			slab_magazine_destroy(cache, mag);
-			destroyed = true;
+	/* Destroy full magazines until the slab count decreases. */
+	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
+		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
+		if(atomic_get(&cache->slab_count) < count) {
+			ret = true;
+			if(!force) {
+				break;
+			}
 		}
 	}
 
 	mutex_unlock(&cache->depot_lock);
-	return destroyed;
+	return ret;
 }
 
 /** Allocate from a slab cache.
@@ -714,6 +736,8 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
  *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
+ * @param priority	Reclaim priority (lower values will be reclaimed before
+ *			higher values).
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
@@ -722,8 +746,9 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  */
 static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
                            slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
-                           void *data, vmem_t *source, int flags) {
-	assert(cache);
+                           void *data, int priority, vmem_t *source, int flags) {
+	slab_cache_t *exist;
+
 	assert(size);
 	assert(source);
 	assert(source->quantum >= SLAB_ALIGN_MIN);
@@ -740,14 +765,16 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	atomic_set(&cache->alloc_current, 0);
 	atomic_set(&cache->alloc_total, 0);
+	atomic_set(&cache->slab_count, 0);
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
 
+	cache->source = source;
 	cache->ctor = ctor;
 	cache->dtor = dtor;
 	cache->reclaim = reclaim;
 	cache->data = data;
-	cache->source = source;
+	cache->priority = priority;
 
 	/* Alignment must be at lest SLAB_ALIGN_MIN. */
 	if(align < SLAB_ALIGN_MIN) {
@@ -793,9 +820,24 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	strncpy(cache->name, name, SLAB_NAME_MAX);
 	cache->name[SLAB_NAME_MAX - 1] = 0;
 
-	/* Add the cache to the global cache list. */
+	/* Add the cache to the global cache list, keeping it ordered by
+	 * priority. */
 	mutex_lock(&slab_caches_lock, 0);
-	list_append(&slab_caches, &cache->header);
+	if(list_empty(&slab_caches)) {
+		list_append(&slab_caches, &cache->header);
+	} else {
+		LIST_FOREACH(&slab_caches, iter) {
+			exist = list_entry(iter, slab_cache_t, header);
+
+			if(exist->priority > priority) {
+				list_add_before(&exist->header, &cache->header);
+				break;
+			} else if(exist->header.next == &slab_caches) {
+				list_append(&slab_caches, &cache->header);
+				break;
+			}
+		}
+	}
 	mutex_unlock(&slab_caches_lock);
 
 	dprintf("slab: created slab cache %p(%s) (objsize: %u, slabsize: %u, align: %u)\n",
@@ -817,6 +859,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
  * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
  *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
+ * @param priority	Reclaim priority (lower values will be reclaimed before
+ *			higher values).
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
@@ -827,7 +871,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
  */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
                                 slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
-                                void *data, vmem_t *source, int flags, int kmflag) {
+                                void *data, int priority, vmem_t *source, int flags,
+                                int kmflag) {
 	slab_cache_t *cache;
 
 	/* Use the kernel heap if no specific source is provided. */
@@ -840,7 +885,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 		return cache;
 	}
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data, source, flags) != 0) {
+	if(slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data, priority, source, flags) != 0) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -873,74 +918,48 @@ void slab_cache_destroy(slab_cache_t *cache) {
 	slab_cache_free(&slab_cache_cache, cache);
 }
 
-/** Reclaim free memory used by slab caches.
- *
- * Attempts to reclaim some memory from all the slab caches in the system.
- *
- * @return		True if anything was reclaimed.
- */
-bool slab_reclaim(void) {
-	slab_cache_t *cache;
+#if 0
+# pragma mark -
+#endif
 
-	mutex_lock(&slab_caches_lock, 0);
+/** Entry point for slab reclaim thread.
+ * @param arg1		First thread argument (unused).
+ * @param arg2		Second thread argument (unused). */
+static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
+	/* Take the reclaim lock immediately, unlocking/relocking it is handled
+	 * by the condition variable. */
+	mutex_lock(&slab_reclaim_lock, 0);
 
-	LIST_FOREACH(&slab_caches, iter) {
-		cache = list_entry(iter, slab_cache_t, header);
+	while(true) {
+		/* Wait for a reclaim request. */
+		condvar_wait(&slab_reclaim_request, &slab_reclaim_lock, NULL, 0);
 
-		if(slab_cache_reclaim(cache, false)) {
-			mutex_unlock(&slab_caches_lock);
-			return true;
-		}
-	}
-
-	mutex_unlock(&slab_caches_lock);
-	return false;
-}
-
-/** Enable magazine layer on all cache's that require it. */
-void __init_text slab_enable_cpu_cache(void) {
-	slab_cache_t *cache;
-
-	mutex_lock(&slab_caches_lock, 0);
-
-	LIST_FOREACH(&slab_caches, iter) {
-		cache = list_entry(iter, slab_cache_t, header);
-
-		if(cache->flags & SLAB_CACHE_LATEMAG) {
-			assert(cache->flags & SLAB_CACHE_NOMAG);
-
-			if(slab_cpu_cache_init(cache) != 0) {
-				fatal("Could not enable CPU cache for %s", cache->name);
+		/* Loop through all caches and reclaim. */
+		mutex_lock(&slab_caches_lock, 0);
+		LIST_FOREACH(&slab_caches, iter) {
+			if(slab_cache_reclaim(list_entry(iter, slab_cache_t, header), false)) {
+				break;
 			}
-
-			cache->flags &= ~(SLAB_CACHE_LATEMAG | SLAB_CACHE_NOMAG);
 		}
-	}
+		mutex_unlock(&slab_caches_lock);
 
-	mutex_unlock(&slab_caches_lock);
+		/* Wake the thread that called us. */
+		condvar_broadcast(&slab_reclaim_response);
+	}
 }
 
-/** Initialise the slab allocator. */
-void __init_text slab_init(void) {
-	/* Initialise the metadata arena. */
-	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", 0, 0, PAGE_SIZE,
-	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
-	                  MM_FATAL);
-
-	/* Initialise statically allocated internal caches. */
-	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0,
-	                   NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_cache_cache");
-	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0,
-	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_bufctl_cache");
-	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0,
-	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_slab_cache");
-	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0,
-	                          NULL, NULL, NULL, NULL, &slab_metadata_arena, SLAB_CACHE_NOMAG) != 0) {
-		fatal("Could not initialise slab_mag_cache");
+/** Reclaim unused memory held by slab caches. */
+void slab_reclaim(void) {
+	/* If the reclaim lock cannot be taken immediately a reclaim is already
+	 * being scheduled or in progress. */
+	if(!slab_reclaim_thread || mutex_lock(&slab_reclaim_lock, SYNC_NONBLOCK) != 0) {
+		return;
 	}
+
+	/* Schedule a reclaim. */
+	condvar_signal(&slab_reclaim_request);
+	condvar_wait(&slab_reclaim_response, &slab_reclaim_lock, NULL, 0);
+	mutex_unlock(&slab_reclaim_lock);
 }
 
 /** Slab command for KDBG.
@@ -975,4 +994,59 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+/** Enable the magazine layer and start the reclaim thread. */
+void __init_text slab_late_init(void) {
+	slab_cache_t *cache;
+	int ret;
+
+	mutex_lock(&slab_caches_lock, 0);
+
+	LIST_FOREACH(&slab_caches, iter) {
+		cache = list_entry(iter, slab_cache_t, header);
+
+		if(cache->flags & SLAB_CACHE_LATEMAG) {
+			assert(cache->flags & SLAB_CACHE_NOMAG);
+
+			if(slab_cpu_cache_init(cache) != 0) {
+				fatal("Could not enable CPU cache for %s", cache->name);
+			}
+
+			cache->flags &= ~(SLAB_CACHE_LATEMAG | SLAB_CACHE_NOMAG);
+		}
+	}
+
+	mutex_unlock(&slab_caches_lock);
+
+	/* Create the reclaim thread. */
+	if((ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry,
+	                        NULL, NULL, &slab_reclaim_thread)) != 0) {
+		fatal("Could not create reclaim thread (%d)", ret);
+	}
+	thread_run(slab_reclaim_thread);
+}
+
+/** Initialise the slab allocator. */
+void __init_text slab_init(void) {
+	/* Initialise the metadata arena. */
+	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", 0, 0, PAGE_SIZE,
+	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
+	                  0, MM_FATAL);
+
+	/* Initialise statically allocated internal caches. */
+	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0, NULL,
+	                   NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+		fatal("Could not initialise slab_cache_cache");
+	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0, NULL,
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+		fatal("Could not initialise slab_bufctl_cache");
+	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0, NULL,
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+		fatal("Could not initialise slab_slab_cache");
+	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena,
+	                          SLAB_CACHE_NOMAG) != 0) {
+		fatal("Could not initialise slab_mag_cache");
+	}
 }

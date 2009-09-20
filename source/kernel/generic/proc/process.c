@@ -435,24 +435,6 @@ void process_release(process_t *process) {
 	}
 }
 
-/** Initialise the process table and slab cache. */
-void __init_text process_init(void) {
-	int ret;
-
-	/* Create the process slab cache and ID vmem arena. */
-	process_id_arena = vmem_create("process_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, MM_FATAL);
-	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
-	                                  process_cache_ctor, NULL, NULL, NULL, NULL,
-	                                  0, MM_FATAL);
-
-	/* Create the kernel process. */
-	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
-	                        PRIORITY_KERNEL, NULL, false, false,
-	                        &kernel_proc)) != 0) {
-		fatal("Could not initialise kernel process (%d)", ret);
-	}
-}
-
 /** Dump the contents of the process table.
  *
  * Dumps out the contents of the process hash table.
@@ -485,6 +467,24 @@ int kdbg_cmd_process(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+/** Initialise the process table and slab cache. */
+void __init_text process_init(void) {
+	int ret;
+
+	/* Create the process slab cache and ID vmem arena. */
+	process_id_arena = vmem_create("process_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
+	                                  process_cache_ctor, NULL, NULL, NULL,
+	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+
+	/* Create the kernel process. */
+	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
+	                        PRIORITY_KERNEL, NULL, false, false,
+	                        &kernel_proc)) != 0) {
+		fatal("Could not initialise kernel process (%d)", ret);
+	}
 }
 
 #if 0

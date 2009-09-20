@@ -73,8 +73,7 @@ typedef struct ipc_message_vector {
 #define IPC_MESSAGE_MAX		16384	/**< Maximum size of a message data buffer. */
 
 /** IPC handle event types. */
-#define IPC_EVENT_MESSAGE	16	/**< Message available to receive. */
-#define IPC_EVENT_HANGUP	17	/**< Remote end hung up the connection. */
+#define IPC_EVENT_HANGUP	16	/**< Remote end hung up the connection. */
 
 extern void ipc_process_init(process_t *process);
 extern void ipc_process_destroy(process_t *process);

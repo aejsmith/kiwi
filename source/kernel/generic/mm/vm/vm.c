@@ -891,10 +891,10 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 void __init_text vm_init(void) {
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
 	                                    0, vm_aspace_ctor, NULL, NULL, NULL,
-	                                    NULL, 0, MM_FATAL);
+	                                    SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 	vm_region_cache = slab_cache_create("vm_region_cache", sizeof(vm_region_t),
-	                                    0, NULL, NULL, NULL, NULL, NULL, 0,
-	                                    MM_FATAL);
+	                                    0, NULL, NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
+	                                    NULL, 0, MM_FATAL);
 
 	/* Initialise other parts of the VM system. */
 	vm_anon_init();

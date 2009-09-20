@@ -494,8 +494,9 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
                             vmem_resource_t align, vmem_resource_t phase,
                             vmem_resource_t nocross, vmem_resource_t minaddr,
                             vmem_resource_t maxaddr, int vmflag) {
-	vmem_resource_t hash;
+	vmem_resource_t curr_size, hash, ret = 0;
 	vmem_btag_t *seg;
+	size_t count = 0;
 
 	assert(vmem);
 	assert(size > 0);
@@ -516,44 +517,69 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 		vmflag |= VM_BESTFIT;
 	}
 
-	/* Find a free segment and import one if we could not find one. */
-	seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag);
-	if(seg == NULL) {
-		if(vmem->source && minaddr == 0 && maxaddr == 0) {
-			/* Don't need to bother waiting if we cannot import
-			 * from the source - the allocation flags get passed
-			 * down so waiting should take place there. */
-			seg = vmem_import(vmem, size, vmflag);
-			if(seg == NULL) {
-				if(vmflag & MM_FATAL) {
-					fatal("Could not perform mandatory allocation on arena %p(%s)",
-					      vmem, vmem->name);
-				}
-				mutex_unlock(&vmem->lock);
-				return 0;
-			}
-		} else {
-			if(vmflag & MM_FATAL) {
-				fatal("Could not perform mandatory allocation on arena %p(%s)",
-				      vmem, vmem->name);
-			} else if(vmflag & MM_SLEEP) {
-				fatal("Waiting for Vmem allocations not implemented");
-			}
-
-			mutex_unlock(&vmem->lock);
-			return 0;
+	/* Continuously loop until we can make the allocation. If MM_SLEEP is
+	 * not set, this will break out once reclaiming from slab cannot free
+	 * any space in the arena. */
+	while(true) {
+		/* First try to find a free segment in the arena. */
+		if((seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag))) {
+			break;
 		}
+
+		/* If there is a source arena and the allocation does not have
+		 * address constraints, try importing from it. Don't need to
+		 * bother sleeping if we cannot import from the source - the
+		 * allocation flags get passed down so waiting should take
+		 * place at the arena at the end of the chain. */
+		if(vmem->source && minaddr == 0 && maxaddr == 0) {
+			seg = vmem_import(vmem, size, vmflag);
+			break;
+		}
+
+		/* Try reclaiming from slab if the arena has specified that we
+		 * should do so. If doing so reduces the in-use size of the
+		 * arena, try the allocation again. */
+		if(vmem->flags & VMEM_RECLAIM) {
+			curr_size = vmem->used_size;
+			mutex_unlock(&vmem->lock);
+
+			slab_reclaim();
+
+			mutex_lock(&vmem->lock, 0);
+			if(vmem->used_size < curr_size) {
+				continue;
+			}
+		}
+
+		/* Could not reclaim any space. Break out if not sleeping. */
+		if(!(vmflag & MM_SLEEP)) {
+			break;
+		}
+
+		/* Give up if we've waited for too long. */
+		if(count++ == VMEM_RETRY_MAX) {
+			fatal("Exhausted available space in %p(%s)", vmem, vmem->name);
+		}
+
+		/* Wait for at most the configured interval and try again. */
+		kprintf(LOG_DEBUG, "vmem: waiting for space in %p(%s)...\n", vmem, vmem->name);
+		condvar_wait_timeout(&vmem->space_cvar, &vmem->lock, NULL, VMEM_RETRY_INTERVAL, 0);
 	}
 
-	/* Add to allocation hash table. */
-	hash = hash_int_hash(seg->base) % vmem->htbl_size;
-	list_append(&vmem->alloc[hash], &seg->s_link);
+	if(seg) {
+		/* Add to allocation hash table. */
+		hash = hash_int_hash(seg->base) % vmem->htbl_size;
+		list_append(&vmem->alloc[hash], &seg->s_link);
 
-	vmem->used_size += size;
-	vmem->alloc_count++;
-
+		vmem->used_size += size;
+		vmem->alloc_count++;
+		ret = seg->base;
+	} else if(vmflag & MM_FATAL) {
+		fatal("Could not perform mandatory allocation on arena %p(%s)",
+		      vmem, vmem->name);
+	}
 	mutex_unlock(&vmem->lock);
-	return seg->base;
+	return ret;
 }
 
 /** Free a segment to a Vmem arena.
@@ -620,6 +646,8 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		/* Check if the span can be unimported. */
 		if(vmem->source && tag->span->type == VMEM_BTAG_IMPORTED) {
 			vmem_unimport(vmem, tag->span);
+		} else {
+			condvar_broadcast(&vmem->space_cvar);
 		}
 
 		mutex_unlock(&vmem->lock);
@@ -743,13 +771,14 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
+ * @param flags		Behaviour flags for the arena.
  * @param vmflag	Allocation flags.
  *
  * @return		0 on success, negative error code on failure.
  */
 int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
               size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
-              vmem_t *source, size_t qcache_max, int vmflag) {
+              vmem_t *source, size_t qcache_max, int flags, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
 
@@ -769,6 +798,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	list_init(&vmem->children);
 	list_init(&vmem->btags);
 	mutex_init(&vmem->lock, "vmem_arena_lock", 0);
+	condvar_init(&vmem->space_cvar, "vmem_space_cvar");
 
 	/* Initialise freelists and the allocation hash table. */
 	for(i = 0; i < VMEM_FREELISTS; i++) {
@@ -784,6 +814,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	vmem->quantum = quantum;
 	vmem->qcache_max = qcache_max;
 	vmem->qshift = log2(quantum) - 1;
+	vmem->flags = flags;
 	vmem->afunc = afunc;
 	vmem->ffunc = ffunc;
 	vmem->source = source;
@@ -802,11 +833,16 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 			snprintf(qcname, SLAB_NAME_MAX, "%s_%zu", vmem->name, (i + 1) * vmem->quantum);
 			qcname[SLAB_NAME_MAX - 1] = 0;
 
+			/* Put quantum caches after the default reclaim
+			 * priority, so that any heap space that gets freed
+			 * after reclaiming from all the other slab caches can
+			 * then be reclaimed from quantum caches. */
 			vmem->qcache[i] = slab_cache_create(qcname, (i + 1) * vmem->quantum,
 			                                    vmem->quantum, NULL, NULL, NULL,
-			                                    NULL, vmem, SLAB_CACHE_QCACHE, 0);
+			                                    NULL, SLAB_DEFAULT_PRIORITY + 1,
+			                                    vmem, SLAB_CACHE_QCACHE, 0);
 			if(vmem->qcache[i] == NULL) {
-				goto qcache_fail;
+				goto fail;
 			}
 		}
 	}
@@ -817,7 +853,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 			if(vmflag & MM_FATAL) {
 				fatal("Could not initialise required arena %s", vmem->name);
 			}
-			return -ERR_NO_MEMORY;
+			goto fail;
 		}
 	}
 
@@ -837,7 +873,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	dprintf("vmem: created arena %p(%s) (quantum: %zu, source: %p)\n",
 		vmem, vmem->name, quantum, source);
 	return 0;
-qcache_fail:
+fail:
 	/* Destroy the quantum caches. */
 	for(i = 0; i < (vmem->qcache_max / vmem->quantum); i++) {
 		if(vmem->qcache[i]) {
@@ -864,13 +900,14 @@ qcache_fail:
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
+ * @param flags		Behaviour flags for the arena.
  * @param vmflag	Allocation flags.
  *
  * @return		Pointer to arena on success, NULL on failure.
  */
 vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                     vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                    size_t qcache_max, int vmflag) {
+                    size_t qcache_max, int flags, int vmflag) {
 	vmem_t *vmem;
 
 	vmem = kmalloc(sizeof(vmem_t), vmflag & MM_FLAG_MASK);
@@ -878,7 +915,7 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 		return NULL;
 	}
 
-	if(vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source, qcache_max, vmflag) != 0) {
+	if(vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source, qcache_max, flags, vmflag) != 0) {
 		kfree(vmem);
 		return NULL;
 	}
@@ -903,7 +940,7 @@ void __init_text vmem_init(void) {
 	/* Create the boundary tag arena. */
 	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
-	                  MM_FATAL);
+	                  0, MM_FATAL);
 }
 
 /*
@@ -942,8 +979,8 @@ static void vmem_dump_list(list_t *header, int indent) {
 	LIST_FOREACH(header, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
-		kprintf(LOG_NONE, "%*s%-*s %-16" PRIu64 " %-16" PRIu64 " %zu\n",
-		        indent, "", VMEM_NAME_MAX - indent, vmem->name,
+		kprintf(LOG_NONE, "%*s%-*s %-5d %-16" PRIu64 " %-16" PRIu64 " %zu\n",
+		        indent, "", VMEM_NAME_MAX - indent, vmem->name, vmem->flags,
 		        vmem->total_size, vmem->used_size, vmem->alloc_count);
 		vmem_dump_list(&vmem->children, indent + 2);
 	}
@@ -978,8 +1015,8 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 
 	/* If no arguments specified dump a tree of all arenas. */
 	if(argc < 2) {
-		kprintf(LOG_NONE, "Name                      Size             Used             Allocations\n");
-		kprintf(LOG_NONE, "====                      ====             ====             ===========\n");
+		kprintf(LOG_NONE, "Name                      Flags Size             Used             Allocations\n");
+		kprintf(LOG_NONE, "====                      ===== ====             ====             ===========\n");
 
 		/* Print a list of arenas. */
 		vmem_dump_list(&vmem_arenas, 0);

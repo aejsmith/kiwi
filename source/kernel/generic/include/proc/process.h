@@ -83,9 +83,9 @@ extern int process_create(const char **args, const char **environ, int flags, in
                           process_t *parent, process_t **procp);
 extern void process_exit(int status) __noreturn;
 
-extern void process_init(void);
-
 extern int kdbg_cmd_process(int argc, char **argv);
+
+extern void process_init(void);
 
 extern handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit);
 extern int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit);

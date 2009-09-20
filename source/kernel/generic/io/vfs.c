@@ -2398,7 +2398,7 @@ void __init_text vfs_init(void) {
 	/* Initialise the node slab cache. */
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
 	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
-	                                   NULL, NULL, NULL, 0, MM_FATAL);
+	                                   NULL, NULL, 1, NULL, 0, MM_FATAL);
 
 	/* Register RamFS and mount it as the root. */
 	if((ret = vfs_type_register(&ramfs_fs_type)) != 0) {

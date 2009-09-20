@@ -117,15 +117,16 @@ void init_bsp(void *data) {
 	smp_detect_cpus();
 	ipi_init();
 
-	/* Now that we know the CPU count, we can enable the magazine layer
-	 * in the slab allocator. */
-	slab_enable_cpu_cache();
-
 	/* Bring up the scheduler and friends. */
 	process_init();
 	thread_init();
 	sched_init();
 	thread_reaper_init();
+
+	/* Now that we know the CPU count and the thread system is up, we can
+	 * enable the magazine layer in the slab allocator and start up its
+	 * reclaim thread. */
+	slab_late_init();
 
 	/* Perform final architecture/platform initialisation. */
 	arch_final_init();

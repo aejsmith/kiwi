@@ -415,8 +415,8 @@ void handle_table_destroy(handle_table_t *table) {
 /** Initialise the handle slab cache. */
 static void __init_text handle_init(void) {
 	handle_info_cache = slab_cache_create("handle_info_cache", sizeof(handle_info_t), 0,
-	                                      handle_info_cache_ctor, NULL, NULL, NULL, NULL,
-	                                      0, MM_FATAL);
+	                                      handle_info_cache_ctor, NULL, NULL, NULL,
+	                                      SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 }
 INITCALL(handle_init);
 

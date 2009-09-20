@@ -35,8 +35,7 @@ typedef struct ipc_message_vector {
 } ipc_message_vector_t;
 
 /** IPC handle event types. */
-#define IPC_EVENT_MESSAGE	16	/**< Message available to receive. */
-#define IPC_EVENT_HANGUP	17	/**< Remote end hung up the connection. */
+#define IPC_EVENT_HANGUP	16	/**< Remote end hung up the connection. */
 
 extern handle_t ipc_connection_open(identifier_t id, timeout_t timeout);
 extern handle_t ipc_connection_listen(timeout_t timeout, identifier_t *pidp);
