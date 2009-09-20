@@ -67,7 +67,7 @@ typedef struct process {
 } process_t;
 
 /** Process handle events. */
-#define PROCESS_EVENT_DEATH	1	/**< Wait for process death. */
+#define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
 
 /** Process flag definitions */
 #define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */

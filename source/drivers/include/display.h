@@ -40,12 +40,12 @@ typedef struct display_mode {
 } display_mode_t;
 
 /** Display device request types. */
-#define DISPLAY_MODE_COUNT	0	/**< Get the number of display modes. */
-#define DISPLAY_MODE_GET	1	/**< Get an array of display modes. */
-#define DISPLAY_MODE_SET	2	/**< Set the display mode. */
+#define DISPLAY_MODE_COUNT	32	/**< Get the number of display modes. */
+#define DISPLAY_MODE_GET	33	/**< Get an array of display modes. */
+#define DISPLAY_MODE_SET	34	/**< Set the display mode. */
 
 /** Display device event types. */
-#define DISPLAY_EVENT_REDRAW	1024	/**< Wait until a redraw is required. */
+#define DISPLAY_EVENT_REDRAW	32	/**< Wait until a redraw is required. */
 
 #ifdef KERNEL
 

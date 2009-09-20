@@ -23,6 +23,8 @@
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 
+#include <proc/handle.h>
+
 #include <assert.h>
 #include <errors.h>
 
@@ -90,6 +92,7 @@ int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *byte
 		for(i = 0; i < count; i++) {
 			buf[i] = pipe_get(pipe);
 		}
+		notifier_run(&pipe->space_notifier, NULL, false);
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
@@ -99,6 +102,7 @@ int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *byte
 
 			mutex_lock(&pipe->lock, 0);
 			buf[i] = pipe_get(pipe);
+			notifier_run(&pipe->space_notifier, NULL, false);
 			mutex_unlock(&pipe->lock);
 		}
 	}
@@ -175,6 +179,45 @@ out:
 	return ret;
 }
 
+/** Wait for a pipe to be readable or writable.
+ *
+ * Waits for a pipe to become readable or writable, and notifies the specified
+ * handle_wait_t structure when it is. This is a convenience function, for
+ * example for devices that use pipes internally.
+ *
+ * @param pipe		Pipe to wait for.
+ * @param write		Whether to wait to be writable (pipe is classed as
+ *			writable when there is space in the buffer).
+ * @param wait		Wait structure to notify.
+ */
+void pipe_wait(pipe_t *pipe, bool write, handle_wait_t *wait) {
+	if(write) {
+		if(pipe->space_sem.queue.missed) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&pipe->space_notifier, handle_wait_notifier, wait);
+		}
+	} else {
+		if(pipe->data_sem.queue.missed) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&pipe->data_notifier, handle_wait_notifier, wait);
+		}
+	}
+}
+
+/** Stop waiting for a pipe.
+ *
+ * Stops waiting for a pipe event.
+ *
+ * @param pipe		Pipe to stop waiting for.
+ * @param write		Whether waiting to be writable.
+ * @param wait		Wait structure.
+ */
+void pipe_unwait(pipe_t *pipe, bool write, handle_wait_t *wait) {
+	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, handle_wait_notifier, wait);
+}
+
 /** Create a new pipe.
  *
  * Allocates a new pipe structure.
@@ -189,6 +232,7 @@ pipe_t *pipe_create(void) {
 	mutex_init(&pipe->lock, "pipe_lock", 0);
 	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
+	notifier_init(&pipe->space_notifier, pipe);
 	notifier_init(&pipe->data_notifier, pipe);
 	pipe->buf = kheap_alloc(PIPE_SIZE, MM_SLEEP);
 	pipe->start = 0;

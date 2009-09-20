@@ -89,6 +89,13 @@ typedef struct handle_wait {
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
 #define HANDLE_TYPE_IPC		6	/**< IPC connection. */
 
+/** Standard handle wait events. */
+#define HANDLE_EVENT_READ	1	/**< Wait for data to be ready to read. */
+#define HANDLE_EVENT_WRITE	2	/**< Wait for handle to be able to accept data. */
+
+/** Start of per-handle type event types. */
+#define HANDLE_EVENT_TYPE_START	16
+
 extern void handle_wait_notifier(void *arg1, void *arg2, void *arg3);
 
 extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data);

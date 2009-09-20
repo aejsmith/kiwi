@@ -111,12 +111,11 @@ static int console_master_wait(device_t *device, handle_wait_t *wait) {
 	console_device_t *console = device->data;
 
 	switch(wait->event) {
-	case DEVICE_EVENT_READABLE:
-		if(console->output->data_sem.queue.missed) {
-			wait->cb(wait);
-		} else {
-			notifier_register(&console->output->data_notifier, handle_wait_notifier, wait);
-		}
+	case HANDLE_EVENT_READ:
+		pipe_wait(console->output, false, wait);
+		return 0;
+	case HANDLE_EVENT_WRITE:
+		pipe_wait(console->input, true, wait);
 		return 0;
 	default:
 		return -ERR_PARAM_INVAL;
@@ -130,8 +129,11 @@ static void console_master_unwait(device_t *device, handle_wait_t *wait) {
 	console_device_t *console = device->data;
 
 	switch(wait->event) {
-	case DEVICE_EVENT_READABLE:
-		notifier_unregister(&console->output->data_notifier, handle_wait_notifier, wait);
+	case HANDLE_EVENT_READ:
+		pipe_unwait(console->output, false, wait);
+		break;
+	case HANDLE_EVENT_WRITE:
+		pipe_unwait(console->input, true, wait);
 		break;
 	}
 }

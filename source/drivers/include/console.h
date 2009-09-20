@@ -22,6 +22,6 @@
 #define __DRIVERS_CONSOLE_H
 
 /** Console manager device requests. */
-#define CONSOLE_MANAGER_CREATE		0	/**< Create a new console. */
+#define CONSOLE_MANAGER_CREATE		1024	/**< Create a new console. */
 
 #endif /* __DRIVERS_CONSOLE_H */

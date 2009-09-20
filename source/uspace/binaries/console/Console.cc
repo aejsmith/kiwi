@@ -94,7 +94,7 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	ToggleCursor();
 
 	/* Register the console with the event loop. */
-	EventLoop::Instance()->AddHandle(m_master, DEVICE_EVENT_READABLE, _Callback, this);
+	EventLoop::Instance()->AddHandle(m_master, HANDLE_EVENT_READ, _Callback, this);
 }
 
 /** Destructor for the console. */

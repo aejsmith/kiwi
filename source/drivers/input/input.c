@@ -196,7 +196,7 @@ static int input_device_wait(device_t *_dev, handle_wait_t *wait) {
 	input_device_t *device = _dev->data;
 
 	switch(wait->event) {
-	case DEVICE_EVENT_READABLE:
+	case HANDLE_EVENT_READ:
 		if(device->sem.queue.missed) {
 			wait->cb(wait);
 		} else {
@@ -215,7 +215,7 @@ static void input_device_unwait(device_t *_dev, handle_wait_t *wait) {
 	input_device_t *device = _dev->data;
 
 	switch(wait->event) {
-	case DEVICE_EVENT_READABLE:
+	case HANDLE_EVENT_READ:
 		notifier_unregister(&device->data_notifier, handle_wait_notifier, wait);
 		break;
 	}

@@ -35,7 +35,7 @@
 #define INPUT_PROTOCOL_AT	0	/**< AT keyboard. */
 
 /** Input device request codes. */
-#define INPUT_KB_SET_LEDS	0	/**< Set keyboard LED state. */
+#define INPUT_KB_SET_LEDS	32	/**< Set keyboard LED state. */
 
 /** Structure describing LED state to set. */
 typedef struct input_kb_led_state {

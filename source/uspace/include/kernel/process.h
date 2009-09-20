@@ -37,7 +37,7 @@ typedef struct process_args {
 } process_args_t;
 
 /** Process handle events. */
-#define PROCESS_EVENT_DEATH	1	/**< Wait for process death. */
+#define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
 
 extern handle_t process_create(const char *path, char *const args[], char *const env[], bool inherit);
 extern int process_replace(const char *path, char *const args[], char *const env[], bool inherit);

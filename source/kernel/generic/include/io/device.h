@@ -35,11 +35,11 @@
 #define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */
 #define DEVICE_ATTR_MAX		256	/**< Maximum length of a device attribute string value. */
 
-/** Standard device handle events. */
-#define DEVICE_EVENT_READABLE	1	/**< Wait for data to become available to read. */
-#define DEVICE_EVENT_WRITABLE	2	/**< Wait for the device to be writable. */
+/** Start of device class event/request numbers. */
+#define DEVICE_CLASS_EVENT_START	32
+#define DEVICE_CLASS_REQUEST_START	32
 
-/** Start of driver-specific request/event numbers. */
+/** Start of device-specific event/request numbers. */
 #define DEVICE_CUSTOM_EVENT_START	1024
 #define DEVICE_CUSTOM_REQUEST_START	1024
 

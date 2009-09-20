@@ -35,6 +35,10 @@ extern "C" {
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
 #define HANDLE_TYPE_IPC		6	/**< IPC connection. */
 
+/** Standard handle wait events. */
+#define HANDLE_EVENT_READ	1	/**< Wait for data to be ready to read. */
+#define HANDLE_EVENT_WRITE	2	/**< Wait for handle to be able to accept data. */
+
 extern int handle_close(handle_t handle);
 extern int handle_type(handle_t handle);
 extern int handle_wait(handle_t handle, int event, timeout_t timeout);

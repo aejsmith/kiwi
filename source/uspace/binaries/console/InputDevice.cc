@@ -81,7 +81,7 @@ InputDevice::InputDevice(const char *path) :
 	}
 
 	/* Register the device with the event loop. */
-	EventLoop::Instance()->AddHandle(m_device, DEVICE_EVENT_READABLE, _Callback, this);
+	EventLoop::Instance()->AddHandle(m_device, HANDLE_EVENT_READ, _Callback, this);
 }
 
 /** Destructor for an input device. */

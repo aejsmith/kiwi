@@ -29,6 +29,8 @@
 /** Size of a pipe's data buffer. */
 #define PIPE_SIZE	4096
 
+struct handle_wait;
+
 /** Structure containing a pipe. */
 typedef struct pipe {
 	mutex_t reader;			/**< Lock to serialize read requests. */
@@ -36,6 +38,7 @@ typedef struct pipe {
 	mutex_t lock;			/**< Lock to protect buffer. */
 
 	semaphore_t space_sem;		/**< Semaphore counting available space. */
+	notifier_t space_notifier;	/**< Notifier for space availability. */
 	semaphore_t data_sem;		/**< Semaphore counting available data. */
 	notifier_t data_notifier;	/**< Notifier for data availability. */
 
@@ -46,6 +49,8 @@ typedef struct pipe {
 
 extern int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp);
 extern int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp);
+extern void pipe_wait(pipe_t *pipe, bool write, struct handle_wait *wait);
+extern void pipe_unwait(pipe_t *pipe, bool write, struct handle_wait *wait);
 
 extern pipe_t *pipe_create(void);
 extern void pipe_destroy(pipe_t *pipe);
