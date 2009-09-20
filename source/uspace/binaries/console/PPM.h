@@ -26,18 +26,9 @@
 /** Class implementing a PPM image reader. */
 class PPM {
 public:
-	/** Constructs the object and reads in the image.
-	 * @param buf		Pointer to memory buffer containing image.
-	 * @param size		Size of memory buffer. */
 	PPM(unsigned char *buf, size_t size);
-
-	/** Destroy the object. */
 	~PPM();
 
-	/** Write the image to a framebuffer.
-	 * @param fb		Framebuffer to write to.
-	 * @param x		X position to write at.
-	 * @param y		Y position to write it. */
 	void Draw(Framebuffer *fb, int x, int y);
 
 	/** Get the width of the image.

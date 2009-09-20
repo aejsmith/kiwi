@@ -71,10 +71,10 @@ typedef struct handle_info {
 
 /** Handle waiting information structure. */
 typedef struct handle_wait {
-	list_t header;			/**< Link to list for handle_wait_multiple(). */
 	handle_info_t *info;		/**< Handle being waited for. */
 	int event;			/**< Event ID being waited for. */
 	void *data;			/**< Internal implementation data pointer. */
+	int idx;			/**< Index into array for handle_wait_multiple(). */
 
 	/** Callback function for an event occurring.
 	 * @param wait		Wait structure. */
@@ -88,6 +88,8 @@ typedef struct handle_wait {
 #define HANDLE_TYPE_THREAD	4	/**< Thread. */
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
 #define HANDLE_TYPE_IPC		6	/**< IPC connection. */
+
+extern void handle_wait_notifier(void *arg1, void *arg2, void *arg3);
 
 extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data);
 extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);

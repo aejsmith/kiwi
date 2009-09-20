@@ -84,17 +84,6 @@ static int ipc_connection_cache_ctor(void *obj, void *data, int mmflag) {
 	return 0;
 }
 
-/** Notifier function for IPC events.
- * @param arg1		Pointer to endpoint.
- * @param arg2		Unused.
- * @param arg3		Wait structure pointer. */
-static void ipc_handle_notifier(void *arg1, void *arg2, void *arg3) {
-	handle_wait_t *wait = arg3;
-
-	assert(wait->info->data == arg1);
-	wait->cb(wait);
-}
-
 /** Signal that an IPC handle event is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
@@ -103,10 +92,18 @@ static int ipc_handle_wait(handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case IPC_EVENT_MESSAGE:
-		notifier_register(&endpoint->msg_notifier, ipc_handle_notifier, wait);
+		if(endpoint->data_sem.queue.missed) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&endpoint->msg_notifier, handle_wait_notifier, wait);
+		}
 		return 0;
 	case IPC_EVENT_HANGUP:
-		notifier_register(&endpoint->hangup_notifier, ipc_handle_notifier, wait);
+		if(!endpoint->remote) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&endpoint->hangup_notifier, handle_wait_notifier, wait);
+		}
 		return 0;
 	default:
 		return -ERR_PARAM_INVAL;
@@ -120,10 +117,10 @@ static void ipc_handle_unwait(handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case IPC_EVENT_MESSAGE:
-		notifier_unregister(&endpoint->msg_notifier, ipc_handle_notifier, wait);
+		notifier_unregister(&endpoint->msg_notifier, handle_wait_notifier, wait);
 		break;
 	case IPC_EVENT_HANGUP:
-		notifier_unregister(&endpoint->hangup_notifier, ipc_handle_notifier, wait);
+		notifier_unregister(&endpoint->hangup_notifier, handle_wait_notifier, wait);
 		break;
 	}
 }
@@ -400,6 +397,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, void *buf, size_t size)
 	/* Queue the message. */
 	list_append(&endpoint->remote->messages, &message->header);
 	semaphore_up(&endpoint->remote->data_sem, 1);
+	notifier_run(&endpoint->remote->msg_notifier, NULL, false);
 
 	mutex_unlock(&endpoint->conn->lock);
 	handle_release(info);

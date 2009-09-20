@@ -465,17 +465,6 @@ int kdbg_cmd_process(int argc, char **argv) {
 # pragma mark Process handle functions.
 #endif
 
-/** Notifier function for PROCESS_EVENT_DEATH waiting.
- * @param arg1		Pointer to process.
- * @param arg2		Unused.
- * @param arg3		Wait structure pointer. */
-static void process_handle_death_notifier(void *arg1, void *arg2, void *arg3) {
-	handle_wait_t *wait = arg3;
-
-	assert(wait->info->data == arg1);
-	wait->cb(wait);
-}
-
 /** Signal that a process is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
@@ -492,7 +481,7 @@ static int process_handle_wait(handle_wait_t *wait) {
 		}
 		spinlock_unlock(&process->lock);
 
-		notifier_register(&process->death_notifier, process_handle_death_notifier, wait);
+		notifier_register(&process->death_notifier, handle_wait_notifier, wait);
 		return 0;
 	default:
 		return -ERR_PARAM_INVAL;
@@ -506,7 +495,7 @@ static void process_handle_unwait(handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, process_handle_death_notifier, wait);
+		notifier_unregister(&process->death_notifier, handle_wait_notifier, wait);
 		break;
 	}
 }

@@ -19,7 +19,9 @@ env.Command('logo.c', ['logo.ppm'], Action('$BIN2HEX logo_ppm $SOURCE > $TARGET'
 
 env.Program('console', [
 	'Console.cc',
+	'EventLoop.cc',
 	'Framebuffer.cc',
+	'Header.cc',
 	'InputDevice.cc',
 	'PPM.cc',
 	'font.c',

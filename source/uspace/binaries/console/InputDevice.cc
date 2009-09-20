@@ -20,13 +20,13 @@
 
 #include <kernel/device.h>
 #include <kernel/handle.h>
-#include <kernel/thread.h>
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "Console.h"
+#include "EventLoop.h"
 #include "InputDevice.h"
 
 /** Definition of some keys. */
@@ -71,89 +71,80 @@ const unsigned char InputDevice::m_keymap_caps[] = {
 /** Constructor for an input device.
  * @param device	Device tree path to input device. */
 InputDevice::InputDevice(const char *path) :
-		m_init_status(0), m_device(-1), m_thread(-1), m_caps(false),
-		m_ctrl(false), m_alt(false), m_shift(false) {
+	m_init_status(0), m_device(-1), m_caps(false), m_ctrl(false),
+	m_alt(false), m_shift(false)
+{
 	/* Open the input device. */
 	if((m_device = device_open(path)) < 0) {
 		m_init_status = m_device;
 		return;
 	}
 
-	/* Create a thread to handle input. */
-	if((m_thread = thread_create("input", NULL, 0, _ThreadEntry, this)) < 0) {
-		m_init_status = m_thread;
-		handle_close(m_device);
-		return;
-	}
+	/* Register the device with the event loop. */
+	EventLoop::Instance()->AddHandle(m_device, DEVICE_EVENT_READABLE, _Callback, this);
 }
 
 /** Destructor for an input device. */
 InputDevice::~InputDevice() {
-	if(m_thread >= 0) {
-		/* FIXME: Gotta kill the thread. */
-		handle_close(m_thread);
-	}
 	if(m_device >= 0) {
 		handle_close(m_device);
 	}
 }
 
-/** Thread function.
- * @param arg		Thread argument (device object pointer). */
-void InputDevice::_ThreadEntry(void *arg) {
+/** Event callback function.
+ * @param arg		Data argument (device object pointer). */
+void InputDevice::_Callback(void *arg) {
 	InputDevice *device = reinterpret_cast<InputDevice *>(arg);
 	unsigned char ch;
 	uint8_t code;
 	size_t bytes;
 	int ret;
 
-	while(true) {
-		if((ret = device_read(device->m_device, &code, 1, 0, &bytes)) != 0) {
-			printf("Failed to read input (%d)\n", ret);
-			continue;
-		} else if(bytes != 1) {
-			continue;
-		} else if(code >= 0xe0) {
-			continue;
-		}
-
-		if(code & 0x80) {
-			code &= 0x7F;
-			if(code == L_SHIFT || code == R_SHIFT) {
-				device->m_shift = false;
-			} else if(code == L_CTRL || code == R_CTRL) {
-				device->m_ctrl = false;
-			} else if(code == L_ALT || code == R_ALT) {
-				device->m_alt = 0;
-			}
-			continue;
-		} else if(code == L_ALT || code == R_ALT) {
-			device->m_alt = true;
-			continue;
-		} else if(code == L_CTRL || code == R_CTRL) {
-			device->m_ctrl = true;
-			continue;
-		} else if(code == L_SHIFT || code == R_SHIFT) {
-			device->m_shift = true;
-			continue;
-		} else if(code == CAPS) {
-			device->m_caps = !device->m_caps;
-			continue;
-		}
-
-		if(device->m_shift) {
-			ch = m_keymap_shift[code];
-		} else if(device->m_caps) {
-			ch = m_keymap_caps[code];
-		} else {
-			ch = m_keymap[code];
-		}
-
-		Console::GetActive()->Output(ch);
-		if(ch == '\b') {
-			Console::GetActive()->Output(' ');
-			Console::GetActive()->Output('\b');
-		}
-		Console::GetActive()->Input(ch);
+	if((ret = device_read(device->m_device, &code, 1, 0, &bytes)) != 0) {
+		printf("Failed to read input (%d)\n", ret);
+		return;
+	} else if(bytes != 1) {
+		return;
+	} else if(code >= 0xe0) {
+		return;
 	}
+
+	if(code & 0x80) {
+		code &= 0x7F;
+		if(code == L_SHIFT || code == R_SHIFT) {
+			device->m_shift = false;
+		} else if(code == L_CTRL || code == R_CTRL) {
+			device->m_ctrl = false;
+		} else if(code == L_ALT || code == R_ALT) {
+			device->m_alt = 0;
+		}
+		return;
+	} else if(code == L_ALT || code == R_ALT) {
+		device->m_alt = true;
+		return;
+	} else if(code == L_CTRL || code == R_CTRL) {
+		device->m_ctrl = true;
+		return;
+	} else if(code == L_SHIFT || code == R_SHIFT) {
+		device->m_shift = true;
+		return;
+	} else if(code == CAPS) {
+		device->m_caps = !device->m_caps;
+		return;
+	}
+
+	if(device->m_shift) {
+		ch = m_keymap_shift[code];
+	} else if(device->m_caps) {
+		ch = m_keymap_caps[code];
+	} else {
+		ch = m_keymap[code];
+	}
+
+	Console::GetActive()->Output(ch);
+	if(ch == '\b') {
+		Console::GetActive()->Output(' ');
+		Console::GetActive()->Output('\b');
+	}
+	Console::GetActive()->Input(ch);
 }

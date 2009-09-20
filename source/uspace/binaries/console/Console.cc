@@ -22,7 +22,6 @@
 
 #include <kernel/device.h>
 #include <kernel/handle.h>
-#include <kernel/thread.h>
 
 #include <kiwi/Process.h>
 
@@ -30,6 +29,7 @@
 #include <string.h>
 
 #include "Console.h"
+#include "EventLoop.h"
 
 using namespace kiwi;
 
@@ -50,11 +50,12 @@ Console *Console::m_active = 0;
  * @param width		Width.
  * @param height	Height. */
 Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
-		m_init_status(0), m_thread(-1), m_master(-1), m_id(-1),
-		m_fb(fb), m_buffer(0), m_fb_x(x), m_fb_y(y), m_width_px(width),
-		m_height_px(height), m_cursor_x(0), m_cursor_y(0),
-		m_cols(width / FONT_WIDTH), m_rows(height / FONT_HEIGHT),
-		m_scroll_start(0), m_scroll_end(m_rows - 1) {
+	m_init_status(0), m_master(-1), m_id(-1), m_fb(fb), m_buffer(0),
+	m_fb_x(x), m_fb_y(y), m_width_px(width), m_height_px(height),
+	m_cursor_x(0), m_cursor_y(0), m_cols(width / FONT_WIDTH),
+	m_rows(height / FONT_HEIGHT), m_scroll_start(0),
+	m_scroll_end(m_rows - 1)
+{
 	handle_t handle;
 	char buf[1024];
 
@@ -81,13 +82,6 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	/* Allocate the buffer. */
 	m_buffer = new RGB[m_width_px * m_height_px];
 
-	/* Create a thread to receive output. */
-	sprintf(buf, "output-%d", m_id);
-	if((m_thread = thread_create(buf, NULL, 0, _ThreadEntry, this)) < 0) {
-		m_init_status = m_thread;
-		return;
-	}
-
 	m_fg_colour.r = m_fg_colour.g = m_fg_colour.b = 0xff;
 	m_bg_colour.r = m_bg_colour.g = m_bg_colour.b = 0x0;
 	memset(m_buffer, 0, m_width_px * m_height_px * sizeof(RGB));
@@ -98,14 +92,13 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	}
 
 	ToggleCursor();
+
+	/* Register the console with the event loop. */
+	EventLoop::Instance()->AddHandle(m_master, DEVICE_EVENT_READABLE, _Callback, this);
 }
 
 /** Destructor for the console. */
 Console::~Console() {
-	if(m_thread >= 0) {
-		/* FIXME: Kill thread. */
-		handle_close(m_thread);
-	}
 	if(m_master >= 0) {
 		handle_close(m_master);
 	}
@@ -293,22 +286,20 @@ void Console::ScrollDown(void) {
 	Redraw();
 }
 
-/** Output thread function.
- * @param arg		Thread argument (console object pointer). */
-void Console::_ThreadEntry(void *arg) {
+/** Event callback function.
+ * @param arg		Data argument (console object pointer). */
+void Console::_Callback(void *arg) {
 	Console *console = reinterpret_cast<Console *>(arg);
 	unsigned char ch;
 	size_t bytes;
 	int ret;
 
-	while(true) {
-		if((ret = device_read(console->m_master, &ch, 1, 0, &bytes)) != 0) {
-			printf("Failed to read output (%d)\n", ret);
-			continue;
-		} else if(bytes != 1) {
-			continue;
-		}
-
-		console->Output(ch);
+	if((ret = device_read(console->m_master, &ch, 1, 0, &bytes)) != 0) {
+		printf("Failed to read output (%d)\n", ret);
+		return;
+	} else if(bytes != 1) {
+		return;
 	}
+
+	console->Output(ch);
 }

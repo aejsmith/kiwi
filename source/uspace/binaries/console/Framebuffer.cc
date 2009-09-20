@@ -19,12 +19,22 @@
  */
 
 #include <kernel/device.h>
+#include <kernel/errors.h>
 #include <kernel/handle.h>
 #include <kernel/vm.h>
 
+#include <stdio.h>
 #include <string.h>
 
+#include "Console.h"
+#include "EventLoop.h"
 #include "Framebuffer.h"
+#include "Header.h"
+
+/** Mode to use. */
+#define MODE_WIDTH	1024
+#define MODE_HEIGHT	768
+#define MODE_DEPTH	16
 
 #if 0
 # pragma mark Get/Set helpers.
@@ -93,15 +103,59 @@ static inline void putpixel_0888(uint32_t *dest, uint32_t colour) {
 #endif
 
 /** Constructor for a Framebuffer object.
- * @param handle	Handle for display device. The object takes
- *			ownership of this (even on failure) - do not close it.
- * @param mode		Display mode for device. Values are copied out
- *			of the structure - can be freed after. */
-Framebuffer::Framebuffer(handle_t handle, display_mode_t *mode) :
-		m_init_status(0), m_buffer(0), m_handle(handle),
-		m_width(mode->width), m_height(mode->height),
-		m_depth(mode->bpp) {
+ * @param device	Path to device to use. */
+Framebuffer::Framebuffer(const char *device) :
+	m_init_status(0), m_buffer(0), m_handle(-1), m_width(MODE_WIDTH),
+	m_height(MODE_HEIGHT), m_depth(MODE_DEPTH)
+{
+	display_mode_t *modes;
+	size_t count = 0, i;
 	int ret;
+
+	if((m_handle = device_open(device)) < 0) {
+		printf("Failed to open display device (%d)\n", m_handle);
+		m_init_status = m_handle;
+		return;
+	}
+
+	/* Fetch a list of display modes. */
+	if((ret = device_request(m_handle, DISPLAY_MODE_COUNT, NULL, 0, &count, sizeof(size_t), NULL)) != 0) {
+		printf("Failed to get mode count (%d)\n", ret);
+		m_init_status = ret;
+		return;
+	} else if(!count) {
+		printf("Display device does not have any usable modes.\n");
+		m_init_status = -ERR_NOT_FOUND;
+		return;
+	}
+
+	modes = new display_mode_t[count];
+	if((ret = device_request(m_handle, DISPLAY_MODE_GET, NULL, 0, modes, sizeof(display_mode_t) * count, NULL)) != 0) {
+		printf("Failed to get mode list (%d)\n", ret);
+		m_init_status = ret;
+		delete[] modes;
+		return;
+	}
+
+	/* Find the one we want. */
+	for(i = 0; i < count; i++) {
+		if(modes[i].width == m_width && modes[i].height == m_height && modes[i].bpp == m_depth) {
+			goto found;
+		}
+	}
+
+	printf("Could not find desired display mode!\n");
+	m_init_status = -ERR_NOT_FOUND;
+	delete[] modes;
+	return;
+found:
+	/* Set the mode. */
+	if((ret = device_request(m_handle, DISPLAY_MODE_SET, &modes[i].id, sizeof(identifier_t), NULL, 0, NULL)) != 0) {
+		printf("Failed to set mode (%d)\n", ret);
+		m_init_status = ret;
+		delete[] modes;
+		return;
+	}
 
 	m_buffer_size = m_width * m_height * (m_depth / 8);
 	if(m_buffer_size % 0x1000) {
@@ -109,13 +163,18 @@ Framebuffer::Framebuffer(handle_t handle, display_mode_t *mode) :
 		m_buffer_size -= m_buffer_size % 0x1000;
 	}
 
-	if((ret = vm_map_device(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode->offset,
+	if((ret = vm_map_device(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, modes[i].offset,
 	                        reinterpret_cast<void **>(&m_buffer))) != 0) {
 		m_init_status = ret;
+		delete[] modes;
 		return;
 	}
+	delete[] modes;
 
 	memset(m_buffer, 0, m_buffer_size);
+
+	/* Register the redraw handler with the event loop. */
+	EventLoop::Instance()->AddHandle(m_handle, DISPLAY_EVENT_REDRAW, _Callback, this);
 }
 
 /** Framebuffer destructor. */
@@ -205,4 +264,13 @@ void Framebuffer::DrawRect(int x, int y, int width, int height, RGB *buffer) {
 			PutPixel(x + j, y + i, buffer[(i * width) + j]);
 		}
 	}
+}
+
+/** Event callback function.
+ * @param arg		Data argument (device object pointer). */
+void Framebuffer::_Callback(void *arg) {
+	Framebuffer *fb = reinterpret_cast<Framebuffer *>(arg);
+
+	Header::Instance()->Draw(fb);
+	Console::GetActive()->Redraw();
 }

@@ -26,18 +26,14 @@
 /** Input device class. */
 class InputDevice {
 public:
-	/** Constructor for an InputDevice object.
-	 * @param path		Device path to use. */
 	InputDevice(const char *path);
 	~InputDevice();
 
 	/** Check if initialisation succeeded.
-	 * @return		0 if succeeded, negative error code if not. */
-	int InitCheck(void) const { return m_init_status; }
+	 * @return		Whether initialisation succeeded. */
+	bool Initialised(void) const { return (m_init_status == 0); }
 private:
-	/** Thread function.
-	 * @param arg		Thread argument (device object pointer). */
-	static void _ThreadEntry(void *arg);
+	static void _Callback(void *arg);
 
 	static const unsigned char m_keymap[];
 	static const unsigned char m_keymap_shift[];
@@ -45,7 +41,6 @@ private:
 
 	int m_init_status;		/**< Initialisation status. */
 	handle_t m_device;		/**< Handle to device. */
-	handle_t m_thread;		/**< Handle to thread. */
 	bool m_caps;			/**< Whether Caps Lock is on. */
 	bool m_ctrl;			/**< Whether Ctrl is held. */
 	bool m_alt;			/**< Whether Alt is held. */

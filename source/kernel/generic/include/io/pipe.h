@@ -21,6 +21,8 @@
 #ifndef __IO_PIPE_H
 #define __IO_PIPE_H
 
+#include <lib/notifier.h>
+
 #include <sync/mutex.h>
 #include <sync/semaphore.h>
 
@@ -35,6 +37,7 @@ typedef struct pipe {
 
 	semaphore_t space_sem;		/**< Semaphore counting available space. */
 	semaphore_t data_sem;		/**< Semaphore counting available data. */
+	notifier_t data_notifier;	/**< Notifier for data availability. */
 
 	char *buf;			/**< Circular data buffer. */
 	size_t start;			/**< Start position of buffer. */

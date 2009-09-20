@@ -23,6 +23,8 @@
 
 #include <mm/vm.h>
 
+#include <proc/handle.h>
+
 #include <sync/mutex.h>
 
 #include <types/list.h>
@@ -33,7 +35,12 @@
 #define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */
 #define DEVICE_ATTR_MAX		256	/**< Maximum length of a device attribute string value. */
 
-/** Start of driver-specific request numbers. */
+/** Standard device handle events. */
+#define DEVICE_EVENT_READABLE	1	/**< Wait for data to become available to read. */
+#define DEVICE_EVENT_WRITABLE	2	/**< Wait for the device to be writable. */
+
+/** Start of driver-specific request/event numbers. */
+#define DEVICE_CUSTOM_EVENT_START	1024
 #define DEVICE_CUSTOM_REQUEST_START	1024
 
 struct device;
@@ -73,6 +80,20 @@ typedef struct device_ops {
 	 * @param bytesp	Where to store number of bytes written.
 	 * @return		0 on success, negative error code on failure. */
 	int (*write)(struct device *device, const void *buf, size_t count, offset_t offset, size_t *bytesp);
+
+	/** Signal that a device event is being waited for.
+	 * @note		If the event being waited for has occurred
+	 *			already, this function should call the callback
+	 *			function and return success.
+	 * @param device	Device to wait for.
+	 * @param wait		Wait information structure.
+	 * @return		0 on success, negative error code on failure. */
+	int (*wait)(struct device *device, handle_wait_t *wait);
+
+	/** Stop waiting for a device event.
+	 * @param device	Device to stop waiting for.
+	 * @param wait		Wait information structure. */
+	void (*unwait)(struct device *device, handle_wait_t *wait);
 
 	/** Fault handler for memory regions mapping the device.
 	 * @note		If this operation is not specified then the

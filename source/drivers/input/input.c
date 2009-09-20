@@ -188,6 +188,39 @@ static int input_device_read(device_t *_dev, void *_buf, size_t count, offset_t 
 	return ret;
 }
 
+/** Signal that an input device event is being waited for.
+ * @param _dev		Device to wait for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int input_device_wait(device_t *_dev, handle_wait_t *wait) {
+	input_device_t *device = _dev->data;
+
+	switch(wait->event) {
+	case DEVICE_EVENT_READABLE:
+		if(device->sem.queue.missed) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&device->data_notifier, handle_wait_notifier, wait);
+		}
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Stop waiting for an input device event.
+ * @param _dev		Device to stop waiting for.
+ * @param wait		Wait information structure. */
+static void input_device_unwait(device_t *_dev, handle_wait_t *wait) {
+	input_device_t *device = _dev->data;
+
+	switch(wait->event) {
+	case DEVICE_EVENT_READABLE:
+		notifier_unregister(&device->data_notifier, handle_wait_notifier, wait);
+		break;
+	}
+}
+
 /** Handler for input device requests.
  * @param _dev		Device request is being made on.
  * @param request	Request number.
@@ -208,6 +241,8 @@ static device_ops_t input_device_ops = {
 	.get = input_device_get,
 	.release = input_device_release,
 	.read = input_device_read,
+	.wait = input_device_wait,
+	.unwait = input_device_unwait,
 	.request = input_device_request,
 };
 
@@ -230,6 +265,7 @@ void input_device_input(input_device_t *device, uint8_t value) {
 
 	device->buffer[(device->start + device->size++) % INPUT_BUFFER_SIZE] = value;
 	semaphore_up(&device->sem, 1);
+	notifier_run_unlocked(&device->data_notifier, NULL, false);
 	spinlock_unlock(&device->lock);
 }
 MODULE_EXPORT(input_device_input);
@@ -273,6 +309,7 @@ int input_device_create(const char *name, device_t *parent, uint8_t type,
 	device = kmalloc(sizeof(input_device_t), MM_SLEEP);
 	spinlock_init(&device->lock, "input_device_lock");
 	semaphore_init(&device->sem, "input_device_sem", 0);
+	notifier_init(&device->data_notifier, device);
 	device->id = atomic_inc(&input_next_id);
 	device->ops = ops;
 	device->data = data;

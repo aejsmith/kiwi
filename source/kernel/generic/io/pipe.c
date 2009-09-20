@@ -145,10 +145,13 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 			}
 		}
 
+		/* For atomic writes, we only run the data notifier after
+		 * writing everything, so we don't do too many calls. */
 		mutex_lock(&pipe->lock, 0);
 		for(i = 0; i < count; i++) {
 			pipe_insert(pipe, buf[i]);
 		}
+		notifier_run(&pipe->data_notifier, NULL, false);
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
@@ -158,6 +161,7 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 
 			mutex_lock(&pipe->lock, 0);
 			pipe_insert(pipe, buf[i]);
+			notifier_run(&pipe->data_notifier, NULL, false);
 			mutex_unlock(&pipe->lock);
 		}
 	}
@@ -185,6 +189,7 @@ pipe_t *pipe_create(void) {
 	mutex_init(&pipe->lock, "pipe_lock", 0);
 	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
+	notifier_init(&pipe->data_notifier, pipe);
 	pipe->buf = kheap_alloc(PIPE_SIZE, MM_SLEEP);
 	pipe->start = 0;
 	pipe->end = 0;

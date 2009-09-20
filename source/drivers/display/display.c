@@ -207,7 +207,8 @@ static void display_console_register(void *arg1, void *arg2, void *_dev) {
  * @param _dev		Device pointer. */
 static void display_console_unregister(void *arg1, void *arg2, void *_dev) {
 	console_unregister(&display_console);
-	condvar_broadcast(&display_console_device->redraw);
+	display_console_device->redraw = true;
+	notifier_run_unlocked(&display_console_device->redraw_notifier, NULL, false);
 }
 
 /** Open a display device.
@@ -232,6 +233,40 @@ static void display_device_release(device_t *_dev) {
 
 	old = atomic_dec(&device->open);
 	assert(old == 1);
+}
+
+/** Signal that a display device event is being waited for.
+ * @param _dev		Device to wait for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int display_device_wait(device_t *_dev, handle_wait_t *wait) {
+	display_device_t *device = _dev->data;
+
+	switch(wait->event) {
+	case DISPLAY_EVENT_REDRAW:
+		if(device->redraw) {
+			device->redraw = false;
+			wait->cb(wait);
+		} else {
+			notifier_register(&device->redraw_notifier, handle_wait_notifier, wait);
+		}
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Stop waiting for a display device event.
+ * @param _dev		Device to stop waiting for.
+ * @param wait		Wait information structure. */
+static void display_device_unwait(device_t *_dev, handle_wait_t *wait) {
+	display_device_t *device = _dev->data;
+
+	switch(wait->event) {
+	case DISPLAY_EVENT_REDRAW:
+		notifier_unregister(&device->redraw_notifier, handle_wait_notifier, wait);
+		break;
+	}
 }
 
 /** Fault handler for memory regions mapping a display device.
@@ -350,13 +385,6 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 
 		mutex_unlock(&device->lock);
 		return 0;
-	case DISPLAY_REDRAW_WAIT:
-		/* FIXME: This should be done by a handle event or something
-		 * after I've implemented handle waiting. */
-		mutex_lock(&device->lock, 0);
-		condvar_wait(&device->redraw, &device->lock, NULL, 0);
-		mutex_unlock(&device->lock);
-		return 0;
 	default:
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->ops->request) {
 			mutex_lock(&device->lock, 0);
@@ -373,6 +401,8 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 static device_ops_t display_device_ops = {
 	.get = display_device_get,
 	.release = display_device_release,
+	.wait = display_device_wait,
+	.unwait = display_device_unwait,
 	.fault = display_device_fault,
 	.request = display_device_request,
 };
@@ -410,7 +440,7 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
 	device = kmalloc(sizeof(display_device_t), MM_SLEEP);
 	mutex_init(&device->lock, "display_device_lock", 0);
 	atomic_set(&device->open, 0);
-	condvar_init(&device->redraw, "display_redraw");
+	notifier_init(&device->redraw_notifier, device);
 	device->id = atomic_inc(&display_next_id);
 	device->ops = ops;
 	device->data = data;
@@ -419,6 +449,7 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
 	device->curr_mode = NULL;
 	device->fb = NULL;
 	device->fb_size = 0;
+	device->redraw = false;
 
 	/* Create the device tree node. */
 	sprintf(dname, "%" PRId32, device->id);

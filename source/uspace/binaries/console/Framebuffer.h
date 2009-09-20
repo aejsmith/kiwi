@@ -31,46 +31,28 @@ struct RGB {
 /** Framebuffer class. */
 class Framebuffer {
 public:
-	/** Constructor for a Framebuffer object.
-	 * @param handle	Handle for display device. The object takes
-	 *			ownership of this - do not close it.
-	 * @param mode		Display mode for device. Values are copied out
-	 *			of the structure - can be freed after. */
-	Framebuffer(handle_t handle, display_mode_t *mode);
+	Framebuffer(const char *device);
 	~Framebuffer();
 
 	/** Check if initialisation succeeded.
-	 * @return		0 if succeeded, negative error code if not. */
-	int InitCheck(void) const { return m_init_status; }
+	 * @return		Whether initialisation succeeded. */
+	bool Initialised(void) const { return (m_init_status == 0); }
 
-	/** Get a pixel from the screen.
-	 * @param x		X position.
-	 * @param y		Y position.
-	 * @return		Pixel colour. */
+	/** Get the framebuffer width.
+	 * @return		Framebuffer width. */
+	size_t Width(void) { return m_width; }
+
+	/** Get the framebuffer height.
+	 * @return		Framebuffer height. */
+	size_t Height(void) { return m_height; }
+
 	RGB GetPixel(int x, int y);
-
-	/** Put a pixel on the screen.
-	 * @param x		X position.
-	 * @param y		Y position.
-	 * @param colour	Colour to write in. */
 	void PutPixel(int x, int y, RGB colour);
-
-	/** Fill an area with a solid colour.
-	 * @param x		X position to start at.
-	 * @param y		Y position to start at.
-	 * @param width		Width of rectangle.
-	 * @param height	Height of rectangle.
-	 * @param colour	Colour to use. */
 	void FillRect(int x, int y, int width, int height, RGB colour);
-
-	/** Write a rectangle to the screen.
-	 * @param x		X position to start at.
-	 * @param y		Y position to start at.
-	 * @param width		Width of rectangle.
-	 * @param height	Height of rectangle.
-	 * @param buffer	Buffer containing rectangle to write. */
 	void DrawRect(int x, int y, int width, int height, RGB *buffer);
 private:
+	static void _Callback(void *arg);
+
 	int m_init_status;		/**< Initialisation status. */
 	uint8_t *m_buffer;		/**< Mapping of display device memory. */
 	size_t m_buffer_size;		/**< Size of mapping. */

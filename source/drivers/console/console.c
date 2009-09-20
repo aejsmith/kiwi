@@ -103,12 +103,47 @@ static int console_master_write(device_t *device, const void *buf, size_t count,
 	return pipe_write(console->input, buf, count, false, bytesp);
 }
 
+/** Signal that a console master event is being waited for.
+ * @param device	Device to wait for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int console_master_wait(device_t *device, handle_wait_t *wait) {
+	console_device_t *console = device->data;
+
+	switch(wait->event) {
+	case DEVICE_EVENT_READABLE:
+		if(console->output->data_sem.queue.missed) {
+			wait->cb(wait);
+		} else {
+			notifier_register(&console->output->data_notifier, handle_wait_notifier, wait);
+		}
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Stop waiting for a console master event.
+ * @param device	Device to stop waiting for.
+ * @param wait		Wait information structure. */
+static void console_master_unwait(device_t *device, handle_wait_t *wait) {
+	console_device_t *console = device->data;
+
+	switch(wait->event) {
+	case DEVICE_EVENT_READABLE:
+		notifier_unregister(&console->output->data_notifier, handle_wait_notifier, wait);
+		break;
+	}
+}
+
 /** Master console device operations. */
 static device_ops_t console_master_ops = {
 	.get = console_master_get,
 	.release = console_master_release,
 	.read = console_master_read,
 	.write = console_master_write,
+	.wait = console_master_wait,
+	.unwait = console_master_unwait,
 };
 
 /** Read from a console slave device.

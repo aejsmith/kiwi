@@ -48,6 +48,8 @@ typedef struct input_kb_led_state {
 
 #include <io/device.h>
 
+#include <lib/notifier.h>
+
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
@@ -110,6 +112,7 @@ typedef struct input_device {
 	semaphore_t sem;		/**< Semaphore to wait for input on. */
 	size_t start;			/**< Start position in input buffer. */
 	size_t size;			/**< Current size of input buffer. */
+	notifier_t data_notifier;	/**< Data notifier. */
 
 	/** Input data buffer. */
 	uint8_t buffer[INPUT_BUFFER_SIZE];

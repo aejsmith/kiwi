@@ -20,6 +20,8 @@
 
 #include <console/kprintf.h>
 
+#include <mm/malloc.h>
+#include <mm/safe.h>
 #include <mm/slab.h>
 
 #include <proc/handle.h>
@@ -56,6 +58,15 @@ static int handle_info_cache_ctor(void *obj, void *data, int kmflag) {
 	refcount_set(&info->count, 0);
 	rwlock_init(&info->lock, "handle_lock");
 	return 0;
+}
+
+/** Notifier function to use for handle waiting.
+ * @param arg1		Unused.
+ * @param arg2		Unused.
+ * @param arg3		Wait structure pointer. */
+void handle_wait_notifier(void *arg1, void *arg2, void *arg3) {
+	handle_wait_t *wait = arg3;
+	wait->cb(wait);
 }
 
 /** Create a new handle.
@@ -247,36 +258,29 @@ static void handle_wait_cb(handle_wait_t *wait) {
  */
 int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t timeout) {
 	handle_wait_sync_t sync;
-	handle_info_t *info;
 	handle_wait_t wait;
 	int ret;
 
-	if((ret = handle_get(table, handle, -1, &info)) != 0) {
-		return ret;
-	} else if(!info->type->wait || !info->type->unwait) {
-		handle_release(info);
-		return -ERR_NOT_SUPPORTED;
-	}
-
 	semaphore_init(&sync.sem, "handle_wait_sem", 0);
 	sync.event = NULL;
-	wait.info = info;
 	wait.event = event;
 	wait.data = &sync;
 	wait.cb = handle_wait_cb;
 
-	if((ret = info->type->wait(&wait)) != 0) {
-		handle_release(info);
+	if((ret = handle_get(table, handle, -1, &wait.info)) != 0) {
 		return ret;
-	} else if((ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
-		info->type->unwait(&wait);
-		handle_release(info);
+	} else if(!wait.info->type->wait || !wait.info->type->unwait) {
+		handle_release(wait.info);
+		return -ERR_NOT_SUPPORTED;
+	} else if((ret = wait.info->type->wait(&wait)) != 0) {
+		handle_release(wait.info);
 		return ret;
 	}
 
-	info->type->unwait(&wait);
-	handle_release(info);
-	return 0;
+	ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
+	wait.info->type->unwait(&wait);
+	handle_release(wait.info);
+	return ret;
 }
 
 /** Wait for events to happen on multiple objects.
@@ -295,14 +299,60 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
  * @param count		Number of handles.
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
  *			return immediately if none of the events have happened,
- *			and a  value of -1 will block indefinitely until one of
+ *			and a value of -1 will block indefinitely until one of
  *			the events happen.
  *
  * @return		Index of handle that had the first event on success,
  *			negative error code on failure.
  */
 int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, timeout_t timeout) {
-	return -ERR_NOT_IMPLEMENTED;
+	handle_wait_sync_t sync;
+	handle_wait_t *waits;
+	size_t i;
+	int ret;
+
+	if(!count || count > 1024 || !table || !handles || !events) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	semaphore_init(&sync.sem, "handle_wait_sem", 0);
+	sync.event = NULL;
+
+	/* Allocate wait structures for each handle and fill them in. */
+	waits = kcalloc(count, sizeof(handle_wait_t), MM_SLEEP);
+	for(i = 0; i < count; i++) {
+		waits[i].event = events[i];
+		waits[i].data = &sync;
+		waits[i].cb = handle_wait_cb;
+		waits[i].idx = i;
+
+		if((ret = handle_get(table, handles[i], -1, &waits[i].info)) != 0) {
+			goto out;
+		} else if(!waits[i].info->type->wait || !waits[i].info->type->unwait) {
+			handle_release(waits[i].info);
+			waits[i].info = NULL;
+			ret = -ERR_NOT_SUPPORTED;
+			goto out;
+		} else if((ret = waits[i].info->type->wait(&waits[i])) != 0) {
+			handle_release(waits[i].info);
+			waits[i].info = NULL;
+			goto out;
+		}
+	}
+
+	ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
+out:
+	for(i = 0; i < count; i++) {
+		if(waits[i].info) {
+			waits[i].info->type->unwait(&waits[i]);
+			handle_release(waits[i].info);
+		}
+	}
+
+	assert(sync.event);
+	ret = sync.event->idx;
+	kfree(waits);
+	return ret;
 }
 
 /** Initialises a process' handle table.
@@ -497,5 +547,29 @@ int sys_handle_wait(handle_t handle, int event, timeout_t timeout) {
  *			negative error code on failure.
  */
 int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout) {
-	return -ERR_NOT_IMPLEMENTED;
+	handle_t *khandles;
+	int *kevents;
+	int ret;
+
+	if(!count || count > 1024 || !handles || !events) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);
+	if((ret = memcpy_from_user(khandles, handles, sizeof(handle_t) * count)) != 0) {
+		kfree(khandles);
+		return ret;
+	}
+
+	kevents = kmalloc(sizeof(int) * count, MM_SLEEP);
+	if((ret = memcpy_from_user(kevents, events, sizeof(int) * count)) != 0) {
+		kfree(kevents);
+		kfree(khandles);
+		return ret;
+	}
+
+	ret = handle_wait_multiple(&curr_proc->handles, khandles, kevents, count, timeout);
+	kfree(kevents);
+	kfree(khandles);
+	return ret;
 }

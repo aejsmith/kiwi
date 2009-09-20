@@ -48,7 +48,9 @@ static unsigned char *ppm_skip(unsigned char *buf) {
 /** Constructs the object and reads in the image.
  * @param buf		Pointer to memory buffer containing image.
  * @param size		Size of memory buffer. */
-PPM::PPM(unsigned char *buf, size_t size) : m_buffer(0), m_width(0), m_height(0) {
+PPM::PPM(unsigned char *buf, size_t size) :
+	m_buffer(0), m_width(0), m_height(0)
+{
 	unsigned int max_colour, coef;
 	size_t i;
 

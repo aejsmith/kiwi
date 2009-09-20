@@ -38,6 +38,10 @@ typedef struct device_request_args {
 	size_t *bytesp;			/**< Where to store number of bytes written. */
 } device_request_args_t;
 
+/** Standard device handle events. */
+#define DEVICE_EVENT_READABLE	1	/**< Wait for data to become available to read. */
+#define DEVICE_EVENT_WRITABLE	2	/**< Wait for the device to be writable. */
+
 extern handle_t device_open(const char *path);
 extern int device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);

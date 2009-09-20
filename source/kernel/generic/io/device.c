@@ -665,6 +665,27 @@ INITCALL(device_init);
 # pragma mark System calls.
 #endif
 
+/** Signal that a device is being waited for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int device_handle_wait(handle_wait_t *wait) {
+	device_t *device = wait->info->data;
+
+	if(!device->ops->wait || !device->ops->unwait) {
+		return -ERR_NOT_IMPLEMENTED;
+	}
+
+	return device->ops->wait(device, wait);
+}
+
+/** Stop waiting for a device.
+ * @param wait		Wait information structure. */
+static void device_handle_unwait(handle_wait_t *wait) {
+	device_t *device = wait->info->data;
+
+	return device->ops->unwait(device, wait);
+}
+
 /** Closes a handle to a device.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
@@ -678,6 +699,8 @@ static int device_handle_close(handle_info_t *info) {
 /** Device handle operations. */
 static handle_type_t device_handle_type = {
 	.id = HANDLE_TYPE_DEVICE,
+	.wait = device_handle_wait,
+	.unwait = device_handle_unwait,
 	.close = device_handle_close,
 };
 
