@@ -28,20 +28,22 @@
  * @param dest		The memory area to copy to.
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
+ *
+ * @return		Destination location.
  */
 void *memmove(void *dest, const void *src, size_t count) {
-	char *a = dest;
 	const char *b = src;
+	char *a = dest;
 
 	if(src != dest) {
 		if(src > dest) {
-			while(count--)
-				*a++ = *b++;
+			memcpy(dest, src, count);
 		} else {
 			a += count - 1;
 			b += count - 1;
-			while(count--)
+			while(count--) {
 				*a-- = *b--;
+			}
 		}
 	}
 

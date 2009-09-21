@@ -18,6 +18,7 @@
  * @brief		Memory copying function.
  */
 
+#include <stddef.h>
 #include <string.h>
 
 /** Copy data in memory.
@@ -25,18 +26,55 @@
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may not overlap.
  *
+ * @note		This function does not like unaligned addresses. Giving
+ *			it unaligned addresses might make it sad. :(
+ *
  * @param dest		The memory area to copy to.
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
+ *
+ * @return		Destination location.
  */
 void *memcpy(void *dest, const void *src, size_t count) {
-	char *d = (char *)dest;
 	const char *s = (const char *)src;
-	size_t i;
+	char *d = (char *)dest;
+	const unsigned long *ns;
+	unsigned long *nd;
 
-	for(i = 0; i < count; i++) {
-		*d++ = *s++;
+	/* Align the destination. */
+	while((ptrdiff_t)d & (sizeof(unsigned long) - 1)) {
+		if(count--) {
+			*d++ = *s++;
+		} else {
+			return dest;
+		}
 	}
 
+	/* Write in native-sized blocks if we can. */
+	if(count >= sizeof(unsigned long)) {
+		nd = (unsigned long *)d;
+		ns = (const unsigned long *)s;
+
+		/* Unroll the loop if possible. */
+		while(count >= (sizeof(unsigned long) * 4)) {
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			count -= sizeof(unsigned long) * 4;
+		}
+		while(count >= sizeof(unsigned long)) {
+			*nd++ = *ns++;
+			count -= sizeof(unsigned long);
+		}
+
+		d = (char *)nd;
+		s = (const char *)ns;
+	}
+
+	/* Write remaining bytes. */
+	while(count--) {
+		*d++ = *s++;
+	}
 	return dest;
 }

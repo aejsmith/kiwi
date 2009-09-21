@@ -23,46 +23,124 @@
 
 #include <mm/malloc.h>
 
-#if !CONFIG_ARCH_HAS_MEMCPY
 /** Copy data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may not overlap.
  *
+ * @note		This function does not like unaligned addresses. Giving
+ *			it unaligned addresses might make it sad. :(
+ *
  * @param dest		The memory area to copy to.
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
+ *
+ * @return		Destination location.
  */
 void *memcpy(void *dest, const void *src, size_t count) {
-	char *d = (char *)dest;
 	const char *s = (const char *)src;
-	size_t i;
+	char *d = (char *)dest;
+	const unsigned long *ns;
+	unsigned long *nd;
 
-	for(i = 0; i < count; i++) {
-		*d++ = *s++;
+	/* Align the destination. */
+	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
+		if(count--) {
+			*d++ = *s++;
+		} else {
+			return dest;
+		}
 	}
 
+	/* Write in native-sized blocks if we can. */
+	if(count >= sizeof(unsigned long)) {
+		nd = (unsigned long *)d;
+		ns = (const unsigned long *)s;
+
+		/* Unroll the loop if possible. */
+		while(count >= (sizeof(unsigned long) * 4)) {
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			*nd++ = *ns++;
+			count -= sizeof(unsigned long) * 4;
+		}
+		while(count >= sizeof(unsigned long)) {
+			*nd++ = *ns++;
+			count -= sizeof(unsigned long);
+		}
+
+		d = (char *)nd;
+		s = (const char *)ns;
+	}
+
+	/* Write remaining bytes. */
+	while(count--) {
+		*d++ = *s++;
+	}
 	return dest;
 }
-#endif
 
-#if !CONFIG_ARCH_HAS_MEMSET
 /** Fill a memory area.
  *
  * Fills a memory area with the value specified.
  *
  * @param dest		The memory area to fill.
- * @param val		The value to fill with.
+ * @param val		The value to fill with (converted to an unsigned char).
  * @param count		The number of bytes to fill.
+ *
+ * @return		Destination location.
  */
 void *memset(void *dest, int val, size_t count) {
-	char *temp = (char *)dest;
-	for(; count != 0; count--) *temp++ = val;
+	unsigned char c = val & 0xff;
+	unsigned long *nd, nval;
+	char *d = (char *)dest;
+	size_t i;
+
+	/* Align the destination. */
+	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
+		if(count--) {
+			*d++ = c;
+		} else {
+			return dest;
+		}
+	}
+
+	/* Write in native-sized blocks if we can. */
+	if(count >= sizeof(unsigned long)) {
+		nd = (unsigned long *)d;
+
+		/* Compute the value we will write. */
+		nval = c;
+		if(nval != 0) {
+			for(i = 8; i < (sizeof(unsigned long) * 8); i <<= 1) {
+				nval = (nval << i) | nval;
+			}
+		}
+
+		/* Unroll the loop if possible. */
+		while(count >= (sizeof(unsigned long) * 4)) {
+			*nd++ = nval;
+			*nd++ = nval;
+			*nd++ = nval;
+			*nd++ = nval;
+			count -= sizeof(unsigned long) * 4;
+		}
+		while(count >= sizeof(unsigned long)) {
+			*nd++ = nval;
+			count -= sizeof(unsigned long);
+		}
+
+		d = (char *)nd;
+	}
+
+	/* Write remaining bytes. */
+	while(count--) {
+		*d++ = val;
+	}
 	return dest;
 }
-#endif
 
-#if !CONFIG_ARCH_HAS_MEMMOVE
 /** Copy overlapping data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
@@ -71,26 +149,27 @@ void *memset(void *dest, int val, size_t count) {
  * @param dest		The memory area to copy to.
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
+ *
+ * @return		Destination location.
  */
 void *memmove(void *dest, const void *src, size_t count) {
-	char *a = dest;
 	const char *b = src;
+	char *a = dest;
 
 	if(src != dest) {
 		if(src > dest) {
-			while(count--)
-				*a++ = *b++;
+			memcpy(dest, src, count);
 		} else {
 			a += count - 1;
 			b += count - 1;
-			while(count--)
+			while(count--) {
 				*a-- = *b--;
+			}
 		}
 	}
 
 	return dest;
 }
-#endif
 
 /** Get length of string.
  *

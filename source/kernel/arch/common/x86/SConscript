@@ -44,6 +44,3 @@ env['OBJFILES'] += [
 	env.Object('smp.c'),
 	env.Object('vm.c'),
 ]
-
-if config['X86_OPTIM_STR']:
-	env['OBJFILES'].append(env.Object('string.c'))

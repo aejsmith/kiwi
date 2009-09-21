@@ -117,10 +117,10 @@ static vmem_t slab_metadata_arena;
 static LIST_DECLARE(slab_caches);
 static MUTEX_DECLARE(slab_caches_lock, 0);
 
-/** Reclaim thread. */
+/** Reclaim thread information. */
 static thread_t *slab_reclaim_thread = NULL;
-static CONDVAR_DECLARE(slab_reclaim_request);
-static CONDVAR_DECLARE(slab_reclaim_response);
+static CONDVAR_DECLARE(slab_reclaim_req);
+static CONDVAR_DECLARE(slab_reclaim_resp);
 static MUTEX_DECLARE(slab_reclaim_lock, 0);
 
 #if 0
@@ -518,14 +518,12 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds) {
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			cc->loaded->objects[cc->loaded->rounds] = NULL;
 			goto out;
 		} else if(cc->previous && cc->previous->rounds) {
 			/* Previous has rounds, exchange loaded with previous
 			 * and allocate from it. */
 			slab_cpu_reload(cc, cc->previous);
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			cc->loaded->objects[cc->loaded->rounds] = NULL;
 			goto out;
 		}
 	}
@@ -540,7 +538,6 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 
 		slab_cpu_reload(cc, mag);
 		ret = cc->loaded->objects[--cc->loaded->rounds];
-		cc->loaded->objects[cc->loaded->rounds] = NULL;
 	}
 out:
 	mutex_unlock(&cc->lock);
@@ -932,7 +929,7 @@ static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
 
 	while(true) {
 		/* Wait for a reclaim request. */
-		condvar_wait(&slab_reclaim_request, &slab_reclaim_lock, NULL, 0);
+		condvar_wait(&slab_reclaim_req, &slab_reclaim_lock, NULL, 0);
 
 		/* Loop through all caches and reclaim. */
 		mutex_lock(&slab_caches_lock, 0);
@@ -944,7 +941,7 @@ static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
 		mutex_unlock(&slab_caches_lock);
 
 		/* Wake the thread that called us. */
-		condvar_broadcast(&slab_reclaim_response);
+		condvar_broadcast(&slab_reclaim_resp);
 	}
 }
 
@@ -957,8 +954,8 @@ void slab_reclaim(void) {
 	}
 
 	/* Schedule a reclaim. */
-	condvar_signal(&slab_reclaim_request);
-	condvar_wait(&slab_reclaim_response, &slab_reclaim_lock, NULL, 0);
+	condvar_signal(&slab_reclaim_req);
+	condvar_wait(&slab_reclaim_resp, &slab_reclaim_lock, NULL, 0);
 	mutex_unlock(&slab_reclaim_lock);
 }
 
