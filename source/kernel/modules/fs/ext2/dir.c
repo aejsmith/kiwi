@@ -104,6 +104,7 @@ int ext2_dir_insert(ext2_inode_t *dir, ext2_inode_t *inode, const char *name) {
 	char *buf;
 
 	assert((le16_to_cpu(dir->disk.i_mode) & EXT2_S_IFMT) == EXT2_S_IFDIR);
+	assert(!(dir->mount->parent->flags & VFS_MOUNT_RDONLY));
 
 	/* Quote: 'It should be noted that some implementation will pad
 	 * directory entries to have better performances on the host
@@ -223,6 +224,7 @@ int ext2_dir_remove(ext2_inode_t *dir, ext2_inode_t *inode, const char *name) {
 	char *buf;
 
 	assert((le16_to_cpu(dir->disk.i_mode) & EXT2_S_IFMT) == EXT2_S_IFDIR);
+	assert(!(dir->mount->parent->flags & VFS_MOUNT_RDONLY));
 
 	name_len = strlen(name);
 

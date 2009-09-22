@@ -52,6 +52,7 @@ static int ext2_inode_get_internal(ext2_mount_t *mount, uint32_t num, ext2_inode
 	/* Create a structure to store details of the inode in memory. */
 	inode = kmalloc(sizeof(ext2_inode_t), MM_SLEEP);
 	rwlock_init(&inode->lock, "ext2_inode_lock");
+	inode->dirty = false;
 	inode->num = num;
 	inode->size = (mount->in_size <= sizeof(ext2_disk_inode_t)) ? mount->in_size : sizeof(ext2_disk_inode_t);
 	inode->offset = ((offset_t)le32_to_cpu(mount->group_tbl[group].bg_inode_table) * mount->blk_size) + offset;
@@ -167,6 +168,8 @@ out:
 static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonblock, uint32_t *rawp) {
 	uint32_t *i_block = NULL, *bi_block = NULL, raw = 0, i_raw, bi_raw;
 	int ret;
+
+	assert(!(inode->mount->parent->flags & VFS_MOUNT_RDONLY));
 
 	/* Allocate a new raw block. */
 	if((ret = ext2_block_alloc(inode->mount, nonblock, &raw)) != 0) {
@@ -302,6 +305,8 @@ out:
 static int ext2_inode_block_free(ext2_inode_t *inode, uint32_t *num) {
 	int ret;
 
+	assert(!(inode->mount->parent->flags & VFS_MOUNT_RDONLY));
+
 	if((ret = ext2_block_free(inode->mount, le32_to_cpu(*num))) != 0) {
 		return ret;
 	}
@@ -419,6 +424,7 @@ static int ext2_inode_truncate(ext2_inode_t *inode, uint32_t size) {
 	}
 
 	inode->disk.i_size = cpu_to_le32(size);
+	inode->dirty = true;
 	return 0;
 }
 
@@ -745,6 +751,7 @@ int ext2_inode_resize(ext2_inode_t *inode, file_size_t size) {
 	}
 
 	if(size > le32_to_cpu(inode->disk.i_size)) {
+		assert(!(inode->mount->parent->flags & VFS_MOUNT_RDONLY));
 		inode->disk.i_size = cpu_to_le32((uint32_t)size);
 		inode->dirty = true;
 	} else if(size < le32_to_cpu(inode->disk.i_size)) {

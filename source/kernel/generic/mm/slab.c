@@ -196,6 +196,10 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	slab_t *slab;
 	size_t i;
 
+	/* Drop slab lock while creating as a reclaim may occur that wants to
+	 * free to this cache. */
+	mutex_unlock(&cache->slab_lock);
+
 	/* Allocate a new slab. */
 	addr = vmem_alloc(cache->source, cache->slab_size, (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(unlikely(addr == 0)) {
@@ -205,8 +209,11 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 			fatal("Could not perform mandatory allocation on object cache %p(%s) (1)",
 			      cache, cache->name);
 		}
+		mutex_lock(&cache->slab_lock, 0);
 		return NULL;
 	}
+
+	mutex_lock(&cache->slab_lock, 0);
 
 	/* Create the slab structure for the slab. */
 	if(cache->flags & SLAB_CACHE_NOTOUCH) {
@@ -275,13 +282,15 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	return slab;
 }
 
-/** Internal part of slab_obj_free(). Runs with slab_lock held.
+/** Destruct an object and free it to the slab layer.
  * @param cache		Cache to free to.
  * @param obj		Object to free. */
-static void slab_obj_free_internal(slab_cache_t *cache, void *obj) {
+static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 	slab_bufctl_t *bufctl, *prev = NULL;
 	uint32_t hash;
 	slab_t *slab;
+
+	mutex_lock(&cache->slab_lock, 0);
 
 	/* Find the buffer control structure. For no-touch caches, look it up
 	 * on the allocation hash table. Otherwise, we use the start of the
@@ -338,6 +347,8 @@ static void slab_obj_free_internal(slab_cache_t *cache, void *obj) {
 		list_remove(&slab->header);
 		list_append(&cache->slab_partial, &slab->header);
 	}
+
+	mutex_unlock(&cache->slab_lock);
 }
 
 /** Allocate an object from the slab layer and construct it.
@@ -359,7 +370,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 		/* No slabs with free objects available - allocate a new
 		 * slab. */
 		slab = slab_create(cache, kmflag);
-		if(slab == NULL) {
+		if(unlikely(slab == NULL)) {
 			mutex_unlock(&cache->slab_lock);
 			return NULL;
 		}
@@ -391,25 +402,17 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 		list_append(&cache->slab_partial, &slab->header);
 	}
 
-	/* Construct the object and return it. */
+	/* Construct the object and return it. Unlock the cache before calling
+	 * the constructor as it may cause a reclaim. */
+	mutex_unlock(&cache->slab_lock);
 	if(cache->ctor) {
 		if(cache->ctor(obj, cache->data, kmflag) != 0) {
-			slab_obj_free_internal(cache, obj);
+			slab_obj_free(cache, obj);
 			return NULL;
 		}
 	}
 
-	mutex_unlock(&cache->slab_lock);
 	return obj;
-}
-
-/** Destruct an object and free it to the slab layer.
- * @param cache		Cache to free to.
- * @param obj		Object to free. */
-static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
-	mutex_lock(&cache->slab_lock, 0);
-	slab_obj_free_internal(cache, obj);
-	mutex_unlock(&cache->slab_lock);
 }
 
 #if 0
