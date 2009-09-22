@@ -98,8 +98,6 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	/* First allocate the range from Vmem and try to reclaim from slab
-	 * if unable to allocate. */
 	if(!(base = (phys_ptr_t)vmem_xalloc(&page_arena, size, (vmem_resource_t)align,
 	                                    (vmem_resource_t)phase, (vmem_resource_t)nocross,
 	                                    (vmem_resource_t)minaddr, (vmem_resource_t)maxaddr,
@@ -156,8 +154,6 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	/* First allocate the range from Vmem and try to reclaim from slab
-	 * if unable to allocate. */
 	if(!(base = (phys_ptr_t)vmem_alloc(&page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);

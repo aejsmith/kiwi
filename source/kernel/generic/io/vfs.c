@@ -73,6 +73,7 @@ vfs_mount_t *vfs_root_mount = NULL;
 
 static vm_object_ops_t vfs_vm_object_ops;
 
+static int vfs_node_free(vfs_node_t *node);
 static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
 static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
 static int vfs_symlink_cache_dest(vfs_node_t *node);
@@ -222,6 +223,50 @@ static void vfs_node_cache_dtor(void *obj, void *data) {
 	vfs_node_t *node = (vfs_node_t *)obj;
 
 	vm_object_destroy(&node->vobj);
+}
+
+/** VFS node reclaim callback.
+ * @note		This could be better.
+ * @param data		Cache data (unused).
+ * @param force		If true, will reclaim all unused nodes. */
+static void vfs_node_cache_reclaim(void *data, bool force) {
+	vfs_mount_t *mount;
+	vfs_node_t *node;
+	size_t count;
+
+	mutex_lock(&vfs_mount_lock, 0);
+
+	/* Iterate through mounts until we can flush at least 2 slabs worth of
+	 * node structures, or if forcing, free everything unused. */
+	count = (vfs_node_cache->slab_size / vfs_node_cache->obj_size) * 2;
+	assert(count);
+	LIST_FOREACH(&vfs_mount_list, iter) {
+		mount = list_entry(iter, vfs_mount_t, header);
+
+		if(mount->type->flags & VFS_TYPE_CACHE_BASED) {
+			continue;
+		}
+
+		mutex_lock(&mount->lock, 0);
+
+		LIST_FOREACH_SAFE(&mount->unused_nodes, niter) {
+			node = list_entry(niter, vfs_node_t, header);
+
+			/* On success, node is unlocked by vfs_node_free(). */
+			mutex_lock(&node->lock, 0);
+			if(vfs_node_free(node) != 0) {
+				mutex_unlock(&node->lock);
+			} else if(--count == 0 && !force) {
+				mutex_unlock(&mount->lock);
+				mutex_unlock(&vfs_mount_lock);
+				return;
+			}
+		}
+
+		mutex_unlock(&mount->lock);
+	}
+
+	mutex_unlock(&vfs_mount_lock);
 }
 
 /** Allocate a node structure and set one reference on it.
@@ -2398,7 +2443,8 @@ void __init_text vfs_init(void) {
 	/* Initialise the node slab cache. */
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
 	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
-	                                   NULL, NULL, 1, NULL, 0, MM_FATAL);
+	                                   vfs_node_cache_reclaim, NULL, 1, NULL,
+	                                   0, MM_FATAL);
 
 	/* Register RamFS and mount it as the root. */
 	if((ret = vfs_type_register(&ramfs_fs_type)) != 0) {

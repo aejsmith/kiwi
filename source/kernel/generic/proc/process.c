@@ -61,8 +61,8 @@ typedef struct process_create_info {
 	int ret;		/**< Return code. */
 } process_create_info_t;
 
-extern void process_destroy(process_t *process);
-extern void process_release(process_t *process);
+extern void process_attach(process_t *process, thread_t *thread);
+extern void process_detach(thread_t *thread);
 
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
@@ -134,6 +134,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	process->name = kstrdup(name, MM_SLEEP);
 	process->flags = flags;
 	process->priority = priority;
+	process->state = PROCESS_RUNNING;
 
 	/* Add to the process tree. */
 	mutex_lock(&process_tree_lock, 0);
@@ -145,6 +146,25 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	dprintf("process: created process %" PRId32 "(%s) (proc: %p)\n",
 		process->id, process->name, process);
 	return 0;
+}
+
+/** Destroy a process structure.
+ * @param process	Process to destroy. */
+static void process_destroy(process_t *process) {
+	assert(refcount_get(&process->count) == 0);
+	assert(process->state == PROCESS_DEAD);
+	assert(list_empty(&process->threads));
+
+	mutex_lock(&process_tree_lock, 0);
+	avl_tree_remove(&process_tree, (key_t)process->id);
+	mutex_unlock(&process_tree_lock);
+
+	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
+		process->id, process->name, process, process->status);
+
+	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
+	kfree(process->name);
+	slab_cache_free(process_cache, process);
 }
 
 /** Copy the data contained in a string array to the argument block.
@@ -274,6 +294,66 @@ fail:
 	semaphore_up(&info->sem, 1);
 }
 
+/** Attach a thread to a process.
+ * @param process	Process to attach to.
+ * @param thread	Thread to attach. */
+void process_attach(process_t *process, thread_t *thread) {
+	thread->owner = process;
+
+	spinlock_lock(&process->lock, 0);
+
+	assert(process->state != PROCESS_DEAD);
+	list_append(&process->threads, &thread->owner_link);
+	refcount_inc(&process->count);
+
+	spinlock_unlock(&process->lock);
+}
+
+/** Detach a thread from its owner.
+ * @param thread	Thread to detach. */
+void process_detach(thread_t *thread) {
+	process_t *process = thread->owner;
+	int ret;
+
+	spinlock_lock(&process->lock, 0);
+
+	ret = refcount_dec(&process->count);
+	list_remove(&thread->owner_link);
+
+	/* Move the process to the dead state if it contains no threads now,
+	 * and clean up resources allocated to it. It is OK (and necessary) to
+	 * perform the clean up with the lock not held, as only one thing
+	 * should get to the clean up as we are the last thread. */
+	if(list_empty(&process->threads)) {
+		process->state = PROCESS_DEAD;
+
+		spinlock_unlock(&process->lock);
+
+		if(process->flags & PROCESS_CRITICAL) {
+			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
+		}
+
+		notifier_run(&process->death_notifier, NULL, true);
+
+		if(process->aspace) {
+			vm_aspace_destroy(process->aspace);
+			process->aspace = NULL;
+		}
+		ipc_process_destroy(process);
+		handle_table_destroy(&process->handles);
+		io_context_destroy(&process->ioctx);
+	} else {
+		spinlock_unlock(&process->lock);
+	}
+
+	thread->owner = NULL;
+
+	/* Destroy the process if there are no handles remaining. */
+	if(ret == 0) {
+		process_destroy(process);
+	}
+}
+
 /** Lookup a process.
  *
  * Looks for a process with the specified ID in the process tree.
@@ -360,8 +440,8 @@ void process_exit(int status) {
 
 	spinlock_lock(&curr_proc->lock, 0);
 
-	LIST_FOREACH(&curr_proc->threads, iter) {
-		thread = list_entry(iter, thread_t, header);
+	LIST_FOREACH_SAFE(&curr_proc->threads, iter) {
+		thread = list_entry(iter, thread_t, owner_link);
 
 		if(thread != curr_thread) {
 			thread_kill(thread);
@@ -372,67 +452,6 @@ void process_exit(int status) {
 	spinlock_unlock(&curr_proc->lock);
 
 	thread_exit();
-}
-
-/** Destroy a process.
- *
- * Destroys a process structure. The reference count of the process must be 0.
- *
- * @param process	Process to destroy.
- */
-void process_destroy(process_t *process) {
-	assert(refcount_get(&process->count) == 0);
-	assert(list_empty(&process->threads));
-
-	mutex_lock(&process_tree_lock, 0);
-	avl_tree_remove(&process_tree, (key_t)process->id);
-	mutex_unlock(&process_tree_lock);
-
-	if(process->aspace) {
-		vm_aspace_destroy(process->aspace);
-	}
-	ipc_process_destroy(process);
-	handle_table_destroy(&process->handles);
-	io_context_destroy(&process->ioctx);
-
-	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
-		process->id, process->name, process, process->status);
-
-	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
-	kfree(process->name);
-	slab_cache_free(process_cache, process);
-}
-
-/** Decrease a process' reference count.
- *
- * Decreases a process' reference count and destroys it if it reaches 0. This
- * should only be called from the thread destruction code and from the process
- * handle management code.
- *
- * @param process	Process to release.
- */
-void process_release(process_t *process) {
-	bool empty;
-	int new;
-
-	spinlock_lock(&process->lock, 0);
-	new = refcount_dec(&process->count);
-	empty = list_empty(&process->threads);
-	spinlock_unlock(&process->lock);
-
-	/* Should only fire once because this empties the notifier list and
-	 * process_handle_wait() does not add a new notifier if thread list
-	 * empty. */
-	if(empty) {
-		if(process->flags & PROCESS_CRITICAL) {
-			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
-		}
-
-		notifier_run(&process->death_notifier, NULL, true);
-	}
-	if(new == 0) {
-		process_destroy(process);
-	}
 }
 
 /** Dump the contents of the process table.
@@ -454,15 +473,20 @@ int kdbg_cmd_process(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID     Prio Flags Count  Aspace             Name\n");
-	kprintf(LOG_NONE, "==     ==== ===== =====  ======             ====\n");
+	kprintf(LOG_NONE, "ID     State   Prio Flags Count  Aspace             Name\n");
+	kprintf(LOG_NONE, "==     =====   ==== ===== =====  ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRId32 "%s %-4d %-5d %-6d %-18p %s\n",
-			process->id, (process == curr_proc) ? "*" : " ",
-		        process->priority, process->flags, refcount_get(&process->count),
+		kprintf(LOG_NONE, "%-5" PRId32 "%s ", process->id, (process == curr_proc) ? "*" : " ");
+		switch(process->state) {
+		case PROCESS_RUNNING:	kprintf(LOG_NONE, "Running "); break;
+		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
+		default:		kprintf(LOG_NONE, "Bad     "); break;
+		}
+		kprintf(LOG_NONE, "%-4d %-5d %-6d %-18p %s\n", process->priority,
+		        process->flags, refcount_get(&process->count),
 			process->aspace, process->name);
 	}
 
@@ -500,7 +524,7 @@ static int process_handle_wait(handle_wait_t *wait) {
 	switch(wait->event) {
 	case PROCESS_EVENT_DEATH:
 		spinlock_lock(&process->lock, 0);
-		if(list_empty(&process->threads)) {
+		if(process->state == PROCESS_DEAD) {
 			wait->cb(wait);
 			spinlock_unlock(&process->lock);
 			return 0;
@@ -530,7 +554,11 @@ static void process_handle_unwait(handle_wait_t *wait) {
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
 static int process_handle_close(handle_info_t *info) {
-	process_release(info->data);
+	process_t *process = info->data;
+
+	if(refcount_dec(&process->count) == 0) {
+		process_destroy(process);
+	}
 	return 0;
 }
 
@@ -810,7 +838,7 @@ handle_t sys_process_open(identifier_t id) {
 
 	mutex_lock(&process_tree_lock, 0);
 
-	if(!(process = avl_tree_lookup(&process_tree, (key_t)id)) || list_empty(&process->threads)) {
+	if(!(process = avl_tree_lookup(&process_tree, (key_t)id)) || process->state == PROCESS_DEAD) {
 		mutex_unlock(&process_tree_lock);
 		return -ERR_NOT_FOUND;
 	}
@@ -819,7 +847,9 @@ handle_t sys_process_open(identifier_t id) {
 	mutex_unlock(&process_tree_lock);
 
 	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
-		process_release(process);
+		if(refcount_dec(&process->count) == 0) {
+			process_destroy(process);
+		}
 	}
 
 	return handle;

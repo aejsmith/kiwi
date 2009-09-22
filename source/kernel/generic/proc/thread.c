@@ -53,7 +53,8 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void process_release(process_t *process);
+extern void process_attach(process_t *process, thread_t *thread);
+extern void process_detach(thread_t *thread);
 extern void waitq_do_wake(thread_t *thread);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
@@ -124,10 +125,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		mutex_unlock(&thread_tree_lock);
 
 		/* Detach from its owner. */
-		spinlock_lock(&thread->owner->lock, 0);
-		list_remove(&thread->owner_link);
-		spinlock_unlock(&thread->owner->lock);
-		process_release(thread->owner);
+		process_detach(thread);
 
 		/* Now clean up the thread. */
 		kheap_free(thread->kstack, KSTACK_SIZE);
@@ -378,13 +376,9 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->entry = entry;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
-	thread->owner = owner;
 
 	/* Add the thread to the owner. */
-	spinlock_lock(&owner->lock, 0);
-	list_append(&owner->threads, &thread->owner_link);
-	refcount_inc(&owner->count);
-	spinlock_unlock(&owner->lock);
+	process_attach(owner, thread);
 
 	/* Add to the thread tree. */
 	mutex_lock(&thread_tree_lock, 0);
@@ -447,7 +441,7 @@ static inline void thread_dump(thread_t *thread, int level) {
 	case THREAD_READY:	kprintf(level, "Ready    "); break;
 	case THREAD_RUNNING:	kprintf(level, "Running  "); break;
 	case THREAD_SLEEPING:	kprintf(level, "Sleeping "); break;
-	case THREAD_DEAD:	kprintf(level, "Dead (!) "); break;
+	case THREAD_DEAD:	kprintf(level, "Dead     "); break;
 	default:		kprintf(level, "Bad      "); break;
 	}
 

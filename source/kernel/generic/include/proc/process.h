@@ -56,6 +56,12 @@ typedef struct process {
 	refcount_t count;		/**< Number of handles open to and threads in the process. */
 	int status;			/**< Exit status of the process. */
 
+	/** State of the process. */
+	enum {
+		PROCESS_RUNNING,	/**< Running. */
+		PROCESS_DEAD,		/**< Dead. */
+	} state;
+
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	list_t threads;			/**< List of threads. */
 	handle_table_t handles;		/**< Table of open handles. */

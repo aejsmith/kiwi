@@ -458,10 +458,13 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {
-		mag = slab_cache_alloc(&slab_mag_cache, 0);
-		if(mag != NULL) {
-			list_init(&mag->header);
-			mag->rounds = 0;
+		/* Do not attempt to allocate a magazine if reclaiming. */
+		if(likely(!mutex_held(&slab_reclaim_lock))) {
+			mag = slab_cache_alloc(&slab_mag_cache, 0);
+			if(mag != NULL) {
+				list_init(&mag->header);
+				mag->rounds = 0;
+			}
 		}
 	}
 
@@ -488,9 +491,7 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 
 	/* Free all rounds within the magazine, if any. */
 	for(i = 0; i < mag->rounds; i++) {
-		if(mag->objects[i]) {
-			slab_obj_free(cache, mag->objects[i]);
-		}
+		slab_obj_free(cache, mag->objects[i]);
 	}
 
 	slab_cache_free(&slab_mag_cache, mag);
