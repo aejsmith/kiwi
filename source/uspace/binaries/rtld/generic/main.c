@@ -27,12 +27,16 @@
 
 extern void *rtld_main(process_args_t *args);
 
+/** Pointer to application image structure. */
+rtld_image_t *rtld_application = NULL;
+
 /** Main function for the RTLD.
+ * @todo		Unload all libraries when returning failure so that
+ *			FINI functions get called.
  * @param args		Arguments structure provided by the kernel.
  * @return		Program entry point address. */
 void *rtld_main(process_args_t *args) {
 	rtld_image_t *image;
-	void (*func)(void);
 	void *entry;
 	int ret;
 
@@ -41,25 +45,15 @@ void *rtld_main(process_args_t *args) {
 	/* Check that we're not attempting to load ourselves. */
 	if(strcmp(args->path, "/system/binaries/rtld-" CONFIG_ARCH) == 0) {
 		printf("RTLD: Should not be invoked directly!\n");
-		process_exit(ERR_PARAM_INVAL);
+		ret = -ERR_PARAM_INVAL;
+		goto fail;
 	}
 
 	/* Load the binary and all its dependencies. */
 	dprintf("RTLD: Loading binary: %s\n", args->path);
-	if((ret = rtld_image_load(args->path, NULL, ELF_ET_EXEC, &entry)) != 0) {
+	if((ret = rtld_image_load(args->path, NULL, ELF_ET_EXEC, &entry, &rtld_application)) != 0) {
 		dprintf("RTLD: Failed to load binary (%d)\n", ret);
-		process_exit(-ret);
-	}
-
-	/* Call INIT functions for loaded images. */
-	LIST_FOREACH(&rtld_loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
-
-		if(image->dynamic[ELF_DT_INIT]) {
-			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
-			dprintf("RTLD: Calling INIT function %p...\n", func);
-			func();
-		}
+		goto fail;
 	}
 
 	/* Print out some debugging information. */
@@ -85,4 +79,10 @@ void *rtld_main(process_args_t *args) {
 	/* Return the program entry point for the startup code to call. */
 	dprintf("RTLD: Calling entry point %p...\n", entry);
 	return entry;
+fail:
+	while(!list_empty(&rtld_loaded_images)) {
+		image = list_entry(rtld_loaded_images.next, rtld_image_t, header);
+		rtld_image_unload(image);
+	}
+	process_exit(-ret);
 }

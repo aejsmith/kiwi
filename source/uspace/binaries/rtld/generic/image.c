@@ -44,12 +44,13 @@ static const char *rtld_library_dirs[] = {
  * @param type		Required ELF type.
  * @param entryp	Where to store entry point for binary, if type is
  *			ELF_ET_EXEC.
+ * @param imagep	Where to store pointer to image structure.
  * @return		0 on success, negative error code on failure. */
-int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp) {
-	rtld_image_t *image = NULL;
-	ElfW(Dyn) *dyntab = NULL;
+int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep) {
+	rtld_image_t *image = NULL, *exist;
 	ElfW(Addr) start, end;
 	size_t bytes, size, i;
+	void (*func)(void);
 	ElfW(Phdr) *phdrs;
 	Elf32_Word *addr;
 	const char *dep;
@@ -148,7 +149,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	 * section if we find it. */
 	for(i = 0; i < ehdr.e_phnum; i++) {
 		if(phdrs[i].p_type == ELF_PT_DYNAMIC) {
-			dyntab = (ElfW(Dyn) *)((ElfW(Addr))image->load_base + phdrs[i].p_vaddr);
+			image->dyntab = (ElfW(Dyn) *)((ElfW(Addr))image->load_base + phdrs[i].p_vaddr);
 			continue;
 		} else if(phdrs[i].p_type != ELF_PT_LOAD) {
 			continue;
@@ -216,29 +217,29 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	}
 
 	/* Check that there was a DYNAMIC header. */
-	if(!dyntab) {
+	if(!image->dyntab) {
 		dprintf("RTLD: Library %s does not have a dynamic PHDR\n", path);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Fill in our dynamic table. */
-	for(i = 0; dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(dyntab[i].d_tag >= ELF_DT_NUM || dyntab[i].d_tag == ELF_DT_NEEDED) {
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
 			continue;
 		}
 
-		image->dynamic[dyntab[i].d_tag] = dyntab[i].d_un.d_ptr;
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
 
 		/* Do address fixups. */
-		switch(dyntab[i].d_tag) {
+		switch(image->dyntab[i].d_tag) {
 		case ELF_DT_HASH:
 		case ELF_DT_PLTGOT:
 		case ELF_DT_STRTAB:
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dynamic[dyntab[i].d_tag] += (ElfW(Addr))image->load_base;
+			image->dynamic[image->dyntab[i].d_tag] += (ElfW(Addr))image->load_base;
 			break;
 		}
 	}
@@ -259,6 +260,32 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		image->h_chains = addr;
 	}
 
+	/* Check if the image is already loaded. */
+	if(type == ELF_ET_DYN) {
+		LIST_FOREACH_SAFE(&rtld_loaded_images, iter) {
+			exist = list_entry(iter, rtld_image_t, header);
+
+			if(strcmp(exist->name, image->name) != 0) {
+				continue;
+			} else if(exist->state == RTLD_IMAGE_LOADING) {
+				printf("RTLD: Cyclic dependency on %s detected!\n", image->name);
+				ret = -ERR_FORMAT_INVAL;
+				goto fail;
+			}
+
+			dprintf("RTLD: Increasing reference count on %s (%p)\n", image->name, exist);
+			exist->refcount++;
+			if(imagep) {
+				*imagep = exist;
+			}
+
+			/* Use the failure path to clean up as the library must
+			 * be freed. */
+			ret = 0;
+			goto fail;
+		}
+	}
+
 	/* Add the library into the library list before checking dependencies
 	 * so that we can check if something has a cyclic dependency. */
 	if(req) {
@@ -268,12 +295,12 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	}
 
 	/* Load libraries that we depend on. */
-	for(i = 0; dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(dyntab[i].d_tag != ELF_DT_NEEDED) {
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag != ELF_DT_NEEDED) {
 			continue;
 		}
 
-		dep = (const char *)(dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
+		dep = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
 
 		/* Don't depend on ourselves... */
 		if(strcmp(dep, image->name) == 0) {
@@ -283,7 +310,10 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		}
 
 		dprintf("RTLD: Image %s depends on %s, loading...\n", path, dep);
-		if((ret = rtld_library_load(dep, image)) != 0) {
+		if((ret = rtld_library_load(dep, image, NULL)) != 0) {
+			if(ret == -ERR_DEP_MISSING) {
+				printf("RTLD: Could not find required library: %s\n", dep);
+			}
 			goto fail;
 		}
 	}
@@ -293,20 +323,79 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		goto fail;
 	}
 
+	/* Run the INIT function. */
+	if(!rtld_dryrun) {
+		if(image->dynamic[ELF_DT_INIT]) {
+			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
+			dprintf("RTLD: Calling INIT function %p...\n", func);
+			func();
+		}
+	}
+
 	image->refcount = 1;
 	image->state = RTLD_IMAGE_LOADED;
 	if(entryp) {
 		*entryp = (void *)ehdr.e_entry;
 	}
+	if(imagep) {
+		*imagep = image;
+	}
 	handle_close(handle);
 	return 0;
 fail:
 	if(image) {
+		if(image->load_base) {
+			vm_unmap(image->load_base, image->load_size);
+		}
 		list_remove(&image->header);
 		free(image);
 	}
 	handle_close(handle);
 	return ret;
+}
+
+/** Unload an image from memory.
+ * @param image		Image to unload. */
+void rtld_image_unload(rtld_image_t *image) {
+	void (*func)(void);
+	rtld_image_t *dep;
+	const char *name;
+	size_t i;
+
+	if(--image->refcount > 0) {
+		dprintf("RTLD: Decreased reference count of %p(%s)\n", image, image->name);
+		return;
+	}
+
+	/* Call the FINI function. */
+	if(image->dynamic[ELF_DT_FINI]) {
+		func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_FINI]);
+		dprintf("RTLD: Calling FINI function %p...\n", func);
+		func();
+	}
+
+	/* Unload all dependencies of the library. */
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag != ELF_DT_NEEDED) {
+			continue;
+		}
+
+		name = (const char *)(image->dyntab[i].d_un.d_ptr + image->dynamic[ELF_DT_STRTAB]);
+		LIST_FOREACH(&rtld_loaded_images, iter) {
+			dep = list_entry(iter, rtld_image_t, header);
+
+			if(strcmp(dep->name, name) == 0) {
+				rtld_image_unload(dep);
+			}
+		}
+	}
+
+	dprintf("RTLD: Unloaded image %p(%s)\n", image, image->name);
+	if(image->load_base) {
+		vm_unmap(image->load_base, image->load_size);
+	}
+	list_remove(&image->header);
+	free(image);
 }
 
 /** Check if a library exists.
@@ -332,27 +421,11 @@ static bool rtld_library_exists(const char *path) {
  * @todo		Use PATH_MAX for buffer size.
  * @param name		Name of library to load.
  * @param req		Image that requires this library.
+ * @param imagep	Where to store pointer to image structure.
  * @return		0 on success, negative error code on failure. */
-int rtld_library_load(const char *name, rtld_image_t *req) {
-	rtld_image_t *exist;
+int rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
 	char buf[4096];
 	size_t i;
-
-	/* Check if the library is already loaded. */
-	LIST_FOREACH_SAFE(&rtld_loaded_images, iter) {
-		exist = list_entry(iter, rtld_image_t, header);
-
-		if(strcmp(exist->name, name) != 0) {
-			continue;
-		} else if(exist->state == RTLD_IMAGE_LOADING) {
-			printf("RTLD: Cyclic dependency on %s detected!\n", name);
-			return -ERR_FORMAT_INVAL;
-		}
-
-		dprintf("RTLD: Increasing reference count on %s (%p)\n", name, exist);
-		exist->refcount++;
-		return 0;
-	}
 
 	/* Look for the library in the search paths. */
 	for(i = 0; rtld_extra_libpaths[i]; i++) {
@@ -360,7 +433,7 @@ int rtld_library_load(const char *name, rtld_image_t *req) {
 		strcat(buf, "/");
 		strcat(buf, name);
 		if(rtld_library_exists(buf)) {
-			return rtld_image_load(buf, req, ELF_ET_DYN, NULL);
+			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
 		}
 	}
 	for(i = 0; rtld_library_dirs[i]; i++) {
@@ -368,10 +441,9 @@ int rtld_library_load(const char *name, rtld_image_t *req) {
 		strcat(buf, "/");
 		strcat(buf, name);
 		if(rtld_library_exists(buf)) {
-			return rtld_image_load(buf, req, ELF_ET_DYN, NULL);
+			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
 		}
 	}
 
-	printf("RTLD: Could not find required library: %s\n", name);
 	return -ERR_DEP_MISSING;
 }

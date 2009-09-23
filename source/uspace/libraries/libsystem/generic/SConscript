@@ -84,4 +84,5 @@ sources += [
 
 	File('fatal.c'),
 	File('init.c'),
+	File('rtld.c'),
 ]

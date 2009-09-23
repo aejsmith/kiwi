@@ -23,16 +23,13 @@
 #include <kernel/handle.h>
 #include <kernel/process.h>
 
-#include <kiwi/Process.h>
-
 #include <string.h>
 
-#include <cstdio>
-#include <cstdlib>
-
-using namespace kiwi;
+#include <stdio.h>
+#include <stdlib.h>
 
 extern "C" int module_load(const char *path, char *depbuf);
+extern char **environ;
 
 /** Load a module in a directory. */
 static int load_module(const char *dir, const char *name) {
@@ -93,25 +90,14 @@ static int load_modules(const char *dir) {
 }
 
 int main(int argc, char **argv) {
-	Process *proc;
+	const char *args[] = { "/system/binaries/svcmgr", NULL };
 	int ret;
-
-	if(Process::GetCurrentID() != 1) {
-		printf("startup: not process 1, exiting...\n");
-		return 1;
-	}
 
 	if((ret = load_modules("/system/modules")) != 0) {
 		return 1;
 	}
 
-	proc = new Process("/system/binaries/console");
-	if(!proc->Initialised(&ret)) {
-		printf("Failed to create process (%d)\n", ret);
-		delete proc;
-		return 1;
-	}
-	proc->WaitTerminate();
-	delete proc;
-	while(1);
+	ret = process_replace(args[0], const_cast<char **>(args), environ, false);
+	printf("Failed to start service manager (%d)\n", ret);
+	return 1;
 }

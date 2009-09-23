@@ -1,4 +1,4 @@
-/* Internal libsystem functions
+/* Kiwi RTLD program interface
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,25 +15,21 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		RTLD program interface.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#ifndef __RTLD_EXPORT_H
+#define __RTLD_EXPORT_H
 
-#include <kernel/process.h>
+/** Exported function structure. */
+typedef struct rtld_export {
+	const char *name;		/**< Exported symbol name. */
+	void *addr;			/**< Address to map to. */
+} rtld_export_t;
 
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
+/** Number of exported functions. */
+#define RTLD_EXPORT_COUNT	3
 
-extern char **environ;
+extern rtld_export_t rtld_exported_funcs[RTLD_EXPORT_COUNT];
 
-extern void kputch(char ch);
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+#endif /* __RTLD_EXPORT_H */

@@ -18,6 +18,7 @@
  * @brief		RTLD symbol functions.
  */
 
+#include <rtld/export.h>
 #include <rtld/symbol.h>
 #include <rtld/utility.h>
 
@@ -50,6 +51,14 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp
 	ElfW(Sym) *symtab;
 	Elf32_Word i;
 	list_t *iter;
+
+	/* Check if it matches an exported symbol. */
+	for(i = 0; i < RTLD_EXPORT_COUNT; i++) {
+		if(strcmp(rtld_exported_funcs[i].name, name) == 0) {
+			*addrp = (ElfW(Addr))rtld_exported_funcs[i].addr;
+			return true;
+		}
+	}
 
 	hash = rtld_symbol_hash((const unsigned char *)name);
 

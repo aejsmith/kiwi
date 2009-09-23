@@ -1,4 +1,4 @@
-/* Internal libsystem functions
+/* Kiwi service manager
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,25 +15,35 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		Service manager.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#include <kiwi/Process.h>
 
-#include <kernel/process.h>
+#include <string.h>
 
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-extern char **environ;
+using namespace kiwi;
 
-extern void kputch(char ch);
+int main(int argc, char **argv) {
+	Process *proc;
+	int ret;
 
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
+	if(Process::GetCurrentID() != 1) {
+		printf("svcmgr: not process 1, exiting...\n");
+		return 1;
+	}
 
-extern int main(int argc, char **argv, char **envp);
+	proc = new Process("/system/binaries/console");
+	if(!proc->Initialised(&ret)) {
+		printf("Failed to create process (%d)\n", ret);
+		delete proc;
+		return 1;
+	}
 
-#endif /* __LIBSYSTEM_H */
+	proc->WaitTerminate();
+	delete proc;
+	while(1);
+}

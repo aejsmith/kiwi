@@ -69,7 +69,7 @@ def sysgen_emitter(target, source, env):
 	return target, source
 env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
 
-SConscript(dirs=['libraries', 'binaries'], exports=['env'])
+SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
 
 # Set arrays needed in the distribution environment.
 # FIXME: Eventually we shouldn't put everything in the boot image.

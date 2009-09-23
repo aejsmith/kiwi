@@ -12,17 +12,8 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'sources')
+Import('env', 'config', 'envmgr')
 
-# Generate the system call functions.
-env.Sysgen('syscalls.S', 'syscalls.def')
-
-sources += [
-	File('args.c'),
-	File('export.c'),
-	File('image.c'),
-	File('main.c'),
-	File('symbol.c'),
-	File('syscalls.S'),
-	File('utility.c'),
-]
+env.Program('svcmgr', [
+	'main.cc',
+], LIBS=['kiwi'])

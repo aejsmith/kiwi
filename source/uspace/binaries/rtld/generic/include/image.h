@@ -38,6 +38,7 @@ typedef struct rtld_image {
 	char *path;			/**< Full path to image file. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
 	ElfW(Addr) dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
+	ElfW(Dyn) *dyntab;		/**< Pointer to unmodified dynamic section. */
 
 	void *load_base;		/**< Base address for the image. */
 	size_t load_size;		/**< Size of the image's memory region. */
@@ -55,10 +56,12 @@ typedef struct rtld_image {
 } rtld_image_t;
 
 extern list_t rtld_loaded_images;
+extern rtld_image_t *rtld_application;
 
 extern int rtld_image_relocate(rtld_image_t *image);
 
-extern int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp);
-extern int rtld_library_load(const char *name, rtld_image_t *req);
+extern int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep);
+extern void rtld_image_unload(rtld_image_t *image);
+extern int rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep);
 
 #endif /* __RTLD_IMAGE_H */
