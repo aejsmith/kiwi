@@ -42,7 +42,7 @@ extern void abort(void);
 extern int abs(int j);
 extern int atexit(void (*function)(void));
 //extern double atof(const char *s);
-//extern int atoi(const char *s);
+extern int atoi(const char *s);
 //extern long atol(const char *s);
 //extern long long atoll(const char *s);
 extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));

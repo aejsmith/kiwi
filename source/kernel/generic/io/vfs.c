@@ -3045,6 +3045,39 @@ int sys_fs_handle_info(handle_t handle, vfs_info_t *infop) {
 	return memcpy_to_user(infop, &kinfo, sizeof(vfs_info_t));
 }
 
+/** Flush changes to a filesystem node to the FS.
+ *
+ * Flushes all changes made to a filesystem node referred to by a handle to
+ * the filesystem.
+ *
+ * @param handle	Handle to flush.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int sys_fs_handle_sync(handle_t handle) {
+	handle_info_t *info;
+	vfs_handle_t *data;
+	int ret;
+
+	/* Look up the handle and check the type. */
+	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+		return ret;
+	} else if(info->type->id != HANDLE_TYPE_FILE && info->type->id != HANDLE_TYPE_DIR) {
+		handle_release(info);
+		return -ERR_TYPE_INVAL;
+	}
+	data = info->data;
+
+	mutex_lock(&data->node->mount->lock, 0);
+	mutex_lock(&data->node->lock, 0);
+	ret = vfs_node_flush(data->node, false);
+	mutex_unlock(&data->node->lock);
+	mutex_unlock(&data->node->mount->lock);
+
+	handle_release(info);
+	return ret;
+}
+
 /** Create a symbolic link.
  *
  * Creates a new symbolic link in the filesystem.

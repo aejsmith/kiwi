@@ -56,6 +56,7 @@ sources += [
 
 	File('stdlib/abort.c'),
 	File('stdlib/abs.c'),
+	File('stdlib/atoi.c'),
 	File('stdlib/bsearch.c'),
 	File('stdlib/environ.c'),
 	File('stdlib/exit.c'),

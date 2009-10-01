@@ -244,7 +244,8 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		}
 	}
 
-	/* Set name and loading state, and fill out hash information. */
+	/* Set name and loading state, and fill out hash information.
+	 * FIXME: Use base of library path if SONAME not set. */
 	if(type == ELF_ET_DYN) {
 		image->name = (const char *)(image->dynamic[ELF_DT_SONAME] + image->dynamic[ELF_DT_STRTAB]);
 	} else {

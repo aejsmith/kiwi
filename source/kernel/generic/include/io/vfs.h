@@ -386,6 +386,7 @@ extern int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, o
 
 extern int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *newp);
 extern int sys_fs_handle_info(handle_t handle, vfs_info_t *infop);
+extern int sys_fs_handle_sync(handle_t handle);
 
 extern int sys_fs_symlink_create(const char *path, const char *target);
 extern int sys_fs_symlink_read(const char *path, char *buf, size_t size);
