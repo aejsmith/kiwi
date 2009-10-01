@@ -38,9 +38,10 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
 		fs_dir_entry_t *entry;
+		char path[4096];
 		const char *dir;
 		handle_t handle;
-		char *link;
+		fs_info_t info;
 		int ret;
 
 		if(SHELL_HELP(argc, argv) || (argc != 1 && argc != 2)) {
@@ -57,29 +58,39 @@ public:
 			return -ERR_NO_MEMORY;
 		}
 
+		printf("ID   Links  Size       Name\n");
+		printf("==   =====  ====       ====\n");
+
 		while(true) {
 			if((ret = fs_dir_read(handle, entry, 4096, -1)) != 0) {
+				handle_close(handle);
+				free(entry);
+
 				if(ret != -ERR_NOT_FOUND) {
 					printf("Failed to read directory entry (%d)\n", ret);
 					return ret;
 				}
-				free(entry);
-				handle_close(handle);
 				return 0;
 			}
 
-			/* Check if its a symlink. */
-			link = new char[4096];
-			strcpy(link, dir);
-			strcat(link, "/");
-			strcpy(link, entry->name);
-			if((ret = fs_symlink_read(link, link, 4096)) > 0) {
-				printf("%-4d - %s -> %s\n", entry->id, entry->name, link);
-			} else {
-				printf("%-4d - %s\n", entry->id, entry->name);
+			strcpy(path, dir);
+			strcat(path, "/");
+			strcpy(path, entry->name);
+
+			/* Get information. */
+			if((ret = fs_info(path, false, &info)) != 0) {
+				printf("Failed to get entry information (%d)\n", ret);
+				handle_close(handle);
+				free(entry);
+				return ret;
 			}
 
-			delete link;
+			printf("%-4d %-6zu %-10llu ", info.id, info.links, info.size);
+			if((ret = fs_symlink_read(path, path, 4096)) > 0) {
+				printf("%s -> %s\n", entry->name, path);
+			} else {
+				printf("%s\n", entry->name);
+			}
 		}
 	}
 };

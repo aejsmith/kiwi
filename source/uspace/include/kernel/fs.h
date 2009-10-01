@@ -36,7 +36,11 @@ typedef struct fs_dir_entry {
 
 /** Filesystem node information structure. */
 typedef struct fs_info {
-	int meow;
+	identifier_t id;		/**< Node ID. */
+	identifier_t mount;		/**< Mount ID. */
+	size_t blksize;			/**< I/O block size. */
+	file_size_t size;		/**< Total size of node data on filesystem. */
+	size_t links;			/**< Number of links to the node. */
 } fs_info_t;
 
 /** Behaviour flags for fs_file_open(). */

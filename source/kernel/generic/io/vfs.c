@@ -870,12 +870,24 @@ out:
  * structure.
  *
  * @param node		Node to get information for.
- * @param infop		Structure to store information in.
- *
- * @return		0 on success, negative error code on failure.
+ * @param info		Structure to store information in.
  */
-int vfs_node_info(vfs_node_t *node, vfs_info_t *infop) {
-	return -ERR_NOT_IMPLEMENTED;
+void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
+	mutex_lock(&node->lock, 0);
+
+	/* Fill in default values for everything. */
+	memset(info, 0, sizeof(vfs_info_t));
+	info->id = node->id;
+	info->mount = (node->mount) ? node->mount->id : -1;
+	info->blksize = PAGE_SIZE;
+	info->size = node->size;
+	info->links = 0;
+
+	if(node->mount && node->mount->type->node_info) {
+		node->mount->type->node_info(node, info);
+	}
+
+	mutex_unlock(&node->lock);
 }
 
 #if 0
@@ -3004,8 +3016,33 @@ out:
 	return ret;
 }
 
+/** Get information about a node.
+ *
+ * Gets information about the file or directory referred to by a handle.
+ *
+ * @param handle	Handle to get information on.
+ * @param infop		Information structure to fill in.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_handle_info(handle_t handle, vfs_info_t *infop) {
-	return -ERR_NOT_IMPLEMENTED;
+	handle_info_t *info;
+	vfs_handle_t *data;
+	vfs_info_t kinfo;
+	int ret;
+
+	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+		return ret;
+	} else if(info->type->id != HANDLE_TYPE_FILE && info->type->id != HANDLE_TYPE_DIR) {
+		handle_release(info);
+		return -ERR_TYPE_INVAL;
+	}
+	data = info->data;
+
+	vfs_node_info(data->node, &kinfo);
+
+	handle_release(info);
+	return memcpy_to_user(infop, &kinfo, sizeof(vfs_info_t));
 }
 
 /** Create a symbolic link.
@@ -3219,8 +3256,40 @@ int sys_fs_setroot(const char *path) {
 	return ret;
 }
 
+/** Get information about a node.
+ *
+ * Gets information about the filesystem entry referred to by a path.
+ *
+ * @param path		Path to get information on.
+ * @param follow	Whether to follow if last path component is a symbolic
+ *			link.
+ * @param infop		Information structure to fill in.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_info(const char *path, bool follow, vfs_info_t *infop) {
-	return -ERR_NOT_IMPLEMENTED;
+	vfs_node_t *node;
+	vfs_info_t kinfo;
+	char *kpath;
+	int ret;
+
+	if(!path || !infop) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Get the path and look it up. */
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+		return ret;
+	} else if((ret = vfs_node_lookup(kpath, follow, -1, &node)) != 0) {
+		kfree(kpath);
+		return ret;
+	}
+
+	vfs_node_info(node, &kinfo);
+
+	vfs_node_release(node);
+	kfree(kpath);
+	return memcpy_to_user(infop, &kinfo, sizeof(vfs_info_t));
 }
 
 int sys_fs_link(const char *source, const char *dest) {

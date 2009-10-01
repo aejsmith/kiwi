@@ -32,6 +32,7 @@
 #include <limits.h>
 
 struct device;
+struct vfs_info;
 struct vfs_mount;
 struct vfs_node;
 
@@ -170,7 +171,12 @@ typedef struct vfs_type {
 	 * @param node		Node being unlinked.
 	 * @return		0 on success, negative error code on failure. */
 	int (*node_unlink)(struct vfs_node *parent, const char *name, struct vfs_node *node);
-	
+
+	/** Get information about a node.
+	 * @param node		Node to get information on.
+	 * @param info		Information structure to fill in. */
+	void (*node_info)(struct vfs_node *node, struct vfs_info *info);
+
 	/**
 	 * Regular file functions.
 	 */
@@ -293,7 +299,11 @@ typedef struct vfs_dir_entry {
 
 /** Filesystem node information structure. */
 typedef struct vfs_info {
-	int meow;
+	identifier_t id;		/**< Node ID. */
+	identifier_t mount;		/**< Mount ID. */
+	size_t blksize;			/**< I/O block size. */
+	file_size_t size;		/**< Total size of node data on filesystem. */
+	size_t links;			/**< Number of links to the node. */
 } vfs_info_t;
 
 /** Filesystem type trait flags. */
@@ -317,7 +327,7 @@ extern int vfs_type_unregister(vfs_type_t *type);
 extern int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep);
 extern void vfs_node_get(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
-extern int vfs_node_info(vfs_node_t *node, vfs_info_t *infop);
+extern void vfs_node_info(vfs_node_t *node, vfs_info_t *info);
 
 extern int vfs_file_create(const char *path, vfs_node_t **nodep);
 extern int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep);

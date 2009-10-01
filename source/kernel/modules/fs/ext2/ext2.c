@@ -451,6 +451,18 @@ static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *n
 	return ret;
 }
 
+/** Get information on an Ext2 node.
+ * @param node		Node to get information on.
+ * @param info		Information structure to fill in. */
+static void ext2_node_info(vfs_node_t *node, vfs_info_t *info) {
+	ext2_inode_t *inode = node->data;
+
+	rwlock_read_lock(&inode->lock, 0);
+	info->size = le32_to_cpu(inode->disk.i_size);
+	info->links = le16_to_cpu(inode->disk.i_links_count);
+	rwlock_unlock(&inode->lock);
+}
+
 /** Resize an Ext2 file.
  * @param node		Node to resize.
  * @param size		New size of the node.
@@ -522,6 +534,7 @@ static vfs_type_t ext2_fs_type = {
 	.node_free = ext2_node_free,
 	.node_create = ext2_node_create,
 	.node_unlink = ext2_node_unlink,
+	.node_info = ext2_node_info,
 	.file_resize = ext2_file_resize,
 	.dir_cache = ext2_dir_cache,
 	.symlink_read = ext2_symlink_read,
