@@ -31,16 +31,20 @@ f.close()
 
 # Create the distribution environment.
 dist = envmgr.Create('dist')
-dist['BOOTDATA'] = {}
+dist['DATA'] = {}
+dist['LIBRARIES'] = []
+dist['BINARIES'] = []
+dist['SERVICES'] = []
 
 # Visit subdirectories.
 SConscript(dirs=['source'])
 
 # Set build defaults.
 Default(Alias('kernel', dist['KERNEL']))
-Default(Alias('modules', envmgr['module']['MODULES']))
-Default(Alias('libraries', envmgr['uspace']['LIBRARIES']))
-Default(Alias('binaries', envmgr['uspace']['BINS']))
+Default(Alias('modules', dist['MODULES']))
+Default(Alias('libraries', dist['LIBRARIES']))
+Default(Alias('binaries', dist['BINARIES']))
+Default(Alias('services', dist['SERVICES']))
 Default(Alias('bootimg', dist['BOOTIMG']))
 
 # Create the ISO image.

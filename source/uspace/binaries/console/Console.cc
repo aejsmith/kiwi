@@ -118,7 +118,7 @@ int Console::Run(const char *cmdline) {
 
 	sprintf(buf, "CONSOLE=/console/%d/slave", m_id);
 
-	Process proc(cmdline, env, false, true);
+	Process proc(cmdline, env, true, 0);
 	if(!proc.Initialised(&ret)) {
 		return ret;
 	}

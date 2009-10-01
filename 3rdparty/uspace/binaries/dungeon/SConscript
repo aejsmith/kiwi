@@ -12,7 +12,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config', 'envmgr')
+Import('env', 'envmgr')
 
 # Definitions controlling features.
 defines = {
@@ -72,4 +72,4 @@ target = env.Program('dungeon', [
 Depends(target, File('dtextc.dat'))
 
 # Add the data file to the boot image.
-envmgr['dist']['BOOTDATA']['dungeon'] = [File('dtextc.dat')]
+envmgr['dist']['DATA']['dungeon'] = [File('dtextc.dat')]

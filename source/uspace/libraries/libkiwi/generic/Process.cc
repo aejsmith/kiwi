@@ -36,9 +36,9 @@ extern char **environ;
 /** Internal creation function.
  * @param args		NULL-terminated argument array.
  * @param env		NULL-terminated environment variable array.
- * @param inherit	Whether the new process should inherit handles.
- * @param usepath	Whether to use the PATH environment variable. */
-void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
+ * @param usepath	Whether to use the PATH environment variable.
+ * @param flags		Process creation flags. */
+void Process::_Init(char **args, char **env, bool usepath, int flags) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
@@ -75,7 +75,7 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			if((m_handle = process_create(buf, args, (env) ? env : environ, inherit)) >= 0) {
+			if((m_handle = process_create(buf, args, (env) ? env : environ, flags)) >= 0) {
 				return;
 			} else if(m_handle != -ERR_NOT_FOUND) {
 				m_init_status = m_handle;
@@ -91,7 +91,7 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
 		m_init_status = -ERR_NOT_FOUND;
 		return;
 	} else {
-		if((m_handle = process_create(args[0], args, (env) ? env : environ, inherit)) < 0) {
+		if((m_handle = process_create(args[0], args, (env) ? env : environ, flags)) < 0) {
 			m_init_status = m_handle;
 		}
 	}
@@ -105,16 +105,15 @@ void Process::_Init(char **args, char **env, bool inherit, bool usepath) {
  * @param env		NULL-terminated environment variable array. A NULL
  *			value for this argument will result in the new process
  *			inheriting the current environment (the default).
- * @param inherit	Whether the new process should inherit handles that are
- *			marked as inheritable (defaults to true).
  * @param usepath	If true, and the program path does not contain a '/'
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
- *			match will be executed (defaults to true). */
-Process::Process(char **args, char **env, bool inherit, bool usepath) :
+ *			match will be executed (defaults to true).
+ * @param flags		Process creation flags. */
+Process::Process(char **args, char **env, bool usepath, int flags) :
 	m_init_status(0)
 {
-	_Init(args, env, inherit, usepath);
+	_Init(args, env, usepath, flags);
 }
 
 /** Create a new process.
@@ -126,13 +125,12 @@ Process::Process(char **args, char **env, bool inherit, bool usepath) :
  * @param env		NULL-terminated environment variable array. A NULL
  *			value for this argument will result in the new process
  *			inheriting the current environment (the default).
- * @param inherit	Whether the new process should inherit handles that are
- *			marked as inheritable (defaults to true).
  * @param usepath	If true, and the program path does not contain a '/'
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
- *			match will be executed (defaults to true). */
-Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) :
+ *			match will be executed (defaults to true).
+ * @param flags		Process creation flags. */
+Process::Process(const char *cmdline, char **env, bool usepath, int flags) :
 	m_init_status(0)
 {
 	char **args = NULL, **tmp, *tok, *dup, *orig;
@@ -172,7 +170,7 @@ Process::Process(const char *cmdline, char **env, bool inherit, bool usepath) :
 		return;
 	}
 
-	_Init(args, env, inherit, usepath);
+	_Init(args, env, usepath, flags);
 	free(args);
 	free(orig);
 }

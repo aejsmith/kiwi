@@ -26,15 +26,18 @@ def boot_image_func(target, source, env):
 	os.makedirs(os.path.join(tmpdir, 'system', 'data'))
 	os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
 	os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
+	os.makedirs(os.path.join(tmpdir, 'system', 'services'))
 
 	# Copy everything needed into it.
-	for bin in env['BOOTBINS']:
+	for bin in env['BINARIES']:
 		shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
-	for lib in env['BOOTLIBS']:
+	for svc in env['SERVICES']:
+		shutil.copy(str(svc), os.path.join(tmpdir, 'system', 'services'))
+	for lib in env['LIBRARIES']:
 		shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
 	for mod in env['MODULES']:
 		shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
-	for app, files in env['BOOTDATA'].items():
+	for app, files in env['DATA'].items():
 		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
@@ -57,5 +60,5 @@ def boot_image_func(target, source, env):
 dist = envmgr['dist']
 dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMSTR'))
 
-dist.BootImage('bootimg.tar.gz', dist['MODULES'] + dist['BOOTBINS'] + dist['BOOTLIBS'])
+dist.BootImage('bootimg.tar.gz', dist['BINARIES'] + dist['SERVICES'] + dist['LIBRARIES'] + dist['MODULES'])
 dist['BOOTIMG'] = File('bootimg.tar.gz')

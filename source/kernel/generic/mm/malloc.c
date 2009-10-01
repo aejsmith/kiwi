@@ -196,7 +196,7 @@ void __init_text malloc_init(void) {
 		name[SLAB_NAME_MAX - 1] = 0;
 
 		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
-		                                      NULL, NULL, SLAB_DEFAULT_PRIORITY,
+		                                      NULL, NULL, SLAB_DEFAULT_PRIORITY + 1,
 		                                      NULL, 0, 0);
 		if(kmalloc_caches[i] == NULL) {
 			fatal("Could not create malloc cache: %s", name);

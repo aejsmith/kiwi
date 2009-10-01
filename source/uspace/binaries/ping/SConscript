@@ -12,7 +12,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config', 'envmgr')
+Import('env')
 
 env.Program('ping', [
 	'main.cc',

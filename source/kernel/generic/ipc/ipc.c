@@ -262,13 +262,13 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 		handle_close(&curr_proc->handles, handle);
 		return -ERR_NOT_FOUND;
 	}
-	spinlock_lock(&process->lock, 0);
+	mutex_lock(&process->lock, 0);
 	list_append(&process->connections, &data.header);
 	semaphore_up(&process->conn_sem, 1);
 
 	/* Wait for the connection to be accepted. */
-	condvar_wait(&data.cvar, NULL, &process->lock, 0);
-	spinlock_unlock(&process->lock);
+	condvar_wait(&data.cvar, &process->lock, NULL, 0);
+	mutex_unlock(&process->lock);
 
 	/* If the process died while we were waiting for it, the return value
 	 * field in the structure will be non-zero. */
@@ -302,11 +302,11 @@ handle_t sys_ipc_connection_listen(timeout_t timeout, identifier_t *pidp) {
 	}
 
 	/* Retreive the connection from the list. */
-	spinlock_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock, 0);
 	assert(!list_empty(&curr_proc->connections));
 	data = list_entry(curr_proc->connections.next, ipc_open_data_t, header);
 	list_remove(&data->header);
-	spinlock_unlock(&curr_proc->lock);
+	mutex_unlock(&curr_proc->lock);
 
 	/* Reference the connection to account for the handle we create. */
 	refcount_inc(&data->conn->count);
@@ -328,10 +328,10 @@ fail:
 	refcount_dec(&data->conn->count);
 
 	/* Return connection to the list. */
-	spinlock_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock, 0);
 	list_append(&curr_proc->connections, &data->header);
 	semaphore_up(&curr_proc->conn_sem, 1);
-	spinlock_unlock(&curr_proc->lock);
+	mutex_unlock(&curr_proc->lock);
 
 	return ret;
 }

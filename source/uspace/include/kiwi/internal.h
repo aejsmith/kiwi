@@ -22,17 +22,19 @@
 #define __KIWI_INTERNAL_H
 
 namespace kiwi {
-	namespace internal {
-		/** Base class that prevents copying of derived classes. */
-		class Noncopyable {
-		protected:
-			Noncopyable() {}
-			~Noncopyable() {}
-		private:
-			Noncopyable(const Noncopyable &);
-			const Noncopyable &operator =(const Noncopyable &);
-		};
-	};
+namespace internal {
+
+/** Base class that prevents copying of derived classes. */
+class Noncopyable {
+protected:
+	Noncopyable() {}
+	~Noncopyable() {}
+private:
+	Noncopyable(const Noncopyable &);
+	const Noncopyable &operator =(const Noncopyable &);
+};
+
+};
 };
 
 #endif /* __KIWI_INTERNAL_H */

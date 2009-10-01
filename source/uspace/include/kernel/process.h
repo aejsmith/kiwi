@@ -36,14 +36,18 @@ typedef struct process_args {
 	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
 } process_args_t;
 
+/** Process creation flag definitions. */
+#define PROCESS_CREATE_INHERIT	(1<<0)	/**< Inherit inheritable handles. */
+
 /** Process handle events. */
 #define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
 
-extern handle_t process_create(const char *path, char *const args[], char *const env[], bool inherit);
-extern int process_replace(const char *path, char *const args[], char *const env[], bool inherit);
+extern handle_t process_create(const char *path, char *const args[], char *const env[], int flags);
+extern int process_replace(const char *path, char *const args[], char *const env[], int flags);
 extern int process_duplicate(handle_t *handlep);
 extern handle_t process_open(identifier_t id);
 extern identifier_t process_id(handle_t handle);
+extern identifier_t process_sid(handle_t handle);
 extern int process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus

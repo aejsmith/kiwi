@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 	int ret;
 
 	sprintf(buf, "%d", id);
-	if((handle = process_create(args[0], args, environ, false)) < 0) {
+	if((handle = process_create(args[0], args, environ, 0)) < 0) {
 		return handle;
 	}
 	printf("Ping: Spawned pong (handle: %d, process: %d)\n", handle, process_id(handle));

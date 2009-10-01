@@ -61,9 +61,6 @@ typedef struct process_create_info {
 	int ret;		/**< Return code. */
 } process_create_info_t;
 
-extern void process_attach(process_t *process, thread_t *thread);
-extern void process_detach(thread_t *thread);
-
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
 
@@ -80,7 +77,7 @@ static slab_cache_t *process_cache;		/**< Cache for process structures. */
 static int process_cache_ctor(void *obj, void *data, int kmflag) {
 	process_t *process = (process_t *)obj;
 
-	spinlock_init(&process->lock, "process_lock");
+	mutex_init(&process->lock, "process_lock", 0);
 	refcount_set(&process->count, 0);
 	list_init(&process->threads);
 	return 0;
@@ -89,15 +86,15 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
 /** Allocate a process structure and initialise it.
  * @param name		Name to give the process.
  * @param id		ID for the process (if negative, one will be allocated).
- * @param flags		Flags for the process.
+ * @param flags		Behaviour flags for the process.
+ * @param cflags	Creation flags for the process.
+ * @param aspace	Whether to give the structure an address space.
  * @param priority	Priority to give the process.
  * @param parent	Process to inherit information from.
- * @param aspace	Whether to give the structure an address space.
- * @param inherit	Whether to inherit handles from the parent.
  * @param procp		Where to store pointer to structure.
  * @return		0 on success, negative error code on failure. */
-static int process_alloc(const char *name, identifier_t id, int flags, int priority,
-                         process_t *parent, bool aspace, bool inherit,
+static int process_alloc(const char *name, identifier_t id, int flags, int cflags,
+                         bool aspace, int priority, process_t *parent,
                          process_t **procp) {
 	process_t *process = slab_cache_alloc(process_cache, MM_SLEEP);
 	int ret;
@@ -117,7 +114,12 @@ static int process_alloc(const char *name, identifier_t id, int flags, int prior
 	}
 
 	/* Initialise the process' handle table. */
-	if((ret = handle_table_init(&process->handles, (parent && inherit) ? &parent->handles : NULL)) != 0) {
+	if(parent && cflags & PROCESS_CREATE_INHERIT) {
+		ret = handle_table_init(&process->handles, &parent->handles);
+	} else {
+		ret = handle_table_init(&process->handles, NULL);
+	}
+	if(ret != 0) {
 		if(process->aspace) {
 			vm_aspace_destroy(process->aspace);
 		}
@@ -300,13 +302,13 @@ fail:
 void process_attach(process_t *process, thread_t *thread) {
 	thread->owner = process;
 
-	spinlock_lock(&process->lock, 0);
+	mutex_lock(&process->lock, 0);
 
 	assert(process->state != PROCESS_DEAD);
 	list_append(&process->threads, &thread->owner_link);
 	refcount_inc(&process->count);
 
-	spinlock_unlock(&process->lock);
+	mutex_unlock(&process->lock);
 }
 
 /** Detach a thread from its owner.
@@ -315,7 +317,7 @@ void process_detach(thread_t *thread) {
 	process_t *process = thread->owner;
 	int ret;
 
-	spinlock_lock(&process->lock, 0);
+	mutex_lock(&process->lock, 0);
 
 	ret = refcount_dec(&process->count);
 	list_remove(&thread->owner_link);
@@ -325,9 +327,10 @@ void process_detach(thread_t *thread) {
 	 * perform the clean up with the lock not held, as only one thing
 	 * should get to the clean up as we are the last thread. */
 	if(list_empty(&process->threads)) {
+		assert(process->state != PROCESS_DEAD);
 		process->state = PROCESS_DEAD;
 
-		spinlock_unlock(&process->lock);
+		mutex_unlock(&process->lock);
 
 		if(process->flags & PROCESS_CRITICAL) {
 			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
@@ -343,7 +346,7 @@ void process_detach(thread_t *thread) {
 		handle_table_destroy(&process->handles);
 		io_context_destroy(&process->ioctx);
 	} else {
-		spinlock_unlock(&process->lock);
+		mutex_unlock(&process->lock);
 	}
 
 	thread->owner = NULL;
@@ -385,14 +388,15 @@ process_t *process_lookup(identifier_t id) {
  * @param args		Arguments to pass to process (NULL-terminated array).
  * @param environ	Environment to pass to process (NULL-terminated array).
  * @param flags		Behaviour flags for the process.
+ * @param cflags	Creation flags for the process.
  * @param priority	Priority for the process.
  * @param parent	Parent for the process.
  * @param procp		Where to store pointer to new process.
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_create(const char **args, const char **environ, int flags, int priority,
-                   process_t *parent, process_t **procp) {
+int process_create(const char **args, const char **environ, int flags, int cflags,
+                   int priority, process_t *parent, process_t **procp) {
 	process_create_info_t info;
 	process_t *process;
 	thread_t *thread;
@@ -410,7 +414,7 @@ int process_create(const char **args, const char **environ, int flags, int prior
 	info.environ = environ;
 	info.ret = 0;
 
-	if((ret = process_alloc(args[0], -1, flags, priority, parent, true, false, &process)) != 0) {
+	if((ret = process_alloc(args[0], -1, flags, cflags, true, priority, parent, &process)) != 0) {
 		return ret;
 	} else if((ret = thread_create("main", process, 0, process_create_thread, &info, NULL, &thread)) != 0) {
 		process_destroy(process);
@@ -438,7 +442,7 @@ int process_create(const char **args, const char **environ, int flags, int prior
 void process_exit(int status) {
 	thread_t *thread;
 
-	spinlock_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock, 0);
 
 	LIST_FOREACH_SAFE(&curr_proc->threads, iter) {
 		thread = list_entry(iter, thread_t, owner_link);
@@ -449,7 +453,7 @@ void process_exit(int status) {
 	}
 
 	curr_proc->status = status;
-	spinlock_unlock(&curr_proc->lock);
+	mutex_unlock(&curr_proc->lock);
 
 	thread_exit();
 }
@@ -479,7 +483,8 @@ int kdbg_cmd_process(int argc, char **argv) {
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRId32 "%s ", process->id, (process == curr_proc) ? "*" : " ");
+		kprintf(LOG_NONE, "%-5" PRId32 "%s ", process->id,
+		        (process == curr_proc) ? "*" : " ");
 		switch(process->state) {
 		case PROCESS_RUNNING:	kprintf(LOG_NONE, "Running "); break;
 		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
@@ -498,15 +503,14 @@ void __init_text process_init(void) {
 	int ret;
 
 	/* Create the process slab cache and ID vmem arena. */
-	process_id_arena = vmem_create("process_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	process_id_arena = vmem_create("process_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
 	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
 	                                  process_cache_ctor, NULL, NULL, NULL,
 	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 
 	/* Create the kernel process. */
 	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
-	                        PRIORITY_KERNEL, NULL, false, false,
-	                        &kernel_proc)) != 0) {
+	                        0, false, PRIORITY_KERNEL, NULL, &kernel_proc)) != 0) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
@@ -523,15 +527,13 @@ static int process_handle_wait(handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case PROCESS_EVENT_DEATH:
-		spinlock_lock(&process->lock, 0);
+		mutex_lock(&process->lock, 0);
 		if(process->state == PROCESS_DEAD) {
 			wait->cb(wait);
-			spinlock_unlock(&process->lock);
-			return 0;
+		} else {
+			notifier_register(&process->death_notifier, handle_wait_notifier, wait);
 		}
-		spinlock_unlock(&process->lock);
-
-		notifier_register(&process->death_notifier, handle_wait_notifier, wait);
+		mutex_unlock(&process->lock);
 		return 0;
 	default:
 		return -ERR_PARAM_INVAL;
@@ -635,12 +637,12 @@ static void sys_process_arg_free(const char *path, const char **args, const char
  * @param path		Path to program to execute.
  * @param args		Argument array (with NULL terminator).
  * @param environ	Environment array (with NULL terminator).
- * @param inherit	Whether to inherit inheritable handles.
+ * @param flags		Flags specifying creation behaviour.
  *
  * @return		Handle to new process (greater than or equal to 0),
  *			negative error code on failure.
  */
-handle_t sys_process_create(const char *path, char *const args[], char *const environ[], bool inherit) {
+handle_t sys_process_create(const char *path, char *const args[], char *const environ[], int flags) {
 	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread = NULL;
@@ -652,7 +654,7 @@ handle_t sys_process_create(const char *path, char *const args[], char *const en
 	}
 
 	/* Create a structure for the process. */
-	if((ret = process_alloc(info.path, -1, 0, PRIORITY_USER, curr_proc, true, inherit, &process)) != 0) {
+	if((ret = process_alloc(info.path, -1, 0, flags, true, PRIORITY_USER, curr_proc, &process)) != 0) {
 		goto fail;
 	}
 
@@ -706,18 +708,18 @@ fail:
  * @param path		Path to program to execute.
  * @param args		Argument array (with NULL terminator).
  * @param environ	Environment array (with NULL terminator).
- * @param inherit	Whether to inherit inheritable handles.
+ * @param flags		Flags specifying creation behaviour.
  *
  * @return		Does not return on success, returns negative error code
  *			on failure.
  */
-int sys_process_replace(const char *path, char *const args[], char *const environ[], bool inherit) {
+int sys_process_replace(const char *path, char *const args[], char *const environ[], int flags) {
 	const char **kargs, **kenv, *kpath;
 	vm_aspace_t *as = NULL, *old;
 	ptr_t stack, entry, uargs;
 	vfs_node_t *node = NULL;
 	void *data = NULL;
-	char *dup, *name;
+	char *name;
 	int ret;
 
 	if((ret = sys_process_arg_copy(path, args, environ, &kpath, &kargs, &kenv)) != 0) {
@@ -747,18 +749,14 @@ int sys_process_replace(const char *path, char *const args[], char *const enviro
 		goto fail;
 	}
 
-	/* Create a duplicate of the name before taking the process' lock, as
-	 * we should not use allocators while a spinlock is held. */
-	dup = kstrdup(kpath, MM_SLEEP);
-
 	/* Set the new name and address space. */
-	spinlock_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock, 0);
 	name = curr_proc->name;
-	curr_proc->name = dup;
+	curr_proc->name = kstrdup(kpath, MM_SLEEP);
 	old = curr_proc->aspace;
 	curr_proc->aspace = as;
 	vm_aspace_switch(as);
-	spinlock_unlock(&curr_proc->lock);
+	mutex_unlock(&curr_proc->lock);
 
 	/* Now that the lock is no longer held, free up old data. */
 	kfree(name);
@@ -838,7 +836,10 @@ handle_t sys_process_open(identifier_t id) {
 
 	mutex_lock(&process_tree_lock, 0);
 
-	if(!(process = avl_tree_lookup(&process_tree, (key_t)id)) || process->state == PROCESS_DEAD) {
+	if(!(process = avl_tree_lookup(&process_tree, (key_t)id))) {
+		mutex_unlock(&process_tree_lock);
+		return -ERR_NOT_FOUND;
+	} else if(process->state == PROCESS_DEAD || process == kernel_proc) {
 		mutex_unlock(&process_tree_lock);
 		return -ERR_NOT_FOUND;
 	}

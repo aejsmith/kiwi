@@ -1037,16 +1037,16 @@ void __init_text slab_init(void) {
 
 	/* Initialise statically allocated internal caches. */
 	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0, NULL,
-	                   NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+	                   NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 2, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialise slab_cache_cache");
 	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 2, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialise slab_bufctl_cache");
 	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena, 0) != 0) {
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 2, &slab_metadata_arena, 0) != 0) {
 		fatal("Could not initialise slab_slab_cache");
 	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY, &slab_metadata_arena,
+	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 2, &slab_metadata_arena,
 	                          SLAB_CACHE_NOMAG) != 0) {
 		fatal("Could not initialise slab_mag_cache");
 	}

@@ -14,6 +14,8 @@
 
 Import('envmgr', 'config')
 
+dist = envmgr['dist']
+
 # Set up the userspace build environment.
 env = envmgr.Create('uspace')
 env['CPPPATH'] = [Dir('include'), Dir('include/c++')]
@@ -24,12 +26,6 @@ env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config[
 # Temporary.
 env['CXXFLAGS'] += ['-fno-rtti', '-fno-exceptions']
 
-# Set up arrays used to track stuff built. Use LIBRARIES rather than LIBS
-# as LIBS is a special SCons variable.
-env['LIBRARIES'] = []
-env['SHLIBS'] = []
-env['BINS'] = []
-
 # Set the directory that we want all libraries to be placed in.
 env['LIBOUTDIR'] = Dir('libraries')
 
@@ -38,11 +34,10 @@ env['LIBOUTDIR'] = Dir('libraries')
 # dependencies for default libraries.
 def lib_emitter(target, source, env):
 	target[0] = File('%s/%s' % (str(env['LIBOUTDIR']), str(target[0])))
-	env['LIBRARIES'].append(target[0])
+	dist['LIBRARIES'].append(target[0])
 	return target, source
 def shlib_emitter(target, source, env):
 	lib_emitter(target, source, env)
-	env['SHLIBS'].append(target[0])
 	Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
 	if target[0].name != 'libsystem.so':
 		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
@@ -54,7 +49,11 @@ env.Append(SHLIBEMITTER=[shlib_emitter])
 # up library dependencies for compiler default libraries (SCons doesn't pick
 # these up).
 def program_emitter(target, source, env):
-	env['BINS'].append(target[0])
+	# Hack.
+	if target[0].get_dir().get_dir().name == 'services':
+		dist['SERVICES'].append(target[0])
+	else:
+		dist['BINARIES'].append(target[0])
 	if target[0].name != 'rtld-%s' % (config['ARCH']):
 		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
 		if env['SMARTLINK'](source, target, env, None) == '$CXX':
@@ -69,9 +68,5 @@ def sysgen_emitter(target, source, env):
 	return target, source
 env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
 
+# Visit subdirectories.
 SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
-
-# Set arrays needed in the distribution environment.
-# FIXME: Eventually we shouldn't put everything in the boot image.
-envmgr['dist']['BOOTBINS'] = env['BINS']
-envmgr['dist']['BOOTLIBS'] = env['SHLIBS']

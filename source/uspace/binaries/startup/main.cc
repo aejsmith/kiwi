@@ -90,14 +90,14 @@ static int load_modules(const char *dir) {
 }
 
 int main(int argc, char **argv) {
-	const char *args[] = { "/system/binaries/svcmgr", NULL };
+	const char *args[] = { "/system/services/svcmgr", NULL };
 	int ret;
 
 	if((ret = load_modules("/system/modules")) != 0) {
 		return 1;
 	}
 
-	ret = process_replace(args[0], const_cast<char **>(args), environ, false);
-	printf("Failed to start service manager (%d)\n", ret);
+	ret = process_replace(args[0], const_cast<char **>(args), environ, 0);
+	printf("Failed to start application server (%d)\n", ret);
 	return 1;
 }

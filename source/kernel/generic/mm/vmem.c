@@ -839,7 +839,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 			 * then be reclaimed from quantum caches. */
 			vmem->qcache[i] = slab_cache_create(qcname, (i + 1) * vmem->quantum,
 			                                    vmem->quantum, NULL, NULL, NULL,
-			                                    NULL, SLAB_DEFAULT_PRIORITY + 1,
+			                                    NULL, SLAB_DEFAULT_PRIORITY + 2,
 			                                    vmem, SLAB_CACHE_QCACHE, 0);
 			if(vmem->qcache[i] == NULL) {
 				goto fail;

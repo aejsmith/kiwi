@@ -53,8 +53,6 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void process_attach(process_t *process, thread_t *thread);
-extern void process_detach(thread_t *thread);
 extern void waitq_do_wake(thread_t *thread);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
@@ -504,7 +502,7 @@ int kdbg_cmd_thread(int argc, char **argv) {
 
 /** Initialise the thread cache. */
 void __init_text thread_init(void) {
-	thread_id_arena = vmem_create("thread_id_arena", 1, 65534, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	thread_id_arena = vmem_create("thread_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
 	                                 thread_cache_ctor, NULL, NULL, NULL,
 	                                 SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);

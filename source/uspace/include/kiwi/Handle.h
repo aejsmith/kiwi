@@ -26,18 +26,20 @@
 #include <kiwi/internal.h>
 
 namespace kiwi {
-	/** Base class for all objects represented by a handle. */
-	class Handle : public internal::Noncopyable {
-	public:
-		~Handle();
 
-		int Wait(int event, timeout_t timeout = -1) const;
-		handle_t GetHandle(void) const;
-	protected:
-		Handle();
+/** Base class for all objects represented by a handle. */
+class Handle : public internal::Noncopyable {
+public:
+	~Handle();
 
-		handle_t m_handle;		/**< Handle ID. */
-	};
+	int Wait(int event, timeout_t timeout = -1) const;
+	handle_t GetHandle(void) const;
+protected:
+	Handle();
+
+	handle_t m_handle;		/**< Handle ID. */
+};
+
 };
 
 #endif /* __KIWI_HANDLE_H */

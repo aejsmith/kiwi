@@ -21,26 +21,30 @@
 #ifndef __KIWI_PROCESS_H
 #define __KIWI_PROCESS_H
 
+#include <kernel/process.h>
+
 #include <kiwi/Handle.h>
 
 namespace kiwi {
-	/** Class providing functionality to create and manipulate processes. */
-	class Process : public Handle {
-	public:
-		Process(char **args, char **env = 0, bool inherit = true, bool usepath = true);
-		Process(const char *cmdline, char **env = 0, bool inherit = true, bool usepath = true);
-		Process(identifier_t id);
 
-		bool Initialised(int *status = 0) const;
-		int WaitTerminate(timeout_t timeout = -1) const;
-		identifier_t GetID(void) const;
+/** Class providing functionality to create and manipulate processes. */
+class Process : public Handle {
+public:
+	Process(char **args, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	Process(const char *cmdline, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	Process(identifier_t id);
 
-		static identifier_t GetCurrentID(void);
-	private:
-		void _Init(char **args, char **env, bool inherit, bool usepath);
+	bool Initialised(int *status = 0) const;
+	int WaitTerminate(timeout_t timeout = -1) const;
+	identifier_t GetID(void) const;
 
-		int m_init_status;		/**< Initialisation status. */
-	};
+	static identifier_t GetCurrentID(void);
+private:
+	void _Init(char **args, char **env, bool usepath, int flags);
+
+	int m_init_status;		/**< Initialisation status. */
+};
+
 };
 
 #endif /* __KIWI_PROCESS_H */
