@@ -881,7 +881,7 @@ void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
 	info->mount = (node->mount) ? node->mount->id : -1;
 	info->blksize = PAGE_SIZE;
 	info->size = node->size;
-	info->links = 0;
+	info->links = 1;
 
 	if(node->mount && node->mount->type->node_info) {
 		node->mount->type->node_info(node, info);
@@ -1516,6 +1516,7 @@ static int vfs_file_handle_close(handle_info_t *info) {
 	}
 
 	vfs_node_release(file->node);
+	kfree(file);
 	return 0;
 }
 
@@ -1759,6 +1760,7 @@ static int vfs_dir_handle_close(handle_info_t *info) {
 	}
 
 	vfs_node_release(dir->node);
+	kfree(dir);
 	return 0;
 }
 
