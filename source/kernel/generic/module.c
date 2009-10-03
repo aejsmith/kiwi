@@ -171,7 +171,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
  * The intended usage of this function is to keep on calling it and loading
  * each unmet dependency it specifies until it succeeds.
  *
- * @param path		Path to module on filesystem.
+ * @param node		Filesystem node containing the module.
  * @param depbuf	Where to store name of unmet dependency (should be
  *			MODULE_NAME_MAX bytes long).
  *
@@ -179,20 +179,15 @@ static int module_check_deps(module_t *module, char *depbuf) {
  *			required dependency is not loaded, the ERR_DEP_MISSING
  *			error code is returned.
  */
-int module_load(const char *path, char *depbuf) {
-	vfs_node_t *node;
+int module_load_node(vfs_node_t *node, char *depbuf) {
 	module_t *module;
 	int ret;
 
-	if(!path || !depbuf) {
+	if(!node || !depbuf) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	/* Look up the node and check it is the correct type. */
-	if((ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node)) != 0) {
-		return ret;
-	} else if(!elf_module_check(node)) {
-		vfs_node_release(node);
+	if(!elf_module_check(node)) {
 		return -ERR_TYPE_INVAL;
 	}
 
@@ -262,10 +257,7 @@ int module_load(const char *path, char *depbuf) {
 		goto fail;
 	}
 
-	/* Node no longer required. */
-	vfs_node_release(module->node);
 	module->node = NULL;
-
 	kprintf(LOG_DEBUG, "module: successfully loaded module %p(%s)\n", module, module->name);
 	mutex_unlock(&module_lock);
 	return 0;
@@ -277,10 +269,39 @@ fail:
 		kfree(module->shdrs);
 	}
 	symbol_table_destroy(&module->symtab);
-	vfs_node_release(module->node);
 	kfree(module);
 
 	mutex_unlock(&module_lock);
+	return ret;
+}
+
+/** Load a kernel module.
+ *
+ * Loads a kernel module from the filesystem. If any of the dependencies of the
+ * module are not met, the name of the first unmet dependency encountered is
+ * stored in the buffer provided, which should be MODULE_NAME_MAX bytes long.
+ * The intended usage of this function is to keep on calling it and loading
+ * each unmet dependency it specifies until it succeeds.
+ *
+ * @param path		Path to module on filesystem.
+ * @param depbuf	Where to store name of unmet dependency (should be
+ *			MODULE_NAME_MAX bytes long).
+ *
+ * @return		0 on success, negative error code on failure. If a
+ *			required dependency is not loaded, the ERR_DEP_MISSING
+ *			error code is returned.
+ */
+int module_load(const char *path, char *depbuf) {
+	vfs_node_t *node;
+	int ret;
+
+	/* Look up the node and check it is the correct type. */
+	if((ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node)) != 0) {
+		return ret;
+	}
+
+	ret = module_load_node(node, depbuf);
+	vfs_node_release(node);
 	return ret;
 }
 

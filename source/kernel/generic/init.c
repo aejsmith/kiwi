@@ -42,7 +42,7 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <bootimg.h>
+#include <bootmod.h>
 #include <fatal.h>
 #include <init.h>
 #include <version.h>
@@ -57,25 +57,31 @@ extern initcall_t __initcall_end[];
  * @param arg1		Thread argument (unused).
  * @param arg2		Thread argument (unused). */
 static void init_thread(void *arg1, void *arg2) {
+	const char *args[] = { "/system/services/svcmgr", NULL }, *env[] = { NULL };
 	initcall_t *initcall;
+	int ret;
 
-	/* Bring up secondary CPUs. */
+	/* Bring up secondary CPUs and call initialisation functions that must
+	 * be called before any initcalls. */
 	smp_boot_cpus();
-
-	/* Call initialisation functions that must be called before any
-	 * initcalls. */
 	vfs_init();
 
-	/* Call initialziation functions. */
+	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
 		(*initcall)();
 	}
 
-	/* Reclaim memory taken up by temporary initialisation code/data. */
+	/* Load boot-time modules and mount the root filesystem. */
+	bootmod_load();
+	vfs_late_init();
+
+	/* Reclaim memory taken up by initialisation code/data. */
 	page_init_reclaim();
 
-	/* Load the boot image. */
-	bootimg_load();
+	/* Run the startup process. */
+	if((ret = process_create(args, env, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM, kernel_proc, NULL)) != 0) {
+		fatal("Could not create startup process (%d)", ret);
+	}
 }
 
 /** Kernel initialisation function.

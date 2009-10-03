@@ -25,6 +25,7 @@
 #include <sync/mutex.h>
 
 #include <errors.h>
+#include <init.h>
 
 /** RamFS mount information structure. */
 typedef struct ramfs_mount {
@@ -119,3 +120,13 @@ vfs_type_t ramfs_fs_type = {
 	.node_unlink = ramfs_node_unlink,
 	.file_resize = ramfs_file_resize,
 };
+
+/** Register RamFS with the VFS. */
+static void __init_text ramfs_init(void) {
+	int ret;
+
+	if((ret = vfs_type_register(&ramfs_fs_type)) != 0) {
+		fatal("Could not register RamFS filesystem type (%d)", ret);
+	}
+}
+INITCALL(ramfs_init);

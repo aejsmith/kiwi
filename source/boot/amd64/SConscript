@@ -12,29 +12,31 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
-import tempfile
-import shutil
+import os, sys, tempfile, shutil
 
 Import('envmgr', 'config')
 
 dist = envmgr['dist']
+dist['GRUBDIR'] = Dir('#source/boot/%s/grub' % (config['ARCH']))
+dist['BASEHD'] = File('#source/boot/%s/hd.img.gz' % (config['ARCH']))
 
 # Function to generate an ISO image.
 def iso_image_func(target, source, env):
 	grubdir = str(env['GRUBDIR'])
 	kernel = str(env['KERNEL'])
-	bootimg = str(env['BOOTIMG'])
+	fsimage = str(env['FSIMAGE'])
 
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwiiso')
 	os.makedirs(os.path.join(tmpdir, 'boot', 'grub'))
+	os.makedirs(os.path.join(tmpdir, 'modules'))
 
 	# Copy stuff into it.
 	shutil.copy(os.path.join(grubdir, 'stage2_eltorito'), os.path.join(tmpdir, 'boot', 'grub'))
 	shutil.copy(kernel, tmpdir)
-	shutil.copy(bootimg, tmpdir)
+	shutil.copy(fsimage, tmpdir)
+	for mod in env['MODULES']:
+		shutil.copy(str(mod), os.path.join(tmpdir, 'modules'))
 
 	# Create the GRUB menu.lst.
 	f = open(os.path.join(tmpdir, 'boot', 'grub', 'menu.lst'), 'w')
@@ -42,7 +44,9 @@ def iso_image_func(target, source, env):
 	f.write('timeout 5\n\n')
 	f.write('title Kiwi v%s (%s-%s)\n' % (env['KIWI_VER_STRING'], config['ARCH'], config['PLATFORM']))
 	f.write('	kernel /%s\n' % (os.path.basename(kernel)))
-	f.write('	module /%s\n' % (os.path.basename(bootimg)))
+	f.write('	module /%s\n' % (os.path.basename(fsimage)))
+	for mod in env['MODULES']:
+		f.write('	module /modules/%s\n' % (os.path.basename(str(mod))))
 	f.close()
 
 	# Create the ISO.
@@ -54,6 +58,41 @@ def iso_image_func(target, source, env):
 	# Clean up.
 	shutil.rmtree(tmpdir)
 	return ret
-
-dist['GRUBDIR'] = Dir('#source/boot/%s/grub' % (config['ARCH']))
 dist['BUILDERS']['ISOImage'] = Builder(action=Action(iso_image_func, '$GENCOMSTR'))
+
+# Function to generate a HD image.
+def hd_image_func(target, source, env):
+	kernel = str(env['KERNEL'])
+	fsimage = str(env['FSIMAGE'])
+
+	# Create the GRUB menu.
+	f = open('menu.lst', 'w')
+	f.write('default 0\n')
+	f.write('timeout 5\n\n')
+	f.write('title Kiwi v%s (%s-%s)\n' % (env['KIWI_VER_STRING'], config['ARCH'], config['PLATFORM']))
+	f.write('	kernel /system/%s root=/disk/0/part0\n' % (os.path.basename(kernel)))
+	for mod in env['MODULES']:
+		f.write('	module /system/modules/%s\n' % (os.path.basename(str(mod))))
+	f.close()
+
+	# Extract the base image.
+	if os.system('zcat %s > %s' % (str(env['BASEHD']), target[0])) != 0:
+		return ret
+
+	# Mount the image and copy everything on to it.
+	tmpdir = tempfile.mkdtemp('.kiwiimg')
+	if os.system('sudo mount -o loop,offset=32256 %s %s -t ext2' % (target[0], tmpdir)) != 0:
+		return ret
+	if os.system('sudo tar xzf %s -C %s' % (fsimage, tmpdir)) != 0:
+		os.system('sudo umount %s' % (tmpdir))
+		return ret
+	if os.system('sudo cp menu.lst %s/boot/grub/' % (tmpdir)) != 0:
+		os.system('sudo umount %s' % (tmpdir))
+		return ret
+	if os.system('sudo umount %s' % (tmpdir)) != 0:
+		return ret
+
+	os.rmdir(tmpdir)
+	os.remove('menu.lst')
+	return 0
+dist['BUILDERS']['HDImage'] = Builder(action=Action(hd_image_func, '$GENCOMSTR'))

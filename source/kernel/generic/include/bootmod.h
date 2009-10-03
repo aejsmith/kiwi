@@ -1,4 +1,4 @@
-/* Kiwi boot image loader
+/* Kiwi boot-time module loader
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,15 +15,25 @@
 
 /**
  * @file
- * @brief		Boot image loader.
+ * @brief		Boot-time module loader.
  */
 
-#ifndef __BOOTIMG_H
-#define __BOOTIMG_H
+#ifndef __BOOTMOD_H
+#define __BOOTMOD_H
 
 #include <types.h>
 
-extern void bootimg_load(void);
-extern void bootimg_set(void *addr, size_t size);
+/** Structure describing a module loaded by the bootloader. */
+typedef struct bootmod {
+	char *name;		/**< Name of module. */
+	void *addr;		/**< Address of module. */
+	size_t size;		/**< Size of module. */
+	bool loaded;		/**< Whether the module has been loaded. */
+} bootmod_t;
 
-#endif /* __BOOTIMG_H */
+extern bootmod_t *bootmod_array;
+extern size_t bootmod_count;
+
+extern void bootmod_load(void);
+
+#endif /* __BOOTMOD_H */

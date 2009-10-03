@@ -12,53 +12,6 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import tarfile, glob, os, tempfile, shutil
-
-Import('config', 'envmgr')
+Import('config')
 
 SConscript(dirs=['boot/%s' % (config['ARCH']), 'kernel', 'drivers', 'uspace'])
-
-# Create a TAR archive containing kernel modules, drivers and startup binaries.
-def boot_image_func(target, source, env):
-	# Create the work directory.
-	tmpdir = tempfile.mkdtemp('.kiwibootimg')
-	os.makedirs(os.path.join(tmpdir, 'system', 'binaries'))
-	os.makedirs(os.path.join(tmpdir, 'system', 'data'))
-	os.makedirs(os.path.join(tmpdir, 'system', 'libraries'))
-	os.makedirs(os.path.join(tmpdir, 'system', 'modules'))
-	os.makedirs(os.path.join(tmpdir, 'system', 'services'))
-
-	# Copy everything needed into it.
-	for bin in env['BINARIES']:
-		shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
-	for svc in env['SERVICES']:
-		shutil.copy(str(svc), os.path.join(tmpdir, 'system', 'services'))
-	for lib in env['LIBRARIES']:
-		shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
-	for mod in env['MODULES']:
-		shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
-	for app, files in env['DATA'].items():
-		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
-		for f in files:
-			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
-
-	# Create the startup symbolic link.
-	os.symlink('system/binaries/startup', os.path.join(tmpdir, 'startup'))
-
-	# Create the TAR file.
-	tar = tarfile.open(str(target[0]), 'w:gz')
-	cwd = os.getcwd()
-	os.chdir(tmpdir)
-	for f in glob.glob('*'):
-		tar.add(f)
-	os.chdir(cwd)
-	tar.close()
-
-	# Clean up.
-	shutil.rmtree(tmpdir)
-
-dist = envmgr['dist']
-dist['BUILDERS']['BootImage'] = Builder(action=Action(boot_image_func, '$GENCOMSTR'))
-
-dist.BootImage('bootimg.tar.gz', dist['BINARIES'] + dist['SERVICES'] + dist['LIBRARIES'] + dist['MODULES'])
-dist['BOOTIMG'] = File('bootimg.tar.gz')

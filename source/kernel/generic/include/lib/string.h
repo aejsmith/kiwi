@@ -41,6 +41,7 @@ extern char *strchr(const char *s, int c);
 extern char *strrchr(const char *s, int c);
 extern char *strcpy(char *dest, const char *src);
 extern char *strncpy(char *dest, const char *src, size_t count);
+extern char *strcat(char *dest, const char *src);
 extern int atoi(const char *s);
 
 extern void *kmemdup(const void *src, size_t count, int kmflag);

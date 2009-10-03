@@ -83,7 +83,8 @@ env['OBJFILES'] += [
 	env.Object('types/hash.c'),
 	env.Object('types/radix.c'),
 
-	env.Object('bootimg.c'),
+	env.Object('args.c'),
+	env.Object('bootmod.c'),
 	env.Object('elf.c'),
 	env.Object('fatal.c'),
 	env.Object('init.c'),

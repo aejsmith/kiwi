@@ -21,5 +21,4 @@ SConscript(dirs=[
 	'ping',
 	'pong',
 	'rtld',
-	'startup',
 ], exports=['env'])

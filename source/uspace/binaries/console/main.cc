@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
 		delete fb;
 		return 1;
 	}
+	console->Run("failshell");
 
 	/* Finally create the input device. */
 	input = new InputDevice("/input/0");
@@ -67,8 +68,6 @@ int main(int argc, char **argv) {
 		delete fb;
 		return 1;
 	}
-
-	console->Run("failshell");
 
 	EventLoop::Instance()->Run();
 	return 0;

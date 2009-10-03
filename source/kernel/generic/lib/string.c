@@ -436,6 +436,23 @@ char *strncpy(char *dest, const char *src, size_t count) {
 	return dest;
 }
 
+/** Concatenate 2 strings.
+ *
+ * Appends one string to another.
+ *
+ * @param dest		Pointer to the string to append to.
+ * @param src		Pointer to the string to append.
+ * 
+ * @return		Pointer to dest.
+ */
+char *strcat(char *dest, const char *src) {
+	size_t destlen = strlen(dest);
+	char *d = dest + destlen;
+
+	while((*d++ = *src++));
+	return dest;
+}
+
 /** Convert string to integer.
  *
  * Converts the string specified to an integer. If a part of the string is

@@ -58,8 +58,8 @@ public:
 			return -ERR_NO_MEMORY;
 		}
 
-		printf("ID   Links  Size       Name\n");
-		printf("==   =====  ====       ====\n");
+		printf("ID    Links  Size       Name\n");
+		printf("==    =====  ====       ====\n");
 
 		while(true) {
 			if((ret = fs_dir_read(handle, entry, 4096, -1)) != 0) {
@@ -85,7 +85,7 @@ public:
 				return ret;
 			}
 
-			printf("%-4d %-6zu %-10llu ", info.id, info.links, info.size);
+			printf("%-5d %-6zu %-10llu ", info.id, info.links, info.size);
 			if((ret = fs_symlink_read(path, path, 4096)) > 0) {
 				printf("%s -> %s\n", entry->name, path);
 			} else {

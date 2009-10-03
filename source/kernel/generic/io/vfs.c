@@ -43,6 +43,7 @@
 #include <proc/handle.h>
 #include <proc/process.h>
 
+#include <args.h>
 #include <assert.h>
 #include <errors.h>
 #include <fatal.h>
@@ -1930,6 +1931,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	/* If the root filesystem is not yet mounted, the only place we can
 	 * mount is '/'. */
 	if(!vfs_root_mount) {
+		assert(curr_proc == kernel_proc);
 		if(strcmp(path, "/") != 0) {
 			ret = -ERR_NOT_FOUND;
 			goto fail;
@@ -2036,6 +2038,12 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	list_append(&vfs_mount_list, &mount->header);
 	if(!vfs_root_mount) {
 		vfs_root_mount = mount;
+
+		/* Give the kernel process a correct current/root directory. */
+		vfs_node_get(vfs_root_mount->root);
+		curr_proc->ioctx.root_dir = vfs_root_mount->root;
+		vfs_node_get(vfs_root_mount->root);
+		curr_proc->ioctx.curr_dir = vfs_root_mount->root;
 	}
 	mutex_unlock(&vfs_mount_lock);
 
@@ -2450,28 +2458,26 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 # pragma mark Initialisation functions.
 #endif
 
-/** Initialisation function for the VFS. */
-void __init_text vfs_init(void) {
+/** Perform late initialisation of the VFS. */
+void __init_text vfs_late_init(void) {
+	const char *device;
 	int ret;
 
-	/* Initialise the node slab cache. */
+	if(!vfs_root_mount) {
+		if(!(device = args_get("root"))) {
+			fatal("No root filesystem specified");
+		} else if((ret = vfs_mount(device, "/", NULL, 0)) != 0) {
+			fatal("Could not mount root filesystem (%d)", ret);
+		}
+	}
+}
+
+/** Initialisation function for the VFS. */
+void __init_text vfs_init(void) {
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
 	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
 	                                   vfs_node_cache_reclaim, NULL, 1, NULL,
 	                                   0, MM_FATAL);
-
-	/* Register RamFS and mount it as the root. */
-	if((ret = vfs_type_register(&ramfs_fs_type)) != 0) {
-		fatal("Could not register RamFS filesystem type (%d)", ret);
-	} else if((ret = vfs_mount(NULL, "/", "ramfs", 0)) != 0) {
-		fatal("Could not mount RamFS at root (%d)", ret);
-	}
-
-	/* Give the kernel process a correct current/root directory. */
-	vfs_node_get(vfs_root_mount->root);
-	curr_proc->ioctx.root_dir = vfs_root_mount->root;
-	vfs_node_get(vfs_root_mount->root);
-	curr_proc->ioctx.curr_dir = vfs_root_mount->root;
 }
 
 #if 0

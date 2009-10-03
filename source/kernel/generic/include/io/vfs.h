@@ -346,6 +346,7 @@ extern int vfs_mount(const char *dev, const char *path, const char *type, int fl
 extern int vfs_unmount(const char *path);
 extern int vfs_unlink(const char *path);
 
+extern void vfs_late_init(void);
 extern void vfs_init(void);
 
 #if 0

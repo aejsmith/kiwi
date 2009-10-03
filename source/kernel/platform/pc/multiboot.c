@@ -30,8 +30,9 @@
 
 #include <platform/multiboot.h>
 
+#include <args.h>
 #include <assert.h>
-#include <bootimg.h>
+#include <bootmod.h>
 #include <fatal.h>
 
 #if CONFIG_PMM_DEBUG
@@ -158,19 +159,36 @@ void __init_text multiboot_premm_init(multiboot_info_t *info) {
 
 /** Save a copy of all required Multiboot information.
  *
- * Saves a copy of all required Multiboot information such as the boot image
- * and the kernel command line. This is done because their virtual addresses
- * get unmapped by the architecture, and their current physical location is
+ * Saves a copy of all required Multiboot information such as the modules and
+ * the kernel command line. This is done because their virtual addresses get
+ * unmapped by the architecture, and their current physical location is
  * reclaimed by the PMM.
  */
 void __init_text multiboot_postmm_init(void) {
 	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
+	char *name, *tmp;
+	size_t i;
 
-	if(mb_info->mods_count == 0) {
-		fatal("No boot image provided, cannot continue");
-	} else if(mb_info->mods_count > 1) {
-		kprintf(LOG_WARN, "platform: multiple modules were loaded, assuming first is boot image\n");
+	args_init((const char *)((ptr_t)mb_info->cmdline));
+	if(mb_info->mods_count != 0) {
+		bootmod_count = mb_info->mods_count;
+		bootmod_array = kcalloc(bootmod_count, sizeof(bootmod_t), MM_FATAL);
+		for(i = 0; i < bootmod_count; i++) {
+			/* Take off any path string on the module name. */
+			if(!(name = strrchr((char *)((ptr_t)mods[i].string), '/'))) {
+				name = (char *)((ptr_t)mods[i].string);
+			} else {
+				name += 1;
+			}
+
+			bootmod_array[i].name = kstrdup(name, MM_FATAL);
+			if((tmp = strchr(bootmod_array[i].name, ' '))) {
+				*tmp = 0;
+			}
+
+			bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
+			bootmod_array[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start),
+			                                bootmod_array[i].size, MM_FATAL);
+		}
 	}
-
-	bootimg_set((void *)((ptr_t)mods[0].mod_start), mods[0].mod_end - mods[0].mod_start);
 }
