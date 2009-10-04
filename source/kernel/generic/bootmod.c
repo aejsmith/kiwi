@@ -166,7 +166,7 @@ static bool __init_text bootmod_load_tar(bootmod_t *mod) {
 		}
 
 		/* 512 for the header, plus the file size if necessary. */
-		hdr = (tar_header_t *)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
+		hdr = (tar_header_t *)(ptr_t)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
 	}
 
 	return true;
