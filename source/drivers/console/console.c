@@ -202,6 +202,7 @@ static int console_manager_request(device_t *manager, int request, void *in, siz
 
 		console = kmalloc(sizeof(console_device_t), MM_SLEEP);
 		console->id = atomic_inc(&console_next_id);
+		console->mopen = false;
 		console->input = pipe_create();
 		console->output = pipe_create();
 
