@@ -1,0 +1,46 @@
+# Kiwi build system
+# Copyright (C) 2009 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'config')
+
+# Nice little trick to make sure that architecture-specific versions of
+# functions will get used in preference to the generic versions.
+class SourceList:
+	def __init__(self):
+		self.sources = {}
+	def __add__(self, sources):
+		for s in sources:
+			base = s.name.rsplit('.', 1)[0]
+			if not self.sources.has_key(base):
+				self.sources[base] = s
+	def files(self):
+		return self.sources.values()
+
+# Get a list of source files. Architecture sources must be first because of the
+# way the above class works.
+sources = SourceList()
+SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic', 'support'], exports=['env', 'sources'])
+
+# Silence some warnings because I can't be bothered to fix them, and include
+# the configuration header because some things need an endianness definition.
+flags = env['CCFLAGS'] + [
+	'-Wno-strict-aliasing',
+	'-Wno-sign-compare',
+	'-Wno-parentheses',
+	'-Wno-uninitialized',
+	'-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
+]
+
+# Build the library from this.
+env.SharedLibrary('m', sources.files(), CCFLAGS=flags)

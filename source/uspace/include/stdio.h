@@ -25,6 +25,8 @@
 extern "C" {
 #endif
 
+#include <kernel/types.h>
+
 #define __need_size_t
 #define __need_NULL
 #include <stddef.h>
@@ -42,7 +44,6 @@ extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
 
-#if 0
 /** Type describing a file offset. */
 typedef offset_t fpos_t;
 
@@ -53,7 +54,7 @@ typedef offset_t fpos_t;
 #define _IOFBF		0		/**< Input/output fully buffered. */
 #define _IOLBF		1		/**< Input/output line buffered. */
 #define _IONBF		2		/**< Input/output unbuffered. */
-
+#if 0
 /** Minimum number of unique files from tmpnam() and friends. */
 #define TMP_MAX		10000
 
@@ -130,6 +131,25 @@ extern int vprintf(const char *fmt, va_list args);
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int vsprintf(char *buf, const char *fmt, va_list args);
 //extern int vsscanf(const char *buf, const char *fmt, va_list args);
+
+#ifdef __cplusplus
+extern int fgetpos(FILE *, fpos_t *);
+extern int fscanf(FILE *stream, const char *fmt, ...);
+extern int vfscanf(FILE *stream, const char *fmt, va_list args);
+extern int fsetpos(FILE *, const fpos_t *);
+extern void perror(const char *s);
+extern int remove(const char *path);
+extern int rename(const char *source, const char *dest);
+extern int scanf(const char *fmt, ...);
+extern int sscanf(const char *buf, const char *fmt, ...);
+extern int vscanf(const char *fmt, va_list args);
+extern int vsscanf(const char *buf, const char *fmt, va_list args);
+extern void setbuf(FILE *, char *);
+extern int setvbuf(FILE *, char *, int, size_t);
+extern FILE *tmpfile(void);
+extern char *tmpnam(char *);
+extern int ungetc(int ch, FILE *stream);
+#endif
 
 #ifdef __cplusplus
 }

@@ -83,6 +83,7 @@ sources += [
 	File('string/strstr.c'),
 	File('string/strtok.c'),
 
+	File('errno.c'),
 	File('fatal.c'),
 	File('init.c'),
 	File('rtld.c'),

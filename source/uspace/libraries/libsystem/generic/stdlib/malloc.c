@@ -10,6 +10,7 @@
 #define LACKS_FCNTL_H
 #define LACKS_ERRNO_H
 #define LACKS_UNISTD_H
+#define LACKS_STDLIB_H
 
 /* Available features */
 #define HAVE_MMAP			1

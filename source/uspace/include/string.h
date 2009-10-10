@@ -60,6 +60,12 @@ extern int strcasecmp(const char *s1, const char *s2);
 extern int strncasecmp(const char *s1, const char *s2, size_t n);
 
 #ifdef __cplusplus
+extern int strcoll(const char *, const char *);
+extern size_t strxfrm(char *, const char *, size_t);
+extern char *strerror(int);
+#endif
+
+#ifdef __cplusplus
 }
 #endif
 

@@ -37,6 +37,16 @@ extern "C" {
 
 #define MB_CUR_MAX	1
 
+/** Structure containing result from div(). */
+typedef struct {
+	int quot, rem;
+} div_t;
+
+/** Structure containing result from ldiv(). */
+typedef struct {
+	long int quot, rem;
+} ldiv_t;
+
 extern void _Exit(int status) __attribute__((noreturn));
 extern void abort(void);
 extern int abs(int j);
@@ -79,6 +89,15 @@ extern unsigned long long int strtoull(const char *cp, char **endp, int base);
 //extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *dest, const wchar_t *src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
+
+#ifdef __cplusplus
+extern double atof(const char *s);
+extern long atol(const char *s);
+extern div_t div(int numerator, int denominator);
+extern ldiv_t ldiv(long numerator, long denominator);
+extern int system(const char *command);
+extern double strtod(const char *s, char **endptr);
+#endif
 
 #ifdef __cplusplus
 }
