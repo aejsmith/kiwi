@@ -32,7 +32,9 @@ static int rtld_export_library_open(const char *path, void **handle) {
 	if(!path || !handle) {
 		return -ERR_PARAM_INVAL;
 	}
-	return rtld_image_load(path, rtld_application, ELF_ET_DYN, NULL, (rtld_image_t **)handle);
+	/* FIXME: Need to call INIT's. */
+	//return rtld_image_load(path, rtld_application, ELF_ET_DYN, NULL, (rtld_image_t **)handle);
+	return -1;
 }
 
 /** Unload a library.

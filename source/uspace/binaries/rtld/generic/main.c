@@ -37,6 +37,7 @@ rtld_image_t *rtld_application = NULL;
  * @return		Program entry point address. */
 void *rtld_main(process_args_t *args) {
 	rtld_image_t *image;
+	void (*func)(void);
 	void *entry;
 	int ret;
 
@@ -74,6 +75,17 @@ void *rtld_main(process_args_t *args) {
 	 * to actually run the program. */
 	if(rtld_dryrun) {
 		process_exit(0);
+	}
+
+	/* Call INIT functions for loaded images. */
+	LIST_FOREACH(&rtld_loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+
+		if(image->dynamic[ELF_DT_INIT]) {
+			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
+			dprintf("RTLD: Calling INIT function %p... (%s)\n", func, image->name);
+			func();
+		}
 	}
 
 	/* Return the program entry point for the startup code to call. */

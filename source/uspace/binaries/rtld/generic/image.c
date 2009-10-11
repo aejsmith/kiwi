@@ -50,7 +50,6 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	rtld_image_t *image = NULL, *exist;
 	ElfW(Addr) start, end;
 	size_t bytes, size, i;
-	void (*func)(void);
 	ElfW(Phdr) *phdrs;
 	Elf32_Word *addr;
 	const char *dep;
@@ -322,15 +321,6 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	/* We can now perform relocations. */
 	if((ret = rtld_image_relocate(image)) != 0) {
 		goto fail;
-	}
-
-	/* Run the INIT function. */
-	if(!rtld_dryrun) {
-		if(image->dynamic[ELF_DT_INIT]) {
-			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
-			dprintf("RTLD: Calling INIT function %p...\n", func);
-			func();
-		}
 	}
 
 	image->refcount = 1;
