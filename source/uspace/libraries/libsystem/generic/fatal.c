@@ -57,3 +57,9 @@ void __libsystem_fatal(const char *fmt, ...) {
 
 	process_exit(1);
 }
+
+/** Print out a fatal error for a stub function being called.
+ * @param name		Name of function. */
+void __libsystem_stub(const char *name) {
+	__libsystem_fatal("unimplemented function: %s", name);
+}

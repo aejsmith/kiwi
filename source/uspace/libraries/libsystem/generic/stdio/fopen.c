@@ -94,6 +94,7 @@ FILE *fopen(const char *path, const char *mode) {
 	stream->type = STREAM_TYPE_FILE;
 	stream->err = false;
 	stream->eof = false;
+	stream->have_pushback = false;
 	return stream;
 }
 
@@ -138,7 +139,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream) {
 	stream->handle = handle;
 	stream->err = false;
 	stream->eof = false;
-
+	stream->have_pushback = false;
 	return stream;
 }
 
@@ -163,6 +164,7 @@ FILE *fopen_handle(handle_t handle) {
 	stream->handle = handle;
 	stream->err = false;
 	stream->eof = false;
+	stream->have_pushback = false;
 	return stream;
 }
 
@@ -182,6 +184,7 @@ FILE *fopen_device(const char *path) {
 	stream->type = STREAM_TYPE_DEVICE;
 	stream->err = false;
 	stream->eof = false;
+	stream->have_pushback = false;
 	return stream;
 }
 
@@ -197,5 +200,6 @@ FILE *fopen_kconsole(void) {
 	stream->type = STREAM_TYPE_KCONSOLE;
 	stream->err = false;
 	stream->eof = false;
+	stream->have_pushback = false;
 	return stream;
 }

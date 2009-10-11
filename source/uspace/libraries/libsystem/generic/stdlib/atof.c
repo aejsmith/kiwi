@@ -1,4 +1,4 @@
-/* Internal libsystem functions
+/* String to double function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,19 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		String to double function.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#include <stdlib.h>
 
-#include <kernel/process.h>
-
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
-
-extern char **environ;
-
-extern void kputch(char ch);
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+/** Convert string to double.
+ *
+ * Converts the initial part of a string to a double.
+ *
+ * @param s		String to convert.
+ *
+ * @return		Converted value.
+ */
+double atof(const char *s) {
+	return strtod(s, NULL);
+}

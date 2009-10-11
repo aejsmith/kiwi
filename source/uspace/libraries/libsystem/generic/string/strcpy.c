@@ -50,7 +50,7 @@ char *strcpy(char *dest, const char *src) {
  */
 char *strncpy(char *dest, const char *src, size_t count) {
 	size_t i;
-	
+
 	for(i = 0; i < count; i++) {
 		dest[i] = src[i];
 		if(!src[i]) {
@@ -58,4 +58,30 @@ char *strncpy(char *dest, const char *src, size_t count) {
 		}
 	}
 	return dest;
+}
+
+/** Transform a string.
+ *
+ * Transforms a string so that the result of strcmp() on the transformed string
+ * is the same as the result of strcoll() on the string.
+ *
+ * @todo		Proper implementation.
+ *
+ * @param dest		Pointer to the destination buffer.
+ * @param src		Pointer to the source buffer.
+ * @param count		Size of destination buffer in bytes.
+ * 
+ * @return		Number of bytes required in dest excluding NULL
+ *			terminator.
+ */
+size_t strxfrm(char *dest, const char *src, size_t count) {
+	size_t i;
+
+	for(i = 0; i < count; i++) {
+		dest[i] = src[i];
+		if(!src[i]) {
+			break;
+		}
+	}
+	return i;
 }

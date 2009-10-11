@@ -90,7 +90,7 @@ extern int fputc(int ch, FILE *stream);
 extern int fputs(const char *s, FILE *stream);
 extern size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
 extern FILE *freopen(const char *path, const char *mode, FILE *stream);
-//extern int fscanf(FILE *stream, const char *fmt, ...);
+extern int fscanf(FILE *stream, const char *fmt, ...);
 extern int fseek(FILE *stream, long off, int act);
 /* int fsetpos(FILE *, const fpos_t *); */
 extern long ftell(FILE *stream);
@@ -114,41 +114,34 @@ extern int puts(const char *s);
 //extern int remove(const char *path);
 //extern int rename(const char *source, const char *dest);
 extern void rewind(FILE *stream);
-//extern int scanf(const char *fmt, ...);
+extern int scanf(const char *fmt, ...);
 /* void setbuf(FILE *, char *); */
 /* int setvbuf(FILE *, char *, int, size_t); */
 extern int snprintf(char *buf, size_t size, const char *fmt, ...);
 extern int sprintf(char *buf, const char *fmt, ...);
-//extern int sscanf(const char *buf, const char *fmt, ...);
+extern int sscanf(const char *buf, const char *fmt, ...);
 /* char *tempnam(const char *, const char *); */
 /* FILE *tmpfile(void); */
 /* char *tmpnam(char *); */
-//extern int ungetc(int ch, FILE *stream);
+extern int ungetc(int ch, FILE *stream);
 extern int vfprintf(FILE *stream, const char *fmt, va_list args);
-//extern int vfscanf(FILE *stream, const char *fmt, va_list args);
+extern int vfscanf(FILE *stream, const char *fmt, va_list args);
 extern int vprintf(const char *fmt, va_list args);
-//extern int vscanf(const char *fmt, va_list args);
+extern int vscanf(const char *fmt, va_list args);
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int vsprintf(char *buf, const char *fmt, va_list args);
-//extern int vsscanf(const char *buf, const char *fmt, va_list args);
+extern int vsscanf(const char *buf, const char *fmt, va_list args);
 
 #ifdef __cplusplus
 extern int fgetpos(FILE *, fpos_t *);
-extern int fscanf(FILE *stream, const char *fmt, ...);
-extern int vfscanf(FILE *stream, const char *fmt, va_list args);
 extern int fsetpos(FILE *, const fpos_t *);
 extern void perror(const char *s);
 extern int remove(const char *path);
 extern int rename(const char *source, const char *dest);
-extern int scanf(const char *fmt, ...);
-extern int sscanf(const char *buf, const char *fmt, ...);
-extern int vscanf(const char *fmt, va_list args);
-extern int vsscanf(const char *buf, const char *fmt, va_list args);
 extern void setbuf(FILE *, char *);
 extern int setvbuf(FILE *, char *, int, size_t);
 extern FILE *tmpfile(void);
 extern char *tmpnam(char *);
-extern int ungetc(int ch, FILE *stream);
 #endif
 
 #ifdef __cplusplus

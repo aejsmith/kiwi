@@ -51,10 +51,10 @@ extern void _Exit(int status) __attribute__((noreturn));
 extern void abort(void);
 extern int abs(int j);
 extern int atexit(void (*function)(void));
-//extern double atof(const char *s);
+extern double atof(const char *s);
 extern int atoi(const char *s);
-//extern long atol(const char *s);
-//extern long long atoll(const char *s);
+extern long atol(const char *s);
+extern long long atoll(const char *s);
 extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
 extern void *calloc(size_t nmemb, size_t size);
 //extern div_t div(int numerator, int denominator);
@@ -78,7 +78,7 @@ extern int rand_r(unsigned int *seed);
 extern void *realloc(void *ptr, size_t size);
 //extern int setenv(const char *name, const char *value, int overwrite);
 extern void srand(unsigned int seed);
-//extern double strtod(const char *s, char **endptr);
+extern double strtod(const char *s, char **endptr);
 //extern float strtof(const char *s, char **endptr);
 extern long strtol(const char *cp, char **endp, int base);
 //extern long double strtold(const char *str, char **endptr);
@@ -91,12 +91,9 @@ extern unsigned long long int strtoull(const char *cp, char **endp, int base);
 //extern int wctomb(char *s, wchar_t wc);
 
 #ifdef __cplusplus
-extern double atof(const char *s);
-extern long atol(const char *s);
 extern div_t div(int numerator, int denominator);
 extern ldiv_t ldiv(long numerator, long denominator);
 extern int system(const char *command);
-extern double strtod(const char *s, char **endptr);
 #endif
 
 #ifdef __cplusplus

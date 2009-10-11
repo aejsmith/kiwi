@@ -1,4 +1,4 @@
-/* Internal libsystem functions
+/* String unformatting function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,23 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		String unformatting function.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#include "stdio_priv.h"
+#include "../libsystem.h"
 
-#include <kernel/process.h>
-
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
-
-extern char **environ;
-
-extern void kputch(char ch);
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+/** Unformat a buffer.
+ *
+ * Unformats a buffer into a list of arguments according to the given format
+ * string.
+ *
+ * @param data		Structure containing helper functions.
+ * @param fmt		Format string.
+ * @param args		Pointers to values to set to unformatted arguments.
+ *
+ * @return		Number of input items matched.
+ */
+int do_scanf(struct scanf_args *data, const char *fmt, va_list args) {
+	__libsystem_stub(__FUNCTION__);
+}

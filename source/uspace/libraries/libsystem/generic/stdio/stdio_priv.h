@@ -40,22 +40,22 @@ struct __fstream_internal {
 	handle_t handle;		/**< Handle for file/device streams. */
 	bool err;			/**< Error indicator. */
 	bool eof;			/**< End of file indicator. */
+	int pushback_ch;		/**< Character pushed back with ungetc(). */
+	bool have_pushback;		/**< Set to true if there is a pushed back character. */
 };
 
-#if 0
 /** Arguments to do_scanf. */
 struct scanf_args {
 	int (*getch)(void *);		/**< Get a character from the source file/string. */
 	int (*putch)(int, void *);	/**< Return a character to the source file/string. */
 	void *data;			/**< Data to pass to the helper functions. */
 };
-#endif
 
 /** Type for a do_printf() helper function. */
 typedef void (*printf_helper_t)(char, void *, int *);
 
 extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args);
-//extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
+extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
 
 extern int fclose_internal(FILE *stream);
 extern FILE *fopen_handle(handle_t handle);

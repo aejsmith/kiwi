@@ -1,4 +1,4 @@
-/* Internal libsystem functions
+/* Set locale function
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,27 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		Set locale function.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#include <locale.h>
+#include <string.h>
 
-#include <kernel/process.h>
-
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
-
-extern char **environ;
-
-extern void kputch(char ch);
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+/** Set the current locale.
+ *
+ * Sets the current locale for the given category to the locale corresponding
+ * to the given string.
+ *
+ * @param category	Category to set locale for.
+ * @param name		Name of locale to set.
+ *
+ * @return		Name of new locale.
+ */
+char *setlocale(int category, const char *name) {
+	if(name != NULL) {
+		if(strcmp(name, "C") && strcmp(name, "POSIX") && strcmp(name, "")) {
+			return NULL;
+		}
+	}
+	return (char *)"C";
+}

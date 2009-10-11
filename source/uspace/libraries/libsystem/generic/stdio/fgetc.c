@@ -39,10 +39,10 @@ int fgetc(FILE *stream) {
 	size_t bytes;
 	int ret;
 
-	//if(stream->have_pushback) {
-	//	stream->have_pushback = false;
-	//	return stream->pushback_ch;
-	//}
+	if(stream->have_pushback) {
+		stream->have_pushback = false;
+		return stream->pushback_ch;
+	}
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
@@ -93,7 +93,6 @@ int getchar(void) {
 	return fgetc(stdin);
 }
 
-#if 0
 /** Push a character back to a stream.
  *
  * Pushes the given character back onto the given input stream, to be read
@@ -111,4 +110,3 @@ int ungetc(int ch, FILE *stream) {
 	stream->eof = 0;
 	return ch;
 }
-#endif

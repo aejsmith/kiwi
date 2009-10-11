@@ -74,3 +74,7 @@ int strncmp(const char *s1, const char *s2, size_t count) {
 	}
 	return 0;
 }
+
+int strcoll(const char *s1, const char *s2) {
+	return strcmp(s1, s2);
+}

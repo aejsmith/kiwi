@@ -22,30 +22,116 @@
 
 #include <kernel/process.h>
 
+#include <stddef.h>
 #include <stdlib.h>
 
-extern int __cxa_atexit(void (*func)(void *), void *arg, void *dso);
+#include "../libsystem.h"
+#include "../list.h"
 
-/** Array of at-exit functions. */
-static struct {
-	enum {
-		ATEXIT_STANDARD,
-		ATEXIT_CXA,
-	} type;
+extern void *__dso_handle __attribute__((__weak__));
 
-	union {
-		struct {
-			void (*func)(void);
-		} standard;
-		struct {
-			void (*func)(void *);
-			void *arg;
-		} cxa;
-	};
-} atexit_functions[ATEXIT_MAX];
+extern int __cxa_atexit(void (*function)(void *), void *arg, void *dso);
+extern void __cxa_finalize(void *d);
 
-/** Number of at-exit functions registered. */
-static int atexit_count = 0;
+/** Structure defining an at-exit function. */
+typedef struct atexit_func {
+	list_t header;			/**< List header. */
+
+	void (*func)(void *);		/**< Function pointer. */
+	void *arg;			/**< Function argument. */
+	void *dso;			/**< DSO handle. */
+} atexit_func_t;
+
+/** Statically allocated structures. */
+static atexit_func_t __atexit_array[ATEXIT_MAX];
+static bool __atexit_inited = false;
+
+/** List of free at-exit functions. */
+static LIST_DECLARE(__atexit_free_funcs);
+static size_t __atexit_free_count = 0;
+
+/** List of registered at-exit functions. */
+static LIST_DECLARE(__atexit_funcs);
+static size_t __atexit_count = 0;
+
+/** Allocate an at-exit function structure.
+ * @return		Function structure pointer, or NULL if none free. */
+static atexit_func_t *__atexit_alloc(void) {
+	atexit_func_t *func = NULL;
+	size_t i;
+
+	if(!__atexit_inited) {
+		for(i = 0; i < ATEXIT_MAX; i++) {
+			list_init(&__atexit_array[i].header);
+			list_append(&__atexit_free_funcs, &__atexit_array[i].header);
+			__atexit_free_count++;
+		}
+
+		__atexit_inited = true;
+	}
+
+	if(__atexit_free_count) {
+		if(list_empty(&__atexit_free_funcs)) {
+			__libsystem_fatal("atexit data is corrupted");
+		}
+
+		func = list_entry(__atexit_free_funcs.next, atexit_func_t, header);
+		list_remove(&func->header);
+	}
+
+	return func;
+}
+
+/** Free an at-exit function structure.
+ * @param func		Function structure. */
+static void __atexit_free(atexit_func_t *func) {
+	list_append(&__atexit_free_funcs, &func->header);
+	__atexit_free_count++;
+}
+
+/** Register a C++ cleanup function.
+ * @param function	Function to call.
+ * @param arg		Argument.
+ * @param dso		DSO handle.
+ * @return		0 on success, -1 on failure. */
+int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
+	atexit_func_t *func;
+
+	if(!(func = __atexit_alloc())) {
+		return -1;
+	}
+
+	func->func = (void (*)(void *))function;
+	func->arg = arg;
+	func->dso = dso;
+
+	list_prepend(&__atexit_funcs, &func->header);
+	__atexit_count++;
+	return 0;
+}
+
+/** Run C++ cleanup functions.
+ * @param d		DSO handle, if NULL will call all handlers. */
+void __cxa_finalize(void *d) {
+	atexit_func_t *func;
+	size_t count;
+restart:
+	LIST_FOREACH_SAFE(&__atexit_funcs, iter) {
+		func = list_entry(iter, atexit_func_t, header);
+		count = __atexit_count;
+
+		if(!d || d == func->dso) {
+			func->func(func->arg);
+
+			if(__atexit_count != count) {
+				__atexit_free(func);
+				goto restart;
+			} else {
+				__atexit_free(func);
+			}
+		}
+	}
+}
 
 /** Define a function to run at process exit.
  *
@@ -59,31 +145,7 @@ static int atexit_count = 0;
  * @return		0 on success, -1 on failure.
  */
 int atexit(void (*function)(void)) {
-	if(atexit_count >= ATEXIT_MAX) {
-		return -1;
-	}
-
-	atexit_functions[atexit_count].type = ATEXIT_STANDARD;
-	atexit_functions[atexit_count].standard.func = function;
-	atexit_count++;
-	return 0;
-}
-
-/** Register a C++ cleanup function.
- * @param func		Function to call.
- * @param arg		Argument.
- * @param dso		DSO handle.
- * @return		0 on success, -1 on failure. */
-int __cxa_atexit(void (*func)(void *), void *arg, void *dso) {
-	if(atexit_count >= ATEXIT_MAX) {
-		return -1;
-	}
-
-	atexit_functions[atexit_count].type = ATEXIT_CXA;
-	atexit_functions[atexit_count].cxa.func = func;
-	atexit_functions[atexit_count].cxa.arg = arg;
-	atexit_count++;
-	return 0;
+	return __cxa_atexit((void (*)(void *))function, NULL, (&__dso_handle) ? __dso_handle : NULL);
 }
 
 /** Call at-exit functions and terminate execution.
@@ -96,19 +158,7 @@ int __cxa_atexit(void (*func)(void *), void *arg, void *dso) {
  * @return		Does not return.
  */
 void exit(int status) {
-	/* Run atexit functions in reverse. */
-	while(atexit_count) {
-		atexit_count--;
-		switch(atexit_functions[atexit_count].type) {
-		case ATEXIT_STANDARD:
-			atexit_functions[atexit_count].standard.func();
-			break;
-		case ATEXIT_CXA:
-			atexit_functions[atexit_count].cxa.func(atexit_functions[atexit_count].cxa.arg);
-			break;
-		}
-	}
-
+	__cxa_finalize(NULL);
 	process_exit(status);
 }
 

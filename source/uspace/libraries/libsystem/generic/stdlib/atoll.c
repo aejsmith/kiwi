@@ -1,5 +1,5 @@
-/* Internal libsystem functions
- * Copyright (C) 2009 Alex Smith
+/* String to integer functions
+ * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,26 +15,31 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		String to integer functions.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#include <stdlib.h>
 
-#include <kernel/process.h>
+/** Convert string to long long.
+ *
+ * Converts the initial part of a string to a long long.
+ *
+ * @param s		String to convert.
+ *
+ * @return		Converted value.
+ */
+long long atoll(const char *s) {
+	return strtoll(s, NULL, 10);
+}
 
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
-
-extern char **environ;
-
-extern void kputch(char ch);
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+/** Convert string to long.
+ *
+ * Converts the initial part of a string to a long.
+ *
+ * @param s		String to convert.
+ *
+ * @return		Converted value.
+ */
+long atol(const char *s) {
+	return strtol(s, NULL, 10);
+}

@@ -43,4 +43,4 @@ flags = env['CCFLAGS'] + [
 ]
 
 # Build the library from this.
-env.SharedLibrary('m', sources.files(), CCFLAGS=flags)
+env.SharedLibrary('m', sources.files(), CCFLAGS=flags, LIBS=['system'])

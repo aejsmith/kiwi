@@ -49,20 +49,18 @@ extern char *strdup(const char *s);
 extern char *strndup(const char *s, size_t n);
 extern char *strcat(char *dest, const char *src);
 extern char *strncat(char *dest, const char *src, size_t max);
-/* int strcoll(const char *, const char *); */
+extern int strcoll(const char *s1, const char *s2);
 extern size_t strcspn(const char *s, const char *reject);
 extern char *strpbrk(const char *s, const char *accept);
 extern size_t strspn(const char *s, const char *accept);
 extern char *strtok(char *str, const char *delim);
 extern char *strtok_r(char *str, const char *delim, char **saveptr);
-/* size_t strxfrm(char *, const char *, size_t); */
+extern size_t strxfrm(char *dest, const char *src, size_t count);
 extern int strcasecmp(const char *s1, const char *s2);
 extern int strncasecmp(const char *s1, const char *s2, size_t n);
+extern char *strerror(int err);
 
 #ifdef __cplusplus
-extern int strcoll(const char *, const char *);
-extern size_t strxfrm(char *, const char *, size_t);
-extern char *strerror(int);
 #endif
 
 #ifdef __cplusplus
