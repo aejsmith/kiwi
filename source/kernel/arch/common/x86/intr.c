@@ -116,6 +116,7 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 		        (frame->err_code & (1<<1)) ? "write" : "read",
 		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
 		        (frame->err_code & (1<<4)) ? " | execute" : "");
+		kdbg_enter(KDBG_ENTRY_USER, frame);
 		process_exit(255);
 	} else {
 		_fatal(frame, "Unhandled kernel-mode pagefault exception (%p)\n"
@@ -189,6 +190,7 @@ void intr_handler(unative_t num, intr_frame_t *frame) {
 			if(frame->cs & 3) {
 				kprintf(LOG_DEBUG, "arch: killing process %" PRId32 " due to exception %" PRIun "\n",
 				        curr_proc->id, num);
+				kdbg_enter(KDBG_ENTRY_USER, frame);
 				process_exit(255);
 			} else {
 				_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)",
