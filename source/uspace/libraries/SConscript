@@ -19,13 +19,13 @@ Import('env', 'config')
 # Create a link to the toolchain's linker script directory.
 if os.path.exists('ldscripts'):
 	os.remove('ldscripts')
-os.symlink('%s/%s/%s/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
+os.symlink('%s/%s/%s/toolchain-lib/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
            'ldscripts')
 
 # Build all the libraries.
 SConscript(dirs=[
-	'libkiwi',
+	'libsystem',
 	'libm',
 	'libstdc++',
-	'libsystem',
+	'libkiwi',
 ], exports=['env'])

@@ -1,6 +1,17 @@
+diff -urN gcc-4.4.1.orig/Makefile.in gcc-4.4.1/Makefile.in
+--- gcc-4.4.1.orig/Makefile.in	2009-10-12 18:45:25.298458791 +0100
++++ gcc-4.4.1/Makefile.in	2009-10-12 18:45:34.308457554 +0100
+@@ -56130,7 +56130,6 @@
+ configure-target-libobjc: maybe-configure-target-boehm-gc
+ all-target-libobjc: maybe-all-target-libiberty
+ all-target-libobjc: maybe-all-target-boehm-gc
+-all-target-libstdc++-v3: maybe-all-target-libiberty
+ configure-target-libstdc++-v3: maybe-configure-target-libgomp
+ all-target-libgloss: maybe-all-target-newlib
+ all-target-winsup: maybe-all-target-libiberty
 diff -urN gcc-4.4.1.orig/config.sub gcc-4.4.1/config.sub
---- gcc-4.4.1.orig/config.sub	2009-09-06 11:33:20.879619393 +0100
-+++ gcc-4.4.1/config.sub	2009-09-06 11:33:33.826711186 +0100
+--- gcc-4.4.1.orig/config.sub	2009-10-12 18:45:25.085541203 +0100
++++ gcc-4.4.1/config.sub	2009-10-12 18:45:34.311790366 +0100
 @@ -1276,7 +1276,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -12,7 +23,7 @@ diff -urN gcc-4.4.1.orig/config.sub gcc-4.4.1/config.sub
  	-qnx*)
 diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi32.h gcc-4.4.1/gcc/config/i386/kiwi32.h
 --- gcc-4.4.1.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/kiwi32.h	2009-09-06 11:33:33.829204648 +0100
++++ gcc-4.4.1/gcc/config/i386/kiwi32.h	2009-10-12 18:45:34.311790366 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -47,7 +58,7 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi32.h gcc-4.4.1/gcc/config/i386/kiwi
 +    %{static:-static}}"
 diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi64.h gcc-4.4.1/gcc/config/i386/kiwi64.h
 --- gcc-4.4.1.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/kiwi64.h	2009-09-06 11:33:33.832549081 +0100
++++ gcc-4.4.1/gcc/config/i386/kiwi64.h	2009-10-12 18:45:34.311790366 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -82,7 +93,7 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi64.h gcc-4.4.1/gcc/config/i386/kiwi
 +    %{static:-static}}"
 diff -urN gcc-4.4.1.orig/gcc/config/i386/t-kiwi64 gcc-4.4.1/gcc/config/i386/t-kiwi64
 --- gcc-4.4.1.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/t-kiwi64	2009-09-06 11:33:33.832549081 +0100
++++ gcc-4.4.1/gcc/config/i386/t-kiwi64	2009-10-12 18:45:34.311790366 +0100
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -103,7 +114,7 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/t-kiwi64 gcc-4.4.1/gcc/config/i386/t-ki
 +TARGET_LIBGCC2_CFLAGS = -fPIC
 diff -urN gcc-4.4.1.orig/gcc/config/kiwi.h gcc-4.4.1/gcc/config/kiwi.h
 --- gcc-4.4.1.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/kiwi.h	2009-09-06 11:36:15.719184139 +0100
++++ gcc-4.4.1/gcc/config/kiwi.h	2009-10-12 18:45:34.311790366 +0100
 @@ -0,0 +1,37 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -141,10 +152,10 @@ diff -urN gcc-4.4.1.orig/gcc/config/kiwi.h gcc-4.4.1/gcc/config/kiwi.h
 +  "%{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
 +
 +#undef  LIB_SPEC
-+#define LIB_SPEC "%{!shared:-lsystem}"
++#define LIB_SPEC "-lsystem"
 diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
---- gcc-4.4.1.orig/gcc/config.gcc	2009-09-06 11:33:21.086285196 +0100
-+++ gcc-4.4.1/gcc/config.gcc	2009-09-06 11:33:33.835912480 +0100
+--- gcc-4.4.1.orig/gcc/config.gcc	2009-10-12 18:45:25.298458791 +0100
++++ gcc-4.4.1/gcc/config.gcc	2009-10-12 18:45:34.315123510 +0100
 @@ -588,6 +588,14 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
@@ -176,8 +187,8 @@ diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
  	tm_file="${tm_file} dbxelf.h elfos.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
 diff -urN gcc-4.4.1.orig/libgcc/config.host gcc-4.4.1/libgcc/config.host
---- gcc-4.4.1.orig/libgcc/config.host	2009-09-06 11:33:21.129618099 +0100
-+++ gcc-4.4.1/libgcc/config.host	2009-09-06 11:33:33.835912480 +0100
+--- gcc-4.4.1.orig/libgcc/config.host	2009-10-12 18:45:25.388459301 +0100
++++ gcc-4.4.1/libgcc/config.host	2009-10-12 18:45:34.315123510 +0100
 @@ -275,6 +275,10 @@
  	;;
  x86_64-*-elf*)
@@ -189,3 +200,421 @@ diff -urN gcc-4.4.1.orig/libgcc/config.host gcc-4.4.1/libgcc/config.host
  i[34567]86-*-aout*)
  	;;
  i[34567]86-*-freebsd*)
+diff -urN gcc-4.4.1.orig/libstdc++-v3/config/io/basic_file_stdio.cc gcc-4.4.1/libstdc++-v3/config/io/basic_file_stdio.cc
+--- gcc-4.4.1.orig/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-12 18:45:26.975541787 +0100
++++ gcc-4.4.1/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-12 18:45:34.328476301 +0100
+@@ -27,43 +27,8 @@
+ // ISO C++ 14882: 27.8  File-based streams
+ //
+ 
++#include <kernel/fs.h>
+ #include <bits/basic_file.h>
+-#include <fcntl.h>
+-#include <errno.h>
+-
+-#ifdef _GLIBCXX_HAVE_POLL
+-#include <poll.h>
+-#endif
+-
+-// Pick up ioctl on Solaris 2.8
+-#ifdef _GLIBCXX_HAVE_UNISTD_H
+-#include <unistd.h>
+-#endif
+-
+-// Pick up FIONREAD on Solaris 2
+-#ifdef _GLIBCXX_HAVE_SYS_IOCTL_H
+-#define BSD_COMP 
+-#include <sys/ioctl.h>
+-#endif
+-
+-// Pick up FIONREAD on Solaris 2.5.
+-#ifdef _GLIBCXX_HAVE_SYS_FILIO_H
+-#include <sys/filio.h>
+-#endif
+-
+-#ifdef _GLIBCXX_HAVE_SYS_UIO_H
+-#include <sys/uio.h>
+-#endif
+-
+-#if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
+-# include <sys/stat.h>
+-# ifdef _GLIBCXX_HAVE_S_ISREG
+-#  define _GLIBCXX_ISREG(x) S_ISREG(x)
+-# else
+-#  define _GLIBCXX_ISREG(x) (((x) & S_IFMT) == S_IFREG)
+-# endif
+-#endif
+-
+ #include <limits> // For <off_t>::max() and min() and <streamsize>::max()
+ 
+ namespace 
+@@ -109,73 +74,6 @@
+       default: return 0; // invalid
+       }
+   }
+-
+-  // Wrapper handling partial write.
+-  static std::streamsize
+-  xwrite(int __fd, const char* __s, std::streamsize __n)
+-  {
+-    std::streamsize __nleft = __n;
+-
+-    for (;;)
+-      {
+-	const std::streamsize __ret = write(__fd, __s, __nleft);
+-	if (__ret == -1L && errno == EINTR)
+-	  continue;
+-	if (__ret == -1L)
+-	  break;
+-
+-	__nleft -= __ret;
+-	if (__nleft == 0)
+-	  break;
+-
+-	__s += __ret;
+-      }
+-
+-    return __n - __nleft;
+-  }
+-
+-#ifdef _GLIBCXX_HAVE_WRITEV
+-  // Wrapper handling partial writev.
+-  static std::streamsize
+-  xwritev(int __fd, const char* __s1, std::streamsize __n1,
+-	  const char* __s2, std::streamsize __n2)
+-  {
+-    std::streamsize __nleft = __n1 + __n2;
+-    std::streamsize __n1_left = __n1;
+-
+-    struct iovec __iov[2];
+-    __iov[1].iov_base = const_cast<char*>(__s2);
+-    __iov[1].iov_len = __n2;
+-
+-    for (;;)
+-      {
+-	__iov[0].iov_base = const_cast<char*>(__s1);
+-	__iov[0].iov_len = __n1_left;
+-
+-	const std::streamsize __ret = writev(__fd, __iov, 2);
+-	if (__ret == -1L && errno == EINTR)
+-	  continue;
+-	if (__ret == -1L)
+-	  break;
+-
+-	__nleft -= __ret;
+-	if (__nleft == 0)
+-	  break;
+-
+-	const std::streamsize __off = __ret - __n1_left;
+-	if (__off >= 0)
+-	  {
+-	    __nleft -= xwrite(__fd, __s2 + __off, __n2 - __off);
+-	    break;
+-	  }
+-	
+-	__s1 += __ret;
+-	__n1_left -= __ret;
+-      }
+-
+-    return __n1 + __n2 - __nleft;
+-  }
+-#endif
+ } // anonymous namespace
+ 
+ 
+@@ -195,10 +93,8 @@
+     if (!this->is_open() && __file)
+       {
+ 	int __err;
+-	errno = 0;	
+-	do
+-	  __err = this->sync();
+-	while (__err && errno == EINTR);
++
++	__err = this->sync();
+ 	if (!__err)
+ 	  {
+ 	    _M_cfile = __file;
+@@ -210,19 +106,9 @@
+   }
+   
+   __basic_file<char>*
+-  __basic_file<char>::sys_open(int __fd, ios_base::openmode __mode)
++  __basic_file<char>::sys_open(int /*__fd*/, ios_base::openmode /*__mode*/)
+   {
+-    __basic_file* __ret = NULL;
+-    const char* __c_mode = fopen_mode(__mode);
+-    if (__c_mode && !this->is_open() && (_M_cfile = fdopen(__fd, __c_mode)))
+-      {
+-	char* __buf = NULL;
+-	_M_cfile_created = true;
+-	if (__fd == 0)
+-	  setvbuf(_M_cfile, __buf, _IONBF, 0);
+-	__ret = this;
+-      }
+-    return __ret;
++    return NULL;
+   }
+   
+   __basic_file<char>* 
+@@ -252,7 +138,7 @@
+   
+   int 
+   __basic_file<char>::fd() 
+-  { return fileno(_M_cfile); }
++  { return -1; }
+   
+   __c_file*
+   __basic_file<char>::file() 
+@@ -271,10 +157,7 @@
+ 	    // for error first. However, C89/C99 (at variance with IEEE
+ 	    // 1003.1, f.i.) do not mandate that fclose must set errno
+ 	    // upon error.
+-	    errno = 0;
+-	    do
+-	      __err = fclose(_M_cfile);
+-	    while (__err && errno == EINTR);
++	    __err = fclose(_M_cfile);
+ 	  }
+ 	_M_cfile = 0;
+ 	if (!__err)
+@@ -286,45 +169,52 @@
+   streamsize 
+   __basic_file<char>::xsgetn(char* __s, streamsize __n)
+   {
+-    streamsize __ret;
+-    do
+-      __ret = read(this->fd(), __s, __n);
+-    while (__ret == -1L && errno == EINTR);
+-    return __ret;
++    streamsize __i;
++    int __ret;
++
++    for(__i = 0; __i < __n; __i++) {
++      if((__ret = fgetc(_M_cfile)) == EOF) {
++        break;
++      }
++      __s[__i] = (char)__ret;
++    }
++    return (__i == 0 && __n > 0 && ferror(_M_cfile)) ? (streamsize)-1L : __i;
+   }
+ 
+   streamsize 
+   __basic_file<char>::xsputn(const char* __s, streamsize __n)
+-  { return xwrite(this->fd(), __s, __n); }
++  {
++    streamsize __i;
++
++    for(__i = 0; __i < __n; __i++) {
++      if(fputc((int)__s[__i], _M_cfile) == EOF) {
++        break;
++      }
++    }
++    return __i;
++  }
+ 
+   streamsize 
+   __basic_file<char>::xsputn_2(const char* __s1, streamsize __n1,
+ 			       const char* __s2, streamsize __n2)
+   {
+     streamsize __ret = 0;
+-#ifdef _GLIBCXX_HAVE_WRITEV
+-    __ret = xwritev(this->fd(), __s1, __n1, __s2, __n2);
+-#else
+     if (__n1)
+-      __ret = xwrite(this->fd(), __s1, __n1);
++      __ret = xsputn(__s1, __n1);
+ 
+     if (__ret == __n1)
+-      __ret += xwrite(this->fd(), __s2, __n2);
+-#endif
++      __ret += xsputn(__s2, __n2);
++
+     return __ret;
+   }
+ 
+   streamoff
+   __basic_file<char>::seekoff(streamoff __off, ios_base::seekdir __way)
+   {
+-#ifdef _GLIBCXX_USE_LFS
+-    return lseek64(this->fd(), __off, __way);
+-#else
+-    if (__off > numeric_limits<off_t>::max()
+-	|| __off < numeric_limits<off_t>::min())
++    if (__off > numeric_limits<long>::max()
++	|| __off < numeric_limits<long>::min())
+       return -1L;
+-    return lseek(this->fd(), __off, __way);
+-#endif
++    return fseek(_M_cfile, __off, __way);
+   }
+ 
+   int 
+@@ -334,45 +224,10 @@
+   streamsize
+   __basic_file<char>::showmanyc()
+   {
+-#ifdef FIONREAD
+-    // Pipes and sockets.    
+-#ifdef _GLIBCXX_FIONREAD_TAKES_OFF_T
+-    off_t __num = 0;
+-#else
+-    int __num = 0;
+-#endif
+-    int __r = ioctl(this->fd(), FIONREAD, &__num);
+-    if (!__r && __num >= 0)
+-      return __num; 
+-#endif    
+-
+-#ifdef _GLIBCXX_HAVE_POLL
+-    // Cheap test.
+-    struct pollfd __pfd[1];
+-    __pfd[0].fd = this->fd();
+-    __pfd[0].events = POLLIN;
+-    if (poll(__pfd, 1, 0) <= 0)
+-      return 0;
+-#endif   
+-
+-#if defined(_GLIBCXX_HAVE_S_ISREG) || defined(_GLIBCXX_HAVE_S_IFREG)
+-    // Regular files.
+-#ifdef _GLIBCXX_USE_LFS
+-    struct stat64 __buffer;
+-    const int __err = fstat64(this->fd(), &__buffer);
+-    if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
+-      {
+-	const streamoff __off = __buffer.st_size - lseek64(this->fd(), 0,
+-							   ios_base::cur);
+-	return std::min(__off, streamoff(numeric_limits<streamsize>::max()));
+-      }
+-#else
+-    struct stat __buffer;
+-    const int __err = fstat(this->fd(), &__buffer);
+-    if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
+-      return __buffer.st_size - lseek(this->fd(), 0, ios_base::cur);
+-#endif
+-#endif
++    //struct stat __buffer;
++    //const int __err = fstat(this->fd(), &__buffer);
++    //if (!__err && _GLIBCXX_ISREG(__buffer.st_mode))
++    //  return __buffer.st_size - lseek(this->fd(), 0, ios_base::cur);
+     return 0;
+   }
+ 
+diff -urN gcc-4.4.1.orig/libstdc++-v3/config/os/kiwi/error_constants.h gcc-4.4.1/libstdc++-v3/config/os/kiwi/error_constants.h
+--- gcc-4.4.1.orig/libstdc++-v3/config/os/kiwi/error_constants.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.1/libstdc++-v3/config/os/kiwi/error_constants.h	2009-10-12 18:45:34.328476301 +0100
+@@ -0,0 +1,44 @@
++// Specific definitions for Kiwi platforms  -*- C++ -*-
++
++// Copyright (C) 2007, 2008, 2009 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// Under Section 7 of GPL version 3, you are granted additional
++// permissions described in the GCC Runtime Library Exception, version
++// 3.1, as published by the Free Software Foundation.
++
++// You should have received a copy of the GNU General Public License and
++// a copy of the GCC Runtime Library Exception along with this program;
++// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
++// <http://www.gnu.org/licenses/>.
++
++/** @file error_constants.h
++ *  This is an internal header file, included by other library headers.
++ *  You should not attempt to use it directly.
++ */
++
++#ifndef _GLIBCXX_ERROR_CONSTANTS
++#define _GLIBCXX_ERROR_CONSTANTS 1
++
++#include <bits/c++config.h>
++
++_GLIBCXX_BEGIN_NAMESPACE(std)
++
++  enum class errc
++    {
++      an_error = 			0
++    };
++
++_GLIBCXX_END_NAMESPACE
++
++#endif
+diff -urN gcc-4.4.1.orig/libstdc++-v3/configure.host gcc-4.4.1/libstdc++-v3/configure.host
+--- gcc-4.4.1.orig/libstdc++-v3/configure.host	2009-10-12 18:45:26.948820765 +0100
++++ gcc-4.4.1/libstdc++-v3/configure.host	2009-10-12 18:45:34.328476301 +0100
+@@ -251,6 +251,10 @@
+     atomicity_dir=os/irix
+     atomic_word_dir=os/irix
+     ;;
++  kiwi*)
++    error_constants_dir="os/kiwi"
++    os_include_dir="os/generic"
++    ;;
+   mingw32*)
+     os_include_dir="os/mingw32"
+     error_constants_dir="os/mingw32"
+diff -urN gcc-4.4.1.orig/libstdc++-v3/crossconfig.m4 gcc-4.4.1/libstdc++-v3/crossconfig.m4
+--- gcc-4.4.1.orig/libstdc++-v3/crossconfig.m4	2009-10-12 18:45:26.945540977 +0100
++++ gcc-4.4.1/libstdc++-v3/crossconfig.m4	2009-10-12 18:45:34.328476301 +0100
+@@ -131,6 +131,10 @@
+ 	;;
+     esac
+     ;;
++  *-kiwi*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES
+diff -urN gcc-4.4.1.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h gcc-4.4.1/libstdc++-v3/include/ext/stdio_sync_filebuf.h
+--- gcc-4.4.1.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-12 18:45:26.998873549 +0100
++++ gcc-4.4.1/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-12 18:45:34.328476301 +0100
+@@ -32,7 +32,7 @@
+ #pragma GCC system_header
+ 
+ #include <streambuf>
+-#include <unistd.h>
++//#include <unistd.h>
+ #include <cstdio>
+ #include <bits/c++io.h>  // For __c_file
+ 
+diff -urN gcc-4.4.1.orig/libtool.m4 gcc-4.4.1/libtool.m4
+--- gcc-4.4.1.orig/libtool.m4	2009-10-12 18:45:27.015541139 +0100
++++ gcc-4.4.1/libtool.m4	2009-10-12 18:45:34.333091049 +0100
+@@ -5276,7 +5276,9 @@
+   _LT_LINKER_SHLIBS($1)
+   _LT_SYS_DYNAMIC_LINKER($1)
+   _LT_LINKER_HARDCODE_LIBPATH($1)
+-  LT_SYS_DLOPEN_SELF
++  if test "$cross_compiling" = no; then
++    LT_SYS_DLOPEN_SELF
++  fi
+   _LT_CMD_STRIPLIB
+ 
+   # Report which library types will actually be built
+diff -urN gcc-4.4.1.orig/ltmain.sh gcc-4.4.1/ltmain.sh
+--- gcc-4.4.1.orig/ltmain.sh	2009-10-12 18:45:25.315126496 +0100
++++ gcc-4.4.1/ltmain.sh	2009-10-12 18:45:53.215120669 +0100
+@@ -1274,6 +1274,12 @@
+       removelist="$lobj $libobj ${libobj}T"
+     fi
+ 
++    case $host_os in
++    kiwi*)
++      pic_mode=yes
++      ;;
++    esac
++
+     # On Cygwin there's no "real" PIC flag so we must build both object types
+     case $host_os in
+     cygwin* | mingw* | pw32* | os2* | cegcc*)

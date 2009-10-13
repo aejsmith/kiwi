@@ -18,7 +18,6 @@ from utilities.toolchain.component import ToolchainComponent
 class BinutilsComponent(ToolchainComponent):
 	name = 'binutils'
 	version = '2.19.1'
-	depends = []
 	source = [
 		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
 	]
@@ -37,7 +36,3 @@ class BinutilsComponent(ToolchainComponent):
 		)
 		self.execute('make -j%d' % (self.manager.makejobs), 'binutils-build')
 		self.execute('make install', 'binutils-build')
-
-		# Move the ldscripts directory to the location we want it in.
-		os.rename('%s/%s/lib/ldscripts' % (self.manager.destdir, self.manager.target),
-		          '%s/%s/ldscripts' % (self.manager.destdir, self.manager.target))

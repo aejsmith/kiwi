@@ -145,9 +145,10 @@ FILE *freopen(const char *path, const char *mode, FILE *stream) {
 
 /** Create a file stream from an existing handle.
  * @param handle	Handle to open.
+ * @param stream	If not NULL, this structure will be used rather than
+ *			allocating a new one.
  * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_handle(handle_t handle) {
-	FILE *stream;
+FILE *fopen_handle(handle_t handle, FILE *stream) {
 	int type;
 
 	/* Check if the handle can be used. */
@@ -156,7 +157,7 @@ FILE *fopen_handle(handle_t handle) {
 		return NULL;
 	}
 
-	if(!(stream = malloc(sizeof(FILE)))) {
+	if(!stream && !(stream = malloc(sizeof(FILE)))) {
 		return NULL;
 	}
 
@@ -170,18 +171,21 @@ FILE *fopen_handle(handle_t handle) {
 
 /** Open a device stream.
  * @param path		Device path to open.
+ * @param stream	If not NULL, this structure will be used rather than
+ *			allocating a new one.
  * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_device(const char *path) {
-	FILE *stream;
+FILE *fopen_device(const char *path, FILE *stream) {
+	handle_t handle;
 
-	if(!(stream = malloc(sizeof(FILE)))) {
+	if((handle = device_open(path)) < 0) {
 		return NULL;
-	} else if((stream->handle = device_open(path)) < 0) {
-		free(stream);
+	} else if(!stream && !(stream = malloc(sizeof(FILE)))) {
+		handle_close(handle);
 		return NULL;
 	}
 
 	stream->type = STREAM_TYPE_DEVICE;
+	stream->handle = handle;
 	stream->err = false;
 	stream->eof = false;
 	stream->have_pushback = false;
@@ -189,11 +193,11 @@ FILE *fopen_device(const char *path) {
 }
 
 /** Open a stream to the kernel console.
+ * @param stream	If not NULL, this structure will be used rather than
+ *			allocating a new one.
  * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_kconsole(void) {
-	FILE *stream;
-
-	if(!(stream = malloc(sizeof(FILE)))) {
+FILE *fopen_kconsole(FILE *stream) {
+	if(!stream && !(stream = malloc(sizeof(FILE)))) {
 		return NULL;
 	}
 

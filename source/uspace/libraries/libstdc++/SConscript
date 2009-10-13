@@ -12,11 +12,21 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env', 'envmgr', 'config')
 
-# Get a list of source files.
-sources = []
-SConscript(dirs=['generic'], exports=['env', 'sources'])
+target = env['LIBOUTDIR'].File('libstdc++.so')
+source = File('%s/%s/%s/toolchain-lib/libstdc++.a' % (config['TOOLCHAIN_DIR'],
+                                                      config['TOOLCHAIN_TARGET'],
+                                                      config['TOOLCHAIN_TARGET']))
 
-# Build the library from this.
-env.SharedLibrary('stdc++', sources, LINKFLAGS='-nodefaultlibs', LIBS=['system', 'm'])
+# Build the shared library from the static library that GCC built.
+env.Command(target, source,
+            Action('$CC $SHLINKFLAGS -o $TARGET -Wl,--whole-archive $SOURCE -Wl,--no-whole-archive -lm',
+                   '$SHLINKCOMSTR'))
+
+# Depend on libm and libsystem.
+Depends(target, env['LIBOUTDIR'].File('libm.so'))
+Depends(target, env['LIBOUTDIR'].File('libsystem.so'))
+
+# Add the library to the libraries array.
+envmgr['dist']['LIBRARIES'].append(target)

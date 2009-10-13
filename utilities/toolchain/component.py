@@ -21,7 +21,6 @@ from time import time
 class ToolchainComponent:
 	def __init__(self, manager):
 		self.manager = manager
-		self.changed = False
 		self.srcdir = os.path.join(os.getcwd(), 'utilities', 'toolchain', self.name)
 		self.dldir = self.manager.parentdir
 
@@ -61,9 +60,11 @@ class ToolchainComponent:
 	# Helper function to execute a command and throw an exception if
 	# required status not returned.
 	def execute(self, cmd, directory='.', expected=0):
+		print "+ %s" % (cmd)
 		oldcwd = os.getcwd()
 		os.chdir(directory)
 		if os.system(cmd) != expected:
+			os.chdir(oldcwd)
 			raise Exception, 'Command did not return expected value'
 		os.chdir(oldcwd)
 
@@ -85,7 +86,7 @@ class ToolchainComponent:
 		end = time()
 		self.manager.totaltime += (end - start)
 
-		# Signify that we've updated this.
+		# Signal that we've updated this.
 		self.changed = True
 		f = open(os.path.join(self.manager.destdir, '.%s-%s-installed' % (self.name, self.version)), 'w')
 		f.write('')

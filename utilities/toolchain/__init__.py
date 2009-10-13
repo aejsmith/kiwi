@@ -12,8 +12,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
+import os, sys, shutil
 
 from utilities.toolchain.binutils import BinutilsComponent
 from utilities.toolchain.gcc import GCCComponent
@@ -41,23 +40,14 @@ class ToolchainManager:
 	def msg(self, msg):
 		print '\033[0;32m>>>\033[0;1m %s\033[0m' % (msg)
 
-	# Check whether any dependencies of a component have changed.
-	def checkdeps(self, c):
-		for d in c.depends:
-			for c in self.components:
-				if c.name == d and c.changed:
-					return True
-		return False
-
 	# Repairs any links within the toolchain directory.
 	def repair(self):
 		# Remove existing stuff.
-		self.remove('%s/%s/include' % (self.destdir, self.target))
+		self.remove('%s/%s/sys-include' % (self.destdir, self.target))
 		self.remove('%s/%s/lib' % (self.destdir, self.target))
 
 		# Link into the source tree.
-		os.symlink('%s/build/%s-%s/source/uspace/include' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
-		           '%s/%s/include' % (self.destdir, self.target))
+		os.symlink('%s/source/uspace/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
 		os.symlink('%s/build/%s-%s/source/uspace/libraries' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
 		           '%s/%s/lib' % (self.destdir, self.target))
 
@@ -71,12 +61,7 @@ class ToolchainManager:
 		if os.path.islink(path) or os.path.isfile(path):
 			os.remove(path)
 		elif os.path.isdir(path):
-			for root, dirs, files in os.walk(path, topdown=False):
-				for name in files:
-					os.remove(os.path.join(root, name))
-				for name in dirs:
-					os.rmdir(os.path.join(root, name))
-			os.rmdir(path)
+			shutil.rmtree(path)
 		else:
 			raise Exception, "Unhandled type during remove (%s)" % (path)
 
@@ -98,31 +83,41 @@ class ToolchainManager:
 	# Check if an update is required.
 	def check(self):
 		for c in self.components:
-			if self.checkdeps(c) or c.check():
-				return 1
-		self.repair()
-		return 0
+			if c.check():
+				return True
 
-	# Rebuilds any components of the toolchain that are out of date.
-	def update(self, target, source, env):
-		# Remove any existing build directory and create the target
-		# directory if required. Also remove symlinks while building
-		# as it interferes with build.
+		# Nothing needs to be built, check links and clean up.
 		self.remove(self.builddir)
-		if not os.path.exists(self.destdir):
-			os.makedirs(self.destdir)
-		else:
-			self.remove('%s/%s/include' % (self.destdir, self.target))
-			self.remove('%s/%s/lib' % (self.destdir, self.target))
+		self.repair()
+		return False
+
+	# Rebuilds the toolchain if required.
+	def update(self, target, source, env):
+		if not self.check():
+			return 0
+
+		# Remove existing installation.
+		self.remove(self.destdir)
+
+		# Create new destination directory, and set up the include link
+		# into the source tree.
+		os.makedirs('%s/%s' % (self.destdir, self.target))
+		os.symlink('%s/source/uspace/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
 
 		# Build necessary components.
 		try:
 			for c in self.components:
-				if self.checkdeps(c) or c.check():
-					self.build(c)
+				self.build(c)
 		except Exception, e:
 			self.msg('Exception during toolchain build: \033[0;0m%s' % (str(e)))
-		else:
-			self.repair()
-			if self.totaltime != 0:
-				self.msg('Toolchain updated in %d seconds' % (self.totaltime))
+			return 1
+
+		# Move the directory containing built libraries and linker
+		# scripts to where the build system expects them.
+		os.rename('%s/%s/lib' % (self.destdir, self.target), '%s/%s/toolchain-lib' % (self.destdir, self.target))
+
+		# Create library directory link and clean up.
+		self.repair()
+		self.remove(self.builddir)
+		self.msg('Toolchain updated in %d seconds' % (self.totaltime))
+		return 0

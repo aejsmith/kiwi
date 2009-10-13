@@ -25,12 +25,13 @@
 #include "libsystem.h"
 #include "stdio/stdio_priv.h"
 
-void *__gxx_personality_v0 = NULL;
+/** Preallocated file structures to use for standard I/O. */
+FILE __stdin, __stdout, __stderr;
 
 /** Standard input/output streams. */
-FILE *stdin = NULL;
-FILE *stdout = NULL;
-FILE *stderr = NULL;
+FILE *stdin = &__stdin;
+FILE *stdout = &__stdout;
+FILE *stderr = &__stderr;
 
 /** Userspace application initialisation function.
  * @param args		Process arguments structure. */
@@ -42,25 +43,21 @@ void __libsystem_init(process_args_t *args) {
 
 	/* Attempt to open streams from existing handles, and open new streams
 	 * if we can't. */
-	if(!(stdin = fopen_handle(0))) {
-		if(!(stdin = fopen_device(console))) {
-			stdin = fopen_kconsole();
+	if(!fopen_handle(0, stdin)) {
+		if(!fopen_device(console, stdin)) {
+			fopen_kconsole(stdin);
 		}
 	}
-	if(!(stdout = fopen_handle(1))) {
-		if(!(stdout = fopen_device(console))) {
-			stdout = fopen_kconsole();
+	if(!fopen_handle(1, stdout)) {
+		if(!fopen_device(console, stdout)) {
+			fopen_kconsole(stdout);
 		}
 	}
-	if(!(stderr = fopen_handle(2))) {
-		if(!(stderr = fopen_device(console))) {
-			stderr = fopen_kconsole();
+	if(!fopen_handle(2, stderr)) {
+		if(!fopen_device(console, stderr)) {
+			fopen_kconsole(stderr);
 		}
 	}
-
-        if(!stdin || !stdout || !stderr) {
-                __libsystem_fatal("Could not open stdio streams");
-        }
 
 	exit(main(args->args_count, args->args, args->env));
 }
