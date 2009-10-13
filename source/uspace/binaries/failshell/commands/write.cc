@@ -22,11 +22,14 @@
 #include <kernel/fs.h>
 #include <kernel/handle.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** Write command. */
 class WriteCommand : Shell::Command {
@@ -45,7 +48,7 @@ public:
 		int ret, i;
 
 		if(SHELL_HELP(argc, argv) || argc < 4) {
-			printf("Usage: %s <file> <offset> <word1> [<word2>...]\n", argv[0]);
+			cout << "Usage: " << argv[0] << " <file> <offset> <word1> [<word2>...]" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 
@@ -56,11 +59,11 @@ public:
 				if((ret = fs_file_create(argv[1])) == 0) {
 					handle = fs_file_open(argv[1], FS_FILE_WRITE);
 				} else {
-					printf("Create failed (%d)\n", ret);
+					cout << "Create failed (" << ret << ")" << endl;
 				}
 			}
 			if(handle < 0) {
-				printf("Open failed (%d)\n", handle);
+				cout << "Open failed (" << handle << ")" << endl;
 				return handle;
 			}
 		}
@@ -73,10 +76,10 @@ public:
 				strcat(buf, " ");
 			}
 			if((ret = fs_file_write(handle, buf, strlen(buf), off, &bytes)) != 0) {
-				printf("Write failed (%d)\n", ret);
+				cout << "Write failed (" << ret << ")" << endl;
 				return ret;
 			} else if(bytes != strlen(buf)) {
-				printf("Didn't write all data (%zu)\n", bytes);
+				cout << "Didn't write all data (" << bytes << ")" << endl;
 				return -ERR_DEVICE_ERROR;
 			}
 

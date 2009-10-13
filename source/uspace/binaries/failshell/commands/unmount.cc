@@ -21,9 +21,11 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 
-#include <stdio.h>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** Unmount command. */
 class UnmountCommand : Shell::Command {
@@ -36,7 +38,7 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
 		if(SHELL_HELP(argc, argv) || argc != 2) {
-			printf("Usage: %s <path>\n", argv[0]);
+			cout << "Usage: " << argv[0] << " <path>" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 

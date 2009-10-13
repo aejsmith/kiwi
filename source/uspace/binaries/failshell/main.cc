@@ -18,22 +18,20 @@
  * @brief		Kiwi shell.
  */
 
-#include <kernel/handle.h>
-#include <kernel/process.h>
-
 #include <kiwi/Process.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <string>
 
 #include "failshell.h"
 
 using namespace kiwi;
+using namespace std;
 
-/** Array of shell commands. */
-Shell::Command **Shell::m_commands = NULL;
-size_t Shell::m_command_count = 0;
+/** Map of shell commands. */
+map<string, Shell::Command *> Shell::m_commands;
 
 /** Help command. */
 class HelpCommand : Shell::Command {
@@ -48,28 +46,28 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(Shell *shell, int argc, char **argv) {
 		const char *nargs[] = { NULL, "--help", NULL };
-		size_t i;
+		map<string, Shell::Command *>::iterator it;
 
 		/* If we want a specific command, call it with --help as an
 		 * argument. */
 		if(argc > 1 && !SHELL_HELP(argc, argv)) {
 			nargs[0] = argv[1];
-			for(i = 0; i < Shell::m_command_count; i++) {
-				if(strcmp(argv[1], Shell::m_commands[i]->Name()) == 0) {
-					(*Shell::m_commands[i])(shell, 2, const_cast<char **>(nargs));
-					return 0;
-				}
+
+			it = Shell::m_commands.find(argv[1]);
+			if(it != Shell::m_commands.end()) {
+				(*it->second)(shell, 2, const_cast<char **>(nargs));
+				return 0;
 			}
 
-			printf("Requested help on invalid command '%s'\n", argv[1]);
+			cout << "Requested help on invalid command '" << argv[1] << "'" << endl;
 			return 1;
 		}
 
-		printf("Command       Info\n");
-		printf("=======       ====\n");
+		cout << "Command       Info" << endl;
+		cout << "=======       ====" << endl;
 
-		for(i = 0; i < Shell::m_command_count; i++) {
-			printf("%-12s  %s\n", Shell::m_commands[i]->Name(), Shell::m_commands[i]->Description());
+		for(it = Shell::m_commands.begin(); it != Shell::m_commands.end(); it++) {
+			printf("%-12s  %s\n", it->second->Name(), it->second->Description());
 		}
 
 		return 0;
@@ -92,7 +90,7 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(Shell *shell, int argc, char **argv) {
 		if(SHELL_HELP(argc, argv)) {
-			printf("Usage: %s\n", argv[0]);
+			cout << "Usage: " << argv[0] << endl;
 			return 0;
 		}
 
@@ -107,13 +105,7 @@ static ExitCommand exit_command;
 /** Add a command to the shell.
  * @param cmd		Command to add. */
 void Shell::AddCommand(Command *cmd) {
-	m_commands = reinterpret_cast<Command **>(realloc(m_commands, (m_command_count + 1) * sizeof(Command *)));
-	if(m_commands == NULL) {
-		printf("Could not add commands!");
-		::exit(1);
-	}
-
-	m_commands[m_command_count++] = cmd;
+	m_commands.insert(pair<string, Command *>(cmd->Name(), cmd));
 }
 
 /** Main loop for the shell.
@@ -132,10 +124,10 @@ int Shell::Run(void) {
 
 		/* Split the string up. */
 		if(!SplitLine(line, argc, argv)) {
-			printf("Out of memory\n");
+			cout << "Out of memory" << endl;
 			return 1;
 		} else if(!argc) {
-			printf("You must enter a command!\n");
+			cout << "You must enter a command!" << endl;
 			continue;
 		}
 
@@ -213,22 +205,21 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
  * @param argc		Argument count.
  * @param argv		Argument array. */
 void Shell::RunCommand(int argc, char **argv) {
-	size_t i;
+	map<string, Command *>::iterator it;
 	int ret;
 
 	/* Try to match it against a built-in command. */
-	for(i = 0; i < m_command_count; i++) {
-		if(strcmp(argv[0], m_commands[i]->Name()) == 0) {
-			if((ret = (*m_commands[i])(this, argc, argv)) != 0) {
-				printf("Command returned error status %d\n", ret);
-			}
-			return;
+	it = Shell::m_commands.find(argv[0]);
+	if(it != Shell::m_commands.end()) {
+		if((ret = (*it->second)(this, argc, argv)) != 0) {
+			cout << "Command returned error status " << ret << endl;
 		}
+		return;
 	}
 
 	Process proc(argv);
 	if(!proc.Initialised(&ret)) {
-		printf("Failed to run command '%s' (%d)\n", argv[0], ret);
+		cout << "Failed to run command '" << argv[0] << "' (" << ret << ")" << endl;
 	}
 	proc.WaitTerminate();
 }
@@ -240,7 +231,7 @@ void Shell::RunCommand(int argc, char **argv) {
 int main(int argc, char **argv) {
 	Shell shell(stdin);
 
-	printf("\n");
-	printf("Welcome to FailShell! (process %d)\n", Process::GetCurrentID());
+	cout << endl;
+	cout << "Welcome to FailShell! (process " << Process::GetCurrentID() << ")" << endl;
 	return shell.Run();
 }

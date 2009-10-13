@@ -23,8 +23,9 @@
 
 #include <kernel/types.h>
 
-#include <stdio.h>
-#include <string.h>
+#include <cstring>
+#include <map>
+#include <string>
 
 /** Shell class. */
 class Shell {
@@ -36,7 +37,8 @@ public:
 		 * @param name		Command name.
 		 * @param description	Command description. */
 		Command(const char *name, const char *description) :
-				m_name(name), m_description(description) {
+			m_name(name), m_description(description)
+		{
 			Shell::AddCommand(this);
 		}
 
@@ -98,10 +100,9 @@ private:
 	FILE *m_input;			/**< Input stream. */
 	bool m_exit;			/**< Whether to exit the shell after the current command. */
 
-	static Command **m_commands;	/**< Array of commands. */
-	static size_t m_command_count;	/**< Number of commands. */
-
-	friend class HelpCommand;
+	/** List of commands. */
+	static std::map<std::string, Command *> m_commands;
+friend class HelpCommand;
 };
 
 /** Helper macro to check if a help message is wanted. */

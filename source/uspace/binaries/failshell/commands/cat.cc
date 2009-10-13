@@ -22,9 +22,11 @@
 #include <kernel/fs.h>
 #include <kernel/handle.h>
 
-#include <stdio.h>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** File concatenation command. */
 class CatCommand : Shell::Command {
@@ -42,32 +44,32 @@ public:
 		char ch;
 
 		if(SHELL_HELP(argc, argv) || argc < 2) {
-			printf("Usage: %s <file1> [<file2> ...]\n", argv[0]);
+			cout << "Usage: " << argv[0] << " <file1> [<file2> ...]" << endl;
 			if(argc < 2) {
-				printf("             _______ \n");
-				printf("            (_Meow!_)\n");
-				printf("              | /    \n");
-				printf("          /|_ |/     \n");
-				printf("        ,'  .\\     \n");
-				printf("    ,--'    _,'     \n");
-				printf("   /       /        \n");
-				printf("  (   -.  |         \n");
-				printf("  |     ) |         \n");
-				printf(" (`-.  `--.)        \n");
-				printf("  `._)----'         \n\n");
+				cout << "             _______ " << endl;
+				cout << "            (_Meow!_)" << endl;
+				cout << "              | /    " << endl;
+				cout << "          /|_ |/     " << endl;
+				cout << "        ,'  .\\     " << endl;
+				cout << "    ,--'    _,'     " << endl;
+				cout << "   /       /        " << endl;
+				cout << "  (   -.  |         " << endl;
+				cout << "  |     ) |         " << endl;
+				cout << " (`-.  `--.)        " << endl;
+				cout << "  `._)----'         " << endl << endl;
 			}
 			return -ERR_PARAM_INVAL;
 		}
 
 		for(i = 1; i < argc; i++) {
 			if((handle = fs_file_open(argv[i], FS_FILE_READ)) < 0) {
-				printf("Failed to open %s (%d)\n", argv[i], handle);
+				cout << "Failed to open " << argv[i] << " (" << handle << ")" << endl;
 				return handle;
 			}
 
 			while(true) {
 				if((ret = fs_file_read(handle, &ch, 1, -1, &bytes)) != 0) {
-					printf("Failed to read %s (%d)\n", argv[i], ret);
+					cout << "Failed to read " << argv[i] << " (" << ret << ")" << endl;
 					handle_close(handle);
 					return ret;
 				} else if(bytes == 0) {

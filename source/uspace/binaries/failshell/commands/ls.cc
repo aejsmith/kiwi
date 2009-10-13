@@ -22,10 +22,12 @@
 #include <kernel/fs.h>
 #include <kernel/handle.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** Directory list command. */
 class LSCommand : Shell::Command {
@@ -45,16 +47,16 @@ public:
 		int ret;
 
 		if(SHELL_HELP(argc, argv) || (argc != 1 && argc != 2)) {
-			printf("Usage: %s [<directory>]\n", argv[0]);
+			cout << "Usage: " << argv[0] << " [<directory>]" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 
 		dir = (argc == 2) ? argv[1] : ".";
 		if((handle = fs_dir_open(dir, 0)) < 0) {
-			printf("Failed to open directory (%d)\n", handle);
+			cout << "Failed to open directory (" << handle << ")" << endl;
 			return handle;
 		} else if(!(entry = reinterpret_cast<fs_dir_entry_t *>(malloc(4096)))) {
-			printf("Failed to allocate directory entry\n");
+			cout << "Failed to allocate directory entry" << endl;
 			return -ERR_NO_MEMORY;
 		}
 
@@ -67,7 +69,7 @@ public:
 				free(entry);
 
 				if(ret != -ERR_NOT_FOUND) {
-					printf("Failed to read directory entry (%d)\n", ret);
+					cout << "Failed to read directory (" << ret << ")" << endl;
 					return ret;
 				}
 				return 0;
@@ -79,7 +81,7 @@ public:
 
 			/* Get information. */
 			if((ret = fs_info(path, false, &info)) != 0) {
-				printf("Failed to get entry information (%d)\n", ret);
+				cout << "Failed to get entry information (" << ret << ")" << endl;
 				handle_close(handle);
 				free(entry);
 				return ret;

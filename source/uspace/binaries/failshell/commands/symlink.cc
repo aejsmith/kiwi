@@ -21,9 +21,11 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 
-#include <stdio.h>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** Create symlink command. */
 class SymlinkCommand : Shell::Command {
@@ -36,7 +38,7 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
 		if(SHELL_HELP(argc, argv) || argc != 3) {
-			printf("Usage: %s <target> <name>\n", argv[0]);
+			cout << "Usage: " << argv[0] << " <target> <name>" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 

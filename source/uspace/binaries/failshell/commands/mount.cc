@@ -21,9 +21,11 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 
-#include <stdio.h>
+#include <iostream>
 
 #include "../failshell.h"
+
+using namespace std;
 
 /** Mount command. */
 class MountCommand : Shell::Command {
@@ -39,7 +41,7 @@ public:
 		int flags = 0;
 
 		if(SHELL_HELP(argc, argv) || (argc != 4 && argc != 5)) {
-			printf("Usage: %s [--rdonly] <dev> <path> <type>\n", argv[0]);
+			cout << "Usage: " << argv[0] << " [--rdonly] <dev> <path> <type>" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 
@@ -47,7 +49,7 @@ public:
 			if(strcmp(argv[1], "--rdonly") == 0) {
 				flags |= FS_MOUNT_RDONLY;
 			} else {
-				printf("Unknown option '%s'\n", argv[1]);
+				cout << "Unknown option '" << argv[1] << "'" << endl;
 				return -ERR_PARAM_INVAL;
 			}
 
