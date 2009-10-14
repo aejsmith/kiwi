@@ -129,6 +129,9 @@ static void thread_reaper(void *arg1, void *arg2) {
 		kheap_free(thread->kstack, KSTACK_SIZE);
 		context_destroy(&thread->context);
 		thread_arch_destroy(thread);
+		if(thread->fpu) {
+			fpu_context_destroy(thread->fpu);
+		}
 
 		/* Deallocate the thread ID. */
 		vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
@@ -355,12 +358,13 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	/* Allocate an ID for the thread. */
 	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
-	atomic_set(&thread->in_usermem, 0);
-	refcount_set(&thread->count, 1);
-
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
+
+	atomic_set(&thread->in_usermem, 0);
+	refcount_set(&thread->count, 1);
+	thread->fpu = NULL;
 	thread->wire_count = 0;
 	thread->killed = false;
 	thread->flags = flags;

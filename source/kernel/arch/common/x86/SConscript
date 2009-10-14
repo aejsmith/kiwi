@@ -38,6 +38,7 @@ env['OBJFILES'] += [
 	File('ap_boot.o'),
 
 	env.Object('cpu.c'),
+	env.Object('fpu.c'),
 	env.Object('intr.c'),
 	env.Object('kdbg.c'),
 	env.Object('lapic.c'),

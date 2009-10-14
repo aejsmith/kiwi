@@ -1,4 +1,4 @@
-/* Kiwi x86 FPU functions
+/* Kiwi FPU context functions
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,18 +15,23 @@
 
 /**
  * @file
- * @brief		x86 FPU functions.
+ * @brief		FPU context functions.
  */
 
-#ifndef __ARCH_X86_FPU_H
-#define __ARCH_X86_FPU_H
+#ifndef __CPU_FPU_H
+#define __CPU_FPU_H
 
-/** FPU context structure alignment. */
-#define FPU_CONTEXT_ALIGN	16
+#include <arch/fpu.h>
 
-/** Structure containing an x86 FPU context. */
-typedef struct fpu_context {
-	char data[512];
-} fpu_context_t;
+extern void fpu_context_save(fpu_context_t *ctx);
+extern void fpu_context_restore(fpu_context_t *ctx);
+extern void fpu_context_destroy(fpu_context_t *ctx);
 
-#endif /* __ARCH_X86_FPU_H */
+extern void fpu_request(void);
+
+extern bool fpu_state(void);
+extern void fpu_enable(void);
+extern void fpu_disable(void);
+extern void fpu_init(void);
+
+#endif /* __CPU_FPU_H */

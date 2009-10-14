@@ -454,6 +454,15 @@ void sched_internal(bool state) {
 		 * the kernel address space. */
 		vm_aspace_switch(curr_thread->owner->aspace);
 
+		/* Save old FPU state if necessary, and disable the FPU. It
+		 * will be re-enabled if required. */
+		if(fpu_state()) {
+			assert(cpu->prev_thread->fpu);
+			fpu_context_save(cpu->prev_thread->fpu);
+		}
+		fpu_disable();
+
+		/* Switch to the new CPU context. */
 		if(context_save(&cpu->prev_thread->context) == 0) {
 			context_restore(&curr_thread->context);
 		}

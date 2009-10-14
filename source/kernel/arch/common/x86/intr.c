@@ -128,6 +128,20 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	}
 }
 
+/** Handler for device-not-available exceptions.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame.
+ * @return		Whether to reschedule. */
+static bool intr_handle_nm(unative_t num, intr_frame_t *frame) {
+	if(frame->cs & 3) {
+		fpu_request();
+		return false;
+	} else {
+		_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)",
+		       num, fault_names[num]);
+	}
+}
+
 /** Handler for double faults.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
@@ -218,6 +232,7 @@ void intr_init(void) {
 	/* Set handlers for faults that require specific handling. */
 	intr_register(FAULT_DEBUG, kdbg_int1_handler);
 	intr_register(FAULT_NMI, intr_handle_nmi);
+	intr_register(FAULT_DEVICE_NOT_AVAIL, intr_handle_nm);
 	intr_register(FAULT_DOUBLE, intr_handle_doublefault);
 	intr_register(FAULT_PAGE, intr_handle_pagefault);
 

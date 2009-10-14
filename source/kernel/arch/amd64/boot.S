@@ -138,9 +138,6 @@ __kernel_entry:
 	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
-	/* Initialise the FPU. */
-	fninit
-
 	/* Point CR3 to the boot PML4. */
 	movl	$KA2PA(__boot_pml4), %eax
 	movl	%eax, %cr3
@@ -151,10 +148,13 @@ __kernel_entry:
 	orl	$SYSREG_EFER_LME, %eax
 	wrmsr
 
-	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
-	 * Monitor Coprocessor). Paging will put us in compatibility mode. */
+	/* Set PG/WP/NE/MP/TS in CR0 (Paging Enable, Write Protect, Numeric Error,
+	 * Monitor Coprocessor, Task Switch), and clear EM (Emulation). Paging
+	 * will put us in compatibility mode. TS is set because we do not want
+	 * the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
+	andl	$~(SYSREG_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
@@ -249,9 +249,6 @@ __kernel_ap_entry:
 	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
-	/* Initialise the FPU. */
-	fninit
-
 	/* Create temporary identity mapping. */
 	movl	$KA2PA(__kernel_pdp) + (PG_PRESENT | PG_WRITE), KA2PA(__boot_pml4)
 
@@ -276,10 +273,13 @@ __kernel_ap_entry:
 	wrmsr
 2:
 #endif
-	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
-	 * Monitor Coprocessor). Paging will put us in compatibility mode. */
+	/* Set PG/WP/NE/MP/TS in CR0 (Paging Enable, Write Protect, Numeric Error,
+	 * Monitor Coprocessor, Task Switch), and clear EM (Emulation). Paging
+	 * will put us in compatibility mode. TS is set because we do not want
+	 * the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
+	andl	$~(SYSREG_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */

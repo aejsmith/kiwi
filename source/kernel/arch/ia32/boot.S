@@ -128,17 +128,16 @@ __kernel_entry:
 	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_PSE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
-	/* Initialise the FPU. */
-	fninit
-
 	/* Point CR3 to the boot PDP. */
 	movl	$KA2PA(__boot_pdp), %eax
 	movl	%eax, %cr3
 
-	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
-	 * Monitor Coprocessor). */
+	/* Set PG/WP/NE/MP/TS in CR0 (Paging Enable, Write Protect, Numeric Error,
+	 * Monitor Coprocessor, Task Switch), and clear EM (Emulation). TS is
+	 * set because we do not want the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
+	andl	$~(SYSREG_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump to the kernel virtual address. */
@@ -215,9 +214,6 @@ __kernel_ap_entry:
 	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_PSE | SYSREG_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
-	/* Initialise the FPU. */
-	fninit
-
 	/* Create temporary identity mapping. */
 	movl	$KA2PA(__ident_pdir) + PG_PRESENT, KA2PA(__boot_pdp)
 
@@ -236,10 +232,12 @@ __kernel_ap_entry:
 	wrmsr
 2:
 #endif
-	/* Set PG/WP/NE/MP in CR0 (Paging Enable, Write Protect, Numeric Error,
-	 * Monitor Coprocessor). */
+	/* Set PG/WP/NE/MP/TS in CR0 (Paging Enable, Write Protect, Numeric Error,
+	 * Monitor Coprocessor, Task Switch), and clear EM (Emulation). TS is
+	 * set because we do not want the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP), %ecx
+	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
+	andl	$~(SYSREG_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump to the kernel virtual address. */

@@ -35,6 +35,7 @@ env['OBJFILES'] += [
 	env.Object('console/kprintf.c'),
 
 	env.Object('cpu/cpu.c'),
+	env.Object('cpu/fpu.c'),
 	env.Object('cpu/irq.c'),
 	env.Object('cpu/ipi.c'),
 
