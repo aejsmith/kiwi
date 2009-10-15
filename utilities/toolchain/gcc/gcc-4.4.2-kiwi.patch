@@ -1,6 +1,6 @@
-diff -urN gcc-4.4.1.orig/Makefile.in gcc-4.4.1/Makefile.in
---- gcc-4.4.1.orig/Makefile.in	2009-10-12 18:45:25.298458791 +0100
-+++ gcc-4.4.1/Makefile.in	2009-10-12 18:45:34.308457554 +0100
+diff -urN gcc-4.4.2.orig/Makefile.in gcc-4.4.2/Makefile.in
+--- gcc-4.4.2.orig/Makefile.in	2009-10-15 18:08:18.165492012 +0100
++++ gcc-4.4.2/Makefile.in	2009-10-15 18:08:26.965461033 +0100
 @@ -56130,7 +56130,6 @@
  configure-target-libobjc: maybe-configure-target-boehm-gc
  all-target-libobjc: maybe-all-target-libiberty
@@ -9,9 +9,9 @@ diff -urN gcc-4.4.1.orig/Makefile.in gcc-4.4.1/Makefile.in
  configure-target-libstdc++-v3: maybe-configure-target-libgomp
  all-target-libgloss: maybe-all-target-newlib
  all-target-winsup: maybe-all-target-libiberty
-diff -urN gcc-4.4.1.orig/config.sub gcc-4.4.1/config.sub
---- gcc-4.4.1.orig/config.sub	2009-10-12 18:45:25.085541203 +0100
-+++ gcc-4.4.1/config.sub	2009-10-12 18:45:34.311790366 +0100
+diff -urN gcc-4.4.2.orig/config.sub gcc-4.4.2/config.sub
+--- gcc-4.4.2.orig/config.sub	2009-10-15 18:08:17.952436263 +0100
++++ gcc-4.4.2/config.sub	2009-10-15 18:08:26.965461033 +0100
 @@ -1276,7 +1276,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -21,9 +21,9 @@ diff -urN gcc-4.4.1.orig/config.sub gcc-4.4.1/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
-diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi32.h gcc-4.4.1/gcc/config/i386/kiwi32.h
---- gcc-4.4.1.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/kiwi32.h	2009-10-12 18:45:34.311790366 +0100
+diff -urN gcc-4.4.2.orig/gcc/config/i386/kiwi32.h gcc-4.4.2/gcc/config/i386/kiwi32.h
+--- gcc-4.4.2.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.2/gcc/config/i386/kiwi32.h	2009-10-15 18:08:26.968794290 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -56,9 +56,9 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi32.h gcc-4.4.1/gcc/config/i386/kiwi
 +      %{m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
 +      %{!m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
 +    %{static:-static}}"
-diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi64.h gcc-4.4.1/gcc/config/i386/kiwi64.h
---- gcc-4.4.1.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/kiwi64.h	2009-10-12 18:45:34.311790366 +0100
+diff -urN gcc-4.4.2.orig/gcc/config/i386/kiwi64.h gcc-4.4.2/gcc/config/i386/kiwi64.h
+--- gcc-4.4.2.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.2/gcc/config/i386/kiwi64.h	2009-10-15 18:08:26.968794290 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -91,9 +91,9 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/kiwi64.h gcc-4.4.1/gcc/config/i386/kiwi
 +      %{!m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
 +      %{m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
 +    %{static:-static}}"
-diff -urN gcc-4.4.1.orig/gcc/config/i386/t-kiwi64 gcc-4.4.1/gcc/config/i386/t-kiwi64
---- gcc-4.4.1.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/i386/t-kiwi64	2009-10-12 18:45:34.311790366 +0100
+diff -urN gcc-4.4.2.orig/gcc/config/i386/t-kiwi64 gcc-4.4.2/gcc/config/i386/t-kiwi64
+--- gcc-4.4.2.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.2/gcc/config/i386/t-kiwi64	2009-10-15 18:08:26.968794290 +0100
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -112,9 +112,9 @@ diff -urN gcc-4.4.1.orig/gcc/config/i386/t-kiwi64 gcc-4.4.1/gcc/config/i386/t-ki
 +
 +# Compile libgcc2.a with pic.
 +TARGET_LIBGCC2_CFLAGS = -fPIC
-diff -urN gcc-4.4.1.orig/gcc/config/kiwi.h gcc-4.4.1/gcc/config/kiwi.h
---- gcc-4.4.1.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/gcc/config/kiwi.h	2009-10-12 18:45:34.311790366 +0100
+diff -urN gcc-4.4.2.orig/gcc/config/kiwi.h gcc-4.4.2/gcc/config/kiwi.h
+--- gcc-4.4.2.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.2/gcc/config/kiwi.h	2009-10-15 18:08:26.968794290 +0100
 @@ -0,0 +1,37 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -153,9 +153,9 @@ diff -urN gcc-4.4.1.orig/gcc/config/kiwi.h gcc-4.4.1/gcc/config/kiwi.h
 +
 +#undef  LIB_SPEC
 +#define LIB_SPEC "-lsystem"
-diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
---- gcc-4.4.1.orig/gcc/config.gcc	2009-10-12 18:45:25.298458791 +0100
-+++ gcc-4.4.1/gcc/config.gcc	2009-10-12 18:45:34.315123510 +0100
+diff -urN gcc-4.4.2.orig/gcc/config.gcc gcc-4.4.2/gcc/config.gcc
+--- gcc-4.4.2.orig/gcc/config.gcc	2009-10-15 18:08:18.162158675 +0100
++++ gcc-4.4.2/gcc/config.gcc	2009-10-15 18:08:26.968794290 +0100
 @@ -588,6 +588,14 @@
    # Assume that newlib is being used and so __cxa_atexit is provided.
    default_use_cxa_atexit=yes
@@ -171,7 +171,7 @@ diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
  esac
  
  case ${target} in
-@@ -1308,6 +1316,14 @@
+@@ -1315,6 +1323,14 @@
  		tm_file="${tm_file} dbxcoff.h"
  	fi
  	;;
@@ -186,9 +186,9 @@ diff -urN gcc-4.4.1.orig/gcc/config.gcc gcc-4.4.1/gcc/config.gcc
  ia64*-*-elf*)
  	tm_file="${tm_file} dbxelf.h elfos.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
-diff -urN gcc-4.4.1.orig/libgcc/config.host gcc-4.4.1/libgcc/config.host
---- gcc-4.4.1.orig/libgcc/config.host	2009-10-12 18:45:25.388459301 +0100
-+++ gcc-4.4.1/libgcc/config.host	2009-10-12 18:45:34.315123510 +0100
+diff -urN gcc-4.4.2.orig/libgcc/config.host gcc-4.4.2/libgcc/config.host
+--- gcc-4.4.2.orig/libgcc/config.host	2009-10-15 18:08:18.205880421 +0100
++++ gcc-4.4.2/libgcc/config.host	2009-10-15 18:08:26.968794290 +0100
 @@ -275,6 +275,10 @@
  	;;
  x86_64-*-elf*)
@@ -200,9 +200,9 @@ diff -urN gcc-4.4.1.orig/libgcc/config.host gcc-4.4.1/libgcc/config.host
  i[34567]86-*-aout*)
  	;;
  i[34567]86-*-freebsd*)
-diff -urN gcc-4.4.1.orig/libstdc++-v3/config/io/basic_file_stdio.cc gcc-4.4.1/libstdc++-v3/config/io/basic_file_stdio.cc
---- gcc-4.4.1.orig/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-12 18:45:26.975541787 +0100
-+++ gcc-4.4.1/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-12 18:45:34.328476301 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/config/io/basic_file_stdio.cc gcc-4.4.2/libstdc++-v3/config/io/basic_file_stdio.cc
+--- gcc-4.4.2.orig/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-15 18:08:18.479211889 +0100
++++ gcc-4.4.2/libstdc++-v3/config/io/basic_file_stdio.cc	2009-10-15 18:08:26.968794290 +0100
 @@ -27,43 +27,8 @@
  // ISO C++ 14882: 27.8  File-based streams
  //
@@ -500,9 +500,9 @@ diff -urN gcc-4.4.1.orig/libstdc++-v3/config/io/basic_file_stdio.cc gcc-4.4.1/li
      return 0;
    }
  
-diff -urN gcc-4.4.1.orig/libstdc++-v3/config/os/kiwi/error_constants.h gcc-4.4.1/libstdc++-v3/config/os/kiwi/error_constants.h
---- gcc-4.4.1.orig/libstdc++-v3/config/os/kiwi/error_constants.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.4.1/libstdc++-v3/config/os/kiwi/error_constants.h	2009-10-12 18:45:34.328476301 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/config/os/kiwi/error_constants.h gcc-4.4.2/libstdc++-v3/config/os/kiwi/error_constants.h
+--- gcc-4.4.2.orig/libstdc++-v3/config/os/kiwi/error_constants.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.4.2/libstdc++-v3/config/os/kiwi/error_constants.h	2009-10-15 18:08:26.968794290 +0100
 @@ -0,0 +1,44 @@
 +// Specific definitions for Kiwi platforms  -*- C++ -*-
 +
@@ -548,9 +548,9 @@ diff -urN gcc-4.4.1.orig/libstdc++-v3/config/os/kiwi/error_constants.h gcc-4.4.1
 +_GLIBCXX_END_NAMESPACE
 +
 +#endif
-diff -urN gcc-4.4.1.orig/libstdc++-v3/configure.host gcc-4.4.1/libstdc++-v3/configure.host
---- gcc-4.4.1.orig/libstdc++-v3/configure.host	2009-10-12 18:45:26.948820765 +0100
-+++ gcc-4.4.1/libstdc++-v3/configure.host	2009-10-12 18:45:34.328476301 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/configure.host gcc-4.4.2/libstdc++-v3/configure.host
+--- gcc-4.4.2.orig/libstdc++-v3/configure.host	2009-10-15 18:08:18.449212271 +0100
++++ gcc-4.4.2/libstdc++-v3/configure.host	2009-10-15 18:08:26.968794290 +0100
 @@ -251,6 +251,10 @@
      atomicity_dir=os/irix
      atomic_word_dir=os/irix
@@ -562,9 +562,9 @@ diff -urN gcc-4.4.1.orig/libstdc++-v3/configure.host gcc-4.4.1/libstdc++-v3/conf
    mingw32*)
      os_include_dir="os/mingw32"
      error_constants_dir="os/mingw32"
-diff -urN gcc-4.4.1.orig/libstdc++-v3/crossconfig.m4 gcc-4.4.1/libstdc++-v3/crossconfig.m4
---- gcc-4.4.1.orig/libstdc++-v3/crossconfig.m4	2009-10-12 18:45:26.945540977 +0100
-+++ gcc-4.4.1/libstdc++-v3/crossconfig.m4	2009-10-12 18:45:34.328476301 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/crossconfig.m4 gcc-4.4.2/libstdc++-v3/crossconfig.m4
+--- gcc-4.4.2.orig/libstdc++-v3/crossconfig.m4	2009-10-15 18:08:18.449212271 +0100
++++ gcc-4.4.2/libstdc++-v3/crossconfig.m4	2009-10-15 18:08:26.968794290 +0100
 @@ -131,6 +131,10 @@
  	;;
      esac
@@ -576,9 +576,9 @@ diff -urN gcc-4.4.1.orig/libstdc++-v3/crossconfig.m4 gcc-4.4.1/libstdc++-v3/cros
    *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu)
      GLIBCXX_CHECK_COMPILER_FEATURES
      GLIBCXX_CHECK_LINKER_FEATURES
-diff -urN gcc-4.4.1.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h gcc-4.4.1/libstdc++-v3/include/ext/stdio_sync_filebuf.h
---- gcc-4.4.1.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-12 18:45:26.998873549 +0100
-+++ gcc-4.4.1/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-12 18:45:34.328476301 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h gcc-4.4.2/libstdc++-v3/include/ext/stdio_sync_filebuf.h
+--- gcc-4.4.2.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-15 18:08:18.505878532 +0100
++++ gcc-4.4.2/libstdc++-v3/include/ext/stdio_sync_filebuf.h	2009-10-15 18:08:26.968794290 +0100
 @@ -32,7 +32,7 @@
  #pragma GCC system_header
  
@@ -588,9 +588,9 @@ diff -urN gcc-4.4.1.orig/libstdc++-v3/include/ext/stdio_sync_filebuf.h gcc-4.4.1
  #include <cstdio>
  #include <bits/c++io.h>  // For __c_file
  
-diff -urN gcc-4.4.1.orig/libtool.m4 gcc-4.4.1/libtool.m4
---- gcc-4.4.1.orig/libtool.m4	2009-10-12 18:45:27.015541139 +0100
-+++ gcc-4.4.1/libtool.m4	2009-10-12 18:45:34.333091049 +0100
+diff -urN gcc-4.4.2.orig/libtool.m4 gcc-4.4.2/libtool.m4
+--- gcc-4.4.2.orig/libtool.m4	2009-10-15 18:08:18.532546632 +0100
++++ gcc-4.4.2/libtool.m4	2009-10-15 18:08:26.972137162 +0100
 @@ -5276,7 +5276,9 @@
    _LT_LINKER_SHLIBS($1)
    _LT_SYS_DYNAMIC_LINKER($1)
@@ -602,9 +602,9 @@ diff -urN gcc-4.4.1.orig/libtool.m4 gcc-4.4.1/libtool.m4
    _LT_CMD_STRIPLIB
  
    # Report which library types will actually be built
-diff -urN gcc-4.4.1.orig/ltmain.sh gcc-4.4.1/ltmain.sh
---- gcc-4.4.1.orig/ltmain.sh	2009-10-12 18:45:25.315126496 +0100
-+++ gcc-4.4.1/ltmain.sh	2009-10-12 18:45:53.215120669 +0100
+diff -urN gcc-4.4.2.orig/ltmain.sh gcc-4.4.2/ltmain.sh
+--- gcc-4.4.2.orig/ltmain.sh	2009-10-15 18:08:18.178815392 +0100
++++ gcc-4.4.2/ltmain.sh	2009-10-15 18:08:26.975052541 +0100
 @@ -1274,6 +1274,12 @@
        removelist="$lobj $libobj ${libobj}T"
      fi

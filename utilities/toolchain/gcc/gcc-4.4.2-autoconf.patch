@@ -1,6 +1,6 @@
-diff -urN gcc-4.4.1.orig/libstdc++-v3/configure gcc-4.4.1/libstdc++-v3/configure
---- gcc-4.4.1.orig/libstdc++-v3/configure	2009-10-12 18:01:04.978745720 +0100
-+++ gcc-4.4.1/libstdc++-v3/configure	2009-10-12 18:01:23.398883119 +0100
+diff -urN gcc-4.4.2.orig/libstdc++-v3/configure gcc-4.4.2/libstdc++-v3/configure
+--- gcc-4.4.2.orig/libstdc++-v3/configure	2009-10-15 18:09:48.226288042 +0100
++++ gcc-4.4.2/libstdc++-v3/configure	2009-10-15 18:11:43.715856673 +0100
 @@ -10602,7 +10602,8 @@
  
  
