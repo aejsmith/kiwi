@@ -18,7 +18,7 @@ dist = envmgr['dist']
 
 # Set up the userspace build environment.
 env = envmgr.Create('uspace')
-env['CPPPATH'] = [Dir('include'), Dir('include/c++')]
+env['CPPPATH'] = [Dir('include')]
 env['LIBPATH'] = [Dir('libraries')]
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
