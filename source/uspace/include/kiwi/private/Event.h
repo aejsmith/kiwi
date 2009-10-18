@@ -1,4 +1,4 @@
-/* Kiwi handle class
+/* Kiwi event class private data
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,32 +15,25 @@
 
 /**
  * @file
- * @brief		Handle class.
+ * @brief		Event class private data.
  */
 
-#ifndef __KIWI_HANDLE_H
-#define __KIWI_HANDLE_H
+#ifndef __KIWI_PRIVATE_EVENT_H
+#define __KIWI_PRIVATE_EVENT_H
 
-#include <kernel/types.h>
+#include <kiwi/private/Object.h>
+#include <kiwi/Event.h>
 
-#include <kiwi/Object.h>
+#include <list>
 
 namespace kiwi {
 
-/** Base class for all objects represented by a handle. */
-class Handle : public Object {
-	KIWI_OBJECT_NONCOPYABLE(Handle);
-public:
-	~Handle();
-
-	int Wait(int event, timeout_t timeout = -1) const;
-	handle_t GetHandle(void) const;
-protected:
-	Handle();
-
-	handle_t m_handle;		/**< Handle ID. */
+/** EventFunctorList class private data. */
+class EventFunctorList::Private {
+	KIWI_OBJECT_PUBLIC(EventFunctorList);
+	std::list<EventFunctor *> m_list;
 };
 
 }
 
-#endif /* __KIWI_HANDLE_H */
+#endif /* __KIWI_PRIVATE_EVENT_H */

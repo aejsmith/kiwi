@@ -45,6 +45,6 @@ private:
 	int m_init_status;		/**< Initialisation status. */
 };
 
-};
+}
 
 #endif /* __KIWI_PROCESS_H */

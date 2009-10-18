@@ -1,4 +1,4 @@
-/* Kiwi API internal definitions
+/* Kiwi API object base class
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,26 +15,27 @@
 
 /**
  * @file
- * @brief		Kiwi API internal definitions.
+ * @brief		API object base class.
  */
 
-#ifndef __KIWI_INTERNAL_H
-#define __KIWI_INTERNAL_H
+#include <kiwi/private/Object.h>
 
-namespace kiwi {
-namespace internal {
+using namespace std;
+using namespace kiwi;
 
-/** Base class that prevents copying of derived classes. */
-class Noncopyable {
-protected:
-	Noncopyable() {}
-	~Noncopyable() {}
-private:
-	Noncopyable(const Noncopyable &);
-	const Noncopyable &operator =(const Noncopyable &);
-};
+/** Destructor for Object::Private. */
+Object::Private::~Private() {}
 
-};
-};
+/** Constructor for Object.
+ * @note		Protected - Object cannot be instantiated directly. */
+Object::Object() : m_private(new Object::Private) {}
 
-#endif /* __KIWI_INTERNAL_H */
+/** Constructor for Object.
+ * @note		Protected - Object cannot be instantiated directly.
+ * @param p		Private data pointer. */
+Object::Object(Private *p) : m_private(p) {}
+
+/** Destructor for Object. */
+Object::~Object() {
+	delete m_private;
+}

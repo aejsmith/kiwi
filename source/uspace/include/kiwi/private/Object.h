@@ -1,4 +1,4 @@
-/* Kiwi handle class
+/* Kiwi Object class private data
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,32 +15,30 @@
 
 /**
  * @file
- * @brief		Handle class.
+ * @brief		Object class private data.
  */
 
-#ifndef __KIWI_HANDLE_H
-#define __KIWI_HANDLE_H
-
-#include <kernel/types.h>
+#ifndef __KIWI_PRIVATE_OBJECT_H
+#define __KIWI_PRIVATE_OBJECT_H
 
 #include <kiwi/Object.h>
 
+/** Define things to allow public classes to access their private class.
+ * @note		This should be placed at the start of a private class
+ *			definition.
+ * @param c		Public class name. */
+#define KIWI_OBJECT_PUBLIC(c)	\
+	friend class c;
+
 namespace kiwi {
 
-/** Base class for all objects represented by a handle. */
-class Handle : public Object {
-	KIWI_OBJECT_NONCOPYABLE(Handle);
-public:
-	~Handle();
-
-	int Wait(int event, timeout_t timeout = -1) const;
-	handle_t GetHandle(void) const;
+/** Object class private data. */
+class Object::Private {
+	KIWI_OBJECT_PUBLIC(Object);
 protected:
-	Handle();
-
-	handle_t m_handle;		/**< Handle ID. */
+	virtual ~Private();
 };
 
 }
 
-#endif /* __KIWI_HANDLE_H */
+#endif /* __KIWI_PRIVATE_OBJECT_H */
