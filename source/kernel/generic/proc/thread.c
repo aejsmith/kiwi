@@ -453,6 +453,40 @@ static inline void thread_dump(thread_t *thread, int level) {
 	        thread->owner->id, thread->name);
 }
 
+/** Kill a thread.
+ *
+ * Kills a thread.
+ *
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ *
+ * @return		KDBG_OK on success, KDBG_FAIL on failure.
+ */
+int kdbg_cmd_kill(int argc, char **argv) {
+	thread_t *thread;
+	unative_t tid;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Kills a currently running thread. The thread will die after KDBG exits.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	} else if(!(thread = thread_lookup(tid))) {
+		kprintf(LOG_NONE, "Invalid thread ID.\n");
+		return KDBG_FAIL;
+	}
+
+	thread_kill(thread);
+	return KDBG_OK;
+}
+
 /** Dump a list of threads.
  *
  * Dumps out a list of threads.
