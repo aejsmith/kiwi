@@ -167,20 +167,24 @@ void *krealloc(void *addr, size_t size, int kmflag) {
  * Frees a block of memory previously allocated with kmalloc(), kcalloc() or
  * krealloc().
  *
- * @param addr		Address to free.
+ * @param addr		Address to free. If NULL, nothing is done.
  */
 void kfree(void *addr) {
-	alloc_btag_t *btag = (alloc_btag_t *)(addr - sizeof(alloc_btag_t));
+	alloc_btag_t *btag;
 
-	/* If the cache pointer is not set, assume the allocation came from
-	 * the heap. */
-	if(btag->cache == NULL) {
-		kheap_free(btag, ROUND_UP(btag->size + sizeof(alloc_btag_t), PAGE_SIZE));
-		return;
+	if(addr) {
+		btag = (alloc_btag_t *)(addr - sizeof(alloc_btag_t));
+
+		/* If the cache pointer is not set, assume the allocation came
+		 * directly from the heap. */
+		if(btag->cache == NULL) {
+			kheap_free(btag, ROUND_UP(btag->size + sizeof(alloc_btag_t), PAGE_SIZE));
+			return;
+		}
+
+		/* Free to the cache it came from. */
+		slab_cache_free(btag->cache, btag);
 	}
-
-	/* Free to the cache it came from. */
-	slab_cache_free(btag->cache, btag);
 }
 
 /** Initialise the allocator caches. */

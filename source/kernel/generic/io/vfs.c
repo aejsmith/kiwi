@@ -3229,8 +3229,108 @@ int sys_fs_unmount(const char *path) {
 	return ret;
 }
 
+/** Get the path to the current working directory.
+ *
+ * Gets the path to the current working directory and stores it in a buffer.
+ *
+ * @param buf		Buffer to store in.
+ * @param size		Size of buffer.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
 int sys_fs_getcwd(char *buf, size_t size) {
-	return -ERR_NOT_IMPLEMENTED;
+	char *kbuf = NULL, *tmp, path[3];
+	vfs_dir_entry_t *entry;
+	vfs_node_t *node;
+	identifier_t id;
+	size_t len = 0;
+	int ret;
+
+	if(!buf || !size) {
+		return -ERR_PARAM_INVAL;
+	}
+
+	/* Get the working directory. */
+	node = curr_proc->ioctx.curr_dir;
+	mutex_lock(&node->lock, 0);
+	vfs_node_get(node);
+
+	/* Loop through until we reach the root. */
+	while(node != curr_proc->ioctx.root_dir) {
+		/* Save the current node's ID. Use the mountpoint ID if this is
+		 * the root of the mount. */
+		id = (node == node->mount->root) ? node->mount->mountpoint->id : node->id;
+
+		/* Get the parent of the node. */
+		strcpy(path, "..");
+		if((ret = vfs_node_lookup_internal(path, node, false, 0, &node)) != 0) {
+			kfree(kbuf);
+			return ret;
+		} else if(node->type != VFS_NODE_DIR) {
+			dprintf("vfs: node %p(%" PRId32 ") should be a directory but it isn't!\n",
+			        node, node->mount->id);
+			mutex_unlock(&node->lock);
+			vfs_node_release(node);
+			kfree(kbuf);
+			return -ERR_TYPE_INVAL;
+		}
+
+		/* Now try to find the old node in this directory. */
+		if((ret = vfs_dir_cache_entries(node)) != 0) {
+			mutex_unlock(&node->lock);
+			vfs_node_release(node);
+			kfree(kbuf);
+			return ret;
+		}
+		entry = NULL;
+		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
+			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+			if(entry->id == id) {
+				break;
+			} else {
+				entry = NULL;
+			}
+		}
+		if(!entry) {
+			/* Directory has probably been unlinked. */
+			mutex_unlock(&node->lock);
+			vfs_node_release(node);
+			kfree(kbuf);
+			return -ERR_NOT_FOUND;
+		}
+
+		/* Add the entry name on to the beginning of the path. */
+		len += ((kbuf) ? strlen(entry->name) + 1 : strlen(entry->name));
+		tmp = kmalloc(len + 1, MM_SLEEP);
+		strcpy(tmp, entry->name);
+		if(kbuf) {
+			strcat(tmp, "/");
+			strcat(tmp, kbuf);
+			kfree(kbuf);
+		}
+		kbuf = tmp;
+	}
+
+	mutex_unlock(&node->lock);
+	vfs_node_release(node);
+
+	/* Prepend a '/'. */
+	tmp = kmalloc((++len) + 1, MM_SLEEP);
+	strcpy(tmp, "/");
+	if(kbuf) {
+		strcat(tmp, kbuf);
+		kfree(kbuf);
+	}
+	kbuf = tmp;
+
+	kprintf(LOG_DEBUG, "Final is '%s', %zu %zu\n", kbuf, len, strlen(kbuf));
+	if(len >= size) {
+		ret = -ERR_BUF_TOO_SMALL;
+	} else {
+		ret = memcpy_to_user(buf, kbuf, len + 1);
+	}
+	kfree(kbuf);
+	return 0;
 }
 
 /** Set the current working directory.

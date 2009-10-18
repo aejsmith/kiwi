@@ -18,6 +18,8 @@
  * @brief		Kiwi shell.
  */
 
+#include <kernel/fs.h>
+
 #include <kiwi/Process.h>
 
 #include <cstdio>
@@ -111,14 +113,17 @@ void Shell::AddCommand(Command *cmd) {
 /** Main loop for the shell.
  * @return		Process exit code. */
 int Shell::Run(void) {
-	char **argv, *line;
+	char **argv, *line, cwd[4096];
 	int argc;
 
 	while(true) {
-		/* Print a prompt and read in the line. */
-		printf("Kiwi> ");
+		if(fs_getcwd(cwd, 4096) == 0) {
+			cout << "Kiwi:" << cwd << "> ";
+		} else {
+			cout << "Kiwi> ";
+		}
 		if(!(line = ReadLine())) {
-			printf("\nOut of memory\n");
+			cout << endl << "Out of memory" << endl;
 			return 1;
 		}
 
