@@ -3323,7 +3323,6 @@ int sys_fs_getcwd(char *buf, size_t size) {
 	}
 	kbuf = tmp;
 
-	kprintf(LOG_DEBUG, "Final is '%s', %zu %zu\n", kbuf, len, strlen(kbuf));
 	if(len >= size) {
 		ret = -ERR_BUF_TOO_SMALL;
 	} else {
