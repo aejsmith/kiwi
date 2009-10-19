@@ -79,7 +79,7 @@ static inline unsigned char *radix_tree_key_concat(unsigned char *key1, unsigned
  * @param key2		Second key.
  * @return		Pointer to duplicated key. */
 static inline unsigned char *radix_tree_key_common(unsigned char *key1, unsigned char *key2) {
-	size_t i;
+	size_t i = 0;
 
 	while(key1[i] == key2[i]) {
 		i++;
