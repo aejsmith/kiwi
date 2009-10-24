@@ -3160,6 +3160,7 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 
 	vfs_node_release(node);
 	kfree(kpath);
+	kfree(kbuf);
 	return ret;
 }
 
