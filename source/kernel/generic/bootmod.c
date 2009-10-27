@@ -74,7 +74,7 @@ typedef struct tar_header {
 #define CONTTYPE	'7'	/**< Contiguous file. */
 
 /** Array of boot-time modules provided by architecture/platform code. */
-bootmod_t *bootmod_array __init_data = NULL;
+bootmod_t bootmod_array[BOOTMOD_MAX] __init_data;
 size_t bootmod_count __init_data = 0;
 
 /** Whether a RamFS has been mounted for the root. */
@@ -234,8 +234,6 @@ void __init_text bootmod_load(void) {
 
 	/* Free up all the modules. */
 	for(i = 0; i < bootmod_count; i++) {
-		kfree(bootmod_array[i].name);
 		kfree(bootmod_array[i].addr);
 	}
-	kfree(bootmod_array);
 }

@@ -23,15 +23,19 @@
 
 #include <types.h>
 
+/** Maximum number of boot modules. */
+#define BOOTMOD_MAX		32
+#define BOOTMOD_NAME_MAX	64
+
 /** Structure describing a module loaded by the bootloader. */
 typedef struct bootmod {
-	char *name;		/**< Name of module. */
-	void *addr;		/**< Address of module. */
-	size_t size;		/**< Size of module. */
-	bool loaded;		/**< Whether the module has been loaded. */
+	char name[BOOTMOD_NAME_MAX + 1];	/**< Name of module. */
+	void *addr;				/**< Address of module. */
+	size_t size;				/**< Size of module. */
+	bool loaded;				/**< Whether the module has been loaded. */
 } bootmod_t;
 
-extern bootmod_t *bootmod_array;
+extern bootmod_t bootmod_array[BOOTMOD_MAX];
 extern size_t bootmod_count;
 
 extern void bootmod_load(void);

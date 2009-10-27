@@ -49,8 +49,13 @@
 
 extern char __init_start[], __init_end[], __end[];
 
-/** Pointer to Multiboot information structure. */
-static multiboot_info_t *mb_info;
+/** Maximum number of Multiboot modules. */
+#define MULTIBOOT_MODS_MAX	32
+#define MULTIBOOT_CMDLINE_MAX	512
+
+/** Saved Multiboot information. */
+static multiboot_info_t mb_info __init_data;
+static char mb_cmdline[MULTIBOOT_CMDLINE_MAX + 1] __init_data;
 
 /** Populate the PMM with memory regions.
  *
@@ -62,8 +67,8 @@ static multiboot_info_t *mb_info;
  *			size supported by the processor.
  */
 void __init_text page_platform_init(void) {
-	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
-	multiboot_memmap_t *map = (multiboot_memmap_t *)((ptr_t)mb_info->mmap_addr);
+	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info.mods_addr);
+	multiboot_memmap_t *map = (multiboot_memmap_t *)((ptr_t)mb_info.mmap_addr);
 	phys_ptr_t start, end;
 	size_t i;
 
@@ -78,7 +83,7 @@ void __init_text page_platform_init(void) {
 	 * identity mapping (unless the bootloader decides to stick the
 	 * memory map ridiculously high up in memory. Smile and wave, boys,
 	 * smile and wave...). */
-	while(map < (multiboot_memmap_t *)((ptr_t)mb_info->mmap_addr + mb_info->mmap_length)) {
+	while(map < (multiboot_memmap_t *)((ptr_t)mb_info.mmap_addr + mb_info.mmap_length)) {
 		if(map->length == 0) {
 			/* Ignore zero-length entries. */
 			goto cont;
@@ -133,7 +138,7 @@ void __init_text page_platform_init(void) {
 	/* Mark all the Multiboot modules as reclaimable. Start addresses
 	 * should be page-aligned because we specify we want that to be the
 	 * case in the Multiboot header. */
-	for(i = 0; i < mb_info->mods_count; i++) {
+	for(i = 0; i < mb_info.mods_count; i++) {
 		assert(!(mods[i].mod_start % PAGE_SIZE));
 
 		page_range_mark_reclaimable(mods[i].mod_start, ROUND_UP(mods[i].mod_end, PAGE_SIZE));
@@ -148,13 +153,54 @@ void __init_text page_platform_init(void) {
  * @param info		Multiboot information pointer.
  */
 void __init_text multiboot_premm_init(multiboot_info_t *info) {
+	multiboot_module_t *mods;
+	char *name, *tmp;
+	size_t i;
+
 	/* Check for required Multiboot flags. */
 	CHECK_MB_FLAG(info, MB_FLAG_MEMINFO);
 	CHECK_MB_FLAG(info, MB_FLAG_MMAP);
 	CHECK_MB_FLAG(info, MB_FLAG_CMDLINE);
 
-	/* Store a pointer to the structure for later use. */
-	mb_info = info;
+	/* Store Multiboot information for later use. We must save copies of
+	 * them because we do not know where the information is in memory, and
+	 * therefore it is difficult to ensure that we do not overwrite it. */
+	memcpy(&mb_info, info, sizeof(multiboot_info_t));
+	if(strlen((const char *)((ptr_t)mb_info.cmdline)) > MULTIBOOT_CMDLINE_MAX) {
+		fatal("Kernel command line is too long");
+	}
+	strcpy(mb_cmdline, (const char *)((ptr_t)mb_info.cmdline));
+	if(mb_info.mods_count > 0) {
+		if((bootmod_count = mb_info.mods_count) > BOOTMOD_MAX) {
+			fatal("Too many boot modules");
+		}
+
+		mods = (multiboot_module_t *)((ptr_t)mb_info.mods_addr);
+		for(i = 0; i < bootmod_count; i++) {
+			/* Take off any path string on the module name. */
+			if(!(name = strrchr((char *)((ptr_t)mods[i].string), '/'))) {
+				name = (char *)((ptr_t)mods[i].string);
+			} else {
+				name += 1;
+			}
+
+			/* Only want the name part. */
+			if((tmp = strchr(name, ' '))) {
+				*tmp = 0;
+			}
+
+			if(strlen(name) > BOOTMOD_NAME_MAX) {
+				fatal("Boot module name is too long");
+			}
+
+			/* Save the address of the module data for now, which
+			 * we will duplicate later. The module data is marked
+			 * as reclaimable so we do not have to copy it now. */
+			strcpy(bootmod_array[i].name, name);
+			bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
+			bootmod_array[i].addr = (void *)((ptr_t)mods[i].mod_start);
+		}
+	}
 }
 
 /** Save a copy of all required Multiboot information.
@@ -165,30 +211,13 @@ void __init_text multiboot_premm_init(multiboot_info_t *info) {
  * reclaimed by the PMM.
  */
 void __init_text multiboot_postmm_init(void) {
-	multiboot_module_t *mods = (multiboot_module_t *)((ptr_t)mb_info->mods_addr);
-	char *name, *tmp;
 	size_t i;
 
-	args_init((const char *)((ptr_t)mb_info->cmdline));
-	if(mb_info->mods_count != 0) {
-		bootmod_count = mb_info->mods_count;
-		bootmod_array = kcalloc(bootmod_count, sizeof(bootmod_t), MM_FATAL);
+	args_init(mb_cmdline);
+	if(bootmod_count != 0) {
 		for(i = 0; i < bootmod_count; i++) {
-			/* Take off any path string on the module name. */
-			if(!(name = strrchr((char *)((ptr_t)mods[i].string), '/'))) {
-				name = (char *)((ptr_t)mods[i].string);
-			} else {
-				name += 1;
-			}
-
-			bootmod_array[i].name = kstrdup(name, MM_FATAL);
-			if((tmp = strchr(bootmod_array[i].name, ' '))) {
-				*tmp = 0;
-			}
-
-			bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
-			bootmod_array[i].addr = kmemdup((void *)((ptr_t)mods[i].mod_start),
-			                                bootmod_array[i].size, MM_FATAL);
+			bootmod_array[i].addr = kmemdup(bootmod_array[i].addr, bootmod_array[i].size,
+			                                MM_FATAL);
 		}
 	}
 }
