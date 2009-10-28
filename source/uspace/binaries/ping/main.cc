@@ -22,39 +22,54 @@
 #include <kernel/ipc.h>
 #include <kernel/process.h>
 
+#include <kiwi/Process.h>
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+using namespace kiwi;
 
 extern char **environ;
 
 int main(int argc, char **argv) {
-	char buf[12];
-	char *args[] = { (char *)"/system/binaries/pong", buf, NULL };
-	identifier_t id = process_id(-1);
-	handle_t handle;
 	uint32_t val = 0, data, type;
+	handle_t port, conn;
+	char buf[12];
 	size_t size;
 	int ret;
 
-	sprintf(buf, "%d", id);
-	if((handle = process_create(args[0], args, environ, 0)) < 0) {
-		return handle;
+	if((port = ipc_port_create()) < 0) {
+		return port;
 	}
-	printf("Ping: Spawned pong (handle: %d, process: %d)\n", handle, process_id(handle));
-	handle_close(handle);
+	printf("Ping: Created port %d (handle: %d)\n", ipc_port_id(port), port);
 
-	if((handle = ipc_connection_listen(-1, &id)) < 0) {
-		return handle;
+	if((ret = ipc_port_acl_add(port, IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_OPEN | IPC_PORT_RIGHT_MODIFY)) != 0) {
+		return ret;
 	}
-	printf("Ping: Received connection from process %d (handle: %d)\n", id, handle);
+
+	sprintf(buf, "%d", ipc_port_id(port));
+	setenv("PORT", buf, 1);
+	{
+		Process proc("pong");
+		if(!proc.Initialised(&ret)) {
+			return ret;
+		}
+		printf("Ping: Spawned pong (process: %d)\n", proc.GetID());
+	}
+
+	if((conn = ipc_port_listen(port, -1)) < 0) {
+		return conn;
+	}
+	printf("Ping: Received connection on port %d (handle: %d)\n", ipc_port_id(port), conn);
 
 	while(true) {
-		if((ret = ipc_message_send(handle, 1, &val, sizeof(uint32_t))) != 0) {
+		if((ret = ipc_message_send(conn, 1, &val, sizeof(uint32_t))) != 0) {
 			return ret;
 		}
 		val++;
 
-		if((ret = ipc_message_receive(handle, -1, &type, &data, &size)) != 0) {
+		if((ret = ipc_message_receive(conn, -1, &type, &data, &size)) != 0) {
 			return ret;
 		}
 

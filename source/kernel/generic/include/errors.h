@@ -35,7 +35,7 @@
 #define ERR_TYPE_INVAL		11	/**< Object type is invalid. */
 #define ERR_READ_ONLY		12	/**< Object cannot be modified. */
 #define ERR_ADDR_INVAL		13	/**< A bad memory location was specified. */
-#define ERR_NO_HANDLES		14	/**< Handle table is full. */
+#define ERR_RESOURCE_UNAVAIL	14	/**< Resource is temporarily unavailable. */
 #define ERR_IN_USE		15	/**< Object is in use. */
 #define ERR_NO_SPACE		16	/**< No space is available. */
 #define ERR_PERM_DENIED		17	/**< Permission denied. */

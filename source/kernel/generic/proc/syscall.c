@@ -109,10 +109,15 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_thread_open,
 	(syscall_handler_t)sys_thread_id,
 	(syscall_handler_t)sys_thread_exit,
+	(syscall_handler_t)sys_ipc_port_create,
+	(syscall_handler_t)sys_ipc_port_open,
+	(syscall_handler_t)sys_ipc_port_id,
+	(syscall_handler_t)sys_ipc_port_listen,
+	(syscall_handler_t)sys_ipc_port_acl_add,
+	(syscall_handler_t)sys_ipc_port_acl_remove,
 	(syscall_handler_t)sys_ipc_connection_open,
-	(syscall_handler_t)sys_ipc_connection_listen,
 	(syscall_handler_t)sys_ipc_message_send,
-	(syscall_handler_t)sys_ipc_message_send_vector,
+	(syscall_handler_t)sys_ipc_message_sendv,
 	(syscall_handler_t)sys_ipc_message_receive,
 };
 

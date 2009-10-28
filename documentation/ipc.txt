@@ -14,27 +14,45 @@ Introduction
 The purpose of this document is to explain how the IPC system used in Kiwi
 works.
 
-There are 2 main concepts within the IPC system:
+There are 3 main concepts within the IPC system:
+
+ * _Port_
+
+   A port represents a point of connection to a service.
 
  * _Connection_
 
-   A connection is a bi-directional communication channel between two
-   processes.
+   A connection is a bi-directional communication channel across a port.
 
  * _Message_
 
    A message is the data transferred through a connection.
 
+Ports
+-----
+
+A port is an object which allows a service to be connected to. When a port is
+created, it is assigned a global, unique integer ID, which can be used to refer
+to it. Its creator is also given a handle to the port. A port has an access
+control list, which specifies which processes, users, etc. can access it, and
+what they can do with it. Initially, the port's ACL gives full access to the
+process that created it. Ports must be operated on through a handle to the
+port, rather than operating on the port ID. There are two reasons for this.
+Firstly, it allows ports to be cleaned up easily: just delete them when no more
+handles are open to them. Secondly, it allows them to be waited on using the
+handle waiting interface.
+
 Connections
 -----------
 
-A process creates a connection by calling `ipc_connection_open` with the ID of
-the process it wishes to connect to. The call will block either until the
-specified timeout passes, or until the process accepts the connection. This
-means that attempting to connect to a process that is not accepting connections
-will just block. When a connection is established, the processes are given a
-handle referring to their end of the connection, which can be used to send
-and receive messages.
+A process opens a connection by calling `ipc_connection_open` with the ID of
+the port it wishes to connect to. This call first checks if the port's ACL
+allows the caller to connect to it, and if it does, will block until either
+until the specified timeout passes, or until the connection is accepted. When a
+connection is established, the processes on each end of the connection are
+given a handle referring to their end of the connection, which can be used to
+send and receive messages. A connection is automatically terminated if the port
+that it is on is deleted.
 
 Messages
 --------
@@ -55,43 +73,75 @@ API
 The following section describes the system call API for the IPC system. All
 functions and types are defined in the header file `kernel/ipc.h`.
 
-### Connections
+### Ports
 
-The following functions are provided for connecting to services.
+    handle_t ipc_port_create(void);
+
+The `ipc_port_create` function creates a new IPC port and returns a handle to
+it. The port's ACL is initially set up to give full access to the calling
+process.
+
+When the port is no longer needed, the handle to it should be closed with
+`handle_close`. The port will be deleted when there are no more handles that
+refer to it. Any connections that are open on the port will be terminated if
+this happens.
+
+    handle_t ipc_port_open(identifier_t id);
+
+The `ipc_port_open` function opens a handle to an IPC port. The caller must
+have the right to open it.
+
+    identifier_t ipc_port_id(handle_t handle);
+
+The `ipc_port_id` function returns the global ID of the port referred to by
+the given handle.
+
+    handle_t ipc_port_listen(handle_t handle, timeout_t timeout);
+
+The `ipc_port_listen` function listens for a connection on a port. The
+function will block until either a connection is made to the port, or until
+the timeout expires, in which case it will return an error. The timeout is
+specified in microseconds. If the timeout is specified as -1, the function will
+block indefinitely until a connection is made to the port. The function returns
+a handle referring to caller's end of the connection.
+
+    int ipc_port_acl_add(handle_t handle, ipc_port_accessor_t type,
+                         identifier_t id, uint32_t rights);
+
+The `ipc_port_acl_add` function adds an entry to a port's ACL. The caller must
+have the right to modify the port's ACL. The `type` parameter specifies the
+type of accessor to add - possible types are `IPC_PORT_ACCESSOR_PROCESS` and
+`IPC_PORT_ACCESSOR_ALL`, which add access to a process and to everything
+respectively. `IPC_PORT_ACCESSOR_USER` will be added once multiple users are
+supported. Note that if the process an ACL entry refers to terminates, the
+entry will be removed. The `rights` argument is a bitmap of rights to give the
+specified accessor.
+
+    int ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type,
+                            identifier_t id, uint32_t rights);
+
+The `ipc_port_acl_remove` function removes rights from the specified accessor
+in a port's ACL. The caller must have the right to modify the port's ACL.
+
+### Connections
 
     handle_t ipc_connection_open(identifier_t id, timeout_t timeout);
 
-The `ipc_connection_open` function opens a connection to a process. Upon
+The `ipc_connection_open` function opens a connection to a port. Upon
 success, this function returns a handle referring to the caller's end of the
-connection. The function will block until either the connection is accepted,
-or until the timeout expires, in which case it will return an error. The
-timeout is specified in microseconds. If the timeout is specified as -1,
-the function will block indefinitely until the connection can be made.
+connection. If the caller does not have the right to connect, an error will be
+returned immediately. Otherwise, the function will block until either the
+connection is accepted, or until the timeout expires, in which case it will
+return an error. The timeout is specified in microseconds. If the timeout is
+specified as -1, the function will block indefinitely until the connection can
+be made.
 
 When the connection is no longer required, the handle should be closed with
 `handle_close`. Doing so will discard all messages queued on the caller's end
 of the connection, and attempts to send messages by the other end of the
 connection after the connection has been closed will return an error.
 
-    handle_t ipc_connection_listen(timeout_t timeout, identifier_t *pidp);
-
-The `ipc_connection_listen` function waits for a connection to be made to the
-calling process. The `timeout` argument for this function behaves the same as
-for `ipc_connection_open`. Upon success, a handle referring to the caller's end
-of the connection will be returned, and the ID of the process that made the
-connection will be placed in `pidp`.
-
 ### Messages
-
-The following types are defined related to messages.
-
-    typedef struct ipc_message_vector {
-    	uint32_t type;
-    	void *buf;
-    	size_t size;
-    } ipc_message_vector_t;
-
-The following functions are provided to send and receive messages.
 
     int ipc_message_send(handle_t handle, uint32_t type, void *buf,
                          size_t size);
@@ -99,6 +149,12 @@ The following functions are provided to send and receive messages.
 The `ipc_message_send` function asynchronously sends a message through a
 connection, and queues it at the other end. If the remote message queue is
 full, then the caller will block until space is available.
+
+    typedef struct ipc_message_vector {
+    	uint32_t type;
+    	void *buf;
+    	size_t size;
+    } ipc_message_vector_t;
 
     int ipc_message_send_vector(handle_t handle, ipc_message_vector_t *vec,
                                 size_t count);
@@ -115,10 +171,10 @@ messages.
                             void *buf, size_t *size);
 
 The `ipc_message_receive` function attempts to receive a message from a
-connection. The function will block until either a message is available to
-receive, or until the timeout expires, in which case it will return an error.
-The timeout is specified in microseconds. If the timeout is specified as -1,
-the function will block indefinitely until a message is received.
+connection. The function will block until either a message is available
+to receive, or until the timeout expires, in which case it will return an
+error. The timeout is specified in microseconds. If the timeout is specified
+as -1, the function will block indefinitely until a message is received.
 
 Since the caller may not know the size of the message it is receiving, the
 function can be called with a NULL buffer pointer. When this is done, the type

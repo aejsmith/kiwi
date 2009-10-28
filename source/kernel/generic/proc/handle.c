@@ -100,7 +100,7 @@ handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data) {
 	if((ret = bitmap_ffz(&table->bitmap)) == -1) {
 		mutex_unlock(&table->lock);
 		slab_cache_free(handle_info_cache, info);
-		return -ERR_NO_HANDLES;
+		return -ERR_RESOURCE_UNAVAIL;
 	}
 
 	/* Set the bit and add the handle to the tree. */

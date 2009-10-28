@@ -33,7 +33,8 @@ extern "C" {
 #define HANDLE_TYPE_PROCESS	3	/**< Process. */
 #define HANDLE_TYPE_THREAD	4	/**< Thread. */
 #define HANDLE_TYPE_DEVICE	5	/**< Device. */
-#define HANDLE_TYPE_IPC		6	/**< IPC connection. */
+#define HANDLE_TYPE_PORT	6	/**< IPC port. */
+#define HANDLE_TYPE_CONNECTION	7	/**< IPC connection. */
 
 /** Standard handle wait events. */
 #define HANDLE_EVENT_READ	1	/**< Wait for data to be ready to read. */

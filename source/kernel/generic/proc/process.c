@@ -22,8 +22,6 @@
 
 #include <lib/string.h>
 
-#include <ipc/ipc.h>
-
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -130,7 +128,6 @@ static int process_alloc(const char *name, identifier_t id, int flags, int cflag
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
-	ipc_process_init(process);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (identifier_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
@@ -315,11 +312,8 @@ void process_attach(process_t *process, thread_t *thread) {
  * @param thread	Thread to detach. */
 void process_detach(thread_t *thread) {
 	process_t *process = thread->owner;
-	int ret;
 
 	mutex_lock(&process->lock, 0);
-
-	ret = refcount_dec(&process->count);
 	list_remove(&thread->owner_link);
 
 	/* Move the process to the dead state if it contains no threads now,
@@ -342,7 +336,6 @@ void process_detach(thread_t *thread) {
 			vm_aspace_destroy(process->aspace);
 			process->aspace = NULL;
 		}
-		ipc_process_destroy(process);
 		handle_table_destroy(&process->handles);
 		io_context_destroy(&process->ioctx);
 	} else {
@@ -352,7 +345,7 @@ void process_detach(thread_t *thread) {
 	thread->owner = NULL;
 
 	/* Destroy the process if there are no handles remaining. */
-	if(ret == 0) {
+	if(refcount_dec(&process->count) == 0) {
 		process_destroy(process);
 	}
 }

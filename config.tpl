@@ -75,6 +75,7 @@ Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x:
 Option('HANDLE_DEBUG', 'Handle manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
 Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
+Option('IPC_DEBUG', 'IPC debugging output.', False, {'DEBUG': lambda x: x})
 
 #######
 Section('Module configuration')

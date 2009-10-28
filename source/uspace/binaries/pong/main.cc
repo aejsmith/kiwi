@@ -18,7 +18,9 @@
  * @brief		IPC test.
  */
 
+#include <kernel/handle.h>
 #include <kernel/ipc.h>
+#include <kernel/process.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,9 +32,18 @@ int main(int argc, char **argv) {
 	size_t size;
 	int ret;
 
-	id = strtoul(argv[1], NULL, 10);
+	id = strtoul(getenv("PORT"), NULL, 10);
+	if((handle = ipc_port_open(id)) < 0) {
+		printf("Pong: Failed to open port %d: %d\n", id, handle);
+		return handle;
+	} else if((ret = ipc_port_acl_add(handle, IPC_PORT_ACCESSOR_PROCESS, process_id(-1), IPC_PORT_RIGHT_CONNECT)) != 0) {
+		printf("Pong: Failed to modify ACL: %d\n", ret);
+		return ret;
+	}
+	handle_close(handle);
 
 	if((handle = ipc_connection_open(id, -1)) < 0) {
+		printf("Pong: Failed to connect to port %d: %d\n", id, handle);
 		return handle;
 	}
 
@@ -47,5 +58,4 @@ int main(int argc, char **argv) {
 			return ret;
 		}
 	}
-	return 0;
 }
