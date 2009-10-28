@@ -164,6 +164,7 @@ static void display_console_putch(unsigned char ch) {
 	if(display_console_x >= display_console_cols) {
 		display_console_x = 0;
 		display_console_y++;
+		memset(device->fb + (row * display_console_y), 0, row);
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
