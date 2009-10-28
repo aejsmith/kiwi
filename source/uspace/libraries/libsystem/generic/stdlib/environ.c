@@ -28,7 +28,7 @@
 
 char **environ;
 
-//static bool __environ_alloced = false;
+static bool __environ_alloced = false;
 
 /** Get the value of an environment variable.
  *
@@ -52,7 +52,7 @@ char *getenv(const char *name) {
 		val = strchr(key, '=');
 
 		if(val == NULL) {
-			__libsystem_fatal("Value '%s' found in environment without an = ***", key);
+			__libsystem_fatal("value '%s' found in environment without an =", key);
 		}
 
 		len = strlen(name);
@@ -66,7 +66,6 @@ char *getenv(const char *name) {
 	return NULL;
 }
 
-#if 0
 /** Set or change an environment variable.
  *
  * Sets or changes an environment variable. The variable will be set to the
@@ -79,10 +78,10 @@ char *getenv(const char *name) {
  */
 int putenv(char *str) {
 	size_t count, len, tmp, i;
-	char **new, *val;
+	char **new;
 
 	if(strchr(str, '=') == NULL) {
-		errno = EINVAL;
+		//errno = EINVAL;
 		return -1;
 	}
 
@@ -121,7 +120,6 @@ int putenv(char *str) {
 	for(count = 0; environ[count] != NULL; count++);
 	new = realloc(environ, (count + 2) * sizeof(char *));
 	if(new == NULL) {
-		free(val);
 		return -1;
 	}
 	environ = new;
@@ -149,7 +147,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 	size_t count, len;
 
 	if(strchr(name, '=') != NULL) {
-		errno = EINVAL;
+		//errno = EINVAL;
 		return -1;
 	}
 
@@ -202,8 +200,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 			return 0;
 		}
 
-		fprintf(stderr, "*** libc fatal: shouldn't get here in setenv! ***\n");
-		abort();
+		__libsystem_fatal("shouldn't get here in setenv");
 	}
 
 	/* Fill out the new entry. */
@@ -228,4 +225,3 @@ int setenv(const char *name, const char *value, int overwrite) {
 
 	return 0;
 }
-#endif
