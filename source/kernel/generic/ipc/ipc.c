@@ -1069,9 +1069,85 @@ fail:
 # pragma mark Debugger functions.
 #endif
 
+/** Print information about IPC ports.
+ *
+ * Prints a list of all IPC ports, or shows information about a certain port.
+ *
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ *
+ * @return		KDBG status code.
+ */
+int kdbg_cmd_port(int argc, char **argv) {
+	ipc_port_acl_entry_t *entry;
+	ipc_connection_t *conn;
+	ipc_port_t *port;
+	unative_t val;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s [<ID>]\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints either a list of all IPC ports or information about a certain port.\n");
+		return KDBG_OK;
+	} else if(argc == 1) {
+		kprintf(LOG_NONE, "ID    Count  Waiting\n");
+		kprintf(LOG_NONE, "==    =====  =======\n");
+
+		AVL_TREE_FOREACH(&ipc_port_tree, iter) {
+			port = avl_tree_entry(iter, ipc_port_t);
+
+			kprintf(LOG_NONE, "%-5d %-6d %u\n", port->id, refcount_get(&port->count),
+			        port->conn_sem.queue.missed);
+		}
+
+		return KDBG_OK;
+	} else if(argc == 2) {
+		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
+			return KDBG_FAIL;
+		} else if(!(port = avl_tree_lookup(&ipc_port_tree, val))) {
+			kprintf(LOG_NONE, "Invalid port ID.\n");
+			return KDBG_FAIL;
+		}
+
+		kprintf(LOG_NONE, "Port %p(%d)\n", port, port->id);
+		kprintf(LOG_NONE, "=================================================\n");
+
+		kprintf(LOG_NONE, "Locked:  %d (%p) (%" PRId32 ")\n", port->lock.recursion,
+		        port->lock.caller, (port->lock.holder) ? port->lock.holder->id : -1);
+		kprintf(LOG_NONE, "Count:   %d\n\n", refcount_get(&port->count));
+
+		kprintf(LOG_NONE, "Waiting (%u):\n", port->conn_sem.queue.missed);
+		LIST_FOREACH(&port->waiting, iter) {
+			conn = list_entry(iter, ipc_connection_t, header);
+			kprintf(LOG_NONE, "  Client(%p) Server(%p)\n", &conn->client, &conn->server);
+		}
+		kprintf(LOG_NONE, "\n");
+
+		kprintf(LOG_NONE, "Connections:\n");
+		LIST_FOREACH(&port->connections, iter) {
+			conn = list_entry(iter, ipc_connection_t, header);
+			kprintf(LOG_NONE, "  Client(%p) Server(%p)\n", &conn->client, &conn->server);
+		}
+		kprintf(LOG_NONE, "\n");
+
+		kprintf(LOG_NONE, "ACL:\n");
+		LIST_FOREACH(&port->acl, iter) {
+			entry = list_entry(iter, ipc_port_acl_entry_t, header);
+
+			kprintf(LOG_NONE, "  Type: %d  Process: %p(%d)  Rights: 0x%x\n",
+			        entry->type, entry->process, (entry->process) ? entry->process->id : -1,
+			        entry->rights);
+		}
+		return KDBG_OK;
+	} else {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+}
+
 /** Print information about an IPC endpoint.
  *
- * Prints information about the IPC endpoint at a certain addres in memory.
+ * Prints information about the IPC endpoint at a certain address in memory.
  *
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -1084,7 +1160,7 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 	unative_t val;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<addr>]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s <addr>\n\n", argv[0]);
 
 		kprintf(LOG_NONE, "Shows information about an IPC endpoint. The address can be obtained by\n");
 		kprintf(LOG_NONE, "looking at the data field of an IPC handle.\n");

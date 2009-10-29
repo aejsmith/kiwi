@@ -71,5 +71,6 @@ extern int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t 
                                    void *buf, size_t *size);
 
 extern int kdbg_cmd_endpoint(int argc, char **argv);
+extern int kdbg_cmd_port(int argc, char **argv);
 
 #endif /* __IPC_IPC_H */
