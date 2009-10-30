@@ -20,19 +20,31 @@
 
 #include <kernel/handle.h>
 
+#include <kiwi/EventLoop.h>
 #include <kiwi/Handle.h>
 
-#include <stdlib.h>
+#include <cstdlib>
+#include <iostream>
 
 using namespace kiwi;
+using namespace std;
+
+extern EventLoop *global_event_loop;
 
 /** Handle constructor. */
 Handle::Handle() : m_handle(-1) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
+	int ret;
+
 	if(m_handle >= 0) {
-		handle_close(m_handle);
+		Event event(this);
+		OnClose(event);
+
+		if((ret = handle_close(m_handle)) != 0) {
+			cerr << "Warning: Failed to close handle " << m_handle << " (" << ret << ')' << endl;
+		}
 	}
 }
 
@@ -54,4 +66,20 @@ int Handle::Wait(int event, timeout_t timeout) const {
  * @return		ID of the handle. */
 handle_t Handle::GetHandle(void) const {
 	return m_handle;
+}
+
+/** Register an event with the current thread's event loop.
+ * @param event		Event ID to register. */
+void Handle::_RegisterEvent(int event) {
+	if(global_event_loop) {
+		global_event_loop->AddHandle(this, event);
+	}
+}
+
+/** Unregister an event with the current thread's event loop.
+ * @param event		Event ID to unregister. */
+void Handle::_UnregisterEvent(int event) {
+	if(global_event_loop) {
+		global_event_loop->RemoveHandle(this, event);
+	}
 }

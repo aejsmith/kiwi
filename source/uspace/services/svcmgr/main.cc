@@ -18,21 +18,32 @@
  * @brief		Service manager.
  */
 
+#include <kernel/ipc.h>
+
 #include <kiwi/Process.h>
 
-#include <string.h>
-
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 
 using namespace kiwi;
+using namespace std;
 
 int main(int argc, char **argv) {
+	handle_t handle;
 	Process *proc;
 	int ret;
 
+	/* Check if we are process 1. */
 	if(Process::GetCurrentID() != 1) {
-		printf("svcmgr: not process 1, exiting...\n");
+		cout << "Must be run as process 1" << endl;
+		return 1;
+	}
+
+	/* Create the service manager port. */
+	if((handle = ipc_port_create()) < 0) {
+		cout << "Could not register port (" << handle << ")" << endl;
+		return 1;
+	} else if(ipc_port_id(handle) != 1) {
+		cout << "Created port is not port 1" << endl;
 		return 1;
 	}
 

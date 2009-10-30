@@ -23,14 +23,17 @@
 #include <kernel/handle.h>
 #include <kernel/thread.h>
 
+#include <kiwi/EventLoop.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "Console.h"
-#include "EventLoop.h"
 #include "Header.h"
 #include "InputDevice.h"
+
+using namespace kiwi;
 
 /** Main function for Console.
  * @param argc		Argument count.
@@ -40,6 +43,7 @@ int main(int argc, char **argv) {
 	InputDevice *input;
 	Console *console;
 	Framebuffer *fb;
+	EventLoop loop;
 
 	/* Create the framebuffer object. */
 	fb = new Framebuffer("/display/0");
@@ -69,6 +73,6 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	EventLoop::Instance()->Run();
+	loop.Run();
 	return 0;
 }

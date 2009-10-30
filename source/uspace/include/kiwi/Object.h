@@ -26,8 +26,9 @@ namespace kiwi {
 /** Make an object noncopyable.
  * @param c		Class name. */
 #define KIWI_OBJECT_NONCOPYABLE(c)	\
-	c(const c &); \
-	const c &operator =(const c &);
+	private: \
+		c(const c &); \
+		const c &operator =(const c &);
 
 /** Define things necessary to allow use of private data classes.
  * @note		This defines a function in the class, GetPrivate(),
@@ -51,7 +52,7 @@ public:
 protected:
 	Object();
 	Object(Private *p);
-private:
+
 	/** Pointer to private data structure.
 	 * @note	This will actually point to an instance of the Private
 	 *		class of the class at the bottom of the inheritance

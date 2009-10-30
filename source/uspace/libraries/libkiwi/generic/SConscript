@@ -16,6 +16,7 @@ Import('sources')
 
 sources += [
 	File('Event.cc'),
+	File('EventLoop.cc'),
 	File('Handle.cc'),
 	File('Object.cc'),
 	File('Process.cc'),

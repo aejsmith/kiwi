@@ -23,24 +23,24 @@
 
 #include <kernel/handle.h>
 
+#include <kiwi/Handle.h>
+
 /** Input device class. */
-class InputDevice {
+class InputDevice : public kiwi::Handle {
 public:
 	InputDevice(const char *path);
-	~InputDevice();
 
 	/** Check if initialisation succeeded.
 	 * @return		Whether initialisation succeeded. */
 	bool Initialised(void) const { return (m_init_status == 0); }
 private:
-	static void _Callback(void *arg);
+	virtual void _EventReceived(int event);
 
 	static const unsigned char m_keymap[];
 	static const unsigned char m_keymap_shift[];
 	static const unsigned char m_keymap_caps[];
 
 	int m_init_status;		/**< Initialisation status. */
-	handle_t m_device;		/**< Handle to device. */
 	bool m_caps;			/**< Whether Caps Lock is on. */
 	bool m_ctrl;			/**< Whether Ctrl is held. */
 	bool m_alt;			/**< Whether Alt is held. */

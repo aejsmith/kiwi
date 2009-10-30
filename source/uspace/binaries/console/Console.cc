@@ -25,11 +25,11 @@
 
 #include <kiwi/Process.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "Console.h"
-#include "EventLoop.h"
 
 using namespace kiwi;
 
@@ -50,9 +50,9 @@ Console *Console::m_active = 0;
  * @param width		Width.
  * @param height	Height. */
 Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
-	m_init_status(0), m_master(-1), m_id(-1), m_fb(fb), m_buffer(0),
-	m_fb_x(x), m_fb_y(y), m_width_px(width), m_height_px(height),
-	m_cursor_x(0), m_cursor_y(0), m_cols(width / FONT_WIDTH),
+	m_init_status(0), m_id(-1), m_fb(fb), m_buffer(0), m_fb_x(x),
+	m_fb_y(y), m_width_px(width), m_height_px(height), m_cursor_x(0),
+	m_cursor_y(0), m_cols(width / FONT_WIDTH),
 	m_rows(height / FONT_HEIGHT), m_scroll_start(0),
 	m_scroll_end(m_rows - 1)
 {
@@ -73,9 +73,9 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 
 	/* Open the console master. */
 	sprintf(buf, "/console/%d/master", m_id);
-	if((m_master = device_open(buf)) < 0) {
-		printf("Failed to open console master (%d)\n", m_master);
-		m_init_status = m_master;
+	if((m_handle = device_open(buf)) < 0) {
+		printf("Failed to open console master (%d)\n", m_handle);
+		m_init_status = m_handle;
 		return;
 	}
 
@@ -94,14 +94,11 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	ToggleCursor();
 
 	/* Register the console with the event loop. */
-	EventLoop::Instance()->AddHandle(m_master, HANDLE_EVENT_READ, _Callback, this);
+	_RegisterEvent(HANDLE_EVENT_READ);
 }
 
 /** Destructor for the console. */
 Console::~Console() {
-	if(m_master >= 0) {
-		handle_close(m_master);
-	}
 	if(m_buffer) {
 		delete[] m_buffer;
 	}
@@ -128,7 +125,7 @@ int Console::Run(const char *cmdline) {
 /** Add input to the console.
  * @param ch		Input character. */
 void Console::Input(unsigned char ch) {
-	device_write(m_master, &ch, 1, 0, NULL);
+	device_write(m_handle, &ch, 1, 0, NULL);
 }
 
 /** Output a character to the console.
@@ -287,19 +284,20 @@ void Console::ScrollDown(void) {
 }
 
 /** Event callback function.
- * @param arg		Data argument (console object pointer). */
-void Console::_Callback(void *arg) {
-	Console *console = reinterpret_cast<Console *>(arg);
+ * @param event		Event number received. */
+void Console::_EventReceived(int event) {
 	unsigned char ch;
 	size_t bytes;
 	int ret;
 
-	if((ret = device_read(console->m_master, &ch, 1, 0, &bytes)) != 0) {
+	assert(event == HANDLE_EVENT_READ);
+
+	if((ret = device_read(m_handle, &ch, 1, 0, &bytes)) != 0) {
 		printf("Failed to read output (%d)\n", ret);
 		return;
 	} else if(bytes != 1) {
 		return;
 	}
 
-	console->Output(ch);
+	Output(ch);
 }

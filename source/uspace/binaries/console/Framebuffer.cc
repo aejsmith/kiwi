@@ -23,11 +23,11 @@
 #include <kernel/handle.h>
 #include <kernel/vm.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "Console.h"
-#include "EventLoop.h"
 #include "Framebuffer.h"
 #include "Header.h"
 
@@ -105,7 +105,7 @@ static inline void putpixel_0888(uint32_t *dest, uint32_t colour) {
 /** Constructor for a Framebuffer object.
  * @param device	Path to device to use. */
 Framebuffer::Framebuffer(const char *device) :
-	m_init_status(0), m_buffer(0), m_handle(-1), m_width(MODE_WIDTH),
+	m_init_status(0), m_buffer(0), m_width(MODE_WIDTH),
 	m_height(MODE_HEIGHT), m_depth(MODE_DEPTH)
 {
 	display_mode_t *modes;
@@ -174,7 +174,7 @@ found:
 	memset(m_buffer, 0, m_buffer_size);
 
 	/* Register the redraw handler with the event loop. */
-	EventLoop::Instance()->AddHandle(m_handle, DISPLAY_EVENT_REDRAW, _Callback, this);
+	_RegisterEvent(DISPLAY_EVENT_REDRAW);
 }
 
 /** Framebuffer destructor. */
@@ -182,7 +182,6 @@ Framebuffer::~Framebuffer() {
 	if(m_buffer) {
 		vm_unmap(m_buffer, m_buffer_size);
 	}
-	handle_close(m_handle);
 }
 
 /** Get a pixel from the screen.
@@ -267,10 +266,10 @@ void Framebuffer::DrawRect(int x, int y, int width, int height, RGB *buffer) {
 }
 
 /** Event callback function.
- * @param arg		Data argument (device object pointer). */
-void Framebuffer::_Callback(void *arg) {
-	Framebuffer *fb = reinterpret_cast<Framebuffer *>(arg);
+ * @param event		Event number. */
+void Framebuffer::_EventReceived(int event) {
+	assert(event == DISPLAY_EVENT_REDRAW);
 
-	Header::Instance()->Draw(fb);
+	Header::Instance()->Draw(this);
 	Console::GetActive()->Redraw();
 }

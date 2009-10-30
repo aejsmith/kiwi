@@ -23,6 +23,7 @@
 
 #include <kernel/process.h>
 
+#include <kiwi/Event.h>
 #include <kiwi/Handle.h>
 
 namespace kiwi {
@@ -39,6 +40,10 @@ public:
 	identifier_t GetID(void) const;
 
 	static identifier_t GetCurrentID(void);
+
+	Signal<Event> OnExit;
+protected:
+	virtual void _EventReceived(int event);
 private:
 	void _Init(char **args, char **env, bool usepath, int flags);
 

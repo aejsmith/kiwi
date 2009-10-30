@@ -21,10 +21,12 @@
 #ifndef __CONSOLE_H
 #define __CONSOLE_H
 
+#include <kiwi/Handle.h>
+
 #include "Framebuffer.h"
 
 /** Main console implementation. */
-class Console {
+class Console : public kiwi::Handle {
 public:
 	Console(Framebuffer *fb, int x, int y, int width, int height);
 	~Console();
@@ -42,18 +44,17 @@ public:
 	 * @return		Pointer to active console. */
 	static Console *GetActive(void) { return m_active; }
 private:
+	virtual void _EventReceived(int event);
+
 	void ToggleCursor(void);
 	void PutChar(unsigned char ch);
 	void Clear(void);
 	void ScrollUp(void);
 	void ScrollDown(void);
 
-	static void _Callback(void *arg);
-
 	static Console *m_active;	/**< Active console. */
 
 	int m_init_status;		/**< Initialisation status. */
-	handle_t m_master;		/**< Handle to console master device. */
 	identifier_t m_id;		/**< Console ID. */
 
 	Framebuffer *m_fb;		/**< Framebuffer. */

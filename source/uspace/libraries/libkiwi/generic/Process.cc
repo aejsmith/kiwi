@@ -23,10 +23,11 @@
 
 #include <kiwi/Process.h>
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 using namespace kiwi;
+using namespace std;
 
 extern char **environ;
 
@@ -76,7 +77,7 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
 			if((m_handle = process_create(buf, args, (env) ? env : environ, flags)) >= 0) {
-				return;
+				goto success;
 			} else if(m_handle != -ERR_NOT_FOUND) {
 				m_init_status = m_handle;
 				return;
@@ -93,8 +94,11 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 	} else {
 		if((m_handle = process_create(args[0], args, (env) ? env : environ, flags)) < 0) {
 			m_init_status = m_handle;
+			return;
 		}
 	}
+success:
+	_RegisterEvent(PROCESS_EVENT_DEATH);
 }
 
 /** Create a new process.
@@ -184,6 +188,8 @@ Process::Process(identifier_t id) :
 {
 	if((m_handle = process_open(id)) < 0) {
 		m_init_status = m_handle;
+	} else {
+		_RegisterEvent(PROCESS_EVENT_DEATH);
 	}
 }
 
@@ -222,4 +228,16 @@ identifier_t Process::GetID(void) const {
  * @return		ID of the current process. */
 identifier_t Process::GetCurrentID(void) {
 	return process_id(-1);
+}
+
+/** Callback for a handle event being received.
+ * @param event		Event ID received. */
+void Process::_EventReceived(int event) {
+	switch(event) {
+	case PROCESS_EVENT_DEATH:
+		Event event(this);
+		OnExit(event);
+		_UnregisterEvent(PROCESS_EVENT_DEATH);
+		break;
+	}
 }

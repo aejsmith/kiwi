@@ -1,4 +1,4 @@
-/* Kiwi handle class
+/* Kiwi event loop class
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,41 +15,36 @@
 
 /**
  * @file
- * @brief		Handle class.
+ * @brief		Kiwi event loop class.
  */
 
-#ifndef __KIWI_HANDLE_H
-#define __KIWI_HANDLE_H
-
-#include <kernel/types.h>
+#ifndef __KIWI_EVENTLOOP_H
+#define __KIWI_EVENTLOOP_H
 
 #include <kiwi/Event.h>
+#include <kiwi/Handle.h>
 #include <kiwi/Object.h>
 
 namespace kiwi {
 
-class EventLoop;
-
-/** Base class for all objects represented by a handle. */
-class Handle : public Object {
-	KIWI_OBJECT_NONCOPYABLE(Handle);
+/** Class implementing a loop for handling handle events.
+ * @todo		When threading support is implemented, each thread
+ *			should have its own event loop, and handles should be
+ *			added to the event loop of the thread they are created
+ *			in. */
+class EventLoop : public Object {
+	KIWI_OBJECT_PRIVATE;
+	KIWI_OBJECT_NONCOPYABLE(EventLoop);
 public:
-	~Handle();
+	EventLoop();
 
-	int Wait(int event, timeout_t timeout = -1) const;
-	handle_t GetHandle(void) const;
-
-	Signal<Event> OnClose;
-protected:
-	Handle();
-	void _RegisterEvent(int event);
-	void _UnregisterEvent(int event);
-	virtual void _EventReceived(int event) = 0;
-
-	handle_t m_handle;		/**< Handle ID. */
-friend class EventLoop;
+	void AddHandle(Handle *handle, int event);
+	void RemoveHandle(Handle *handle, int event);
+	void Run();
+private:
+	void _HandleClosed(Event &event);
 };
 
 }
 
-#endif /* __KIWI_HANDLE_H */
+#endif /* __KIWI_EVENTLOOP_H */

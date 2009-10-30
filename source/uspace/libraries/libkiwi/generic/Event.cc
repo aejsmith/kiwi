@@ -37,7 +37,8 @@ EventFunctorList::~EventFunctorList() {
 	Private *p = GetPrivate();
 
 	/* Clear out the list. */
-	for(it = p->m_list.begin(); it != p->m_list.end(); ++it) {
+	while(!p->m_list.empty()) {
+		it = p->m_list.begin();
 		delete (*it);
 		p->m_list.erase(it);
 	}

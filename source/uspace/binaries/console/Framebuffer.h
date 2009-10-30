@@ -23,13 +23,15 @@
 
 #include <drivers/display.h>
 
+#include <kiwi/Handle.h>
+
 /** RGB colour structure. */
 struct RGB {
 	uint8_t r, g, b;
 } __attribute__((packed));
 
 /** Framebuffer class. */
-class Framebuffer {
+class Framebuffer : public kiwi::Handle {
 public:
 	Framebuffer(const char *device);
 	~Framebuffer();
@@ -51,12 +53,11 @@ public:
 	void FillRect(int x, int y, int width, int height, RGB colour);
 	void DrawRect(int x, int y, int width, int height, RGB *buffer);
 private:
-	static void _Callback(void *arg);
+	virtual void _EventReceived(int event);
 
 	int m_init_status;		/**< Initialisation status. */
 	uint8_t *m_buffer;		/**< Mapping of display device memory. */
 	size_t m_buffer_size;		/**< Size of mapping. */
-	handle_t m_handle;		/**< Handle to device. */
 	size_t m_width;			/**< Display width. */
 	size_t m_height;		/**< Display height. */
 	size_t m_depth;			/**< Display depth. */
