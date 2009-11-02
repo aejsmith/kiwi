@@ -342,7 +342,7 @@ int input_device_create(const char *name, device_t *parent, uint8_t type,
 			 * already exists, and ID should be unique. Note that
 			 * with current ID allocation implementation this can
 			 * happen - FIXME. */
-			fatal("Could not create device alias");
+			fatal("Could not create device alias (%d)", ret);
 		}
 	} else {
 		if((ret = device_create(dname, input_device_dir, &input_device_ops, device, attrs,

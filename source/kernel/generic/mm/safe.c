@@ -277,6 +277,7 @@ int arrcpy_from_user(char *const src[], char ***arrayp) {
 	/* Copy the arrays across. */
 	for(i = 0; ; i++) {
 		if(!(narr = krealloc(array, sizeof(char *) * (i + 1), 0))) {
+			ret = -ERR_NO_MEMORY;
 			goto fail;
 		}
 

@@ -63,9 +63,8 @@ static bool ext2_probe(device_t *device) {
 	uint32_t revision;
 	bool found = true;
 	size_t bytes;
-	int ret;
 
-	if((ret = device_read(device, sb, sizeof(ext2_superblock_t), 1024, &bytes)) != 0) {
+	if(device_read(device, sb, sizeof(ext2_superblock_t), 1024, &bytes) != 0) {
 		found = false;
 	} else if(bytes != sizeof(ext2_superblock_t) || le16_to_cpu(sb->s_magic) != EXT2_MAGIC) {
 		found = false;
@@ -385,7 +384,6 @@ static int ext2_node_create(vfs_node_t *_parent, const char *name, vfs_node_t *n
 				goto fail;
 			}
 			kfree(buf);
-			ret = 0;
 		}
 	}
 
@@ -514,6 +512,7 @@ static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
 			rwlock_unlock(&inode->lock);
 			return -ERR_NO_MEMORY;
 		}
+		buf = tmp;
 	}
 
 	rwlock_unlock(&inode->lock);

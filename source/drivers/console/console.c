@@ -20,12 +20,11 @@
  * @todo		Destroying devices.
  */
 
-#include <console/kprintf.h>
-
 #include <drivers/console.h>
 
 #include <io/device.h>
-#include <io/pipe.h>
+
+#include <ipc/pipe.h>
 
 #include <lib/string.h>
 

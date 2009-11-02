@@ -35,7 +35,11 @@ class EnvironmentManager(dict):
 		self.base = Environment(platform='posix', ENV=os.environ)
 
 		# Set paths to toolchain components.
-		self.base['CC'] = self.get_tool_path('gcc')
+		if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
+			self.base['CC'] = os.environ['CC']
+			self.base['ENV']['CCC_CC'] = self.get_tool_path('gcc')
+		else:
+			self.base['CC'] = self.get_tool_path('gcc')
 		self.base['CXX'] = self.get_tool_path('g++')
 		self.base['AS'] = self.get_tool_path('as')
 		self.base['OBJDUMP'] = self.get_tool_path('objdump')

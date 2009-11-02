@@ -715,7 +715,7 @@ out:
 	}
 	mutex_unlock(&port->lock);
 	handle_release(info);
-	return 0;
+	return ret;
 }
 
 /** Remove rights from a port's ACL.
@@ -783,7 +783,7 @@ out:
 	}
 	mutex_unlock(&port->lock);
 	handle_release(info);
-	return 0;
+	return ret;
 }
 
 /** Open an IPC connection to a port.
@@ -851,7 +851,8 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	semaphore_up(&port->conn_sem, 1);
 	mutex_unlock(&port->lock);
 
-	/* Wait for the connection to be accepted. */
+	/* Wait for the connection to be accepted. FIXME: This won't work with
+	 * timeout = 0, it doesn't give waiting listens to get here! */
 	if((ret = semaphore_down_timeout(&sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		/* Take the port tree lock to ensure that the port doesn't get
 		 * freed. This is a bit naff, but oh well. */
@@ -862,11 +863,13 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 			mutex_unlock(&conn->port->lock);
 		}
 		mutex_unlock(&ipc_port_tree_lock);
+		return ret;
 	} else if(conn->port == NULL) {
 		handle_close(&curr_proc->handles, handle);
 		return -ERR_NOT_FOUND;
+	} else {
+		return handle;
 	}
-	return handle;
 }
 
 /** Send a message on a connection.

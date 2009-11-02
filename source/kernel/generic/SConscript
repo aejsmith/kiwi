@@ -41,11 +41,11 @@ env['OBJFILES'] += [
 
 	env.Object('io/context.c'),
 	env.Object('io/device.c'),
-	env.Object('io/pipe.c'),
 	env.Object('io/ramfs.c'),
 	env.Object('io/vfs.c'),
 
 	env.Object('ipc/ipc.c'),
+	env.Object('ipc/pipe.c'),
 
 	env.Object('lib/do_printf.c'),
 	env.Object('lib/notifier.c'),

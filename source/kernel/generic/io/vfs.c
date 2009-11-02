@@ -3330,7 +3330,7 @@ int sys_fs_getcwd(char *buf, size_t size) {
 		ret = memcpy_to_user(buf, kbuf, len + 1);
 	}
 	kfree(kbuf);
-	return 0;
+	return ret;
 }
 
 /** Set the current working directory.

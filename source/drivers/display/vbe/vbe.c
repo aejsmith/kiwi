@@ -213,7 +213,7 @@ out:
 	if(info) {
 		bios_mem_free(info, sizeof(vbe_info_t));
 	}
-	return 0;
+	return ret;
 }
 
 /** Unloading function for the VBE driver.

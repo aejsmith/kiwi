@@ -63,10 +63,9 @@ static bool elf_check_ehdr(elf_ehdr_t *ehdr, int type) {
 static bool elf_check_node(vfs_node_t *node, int type) {
 	elf_ehdr_t ehdr;
 	size_t bytes;
-	int ret;
 
 	/* Read the ELF header in from the file. */
-	if((ret = vfs_file_read(node, &ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
+	if(vfs_file_read(node, &ehdr, sizeof(elf_ehdr_t), 0, &bytes) != 0) {
 		return false;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
 		return false;
@@ -282,7 +281,7 @@ static int elf_binary_load_internal(vfs_node_t *node, vm_aspace_t *as, bool inte
 
 		ret = elf_binary_load_internal(node, as, true, datap);
 		vfs_node_release(node);
-		return 0;
+		return ret;
 	}
 
 	/* Handle all the program headers. */

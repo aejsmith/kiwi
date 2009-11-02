@@ -37,7 +37,6 @@
 int fgetc(FILE *stream) {
 	unsigned char ch;
 	size_t bytes;
-	int ret;
 
 	if(stream->have_pushback) {
 		stream->have_pushback = false;
@@ -46,7 +45,7 @@ int fgetc(FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if((ret = fs_file_read(stream->handle, &ch, 1, -1, &bytes)) != 0) {
+		if(fs_file_read(stream->handle, &ch, 1, -1, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
@@ -55,7 +54,7 @@ int fgetc(FILE *stream) {
 		}
 		break;
 	case STREAM_TYPE_DEVICE:
-		if((ret = device_read(stream->handle, &ch, 1, 0, &bytes)) != 0) {
+		if(device_read(stream->handle, &ch, 1, 0, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
@@ -63,7 +62,7 @@ int fgetc(FILE *stream) {
 			return EOF;
 		}
 		break;
-	case STREAM_TYPE_KCONSOLE:
+	default:
 		stream->err = 1;
 		return EOF;
 	}

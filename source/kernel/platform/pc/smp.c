@@ -96,7 +96,7 @@ static inline bool smp_detect_mps(void) {
 	size_t i;
 
 	/* Get the base address of the Extended BIOS Data Area (EBDA). */
-	ebda = (ptr_t)(*(uint16_t *)0x40e << 4);
+	ebda = (ptr_t)((*(uint16_t *)0x40e) << 4);
 
 	/* Search for the MPFP structure. */
 	if(!(fp = smp_mps_find_fp(ebda, 0x400)) && !(fp = smp_mps_find_fp(0xE0000, 0x20000))) {

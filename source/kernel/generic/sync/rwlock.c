@@ -104,7 +104,7 @@ int rwlock_read_lock(rwlock_t *lock, int flags) {
 	spinlock_lock(&lock->lock, 0);
 
 	/* If we can take the exclusive lock without blocking, we're OK. */
-	if((ret = semaphore_down(&lock->exclusive, SYNC_NONBLOCK)) != 0) {
+	if(semaphore_down(&lock->exclusive, SYNC_NONBLOCK) != 0) {
 		/* Lock is held, check if its held by readers. If it is, and
 		 * there's something else blocked on the lock, we wait anyway.
 		 * This is to prevent starvation of writers. */

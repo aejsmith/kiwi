@@ -37,11 +37,10 @@
  * @return		0 on success, -1 on failure.
  */
 int fseek(FILE *stream, long off, int act) {
-	int ret;
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if((ret = fs_handle_seek(stream->handle, act, (offset_t)off, NULL)) != 0) {
+		if(fs_handle_seek(stream->handle, act, (offset_t)off, NULL) != 0) {
 			return -1;
 		}
 		return 0;
@@ -72,11 +71,10 @@ void rewind(FILE *stream) {
  */
 long ftell(FILE *stream) {
 	offset_t new;
-	int ret;
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if((ret = fs_handle_seek(stream->handle, FS_HANDLE_SEEK_ADD, 0, &new)) != 0) {
+		if(fs_handle_seek(stream->handle, FS_HANDLE_SEEK_ADD, 0, &new) != 0) {
 			return -1;
 		}
 		return new;

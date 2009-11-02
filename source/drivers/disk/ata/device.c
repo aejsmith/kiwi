@@ -241,12 +241,12 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 
 	/* Send an IDENTIFY DEVICE command. */
 	ata_controller_command(controller, ATA_CMD_IDENTIFY);
-	if((ret = ata_controller_wait(controller, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 50000)) != 0) {
+	if(ata_controller_wait(controller, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 50000) != 0) {
 		goto fail;
 	}
 
 	/* Wait for data. */
-	if((ret = ata_controller_wait(controller, ATA_STATUS_DRQ, ATA_STATUS_BSY, false, true, 500000)) != 0) {
+	if(ata_controller_wait(controller, ATA_STATUS_DRQ, ATA_STATUS_BSY, false, true, 500000) != 0) {
 		goto fail;
 	}
 
@@ -301,7 +301,7 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 	sprintf(name, "%d", num);
 	if((ret = disk_device_create(name, controller->device, &ata_device_ops, device,
 	                             blksize, &device->device)) != 0) {
-		fatal("Could not create ATA disk device %s", name);
+		fatal("Could not create ATA disk device %s (%d)", name, ret);
 	}
 
 	mutex_lock(&controller->lock, 0);

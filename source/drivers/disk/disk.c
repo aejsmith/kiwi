@@ -269,7 +269,7 @@ int disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 			 * already exists, and ID should be unique. Note that
 			 * with current ID allocation implementation this can
 			 * happen - FIXME. */
-			fatal("Could not create device alias");
+			fatal("Could not create device alias (%d)", ret);
 		}
 	} else {
 		if((ret = device_create(dname, disk_device_dir, &disk_device_ops, device, attrs,

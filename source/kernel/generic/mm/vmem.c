@@ -337,6 +337,7 @@ found:
 
 		/* We have all the tags required, perform any splits needed. */
 		if(seg->base < minaddr) {
+			assert(split1);
 			split1->base = seg->base;
 			split1->size = minaddr - seg->base;
 			split1->span = seg->span;
@@ -349,6 +350,7 @@ found:
 			split1 = NULL;
 		}
 		if(seg->size > size) {
+			assert(split2);
 			split2->base = seg->base + size;
 			split2->size = seg->size - size;
 			split2->span = seg->span;

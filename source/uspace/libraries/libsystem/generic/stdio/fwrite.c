@@ -39,10 +39,9 @@
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
 	const char *buf = (char *)ptr;
 	size_t i;
-	int ret;
 
 	for(i = 0; i < (size * nmemb); i++) {
-		if((ret = fputc((int)buf[i], stream)) == EOF) {
+		if(fputc((int)buf[i], stream) == EOF) {
 			break;
 		}
 	}

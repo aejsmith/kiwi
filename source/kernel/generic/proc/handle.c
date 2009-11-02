@@ -229,7 +229,7 @@ out:
 	if(free) {
 		slab_cache_free(handle_info_cache, info);
 	}
-	return 0;
+	return ret;
 }
 
 /** Handle waiting callback function.
@@ -348,9 +348,10 @@ out:
 			handle_release(waits[i].info);
 		}
 	}
-
-	assert(sync.event);
-	ret = sync.event->idx;
+	if(ret == 0) {
+		assert(sync.event);
+		ret = sync.event->idx;
+	}
 	kfree(waits);
 	return ret;
 }

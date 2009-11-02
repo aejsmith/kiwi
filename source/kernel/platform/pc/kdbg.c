@@ -130,7 +130,7 @@ unsigned char kdbg_get_char(void) {
 			 * an extra newline being sent. */
 			if(ret == '\n') {
 				while((in8(0x64) & 1) == 0) {};
-				code = in8(0x60);
+				in8(0x60);
 			}
 
 			if(ret != 0) {

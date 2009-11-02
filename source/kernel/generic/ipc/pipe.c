@@ -18,7 +18,7 @@
  * @brief		Unidirectional data pipe implementation.
  */
 
-#include <io/pipe.h>
+#include <ipc/pipe.h>
 
 #include <mm/kheap.h>
 #include <mm/malloc.h>

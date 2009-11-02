@@ -338,50 +338,50 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 				display_console_device = NULL;
 			}
 			device->curr_mode = NULL;
-		}
-
-		/* Look for the mode requested. */
-		id = *(identifier_t *)in;
-		for(i = 0; i < device->count; i++) {
-			if(device->modes[i].id == id) {
-				mode = &device->modes[i];
-				break;
+		} else {
+			/* Look for the mode requested. */
+			id = *(identifier_t *)in;
+			for(i = 0; i < device->count; i++) {
+				if(device->modes[i].id == id) {
+					mode = &device->modes[i];
+					break;
+				}
 			}
-		}
-		if(!mode) {
-			mutex_unlock(&device->lock);
-			return -ERR_NOT_FOUND;
-		}
-
-		if((ret = device->ops->mode_set(device, mode)) != 0) {
-			mutex_unlock(&device->lock);
-			return ret;
-		}
-
-		device->curr_mode = mode;
-
-		/* Set this device as the KDBG/fatal console if there isn't
-		 * already one set up. */
-		if(!display_console_device || display_console_device == device) {
-			if((ret = device->ops->fault(device, mode->offset, &phys)) != 0) {
-				fatal("Could not get video device framebuffer");
+			if(!mode) {
+				mutex_unlock(&device->lock);
+				return -ERR_NOT_FOUND;
 			}
 
-			/* Unmap old framebuffer. */
-			if(device->fb) {
-				page_phys_unmap(device->fb, device->fb_size, true);
+			if((ret = device->ops->mode_set(device, mode)) != 0) {
+				mutex_unlock(&device->lock);
+				return ret;
 			}
 
-			device->fb_size = mode->width * mode->height * (mode->bpp / 8);
-			device->fb = page_phys_map(phys, device->fb_size, MM_SLEEP);
+			device->curr_mode = mode;
 
-			if(!display_console_device) {
-				notifier_register(&fatal_notifier, display_console_register, device);
-				notifier_register(&kdbg_entry_notifier, display_console_register, device);
-				notifier_register(&kdbg_exit_notifier, display_console_unregister, device);
+			/* Set this device as the KDBG/fatal console if there
+			 * isn't already one set up. */
+			if(!display_console_device || display_console_device == device) {
+				if((ret = device->ops->fault(device, mode->offset, &phys)) != 0) {
+					fatal("Could not get video device framebuffer (%d)", ret);
+				}
+
+				/* Unmap old framebuffer. */
+				if(device->fb) {
+					page_phys_unmap(device->fb, device->fb_size, true);
+				}
+
+				device->fb_size = mode->width * mode->height * (mode->bpp / 8);
+				device->fb = page_phys_map(phys, device->fb_size, MM_SLEEP);
+
+				if(!display_console_device) {
+					notifier_register(&fatal_notifier, display_console_register, device);
+					notifier_register(&kdbg_entry_notifier, display_console_register, device);
+					notifier_register(&kdbg_exit_notifier, display_console_unregister, device);
+				}
+
+				display_console_device = device;
 			}
-
-			display_console_device = device;
 		}
 
 		mutex_unlock(&device->lock);
@@ -464,7 +464,7 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
 			 * already exists, and ID should be unique. Note that
 			 * with current ID allocation implementation this can
 			 * happen - FIXME. */
-			fatal("Could not create device alias");
+			fatal("Could not create device alias (%d)", ret);
 		}
 	} else {
 		if((ret = device_create(dname, display_device_dir, &display_device_ops, device, attrs,

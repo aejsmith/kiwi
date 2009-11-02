@@ -39,11 +39,10 @@
 int fputc(int ch, FILE *stream) {
 	unsigned char val = (unsigned char)ch;
 	size_t bytes;
-	int ret;
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if((ret = fs_file_write(stream->handle, &val, 1, -1, &bytes)) != 0) {
+		if(fs_file_write(stream->handle, &val, 1, -1, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
@@ -52,7 +51,7 @@ int fputc(int ch, FILE *stream) {
 		}
 		break;
 	case STREAM_TYPE_DEVICE:
-		if((ret = device_write(stream->handle, &val, 1, 0, &bytes)) != 0) {
+		if(device_write(stream->handle, &val, 1, 0, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
