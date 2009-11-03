@@ -25,6 +25,7 @@ Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-serial stdio -vga std')
 
 Option('TOOLCHAIN_DIR', 'Directory to store toolchain builds in.', '/please/change/me')
 Option('TOOLCHAIN_MAKE_JOBS', 'Argument to pass to -j for make when building toolchain.', 1)
+Option('USE_CLANG', 'Use Clang/LLVM to build the kernel.', False)
 
 #######
 Section('Architecture selection')

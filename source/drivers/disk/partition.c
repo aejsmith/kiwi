@@ -95,7 +95,7 @@ void disk_partition_probe(disk_device_t *device) {
  * @param size		Size of partition in blocks. */
 void disk_partition_add(disk_device_t *device, identifier_t id, uint64_t offset, uint64_t size) {
 	device_attr_t attrs[] = {
-		{ "type", DEVICE_ATTR_STRING, {string: "partition"} },
+		{ "type", DEVICE_ATTR_STRING, { .string = "partition" } },
 	};
 	char name[DEVICE_NAME_MAX];
 	partition_t *part;

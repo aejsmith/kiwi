@@ -238,8 +238,8 @@ out:
 int disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
                        void *data, size_t blksize, disk_device_t **devicep) {
 	device_attr_t attrs[] = {
-		{ "type", DEVICE_ATTR_STRING, {string: "disk"} },
-		{ "disk.block-size", DEVICE_ATTR_UINT32, {uint32: blksize} },
+		{ "type", DEVICE_ATTR_STRING, { .string = "disk" } },
+		{ "disk.block-size", DEVICE_ATTR_UINT32, { .uint32 = blksize } },
 	};
 	char dname[DEVICE_NAME_MAX];
 	disk_device_t *device;

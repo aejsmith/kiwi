@@ -63,24 +63,24 @@ static device_t *pci_bus_dir;
  * @return		0 on success, negative error code on failure. */
 static int pci_device_scan(device_t *bus, int id, int dev, int func) {
 	device_attr_t attr[] = {
-		{ "type", DEVICE_ATTR_STRING, { string: "pci-device" } },
+		{ "type", DEVICE_ATTR_STRING, { .string = "pci-device" } },
 		{ "pci.vendor-id", DEVICE_ATTR_UINT16,
-			{ uint16: pci_config_read16(id, dev, func, PCI_DEVICE_VENDOR_ID) },
+			{ .uint16 = pci_config_read16(id, dev, func, PCI_DEVICE_VENDOR_ID) },
 		},
 		{ "pci.device-id", DEVICE_ATTR_UINT16,
-			{ uint16: pci_config_read16(id, dev, func, PCI_DEVICE_DEVICE_ID) },
+			{ .uint16 = pci_config_read16(id, dev, func, PCI_DEVICE_DEVICE_ID) },
 		},
 		{ "pci.revision", DEVICE_ATTR_UINT8,
-			{ uint8: pci_config_read8(id, dev, func, PCI_DEVICE_REVISION) },
+			{ .uint8 = pci_config_read8(id, dev, func, PCI_DEVICE_REVISION) },
 		},
 		{ "pci.interface", DEVICE_ATTR_UINT8,
-			{ uint8: pci_config_read8(id, dev, func, PCI_DEVICE_PI) },
+			{ .uint8 = pci_config_read8(id, dev, func, PCI_DEVICE_PI) },
 		},
 		{ "pci.base-class", DEVICE_ATTR_UINT8,
-			{ uint8: pci_config_read8(id, dev, func, PCI_DEVICE_BASE_CLASS) },
+			{ .uint8 = pci_config_read8(id, dev, func, PCI_DEVICE_BASE_CLASS) },
 		},
 		{ "pci.sub-class", DEVICE_ATTR_UINT8,
-			{ uint8: pci_config_read8(id, dev, func, PCI_DEVICE_SUB_CLASS) },
+			{ .uint8 = pci_config_read8(id, dev, func, PCI_DEVICE_SUB_CLASS) },
 		},
 	};
 	char name[DEVICE_NAME_MAX];
@@ -125,7 +125,7 @@ static int pci_device_scan(device_t *bus, int id, int dev, int func) {
  * @param id		Bus number to scan.
  * @return		0 on success, negative error code on failure. */
 static int pci_bus_scan(int id) {
-	device_attr_t attr = { "type", DEVICE_ATTR_STRING, { string: "pci-bus" } };
+	device_attr_t attr = { "type", DEVICE_ATTR_STRING, { .string = "pci-bus" } };
 	char name[DEVICE_NAME_MAX];
 	device_t *device;
 	int i, j, ret;

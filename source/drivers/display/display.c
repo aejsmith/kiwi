@@ -428,7 +428,7 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
                           void *data, display_mode_t *modes, size_t count,
                           display_device_t **devicep) {
 	device_attr_t attrs[] = {
-		{ "type", DEVICE_ATTR_STRING, {string: "display"} },
+		{ "type", DEVICE_ATTR_STRING, { .string = "display" } },
 	};
 	char dname[DEVICE_NAME_MAX];
 	display_device_t *device;

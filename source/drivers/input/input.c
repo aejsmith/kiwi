@@ -294,9 +294,9 @@ int input_device_create(const char *name, device_t *parent, uint8_t type,
                         uint8_t protocol, void *ops, void *data,
                         input_device_t **devicep) {
 	device_attr_t attrs[] = {
-		{ "type", DEVICE_ATTR_STRING, {string: "input"} },
-		{ "input.type", DEVICE_ATTR_UINT8, {uint8: type} },
-		{ "input.protocol", DEVICE_ATTR_UINT8, {uint8: protocol} },
+		{ "type", DEVICE_ATTR_STRING, { .string = "input" } },
+		{ "input.type", DEVICE_ATTR_UINT8, { .uint8 = type } },
+		{ "input.protocol", DEVICE_ATTR_UINT8, { .uint8 = protocol } },
 	};
 	char dname[DEVICE_NAME_MAX];
 	input_device_t *device;
