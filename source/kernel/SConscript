@@ -29,7 +29,10 @@ Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config[
 # Create the kernel environment.
 env = envmgr.Create('kernel')
 if config['USE_CLANG']:
-	env['CC'] = 'clang'
+	if env['ENV'].has_key('CCC_CC'):
+		env['CCC_CC'] = 'clang'
+	else:
+		env['CC'] = 'clang'
 env['LINK'] = envmgr.get_tool_path('ld')
 env['LDFLAGS'] = []
 env['LDSCRIPT'] = File('arch/%s/link.ld' % (config['ARCH']))
