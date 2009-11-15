@@ -67,11 +67,11 @@ typedef struct module {
 
 /** Set the name of a module. */
 #define MODULE_NAME(mname)		\
-	static const char * __used __module_name = mname
+	static char __used __module_name[] = mname
 
 /** Set the description of a module. */
 #define MODULE_DESC(mdesc)              \
-        static const char * __used __module_desc = mdesc
+        static char __used __module_desc[] = mdesc
 
 /** Set the module hook functions. */
 #define MODULE_FUNCS(minit, munload)    \
@@ -92,6 +92,7 @@ typedef struct module {
 
 extern void *module_mem_alloc(size_t size, int mmflag);
 
+extern int module_name(vfs_node_t *node, char *namebuf);
 extern int module_load_node(vfs_node_t *node, char *depbuf);
 extern int module_load(const char *path, char *depbuf);
 

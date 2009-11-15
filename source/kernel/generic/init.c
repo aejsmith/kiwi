@@ -61,10 +61,8 @@ static void init_thread(void *arg1, void *arg2) {
 	initcall_t *initcall;
 	int ret;
 
-	/* Bring up secondary CPUs and call initialisation functions that must
-	 * be called before any initcalls. */
+	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
-	vfs_init();
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -134,9 +132,12 @@ void init_bsp(void *data) {
 	 * reclaim thread. */
 	slab_late_init();
 
+	/* Initialise other things. */
+	vfs_init();
+
 	/* Perform final architecture/platform initialisation. */
-	arch_final_init();
 	platform_final_init();
+	arch_final_init();
 
 	/* Create the second stage initialisation thread. */
 	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {

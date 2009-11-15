@@ -23,9 +23,9 @@
 
 extern void platform_premm_init(void *data);
 extern void platform_postmm_init(void);
+extern void platform_final_init(void);
 
 /** Not required on this platform. */
-#define platform_ap_init()	
-#define platform_final_init()	
+#define platform_ap_init()
 
 #endif /* __PLATFORM_PLATFORM_H */

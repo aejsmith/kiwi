@@ -102,16 +102,6 @@ static module_t *module_find(const char *name) {
 	return NULL;
 }
 
-/** Get the value of a pointer in a module.
- * @param module	Module to look in.
- * @param name		Name of pointer symbol. */
-static void *module_lookup_pointer(module_t *module, const char *name) {
-	symbol_t *sym;
-
-	sym = symbol_table_lookup_name(&module->symtab, name, false, false);
-	return (sym) ? (void *)(*(ptr_t *)sym->addr) : NULL;
-}
-
 /** Check module dependencies.
  * @param module	Module to check.
  * @param depbuf	Buffer to store name of missing dependency in.
@@ -133,7 +123,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 
 	/* Loop through each dependency. */
 	for(i = 0; module->deps[i] != NULL; i++) {
-		if(strnlen(module->deps[i], MODULE_NAME_MAX) == MODULE_NAME_MAX) {
+		if(strnlen(module->deps[i], MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
 			/* Meh, ignore it. */
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
@@ -146,7 +136,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			/* Unloaded dependency, store it in depbuf and return
 			 * error. */
 			if(depbuf != NULL) {
-				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX);
+				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX + 1);
 			}
 			return -ERR_DEP_MISSING;
 		}
@@ -163,6 +153,67 @@ static int module_check_deps(module_t *module, char *depbuf) {
 	return 0;
 }
 
+/** Get the name of a kernel module.
+ *
+ * Gets the name of a kernel module and places it in a buffer.
+ *
+ * @param node		Node for module to get name of.
+ * @param namebuf	Buffer to store name in (should be MODULE_NAME_MAX + 1
+ *			bytes long).
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int module_name(vfs_node_t *node, char *namebuf) {
+	module_t *module;
+	symbol_t *sym;
+	int ret = 0;
+
+	if(!node || !namebuf) {
+		return -ERR_PARAM_INVAL;
+	} else if(!elf_module_check(node)) {
+		return -ERR_TYPE_INVAL;
+	}
+
+	/* Create a module structure for the module. */
+	module = kmalloc(sizeof(module_t), MM_SLEEP);
+	list_init(&module->header);
+	refcount_set(&module->count, 0);
+	symbol_table_init(&module->symtab);
+	module->node = node;
+	module->shdrs = NULL;
+	module->load_base = NULL;
+	module->load_size = 0;
+
+	/* Take the module lock in order to serialize module loading. */
+	mutex_lock(&module_lock, 0);
+
+	/* Perform first stage of loading the module. */
+	if((ret = elf_module_load(module)) != 0) {
+		goto out;
+	}
+
+	/* Retrieve the name. */
+	if((sym = symbol_table_lookup_name(&module->symtab, "__module_name", false, false))) {
+		if(strnlen((char *)sym->addr, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
+			ret = -ERR_FORMAT_INVAL;
+			goto out;
+		}
+		strcpy(namebuf, (char *)sym->addr);
+	}
+out:
+	if(module->load_base) {
+		module_mem_free(module->load_base, module->load_size);
+	}
+	if(module->shdrs) {
+		kfree(module->shdrs);
+	}
+	symbol_table_destroy(&module->symtab);
+	kfree(module);
+
+	mutex_unlock(&module_lock);
+	return ret;
+}
+
 /** Load a kernel module.
  *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
@@ -173,7 +224,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
  *
  * @param node		Filesystem node containing the module.
  * @param depbuf	Where to store name of unmet dependency (should be
- *			MODULE_NAME_MAX bytes long).
+ *			MODULE_NAME_MAX + 1 bytes long).
  *
  * @return		0 on success, negative error code on failure. If a
  *			required dependency is not loaded, the ERR_DEP_MISSING
@@ -181,13 +232,12 @@ static int module_check_deps(module_t *module, char *depbuf) {
  */
 int module_load_node(vfs_node_t *node, char *depbuf) {
 	module_t *module;
+	symbol_t *sym;
 	int ret;
 
 	if(!node || !depbuf) {
 		return -ERR_PARAM_INVAL;
-	}
-
-	if(!elf_module_check(node)) {
+	} else if(!elf_module_check(node)) {
 		return -ERR_TYPE_INVAL;
 	}
 
@@ -210,15 +260,21 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 	}
 
 	/* Retrieve the module information. */
-	module->name = module_lookup_pointer(module, "__module_name");
-	module->description = module_lookup_pointer(module, "__module_desc");
-	module->init = module_lookup_pointer(module, "__module_init");
-	module->unload = module_lookup_pointer(module, "__module_unload");
+	sym = symbol_table_lookup_name(&module->symtab, "__module_name", false, false);
+	module->name = (sym) ? (char *)sym->addr : NULL;
+	sym = symbol_table_lookup_name(&module->symtab, "__module_desc", false, false);
+	module->description = (sym) ? (char *)sym->addr : NULL;
+	sym = symbol_table_lookup_name(&module->symtab, "__module_init", false, false);
+	module->init = (sym) ? (void *)(*(ptr_t *)sym->addr) : NULL;
+	sym = symbol_table_lookup_name(&module->symtab, "__module_unload", false, false);
+	module->unload = (sym) ? (void *)(*(ptr_t *)sym->addr) : NULL;
+
+	/* Check if it is valid. */
 	if(!module->name || !module->description || !module->init) {
 		kprintf(LOG_DEBUG, "module: information for module %p is invalid\n", module);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
-	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
+	} else if(strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
 		kprintf(LOG_DEBUG, "module: name of module %p is too long\n", module);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
@@ -400,20 +456,20 @@ int kdbg_cmd_modules(int argc, char **argv) {
  *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
  * module are not met, the name of the first unmet dependency encountered is
- * stored in the buffer provided, which should be MODULE_NAME_MAX bytes long.
- * The intended usage of this function is to keep on calling it and loading
- * each unmet dependency it specifies until it succeeds.
+ * stored in the buffer provided. The intended usage of this function is to
+ * keep on calling it and loading each unmet dependency it specifies until it
+ * succeeds.
  *
  * @param path		Path to module on filesystem.
  * @param depbuf	Where to store name of unmet dependency (should be
- *			MODULE_NAME_MAX bytes long).
+ *			MODULE_NAME_MAX + 1 bytes long).
  *
  * @return		0 on success, negative error code on failure. If a
  *			required dependency is not loaded, the ERR_DEP_MISSING
  *			error code is returned.
  */
 int sys_module_load(const char *path, char *depbuf) {
-	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX];
+	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
 	int ret, err;
 
 	/* Copy the path across. */
@@ -423,7 +479,7 @@ int sys_module_load(const char *path, char *depbuf) {
 
 	ret = module_load(kpath, kdepbuf);
 	if(ret == -ERR_DEP_MISSING) {
-		if((err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX)) != 0) {
+		if((err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1)) != 0) {
 			ret = err;
 		}
 	}

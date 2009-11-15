@@ -21,17 +21,18 @@
 #ifndef __BOOTMOD_H
 #define __BOOTMOD_H
 
+#include <io/vfs.h>
+
+#include <module.h>
 #include <types.h>
 
 /** Maximum number of boot modules. */
 #define BOOTMOD_MAX		32
-#define BOOTMOD_NAME_MAX	64
 
 /** Structure describing a module loaded by the bootloader. */
 typedef struct bootmod {
-	char name[BOOTMOD_NAME_MAX + 1];	/**< Name of module. */
-	void *addr;				/**< Address of module. */
-	size_t size;				/**< Size of module. */
+	vfs_node_t *node;			/**< Node containing module data. */
+	char *name;				/**< Cached name. */
 	bool loaded;				/**< Whether the module has been loaded. */
 } bootmod_t;
 

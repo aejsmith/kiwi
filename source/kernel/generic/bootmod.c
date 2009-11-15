@@ -39,9 +39,6 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Filename extension of kernel modules. */
-#define MODULE_EXTENSION	".km"
-
 /** Header for a tar file. */
 typedef struct tar_header {
 	char name[100];		/**< Name of entry. */
@@ -80,14 +77,24 @@ size_t bootmod_count __init_data = 0;
 /** Whether a RamFS has been mounted for the root. */
 static bool bootmod_mounted_ramfs __init_data = false;
 
-/** Get a module from the boot module array.
+/** Look up a kernel module in the boot module array.
  * @param name		Name to look for.
  * @return		Pointer to module if found, NULL if not. */
-static inline bootmod_t *bootmod_lookup(const char *name) {
+static bootmod_t *bootmod_lookup(const char *name) {
+	char *tmp;
 	size_t i;
 
 	for(i = 0; i < bootmod_count; i++) {
-		if(strcmp(bootmod_array[i].name, name) == 0) {
+		if(!bootmod_array[i].name) {
+			tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
+			if(module_name(bootmod_array[i].node, tmp) != 0) {
+				kfree(tmp);
+				continue;
+			}
+			bootmod_array[i].name = tmp;
+		}
+
+		if(strcmp(name, bootmod_array[i].name) == 0) {
 			return &bootmod_array[i];
 		}
 	}
@@ -99,14 +106,21 @@ static inline bootmod_t *bootmod_lookup(const char *name) {
  * @param mod		Boot module containing archive.
  * @return		Whether the module was a TAR archive. */
 static bool __init_text bootmod_load_tar(bootmod_t *mod) {
-	tar_header_t *hdr = mod->addr;
+	tar_header_t *hdr;
 	vfs_node_t *node;
 	int64_t size;
 	size_t bytes;
+	void *buf;
 	int ret;
+
+	buf = hdr = kmalloc(mod->node->size, MM_FATAL);
+	if(vfs_file_read(mod->node, buf, mod->node->size, 0, &bytes) != 0 || bytes != mod->node->size) {
+		fatal("Could not read TAR file data");
+	}
 
 	/* Check format of module. */
 	if(strncmp(hdr->magic, "ustar", 5) != 0) {
+		kfree(buf);
 		return false;
 	}
 
@@ -169,6 +183,7 @@ static bool __init_text bootmod_load_tar(bootmod_t *mod) {
 		hdr = (tar_header_t *)(ptr_t)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
 	}
 
+	kfree(buf);
 	return true;
 }
 
@@ -176,36 +191,23 @@ static bool __init_text bootmod_load_tar(bootmod_t *mod) {
  * @param mod		Module to load.
  * @return		Whether the file was a kernel module. */
 static bool __init_text bootmod_load_kmod(bootmod_t *mod) {
-	char depbuf[MODULE_NAME_MAX + strlen(MODULE_EXTENSION)];
-	vfs_node_t *node;
+	char name[MODULE_NAME_MAX + 1];
 	bootmod_t *dep;
 	int ret;
 
-	/* Create a temporary node from the module buffer. */
-	if((ret = vfs_file_from_memory(mod->addr, mod->size, &node)) != 0) {
-		fatal("Could not create temporary node for boot module (%d)", ret);
-	}
-
 	/* Try to load the module and all dependencies. */
 	while(true) {
-		if((ret = module_load_node(node, depbuf)) == 0) {
-			kprintf(LOG_DEBUG, "bootmod: loaded module %s (addr: 0x%p, size: %u)\n",
-				mod->name, mod->addr, mod->size);
-			vfs_node_release(node);
+		if((ret = module_load_node(mod->node, name)) == 0) {
 			return true;
 		} else if(ret == -ERR_TYPE_INVAL) {
-			vfs_node_release(node);
 			return false;
 		} else if(ret != -ERR_DEP_MISSING) {
-			fatal("Could not load module %s (%d)", mod->name, ret);
+			fatal("Could not load module %p (%d)", mod, ret);
 		}
 
 		/* Unloaded dependency, try to find it and load it. */
-		strcat(depbuf, MODULE_EXTENSION);
-		if(!(dep = bootmod_lookup(depbuf))) {
-			fatal("Module '%s' depends on '%s' which is unavailable", mod->name, depbuf);
-		} else if(!bootmod_load_kmod(dep)) {
-			fatal("Module '%s' depends on '%s' which is not a module", mod->name, depbuf);
+		if(!(dep = bootmod_lookup(name)) || !bootmod_load_kmod(dep)) {
+			fatal("Dependency on '%s' which is not available", name);
 		} else {
 			dep->loaded = true;
 		}
@@ -227,13 +229,16 @@ void __init_text bootmod_load(void) {
 			if(bootmod_load_tar(&bootmod_array[i]) || bootmod_load_kmod(&bootmod_array[i])) {
 				bootmod_array[i].loaded = true;
 			} else {
-				fatal("Module '%s' has unknown format", bootmod_array[i].name);
+				fatal("Module %u has unknown format", i);
 			}
 		}
 	}
 
 	/* Free up all the modules. */
 	for(i = 0; i < bootmod_count; i++) {
-		kfree(bootmod_array[i].addr);
+		if(bootmod_array[i].name) {
+			kfree(bootmod_array[i].name);
+		}
+		vfs_node_release(bootmod_array[i].node);
 	}
 }

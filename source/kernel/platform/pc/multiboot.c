@@ -49,13 +49,13 @@
 
 extern char __init_start[], __init_end[], __end[];
 
-/** Maximum number of Multiboot modules. */
-#define MULTIBOOT_MODS_MAX	32
+/** Maximum length of Multiboot command line. */
 #define MULTIBOOT_CMDLINE_MAX	512
 
 /** Saved Multiboot information. */
 static multiboot_info_t mb_info __init_data;
 static char mb_cmdline[MULTIBOOT_CMDLINE_MAX + 1] __init_data;
+static multiboot_module_t mb_mods[BOOTMOD_MAX] __init_data;
 
 /** Populate the PMM with memory regions.
  *
@@ -153,10 +153,6 @@ void __init_text page_platform_init(void) {
  * @param info		Multiboot information pointer.
  */
 void __init_text multiboot_premm_init(multiboot_info_t *info) {
-	multiboot_module_t *mods;
-	char *name, *tmp;
-	size_t i;
-
 	/* Check for required Multiboot flags. */
 	CHECK_MB_FLAG(info, MB_FLAG_MEMINFO);
 	CHECK_MB_FLAG(info, MB_FLAG_MMAP);
@@ -174,50 +170,29 @@ void __init_text multiboot_premm_init(multiboot_info_t *info) {
 		if((bootmod_count = mb_info.mods_count) > BOOTMOD_MAX) {
 			fatal("Too many boot modules");
 		}
-
-		mods = (multiboot_module_t *)((ptr_t)mb_info.mods_addr);
-		for(i = 0; i < bootmod_count; i++) {
-			/* Take off any path string on the module name. */
-			if(!(name = strrchr((char *)((ptr_t)mods[i].string), '/'))) {
-				name = (char *)((ptr_t)mods[i].string);
-			} else {
-				name += 1;
-			}
-
-			/* Only want the name part. */
-			if((tmp = strchr(name, ' '))) {
-				*tmp = 0;
-			}
-
-			if(strlen(name) > BOOTMOD_NAME_MAX) {
-				fatal("Boot module name is too long");
-			}
-
-			/* Save the address of the module data for now, which
-			 * we will duplicate later. The module data is marked
-			 * as reclaimable so we do not have to copy it now. */
-			strcpy(bootmod_array[i].name, name);
-			bootmod_array[i].size = mods[i].mod_end - mods[i].mod_start;
-			bootmod_array[i].addr = (void *)((ptr_t)mods[i].mod_start);
-		}
+		memcpy(mb_mods, (multiboot_module_t *)((ptr_t)mb_info.mods_addr), bootmod_count * sizeof(multiboot_module_t));
 	}
 }
 
-/** Save a copy of all required Multiboot information.
- *
- * Saves a copy of all required Multiboot information such as the modules and
- * the kernel command line. This is done because their virtual addresses get
- * unmapped by the architecture, and their current physical location is
- * reclaimed by the PMM.
- */
+/** Load the kernel command line into the argument parser. */
 void __init_text multiboot_postmm_init(void) {
-	size_t i;
-
 	args_init(mb_cmdline);
+}
+
+/** Final stage of platform initialisation. */
+void __init_text platform_final_init(void) {
+	size_t i, size;
+	void * addr;
+	int ret;
+
+	/* Populate the real boot module array. */
 	if(bootmod_count != 0) {
 		for(i = 0; i < bootmod_count; i++) {
-			bootmod_array[i].addr = kmemdup(bootmod_array[i].addr, bootmod_array[i].size,
-			                                MM_FATAL);
+			size = mb_mods[i].mod_end - mb_mods[i].mod_start;
+			addr = (void *)((ptr_t)mb_mods[i].mod_start);
+			if((ret = vfs_file_from_memory(addr, size, &bootmod_array[i].node)) != 0) {
+				fatal("Could not create VFS node from boot module (%d)", ret);
+			}
 		}
 	}
 }
