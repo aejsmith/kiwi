@@ -32,20 +32,30 @@ using namespace std;
 extern EventLoop *global_event_loop;
 
 /** Handle constructor. */
-Handle::Handle() : m_handle(-1) {}
+Handle::Handle(handle_t handle) : m_handle(handle) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
-	int ret;
+	Close();
+}
+
+/** Close the handle.
+ * @return		True on success, false on failure. */
+bool Handle::Close() {
+	bool ret = true;
 
 	if(m_handle >= 0) {
-		Event event(this);
-		OnClose(event);
+		OnClose(this);
 
-		if((ret = handle_close(m_handle)) != 0) {
+		if(handle_close(m_handle) == 0) {
+			m_handle = -1;
+		} else {
 			cerr << "Warning: Failed to close handle " << m_handle << " (" << ret << ')' << endl;
+			ret = false;
 		}
 	}
+
+	return ret;
 }
 
 /** Wait for a handle event.
@@ -57,9 +67,9 @@ Handle::~Handle() {
  *			error immediately if the event has not already
  *			happened, and a value of -1 (the default) will block
  *			indefinitely until the event happens.
- * @return		0 on success, error code on failure. */
-int Handle::Wait(int event, timeout_t timeout) const {
-	return abs(handle_wait(m_handle, event, timeout));
+ * @return		True on success, false on failure. */
+bool Handle::Wait(int event, timeout_t timeout) const {
+	return (handle_wait(m_handle, event, timeout) == 0);
 }
 
 /** Get the ID of the handle.

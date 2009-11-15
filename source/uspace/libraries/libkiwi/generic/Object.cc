@@ -18,24 +18,13 @@
  * @brief		API object base class.
  */
 
-#include <kiwi/private/Object.h>
+#include <kiwi/Object.h>
 
-using namespace std;
 using namespace kiwi;
-
-/** Destructor for Object::Private. */
-Object::Private::~Private() {}
 
 /** Constructor for Object.
  * @note		Protected - Object cannot be instantiated directly. */
-Object::Object() : m_private(new Object::Private) {}
-
-/** Constructor for Object.
- * @note		Protected - Object cannot be instantiated directly.
- * @param p		Private data pointer. */
-Object::Object(Private *p) : m_private(p) {}
+Object::Object() {}
 
 /** Destructor for Object. */
-Object::~Object() {
-	delete m_private;
-}
+Object::~Object() {}

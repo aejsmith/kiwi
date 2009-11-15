@@ -23,8 +23,8 @@
 
 #include <kernel/types.h>
 
-#include <kiwi/Event.h>
 #include <kiwi/Object.h>
+#include <kiwi/Signal.h>
 
 namespace kiwi {
 
@@ -33,21 +33,23 @@ class EventLoop;
 /** Base class for all objects represented by a handle. */
 class Handle : public Object {
 	KIWI_OBJECT_NONCOPYABLE(Handle);
+	friend class EventLoop;
 public:
 	~Handle();
 
-	int Wait(int event, timeout_t timeout = -1) const;
+	virtual bool Close();
+	bool Wait(int event, timeout_t timeout = -1) const;
 	handle_t GetHandle(void) const;
 
-	Signal<Event> OnClose;
+	Signal<Handle *> OnClose;
 protected:
-	Handle();
+	Handle(handle_t handle = -1);
+
 	void _RegisterEvent(int event);
 	void _UnregisterEvent(int event);
-	virtual void _EventReceived(int event) = 0;
+	virtual void _EventReceived(int id) = 0;
 
 	handle_t m_handle;		/**< Handle ID. */
-friend class EventLoop;
 };
 
 }

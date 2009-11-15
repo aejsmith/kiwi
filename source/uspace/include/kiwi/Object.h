@@ -21,6 +21,8 @@
 #ifndef __KIWI_OBJECT_H
 #define __KIWI_OBJECT_H
 
+#include <list>
+
 namespace kiwi {
 
 /** Make an object noncopyable.
@@ -30,34 +32,12 @@ namespace kiwi {
 		c(const c &); \
 		const c &operator =(const c &);
 
-/** Define things necessary to allow use of private data classes.
- * @note		This defines a function in the class, GetPrivate(),
- *			that gives access to the class' private data pointer.
- * @note		After using this macro the access level will be
- *			private. The best thing to do is place it at the very
- *			start of the class definition. */
-#define KIWI_OBJECT_PRIVATE		\
-	friend class Private; \
-	protected: \
-		class Private; \
-	private: \
-		inline Private *GetPrivate() { return reinterpret_cast<Private *>(m_private); } \
-    		inline const Private *GetPrivate() const { return reinterpret_cast<const Private *>(m_private); }
-
 /** Base class for an API object. */
 class Object {
-	KIWI_OBJECT_PRIVATE
 public:
 	virtual ~Object();
 protected:
 	Object();
-	Object(Private *p);
-
-	/** Pointer to private data structure.
-	 * @note	This will actually point to an instance of the Private
-	 *		class of the class at the bottom of the inheritance
-	 *		tree, which should be derived from our Private class. */
-	Private *m_private;
 };
 
 }

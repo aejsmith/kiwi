@@ -21,9 +21,10 @@
 #ifndef __KIWI_EVENTLOOP_H
 #define __KIWI_EVENTLOOP_H
 
-#include <kiwi/Event.h>
 #include <kiwi/Handle.h>
 #include <kiwi/Object.h>
+
+#include <vector>
 
 namespace kiwi {
 
@@ -33,7 +34,6 @@ namespace kiwi {
  *			added to the event loop of the thread they are created
  *			in. */
 class EventLoop : public Object {
-	KIWI_OBJECT_PRIVATE;
 	KIWI_OBJECT_NONCOPYABLE(EventLoop);
 public:
 	EventLoop();
@@ -42,7 +42,13 @@ public:
 	void RemoveHandle(Handle *handle, int event);
 	void Run();
 private:
-	void _HandleClosed(Event &event);
+	void _HandleClosed(Handle *handle);
+
+	/** @note Data stored as multiple vectors because it is the format
+	 *        handle_wait_multiple() expects. */
+	std::vector<Handle *> m_handles;	/**< Array of handle objects (used for callbacks). */
+	std::vector<handle_t> m_ids;		/**< Array of handle IDs. */
+	std::vector<int> m_events;		/**< Array of events to wait for. */
 };
 
 }

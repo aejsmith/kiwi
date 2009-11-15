@@ -20,7 +20,7 @@
 
 #include <kernel/handle.h>
 
-#include <kiwi/private/EventLoop.h>
+#include <kiwi/EventLoop.h>
 
 #include <exception>
 #include <iostream>
@@ -32,7 +32,7 @@ using namespace std;
 EventLoop *global_event_loop = 0;
 
 /** EventLoop constructor. */
-EventLoop::EventLoop() : Object(new EventLoop::Private) {
+EventLoop::EventLoop() {
 	if(global_event_loop) {
 		/* FIXME. */
 		throw std::exception();
@@ -45,11 +45,9 @@ EventLoop::EventLoop() : Object(new EventLoop::Private) {
  * @param handle	Handle to use.
  * @param event		Event to wait for on the handle. */
 void EventLoop::AddHandle(Handle *handle, int event) {
-	Private *p = GetPrivate();
-
-	p->m_handles.push_back(handle);
-	p->m_ids.push_back(handle->GetHandle());
-	p->m_events.push_back(event);
+	m_handles.push_back(handle);
+	m_ids.push_back(handle->GetHandle());
+	m_events.push_back(event);
 
 	handle->OnClose.Connect(this, &EventLoop::_HandleClosed);
 }
@@ -59,45 +57,41 @@ void EventLoop::AddHandle(Handle *handle, int event) {
  * @param event		Event that should be removed. */
 void EventLoop::RemoveHandle(Handle *handle, int event) {
 	vector<Handle *>::iterator it;
-	Private *p = GetPrivate();
 	size_t i;
 
-	for(i = 0; i < p->m_handles.size(); i++) {
-		if(p->m_handles[i] == handle && p->m_events[i] == event) {
-			p->m_handles.erase(p->m_handles.begin() + i);
-			p->m_ids.erase(p->m_ids.begin() + i);
-			p->m_events.erase(p->m_events.begin() + i);
+	for(i = 0; i < m_handles.size(); i++) {
+		if(m_handles[i] == handle && m_events[i] == event) {
+			m_handles.erase(m_handles.begin() + i);
+			m_ids.erase(m_ids.begin() + i);
+			m_events.erase(m_events.begin() + i);
 		}
 	}
 }
 
 /** Run the event loop. */
 void EventLoop::Run(void) {
-	Private *p = GetPrivate();
 	int ret;
 
 	while(true) {
-		if((ret = handle_wait_multiple(&p->m_ids[0], &p->m_events[0], p->m_handles.size(), -1)) < 0) {
+		if((ret = handle_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1)) < 0) {
 			cerr << "Failed to wait for events (" << ret << ')' << endl;
 			return;
 		}
 
-		p->m_handles[ret]->_EventReceived(p->m_events[ret]);
+		m_handles[ret]->_EventReceived(m_events[ret]);
 	}
 }
 
 /** Removes all events registered to a handle being closed. */
-void EventLoop::_HandleClosed(Event &event) {
-	Handle *handle = static_cast<Handle *>(event.GetObject());
+void EventLoop::_HandleClosed(Handle *handle) {
 	vector<Handle *>::iterator it;
-	Private *p = GetPrivate();
 	size_t i;
 
-	for(i = 0; i < p->m_handles.size(); i++) {
-		if(p->m_handles[i] == handle) {
-			p->m_handles.erase(p->m_handles.begin() + i);
-			p->m_ids.erase(p->m_ids.begin() + i);
-			p->m_events.erase(p->m_events.begin() + i);
+	for(i = 0; i < m_handles.size(); i++) {
+		if(m_handles[i] == handle) {
+			m_handles.erase(m_handles.begin() + i);
+			m_ids.erase(m_ids.begin() + i);
+			m_events.erase(m_events.begin() + i);
 		}
 	}
 }

@@ -235,8 +235,8 @@ identifier_t Process::GetCurrentID(void) {
 void Process::_EventReceived(int event) {
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
-		Event event(this);
-		OnExit(event);
+		/* FIXME: Get status. */
+		OnExit(0);
 		_UnregisterEvent(PROCESS_EVENT_DEATH);
 		break;
 	}
