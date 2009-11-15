@@ -19,6 +19,9 @@
  *
  * @todo		This really ought to be automatically generated
  *			somehow.
+ * @todo		Track slots created for methods within Object-derived
+ *			classes, so that when the object is destroyed the slots
+ *			are automatically removed.
  */
 
 #ifndef __KIWI_SIGNAL_H

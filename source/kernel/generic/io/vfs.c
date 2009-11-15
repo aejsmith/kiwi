@@ -2192,6 +2192,7 @@ fail:
  */
 int vfs_unlink(const char *path) {
 	vfs_node_t *parent = NULL, *node = NULL;
+	vfs_dir_entry_t *entry;
 	char *dir, *name;
 	int ret;
 
@@ -2220,6 +2221,22 @@ int vfs_unlink(const char *path) {
 	} else if(!node->mount->type->node_unlink) {
 		ret = -ERR_NOT_SUPPORTED;
 		goto out;
+	}
+
+	/* If it is a directory, ensure that it is empty. */
+	if(node->type == VFS_NODE_DIR) {
+		if((ret = vfs_dir_cache_entries(node)) != 0) {
+			goto out;
+		}
+
+		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
+			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+
+			if(strcmp(entry->name, "..") && strcmp(entry->name, ".")) {
+				ret = -ERR_IN_USE;
+				goto out;
+			}
+		}
 	}
 
 	/* Call the filesystem's unlink operation. */

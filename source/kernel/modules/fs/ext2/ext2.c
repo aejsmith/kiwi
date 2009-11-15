@@ -418,13 +418,8 @@ static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *n
 	rwlock_write_lock(&inode->lock, 0);
 
 	if(node->type == VFS_NODE_DIR) {
-		if(!ext2_dir_empty(inode)) {
-			rwlock_unlock(&inode->lock);
-			rwlock_unlock(&parent->lock);
-			return -ERR_IN_USE;
-		}
-
-		/* Remove the . and .. entries. */
+		/* Remove the . and .. entries. The VFS ensures that these are
+		 * the only entries in the directory. */
 		if((ret = ext2_dir_remove(inode, inode, ".")) != 0) {
 			rwlock_unlock(&inode->lock);
 			rwlock_unlock(&parent->lock);
