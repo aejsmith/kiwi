@@ -836,7 +836,7 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	conn->port = port;
 	conn->sem = &sem;
 
-	semaphore_init(&sem, "ipc_connection_open_sem", 0);
+	semaphore_init(&sem, "ipc_open_sem", 0);
 
 	/* Create a handle now, as we do not want to find that we cannot create
 	 * the handle after the connection has been accepted. */
@@ -849,6 +849,7 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	/* Place the connection in the port's waiting list. */
 	list_append(&port->waiting, &conn->header);
 	semaphore_up(&port->conn_sem, 1);
+	notifier_run(&port->conn_notifier, NULL, false);
 	mutex_unlock(&port->lock);
 
 	/* Wait for the connection to be accepted. FIXME: This won't work with
