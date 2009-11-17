@@ -24,6 +24,7 @@
 
 #include <sync/spinlock.h>
 
+#include <kdbg.h>
 #include <types.h>
 
 /** Number of characters in the log buffer. */
@@ -119,4 +120,52 @@ void console_unregister(console_t *cons) {
 	spinlock_lock(&console_lock, 0);
 	list_remove(&cons->header);
 	spinlock_unlock(&console_lock);
+}
+
+/** Print out the kernel log buffer.
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ * @return		Command status. */
+int kdbg_cmd_log(int argc, char **argv) {
+	int level = -1;
+	size_t i, pos;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s [/level]\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints out the contents of the kernel log buffer. If no level is specified\n");
+		kprintf(LOG_NONE, "the entire log will be printed, otherwise only characters with the specified\n");
+		kprintf(LOG_NONE, "level or higher will be printed.\n");
+		kprintf(LOG_NONE, "  Log levels:\n");
+		kprintf(LOG_NONE, "    d    Debug.\n");
+		kprintf(LOG_NONE, "    n    Normal.\n");
+		kprintf(LOG_NONE, "    w    Warning.\n");
+		return KDBG_OK;
+	} else if(!(argc == 1 || (argc == 2 && argv[1][0] == '/'))) {
+		kprintf(LOG_NONE, "Invalid arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	/* Look for a log level. */
+	if(argc == 2) {
+		argv[1]++;
+		switch(*argv[1]) {
+		case 'd': level = LOG_DEBUG; break;
+		case 'n': level = LOG_NORMAL; break;
+		case 'w': level = LOG_WARN; break;
+		default:
+			kprintf(LOG_NONE, "Unknown level character '%c'\n", *argv[1]);
+			return KDBG_FAIL;
+		}
+	}
+
+	for(i = 0, pos = klog_start; i < klog_length; i++) {
+		if(level == -1 || klog_buffer[pos].level >= level) {
+			console_putch(LOG_NONE, klog_buffer[pos].ch);
+		}
+		if(++pos >= KLOG_SIZE) {
+			pos = 0;
+		}
+	}
+	return KDBG_OK;
 }

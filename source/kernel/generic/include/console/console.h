@@ -53,6 +53,8 @@ extern void console_putch(unsigned char level, char ch);
 extern void console_register(console_t *cons);
 extern void console_unregister(console_t *cons);
 
+extern int kdbg_cmd_log(int argc, char **argv);
+
 extern void console_early_init(void);
 
 #endif /* __CONSOLE_CONSOLE_H */

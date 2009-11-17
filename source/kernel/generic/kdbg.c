@@ -100,6 +100,7 @@ static struct {
 	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "kill",	"Kill a thread.",				kdbg_cmd_kill },
+	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
 	{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
