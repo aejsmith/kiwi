@@ -15,7 +15,7 @@
 import os
 import sys
 
-Import('env', 'config')
+Import('env', 'envmgr', 'config')
 
 # Set IA32-specific compilation flags.
 env['ASFLAGS'] += ['-m32']
@@ -24,7 +24,7 @@ env['LDFLAGS'] += ['-b', 'elf32-i386', '-m', 'elf_i386']
 
 # We need to link the kernel with libgcc, and force some symbols from it to be
 # linked in.
-env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % env['CC']).read().strip()]
+env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % envmgr.base['CC']).read().strip()]
 env['LDFLAGS'] += ['--undefined=__moddi3', '--undefined=__divdi3']
 
 # Pull in x86 common code.

@@ -29,6 +29,7 @@
 #include <mm/page.h>
 
 #include <platform/multiboot.h>
+#include <platform/platform.h>
 
 #include <args.h>
 #include <assert.h>

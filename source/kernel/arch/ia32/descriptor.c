@@ -55,7 +55,7 @@ static tss_t __doublefault_tss;
 /** Bootstrap GDT pointer. */
 gdt_pointer_t __boot_gdtp = {
 	.limit = sizeof(__initial_gdt) - 1,
-	.base = (ptr_t)KA2PA((ptr_t)__initial_gdt),
+	.base = (((ptr_t)__initial_gdt - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE),
 };
 
 /** Set the base address of a segment.
