@@ -25,6 +25,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 using namespace kiwi;
 using namespace std;
@@ -34,16 +35,36 @@ extern char **environ;
 /* FIXME. */
 #define PATH_MAX 4096
 
-/** Internal creation function.
- * @param args		NULL-terminated argument array.
- * @param env		NULL-terminated environment variable array.
- * @param usepath	Whether to use the PATH environment variable.
- * @param flags		Process creation flags. */
-void Process::_Init(char **args, char **env, bool usepath, int flags) {
+/** Constructor for Process.
+ * @param handle	Handle ID (default is -1, which means the object will
+ *			not refer to a handle). */
+Process::Process(handle_t handle) : Handle(handle) {
+	if(m_handle >= 0) {
+		_RegisterEvent(PROCESS_EVENT_DEATH);
+	}
+}
+
+/** Create a new process.
+ * @param args		NULL-terminated argument array. First entry should be
+ *			the path to the program to run.
+ * @param env		NULL-terminated environment variable array. A NULL
+ *			value for this argument will result in the new process
+ *			inheriting the current environment (the default).
+ * @param usepath	If true, and the program path does not contain a '/'
+ *			character, then it will be looked up in all directories
+ *			listed in the PATH environment variable. The first
+ *			match will be executed (defaults to true).
+ * @param flags		Process creation flags.
+ * @return		True on success, false on failure. */
+bool Process::Create(char **args, char **env, bool usepath, int flags) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
 	size_t len;
+
+	if(!Close()) {
+		return false;
+	}
 
 	if(usepath && !strchr(args[0], '/')) {
 		if(!(path = getenv("PATH"))) {
@@ -60,8 +81,7 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 				cur--;
 			} else {
 				if((next - cur) >= (PATH_MAX - 3)) {
-					m_init_status = -ERR_PARAM_INVAL;
-					return;
+					return false;
 				}
 
 				memcpy(buf, cur, (size_t)(next - cur));
@@ -70,8 +90,7 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 			buf[next - cur] = '/';
 			len = strlen(args[0]);
 			if(len + (next - cur) >= (PATH_MAX - 2)) {
-				m_init_status = -ERR_PARAM_INVAL;
-				return;
+				return false;
 			}
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
@@ -79,8 +98,7 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 			if((m_handle = process_create(buf, args, (env) ? env : environ, flags)) >= 0) {
 				goto success;
 			} else if(m_handle != -ERR_NOT_FOUND) {
-				m_init_status = m_handle;
-				return;
+				return false;
 			}
 
 			if(*next == 0) {
@@ -89,40 +107,18 @@ void Process::_Init(char **args, char **env, bool usepath, int flags) {
 			next++;
 		}
 
-		m_init_status = -ERR_NOT_FOUND;
-		return;
+		return false;
 	} else {
 		if((m_handle = process_create(args[0], args, (env) ? env : environ, flags)) < 0) {
-			m_init_status = m_handle;
-			return;
+			return false;
 		}
 	}
 success:
 	_RegisterEvent(PROCESS_EVENT_DEATH);
+	return true;
 }
 
 /** Create a new process.
- * @note		After creating the object you should call Initialised()
- *			to check if initialisation succeeded.
- * @param args		NULL-terminated argument array. First entry should be
- *			the path to the program to run.
- * @param env		NULL-terminated environment variable array. A NULL
- *			value for this argument will result in the new process
- *			inheriting the current environment (the default).
- * @param usepath	If true, and the program path does not contain a '/'
- *			character, then it will be looked up in all directories
- *			listed in the PATH environment variable. The first
- *			match will be executed (defaults to true).
- * @param flags		Process creation flags. */
-Process::Process(char **args, char **env, bool usepath, int flags) :
-	m_init_status(0)
-{
-	_Init(args, env, usepath, flags);
-}
-
-/** Create a new process.
- * @note		After creating the object you should call Initialised()
- *			to check if initialisation succeeded.
  * @param cmdline	Command line string, each argument seperated by a
  *			space character. First part of the string should be the
  *			path to the program to run.
@@ -133,79 +129,51 @@ Process::Process(char **args, char **env, bool usepath, int flags) :
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
- * @param flags		Process creation flags. */
-Process::Process(const char *cmdline, char **env, bool usepath, int flags) :
-	m_init_status(0)
-{
-	char **args = NULL, **tmp, *tok, *dup, *orig;
-	size_t count = 0;
+ * @param flags		Process creation flags.
+ * @return		True on success, false on failure. */
+bool Process::Create(const char *cmdline, char **env, bool usepath, int flags) {
+	char *tok, *dup, *orig;
+	vector<char *> args;
+	bool ret;
 
 	/* Duplicate the command line string so we can modify it. */
 	if(!(orig = strdup(cmdline))) {
-		m_init_status = -ERR_NO_MEMORY;
-		return;
+		return false;
 	}
 	dup = orig;
 
-	/* Loop through each token of the command line and place them into an
-	 * array. */
+	/* Create a vector from each token. */
 	while((tok = strsep(&dup, " "))) {
 		if(!tok[0]) {
 			continue;
 		}
-
-		if(!(tmp = reinterpret_cast<char **>(realloc(args, (count + 2) * sizeof(char *))))) {
-			free(orig);
-			free(args);
-			m_init_status = -ERR_NO_MEMORY;
-			return;
-		}
-		args = tmp;
-
-		/* Duplicating the token is not necessary, and not doing so
-		 * makes it easier to handle failure - just free the array and
-		 * duplicated string. */
-		args[count++] = tok;
-		args[count] = NULL;
+		args.push_back(tok);
 	}
 
-	if(!count) {
-		m_init_status = -ERR_PARAM_INVAL;
-		return;
+	if(!args.size()) {
+		return false;
 	}
 
-	_Init(args, env, usepath, flags);
-	free(args);
+	/* Null-terminate the array. */
+	args.push_back(0);
+
+	ret = Create(&args[0], env, usepath, flags);
 	free(orig);
+	return ret;
 }
 
 /** Open an existing process.
- * @note		After creating the object you should call Initialised()
- *			to check if initialisation succeeded.
- * @param id		ID of the process to open. */
-Process::Process(identifier_t id) :
-	m_init_status(0)
-{
-	if((m_handle = process_open(id)) < 0) {
-		m_init_status = m_handle;
-	} else {
-		_RegisterEvent(PROCESS_EVENT_DEATH);
-	}
-}
-
-/** Check whether initialisation was successful.
- * @param status	Pointer to integer to store error code in if not
- *			successful.
- * @return		True if successful, false if not. */
-bool Process::Initialised(int *status) const {
-	if(m_init_status != 0) {
-		if(status) {
-			*status = abs(m_init_status);
-		}
+ * @param id		ID of the process to open.
+ * @return		True on success, false on failure. */
+bool Process::Open(identifier_t id) {
+	if(!Close()) {
 		return false;
-	} else {
-		return true;
+	} else if((m_handle = process_open(id)) < 0) {
+		return false;
 	}
+
+	_RegisterEvent(PROCESS_EVENT_DEATH);
+	return true;
 }
 
 /** Wait for the process to die.
@@ -213,8 +181,8 @@ bool Process::Initialised(int *status) const {
  *			error immediately if the process has not already
  *			terminated, and a value of -1 (the default) will block
  *			indefinitely until the process terminates.
- * @return		0 on success, error code on failure. */
-int Process::WaitTerminate(timeout_t timeout) const {
+ * @return		True on success, false on failure. */
+bool Process::WaitTerminate(timeout_t timeout) const {
 	return Wait(PROCESS_EVENT_DEATH, timeout);
 }
 
@@ -237,6 +205,9 @@ void Process::_EventReceived(int event) {
 	case PROCESS_EVENT_DEATH:
 		/* FIXME: Get status. */
 		OnExit(0);
+
+		/* Unregister the death event so that it doesn't continually
+		 * get signalled. */
 		_UnregisterEvent(PROCESS_EVENT_DEATH);
 		break;
 	}

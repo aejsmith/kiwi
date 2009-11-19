@@ -887,7 +887,7 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_send(handle_t handle, uint32_t type, void *buf, size_t size) {
+int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
 	ipc_endpoint_t *endpoint = NULL;
 	handle_info_t *info = NULL;
 	ipc_message_t *message;

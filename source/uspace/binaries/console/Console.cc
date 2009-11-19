@@ -106,20 +106,14 @@ Console::~Console() {
 
 /** Run a command within a console.
  * @param cmdline	Command line to run.
- * @return		0 if command started successfully, negative error code
- *			on failure. */
-int Console::Run(const char *cmdline) {
+ * @return		Whether command started successfully. */
+bool Console::Run(const char *cmdline) {
 	char buf[1024];
 	char *env[] = { const_cast<char *>("PATH=/system/binaries"), buf, NULL };
-	int ret;
+	Process proc;
 
 	sprintf(buf, "CONSOLE=/console/%d/slave", m_id);
-
-	Process proc(cmdline, env, true, 0);
-	if(!proc.Initialised(&ret)) {
-		return ret;
-	}
-	return 0;
+	return proc.Create(cmdline, env, true, 0);
 }
 
 /** Add input to the console.

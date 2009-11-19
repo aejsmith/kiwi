@@ -211,6 +211,7 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
  * @param argv		Argument array. */
 void Shell::RunCommand(int argc, char **argv) {
 	map<string, Command *>::iterator it;
+	Process proc;
 	int ret;
 
 	/* Try to match it against a built-in command. */
@@ -222,9 +223,9 @@ void Shell::RunCommand(int argc, char **argv) {
 		return;
 	}
 
-	Process proc(argv);
-	if(!proc.Initialised(&ret)) {
-		cout << "Failed to run command '" << argv[0] << "' (" << ret << ")" << endl;
+	/* Run a process. */
+	if(!proc.Create(argv)) {
+		cout << "Failed to run command '" << argv[0] << "'" << endl;
 	}
 	proc.WaitTerminate();
 }

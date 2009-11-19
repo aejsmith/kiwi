@@ -25,10 +25,6 @@
 
 #include <kiwi/EventLoop.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "Console.h"
 #include "Header.h"
 #include "InputDevice.h"
@@ -40,36 +36,27 @@ using namespace kiwi;
  * @param argv		Argument array.
  * @return		Process exit code. */
 int main(int argc, char **argv) {
-	InputDevice *input;
-	Console *console;
-	Framebuffer *fb;
 	EventLoop loop;
 
 	/* Create the framebuffer object. */
-	fb = new Framebuffer("/display/0");
-	if(!fb->Initialised()) {
-		delete fb;
+	Framebuffer fb("/display/0");
+	if(!fb.Initialised()) {
 		return 1;
 	}
 
 	/* Draw the header. */
-	Header::Instance()->Draw(fb);
+	Header::Instance()->Draw(&fb);
 
 	/* Create the console. */
-	console = new Console(fb, 0, Header::Instance()->Height(), fb->Width(), fb->Height() - Header::Instance()->Height());
-	if(!console->Initialised()) {
-		delete console;
-		delete fb;
+	Console console(&fb, 0, Header::Instance()->Height(), fb.Width(), fb.Height() - Header::Instance()->Height());
+	if(!console.Initialised()) {
 		return 1;
 	}
-	console->Run("failshell");
+	console.Run("failshell");
 
 	/* Finally create the input device. */
-	input = new InputDevice("/input/0");
-	if(!input->Initialised()) {
-		delete input;
-		delete console;
-		delete fb;
+	InputDevice input("/input/0");
+	if(!input.Initialised()) {
 		return 1;
 	}
 

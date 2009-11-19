@@ -35,7 +35,7 @@ class Handle : public Object {
 	KIWI_OBJECT_NONCOPYABLE(Handle);
 	friend class EventLoop;
 public:
-	~Handle();
+	virtual ~Handle();
 
 	virtual bool Close();
 	bool Wait(int event, timeout_t timeout = -1) const;

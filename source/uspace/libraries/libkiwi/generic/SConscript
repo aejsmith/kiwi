@@ -17,6 +17,8 @@ Import('sources')
 sources += [
 	File('EventLoop.cc'),
 	File('Handle.cc'),
+	File('IPCConnection.cc'),
+	File('IPCPort.cc'),
 	File('Object.cc'),
 	File('Process.cc'),
 	File('Signal.cc'),

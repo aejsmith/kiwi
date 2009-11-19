@@ -22,7 +22,7 @@
 #ifdef NDEBUG
 # define assert(ignore)	((void)0)
 #else
-# define assert(cond)	if(!(cond)) { __assert_fail(#cond, __FILE__, __LINE__, __func__); }
+# define assert(cond)	if(!(cond)) { __assert_fail(#cond, __FILE__, __LINE__, __PRETTY_FUNCTION__); }
 #endif
 
 #ifndef __ASSERT_H
@@ -32,17 +32,7 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-
-static inline void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
-	if(func == (__const char *)0) {
-		printf("Assert failed: '%s' (%s:%d)\n", cond, file, line);
-	} else {
-		printf("Assert failed: '%s' (%s:%d - %s)\n", cond, file, line, func);
-	}
-	abort();
-}
+extern void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func);
 
 #ifdef __cplusplus
 }

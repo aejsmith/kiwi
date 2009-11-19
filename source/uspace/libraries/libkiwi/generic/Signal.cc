@@ -33,12 +33,16 @@ SignalBase::SignalBase() : m_slots(0) {}
 
 SignalBase::~SignalBase() {
 	list<Slot *>::iterator it;
+	Slot *slot;
 
 	if(m_slots) {
 		while((it = m_slots->begin()) != m_slots->end()) {
+			slot = *it;
 			m_slots->erase(it);
-			delete *it;
+			delete slot;
 		}
+
+		delete m_slots;
 	}
 }
 
@@ -57,7 +61,7 @@ void SignalBase::_Disconnect(Slot *slot) {
 	for(it = m_slots->begin(); it != m_slots->end(); ++it) {
 		if(*it == slot) {
 			m_slots->erase(it);
-			delete *it;
+			delete slot;
 			return;
 		}
 	}
@@ -68,6 +72,7 @@ void SignalBase::_Emit(Emitter &em) {
 
 	if(m_slots) {
 		for(it = m_slots->begin(); it != m_slots->end(); ++it) {
+			assert(*it);
 			em(*it);
 		}
 	}

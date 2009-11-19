@@ -18,44 +18,72 @@
  * @brief		IPC test.
  */
 
-#include <kernel/handle.h>
-#include <kernel/ipc.h>
-#include <kernel/process.h>
+#include <kiwi/private/svcmgr.h>
+#include <kiwi/IPCConnection.h>
+#include <kiwi/IPCPort.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+
+#define PORT_NAME "org.kiwi.Pong"
+
+using namespace kiwi;
+using namespace std;
+
+extern "C" FILE *fopen_device(const char *path, FILE *stream);
 
 int main(int argc, char **argv) {
-	uint32_t type, data;
-	identifier_t id;
-	handle_t handle;
-	size_t size;
-	int ret;
+	IPCConnection *conn;
+	IPCPort port;
 
-	id = strtoul(getenv("PORT"), NULL, 10);
-	if((handle = ipc_port_open(id)) < 0) {
-		printf("Pong: Failed to open port %d: %d\n", id, handle);
-		return handle;
-	} else if((ret = ipc_port_acl_add(handle, IPC_PORT_ACCESSOR_PROCESS, process_id(-1), IPC_PORT_RIGHT_CONNECT)) != 0) {
-		printf("Pong: Failed to modify ACL: %d\n", ret);
-		return ret;
+	/* Use the console for output. */
+	fopen_device("/console/0/slave", stdout);
+
+	/* Create the port. */
+	port.Create();
+	port.GrantAccess(IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_CONNECT);
+
+	/* FIXME: Integrate this into IPCPort. */
+	{
+		svcmgr_register_port_t *msg;
+		IPCConnection svcmgr;
+		uint32_t type;
+		size_t size;
+		char *data;
+
+		msg = reinterpret_cast<svcmgr_register_port_t *>(malloc(sizeof(*msg) + strlen(PORT_NAME)));
+		msg->id = port.GetID();
+		memcpy(msg->name, PORT_NAME, strlen(PORT_NAME));
+
+		svcmgr.Connect(1);
+		svcmgr.Send(SVCMGR_REGISTER_PORT, msg, sizeof(*msg) + strlen(PORT_NAME));
+		svcmgr.Receive(type, data, size);
+		delete[] data;
+		free(msg);
 	}
-	handle_close(handle);
 
-	if((handle = ipc_connection_open(id, -1)) < 0) {
-		printf("Pong: Failed to connect to port %d: %d\n", id, handle);
-		return handle;
-	}
+	while((conn = port.Listen())) {
+		while(true) {
+			uint32_t type, val;
+			size_t size;
+			char *data;
 
-	while(true) {
-		if((ret = ipc_message_receive(handle, -1, &type, &data, &size)) != 0) {
-			return ret;
+			if(!conn->Receive(type, data, size)) {
+				break;
+			}
+
+			val = *(reinterpret_cast<uint32_t *>(data));
+			cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
+
+			if(!conn->Send(2, data, size)) {
+				break;
+			}
+
+			delete data;
 		}
 
-		printf("Pong: Received message type %u: %u (size: %zu)\n", type, data, size);
-
-		if((ret = ipc_message_send(handle, 2, &data, sizeof(uint32_t))) != 0) {
-			return ret;
-		}
+		delete conn;
 	}
 }

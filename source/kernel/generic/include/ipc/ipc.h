@@ -35,7 +35,7 @@ typedef enum ipc_port_accessor {
 /** Structure describing a message to send with ipc_message_send_vector(). */
 typedef struct ipc_message_vector {
 	uint32_t type;				/**< Type of message. */
-	void *buf;				/**< Data buffer. */
+	const void *buf;			/**< Data buffer. */
 	size_t size;				/**< Size of data buffer. */
 } ipc_message_vector_t;
 
@@ -65,7 +65,7 @@ extern int sys_ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type,
 
 extern handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout);
 
-extern int sys_ipc_message_send(handle_t handle, uint32_t type, void *buf, size_t size);
+extern int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size);
 extern int sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count);
 extern int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
                                    void *buf, size_t *size);

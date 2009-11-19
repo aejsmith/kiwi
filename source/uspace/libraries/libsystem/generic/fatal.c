@@ -18,6 +18,10 @@
  * @brief		Fatal error function.
  */
 
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "libsystem.h"
 #include "stdio/stdio_priv.h"
 
@@ -62,4 +66,18 @@ void __libsystem_fatal(const char *fmt, ...) {
  * @param name		Name of function. */
 void __libsystem_stub(const char *name) {
 	__libsystem_fatal("unimplemented function: %s", name);
+}
+
+/** Print out an assertion fail message.
+ * @param cond		Condition.
+ * @param file		File it occurred in.
+ * @param line		Line number.
+ * @param func		Function name. */
+void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
+	if(func == (__const char *)0) {
+		fprintf(stderr, "assert: Assertion '%s' failed at %s:%d\n", cond, file, line);
+	} else {
+		fprintf(stderr, "assert:%s: Assertion '%s' failed at %s:%d\n", func, cond, file, line);
+	}
+	abort();
 }

@@ -1,4 +1,4 @@
-/* Kiwi process class
+/* Kiwi IPC port class
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,37 +15,37 @@
 
 /**
  * @file
- * @brief		Process class.
+ * @brief		IPC port class.
  */
 
-#ifndef __KIWI_PROCESS_H
-#define __KIWI_PROCESS_H
+#ifndef __KIWI_IPCPORT_H
+#define __KIWI_IPCPORT_H
 
-#include <kernel/process.h>
+#include <kernel/ipc.h>
 
 #include <kiwi/Handle.h>
+#include <kiwi/IPCConnection.h>
 
 namespace kiwi {
 
-/** Class providing functionality to create and manipulate processes. */
-class Process : public Handle {
+/** Class implementing an IPC port. */
+class IPCPort : public Handle {
 public:
-	Process(handle_t handle = -1);
+	IPCPort(handle_t handle = -1);
 
-	bool Create(char **args, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
-	bool Create(const char *cmdline, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	bool Create();
 	bool Open(identifier_t id);
 
-	bool WaitTerminate(timeout_t timeout = -1) const;
-	identifier_t GetID(void) const;
+	IPCConnection *Listen(timeout_t timeout = -1) const;
+	bool GrantAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;
+	bool RevokeAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;
+	identifier_t GetID() const;
 
-	static identifier_t GetCurrentID(void);
-
-	Signal<int> OnExit;
-protected:
-	virtual void _EventReceived(int event);
+	Signal<> OnConnection;
+private:
+	void _EventReceived(int id);
 };
 
 }
 
-#endif /* __KIWI_PROCESS_H */
+#endif /* __KIWI_IPCPORT_H */

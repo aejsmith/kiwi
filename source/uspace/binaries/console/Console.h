@@ -35,7 +35,7 @@ public:
 	 * @return		Whether initialisation succeeded. */
 	bool Initialised(void) const { return (m_init_status == 0); }
 
-	int Run(const char *cmdline);
+	bool Run(const char *cmdline);
 	void Input(unsigned char ch);
 	void Output(unsigned char ch);
 	void Redraw(void);

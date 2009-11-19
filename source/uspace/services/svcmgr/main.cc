@@ -18,43 +18,21 @@
  * @brief		Service manager.
  */
 
-#include <kernel/ipc.h>
-
-#include <kiwi/Process.h>
-
-#include <iostream>
-
-using namespace kiwi;
-using namespace std;
+#include "Service.h"
+#include "ServiceManager.h"
 
 int main(int argc, char **argv) {
-	handle_t handle;
-	Process *proc;
-	int ret;
+	ServiceManager svcmgr;
+	Service *service;
 
-	/* Check if we are process 1. */
-	if(Process::GetCurrentID() != 1) {
-		cout << "Must be run as process 1" << endl;
-		return 1;
-	}
+	/* Add services. TODO: These should be in configuration files. */
+	service = new Service("console", "Service providing a graphical console.", "/system/binaries/console");
+	svcmgr.AddService(service);
 
-	/* Create the service manager port. */
-	if((handle = ipc_port_create()) < 0) {
-		cout << "Could not register port (" << handle << ")" << endl;
-		return 1;
-	} else if(ipc_port_id(handle) != 1) {
-		cout << "Created port is not port 1" << endl;
-		return 1;
-	}
+	service = new Service("pong", "Service that pongs pings.", "/system/binaries/pong", Service::OnDemand);
+	service->AddPort("org.kiwi.Pong");
+	svcmgr.AddService(service);
 
-	proc = new Process("/system/binaries/console");
-	if(!proc->Initialised(&ret)) {
-		printf("Failed to create process (%d)\n", ret);
-		delete proc;
-		return 1;
-	}
-
-	proc->WaitTerminate();
-	delete proc;
-	while(1);
+	svcmgr.Run();
+	return 0;
 }

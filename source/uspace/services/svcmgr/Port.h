@@ -1,4 +1,4 @@
-/* Kiwi IPC test
+/* Kiwi service manager
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,38 +15,30 @@
 
 /**
  * @file
- * @brief		IPC test.
+ * @brief		Service manager.
  */
 
+#ifndef __PORT_H
+#define __PORT_H
+
 #include <kiwi/IPCConnection.h>
-#include <iostream>
 
-using namespace kiwi;
-using namespace std;
+#include <list>
 
-int main(int argc, char **argv) {
-	IPCConnection conn;
-	uint32_t val = 0;
+#include "Service.h"
 
-	if(!conn.Connect("org.kiwi.Pong")) {
-		return 1;
-	}
+/** Class containing details of a port. */
+class Port {
+public:
+	Port(Service *service);
+	void SetID(identifier_t id);
+	void SendID(kiwi::IPCConnection *conn);
+private:
+	identifier_t m_id;		/**< Port ID. */
+	Service *m_service;		/**< Service managing the port. */
 
-	while(true) {
-		uint32_t type;
-		size_t size;
-		char *data;
+	/** List of connections waiting for the port to be registered. */
+	std::list<kiwi::IPCConnection *> m_waiting;
+};
 
-		if(!conn.Send(1, &val, sizeof(uint32_t))) {
-			break;
-		} else if(!conn.Receive(type, data, size)) {
-			break;
-		}
-
-		val = *(reinterpret_cast<uint32_t *>(data));
-		cout << "Ping: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
-		delete[] data;
-
-		val++;
-	}
-}
+#endif /* __PORT_H */

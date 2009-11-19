@@ -15,5 +15,8 @@
 Import('env')
 
 env.Program('svcmgr', [
+	'Port.cc',
+	'Service.cc',
+	'ServiceManager.cc',
 	'main.cc',
 ], LIBS=['kiwi'])
