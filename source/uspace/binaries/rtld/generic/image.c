@@ -164,9 +164,12 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 			goto fail;
 		}
 
-		/* Set the private and fixed flags - we always want to insert
-		 * at the position we say, and not share stuff. */
-		flags |= (VM_MAP_FIXED | VM_MAP_PRIVATE);
+		/* Set the fixed flag, and the private flag if mapping as
+		 * writeable. */
+		flags |= VM_MAP_FIXED;
+		if(phdrs[i].p_flags & ELF_PF_W) {
+			flags |= VM_MAP_PRIVATE;
+		}
 
 		/* Map the BSS if required. */
 		if(phdrs[i].p_filesz != phdrs[i].p_memsz) {
