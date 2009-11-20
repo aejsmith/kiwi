@@ -30,12 +30,15 @@ using namespace std;
 Port::Port(Service *service) : m_id(-1), m_service(service) {}
 
 /** Set the ID of a port.
- * @param id		New ID. */
-void Port::SetID(identifier_t id) {
+ * @param id		New ID.
+ * @return		Whether successful. */
+bool Port::SetID(identifier_t id) {
 	list<IPCConnection *>::iterator it;
 	IPCConnection *conn;
 
-	assert(m_service->GetState() == Service::Running);
+	if(m_service->GetState() != Service::Running) {
+		return false;
+	}
 
 	m_id = id;
 
@@ -46,6 +49,8 @@ void Port::SetID(identifier_t id) {
 		m_waiting.erase(it);
 		SendID(conn);
 	}
+
+	return true;
 }
 
 /** Send the ID of a port on a connection.

@@ -31,7 +31,7 @@
 class Port {
 public:
 	Port(Service *service);
-	void SetID(identifier_t id);
+	bool SetID(identifier_t id);
 	void SendID(kiwi::IPCConnection *conn);
 private:
 	identifier_t m_id;		/**< Port ID. */

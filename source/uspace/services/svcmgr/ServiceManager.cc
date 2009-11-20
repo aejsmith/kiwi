@@ -112,7 +112,9 @@ void ServiceManager::_MessageReceived(IPCConnection *conn) {
 		if(size > sizeof(svcmgr_register_port_t) && args->id > 0) {
 			string name(args->name, size - sizeof(svcmgr_register_port_t));
 			if((port = LookupPort(name.c_str()))) {
-				port->SetID(args->id);
+				if(!port->SetID(args->id)) {
+					ret = -ERR_PERM_DENIED;
+				}
 			} else {
 				ret = -ERR_NOT_FOUND;
 			}
