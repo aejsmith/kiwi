@@ -27,8 +27,6 @@
 #include <cstring>
 #include <iostream>
 
-#define PORT_NAME "org.kiwi.Pong"
-
 using namespace kiwi;
 using namespace std;
 
@@ -44,25 +42,7 @@ int main(int argc, char **argv) {
 	/* Create the port. */
 	port.Create();
 	port.GrantAccess(IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_CONNECT);
-
-	/* FIXME: Integrate this into IPCPort. */
-	{
-		svcmgr_register_port_t *msg;
-		IPCConnection svcmgr;
-		uint32_t type;
-		size_t size;
-		char *data;
-
-		msg = reinterpret_cast<svcmgr_register_port_t *>(malloc(sizeof(*msg) + strlen(PORT_NAME)));
-		msg->id = port.GetID();
-		memcpy(msg->name, PORT_NAME, strlen(PORT_NAME));
-
-		svcmgr.Connect(1);
-		svcmgr.Send(SVCMGR_REGISTER_PORT, msg, sizeof(*msg) + strlen(PORT_NAME));
-		svcmgr.Receive(type, data, size);
-		delete[] data;
-		free(msg);
-	}
+	port.Register("org.kiwi.Pong");
 
 	while((conn = port.Listen())) {
 		while(true) {

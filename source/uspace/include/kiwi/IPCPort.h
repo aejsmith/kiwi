@@ -35,6 +35,7 @@ public:
 
 	bool Create();
 	bool Open(identifier_t id);
+	bool Register(const char *name);
 
 	IPCConnection *Listen(timeout_t timeout = -1) const;
 	bool GrantAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;

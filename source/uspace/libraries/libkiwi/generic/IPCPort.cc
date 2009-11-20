@@ -18,7 +18,11 @@
  * @brief		IPC port class.
  */
 
+#include <kiwi/private/svcmgr.h>
 #include <kiwi/IPCPort.h>
+
+#include <cstdlib>
+#include <cstring>
 
 using namespace kiwi;
 using namespace std;
@@ -43,12 +47,12 @@ IPCPort::IPCPort(handle_t handle) : Handle(handle) {
 bool IPCPort::Create() {
 	if(!Close()) {
 		return false;
-	} else if((m_handle = ipc_port_create()) >= 0) {
-		_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
-		return true;
-	} else {
+	} else if((m_handle = ipc_port_create()) < 0) {
 		return false;
 	}
+
+	_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
+	return true;
 }
 
 /** Open an existing port.
@@ -71,6 +75,37 @@ bool IPCPort::Open(identifier_t id) {
 	} else {
 		return false;
 	}
+}
+
+/** Register the port with the service manager.
+ * @param name		Port name to register with.
+ * @return		Whether registration was successful. */
+bool IPCPort::Register(const char *name) {
+	svcmgr_register_port_t *msg;
+	IPCConnection svcmgr;
+	uint32_t type;
+	size_t size;
+	char *data;
+
+	/* Send the message. */
+	size = sizeof(*msg) + strlen(name);
+	data = new char[size];
+	msg = reinterpret_cast<svcmgr_register_port_t *>(data);
+	msg->id = GetID();
+	memcpy(msg->name, name, size - sizeof(*msg));
+	if(!svcmgr.Connect(1) || !svcmgr.Send(SVCMGR_REGISTER_PORT, msg, size)) {
+		Close();
+		return false;
+	}
+	delete[] data;
+
+	/* Await the reply. */
+	if(!svcmgr.Receive(type, data, size) || *(reinterpret_cast<int *>(data)) != 0) {
+		Close();
+		return false;
+	}
+	delete[] data;
+	return true;
 }
 
 /** Block until a connection is made to the port.
