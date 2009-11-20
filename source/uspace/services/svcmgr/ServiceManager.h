@@ -37,25 +37,15 @@
 class ServiceManager : public kiwi::EventLoop {
 	/** Type for the port map. */
 	typedef std::map<std::string, Port *> PortMap;
-
-	/** Class representing a connection to the service manager. */
-	class Connection {
-	public:
-		Connection(kiwi::IPCConnection *conn, ServiceManager *svcmgr);
-	private:
-		void _MessageReceived();
-		void _ConnectionHangup();
-
-		kiwi::IPCConnection *m_conn;	/**< Connection structure. */
-		ServiceManager *m_svcmgr;	/**< Service manager. */
-	};
 public:
 	ServiceManager();
 
 	void AddService(Service *service);
 	Port *LookupPort(const char *name);
 private:
-	void _HandleConnection();
+	void _HandleConnection(kiwi::IPCPort *);
+	void _MessageReceived(kiwi::IPCConnection *conn);
+	void _ConnectionHangup(kiwi::IPCConnection *conn);
 
 	kiwi::IPCPort m_port;			/**< Service manager port. */
 	std::list<Service *> m_services;	/**< List of services. */

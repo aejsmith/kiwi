@@ -41,7 +41,7 @@ public:
 	bool RevokeAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;
 	identifier_t GetID() const;
 
-	Signal<> OnConnection;
+	Signal<IPCPort *> OnConnection;
 private:
 	void _EventReceived(int id);
 };

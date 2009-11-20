@@ -59,7 +59,7 @@ public:
 	 * @return		Reference to the port list. */
 	const PortList &GetPorts() const { return m_ports; }
 private:
-	void _ProcessExited(int status);
+	void _ProcessExited(kiwi::Process *, int status);
 
 	std::string m_name;		/**< Name of the service. */
 	std::string m_description;	/**< Description of the service. */

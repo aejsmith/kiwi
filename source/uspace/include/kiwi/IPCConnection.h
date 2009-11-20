@@ -39,8 +39,8 @@ public:
 	//bool Receive(Message *&message, timeout_t timeout = -1);
 	bool Receive(uint32_t &type, char *&data, size_t &size, timeout_t timeout = -1);
 
-	Signal<> OnMessage;
-	Signal<> OnHangup;
+	Signal<IPCConnection *> OnMessage;
+	Signal<IPCConnection *> OnHangup;
 protected:
 	void _EventReceived(int id);
 };

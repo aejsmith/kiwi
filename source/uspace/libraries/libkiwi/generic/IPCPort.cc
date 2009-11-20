@@ -123,7 +123,7 @@ identifier_t IPCPort::GetID() const {
 void IPCPort::_EventReceived(int id) {
 	switch(id) {
 	case IPC_PORT_EVENT_CONNECTION:
-		OnConnection();
+		OnConnection(this);
 		break;
 	}
 }

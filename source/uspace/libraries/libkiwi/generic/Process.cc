@@ -204,7 +204,7 @@ void Process::_EventReceived(int event) {
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
 		/* FIXME: Get status. */
-		OnExit(0);
+		OnExit(this, 0);
 
 		/* Unregister the death event so that it doesn't continually
 		 * get signalled. */

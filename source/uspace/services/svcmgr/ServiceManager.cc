@@ -30,72 +30,6 @@
 using namespace kiwi;
 using namespace std;
 
-/** Service manager connection constructor. */
-ServiceManager::Connection::Connection(IPCConnection *conn, ServiceManager *svcmgr) :
-	m_conn(conn), m_svcmgr(svcmgr)
-{
-	conn->OnMessage.Connect(this, &ServiceManager::Connection::_MessageReceived);
-	conn->OnHangup.Connect(this, &ServiceManager::Connection::_ConnectionHangup);
-}
-
-/** Handle a message on a connection to the service manager. */
-void ServiceManager::Connection::_MessageReceived() {
-	uint32_t type;
-	size_t size;
-	Port *port;
-	char *data;
-
-	if(!m_conn->Receive(type, data, size)) {
-		return;
-	}
-
-	switch(type) {
-	case SVCMGR_LOOKUP_PORT:
-	{
-		string name(data, size);
-		if((port = m_svcmgr->LookupPort(name.c_str()))) {
-			port->SendID(m_conn);
-		} else {
-			identifier_t ret = -ERR_NOT_FOUND;
-			m_conn->Send(type, &ret, sizeof(ret));
-		}
-		break;
-	}
-	case SVCMGR_REGISTER_PORT:
-	{
-		svcmgr_register_port_t *args = reinterpret_cast<svcmgr_register_port_t *>(data);
-		int ret = 0;
-
-		if(size > sizeof(svcmgr_register_port_t) && args->id > 0) {
-			string name(args->name, size - sizeof(svcmgr_register_port_t));
-			if((port = m_svcmgr->LookupPort(name.c_str()))) {
-				port->SetID(args->id);
-			} else {
-				ret = -ERR_NOT_FOUND;
-			}
-		} else {
-			ret = -ERR_PARAM_INVAL;
-		}
-
-		m_conn->Send(type, &ret, sizeof(ret));
-		break;
-	}
-	default:
-		/* Just ignore it. */
-		break;
-	}
-
-	delete[] data;
-}
-
-/** Handle the connection being hung up. */
-void ServiceManager::Connection::_ConnectionHangup() {
-	/* FIXME: AUGH. */
-	m_conn->Close();
-	//delete m_conn;
-	//delete this;
-}
-
 /** Service manager constructor. */
 ServiceManager::ServiceManager() {
 	Process proc;
@@ -137,10 +71,71 @@ Port *ServiceManager::LookupPort(const char *name) {
 }
 
 /** Handle a connection on the service manager port. */
-void ServiceManager::_HandleConnection() {
+void ServiceManager::_HandleConnection(IPCPort *) {
 	IPCConnection *conn;
 
 	if((conn = m_port.Listen())) {
-		new Connection(conn, this);
+		conn->OnMessage.Connect(this, &ServiceManager::_MessageReceived); 
+		conn->OnHangup.Connect(this, &ServiceManager::_ConnectionHangup);
 	}
+}
+
+/** Handle a message on a connection to the service manager.
+ * @param conn		Connection object. */
+void ServiceManager::_MessageReceived(IPCConnection *conn) {
+	uint32_t type;
+	size_t size;
+	Port *port;
+	char *data;
+
+	if(!conn->Receive(type, data, size)) {
+		return;
+	}
+
+	switch(type) {
+	case SVCMGR_LOOKUP_PORT:
+	{
+		string name(data, size);
+		if((port = LookupPort(name.c_str()))) {
+			port->SendID(conn);
+		} else {
+			identifier_t ret = -ERR_NOT_FOUND;
+			conn->Send(type, &ret, sizeof(ret));
+		}
+		break;
+	}
+	case SVCMGR_REGISTER_PORT:
+	{
+		svcmgr_register_port_t *args = reinterpret_cast<svcmgr_register_port_t *>(data);
+		int ret = 0;
+
+		if(size > sizeof(svcmgr_register_port_t) && args->id > 0) {
+			string name(args->name, size - sizeof(svcmgr_register_port_t));
+			if((port = LookupPort(name.c_str()))) {
+				port->SetID(args->id);
+			} else {
+				ret = -ERR_NOT_FOUND;
+			}
+		} else {
+			ret = -ERR_PARAM_INVAL;
+		}
+
+		conn->Send(type, &ret, sizeof(ret));
+		break;
+	}
+	default:
+		/* Just ignore it. */
+		break;
+	}
+
+	delete[] data;
+}
+
+/** Handle the connection being hung up.
+ * @param conn		Connection object. */
+void ServiceManager::_ConnectionHangup(IPCConnection *conn) {
+	/* FIXME: AUGH, can't do this because we're called from the object.
+	 * Need a delayed delete function on Object. */
+	conn->Close();
+	//delete conn;
 }

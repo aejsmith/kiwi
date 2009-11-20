@@ -41,7 +41,7 @@ public:
 
 	static identifier_t GetCurrentID(void);
 
-	Signal<int> OnExit;
+	Signal<Process *, int> OnExit;
 protected:
 	virtual void _EventReceived(int event);
 };

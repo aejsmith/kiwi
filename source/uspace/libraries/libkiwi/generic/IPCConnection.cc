@@ -142,10 +142,10 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, timeout_t
 void IPCConnection::_EventReceived(int id) {
 	switch(id) {
 	case HANDLE_EVENT_READ:
-		OnMessage();
+		OnMessage(this);
 		break;
 	case IPC_CONNECTION_EVENT_HANGUP:
-		OnHangup();
+		OnHangup(this);
 		break;
 	}
 }
