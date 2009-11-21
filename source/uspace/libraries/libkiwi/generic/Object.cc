@@ -18,9 +18,12 @@
  * @brief		API object base class.
  */
 
+#include <kiwi/EventLoop.h>
 #include <kiwi/Object.h>
 
 using namespace kiwi;
+
+extern EventLoop *global_event_loop;
 
 /** Constructor for Object.
  * @note		Protected - Object cannot be instantiated directly. */
@@ -28,3 +31,10 @@ Object::Object() {}
 
 /** Destructor for Object. */
 Object::~Object() {}
+
+/** Schedule the object for deletion when control returns to the event loop. */
+void Object::DeleteLater() {
+	if(global_event_loop) {
+		global_event_loop->DeleteObject(this);
+	}
+}

@@ -24,6 +24,7 @@
 #include <kiwi/Handle.h>
 #include <kiwi/Object.h>
 
+#include <list>
 #include <vector>
 
 namespace kiwi {
@@ -40,9 +41,12 @@ public:
 
 	void AddHandle(Handle *handle, int event);
 	void RemoveHandle(Handle *handle, int event);
+	void DeleteObject(Object *obj);
 	void Run();
 private:
 	void _HandleClosed(Handle *handle);
+
+	std::list<Object *> m_to_delete;	/**< Objects to delete when control returns to the loop. */
 
 	/** @note Data stored as multiple vectors because it is the format
 	 *        handle_wait_multiple() expects. */

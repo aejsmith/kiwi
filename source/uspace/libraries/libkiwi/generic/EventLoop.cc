@@ -68,11 +68,24 @@ void EventLoop::RemoveHandle(Handle *handle, int event) {
 	}
 }
 
+/** Register an object to be deleted when control returns to the event loop.
+ * @param obj		Object to delete. */
+void EventLoop::DeleteObject(Object *obj) {
+	m_to_delete.push_back(obj);
+}
+
 /** Run the event loop. */
 void EventLoop::Run(void) {
+	list<Object *>::iterator it;
 	int ret;
 
 	while(true) {
+		/* Delete objects scheduled for deletion. */
+		while((it = m_to_delete.begin()) != m_to_delete.end()) {
+			delete *it;
+			m_to_delete.erase(it);
+		}
+
 		if((ret = handle_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1)) < 0) {
 			cerr << "Failed to wait for events (" << ret << ')' << endl;
 			return;

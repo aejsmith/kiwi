@@ -36,6 +36,8 @@ namespace kiwi {
 class Object {
 public:
 	virtual ~Object();
+
+	void DeleteLater();
 protected:
 	Object();
 };

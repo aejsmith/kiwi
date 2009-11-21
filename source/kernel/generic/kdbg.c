@@ -516,6 +516,22 @@ static int kdbg_process_input(char *input) {
 		}
 	}
 
+	/* I was bored. */
+	if(strcmp(argv[0], "cheez") == 0) {
+		kprintf(LOG_NONE, "         _--\"-.\n");
+		kprintf(LOG_NONE, "      .-\"      \"-.\n");
+		kprintf(LOG_NONE, "     |\"\"--..      '-.\n");
+		kprintf(LOG_NONE, "     |      \"\"--..   '-.\n");
+		kprintf(LOG_NONE, "     |.-. .-\".    \"\"--..\".\n");
+		kprintf(LOG_NONE, "     |'./  -_'  .-.      |\n");
+		kprintf(LOG_NONE, "     |      .-. '.-'   .-'\n");
+		kprintf(LOG_NONE, "     '--..  '.'    .-  -.\n");
+		kprintf(LOG_NONE, "          \"\"--..   '_'   :\n");
+		kprintf(LOG_NONE, "                \"\"--..   |\n");
+		kprintf(LOG_NONE, "                      \"\"-'\n");
+		return KDBG_OK;
+	}
+
 	argv[argc] = NULL;
 
 	/* Search for the command and run it. */

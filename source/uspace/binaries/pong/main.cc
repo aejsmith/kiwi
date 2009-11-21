@@ -18,13 +18,9 @@
  * @brief		IPC test.
  */
 
-#include <kiwi/private/svcmgr.h>
 #include <kiwi/IPCConnection.h>
 #include <kiwi/IPCPort.h>
 
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <iostream>
 
 using namespace kiwi;

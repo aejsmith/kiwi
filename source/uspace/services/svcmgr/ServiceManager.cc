@@ -136,8 +136,5 @@ void ServiceManager::_MessageReceived(IPCConnection *conn) {
 /** Handle the connection being hung up.
  * @param conn		Connection object. */
 void ServiceManager::_ConnectionHangup(IPCConnection *conn) {
-	/* FIXME: AUGH, can't do this because we're called from the object.
-	 * Need a delayed delete function on Object. */
-	conn->Close();
-	//delete conn;
+	conn->DeleteLater();
 }
