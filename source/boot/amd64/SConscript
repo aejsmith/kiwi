@@ -51,13 +51,16 @@ def iso_image_func(target, source, env):
 
 	# Create the ISO.
 	verbose = envmgr.verbose and '' or '>> /dev/null 2>&1'
-	ret = os.system('mkisofs -J -R -l -b boot/grub/stage2_eltorito ' + \
-	                '-boot-load-size 4 -boot-info-table -no-emul-boot ' + \
-	                '-o %s %s %s' % (target[0], tmpdir, verbose))
+	if os.system('mkisofs -J -R -l -b boot/grub/stage2_eltorito ' + \
+	             '-boot-load-size 4 -boot-info-table -no-emul-boot ' + \
+	             '-o %s %s %s' % (target[0], tmpdir, verbose)) != 0:
+		print "Could not find mkisofs! Please ensure that it is installed."
+		shutil.rmtree(tmpdir)
+		return 1
 
 	# Clean up.
 	shutil.rmtree(tmpdir)
-	return ret
+	return 0
 dist['BUILDERS']['ISOImage'] = Builder(action=Action(iso_image_func, '$GENCOMSTR'))
 
 # Function to generate a HD image.

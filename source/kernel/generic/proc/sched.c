@@ -449,7 +449,7 @@ void sched_internal(bool state) {
 	 * handler in waitq_sleep(), so put anything to do after a switch in
 	 * sched_post_switch(). */
 	if(curr_thread != cpu->prev_thread) {
-		/* Switch the address space. If the new process' addres space
+		/* Switch the address space. If the new process' address space
 		 * is set to NULL then vm_aspace_switch() will just switch to
 		 * the kernel address space. */
 		vm_aspace_switch(curr_thread->owner->aspace);

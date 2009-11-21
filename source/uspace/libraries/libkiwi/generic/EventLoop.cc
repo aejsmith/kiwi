@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Kiwi event loop class.
+ * @brief		Event loop class.
  */
 
 #include <kernel/handle.h>
