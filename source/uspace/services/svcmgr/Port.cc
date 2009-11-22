@@ -18,6 +18,8 @@
  * @brief		Service manager.
  */
 
+#include <kernel/errors.h>
+
 #include <assert.h>
 
 #include "Port.h"
@@ -58,10 +60,14 @@ bool Port::SetID(identifier_t id) {
  *			needs to be started. */
 void Port::SendID(IPCConnection *conn) {
 	if(m_service->GetState() == Service::Running) {
-		conn->Send(SVCMGR_LOOKUP_PORT, reinterpret_cast<char *>(&m_id), sizeof(m_id));
+		conn->Send(SVCMGR_LOOKUP_PORT, &m_id, sizeof(m_id));
 	} else {
 		/* Start it and wait for the port to be registered. */
-		m_service->Start();
-		m_waiting.push_back(conn);
+		if(!m_service->Start()) {
+			identifier_t ret = -ERR_RESOURCE_UNAVAIL;
+			conn->Send(SVCMGR_LOOKUP_PORT, &ret, sizeof(ret));
+		} else {
+			m_waiting.push_back(conn);
+		}
 	}
 }

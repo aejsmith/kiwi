@@ -15,5 +15,7 @@
 Import('env')
 
 SConscript(dirs=[
+	'console',
+	'pong',
 	'svcmgr',
 ], exports=['env'])

@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
 	Service *service;
 
 	/* Add services. TODO: These should be in configuration files. */
-	service = new Service("console", "Service providing a graphical console.", "/system/binaries/console");
+	service = new Service("console", "Service providing a graphical console.", "/system/services/console");
 	svcmgr.AddService(service);
 
-	service = new Service("pong", "Service that pongs pings.", "/system/binaries/pong", Service::OnDemand);
+	service = new Service("pong", "Service that pongs pings.", "/system/services/pong", Service::OnDemand);
 	service->AddPort("org.kiwi.Pong");
 	svcmgr.AddService(service);
 
