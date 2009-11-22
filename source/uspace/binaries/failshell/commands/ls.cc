@@ -77,7 +77,7 @@ public:
 
 			strcpy(path, dir);
 			strcat(path, "/");
-			strcpy(path, entry->name);
+			strcat(path, entry->name);
 
 			/* Get information. */
 			if((ret = fs_info(path, false, &info)) != 0) {
