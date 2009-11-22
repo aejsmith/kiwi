@@ -32,8 +32,10 @@ class Process : public Handle {
 public:
 	Process(handle_t handle = -1);
 
-	bool Create(char **args, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
-	bool Create(const char *cmdline, char **env = 0, bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	bool Create(const char *const args[], const char *const env[] = 0,
+	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	bool Create(const char *cmdline, const char *const env[] = 0,
+	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
 	bool Open(identifier_t id);
 
 	bool WaitTerminate(timeout_t timeout = -1) const;

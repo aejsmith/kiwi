@@ -270,7 +270,7 @@ int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int arrcpy_from_user(char *const src[], char ***arrayp) {
+int arrcpy_from_user(const char *const src[], char ***arrayp) {
 	char **array = NULL, **narr;
 	int ret, i;
 

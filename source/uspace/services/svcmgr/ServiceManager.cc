@@ -32,16 +32,14 @@ using namespace std;
 
 /** Service manager constructor. */
 ServiceManager::ServiceManager() {
-	Process proc;
-
 	m_port.OnConnection.Connect(this, &ServiceManager::_HandleConnection);
 
 	/* Create the port. TODO: Per-user instance. */
 	if(!m_port.Create()) {
-		cerr << "svcmgr: could not register port" << endl;
+		cerr << "svcmgr: could not create port" << endl;
 		throw exception();
 	} else if(m_port.GetID() != 1) {
-		cerr << "svcmgr: registered port (" << m_port.GetID() << ") is not port 1" << endl;
+		cerr << "svcmgr: created port (" << m_port.GetID() << ") is not port 1" << endl;
 		throw exception();
 	}
 	m_port.GrantAccess(IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_CONNECT);
@@ -75,14 +73,14 @@ void ServiceManager::_HandleConnection(IPCPort *) {
 	IPCConnection *conn;
 
 	if((conn = m_port.Listen())) {
-		conn->OnMessage.Connect(this, &ServiceManager::_MessageReceived); 
-		conn->OnHangup.Connect(this, &ServiceManager::_ConnectionHangup);
+		conn->OnMessage.Connect(this, &ServiceManager::_HandleMessage); 
+		conn->OnHangup.Connect(this, &ServiceManager::_HandleHangup);
 	}
 }
 
 /** Handle a message on a connection to the service manager.
  * @param conn		Connection object. */
-void ServiceManager::_MessageReceived(IPCConnection *conn) {
+void ServiceManager::_HandleMessage(IPCConnection *conn) {
 	uint32_t type;
 	size_t size;
 	Port *port;
@@ -135,6 +133,6 @@ void ServiceManager::_MessageReceived(IPCConnection *conn) {
 
 /** Handle the connection being hung up.
  * @param conn		Connection object. */
-void ServiceManager::_ConnectionHangup(IPCConnection *conn) {
+void ServiceManager::_HandleHangup(IPCConnection *conn) {
 	conn->DeleteLater();
 }

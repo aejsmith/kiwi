@@ -97,8 +97,8 @@ extern int kdbg_cmd_process(int argc, char **argv);
 
 extern void process_init(void);
 
-extern handle_t sys_process_create(const char *path, char *const args[], char *const environ[], int flags);
-extern int sys_process_replace(const char *path, char *const args[], char *const environ[], int flags);
+extern handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags);
+extern int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags);
 extern int sys_process_duplicate(handle_t *handlep);
 extern handle_t sys_process_open(identifier_t id);
 extern identifier_t sys_process_id(handle_t handle);

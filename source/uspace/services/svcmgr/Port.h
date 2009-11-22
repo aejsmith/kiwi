@@ -34,6 +34,8 @@ public:
 	bool SetID(identifier_t id);
 	void SendID(kiwi::IPCConnection *conn);
 private:
+	void _ServiceStopped();
+
 	identifier_t m_id;		/**< Port ID. */
 	Service *m_service;		/**< Service managing the port. */
 

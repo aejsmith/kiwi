@@ -61,4 +61,5 @@ void Service::_ProcessExited(Process *, int status) {
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
 	m_process.Close();
 	m_state = Stopped;
+	OnStop();
 }

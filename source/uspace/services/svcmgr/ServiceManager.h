@@ -44,8 +44,8 @@ public:
 	Port *LookupPort(const char *name);
 private:
 	void _HandleConnection(kiwi::IPCPort *);
-	void _MessageReceived(kiwi::IPCConnection *conn);
-	void _ConnectionHangup(kiwi::IPCConnection *conn);
+	void _HandleMessage(kiwi::IPCConnection *conn);
+	void _HandleHangup(kiwi::IPCConnection *conn);
 
 	kiwi::IPCPort m_port;			/**< Service manager port. */
 	std::list<Service *> m_services;	/**< List of services. */

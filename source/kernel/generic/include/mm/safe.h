@@ -33,6 +33,6 @@ extern int strcpy_from_user(char *dest, const char *src);
 
 extern int strdup_from_user(const void *src, int mmflag, char **destp);
 extern int strndup_from_user(const void *src, size_t max, int mmflag, char **destp);
-extern int arrcpy_from_user(char *const src[], char ***arrayp);
+extern int arrcpy_from_user(const char *const src[], char ***arrayp);
 
 #endif /* __MM_SAFE_H */

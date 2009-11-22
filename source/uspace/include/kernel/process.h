@@ -42,8 +42,8 @@ typedef struct process_args {
 /** Process handle events. */
 #define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
 
-extern handle_t process_create(const char *path, char *const args[], char *const env[], int flags);
-extern int process_replace(const char *path, char *const args[], char *const env[], int flags);
+extern handle_t process_create(const char *path, const char *const args[], const char *const env[], int flags);
+extern int process_replace(const char *path, const char *const args[], const char *const env[], int flags);
 extern int process_duplicate(handle_t *handlep);
 extern handle_t process_open(identifier_t id);
 extern identifier_t process_id(handle_t handle);

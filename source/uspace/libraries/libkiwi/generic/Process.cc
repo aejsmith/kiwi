@@ -56,7 +56,7 @@ Process::Process(handle_t handle) : Handle(handle) {
  *			match will be executed (defaults to true).
  * @param flags		Process creation flags.
  * @return		True on success, false on failure. */
-bool Process::Create(char **args, char **env, bool usepath, int flags) {
+bool Process::Create(const char *const args[], const char *const env[], bool usepath, int flags) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
@@ -131,7 +131,7 @@ success:
  *			match will be executed (defaults to true).
  * @param flags		Process creation flags.
  * @return		True on success, false on failure. */
-bool Process::Create(const char *cmdline, char **env, bool usepath, int flags) {
+bool Process::Create(const char *cmdline, const char *const env[], bool usepath, int flags) {
 	char *tok, *dup, *orig;
 	vector<char *> args;
 	bool ret;

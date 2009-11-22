@@ -577,7 +577,7 @@ static handle_type_t process_handle_type = {
  * @param kargsp	Where to store kernel address of argument array.
  * @param kenvp		Where to store kernel address of environment array.
  * @return		0 on success, negative error code on failure. */
-static int sys_process_arg_copy(const char *path, char *const args[], char *const environ[],
+static int sys_process_arg_copy(const char *path, const char *const args[], const char *const environ[],
                                 const char **kpathp, const char ***kargsp, const char ***kenvp) {
 	char **kargs, **kenv, *kpath;
 	int ret;
@@ -635,7 +635,7 @@ static void sys_process_arg_free(const char *path, const char **args, const char
  * @return		Handle to new process (greater than or equal to 0),
  *			negative error code on failure.
  */
-handle_t sys_process_create(const char *path, char *const args[], char *const environ[], int flags) {
+handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags) {
 	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread = NULL;
@@ -706,7 +706,7 @@ fail:
  * @return		Does not return on success, returns negative error code
  *			on failure.
  */
-int sys_process_replace(const char *path, char *const args[], char *const environ[], int flags) {
+int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags) {
 	const char **kargs, **kenv, *kpath;
 	vm_aspace_t *as = NULL, *old;
 	ptr_t stack, entry, uargs;

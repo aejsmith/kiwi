@@ -29,7 +29,9 @@ using namespace kiwi;
 using namespace std;
 
 /** Constructor for a port. */
-Port::Port(Service *service) : m_id(-1), m_service(service) {}
+Port::Port(Service *service) : m_id(-1), m_service(service) {
+	service->OnStop.Connect(this, &Port::_ServiceStopped);
+}
 
 /** Set the ID of a port.
  * @param id		New ID.
@@ -44,8 +46,9 @@ bool Port::SetID(identifier_t id) {
 
 	m_id = id;
 
-	/* Send a message for all waiting connections. FIXME: If any of these
-	 * connections have hung up then the pointer will be invalid. */
+	/* Send a message for all waiting connections. FIXME: If any of
+	 * these connections have hung up then the pointer will be
+	 * invalid. */
 	while((it = m_waiting.begin()) != m_waiting.end()) {
 		conn = *it;
 		m_waiting.erase(it);
@@ -59,15 +62,20 @@ bool Port::SetID(identifier_t id) {
  * @note		The ID may not be sent immediately if the service
  *			needs to be started. */
 void Port::SendID(IPCConnection *conn) {
-	if(m_service->GetState() == Service::Running) {
+	if(m_id >= 0) {
 		conn->Send(SVCMGR_LOOKUP_PORT, &m_id, sizeof(m_id));
 	} else {
 		/* Start it and wait for the port to be registered. */
-		if(!m_service->Start()) {
+		if(m_service->GetState() != Service::Running && !m_service->Start()) {
 			identifier_t ret = -ERR_RESOURCE_UNAVAIL;
 			conn->Send(SVCMGR_LOOKUP_PORT, &ret, sizeof(ret));
 		} else {
 			m_waiting.push_back(conn);
 		}
 	}
+}
+
+/** Handle the service stopping. */
+void Port::_ServiceStopped() {
+	m_id = -1;
 }

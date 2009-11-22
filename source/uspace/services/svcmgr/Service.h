@@ -58,6 +58,8 @@ public:
 	/** Get a reference to the port list.
 	 * @return		Reference to the port list. */
 	const PortList &GetPorts() const { return m_ports; }
+
+	kiwi::Signal<> OnStop;
 private:
 	void _ProcessExited(kiwi::Process *, int status);
 
