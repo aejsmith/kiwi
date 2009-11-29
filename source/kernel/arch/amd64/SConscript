@@ -12,10 +12,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
-
-Import('env', 'config')
+Import('env', 'sources')
 
 # Set AMD64-specific compilation flags.
 env['ASFLAGS'] += ['-m64']
@@ -23,18 +20,18 @@ env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone', '-fno-omit-frame-
 env['LDFLAGS'] += ['-A', 'x86_64', '-m', 'elf_x86_64']
 
 # Pull in x86 common code.
-SConscript(dirs=['../common/x86'], exports=['env'])
+SConscript(dirs=['../common/x86'], exports=['env', 'sources'])
 
 # Add source files.
-env['OBJFILES'] += [
-	env.Object('arch.c'),
-	env.Object('boot.S'),
-	env.Object('context.c'),
-	env.Object('descriptor.c'),
-	env.Object('elf.c'),
-	env.Object('entry.S'),
-	env.Object('kdbg.c'),
-	env.Object('page.c'),
-	env.Object('switch.S'),
-	env.Object('thread.c'),
+sources += [
+	File('arch.c'),
+	File('boot.S'),
+	File('context.c'),
+	File('descriptor.c'),
+	File('elf.c'),
+	File('entry.S'),
+	File('kdbg.c'),
+	File('page.c'),
+	File('switch.S'),
+	File('thread.c'),
 ]

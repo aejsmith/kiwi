@@ -15,33 +15,27 @@
 import os
 import sys
 
-Import('env', 'config')
+Import('env', 'sources')
 
 # Set build flags to prevent FPU code generation.
 env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 
 # Generate the AP boot code.
-def gen_inc_s(target, source, env):
-	f = open(str(target[0]), 'w')
-	f.write('.section .init.trampoline, "ax", @progbits\n')
-	f.write('.incbin "ap_boot.bin"\n')
-	f.close()
-env.Object('ap_boot.bin.o', 'ap_boot.S')
-env.Command('ap_boot.bin.elf', 'ap_boot.bin.o', Action('$LINK -Ttext=0 -o $TARGET $SOURCE', None))
-env.Command('ap_boot.bin', 'ap_boot.bin.elf', Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
-env.Command('ap_boot.bin.S', 'ap_boot.bin', Action(gen_inc_s, None))
-env.Command('ap_boot.o', ['ap_boot.bin.S'], Action('$CC $ASFLAGS -c -o $TARGET $SOURCE -Wa,-I%s' %
-            (os.path.abspath(str(File('ap_boot.bin').dir))), None))
+env.Object('ap_boot.S')
+env.Command('ap_boot.bin.elf', ['ap_boot.o'], Action('$LINK -Ttext=0 -o $TARGET $SOURCE', None))
+env.Command('ap_boot.bin', ['ap_boot.bin.elf'], Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
+env.Command('ap_boot.bin.c', ['ap_boot.bin'],
+            Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
+                   '$GENCOMSTR'))
 
 # Add source files.
-env['OBJFILES'] += [
-	File('ap_boot.o'),
-
-	env.Object('cpu.c'),
-	env.Object('fpu.c'),
-	env.Object('intr.c'),
-	env.Object('kdbg.c'),
-	env.Object('lapic.c'),
-	env.Object('smp.c'),
-	env.Object('vm.c'),
+sources += [
+	File('ap_boot.bin.c'),
+	File('cpu.c'),
+	File('fpu.c'),
+	File('intr.c'),
+	File('kdbg.c'),
+	File('lapic.c'),
+	File('smp.c'),
+	File('vm.c'),
 ]

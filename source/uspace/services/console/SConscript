@@ -15,7 +15,7 @@
 Import('env')
 
 # Compile in the logo image.
-env.Command('logo.c', ['logo.ppm'], Action('$BIN2HEX logo_ppm $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('logo.c', ['logo.ppm'], Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
 
 env.Program('console', [
 	'Console.cc',

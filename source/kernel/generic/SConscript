@@ -12,10 +12,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
-
-Import('env', 'config')
+Import('env', 'sources')
 
 # Generate the version information file. Thanks to the use of MD5 file
 # checksums, this won't be rebuilt unless the version info changes!
@@ -29,68 +26,68 @@ def gen_version_c(target, source, env):
 	f.close()
 AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
-env['OBJFILES'] += [
-	env.Object('console/console.c'),
-	env.Object('console/font_8x8.c'),
-	env.Object('console/kprintf.c'),
+sources += [
+	File('console/console.c'),
+	File('console/font_8x8.c'),
+	File('console/kprintf.c'),
 
-	env.Object('cpu/cpu.c'),
-	env.Object('cpu/fpu.c'),
-	env.Object('cpu/irq.c'),
-	env.Object('cpu/ipi.c'),
+	File('cpu/cpu.c'),
+	File('cpu/fpu.c'),
+	File('cpu/irq.c'),
+	File('cpu/ipi.c'),
 
-	env.Object('io/context.c'),
-	env.Object('io/device.c'),
-	env.Object('io/ramfs.c'),
-	env.Object('io/vfs.c'),
+	File('io/context.c'),
+	File('io/device.c'),
+	File('io/ramfs.c'),
+	File('io/vfs.c'),
 
-	env.Object('ipc/ipc.c'),
-	env.Object('ipc/pipe.c'),
+	File('ipc/ipc.c'),
+	File('ipc/pipe.c'),
 
-	env.Object('lib/do_printf.c'),
-	env.Object('lib/notifier.c'),
-	env.Object('lib/qsort.c'),
-	env.Object('lib/sprintf.c'),
-	env.Object('lib/string.c'),
+	File('lib/do_printf.c'),
+	File('lib/notifier.c'),
+	File('lib/qsort.c'),
+	File('lib/sprintf.c'),
+	File('lib/string.c'),
 
-	env.Object('mm/kheap.c'),
-	env.Object('mm/malloc.c'),
-	env.Object('mm/page.c'),
-	env.Object('mm/safe.c'),
-	env.Object('mm/slab.c'),
-	env.Object('mm/tlb.c'),
-	env.Object('mm/vm/anon.c'),
-	env.Object('mm/vm/page.c'),
-	env.Object('mm/vm/vm.c'),
-	env.Object('mm/vmem.c'),
+	File('mm/kheap.c'),
+	File('mm/malloc.c'),
+	File('mm/page.c'),
+	File('mm/safe.c'),
+	File('mm/slab.c'),
+	File('mm/tlb.c'),
+	File('mm/vm/anon.c'),
+	File('mm/vm/page.c'),
+	File('mm/vm/vm.c'),
+	File('mm/vmem.c'),
 
-	env.Object('proc/handle.c'),
-	env.Object('proc/process.c'),
-	env.Object('proc/sched.c'),
-	env.Object('proc/syscall.c'),
-	env.Object('proc/thread.c'),
+	File('proc/handle.c'),
+	File('proc/process.c'),
+	File('proc/sched.c'),
+	File('proc/syscall.c'),
+	File('proc/thread.c'),
 
-	env.Object('sync/condvar.c'),
-	env.Object('sync/mutex.c'),
-	env.Object('sync/rwlock.c'),
-	env.Object('sync/semaphore.c'),
-	env.Object('sync/spinlock.c'),
-	env.Object('sync/waitq.c'),
+	File('sync/condvar.c'),
+	File('sync/mutex.c'),
+	File('sync/rwlock.c'),
+	File('sync/semaphore.c'),
+	File('sync/spinlock.c'),
+	File('sync/waitq.c'),
 
-	env.Object('time/timer.c'),
+	File('time/timer.c'),
 
-	env.Object('types/avl.c'),
-	env.Object('types/bitmap.c'),
-	env.Object('types/hash.c'),
-	env.Object('types/radix.c'),
+	File('types/avl.c'),
+	File('types/bitmap.c'),
+	File('types/hash.c'),
+	File('types/radix.c'),
 
-	env.Object('args.c'),
-	env.Object('bootmod.c'),
-	env.Object('elf.c'),
-	env.Object('fatal.c'),
-	env.Object('init.c'),
-	env.Object('kdbg.c'),
-	env.Object('module.c'),
-	env.Object('symbol.c'),
-	env.Object('version.c'),
+	File('args.c'),
+	File('bootmod.c'),
+	File('elf.c'),
+	File('fatal.c'),
+	File('init.c'),
+	File('kdbg.c'),
+	File('module.c'),
+	File('symbol.c'),
+	File('version.c'),
 ]

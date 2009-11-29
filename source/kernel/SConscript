@@ -12,9 +12,6 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
-
 Import('config', 'envmgr')
 
 ####################################
@@ -45,13 +42,16 @@ env['ASFLAGS'] += ['-nostdinc', '-include', 'build/%s-%s/config.h' % (config['AR
 env['CPPDEFINES'] = {'KERNEL': None}
 
 # Get the list of source files.
-env['OBJFILES'] = []
+sources = []
 SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'generic'],
-           exports=['env'])
+           exports=['env', 'sources'])
 
 ###################
 # Kernel linking. #
 ###################
+
+# Get a list of objects.
+env['OBJFILES'] = map(env.Object, sources)
 
 # Create a fake symbol table used for the first linking stage.
 def fake_symtab_func(target, source, env):
