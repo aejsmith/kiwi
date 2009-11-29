@@ -45,6 +45,7 @@
 #include <mm/tlb.h>
 
 #include <assert.h>
+#include <errors.h>
 #include <fatal.h>
 
 #include "vm_priv.h"
@@ -113,7 +114,7 @@ static void vm_anon_object_release(vm_object_t *_obj, vm_region_t *region) {
  * @return		0 on success, negative error code on failure. */
 static int vm_anon_object_map(vm_object_t *_obj, offset_t offset, size_t size) {
 	vm_anon_object_t *obj = (vm_anon_object_t *)_obj;
-	size_t i, start, end;
+	size_t i, j, start, end;
 
 	mutex_lock(&obj->lock, 0);
 
@@ -127,10 +128,13 @@ static int vm_anon_object_map(vm_object_t *_obj, offset_t offset, size_t size) {
 	/* Increase the region reference counts for pages in the region. */
 	for(i = start; i < end; i++) {
 		if(obj->rref[i] == UINT16_MAX) {
-			/* TODO: Should probably handle this properly, although
-			 * it seems unlikely that the object will be shared
-			 * between more than 65,535 regions. */
-			fatal("Object %p rref[%zu] is at maximum value!", obj, i);
+			kprintf(LOG_DEBUG, "vm: anon object %p rref[%zu] is at maximum value!\n", obj, i);
+
+			/* Go and undo what we've done. */
+			for(j = start; j < i; j++) {
+				obj->rref[j]--;
+			}
+			return -ERR_RESOURCE_UNAVAIL;
 		}
 		obj->rref[i]++;
 	}
