@@ -36,8 +36,8 @@ struct slab_bufctl;
 
 /** Allocator limitations/settings. */
 #define SLAB_NAME_MAX		25		/**< Maximum slab cache name length. */
-#define SLAB_MAGAZINE_SIZE	8		/**< Initial magazine size (resizing currently not supported). */
-#define SLAB_HASH_SIZE		32		/**< Allocation hash table size. */
+#define SLAB_MAGAZINE_SIZE	16		/**< Initial magazine size (resizing currently not supported). */
+#define SLAB_HASH_SIZE		64		/**< Allocation hash table size. */
 #define SLAB_ALIGN_MIN		8		/**< Minimum alignment. */
 #define SLAB_LARGE_FRACTION	8		/**< Minimum fraction of the source quantum for large objects. */
 #define SLAB_WASTE_FRACTION	8		/**< Maximum fraction of a slab that should be wasted. */
@@ -63,9 +63,11 @@ typedef struct slab_cache {
 	list_t magazine_empty;			/**< List of empty magazines. */
 
 	/** Statistics. */
+#if CONFIG_SLAB_STATS
 	atomic_t alloc_total;			/**< Total number of allocations that have been made. */
 	atomic_t alloc_current;			/**< Number of currently allocated objects. */
-	atomic_t slab_count;			/**< Number of allocated slabs. */
+#endif
+	size_t slab_count;			/**< Number of allocated slabs. */
 
 	/** Slab lists/cache colouring settings. */
 	mutex_t slab_lock;			/**< Lock to protect slab lists. */

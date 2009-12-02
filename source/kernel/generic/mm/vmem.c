@@ -174,7 +174,7 @@ static bool vmem_freelist_empty(vmem_t *vmem, vmem_resource_t list) {
  * @param vmem		Arena to modify.
  * @param tag		Segment to add. */
 static void vmem_freelist_insert(vmem_t *vmem, vmem_btag_t *tag) {
-	vmem_resource_t list = log2(tag->size) - 1;
+	int list = highbit(tag->size) - 1;
 
 	list_append(&vmem->free[list], &tag->s_link);
 	vmem->freemap |= ((vmem_resource_t)1 << list);
@@ -184,7 +184,7 @@ static void vmem_freelist_insert(vmem_t *vmem, vmem_btag_t *tag) {
  * @param vmem		Arena to modify.
  * @param tag		Segment to remove. */
 static void vmem_freelist_remove(vmem_t *vmem, vmem_btag_t *tag) {
-	vmem_resource_t list = log2(tag->size) - 1;
+	int list = highbit(tag->size) - 1;
 
 	list_remove(&tag->s_link);
 	if(list_empty(&vmem->free[list])) {
@@ -259,8 +259,9 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
                                       vmem_resource_t minaddr, vmem_resource_t maxaddr,
                                       int vmflag) {
-	vmem_resource_t list = log2(size) - 1, start, end, i;
 	vmem_btag_t *seg, *split1 = NULL, *split2 = NULL;
+	vmem_resource_t start, end, i;
+	int list = highbit(size) - 1;
 
 	assert(size);
 
@@ -827,7 +828,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 
 	vmem->quantum = quantum;
 	vmem->qcache_max = qcache_max;
-	vmem->qshift = log2(quantum) - 1;
+	vmem->qshift = highbit(quantum) - 1;
 	vmem->flags = flags;
 	vmem->afunc = afunc;
 	vmem->ffunc = ffunc;

@@ -73,10 +73,10 @@ void *kmalloc(size_t size, int kmflag) {
 
 	/* Use the slab caches where possible. */
 	if(total <= (1 << KMALLOC_CACHE_MAX)) {
-		/* If exactly a power-of-two, then log2(total) will work,
-		 * else we want the next size up. Remember that the log2
+		/* If exactly a power-of-two, then highbit(total) will work,
+		 * else we want the next size up. Remember that the highbit
 		 * function returns (log2(n) + 1). */
-		idx = ((total & (total - 1)) == 0) ? log2(total) - 1 : log2(total);
+		idx = ((total & (total - 1)) == 0) ? highbit(total) - 1 : highbit(total);
 		if(idx < KMALLOC_CACHE_MIN) {
 			idx = KMALLOC_CACHE_MIN;
 		}

@@ -21,6 +21,8 @@
 #ifndef __LIB_UTILITY_H
 #define __LIB_UTILITY_H
 
+#include <arch/bitops.h>
+
 #include <types.h>
 
 /** Round a value up. */
@@ -61,13 +63,26 @@
 /** Get log base 2 (high bit) of a value.
  * @param val		Value to get high bit from.
  * @return		High bit + 1. */
-static inline uint64_t log2(uint64_t val) {
-	uint64_t r = 0;
-
-	while((val >> r) != 0) {
-		r++;
+static inline int highbit(uint64_t val) {
+	if(!val) {
+		return 0;
 	}
-	return r;
+
+#if CONFIG_ARCH_64BIT
+	return bitops_fls(val) + 1;
+#elif CONFIG_ARCH_32BIT
+	unative_t high, low;
+
+	high = (unative_t)((val >> 32) & 0xffffffff);
+	low = (unative_t)(val & 0xffffffff);
+	if(high) {
+		return bitops_fls(high) + 32 + 1;
+	} else {
+		return bitops_fls(low) + 1;
+	}
+#else
+# error "Implement this."
+#endif
 }
 
 #endif /* __LIB_UTILITY_H */

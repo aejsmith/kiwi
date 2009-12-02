@@ -182,7 +182,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 		slab_cache_free(&slab_slab_cache, slab);
 	}
 
-	atomic_dec(&cache->slab_count);
+	cache->slab_count--;
 	vmem_free(cache->source, addr, cache->slab_size);
 }
 
@@ -232,7 +232,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		slab = (slab_t *)((addr + cache->slab_size) - sizeof(slab_t));
 	}
 
-	atomic_inc(&cache->slab_count);
+	cache->slab_count--;
 
 	list_init(&slab->header);
 	slab->base = (void *)addr;
@@ -344,7 +344,6 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 		slab_destroy(cache, slab);
 	} else if((slab->refcount + 1) == cache->obj_count) {
 		/* Take from the full list and move to the partial list. */
-		list_remove(&slab->header);
 		list_append(&cache->slab_partial, &slab->header);
 	}
 
@@ -390,7 +389,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 
 	/* Place the allocation on the allocation hash table if required. */
 	if(cache->flags & SLAB_CACHE_NOTOUCH) {
-		hash = 	hash_int_hash((key_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
+		hash = hash_int_hash((key_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
 		bufctl->next = cache->bufctl_hash[hash];
 		cache->bufctl_hash[hash] = bufctl;
 	}
@@ -624,7 +623,7 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
  * @return		Whether any slabs were freed. */
 static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	bool ret = false;
-	int count;
+	size_t count;
 
 	kprintf(LOG_DEBUG, "slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
 
@@ -642,7 +641,7 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	}
 
 	/* Get the slab count before destroying. */
-	if(!(count = atomic_get(&cache->slab_count))) {
+	if(!(count = cache->slab_count)) {
 		mutex_unlock(&cache->depot_lock);
 		return false;
 	}
@@ -650,7 +649,7 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	/* Destroy full magazines until the slab count decreases. */
 	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
 		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-		if(atomic_get(&cache->slab_count) < count) {
+		if(cache->slab_count < count) {
 			ret = true;
 			if(!force) {
 				break;
@@ -680,8 +679,10 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_cpu_obj_alloc(cache);
 		if(likely(ret != NULL)) {
+#if CONFIG_SLAB_STATS
 			atomic_inc(&cache->alloc_total);
 			atomic_inc(&cache->alloc_current);
+#endif
 			dprintf("slab: allocated %p from cache %p(%s) (magazine)\n", ret, cache, cache->name);
 			return ret;
 		}
@@ -690,8 +691,10 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	/* Cannot allocate from magazine layer, allocate from slab layer. */
 	ret = slab_obj_alloc(cache, kmflag);
 	if(likely(ret != NULL)) {
+#if CONFIG_SLAB_STATS
 		atomic_inc(&cache->alloc_total);
 		atomic_inc(&cache->alloc_current);
+#endif
 		dprintf("slab: allocated %p from cache %p(%s) (slab)\n", ret, cache, cache->name);
 	}
 
@@ -710,7 +713,9 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		if(likely(slab_cpu_obj_free(cache, obj))) {
+#if CONFIG_SLAB_STATS
 			atomic_dec(&cache->alloc_current);
+#endif
 			dprintf("slab: freed %p to cache %p(%s) (magazine)\n", obj, cache, cache->name);
 			return;
 		}
@@ -718,7 +723,9 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	/* Cannot free to magazine layer, free to slab layer. */
 	slab_obj_free(cache, obj);
+#if CONFIG_SLAB_STATS
 	atomic_dec(&cache->alloc_current);
+#endif
 	dprintf("slab: freed %p to cache %p(%s) (slab)\n", obj, cache, cache->name);
 }
 
@@ -764,9 +771,11 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	list_init(&cache->slab_full);
 	list_init(&cache->header);
 
+#if CONFIG_SLAB_STATS
 	atomic_set(&cache->alloc_current, 0);
 	atomic_set(&cache->alloc_total, 0);
-	atomic_set(&cache->slab_count, 0);
+#endif
+	cache->slab_count = 0;
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
 
@@ -982,16 +991,27 @@ int kdbg_cmd_slab(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
+#if CONFIG_SLAB_STATS
 	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Current Total\n");
 	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ======= =====\n");
+#else
+	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags\n");
+	kprintf(LOG_NONE, "====                      =====  ======== ========= =====\n");
+#endif
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
+#if CONFIG_SLAB_STATS
 		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-7d %d\n",
 		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
 		        cache->slab_size, cache->flags, atomic_get(&cache->alloc_current),
 		        atomic_get(&cache->alloc_total));
+#else
+		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %d\n",
+		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+		        cache->slab_size, cache->flags);
+#endif
 	}
 
 	return KDBG_OK;

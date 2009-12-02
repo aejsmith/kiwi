@@ -46,7 +46,7 @@ struct vmem;
 #define VMEM_FREELISTS		BITS(vmem_resource_t)
 
 /** Slab size to use for a vmem quantum cache. */
-#define VMEM_QCACHE_SSIZE(m)	MAX(1 << log2(3 * (m)), 64)
+#define VMEM_QCACHE_SSIZE(m)	MAX(1 << highbit(3 * (m)), 64)
 
 /** Type of vmem-allocated resources. */
 typedef uint64_t vmem_resource_t;
