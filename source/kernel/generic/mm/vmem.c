@@ -114,13 +114,17 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		 * new tags if multiple threads try to refill at the same
 		 * time. */
 		mutex_lock(&vmem_refill_lock, 0);
+		mutex_lock(&vmem_lock, 0);
 		if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
 			mutex_unlock(&vmem_refill_lock);
+			mutex_unlock(&vmem_lock);
 			mutex_lock(&vmem->lock, 0);
 			continue;
 		}
+		mutex_unlock(&vmem_lock);
 
-		/* Allocate a page from the tag arena and split it up into tags. */
+		/* Allocate a page from the tag arena and split it up into
+		 * tags. */
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
 		mutex_lock(&vmem->lock, 0);
 		if(addr == 0) {
@@ -430,6 +434,7 @@ static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) 
  * @param vmem		Arena to unimport from.
  * @param span		Span to unimport. */
 static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
+	vmem_resource_t base, size;
 	vmem_btag_t *seg;
 
 	assert(span);
@@ -446,16 +451,21 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 	vmem->total_size -= span->size;
 	vmem->imported_size -= span->size;
 
+	/* Record what we're freeing as something may take the tag after we've
+	 * freed it. */
+	base = span->base;
+	size = span->size;
+
 	vmem_freelist_remove(vmem, seg);
 	vmem_btag_free(seg);
 	vmem_btag_free(span);
 
 	mutex_unlock(&vmem->lock);
-	vmem->ffunc(vmem->source, span->base, span->size);
+	vmem->ffunc(vmem->source, base, size);
 	mutex_lock(&vmem->lock, 0);
 
 	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
-		span->base, span->base + span->size, vmem->name, vmem->source->name);
+		base, base + size, vmem->name, vmem->source->name);
 }
 
 /** Allocate a segment from a Vmem arena.
@@ -626,6 +636,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		if(tag->header.next != &vmem->btags) {
 			exist = list_entry(tag->header.next, vmem_btag_t, header);
 			if(exist->type == VMEM_BTAG_FREE) {
+				assert((tag->base + tag->size) == exist->base);
 				tag->size += exist->size;
 				vmem_freelist_remove(vmem, exist);
 				vmem_btag_free(exist);
@@ -637,6 +648,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 
 		exist = list_entry(tag->header.prev, vmem_btag_t, header);
 		if(exist->type == VMEM_BTAG_FREE) {
+			assert((exist->base + exist->size) == tag->base);
 			tag->base = exist->base;
 			tag->size += exist->size;
 			vmem_freelist_remove(vmem, exist);
