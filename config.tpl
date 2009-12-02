@@ -61,9 +61,10 @@ Section('Kernel configuration')
 Option('HANDLE_MAX', 'Maximum number of open handles for a process.', 1024)
 
 #######
-Section('Kernel debug output')
+Section('Kernel debugging')
 #######
 
+Option('SLAB_STATS', 'Slab allocator statistics.', False)
 Option('DEBUG', 'Basic debugging output.', True)
 Option('PAGE_DEBUG', 'Physical memory manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VMEM_DEBUG', 'Vmem allocator debug output.', False, {'DEBUG': lambda x: x})

@@ -94,8 +94,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 /** Kernel heap arena allocation function.
  *
  * Allocates a range from the given source arena and backs it with anonymous
- * pages. This function has special handling for VM_REFILLING with regard to
- * the page map lock as it is used within the 
+ * pages.
  *
  * @param source	Source arena.
  * @param size		Size of range to allocate.
@@ -117,9 +116,6 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 
 	/* Back the allocation with anonymous pages. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		/* Don't use PM_ZERO - this may cause the page to be
-		 * mapped on the kernel heap to zero it, and we can just do
-		 * this ourselves. */
 		page = page_alloc(1, vmflag & MM_FLAG_MASK);
 		if(page == 0) {
 			dprintf("kheap: unable to allocate pages to back allocation\n");
@@ -138,7 +134,6 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", page, ret + i);
 	}
 
-	memset((void *)ret, 0, (size_t)size);
 	return ret;
 fail:
 	/* Go back and reverse what we have done. */
