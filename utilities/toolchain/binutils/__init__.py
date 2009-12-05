@@ -30,7 +30,7 @@ class BinutilsComponent(ToolchainComponent):
 
 		# Build and install it.
 		self.execute(
-			'../binutils-%s/configure --prefix=%s --target=%s' \
+			'../binutils-%s/configure --prefix=%s --target=%s --disable-werror' \
 			% (self.version, self.manager.destdir, self.manager.target),
 			'binutils-build'
 		)
