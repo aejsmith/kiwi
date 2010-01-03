@@ -15,7 +15,11 @@
 import os
 import sys
 import time
-import snack
+try:
+	import snack
+	newt = true
+except ImportError:
+	newt = False
 
 from SCons.Script import *
 
@@ -384,6 +388,9 @@ class ConfigManager:
 
 	# Run the configuration UI to create the build configuration.
 	def configure(self, target, source, env):
+		if not newt:
+			print "Please install newt."
+			return 1
 		if ConfigTextUI(self).run():
 			# Write out the modified configuration.
 			self.writeconfig()
