@@ -17,7 +17,7 @@ import sys
 import time
 try:
 	import snack
-	newt = true
+	newt = True
 except ImportError:
 	newt = False
 
