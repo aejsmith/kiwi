@@ -13,7 +13,7 @@
 
 Import('env')
 
-env['INCDIRS']['platform'] = Dir('include')
+env['CPPPATH'].append(Dir('include'))
 
 env.Module('bios', [
 	'x86emu/decode.c',

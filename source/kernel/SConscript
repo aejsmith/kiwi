@@ -17,19 +17,14 @@
 
 Import('config', 'envmgr')
 
-# Set up include directory links.
-Dir('include').link(Dir('#source/kernel/generic/include'), 1)
-Dir('include/arch').link(Dir('#source/kernel/arch/%s/include' % (config['SRCARCH'])), 1)
-Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config['PLATFORM'])), 1)
-
 # Create the kernel environment.
 env = envmgr.Create('kernel', {
 	'LIBS': [],
-	#'CPPPATH': [
-	#	Dir('include'),
-	#	Dir('arch/%s/include' % (config['SRCARCH'])),
-	#	Dir('platform/%s/include' % (config['PLATFORM'])),
-	#],
+	'CPPPATH': [
+		Dir('generic/include'),
+		Dir('arch/%s/include' % (config['SRCARCH'])),
+		Dir('platform/%s/include' % (config['PLATFORM'])),
+	],
 	'CCFLAGS': [
 		'-nostdlib', '-nostdinc', '-ffreestanding',
 		'-fno-stack-protector', '-include',
@@ -48,9 +43,6 @@ env = envmgr.Create('kernel', {
 	'CPPDEFINES': {
 		'KERNEL': None,
 	},
-
-	# Temporary.
-	'CPPPATH': [Dir('include')],
 })
 
 # Set up stuff for using Clang.
