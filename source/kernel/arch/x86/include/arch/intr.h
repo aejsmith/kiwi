@@ -45,7 +45,6 @@
 #define FAULT_SIMD		19	/**< SIMD Floating-Point. */
 
 /** Various definitions. */
-#define INTR_COUNT		256	/**< Total number of interrupts. */
 #define IRQ_COUNT		16	/**< Total number of IRQs. */
 #define IRQ_BASE		32	/**< IRQ number base. */
 

@@ -46,7 +46,7 @@ extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
 extern void intr_handler(unative_t num, intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
-static intr_handler_t intr_handlers[INTR_COUNT];
+static intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
 
 /** String names for CPU exceptions. */
 static const char *fault_names[] = {
@@ -169,7 +169,7 @@ static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
  * @param handler	Function pointer to handler routine.
  */
 void intr_register(unative_t num, intr_handler_t handler) {
-	assert(num < INTR_COUNT);
+	assert(num < IDT_ENTRY_COUNT);
 	intr_handlers[num] = handler;
 }
 
@@ -180,7 +180,7 @@ void intr_register(unative_t num, intr_handler_t handler) {
  * @param num		Interrupt number.
  */
 void intr_remove(unative_t num) {
-	assert(num < INTR_COUNT);
+	assert(num < IDT_ENTRY_COUNT);
 	intr_handlers[num] = NULL;
 }
 
