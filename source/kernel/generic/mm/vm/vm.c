@@ -346,8 +346,8 @@ static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
 		if(prev == NULL) {
 			/* First region, check if there is a hole preceding it
 			 * and whether it is big enough. */
-			if((ASPACE_BASE + size) <= region->start) {
-				*addrp = ASPACE_BASE;
+			if((USER_MEMORY_BASE + size) <= region->start) {
+				*addrp = USER_MEMORY_BASE;
 				return true;
 			}
 		} else {
@@ -366,13 +366,13 @@ static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
 	 * the previous entry. If there wasn't a previous entry, the address
 	 * space was empty. */
 	if(prev) {
-		if((prev->end + size) > prev->end && (prev->end + size) <= (ASPACE_BASE + ASPACE_SIZE)) {
+		if((prev->end + size) > prev->end && (prev->end + size) <= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
 			/* We have some space, return it. */
 			*addrp = prev->end;
 			return true;
 		}
-	} else if(size <= ASPACE_SIZE) {
-		*addrp = ASPACE_BASE;
+	} else if(size <= USER_MEMORY_SIZE) {
+		*addrp = USER_MEMORY_BASE;
 		return true;
 	}
 

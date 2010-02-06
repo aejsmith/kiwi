@@ -31,12 +31,12 @@
 #include <errors.h>
 
 /** Check if an address is valid. */
-#if ASPACE_BASE == 0
+#if USER_MEMORY_BASE == 0
 # define VALID(addr, count)			\
-	(((addr) + (count)) <= ASPACE_SIZE && ((addr) + (count)) >= (addr))
+	(((addr) + (count)) <= USER_MEMORY_SIZE && ((addr) + (count)) >= (addr))
 #else
 # define VALID(addr, count)			\
-	((addr) >= ASPACE_BASE && ((addr) + (count)) <= (ASPACE_BASE + ASPACE_SIZE) && ((addr) + (count)) >= (addr))
+	((addr) >= USER_MEMORY_BASE && ((addr) + (count)) <= (USER_MEMORY_BASE + USER_MEMORY_SIZE) && ((addr) + (count)) >= (addr))
 #endif
 
 /** Common entry code for userspace memory functions. */

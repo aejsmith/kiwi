@@ -33,10 +33,11 @@
 #endif
 
 /** Check if a range fits in an address space. */
-#if ASPACE_BASE == 0
-# define vm_region_fits(start, size)	(((start) + (size)) <= ASPACE_SIZE)
+#if USER_MEMORY_BASE == 0
+# define vm_region_fits(start, size)	(((start) + (size)) <= USER_MEMORY_SIZE)
 #else
-# define vm_region_fits(start, size)	((start) >= ASPACE_BASE && ((start) + (size)) <= (ASPACE_BASE + ASPACE_SIZE))
+# define vm_region_fits(start, size)	\
+	((start) >= USER_MEMORY_BASE && ((start) + (size)) <= (USER_MEMORY_BASE + USER_MEMORY_SIZE))
 #endif
 
 /** Architecture hooks. */

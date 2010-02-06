@@ -19,7 +19,7 @@ Import('config', 'envmgr')
 
 # Set up include directory links.
 Dir('include').link(Dir('#source/kernel/generic/include'), 1)
-Dir('include/arch').link(Dir('#source/kernel/arch/%s/include' % (config['ARCH'])), 1)
+Dir('include/arch').link(Dir('#source/kernel/arch/%s/include' % (config['SRCARCH'])), 1)
 Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config['PLATFORM'])), 1)
 
 # Create the kernel environment.
@@ -50,7 +50,6 @@ env = envmgr.Create('kernel', {
 	},
 
 	# Temporary.
-	'LDSCRIPT': File('arch/%s/link.ld' % (config['ARCH'])),
 	'CPPPATH': [Dir('include')],
 })
 
@@ -62,8 +61,7 @@ if config['USE_CLANG']:
 		env['CC'] = 'clang'
 
 # Get the list of source files from the architecture/platform.
-#arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
-arch_sources = SConscript(dirs=['arch/' + config['ARCH']], exports=['env'])
+arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
 platform_sources = SConscript(dirs=['platform/' + config['PLATFORM']], exports=['env'])
 generic_sources = SConscript(dirs=['generic'], exports=['env'])
 sources = arch_sources + platform_sources + generic_sources

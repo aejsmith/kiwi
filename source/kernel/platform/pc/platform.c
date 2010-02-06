@@ -18,7 +18,7 @@
  * @brief		PC platform core code.
  */
 
-#include <arch/x86/lapic.h>
+#include <arch/lapic.h>
 
 #include <cpu/cpu.h>
 

@@ -19,7 +19,7 @@
  */
 
 #include <arch/io.h>
-#include <arch/x86/sysreg.h>
+#include <arch/sysreg.h>
 
 #include <console/kprintf.h>
 

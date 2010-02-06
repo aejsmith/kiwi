@@ -105,7 +105,9 @@ Option('DRIVER_INPUT_I8042', 'i8042 keyboard/mouse port driver.', True)
 @PostConfig
 def PostConfigFunc(config):
 	config['ARCH_%s' % config['ARCH'].upper()] = True
+	config['SRCARCH'] = config['ARCH']
 	if config['ARCH'] == 'ia32' or config['ARCH'] == 'amd64':
+		config['SRCARCH'] = 'x86'
 		if config['ARCH'] == 'ia32':
 			config['TOOLCHAIN_TARGET'] = 'i686-kiwi'
 			config['ARCH_32BIT'] = True
