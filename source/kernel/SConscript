@@ -1,5 +1,4 @@
-# Kiwi build system
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -12,11 +11,11 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'envmgr')
+############################
+# Build environment set-up #
+############################
 
-####################################
-# Kernel build environment set-up. #
-####################################
+Import('config', 'envmgr')
 
 # Set up include directory links.
 Dir('include').link(Dir('#source/kernel/generic/include'), 1)
@@ -24,34 +23,50 @@ Dir('include/arch').link(Dir('#source/kernel/arch/%s/include' % (config['ARCH'])
 Dir('include/platform').link(Dir('#source/kernel/platform/%s/include' % (config['PLATFORM'])), 1)
 
 # Create the kernel environment.
-env = envmgr.Create('kernel')
+env = envmgr.Create('kernel', {
+	'LIBS': [],
+	#'CPPPATH': [
+	#	Dir('include'),
+	#	Dir('arch/%s/include' % (config['SRCARCH'])),
+	#	Dir('platform/%s/include' % (config['PLATFORM'])),
+	#],
+	'CCFLAGS': [
+		'-nostdlib', '-nostdinc', '-ffreestanding',
+		'-fno-stack-protector', '-include',
+		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+	],
+	'CXXFLAGS': [
+		'-fno-exceptions', '-fno-rtti',
+	],
+	'ASFLAGS': [
+		'-nostdinc', '-include',
+		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+	],
+	'LINKFLAGS': [
+		'-nostdlib',
+	],
+	'CPPDEFINES': {
+		'KERNEL': None,
+	},
+
+	# Temporary.
+	'LDSCRIPT': File('arch/%s/link.ld' % (config['ARCH'])),
+	'CPPPATH': [Dir('include')],
+})
+
+# Set up stuff for using Clang.
 if config['USE_CLANG']:
 	if env['ENV'].has_key('CCC_CC'):
 		env['CCC_CC'] = 'clang'
 	else:
 		env['CC'] = 'clang'
-env['LINK'] = envmgr.get_tool_path('ld')
-env['LDFLAGS'] = []
-env['LDSCRIPT'] = File('arch/%s/link.ld' % (config['ARCH']))
-env['CPPPATH'] = [Dir('include')]
-env['CCFLAGS'] += ['-nostdlib', '-nostdinc', '-ffreestanding', 
-                   '-fno-stack-protector', '-include',
-                   'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
-env['CXXFLAGS'] += ['-fno-exceptions', '-fno-rtti']
-env['ASFLAGS'] += ['-nostdinc', '-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
-env['CPPDEFINES'] = {'KERNEL': None}
 
-# Get the list of source files.
-sources = []
-SConscript(dirs=['arch/' + config['ARCH'], 'platform/' + config['PLATFORM'], 'generic'],
-           exports=['env', 'sources'])
-
-###################
-# Kernel linking. #
-###################
-
-# Get a list of objects.
-env['OBJFILES'] = map(env.Object, sources)
+# Get the list of source files from the architecture/platform.
+#arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
+arch_sources = SConscript(dirs=['arch/' + config['ARCH']], exports=['env'])
+platform_sources = SConscript(dirs=['platform/' + config['PLATFORM']], exports=['env'])
+generic_sources = SConscript(dirs=['generic'], exports=['env'])
+sources = arch_sources + platform_sources + generic_sources
 
 # Create a fake symbol table used for the first linking stage.
 def fake_symtab_func(target, source, env):
@@ -65,37 +80,33 @@ def fake_symtab_func(target, source, env):
 
 # Link the first kernel image using a fake symbol table.
 env.Command('fake-symtab.c', [], Action(fake_symtab_func, '$GENCOMSTR'))
-env.Object('fake-symtab.o', 'fake-symtab.c')
-env.Command('kiwi-pass1.elf', [env['LDSCRIPT'], env['OBJFILES'], 'fake-symtab.o'],
-            Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("fake-symtab.o")} $LDFLAGS',
-                   '$LINKCOMSTR'))
+env.Program('kernel-pass1', map(env.Object, sources) + ['fake-symtab.c'],
+            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+Depends('kernel-pass1', env['LDSCRIPT'])
 
 # Generate the first real symbol table and relink the kernel with it.
-env.Command('symtab-pass1.c', ['kiwi-pass1.elf'],
+env.Command('symtab-pass1.c', ['kernel-pass1'],
             Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
-env.Object('symtab-pass1.o', 'symtab-pass1.c')
-env.Command('kiwi-pass2.elf', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass1.o'],
-            Action('$LINK -T $LDSCRIPT -o $TARGET $OBJFILES ${File("symtab-pass1.o")} $LDFLAGS',
-                   '$LINKCOMSTR'))
+env.Program('kernel-pass2', map(env.Object, sources) + ['symtab-pass1.c'],
+            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+Depends('kernel-pass2', env['LDSCRIPT'])
 
 # Generate the final symbol table with correct symbol addresses.
-env.Command('symtab-pass2.c', ['kiwi-pass2.elf'],
+env.Command('symtab-pass2.c', ['kernel-pass2'],
             Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
-env.Object('symtab-pass2.o', 'symtab-pass2.c')
-env.Command('kiwi.debug', [env['LDSCRIPT'], env['OBJFILES'], 'symtab-pass2.o'],
-            Action('$LINK -T $LDSCRIPT -o $TARGET -Map ${File("kiwi.map")} ' + \
-                   '$OBJFILES ${File("symtab-pass2.o")} $LDFLAGS',
-                   '$LINKCOMSTR'))
+env.Program('kernel-unstripped', map(env.Object, sources) + ['symtab-pass2.c'],
+            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+Depends('kernel-unstripped', env['LDSCRIPT'])
 
 # Generate various information files and the stripped kernel image.
-env.Command('kiwi.lst', 'kiwi.debug', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
-env.Command('kiwi.rde', 'kiwi.debug', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
-env.Command('kiwi.sym', 'kiwi.debug', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
-elf = env.Command('kiwi.elf', 'kiwi.debug', Action('$STRIP --strip-debug $SOURCE -o $TARGET', '$GENCOMSTR'))
-Depends(elf, ['kiwi.lst', 'kiwi.rde', 'kiwi.sym'])
+env.Command('kernel.lst', 'kernel-unstripped', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('kernel.rde', 'kernel-unstripped', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('kernel.sym', 'kernel-unstripped', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
+env.Command('kernel', 'kernel-unstripped', Action('$STRIP --strip-debug $SOURCE -o $TARGET', '$GENCOMSTR'))
+Depends('kernel', ['kernel.lst', 'kernel.rde', 'kernel.sym'])
 
 # Let the distribution environment know where the kernel is.
-envmgr['dist']['KERNEL'] = File('kiwi.elf')
+envmgr['dist']['KERNEL'] = File('kernel')
 
 ###########
 # Modules #

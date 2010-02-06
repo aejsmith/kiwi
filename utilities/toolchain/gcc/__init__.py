@@ -1,4 +1,3 @@
-# Kiwi toolchain build script
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
@@ -36,7 +35,6 @@ class GCCComponent(ToolchainComponent):
 		confopts += '--target=%s ' % (self.manager.target)
 		confopts += '--enable-languages=c,c++ '
 		confopts += '--disable-libstdcxx-pch '
-		confopts += '--disable-multilib '
 		confopts += '--disable-shared '
 		if os.uname()[0] == 'Darwin':
 			confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'

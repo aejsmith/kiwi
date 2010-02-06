@@ -1,5 +1,4 @@
-# Kiwi build system
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -12,30 +11,29 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
-import sys
+sources = map(File, [
+	'ap_boot.bin.c',
+	'cpu.c',
+	'fpu.c',
+	'intr.c',
+	'kdbg.c',
+	'lapic.c',
+	'smp.c',
+	'vm.c',
+])
 
-Import('env', 'sources')
+Import('env')
 
 # Set build flags to prevent FPU code generation.
 env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 
 # Generate the AP boot code.
+Import('envmgr')
 env.Object('ap_boot.S')
-env.Command('ap_boot.bin.elf', ['ap_boot.o'], Action('$LINK -Ttext=0 -o $TARGET $SOURCE', None))
+env.Command('ap_boot.bin.elf', ['ap_boot.o'], Action('%s -Ttext=0 -o $TARGET $SOURCE' % (envmgr.GetToolPath('ld')), None))
 env.Command('ap_boot.bin', ['ap_boot.bin.elf'], Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
 env.Command('ap_boot.bin.c', ['ap_boot.bin'],
             Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
                    '$GENCOMSTR'))
 
-# Add source files.
-sources += [
-	File('ap_boot.bin.c'),
-	File('cpu.c'),
-	File('fpu.c'),
-	File('intr.c'),
-	File('kdbg.c'),
-	File('lapic.c'),
-	File('smp.c'),
-	File('vm.c'),
-]
+Return('sources')

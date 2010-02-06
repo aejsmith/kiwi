@@ -1,5 +1,4 @@
-# Kiwi build system
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -12,26 +11,27 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'sources')
+sources = map(File, [
+	'arch.c',
+	'boot.S',
+	'context.c',
+	'descriptor.c',
+	'elf.c',
+	'entry.S',
+	'kdbg.c',
+	'page.c',
+	'switch.S',
+	'thread.c',
+])
+
+Import('env')
 
 # Set AMD64-specific compilation flags.
 env['ASFLAGS'] += ['-m64']
 env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone', '-fno-omit-frame-pointer']
-env['LDFLAGS'] += ['-A', 'x86_64', '-m', 'elf_x86_64']
+env['LINKFLAGS'] += ['-Wl,-m,elf_x86_64']
 
 # Pull in x86 common code.
-SConscript(dirs=['../common/x86'], exports=['env', 'sources'])
+sources += SConscript(dirs=['../common/x86'], exports=['env'])
 
-# Add source files.
-sources += [
-	File('arch.c'),
-	File('boot.S'),
-	File('context.c'),
-	File('descriptor.c'),
-	File('elf.c'),
-	File('entry.S'),
-	File('kdbg.c'),
-	File('page.c'),
-	File('switch.S'),
-	File('thread.c'),
-]
+Return('sources')

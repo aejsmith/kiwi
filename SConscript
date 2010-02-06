@@ -1,5 +1,4 @@
-# Kiwi build system
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -79,12 +78,12 @@ dist.FSImage('fsimage.tar.gz', [dist['KERNEL']] + dist['MODULES'] + dist['LIBRAR
 dist['FSIMAGE'] = File('fsimage.tar.gz')
 
 # Set build defaults.
-Default(Alias('kernel', dist['KERNEL']))
-Default(Alias('modules', dist['MODULES']))
-Default(Alias('libraries', dist['LIBRARIES']))
-Default(Alias('binaries', dist['BINARIES']))
-Default(Alias('services', dist['SERVICES']))
-Default(Alias('fsimage', dist['FSIMAGE']))
+Alias('kernel', dist['KERNEL'])
+Alias('modules', dist['MODULES'])
+Alias('libraries', dist['LIBRARIES'])
+Alias('binaries', dist['BINARIES'])
+Alias('services', dist['SERVICES'])
+Alias('fsimage', dist['FSIMAGE'])
 Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL'], dist['FSIMAGE']])))
 
 # Create the ISO/HD images. Only build HD image on Linux for now.

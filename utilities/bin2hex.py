@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #
-# Binary to C file convertor
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
@@ -60,7 +59,9 @@ def main(args):
 	else:
 		print 'unsigned char %s[] = {' % (args[1])
 	for i in range(0, len(data)):
-		print '0x%x,' % (ord(data[i]))
+		if not i % 8:
+			sys.stdout.write('\n')
+		sys.stdout.write('0x%x,' % (ord(data[i])))
 	print '};'
 	if size:
 		print 'unsigned int %s_size = %d;' % (args[1], len(data))

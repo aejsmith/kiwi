@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-# Kiwi userspace system call function generator
+#
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit

@@ -1,4 +1,3 @@
-# Kiwi build system
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
@@ -15,11 +14,7 @@
 import os
 import sys
 import time
-try:
-	import snack
-	newt = True
-except ImportError:
-	newt = False
+import snack
 
 from SCons.Script import *
 
@@ -388,9 +383,6 @@ class ConfigManager:
 
 	# Run the configuration UI to create the build configuration.
 	def configure(self, target, source, env):
-		if not newt:
-			print "Please install newt."
-			return 1
 		if ConfigTextUI(self).run():
 			# Write out the modified configuration.
 			self.writeconfig()

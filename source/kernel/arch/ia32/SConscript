@@ -1,4 +1,3 @@
-# Kiwi build system
 # Copyright (C) 2009 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
@@ -12,33 +11,31 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
+sources = map(File, [
+	'arch.c',
+	'boot.S',
+	'context.c',
+	'descriptor.c',
+	'elf.c',
+	'entry.S',
+	'kdbg.c',
+	'page.c',
+	'switch.S',
+	'thread.c',
+])
 
-Import('env', 'envmgr', 'sources')
+Import('env')
 
 # Set IA32-specific compilation flags.
 env['ASFLAGS'] += ['-m32']
 env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer', '-march=i686']
-env['LDFLAGS'] += ['-b', 'elf32-i386', '-m', 'elf_i386']
+env['LINKFLAGS'] += ['-Wl,-b,elf32-i386', '-Wl,-m,elf_i386']
 
-# We need to link the kernel with libgcc, and force some symbols from it to be
-# linked in.
-env['LDFLAGS'] += [os.popen('%s -print-libgcc-file-name' % envmgr.base['CC']).read().strip()]
-env['LDFLAGS'] += ['--undefined=__moddi3', '--undefined=__divdi3']
+# Need to link with libgcc, and force some symbols to be linked in for modules.
+env['LIBS'] += ['gcc']
+env['LINKFLAGS'] += ['--undefined=__moddi3', '--undefined=__divdi3']
 
 # Pull in x86 common code.
-SConscript(dirs=['../common/x86'], exports=['env', 'sources'])
+sources += SConscript(dirs=['../common/x86'], exports=['env'])
 
-# Add source files.
-sources += [
-	File('arch.c'),
-	File('boot.S'),
-	File('context.c'),
-	File('descriptor.c'),
-	File('elf.c'),
-	File('entry.S'),
-	File('kdbg.c'),
-	File('page.c'),
-	File('switch.S'),
-	File('thread.c'),
-]
+Return('sources')
