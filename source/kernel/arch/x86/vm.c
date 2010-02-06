@@ -18,7 +18,7 @@
  * @brief		x86 virtual memory manager functions.
  */
 
-#include "../../generic/mm/vm/vm_priv.h"
+#include "../../mm/vm/vm_priv.h"
 
 /** X86-specific address space initialisation function.
  *

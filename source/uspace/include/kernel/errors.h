@@ -1,1 +1,1 @@
-../../../kernel/generic/include/errors.h
+../../../kernel/include/errors.h
