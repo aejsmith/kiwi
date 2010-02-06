@@ -169,7 +169,7 @@ char *Shell::ReadLine(void) {
 				buf[--count] = 0;
 			}
 		} else {
-			buf[count++] = (ch == '\n') ? 0 : (unsigned char)ch;
+			buf[count++] = (ch == '\n') ? 0 : static_cast<unsigned char>(ch);
 		}
 	} while(ch != '\n');
 

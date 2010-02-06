@@ -71,7 +71,7 @@ bool Process::Create(const char *const args[], const char *const env[], bool use
 			path = "/system/binaries";
 		}
 
-		for(cur = (char *)path; cur; cur = next) {
+		for(cur = const_cast<char *>(path); cur; cur = next) {
 			if(!(next = strchr(cur, ':'))) {
 				next = cur + strlen(cur);
 			}
@@ -84,7 +84,7 @@ bool Process::Create(const char *const args[], const char *const env[], bool use
 					return false;
 				}
 
-				memcpy(buf, cur, (size_t)(next - cur));
+				memcpy(buf, cur, next - cur);
 			}
 
 			buf[next - cur] = '/';
