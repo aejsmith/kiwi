@@ -1,4 +1,4 @@
-/* AMD64 setjmp/longjmp functions
+/*
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit

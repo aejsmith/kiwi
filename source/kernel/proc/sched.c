@@ -1,4 +1,4 @@
-/* Kiwi thread scheduler
+/*
  * Copyright (C) 2008-2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit

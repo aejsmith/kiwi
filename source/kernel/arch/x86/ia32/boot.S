@@ -1,4 +1,4 @@
-/* Kiwi IA32 boot code.
+/*
  * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
