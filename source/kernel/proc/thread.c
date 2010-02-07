@@ -18,8 +18,6 @@
  * @brief		Thread management code.
  */
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
 
@@ -41,6 +39,7 @@
 #include <types/avl.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>

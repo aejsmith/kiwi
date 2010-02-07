@@ -20,8 +20,6 @@
 
 #include <arch/memmap.h>
 
-#include <console/kprintf.h>
-
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
@@ -29,6 +27,7 @@
 
 #include <sync/mutex.h>
 
+#include <console.h>
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>

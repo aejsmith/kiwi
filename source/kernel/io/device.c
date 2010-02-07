@@ -18,8 +18,6 @@
  * @brief		Device manager.
  */
 
-#include <console/kprintf.h>
-
 #include <io/device.h>
 
 #include <lib/string.h>
@@ -31,6 +29,7 @@
 #include <proc/process.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <init.h>

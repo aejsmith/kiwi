@@ -21,12 +21,11 @@
 #include <arch/features.h>
 #include <arch/lapic.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 
 #include <lib/string.h>
 
+#include <console.h>
 #include <kdbg.h>
 
 /** Atomic variable for paused CPUs to wait on. */

@@ -28,8 +28,6 @@
 
 #include <arch/io.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/intr.h>
 
 #include <lib/string.h>
@@ -40,6 +38,7 @@
 #include <time/timer.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <module.h>
 

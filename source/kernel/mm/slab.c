@@ -35,8 +35,6 @@
  *			boundary.
  */
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 
 #include <lib/string.h>
@@ -55,6 +53,7 @@
 #include <types/hash.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>

@@ -329,7 +329,7 @@ extern    X86EMU_sysEnv	_X86EMU_env;
 /* Function to log information at runtime */
 
 /* Kiwi modification. */
-#include <console/kprintf.h>
+#include <console.h>
 #define printk(fmt...)	kprintf(LOG_DEBUG, fmt)
 //void	printk(const char *fmt, ...);
 

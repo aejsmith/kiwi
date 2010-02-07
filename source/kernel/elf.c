@@ -18,8 +18,6 @@
  * @brief		ELF binary loader.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -28,6 +26,7 @@
 
 #include <proc/process.h>
 
+#include <console.h>
 #include <elf.h>
 #include <errors.h>
 #include <fatal.h>

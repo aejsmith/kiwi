@@ -25,8 +25,6 @@
 
 #include <arch/lapic.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/smp.h>
 
@@ -39,6 +37,7 @@
 #include <platform/mps.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 /** Checksum a memory range.

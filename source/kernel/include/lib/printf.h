@@ -15,22 +15,17 @@
 
 /**
  * @file
- * @brief		Variadic argument definitions.
+ * @brief		Formatted output function.
  */
 
-#ifndef __TYPES_VARARG_H
-#define __TYPES_VARARG_H
+#ifndef __LIB_PRINTF_H
+#define __LIB_PRINTF_H
 
-/** Variadic argument list. */
-typedef __builtin_va_list va_list;
+#include <stdarg.h>
 
-/** Initialises a va_list. */
-#define va_start(a,b)		__builtin_va_start(a,b)
+/** Type for a do_printf() helper function. */
+typedef void (*printf_helper_t)(char, void *, int *);
 
-/** Ends use of a va_list. */
-#define va_end(a)		__builtin_va_end(a)
+extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args);
 
-/** Gets an argument from a va_list. */
-#define va_arg(a, b)		__builtin_va_arg(a, b)
-
-#endif /* __TYPES_VARARG_H */
+#endif /* __LIB_PRINTF_H */

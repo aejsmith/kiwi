@@ -16,7 +16,6 @@ Import('config', 'envmgr')
 sources = map(File, [
 	'console/console.c',
 	'console/font_8x8.c',
-	'console/kprintf.c',
 
 	'cpu/cpu.c',
 	'cpu/fpu.c',
@@ -31,10 +30,9 @@ sources = map(File, [
 	'ipc/ipc.c',
 	'ipc/pipe.c',
 
-	'lib/do_printf.c',
+	'lib/printf.c',
 	'lib/notifier.c',
 	'lib/qsort.c',
-	'lib/sprintf.c',
 	'lib/string.c',
 
 	'mm/kheap.c',

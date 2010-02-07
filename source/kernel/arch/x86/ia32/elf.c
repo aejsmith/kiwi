@@ -18,10 +18,9 @@
  * @brief		IA32 ELF helper functions.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/utility.h>
 
+#include <console.h>
 #include <elf.h>
 #include <errors.h>
 #include <module.h>

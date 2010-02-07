@@ -29,8 +29,6 @@
  *   http://en.wikipedia.org/wiki/Radix_tree
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 

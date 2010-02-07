@@ -26,14 +26,13 @@
  *			pass before the 50 second timer fires.
  */
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
 #include <time/timer.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 
 /** Current timer device. */

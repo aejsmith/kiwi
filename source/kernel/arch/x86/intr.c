@@ -23,8 +23,6 @@
 #include <arch/page.h>
 #include <arch/sysreg.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/intr.h>
 
 #include <lib/utility.h>
@@ -36,6 +34,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
 
@@ -148,7 +147,7 @@ static bool intr_handle_nm(unative_t num, intr_frame_t *frame) {
  * @param frame		Interrupt stack frame.
  * @return		Doesn't return. */
 static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
-#if !CONFIG_ARCH_AMD64
+#ifndef __x86_64__
 	/* Disable KDBG on IA32. */
 	atomic_set(&kdbg_running, 3);
 #endif

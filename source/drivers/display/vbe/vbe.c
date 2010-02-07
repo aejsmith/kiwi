@@ -18,8 +18,6 @@
  * @brief		VBE display driver.
  */
 
-#include <console/kprintf.h>
-
 #include <drivers/display.h>
 
 #include <mm/malloc.h>
@@ -27,6 +25,7 @@
 #include <platform/bios.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>

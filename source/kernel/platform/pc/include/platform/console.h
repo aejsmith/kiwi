@@ -21,7 +21,7 @@
 #ifndef __PLATFORM_CONSOLE_H
 #define __PLATFORM_CONSOLE_H
 
-#include <console/console.h>
+#include <console.h>
 
 /** Convert the serial port number from the configuration to a port number. */
 #if CONFIG_X86_SERIAL_PORT == 1

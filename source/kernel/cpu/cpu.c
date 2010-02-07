@@ -27,8 +27,6 @@
  * the cpu_t structures for them.
  */
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
@@ -39,6 +37,7 @@
 #include <proc/sched.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 /** Boot CPU structure. */

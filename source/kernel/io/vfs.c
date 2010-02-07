@@ -26,8 +26,6 @@
  *			attempts to lock node, deadlock).
  */
 
-#include <console/kprintf.h>
-
 #include <io/context.h>
 #include <io/device.h>
 #include <io/vfs.h>
@@ -45,6 +43,7 @@
 
 #include <args.h>
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>

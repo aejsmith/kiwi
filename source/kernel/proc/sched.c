@@ -48,8 +48,6 @@
 #include <arch/sched.h>
 #include <arch/stack.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
@@ -66,6 +64,7 @@
 #include <time/timer.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 #if CONFIG_SCHED_DEBUG

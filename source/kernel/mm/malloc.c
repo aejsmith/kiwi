@@ -35,8 +35,6 @@
  * cache pointer will be NULL.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 
 #include <mm/kheap.h>

@@ -20,8 +20,6 @@
 
 #include <arch/memmap.h>
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -30,6 +28,7 @@
 #include <platform/acpi.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 /** Whether ACPI is supported. */

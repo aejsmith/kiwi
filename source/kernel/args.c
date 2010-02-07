@@ -18,13 +18,12 @@
  * @brief		Kernel argument functions.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
 
 #include <args.h>
+#include <console.h>
 
 /** Structure containing an argument. */
 typedef struct arg {

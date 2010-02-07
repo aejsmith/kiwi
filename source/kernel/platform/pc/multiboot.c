@@ -20,8 +20,6 @@
 
 #include <arch/memmap.h>
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -33,6 +31,7 @@
 
 #include <args.h>
 #include <assert.h>
+#include <console.h>
 #include <bootmod.h>
 #include <fatal.h>
 

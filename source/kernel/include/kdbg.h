@@ -21,13 +21,12 @@
 #ifndef __KDBG_H
 #define __KDBG_H
 
-#include <console/kprintf.h>
-
 #include <lib/notifier.h>
 #include <lib/string.h>
 
 #include <types/atomic.h>
 
+#include <console.h>
 #include <types.h>
 
 /** Size of KDBG input buffer. */

@@ -20,8 +20,6 @@
 
 #include <arch/lapic.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/smp.h>
@@ -34,6 +32,7 @@
 #include <time/timer.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
 

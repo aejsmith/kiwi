@@ -23,8 +23,7 @@
 
 #include <mm/flags.h>
 
-#include <types/vararg.h>
-
+#include <stdarg.h>
 #include <types.h>
 
 extern void *memcpy(void *dest, const void *src, size_t count);
@@ -39,22 +38,19 @@ extern int strncasecmp(const char *s1, const char *s2, size_t count);
 extern char *strsep(char **stringp, const char *delim);
 extern char *strchr(const char *s, int c);
 extern char *strrchr(const char *s, int c);
+extern char *strstrip(char *str);
 extern char *strcpy(char *dest, const char *src);
 extern char *strncpy(char *dest, const char *src, size_t count);
 extern char *strcat(char *dest, const char *src);
-extern int atoi(const char *s);
-
 extern void *kmemdup(const void *src, size_t count, int kmflag);
 extern char *kstrdup(const char *s, int kmflag);
 extern char *kstrndup(const char *s, size_t n, int kmflag);
 extern char *kbasename(const char *path, int kmflag);
 extern char *kdirname(const char *path, int kmflag);
-
 extern unsigned long strtoul(const char *cp, char **endp, unsigned int base);
 extern long strtol(const char *cp,char **endp,unsigned int base);
 extern unsigned long long strtoull(const char *cp, char **endp, unsigned int base);
 extern long long strtoll(const char *cp, char **endp, unsigned int base);
-
 extern int vsnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int vsprintf(char *buf, const char *fmt, va_list args);
 extern int snprintf(char *buf, size_t size, const char *fmt, ...);

@@ -20,14 +20,13 @@
 
 #include <arch/stack.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/context.h>
 #include <cpu/intr.h>
 
 #include <lib/string.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 extern void __context_restore_frame(void);

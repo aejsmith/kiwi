@@ -18,14 +18,12 @@
  * @brief		Error handling functions.
  */
 
-#include <console/console.h>
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
-#include <lib/do_printf.h>
+#include <lib/printf.h>
 
+#include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
 #include <version.h>

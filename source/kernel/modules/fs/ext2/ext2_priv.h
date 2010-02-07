@@ -21,12 +21,12 @@
 #ifndef __EXT2_PRIV_H
 #define __EXT2_PRIV_H
 
-#include <console/kprintf.h>
-
 #include <io/device.h>
 #include <io/vfs.h>
 
 #include <sync/rwlock.h>
+
+#include <console.h>
 
 #if CONFIG_MODULE_FS_EXT2_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

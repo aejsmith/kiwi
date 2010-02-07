@@ -21,13 +21,12 @@
 #include <arch/arch.h>
 #include <arch/io.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/intr.h>
 
 #include <drivers/input.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>

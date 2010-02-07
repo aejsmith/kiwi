@@ -29,8 +29,6 @@
  * possible.
  */
 
-#include <console/console.h>
-
 #include <cpu/context.h>
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -42,7 +40,6 @@
 
 #include <lib/ctype.h>
 #include <lib/string.h>
-#include <lib/do_printf.h>
 
 #include <mm/slab.h>
 #include <mm/vm.h>

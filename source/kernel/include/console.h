@@ -18,16 +18,17 @@
  * @brief		Kernel console functions.
  */
 
-#ifndef __CONSOLE_CONSOLE_H
-#define __CONSOLE_CONSOLE_H
+#ifndef __CONSOLE_H
+#define __CONSOLE_H
 
 #include <types/list.h>
+#include <stdarg.h>
 
 /** Kernel console implementation structure. */
 typedef struct console {
 	list_t header;			/**< Link to console list. */
-
-	int min_level;			/**< Console will not receive output less than this level. */
+	int min_level;			/**< Console will not receive output below this level. */
+	bool inhibited;			/**< Whether output is inhibited. */
 
 	/** Initialise the console. */
 	void (*init)(void);
@@ -49,7 +50,10 @@ typedef struct console {
 
 extern unsigned char console_font_8x8[2048];
 
-extern void console_putch(unsigned char level, char ch);
+extern int kvprintf(int level, const char *fmt, va_list args);
+extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
+
+extern void console_putch(int level, char ch);
 extern void console_register(console_t *cons);
 extern void console_unregister(console_t *cons);
 
@@ -57,4 +61,4 @@ extern int kdbg_cmd_log(int argc, char **argv);
 
 extern void console_early_init(void);
 
-#endif /* __CONSOLE_CONSOLE_H */
+#endif /* __CONSOLE_H */

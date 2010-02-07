@@ -58,6 +58,7 @@ Section('Kernel configuration')
 #######
 
 Option('HANDLE_MAX', 'Maximum number of open handles for a process.', 1024)
+Option('KLOG_SIZE', 'Size of the kernel log buffer in characters.', 16384)
 
 #######
 Section('Kernel debugging')

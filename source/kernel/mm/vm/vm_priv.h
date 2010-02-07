@@ -21,10 +21,10 @@
 #ifndef __VM_PRIV_H
 #define __VM_PRIV_H
 
-#include <console/kprintf.h>
-
 #include <mm/page.h>
 #include <mm/vm.h>
+
+#include <console.h>
 
 #if CONFIG_VM_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

@@ -18,8 +18,6 @@
  * @brief		Per-process object manager.
  */
 
-#include <console/kprintf.h>
-
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -28,6 +26,7 @@
 #include <proc/process.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <init.h>
 #include <kdbg.h>

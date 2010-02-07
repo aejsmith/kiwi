@@ -20,7 +20,7 @@
 
 #include <lib/ctype.h>
 #include <lib/string.h>
-#include <lib/do_printf.h>
+#include <lib/printf.h>
 
 #include <types.h>
 

@@ -21,8 +21,6 @@
  *			device interface...
  */
 
-#include <console/console.h>
-
 #include <drivers/display.h>
 
 #include <lib/utility.h>
@@ -33,6 +31,7 @@
 #include <types/atomic.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>

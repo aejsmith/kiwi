@@ -28,8 +28,6 @@
 
 #include <arch/io.h>
 
-#include <console/kprintf.h>
-
 #include <drivers/pci.h>
 
 #include <lib/string.h>
@@ -38,6 +36,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
+#include <console.h>
 #include <endian.h>
 #include <errors.h>
 #include <kdbg.h>

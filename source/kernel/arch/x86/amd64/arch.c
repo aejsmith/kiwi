@@ -25,11 +25,10 @@
 #include <arch/page.h>
 #include <arch/sysreg.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
+#include <console.h>
 #include <fatal.h>
 
 extern void __syscall_entry(void);

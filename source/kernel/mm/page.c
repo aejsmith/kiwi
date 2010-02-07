@@ -18,8 +18,6 @@
  * @brief		Physical memory management.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -30,6 +28,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 

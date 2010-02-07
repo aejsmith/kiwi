@@ -41,8 +41,6 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 
 #include <mm/kheap.h>
@@ -51,6 +49,7 @@
 #include <mm/vmem.h>
 
 #include <assert.h>
+#include <console.h>
 #include <fatal.h>
 
 #if CONFIG_KHEAP_DEBUG

@@ -26,14 +26,13 @@
  *   http://www.t13.org/Documents/UploadedDocuments/docs2007/
  */
 
-#include <console/kprintf.h>
-
 #include <drivers/pci.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <module.h>
 

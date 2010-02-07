@@ -18,17 +18,16 @@
  * @brief		Boot-time module loader.
  */
 
-#include <console/kprintf.h>
+#include <io/vfs.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
-
-#include <io/vfs.h>
 
 #include <mm/malloc.h>
 
 #include <assert.h>
 #include <bootmod.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <module.h>

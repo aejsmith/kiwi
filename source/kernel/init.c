@@ -20,8 +20,6 @@
 
 #include <arch/arch.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
@@ -43,6 +41,7 @@
 #include <proc/thread.h>
 
 #include <bootmod.h>
+#include <console.h>
 #include <fatal.h>
 #include <init.h>
 #include <version.h>

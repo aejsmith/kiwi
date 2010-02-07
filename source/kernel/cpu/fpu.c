@@ -18,12 +18,11 @@
  * @brief		FPU context functions.
  */
 
-#include <console/kprintf.h>
-
 #include <mm/slab.h>
 
 #include <proc/thread.h>
 
+#include <console.h>
 #include <init.h>
 
 #if CONFIG_PROC_DEBUG

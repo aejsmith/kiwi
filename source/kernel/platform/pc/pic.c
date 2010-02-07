@@ -20,12 +20,11 @@
 
 #include <arch/io.h>
 
-#include <console/kprintf.h>
-
 #include <cpu/intr.h>
 
 #include <platform/pic.h>
 
+#include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
 

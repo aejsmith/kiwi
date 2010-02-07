@@ -21,8 +21,6 @@
 #include <arch/io.h>
 #include <arch/sysreg.h>
 
-#include <console/kprintf.h>
-
 #include <mm/malloc.h>
 #include <mm/vmem.h>
 
@@ -35,6 +33,7 @@
 #include <sync/semaphore.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>

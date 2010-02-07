@@ -18,8 +18,6 @@
  * @brief		Process management functions.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -39,6 +37,7 @@
 #include <types/avl.h>
 
 #include <assert.h>
+#include <console.h>
 #include <elf.h>
 #include <errors.h>
 #include <fatal.h>

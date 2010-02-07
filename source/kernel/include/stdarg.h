@@ -15,17 +15,22 @@
 
 /**
  * @file
- * @brief		Formatted output functions.
+ * @brief		Variadic argument definitions.
  */
 
-#ifndef __CONSOLE_KPRINTF_H
-#define __CONSOLE_KPRINTF_H
+#ifndef __STDARG_H
+#define __STDARG_H
 
-#include <console/console.h>
+/** Variadic argument list. */
+typedef __builtin_va_list va_list;
 
-#include <types/vararg.h>
+/** Initialises a va_list. */
+#define va_start(a,b)		__builtin_va_start(a,b)
 
-extern int kvprintf(int level, const char *format, va_list args);
-extern int kprintf(int level, const char *format, ...) __printf(2, 3);
+/** Ends use of a va_list. */
+#define va_end(a)		__builtin_va_end(a)
 
-#endif /* __CONSOLE_KPRINTF_H */
+/** Gets an argument from a va_list. */
+#define va_arg(a, b)		__builtin_va_arg(a, b)
+
+#endif /* __STDARG_H */

@@ -28,8 +28,6 @@
  *   http://wiki.osdev.org/PCI
  */
 
-#include <console/kprintf.h>
-
 #include <drivers/pci.h>
 
 #include <lib/string.h>
@@ -39,6 +37,7 @@
 
 #include <io/device.h>
 
+#include <console.h>
 #include <errors.h>
 #include <module.h>
 

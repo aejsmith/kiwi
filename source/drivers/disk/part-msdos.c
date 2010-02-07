@@ -18,11 +18,9 @@
  * @brief		MSDOS partition table scanner.
  */
 
-#include <console/kprintf.h>
-
 #include <lib/utility.h>
-
 #include <mm/malloc.h>
+#include <console.h>
 
 #include "disk_priv.h"
 

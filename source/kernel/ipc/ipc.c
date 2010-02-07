@@ -31,8 +31,6 @@
  * closed.
  */
 
-#include <console/kprintf.h>
-
 #include <ipc/ipc.h>
 
 #include <lib/notifier.h>
@@ -53,6 +51,7 @@
 #include <types/refcount.h>
 
 #include <assert.h>
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <init.h>

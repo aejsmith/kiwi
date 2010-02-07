@@ -19,6 +19,7 @@
  */
 
 #include <lib/ctype.h>
+#include <lib/printf.h>
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -40,11 +41,11 @@
 void *memcpy(void *dest, const void *src, size_t count) {
 	const char *s = (const char *)src;
 	char *d = (char *)dest;
-	const unsigned long *ns;
-	unsigned long *nd;
+	const unative_t *ns;
+	unative_t *nd;
 
 	/* Align the destination. */
-	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
+	while((ptr_t)d & (sizeof(unative_t) - 1)) {
 		if(count--) {
 			*d++ = *s++;
 		} else {
@@ -53,21 +54,21 @@ void *memcpy(void *dest, const void *src, size_t count) {
 	}
 
 	/* Write in native-sized blocks if we can. */
-	if(count >= sizeof(unsigned long)) {
-		nd = (unsigned long *)d;
-		ns = (const unsigned long *)s;
+	if(count >= sizeof(unative_t)) {
+		nd = (unative_t *)d;
+		ns = (const unative_t *)s;
 
 		/* Unroll the loop if possible. */
-		while(count >= (sizeof(unsigned long) * 4)) {
+		while(count >= (sizeof(unative_t) * 4)) {
 			*nd++ = *ns++;
 			*nd++ = *ns++;
 			*nd++ = *ns++;
 			*nd++ = *ns++;
-			count -= sizeof(unsigned long) * 4;
+			count -= sizeof(unative_t) * 4;
 		}
-		while(count >= sizeof(unsigned long)) {
+		while(count >= sizeof(unative_t)) {
 			*nd++ = *ns++;
-			count -= sizeof(unsigned long);
+			count -= sizeof(unative_t);
 		}
 
 		d = (char *)nd;
@@ -93,12 +94,12 @@ void *memcpy(void *dest, const void *src, size_t count) {
  */
 void *memset(void *dest, int val, size_t count) {
 	unsigned char c = val & 0xff;
-	unsigned long *nd, nval;
+	unative_t *nd, nval;
 	char *d = (char *)dest;
 	size_t i;
 
 	/* Align the destination. */
-	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
+	while((ptr_t)d & (sizeof(unative_t) - 1)) {
 		if(count--) {
 			*d++ = c;
 		} else {
@@ -107,28 +108,28 @@ void *memset(void *dest, int val, size_t count) {
 	}
 
 	/* Write in native-sized blocks if we can. */
-	if(count >= sizeof(unsigned long)) {
-		nd = (unsigned long *)d;
+	if(count >= sizeof(unative_t)) {
+		nd = (unative_t *)d;
 
 		/* Compute the value we will write. */
 		nval = c;
 		if(nval != 0) {
-			for(i = 8; i < (sizeof(unsigned long) * 8); i <<= 1) {
+			for(i = 8; i < (sizeof(unative_t) * 8); i <<= 1) {
 				nval = (nval << i) | nval;
 			}
 		}
 
 		/* Unroll the loop if possible. */
-		while(count >= (sizeof(unsigned long) * 4)) {
+		while(count >= (sizeof(unative_t) * 4)) {
 			*nd++ = nval;
 			*nd++ = nval;
 			*nd++ = nval;
 			*nd++ = nval;
-			count -= sizeof(unsigned long) * 4;
+			count -= sizeof(unative_t) * 4;
 		}
-		while(count >= sizeof(unsigned long)) {
+		while(count >= sizeof(unative_t)) {
 			*nd++ = nval;
-			count -= sizeof(unsigned long);
+			count -= sizeof(unative_t);
 		}
 
 		d = (char *)nd;
@@ -396,6 +397,34 @@ char *strrchr(const char *s, int c) {
 	return (char *)l;
 }
 
+/** Strip whitespace from a string.
+ * 
+ * Strips whitespace from the start and end of a string. The string is modified
+ * in-place.
+ *
+ * @param str           String to remove from.
+ *
+ * @return              Pointer to new start of string.
+ */
+char *strstrip(char *str) {
+	size_t len;
+
+	/* Strip from beginning. */
+	while(isspace(*str)) {
+		str++;
+	}
+
+	/* Strip from end. */
+	len = strlen(str);
+	while(len--) {
+		if(!isspace(str[len])) {
+			break;
+		}
+	}
+	str[++len] = 0;
+	return str;
+}
+
 /** Copy a string.
  *
  * Copies a string from one place to another. Assumes that the destination
@@ -451,39 +480,6 @@ char *strcat(char *dest, const char *src) {
 
 	while((*d++ = *src++));
 	return dest;
-}
-
-/** Convert string to integer.
- *
- * Converts the string specified to an integer. If a part of the string is
- * encountered that cannot be converted, i.e. not a number, then the function
- * returns the current value.
- *
- * @param s		Pointer to the string to convert.
- * 
- * @return		The converted value.
- */
-int atoi(const char *s) {
-	int v = 0;
-	int sign = 1;
-
-	while(*s == ' ' || (unsigned int)(*s - 9) < 5u) {
-		s++;
-	}
-
-	switch(*s) {
-		case '-':
-			sign=-1;
-		case '+':
-			s++;
-	}
-
-	while((unsigned int) (*s - '0') < 10u) {
-		v = v * 10 + *s - '0';
-		s++;
-	}
-	
-	return (sign == -1)? -v:v;
 }
 
 /** Duplicate memory.
@@ -764,4 +760,116 @@ long long strtoll(const char *cp, char **endp, unsigned int base) {
 		return -strtoull(cp + 1, endp, base);
 	}
 	return strtoull(cp, endp, base);
+}
+
+/** Data used by vsnprintf_helper(). */
+struct vsnprintf_data {
+	char *buf;			/**< Buffer to write to. */
+	size_t size;			/**< Total size of buffer. */
+	size_t off;			/**< Current number of bytes written. */
+};
+
+/** Helper for vsnprintf().
+ * @param ch		Character to place in buffer.
+ * @param _data		Data.
+ * @param total		Pointer to total character count. */
+static void vsnprintf_helper(char ch, void *_data, int *total) {
+	struct vsnprintf_data *data = _data;
+
+	if(data->off < data->size) {
+		data->buf[data->off++] = ch;
+		*total = *total + 1;
+	}
+}
+
+/** Format a string and place it in a buffer.
+ *
+ * Places a formatted string in a buffer according to the format and
+ * arguments given.
+ *
+ * @param buf		The buffer to place the result into.
+ * @param size		The size of the buffer, including the trailing NULL.
+ * @param fmt		The format string to use.
+ * @param args		Arguments for the format string.
+ *
+ * @return		The number of characters generated, excluding the
+ *			trailing NULL.
+ */
+int vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
+	struct vsnprintf_data data;
+	int ret;
+
+	data.buf = buf;
+	data.size = size - 1;
+	data.off = 0;
+
+	ret = do_printf(vsnprintf_helper, &data, fmt, args);
+
+	if(data.off < data.size) {
+		data.buf[data.off] = 0;
+	} else {
+		data.buf[data.size-1] = 0;
+	}
+	return ret;
+}
+
+/** Format a string and place it in a buffer.
+ *
+ * Places a formatted string in a buffer according to the format and
+ * arguments given.
+ *
+ * @param buf		The buffer to place the result into.
+ * @param fmt		The format string to use.
+ * @param args		Arguments for the format string.
+ *
+ * @return		The number of characters generated, excluding the
+ *			trailing NULL.
+ */
+int vsprintf(char *buf, const char *fmt, va_list args) {
+	return vsnprintf(buf, (size_t)-1, fmt, args);
+}
+
+/** Format a string and place it in a buffer.
+ *
+ * Places a formatted string in a buffer according to the format and
+ * arguments given.
+ *
+ * @param buf		The buffer to place the result into.
+ * @param size		The size of the buffer, including the trailing NULL.
+ * @param fmt		The format string to use.
+ *
+ * @return		The number of characters generated, excluding the
+ *			trailing NULL, as per ISO C99.
+ */
+int snprintf(char *buf, size_t size, const char *fmt, ...) {
+	va_list args;
+	int ret;
+
+	va_start(args, fmt);
+	ret = vsnprintf(buf, size, fmt, args);
+	va_end(args);
+
+	return ret;
+}
+
+/** Format a string and place it in a buffer.
+ *
+ * Places a formatted string in a buffer according to the format and
+ * arguments given.
+ *
+ * @param buf		The buffer to place the result into.
+ * @param fmt		The format string to use.
+ *
+ * @return		The number of characters generated, excluding the
+ *			trailing NULL, as per ISO C99.
+ */
+int sprintf(char *buf, const char *fmt, ...) {
+	va_list args;
+	int ret;
+
+	va_start(args, fmt);
+	ret = vsprintf(buf, fmt, args);
+	va_end(args);
+
+	return ret;
 }

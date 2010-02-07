@@ -20,18 +20,16 @@
 
 #include <arch/syscall.h>
 
-#include <console/kprintf.h>
-
 #include <io/device.h>
 #include <io/vfs.h>
 
 #include <ipc/ipc.h>
 
-#include <mm/malloc.h>
-#include <mm/vm.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <mm/malloc.h>
+#include <mm/vm.h>
 
 #include <proc/handle.h>
 #include <proc/process.h>
@@ -39,6 +37,7 @@
 
 #include <sync/mutex.h>
 
+#include <console.h>
 #include <errors.h>
 #include <fatal.h>
 #include <init.h>
