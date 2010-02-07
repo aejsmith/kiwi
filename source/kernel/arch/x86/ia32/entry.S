@@ -58,7 +58,7 @@
 .align 16
 	push	$0
 	push	$\nr
-	jmp	__isr_common
+	jmp	isr_common
 .endm
 
 /** Macro to define an ISR (with error code).
@@ -73,7 +73,7 @@
 .macro ISR_E nr
 .align 16
 	push	$\nr
-	jmp	__isr_common
+	jmp	isr_common
 .endm
 
 /** Array of ISR handlers, each 16 bytes long. */
@@ -124,13 +124,13 @@ __isr_array:
 .size __isr_array, .-__isr_array
 
 /** Common ISR handling code. */
-.type __isr_common, @function
-__isr_common:
+.type isr_common, @function
+isr_common:
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
 	/* Set sane segment descriptors. */
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
@@ -153,7 +153,7 @@ __isr_common:
 	/* Get rid of the error code and interrupt number. */
 	addl	$8, %esp
 	iret
-.size __isr_common, .-__isr_common
+.size isr_common, .-isr_common
 
 /** Userspace entry function. */
 .global thread_arch_enter_userspace
@@ -178,14 +178,14 @@ thread_arch_enter_userspace:
 	 *  - EFLAGS.
 	 *  - CS.
 	 *  - EIP. */
-	push	$(SEG_U_DS | 0x03)
+	push	$(SEGMENT_U_DS | 0x03)
 	push	%esi
 	push	$(SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1)
-	push	$(SEG_U_CS | 0x03)
+	push	$(SEGMENT_U_CS | 0x03)
 	push	%edi
 	
 	/* Set other segment registers. */
-	mov	$(SEG_U_DS | 0x03), %ax
+	mov	$(SEGMENT_U_DS | 0x03), %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	

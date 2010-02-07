@@ -15,6 +15,8 @@ Import('config', 'env')
 
 sources = map(File, [
 	'ap_boot.bin.c',
+	'arch.c',
+	'context.c',
 	'cpu.c',
 	'fpu.c',
 	'intr.c',
@@ -37,7 +39,9 @@ env.Command('ap_boot.bin.c', ['ap_boot.bin'],
                    '$GENCOMSTR'))
 
 # Set the linker script path.
-env['LDSCRIPT'] = File('link-%s.ld' % (config['ARCH']))
+env.Command('link.ld', 'link-%s.ld.in' % (config['ARCH']),
+            Action('$CC $_CCCOMCOM $ASFLAGS -E -x c $SOURCE | grep -v "^\#" > $TARGET', '$GENCOMSTR'))
+env['LDSCRIPT'] = File('link.ld')
 
 # Pull in AMD64-/IA32-specific stuff.
 sources += SConscript(dirs=[config['ARCH']], exports=['env'])

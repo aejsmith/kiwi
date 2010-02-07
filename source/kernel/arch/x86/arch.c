@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,11 +15,10 @@
 
 /**
  * @file
- * @brief		IA32 architecture core code.
+ * @brief		x86 architecture core code.
  */
 
 #include <arch/arch.h>
-#include <arch/descriptor.h>
 #include <arch/io.h>
 #include <arch/lapic.h>
 #include <arch/page.h>
@@ -28,55 +27,29 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
-#include <proc/syscall.h>
-
+#include <console.h>
 #include <fatal.h>
 
-/** System call handler function.
- * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-static bool syscall_intr_handler(unative_t num, intr_frame_t *frame) {
-	bool state = intr_enable();
-
-	frame->ax = syscall_handler((syscall_frame_t *)frame);
-	intr_restore(state);
-	return false;
-}
-
-/** IA32 architecture startup code.
- *
- * Initial startup code for the IA32 architecture, run before the memory
- * management subsystem is set up.
- *
- * @param data		Multiboot information pointer.
- */
+/** x86-specific early initialisation.
+ * @param data		Multiboot information pointer. */
 void __init_text arch_premm_init(void *data) {
 	descriptor_init();
 	intr_init();
 	cpu_arch_init(&curr_cpu->arch);
 }
 
-/** IA32 architecture startup code.
- *
- * Second stage startup code for the IA32 architecture, run after the memory
- * allocation subsystem is set up.
- */
+/** x86-specific second stage initialisation. */
 void __init_text arch_postmm_init(void) {
 	lapic_init();
-	intr_register(SYSCALL_INT_NO, syscall_intr_handler);
+	syscall_arch_init();
 }
 
-/** IA32 architecture startup code.
- *
- * Third stage startup code for the IA32 architecture, unmaps the temporary
- * identity mapping used during boot.
- */
+/** x86-specific final initialisation. */
 void __init_text arch_final_init(void) {
 	page_late_init();
 }
 
-/** Architecture initialisation for an AP. */
+/** x86-specific initialisation for an AP. */
 void __init_text arch_ap_init(void) {
 	descriptor_ap_init();
 	cpu_arch_init(&curr_cpu->arch);
@@ -85,6 +58,9 @@ void __init_text arch_ap_init(void) {
 	if(!lapic_init()) {
 		fatal("LAPIC initialisation failed for CPU %" PRIu32 "\n", curr_cpu->id);
 	}
+#ifdef __x86_64__
+	syscall_arch_init();
+#endif
 }
 
 /** Reboot the system. */

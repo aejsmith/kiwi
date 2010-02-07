@@ -46,25 +46,25 @@ typedef struct syscall_frame {
 	unative_t rip;		/**< RIP (RCX). */
 	unative_t rsp;		/**< RSP (userspace stack pointer). */
 #else
-	unative_t gs;			/**< GS. */
-	unative_t fs;			/**< FS. */
-	unative_t es;			/**< ES. */
-	unative_t ds;			/**< DS. */
-	unative_t p3;			/**< Third parameter (EDI). */
-	unative_t p4;			/**< Fourth parameter (ESI). */
-	unative_t p6;			/**< Sixth parameter (EBP). */
-	unative_t ksp;			/**< ESP (kernel). */
-	unative_t p5;			/**< Fifth parameter (EBX). */
-	unative_t p1;			/**< First parameter (EDX). */
-	unative_t p2;			/**< Second parameter (ECX). */
-	unative_t id;			/**< System call ID (EAX). */
-	unative_t int_no;		/**< Interrupt number. */
-	unative_t err_code;		/**< Error code (if applicable). */
-	unative_t ip;			/**< EIP. */
-	unative_t cs;			/**< CS. */
-	unative_t flags;		/**< EFLAGS. */
-	unative_t sp;			/**< ESP. */
-	unative_t ss;			/**< SS. */
+	unative_t gs;		/**< GS. */
+	unative_t fs;		/**< FS. */
+	unative_t es;		/**< ES. */
+	unative_t ds;		/**< DS. */
+	unative_t p3;		/**< Third parameter (EDI). */
+	unative_t p4;		/**< Fourth parameter (ESI). */
+	unative_t p6;		/**< Sixth parameter (EBP). */
+	unative_t ksp;		/**< ESP (kernel). */
+	unative_t p5;		/**< Fifth parameter (EBX). */
+	unative_t p1;		/**< First parameter (EDX). */
+	unative_t p2;		/**< Second parameter (ECX). */
+	unative_t id;		/**< System call ID (EAX). */
+	unative_t int_no;	/**< Interrupt number. */
+	unative_t err_code;	/**< Error code (if applicable). */
+	unative_t ip;		/**< EIP. */
+	unative_t cs;		/**< CS. */
+	unative_t flags;	/**< EFLAGS. */
+	unative_t sp;		/**< ESP. */
+	unative_t ss;		/**< SS. */
 #endif
 } __packed syscall_frame_t;
 
@@ -72,5 +72,7 @@ typedef struct syscall_frame {
 #ifndef __x86_64__
 # define SYSCALL_INT_NO		0x80
 #endif
+
+extern void syscall_arch_init(void);
 
 #endif /* __ARCH_SYSCALL_H */

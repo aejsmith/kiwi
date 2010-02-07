@@ -81,13 +81,13 @@ __kernel_entry:
 
 	/* Set up the temporary GDT and jump to the kernel code segment. */
 	lgdt	KA2PA(__boot_gdtp)
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
 	mov	%ax, %ss
-	ljmp	$SEG_K_CS, $KA2PA(1f)
+	ljmp	$SEGMENT_K_CS, $KA2PA(1f)
 1:
 	/* Check for CPUID - if we can change EFLAGS.ID, it is supported. */
 	pushf
@@ -201,13 +201,13 @@ __kernel_entry:
 __kernel_ap_entry:
 	/* Set proper segments. */
 	lgdt	KA2PA(__boot_gdtp)
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
 	mov	%ax, %ss
-	ljmp	$SEG_K_CS, $KA2PA(1f)
+	ljmp	$SEGMENT_K_CS, $KA2PA(1f)
 1:
 	/* Enable PAE/PGE/PSE/OSFXSR. */
 	movl	%cr4, %eax

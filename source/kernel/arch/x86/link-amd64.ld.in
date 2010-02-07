@@ -1,0 +1,89 @@
+/*
+ * Copyright (C) 2009-2010 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		AMD64 kernel linker script.
+ */
+
+#include <arch/memmap.h>
+#include <arch/page.h>
+
+ENTRY(__kernel_entry)
+OUTPUT_ARCH("i386:x86-64")
+OUTPUT_FORMAT("elf64-x86-64")
+
+SECTIONS {
+	. = KERNEL_VIRT_BASE + SIZEOF_HEADERS;
+
+	.text : {
+		__text_start = .;
+		*(.multiboot)
+		*(.text)
+		*(.text.*)
+		. = ALIGN(PAGE_SIZE);
+		__text_end = .;
+	}
+
+	.init ALIGN(PAGE_SIZE) : {
+		__init_start = .;
+		*(.init.data)
+		*(.init.text)
+
+		. = ALIGN(32);
+		__initcall_start = .;
+		*(.init.initcalls)
+		__initcall_end = .;
+
+		__ap_trampoline_start = .;
+		*(.init.trampoline)
+		__ap_trampoline_end = .;
+
+		. = ALIGN(PAGE_SIZE);
+		__init_end = .;
+	}
+
+	.rodata ALIGN(PAGE_SIZE) : {
+		__rodata_start = .;
+		*(.rodata)
+		*(.rodata.*)
+		. = ALIGN(PAGE_SIZE);
+		__rodata_end = .;
+	}
+
+	.data ALIGN(PAGE_SIZE) : {
+		__data_start = .;
+		*(.data)
+		*(.data.*)
+		. = ALIGN(PAGE_SIZE);
+		__data_end = .;
+	}
+
+	.bss ALIGN(PAGE_SIZE) : {
+		__bss_start = .;
+		*(.bss)
+		*(.bss.*)
+		*(COMMON)
+		. = ALIGN(PAGE_SIZE);
+		__bss_end = .;
+	}
+
+	__end = .;
+
+	/DISCARD/ : {
+		*(.note.GNU-stack)
+		*(.comment*)
+	}
+}

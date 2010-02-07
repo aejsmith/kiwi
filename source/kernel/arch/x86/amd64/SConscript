@@ -14,15 +14,14 @@
 Import('env')
 
 sources = map(File, [
-	'arch.c',
 	'boot.S',
-	'context.c',
 	'descriptor.c',
 	'elf.c',
 	'entry.S',
 	'kdbg.c',
 	'page.c',
 	'switch.S',
+	'syscall.c',
 	'thread.c',
 ])
 

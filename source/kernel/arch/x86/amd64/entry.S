@@ -75,7 +75,7 @@
 .align 16
 	push	$0
 	push	$\nr
-	jmp	__isr_common
+	jmp	isr_common
 .endm
 
 /** Macro to define an ISR with an error code.
@@ -85,7 +85,7 @@
 .macro ISR_E nr
 .align 16
 	push	$\nr
-	jmp	__isr_common
+	jmp	isr_common
 .endm
 
 /** Array of ISR handlers, each 16 bytes long. */
@@ -136,13 +136,13 @@ __isr_array:
 .size __isr_array, .-__isr_array
 
 /** Common ISR handling code. */
-.type __isr_common, @function
-__isr_common:
+.type isr_common, @function
+isr_common:
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
 	/* Set sane segment descriptors. */
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %ss
@@ -162,12 +162,12 @@ __isr_common:
 	/* Get rid of the error code and interrupt number. */
 	addq	$16, %rsp
 	iretq
-.size __isr_common, .-__isr_common
+.size isr_common, .-isr_common
 
 /** SYSCALL entry point. */
-.global __syscall_entry
-.type __syscall_entry, @function
-__syscall_entry:
+.global syscall_entry
+.type syscall_entry, @function
+syscall_entry:
 	/* Switch to the kernel mode stack. The GS_BASE MSR points to the
 	 * thread's architecture-specific data. Use the SWAPGS instruction
 	 * to get at it, so we can get our stack pointer. The userspace RSP
@@ -247,7 +247,7 @@ __syscall_entry:
 
 	/* Return to user-mode. */
 	sysretq
-.size __syscall_entry, .-__syscall_entry
+.size syscall_entry, .-syscall_entry
 
 /** Userspace entry function. */
 .global thread_arch_enter_userspace
@@ -263,14 +263,14 @@ thread_arch_enter_userspace:
 	 *  - RFLAGS.
 	 *  - CS.
 	 *  - RIP. */
-	push	$(SEG_U_DS | 0x03)
+	push	$(SEGMENT_U_DS | 0x03)
 	push	%rsi
 	push	$(SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1)
-	push	$(SEG_U_CS | 0x03)
+	push	$(SEGMENT_U_CS | 0x03)
 	push	%rdi
 	
 	/* Set other segment registers. */
-	mov	$(SEG_U_DS | 0x03), %ax
+	mov	$(SEGMENT_U_DS | 0x03), %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 

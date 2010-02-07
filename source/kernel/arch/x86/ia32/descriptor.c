@@ -81,10 +81,10 @@ static void __init_text gdt_init(void) {
 	memcpy(curr_cpu->arch.gdt, __initial_gdt, sizeof(__initial_gdt));
 
 	/* Set up the TSS descriptor. */
-	gdt_set_base(SEG_TSS, (ptr_t)&curr_cpu->arch.tss);
-	gdt_set_limit(SEG_TSS, sizeof(tss_t));
-	gdt_set_base(SEG_DF_TSS, (ptr_t)&__doublefault_tss);
-	gdt_set_limit(SEG_DF_TSS, sizeof(tss_t));
+	gdt_set_base(SEGMENT_TSS, (ptr_t)&curr_cpu->arch.tss);
+	gdt_set_limit(SEGMENT_TSS, sizeof(tss_t));
+	gdt_set_base(SEGMENT_DF_TSS, (ptr_t)&__doublefault_tss);
+	gdt_set_limit(SEGMENT_DF_TSS, sizeof(tss_t));
 
 	/* Set the GDT pointer. */
 	lgdt((ptr_t)&curr_cpu->arch.gdt, sizeof(curr_cpu->arch.gdt) - 1);
@@ -96,7 +96,7 @@ static void __init_text tss_init(void) {
 
 	/* Set up the contents of the TSS. */
 	memset(&curr_cpu->arch.tss, 0, sizeof(tss_t));
-	curr_cpu->arch.tss.ss0 = SEG_K_DS;
+	curr_cpu->arch.tss.ss0 = SEGMENT_K_DS;
 	curr_cpu->arch.tss.io_bitmap = 104;
 
 	/* Set up the doublefault TSS. */
@@ -105,16 +105,16 @@ static void __init_text tss_init(void) {
 	__doublefault_tss.eip = (ptr_t)&__isr_array[FAULT_DOUBLE];
 	__doublefault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
 	__doublefault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
-	__doublefault_tss.es = SEG_K_DS;
-	__doublefault_tss.cs = SEG_K_CS;
-	__doublefault_tss.ss = SEG_K_DS;
-	__doublefault_tss.ds = SEG_K_DS;
+	__doublefault_tss.es = SEGMENT_K_DS;
+	__doublefault_tss.cs = SEGMENT_K_CS;
+	__doublefault_tss.ss = SEGMENT_K_DS;
+	__doublefault_tss.ds = SEGMENT_K_DS;
 
 	/* Set CPU pointer on doublefault stack. */
 	*(ptr_t *)stack = cpu_get_pointer();
 
 	/* Load the TSS segment into TR. */
-	ltr(SEG_TSS);
+	ltr(SEGMENT_TSS);
 }
 
 /** Initialise the IDT shared by all CPUs. */
@@ -127,7 +127,7 @@ static inline void idt_init(void) {
 		addr = (ptr_t)&__isr_array[i];
 		idt[i].base0 = (addr & 0xFFFF);
 		idt[i].base1 = ((addr >> 16) & 0xFFFF);
-		idt[i].sel = SEG_K_CS;
+		idt[i].sel = SEGMENT_K_CS;
 		idt[i].unused = 0;
 		idt[i].flags = 0x8E;
 	}
@@ -135,7 +135,7 @@ static inline void idt_init(void) {
 	/* Modify the double fault entry to become a task gate using the
 	 * doublefault TSS. */
 	idt[FAULT_DOUBLE].flags = 0xE5;
-	idt[FAULT_DOUBLE].sel = SEG_DF_TSS;
+	idt[FAULT_DOUBLE].sel = SEGMENT_DF_TSS;
 	idt[FAULT_DOUBLE].base0 = 0;
 	idt[FAULT_DOUBLE].base1 = 0;
 

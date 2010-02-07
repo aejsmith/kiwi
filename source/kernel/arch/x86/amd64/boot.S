@@ -87,13 +87,13 @@ __kernel_entry:
 
 	/* Set up the temporary GDT and jump to the 32-bit code segment. */
 	lgdt	KA2PA(__boot_gdtp)
-	mov	$SEG_K_DS32, %ax
+	mov	$SEGMENT_K_DS32, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
 	mov	%ax, %ss
-	ljmp	$SEG_K_CS32, $KA2PA(1f)
+	ljmp	$SEGMENT_K_CS32, $KA2PA(1f)
 1:
 	/* Check for CPUID - if we can change EFLAGS.ID, it is supported. */
 	pushf
@@ -158,7 +158,7 @@ __kernel_entry:
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
-	ljmp	$SEG_K_CS, $KA2PA(.Llmode)
+	ljmp	$SEGMENT_K_CS, $KA2PA(.Llmode)
 .Lmagic_err:
 	movl	$KA2PA(magic_err_str), %esi
 	jmp	.Learly_die
@@ -196,7 +196,7 @@ __kernel_entry:
 	jmp	*%rax
 5:
 	/* Set data segments. */
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
@@ -236,13 +236,13 @@ __kernel_ap_entry:
 .code32
 	/* Set proper segments. */
 	lgdt	KA2PA(__boot_gdtp)
-	mov	$SEG_K_DS32, %ax
+	mov	$SEGMENT_K_DS32, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
 	mov	%ax, %ss
-	ljmp	$SEG_K_CS32, $KA2PA(1f)
+	ljmp	$SEGMENT_K_CS32, $KA2PA(1f)
 1:
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
@@ -283,7 +283,7 @@ __kernel_ap_entry:
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
-	ljmp	$SEG_K_CS, $KA2PA(2f)
+	ljmp	$SEGMENT_K_CS, $KA2PA(2f)
 .align 8
 .code64
 2:
@@ -292,7 +292,7 @@ __kernel_ap_entry:
 	jmp	*%rax
 3:
 	/* Set data segment. */
-	mov	$SEG_K_DS, %ax
+	mov	$SEGMENT_K_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs

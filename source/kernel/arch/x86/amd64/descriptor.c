@@ -68,7 +68,7 @@ static void __init_text gdt_init(void) {
 	base = (ptr_t)&curr_cpu->arch.tss;
 	size = sizeof(tss_t);
 
-	desc = (gdt_tss_entry_t *)&curr_cpu->arch.gdt[SEG_TSS / 0x08];
+	desc = (gdt_tss_entry_t *)&curr_cpu->arch.gdt[SEGMENT_TSS / 0x08];
 	desc->base0 = base & 0xffff;
 	desc->base1 = ((base) >> 16) & 0xff;
 	desc->base2 = ((base) >> 24) & 0xff;
@@ -96,7 +96,7 @@ static void __init_text tss_init(void) {
 	*(ptr_t *)stack = cpu_get_pointer();
 
 	/* Load the TSS segment into TR. */
-	ltr(SEG_TSS);
+	ltr(SEGMENT_TSS);
 }
 
 /** Initialise the IDT shared by all CPUs. */
@@ -112,7 +112,7 @@ static inline void idt_init(void) {
 		idt[i].base2 = ((addr >> 32) & 0xFFFFFFFF);
 		idt[i].ist = 0;
 		idt[i].reserved = 0;
-		idt[i].sel = SEG_K_CS;
+		idt[i].sel = SEGMENT_K_CS;
 		idt[i].unused = 0;
 		idt[i].flags = 0x8E;
 	}
