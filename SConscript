@@ -48,7 +48,6 @@ def fs_image_func(target, source, env):
 	os.makedirs(os.path.join(tmpdir, 'system', 'services'))
 
 	# Copy everything needed into it.
-	shutil.copy(str(env['KERNEL']), os.path.join(tmpdir, 'system'))
 	for bin in env['BINARIES']:
 		shutil.copy(str(bin), os.path.join(tmpdir, 'system', 'binaries'))
 	for svc in env['SERVICES']:
@@ -74,24 +73,19 @@ def fs_image_func(target, source, env):
 	# Clean up.
 	shutil.rmtree(tmpdir)
 dist['BUILDERS']['FSImage'] = Builder(action=Action(fs_image_func, '$GENCOMSTR'))
-dist.FSImage('fsimage.tar.gz', [dist['KERNEL']] + dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'])
+dist.FSImage('fsimage.tar.gz', dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'])
 dist['FSIMAGE'] = File('fsimage.tar.gz')
 
-# Set build defaults.
+# Add aliases and set the default target.
+Alias('loader', dist['LOADER'])
 Alias('kernel', dist['KERNEL'])
 Alias('modules', dist['MODULES'])
 Alias('libraries', dist['LIBRARIES'])
 Alias('binaries', dist['BINARIES'])
 Alias('services', dist['SERVICES'])
 Alias('fsimage', dist['FSIMAGE'])
-Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [dist['KERNEL'], dist['FSIMAGE']])))
+Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
-# Create the ISO/HD images. Only build HD image on Linux for now.
-if os.uname()[0] == 'Linux':
-	#Default(Alias('hd', dist.HDImage('hd.img', dist['FSIMAGE'])))
-	Alias('hd', dist.HDImage('hd.img', dist['FSIMAGE']))
-	#Alias('qtest', dist.Command('qtest', ['hd.img'],
-	#      Action(config['QEMU_BINARY'] + ' -hda $SOURCE -boot c ' + config['QEMU_OPTS'], None)))
-#else:
+# Target to run in QEMU.
 Alias('qtest', dist.Command('qtest', ['cdrom.iso'],
       Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'], None)))

@@ -37,6 +37,7 @@ typedef int64_t timeout_t;		/**< Type used to store a timeout for an operation. 
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t key_t;			/**< Type used to identify something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
+typedef uint64_t inode_t;		/**< Type used to store a filesystem inode number. */
 
 /** Various definitions. */
 #define false		0		/**< False boolean value. */

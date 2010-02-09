@@ -44,14 +44,16 @@
 #include <console.h>
 #include <fatal.h>
 #include <init.h>
+#include <kargs.h>
 #include <version.h>
 
-extern void init_bsp(void *data);
+extern void kmain(kernel_args_t *args, uint32_t cpu);
 extern void init_ap(void);
 
 extern initcall_t __initcall_start[];
 extern initcall_t __initcall_end[];
 
+#if 0
 /** Second-stage intialization thread.
  * @param arg1		Thread argument (unused).
  * @param arg2		Thread argument (unused). */
@@ -80,14 +82,14 @@ static void init_thread(void *arg1, void *arg2) {
 		fatal("Could not create startup process (%d)", ret);
 	}
 }
+#endif
 
-/** Kernel initialisation function.
- *
- * Kernel initialisation function for the boot CPU.
- *
- * @param data		Data to pass into the architecture setup code.
- */
-void init_bsp(void *data) {
+/** Main function of the kernel.
+ * @param args          Arguments from the bootloader.
+ * @param cpu           CPU that the function is running on. */
+void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
+	while(1);
+#if 0
 	thread_t *thread;
 
 	cpu_early_init();
@@ -146,6 +148,7 @@ void init_bsp(void *data) {
 
 	/* We now become the boot CPU's idle thread. */
 	sched_idle();
+#endif
 }
 
 /** AP kernel initialisation function. */

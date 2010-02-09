@@ -24,6 +24,8 @@
 #include <arch/tlb.h>
 #include <arch/sysreg.h>
 
+#include <cpu/cpu.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 

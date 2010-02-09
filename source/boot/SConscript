@@ -1,0 +1,92 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('config', 'envmgr')
+
+# List of our own sources.
+sources = map(File, [
+	'fs/iso9660.c',
+	'console.c',
+	'fatal.c',
+	'kargs.c',
+	'main.c',
+	'memory.c',
+	'menu.c',
+	'vfs.c',
+])
+
+# Sources to use from the kernel.
+ksources = map(lambda x: File('../kernel/%s' % x), [
+	'lib/printf.c',
+	'lib/string.c',
+])
+
+############################
+# Build environment set-up #
+############################
+
+# Create the boot environment.
+env = envmgr.Create('boot', {
+	'LIBS': [],
+	'CPPPATH': [
+		Dir('include'),
+		Dir('arch/%s/include' % (config['SRCARCH'])),
+		Dir('platform/%s/include' % (config['PLATFORM'])),
+		Dir('../kernel/include'),
+		Dir('../kernel/arch/%s/include' % (config['SRCARCH'])),
+		Dir('../kernel/platform/%s/include' % (config['PLATFORM'])),
+	],
+	'CCFLAGS': [
+		'-nostdlib', '-nostdinc', '-ffreestanding',
+		'-fno-stack-protector', '-include',
+		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+	],
+	'CXXFLAGS': [
+		'-fno-exceptions', '-fno-rtti',
+	],
+	'ASFLAGS': [
+		'-nostdinc', '-include',
+		'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+	],
+	'LINKFLAGS': [
+		'-nostdlib',
+	],
+	'CPPDEFINES': {
+		'KERNEL': None,
+		'LOADER': None,
+	},
+})
+
+# Get the list of source files from the architecture/platform.
+arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
+platform_sources = SConscript(dirs=['platform/' + config['PLATFORM']], exports=['env'])
+sources = arch_sources + platform_sources + sources
+
+# Perform some black magic to make the object files built from kernel sources
+# have an alternative file name to not conflict.
+kobjects = map(lambda x: env.Object(target='%s.o' % (x.name), source = x), ksources)
+objects = map(env.Object, sources) + kobjects
+
+# Link the bootloader.
+env.Program('loader.elf', objects, LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+Depends('loader.elf', env['LDSCRIPT'])
+
+# Generate various information files and the stripped boot loader image.
+env.Command('loader.lst', 'loader.elf', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('loader.rde', 'loader.elf', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
+env.Command('loader.sym', 'loader.elf', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
+env.Command('loader', 'loader.elf', Action('$OBJCOPY -O binary --strip-all $SOURCE $TARGET', '$GENCOMSTR'))
+Depends('loader', ['loader.lst', 'loader.rde', 'loader.sym'])
+
+# Let the distribution environment know where the loader is.
+envmgr['dist']['LOADER'] = File('loader')

@@ -21,32 +21,29 @@
 #ifndef __ARCH_DESCRIPTOR_H
 #define __ARCH_DESCRIPTOR_H
 
-/** Total number of GDT descriptors. */
-#ifdef __x86_64__
-# define GDT_ENTRY_COUNT	9
-#else
-# define GDT_ENTRY_COUNT	7
-#endif
-
-/** Total number of IDT descriptors. */
-#define IDT_ENTRY_COUNT		256
-
-/** Segment definitions. */
-#if __x86_64__
-# define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
-# define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
-# define SEGMENT_U_DS		0x18	/**< User data segment. */
-# define SEGMENT_U_CS		0x20	/**< User code segment. */
-# define SEGMENT_K_CS32		0x28	/**< 32-bit kernel code segment. */
-# define SEGMENT_K_DS32		0x30	/**< 32-bit kernel data segment. */
-# define SEGMENT_TSS		0x38	/**< TSS segment. */
-#else
-# define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
-# define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
-# define SEGMENT_U_CS		0x18	/**< User code segment. */
-# define SEGMENT_U_DS		0x20	/**< User data segment. */
-# define SEGMENT_TSS		0x28	/**< TSS segment. */
-# define SEGMENT_DF_TSS		0x30	/**< Double fault TSS segment. */
+#ifndef LOADER
+# ifdef __x86_64__
+#  define GDT_ENTRY_COUNT	9	/**< Total number of GDT descriptors. */
+# else
+#  define GDT_ENTRY_COUNT	7	/**< Total number of GDT descriptors. */
+# endif
+# define IDT_ENTRY_COUNT	256	/**< Total number of IDT descriptors. */
+# if __x86_64__
+#  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
+#  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
+#  define SEGMENT_U_DS		0x18	/**< User data segment. */
+#  define SEGMENT_U_CS		0x20	/**< User code segment. */
+#  define SEGMENT_K_CS32	0x28	/**< 32-bit kernel code segment. */
+#  define SEGMENT_K_DS32	0x30	/**< 32-bit kernel data segment. */
+#  define SEGMENT_TSS		0x38	/**< TSS segment. */
+# else
+#  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
+#  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
+#  define SEGMENT_U_CS		0x18	/**< User code segment. */
+#  define SEGMENT_U_DS		0x20	/**< User data segment. */
+#  define SEGMENT_TSS		0x28	/**< TSS segment. */
+#  define SEGMENT_DF_TSS	0x30	/**< Double fault TSS segment. */
+# endif
 #endif
 
 #ifndef __ASM__
@@ -174,6 +171,7 @@ typedef struct idt_entry {
 #endif
 } __packed idt_entry_t;
 
+#ifndef LOADER
 /** Load a value into TR (Task Register).
  * @param sel		Selector to load. */
 static inline void ltr(uint32_t sel) {
@@ -200,6 +198,6 @@ extern gdt_pointer_t __boot_gdtp;
 
 extern void descriptor_init(void);
 extern void descriptor_ap_init(void);
-
+#endif
 #endif /* __ASM__ */
 #endif /* __ARCH_DESCRIPTOR_H */

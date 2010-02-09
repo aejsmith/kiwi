@@ -21,7 +21,9 @@
 #ifndef __LIB_STRING_H
 #define __LIB_STRING_H
 
-#include <mm/flags.h>
+#ifndef LOADER
+# include <mm/flags.h>
+#endif
 
 #include <stdarg.h>
 #include <types.h>
@@ -42,11 +44,16 @@ extern char *strstrip(char *str);
 extern char *strcpy(char *dest, const char *src);
 extern char *strncpy(char *dest, const char *src, size_t count);
 extern char *strcat(char *dest, const char *src);
+#ifdef LOADER
+extern char *kstrdup(const char *s);
+extern char *kstrndup(const char *s, size_t n);
+#else
 extern void *kmemdup(const void *src, size_t count, int kmflag);
 extern char *kstrdup(const char *s, int kmflag);
 extern char *kstrndup(const char *s, size_t n, int kmflag);
 extern char *kbasename(const char *path, int kmflag);
 extern char *kdirname(const char *path, int kmflag);
+#endif
 extern unsigned long strtoul(const char *cp, char **endp, unsigned int base);
 extern long strtol(const char *cp,char **endp,unsigned int base);
 extern unsigned long long strtoull(const char *cp, char **endp, unsigned int base);

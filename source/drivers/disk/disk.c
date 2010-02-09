@@ -88,7 +88,7 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 		block = kmalloc(blksize, MM_SLEEP);
 	}
 
-	/* Now work out the start page and the end block. Subtract one from
+	/* Now work out the start block and the end block. Subtract one from
 	 * count to prevent end from going onto the next block when the offset
 	 * plus the count is an exact multiple of the block size. */
 	start = offset / blksize;

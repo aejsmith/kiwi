@@ -46,23 +46,35 @@
 
 #ifndef __ASM__
 
-#include <cpu/cpu.h>
+#include <types.h>
 
+/* FIXME. */
+#ifdef LOADER
 /** Check for a standard feature (ECX). */
-#define CPU_FEAT_STD_ECX(cpu, bit)	\
-	((cpu)->arch.features.feat_ecx & (1<<(bit)))
+#define CPU_FEAT_STD_ECX(cpu, bit)	((cpu)->arch.feat_ecx & (1<<(bit)))
 
 /** Check for a standard feature (EDX). */
-#define CPU_FEAT_STD_EDX(cpu, bit)	\
-	((cpu)->arch.features.feat_edx & (1<<(bit)))
+#define CPU_FEAT_STD_EDX(cpu, bit)	((cpu)->arch.feat_edx & (1<<(bit)))
 
 /** Check for an extended feature (ECX). */
-#define CPU_FEAT_EXT_ECX(cpu, bit)	\
-	((cpu)->arch.features.ext_ecx & (1<<(bit)))
+#define CPU_FEAT_EXT_ECX(cpu, bit)	((cpu)->arch.ext_ecx & (1<<(bit)))
 
 /** Check for an extended feature (EDX). */
-#define CPU_FEAT_EXT_EDX(cpu, bit)	\
-	((cpu)->arch.features.ext_edx & (1<<(bit)))
+#define CPU_FEAT_EXT_EDX(cpu, bit)	((cpu)->arch.ext_edx & (1<<(bit)))
+#else
+/** Check for a standard feature (ECX). */
+#define CPU_FEAT_STD_ECX(cpu, bit)	((cpu)->arch.features.feat_ecx & (1<<(bit)))
+
+/** Check for a standard feature (EDX). */
+#define CPU_FEAT_STD_EDX(cpu, bit)	((cpu)->arch.features.feat_edx & (1<<(bit)))
+
+/** Check for an extended feature (ECX). */
+#define CPU_FEAT_EXT_ECX(cpu, bit)	((cpu)->arch.features.ext_ecx & (1<<(bit)))
+
+/** Check for an extended feature (EDX). */
+#define CPU_FEAT_EXT_EDX(cpu, bit)	((cpu)->arch.features.ext_edx & (1<<(bit)))
+
+#endif
 
 /** Feature check macros - Standard CPUID Features (EDX). */
 #define CPU_HAS_FPU(c)		CPU_FEAT_STD_EDX(c, 0)	/**< FPU. */
