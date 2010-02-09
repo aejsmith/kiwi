@@ -75,7 +75,6 @@ extern void page_range_add(phys_ptr_t start, phys_ptr_t end);
 extern void page_range_mark_reclaimable(phys_ptr_t start, phys_ptr_t end);
 extern void page_range_mark_reserved(phys_ptr_t start, phys_ptr_t end);
 
-extern void page_platform_init(void);
 extern void page_arch_init(void);
 extern void page_init(void);
 extern void page_init_reclaim(void);

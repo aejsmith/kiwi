@@ -23,7 +23,6 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
-#include <cpu/smp.h>
 
 #include <io/vfs.h>
 
@@ -88,7 +87,31 @@ static void init_thread(void *arg1, void *arg2) {
  * @param args          Arguments from the bootloader.
  * @param cpu           CPU that the function is running on. */
 void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
-	while(1);
+	if(cpu == args->boot_cpu) {
+		cpu_early_init(args);
+		console_early_init();
+
+		kprintf(LOG_NORMAL, "kernel: version %s booting (%" PRIu32 " CPU(s))\n",
+		        kiwi_ver_string, cpu_count);
+
+		/* Perform early architecture/platform initialisation. */
+		arch_premm_init(args);
+		platform_premm_init(args);
+
+		/* Initialise other memory management subsystems. */
+		vmem_early_init();
+		kheap_early_init();
+		vmem_init();
+		page_init();
+		slab_init();
+		kheap_init();
+		malloc_init();
+		vm_init();
+
+		while(true);
+	} else {
+		while(true);
+	}
 #if 0
 	thread_t *thread;
 
@@ -153,6 +176,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 
 /** AP kernel initialisation function. */
 void init_ap(void) {
+#if 0
 	curr_cpu->state = CPU_RUNNING;
 	list_append(&cpus_running, &curr_cpu->header);
 
@@ -164,4 +188,5 @@ void init_ap(void) {
 
 	/* We now become this CPU's idle thread. */
 	sched_idle();
+#endif
 }

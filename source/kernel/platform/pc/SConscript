@@ -12,14 +12,11 @@
 # for complete terms.
 
 sources = map(File, [
-	'acpi.c',
 	'console.c',
 	'kdbg.c',
-	'multiboot.c',
 	'pic.c',
 	'pit.c',
 	'platform.c',
-	'smp.c',
 ])
 
 Return('sources')

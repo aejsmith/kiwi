@@ -26,6 +26,7 @@
 #include <lib/string.h>
 
 #include <console.h>
+#include <kargs.h>
 #include <kdbg.h>
 
 /** Atomic variable for paused CPUs to wait on. */
@@ -46,31 +47,19 @@ void cpu_pause_all(void) {
 	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
 }
 
-/** Resume paused CPUs.
- *
- * Resumes execution of all other CPUs that have been paused using
- * cpu_pause_all().
- */
+/** Resume CPUs paused with cpu_pause_all(). */
 void cpu_resume_all(void) {
 	atomic_set(&cpu_pause_wait, 0);
 }
 
-/** Halt all other CPUs.
- *
- * Halts execution of all other CPUs other than the CPU that calls the
- * function. The CPUs will not be able to resume after being halted.
- */
+/** Halt all other CPUs. */
 void cpu_halt_all(void) {
 	atomic_set(&cpu_halting_all, 1);
 	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
 }
 
 /** Cause a CPU to reschedule.
- *
- * Causes the specified CPU to perform a thread switch.
- *
- * @param cpu		CPU to reschedule.
- */
+ * @param cpu		CPU to reschedule. */
 void cpu_reschedule(cpu_t *cpu) {
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_FIXED, LAPIC_VECT_RESCHEDULE);
 }
@@ -78,8 +67,8 @@ void cpu_reschedule(cpu_t *cpu) {
 /** Get current CPU ID.
  * 
  * Gets the ID of the CPU that the function executes on. This function should
- * only be used in cases where the curr_cpu variable is unavailable, i.e.
- * during thread switching. Normally, you should use curr_cpu->id instead.
+ * only be used in cases where the curr_cpu variable is unavailable or unsafe,
+ * i.e. during thread switching.
  *
  * @return              Current CPU ID.
  */
@@ -87,74 +76,29 @@ cpu_id_t cpu_current_id(void) {
         return (cpu_id_t)lapic_id();
 }
 
-/** Initialise an x86 CPU information structure.
- *
- * Fills in the given x86 CPU information structure with information about
- * the current CPU.
- *
- * @param cpu		CPU information structure to fill in.
- */
-void __init_text cpu_arch_init(cpu_arch_t *cpu) {
-	uint32_t eax, ebx, ecx, edx;
-	size_t i = 0, j = 0;
-	uint32_t *ptr;
-	char *str;
-
-	/* Get the highest supported standard level. */
-	cpuid(CPUID_VENDOR_ID, &cpu->features.largest_standard, &ebx, &ecx, &edx);
-	if(cpu->features.largest_standard >= CPUID_FEATURE_INFO) {
-		/* Get standard feature information. */
-		cpuid(CPUID_FEATURE_INFO, &eax, &ebx, &cpu->features.feat_ecx, &cpu->features.feat_edx);
-		cpu->family = (eax >> 8) & 0x0f;
-		cpu->model = (eax >> 4) & 0x0f;
-		cpu->stepping = eax & 0x0f;
-	}
-
-	/* Get the highest supported extended level. */
-	cpuid(CPUID_EXT_MAX, &cpu->features.largest_extended, &ebx, &ecx, &edx);
-	if(cpu->features.largest_extended & (1<<31)) {
-		if(cpu->features.largest_extended >= CPUID_EXT_FEATURE) {
-			/* Get extended feature information. */
-			cpuid(CPUID_EXT_FEATURE, &eax, &ebx, &cpu->features.ext_ecx, &cpu->features.ext_edx);
-		}
-
-		if(cpu->features.largest_extended >= CPUID_BRAND_STRING3) {
-			/* Get brand information. */
-			memset(cpu->model_name, 0, sizeof(cpu->model_name));
-			str = cpu->model_name;
-			ptr = (uint32_t *)str;
-
-			cpuid(CPUID_BRAND_STRING1, &ptr[0], &ptr[1], &ptr[2],  &ptr[3]);
-			cpuid(CPUID_BRAND_STRING2, &ptr[4], &ptr[5], &ptr[6],  &ptr[7]);
-			cpuid(CPUID_BRAND_STRING3, &ptr[8], &ptr[9], &ptr[10], &ptr[11]);
-
-			/* Some CPUs right-justify the string... */
-			while(str[i] == ' ') {
-				i++;
-			}
-			if(i > 0) {
-				while(str[i]) {
-					str[j++] = str[i++];
-				}
-				while(j < sizeof(cpu->model_name)) {
-					str[j++] = 0;
-				}
-			}
-		}
-	} else {
-		cpu->features.largest_extended = 0;
-	}
+/** Initialise an x86 CPU structure.
+ * @param cpu		CPU structure to fill in.
+ * @param args		Kernel arguments structure for the CPU. */
+void __init_text cpu_arch_init(cpu_arch_t *cpu, kernel_args_cpu_arch_t *args) {
+	cpu->cpu_freq = args->cpu_freq;
+	cpu->bus_freq = args->bus_freq;
+	memcpy(cpu->model_name, args->model_name, sizeof(cpu->model_name));
+	cpu->family = args->family;
+	cpu->model = args->model;
+	cpu->stepping = args->stepping;
+	cpu->cache_alignment = args->cache_alignment;
+	cpu->largest_standard = args->largest_standard;
+	cpu->feat_ecx = args->feat_ecx;
+	cpu->feat_edx = args->feat_edx;
+	cpu->largest_extended = args->largest_extended;
+	cpu->ext_ecx = args->ext_ecx;
+	cpu->ext_edx = args->ext_edx;
 }
 
 /** CPU information command for KDBG.
- *
- * Prints a list of all CPUs and information about them.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		KDBG_OK on success.
- */
+ * @return		KDBG_OK on success. */
 int kdbg_cmd_cpus(int argc, char **argv) {
 	size_t i;
 
@@ -165,22 +109,18 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID   State    Model Name\n");
-	kprintf(LOG_NONE, "==   =====    ==========\n");
+	kprintf(LOG_NONE, "ID   Freq (MHz)  Bus Freq (MHz)  Cache Align Model Name\n");
+	kprintf(LOG_NONE, "==   ==========  ==============  =========== ==========\n");
 
 	for(i = 0; i <= cpu_id_max; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}
 
-		kprintf(LOG_NONE, "%-4" PRIu32 " ", cpus[i]->id);
-		switch(cpus[i]->state) {
-		case CPU_DISABLED:	kprintf(LOG_NONE, "Disabled "); break;
-		case CPU_DOWN:		kprintf(LOG_NONE, "Down     "); break;
-		case CPU_RUNNING:	kprintf(LOG_NONE, "Running  "); break;
-		default:		kprintf(LOG_NONE, "Bad      "); break;
-		}
-		kprintf(LOG_NONE, "%s\n", (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
+		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-10" PRIu64 " %-11d %s\n",
+		        cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
+		        cpus[i]->arch.bus_freq / 1000000, cpus[i]->arch.cache_alignment,
+		        (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
 	}
 
 	return KDBG_OK;

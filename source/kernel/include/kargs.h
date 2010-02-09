@@ -18,8 +18,8 @@
  * @brief		Kernel arguments structure.
  */
 
-#ifndef __BOOT_KARGS_H
-#define __BOOT_KARGS_H
+#ifndef __KARGS_H
+#define __KARGS_H
 
 #include <arch/kargs.h>
 #include <types.h>
@@ -96,4 +96,4 @@ extern kernel_args_cpu_t *kargs_cpu_add(uint32_t id);
 extern void kargs_init(void);
 #endif
 
-#endif /* __BOOT_KARGS_H */
+#endif /* __KARGS_H */

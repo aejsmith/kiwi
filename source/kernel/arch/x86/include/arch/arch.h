@@ -21,8 +21,10 @@
 #ifndef __ARCH_ARCH_H
 #define __ARCH_ARCH_H
 
-extern void arch_premm_init(void *data);
-extern void arch_postmm_init(void);
+#include <kargs.h>
+
+extern void arch_premm_init(kernel_args_t *args);
+extern void arch_postmm_init(kernel_args_t *args);
 extern void arch_final_init(void);
 extern void arch_ap_init(void);
 extern void arch_reboot(void);

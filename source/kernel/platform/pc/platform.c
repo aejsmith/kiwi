@@ -20,11 +20,6 @@
 
 #include <arch/lapic.h>
 
-#include <cpu/cpu.h>
-
-#include <platform/acpi.h>
-#include <platform/console.h>
-#include <platform/multiboot.h>
 #include <platform/pic.h>
 #include <platform/pit.h>
 #include <platform/platform.h>
@@ -33,29 +28,11 @@
 
 #include <fatal.h>
 
-/** PC platform startup code.
- *
- * Initial startup code for the PC platform, run before the memory management
- * subsystem is set up.
- *
- * @param data		Multiboot information pointer.
- */
-void __init_text platform_premm_init(void *data) {
-	multiboot_premm_init((multiboot_info_t *)data);
-	pic_init();
-}
-
-/** PC platform startup code.
- *
- * Second stage startup code for the PC platform, run after the memory
- * management subsystem is set up.
- */
-void __init_text platform_postmm_init(void) {
-	multiboot_postmm_init();
-	console_late_init();
-	acpi_init();
-
+/** PC platform second stage initialisation.
+ * @param args		Kernel arguments structure. */
+void __init_text platform_postmm_init(kernel_args_t *args) {
 	/* Initialise interrupt handling and the timer. */
+	pic_init();
 	if(!lapic_enabled) {
 		timer_device_set(&pit_timer_device);
 	}

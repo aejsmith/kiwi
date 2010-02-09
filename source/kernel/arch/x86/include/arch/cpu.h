@@ -30,32 +30,28 @@
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;
 
-/** CPU feature information structure. */
-typedef struct cpu_features {
-	uint32_t largest_standard;		/**< Largest standard function. */
-	uint32_t feat_ecx;			/**< ECX value of function 01h. */
-	uint32_t feat_edx;			/**< EDX value of function 01h. */
-
-	uint32_t largest_extended;		/**< Largest extended function. */
-	uint32_t ext_ecx;			/**< ECX value of function 80000000h. */
-	uint32_t ext_edx;			/**< ECX value of function 80000000h. */
-} cpu_features_t;
-
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
 	/** Per-CPU CPU structures. */
 	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
 	tss_t tss;				/**< Task State Segment (TSS). */
 
-	/** Per-CPU information. */
-	uint64_t lapic_freq;			/**< Bus frequency, used for LAPIC timer. */
-
-	/** Other information. */
-	cpu_features_t features;		/**< CPUID information. */
+	/** Basic CPU information. */
+	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
+	uint64_t bus_freq;			/**< CPU bus frequency in Hz (for the LAPIC timer). */
 	char model_name[64];			/**< CPU model name. */
 	uint8_t family;				/**< CPU family. */
 	uint8_t model;				/**< CPU model. */
 	uint8_t stepping;			/**< CPU stepping. */
+	int cache_alignment;			/**< Cache line size. */
+
+	/** Feature information. */
+	uint32_t largest_standard;		/**< Largest standard function. */
+	uint32_t feat_ecx;			/**< ECX value of function 01h. */
+	uint32_t feat_edx;			/**< EDX value of function 01h. */
+	uint32_t largest_extended;		/**< Largest extended function. */
+	uint32_t ext_ecx;			/**< ECX value of function 80000000h. */
+	uint32_t ext_edx;			/**< ECX value of function 80000000h. */
 } cpu_arch_t;
 
 /** Get the current CPU structure pointer from the base of the stack.
@@ -76,7 +72,5 @@ static inline __noreturn void cpu_halt(void) {
 		__asm__ volatile("cli; hlt");
 	}
 }
-
-extern void cpu_arch_init(cpu_arch_t *cpu);
 
 #endif /* __ARCH_CPU_H */

@@ -305,8 +305,9 @@ void __init_text page_init(void) {
 
 	/* Populate the arena with memory regions, and perform other
 	 * architecture/platform initialisation tasks. */
-	page_platform_init();
-	page_arch_init();
+	fatal("Not implemented");
+	//page_platform_init();
+	//page_arch_init();
 }
 
 /** Reclaim memory no longer in use after kernel initialisation.

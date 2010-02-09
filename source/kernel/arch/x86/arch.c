@@ -31,15 +31,15 @@
 #include <fatal.h>
 
 /** x86-specific early initialisation.
- * @param data		Multiboot information pointer. */
-void __init_text arch_premm_init(void *data) {
+ * @param args		Kernel arguments structure. */
+void __init_text arch_premm_init(kernel_args_t *args) {
 	descriptor_init();
 	intr_init();
-	cpu_arch_init(&curr_cpu->arch);
 }
 
-/** x86-specific second stage initialisation. */
-void __init_text arch_postmm_init(void) {
+/** x86-specific second stage initialisation.
+ * @param args		Kernel arguments structure. */
+void __init_text arch_postmm_init(kernel_args_t *args) {
 	lapic_init();
 	syscall_arch_init();
 }
@@ -52,7 +52,7 @@ void __init_text arch_final_init(void) {
 /** x86-specific initialisation for an AP. */
 void __init_text arch_ap_init(void) {
 	descriptor_ap_init();
-	cpu_arch_init(&curr_cpu->arch);
+	//cpu_arch_init(&curr_cpu->arch);
 
 	/* Initialise the LAPIC. */
 	if(!lapic_init()) {

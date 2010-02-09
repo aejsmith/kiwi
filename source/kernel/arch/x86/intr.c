@@ -151,10 +151,6 @@ static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
 	/* Disable KDBG on IA32. */
 	atomic_set(&kdbg_running, 3);
 #endif
-
-	/* Crappy workaround, using MMX memcpy() from the console code seems
-	 * to cause nasty problems. */
-	curr_cpu->arch.features.feat_edx &= ~(1<<23);
 	_fatal(frame, "Double Fault (%p)", frame->ip);
 	cpu_halt();
 }

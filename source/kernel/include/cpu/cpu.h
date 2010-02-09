@@ -22,27 +22,20 @@
 #define __CPU_CPU_H
 
 #include <arch/cpu.h>
-
 #include <sync/spinlock.h>
-
 #include <types/list.h>
 
-struct vm_aspace;
+struct kernel_args;
+struct kernel_args_cpu_arch;
 struct sched_cpu;
 struct thread;
+struct vm_aspace;
 
 /** Structure describing a CPU. */
 typedef struct cpu {
 	list_t header;			/**< Link to running CPUs list. */
+
 	cpu_id_t id;			/**< ID of the CPU. */
-
-	/** Current state of the CPU. */
-	enum {
-		CPU_DISABLED,		/**< CPU does not exist. */
-		CPU_DOWN,		/**< CPU is not running. */
-		CPU_RUNNING,		/**< CPU is running. */
-	} state;
-
 	cpu_arch_t arch;		/**< Architecture-specific information. */
 
 	/** Scheduler information. */
@@ -78,9 +71,9 @@ extern void cpu_reschedule(cpu_t *cpu);
 
 extern cpu_id_t cpu_current_id(void);
 
-extern cpu_t *cpu_add(cpu_id_t id, int state);
+extern void cpu_arch_init(cpu_arch_t *cpu, struct kernel_args_cpu_arch *args);
 extern void cpu_init(void);
-extern void cpu_early_init(void);
+extern void cpu_early_init(struct kernel_args *args);
 
 extern int kdbg_cmd_cpus(int argc, char **argv);
 

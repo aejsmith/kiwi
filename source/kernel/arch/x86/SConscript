@@ -14,7 +14,6 @@
 Import('config', 'env')
 
 sources = map(File, [
-	'ap_boot.bin.c',
 	'arch.c',
 	'context.c',
 	'cpu.c',
@@ -22,21 +21,11 @@ sources = map(File, [
 	'intr.c',
 	'kdbg.c',
 	'lapic.c',
-	'smp.c',
 	'vm.c',
 ])
 
 # Set build flags to prevent FPU code generation.
 env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
-
-# Generate the AP boot code.
-Import('envmgr')
-env.Object('ap_boot.S')
-env.Command('ap_boot.bin.elf', ['ap_boot.o'], Action('%s -Ttext=0 -o $TARGET $SOURCE' % (envmgr.GetToolPath('ld')), None))
-env.Command('ap_boot.bin', ['ap_boot.bin.elf'], Action('$OBJCOPY -O binary $SOURCE $TARGET', None))
-env.Command('ap_boot.bin.c', ['ap_boot.bin'],
-            Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
-                   '$GENCOMSTR'))
 
 # Set the linker script path.
 env.Command('link.ld', 'link-%s.ld.in' % (config['ARCH']),

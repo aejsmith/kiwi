@@ -216,7 +216,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 	}
 
 	/* Check if the destination exists. */
-	if(dest > cpu_id_max || !cpus[dest] || cpus[dest]->state == CPU_DOWN) {
+	if(dest > cpu_id_max || !cpus[dest]) {
 		intr_restore(state);
 		return -ERR_NOT_FOUND;
 	}

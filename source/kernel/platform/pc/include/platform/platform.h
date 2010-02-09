@@ -21,11 +21,13 @@
 #ifndef __PLATFORM_PLATFORM_H
 #define __PLATFORM_PLATFORM_H
 
-extern void platform_premm_init(void *data);
-extern void platform_postmm_init(void);
+#include <kargs.h>
+
+extern void platform_postmm_init(kernel_args_t *args);
 extern void platform_final_init(void);
 
 /** Not required on this platform. */
+#define platform_premm_init(args)
 #define platform_ap_init()
 
 #endif /* __PLATFORM_PLATFORM_H */

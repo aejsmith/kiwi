@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,42 +33,5 @@
 #elif CONFIG_X86_SERIAL_PORT == 4
 # define SERIAL_PORT		0x2E8
 #endif
-
-/** Physical address of VGA memory. */
-#define VGA_MEM_PHYS		0xB8000
-
-/** VGA register definitions. */
-#define	VGA_AC_INDEX		0x3C0
-#define	VGA_AC_WRITE		0x3C0
-#define	VGA_AC_READ		0x3C1
-#define	VGA_MISC_WRITE		0x3C2
-#define VGA_SEQ_INDEX		0x3C4
-#define VGA_SEQ_DATA		0x3C5
-#define	VGA_DAC_READ_INDEX	0x3C7
-#define	VGA_DAC_WRITE_INDEX	0x3C8
-#define	VGA_DAC_DATA		0x3C9
-#define	VGA_MISC_READ		0x3CC
-#define VGA_GC_INDEX 		0x3CE
-#define VGA_GC_DATA 		0x3CF
-#define VGA_CRTC_INDEX		0x3D4
-#define VGA_CRTC_DATA		0x3D5
-#define	VGA_INSTAT_READ		0x3DA
-#define	VGA_NUM_SEQ_REGS	5
-#define	VGA_NUM_CRTC_REGS	25
-#define	VGA_NUM_GC_REGS		9
-#define	VGA_NUM_AC_REGS		21
-#define	VGA_NUM_REGS		(1 + VGA_NUM_SEQ_REGS + VGA_NUM_CRTC_REGS + \
-				 VGA_NUM_GC_REGS + VGA_NUM_AC_REGS)
-
-/** VGA console properties. */
-#define VGA_CONSOLE_COLS	80	/**< Number of columns on the VGA console. */
-#define VGA_CONSOLE_ROWS	50	/**< Number of rows on the VGA console. */
-#define VGA_CONSOLE_FG		0xF	/**< Foreground colour (white). */
-#define VGA_CONSOLE_BG		0x0	/**< Background colour (black). */
-
-/** VGA attribute byte. */
-#define VGA_ATTRIB		((uint16_t)((VGA_CONSOLE_BG << 4) | VGA_CONSOLE_FG) << 8)
-
-extern void console_late_init(void);
 
 #endif /* __PLATFORM_CONSOLE_H */
