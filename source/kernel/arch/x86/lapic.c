@@ -171,7 +171,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
  * @return		Whether initialisation succeeded.
  */
 bool __init_text lapic_init(void) {
-	fatal("Your mum");
+	fatal("Not implemented");
 #if 0
 	phys_ptr_t base;
 

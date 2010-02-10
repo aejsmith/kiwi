@@ -49,12 +49,6 @@ static idt_entry_t idt[IDT_ENTRY_COUNT] __aligned(8);
 /** Double fault handler stack. */
 static uint8_t __doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
-/** Bootstrap GDT pointer. */
-gdt_pointer_t __boot_gdtp = {
-	.limit = sizeof(__initial_gdt) - 1,
-	.base = (ptr_t)KA2PA((ptr_t)__initial_gdt),
-};
-
 /** Set up the GDT for the current CPU. */
 static void __init_text gdt_init(void) {
 	gdt_tss_entry_t *desc;

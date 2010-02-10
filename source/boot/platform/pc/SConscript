@@ -39,14 +39,18 @@ def iso_image_func(target, source, env):
 	cdboot = str(env['CDBOOT'])
 	loader = str(env['LOADER'])
 	kernel = str(env['KERNEL'])
+	fsimage = str(env['FSIMAGE'])
 
 	# Create the work directory.
 	tmpdir = tempfile.mkdtemp('.kiwiiso')
 	os.makedirs(os.path.join(tmpdir, 'boot'))
-	os.makedirs(os.path.join(tmpdir, 'kiwi'))
+	os.makedirs(os.path.join(tmpdir, 'kiwi', 'modules'))
 
 	# Copy stuff into it.
 	shutil.copy(kernel, os.path.join(tmpdir, 'kiwi'))
+	shutil.copy(fsimage, os.path.join(tmpdir, 'kiwi', 'modules'))
+	for mod in env['MODULES']:
+		shutil.copy(str(mod), os.path.join(tmpdir, 'kiwi', 'modules'))
 
 	# Create the loader by concatenating the CD boot sector and the loader
 	# together.
@@ -68,7 +72,7 @@ def iso_image_func(target, source, env):
 	shutil.rmtree(tmpdir)
 	return 0
 def iso_image_emitter(target, source, env):
-	return (target, source + [env['KERNEL'], env['LOADER'], env['CDBOOT']])
+	return (target, source + [env['KERNEL'], env['LOADER'], env['CDBOOT'], env['FSIMAGE']] + env['MODULES'])
 envmgr['dist']['BUILDERS']['ISOImage'] = Builder(action=Action(iso_image_func, '$GENCOMSTR'), emitter=iso_image_emitter)
 
 Return('sources')

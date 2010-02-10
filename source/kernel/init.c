@@ -108,16 +108,16 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		malloc_init();
 		vm_init();
 
+		/* Perform second stage architecture/platform initialisation. */
+		arch_postmm_init(args);
+		platform_postmm_init(args);
+
 		while(true);
 	} else {
 		while(true);
 	}
 #if 0
 	thread_t *thread;
-
-	/* Perform second stage architecture/platform initialisation. */
-	arch_postmm_init();
-	platform_postmm_init();
 
 	/* Detect secondary CPUs. */
 	cpu_init();

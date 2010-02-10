@@ -57,14 +57,4 @@
 # define KERNEL_PTBL_BASE	0xFFE00000		/**< Kernel page tables base. */
 #endif
 
-/** Kernel physical base address. */
-#define KERNEL_PHYS_BASE	0x200000
-
-/** Convert a kernel address to the equivalent physical address. */
-#ifndef __ASM__
-# define KA2PA(a)		(((phys_ptr_t)(ptr_t)(a) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE)
-#else
-# define KA2PA(a)		(((a) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE)
-#endif
-
 #endif /* __ARCH_MEMMAP_H */
