@@ -29,20 +29,20 @@
 #include <types.h>
 
 /** List of kernel consoles. */
-static LIST_DECLARE(console_list);
+static LIST_DECLARE(g_console_list);
 static SPINLOCK_DECLARE(console_lock);
 
-/** Cyclic kernel log buffer. Defined as a structure to make access easier. */
+/** Cyclic kernel log buffer.. */
 static struct {
 	unsigned char level;		/**< Log level. */
 	unsigned char ch;		/**< Character. */
-} klog_buffer[CONFIG_KLOG_SIZE] __aligned(PAGE_SIZE);
+} g_klog_buffer[CONFIG_KLOG_SIZE] __aligned(PAGE_SIZE);
 
 /** Start of the log buffer. */
-static uint32_t klog_start = 0;
+static uint32_t g_klog_start = 0;
 
 /** Number of characters in the buffer. */
-static uint32_t klog_length = 0;
+static uint32_t g_klog_length = 0;
 
 /** Write a character to the console/log
  * @note		Does not take the console lock.
@@ -55,12 +55,12 @@ static void console_putch_unlocked(int level, char ch) {
 		return;
 	}
 #endif
-	LIST_FOREACH(&console_list, iter) {
+	LIST_FOREACH(&g_console_list, iter) {
 		cons = list_entry(iter, console_t, header);
 
 		if(level < cons->min_level) {
 			continue;
-		} else if(unlikely(!cons->putch)) {
+		} else if(cons->inhibited && level != LOG_NONE) {
 			continue;
 		}
 
@@ -69,12 +69,12 @@ static void console_putch_unlocked(int level, char ch) {
 
 	/* Store in the log buffer. */
 	if(level != LOG_NONE) {
-		klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].level = level;
-		klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].ch = (unsigned char)ch;
-		if(klog_length < CONFIG_KLOG_SIZE) {
-			klog_length++;
+		g_klog_buffer[(g_klog_start + g_klog_length) % CONFIG_KLOG_SIZE].level = level;
+		g_klog_buffer[(g_klog_start + g_klog_length) % CONFIG_KLOG_SIZE].ch = (unsigned char)ch;
+		if(g_klog_length < CONFIG_KLOG_SIZE) {
+			g_klog_length++;
 		} else {
-			klog_start = (klog_start + 1) % CONFIG_KLOG_SIZE;
+			g_klog_start = (g_klog_start + 1) % CONFIG_KLOG_SIZE;
 		}
 	}
 }
@@ -114,7 +114,7 @@ void console_register(console_t *cons) {
 
 	cons->inhibited = false;
 	list_init(&cons->header);
-	list_append(&console_list, &cons->header);
+	list_append(&g_console_list, &cons->header);
 
 	if(cons->init) {
 		cons->init();
@@ -210,9 +210,9 @@ int kdbg_cmd_log(int argc, char **argv) {
 		}
 	}
 
-	for(i = 0, pos = klog_start; i < klog_length; i++) {
-		if(level == -1 || klog_buffer[pos].level >= level) {
-			console_putch(LOG_NONE, klog_buffer[pos].ch);
+	for(i = 0, pos = g_klog_start; i < g_klog_length; i++) {
+		if(level == -1 || g_klog_buffer[pos].level >= level) {
+			console_putch(LOG_NONE, g_klog_buffer[pos].ch);
 		}
 		if(++pos >= CONFIG_KLOG_SIZE) {
 			pos = 0;

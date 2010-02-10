@@ -91,14 +91,11 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		cpu_early_init(args);
 		console_early_init();
 
-		kprintf(LOG_NORMAL, "kernel: version %s booting (%" PRIu32 " CPU(s))\n",
-		        kiwi_ver_string, cpu_count);
-
 		/* Perform early architecture/platform initialisation. */
 		arch_premm_init(args);
 		platform_premm_init(args);
 
-		/* Initialise other memory management subsystems. */
+		/* Initialise memory management subsystems. */
 		vmem_early_init();
 		kheap_early_init();
 		vmem_init();
@@ -107,6 +104,11 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		kheap_init();
 		malloc_init();
 		vm_init();
+
+		/* Set up the console. */
+		console_init(args);
+		kprintf(LOG_NORMAL, "kernel: version %s booting (%" PRIu32 " CPU(s))\n",
+		        kiwi_ver_string, cpu_count);
 
 		/* Perform second stage architecture/platform initialisation. */
 		arch_postmm_init(args);

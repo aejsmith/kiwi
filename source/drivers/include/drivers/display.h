@@ -101,8 +101,6 @@ typedef struct display_device {
 	size_t count;			/**< Number of modes. */
 
 	display_mode_t *curr_mode;	/**< Current mode. */
-	void *fb;			/**< Framebuffer mapping. */
-	size_t fb_size;			/**< Framebuffer mapping size. */
 	notifier_t redraw_notifier;	/**< Notifier for display redraw. */
 	bool redraw;			/**< Whether any redraw requests have been missed. */
 } display_device_t;

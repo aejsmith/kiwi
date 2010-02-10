@@ -43,12 +43,9 @@ typedef struct console {
 #define LOG_WARN	3		/**< Warning message. */
 #define LOG_NONE	4		/**< Do not log the message (for fatal/KDBG). */
 
-/** Font definitions. */
-#define FONT_WIDTH		8
-#define FONT_HEIGHT		8
-#define FONT_DATA		console_font_8x8
+struct kernel_args;
 
-extern unsigned char console_font_8x8[2048];
+extern console_t g_fb_console;
 
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
@@ -59,6 +56,12 @@ extern void console_unregister(console_t *cons);
 
 extern int kdbg_cmd_log(int argc, char **argv);
 
+extern void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth,
+                                   phys_ptr_t addr);
+extern void fb_console_reset(void);
+
 extern void console_early_init(void);
+extern void console_init(struct kernel_args *args);
+extern void console_update_boot_progress(int percent);
 
 #endif /* __CONSOLE_H */
