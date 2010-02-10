@@ -122,6 +122,9 @@ static CONDVAR_DECLARE(slab_reclaim_req);
 static CONDVAR_DECLARE(slab_reclaim_resp);
 static MUTEX_DECLARE(slab_reclaim_lock, 0);
 
+/** Whether the allocator is fully initialised. */
+static bool g_slab_initialised = false;
+
 #if 0
 # pragma mark Helper functions.
 #endif
@@ -596,10 +599,10 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 static int slab_cpu_cache_init(slab_cache_t *cache) {
 	size_t i;
 
-	assert(cpu_count != 0);
+	assert(g_slab_initialised);
 
 	cache->cpu_caches = kcalloc(cpu_id_max + 1, sizeof(slab_cpu_cache_t), 0);
-	if(cache->cpu_caches == NULL) {
+	if(!cache->cpu_caches) {
 		return -ERR_NO_MEMORY;
 	}
 
@@ -729,9 +732,6 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 }
 
 /** Initialise a slab cache.
- *
- * Initialises a pre-allocated slab cache structure.
- *
  * @param cache		Cache to initialise.
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
@@ -748,9 +748,7 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
                            slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
                            void *data, int priority, vmem_t *source, int flags) {
@@ -793,13 +791,13 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 	/* Ensure that the slab size is aligned. */
 	size = ROUND_UP(size, align);
 
-	/* If we want the magazine layer to be enabled but the CPU count is
-	 * not known, disable it until it is known. */
-	if(!(flags & SLAB_CACHE_NOMAG) && cpu_count == 0) {
+	/* If we want the magazine layer to be enabled but initialisation has
+	 * not been fully performed, disable it for now. */
+	if(!(flags & SLAB_CACHE_NOMAG) && !g_slab_initialised) {
 		flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
 	}
 
-	/* If the cache contains large objects or is a quantum cache for Vmem,
+	/* If the cache contains large objects or is a quantum cache for vmem,
 	 * do not store the metadata within allocated buffers. */
 	if(flags & SLAB_CACHE_QCACHE || size >= (source->quantum / SLAB_LARGE_FRACTION)) {
 		flags |= SLAB_CACHE_NOTOUCH;
@@ -855,9 +853,6 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 }
 
 /** Create a slab cache.
- *
- * Allocates and initialises a new slab cache.
- *
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
@@ -874,10 +869,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
  *			kernel heap arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param kmflag	Allocation flags.
- *
  * @return		Pointer to cache on success, negative error code on
- *			failure.
- */
+ *			failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
                                 slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
                                 void *data, int priority, vmem_t *source, int flags,
@@ -903,11 +896,7 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 }
 
 /** Destroy a slab cache.
- *
- * Destroys all the slabs in a slab cache and the cache itself.
- *
- * @param cache		Cache to destroy.
- */
+ * @param cache		Cache to destroy. */
 void slab_cache_destroy(slab_cache_t *cache) {
 	assert(cache);
 
@@ -926,10 +915,6 @@ void slab_cache_destroy(slab_cache_t *cache) {
 
 	slab_cache_free(&slab_cache_cache, cache);
 }
-
-#if 0
-# pragma mark -
-#endif
 
 /** Entry point for slab reclaim thread.
  * @param arg1		First thread argument (unused).
@@ -971,15 +956,10 @@ void slab_reclaim(void) {
 	mutex_unlock(&slab_reclaim_lock);
 }
 
-/** Slab command for KDBG.
- *
- * Prints out a list of all slab caches.
- *
+/** Prints a list of all slab caches.
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		KDBG_OK on success.
- */
+ * @return		KDBG_OK on success. */
 int kdbg_cmd_slab(int argc, char **argv) {
 	slab_cache_t *cache;
 
@@ -1023,6 +1003,7 @@ void __init_text slab_late_init(void) {
 
 	mutex_lock(&slab_caches_lock, 0);
 
+	g_slab_initialised = true;
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 

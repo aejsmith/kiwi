@@ -87,10 +87,8 @@ static int device_vm_object_fault(vm_region_t *region, ptr_t addr, int reason, i
 	}
 
 	/* Insert into page map. */
-	if(unlikely(page_map_insert(&region->as->pmap, addr, page, vm_region_flags_to_page(region->flags), MM_SLEEP) != 0)) {
-		fatal("Failed to insert page map entry for %p", addr);
-	}
-
+	page_map_insert(&region->as->pmap, addr, page, region->flags & VM_REGION_WRITE,
+	                region->flags & VM_REGION_EXEC, MM_SLEEP);
 	return VM_FAULT_HANDLED;
 }
 

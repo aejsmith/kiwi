@@ -185,7 +185,6 @@ static void vm_anon_object_unmap(vm_object_t *_obj, offset_t offset, size_t size
 static int vm_anon_object_copy(vm_region_t *src, vm_region_t *dest) {
 	vm_anon_object_t *srcobj = (vm_anon_object_t *)src->object, *destobj;
 	size_t i, start, end;
-	int ret;
 
 	assert(src->flags & VM_REGION_PRIVATE);
 
@@ -231,16 +230,8 @@ static int vm_anon_object_copy(vm_region_t *src, vm_region_t *dest) {
 	dest->object = &destobj->header;
 	dest->offset = 0;
 
-	/* Write-protect all mappings on the source region. Should not fail,
-	 * we use MM_SLEEP, and page_map_protect() is supposed to ignore
-	 * missing entries. */
-	ret = page_map_protect(&src->as->pmap, src->start, src->end,
-	                       vm_region_flags_to_page(src->flags & ~VM_REGION_WRITE));
-	if(ret != 0) {
-		fatal("Could not write-protect original region (%d)", ret);
-	}
-
-	/* Invalidate TLB entries for the range in the source address space. */
+	/* Write-protect all mappings on the source region. */
+	page_map_remap(&src->as->pmap, src->start, src->end, false, src->flags & VM_REGION_EXEC);
 	tlb_invalidate(src->as, src->start, src->end);
 
 	dprintf("vm: copied anonymous region %p (obj: %p) to %p (obj: %p)\n",
@@ -260,8 +251,9 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 	phys_ptr_t paddr;
 	offset_t offset;
 	vm_page_t *page;
-	int ret, flags;
+	bool write;
 	size_t i;
+	int ret;
 
 	/* Work out the offset into the object. */
 	offset = region->offset + (addr - region->start);
@@ -284,7 +276,7 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 	}
 
 	/* Get the page and work out the flags to map with. */
-	flags = vm_region_flags_to_page(region->flags);
+	write = region->flags & VM_REGION_WRITE;
 	if(!obj->pages[i] && !obj->source) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
@@ -359,7 +351,7 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 			 * only. */
 			if(refcount_get(&obj->pages[i]->count) > 1) {
 				assert(region->flags & VM_REGION_PRIVATE);
-				flags &= ~PAGE_MAP_WRITE;
+				write = false;
 			}
 
 			paddr = obj->pages[i]->addr;
@@ -378,8 +370,7 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIpp " from %p as read-only\n",
 			        paddr, obj->source);
-
-			flags &= ~PAGE_MAP_WRITE;
+			write = false;
 		}
 	}
 
@@ -387,7 +378,7 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 	 * set correctly. If this is a protection fault, remove existing
 	 * mappings. */
 	if(reason == VM_FAULT_PROTECTION) {
-		if(unlikely(page_map_remove(&region->as->pmap, addr, NULL) != 0)) {
+		if(unlikely(!page_map_remove(&region->as->pmap, addr, NULL))) {
 			fatal("Could not remove previous mapping for %p", addr);
 		}
 
@@ -396,12 +387,9 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	if(unlikely(page_map_insert(&region->as->pmap, addr, paddr, flags, MM_SLEEP) != 0)) {
-		fatal("Failed to insert page map entry for %p", addr);
-	}
-
-	dprintf("vm:  anon fault: mapped 0x%" PRIpp " at %p (as: %p, flags: %d)\n",
-	        paddr, addr, region->as, flags);
+	page_map_insert(&region->as->pmap, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
+	dprintf("vm:  anon fault: mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n",
+	        paddr, addr, region->as, write);
 	mutex_unlock(&obj->lock);
 	return VM_FAULT_HANDLED;
 }

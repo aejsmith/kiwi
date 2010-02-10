@@ -73,7 +73,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 	ptr_t i;
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(page_map_remove(&kernel_page_map, i, &page) != 0) {
+		if(!page_map_remove(&g_kernel_page_map, i, &page)) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
@@ -109,7 +109,7 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 
 	/* Allocate a range from the backing arena. */
 	ret = (ptr_t)vmem_alloc(source, size, vmflag);
-	if(ret == 0) {
+	if(!ret) {
 		return 0;
 	}
 
@@ -122,8 +122,7 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		}
 
 		/* Map the page into the kernel address space. */
-		if(page_map_insert(&kernel_page_map, ret + i, page,
-		                   PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
+		if(page_map_insert(&g_kernel_page_map, ret + i, page, true, true,
 		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", page, ret + i);
 			page_free(page, 1);
@@ -137,7 +136,7 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true, true);
-	vmem_free(source, (vmem_resource_t)ret, size);
+	vmem_free(source, ret, size);
 	return 0;
 }
 
@@ -204,16 +203,13 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 	assert(!(base % PAGE_SIZE));
 
 	ret = (ptr_t)vmem_alloc(&kheap_va_arena, size, vmflag);
-	if(ret == 0) {
+	if(!ret) {
 		return 0;
 	}
 
-	mutex_lock(&kheap_va_arena.lock, 0);
-
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE, base += PAGE_SIZE) {
-		if(page_map_insert(&kernel_page_map, ret + i, base,
-		                   PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC,
+		if(page_map_insert(&g_kernel_page_map, ret + i, base, true, true,
 		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", base, ret + i);
 			goto fail;
@@ -222,14 +218,11 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", base, ret + i);
 	}
 
-	mutex_unlock(&kheap_va_arena.lock);
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true, true);
-	mutex_unlock(&kheap_va_arena.lock);
-
-	vmem_free(&kheap_va_arena, (vmem_resource_t)ret, size);
+	vmem_free(&kheap_va_arena, ret, size);
 	return NULL;
 }
 
@@ -248,11 +241,8 @@ fail:
  *			physical mappings.
  */
 void kheap_unmap_range(void *addr, size_t size, bool shared) {
-	mutex_lock(&kheap_va_arena.lock, 0);
 	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + size, false, shared);
-	mutex_unlock(&kheap_va_arena.lock);
-
-	vmem_free(&kheap_va_arena, (vmem_resource_t)((ptr_t)addr), size);
+	vmem_free(&kheap_va_arena, (ptr_t)addr, size);
 }
 
 /** First part of kernel heap initialisation. */

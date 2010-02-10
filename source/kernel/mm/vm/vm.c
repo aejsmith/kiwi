@@ -164,7 +164,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 	assert(!(region->flags & VM_REGION_RESERVED));
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(page_map_remove(&region->as->pmap, i, &paddr) != 0) {
+		if(!page_map_remove(&region->as->pmap, i, &paddr)) {
 			continue;
 		}
 
@@ -501,7 +501,8 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	vm_region_t *region;
 	vm_page_t *page;
 	offset_t offset;
-	int ret, flags;
+	bool write;
+	int ret;
 
 	/* If we don't have an address space, don't do anything. */
 	if(!as) {
@@ -561,7 +562,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 		}
 
 		/* Unmap previous entry. */
-		if(unlikely(page_map_remove(&as->pmap, addr, NULL) != 0)) {
+		if(unlikely(!page_map_remove(&as->pmap, addr, NULL))) {
 			fatal("Could not remove previous mapping for %p", addr);
 		}
 
@@ -572,11 +573,11 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	/* Work out the flags to map with. If we're not writing, and the page
 	 * is not already dirty, mark it as read-only, so we can make the page
 	 * dirty when it gets written to. */
-	flags = vm_region_flags_to_page(region->flags);
+	write = region->flags & VM_REGION_WRITE;
 	if(access != VM_MAP_WRITE) {
 		if(!(page->flags & VM_PAGE_DIRTY)) {
 			dprintf("vm:  page 0x%" PRIpp " not dirty yet, mapping read-only\n", page->addr);
-			flags &= ~PAGE_MAP_WRITE;
+			write = false;
 		}
 	} else {
 		page->flags |= VM_PAGE_DIRTY;
@@ -584,11 +585,8 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	if(unlikely(page_map_insert(&as->pmap, addr, page->addr, flags, MM_SLEEP) != 0)) {
-		fatal("Failed to insert page map entry for %p", addr);
-	}
-
-	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, flags: %d)\n", page->addr, addr, as, flags);
+	page_map_insert(&as->pmap, addr, page->addr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
+	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n", page->addr, addr, as, write);
 	mutex_unlock(&as->lock);
 	return VM_FAULT_HANDLED;
 fault:
@@ -825,7 +823,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		refcount_inc(&as->count);
 		page_map_switch(&as->pmap);
 	} else {
-		page_map_switch(&kernel_page_map);
+		page_map_switch(&g_kernel_page_map);
 	}
 
 	curr_aspace = as;
@@ -843,11 +841,7 @@ vm_aspace_t *vm_aspace_create(void) {
 	vm_aspace_t *as;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	if(page_map_init(&as->pmap) != 0) {
-		slab_cache_free(vm_aspace_cache, as);
-		return NULL;
-	}
-
+	page_map_init(&as->pmap, MM_SLEEP);
 	as->find_cache = NULL;
 
 	/* Do architecture-specific initialisation. */

@@ -126,7 +126,7 @@ bios_interrupt:
 	mov	%ax, %gs
 	mov	%ax, %ss
 
-	/* Switch back to the loader IVT. */
+	/* Switch back to the loader IDT. */
 	lidt	(g_loader_idtp)
 
 	/* Restore stack pointer. */
@@ -147,7 +147,7 @@ bios_interrupt:
 	ret
 .size bios_interrupt, .-bios_interrupt
 
-/** IDT descriptor for the BIOS IVT. */
+/** IDT pointer for the BIOS IVT. */
 .type g_bios_idtp, @object
 g_bios_idtp:
         .word 0x7FF

@@ -102,7 +102,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		vmem_early_init();
 		kheap_early_init();
 		vmem_init();
-		page_init();
+		page_init(args);
 		slab_init();
 		kheap_init();
 		malloc_init();
@@ -114,27 +114,6 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	}
 #if 0
 	thread_t *thread;
-
-	cpu_early_init();
-	console_early_init();
-
-	kprintf(LOG_NORMAL, "\nKiwi v%s - built for %s-%s\n",
-	        kiwi_ver_string, CONFIG_ARCH, CONFIG_PLATFORM);
-	kprintf(LOG_NORMAL, "Copyright (C) 2007-2009 Kiwi Developers\n\n");
-
-	/* Perform early architecture/platform initialisation. */
-	arch_premm_init(data);
-	platform_premm_init(data);
-
-	/* Initialise other memory management subsystems. */
-	vmem_early_init();
-	kheap_early_init();
-	vmem_init();
-	page_init();
-	slab_init();
-	kheap_init();
-	malloc_init();
-	vm_init();
 
 	/* Perform second stage architecture/platform initialisation. */
 	arch_postmm_init();

@@ -57,16 +57,8 @@
 /** Architecture-specific page map structure. */
 typedef struct page_map {
 	mutex_t lock;			/**< Lock to protect page map. */
-#ifdef __x86_64__
-	phys_ptr_t pml4;		/**< Physical address of PML4. */
-#else
-	phys_ptr_t pdp;			/**< Physical address of PDP. */
-#endif
+	phys_ptr_t cr3;			/**< Value to load into the CR3 register. */
 	bool user;			/**< Whether pages mapped should be userspace accessible. */
-
-	/** Range covered by page map. */
-	ptr_t first;			/**< First allowed page. */
-	ptr_t last;			/**< Last allowed page. */
 } page_map_t;
 
 extern void page_late_init(void);

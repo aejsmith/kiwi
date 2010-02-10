@@ -46,7 +46,7 @@ void __init_text arch_postmm_init(kernel_args_t *args) {
 
 /** x86-specific final initialisation. */
 void __init_text arch_final_init(void) {
-	page_late_init();
+	//page_late_init();
 }
 
 /** x86-specific initialisation for an AP. */

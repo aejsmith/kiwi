@@ -101,7 +101,7 @@ typedef struct slab_cache {
 
 /** Slab cache flags. */
 #define SLAB_CACHE_NOMAG	(1<<0)		/**< Disable the magazine layer. */
-#define SLAB_CACHE_LATEMAG	(1<<1)		/**< Magazine layer should be enabled once CPU count is known. */
+#define SLAB_CACHE_LATEMAG	(1<<1)		/**< Only used during initialisation. */
 #define SLAB_CACHE_NOTOUCH	(1<<2)		/**< Always store metadata outside of allocated memory. */
 #define SLAB_CACHE_QCACHE	(1<<3)		/**< Cache is serving as a quantum cache for its source. */
 

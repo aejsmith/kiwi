@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,6 +18,8 @@
  * @brief		Physical memory management.
  */
 
+#include <arch/memmap.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -31,6 +33,7 @@
 #include <console.h>
 #include <errors.h>
 #include <fatal.h>
+#include <kargs.h>
 
 #if CONFIG_PAGE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -38,37 +41,36 @@
 # define dprintf(fmt...)	
 #endif
 
+extern char __init_start[], __init_end[];
+
 /** Array of boot-reclaimable ranges. */
-static struct {
-	phys_ptr_t start;
-	phys_ptr_t end;
-} page_reclaim_ranges[64] __init_data;
-static size_t page_reclaim_count __init_data = 0;
+static struct { phys_ptr_t start; phys_ptr_t end; } g_reclaim_ranges[64] __init_data;
+static size_t g_reclaim_range_count __init_data = 0;
 
 /** Vmem arena used for page allocations. */
-static vmem_t page_arena;
+static vmem_t g_page_arena;
 
 /** Zero a range of pages.
  * @param base		Base address to zero from.
- * @param size		Number of pages to zero.
+ * @param size		Size of range to zero.
  * @param pmflag	Allocation flags.
  * @return		True on success, false on failure. */
-static bool page_range_zero(phys_ptr_t base, size_t count, int pmflag) {
+static bool page_range_zero(phys_ptr_t base, size_t size, int pmflag) {
 	void *mapping;
 
 	thread_wire(curr_thread);
 
-	mapping = page_phys_map(base, (count * PAGE_SIZE), (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
+	mapping = page_phys_map(base, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(mapping == NULL) {
 		if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %zu pages (2)", count);
+			fatal("Could not perform mandatory allocation of %zu pages (2)", size / PAGE_SIZE);
 		}
 		thread_unwire(curr_thread);
 		return false;
 	}
 
-	memset(mapping, 0, (count * PAGE_SIZE));
-	page_phys_unmap(mapping, (count * PAGE_SIZE), false);
+	memset(mapping, 0, size);
+	page_phys_unmap(mapping, size, false);
 	thread_unwire(curr_thread);
 	return true;
 }
@@ -97,10 +99,8 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	if(!(base = (phys_ptr_t)vmem_xalloc(&page_arena, size, (vmem_resource_t)align,
-	                                    (vmem_resource_t)phase, (vmem_resource_t)nocross,
-	                                    (vmem_resource_t)minaddr, (vmem_resource_t)maxaddr,
-	                                    (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+	if(!(base = vmem_xalloc(&g_page_arena, size, align, phase, nocross, minaddr,
+	                        maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		}
@@ -109,8 +109,8 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 
 	/* Handle zeroing requests. */
 	if(pmflag & PM_ZERO) {
-		if(!page_range_zero(base, count, pmflag)) {
-			vmem_xfree(&page_arena, (vmem_resource_t)base, size);
+		if(!page_range_zero(base, size, pmflag)) {
+			vmem_xfree(&g_page_arena, base, size);
 			return 0;
 		}
 	}
@@ -131,7 +131,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
  * @param count		Number of pages to free.
  */
 void page_xfree(phys_ptr_t base, size_t count) {
-	vmem_xfree(&page_arena, (vmem_resource_t)base, (count * PAGE_SIZE));
+	vmem_xfree(&g_page_arena, base, (count * PAGE_SIZE));
 
 	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ") (constrained)\n",
 		base, base + (count * PAGE_SIZE));
@@ -153,7 +153,7 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	if(!(base = (phys_ptr_t)vmem_alloc(&page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+	if(!(base = vmem_alloc(&g_page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		}
@@ -162,8 +162,8 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 
 	/* Handle zeroing requests. */
 	if(pmflag & PM_ZERO) {
-		if(!page_range_zero(base, count, pmflag)) {
-			vmem_free(&page_arena, (vmem_resource_t)base, size);
+		if(!page_range_zero(base, size, pmflag)) {
+			vmem_free(&g_page_arena, base, size);
 			return 0;
 		}
 	}
@@ -183,7 +183,7 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
  * @param count		Number of pages to free.
  */
 void page_free(phys_ptr_t base, size_t count) {
-	vmem_free(&page_arena, (vmem_resource_t)base, (count * PAGE_SIZE));
+	vmem_free(&g_page_arena, (vmem_resource_t)base, (count * PAGE_SIZE));
 
 	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ")\n",
 		base, base + (count * PAGE_SIZE));
@@ -248,80 +248,75 @@ int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 	page_phys_unmap(mdest, PAGE_SIZE, false);
 	thread_unwire(curr_thread);
 	return 0;
-
 }
 
-/** Add a range of free pages.
- *
- * Adds a range of free pages to the page allocator's vmem arena. This range
- * must not overlap an existing range.
- *
+/** Mark a range of pages as reclaimable.
  * @param start		Start of range.
- * @param end		End of range.
- */
-void page_range_add(phys_ptr_t start, phys_ptr_t end) {
-	vmem_add(&page_arena, (vmem_resource_t)start, (vmem_resource_t)(end - start), MM_FATAL);
-}
+ * @param end		End of range. */
+static void __init_text page_mark_reclaimable(phys_ptr_t start, phys_ptr_t end) {
+	/* Allocate the range so nothing else allocates from it. */
+	vmem_xalloc(&g_page_arena, end - start, 0, 0, 0, start, end, MM_FATAL);
 
-/** Mark part of a page range as temporarily in-use.
- *
- * Marks part of an existing page range as temporarily in-use, to be freed
- * when page_init_reclaim() is called.
- *
- * @param start		Start of range.
- * @param end		End of range.
- */
-void page_range_mark_reclaimable(phys_ptr_t start, phys_ptr_t end) {
-	/* Mark the pages covering the range as in-use. */
-	vmem_xalloc(&page_arena, (vmem_resource_t)(end - start), 0, 0, 0,
-	            (vmem_resource_t)start, (vmem_resource_t)end, MM_FATAL);
-
-	/* Record the reclaimable region. */
-	if(page_reclaim_count > ARRAYSZ(page_reclaim_ranges)) {
+	/* Record details of it so it can be reclaimed later. */
+	if(g_reclaim_range_count >= ARRAYSZ(g_reclaim_ranges)) {
 		fatal("Out of reclaim range structures");
 	}
-	page_reclaim_ranges[page_reclaim_count].start = start;
-	page_reclaim_ranges[page_reclaim_count].end = end;
-	page_reclaim_count++;
+	g_reclaim_ranges[g_reclaim_range_count].start = start;
+	g_reclaim_ranges[g_reclaim_range_count].end = end;
+	g_reclaim_range_count++;
 }
 
-/** Mark part of a page range as in-use.
- *
- * Marks part of an existing page range as in-use.
- *
- * @param start		Start of range.
- * @param end		End of range.
- */
-void page_range_mark_reserved(phys_ptr_t start, phys_ptr_t end) {
-	/* Mark the pages covering the range as in-use. */
-	vmem_xalloc(&page_arena, (vmem_resource_t)(end - start), 0, 0, 0,
-	            (vmem_resource_t)start, (vmem_resource_t)end, MM_FATAL);
-}
+/** Initialise the physical memory manager.
+ * @param args		Kernel arguments. */
+void __init_text page_init(kernel_args_t *args) {
+	kernel_args_memory_t *range;
+	phys_ptr_t start, end;
+	uint32_t i;
 
-/** Initialise the physical memory manager. */
-void __init_text page_init(void) {
-	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
+	vmem_early_create(&g_page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
 	                  NULL, 0, VMEM_RECLAIM, MM_FATAL);
 
-	/* Populate the arena with memory regions, and perform other
-	 * architecture/platform initialisation tasks. */
-	fatal("Not implemented");
-	//page_platform_init();
-	//page_arch_init();
+	/* Populate the arena with physical memory ranges given by the
+	 * bootloader. */
+	for(i = 0; i < args->phys_range_count; i++) {
+		range = &args->phys_ranges[i];
+		switch(range->type) {
+		case PHYS_MEMORY_FREE:
+			vmem_add(&g_page_arena, range->start, range->end - range->start, MM_FATAL);
+			break;
+		case PHYS_MEMORY_RECLAIMABLE:
+			vmem_add(&g_page_arena, range->start, range->end - range->start, MM_FATAL);
+			page_mark_reclaimable(range->start, range->end);
+			break;
+		default:
+			/* Don't care about anything else. */
+			break;
+		}
+	}
+
+	/* Mark the kernel init section as reclaimable. Since the kernel is
+	 * marked as allocated by the bootloader, the range will not have
+	 * been added by the above loop. Therefore, the range must be added
+	 * first. */
+	start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + args->kernel_phys;
+	end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + args->kernel_phys;
+	vmem_add(&g_page_arena, start, end - start, MM_FATAL);
+	page_mark_reclaimable(start, end);
+
+	/* Initialise architecture paging-related things. */
+	page_arch_init(args);
 }
 
-/** Reclaim memory no longer in use after kernel initialisation.
- * @note		It is OK for this function to clear regions despite
- *			the reclaim information structures being there because
- *			nothing should make any allocations while this is
- *			running. */
+/** Reclaim memory no longer in use after kernel initialisation. */
 void page_init_reclaim(void) {
 	size_t reclaimed = 0, size, i;
 
-	for(i = 0; i < page_reclaim_count; i++) {
-		size = (size_t)(page_reclaim_ranges[i].end - page_reclaim_ranges[i].start);
-
-		vmem_xfree(&page_arena, (vmem_resource_t)page_reclaim_ranges[i].start, size);
+	/* It is OK to clear regions despite the reclaim information structures
+	 * being in a reclaimable region because nothing should make any
+	 * allocations while this is running. */
+	for(i = 0; i < g_reclaim_range_count; i++) {
+		size = g_reclaim_ranges[i].end - g_reclaim_ranges[i].start;
+		vmem_xfree(&g_page_arena, g_reclaim_ranges[i].start, size);
 		reclaimed += size;
 	}
 

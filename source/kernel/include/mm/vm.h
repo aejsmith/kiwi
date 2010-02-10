@@ -210,18 +210,6 @@ typedef struct vm_aspace {
 #define VM_FAULT_HANDLED	1	/**< Fault was handled and execution can resume. */
 #define VM_FAULT_UNHANDLED	2	/**< Fault could not be handled. */
 
-/** Convert region flags to page map flags.
- * @param flags         Flags to convert.
- * @return              Page map flags. */
-static inline int vm_region_flags_to_page(int flags) {
-        int ret = 0;
-
-        ret |= ((flags & VM_REGION_READ) ? PAGE_MAP_READ : 0);
-        ret |= ((flags & VM_REGION_WRITE) ? PAGE_MAP_WRITE : 0);
-       	ret |= ((flags & VM_REGION_EXEC) ? PAGE_MAP_EXEC : 0);
-        return ret;
-}
-
 extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
 extern vm_page_t *vm_page_alloc(int pmflag);
 extern void vm_page_free(vm_page_t *page);

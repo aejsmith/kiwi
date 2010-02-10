@@ -135,4 +135,7 @@ void __init_text cpu_early_init(kernel_args_t *args) {
 
 	/* Add the boot CPU. */
 	cpu_add(&boot_cpu, (kernel_args_cpu_t *)((ptr_t)args->cpus));
+
+	/* Set the CPU pointer. */
+	cpu_set_pointer((ptr_t)&boot_cpu);
 }
