@@ -62,7 +62,7 @@ def fs_image_func(target, source, env):
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
 
 	# Create the TAR file.
-	tar = tarfile.open(str(target[0]), 'w:gz')
+	tar = tarfile.open(str(target[0]), 'w')
 	cwd = os.getcwd()
 	os.chdir(tmpdir)
 	for f in glob.glob('*'):
@@ -73,8 +73,8 @@ def fs_image_func(target, source, env):
 	# Clean up.
 	shutil.rmtree(tmpdir)
 dist['BUILDERS']['FSImage'] = Builder(action=Action(fs_image_func, '$GENCOMSTR'))
-dist.FSImage('fsimage.tar.gz', dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'])
-dist['FSIMAGE'] = File('fsimage.tar.gz')
+dist.FSImage('fsimage.tar', dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'])
+dist['FSIMAGE'] = File('fsimage.tar')
 
 # Add aliases and set the default target.
 Alias('loader', dist['LOADER'])

@@ -69,7 +69,6 @@ sources = map(File, [
 	'types/hash.c',
 	'types/radix.c',
 
-	'bootmod.c',
 	'elf.c',
 	'fatal.c',
 	'init.c',

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -26,6 +26,8 @@
 
 #include <io/vfs.h>
 
+#include <lib/string.h>
+
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
@@ -39,25 +41,237 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <bootmod.h>
 #include <console.h>
+#include <errors.h>
 #include <fatal.h>
 #include <init.h>
 #include <kargs.h>
+#include <module.h>
+#include <tar.h>
 #include <version.h>
 
-extern void kmain(kernel_args_t *args, uint32_t cpu);
+/** Structure describing a boot module. */
+typedef struct boot_module {
+	list_t header;		/**< Link to modules list. */
+	vfs_node_t *node;	/**< Node containing module data. */
+	char *name;		/**< Name of the module. */
+} boot_module_t;
 
-extern initcall_t __initcall_start[];
-extern initcall_t __initcall_end[];
+extern void kmain(kernel_args_t *args, uint32_t cpu);
+extern initcall_t __initcall_start[], __initcall_end[];
 
 /** Rendezvous variables for SMP boot. */
-static atomic_t g_boot_rendezvous1 = 0;
-static atomic_t g_boot_rendezvous2 = 0;
-static atomic_t g_boot_rendezvous3 = 0;
+static atomic_t g_boot_rendezvous1 __init_data = 0;
+static atomic_t g_boot_rendezvous2 __init_data = 0;
+static atomic_t g_boot_rendezvous3 __init_data = 0;
 
-/** Lock to serialise the early part of SMP boot. */
+/** Whether a RamFS has been mounted for the root. */
+static bool g_boot_fs_mounted __init_data = false;
+
+/** The amount to increment the boot progress for each module. */
+static int g_current_progress = 10;
+static int g_boot_progress_per_module;
+
+/** Lock to serialise the SMP boot. */
 static SPINLOCK_DECLARE(g_boot_spinlock);
+
+/** List of modules from the bootloader. */
+static LIST_DECLARE(g_boot_modules);
+
+/** Remove a module from the module list.
+ * @param mod		Module to remove. */
+static void __init_text boot_module_remove(boot_module_t *mod) {
+	list_remove(&mod->header);
+	if(mod->name) {
+		kfree(mod->name);
+	}
+	vfs_node_release(mod->node);
+	kfree(mod);
+
+	/* Update progress. */
+	g_current_progress += g_boot_progress_per_module;
+	console_update_boot_progress(g_current_progress);
+}
+
+/** Look up a kernel module in the boot module list.
+ * @param name		Name to look for.
+ * @return		Pointer to module if found, NULL if not. */
+static boot_module_t *boot_module_lookup(const char *name) {
+	boot_module_t *mod;
+
+	LIST_FOREACH(&g_boot_modules, iter) {
+		mod = list_entry(iter, boot_module_t, header);
+
+		if(mod->name && strcmp(mod->name, name) == 0) {
+			return mod;
+		}
+	}
+
+	return NULL;
+}
+
+/** Extract a TAR archive to the root FS.
+ * @param mod		Boot module containing archive.
+ * @return		Whether the module was a TAR archive. */
+static bool __init_text boot_module_load_tar(boot_module_t *mod) {
+	tar_header_t *hdr;
+	vfs_node_t *node;
+	int64_t size;
+	size_t bytes;
+	void *buf;
+	int ret;
+
+	buf = hdr = kmalloc(mod->node->size, MM_FATAL);
+	if(vfs_file_read(mod->node, buf, mod->node->size, 0, &bytes) != 0 || bytes != mod->node->size) {
+		fatal("Could not read TAR file data");
+	}
+
+	/* Check format of module. */
+	if(strncmp(hdr->magic, "ustar", 5) != 0) {
+		kfree(buf);
+		return false;
+	}
+
+	/* If any TAR files are loaded it means we should mount a RamFS at the
+	 * root, if this has not already been done. */
+	if(!g_boot_fs_mounted) {
+		if((ret = vfs_mount(NULL, "/", "ramfs", 0)) != 0) {
+			fatal("Could not mount RamFS at root (%d)", ret);
+		}
+		g_boot_fs_mounted = true;
+	}
+
+	/* Loop until we encounter two null bytes (EOF). */
+	while(hdr->name[0] && hdr->name[1]) {
+		if(strncmp(hdr->magic, "ustar", 5) != 0) {
+			fatal("TAR file format is not correct");
+		}
+
+		/* All fields in the header are stored as ASCII - convert the
+		 * size to an integer (base 8). */
+		size = strtoll(hdr->size, NULL, 8);
+
+		/* Handle the entry based on its type flag. */
+		switch(hdr->typeflag) {
+		case REGTYPE:
+		case AREGTYPE:
+			if((ret = vfs_file_create(hdr->name, &node)) != 0) {
+				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
+			} else if((ret = vfs_file_write(node, (void *)((ptr_t)hdr + 512), size, 0, &bytes)) != 0) {
+				fatal("Failed to write file %s (%d)", hdr->name, ret);
+			} else if((int64_t)bytes != size) {
+				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
+			}
+			vfs_node_release(node);
+			break;
+		case DIRTYPE:
+			if((ret = vfs_dir_create(hdr->name, NULL)) != 0) {
+				fatal("Failed to create directory %s (%d)", hdr->name, ret);
+			}
+			break;
+		case SYMTYPE:
+			if((ret = vfs_symlink_create(hdr->name, hdr->linkname, NULL)) != 0) {
+				fatal("Failed to create symbolic link %s (%d)", hdr->name, ret);
+			}
+			break;
+		default:
+			kprintf(LOG_DEBUG, "init: unhandled TAR type flag '%c'\n", hdr->typeflag);
+			break;
+		}
+
+		/* 512 for the header, plus the file size if necessary. */
+		hdr = (tar_header_t *)(ptr_t)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
+	}
+
+	kfree(buf);
+	boot_module_remove(mod);
+	return true;
+}
+
+/** Load a kernel module provided at boot.
+ * @param mod		Module to load.
+ * @return		Whether the file was a kernel module. */
+static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
+	char name[MODULE_NAME_MAX + 1];
+	boot_module_t *dep;
+	int ret;
+
+	/* Try to load the module and all dependencies. */
+	while(true) {
+		if((ret = module_load_node(mod->node, name)) == 0) {
+			boot_module_remove(mod);
+			return true;
+		} else if(ret == -ERR_TYPE_INVAL) {
+			return false;
+		} else if(ret != -ERR_DEP_MISSING) {
+			fatal("Could not load module %s (%d)", mod->name);
+		}
+
+		/* Unloaded dependency, try to find it and load it. */
+		if(!(dep = boot_module_lookup(name)) || !boot_module_load_kmod(dep)) {
+			fatal("Dependency on '%s' which is not available", name);
+		}
+	}
+}
+
+/** Load modules loaded by the bootloader.
+ * @param args		Kernel arguments structure. */
+static void __init_text load_modules(kernel_args_t *args) {
+	kernel_args_module_t *amod;
+	boot_module_t *mod;
+	phys_ptr_t addr;
+	void *mapping;
+	char *tmp;
+
+	if(!args->module_count) {
+		fatal("No modules were provided, cannot do anything!");
+	}
+
+	/* Firstly, populate our module list with the module details from the
+	 * bootloader. This is done so that it's much easier to look up module
+	 * dependencies, and also because the module loader requires VFS
+	 * nodes rather than a chunk of memory. */
+	for(addr = args->modules; addr;) {
+		amod = page_phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
+
+		mod = kmalloc(sizeof(boot_module_t), MM_FATAL);
+		list_init(&mod->header);
+		mod->name = NULL;
+
+		/* Map in the data and convert it into a VFS node. */
+		mapping = page_phys_map(amod->base, amod->size, MM_FATAL);
+		if(vfs_file_from_memory(mapping, amod->size, &mod->node) != 0) {
+			fatal("Failed to create node from module data");
+		}
+		page_phys_unmap(mapping, amod->size, true);
+
+		/* Figure out the module name. Do not fail if unable to get
+		 * the name, may be a filesystem image or something. */
+		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
+		if(module_name(mod->node, tmp) != 0) {
+			kfree(tmp);
+		} else {
+			mod->name = tmp;
+		}
+
+		list_append(&g_boot_modules, &mod->header);
+
+		addr = amod->next;
+		page_phys_unmap(amod, sizeof(kernel_args_module_t), true);
+	}
+
+	/* Determine how much to increase the boot progress by for each
+	 * module loaded. */
+	g_boot_progress_per_module = 80 / args->module_count;
+
+	/* Now keep on loading until all modules have been loaded. */
+	while(!list_empty(&g_boot_modules)) {
+		mod = list_entry(g_boot_modules.next, boot_module_t, header);
+		if(!boot_module_load_tar(mod) && !boot_module_load_kmod(mod)) {
+			fatal("Module with unknown format in module list");
+		}
+	}
+}
 
 /** Wait until all CPUs reach a certain point.
  * @param args		Kernel arguments structure.
@@ -68,11 +282,10 @@ static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
 }
 
 /** Second-stage intialization thread.
- * @param _args		Kernel arguments structure pointer.
+ * @param args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
-static void init_thread(void *_args, void *arg2) {
+static void init_thread(void *args, void *arg2) {
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
-	kernel_args_t *args = _args;
 	initcall_t *initcall;
 	int ret;
 
@@ -91,10 +304,8 @@ static void init_thread(void *_args, void *arg2) {
 
 	console_update_boot_progress(10);
 
-	/* Load boot-time modules and mount the root filesystem. */
-	bootmod_load();
-
-	/* Mount the root filesystem. */
+	/* Load modules and mount the root filesystem. */
+	load_modules(args);
 	vfs_mount_root(args);
 
 	/* Reclaim memory taken up by initialisation code/data. */

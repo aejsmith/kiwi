@@ -126,7 +126,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
 			/* Meh, ignore it. */
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
-			kprintf(LOG_DEBUG, "module: module %p(%s) depends on itself\n", module, module->name);
+			kprintf(LOG_NORMAL, "module: module %s depends on itself\n", module, module->name);
 			return -ERR_FORMAT_INVAL;
 		}
 
@@ -270,11 +270,11 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 
 	/* Check if it is valid. */
 	if(!module->name || !module->description || !module->init) {
-		kprintf(LOG_DEBUG, "module: information for module %p is invalid\n", module);
+		kprintf(LOG_NORMAL, "module: information for module %p is invalid\n", module);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
-		kprintf(LOG_DEBUG, "module: name of module %p is too long\n", module);
+		kprintf(LOG_NORMAL, "module: name of module %p is too long\n", module);
 		ret = -ERR_FORMAT_INVAL;
 		goto fail;
 	}
@@ -313,7 +313,7 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 	}
 
 	module->node = NULL;
-	kprintf(LOG_DEBUG, "module: successfully loaded module %p(%s)\n", module, module->name);
+	kprintf(LOG_NORMAL, "module: successfully loaded module %s\n", module->name);
 	mutex_unlock(&module_lock);
 	return 0;
 fail:

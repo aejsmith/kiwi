@@ -210,7 +210,7 @@ int syscall_service_register(uint16_t num, syscall_service_t *service) {
 	}
 
 	syscall_services[num] = service;
-	kprintf(LOG_DEBUG, "syscall: registered system call service %" PRIu16 "(%p)\n", num, service);
+	kprintf(LOG_NORMAL, "syscall: registered system call service %" PRIu16 "\n", num);
 	mutex_unlock(&syscall_services_lock);
 	return 0;
 }

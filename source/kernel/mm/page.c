@@ -322,5 +322,5 @@ void __init_text page_late_init(void) {
 		reclaimed += size;
 	}
 
-	kprintf(LOG_NORMAL, "page: reclaimed %zu KiB unused kernel memory\n", (reclaimed / 1024));
+	kprintf(LOG_NORMAL, "page: reclaimed %zu KiB of unneeded memory\n", (reclaimed / 1024));
 }
