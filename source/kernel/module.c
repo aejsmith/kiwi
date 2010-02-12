@@ -313,7 +313,8 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 	}
 
 	module->node = NULL;
-	kprintf(LOG_NORMAL, "module: successfully loaded module %s\n", module->name);
+	kprintf(LOG_NORMAL, "module: successfully loaded module %s (%s)\n",
+	        module->name, module->description);
 	mutex_unlock(&module_lock);
 	return 0;
 fail:

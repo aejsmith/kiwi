@@ -101,7 +101,7 @@ static int ata_device_transfer_begin(ata_device_t *device, uint64_t lba) {
 		return true;
 	} else if(lba < ((uint64_t)1<<48)) {
 		if(!(device->flags & ATA_DEVICE_LBA48)) {
-			kprintf(LOG_DEBUG, "ata: attempted LBA48 read (%llu) on non-LBA48 device\n", lba);
+			kprintf(LOG_WARN, "ata: attempted LBA48 read (%llu) on non-LBA48 device\n", lba);
 			return false;
 		}
 
@@ -125,7 +125,7 @@ static int ata_device_transfer_begin(ata_device_t *device, uint64_t lba) {
 		out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4));
 		return true;
 	} else {
-		kprintf(LOG_DEBUG, "ata: attempted out of range transfer (%llu)\n", lba);
+		kprintf(LOG_WARN, "ata: attempted out of range transfer (%llu)\n", lba);
 		return false;
 	}
 }
@@ -160,7 +160,7 @@ static int ata_device_block_read(disk_device_t *_dev, void *buf, uint64_t lba) {
 		if(ret == -ERR_DEVICE_ERROR && ata_controller_error(device->parent) & (ATA_ERR_ABRT | ATA_ERR_IDNF)) {
 			ret = 0;
 		} else {
-			kprintf(LOG_DEBUG, "ata: read device %" PRId32 ":%" PRIu8 " failed (%d)\n",
+			kprintf(LOG_WARN, "ata: read on device %" PRId32 ":%" PRIu8 " failed (%d)\n",
 				device->parent->id, device->num, ret);
 		}
 
@@ -202,7 +202,7 @@ static int ata_device_block_write(disk_device_t *_dev, const void *buf, uint64_t
 		if(ret == -ERR_DEVICE_ERROR && ata_controller_error(device->parent) & (ATA_ERR_ABRT | ATA_ERR_IDNF)) {
 			ret = 0;
 		} else {
-			kprintf(LOG_DEBUG, "ata: write device %" PRId32 ":%" PRIu8 " failed (%d)\n",
+			kprintf(LOG_WARN, "ata: write on device %" PRId32 ":%" PRIu8 " failed (%d)\n",
 				device->parent->id, device->num, ret);
 		}
 

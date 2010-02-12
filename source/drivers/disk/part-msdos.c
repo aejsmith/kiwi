@@ -57,7 +57,7 @@ bool disk_partition_probe_msdos(disk_device_t *device) {
 	int ret;
 
 	if((ret = disk_device_read(device, mbr, sizeof(msdos_mbr_t), 0, &bytes)) != 0 || bytes != sizeof(msdos_mbr_t)) {
-		kprintf(LOG_DEBUG, "disk: could not read MSDOS MBR from %p (%d)\n",
+		kprintf(LOG_WARN, "disk: could not read MSDOS MBR from %p (%d)\n",
 			device, ret);
 		kfree(mbr);
 		return false;
@@ -72,10 +72,10 @@ bool disk_partition_probe_msdos(disk_device_t *device) {
 			continue;
 		}
 
-		kprintf(LOG_DEBUG, "disk: found MSDOS partition %d on device %p\n", i, device);
-		kprintf(LOG_DEBUG, " type:      0x%x\n", mbr->partitions[i].type);
-		kprintf(LOG_DEBUG, " start_lba: %u\n",   mbr->partitions[i].start_lba);
-		kprintf(LOG_DEBUG, " num_sects: %u\n",   mbr->partitions[i].num_sects);
+		kprintf(LOG_NORMAL, "disk: found MSDOS partition %d on device %p\n", i, device);
+		kprintf(LOG_NORMAL, " type:      0x%x\n", mbr->partitions[i].type);
+		kprintf(LOG_NORMAL, " start_lba: %u\n",   mbr->partitions[i].start_lba);
+		kprintf(LOG_NORMAL, " num_sects: %u\n",   mbr->partitions[i].num_sects);
 
 		disk_partition_add(device, i, mbr->partitions[i].start_lba, mbr->partitions[i].num_sects);
 	}
