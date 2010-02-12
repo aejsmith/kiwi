@@ -37,7 +37,7 @@ typedef struct cpu_arch {
 	tss_t tss;				/**< Task State Segment (TSS). */
 
 	/** APIC timer conversion factor. */
-	uint32_t lapic_timer_cv;
+	uint64_t lapic_timer_cv;
 
 	/** Basic CPU information. */
 	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
