@@ -95,6 +95,12 @@ class EnvironmentManager(dict):
 		for k, v in version.items():
 			self.base[k] = v
 
+		# Add a builder for linker scripts.
+		self.base['BUILDERS']['LDScript'] = Builder(action=Action(
+			'$CC $_CCCOMCOM $ASFLAGS -E -x c $SOURCE | grep -v "^\#" > $TARGET',
+			'$GENCOMSTR'
+		))
+
 	# Gets the full path to a tool in the toolchain.
 	def GetToolPath(self, name):
 		return os.path.join(self.config['TOOLCHAIN_DIR'], \

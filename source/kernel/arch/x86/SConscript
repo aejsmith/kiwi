@@ -28,9 +28,7 @@ sources = map(File, [
 env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 
 # Set the linker script path.
-env.Command('link.ld', 'link-%s.ld.in' % (config['ARCH']),
-            Action('$CC $_CCCOMCOM $ASFLAGS -E -x c $SOURCE | grep -v "^\#" > $TARGET', '$GENCOMSTR'))
-env['LDSCRIPT'] = File('link.ld')
+env['LDSCRIPT'] = env.LDScript('link.ld', 'link-%s.ld.in' % (config['ARCH']))
 
 # Pull in AMD64-/IA32-specific stuff.
 sources += SConscript(dirs=[config['ARCH']], exports=['env'])

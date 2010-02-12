@@ -24,8 +24,7 @@ sources = map(File, [
 ])
 
 # Set the linker script path.
-env.Command('link.ld', 'link.ld.in', Action('$CC $_CCCOMCOM $ASFLAGS -E -x c $SOURCE | grep -v "^\#" > $TARGET', '$GENCOMSTR'))
-env['LDSCRIPT'] = File('link.ld')
+env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
 
 # Build the stage 1 loaders.
 env.Program('cdboot.elf', 'cdboot.S', LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-Ttext,0x7C00', '-Wl,-N'])
