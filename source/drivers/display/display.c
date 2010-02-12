@@ -68,6 +68,47 @@ static void display_console_unregister(void *arg1, void *arg2, void *arg3) {
 	notifier_run_unlocked(&display_console_device->redraw_notifier, NULL, false);
 }
 
+/** Get a display mode by ID.
+ * @param device	Device to get from.
+ * @param id		ID of mode to get.
+ * @return		Pointer to mode if found, NULL if not. */
+static display_mode_t *display_mode_get(display_device_t *device, uint16_t id) {
+	size_t i;
+
+	for(i = 0; i < device->count; i++) {
+		if(device->modes[i].id == id) {
+			return &device->modes[i];
+		}
+	}
+
+	return NULL;
+}
+
+/** Find a display mode.
+ * @param device	Device to find in.
+ * @param width		Width of mode.
+ * @param height	Height of mode.
+ * @param depth		Depth of mode. If 0, matching mode with highest depth
+ *			will be returned.
+ * @return		Pointer to mode if found, NULL if not. */
+static display_mode_t *display_mode_find(display_device_t *device, uint16_t width,
+                                         uint16_t height, uint8_t depth) {
+	display_mode_t *ret = NULL;
+	size_t i;
+
+	for(i = 0; i < device->count; i++) {
+		if(device->modes[i].width == width && device->modes[i].height == height) {
+			if(depth && device->modes[i].depth == depth) {
+				return &device->modes[i];
+			} else if(!ret || device->modes[i].depth > ret->depth) {
+				ret = &device->modes[i];
+			}
+		}
+	}
+
+	return ret;
+}
+
 /** Open a display device.
  * @param _dev		Device being opened.
  * @return		0 on success, negative error code on failure. */
@@ -150,7 +191,6 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 	display_mode_t *mode = NULL;
 	identifier_t id;
 	phys_ptr_t phys;
-	size_t i;
 	int ret;
 
 	switch(request) {
@@ -161,14 +201,39 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 		*outp = kmemdup(&device->count, sizeof(size_t), MM_SLEEP);
 		*outszp = sizeof(size_t);
 		return 0;
-	case DISPLAY_MODE_GET:
+	case DISPLAY_GET_MODES:
 		if(!outp || !outszp) {
 			return -ERR_PARAM_INVAL;
 		}
 		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_SLEEP);
 		*outszp = sizeof(display_mode_t) * device->count;
 		return 0;
-	case DISPLAY_MODE_SET:
+	case DISPLAY_GET_PREFERRED_MODE:
+		if(!outp || !outszp) {
+			return -ERR_PARAM_INVAL;
+		}
+
+		mutex_lock(&device->lock, 0);
+
+		/* For now just return whatever mode the kernel console is
+		 * using, and fallback on 1024x768, then 800x600 if the mode
+		 * is unavailable. */
+		if(!(mode = display_mode_find(device, g_fb_console_width,
+		                              g_fb_console_height,
+		                              g_fb_console_depth))) {
+			if(!(mode = display_mode_find(device, 1024, 768, 0))) {
+				if(!(mode = display_mode_find(device, 800, 600, 0))) {
+					mutex_unlock(&device->lock);
+					return -ERR_NOT_FOUND;
+				}
+			}
+		}
+
+		*outp = kmemdup(mode, sizeof(display_mode_t), MM_SLEEP);
+		*outszp = sizeof(display_mode_t);
+		mutex_unlock(&device->lock);
+		return 0;
+	case DISPLAY_SET_MODE:
 		if(in && insz != sizeof(identifier_t)) {
 			return -ERR_PARAM_INVAL;
 		} else if(!device->ops->mode_set) {
@@ -194,13 +259,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 		} else {
 			/* Look for the mode requested. */
 			id = *(identifier_t *)in;
-			for(i = 0; i < device->count; i++) {
-				if(device->modes[i].id == id) {
-					mode = &device->modes[i];
-					break;
-				}
-			}
-			if(!mode) {
+			if(!(mode = display_mode_get(device, id))) {
 				mutex_unlock(&device->lock);
 				return -ERR_NOT_FOUND;
 			}
@@ -220,7 +279,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 				}
 
 				/* Point the framebuffer console at the device. */
-				fb_console_reconfigure(mode->width, mode->height, mode->bpp, phys);
+				fb_console_reconfigure(mode->width, mode->height, mode->depth, phys);
 				g_fb_console.inhibited = true;
 
 				/* Register notifiers to reset the console upon

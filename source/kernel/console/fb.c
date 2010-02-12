@@ -61,10 +61,12 @@ static bool g_splash_enabled = false;
 static uint16_t g_splash_progress_x;
 static uint16_t g_splash_progress_y;
 
+/** Current display mode. */
+uint16_t g_fb_console_width;
+uint16_t g_fb_console_height;
+uint8_t g_fb_console_depth;
+
 /** Framebuffer console details. */
-static uint16_t g_fb_console_width;
-static uint16_t g_fb_console_height;
-static uint8_t g_fb_console_depth;
 static uint16_t g_fb_console_cols;
 static uint16_t g_fb_console_rows;
 static uint16_t g_fb_console_x = 0;

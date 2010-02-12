@@ -186,7 +186,7 @@ static int vbe_init(void) {
 		modes[count].id = location[i];
 		modes[count].width = minfo->x_resolution;
 		modes[count].height = minfo->y_resolution;
-		modes[count].bpp = minfo->bits_per_pixel;
+		modes[count].depth = minfo->bits_per_pixel;
 		modes[count].offset = minfo->phys_base_ptr;
 		count++;
 

@@ -46,6 +46,9 @@ typedef struct console {
 struct kernel_args;
 
 extern console_t g_fb_console;
+extern uint16_t g_fb_console_width;
+extern uint16_t g_fb_console_height;
+extern uint8_t g_fb_console_depth;
 
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);

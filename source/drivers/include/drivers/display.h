@@ -33,16 +33,17 @@
 /** Structure describing a display mode. */
 typedef struct display_mode {
 	identifier_t id;		/**< Mode ID. */
-	uint32_t width;			/**< Width of mode (in pixels). */
-	uint32_t height;		/**< Height of mode (in pixels). */
-	uint8_t bpp;			/**< Bits per pixel. */
+	uint16_t width;			/**< Width of mode (in pixels). */
+	uint16_t height;		/**< Height of mode (in pixels). */
+	uint8_t depth;			/**< Bits per pixel. */
 	offset_t offset;		/**< Offset into device memory of framebuffer. */
 } display_mode_t;
 
 /** Display device request types. */
-#define DISPLAY_MODE_COUNT	32	/**< Get the number of display modes. */
-#define DISPLAY_MODE_GET	33	/**< Get an array of display modes. */
-#define DISPLAY_MODE_SET	34	/**< Set the display mode. */
+#define DISPLAY_MODE_COUNT		32	/**< Get the number of display modes. */
+#define DISPLAY_GET_MODES		33	/**< Get an array of display modes. */
+#define DISPLAY_GET_PREFERRED_MODE	34	/**< Get the preferred mode. */
+#define DISPLAY_SET_MODE		35	/**< Set the display mode. */
 
 /** Display device event types. */
 #define DISPLAY_EVENT_REDRAW	32	/**< Wait until a redraw is required. */
