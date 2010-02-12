@@ -21,6 +21,7 @@
 #include <lib/ctype.h>
 #include <lib/string.h>
 
+#include <mm/malloc.h>
 #include <mm/page.h>
 
 #include <sync/spinlock.h>
@@ -70,6 +71,9 @@ static uint16_t g_fb_console_x = 0;
 static uint16_t g_fb_console_y = 0;
 static char *g_fb_console_mapping = NULL;
 
+/** Backbuffer for the console. */
+static char *g_fb_console_buffer = NULL;
+
 /** Lock for the framebuffer console. */
 static SPINLOCK_DECLARE(fb_console_lock);
 
@@ -112,23 +116,26 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
 	*heightp = strtoul((const char *)ppm, (char **)&ppm, 10);
 }
 
-/** Draw a character to the framebuffer.
+/** Draw a pixel to the framebuffer.
  * @param colour	RGB colour for pixel.
  * @param x		X position of pixel.
  * @param y		Y position of pixel. */
 static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
 	size_t offset = ((y * g_fb_console_width) + x) * (g_fb_console_depth / 8);
-	char *dest = g_fb_console_mapping + offset;
+	char *mdest = g_fb_console_mapping + offset;
+	char *bdest = g_fb_console_buffer + offset;
+	uint16_t colour16;
 
 	/* Draw the pixel. */
 	switch(g_fb_console_depth) {
 	case 16:
-		*(uint16_t *)dest = (RED(colour, 5) << 11) | (GREEN(colour, 6) << 5) | BLUE(colour, 5);
+		colour16 = (RED(colour, 5) << 11) | (GREEN(colour, 6) << 5) | BLUE(colour, 5);
+		*(uint16_t *)mdest = *(uint16_t *)bdest = colour16;
 		break;
 	case 24:
 		colour &= 0x00FFFFFF;
 	case 32:
-		*(uint32_t *)dest = colour;
+		*(uint32_t *)mdest = *(uint32_t *)bdest = colour;
 		break;
 	}
 }
@@ -251,11 +258,17 @@ static void fb_console_putch(unsigned char ch) {
 
 	/* If we have reached the bottom of the screen, scroll. */
 	if(g_fb_console_y >= g_fb_console_rows) {
-		memcpy(g_fb_console_mapping, g_fb_console_mapping + ROW_SIZE,
+		/* Move everything up in the backbuffer, and fill the last row
+		 * with blanks. */
+		memcpy(g_fb_console_buffer, g_fb_console_buffer + ROW_SIZE,
 		       ROW_SIZE * (g_fb_console_rows - 1));
+		memset(g_fb_console_buffer + (ROW_SIZE * (g_fb_console_rows - 1)), 0, ROW_SIZE);
 
-		/* Fill the last row with blanks. */
-		memset(g_fb_console_mapping + (ROW_SIZE * (g_fb_console_rows - 1)), 0, ROW_SIZE);
+		/* Copy the updated backbuffer onto the framebuffer. */
+		memcpy(g_fb_console_mapping, g_fb_console_buffer,
+		       g_fb_console_width * g_fb_console_height * (g_fb_console_depth / 8));
+
+		/* Update the cursor position. */
 		g_fb_console_y = g_fb_console_rows - 1;
 	}
 
@@ -274,25 +287,28 @@ console_t g_fb_console = {
  * @param depth		Bits per pixel.
  * @param addr		Physical address of framebuffer. */
 void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys_ptr_t addr) {
-	void *mapping, *orig = NULL;
-	size_t size;
+	void *nmap, *nbuf, *omap = NULL, *obuf = NULL;
+	size_t size = 0;
 
-	/* Map and clear the new framebuffer. */
-	mapping = page_phys_map(addr, width * height * (depth / 8), MM_SLEEP);
-	memset(mapping, 0, width * height * (depth / 8));
+	/* Map and clear the new framebuffer, and allocate a backbuffer. */
+	nmap = page_phys_map(addr, width * height * (depth / 8), MM_SLEEP);
+	memset(nmap, 0, width * height * (depth / 8));
+	nbuf = kcalloc(width * height, depth / 8, MM_SLEEP);
 
 	/* Take the lock across updating the details (must be done in case
 	 * another CPU tries to write to the console while updating). */
 	spinlock_lock(&fb_console_lock, 0);
 
-	/* Save old mapping details to unmap after unlocking. */
+	/* Save old mapping/buffer details to unmap/free after unlocking. */
 	if(g_fb_console_mapping) {
-		orig = g_fb_console_mapping;
+		omap = g_fb_console_mapping;
+		obuf = g_fb_console_buffer;
 		size = g_fb_console_width * g_fb_console_height * (g_fb_console_depth / 8);
 	}
 
 	/* Store new details. */
-	g_fb_console_mapping = mapping;
+	g_fb_console_mapping = nmap;
+	g_fb_console_buffer = nbuf;
 	g_fb_console_width = width;
 	g_fb_console_height = height;
 	g_fb_console_depth = depth;
@@ -302,9 +318,10 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 
 	spinlock_unlock(&fb_console_lock);
 
-	/* Free the old mapping if necessary. */
-	if(orig) {
-		page_phys_unmap(orig, size, true);
+	/* Free the old mapping/buffer if necessary. */
+	if(omap) {
+		page_phys_unmap(omap, size, true);
+		kfree(obuf);
 	}
 }
 
