@@ -47,17 +47,16 @@
 #include <version.h>
 
 extern void kmain(kernel_args_t *args, uint32_t cpu);
-extern void init_ap(void);
 
 extern initcall_t __initcall_start[];
 extern initcall_t __initcall_end[];
 
-#if 0
 /** Second-stage intialization thread.
- * @param arg1		Thread argument (unused).
+ * @param _args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
-static void init_thread(void *arg1, void *arg2) {
-	const char *args[] = { "/system/services/svcmgr", NULL }, *env[] = { NULL };
+static void init_thread(void *_args, void *arg2) {
+	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
+	kernel_args_t *args = _args;
 	initcall_t *initcall;
 	int ret;
 
@@ -65,7 +64,7 @@ static void init_thread(void *arg1, void *arg2) {
 	vfs_init();
 
 	/* Bring up secondary CPUs. */
-	smp_boot_cpus();
+	//smp_boot_cpus();
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -74,22 +73,26 @@ static void init_thread(void *arg1, void *arg2) {
 
 	/* Load boot-time modules and mount the root filesystem. */
 	bootmod_load();
-	vfs_late_init();
+
+	/* Mount the root filesystem. */
+	vfs_mount_root(args);
 
 	/* Reclaim memory taken up by initialisation code/data. */
-	page_init_reclaim();
+	page_late_init();
 
 	/* Run the startup process. */
-	if((ret = process_create(args, env, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM, kernel_proc, NULL)) != 0) {
+	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM,
+	                         kernel_proc, NULL)) != 0) {
 		fatal("Could not create startup process (%d)", ret);
 	}
 }
-#endif
 
 /** Main function of the kernel.
  * @param args          Arguments from the bootloader.
  * @param cpu           CPU that the function is running on. */
 void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
+	thread_t *thread;
+
 	if(cpu == args->boot_cpu) {
 		cpu_early_init(args);
 		console_early_init();
@@ -132,27 +135,16 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		 * started and the magazine layer can be enabled. */
 		slab_late_init();
 
+		/* Create the second stage initialisation thread. */
+		if(thread_create("init", kernel_proc, 0, init_thread, args, NULL, &thread) != 0) {
+			fatal("Could not create second-stage initialisation thread");
+		}
+		thread_run(thread);
+
 		/* Finally begin executing other threads. */
 		sched_enter();
 	} else {
 		while(true);
-	}
-#if 0
-	thread_t *thread;
-
-	/* Create the second stage initialisation thread. */
-	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {
-		fatal("Could not create second-stage initialisation thread");
-	}
-	thread_run(thread);
-
-	/* We now become the boot CPU's idle thread. */
-	sched_idle();
-#endif
-}
-
-/** AP kernel initialisation function. */
-void init_ap(void) {
 #if 0
 	curr_cpu->state = CPU_RUNNING;
 	list_append(&cpus_running, &curr_cpu->header);
@@ -166,4 +158,5 @@ void init_ap(void) {
 	/* We now become this CPU's idle thread. */
 	sched_idle();
 #endif
+	}
 }

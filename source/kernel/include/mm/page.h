@@ -56,6 +56,7 @@ extern int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
 
 extern void page_arch_init(struct kernel_args *args);
 extern void page_init(struct kernel_args *args);
-extern void page_init_reclaim(void);
+extern void page_arch_late_init(void);
+extern void page_late_init(void);
 
 #endif /* __MM_PAGE_H */

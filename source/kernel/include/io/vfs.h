@@ -32,6 +32,7 @@
 #include <limits.h>
 
 struct device;
+struct kernel_args;
 struct vfs_info;
 struct vfs_mount;
 struct vfs_node;
@@ -346,7 +347,7 @@ extern int vfs_mount(const char *dev, const char *path, const char *type, int fl
 extern int vfs_unmount(const char *path);
 extern int vfs_unlink(const char *path);
 
-extern void vfs_late_init(void);
+extern void vfs_mount_root(struct kernel_args *args);
 extern void vfs_init(void);
 
 #if 0

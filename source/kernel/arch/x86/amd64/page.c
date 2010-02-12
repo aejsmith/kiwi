@@ -29,6 +29,7 @@
 #include <lib/utility.h>
 
 #include <mm/page.h>
+#include <mm/tlb.h>
 
 #include <assert.h>
 #include <console.h>
@@ -521,7 +522,7 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 /** Perform AMD64 paging initialisation.
  * @param args		Kernel arguments pointer. */
 void __init_text page_arch_init(kernel_args_t *args) {
-	uint64_t *pml4;
+	uint64_t *pml4, *bpml4;
 	phys_ptr_t i;
 #if CONFIG_X86_NX
 	/* Enable NX/XD if supported. */
@@ -553,9 +554,13 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* The temporary identity mapping is still required as all the CPUs'
 	 * stack pointers are in it, and the kernel arguments pointer points to
-	 * it. Just point the first PML4 entry to the kernel PDP. */
+	 * it. Use the structures from the bootloader rather than just using
+	 * the new kernel PDP because the kernel PDP has the global flag set
+	 * on all pages, which makes invalidating the TLB entries difficult
+	 * when removing the mapping. */
 	pml4 = page_structure_map(g_kernel_page_map.cr3);
-	pml4[0] = pml4[511];
+	bpml4 = page_structure_map(sysreg_cr3_read() & PAGE_MASK);
+	pml4[0] = bpml4[0];
 
 	dprintf("page: initialised kernel page map (pml4: 0x%" PRIpp ")\n",
 	        g_kernel_page_map.cr3);
@@ -565,4 +570,16 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* The physical map area can now be used. */
 	g_paging_inited = true;
+}
+
+/** Perform late AMD64 paging initialisation. */
+void page_arch_late_init(void) {
+	uint64_t *pml4;
+
+	/* All of the CPUs have been booted and have new stacks, and the kernel
+	 * arguments are no longer required. Remove the temporary identity
+	 * mapping and flush the TLB on all CPUs. */
+	pml4 = page_structure_map(g_kernel_page_map.cr3);
+	pml4[0] = 0;
+	tlb_invalidate(NULL, 0, 0);
 }

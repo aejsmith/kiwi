@@ -308,8 +308,10 @@ void __init_text page_init(kernel_args_t *args) {
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */
-void page_init_reclaim(void) {
+void __init_text page_late_init(void) {
 	size_t reclaimed = 0, size, i;
+
+	page_arch_late_init();
 
 	/* It is OK to clear regions despite the reclaim information structures
 	 * being in a reclaimable region because nothing should make any
@@ -320,5 +322,5 @@ void page_init_reclaim(void) {
 		reclaimed += size;
 	}
 
-	kprintf(LOG_DEBUG, "page: reclaimed %zu KiB unused kernel memory\n", (reclaimed / 1024));
+	kprintf(LOG_NORMAL, "page: reclaimed %zu KiB unused kernel memory\n", (reclaimed / 1024));
 }

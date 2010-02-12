@@ -47,14 +47,19 @@ static int tlb_invalidate_handler(void *msg, unative_t data1, unative_t data2,
 	}
 
 	/* Perform the required action. */
-	tlb_arch_invalidate(start, end);
+	if(start && end) {
+		tlb_arch_invalidate(start, end);
+	} else {
+		tlb_arch_invalidate_all();
+	}
 	return 0;
 }
 
 /** Invalidate TLB entries.
  *
  * Invalidates the given address range in the TLB of all CPUs using an
- * address space.
+ * address space. If the start and end arguments are both 0, the whole TLB will
+ * be flushed.
  *
  * @todo		Implement ipi_multicast()
  *
@@ -69,7 +74,11 @@ void tlb_invalidate(vm_aspace_t *as, ptr_t start, ptr_t end) {
 
 	/* Invalidate on the calling CPU if required. */
 	if(as == NULL || as == curr_aspace) {
-		tlb_arch_invalidate(start, end);
+		if(start && end) {
+			tlb_arch_invalidate(start, end);
+		} else {
+			tlb_arch_invalidate_all();
+		}
 	}
 
 	/* Don't need to do anything with 1 CPU. */

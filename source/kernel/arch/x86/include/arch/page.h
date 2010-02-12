@@ -61,7 +61,5 @@ typedef struct page_map {
 	bool user;			/**< Whether pages mapped should be userspace accessible. */
 } page_map_t;
 
-extern void page_late_init(void);
-
 #endif /* __ASM__/LOADER */
 #endif /* __ARCH_PAGE_H */

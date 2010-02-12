@@ -41,11 +41,11 @@
 #include <proc/handle.h>
 #include <proc/process.h>
 
-#include <args.h>
 #include <assert.h>
 #include <console.h>
 #include <errors.h>
 #include <fatal.h>
+#include <kargs.h>
 #include <kdbg.h>
 
 #if CONFIG_VFS_DEBUG
@@ -2474,17 +2474,11 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 # pragma mark Initialisation functions.
 #endif
 
-/** Perform late initialisation of the VFS. */
-void __init_text vfs_late_init(void) {
-	const char *device;
-	int ret;
-
+/** Mount the root filesystem.
+ * @param args		Kernel arguments structure. */
+void __init_text vfs_mount_root(kernel_args_t *args) {
 	if(!vfs_root_mount) {
-		if(!(device = args_get("root"))) {
-			fatal("No root filesystem specified");
-		} else if((ret = vfs_mount(device, "/", NULL, 0)) != 0) {
-			fatal("Could not mount root filesystem (%d)", ret);
-		}
+		fatal("Root filesystem probe not implemented");
 	}
 }
 
