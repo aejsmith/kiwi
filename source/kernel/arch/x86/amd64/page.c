@@ -301,7 +301,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	/* Find the page table for the entry. */
 	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
 		mutex_unlock(&map->lock);
-		return -ERR_NOT_FOUND;
+		return false;
 	}
 
 	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
@@ -315,10 +315,10 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		ptbl[pte] = 0;
 		memory_barrier();
 		mutex_unlock(&map->lock);
-		return 0;
+		return true;
 	} else {
 		mutex_unlock(&map->lock);
-		return -ERR_NOT_FOUND;
+		return false;
 	}
 }
 

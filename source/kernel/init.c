@@ -61,6 +61,9 @@ static void init_thread(void *arg1, void *arg2) {
 	initcall_t *initcall;
 	int ret;
 
+	/* Initialise other things. */
+	vfs_init();
+
 	/* Bring up secondary CPUs. */
 	smp_boot_cpus();
 
@@ -114,35 +117,28 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		arch_postmm_init(args);
 		platform_postmm_init(args);
 
-		while(true);
+		/* Register all other CPUs, and set up the IPI system. */
+		cpu_init(args);
+		ipi_init();
+
+		/* Bring up the scheduler and friends. */
+		process_init();
+		thread_init();
+		sched_init();
+		thread_reaper_init();
+
+		/* Now that the thread system is up and all CPUs have been
+		 * regsitered, the slab allocator's reclaim thread can be
+		 * started and the magazine layer can be enabled. */
+		slab_late_init();
+
+		/* Finally begin executing other threads. */
+		sched_enter();
 	} else {
 		while(true);
 	}
 #if 0
 	thread_t *thread;
-
-	/* Detect secondary CPUs. */
-	cpu_init();
-	smp_detect_cpus();
-	ipi_init();
-
-	/* Bring up the scheduler and friends. */
-	process_init();
-	thread_init();
-	sched_init();
-	thread_reaper_init();
-
-	/* Now that we know the CPU count and the thread system is up, we can
-	 * enable the magazine layer in the slab allocator and start up its
-	 * reclaim thread. */
-	slab_late_init();
-
-	/* Initialise other things. */
-	vfs_init();
-
-	/* Perform final architecture/platform initialisation. */
-	platform_final_init();
-	arch_final_init();
 
 	/* Create the second stage initialisation thread. */
 	if(thread_create("init", kernel_proc, 0, init_thread, NULL, NULL, &thread) != 0) {

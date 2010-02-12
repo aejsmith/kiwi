@@ -33,7 +33,7 @@
 void __init_text platform_postmm_init(kernel_args_t *args) {
 	/* Initialise interrupt handling and the timer. */
 	pic_init();
-	if(!lapic_enabled) {
+	if(args->arch.lapic_disabled) {
 		timer_device_set(&pit_timer_device);
 	}
 }

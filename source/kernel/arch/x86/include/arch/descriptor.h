@@ -33,9 +33,7 @@
 #  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
 #  define SEGMENT_U_DS		0x18	/**< User data segment. */
 #  define SEGMENT_U_CS		0x20	/**< User code segment. */
-#  define SEGMENT_K_CS32	0x28	/**< 32-bit kernel code segment. */
-#  define SEGMENT_K_DS32	0x30	/**< 32-bit kernel data segment. */
-#  define SEGMENT_TSS		0x38	/**< TSS segment. */
+#  define SEGMENT_TSS		0x28	/**< TSS segment. */
 # else
 #  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
 #  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */

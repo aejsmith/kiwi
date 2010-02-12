@@ -48,8 +48,7 @@ void __init_text syscall_arch_init(void) {
 	 * Weird. This means that we have to have a specific GDT order to
 	 * make things work. We set the SYSRET values below to the kernel DS,
 	 * so that we get the correct segment (kernel DS + 16 = user CS, and
-	 * kernel DS + 8 = user DS).
-	 */
+	 * kernel DS + 8 = user DS). */
 	star = ((uint64_t)(SEGMENT_K_DS | 0x03) << 48) | ((uint64_t)SEGMENT_K_CS << 32);
 
 	/* Set System Call Enable (SCE) in EFER and write everything out. */
@@ -58,8 +57,8 @@ void __init_text syscall_arch_init(void) {
 	sysreg_msr_write(SYSREG_MSR_LSTAR, lstar);
 	sysreg_msr_write(SYSREG_MSR_STAR, star);
 
-	kprintf(LOG_DEBUG, "syscall: set up SYSCALL MSRs on CPU %" PRIu32 ":\n", curr_cpu->id);
-	kprintf(LOG_DEBUG, "  FMASK: 0x%" PRIx64 "\n", fmask);
-	kprintf(LOG_DEBUG, "  LSTAR: 0x%" PRIx64 "\n", lstar);
-	kprintf(LOG_DEBUG, "  STAR:  0x%" PRIx64 "\n", star);
+	kprintf(LOG_NORMAL, "syscall: set up SYSCALL MSRs on CPU %" PRIu32 ":\n", curr_cpu->id);
+	kprintf(LOG_NORMAL, "  FMASK: 0x%" PRIx64 "\n", fmask);
+	kprintf(LOG_NORMAL, "  LSTAR: 0x%" PRIx64 "\n", lstar);
+	kprintf(LOG_NORMAL, "  STAR:  0x%" PRIx64 "\n", star);
 }

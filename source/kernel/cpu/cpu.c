@@ -30,6 +30,7 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
+#include <mm/page.h>
 
 #include <proc/sched.h>
 
@@ -66,66 +67,37 @@ static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	spinlock_init(&cpu->timer_lock, "timer_lock");
 	cpu->tick_len = 0;
 
-	/* Store in the list of running CPUs. */
+	/* Store in the list of running CPUs and the CPU array. */
 	list_init(&cpu->header);
 	list_append(&cpus_running, &cpu->header);
-}
-#if 0
-/** Add a new CPU.
- *
- * Adds a new CPU to the CPU array.
- *
- * @param id		ID of the CPU.
- * @param state		Current state of the CPU.
- *
- * @return		Pointer to CPU structure.
- */
-cpu_t *cpu_add(cpu_id_t id, int state) {
-	assert(id != cpu_current_id());
-
-	/* If the ID is higher than the maximum ID currently in the array,
-	 * resize it. */
-	if(id > cpu_id_max) {
-		cpus = krealloc(cpus, sizeof(cpu_t *) * (id + 1), MM_FATAL);
-		memset(&cpus[cpu_id_max + 1], 0, (id - cpu_id_max) * sizeof(cpu_t *));
-
-		cpu_id_max = id;
+	if(cpus) {
+		cpus[cpu->id] = cpu;
 	}
-
-	/* Allocate a new CPU structure to track the CPU. */
-	cpus[id] = kcalloc(1, sizeof(cpu_t), MM_FATAL);
-	cpus[id]->id = id;
-	cpus[id]->state = state;
-
-	list_init(&cpus[id]->header);
-	if(state == CPU_RUNNING) {
-		list_append(&cpus_running, &cpus[id]->header);
-	}
-
-	/* Initialise IPI information. */
-	list_init(&cpus[id]->ipi_queue);
-	spinlock_init(&cpus[id]->ipi_lock, "ipi_lock");
-
-	/* Initialise timer information. */
-	list_init(&cpus[id]->timer_list);
-	spinlock_init(&cpus[id]->timer_lock, "timer_lock");
-	cpus[id]->tick_len = 0;
-
-	cpu_count++;
-	return cpus[id];
 }
 
-/** Properly initialise the CPU subsystem. */
-void __init_text cpu_init(void) {
-	/* First get the real ID of the boot CPU. */
-	boot_cpu.id = cpu_id_max = cpu_current_id();
-	cpu_count = 1;
+/** Register all non-boot CPUs.
+ * @param args		Kernel arguments structure. */
+void __init_text cpu_init(kernel_args_t *args) {
+	kernel_args_cpu_t *cpu;
+	phys_ptr_t addr;
 
-	/* Now create the initial CPU array and add the boot CPU to it. */
+	/* Create the CPU array and add the boot CPU to it. */
 	cpus = kcalloc(cpu_id_max + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
+
+	/* Add all non-boot CPUs. */
+	for(addr = args->cpus; addr;) {
+		cpu = page_phys_map(addr, sizeof(kernel_args_cpu_t), MM_FATAL);
+
+		if(cpu->id != boot_cpu.id) {
+			cpu_add(kmalloc(sizeof(cpu_t), MM_FATAL), cpu);
+		}
+
+		addr = cpu->next;
+		page_phys_unmap(cpu, sizeof(kernel_args_cpu_t), false);
+	}
 }
-#endif
+
 /** Initialise the boot CPU structure and CPU pointer.
  * @param args		Kernel arguments structure. */
 void __init_text cpu_early_init(kernel_args_t *args) {

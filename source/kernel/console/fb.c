@@ -204,8 +204,6 @@ static void fb_console_fillrect(uint32_t colour, uint16_t x, uint16_t y,
 static void fb_console_putch(unsigned char ch) {
 	int i, j, x, y;
 
-	spinlock_lock(&fb_console_lock, 0);
-
 	switch(ch) {
 	case '\b':
 		/* Backspace, move back one character if we can. */
@@ -271,8 +269,6 @@ static void fb_console_putch(unsigned char ch) {
 		/* Update the cursor position. */
 		g_fb_console_y = g_fb_console_rows - 1;
 	}
-
-	spinlock_unlock(&fb_console_lock);
 }
 
 /** Framebuffer console. */
@@ -297,7 +293,8 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 
 	/* Take the lock across updating the details (must be done in case
 	 * another CPU tries to write to the console while updating). */
-	spinlock_lock(&fb_console_lock, 0);
+	// FIXME
+	//spinlock_lock(&fb_console_lock, 0);
 
 	/* Save old mapping/buffer details to unmap/free after unlocking. */
 	if(g_fb_console_mapping) {
@@ -316,7 +313,7 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 	g_fb_console_rows = height / FONT_HEIGHT;
 	g_fb_console_x = g_fb_console_y = 0;
 
-	spinlock_unlock(&fb_console_lock);
+	//spinlock_unlock(&fb_console_lock);
 
 	/* Free the old mapping/buffer if necessary. */
 	if(omap) {

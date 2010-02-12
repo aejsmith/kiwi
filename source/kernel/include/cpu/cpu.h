@@ -72,7 +72,7 @@ extern void cpu_reschedule(cpu_t *cpu);
 extern cpu_id_t cpu_current_id(void);
 
 extern void cpu_arch_init(cpu_arch_t *cpu, struct kernel_args_cpu_arch *args);
-extern void cpu_init(void);
+extern void cpu_init(struct kernel_args *args);
 extern void cpu_early_init(struct kernel_args *args);
 
 extern int kdbg_cmd_cpus(int argc, char **argv);

@@ -24,7 +24,6 @@
 #include <kargs.h>
 
 extern void platform_postmm_init(kernel_args_t *args);
-extern void platform_final_init(void);
 
 /** Not required on this platform. */
 #define platform_premm_init(args)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -34,14 +34,12 @@
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
+#include <kargs.h>
 #include <kdbg.h>
 
 extern void ipi_process_pending(void);
 
-/** Whether the local APIC is present and enabled. */
-bool lapic_enabled = false;
-
-/** Local APIC mapping on the kernel heap. */
+/** Local APIC mapping. If NULL the LAPIC is not present. */
 static volatile uint32_t *lapic_mapping = NULL;
 
 /** Read from a register in the current CPU's local APIC.
@@ -57,7 +55,7 @@ static inline uint32_t lapic_read(int reg) {
 static inline void lapic_write(int reg, uint32_t value) {
 	lapic_mapping[reg] = value;
 }
-#if 0
+
 /** Send an EOI to the local APIC. */
 static inline void lapic_eoi(void) {
 	lapic_write(LAPIC_REG_EOI, 0);
@@ -106,7 +104,7 @@ static void lapic_timer_disable(void) {
 /** Prepare local APIC timer tick.
  * @param us		Number of microseconds to tick in. */
 static void lapic_timer_prepare(timeout_t us) {
-	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_freq * us) >> 32);
+	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_timer_cv * us) >> 32);
 	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && us != 0) ? 1 : count);
 }
 
@@ -128,11 +126,11 @@ static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
 	lapic_eoi();
 	return ret;
 }
-#endif
+
 /** Get the current local APIC ID.
  * @return		Local APIC ID. */
 uint32_t lapic_id(void) {
-	if(!lapic_enabled || !lapic_mapping) {
+	if(!lapic_mapping) {
 		return 0;
 	}
 	return (lapic_read(LAPIC_REG_APIC_ID) >> 24);
@@ -146,7 +144,7 @@ uint32_t lapic_id(void) {
 void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	/* Must perform this check to prevent problems if fatal() is called
 	 * before we've initialised the LAPIC. */
-	if(!lapic_enabled || !lapic_mapping) {
+	if(!lapic_mapping) {
 		return;
 	}
 
@@ -160,39 +158,22 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	lapic_write(LAPIC_REG_ICR0, (1<<14) | (dest << 18) | (mode << 8) | vector);
 }
 
-/** Initialise the local APIC.
- *
- * Maps the local APIC if it has not already been mapped and initialises the
- * current CPU's local APIC.
- *
- * @todo		If APIC is disabled in MSR, enable it if the APIC is
- *			not based on the APIC bus.
- *
- * @return		Whether initialisation succeeded.
- */
-bool __init_text lapic_init(void) {
-	fatal("Not implemented");
-#if 0
-	phys_ptr_t base;
-
-	if(!CPU_HAS_APIC(curr_cpu)) {
-		return false;
+/** Initialise the local APIC on the current CPU.
+ * @param args		Kernel arguments structure. */
+void __init_text lapic_init(kernel_args_t *args) {
+	/* Don't do anything if the bootloader did not detect an LAPIC or if
+	 * it was manually disabled. */
+	if(args->arch.lapic_disabled) {
+		return;
 	}
 
-	base = sysreg_msr_read(SYSREG_MSR_APIC_BASE);
-
-	/* If bit 11 is 0, the APIC is disabled (see above todo). */
-	if(!(base & (1<<11))) {
-		return false;
-	}
-
-	/* If the mapping is not set, we're being run on the BSP. Create it,
-	 * set the clock source, and register interrupt vector handlers. */
+	/* If the mapping has not been made, we're being run on the BSP. Create
+	 * it and register interrupt vector handlers. */
 	if(!lapic_mapping) {
-		/* Map on the kernel heap. */
-		lapic_mapping = page_phys_map(base & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+		lapic_mapping = page_phys_map(args->arch.lapic_address, PAGE_SIZE, MM_FATAL);
+		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIpp ", mapped to %p\n",
+		        args->arch.lapic_address, lapic_mapping);
 
-		/* Grab interrupt vectors. */
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
 		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
@@ -204,13 +185,11 @@ bool __init_text lapic_init(void) {
 	lapic_write(LAPIC_REG_SPURIOUS, LAPIC_VECT_SPURIOUS | (1<<8));
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
-	/* Figure out the CPU bus frequency. */
-	curr_cpu->arch.lapic_freq = ((lapic_get_freq() / 8) << 32) / 1000000;
+	/* Figure out the timer conversion factor. */
+	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.bus_freq / 8) << 32) / 1000000;
+	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU%u is %u\n",
+	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv);
 
 	/* Set the timer device. */
 	timer_device_set(&lapic_timer_device);
-
-	lapic_enabled = true;
-	return true;
-#endif
 }

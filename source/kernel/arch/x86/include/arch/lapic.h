@@ -23,6 +23,8 @@
 
 #include <types.h>
 
+struct kernel_args;
+
 /** Local APIC register offsets. */
 #define LAPIC_REG_APIC_ID		8	/**< Local APIC ID. */
 #define LAPIC_REG_APIC_VERSION		12	/**< Local APIC Version. */
@@ -97,11 +99,9 @@
 #define LAPIC_IPI_DEST_ALL		0x03	/**< All, excluding self. */
 #define LAPIC_IPI_DEST_ALL_INCL		0x02	/**< All, including self. */
 
-extern bool lapic_enabled;
-
 extern uint32_t lapic_id(void);
 extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
-extern bool lapic_init(void);
+extern void lapic_init(struct kernel_args *args);
 
 #endif /* __ARCH_LAPIC_H */

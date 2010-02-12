@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -37,8 +37,6 @@ static gdt_entry_t __initial_gdt[] __aligned(8) = {
 	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 0, 1, 0 },	/**< Kernel DS (Data). */
 	{ 0xFFFF, 0, 0, 0xF2, 0xF, 0, 0, 1, 1, 0 },	/**< User DS (Data). */
 	{ 0xFFFF, 0, 0, 0xF8, 0xF, 0, 1, 0, 1, 0 },	/**< User CS (Code). */
-	{ 0xFFFF, 0, 0, 0x9A, 0xF, 0, 0, 1, 1, 0 },	/**< Kernel 32-bit CS (Code). */
-	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 1, 1, 0 },	/**< Kernel 32-bit DS (Data). */
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< TSS descriptor - filled in by gdt_init(). */
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< Second part of TSS descriptor. */
 };
@@ -74,6 +72,21 @@ static void __init_text gdt_init(void) {
 
 	/* Set the GDT pointer. */
 	lgdt((ptr_t)&curr_cpu->arch.gdt, sizeof(curr_cpu->arch.gdt) - 1);
+
+	/* Reload the segment registers. There is a 64-bit far jump instruction
+	 * but GAS doesn't like it... use LRETQ to reload CS instead. */
+	__asm__ volatile(
+		"push	%0\n"
+		"push	$1f\n"
+		"lretq\n"
+		"1:\n"
+		"mov	%1, %%ds\n"
+		"mov	%1, %%es\n"
+		"mov	%1, %%fs\n"
+		"mov	%1, %%gs\n"
+		"mov	%1, %%ss\n"
+		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS)
+	);
 }
 
 /** Set up the TSS for the current CPU. */

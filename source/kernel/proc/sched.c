@@ -364,10 +364,6 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 	atomic_inc(&threads_runnable);
 }
 
-#if 0
-# pragma mark Public scheduler interface.
-#endif
-
 /** Scheduler timer handler function.
  * @param data		Data argument (unused).
  * @return		Whether to perform a thread switch. */
@@ -384,6 +380,17 @@ static bool sched_timer_handler(void *data) {
 
 	spinlock_unlock(&curr_thread->lock);
 	return ret;
+}
+
+/** Scheduler idle thread function.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void sched_idle_thread(void *arg1, void *arg2) {
+	intr_disable();
+	while(true) {
+		sched_yield();
+		sched_cpu_idle();
+	}
 }
 
 /** Internal part of the thread scheduler. Expects current thread to be locked.
@@ -507,11 +514,7 @@ void sched_thread_insert(thread_t *thread) {
 	}
 }
 
-/** Switch to another thread.
- *
- * Yields the remainder of the calling thread's timeslice and switches to
- * another thread.
- */
+/** Yield remaining timeslice and switch to another thread. */
 void sched_yield(void) {
 	bool state = intr_disable();
 
@@ -532,10 +535,7 @@ void sched_preempt_disable(void) {
 }
 
 /** Enable preemption.
- *
- * Enables preemption for the current thread. See documentation for
- * sched_preempt_disable().
- */
+ * @note		See sched_preempt_disable() for details of behaviour. */
 void sched_preempt_enable(void) {
 	spinlock_lock(&curr_thread->lock, 0);
 
@@ -553,17 +553,6 @@ void sched_preempt_enable(void) {
 	}
 }
 
-/** Scheduler idle loop. */
-void sched_idle(void) {
-	/* Interrupts should be disabled here. */
-	assert(intr_state() == false);
-
-	while(true) {
-		sched_yield();
-		sched_cpu_idle();
-	}
-}
-
 /** Initialise the scheduler for the current CPU. */
 void __init_text sched_init(void) {
 	char name[THREAD_NAME_MAX];
@@ -577,18 +566,15 @@ void __init_text sched_init(void) {
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
 	if(thread_create(name, kernel_proc, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
-	                 NULL, NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
+	                 sched_idle_thread, NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
 		fatal("Could not create idle thread for %" PRIu32, curr_cpu->id);
 	}
 	thread_wire(curr_cpu->sched->idle_thread);
 
-	/* The boot code becomes the idle thread, so free the stack that was
-	 * allocated for it and point it at the current stack. We also set the
-	 * current state to running and point the current thread to it. */
-	kheap_free(curr_cpu->sched->idle_thread->kstack, KSTACK_SIZE);
-	curr_cpu->sched->idle_thread->kstack = stack_get_base();
+	/* Set the idle thread as the current thread. */
 	curr_cpu->sched->idle_thread->cpu = curr_cpu;
 	curr_cpu->sched->idle_thread->state = THREAD_RUNNING;
+	curr_cpu->sched->prev_thread = curr_cpu->sched->idle_thread;
 	curr_cpu->thread = curr_cpu->sched->idle_thread;
 	curr_cpu->idle = true;
 
@@ -601,7 +587,7 @@ void __init_text sched_init(void) {
 		curr_cpu->sched->count[i] = 0;
 	}
 
-	/* Create the load-balancing thread if we have more than one CPU. */
+	/* Create the load-balancing thread if there is more than one CPU. */
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
 		if(thread_create(name, kernel_proc,THREAD_UNPREEMPTABLE, sched_balancer_thread,
@@ -611,4 +597,16 @@ void __init_text sched_init(void) {
 		thread_wire(curr_cpu->sched->balancer_thread);
 		thread_run(curr_cpu->sched->balancer_thread);
 	}
+}
+
+/** Begin executing other threads. */
+void __init_text sched_enter(void) {
+	assert(!intr_state());
+
+	/* Lock the idle thread - sched_post_switch() expects the thread to be
+	 * locked. */
+	spinlock_lock_ni(&curr_thread->lock, 0);
+
+	/* Restore the idle thread's context. */
+	context_restore(&curr_cpu->sched->idle_thread->context);
 }

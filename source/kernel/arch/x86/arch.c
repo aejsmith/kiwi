@@ -40,24 +40,15 @@ void __init_text arch_premm_init(kernel_args_t *args) {
 /** x86-specific second stage initialisation.
  * @param args		Kernel arguments structure. */
 void __init_text arch_postmm_init(kernel_args_t *args) {
-	lapic_init();
+	lapic_init(args);
 	syscall_arch_init();
-}
-
-/** x86-specific final initialisation. */
-void __init_text arch_final_init(void) {
-	//page_late_init();
 }
 
 /** x86-specific initialisation for an AP. */
 void __init_text arch_ap_init(void) {
 	descriptor_ap_init();
 	//cpu_arch_init(&curr_cpu->arch);
-
-	/* Initialise the LAPIC. */
-	if(!lapic_init()) {
-		fatal("LAPIC initialisation failed for CPU %" PRIu32 "\n", curr_cpu->id);
-	}
+	//lapic_init(args);
 #ifdef __x86_64__
 	syscall_arch_init();
 #endif
