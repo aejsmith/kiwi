@@ -115,14 +115,14 @@ static int vbe_init(void) {
 		goto out;
 	}
 
-	kprintf(LOG_DEBUG, "vbe: vbe presence was detected:\n");
-	kprintf(LOG_DEBUG, " signature:    %s\n", info->vbe_signature);
-	kprintf(LOG_DEBUG, " version:      0x%" PRIx16 "\n", info->vbe_version);
-	kprintf(LOG_DEBUG, " capabilities: 0x%" PRIx32 "\n", info->capabilities);
-	kprintf(LOG_DEBUG, " mode pointer: 0x%" PRIx32 "\n", info->video_mode_ptr);
-	kprintf(LOG_DEBUG, " total memory: %" PRIu16 "KB\n", info->total_memory * 64);
+	kprintf(LOG_NORMAL, "vbe: vbe presence was detected:\n");
+	kprintf(LOG_NORMAL, " signature:    %s\n", info->vbe_signature);
+	kprintf(LOG_NORMAL, " version:      0x%" PRIx16 "\n", info->vbe_version);
+	kprintf(LOG_NORMAL, " capabilities: 0x%" PRIx32 "\n", info->capabilities);
+	kprintf(LOG_NORMAL, " mode pointer: 0x%" PRIx32 "\n", info->video_mode_ptr);
+	kprintf(LOG_NORMAL, " total memory: %" PRIu16 "KB\n", info->total_memory * 64);
 	if(info->vbe_version >= 0x0200) {
-		kprintf(LOG_DEBUG, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
+		kprintf(LOG_NORMAL, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
 	}
 
 	/* Save a copy of the data, but don't free it yet: the modes may be

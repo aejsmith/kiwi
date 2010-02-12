@@ -106,14 +106,14 @@ static int pci_device_scan(device_t *bus, int id, int dev, int func) {
 		return ret;
 	}
 
-	kprintf(LOG_DEBUG, "pci: got device %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
+	kprintf(LOG_NORMAL, "pci: got device %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
 	        id, dev, func, attr[1].value.uint16, attr[2].value.uint16,
 	        attr[5].value.uint8, attr[6].value.uint8);
 
 	/* Check for a PCI-to-PCI bridge. */
 	if(attr[5].value.uint8 == 0x06 && attr[6].value.uint8 == 0x04) {
 		dest = pci_config_read8(id, dev, func, 0x19);
-		kprintf(LOG_DEBUG, "pci: device %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
+		kprintf(LOG_NORMAL, "pci: device %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
 		        id, dev, func, dest);
 		pci_bus_scan(dest);
 	}
@@ -134,18 +134,18 @@ static int pci_bus_scan(int id) {
 		return ret;
 	}
 
-	kprintf(LOG_DEBUG, "pci: scanning bus %p(%d) for devices...\n", device, id);
+	kprintf(LOG_NORMAL, "pci: scanning bus %d for devices...\n", id);
 	for(i = 0; i < 32; i++) {
 		if(pci_config_read8(id, i, 0, PCI_DEVICE_HEADER_TYPE) & 0x80) {
 			for(j = 0; j < 8; j++) {
 				if((ret = pci_device_scan(device, id, i, j)) != 0) {
-					kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x.%d: %d\n",
+					kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x.%d (%d)\n",
 						id, i, j, ret);
 				}
 			}
 		} else {
 			if((ret = pci_device_scan(device, id, i, 0)) != 0) {
-				kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x: %d\n",
+				kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x (%d)\n",
 					id, i, ret);
 			}
 		}
@@ -312,7 +312,7 @@ static int pci_init(void) {
 
 	/* Get the architecture to detect PCI presence. */
 	if((ret = pci_arch_init()) != 0) {
-		kprintf(LOG_DEBUG, "pci: PCI is not present or not usable (%d)\n", ret);
+		kprintf(LOG_NORMAL, "pci: PCI is not present or not usable (%d)\n", ret);
 		return ret;
 	}
 
