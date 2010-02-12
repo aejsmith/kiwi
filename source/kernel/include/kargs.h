@@ -54,10 +54,17 @@ typedef struct kernel_args_memory {
 
 /** Structure containing details of a CPU passed to the kernel. */
 typedef struct kernel_args_cpu {
-	phys_ptr_t next;		/**< Pointer to next CPU (or NULL if last). */
+	phys_ptr_t next;		/**< Pointer to next CPU (or 0 if last). */
 	uint32_t id;			/**< ID of the CPU. */
 	kernel_args_cpu_arch_t arch;	/**< Architecture data. */
 } __packed kernel_args_cpu_t;
+
+/** Structure describing a boot module. */
+typedef struct kernel_args_module {
+	phys_ptr_t next;		/**< Pointer to next module structure (or 0 if last). */
+	phys_ptr_t base;		/**< Address of the module. */
+	uint32_t size;			/**< Size of the module. */
+} __packed kernel_args_module_t;
 
 /** Structure containing arguments passed to the kernel. */
 typedef struct kernel_args {
@@ -78,6 +85,10 @@ typedef struct kernel_args {
 	uint8_t fb_depth;		/**< Bits per pixel. */
 	phys_ptr_t fb_addr;		/**< Physical address of the framebuffer. */
 
+	/** Module information. */
+	phys_ptr_t modules;		/**< Linked list of module structures. */
+	uint32_t module_count;		/**< Number of modules. */
+
 	/** Boot filesystem UUID. */
 	char boot_fs_uuid[KERNEL_ARGS_UUID_LEN];
 
@@ -93,6 +104,7 @@ typedef struct kernel_args {
 extern kernel_args_t *g_kernel_args;
 
 extern kernel_args_cpu_t *kargs_cpu_add(uint32_t id);
+extern kernel_args_module_t *kargs_module_add(phys_ptr_t base, uint32_t size);
 extern void kargs_init(void);
 #endif
 

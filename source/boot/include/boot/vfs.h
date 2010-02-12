@@ -132,6 +132,7 @@ extern bool vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t of
 
 extern void vfs_dir_insert(vfs_node_t *node, char *name, inode_t id);
 extern vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path);
+extern vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev);
 
 extern bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset);
 extern disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops,

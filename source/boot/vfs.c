@@ -194,8 +194,7 @@ static bool vfs_dir_get_child(vfs_node_t *node, const char *name, inode_t *idp) 
 
 	if(list_empty(&node->entries)) {
 		if(!node->fs->ops->dir_cache(node)) {
-			vfs_node_release(node);
-			return NULL;
+			return false;
 		}
 	}
 
@@ -272,6 +271,32 @@ vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path) {
 
 		vfs_node_release(node);
 		node = child;
+	}
+}
+
+/** Iterate through entries in a directory.
+ * @param node		Node for directory.
+ * @param prev		Previous entry (or NULL to start from beginning).
+ * @return		Pointer to entry structure for next entry. */
+vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev) {
+	assert(node->type == VFS_NODE_DIR);
+
+	if(list_empty(&node->entries)) {
+		if(!node->fs->ops->dir_cache(node)) {
+			return NULL;
+		}
+		if(list_empty(&node->entries)) {
+			return NULL;
+		}
+	}
+
+	if(prev) {
+		if(&prev->header == node->entries.prev) {
+			return NULL;
+		}
+		return list_entry(prev->header.next, vfs_dir_entry_t, header);
+	} else {
+		return list_entry(node->entries.next, vfs_dir_entry_t, header);
 	}
 }
 

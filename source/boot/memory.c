@@ -117,32 +117,11 @@ static void phys_memory_dump(void) {
 	}
 }
 
-/** Allocate memory from the heap.
- * @note		A fatal error will be raised if heap is full.
- * @param size		Size of allocation to make.
- * @return		Address of allocation. */
-void *kmalloc(size_t size) {
-	uint8_t *ret = g_heap + g_heap_next;
-
-	if((g_heap_next + size) > HEAP_SIZE) {
-		fatal("Exhausted available heap space");
-	}
-
-	g_heap_next += size;
-	return ret;
-}
-
-/** Free memory allocated with kfree().
- * @param addr		Address of allocation. */
-void kfree(void *addr) {
-	/* FIXME: Implement. */
-}
-
 /** Add a range of physical memory.
  * @param start		Start of the range (must be page-aligned).
  * @param end		End of the range (must be page-aligned).
  * @param type		Type of the range. */
-void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type) {
+static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type) {
 	memory_range_t *range, *other, *split;
 
 	assert(!(start % PAGE_SIZE));
@@ -198,7 +177,35 @@ void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type) {
 
 	/* Finally, merge the region with adjacent ranges of the same type. */
 	memory_range_merge(range);
+}
 
+/** Allocate memory from the heap.
+ * @note		A fatal error will be raised if heap is full.
+ * @param size		Size of allocation to make.
+ * @return		Address of allocation. */
+void *kmalloc(size_t size) {
+	uint8_t *ret = g_heap + g_heap_next;
+
+	if((g_heap_next + size) > HEAP_SIZE) {
+		fatal("Exhausted available heap space");
+	}
+
+	g_heap_next += size;
+	return ret;
+}
+
+/** Free memory allocated with kfree().
+ * @param addr		Address of allocation. */
+void kfree(void *addr) {
+	/* FIXME: Implement. */
+}
+
+/** Add a range of physical memory.
+ * @param start		Start of the range (must be page-aligned).
+ * @param end		End of the range (must be page-aligned).
+ * @param type		Type of the range. */
+void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type) {
+	phys_memory_add_internal(start, end, type);
 	dprintf("memory: added range 0x%" PRIpp "-0x%" PRIpp " (type: %d)\n",
 	        start, end, type);
 }
@@ -229,7 +236,7 @@ phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim) {
 			continue;
 		}
 
-		phys_memory_add(start, start + size, type);
+		phys_memory_add_internal(start, start + size, type);
 		dprintf("memory: allocated 0x%" PRIpp "-0x%" PRIpp " (align: 0x%zx, reclaim: %d)\n",
 		        start, start + size, align, reclaim);
 		return start;

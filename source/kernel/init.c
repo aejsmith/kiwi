@@ -71,6 +71,8 @@ static void init_thread(void *_args, void *arg2) {
 		(*initcall)();
 	}
 
+	console_update_boot_progress(10);
+
 	/* Load boot-time modules and mount the root filesystem. */
 	bootmod_load();
 
@@ -79,6 +81,8 @@ static void init_thread(void *_args, void *arg2) {
 
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();
+
+	console_update_boot_progress(100);
 
 	/* Run the startup process. */
 	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM,

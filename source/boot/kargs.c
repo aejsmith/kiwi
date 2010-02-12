@@ -60,11 +60,36 @@ kernel_args_cpu_t *kargs_cpu_add(uint32_t id) {
 	return cpu;
 }
 
+/** Add a module to the kernel arguments.
+ * @param base		Address of module.
+ * @param size		Size of module. */
+kernel_args_module_t *kargs_module_add(phys_ptr_t base, uint32_t size) {
+	kernel_args_module_t *mod, *exist;
+	phys_ptr_t addr;
+
+	mod = kmalloc(sizeof(kernel_args_module_t));
+	mod->next = 0;
+	mod->base = base;
+	mod->size = size;
+
+	if(!g_kernel_args->modules) {
+		g_kernel_args->modules = (ptr_t)mod;
+	} else {
+		for(addr = g_kernel_args->modules; addr; addr = exist->next) {
+			exist = (kernel_args_module_t *)((ptr_t)addr);
+		}
+
+		exist->next = (ptr_t)mod;
+	}
+
+	g_kernel_args->module_count++;
+	return mod;
+}
+
 /** Initialise the kernel arguments structure. */
 void kargs_init(void) {
 	g_kernel_args = kmalloc(sizeof(kernel_args_t));
 	memset(g_kernel_args, 0, sizeof(kernel_args_t));
-	g_kernel_args->highest_cpu_id = 0;
 #if CONFIG_DEBUG
 	/* Disable the boot splash by default for debug builds. */
 	g_kernel_args->splash_disabled = true;

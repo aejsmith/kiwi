@@ -131,4 +131,7 @@ void platform_memory_detect() {
 	 * is no longer needed, but it is needed in the kernel to call BIOS
 	 * interrupts. */
 	phys_memory_add(0, PAGE_SIZE, PHYS_MEMORY_RESERVED);
+
+	/* Mark the memory area we use for BIOS calls as internal. */
+	phys_memory_add(BIOS_MEM_BASE, BIOS_MEM_BASE + BIOS_MEM_SIZE, PHYS_MEMORY_INTERNAL);
 }
