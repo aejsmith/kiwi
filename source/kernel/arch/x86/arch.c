@@ -44,11 +44,11 @@ void __init_text arch_postmm_init(kernel_args_t *args) {
 	syscall_arch_init();
 }
 
-/** x86-specific initialisation for an AP. */
-void __init_text arch_ap_init(void) {
+/** x86-specific initialisation for an AP.
+ * @param args		Kernel arguments structure. */
+void __init_text arch_ap_init(kernel_args_t *args) {
 	descriptor_ap_init();
-	//cpu_arch_init(&curr_cpu->arch);
-	//lapic_init(args);
+	lapic_init(args);
 #ifdef __x86_64__
 	syscall_arch_init();
 #endif

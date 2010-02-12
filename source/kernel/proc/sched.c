@@ -174,7 +174,7 @@ static inline int sched_migrate_priority(int average, int priority, int max) {
 
 	LIST_FOREACH(&cpus_running, iter) {
 		cpu = list_entry(iter, cpu_t, header);
-		if(cpu == curr_cpu) {
+		if(cpu == curr_cpu || !cpu->sched) {
 			continue;
 		}
 

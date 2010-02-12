@@ -145,7 +145,12 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 		fatal("CPU %" PRIu32 " does not support required features",
 		      g_booting_cpu->id);
 	}
-
+#if CONFIG_X86_NX
+	/* Enable NX/XD if supported. */
+	if(CPU_HAS_XD(g_booting_cpu)) {
+		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
+	}
+#endif
 	/* Shitty workaround: when running under QEMU the boot CPU's frequency
 	 * is OK but the others will usually get rubbish. Use the boot CPU's
 	 * frequency on all CPUs under QEMU. */

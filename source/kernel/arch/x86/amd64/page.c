@@ -524,13 +524,7 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 void __init_text page_arch_init(kernel_args_t *args) {
 	uint64_t *pml4, *bpml4;
 	phys_ptr_t i;
-#if CONFIG_X86_NX
-	/* Enable NX/XD if supported. */
-	if(CPU_HAS_XD(curr_cpu)) {
-		dprintf("page: CPU supports NX/XD, enabling...\n");
-		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
-	}
-#endif
+
 	/* Initialise the kernel page map structure. */
 	mutex_init(&g_kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
 	g_kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);

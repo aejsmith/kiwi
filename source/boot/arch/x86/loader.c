@@ -25,6 +25,7 @@
 #include <arch/boot.h>
 #include <arch/features.h>
 #include <arch/page.h>
+#include <arch/sysreg.h>
 
 #include <boot/cpu.h>
 #include <boot/elf.h>

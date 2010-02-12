@@ -53,6 +53,7 @@ cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). *
  * @param args		Kernel arguments CPU structure. */
 static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	memset(cpu, 0, sizeof(cpu_t));
+	list_init(&cpu->header);
 	cpu->id = args->id;
 
 	/* Initialise architecture-specific data. */
@@ -67,9 +68,7 @@ static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	spinlock_init(&cpu->timer_lock, "timer_lock");
 	cpu->tick_len = 0;
 
-	/* Store in the list of running CPUs and the CPU array. */
-	list_init(&cpu->header);
-	list_append(&cpus_running, &cpu->header);
+	/* Store in the CPU array. */
 	if(cpus) {
 		cpus[cpu->id] = cpu;
 	}
@@ -107,6 +106,7 @@ void __init_text cpu_early_init(kernel_args_t *args) {
 
 	/* Add the boot CPU. */
 	cpu_add(&boot_cpu, (kernel_args_cpu_t *)((ptr_t)args->cpus));
+	list_append(&cpus_running, &boot_cpu.header);
 
 	/* Set the CPU pointer. */
 	cpu_set_pointer((ptr_t)&boot_cpu);

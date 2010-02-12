@@ -51,6 +51,22 @@ extern void kmain(kernel_args_t *args, uint32_t cpu);
 extern initcall_t __initcall_start[];
 extern initcall_t __initcall_end[];
 
+/** Rendezvous variables for SMP boot. */
+static atomic_t g_boot_rendezvous1 = 0;
+static atomic_t g_boot_rendezvous2 = 0;
+static atomic_t g_boot_rendezvous3 = 0;
+
+/** Lock to serialise the early part of SMP boot. */
+static SPINLOCK_DECLARE(g_boot_spinlock);
+
+/** Wait until all CPUs reach a certain point.
+ * @param args		Kernel arguments structure.
+ * @param var		Variable to wait on. */
+static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
+	atomic_inc(var);
+	while(atomic_get(var) < (int)args->cpu_count);
+}
+
 /** Second-stage intialization thread.
  * @param _args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
@@ -63,8 +79,10 @@ static void init_thread(void *_args, void *arg2) {
 	/* Initialise other things. */
 	vfs_init();
 
-	/* Bring up secondary CPUs. */
-	//smp_boot_cpus();
+	/* Bring up secondary CPUs. The first rendezvous sets off their
+	 * initialisation, the second waits for them to complete. */
+	init_rendezvous(args, &g_boot_rendezvous2);
+	init_rendezvous(args, &g_boot_rendezvous3);
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -96,6 +114,9 @@ static void init_thread(void *_args, void *arg2) {
  * @param cpu           CPU that the function is running on. */
 void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	thread_t *thread;
+
+	/* Wait for all CPUs to enter the kernel. */
+	init_rendezvous(args, &g_boot_rendezvous1);
 
 	if(cpu == args->boot_cpu) {
 		cpu_early_init(args);
@@ -148,19 +169,28 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		/* Finally begin executing other threads. */
 		sched_enter();
 	} else {
-		while(true);
-#if 0
-	curr_cpu->state = CPU_RUNNING;
-	list_append(&cpus_running, &curr_cpu->header);
+		/* Wait for the boot CPU to do its initialisation. */
+		init_rendezvous(args, &g_boot_rendezvous2);
 
-	arch_ap_init();
-	platform_ap_init();
-	sched_init();
+		spinlock_lock(&g_boot_spinlock, 0);
 
-	atomic_set(&ap_boot_wait, 1);
+		/* Switch to the kernel page map, set the CPU pointer and do
+		 * architecture/platform initialisation. */
+		page_map_switch(&g_kernel_page_map);
+		cpu_set_pointer((ptr_t)cpus[cpu]);
+		arch_ap_init(args);
+		platform_ap_init(args);
 
-	/* We now become this CPU's idle thread. */
-	sched_idle();
-#endif
+		/* We're running, add ourselves to the running CPU list. */
+		list_append(&cpus_running, &curr_cpu->header);
+
+		/* Do scheduler initialisation. */
+		sched_init();
+
+		spinlock_unlock(&g_boot_spinlock);
+
+		/* Perform the final rendezvous and then enter the scheduler. */
+		init_rendezvous(args, &g_boot_rendezvous3);
+		sched_enter();
 	}
 }

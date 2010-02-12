@@ -27,6 +27,6 @@ extern void platform_postmm_init(kernel_args_t *args);
 
 /** Not required on this platform. */
 #define platform_premm_init(args)
-#define platform_ap_init()
+#define platform_ap_init(args)
 
 #endif /* __PLATFORM_PLATFORM_H */

@@ -43,8 +43,16 @@ atomic_t cpu_halting_all = 0;
  * function.
  */
 void cpu_pause_all(void) {
+	cpu_t *cpu;
+
 	atomic_set(&cpu_pause_wait, 1);
-	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+
+	LIST_FOREACH(&cpus_running, iter) {
+		cpu = list_entry(iter, cpu_t, header);
+		if(cpu->id != cpu_current_id()) {
+			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
+		}
+	}
 }
 
 /** Resume CPUs paused with cpu_pause_all(). */
@@ -54,8 +62,19 @@ void cpu_resume_all(void) {
 
 /** Halt all other CPUs. */
 void cpu_halt_all(void) {
+	cpu_t *cpu;
+
 	atomic_set(&cpu_halting_all, 1);
-	lapic_ipi(LAPIC_IPI_DEST_ALL, 0, LAPIC_IPI_NMI, 0);
+
+	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
+	 * during early boot, secondary CPUs do not have an IDT set up so
+	 * sending them an NMI IPI results in a triple fault. */
+	LIST_FOREACH(&cpus_running, iter) {
+		cpu = list_entry(iter, cpu_t, header);
+		if(cpu->id != cpu_current_id()) {
+			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
+		}
+	}
 }
 
 /** Cause a CPU to reschedule.
@@ -109,15 +128,15 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID   Freq (MHz)  Bus Freq (MHz)  Cache Align Model Name\n");
-	kprintf(LOG_NONE, "==   ==========  ==============  =========== ==========\n");
+	kprintf(LOG_NONE, "ID   Freq (MHz) Bus Freq (MHz) Cache Align Model Name\n");
+	kprintf(LOG_NONE, "==   ========== ============== =========== ==========\n");
 
 	for(i = 0; i <= cpu_id_max; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}
 
-		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-10" PRIu64 " %-11d %s\n",
+		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-14" PRIu64 " %-11d %s\n",
 		        cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
 		        cpus[i]->arch.bus_freq / 1000000, cpus[i]->arch.cache_alignment,
 		        (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
