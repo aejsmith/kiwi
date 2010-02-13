@@ -126,6 +126,7 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
 
 	assert(!(start % PAGE_SIZE));
 	assert(!(end % PAGE_SIZE));
+	assert(end > start);
 
 	range = memory_range_alloc(start, end, type);
 

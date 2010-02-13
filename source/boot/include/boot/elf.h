@@ -92,7 +92,8 @@ static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, 
 			} \
 		} \
 		\
-		g_kernel_args->kernel_phys = phys_memory_alloc(virt_end - virt_base, _alignment, false); \
+		g_kernel_args->kernel_phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), \
+		                                               _alignment, false); \
 		dprintf("elf: loading kernel image to 0x%" PRIpp " (size: 0x%zx, align: 0x%zx)\n", \
 		        g_kernel_args->kernel_phys, (size_t)(virt_end - virt_base), _alignment); \
 		\

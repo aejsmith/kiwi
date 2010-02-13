@@ -27,12 +27,12 @@
 
 /* Ensure that this code is linked in first. */
 .section .init.text, "ax", @progbits
-.code16
 
 /** Real-mode startup function. */
 .global _start
 .type _start, @function
 _start:
+.code16
 	/* Don't want interrupts. */
 	cli
 
@@ -52,15 +52,8 @@ _start:
 	xorw	%dx, %dx
 	int	$0x10
 
-	/* Enable the A20 line. I'm using the fast A20 mechanism here - the
-	 * Haiku bootloader uses it as the only method of enabling it, and
-	 * nobody has complained that it doesn't work. */
-	inb	$0x92, %al
-	testb	$0x02, %al
-	jnz	1f
-	orb	$(1<<1), %al
-	andb	$~(1<<0), %al
-	outb	%al, $0x92
+	/* Enable the A20 line. */
+	call	enable_a20
 
 	/* Now we need to switch to protected mode. */
 1:	addr32	lgdt	(g_gdt_pointer - LOADER_LOAD_ADDR)
@@ -81,6 +74,108 @@ _start:
 	jmp	__loader_entry
 .size _start, .-_start
 
+/** Test whether the A20 line is enabled.
+ * @note		Partially based on code found at
+ *			http://wiki.osdev.org/A20_Line
+ * @return		AX = 1 if enabled, AX = 0 if not. */
+.type test_a20, @function
+test_a20:
+.code16
+	/* Iterate checking to give time for enabling attempts we make to take
+	 * effect. */
+	push	%cx
+	mov	$0x1000, %cx
+
+	/* Set segment registers and addresses to compare. */
+1:	xor	%ax, %ax
+	mov	%ax, %fs
+	not	%ax
+	mov	%ax, %gs
+	mov	$0x1000, %di
+	mov	$0x1010, %si
+
+	/* Write different values to the two addresses, and compare. If they
+	 * both equal the second value written, the A20 line is not enabled. */
+	movb	$0x00, %fs:(%di)
+	outb	%al, $0x80
+	movb	$0xFF, %gs:(%si)
+	outb	%al, $0x80
+	cmpb	$0xFF, %fs:(%di)
+	jne	2f
+	loop	1b
+	xor	%ax, %ax
+	pop	%cx
+	ret
+2:	mov	$1, %ax
+	pop	%cx
+	ret
+.size test_a20, .-test_a20
+
+/** Enable the A20 line. */
+.type enable_a20, @function
+enable_a20:
+	mov	$0x100, %cx
+.Lbegin:
+	/* Don't do anything if already enabled. */
+	call	test_a20
+	cmp	$0, %ax
+	je	.Lenable_bios
+	ret
+.Lenable_bios:
+	/* First try using a BIOS interrupt. */
+	mov	$0x2401, %ax
+	int	$0x15
+	call	test_a20
+	cmp	$0, %eax
+	je	.Lenable_kbd
+	ret
+.Lenable_kbd:
+	/* Try the keyboard controller. */
+	call	.Lflush
+	mov	$0xD1, %al
+	outb	%al, $0x64
+	call	.Lflush
+	mov	$0xDF, %al
+	outb	%al, $0x60
+	call	.Lflush
+	mov	$0xFF, %al
+	outb	%al, $0x64
+	call	.Lflush
+	call	test_a20
+	cmp	$0, %eax
+	je	.Lenable_fast
+	ret
+.Lenable_fast:
+	/* Try the fast A20 mechanism. */
+	inb	$0x92, %al
+	testb	$(1<<1), %al
+	jnz	.Lfail
+	orb	$(1<<1), %al
+	andb	$~(1<<0), %al
+	outb	%al, $0x92
+	call	test_a20
+	cmp	$0, %eax
+	je	.Lfail
+	ret
+.Lfail:
+	loop	.Lbegin
+	mov	$'a', %al
+	mov	$0x3F8, %dx
+	outb	%al, (%dx)
+1:	jmp	1b
+.Lflush:
+	outb	%al, $0x80
+	in	$0x64, %al
+	test	$1, %al
+	jz	2f
+	outb	%al, $0x80
+	in	$0x60, %al
+	jmp	.Lflush
+2:	test	$2, %al
+	jnz	.Lflush
+	ret
+.size enable_a20, .-enable_a20
+
 /** Multiboot header structure. */
 .align 4
 .type multiboot_header, @object
@@ -98,6 +193,7 @@ multiboot_header:
 /** Multiboot startup function. */
 .type __multiboot_entry, @function
 __multiboot_entry:
+.code32
 	/* Don't want interrupts. */
 	cli
 

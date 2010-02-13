@@ -406,6 +406,9 @@ void cpu_postmenu_init(void) {
 	if(!g_kernel_args->arch.lapic_disabled && cpu_lapic_init()) {
 		/* Set the real ID of the boot CPU. */
 		g_booting_cpu->id = cpu_current_id();
+		if(g_booting_cpu->id > g_kernel_args->highest_cpu_id) {
+			g_kernel_args->highest_cpu_id = g_booting_cpu->id;
+		}
 	} else {
 		/* Force SMP to be disabled if the boot CPU does not have a
 		 * local APIC or if it has been manually disabled. */

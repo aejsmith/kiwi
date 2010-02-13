@@ -113,7 +113,6 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 	dprintf("loader: 64-bit kernel entry point is 0x%llx, CR3 is %p\n",
 	        g_kernel_entry64, g_kernel_cr3);
 	return true;
-
 }
 
 /** Load a 32-bit kernel image.
@@ -151,7 +150,7 @@ static bool arch_load_kernel32(vfs_node_t *file) {
 
 	/* Save details for later use. */
 	g_kernel_cr3 = (ptr_t)pdp;
-	dprintf("loader: 32-bit kernel entry point is 0x%llx, CR3 is %p\n",
+	dprintf("loader: 32-bit kernel entry point is %p, CR3 is %p\n",
 	        g_kernel_entry32, g_kernel_cr3);
 	return true;
 }
