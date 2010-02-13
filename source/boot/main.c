@@ -52,6 +52,7 @@ static void load_kernel(vfs_node_t *dir) {
 		fatal("Couldn't find kernel in boot directory");
 	}
 
+	kprintf("Loading kernel...\n");
 	arch_load_kernel(kernel);
 	vfs_node_release(kernel);
 }
@@ -75,6 +76,8 @@ static void load_modules(vfs_node_t *dir) {
 			vfs_node_release(node);
 			continue;
 		}
+
+		kprintf("Loading %s...\n", entry->name);
 
 		/* Allocate a chunk of memory to load to. */
 		addr = phys_memory_alloc(ROUND_UP(node->size, PAGE_SIZE), PAGE_SIZE, true);

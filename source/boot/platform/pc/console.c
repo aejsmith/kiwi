@@ -57,15 +57,6 @@ static int g_vga_cursor_y = 0;
 /** Whether the serial console is enabled. */
 static bool g_serial_enabled = false;
 
-/** Initialise the VGA console. */
-static void pc_console_init(void) {
-	/* We don't care about the cursor, move it out the way. */
-	out8(VGA_CRTC_INDEX, 14);
-	out8(VGA_CRTC_DATA, (((VGA_ROWS + 1) * VGA_COLS) >> 8) & 0xFF);
-	out8(VGA_CRTC_INDEX, 15);
-	out8(VGA_CRTC_DATA, ((VGA_ROWS + 1) * VGA_COLS) & 0xFF);
-}
-
 /** Check if shift is held.
  * @return		Whether shift is held. */
 static bool pc_console_shift_held(void) {
@@ -204,6 +195,17 @@ static void pc_console_highlight(int x, int y, int width, int height) {
 static void pc_console_move_cursor(int x, int y) {
 	g_vga_cursor_x = x;
 	g_vga_cursor_y = y;
+}
+
+/** Initialise the VGA console. */
+static void pc_console_init(void) {
+	/* We don't care about the cursor, move it out the way. */
+	out8(VGA_CRTC_INDEX, 14);
+	out8(VGA_CRTC_DATA, (((VGA_ROWS + 1) * VGA_COLS) >> 8) & 0xFF);
+	out8(VGA_CRTC_INDEX, 15);
+	out8(VGA_CRTC_DATA, ((VGA_ROWS + 1) * VGA_COLS) & 0xFF);
+
+	pc_console_clear();
 }
 
 /** Main console. */

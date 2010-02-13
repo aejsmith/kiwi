@@ -125,7 +125,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	mount->blocks_count = le32_to_cpu(mount->sb.s_blocks_count);
 	mount->blk_size = 1024 << le32_to_cpu(mount->sb.s_log_block_size);
 	if(mount->blk_size > PAGE_SIZE) {
-		dprintf("ext2: cannot support block size greater than system page size!\n");
+		kprintf(LOG_WARN, "ext2: cannot support block size greater than system page size!\n");
 		ret = -ERR_NOT_SUPPORTED;
 		goto fail;
 	}
