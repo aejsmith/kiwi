@@ -33,7 +33,7 @@
 extern uint8_t __isr_array[IDT_ENTRY_COUNT][16];
 
 /** Array of GDT descriptors. */
-static gdt_entry_t __initial_gdt[] __aligned(8) = {
+static gdt_entry_t g_initial_gdt[] __aligned(8) = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< NULL descriptor. */
 	{ 0xFFFF, 0, 0, 0x9A, 0xF, 0, 0, 1, 1, 0 },	/**< Kernel CS (Code). */
 	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 1, 1, 0 },	/**< Kernel DS (Data). */
@@ -44,19 +44,13 @@ static gdt_entry_t __initial_gdt[] __aligned(8) = {
 };
 
 /** Array of IDT entries. */
-static idt_entry_t idt[IDT_ENTRY_COUNT] __aligned(8);
+static idt_entry_t g_idt[IDT_ENTRY_COUNT] __aligned(8);
 
 /** Double fault handler stack. */
-static uint8_t __doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
+static uint8_t g_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
 /** Double fault handler TSS. */
-static tss_t __doublefault_tss;
-
-/** Bootstrap GDT pointer. */
-gdt_pointer_t __boot_gdtp = {
-	.limit = sizeof(__initial_gdt) - 1,
-	.base = (((ptr_t)__initial_gdt - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE),
-};
+static tss_t g_doublefault_tss;
 
 /** Set the base address of a segment.
  * @param sel		Segment to modify.
@@ -78,16 +72,28 @@ static inline void gdt_set_limit(int sel, size_t limit) {
 /** Set up the GDT for the current CPU. */
 static void __init_text gdt_init(void) {
 	/* Create a copy of the statically allocated GDT. */
-	memcpy(curr_cpu->arch.gdt, __initial_gdt, sizeof(__initial_gdt));
+	memcpy(curr_cpu->arch.gdt, g_initial_gdt, sizeof(g_initial_gdt));
 
 	/* Set up the TSS descriptor. */
 	gdt_set_base(SEGMENT_TSS, (ptr_t)&curr_cpu->arch.tss);
 	gdt_set_limit(SEGMENT_TSS, sizeof(tss_t));
-	gdt_set_base(SEGMENT_DF_TSS, (ptr_t)&__doublefault_tss);
+	gdt_set_base(SEGMENT_DF_TSS, (ptr_t)&g_doublefault_tss);
 	gdt_set_limit(SEGMENT_DF_TSS, sizeof(tss_t));
 
 	/* Set the GDT pointer. */
 	lgdt((ptr_t)&curr_cpu->arch.gdt, sizeof(curr_cpu->arch.gdt) - 1);
+
+	/* Reload the segment registers. */
+	__asm__ volatile(
+		"ljmp	%0, $1f\n"
+		"1:\n"
+		"mov	%1, %%ds\n"
+		"mov	%1, %%es\n"
+		"mov	%1, %%fs\n"
+		"mov	%1, %%gs\n"
+		"mov	%1, %%ss\n"
+		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS)
+	);
 }
 
 /** Set up the TSS for the current CPU. */
@@ -100,15 +106,16 @@ static void __init_text tss_init(void) {
 	curr_cpu->arch.tss.io_bitmap = 104;
 
 	/* Set up the doublefault TSS. */
-	stack = (ptr_t)__doublefault_stack;
-	__doublefault_tss.cr3 = sysreg_cr3_read();
-	__doublefault_tss.eip = (ptr_t)&__isr_array[FAULT_DOUBLE];
-	__doublefault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
-	__doublefault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
-	__doublefault_tss.es = SEGMENT_K_DS;
-	__doublefault_tss.cs = SEGMENT_K_CS;
-	__doublefault_tss.ss = SEGMENT_K_DS;
-	__doublefault_tss.ds = SEGMENT_K_DS;
+	stack = (ptr_t)g_doublefault_stack;
+	// FIXME
+	//g_doublefault_tss.cr3 = sysreg_cr3_read();
+	g_doublefault_tss.eip = (ptr_t)&__isr_array[FAULT_DOUBLE];
+	g_doublefault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
+	g_doublefault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
+	g_doublefault_tss.es = SEGMENT_K_DS;
+	g_doublefault_tss.cs = SEGMENT_K_CS;
+	g_doublefault_tss.ss = SEGMENT_K_DS;
+	g_doublefault_tss.ds = SEGMENT_K_DS;
 
 	/* Set CPU pointer on doublefault stack. */
 	*(ptr_t *)stack = cpu_get_pointer();
@@ -125,23 +132,23 @@ static inline void idt_init(void) {
 	/* Fill out the handlers in the IDT. */
 	for(i = 0; i < IDT_ENTRY_COUNT; i++) {
 		addr = (ptr_t)&__isr_array[i];
-		idt[i].base0 = (addr & 0xFFFF);
-		idt[i].base1 = ((addr >> 16) & 0xFFFF);
-		idt[i].sel = SEGMENT_K_CS;
-		idt[i].unused = 0;
-		idt[i].flags = 0x8E;
+		g_idt[i].base0 = (addr & 0xFFFF);
+		g_idt[i].base1 = ((addr >> 16) & 0xFFFF);
+		g_idt[i].sel = SEGMENT_K_CS;
+		g_idt[i].unused = 0;
+		g_idt[i].flags = 0x8E;
 	}
 
 	/* Modify the double fault entry to become a task gate using the
 	 * doublefault TSS. */
-	idt[FAULT_DOUBLE].flags = 0xE5;
-	idt[FAULT_DOUBLE].sel = SEGMENT_DF_TSS;
-	idt[FAULT_DOUBLE].base0 = 0;
-	idt[FAULT_DOUBLE].base1 = 0;
+	g_idt[FAULT_DOUBLE].flags = 0xE5;
+	g_idt[FAULT_DOUBLE].sel = SEGMENT_DF_TSS;
+	g_idt[FAULT_DOUBLE].base0 = 0;
+	g_idt[FAULT_DOUBLE].base1 = 0;
 
 	/* Modify the system call entry's DPL to be 3. The system call handler
 	 * is added in arch.c. */
-	idt[SYSCALL_INT_NO].flags |= 0x60;
+	g_idt[SYSCALL_INT_NO].flags |= 0x60;
 }
 
 /** Initialise descriptor tables for the boot CPU. */
@@ -154,7 +161,7 @@ void __init_text descriptor_init(void) {
 	idt_init();
 
 	/* Point the CPU to the new IDT. */
-	lidt((ptr_t)&idt, (sizeof(idt) - 1));
+	lidt((ptr_t)&g_idt, (sizeof(g_idt) - 1));
 }
 
 /** Initialise descriptor tables for an application CPU. */
@@ -166,5 +173,5 @@ void __init_text descriptor_ap_init(void) {
 
 	/* For the IDT, there is no need to have a seperate IDT for each CPU,
 	 * so just point the IDTR at the shared IDT. */
-	lidt((ptr_t)&idt, (sizeof(idt) - 1));
+	lidt((ptr_t)&g_idt, (sizeof(g_idt) - 1));
 }

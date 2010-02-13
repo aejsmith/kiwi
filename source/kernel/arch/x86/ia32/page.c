@@ -21,7 +21,6 @@
 #include <arch/barrier.h>
 #include <arch/features.h>
 #include <arch/memmap.h>
-#include <arch/tlb.h>
 #include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
@@ -31,6 +30,7 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
+#include <mm/tlb.h>
 
 #include <proc/thread.h>
 
@@ -38,298 +38,311 @@
 #include <console.h>
 #include <errors.h>
 #include <fatal.h>
+#include <kargs.h>
 
-/** Kernel paging structures. */
-extern uint64_t __kernel_pdir[];
-extern uint64_t __boot_pdp[];
-
-/** Symbols defined by the linker script. */
-extern char __text_start[], __text_end[], __rodata_start[], __rodata_end[];
-extern char __bss_end[], __end[];
-
-#if 0
-# pragma mark Page map functions.
+#if CONFIG_PAGE_DEBUG
+# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#else
+# define dprintf(fmt...)	
 #endif
 
-/** Macro to get address of a kernel page table. */
-#define KERNEL_PTBL_ADDR(pde)		((uint64_t *)(KERNEL_PTBL_BASE + ((ptr_t)(pde) * PAGE_SIZE)))
+/** Macro to get mapping for a kernel page table.
+ * @param addr		Virtual address to get page table for. */
+#define KERNEL_PTBL_ADDR(addr)	(KERNEL_PTBL_BASE + (((addr % 0x40000000) / 0x200000) * 0x1000))
+
+/** Macro expanding to the address of the kernel page directory mapping. */
+#define KERNEL_PDIR_ADDR	KERNEL_PTBL_ADDR(KERNEL_PTBL_BASE)
+
+extern char __text_start[], __text_end[];
+extern char __init_start[], __init_end[];
+extern char __rodata_start[], __rodata_end[];
+extern char __data_start[], __bss_end[];
 
 /** Kernel page map. */
-page_map_t kernel_page_map;
+page_map_t g_kernel_page_map;
 
-/** Convert page map flags to PTE flags.
- * @param flags		Flags to convert.
- * @return		Converted flags. */
-static inline uint64_t page_map_flags_to_pte(int prot) {
-	uint64_t ret = 0;
+/** Whether the kernel page map has been initialised. */
+static bool g_paging_inited = false;
 
-	ret |= ((prot & PAGE_MAP_WRITE) ? PG_WRITE : 0);
-#if CONFIG_X86_NX
-	ret |= ((!(prot & PAGE_MAP_EXEC) && CPU_HAS_XD(curr_cpu)) ? PG_NOEXEC : 0);
-#endif
-	return ret;
-}
-
-/** Get a page table for a kernel address.
- * @param virt		Address to get page table for.
- * @param alloc		Whether to allocate structures if not found.
+/** Allocate a paging structure.
+ * @note		The structure will not be zeroed unless PM_ZERO is
+ *			specified, and this should only be done in cases where
+ *			it is safe.
  * @param mmflag	Allocation flags.
- * @param ptblp		Where to store (virtual) pointer to page table.
- * @return		0 on success, negative error code on failure. */
-static int page_map_get_kernel_ptbl(ptr_t virt, bool alloc, int mmflag, uint64_t **ptblp) {
+ * @return		Address of structure on success, 0 on failure. */
+static phys_ptr_t page_structure_alloc(int mmflag) {
 	phys_ptr_t page;
-	int pde;
 
-	assert(virt >= 0xC0000000);
-
-	/* Get the kernel page directory entry. */
-	pde = (virt % 0x40000000) / 0x200000;
-	if(!(__kernel_pdir[pde] & PG_PRESENT)) {
-		if(!alloc) {
-			return -ERR_NOT_FOUND;
-		}
-
-		/* Allocate a new page table. Allocating a page can
-		 * cause page mappings to be modified (if a Vmem
-		 * boundary tag refill occurs), handle this
-		 * possibility. */
-		page = page_alloc(1, mmflag);
-		if(__kernel_pdir[pde] & PG_PRESENT) {
-			if(page) {
-				page_free(page, 1);
-			}
-		} else {
-			if(!page) {
-				return -ERR_NOT_FOUND;
-			}
-
-			/* Map it into the page directory. */
-			__kernel_pdir[pde] = page | PG_PRESENT | PG_WRITE;
-
-			/* Now clear the page table. */
-			memset(KERNEL_PTBL_ADDR(pde), 0, PAGE_SIZE);
-		}
+	/* Prefer allocating structures below 1GB because pages in the first
+	 * 1GB of memory are always mapped in. During initialisation, must
+	 * always allocate below 1GB because the heap is not set up. */
+	page = page_xalloc(1, 0, 0, 0, 0, 0x40000000, (g_paging_inited) ? (mmflag & ~MM_FATAL) : mmflag);
+	if(!page) {
+		page = page_xalloc(1, 0, 0, 0, 0, 0x100000000LL, mmflag);
 	}
 
-	assert(!(__kernel_pdir[pde] & PG_LARGE));
-	*ptblp = KERNEL_PTBL_ADDR(pde);
-	return 0;
+	return page;
 }
 
-/** Get the page table for a user address.
- * @param map		Page map to get from.
- * @param virt		Address to get page table for.
- * @param alloc		Whether to allocate structures if not found.
+/** Map a paging structure into memory.
+ * @note		The calling thread should be wired.
+ * @param map		Page map that the structure belongs to.
+ * @param addr		Physical address of table.
  * @param mmflag	Allocation flags.
- * @param ptblp		Where to store (virtual) pointer to page table.
- * @return		0 on success, negative error code on failure. */
-static int page_map_get_user_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag, uint64_t **ptblp) {
-	uint64_t *mapping;
-	phys_ptr_t page;
-	int pdpe, pde;
-
-	/* Wire to CPU so we do not have to do remote TLB invalidations. */
+ * @return		Pointer to mapping on success, NULL on failure. */
+static uint64_t *page_structure_map(page_map_t *map, phys_ptr_t addr, int mmflag) {
+	assert(map->user || !g_paging_inited);
 	thread_wire(curr_thread);
+	return page_phys_map(addr, PAGE_SIZE, mmflag);
+}
 
-	/* Map PDP into the virtual address space. */
-	mapping = page_phys_map(map->pdp, PAGE_SIZE, mmflag);
-	if(mapping == NULL) {
+/** Unmap a paging structure.
+ * @param map		Page map that the structure belongs to.
+ * @param addr		Address of mapping. */
+static void page_structure_unmap(page_map_t *map, uint64_t *addr) {
+	if(map->user || !g_paging_inited) {
+		page_phys_unmap(addr, PAGE_SIZE, false);
 		thread_unwire(curr_thread);
-		return -ERR_NO_MEMORY;
+	}
+}
+
+/** Get the page directory containing an address.
+ * @param map		Page map to get from.
+ * @param virt		Virtual address to get page directory for.
+ * @param alloc		Whether to allocate new tables if not found.
+ * @param mmflag	Allocation flags.
+ * @return		Virtual address of mapping, NULL on failure. */
+static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int mmflag) {
+	uint64_t *pdp, *pdir;
+	phys_ptr_t page;
+	int pdpe;
+
+	assert(!(mmflag & PM_ZERO));
+
+	/* Special handling for the kernel address space. */
+	if(!map->user && g_paging_inited) {
+		/* Shouldn't be modifying anything below the top GB (the
+		 * physical mapping is below, however it should not be modified
+		 * after initialisation. */
+		assert(virt >= 0xC0000000);
+		return (uint64_t *)KERNEL_PDIR_ADDR;
+	}
+
+	/* Get the virtual address of the PDP. */
+	pdp = page_structure_map(map, map->cr3, mmflag);
+	if(unlikely(!pdp)) {
+		return NULL;
 	}
 
 	/* Get the page directory number. A page directory covers 1GB. */
 	pdpe = virt / 0x40000000;
-	if(!(mapping[pdpe] & PG_PRESENT)) {
+	if(!(pdp[pdpe] & PG_PRESENT)) {
 		/* Allocate a new page directory if required. */
-		if(!alloc || !(page = page_alloc(1, mmflag | PM_ZERO))) {
-			page_phys_unmap(mapping, PAGE_SIZE, false);
-			thread_unwire(curr_thread);
-			return (!alloc) ? -ERR_NOT_FOUND : -ERR_NO_MEMORY;
+		if(!alloc || unlikely(!(page = page_structure_alloc(mmflag | PM_ZERO)))) {
+			page_structure_unmap(map, pdp);
+			return NULL;
 		}
 
 		/* Map it into the PDP. */
-		mapping[pdpe] = page | PG_PRESENT;
+		pdp[pdpe] = page | PG_PRESENT;
 
 		/* Newer Intel CPUs seem to cache PDP entries and INVLPG does
 		 * fuck all, completely flush the TLB if we're using this
 		 * page map. */
-		if((sysreg_cr3_read() & PAGE_MASK) == map->pdp) {
+		if(g_paging_inited && (sysreg_cr3_read() & PAGE_MASK) == map->cr3) {
 			sysreg_cr3_write(sysreg_cr3_read());
 		}
-	} else {
-		page = mapping[pdpe] & PAGE_MASK;
 	}
 
-	/* Unmap PDP and map page directory. Fiddle with mappings directly to
-	 * speed things up a bit. Do not need to worry about invalidating the
-	 * TLB on other CPUs because nothing else knows about this mapping. */
-	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
-	tlb_arch_invalidate((ptr_t)mapping, (ptr_t)mapping + PAGE_SIZE);
-	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
-
-	/* Get the page table number. A page table covers 2MB. */
-	pde = (virt % 0x40000000) / 0x200000;
-	if(!(mapping[pde] & PG_PRESENT)) {
-		/* Allocate a new page table if required. */
-		if(!alloc || !(page = page_alloc(1, mmflag | PM_ZERO))) {
-			page_phys_unmap(mapping, PAGE_SIZE, false);
-			thread_unwire(curr_thread);
-			return (!alloc) ? -ERR_NOT_FOUND : -ERR_NO_MEMORY;
-		}
-
-		/* Map it into the page directory. */
-		mapping[pde] = page | PG_PRESENT | PG_WRITE | PG_USER;
-	} else {
-		assert(!(mapping[pde] & PG_LARGE));
-		page = mapping[pde] & PAGE_MASK;
-	}
-
-	/* Unmap page directory and map page table. */
-	page_map_remove(&kernel_page_map, (ptr_t)mapping, NULL);
-	tlb_arch_invalidate((ptr_t)mapping, (ptr_t)mapping + PAGE_SIZE);
-	page_map_insert(&kernel_page_map, (ptr_t)mapping, page, PAGE_MAP_READ | PAGE_MAP_WRITE | PAGE_MAP_EXEC, MM_SLEEP);
-	*ptblp = mapping;
-	return 0;
+	/* Unmap the PDP and return the page directory address. */
+	pdir = page_structure_map(map, pdp[pdpe] & PAGE_MASK, mmflag);
+	page_structure_unmap(map, pdp);
+	return pdir;
 }
 
 /** Get the page table containing an address.
  * @param map		Page map to get from.
- * @param virt		Address to get page table for.
- * @param alloc		Whether to allocate structures if not found.
+ * @param virt		Virtual address to get page table for.
+ * @param alloc		Whether to allocate new tables if not found.
  * @param mmflag	Allocation flags.
- * @param ptblp		Where to store (virtual) pointer to page table.
- * @return		0 on success, negative error code on failure. */
-static int page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag, uint64_t **ptblp) {
+ * @return		Virtual address of mapping, NULL on failure. */
+static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int mmflag) {
+	uint64_t *pdir, *ptbl;
+	phys_ptr_t page;
+	int pde;
+
 	assert(!(mmflag & PM_ZERO));
 
-	/* Kernel mappings require special handling. */
-	if(map->user) {
-		return page_map_get_user_ptbl(map, virt, alloc, mmflag, ptblp);
+	/* Get the page directory. */
+	pdir = page_map_get_pdir(map, virt, alloc, mmflag);
+	if(unlikely(!pdir)) {
+		return NULL;
+	}
+
+	/* Get the page table number. A page table covers 2MB. */
+	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
+	if(!(pdir[pde] & PG_PRESENT)) {
+		/* Allocate a new page table if required. */
+		if(!alloc || unlikely(!(page = page_structure_alloc(mmflag | PM_ZERO)))) {
+			page_structure_unmap(map, pdir);
+			return NULL;
+		}
+
+		/* Map it into the page directory. */
+		pdir[pde] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+	}
+
+	/* Unmap the page directory and return the page table address. */
+	if(!map->user && g_paging_inited) {
+		ptbl = (uint64_t *)KERNEL_PTBL_ADDR(virt);
 	} else {
-		return page_map_get_kernel_ptbl(virt, alloc, mmflag, ptblp);
+		ptbl = page_structure_map(map, pdir[pde] & PAGE_MASK, mmflag);
 	}
+	page_structure_unmap(map, pdir);
+	return ptbl;
 }
 
-/** Unmap the mapping made for a page table.
- * @param map		Page map that table was from.
- * @param ptbl		Page table to unmap. */
-static void page_map_release_ptbl(page_map_t *map, uint64_t *ptbl) {
-	if(map->user) {
-		page_phys_unmap(ptbl, PAGE_SIZE, false);
-		thread_unwire(curr_thread);
+/** Map a large page into a page map.
+ * @param map		Page map to map into.
+ * @param virt		Virtual address to map (multiple of LARGE_PAGE_SIZE).
+ * @param phys		Page to map to (multiple of LARGE_PAGE_SIZE).
+ * @param write		Whether to make the mapping writable.
+ * @param exec		Whether to make the mapping executable.
+ * @param mmflag	Allocation flags.
+ * @return		0 on success, negative error code on failure. */
+static int page_map_insert_large(page_map_t *map, ptr_t virt, phys_ptr_t phys,
+                                 bool write, bool exec, int mmflag) {
+	uint64_t *pdir, flags;
+	int pde;
+
+	assert(!(virt % LARGE_PAGE_SIZE));
+	assert(!(phys % LARGE_PAGE_SIZE));
+
+	mutex_lock(&map->lock, 0);
+
+	/* Find the page directory for the entry. */
+	if(!(pdir = page_map_get_pdir(map, virt, true, mmflag))) {
+		mutex_unlock(&map->lock);
+		return -ERR_NO_MEMORY;
 	}
+
+	/* Check that the mapping doesn't already exist. */
+	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
+	if(pdir[pde] & PG_PRESENT) {
+		fatal("Mapping %p which is already mapped", virt);
+	}
+
+	/* Determine the flags to map with. Kernel mappings are created with
+	 * the global flag. */
+	flags = PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL) | PG_LARGE;
+	if(write) {
+		flags |= PG_WRITE;
+	}
+#if CONFIG_X86_NX
+	if(!exec && CPU_HAS_XD(curr_cpu)) {
+		flags |= PG_NOEXEC;
+	}
+#endif
+	/* Create the mapping. */
+	pdir[pde] = phys | flags;
+	memory_barrier();
+	page_structure_unmap(map, pdir);
+	mutex_unlock(&map->lock);
+	return 0;
 }
 
-/** Insert a mapping in a page map.
- *
- * Maps a virtual address to a physical address with the given protection
- * settings in a page map.
- *
- * @param map		Page map to insert in.
+/** Map a page into a page map.
+ * @param map		Page map to map into.
  * @param virt		Virtual address to map.
- * @param phys		Physical address to map to.
- * @param prot		Protection flags.
- * @param mmflag	Page allocation flags.
- *
- * @return		0 on success, negative error code on failure. Can only
- *			fail if MM_SLEEP is not set.
- */
-int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, int prot, int mmflag) {
-	uint64_t *ptbl;
-	int pte, ret;
+ * @param phys		Page to map to.
+ * @param write		Whether to make the mapping writable.
+ * @param exec		Whether to make the mapping executable.
+ * @param mmflag	Allocation flags.
+ * @return		0 on success, negative error code on failure. */
+int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
+                    bool exec, int mmflag) {
+	uint64_t *ptbl, flags;
+	int pte;
 
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
 
 	mutex_lock(&map->lock, 0);
 
-	/* Check that we can map here. */
-	if(virt < map->first || virt > map->last) {
-		fatal("Map on %p outside allowed area", map);
-	}
-
 	/* Find the page table for the entry. */
-	if((ret = page_map_get_ptbl(map, virt, true, mmflag, &ptbl)) != 0) {
+	if(!(ptbl = page_map_get_ptbl(map, virt, true, mmflag))) {
 		mutex_unlock(&map->lock);
-		return ret;
+		return -ERR_NO_MEMORY;
 	}
 
 	/* Check that the mapping doesn't already exist. */
-	pte = (virt % 0x200000) / PAGE_SIZE;
+	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
 	if(ptbl[pte] & PG_PRESENT) {
 		fatal("Mapping %p which is already mapped", virt);
 	}
 
-	/* Map the address in. */
-	ptbl[pte] = phys | PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL) | page_map_flags_to_pte(prot);
+	/* Determine the flags to map with. Kernel mappings are created with
+	 * the global flag. */
+	flags = PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL);
+	if(write) {
+		flags |= PG_WRITE;
+	}
+#if CONFIG_X86_NX
+	if(!exec && CPU_HAS_XD(curr_cpu)) {
+		flags |= PG_NOEXEC;
+	}
+#endif
+	/* Create the mapping. */
+	ptbl[pte] = phys | flags;
 	memory_barrier();
-	page_map_release_ptbl(map, ptbl);
+	page_structure_unmap(map, ptbl);
 	mutex_unlock(&map->lock);
 	return 0;
 }
 
-/** Remove a mapping from a page map.
- *
- * Removes the mapping at a virtual address from a page map.
- *
- * @param map		Page map to unmap from.
+/** Unmap a page.
+ * @param map		Page map to unmap from in.
  * @param virt		Virtual address to unmap.
- * @param physp		Where to store mapping's physical address prior to
- *			unmapping (can be NULL).
- *
- * @return		0 on success, -ERR_NOT_FOUND if mapping missing.
- */
-int page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
+ * @param physp		Where to store physical address that was mapped.
+ * @return		Whether the address was mapped. */
+bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
+	bool ret = false;
 	uint64_t *ptbl;
-	int pte, ret;
+	int pte;
 
 	assert(!(virt % PAGE_SIZE));
 
 	mutex_lock(&map->lock, 0);
 
-	/* Check that we can map here. */
-	if(virt < map->first || virt > map->last) {
-		fatal("Unmap on %p outside allowed area", map);
-	}
-
 	/* Find the page table for the entry. */
-	if((ret = page_map_get_ptbl(map, virt, false, 0, &ptbl)) != 0) {
+	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
 		mutex_unlock(&map->lock);
-		return ret;
+		return false;
 	}
 
-	pte = (virt % 0x200000) / PAGE_SIZE;
+	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
 	if(ptbl[pte] & PG_PRESENT) {
 		/* Store the physical address if required. */
-		if(physp != NULL) {
+		if(physp) {
 			*physp = ptbl[pte] & PAGE_MASK;
 		}
 
 		/* Clear the entry. */
 		ptbl[pte] = 0;
 		memory_barrier();
-		ret = 0;
-	} else {
-		ret = -ERR_NOT_FOUND;
+		ret = true;
 	}
 
-	page_map_release_ptbl(map, ptbl);
+	page_structure_unmap(map, ptbl);
 	mutex_unlock(&map->lock);
 	return ret;
 }
 
-/** Get the value of a mapping in a page map.
- *
- * Gets the physical address, if any, that a virtual address is mapped to in
- * a page map.
- *
- * @param map		Page map to lookup in.
- * @param virt		Address to find.
- * @param physp		Where to store mapping's value.
- *
- * @return		True if mapping is present, false if not.
- */
+/** Find the page a virtual address is mapped to.
+ * @param map		Page map to find in.
+ * @param virt		Virtual address to find.
+ * @param physp		Where to store physical address.
+ * @return		Whether the virtual address was mapped. */
 bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	bool ret = false;
 	uint64_t *ptbl;
@@ -341,35 +354,32 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	mutex_lock(&map->lock, 0);
 
 	/* Find the page table for the entry. */
-	if(page_map_get_ptbl(map, virt, false, 0, &ptbl) == 0) {
+	if((ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;
 			ret = true;
 		}
-
-		page_map_release_ptbl(map, ptbl);
 	}
 
+	page_structure_unmap(map, ptbl);
 	mutex_unlock(&map->lock);
 	return ret;
 }
 
-/** Modify protection flags of a range.
+/** Modify the protection flags on a range.
  *
- * Modifies the protection flags of a range of pages in a page map. If any of
- * the pages in the range are not mapped, then the function will ignore it and
- * move on to the next.
+ * Modifies the protection flags on a range in a page map. Any entries that are
+ * not currently mapped will be ignored.
  *
- * @param map		Map to modify in.
- * @param start		Start of page range.
- * @param end		End of page range.
- * @param prot		New protection flags.
- *
- * @return		0 on success, negative error code on failure.
+ * @param map		Page map to modify.
+ * @param start		Start of range to modify.
+ * @param end		End of range to modify.
+ * @param write		Whether the range should be writable.
+ * @param exec		Whether the range should be executable.
  */
-int page_map_protect(page_map_t *map, ptr_t start, ptr_t end, int prot) {
-	uint64_t *ptbl;
+void page_map_remap(page_map_t *map, ptr_t start, ptr_t end, bool write, bool exec) {
+	uint64_t *ptbl, flags;
 	ptr_t i;
 	int pte;
 
@@ -378,253 +388,253 @@ int page_map_protect(page_map_t *map, ptr_t start, ptr_t end, int prot) {
 
 	mutex_lock(&map->lock, 0);
 
-	for(i = start; i < end; i++) {
-		pte = (i % 0x200000) / PAGE_SIZE;
+	for(i = start; i < end; i += PAGE_SIZE) {
+		pte = (i % LARGE_PAGE_SIZE) / PAGE_SIZE;
 
-		if(page_map_get_ptbl(map, i, false, 0, &ptbl) != 0) {
+		if(!(ptbl = page_map_get_ptbl(map, i, false, MM_SLEEP))) {
 			continue;
 		} else if(!(ptbl[pte] & PG_PRESENT)) {
-			page_map_release_ptbl(map, ptbl);
+			page_structure_unmap(map, ptbl);
 			continue;
 		}
 
+		/* Work out the new flags to set. */
+		flags = 0;
+		if(write) {
+			flags |= PG_WRITE;
+		}
+#if CONFIG_X86_NX
+		if(!exec && CPU_HAS_XD(curr_cpu)) {
+			flags |= PG_NOEXEC;
+		}
+#endif
 		/* Clear out original flags, and set the new flags. */
-		ptbl[pte] = (ptbl[pte] & ~(PG_WRITE | PG_NOEXEC)) | page_map_flags_to_pte(prot);
-		page_map_release_ptbl(map, ptbl);
+		ptbl[pte] = (ptbl[pte] & ~(PG_WRITE | PG_NOEXEC)) | flags;
+		memory_barrier();
+		page_structure_unmap(map, ptbl);
 	}
 
 	mutex_unlock(&map->lock);
-	return 0;
 }
 
-/** Switch to a different page map.
- *
- * Switches to a different page map.
- *
- * @param map		Page map to switch to.
- */
+/** Switch to a page map.
+ * @param map		Page map to switch to. */
 void page_map_switch(page_map_t *map) {
-	sysreg_cr3_write(map->pdp);
+	sysreg_cr3_write(map->cr3);
 }
 
-/** Initialise a page map structure.
- *
- * Initialises a userspace page map structure.
- *
+/** Initialise a page map.
  * @param map		Page map to initialise.
- *
- * @return		0 on success, negative error code on failure.
- */
-int page_map_init(page_map_t *map) {
-	uint64_t *pdp;
+ * @param mmflag	Allocation flags.
+ * @return		0 on success, negative error code on failure. Failure
+ *			can only occur if MM_SLEEP is not specified. */
+int page_map_init(page_map_t *map, int mmflag) {
+	uint64_t *kpdp, *pdp;
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
-	map->pdp = page_xalloc(1, 0, 0, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP | PM_ZERO);
 	map->user = true;
-	map->first = USER_MEMORY_BASE;
-	map->last = (USER_MEMORY_BASE + USER_MEMORY_SIZE) - PAGE_SIZE;
 
-	/* Get the kernel mappings into the new PDP. */
-	thread_wire(curr_thread);
-	pdp = page_phys_map(map->pdp, PAGE_SIZE, MM_SLEEP);
-	pdp[3] = KA2PA(__kernel_pdir) | PG_PRESENT;
-	page_phys_unmap(pdp, PAGE_SIZE, false);
-	thread_unwire(curr_thread);
+	if(!(map->cr3 = page_structure_alloc(mmflag | PM_ZERO))) {
+		return -ERR_NO_MEMORY;
+	}
+
+	/* Duplicate the kernel mappings. */
+	if(!(kpdp = page_structure_map(map, g_kernel_page_map.cr3, mmflag))) {
+		page_xfree(map->cr3, 1);
+		return -ERR_NO_MEMORY;
+	} else if(!(pdp = page_structure_map(map, map->cr3, mmflag))) {
+		page_structure_unmap(map, kpdp);
+		page_xfree(map->cr3, 1);
+		return -ERR_NO_MEMORY;
+	}
+
+	pdp[2] = kpdp[2] & ~PG_ACCESSED;
+	pdp[3] = kpdp[3] & ~PG_ACCESSED;
+
+	page_structure_unmap(map, pdp);
+	page_structure_unmap(map, kpdp);
 	return 0;
 }
 
 /** Destroy a page map.
  *
- * Destroys all mappings in a page map and frees up anything it has allocated.
- *
- * @todo		Implement this properly.
+ * Destroys a page map. Will not free any pages that have been mapped into the
+ * page map - this should be done by the caller.
  *
  * @param map		Page map to destroy.
  */
 void page_map_destroy(page_map_t *map) {
-	page_free(map->pdp, 1);
-}
+	uint64_t *pdp, *pdir;
+	int i, j;
 
-#if 0
-# pragma mark Physical memory access functions.
-#endif
+	/* Free all structures in the bottom half of the PDP (user memory). */
+	pdp = page_structure_map(map, map->cr3, MM_SLEEP);
+	for(i = 0; i < 2; i++) {
+		if(!(pdp[i] & PG_PRESENT)) {
+			continue;
+		}
+
+		pdir = page_structure_map(map, pdp[i] & PAGE_MASK, MM_SLEEP);
+		for(j = 0; j < 512; j++) {
+			if(!(pdir[j] & PG_PRESENT)) {
+				continue;
+			}
+
+			if(!(pdir[j] & PG_LARGE)) {
+				page_free(pdir[j] & PAGE_MASK, 1);
+			}
+		}
+		page_structure_unmap(map, pdir);
+
+		page_free(pdp[i] & PAGE_MASK, 1);
+	}
+	page_structure_unmap(map, pdp);
+
+	page_free(map->cr3, 1);
+}
 
 /** Map physical memory into the kernel address space.
- *
- * Maps a range of physical memory into the kernel's address space. The
- * range does not have to be page-aligned. When the memory is no longer needed,
- * the mapping should be removed with page_phys_unmap().
- *
- * @param addr		Base of range to map.
+ * @note		The range does not need to be page-aligned.
+ * @param addr		Physical address to map.
  * @param size		Size of range to map.
- * @param mmflag	Allocation flags.
- *
- * @return		Virtual address of mapping.
- */
+ * @param mmflag	Allocation behaviour flags.
+ * @return		Address of mapping or NULL on failure. */
 void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	phys_ptr_t base, end;
-	void *ret;
+	char *ret;
 
-	if(size == 0) {
+	if(!size) {
 		return NULL;
 	}
 
-	/* Work out the page that the address starts on and the actual
-	 * size of the mapping we need to make. */
-	base = ROUND_DOWN(addr, PAGE_SIZE);
-	end = ROUND_UP(addr + size, PAGE_SIZE);
+	if(g_paging_inited) {
+		if(addr < KERNEL_PMAP_SIZE) {
+			return (void *)((ptr_t)addr + KERNEL_PMAP_BASE);
+		} else {
+			/* Work out the page that the address starts on and the
+			 * actual size of the mapping we need to make. */
+			base = ROUND_DOWN(addr, PAGE_SIZE);
+			end = ROUND_UP(addr + size, PAGE_SIZE);
 
-	ret = kheap_map_range(base, end - base, mmflag);
-	if(ret == NULL) {
-		return NULL;
+			if(!(ret = kheap_map_range(base, end - base, mmflag))) {
+				return NULL;
+			}
+
+			return ret + (addr - base);
+		}
+	} else {
+		/* During boot there is a 1GB identity mapping. */
+		assert(addr < 0x40000000);
+		return (void *)((ptr_t)addr);
 	}
-
-	return (void *)((ptr_t)ret + (ptr_t)(addr - base));
 }
 
-/** Unmap physical memory.
- *
- * Unmaps a range of physical memory previously mapped with page_phys_map().
- *
- * @param addr		Virtual address returned from page_phys_map().
- * @param size		Size of original mapping.
- * @param shared	Whether the mapping was used by any other CPUs. This
- *			is used as an optimization to reduce the number of
- *			remote TLB invalidations we have to do when doing
- *			physical mappings.
- */
+/** Unmap physical memory from the kernel address space.
+ * @param addr		Address to unmap.
+ * @param size		Size of mapping.
+ * @param shared	Whether the mapping was accessed by any CPUs other than
+ *			the CPU that mapped it. This is used as an optimisation
+ *			to not perform remote TLB invalidations when not
+ *			required. */
 void page_phys_unmap(void *addr, size_t size, bool shared) {
 	ptr_t base, end;
 
-	/* Work out the base of the allocation and its real original size. */
-	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
-	end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
+	if((ptr_t)addr >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
+		base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+		end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
 
-	kheap_unmap_range((void *)base, end - base, shared);
-}
-
-#if 0
-# pragma mark Initialisation functions.
-#endif
-
-/** Convert a large page to a page table if necessary.
- * @param virt		Virtual address to check. */
-static void __init_text page_large_to_ptbl(ptr_t virt) {
-	int pde = (virt % 0x40000000) / 0x200000, i;
-	phys_ptr_t page;
-	uint64_t *ptbl;
-
-	if(__kernel_pdir[pde] & PG_LARGE) {
-		page = page_alloc(1, MM_FATAL);
-		ptbl = page_phys_map(page, PAGE_SIZE, MM_FATAL);
-		memset(ptbl, 0, PAGE_SIZE);
-
-		/* Set pages and copy all flags from the PDE. */
-		for(i = 0; i < 512; i++) {
-			ptbl[i] = (__kernel_pdir[pde] & ~(PG_LARGE | PG_ACCESSED)) + (i * PAGE_SIZE);
-		}
-
-		/* Replace the large page in the page directory. */
-		__kernel_pdir[pde] = page | PG_PRESENT | PG_WRITE;
-
-		__asm__ volatile("invlpg (%0)" :: "r"(ROUND_DOWN(virt, 0x200000)));
-		__asm__ volatile("invlpg (%0)" :: "r"((ptr_t)KERNEL_PTBL_ADDR(pde)));
-
-		page_phys_unmap(ptbl, PAGE_SIZE, false);
+		kheap_unmap_range((void *)base, end - base, shared);
 	}
 }
 
-#if CONFIG_X86_NX
-/** Set a flag on a range of pages.
- * @param flag		Flag to set.
- * @param start		Start virtual address.
- * @param end		End virtual address.  */
-static inline void page_set_flag(uint64_t flag, ptr_t start, ptr_t end) {
-	uint64_t *ptbl;
-	ptr_t i;
-	int ret;
+/** Map part of the kernel into the kernel page map.
+ * @param args		Kernel arguments pointer.
+ * @param start		Start of range to map.
+ * @param end		End of range to map.
+ * @param write		Whether to mark as writable.
+ * @param exec		Whether to mark as executable. */
+static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, ptr_t end,
+                                              bool write, bool exec) {
+	phys_ptr_t phys = (start - KERNEL_VIRT_BASE) + args->kernel_phys;
+	size_t i;
 
 	assert(start >= KERNEL_VIRT_BASE);
-	assert((start % PAGE_SIZE) == 0);
-	assert((end % PAGE_SIZE) == 0);
+	assert(!(start % PAGE_SIZE));
+	assert(!(end % PAGE_SIZE));
 
-	for(i = start; i < end; i += PAGE_SIZE) {
-		page_large_to_ptbl(i);
-
-		if((ret = page_map_get_ptbl(&kernel_page_map, i, false, 0, &ptbl)) != 0) {
-			fatal("Could not get kernel page table (%d)", ret);
-		}
-
-		ptbl[(i % 0x200000) / PAGE_SIZE] |= flag;
-		__asm__ volatile("invlpg (%0)" :: "r"(i));
+	for(i = 0; i < (end - start); i += PAGE_SIZE) {
+		page_map_insert(&g_kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
 	}
-}
-#endif
 
-/** Set a flag on a range of pages.
- * @param flag		Flag to set.
- * @param start		Start virtual address.
- * @param end		End virtual address.  */
-static void __init_text page_clear_flag(uint64_t flag, ptr_t start, ptr_t end) {
-	uint64_t *ptbl;
-	ptr_t i;
-	int ret;
-
-	assert(start >= KERNEL_VIRT_BASE);
-	assert((start % PAGE_SIZE) == 0);
-	assert((end % PAGE_SIZE) == 0);
-
-	for(i = start; i < end; i += PAGE_SIZE) {
-		page_large_to_ptbl(i);
-
-		if((ret = page_map_get_ptbl(&kernel_page_map, i, false, 0, &ptbl)) != 0) {
-			fatal("Could not get kernel page table (%d)", ret);
-		}
-
-		ptbl[(i % 0x200000) / PAGE_SIZE] &= ~flag;
-		__asm__ volatile("invlpg (%0)" :: "r"(i));
-	}
+	dprintf("page: created kernel mapping [%p,%p) to [0x%" PRIpp ",0x%" PRIpp ") (%d %d)\n",
+	        start, end, phys, phys + (end - start), write, exec);
 }
 
-/** Set up the kernel page map. */
-void __init_text page_arch_init(void) {
-	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
-	kernel_page_map.pdp = KA2PA(__boot_pdp);
-	kernel_page_map.user = false;
-	kernel_page_map.first = KERNEL_HEAP_BASE;
-	kernel_page_map.last = (ptr_t)-PAGE_SIZE;
+/** Perform IA32 paging initialisation.
+ * @param args		Kernel arguments pointer. */
+void __init_text page_arch_init(kernel_args_t *args) {
+	uint64_t *pdp, *bpdp, *pdir;
+	phys_ptr_t i;
+	int pde;
 
-	kprintf(LOG_DEBUG, "page: initialised kernel page map (pdp: 0x%" PRIpp ")\n", kernel_page_map.pdp);
-#if CONFIG_X86_NX
-	/* Enable NX/XD if supported. */
-	if(CPU_HAS_XD(curr_cpu)) {
-		kprintf(LOG_DEBUG, "page: CPU supports NX/XD, enabling...\n");
-		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
+	/* Initialise the kernel page map structure. */
+	mutex_init(&g_kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
+	g_kernel_page_map.cr3 = page_structure_alloc(MM_FATAL | PM_ZERO);
+	g_kernel_page_map.user = false;
+
+	/* Map the kernel in. The following mappings are made:
+	 *  .text      - R/X
+	 *  .init      - R/W/X
+	 *  .rodata    - R
+	 *  .data/.bss - R/W */
+	page_map_kernel_range(args, ROUND_DOWN((ptr_t)__text_start, PAGE_SIZE), (ptr_t)__text_end, false, true);
+	page_map_kernel_range(args, (ptr_t)__init_start, (ptr_t)__init_end, true, true);
+	page_map_kernel_range(args, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
+	page_map_kernel_range(args, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
+
+	/* Create a 1GB physical mapping. */
+	for(i = 0; i < KERNEL_PMAP_SIZE; i += LARGE_PAGE_SIZE) {
+		page_map_insert_large(&g_kernel_page_map, i + KERNEL_PMAP_BASE,
+		                      i, true, true, MM_FATAL);
 	}
-#endif
+
+	/* Add the fractal mapping for the kernel page table. */
+	pdp = page_phys_map(g_kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdir = page_phys_map(pdp[3] & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	pde = (KERNEL_PTBL_BASE % 0x40000000) / LARGE_PAGE_SIZE;
+	pdir[pde] = (pdp[3] & PAGE_MASK) | PG_PRESENT | PG_WRITE;
+	page_phys_unmap(pdir, PAGE_SIZE, true);
+
+	/* The temporary identity mapping is still required as all the CPUs'
+	 * stack pointers are in it, and the kernel arguments pointer points to
+	 * it. Use the structures from the bootloader rather than just using
+	 * the new physical map page directory because the new one has the
+	 * global flag set on all pages, which makes invalidating the TLB
+	 * entries difficult when removing the mapping. */
+	bpdp = page_phys_map(sysreg_cr3_read() & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	pdp[0] = bpdp[0];
+	page_phys_unmap(bpdp, PAGE_SIZE, true);
+	page_phys_unmap(pdp, PAGE_SIZE, true);
+
+	dprintf("page: initialised kernel page map (pdp: 0x%" PRIpp ")\n",
+	        g_kernel_page_map.cr3);
+
+	/* Switch to the kernel page map. */
+	page_map_switch(&g_kernel_page_map);
+
+	/* The physical map area can now be used. */
+	g_paging_inited = true;
 }
 
-/** Mark kernel sections as read-only/no-execute and unmap identity mapping. */
-void __init_text page_late_init(void) {
-	/* Mark .text and .rodata as read-only. OK to round down - __text_start
-	 * is only non-aligned because of the SIZEOF_HEADERS in the linker
-	 * script. */
-	page_clear_flag(PG_WRITE, ROUND_DOWN((ptr_t)__text_start, PAGE_SIZE), (ptr_t)__text_end);
-	page_clear_flag(PG_WRITE, (ptr_t)__rodata_start, (ptr_t)__rodata_end);
-	kprintf(LOG_DEBUG, "page: marked sections (.text .rodata) as read-only\n");
+/** Perform late IA32 paging initialisation. */
+void page_arch_late_init(void) {
+	uint64_t *pdp;
 
-#if CONFIG_X86_NX
-	/* Mark sections of the kernel no-execute if supported. */
-	if(CPU_HAS_XD(curr_cpu)) {
-		/* Assumes certain layout in linker script: .rodata, .data and
-		 * then .bss. */
-		page_set_flag(PG_NOEXEC, (ptr_t)__rodata_start, (ptr_t)__bss_end);
-		kprintf(LOG_DEBUG, "page: marked sections (.rodata .data .bss) as no-execute\n");
-	}
-#endif
-
-	/* Clear identity mapping and flush it out of the TLB. */
-	__boot_pdp[0] = 0;
-	memory_barrier();
-	sysreg_cr3_write(sysreg_cr3_read());
+	/* All of the CPUs have been booted and have new stacks, and the kernel
+	 * arguments are no longer required. Remove the temporary identity
+	 * mapping and flush the TLB on all CPUs. */
+	pdp = page_phys_map(g_kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdp[0] = 0;
+	page_phys_unmap(pdp, PAGE_SIZE, true);
+	tlb_invalidate(NULL, 0, 0);
 }

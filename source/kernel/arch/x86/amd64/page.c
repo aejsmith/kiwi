@@ -393,6 +393,7 @@ void page_map_remap(page_map_t *map, ptr_t start, ptr_t end, bool write, bool ex
 #endif
 		/* Clear out original flags, and set the new flags. */
 		ptbl[pte] = (ptbl[pte] & ~(PG_WRITE | PG_NOEXEC)) | flags;
+		memory_barrier();
 	}
 
 	mutex_unlock(&map->lock);
@@ -413,8 +414,11 @@ int page_map_init(page_map_t *map, int mmflag) {
 	uint64_t *kpml4, *pml4;
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
-	map->cr3 = page_structure_alloc(mmflag);
 	map->user = true;
+
+	if(!(map->cr3 = page_structure_alloc(mmflag))) {
+		return -ERR_NO_MEMORY;
+	}
 
 	/* Get the kernel mappings into the new PML4. */
 	kpml4 = page_structure_map(g_kernel_page_map.cr3);
@@ -476,6 +480,10 @@ void page_map_destroy(page_map_t *map) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Address of mapping or NULL on failure. */
 void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+	if(!size) {
+		return NULL;
+	}
+
 	if(g_paging_inited) {
 		return (void *)(KERNEL_PMAP_BASE + addr);
 	} else {

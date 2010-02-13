@@ -30,7 +30,6 @@ SECTIONS {
 
 	.text : {
 		__text_start = .;
-		*(.multiboot)
 		*(.text)
 		*(.text.*)
 		. = ALIGN(PAGE_SIZE);
@@ -46,10 +45,6 @@ SECTIONS {
 		__initcall_start = .;
 		*(.init.initcalls)
 		__initcall_end = .;
-
-		__ap_trampoline_start = .;
-		*(.init.trampoline)
-		__ap_trampoline_end = .;
 
 		. = ALIGN(PAGE_SIZE);
 		__init_end = .;

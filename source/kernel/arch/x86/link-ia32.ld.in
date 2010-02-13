@@ -21,24 +21,22 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 
-ENTRY(__phys_entry)
+ENTRY(kmain)
 OUTPUT_ARCH("i386")
 OUTPUT_FORMAT("elf32-i386")
 
 SECTIONS {
 	. = KERNEL_VIRT_BASE + SIZEOF_HEADERS;
-	__phys_entry = (__kernel_entry - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE;
 
-	.text : AT((ADDR(.text) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE) {
+	.text : {
 		__text_start = .;
-		*(.multiboot)
 		*(.text)
 		*(.text.*)
 		. = ALIGN(PAGE_SIZE);
 		__text_end = .;
 	}
 
-	.init ALIGN(PAGE_SIZE) : AT((ADDR(.init) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE) {
+	.init ALIGN(PAGE_SIZE) : {
 		__init_start = .;
 		*(.init.data)
 		*(.init.text)
@@ -48,15 +46,11 @@ SECTIONS {
 		*(.init.initcalls)
 		__initcall_end = .;
 
-		__ap_trampoline_start = .;
-		*(.init.trampoline)
-		__ap_trampoline_end = .;
-
 		. = ALIGN(PAGE_SIZE);
 		__init_end = .;
 	}
 
-	.rodata ALIGN(PAGE_SIZE) : AT((ADDR(.rodata) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE) {
+	.rodata ALIGN(PAGE_SIZE) : {
 		__rodata_start = .;
 		*(.rodata)
 		*(.rodata.*)
@@ -64,7 +58,7 @@ SECTIONS {
 		__rodata_end = .;
 	}
 
-	.data ALIGN(PAGE_SIZE) : AT((ADDR(.data) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE) {
+	.data ALIGN(PAGE_SIZE) : {
 		__data_start = .;
 		*(.data)
 		*(.data.*)
@@ -72,7 +66,7 @@ SECTIONS {
 		__data_end = .;
 	}
 
-	.bss ALIGN(PAGE_SIZE) : AT((ADDR(.bss) - KERNEL_VIRT_BASE) + KERNEL_PHYS_BASE) {
+	.bss ALIGN(PAGE_SIZE) : {
 		__bss_start = .;
 		*(.bss)
 		*(.bss.*)
