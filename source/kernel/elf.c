@@ -73,10 +73,6 @@ static bool elf_check_node(vfs_node_t *node, int type) {
 	return elf_check_ehdr(&ehdr, type);
 }
 
-#if 0
-# pragma mark ELF executable loader.
-#endif
-
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
@@ -363,10 +359,6 @@ void elf_binary_cleanup(void *data) {
 	kfree(binary->phdrs);
 	kfree(binary);
 }
-
-#if 0
-# pragma mark ELF module loader.
-#endif
 
 #undef dprintf
 #if CONFIG_MODULE_DEBUG

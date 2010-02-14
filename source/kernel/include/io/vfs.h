@@ -37,10 +37,6 @@ struct vfs_info;
 struct vfs_mount;
 struct vfs_node;
 
-#if 0
-# pragma mark Kernel interface.
-#endif
-
 /** Filesystem type description structure.
  * @note		When adding new required operations to this structure,
  *			add a check to fs_type_register(). */
@@ -350,17 +346,9 @@ extern int vfs_unlink(const char *path);
 extern void vfs_mount_root(struct kernel_args *args);
 extern void vfs_init(void);
 
-#if 0
-# pragma mark Debugger commands.
-#endif
-
 extern int kdbg_cmd_mounts(int argc, char **argv);
 extern int kdbg_cmd_vnodes(int argc, char **argv);
 extern int kdbg_cmd_vnode(int argc, char **argv);
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Behaviour flags for fs_file_open(). */
 #define FS_FILE_READ		0x0001	/**< Open for reading. */

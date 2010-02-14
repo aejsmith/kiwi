@@ -101,10 +101,6 @@
 /** Limitations. */
 #define EXT2_NAME_MAX		256		/**< Maximum file name length. */
 
-#if 0
-# pragma mark On-disk filesystem structures.
-#endif
-
 /** Superblock of an EXT2 filesystem. */
 typedef struct ext2_superblock {
 	uint32_t s_inodes_count;		/**< Inodes count. */
@@ -231,10 +227,6 @@ typedef struct ext2_dirent {
 	uint8_t file_type;			/**< File type. */
 	char name[EXT2_NAME_MAX];		/**< Name of the file. */
 } __attribute__((packed)) ext2_dirent_t;
-
-#if 0
-# pragma mark In-memory structures.
-#endif
 
 /** Data for an Ext2 mount. */
 typedef struct ext2_mount {

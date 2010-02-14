@@ -658,10 +658,6 @@ static void __init_text device_init(void) {
 }
 INITCALL(device_init);
 
-#if 0
-# pragma mark System calls.
-#endif
-
 /** Signal that a device is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */

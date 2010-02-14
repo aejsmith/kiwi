@@ -113,10 +113,6 @@ static struct {
 	{ "vnode",	"Print information about a filesystem node.",	kdbg_cmd_vnode },
 };
 
-/*
- * Built-in commands.
- */
-
 /** Exit KDBG and resume execution.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -372,10 +368,6 @@ static int kdbg_cmd_step(int argc, char **argv) {
 	kdbg_step_count = value;
 	return KDBG_STEP;
 }
-
-/*
- * Main functions.
- */
 
 /** Find all tab completion matches for the current input buffer.
  * @param lenp		Pointer to current buffer length.

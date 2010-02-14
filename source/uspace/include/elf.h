@@ -300,10 +300,6 @@ typedef int64_t Elf64_Sxword;
 /** Special symbol table indices. */
 #define ELF_STN_UNDEF		0		/**< End of a chain. */
 
-#if 0
-# pragma mark ELF32 structures.
-#endif
-
 #define ELF32_R_SYM(i)		((i)>>8)
 #define ELF32_R_TYPE(i)		((unsigned char)(i))
 #define ELF32_R_INFO(s,t)	(((s)<<8)+(unsigned char)(t))
@@ -376,10 +372,6 @@ typedef struct {
 		Elf32_Addr d_ptr;
 	} d_un;
 } __attribute__((packed)) Elf32_Dyn;
-
-#if 0
-# pragma mark ELF64 structures.
-#endif
 
 #define ELF64_R_SYM(i)		((i) >> 32)
 #define ELF64_R_TYPE(i)		((i) & 0xffffffffL)

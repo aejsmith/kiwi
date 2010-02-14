@@ -957,10 +957,6 @@ void __init_text vmem_init(void) {
 	                  0, MM_FATAL);
 }
 
-/*
- * KDBG commands.
- */
-
 /** Find a Vmem arena by name.
  * @param header	List header to search from.
  * @param name		Name of arena to find.

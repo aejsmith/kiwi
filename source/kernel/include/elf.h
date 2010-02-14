@@ -325,10 +325,6 @@ typedef int64_t  Elf64_Sxword;
 /** Special symbol table indices. */
 #define ELF_STN_UNDEF		0		/**< End of a chain. */
 
-/*
- * ELF32 structures
- */
-
 #define ELF32_R_SYM(i)		((i)>>8)
 #define ELF32_R_TYPE(i)		((unsigned char)(i))
 #define ELF32_R_INFO(s,t)	(((s)<<8)+(unsigned char)(t))
@@ -407,10 +403,6 @@ typedef struct {
 	Elf32_Word n_descsz;			/**< Length of the note's descriptor. */
 	Elf32_Word n_type;			/**< Type of the note. */
 } __packed Elf32_Note;
-
-/*
- * ELF64 structures
- */
 
 #define ELF64_R_SYM(i)		((i) >> 32)
 #define ELF64_R_TYPE(i)		((i) & 0xffffffffL)

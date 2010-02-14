@@ -594,10 +594,6 @@ fault:
 	return VM_FAULT_UNHANDLED;
 }
 
-#if 0
-# pragma mark Public interface.
-#endif
-
 /** Mark a region as reserved.
  *
  * Marks a region of memory in an address space as reserved. Reserved regions
@@ -895,10 +891,6 @@ void __init_text vm_init(void) {
 	vm_page_init();
 }
 
-#if 0
-# pragma mark Debugger commands.
-#endif
-
 /** Dump an address space.
  *
  * Dumps out a list of all regions held in an address space.
@@ -959,10 +951,6 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Map a region of anonymous memory.
  *

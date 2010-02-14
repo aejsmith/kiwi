@@ -30,9 +30,11 @@
 extern int _vm_map_file(vm_map_args_t *args);
 extern int putch(char ch);
 
-#if 0
-# pragma mark System call wrappers.
-#endif
+/** Size of the statically allocated heap. */
+#define RTLD_HEAP_SIZE		16384
+
+static uint8_t rtld_heap[RTLD_HEAP_SIZE];
+static size_t rtld_heap_current = 0;
 
 /** Map a file into memory.
  * @param start		Start address of region (if VM_MAP_FIXED).
@@ -54,10 +56,6 @@ int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t o
 
 	return _vm_map_file(&args);
 }
-
-#if 0
-# pragma mark String functions.
-#endif
 
 /** Get length of string.
  * @param str		Pointer to the string.
@@ -256,10 +254,6 @@ char *strsep(char **stringp, const char *delim) {
 	}
 }
 
-#if 0
-# pragma mark Output functions.
-#endif
-
 /** Print a string.
  * @param str		String to print. */
 static inline void printf_print_string(const char *str) {
@@ -389,16 +383,6 @@ void dprintf(const char *format, ...) {
 	}
 	va_end(args);
 }
-
-#if 0
-# pragma mark Memory allocation functions.
-#endif
-
-/** Size of the statically allocated heap. */
-#define RTLD_HEAP_SIZE		16384
-
-static uint8_t rtld_heap[RTLD_HEAP_SIZE];
-static size_t rtld_heap_current = 0;
 
 /** Allocate some memory.
  * @param size		Size to allocate.

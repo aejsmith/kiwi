@@ -125,10 +125,6 @@ static MUTEX_DECLARE(slab_reclaim_lock, 0);
 /** Whether the allocator is fully initialised. */
 static bool slab_inited = false;
 
-#if 0
-# pragma mark Helper functions.
-#endif
-
 /** Work out the optimal slab size for a cache.
  * @todo		Better implementation.
  * @param cache		Cache to work out for.
@@ -152,10 +148,6 @@ static inline size_t slab_get_slabsize(slab_cache_t *cache) {
 
 	return size;
 }
-
-#if 0
-# pragma mark Slab layer functions.
-#endif
 
 /** Destroy a slab.
  * @param cache		Cache to destroy in.
@@ -416,10 +408,6 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 	return obj;
 }
 
-#if 0
-# pragma mark Magazine layer functions.
-#endif
-
 /** Get a full magazine from a cache's depot.
  * @param cache		Cache to get from.
  * @return		Pointer to magazine on success, NULL on failure. */
@@ -613,10 +601,6 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
 
 	return 0;
 }
-
-#if 0
-# pragma mark Slab cache functions.
-#endif
 
 /** Reclaim memory from a slab cache.
  * @todo		Should we reclaim partial magazines too, somehow?

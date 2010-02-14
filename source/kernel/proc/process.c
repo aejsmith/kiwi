@@ -507,10 +507,6 @@ void __init_text process_init(void) {
 	}
 }
 
-#if 0
-# pragma mark Process handle functions.
-#endif
-
 /** Signal that a process is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
@@ -563,10 +559,6 @@ static handle_type_t process_handle_type = {
 	.unwait = process_handle_unwait,
 	.close = process_handle_close,
 };
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Helper to copy information from userspace.
  * @param path		Path to copy.

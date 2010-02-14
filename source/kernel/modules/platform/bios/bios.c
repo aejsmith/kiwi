@@ -72,10 +72,6 @@ static thread_t *bios_thread = NULL;
 /** Lock to protect request queue/allocation data. */
 static MUTEX_DECLARE(bios_lock, 0);
 
-#if 0
-# pragma mark X86EMU helper functions.
-#endif
-
 /** Read 8 bits from a port.
  * @param port		Port to read from.
  * @return		Value read. */
@@ -235,10 +231,6 @@ static X86EMU_memFuncs x86emu_mem_funcs = {
 	.rdl = x86emu_mem_rdl,
 	.wrl = x86emu_mem_wrl,
 };
-
-#if 0
-# pragma mark Main functions.
-#endif
 
 /** BIOS request thread. */
 static void bios_thread_entry(void *arg1, void *arg2) {

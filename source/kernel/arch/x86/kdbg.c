@@ -167,10 +167,6 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
 	kdbg_setup_dreg();
 }
 
-/*
- * Architecture-implemented commands.
- */
-
 /** Print out a stack trace.
  *
  * Prints out a stack trace using the base pointer in the current KDBG

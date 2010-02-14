@@ -27,10 +27,6 @@
 #include <sync/condvar.h>
 #include <sync/mutex.h>
 
-#if 0
-# pragma mark ATA structures/definitions.
-#endif
-
 /** ATA Commands. */
 #define ATA_CMD_READ_SECTORS		0x20	/**< READ SECTORS. */
 #define ATA_CMD_READ_SECTORS_EXT	0x24	/**< READ SECTORS EXT. */
@@ -69,10 +65,6 @@
 #define ATA_STATUS_DF			(1<<5)	/**< Device Fault. */
 #define ATA_STATUS_DRDY			(1<<6)	/**< Device Ready. */
 #define ATA_STATUS_BSY			(1<<7)	/**< Busy. */
-
-#if 0
-# pragma mark Internal structures/definitions.
-#endif
 
 /** Structure describing an ATA controller. */
 typedef struct ata_controller {

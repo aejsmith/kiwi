@@ -448,10 +448,6 @@ int kdbg_cmd_modules(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-#if 0
-# pragma mark System calls.
-#endif
-
 /** Load a kernel module.
  *
  * Loads a kernel module from the filesystem. If any of the dependencies of the

@@ -131,10 +131,6 @@ static vmem_t *ipc_port_id_arena;
 static AVL_TREE_DECLARE(ipc_port_tree);
 static MUTEX_DECLARE(ipc_port_tree_lock, 0);
 
-#if 0
-# pragma mark Object cache functions.
-#endif
-
 /** Port object constructor.
  * @param obj		Object to construct.
  * @param data		Cache data (unused).
@@ -177,10 +173,6 @@ static int ipc_connection_cache_ctor(void *obj, void *data, int mmflag) {
 	ipc_endpoint_init(&conn->server);
 	return 0;
 }
-
-#if 0
-# pragma mark ACL functions.
-#endif
 
 /** Callback function for process death.
  * @param _process	Process that has died.
@@ -233,10 +225,6 @@ static bool ipc_port_acl_check(ipc_port_t *port, uint32_t right) {
 
 	return false;
 }
-
-#if 0
-# pragma mark Port handle functions.
-#endif
 
 /** Signal that a port handle event is being waited for.
  * @param wait		Wait information structure.
@@ -351,10 +339,6 @@ static handle_type_t ipc_port_handle_type = {
 	.unwait = ipc_port_handle_unwait,
 	.close = ipc_port_handle_close,
 };
-
-#if 0
-# pragma mark Connection handle functions.
-#endif
 
 /** Signal that a connection handle event is being waited for.
  * @param wait		Wait information structure.
@@ -1068,10 +1052,6 @@ fail:
 	return ret;
 }
 
-#if 0
-# pragma mark Debugger functions.
-#endif
-
 /** Print information about IPC ports.
  *
  * Prints a list of all IPC ports, or shows information about a certain port.
@@ -1198,10 +1178,6 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
-#if 0
-# pragma mark -
-#endif
 
 /** Initialise the IPC slab cache. */
 static void __init_text ipc_init(void) {

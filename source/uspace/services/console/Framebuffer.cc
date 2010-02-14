@@ -31,10 +31,6 @@
 #include "Framebuffer.h"
 #include "Header.h"
 
-#if 0
-# pragma mark Get/Set helpers.
-#endif
-
 /** Get red colour from RGB value. */
 #define RED(x, bits)		((x >> (24 - bits)) & ((1 << bits) - 1))
 
@@ -92,10 +88,6 @@ static inline uint32_t getpixel_0888(uint32_t *src) {
 static inline void putpixel_0888(uint32_t *dest, uint32_t colour) {
 	*dest = colour;
 }
-
-#if 0
-# pragma mark Framebuffer functions.
-#endif
 
 /** Constructor for a Framebuffer object.
  * @param device	Path to device to use. */

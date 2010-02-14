@@ -78,10 +78,6 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
 static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
 static int vfs_symlink_cache_dest(vfs_node_t *node);
 
-#if 0
-# pragma mark Filesystem type functions.
-#endif
-
 /** Look up a filesystem type with lock already held.
  * @param name		Name of filesystem type to look up.
  * @return		Pointer to type structure if found, NULL if not. */
@@ -194,10 +190,6 @@ int vfs_type_unregister(vfs_type_t *type) {
 	mutex_unlock(&vfs_type_list_lock);
 	return 0;
 }
-
-#if 0
-# pragma mark Node functions.
-#endif
 
 /** VFS node object constructor.
  * @param obj		Object to construct.
@@ -890,10 +882,6 @@ void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
 	mutex_unlock(&node->lock);
 }
 
-#if 0
-# pragma mark Regular file operations.
-#endif
-
 /** Get a page from a file's cache.
  * @note		Should not be passed both mappingp and pagep.
  * @param node		Node to get page from.
@@ -1526,10 +1514,6 @@ static handle_type_t vfs_file_handle_type = {
 	.close = vfs_file_handle_close,
 };
 
-#if 0
-# pragma mark Directory operations.
-#endif
-
 /** Populate a directory's entry cache if it is empty.
  * @param node		Node of directory.
  * @return		0 on success, negative error code on failure. */
@@ -1770,10 +1754,6 @@ static handle_type_t vfs_dir_handle_type = {
 	.close = vfs_dir_handle_close,
 };
 
-#if 0
-# pragma mark Symbolic link operations.
-#endif
-
 /** Ensure that a symbolic link's destination is cached.
  * @param node		Node of link (should be locked).
  * @return		0 on success, negative error code on failure. */
@@ -1873,10 +1853,6 @@ int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
 	mutex_unlock(&node->lock);
 	return (int)len;
 }
-
-#if 0
-# pragma mark Mount operations.
-#endif
 
 /** Look up a mount by ID.
  * @note		Does not take the mount lock.
@@ -2174,10 +2150,6 @@ fail:
 	return ret;
 }
 
-#if 0
-# pragma mark Other functions.
-#endif
-
 /** Decrease the link count of a filesystem node.
  *
  * Decreases the link count of a filesystem node, and removes the directory
@@ -2256,10 +2228,6 @@ out:
 	kfree(name);
 	return ret;
 }
-
-#if 0
-# pragma mark Debugger commands.
-#endif
 
 /** Print a list of mounts.
  *
@@ -2470,10 +2438,6 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-#if 0
-# pragma mark Initialisation functions.
-#endif
-
 /** Mount the root filesystem.
  * @param args		Kernel arguments structure. */
 void __init_text vfs_mount_root(kernel_args_t *args) {
@@ -2489,10 +2453,6 @@ void __init_text vfs_init(void) {
 	                                   vfs_node_cache_reclaim, NULL, 1, NULL,
 	                                   0, MM_FATAL);
 }
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Create a file in the file system.
  *

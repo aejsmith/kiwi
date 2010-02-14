@@ -219,10 +219,6 @@ extern void vm_object_destroy(vm_object_t *object);
 
 extern int vm_fault(ptr_t addr, int reason, int access);
 
-#if 0
-# pragma mark Public interface.
-#endif
-
 extern int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 extern int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *addrp);
 extern int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct vfs_node *node,
@@ -238,10 +234,6 @@ extern void vm_aspace_destroy(vm_aspace_t *as);
 extern void vm_init(void);
 
 extern int kdbg_cmd_aspace(int argc, char **argv);
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Structure containing arguments for sys_vm_map_file()/sys_vm_map_device(). */
 typedef struct vm_map_args {

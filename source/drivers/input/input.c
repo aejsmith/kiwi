@@ -59,10 +59,6 @@ static device_t *input_device_dir;
 /** Next device ID. */
 static atomic_t input_next_id = 0;
 
-#if 0
-# pragma mark Keyboard device type.
-#endif
-
 /** Handler for keyboard requests.
  * @param device	Device request is being made on.
  * @param request	Request number.
@@ -97,10 +93,6 @@ static input_type_t input_keyboard_type = {
 	.request = input_keyboard_request,
 };
 
-#if 0
-# pragma mark Mouse device type.
-#endif
-
 /** Handler for mouse requests.
  * @param device	Device request is being made on.
  * @param request	Request number.
@@ -125,10 +117,6 @@ static int input_mouse_request(input_device_t *device, int request, void *in, si
 static input_type_t input_mouse_type = {
 	.request = input_mouse_request,
 };
-
-#if 0
-# pragma mark -
-#endif
 
 /** Open an input device.
  * @param _dev		Device being opened.

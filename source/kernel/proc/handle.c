@@ -420,10 +420,6 @@ static void __init_text handle_init(void) {
 }
 INITCALL(handle_init);
 
-#if 0
-# pragma mark Debugger functions.
-#endif
-
 /** Print a list of handles for a process.
  *
  * Prints out a list of all currently open handles in a process.
@@ -468,10 +464,6 @@ int kdbg_cmd_handles(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Close a handle.
  *

@@ -555,10 +555,6 @@ void __init_text thread_reaper_init(void) {
 	thread_run(thread);
 }
 
-#if 0
-# pragma mark Process handle functions.
-#endif
-
 /** Closes a handle to a thread.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
@@ -572,10 +568,6 @@ static handle_type_t thread_handle_type = {
 	.id = HANDLE_TYPE_THREAD,
 	.close = thread_handle_close,
 };
-
-#if 0
-# pragma mark System calls.
-#endif
 
 /** Thread creation arguments structure. */
 typedef struct sys_thread_args {
