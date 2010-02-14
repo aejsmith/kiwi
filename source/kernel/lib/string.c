@@ -42,7 +42,7 @@
  *
  * @return		Destination location.
  */
-void *memcpy(void *dest, const void *src, size_t count) {
+void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	const char *s = (const char *)src;
 	char *d = (char *)dest;
 	const unative_t *ns;
@@ -439,7 +439,7 @@ char *strstrip(char *str) {
  * 
  * @return		The value specified for dest.
  */
-char *strcpy(char *dest, const char *src) {
+char *strcpy(char *restrict dest, const char *restrict src) {
 	char *d = dest;
 
 	while((*d++ = *src++));
@@ -457,7 +457,7 @@ char *strcpy(char *dest, const char *src) {
  * 
  * @return		The value specified for dest.
  */
-char *strncpy(char *dest, const char *src, size_t count) {
+char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 	size_t i;
 	
 	for(i = 0; i < count; i++) {
@@ -478,7 +478,7 @@ char *strncpy(char *dest, const char *src, size_t count) {
  * 
  * @return		Pointer to dest.
  */
-char *strcat(char *dest, const char *src) {
+char *strcat(char *restrict dest, const char *restrict src) {
 	size_t destlen = strlen(dest);
 	char *d = dest + destlen;
 

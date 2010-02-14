@@ -28,7 +28,7 @@
 #include <stdarg.h>
 #include <types.h>
 
-extern void *memcpy(void *dest, const void *src, size_t count);
+extern void *memcpy(void *restrict dest, const void *restrict src, size_t count);
 extern void *memset(void *dest, int val, size_t count);
 extern void *memmove(void *dest, const void *src, size_t count);
 extern size_t strlen(const char *str);
@@ -41,9 +41,9 @@ extern char *strsep(char **stringp, const char *delim);
 extern char *strchr(const char *s, int c);
 extern char *strrchr(const char *s, int c);
 extern char *strstrip(char *str);
-extern char *strcpy(char *dest, const char *src);
-extern char *strncpy(char *dest, const char *src, size_t count);
-extern char *strcat(char *dest, const char *src);
+extern char *strcpy(char *restrict dest, const char *restrict src);
+extern char *strncpy(char *restrict dest, const char *restrict src, size_t count);
+extern char *strcat(char *restrict dest, const char *restrict src);
 #ifdef LOADER
 extern char *kstrdup(const char *s);
 extern char *kstrndup(const char *s, size_t n);
