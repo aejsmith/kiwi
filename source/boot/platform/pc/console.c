@@ -48,14 +48,14 @@
 #define VGA_CRTC_DATA		0x3D5
 
 /** VGA memory pointer. */
-static uint16_t *g_vga_mapping = (uint16_t *)0xB8000;
+static uint16_t *vga_mapping = (uint16_t *)0xB8000;
 
 /** VGA cursor position. */
-static int g_vga_cursor_x = 0;
-static int g_vga_cursor_y = 0;
+static int vga_cursor_x = 0;
+static int vga_cursor_y = 0;
 
 /** Whether the serial console is enabled. */
-static bool g_serial_enabled = false;
+static bool serial_enabled = false;
 
 /** Check if shift is held.
  * @return		Whether shift is held. */
@@ -104,24 +104,24 @@ static void pc_console_putch(char ch) {
 	switch(ch) {
 	case '\b':
 		/* Backspace, move back one character if we can. */
-		if(g_vga_cursor_x != 0) {
-			g_vga_cursor_x--;
+		if(vga_cursor_x != 0) {
+			vga_cursor_x--;
 		} else {
-			g_vga_cursor_x = VGA_COLS - 1;
-			g_vga_cursor_y--;
+			vga_cursor_x = VGA_COLS - 1;
+			vga_cursor_y--;
 		}
 		break;
 	case '\r':
 		/* Carriage return, move to the start of the line. */
-		g_vga_cursor_x = 0;
+		vga_cursor_x = 0;
 		break;
 	case '\n':
 		/* Newline, treat it as if a carriage return was also there. */
-		g_vga_cursor_x = 0;
-		g_vga_cursor_y++;
+		vga_cursor_x = 0;
+		vga_cursor_y++;
 		break;
 	case '\t':
-		g_vga_cursor_x += 8 - (g_vga_cursor_x % 8);
+		vga_cursor_x += 8 - (vga_cursor_x % 8);
 		break;
 	default:
 		/* If it is a non-printing character, ignore it. */
@@ -129,30 +129,30 @@ static void pc_console_putch(char ch) {
 			break;
 		}
 
-		g_vga_mapping[(g_vga_cursor_y * VGA_COLS) + g_vga_cursor_x] &= 0xFF00;
-		g_vga_mapping[(g_vga_cursor_y * VGA_COLS) + g_vga_cursor_x] |= ch;
-		g_vga_cursor_x++;
+		vga_mapping[(vga_cursor_y * VGA_COLS) + vga_cursor_x] &= 0xFF00;
+		vga_mapping[(vga_cursor_y * VGA_COLS) + vga_cursor_x] |= ch;
+		vga_cursor_x++;
 		break;
 	}
 
 	/* If we have reached the edge of the screen insert a new line. */
-	if(g_vga_cursor_x >= VGA_COLS) {
-		g_vga_cursor_x = 0;
-		g_vga_cursor_y++;
+	if(vga_cursor_x >= VGA_COLS) {
+		vga_cursor_x = 0;
+		vga_cursor_y++;
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
-	if(g_vga_cursor_y >= VGA_ROWS) {
+	if(vga_cursor_y >= VGA_ROWS) {
 		/* Shift up the content of the VGA memory.*/
-		memmove(g_vga_mapping, g_vga_mapping + VGA_COLS, (VGA_ROWS - 1) * VGA_COLS * 2);
+		memmove(vga_mapping, vga_mapping + VGA_COLS, (VGA_ROWS - 1) * VGA_COLS * 2);
 
 		/* Fill the last row with blanks. */
 		for(i = 0; i < VGA_COLS; i++) {
-			g_vga_mapping[((VGA_ROWS - 1) * VGA_COLS) + i] &= 0xFF00;
-			g_vga_mapping[((VGA_ROWS - 1) * VGA_COLS) + i] |= ' ';
+			vga_mapping[((VGA_ROWS - 1) * VGA_COLS) + i] &= 0xFF00;
+			vga_mapping[((VGA_ROWS - 1) * VGA_COLS) + i] |= ' ';
 		}
 
-		g_vga_cursor_y = VGA_ROWS - 1;
+		vga_cursor_y = VGA_ROWS - 1;
 	}
 }
 
@@ -162,11 +162,11 @@ static void pc_console_clear(void) {
 
 	for(i = 0; i < VGA_ROWS; i++) {
 		for(j = 0; j < VGA_COLS; j++) {
-			g_vga_mapping[(i * VGA_COLS) + j] =  ' ' | VGA_ATTRIB;
+			vga_mapping[(i * VGA_COLS) + j] =  ' ' | VGA_ATTRIB;
 		}
 	}
 
-	g_vga_cursor_x = g_vga_cursor_y = 0;
+	vga_cursor_x = vga_cursor_y = 0;
 }
 
 /** Change the highlight on a portion of the console.
@@ -181,10 +181,10 @@ static void pc_console_highlight(int x, int y, int width, int height) {
 	for(i = y; i < (y + height); i++) {
 		for(j = x; j < (x + width); j++) {
 			/* Swap the foreground/background colour. */
-			word = g_vga_mapping[(i * VGA_COLS) + j];
+			word = vga_mapping[(i * VGA_COLS) + j];
 			fg = (word << 4) & 0xF000;
 			bg = (word >> 4) & 0x0F00;
-			g_vga_mapping[(i * VGA_COLS) + j] = (word & 0xFF) | fg | bg;
+			vga_mapping[(i * VGA_COLS) + j] = (word & 0xFF) | fg | bg;
 		}
 	}
 }
@@ -193,8 +193,8 @@ static void pc_console_highlight(int x, int y, int width, int height) {
  * @param x		New X position.
  * @param y		New Y position. */
 static void pc_console_move_cursor(int x, int y) {
-	g_vga_cursor_x = x;
-	g_vga_cursor_y = y;
+	vga_cursor_x = x;
+	vga_cursor_y = y;
 }
 
 /** Initialise the VGA console. */
@@ -209,7 +209,7 @@ static void pc_console_init(void) {
 }
 
 /** Main console. */
-console_t g_console = {
+console_t main_console = {
 	.width = VGA_COLS,
 	.height = VGA_ROWS,
 
@@ -229,7 +229,7 @@ static void serial_console_init(void) {
 	/* Only enable the serial port when it is present. */
 	status = in8(SERIAL_PORT + 6);
 	if((status & ((1<<4) | (1<<5))) && status != 0xFF) {
-		g_serial_enabled = true;
+		serial_enabled = true;
 		out8(SERIAL_PORT + 1, 0x00);  /* Disable all interrupts */
 		out8(SERIAL_PORT + 3, 0x80);  /* Enable DLAB (set baud rate divisor) */
 		out8(SERIAL_PORT + 0, 0x03);  /* Set divisor to 3 (lo byte) 38400 baud */
@@ -243,7 +243,7 @@ static void serial_console_init(void) {
 /** Write a character to the serial console.
  * @param ch		Character to write. */
 static void serial_console_putch(char ch) {
-	if(g_serial_enabled) {
+	if(serial_enabled) {
 		while(!(in8(SERIAL_PORT + 5) & 0x20));
 		if(ch == '\n') {
 			while(!(in8(SERIAL_PORT + 5) & 0x20));
@@ -254,7 +254,7 @@ static void serial_console_putch(char ch) {
 }
 
 /** Debug console. */
-console_t g_debug_console = {
+console_t debug_console = {
 	.init = serial_console_init,
 	.putch = serial_console_putch,
 };

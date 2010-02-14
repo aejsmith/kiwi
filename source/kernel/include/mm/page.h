@@ -29,7 +29,7 @@ struct kernel_args;
 /** Flags to modify page allocation behaviour. */
 #define PM_ZERO			(1<<10)	/**< Clear the page contents before returning. */
 
-extern page_map_t g_kernel_page_map;
+extern page_map_t kernel_page_map;
 
 extern int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
                            bool exec, int mmflag);

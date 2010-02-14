@@ -179,6 +179,6 @@ typedef struct iso9660_directory_record {
         uint8_t file_ident[];			/**< File Identifier. */
 } __packed iso9660_directory_record_t;
 
-extern vfs_filesystem_ops_t g_iso9660_filesystem_ops;
+extern vfs_filesystem_ops_t iso9660_filesystem_ops;
 
 #endif /* __FS_ISO9660_H */

@@ -28,10 +28,10 @@
 #include <lib/string.h>
 
 /** ISR array in entry.S. Each handler is aligned to 16 bytes. */
-extern uint8_t __isr_array[IDT_ENTRY_COUNT][16];
+extern uint8_t isr_array[IDT_ENTRY_COUNT][16];
 
 /** Array of GDT descriptors. */
-static gdt_entry_t __initial_gdt[] __aligned(8) = {
+static gdt_entry_t initial_gdt[] __aligned(8) = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< NULL descriptor. */
 	{ 0xFFFF, 0, 0, 0x9A, 0xF, 0, 1, 0, 1, 0 },	/**< Kernel CS (Code). */
 	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 0, 1, 0 },	/**< Kernel DS (Data). */
@@ -42,10 +42,10 @@ static gdt_entry_t __initial_gdt[] __aligned(8) = {
 };
 
 /** Array of IDT entries. */
-static idt_entry_t idt[IDT_ENTRY_COUNT] __aligned(8);
+static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 
 /** Double fault handler stack. */
-static uint8_t __doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
+static uint8_t doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
 /** Set up the GDT for the current CPU. */
 static void __init_text gdt_init(void) {
@@ -54,7 +54,7 @@ static void __init_text gdt_init(void) {
 	ptr_t base;
 
 	/* Create a copy of the statically allocated GDT. */
-	memcpy(curr_cpu->arch.gdt, __initial_gdt, sizeof(__initial_gdt));
+	memcpy(curr_cpu->arch.gdt, initial_gdt, sizeof(initial_gdt));
 
 	/* Set up the TSS descriptor. */
 	base = (ptr_t)&curr_cpu->arch.tss;
@@ -91,7 +91,7 @@ static void __init_text gdt_init(void) {
 
 /** Set up the TSS for the current CPU. */
 static void __init_text tss_init(void) {
-	ptr_t stack = (ptr_t)__doublefault_stack;
+	ptr_t stack = (ptr_t)doublefault_stack;
 
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
@@ -113,20 +113,20 @@ static inline void idt_init(void) {
 
 	/* Fill out the handlers in the IDT. */
 	for(i = 0; i < IDT_ENTRY_COUNT; i++) {
-		addr = (ptr_t)&__isr_array[i];
-		idt[i].base0 = (addr & 0xFFFF);
-		idt[i].base1 = ((addr >> 16) & 0xFFFF);
-		idt[i].base2 = ((addr >> 32) & 0xFFFFFFFF);
-		idt[i].ist = 0;
-		idt[i].reserved = 0;
-		idt[i].sel = SEGMENT_K_CS;
-		idt[i].unused = 0;
-		idt[i].flags = 0x8E;
+		addr = (ptr_t)&isr_array[i];
+		kernel_idt[i].base0 = (addr & 0xFFFF);
+		kernel_idt[i].base1 = ((addr >> 16) & 0xFFFF);
+		kernel_idt[i].base2 = ((addr >> 32) & 0xFFFFFFFF);
+		kernel_idt[i].ist = 0;
+		kernel_idt[i].reserved = 0;
+		kernel_idt[i].sel = SEGMENT_K_CS;
+		kernel_idt[i].unused = 0;
+		kernel_idt[i].flags = 0x8E;
 	}
 
 	/* In tss_init() above we point the first IST entry at the double
 	 * fault stack. Point the double fault IDT entry at this stack. */
-	idt[FAULT_DOUBLE].ist = 1;
+	kernel_idt[FAULT_DOUBLE].ist = 1;
 }
 
 /** Initialise descriptor tables for the boot CPU. */
@@ -139,7 +139,7 @@ void __init_text descriptor_init(void) {
 	idt_init();
 
 	/* Point the CPU to the new IDT. */
-	lidt((ptr_t)&idt, (sizeof(idt) - 1));
+	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
 }
 
 /** Initialise descriptor tables for an application CPU. */
@@ -151,5 +151,5 @@ void __init_text descriptor_ap_init(void) {
 
 	/* For the IDT, there is no need to have a seperate IDT for each CPU,
 	 * so just point the IDTR at the shared IDT. */
-	lidt((ptr_t)&idt, (sizeof(idt) - 1));
+	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
 }

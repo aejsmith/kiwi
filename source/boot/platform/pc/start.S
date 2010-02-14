@@ -42,9 +42,9 @@ _start:
 	movw	%ax, %es
 
 	/* Save the boot device/partition offset. */
-	addr32 movb	%dl, (g_boot_device - LOADER_LOAD_ADDR)
-	addr32 movl	%ebx, (g_boot_offset - LOADER_LOAD_ADDR)
-	addr32 movl	%ecx, (g_boot_offset - LOADER_LOAD_ADDR) + 4
+	addr32 movb	%dl, (boot_device_id - LOADER_LOAD_ADDR)
+	addr32 movl	%ebx, (boot_part_offset - LOADER_LOAD_ADDR)
+	addr32 movl	%ecx, (boot_part_offset - LOADER_LOAD_ADDR) + 4
 
 	/* Make sure we're displaying page 0, and move the cursor to (0,0) */
 	movb	$0x02, %ah
@@ -56,7 +56,7 @@ _start:
 	call	enable_a20
 
 	/* Now we need to switch to protected mode. */
-1:	addr32	lgdt	(g_gdt_pointer - LOADER_LOAD_ADDR)
+1:	addr32	lgdt	(loader_gdtp - LOADER_LOAD_ADDR)
 	movl	%cr0, %eax
 	orl	$(1<<0), %eax
 	movl	%eax, %cr0
@@ -205,7 +205,7 @@ __multiboot_entry:
 	rep movsb
 
 	/* Load the GDT. */
-	lgdt	(g_gdt_pointer)
+	lgdt	(loader_gdtp)
 	ljmp	$SEGMENT_CS, $1f
 1:
 	mov	$SEGMENT_DS, %ax
@@ -216,7 +216,7 @@ __multiboot_entry:
 	mov	%ax, %ss
 
 	/* Save information pointer. */
-	movl	%ebx, (g_multiboot_info)
+	movl	%ebx, (multiboot_info)
 
 	/* Jump to the common startup code. */
 	jmp	__loader_entry
@@ -227,7 +227,7 @@ __multiboot_entry:
 __loader_entry:
 	/* Set the stack pointer to the physical location of our stack and
 	 * clear the stack frame/EFLAGS. */
-	movl	$g_boot_stack + KSTACK_SIZE, %esp
+	movl	$boot_stack + KSTACK_SIZE, %esp
 	xorl	%ebp, %ebp
 	push	$0
 	popf
@@ -238,36 +238,36 @@ __loader_entry:
 .size __loader_entry, .-__loader_entry
 
 /** GDT pointer. */
-.global g_gdt_pointer
-.type g_gdt_pointer, @object
-g_gdt_pointer:
+.global loader_gdtp
+.type loader_gdtp, @object
+loader_gdtp:
         .word .L__gdt_end-__gdt-1
         .long __gdt
-.size g_gdt_pointer, .-g_gdt_pointer
+.size loader_gdtp, .-loader_gdtp
 
 /** Boot drive. */
-.global g_boot_device
-.type g_boot_device, @object
-g_boot_device:
+.global boot_device_id
+.type boot_device_id, @object
+boot_device_id:
 	.byte 0
-.size g_boot_device, .-g_boot_device
+.size boot_device_id, .-boot_device_id
 
 /** Boot partition offset. */
-.global g_boot_offset
-.type g_boot_offset, @object
-g_boot_offset:
+.global boot_part_offset
+.type boot_part_offset, @object
+boot_part_offset:
 	.quad 0
-.size g_boot_offset, .-g_boot_offset
+.size boot_part_offset, .-boot_part_offset
 
 .section .data, "aw", @progbits
 
 /** Stack. */
 .align PAGE_SIZE
-.global g_boot_stack
-.type g_boot_stack, @object
-g_boot_stack:
+.global boot_stack
+.type boot_stack, @object
+boot_stack:
 	.fill	KSTACK_SIZE
-.size g_boot_stack, .-g_boot_stack
+.size boot_stack, .-boot_stack
 
 /** Global descriptor table. */
 .type __gdt, @object
@@ -282,8 +282,8 @@ __gdt:
 .size __gdt, .-__gdt
 
 /** Multiboot information pointer. */
-.global g_multiboot_info
-.type g_multiboot_info, @object
-g_multiboot_info:
+.global multiboot_info
+.type multiboot_info, @object
+multiboot_info:
 	.long 0
-.size g_multiboot_info, .-g_multiboot_info
+.size multiboot_info, .-multiboot_info

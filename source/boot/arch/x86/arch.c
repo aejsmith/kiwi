@@ -26,7 +26,7 @@
  * @param menu		Main menu.
  * @param options	Options menu. */
 void arch_add_menu_options(menu_t *menu, menu_t *options) {
-	menu_add_checkbox(options, "Disable Local APIC usage", &g_kernel_args->arch.lapic_disabled);
+	menu_add_checkbox(options, "Disable Local APIC usage", &kernel_args->arch.lapic_disabled);
 }
 
 /** Perform early architecture initialisation. */

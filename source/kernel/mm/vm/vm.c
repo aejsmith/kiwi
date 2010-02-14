@@ -823,7 +823,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		refcount_inc(&as->count);
 		page_map_switch(&as->pmap);
 	} else {
-		page_map_switch(&g_kernel_page_map);
+		page_map_switch(&kernel_page_map);
 	}
 
 	curr_aspace = as;

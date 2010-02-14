@@ -40,7 +40,7 @@ int kprintf(const char *fmt, ...) {
 	int ret;
 
 	va_start(args, fmt);
-	ret = do_printf(printf_helper, &g_console, fmt, args);
+	ret = do_printf(printf_helper, &main_console, fmt, args);
 	va_end(args);
 
 	return ret;
@@ -55,7 +55,7 @@ int dprintf(const char *fmt, ...) {
 	int ret;
 
 	va_start(args, fmt);
-	ret = do_printf(printf_helper, &g_debug_console, fmt, args);
+	ret = do_printf(printf_helper, &debug_console, fmt, args);
 	va_end(args);
 
 	return ret;

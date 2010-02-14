@@ -118,8 +118,8 @@ typedef struct vfs_dir_entry {
 	inode_t id;			/**< Node ID entry refers to. */
 } vfs_dir_entry_t;
 
-extern list_t g_filesystems;
-extern vfs_filesystem_t *g_boot_filesystem;
+extern list_t filesystem_list;
+extern vfs_filesystem_t *boot_filesystem;
 
 extern vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path);
 extern vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs);

@@ -123,7 +123,7 @@ static CONDVAR_DECLARE(slab_reclaim_resp);
 static MUTEX_DECLARE(slab_reclaim_lock, 0);
 
 /** Whether the allocator is fully initialised. */
-static bool g_slab_initialised = false;
+static bool slab_inited = false;
 
 #if 0
 # pragma mark Helper functions.
@@ -599,7 +599,7 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 static int slab_cpu_cache_init(slab_cache_t *cache) {
 	size_t i;
 
-	assert(g_slab_initialised);
+	assert(slab_inited);
 
 	cache->cpu_caches = kcalloc(cpu_id_max + 1, sizeof(slab_cpu_cache_t), 0);
 	if(!cache->cpu_caches) {
@@ -793,7 +793,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	/* If we want the magazine layer to be enabled but initialisation has
 	 * not been fully performed, disable it for now. */
-	if(!(flags & SLAB_CACHE_NOMAG) && !g_slab_initialised) {
+	if(!(flags & SLAB_CACHE_NOMAG) && !slab_inited) {
 		flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
 	}
 
@@ -1003,7 +1003,7 @@ void __init_text slab_late_init(void) {
 
 	mutex_lock(&slab_caches_lock, 0);
 
-	g_slab_initialised = true;
+	slab_inited = true;
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 

@@ -414,7 +414,7 @@ static bool iso9660_dir_cache(vfs_node_t *node) {
 }
 
 /** ISO9660 filesystem operations structure. */
-vfs_filesystem_ops_t g_iso9660_filesystem_ops = {
+vfs_filesystem_ops_t iso9660_filesystem_ops = {
 	.mount = iso9660_mount,
 	.node_get = iso9660_node_get,
 	.file_read = iso9660_file_read,

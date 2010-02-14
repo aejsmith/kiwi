@@ -52,9 +52,9 @@ static display_device_t *display_console_device = NULL;
  * @param arg3		Third notifier argument. */
 static void display_console_register(void *arg1, void *arg2, void *arg3) {
 	/* Use the inhibited flag to determine whether a reset is required. */
-	if(g_fb_console.inhibited) {
+	if(fb_console.inhibited) {
 		fb_console_reset();
-		g_fb_console.inhibited = false;
+		fb_console.inhibited = false;
 	}
 }
 
@@ -63,7 +63,7 @@ static void display_console_register(void *arg1, void *arg2, void *arg3) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void display_console_unregister(void *arg1, void *arg2, void *arg3) {
-	g_fb_console.inhibited = true;
+	fb_console.inhibited = true;
 	display_console_device->redraw = true;
 	notifier_run_unlocked(&display_console_device->redraw_notifier, NULL, false);
 }
@@ -218,9 +218,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 		/* For now just return whatever mode the kernel console is
 		 * using, and fallback on 1024x768, then 800x600 if the mode
 		 * is unavailable. */
-		if(!(mode = display_mode_find(device, g_fb_console_width,
-		                              g_fb_console_height,
-		                              g_fb_console_depth))) {
+		if(!(mode = display_mode_find(device, fb_console_width, fb_console_height, fb_console_depth))) {
 			if(!(mode = display_mode_find(device, 1024, 768, 0))) {
 				if(!(mode = display_mode_find(device, 800, 600, 0))) {
 					mutex_unlock(&device->lock);
@@ -253,7 +251,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 				notifier_unregister(&kdbg_entry_notifier, display_console_register, NULL);
 				notifier_unregister(&kdbg_exit_notifier, display_console_unregister, NULL);
 				display_console_device = NULL;
-				g_fb_console.inhibited = false;
+				fb_console.inhibited = false;
 			}
 			device->curr_mode = NULL;
 		} else {
@@ -280,7 +278,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 
 				/* Point the framebuffer console at the device. */
 				fb_console_reconfigure(mode->width, mode->height, mode->depth, phys);
-				g_fb_console.inhibited = true;
+				fb_console.inhibited = true;
 
 				/* Register notifiers to reset the console upon
 				 * KDBG/fatal. */

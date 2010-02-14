@@ -21,13 +21,14 @@
 #ifndef __BOOT_CPU_H
 #define __BOOT_CPU_H
 
+#include <types/atomic.h>
 #include <kargs.h>
 
-extern kernel_args_cpu_t *g_booting_cpu;
-extern kernel_args_cpu_t *g_boot_cpu;
+extern kernel_args_cpu_t *booting_cpu;
+extern kernel_args_cpu_t *boot_cpu;
 
-extern volatile int g_ap_boot_wait;
-extern volatile int g_ap_kernel_wait;
+extern atomic_t ap_boot_wait;
+extern atomic_t ap_kernel_wait;
 
 extern void spin(uint64_t us);
 

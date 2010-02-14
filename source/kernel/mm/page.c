@@ -44,11 +44,11 @@
 extern char __init_start[], __init_end[];
 
 /** Array of boot-reclaimable ranges. */
-static struct { phys_ptr_t start; phys_ptr_t end; } g_reclaim_ranges[64] __init_data;
-static size_t g_reclaim_range_count __init_data = 0;
+static struct { phys_ptr_t start; phys_ptr_t end; } page_reclaim_ranges[64] __init_data;
+static size_t page_reclaim_count __init_data = 0;
 
 /** Vmem arena used for page allocations. */
-static vmem_t g_page_arena;
+static vmem_t page_arena;
 
 /** Zero a range of pages.
  * @param base		Base address to zero from.
@@ -99,7 +99,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	if(!(base = vmem_xalloc(&g_page_arena, size, align, phase, nocross, minaddr,
+	if(!(base = vmem_xalloc(&page_arena, size, align, phase, nocross, minaddr,
 	                        maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
@@ -110,7 +110,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
 	/* Handle zeroing requests. */
 	if(pmflag & PM_ZERO) {
 		if(!page_range_zero(base, size, pmflag)) {
-			vmem_xfree(&g_page_arena, base, size);
+			vmem_xfree(&page_arena, base, size);
 			return 0;
 		}
 	}
@@ -131,7 +131,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
  * @param count		Number of pages to free.
  */
 void page_xfree(phys_ptr_t base, size_t count) {
-	vmem_xfree(&g_page_arena, base, (count * PAGE_SIZE));
+	vmem_xfree(&page_arena, base, (count * PAGE_SIZE));
 
 	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ") (constrained)\n",
 		base, base + (count * PAGE_SIZE));
@@ -153,7 +153,7 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 	size_t size = (count * PAGE_SIZE);
 	phys_ptr_t base;
 
-	if(!(base = vmem_alloc(&g_page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+	if(!(base = vmem_alloc(&page_arena, size, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		}
@@ -163,7 +163,7 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
 	/* Handle zeroing requests. */
 	if(pmflag & PM_ZERO) {
 		if(!page_range_zero(base, size, pmflag)) {
-			vmem_free(&g_page_arena, base, size);
+			vmem_free(&page_arena, base, size);
 			return 0;
 		}
 	}
@@ -183,7 +183,7 @@ phys_ptr_t page_alloc(size_t count, int pmflag) {
  * @param count		Number of pages to free.
  */
 void page_free(phys_ptr_t base, size_t count) {
-	vmem_free(&g_page_arena, (vmem_resource_t)base, (count * PAGE_SIZE));
+	vmem_free(&page_arena, (vmem_resource_t)base, (count * PAGE_SIZE));
 
 	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ")\n",
 		base, base + (count * PAGE_SIZE));
@@ -255,15 +255,15 @@ int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
  * @param end		End of range. */
 static void __init_text page_mark_reclaimable(phys_ptr_t start, phys_ptr_t end) {
 	/* Allocate the range so nothing else allocates from it. */
-	vmem_xalloc(&g_page_arena, end - start, 0, 0, 0, start, end, MM_FATAL);
+	vmem_xalloc(&page_arena, end - start, 0, 0, 0, start, end, MM_FATAL);
 
 	/* Record details of it so it can be reclaimed later. */
-	if(g_reclaim_range_count >= ARRAYSZ(g_reclaim_ranges)) {
+	if(page_reclaim_count >= ARRAYSZ(page_reclaim_ranges)) {
 		fatal("Out of reclaim range structures");
 	}
-	g_reclaim_ranges[g_reclaim_range_count].start = start;
-	g_reclaim_ranges[g_reclaim_range_count].end = end;
-	g_reclaim_range_count++;
+	page_reclaim_ranges[page_reclaim_count].start = start;
+	page_reclaim_ranges[page_reclaim_count].end = end;
+	page_reclaim_count++;
 }
 
 /** Initialise the physical memory manager.
@@ -273,7 +273,7 @@ void __init_text page_init(kernel_args_t *args) {
 	phys_ptr_t start, end;
 	uint32_t i;
 
-	vmem_early_create(&g_page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
+	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
 	                  NULL, 0, VMEM_RECLAIM, MM_FATAL);
 
 	/* Populate the arena with physical memory ranges given by the
@@ -282,10 +282,10 @@ void __init_text page_init(kernel_args_t *args) {
 		range = &args->phys_ranges[i];
 		switch(range->type) {
 		case PHYS_MEMORY_FREE:
-			vmem_add(&g_page_arena, range->start, range->end - range->start, MM_FATAL);
+			vmem_add(&page_arena, range->start, range->end - range->start, MM_FATAL);
 			break;
 		case PHYS_MEMORY_RECLAIMABLE:
-			vmem_add(&g_page_arena, range->start, range->end - range->start, MM_FATAL);
+			vmem_add(&page_arena, range->start, range->end - range->start, MM_FATAL);
 			page_mark_reclaimable(range->start, range->end);
 			break;
 		default:
@@ -300,7 +300,7 @@ void __init_text page_init(kernel_args_t *args) {
 	 * first. */
 	start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + args->kernel_phys;
 	end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + args->kernel_phys;
-	vmem_add(&g_page_arena, start, end - start, MM_FATAL);
+	vmem_add(&page_arena, start, end - start, MM_FATAL);
 	page_mark_reclaimable(start, end);
 
 	/* Initialise architecture paging-related things. */
@@ -316,9 +316,9 @@ void __init_text page_late_init(void) {
 	/* It is OK to clear regions despite the reclaim information structures
 	 * being in a reclaimable region because nothing should make any
 	 * allocations while this is running. */
-	for(i = 0; i < g_reclaim_range_count; i++) {
-		size = g_reclaim_ranges[i].end - g_reclaim_ranges[i].start;
-		vmem_xfree(&g_page_arena, g_reclaim_ranges[i].start, size);
+	for(i = 0; i < page_reclaim_count; i++) {
+		size = page_reclaim_ranges[i].end - page_reclaim_ranges[i].start;
+		vmem_xfree(&page_arena, page_reclaim_ranges[i].start, size);
 		reclaimed += size;
 	}
 

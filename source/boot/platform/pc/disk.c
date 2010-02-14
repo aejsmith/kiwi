@@ -59,9 +59,9 @@ typedef struct specification_packet {
         uint16_t device_spec;
 } __packed specification_packet_t;
 
-extern uint8_t g_boot_device;
-extern uint64_t g_boot_offset;
-extern multiboot_info_t *g_multiboot_info;
+extern uint8_t boot_device_id;
+extern uint64_t boot_part_offset;
+extern multiboot_info_t *multiboot_info;
 
 /** Read a block from a disk device.
  * @param disk		Disk to read from.
@@ -97,7 +97,7 @@ static bool bios_disk_block_read(disk_t *disk, void *buf, offset_t lba) {
 }
 
 /** Operations for a BIOS disk device. */
-static disk_ops_t g_bios_disk_ops = {
+static disk_ops_t bios_disk_ops = {
 	.block_read = bios_disk_block_read,
 };
 
@@ -123,10 +123,10 @@ static bool platform_booted_from_cd(void) {
 	/* Use the bootable CD-ROM status function. */
 	memset(&regs, 0, sizeof(bios_regs_t));
 	regs.eax = 0x4B01;
-	regs.edx = g_boot_device;
+	regs.edx = boot_device_id;
 	regs.esi = BIOS_MEM_BASE;
 	bios_interrupt(0x13, &regs);
-	return (!(regs.eflags & (1<<0)) && packet->drive_number == g_boot_device);
+	return (!(regs.eflags & (1<<0)) && packet->drive_number == boot_device_id);
 }
 
 /** Add the disk with the specified ID.
@@ -141,8 +141,8 @@ static void platform_disk_add(uint8_t id) {
 	 * Installation Check/Get Drive Parameters functions return an error
 	 * on Intel/AMI BIOSes, yet the Extended Read function still works.
 	 * Work around this by forcing use of extensions when booted from CD. */
-	if(id == g_boot_device && platform_booted_from_cd()) {
-		if((disk = disk_add(id, 2048, ~0LL, &g_bios_disk_ops, NULL, true))) {
+	if(id == boot_device_id && platform_booted_from_cd()) {
+		if((disk = disk_add(id, 2048, ~0LL, &bios_disk_ops, NULL, true))) {
 			dprintf("disk: detected boot CD 0x%x (blksize: %zu)\n", id, disk->blksize);
 		}
 	} else {
@@ -173,7 +173,7 @@ static void platform_disk_add(uint8_t id) {
 
 		/* Create the disk object. */
 		if((disk = disk_add(id, params->sector_size, params->sector_count,
-		                    &g_bios_disk_ops, NULL, id == g_boot_device))) {
+		                    &bios_disk_ops, NULL, id == boot_device_id))) {
 			dprintf("disk: detected device 0x%x (blocks: %" PRIu64 ", blksize: %zu)\n",
 			        id, disk->blocks, disk->blksize);
 		}
@@ -185,12 +185,12 @@ void platform_disk_detect(void) {
 	uint8_t count, id;
 
 	/* Use Multiboot device info if booted via Multiboot. */
-	if(g_multiboot_info) {
-		g_boot_device = (g_multiboot_info->boot_device & 0xFF000000) >> 24;
+	if(multiboot_info) {
+		boot_device_id = (multiboot_info->boot_device & 0xFF000000) >> 24;
 	}
 
 	dprintf("disk: boot device ID is 0x%x, partition offset is 0x%" PRIx64 "\n",
-	        g_boot_device, g_boot_offset);
+	        boot_device_id, boot_part_offset);
 
 	/* Probe all hard disks. */
 	count = platform_disk_count();
@@ -199,7 +199,7 @@ void platform_disk_detect(void) {
 		 * after the loop is completed. This is done because this loop
 		 * only probes hard disks, so in order to support CD's, etc,
 		 * we have to add the boot disk separately. */
-		if(id == g_boot_device) {
+		if(id == boot_device_id) {
 			continue;
 		}
 
@@ -207,5 +207,5 @@ void platform_disk_detect(void) {
 	}
 
 	/* Add the boot device. */
-	platform_disk_add(g_boot_device);
+	platform_disk_add(boot_device_id);
 }

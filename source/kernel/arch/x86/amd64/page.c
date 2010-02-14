@@ -49,16 +49,16 @@ extern char __rodata_start[], __rodata_end[];
 extern char __data_start[], __bss_end[];
 
 /** Kernel page map. */
-page_map_t g_kernel_page_map;
+page_map_t kernel_page_map;
 
 /** Whether the kernel page map has been initialised. */
-static bool g_paging_inited = false;
+static bool paging_inited = false;
 
 /** Allocate a paging structure.
  * @param mmflag	Allocation flags. PM_ZERO will be added.
  * @return		Address of structure on success, 0 on failure. */
 static phys_ptr_t page_structure_alloc(int mmflag) {
-	if(g_paging_inited) {
+	if(paging_inited) {
 		return page_alloc(1, mmflag | PM_ZERO);
 	} else {
 		/* During initialisation we only have 1GB of physical mapping. */
@@ -421,7 +421,7 @@ int page_map_init(page_map_t *map, int mmflag) {
 	}
 
 	/* Get the kernel mappings into the new PML4. */
-	kpml4 = page_structure_map(g_kernel_page_map.cr3);
+	kpml4 = page_structure_map(kernel_page_map.cr3);
 	pml4 = page_structure_map(map->cr3);
 	pml4[511] = kpml4[511] & ~PG_ACCESSED;
 	return 0;
@@ -484,7 +484,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 		return NULL;
 	}
 
-	if(g_paging_inited) {
+	if(paging_inited) {
 		return (void *)(KERNEL_PMAP_BASE + addr);
 	} else {
 		/* During boot there is a 1GB identity mapping. */
@@ -520,7 +520,7 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 	assert(!(end % PAGE_SIZE));
 
 	for(i = 0; i < (end - start); i += PAGE_SIZE) {
-		page_map_insert(&g_kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
+		page_map_insert(&kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
 	}
 
 	dprintf("page: created kernel mapping [%p,%p) to [0x%" PRIpp ",0x%" PRIpp ") (%d %d)\n",
@@ -534,9 +534,9 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	phys_ptr_t i;
 
 	/* Initialise the kernel page map structure. */
-	mutex_init(&g_kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
-	g_kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);
-	g_kernel_page_map.user = false;
+	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
+	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);
+	kernel_page_map.user = false;
 
 	/* Map the kernel in. The following mappings are made:
 	 *  .text      - R/X
@@ -550,7 +550,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* Create 4GB of physical mapping for now. FIXME. */
 	for(i = 0; i < 0x100000000; i += LARGE_PAGE_SIZE) {
-		page_map_insert_large(&g_kernel_page_map, i + KERNEL_PMAP_BASE,
+		page_map_insert_large(&kernel_page_map, i + KERNEL_PMAP_BASE,
 		                      i, true, true, MM_FATAL);
 	}
 
@@ -560,18 +560,18 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	 * the new kernel PDP because the kernel PDP has the global flag set
 	 * on all pages, which makes invalidating the TLB entries difficult
 	 * when removing the mapping. */
-	pml4 = page_structure_map(g_kernel_page_map.cr3);
+	pml4 = page_structure_map(kernel_page_map.cr3);
 	bpml4 = page_structure_map(sysreg_cr3_read() & PAGE_MASK);
 	pml4[0] = bpml4[0];
 
 	dprintf("page: initialised kernel page map (pml4: 0x%" PRIpp ")\n",
-	        g_kernel_page_map.cr3);
+	        kernel_page_map.cr3);
 
 	/* Switch to the kernel page map. */
-	page_map_switch(&g_kernel_page_map);
+	page_map_switch(&kernel_page_map);
 
 	/* The physical map area can now be used. */
-	g_paging_inited = true;
+	paging_inited = true;
 }
 
 /** Perform late AMD64 paging initialisation. */
@@ -581,7 +581,7 @@ void page_arch_late_init(void) {
 	/* All of the CPUs have been booted and have new stacks, and the kernel
 	 * arguments are no longer required. Remove the temporary identity
 	 * mapping and flush the TLB on all CPUs. */
-	pml4 = page_structure_map(g_kernel_page_map.cr3);
+	pml4 = page_structure_map(kernel_page_map.cr3);
 	pml4[0] = 0;
 	tlb_invalidate(NULL, 0, 0);
 }

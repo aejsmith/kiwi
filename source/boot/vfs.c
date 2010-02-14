@@ -28,20 +28,20 @@
 #include "fs/iso9660.h"
 
 /** List of all detected filesystems. */
-LIST_DECLARE(g_filesystems);
+LIST_DECLARE(filesystem_list);
 
 /** The filesystem being booted from. */
-vfs_filesystem_t *g_boot_filesystem = NULL;
+vfs_filesystem_t *boot_filesystem = NULL;
 
 /** Array of paths to search for boot files. */
-static const char *g_boot_paths[] = {
+static const char *boot_paths[] = {
 	"/system/boot",
 	"/kiwi",
 };
 
 /** Array of filesystem implementations. */
-static vfs_filesystem_ops_t *g_filesystem_types[] = {
-	&g_iso9660_filesystem_ops,
+static vfs_filesystem_ops_t *filesystem_types[] = {
+	&iso9660_filesystem_ops,
 };
 
 /** Probe a disk for filesystems.
@@ -57,8 +57,8 @@ static vfs_filesystem_t *vfs_filesystem_probe(disk_t *disk) {
 	list_init(&fs->nodes);
 	fs->disk = disk;
 
-	for(i = 0; i < ARRAYSZ(g_filesystem_types); i++) {
-		fs->ops = g_filesystem_types[i];
+	for(i = 0; i < ARRAYSZ(filesystem_types); i++) {
+		fs->ops = filesystem_types[i];
 		if(!fs->ops->mount(fs)) {
 			continue;
 		}
@@ -69,7 +69,7 @@ static vfs_filesystem_t *vfs_filesystem_probe(disk_t *disk) {
 		}
 		vfs_node_release(node);
 
-		list_append(&g_filesystems, &fs->header);
+		list_append(&filesystem_list, &fs->header);
 		return fs;
 	}
 
@@ -123,8 +123,8 @@ vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs) {
 	size_t i;
 
 	/* Check whether each of the boot paths exists and is a directory. */
-	for(i = 0; i < ARRAYSZ(g_boot_paths); i++) {
-		if((node = vfs_filesystem_lookup(fs, g_boot_paths[i]))) {
+	for(i = 0; i < ARRAYSZ(boot_paths); i++) {
+		if((node = vfs_filesystem_lookup(fs, boot_paths[i]))) {
 			if(node->type == VFS_NODE_DIR) {
 				return node;
 			}
@@ -379,7 +379,7 @@ disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops
 	/* Probe the disk for filesystems. */
 	if((fs = vfs_filesystem_probe(disk))) {
 		if(boot) {
-			g_boot_filesystem = fs;
+			boot_filesystem = fs;
 		}
 		return disk;
 	} else {
@@ -392,7 +392,7 @@ disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops
 /** Initialise the disk system. */
 void disk_init() {
 	platform_disk_detect();
-	if(!g_boot_filesystem) {
+	if(!boot_filesystem) {
 		fatal("Could not find boot filesystem");
 	}
 }

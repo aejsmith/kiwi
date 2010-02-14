@@ -30,15 +30,15 @@
 #define IDT_ENTRY_COUNT		32
 
 extern void interrupt_handler(intr_frame_t *frame);
-extern uint8_t g_isr_array[IDT_ENTRY_COUNT][16];
+extern uint8_t isr_array[IDT_ENTRY_COUNT][16];
 
 /** Interrupt descriptor table. */
-static idt_entry_t g_loader_idt[IDT_ENTRY_COUNT];
+static idt_entry_t loader_idt[IDT_ENTRY_COUNT];
 
 /** IDT pointer loaded into the IDTR register. */
-idt_pointer_t g_loader_idtp = {
-	.limit = sizeof(g_loader_idt) - 1,
-	.base = (ptr_t)&g_loader_idt,
+idt_pointer_t loader_idtp = {
+	.limit = sizeof(loader_idt) - 1,
+	.base = (ptr_t)&loader_idt,
 };
 
 /** Initialise the IDT. */
@@ -48,16 +48,16 @@ void idt_init(void) {
 
 	/* Fill out the handlers in the IDT. */
 	for(i = 0; i < IDT_ENTRY_COUNT; i++) {
-		addr = (ptr_t)&g_isr_array[i];
-		g_loader_idt[i].base0 = (addr & 0xFFFF);
-		g_loader_idt[i].base1 = ((addr >> 16) & 0xFFFF);
-		g_loader_idt[i].sel = SEGMENT_CS;
-		g_loader_idt[i].unused = 0;
-		g_loader_idt[i].flags = 0x8E;
+		addr = (ptr_t)&isr_array[i];
+		loader_idt[i].base0 = (addr & 0xFFFF);
+		loader_idt[i].base1 = ((addr >> 16) & 0xFFFF);
+		loader_idt[i].sel = SEGMENT_CS;
+		loader_idt[i].unused = 0;
+		loader_idt[i].flags = 0x8E;
 	}
 
 	/* Load the new IDT. */
-	__asm__ volatile("lidt %0" :: "m"(g_loader_idtp));
+	__asm__ volatile("lidt %0" :: "m"(loader_idtp));
 }
 
 /** Handle an exception.

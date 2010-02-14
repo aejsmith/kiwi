@@ -51,13 +51,13 @@ typedef struct video_mode {
 #define FALLBACK_MODE_HEIGHT		600
 
 /** List of video modes. */
-static LIST_DECLARE(g_video_modes);
+static LIST_DECLARE(video_modes);
 
 /** Detected best video mode. */
-static video_mode_t *g_best_video_mode = NULL;
+static video_mode_t *best_video_mode = NULL;
 
 /** Menu choice for the video mode. */
-static menu_item_t *g_video_mode_choice = NULL;
+static menu_item_t *video_mode_choice = NULL;
 
 /** Search for a video mode.
  * @note		This will prefer modes with a higher depth.
@@ -67,7 +67,7 @@ static menu_item_t *g_video_mode_choice = NULL;
 static video_mode_t *video_mode_find(int width, int height) {
 	video_mode_t *mode, *ret = NULL;
 
-	LIST_FOREACH(&g_video_modes, iter) {
+	LIST_FOREACH(&video_modes, iter) {
 		mode = list_entry(iter, video_mode_t, header);
 		if(mode->width == width && mode->height == height) {
 			if(!ret || mode->bpp > ret->bpp) {
@@ -94,15 +94,15 @@ void platform_add_menu_options(menu_t *menu, menu_t *options) {
 	char *str;
 
 	/* Add a list to choose the video mode. */
-	g_video_mode_choice = menu_add_choice(menu, "Video Mode");
-	LIST_FOREACH(&g_video_modes, iter) {
+	video_mode_choice = menu_add_choice(menu, "Video Mode");
+	LIST_FOREACH(&video_modes, iter) {
 		mode = list_entry(iter, video_mode_t, header);
 
 		/* Create a string for the mode. */
 		str = kmalloc(16);
 		sprintf(str, "%dx%dx%d", mode->width, mode->height, mode->bpp);
 
-		menu_item_add_choice(g_video_mode_choice, str, mode, mode == g_best_video_mode);
+		menu_item_add_choice(video_mode_choice, str, mode, mode == best_video_mode);
 	}
 }
 
@@ -182,18 +182,18 @@ void platform_video_init(void) {
 		mode->height = minfo->y_resolution;
 		mode->bpp = minfo->bits_per_pixel;
 		mode->addr = minfo->phys_base_ptr;
-		list_append(&g_video_modes, &mode->header);
+		list_append(&video_modes, &mode->header);
 	}
 
-	if(list_empty(&g_video_modes)) {
+	if(list_empty(&video_modes)) {
 		fatal("No usable video modes detected");
 	}
 
 	/* Try to find the best mode. */
-	if(!(g_best_video_mode = probe_mode_edid())) {
-		if(!(g_best_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
+	if(!(best_video_mode = probe_mode_edid())) {
+		if(!(best_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
 		                                         PREFERRED_MODE_HEIGHT))) {
-			if(!(g_best_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
+			if(!(best_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
 			                                         FALLBACK_MODE_HEIGHT))) {
 				fatal("Could not find video mode to use");
 			}
@@ -208,10 +208,10 @@ void platform_video_enable(void) {
 
 	/* Get the video mode to set. If the menu has been displayed, use the
 	 * mode that was selected there, else use the best mode. */
-	if(g_video_mode_choice) {
-		mode = (video_mode_t *)g_video_mode_choice->value;
+	if(video_mode_choice) {
+		mode = (video_mode_t *)video_mode_choice->value;
 	} else {
-		mode = g_best_video_mode;
+		mode = best_video_mode;
 	}
 
 	/* Set the mode. Bit 14 in the mode ID indicates that we wish to use
@@ -225,8 +225,8 @@ void platform_video_enable(void) {
 	        mode->width, mode->height, mode->bpp, mode->addr);
 
 	/* Write mode information to the kernel arguments. */
-	g_kernel_args->fb_width = mode->width;
-	g_kernel_args->fb_height = mode->height;
-	g_kernel_args->fb_depth = mode->bpp;
-	g_kernel_args->fb_addr = mode->addr;
+	kernel_args->fb_width = mode->width;
+	kernel_args->fb_height = mode->height;
+	kernel_args->fb_depth = mode->bpp;
+	kernel_args->fb_addr = mode->addr;
 }

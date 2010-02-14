@@ -130,9 +130,9 @@ AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
 # Generate the boot splash image source files.
 env.Command('console/logo.c', ['console/logo.ppm'],
-            Action('$BIN2HEX $SOURCE g_logo_ppm > $TARGET', '$GENCOMSTR'))
+            Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
 env.Command('console/copyright.c', ['console/copyright.ppm'],
-            Action('$BIN2HEX $SOURCE g_copyright_ppm > $TARGET', '$GENCOMSTR'))
+            Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])

@@ -58,7 +58,7 @@ bios_interrupt:
 	movl	$REAL_MODE_SP, %esp
 
 	/* Switch to the BIOS IVT. */
-	lidt	(g_bios_idtp)
+	lidt	(bios_idtp)
 
 	/* Jump into the real mode code segment. */
 	ljmp	$SEGMENT_CS16, $1f - LOADER_LOAD_ADDR
@@ -127,7 +127,7 @@ bios_interrupt:
 	mov	%ax, %ss
 
 	/* Switch back to the loader IDT. */
-	lidt	(g_loader_idtp)
+	lidt	(loader_idtp)
 
 	/* Restore stack pointer. */
 	mov	(REAL_MODE_STACK), %esp
@@ -148,8 +148,8 @@ bios_interrupt:
 .size bios_interrupt, .-bios_interrupt
 
 /** IDT pointer for the BIOS IVT. */
-.type g_bios_idtp, @object
-g_bios_idtp:
+.type bios_idtp, @object
+bios_idtp:
         .word 0x7FF
         .long 0
-.size g_bios_idtp, .-g_bios_idtp
+.size bios_idtp, .-bios_idtp

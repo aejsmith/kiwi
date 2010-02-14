@@ -92,17 +92,17 @@ static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, 
 			} \
 		} \
 		\
-		g_kernel_args->kernel_phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), \
+		kernel_args->kernel_phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), \
 		                                               _alignment, false); \
 		dprintf("elf: loading kernel image to 0x%" PRIpp " (size: 0x%zx, align: 0x%zx)\n", \
-		        g_kernel_args->kernel_phys, (size_t)(virt_end - virt_base), _alignment); \
+		        kernel_args->kernel_phys, (size_t)(virt_end - virt_base), _alignment); \
 		\
 		for(i = 0; i < ehdr.e_phnum; i++) { \
 			if(phdrs[i].p_type != ELF_PT_LOAD) { \
 				continue; \
 			} \
 			\
-			dest = (ptr_t)(g_kernel_args->kernel_phys + (phdrs[i].p_vaddr - virt_base)); \
+			dest = (ptr_t)(kernel_args->kernel_phys + (phdrs[i].p_vaddr - virt_base)); \
 			if(!vfs_file_read(file, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
 				fatal("Could not read kernel from boot device"); \
 			} \

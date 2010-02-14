@@ -61,22 +61,19 @@ extern void kmain(kernel_args_t *args, uint32_t cpu);
 extern initcall_t __initcall_start[], __initcall_end[];
 
 /** Rendezvous variables for SMP boot. */
-static atomic_t g_boot_rendezvous1 __init_data = 0;
-static atomic_t g_boot_rendezvous2 __init_data = 0;
-static atomic_t g_boot_rendezvous3 __init_data = 0;
-
-/** Whether a RamFS has been mounted for the root. */
-static bool g_boot_fs_mounted __init_data = false;
+static atomic_t init_rendezvous_1 __init_data = 0;
+static atomic_t init_rendezvous_2 __init_data = 0;
+static atomic_t init_rendezvous_3 __init_data = 0;
 
 /** The amount to increment the boot progress for each module. */
-static int g_current_progress = 10;
-static int g_boot_progress_per_module;
+static int init_current_progress __init_data = 10;
+static int init_progress_per_module __init_data;
 
 /** Lock to serialise the SMP boot. */
-static SPINLOCK_DECLARE(g_boot_spinlock);
+static SPINLOCK_DECLARE(smp_boot_spinlock);
 
 /** List of modules from the bootloader. */
-static LIST_DECLARE(g_boot_modules);
+static LIST_DECLARE(boot_module_list);
 
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
@@ -89,8 +86,8 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	kfree(mod);
 
 	/* Update progress. */
-	g_current_progress += g_boot_progress_per_module;
-	console_update_boot_progress(g_current_progress);
+	init_current_progress += init_progress_per_module;
+	console_update_boot_progress(init_current_progress);
 }
 
 /** Look up a kernel module in the boot module list.
@@ -99,7 +96,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 static boot_module_t *boot_module_lookup(const char *name) {
 	boot_module_t *mod;
 
-	LIST_FOREACH(&g_boot_modules, iter) {
+	LIST_FOREACH(&boot_module_list, iter) {
 		mod = list_entry(iter, boot_module_t, header);
 
 		if(mod->name && strcmp(mod->name, name) == 0) {
@@ -134,11 +131,10 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 
 	/* If any TAR files are loaded it means we should mount a RamFS at the
 	 * root, if this has not already been done. */
-	if(!g_boot_fs_mounted) {
+	if(!vfs_root_mount) {
 		if((ret = vfs_mount(NULL, "/", "ramfs", 0)) != 0) {
 			fatal("Could not mount RamFS at root (%d)", ret);
 		}
-		g_boot_fs_mounted = true;
 	}
 
 	/* Loop until we encounter two null bytes (EOF). */
@@ -254,7 +250,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 			mod->name = tmp;
 		}
 
-		list_append(&g_boot_modules, &mod->header);
+		list_append(&boot_module_list, &mod->header);
 
 		addr = amod->next;
 		page_phys_unmap(amod, sizeof(kernel_args_module_t), true);
@@ -262,11 +258,11 @@ static void __init_text load_modules(kernel_args_t *args) {
 
 	/* Determine how much to increase the boot progress by for each
 	 * module loaded. */
-	g_boot_progress_per_module = 80 / args->module_count;
+	init_progress_per_module = 80 / args->module_count;
 
 	/* Now keep on loading until all modules have been loaded. */
-	while(!list_empty(&g_boot_modules)) {
-		mod = list_entry(g_boot_modules.next, boot_module_t, header);
+	while(!list_empty(&boot_module_list)) {
+		mod = list_entry(boot_module_list.next, boot_module_t, header);
 		if(!boot_module_load_tar(mod) && !boot_module_load_kmod(mod)) {
 			fatal("Module with unknown format in module list");
 		}
@@ -294,8 +290,8 @@ static void init_thread(void *args, void *arg2) {
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their
 	 * initialisation, the second waits for them to complete. */
-	init_rendezvous(args, &g_boot_rendezvous2);
-	init_rendezvous(args, &g_boot_rendezvous3);
+	init_rendezvous(args, &init_rendezvous_2);
+	init_rendezvous(args, &init_rendezvous_3);
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -327,7 +323,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	thread_t *thread;
 
 	/* Wait for all CPUs to enter the kernel. */
-	init_rendezvous(args, &g_boot_rendezvous1);
+	init_rendezvous(args, &init_rendezvous_1);
 
 	if(cpu == args->boot_cpu) {
 		cpu_early_init(args);
@@ -381,13 +377,13 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		sched_enter();
 	} else {
 		/* Wait for the boot CPU to do its initialisation. */
-		init_rendezvous(args, &g_boot_rendezvous2);
+		init_rendezvous(args, &init_rendezvous_2);
 
-		spinlock_lock(&g_boot_spinlock, 0);
+		spinlock_lock(&smp_boot_spinlock, 0);
 
 		/* Switch to the kernel page map, set the CPU pointer and do
 		 * architecture/platform initialisation. */
-		page_map_switch(&g_kernel_page_map);
+		page_map_switch(&kernel_page_map);
 		cpu_set_pointer((ptr_t)cpus[cpu]);
 		arch_ap_init(args);
 		platform_ap_init(args);
@@ -398,10 +394,10 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		/* Do scheduler initialisation. */
 		sched_init();
 
-		spinlock_unlock(&g_boot_spinlock);
+		spinlock_unlock(&smp_boot_spinlock);
 
 		/* Perform the final rendezvous and then enter the scheduler. */
-		init_rendezvous(args, &g_boot_rendezvous3);
+		init_rendezvous(args, &init_rendezvous_3);
 		sched_enter();
 	}
 }

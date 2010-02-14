@@ -59,10 +59,10 @@ extern char __rodata_start[], __rodata_end[];
 extern char __data_start[], __bss_end[];
 
 /** Kernel page map. */
-page_map_t g_kernel_page_map;
+page_map_t kernel_page_map;
 
 /** Whether the kernel page map has been initialised. */
-static bool g_paging_inited = false;
+static bool paging_inited = false;
 
 /** Allocate a paging structure.
  * @note		The structure will not be zeroed unless PM_ZERO is
@@ -76,7 +76,7 @@ static phys_ptr_t page_structure_alloc(int mmflag) {
 	/* Prefer allocating structures below 1GB because pages in the first
 	 * 1GB of memory are always mapped in. During initialisation, must
 	 * always allocate below 1GB because the heap is not set up. */
-	page = page_xalloc(1, 0, 0, 0, 0, 0x40000000, (g_paging_inited) ? (mmflag & ~MM_FATAL) : mmflag);
+	page = page_xalloc(1, 0, 0, 0, 0, 0x40000000, (paging_inited) ? (mmflag & ~MM_FATAL) : mmflag);
 	if(!page) {
 		page = page_xalloc(1, 0, 0, 0, 0, 0x100000000LL, mmflag);
 	}
@@ -91,7 +91,7 @@ static phys_ptr_t page_structure_alloc(int mmflag) {
  * @param mmflag	Allocation flags.
  * @return		Pointer to mapping on success, NULL on failure. */
 static uint64_t *page_structure_map(page_map_t *map, phys_ptr_t addr, int mmflag) {
-	assert(map->user || !g_paging_inited);
+	assert(map->user || !paging_inited);
 	thread_wire(curr_thread);
 	return page_phys_map(addr, PAGE_SIZE, mmflag);
 }
@@ -100,7 +100,7 @@ static uint64_t *page_structure_map(page_map_t *map, phys_ptr_t addr, int mmflag
  * @param map		Page map that the structure belongs to.
  * @param addr		Address of mapping. */
 static void page_structure_unmap(page_map_t *map, uint64_t *addr) {
-	if(map->user || !g_paging_inited) {
+	if(map->user || !paging_inited) {
 		page_phys_unmap(addr, PAGE_SIZE, false);
 		thread_unwire(curr_thread);
 	}
@@ -120,7 +120,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 	assert(!(mmflag & PM_ZERO));
 
 	/* Special handling for the kernel address space. */
-	if(!map->user && g_paging_inited) {
+	if(!map->user && paging_inited) {
 		/* Shouldn't be modifying anything below the top GB (the
 		 * physical mapping is below, however it should not be modified
 		 * after initialisation. */
@@ -149,7 +149,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 		/* Newer Intel CPUs seem to cache PDP entries and INVLPG does
 		 * fuck all, completely flush the TLB if we're using this
 		 * page map. */
-		if(g_paging_inited && (sysreg_cr3_read() & PAGE_MASK) == map->cr3) {
+		if(paging_inited && (sysreg_cr3_read() & PAGE_MASK) == map->cr3) {
 			sysreg_cr3_write(sysreg_cr3_read());
 		}
 	}
@@ -193,7 +193,7 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	}
 
 	/* Unmap the page directory and return the page table address. */
-	if(!map->user && g_paging_inited) {
+	if(!map->user && paging_inited) {
 		ptbl = (uint64_t *)KERNEL_PTBL_ADDR(virt);
 	} else {
 		ptbl = page_structure_map(map, pdir[pde] & PAGE_MASK, mmflag);
@@ -439,7 +439,7 @@ int page_map_init(page_map_t *map, int mmflag) {
 	}
 
 	/* Duplicate the kernel mappings. */
-	if(!(kpdp = page_structure_map(map, g_kernel_page_map.cr3, mmflag))) {
+	if(!(kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag))) {
 		page_xfree(map->cr3, 1);
 		return -ERR_NO_MEMORY;
 	} else if(!(pdp = page_structure_map(map, map->cr3, mmflag))) {
@@ -507,7 +507,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 		return NULL;
 	}
 
-	if(g_paging_inited) {
+	if(paging_inited) {
 		if(addr < KERNEL_PMAP_SIZE) {
 			return (void *)((ptr_t)addr + KERNEL_PMAP_BASE);
 		} else {
@@ -563,7 +563,7 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 	assert(!(end % PAGE_SIZE));
 
 	for(i = 0; i < (end - start); i += PAGE_SIZE) {
-		page_map_insert(&g_kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
+		page_map_insert(&kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
 	}
 
 	dprintf("page: created kernel mapping [%p,%p) to [0x%" PRIpp ",0x%" PRIpp ") (%d %d)\n",
@@ -578,9 +578,9 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	int pde;
 
 	/* Initialise the kernel page map structure. */
-	mutex_init(&g_kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
-	g_kernel_page_map.cr3 = page_structure_alloc(MM_FATAL | PM_ZERO);
-	g_kernel_page_map.user = false;
+	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
+	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL | PM_ZERO);
+	kernel_page_map.user = false;
 
 	/* Map the kernel in. The following mappings are made:
 	 *  .text      - R/X
@@ -594,12 +594,12 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* Create a 1GB physical mapping. */
 	for(i = 0; i < KERNEL_PMAP_SIZE; i += LARGE_PAGE_SIZE) {
-		page_map_insert_large(&g_kernel_page_map, i + KERNEL_PMAP_BASE,
+		page_map_insert_large(&kernel_page_map, i + KERNEL_PMAP_BASE,
 		                      i, true, true, MM_FATAL);
 	}
 
 	/* Add the fractal mapping for the kernel page table. */
-	pdp = page_phys_map(g_kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
 	pdir = page_phys_map(pdp[3] & PAGE_MASK, PAGE_SIZE, MM_FATAL);
 	pde = (KERNEL_PTBL_BASE % 0x40000000) / LARGE_PAGE_SIZE;
 	pdir[pde] = (pdp[3] & PAGE_MASK) | PG_PRESENT | PG_WRITE;
@@ -617,13 +617,13 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	page_phys_unmap(pdp, PAGE_SIZE, true);
 
 	dprintf("page: initialised kernel page map (pdp: 0x%" PRIpp ")\n",
-	        g_kernel_page_map.cr3);
+	        kernel_page_map.cr3);
 
 	/* Switch to the kernel page map. */
-	page_map_switch(&g_kernel_page_map);
+	page_map_switch(&kernel_page_map);
 
 	/* The physical map area can now be used. */
-	g_paging_inited = true;
+	paging_inited = true;
 }
 
 /** Perform late IA32 paging initialisation. */
@@ -633,7 +633,7 @@ void page_arch_late_init(void) {
 	/* All of the CPUs have been booted and have new stacks, and the kernel
 	 * arguments are no longer required. Remove the temporary identity
 	 * mapping and flush the TLB on all CPUs. */
-	pdp = page_phys_map(g_kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
 	pdp[0] = 0;
 	page_phys_unmap(pdp, PAGE_SIZE, true);
 	tlb_invalidate(NULL, 0, 0);

@@ -39,8 +39,8 @@ extern void loader_main(void);
 extern void loader_ap_main(void);
 
 /** Waiting variables for the SMP boot process. */
-volatile int g_ap_boot_wait = 0;
-volatile int g_ap_kernel_wait = 0;
+atomic_t ap_boot_wait = 0;
+atomic_t ap_kernel_wait = 0;
 
 /** Load the kernel.
  * @param dir		Directory to load from. */
@@ -103,8 +103,8 @@ void loader_main(void) {
 	memset(__bss_start, 0, __bss_end - __bss_start);
 
 	/* Initialise the consoles. */
-	g_console.init();
-	g_debug_console.init();
+	main_console.init();
+	debug_console.init();
 
 	/* Perform early architecture/platform initialisation. */
 	arch_early_init();
@@ -124,12 +124,12 @@ void loader_main(void) {
 	/* Do post-menu CPU intialisation, and detect all other CPUs if SMP
 	 * was not disabled in the menu. */
 	cpu_postmenu_init();
-	if(!g_kernel_args->smp_disabled) {
+	if(!kernel_args->smp_disabled) {
 		cpu_detect();
 	}
 
 	/* Load the kernel and modules. */
-	if(!(node = vfs_filesystem_boot_path(g_boot_filesystem))) {
+	if(!(node = vfs_filesystem_boot_path(boot_filesystem))) {
 		fatal("Couldn't get boot directory");
 	}
 	load_kernel(node);
@@ -143,13 +143,13 @@ void loader_main(void) {
 	platform_video_enable();
 
 	/* Write final details to the kernel arguments structure. */
-	strncpy(g_kernel_args->boot_fs_uuid, g_boot_filesystem->uuid, KERNEL_ARGS_UUID_LEN);
-	g_kernel_args->boot_fs_uuid[KERNEL_ARGS_UUID_LEN - 1] = 0;
+	strncpy(kernel_args->boot_fs_uuid, boot_filesystem->uuid, KERNEL_ARGS_UUID_LEN);
+	kernel_args->boot_fs_uuid[KERNEL_ARGS_UUID_LEN - 1] = 0;
 	memory_finalise();
-	g_kernel_args->boot_cpu = cpu_current_id();
+	kernel_args->boot_cpu = cpu_current_id();
 
 	/* Enter the kernel. */
-	g_ap_kernel_wait = 1;
+	atomic_inc(&ap_kernel_wait);
 	arch_enter_kernel();
 }
 
@@ -157,9 +157,9 @@ void loader_main(void) {
 void loader_ap_main(void) {
 	/* Do architecture initialisation and then wake up the boot process. */
 	cpu_ap_init();
-	g_ap_boot_wait = 1;
+	atomic_inc(&ap_boot_wait);
 
 	/* Wait until the boot CPU signals that we can boot. */
-	while(!g_ap_kernel_wait);
+	while(!atomic_get(&ap_kernel_wait));
 	arch_enter_kernel();
 }

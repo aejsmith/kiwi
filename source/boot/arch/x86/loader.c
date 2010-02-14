@@ -41,10 +41,10 @@ extern void arch_enter_kernel64(kernel_args_t *args, uint32_t cpu, ptr_t cr3, ui
 extern void arch_enter_kernel32(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint32_t entry) __noreturn;
 
 /** Information on the loaded kernel. */
-static bool g_kernel_64bit = false;
-static Elf32_Addr g_kernel_entry32;
-static Elf64_Addr g_kernel_entry64;
-static ptr_t g_kernel_cr3;
+static bool kernel_is_64bit = false;
+static Elf32_Addr kernel_entry32;
+static Elf64_Addr kernel_entry64;
+static ptr_t kernel_cr3;
 
 /** IA32 kernel loader function. */
 DEFINE_ELF_LOADER(load_elf32_kernel, 32, LARGE_PAGE_SIZE);
@@ -77,13 +77,13 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 		return false;
 	}
 
-	/* Check for long mode support (g_booting_cpu is still set to the BSP
+	/* Check for long mode support (booting_cpu is still set to the BSP
 	 * at this point). */
-	if(!CPU_HAS_LMODE(g_booting_cpu)) {
+	if(!CPU_HAS_LMODE(booting_cpu)) {
 		fatal("64-bit kernel requires 64-bit CPU");
 	}
 
-	load_elf64_kernel(file, &g_kernel_entry64, &virt_base, &load_size);
+	load_elf64_kernel(file, &kernel_entry64, &virt_base, &load_size);
 
 	assert(virt_base >= 0xFFFFFFFF80000000LL);
 
@@ -104,14 +104,14 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 	pdp[pdpe] = (ptr_t)pdir | PG_PRESENT | PG_WRITE;
 	pde = (virt_base % 0x40000000) / LARGE_PAGE_SIZE;
 	for(i = 0; i < ROUND_UP(load_size, LARGE_PAGE_SIZE) / LARGE_PAGE_SIZE; i++) {
-		pdir[pde + i] = (g_kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
+		pdir[pde + i] = (kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
 	}
 
 	/* Save details for later use. */
-	g_kernel_64bit = true;
-	g_kernel_cr3 = (ptr_t)pml4;
+	kernel_is_64bit = true;
+	kernel_cr3 = (ptr_t)pml4;
 	dprintf("loader: 64-bit kernel entry point is 0x%llx, CR3 is %p\n",
-	        g_kernel_entry64, g_kernel_cr3);
+	        kernel_entry64, kernel_cr3);
 	return true;
 }
 
@@ -128,7 +128,7 @@ static bool arch_load_kernel32(vfs_node_t *file) {
 		return false;
 	}
 
-	load_elf32_kernel(file, &g_kernel_entry32, &virt_base, &load_size);
+	load_elf32_kernel(file, &kernel_entry32, &virt_base, &load_size);
 
 	assert(virt_base >= 0xC0000000);
 
@@ -145,13 +145,13 @@ static bool arch_load_kernel32(vfs_node_t *file) {
 	pdp[3] = (ptr_t)pdir | PG_PRESENT;
 	pde = (virt_base % 0x40000000) / LARGE_PAGE_SIZE;
 	for(i = 0; i < ROUND_UP(load_size, LARGE_PAGE_SIZE) / LARGE_PAGE_SIZE; i++) {
-		pdir[pde + i] = (g_kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
+		pdir[pde + i] = (kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
 	}
 
 	/* Save details for later use. */
-	g_kernel_cr3 = (ptr_t)pdp;
+	kernel_cr3 = (ptr_t)pdp;
 	dprintf("loader: 32-bit kernel entry point is %p, CR3 is %p\n",
-	        g_kernel_entry32, g_kernel_cr3);
+	        kernel_entry32, kernel_cr3);
 	return true;
 }
 
@@ -167,9 +167,9 @@ void arch_load_kernel(vfs_node_t *file) {
 
 /** Enter the kernel. */
 void arch_enter_kernel(void) {
-	if(g_kernel_64bit) {
-		arch_enter_kernel64(g_kernel_args, cpu_current_id(), g_kernel_cr3, g_kernel_entry64);
+	if(kernel_is_64bit) {
+		arch_enter_kernel64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);
 	} else {
-		arch_enter_kernel32(g_kernel_args, cpu_current_id(), g_kernel_cr3, g_kernel_entry32);
+		arch_enter_kernel32(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry32);
 	}
 }

@@ -35,7 +35,7 @@
 	movw	%ax, %es
 
 	/* Switch to protected mode. */
-1:	addr32	lgdt	(g_gdt_pointer - LOADER_LOAD_ADDR)
+1:	addr32	lgdt	(loader_gdtp - LOADER_LOAD_ADDR)
 	movl	%cr0, %eax
 	orl	$(1<<0), %eax
 	movl	%eax, %cr0
@@ -50,10 +50,10 @@
 	mov	%ax, %ss
 
 	/* Set the stack pointer. */
-	movl	g_ap_stack, %esp
+	movl	ap_stack_ptr, %esp
 
 	/* Load the bootloader IDT. */
-	lidt	(g_loader_idtp)
+	lidt	(loader_idtp)
 
 	/* Jump to the kernel. */
 	jmp	loader_ap_main

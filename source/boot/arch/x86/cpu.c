@@ -39,10 +39,10 @@
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
 
 /** Address of the local APIC. */
-static volatile uint32_t *g_lapic_mapping = NULL;
+static volatile uint32_t *lapic_mapping = NULL;
 
 /** Stack pointer for the booting AP. */
-ptr_t g_ap_stack = 0;
+ptr_t ap_stack_ptr = 0;
 
 /** Read the Time Stamp Counter.
  * @return		Value of the TSC. */
@@ -70,7 +70,7 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 	flags = sysreg_flags_read();
 	sysreg_flags_write(flags ^ SYSREG_FLAGS_ID);
 	if((sysreg_flags_read() & SYSREG_FLAGS_ID) == (flags & SYSREG_FLAGS_ID)) {
-		fatal("CPU %" PRIu32 " does not support CPUID", g_booting_cpu->id);
+		fatal("CPU %" PRIu32 " does not support CPUID", booting_cpu->id);
 	}
 
 	/* Get the highest supported standard level. */
@@ -89,7 +89,7 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 		}
 	} else {
 		fatal("CPU %" PRIu32 " does not support CPUID feature information",
-		      g_booting_cpu->id);
+		      booting_cpu->id);
 	}
 
 	/* Get the highest supported extended level. */
@@ -135,27 +135,27 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 	/* If the cache line size is not set, use a sane default based on
 	 * whether the CPU supports long mode. */
 	if(!cpu->cache_alignment) {
-		cpu->cache_alignment = CPU_HAS_LMODE(g_booting_cpu) ? 64 : 32;
+		cpu->cache_alignment = CPU_HAS_LMODE(booting_cpu) ? 64 : 32;
 	}
 
 	/* Check that all required features are supported. */
-	if(!CPU_HAS_FPU(g_booting_cpu) || !CPU_HAS_TSC(g_booting_cpu) ||
-	   !CPU_HAS_PAE(g_booting_cpu) || !CPU_HAS_PGE(g_booting_cpu) ||
-	   !CPU_HAS_FXSR(g_booting_cpu)) {
+	if(!CPU_HAS_FPU(booting_cpu) || !CPU_HAS_TSC(booting_cpu) ||
+	   !CPU_HAS_PAE(booting_cpu) || !CPU_HAS_PGE(booting_cpu) ||
+	   !CPU_HAS_FXSR(booting_cpu)) {
 		fatal("CPU %" PRIu32 " does not support required features",
-		      g_booting_cpu->id);
+		      booting_cpu->id);
 	}
 #if CONFIG_X86_NX
 	/* Enable NX/XD if supported. */
-	if(CPU_HAS_XD(g_booting_cpu)) {
+	if(CPU_HAS_XD(booting_cpu)) {
 		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
 	}
 #endif
 	/* Shitty workaround: when running under QEMU the boot CPU's frequency
 	 * is OK but the others will usually get rubbish. Use the boot CPU's
 	 * frequency on all CPUs under QEMU. */
-	if(strncmp(cpu->model_name, "QEMU", 4) == 0 && g_booting_cpu != g_boot_cpu) {
-		cpu->cpu_freq = g_boot_cpu->arch.cpu_freq;
+	if(strncmp(cpu->model_name, "QEMU", 4) == 0 && booting_cpu != boot_cpu) {
+		cpu->cpu_freq = boot_cpu->arch.cpu_freq;
 		return;
 	}
 
@@ -201,7 +201,7 @@ static bool cpu_lapic_init(void) {
 	uint32_t *mapping;
 	uint64_t base;
 
-	if(!CPU_HAS_APIC(g_booting_cpu)) {
+	if(!CPU_HAS_APIC(booting_cpu)) {
 		return false;
 	}
 
@@ -215,23 +215,23 @@ static bool cpu_lapic_init(void) {
 	/* Store the mapping address, ensuring no CPUs have differing
 	 * addresses. */
 	mapping = (uint32_t *)((ptr_t)base & 0xFFFFF000);
-	if(g_lapic_mapping) {
-		if(g_lapic_mapping != mapping) {
+	if(lapic_mapping) {
+		if(lapic_mapping != mapping) {
 			fatal("CPUs have different LAPIC base addresses");
 		}
 	} else {
-		g_lapic_mapping = mapping;
-		g_kernel_args->arch.lapic_address = base & 0xFFFFF000;
+		lapic_mapping = mapping;
+		kernel_args->arch.lapic_address = base & 0xFFFFF000;
 	}
 
 	/* Enable the LAPIC. */
-	g_lapic_mapping[LAPIC_REG_SPURIOUS] = g_lapic_mapping[LAPIC_REG_SPURIOUS] | (1<<8);
-	g_lapic_mapping[LAPIC_REG_TIMER_DIVIDER] = LAPIC_TIMER_DIV4;
-	g_lapic_mapping[LAPIC_REG_LVT_TIMER] = (1<<16);
+	lapic_mapping[LAPIC_REG_SPURIOUS] = lapic_mapping[LAPIC_REG_SPURIOUS] | (1<<8);
+	lapic_mapping[LAPIC_REG_TIMER_DIVIDER] = LAPIC_TIMER_DIV4;
+	lapic_mapping[LAPIC_REG_LVT_TIMER] = (1<<16);
 
 	/* Shitty workaround: see above. */
-	if(strncmp(g_booting_cpu->arch.model_name, "QEMU", 4) == 0 && g_booting_cpu != g_boot_cpu) {
-		g_booting_cpu->arch.bus_freq = g_boot_cpu->arch.bus_freq;
+	if(strncmp(booting_cpu->arch.model_name, "QEMU", 4) == 0 && booting_cpu != boot_cpu) {
+		booting_cpu->arch.bus_freq = boot_cpu->arch.bus_freq;
 		return true;
 	}
 
@@ -249,7 +249,7 @@ static bool cpu_lapic_init(void) {
 	} while(shi != 0xFF);
 
 	/* Kick off the LAPIC timer. */
-	g_lapic_mapping[LAPIC_REG_TIMER_INITIAL] = 0xFFFFFFFF;
+	lapic_mapping[LAPIC_REG_TIMER_INITIAL] = 0xFFFFFFFF;
 
 	/* Wait for the high byte to drop to 128. */
 	do {
@@ -259,14 +259,14 @@ static bool cpu_lapic_init(void) {
 	} while(ehi > 0x80);
 
 	/* Get the current timer value. */
-	end = g_lapic_mapping[LAPIC_REG_TIMER_CURRENT];
+	end = lapic_mapping[LAPIC_REG_TIMER_CURRENT];
 
 	/* Calculate the differences between the values. */
 	lticks = 0xFFFFFFFF - end;
 	pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
 
 	/* Calculate frequency. */
-	g_booting_cpu->arch.bus_freq = (lticks * 4 * PIT_FREQUENCY) / pticks;
+	booting_cpu->arch.bus_freq = (lticks * 4 * PIT_FREQUENCY) / pticks;
 	return true;
 }
 
@@ -277,13 +277,13 @@ static bool cpu_lapic_init(void) {
  * @param vector	Value of vector field. */
 static void cpu_ipi(uint8_t dest, uint32_t id, uint8_t mode, uint8_t vector) {
 	/* Write the destination ID to the high part of the ICR. */
-	g_lapic_mapping[LAPIC_REG_ICR1] = id << 24;
+	lapic_mapping[LAPIC_REG_ICR1] = id << 24;
 
 	/* Send the IPI:
 	 * - Destination Mode: Physical.
 	 * - Level: Assert (bit 14).
 	 * - Trigger Mode: Edge. */
-	g_lapic_mapping[LAPIC_REG_ICR0] = (1<<14) | (dest << 18) | (mode << 8) | vector;
+	lapic_mapping[LAPIC_REG_ICR0] = (1<<14) | (dest << 18) | (mode << 8) | vector;
 }
 
 /** Boot a CPU.
@@ -291,18 +291,18 @@ static void cpu_ipi(uint8_t dest, uint32_t id, uint8_t mode, uint8_t vector) {
 static void cpu_boot(kernel_args_cpu_t *cpu) {
 	uint32_t delay;
 
-	assert(!g_kernel_args->smp_disabled);
-	assert(!g_kernel_args->arch.lapic_disabled);
+	assert(!kernel_args->smp_disabled);
+	assert(!kernel_args->arch.lapic_disabled);
 
 	dprintf("cpu: booting CPU %" PRIu32 "...\n", cpu->id, cpu);
-	g_booting_cpu = cpu;
-	g_ap_boot_wait = 0;
+	booting_cpu = cpu;
+	atomic_set(&ap_boot_wait, 0);
 
 	/* Copy the trampoline code to 0x7000. */
 	memcpy((void *)0x7000, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
 
 	/* Allocate a new stack for the AP, marked as reclaimable. */
-	g_ap_stack = phys_memory_alloc(KSTACK_SIZE, PAGE_SIZE, true) + PAGE_SIZE;
+	ap_stack_ptr = phys_memory_alloc(KSTACK_SIZE, PAGE_SIZE, true) + PAGE_SIZE;
 
 	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
 	cpu_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
@@ -319,7 +319,7 @@ static void cpu_boot(kernel_args_cpu_t *cpu) {
 	spin(10000);
 
 	/* If the CPU is up, then return. */
-	if(g_ap_boot_wait) {
+	if(atomic_get(&ap_boot_wait)) {
 		return;
 	}
 
@@ -327,7 +327,7 @@ static void cpu_boot(kernel_args_cpu_t *cpu) {
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
 	cpu_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, 0x07);
 	for(delay = 0; delay < 5000000; delay += 10000) {
-		if(g_ap_boot_wait) {
+		if(atomic_get(&ap_boot_wait)) {
 			return;
 		}
 		spin(10000);
@@ -341,16 +341,16 @@ static void cpu_print_info(void) {
 	kernel_args_cpu_t *cpu;
 	phys_ptr_t addr;
 
-	dprintf("cpu: detected %" PRIu32 " CPU(s):\n", g_kernel_args->cpu_count);
+	dprintf("cpu: detected %" PRIu32 " CPU(s):\n", kernel_args->cpu_count);
 
-	for(addr = g_kernel_args->cpus; addr; addr = cpu->next) {
+	for(addr = kernel_args->cpus; addr; addr = cpu->next) {
 		cpu = (kernel_args_cpu_t *)((ptr_t)addr);
 
 		dprintf(" cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
 		        cpu->id, cpu->arch.model_name, cpu->arch.family,
 		        cpu->arch.model, cpu->arch.stepping);
 		dprintf("  cpu_freq: %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000 / 1000);
-		if(!g_kernel_args->arch.lapic_disabled) {
+		if(!kernel_args->arch.lapic_disabled) {
 			dprintf("  bus_freq: %" PRIu64 "MHz\n", cpu->arch.bus_freq / 1000 / 1000);
 		}
 		dprintf("  clsize:   %d\n", cpu->arch.cache_alignment);
@@ -361,7 +361,7 @@ static void cpu_print_info(void) {
  * @param us		Microseconds to delay for. */
 void spin(uint64_t us) {
 	/* Work out when we will finish */
-	uint64_t target = rdtsc() + ((g_boot_cpu->arch.cpu_freq / 1000000) * us);
+	uint64_t target = rdtsc() + ((boot_cpu->arch.cpu_freq / 1000000) * us);
 
 	/* Spin until the target is reached. */
 	while(rdtsc() < target) {
@@ -371,7 +371,7 @@ void spin(uint64_t us) {
 
 /** Get the ID of the current CPU. */
 uint32_t cpu_current_id(void) {
-	return (g_kernel_args->arch.lapic_disabled) ? 0 : (g_lapic_mapping[LAPIC_REG_APIC_ID] >> 24);
+	return (kernel_args->arch.lapic_disabled) ? 0 : (lapic_mapping[LAPIC_REG_APIC_ID] >> 24);
 }
 
 /** Boot all CPUs. */
@@ -379,7 +379,7 @@ void cpu_boot_all(void) {
 	kernel_args_cpu_t *cpu;
 	phys_ptr_t addr;
 
-	for(addr = g_kernel_args->cpus; addr; addr = cpu->next) {
+	for(addr = kernel_args->cpus; addr; addr = cpu->next) {
 		cpu = (kernel_args_cpu_t *)((ptr_t)addr);
 		if(cpu->id == cpu_current_id()) {
 			continue;
@@ -394,33 +394,33 @@ void cpu_boot_all(void) {
 void cpu_early_init(void) {
 	/* To begin with add the CPU with an ID of 0. It will be set correctly
 	 * once we have set up the LAPIC. */
-	g_booting_cpu = kargs_cpu_add(0);
+	booting_cpu = kargs_cpu_add(0);
 
 	/* Detect CPU information. */
-	cpu_arch_init(&g_booting_cpu->arch);
+	cpu_arch_init(&booting_cpu->arch);
 }
 
 /** Perform extra initialisation for the BSP. */
 void cpu_postmenu_init(void) {
 	/* Check if the LAPIC is available. */
-	if(!g_kernel_args->arch.lapic_disabled && cpu_lapic_init()) {
+	if(!kernel_args->arch.lapic_disabled && cpu_lapic_init()) {
 		/* Set the real ID of the boot CPU. */
-		g_booting_cpu->id = cpu_current_id();
-		if(g_booting_cpu->id > g_kernel_args->highest_cpu_id) {
-			g_kernel_args->highest_cpu_id = g_booting_cpu->id;
+		booting_cpu->id = cpu_current_id();
+		if(booting_cpu->id > kernel_args->highest_cpu_id) {
+			kernel_args->highest_cpu_id = booting_cpu->id;
 		}
 	} else {
 		/* Force SMP to be disabled if the boot CPU does not have a
 		 * local APIC or if it has been manually disabled. */
-		g_kernel_args->arch.lapic_disabled = true;
-		g_kernel_args->smp_disabled = true;
+		kernel_args->arch.lapic_disabled = true;
+		kernel_args->smp_disabled = true;
 	}
 }
 
 /** Perform AP initialisation. */
 void cpu_ap_init(void) {
-	cpu_arch_init(&g_booting_cpu->arch);
+	cpu_arch_init(&booting_cpu->arch);
 	if(!cpu_lapic_init()) {
-		fatal("CPU %" PRIu32 " APIC could not be enabled", g_booting_cpu->id);
+		fatal("CPU %" PRIu32 " APIC could not be enabled", booting_cpu->id);
 	}
 }

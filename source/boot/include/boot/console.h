@@ -69,8 +69,8 @@ typedef struct console {
 #define CONSOLE_KEY_LEFT	0x102
 #define CONSOLE_KEY_RIGHT	0x103
 
-extern console_t g_console;
-extern console_t g_debug_console;
+extern console_t main_console;
+extern console_t debug_console;
 
 extern int kprintf(const char *fmt, ...) __printf(1, 2);
 extern int dprintf(const char *fmt, ...) __printf(1, 2);

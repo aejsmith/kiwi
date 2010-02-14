@@ -103,7 +103,7 @@ static void *menu_display_real(menu_t *menu, size_t index) {
 	uint16_t ch;
 
 	/* Determine the number of items that can be fit on at a time. */
-	total = g_console.height - 4;
+	total = main_console.height - 4;
 
 	/* Set the initial offset based on the selected index. */
 	offset = 0;
@@ -114,19 +114,19 @@ static void *menu_display_real(menu_t *menu, size_t index) {
 
 	/* Loop until an item requests to exit the menu. */
 	while(!exit) {
-		g_console.clear();
+		main_console.clear();
 
 		/* Display a header. */
 		kprintf(menu->title);
-		g_console.highlight(0, 0, g_console.width, 1);
+		main_console.highlight(0, 0, main_console.width, 1);
 
 		/* Add instructions. */
-		g_console.move_cursor(0, g_console.height - 1);
+		main_console.move_cursor(0, main_console.height - 1);
 		kprintf("Enter/Space = Select   Up = Move up   Down = Move down");
-		g_console.highlight(0, g_console.height - 1, g_console.width, 1);
+		main_console.highlight(0, main_console.height - 1, main_console.width, 1);
 
 		/* Display each item. */
-		g_console.move_cursor(0, 2);
+		main_console.move_cursor(0, 2);
 		i = 0;
 		LIST_FOREACH(&menu->items, iter) {
 			if(i < offset || ((menu->count - offset) >= total && i >= (offset + total))) {
@@ -142,9 +142,9 @@ static void *menu_display_real(menu_t *menu, size_t index) {
 		while(true) {
 			/* highlight current entry, get a keypress and then
 			 * unhighlight before modifying anything. */
-			g_console.highlight(1, index + 2, g_console.width - 2, 1);
-			ch = g_console.getch();
-			g_console.highlight(1, index + 2, g_console.width - 2, 1);
+			main_console.highlight(1, index + 2, main_console.width - 2, 1);
+			ch = main_console.getch();
+			main_console.highlight(1, index + 2, main_console.width - 2, 1);
 
 			/* Handle the character. */
 			if(ch == CONSOLE_KEY_UP) {
@@ -180,7 +180,7 @@ static void *menu_display_real(menu_t *menu, size_t index) {
 	}
 
 	/* Clear the console. */
-	g_console.clear();
+	main_console.clear();
 
 	return ret;
 }
@@ -286,7 +286,7 @@ void menu_display(void) {
 
 	/* Give the user a short time to hold down shift. */
 	spin(300000);
-	if(!g_console.shift_held()) {
+	if(!main_console.shift_held()) {
 		return;
 	}
 
@@ -296,16 +296,16 @@ void menu_display(void) {
 
 	/* Add a list to choose the boot filesystem. */
 	volume = menu_add_choice(menu, "Boot Volume");
-	LIST_FOREACH(&g_filesystems, iter) {
+	LIST_FOREACH(&filesystem_list, iter) {
 		fs = list_entry(iter, vfs_filesystem_t, header);
-		menu_item_add_choice(volume, fs->label, fs, fs == g_boot_filesystem);
+		menu_item_add_choice(volume, fs->label, fs, fs == boot_filesystem);
 	}
 
 	/* Add a menu to set kernel options. */
 	options = menu_add_submenu(menu, "Kernel Options");
 	menu_add_exit(options, "Return to main menu", NULL);
-	menu_add_checkbox(options, "Disable SMP", &g_kernel_args->smp_disabled);
-	menu_add_checkbox(options, "Disable boot splash", &g_kernel_args->splash_disabled);
+	menu_add_checkbox(options, "Disable SMP", &kernel_args->smp_disabled);
+	menu_add_checkbox(options, "Disable boot splash", &kernel_args->splash_disabled);
 
 	/* Add architecture/platform options. */
 	arch_add_menu_options(menu, options);
@@ -315,5 +315,5 @@ void menu_display(void) {
 	menu_display_real(menu, 0);
 
 	/* Pull the boot filesystem option out. */
-	g_boot_filesystem = (vfs_filesystem_t *)volume->value;
+	boot_filesystem = (vfs_filesystem_t *)volume->value;
 }

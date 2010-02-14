@@ -30,9 +30,9 @@
 #include <errors.h>
 #include <kargs.h>
 
-extern unsigned char g_console_font[];
-extern unsigned char g_logo_ppm[];
-extern unsigned char g_copyright_ppm[];
+extern unsigned char console_font[];
+extern unsigned char logo_ppm[];
+extern unsigned char copyright_ppm[];
 
 /** Width and height of the console font. */
 #define FONT_WIDTH		6
@@ -45,7 +45,7 @@ extern unsigned char g_copyright_ppm[];
 #define SPLASH_PROGRESS_HEIGHT	3
 
 /** Size of one row in bytes. */
-#define ROW_SIZE		((g_fb_console_width * FONT_HEIGHT) * (g_fb_console_depth / 8))
+#define ROW_SIZE		((fb_console_width * FONT_HEIGHT) * (fb_console_depth / 8))
 
 /** Get red colour from RGB value. */
 #define RED(x, bits)		((x >> (24 - bits)) & ((1 << bits) - 1))
@@ -57,24 +57,24 @@ extern unsigned char g_copyright_ppm[];
 #define BLUE(x, bits)		((x >> (8  - bits)) & ((1 << bits) - 1))
 
 /** Boot splash information. */
-static bool g_splash_enabled = false;
-static uint16_t g_splash_progress_x;
-static uint16_t g_splash_progress_y;
+static bool splash_enabled = false;
+static uint16_t splash_progress_x;
+static uint16_t splash_progress_y;
 
 /** Current display mode. */
-uint16_t g_fb_console_width;
-uint16_t g_fb_console_height;
-uint8_t g_fb_console_depth;
+uint16_t fb_console_width;
+uint16_t fb_console_height;
+uint8_t fb_console_depth;
 
 /** Framebuffer console details. */
-static uint16_t g_fb_console_cols;
-static uint16_t g_fb_console_rows;
-static uint16_t g_fb_console_x = 0;
-static uint16_t g_fb_console_y = 0;
-static char *g_fb_console_mapping = NULL;
+static uint16_t fb_console_cols;
+static uint16_t fb_console_rows;
+static uint16_t fb_console_x = 0;
+static uint16_t fb_console_y = 0;
+static char *fb_console_mapping = NULL;
 
 /** Backbuffer for the console. */
-static char *g_fb_console_buffer = NULL;
+static char *fb_console_buffer = NULL;
 
 /** Lock for the framebuffer console. */
 static SPINLOCK_DECLARE(fb_console_lock);
@@ -123,13 +123,13 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
  * @param x		X position of pixel.
  * @param y		Y position of pixel. */
 static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
-	size_t offset = ((y * g_fb_console_width) + x) * (g_fb_console_depth / 8);
-	char *mdest = g_fb_console_mapping + offset;
-	char *bdest = g_fb_console_buffer + offset;
+	size_t offset = ((y * fb_console_width) + x) * (fb_console_depth / 8);
+	char *mdest = fb_console_mapping + offset;
+	char *bdest = fb_console_buffer + offset;
 	uint16_t colour16;
 
 	/* Draw the pixel. */
-	switch(g_fb_console_depth) {
+	switch(fb_console_depth) {
 	case 16:
 		colour16 = (RED(colour, 5) << 11) | (GREEN(colour, 6) << 5) | BLUE(colour, 5);
 		*(uint16_t *)mdest = *(uint16_t *)bdest = colour16;
@@ -209,24 +209,24 @@ static void fb_console_putch(unsigned char ch) {
 	switch(ch) {
 	case '\b':
 		/* Backspace, move back one character if we can. */
-		if(g_fb_console_x) {
-			g_fb_console_x--;
-		} else if(g_fb_console_y) {
-			g_fb_console_x = g_fb_console_rows - 1;
-			g_fb_console_y--;
+		if(fb_console_x) {
+			fb_console_x--;
+		} else if(fb_console_y) {
+			fb_console_x = fb_console_rows - 1;
+			fb_console_y--;
 		}
 		break;
 	case '\r':
 		/* Carriage return, move to the start of the line. */
-		g_fb_console_x = 0;
+		fb_console_x = 0;
 		break;
 	case '\n':
 		/* Newline, treat it as if a carriage return was also there. */
-		g_fb_console_x = 0;
-		g_fb_console_y++;
+		fb_console_x = 0;
+		fb_console_y++;
 		break;
 	case '\t':
-		g_fb_console_x += 8 - (g_fb_console_x % 8);
+		fb_console_x += 8 - (fb_console_x % 8);
 		break;
 	default:
 		/* If it is a non-printing character, ignore it. */
@@ -234,11 +234,11 @@ static void fb_console_putch(unsigned char ch) {
 			break;
 		}
 
-		x = g_fb_console_x * FONT_WIDTH;
-		y = g_fb_console_y * FONT_HEIGHT;
+		x = fb_console_x * FONT_WIDTH;
+		y = fb_console_y * FONT_HEIGHT;
 		for(i = 0; i < FONT_HEIGHT; i++) {
 			for(j = 0; j < FONT_WIDTH; j++) {
-				if(g_console_font[(ch * FONT_HEIGHT) + i] & (1<<(7-j))) {
+				if(console_font[(ch * FONT_HEIGHT) + i] & (1<<(7-j))) {
 					fb_console_putpixel(0xffffff, x + j, y + i);
 				} else {
 					fb_console_putpixel(0x0, x + j, y + i);
@@ -246,35 +246,35 @@ static void fb_console_putch(unsigned char ch) {
 			}
 		}
 
-		g_fb_console_x++;
+		fb_console_x++;
 		break;
 	}
 
 	/* If we have reached the edge of the screen insert a new line. */
-	if(g_fb_console_x >= g_fb_console_cols) {
-		g_fb_console_x = 0;
-		g_fb_console_y++;
+	if(fb_console_x >= fb_console_cols) {
+		fb_console_x = 0;
+		fb_console_y++;
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
-	if(g_fb_console_y >= g_fb_console_rows) {
+	if(fb_console_y >= fb_console_rows) {
 		/* Move everything up in the backbuffer, and fill the last row
 		 * with blanks. */
-		memcpy(g_fb_console_buffer, g_fb_console_buffer + ROW_SIZE,
-		       ROW_SIZE * (g_fb_console_rows - 1));
-		memset(g_fb_console_buffer + (ROW_SIZE * (g_fb_console_rows - 1)), 0, ROW_SIZE);
+		memcpy(fb_console_buffer, fb_console_buffer + ROW_SIZE,
+		       ROW_SIZE * (fb_console_rows - 1));
+		memset(fb_console_buffer + (ROW_SIZE * (fb_console_rows - 1)), 0, ROW_SIZE);
 
 		/* Copy the updated backbuffer onto the framebuffer. */
-		memcpy(g_fb_console_mapping, g_fb_console_buffer,
-		       g_fb_console_width * g_fb_console_height * (g_fb_console_depth / 8));
+		memcpy(fb_console_mapping, fb_console_buffer,
+		       fb_console_width * fb_console_height * (fb_console_depth / 8));
 
 		/* Update the cursor position. */
-		g_fb_console_y = g_fb_console_rows - 1;
+		fb_console_y = fb_console_rows - 1;
 	}
 }
 
 /** Framebuffer console. */
-console_t g_fb_console = {
+console_t fb_console = {
 	.min_level = LOG_NORMAL,
 	.putch = fb_console_putch,
 };
@@ -299,21 +299,21 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 	//spinlock_lock(&fb_console_lock, 0);
 
 	/* Save old mapping/buffer details to unmap/free after unlocking. */
-	if(g_fb_console_mapping) {
-		omap = g_fb_console_mapping;
-		obuf = g_fb_console_buffer;
-		size = g_fb_console_width * g_fb_console_height * (g_fb_console_depth / 8);
+	if(fb_console_mapping) {
+		omap = fb_console_mapping;
+		obuf = fb_console_buffer;
+		size = fb_console_width * fb_console_height * (fb_console_depth / 8);
 	}
 
 	/* Store new details. */
-	g_fb_console_mapping = nmap;
-	g_fb_console_buffer = nbuf;
-	g_fb_console_width = width;
-	g_fb_console_height = height;
-	g_fb_console_depth = depth;
-	g_fb_console_cols = width / FONT_WIDTH;
-	g_fb_console_rows = height / FONT_HEIGHT;
-	g_fb_console_x = g_fb_console_y = 0;
+	fb_console_mapping = nmap;
+	fb_console_buffer = nbuf;
+	fb_console_width = width;
+	fb_console_height = height;
+	fb_console_depth = depth;
+	fb_console_cols = width / FONT_WIDTH;
+	fb_console_rows = height / FONT_HEIGHT;
+	fb_console_x = fb_console_y = 0;
 
 	//spinlock_unlock(&fb_console_lock);
 
@@ -327,7 +327,7 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 /** Reset the framebuffer console cursor position. */
 void fb_console_reset(void) {
 	spinlock_lock(&fb_console_lock, 0);
-	g_fb_console_x = g_fb_console_y = 0;
+	fb_console_x = fb_console_y = 0;
 	spinlock_unlock(&fb_console_lock);
 }
 
@@ -339,27 +339,27 @@ void __init_text console_init(kernel_args_t *args) {
 	/* Configure the console using information from the bootloader and
 	 * register it. */
 	fb_console_reconfigure(args->fb_width, args->fb_height, args->fb_depth, args->fb_addr);
-	console_register(&g_fb_console);
+	console_register(&fb_console);
 
 	if(!args->splash_disabled) {
-		g_fb_console.inhibited = true;
-		g_splash_enabled = true;
+		fb_console.inhibited = true;
+		splash_enabled = true;
 
 		/* Draw copyright text. */
-		ppm_size(g_copyright_ppm, &width, &height);
-		fb_console_draw_ppm(g_copyright_ppm, (g_fb_console_width / 2) - (width / 2),
-		                    g_fb_console_height - height - 5);
+		ppm_size(copyright_ppm, &width, &height);
+		fb_console_draw_ppm(copyright_ppm, (fb_console_width / 2) - (width / 2),
+		                    fb_console_height - height - 5);
 
 		/* Get logo dimensions. */
-		ppm_size(g_logo_ppm, &width, &height);
+		ppm_size(logo_ppm, &width, &height);
 
 		/* Determine where to draw the progress bar. */
-		g_splash_progress_x = (g_fb_console_width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
-		g_splash_progress_y = (g_fb_console_height / 2) + (height / 2) + 10;
+		splash_progress_x = (fb_console_width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
+		splash_progress_y = (fb_console_height / 2) + (height / 2) + 10;
 
 		/* Draw logo. */
-		fb_console_draw_ppm(g_logo_ppm, (g_fb_console_width / 2) - (width / 2),
-		                    (g_fb_console_height / 2) - (height / 2) - 10);
+		fb_console_draw_ppm(logo_ppm, (fb_console_width / 2) - (width / 2),
+		                    (fb_console_height / 2) - (height / 2) - 10);
 
 		/* Draw initial progress bar. */
 		console_update_boot_progress(0);
@@ -369,12 +369,12 @@ void __init_text console_init(kernel_args_t *args) {
 /** Update the progress on the boot splash.
  * @param percent	Boot progress percentage. */
 void console_update_boot_progress(int percent) {
-	if(g_splash_enabled) {
-		fb_console_fillrect(SPLASH_PROGRESS_BG, g_splash_progress_x,
-		                    g_splash_progress_y, SPLASH_PROGRESS_WIDTH,
+	if(splash_enabled) {
+		fb_console_fillrect(SPLASH_PROGRESS_BG, splash_progress_x,
+		                    splash_progress_y, SPLASH_PROGRESS_WIDTH,
 		                    SPLASH_PROGRESS_HEIGHT);
-		fb_console_fillrect(SPLASH_PROGRESS_FG, g_splash_progress_x,
-		                    g_splash_progress_y, (SPLASH_PROGRESS_WIDTH * percent) / 100,
+		fb_console_fillrect(SPLASH_PROGRESS_FG, splash_progress_x,
+		                    splash_progress_y, (SPLASH_PROGRESS_WIDTH * percent) / 100,
 		                    SPLASH_PROGRESS_HEIGHT);
 	}
 }

@@ -90,9 +90,9 @@
 
 /** Array of ISR handlers, each 16 bytes long. */
 .align 16
-.global __isr_array
-.type __isr_array, @function
-__isr_array:
+.global isr_array
+.type isr_array, @function
+isr_array:
 	/* Define the exceptions (0-19) and the reserved interrupts (20-31). */
 	ISR	0
 	ISR	1
@@ -133,7 +133,7 @@ __isr_array:
 		ISR .Lintr
 		.Lintr = .Lintr+1
 	.endr
-.size __isr_array, .-__isr_array
+.size isr_array, .-isr_array
 
 /** Common ISR handling code. */
 .type isr_common, @function

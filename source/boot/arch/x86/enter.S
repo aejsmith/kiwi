@@ -58,7 +58,6 @@ arch_enter_kernel64:
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
-	lgdt	(g_gdt_pointer)
 	ljmp	$SEGMENT_CS64, $.Llmode
 .align 8
 .code64

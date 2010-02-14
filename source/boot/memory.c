@@ -40,14 +40,14 @@ typedef struct memory_range {
 	int type;			/**< Type of range. */
 } memory_range_t;
 
-extern char __start[], __end[], g_boot_stack[];
+extern char __start[], __end[], boot_stack[];
 
 /** Statically allocated heap. */
-static uint8_t g_heap[HEAP_SIZE] __aligned(PAGE_SIZE);
-static size_t g_heap_next = 0;
+static uint8_t loader_heap[HEAP_SIZE] __aligned(PAGE_SIZE);
+static size_t loader_heap_next = 0;
 
 /** List of physical memory ranges. */
-static LIST_DECLARE(g_memory_ranges);
+static LIST_DECLARE(memory_ranges);
 
 /** Allocate a memory range structure.
  * @param start		Start address.
@@ -68,7 +68,7 @@ static memory_range_t *memory_range_alloc(phys_ptr_t start, phys_ptr_t end, int 
 static void memory_range_merge(memory_range_t *range) {
 	memory_range_t *other;
 
-	if(g_memory_ranges.next != &range->header) {
+	if(memory_ranges.next != &range->header) {
 		other = list_entry(range->header.prev, memory_range_t, header);
 		if(other->end == range->start && other->type == range->type) {
 			range->start = other->start;
@@ -76,7 +76,7 @@ static void memory_range_merge(memory_range_t *range) {
 			kfree(other);
 		}
 	}
-	if(g_memory_ranges.prev != &range->header) {
+	if(memory_ranges.prev != &range->header) {
 		other = list_entry(range->header.next, memory_range_t, header);
 		if(other->start == range->end && other->type == range->type) {
 			range->end = other->end;
@@ -90,7 +90,7 @@ static void memory_range_merge(memory_range_t *range) {
 static void phys_memory_dump(void) {
 	memory_range_t *range;
 
-	LIST_FOREACH(&g_memory_ranges, iter) {
+	LIST_FOREACH(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
 
 		dprintf(" 0x%016" PRIpp "-0x%016" PRIpp ": ", range->start, range->end);
@@ -131,7 +131,7 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
 	range = memory_range_alloc(start, end, type);
 
 	/* Try to find where to insert the region in the list. */
-	LIST_FOREACH(&g_memory_ranges, iter) {
+	LIST_FOREACH(&memory_ranges, iter) {
 		other = list_entry(iter, memory_range_t, header);
 		if(start <= other->start) {
 			list_add_before(&other->header, &range->header);
@@ -141,11 +141,11 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
 
 	/* If the range has not been added, add it now. */
 	if(list_empty(&range->header)) {
-		list_append(&g_memory_ranges, &range->header);
+		list_append(&memory_ranges, &range->header);
 	}
 
 	/* Check if the new range has overlapped part of the previous range. */
-	if(g_memory_ranges.next != &range->header) {
+	if(memory_ranges.next != &range->header) {
 		other = list_entry(range->header.prev, memory_range_t, header);
 		if(range->start < other->end) {
 			if(other->end > range->end) {
@@ -159,7 +159,7 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
 
 	/* Swallow up any following ranges that the new range overlaps. */
 	LIST_FOREACH_SAFE(&range->header, iter) {
-		if(iter == &g_memory_ranges) {
+		if(iter == &memory_ranges) {
 			break;
 		}
 
@@ -185,13 +185,13 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
  * @param size		Size of allocation to make.
  * @return		Address of allocation. */
 void *kmalloc(size_t size) {
-	uint8_t *ret = g_heap + g_heap_next;
+	uint8_t *ret = loader_heap + loader_heap_next;
 
-	if((g_heap_next + size) > HEAP_SIZE) {
+	if((loader_heap_next + size) > HEAP_SIZE) {
 		fatal("Exhausted available heap space");
 	}
 
-	g_heap_next += size;
+	loader_heap_next += size;
 	return ret;
 }
 
@@ -225,7 +225,7 @@ phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim) {
 	assert(!(size % PAGE_SIZE));
 
 	/* Find a free range that is large enough to hold the new range. */
-	LIST_FOREACH(&g_memory_ranges, iter) {
+	LIST_FOREACH(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
 		if(range->type != PHYS_MEMORY_FREE) {
 			continue;
@@ -258,10 +258,10 @@ void memory_init() {
 	phys_memory_add(ROUND_DOWN((phys_ptr_t)((ptr_t)__start), PAGE_SIZE),
 	                (phys_ptr_t)((ptr_t)__end),
 	                PHYS_MEMORY_INTERNAL);
-	phys_memory_add((ptr_t)g_heap, (ptr_t)g_heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
+	phys_memory_add((ptr_t)loader_heap, (ptr_t)loader_heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
 
 	/* Mark the boot CPU's stack as reclaimable. */
-	phys_memory_add((ptr_t)g_boot_stack, (ptr_t)g_boot_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);
+	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);
 }
 
 /** Reclaim internal memory and write the memory map. */
@@ -270,7 +270,7 @@ void memory_finalise() {
 	size_t i = 0;
 
 	/* Reclaim all internal memory ranges. */
-	LIST_FOREACH(&g_memory_ranges, iter) {
+	LIST_FOREACH(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
 		if(range->type == PHYS_MEMORY_INTERNAL) {
 			range->type = PHYS_MEMORY_FREE;
@@ -283,18 +283,18 @@ void memory_finalise() {
 	phys_memory_dump();
 
 	/* Write out all ranges to the arguments structure. */
-	LIST_FOREACH(&g_memory_ranges, iter) {
+	LIST_FOREACH(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
 
 		if(i >= KERNEL_ARGS_RANGES_MAX) {
 			fatal("Too many physical memory ranges");
 		}
 
-		g_kernel_args->phys_ranges[i].type = range->type;
-		g_kernel_args->phys_ranges[i].start = range->start;
-		g_kernel_args->phys_ranges[i].end = range->end;
+		kernel_args->phys_ranges[i].type = range->type;
+		kernel_args->phys_ranges[i].start = range->start;
+		kernel_args->phys_ranges[i].end = range->end;
 		i++;
 	}
 
-	g_kernel_args->phys_range_count = i;
+	kernel_args->phys_range_count = i;
 }

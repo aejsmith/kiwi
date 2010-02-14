@@ -101,7 +101,7 @@ typedef struct kernel_args {
 } __packed kernel_args_t;
 
 #ifdef LOADER
-extern kernel_args_t *g_kernel_args;
+extern kernel_args_t *kernel_args;
 
 extern kernel_args_cpu_t *kargs_cpu_add(uint32_t id);
 extern kernel_args_module_t *kargs_module_add(phys_ptr_t base, uint32_t size);

@@ -73,7 +73,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 	ptr_t i;
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(!page_map_remove(&g_kernel_page_map, i, &page)) {
+		if(!page_map_remove(&kernel_page_map, i, &page)) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
@@ -122,7 +122,7 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		}
 
 		/* Map the page into the kernel address space. */
-		if(page_map_insert(&g_kernel_page_map, ret + i, page, true, true,
+		if(page_map_insert(&kernel_page_map, ret + i, page, true, true,
 		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", page, ret + i);
 			page_free(page, 1);
@@ -209,7 +209,7 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE, base += PAGE_SIZE) {
-		if(page_map_insert(&g_kernel_page_map, ret + i, base, true, true,
+		if(page_map_insert(&kernel_page_map, ret + i, base, true, true,
 		                   vmflag & MM_FLAG_MASK) != 0) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", base, ret + i);
 			goto fail;
