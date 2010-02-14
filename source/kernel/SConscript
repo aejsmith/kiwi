@@ -110,7 +110,7 @@ env = envmgr.Create('kernel', {
 	},
 })
 
-# Set up stuff for using Clang.
+# Set up stuff for using clang.
 if config['USE_CLANG']:
 	if env['ENV'].has_key('CCC_CC'):
 		env['CCC_CC'] = 'clang'

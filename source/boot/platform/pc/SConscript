@@ -28,7 +28,7 @@ env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
 
 # Build the stage 1 loaders.
 env.Program('cdboot.elf', 'cdboot.S', LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-Ttext,0x7C00', '-Wl,-N'])
-env.Command('cdboot', 'cdboot.elf', Action('$OBJCOPY -O binary --strip-unneeded -R .note -R .comment $SOURCE $TARGET', '$GENCOMSTR'))
+env.Command('cdboot', 'cdboot.elf', Action("$OBJCOPY -O binary --strip-all -R '.note.*' -R .comment $SOURCE $TARGET", '$GENCOMSTR'))
 envmgr['dist']['CDBOOT'] = File('cdboot')
 
 # Function to generate an ISO image.

@@ -117,7 +117,7 @@ static void *menu_display_real(menu_t *menu, size_t index) {
 		main_console.clear();
 
 		/* Display a header. */
-		kprintf(menu->title);
+		kprintf("%s", menu->title);
 		main_console.highlight(0, 0, main_console.width, 1);
 
 		/* Add instructions. */
