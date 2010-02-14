@@ -76,9 +76,6 @@ static char *fb_console_mapping = NULL;
 /** Backbuffer for the console. */
 static char *fb_console_buffer = NULL;
 
-/** Lock for the framebuffer console. */
-static SPINLOCK_DECLARE(fb_console_lock);
-
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.
  * @return		Address of next non-whitespace byte. */
@@ -221,9 +218,9 @@ static void fb_console_putch(unsigned char ch) {
 		fb_console_x = 0;
 		break;
 	case '\n':
-		/* Newline, treat it as if a carriage return was also there. */
-		fb_console_x = 0;
-		fb_console_y++;
+		/* Newline, treat it as if a carriage return was there (will
+		 * be handled below. */
+		fb_console_x = fb_console_cols;
 		break;
 	case '\t':
 		fb_console_x += 8 - (fb_console_x % 8);
@@ -253,7 +250,10 @@ static void fb_console_putch(unsigned char ch) {
 	/* If we have reached the edge of the screen insert a new line. */
 	if(fb_console_x >= fb_console_cols) {
 		fb_console_x = 0;
-		fb_console_y++;
+		if(++fb_console_y < fb_console_rows) {
+			memset(fb_console_mapping + (ROW_SIZE * fb_console_y), 0, ROW_SIZE);
+			memset(fb_console_buffer + (ROW_SIZE * fb_console_y), 0, ROW_SIZE);
+		}
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
@@ -326,9 +326,11 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 
 /** Reset the framebuffer console cursor position. */
 void fb_console_reset(void) {
-	spinlock_lock(&fb_console_lock, 0);
+	//spinlock_lock(&fb_console_lock, 0);
 	fb_console_x = fb_console_y = 0;
-	spinlock_unlock(&fb_console_lock);
+	memset(fb_console_mapping, 0, ROW_SIZE);
+	memset(fb_console_buffer, 0, ROW_SIZE);
+	//spinlock_unlock(&fb_console_lock);
 }
 
 /** Initialise the framebuffer console.
