@@ -21,8 +21,8 @@
 #include <kernel/errors.h>
 #include <kernel/process.h>
 
-#include <rtld/args.h>
-#include <rtld/utility.h>
+#include "args.h"
+#include "utility.h"
 
 /** Define to 1 if it is desired for debug mode to always be enabled. */
 #define RTLD_ALWAYS_DEBUG	0

@@ -11,11 +11,14 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env')
 
-# Get a list of source files.
-sources = []
-SConscript(dirs=['generic'], exports=['env', 'sources'])
-
-# Build the library from this.
-env.SharedLibrary('kiwi', sources, LIBS=['stdc++'])
+env.SharedLibrary('kiwi', [
+	'EventLoop.cc',
+	'Handle.cc',
+	'IPCConnection.cc',
+	'IPCPort.cc',
+	'Object.cc',
+	'Process.cc',
+	'Signal.cc',
+], LIBS=['stdc++'])

@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,13 +11,15 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'sources')
+Import('env')
+
+sources = map(File, [
+	'setjmp.S',
+])
 
 # Build rule to create required CRT files.
 env.Object('%s/crt1.o' % (str(env['LIBOUTDIR'])), ['crt1.S'])
 env.Object('%s/crti.o' % (str(env['LIBOUTDIR'])), ['crti.S'])
 env.Object('%s/crtn.o' % (str(env['LIBOUTDIR'])), ['crtn.S'])
 
-sources += [
-	File('setjmp.S'),
-]
+Return('sources')

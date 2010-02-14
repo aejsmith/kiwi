@@ -18,9 +18,9 @@
  * @brief		RTLD symbol functions.
  */
 
-#include <rtld/export.h>
-#include <rtld/symbol.h>
-#include <rtld/utility.h>
+#include "export.h"
+#include "symbol.h"
+#include "utility.h"
 
 /** Work out the ELF hash for a symbol name.
  * @param name		Name to get hash of.

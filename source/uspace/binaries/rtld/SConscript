@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,25 +11,35 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config', 'envmgr')
+Import('env', 'config')
 
-# Set up the include directory.
-Dir('include/rtld').link(Dir('#source/uspace/binaries/rtld/generic/include'), 1)
-Dir('include/rtld/arch').link(Dir('#source/uspace/binaries/rtld/arch/%s/include' % (config['ARCH'])), 1)
+sources = map(File, [
+	'args.c',
+	'export.c',
+	'image.c',
+	'main.c',
+	'symbol.c',
+	'syscalls.S',
+	'utility.c',
+])
 
-# Get the list of source files.
-sources = []
-SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
+# Generate the system call functions.
+env.Sysgen('syscalls.S', 'syscalls.def')
+
+# Get the list of architecture-specific source files.
+arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 
 # Figure out the path to the linker script. A special script is required to
 # ensure that the RTLD is linked to run at an address that will not conflict
 # with real binaries.
 ldscript = File('arch/%s/link.ld' % (config['ARCH']))
 
+# Copy the architecture header in.
+Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
+
 # Build the RTLD from these sources. The RTLD must be statically linked, and
 # should not use any external libraries.
-target = env.Program('rtld-%s' % (config['ARCH']), sources,
-	CPPPATH=env['CPPPATH'] + [Dir('include')],
+target = env.Program('rtld-%s' % (config['ARCH']), arch_sources + sources,
 	LDSCRIPT=ldscript,
 	LINKFLAGS='-static -nostdlib -Wl,-T,$LDSCRIPT',
 	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding']

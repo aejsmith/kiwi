@@ -11,8 +11,8 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('sources')
+sources = map(File, [
+	'arch.c',
+])
 
-sources += [
-	File('arch.c'),
-]
+Return('sources')

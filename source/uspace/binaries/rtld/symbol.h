@@ -15,30 +15,15 @@
 
 /**
  * @file
- * @brief		AMD64 RTLD ELF definitions
+ * @brief		RTLD symbol functions.
  */
 
-#ifndef __RTLD_ARCH_ELF_H
-#define __RTLD_ARCH_ELF_H
+#ifndef __RTLD_SYMBOL_H
+#define __RTLD_SYMBOL_H
 
-#include <elf.h>
+#include "image.h"
+#include <stdbool.h>
 
-/** Macro to get the correct ELF type. */
-#define _ElfW(type)		Elf64_##type
-#define ElfW(type)		_ElfW(type)
+extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp);
 
-/** Relocation types. */
-#define ELF_DT_REL_TYPE		ELF_DT_RELA
-#define ELF_DT_RELSZ_TYPE	ELF_DT_RELASZ
-#define ELF_DT_RELENT_TYPE	ELF_DT_RELAENT
-#define ELF_REL_TYPE		Rela
-
-/** Machine type definitions. */
-#define ELF_CLASS		ELFCLASS64
-#define ELF_ENDIAN		ELFDATA2LSB
-#define ELF_MACHINE		ELF_EM_X86_64
-
-/* FIXME: Better place for this. */
-#define PAGE_SIZE		0x1000
-
-#endif /* __RTLD_ARCH_ELF_H */
+#endif /* __RTLD_SYMBOL_H */

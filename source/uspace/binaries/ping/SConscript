@@ -13,6 +13,4 @@
 
 Import('env')
 
-env.Program('ping', [
-	'main.cc',
-], LIBS=['kiwi'])
+env.Program('ping', ['main.cc'], LIBS=['kiwi'])

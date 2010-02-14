@@ -20,12 +20,12 @@
 
 #include <kernel/vm.h>
 
-#include <rtld/args.h>
-#include <rtld/utility.h>
-
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "args.h"
+#include "utility.h"
 
 extern int _vm_map_file(vm_map_args_t *args);
 extern int putch(char ch);

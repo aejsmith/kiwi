@@ -23,9 +23,9 @@
 #include <kernel/handle.h>
 #include <kernel/vm.h>
 
-#include <rtld/args.h>
-#include <rtld/image.h>
-#include <rtld/utility.h>
+#include "args.h"
+#include "image.h"
+#include "utility.h"
 
 /** List of loaded images. */
 LIST_DECLARE(rtld_loaded_images);

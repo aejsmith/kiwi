@@ -13,10 +13,11 @@
 
 Import('env', 'config')
 
-# Get the list of source files.
-sources = []
-if config['ARCH'] == 'amd64' or config['ARCH'] == 'ia32':
-	SConscript(dirs=['arch/x86'], exports=['env', 'sources'])
-SConscript(dirs=['generic'], exports=['env', 'sources'])
+sources = map(File, [
+	'pci.c',
+])
 
-env.Module('pci', sources)
+# Get the architecture-specific source files.
+arch_sources = SConscript(dirs=['arch/%s' % (config['SRCARCH'])], exports=['env'])
+
+env.Module('pci', sources + arch_sources)

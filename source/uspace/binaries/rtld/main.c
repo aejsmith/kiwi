@@ -21,9 +21,9 @@
 #include <kernel/errors.h>
 #include <kernel/process.h>
 
-#include <rtld/args.h>
-#include <rtld/image.h>
-#include <rtld/utility.h>
+#include "args.h"
+#include "image.h"
+#include "utility.h"
 
 extern void *rtld_main(process_args_t *args);
 

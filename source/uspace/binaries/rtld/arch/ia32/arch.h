@@ -15,15 +15,30 @@
 
 /**
  * @file
- * @brief		RTLD symbol functions.
+ * @brief		IA32 RTLD definitions.
  */
 
-#ifndef __RTLD_SYMBOL_H
-#define __RTLD_SYMBOL_H
+#ifndef __RTLD_ARCH_H
+#define __RTLD_ARCH_H
 
-#include <rtld/image.h>
-#include <stdbool.h>
+#include <elf.h>
 
-extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp);
+/** Macro to get the correct ELF type. */
+#define _ElfW(type)		Elf32_##type
+#define ElfW(type)		_ElfW(type)
 
-#endif /* __RTLD_SYMBOL_H */
+/** Relocation types. */
+#define ELF_DT_REL_TYPE		ELF_DT_REL
+#define ELF_DT_RELSZ_TYPE	ELF_DT_RELSZ
+#define ELF_DT_RELENT_TYPE	ELF_DT_RELENT
+#define ELF_REL_TYPE		Rel
+
+/** Machine type definitions. */
+#define ELF_CLASS		ELFCLASS32
+#define ELF_ENDIAN		ELFDATA2LSB
+#define ELF_MACHINE		ELF_EM_386
+
+/* FIXME: Better place for this. */
+#define PAGE_SIZE		0x1000
+
+#endif /* __RTLD_ARCH_H */

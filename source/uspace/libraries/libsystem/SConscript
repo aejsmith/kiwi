@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -13,9 +13,99 @@
 
 Import('env', 'config')
 
-# Get a list of source files.
-sources = []
-SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic'], exports=['env', 'sources'])
+sources = map(File, [
+	'ctype/isalnum.c',
+	'ctype/isalpha.c',
+	'ctype/isascii.c',
+	'ctype/isblank.c',
+	'ctype/iscntrl.c',
+	'ctype/isdigit.c',
+	'ctype/isgraph.c',
+	'ctype/islower.c',
+	'ctype/isprint.c',
+	'ctype/ispunct.c',
+	'ctype/isspace.c',
+	'ctype/isupper.c',
+	'ctype/isxdigit.c',
+	'ctype/toascii.c',
+	'ctype/tolower.c',
+	'ctype/toupper.c',
+
+	'kernel/device.c',
+	'kernel/syscalls.S',
+	'kernel/vm.c',
+
+	'locale/localeconv.c',
+	'locale/setlocale.c',
+
+	'stdio/do_printf.c',
+	'stdio/do_scanf.c',
+	'stdio/fclose.c',
+	'stdio/fflush.c',
+	'stdio/fgetc.c',
+	'stdio/fgets.c',
+	'stdio/fopen.c',
+	'stdio/fputc.c',
+	'stdio/fputs.c',
+	'stdio/fread.c',
+	'stdio/fseek.c',
+	'stdio/fstatus.c',
+	'stdio/fwrite.c',
+	'stdio/vfprintf.c',
+	'stdio/vfscanf.c',
+	'stdio/vsnprintf.c',
+	'stdio/vsscanf.c',
+
+	'stdlib/abort.c',
+	'stdlib/abs.c',
+	'stdlib/atoi.c',
+	'stdlib/atoll.c',
+	'stdlib/atof.c',
+	'stdlib/bsearch.c',
+	'stdlib/environ.c',
+	'stdlib/exit.c',
+	'stdlib/malloc.c',
+	'stdlib/qsort.c',
+	'stdlib/rand.c',
+	'stdlib/strtod.c',
+	'stdlib/strtoul.c',
+
+	'string/memchr.c',
+	'string/memcmp.c',
+	'string/memcpy.c',
+	'string/memmove.c',
+	'string/memset.c',
+	'string/strcasecmp.c',
+	'string/strcat.c',
+	'string/strchr.c',
+	'string/strcmp.c',
+	'string/strcpy.c',
+	'string/strcspn.c',
+	'string/strdup.c',
+	'string/strerror.c',
+	'string/strlen.c',
+	'string/strpbrk.c',
+	'string/strsep.c',
+	'string/strstr.c',
+	'string/strtok.c',
+
+	'time/asctime.c',
+	'time/gmtime.c',
+	'time/localtime.c',
+	'time/mktime.c',
+	'time/strftime.c',
+
+	'errno.c',
+	'fatal.c',
+	'init.c',
+	'rtld.c',
+])
+
+# Generate the system call functions.
+env.Sysgen('kernel/syscalls.S', 'kernel/syscalls.def')
+
+# Get a list of architecture-specific source files.
+arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 
 # Build the library from this.
-env.SharedLibrary('system', sources, LINKFLAGS='-nodefaultlibs')
+env.SharedLibrary('system', arch_sources + sources, LINKFLAGS='-nodefaultlibs')

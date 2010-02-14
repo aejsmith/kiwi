@@ -21,8 +21,8 @@
 #ifndef __RTLD_IMAGE_H
 #define __RTLD_IMAGE_H
 
-#include <rtld/arch/elf.h>
-#include <rtld/list.h>
+#include "arch.h"
+#include "list.h"
 
 #define __need_size_t
 #define __need_NULL

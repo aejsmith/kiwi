@@ -20,9 +20,9 @@
 
 #include <kernel/errors.h>
 
-#include <rtld/image.h>
-#include <rtld/symbol.h>
-#include <rtld/utility.h>
+#include "../../image.h"
+#include "../../symbol.h"
+#include "../../utility.h"
 
 /** Internal part of relocation.
  * @param image		Image to relocate.

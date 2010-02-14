@@ -13,8 +13,8 @@
 
 Import('sources')
 
-sources += [
-	File('isinf.c'),
-	File('isnan.c'),
-	File('signbit.c'),
-]
+sources += map(File, [
+	'isinf.c',
+	'isnan.c',
+	'signbit.c',
+])

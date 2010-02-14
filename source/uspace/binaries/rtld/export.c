@@ -20,9 +20,9 @@
 
 #include <kernel/errors.h>
 
-#include <rtld/export.h>
-#include <rtld/image.h>
-#include <rtld/symbol.h>
+#include "export.h"
+#include "image.h"
+#include "symbol.h"
 
 /** Load a library into memory.
  * @param path		Path to library to open.
