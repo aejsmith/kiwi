@@ -24,9 +24,8 @@
 
 #include <platform/boot.h>
 
+#include <lib/list.h>
 #include <lib/string.h>
-
-#include <types/list.h>
 
 #include <fatal.h>
 #include <kargs.h>

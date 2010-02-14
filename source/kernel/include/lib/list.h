@@ -18,8 +18,8 @@
  * @brief		Linked list implementation.
  */
 
-#ifndef __TYPES_LIST_H
-#define __TYPES_LIST_H
+#ifndef __LIB_LIST_H
+#define __LIB_LIST_H
 
 #include <types.h>
 
@@ -154,4 +154,4 @@ static inline void list_remove(list_t *entry) {
 	list_init(entry);
 }
 
-#endif /* __TYPES_LIST_H */
+#endif /* __LIB_LIST_H */

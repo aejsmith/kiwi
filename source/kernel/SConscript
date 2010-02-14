@@ -33,9 +33,13 @@ sources = map(File, [
 	'ipc/ipc.c',
 	'ipc/pipe.c',
 
-	'lib/printf.c',
+	'lib/avl.c',
+	'lib/bitmap.c',
+	'lib/hash.c',
 	'lib/notifier.c',
+	'lib/printf.c',
 	'lib/qsort.c',
+	'lib/radix.c',
 	'lib/string.c',
 
 	'mm/kheap.c',
@@ -63,11 +67,6 @@ sources = map(File, [
 	'sync/waitq.c',
 
 	'time/timer.c',
-
-	'types/avl.c',
-	'types/bitmap.c',
-	'types/hash.c',
-	'types/radix.c',
 
 	'elf.c',
 	'fatal.c',

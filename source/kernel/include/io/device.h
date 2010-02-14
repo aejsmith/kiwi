@@ -21,15 +21,15 @@
 #ifndef __IO_DEVICE_H
 #define __IO_DEVICE_H
 
+#include <lib/list.h>
+#include <lib/radix.h>
+#include <lib/refcount.h>
+
 #include <mm/vm.h>
 
 #include <proc/handle.h>
 
 #include <sync/mutex.h>
-
-#include <types/list.h>
-#include <types/radix.h>
-#include <types/refcount.h>
 
 /** Various limitations. */
 #define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */

@@ -21,7 +21,7 @@
 #ifndef __TIME_TIMER_H
 #define __TIME_TIMER_H
 
-#include <types/list.h>
+#include <lib/list.h>
 
 struct cpu;
 

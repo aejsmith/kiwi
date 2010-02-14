@@ -21,6 +21,7 @@
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
 
+#include <lib/avl.h>
 #include <lib/string.h>
 
 #include <mm/kheap.h>
@@ -35,8 +36,6 @@
 #include <sync/mutex.h>
 #include <sync/semaphore.h>
 #include <sync/waitq.h>
-
-#include <types/avl.h>
 
 #include <assert.h>
 #include <console.h>

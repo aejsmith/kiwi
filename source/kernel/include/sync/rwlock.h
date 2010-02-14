@@ -24,8 +24,6 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <types/atomic.h>
-
 /** Structure containing a readers-writer lock. */
 typedef struct rwlock {
 	spinlock_t lock;		/**< Lock to protect structure. */

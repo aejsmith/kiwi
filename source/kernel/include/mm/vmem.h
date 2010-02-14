@@ -21,14 +21,13 @@
 #ifndef __MM_VMEM_H
 #define __MM_VMEM_H
 
+#include <lib/list.h>
 #include <lib/utility.h>
 
 #include <mm/flags.h>
 
 #include <sync/condvar.h>
 #include <sync/mutex.h>
-
-#include <types/list.h>
 
 struct slab_cache;
 struct vmem;

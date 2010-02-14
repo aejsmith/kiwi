@@ -18,12 +18,10 @@
  * @brief		Hash table implementation.
  */
 
-#ifndef __TYPES_HASH_H
-#define __TYPES_HASH_H
+#ifndef __LIB_HASH_H
+#define __LIB_HASH_H
 
-#include <types/list.h>
-
-#include <types.h>
+#include <lib/list.h>
 
 /** 32-bit FNV_prime. */
 #define FNV_PRIME        16777619UL
@@ -81,4 +79,4 @@ extern void hash_remove(list_t *entry);
 extern list_t *hash_lookup(hash_t *hash, key_t key);
 extern int hash_init(hash_t *hash, size_t entries, hash_ops_t *ops);
 
-#endif /* __TYPES_HASH_H */
+#endif /* __LIB_HASH_H */

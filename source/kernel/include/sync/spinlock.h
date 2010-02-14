@@ -21,11 +21,9 @@
 #ifndef __SYNC_SPINLOCK_H
 #define __SYNC_SPINLOCK_H
 
+#include <lib/atomic.h>
+
 #include <sync/flags.h>
-
-#include <types/atomic.h>
-
-#include <types.h>
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {

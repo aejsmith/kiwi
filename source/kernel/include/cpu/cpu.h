@@ -22,8 +22,8 @@
 #define __CPU_CPU_H
 
 #include <arch/cpu.h>
+#include <lib/list.h>
 #include <sync/spinlock.h>
-#include <types/list.h>
 
 struct kernel_args;
 struct kernel_args_cpu_arch;

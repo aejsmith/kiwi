@@ -21,7 +21,7 @@
 #ifndef __BOOT_MENU_H
 #define __BOOT_MENU_H
 
-#include <types/list.h>
+#include <lib/list.h>
 
 /** Structure representing a menu. */
 typedef struct menu {

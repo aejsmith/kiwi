@@ -23,12 +23,12 @@
 
 #include <arch/page.h>
 
+#include <lib/atomic.h>
+#include <lib/list.h>
+
 #include <mm/flags.h>
 
 #include <sync/mutex.h>
-
-#include <types/atomic.h>
-#include <types/list.h>
 
 struct vmem;
 struct slab_cpu_cache;

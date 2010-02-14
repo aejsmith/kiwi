@@ -33,7 +33,9 @@
 
 #include <ipc/ipc.h>
 
+#include <lib/avl.h>
 #include <lib/notifier.h>
+#include <lib/refcount.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
@@ -46,9 +48,6 @@
 
 #include <sync/condvar.h>
 #include <sync/mutex.h>
-
-#include <types/avl.h>
-#include <types/refcount.h>
 
 #include <assert.h>
 #include <console.h>

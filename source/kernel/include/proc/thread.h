@@ -27,12 +27,12 @@
 #include <cpu/cpu.h>
 #include <cpu/fpu.h>
 
+#include <lib/list.h>
+#include <lib/refcount.h>
+
 #include <sync/spinlock.h>
 
 #include <time/timer.h>
-
-#include <types/list.h>
-#include <types/refcount.h>
 
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32

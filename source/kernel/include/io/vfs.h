@@ -21,13 +21,13 @@
 #ifndef __IO_VFS_H
 #define __IO_VFS_H
 
+#include <lib/avl.h>
+#include <lib/radix.h>
+#include <lib/refcount.h>
+
 #include <mm/vm.h>
 
 #include <sync/mutex.h>
-
-#include <types/avl.h>
-#include <types/radix.h>
-#include <types/refcount.h>
 
 #include <limits.h>
 

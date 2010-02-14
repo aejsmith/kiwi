@@ -21,7 +21,7 @@
 #ifndef __DRIVERS_PCI_H
 #define __DRIVERS_PCI_H
 
-#include <types/list.h>
+#include <types.h>
 
 struct device;
 

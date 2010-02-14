@@ -21,12 +21,12 @@
 #ifndef __PROC_HANDLE_H
 #define __PROC_HANDLE_H
 
+#include <lib/avl.h>
+#include <lib/bitmap.h>
+#include <lib/refcount.h>
+
 #include <sync/mutex.h>
 #include <sync/rwlock.h>
-
-#include <types/avl.h>
-#include <types/bitmap.h>
-#include <types/refcount.h>
 
 struct handle_info;
 struct handle_wait;

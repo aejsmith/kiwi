@@ -21,10 +21,9 @@
 #ifndef __BOOT_VFS_H
 #define __BOOT_VFS_H
 
+#include <lib/list.h>
+#include <lib/refcount.h>
 #include <lib/utility.h>
-
-#include <types/list.h>
-#include <types/refcount.h>
 
 struct disk;
 struct vfs_filesystem;

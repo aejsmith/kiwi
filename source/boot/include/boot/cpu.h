@@ -21,7 +21,7 @@
 #ifndef __BOOT_CPU_H
 #define __BOOT_CPU_H
 
-#include <types/atomic.h>
+#include <lib/atomic.h>
 #include <kargs.h>
 
 extern kernel_args_cpu_t *booting_cpu;

@@ -21,10 +21,10 @@
 #ifndef __SYNC_WAITQ_H
 #define __SYNC_WAITQ_H
 
+#include <lib/list.h>
+
 #include <sync/flags.h>
 #include <sync/spinlock.h>
-
-#include <types/list.h>
 
 struct mutex;
 

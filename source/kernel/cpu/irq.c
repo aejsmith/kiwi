@@ -30,8 +30,6 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <types/list.h>
-
 #include <assert.h>
 #include <console.h>
 #include <errors.h>

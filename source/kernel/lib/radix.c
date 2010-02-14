@@ -29,12 +29,11 @@
  *   http://en.wikipedia.org/wiki/Radix_tree
  */
 
+#include <lib/radix.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-
-#include <types/radix.h>
 
 #include <assert.h>
 #include <fatal.h>

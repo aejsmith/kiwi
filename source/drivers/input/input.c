@@ -28,12 +28,11 @@
 
 #include <io/device.h>
 
+#include <lib/atomic.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-
-#include <types/atomic.h>
 
 #include <assert.h>
 #include <errors.h>

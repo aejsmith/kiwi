@@ -35,6 +35,7 @@
 
 #include <arch/memmap.h>
 
+#include <lib/hash.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -46,8 +47,6 @@
 #include <proc/thread.h>
 
 #include <sync/spinlock.h>
-
-#include <types/hash.h>
 
 #include <assert.h>
 #include <console.h>

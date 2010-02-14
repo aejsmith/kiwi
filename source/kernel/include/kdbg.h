@@ -21,10 +21,9 @@
 #ifndef __KDBG_H
 #define __KDBG_H
 
+#include <lib/atomic.h>
 #include <lib/notifier.h>
 #include <lib/string.h>
-
-#include <types/atomic.h>
 
 #include <console.h>
 #include <types.h>

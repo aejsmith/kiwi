@@ -20,12 +20,11 @@
 
 #include <arch/bitops.h>
 
+#include <lib/bitmap.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-
-#include <types/bitmap.h>
 
 #include <assert.h>
 #include <errors.h>

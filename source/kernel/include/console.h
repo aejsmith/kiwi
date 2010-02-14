@@ -21,7 +21,7 @@
 #ifndef __CONSOLE_H
 #define __CONSOLE_H
 
-#include <types/list.h>
+#include <lib/list.h>
 #include <stdarg.h>
 
 /** Kernel console implementation structure. */

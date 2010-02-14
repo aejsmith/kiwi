@@ -25,12 +25,12 @@
 
 #include <cpu/cpu.h>
 
+#include <lib/avl.h>
+#include <lib/refcount.h>
+
 #include <mm/page.h>
 
 #include <sync/mutex.h>
-
-#include <types/avl.h>
-#include <types/refcount.h>
 
 struct device;
 struct vfs_node;

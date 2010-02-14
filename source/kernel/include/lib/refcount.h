@@ -18,12 +18,10 @@
  * @brief		Reference counting functions.
  */
 
-#ifndef __TYPES_REFCOUNT_H
-#define __TYPES_REFCOUNT_H
+#ifndef __LIB_REFCOUNT_H
+#define __LIB_REFCOUNT_H
 
-#include <types/atomic.h>
-
-#include <compiler.h>
+#include <lib/atomic.h>
 #include <fatal.h>
 
 /** Type containing a reference count */
@@ -111,4 +109,4 @@ static inline void refcount_set(refcount_t *ref, int val) {
 	atomic_set(ref, val);
 }
 
-#endif /* __TYPES_REFCOUNT_H */
+#endif /* __LIB_REFCOUNT_H */

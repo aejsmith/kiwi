@@ -23,8 +23,8 @@
 
 #include <io/vfs.h>
 
-#include <types/list.h>
-#include <types/refcount.h>
+#include <lib/list.h>
+#include <lib/refcount.h>
 
 #include <elf.h>
 #include <symbol.h>

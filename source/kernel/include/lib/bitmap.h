@@ -18,14 +18,12 @@
  * @brief		Bitmap data type.
  */
 
-#ifndef __BITMAP_H
-#define __BITMAP_H
+#ifndef __LIB_BITMAP_H
+#define __LIB_BITMAP_H
 
 #include <lib/utility.h>
 
 #include <mm/flags.h>
-
-#include <types.h>
 
 /** Structure containing a bitmap. */
 typedef struct bitmap {
@@ -46,4 +44,4 @@ extern bool bitmap_test(bitmap_t *bitmap, int bit);
 extern int bitmap_ffs(bitmap_t *bitmap);
 extern int bitmap_ffz(bitmap_t *bitmap);
 
-#endif /* __BITMAP_H */
+#endif /* __LIB_BITMAP_H */

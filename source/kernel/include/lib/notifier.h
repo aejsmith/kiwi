@@ -23,8 +23,6 @@
 
 #include <sync/mutex.h>
 
-#include <types/list.h>
-
 /** Notifier structure. */
 typedef struct notifier {
 	mutex_t lock;			/**< Lock to protect list. */

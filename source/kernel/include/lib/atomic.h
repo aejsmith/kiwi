@@ -18,8 +18,8 @@
  * @brief		x86 atomic operations.
  */
 
-#ifndef __TYPES_ATOMIC_H
-#define __TYPES_ATOMIC_H
+#ifndef __LIB_ATOMIC_H
+#define __LIB_ATOMIC_H
 
 #include <types.h>
 
@@ -114,4 +114,4 @@ static inline int atomic_get(atomic_t *var) {
 	return *var;
 }
 
-#endif /* __TYPES_ATOMIC_H */
+#endif /* __LIB_ATOMIC_H */
