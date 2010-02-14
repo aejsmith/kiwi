@@ -42,7 +42,7 @@ extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 
 extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
-extern void intr_handler(unative_t num, intr_frame_t *frame);
+extern void intr_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
 static intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
@@ -169,32 +169,22 @@ void intr_register(unative_t num, intr_handler_t handler) {
 }
 
 /** Remove an interrupt handler.
- *
- * Unregisters an interrupt handler.
- *
- * @param num		Interrupt number.
- */
+ * @param num		Interrupt number. */
 void intr_remove(unative_t num) {
 	assert(num < IDT_ENTRY_COUNT);
 	intr_handlers[num] = NULL;
 }
 
 /** Interrupt handler routine.
- *
- * Handles a CPU interrupt by looking up the handler routine in the handler
- * table and calling it.
- *
- * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- */
-void intr_handler(unative_t num, intr_frame_t *frame) {
-	intr_handler_t handler = intr_handlers[num];
+ * @param frame		Interrupt stack frame. */
+void intr_handler(intr_frame_t *frame) {
+	unative_t num = frame->int_no;
 	bool schedule;
 
-	if(num < 32 && unlikely(atomic_get(&kdbg_running) == 2)) {
-		kdbg_except_handler(num, fault_names[num], frame);
+	if(unlikely(atomic_get(&kdbg_running) == 2)) {
+		kdbg_except_handler(num, (num < 32) ? fault_names[num] : "Unknown", frame);
 		return;
-	} else if(unlikely(!handler)) {
+	} else if(unlikely(!intr_handlers[num])) {
 		if(num < 32) {
 			/* Fatal if in kernel-mode, exit if in user-mode. */
 			if(frame->cs & 3) {
@@ -211,7 +201,7 @@ void intr_handler(unative_t num, intr_frame_t *frame) {
 		}
 	}
 
-	schedule = handler(num, frame);
+	schedule = intr_handlers[num](num, frame);
 
 	/* If thread is killed and we're returning to userspace, exit now. */
 	if(curr_thread->killed && frame->cs & 3) {
@@ -221,7 +211,7 @@ void intr_handler(unative_t num, intr_frame_t *frame) {
 	}
 }
 
-/** Initialise the interrupt handling code. */
+/** Initialise the interrupt handler table. */
 void intr_init(void) {
 	int i;
 

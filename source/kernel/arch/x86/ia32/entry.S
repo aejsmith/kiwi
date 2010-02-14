@@ -139,13 +139,10 @@ isr_common:
 	/* Clear direction flag. */
 	cld
 
-	/* Pass the interrupt number and a pointer to the structure we made
-	 * to the interrupt handler. Offset for interrupt number is 48, plus 4
-	 * to account for the pointer we pushed. */
+	/* Pass a pointer to the structure we made to the interrupt handler. */
 	push	%esp
-	push	52(%esp)
 	call	intr_handler
-	addl	$8, %esp
+	addl	$4, %esp
 
 	/* Restore the saved registers. */
 	POP_REGS

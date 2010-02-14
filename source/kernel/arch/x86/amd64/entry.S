@@ -150,10 +150,8 @@ isr_common:
 	/* Clear direction flag. */
 	cld
 
-	/* Pass the interrupt number and a pointer to the structure we made
-	 * to the interrupt handler. */
-	movq	136(%rsp), %rdi
-	movq	%rsp, %rsi
+	/* Pass a pointer to the structure we made to the interrupt handler. */
+	movq	%rsp, %rdi
 	call	intr_handler
 
 	/* Restore the saved registers. */
