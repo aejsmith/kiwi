@@ -67,20 +67,12 @@ static inline void kdbg_setup_dreg(void) {
 }
 
 /** Debug exception handler.
- *
- * Handles a debug exception by pulling the entry reason out of EAX and
- * calling KDBG.
- *
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame.
- *
- * @return		Always returns false.
- */
+ * @return		Always returns false. */
 bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
-	static bool bp_resume = false;
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
-	size_t i = 0;
 
 	/* Work out the reason. */
 	dr6 = sysreg_dr6_read();
@@ -92,23 +84,9 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 		reason = (unative_t)frame->ax;
 	} else {
 		if(dr6 & SYSREG_DR6_BS) {
-			/* See comment later on about QEMU/Resume Flag. */
-			if(bp_resume) {
-				bp_resume = false;
-				kdbg_setup_dreg();
-				frame->flags &= ~SYSREG_FLAGS_TF;
-				sysreg_dr6_write(0);
-				return false;
-			}
-
 			reason = KDBG_ENTRY_STEPPED;
 		} else if(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 | SYSREG_DR6_B3)) {
 			reason = KDBG_ENTRY_BREAK;
-			for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
-				if(frame->ip == kdbg_breakpoints[i].addr) {
-					break;
-				}
-			}
 		}
 	}
 
@@ -117,21 +95,9 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	/* Clear the Debug Status Register (DR6). */
 	sysreg_dr6_write(0);
 
-	/* So this nasty load of crap is to hack past QEMU's lack of Resume
-	 * Flag support. Disable the breakpoint temporarily, set single step
-	 * and then re-enable after the step. */
+	/* Set the resume flag if resuming from a breakpoint. */
 	if(reason == KDBG_ENTRY_BREAK) {
-		if(i >= 4 || !kdbg_breakpoints[i].enabled) {
-			return false;
-		}
-
-		sysreg_dr7_write(sysreg_dr7_read() & ~(1<<i));
-
-		/* Prevent a requested step from actually continuing. */
-		if(!(frame->flags & SYSREG_FLAGS_TF)) {
-			bp_resume = true;
-			frame->flags |= SYSREG_FLAGS_TF;
-		}
+		frame->flags |= SYSREG_FLAGS_RF;
 	}
 
 	return false;
@@ -167,16 +133,10 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
 	kdbg_setup_dreg();
 }
 
-/** Print out a stack trace.
- *
- * Prints out a stack trace using the base pointer in the current KDBG
- * register structure.
- *
+/** KDBG backtrace command.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
 	thread_t *thread;
@@ -234,14 +194,9 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 }
 
 /** Delete a breakpoint.
- *
- * Removes the breakpoint with the given ID.
- *
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_bdelete(int argc, char **argv) {
 	size_t num;
 
@@ -268,14 +223,9 @@ int kdbg_cmd_bdelete(int argc, char **argv) {
 }
 
 /** Disable a breakpoint.
- *
- * Disables the breakpoint with the specified ID.
- *
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_bdisable(int argc, char **argv) {
 	size_t num;
 
@@ -300,14 +250,9 @@ int kdbg_cmd_bdisable(int argc, char **argv) {
 }
 
 /** Enable a breakpoint.
- *
- * Enables the breakpoint with the specified ID.
- *
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_benable(int argc, char **argv) {
 	size_t num;
 
@@ -331,16 +276,10 @@ int kdbg_cmd_benable(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Create/list breakpoints.
- *
- * Creates a new breakpoint or lists all current breakpoints if no argument
- * given.
- *
+/** Create or list breakpoints.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_break(int argc, char **argv) {
 	size_t i, off = 0;
 	unative_t addr;
