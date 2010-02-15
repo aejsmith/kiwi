@@ -40,29 +40,26 @@ typedef struct stack_frame {
 	ptr_t addr;			/**< Function return address. */
 } stack_frame_t;
 
-/** Breakpoint tracking structures. */
-static struct {
-	bool used;
-	bool enabled;
-	ptr_t addr;
-} kdbg_breakpoints[4];
+/** Structure containing details of a breakpoint. */
+typedef struct breakpoint {
+	unative_t dr7;			/**< Value to OR into DR7. */
+	ptr_t addr;			/**< Address of the breakpoint. */
+} breakpoint_t;
+
+/** Breakpoint/watchpoint tracking structures. */
+static breakpoint_t kdbg_breakpoints[4];
 
 /** Set breakpoint settings in the debug registers. */
 static inline void kdbg_setup_dreg(void) {
 	unative_t dr7 = 0;
-	size_t i;
 
 	sysreg_dr0_write(kdbg_breakpoints[0].addr);
 	sysreg_dr1_write(kdbg_breakpoints[1].addr);
 	sysreg_dr2_write(kdbg_breakpoints[2].addr);
 	sysreg_dr3_write(kdbg_breakpoints[3].addr);
 
-	for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
-		if(kdbg_breakpoints[i].enabled) {
-			dr7 |= (1<<i);
-		}
-	}
-
+	dr7 |= (kdbg_breakpoints[0].dr7 | kdbg_breakpoints[1].dr7);
+	dr7 |= (kdbg_breakpoints[2].dr7 | kdbg_breakpoints[3].dr7);
 	sysreg_dr7_write(dr7);
 }
 
@@ -73,6 +70,7 @@ static inline void kdbg_setup_dreg(void) {
 bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
+	size_t i;
 
 	/* Work out the reason. */
 	dr6 = sysreg_dr6_read();
@@ -86,7 +84,15 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 		if(dr6 & SYSREG_DR6_BS) {
 			reason = KDBG_ENTRY_STEPPED;
 		} else if(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 | SYSREG_DR6_B3)) {
-			reason = KDBG_ENTRY_BREAK;
+			for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
+				if(frame->ip == kdbg_breakpoints[i].addr) {
+					reason = KDBG_ENTRY_BREAK;
+					kdbg_breakpoint_id = i;
+				} else if(dr6 & (1UL<<i)) {
+					reason = KDBG_ENTRY_WATCH;
+					kdbg_breakpoint_id = i;
+				}
+			}
 		}
 	}
 
@@ -110,7 +116,7 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
  * generate a register structure and enter KDBG.
  *
  * @param reason	KDBG entry reason.
- * @param frame		Interrupt stack frame. (if NULL will generate one).
+ * @param frame		Interrupt stack frame (if NULL will generate one).
  */
 void kdbg_enter(int reason, intr_frame_t *frame) {
 	if(frame == NULL) {
@@ -193,90 +199,7 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Delete a breakpoint.
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_bdelete(int argc, char **argv) {
-	size_t num;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_NONE, "Deletes the breakpoint with the given ID.\n");
-		return KDBG_OK;
-	} else if(argc < 2) {
-		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
-		return KDBG_FAIL;
-	}
-
-	num = strtoul(argv[1], NULL, 0);
-
-	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %zu invalid\n", num);
-		return KDBG_FAIL;
-	}
-
-	kdbg_breakpoints[num].used = false;
-	kdbg_breakpoints[num].enabled = false;
-	kdbg_breakpoints[num].addr = 0;
-	return KDBG_OK;
-}
-
-/** Disable a breakpoint.
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_bdisable(int argc, char **argv) {
-	size_t num;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_NONE, "Disables the breakpoint with the given ID.\n");
-		return KDBG_OK;
-	} else if(argc < 2) {
-		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
-		return KDBG_FAIL;
-	}
-
-	num = strtoul(argv[1], NULL, 0);
-
-	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %zu invalid.\n", num);
-		return KDBG_FAIL;
-	}
-
-	kdbg_breakpoints[num].enabled = false;
-	return KDBG_OK;
-}
-
-/** Enable a breakpoint.
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_benable(int argc, char **argv) {
-	size_t num;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s id\n\n", argv[0]);
-		kprintf(LOG_NONE, "Enables the breakpoint with the given ID.\n");
-		return KDBG_OK;
-	} else if(argc < 2) {
-		kprintf(LOG_NONE, "Breakpoint ID expected.\n");
-		return KDBG_FAIL;
-	}
-
-	num = strtoul(argv[1], NULL, 0);
-
-	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].used) {
-		kprintf(LOG_NONE, "Breakpoint number %zu invalid\n", num);
-		return KDBG_FAIL;
-	}
-
-	kdbg_breakpoints[num].enabled = true;
-	return KDBG_OK;
-}
-
-/** Create or list breakpoints.
+/** Create a breakpoint.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
@@ -286,54 +209,178 @@ int kdbg_cmd_break(int argc, char **argv) {
 	symbol_t *sym;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [address]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
 
 		kprintf(LOG_NONE, "Creates a new breakpoint at the given address. The address is treated as an\n");
-		kprintf(LOG_NONE, "expression. If no arguments are given, will list all current breakpoints.\n");
-		kprintf(LOG_NONE, "New breakpoints default to being enabled. It should be noted that breakpoints\n");
-		kprintf(LOG_NONE, "do not work on older versions of QEMU (0.9.1 or earlier) - it only gained\n");
-		kprintf(LOG_NONE, "support for hardware breakpoints in revision 5747.\n");
-
+		kprintf(LOG_NONE, "expression. Be warned that older versions of QEMU do not support breakpoints\n");
+		kprintf(LOG_NONE, "well.\n");
 		return KDBG_OK;
-	}
-
-	if(argc < 2) {
-		for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
-			if(!kdbg_breakpoints[i].used) {
-				continue;
-			}
-			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_NONE, "Breakpoint %zu: [%p] %s+0x%zx (%s)\n", i,
-			            kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
-			            off, (kdbg_breakpoints[i].enabled) ? "enabled" : "disabled");
-		}
-
-		return KDBG_OK;
-	} else {
-		if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
-		} else if(addr < KERNEL_VIRT_BASE) {
-			kprintf(LOG_NONE, "Cannot set breakpoint outside of kernel code.\n");
-			return KDBG_FAIL;
-		}
-
-		/* Search for a free slot. */
-		for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
-			if(kdbg_breakpoints[i].used) {
-				continue;
-			}
-
-			kdbg_breakpoints[i].used = true;
-			kdbg_breakpoints[i].enabled = true;
-			kdbg_breakpoints[i].addr = (ptr_t)addr;
-
-			sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
-			kprintf(LOG_NONE, "Created breakpoint %zu: [%p] %s+0x%zx\n",
-			        i, addr, (sym) ? sym->name : "<unknown>", off);
-			return KDBG_OK;
-		}
-
-		kprintf(LOG_NONE, "No free breakpoint slots.\n");
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
 		return KDBG_FAIL;
 	}
+
+	if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	}
+
+	/* Search for a free slot. */
+	for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
+		if(kdbg_breakpoints[i].dr7) {
+			continue;
+		}
+
+		kdbg_breakpoints[i].dr7 = (1<<(1+(i*2)));
+		kdbg_breakpoints[i].addr = addr;
+
+		sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
+		kprintf(LOG_NONE, "Created breakpoint %zu [%p] %s+0x%zx\n",
+		        i, addr, (sym) ? sym->name : "<unknown>", off);
+		return KDBG_OK;
+	}
+
+	kprintf(LOG_NONE, "No free breakpoint slots.\n");
+	return KDBG_FAIL;
+}
+
+/** Delete a breakpoint/watchpoint.
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_delete(int argc, char **argv) {
+	unsigned long num;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s <id>\n\n", argv[0]);
+		kprintf(LOG_NONE, "Deletes the breakpoint/watchpoint with the given ID.\n");
+		return KDBG_OK;
+	} else if(argc < 2) {
+		kprintf(LOG_NONE, "ID expected. See 'help %s' for more information.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	num = strtoul(argv[1], NULL, 0);
+
+	if(num >= ARRAYSZ(kdbg_breakpoints) || !kdbg_breakpoints[num].dr7) {
+		kprintf(LOG_NONE, "Breakpoint/watchpoint ID %lu invalid.\n", num);
+		return KDBG_FAIL;
+	}
+
+	kdbg_breakpoints[num].dr7 = 0;
+	kdbg_breakpoints[num].addr = 0;
+	return KDBG_OK;
+}
+
+/** Create or list breakpoints.
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_list(int argc, char **argv) {
+	symbol_t *sym;
+	size_t i, off;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+		kprintf(LOG_NONE, "List all breakpoints and watchpoints.\n");
+		return KDBG_OK;
+	}
+
+	for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
+		if(!kdbg_breakpoints[i].dr7) {
+			continue;
+		}
+
+		sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
+		kprintf(LOG_NONE, "%spoint %zu: [%p] %s+0x%zx\n",
+			(kdbg_breakpoints[i].dr7 == (1UL<<(1+(i*2)))) ? "Break" : "Watch",
+		        i, kdbg_breakpoints[i].addr, (sym) ? sym->name : "<unknown>",
+		        off);
+	}
+
+	return KDBG_OK;
+}
+
+/** Create a watchpoint.
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_watch(int argc, char **argv) {
+	unative_t addr, size, dr7 = 0;
+	size_t i, off = 0;
+	bool rw = false;
+	symbol_t *sym;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s [--rw] <address> <size>\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Creates a new watchpoint at the given address. The address is treated as an\n");
+		kprintf(LOG_NONE, "expression. If the '--rw' argument is given, the watchpoint will trigger on\n");
+		kprintf(LOG_NONE, "reads and writes, rather than just writes. Be warned that older versions of\n");
+		kprintf(LOG_NONE, "QEMU do not support watchpoints well.\n");
+		return KDBG_OK;
+	} else if(argc != 3 && argc != 4) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(argc == 4) {
+		if(strcmp(argv[1], "--rw") == 0) {
+			rw = true;
+		} else {
+			kprintf(LOG_NONE, "Unknown argument. See 'help %s' for more information.\n", argv[0]);
+			return KDBG_FAIL;
+		}
+	}
+
+	if(kdbg_parse_expression(argv[argc - 2], &addr, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	} else if(kdbg_parse_expression(argv[argc - 1], &size, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	}
+
+	/* Search for a free slot. */
+	for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
+		if(kdbg_breakpoints[i].dr7) {
+			continue;
+		}
+
+		/* Set the global enable bit for the breakpoint. */
+		dr7 = (1<<(1+(i*2)));
+
+		/* Set the condition. */
+		dr7 |= (1<<(16+(i*4)));
+		if(rw) {
+			dr7 |= (1<<(17+(i*4)));
+		}
+
+		/* Set the size. */
+		switch(size) {
+		case 1:
+			break;
+		case 4:
+			dr7 |= (1<<(19+(i*4)));
+		case 2:
+			dr7 |= (1<<(18+(i*4)));
+			break;
+#if __x86_64__
+		case 8:
+			dr7 |= (1<<(19+(i*4)));
+			break;
+#endif
+		default:
+			kprintf(LOG_NONE, "Invalid size.\n");
+			return KDBG_FAIL;
+		}
+
+		kdbg_breakpoints[i].dr7 = dr7;
+		kdbg_breakpoints[i].addr = addr;
+
+		sym = symbol_lookup_addr(kdbg_breakpoints[i].addr, &off);
+		kprintf(LOG_NONE, "Created watchpoint %zu [%p] %s+0x%zx\n",
+		        i, addr, (sym) ? sym->name : "<unknown>", off);
+		return KDBG_OK;
+	}
+
+	kprintf(LOG_NONE, "No free breakpoint slots.\n");
+	return KDBG_FAIL;
 }

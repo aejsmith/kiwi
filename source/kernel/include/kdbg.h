@@ -41,7 +41,8 @@
 #define KDBG_ENTRY_USER		0	/**< Entry by user request. */
 #define KDBG_ENTRY_FATAL	1	/**< Called from fatal(). */
 #define KDBG_ENTRY_BREAK	2	/**< Breakpoint. */
-#define KDBG_ENTRY_STEPPED	3	/**< Stepped one instruction. */
+#define KDBG_ENTRY_WATCH	3	/**< Watchpoint. */
+#define KDBG_ENTRY_STEPPED	4	/**< Stepped. */
 
 /** Helper macro to check if a help message is wanted. */
 #define KDBG_HELP(ac, av)	\
@@ -51,19 +52,19 @@ struct intr_frame;
 
 extern atomic_t kdbg_running;
 extern struct intr_frame *curr_kdbg_frame;
+extern size_t kdbg_breakpoint_id;
 extern notifier_t kdbg_entry_notifier;
 extern notifier_t kdbg_exit_notifier;
 
-/** Functions implemented by the architecture/platform. */
 extern void kdbg_enter(int reason, struct intr_frame *frame);
 extern unsigned char kdbg_get_char(void);
 extern int kdbg_register_value(const char *name, size_t len, unative_t *regp);
 extern int kdbg_cmd_backtrace(int argc, char **argv);
-extern int kdbg_cmd_bdelete(int argc, char **argv);
-extern int kdbg_cmd_bdisable(int argc, char **argv);
-extern int kdbg_cmd_benable(int argc, char **argv);
 extern int kdbg_cmd_break(int argc, char **argv);
+extern int kdbg_cmd_delete(int argc, char **argv);
+extern int kdbg_cmd_list(int argc, char **argv);
 extern int kdbg_cmd_regs(int argc, char **argv);
+extern int kdbg_cmd_watch(int argc, char **argv);
 
 extern int kdbg_parse_expression(char *exp, unative_t *valp, char **strp);
 extern void kdbg_except_handler(unative_t num, const char *name, struct intr_frame *frame);

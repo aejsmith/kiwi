@@ -65,6 +65,9 @@ atomic_t kdbg_running = 0;
 /** Registers structure that KDBG was entered with. */
 intr_frame_t *curr_kdbg_frame = NULL;
 
+/** Breakpoint/watchpoint ID that triggered entry. */
+size_t kdbg_breakpoint_id = 0;
+
 static context_t kdbg_fault_context;			/**< Context to restore upon exceptions. */
 static char kdbg_in_buffer[KDBG_INPUT_BUF_SIZE];	/**< User input buffer. */
 static size_t kdbg_step_count = 0;			/**< Instructions remaining to single-step. */
@@ -85,18 +88,17 @@ static struct {
 } kdbg_commands[] = {
 	{ "aspace",	"Print the contents of an address space.",	kdbg_cmd_aspace },
 	{ "backtrace",	"Print a backtrace.",				kdbg_cmd_backtrace },
-	{ "bdelete",	"Delete a breakpoint.",				kdbg_cmd_bdelete },
-	{ "bdisable",	"Disable a breakpoint.",			kdbg_cmd_bdisable },
-	{ "benable",	"Enable a breakpoint.",				kdbg_cmd_benable },
-	{ "break",	"Create/list breakpoints.",			kdbg_cmd_break },
+	{ "break",	"Create a breakpoint.",				kdbg_cmd_break },
 	{ "continue",	"Exit KDBG and continue execution.",		kdbg_cmd_continue },
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
+	{ "delete",	"Delete a breakpoint/watchpoint.",		kdbg_cmd_delete },
 	{ "device",	"Print out information about devices.",		kdbg_cmd_device },
 	{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
 	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "kill",	"Kill a thread.",				kdbg_cmd_kill },
+	{ "list",	"List breakpoints/watchpoints.",		kdbg_cmd_list },
 	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
@@ -111,6 +113,7 @@ static struct {
 	{ "vmem",	"Show information about Vmem arenas.",		kdbg_cmd_vmem },
 	{ "vnodes",	"Print a list of nodes on a mount.",		kdbg_cmd_vnodes },
 	{ "vnode",	"Print information about a filesystem node.",	kdbg_cmd_vnode },
+	{ "watch",	"Create a watchpoint.",				kdbg_cmd_watch },
 };
 
 /** Exit KDBG and resume execution.
@@ -738,8 +741,13 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 
 	sym = symbol_lookup_addr(frame->ip, &off);
 	if(reason == KDBG_ENTRY_BREAK) {
-		kprintf(LOG_NONE, "\nBreakpoint at [%p] %s+0x%zx\n",
-		        frame->ip, (sym) ? sym->name : "<unknown>", off);
+		kprintf(LOG_NONE, "\nBreakpoint %zu at [%p] %s+0x%zx\n",
+		        kdbg_breakpoint_id, frame->ip,
+		        (sym) ? sym->name : "<unknown>", off);
+	} else if(reason == KDBG_ENTRY_WATCH) {
+		kprintf(LOG_NONE, "\nWatchpoint %zu at [%p] %s+0x%zx\n",
+		        kdbg_breakpoint_id, frame->ip,
+		        (sym) ? sym->name : "<unknown>", off);
 	} else if(reason == KDBG_ENTRY_STEPPED) {
 		kprintf(LOG_NONE, "Stepped to [%p] %s+0x%zx\n",
 		        frame->ip, (sym) ? sym->name : "<unknown>", off);
