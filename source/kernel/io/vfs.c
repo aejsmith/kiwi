@@ -2303,8 +2303,8 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID       Flags Count Locked Type Size         Mount\n");
-	kprintf(LOG_NONE, "==       ===== ===== ====== ==== ====         =====\n");
+	kprintf(LOG_NONE, "ID       Flags Count Locked Type Size         Pages      Mount\n");
+	kprintf(LOG_NONE, "==       ===== ===== ====== ==== ====         =====      =====\n");
 
 	if(argc == 3) {
 		list = (strcmp(argv[1], "--unused") == 0) ? &mount->unused_nodes : &mount->used_nodes;
@@ -2312,17 +2312,21 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		LIST_FOREACH(list, iter) {
 			node = list_entry(iter, vfs_node_t, header);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->lock.recursion, node->type, node->size, node->mount);
+			        node->lock.recursion, node->type, node->size,
+			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
+			        node->mount);
 		}
 	} else {
 		AVL_TREE_FOREACH(&mount->nodes, iter) {
 			node = avl_tree_entry(iter, vfs_node_t);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->lock.recursion, node->type, node->size, node->mount);
+			        node->lock.recursion, node->type, node->size,
+			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
+			        node->mount);
 		}
 	}
 	return KDBG_FAIL;

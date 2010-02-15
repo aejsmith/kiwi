@@ -225,7 +225,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 		slab = (slab_t *)((addr + cache->slab_size) - sizeof(slab_t));
 	}
 
-	cache->slab_count--;
+	cache->slab_count++;
 
 	list_init(&slab->header);
 	slab->base = (void *)addr;
@@ -485,6 +485,7 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 		slab_obj_free(cache, mag->objects[i]);
 	}
 
+	list_remove(&mag->header);
 	slab_cache_free(&slab_mag_cache, mag);
 }
 
@@ -954,25 +955,25 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	}
 
 #if CONFIG_SLAB_STATS
-	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Current Total\n");
-	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ======= =====\n");
+	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
+	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ========== ======= =====\n");
 #else
-	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags\n");
-	kprintf(LOG_NONE, "====                      =====  ======== ========= =====\n");
+	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Slab Count\n");
+	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ==========\n");
 #endif
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
 #if CONFIG_SLAB_STATS
-		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-7d %d\n",
+		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-10zu %-7d %d\n",
 		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-		        cache->slab_size, cache->flags, atomic_get(&cache->alloc_current),
-		        atomic_get(&cache->alloc_total));
+		        cache->slab_size, cache->flags, cache->slab_count,
+		        atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
 #else
-		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %d\n",
+		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %zu\n",
 		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-		        cache->slab_size, cache->flags);
+		        cache->slab_size, cache->flags, cache->slab_count);
 #endif
 	}
 
