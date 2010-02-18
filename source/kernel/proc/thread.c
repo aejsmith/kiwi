@@ -51,7 +51,7 @@
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
-extern void waitq_do_wake(thread_t *thread);
+extern void thread_wake(thread_t *thread);
 
 static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
 static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
@@ -78,25 +78,19 @@ static int thread_cache_ctor(void *obj, void *data, int kmflag) {
 	return 0;
 }
 
-/** Thread entry point.
- *
- * Entry point for all threads. Wraps the real main function for a thread to
- * peform post-switch tasks before calling the function. This is necessary
- * because when real_schedule() switches to a newly-created thread, it will
- * return to this function and sched_post() does not get called by the
- * scheduler, so this function must do that.
- */
+/** Thread entry function wrapper. */
 static void thread_trampoline(void) {
+	/* Upon switching to a newly-created thread's context, execution will
+	 * jump to this function, rather than going back to the scheduler.
+	 * It is therefore necessary to perform post-switch tasks now. */
 	sched_post_switch(true);
 
 	dprintf("thread: entered thread %" PRId32 "(%s) on CPU %" PRIu32 "\n",
 		curr_thread->id, curr_thread->name, curr_cpu->id);
 
+	/* Run the thread's main function and then exit when it returns. */
 	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
 	thread_exit();
-	while(1) {
-		sched_yield();
-	}
 }
 
 /** Dead thread reaper.
@@ -106,17 +100,17 @@ static void thread_reaper(void *arg1, void *arg2) {
 	thread_t *thread;
 
 	while(true) {
-		semaphore_down(&dead_thread_sem, 0);
+		semaphore_down(&dead_thread_sem);
 
 		/* Take the next thread off the list. */
-		spinlock_lock(&dead_thread_lock, 0);
+		spinlock_lock(&dead_thread_lock);
 		assert(!list_empty(&dead_threads));
 		thread = list_entry(dead_threads.next, thread_t, header);
 		list_remove(&thread->header);
 		spinlock_unlock(&dead_thread_lock);
 
 		/* Remove from thread tree. */
-		mutex_lock(&thread_tree_lock, 0);
+		mutex_lock(&thread_tree_lock);
 		avl_tree_remove(&thread_tree, (key_t)thread->id);
 		mutex_unlock(&thread_tree_lock);
 
@@ -141,23 +135,24 @@ static void thread_reaper(void *arg1, void *arg2) {
 	}
 }
 
-/** Run a newly-created thread.
- *
- * Moves a newly created thread into the Ready state and places it on the
- * run queue of the current CPU.
- *
- * @param thread	Thread to run.
- */
-void thread_run(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
+/** Wake up a sleeping thread.
+ * @note		Thread and its wait queue should be locked.
+ * @param thread	Thread to wake up. */
+void thread_wake(thread_t *thread) {
+	assert(thread->state == THREAD_SLEEPING);
+	assert(spinlock_held(&thread->lock));
+	assert(spinlock_held(&thread->waitq->lock));
 
-	assert(thread->state == THREAD_CREATED);
+	/* Stop the timer. */
+	timer_stop(&thread->sleep_timer);
+
+	/* Remove the thread from the queue and wake it up. */
+	list_remove(&thread->waitq_link);
+	thread->waitq = NULL;
+	thread->interruptible = false;
 
 	thread->state = THREAD_READY;
-	thread->cpu = curr_cpu;
 	sched_thread_insert(thread);
-
-	spinlock_unlock(&thread->lock);
 }
 
 /** Wire a thread to its current CPU.
@@ -169,7 +164,7 @@ void thread_run(thread_t *thread) {
  */
 void thread_wire(thread_t *thread) {
 	if(thread) {
-		spinlock_lock(&thread->lock, 0);
+		spinlock_lock(&thread->lock);
 		thread->wire_count++;
 		spinlock_unlock(&thread->lock);
 	}
@@ -177,13 +172,14 @@ void thread_wire(thread_t *thread) {
 
 /** Unwire a thread.
  *
- * Decreases the wire count of a thread.
+ * Decreases the wire count of a thread. If the count reaches 0, the thread
+ * will be unwired and able to migrate again.
  *
  * @param thread	Thread to unwire.
  */
 void thread_unwire(thread_t *thread) {
 	if(thread) {
-		spinlock_lock(&thread->lock, 0);
+		spinlock_lock(&thread->lock);
 		if(thread->wire_count == 0) {
 			fatal("Calling unwire when thread already unwired");
 		}
@@ -194,68 +190,73 @@ void thread_unwire(thread_t *thread) {
 
 /** Interrupt a sleeping thread.
  *
- * Interrupts a thread that is sleeping on a wait queue if possible. Should
- * only be called by wait queue code, as it does not take the wait queue lock.
+ * Causes a sleeping thread to be woken and to return an error from the sleep
+ * call if it is interruptible.
  *
  * @param thread	Thread to interrupt.
  *
  * @return		Whether the thread was interrupted.
  */
 bool thread_interrupt(thread_t *thread) {
+	waitq_t *queue;
 	bool ret;
 
-	spinlock_lock(&thread->lock, 0);
+	spinlock_lock(&thread->lock);
 
 	assert(thread->state == THREAD_SLEEPING);
-	assert(thread->waitq);
 
 	if((ret = thread->interruptible)) {
-		/* Restore the interruption context and queue it to run. */
 		thread->context = thread->sleep_context;
-		waitq_do_wake(thread);
+		queue = thread->waitq;
+		spinlock_lock(&queue->lock);
+		thread_wake(thread);
+		spinlock_unlock(&queue->lock);
 	}
 
 	spinlock_unlock(&thread->lock);
 	return ret;
 }
 
-/** Handler for a thread kill IPI.
- * @note		Does not actually do anything, simply serves as an
- *			interruption in case the thread is in userspace, so
- *			that it gets killed when returning from the interrupt.
- * @param msg		IPI message structure.
- * @param data1		Unused.
- * @param data2		Unused.
- * @param data3		Unused.
- * @param data4		Unused.
- * @return		Always returns 0. */
-static int thread_kill_handler(void *msg, unative_t data1, unative_t data2,
-                               unative_t data3, unative_t data4) {
-	return 0;
-}
-
-/** Request that a thread terminates.
+/** Request a thread to terminate.
  *
  * Ask a userspace thread to terminate as soon as possible (upon next exit from
  * the kernel). If the thread is currently in interruptible sleep, it will be
- * interrupted. You cannot make a kernel thread terminate.
+ * interrupted. You cannot terminate a kernel thread.
  *
  * @param thread	Thread to kill.
  */
 void thread_kill(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
+	waitq_t *queue;
 
-	thread->killed = true;
-	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
-		thread->context = thread->sleep_context;
-		waitq_do_wake(thread);
+	spinlock_lock(&thread->lock);
+	if(thread->owner != kernel_proc) {
+		thread->killed = true;
+
+		/* Interrupt the thread if it is in interruptible sleep. */
+		if(thread->state == THREAD_SLEEPING && thread->interruptible) {
+			thread->context = thread->sleep_context;
+			queue = thread->waitq;
+			spinlock_lock(&queue->lock);
+			thread_wake(thread);
+			spinlock_unlock(&queue->lock);
+		}
+
+		/* If the thread is on a different CPU, send the CPU an IPI
+		 * so that it will check the thread killed state. */
+		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
+			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
+		}
 	}
+	spinlock_unlock(&thread->lock);
+}
 
-	/* If the thread is on a different CPU, send the CPU an IPI. */
-	if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
-		ipi_send(thread->cpu->id, thread_kill_handler, 0, 0, 0, 0, 0);
-	}
-
+/** Rename a thread.
+ * @param thread	Thread to rename.
+ * @param name		New name for the thread. */
+void thread_rename(thread_t *thread, const char *name) {
+	spinlock_lock(&thread->lock);
+	strncpy(thread->name, name, THREAD_NAME_MAX);
+	thread->name[THREAD_NAME_MAX - 1] = 0;
 	spinlock_unlock(&thread->lock);
 }
 
@@ -265,20 +266,6 @@ void thread_exit(void) {
 	curr_thread->state = THREAD_DEAD;
 	sched_yield();
 	fatal("Shouldn't get here");
-}
-
-/** Rename a thread.
- *
- * Changes the name of a thread.
- *
- * @param thread	Thread to rename.
- * @param name		New name for the thread.
- */
-void thread_rename(thread_t *thread, const char *name) {
-	spinlock_lock(&thread->lock, 0);
-	strncpy(thread->name, name, THREAD_NAME_MAX);
-	thread->name[THREAD_NAME_MAX - 1] = 0;
-	spinlock_unlock(&thread->lock);
 }
 
 /** Lookup a thread.
@@ -296,7 +283,7 @@ thread_t *thread_lookup(identifier_t id) {
 	if(atomic_get(&kdbg_running)) {
 		thread = avl_tree_lookup(&thread_tree, (key_t)id);
 	} else {
-		mutex_lock(&thread_tree_lock, 0);
+		mutex_lock(&thread_tree_lock);
 		thread = avl_tree_lookup(&thread_tree, (key_t)id);
 		mutex_unlock(&thread_tree_lock);
 	}
@@ -311,9 +298,6 @@ thread_t *thread_lookup(identifier_t id) {
  *
  * Creates a new thread that will begin execution at the given function and
  * places it in the Created state.
- *
- * @todo		If the thread is not tied to the current CPU, pick the
- *			best CPU for it to run on.
  *
  * @param name		Name to give the thread.
  * @param owner		Process that the thread should belong to.
@@ -372,6 +356,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->preempt_missed = false;
 	thread->waitq = NULL;
 	thread->interruptible = false;
+	thread->timed_out = false;
 	thread->state = THREAD_CREATED;
 	thread->entry = entry;
 	thread->arg1 = arg1;
@@ -381,7 +366,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	process_attach(owner, thread);
 
 	/* Add to the thread tree. */
-	mutex_lock(&thread_tree_lock, 0);
+	mutex_lock(&thread_tree_lock);
 	avl_tree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
 	mutex_unlock(&thread_tree_lock);
 
@@ -390,6 +375,28 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
 	return 0;
+}
+
+/** Run a newly-created thread.
+ *
+ * Moves a newly created thread into the Ready state and places it on the
+ * run queue of the current CPU.
+ *
+ * @todo		If the thread is not tied to the current CPU, pick the
+ *			best CPU for it to run on.
+ *
+ * @param thread	Thread to run.
+ */
+void thread_run(thread_t *thread) {
+	spinlock_lock(&thread->lock);
+
+	assert(thread->state == THREAD_CREATED);
+
+	thread->state = THREAD_READY;
+	thread->cpu = curr_cpu;
+	sched_thread_insert(thread);
+
+	spinlock_unlock(&thread->lock);
 }
 
 /** Destroy a thread.
@@ -407,7 +414,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
  * @param thread	Thread to destroy.
  */
 void thread_destroy(thread_t *thread) {
-	spinlock_lock(&thread->lock, 0);
+	spinlock_lock(&thread->lock);
 
 	if(refcount_dec(&thread->count) > 0) {
 		spinlock_unlock(&thread->lock);
@@ -421,12 +428,42 @@ void thread_destroy(thread_t *thread) {
 	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
 
 	/* Queue for deletion by the thread reaper. */
-	spinlock_lock(&dead_thread_lock, 0);
+	spinlock_lock(&dead_thread_lock);
 	list_append(&dead_threads, &thread->header);
 	semaphore_up(&dead_thread_sem, 1);
 	spinlock_unlock(&dead_thread_lock);
 
 	spinlock_unlock(&thread->lock);
+}
+
+/** Kill a thread.
+ * @param argc		Argument count.
+ * @param argv		Argument pointer array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_kill(int argc, char **argv) {
+	thread_t *thread;
+	unative_t tid;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Schedules a currently running thread to be killed once KDBG exits.\n");
+		kprintf(LOG_NONE, "Note that this has no effect on kernel threads.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	} else if(!(thread = thread_lookup(tid))) {
+		kprintf(LOG_NONE, "Invalid thread ID.\n");
+		return KDBG_FAIL;
+	}
+
+	thread_kill(thread);
+	return KDBG_OK;
 }
 
 /** Print information about a thread.
@@ -451,49 +488,10 @@ static inline void thread_dump(thread_t *thread, int level) {
 	        thread->owner->id, thread->name);
 }
 
-/** Kill a thread.
- *
- * Kills a thread.
- *
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
-int kdbg_cmd_kill(int argc, char **argv) {
-	thread_t *thread;
-	unative_t tid;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
-
-		kprintf(LOG_NONE, "Kills a currently running thread. The thread will die after KDBG exits.\n");
-		return KDBG_OK;
-	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
-	}
-
-	if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
-	} else if(!(thread = thread_lookup(tid))) {
-		kprintf(LOG_NONE, "Invalid thread ID.\n");
-		return KDBG_FAIL;
-	}
-
-	thread_kill(thread);
-	return KDBG_OK;
-}
-
 /** Dump a list of threads.
- *
- * Dumps out a list of threads.
- *
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_thread(int argc, char **argv) {
 	process_t *process;
 	thread_t *thread;
@@ -510,8 +508,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID     State    CPU  Wire Prio Flags WaitQ                Owner Name\n");
-	kprintf(LOG_NONE, "==     =====    ===  ==== ==== ===== =====                ===== ====\n");
+	kprintf(LOG_NONE, "ID     State    CPU  Wire Prio Flags Waiting On           Owner Name\n");
+	kprintf(LOG_NONE, "==     =====    ===  ==== ==== ===== ==========           ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */
@@ -666,11 +664,7 @@ fail:
 }
 
 /** Open a handle to a thread.
- *
- * Opens a handle to a thread in order to perform other operations on it.
- *
- * @param id		Global ID of the thread to open.
- */
+ * @param id		Global ID of the thread to open. */
 handle_t sys_thread_open(identifier_t id) {
 	thread_t *thread;
 	handle_t handle;
@@ -715,13 +709,8 @@ identifier_t sys_thread_id(handle_t handle) {
 }
 
 /** Terminate the calling thread.
- *
- * Terminates execution of the calling thread.
- *
  * @todo		Status.
- *
- * @param status	Exit status code.
- */
+ * @param status	Exit status code. */
 void sys_thread_exit(int status) {
 	thread_exit();
 }

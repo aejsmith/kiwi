@@ -155,11 +155,11 @@ static int input_device_read(device_t *_dev, void *_buf, size_t count, offset_t 
 	size_t i;
 
 	for(i = 0; i < count; i++) {
-		if((ret = semaphore_down(&device->sem, SYNC_INTERRUPTIBLE)) != 0) {
+		if((ret = semaphore_down_etc(&device->sem, -1, SYNC_INTERRUPTIBLE)) != 0) {
 			break;
 		}
 
-		spinlock_lock(&device->lock, 0);
+		spinlock_lock(&device->lock);
 
 		buf[i] = device->buffer[device->start];
 
@@ -184,7 +184,7 @@ static int input_device_wait(device_t *_dev, handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case HANDLE_EVENT_READ:
-		if(device->sem.queue.missed) {
+		if(semaphore_count(&device->sem)) {
 			wait->cb(wait);
 		} else {
 			notifier_register(&device->data_notifier, handle_wait_notifier, wait);
@@ -242,7 +242,7 @@ static device_ops_t input_device_ops = {
  * @param value		Value to add.
  */
 void input_device_input(input_device_t *device, uint8_t value) {
-	spinlock_lock(&device->lock, 0);
+	spinlock_lock(&device->lock);
 
 	/* Drop the input if full or device is not open. */
 	if(!atomic_get(&device->open) || device->size == INPUT_BUFFER_SIZE) {

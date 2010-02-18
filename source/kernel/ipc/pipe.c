@@ -72,23 +72,23 @@ static inline void pipe_insert(pipe_t *pipe, char ch) {
  * @return		0 on success, negative error code on failure.
  */
 int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp) {
-	int flags = (nonblock) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE;
 	size_t i = 0;
 	int ret;
 
-	mutex_lock(&pipe->reader, 0);
+	mutex_lock(&pipe->reader);
 
 	if(count <= PIPE_SIZE) {
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down(&pipe->data_sem, flags)) != 0) {
+			if((ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
+			                             SYNC_INTERRUPTIBLE)) != 0) {
 				semaphore_up(&pipe->data_sem, i);
 				i = 0;
 				goto out;
 			}
 		}
 
-		mutex_lock(&pipe->lock, 0);
+		mutex_lock(&pipe->lock);
 		for(i = 0; i < count; i++) {
 			buf[i] = pipe_get(pipe);
 		}
@@ -96,11 +96,12 @@ int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *byte
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down(&pipe->data_sem, flags)) != 0) {
+			if((ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
+			                             SYNC_INTERRUPTIBLE)) != 0) {
 				goto out;
 			}
 
-			mutex_lock(&pipe->lock, 0);
+			mutex_lock(&pipe->lock);
 			buf[i] = pipe_get(pipe);
 			notifier_run(&pipe->space_notifier, NULL, false);
 			mutex_unlock(&pipe->lock);
@@ -133,16 +134,16 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp) {
-	int flags = (nonblock) ? SYNC_NONBLOCK : SYNC_INTERRUPTIBLE;
 	size_t i = 0;
 	int ret;
 
-	mutex_lock(&pipe->writer, 0);
+	mutex_lock(&pipe->writer);
 
 	if(count <= PIPE_SIZE) {
 		/* Try to get all required space before writing. */
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down(&pipe->space_sem, flags)) != 0) {
+			if((ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
+			                             SYNC_INTERRUPTIBLE)) != 0) {
 				semaphore_up(&pipe->space_sem, i);
 				i = 0;
 				goto out;
@@ -151,7 +152,7 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 
 		/* For atomic writes, we only run the data notifier after
 		 * writing everything, so we don't do too many calls. */
-		mutex_lock(&pipe->lock, 0);
+		mutex_lock(&pipe->lock);
 		for(i = 0; i < count; i++) {
 			pipe_insert(pipe, buf[i]);
 		}
@@ -159,11 +160,12 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down(&pipe->space_sem, flags)) != 0) {
+			if((ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
+			                             SYNC_INTERRUPTIBLE)) != 0) {
 				goto out;
 			}
 
-			mutex_lock(&pipe->lock, 0);
+			mutex_lock(&pipe->lock);
 			pipe_insert(pipe, buf[i]);
 			notifier_run(&pipe->data_notifier, NULL, false);
 			mutex_unlock(&pipe->lock);
@@ -192,13 +194,13 @@ out:
  */
 void pipe_wait(pipe_t *pipe, bool write, handle_wait_t *wait) {
 	if(write) {
-		if(pipe->space_sem.queue.missed) {
+		if(semaphore_count(&pipe->space_sem)) {
 			wait->cb(wait);
 		} else {
 			notifier_register(&pipe->space_notifier, handle_wait_notifier, wait);
 		}
 	} else {
-		if(pipe->data_sem.queue.missed) {
+		if(semaphore_count(&pipe->data_sem)) {
 			wait->cb(wait);
 		} else {
 			notifier_register(&pipe->data_notifier, handle_wait_notifier, wait);

@@ -40,7 +40,7 @@ int ext2_dir_cache(vfs_node_t *node) {
 	uint32_t current = 0;
 	int count, ret;
 
-	rwlock_read_lock(&inode->lock, 0);
+	rwlock_read_lock(&inode->lock);
 
 	assert(node->type == VFS_NODE_DIR);
 

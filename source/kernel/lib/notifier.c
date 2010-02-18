@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,12 +31,8 @@ typedef struct notifier_func {
 } notifier_func_t;
 
 /** Initialise a notifier.
- *
- * Initialises a notifier structure.
- *
  * @param notif		Notifier to initialise.
- * @param data		Pointer to pass as first argument to functions.
- */
+ * @param data		Pointer to pass as first argument to functions. */
 void notifier_init(notifier_t *notif, void *data) {
 	mutex_init(&notif->lock, "notifier_lock", 0);
 	list_init(&notif->functions);
@@ -50,13 +46,12 @@ void notifier_init(notifier_t *notif, void *data) {
  *
  * @param notif		Notifier to destroy.
  */
-void notifier_empty(notifier_t *notif) {
+void notifier_clear(notifier_t *notif) {
 	notifier_func_t *nf;
 
-	mutex_lock(&notif->lock, 0);
+	mutex_lock(&notif->lock);
 	LIST_FOREACH_SAFE(&notif->functions, iter) {
 		nf = list_entry(iter, notifier_func_t, header);
-
 		list_remove(&nf->header);
 		kfree(nf);
 	}
@@ -94,7 +89,7 @@ void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
  * @param destroy	Whether to remove functions after calling them.
  */
 void notifier_run(notifier_t *notif, void *data, bool destroy) {
-	mutex_lock(&notif->lock, 0);
+	mutex_lock(&notif->lock);
 	notifier_run_unlocked(notif, data, destroy);
 	mutex_unlock(&notif->lock);
 }
@@ -114,7 +109,7 @@ void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), 
 	nf->func = func;
 	nf->data = data;
 
-	mutex_lock(&notif->lock, 0);
+	mutex_lock(&notif->lock);
 	list_append(&notif->functions, &nf->header);
 	mutex_unlock(&notif->lock);
 }
@@ -130,7 +125,7 @@ void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), 
 void notifier_unregister(notifier_t *notif, void (*func)(void *, void *, void *), void *data) {
 	notifier_func_t *nf;
 
-	mutex_lock(&notif->lock, 0);
+	mutex_lock(&notif->lock);
 
 	LIST_FOREACH_SAFE(&notif->functions, iter) {
 		nf = list_entry(iter, notifier_func_t, header);

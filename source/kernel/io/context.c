@@ -44,7 +44,7 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 
 	/* Inherit parent's current/root directories if possible. */
 	if(parent) {
-		mutex_lock(&parent->lock, 0);
+		mutex_lock(&parent->lock);
 
 		assert(parent->root_dir);
 		assert(parent->curr_dir);
@@ -98,7 +98,7 @@ int io_context_setcwd(io_context_t *context, vfs_node_t *node) {
 
 	vfs_node_get(node);
 
-	mutex_lock(&context->lock, 0);
+	mutex_lock(&context->lock);
 	old = context->curr_dir;
 	context->curr_dir = node;
 	mutex_unlock(&context->lock);
@@ -128,7 +128,7 @@ int io_context_setroot(io_context_t *context, vfs_node_t *node) {
 	vfs_node_get(node);
 	vfs_node_get(node);
 
-	mutex_lock(&context->lock, 0);
+	mutex_lock(&context->lock);
 	oldc = context->curr_dir;
 	context->curr_dir = node;
 	oldr = context->root_dir;

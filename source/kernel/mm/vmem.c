@@ -84,7 +84,7 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 	size_t i;
 
 	while(true) {
-		mutex_lock(&vmem_lock, 0);
+		mutex_lock(&vmem_lock);
 
 		/* If there are more tags than the refill threshold or we are
 		 * refilling the tag list at the moment then take a tag from
@@ -111,12 +111,12 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		 * necessary. This is to prevent unnecessary allocations of
 		 * new tags if multiple threads try to refill at the same
 		 * time. */
-		mutex_lock(&vmem_refill_lock, 0);
-		mutex_lock(&vmem_lock, 0);
+		mutex_lock(&vmem_refill_lock);
+		mutex_lock(&vmem_lock);
 		if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
 			mutex_unlock(&vmem_refill_lock);
 			mutex_unlock(&vmem_lock);
-			mutex_lock(&vmem->lock, 0);
+			mutex_lock(&vmem->lock);
 			continue;
 		}
 		mutex_unlock(&vmem_lock);
@@ -124,13 +124,13 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		/* Allocate a page from the tag arena and split it up into
 		 * tags. */
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
-		mutex_lock(&vmem->lock, 0);
+		mutex_lock(&vmem->lock);
 		if(addr == 0) {
 			mutex_unlock(&vmem_refill_lock);
 			return NULL;
 		}
 
-		mutex_lock(&vmem_lock, 0);
+		mutex_lock(&vmem_lock);
 
 		tag = (vmem_btag_t *)((ptr_t)addr);
 		for(i = 0; i < (PAGE_SIZE / sizeof(vmem_btag_t)); i++) {
@@ -150,7 +150,7 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 static void vmem_btag_free(vmem_btag_t *tag) {
 	assert(list_empty(&tag->s_link));
 
-	mutex_lock(&vmem_lock, 0);
+	mutex_lock(&vmem_lock);
 	list_prepend(&vmem_btags, &tag->header);
 	mutex_unlock(&vmem_lock);
 }
@@ -392,7 +392,7 @@ static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) 
 	 * calls that may take place on this arena if using MM_SLEEP. */
 	mutex_unlock(&vmem->lock);
 	ret = vmem->afunc(vmem->source, size, vmflag);
-	mutex_lock(&vmem->lock, 0);
+	mutex_lock(&vmem->lock);
 
 	if(ret == 0) {
 		return NULL;
@@ -410,7 +410,7 @@ static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) 
 		vmem_btag_free(span);
 		mutex_unlock(&vmem->lock);
 		vmem->ffunc(vmem->source, ret, size);
-		mutex_lock(&vmem->lock, 0);
+		mutex_lock(&vmem->lock);
 		return NULL;
 	}
 
@@ -461,7 +461,7 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 
 	mutex_unlock(&vmem->lock);
 	vmem->ffunc(vmem->source, base, size);
-	mutex_lock(&vmem->lock, 0);
+	mutex_lock(&vmem->lock);
 
 	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
 		base, base + size, vmem->name, vmem->source->name);
@@ -515,7 +515,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	assert(!(minaddr % vmem->quantum));
 	assert(!(maxaddr % vmem->quantum));
 
-	mutex_lock(&vmem->lock, 0);
+	mutex_lock(&vmem->lock);
 
 	if(align != 0 || phase != 0 || nocross != 0) {
 		fatal("Laziness has prevented implementation of these constraints. Sorry!");
@@ -556,7 +556,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 			slab_reclaim();
 
-			mutex_lock(&vmem->lock, 0);
+			mutex_lock(&vmem->lock);
 			if(vmem->used_size < curr_size) {
 				continue;
 			}
@@ -574,7 +574,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 		/* Wait for at most the configured interval and try again. */
 		kprintf(LOG_DEBUG, "vmem: waiting for space in %p(%s)...\n", vmem, vmem->name);
-		condvar_wait_timeout(&vmem->space_cvar, &vmem->lock, NULL, VMEM_RETRY_INTERVAL, 0);
+		condvar_wait_etc(&vmem->space_cvar, &vmem->lock, NULL, VMEM_RETRY_INTERVAL, 0);
 	}
 
 	if(seg) {
@@ -610,7 +610,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	assert(vmem);
 	assert((size % vmem->quantum) == 0);
 
-	mutex_lock(&vmem->lock, 0);
+	mutex_lock(&vmem->lock);
 
 	/* Look for the allocation on the allocation hash table. */
 	hash = hash_int_hash(addr) % vmem->htbl_size;
@@ -732,7 +732,7 @@ void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag) {
 	vmem_btag_t *span, *seg;
 
-	mutex_lock(&vmem->lock, 0);
+	mutex_lock(&vmem->lock);
 
 	/* The new span should not overlap an existing span. */
 	if(vmem_span_overlaps(vmem, base, base + size)) {
@@ -874,11 +874,11 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 	if(source) {
 		assert(afunc && ffunc);
 
-		mutex_lock(&source->lock, 0);
+		mutex_lock(&source->lock);
 		list_append(&source->children, &vmem->header);
 		mutex_unlock(&source->lock);
 	} else {
-		mutex_lock(&vmem_lock, 0);
+		mutex_lock(&vmem_lock);
 		list_append(&vmem_arenas, &vmem->header);
 		mutex_unlock(&vmem_lock);
 	}
@@ -1051,8 +1051,8 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	kprintf(LOG_NONE, "============================================================\n");
 	kprintf(LOG_NONE, "Quantum: %zu  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %zu\n",
 	            vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
-	kprintf(LOG_NONE, "Locked: %d (%p) (%" PRId32 ")\n", vmem->lock.recursion,
-	        vmem->lock.caller, (vmem->lock.holder) ? vmem->lock.holder->id : -1);
+	kprintf(LOG_NONE, "Locked: %d (%" PRId32 ")\n", atomic_get(&vmem->lock.locked),
+	        (vmem->lock.holder) ? vmem->lock.holder->id : -1);
 	if(vmem->source) {
 		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",
 		            vmem->source, vmem->source->name, vmem->imported_size);

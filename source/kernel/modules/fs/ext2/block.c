@@ -38,7 +38,7 @@ int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp) {
 
 	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock, 0);
+	rwlock_write_lock(&mount->lock);
 
 	if(le32_to_cpu(mount->sb.s_free_blocks_count) == 0) {
 		rwlock_unlock(&mount->lock);
@@ -118,7 +118,7 @@ int ext2_block_free(ext2_mount_t *mount, uint32_t num) {
 
 	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock, 0);
+	rwlock_write_lock(&mount->lock);
 
 	num -= le32_to_cpu(mount->sb.s_first_data_block);
 

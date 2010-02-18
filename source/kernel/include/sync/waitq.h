@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -32,33 +32,31 @@ struct mutex;
 typedef struct waitq {
 	spinlock_t lock;		/**< Lock to protect the queue. */
 	list_t threads;			/**< List of threads on the queue. */
-	int flags;			/**< Flags for the wait queue. */
-	unsigned int missed;		/**< Number of missed wakeups. */
 	const char *name;		/**< Name of wait queue. */
 } waitq_t;
 
 /** Initialises a statically declared wait queue. */
-#define WAITQ_INITIALISER(_var, _name, _flags, _missed)	\
+#define WAITQ_INITIALISER(_var, _name)	\
 	{ \
 		.lock = SPINLOCK_INITIALISER("waitq_lock"), \
 		.threads = LIST_INITIALISER(_var.threads), \
-		.flags = _flags, \
-		.missed = _missed, \
 		.name = _name, \
 	}
 
 /** Statically declares a new wait queue. */
-#define WAITQ_DECLARE(_var, _flags, _missed)		\
-	waitq_t _var = WAITQ_INITIALISER(_var, #_var, _flags, _missed)
+#define WAITQ_DECLARE(_var)		\
+	waitq_t _var = WAITQ_INITIALISER(_var, #_var)
 
-/** Wait queue behaviour flags. */
-#define WAITQ_COUNT_MISSED	(1<<0)	/**< Count missed wakeups. */
+extern bool waitq_sleep_prepare(waitq_t *queue);
+extern int waitq_sleep_unsafe(waitq_t *queue, timeout_t timeout, int flags, bool state);
+extern int waitq_sleep(waitq_t *queue, timeout_t timeout, int flags);
 
-extern int waitq_sleep(waitq_t *waitq, struct mutex *mtx, spinlock_t *sl, timeout_t timeout, int flags);
-extern bool waitq_wake(waitq_t *waitq, bool all);
+extern bool waitq_wake_unsafe(waitq_t *queue);
+extern bool waitq_wake(waitq_t *queue);
+extern bool waitq_wake_all(waitq_t *queue);
 
-extern bool waitq_empty(waitq_t *waitq);
+extern bool waitq_empty(waitq_t *queue);
 
-extern void waitq_init(waitq_t *waitq, const char *name, int flags);
+extern void waitq_init(waitq_t *queue, const char *name);
 
 #endif /* __SYNC_WAITQ_H */

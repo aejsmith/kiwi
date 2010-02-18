@@ -204,7 +204,7 @@ ata_controller_t *ata_controller_add(device_t *device, uint32_t ctl, uint32_t cm
 		return NULL;
 	}
 
-	mutex_lock(&ata_controllers_lock, 0);
+	mutex_lock(&ata_controllers_lock);
 	list_append(&ata_controllers, &controller->header);
 	mutex_unlock(&ata_controllers_lock);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -26,22 +26,31 @@
 
 /** Structure containing a semaphore. */
 typedef struct semaphore {
-	waitq_t queue;			/**< Wait queue implementing the semaphore. */
+	size_t count;			/**< Count of the semaphore. */
+	waitq_t queue;			/**< Queue for threads to wait on. */
 } semaphore_t;
 
 /** Initialises a statically declared semaphore. */
 #define SEMAPHORE_INITIALISER(_var, _name, _initial)	\
 	{ \
-		.queue = WAITQ_INITIALISER(_var.queue, _name, WAITQ_COUNT_MISSED, _initial), \
+		.count = _initial, \
+		.queue = WAITQ_INITIALISER(_var.queue, _name), \
 	}
 
 /** Statically declares a new semaphore. */
 #define SEMAPHORE_DECLARE(_var, _initial)		\
 	semaphore_t _var = SEMAPHORE_INITIALISER(_var, #_var, _initial)
 
-extern int semaphore_down_timeout(semaphore_t *sem, timeout_t timeout, int flags);
-extern int semaphore_down(semaphore_t *sem, int flags);
+/** Get the current value of a semaphore.
+ * @param sem		Semaphore to get count of.
+ * @return		Semaphore's value. */
+static inline size_t semaphore_count(semaphore_t *sem) {
+	return sem->count;
+}
+
+extern int semaphore_down_etc(semaphore_t *sem, timeout_t timeout, int flags);
+extern void semaphore_down(semaphore_t *sem);
 extern void semaphore_up(semaphore_t *sem, size_t count);
-extern void semaphore_init(semaphore_t *sem, const char *name, unsigned int initial);
+extern void semaphore_init(semaphore_t *sem, const char *name, size_t initial);
 
 #endif /* __SYNC_SEMAPHORE_H */

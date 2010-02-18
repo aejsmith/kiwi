@@ -42,8 +42,15 @@ typedef struct notifier {
 #define NOTIFIER_DECLARE(_var, _data)		\
 	notifier_t _var = NOTIFIER_INITIALISER(_var, _data)
 
+/** Check if a notifier's function list is empty.
+ * @param notif		Notifier to check.
+ * @return		Whether the function list is empty. */
+static inline bool notifier_empty(notifier_t *notif) {
+	return list_empty(&notif->functions);
+}
+
 extern void notifier_init(notifier_t *notif, void *data);
-extern void notifier_empty(notifier_t *notif);
+extern void notifier_clear(notifier_t *notif);
 extern void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy);
 extern void notifier_run(notifier_t *notif, void *data, bool destroy);
 extern void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data);

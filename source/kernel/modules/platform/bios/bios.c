@@ -238,7 +238,7 @@ static void bios_thread_entry(void *arg1, void *arg2) {
 	void *halt, *stack;
 
 	while(true) {
-		semaphore_down(&bios_sem, 0);
+		semaphore_down(&bios_sem);
 		request = list_entry(bios_queue.next, bios_request_t, header);
 		list_remove(&request->header);
 
@@ -305,7 +305,7 @@ static void bios_thread_entry(void *arg1, void *arg2) {
 void *bios_mem_alloc(size_t size, int mmflag) {
 	vmem_resource_t ret;
 
-	mutex_lock(&bios_lock, 0);
+	mutex_lock(&bios_lock);
 
 	if(!(ret = vmem_alloc(bios_mem_arena, size, mmflag))) {
 		mutex_unlock(&bios_lock);
@@ -335,7 +335,7 @@ MODULE_EXPORT(bios_mem_alloc);
 void bios_mem_free(void *addr, size_t size) {
 	vmem_resource_t base;
 
-	mutex_lock(&bios_lock, 0);
+	mutex_lock(&bios_lock);
 
 	/* Get allocation address/size. */
 	base = (vmem_resource_t)(((ptr_t)addr - (ptr_t)bios_mem_area) + BIOS_MEM_BASE);
@@ -408,12 +408,12 @@ int bios_interrupt(uint8_t num, bios_regs_t *regs) {
 	request.num = num;
 	request.regs = regs;
 
-	mutex_lock(&bios_lock, 0);
+	mutex_lock(&bios_lock);
 	list_append(&bios_queue, &request.header);
 	semaphore_up(&bios_sem, 1);
 	mutex_unlock(&bios_lock);
 
-	semaphore_down(&request.sem, 0);
+	semaphore_down(&request.sem);
 	return 0;
 }
 MODULE_EXPORT(bios_interrupt);

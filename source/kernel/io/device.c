@@ -127,7 +127,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	}
 
 	/* Check if a child already exists with this name. */
-	mutex_lock(&parent->lock, 0);
+	mutex_lock(&parent->lock);
 	if(radix_tree_lookup(&parent->children, name)) {
 		ret = -ERR_ALREADY_EXISTS;
 		goto fail;
@@ -214,7 +214,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	}
 
 	/* Check if a child already exists with this name. */
-	mutex_lock(&parent->lock, 0);
+	mutex_lock(&parent->lock);
 	if(radix_tree_lookup(&parent->children, name)) {
 		mutex_unlock(&parent->lock);
 		return -ERR_ALREADY_EXISTS;
@@ -263,8 +263,8 @@ int device_destroy(device_t *device) {
 
 	assert(device->parent);
 
-	mutex_lock(&device->parent->lock, 0);
-	mutex_lock(&device->lock, 0);
+	mutex_lock(&device->parent->lock);
+	mutex_lock(&device->lock);
 
 	if(refcount_get(&device->count) != 0) {
 		mutex_unlock(&device->lock);
@@ -359,7 +359,7 @@ int device_get(const char *path, device_t **devicep) {
 
 	dup = orig = kstrdup(path, MM_SLEEP);
 
-	mutex_lock(&device->lock, 0);
+	mutex_lock(&device->lock);
 	while((tok = strsep(&dup, "/"))) {
 		if(!tok[0]) {
 			continue;
@@ -372,7 +372,7 @@ int device_get(const char *path, device_t **devicep) {
 		/* Move down to the device and then iterate through until we
 		 * reach an entry that isn't an alias. */
 		do {
-			mutex_lock(&child->lock, 0);
+			mutex_lock(&child->lock);
 			mutex_unlock(&device->lock);
 			device = child;
 		} while((child = device->dest));
@@ -530,7 +530,7 @@ device_attr_t *device_attr(device_t *device, const char *name, int type) {
  * @param device	Device to release.
  */
 void device_release(device_t *device) {
-	mutex_lock(&device->lock, 0);
+	mutex_lock(&device->lock);
 
 	if(device->ops && device->ops->release) {
 		device->ops->release(device);

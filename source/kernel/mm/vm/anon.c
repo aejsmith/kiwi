@@ -81,7 +81,7 @@ static void vm_anon_object_get(vm_object_t *_obj, vm_region_t *region) {
 		fatal("Non-private region referencing anonymous object with source");
 	}
 
-	mutex_lock(&obj->lock, 0);
+	mutex_lock(&obj->lock);
 	refcount_inc(&obj->count);
 	list_append(&obj->regions, &region->object_link);
 	mutex_unlock(&obj->lock);
@@ -93,7 +93,7 @@ static void vm_anon_object_get(vm_object_t *_obj, vm_region_t *region) {
 static void vm_anon_object_release(vm_object_t *_obj, vm_region_t *region) {
 	vm_anon_object_t *obj = (vm_anon_object_t *)_obj;
 
-	mutex_lock(&obj->lock, 0);
+	mutex_lock(&obj->lock);
 
 	/* Detach the region from the object. */
 	list_remove(&region->object_link);
@@ -116,7 +116,7 @@ static int vm_anon_object_map(vm_object_t *_obj, offset_t offset, size_t size) {
 	vm_anon_object_t *obj = (vm_anon_object_t *)_obj;
 	size_t i, j, start, end;
 
-	mutex_lock(&obj->lock, 0);
+	mutex_lock(&obj->lock);
 
 	/* Work out the entries within the object that this covers and ensure
 	 * it's within the object - for anonymous objects mappings can't be
@@ -151,7 +151,7 @@ static void vm_anon_object_unmap(vm_object_t *_obj, offset_t offset, size_t size
 	vm_anon_object_t *obj = (vm_anon_object_t *)_obj;
 	size_t i, start, end;
 
-	mutex_lock(&obj->lock, 0);
+	mutex_lock(&obj->lock);
 
 	/* Work out the entries within the object that this covers and ensure
 	 * it's within the object. */
@@ -188,7 +188,7 @@ static int vm_anon_object_copy(vm_region_t *src, vm_region_t *dest) {
 
 	assert(src->flags & VM_REGION_PRIVATE);
 
-	mutex_lock(&srcobj->lock, 0);
+	mutex_lock(&srcobj->lock);
 
 	/* Work out the entries within the source object that the destination
 	 * region covers. */
@@ -259,7 +259,7 @@ static int vm_anon_object_fault(vm_region_t *region, ptr_t addr, int reason, int
 	offset = region->offset + (addr - region->start);
 	i = (size_t)(offset >> PAGE_WIDTH);
 
-	mutex_lock(&obj->lock, 0);
+	mutex_lock(&obj->lock);
 
 	assert(i < obj->max_size);
 

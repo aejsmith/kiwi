@@ -98,7 +98,7 @@ bool timer_tick(void) {
 
 	assert(curr_timer_device);
 
-	spinlock_lock(&curr_cpu->timer_lock, 0);
+	spinlock_lock(&curr_cpu->timer_lock);
 
 	/* Iterate the list and check for expired timers. */
 	LIST_FOREACH_SAFE(&curr_cpu->timer_list, iter) {
@@ -162,7 +162,7 @@ void timer_start(timer_t *timer, timeout_t length) {
 		return;
 	}
 
-	spinlock_lock(&curr_cpu->timer_lock, 0);
+	spinlock_lock(&curr_cpu->timer_lock);
 
 	timer->length = length;
 	timer->cpu = curr_cpu;
@@ -229,6 +229,6 @@ void timer_usleep(timeout_t us) {
 
 	assert(us > 0);
 
-	waitq_init(&queue, "timer_queue", 0);
-	waitq_sleep(&queue, NULL, NULL, us, 0);
+	waitq_init(&queue, "timer_queue");
+	waitq_sleep(&queue, us, 0);
 }

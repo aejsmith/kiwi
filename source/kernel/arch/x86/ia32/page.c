@@ -218,7 +218,7 @@ static int page_map_insert_large(page_map_t *map, ptr_t virt, phys_ptr_t phys,
 	assert(!(virt % LARGE_PAGE_SIZE));
 	assert(!(phys % LARGE_PAGE_SIZE));
 
-	mutex_lock(&map->lock, 0);
+	mutex_lock(&map->lock);
 
 	/* Find the page directory for the entry. */
 	if(!(pdir = page_map_get_pdir(map, virt, true, mmflag))) {
@@ -267,7 +267,7 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
 
-	mutex_lock(&map->lock, 0);
+	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
 	if(!(ptbl = page_map_get_ptbl(map, virt, true, mmflag))) {
@@ -312,7 +312,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 	assert(!(virt % PAGE_SIZE));
 
-	mutex_lock(&map->lock, 0);
+	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
 	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
@@ -351,7 +351,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
-	mutex_lock(&map->lock, 0);
+	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
 	if((ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
@@ -386,7 +386,7 @@ void page_map_remap(page_map_t *map, ptr_t start, ptr_t end, bool write, bool ex
 	assert(!(start % PAGE_SIZE));
 	assert(!(end % PAGE_SIZE));
 
-	mutex_lock(&map->lock, 0);
+	mutex_lock(&map->lock);
 
 	for(i = start; i < end; i += PAGE_SIZE) {
 		pte = (i % LARGE_PAGE_SIZE) / PAGE_SIZE;

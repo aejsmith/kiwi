@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,73 +18,59 @@
  * @brief		Semaphore implementation.
  */
 
+#include <cpu/intr.h>
 #include <sync/semaphore.h>
 
-#include <errors.h>
-
 /** Down a semaphore.
- *
- * Attempts to down (decrease the value of) a semaphore. If SYNC_NONBLOCK is
- * specified, the function will return if it is unable to down, otherwise
- * it will block until it is able to perform the down.
- *
  * @param sem		Semaphore to down.
  * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
- *			forever until the semaphore is downed, and a timeout of
- *			0 is equivalent to SYNC_NONBLOCK.
+ *			forever until the lock is acquired, and a timeout of 0
+ *			will return an error immediately if unable to down
+ *			the semaphore.
  * @param flags		Synchronization flags.
- *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
- */
-int semaphore_down_timeout(semaphore_t *sem, timeout_t timeout, int flags) {
-	return waitq_sleep(&sem->queue, NULL, NULL, timeout, flags);
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set. */
+int semaphore_down_etc(semaphore_t *sem, timeout_t timeout, int flags) {
+	bool state;
+
+	state = waitq_sleep_prepare(&sem->queue);
+	if(sem->count) {
+		--sem->count;
+		spinlock_unlock_ni(&sem->queue.lock);
+		intr_restore(state);
+		return 0;
+	}
+
+	return waitq_sleep_unsafe(&sem->queue, timeout, flags, state);
 }
 
 /** Down a semaphore.
- *
- * Attempts to down (decrease the value of) a semaphore. If SYNC_NONBLOCK is
- * specified, the function will return if it is unable to down, otherwise
- * it will block until it is able to perform the down.
- *
- * @param sem		Semaphore to down.
- * @param flags		Synchronization flags.
- *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
- */
-int semaphore_down(semaphore_t *sem, int flags) {
-	return semaphore_down_timeout(sem, -1, flags);
+ * @param sem		Semaphore to down. */
+void semaphore_down(semaphore_t *sem) {
+	semaphore_down_etc(sem, -1, 0);
 }
 
 /** Up a semaphore.
- *
- * Ups (increases the value of) a semaphore, and unblocks threads waiting if
- * necessary.
- *
  * @param sem		Semaphore to up.
- * @param count		Value to increment by.
- */
+ * @param count		Value to increment the count by. */
 void semaphore_up(semaphore_t *sem, size_t count) {
-	for(size_t i = 0; i < count; i++) {
-		waitq_wake(&sem->queue, false);
+	size_t i;
+
+	spinlock_lock(&sem->queue.lock);
+	for(i = 0; i < count; i++) {
+		if(!waitq_wake_unsafe(&sem->queue)) {
+			sem->count++;
+		}
 	}
+	spinlock_unlock(&sem->queue.lock);
 }
 
 /** Initialise a semaphore structure.
- *
- * Initialises a semaphore structure and sets its initial count to the
- * value specified.
- *
  * @param sem		Semaphore to initialise.
  * @param name		Name of the semaphore, for debugging purposes.
- * @param initial	Initial value of the semaphore.
- *
- * @return		True if attempt to down succeeds, false otherwise.
- */
-void semaphore_init(semaphore_t *sem, const char *name, unsigned int initial) {
-	waitq_init(&sem->queue, name, WAITQ_COUNT_MISSED);
-	sem->queue.missed = initial;
+ * @param initial	Initial value of the semaphore. */
+void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
+	waitq_init(&sem->queue, name);
+	sem->count = initial;
 }

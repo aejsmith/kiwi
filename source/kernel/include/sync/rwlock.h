@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,30 +21,31 @@
 #ifndef __SYNC_RWLOCK_H
 #define __SYNC_RWLOCK_H
 
-#include <sync/semaphore.h>
-#include <sync/spinlock.h>
+#include <sync/waitq.h>
 
 /** Structure containing a readers-writer lock. */
 typedef struct rwlock {
-	spinlock_t lock;		/**< Lock to protect structure. */
-	semaphore_t exclusive;		/**< Semaphore controlling exclusive access. */
-	size_t readers;			/**< Number of readers of the lock. */
+	int held;			/**< Whether the lock is held. */
+	size_t readers;			/**< Number of readers holding the lock. */
+	waitq_t queue;			/**< Queue to sleep on. */
 } rwlock_t;
 
 /** Initialises a statically declared readers-writer lock. */
 #define RWLOCK_INITIALISER(_var, _name)		\
 	{ \
-		.lock = SPINLOCK_INITIALISER("rwlock_lock"), \
-		.exclusive = SEMAPHORE_INITIALISER(_var.exclusive, _name, 1), \
+		.held = 0, \
 		.readers = 0, \
+		.queue = WAITQ_INITIALISER(_var.queue, _name), \
 	}
 
 /** Statically declares a new readers-writer lock. */
 #define RWLOCK_DECLARE(_var)			\
 	rwlock_t _var = RWLOCK_INITIALISER(_var, #_var)
 
-extern int rwlock_read_lock(rwlock_t *lock, int flags);
-extern int rwlock_write_lock(rwlock_t *lock, int flags);
+extern int rwlock_read_lock_etc(rwlock_t *lock, timeout_t timeout, int flags);
+extern int rwlock_write_lock_etc(rwlock_t *lock, timeout_t timeout, int flags);
+extern void rwlock_read_lock(rwlock_t *lock);
+extern void rwlock_write_lock(rwlock_t *lock);
 extern void rwlock_unlock(rwlock_t *lock);
 
 extern void rwlock_init(rwlock_t *lock, const char *name);

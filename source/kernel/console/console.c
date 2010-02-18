@@ -99,7 +99,7 @@ static void kvprintf_helper(char ch, void *data, int *total) {
  */
 void console_putch(int level, char ch) {
 	if(level != LOG_NONE) {
-		spinlock_lock(&console_lock, 0);
+		spinlock_lock(&console_lock);
 		console_putch_unlocked(level, ch);
 		spinlock_unlock(&console_lock);
 	} else {
@@ -110,7 +110,7 @@ void console_putch(int level, char ch) {
 /** Register a console and initialise it.
  * @param cons		Console to register. */
 void console_register(console_t *cons) {
-	spinlock_lock(&console_lock, 0);
+	spinlock_lock(&console_lock);
 
 	cons->inhibited = false;
 	list_init(&cons->header);
@@ -126,7 +126,7 @@ void console_register(console_t *cons) {
 /** Unregister a console.
  * @param cons		Console to register. */
 void console_unregister(console_t *cons) {
-	spinlock_lock(&console_lock, 0);
+	spinlock_lock(&console_lock);
 	list_remove(&cons->header);
 	spinlock_unlock(&console_lock);
 }
@@ -147,7 +147,7 @@ int kvprintf(int level, const char *fmt, va_list args) {
 	/* Do not take the lock if not logging as LOG_NONE is usually used from
 	 * KDBG/fatal(). */
 	if(level != LOG_NONE) {
-		spinlock_lock(&console_lock, 0);
+		spinlock_lock(&console_lock);
 		ret = do_printf(kvprintf_helper, &level, fmt, args);
 		spinlock_unlock(&console_lock);
 	} else {

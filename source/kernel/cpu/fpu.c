@@ -49,7 +49,7 @@ void fpu_request(void) {
 		 * should only be called from an interrupt in userspace. */
 		ctx = slab_cache_alloc(fpu_context_cache, MM_SLEEP);
 
-		spinlock_lock(&curr_thread->lock, 0);
+		spinlock_lock(&curr_thread->lock);
 		curr_thread->fpu = ctx;
 		fpu_enable();
 		fpu_init();

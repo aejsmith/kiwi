@@ -65,7 +65,7 @@ static SPINLOCK_DECLARE(pci_config_lock);
 uint8_t pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint8_t ret;
 
-	spinlock_lock(&pci_config_lock, 0);
+	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	ret = in8(PCI_CONFIG_DATA + (reg & 3));
 	spinlock_unlock(&pci_config_lock);
@@ -89,7 +89,7 @@ MODULE_EXPORT(pci_config_read8);
 uint16_t pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint16_t ret;
 
-	spinlock_lock(&pci_config_lock, 0);
+	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	ret = in16(PCI_CONFIG_DATA + (reg & 2));
 	spinlock_unlock(&pci_config_lock);
@@ -113,7 +113,7 @@ MODULE_EXPORT(pci_config_read16);
 uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint32_t ret;
 
-	spinlock_lock(&pci_config_lock, 0);
+	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	ret = in32(PCI_CONFIG_DATA);
 	spinlock_unlock(&pci_config_lock);

@@ -103,7 +103,7 @@ static atomic_t threads_runnable = 0;
  * @param thread	Thread to migrate.
  * @return		1 if successful, 0 if not. */
 static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
-	spinlock_lock_ni(&thread->lock, 0);
+	spinlock_lock_ni(&thread->lock);
 
 	assert(thread->cpu->sched == cpu);
 	assert(thread->state == THREAD_READY);
@@ -130,7 +130,7 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 	spinlock_unlock_ni(&cpu->lock);
 
 	/* Insert it in the current CPU's queue. */
-	spinlock_lock_ni(&curr_cpu->sched->lock, 0);
+	spinlock_lock_ni(&curr_cpu->sched->lock);
 	curr_cpu->sched->count[thread->priority]++;
 	list_append(&curr_cpu->sched->queues[thread->priority], &thread->header);
 	atomic_inc(&curr_cpu->sched->runnable);
@@ -138,7 +138,7 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 	spinlock_unlock_ni(&thread->lock);
 
 	/* Retake the source CPU lock. */
-	spinlock_lock_ni(&cpu->lock, 0);
+	spinlock_lock_ni(&cpu->lock);
 	return 1;
 }
 
@@ -178,7 +178,7 @@ static inline int sched_migrate_priority(int average, int priority, int max) {
 			continue;
 		}
 
-		spinlock_lock_ni(&cpu->sched->lock, 0);
+		spinlock_lock_ni(&cpu->sched->lock);
 
 		/* Check whether the CPU has some threads that we can take. */
 		load = atomic_get(&cpu->sched->runnable);
@@ -225,7 +225,7 @@ static void sched_balancer_thread(void *arg1, void *arg2) {
 		/* Check if there are any threads available. */
 		total = atomic_get(&threads_runnable);
 		if(total == 0) {
-			dprintf("sched: total thread count is 0, nothing to do\n");
+			dprintf("sched: runnable thread count is 0, nothing to do\n");
 			continue;
 		}
 
@@ -333,7 +333,7 @@ static thread_t *sched_queue_pick(sched_cpu_t *cpu) {
 		/* Only lock the new thread if it isn't the current - the
 		 * current gets locked by sched_internal(). */
 		if(thread != curr_thread) {
-			spinlock_lock_ni(&thread->lock, 0);
+			spinlock_lock_ni(&thread->lock);
 		}
 
 		/* Calculate a new timeslice for the thread using the algorithm
@@ -370,7 +370,7 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 static bool sched_timer_handler(void *data) {
 	bool ret = true;
 
-	spinlock_lock(&curr_thread->lock, 0);
+	spinlock_lock(&curr_thread->lock);
 
 	curr_thread->timeslice = 0;
 	if(curr_thread->preempt_off > 0) {
@@ -399,7 +399,7 @@ void sched_internal(bool state) {
 	sched_cpu_t *cpu = curr_cpu->sched;
 	thread_t *new;
 
-	spinlock_lock_ni(&cpu->lock, 0);
+	spinlock_lock_ni(&cpu->lock);
 
 	/* Thread can't be in ready state if we're running it now. */
 	assert(curr_thread->state != THREAD_READY);
@@ -420,7 +420,7 @@ void sched_internal(bool state) {
 	if(new == NULL) {
 		new = cpu->idle_thread;
 		if(new != curr_thread) {
-			spinlock_lock_ni(&new->lock, 0);
+			spinlock_lock_ni(&new->lock);
 			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n", curr_cpu->id);
 		}
 		new->timeslice = 0;
@@ -505,7 +505,7 @@ void sched_thread_insert(thread_t *thread) {
 	assert(thread->state == THREAD_READY);
 	assert(!(thread->flags & THREAD_UNQUEUEABLE));
 
-	spinlock_lock(&thread->cpu->sched->lock, 0);
+	spinlock_lock(&thread->cpu->sched->lock);
 	sched_queue_store(thread->cpu->sched, thread);
 	spinlock_unlock(&thread->cpu->sched->lock);
 
@@ -518,7 +518,7 @@ void sched_thread_insert(thread_t *thread) {
 void sched_yield(void) {
 	bool state = intr_disable();
 
-	spinlock_lock_ni(&curr_thread->lock, 0);
+	spinlock_lock_ni(&curr_thread->lock);
 	sched_internal(state);
 }
 
@@ -529,7 +529,7 @@ void sched_yield(void) {
  * required to reenable preemption.
  */
 void sched_preempt_disable(void) {
-	spinlock_lock(&curr_thread->lock, 0);
+	spinlock_lock(&curr_thread->lock);
 	curr_thread->preempt_off++;
 	spinlock_unlock(&curr_thread->lock);
 }
@@ -537,7 +537,7 @@ void sched_preempt_disable(void) {
 /** Enable preemption.
  * @note		See sched_preempt_disable() for details of behaviour. */
 void sched_preempt_enable(void) {
-	spinlock_lock(&curr_thread->lock, 0);
+	spinlock_lock(&curr_thread->lock);
 
 	if(curr_thread->preempt_off <= 0) {
 		fatal("Preemption already enabled or negative");
@@ -605,7 +605,7 @@ void __init_text sched_enter(void) {
 
 	/* Lock the idle thread - sched_post_switch() expects the thread to be
 	 * locked. */
-	spinlock_lock_ni(&curr_thread->lock, 0);
+	spinlock_lock_ni(&curr_thread->lock);
 
 	/* Restore the idle thread's context. */
 	context_restore(&curr_cpu->sched->idle_thread->context);

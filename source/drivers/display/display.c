@@ -212,7 +212,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 			return -ERR_PARAM_INVAL;
 		}
 
-		mutex_lock(&device->lock, 0);
+		mutex_lock(&device->lock);
 
 		/* For now just return whatever mode the kernel console is
 		 * using, and fallback on 1024x768, then 800x600 if the mode
@@ -237,7 +237,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 			return -ERR_NOT_SUPPORTED;
 		}
 
-		mutex_lock(&device->lock, 0);
+		mutex_lock(&device->lock);
 
 		if(!in) {
 			if((ret = device->ops->mode_set(device, NULL)) != 0) {
@@ -295,7 +295,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 		return 0;
 	default:
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->ops->request) {
-			mutex_lock(&device->lock, 0);
+			mutex_lock(&device->lock);
 			ret = device->ops->request(device, request, in, insz, outp, outszp);
 			mutex_unlock(&device->lock);
 			return ret;

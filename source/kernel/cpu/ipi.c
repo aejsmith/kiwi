@@ -72,7 +72,7 @@ static ipi_message_t *ipi_message_get(void) {
 			ipi_process_pending();
 		}
 
-		spinlock_lock(&ipi_message_lock, 0);
+		spinlock_lock(&ipi_message_lock);
 
 		/* Another CPU could have taken a message while we were waiting.
 		 * If this is the case, go and retry. */
@@ -109,7 +109,7 @@ static void ipi_message_release(ipi_message_t *message) {
 
 	assert(list_empty(&message->cpu_link));
 
-	spinlock_lock(&ipi_message_lock, 0);
+	spinlock_lock(&ipi_message_lock);
 	list_append(&ipi_message_pool, &message->header);
 	atomic_inc(&ipi_message_count);
 	spinlock_unlock(&ipi_message_lock);
@@ -119,7 +119,7 @@ static void ipi_message_release(ipi_message_t *message) {
  * @param message	Message to queue.
  * @param cpu		CPU to queue in. */
 static void ipi_message_queue(ipi_message_t *message, cpu_t *cpu) {
-	spinlock_lock(&cpu->ipi_lock, 0);
+	spinlock_lock(&cpu->ipi_lock);
 
 	list_append(&cpu->ipi_queue, &message->cpu_link);
 
@@ -142,7 +142,7 @@ void ipi_process_pending(void) {
 
 	assert(ipi_enabled);
 
-	spinlock_lock(&curr_cpu->ipi_lock, 0);
+	spinlock_lock(&curr_cpu->ipi_lock);
 
 	/* If we're being called while spinning in ipi_message_get() or
 	 * ipi_send(), then there may not have been an IPI sent. */
@@ -159,9 +159,12 @@ void ipi_process_pending(void) {
 		/* Unlock the queue while we call the handler. */
 		spinlock_unlock(&curr_cpu->ipi_lock);
 
-		/* Call the handler itself. */
-		ret = message->handler(message, message->data1, message->data2,
-		                       message->data3, message->data4);
+		if(message->handler) {
+			ret = message->handler(message, message->data1, message->data2,
+			                       message->data3, message->data4);
+		} else {
+			ret = 0;
+		}
 
 		/* If the handler has not already been acknowledged, then
 		 * acknowledge it now. */
@@ -174,7 +177,7 @@ void ipi_process_pending(void) {
 		ipi_message_release(message);
 
 		/* Relock the queue before we check again. */
-		spinlock_lock(&curr_cpu->ipi_lock, 0);
+		spinlock_lock(&curr_cpu->ipi_lock);
 	}
 
 	curr_cpu->ipi_sent = false;
@@ -190,7 +193,7 @@ void ipi_process_pending(void) {
  * will return immediately after sending the message.
  *
  * @param dest		Destination CPU ID.
- * @param handler	Handler function for the message.
+ * @param handler	Handler function for the message (can be NULL).
  * @param data1		First handler argument.
  * @param data2		Second handler argument.
  * @param data3		Third handler argument.
@@ -265,7 +268,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
  *			then ipi_send() should be used to individually send an
  *			IPI to each CPU in the cpus_running list.
  *
- * @param handler	Handler function for the message.
+ * @param handler	Handler function for the message (can be NULL).
  * @param data1		First handler argument.
  * @param data2		Second handler argument.
  * @param data3		Third handler argument.

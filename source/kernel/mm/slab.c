@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -202,11 +202,11 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 			fatal("Could not perform mandatory allocation on object cache %p(%s) (1)",
 			      cache, cache->name);
 		}
-		mutex_lock(&cache->slab_lock, 0);
+		mutex_lock(&cache->slab_lock);
 		return NULL;
 	}
 
-	mutex_lock(&cache->slab_lock, 0);
+	mutex_lock(&cache->slab_lock);
 
 	/* Create the slab structure for the slab. */
 	if(cache->flags & SLAB_CACHE_NOTOUCH) {
@@ -283,7 +283,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 	uint32_t hash;
 	slab_t *slab;
 
-	mutex_lock(&cache->slab_lock, 0);
+	mutex_lock(&cache->slab_lock);
 
 	/* Find the buffer control structure. For no-touch caches, look it up
 	 * on the allocation hash table. Otherwise, we use the start of the
@@ -353,7 +353,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 	slab_t *slab;
 	void *obj;
 
-	mutex_lock(&cache->slab_lock, 0);
+	mutex_lock(&cache->slab_lock);
 
 	/* If there is a slab in the partial list, take it. */
 	if(!list_empty(&cache->slab_partial)) {
@@ -413,7 +413,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
 	slab_magazine_t *mag = NULL;
 
-	mutex_lock(&cache->depot_lock, 0);
+	mutex_lock(&cache->depot_lock);
 
 	if(!list_empty(&cache->magazine_full)) {
 		mag = list_entry(cache->magazine_full.next, slab_magazine_t, header);
@@ -431,7 +431,7 @@ static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
 static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *mag) {
 	assert(mag->rounds == SLAB_MAGAZINE_SIZE);
 
-	mutex_lock(&cache->depot_lock, 0);
+	mutex_lock(&cache->depot_lock);
 	list_prepend(&cache->magazine_full, &mag->header);
 	mutex_unlock(&cache->depot_lock);
 }
@@ -442,7 +442,7 @@ static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *
 static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 	slab_magazine_t *mag = NULL;
 
-	mutex_lock(&cache->depot_lock, 0);
+	mutex_lock(&cache->depot_lock);
 
 	if(!list_empty(&cache->magazine_empty)) {
 		mag = list_entry(cache->magazine_empty.next, slab_magazine_t, header);
@@ -469,7 +469,7 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 static inline void slab_magazine_put_empty(slab_cache_t *cache, slab_magazine_t *mag) {
 	assert(!mag->rounds);
 
-	mutex_lock(&cache->depot_lock, 0);
+	mutex_lock(&cache->depot_lock);
 	list_prepend(&cache->magazine_empty, &mag->header);
 	mutex_unlock(&cache->depot_lock);
 }
@@ -505,7 +505,7 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	slab_magazine_t *mag;
 	void *ret = NULL;
 
-	mutex_lock(&cc->lock, 0);
+	mutex_lock(&cc->lock);
 
 	/* Check if we have a magazine to allocate from. */
 	if(likely(cc->loaded)) {
@@ -545,7 +545,7 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 	slab_cpu_cache_t *cc = &cache->cpu_caches[curr_cpu->id];
 	slab_magazine_t *mag;
 
-	mutex_lock(&cc->lock, 0);
+	mutex_lock(&cc->lock);
 
 	/* If the loaded magazine has spare slots, just put the object there
 	 * and return. */
@@ -619,7 +619,7 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 		cache->reclaim(cache->data, force);
 	}
 
-	mutex_lock(&cache->depot_lock, 0);
+	mutex_lock(&cache->depot_lock);
 
 	/* Destroy empty magazines. */
 	LIST_FOREACH_SAFE(&cache->magazine_empty, iter) {
@@ -813,7 +813,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	/* Add the cache to the global cache list, keeping it ordered by
 	 * priority. */
-	mutex_lock(&slab_caches_lock, 0);
+	mutex_lock(&slab_caches_lock);
 	if(list_empty(&slab_caches)) {
 		list_append(&slab_caches, &cache->header);
 	} else {
@@ -887,13 +887,13 @@ void slab_cache_destroy(slab_cache_t *cache) {
 	/* Destroy all magazines. */
 	slab_cache_reclaim(cache, true);
 
-	mutex_lock(&cache->slab_lock, 0);
+	mutex_lock(&cache->slab_lock);
 	if(!list_empty(&cache->slab_partial) || !list_empty(&cache->slab_full)) {
 		fatal("Cache %s still has allocations during destruction", cache->name);
 	}
 	mutex_unlock(&cache->slab_lock);
 
-	mutex_lock(&slab_caches_lock, 0);
+	mutex_lock(&slab_caches_lock);
 	list_remove(&cache->header);
 	mutex_unlock(&slab_caches_lock);
 
@@ -906,14 +906,14 @@ void slab_cache_destroy(slab_cache_t *cache) {
 static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
 	/* Take the reclaim lock immediately, unlocking/relocking it is handled
 	 * by the condition variable. */
-	mutex_lock(&slab_reclaim_lock, 0);
+	mutex_lock(&slab_reclaim_lock);
 
 	while(true) {
 		/* Wait for a reclaim request. */
-		condvar_wait(&slab_reclaim_req, &slab_reclaim_lock, NULL, 0);
+		condvar_wait(&slab_reclaim_req, &slab_reclaim_lock, NULL);
 
 		/* Loop through all caches and reclaim. */
-		mutex_lock(&slab_caches_lock, 0);
+		mutex_lock(&slab_caches_lock);
 		LIST_FOREACH(&slab_caches, iter) {
 			if(slab_cache_reclaim(list_entry(iter, slab_cache_t, header), false)) {
 				break;
@@ -930,13 +930,13 @@ static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
 void slab_reclaim(void) {
 	/* If the reclaim lock cannot be taken immediately a reclaim is already
 	 * being scheduled or in progress. */
-	if(!slab_reclaim_thread || mutex_lock(&slab_reclaim_lock, SYNC_NONBLOCK) != 0) {
+	if(!slab_reclaim_thread || mutex_lock_etc(&slab_reclaim_lock, 0, 0) != 0) {
 		return;
 	}
 
 	/* Schedule a reclaim. */
 	condvar_signal(&slab_reclaim_req);
-	condvar_wait(&slab_reclaim_resp, &slab_reclaim_lock, NULL, 0);
+	condvar_wait(&slab_reclaim_resp, &slab_reclaim_lock, NULL);
 	mutex_unlock(&slab_reclaim_lock);
 }
 
@@ -985,7 +985,7 @@ void __init_text slab_late_init(void) {
 	slab_cache_t *cache;
 	int ret;
 
-	mutex_lock(&slab_caches_lock, 0);
+	mutex_lock(&slab_caches_lock);
 
 	slab_inited = true;
 	LIST_FOREACH(&slab_caches, iter) {

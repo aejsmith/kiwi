@@ -141,7 +141,7 @@ static int ata_device_block_read(disk_device_t *_dev, void *buf, uint64_t lba) {
 	uint8_t cmd;
 	int ret;
 
-	mutex_lock(&device->parent->lock, 0);
+	mutex_lock(&device->parent->lock);
 
 	/* Set up the address registers and select the device. */
 	if(!ata_device_transfer_begin(device, lba)) {
@@ -185,7 +185,7 @@ static int ata_device_block_write(disk_device_t *_dev, const void *buf, uint64_t
 	uint8_t cmd;
 	int ret;
 
-	mutex_lock(&device->parent->lock, 0);
+	mutex_lock(&device->parent->lock);
 
 	/* Set up the address registers and select the device. */
 	if(!ata_device_transfer_begin(device, lba)) {
@@ -233,7 +233,7 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 	size_t blksize;
 	int ret;
 
-	mutex_lock(&controller->lock, 0);
+	mutex_lock(&controller->lock);
 
 	/* Set the device. */
 	ata_controller_select(controller, num);
@@ -303,7 +303,7 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 		fatal("Could not create ATA disk device %s (%d)", name, ret);
 	}
 
-	mutex_lock(&controller->lock, 0);
+	mutex_lock(&controller->lock);
 	list_append(&controller->devices, &device->header);
 
 	kfree(ident);

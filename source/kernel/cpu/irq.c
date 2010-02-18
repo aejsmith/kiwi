@@ -69,7 +69,7 @@ static void irq_thread(void *_handler, void *arg2) {
 	assert(handler->bottom);
 
 	while(true) {
-		semaphore_down(&handler->sem, 0);
+		semaphore_down(&handler->sem);
 
 		/* If the list header is not attached the handler has been
 		 * removed, destroy it and exit. */
@@ -127,7 +127,7 @@ int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) 
 		}
 	}
 
-	spinlock_lock(&irq_table[num].lock, 0);
+	spinlock_lock(&irq_table[num].lock);
 
 	/* Check if a handler exists with the same functions/data. */
 	LIST_FOREACH(&irq_table[num].handlers, iter) {
@@ -180,7 +180,7 @@ int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data
 		return -ERR_PARAM_INVAL;
 	}
 
-	spinlock_lock(&irq_table[num].lock, 0);
+	spinlock_lock(&irq_table[num].lock);
 
 	LIST_FOREACH(&irq_table[num].handlers, iter) {
 		handler = list_entry(iter, irq_handler_t, header);

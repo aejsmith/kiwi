@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -29,7 +29,7 @@
 typedef struct spinlock {
 	const char *name;		/**< Name of the spinlock. */
 	atomic_t locked;		/**< Whether the lock is taken. */
-	volatile int state;		/**< Interrupt state prior to locking. */
+	volatile bool state;		/**< Interrupt state prior to locking. */
 } spinlock_t;
 
 /** Initialises a statically-declared spinlock. */
@@ -45,19 +45,16 @@ typedef struct spinlock {
 	spinlock_t _var = SPINLOCK_INITIALISER(#_var)
 
 /** Check if a spinlock is held.
- *
- * Checks if the specified spinlock is held.
- *
  * @param lock		Spinlock to check.
- *
- * @return		True if lock is locked, false otherwise.
- */
+ * @return		True if lock is locked, false otherwise. */
 static inline bool spinlock_held(spinlock_t *lock) {
 	return atomic_get(&lock->locked);
 }
 
-extern int spinlock_lock(spinlock_t *lock, int flags);
-extern int spinlock_lock_ni(spinlock_t *lock, int flags);
+extern int spinlock_lock_etc(spinlock_t *lock, timeout_t timeout, int flags);
+extern int spinlock_lock_ni_etc(spinlock_t *lock, timeout_t timeout, int flags);
+extern void spinlock_lock(spinlock_t *lock);
+extern void spinlock_lock_ni(spinlock_t *lock);
 extern void spinlock_unlock(spinlock_t *lock);
 extern void spinlock_unlock_ni(spinlock_t *lock);
 extern void spinlock_init(spinlock_t *lock, const char *name);

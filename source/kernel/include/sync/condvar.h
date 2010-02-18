@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -32,15 +32,15 @@ typedef struct condvar {
 /** Initialises a statically declared condition variable. */
 #define CONDVAR_INITIALISER(_var, _name)	\
 	{ \
-		.queue = WAITQ_INITIALISER(_var.queue, _name, 0, 0), \
+		.queue = WAITQ_INITIALISER(_var.queue, _name), \
 	}
 
 /** Statically declares a new condition variable. */
 #define CONDVAR_DECLARE(_var)			\
 	condvar_t _var = CONDVAR_INITIALISER(_var, #_var)
 
-extern int condvar_wait_timeout(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags);
-extern int condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, int flags);
+extern int condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags);
+extern void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);
 

@@ -101,7 +101,7 @@ static vfs_type_t *vfs_type_lookup_internal(const char *name) {
 static vfs_type_t *vfs_type_lookup(const char *name) {
 	vfs_type_t *type;
 
-	mutex_lock(&vfs_type_list_lock, 0);
+	mutex_lock(&vfs_type_list_lock);
 
 	type = vfs_type_lookup_internal(name);
 	if(type) {
@@ -121,7 +121,7 @@ static vfs_type_t *vfs_type_probe(device_t *device) {
 
 	assert(device);
 
-	mutex_lock(&vfs_type_list_lock, 0);
+	mutex_lock(&vfs_type_list_lock);
 
 	LIST_FOREACH(&vfs_type_list, iter) {
 		type = list_entry(iter, vfs_type_t, header);
@@ -148,7 +148,7 @@ static vfs_type_t *vfs_type_probe(device_t *device) {
  * @return		0 on success, negative error code on failure.
  */
 int vfs_type_register(vfs_type_t *type) {
-	mutex_lock(&vfs_type_list_lock, 0);
+	mutex_lock(&vfs_type_list_lock);
 
 	/* Check if this type already exists. */
 	if(vfs_type_lookup_internal(type->name) != NULL) {
@@ -175,7 +175,7 @@ int vfs_type_register(vfs_type_t *type) {
  * @return		0 on success, negative error code on failure.
  */
 int vfs_type_unregister(vfs_type_t *type) {
-	mutex_lock(&vfs_type_list_lock, 0);
+	mutex_lock(&vfs_type_list_lock);
 
 	/* Check that the type is actually there. */
 	if(vfs_type_lookup_internal(type->name) != type) {
@@ -226,7 +226,7 @@ static void vfs_node_cache_reclaim(void *data, bool force) {
 	vfs_node_t *node;
 	size_t count;
 
-	mutex_lock(&vfs_mount_lock, 0);
+	mutex_lock(&vfs_mount_lock);
 
 	/* Iterate through mounts until we can flush at least 2 slabs worth of
 	 * node structures, or if forcing, free everything unused. */
@@ -239,13 +239,13 @@ static void vfs_node_cache_reclaim(void *data, bool force) {
 			continue;
 		}
 
-		mutex_lock(&mount->lock, 0);
+		mutex_lock(&mount->lock);
 
 		LIST_FOREACH_SAFE(&mount->unused_nodes, niter) {
 			node = list_entry(niter, vfs_node_t, header);
 
 			/* On success, node is unlocked by vfs_node_free(). */
-			mutex_lock(&node->lock, 0);
+			mutex_lock(&node->lock);
 			if(vfs_node_free(node) != 0) {
 				mutex_unlock(&node->lock);
 			} else if(--count == 0 && !force) {
@@ -421,7 +421,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		assert(curr_proc->ioctx.root_dir);
 
 		node = curr_proc->ioctx.root_dir;
-		mutex_lock(&node->lock, 0);
+		mutex_lock(&node->lock);
 		vfs_node_get(node);
 
 		/* If we have already reached the end of the path string,
@@ -474,7 +474,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 			 * of the loop left a reference on previous for us. */
 			tmp = node; node = prev; prev = tmp;
 			mutex_unlock(&prev->lock);
-			mutex_lock(&node->lock, 0);
+			mutex_lock(&node->lock);
 
 			/* Recurse to find the link destination. The check
 			 * above ensures we do not infinitely recurse. */
@@ -490,14 +490,14 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 
 			mutex_unlock(&node->lock);
 			vfs_node_release(prev);
-			mutex_lock(&node->lock, 0);
+			mutex_lock(&node->lock);
 		} else if(node->type == VFS_NODE_SYMLINK) {
 			/* The new node is a symbolic link but we do not want
 			 * to follow it. We must release the previous node. */
 			assert(prev != node);
 			mutex_unlock(&node->lock);
 			vfs_node_release(prev);
-			mutex_lock(&node->lock, 0);
+			mutex_lock(&node->lock);
 		}
 
 		if(tok == NULL) {
@@ -542,7 +542,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				vfs_node_get(node);
 				mutex_unlock(&prev->lock);
 				vfs_node_release(prev);
-				mutex_lock(&node->lock, 0);
+				mutex_lock(&node->lock);
 			}
 		}
 
@@ -563,7 +563,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		 * locking order. */
 		mount = node->mount;
 		mutex_unlock(&node->lock);
-		mutex_lock(&mount->lock, 0);
+		mutex_lock(&mount->lock);
 
 		prev = node;
 
@@ -627,7 +627,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		}
 
 		/* Lock the new node. */
-		mutex_lock(&node->lock, 0);
+		mutex_lock(&node->lock);
 	}
 }
 
@@ -664,14 +664,14 @@ int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep)
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&curr_proc->ioctx.lock, 0);
+	mutex_lock(&curr_proc->ioctx.lock);
 
 	/* Start from the current directory if the path is relative. */
 	if(path[0] != '/') {
 		assert(curr_proc->ioctx.curr_dir);
 
 		node = curr_proc->ioctx.curr_dir;
-		mutex_lock(&node->lock, 0);
+		mutex_lock(&node->lock);
 		vfs_node_get(node);
 	}
 
@@ -729,10 +729,10 @@ void vfs_node_release(vfs_node_t *node) {
 	/* Acquire mount lock then node lock. See note in file header about
 	 * locking order. */
 	if(node->mount) {
-		mutex_lock(&node->mount->lock, 0);
+		mutex_lock(&node->mount->lock);
 		mount = node->mount;
 	}
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	if(refcount_dec(&node->count) == 0) {
 		assert(!node->mounted);
@@ -803,8 +803,8 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 		goto out;
 	}
 
-	mutex_lock(&parent->mount->lock, 0);
-	mutex_lock(&parent->lock, 0);
+	mutex_lock(&parent->mount->lock);
+	mutex_lock(&parent->lock);
 
 	/* Ensure that we are on a writable filesystem, and that the FS
 	 * supports node creation. */
@@ -865,7 +865,7 @@ out:
  * @param info		Structure to store information in.
  */
 void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Fill in default values for everything. */
 	memset(info, 0, sizeof(vfs_info_t));
@@ -906,7 +906,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 	assert(node->type == VFS_NODE_FILE);
 	assert((pagep && !mappingp) || (mappingp && !pagep));
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Check whether it is within the size of the node. */
 	if((file_size_t)offset >= node->size) {
@@ -1007,7 +1007,7 @@ static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bo
 
 	assert(node->type == VFS_NODE_FILE);
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	if(!(page = avl_tree_lookup(&node->pages, (key_t)offset))) {
 		fatal("Tried to release page that isn't cached");
@@ -1237,7 +1237,7 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Check if the node is a suitable type. */
 	if(node->type != VFS_NODE_FILE) {
@@ -1345,7 +1345,7 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Check if the node is a suitable type, and if it's on a writeable
 	 * filesystem. */
@@ -1459,7 +1459,7 @@ int vfs_file_resize(vfs_node_t *node, file_size_t size) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Check if the node is a suitable type and if resizing is allowed. */
 	if(node->type != VFS_NODE_FILE) {
@@ -1652,7 +1652,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Ensure that the node is a directory. */
 	if(node->type != VFS_NODE_DIR) {
@@ -1693,8 +1693,8 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 	memcpy(buf, entry, entry->length);
 
 	mutex_unlock(&node->lock);
-	mutex_lock(&node->mount->lock, 0);
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->mount->lock);
+	mutex_lock(&node->lock);
 
 	/* Fix up the entry. */
 	if(node == node->mount->root && strcmp(entry->name, "..") == 0) {
@@ -1702,7 +1702,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		 * mount. Change the node ID to be the ID of the mountpoint,
 		 * if any. */
 		if(node->mount->mountpoint) {
-			mutex_lock(&node->mount->mountpoint->lock, 0);
+			mutex_lock(&node->mount->mountpoint->lock);
 			if((buf->id = vfs_dir_entry_get(node->mount->mountpoint, "..")) < 0) {
 				mutex_unlock(&node->mount->mountpoint->lock);
 				mutex_unlock(&node->mount->lock);
@@ -1719,7 +1719,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		 * mountpoint (mountpoints are always in the cache). */
 		if((child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id))) {
 			if(child != node) {
-				mutex_lock(&child->lock, 0);
+				mutex_lock(&child->lock);
 				if(child->type == VFS_NODE_DIR && child->mounted) {
 					buf->id = child->mounted->root->id;
 				}
@@ -1840,7 +1840,7 @@ int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
 		return -ERR_TYPE_INVAL;
 	}
 
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 
 	/* Ensure destination is cached. */
 	if((ret = vfs_symlink_cache_dest(node)) != 0) {
@@ -1901,7 +1901,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 
 	/* Lock the mount lock across the entire operation, so that only one
 	 * mount can take place at a time. */
-	mutex_lock(&vfs_mount_lock, 0);
+	mutex_lock(&vfs_mount_lock);
 
 	/* If the root filesystem is not yet mounted, the only place we can
 	 * mount is '/'. */
@@ -1917,7 +1917,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 			goto fail;
 		}
 
-		mutex_lock(&node->lock, 0);
+		mutex_lock(&node->lock);
 
 		/* Check that it is not being used as a mount point already. */
 		if(node->mount->root == node) {
@@ -2067,7 +2067,7 @@ int vfs_unmount(const char *path) {
 	}
 
 	/* Serialise mount/unmount operations. */
-	mutex_lock(&vfs_mount_lock, 0);
+	mutex_lock(&vfs_mount_lock);
 
 	/* Look up the destination directory. */
 	if((ret = vfs_node_lookup(path, true, VFS_NODE_DIR, &node)) != 0) {
@@ -2083,9 +2083,9 @@ int vfs_unmount(const char *path) {
 	/* Lock parent mount to ensure that the mount does not get looked up
 	 * while we are unmounting. */
 	mount = node->mount;
-	mutex_lock(&mount->mountpoint->mount->lock, 0);
-	mutex_lock(&mount->lock, 0);
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&mount->mountpoint->mount->lock);
+	mutex_lock(&mount->lock);
+	mutex_lock(&node->lock);
 
 	/* Get rid of the reference the lookup added, and check if any nodes
 	 * on the mount are in use. */
@@ -2102,7 +2102,7 @@ int vfs_unmount(const char *path) {
 		child = list_entry(iter, vfs_node_t, header);
 
 		/* On success, the child is unlocked by vfs_node_free(). */
-		mutex_lock(&child->lock, 0);
+		mutex_lock(&child->lock);
 		if((ret = vfs_node_free(child)) != 0) {
 			mutex_unlock(&child->lock);
 			goto fail;
@@ -2180,8 +2180,8 @@ int vfs_unlink(const char *path) {
 		goto out;
 	}
 
-	mutex_lock(&parent->lock, 0);
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&parent->lock);
+	mutex_lock(&node->lock);
 
 	if(parent->mount != node->mount) {
 		ret = -ERR_IN_USE;
@@ -2314,7 +2314,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 
 			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->lock.recursion, node->type, node->size,
+			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
 			        node->mount);
 		}
@@ -2324,7 +2324,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 
 			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
-			        node->lock.recursion, node->type, node->size,
+			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
 			        node->mount);
 		}
@@ -2393,11 +2393,11 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 	kprintf(LOG_NONE, "=================================================\n");
 
 	kprintf(LOG_NONE, "Count:        %d\n", refcount_get(&node->count));
-	kprintf(LOG_NONE, "Locked:       %d (%p) (%" PRId32 ")\n", node->lock.recursion,
-	        node->lock.caller, (node->lock.holder) ? node->lock.holder->id : -1);
+	kprintf(LOG_NONE, "Locked:       %d (%" PRId32 ")\n", atomic_get(&node->lock.locked),
+	        (node->lock.holder) ? node->lock.holder->id : -1);
 	if(node->mount) {
-		kprintf(LOG_NONE, "Mount:        %p (Locked: %d (%p) (%" PRId32 "))\n", node->mount,
-		        node->mount->lock.recursion, node->mount->lock.caller,
+		kprintf(LOG_NONE, "Mount:        %p (Locked: %d (%" PRId32 "))\n", node->mount,
+		        atomic_get(&node->mount->lock.locked),
 		        (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
 	} else {
 		kprintf(LOG_NONE, "Mount:        %p\n", node->mount);
@@ -2597,7 +2597,7 @@ int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, 
 
 	/* Work out the offset to read from. */
 	if(offset < 0) {
-		mutex_lock(&file->lock, 0);
+		mutex_lock(&file->lock);
 		offset = file->offset;
 		mutex_unlock(&file->lock);
 
@@ -2618,7 +2618,7 @@ int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, 
 	if(bytes) {
 		/* Update file offset. */
 		if(update) {
-			mutex_lock(&file->lock, 0);
+			mutex_lock(&file->lock);
 			file->offset += bytes;
 			mutex_unlock(&file->lock);
 		}
@@ -2693,7 +2693,7 @@ int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t o
 	/* Work out the offset to write to, and set it to the end of the file
 	 * if the handle has the FS_FILE_APPEND flag set. */
 	if(offset < 0) {
-		mutex_lock(&file->lock, 0);
+		mutex_lock(&file->lock);
 		if(file->flags & FS_FILE_APPEND) {
 			file->offset = file->node->size;
 		}
@@ -2717,7 +2717,7 @@ int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t o
 	/* Perform the actual write and update file offset if necessary. */
 	ret = vfs_file_write(file->node, kbuf, count, offset, &bytes);
 	if(bytes && update) {
-		mutex_lock(&file->lock, 0);
+		mutex_lock(&file->lock);
 		file->offset += bytes;
 		mutex_unlock(&file->lock);
 	}
@@ -2899,7 +2899,7 @@ int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t
 
 	/* Work out the index of the entry to read. */
 	if(index < 0) {
-		mutex_lock(&dir->lock, 0);
+		mutex_lock(&dir->lock);
 		index = dir->offset;
 		mutex_unlock(&dir->lock);
 
@@ -2920,7 +2920,7 @@ int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t
 	if(ret == 0) {
 		/* Update offset in the handle. */
 		if(update) {
-			mutex_lock(&dir->lock, 0);
+			mutex_lock(&dir->lock);
 			dir->offset++;
 			mutex_unlock(&dir->lock);
 		}
@@ -2962,7 +2962,7 @@ int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *n
 
 	/* Get the data structure and lock it. */
 	data = info->data;
-	mutex_lock(&data->lock, 0);
+	mutex_lock(&data->lock);
 
 	/* Perform the action. */
 	switch(action) {
@@ -2973,7 +2973,7 @@ int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *n
 		data->offset += offset;
 		break;
 	case FS_HANDLE_SEEK_END:
-		mutex_lock(&data->node->lock, 0);
+		mutex_lock(&data->node->lock);
 
 		/* To do this on directories, we must cache the entries to
 		 * know the size. */
@@ -3050,8 +3050,8 @@ int sys_fs_handle_sync(handle_t handle) {
 	}
 	data = info->data;
 
-	mutex_lock(&data->node->mount->lock, 0);
-	mutex_lock(&data->node->lock, 0);
+	mutex_lock(&data->node->mount->lock);
+	mutex_lock(&data->node->lock);
 	ret = vfs_node_flush(data->node, false);
 	mutex_unlock(&data->node->lock);
 	mutex_unlock(&data->node->mount->lock);
@@ -3227,7 +3227,7 @@ int sys_fs_getcwd(char *buf, size_t size) {
 
 	/* Get the working directory. */
 	node = curr_proc->ioctx.curr_dir;
-	mutex_lock(&node->lock, 0);
+	mutex_lock(&node->lock);
 	vfs_node_get(node);
 
 	/* Loop through until we reach the root. */

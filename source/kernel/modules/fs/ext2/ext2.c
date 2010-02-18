@@ -212,7 +212,7 @@ static int ext2_page_read(vfs_node_t *node, void *page, offset_t offset, bool no
 	assert(inode->mount->blk_size <= PAGE_SIZE);
 	assert(!(offset % inode->mount->blk_size));
 
-	rwlock_read_lock(&inode->lock, 0);
+	rwlock_read_lock(&inode->lock);
 	ret = ext2_inode_read(inode, page, offset / inode->mount->blk_size, PAGE_SIZE / inode->mount->blk_size, nonblock);
 	rwlock_unlock(&inode->lock);
 	return (ret < 0) ? ret : 0;
@@ -233,7 +233,7 @@ static int ext2_page_flush(vfs_node_t *node, const void *page, offset_t offset, 
 	assert(inode->mount->blk_size <= PAGE_SIZE);
 	assert(!(offset % inode->mount->blk_size));
 
-	rwlock_write_lock(&inode->lock, 0);
+	rwlock_write_lock(&inode->lock);
 	ret = ext2_inode_write(inode, page, offset / inode->mount->blk_size, PAGE_SIZE / inode->mount->blk_size, nonblock);
 	rwlock_unlock(&inode->lock);
 	return (ret < 0) ? ret : 0;
@@ -349,8 +349,8 @@ static int ext2_node_create(vfs_node_t *_parent, const char *name, vfs_node_t *n
 	if((ret = ext2_inode_alloc(parent->mount, mode, &inode)) != 0) {
 		return ret;
 	}
-	rwlock_write_lock(&inode->lock, 0);
-	rwlock_write_lock(&parent->lock, 0);
+	rwlock_write_lock(&inode->lock);
+	rwlock_write_lock(&parent->lock);
 
 	/* Fill in node structure. */
 	node->id = inode->num;
@@ -414,8 +414,8 @@ static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *n
 	assert(parent);
 	assert(inode);
 
-	rwlock_write_lock(&parent->lock, 0);
-	rwlock_write_lock(&inode->lock, 0);
+	rwlock_write_lock(&parent->lock);
+	rwlock_write_lock(&inode->lock);
 
 	if(node->type == VFS_NODE_DIR) {
 		/* Remove the . and .. entries. The VFS ensures that these are
@@ -450,7 +450,7 @@ static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *n
 static void ext2_node_info(vfs_node_t *node, vfs_info_t *info) {
 	ext2_inode_t *inode = node->data;
 
-	rwlock_read_lock(&inode->lock, 0);
+	rwlock_read_lock(&inode->lock);
 	info->size = le32_to_cpu(inode->disk.i_size);
 	info->links = le16_to_cpu(inode->disk.i_links_count);
 	rwlock_unlock(&inode->lock);
@@ -464,7 +464,7 @@ static int ext2_file_resize(vfs_node_t *node, file_size_t size) {
 	ext2_inode_t *inode = node->data;
 	int ret;
 
-	rwlock_write_lock(&inode->lock, 0);
+	rwlock_write_lock(&inode->lock);
 	ret = ext2_inode_resize(inode, size);
 	rwlock_unlock(&inode->lock);
 	return ret;
@@ -481,7 +481,7 @@ static int ext2_symlink_read(vfs_node_t *node, char **bufp) {
 	int ret, count;
 	size_t size;
 
-	rwlock_read_lock(&inode->lock, 0);
+	rwlock_read_lock(&inode->lock);
 
 	size = le32_to_cpu(inode->disk.i_size);
 	if(le32_to_cpu(inode->disk.i_blocks) == 0) {

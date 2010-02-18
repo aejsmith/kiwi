@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -28,49 +28,67 @@
  * becomes true. The specified mutex/spinlock should be held by the calling
  * thread. When the function returns (upon both failure and success) the
  * mutex/spinlock will be held again by the calling thread. A condition becomes
- * true when either condvar_signal() or condvar_broadcast() is called on it. It
- * is pointless to specify the SYNC_NONBLOCK flag - the call will always return
- * an error if it is set.
+ * true when either condvar_signal() or condvar_broadcast() is called on it.
+ *
+ * @note		You must not specify both a mutex and a spinlock.
  *
  * @param cv		Condition variable to wait on.
  * @param mtx		Mutex to unlock/relock.
- * @param sl		Spinlock to unlock/relock. Must not specify both mutex
- *			and spinlock.
- * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
- *			forever until the condition is signaled.
+ * @param sl		Spinlock to unlock/relock.
+ * @param timeout	Timeout in microseconds. If 0 is specified, then the
+ *			function will return an error immediately. If -1, it
+ *			will block indefinitely until the condition becomes
+ *			true.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
  */
-int condvar_wait_timeout(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
+int condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
+	bool state;
+	int ret;
+
 	assert(!!mtx ^ !!sl);
-	return waitq_sleep(&cv->queue, mtx, sl, timeout, flags);
+
+	/* Acquire the wait queue lock and disable interrupts, then release
+	 * the specified lock. */
+	state = waitq_sleep_prepare(&cv->queue);
+	if(mtx) {
+		mutex_unlock(mtx);
+	} else {
+		assert(!state);
+		spinlock_unlock_ni(sl);
+	}
+
+	/* Go to sleep. */
+	ret = waitq_sleep_unsafe(&cv->queue, timeout, flags, state);
+
+	/* Re-acquire the lock. */
+	if(mtx) {
+		mutex_lock(mtx);
+	} else {
+		spinlock_lock_ni(sl);
+	}
+
+	return ret;
 }
 
 /** Wait for a condition to become true.
  *
  * Atomically unlocks a mutex or spinlock and then blocks until a condition
  * becomes true. The specified mutex/spinlock should be held by the calling
- * thread. When the function returns (upon both failure and success) the
- * mutex/spinlock will be held again by the calling thread. A condition becomes
- * true when either condvar_signal() or condvar_broadcast() is called on it. It
- * is pointless to specify the SYNC_NONBLOCK flag - the call will always return
- * an error if it is set.
+ * thread. When the function returns the mutex/spinlock will be held again by
+ * the calling thread. A condition becomes true when either condvar_signal()
+ * or condvar_broadcast() is called on it.
  *
  * @param cv		Condition variable to wait on.
  * @param mtx		Mutex to unlock/relock.
  * @param sl		Spinlock to unlock/relock. Must not specify both mutex
  *			and spinlock.
- * @param flags		Synchronization flags.
- *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
  */
-int condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, int flags) {
-	return condvar_wait_timeout(cv, mtx, sl, -1, flags);
+void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl) {
+	condvar_wait_etc(cv, mtx, sl, -1, 0);
 }
 
 /** Signal that a condition has become true.
@@ -83,7 +101,7 @@ int condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, int flags) {
  * @return		Whether a thread was woken.
  */
 bool condvar_signal(condvar_t *cv) {
-	return waitq_wake(&cv->queue, false);
+	return waitq_wake(&cv->queue);
 }
 
 /** Broadcast that a condition has become true.
@@ -96,16 +114,12 @@ bool condvar_signal(condvar_t *cv) {
  * @return		Whether any threads were woken.
  */
 bool condvar_broadcast(condvar_t *cv) {
-	return waitq_wake(&cv->queue, true);
+	return waitq_wake_all(&cv->queue);
 }
 
 /** Initialise a condition variable.
- *
- * Initialises the given condition variable structure.
- *
  * @param cv		Condition variable to initialise.
- * @param name		Name to give the condition variable.
- */
+ * @param name		Name to give the condition variable. */
 void condvar_init(condvar_t *cv, const char *name) {
-	waitq_init(&cv->queue, name, 0);
+	waitq_init(&cv->queue, name);
 }

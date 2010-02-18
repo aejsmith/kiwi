@@ -25,6 +25,8 @@
 #include <proc/handle.h>
 #include <proc/process.h>
 
+#include <sync/semaphore.h>
+
 #include <assert.h>
 #include <console.h>
 #include <errors.h>
@@ -93,7 +95,7 @@ handle_t handle_create(handle_table_t *table, handle_type_t *type, void *data) {
 	info->type = type;
 	info->data = data;
 
-	mutex_lock(&table->lock, 0);
+	mutex_lock(&table->lock);
 
 	/* Find a handle ID in the table. */
 	if((ret = bitmap_ffz(&table->bitmap)) == -1) {
@@ -141,7 +143,7 @@ int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t *
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&table->lock, 0);
+	mutex_lock(&table->lock);
 
 	/* Look up the handle in the tree. */
 	if(!(info = avl_tree_lookup(&table->tree, (key_t)handle))) {
@@ -149,7 +151,7 @@ int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t *
 		return -ERR_NOT_FOUND;
 	}
 
-	rwlock_read_lock(&info->lock, 0);
+	rwlock_read_lock(&info->lock);
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && info->type->id != type) {
@@ -192,7 +194,7 @@ int handle_close(handle_table_t *table, handle_t handle) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&table->lock, 0);
+	mutex_lock(&table->lock);
 
 	/* Look up the handle in the tree. */
 	if(!(info = avl_tree_lookup(&table->tree, (key_t)handle))) {
@@ -202,7 +204,7 @@ int handle_close(handle_table_t *table, handle_t handle) {
 
 	/* Closing the handle requires exclusive access (ensures that the
 	 * handle is not currently in use). */
-	rwlock_write_lock(&info->lock, 0);
+	rwlock_write_lock(&info->lock);
 
 	/* If there are no more references we can close it. */
 	if(refcount_dec(&info->count) == 0) {
@@ -276,7 +278,7 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
 		return ret;
 	}
 
-	ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
 	wait.info->type->unwait(&wait);
 	handle_release(wait.info);
 	return ret;
@@ -339,7 +341,7 @@ int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, 
 		}
 	}
 
-	ret = semaphore_down_timeout(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
 out:
 	for(i = 0; i < count; i++) {
 		if(waits[i].info) {
@@ -385,13 +387,13 @@ void handle_table_destroy(handle_table_t *table) {
 	handle_info_t *info;
 	int ret;
 
-	mutex_lock(&table->lock, 0);
+	mutex_lock(&table->lock);
 
 	/* Close all handles in the table. */
 	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
 		info = avl_tree_entry(iter, handle_info_t);
 
-		rwlock_write_lock(&info->lock, 0);
+		rwlock_write_lock(&info->lock);
 
 		if(refcount_dec(&info->count) == 0) {
 			if(info->type->close && (ret = info->type->close(info)) != 0) {

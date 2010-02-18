@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,118 +33,88 @@
 
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
-extern void sched_thread_insert(thread_t *thread);
-extern void waitq_do_wake(thread_t *thread);
+extern void thread_wake(thread_t *thread);
 
 /** Handle a timeout on a wait queue.
  * @param _thread	Pointer to thread that timed out.
  * @return		Whether to reschedule. */
 static bool waitq_timer_handler(void *_thread) {
 	thread_t *thread = _thread;
+	waitq_t *queue;
 
-	spinlock_lock(&thread->lock, 0);
+	spinlock_lock(&thread->lock);
 
-	/* Restore the interruption context and queue it to run. */
-	thread->timed_out = true;
-	thread->context = thread->sleep_context;
-	waitq_do_wake(thread);
+	/* The thread could have been woken up already by another CPU. */
+	if(thread->state == THREAD_SLEEPING) {
+		/* Restore the interruption context and queue it to run. */
+		queue = thread->waitq;
+		spinlock_lock(&queue->lock);
+		thread->timed_out = true;
+		thread->context = thread->sleep_context;
+		thread_wake(thread);
+		spinlock_unlock(&queue->lock);
+	}
 
 	spinlock_unlock(&thread->lock);
 	return false;
 }
 
-/** Wake up a single thread. Thread and queue should be locked.
- * @param thread	Thread to wake up. */
-void waitq_do_wake(thread_t *thread) {
-	assert(thread->state == THREAD_SLEEPING);
-
-	/* Stop the timer. */
-	timer_stop(&thread->sleep_timer);
-
-	/* Remove the thread from the queue and wake it up. */
-	list_remove(&thread->waitq_link);
-	thread->waitq = NULL;
-	thread->interruptible = false;
-
-	thread->state = THREAD_READY;
-	sched_thread_insert(thread);
+/** Prepare to sleep on a wait queue.
+ *
+ * Prepares for the current thread to sleep on a wait queue. The wait queue
+ * lock will be taken and interrupts will be disabled. To begin waiting after
+ * calling this function, use waitq_sleep_unsafe(). This function should only
+ * be used if it is necessary to perform special tasks between taking the wait
+ * queue lock and going to sleep (for an example, see condvar_wait()); if no
+ * special behaviour is required, use waitq_sleep().
+ *
+ * @param queue		Queue to lock.
+ *
+ * @return		Previous interrupt state.
+ */
+bool waitq_sleep_prepare(waitq_t *queue) {
+	bool state = intr_disable();
+	spinlock_lock_ni(&queue->lock);
+	return state;
 }
 
 /** Sleep on a wait queue.
- *
- * Inserts the current thread into the specified wait queue and then sleeps
- * until it is woken by waitq_wake(). If the wait queue was created with
- * WAITQ_COUNT_MISSED, then the SYNC_NONBLOCK flag will cause the function to
- * return false if there is not a missed wakeup available. Otherwise, it will
- * have no effect.
- *
- * @param wait		Wait queue to wait on.
- * @param mtx		Optional mutex to unlock before sleeping, and relock
- *			after sleeping. This will not be used if SYNC_NONBLOCK
- *			is specified. The mutex will always be locked when the
- *			function returns - the flags specified will not be
- *			passed to mutex_lock() when relocking.
- * @param sl		Same as mtx but for a spinlock. You must not specify
- *			both a spinlock and a mutex.
- * @param timeout	Timeout in microseconds. A timeout of 0 has the same
- *			effect as SYNC_NONBLOCK (the reason both are provided
- *			is to let non-blocking mode be set for higher-level
- *			functions that don't allow a timeout parameter), and a
- *			timeout of -1 will sleep forever until the thread is
- *			woken.
- * @param flags		Synchronization flags (see sync/flags.h)
- *
- * @return		0 on success, negative error code on failure.
- */
-int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
-	bool state = intr_disable();
-	int ret = 0;
+ * @see			waitq_sleep_prepare().
+ * @param queue		Queue to sleep on.
+ * @param timeout	Timeout in microseconds. If 0 is specified, then the
+ *			function will return an error immediately. If -1, it
+ *			will block indefinitely until the thread is woken.
+ * @param flags		Flags to modify behaviour (see sync/flags.h).
+ * @param state		Interrupt state returned from waitq_sleep_prepare().
+ * @return		0 on success, negative error code on failure. */
+int waitq_sleep_unsafe(waitq_t *queue, timeout_t timeout, int flags, bool state) {
+	int ret;
 
-	assert(!(mtx && sl));
+	assert(spinlock_held(&queue->lock));
+	assert(!intr_state());
 
-	spinlock_lock_ni(&waitq->lock, 0);
-
-	/* Check if any missed wakeups are available. */
-	if(waitq->flags & WAITQ_COUNT_MISSED) {
-		if(waitq->missed > 0) {
-			waitq->missed--;
-
-			spinlock_unlock_ni(&waitq->lock);
-			intr_restore(state);
-			return 0;
-		} else if(flags & SYNC_NONBLOCK || timeout == 0) {
-			spinlock_unlock_ni(&waitq->lock);
-			intr_restore(state);
-			return -ERR_WOULD_BLOCK;
-		}
+	if(!timeout) {
+		spinlock_unlock_ni(&queue->lock);
+		intr_restore(state);
+		return -ERR_WOULD_BLOCK;
 	}
 
-	/* We're going to sleep, now that the wait queue lock is held we can
-	 * drop any locks we've been asked to drop. */
-	if(mtx) {
-		mutex_unlock(mtx);
-	} else if(sl) {
-		assert(!state);
-		spinlock_unlock_ni(sl);
-	}
+	spinlock_lock_ni(&curr_thread->lock);
 
-	spinlock_lock_ni(&curr_thread->lock, 0);
-
-	curr_thread->waitq = waitq;
+	curr_thread->waitq = queue;
 	curr_thread->timed_out = false;
 
-	/* Set up interruption/timeout context if required. */
+	/* Set up interruption/timeout context if necessary. This context will
+	 * be restored if sleep is interrupted. */
 	if(flags & SYNC_INTERRUPTIBLE || timeout > 0) {
 		if(context_save(&curr_thread->sleep_context) != 0) {
 			ret = (curr_thread->timed_out) ? -ERR_TIMED_OUT : -ERR_INTERRUPTED;
 			sched_post_switch(state);
-			goto out;
+			return ret;
 		}
 	}
 
-	/* Set whether we're interruptible, and set up a timeout if needed.
-	 * Always initialise the timer structure as it gets checked in the
-	 * wakeup functions. */
+	/* Set whether we're interruptible, and set up a timeout if needed. */
 	curr_thread->interruptible = ((flags & SYNC_INTERRUPTIBLE) != 0);
 	timer_init(&curr_thread->sleep_timer, waitq_timer_handler, curr_thread);
 	if(timeout > 0) {
@@ -152,96 +122,97 @@ int waitq_sleep(waitq_t *waitq, mutex_t *mtx, spinlock_t *sl, timeout_t timeout,
 	}
 
 	/* Add the thread to the queue and unlock it. */
-	list_append(&waitq->threads, &curr_thread->waitq_link);
-	spinlock_unlock_ni(&waitq->lock);
+	list_append(&queue->threads, &curr_thread->waitq_link);
+	spinlock_unlock_ni(&queue->lock);
 
 	/* Send the thread to sleep. The scheduler will handle interrupt state
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
 	sched_internal(state);
-out:
-	if(mtx) {
-		mutex_lock(mtx, 0);
-	} else if(sl) {
-		assert(!intr_state());
-		spinlock_lock_ni(sl, 0);
+	return 0;
+}
+
+/** Sleep on a wait queue.
+ *
+ * Inserts the current thread into a wait queue and then sleeps until woken
+ * by waitq_wake()/waitq_wake_all(), until the timeout specified expires, or,
+ * if the SYNC_INTERRUPTIBLE flag is set, until interrupted.
+ *
+ * @param queue		Queue to sleep on.
+ * @param timeout	Timeout in microseconds. If 0 is specified, then the
+ *			function will return an error immediately. If -1, it
+ *			will block indefinitely until the thread is woken.
+ * @param flags		Flags to modify behaviour (see sync/flags.h).
+ *
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
+ */
+int waitq_sleep(waitq_t *queue, timeout_t timeout, int flags) {
+	return waitq_sleep_unsafe(queue, timeout, flags, waitq_sleep_prepare(queue));
+}
+
+/** Wake up the next thread on a wait queue.
+ * @param queue		Queue to wake from. Will NOT be locked or unlocked.
+ * @return		Whether a thread was woken. */
+bool waitq_wake_unsafe(waitq_t *queue) {
+	thread_t *thread;
+
+	if(!list_empty(&queue->threads)) {
+		thread = list_entry(queue->threads.next, thread_t, waitq_link);
+		spinlock_lock(&thread->lock);
+		thread_wake(thread);
+		spinlock_unlock(&thread->lock);
+		return true;
+	} else {
+		return false;
 	}
+}
+
+/** Wake up the next thread on a wait queue.
+ * @param queue		Queue to wake from.
+ * @return		Whether a thread was woken. */
+bool waitq_wake(waitq_t *queue) {
+	bool ret;
+
+	spinlock_lock(&queue->lock);
+	ret = waitq_wake_unsafe(queue);
+	spinlock_unlock(&queue->lock);
 	return ret;
 }
 
-/** Wake up threads on a wait queue.
- *
- * Wakes up one or all threads currently waiting on a wait queue. If the queue
- * has the WAITQ_COUNT_MISSED flag set, the missed count will not be updated if
- * attempting to wake all threads.
- *
- * @param waitq		Wait queue to wake from.
- * @param all		Whether to wake all threads.
- *
- * @return		True if anything was woken, false if queue was empty.
- */
-bool waitq_wake(waitq_t *waitq, bool all) {
+/** Wake up all threads on a wait queue.
+ * @param queue		Queue to wake from.
+ * @return		Whether any threads were woken. */
+bool waitq_wake_all(waitq_t *queue) {
 	bool woken = false;
-	thread_t *thread;
 
-	spinlock_lock(&waitq->lock, 0);
-
-	while(!list_empty(&waitq->threads)) {
-		thread = list_entry(waitq->threads.next, thread_t, waitq_link);
-
-		spinlock_lock(&thread->lock, 0);
-
-		assert(thread->state == THREAD_SLEEPING);
-
-		/* Remove the thread from the queue and wake it up. */
-		waitq_do_wake(thread);
-		spinlock_unlock(&thread->lock);
-
+	spinlock_lock(&queue->lock);
+	while(waitq_wake_unsafe(queue)) {
 		woken = true;
-		if(!all) {
-			break;
-		}
 	}
-
-	if(!woken && !all && waitq->flags & WAITQ_COUNT_MISSED) {
-		waitq->missed++;
-	}
-
-	spinlock_unlock(&waitq->lock);
+	spinlock_unlock(&queue->lock);
 	return woken;
 }
 
 /** Check if a wait queue is empty.
- *
- * Checks if a wait queue is empty.
- *
- * @param waitq		Wait queue to check.
- *
- * @return		True if empty, false if not.
- */
-bool waitq_empty(waitq_t *waitq) {
+ * @param queue		Wait queue to check.
+ * @return		Whether the wait queue is empty. */
+bool waitq_empty(waitq_t *queue) {
 	bool ret;
 
-	spinlock_lock(&waitq->lock, 0);
-	ret = list_empty(&waitq->threads);
-	spinlock_unlock(&waitq->lock);
+	spinlock_lock(&queue->lock);
+	ret = list_empty(&queue->threads);
+	spinlock_unlock(&queue->lock);
 
 	return ret;
 }
 
-/** Initialise a wait queue.
- *
- * Initialises the specified wait queue structure.
- *
- * @param waitq		Wait queue to initialise.
- * @param name		Name of wait queue.
- * @param flags		Flags for the queue.
- */
-void waitq_init(waitq_t *waitq, const char *name, int flags) {
-	spinlock_init(&waitq->lock, "waitq_lock");
-	list_init(&waitq->threads);
-
-	waitq->flags = flags;
-	waitq->missed = 0;
-	waitq->name = name;
+/** Initialise a wait queue structure.
+ * @param queue		Wait queue to initialise.
+ * @param name		Name of wait queue. */
+void waitq_init(waitq_t *queue, const char *name) {
+	spinlock_init(&queue->lock, "waitq_lock");
+	list_init(&queue->threads);
+	queue->name = name;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,6 +18,8 @@
  * @brief		Mutex implementation.
  */
 
+#include <cpu/intr.h>
+
 #include <proc/thread.h>
 
 #include <sync/mutex.h>
@@ -28,61 +30,69 @@
 
 /** Lock a mutex.
  *
- * Attempts to lock a mutex. If SYNC_NONBLOCK is specified, the function will
- * return if it is unable to take the lock immediately, otherwise it will block
- * until it is able to do so. If the mutex is recursive, and the calling thread
+ * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
  * already holds the lock, then its recursion count will be increased and the
  * function will return immediately.
  *
  * @param lock		Mutex to lock.
  * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
  *			forever until the lock is acquired, and a timeout of 0
- *			is equivalent to SYNC_NONBLOCK.
+ *			will return an error immediately if unable to acquire
+ *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
  */
-int mutex_lock_timeout(mutex_t *lock, timeout_t timeout, int flags) {
+int mutex_lock_etc(mutex_t *lock, timeout_t timeout, int flags) {
+	bool state;
 	int ret;
 
-	if(lock->holder != curr_thread) {
-		ret = semaphore_down_timeout(&lock->sem, timeout, flags);
-		if(ret != 0) {
-			return ret;
-		}
+	/* Try to take the lock. */
+	if(!atomic_cmp_set(&lock->locked, 0, 1)) {
+		if(lock->holder == curr_thread) {
+			/* Wrap this with likely because if held by the current
+			 * thread the MUTEX_RECURSIVE flag should be set. */
+			if(likely(lock->flags & MUTEX_RECURSIVE)) {
+				atomic_inc(&lock->locked);
+				return 0;
+			} else {
+				fatal("Recursive locking of non-recursive mutex %p(%s)",
+				      lock, lock->queue.name);
+			}
+                } else {
+			state = waitq_sleep_prepare(&lock->queue);
 
-		assert(!lock->recursion);
-		lock->holder = curr_thread;
-		lock->caller = (ptr_t)__builtin_return_address(0);
-	} else if(curr_thread && !(lock->flags & MUTEX_RECURSIVE)) {
-		fatal("Nested locking of mutex %p(%s)\nThread: %" PRIu32 "(%s) Caller: %p",
-		      lock, lock->sem.queue.name, lock->holder->id,
-		      lock->holder->name, lock->caller);
+			/* Check again now that we have the wait queue lock,
+			 * in case mutex_unlock() was called on another CPU. */
+			if(atomic_cmp_set(&lock->locked, 0, 1)) {
+				spinlock_unlock_ni(&lock->queue.lock);
+				intr_restore(state);
+			} else {
+				/* If sleep is successful, lock ownership will
+				 * have been transferred to us. */
+				if((ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state)) != 0) {
+					return ret;
+				}
+			}
+		}
 	}
 
-	lock->recursion++;
+	lock->holder = curr_thread;
 	return 0;
 }
 
 /** Lock a mutex.
  *
- * Attempts to lock a mutex. If SYNC_NONBLOCK is specified, the function will
- * return if it is unable to take the lock immediately, otherwise it will block
- * until it is able to do so. If the mutex is recursive, and the calling thread
+ * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
  * already holds the lock, then its recursion count will be increased and the
  * function will return immediately.
  *
  * @param lock		Mutex to lock.
- * @param flags		Synchronization flags.
- *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
  */
-int mutex_lock(mutex_t *lock, int flags) {
-	return mutex_lock_timeout(lock, -1, flags);
+void mutex_lock(mutex_t *lock) {
+	mutex_lock_etc(lock, -1, 0);
 }
 
 /** Unlock a mutex.
@@ -95,37 +105,37 @@ int mutex_lock(mutex_t *lock, int flags) {
  * @param lock		Mutex to unlock.
  */
 void mutex_unlock(mutex_t *lock) {
-	if(!lock->recursion) {
-		fatal("Unlock of unheld mutex %p(%s)", lock, lock->sem.queue.name);
-	} else if(lock->holder != curr_thread) {
-		fatal("Unlock of mutex %p(%s) from incorrect thread\n"
-		      "Holder: %p  Current: %p",
-		      lock, lock->sem.queue.name, lock->holder, curr_thread);
+	spinlock_lock(&lock->queue.lock);
+
+	if(unlikely(!atomic_get(&lock->locked))) {
+		fatal("Unlock of unheld mutex %p(%s)", lock, lock->queue.name);
+	} else if(unlikely(lock->holder != curr_thread)) {
+		fatal("Unlock of mutex %p(%s) from incorrect thread (holder: %" PRIu32 ")",
+		      lock, lock->queue.name, (lock->holder) ? lock->holder->id : -1);
 	}
 
-	assert(lock->recursion <= 1 || lock->flags & MUTEX_RECURSIVE);
-
-	/* Check that holder is NULL because mutexes can be used when the
-	 * scheduler is not up. In this case, mutex_lock() does not down the
-	 * semaphore. */
-	if(--lock->recursion == 0 && lock->holder) {
-		lock->caller = 0;
+	/* If the current value is 1, the lock is being released. If there is
+	 * a thread waiting, we do not need to modify the count, as we transfer
+	 * ownership of the lock to it. Otherwise, decrement the count. */
+	if(atomic_get(&lock->locked) == 1) {
 		lock->holder = NULL;
-		semaphore_up(&lock->sem, 1);
+		if(!waitq_wake_unsafe(&lock->queue)) {
+			atomic_dec(&lock->locked);
+		}
+	} else {
+		atomic_dec(&lock->locked);
 	}
+
+	spinlock_unlock(&lock->queue.lock);
 }
 
 /** Initialise a mutex.
- *
- * Initialises the given mutex structure.
- *
  * @param lock		Mutex to initialise.
  * @param name		Name to give the mutex.
- * @param flags		Behaviour flags for the mutex.
- */
+ * @param flags		Behaviour flags for the mutex. */
 void mutex_init(mutex_t *lock, const char *name, int flags) {
-	semaphore_init(&lock->sem, name, 1);
-	lock->flags = flags;
+	atomic_set(&lock->locked, 0);
+	waitq_init(&lock->queue, name);
 	lock->holder = NULL;
-	lock->recursion = 0;
+	lock->flags = flags;
 }

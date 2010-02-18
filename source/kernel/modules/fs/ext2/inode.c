@@ -441,7 +441,7 @@ int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, ext2_inode_t **inodep) 
 
 	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock, 0);
+	rwlock_write_lock(&mount->lock);
 
 	if(le32_to_cpu(mount->sb.s_free_inodes_count) == 0) {
 		rwlock_unlock(&mount->lock);
@@ -551,7 +551,7 @@ int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 
 	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock, 0);
+	rwlock_write_lock(&mount->lock);
 
 	/* Inode numbers are 1-based. */
 	num -= 1;
@@ -605,7 +605,7 @@ int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 int ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep) {
 	int ret;
 
-	rwlock_read_lock(&mount->lock, 0);
+	rwlock_read_lock(&mount->lock);
 	ret = ext2_inode_get_internal(mount, num, inodep);
 	rwlock_unlock(&mount->lock);
 	return ret;

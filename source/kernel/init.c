@@ -379,7 +379,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		/* Wait for the boot CPU to do its initialisation. */
 		init_rendezvous(args, &init_rendezvous_2);
 
-		spinlock_lock(&smp_boot_spinlock, 0);
+		spinlock_lock(&smp_boot_spinlock);
 
 		/* Switch to the kernel page map, set the CPU pointer and do
 		 * architecture/platform initialisation. */

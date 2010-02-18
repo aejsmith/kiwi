@@ -142,14 +142,8 @@ static void syscall_trace(syscall_handler_t handler, unative_t ret, syscall_fram
 #endif
 
 /** System call dispatcher.
- *
- * Handles a system call from a userspace process. It simply forwards the call
- * to the function defined by the process' subsystem.
- *
  * @param frame		System call frame structure.
- *
- * @return		Return value of the system call.
- */
+ * @return		Return value of the system call. */
 unative_t syscall_handler(syscall_frame_t *frame) {
 	syscall_service_t *service;
 	unative_t ret;
@@ -187,16 +181,11 @@ unative_t syscall_handler(syscall_frame_t *frame) {
 }
 
 /** Register a system call service.
- *
- * Registers a new system call service.
- *
  * @param num		Service number.
  * @param service	Service structure describing the service.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int syscall_service_register(uint16_t num, syscall_service_t *service) {
-	mutex_lock(&syscall_services_lock, 0);
+	mutex_lock(&syscall_services_lock);
 
 	/* Resize the table if necessary. */
 	if(num > syscall_service_max || !syscall_services) {

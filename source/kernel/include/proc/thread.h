@@ -106,18 +106,18 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern void thread_run(thread_t *thread);
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
-extern void thread_exit(void) __noreturn;
-
 extern void thread_rename(thread_t *thread, const char *name);
+
+extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup(identifier_t id);
 extern int thread_create(const char *name, struct process *owner, int flags,
                          thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
+extern void thread_run(thread_t *thread);
 extern void thread_destroy(thread_t *thread);
 
 extern int kdbg_cmd_kill(int argc, char **argv);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,24 +21,23 @@
 #ifndef __SYNC_MUTEX_H
 #define __SYNC_MUTEX_H
 
-#include <sync/semaphore.h>
+#include <sync/waitq.h>
 
 /** Structure containing a mutex. */
 typedef struct mutex {
-	semaphore_t sem;		/**< Semaphore for threads to wait on. */
-	int flags;			/**< Behaviour flags for the mutex. */
+	atomic_t locked;		/**< Lock count. */
+	waitq_t queue;			/**< Queue for threads to wait on. */
 	struct thread *holder;		/**< Thread holding the lock. */
-	int recursion;			/**< Recursion count. */
-	ptr_t caller;			/**< Return address of call that first locked. */
+	int flags;			/**< Behaviour flags for the mutex. */
 } mutex_t;
 
 /** Initialises a statically declared mutex. */
 #define MUTEX_INITIALISER(_var, _name, _flags)	\
 	{ \
-		.sem = SEMAPHORE_INITIALISER(_var.sem, _name, 1), \
-		.flags = _flags, \
+		.locked = 0, \
+		.queue = WAITQ_INITIALISER(_var.queue, _name), \
 		.holder = NULL, \
-		.recursion = 0, \
+		.flags = _flags, \
 	}
 
 /** Statically declares a new mutex. */
@@ -52,11 +51,11 @@ typedef struct mutex {
  * @param lock		Mutex to check.
  * @return		Whether the mutex is held. */
 static inline bool mutex_held(mutex_t *lock) {
-	return (lock->recursion > 0);
+	return atomic_get(&lock->locked) != 0;
 }
 
-extern int mutex_lock_timeout(mutex_t *lock, timeout_t timeout, int flags);
-extern int mutex_lock(mutex_t *lock, int flags);
+extern int mutex_lock_etc(mutex_t *lock, timeout_t timeout, int flags);
+extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
 extern void mutex_init(mutex_t *lock, const char *name, int flags);
 

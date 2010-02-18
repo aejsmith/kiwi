@@ -184,7 +184,7 @@ int module_name(vfs_node_t *node, char *namebuf) {
 	module->load_size = 0;
 
 	/* Take the module lock in order to serialize module loading. */
-	mutex_lock(&module_lock, 0);
+	mutex_lock(&module_lock);
 
 	/* Perform first stage of loading the module. */
 	if((ret = elf_module_load(module)) != 0) {
@@ -251,7 +251,7 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 	module->load_size = 0;
 
 	/* Take the module lock in order to serialize module loading. */
-	mutex_lock(&module_lock, 0);
+	mutex_lock(&module_lock);
 
 	/* Perform first stage of loading the module. */
 	if((ret = elf_module_load(module)) != 0) {

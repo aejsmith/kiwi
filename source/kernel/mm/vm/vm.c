@@ -517,7 +517,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	/* Safe to take the lock despite us being in an interrupt - the lock
 	 * is only held within the functions in this file, and they should not
 	 * incur a pagefault (if they do there's something wrong!). */
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 
 	/* Find the region that the fault occurred in - if its a reserved
 	 * region, the memory is unmapped so treat it as though no region is
@@ -614,7 +614,7 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 
 	/* Allocate the region structure. */
 	region = vm_region_alloc(as, start, start + size, VM_REGION_RESERVED);
@@ -662,7 +662,7 @@ int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *add
 	/* Create a new anonymous object. */
 	object = vm_anon_object_create(size, NULL, 0);
 
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 
 	/* Attempt to map the region in. */
 	if((ret = vm_map_internal(as, start, size, flags, object, 0, addrp)) != 0) {
@@ -722,7 +722,7 @@ int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, vfs_node_t
 		object = &node->vobj;
 	}
 
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 
 	/* Attempt to map the region in. */
 	if((ret = vm_map_internal(as, start, size, flags, object, offset, addrp)) != 0) {
@@ -767,7 +767,7 @@ int vm_map_device(vm_aspace_t *as, ptr_t start, size_t size, int flags, device_t
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 
 	/* Attempt to map the region in. */
 	ret = vm_map_internal(as, start, size, flags, &device->vobj, offset, addrp);
@@ -790,7 +790,7 @@ int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	mutex_lock(&as->lock, 0);
+	mutex_lock(&as->lock);
 	vm_unmap_internal(as, start, start + size);
 	mutex_unlock(&as->lock);
 

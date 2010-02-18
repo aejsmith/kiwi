@@ -101,7 +101,7 @@ void disk_partition_add(disk_device_t *device, identifier_t id, uint64_t offset,
 	partition_t *part;
 	int ret;
 
-	mutex_lock(&device->lock, 0);
+	mutex_lock(&device->lock);
 
 	part = kmalloc(sizeof(partition_t), MM_SLEEP);
 	list_init(&part->header);

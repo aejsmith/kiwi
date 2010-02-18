@@ -72,7 +72,7 @@ static int ramfs_node_create(vfs_node_t *parent, const char *name, vfs_node_t *n
 	 * (next ID + 1) < next ID, but according to GCC, signed overflow
 	 * doesn't happen...
 	 * http://archives.postgresql.org/pgsql-hackers/2005-12/msg00635.php */
-	mutex_lock(&mount->lock, 0);
+	mutex_lock(&mount->lock);
 	if(mount->next_id == INT32_MAX) {
 		mutex_unlock(&mount->lock);
 		return -ERR_NO_SPACE;

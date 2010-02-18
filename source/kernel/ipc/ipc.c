@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,6 +31,8 @@
  * closed.
  */
 
+#include <cpu/intr.h>
+
 #include <ipc/ipc.h>
 
 #include <lib/avl.h>
@@ -48,6 +50,7 @@
 
 #include <sync/condvar.h>
 #include <sync/mutex.h>
+#include <sync/semaphore.h>
 
 #include <assert.h>
 #include <console.h>
@@ -182,7 +185,7 @@ static void ipc_process_death_notifier(void *_process, void *arg2, void *_port) 
 	ipc_port_acl_entry_t *entry;
 	ipc_port_t *port = _port;
 
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 
 	LIST_FOREACH(&port->acl, iter) {
 		entry = list_entry(iter, ipc_port_acl_entry_t, header);
@@ -232,11 +235,11 @@ static int ipc_port_handle_wait(handle_wait_t *wait) {
 	ipc_port_t *port = wait->info->data;
 	int ret = 0;
 
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 
 	switch(wait->event) {
 	case IPC_PORT_EVENT_CONNECTION:
-		if(port->conn_sem.queue.missed) {
+		if(semaphore_count(&port->conn_sem)) {
 			wait->cb(wait);
 		} else {
 			notifier_register(&port->conn_notifier, handle_wait_notifier, wait);
@@ -275,8 +278,8 @@ static int ipc_port_handle_close(handle_info_t *info) {
 		return 0;
 	}
 
-	mutex_lock(&ipc_port_tree_lock, 0);
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&ipc_port_tree_lock);
+	mutex_lock(&port->lock);
 
 	/* Cancel all in-progress connection attempts. */
 	LIST_FOREACH(&port->waiting, iter) {
@@ -292,15 +295,15 @@ static int ipc_port_handle_close(handle_info_t *info) {
 	LIST_FOREACH_SAFE(&port->connections, iter) {
 		conn = list_entry(iter, ipc_connection_t, header);
 
-		mutex_lock(&conn->lock, 0);
+		mutex_lock(&conn->lock);
 
-		waitq_wake(&conn->client.space_sem.queue, true);
-		waitq_wake(&conn->client.data_sem.queue, true);
+		waitq_wake_all(&conn->client.space_sem.queue);
+		waitq_wake_all(&conn->client.data_sem.queue);
 		notifier_run(&conn->client.hangup_notifier, NULL, false);
 		conn->client.remote = NULL;
 
-		waitq_wake(&conn->server.space_sem.queue, true);
-		waitq_wake(&conn->server.data_sem.queue, true);
+		waitq_wake_all(&conn->server.space_sem.queue);
+		waitq_wake_all(&conn->server.data_sem.queue);
 		notifier_run(&conn->server.hangup_notifier, NULL, false);
 		conn->server.remote = NULL;
 
@@ -346,11 +349,11 @@ static int ipc_connection_handle_wait(handle_wait_t *wait) {
 	ipc_endpoint_t *endpoint = wait->info->data;
 	int ret = 0;
 
-	mutex_lock(&endpoint->conn->lock, 0);
+	mutex_lock(&endpoint->conn->lock);
 
 	switch(wait->event) {
 	case HANDLE_EVENT_READ:
-		if(endpoint->data_sem.queue.missed) {
+		if(semaphore_count(&endpoint->data_sem)) {
 			wait->cb(wait);
 		} else {
 			notifier_register(&endpoint->msg_notifier, handle_wait_notifier, wait);
@@ -395,15 +398,15 @@ static int ipc_connection_handle_close(handle_info_t *info) {
 	ipc_message_t *message;
 	int ret;
 
-	mutex_lock(&endpoint->conn->lock, 0);
+	mutex_lock(&endpoint->conn->lock);
 
 	/* If the remote is open, detach it from this end, and wake all threads
 	 * all threads waiting for space on this end or messages on the remote
 	 * end. They will detect that we have set remote to NULL and return an
 	 * error. */
 	if(endpoint->remote) {
-		waitq_wake(&endpoint->space_sem.queue, true);
-		waitq_wake(&endpoint->remote->data_sem.queue, true);
+		waitq_wake_all(&endpoint->space_sem.queue);
+		waitq_wake_all(&endpoint->remote->data_sem.queue);
 		notifier_run(&endpoint->remote->hangup_notifier, NULL, false);
 		endpoint->remote->remote = NULL;
 		endpoint->remote = NULL;
@@ -416,7 +419,7 @@ static int ipc_connection_handle_close(handle_info_t *info) {
 		/* We must change the semaphores even though the endpoint is
 		 * being freed as they are initialised in the slab constructor
 		 * rather than after being allocated. */
-		ret = semaphore_down(&endpoint->data_sem, SYNC_NONBLOCK);
+		ret = semaphore_down_etc(&endpoint->data_sem, 0, 0);
 		assert(ret == 0);
 		semaphore_up(&endpoint->space_sem, 1);
 
@@ -424,10 +427,10 @@ static int ipc_connection_handle_close(handle_info_t *info) {
 		kfree(message);
 	}
 
-	assert(endpoint->data_sem.queue.missed == 0);
-	assert(endpoint->space_sem.queue.missed == IPC_QUEUE_MAX);
-	assert(list_empty(&endpoint->msg_notifier.functions));
-	assert(list_empty(&endpoint->hangup_notifier.functions));
+	assert(semaphore_count(&endpoint->data_sem) == 0);
+	assert(semaphore_count(&endpoint->space_sem) == IPC_QUEUE_MAX);
+	assert(notifier_empty(&endpoint->msg_notifier));
+	assert(notifier_empty(&endpoint->hangup_notifier));
 
 	dprintf("ipc: destroyed endpoint %p (conn: %p, port: %d)\n", endpoint,
 	        endpoint->conn, (endpoint->conn->port) ? endpoint->conn->port->id : -1);
@@ -483,7 +486,7 @@ handle_t sys_ipc_port_create(void) {
 	entry->rights = IPC_PORT_RIGHT_OPEN | IPC_PORT_RIGHT_MODIFY | IPC_PORT_RIGHT_CONNECT;
 	notifier_register(&curr_proc->death_notifier, ipc_process_death_notifier, port);
 
-	mutex_lock(&ipc_port_tree_lock, 0);
+	mutex_lock(&ipc_port_tree_lock);
 
 	if((ret = handle_create(&curr_proc->handles, &ipc_port_handle_type, port)) < 0) {
 		vmem_free(ipc_port_id_arena, (vmem_resource_t)port->id, 1);
@@ -514,13 +517,13 @@ handle_t sys_ipc_port_open(identifier_t id) {
 	ipc_port_t *port;
 	handle_t ret;
 
-	mutex_lock(&ipc_port_tree_lock, 0);
+	mutex_lock(&ipc_port_tree_lock);
 
 	if(!(port = avl_tree_lookup(&ipc_port_tree, id))) {
 		mutex_unlock(&ipc_port_tree_lock);
 		return -ERR_NOT_FOUND;
 	}
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 	mutex_unlock(&ipc_port_tree_lock);
 
 	if(!ipc_port_acl_check(port, IPC_PORT_RIGHT_OPEN)) {
@@ -585,12 +588,12 @@ handle_t sys_ipc_port_listen(handle_t handle, timeout_t timeout) {
 	/* Try to get a connection. FIXME: This does not handle timeout
 	 * properly! */
 	while(!conn) {
-		if((ret = semaphore_down_timeout(&port->conn_sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
+		if((ret = semaphore_down_etc(&port->conn_sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 			handle_release(info);
 			return ret;
 		}
 
-		mutex_lock(&port->lock, 0);
+		mutex_lock(&port->lock);
 		if(!list_empty(&port->waiting)) {
 			conn = list_entry(port->waiting.next, ipc_connection_t, header);
 			break;
@@ -654,7 +657,7 @@ int sys_ipc_port_acl_add(handle_t handle, ipc_port_accessor_t type, identifier_t
 	}
 	port = info->data;
 
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 
 	if(!ipc_port_acl_check(port, IPC_PORT_RIGHT_MODIFY)) {
 		ret = -ERR_PERM_DENIED;
@@ -668,7 +671,7 @@ int sys_ipc_port_acl_add(handle_t handle, ipc_port_accessor_t type, identifier_t
 			ret = -ERR_NOT_FOUND;
 			goto out;
 		}
-		mutex_lock(&process->lock, 0);
+		mutex_lock(&process->lock);
 	}
 
 	/* Look for an existing entry to modify. */
@@ -732,7 +735,7 @@ int sys_ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type, identifie
 	}
 	port = info->data;
 
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 
 	if(!ipc_port_acl_check(port, IPC_PORT_RIGHT_MODIFY)) {
 		ret = -ERR_PERM_DENIED;
@@ -746,7 +749,7 @@ int sys_ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type, identifie
 			ret = -ERR_NOT_FOUND;
 			goto out;
 		}
-		mutex_lock(&process->lock, 0);
+		mutex_lock(&process->lock);
 	}
 
 	LIST_FOREACH(&port->acl, iter) {
@@ -796,11 +799,11 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 	}
 
 	/* Look up the port. */
-	mutex_lock(&ipc_port_tree_lock, 0);
+	mutex_lock(&ipc_port_tree_lock);
 	if(!(port = avl_tree_lookup(&ipc_port_tree, id))) {
 		return -ERR_NOT_FOUND;
 	}
-	mutex_lock(&port->lock, 0);
+	mutex_lock(&port->lock);
 	mutex_unlock(&ipc_port_tree_lock);
 
 	if(!ipc_port_acl_check(port, IPC_PORT_RIGHT_CONNECT)) {
@@ -836,12 +839,12 @@ handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
 
 	/* Wait for the connection to be accepted. FIXME: This won't work with
 	 * timeout = 0, it doesn't give waiting listens to get here! */
-	if((ret = semaphore_down_timeout(&sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
+	if((ret = semaphore_down_etc(&sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
 		/* Take the port tree lock to ensure that the port doesn't get
 		 * freed. This is a bit naff, but oh well. */
-		mutex_lock(&ipc_port_tree_lock, 0);
+		mutex_lock(&ipc_port_tree_lock);
 		if(conn->port) {
-			mutex_lock(&conn->port->lock, 0);
+			mutex_lock(&conn->port->lock);
 			list_remove(&conn->header);
 			mutex_unlock(&conn->port->lock);
 		}
@@ -873,6 +876,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 	ipc_endpoint_t *endpoint = NULL;
 	handle_info_t *info = NULL;
 	ipc_message_t *message;
+	bool state;
 	int ret;
 
 	if((!buf && size) || size > IPC_MESSAGE_MAX) {
@@ -895,16 +899,25 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 		goto fail;
 	}
 	endpoint = info->data;
-	mutex_lock(&endpoint->conn->lock, 0);
+	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for space in the remote message queue. The unlock/wait needs to
 	 * be atomic in order to interact properly with
 	 * ipc_connection_handle_close(). FIXME: Should integrate this in the
 	 * semaphore API. */
 	if(endpoint->remote) {
-		if((ret = waitq_sleep(&endpoint->remote->space_sem.queue, &endpoint->conn->lock,
-		                      NULL, -1, SYNC_INTERRUPTIBLE)) != 0) {
-			goto fail;
+		state = waitq_sleep_prepare(&endpoint->remote->space_sem.queue);
+		if(endpoint->remote->space_sem.count) {
+			--endpoint->remote->space_sem.count;
+			spinlock_unlock_ni(&endpoint->remote->space_sem.queue.lock);
+			intr_restore(state);
+		} else {
+			mutex_unlock(&endpoint->conn->lock);
+			ret = waitq_sleep_unsafe(&endpoint->remote->space_sem.queue, -1, SYNC_INTERRUPTIBLE, state);
+			mutex_lock(&endpoint->conn->lock);
+			if(ret != 0) {
+				goto fail;
+			}
 		}
 	}
 
@@ -983,6 +996,7 @@ int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
 	ipc_message_t *message = NULL;
 	handle_info_t *info = NULL;
 	ipc_endpoint_t *endpoint;
+	bool state;
 	int ret;
 
 	/* Look up the IPC handle. */
@@ -990,7 +1004,7 @@ int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
 		return ret;
 	}
 	endpoint = info->data;
-	mutex_lock(&endpoint->conn->lock, 0);
+	mutex_lock(&endpoint->conn->lock);
 
 	/* Check if anything can send us a message. */
 	if(!endpoint->remote) {
@@ -1000,9 +1014,18 @@ int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
 
 	/* Wait for data in our message queue. The unlock/wait needs to be
 	 * atomic in order to interact properly with ipc_handle_close(). */
-	if((ret = waitq_sleep(&endpoint->data_sem.queue, &endpoint->conn->lock,
-	                      NULL, timeout, SYNC_INTERRUPTIBLE)) != 0) {
-		goto fail;
+	state = waitq_sleep_prepare(&endpoint->data_sem.queue);
+	if(endpoint->data_sem.count) {
+		--endpoint->data_sem.count;
+		spinlock_unlock_ni(&endpoint->data_sem.queue.lock);
+		intr_restore(state);
+	} else {
+		mutex_unlock(&endpoint->conn->lock);
+		ret = waitq_sleep_unsafe(&endpoint->data_sem.queue, timeout, SYNC_INTERRUPTIBLE, state);
+		mutex_lock(&endpoint->conn->lock);
+		if(ret != 0) {
+			goto fail;
+		}
 	}
 
 	/* Recheck that we have a remote end, as it may have hung up. If there
@@ -1079,7 +1102,7 @@ int kdbg_cmd_port(int argc, char **argv) {
 			port = avl_tree_entry(iter, ipc_port_t);
 
 			kprintf(LOG_NONE, "%-5d %-6d %u\n", port->id, refcount_get(&port->count),
-			        port->conn_sem.queue.missed);
+			        semaphore_count(&port->conn_sem));
 		}
 
 		return KDBG_OK;
@@ -1094,11 +1117,11 @@ int kdbg_cmd_port(int argc, char **argv) {
 		kprintf(LOG_NONE, "Port %p(%d)\n", port, port->id);
 		kprintf(LOG_NONE, "=================================================\n");
 
-		kprintf(LOG_NONE, "Locked:  %d (%p) (%" PRId32 ")\n", port->lock.recursion,
-		        port->lock.caller, (port->lock.holder) ? port->lock.holder->id : -1);
+		kprintf(LOG_NONE, "Locked:  %d (%" PRId32 ")\n", atomic_get(&port->lock.locked),
+		        (port->lock.holder) ? port->lock.holder->id : -1);
 		kprintf(LOG_NONE, "Count:   %d\n\n", refcount_get(&port->count));
 
-		kprintf(LOG_NONE, "Waiting (%u):\n", port->conn_sem.queue.missed);
+		kprintf(LOG_NONE, "Waiting (%u):\n", semaphore_count(&port->conn_sem));
 		LIST_FOREACH(&port->waiting, iter) {
 			conn = list_entry(iter, ipc_connection_t, header);
 			kprintf(LOG_NONE, "  Client(%p) Server(%p)\n", &conn->client, &conn->server);
@@ -1160,11 +1183,10 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 	kprintf(LOG_NONE, "Endpoint %p\n", endpoint);
 	kprintf(LOG_NONE, "=================================================\n");
 
-	kprintf(LOG_NONE, "Locked: %d (%p) (%" PRId32 ")\n", endpoint->conn->lock.recursion,
-	        endpoint->conn->lock.caller,
+	kprintf(LOG_NONE, "Locked: %d (%p) (%" PRId32 ")\n", atomic_get(&endpoint->conn->lock.locked),
 	        (endpoint->conn->lock.holder) ? endpoint->conn->lock.holder->id : -1);
-	kprintf(LOG_NONE, "Space:  %u\n", endpoint->space_sem.queue.missed);
-	kprintf(LOG_NONE, "Data:   %u\n", endpoint->data_sem.queue.missed);
+	kprintf(LOG_NONE, "Space:  %u\n", semaphore_count(&endpoint->space_sem));
+	kprintf(LOG_NONE, "Data:   %u\n", semaphore_count(&endpoint->data_sem));
 	kprintf(LOG_NONE, "Remote: %p\n\n", endpoint->remote);
 
 	kprintf(LOG_NONE, "Messages:\n");

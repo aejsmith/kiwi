@@ -134,7 +134,7 @@ static int process_alloc(const char *name, identifier_t id, int flags, int cflag
 	process->state = PROCESS_RUNNING;
 
 	/* Add to the process tree. */
-	mutex_lock(&process_tree_lock, 0);
+	mutex_lock(&process_tree_lock);
 	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
 	mutex_unlock(&process_tree_lock);
 
@@ -152,7 +152,7 @@ static void process_destroy(process_t *process) {
 	assert(process->state == PROCESS_DEAD);
 	assert(list_empty(&process->threads));
 
-	mutex_lock(&process_tree_lock, 0);
+	mutex_lock(&process_tree_lock);
 	avl_tree_remove(&process_tree, (key_t)process->id);
 	mutex_unlock(&process_tree_lock);
 
@@ -297,7 +297,7 @@ fail:
 void process_attach(process_t *process, thread_t *thread) {
 	thread->owner = process;
 
-	mutex_lock(&process->lock, 0);
+	mutex_lock(&process->lock);
 
 	assert(process->state != PROCESS_DEAD);
 	list_append(&process->threads, &thread->owner_link);
@@ -311,7 +311,7 @@ void process_attach(process_t *process, thread_t *thread) {
 void process_detach(thread_t *thread) {
 	process_t *process = thread->owner;
 
-	mutex_lock(&process->lock, 0);
+	mutex_lock(&process->lock);
 	list_remove(&thread->owner_link);
 
 	/* Move the process to the dead state if it contains no threads now,
@@ -363,7 +363,7 @@ process_t *process_lookup(identifier_t id) {
 	if(atomic_get(&kdbg_running)) {
 		process = avl_tree_lookup(&process_tree, (key_t)id);
 	} else {
-		mutex_lock(&process_tree_lock, 0);
+		mutex_lock(&process_tree_lock);
 		process = avl_tree_lookup(&process_tree, (key_t)id);
 		mutex_unlock(&process_tree_lock);
 	}
@@ -415,7 +415,7 @@ int process_create(const char **args, const char **environ, int flags, int cflag
 
 	/* Wait for completion, and return. No cleanup is necessary as the
 	 * process/thread will be cleaned up by the normal mechanism. */
-	semaphore_down(&info.sem, 0);
+	semaphore_down(&info.sem);
 	if(info.ret == 0 && procp) {
 		*procp = process;
 	}
@@ -433,7 +433,7 @@ int process_create(const char **args, const char **environ, int flags, int cflag
 void process_exit(int status) {
 	thread_t *thread;
 
-	mutex_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock);
 
 	LIST_FOREACH_SAFE(&curr_proc->threads, iter) {
 		thread = list_entry(iter, thread_t, owner_link);
@@ -514,7 +514,7 @@ static int process_handle_wait(handle_wait_t *wait) {
 
 	switch(wait->event) {
 	case PROCESS_EVENT_DEATH:
-		mutex_lock(&process->lock, 0);
+		mutex_lock(&process->lock);
 		if(process->state == PROCESS_DEAD) {
 			wait->cb(wait);
 		} else {
@@ -662,7 +662,7 @@ handle_t sys_process_create(const char *path, const char *const args[], const ch
 	thread_run(thread);
 
 	/* Wait for completion and check the return code. */
-	semaphore_down(&info.sem, 0);
+	semaphore_down(&info.sem);
 	if((ret = info.ret) != 0) {
 		goto fail;
 	}
@@ -733,7 +733,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 	}
 
 	/* Set the new name and address space. */
-	mutex_lock(&curr_proc->lock, 0);
+	mutex_lock(&curr_proc->lock);
 	name = curr_proc->name;
 	curr_proc->name = kstrdup(kpath, MM_SLEEP);
 	old = curr_proc->aspace;
@@ -817,7 +817,7 @@ handle_t sys_process_open(identifier_t id) {
 	process_t *process;
 	handle_t handle;
 
-	mutex_lock(&process_tree_lock, 0);
+	mutex_lock(&process_tree_lock);
 
 	if(!(process = avl_tree_lookup(&process_tree, (key_t)id))) {
 		mutex_unlock(&process_tree_lock);

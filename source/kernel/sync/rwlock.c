@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,43 +21,36 @@
  * starvation, are from HelenOS' readers-writer lock implementation.
  */
 
+#include <cpu/intr.h>
 #include <proc/thread.h>
-
 #include <sync/rwlock.h>
 
-extern void waitq_do_wake(thread_t *thread);
+extern void thread_wake(thread_t *thread);
 
-/** Transfer lock ownership to waiting writer or waiting readers.
- * @note		Spinlock should be held.
+/** Transfer lock ownership to a waiting writer or waiting readers.
+ * @note		Queue lock should be held.
  * @param lock		Lock to transfer ownership of. */
 static void rwlock_transfer_ownership(rwlock_t *lock) {
 	thread_t *thread;
-	waitq_t *queue;
-
-	/* Meh, take a copy of it just to make the code a bit nicer. */
-	queue = &lock->exclusive.queue;
-
-	spinlock_lock(&queue->lock, 0);
 
 	/* Check if there are any threads to transfer ownership to. */
-	if(list_empty(&queue->threads)) {
+	if(list_empty(&lock->queue.threads)) {
 		/* There aren't. If there are still readers (it is possible for
 		 * there to be, because this function gets called if a writer
 		 * is interrupted while blocking in order to allow readers
 		 * queued behind it in), then we do not want to do anything.
 		 * Otherwise, release the lock. */
 		if(!lock->readers) {
-			queue->missed++;
+			lock->held = 0;
 		}
-		spinlock_unlock(&queue->lock);
 		return;
 	}
 
 	/* Go through all threads queued. */
-	LIST_FOREACH_SAFE(&queue->threads, iter) {
+	LIST_FOREACH_SAFE(&lock->queue.threads, iter) {
 		thread = list_entry(iter, thread_t, waitq_link);
 
-		spinlock_lock(&thread->lock, 0);
+		spinlock_lock(&thread->lock);
 
 		/* If it is a reader, we can wake it and continue. If it is a
 		 * writer and the lock has no readers, wake it up and finish.
@@ -66,7 +59,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 			spinlock_unlock(&thread->lock);
 			break;
 		} else {
-			waitq_do_wake(thread);
+			thread_wake(thread);
 			if(thread->rwlock_writer) {
 				spinlock_unlock(&thread->lock);
 				break;
@@ -77,50 +70,48 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 			}
 		}
 	}
-
-	spinlock_unlock(&queue->lock);
 }
 
 /** Acquire a readers-writer lock for reading.
  *
- * Acquires a readers-writer lock for reading. If the lock is currently held
- * by any other readers, the call will succeed immediately. If it is not held
- * at all, then it will succeed. Otherwise, the lock must be held by a writer,
- * and the call will not succeed until the writer releases the lock (or, if
- * SYNC_NONBLOCK is specified, an error will be returned immediately).
+ * Acquires a readers-writer lock for reading. Multiple readers can hold a
+ * readers-writer lock at any one time, however if there are any writers
+ * waiting for the lock, the function will block and allow the writer to take
+ * the lock, in order to prevent starvation of writers.
  *
  * @param lock		Lock to acquire.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the lock is acquired, and a timeout of 0
+ *			will return an error immediately if unable to acquire
+ *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_read_lock(rwlock_t *lock, int flags) {
-	int ret;
+int rwlock_read_lock_etc(rwlock_t *lock, timeout_t timeout, int flags) {
+	bool state = intr_disable();
 
 	curr_thread->rwlock_writer = false;
+	spinlock_lock_ni(&lock->queue.lock);
 
-	spinlock_lock(&lock->lock, 0);
-
-	/* If we can take the exclusive lock without blocking, we're OK. */
-	if(semaphore_down(&lock->exclusive, SYNC_NONBLOCK) != 0) {
-		/* Lock is held, check if its held by readers. If it is, and
-		 * there's something else blocked on the lock, we wait anyway.
-		 * This is to prevent starvation of writers. */
-		if(!lock->readers || !waitq_empty(&lock->exclusive.queue)) {
-			spinlock_unlock(&lock->lock);
-			if((ret = semaphore_down(&lock->exclusive, flags)) != 0) {
-				return ret;
-			}
-
-			/* Readers count will have been incremented for us. */
-			return 0;
+	if(lock->held) {
+		/* Lock is held, check if it's held by readers. If it is, and
+		 * there's something waiting on the queue, we wait anyway. This
+		 * is to prevent starvation of writers. */
+		if(!lock->readers || !list_empty(&lock->queue.threads)) {
+			/* Readers count will have been incremented for us
+			 * upon success. */
+			return waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
 		}
+	} else {
+		lock->held = 1;
 	}
 
 	lock->readers++;
-	spinlock_unlock(&lock->lock);
+	spinlock_unlock_ni(&lock->queue.lock);
+	intr_restore(state);
 	return 0;
 }
 
@@ -128,68 +119,90 @@ int rwlock_read_lock(rwlock_t *lock, int flags) {
  *
  * Acquires a readers-writer lock for writing. When the lock has been acquired,
  * no other readers or writers will be holding the lock, or be able to acquire
- * it. If SYNC_NONBLOCK is specified, an error will be returned if the call is
- * not able to acquire the lock immediately.
+ * it.
  *
  * @param lock		Lock to acquire.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the lock is acquired, and a timeout of 0
+ *			will return an error immediately if unable to acquire
+ *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success (always the case if neither SYNC_NONBLOCK
- *			or SYNC_INTERRUPTIBLE are specified), negative error
- *			code on failure.
+ * @return		0 on success, negative error code on failure. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_write_lock(rwlock_t *lock, int flags) {
-	int ret;
+int rwlock_write_lock_etc(rwlock_t *lock, timeout_t timeout, int flags) {
+	bool state = intr_disable();
+	int ret = 0;
 
 	curr_thread->rwlock_writer = true;
+	spinlock_lock_ni(&lock->queue.lock);
 
 	/* Just acquire the exclusive lock. */
-	if((ret = semaphore_down(&lock->exclusive, flags)) != 0) {
-		/* Failed to acquire the lock, we may have been interrupted.
-		 * In this case, there may be a reader queued behind us that
-		 * can be let in. */
-		spinlock_lock(&lock->lock, 0);
-		if(lock->readers) {
-			rwlock_transfer_ownership(lock);
+	if(lock->held) {
+		if((ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state)) != 0) {
+			/* Failed to acquire the lock. In this case, there may
+			 * be a reader queued behind us that can be let in. */
+			spinlock_lock(&lock->queue.lock);
+			if(lock->readers) {
+				rwlock_transfer_ownership(lock);
+			}
+			spinlock_unlock(&lock->queue.lock);
 		}
-		spinlock_unlock(&lock->lock);
+	} else {
+		lock->held = 1;
+		spinlock_unlock_ni(&lock->queue.lock);
+		intr_restore(state);
 	}
 
 	return ret;
 }
 
-/** Release a readers-writer lock.
+/** Acquire a readers-writer lock for reading.
  *
- * Releases a readers-writer lock. 
+ * Acquires a readers-writer lock for reading. Multiple readers can hold a
+ * readers-writer lock at any one time, however if there are any writers
+ * waiting for the lock, the function will block and allow the writer to take
+ * the lock, in order to prevent starvation of writers.
  *
- * @param lock		Lock to release.
+ * @param lock		Lock to acquire.
  */
-void rwlock_unlock(rwlock_t *lock) {
-	spinlock_lock(&lock->lock, 0);
+void rwlock_read_lock(rwlock_t *lock) {
+	rwlock_read_lock_etc(lock, -1, 0);
+}
 
-	if(lock->readers && --lock->readers) {
-		spinlock_unlock(&lock->lock);
-		return;
+/** Acquire a readers-writer lock for writing.
+ *
+ * Acquires a readers-writer lock for writing. When the lock has been acquired,
+ * no other readers or writers will be holding the lock, or be able to acquire
+ * it.
+ *
+ * @param lock		Lock to acquire.
+ */
+void rwlock_write_lock(rwlock_t *lock) {
+	rwlock_write_lock_etc(lock, -1, 0);
+}
+
+/** Release a readers-writer lock.
+ * @param lock		Lock to release. */
+void rwlock_unlock(rwlock_t *lock) {
+	spinlock_lock(&lock->queue.lock);
+
+	if(!lock->held) {
+		fatal("Unlock of unheld rwlock %p(%s)", lock, lock->queue.name);
+	} else if(!lock->readers || !--lock->readers) {
+		rwlock_transfer_ownership(lock);
 	}
 
-	rwlock_transfer_ownership(lock);
-	spinlock_unlock(&lock->lock);
+	spinlock_unlock(&lock->queue.lock);
 }
 
 /** Initialise a readers-writer lock.
- *
- * Initialises a readers-writer lock structure.
- *
  * @param lock		Lock to initialise.
- * @param name		Name to give lock.
- */
+ * @param name		Name to give lock. */
 void rwlock_init(rwlock_t *lock, const char *name) {
-	/* Name the spinlock "rwlock_lock" because that lock is for use
-	 * internally, so if any locking bugs occur internally, it'll be more
-	 * obvious where it has happened. The exclusive semaphore is given the
-	 * name we're provided so that it will show up as the wait queue name
-	 * if a thread is blocking on it. */
-	spinlock_init(&lock->lock, "rwlock_lock");
-	semaphore_init(&lock->exclusive, name, 1);
+	waitq_init(&lock->queue, name);
+	lock->held = 0;
 	lock->readers = 0;
 }

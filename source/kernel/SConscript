@@ -22,8 +22,8 @@ sources = map(File, [
 
 	'cpu/cpu.c',
 	'cpu/fpu.c',
-	'cpu/irq.c',
 	'cpu/ipi.c',
+	'cpu/irq.c',
 
 	'io/context.c',
 	'io/device.c',
