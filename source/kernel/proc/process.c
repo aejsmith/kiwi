@@ -25,7 +25,6 @@
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
-#include <mm/vmem.h>
 
 #include <proc/handle.h>
 #include <proc/process.h>
@@ -41,6 +40,7 @@
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <vmem.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

@@ -44,7 +44,6 @@
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
-#include <mm/vmem.h>
 
 #include <proc/process.h>
 #include <proc/thread.h>
@@ -56,6 +55,7 @@
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <vmem.h>
 
 #if CONFIG_SLAB_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

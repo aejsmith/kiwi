@@ -46,7 +46,6 @@
 #include <mm/kheap.h>
 #include <mm/page.h>
 #include <mm/tlb.h>
-#include <mm/vmem.h>
 
 #include <assert.h>
 #include <console.h>

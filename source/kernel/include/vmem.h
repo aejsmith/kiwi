@@ -18,8 +18,8 @@
  * @brief		Vmem resource allocator.
  */
 
-#ifndef __MM_VMEM_H
-#define __MM_VMEM_H
+#ifndef __VMEM_H
+#define __VMEM_H
 
 #include <lib/list.h>
 #include <lib/utility.h>
@@ -140,4 +140,4 @@ extern void vmem_init(void);
 
 extern int kdbg_cmd_vmem(int argc, char **argv);
 
-#endif /* __MM_VMEM_H */
+#endif /* __VMEM_H */

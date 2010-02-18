@@ -42,7 +42,6 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
-#include <mm/vmem.h>
 
 #include <proc/handle.h>
 #include <proc/process.h>
@@ -58,6 +57,7 @@
 #include <fatal.h>
 #include <init.h>
 #include <kdbg.h>
+#include <vmem.h>
 
 #if CONFIG_IPC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

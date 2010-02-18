@@ -25,7 +25,6 @@
 
 #include <mm/page.h>
 #include <mm/slab.h>
-#include <mm/vmem.h>
 
 #include <proc/thread.h>
 
@@ -34,6 +33,7 @@
 #include <errors.h>
 #include <fatal.h>
 #include <kargs.h>
+#include <vmem.h>
 
 #if CONFIG_PAGE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

@@ -23,9 +23,8 @@
 
 #include <arch/page.h>
 
-#include <mm/vmem.h>
-
 #include <types.h>
+#include <vmem.h>
 
 extern vmem_t kheap_raw_arena;
 extern vmem_t kheap_va_arena;

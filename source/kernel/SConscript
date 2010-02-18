@@ -51,7 +51,6 @@ sources = map(File, [
 	'mm/vm/anon.c',
 	'mm/vm/page.c',
 	'mm/vm/vm.c',
-	'mm/vmem.c',
 
 	'proc/handle.c',
 	'proc/process.c',
@@ -75,6 +74,7 @@ sources = map(File, [
 	'module.c',
 	'symbol.c',
 	'version.c',
+	'vmem.c',
 ])
 
 ############################

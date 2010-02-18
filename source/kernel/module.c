@@ -23,7 +23,6 @@
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
-#include <mm/vmem.h>
 
 #include <sync/mutex.h>
 
@@ -31,6 +30,7 @@
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+#include <vmem.h>
 
 #if CONFIG_MODULE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

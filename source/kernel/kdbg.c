@@ -43,7 +43,6 @@
 
 #include <mm/slab.h>
 #include <mm/vm.h>
-#include <mm/vmem.h>
 
 #include <proc/handle.h>
 #include <proc/process.h>
@@ -52,6 +51,7 @@
 #include <kdbg.h>
 #include <module.h>
 #include <symbol.h>
+#include <vmem.h>
 
 extern void arch_reboot(void);
 

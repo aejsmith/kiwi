@@ -22,7 +22,6 @@
 #include <arch/sysreg.h>
 
 #include <mm/malloc.h>
-#include <mm/vmem.h>
 
 #include <platform/bios.h>
 
@@ -37,6 +36,7 @@
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+#include <vmem.h>
 
 #include "x86emu/x86emu.h"
 
