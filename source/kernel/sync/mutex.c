@@ -45,7 +45,7 @@
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int mutex_lock_etc(mutex_t *lock, timeout_t timeout, int flags) {
+int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 	bool state;
 	int ret;
 

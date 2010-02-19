@@ -48,8 +48,8 @@ typedef struct waitq {
 	waitq_t _var = WAITQ_INITIALISER(_var, #_var)
 
 extern bool waitq_sleep_prepare(waitq_t *queue);
-extern int waitq_sleep_unsafe(waitq_t *queue, timeout_t timeout, int flags, bool state);
-extern int waitq_sleep(waitq_t *queue, timeout_t timeout, int flags);
+extern int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state);
+extern int waitq_sleep(waitq_t *queue, useconds_t timeout, int flags);
 
 extern bool waitq_wake_unsafe(waitq_t *queue);
 extern bool waitq_wake(waitq_t *queue);

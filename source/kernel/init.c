@@ -48,6 +48,7 @@
 #include <kargs.h>
 #include <module.h>
 #include <tar.h>
+#include <time.h>
 #include <version.h>
 
 /** Structure describing a boot module. */
@@ -352,11 +353,10 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		arch_postmm_init(args);
 		platform_postmm_init(args);
 
-		/* Register all other CPUs, and set up the IPI system. */
+		/* Bring up other stuff. */
+		time_init();
 		cpu_init(args);
 		ipi_init();
-
-		/* Bring up the scheduler and friends. */
 		process_init();
 		thread_init();
 		sched_init();

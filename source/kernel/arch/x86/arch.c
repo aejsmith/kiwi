@@ -29,6 +29,7 @@
 
 #include <console.h>
 #include <fatal.h>
+#include <time.h>
 
 /** x86-specific early initialisation.
  * @param args		Kernel arguments structure. */
@@ -56,13 +57,9 @@ void __init_text arch_ap_init(kernel_args_t *args) {
 
 /** Reboot the system. */
 void arch_reboot(void) {
-	int i;
-
 	/* Try the keyboard controller. */
 	out8(0x64, 0xfe);
-	for(i = 0; i < 10000000; i++) {
-		__asm__ volatile("pause");
-	}
+	spin(5000);
 
 	/* Fall back on a triple fault. */
 	lidt(0, 0);

@@ -30,14 +30,14 @@ class IPCConnection : public Handle {
 public:
 	IPCConnection(handle_t handle = -1);
 
-	bool Connect(identifier_t id, timeout_t timeout = -1);
-	bool Connect(const char *name, timeout_t timeout = -1);
+	bool Connect(identifier_t id, useconds_t timeout = -1);
+	bool Connect(const char *name, useconds_t timeout = -1);
 
 	//bool Send(Message &message);
 	bool Send(uint32_t type, const void *buf, size_t size);
 
-	//bool Receive(Message *&message, timeout_t timeout = -1);
-	bool Receive(uint32_t &type, char *&data, size_t &size, timeout_t timeout = -1);
+	//bool Receive(Message *&message, useconds_t timeout = -1);
+	bool Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
 
 	Signal<IPCConnection *> OnMessage;
 	Signal<IPCConnection *> OnHangup;

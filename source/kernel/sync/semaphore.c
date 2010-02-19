@@ -31,7 +31,7 @@
  * @return		0 on success, negative error code on failure. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set. */
-int semaphore_down_etc(semaphore_t *sem, timeout_t timeout, int flags) {
+int semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
 	bool state;
 
 	state = waitq_sleep_prepare(&sem->queue);

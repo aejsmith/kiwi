@@ -1,0 +1,76 @@
+/*
+ * Copyright (C) 2008-2010 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		PC RTC functions.
+ */
+
+#include <arch/cpu.h>
+#include <arch/io.h>
+
+#include <sync/spinlock.h>
+
+#include <time.h>
+
+/** Converts a BCD value from the RTC to decimal. */
+#define BCD2DEC(num)	((((num & 0xF0) >> 4) * 10) + (num & 0x0F))
+
+/** Lock serialising accesses to the RTC. */
+static SPINLOCK_DECLARE(rtc_lock);
+
+/** Get the number of microseconds since the Epoch from the RTC.
+ * @return		Number of microseconds since Epoch. */
+useconds_t time_from_hardware(void) {
+	uint32_t year, month, day, hour, min, sec;
+	uint8_t tmp;
+
+	spinlock_lock(&rtc_lock);
+
+	/* Check if an update is in progress. */
+	out8(0x70, 0x0A);
+	while(in8(0x71) & 0x80) {
+		spin_loop_hint();
+		out8(0x70, 0x0A);
+	}
+
+	/* Read in each value. */
+	out8(0x70, 0x00);
+	sec = BCD2DEC(in8(0x71));
+	out8(0x70, 0x02);
+	min = BCD2DEC(in8(0x71));
+	out8(0x70, 0x07);
+	day = BCD2DEC(in8(0x71));
+	out8(0x70, 0x08);
+	month = BCD2DEC(in8(0x71));
+
+	/* Make a nice big assumption about which year we're in. */
+	out8(0x70, 0x09);
+	year = BCD2DEC(in8(0x71)) + 2000;
+
+	/* Hours need special handling, we need to check whether they are in
+	 * 12- or 24-hour mode. If the high bit is set, then it is in 12-hour
+	 * mode, PM, meaning we must add 12 to it. */
+	out8(0x70, 0x04);
+	tmp = in8(0x71);
+	if(tmp & (1<<7)) {
+		hour = BCD2DEC(tmp) + 12;
+	} else {
+		hour = BCD2DEC(tmp);
+	}
+
+	spinlock_unlock(&rtc_lock);
+	return time_to_unix(year, month, day, hour, min, sec);
+}

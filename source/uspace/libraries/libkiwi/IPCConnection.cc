@@ -54,7 +54,7 @@ IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
  *
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(identifier_t id, timeout_t timeout) {
+bool IPCConnection::Connect(identifier_t id, useconds_t timeout) {
 	if(!Close()) {
 		return false;
 	} else if((m_handle = ipc_connection_open(id, timeout)) >= 0) {
@@ -83,7 +83,7 @@ bool IPCConnection::Connect(identifier_t id, timeout_t timeout) {
  *
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(const char *name, timeout_t timeout) {
+bool IPCConnection::Connect(const char *name, useconds_t timeout) {
 	IPCConnection svcmgr;
 	identifier_t id;
 	uint32_t type;
@@ -123,7 +123,7 @@ bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
  *			return immediately if no messages are waiting to be
  *			received.
  * @return		Whether received successfully. */
-bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, timeout_t timeout) {
+bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
 	if(ipc_message_receive(m_handle, timeout, &type, 0, &size) != 0) {
 		return false;
 	}

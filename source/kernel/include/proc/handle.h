@@ -103,8 +103,8 @@ extern handle_t handle_create(handle_table_t *table, handle_type_t *type, void *
 extern int handle_get(handle_table_t *table, handle_t handle, int type, handle_info_t **infop);
 extern void handle_release(handle_info_t *info);
 extern int handle_close(handle_table_t *table, handle_t handle);
-extern int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t timeout);
-extern int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, timeout_t timeout);
+extern int handle_wait(handle_table_t *table, handle_t handle, int event, useconds_t timeout);
+extern int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, useconds_t timeout);
 
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
@@ -113,7 +113,7 @@ extern int kdbg_cmd_handles(int argc, char **argv);
 
 extern int sys_handle_close(handle_t handle);
 extern int sys_handle_type(handle_t handle);
-extern int sys_handle_wait(handle_t handle, int event, timeout_t timeout);
-extern int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout);
+extern int sys_handle_wait(handle_t handle, int event, useconds_t timeout);
+extern int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, useconds_t timeout);
 
 #endif /* __PROC_HANDLE_H */

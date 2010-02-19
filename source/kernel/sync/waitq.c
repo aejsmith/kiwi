@@ -87,7 +87,7 @@ bool waitq_sleep_prepare(waitq_t *queue) {
  * @param flags		Flags to modify behaviour (see sync/flags.h).
  * @param state		Interrupt state returned from waitq_sleep_prepare().
  * @return		0 on success, negative error code on failure. */
-int waitq_sleep_unsafe(waitq_t *queue, timeout_t timeout, int flags, bool state) {
+int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
 	int ret;
 
 	assert(spinlock_held(&queue->lock));
@@ -148,7 +148,7 @@ int waitq_sleep_unsafe(waitq_t *queue, timeout_t timeout, int flags, bool state)
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int waitq_sleep(waitq_t *queue, timeout_t timeout, int flags) {
+int waitq_sleep(waitq_t *queue, useconds_t timeout, int flags) {
 	return waitq_sleep_unsafe(queue, timeout, flags, waitq_sleep_prepare(queue));
 }
 

@@ -19,7 +19,6 @@
  */
 
 #include <arch/ipi.h>
-#include <arch/spinlock.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

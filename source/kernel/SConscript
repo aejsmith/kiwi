@@ -73,6 +73,7 @@ sources = map(File, [
 	'kdbg.c',
 	'module.c',
 	'symbol.c',
+	'time.c',
 	'version.c',
 	'vmem.c',
 ])

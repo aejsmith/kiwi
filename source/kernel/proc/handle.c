@@ -257,7 +257,7 @@ static void handle_wait_cb(handle_wait_t *wait) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t timeout) {
+int handle_wait(handle_table_t *table, handle_t handle, int event, useconds_t timeout) {
 	handle_wait_sync_t sync;
 	handle_wait_t wait;
 	int ret;
@@ -306,7 +306,7 @@ int handle_wait(handle_table_t *table, handle_t handle, int event, timeout_t tim
  * @return		Index of handle that had the first event on success,
  *			negative error code on failure.
  */
-int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, timeout_t timeout) {
+int handle_wait_multiple(handle_table_t *table, handle_t *handles, int *events, size_t count, useconds_t timeout) {
 	handle_wait_sync_t sync;
 	handle_wait_t *waits;
 	size_t i;
@@ -515,7 +515,7 @@ int sys_handle_type(handle_t handle) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_handle_wait(handle_t handle, int event, timeout_t timeout) {
+int sys_handle_wait(handle_t handle, int event, useconds_t timeout) {
 	return handle_wait(&curr_proc->handles, handle, event, timeout);
 }
 
@@ -540,7 +540,7 @@ int sys_handle_wait(handle_t handle, int event, timeout_t timeout) {
  * @return		Index of handle that had the first event on success,
  *			negative error code on failure.
  */
-int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, timeout_t timeout) {
+int sys_handle_wait_multiple(handle_t *handles, int *events, size_t count, useconds_t timeout) {
 	handle_t *khandles;
 	int *kevents;
 	int ret;

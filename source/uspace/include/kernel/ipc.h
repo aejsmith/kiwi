@@ -55,17 +55,17 @@ typedef struct ipc_message_vector {
 extern handle_t ipc_port_create(void);
 extern handle_t ipc_port_open(identifier_t id);
 extern identifier_t ipc_port_id(handle_t handle);
-extern handle_t ipc_port_listen(handle_t handle, timeout_t timeout);
+extern handle_t ipc_port_listen(handle_t handle, useconds_t timeout);
 extern int ipc_port_acl_add(handle_t handle, ipc_port_accessor_t type, identifier_t id,
                             uint32_t rights);
 extern int ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type, identifier_t id,
                                uint32_t rights);
 
-extern handle_t ipc_connection_open(identifier_t id, timeout_t timeout);
+extern handle_t ipc_connection_open(identifier_t id, useconds_t timeout);
 
 extern int ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size);
 extern int ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count);
-extern int ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type, void *buf, size_t *size);
+extern int ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *type, void *buf, size_t *size);
 
 #ifdef __cplusplus
 }

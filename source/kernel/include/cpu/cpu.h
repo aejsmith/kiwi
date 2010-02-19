@@ -50,7 +50,7 @@ typedef struct cpu {
 	spinlock_t ipi_lock;		/**< Lock to protect IPI queue. */
 
 	/** Timer information. */
-	timeout_t tick_len;		/**< Current tick length. */
+	useconds_t tick_len;		/**< Current tick length. */
 	list_t timer_list;		/**< List of active timers. */
 	spinlock_t timer_lock;		/**< Timer list lock. */
 } cpu_t;

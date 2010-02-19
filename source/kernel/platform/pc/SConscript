@@ -17,6 +17,7 @@ sources = map(File, [
 	'pic.c',
 	'pit.c',
 	'platform.c',
+	'rtc.c',
 ])
 
 Return('sources')

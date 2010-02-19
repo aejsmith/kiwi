@@ -103,7 +103,7 @@ static void lapic_timer_disable(void) {
 
 /** Prepare local APIC timer tick.
  * @param us		Number of microseconds to tick in. */
-static void lapic_timer_prepare(timeout_t us) {
+static void lapic_timer_prepare(useconds_t us) {
 	uint32_t count = (uint32_t)((curr_cpu->arch.lapic_timer_cv * us) >> 32);
 	lapic_write(LAPIC_REG_TIMER_INITIAL, (count == 0 && us != 0) ? 1 : count);
 }

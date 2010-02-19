@@ -44,7 +44,7 @@ typedef struct timer_device {
 
 	/** Set up the next tick (for one-shot devices).
 	 * @param us		Microseconds to fire in. */
-	void (*prepare)(timeout_t us);
+	void (*prepare)(useconds_t us);
 } timer_device_t;
 
 /** Callback function for timers.
@@ -58,7 +58,7 @@ typedef bool (*timer_func_t)(void *data);
 typedef struct timer {
 	list_t header;			/**< Link to timers list. */
 
-	timeout_t length;		/**< Microseconds until the timer fires. */
+	useconds_t length;		/**< Microseconds until the timer fires. */
 	struct cpu *cpu;		/**< CPU that the timer was started on. */
 	timer_func_t func;		/**< Function to call when the timer expires. */
 	void *data;			/**< Data to pass to timer handler. */
@@ -78,19 +78,19 @@ typedef struct timer {
 
 /** Sleep for a certain number of milliseconds.
  * @param ms		Milliseconds to sleep for. */
-#define timer_msleep(s)		timer_usleep((timeout_t)(s) * 1000)
+#define timer_msleep(s)		timer_usleep((useconds_t)(s) * 1000)
 
 /** Sleep for a certain number of seconds.
  * @param s		Seconds to sleep for. */
-#define timer_sleep(s)		timer_usleep((timeout_t)(s) * 1000000)
+#define timer_sleep(s)		timer_usleep((useconds_t)(s) * 1000000)
 
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);
 
 extern void timer_init(timer_t *timer, timer_func_t func, void *data);
-extern void timer_start(timer_t *timer, timeout_t length);
+extern void timer_start(timer_t *timer, useconds_t length);
 extern void timer_stop(timer_t *timer);
 
-extern void timer_usleep(timeout_t us);
+extern void timer_usleep(useconds_t us);
 
 #endif /* __TIME_TIMER_H */

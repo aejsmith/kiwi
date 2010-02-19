@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -36,8 +36,9 @@ typedef struct cpu_arch {
 	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
 	tss_t tss;				/**< Task State Segment (TSS). */
 
-	/** APIC timer conversion factor. */
-	uint64_t lapic_timer_cv;
+	/** Time conversion factors. */
+	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
+	uint64_t lapic_timer_cv;		/**< LAPIC timer conversion factor. */
 
 	/** Basic CPU information. */
 	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
@@ -74,6 +75,15 @@ static inline __noreturn void cpu_halt(void) {
 	while(true) {
 		__asm__ volatile("cli; hlt");
 	}
+}
+
+/** Spin loop hint using the PAUSE instruction.
+ * @note		See PAUSE instruction in Intel 64 and IA-32
+ *			Architectures Software Developer's Manual, Volume 2B:
+ *			Instruction Set Reference N-Z for more information as
+ *			to why this function is necessary. */
+static inline void spin_loop_hint(void) {
+	__asm__ volatile("pause");
 }
 
 #endif /* __ARCH_CPU_H */

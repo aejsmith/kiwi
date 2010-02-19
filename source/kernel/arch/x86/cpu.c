@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -99,6 +99,7 @@ cpu_id_t cpu_current_id(void) {
  * @param cpu		CPU structure to fill in.
  * @param args		Kernel arguments structure for the CPU. */
 void __init_text cpu_arch_init(cpu_arch_t *cpu, kernel_args_cpu_arch_t *args) {
+	/* Copy information from the kernel arguments. */
 	cpu->cpu_freq = args->cpu_freq;
 	cpu->bus_freq = args->bus_freq;
 	memcpy(cpu->model_name, args->model_name, sizeof(cpu->model_name));
@@ -112,6 +113,9 @@ void __init_text cpu_arch_init(cpu_arch_t *cpu, kernel_args_cpu_arch_t *args) {
 	cpu->largest_extended = args->largest_extended;
 	cpu->ext_ecx = args->ext_ecx;
 	cpu->ext_edx = args->ext_edx;
+
+	/* Work out the cycles per µs. */
+	cpu->cycles_per_us = cpu->cpu_freq / 1000000;
 }
 
 /** CPU information command for KDBG.

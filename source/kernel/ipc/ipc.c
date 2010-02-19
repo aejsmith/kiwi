@@ -574,7 +574,7 @@ identifier_t sys_ipc_port_id(handle_t handle) {
  * @return		Handle to the caller's end of the connection on
  *			success, negative error code on failure.
  */
-handle_t sys_ipc_port_listen(handle_t handle, timeout_t timeout) {
+handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
 	ipc_connection_t *conn = NULL;
 	handle_info_t *info;
 	ipc_port_t *port;
@@ -786,7 +786,7 @@ out:
  * @return		Handle referring to caller's end of connection on
  *			success, negative error code on failure.
  */
-handle_t sys_ipc_connection_open(identifier_t id, timeout_t timeout) {
+handle_t sys_ipc_connection_open(identifier_t id, useconds_t timeout) {
 	ipc_connection_t *conn;
 	ipc_port_t *port;
 	semaphore_t sem;
@@ -991,7 +991,7 @@ int sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t cou
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
+int sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *type,
                             void *buf, size_t *size) {
 	ipc_message_t *message = NULL;
 	handle_info_t *info = NULL;

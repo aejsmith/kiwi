@@ -38,7 +38,7 @@ public:
 	virtual ~Handle();
 
 	virtual bool Close();
-	bool Wait(int event, timeout_t timeout = -1) const;
+	bool Wait(int event, useconds_t timeout = -1) const;
 	handle_t GetHandle(void) const;
 
 	Signal<Handle *> OnClose;

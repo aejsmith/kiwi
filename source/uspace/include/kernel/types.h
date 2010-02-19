@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,7 +33,7 @@ typedef signed long native_t;		/**< Signed native-sized type. */
 /** Kiwi-specific integer types. */
 typedef int32_t identifier_t;		/**< Type used to store an identifier for a global object. */
 typedef int32_t handle_t;		/**< Type used to store a handle to a per-process object. */
-typedef int64_t timeout_t;		/**< Type used to store a timeout for an operation. */
+typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t key_t;			/**< Type used to identify something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */

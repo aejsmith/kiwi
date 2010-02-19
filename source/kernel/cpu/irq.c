@@ -287,7 +287,7 @@ out:
 }
 
 /** Initialise the IRQ handling system. */
-void irq_init(void) {
+void __init_text irq_init(void) {
 	size_t i;
 
 	for(i = 0; i < IRQ_COUNT; i++) {

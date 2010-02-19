@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,19 +15,22 @@
 
 /**
  * @file
- * @brief		x86 spinlock helper functions.
- *
- * See PAUSE instruction in Intel 64 and IA-32 Architectures Software
- * Developer's Manual, Volume 2B: Instruction Set Reference N-Z for more
- * information as to why this function is necessary.
+ * @brief		x86 time handling functions.
  */
 
-#ifndef __ARCH_SPINLOCK_H
-#define __ARCH_SPINLOCK_H
+#include <cpu/cpu.h>
+#include <time.h>
 
-/** Spinlock loop hint using the PAUSE instruction. */
-static inline void spinlock_loop_hint(void) {
-	__asm__ volatile("pause");
+/** Read the Time Stamp Counter.
+ * @return		Value of the TSC. */
+static inline uint64_t rdtsc(void) {
+	uint32_t high, low;
+	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
+	return ((uint64_t)high << 32) | low;
 }
 
-#endif /* __ARCH_SPINLOCK_H */
+/** Get the number of microseconds since the system was booted.
+ * @return		Number of microseconds since system was booted. */
+useconds_t time_since_boot(void) {
+	return (useconds_t)(rdtsc() / curr_cpu->arch.cycles_per_us);
+}

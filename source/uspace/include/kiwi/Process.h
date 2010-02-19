@@ -38,7 +38,7 @@ public:
 	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
 	bool Open(identifier_t id);
 
-	bool WaitTerminate(timeout_t timeout = -1) const;
+	bool WaitTerminate(useconds_t timeout = -1) const;
 	identifier_t GetID(void) const;
 
 	static identifier_t GetCurrentID(void);

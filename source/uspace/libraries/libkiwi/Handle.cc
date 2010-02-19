@@ -68,7 +68,7 @@ bool Handle::Close() {
  *			happened, and a value of -1 (the default) will block
  *			indefinitely until the event happens.
  * @return		True on success, false on failure. */
-bool Handle::Wait(int event, timeout_t timeout) const {
+bool Handle::Wait(int event, useconds_t timeout) const {
 	return (handle_wait(m_handle, event, timeout) == 0);
 }
 

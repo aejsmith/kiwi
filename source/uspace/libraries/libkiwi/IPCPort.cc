@@ -114,7 +114,7 @@ bool IPCPort::Register(const char *name) {
  *			return immediately if no connection attempts are in
  *			progress.
  * @return		Pointer to connection on success, NULL on failure. */
-IPCConnection *IPCPort::Listen(timeout_t timeout) const {
+IPCConnection *IPCPort::Listen(useconds_t timeout) const {
 	handle_t handle;
 
 	if((handle = ipc_port_listen(m_handle, timeout)) < 0) {

@@ -19,7 +19,6 @@
  */
 
 #include <arch/barrier.h>
-#include <arch/spinlock.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -35,7 +34,7 @@
  * @param timeout	Timeout.
  * @param flags		Synchronization flags.
  * @return		0 on success, negative error code on failure. */
-static inline int spinlock_lock_internal(spinlock_t *lock, timeout_t timeout, int flags) {
+static inline int spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, int flags) {
 	/* When running on a single processor there is no need for us to
 	 * spin as there should only ever be one thing here at any one time.
 	 * so just die if it's already locked. */
@@ -46,7 +45,7 @@ static inline int spinlock_lock_internal(spinlock_t *lock, timeout_t timeout, in
 			}
 		} else {
 			while(!atomic_cmp_set(&lock->locked, 0, 1)) {
-				spinlock_loop_hint();
+				spin_loop_hint();
 			}
 		}
 	} else {
@@ -80,7 +79,7 @@ static inline int spinlock_lock_internal(spinlock_t *lock, timeout_t timeout, in
  * @return		0 on success, negative error code on failure. Failure
  *			is only possible if the timeout is not -1.
  */
-int spinlock_lock_etc(spinlock_t *lock, timeout_t timeout, int flags) {
+int spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
 	bool state;
 	int ret;
 
@@ -125,7 +124,7 @@ int spinlock_lock_etc(spinlock_t *lock, timeout_t timeout, int flags) {
  * @return		0 on success, negative error code on failure. Failure
  *			is only possible if the timeout is not -1.
  */
-int spinlock_lock_ni_etc(spinlock_t *lock, timeout_t timeout, int flags) {
+int spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
 	int ret;
 
 	assert(!intr_state());

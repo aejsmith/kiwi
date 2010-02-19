@@ -54,7 +54,7 @@ static inline bool mutex_held(mutex_t *lock) {
 	return atomic_get(&lock->locked) != 0;
 }
 
-extern int mutex_lock_etc(mutex_t *lock, timeout_t timeout, int flags);
+extern int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags);
 extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
 extern void mutex_init(mutex_t *lock, const char *name, int flags);

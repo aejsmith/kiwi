@@ -182,7 +182,7 @@ bool Process::Open(identifier_t id) {
  *			terminated, and a value of -1 (the default) will block
  *			indefinitely until the process terminates.
  * @return		True on success, false on failure. */
-bool Process::WaitTerminate(timeout_t timeout) const {
+bool Process::WaitTerminate(useconds_t timeout) const {
 	return Wait(PROCESS_EVENT_DEATH, timeout);
 }
 

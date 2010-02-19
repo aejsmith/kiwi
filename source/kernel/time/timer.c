@@ -155,7 +155,7 @@ void timer_init(timer_t *timer, timer_func_t func, void *data) {
  * @param timer		Timer to start.
  * @param length	Microseconds to run the timer for.
  */
-void timer_start(timer_t *timer, timeout_t length) {
+void timer_start(timer_t *timer, useconds_t length) {
 	timer_t *exist;
 
 	if(length <= 0) {
@@ -224,7 +224,7 @@ void timer_stop(timer_t *timer) {
  *
  * @param us		Microseconds to sleep for. Must be greater than 0.
  */
-void timer_usleep(timeout_t us) {
+void timer_usleep(useconds_t us) {
 	waitq_t queue;
 
 	assert(us > 0);

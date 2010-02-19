@@ -90,7 +90,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_read_lock_etc(rwlock_t *lock, timeout_t timeout, int flags) {
+int rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	bool state = intr_disable();
 
 	curr_thread->rwlock_writer = false;
@@ -132,7 +132,7 @@ int rwlock_read_lock_etc(rwlock_t *lock, timeout_t timeout, int flags) {
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_write_lock_etc(rwlock_t *lock, timeout_t timeout, int flags) {
+int rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	bool state = intr_disable();
 	int ret = 0;
 

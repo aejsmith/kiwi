@@ -45,7 +45,7 @@
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, timeout_t timeout, int flags) {
+int condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_t timeout, int flags) {
 	bool state;
 	int ret;
 
