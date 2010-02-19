@@ -19,13 +19,13 @@
  */
 
 #include <boot/console.h>
-#include <boot/cpu.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
 #include <boot/vfs.h>
 
 #include <assert.h>
 #include <kargs.h>
+#include <time.h>
 
 static void *menu_display_real(menu_t *menu, size_t index);
 

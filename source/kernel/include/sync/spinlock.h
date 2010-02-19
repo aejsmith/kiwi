@@ -27,9 +27,9 @@
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {
-	const char *name;		/**< Name of the spinlock. */
 	atomic_t locked;		/**< Whether the lock is taken. */
 	volatile bool state;		/**< Interrupt state prior to locking. */
+	const char *name;		/**< Name of the spinlock. */
 } spinlock_t;
 
 /** Initialises a statically-declared spinlock. */

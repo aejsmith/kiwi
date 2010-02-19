@@ -24,8 +24,6 @@
 #include <platform/pit.h>
 #include <platform/platform.h>
 
-#include <time/timer.h>
-
 #include <fatal.h>
 
 /** PC platform second stage initialisation.

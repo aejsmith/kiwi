@@ -19,12 +19,8 @@
  */
 
 #include <arch/io.h>
-
 #include <cpu/intr.h>
-
 #include <platform/pit.h>
-
-#include <time/timer.h>
 
 /** Handle a PIT tick.
  * @param num		IRQ number.
@@ -56,7 +52,6 @@ static void pit_disable(void) {
 /** PIT clock source. */
 timer_device_t pit_timer_device = {
 	.name = "PIT",
-	.len = 1000000 / 1000,
 	.type = TIMER_DEVICE_PERIODIC,
 	.enable = pit_enable,
 	.disable = pit_disable,

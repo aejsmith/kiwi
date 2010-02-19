@@ -61,11 +61,10 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <time/timer.h>
-
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
+#include <time.h>
 
 #if CONFIG_SCHED_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -217,9 +216,7 @@ static void sched_balancer_thread(void *arg1, void *arg2) {
 	int total, load, average, count, i;
 
 	while(true) {
-		/* Sleep for 3 seconds. */
-		timer_sleep(3);
-
+		usleep(SECS2USECS(3));
 		dprintf("sched: load-balancer for CPU %" PRIu32 " woken\n", curr_cpu->id);
 
 		/* Check if there are any threads available. */

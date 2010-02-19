@@ -26,10 +26,9 @@
 #include <sync/mutex.h>
 #include <sync/waitq.h>
 
-#include <time/timer.h>
-
 #include <assert.h>
 #include <errors.h>
+#include <time.h>
 
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);

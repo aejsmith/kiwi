@@ -51,6 +51,7 @@
 #include <kdbg.h>
 #include <module.h>
 #include <symbol.h>
+#include <time.h>
 #include <vmem.h>
 
 extern void arch_reboot(void);
@@ -110,6 +111,8 @@ static struct {
 	{ "slab",	"Print out a list of all slab caches.",		kdbg_cmd_slab },
 	{ "step",	"Step a certain number of instructions.",	kdbg_cmd_step },
 	{ "thread",	"Print a list of threads.",			kdbg_cmd_thread },
+	{ "timers",	"Dumps a list of timers.",			kdbg_cmd_timers },
+	{ "uptime",	"Prints the system uptime.",			kdbg_cmd_uptime },
 	{ "vmem",	"Show information about Vmem arenas.",		kdbg_cmd_vmem },
 	{ "vnodes",	"Print a list of nodes on a mount.",		kdbg_cmd_vnodes },
 	{ "vnode",	"Print information about a filesystem node.",	kdbg_cmd_vnode },

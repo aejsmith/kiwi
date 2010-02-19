@@ -35,12 +35,11 @@
 
 #include <mm/malloc.h>
 
-#include <time/timer.h>
-
 #include <assert.h>
 #include <console.h>
 #include <errors.h>
 #include <module.h>
+#include <time.h>
 
 #include "ata_priv.h"
 
@@ -96,8 +95,8 @@ uint8_t ata_controller_error(ata_controller_t *controller) {
  * @param timeout	Timeout in microseconds.
  * @return		0 on success, negative error code on failure. */
 int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear,
-                        bool any, bool error, uint64_t timeout) {
-	uint64_t elapsed = 0, i;
+                        bool any, bool error, useconds_t timeout) {
+	useconds_t elapsed = 0, i;
 	uint8_t status;
 
 	assert(timeout);
@@ -114,7 +113,7 @@ int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear
 		}
 
 		i = (timeout < 1000) ? timeout : 1000;
-		timer_usleep(i);
+		usleep(i);
 		elapsed += i;
 	}
 
@@ -135,7 +134,7 @@ void ata_controller_select(ata_controller_t *controller, uint8_t num) {
 	assert(num == 0 || num == 1);
 
 	out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0xA0 | (num << 4));
-	timer_usleep(1);
+	usleep(1);
 }
 
 /** Perform a PIO data read.

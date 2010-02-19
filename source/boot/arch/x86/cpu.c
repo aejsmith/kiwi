@@ -32,6 +32,7 @@
 
 #include <assert.h>
 #include <fatal.h>
+#include <time.h>
 
 /** Frequency of the PIT. */
 #define PIT_FREQUENCY		1193182L
@@ -359,7 +360,7 @@ static void cpu_print_info(void) {
 
 /** Spin for a certain amount of time.
  * @param us		Microseconds to delay for. */
-void spin(uint64_t us) {
+void spin(useconds_t us) {
 	/* Work out when we will finish */
 	uint64_t target = rdtsc() + ((boot_cpu->arch.cpu_freq / 1000000) * us);
 

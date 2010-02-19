@@ -29,13 +29,12 @@
 #include <mm/page.h>
 #include <mm/tlb.h>
 
-#include <time/timer.h>
-
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <time.h>
 
 extern void ipi_process_pending(void);
 

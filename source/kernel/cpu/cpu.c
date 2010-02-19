@@ -64,9 +64,8 @@ static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	spinlock_init(&cpu->ipi_lock, "ipi_lock");
 
 	/* Initialise timer information. */
-	list_init(&cpu->timer_list);
+	list_init(&cpu->timers);
 	spinlock_init(&cpu->timer_lock, "timer_lock");
-	cpu->tick_len = 0;
 
 	/* Store in the CPU array. */
 	if(cpus) {

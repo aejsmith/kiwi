@@ -21,7 +21,7 @@
 #ifndef __PLATFORM_PIT_H
 #define __PLATFORM_PIT_H
 
-#include <time/timer.h>
+#include <time.h>
 
 /** Frequency to use for PIT (in Hz). */
 #define PIT_FREQUENCY		1000
