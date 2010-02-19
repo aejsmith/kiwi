@@ -200,7 +200,7 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 		} else if(ret == -ERR_TYPE_INVAL) {
 			return false;
 		} else if(ret != -ERR_DEP_MISSING) {
-			fatal("Could not load module %s (%d)", mod->name);
+			fatal("Could not load module %s (%d)", mod->name, ret);
 		}
 
 		/* Unloaded dependency, try to find it and load it. */

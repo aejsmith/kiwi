@@ -57,20 +57,17 @@ static int vbe_display_fault(display_device_t *_dev, offset_t offset, phys_ptr_t
  * @return		0 on success, negative error code on failure. */
 static int vbe_display_mode_set(display_device_t *_dev, display_mode_t *mode) {
 	bios_regs_t regs;
-	int ret;
-
-	memset(&regs, 0, sizeof(bios_regs_t));
 
 	if(mode) {
-		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: 0x%p)\n", mode->id, mode);
+		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: %p)\n", mode->id, mode);
 	}
 
 	/* Set bit 14 in the mode register to use linear framebuffer model. */
+	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_SET_MODE;
 	regs.ebx = (mode) ? (mode->id | (1<<14)) : 3;
-	if((ret = bios_interrupt(0x10, &regs)) != 0) {
-		return ret;
-	} else if((regs.eax & 0xFF00) != 0) {
+	bios_interrupt(0x10, &regs);
+	if((regs.eax & 0xFF00) != 0) {
 		kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
 		return -ERR_DEVICE_ERROR;
 	}
@@ -96,16 +93,14 @@ static int vbe_init(void) {
 	bios_regs_t regs;
 	int ret;
 
-	memset(&regs, 0, sizeof(bios_regs_t));
-
 	/* Detect VBE presence by trying to get controller information. */
 	info = bios_mem_alloc(sizeof(vbe_info_t), MM_SLEEP);
 	strncpy(info->vbe_signature, "VBE2", 4);
+	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_CONTROLLER_INFO;
 	regs.edi = bios_mem_virt2phys(info);
-	if((ret = bios_interrupt(0x10, &regs)) != 0) {
-		goto out;
-	} else if((regs.eax & 0x00FF) != 0x4F) {
+	bios_interrupt(0x10, &regs);
+	if((regs.eax & 0x00FF) != 0x4F) {
 		kprintf(LOG_DEBUG, "vbe: VBE is not supported!\n");
 		ret = -ERR_NOT_SUPPORTED;
 		goto out;
@@ -142,15 +137,13 @@ static int vbe_init(void) {
 	/* Iterate through all the modes available. An ID of 0xFFFF indicates
 	 * the end of the mode list. */
 	for(i = 0; location[i] != 0xFFFF; i++) {
-		memset(&regs, 0, sizeof(bios_regs_t));
-
 		/* Get information on the mode. */
+		bios_regs_init(&regs);
 		regs.eax = VBE_FUNCTION_MODE_INFO;
 		regs.ecx = location[i];
 		regs.edi = bios_mem_virt2phys(minfo);
-		if((ret = bios_interrupt(0x10, &regs)) != 0) {
-			goto out;
-		} else if((regs.eax & 0xFF00) != 0) {
+		bios_interrupt(0x10, &regs);
+		if((regs.eax & 0xFF00) != 0) {
 			kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
 			ret = -ERR_DEVICE_ERROR;
 			goto out;
