@@ -30,6 +30,6 @@ void arch_add_menu_options(menu_t *menu, menu_t *options) {
 }
 
 /** Perform early architecture initialisation. */
-void arch_early_init() {
+void arch_early_init(void) {
 	idt_init();
 }

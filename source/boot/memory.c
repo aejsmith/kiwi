@@ -247,7 +247,7 @@ phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim) {
 }
 
 /** Initialise the memory manager. */
-void memory_init() {
+void memory_init(void) {
 	/* Detect memory ranges. */
 	platform_memory_detect();
 
@@ -264,7 +264,7 @@ void memory_init() {
 }
 
 /** Reclaim internal memory and write the memory map. */
-void memory_finalise() {
+void memory_finalise(void) {
 	memory_range_t *range;
 	size_t i = 0;
 

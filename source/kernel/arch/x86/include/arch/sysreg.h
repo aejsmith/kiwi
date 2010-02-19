@@ -198,6 +198,7 @@ static inline void sysreg_flags_write(unative_t val) {
 #endif /* __ASM__ */
 
 /** Model Specific Registers. */
+#define SYSREG_MSR_TSC		0x10		/**< Time Stamp Counter (TSC). */
 #define SYSREG_MSR_APIC_BASE	0x1b		/**< LAPIC base address. */
 #define SYSREG_MSR_EFER		0xc0000080	/**< Extended Feature Enable register. */
 #define SYSREG_MSR_STAR		0xc0000081	/**< System Call Target Address. */

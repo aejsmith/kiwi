@@ -42,7 +42,7 @@ typedef struct e820_entry {
 } __packed e820_entry_t;
 
 /** Detect physical memory. */
-void platform_memory_detect() {
+void platform_memory_detect(void) {
 	e820_entry_t *mmap = (e820_entry_t *)BIOS_MEM_BASE;
 	phys_ptr_t start, end;
 	size_t count = 0, i;

@@ -81,7 +81,7 @@ static video_mode_t *video_mode_find(int width, int height) {
 /** Detect the best mode to use via EDID.
  * @todo		Implement this.
  * @return		Best mode to use, or NULL if unable to detect. */
-static video_mode_t *probe_mode_edid() {
+static video_mode_t *probe_mode_edid(void) {
 	return NULL;
 }
 

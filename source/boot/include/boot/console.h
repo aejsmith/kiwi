@@ -30,22 +30,22 @@ typedef struct console {
 	int height;		/**< Height of the console (rows). */
 
 	/** Initialise the console. */
-	void (*init)();
+	void (*init)(void);
 
 	/** Check if shift is held.
 	 * @return		Whether shift is held. */
-	bool (*shift_held)();
+	bool (*shift_held)(void);
 
 	/** Read a character from the console.
 	 * @return		Character read from the console. */
-	uint16_t (*getch)();
+	uint16_t (*getch)(void);
 
 	/** Write a character to the console.
 	 * @param ch		Character to write. */
 	void (*putch)(char ch);
 
 	/** Clear the console. */
-	void (*clear)();
+	void (*clear)(void);
 
 	/** Change the highlight on a portion of the console.
 	 * @note		This reverses whatever the current state of

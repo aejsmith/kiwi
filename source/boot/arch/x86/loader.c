@@ -167,6 +167,11 @@ void arch_load_kernel(vfs_node_t *file) {
 
 /** Enter the kernel. */
 void arch_enter_kernel(void) {
+	/* All CPUs should reach this point simultaneously. Reset the TSC to
+	 * 0, so that the kernel's timing functions return a consistent value
+	 * on all CPUs. */
+	sysreg_msr_write(SYSREG_MSR_TSC, 0);
+
 	if(kernel_is_64bit) {
 		arch_enter_kernel64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);
 	} else {

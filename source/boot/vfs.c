@@ -390,7 +390,7 @@ disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops
 }
 
 /** Initialise the disk system. */
-void disk_init() {
+void disk_init(void) {
 	platform_disk_detect();
 	if(!boot_filesystem) {
 		fatal("Could not find boot filesystem");

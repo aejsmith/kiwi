@@ -46,7 +46,7 @@ ptr_t ap_stack_ptr = 0;
 
 /** Read the Time Stamp Counter.
  * @return		Value of the TSC. */
-static inline uint64_t rdtsc() {
+static inline uint64_t rdtsc(void) {
 	uint32_t high, low;
 	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
 	return ((uint64_t)high << 32) | low;
