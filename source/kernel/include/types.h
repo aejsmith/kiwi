@@ -35,9 +35,11 @@ typedef int32_t identifier_t;		/**< Type used to store an identifier for a globa
 typedef int32_t handle_t;		/**< Type used to store a handle to a per-process object. */
 typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
-typedef uint64_t key_t;			/**< Type used to identify something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 typedef uint64_t inode_t;		/**< Type used to store a filesystem inode number. */
+
+/** Internal kernel integer types. */
+typedef uint64_t key_t;			/**< Type used to store a key for a container. */
 
 /** Various definitions. */
 #define false		0		/**< False boolean value. */

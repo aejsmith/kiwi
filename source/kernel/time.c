@@ -322,6 +322,8 @@ int kdbg_cmd_timers(int argc, char **argv) {
  * @param argv		Argument array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */ 
 int kdbg_cmd_uptime(int argc, char **argv) {
+	useconds_t time = time_since_boot();
+
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
 
@@ -329,7 +331,7 @@ int kdbg_cmd_uptime(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "%llu\n", time_since_boot());
+	kprintf(LOG_NONE, "%llu seconds (%llu microseconds)\n", time / 1000000, time);
 	return KDBG_OK;
 }
 
