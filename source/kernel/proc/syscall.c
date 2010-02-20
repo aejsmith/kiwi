@@ -108,6 +108,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_thread_open,
 	(syscall_handler_t)sys_thread_id,
 	(syscall_handler_t)sys_thread_exit,
+	(syscall_handler_t)sys_thread_usleep,
 	(syscall_handler_t)sys_ipc_port_create,
 	(syscall_handler_t)sys_ipc_port_open,
 	(syscall_handler_t)sys_ipc_port_id,

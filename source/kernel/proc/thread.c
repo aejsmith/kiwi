@@ -714,3 +714,14 @@ identifier_t sys_thread_id(handle_t handle) {
 void sys_thread_exit(int status) {
 	thread_exit();
 }
+
+/** Sleep for a certain amount of time.
+ * @param us		Number of microseconds to sleep for. Must be 0 or
+ *			higher.
+ * @return		0 on success, negative error code on failure. */
+int sys_thread_usleep(useconds_t us) {
+	if(us < 0) {
+		return -ERR_PARAM_INVAL;
+	}
+	return usleep_etc(us, SYNC_INTERRUPTIBLE);
+}

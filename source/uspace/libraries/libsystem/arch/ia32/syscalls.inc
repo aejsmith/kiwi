@@ -25,7 +25,7 @@ Type('handle_t', 1)
 Type('offset_t', 2)
 Type('file_size_t', 2)
 Type('identifier_t', 1)
-Type('timeout_t', 2)
+Type('useconds_t', 2)
 
 # System call function generator.
 @SyscallGenerator

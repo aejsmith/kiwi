@@ -130,5 +130,6 @@ extern handle_t sys_thread_create(const char *name, void *stack, size_t stacksz,
 extern handle_t sys_thread_open(identifier_t id);
 extern identifier_t sys_thread_id(handle_t handle);
 extern void sys_thread_exit(int status);
+extern int sys_thread_usleep(useconds_t us);
 
 #endif /* __PROC_THREAD_H */

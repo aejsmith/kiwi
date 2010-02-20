@@ -31,6 +31,7 @@ extern handle_t thread_create(const char *name, void *stack, size_t stacksz, voi
 extern handle_t thread_open(identifier_t id);
 extern identifier_t thread_id(handle_t handle);
 extern void thread_exit(int status) __attribute__((noreturn));
+extern int thread_usleep(useconds_t us);
 
 #ifdef __cplusplus
 }
