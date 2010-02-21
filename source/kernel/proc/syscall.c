@@ -40,17 +40,14 @@
 #include <console.h>
 #include <errors.h>
 #include <fatal.h>
-#include <init.h>
 #include <module.h>
 #include <symbol.h>
+#include <time.h>
 
 /** Array of system call services. */
 static syscall_service_t **syscall_services = NULL;
 static size_t syscall_service_max = 0;
 static MUTEX_DECLARE(syscall_services_lock, 0);
-
-/** Define to 1 to print out every system call. */
-#define TRACE_SYSCALLS		0
 
 /** Print a character to the screen.
  * @param ch		Character to print.
@@ -127,58 +124,59 @@ static syscall_service_t kernel_syscall_service = {
 	.size = ARRAYSZ(kernel_syscall_table),
 };
 
-#if TRACE_SYSCALLS
-/** Print out system call information.
- * @param func		System call function.
- * @param ret		Return value.
- * @param frame		System call frame. */
-static void syscall_trace(syscall_handler_t handler, unative_t ret, syscall_frame_t *frame) {
-	symbol_t *symbol;
-
-	symbol = symbol_lookup_addr((ptr_t)handler, NULL);
-	kprintf(LOG_DEBUG, "%s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx) = 0x%lx\n",
-	        (symbol) ? symbol->name : "<unknown>", frame->p1, frame->p2,
-	        frame->p3, frame->p4, frame->p5, frame->p6, ret);
-}
-#endif
-
 /** System call dispatcher.
  * @param frame		System call frame structure.
  * @return		Return value of the system call. */
 unative_t syscall_handler(syscall_frame_t *frame) {
 	syscall_service_t *service;
+#if CONFIG_TRACE_SYSCALLS
+	useconds_t start, end;
+	symbol_t *symbol;
 	unative_t ret;
+#endif
 	uint16_t num;
 
-	/* Kill the thread now if required. */
+	/* Kill the thread now if required - if it's been killed there's no
+	 * need to bother carrying out the system call. */
 	if(curr_thread->killed) {
 		thread_exit();
 	}
 
 	/* Get the service number. */
 	num = (frame->id >> 16) & 0xFFFF;
-	if(num > syscall_service_max) {
-		return -ERR_SYSCALL_INVAL;
+	if(num == 0) {
+		/* The kernel service is always installed - it is given special
+		 * handling so that it is not necessary to lock the service
+		 * array lock for kernel system calls. */
+		service = &kernel_syscall_service;
+	} else {
+		mutex_lock(&syscall_services_lock);
+		if(num > syscall_service_max || !(service = syscall_services[num])) {
+			mutex_unlock(&syscall_services_lock);
+			return -ERR_SYSCALL_INVAL;
+		}
+		mutex_unlock(&syscall_services_lock);
 	}
-	service = syscall_services[num];
 
 	/* Get the call number. */
 	num = frame->id & 0xFFFF;
-	if(!service || num >= service->size) {
+	if(num >= service->size) {
 		return -ERR_SYSCALL_INVAL;
 	}
 
+#if CONFIG_TRACE_SYSCALLS
+	start = time_since_boot();
 	ret = service->table[num](frame->p1, frame->p2, frame->p3, frame->p4, frame->p5, frame->p6);
-#if TRACE_SYSCALLS
-	syscall_trace(service->table[num], ret, frame);
-#endif
+	end = time_since_boot();
 
-	/* Check again if the thread has been killed. */
-	if(curr_thread->killed) {
-		thread_exit();
-	}
-
+	symbol = symbol_lookup_addr((ptr_t)service->table[num], NULL);
+	kprintf(LOG_DEBUG, "%s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx) = 0x%lx [%llu microseconds]\n",
+	        (symbol) ? symbol->name : "<unknown>", frame->p1, frame->p2,
+	        frame->p3, frame->p4, frame->p5, frame->p6, ret, end - start);
 	return ret;
+#else
+	return service->table[num](frame->p1, frame->p2, frame->p3, frame->p4, frame->p5, frame->p6);
+#endif
 }
 
 /** Register a system call service.
@@ -204,11 +202,3 @@ int syscall_service_register(uint16_t num, syscall_service_t *service) {
 	mutex_unlock(&syscall_services_lock);
 	return 0;
 }
-
-/** Initialise the system call handling code. */
-static void __init_text syscall_init(void) {
-	if(syscall_service_register(0, &kernel_syscall_service) != 0) {
-		fatal("Could not register kernel system call service");
-	}
-}
-INITCALL(syscall_init);

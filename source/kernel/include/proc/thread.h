@@ -112,6 +112,7 @@ extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
 
+extern void thread_at_kernel_exit(void);
 extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup(identifier_t id);

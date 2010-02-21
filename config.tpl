@@ -66,6 +66,7 @@ Section('Kernel debugging')
 
 Option('SLAB_STATS', 'Slab allocator statistics.', False)
 Option('DEBUG', 'Basic debugging output.', True)
+Option('TRACE_SYSCALLS', 'Print out details of every system call on the debug console.', False, {'DEBUG': lambda x: x})
 Option('PAGE_DEBUG', 'Physical memory manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VMEM_DEBUG', 'Vmem allocator debug output.', False, {'DEBUG': lambda x: x})
 Option('KHEAP_DEBUG', 'Kernel heap allocator debug output.', False, {'DEBUG': lambda x: x})

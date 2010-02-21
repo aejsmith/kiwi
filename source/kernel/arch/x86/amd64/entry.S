@@ -211,19 +211,21 @@ syscall_entry:
 	/* Push system call ID. */
 	push	%rax
 
-	/* Now that our stack frame is set up we can enable interrupts - they
-	 * do not need to be off across a system call. */
-	sti
-
 	/* Store a pointer to the system call frame as the first argument
-	 * and call the system call dispatcher. */
+	 * and call the system call dispatcher. Interrupts are enabled across
+	 * the call as it is not necessary to have them disabled. */
+	sti
 	movq	%rsp, %rdi
 	call	syscall_handler
-
-	/* Disable interrupts and restore saved state. Restore arguments as
-	 * they are not callee-save, and we do not want to leak values stored
-	 * by the kernel back to userspace. */
 	cli
+
+	/* Perform kernel exit work. Preserve the system call's return value. */
+	push	%rax
+	call	thread_at_kernel_exit
+	pop	%rax
+
+	/* Restore saved state. Restore arguments as we do not want to leak
+	 * values stored by the kernel back to userspace. */
 	addq	$8, %rsp
 	pop	%rdi
 	pop	%rsi

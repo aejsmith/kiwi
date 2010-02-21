@@ -203,10 +203,15 @@ void intr_handler(intr_frame_t *frame) {
 
 	schedule = intr_handlers[num](num, frame);
 
-	/* If thread is killed and we're returning to userspace, exit now. */
-	if(curr_thread->killed && frame->cs & 3) {
-		thread_exit();
-	} else if(schedule) {
+	/* Do userspace return work if returning to userspace. This is done
+	 * before rescheduling so that the thread does not stay around longer
+	 * than necessary if it has been killed. */
+	if(frame->cs & 3) {
+		thread_at_kernel_exit();
+	}
+
+	/* Reschedule if asked to by the interrupt handler. */
+	if(schedule) {
 		sched_yield();
 	}
 }

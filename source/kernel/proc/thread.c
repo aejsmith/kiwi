@@ -260,6 +260,13 @@ void thread_rename(thread_t *thread, const char *name) {
 	spinlock_unlock(&thread->lock);
 }
 
+/** Perform tasks necessary when a thread is returning to userspace. */
+void thread_at_kernel_exit(void) {
+	if(curr_thread->killed) {
+		thread_exit();
+	}
+}
+
 /** Terminate the current thread.
  * @note		Does not return. */
 void thread_exit(void) {
