@@ -148,8 +148,23 @@ static bool intr_handle_nm(unative_t num, intr_frame_t *frame) {
  * @return		Doesn't return. */
 static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
 #ifndef __x86_64__
-	/* Disable KDBG on IA32. */
-	atomic_set(&kdbg_running, 3);
+	/* Copy in the state from before the fault into the frame. */
+	frame->gs = curr_cpu->arch.tss.gs;
+	frame->fs = curr_cpu->arch.tss.fs;
+	frame->es = curr_cpu->arch.tss.es;
+	frame->ds = curr_cpu->arch.tss.ds;
+	frame->di = curr_cpu->arch.tss.edi;
+	frame->si = curr_cpu->arch.tss.esi;
+	frame->bp = curr_cpu->arch.tss.ebp;
+	frame->bx = curr_cpu->arch.tss.ebx;
+	frame->dx = curr_cpu->arch.tss.edx;
+	frame->cx = curr_cpu->arch.tss.ecx;
+	frame->ax = curr_cpu->arch.tss.eax;
+	frame->ip = curr_cpu->arch.tss.eip;
+	frame->cs = curr_cpu->arch.tss.cs;
+	frame->flags = curr_cpu->arch.tss.eflags;
+	frame->sp = curr_cpu->arch.tss.esp;
+	frame->ss = curr_cpu->arch.tss.ss;
 #endif
 	_fatal(frame, "Double Fault (%p)", frame->ip);
 	cpu_halt();

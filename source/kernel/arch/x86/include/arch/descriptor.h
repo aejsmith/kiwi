@@ -192,6 +192,9 @@ static inline void lidt(ptr_t base, uint16_t limit) {
 	__asm__ volatile("lidt %0" :: "m"(idtp));
 }
 
+#ifndef __x86_64__
+extern void tss_init(void);
+#endif
 extern void descriptor_init(void);
 extern void descriptor_ap_init(void);
 #endif

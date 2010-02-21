@@ -57,7 +57,7 @@ static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	cpu->id = args->id;
 
 	/* Initialise architecture-specific data. */
-	cpu_arch_init(&cpu->arch, &args->arch);
+	cpu_arch_init(cpu, &args->arch);
 
 	/* Initialise IPI information. */
 	list_init(&cpu->ipi_queue);

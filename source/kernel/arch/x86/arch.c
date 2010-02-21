@@ -41,6 +41,9 @@ void __init_text arch_premm_init(kernel_args_t *args) {
 /** x86-specific second stage initialisation.
  * @param args		Kernel arguments structure. */
 void __init_text arch_postmm_init(kernel_args_t *args) {
+#ifndef __x86_64__
+	tss_init();
+#endif
 	lapic_init(args);
 	syscall_arch_init();
 }

@@ -32,17 +32,21 @@ typedef uint32_t cpu_id_t;
 
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
-	/** Per-CPU CPU structures. */
-	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
-	tss_t tss;				/**< Task State Segment (TSS). */
-
 	/** Time conversion factors. */
 	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
 	uint64_t lapic_timer_cv;		/**< LAPIC timer conversion factor. */
 
+	/** Per-CPU CPU structures. */
+	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
+	tss_t tss;				/**< Task State Segment (TSS). */
+#ifndef __x86_64__
+	tss_t double_fault_tss;			/**< Double fault TSS. */
+#endif
+	void *double_fault_stack;		/**< Pointer to the stack for double faults. */
+
 	/** Basic CPU information. */
 	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
-	uint64_t lapic_freq;		/**< LAPIC timer frequency in Hz. */
+	uint64_t lapic_freq;			/**< LAPIC timer frequency in Hz. */
 	char model_name[64];			/**< CPU model name. */
 	uint8_t family;				/**< CPU family. */
 	uint8_t model;				/**< CPU model. */

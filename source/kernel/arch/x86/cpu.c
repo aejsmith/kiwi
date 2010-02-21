@@ -20,10 +20,13 @@
 
 #include <arch/features.h>
 #include <arch/lapic.h>
+#include <arch/stack.h>
 
 #include <cpu/cpu.h>
 
 #include <lib/string.h>
+
+#include <mm/kheap.h>
 
 #include <console.h>
 #include <kargs.h>
@@ -34,6 +37,10 @@ atomic_t cpu_pause_wait = 0;
 
 /** Whether cpu_halt_all() has been called. */
 atomic_t cpu_halting_all = 0;
+
+/** Double fault handler stack for the boot CPU. */
+static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
+static bool boot_doublefault_stack_used = false;
 
 /** Pause execution of other CPUs.
  *
@@ -98,24 +105,33 @@ cpu_id_t cpu_current_id(void) {
 /** Initialise an x86 CPU structure.
  * @param cpu		CPU structure to fill in.
  * @param args		Kernel arguments structure for the CPU. */
-void __init_text cpu_arch_init(cpu_arch_t *cpu, kernel_args_cpu_arch_t *args) {
+void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
 	/* Copy information from the kernel arguments. */
-	cpu->cpu_freq = args->cpu_freq;
-	cpu->lapic_freq = args->lapic_freq;
-	memcpy(cpu->model_name, args->model_name, sizeof(cpu->model_name));
-	cpu->family = args->family;
-	cpu->model = args->model;
-	cpu->stepping = args->stepping;
-	cpu->cache_alignment = args->cache_alignment;
-	cpu->largest_standard = args->largest_standard;
-	cpu->feat_ecx = args->feat_ecx;
-	cpu->feat_edx = args->feat_edx;
-	cpu->largest_extended = args->largest_extended;
-	cpu->ext_ecx = args->ext_ecx;
-	cpu->ext_edx = args->ext_edx;
+	cpu->arch.cpu_freq = args->cpu_freq;
+	cpu->arch.lapic_freq = args->lapic_freq;
+	memcpy(cpu->arch.model_name, args->model_name, sizeof(cpu->arch.model_name));
+	cpu->arch.family = args->family;
+	cpu->arch.model = args->model;
+	cpu->arch.stepping = args->stepping;
+	cpu->arch.cache_alignment = args->cache_alignment;
+	cpu->arch.largest_standard = args->largest_standard;
+	cpu->arch.feat_ecx = args->feat_ecx;
+	cpu->arch.feat_edx = args->feat_edx;
+	cpu->arch.largest_extended = args->largest_extended;
+	cpu->arch.ext_ecx = args->ext_ecx;
+	cpu->arch.ext_edx = args->ext_edx;
 
 	/* Work out the cycles per µs. */
-	cpu->cycles_per_us = cpu->cpu_freq / 1000000;
+	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;
+
+	/* Allocate a stack to use for double fault handling. */
+	if(boot_doublefault_stack_used) {
+		cpu->arch.double_fault_stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
+	} else {
+		cpu->arch.double_fault_stack = boot_doublefault_stack;
+		boot_doublefault_stack_used = true;
+	}
+	*(ptr_t *)cpu->arch.double_fault_stack = (ptr_t)cpu;
 }
 
 /** CPU information command for KDBG.

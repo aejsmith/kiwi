@@ -46,12 +46,6 @@ static gdt_entry_t initial_gdt[] __aligned(8) = {
 /** Array of IDT entries. */
 static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 
-/** Double fault handler stack. */
-static uint8_t doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
-
-/** Double fault handler TSS. */
-static tss_t doublefault_tss;
-
 /** Set the base address of a segment.
  * @param sel		Segment to modify.
  * @param base		New base address of the segment. */
@@ -77,7 +71,7 @@ static void __init_text gdt_init(void) {
 	/* Set up the TSS descriptor. */
 	gdt_set_base(SEGMENT_TSS, (ptr_t)&curr_cpu->arch.tss);
 	gdt_set_limit(SEGMENT_TSS, sizeof(tss_t));
-	gdt_set_base(SEGMENT_DF_TSS, (ptr_t)&doublefault_tss);
+	gdt_set_base(SEGMENT_DF_TSS, (ptr_t)&curr_cpu->arch.double_fault_tss);
 	gdt_set_limit(SEGMENT_DF_TSS, sizeof(tss_t));
 
 	/* Set the GDT pointer. */
@@ -97,7 +91,7 @@ static void __init_text gdt_init(void) {
 }
 
 /** Set up the TSS for the current CPU. */
-static void __init_text tss_init(void) {
+void __init_text tss_init(void) {
 	ptr_t stack;
 
 	/* Set up the contents of the TSS. */
@@ -106,19 +100,16 @@ static void __init_text tss_init(void) {
 	curr_cpu->arch.tss.io_bitmap = 104;
 
 	/* Set up the doublefault TSS. */
-	stack = (ptr_t)doublefault_stack;
-	// FIXME
-	//doublefault_tss.cr3 = sysreg_cr3_read();
-	doublefault_tss.eip = (ptr_t)&isr_array[FAULT_DOUBLE];
-	doublefault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
-	doublefault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
-	doublefault_tss.es = SEGMENT_K_DS;
-	doublefault_tss.cs = SEGMENT_K_CS;
-	doublefault_tss.ss = SEGMENT_K_DS;
-	doublefault_tss.ds = SEGMENT_K_DS;
-
-	/* Set CPU pointer on doublefault stack. */
-	*(ptr_t *)stack = cpu_get_pointer();
+	memset(&curr_cpu->arch.double_fault_tss, 0, sizeof(tss_t));
+	stack = (ptr_t)curr_cpu->arch.double_fault_stack;
+	curr_cpu->arch.double_fault_tss.cr3 = sysreg_cr3_read();
+	curr_cpu->arch.double_fault_tss.eip = (ptr_t)&isr_array[FAULT_DOUBLE];
+	curr_cpu->arch.double_fault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
+	curr_cpu->arch.double_fault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
+	curr_cpu->arch.double_fault_tss.es = SEGMENT_K_DS;
+	curr_cpu->arch.double_fault_tss.cs = SEGMENT_K_CS;
+	curr_cpu->arch.double_fault_tss.ss = SEGMENT_K_DS;
+	curr_cpu->arch.double_fault_tss.ds = SEGMENT_K_DS;
 
 	/* Load the TSS segment into TR. */
 	ltr(SEGMENT_TSS);
@@ -153,8 +144,10 @@ static inline void idt_init(void) {
 
 /** Initialise descriptor tables for the boot CPU. */
 void __init_text descriptor_init(void) {
+	/* Cannot call tss_init() here as it relies on the kernel page map
+	 * being set up to be able to set up the double fault TSS correctly.
+	 * It will be called in arch_postmm_init(). */
 	gdt_init();
-	tss_init();
 
 	/* The IDT only needs to be initialised once. Do that now as we are on
 	 * the boot CPU. */
@@ -167,7 +160,9 @@ void __init_text descriptor_init(void) {
 /** Initialise descriptor tables for an application CPU. */
 void __init_text descriptor_ap_init(void) {
 	/* The GDT/TSS setup procedures are the same on both the BSP and APs,
-	 * so just call the functions for them. */
+	 * so just call the functions for them. The kernel page map will have
+	 * been switched to when this is called so it is OK to call tss_init()
+	 * here. */
 	gdt_init();
 	tss_init();
 
