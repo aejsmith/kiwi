@@ -79,9 +79,6 @@ bios_interrupt:
 	mov	%ax, %gs
 	mov	%ax, %ss
 
-	/* Re-enable interrupts. */
-	sti
-
 	/* Get the registers/flags to use. */
 	popfl
 	movl	28(%esp), %eax
@@ -93,6 +90,9 @@ bios_interrupt:
 	movl	16(%esp), %edi
 	movl	20(%esp), %esi
 	movl	24(%esp), %ebp
+
+	/* Re-enable interrupts. */
+	sti
 
 	/* Hard-code in an INT instruction that gets modified above to contain
 	 * the correct interrupt number. */

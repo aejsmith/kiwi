@@ -63,7 +63,7 @@ static bool pc_console_shift_held(void) {
 	bios_regs_t regs;
 
 	/* Get the shift flags. */
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = 0x0200;
 	bios_interrupt(0x16, &regs);
 	return (regs.eax & ((1<<0) | (1<<1)));
@@ -75,7 +75,7 @@ static uint16_t pc_console_getch(void) {
 	uint8_t ascii, scan;
 	bios_regs_t regs;
 
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = 0x0000;
 	bios_interrupt(0x16, &regs);
 

@@ -117,7 +117,7 @@ void platform_video_init(void) {
 
 	/* Try to get controller information. */
 	strncpy(info->vbe_signature, "VBE2", 4);
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_CONTROLLER_INFO;
 	regs.edi = BIOS_MEM_BASE;
 	bios_interrupt(0x10, &regs);
@@ -140,7 +140,7 @@ void platform_video_init(void) {
 	/* Iterate through the modes. 0xFFFF indicates the end of the list. */
 	location = (uint16_t *)SEGOFF2LIN(info->video_mode_ptr);
 	for(i = 0; location[i] != 0xFFFF; i++) {
-		memset(&regs, 0, sizeof(bios_regs_t));
+		bios_regs_init(&regs);
 		regs.eax = VBE_FUNCTION_MODE_INFO;
 		regs.ecx = location[i];
 		regs.edi = BIOS_MEM_BASE + sizeof(vbe_info_t);
@@ -215,7 +215,7 @@ void platform_video_enable(void) {
 
 	/* Set the mode. Bit 14 in the mode ID indicates that we wish to use
 	 * the linear framebuffer model. */
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_SET_MODE;
 	regs.ebx = mode->id | (1<<14);
 	bios_interrupt(0x10, &regs);

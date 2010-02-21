@@ -21,6 +21,7 @@
 #ifndef __PLATFORM_BIOS_H
 #define __PLATFORM_BIOS_H
 
+#include <arch/sysreg.h>
 #include <types.h>
 
 /** Memory area to use when passing data to BIOS interrupts (56KB).
@@ -36,6 +37,13 @@
 typedef struct bios_regs {
 	uint32_t eflags, eax, ebx, ecx, edx, edi, esi, ebp, es;
 } bios_regs_t;
+
+/** Initialise a BIOS registers structure.
+ * @param regs		Structure to initialise. */
+static inline void bios_regs_init(bios_regs_t *regs) {
+	regs->eax = regs->ebx = regs->ecx = regs->edx = regs->edi = regs->esi = regs->ebp = regs->es = 0;
+	regs->eflags = SYSREG_FLAGS_ALWAYS1 | SYSREG_FLAGS_IF;
+}
 
 extern void bios_interrupt(uint8_t num, bios_regs_t *regs);
 

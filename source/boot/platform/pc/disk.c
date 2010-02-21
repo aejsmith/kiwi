@@ -82,7 +82,7 @@ static bool bios_disk_block_read(disk_t *disk, void *buf, offset_t lba) {
 	dap->start_lba = lba;
 
 	/* Perform the transfer. */
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = 0x4200;
 	regs.edx = disk->id;
 	regs.esi = BIOS_MEM_BASE;
@@ -107,7 +107,7 @@ static uint8_t platform_disk_count(void) {
 	bios_regs_t regs;
 
 	/* Use the Get Drive Parameters call. */
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = 0x800;
 	regs.edx = 0x80;
 	bios_interrupt(0x13, &regs);
@@ -121,7 +121,7 @@ static bool platform_booted_from_cd(void) {
 	bios_regs_t regs;
 
 	/* Use the bootable CD-ROM status function. */
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 	regs.eax = 0x4B01;
 	regs.edx = boot_device_id;
 	regs.esi = BIOS_MEM_BASE;
@@ -146,7 +146,7 @@ static void platform_disk_add(uint8_t id) {
 			dprintf("disk: detected boot CD 0x%x (blksize: %zu)\n", id, disk->blksize);
 		}
 	} else {
-		memset(&regs, 0, sizeof(bios_regs_t));
+		bios_regs_init(&regs);
 		regs.eax = 0x4100;
 		regs.ebx = 0x55AA;
 		regs.edx = id;
@@ -161,7 +161,7 @@ static void platform_disk_add(uint8_t id) {
 		 * not 0. Clear the entire structure to be on the safe side. */
 		memset(params, 0, sizeof(drive_parameters_t));
 		params->size = sizeof(drive_parameters_t);
-		memset(&regs, 0, sizeof(bios_regs_t));
+		bios_regs_init(&regs);
 		regs.eax = 0x4800;
 		regs.edx = id;
 		regs.esi = BIOS_MEM_BASE;

@@ -49,7 +49,7 @@ void platform_memory_detect(void) {
 	bios_regs_t regs;
 	int type;
 
-	memset(&regs, 0, sizeof(bios_regs_t));
+	bios_regs_init(&regs);
 
 	/* Obtain a memory map using interrupt 15h, function E820h. */
 	do {
