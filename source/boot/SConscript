@@ -28,6 +28,7 @@ sources = map(File, [
 # Sources to use from the kernel.
 ksources = map(lambda x: File('../kernel/%s' % x), [
 	'lib/printf.c',
+	'lib/qsort.c',
 	'lib/string.c',
 ])
 

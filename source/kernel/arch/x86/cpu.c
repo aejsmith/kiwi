@@ -101,7 +101,7 @@ cpu_id_t cpu_current_id(void) {
 void __init_text cpu_arch_init(cpu_arch_t *cpu, kernel_args_cpu_arch_t *args) {
 	/* Copy information from the kernel arguments. */
 	cpu->cpu_freq = args->cpu_freq;
-	cpu->bus_freq = args->bus_freq;
+	cpu->lapic_freq = args->lapic_freq;
 	memcpy(cpu->model_name, args->model_name, sizeof(cpu->model_name));
 	cpu->family = args->family;
 	cpu->model = args->model;
@@ -132,17 +132,17 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID   Freq (MHz) Bus Freq (MHz) Cache Align Model Name\n");
-	kprintf(LOG_NONE, "==   ========== ============== =========== ==========\n");
+	kprintf(LOG_NONE, "ID   Freq (MHz) LAPIC Freq (MHz) Cache Align Model Name\n");
+	kprintf(LOG_NONE, "==   ========== ================ =========== ==========\n");
 
 	for(i = 0; i <= cpu_id_max; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}
 
-		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-14" PRIu64 " %-11d %s\n",
+		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-16" PRIu64 " %-11d %s\n",
 		        cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
-		        cpus[i]->arch.bus_freq / 1000000, cpus[i]->arch.cache_alignment,
+		        cpus[i]->arch.lapic_freq / 1000000, cpus[i]->arch.cache_alignment,
 		        (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
 	}
 

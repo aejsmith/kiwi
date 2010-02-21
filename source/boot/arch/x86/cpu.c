@@ -28,6 +28,7 @@
 #include <boot/cpu.h>
 #include <boot/memory.h>
 
+#include <lib/qsort.h>
 #include <lib/string.h>
 
 #include <assert.h>
@@ -36,6 +37,9 @@
 
 /** Frequency of the PIT. */
 #define PIT_FREQUENCY		1193182L
+
+/** Number of times to get a frequency (must be odd). */
+#define FREQUENCY_ATTEMPTS	9
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
 
@@ -53,12 +57,115 @@ static inline uint64_t rdtsc(void) {
 	return ((uint64_t)high << 32) | low;
 }
 
+/** Comparison function for qsort() on an array of uint64_t's.
+ * @param a		Pointer to first value.
+ * @param b		Pointer to second value.
+ * @return		Result of the comparison. */
+static int frequency_compare(const void *a, const void *b) {
+	return *(uint64_t *)a - *(uint64_t *)b;
+}
+
+/** Calculate a frequency multiple times and get the median of the results.
+ * @param func		Function to call to get a frequency.
+ * @return		Median of the results. */
+static uint64_t calculate_frequency(uint64_t (*func)(void)) {
+	uint64_t results[FREQUENCY_ATTEMPTS];
+	size_t i;
+
+	/* Get the frequencies. */
+	for(i = 0; i < FREQUENCY_ATTEMPTS; i++) {
+		results[i] = func();
+	}
+
+	/* Sort them in ascending order. */
+	qsort(results, FREQUENCY_ATTEMPTS, sizeof(uint64_t), frequency_compare);
+
+	/* Pick the median of the results. */
+	return results[FREQUENCY_ATTEMPTS / 2];
+}
+
+/** Function to calculate the CPU frequency.
+ * @return		Calculated frequency. */
+static uint64_t calculate_cpu_frequency(void) {
+	uint16_t shi, slo, ehi, elo, ticks;
+	uint64_t start, end, cycles;
+
+	/* First set the PIT to rate generator mode. */
+	out8(0x43, 0x34);
+	out8(0x40, 0xFF);
+	out8(0x40, 0xFF);
+
+	/* Wait for the cycle to begin. */
+	do {
+		out8(0x43, 0x00);
+		slo = in8(0x40);
+		shi = in8(0x40);
+	} while(shi != 0xFF);
+
+	/* Get the start TSC value. */
+	start = rdtsc();
+
+	/* Wait for the high byte to drop to 128. */
+	do {
+		out8(0x43, 0x00);
+		elo = in8(0x40);
+		ehi = in8(0x40);
+	} while(ehi > 0x80);
+
+	/* Get the end TSC value. */
+	end = rdtsc();
+
+	/* Calculate the differences between the values. */
+	cycles = end - start;
+	ticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
+
+	/* Calculate frequency. */
+	return (cycles * PIT_FREQUENCY) / ticks;
+}
+
+/** Function to calculate the LAPIC timer frequency.
+ * @return		Calculated frequency. */
+static uint64_t calculate_lapic_frequency(void) {
+	uint16_t shi, slo, ehi, elo, pticks;
+	uint64_t end, lticks;
+
+	/* First set the PIT to rate generator mode. */
+	out8(0x43, 0x34);
+	out8(0x40, 0xFF);
+	out8(0x40, 0xFF);
+
+	/* Wait for the cycle to begin. */
+	do {
+		out8(0x43, 0x00);
+		slo = in8(0x40);
+		shi = in8(0x40);
+	} while(shi != 0xFF);
+
+	/* Kick off the LAPIC timer. */
+	lapic_mapping[LAPIC_REG_TIMER_INITIAL] = 0xFFFFFFFF;
+
+	/* Wait for the high byte to drop to 128. */
+	do {
+		out8(0x43, 0x00);
+		elo = in8(0x40);
+		ehi = in8(0x40);
+	} while(ehi > 0x80);
+
+	/* Get the current timer value. */
+	end = lapic_mapping[LAPIC_REG_TIMER_CURRENT];
+
+	/* Calculate the differences between the values. */
+	lticks = 0xFFFFFFFF - end;
+	pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
+
+	/* Calculate frequency. */
+	return (lticks * 4 * PIT_FREQUENCY) / pticks;
+}
+
 /** Detect information about the current CPU.
  * @param cpu		CPU structure to store in. */
 static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 	uint32_t eax, ebx, ecx, edx, flags;
-	uint16_t shi, slo, ehi, elo, ticks;
-	uint64_t start, end, cycles;
 	uint32_t *ptr;
 	size_t i, j;
 	char *str;
@@ -160,45 +267,13 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 		return;
 	}
 
-	/* Find out the CPU frequency. First set the PIT to rate generator
-	 * mode. */
-	out8(0x43, 0x34);
-	out8(0x40, 0xFF);
-	out8(0x40, 0xFF);
-
-	/* Wait for the cycle to begin. */
-	do {
-		out8(0x43, 0x00);
-		slo = in8(0x40);
-		shi = in8(0x40);
-	} while(shi != 0xFF);
-
-	/* Get the start TSC value. */
-	start = rdtsc();
-
-	/* Wait for the high byte to drop to 128. */
-	do {
-		out8(0x43, 0x00);
-		elo = in8(0x40);
-		ehi = in8(0x40);
-	} while(ehi > 0x80);
-
-	/* Get the end TSC value. */
-	end = rdtsc();
-
-	/* Calculate the differences between the values. */
-	cycles = end - start;
-	ticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
-
-	/* Calculate frequency. */
-	cpu->cpu_freq = (cycles * PIT_FREQUENCY) / ticks;
+	/* Find out the CPU frequency. */
+	cpu->cpu_freq = calculate_frequency(calculate_cpu_frequency);
 }
 
 /** Initialise the local APIC.
  * @return		Whether the local APIC is present. */
 static bool cpu_lapic_init(void) {
-	uint16_t shi, slo, ehi, elo, pticks;
-	uint64_t end, lticks;
 	uint32_t *mapping;
 	uint64_t base;
 
@@ -232,42 +307,12 @@ static bool cpu_lapic_init(void) {
 
 	/* Shitty workaround: see above. */
 	if(strncmp(booting_cpu->arch.model_name, "QEMU", 4) == 0 && booting_cpu != boot_cpu) {
-		booting_cpu->arch.bus_freq = boot_cpu->arch.bus_freq;
+		booting_cpu->arch.lapic_freq = boot_cpu->arch.lapic_freq;
 		return true;
 	}
 
-	/* Calculate the CPU's bus frequency, which is used to calculate timer
-	 * counts. First set the PIT to rate generator mode. */
-	out8(0x43, 0x34);
-	out8(0x40, 0xFF);
-	out8(0x40, 0xFF);
-
-	/* Wait for the cycle to begin. */
-	do {
-		out8(0x43, 0x00);
-		slo = in8(0x40);
-		shi = in8(0x40);
-	} while(shi != 0xFF);
-
-	/* Kick off the LAPIC timer. */
-	lapic_mapping[LAPIC_REG_TIMER_INITIAL] = 0xFFFFFFFF;
-
-	/* Wait for the high byte to drop to 128. */
-	do {
-		out8(0x43, 0x00);
-		elo = in8(0x40);
-		ehi = in8(0x40);
-	} while(ehi > 0x80);
-
-	/* Get the current timer value. */
-	end = lapic_mapping[LAPIC_REG_TIMER_CURRENT];
-
-	/* Calculate the differences between the values. */
-	lticks = 0xFFFFFFFF - end;
-	pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
-
-	/* Calculate frequency. */
-	booting_cpu->arch.bus_freq = (lticks * 4 * PIT_FREQUENCY) / pticks;
+	/* Calculate the LAPIC tick frequency. */
+	booting_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
 	return true;
 }
 
@@ -350,11 +395,11 @@ static void cpu_print_info(void) {
 		dprintf(" cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
 		        cpu->id, cpu->arch.model_name, cpu->arch.family,
 		        cpu->arch.model, cpu->arch.stepping);
-		dprintf("  cpu_freq: %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000 / 1000);
+		dprintf("  cpu_freq:   %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000 / 1000);
 		if(!kernel_args->arch.lapic_disabled) {
-			dprintf("  bus_freq: %" PRIu64 "MHz\n", cpu->arch.bus_freq / 1000 / 1000);
+			dprintf("  lapic_freq: %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000 / 1000);
 		}
-		dprintf("  clsize:   %d\n", cpu->arch.cache_alignment);
+		dprintf("  clsize:     %d\n", cpu->arch.cache_alignment);
 	}
 }
 

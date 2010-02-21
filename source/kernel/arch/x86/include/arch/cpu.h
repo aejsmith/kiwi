@@ -42,7 +42,7 @@ typedef struct cpu_arch {
 
 	/** Basic CPU information. */
 	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
-	uint64_t bus_freq;			/**< CPU bus frequency in Hz (for the LAPIC timer). */
+	uint64_t lapic_freq;		/**< LAPIC timer frequency in Hz. */
 	char model_name[64];			/**< CPU model name. */
 	uint8_t family;				/**< CPU family. */
 	uint8_t model;				/**< CPU model. */

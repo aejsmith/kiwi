@@ -185,7 +185,7 @@ void __init_text lapic_init(kernel_args_t *args) {
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
 	/* Figure out the timer conversion factor. */
-	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.bus_freq / 8) << 32) / 1000000;
+	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
 	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU%u is %u\n",
 	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv);
 
