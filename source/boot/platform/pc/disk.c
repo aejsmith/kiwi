@@ -23,10 +23,8 @@
 
 #include <lib/string.h>
 
-#include <errors.h>
-
-#include "bios.h"
-#include "multiboot.h"
+#include <platform/bios.h>
+#include <platform/multiboot.h>
 
 /** Drive parameters structure. We only care about the EDD 1.x fields. */
 typedef struct drive_parameters {
@@ -61,7 +59,6 @@ typedef struct specification_packet {
 
 extern uint8_t boot_device_id;
 extern uint64_t boot_part_offset;
-extern multiboot_info_t *multiboot_info;
 
 /** Read a block from a disk device.
  * @param disk		Disk to read from.
@@ -184,13 +181,15 @@ static void platform_disk_add(uint8_t id) {
 void platform_disk_detect(void) {
 	uint8_t count, id;
 
-	/* Use Multiboot device info if booted via Multiboot. */
-	if(multiboot_info) {
-		boot_device_id = (multiboot_info->boot_device & 0xFF000000) >> 24;
+	/* If booted from Multiboot, boot_part_offset stores the ID of the
+	 * boot partition rather than its offset. */
+	if(multiboot_magic == MB_LOADER_MAGIC) {
+		dprintf("disk: boot device ID is 0x%x, partition ID is %" PRIu64 "\n",
+		        boot_device_id, boot_part_offset);
+	} else {
+		dprintf("disk: boot device ID is 0x%x, partition offset is 0x%" PRIx64 "\n",
+		        boot_device_id, boot_part_offset);
 	}
-
-	dprintf("disk: boot device ID is 0x%x, partition offset is 0x%" PRIx64 "\n",
-	        boot_device_id, boot_part_offset);
 
 	/* Probe all hard disks. */
 	count = platform_disk_count();

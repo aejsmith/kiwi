@@ -26,7 +26,6 @@
 
 #include <assert.h>
 #include <endian.h>
-#include <errors.h>
 
 #include "iso9660.h"
 

@@ -44,6 +44,16 @@
 #define MB_FLAG_APMTABLE	(1<<10)		/**< Bootloader provided APM table. */
 #define MB_FLAG_VBEINFO		(1<<11)		/**< Bootloader provided VBE info. */
 
+/** Size of the Multiboot information structure. */
+#define MB_INFO_SIZE		88
+
+/** Maximum length of the Multiboot command line. */
+#define MB_CMDLINE_MAX		256
+
+/** Offsets into the structure required in assembly code. */
+#define MB_INFO_OFFSET_BOOTDEV	12		/**< Offset of the boot device field. */
+#define MB_INFO_OFFSET_CMDLINE	16		/**< Offset of the command line field. */
+
 #ifndef __ASM__
 
 #include <types.h>
@@ -73,6 +83,8 @@ typedef struct multiboot_info {
 	uint16_t vbe_interface_len;		/**< VBE interface length. */
 } __packed multiboot_info_t;
 
-#endif /* __ASM__ */
+extern unsigned long multiboot_magic;
+extern char multiboot_cmdline[];
 
+#endif /* __ASM__ */
 #endif /* __PLATFORM_MULTIBOOT_H */

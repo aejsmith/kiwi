@@ -23,10 +23,10 @@
 
 #include <lib/string.h>
 
-#include <assert.h>
+#include <platform/acpi.h>
+#include <platform/mps.h>
 
-#include "acpi.h"
-#include "mps.h"
+#include <assert.h>
 
 /** Checksum a memory range.
  * @param start		Start of range to check.

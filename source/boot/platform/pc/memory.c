@@ -24,9 +24,9 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <fatal.h>
+#include <platform/bios.h>
 
-#include "bios.h"
+#include <fatal.h>
 
 /** Memory map type values. */
 #define E820_TYPE_FREE		1		/**< Usable memory. */

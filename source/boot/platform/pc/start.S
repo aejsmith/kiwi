@@ -22,8 +22,7 @@
 #include <arch/stack.h>
 
 #include <platform/boot.h>
-
-#include "multiboot.h"
+#include <platform/multiboot.h>
 
 /* Ensure that this code is linked in first. */
 .section .init.text, "ax", @progbits
@@ -194,8 +193,28 @@ multiboot_header:
 .type __multiboot_entry, @function
 __multiboot_entry:
 .code32
-	/* Don't want interrupts. */
 	cli
+
+	/* Duplicate the Multiboot information that we want. It is possible
+	 * that the Multiboot loader has placed the information in the same
+	 * place that we are going to relocate to, so it must be duplicated
+	 * to ensure that it won't be overwritten. */
+	mov	%eax, (multiboot_magic + MULTIBOOT_LOAD_OFFSET)
+	mov	MB_INFO_OFFSET_BOOTDEV(%ebx), %eax
+	andl	$0xFF000000, %eax
+	shrl	$24, %eax
+	movb	%al, (boot_device_id + MULTIBOOT_LOAD_OFFSET)
+	mov	MB_INFO_OFFSET_BOOTDEV(%ebx), %eax
+	andl	$0x00FF0000, %eax
+	shrl	$16, %eax
+	movb	%al, (boot_part_offset + MULTIBOOT_LOAD_OFFSET)
+	cld
+	mov	MB_INFO_OFFSET_CMDLINE(%ebx), %esi
+	mov	$(multiboot_cmdline + MULTIBOOT_LOAD_OFFSET), %edi
+1:	lodsb
+	stosb
+	test	%al, %al
+	jnz	1b
 
 	/* Relocate the loader image. */
 	cld
@@ -206,17 +225,14 @@ __multiboot_entry:
 
 	/* Load the GDT. */
 	lgdt	(loader_gdtp)
-	ljmp	$SEGMENT_CS, $1f
-1:
+	ljmp	$SEGMENT_CS, $2f
+2:
 	mov	$SEGMENT_DS, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
 	mov	%ax, %ss
-
-	/* Save information pointer. */
-	movl	%ebx, (multiboot_info)
 
 	/* Jump to the common startup code. */
 	jmp	__loader_entry
@@ -281,9 +297,23 @@ __gdt:
 .L__gdt_end:
 .size __gdt, .-__gdt
 
-/** Multiboot information pointer. */
+/** Multiboot magic number. */
+.global multiboot_magic
+.type multiboot_magic, @object
+multiboot_magic:
+	.long	0
+.size multiboot_magic, .-multiboot_magic
+
+/** Multiboot information structure. */
 .global multiboot_info
 .type multiboot_info, @object
 multiboot_info:
-	.long 0
+	.fill	MB_INFO_SIZE
 .size multiboot_info, .-multiboot_info
+
+/** Multiboot command line. */
+.global multiboot_cmdline
+.type multiboot_cmdline, @object
+multiboot_cmdline:
+	.fill	MB_CMDLINE_MAX
+.size multiboot_cmdline, .-multiboot_cmdline

@@ -35,7 +35,7 @@
 
 #ifndef __ASM__
 
-#define platform_early_init()	
+extern void platform_early_init(void);
 extern void platform_video_init(void);
 extern void platform_video_enable(void);
 

@@ -33,6 +33,9 @@ LIST_DECLARE(filesystem_list);
 /** The filesystem being booted from. */
 vfs_filesystem_t *boot_filesystem = NULL;
 
+/** Boot path override string. */
+char *boot_path_override = NULL;
+
 /** Array of paths to search for boot files. */
 static const char *boot_paths[] = {
 	"/system/boot",
@@ -121,6 +124,16 @@ vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path) {
 vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs) {
 	vfs_node_t *node;
 	size_t i;
+
+	if(boot_path_override) {
+		if((node = vfs_filesystem_lookup(fs, boot_path_override))) {
+			if(node->type == VFS_NODE_DIR) {
+				return node;
+			}
+			vfs_node_release(node);
+		}
+		return NULL;
+	}
 
 	/* Check whether each of the boot paths exists and is a directory. */
 	for(i = 0; i < ARRAYSZ(boot_paths); i++) {

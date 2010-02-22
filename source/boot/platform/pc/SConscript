@@ -19,6 +19,7 @@ sources = map(File, [
 	'cpu.c',
 	'disk.c',
 	'memory.c',
+	'platform.c',
 	'start.S',
 	'video.c',
 ])

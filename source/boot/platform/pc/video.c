@@ -22,16 +22,15 @@
 #include <boot/memory.h>
 #include <boot/menu.h>
 
+#include <platform/bios.h>
 #include <platform/boot.h>
+#include <platform/vbe.h>
 
 #include <lib/list.h>
 #include <lib/string.h>
 
 #include <fatal.h>
 #include <kargs.h>
-
-#include "bios.h"
-#include "vbe.h"
 
 /** Structure describing a video mode. */
 typedef struct video_mode {
@@ -58,18 +57,25 @@ static video_mode_t *best_video_mode = NULL;
 /** Menu choice for the video mode. */
 static menu_item_t *video_mode_choice = NULL;
 
+/** Override for video mode from Multiboot command line. */
+char *video_mode_override = NULL;
+
 /** Search for a video mode.
- * @note		This will prefer modes with a higher depth.
  * @param width		Width to search for.
  * @param height	Height to search for.
+ * @param depth		Depth to search for or 0 to use the highest depth found.
  * @return		Pointer to mode structure, or NULL if not found. */
-static video_mode_t *video_mode_find(int width, int height) {
+static video_mode_t *video_mode_find(int width, int height, int depth) {
 	video_mode_t *mode, *ret = NULL;
 
 	LIST_FOREACH(&video_modes, iter) {
 		mode = list_entry(iter, video_mode_t, header);
 		if(mode->width == width && mode->height == height) {
-			if(!ret || mode->bpp > ret->bpp) {
+			if(depth) {
+				if(mode->bpp == depth) {
+					return mode;
+				}
+			} else if(!ret || mode->bpp > ret->bpp) {
 				ret = mode;
 			}
 		}
@@ -82,6 +88,31 @@ static video_mode_t *video_mode_find(int width, int height) {
  * @todo		Implement this.
  * @return		Best mode to use, or NULL if unable to detect. */
 static video_mode_t *probe_mode_edid(void) {
+	return NULL;
+}
+
+/** Get the mode specified by the override string.
+ * @return		Mode if found, NULL if not. */
+static video_mode_t *get_override_mode(void) {
+	int width = 0, height = 0, depth = 0;
+	char *tok;
+
+	if(video_mode_override) {
+		if((tok = strsep(&video_mode_override, "x"))) {
+			width = strtol(tok, NULL, 0);
+		}
+		if((tok = strsep(&video_mode_override, "x"))) {
+			height = strtol(tok, NULL, 0);
+		}
+		if((tok = strsep(&video_mode_override, "x"))) {
+			depth = strtol(tok, NULL, 0);
+		}
+
+		if(width && height) {
+			return video_mode_find(width, height, depth);
+		}
+	}
+
 	return NULL;
 }
 
@@ -189,12 +220,16 @@ void platform_video_init(void) {
 	}
 
 	/* Try to find the best mode. */
-	if(!(best_video_mode = probe_mode_edid())) {
-		if(!(best_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
-		                                         PREFERRED_MODE_HEIGHT))) {
-			if(!(best_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
-			                                         FALLBACK_MODE_HEIGHT))) {
-				fatal("Could not find video mode to use");
+	if(!(best_video_mode = get_override_mode())) {
+		if(!(best_video_mode = probe_mode_edid())) {
+			if(!(best_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
+			                                       PREFERRED_MODE_HEIGHT,
+			                                       0))) {
+				if(!(best_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
+				                                       FALLBACK_MODE_HEIGHT,
+				                                       0))) {
+					fatal("Could not find video mode to use");
+				}
 			}
 		}
 	}
