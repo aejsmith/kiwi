@@ -21,17 +21,19 @@
 #ifndef __EXT2_PRIV_H
 #define __EXT2_PRIV_H
 
-#include <io/device.h>
-#include <io/vfs.h>
-
-#include <sync/rwlock.h>
-
-#include <console.h>
-
-#if CONFIG_MODULE_FS_EXT2_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+#ifndef LOADER
+# include <io/device.h>
+# include <io/vfs.h>
+# include <sync/rwlock.h>
+# include <console.h>
+# if CONFIG_MODULE_FS_EXT2_DEBUG
+#  define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
+# else
+#  define dprintf(fmt...)		
+# endif
 #else
-# define dprintf(fmt...)		
+# include <boot/vfs.h>
+# include <types.h>
 #endif
 
 /** EXT2 filesystem magic number. */
@@ -160,7 +162,7 @@ typedef struct ext2_superblock {
 	uint32_t s_mkfs_time;			/**< When the filesystem was created. */
 	uint32_t s_jnl_blocks[17]; 		/**< Backup of the journal inode. */
 	uint32_t s_reserved[172];		/**< Padding to the end of the block. */
-} __attribute__((packed)) ext2_superblock_t;
+} __packed ext2_superblock_t;
 
 /** Group descriptor table. */
 typedef struct ext2_group_desc {
@@ -172,7 +174,7 @@ typedef struct ext2_group_desc {
 	uint16_t bg_used_dirs_count;		/**< Number of used directories. */
 	uint16_t bg_pad;
 	uint32_t bg_reserved[3];
-} __attribute__((packed)) ext2_group_desc_t;
+} __packed ext2_group_desc_t;
 
 /** EXT2 inode structure. */
 typedef struct ext2_disk_inode {
@@ -217,7 +219,7 @@ typedef struct ext2_disk_inode {
 			uint32_t m_i_reserved2[2];
 		} masix2;
 	} osd2;					/**< OS-dependent data 2. */
-} __attribute__((packed)) ext2_disk_inode_t;
+} __packed ext2_disk_inode_t;
 
 /** EXT2 directory entry. */
 typedef struct ext2_dirent {
@@ -226,8 +228,9 @@ typedef struct ext2_dirent {
 	uint8_t name_len;			/**< Name length. */
 	uint8_t file_type;			/**< File type. */
 	char name[EXT2_NAME_MAX];		/**< Name of the file. */
-} __attribute__((packed)) ext2_dirent_t;
+} __packed ext2_dirent_t;
 
+#ifndef LOADER
 /** Data for an Ext2 mount. */
 typedef struct ext2_mount {
 	rwlock_t lock;				/**< Lock to protect filesystem structures. */
@@ -300,5 +303,7 @@ extern int ext2_inode_write(ext2_inode_t *inode, const void *buf, uint32_t block
 extern int ext2_inode_resize(ext2_inode_t *inode, file_size_t size);
 
 extern void ext2_mount_flush(ext2_mount_t *mount);
-
+#else
+extern vfs_filesystem_ops_t ext2_filesystem_ops;
+#endif /* LOADER */
 #endif /* __EXT2_PRIV_H */

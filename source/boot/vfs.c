@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Filesystem class.
+ * @brief		Virtual file system.
  */
 
 #include <boot/memory.h>
@@ -25,7 +25,10 @@
 
 #include <assert.h>
 
+#include "fs/ext2.h"
 #include "fs/iso9660.h"
+
+#include "partitions/msdos.h"
 
 /** List of all detected filesystems. */
 LIST_DECLARE(filesystem_list);
@@ -44,7 +47,13 @@ static const char *boot_paths[] = {
 
 /** Array of filesystem implementations. */
 static vfs_filesystem_ops_t *filesystem_types[] = {
+	&ext2_filesystem_ops,
 	&iso9660_filesystem_ops,
+};
+
+/** Array of partition probe functions. */
+static bool (*partition_probe_funcs[])(disk_t *) = {
+	msdos_partition_probe,
 };
 
 /** Probe a disk for filesystems.
@@ -369,6 +378,50 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
 	return true;
 }
 
+/** Read a block from a partition.
+ * @param disk		Disk being read from.
+ * @param buf		Buffer to read into.
+ * @param lba		Block number to read.
+ * @return		Whether reading succeeded. */
+static bool partition_block_read(disk_t *disk, void *buf, offset_t lba) {
+	disk_t *parent = disk->data;
+	return parent->ops->block_read(parent, buf, lba + disk->offset);
+}
+
+/** Operations for a partition disk. */
+static disk_ops_t partition_disk_ops = {
+	.block_read = partition_block_read,
+};
+
+/** Add a partition to a disk device.
+ * @param disk		Disk to add to.
+ * @param id		ID of partition.
+ * @param lba		Block number that the partitions starts at.
+ * @param blocks	Number of blocks the partition takes up. */
+void disk_partition_add(disk_t *disk, int id, offset_t lba, file_size_t blocks) {
+	disk_t *child = kmalloc(sizeof(disk_t));
+	vfs_filesystem_t *fs;
+
+	child->id = id;
+	child->blksize = disk->blksize;
+	child->blocks = blocks;
+	child->ops = &partition_disk_ops;
+	child->data = disk;
+	child->partial_block = NULL;
+	child->boot = false;
+	child->offset = lba;
+
+	if((fs = vfs_filesystem_probe(child))) {
+		if(disk->boot && disk->ops->is_boot_partition) {
+			if(disk->ops->is_boot_partition(child, id, lba)) {
+				boot_filesystem = fs;
+			}
+		}
+	} else {
+		kfree(child);
+	}
+}
+
 /** Add a disk device.
  * @param id		ID of the disk (specific to the implementation).
  * @param blksize	Size of a block on the disk.
@@ -381,6 +434,7 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
 disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops, void *data, bool boot) {
 	disk_t *disk = kmalloc(sizeof(disk_t));
 	vfs_filesystem_t *fs;
+	size_t i;
 
 	disk->id = id;
 	disk->blksize = blksize;
@@ -388,15 +442,22 @@ disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops
 	disk->ops = ops;
 	disk->data = data;
 	disk->partial_block = NULL;
+	disk->boot = boot;
+	disk->offset = 0;
 
-	/* Probe the disk for filesystems. */
+	/* Probe the disk for filesystems/partitions. */
 	if((fs = vfs_filesystem_probe(disk))) {
 		if(boot) {
 			boot_filesystem = fs;
 		}
 		return disk;
 	} else {
-		/* TODO: Probe for partitions. */
+		for(i = 0; i < ARRAYSZ(partition_probe_funcs); i++) {
+			if(partition_probe_funcs[i](disk)) {
+				return disk;
+			}
+		}
+
 		kfree(disk);
 		return NULL;
 	}

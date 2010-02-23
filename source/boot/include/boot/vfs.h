@@ -31,6 +31,13 @@ struct vfs_node;
 
 /** Structure containing operations for a disk device. */
 typedef struct disk_ops_t {
+	/** Check if a partition is the boot partition.
+	 * @param disk		Disk partition is on.
+	 * @param id		ID of partition.
+	 * @param lba		Block that the partition starts at.
+	 * @return		Whether partition is a boot partition. */
+	bool (*is_boot_partition)(struct disk *disk, int id, offset_t lba);
+
 	/** Read a block from the disk.
 	 * @param disk		Disk being read from.
 	 * @param buf		Buffer to read into.
@@ -45,8 +52,13 @@ typedef struct disk {
 	size_t blksize;			/**< Size of one block on the disk. */
 	file_size_t blocks;		/**< Number of blocks on the disk. */
 	disk_ops_t *ops;		/**< Pointer to operations structure. */
-	void *data;			/**< Implementation-specific data pointer. */
+	union {
+		void *data;		/**< Implementation-specific data pointer. */
+		struct disk *parent;	/**< Parent device pointer. */
+	};
 	char *partial_block;		/**< Block for partial transfers. */
+	bool boot;			/**< Whether the disk is the boot disk. */
+	offset_t offset;		/**< Starting block (if a partition). */
 } disk_t;
 
 /** Structure containing operations for a filesystem. */
@@ -135,6 +147,7 @@ extern vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path);
 extern vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev);
 
 extern bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset);
+extern void disk_partition_add(disk_t *disk, int id, offset_t lba, file_size_t blocks);
 extern disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops,
                         void *data, bool boot);
 

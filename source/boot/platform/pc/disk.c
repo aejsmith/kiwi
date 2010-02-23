@@ -60,6 +60,21 @@ typedef struct specification_packet {
 extern uint8_t boot_device_id;
 extern uint64_t boot_part_offset;
 
+/** Check if a partition is the boot partition.
+ * @param disk		Disk the partition resides on.
+ * @param id		ID of partition.
+ * @param lba		Block that the partition starts at.
+ * @return		Whether partition is a boot partition. */
+static bool bios_disk_is_boot_partition(disk_t *disk, int id, offset_t lba) {
+	if(multiboot_magic == MB_LOADER_MAGIC && (uint64_t)id == boot_part_offset) {
+		return true;
+	} else if(lba == (offset_t)boot_part_offset) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
 /** Read a block from a disk device.
  * @param disk		Disk to read from.
  * @param buf		Buffer to read into.
@@ -95,6 +110,7 @@ static bool bios_disk_block_read(disk_t *disk, void *buf, offset_t lba) {
 
 /** Operations for a BIOS disk device. */
 static disk_ops_t bios_disk_ops = {
+	.is_boot_partition = bios_disk_is_boot_partition,
 	.block_read = bios_disk_block_read,
 };
 

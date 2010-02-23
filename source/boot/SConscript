@@ -15,7 +15,9 @@ Import('config', 'envmgr')
 
 # List of our own sources.
 sources = map(File, [
+	'fs/ext2.c',
 	'fs/iso9660.c',
+	'partitions/msdos.c',
 	'console.c',
 	'fatal.c',
 	'kargs.c',
