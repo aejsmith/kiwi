@@ -54,7 +54,45 @@ typedef struct ext2_inode {
  * @param num		Block number.
  * @return		Whether successful. */
 static bool ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t num) {
-	return disk_read(mount->parent->disk, buf, mount->blk_size, num * mount->blk_size);
+	return disk_read(mount->parent->disk, buf, mount->blk_size, (uint64_t)num * mount->blk_size);
+}
+
+/** Recurse through the extent index tree to find a leaf.
+ * @param mount		Mount being read from.
+ * @param header	Extent header to start at.
+ * @param block		Block number to get.
+ * @return		Pointer to header for leaf, NULL on failure. */
+static ext4_extent_header_t *ext4_find_leaf(ext2_mount_t *mount, ext4_extent_header_t *header,
+                                            uint32_t block) {
+	ext4_extent_idx_t *index;
+	uint16_t i;
+
+	while(true) {
+		index = (ext4_extent_idx_t *)&header[1];
+
+		if(le16_to_cpu(header->eh_magic) != EXT4_EXT_MAGIC) {
+			return NULL;
+		} else if(!le16_to_cpu(header->eh_depth)) {
+			return header;
+		}
+
+		for(i = 0; i < le16_to_cpu(header->eh_entries); i++) {
+			if(block < le32_to_cpu(index[i].ei_block)) {
+				break;
+			}
+		}
+
+		if(!i) {
+			return NULL;
+		} else if(!mount->temp_block1) {
+			mount->temp_block1 = kmalloc(mount->blk_size);
+		}
+
+		if(!ext2_block_read(mount, mount->temp_block1, le32_to_cpu(index[i - 1].ei_leaf))) {
+			return NULL;
+		}
+		header = (ext4_extent_header_t *)mount->temp_block1;
+	}
 }
 
 /** Get the raw block number from an inode block number.
@@ -65,72 +103,102 @@ static bool ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t num) {
  * @return		Whether successful. */
 static bool ext2_inode_block_get(ext2_inode_t *inode, uint32_t block, uint32_t *nump) {
 	uint32_t *i_block, *bi_block, num;
+	ext4_extent_header_t *header;
+	ext4_extent_t *extent;
+	uint16_t i;
 
-	/* First check if it's a direct block. This is easy to handle, just
-	 * need to get it straight out of the inode structure. */
-	if(block < EXT2_NDIR_BLOCKS) {
-		*nump = le32_to_cpu(inode->disk.i_block[block]);
-		return true;
-	}
-
-	block -= EXT2_NDIR_BLOCKS;
-	if(!inode->mount->temp_block1) {
-		inode->mount->temp_block1 = kmalloc(inode->mount->blk_size);
-	}
-	i_block = inode->mount->temp_block1;
-
-	/* Check whether the indirect block contains the block number we need.
-	 * The indirect block contains as many 32-bit entries as will fit in
-	 * one block of the filesystem. */
-	if(block < (inode->mount->blk_size / sizeof(uint32_t))) {
-		num = le32_to_cpu(inode->disk.i_block[EXT2_IND_BLOCK]);
-		if(num == 0) {
-			*nump = 0;
-			return true;
-		} else if(!ext2_block_read(inode->mount, i_block, num)) {
+	if(le32_to_cpu(inode->disk.i_flags) & EXT4_EXTENTS_FL) {
+		header = ext4_find_leaf(inode->mount, (ext4_extent_header_t *)inode->disk.i_block, block);
+		if(!header) {
 			return false;
 		}
 
-		*nump = le32_to_cpu(i_block[block]);
-		return true;
-	}
+		extent = (ext4_extent_t *)&header[1];
+		for(i = 0; i < le16_to_cpu(header->eh_entries); i++) {
+			if(block < le32_to_cpu(extent[i].ee_block)) {
+				break;
+			}
+		}
 
-	block -= inode->mount->blk_size / sizeof(uint32_t);
-	if(!inode->mount->temp_block2) {
-		inode->mount->temp_block2 = kmalloc(inode->mount->blk_size);
-	}
-	bi_block = inode->mount->temp_block2;
-
-	/* Not in the indirect block, check the bi-indirect blocks. The
-	 * bi-indirect block contains as many 32-bit entries as will fit in
-	 * one block of the filesystem, with each entry pointing to an
-	 * indirect block. */
-	if(block < ((inode->mount->blk_size / sizeof(uint32_t)) * (inode->mount->blk_size / sizeof(uint32_t)))) {
-		num = le32_to_cpu(inode->disk.i_block[EXT2_DIND_BLOCK]);
-		if(num == 0) {
-			*nump = 0;
-			return true;
-		} else if(!ext2_block_read(inode->mount, bi_block, num)) {
+		if(!i) {
 			return false;
 		}
 
-		/* Get indirect block inside bi-indirect block. */
-		num = le32_to_cpu(bi_block[block / (inode->mount->blk_size / sizeof(uint32_t))]);
-		if(num == 0) {
+		block -= le32_to_cpu(extent[i - 1].ee_block);
+		if(block >= le16_to_cpu(extent[i - 1].ee_len)) {
 			*nump = 0;
-			return true;
-		} else if(!ext2_block_read(inode->mount, i_block, num)) {
-			return false;
+		} else {
+			*nump = block + le32_to_cpu(extent[i - 1].ee_start);
 		}
 
-		*nump = le32_to_cpu(i_block[block % (inode->mount->blk_size / sizeof(uint32_t))]);
 		return true;
-	}
+	} else {
+		/* First check if it's a direct block. This is easy to handle,
+		 * just need to get it straight out of the inode structure. */
+		if(block < EXT2_NDIR_BLOCKS) {
+			*nump = le32_to_cpu(inode->disk.i_block[block]);
+			return true;
+		}
 
-	/* Triple indirect block. I somewhat doubt this will be necessary in
-	 * the bootloader. */
-	dprintf("ext2: tri-indirect blocks not yet supported!\n");
-	return false;
+		block -= EXT2_NDIR_BLOCKS;
+		if(!inode->mount->temp_block1) {
+			inode->mount->temp_block1 = kmalloc(inode->mount->blk_size);
+		}
+		i_block = inode->mount->temp_block1;
+
+		/* Check whether the indirect block contains the block number
+		 * we need. The indirect block contains as many 32-bit entries
+		 * as will fit in one block of the filesystem. */
+		if(block < (inode->mount->blk_size / sizeof(uint32_t))) {
+			num = le32_to_cpu(inode->disk.i_block[EXT2_IND_BLOCK]);
+			if(num == 0) {
+				*nump = 0;
+				return true;
+			} else if(!ext2_block_read(inode->mount, i_block, num)) {
+				return false;
+			}
+
+			*nump = le32_to_cpu(i_block[block]);
+			return true;
+		}
+
+		block -= inode->mount->blk_size / sizeof(uint32_t);
+		if(!inode->mount->temp_block2) {
+			inode->mount->temp_block2 = kmalloc(inode->mount->blk_size);
+		}
+		bi_block = inode->mount->temp_block2;
+
+		/* Not in the indirect block, check the bi-indirect blocks. The
+		 * bi-indirect block contains as many 32-bit entries as will
+		 * fit in one block of the filesystem, with each entry pointing
+		 * to an indirect block. */
+		if(block < ((inode->mount->blk_size / sizeof(uint32_t)) * (inode->mount->blk_size / sizeof(uint32_t)))) {
+			num = le32_to_cpu(inode->disk.i_block[EXT2_DIND_BLOCK]);
+			if(num == 0) {
+				*nump = 0;
+				return true;
+			} else if(!ext2_block_read(inode->mount, bi_block, num)) {
+				return false;
+			}
+
+			/* Get indirect block inside bi-indirect block. */
+			num = le32_to_cpu(bi_block[block / (inode->mount->blk_size / sizeof(uint32_t))]);
+			if(num == 0) {
+				*nump = 0;
+				return true;
+			} else if(!ext2_block_read(inode->mount, i_block, num)) {
+				return false;
+			}
+
+			*nump = le32_to_cpu(i_block[block % (inode->mount->blk_size / sizeof(uint32_t))]);
+			return true;
+		}
+
+		/* Triple indirect block. I somewhat doubt this will be needed
+		 * in the bootloader. */
+		dprintf("ext2: tri-indirect blocks not yet supported!\n");
+		return false;
+	}
 }
 
 /** Read blocks from an Ext2 inode.
@@ -169,6 +237,7 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, inode_t id) {
 
 	/* Get the group descriptor table containing the inode. */
 	if((group = (id - 1) / mount->inodes_per_group) >= mount->blk_groups) {
+		dprintf("ext2: bad inode number %llu\n", id);
 		return NULL;
 	}
 
@@ -183,6 +252,7 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, inode_t id) {
 	size = (mount->in_size <= sizeof(ext2_disk_inode_t)) ? mount->in_size : sizeof(ext2_disk_inode_t);
 	offset = ((offset_t)le32_to_cpu(mount->group_tbl[group].bg_inode_table) * mount->blk_size) + offset;
 	if(!disk_read(fs->disk, &inode->disk, size, offset)) {
+		dprintf("ext2: failed to read inode %llu\n", id);
 		kfree(inode);
 		return false;
 	}
@@ -198,6 +268,7 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, inode_t id) {
 		type = VFS_NODE_DIR;
 		break;
 	default:
+		dprintf("ext2: unhandled inode type for %llu\n", id);
 		kfree(inode);
 		return false;
 	}
@@ -289,10 +360,10 @@ static bool ext2_dir_cache(vfs_node_t *node) {
 		if(dirent->file_type != EXT2_FT_UNKNOWN && dirent->name_len != 0) {
 			strncpy(name, dirent->name, dirent->name_len);
 			name[dirent->name_len] = 0;
+			dprintf("'%s' %u\n", name, dirent->inode);
 			vfs_dir_insert(node, name, le32_to_cpu(dirent->inode));
 		} else if(!le16_to_cpu(dirent->rec_len)) {
-			dprintf("ext2: directory entry length was 0\n");
-			goto out;
+			break;
 		}
 	}
 
@@ -327,7 +398,7 @@ static bool ext2_mount(vfs_filesystem_t *fs) {
 		goto fail;
 	} else if(le32_to_cpu(mount->sb.s_rev_level) != EXT2_DYNAMIC_REV) {
 		/* Have to reject this because GOOD_OLD_REV does not have
-		 * a UUID. */
+		 * a UUID or label. */
 		dprintf("ext2: not EXT2_DYNAMIC_REV!\n");
 		goto fail;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -36,8 +36,9 @@
 # include <types.h>
 #endif
 
-/** EXT2 filesystem magic number. */
+/** Ext2 filesystem magic number. */
 #define EXT2_MAGIC		0xEF53
+#define EXT4_EXT_MAGIC		0xF30A
 
 /** Special block numbers. */
 #define EXT2_NDIR_BLOCKS	12		/**< Direct blocks. */
@@ -103,7 +104,10 @@
 /** Limitations. */
 #define EXT2_NAME_MAX		256		/**< Maximum file name length. */
 
-/** Superblock of an EXT2 filesystem. */
+/* Inode flags. */
+#define EXT4_EXTENTS_FL		0x00080000	/**< Inode uses extents. */
+
+/** Superblock of an Ext2 filesystem. */
 typedef struct ext2_superblock {
 	uint32_t s_inodes_count;		/**< Inodes count. */
 	uint32_t s_blocks_count;		/**< Blocks count. */
@@ -176,7 +180,7 @@ typedef struct ext2_group_desc {
 	uint32_t bg_reserved[3];
 } __packed ext2_group_desc_t;
 
-/** EXT2 inode structure. */
+/** Ext2 inode structure. */
 typedef struct ext2_disk_inode {
 	uint16_t i_mode;			/**< File mode. */
 	uint16_t i_uid;				/**< Lower 16-bits of owner's UID. */
@@ -221,7 +225,7 @@ typedef struct ext2_disk_inode {
 	} osd2;					/**< OS-dependent data 2. */
 } __packed ext2_disk_inode_t;
 
-/** EXT2 directory entry. */
+/** Ext2 directory entry. */
 typedef struct ext2_dirent {
 	uint32_t inode;				/**< Inode number. */
 	uint16_t rec_len;			/**< Length of the structure. */
@@ -229,6 +233,31 @@ typedef struct ext2_dirent {
 	uint8_t file_type;			/**< File type. */
 	char name[EXT2_NAME_MAX];		/**< Name of the file. */
 } __packed ext2_dirent_t;
+
+/* Ext4 on-disk extent structure. */
+typedef struct ext4_extent {
+	uint32_t ee_block;			/**< First logical block extent covers. */
+	uint16_t ee_len;			/**< Number of blocks covered by extent. */
+	uint16_t ee_start_hi;			/**< High 16 bits of physical block. */
+	uint32_t ee_start;			/**< Low 32 bits of physical block. */
+} __packed ext4_extent_t;
+
+/* Ext4 on-disk index structure. */
+typedef struct ext4_extent_idx {
+	uint32_t ei_block;			/**< Index covers logical blocks from 'block'. */
+	uint32_t ei_leaf;			/**< Pointer to the physical block of the next level. */
+	uint16_t ei_leaf_hi;			/**< High 16 bits of physical block. */
+	uint16_t ei_unused;			/**< Unused. */
+} __packed ext4_extent_idx_t;
+
+/* Ext4 extent header structure. */
+typedef struct ext4_extent_header {
+	uint16_t eh_magic;			/**< Magic number. */
+	uint16_t eh_entries;			/**< Number of valid entries. */
+	uint16_t eh_max;			/**< Capacity of store in entries. */
+	uint16_t eh_depth;
+	uint32_t eh_generation;
+} __packed ext4_extent_header_t;
 
 #ifndef LOADER
 /** Data for an Ext2 mount. */
