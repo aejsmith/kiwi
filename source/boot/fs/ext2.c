@@ -360,7 +360,6 @@ static bool ext2_dir_cache(vfs_node_t *node) {
 		if(dirent->file_type != EXT2_FT_UNKNOWN && dirent->name_len != 0) {
 			strncpy(name, dirent->name, dirent->name_len);
 			name[dirent->name_len] = 0;
-			dprintf("'%s' %u\n", name, dirent->inode);
 			vfs_dir_insert(node, name, le32_to_cpu(dirent->inode));
 		} else if(!le16_to_cpu(dirent->rec_len)) {
 			break;
