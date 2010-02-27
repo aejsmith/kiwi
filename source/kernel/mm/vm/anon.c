@@ -177,7 +177,7 @@ static void vm_anon_object_unmap(vm_object_t *_obj, offset_t offset, size_t size
 
 	mutex_unlock(&obj->lock);
 }
-
+#if 0
 /** Copy a private region using an anonymous object.
  * @param src		Source region to copy from.
  * @param dest		Destination region to copy to.
@@ -239,7 +239,7 @@ static int vm_anon_object_copy(vm_region_t *src, vm_region_t *dest) {
 	mutex_unlock(&srcobj->lock);
 	return 0;
 }
-
+#endif
 /** Handle a fault on an anonymous region.
  * @param region	Region fault occurred in.
  * @param addr		Virtual address of fault (rounded down to base of page).
@@ -426,7 +426,6 @@ static vm_object_ops_t vm_anon_object_ops = {
 	.release = vm_anon_object_release,
 	.map = vm_anon_object_map,
 	.unmap = vm_anon_object_unmap,
-	.copy = vm_anon_object_copy,
 	.fault = vm_anon_object_fault,
 	.page_release = vm_anon_object_page_release,
 };

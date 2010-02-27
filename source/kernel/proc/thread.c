@@ -558,7 +558,7 @@ void __init_text thread_reaper_init(void) {
 	}
 	thread_run(thread);
 }
-
+#if 0
 /** Closes a handle to a thread.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
@@ -732,3 +732,4 @@ int sys_thread_usleep(useconds_t us) {
 	}
 	return usleep_etc(us, SYNC_INTERRUPTIBLE);
 }
+#endif

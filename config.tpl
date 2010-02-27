@@ -75,7 +75,7 @@ Option('VM_DEBUG', 'Virtual memory manager debug output.', False, {'DEBUG': lamb
 Option('PROC_DEBUG', 'Process/thread management debug output.', False, {'DEBUG': lambda x: x})
 Option('SCHED_DEBUG', 'Scheduler debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('MODULE_DEBUG', 'Module loader debug output.', False, {'DEBUG': lambda x: x})
-Option('HANDLE_DEBUG', 'Handle manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
+Option('OBJECT_DEBUG', 'Object manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VFS_DEBUG', 'VFS debugging output.', False, {'DEBUG': lambda x: x})
 Option('DEVICE_DEBUG', 'Device manager debugging output.', False, {'DEBUG': lambda x: x})
 Option('IPC_DEBUG', 'IPC debugging output.', False, {'DEBUG': lambda x: x})

@@ -23,10 +23,9 @@
 #include <mm/kheap.h>
 #include <mm/malloc.h>
 
-#include <proc/handle.h>
-
 #include <assert.h>
 #include <errors.h>
+#include <object.h>
 
 /** Read a byte from a pipe.
  * @param pipe		Pipe structure. Should be locked, and have data.
@@ -184,7 +183,7 @@ out:
 /** Wait for a pipe to be readable or writable.
  *
  * Waits for a pipe to become readable or writable, and notifies the specified
- * handle_wait_t structure when it is. This is a convenience function, for
+ * object_wait_t structure when it is. This is a convenience function, for
  * example for devices that use pipes internally.
  *
  * @param pipe		Pipe to wait for.
@@ -192,40 +191,32 @@ out:
  *			writable when there is space in the buffer).
  * @param wait		Wait structure to notify.
  */
-void pipe_wait(pipe_t *pipe, bool write, handle_wait_t *wait) {
+void pipe_wait(pipe_t *pipe, bool write, object_wait_t *wait) {
 	if(write) {
 		if(semaphore_count(&pipe->space_sem)) {
-			wait->cb(wait);
+			object_wait_callback(wait);
 		} else {
-			notifier_register(&pipe->space_notifier, handle_wait_notifier, wait);
+			notifier_register(&pipe->space_notifier, object_wait_notifier, wait);
 		}
 	} else {
 		if(semaphore_count(&pipe->data_sem)) {
-			wait->cb(wait);
+			object_wait_callback(wait);
 		} else {
-			notifier_register(&pipe->data_notifier, handle_wait_notifier, wait);
+			notifier_register(&pipe->data_notifier, object_wait_notifier, wait);
 		}
 	}
 }
 
-/** Stop waiting for a pipe.
- *
- * Stops waiting for a pipe event.
- *
+/** Stop waiting for a pipe event.
  * @param pipe		Pipe to stop waiting for.
  * @param write		Whether waiting to be writable.
- * @param wait		Wait structure.
- */
-void pipe_unwait(pipe_t *pipe, bool write, handle_wait_t *wait) {
-	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, handle_wait_notifier, wait);
+ * @param wait		Wait structure. */
+void pipe_unwait(pipe_t *pipe, bool write, object_wait_t *wait) {
+	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, object_wait_notifier, wait);
 }
 
 /** Create a new pipe.
- *
- * Allocates a new pipe structure.
- *
- * @return		Pointer to pipe structure.
- */
+ * @return		Pointer to pipe structure. */
 pipe_t *pipe_create(void) {
 	pipe_t *pipe = kmalloc(sizeof(pipe_t), MM_SLEEP);
 
@@ -244,15 +235,10 @@ pipe_t *pipe_create(void) {
 }
 
 /** Destroy a pipe.
- *
- * Destroys a pipe structure previously created with pipe_create().
- *
  * @note		It is up to the caller to ensure that nothing will be
  *			using this pipe. For example, the handle system can be
  *			used for this purpose.
- *
- * @param pipe		Pipe to destroy.
- */
+ * @param pipe		Pipe to destroy. */
 void pipe_destroy(pipe_t *pipe) {
 	assert(!mutex_held(&pipe->reader));
 	assert(!mutex_held(&pipe->writer));

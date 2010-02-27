@@ -23,15 +23,14 @@
 
 #include <io/context.h>
 
-#include <lib/list.h>
 #include <lib/notifier.h>
-#include <lib/refcount.h>
 
-#include <proc/handle.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <sync/spinlock.h>
+
+#include <object.h>
 
 struct vfs_node;
 struct vm_aspace;

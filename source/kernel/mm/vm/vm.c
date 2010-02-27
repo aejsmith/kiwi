@@ -45,7 +45,6 @@
 #include <mm/slab.h>
 #include <mm/tlb.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/thread.h>
 
@@ -672,7 +671,7 @@ int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *add
 	mutex_unlock(&as->lock);
 	return ret;
 }
-
+#if 0
 /** Map a file into memory.
  *
  * Maps all or part of a file into the calling process' address space. If the
@@ -774,7 +773,7 @@ int vm_map_device(vm_aspace_t *as, ptr_t start, size_t size, int flags, device_t
 	mutex_unlock(&as->lock);
 	return ret;
 }
-
+#endif
 /** Unmaps a region of memory.
  *
  * Marks the specified address range as free in an address space and unmaps
@@ -989,7 +988,7 @@ int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp) {
 
 	return 0;
 }
-
+#if 0
 /** Map a file into memory.
  *
  * Maps all or part of a file into the calling process' address space. If the
@@ -1097,7 +1096,7 @@ int sys_vm_map_device(vm_map_args_t *args) {
 	handle_release(info);
 	return ret;
 }
-
+#endif
 /** Unmaps a region of memory.
  *
  * Marks the specified address range as free in the calling process' address

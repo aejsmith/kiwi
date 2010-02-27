@@ -30,7 +30,7 @@
  * closed. This makes it simpler to handle one end of a connection being
  * closed.
  */
-
+#if 0
 #include <cpu/intr.h>
 
 #include <ipc/ipc.h>
@@ -1213,3 +1213,4 @@ static void __init_text ipc_init(void) {
 	                                         NULL, 0, MM_FATAL);
 }
 INITCALL(ipc_init);
+#endif

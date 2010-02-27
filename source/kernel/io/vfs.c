@@ -38,7 +38,6 @@
 #include <mm/safe.h>
 #include <mm/slab.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 
 #include <assert.h>
@@ -1492,7 +1491,7 @@ int vfs_file_resize(vfs_node_t *node, file_size_t size) {
 	mutex_unlock(&node->lock);
 	return 0;
 }
-
+#if 0
 /** Closes a handle to a regular file.
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
@@ -1513,7 +1512,7 @@ static handle_type_t vfs_file_handle_type = {
 	.id = HANDLE_TYPE_FILE,
 	.close = vfs_file_handle_close,
 };
-
+#endif
 /** Populate a directory's entry cache if it is empty.
  * @param node		Node of directory.
  * @return		0 on success, negative error code on failure. */
@@ -1732,7 +1731,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 	mutex_unlock(&node->lock);
 	return 0;
 }
-
+#if 0
 /** Closes a handle to a directory
  * @param info		Handle information structure.
  * @return		0 on success, negative error code on failure. */
@@ -1753,7 +1752,7 @@ static handle_type_t vfs_dir_handle_type = {
 	.id = HANDLE_TYPE_DIR,
 	.close = vfs_dir_handle_close,
 };
-
+#endif
 /** Ensure that a symbolic link's destination is cached.
  * @param node		Node of link (should be locked).
  * @return		0 on success, negative error code on failure. */
@@ -2457,7 +2456,7 @@ void __init_text vfs_init(void) {
 	                                   vfs_node_cache_reclaim, NULL, 1, NULL,
 	                                   0, MM_FATAL);
 }
-
+#if 0
 /** Create a file in the file system.
  *
  * Creates a new regular file in the filesystem.
@@ -3438,3 +3437,4 @@ int sys_fs_unlink(const char *path) {
 int sys_fs_rename(const char *source, const char *dest) {
 	return -ERR_NOT_IMPLEMENTED;
 }
+#endif

@@ -36,7 +36,6 @@
 
 #include <platform/platform.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -47,6 +46,7 @@
 #include <init.h>
 #include <kargs.h>
 #include <module.h>
+#include <object.h>
 #include <tar.h>
 #include <time.h>
 #include <version.h>
@@ -287,6 +287,7 @@ static void init_thread(void *args, void *arg2) {
 	int ret;
 
 	/* Initialise other things. */
+	handle_cache_init();
 	vfs_init();
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their

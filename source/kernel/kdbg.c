@@ -44,7 +44,6 @@
 #include <mm/slab.h>
 #include <mm/vm.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/thread.h>
 
@@ -94,16 +93,16 @@ static struct {
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "delete",	"Delete a breakpoint/watchpoint.",		kdbg_cmd_delete },
 	{ "device",	"Print out information about devices.",		kdbg_cmd_device },
-	{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
+	//{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
-	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
+	//{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "kill",	"Kill a thread.",				kdbg_cmd_kill },
 	{ "list",	"List breakpoints/watchpoints.",		kdbg_cmd_list },
 	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
-	{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
+	//{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },
 	{ "reboot",	"Reboot the system.",				kdbg_cmd_reboot },

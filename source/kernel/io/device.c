@@ -25,7 +25,6 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 
 #include <assert.h>
@@ -47,6 +46,7 @@ device_t *device_tree_root;
 /** Standard device directories. */
 device_t *device_bus_dir;
 
+#if 0
 /** Increase the reference count of a device VM object.
  * @param obj		Object to reference.
  * @param region	Region referencing the object. */
@@ -98,6 +98,41 @@ static vm_object_ops_t device_vm_object_ops = {
 	.release = device_vm_object_release,
 	.fault = device_vm_object_fault,
 };
+#endif
+
+/** Signal that a device is being waited for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int device_object_wait(object_wait_t *wait) {
+	device_t *device = (device_t *)wait->handle->object;
+
+	if(!device->ops->wait || !device->ops->unwait) {
+		return -ERR_NOT_IMPLEMENTED;
+	}
+
+	return device->ops->wait(device, wait);
+}
+
+/** Stop waiting for a device.
+ * @param wait		Wait information structure. */
+static void device_object_unwait(object_wait_t *wait) {
+	device_t *device = (device_t *)wait->handle->object;
+	return device->ops->unwait(device, wait);
+}
+
+/** Closes a handle to a device.
+ * @param handle	Handle to the device. */
+static void device_object_close(object_handle_t *handle) {
+	device_release((device_t *)handle->object);
+}
+
+/** Device object type structure. */
+static object_type_t device_object_type = {
+	.id = OBJECT_TYPE_DEVICE,
+	.wait = device_object_wait,
+	.unwait = device_object_unwait,
+	.close = device_object_close,
+};
 
 /** Create a new device tree node.
  *
@@ -134,7 +169,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	}
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	vm_object_init(&device->vobj, &device_vm_object_ops);
+	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -223,7 +258,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	refcount_inc(&dest->count);
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	vm_object_init(&device->vobj, &device_vm_object_ops);
+	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -293,7 +328,7 @@ int device_destroy(device_t *device) {
 	}
 
 	dprintf("device: destroyed device %p(%s) (parent: %p)\n", device, device->name, device->parent);
-	vm_object_destroy(&device->vobj);
+	object_destroy(&device->obj);
 	kfree(device->name);
 	kfree(device);
 	return 0;
@@ -657,46 +692,7 @@ static void __init_text device_init(void) {
 	}
 }
 INITCALL(device_init);
-
-/** Signal that a device is being waited for.
- * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int device_handle_wait(handle_wait_t *wait) {
-	device_t *device = wait->info->data;
-
-	if(!device->ops->wait || !device->ops->unwait) {
-		return -ERR_NOT_IMPLEMENTED;
-	}
-
-	return device->ops->wait(device, wait);
-}
-
-/** Stop waiting for a device.
- * @param wait		Wait information structure. */
-static void device_handle_unwait(handle_wait_t *wait) {
-	device_t *device = wait->info->data;
-
-	return device->ops->unwait(device, wait);
-}
-
-/** Closes a handle to a device.
- * @param info		Handle information structure.
- * @return		0 on success, negative error code on failure. */
-static int device_handle_close(handle_info_t *info) {
-	device_t *device = info->data;
-
-	device_release(device);
-	return 0;
-}
-
-/** Device handle operations. */
-static handle_type_t device_handle_type = {
-	.id = HANDLE_TYPE_DEVICE,
-	.wait = device_handle_wait,
-	.unwait = device_handle_unwait,
-	.close = device_handle_close,
-};
-
+#if 0
 /** Open a handle to a device.
  *
  * Opens a handle to a device that can be used to perform other operations on
@@ -900,3 +896,4 @@ out:
 	handle_release(info);
 	return ret;
 }
+#endif

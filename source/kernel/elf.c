@@ -173,7 +173,8 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - vm_map_file() will reject the call if they
 	 * are. */
-	return vm_map_file(binary->as, start, size, flags, binary->node, offset, NULL);
+	fatal("monkeys on bicycles");
+	//return vm_map_file(binary->as, start, size, flags, binary->node, offset, NULL);
 }
 
 /** Check whether a binary is an ELF binary.

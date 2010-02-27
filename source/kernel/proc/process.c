@@ -26,7 +26,6 @@
 #include <mm/slab.h>
 #include <mm/vm.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/sched.h>
 #include <proc/thread.h>
@@ -40,6 +39,7 @@
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <object.h>
 #include <vmem.h>
 
 #if CONFIG_PROC_DEBUG
@@ -505,7 +505,7 @@ void __init_text process_init(void) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
-
+#if 0
 /** Signal that a process is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
@@ -876,3 +876,4 @@ identifier_t sys_process_id(handle_t handle) {
 void sys_process_exit(int status) {
 	process_exit(status);
 }
+#endif

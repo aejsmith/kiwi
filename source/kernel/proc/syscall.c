@@ -31,7 +31,6 @@
 #include <mm/malloc.h>
 #include <mm/vm.h>
 
-#include <proc/handle.h>
 #include <proc/process.h>
 #include <proc/syscall.h>
 
@@ -61,6 +60,7 @@ static int sys_putch(char ch) {
 static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_putch,
 	(syscall_handler_t)sys_module_load,
+#if 0
 	(syscall_handler_t)sys_handle_close,
 	(syscall_handler_t)sys_handle_type,
 	(syscall_handler_t)sys_handle_wait,
@@ -116,6 +116,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_ipc_message_send,
 	(syscall_handler_t)sys_ipc_message_sendv,
 	(syscall_handler_t)sys_ipc_message_receive,
+#endif
 };
 
 /** Main kernel system call service. */

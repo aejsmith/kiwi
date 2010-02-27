@@ -21,15 +21,9 @@
 #ifndef __IO_DEVICE_H
 #define __IO_DEVICE_H
 
-#include <lib/list.h>
 #include <lib/radix.h>
-#include <lib/refcount.h>
-
-#include <mm/vm.h>
-
-#include <proc/handle.h>
-
 #include <sync/mutex.h>
+#include <object.h>
 
 /** Various limitations. */
 #define DEVICE_NAME_MAX		32	/**< Maximum length of a device name/device attribute name. */
@@ -88,12 +82,12 @@ typedef struct device_ops {
 	 * @param device	Device to wait for.
 	 * @param wait		Wait information structure.
 	 * @return		0 on success, negative error code on failure. */
-	int (*wait)(struct device *device, handle_wait_t *wait);
+	int (*wait)(struct device *device, object_wait_t *wait);
 
 	/** Stop waiting for a device event.
 	 * @param device	Device to stop waiting for.
 	 * @param wait		Wait information structure. */
-	void (*unwait)(struct device *device, handle_wait_t *wait);
+	void (*unwait)(struct device *device, object_wait_t *wait);
 
 	/** Fault handler for memory regions mapping the device.
 	 * @note		If this operation is not specified then the
@@ -142,7 +136,7 @@ typedef struct device_attr {
 
 /** Structure describing an entry in the device tree. */
 typedef struct device {
-	vm_object_t vobj;		/**< VM object header. */
+	object_t obj;			/**< Object header. */
 
 	char *name;			/**< Name of the device. */
 	mutex_t lock;			/**< Lock to protect structure. */
