@@ -508,15 +508,10 @@ void process_exit(int status) {
 	thread_exit();
 }
 
-/** Dump the contents of the process table.
- *
- * Dumps out the contents of the process hash table.
- *
+/** Dump the contents of the process tree.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
- *
- * @return		Always returns KDBG_OK.
- */
+ * @return		Always returns KDBG_OK. */
 int kdbg_cmd_process(int argc, char **argv) {
 	process_t *process;
 

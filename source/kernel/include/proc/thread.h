@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -32,6 +32,7 @@
 
 #include <sync/spinlock.h>
 
+#include <object.h>
 #include <time.h>
 
 /** Maximum length of a thread name. */
@@ -45,7 +46,7 @@ typedef void (*thread_func_t)(void *, void *);
 
 /** Definition of a thread. */
 typedef struct thread {
-	list_t header;			/**< Link to run queues. */
+	object_t obj;			/**< Object header. */
 
 	/** Main thread information. */
 	spinlock_t lock;		/**< Protects the thread's internals. */
@@ -60,6 +61,7 @@ typedef struct thread {
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
 
 	/** Scheduling information. */
+	list_t runq_link;		/**< Link to run queues. */
 	size_t priority;		/**< Current scheduling priority. */
 	uint32_t timeslice;		/**< Current timeslice. */
 	int preempt_off;		/**< Whether preemption is disabled. */
@@ -93,7 +95,7 @@ typedef struct thread {
 	void *arg2;			/**< Second argument to thread entry function. */
 
 	/** Other thread information. */
-	identifier_t id;		/**< ID of the thread. */
+	thread_id_t id;			/**< ID of the thread. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
@@ -115,7 +117,8 @@ extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_at_kernel_exit(void);
 extern void thread_exit(void) __noreturn;
 
-extern thread_t *thread_lookup(identifier_t id);
+extern thread_t *thread_lookup_unsafe(thread_id_t id);
+extern thread_t *thread_lookup(thread_id_t id);
 extern int thread_create(const char *name, struct process *owner, int flags,
                          thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
 extern void thread_run(thread_t *thread);
@@ -128,8 +131,8 @@ extern void thread_init(void);
 extern void thread_reaper_init(void);
 
 extern handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
-extern handle_t sys_thread_open(identifier_t id);
-extern identifier_t sys_thread_id(handle_t handle);
+extern handle_t sys_thread_open(thread_id_t id);
+extern thread_id_t sys_thread_id(handle_t handle);
 extern void sys_thread_exit(int status);
 extern int sys_thread_usleep(useconds_t us);
 

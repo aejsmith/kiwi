@@ -117,7 +117,7 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 		thread->id, thread->name, curr_cpu->id, thread->cpu->id);
 
 	/* Remove the thread from its old CPU. */
-	list_remove(&thread->header);
+	list_remove(&thread->runq_link);
 	cpu->count[thread->priority]--;
 	atomic_dec(&cpu->runnable);
 
@@ -131,7 +131,7 @@ static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
 	/* Insert it in the current CPU's queue. */
 	spinlock_lock_ni(&curr_cpu->sched->lock);
 	curr_cpu->sched->count[thread->priority]++;
-	list_append(&curr_cpu->sched->queues[thread->priority], &thread->header);
+	list_append(&curr_cpu->sched->queues[thread->priority], &thread->runq_link);
 	atomic_inc(&curr_cpu->sched->runnable);
 	spinlock_unlock_ni(&curr_cpu->sched->lock);
 	spinlock_unlock_ni(&thread->lock);
@@ -151,7 +151,7 @@ static inline int sched_migrate_cpu(sched_cpu_t *cpu, int priority, int max) {
 	int count = max;
 
 	LIST_FOREACH_SAFE(&cpu->queues[priority], iter) {
-		thread = list_entry(iter, thread_t, header);
+		thread = list_entry(iter, thread_t, runq_link);
 
 		if((count -= sched_migrate_thread(cpu, thread)) == 0) {
 			break;
@@ -320,8 +320,8 @@ static thread_t *sched_queue_pick(sched_cpu_t *cpu) {
 		}
 
 		/* Pick the first thread off the queue. */
-		thread = list_entry(cpu->queues[i].next, thread_t, header);
-		list_remove(&thread->header);
+		thread = list_entry(cpu->queues[i].next, thread_t, runq_link);
+		list_remove(&thread->runq_link);
 		cpu->count[i]--;
 
 		atomic_dec(&threads_runnable);
@@ -355,7 +355,7 @@ static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
 	assert(thread->priority < PRIORITY_MAX);
 
 	cpu->count[thread->priority]++;
-	list_append(&cpu->queues[thread->priority], &thread->header);
+	list_append(&cpu->queues[thread->priority], &thread->runq_link);
 
 	atomic_inc(&cpu->runnable);
 	atomic_inc(&threads_runnable);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -49,14 +49,26 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Thread creation arguments structure. */
+typedef struct thread_uspace_args {
+	ptr_t sp;			/**< Stack pointer. */
+	ptr_t entry;			/**< Entry point address. */
+	ptr_t arg;			/**< Argument. */
+} thread_uspace_args_t;
+
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
 
-static AVL_TREE_DECLARE(thread_tree);		/**< Tree of all threads. */
-static MUTEX_DECLARE(thread_tree_lock, 0);	/**< Lock for thread AVL tree. */
-static vmem_t *thread_id_arena;			/**< Thread ID Vmem arena. */
-static slab_cache_t *thread_cache;		/**< Cache for thread structures. */
+/** Tree of all threads. */
+static AVL_TREE_DECLARE(thread_tree);
+static RWLOCK_DECLARE(thread_tree_lock);
+
+/** Thread ID allocator. */
+static vmem_t *thread_id_arena;
+
+/** Thread structure cache. */
+static slab_cache_t *thread_cache;
 
 /** Dead thread queue information. */
 static LIST_DECLARE(dead_threads);
@@ -72,7 +84,7 @@ static int thread_cache_ctor(void *obj, void *data, int kmflag) {
 	thread_t *thread = (thread_t *)obj;
 
 	spinlock_init(&thread->lock, "thread_lock");
-	list_init(&thread->header);
+	list_init(&thread->runq_link);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
 	return 0;
@@ -93,6 +105,21 @@ static void thread_trampoline(void) {
 	thread_exit();
 }
 
+/** Entry function for a userspace thread.
+ * @param _args		Argument structure pointer.
+ * @param arg2		Unused. */
+static void thread_uspace_trampoline(void *_args, void *arg2) {
+	thread_uspace_args_t *args = _args;
+	ptr_t entry, sp, arg;
+
+	entry = args->entry;
+	sp = args->sp;
+	arg = args->arg;
+	kfree(args);
+
+	thread_arch_enter_userspace(entry, sp, arg);
+}
+
 /** Dead thread reaper.
  * @param arg1		Unused.
  * @param arg2		Unused. */
@@ -105,14 +132,14 @@ static void thread_reaper(void *arg1, void *arg2) {
 		/* Take the next thread off the list. */
 		spinlock_lock(&dead_thread_lock);
 		assert(!list_empty(&dead_threads));
-		thread = list_entry(dead_threads.next, thread_t, header);
-		list_remove(&thread->header);
+		thread = list_entry(dead_threads.next, thread_t, runq_link);
+		list_remove(&thread->runq_link);
 		spinlock_unlock(&dead_thread_lock);
 
 		/* Remove from thread tree. */
-		mutex_lock(&thread_tree_lock);
+		rwlock_write_lock(&thread_tree_lock);
 		avl_tree_remove(&thread_tree, (key_t)thread->id);
-		mutex_unlock(&thread_tree_lock);
+		rwlock_unlock(&thread_tree_lock);
 
 		/* Detach from its owner. */
 		process_detach(thread);
@@ -124,6 +151,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		if(thread->fpu) {
 			fpu_context_destroy(thread->fpu);
 		}
+		object_destroy(&thread->obj);
 
 		/* Deallocate the thread ID. */
 		vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
@@ -134,6 +162,18 @@ static void thread_reaper(void *arg1, void *arg2) {
 		slab_cache_free(thread_cache, thread);
 	}
 }
+
+/** Closes a handle to a thread.
+ * @param handle	Handle being closed. */
+static void thread_object_close(object_handle_t *handle) {
+	thread_destroy((thread_t *)handle->object);
+}
+
+/** Thread object type. */
+static object_type_t thread_object_type = {
+	.id = OBJECT_TYPE_THREAD,
+	.close = thread_object_close,
+};
 
 /** Wake up a sleeping thread.
  * @note		Thread and its wait queue should be locked.
@@ -275,30 +315,29 @@ void thread_exit(void) {
 	fatal("Shouldn't get here");
 }
 
-/** Lookup a thread.
- *
- * Looks for a thread with the specified id in the thread tree. Created/dead
- * threads cannot be looked up.
- *
+/** Lookup a running thread without taking the tree lock.
+ * @note		Newly created and dead threads are ignored.
+ * @note		This function should only be used within KDBG. Use
+ *			thread_lookup() outside of KDBG.
  * @param id		ID of the thread to find.
- *
- * @return		Pointer to thread found, or NULL if not found.
- */
-thread_t *thread_lookup(identifier_t id) {
-	thread_t *thread;
+ * @return		Pointer to thread found, or NULL if not found. */
+thread_t *thread_lookup_unsafe(thread_id_t id) {
+	thread_t *thread = avl_tree_lookup(&thread_tree, (key_t)id);
+	return (thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) ? NULL : thread;
+}
 
-	if(atomic_get(&kdbg_running)) {
-		thread = avl_tree_lookup(&thread_tree, (key_t)id);
-	} else {
-		mutex_lock(&thread_tree_lock);
-		thread = avl_tree_lookup(&thread_tree, (key_t)id);
-		mutex_unlock(&thread_tree_lock);
-	}
+/** Lookup a running thread.
+ * @note		Newly created and dead threads are ignored.
+ * @param id		ID of the thread to find.
+ * @return		Pointer to thread found, or NULL if not found. */
+thread_t *thread_lookup(thread_id_t id) {
+	thread_t *ret;
 
-	if(thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) {
-		thread = NULL;
-	}
-	return thread;
+	rwlock_read_lock(&thread_tree_lock);
+	ret = thread_lookup_unsafe(id);
+	rwlock_unlock(&thread_tree_lock);
+
+	return ret;
 }
 
 /** Create a new thread.
@@ -345,12 +384,13 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	}
 
 	/* Allocate an ID for the thread. */
-	thread->id = (identifier_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
+	thread->id = (thread_id_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 
+	object_init(&thread->obj, &thread_object_type);
 	atomic_set(&thread->in_usermem, 0);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
@@ -373,9 +413,9 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	process_attach(owner, thread);
 
 	/* Add to the thread tree. */
-	mutex_lock(&thread_tree_lock);
+	rwlock_write_lock(&thread_tree_lock);
 	avl_tree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
-	mutex_unlock(&thread_tree_lock);
+	rwlock_unlock(&thread_tree_lock);
 
 	*threadp = thread;
 
@@ -431,12 +471,12 @@ void thread_destroy(thread_t *thread) {
 	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
 		thread->id, thread->name, thread->owner->id);
 
-	assert(list_empty(&thread->header));
+	assert(list_empty(&thread->runq_link));
 	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
 
 	/* Queue for deletion by the thread reaper. */
 	spinlock_lock(&dead_thread_lock);
-	list_append(&dead_threads, &thread->header);
+	list_append(&dead_threads, &thread->runq_link);
 	semaphore_up(&dead_thread_sem, 1);
 	spinlock_unlock(&dead_thread_lock);
 
@@ -464,7 +504,7 @@ int kdbg_cmd_kill(int argc, char **argv) {
 
 	if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
 		return KDBG_FAIL;
-	} else if(!(thread = thread_lookup(tid))) {
+	} else if(!(thread = thread_lookup_unsafe(tid))) {
 		kprintf(LOG_NONE, "Invalid thread ID.\n");
 		return KDBG_FAIL;
 	}
@@ -558,42 +598,6 @@ void __init_text thread_reaper_init(void) {
 	}
 	thread_run(thread);
 }
-#if 0
-/** Closes a handle to a thread.
- * @param info		Handle information structure.
- * @return		0 on success, negative error code on failure. */
-static int thread_handle_close(handle_info_t *info) {
-	thread_destroy(info->data);
-	return 0;
-}
-
-/** Thread handle operations. */
-static handle_type_t thread_handle_type = {
-	.id = HANDLE_TYPE_THREAD,
-	.close = thread_handle_close,
-};
-
-/** Thread creation arguments structure. */
-typedef struct sys_thread_args {
-	ptr_t sp;			/**< Stack pointer. */
-	ptr_t entry;			/**< Entry point address. */
-	ptr_t arg;			/**< Argument. */
-} sys_thread_args_t;
-
-/** Entry function for a userspace thread.
- * @param _args		Argument structure address.
- * @param arg2		Unused. */
-static void sys_thread_create_entry(void *_args, void *arg2) {
-	sys_thread_args_t *args = _args;
-	ptr_t entry, sp, arg;
-
-	entry = args->entry;
-	sp = args->sp;
-	arg = args->arg;
-	kfree(args);
-
-	thread_arch_enter_userspace(entry, sp, arg);
-}
 
 /** Create a new thread.
  *
@@ -610,9 +614,10 @@ static void sys_thread_create_entry(void *_args, void *arg2) {
  * @param arg		Argument to pass to thread.
  */
 handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
-	sys_thread_args_t *args;
+	thread_uspace_args_t *args;
+	object_handle_t *handle;
 	thread_t *thread = NULL;
-	handle_t handle = -1;
+	handle_t hid = -1;
 	char *kname;
 	int ret;
 
@@ -623,21 +628,24 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	}
 
 	/* Create arguments structure. */
-	args = kmalloc(sizeof(sys_thread_args_t), MM_SLEEP);
+	args = kmalloc(sizeof(thread_uspace_args_t), MM_SLEEP);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 
 	/* Create the thread, but do not run it yet. */
-	if((ret = thread_create(kname, curr_proc, 0, sys_thread_create_entry, args, NULL, &thread)) != 0) {
+	if((ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread)) != 0) {
 		goto fail;
 	}
 
 	/* Try to create the handle for the thread. */
-	if((handle = handle_create(&curr_proc->handles, &thread_handle_type, thread)) < 0) {
-		ret = (int)handle;
+	refcount_inc(&thread->count);
+	handle = object_handle_create(&thread->obj, NULL);
+	hid = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
+	if(hid < 0) {
+		ret = (int)hid;
 		goto fail;
 	}
-	refcount_inc(&thread->count);
 
 	/* Create a userspace stack. TODO: Stack direction! */
 	if(stack) {
@@ -657,13 +665,11 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 
 	kfree(kname);
 	thread_run(thread);
-	return handle;
+	return hid;
 fail:
-	if(handle >= 0) {
-		handle_close(&curr_proc->handles, handle);
-	}
-	if(thread) {
-		thread_destroy(thread);
+	if(hid >= 0) {
+		/* This will handle thread destruction. */
+		object_handle_detach(curr_proc, hid);
 	}
 	kfree(args);
 	kfree(kname);
@@ -672,9 +678,10 @@ fail:
 
 /** Open a handle to a thread.
  * @param id		Global ID of the thread to open. */
-handle_t sys_thread_open(identifier_t id) {
+handle_t sys_thread_open(thread_id_t id) {
+	object_handle_t *handle;
 	thread_t *thread;
-	handle_t handle;
+	handle_t ret;
 
 	if(!(thread = thread_lookup(id))) {
 		return -ERR_NOT_FOUND;
@@ -682,11 +689,10 @@ handle_t sys_thread_open(identifier_t id) {
 
 	refcount_inc(&thread->count);
 
-	if((handle = handle_create(&curr_proc->handles, &thread_handle_type, thread)) < 0) {
-		thread_destroy(thread);
-	}
-
-	return handle;
+	handle = object_handle_create(&thread->obj, NULL);
+	ret = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
+	return ret;
 }
 
 /** Get the ID of a thread.
@@ -699,17 +705,17 @@ handle_t sys_thread_open(identifier_t id) {
  * @return		Thread ID on success (greater than or equal to zero),
  *			negative error code on failure.
  */
-identifier_t sys_thread_id(handle_t handle) {
-	handle_info_t *info;
+thread_id_t sys_thread_id(handle_t handle) {
+	object_handle_t *obj;
 	thread_t *thread;
-	identifier_t id;
+	thread_id_t id;
 
 	if(handle == -1) {
 		id = curr_thread->id;
-	} else if(!(id = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_THREAD, &info))) {
-		thread = info->data;
+	} else if((id = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &obj)) == 0) {
+		thread = (thread_t *)obj->object;
 		id = thread->id;
-		handle_release(info);
+		object_handle_release(obj);
 	}
 
 	return id;
@@ -732,4 +738,3 @@ int sys_thread_usleep(useconds_t us) {
 	}
 	return usleep_etc(us, SYNC_INTERRUPTIBLE);
 }
-#endif

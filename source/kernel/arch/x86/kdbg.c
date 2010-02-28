@@ -165,7 +165,7 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	if(argc == 2) {
 		if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
-		} else if(!(thread = thread_lookup(tid))) {
+		} else if(!(thread = thread_lookup_unsafe(tid))) {
 			kprintf(LOG_NONE, "Invalid thread ID.\n");
 			return KDBG_FAIL;
 		}
