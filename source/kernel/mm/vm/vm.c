@@ -929,7 +929,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	} else {
 		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
-		} else if(!(process = process_lookup(val))) {
+		} else if(!(process = process_lookup_unsafe(val))) {
 			kprintf(LOG_NONE, "Invalid process ID.\n");
 			return KDBG_FAIL;
 		}

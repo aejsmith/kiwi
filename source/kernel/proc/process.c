@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -30,7 +30,7 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <sync/mutex.h>
+#include <sync/rwlock.h>
 #include <sync/semaphore.h>
 
 #include <assert.h>
@@ -57,13 +57,20 @@ typedef struct process_create_info {
 	int ret;		/**< Return code. */
 } process_create_info_t;
 
+static object_type_t process_object_type;
+
+/** Tree of all processes. */
+static AVL_TREE_DECLARE(process_tree);
+static RWLOCK_DECLARE(process_tree_lock);
+
+/** Process ID allocator. */
+static vmem_t *process_id_arena;
+
+/** Cache for process structures. */
+static slab_cache_t *process_cache;
+
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
-
-static AVL_TREE_DECLARE(process_tree);		/**< Tree of all processes. */
-static MUTEX_DECLARE(process_tree_lock, 0);	/**< Lock for process AVL tree. */
-static vmem_t *process_id_arena;		/**< Process ID Vmem arena. */
-static slab_cache_t *process_cache;		/**< Cache for process structures. */
 
 /** Constructor for process objects.
  * @param obj		Pointer to object.
@@ -89,7 +96,7 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
  * @param parent	Process to inherit information from.
  * @param procp		Where to store pointer to structure.
  * @return		0 on success, negative error code on failure. */
-static int process_alloc(const char *name, identifier_t id, int flags, int cflags,
+static int process_alloc(const char *name, process_id_t id, int flags, int cflags,
                          bool aspace, int priority, process_t *parent,
                          process_t **procp) {
 	process_t *process = slab_cache_alloc(process_cache, MM_SLEEP);
@@ -125,18 +132,19 @@ static int process_alloc(const char *name, identifier_t id, int flags, int cflag
 
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
+	object_init(&process->obj, &process_object_type);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
-	process->id = (id < 0) ? (identifier_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
+	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
 	process->flags = flags;
 	process->priority = priority;
 	process->state = PROCESS_RUNNING;
 
 	/* Add to the process tree. */
-	mutex_lock(&process_tree_lock);
+	rwlock_write_lock(&process_tree_lock);
 	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
-	mutex_unlock(&process_tree_lock);
+	rwlock_unlock(&process_tree_lock);
 
 	*procp = process;
 
@@ -152,17 +160,69 @@ static void process_destroy(process_t *process) {
 	assert(process->state == PROCESS_DEAD);
 	assert(list_empty(&process->threads));
 
-	mutex_lock(&process_tree_lock);
+	rwlock_write_lock(&process_tree_lock);
 	avl_tree_remove(&process_tree, (key_t)process->id);
-	mutex_unlock(&process_tree_lock);
+	rwlock_unlock(&process_tree_lock);
 
 	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
 		process->id, process->name, process, process->status);
 
+	object_destroy(&process->obj);
 	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
 	kfree(process->name);
 	slab_cache_free(process_cache, process);
 }
+
+/** Signal that a process is being waited for.
+ * @param wait		Wait information structure.
+ * @return		0 on success, negative error code on failure. */
+static int process_object_wait(object_wait_t *wait) {
+	process_t *process = (process_t *)wait->handle->object;
+
+	switch(wait->event) {
+	case PROCESS_EVENT_DEATH:
+		mutex_lock(&process->lock);
+		if(process->state == PROCESS_DEAD) {
+			object_wait_callback(wait);
+		} else {
+			notifier_register(&process->death_notifier, object_wait_notifier, wait);
+		}
+		mutex_unlock(&process->lock);
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Stop waiting for a process.
+ * @param wait		Wait information structure. */
+static void process_object_unwait(object_wait_t *wait) {
+	process_t *process = (process_t *)wait->handle->object;
+
+	switch(wait->event) {
+	case PROCESS_EVENT_DEATH:
+		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
+		break;
+	}
+}
+
+/** Closes a handle to a process.
+ * @param handle	Handle to close. */
+static void process_object_close(object_handle_t *handle) {
+	process_t *process = (process_t *)handle->object;
+
+	if(refcount_dec(&process->count) == 0) {
+		process_destroy(process);
+	}
+}
+
+/** Process object type operations. */
+static object_type_t process_object_type = {
+	.id = OBJECT_TYPE_PROCESS,
+	.wait = process_object_wait,
+	.unwait = process_object_unwait,
+	.close = process_object_close,
+};
 
 /** Copy the data contained in a string array to the argument block.
  * @param dest		Array to store addresses copied to in.
@@ -170,7 +230,7 @@ static void process_destroy(process_t *process) {
  * @param count		Number of array entries.
  * @param base		Base address to copy to.
  * @return		Total size copied. */
-static size_t process_copy_args_data(char **dest, const char **source, size_t count, ptr_t base) {
+static size_t copy_argument_strings(char **dest, const char **source, size_t count, ptr_t base) {
 	size_t i, len, total = 0;
 
 	for(i = 0; i < count; i++) {
@@ -190,7 +250,7 @@ static size_t process_copy_args_data(char **dest, const char **source, size_t co
  * @param kenv		Environment array.
  * @param addrp		Where to store address of argument block.
  * @return		0 on success, negative error code on failure. */
-static int process_copy_args(const char *kpath, const char **kargs, const char **kenv, ptr_t *addrp) {
+static int copy_arguments(const char *kpath, const char **kargs, const char **kenv, ptr_t *addrp) {
 	process_args_t *uargs;
 	int argc, envc;
 	size_t size;
@@ -225,8 +285,8 @@ static int process_copy_args(const char *kpath, const char **kargs, const char *
 	strcpy(uargs->path, kpath);
 
 	/* Copy actual data for the arrays. */
-	addr += process_copy_args_data(uargs->args, kargs, argc, addr);
-	addr += process_copy_args_data(uargs->env, kenv, envc, addr);
+	addr += copy_argument_strings(uargs->args, kargs, argc, addr);
+	addr += copy_argument_strings(uargs->env, kenv, envc, addr);
 	return 0;
 }
 
@@ -256,7 +316,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 	}
 
 	/* Copy arguments to the process' address space. */
-	if((ret = process_copy_args(info->path, info->args, info->environ, &uargs)) != 0) {
+	if((ret = copy_arguments(info->path, info->args, info->environ, &uargs)) != 0) {
 		goto fail;
 	}
 
@@ -348,27 +408,26 @@ void process_detach(thread_t *thread) {
 	}
 }
 
-/** Lookup a process.
- *
- * Looks for a process with the specified ID in the process tree.
- *
+/** Look up a process without taking the tree lock.
+ * @note		This function should only be used within KDBG. Use
+ *			process_lookup() outside of KDBG.
  * @param id		ID of the process to find.
- *
- * @return		Pointer to process found, or NULL if not found.
- */
-process_t *process_lookup(identifier_t id) {
-	process_t *process;
+ * @return		Pointer to process found, or NULL if not found. */
+process_t *process_lookup_unsafe(process_id_t id) {
+	return avl_tree_lookup(&process_tree, (key_t)id);
+}
 
-	/* Small hack so that KDBG functions can use this. */
-	if(atomic_get(&kdbg_running)) {
-		process = avl_tree_lookup(&process_tree, (key_t)id);
-	} else {
-		mutex_lock(&process_tree_lock);
-		process = avl_tree_lookup(&process_tree, (key_t)id);
-		mutex_unlock(&process_tree_lock);
-	}
+/** Look up a process.
+ * @param id		ID of the process to find.
+ * @return		Pointer to process found, or NULL if not found. */
+process_t *process_lookup(process_id_t id) {
+	process_t *ret;
 
-	return process;
+	rwlock_read_lock(&process_tree_lock);
+	ret = process_lookup_unsafe(id);
+	rwlock_unlock(&process_tree_lock);
+
+	return ret;
 }
 
 /** Execute a new process.
@@ -505,59 +564,6 @@ void __init_text process_init(void) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
-#if 0
-/** Signal that a process is being waited for.
- * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int process_handle_wait(handle_wait_t *wait) {
-	process_t *process = wait->info->data;
-
-	switch(wait->event) {
-	case PROCESS_EVENT_DEATH:
-		mutex_lock(&process->lock);
-		if(process->state == PROCESS_DEAD) {
-			wait->cb(wait);
-		} else {
-			notifier_register(&process->death_notifier, handle_wait_notifier, wait);
-		}
-		mutex_unlock(&process->lock);
-		return 0;
-	default:
-		return -ERR_PARAM_INVAL;
-	}
-}
-
-/** Stop waiting for a process.
- * @param wait		Wait information structure. */
-static void process_handle_unwait(handle_wait_t *wait) {
-	process_t *process = wait->info->data;
-
-	switch(wait->event) {
-	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, handle_wait_notifier, wait);
-		break;
-	}
-}
-
-/** Closes a handle to a process.
- * @param info		Handle information structure.
- * @return		0 on success, negative error code on failure. */
-static int process_handle_close(handle_info_t *info) {
-	process_t *process = info->data;
-
-	if(refcount_dec(&process->count) == 0) {
-		process_destroy(process);
-	}
-	return 0;
-}
-
-/** Process handle operations. */
-static handle_type_t process_handle_type = {
-	.id = HANDLE_TYPE_PROCESS,
-	.wait = process_handle_wait,
-	.unwait = process_handle_unwait,
-	.close = process_handle_close,
-};
 
 /** Helper to copy information from userspace.
  * @param path		Path to copy.
@@ -628,8 +634,9 @@ static void sys_process_arg_free(const char *path, const char **args, const char
 handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags) {
 	process_create_info_t info;
 	process_t *process = NULL;
+	object_handle_t *handle;
 	thread_t *thread = NULL;
-	handle_t handle = -1;
+	handle_t hid = -1;
 	int ret;
 
 	if((ret = sys_process_arg_copy(path, args, environ, &info.path, &info.args, &info.environ)) != 0) {
@@ -645,11 +652,14 @@ handle_t sys_process_create(const char *path, const char *const args[], const ch
 	 * until after the process has begun running, because it could fail and
 	 * leave the new process running, but make the caller think it isn't
 	 * running. */
-	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
-		ret = (int)handle;
+	refcount_inc(&process->count);
+	handle = object_handle_create(&process->obj, NULL);
+	hid = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
+	if(hid < 0) {
+		ret = (int)hid;
 		goto fail;
 	}
-	refcount_inc(&process->count);
 
 	/* Fill in the information structure to pass information into the main
 	 * thread of the new process. */
@@ -668,11 +678,11 @@ handle_t sys_process_create(const char *path, const char *const args[], const ch
 	}
 
 	sys_process_arg_free(info.path, info.args, info.environ);
-	return handle;
+	return hid;
 fail:
-	if(handle >= 0) {
+	if(hid >= 0) {
 		/* This will handle process destruction. */
-		handle_close(&curr_proc->handles, handle);
+		object_handle_detach(curr_proc, hid);
 	}
 	sys_process_arg_free(info.path, info.args, info.environ);
 	return (handle_t)ret;
@@ -747,7 +757,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 
 	/* Copy arguments to the process' address space. TODO: Better failure
 	 * handling here. */
-	if((ret = process_copy_args(kpath, kargs, kenv, &uargs)) != 0) {
+	if((ret = copy_arguments(kpath, kargs, kenv, &uargs)) != 0) {
 		fatal("Meep, need to handle this (%d)", ret);
 	}
 
@@ -808,35 +818,29 @@ int sys_process_duplicate(handle_t *handlep) {
 }
 
 /** Open a handle to a process.
- *
- * Opens a handle to a process in order to perform other operations on it.
- *
- * @param id		Global ID of the process to open.
- */
-handle_t sys_process_open(identifier_t id) {
+ * @param id		Global ID of the process to open. */
+handle_t sys_process_open(process_id_t id) {
+	object_handle_t *handle;
 	process_t *process;
-	handle_t handle;
+	handle_t ret;
 
-	mutex_lock(&process_tree_lock);
+	rwlock_read_lock(&process_tree_lock);
 
 	if(!(process = avl_tree_lookup(&process_tree, (key_t)id))) {
-		mutex_unlock(&process_tree_lock);
+		rwlock_unlock(&process_tree_lock);
 		return -ERR_NOT_FOUND;
 	} else if(process->state == PROCESS_DEAD || process == kernel_proc) {
-		mutex_unlock(&process_tree_lock);
+		rwlock_unlock(&process_tree_lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	refcount_inc(&process->count);
-	mutex_unlock(&process_tree_lock);
+	rwlock_unlock(&process_tree_lock);
 
-	if((handle = handle_create(&curr_proc->handles, &process_handle_type, process)) < 0) {
-		if(refcount_dec(&process->count) == 0) {
-			process_destroy(process);
-		}
-	}
-
-	return handle;
+	handle = object_handle_create(&process->obj, NULL);
+	ret = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
+	return ret;
 }
 
 /** Get the ID of a process.
@@ -849,17 +853,17 @@ handle_t sys_process_open(identifier_t id) {
  * @return		Process ID on success (greater than or equal to zero),
  *			negative error code on failure.
  */
-identifier_t sys_process_id(handle_t handle) {
-	handle_info_t *info;
+process_id_t sys_process_id(handle_t handle) {
+	object_handle_t *obj;
 	process_t *process;
-	identifier_t id;
+	process_id_t id;
 
 	if(handle == -1) {
 		id = curr_proc->id;
-	} else if(!(id = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_PROCESS, &info))) {
-		process = info->data;
+	} else if(!(id = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &obj))) {
+		process = (process_t *)obj->object;
 		id = process->id;
-		handle_release(info);
+		object_handle_release(obj);
 	}
 
 	return id;
@@ -876,4 +880,3 @@ identifier_t sys_process_id(handle_t handle) {
 void sys_process_exit(int status) {
 	process_exit(status);
 }
-#endif

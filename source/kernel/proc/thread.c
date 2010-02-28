@@ -522,7 +522,7 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		/* Find the process ID. */
 		if(kdbg_parse_expression(argv[1], &pid, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
-		} else if(!(process = process_lookup(pid))) {
+		} else if(!(process = process_lookup_unsafe(pid))) {
 			kprintf(LOG_NONE, "Invalid process ID.\n");
 			return KDBG_FAIL;
 		}

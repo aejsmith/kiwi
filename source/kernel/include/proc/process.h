@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -46,8 +46,10 @@ typedef struct process_args {
 
 /** Structure containing details about a process. */
 typedef struct process {
+	object_t obj;			/**< Kernel object header. */
+
 	mutex_t lock;			/**< Lock to protect data in structure. */
-	identifier_t id;		/**< ID of the process. */
+	process_id_t id;		/**< ID of the process. */
 	char *name;			/**< Name of the process. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
@@ -76,7 +78,7 @@ typedef struct process {
 #define PROCESS_CREATE_INHERIT	(1<<0)	/**< Inherit inheritable handles. */
 
 /** Process handle events. */
-#define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
+#define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
 /** Macro that expands to a pointer to the current process. */
 #define curr_proc		(curr_thread->owner)
@@ -86,7 +88,8 @@ extern process_t *kernel_proc;
 extern void process_attach(process_t *process, thread_t *thread);
 extern void process_detach(thread_t *thread);
 
-extern process_t *process_lookup(identifier_t id);
+extern process_t *process_lookup_unsafe(process_id_t id);
+extern process_t *process_lookup(process_id_t id);
 extern int process_create(const char **args, const char **environ, int flags, int cflags,
                           int priority, process_t *parent, process_t **procp);
 extern void process_exit(int status) __noreturn;
@@ -98,10 +101,8 @@ extern void process_init(void);
 extern handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags);
 extern int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags);
 extern int sys_process_duplicate(handle_t *handlep);
-extern handle_t sys_process_open(identifier_t id);
-extern identifier_t sys_process_id(handle_t handle);
-extern identifier_t sys_process_sid(handle_t handle);
-extern identifier_t sys_process_setsid(void);
+extern handle_t sys_process_open(process_id_t id);
+extern process_id_t sys_process_id(handle_t handle);
 extern void sys_process_exit(int status);
 
 #endif /* __PROC_PROCESS_H */

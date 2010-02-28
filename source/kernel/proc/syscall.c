@@ -60,11 +60,11 @@ static int sys_putch(char ch) {
 static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_putch,
 	(syscall_handler_t)sys_module_load,
-#if 0
+	(syscall_handler_t)sys_object_type,
+	(syscall_handler_t)sys_object_wait,
+	(syscall_handler_t)sys_object_wait_multiple,
 	(syscall_handler_t)sys_handle_close,
-	(syscall_handler_t)sys_handle_type,
-	(syscall_handler_t)sys_handle_wait,
-	(syscall_handler_t)sys_handle_wait_multiple,
+#if 0
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,
