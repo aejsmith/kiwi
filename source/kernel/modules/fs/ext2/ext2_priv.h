@@ -267,7 +267,7 @@ typedef struct ext2_mount {
 	ext2_superblock_t sb;			/**< Superblock of the filesystem. */
 	ext2_group_desc_t *group_tbl;		/**< Pointer to block group descriptor table. */
 	vfs_mount_t *parent;			/**< Pointer to mount structure. */
-	device_t *device;			/**< Pointer to backing device. */
+	object_handle_t *device;		/**< Handle to backing device. */
 
 	uint32_t inodes_per_group;		/**< Inodes per group. */
 	uint32_t inodes_count;			/**< Inodes count. */

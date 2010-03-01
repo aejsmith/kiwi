@@ -30,8 +30,8 @@
 #include <sync/mutex.h>
 
 #include <limits.h>
+#include <object.h>
 
-struct device;
 struct kernel_args;
 struct vfs_info;
 struct vfs_mount;
@@ -55,10 +55,10 @@ typedef struct vfs_type {
 	 * @note		If a filesystem type does not provide this
 	 *			function, then it is assumed that the FS does
 	 *			not use a backing device (e.g. RamFS).
-	 * @param device	Device to check.
+	 * @param handle	Handle to device to check.
 	 * @return		True if the device contains a FS of this type,
 	 *			false if not. */
-	bool (*probe)(struct device *device);
+	bool (*probe)(object_handle_t *device);
 
 	/** Mount an instance of this filesystem type.
 	 * @note		It is guaranteed that the device will contain
@@ -238,7 +238,7 @@ typedef struct vfs_mount {
 	identifier_t id;		/**< Mount ID. */
 	vfs_type_t *type;		/**< Filesystem type. */
 	void *data;			/**< Filesystem type data. */
-	struct device *device;		/**< Device that the filesystem resides on. */
+	object_handle_t *device;	/**< Handle to device that the filesystem resides on. */
 	int flags;			/**< Flags for the mount. */
 
 	struct vfs_node *root;		/**< Root node for the mount. */

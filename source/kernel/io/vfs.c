@@ -112,13 +112,11 @@ static vfs_type_t *vfs_type_lookup(const char *name) {
 }
 
 /** Determine which filesystem type a device contains.
- * @param device	Device to probe.
+ * @param handle	Handle to device to probe.
  * @return		Pointer to type structure, or NULL if filesystem type
  *			not recognized. If found, type will be referenced. */
-static vfs_type_t *vfs_type_probe(device_t *device) {
+static vfs_type_t *vfs_type_probe(object_handle_t *handle) {
 	vfs_type_t *type;
-
-	assert(device);
 
 	mutex_lock(&vfs_type_list_lock);
 
@@ -127,7 +125,7 @@ static vfs_type_t *vfs_type_probe(device_t *device) {
 
 		if(!type->probe) {
 			continue;
-		} else if(type->probe(device)) {
+		} else if(type->probe(handle)) {
 			refcount_inc(&type->count);
 			mutex_unlock(&vfs_type_list_lock);
 			return type;
@@ -1892,6 +1890,7 @@ static vfs_mount_t *vfs_mount_lookup(identifier_t id) {
 int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	vfs_mount_t *mount = NULL;
 	vfs_node_t *node = NULL;
+	device_t *device;
 	int ret;
 
 	if(!path || (!dev && !type)) {
@@ -1940,7 +1939,13 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 
 	/* Look up the device, if any. */
 	if(dev) {
-		if((ret = device_get(dev, &mount->device)) != 0) {
+		if((ret = device_lookup(dev, &device)) != 0) {
+			goto fail;
+		}
+
+		ret = device_open(device, &mount->device);
+		device_release(device);
+		if(ret != 0) {
 			goto fail;
 		}
 	}
@@ -1962,10 +1967,10 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		 * device contains the FS type. */
 		if(!mount->type->probe) {
 			if(mount->device) {
-				device_release(mount->device);
+				object_handle_release(mount->device);
 				mount->device = NULL;
 			}
-		} else if(!dev) {
+		} else if(!mount->device) {
 			ret = -ERR_PARAM_INVAL;
 			goto fail;
 		} else if(!mount->type->probe(mount->device)) {
@@ -2028,7 +2033,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 fail:
 	if(mount) {
 		if(mount->device) {
-			device_release(mount->device);
+			object_handle_release(mount->device);
 		}
 		if(mount->root) {
 			slab_cache_free(vfs_node_cache, mount->root);
@@ -2125,7 +2130,7 @@ int vfs_unmount(const char *path) {
 		mount->type->unmount(mount);
 	}
 	if(mount->device) {
-		device_release(mount->device);
+		object_handle_release(mount->device);
 	}
 	refcount_dec(&mount->type->count);
 

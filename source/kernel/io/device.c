@@ -106,24 +106,31 @@ static vm_object_ops_t device_vm_object_ops = {
 static int device_object_wait(object_wait_t *wait) {
 	device_t *device = (device_t *)wait->handle->object;
 
-	if(!device->ops->wait || !device->ops->unwait) {
+	if(device->ops && (!device->ops->wait || !device->ops->unwait)) {
 		return -ERR_NOT_IMPLEMENTED;
 	}
 
-	return device->ops->wait(device, wait);
+	return device->ops->wait(device, wait->handle->data, wait);
 }
 
 /** Stop waiting for a device.
  * @param wait		Wait information structure. */
 static void device_object_unwait(object_wait_t *wait) {
 	device_t *device = (device_t *)wait->handle->object;
-	return device->ops->unwait(device, wait);
+	assert(device->ops);
+	return device->ops->unwait(device, wait->handle->data, wait);
 }
 
 /** Closes a handle to a device.
  * @param handle	Handle to the device. */
 static void device_object_close(object_handle_t *handle) {
-	device_release((device_t *)handle->object);
+	device_t *device = (device_t *)handle->object;
+
+	if(device->ops && device->ops->close) {
+		device->ops->close(device, handle->data);
+	}
+
+	device_release(device);
 }
 
 /** Device object type structure. */
@@ -383,10 +390,9 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
  * @param path		Path to device.
  * @param devicep	Where to store pointer to device structure.
  */
-int device_get(const char *path, device_t **devicep) {
+int device_lookup(const char *path, device_t **devicep) {
 	device_t *device = device_tree_root, *child;
 	char *dup, *orig, *tok;
-	int ret;
 
 	if(!path || !path[0] || path[0] != '/' || !devicep) {
 		return -ERR_PARAM_INVAL;
@@ -414,121 +420,9 @@ int device_get(const char *path, device_t **devicep) {
 	}
 
 	refcount_inc(&device->count);
-
-	if(device->ops && device->ops->get && (ret = device->ops->get(device)) != 0) {
-		refcount_dec(&device->count);
-		return ret;
-	}
-
 	mutex_unlock(&device->lock);
 	*devicep = device;
 	return 0;
-}
-
-/** Read from a device.
- *
- * Reads data from a device into a buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param device	Device to read from.
- * @param buf		Buffer to read into.
- * @param count		Number of bytes to read.
- * @param offset	Offset in the device to read from (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read.
- *
- * @return		0 on success, negative error code on failure.
- */
-int device_read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	size_t bytes;
-	int ret;
-
-	if(!device || !buf || offset < 0) {
-		return -ERR_PARAM_INVAL;
-	} else if(!device->ops || !device->ops->read) {
-		return -ERR_NOT_SUPPORTED;
-	} else if(!count) {
-		if(bytesp) {
-			*bytesp = 0;
-		}
-		return 0;
-	}
-
-	assert(refcount_get(&device->count));
-
-	ret = device->ops->read(device, buf, count, offset, &bytes);
-	if(bytesp) {
-		*bytesp = bytes;
-	}
-	return ret;
-}
-
-/** Write to a device.
- *
- * Writes data to a device from buffer. The device may not support the
- * operation - it is provided as a function rather than a request type because
- * it is supported by multiple device types.
- *
- * @param device	Device to write to.
- * @param buf		Buffer containing data to write.
- * @param count		Number of bytes to write.
- * @param offset	Offset in the device to write to (only valid for
- *			certain device types).
- * @param bytesp	Where to store number of bytes read.
- *
- * @return		0 on success, negative error code on failure.
- */
-int device_write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	size_t bytes;
-	int ret;
-
-	if(!device || !buf || offset < 0) {
-		return -ERR_PARAM_INVAL;
-	} else if(!device->ops || !device->ops->write) {
-		return -ERR_NOT_SUPPORTED;
-	} else if(!count) {
-		if(bytesp) {
-			*bytesp = 0;
-		}
-		return 0;
-	}
-
-	assert(refcount_get(&device->count));
-
-	ret = device->ops->write(device, buf, count, offset, &bytes);
-	if(bytesp) {
-		*bytesp = bytes;
-	}
-	return ret;
-}
-
-/** Perform a device-specific operation.
- *
- * Performs an operation that is specific to a device/device type.
- *
- * @param device	Device to perform operation on.
- * @param request	Operation number to perform.
- * @param in		Optional input buffer containing data to pass to the
- *			operation handler.
- * @param insz		Size of input buffer.
- * @param outp		Where to store pointer to data returned by the
- *			operation handler (optional).
- * @param outszp	Where to store size of data returned.
- *
- * @return		Positive value on success, negative error code on
- *			failure.
- */
-int device_request(device_t *device, int request, void *in, size_t insz, void **outp, size_t *outszp) {
-	if(!device) {
-		return -ERR_PARAM_INVAL;
-	} else if(!device->ops || !device->ops->request) {
-		return -ERR_NOT_SUPPORTED;
-	}
-
-	assert(refcount_get(&device->count));
-
-	return device->ops->request(device, request, in, insz, outp, outszp);
 }
 
 /** Get a device attribute.
@@ -545,6 +439,9 @@ int device_request(device_t *device, int request, void *in, size_t insz, void **
 device_attr_t *device_attr(device_t *device, const char *name, int type) {
 	size_t i;
 
+	assert(device);
+	assert(name);
+
 	for(i = 0; i < device->attr_count; i++) {
 		if(strcmp(device->attrs[i].name, name) == 0) {
 			if(type != -1 && (int)device->attrs[i].type != type) {
@@ -560,19 +457,143 @@ device_attr_t *device_attr(device_t *device, const char *name, int type) {
 /** Release a device.
  *
  * Signal that a device is no longer required. This should be called once a
- * device obtained via device_get() is not needed any more.
+ * device obtained via device_lookup() is not needed any more.
  *
  * @param device	Device to release.
  */
 void device_release(device_t *device) {
+	refcount_dec(&device->count);
+}
+
+/** Create a handle to a device.
+ * @param device	Device to create handle to.
+ * @param handlep	Where to store pointer to handle structure.
+ * @return		0 on success, negative error code on failure. */
+int device_open(device_t *device, object_handle_t **handlep) {
+	void *data;
+	int ret;
+
+	assert(device);
+	assert(handlep);
+
 	mutex_lock(&device->lock);
 
-	if(device->ops && device->ops->release) {
-		device->ops->release(device);
+	if(device->ops && device->ops->open && (ret = device->ops->open(device, &data)) != 0) {
+		mutex_unlock(&device->lock);
+		return ret;
 	}
 
-	refcount_dec(&device->count);
+	*handlep = object_handle_create(&device->obj, data);
 	mutex_unlock(&device->lock);
+	return 0;
+}
+
+/** Read from a device.
+ *
+ * Reads data from a device into a buffer. The device may not support the
+ * operation - it is provided as a function rather than a request type because
+ * it is supported by multiple device types.
+ *
+ * @param handle	Handle to device to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset in the device to read from (only valid for
+ *			certain device types).
+ * @param bytesp	Where to store number of bytes read.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	device_t *device;
+	size_t bytes;
+	int ret;
+
+	assert(handle);
+	assert(buf);
+
+	device = (device_t *)handle->object;
+	if(offset < 0) {
+		return -ERR_PARAM_INVAL;
+	} else if(!device->ops || !device->ops->read) {
+		return -ERR_NOT_SUPPORTED;
+	} else if(!count) {
+		if(bytesp) {
+			*bytesp = 0;
+		}
+		return 0;
+	}
+
+	ret = device->ops->read(device, handle->data, buf, count, offset, &bytes);
+	if(bytesp) {
+		*bytesp = bytes;
+	}
+	return ret;
+}
+
+/** Write to a device.
+ *
+ * Writes data to a device from buffer. The device may not support the
+ * operation - it is provided as a function rather than a request type because
+ * it is supported by multiple device types.
+ *
+ * @param handle	Handle to device to write to.
+ * @param buf		Buffer containing data to write.
+ * @param count		Number of bytes to write.
+ * @param offset	Offset in the device to write to (only valid for
+ *			certain device types).
+ * @param bytesp	Where to store number of bytes read.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int device_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	device_t *device;
+	size_t bytes;
+	int ret;
+
+	assert(handle);
+	assert(buf);
+
+	device = (device_t *)handle->object;
+	if(offset < 0) {
+		return -ERR_PARAM_INVAL;
+	} else if(!device->ops || !device->ops->write) {
+		return -ERR_NOT_SUPPORTED;
+	} else if(!count) {
+		if(bytesp) {
+			*bytesp = 0;
+		}
+		return 0;
+	}
+
+	ret = device->ops->write(device, handle->data, buf, count, offset, &bytes);
+	if(bytesp) {
+		*bytesp = bytes;
+	}
+	return ret;
+}
+
+/** Perform a device-specific operation.
+ * @param handle	Handle to device to perform operation on.
+ * @param request	Operation number to perform.
+ * @param in		Optional input buffer containing data to pass to the
+ *			operation handler.
+ * @param insz		Size of input buffer.
+ * @param outp		Where to store pointer to data returned by the
+ *			operation handler (optional).
+ * @param outszp	Where to store size of data returned.
+ * @return		Positive value on success, negative error code on
+ *			failure. */
+int device_request(object_handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+	device_t *device;
+
+	assert(handle);
+
+	device = (device_t *)handle->object;
+	if(!device->ops || !device->ops->request) {
+		return -ERR_NOT_SUPPORTED;
+	}
+
+	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
 }
 
 /** Print out a device's children.
@@ -596,14 +617,9 @@ static void device_dump_children(radix_tree_t *tree, int indent) {
 }
 
 /** Print out device information.
- *
- * Prints out information about devices.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		Always returns KDBG_OK.
- */
+ * @return		Always returns KDBG_OK. */
 int kdbg_cmd_device(int argc, char **argv) {
 	device_t *device;
 	unative_t val;

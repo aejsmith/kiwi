@@ -56,15 +56,15 @@ void ext2_mount_flush(ext2_mount_t *mount) {
 }
 
 /** Check whether a device contains an Ext2 filesystem.
- * @param device	Device to check.
+ * @param handle	Handle to device to check.
  * @return		Whether if the device contains an Ext2 FS. */
-static bool ext2_probe(device_t *device) {
+static bool ext2_probe(object_handle_t *handle) {
 	ext2_superblock_t *sb = kmalloc(sizeof(ext2_superblock_t), MM_SLEEP);
 	uint32_t revision;
 	bool found = true;
 	size_t bytes;
 
-	if(device_read(device, sb, sizeof(ext2_superblock_t), 1024, &bytes) != 0) {
+	if(device_read(handle, sb, sizeof(ext2_superblock_t), 1024, &bytes) != 0) {
 		found = false;
 	} else if(bytes != sizeof(ext2_superblock_t) || le16_to_cpu(sb->s_magic) != EXT2_MAGIC) {
 		found = false;
@@ -72,8 +72,8 @@ static bool ext2_probe(device_t *device) {
 
 	revision = le32_to_cpu(sb->s_rev_level);
 	if(revision != EXT2_GOOD_OLD_REV && revision != EXT2_DYNAMIC_REV) {
-		dprintf("ext2: device %p(%s) has unknown revision %" PRIu32 "\n", device,
-		        device->name, revision);
+		dprintf("ext2: device %s has unknown revision %" PRIu32 "\n",
+		        device_name(handle), revision);
 		found = false;
 	}
 
@@ -114,7 +114,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	/* Print a warning if the FS is not clean and mount it read-only. */
 	if(le16_to_cpu(mount->sb.s_state) != EXT2_VALID_FS) {
 		kprintf(LOG_WARN, "ext2: warning: %s not cleanly unmounted/damaged, mounting read only\n",
-		        mount->device->name);
+		        device_name(mount->device));
 		_mount->flags |= VFS_MOUNT_RDONLY;
 	}
 
@@ -134,7 +134,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	mount->group_tbl_off = mount->blk_size * (le32_to_cpu(mount->sb.s_first_data_block) + 1);
 	mount->group_tbl_size = ROUND_UP(mount->blk_groups * sizeof(ext2_group_desc_t), mount->blk_size);
 
-	dprintf("ext2: mounting ext2 filesystem from device %p(%s)...\n", mount->device, mount->device->name);
+	dprintf("ext2: mounting ext2 filesystem from device %s...\n", device_name(mount->device));
 	dprintf(" rev_level:  %u\n", le32_to_cpu(mount->sb.s_rev_level));
 	dprintf(" blk_size:   %u\n", mount->blk_size);
 	dprintf(" blk_groups: %u\n", mount->blk_groups);
@@ -175,8 +175,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 		goto fail;
 	}
 
-	dprintf("ext2: mounted device %p(%s) mounted (mount: %p)\n", mount->device,
-		mount->device->name, mount);
+	dprintf("ext2: mounted device %s (data: %p)\n", device_name(mount->device), mount);
 	return 0;
 fail:
 	if(mount->group_tbl) {
