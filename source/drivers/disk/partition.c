@@ -27,12 +27,14 @@
 
 /** Read from a partition device.
  * @param device	Device to read from.
+ * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset to write to.
  * @param bytesp	Where to store number of bytes read.
  * @return		0 on success, negative error code on failure. */
-static int partition_device_read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+static int partition_device_read(device_t *device, void *data, void *buf, size_t count,
+                                 offset_t offset, size_t *bytesp) {
 	partition_t *part = device->data;
 	disk_device_t *disk = part->parent;
 
@@ -46,12 +48,14 @@ static int partition_device_read(device_t *device, void *buf, size_t count, offs
 
 /** Write to a device.
  * @param device	Device to write to.
+ * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer containing data to write.
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to.
  * @param bytesp	Where to store number of bytes written.
  * @return		0 on success, negative error code on failure. */
-static int partition_device_write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+static int partition_device_write(device_t *device, void *data, const void *buf, size_t count,
+                                  offset_t offset, size_t *bytesp) {
 	partition_t *part = device->data;
 	disk_device_t *disk = part->parent;
 

@@ -38,23 +38,27 @@ static atomic_t disk_next_id = 0;
 
 /** Read from a disk device.
  * @param device	Device to read from.
+ * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset to read from.
  * @param bytesp	Where to store number of bytes read.
  * @return		0 on success, negative error code on failure. */
-static int disk_device__read(device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+static int disk_device__read(device_t *device, void *data, void *buf, size_t count,
+                             offset_t offset, size_t *bytesp) {
 	return disk_device_read(device->data, buf, count, offset, bytesp);
 }
 
 /** Write to a disk device.
  * @param device	Device to write to.
+ * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer to write from.
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to.
  * @param bytesp	Where to store number of bytes written.
  * @return		0 on success, negative error code on failure. */
-static int disk_device__write(device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+static int disk_device__write(device_t *device, void *data, const void *buf, size_t count,
+                              offset_t offset, size_t *bytesp) {
 	return disk_device_write(device->data, buf, count, offset, bytesp);
 }
 

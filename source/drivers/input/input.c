@@ -119,8 +119,9 @@ static input_type_t input_mouse_type = {
 
 /** Open an input device.
  * @param _dev		Device being opened.
+ * @param datap		Where to store handle-specific data pointer (unused).
  * @return		0 on success, negative error code on failure. */
-static int input_device_get(device_t *_dev) {
+static int input_device_open(device_t *_dev, void **datap) {
 	input_device_t *device = _dev->data;
 
 	if(!atomic_cmp_set(&device->open, 0, 1)) {
@@ -132,8 +133,9 @@ static int input_device_get(device_t *_dev) {
 
 /** Close an input device.
  * @param _dev		Device being closed.
+ * @param data		Handle-specific data pointer (unused).
  * @return		0 on success, negative error code on failure. */
-static void input_device_release(device_t *_dev) {
+static void input_device_close(device_t *_dev, void *data) {
 	input_device_t *device = _dev->data;
 	int old;
 
@@ -143,12 +145,14 @@ static void input_device_release(device_t *_dev) {
 
 /** Read from an input device.
  * @param _dev		Device to read from.
+ * @param data		Handle-specific data pointer (unused).
  * @param _buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset to write to (ignored).
  * @param bytesp	Where to store number of bytes read.
  * @return		0 on success, negative error code on failure. */
-static int input_device_read(device_t *_dev, void *_buf, size_t count, offset_t offset, size_t *bytesp) {
+static int input_device_read(device_t *_dev, void *data, void *_buf, size_t count,
+                             offset_t offset, size_t *bytesp) {
 	input_device_t *device = _dev->data;
 	char *buf = _buf;
 	int ret = 0;
@@ -177,17 +181,18 @@ static int input_device_read(device_t *_dev, void *_buf, size_t count, offset_t 
 
 /** Signal that an input device event is being waited for.
  * @param _dev		Device to wait for.
+ * @param data		Handle-specific data pointer (unused).
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
-static int input_device_wait(device_t *_dev, handle_wait_t *wait) {
+static int input_device_wait(device_t *_dev, void *data, object_wait_t *wait) {
 	input_device_t *device = _dev->data;
 
 	switch(wait->event) {
-	case HANDLE_EVENT_READ:
+	case DEVICE_EVENT_READABLE:
 		if(semaphore_count(&device->sem)) {
-			wait->cb(wait);
+			object_wait_callback(wait);
 		} else {
-			notifier_register(&device->data_notifier, handle_wait_notifier, wait);
+			notifier_register(&device->data_notifier, object_wait_notifier, wait);
 		}
 		return 0;
 	default:
@@ -197,19 +202,21 @@ static int input_device_wait(device_t *_dev, handle_wait_t *wait) {
 
 /** Stop waiting for an input device event.
  * @param _dev		Device to stop waiting for.
+ * @param data		Handle-specific data pointer (unused).
  * @param wait		Wait information structure. */
-static void input_device_unwait(device_t *_dev, handle_wait_t *wait) {
+static void input_device_unwait(device_t *_dev, void *data, object_wait_t *wait) {
 	input_device_t *device = _dev->data;
 
 	switch(wait->event) {
-	case HANDLE_EVENT_READ:
-		notifier_unregister(&device->data_notifier, handle_wait_notifier, wait);
+	case DEVICE_EVENT_READABLE:
+		notifier_unregister(&device->data_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
 
 /** Handler for input device requests.
  * @param _dev		Device request is being made on.
+ * @param data		Handle-specific data pointer (unused).
  * @param request	Request number.
  * @param in		Input buffer.
  * @param insz		Input buffer size.
@@ -217,16 +224,16 @@ static void input_device_unwait(device_t *_dev, handle_wait_t *wait) {
  * @param outszp	Where to store output buffer size.
  * @return		Positive value on success, negative error code on
  *			failure. */
-static int input_device_request(device_t *_dev, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+static int input_device_request(device_t *_dev, void *data, int request, void *in,
+                                size_t insz, void **outp, size_t *outszp) {
 	input_device_t *device = _dev->data;
-
 	return device->type->request(device, request, in, insz, outp, outszp);
 }
 
 /** Input device operations. */
 static device_ops_t input_device_ops = {
-	.get = input_device_get,
-	.release = input_device_release,
+	.open = input_device_open,
+	.close = input_device_close,
 	.read = input_device_read,
 	.wait = input_device_wait,
 	.unwait = input_device_unwait,

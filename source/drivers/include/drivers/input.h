@@ -73,7 +73,8 @@ typedef struct input_kb_ops {
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Positive value on success, negative error code
 	 *			on failure. */
-	int (*request)(struct input_device *device, int request, void *in, size_t insz, void **outp, size_t *outszp);
+	int (*request)(struct input_device *device, int request, void *in, size_t insz,
+	               void **outp, size_t *outszp);
 
 	/** Set LED state.
 	 * @param device	Device to set state of.
@@ -95,7 +96,8 @@ typedef struct input_mouse_ops {
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Positive value on success, negative error code
 	 *			on failure. */
-	int (*request)(struct input_device *device, int request, void *in, size_t insz, void **outp, size_t *outszp);
+	int (*request)(struct input_device *device, int request, void *in, size_t insz,
+	               void **outp, size_t *outszp);
 } input_mouse_ops_t;
 
 /** Input device structure. */

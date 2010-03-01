@@ -39,7 +39,8 @@ typedef struct disk_ops {
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Positive value on success, negative error code
 	 *			on failure. */
-	int (*request)(struct disk_device *device, int request, void *in, size_t insz, void **outp, size_t *outszp);
+	int (*request)(struct disk_device *device, int request, void *in, size_t insz,
+	               void **outp, size_t *outszp);
 
 	/** Read a block from the device.
 	 * @param device	Device to read from.

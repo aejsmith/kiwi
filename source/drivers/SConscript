@@ -14,11 +14,11 @@
 Import('envmgr')
 
 subdirs = [
-	#'bus',
+	'bus',
 	#'console',
-	#'disk',
+	'disk',
 	#'display',
-	#'input',
+	'input',
 ]
 
 # Get environment and add driver include directory.
