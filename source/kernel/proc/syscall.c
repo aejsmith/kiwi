@@ -34,7 +34,7 @@
 #include <proc/process.h>
 #include <proc/syscall.h>
 
-#include <sync/mutex.h>
+#include <sync/rwlock.h>
 
 #include <console.h>
 #include <errors.h>
@@ -46,7 +46,7 @@
 /** Array of system call services. */
 static syscall_service_t **syscall_services = NULL;
 static size_t syscall_service_max = 0;
-static MUTEX_DECLARE(syscall_services_lock, 0);
+static RWLOCK_DECLARE(syscall_services_lock);
 
 /** Print a character to the screen.
  * @param ch		Character to print.
@@ -151,12 +151,12 @@ unative_t syscall_handler(syscall_frame_t *frame) {
 		 * array lock for kernel system calls. */
 		service = &kernel_syscall_service;
 	} else {
-		mutex_lock(&syscall_services_lock);
+		rwlock_read_lock(&syscall_services_lock);
 		if(num > syscall_service_max || !(service = syscall_services[num])) {
-			mutex_unlock(&syscall_services_lock);
+			rwlock_unlock(&syscall_services_lock);
 			return -ERR_SYSCALL_INVAL;
 		}
-		mutex_unlock(&syscall_services_lock);
+		rwlock_unlock(&syscall_services_lock);
 	}
 
 	/* Get the call number. */
@@ -185,7 +185,7 @@ unative_t syscall_handler(syscall_frame_t *frame) {
  * @param service	Service structure describing the service.
  * @return		0 on success, negative error code on failure. */
 int syscall_service_register(uint16_t num, syscall_service_t *service) {
-	mutex_lock(&syscall_services_lock);
+	rwlock_write_lock(&syscall_services_lock);
 
 	/* Resize the table if necessary. */
 	if(num > syscall_service_max || !syscall_services) {
@@ -194,12 +194,12 @@ int syscall_service_register(uint16_t num, syscall_service_t *service) {
 
 		syscall_service_max = num;
 	} else if(syscall_services[num] != NULL) {
-		mutex_unlock(&syscall_services_lock);
+		rwlock_unlock(&syscall_services_lock);
 		return -ERR_ALREADY_EXISTS;
 	}
 
 	syscall_services[num] = service;
 	kprintf(LOG_NORMAL, "syscall: registered system call service %" PRIu16 "\n", num);
-	mutex_unlock(&syscall_services_lock);
+	rwlock_unlock(&syscall_services_lock);
 	return 0;
 }
