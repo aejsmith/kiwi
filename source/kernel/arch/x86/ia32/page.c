@@ -508,7 +508,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	}
 
 	if(paging_inited) {
-		if(addr < KERNEL_PMAP_SIZE) {
+		if(addr < KERNEL_PMAP_SIZE && (addr + size) <= KERNEL_PMAP_SIZE) {
 			return (void *)((ptr_t)addr + KERNEL_PMAP_BASE);
 		} else {
 			/* Work out the page that the address starts on and the
@@ -525,6 +525,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	} else {
 		/* During boot there is a 1GB identity mapping. */
 		assert(addr < 0x40000000);
+		assert((addr + size) <= 0x40000000);
 		return (void *)((ptr_t)addr);
 	}
 }
