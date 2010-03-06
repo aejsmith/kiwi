@@ -509,6 +509,7 @@ int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offse
 	int ret;
 
 	assert(handle);
+	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
 	assert(buf);
 
 	device = (device_t *)handle->object;
@@ -551,6 +552,7 @@ int device_write(object_handle_t *handle, const void *buf, size_t count, offset_
 	int ret;
 
 	assert(handle);
+	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
 	assert(buf);
 
 	device = (device_t *)handle->object;
@@ -587,6 +589,7 @@ int device_request(object_handle_t *handle, int request, void *in, size_t insz, 
 	device_t *device;
 
 	assert(handle);
+	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->request) {
