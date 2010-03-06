@@ -45,7 +45,7 @@ typedef struct device_ops {
 
 	/** Read from a device.
 	 * @param device	Device to read from.
-	 * @param data		Handle specific data pointer.
+	 * @param data		Handle-specific data pointer.
 	 * @param buf		Buffer to read into.
 	 * @param count		Number of bytes to read.
 	 * @param offset	Offset to write to (only valid for certain
@@ -57,7 +57,7 @@ typedef struct device_ops {
 
 	/** Write to a device.
 	 * @param device	Device to write to.
-	 * @param data		Handle specific data pointer.
+	 * @param data		Handle-specific data pointer.
 	 * @param buf		Buffer containing data to write.
 	 * @param count		Number of bytes to write.
 	 * @param offset	Offset to write to (only valid for certain
@@ -72,14 +72,14 @@ typedef struct device_ops {
 	 *			already, this function should call the callback
 	 *			function and return success.
 	 * @param device	Device to wait for.
-	 * @param data		Handle specific data pointer.
+	 * @param data		Handle-specific data pointer.
 	 * @param wait		Wait information structure.
 	 * @return		0 on success, negative error code on failure. */
 	int (*wait)(struct device *device, void *data, object_wait_t *wait);
 
 	/** Stop waiting for a device event.
 	 * @param device	Device to stop waiting for.
-	 * @param data		Handle specific data pointer.
+	 * @param data		Handle-specific data pointer.
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct device *device, void *data, object_wait_t *wait);
 
@@ -87,11 +87,12 @@ typedef struct device_ops {
 	 * @note		If this operation is not specified then the
 	 *			device won't be allowed to be memory-mapped.
 	 * @param device	Device fault occurred on.
+	 * @param data		Handle-specific data pointer.
 	 * @param offset	Offset into device fault occurred at (page
 	 *			aligned).
 	 * @param physp		Where to store address of page to map.
 	 * @return		0 on success, negative error code on failure. */
-	//int (*fault)(struct device *device, offset_t offset, phys_ptr_t *physp);
+	int (*fault)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.

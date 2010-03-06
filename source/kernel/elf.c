@@ -152,7 +152,7 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 		}
 
 		/* Create an anonymous memory region for it. */
-		if((ret = vm_map_anon(binary->as, start, size, flags, NULL)) != 0) {
+		if((ret = vm_map(binary->as, start, size, flags, NULL, 0, NULL)) != 0) {
 			return ret;
 		}
 	}

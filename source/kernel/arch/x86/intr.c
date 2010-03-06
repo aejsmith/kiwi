@@ -96,7 +96,7 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	/* Try the virtual memory manager if the fault occurred at a userspace
 	 * address. */
 	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
-		if(vm_fault(addr, reason, access) == VM_FAULT_HANDLED) {
+		if(vm_fault(addr, reason, access)) {
 			return false;
 		} else if(atomic_get(&curr_thread->in_usermem)) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);

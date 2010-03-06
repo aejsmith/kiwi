@@ -48,9 +48,7 @@ sources = map(File, [
 	'mm/safe.c',
 	'mm/slab.c',
 	'mm/tlb.c',
-	'mm/vm/anon.c',
-	'mm/vm/page.c',
-	'mm/vm/vm.c',
+	'mm/vm.c',
 
 	'proc/process.c',
 	'proc/sched.c',

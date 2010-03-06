@@ -70,8 +70,6 @@ static slab_cache_t *vfs_node_cache;
 /** Pointer to mount at root of the filesystem. */
 vfs_mount_t *vfs_root_mount = NULL;
 
-static vm_object_ops_t vfs_vm_object_ops;
-
 static int vfs_node_free(vfs_node_t *node);
 static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
 static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
@@ -196,22 +194,12 @@ int vfs_type_unregister(vfs_type_t *type) {
 static int vfs_node_cache_ctor(void *obj, void *data, int kmflag) {
 	vfs_node_t *node = (vfs_node_t *)obj;
 
-	vm_object_init(&node->vobj, &vfs_vm_object_ops);
 	list_init(&node->header);
 	mutex_init(&node->lock, "vfs_node_lock", 0);
 	refcount_set(&node->count, 0);
 	avl_tree_init(&node->pages);
 	radix_tree_init(&node->dir_entries);
 	return 0;
-}
-
-/** VFS node object destructor.
- * @param obj		Object to destruct.
- * @param data		Cache data (unused). */
-static void vfs_node_cache_dtor(void *obj, void *data) {
-	vfs_node_t *node = (vfs_node_t *)obj;
-
-	vm_object_destroy(&node->vobj);
 }
 
 /** VFS node reclaim callback.
@@ -1065,7 +1053,7 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 
 	return ret;
 }
-
+#if 0
 /** Increase the reference count of a file VM object.
  * @param obj		Object to reference.
  * @param region	Region referencing the object. */
@@ -1104,7 +1092,7 @@ static vm_object_ops_t vfs_vm_object_ops = {
 	.page_get = vfs_vm_object_page_get,
 	.page_release = vfs_vm_object_page_release,
 };
-
+#endif
 /** Get and map a page from a file's data cache.
  * @param node		Node to get page from.
  * @param offset	Offset of page to get.
@@ -2457,9 +2445,8 @@ void __init_text vfs_mount_root(kernel_args_t *args) {
 /** Initialisation function for the VFS. */
 void __init_text vfs_init(void) {
 	vfs_node_cache = slab_cache_create("vfs_node_cache", sizeof(vfs_node_t), 0,
-	                                   vfs_node_cache_ctor, vfs_node_cache_dtor,
-	                                   vfs_node_cache_reclaim, NULL, 1, NULL,
-	                                   0, MM_FATAL);
+	                                   vfs_node_cache_ctor, NULL, vfs_node_cache_reclaim,
+	                                   NULL, 1, NULL, 0, MM_FATAL);
 }
 #if 0
 /** Create a file in the file system.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -16,6 +16,10 @@
 /**
  * @file
  * @brief		Reference counting functions.
+ *
+ * This file provides a reference count type and functions to modify the type.
+ * The reference count is implemented using an atomic variable, and therefore
+ * is atomic.
  */
 
 #ifndef __LIB_REFCOUNT_H
@@ -35,13 +39,8 @@ typedef atomic_t refcount_t;
 	refcount_t _var = REFCOUNT_INITIALISER(_initial)
 
 /** Increase a reference count.
- *
- * Atomically increases the value of a reference count.
- *
  * @param ref		Reference count to increase.
- *
- * @return		The new value of the count.
- */
+ * @return		The new value of the count. */
 static inline int refcount_inc(refcount_t *ref) {
 	return atomic_inc(ref) + 1;
 }
@@ -87,24 +86,15 @@ static inline int refcount_dec_func(refcount_t *ref, void (*func)(refcount_t *))
 }
 
 /** Get the value of a reference count.
- *
- * Atomically gets the current value of a reference count.
- *
  * @param ref		Reference count to get value of.
- *
- * @return		The value of the count.
- */
+ * @return		The value of the count. */
 static inline int refcount_get(refcount_t *ref) {
 	return atomic_get(ref);
 }
 
 /** Set the value of a reference count.
- *
- * Atomically sets the current value of a reference count to the given value.
- *
  * @param ref		Reference count to set.
- * @param val		Value to set to.
- */
+ * @param val		Value to set to. */
 static inline void refcount_set(refcount_t *ref, int val) {
 	atomic_set(ref, val);
 }

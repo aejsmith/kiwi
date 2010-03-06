@@ -31,6 +31,8 @@
 struct object_handle;
 struct object_wait;
 struct process;
+struct vm_page;
+struct vm_region;
 
 /** Handle type ID definitions. */
 #define OBJECT_TYPE_FILE	1	/**< File. */
@@ -41,11 +43,7 @@ struct process;
 #define OBJECT_TYPE_PORT	6	/**< IPC port. */
 #define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 
-/** Kernel object type structure.
- * @note		The map, unmap, copy, fault, page_get and page_release
- *			operations only need to be implemented by mappable
- *			objects. An object is classed as mappable if either
- *			the fault or page_get operation is implemented. */
+/** Kernel object type structure. */
 typedef struct object_type {
 	int id;				/**< ID number for the type. */
 
@@ -64,6 +62,38 @@ typedef struct object_type {
 	/** Stop waiting for an object.
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct object_wait *wait);
+
+	/** Non-standard fault handling.
+	 * @note		If this operation is specified, it is called
+	 *			on all faults on memory regions using the
+	 *			object rather than using the standard fault
+	 *			handling mechanism. In this case, the page_get
+	 *			operation is not needed.
+	 * @note		When this is called, the main fault handler
+	 *			will have verified that the fault is allowed by
+	 *			the region's access flags.
+	 * @param region	Region fault occurred in.
+	 * @param addr		Virtual address of fault (rounded down to base
+	 *			of page).
+	 * @param reason	Reason for the fault.
+	 * @param access	Type of access that caused the fault.
+	 * @return		Whether succeeded in handling the fault. */
+	bool (*fault)(struct vm_region *region, ptr_t addr, int reason, int access);
+
+	/** Get a page from the object.
+	 * @param handle	Handle to object to get page from.
+	 * @param offset	Offset to get page from (the offset into the
+	 *			region the fault occurred at, plus the offset
+	 *			of the region into the object).
+	 * @param pagep		Where to store pointer to page structure.
+	 * @return		0 on success, negative error code on failure. */
+	int (*page_get)(struct object_handle *handle, offset_t offset, struct vm_page **pagep);
+
+	/** Release a page from the object.
+	 * @param handle	Handle to object to release page in.
+	 * @param offset	Offset of page in object.
+	 * @param paddr		Physical address of page that was unmapped. */
+	void (*page_release)(struct object_handle *handle, offset_t offset, phys_ptr_t paddr);
 } object_type_t;
 
 /** Structure defining a kernel object.
@@ -71,6 +101,7 @@ typedef struct object_type {
  *			another structure for the object. */
 typedef struct object {
 	object_type_t *type;		/**< Type of the object. */
+	int flags;			/**< Flags for the object. */
 	//rwlock_t lock;		/**< Lock protecting the ACL. */
 	//list_t acl;			/**< List of ACL entries. */
 } object_t;
@@ -97,7 +128,10 @@ typedef struct handle_table {
 	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
-extern void object_init(object_t *obj, object_type_t *type);
+/** Object flags. */
+#define OBJECT_MAPPABLE		(1<<0)	/**< Object is mappable (fault or page_get should be implemented). */
+
+extern void object_init(object_t *obj, object_type_t *type, int flags);
 extern void object_destroy(object_t *obj);
 //extern bool object_acl_check(object_t *obj, process_t *proc, uint32_t rights);
 //extern void object_acl_insert(object_t *obj,

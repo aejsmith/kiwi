@@ -46,59 +46,17 @@ device_t *device_tree_root;
 /** Standard device directories. */
 device_t *device_bus_dir;
 
-#if 0
-/** Increase the reference count of a device VM object.
- * @param obj		Object to reference.
- * @param region	Region referencing the object. */
-static void device_vm_object_get(vm_object_t *obj, vm_region_t *region) {
-	device_t *device = (device_t *)obj;
+/** Closes a handle to a device.
+ * @param handle	Handle to the device. */
+static void device_object_close(object_handle_t *handle) {
+	device_t *device = (device_t *)handle->object;
 
-	assert(device->ops && device->ops->fault);
-	refcount_inc(&device->count);
-}
-
-/** Decrease the reference count of a device VM object.
- * @param obj		Object to decrease count of.
- * @param region	Region to detach. */
-static void device_vm_object_release(vm_object_t *obj, vm_region_t *region) {
-	device_t *device = (device_t *)obj;
-	refcount_dec(&device->count);
-}
-
-/** Handle a page fault on a device-backed region.
- * @param region	Region fault occurred in.
- * @param addr		Virtual address of fault (rounded down to base of page).
- * @param reason	Reason for the fault.
- * @param access	Type of access that caused the fault.
- * @return		Fault status code. */
-static int device_vm_object_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	offset_t offset = region->offset + (addr - region->start);
-	device_t *device = (device_t *)region->object;
-	phys_ptr_t page;
-	int ret;
-
-	assert(device->ops && device->ops->fault);
-
-	/* Ask the device for a page. */
-	if((ret = device->ops->fault(device, offset, &page)) != 0) {
-		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
-		        offset, device, device->name, ret);
-		return VM_FAULT_UNHANDLED;
+	if(device->ops && device->ops->close) {
+		device->ops->close(device, handle->data);
 	}
 
-	/* Insert into page map. */
-	page_map_insert(&region->as->pmap, addr, page, region->flags & VM_REGION_WRITE,
-	                region->flags & VM_REGION_EXEC, MM_SLEEP);
-	return VM_FAULT_HANDLED;
+	device_release(device);
 }
-
-/** Device VM object operations. */
-static vm_object_ops_t device_vm_object_ops = {
-	.get = device_vm_object_get,
-	.release = device_vm_object_release,
-	.fault = device_vm_object_fault,
-};
-#endif
 
 /** Signal that a device is being waited for.
  * @param wait		Wait information structure.
@@ -121,24 +79,40 @@ static void device_object_unwait(object_wait_t *wait) {
 	return device->ops->unwait(device, wait->handle->data, wait);
 }
 
-/** Closes a handle to a device.
- * @param handle	Handle to the device. */
-static void device_object_close(object_handle_t *handle) {
-	device_t *device = (device_t *)handle->object;
+/** Handle a page fault on a device-backed region.
+ * @param region	Region fault occurred in.
+ * @param addr		Virtual address of fault (rounded down to base of page).
+ * @param reason	Reason for the fault.
+ * @param access	Type of access that caused the fault.
+ * @return		Whether fault was handled. */
+static bool device_object_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
+	offset_t offset = region->obj_offset + (addr - region->start);
+	device_t *device = (device_t *)region->handle->object;
+	phys_ptr_t page;
+	int ret;
 
-	if(device->ops && device->ops->close) {
-		device->ops->close(device, handle->data);
+	assert(device->ops && device->ops->fault);
+
+	/* Ask the device for a page. */
+	if((ret = device->ops->fault(device, region->handle->data, offset, &page)) != 0) {
+		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
+		        offset, device, device->name, ret);
+		return false;
 	}
 
-	device_release(device);
+	/* Insert into page map. */
+	page_map_insert(&region->as->pmap, addr, page, region->flags & VM_REGION_WRITE,
+	                region->flags & VM_REGION_EXEC, MM_SLEEP);
+	return true;
 }
 
 /** Device object type structure. */
 static object_type_t device_object_type = {
 	.id = OBJECT_TYPE_DEVICE,
+	.close = device_object_close,
 	.wait = device_object_wait,
 	.unwait = device_object_unwait,
-	.close = device_object_close,
+	.fault = device_object_fault,
 };
 
 /** Create a new device tree node.
@@ -176,7 +150,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	}
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type);
+	object_init(&device->obj, &device_object_type, (ops->fault) ? OBJECT_MAPPABLE : 0);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -265,7 +239,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	refcount_inc(&dest->count);
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type);
+	object_init(&device->obj, &device_object_type, 0);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);

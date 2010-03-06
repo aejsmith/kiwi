@@ -61,9 +61,14 @@ static slab_cache_t *object_handle_cache;
 
 /** Initialise an object structure.
  * @param obj		Object to initialise.
- * @param type		Pointer to type structure for object type. */
-void object_init(object_t *obj, object_type_t *type) {
+ * @param type		Pointer to type structure for object type.
+ * @param flags		Behaviour flags for the object. */
+void object_init(object_t *obj, object_type_t *type, int flags) {
+	if(flags & OBJECT_MAPPABLE) {
+		assert(type->fault || type->page_get);
+	}
 	obj->type = type;
+	obj->flags = flags;
 }
 
 /** Destroy an object structure.

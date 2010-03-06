@@ -22,20 +22,14 @@
 #define __MM_VM_H
 
 #include <arch/memmap.h>
-
 #include <cpu/cpu.h>
-
-#include <lib/avl.h>
-#include <lib/refcount.h>
-
 #include <mm/page.h>
-
 #include <sync/mutex.h>
+#include <object.h>
 
 struct device;
 struct vfs_node;
 struct vm_aspace;
-struct vm_object;
 struct vm_region;
 
 /** Structure tracking a page being used within the VM system. */
@@ -47,119 +41,28 @@ typedef struct vm_page {
 	int flags;			/**< Flags specifying information about the page. */
 } vm_page_t;
 
-/** Structure defining operations for an object. */
-typedef struct vm_object_ops {
-	/** Increase the reference count of an object.
-	 * @param obj		Object to increase count of.
-	 * @param region	Region that the reference is for. */
-	void (*get)(struct vm_object *obj, struct vm_region *region);
+/** Structure containing an anonymous memory map. */
+typedef struct vm_amap {
+	refcount_t count;		/**< Count of regions referring to this object. */
+	mutex_t lock;			/**< Lock to protect map. */
 
-	/** Decrease the reference count of an object.
-	 * @param obj		Object to decrease count of.
-	 * @param region	Region being detached. */
-	void (*release)(struct vm_object *obj, struct vm_region *region);
+	size_t curr_size;		/**< Number of pages currently contained in object. */
+	size_t max_size;		/**< Maximum number of pages in object. */
+	vm_page_t **pages;		/**< Array of pages currently in object. */
+	uint16_t *rref;			/**< Region reference count array. */
+} vm_amap_t;
 
-	/** Map part of an object.
-	 * @note		This (optional) operation is called when
-	 *			creating a region that maps part of the object.
-	 *			This includes duplicating shared regions to
-	 *			a new address space (in this case, the get
-	 *			operation is called before this one).
-	 * @param obj		Object being mapped.
-	 * @param offset	Offset into the object that the region starts
-	 *			at.
-	 * @param size		Size of the region being created.
-	 * @return		0 on success, negative error code on failure. */
-	int (*map)(struct vm_object *obj, offset_t offset, size_t size);
-
-	/** Unmap part of an object.
-	 * @note		This (optional) operation is called when all or
-	 *			part of a region mapping the object is being
-	 *			unmapped. If an entire region is being unmapped
-	 *			this function is called before the release
-	 *			operation for the object. This function is
-	 *			called after any mapped pages have been
-	 *			released.
-	 * @param obj		Object being unmapped.
-	 * @param offset	Offset into object being unmapped.
-	 * @param size		Size of area being unmapped. */
-	void (*unmap)(struct vm_object *obj, offset_t offset, size_t size);
-
-	/** Create a copy of an object.
-	 * @note		This is used when duplicating private regions
-	 *			to a new address space. The destination region
-	 *			will have the same start/end addresses and
-	 *			flags. This function must set the object
-	 *			pointer and offset into the object.
-	 * @note		This is only really here to allow all of the
-	 *			copy-on-write handling code to be moved into
-	 *			the anonymous object type - all private regions
-	 *			use anonymous objects. It should not be
-	 *			implemented by any other object type.
-	 * @param src		Source region to copy.
-	 * @param dest		Destination region to copy to.
-	 * @return		0 on success, negative error code on failure. */
-	int (*copy)(struct vm_region *src, struct vm_region *dest);
-
-	/** Non-standard fault handling.
-	 * @note		If this operation is specified, it is called
-	 *			on all faults on regions using the object
-	 *			rather than using the standard fault handling
-	 *			mechanism. In this case, the page_get operation
-	 *			is not needed.
-	 * @note		When this is called, the main fault handler
-	 *			will have verified that the fault is allowed by
-	 *			the region's access flags.
-	 * @param region	Region fault occurred in.
-	 * @param addr		Virtual address of fault (rounded down to base
-	 *			of page).
-	 * @param reason	Reason for the fault.
-	 * @param access	Type of access that caused the fault.
-	 * @return		Fault status code. */
-	int (*fault)(struct vm_region *region, ptr_t addr, int reason, int access);
-
-	/** Get a page from the object.
-	 * @note		This operation is not required if the fault
-	 *			operation is specified. If the fault operation
-	 *			is not specified, then it is required.
-	 * @param obj		Object to get page from.
-	 * @param offset	Offset to get page from (the offset into the
-	 *			region the fault occurred at, plus the offset
-	 *			of the region into the object).
-	 * @param pagep		Where to store pointer to page structure.
-	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct vm_object *obj, offset_t offset, vm_page_t **pagep);
-
-	/** Release a page from the object.
-	 * @param obj		Object to release page in.
-	 * @param offset	Offset of page in object.
-	 * @param paddr		Physical address of page that was unmapped. */
-	void (*page_release)(struct vm_object *obj, offset_t offset, phys_ptr_t paddr);
-} vm_object_ops_t;
-
-/** Structure defining an object that can be memory-mapped.
- * @note		This structure is intended to be embedded within
- *			another structure (e.g. vfs_node_t). It is essentially
- *			a handle provided to the VM system to map an object
- *			in.
- * @note		The object structure does not provide reference
- *			counting for objects - the reference/detach operations
- *			are provided to allow the object type to manage
- *			reference counting itself. */
-typedef struct vm_object {
-	vm_object_ops_t *ops;		/**< Operations for the object. */
-} vm_object_t;
-
-/** Structure defining a region in an address space. */
+/** Structure representing a region in an address space. */
 typedef struct vm_region {
 	struct vm_aspace *as;		/**< Address space region belongs to. */
 	ptr_t start;			/**< Base address of the region. */
 	ptr_t end;			/**< Size of the region. */
 	int flags;			/**< Flags for the region. */
 
-	list_t object_link;		/**< Link for object to use. */
-	vm_object_t *object;		/**< Object that this region is mapping. */
-	offset_t offset;		/**< Offset into the object. */
+	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
+	offset_t obj_offset;		/**< Offset into the object. */
+	vm_amap_t *amap;		/**< Anonymous map. */
+	offset_t amap_offset;		/**< Offset into the anonymous map. */
 
 	avl_tree_node_t *node;		/**< AVL tree node for the region. */
 } vm_region_t;
@@ -201,30 +104,22 @@ typedef struct vm_aspace {
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
 #define VM_FAULT_PROTECTION	2	/**< Fault caused by a protection violation. */
 
-/** Page fault access codes. */
-#define VM_FAULT_READ		1	/**< Fault caused by a read. */
-#define VM_FAULT_WRITE		2	/**< Fault caused by a write. */
-#define VM_FAULT_EXEC		3	/**< Fault when trying to execute. */
-
-/** Page fault status codes. */
-#define VM_FAULT_HANDLED	1	/**< Fault was handled and execution can resume. */
-#define VM_FAULT_UNHANDLED	2	/**< Fault could not be handled. */
+/** Page fault access codes.
+ * @note		Defined to the same values as the region protection
+ *			flags. */
+#define VM_FAULT_READ		(1<<0)	/**< Fault caused by a read. */
+#define VM_FAULT_WRITE		(1<<1)	/**< Fault caused by a write. */
+#define VM_FAULT_EXEC		(1<<2)	/**< Fault when trying to execute. */
 
 extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
 extern vm_page_t *vm_page_alloc(int pmflag);
 extern void vm_page_free(vm_page_t *page);
 
-extern void vm_object_init(vm_object_t *object, vm_object_ops_t *ops);
-extern void vm_object_destroy(vm_object_t *object);
-
-extern int vm_fault(ptr_t addr, int reason, int access);
+extern bool vm_fault(ptr_t addr, int reason, int access);
 
 extern int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
-extern int vm_map_anon(vm_aspace_t *as, ptr_t start, size_t size, int flags, ptr_t *addrp);
-extern int vm_map_file(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct vfs_node *node,
-                       offset_t offset, ptr_t *addrp);
-extern int vm_map_device(vm_aspace_t *as, ptr_t start, size_t size, int flags, struct device *device,
-                         offset_t offset, ptr_t *addrp);
+extern int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
+                  offset_t offset, ptr_t *addrp);
 extern int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);

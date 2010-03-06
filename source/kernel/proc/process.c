@@ -107,14 +107,7 @@ static int process_alloc(const char *name, process_id_t id, int flags, int cflag
 	assert(priority >= 0 && priority < PRIORITY_MAX);
 
 	/* Create the address space. */
-	if(aspace) {
-		if(!(process->aspace = vm_aspace_create())) {
-			slab_cache_free(process_cache, process);
-			return -ERR_NO_MEMORY;
-		}
-	} else {
-		process->aspace = NULL;
-	}
+	process->aspace = (aspace) ? vm_aspace_create() : NULL;
 
 	/* Initialise the process' handle table. */
 	if(parent && cflags & PROCESS_CREATE_INHERIT) {
@@ -132,7 +125,7 @@ static int process_alloc(const char *name, process_id_t id, int flags, int cflag
 
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
-	object_init(&process->obj, &process_object_type);
+	object_init(&process->obj, &process_object_type, 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
@@ -264,7 +257,8 @@ static int copy_arguments(const char *kpath, const char **kargs, const char **ke
 	size = ROUND_UP(size, PAGE_SIZE);
 
 	/* Allocate a chunk of memory for the data. */
-	if((ret = vm_map_anon(curr_aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &addr)) != 0) {
+	if((ret = vm_map(curr_aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	                 NULL, 0, &addr)) != 0) {
 		return ret;
 	}
 	*addrp = addr;
@@ -322,7 +316,8 @@ static void process_create_thread(void *arg1, void *arg2) {
 
 	/* Create a userspace stack and place the argument block address on it.
 	 * TODO: Stack direction! */
-	if((ret = vm_map_anon(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &stack)) != 0) {
+	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	                 NULL, 0, &stack)) != 0) {
 		goto fail;
 	}
 	stack += (USTACK_SIZE - STACK_DELTA);
@@ -727,10 +722,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 	}
 
 	/* Create a new address space to load the binary into. */
-	if(!(as = vm_aspace_create())) {
-		ret = -ERR_NO_MEMORY;
-		goto fail;
-	}
+	as = vm_aspace_create();
 
 	/* Get the ELF loader to do the main work of loading the binary. */
 	if((ret = elf_binary_load(node, as, &data)) != 0) {
@@ -758,7 +750,8 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 
 	/* Create a userspace stack and place the argument block address on it.
 	 * TODO: Stack direction! */
-	if((ret = vm_map_anon(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &stack)) != 0) {
+	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	                 NULL, 0, &stack)) != 0) {
 		fatal("Meep, need to handle this too (%d)", ret);
 	}
 	stack += (USTACK_SIZE - STACK_DELTA);

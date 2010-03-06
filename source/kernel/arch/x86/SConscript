@@ -22,7 +22,6 @@ sources = map(File, [
 	'kdbg.c',
 	'lapic.c',
 	'time.c',
-	'vm.c',
 ])
 
 # Set build flags to prevent FPU code generation.

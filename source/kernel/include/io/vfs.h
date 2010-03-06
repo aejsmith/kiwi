@@ -251,7 +251,6 @@ typedef struct vfs_mount {
 
 /** Structure describing a node in the filesystem. */
 typedef struct vfs_node {
-	vm_object_t vobj;		/**< VM object header. */
 	list_t header;			/**< Link to mount's node lists. */
 
 	mutex_t lock;			/**< Lock to protect the node. */

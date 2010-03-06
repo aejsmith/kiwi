@@ -390,7 +390,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 
-	object_init(&thread->obj, &thread_object_type);
+	object_init(&thread->obj, &thread_object_type, 0);
 	atomic_set(&thread->in_usermem, 0);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
@@ -657,7 +657,8 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 			stacksz = USTACK_SIZE;
 		}
 
-		if((ret = vm_map_anon(curr_proc->aspace, 0, stacksz, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &args->sp)) != 0) {
+		if((ret = vm_map(curr_proc->aspace, 0, stacksz, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+		                 NULL, 0, &args->sp)) != 0) {
 			goto fail;
 		}
 		args->sp += (stacksz - STACK_DELTA);
