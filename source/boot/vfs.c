@@ -93,7 +93,7 @@ static vfs_filesystem_t *vfs_filesystem_probe(disk_t *disk) {
  * @param fs		Filesystem to get from.
  * @param id		ID of node to get.
  * @return		Pointer to node or NULL if not found. */
-static vfs_node_t *vfs_filesystem_get_node(vfs_filesystem_t *fs, inode_t id) {
+static vfs_node_t *vfs_filesystem_get_node(vfs_filesystem_t *fs, node_id_t id) {
 	vfs_node_t *node;
 
 	/* Search in the node cache first. */
@@ -164,7 +164,7 @@ vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs) {
  * @param size		Size of the file data (if a file).
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to node structure. */
-vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, inode_t id, int type, file_size_t size, void *data) {
+vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, file_size_t size, void *data) {
 	vfs_node_t *node = kmalloc(sizeof(vfs_node_t));
 
 	list_init(&node->header);
@@ -211,7 +211,7 @@ bool vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset) {
  * @param name		Name of entry to get.
  * @param idp		Where to store ID of entry.
  * @return		Whether entry was found. */
-static bool vfs_dir_get_child(vfs_node_t *node, const char *name, inode_t *idp) {
+static bool vfs_dir_get_child(vfs_node_t *node, const char *name, node_id_t *idp) {
 	vfs_dir_entry_t *entry;
 
 	if(list_empty(&node->entries)) {
@@ -235,7 +235,7 @@ static bool vfs_dir_get_child(vfs_node_t *node, const char *name, inode_t *idp) 
  * @param node		Node to add to.
  * @param name		Name of the entry to add (will be duplicated).
  * @param id		ID of the node the entry refers to. */
-void vfs_dir_insert(vfs_node_t *node, char *name, inode_t id) {
+void vfs_dir_insert(vfs_node_t *node, char *name, node_id_t id) {
 	vfs_dir_entry_t *entry;
 
 	assert(node->type == VFS_NODE_DIR);
@@ -255,7 +255,7 @@ void vfs_dir_insert(vfs_node_t *node, char *name, inode_t id) {
 vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path) {
 	vfs_node_t *child;
 	char *dup, *tok;
-	inode_t id;
+	node_id_t id;
 
 	vfs_node_acquire(node);
 

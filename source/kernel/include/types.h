@@ -42,7 +42,6 @@ typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
 /** TODO: To be removed. */
-typedef uint64_t inode_t;		/**< Type used to store a filesystem inode number. */
 typedef int32_t identifier_t;		/**< Type used to store an identifier for a global object. */
 
 /** Internal kernel integer types. */

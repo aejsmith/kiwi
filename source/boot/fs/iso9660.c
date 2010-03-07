@@ -118,15 +118,15 @@ static int wcsntombs_be(uint8_t *s, uint8_t *pwcs, int inlen, int maxlen) {
  * @param extent	Location of extent containing directory record.
  * @param offset	Offset into extent of directory record.
  * @return		Inode number. */
-static inode_t iso9660_node_num(uint32_t extent, uint32_t offset) {
-	return ((inode_t)extent << 32) | (inode_t)offset;
+static node_id_t iso9660_node_num(uint32_t extent, uint32_t offset) {
+	return ((node_id_t)extent << 32) | (node_id_t)offset;
 }
 
 /** Get location of a directory record from a node number.
  * @param num		Node number to convert.
  * @param extentp	Where to store extent containing directory record.
  * @param offsetp	Where to store offset into extent of record. */
-static void iso9660_record_location(inode_t num, uint32_t *extentp, uint32_t *offsetp) {
+static void iso9660_record_location(node_id_t num, uint32_t *extentp, uint32_t *offsetp) {
 	*extentp = num >> 32;
 	*offsetp = num & 0xFFFFFFFF;
 }
@@ -224,7 +224,7 @@ static char *iso9660_make_uuid(iso9660_primary_volume_desc_t *pri) {
  * @param id		ID to give the node.
  * @param rec		Record to create from.
  * @return		Pointer to node. */
-static vfs_node_t *iso9660_node_create(vfs_filesystem_t *fs, inode_t id, iso9660_directory_record_t *rec) {
+static vfs_node_t *iso9660_node_create(vfs_filesystem_t *fs, node_id_t id, iso9660_directory_record_t *rec) {
 	int type = (rec->file_flags & (1<<1)) ? VFS_NODE_DIR : VFS_NODE_FILE;
 	iso9660_node_t *node;
 
@@ -331,7 +331,7 @@ out:
  * @param fs		Filesystem to get from.
  * @param id		ID of node to read.
  * @return		Pointer to node on success, NULL on failure. */
-static vfs_node_t *iso9660_node_get(vfs_filesystem_t *fs, inode_t id) {
+static vfs_node_t *iso9660_node_get(vfs_filesystem_t *fs, node_id_t id) {
 	iso9660_directory_record_t record;
 	uint32_t extent, offset;
 

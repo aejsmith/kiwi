@@ -72,7 +72,7 @@ typedef struct vfs_filesystem_ops {
 	 * @param fs		Filesystem to read from.
 	 * @param id		ID of node.
 	 * @return		Pointer to node on success, NULL on failure. */
-	struct vfs_node *(*node_get)(struct vfs_filesystem *fs, inode_t id);
+	struct vfs_node *(*node_get)(struct vfs_filesystem *fs, node_id_t id);
 
 	/** Read from a file.
 	 * @param node		Node referring to file.
@@ -106,7 +106,7 @@ typedef struct vfs_node {
 	list_t header;			/**< Link to filesystem's node list. */
 
 	vfs_filesystem_t *fs;		/**< Filesystem that the node is on. */
-	inode_t id;			/**< Node number. */
+	node_id_t id;			/**< Node number. */
 
 	/** Type of the node. */
 	enum {
@@ -126,7 +126,7 @@ typedef struct vfs_dir_entry {
 	list_t header;			/**< Link to entry list. */
 
 	char *name;			/**< Name of entry. */
-	inode_t id;			/**< Node ID entry refers to. */
+	node_id_t id;			/**< Node ID entry refers to. */
 } vfs_dir_entry_t;
 
 extern list_t filesystem_list;
@@ -136,13 +136,13 @@ extern char *boot_path_override;
 extern vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path);
 extern vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs);
 
-extern vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, inode_t id, int type, file_size_t size, void *data);
+extern vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, file_size_t size, void *data);
 extern void vfs_node_acquire(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
 
 extern bool vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset);
 
-extern void vfs_dir_insert(vfs_node_t *node, char *name, inode_t id);
+extern void vfs_dir_insert(vfs_node_t *node, char *name, node_id_t id);
 extern vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path);
 extern vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev);
 

@@ -228,7 +228,7 @@ static bool ext2_inode_block_read(ext2_inode_t *inode, void *buf, uint32_t block
  * @param fs		Filesystem to read from.
  * @param id		ID of node.
  * @return		Pointer to node on success, NULL on failure. */
-static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, inode_t id) {
+static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
 	ext2_mount_t *mount = fs->data;
 	ext2_inode_t *inode;
 	size_t group, size;
