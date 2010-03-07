@@ -36,12 +36,12 @@ public:
 	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
 	bool Create(const char *cmdline, const char *const env[] = 0,
 	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
-	bool Open(identifier_t id);
+	bool Open(process_id_t id);
 
 	bool WaitTerminate(useconds_t timeout = -1) const;
-	identifier_t GetID(void) const;
+	process_id_t GetID(void) const;
 
-	static identifier_t GetCurrentID(void);
+	static process_id_t GetCurrentID(void);
 
 	Signal<Process *, int> OnExit;
 protected:

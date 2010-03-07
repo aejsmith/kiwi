@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,7 +21,7 @@
 #include <drivers/console.h>
 
 #include <kernel/device.h>
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <kiwi/Process.h>
 
@@ -94,7 +94,7 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	ToggleCursor();
 
 	/* Register the console with the event loop. */
-	_RegisterEvent(HANDLE_EVENT_READ);
+	_RegisterEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Destructor for the console. */
@@ -284,7 +284,7 @@ void Console::_EventReceived(int event) {
 	size_t bytes;
 	int ret;
 
-	assert(event == HANDLE_EVENT_READ);
+	assert(event == DEVICE_EVENT_READABLE);
 
 	if((ret = device_read(m_handle, &ch, 1, 0, &bytes)) != 0) {
 		printf("Failed to read output (%d)\n", ret);

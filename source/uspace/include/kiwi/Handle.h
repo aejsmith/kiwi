@@ -30,7 +30,7 @@ namespace kiwi {
 
 class EventLoop;
 
-/** Base class for all objects represented by a handle. */
+/** Base class for all objects accessed through a handle. */
 class Handle : public Object {
 	KIWI_OBJECT_NONCOPYABLE(Handle);
 	friend class EventLoop;

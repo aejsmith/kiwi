@@ -152,8 +152,8 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 	int type;
 
 	/* Check if the handle can be used. */
-	type = handle_type(handle);
-	if(type != HANDLE_TYPE_FILE && type != HANDLE_TYPE_DEVICE) {
+	type = object_type(handle);
+	if(type != OBJECT_TYPE_FILE && type != OBJECT_TYPE_DEVICE) {
 		return NULL;
 	}
 
@@ -161,7 +161,7 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 		return NULL;
 	}
 
-	stream->type = (type == HANDLE_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : STREAM_TYPE_FILE;
+	stream->type = (type == OBJECT_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : OBJECT_TYPE_FILE;
 	stream->handle = handle;
 	stream->err = false;
 	stream->eof = false;

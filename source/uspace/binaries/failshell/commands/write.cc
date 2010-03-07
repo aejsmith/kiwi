@@ -20,7 +20,7 @@
 
 #include <kernel/errors.h>
 #include <kernel/fs.h>
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <cstdio>
 #include <cstdlib>

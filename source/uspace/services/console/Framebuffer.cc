@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -20,7 +20,7 @@
 
 #include <kernel/device.h>
 #include <kernel/errors.h>
-#include <kernel/handle.h>
+#include <kernel/object.h>
 #include <kernel/vm.h>
 
 #include <assert.h>
@@ -112,7 +112,7 @@ Framebuffer::Framebuffer(const char *device) :
 	}
 
 	/* Set the mode. */
-	if((ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(identifier_t), NULL, 0, NULL)) != 0) {
+	if((ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL)) != 0) {
 		printf("Failed to set mode (%d)\n", ret);
 		m_init_status = ret;
 		return;
@@ -131,8 +131,8 @@ Framebuffer::Framebuffer(const char *device) :
 	}
 
 	/* Create a mapping for the framebuffer and clear it. */
-	if((ret = vm_map_device(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset,
-	                        reinterpret_cast<void **>(&m_buffer))) != 0) {
+	if((ret = vm_map(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset,
+	                 reinterpret_cast<void **>(&m_buffer))) != 0) {
 		m_init_status = ret;
 		return;
 	}

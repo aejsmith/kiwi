@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -19,7 +19,7 @@
  */
 
 #include <kernel/device.h>
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <assert.h>
 #include <stdint.h>
@@ -81,7 +81,7 @@ InputDevice::InputDevice(const char *path) :
 	}
 
 	/* Register the device with the event loop. */
-	_RegisterEvent(HANDLE_EVENT_READ);
+	_RegisterEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Event callback function.
@@ -92,7 +92,7 @@ void InputDevice::_EventReceived(int event) {
 	size_t bytes;
 	int ret;
 
-	assert(event == HANDLE_EVENT_READ);
+	assert(event == DEVICE_EVENT_READABLE);
 
 	if((ret = device_read(m_handle, &code, 1, 0, &bytes)) != 0) {
 		printf("Failed to read input (%d)\n", ret);

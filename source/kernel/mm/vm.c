@@ -1260,7 +1260,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  * @return		0 on success, negative error code on failure.
  */
 int sys_vm_map(vm_map_args_t *args) {
-	object_handle_t *obj;
+	object_handle_t *obj = NULL;
 	vm_map_args_t kargs;
 	int ret, err;
 	ptr_t addr;
@@ -1269,8 +1269,10 @@ int sys_vm_map(vm_map_args_t *args) {
 		return ret;
 	} else if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
 		return -ERR_PARAM_INVAL;
-	} else if((ret = object_handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
-		return ret;
+	} else if(kargs.handle >= 0) {
+		if((ret = object_handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
+			return ret;
+		}
 	}
 
 	ret = vm_map(curr_proc->aspace, (ptr_t)kargs.start, kargs.size, kargs.flags,
@@ -1282,7 +1284,9 @@ int sys_vm_map(vm_map_args_t *args) {
 		}
 	}
 
-	object_handle_release(obj);
+	if(obj) {
+		object_handle_release(obj);
+	}
 	return ret;
 }
 

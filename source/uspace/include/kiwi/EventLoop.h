@@ -29,7 +29,7 @@
 
 namespace kiwi {
 
-/** Class implementing a loop for handling handle events.
+/** Class implementing a loop for handling object events.
  * @todo		When threading support is implemented, each thread
  *			should have its own event loop, and handles should be
  *			added to the event loop of the thread they are created
@@ -49,7 +49,7 @@ private:
 	std::list<Object *> m_to_delete;	/**< Objects to delete when control returns to the loop. */
 
 	/** @note Data stored as multiple vectors because it is the format
-	 *        handle_wait_multiple() expects. */
+	 *        object_wait_multiple() expects. */
 	std::vector<Handle *> m_handles;	/**< Array of handle objects (used for callbacks). */
 	std::vector<handle_t> m_ids;		/**< Array of handle IDs. */
 	std::vector<int> m_events;		/**< Array of events to wait for. */

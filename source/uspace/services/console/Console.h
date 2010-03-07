@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -55,7 +55,7 @@ private:
 	static Console *m_active;	/**< Active console. */
 
 	int m_init_status;		/**< Initialisation status. */
-	identifier_t m_id;		/**< Console ID. */
+	int m_id;			/**< Console ID. */
 
 	Framebuffer *m_fb;		/**< Framebuffer. */
 	RGB *m_buffer;			/**< Back buffer. */

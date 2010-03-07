@@ -165,7 +165,7 @@ bool Process::Create(const char *cmdline, const char *const env[], bool usepath,
 /** Open an existing process.
  * @param id		ID of the process to open.
  * @return		True on success, false on failure. */
-bool Process::Open(identifier_t id) {
+bool Process::Open(process_id_t id) {
 	if(!Close()) {
 		return false;
 	} else if((m_handle = process_open(id)) < 0) {
@@ -188,17 +188,17 @@ bool Process::WaitTerminate(useconds_t timeout) const {
 
 /** Get the ID of the process.
  * @return		ID of the process. */
-identifier_t Process::GetID(void) const {
+process_id_t Process::GetID(void) const {
 	return process_id(m_handle);
 }
 
 /** Get the ID of the current process.
  * @return		ID of the current process. */
-identifier_t Process::GetCurrentID(void) {
+process_id_t Process::GetCurrentID(void) {
 	return process_id(-1);
 }
 
-/** Callback for a handle event being received.
+/** Callback for an object event being received.
  * @param event		Event ID received. */
 void Process::_EventReceived(int event) {
 	switch(event) {

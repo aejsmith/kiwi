@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -20,7 +20,7 @@
 
 #include <kernel/errors.h>
 #include <kernel/fs.h>
-#include <kernel/handle.h>
+#include <kernel/object.h>
 #include <kernel/vm.h>
 
 #include "args.h"
@@ -135,7 +135,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		}
 
 		/* Allocate a chunk of memory for it. */
-		if((ret = vm_map_anon(NULL, image->load_size, VM_MAP_READ | VM_MAP_PRIVATE, &image->load_base)) != 0) {
+		if((ret = vm_map(NULL, image->load_size, VM_MAP_READ | VM_MAP_PRIVATE, -1, 0, &image->load_base)) != 0) {
 			printf("RTLD: Unable to allocate memory for %s (%d)\n", path, ret);
 			goto fail;
 		}
@@ -185,7 +185,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 			}
 
 			/* Create an anonymous region for it. */
-			if((ret = vm_map_anon((void *)start, size, flags, NULL)) != 0) {
+			if((ret = vm_map((void *)start, size, flags, -1, 0, NULL)) != 0) {
 				printf("RTLD: Unable to map %s into memory (%d) (1)\n", path, ret);
 				goto fail;
 			}
@@ -203,7 +203,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 
 		dprintf("RTLD: Loading %u (%s) to %p (size: %d)\n", i, path, start, size);
 
-		if((ret = vm_map_file((void *)start, size, flags, handle, offset, NULL)) != 0) {
+		if((ret = vm_map((void *)start, size, flags, handle, offset, NULL)) != 0) {
 			printf("RTLD: Unable to map %s into memory (%d) (2)\n", path, ret);
 			goto fail;
 		}

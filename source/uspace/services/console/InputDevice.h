@@ -21,7 +21,7 @@
 #ifndef __INPUTDEVICE_H
 #define __INPUTDEVICE_H
 
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <kiwi/Handle.h>
 

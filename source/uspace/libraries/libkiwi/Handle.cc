@@ -18,7 +18,7 @@
  * @brief		Handle class.
  */
 
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <kiwi/EventLoop.h>
 #include <kiwi/Handle.h>
@@ -58,7 +58,7 @@ bool Handle::Close() {
 	return ret;
 }
 
-/** Wait for a handle event.
+/** Wait for an event on the object referred to by the handle.
  * @note		Derived classes should implement their own functions to
  *			wait for events on top of this function, which should
  *			be used rather than using this function directly.
@@ -69,7 +69,7 @@ bool Handle::Close() {
  *			indefinitely until the event happens.
  * @return		True on success, false on failure. */
 bool Handle::Wait(int event, useconds_t timeout) const {
-	return (handle_wait(m_handle, event, timeout) == 0);
+	return (object_wait(m_handle, event, timeout) == 0);
 }
 
 /** Get the ID of the handle.

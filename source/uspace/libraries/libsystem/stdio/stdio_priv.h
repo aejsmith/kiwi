@@ -21,7 +21,7 @@
 #ifndef __STDIO_PRIV_H
 #define __STDIO_PRIV_H
 
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <stdarg.h>
 #include <stdbool.h>

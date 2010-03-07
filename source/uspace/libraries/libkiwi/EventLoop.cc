@@ -18,7 +18,7 @@
  * @brief		Event loop class.
  */
 
-#include <kernel/handle.h>
+#include <kernel/object.h>
 
 #include <kiwi/EventLoop.h>
 
@@ -86,7 +86,7 @@ void EventLoop::Run(void) {
 			m_to_delete.erase(it);
 		}
 
-		if((ret = handle_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1)) < 0) {
+		if((ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1)) < 0) {
 			cerr << "Failed to wait for events (" << ret << ')' << endl;
 			return;
 		}

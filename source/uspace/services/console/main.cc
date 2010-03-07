@@ -18,11 +18,6 @@
  * @brief		Console application.
  */
 
-#include <kernel/device.h>
-#include <kernel/errors.h>
-#include <kernel/handle.h>
-#include <kernel/thread.h>
-
 #include <kiwi/EventLoop.h>
 
 #include "Console.h"

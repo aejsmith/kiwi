@@ -37,7 +37,6 @@
  * @return		0 on success, -1 on failure.
  */
 int fseek(FILE *stream, long off, int act) {
-
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
 		if(fs_handle_seek(stream->handle, act, (offset_t)off, NULL) != 0) {
@@ -57,7 +56,7 @@ int fseek(FILE *stream, long off, int act) {
  * @param stream	Stream to reposition.
  */
 void rewind(FILE *stream) {
-	fseek(stream, 0, FS_HANDLE_SEEK_SET);
+	fseek(stream, 0, FS_SEEK_SET);
 	clearerr(stream);
 }
 
@@ -74,7 +73,7 @@ long ftell(FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_handle_seek(stream->handle, FS_HANDLE_SEEK_ADD, 0, &new) != 0) {
+		if(fs_handle_seek(stream->handle, FS_SEEK_ADD, 0, &new) != 0) {
 			return -1;
 		}
 		return new;

@@ -34,7 +34,7 @@ static inline void *mmap_wrapper(size_t size) {
 	void *addr;
 	int ret;
 
-	ret = vm_map_anon(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, &addr);
+	ret = vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &addr);
 	if(ret != 0) {
 		return (void *)-1;
 	}

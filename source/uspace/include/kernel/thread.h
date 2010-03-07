@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -28,8 +28,8 @@ extern "C" {
 #include <kernel/types.h>
 
 extern handle_t thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
-extern handle_t thread_open(identifier_t id);
-extern identifier_t thread_id(handle_t handle);
+extern handle_t thread_open(thread_id_t id);
+extern thread_id_t thread_id(handle_t handle);
 extern void thread_exit(int status) __attribute__((noreturn));
 extern int thread_usleep(useconds_t us);
 

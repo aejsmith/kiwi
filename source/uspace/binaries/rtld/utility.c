@@ -27,7 +27,7 @@
 #include "args.h"
 #include "utility.h"
 
-extern int _vm_map_file(vm_map_args_t *args);
+extern int _vm_map(vm_map_args_t *args);
 extern int putch(char ch);
 
 /** Size of the statically allocated heap. */
@@ -36,25 +36,25 @@ extern int putch(char ch);
 static uint8_t rtld_heap[RTLD_HEAP_SIZE];
 static size_t rtld_heap_current = 0;
 
-/** Map a file into memory.
+/** Map an object into memory.
  * @param start		Start address of region (if VM_MAP_FIXED).
- * @param size		Size of region to map (multiple of system page size).
+ * @param size		Size of region to map.
  * @param flags		Flags to control mapping behaviour (VM_MAP_*).
- * @param handle	Handle to file to map in.
- * @param offset	Offset into file to map from.
+ * @param handle	Handle to object to map in. If -1, then the region
+ *			will be an anonymous memory mapping.
+ * @param offset	Offset into object to map from.
  * @param addrp		Where to store address of mapping.
  * @return		0 on success, negative error code on failure. */
-int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
-	vm_map_args_t args;
-
-	args.start = start;
-	args.size = size;
-	args.flags = flags;
-	args.handle = handle;
-	args.offset = offset;
-	args.addrp = addrp;
-
-	return _vm_map_file(&args);
+int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
+	vm_map_args_t args = {
+		.start = start,
+		.size = size,
+		.flags = flags,
+		.handle = handle,
+		.offset = offset,
+		.addrp = addrp,
+	};
+	return _vm_map(&args);
 }
 
 /** Get length of string.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -39,16 +39,15 @@ typedef struct process_args {
 /** Process creation flag definitions. */
 #define PROCESS_CREATE_INHERIT	(1<<0)	/**< Inherit inheritable handles. */
 
-/** Process handle events. */
-#define PROCESS_EVENT_DEATH	16	/**< Wait for process death. */
+/** Process object events. */
+#define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
-extern handle_t process_create(const char *path, const char *const args[], const char *const env[], int flags);
-extern int process_replace(const char *path, const char *const args[], const char *const env[], int flags);
+extern handle_t process_create(const char *path, const char *const args[], const char *const environ[], int flags);
+extern int process_replace(const char *path, const char *const args[], const char *const environ[], int flags);
 extern int process_duplicate(handle_t *handlep);
-extern handle_t process_open(identifier_t id);
-extern identifier_t process_id(handle_t handle);
-extern identifier_t process_sid(handle_t handle);
-extern int process_exit(int status) __attribute__((noreturn));
+extern handle_t process_open(process_id_t id);
+extern process_id_t process_id(handle_t handle);
+extern void process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
 }

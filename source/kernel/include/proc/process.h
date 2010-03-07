@@ -77,7 +77,7 @@ typedef struct process {
 /** Process creation flag definitions. */
 #define PROCESS_CREATE_INHERIT	(1<<0)	/**< Inherit inheritable handles. */
 
-/** Process handle events. */
+/** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
 /** Macro that expands to a pointer to the current process. */

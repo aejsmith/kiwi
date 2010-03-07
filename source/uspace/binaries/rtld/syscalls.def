@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -14,10 +14,9 @@
 Service(0)
 
 Syscall('putch',		['char'], 0)
-Syscall('handle_close',		['handle_t'], 2)
+Syscall('handle_close',		['handle_t'], 5)
 Syscall('fs_file_open',		['ptr_t', 'int'], 7)
 Syscall('fs_file_read',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'], 8)
-Syscall('vm_map_anon',		['ptr_t', 'size_t', 'int', 'ptr_t'], 28)
-Syscall('_vm_map_file',		['ptr_t'], 29)
-Syscall('vm_unmap',		['ptr_t', 'size_t'], 31)
-Syscall('process_exit',		['int'], 37)
+Syscall('_vm_map',		['ptr_t'], 28)
+Syscall('vm_unmap',		['ptr_t', 'size_t'], 29)
+Syscall('process_exit',		['int'], 35)

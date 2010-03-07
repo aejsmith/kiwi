@@ -16,8 +16,8 @@ Import('env')
 env.SharedLibrary('kiwi', [
 	'EventLoop.cc',
 	'Handle.cc',
-	'IPCConnection.cc',
-	'IPCPort.cc',
+	#'IPCConnection.cc',
+	#'IPCPort.cc',
 	'Object.cc',
 	'Process.cc',
 	'Signal.cc',

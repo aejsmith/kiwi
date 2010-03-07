@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -27,7 +27,7 @@ extern "C" {
 
 #include <kernel/types.h>
 
-/** Structure containing arguments for _vm_map_file()/_vm_map_device(). */
+/** Structure containing arguments for _vm_map(). */
 typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not AS_REGION_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
@@ -44,9 +44,7 @@ typedef struct vm_map_args {
 #define VM_MAP_PRIVATE		(1<<3)	/**< Modifications to the mapping should not be visible to other processes. */
 #define VM_MAP_FIXED		(1<<4)	/**< Mapping should be placed at the exact location specified. */
 
-extern int vm_map_anon(void *start, size_t size, int flags, void **addrp);
-extern int vm_map_file(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
-extern int vm_map_device(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
+extern int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
 extern int vm_unmap(void *start, size_t size);
 
 #ifdef __cplusplus
