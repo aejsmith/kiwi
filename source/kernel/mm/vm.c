@@ -211,6 +211,7 @@ static vm_amap_t *vm_amap_create(size_t size) {
 	assert(size);
 
 	map = slab_cache_alloc(vm_amap_cache, MM_SLEEP);
+	refcount_set(&map->count, 1);
 	map->curr_size = 0;
 	map->max_size = size >> PAGE_WIDTH;
 	map->pages = kcalloc(map->max_size, sizeof(vm_page_t *), MM_SLEEP);
