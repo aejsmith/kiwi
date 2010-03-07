@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -30,7 +30,6 @@ typedef struct io_context {
 	mutex_t lock;			/**< Lock to protect context. */
 	vfs_node_t *root_dir;		/**< Root directory. */
 	vfs_node_t *curr_dir;		/**< Current working directory. */
-	list_t async_requests;		/**< Current in-progress asynchronous I/O requests. */
 } io_context_t;
 
 extern void io_context_init(io_context_t *context, io_context_t *parent);

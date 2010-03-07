@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -153,23 +153,18 @@ static int module_check_deps(module_t *module, char *depbuf) {
 }
 
 /** Get the name of a kernel module.
- *
- * Gets the name of a kernel module and places it in a buffer.
- *
- * @param node		Node for module to get name of.
+ * @param handle	Handle to file containing module.
  * @param namebuf	Buffer to store name in (should be MODULE_NAME_MAX + 1
  *			bytes long).
- *
- * @return		0 on success, negative error code on failure.
- */
-int module_name(vfs_node_t *node, char *namebuf) {
+ * @return		0 on success, negative error code on failure. */
+int module_name(object_handle_t *handle, char *namebuf) {
 	module_t *module;
 	symbol_t *sym;
 	int ret = 0;
 
-	if(!node || !namebuf) {
+	if(!handle || !namebuf) {
 		return -ERR_PARAM_INVAL;
-	} else if(!elf_module_check(node)) {
+	} else if(!elf_module_check(handle)) {
 		return -ERR_TYPE_INVAL;
 	}
 
@@ -178,7 +173,7 @@ int module_name(vfs_node_t *node, char *namebuf) {
 	list_init(&module->header);
 	refcount_set(&module->count, 0);
 	symbol_table_init(&module->symtab);
-	module->node = node;
+	module->handle = handle;
 	module->shdrs = NULL;
 	module->load_base = NULL;
 	module->load_size = 0;
@@ -221,7 +216,7 @@ out:
  * The intended usage of this function is to keep on calling it and loading
  * each unmet dependency it specifies until it succeeds.
  *
- * @param node		Filesystem node containing the module.
+ * @param handle	Handle to module file.
  * @param depbuf	Where to store name of unmet dependency (should be
  *			MODULE_NAME_MAX + 1 bytes long).
  *
@@ -229,14 +224,14 @@ out:
  *			required dependency is not loaded, the ERR_DEP_MISSING
  *			error code is returned.
  */
-int module_load_node(vfs_node_t *node, char *depbuf) {
+int module_load(object_handle_t *handle, char *depbuf) {
 	module_t *module;
 	symbol_t *sym;
 	int ret;
 
-	if(!node || !depbuf) {
+	if(!handle || !depbuf) {
 		return -ERR_PARAM_INVAL;
-	} else if(!elf_module_check(node)) {
+	} else if(!elf_module_check(handle)) {
 		return -ERR_TYPE_INVAL;
 	}
 
@@ -245,7 +240,7 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 	list_init(&module->header);
 	refcount_set(&module->count, 0);
 	symbol_table_init(&module->symtab);
-	module->node = node;
+	module->handle = handle;
 	module->shdrs = NULL;
 	module->load_base = NULL;
 	module->load_size = 0;
@@ -312,7 +307,7 @@ int module_load_node(vfs_node_t *node, char *depbuf) {
 		goto fail;
 	}
 
-	module->node = NULL;
+	module->handle = NULL;
 	kprintf(LOG_NORMAL, "module: successfully loaded module %s (%s)\n",
 	        module->name, module->description);
 	mutex_unlock(&module_lock);
@@ -328,36 +323,6 @@ fail:
 	kfree(module);
 
 	mutex_unlock(&module_lock);
-	return ret;
-}
-
-/** Load a kernel module.
- *
- * Loads a kernel module from the filesystem. If any of the dependencies of the
- * module are not met, the name of the first unmet dependency encountered is
- * stored in the buffer provided, which should be MODULE_NAME_MAX bytes long.
- * The intended usage of this function is to keep on calling it and loading
- * each unmet dependency it specifies until it succeeds.
- *
- * @param path		Path to module on filesystem.
- * @param depbuf	Where to store name of unmet dependency (should be
- *			MODULE_NAME_MAX bytes long).
- *
- * @return		0 on success, negative error code on failure. If a
- *			required dependency is not loaded, the ERR_DEP_MISSING
- *			error code is returned.
- */
-int module_load(const char *path, char *depbuf) {
-	vfs_node_t *node;
-	int ret;
-
-	/* Look up the node and check it is the correct type. */
-	if((ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node)) != 0) {
-		return ret;
-	}
-
-	ret = module_load_node(node, depbuf);
-	vfs_node_release(node);
 	return ret;
 }
 
@@ -466,6 +431,7 @@ int kdbg_cmd_modules(int argc, char **argv) {
  */
 int sys_module_load(const char *path, char *depbuf) {
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
+	object_handle_t *handle;
 	int ret, err;
 
 	/* Copy the path across. */
@@ -473,12 +439,20 @@ int sys_module_load(const char *path, char *depbuf) {
 		return (handle_t)ret;
 	}
 
-	ret = module_load(kpath, kdepbuf);
+	/* Open a handle to the file. */
+	if((ret = vfs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
+		kfree(kpath);
+		return ret;
+	}
+
+	ret = module_load(handle, kdepbuf);
 	if(ret == -ERR_DEP_MISSING) {
 		if((err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1)) != 0) {
 			ret = err;
 		}
 	}
 
+	object_handle_release(handle);
+	kfree(kpath);
 	return ret;
 }

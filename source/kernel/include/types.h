@@ -34,15 +34,15 @@ typedef _Bool bool;			/**< Boolean type. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */
 typedef int32_t thread_id_t;		/**< Type used to store a thread ID. */
 typedef int32_t port_id_t;		/**< Type used to store a port ID. */
-typedef int32_t handle_t;		/**< Type used to store a handle to a per-process object. */
+typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
+typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
+typedef int32_t handle_t;		/**< Type used to store a handle to an object. */
 typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
-/** TODO: Rename me. */
-typedef uint64_t inode_t;		/**< Type used to store a filesystem inode number. */
-
 /** TODO: To be removed. */
+typedef uint64_t inode_t;		/**< Type used to store a filesystem inode number. */
 typedef int32_t identifier_t;		/**< Type used to store an identifier for a global object. */
 
 /** Internal kernel integer types. */

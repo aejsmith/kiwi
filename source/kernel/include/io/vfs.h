@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -39,7 +39,7 @@ struct vfs_node;
 
 /** Filesystem type description structure.
  * @note		When adding new required operations to this structure,
- *			add a check to fs_type_register(). */
+ *			add a check to vfs_type_register(). */
 typedef struct vfs_type {
 	list_t header;			/**< Link to types list. */
 
@@ -64,9 +64,9 @@ typedef struct vfs_type {
 	 * @note		It is guaranteed that the device will contain
 	 *			the correct FS type when this is called, as
 	 *			the probe operation is called prior to this.
-	 * @note		This function should fill in details for the
-	 *			root filesystem node as though node_get were
-	 *			called on it.
+	 * @note		This function should create the root node for
+	 *			the filesystem and store it in mount->root, as
+	 *			though node_get was called for it.
 	 * @param mount		Mount structure for the FS. This structure will
 	 *			contain a pointer to the device the FS resides
 	 *			on (if the filesystem has no source, the device
@@ -117,11 +117,12 @@ typedef struct vfs_type {
 	 * Node manipulation functions.
 	 */
 
-	/** Fill out a node structure with details of a node.
-	 * @param node		Node structure to fill out.
-	 * @param id		ID of node that structure is for.
+	/** Read a node from the filesystem.
+	 * @param mount		Mount to obtain node from.
+	 * @param id		ID of node to get.
+	 * @param nodep		Where to store pointer to node structure.
 	 * @return		0 on success, negative error code on failure. */
-	int (*node_get)(struct vfs_node *node, identifier_t id);
+	int (*node_get)(struct vfs_mount *mount, node_id_t id, struct vfs_node **nodep);
 
 	/** Flush changes to node metadata.
 	 * @param node		Node to flush.
@@ -184,16 +185,6 @@ typedef struct vfs_type {
 	 * @return		0 on success, negative error code on failure. */
 	int (*file_resize)(struct vfs_node *node, file_size_t size);
 
-	/** Open a file.
-	 * @param node		Node being opened (will be VFS_NODE_FILE).
-	 * @param flags		Flags to fs_file_open().
-	 * @return		0 on success, negative error code on failure. */
-	int (*file_open)(struct vfs_node *node, int flags);
-
-	/** Close a file.
-	 * @param node		Node being closed. */
-	void (*file_close)(struct vfs_node *node);
-
 	/**
 	 * Directory functions.
 	 */
@@ -205,16 +196,6 @@ typedef struct vfs_type {
 	 * @param node		Node to cache contents of.
 	 * @return		0 on success, negative error code on failure. */
 	int (*dir_cache)(struct vfs_node *node);
-
-	/** Open a directory.
-	 * @param node		Directory being opened.
-	 * @param flags		Flags to fs_dir_open().
-	 * @return		0 on success, negative error code on failure. */
-	int (*dir_open)(struct vfs_node *node, int flags);
-
-	/** Close a directory.
-	 * @param node		Node being closed. */
-	void (*dir_close)(struct vfs_node *node);
 
 	/**
 	 * Symbolic link functions.
@@ -235,7 +216,7 @@ typedef struct vfs_mount {
 	list_t header;			/**< Link to mounts list. */
 
 	mutex_t lock;			/**< Lock to protect structure. */
-	identifier_t id;		/**< Mount ID. */
+	mount_id_t id;			/**< Mount ID. */
 	vfs_type_t *type;		/**< Filesystem type. */
 	void *data;			/**< Filesystem type data. */
 	object_handle_t *device;	/**< Handle to device that the filesystem resides on. */
@@ -249,54 +230,49 @@ typedef struct vfs_mount {
 	list_t unused_nodes;		/**< List of unused nodes (in LRU order). */
 } vfs_mount_t;
 
+/** Type of a filesystem node. */
+typedef enum vfs_node_type {
+	VFS_NODE_FILE,			/**< Regular file. */
+	VFS_NODE_DIR,			/**< Directory. */
+	VFS_NODE_SYMLINK,		/**< Symbolic link. */
+	VFS_NODE_BLKDEV,		/**< Block device. */
+	VFS_NODE_CHRDEV,		/**< Character device. */
+	VFS_NODE_FIFO,			/**< FIFO (named pipe). */
+	VFS_NODE_SOCK,			/**< Socket. */
+} vfs_node_type_t;
+
 /** Structure describing a node in the filesystem. */
 typedef struct vfs_node {
-	list_t header;			/**< Link to mount's node lists. */
+	object_t obj;                   /**< Object header. */
 
 	mutex_t lock;			/**< Lock to protect the node. */
+	list_t mount_link;		/**< Link to mount's node lists. */
 	refcount_t count;		/**< Reference count to track users of the node. */
-	identifier_t id;		/**< Identifier of the node. */
+	node_id_t id;			/**< Identifier of the node. */
+	vfs_node_type_t type;		/**< Type of the node. */
 	vfs_mount_t *mount;		/**< Mount that the node resides on. */
 	void *data;			/**< Internal data pointer for filesystem type. */
 	int flags;			/**< Behaviour flags for the node. */
 	vfs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 
-	/** Type of the node. */
-	enum {
-		VFS_NODE_FILE,		/**< Regular file. */
-		VFS_NODE_DIR,		/**< Directory. */
-		VFS_NODE_SYMLINK,	/**< Symbolic link. */
-		VFS_NODE_BLKDEV,	/**< Block device. */
-		VFS_NODE_CHRDEV,	/**< Character device. */
-		VFS_NODE_FIFO,		/**< FIFO (named pipe). */
-		VFS_NODE_SOCK,		/**< Socket. */
-	} type;
-
 	avl_tree_t pages;		/**< Tree of cached data pages (VFS_NODE_FILE). */
+	file_size_t size;		/**< Total size of node data on filesystem. */
 	radix_tree_t dir_entries;	/**< Tree of cached directory entries (VFS_NODE_DIR). */
-	file_size_t size;		/**< Total size of node data/number of cached directory entries. */
+	size_t entry_count;		/**< Number of cached directory entries. */
 	char *link_dest;		/**< Cached symlink destination (VFS_NODE_SYMLINK). */
 } vfs_node_t;
-
-/** Data for a VFS handle (both handle types need the same data). */
-typedef struct vfs_handle {
-	mutex_t lock;			/**< Lock to protect offset. */
-	vfs_node_t *node;		/**< Node that the handle refers to. */
-	offset_t offset;		/**< Current file offset. */
-	int flags;			/**< Flags the file was opened with. */
-} vfs_handle_t;
 
 /** Directory entry information structure. */
 typedef struct vfs_dir_entry {
 	size_t length;			/**< Length of this structure including name. */
-	identifier_t id;		/**< ID of the node for the entry. */
+	node_id_t id;			/**< ID of the node for the entry. */
 	char name[];			/**< Name of entry. */
 } vfs_dir_entry_t;
 
 /** Filesystem node information structure. */
 typedef struct vfs_info {
-	identifier_t id;		/**< Node ID. */
-	identifier_t mount;		/**< Mount ID. */
+	node_id_t id;			/**< Node ID. */
+	mount_id_t mount;		/**< Mount ID. */
 	size_t blksize;			/**< I/O block size. */
 	file_size_t size;		/**< Total size of node data on filesystem. */
 	size_t links;			/**< Number of links to the node. */
@@ -315,32 +291,53 @@ typedef struct vfs_info {
 /** Macro to check if a node is read-only. */
 #define VFS_NODE_IS_RDONLY(node)	((node)->mount && (node)->mount->flags & VFS_MOUNT_RDONLY)
 
+/** Behaviour flags for both FS handle types. */
+#define FS_HANDLE_NONBLOCK	(1<<0)	/**< I/O operations on the handle should not block. */
+
+/** Behaviour flags for fs_file_open(). */
+#define FS_FILE_READ		(1<<1)	/**< Open for reading. */
+#define FS_FILE_WRITE		(1<<2)	/**< Open for writing. */
+#define FS_FILE_APPEND		(1<<3)	/**< Before each write, offset is set to the end of the file. */
+
+/** Operations for fs_handle_seek(). */
+#define FS_SEEK_SET		1	/**< Set the offset to the exact position specified. */
+#define FS_SEEK_ADD		2	/**< Add the supplied value to the current offset. */
+#define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
+
 extern vfs_mount_t *vfs_root_mount;
 
 extern int vfs_type_register(vfs_type_t *type);
 extern int vfs_type_unregister(vfs_type_t *type);
 
-extern int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep);
+extern vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, vfs_node_type_t type);
 extern void vfs_node_get(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
-extern void vfs_node_info(vfs_node_t *node, vfs_info_t *info);
 
-extern int vfs_file_create(const char *path, vfs_node_t **nodep);
-extern int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep);
-extern int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int vfs_file_resize(vfs_node_t *node, file_size_t size);
+extern int vfs_file_create(const char *path);
+extern int vfs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep);
+extern int vfs_file_open(const char *path, int flags, object_handle_t **handlep);
+extern int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
+extern int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
+extern int vfs_file_resize(object_handle_t *handle, file_size_t size);
 
-extern void vfs_dir_entry_add(vfs_node_t *node, identifier_t id, const char *name);
-extern int vfs_dir_create(const char *path, vfs_node_t **nodep);
-extern int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t index);
+extern void vfs_dir_entry_add(vfs_node_t *node, node_id_t id, const char *name);
+extern int vfs_dir_create(const char *path);
+extern int vfs_dir_open(const char *path, int flags, object_handle_t **handlep);
+extern int vfs_dir_read(object_handle_t *handle, vfs_dir_entry_t *buf, size_t size, offset_t index);
 
-extern int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep);
-extern int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size);
+extern int vfs_handle_seek(object_handle_t *handle, int action, offset_t offset, offset_t *newp);
+extern int vfs_handle_info(object_handle_t *handle, vfs_info_t *info);
+extern int vfs_handle_sync(object_handle_t *handle);
+
+extern int vfs_symlink_create(const char *path, const char *target);
+extern int vfs_symlink_read(const char *path, char *buf, size_t size);
 
 extern int vfs_mount(const char *dev, const char *path, const char *type, int flags);
 extern int vfs_unmount(const char *path);
+extern int vfs_info(const char *path, bool follow, vfs_info_t *info);
+//extern int vfs_link(const char *source, const char *dest);
 extern int vfs_unlink(const char *path);
+//extern int vfs_rename(const char *source, const char *dest);
 
 extern void vfs_mount_root(struct kernel_args *args);
 extern void vfs_init(void);
@@ -348,20 +345,6 @@ extern void vfs_init(void);
 extern int kdbg_cmd_mounts(int argc, char **argv);
 extern int kdbg_cmd_vnodes(int argc, char **argv);
 extern int kdbg_cmd_vnode(int argc, char **argv);
-
-/** Behaviour flags for fs_file_open(). */
-#define FS_FILE_READ		0x0001	/**< Open for reading. */
-#define FS_FILE_WRITE		0x0002	/**< Open for writing. */
-#define FS_FILE_APPEND		0x0004	/**< Before each write, offset is set to the end of the file. */
-#define FS_FILE_NONBLOCK	0x0008	/**< Read/write operations on the file will not block. */
-
-/** Behaviour flags for fs_dir_open(). */
-#define FS_DIR_NONBLOCK		0x0001	/**< Read operations on the directory should not block. */
-
-/** Operations for fs_handle_seek(). */
-#define FS_HANDLE_SEEK_SET	1	/**< Set the offset to the exact position specified. */
-#define FS_HANDLE_SEEK_ADD	2	/**< Add the supplied value to the current offset. */
-#define FS_HANDLE_SEEK_END	3	/**< Set the offset to the end of the file plus the supplied value. */
 
 extern int sys_fs_file_create(const char *path);
 extern handle_t sys_fs_file_open(const char *path, int flags);

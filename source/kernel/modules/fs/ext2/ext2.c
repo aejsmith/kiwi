@@ -30,7 +30,7 @@
 
 #include "ext2_priv.h"
 
-static int ext2_node_get(vfs_node_t *node, identifier_t id);
+static int ext2_node_get(vfs_mount_t *mount, node_id_t id, vfs_node_t **nodep);
 
 /** Flush data for an Ext2 mount to disk.
  * @note		Should not be called if mount is read-only.
@@ -171,7 +171,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	}
 
 	/* Now get the root inode (second inode in first group descriptor) */
-	if((ret = ext2_node_get(_mount->root, EXT2_ROOT_INO)) != 0) {
+	if((ret = ext2_node_get(_mount, EXT2_ROOT_INO, &_mount->root)) != 0) {
 		goto fail;
 	}
 
@@ -239,46 +239,43 @@ static int ext2_page_flush(vfs_node_t *node, const void *page, offset_t offset, 
 }
 
 /** Read in an Ext2 filesystem node.
- * @param node		Node structure to fill out.
- * @param id		ID of node that structure is for.
+ * @param _mount	Mount to get node from.
+ * @param id		ID of node to get.
+ * @param nodep		Where to store pointer to node structure.
  * @return		0 on success, negative error code on failure. */
-static int ext2_node_get(vfs_node_t *node, identifier_t id) {
-	ext2_mount_t *mount = node->mount->data;
+static int ext2_node_get(vfs_mount_t *_mount, node_id_t id, vfs_node_t **nodep) {
+	ext2_mount_t *mount = _mount->data;
+	vfs_node_type_t type;
 	ext2_inode_t *inode;
+	vfs_node_t *node;
 	int ret;
 
 	if((ret = ext2_inode_get(mount, id, &inode)) != 0) {
 		return ret;
 	}
 
-	node->id = id;
-	node->data = inode;
-	node->size = le32_to_cpu(inode->disk.i_size);
-
 	/* Figure out the node type. */
 	switch(le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFMT) {
 	case EXT2_S_IFSOCK:
-		node->type = VFS_NODE_SOCK;
+		type = VFS_NODE_SOCK;
 		break;
 	case EXT2_S_IFLNK:
-		node->type = VFS_NODE_SYMLINK;
+		type = VFS_NODE_SYMLINK;
 		break;
 	case EXT2_S_IFREG:
-		node->type = VFS_NODE_FILE;
+		type = VFS_NODE_FILE;
 		break;
 	case EXT2_S_IFBLK:
-		node->type = VFS_NODE_BLKDEV;
+		type = VFS_NODE_BLKDEV;
 		break;
 	case EXT2_S_IFDIR:
-		/* For directories size is used internally by the VFS. */
-		node->size = 0;
-		node->type = VFS_NODE_DIR;
+		type = VFS_NODE_DIR;
 		break;
 	case EXT2_S_IFCHR:
-		node->type = VFS_NODE_CHRDEV;
+		type = VFS_NODE_CHRDEV;
 		break;
 	case EXT2_S_IFIFO:
-		node->type = VFS_NODE_FIFO;
+		type = VFS_NODE_FIFO;
 		break;
 	default:
 		dprintf("ext2: inode %" PRId32 " has invalid type in mode (%" PRIu16 ")\n",
@@ -288,13 +285,19 @@ static int ext2_node_get(vfs_node_t *node, identifier_t id) {
 	}
 
 	/* Sanity check. */
-	if(id == EXT2_ROOT_INO && node->type != VFS_NODE_DIR) {
+	if(id == EXT2_ROOT_INO && type != VFS_NODE_DIR) {
 		dprintf("ext2: root inode %" PRId32 " is not a directory (%" PRIu16 ")\n",
 		        id, le16_to_cpu(inode->disk.i_mode));
 		ext2_inode_release(inode);
 		return -ERR_FORMAT_INVAL;
 	}
 
+	/* Create and fill out a node structure. */
+	node = vfs_node_alloc(_mount, type);
+	node->id = id;
+	node->data = inode;
+	node->size = le32_to_cpu(inode->disk.i_size);
+	*nodep = node;
 	return 0;
 }
 

@@ -61,7 +61,9 @@ static slab_cache_t *object_handle_cache;
 
 /** Initialise an object structure.
  * @param obj		Object to initialise.
- * @param type		Pointer to type structure for object type.
+ * @param type		Pointer to type structure for object type. Can be NULL,
+ *			in which case the object will be a 'NULL object', and
+ *			handles will never be created to it.
  * @param flags		Behaviour flags for the object. */
 void object_init(object_t *obj, object_type_t *type, int flags) {
 	if(flags & OBJECT_MAPPABLE) {
@@ -93,6 +95,7 @@ object_handle_t *object_handle_create(object_t *obj, void *data) {
 	object_handle_t *handle;
 
 	assert(obj);
+	assert(obj->type);
 
 	handle = slab_cache_alloc(object_handle_cache, MM_SLEEP);
 	refcount_set(&handle->count, 1);

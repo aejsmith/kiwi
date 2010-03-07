@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -45,7 +45,7 @@ typedef struct module {
 	/** Internally-used information. */
 	symbol_table_t symtab;		/**< Symbol table for the module. */
 	refcount_t count;		/**< Count of modules depending on this module. */
-	vfs_node_t *node;		/**< Node for the module (only valid while loading). */
+	object_handle_t *handle;	/**< Handle to module file (only valid while loading). */
 
 	/** Module information. */
 	const char *name;		/**< Name of module. */
@@ -92,9 +92,8 @@ typedef struct module {
 
 extern void *module_mem_alloc(size_t size, int mmflag);
 
-extern int module_name(vfs_node_t *node, char *namebuf);
-extern int module_load_node(vfs_node_t *node, char *depbuf);
-extern int module_load(const char *path, char *depbuf);
+extern int module_name(object_handle_t *handle, char *namebuf);
+extern int module_load(object_handle_t *handle, char *depbuf);
 
 extern symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp);
 extern symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported);

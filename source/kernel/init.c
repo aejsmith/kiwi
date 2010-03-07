@@ -53,9 +53,10 @@
 
 /** Structure describing a boot module. */
 typedef struct boot_module {
-	list_t header;		/**< Link to modules list. */
-	vfs_node_t *node;	/**< Node containing module data. */
-	char *name;		/**< Name of the module. */
+	list_t header;			/**< Link to modules list. */
+	object_handle_t *handle;	/**< Handle to in-memory module file. */
+	char *name;			/**< Name of the module. */
+	size_t size;			/**< Size of the module data. */
 } boot_module_t;
 
 extern void kmain(kernel_args_t *args, uint32_t cpu);
@@ -83,7 +84,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	if(mod->name) {
 		kfree(mod->name);
 	}
-	vfs_node_release(mod->node);
+	object_handle_release(mod->handle);
 	kfree(mod);
 
 	/* Update progress. */
@@ -112,15 +113,16 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @param mod		Boot module containing archive.
  * @return		Whether the module was a TAR archive. */
 static bool __init_text boot_module_load_tar(boot_module_t *mod) {
+	object_handle_t *handle;
 	tar_header_t *hdr;
-	vfs_node_t *node;
 	int64_t size;
 	size_t bytes;
 	void *buf;
 	int ret;
 
-	buf = hdr = kmalloc(mod->node->size, MM_FATAL);
-	if(vfs_file_read(mod->node, buf, mod->node->size, 0, &bytes) != 0 || bytes != mod->node->size) {
+	/* Get the size of the data. */
+	buf = hdr = kmalloc(mod->size, MM_FATAL);
+	if(vfs_file_read(mod->handle, buf, mod->size, 0, &bytes) != 0 || bytes != mod->size) {
 		fatal("Could not read TAR file data");
 	}
 
@@ -152,22 +154,24 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 		switch(hdr->typeflag) {
 		case REGTYPE:
 		case AREGTYPE:
-			if((ret = vfs_file_create(hdr->name, &node)) != 0) {
+			if((ret = vfs_file_create(hdr->name)) != 0) {
 				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
-			} else if((ret = vfs_file_write(node, (void *)((ptr_t)hdr + 512), size, 0, &bytes)) != 0) {
+			} else if((ret = vfs_file_open(hdr->name, FS_FILE_WRITE, &handle)) != 0) {
+				fatal("Failed to open file %s (%d)", hdr->name, ret);
+			} else if((ret = vfs_file_write(handle, (void *)((ptr_t)hdr + 512), size, 0, &bytes)) != 0) {
 				fatal("Failed to write file %s (%d)", hdr->name, ret);
 			} else if((int64_t)bytes != size) {
 				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
 			}
-			vfs_node_release(node);
+			object_handle_release(handle);
 			break;
 		case DIRTYPE:
-			if((ret = vfs_dir_create(hdr->name, NULL)) != 0) {
+			if((ret = vfs_dir_create(hdr->name)) != 0) {
 				fatal("Failed to create directory %s (%d)", hdr->name, ret);
 			}
 			break;
 		case SYMTYPE:
-			if((ret = vfs_symlink_create(hdr->name, hdr->linkname, NULL)) != 0) {
+			if((ret = vfs_symlink_create(hdr->name, hdr->linkname)) != 0) {
 				fatal("Failed to create symbolic link %s (%d)", hdr->name, ret);
 			}
 			break;
@@ -195,7 +199,7 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 
 	/* Try to load the module and all dependencies. */
 	while(true) {
-		if((ret = module_load_node(mod->node, name)) == 0) {
+		if((ret = module_load(mod->handle, name)) == 0) {
 			boot_module_remove(mod);
 			return true;
 		} else if(ret == -ERR_TYPE_INVAL) {
@@ -226,18 +230,19 @@ static void __init_text load_modules(kernel_args_t *args) {
 
 	/* Firstly, populate our module list with the module details from the
 	 * bootloader. This is done so that it's much easier to look up module
-	 * dependencies, and also because the module loader requires VFS
-	 * nodes rather than a chunk of memory. */
+	 * dependencies, and also because the module loader requires handles
+	 * rather than a chunk of memory. */
 	for(addr = args->modules; addr;) {
 		amod = page_phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
 
 		mod = kmalloc(sizeof(boot_module_t), MM_FATAL);
 		list_init(&mod->header);
 		mod->name = NULL;
+		mod->size = amod->size;
 
 		/* Map in the data and convert it into a VFS node. */
 		mapping = page_phys_map(amod->base, amod->size, MM_FATAL);
-		if(vfs_file_from_memory(mapping, amod->size, &mod->node) != 0) {
+		if(vfs_file_from_memory(mapping, amod->size, FS_FILE_READ, &mod->handle) != 0) {
 			fatal("Failed to create node from module data");
 		}
 		page_phys_unmap(mapping, amod->size, true);
@@ -245,7 +250,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		/* Figure out the module name. Do not fail if unable to get
 		 * the name, may be a filesystem image or something. */
 		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
-		if(module_name(mod->node, tmp) != 0) {
+		if(module_name(mod->handle, tmp) != 0) {
 			kfree(tmp);
 		} else {
 			mod->name = tmp;

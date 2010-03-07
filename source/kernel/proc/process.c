@@ -16,6 +16,8 @@
 /**
  * @file
  * @brief		Process management functions.
+ *
+ * @todo		Check execute permission on binaries.
  */
 
 #include <lib/avl.h>
@@ -289,8 +291,8 @@ static int copy_arguments(const char *kpath, const char **kargs, const char **ke
  * @param arg2		Unused. */
 static void process_create_thread(void *arg1, void *arg2) {
 	process_create_info_t *info = arg1;
+	object_handle_t *handle = NULL;
 	ptr_t stack, entry, uargs;
-	vfs_node_t *node = NULL;
 	void *data = NULL;
 	int ret;
 
@@ -299,13 +301,13 @@ static void process_create_thread(void *arg1, void *arg2) {
 	assert(info->environ);
 	assert(curr_proc->aspace == curr_aspace);
 
-	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(info->path, true, VFS_NODE_FILE, &node)) != 0) {
+	/* Open a handle to the binary. */
+	if((ret = vfs_file_open(info->path, FS_FILE_READ, &handle)) != 0) {
 		goto fail;
 	}
 
 	/* Get the ELF loader to do the main work of loading the binary. */
-	if((ret = elf_binary_load(node, curr_aspace, &data)) != 0) {
+	if((ret = elf_binary_load(handle, curr_aspace, &data)) != 0) {
 		goto fail;
 	}
 
@@ -328,7 +330,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 
 	/* Clean up our mess and wake up the caller. */
 	elf_binary_cleanup(data);
-	vfs_node_release(node);
+	object_handle_release(handle);
 	semaphore_up(&info->sem, 1);
 
 	/* To userspace, and beyond! */
@@ -339,8 +341,8 @@ fail:
 	if(data) {
 		elf_binary_cleanup(data);
 	}
-	if(node) {
-		vfs_node_release(node);
+	if(handle) {
+		object_handle_release(handle);
 	}
 	info->ret = ret;
 	semaphore_up(&info->sem, 1);
@@ -698,9 +700,9 @@ fail:
  */
 int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags) {
 	const char **kargs, **kenv, *kpath;
+	object_handle_t *handle = NULL;
 	vm_aspace_t *as = NULL, *old;
 	ptr_t stack, entry, uargs;
-	vfs_node_t *node = NULL;
 	void *data = NULL;
 	char *name;
 	int ret;
@@ -716,8 +718,8 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 		goto fail;
 	}
 
-	/* Look up the node on the filesystem. */
-	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_FILE, &node)) != 0) {
+	/* Open a handle to the binary. */
+	if((ret = vfs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
 		goto fail;
 	}
 
@@ -725,7 +727,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 	as = vm_aspace_create();
 
 	/* Get the ELF loader to do the main work of loading the binary. */
-	if((ret = elf_binary_load(node, as, &data)) != 0) {
+	if((ret = elf_binary_load(handle, as, &data)) != 0) {
 		goto fail;
 	}
 
@@ -762,7 +764,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 
 	/* Clean up our mess. */
 	elf_binary_cleanup(data);
-	vfs_node_release(node);
+	object_handle_release(handle);
 	sys_process_arg_free(kpath, kargs, kenv);
 
 	/* To userspace, and beyond! */
@@ -776,8 +778,8 @@ fail:
 	if(as) {
 		vm_aspace_destroy(as);
 	}
-	if(node) {
-		vfs_node_release(node);
+	if(handle) {
+		object_handle_release(handle);
 	}
 	sys_process_arg_free(kpath, kargs, kenv);
 	return ret;

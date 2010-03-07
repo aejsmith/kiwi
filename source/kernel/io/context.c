@@ -29,16 +29,14 @@
  *
  * Initialises an I/O context structure. If a parent context is provided, then
  * the new context will inherit parts of the parent context such as current
- * working directory. In-progress asynchronous I/O requests are not inherited.
- * If no parent is specified, the working directory will be set to the root of
- * the filesystem.
+ * working directory. If no parent is specified, the working directory will be
+ * set to the root of the filesystem.
  *
  * @param context	Context to initialise.
  * @param parent	Parent context (can be NULL).
  */
 void io_context_init(io_context_t *context, io_context_t *parent) {
 	mutex_init(&context->lock, "io_context_lock", 0);
-	list_init(&context->async_requests);
 	context->curr_dir = NULL;
 	context->root_dir = NULL;
 
@@ -68,12 +66,7 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
 }
 
 /** Destroy an I/O context.
- *
- * Destroys an I/O context by cancelling all in-progress asynchronous I/O
- * requests and freeing its current directory.
- *
- * @param context	Context to destroy.
- */
+ * @param context	Context to destroy. */
 void io_context_destroy(io_context_t *context) {
 	vfs_node_release(context->curr_dir);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -24,6 +24,11 @@
  *			can occur (lock node, attempt to lock mount which
  *			blocks because node is being searched for, search
  *			attempts to lock node, deadlock).
+ *
+ * @todo		This needs a major cleanup, and should be split up into
+ *			multiple files.
+ * @todo		Implement FS_HANDLE_NONBLOCK.
+ * @todo		Could probably use an rwlock on nodes.
  */
 
 #include <io/context.h>
@@ -40,6 +45,8 @@
 
 #include <proc/process.h>
 
+#include <sync/rwlock.h>
+
 #include <assert.h>
 #include <console.h>
 #include <errors.h>
@@ -53,10 +60,20 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Data for a VFS handle (both handle types need the same data). */
+typedef struct vfs_handle {
+	rwlock_t lock;			/**< Lock to protect offset. */
+	offset_t offset;		/**< Current file offset. */
+	int flags;			/**< Flags the file was opened with. */
+} vfs_handle_t;
+
 extern vfs_type_t ramfs_fs_type;
 
+/** Pointer to mount at root of the filesystem. */
+vfs_mount_t *vfs_root_mount = NULL;
+
 /** List of all mounts. */
-static identifier_t vfs_next_mount_id = 0;
+static mount_id_t vfs_next_mount_id = 0;
 static LIST_DECLARE(vfs_mount_list);
 static MUTEX_DECLARE(vfs_mount_lock, 0);
 
@@ -67,12 +84,12 @@ static MUTEX_DECLARE(vfs_type_list_lock, 0);
 /** Filesystem node slab cache. */
 static slab_cache_t *vfs_node_cache;
 
-/** Pointer to mount at root of the filesystem. */
-vfs_mount_t *vfs_root_mount = NULL;
+static object_type_t vfs_file_object_type;
+static object_type_t vfs_dir_object_type;
 
 static int vfs_node_free(vfs_node_t *node);
 static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page);
-static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name);
+static int vfs_dir_entry_get(vfs_node_t *node, const char *name, node_id_t *idp);
 static int vfs_symlink_cache_dest(vfs_node_t *node);
 
 /** Look up a filesystem type with lock already held.
@@ -135,14 +152,14 @@ static vfs_type_t *vfs_type_probe(object_handle_t *handle) {
 }
 
 /** Register a new filesystem type.
- *
- * Registers a new filesystem type with the VFS.
- *
  * @param type		Pointer to type structure to register.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int vfs_type_register(vfs_type_t *type) {
+	/* Check for required operations. */
+	if(!type->mount) {
+		return -ERR_PARAM_INVAL;
+	}
+
 	mutex_lock(&vfs_type_list_lock);
 
 	/* Check if this type already exists. */
@@ -194,7 +211,7 @@ int vfs_type_unregister(vfs_type_t *type) {
 static int vfs_node_cache_ctor(void *obj, void *data, int kmflag) {
 	vfs_node_t *node = (vfs_node_t *)obj;
 
-	list_init(&node->header);
+	list_init(&node->mount_link);
 	mutex_init(&node->lock, "vfs_node_lock", 0);
 	refcount_set(&node->count, 0);
 	avl_tree_init(&node->pages);
@@ -227,7 +244,7 @@ static void vfs_node_cache_reclaim(void *data, bool force) {
 		mutex_lock(&mount->lock);
 
 		LIST_FOREACH_SAFE(&mount->unused_nodes, niter) {
-			node = list_entry(niter, vfs_node_t, header);
+			node = list_entry(niter, vfs_node_t, mount_link);
 
 			/* On success, node is unlocked by vfs_node_free(). */
 			mutex_lock(&node->lock);
@@ -249,26 +266,35 @@ static void vfs_node_cache_reclaim(void *data, bool force) {
 /** Allocate a node structure and set one reference on it.
  * @note		Does not attach to the mount.
  * @param mount		Mount that the node resides on.
- * @param mmflag	Allocation flags.
- * @return		Pointer to node on success, NULL on failure (always
- *			succeeds if MM_SLEEP is specified). */
-static vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, int mmflag) {
+ * @param type		Type to give the node.
+ * @return		Pointer to node structure allocated. */
+vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, vfs_node_type_t type) {
 	vfs_node_t *node;
 
-	node = slab_cache_alloc(vfs_node_cache, mmflag);
-	if(node == NULL) {
-		return NULL;
-	}
-
+	node = slab_cache_alloc(vfs_node_cache, MM_SLEEP);
+	refcount_set(&node->count, 1);
 	node->id = 0;
 	node->mount = mount;
 	node->flags = 0;
-	node->type = VFS_NODE_FILE;
+	node->type = type;
 	node->size = 0;
+	node->entry_count = 0;
 	node->link_dest = NULL;
 	node->mounted = NULL;
 
-	refcount_inc(&node->count);
+	/* Initialise the node's object header. */
+	switch(type) {
+	case VFS_NODE_FILE:
+		object_init(&node->obj, &vfs_file_object_type, OBJECT_MAPPABLE);
+		break;
+	case VFS_NODE_DIR:
+		object_init(&node->obj, &vfs_dir_object_type, 0);
+		break;
+	default:
+		object_init(&node->obj, NULL, 0);
+		break;
+	}
+
 	return node;
 }
 
@@ -352,17 +378,18 @@ static int vfs_node_free(vfs_node_t *node) {
 	 * the mount's node_free operation (if any). */
 	if(node->mount) {
 		avl_tree_remove(&node->mount->nodes, (key_t)node->id);
-		list_remove(&node->header);
+		list_remove(&node->mount_link);
 		if(node->mount->type->node_free) {
 			node->mount->type->node_free(node);
 		}
 	}
 
-	/* Free up other cached bits of data.*/
+	/* Free up other bits of data.*/
 	radix_tree_clear(&node->dir_entries, kfree);
 	if(node->link_dest) {
 		kfree(node->link_dest);
 	}
+	object_destroy(&node->obj);
 
 	dprintf("vfs: freed node %p(%" PRId32 ":%" PRId32 ")\n", node,
 	        (node->mount) ? node->mount->id : -1, node->id);
@@ -385,7 +412,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 	vfs_node_t *prev = NULL, *tmp;
 	vfs_mount_t *mount;
 	char *tok, *link;
-	identifier_t id;
+	node_id_t id;
 	int ret;
 
 	/* Handle absolute paths here rather than in vfs_node_lookup() because
@@ -532,10 +559,10 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		}
 
 		/* Look up this name within the directory entry cache. */
-		if((id = vfs_dir_entry_get(node, tok)) < 0) {
+		if((ret = vfs_dir_entry_get(node, tok, &id)) != 0) {
 			mutex_unlock(&node->lock);
 			vfs_node_release(node);
-			return (int)id;
+			return ret;
 		}
 
 		/* If the ID is the same as the current node (e.g. the '.'
@@ -573,7 +600,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				/* Reference the node and lock it, and move it
 				 * to the used list if it was unused before. */
 				if(refcount_inc(&node->count) == 1) {
-					list_append(&mount->used_nodes, &node->header);
+					list_append(&mount->used_nodes, &node->mount_link);
 				}
 
 				mutex_unlock(&mount->lock);
@@ -588,20 +615,16 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				return -ERR_NOT_SUPPORTED;
 			}
 
-			/* Allocate a new node structure. */
-			node = vfs_node_alloc(mount, MM_SLEEP);
-
 			/* Request the node from the filesystem. */
-			if((ret = mount->type->node_get(node, id)) != 0) {
+			if((ret = mount->type->node_get(mount, id, &node)) != 0) {
 				mutex_unlock(&mount->lock);
-				slab_cache_free(vfs_node_cache, node);
 				vfs_node_release(prev);
 				return ret;
 			}
 
 			/* Attach the node to the node tree and used list. */
 			avl_tree_insert(&mount->nodes, (key_t)id, node, NULL);
-			list_append(&mount->used_nodes, &node->header);
+			list_append(&mount->used_nodes, &node->mount_link);
 			mutex_unlock(&mount->lock);
 		}
 
@@ -640,7 +663,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep) {
+static int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep) {
 	vfs_node_t *node = NULL;
 	char *dup;
 	int ret;
@@ -681,13 +704,9 @@ int vfs_node_lookup(const char *path, bool follow, int type, vfs_node_t **nodep)
 }
 
 /** Increase the reference count of a node.
- *
- * Increases the reference count of a filesystem node. This function should not
- * be used on nodes with a zero reference count, as nothing outside the VFS
- * should access a node with a zero reference count.
- *
- * @param node		Node to increase reference count of.
- */
+ * @note		Should not be used on nodes with a zero reference
+ *			count.
+ * @param node		Node to increase reference count of. */
 void vfs_node_get(vfs_node_t *node) {
 	int val = refcount_inc(&node->count);
 
@@ -725,8 +744,8 @@ void vfs_node_release(vfs_node_t *node) {
 		/* Node has no references remaining, move it to its mount's
 		 * unused list if it has a mount. If the node is not attached
 		 * to anything, then destroy it immediately. */
-		if(mount && !(node->flags & VFS_NODE_REMOVED)) {
-			list_append(&node->mount->unused_nodes, &node->header);
+		if(mount && !(node->flags & VFS_NODE_REMOVED) && !list_empty(&node->mount_link)) {
+			list_append(&node->mount->unused_nodes, &node->mount_link);
 			dprintf("vfs: transferred node %p to unused list (mount: %p)\n", node, node->mount);
 			mutex_unlock(&node->lock);
 			mutex_unlock(&mount->lock);
@@ -759,7 +778,7 @@ void vfs_node_release(vfs_node_t *node) {
 static int vfs_node_create(const char *path, vfs_node_t *node) {
 	vfs_node_t *parent = NULL;
 	char *dir, *name;
-	identifier_t id;
+	node_id_t id;
 	int ret;
 
 	assert(!node->mount);
@@ -803,8 +822,10 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 
 	/* Check if the name we're creating already exists. This will populate
 	 * the entry cache so it will be OK to add the node to it. */
-	if((id = vfs_dir_entry_get(parent, name)) != -ERR_NOT_FOUND) {
-		ret = (id >= 0) ? -ERR_ALREADY_EXISTS : (int)id;
+	if((ret = vfs_dir_entry_get(parent, name, &id)) != -ERR_NOT_FOUND) {
+		if(ret == 0) {
+			ret = -ERR_ALREADY_EXISTS;
+		}
 		goto out;
 	}
 
@@ -816,7 +837,7 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 
 	/* Attach the node to the node tree and used list. */
 	avl_tree_insert(&node->mount->nodes, (key_t)node->id, node, NULL);
-	list_append(&node->mount->used_nodes, &node->header);
+	list_append(&node->mount->used_nodes, &node->mount_link);
 
 	/* Insert the node into the parent's entry cache. */
 	vfs_dir_entry_add(parent, node->id, name);
@@ -842,14 +863,9 @@ out:
 }
 
 /** Get information about a node.
- *
- * Gets information about a filesystem node and stores it in the provided
- * structure.
- *
  * @param node		Node to get information for.
- * @param info		Structure to store information in.
- */
-void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
+ * @param info		Structure to store information in. */
+static void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
 	mutex_lock(&node->lock);
 
 	/* Fill in default values for everything. */
@@ -865,6 +881,28 @@ void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
 	}
 
 	mutex_unlock(&node->lock);
+}
+
+/** Create a handle to a node.
+ * @param node		Node to create handle to. Will have an extra reference
+ *			added to it.
+ * @param flags		Flags for the handle.
+ * @return		Pointer to handle structure. */
+static object_handle_t *vfs_handle_create(vfs_node_t *node, int flags) {
+	object_handle_t *handle;
+	vfs_handle_t *data;
+
+	/* Allocate the per-handle data structure. */
+	data = kmalloc(sizeof(vfs_handle_t), MM_SLEEP);
+	rwlock_init(&data->lock, "vfs_handle_lock");
+	data->offset = 0;
+	data->flags = flags;
+
+	/* Create the handle. */
+	vfs_node_get(node);
+	handle = object_handle_create(&node->obj, data);
+	dprintf("vfs: opened handle %p to node %p (data: %p)\n", handle, node, data);
+	return handle;
 }
 
 /** Get a page from a file's cache.
@@ -1053,46 +1091,7 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 
 	return ret;
 }
-#if 0
-/** Increase the reference count of a file VM object.
- * @param obj		Object to reference.
- * @param region	Region referencing the object. */
-static void vfs_vm_object_get(vm_object_t *obj, vm_region_t *region) {
-	vfs_node_get((vfs_node_t *)obj);
-}
 
-/** Decrease the reference count of a file VM object.
- * @param obj		Object to decrease count of.
- * @param region	Region to detach. */
-static void vfs_vm_object_release(vm_object_t *obj, vm_region_t *region) {
-	vfs_node_release((vfs_node_t *)obj);
-}
-
-/** Get a page from a file VM object.
- * @param obj		Object to get page from.
- * @param offset	Offset of page to get.
- * @param pagep		Where to store pointer to page structure.
- * @return		0 on success, negative error code on failure. */
-static int vfs_vm_object_page_get(vm_object_t *obj, offset_t offset, vm_page_t **pagep) {
-	return vfs_file_page_get_internal((vfs_node_t *)obj, offset, false, pagep, NULL, NULL);
-}
-
-/** Release a page from a file VM object.
- * @param obj		Object that the page belongs to.
- * @param offset	Offset of page to release.
- * @param paddr		Physical address of page that was unmapped. */
-static void vfs_vm_object_page_release(vm_object_t *obj, offset_t offset, phys_ptr_t paddr) {
-	vfs_file_page_release_internal((vfs_node_t *)obj, offset, false);
-}
-
-/** File VM object operations. */
-static vm_object_ops_t vfs_vm_object_ops = {
-	.get = vfs_vm_object_get,
-	.release = vfs_vm_object_release,
-	.page_get = vfs_vm_object_page_get,
-	.page_release = vfs_vm_object_page_release,
-};
-#endif
 /** Get and map a page from a file's data cache.
  * @param node		Node to get page from.
  * @param offset	Offset of page to get.
@@ -1122,134 +1121,184 @@ static void vfs_file_page_unmap(vfs_node_t *node, void *mapping, offset_t offset
 	vfs_file_page_release_internal(node, offset, dirty);
 }
 
-/** Create a file in the file system.
- *
- * Creates a new regular file in the filesystem.
- *
+/** Close a handle to a file.
+ * @param handle	Handle to close. */
+static void vfs_file_object_close(object_handle_t *handle) {
+	vfs_node_release((vfs_node_t *)handle->object);
+	kfree(handle->data);
+}
+
+/** Get a page from a file object.
+ * @param handle	Handle to file to get page from.
+ * @param offset	Offset of page to get.
+ * @param pagep		Where to store pointer to page structure.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_file_object_page_get(object_handle_t *handle, offset_t offset, vm_page_t **pagep) {
+	return vfs_file_page_get_internal((vfs_node_t *)handle->object, offset, false, pagep, NULL, NULL);
+}
+
+/** Release a page from a file VM object.
+ * @param handle	Handle to file that the page belongs to.
+ * @param offset	Offset of page to release.
+ * @param paddr		Physical address of page that was unmapped. */
+static void vfs_file_object_page_release(object_handle_t *handle, offset_t offset, phys_ptr_t paddr) {
+	vfs_file_page_release_internal((vfs_node_t *)handle->object, offset, false);
+}
+
+/** File object operations. */
+static object_type_t vfs_file_object_type = {
+	.id = OBJECT_TYPE_FILE,
+	.close = vfs_file_object_close,
+	.page_get = vfs_file_object_page_get,
+	.page_release = vfs_file_object_page_release,
+};
+
+/** Create a regular file in the file system.
  * @param path		Path to file to create.
- * @param nodep		Where to store pointer to node for file (optional).
- *
- * @return		0 on success, negative error code on failure.
- */
-int vfs_file_create(const char *path, vfs_node_t **nodep) {
+ * @return		0 on success, negative error code on failure. */
+int vfs_file_create(const char *path) {
 	vfs_node_t *node;
 	int ret;
 
 	/* Allocate a new node and fill in some details. */
-	node = vfs_node_alloc(NULL, MM_SLEEP);
-	node->type = VFS_NODE_FILE;
+	node = vfs_node_alloc(NULL, VFS_NODE_FILE);
 
 	/* Call the common creation code. */
-	if((ret = vfs_node_create(path, node)) != 0) {
-		vfs_node_release(node);
-		return ret;
-	}
-
-	/* Store a pointer to the node or release it if it is not wanted. */
-	if(nodep) {
-		*nodep = node;
-	} else {
-		vfs_node_release(node);
-	}
-	return 0;
+	ret = vfs_node_create(path, node);
+	vfs_node_release(node);
+	return ret;
 }
 
-/** Create a special node backed by a chunk of memory.
+/** Create a special file backed by a chunk of memory.
  *
- * Creates a special VFS node structure that is backed by the specified chunk
- * of memory. This is useful to pass data stored in memory to code that expects
- * to be operating on filesystem nodes, such as the program loader.
+ * Creates a special file that is backed by the specified chunk of memory.
+ * This is useful to pass data stored in memory to code that expects to be
+ * operating on filesystem entries, such as the module loader.
  *
- * When the node is created, the data in the given memory area is duplicated
- * into the node's data cache, so updates to the memory area after this
- * function has be called will not show on reads from the node. Similarly,
- * writes to the node will not be written back to the memory area.
+ * When the file is created, the data in the given memory area is duplicated
+ * into its data cache, so updates to the memory area after this function has
+ * been called will not show on reads from the file. Similarly, writes to the
+ * file will not be written back to the memory area.
  *
- * The node is not attached anywhere in the filesystem, and therefore once its
- * reference count reaches 0, it will be immediately destroyed.
+ * The file is not attached anywhere in the filesystem, and therefore when the
+ * handle is closed, it will be immediately destroyed.
  *
  * @param buf		Pointer to memory area to use.
  * @param size		Size of memory area.
- * @param nodep		Where to store pointer to created node.
+ * @param flags		Flags for the handle.
+ * @param handlep	Where to store handle to file.
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_file_from_memory(const void *buf, size_t size, vfs_node_t **nodep) {
+int vfs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep) {
+	object_handle_t *handle;
 	vfs_node_t *node;
 	int ret;
 
-	if(!buf || !size || !nodep) {
+	if(!buf || !size || !flags || !handlep) {
 		return -ERR_PARAM_INVAL;
 	}
 
-	node = vfs_node_alloc(NULL, MM_SLEEP);
-	node->type = VFS_NODE_FILE;
+	/* Create a node to store the data. */
+	node = vfs_node_alloc(NULL, VFS_NODE_FILE);
 	node->size = size;
 
-	/* Write the data into the node. */
-	if((ret = vfs_file_write(node, buf, size, 0, NULL)) != 0) {
-		vfs_node_release(node);
-		return ret;
+	/* Create a temporary handle to the file with write permission and
+	 * write the data to the file. */
+	handle = vfs_handle_create(node, FS_FILE_READ);
+	if((ret = vfs_file_write(handle, buf, size, 0, NULL)) == 0) {
+		*handlep = vfs_handle_create(node, flags);
 	}
 
-	*nodep = node;
+	object_handle_release(handle);
+	vfs_node_release(node);
+	return ret;
+}
+
+/** Open a handle to a file.
+ * @param path		Path to file to open.
+ * @param flags		Behaviour flags for the handle.
+ * @param handlep	Where to store pointer to handle structure.
+ * @return		0 on success, negative error code on failure. */
+int vfs_file_open(const char *path, int flags, object_handle_t **handlep) {
+	vfs_node_t *node;
+	int ret;
+
+	/* Look up the filesystem node and check if it is suitable. */
+	if((ret = vfs_node_lookup(path, true, VFS_NODE_FILE, &node)) != 0) {
+		return ret;
+	} else if(flags & FS_FILE_WRITE && VFS_NODE_IS_RDONLY(node)) {
+		vfs_node_release(node);
+		return -ERR_READ_ONLY;
+	}
+
+	*handlep = vfs_handle_create(node, flags);
+	vfs_node_release(node);
 	return 0;
 }
 
 /** Read from a file.
  *
- * Reads data from a file into a buffer.
+ * Reads data from a file into a buffer. If a non-negative offset is supplied,
+ * then it will be used as the offset to read from, and the offset of the file
+ * handle will not be taken into account or updated. Otherwise, the read will
+ * occur from the file handle's current offset, and before returning the offset
+ * will be incremented by the number of bytes read.
  *
- * @param node		Node to read from (must be VFS_NODE_FILE).
- * @param buf		Buffer to read data into. Must be at least count
- *			bytes long.
- * @param count		Number of bytes to read.
- * @param offset	Offset within the file to read from.
+ * @param handle	Handle to file to read from.
+ * @param buf		Buffer to read data into.
+ * @param count		Number of bytes to read. The supplied buffer should be
+ *			at least this size.
+ * @param offset	Offset within the file to read from (if non-negative).
  * @param bytesp	Where to store number of bytes read (optional). This
  *			is updated even if the call fails, as it can fail
  *			when part of the data has been read.
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	offset_t start, end, i, size;
+	bool update = false;
+	vfs_handle_t *data;
+	vfs_node_t *node;
 	size_t total = 0;
 	void *mapping;
 	bool shared;
-	int ret;
+	int ret = 0;
 
-	if(!node || !buf || offset < 0) {
-		return -ERR_PARAM_INVAL;
+	if(!handle || !buf) {
+		ret = -ERR_PARAM_INVAL;
+		goto out;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
+		ret = -ERR_TYPE_INVAL;
+		goto out;
+	} else if(!count) {
+		goto out;
+	}
+
+	node = (vfs_node_t *)handle->object;
+	data = handle->data;
+	assert(node->type == VFS_NODE_FILE);
+
+	/* If not overriding the handle's offset, pull the offset out of the
+	 * handle structure. */
+	if(offset < 0) {
+		rwlock_read_lock(&data->lock);
+		offset = data->offset;
+		rwlock_unlock(&data->lock);
+		update = true;
 	}
 
 	mutex_lock(&node->lock);
 
-	/* Check if the node is a suitable type. */
-	if(node->type != VFS_NODE_FILE) {
-		ret = -ERR_TYPE_INVAL;
-		mutex_unlock(&node->lock);
-		goto out;
-	}
-
 	/* Ensure that we do not go pass the end of the node. */
 	if(offset > (offset_t)node->size) {
-		ret = 0;
 		mutex_unlock(&node->lock);
 		goto out;
 	} else if((offset + (offset_t)count) > (offset_t)node->size) {
 		count = (size_t)((offset_t)node->size - offset);
 	}
 
-	/* It is not an error to pass a zero count, just return silently if
-	 * this happens, however do it after all the other checks so we do
-	 * return errors where appropriate. */
-	if(count == 0) {
-		ret = 0;
-		mutex_unlock(&node->lock);
-		goto out;
-	}
-
-	/* Exclusive access no longer required. */
 	mutex_unlock(&node->lock);
 
 	/* Now work out the start page and the end page. Subtract one from
@@ -1298,6 +1347,13 @@ int vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset, si
 	        total, offset, node, (node->mount) ? node->mount->id : -1, node->id);
 	ret = 0;
 out:
+	/* Update handle offset if required. */
+	if(update && total) {
+		rwlock_write_lock(&data->lock);
+		data->offset += total;
+		rwlock_unlock(&data->lock);
+	}
+
 	if(bytesp) {
 		*bytesp = total;
 	}
@@ -1306,43 +1362,66 @@ out:
 
 /** Write to a file.
  *
- * Writes data from a buffer into a file.
+ * Writes data from a buffer into a file. If a non-negative offset is supplied,
+ * then it will be used as the offset to write to. In this case, neither the
+ * offset of the file handle or the FS_FILE_APPEND flag will be taken into
+ * account, and the handle's offset will not be modified. Otherwise, the write
+ * will occur at the file handle's current offset (if the FS_FILE_APPEND flag
+ * is set, the offset will be set to the end of the file and the write will
+ * take place there), and before returning the handle's offset will be
+ * incremented by the number of bytes written.
  *
- * @param node		Node to write to (must be VFS_NODE_FILE).
- * @param buf		Buffer to write data from. Must be at least count
- *			bytes long.
- * @param count		Number of bytes to write.
- * @param offset	Offset within the file to write to.
+ * @param handle	Handle to file to write to.
+ * @param buf		Buffer to write data from.
+ * @param count		Number of bytes to write. The supplied buffer should be
+ *			at least this size. If zero, the function will return
+ *			after checking all arguments, and the file handle
+ *			offset will not be modified (even if FS_FILE_APPEND is
+ *			set).
+ * @param offset	Offset within the file to write to (if non-negative).
  * @param bytesp	Where to store number of bytes written (optional). This
- *			is updated even if the call fails, as it can fail
- *			when part of the data has been read.
+ *			is updated even if the call fails, as it can fail when
+ *			part of the data has been read.
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	offset_t start, end, i, size;
+	bool update = false;
+	vfs_handle_t *data;
+	vfs_node_t *node;
 	size_t total = 0;
 	void *mapping;
 	bool shared;
-	int ret;
+	int ret = 0;
 
-	if(!node || !buf || offset < 0) {
-		return -ERR_PARAM_INVAL;
+	if(!handle || !buf) {
+		ret = -ERR_PARAM_INVAL;
+		goto out;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
+		ret = -ERR_TYPE_INVAL;
+		goto out;
+	} else if(!count) {
+		goto out;
+	}
+
+	node = (vfs_node_t *)handle->object;
+	data = handle->data;
+	assert(node->type == VFS_NODE_FILE);
+
+	/* If not overriding the handle's offset, pull the offset out of the
+	 * handle structure, and handle the FS_FILE_APPEND flag. */
+	if(offset < 0) {
+		rwlock_write_lock(&data->lock);
+		if(data->flags & FS_FILE_APPEND) {
+			data->offset = node->size;
+		}
+		offset = data->offset;
+		rwlock_unlock(&data->lock);
+		update = true;
 	}
 
 	mutex_lock(&node->lock);
-
-	/* Check if the node is a suitable type, and if it's on a writeable
-	 * filesystem. */
-	if(node->type != VFS_NODE_FILE) {
-		ret = -ERR_TYPE_INVAL;
-		mutex_unlock(&node->lock);
-		goto out;
-	} else if(VFS_NODE_IS_RDONLY(node)) {
-		ret = -ERR_READ_ONLY;
-		mutex_unlock(&node->lock);
-		goto out;
-	}
 
 	/* Attempt to resize the node if necessary. */
 	if((offset + (offset_t)count) > (offset_t)node->size) {
@@ -1418,6 +1497,13 @@ int vfs_file_write(vfs_node_t *node, const void *buf, size_t count, offset_t off
 	        total, offset, node, (node->mount) ? node->mount->id : -1, node->id);
 	ret = 0;
 out:
+	/* Update handle offset if required. */
+	if(update && total) {
+		rwlock_write_lock(&data->lock);
+		data->offset += total;
+		rwlock_unlock(&data->lock);
+	}
+
 	if(bytesp) {
 		*bytesp = total;
 	}
@@ -1431,26 +1517,28 @@ out:
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @param node		Node to resize.
+ * @param handle	Handle to file to resize.
  * @param size		New size of the file.
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_file_resize(vfs_node_t *node, file_size_t size) {
+int vfs_file_resize(object_handle_t *handle, file_size_t size) {
+	vfs_node_t *node;
 	vm_page_t *page;
 	int ret;
 
-	if(!node) {
+	if(!handle) {
 		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
+		return -ERR_TYPE_INVAL;
 	}
 
+	node = (vfs_node_t *)handle->object;
 	mutex_lock(&node->lock);
+	assert(node->type == VFS_NODE_FILE);
 
-	/* Check if the node is a suitable type and if resizing is allowed. */
-	if(node->type != VFS_NODE_FILE) {
-		mutex_unlock(&node->lock);
-		return -ERR_TYPE_INVAL;
-	} else if(!node->mount->type->file_resize) {
+	/* Check if resizing is allowed. */
+	if(!node->mount->type->file_resize) {
 		mutex_unlock(&node->lock);
 		return -ERR_NOT_SUPPORTED;
 	}
@@ -1477,38 +1565,30 @@ int vfs_file_resize(vfs_node_t *node, file_size_t size) {
 	mutex_unlock(&node->lock);
 	return 0;
 }
-#if 0
-/** Closes a handle to a regular file.
- * @param info		Handle information structure.
- * @return		0 on success, negative error code on failure. */
-static int vfs_file_handle_close(handle_info_t *info) {
-	vfs_handle_t *file = info->data;
 
-	if(file->node->mount->type->file_close) {
-		file->node->mount->type->file_close(file->node);
-	}
-
-	vfs_node_release(file->node);
-	kfree(file);
-	return 0;
+/** Close a handle to a directory.
+ * @param handle	Handle to close. */
+static void vfs_dir_object_close(object_handle_t *handle) {
+	vfs_node_release((vfs_node_t *)handle->object);
+	kfree(handle->data);
 }
 
-/** File handle operations. */
-static handle_type_t vfs_file_handle_type = {
-	.id = HANDLE_TYPE_FILE,
-	.close = vfs_file_handle_close,
+/** Directory object operations. */
+static object_type_t vfs_dir_object_type = {
+	.id = OBJECT_TYPE_DIR,
+	.close = vfs_dir_object_close,
 };
-#endif
+
 /** Populate a directory's entry cache if it is empty.
  * @param node		Node of directory.
  * @return		0 on success, negative error code on failure. */
 static int vfs_dir_cache_entries(vfs_node_t *node) {
 	int ret = 0;
 
-	/* If the radix tree is empty, we consider the cache to be empty - even
+	/* If the entry count is 0, we consider the cache to be empty - even
 	 * if the directory is empty, the cache should at least have '.' and
 	 * '..' entries. */
-	if(radix_tree_empty(&node->dir_entries)) {
+	if(!node->entry_count) {
 		if(!node->mount->type->dir_cache) {
 			kprintf(LOG_WARN, "vfs: entry cache empty, but filesystem %p lacks dir_cache!\n",
 			        node->mount->type);
@@ -1524,9 +1604,9 @@ static int vfs_dir_cache_entries(vfs_node_t *node) {
 /** Get the node ID of a directory entry.
  * @param node		Node of directory (should be locked).
  * @param name		Name of entry to get.
- * @return		ID of node on success, negative error code on
- *			failure. */
-static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name) {
+ * @param idp		Where to store ID of node.
+ * @return		0 on success, negative error code on failure. */
+static int vfs_dir_entry_get(vfs_node_t *node, const char *name, node_id_t *idp) {
 	vfs_dir_entry_t *entry;
 	int ret;
 
@@ -1539,8 +1619,12 @@ static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name) {
 	}
 
 	/* Look up the entry. */
-	entry = radix_tree_lookup(&node->dir_entries, name);
-	return (entry == NULL) ? -ERR_NOT_FOUND : entry->id;
+	if((entry = radix_tree_lookup(&node->dir_entries, name))) {
+		*idp = entry->id;
+		return 0;
+	} else {
+		return -ERR_NOT_FOUND;
+	}
 }
 
 /** Add an entry to a directory's entry cache.
@@ -1552,7 +1636,7 @@ static identifier_t vfs_dir_entry_get(vfs_node_t *node, const char *name) {
  * @param id		ID of node entry points to.
  * @param name		Name of entry.
  */
-void vfs_dir_entry_add(vfs_node_t *node, identifier_t id, const char *name) {
+void vfs_dir_entry_add(vfs_node_t *node, node_id_t id, const char *name) {
 	vfs_dir_entry_t *entry;
 	size_t len;
 
@@ -1569,7 +1653,7 @@ void vfs_dir_entry_add(vfs_node_t *node, identifier_t id, const char *name) {
 	radix_tree_insert(&node->dir_entries, name, entry);
 
 	/* Increase count. */
-	node->size++;
+	node->entry_count++;
 }
 
 /** Remove an entry from a directory's entry cache.
@@ -1577,38 +1661,41 @@ void vfs_dir_entry_add(vfs_node_t *node, identifier_t id, const char *name) {
  * @param name		Name of entry to remove. */
 static void vfs_dir_entry_remove(vfs_node_t *node, const char *name) {
 	radix_tree_remove(&node->dir_entries, name, kfree);
-	node->size--;
+	node->entry_count--;
 }
 
 /** Create a directory in the file system.
- *
- * Creates a new directory in the filesystem.
- *
  * @param path		Path to directory to create.
- * @param nodep		Where to store pointer to node for directory (optional).
- *
- * @return		0 on success, negative error code on failure.
- */
-int vfs_dir_create(const char *path, vfs_node_t **nodep) {
+ * @return		0 on success, negative error code on failure. */
+int vfs_dir_create(const char *path) {
 	vfs_node_t *node;
 	int ret;
 
 	/* Allocate a new node and fill in some details. */
-	node = vfs_node_alloc(NULL, MM_SLEEP);
-	node->type = VFS_NODE_DIR;
+	node = vfs_node_alloc(NULL, VFS_NODE_DIR);
 
 	/* Call the common creation code. */
-	if((ret = vfs_node_create(path, node)) != 0) {
-		vfs_node_release(node);
+	ret = vfs_node_create(path, node);
+	vfs_node_release(node);
+	return ret;
+}
+
+/** Open a handle to a directory.
+ * @param path		Path to directory to open.
+ * @param flags		Behaviour flags for the handle.
+ * @param handlep	Where to store pointer to handle structure.
+ * @return		0 on success, negative error code on failure. */
+int vfs_dir_open(const char *path, int flags, object_handle_t **handlep) {
+	vfs_node_t *node;
+	int ret;
+
+	/* Look up the filesystem node. */
+	if((ret = vfs_node_lookup(path, true, VFS_NODE_DIR, &node)) != 0) {
 		return ret;
 	}
 
-	/* Store a pointer to the node or release it if it is not wanted. */
-	if(nodep) {
-		*nodep = node;
-	} else {
-		vfs_node_release(node);
-	}
+	*handlep = vfs_handle_create(node, flags);
+	vfs_node_release(node);
 	return 0;
 }
 
@@ -1616,41 +1703,55 @@ int vfs_dir_create(const char *path, vfs_node_t **nodep) {
  *
  * Reads a single directory entry structure from a directory into a buffer. As
  * the structure length is variable, a buffer size argument must be provided
- * to ensure that the buffer isn't overflowed.
+ * to ensure that the buffer isn't overflowed. If the index provided is a
+ * non-negative value, then the handle's current index will not be used or
+ * modified, and the supplied value will be used instead. Otherwise, the
+ * current index will be used, and upon success it will be incremented by 1.
  *
- * @param node		Node to read from.
+ * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
- * @param size		Size of buffer (if not large enough, -ERR_PARAM_INVAL
+ * @param size		Size of buffer (if not large enough, -ERR_BUF_TOO_SMALL
  *			will be returned).
- * @param index		Number of the directory entry to read (if not found,
- *			-ERR_NOT_FOUND will be returned).
+ * @param index		Index of the directory entry to read, if not negative.
+ *			If not found, -ERR_NOT_FOUND will be returned.
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t index) {
+int vfs_dir_read(object_handle_t *handle, vfs_dir_entry_t *buf, size_t size, offset_t index) {
 	vfs_dir_entry_t *entry = NULL;
-	vfs_node_t *child;
+	vfs_node_t *child, *node;
+	bool update = false;
+	vfs_handle_t *data;
 	offset_t i = 0;
 	int ret;
 
-	if(!node || !buf || !size || index < 0) {
+	if(!handle || !buf) {
 		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
+		return -ERR_TYPE_INVAL;
+	}
+
+	node = (vfs_node_t *)handle->object;
+	data = handle->data;
+	assert(node->type == VFS_NODE_DIR);
+
+	/* If not overriding the handle's offset, pull the offset out of the
+	 * handle structure. */
+	if(index < 0) {
+		rwlock_read_lock(&data->lock);
+		index = data->offset;
+		rwlock_unlock(&data->lock);
+		update = true;
 	}
 
 	mutex_lock(&node->lock);
-
-	/* Ensure that the node is a directory. */
-	if(node->type != VFS_NODE_DIR) {
-		mutex_unlock(&node->lock);
-		return -ERR_TYPE_INVAL;
-	}
 
 	/* Cache the directory entries if we do not already have them, and
 	 * check that the index is valid. */
 	if((ret = vfs_dir_cache_entries(node)) != 0) {
 		mutex_unlock(&node->lock);
 		return ret;
-	} else if(index >= (offset_t)node->size) {
+	} else if(index >= (offset_t)node->entry_count) {
 		mutex_unlock(&node->lock);
 		return -ERR_NOT_FOUND;
 	}
@@ -1663,7 +1764,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		}
 	}
 
-	/* We should have it because we checked against size. */
+	/* We should have it because we checked against the entry count. */
 	if(!entry) {
 		fatal("Entry %" PRId64 " within size but not found (%p)", index, node);
 	}
@@ -1671,7 +1772,7 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 	/* Check that the buffer is large enough. */
 	if(size < entry->length) {
 		mutex_unlock(&node->lock);
-		return -ERR_NOT_FOUND;
+		return -ERR_BUF_TOO_SMALL;
 	}
 
 	/* Copy it to the buffer. */
@@ -1688,11 +1789,11 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 		 * if any. */
 		if(node->mount->mountpoint) {
 			mutex_lock(&node->mount->mountpoint->lock);
-			if((buf->id = vfs_dir_entry_get(node->mount->mountpoint, "..")) < 0) {
+			if((ret = vfs_dir_entry_get(node->mount->mountpoint, "..", &buf->id)) != 0) {
 				mutex_unlock(&node->mount->mountpoint->lock);
 				mutex_unlock(&node->mount->lock);
 				mutex_unlock(&node->lock);
-				return (int)buf->id;
+				return ret;
 			}
 			mutex_unlock(&node->mount->mountpoint->lock);
 		}
@@ -1715,30 +1816,122 @@ int vfs_dir_read(vfs_node_t *node, vfs_dir_entry_t *buf, size_t size, offset_t i
 
 	mutex_unlock(&node->mount->lock);
 	mutex_unlock(&node->lock);
+
+	/* Update offset in the handle. */
+	if(update) {
+		rwlock_read_lock(&data->lock);
+		data->offset++;
+		rwlock_unlock(&data->lock);
+	}
 	return 0;
 }
-#if 0
-/** Closes a handle to a directory
- * @param info		Handle information structure.
- * @return		0 on success, negative error code on failure. */
-static int vfs_dir_handle_close(handle_info_t *info) {
-	vfs_handle_t *dir = info->data;
 
-	if(dir->node->mount->type->dir_close) {
-		dir->node->mount->type->dir_close(dir->node);
+/** Set the offset of a file/directory handle.
+ *
+ * Modifies the offset of a file or directory handle according to the specified
+ * action, and returns the new offset. For directories, the offset is the
+ * index of the next directory entry that will be read.
+ *
+ * @param handle	Handle to modify offset of.
+ * @param action	Operation to perform (FS_SEEK_*).
+ * @param offset	Value to perform operation with.
+ * @param newp		Where to store new offset value (optional).
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int vfs_handle_seek(object_handle_t *handle, int action, offset_t offset, offset_t *newp) {
+	vfs_handle_t *data;
+	vfs_node_t *node;
+	int ret;
+
+	if(!handle || (action != FS_SEEK_SET && action != FS_SEEK_ADD && action != FS_SEEK_END)) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
+	          handle->object->type->id != OBJECT_TYPE_DIR) {
+		return -ERR_TYPE_INVAL;
 	}
 
-	vfs_node_release(dir->node);
-	kfree(dir);
+	node = (vfs_node_t *)handle->object;
+	data = handle->data;
+	rwlock_write_lock(&data->lock);
+
+	/* Perform the action. */
+	switch(action) {
+	case FS_SEEK_SET:
+		data->offset = offset;
+		break;
+	case FS_SEEK_ADD:
+		data->offset += offset;
+		break;
+	case FS_SEEK_END:
+		mutex_lock(&node->lock);
+
+		if(node->type == VFS_NODE_DIR) {
+			/* To do this on directories, we must cache the entries
+			 * to know the entry count. */
+			if((ret = vfs_dir_cache_entries(node)) != 0) {
+				mutex_unlock(&node->lock);
+				rwlock_unlock(&data->lock);
+				return ret;
+			}
+			data->offset = node->entry_count + offset;
+		} else {
+			data->offset = node->size + offset;
+		}
+
+		mutex_unlock(&node->lock);
+		break;
+	}
+
+	/* Save the new offset if necessary. */
+	if(newp) {
+		*newp = data->offset;
+	}
+	rwlock_unlock(&data->lock);
 	return 0;
 }
 
-/** Directory handle operations. */
-static handle_type_t vfs_dir_handle_type = {
-	.id = HANDLE_TYPE_DIR,
-	.close = vfs_dir_handle_close,
-};
-#endif
+/** Get information about a file or directory.
+ * @param handle	Handle to file/directory to get information on.
+ * @param info		Information structure to fill in.
+ * @return		0 on success, negative error code on failure. */
+int vfs_handle_info(object_handle_t *handle, vfs_info_t *info) {
+	if(!handle || !info) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
+	          handle->object->type->id != OBJECT_TYPE_DIR) {
+		return -ERR_TYPE_INVAL;
+	}
+
+	vfs_node_info((vfs_node_t *)handle->object, info);
+	return 0;
+}
+
+/** Flush changes to a filesystem node to the FS.
+ * @param handle	Handle to node to flush.
+ * @return		0 on success, negative error code on failure. */
+int vfs_handle_sync(object_handle_t *handle) {
+	vfs_node_t *node;
+	int ret;
+
+	if(!handle) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
+	          handle->object->type->id != OBJECT_TYPE_DIR) {
+		return -ERR_TYPE_INVAL;
+	}
+
+	node = (vfs_node_t *)handle->object;
+
+	mutex_lock(&node->mount->lock);
+	mutex_lock(&node->lock);
+	ret = vfs_node_flush(node, false);
+	mutex_unlock(&node->lock);
+	mutex_unlock(&node->mount->lock);
+
+	return ret;
+}
+
 /** Ensure that a symbolic link's destination is cached.
  * @param node		Node of link (should be locked).
  * @return		0 on success, negative error code on failure. */
@@ -1766,40 +1959,23 @@ static int vfs_symlink_cache_dest(vfs_node_t *node) {
 }
 
 /** Create a symbolic link.
- *
- * Creates a new symbolic link in the filesystem.
- *
  * @param path		Path to symbolic link to create.
  * @param target	Target for the symbolic link (does not have to exist).
  *			If the path is relative, it is relative to the
  *			directory containing the link.
- * @param nodep		Where to store pointer to node for link (optional).
- *
- * @return		0 on success, negative error code on failure.
- */
-int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep) {
+ * @return		0 on success, negative error code on failure. */
+int vfs_symlink_create(const char *path, const char *target) {
 	vfs_node_t *node;
 	int ret;
 
 	/* Allocate a new node and fill in some details. */
-	node = vfs_node_alloc(NULL, MM_SLEEP);
-	node->type = VFS_NODE_SYMLINK;
+	node = vfs_node_alloc(NULL, VFS_NODE_SYMLINK);
 	node->link_dest = kstrdup(target, MM_SLEEP);
 
 	/* Call the common creation code. */
-	if((ret = vfs_node_create(path, node)) != 0) {
-		/* This will free the link destination. */
-		vfs_node_release(node);
-		return ret;
-	}
-
-	/* Store a pointer to the node or release it if it is not wanted. */
-	if(nodep) {
-		*nodep = node;
-	} else {
-		vfs_node_release(node);
-	}
-	return 0;
+	ret = vfs_node_create(path, node);
+	vfs_node_release(node);
+	return ret;
 }
 
 /** Get the destination of a symbolic link.
@@ -1807,7 +1983,7 @@ int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep)
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
  * be placed at the end of the buffer, unless the buffer is too small.
  *
- * @param node		Node of symbolic link.
+ * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
  * @param size		Size of buffer (destination will be truncated if buffer
  *			is too small).
@@ -1815,14 +1991,15 @@ int vfs_symlink_create(const char *path, const char *target, vfs_node_t **nodep)
  * @return		Number of bytes read on success, negative error code
  *			on failure.
  */
-int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
+int vfs_symlink_read(const char *path, char *buf, size_t size) {
+	vfs_node_t *node;
 	size_t len;
 	int ret;
 
-	if(!node || !buf || !size) {
+	if(!path || !buf || !size) {
 		return -ERR_PARAM_INVAL;
-	} else if(node->type != VFS_NODE_SYMLINK) {
-		return -ERR_TYPE_INVAL;
+	} else if((ret = vfs_node_lookup(path, false, VFS_NODE_SYMLINK, &node)) != 0) {
+		return ret;
 	}
 
 	mutex_lock(&node->lock);
@@ -1836,6 +2013,7 @@ int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
 	len = ((len = strlen(node->link_dest) + 1) > size) ? size : len;
 	memcpy(buf, node->link_dest, len);
 	mutex_unlock(&node->lock);
+	vfs_node_release(node);
 	return (int)len;
 }
 
@@ -1843,13 +2021,12 @@ int vfs_symlink_read(vfs_node_t *node, char *buf, size_t size) {
  * @note		Does not take the mount lock.
  * @param id		ID of mount to look up.
  * @return		Pointer to mount if found, NULL if not. */
-static vfs_mount_t *vfs_mount_lookup(identifier_t id) {
+static vfs_mount_t *vfs_mount_lookup(mount_id_t id) {
 	vfs_mount_t *mount;
 
 	LIST_FOREACH(&vfs_mount_list, iter) {
 		mount = list_entry(iter, vfs_mount_t, header);
-
-		if(mount->id == (identifier_t)id) {
+		if(mount->id == id) {
 			return mount;
 		}
 	}
@@ -1967,8 +2144,10 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		}
 	}
 
+	assert(mount->type->mount);
+
 	/* Allocate a mount ID. */
-	if(vfs_next_mount_id == INT32_MAX) {
+	if(vfs_next_mount_id == UINT16_MAX) {
 		ret = -ERR_NO_SPACE;
 		goto fail;
 	}
@@ -1979,21 +2158,17 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 		mount->flags |= VFS_MOUNT_RDONLY;
 	}
 
-	/* Create the root node for the filesystem. */
-	mount->root = vfs_node_alloc(mount, MM_SLEEP);
-	mount->root->type = VFS_NODE_DIR;
-
 	/* Call the filesystem's mount operation. */
-	if(mount->type->mount) {
-		ret = mount->type->mount(mount);
-		if(ret != 0) {
-			goto fail;
-		}
+	ret = mount->type->mount(mount);
+	if(ret != 0) {
+		goto fail;
 	}
+
+	assert(mount->root);
 
 	/* Put the root node into the node tree/used list. */
 	avl_tree_insert(&mount->nodes, (key_t)mount->root->id, mount->root, NULL);
-	list_append(&mount->used_nodes, &mount->root->header);
+	list_append(&mount->used_nodes, &mount->root->mount_link);
 
 	/* Make the mount point point to the new mount. */
 	if(mount->mountpoint) {
@@ -2084,14 +2259,14 @@ int vfs_unmount(const char *path) {
 	if(refcount_dec(&node->count) != 1) {
 		ret = -ERR_IN_USE;
 		goto fail;
-	} else if(node->header.next != &mount->used_nodes || node->header.prev != &mount->used_nodes) {
+	} else if(node->mount_link.next != &mount->used_nodes || node->mount_link.prev != &mount->used_nodes) {
 		ret = -ERR_IN_USE;
 		goto fail;
 	}
 
 	/* Flush all child nodes. */
 	LIST_FOREACH_SAFE(&mount->unused_nodes, iter) {
-		child = list_entry(iter, vfs_node_t, header);
+		child = list_entry(iter, vfs_node_t, mount_link);
 
 		/* On success, the child is unlocked by vfs_node_free(). */
 		mutex_lock(&child->lock);
@@ -2140,6 +2315,27 @@ fail:
 	}
 	mutex_unlock(&vfs_mount_lock);
 	return ret;
+}
+
+/** Get information about a filesystem entry.
+ * @param path		Path to get information on.
+ * @param follow	Whether to follow if last path component is a symbolic
+ *			link.
+ * @param info		Information structure to fill in.
+ * @return		0 on success, negative error code on failure. */
+int vfs_info(const char *path, bool follow, vfs_info_t *info) {
+	vfs_node_t *node;
+	int ret;
+
+	if(!path || !info) {
+		return -ERR_PARAM_INVAL;
+	} else if((ret = vfs_node_lookup(path, follow, -1, &node)) != 0) {
+		return ret;
+	}
+
+	vfs_node_info(node, info);
+	vfs_node_release(node);
+	return 0;
 }
 
 /** Decrease the link count of a filesystem node.
@@ -2222,14 +2418,9 @@ out:
 }
 
 /** Print a list of mounts.
- *
- * Prints out a list of all mounted filesystems.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		Always returns KDBG_OK.
- */
+ * @return		Always returns KDBG_OK. */
 int kdbg_cmd_mounts(int argc, char **argv) {
 	vfs_mount_t *mount;
 
@@ -2255,14 +2446,9 @@ int kdbg_cmd_mounts(int argc, char **argv) {
 }
 
 /** Print a list of nodes.
- *
- * Prints out a list of nodes on a mount.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_vnodes(int argc, char **argv) {
 	vfs_mount_t *mount;
 	vfs_node_t *node;
@@ -2290,49 +2476,44 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 	}
 
 	/* Search for the mount. */
-	if(!(mount = vfs_mount_lookup((identifier_t)id))) {
+	if(!(mount = vfs_mount_lookup((mount_id_t)id))) {
 		kprintf(LOG_NONE, "Unknown mount ID %" PRId32 ".\n", id);
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID       Flags Count Locked Type Size         Pages      Mount\n");
-	kprintf(LOG_NONE, "==       ===== ===== ====== ==== ====         =====      =====\n");
+	kprintf(LOG_NONE, "ID       Flags Count Locked Type Size         Pages      Entries Mount\n");
+	kprintf(LOG_NONE, "==       ===== ===== ====== ==== ====         =====      ======= =====\n");
 
 	if(argc == 3) {
 		list = (strcmp(argv[1], "--unused") == 0) ? &mount->unused_nodes : &mount->used_nodes;
 
 		LIST_FOREACH(list, iter) {
-			node = list_entry(iter, vfs_node_t, header);
+			node = list_entry(iter, vfs_node_t, mount_link);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
 			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
-			        node->mount);
+			        node->entry_count, node->mount);
 		}
 	} else {
 		AVL_TREE_FOREACH(&mount->nodes, iter) {
 			node = avl_tree_entry(iter, vfs_node_t);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %p\n",
+			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
 			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
-			        node->mount);
+			        node->entry_count, node->mount);
 		}
 	}
 	return KDBG_FAIL;
 }
 
 /** Print information about a node.
- *
- * Prints out information about a node on the filesystem.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_vnode(int argc, char **argv) {
 	vfs_dir_entry_t *entry;
 	vfs_mount_t *mount;
@@ -2354,7 +2535,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		}
-		if(!(mount = vfs_mount_lookup((identifier_t)val))) {
+		if(!(mount = vfs_mount_lookup((mount_id_t)val))) {
 			kprintf(LOG_NONE, "Unknown mount ID %" PRId32 ".\n", val);
 			return KDBG_FAIL;
 		}
@@ -2404,9 +2585,12 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		kprintf(LOG_NONE, "Destination:  %p(%s)\n", node->link_dest,
 		        (node->link_dest) ? node->link_dest : "<not cached>");
 	}
-	if(node->type == VFS_NODE_DIR && node->mounted) {
-		kprintf(LOG_NONE, "Mounted:      %p(%" PRId32 ")\n", node->mounted,
-		        node->mounted->id);
+	if(node->type == VFS_NODE_DIR) {
+		kprintf(LOG_NONE, "Entries:      %zu\n", node->entry_count);
+		if(node->mounted) {
+			kprintf(LOG_NONE, "Mounted:      %p(%" PRId32 ")\n", node->mounted,
+			        node->mounted->id);
+		}
 	}
 
 	/* If it is a directory, print out a list of cached entries. If it is
@@ -2974,6 +3158,7 @@ int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *n
 			goto out;
 		}
 
+		AAAAAAAAAAAAAA FIXME!!!1111 entry_count
 		data->offset = data->node->size + offset;
 		mutex_unlock(&data->node->lock);
 		break;
@@ -3208,8 +3393,8 @@ int sys_fs_getcwd(char *buf, size_t size) {
 	char *kbuf = NULL, *tmp, path[3];
 	vfs_dir_entry_t *entry;
 	vfs_node_t *node;
-	identifier_t id;
 	size_t len = 0;
+	node_id_t id;
 	int ret;
 
 	if(!buf || !size) {

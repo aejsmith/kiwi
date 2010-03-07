@@ -486,15 +486,15 @@ typedef struct {
 #include <arch/elf.h>
 
 struct module;
-struct vfs_node;
+struct object_handle;
 struct vm_aspace;
 
-extern bool elf_binary_check(struct vfs_node *node);
-extern int elf_binary_load(struct vfs_node *node, struct vm_aspace *as, void **datap);
+extern bool elf_binary_check(struct object_handle *handle);
+extern int elf_binary_load(struct object_handle *handle, struct vm_aspace *as, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 extern void elf_binary_cleanup(void *data);
 
-extern bool elf_module_check(struct vfs_node *node);
+extern bool elf_module_check(struct object_handle *handle);
 extern int elf_module_load(struct module *module);
 extern int elf_module_relocate(struct module *module, bool external);
 

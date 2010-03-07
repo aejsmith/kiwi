@@ -30,7 +30,7 @@
 /** RamFS mount information structure. */
 typedef struct ramfs_mount {
 	mutex_t lock;			/**< Lock to protect ID allocation. */
-	identifier_t next_id;		/**< Next node ID. */
+	node_id_t next_id;		/**< Next node ID. */
 } ramfs_mount_t;
 
 extern vfs_type_t ramfs_fs_type;
@@ -43,12 +43,12 @@ static int ramfs_mount(vfs_mount_t *mount) {
 
 	mount->data = data = kmalloc(sizeof(ramfs_mount_t), MM_SLEEP);
 	mutex_init(&data->lock, "ramfs_mount_lock", 0);
-
-	/* The root node has its ID as 0, and set the next ID to 1. */
-	mount->root->id = 0;
 	data->next_id = 1;
 
-	/* Add a '.' entry and a fake '..' entry to the root node. */
+	/* Create the root directory, and add a '.' entry and a fake '..'
+	 * entry. */
+	mount->root = vfs_node_alloc(mount, VFS_NODE_DIR);
+	mount->root->id = 0;
 	vfs_dir_entry_add(mount->root, mount->root->id, ".");
 	vfs_dir_entry_add(mount->root, mount->root->id, "..");
 	return 0;

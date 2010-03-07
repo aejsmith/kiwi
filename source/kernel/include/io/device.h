@@ -163,6 +163,8 @@ typedef int (*device_iterate_t)(device_t *device, void *data);
 /** Generic device events. */
 #define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */
 #define DEVICE_EVENT_WRITABLE		1	/**< Wait for the device to be writable. */
+//#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
+//#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
 
 /** Start of class-specific event/request numbers. */
 #define DEVICE_CLASS_EVENT_START	32
