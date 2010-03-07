@@ -23,7 +23,7 @@
 #include <io/device.h>
 #include <io/vfs.h>
 
-#include <ipc/ipc.h>
+//#include <ipc/ipc.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>

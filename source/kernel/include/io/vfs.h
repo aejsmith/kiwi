@@ -368,7 +368,7 @@ extern int sys_fs_unmount(const char *path);
 extern int sys_fs_getcwd(char *buf, size_t size);
 extern int sys_fs_setcwd(const char *path);
 extern int sys_fs_setroot(const char *path);
-extern int sys_fs_info(const char *path, bool follow, vfs_info_t *infop);
+extern int sys_fs_info(const char *path, bool follow, vfs_info_t *info);
 extern int sys_fs_link(const char *source, const char *dest);
 extern int sys_fs_unlink(const char *path);
 extern int sys_fs_rename(const char *source, const char *dest);

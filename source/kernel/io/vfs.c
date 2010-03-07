@@ -3297,31 +3297,22 @@ int sys_fs_setroot(const char *path) {
  * @param path		Path to get information on.
  * @param follow	Whether to follow if last path component is a symbolic
  *			link.
- * @param infop		Information structure to fill in.
+ * @param info		Information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-int sys_fs_info(const char *path, bool follow, vfs_info_t *infop) {
-	vfs_node_t *node;
+int sys_fs_info(const char *path, bool follow, vfs_info_t *info) {
 	vfs_info_t kinfo;
 	char *kpath;
 	int ret;
 
-	if(!path || !infop) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	/* Get the path and look it up. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
 		return ret;
-	} else if((ret = vfs_node_lookup(kpath, follow, -1, &node)) != 0) {
-		kfree(kpath);
-		return ret;
 	}
 
-	vfs_node_info(node, &kinfo);
-
-	vfs_node_release(node);
+	if((ret = vfs_info(kpath, follow, &kinfo)) == 0) {
+		ret = memcpy_to_user(info, &kinfo, sizeof(vfs_info_t));
+	}
 	kfree(kpath);
-	return memcpy_to_user(infop, &kinfo, sizeof(vfs_info_t));
+	return ret;
 }
 
 int sys_fs_link(const char *source, const char *dest) {

@@ -41,9 +41,6 @@ typedef int64_t useconds_t;		/**< Type used to store a time period in microsecon
 typedef int64_t offset_t;		/**< Type used to store an offset into something. */
 typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
-/** TODO: To be removed. */
-typedef int32_t identifier_t;		/**< Type used to store an identifier for a global object. */
-
 /** Internal kernel integer types. */
 typedef uint64_t key_t;			/**< Type used to store a key for a container. */
 

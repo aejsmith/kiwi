@@ -33,7 +33,7 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
-#include <ipc/ipc.h>
+//#include <ipc/ipc.h>
 
 #include <io/device.h>
 #include <io/vfs.h>
