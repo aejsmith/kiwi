@@ -70,7 +70,7 @@
 typedef struct ata_controller {
 	list_t header;				/**< Controller list header. */
 
-	identifier_t id;			/**< Number of the controller. */
+	int id;					/**< Number of the controller. */
 	mutex_t lock;				/**< Lock to serialize access to controller. */
 	device_t *pci;				/**< PCI device. */
 	device_t *device;			/**< Device tree node. */

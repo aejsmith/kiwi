@@ -102,7 +102,7 @@ typedef struct input_mouse_ops {
 
 /** Input device structure. */
 typedef struct input_device {
-	identifier_t id;		/**< Device ID. */
+	int id;				/**< Device ID. */
 	device_t *device;		/**< Device tree entry. */
 	device_t *alias;		/**< Alias if main device is under a different directory. */
 	struct input_type *type;	/**< Input device type. */

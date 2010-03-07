@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -110,8 +110,9 @@ static display_mode_t *display_mode_find(display_device_t *device, uint16_t widt
 
 /** Open a display device.
  * @param _dev		Device being opened.
+ * @param datap		Where to store handle-specific data pointer.
  * @return		0 on success, negative error code on failure. */
-static int display_device_get(device_t *_dev) {
+static int display_device_open(device_t *_dev, void **datap) {
 	display_device_t *device = _dev->data;
 
 	if(!atomic_cmp_set(&device->open, 0, 1)) {
@@ -123,8 +124,9 @@ static int display_device_get(device_t *_dev) {
 
 /** Close a display device.
  * @param _dev		Device being closed.
+ * @param data		Unused.
  * @return		0 on success, negative error code on failure. */
-static void display_device_release(device_t *_dev) {
+static void display_device_close(device_t *_dev, void *data) {
 	display_device_t *device = _dev->data;
 	int old;
 
@@ -134,18 +136,19 @@ static void display_device_release(device_t *_dev) {
 
 /** Signal that a display device event is being waited for.
  * @param _dev		Device to wait for.
+ * @param data		Unused.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
-static int display_device_wait(device_t *_dev, handle_wait_t *wait) {
+static int display_device_wait(device_t *_dev, void *data, object_wait_t *wait) {
 	display_device_t *device = _dev->data;
 
 	switch(wait->event) {
 	case DISPLAY_EVENT_REDRAW:
 		if(device->redraw) {
 			device->redraw = false;
-			wait->cb(wait);
+			object_wait_callback(wait);
 		} else {
-			notifier_register(&device->redraw_notifier, handle_wait_notifier, wait);
+			notifier_register(&device->redraw_notifier, object_wait_notifier, wait);
 		}
 		return 0;
 	default:
@@ -155,23 +158,25 @@ static int display_device_wait(device_t *_dev, handle_wait_t *wait) {
 
 /** Stop waiting for a display device event.
  * @param _dev		Device to stop waiting for.
+ * @param data		Unused.
  * @param wait		Wait information structure. */
-static void display_device_unwait(device_t *_dev, handle_wait_t *wait) {
+static void display_device_unwait(device_t *_dev, void *data, object_wait_t *wait) {
 	display_device_t *device = _dev->data;
 
 	switch(wait->event) {
 	case DISPLAY_EVENT_REDRAW:
-		notifier_unregister(&device->redraw_notifier, handle_wait_notifier, wait);
+		notifier_unregister(&device->redraw_notifier, object_wait_notifier, wait);
 		break;
 	}
 }
 
 /** Fault handler for memory regions mapping a display device.
  * @param _dev		Device fault occurred on.
+ * @param data		Unused.
  * @param offset	Offset into device fault occurred at (page aligned).
  * @param physp		Where to store address of page to map.
  * @return		0 on success, negative error code on failure. */
-static int display_device_fault(device_t *_dev, offset_t offset, phys_ptr_t *physp) {
+static int display_device_fault(device_t *_dev, void *data, offset_t offset, phys_ptr_t *physp) {
 	display_device_t *device = _dev->data;
 
 	return device->ops->fault(device, offset, physp);
@@ -179,17 +184,19 @@ static int display_device_fault(device_t *_dev, offset_t offset, phys_ptr_t *phy
 
 /** Handler for display device requests.
  * @param _dev		Device request is being made on.
+ * @param data		Unused.
  * @param request	Request number.
  * @param in		Input buffer.
  * @param insz		Input buffer size.
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
  * @return		0 value on success, negative error code on failure. */
-static int display_device_request(device_t *_dev, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+static int display_device_request(device_t *_dev, void *data, int request, void *in,
+                                  size_t insz, void **outp, size_t *outszp) {
 	display_device_t *device = _dev->data;
 	display_mode_t *mode = NULL;
-	identifier_t id;
 	phys_ptr_t phys;
+	uint16_t id;
 	int ret;
 
 	switch(request) {
@@ -231,7 +238,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 		mutex_unlock(&device->lock);
 		return 0;
 	case DISPLAY_SET_MODE:
-		if(in && insz != sizeof(identifier_t)) {
+		if(in && insz != sizeof(uint16_t)) {
 			return -ERR_PARAM_INVAL;
 		} else if(!device->ops->mode_set) {
 			return -ERR_NOT_SUPPORTED;
@@ -255,7 +262,7 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 			device->curr_mode = NULL;
 		} else {
 			/* Look for the mode requested. */
-			id = *(identifier_t *)in;
+			id = *(uint16_t *)in;
 			if(!(mode = display_mode_get(device, id))) {
 				mutex_unlock(&device->lock);
 				return -ERR_NOT_FOUND;
@@ -307,8 +314,8 @@ static int display_device_request(device_t *_dev, int request, void *in, size_t 
 
 /** Display device operations structure. */
 static device_ops_t display_device_ops = {
-	.get = display_device_get,
-	.release = display_device_release,
+	.open = display_device_open,
+	.close = display_device_close,
 	.wait = display_device_wait,
 	.unwait = display_device_unwait,
 	.fault = display_device_fault,
@@ -316,9 +323,6 @@ static device_ops_t display_device_ops = {
 };
 
 /** Create a new display device.
- *
- * Registers a new display device with the display device manager.
- *
  * @param name		Name to give device. Only used if parent is specified.
  * @param parent	Optional parent node. If not provided, then the main
  *			device will be created under the display device
@@ -328,9 +332,7 @@ static device_ops_t display_device_ops = {
  * @param modes		Pointer to array of mode structures (will duplicate).
  * @param count		Number of modes.
  * @param devicep	Where to store pointer to device structure.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int display_device_create(const char *name, device_t *parent, display_ops_t *ops,
                           void *data, display_mode_t *modes, size_t count,
                           display_device_t **devicep) {
@@ -386,13 +388,8 @@ int display_device_create(const char *name, device_t *parent, display_ops_t *ops
 MODULE_EXPORT(display_device_create);
 
 /** Destroy a display device.
- *
- * Removes a display device from the device tree.
- *
  * @param device	Device to remove.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int display_device_destroy(display_device_t *device) {
 	return -ERR_NOT_IMPLEMENTED;
 }

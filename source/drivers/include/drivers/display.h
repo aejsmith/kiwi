@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -32,7 +32,7 @@
 
 /** Structure describing a display mode. */
 typedef struct display_mode {
-	identifier_t id;		/**< Mode ID. */
+	uint16_t id;			/**< Mode ID. */
 	uint16_t width;			/**< Width of mode (in pixels). */
 	uint16_t height;		/**< Height of mode (in pixels). */
 	uint8_t depth;			/**< Bits per pixel. */
@@ -70,7 +70,8 @@ typedef struct display_ops {
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Positive value on success, negative error code
 	 *			on failure. */
-	int (*request)(struct display_device *device, int request, void *in, size_t insz, void **outp, size_t *outszp);
+	int (*request)(struct display_device *device, int request, void *in, size_t insz,
+	               void **outp, size_t *outszp);
 
 	/** Get a framebuffer address.
 	 * @note		This should check that the offset is within the
@@ -91,7 +92,7 @@ typedef struct display_ops {
 /** Structure describing a display device. */
 typedef struct display_device {
 	mutex_t lock;			/**< Lock to protect device. */
-	identifier_t id;		/**< Device ID. */
+	int id;				/**< Device ID. */
 	device_t *device;		/**< Device tree node. */
 	device_t *alias;		/**< Alias if main device under different directory. */
 	display_ops_t *ops;		/**< Device operations structure. */

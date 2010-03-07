@@ -62,7 +62,7 @@ typedef struct disk_ops {
 /** Disk device information structure. */
 typedef struct disk_device {
 	mutex_t lock;			/**< Lock to protect structure. */
-	identifier_t id;		/**< Device ID. */
+	int id;				/**< Device ID. */
 
 	device_t *device;		/**< Device tree node. */
 	device_t *alias;		/**< Alias if main device under different directory. */

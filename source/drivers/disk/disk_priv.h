@@ -43,7 +43,7 @@ typedef bool (*disk_partition_probe_t)(disk_device_t *device);
 extern bool disk_partition_probe_msdos(disk_device_t *device);
 
 extern void disk_partition_probe(disk_device_t *device);
-extern void disk_partition_add(disk_device_t *device, identifier_t id, uint64_t offset, uint64_t size);
+extern void disk_partition_add(disk_device_t *device, int id, uint64_t offset, uint64_t size);
 
 extern int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp);
 extern int disk_device_write(disk_device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp);
