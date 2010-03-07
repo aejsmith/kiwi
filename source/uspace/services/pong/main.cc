@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 	IPCPort port;
 
 	/* Use the console for output. */
-	fopen_device("/console/0/slave", stdout);
+	fopen_device("/console/0", stdout);
 
 	/* Create the port. */
 	port.Create();

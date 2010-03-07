@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,7 +21,7 @@
 #ifndef __DRIVERS_CONSOLE_H
 #define __DRIVERS_CONSOLE_H
 
-/** Console manager device requests. */
-#define CONSOLE_MANAGER_CREATE		1024	/**< Create a new console. */
+/** Console master device requests. */
+#define CONSOLE_MASTER_GET_ID		1024	/**< Get the ID of the slave device. */
 
 #endif /* __DRIVERS_CONSOLE_H */

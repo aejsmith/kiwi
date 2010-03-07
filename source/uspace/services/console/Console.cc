@@ -56,26 +56,14 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	m_rows(height / FONT_HEIGHT), m_scroll_start(0),
 	m_scroll_end(m_rows - 1)
 {
-	handle_t handle;
-	char buf[1024];
-
-	/* Open the console manager and request a console. */
-	if((handle = device_open("/console/manager")) < 0) {
-		printf("Failed to open console manager (%d)\n", handle);
-		m_init_status = handle;
-		return;
-	} else if((m_id = device_request(handle, CONSOLE_MANAGER_CREATE, NULL, 0, NULL, 0, NULL)) < 0) {
-		printf("Failed to create console master (%d)\n", m_id);
-		m_init_status = m_id;
-		return;
-	}
-	handle_close(handle);
-
 	/* Open the console master. */
-	sprintf(buf, "/console/%d/master", m_id);
-	if((m_handle = device_open(buf)) < 0) {
+	if((m_handle = device_open("/console/master")) < 0) {
 		printf("Failed to open console master (%d)\n", m_handle);
 		m_init_status = m_handle;
+		return;
+	} else if((m_id = device_request(m_handle, CONSOLE_MASTER_GET_ID, NULL, 0, NULL, 0, NULL)) < 0) {
+		printf("Failed to get console ID (%d)\n", m_id);
+		m_init_status = m_id;
 		return;
 	}
 
@@ -112,7 +100,7 @@ bool Console::Run(const char *cmdline) {
 	char *env[] = { const_cast<char *>("PATH=/system/binaries"), buf, NULL };
 	Process proc;
 
-	sprintf(buf, "CONSOLE=/console/%d/slave", m_id);
+	sprintf(buf, "CONSOLE=/console/%d", m_id);
 	return proc.Create(cmdline, env, true, 0);
 }
 
