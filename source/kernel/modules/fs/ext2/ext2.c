@@ -309,7 +309,6 @@ static int ext2_node_flush(vfs_node_t *node) {
 }
 
 /** Clean up data associated with a node structure.
- * @todo		Remove if link count 0.
  * @note		This can only be called from vfs_node_free() which
  *			holds the node/mount locks between calling flush and
  *			this function - this guarantees that the inode won't

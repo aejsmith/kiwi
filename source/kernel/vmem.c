@@ -29,7 +29,6 @@
  * a span, however, are sorted.
  *
  * @todo		Allow merging adjacent allocated segments.
- * @todo		Implement MM_SLEEP.
  * @todo		Hash table resizing.
  */
 
