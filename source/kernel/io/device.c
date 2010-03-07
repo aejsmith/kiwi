@@ -440,7 +440,8 @@ void device_release(device_t *device) {
 }
 
 /** Create a handle to a device.
- * @param device	Device to create handle to.
+ * @param device	Device to create handle to. Will have an extra
+ *			reference placed on it.
  * @param handlep	Where to store pointer to handle structure.
  * @return		0 on success, negative error code on failure. */
 int device_open(device_t *device, object_handle_t **handlep) {
@@ -457,6 +458,7 @@ int device_open(device_t *device, object_handle_t **handlep) {
 		return ret;
 	}
 
+	refcount_inc(&device->count);
 	*handlep = object_handle_create(&device->obj, data);
 	mutex_unlock(&device->lock);
 	return 0;
