@@ -390,7 +390,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 
-	object_init(&thread->obj, &thread_object_type, 0);
+	object_init(&thread->obj, &thread_object_type);
 	atomic_set(&thread->in_usermem, 0);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;

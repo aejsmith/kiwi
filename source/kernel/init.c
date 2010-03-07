@@ -287,7 +287,8 @@ static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
  * @param args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
 static void init_thread(void *args, void *arg2) {
-	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
+	//const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
+	const char *pargs[] = { "/system/services/console", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
 	int ret;
 
@@ -316,10 +317,10 @@ static void init_thread(void *args, void *arg2) {
 
 	console_update_boot_progress(100);
 
-	/* Run the startup process. */
+	/* Run the service manager. */
 	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM,
 	                         kernel_proc, NULL)) != 0) {
-		fatal("Could not create startup process (%d)", ret);
+		fatal("Could not start service manager (%d)", ret);
 	}
 }
 

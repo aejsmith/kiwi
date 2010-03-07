@@ -285,13 +285,13 @@ vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, vfs_node_type_t type) {
 	/* Initialise the node's object header. */
 	switch(type) {
 	case VFS_NODE_FILE:
-		object_init(&node->obj, &vfs_file_object_type, OBJECT_MAPPABLE);
+		object_init(&node->obj, &vfs_file_object_type);
 		break;
 	case VFS_NODE_DIR:
-		object_init(&node->obj, &vfs_dir_object_type, 0);
+		object_init(&node->obj, &vfs_dir_object_type);
 		break;
 	default:
-		object_init(&node->obj, NULL, 0);
+		object_init(&node->obj, NULL);
 		break;
 	}
 
@@ -1128,6 +1128,22 @@ static void vfs_file_object_close(object_handle_t *handle) {
 	kfree(handle->data);
 }
 
+/** Check if a file can be memory-mapped.
+ * @param handle	Handle to fi;e.
+ * @param flags		Mapping flags (VM_MAP_*).
+ * @return		0 if can be mapped, negative error code if not. */
+static int vfs_file_object_mappable(object_handle_t *handle, int flags) {
+	vfs_handle_t *data = handle->data;
+
+	/* If shared write access is required, ensure that the handle flags
+	 * allow this. */
+	if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && !(data->flags & FS_FILE_WRITE)) {
+		return -ERR_PERM_DENIED;
+	} else {
+		return 0;
+	}
+}
+
 /** Get a page from a file object.
  * @param handle	Handle to file to get page from.
  * @param offset	Offset of page to get.
@@ -1149,6 +1165,7 @@ static void vfs_file_object_page_release(object_handle_t *handle, offset_t offse
 static object_type_t vfs_file_object_type = {
 	.id = OBJECT_TYPE_FILE,
 	.close = vfs_file_object_close,
+	.mappable = vfs_file_object_mappable,
 	.page_get = vfs_file_object_page_get,
 	.page_release = vfs_file_object_page_release,
 };
@@ -1205,7 +1222,7 @@ int vfs_file_from_memory(const void *buf, size_t size, int flags, object_handle_
 
 	/* Create a temporary handle to the file with write permission and
 	 * write the data to the file. */
-	handle = vfs_handle_create(node, FS_FILE_READ);
+	handle = vfs_handle_create(node, FS_FILE_WRITE);
 	if((ret = vfs_file_write(handle, buf, size, 0, NULL)) == 0) {
 		*handlep = vfs_handle_create(node, flags);
 	}
@@ -1272,13 +1289,18 @@ int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t off
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = -ERR_TYPE_INVAL;
 		goto out;
-	} else if(!count) {
-		goto out;
 	}
 
 	node = (vfs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == VFS_NODE_FILE);
+
+	if(!(data->flags & FS_FILE_READ)) {
+		ret = -ERR_PERM_DENIED;
+		goto out;
+	} else if(!count) {
+		goto out;
+	}
 
 	/* If not overriding the handle's offset, pull the offset out of the
 	 * handle structure. */
@@ -1401,13 +1423,18 @@ int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offse
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = -ERR_TYPE_INVAL;
 		goto out;
-	} else if(!count) {
-		goto out;
 	}
 
 	node = (vfs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == VFS_NODE_FILE);
+
+	if(!(data->flags & FS_FILE_WRITE)) {
+		ret = -ERR_PERM_DENIED;
+		goto out;
+	} else if(!count) {
+		goto out;
+	}
 
 	/* If not overriding the handle's offset, pull the offset out of the
 	 * handle structure, and handle the FS_FILE_APPEND flag. */
@@ -1523,6 +1550,7 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int vfs_file_resize(object_handle_t *handle, file_size_t size) {
+	vfs_handle_t *data;
 	vfs_node_t *node;
 	vm_page_t *page;
 	int ret;
@@ -1534,11 +1562,15 @@ int vfs_file_resize(object_handle_t *handle, file_size_t size) {
 	}
 
 	node = (vfs_node_t *)handle->object;
+	data = handle->data;
 	mutex_lock(&node->lock);
 	assert(node->type == VFS_NODE_FILE);
 
 	/* Check if resizing is allowed. */
-	if(!node->mount->type->file_resize) {
+	if(!(data->flags & FS_FILE_WRITE)) {
+		mutex_unlock(&node->lock);
+		return -ERR_PERM_DENIED;
+	} else if(!node->mount->type->file_resize) {
 		mutex_unlock(&node->lock);
 		return -ERR_NOT_SUPPORTED;
 	}
@@ -2632,16 +2664,10 @@ void __init_text vfs_init(void) {
 	                                   vfs_node_cache_ctor, NULL, vfs_node_cache_reclaim,
 	                                   NULL, 1, NULL, 0, MM_FATAL);
 }
-#if 0
-/** Create a file in the file system.
- *
- * Creates a new regular file in the filesystem.
- *
+
+/** Create a regular file in the file system.
  * @param path		Path to file to create.
- * @param nodep		Where to store pointer to node for file (optional).
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_file_create(const char *path) {
 	char *kpath;
 	int ret;
@@ -2650,79 +2676,31 @@ int sys_fs_file_create(const char *path) {
 		return ret;
 	}
 
-	ret = vfs_file_create(kpath, NULL);
+	ret = vfs_file_create(kpath);
 	kfree(kpath);
 	return ret;
 }
 
-/** Open a new file handle.
- *
- * Opens a handle to a file in the filesystem. This handle can be passed to
- * other regular file operations. When it is no longer required, it should be
- * passed to sys_handle_close(). It will automatically be closed if it is still
- * open when the calling process terminates.
- *
+/** Open a handle to a file.
  * @param path		Path to file to open.
  * @param flags		Behaviour flags for the handle.
- *
- * @return		Handle ID (positive) on success, negative error code
- *			on failure.
- */
+ * @return		Handle ID on success, negative error code on failure. */
 handle_t sys_fs_file_open(const char *path, int flags) {
-	vfs_handle_t *data = NULL;
+	object_handle_t *handle;
 	char *kpath = NULL;
-	handle_t handle;
-	int ret;
+	handle_t ret;
 
-	/* Copy the path across. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
-		return (handle_t)ret;
+		return ret;
+	} else if((ret = vfs_file_open(kpath, flags, &handle)) != 0) {
+		kfree(kpath);
+		return ret;
 	}
 
-	/* Allocate a handle data structure. */
-	data = kmalloc(sizeof(vfs_handle_t), MM_SLEEP);
-	mutex_init(&data->lock, "vfs_file_handle_lock", 0);
-	data->node = NULL;
-	data->offset = 0;
-	data->flags = flags;
-
-	/* Look up the filesystem node and check if it is suitable. */
-	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_FILE, &data->node)) != 0) {
-		goto fail;
-	} else if(flags & FS_FILE_WRITE && VFS_NODE_IS_RDONLY(data->node)) {
-		ret = -ERR_READ_ONLY;
-		goto fail;
-	}
-
-	/* Call the mount's open function, if any. */
-	if(data->node->mount->type->file_open) {
-		if((ret = data->node->mount->type->file_open(data->node, flags)) != 0) {
-			goto fail;
-		}
-	}
-
-	/* Allocate a handle in the current process. */
-	if((handle = handle_create(&curr_proc->handles, &vfs_file_handle_type, data)) < 0) {
-		if(data->node->mount->type->file_close) {
-			data->node->mount->type->file_close(data->node);
-		}
-		ret = (int)handle;
-		goto fail;
-	}
-
-	dprintf("vfs: opened file handle %" PRId32 "(%p) to %s (node: %p, process: %" PRIu32 ")\n",
-	        handle, data, kpath, data->node, curr_proc->id);
+	ret = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
 	kfree(kpath);
-	return handle;
-fail:
-	if(data) {
-		if(data->node) {
-			vfs_node_release(data->node);
-		}
-		kfree(data);
-	}
-	kfree(kpath);
-	return (handle_t)ret;
+	return ret;
 }
 
 /** Read from a file.
@@ -2733,13 +2711,11 @@ fail:
  * occur from the file handle's current offset, and before returning the offset
  * will be incremented by the number of bytes read.
  *
- * @todo		Nonblocking reads.
- *
- * @param handle	File handle to read from.
- * @param buf		Buffer to read data into. Must be at least count
- *			bytes long.
- * @param count		Number of bytes to read.
- * @param offset	Offset to read from (if non-negative).
+ * @param handle	Handle to file to read from.
+ * @param buf		Buffer to read data into.
+ * @param count		Number of bytes to read. The supplied buffer should be
+ *			at least this size.
+ * @param offset	Offset within the file to read from (if non-negative).
  * @param bytesp	Where to store number of bytes read (optional). This
  *			is updated even if the call fails, as it can fail
  *			when part of the data has been read.
@@ -2747,36 +2723,15 @@ fail:
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info = NULL;
-	bool update = false;
-	vfs_handle_t *file;
+	object_handle_t *obj = NULL;
 	size_t bytes = 0;
-	int ret = 0, err;
+	int ret, err;
 	void *kbuf;
 
-	/* Look up the file handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_FILE, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &obj)) != 0) {
 		goto out;
-	}
-	file = info->data;
-
-	if(count == 0) {
+	} else if(!count) {
 		goto out;
-	}
-
-	/* Check if the handle is open for reading. */
-	if(!(file->flags & FS_FILE_READ)) {
-		ret = -ERR_PERM_DENIED;
-		goto out;
-	}
-
-	/* Work out the offset to read from. */
-	if(offset < 0) {
-		mutex_lock(&file->lock);
-		offset = file->offset;
-		mutex_unlock(&file->lock);
-
-		update = true;
 	}
 
 	/* Allocate a temporary buffer to read into. Don't use MM_SLEEP for
@@ -2789,30 +2744,22 @@ int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, 
 	}
 
 	/* Perform the actual read. */
-	ret = vfs_file_read(file->node, kbuf, count, offset, &bytes);
+	ret = vfs_file_read(obj, kbuf, count, offset, &bytes);
 	if(bytes) {
-		/* Update file offset. */
-		if(update) {
-			mutex_lock(&file->lock);
-			file->offset += bytes;
-			mutex_unlock(&file->lock);
-		}
-
-		/* Copy data across. */
 		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
 			ret = err;
 		}
 	}
 	kfree(kbuf);
 out:
+	if(obj) {
+		object_handle_release(obj);
+	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
 		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
 			ret = err;
 		}
-	}
-	if(info) {
-		handle_release(info);
 	}
 	return ret;
 }
@@ -2828,54 +2775,30 @@ out:
  * take place there), and before returning the handle's offset will be
  * incremented by the number of bytes written.
  *
- * @todo		Nonblocking writes.
- *
- * @param node		Node to write to (must be VFS_NODE_FILE).
- * @param buf		Buffer to write data from. Must be at least count
- *			bytes long.
- * @param count		Number of bytes to write.
- * @param offset	Offset to write to (if non-negative).
+ * @param handle	Handle to file to write to.
+ * @param buf		Buffer to write data from.
+ * @param count		Number of bytes to write. The supplied buffer should be
+ *			at least this size. If zero, the function will return
+ *			after checking all arguments, and the file handle
+ *			offset will not be modified (even if FS_FILE_APPEND is
+ *			set).
+ * @param offset	Offset within the file to write to (if non-negative).
  * @param bytesp	Where to store number of bytes written (optional). This
- *			is updated even if the call fails, as it can fail
- *			when part of the data has been read.
+ *			is updated even if the call fails, as it can fail when
+ *			part of the data has been read.
  *
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info = NULL;
-	bool update = false;
-	vfs_handle_t *file;
+	object_handle_t *obj = NULL;
 	void *kbuf = NULL;
 	size_t bytes = 0;
-	int ret = 0, err;
+	int ret, err;
 
-	/* Look up the file handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_FILE, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &obj)) != 0) {
 		goto out;
-	}
-	file = info->data;
-
-	if(count == 0) {
+	} else if(!count) {
 		goto out;
-	}
-
-	/* Check if the handle is open for writing. */
-	if(!(file->flags & FS_FILE_WRITE)) {
-		ret = -ERR_PERM_DENIED;
-		goto out;
-	}
-
-	/* Work out the offset to write to, and set it to the end of the file
-	 * if the handle has the FS_FILE_APPEND flag set. */
-	if(offset < 0) {
-		mutex_lock(&file->lock);
-		if(file->flags & FS_FILE_APPEND) {
-			file->offset = file->node->size;
-		}
-		offset = file->offset;
-		mutex_unlock(&file->lock);
-
-		update = true;
 	}
 
 	/* Copy the data to write across from userspace. Don't use MM_SLEEP for
@@ -2890,24 +2813,19 @@ int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t o
 	}
 
 	/* Perform the actual write and update file offset if necessary. */
-	ret = vfs_file_write(file->node, kbuf, count, offset, &bytes);
-	if(bytes && update) {
-		mutex_lock(&file->lock);
-		file->offset += bytes;
-		mutex_unlock(&file->lock);
-	}
+	ret = vfs_file_write(obj, kbuf, count, offset, &bytes);
 out:
 	if(kbuf) {
 		kfree(kbuf);
+	}
+	if(obj) {
+		object_handle_release(obj);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
 		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
 			ret = err;
 		}
-	}
-	if(info) {
-		handle_release(info);
 	}
 	return ret;
 }
@@ -2925,36 +2843,21 @@ out:
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_file_resize(handle_t handle, file_size_t size) {
-	handle_info_t *info;
-	vfs_handle_t *file;
+	object_handle_t *obj;
 	int ret;
 
-	/* Look up the file handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_FILE, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &obj)) != 0) {
 		return ret;
 	}
-	file = info->data;
 
-	/* Check if the handle is open for writing. */
-	if(!(file->flags & FS_FILE_WRITE)) {
-		handle_release(info);
-		return -ERR_PERM_DENIED;
-	}
-
-	ret = vfs_file_resize(file->node, size);
-	handle_release(info);
+	ret = vfs_file_resize(obj, size);
+	object_handle_release(obj);
 	return ret;
 }
 
 /** Create a directory in the file system.
- *
- * Creates a new directory in the filesystem.
- *
  * @param path		Path to directory to create.
- * @param nodep		Where to store pointer to node for directory (optional).
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_dir_create(const char *path) {
 	char *kpath;
 	int ret;
@@ -2963,76 +2866,31 @@ int sys_fs_dir_create(const char *path) {
 		return ret;
 	}
 
-	ret = vfs_dir_create(kpath, NULL);
+	ret = vfs_dir_create(kpath);
 	kfree(kpath);
 	return ret;
 }
 
-/** Open a new directory handle.
- *
- * Opens a handle to a directory in the filesystem. This handle can be passed
- * to other directory operations. When it is no longer required, it should be
- * passed to sys_handle_close(). It will automatically be closed if it is still
- * open when the calling process terminates.
- *
+/** Open a handle to a directory.
  * @param path		Path to directory to open.
  * @param flags		Behaviour flags for the handle.
- *
- * @return		Handle ID (positive) on success, negative error code
- *			on failure.
- */
+ * @return		Handle ID on success, negative error code on failure. */
 handle_t sys_fs_dir_open(const char *path, int flags) {
-	vfs_handle_t *data = NULL;
+	object_handle_t *handle;
 	char *kpath = NULL;
-	handle_t handle;
-	int ret;
+	handle_t ret;
 
-	/* Copy the path across. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
-		return (handle_t)ret;
+		return ret;
+	} else if((ret = vfs_dir_open(kpath, flags, &handle)) != 0) {
+		kfree(kpath);
+		return ret;
 	}
 
-	/* Allocate a handle data structure. */
-	data = kmalloc(sizeof(vfs_handle_t), MM_SLEEP);
-	mutex_init(&data->lock, "vfs_dir_handle_lock", 0);
-	data->node = NULL;
-	data->offset = 0;
-	data->flags = flags;
-
-	/* Look up the filesystem node and check if it is suitable. */
-	if((ret = vfs_node_lookup(kpath, true, VFS_NODE_DIR, &data->node)) != 0) {
-		goto fail;
-	}
-
-	/* Call the mount's open function, if any. */
-	if(data->node->mount->type->dir_open) {
-		if((ret = data->node->mount->type->dir_open(data->node, flags)) != 0) {
-			goto fail;
-		}
-	}
-
-	/* Allocate a handle in the current process. */
-	if((handle = handle_create(&curr_proc->handles, &vfs_dir_handle_type, data)) < 0) {
-		if(data->node->mount->type->dir_close) {
-			data->node->mount->type->dir_close(data->node);
-		}
-		ret = (int)handle;
-		goto fail;
-	}
-
-	dprintf("vfs: opened dir handle %" PRId32 "(%p) to %s (node: %p, process: %" PRIu32 ")\n",
-	        handle, data, kpath, data->node, curr_proc->id);
+	ret = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
 	kfree(kpath);
-	return handle;
-fail:
-	if(data) {
-		if(data->node) {
-			vfs_node_release(data->node);
-		}
-		kfree(data);
-	}
-	kfree(kpath);
-	return (handle_t)ret;
+	return ret;
 }
 
 /** Read a directory entry.
@@ -3044,41 +2902,24 @@ fail:
  * modified, and the supplied value will be used instead. Otherwise, the
  * current index will be used, and upon success it will be incremented by 1.
  *
- * @todo		Nonblocking reads.
- *
  * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
- * @param size		Size of buffer (if not large enough, -ERR_PARAM_INVAL
+ * @param size		Size of buffer (if not large enough, -ERR_BUF_TOO_SMALL
  *			will be returned).
- * @param index		Number of the directory entry to read, if non-negative.
+ * @param index		Index of the directory entry to read, if not negative.
  *			If not found, -ERR_NOT_FOUND will be returned.
  *
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t index) {
 	vfs_dir_entry_t *kbuf;
-	handle_info_t *info;
-	bool update = false;
-	vfs_handle_t *dir;
+	object_handle_t *obj;
 	int ret;
 
 	if(!size) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	/* Look up the directory handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_DIR, &info)) != 0) {
+		return -ERR_BUF_TOO_SMALL;
+	} else if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_DIR, &obj)) != 0) {
 		return ret;
-	}
-	dir = info->data;
-
-	/* Work out the index of the entry to read. */
-	if(index < 0) {
-		mutex_lock(&dir->lock);
-		index = dir->offset;
-		mutex_unlock(&dir->lock);
-
-		update = true;
 	}
 
 	/* Allocate a temporary buffer to read into. Don't use MM_SLEEP for
@@ -3086,167 +2927,91 @@ int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
 	if(!(kbuf = kmalloc(size, 0))) {
-		handle_release(info);
+		object_handle_release(obj);
 		return -ERR_NO_MEMORY;
 	}
 
 	/* Perform the actual read. */
-	ret = vfs_dir_read(dir->node, kbuf, size, index);
-	if(ret == 0) {
-		/* Update offset in the handle. */
-		if(update) {
-			mutex_lock(&dir->lock);
-			dir->offset++;
-			mutex_unlock(&dir->lock);
-		}
-
-		/* Copy data across. */
+	if((ret = vfs_dir_read(obj, kbuf, size, index)) == 0) {
 		ret = memcpy_to_user(buf, kbuf, kbuf->length);
 	}
 
 	kfree(kbuf);
-	handle_release(info);
+	object_handle_release(obj);
 	return ret;
 }
 
-/** Set the offset of a VFS handle.
+/** Set the offset of a file/directory handle.
  *
  * Modifies the offset of a file or directory handle according to the specified
  * action, and returns the new offset. For directories, the offset is the
  * index of the next directory entry that will be read.
  *
  * @param handle	Handle to modify offset of.
- * @param action	Operation to perform (FS_FILE_SEEK_*).
+ * @param action	Operation to perform (FS_SEEK_*).
  * @param offset	Value to perform operation with.
  * @param newp		Where to store new offset value (optional).
  *
  * @return		0 on success, negative error code on failure.
  */
 int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *newp) {
-	handle_info_t *info;
-	vfs_handle_t *data;
+	object_handle_t *obj;
+	offset_t new;
 	int ret;
 
-	/* Look up the handle and check the type. */
-	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
 		return ret;
-	} else if(info->type->id != HANDLE_TYPE_FILE && info->type->id != HANDLE_TYPE_DIR) {
-		ret = -ERR_TYPE_INVAL;
-		goto out;
 	}
 
-	/* Get the data structure and lock it. */
-	data = info->data;
-	mutex_lock(&data->lock);
-
-	/* Perform the action. */
-	switch(action) {
-	case FS_HANDLE_SEEK_SET:
-		data->offset = offset;
-		break;
-	case FS_HANDLE_SEEK_ADD:
-		data->offset += offset;
-		break;
-	case FS_HANDLE_SEEK_END:
-		mutex_lock(&data->node->lock);
-
-		/* To do this on directories, we must cache the entries to
-		 * know the size. */
-		if((ret = vfs_dir_cache_entries(data->node)) != 0) {
-			mutex_unlock(&data->node->lock);
-			mutex_unlock(&data->lock);
-			goto out;
-		}
-
-		AAAAAAAAAAAAAA FIXME!!!1111 entry_count
-		data->offset = data->node->size + offset;
-		mutex_unlock(&data->node->lock);
-		break;
+	if((ret = vfs_handle_seek(obj, action, offset, &new)) == 0) {
+		ret = memcpy_to_user(newp, &new, sizeof(offset_t));
 	}
-
-	/* Write the new offset if necessary. */
-	if(newp) {
-		ret = memcpy_to_user(newp, &data->offset, sizeof(offset_t));
-	}
-	mutex_unlock(&data->lock);
-out:
-	handle_release(info);
+	object_handle_release(obj);
 	return ret;
 }
 
-/** Get information about a node.
- *
- * Gets information about the file or directory referred to by a handle.
- *
- * @param handle	Handle to get information on.
- * @param infop		Information structure to fill in.
- *
- * @return		0 on success, negative error code on failure.
- */
-int sys_fs_handle_info(handle_t handle, vfs_info_t *infop) {
-	handle_info_t *info;
-	vfs_handle_t *data;
+/** Get information about a file or directory.
+ * @param handle	Handle to file/directory to get information on.
+ * @param info		Information structure to fill in.
+ * @return		0 on success, negative error code on failure. */
+int sys_fs_handle_info(handle_t handle, vfs_info_t *info) {
+	object_handle_t *obj;
 	vfs_info_t kinfo;
 	int ret;
 
-	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
 		return ret;
-	} else if(info->type->id != HANDLE_TYPE_FILE && info->type->id != HANDLE_TYPE_DIR) {
-		handle_release(info);
-		return -ERR_TYPE_INVAL;
 	}
-	data = info->data;
 
-	vfs_node_info(data->node, &kinfo);
-
-	handle_release(info);
-	return memcpy_to_user(infop, &kinfo, sizeof(vfs_info_t));
+	if((ret = vfs_handle_info(obj, &kinfo)) == 0) {
+		ret = memcpy_to_user(info, &kinfo, sizeof(vfs_info_t));
+	}
+	object_handle_release(obj);
+	return ret;
 }
 
 /** Flush changes to a filesystem node to the FS.
- *
- * Flushes all changes made to a filesystem node referred to by a handle to
- * the filesystem.
- *
- * @param handle	Handle to flush.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @param handle	Handle to node to flush.
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_handle_sync(handle_t handle) {
-	handle_info_t *info;
-	vfs_handle_t *data;
+	object_handle_t *obj;
 	int ret;
 
-	/* Look up the handle and check the type. */
-	if((ret = handle_get(&curr_proc->handles, handle, -1, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
 		return ret;
-	} else if(info->type->id != HANDLE_TYPE_FILE && info->type->id != HANDLE_TYPE_DIR) {
-		handle_release(info);
-		return -ERR_TYPE_INVAL;
 	}
-	data = info->data;
 
-	mutex_lock(&data->node->mount->lock);
-	mutex_lock(&data->node->lock);
-	ret = vfs_node_flush(data->node, false);
-	mutex_unlock(&data->node->lock);
-	mutex_unlock(&data->node->mount->lock);
-
-	handle_release(info);
+	ret = vfs_handle_sync(obj);
+	object_handle_release(obj);
 	return ret;
 }
 
 /** Create a symbolic link.
- *
- * Creates a new symbolic link in the filesystem.
- *
  * @param path		Path to symbolic link to create.
  * @param target	Target for the symbolic link (does not have to exist).
  *			If the path is relative, it is relative to the
  *			directory containing the link.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_symlink_create(const char *path, const char *target) {
 	char *kpath, *ktarget;
 	int ret;
@@ -3258,7 +3023,7 @@ int sys_fs_symlink_create(const char *path, const char *target) {
 		return ret;
 	}
 
-	ret = vfs_symlink_create(kpath, ktarget, NULL);
+	ret = vfs_symlink_create(kpath, ktarget);
 	kfree(ktarget);
 	kfree(kpath);
 	return ret;
@@ -3279,7 +3044,6 @@ int sys_fs_symlink_create(const char *path, const char *target) {
  */
 int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 	char *kpath, *kbuf;
-	vfs_node_t *node;
 	int ret, err;
 
 	/* Copy the path across. */
@@ -3287,28 +3051,20 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 		return ret;
 	}
 
-	/* Look up the filesystem node. */
-	if((ret = vfs_node_lookup(kpath, false, VFS_NODE_SYMLINK, &node)) != 0) {
-		kfree(kpath);
-		return ret;
-	}
-
 	/* Allocate a buffer to read into. See comment in sys_fs_file_read()
 	 * about not using MM_SLEEP. */
 	if(!(kbuf = kmalloc(size, 0))) {
-		vfs_node_release(node);
 		kfree(kpath);
 		return -ERR_NO_MEMORY;
 	}
 
-	ret = vfs_symlink_read(node, kbuf, size);
+	ret = vfs_symlink_read(kpath, kbuf, size);
 	if(ret > 0) {
 		if((err = memcpy_to_user(buf, kbuf, size)) != 0) {
 			ret = err;
 		}
 	}
 
-	vfs_node_release(node);
 	kfree(kpath);
 	kfree(kbuf);
 	return ret;
@@ -3381,14 +3137,9 @@ int sys_fs_unmount(const char *path) {
 }
 
 /** Get the path to the current working directory.
- *
- * Gets the path to the current working directory and stores it in a buffer.
- *
  * @param buf		Buffer to store in.
  * @param size		Size of buffer.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_getcwd(char *buf, size_t size) {
 	char *kbuf = NULL, *tmp, path[3];
 	vfs_dir_entry_t *entry;
@@ -3484,13 +3235,8 @@ int sys_fs_getcwd(char *buf, size_t size) {
 }
 
 /** Set the current working directory.
- *
- * Changes the calling process' current working directory.
- *
  * @param path		Path to change to.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_setcwd(const char *path) {
 	vfs_node_t *node;
 	char *kpath;
@@ -3548,16 +3294,11 @@ int sys_fs_setroot(const char *path) {
 }
 
 /** Get information about a node.
- *
- * Gets information about the filesystem entry referred to by a path.
- *
  * @param path		Path to get information on.
  * @param follow	Whether to follow if last path component is a symbolic
  *			link.
  * @param infop		Information structure to fill in.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, negative error code on failure. */
 int sys_fs_info(const char *path, bool follow, vfs_info_t *infop) {
 	vfs_node_t *node;
 	vfs_info_t kinfo;
@@ -3614,4 +3355,3 @@ int sys_fs_unlink(const char *path) {
 int sys_fs_rename(const char *source, const char *dest) {
 	return -ERR_NOT_IMPLEMENTED;
 }
-#endif

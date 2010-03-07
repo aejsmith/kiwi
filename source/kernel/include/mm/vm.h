@@ -130,7 +130,7 @@ extern void vm_init(void);
 
 extern int kdbg_cmd_aspace(int argc, char **argv);
 
-/** Structure containing arguments for sys_vm_map_file()/sys_vm_map_device(). */
+/** Structure containing arguments for sys_vm_map(). */
 typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
@@ -140,9 +140,7 @@ typedef struct vm_map_args {
 	void **addrp;			/**< Where to store address mapped to. */
 } vm_map_args_t;
 
-extern int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp);
-extern int sys_vm_map_file(vm_map_args_t *args);
-extern int sys_vm_map_device(vm_map_args_t *args);
+extern int sys_vm_map(vm_map_args_t *args);
 extern int sys_vm_unmap(void *start, size_t size);
 
 #endif /* __MM_VM_H */

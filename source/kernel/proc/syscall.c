@@ -64,7 +64,6 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_object_wait,
 	(syscall_handler_t)sys_object_wait_multiple,
 	(syscall_handler_t)sys_handle_close,
-#if 0
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,
@@ -87,9 +86,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_fs_link,
 	(syscall_handler_t)sys_fs_unlink,
 	(syscall_handler_t)sys_fs_rename,
-	(syscall_handler_t)sys_vm_map_anon,
-	(syscall_handler_t)sys_vm_map_file,
-	(syscall_handler_t)sys_vm_map_device,
+	(syscall_handler_t)sys_vm_map,
 	(syscall_handler_t)sys_vm_unmap,
 	(syscall_handler_t)sys_process_create,
 	(syscall_handler_t)sys_process_replace,
@@ -106,6 +103,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_thread_id,
 	(syscall_handler_t)sys_thread_exit,
 	(syscall_handler_t)sys_thread_usleep,
+#if 0
 	(syscall_handler_t)sys_ipc_port_create,
 	(syscall_handler_t)sys_ipc_port_open,
 	(syscall_handler_t)sys_ipc_port_id,

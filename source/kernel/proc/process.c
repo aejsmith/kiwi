@@ -127,7 +127,7 @@ static int process_alloc(const char *name, process_id_t id, int flags, int cflag
 
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
-	object_init(&process->obj, &process_object_type, 0);
+	object_init(&process->obj, &process_object_type);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;

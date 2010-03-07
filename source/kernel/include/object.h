@@ -63,6 +63,17 @@ typedef struct object_type {
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct object_wait *wait);
 
+	/** Check if an object can be memory-mapped.
+	 * @note		If this function is implemented, either the
+	 *			fault or page_get operation MUST be implemented.
+	 *			If it is not, then the object will be classed
+	 *			as mappable if either of those two functions is
+	 *			implemented.
+	 * @param handle	Handle to object.
+	 * @param flags		Mapping flags (VM_MAP_*).
+	 * @return		0 if can be mapped, negative error code if not. */
+	int (*mappable)(struct object_handle *handle, int flags);
+
 	/** Non-standard fault handling.
 	 * @note		If this operation is specified, it is called
 	 *			on all faults on memory regions using the
@@ -101,7 +112,6 @@ typedef struct object_type {
  *			another structure for the object. */
 typedef struct object {
 	object_type_t *type;		/**< Type of the object. */
-	int flags;			/**< Flags for the object. */
 	//rwlock_t lock;		/**< Lock protecting the ACL. */
 	//list_t acl;			/**< List of ACL entries. */
 } object_t;
@@ -128,10 +138,7 @@ typedef struct handle_table {
 	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
-/** Object flags. */
-#define OBJECT_MAPPABLE		(1<<0)	/**< Object is mappable (fault or page_get should be implemented). */
-
-extern void object_init(object_t *obj, object_type_t *type, int flags);
+extern void object_init(object_t *obj, object_type_t *type);
 extern void object_destroy(object_t *obj);
 //extern bool object_acl_check(object_t *obj, process_t *proc, uint32_t rights);
 //extern void object_acl_insert(object_t *obj,

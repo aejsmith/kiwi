@@ -258,6 +258,7 @@ static int vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 			for(j = start; j < i; j++) {
 				map->rref[j]--;
 			}
+			mutex_unlock(&map->lock);
 			return -ERR_RESOURCE_UNAVAIL;
 		}
 		map->rref[i]++;
@@ -995,7 +996,7 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
            offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
-	int rflags;
+	int rflags, ret;
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
@@ -1009,16 +1010,22 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 		return -ERR_PARAM_INVAL;
 	}
 	if(handle) {
-		if(!(handle->object->flags & OBJECT_MAPPABLE)) {
-			return -ERR_NOT_SUPPORTED;
-		}
-
-		assert(handle->object->type->page_get || handle->object->type->fault);
-
 		/* Cannot create private mappings to objects requiring special
 		 * fault handling. */
 		if(flags & VM_MAP_PRIVATE && handle->object->type->fault) {
 			return -ERR_NOT_SUPPORTED;
+		}
+
+		/* Check if the object can be mapped in with the given flags. */
+		if(handle->object->type->mappable) {
+			assert(handle->object->type->page_get || handle->object->type->fault);
+			if((ret = handle->object->type->mappable(handle, flags)) != 0) {
+				return ret;
+			}
+		} else {
+			if(!handle->object->type->page_get && !handle->object->type->fault) {
+				return -ERR_NOT_SUPPORTED;
+			}
 		}
 	}
 
@@ -1037,7 +1044,6 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 			mutex_unlock(&as->lock);
 			return -ERR_NO_MEMORY;
 		}
-		*addrp = start;
 	}
 
 	/* Create the region structure, attach the object to it, and create an
@@ -1061,6 +1067,9 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
 	        region->start, region->end, as, handle, flags, rflags);
+	if(addrp) {
+		*addrp = region->start;
+	}
 	mutex_unlock(&as->lock);
 	return 0;
 }
@@ -1232,95 +1241,40 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-#if 0
-/** Map a region of anonymous memory.
- *
- * Maps a region of anonymous memory (i.e. not backed by any data source) into
- * the calling process' address space. If the VM_MAP_FIXED flag is specified,
- * then the region will be mapped at the exact location specified, and any
- * existing mappings in the same region will be overwritten. Otherwise, a
- * region of unused space will be allocated for the mapping. If the
- * VM_MAP_PRIVATE flag is specified, then the region will not be shared if the
- * process duplicates itself - the child and the original process will be
- * given copy-on-write copies of the region. If the VM_MAP_PRIVATE flag is not
- * specified and the process duplicates itself, changes made by the parent and
- * the child will be visible to each other.
- *
- * @param start		Start address of region (if VM_MAP_FIXED).
- * @param size		Size of region to map (multiple of system page size).
- * @param flags		Flags to control mapping behaviour (VM_MAP_*).
- * @param addrp		Where to store address of mapping.
- *
- * @return		0 on success, negative error code on failure.
- */
-int sys_vm_map_anon(void *start, size_t size, int flags, void **addrp) {
-	ptr_t addr;
-	int ret;
 
-	if(!(flags & VM_MAP_FIXED) && !addrp) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	if((ret = vm_map_anon(curr_proc->aspace, (ptr_t)start, size, flags, &addr)) != 0) {
-		return ret;
-	} else if(addrp && (ret = memcpy_to_user(addrp, &addr, sizeof(void *))) != 0) {
-		vm_unmap(curr_proc->aspace, addr, size);
-		return ret;
-	}
-
-	return 0;
-}
-
-/** Map a file into memory.
+/** Map an object into memory.
  *
- * Maps all or part of a file into the calling process' address space. If the
- * VM_MAP_FIXED flag is specified, then the region will be mapped at the exact
- * location specified, and any existing mappings in the same region will be
- * overwritten. Otherwise, a region of unused space will be allocated for the
- * mapping. If the VM_MAP_PRIVATE flag is specified, then a copy-on-write
- * mapping will be created - changes to the mapped data will not be made in the
- * underlying file, and will not be visible to other regions mapping the file.
- * Also, changes made to the file's data after the mapping has been written
- * to may not be visible in the mapping. If the process duplicates itself,
- * changes made in the child after the duplication will not be visible in the
- * parent, and vice-versa. If the VM_MAP_PRIVATE flag is not specified, then
- * changes to the mapped data will be made in the underlying file, and will be
- * visible to other regions mapping the file.
+ * Creates a new memory mapping within an address space that maps either an
+ * object or anonymous memory. If the VM_MAP_FIXED flag is specified, then the
+ * region will be mapped at the exact location specified, and any existing
+ * mappings in the same region will be overwritten. Otherwise, a region of
+ * unused space will be allocated for the mapping. If the VM_MAP_PRIVATE flag
+ * is specified, modifications to the mapping will not be transferred through
+ * to the source object, and if the address space is duplicated, the duplicate
+ * and original will be given copy-on-write copies of the region. If the
+ * VM_MAP_PRIVATE flag is not specified and the address space is duplicated,
+ * changes made in either address space will be visible in the other.
  *
  * @param args		Pointer to arguments structure.
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_vm_map_file(vm_map_args_t *args) {
+int sys_vm_map(vm_map_args_t *args) {
+	object_handle_t *obj;
 	vm_map_args_t kargs;
-	handle_info_t *info;
-	vfs_handle_t *file;
 	int ret, err;
 	ptr_t addr;
 
 	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_args_t))) != 0) {
 		return ret;
-	}
-
-	if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
+	} else if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
 		return -ERR_PARAM_INVAL;
-	}
-
-	/* Look up the handle. */
-	if((ret = handle_get(&curr_proc->handles, kargs.handle, HANDLE_TYPE_FILE, &info)) != 0) {
+	} else if((ret = object_handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
 		return ret;
 	}
-	file = info->data;
 
-	/* If shared write access is required, ensure that the handle flags
-	 * allow this. */
-	if(!(kargs.flags & VM_MAP_PRIVATE) && kargs.flags & VM_MAP_WRITE && !(file->flags & FS_FILE_WRITE)) {
-		handle_release(info);
-		return -ERR_PERM_DENIED;
-	}
-
-	ret = vm_map_file(curr_proc->aspace, (ptr_t)kargs.start, kargs.size,
-	                  kargs.flags, file->node, kargs.offset, &addr);
+	ret = vm_map(curr_proc->aspace, (ptr_t)kargs.start, kargs.size, kargs.flags,
+	             obj, kargs.offset, &addr);
 	if(ret == 0 && kargs.addrp) {
 		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
 			vm_unmap(curr_proc->aspace, addr, kargs.size);
@@ -1328,54 +1282,7 @@ int sys_vm_map_file(vm_map_args_t *args) {
 		}
 	}
 
-	handle_release(info);
-	return ret;
-}
-
-/** Map a device into memory.
- *
- * Maps all or part of a device's memory into the calling process' address
- * space. If the VM_MAP_FIXED flag is specified, then the region will be mapped
- * at the exact location specified, and any existing mappings in the same
- * region will be overwritten. Otherwise, a region of unused space will be
- * allocated for the mapping. The VM_MAP_PRIVATE flag must not be specified. An
- * error will be returned if the device does not support memory mapping.
- *
- * @param args		Pointer to arguments structure.
- *
- * @return		0 on success, negative error code on failure.
- */
-int sys_vm_map_device(vm_map_args_t *args) {
-	vm_map_args_t kargs;
-	handle_info_t *info;
-	device_t *device;
-	int ret, err;
-	ptr_t addr;
-
-	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_args_t))) != 0) {
-		return ret;
-	}
-
-	if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	/* Look up the handle. */
-	if((ret = handle_get(&curr_proc->handles, kargs.handle, HANDLE_TYPE_DEVICE, &info)) != 0) {
-		return ret;
-	}
-	device = info->data;
-
-	ret = vm_map_device(curr_proc->aspace, (ptr_t)kargs.start, kargs.size,
-	                  kargs.flags, device, kargs.offset, &addr);
-	if(ret == 0 && kargs.addrp) {
-		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
-			vm_unmap(curr_proc->aspace, addr, kargs.size);
-			ret = err;
-		}
-	}
-
-	handle_release(info);
+	object_handle_release(obj);
 	return ret;
 }
 
@@ -1392,4 +1299,3 @@ int sys_vm_map_device(vm_map_args_t *args) {
 int sys_vm_unmap(void *start, size_t size) {
 	return vm_unmap(curr_proc->aspace, (ptr_t)start, size);
 }
-#endif

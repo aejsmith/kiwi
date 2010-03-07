@@ -79,6 +79,15 @@ static void device_object_unwait(object_wait_t *wait) {
 	return device->ops->unwait(device, wait->handle->data, wait);
 }
 
+/** Check if a device can be memory-mapped.
+ * @param handle	Handle to device.
+ * @param flags		Mapping flags (VM_MAP_*).
+ * @return		0 if can be mapped, negative error code if not. */
+static int device_object_mappable(object_handle_t *handle, int flags) {
+	device_t *device = (device_t *)handle->object;
+	return (device->ops->fault) ? 0 : -ERR_NOT_SUPPORTED;
+}
+
 /** Handle a page fault on a device-backed region.
  * @param region	Region fault occurred in.
  * @param addr		Virtual address of fault (rounded down to base of page).
@@ -112,6 +121,7 @@ static object_type_t device_object_type = {
 	.close = device_object_close,
 	.wait = device_object_wait,
 	.unwait = device_object_unwait,
+	.mappable = device_object_mappable,
 	.fault = device_object_fault,
 };
 
@@ -150,7 +160,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	}
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type, (ops->fault) ? OBJECT_MAPPABLE : 0);
+	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -239,7 +249,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	refcount_inc(&dest->count);
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type, 0);
+	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -484,14 +494,14 @@ int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offse
 	size_t bytes;
 	int ret;
 
-	assert(handle);
-	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
-	assert(buf);
+	if(!handle || !buf || offset < 0) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
+		return -ERR_TYPE_INVAL;
+	}
 
 	device = (device_t *)handle->object;
-	if(offset < 0) {
-		return -ERR_PARAM_INVAL;
-	} else if(!device->ops || !device->ops->read) {
+	if(!device->ops || !device->ops->read) {
 		return -ERR_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
@@ -527,14 +537,14 @@ int device_write(object_handle_t *handle, const void *buf, size_t count, offset_
 	size_t bytes;
 	int ret;
 
-	assert(handle);
-	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
-	assert(buf);
+	if(!handle || !buf || offset < 0) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
+		return -ERR_TYPE_INVAL;
+	}
 
 	device = (device_t *)handle->object;
-	if(offset < 0) {
-		return -ERR_PARAM_INVAL;
-	} else if(!device->ops || !device->ops->write) {
+	if(!device->ops || !device->ops->write) {
 		return -ERR_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
@@ -564,8 +574,11 @@ int device_write(object_handle_t *handle, const void *buf, size_t count, offset_
 int device_request(object_handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
 	device_t *device;
 
-	assert(handle);
-	assert(handle->object->type->id == OBJECT_TYPE_DEVICE);
+	if(!handle) {
+		return -ERR_PARAM_INVAL;
+	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
+		return -ERR_TYPE_INVAL;
+	}
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->request) {
@@ -687,7 +700,7 @@ static void __init_text device_init(void) {
 	}
 }
 INITCALL(device_init);
-#if 0
+
 /** Open a handle to a device.
  *
  * Opens a handle to a device that can be used to perform other operations on
@@ -699,15 +712,22 @@ INITCALL(device_init);
  * @return		Handle ID on success, negative error code on failure.
  */
 handle_t sys_device_open(const char *path) {
+	object_handle_t *handle;
 	device_t *device;
 	handle_t ret;
 
-	if((ret = device_get(path, &device)) != 0) {
+	if((ret = device_lookup(path, &device)) != 0) {
 		return ret;
-	} else if((ret = handle_create(&curr_proc->handles, &device_handle_type, device)) < 0) {
-		device_release(device);
 	}
 
+	ret = device_open(device, &handle);
+	device_release(device);
+	if(ret != 0) {
+		return ret;
+	}
+
+	ret = object_handle_attach(curr_proc, handle);
+	object_handle_release(handle);
 	return ret;
 }
 
@@ -722,24 +742,19 @@ handle_t sys_device_open(const char *path) {
  * @param count		Number of bytes to read.
  * @param offset	Offset in the device to read from (only valid for
  *			certain device types).
- * @param bytesp	Where to store number of bytes read.
+ * @param bytesp	Where to store number of bytes read (can be NULL).
  *
  * @return		0 on success, negative error code on failure.
  */
 int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info = NULL;
-	device_t *device;
+	object_handle_t *obj = NULL;
 	size_t bytes = 0;
-	int ret = 0, err;
+	int ret, err;
 	void *kbuf;
 
-	/* Look up the device handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_DEVICE, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		goto out;
-	}
-	device = info->data;
-
-	if(!count) {
+	} else if(!count) {
 		goto out;
 	}
 
@@ -752,22 +767,23 @@ int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, s
 		goto out;
 	}
 
-	ret = device_read(device, kbuf, count, offset, &bytes);
+	ret = device_read(obj, kbuf, count, offset, &bytes);
 	if(bytes) {
 		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
 			ret = err;
+			bytes = 0;
 		}
 	}
 	kfree(kbuf);
 out:
+	if(obj) {
+		object_handle_release(obj);
+	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
 		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
 			ret = err;
 		}
-	}
-	if(info) {
-		handle_release(info);
 	}
 	return ret;
 }
@@ -783,24 +799,19 @@ out:
  * @param count		Number of bytes to write.
  * @param offset	Offset in the device to write to (only valid for
  *			certain device types).
- * @param bytesp	Where to store number of bytes read.
+ * @param bytesp	Where to store number of bytes read (can be NULL).
  *
  * @return		0 on success, negative error code on failure.
  */
 int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_info_t *info = NULL;
+	object_handle_t *obj = NULL;
 	void *kbuf = NULL;
-	device_t *device;
 	size_t bytes = 0;
-	int ret = 0, err;
+	int ret, err;
 
-	/* Look up the device handle. */
-	if((ret = handle_get(&curr_proc->handles, handle, HANDLE_TYPE_DEVICE, &info)) != 0) {
+	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		goto out;
-	}
-	device = info->data;
-
-	if(count == 0) {
+	} else if(!count) {
 		goto out;
 	}
 
@@ -815,49 +826,40 @@ int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t of
 		goto out;
 	}
 
-	ret = device_write(device, kbuf, count, offset, &bytes);
+	ret = device_write(obj, kbuf, count, offset, &bytes);
 out:
 	if(kbuf) {
 		kfree(kbuf);
+	}
+	if(obj) {
+		object_handle_release(obj);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
 		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
 			ret = err;
+			bytes = 0;
 		}
-	}
-	if(info) {
-		handle_release(info);
 	}
 	return ret;
 }
 
 /** Perform a device-specific operation.
- *
- * Performs an operation that is specific to a device/device type.
- *
  * @param args		Pointer to arguments structure.
- *
  * @return		Positive value on success, negative error code on
- *			failure.
- */
+ *			failure. */
 int sys_device_request(device_request_args_t *args) {
 	void *kin = NULL, *kout = NULL;
 	device_request_args_t kargs;
-	handle_info_t *info;
-	device_t *device;
+	object_handle_t *obj;
 	size_t koutsz;
 	int ret, err;
 
 	if((ret = memcpy_from_user(&kargs, args, sizeof(device_request_args_t))) != 0) {
 		return ret;
-	}
-
-	/* Look up the device handle. */
-	if((ret = handle_get(&curr_proc->handles, kargs.handle, HANDLE_TYPE_DEVICE, &info)) != 0) {
+	} else if((ret = object_handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		return ret;
 	}
-	device = info->data;
 
 	if(kargs.in && kargs.insz) {
 		if(!(kin = kmalloc(kargs.insz, 0))) {
@@ -868,7 +870,7 @@ int sys_device_request(device_request_args_t *args) {
 		}
 	}
 
-	ret = device_request(device, kargs.request, kin, kargs.insz, &kout, &koutsz);
+	ret = device_request(obj, kargs.request, kin, kargs.insz, &kout, &koutsz);
 	if(kout) {
 		assert(koutsz);
 		if(koutsz > kargs.outsz) {
@@ -888,7 +890,6 @@ out:
 	if(kout) {
 		kfree(kout);
 	}
-	handle_release(info);
+	object_handle_release(obj);
 	return ret;
 }
-#endif
