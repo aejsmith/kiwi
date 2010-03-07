@@ -81,13 +81,9 @@ void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 }
 
 /** Runs all functions on a notifier.
- *
- * Runs all the functions currently registered for a notifier.
- *
  * @param notif		Notifier to run.
  * @param data		Pointer to pass as second argument to functions.
- * @param destroy	Whether to remove functions after calling them.
- */
+ * @param destroy	Whether to remove functions after calling them. */
 void notifier_run(notifier_t *notif, void *data, bool destroy) {
 	mutex_lock(&notif->lock);
 	notifier_run_unlocked(notif, data, destroy);
@@ -95,13 +91,9 @@ void notifier_run(notifier_t *notif, void *data, bool destroy) {
 }
 
 /** Add a function to a notifier.
- *
- * Register a function to be called when a notifier is run.
- *
  * @param notif		Notifier to add to.
  * @param func		Function to add.
- * @param data		Pointer to pass as third argument to function.
- */
+ * @param data		Pointer to pass as third argument to function. */
 void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data) {
 	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_SLEEP);
 
@@ -115,13 +107,9 @@ void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), 
 }
 
 /** Remove a function from a notifier.
- *
- * Removes any functions matching the specified arguments from a notifier.
- *
  * @param notif		Notifier to remove from.
  * @param func		Function to remove.
- * @param data		Data argument function was registered with.
- */
+ * @param data		Data argument function was registered with. */
 void notifier_unregister(notifier_t *notif, void (*func)(void *, void *, void *), void *data) {
 	notifier_func_t *nf;
 

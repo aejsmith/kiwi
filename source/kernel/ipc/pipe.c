@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,11 +21,33 @@
 #include <ipc/pipe.h>
 
 #include <mm/kheap.h>
-#include <mm/malloc.h>
+#include <mm/slab.h>
 
 #include <assert.h>
 #include <errors.h>
+#include <init.h>
 #include <object.h>
+
+/** Cache for pipe structures. */
+static slab_cache_t *pipe_cache;
+
+/** Constructor for pipe structures.
+ * @param obj		Object to construct.
+ * @param data		Unused.
+ * @param kmflag	Allocation flags (unused).
+ * @return		Always returns 0. */
+static int pipe_ctor(void *obj, void *data, int kmflag) {
+	pipe_t *pipe = obj;
+
+	mutex_init(&pipe->reader, "pipe_reader_lock", 0);
+	mutex_init(&pipe->writer, "pipe_writer_lock", 0);
+	mutex_init(&pipe->lock, "pipe_lock", 0);
+	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
+	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
+	notifier_init(&pipe->space_notifier, pipe);
+	notifier_init(&pipe->data_notifier, pipe);
+	return 0;
+}
 
 /** Read a byte from a pipe.
  * @param pipe		Pipe structure. Should be locked, and have data.
@@ -218,30 +240,31 @@ void pipe_unwait(pipe_t *pipe, bool write, object_wait_t *wait) {
 /** Create a new pipe.
  * @return		Pointer to pipe structure. */
 pipe_t *pipe_create(void) {
-	pipe_t *pipe = kmalloc(sizeof(pipe_t), MM_SLEEP);
+	pipe_t *pipe;
 
-	mutex_init(&pipe->reader, "pipe_reader_lock", 0);
-	mutex_init(&pipe->writer, "pipe_writer_lock", 0);
-	mutex_init(&pipe->lock, "pipe_lock", 0);
-	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
-	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
-	notifier_init(&pipe->space_notifier, pipe);
-	notifier_init(&pipe->data_notifier, pipe);
+	pipe = slab_cache_alloc(pipe_cache, MM_SLEEP);
 	pipe->buf = kheap_alloc(PIPE_SIZE, MM_SLEEP);
 	pipe->start = 0;
 	pipe->end = 0;
-
 	return pipe;
 }
 
 /** Destroy a pipe.
- * @note		It is up to the caller to ensure that nothing will be
- *			using this pipe. For example, the handle system can be
- *			used for this purpose.
+ * @note		Caller must ensure that nothing is using the pipe.
  * @param pipe		Pipe to destroy. */
 void pipe_destroy(pipe_t *pipe) {
 	assert(!mutex_held(&pipe->reader));
 	assert(!mutex_held(&pipe->writer));
-	kfree(pipe->buf);
-	kfree(pipe);
+	assert(notifier_empty(&pipe->space_notifier));
+	assert(notifier_empty(&pipe->data_notifier));
+	kheap_free(pipe->buf, PIPE_SIZE);
+	slab_cache_free(pipe_cache, pipe);
 }
+
+/** Initialise the pipe slab cache. */
+static void __init_text pipe_cache_init(void) {
+	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
+	                               NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
+	                               NULL, 0, MM_FATAL);
+}
+INITCALL(pipe_cache_init);
