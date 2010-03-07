@@ -2963,7 +2963,7 @@ int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *n
 		return ret;
 	}
 
-	if((ret = vfs_handle_seek(obj, action, offset, &new)) == 0) {
+	if((ret = vfs_handle_seek(obj, action, offset, &new)) == 0 && newp) {
 		ret = memcpy_to_user(newp, &new, sizeof(offset_t));
 	}
 	object_handle_release(obj);
