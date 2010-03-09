@@ -337,6 +337,8 @@ int kdbg_cmd_uptime(int argc, char **argv) {
 
 /** Initialise the timing system. */
 void __init_text time_init(void) {
+	time_arch_init();
+
 	/* Initialise the boot time. */
 	boot_unix_time = time_from_hardware() - time_since_boot();
 }

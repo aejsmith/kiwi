@@ -21,6 +21,9 @@
 #include <cpu/cpu.h>
 #include <time.h>
 
+/** Value of TSC when time_arch_init() was called. */
+static uint64_t boot_time_offset = 0;
+
 /** Read the Time Stamp Counter.
  * @return		Value of the TSC. */
 static inline uint64_t rdtsc(void) {
@@ -32,5 +35,14 @@ static inline uint64_t rdtsc(void) {
 /** Get the number of microseconds since the system was booted.
  * @return		Number of microseconds since system was booted. */
 useconds_t time_since_boot(void) {
-	return (useconds_t)(rdtsc() / curr_cpu->arch.cycles_per_us);
+	return (useconds_t)((rdtsc() - boot_time_offset) / curr_cpu->arch.cycles_per_us);
+}
+
+/** Set up the boot time offset. */
+void __init_text time_arch_init(void) {
+	/* Initialise the boot time offset. In time_since_boot() this value is
+	 * subtracted from the value returned from TSC. This is necessary
+	 * because although the bootloader set the TSC to 0, QEMU (and possibly
+	 * some other things) don't support writing the TSC. */
+	boot_time_offset = rdtsc();
 }

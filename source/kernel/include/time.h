@@ -88,6 +88,7 @@ extern void usleep(useconds_t us);
 extern int kdbg_cmd_timers(int argc, char **argv);
 extern int kdbg_cmd_uptime(int argc, char **argv);
 
+extern void time_arch_init(void);
 extern void time_init(void);
 
 #endif /* LOADER */

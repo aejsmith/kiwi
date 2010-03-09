@@ -53,10 +53,10 @@ static void fatal_printf(const char *format, ...) {
 	va_end(args);
 }
 
-/** Print an error message and halt the kernel.
+/** Raise a fatal error.
  *
- * Prints a formatted error message to the screen, along with a stack trace,
- * then halts the kernel.
+ * Halts all CPUs, prints a formatted error message to the console and enters
+ * KDBG. The function will never return.
  *
  * @param frame		Interrupt stack frame (if any).
  * @param format	The format string for the message.
