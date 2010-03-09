@@ -49,6 +49,7 @@
 
 #include <kdbg.h>
 #include <module.h>
+#include <object.h>
 #include <symbol.h>
 #include <time.h>
 #include <vmem.h>
@@ -95,7 +96,7 @@ static struct {
 	{ "device",	"Print out information about devices.",		kdbg_cmd_device },
 	//{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
-	//{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
+	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
 	{ "kill",	"Kill a thread.",				kdbg_cmd_kill },
 	{ "list",	"List breakpoints/watchpoints.",		kdbg_cmd_list },

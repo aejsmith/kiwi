@@ -159,6 +159,8 @@ extern int object_wait_multiple(object_handle_t **handles, int *events, size_t c
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
 
+extern int kdbg_cmd_handles(int argc, char **argv);
+
 extern void handle_cache_init(void);
 
 extern int sys_object_type(handle_t handle);

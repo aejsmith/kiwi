@@ -42,6 +42,7 @@
 #include <assert.h>
 #include <console.h>
 #include <errors.h>
+#include <kdbg.h>
 #include <object.h>
 
 #if CONFIG_OBJECT_DEBUG
@@ -389,6 +390,45 @@ void handle_table_destroy(handle_table_t *table) {
 	}
 
 	bitmap_destroy(&table->bitmap);
+}
+
+/** Print a list of a process' handles.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_handles(int argc, char **argv) {
+	object_handle_t *handle;
+	process_t *process;
+	unative_t id;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s <process ID>\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints out a list of all currently open handles in a process.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(kdbg_parse_expression(argv[1], &id, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	} else if(!(process = process_lookup_unsafe(id))) {
+		kprintf(LOG_NONE, "Invalid process ID.\n");
+		return KDBG_FAIL;
+	}
+
+	kprintf(LOG_NONE, "ID    Object             Type                  Count  Data\n");
+	kprintf(LOG_NONE, "==    ======             ====                  =====  ====\n");
+
+	AVL_TREE_FOREACH(&process->handles.tree, iter) {
+		handle = avl_tree_entry(iter, object_handle_t);
+		kprintf(LOG_NONE, "%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
+		        iter->key, handle, handle->object->type->id, handle->object->type,
+		        refcount_get(&handle->count), handle->data);
+	}
+
+	return KDBG_OK;
 }
 
 /** Initialise the object handle cache. */
