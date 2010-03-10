@@ -64,11 +64,11 @@ static void device_object_close(object_handle_t *handle) {
 static int device_object_wait(object_wait_t *wait) {
 	device_t *device = (device_t *)wait->handle->object;
 
-	if(device->ops && (!device->ops->wait || !device->ops->unwait)) {
+	if(device->ops && device->ops->wait && device->ops->unwait) {
+		return device->ops->wait(device, wait->handle->data, wait);
+	} else {
 		return -ERR_NOT_IMPLEMENTED;
 	}
-
-	return device->ops->wait(device, wait->handle->data, wait);
 }
 
 /** Stop waiting for a device.
@@ -455,7 +455,7 @@ void device_release(device_t *device) {
  * @param handlep	Where to store pointer to handle structure.
  * @return		0 on success, negative error code on failure. */
 int device_open(device_t *device, object_handle_t **handlep) {
-	void *data;
+	void *data = NULL;
 	int ret;
 
 	assert(device);

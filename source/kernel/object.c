@@ -347,7 +347,7 @@ int object_wait_multiple(object_handle_t **handles, int *events, size_t count, u
 
 	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
 out:
-	for(i = 0; i < count; i++) {
+	while(i--) {
 		handles[i]->object->type->unwait(&waits[i]);
 	}
 	if(ret == 0) {
