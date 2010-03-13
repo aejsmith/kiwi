@@ -42,7 +42,8 @@ typedef struct vm_map_args {
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */
 #define VM_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
 #define VM_MAP_PRIVATE		(1<<3)	/**< Modifications to the mapping should not be visible to other processes. */
-#define VM_MAP_FIXED		(1<<4)	/**< Mapping should be placed at the exact location specified. */
+#define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
+#define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
 
 extern int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
 extern int vm_unmap(void *start, size_t size);

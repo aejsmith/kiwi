@@ -919,6 +919,14 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 		goto out;
 	}
 
+	/* If the region is a stack region, check if we've hit the guard page.
+	 * TODO: Stack direction. */
+	if(region->flags & VM_REGION_STACK && addr == region->start) {
+		kprintf(LOG_DEBUG, "vm: thread %" PRIu32 " hit stack guard page %p\n",
+		        curr_thread->id, addr);
+		return false;
+	}
+
 	/* Call the anonymous fault handler if there is an anonymous map, or
 	 * pass the fault through to the object if it has its own fault
 	 * handler. */
@@ -1032,7 +1040,7 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 
 	/* Convert mapping flags to region flags. The flags with a region
 	 * equivalent have the same value. */
-	rflags = flags & (VM_MAP_READ | VM_MAP_WRITE | VM_MAP_EXEC | VM_MAP_PRIVATE);
+	rflags = flags & (VM_MAP_READ | VM_MAP_WRITE | VM_MAP_EXEC | VM_MAP_PRIVATE | VM_MAP_STACK);
 
 	mutex_lock(&as->lock);
 

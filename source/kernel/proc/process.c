@@ -318,7 +318,8 @@ static void process_create_thread(void *arg1, void *arg2) {
 
 	/* Create a userspace stack and place the argument block address on it.
 	 * TODO: Stack direction! */
-	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE,
+	                 VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
 	                 NULL, 0, &stack)) != 0) {
 		goto fail;
 	}
@@ -752,7 +753,8 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 
 	/* Create a userspace stack and place the argument block address on it.
 	 * TODO: Stack direction! */
-	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	if((ret = vm_map(curr_aspace, 0, USTACK_SIZE,
+	                 VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
 	                 NULL, 0, &stack)) != 0) {
 		fatal("Meep, need to handle this too (%d)", ret);
 	}

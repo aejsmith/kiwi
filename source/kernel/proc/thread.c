@@ -657,7 +657,8 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 			stacksz = USTACK_SIZE;
 		}
 
-		if((ret = vm_map(curr_proc->aspace, 0, stacksz, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+		if((ret = vm_map(curr_proc->aspace, 0, stacksz,
+		                 VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
 		                 NULL, 0, &args->sp)) != 0) {
 			goto fail;
 		}

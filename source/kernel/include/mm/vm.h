@@ -89,7 +89,8 @@ typedef struct vm_aspace {
 #define VM_REGION_WRITE		(1<<1)	/**< Region is writable. */
 #define VM_REGION_EXEC		(1<<2)	/**< Region is executable. */
 #define VM_REGION_PRIVATE	(1<<3)	/**< Modifications to this region should not be visible to other processes. */
-#define VM_REGION_RESERVED	(1<<4)	/**< Region is reserved and should never be allocated. */
+#define VM_REGION_STACK		(1<<4)	/**< Region contains a stack and should have a guard page. */
+#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
 
 /** Behaviour flags for vm_map_* functions.
  * @note		Flags that have a region equivalent are defined to the
@@ -98,7 +99,8 @@ typedef struct vm_aspace {
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */
 #define VM_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
 #define VM_MAP_PRIVATE		(1<<3)	/**< Modifications to the mapping should not be visible to other processes. */
-#define VM_MAP_FIXED		(1<<4)	/**< Mapping should be placed at the exact location specified. */
+#define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
+#define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
 
 /** Page fault reason codes. */
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */

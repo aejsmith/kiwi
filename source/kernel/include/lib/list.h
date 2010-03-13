@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -78,22 +78,14 @@ static inline void list_real_remove(list_t *entry) {
 }
 
 /** Initialises a linked list.
- *
- * Initialises the given linked list header structure.
- *
- * @param list		List to initialise.
- */
+ * @param list		List to initialise. */
 static inline void list_init(list_t *list) {
 	list->prev = list->next = list;
 }
 
-/** Add an entry to a list.
- *
- * Adds an entry to a list before the given entry.
- *
+/** Add an entry to a list before the given entry.
  * @param exist		Existing entry to add before.
- * @param entry		Entry to append.
- */
+ * @param entry		Entry to append. */
 static inline void list_add_before(list_t *exist, list_t *entry) {
 	list_real_remove(entry);
 
@@ -103,13 +95,9 @@ static inline void list_add_before(list_t *exist, list_t *entry) {
 	exist->prev = entry;
 }
 
-/** Add an entry to a list.
- *
- * Adds an entry to a list after the given entry.
- *
+/** Add an entry to a list after the given entry.
  * @param exist		Existing entry to add after.
- * @param entry		Entry to append.
- */
+ * @param entry		Entry to append. */
 static inline void list_add_after(list_t *exist, list_t *entry) {
 	list_real_remove(entry);
 
@@ -120,35 +108,21 @@ static inline void list_add_after(list_t *exist, list_t *entry) {
 }
 
 /** Append an entry to a list.
- *
- * Adds an entry to a list before the list header, thus appending it to the
- * list.
- *
  * @param list		List to append to.
- * @param entry		Entry to append.
- */
+ * @param entry		Entry to append. */
 static inline void list_append(list_t *list, list_t *entry) {
 	list_add_before(list, entry);
 }
 
 /** Prepend an entry to a list.
- *
- * Adds an entry to a list after the list header, thus prepending it to the
- * list.
- *
  * @param list		List to prepend to.
- * @param entry		Entry to prepend.
- */
+ * @param entry		Entry to prepend. */
 static inline void list_prepend(list_t *list, list_t *entry) {
 	list_add_after(list, entry);
 }
 
-/** Remove a list entry.
- *
- * Removes a list header from its containing list.
- *
- * @param entry		Entry to remove.
- */
+/** Remove a list entry from its containing list.
+ * @param entry		Entry to remove. */
 static inline void list_remove(list_t *entry) {
 	list_real_remove(entry);
 	list_init(entry);
