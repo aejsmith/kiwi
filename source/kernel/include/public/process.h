@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Process functions.
+ * @brief		Process management functions.
  */
 
 #ifndef __KERNEL_PROCESS_H
@@ -25,7 +25,11 @@
 extern "C" {
 #endif
 
-#include <kernel/types.h>
+#ifdef KERNEL
+# include <public/types.h>
+#else
+# include <kernel/types.h>
+#endif
 
 /** Process arguments structure. */
 typedef struct process_args {
@@ -42,12 +46,14 @@ typedef struct process_args {
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
-extern handle_t process_create(const char *path, const char *const args[], const char *const environ[], int flags);
-extern int process_replace(const char *path, const char *const args[], const char *const environ[], int flags);
-extern int process_duplicate(handle_t *handlep);
-extern handle_t process_open(process_id_t id);
-extern process_id_t process_id(handle_t handle);
-extern void process_exit(int status) __attribute__((noreturn));
+extern handle_t SYSCALL(process_create)(const char *path, const char *const args[],
+                                        const char *const environ[], int flags);
+extern int SYSCALL(process_replace)(const char *path, const char *const args[],
+                                    const char *const environ[], int flags);
+extern int SYSCALL(process_duplicate)(handle_t *handlep);
+extern handle_t SYSCALL(process_open)(process_id_t id);
+extern process_id_t SYSCALL(process_id)(handle_t handle);
+extern void SYSCALL(process_exit)(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
 }

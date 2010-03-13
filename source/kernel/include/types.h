@@ -22,24 +22,13 @@
 #define __TYPES_H
 
 #include <arch/types.h>
-
+#include <public/types.h>
 #include <compiler.h>
 
 /** C standard types. */
 typedef __SIZE_TYPE__ size_t;		/**< Type to represent the size of an object. */
 typedef __PTRDIFF_TYPE__ ptrdiff_t;	/**< Type to store the difference between two pointers. */
 typedef _Bool bool;			/**< Boolean type. */
-
-/** Kiwi-specific integer types. */
-typedef int32_t process_id_t;		/**< Type used to store a process ID. */
-typedef int32_t thread_id_t;		/**< Type used to store a thread ID. */
-typedef int32_t port_id_t;		/**< Type used to store a port ID. */
-typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
-typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
-typedef int32_t handle_t;		/**< Type used to store a handle to an object. */
-typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
-typedef int64_t offset_t;		/**< Type used to store an offset into something. */
-typedef uint64_t file_size_t;		/**< Type used to store a file size. */
 
 /** Internal kernel integer types. */
 typedef uint64_t key_t;			/**< Type used to store a key for a container. */

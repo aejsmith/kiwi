@@ -40,7 +40,7 @@ void ext2_mount_flush(ext2_mount_t *mount) {
 	size_t bytes;
 	int ret;
 
-	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
+	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
 	ret = device_write(mount->device, &mount->sb, sizeof(ext2_superblock_t), 1024, &bytes);
 	if(ret != 0 || bytes != sizeof(ext2_superblock_t)) {
@@ -115,7 +115,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	if(le16_to_cpu(mount->sb.s_state) != EXT2_VALID_FS) {
 		kprintf(LOG_WARN, "ext2: warning: %s not cleanly unmounted/damaged, mounting read only\n",
 		        device_name(mount->device));
-		_mount->flags |= VFS_MOUNT_RDONLY;
+		_mount->flags |= FS_MOUNT_RDONLY;
 	}
 
 	/* Get useful information out of the superblock. */
@@ -158,7 +158,7 @@ static int ext2_mount(vfs_mount_t *_mount) {
 	}
 
 	/* If mounting read-write, write back the superblock as mounted. */
-	if(!(_mount->flags & VFS_MOUNT_RDONLY)) {
+	if(!(_mount->flags & FS_MOUNT_RDONLY)) {
 		mount->sb.s_state = cpu_to_le16(EXT2_ERROR_FS);
 		mount->sb.s_mnt_count = cpu_to_le16(le16_to_cpu(mount->sb.s_mnt_count) + 1);
 
@@ -190,7 +190,7 @@ fail:
 static void ext2_unmount(vfs_mount_t *_mount) {
 	ext2_mount_t *mount = _mount->data;
 
-	if(!(_mount->flags & VFS_MOUNT_RDONLY)) {
+	if(!(_mount->flags & FS_MOUNT_RDONLY)) {
 		mount->sb.s_state = cpu_to_le16(EXT2_VALID_FS);
 		ext2_mount_flush(mount);
 	}
@@ -448,7 +448,7 @@ static int ext2_node_unlink(vfs_node_t *_parent, const char *name, vfs_node_t *n
 /** Get information on an Ext2 node.
  * @param node		Node to get information on.
  * @param info		Information structure to fill in. */
-static void ext2_node_info(vfs_node_t *node, vfs_info_t *info) {
+static void ext2_node_info(vfs_node_t *node, fs_info_t *info) {
 	ext2_inode_t *inode = node->data;
 
 	rwlock_read_lock(&inode->lock);

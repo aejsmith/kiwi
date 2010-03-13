@@ -36,7 +36,7 @@ int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp) {
 	ext2_group_desc_t *group;
 	int ret;
 
-	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
+	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
 	rwlock_write_lock(&mount->lock);
 
@@ -116,7 +116,7 @@ int ext2_block_free(ext2_mount_t *mount, uint32_t num) {
 	ext2_group_desc_t *group;
 	int ret;
 
-	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
+	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
 	rwlock_write_lock(&mount->lock);
 
@@ -197,7 +197,7 @@ int ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block, bool 
 	size_t bytes;
 	int ret;
 
-	assert(!(mount->parent->flags & VFS_MOUNT_RDONLY));
+	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
 	if(block > mount->blocks_count) {
 		dprintf("ext2: attempted to write invalid block number %" PRIu32 " on mount %p\n", block, mount);

@@ -21,14 +21,21 @@
 #ifndef __KERNEL_TYPES_H
 #define __KERNEL_TYPES_H
 
-#define __need_size_t
-#include <stddef.h>
-#include <stdbool.h>
-#include <stdint.h>
+#ifdef KERNEL
+# include <arch/types.h>
+#else
+# define __need_size_t
+# include <stddef.h>
+# include <stdbool.h>
+# include <stdint.h>
+#endif
 
-/** Native-sized types. FIXME: Need architecture definitions of these! */
-typedef unsigned long unative_t;	/**< Unsigned native-sized type. */
-typedef signed long native_t;		/**< Signed native-sized type. */
+/** Macro for system call function names. */
+#ifdef KERNEL
+# define SYSCALL(name)	sys_ ## name
+#else
+# define SYSCALL(name)	name
+#endif
 
 /** Kiwi-specific integer types. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */

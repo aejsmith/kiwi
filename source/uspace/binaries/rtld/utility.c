@@ -27,7 +27,6 @@
 #include "args.h"
 #include "utility.h"
 
-extern int _vm_map(vm_map_args_t *args);
 extern int putch(char ch);
 
 /** Size of the statically allocated heap. */

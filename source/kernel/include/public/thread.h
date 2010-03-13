@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Thread functions.
+ * @brief		Thread management functions.
  */
 
 #ifndef __KERNEL_THREAD_H
@@ -25,13 +25,18 @@
 extern "C" {
 #endif
 
-#include <kernel/types.h>
+#ifdef KERNEL
+# include <public/types.h>
+#else
+# include <kernel/types.h>
+#endif
 
-extern handle_t thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
-extern handle_t thread_open(thread_id_t id);
-extern thread_id_t thread_id(handle_t handle);
-extern void thread_exit(int status) __attribute__((noreturn));
-extern int thread_usleep(useconds_t us);
+extern handle_t SYSCALL(thread_create)(const char *name, void *stack, size_t stacksz,
+                                       void (*func)(void *), void *arg1);
+extern handle_t SYSCALL(thread_open)(thread_id_t id);
+extern thread_id_t SYSCALL(thread_id)(handle_t handle);
+extern void SYSCALL(thread_exit)(int status) __attribute__((noreturn));
+extern int SYSCALL(thread_usleep)(useconds_t us);
 
 #ifdef __cplusplus
 }

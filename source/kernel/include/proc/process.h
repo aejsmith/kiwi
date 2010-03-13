@@ -28,21 +28,14 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <public/process.h>
+
 #include <sync/spinlock.h>
 
 #include <object.h>
 
 struct vfs_node;
 struct vm_aspace;
-
-/** Process arguments structure. */
-typedef struct process_args {
-	char *path;			/**< Path to program. */
-	char **args;			/**< Argument array. */
-	char **env;			/**< Environment variable array. */
-	int args_count;			/**< Number of entries in argument array (excluding NULL-terminator). */
-	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
-} process_args_t;
 
 /** Structure containing details about a process. */
 typedef struct process {
@@ -74,12 +67,6 @@ typedef struct process {
 #define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */
 #define PROCESS_FIXEDPRIO	(1<<1)	/**< Process' priority is fixed and should not be changed. */
 
-/** Process creation flag definitions. */
-#define PROCESS_CREATE_INHERIT	(1<<0)	/**< Inherit inheritable handles. */
-
-/** Process object events. */
-#define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
-
 /** Macro that expands to a pointer to the current process. */
 #define curr_proc		(curr_thread->owner)
 
@@ -97,12 +84,5 @@ extern void process_exit(int status) __noreturn;
 extern int kdbg_cmd_process(int argc, char **argv);
 
 extern void process_init(void);
-
-extern handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags);
-extern int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags);
-extern int sys_process_duplicate(handle_t *handlep);
-extern handle_t sys_process_open(process_id_t id);
-extern process_id_t sys_process_id(handle_t handle);
-extern void sys_process_exit(int status);
 
 #endif /* __PROC_PROCESS_H */

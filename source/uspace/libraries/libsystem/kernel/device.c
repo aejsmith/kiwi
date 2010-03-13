@@ -20,8 +20,6 @@
 
 #include <kernel/device.h>
 
-extern int _device_request(device_request_args_t *args);
-
 /** Perform a device-specific operation.
  * @param handle	Handle to device to perform operation on.
  * @param request	Operation number to perform.

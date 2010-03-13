@@ -27,6 +27,8 @@
 
 #include <mm/vm.h>
 
+#include <public/fs.h>
+
 #include <sync/mutex.h>
 
 #include <limits.h>
@@ -173,7 +175,7 @@ typedef struct vfs_type {
 	/** Get information about a node.
 	 * @param node		Node to get information on.
 	 * @param info		Information structure to fill in. */
-	void (*node_info)(struct vfs_node *node, struct vfs_info *info);
+	void (*node_info)(struct vfs_node *node, struct fs_info *info);
 
 	/**
 	 * Regular file functions.
@@ -262,47 +264,15 @@ typedef struct vfs_node {
 	char *link_dest;		/**< Cached symlink destination (VFS_NODE_SYMLINK). */
 } vfs_node_t;
 
-/** Directory entry information structure. */
-typedef struct vfs_dir_entry {
-	size_t length;			/**< Length of this structure including name. */
-	node_id_t id;			/**< ID of the node for the entry. */
-	char name[];			/**< Name of entry. */
-} vfs_dir_entry_t;
-
-/** Filesystem node information structure. */
-typedef struct vfs_info {
-	node_id_t id;			/**< Node ID. */
-	mount_id_t mount;		/**< Mount ID. */
-	size_t blksize;			/**< I/O block size. */
-	file_size_t size;		/**< Total size of node data on filesystem. */
-	size_t links;			/**< Number of links to the node. */
-} vfs_info_t;
-
 /** Filesystem type trait flags. */
 #define VFS_TYPE_RDONLY		(1<<0)	/**< Filesystem type is read-only. */
 #define VFS_TYPE_CACHE_BASED	(1<<1)	/**< Filesystem type is cache-based - all nodes will remain in memory. */
-
-/** Mount behaviour flags. */
-#define VFS_MOUNT_RDONLY	(1<<0)	/**< Mount is read-only. */
 
 /** Node behaviour flags. */
 #define VFS_NODE_REMOVED	(1<<0)	/**< Node should be freed immediately when its reference count reaches 0. */
 
 /** Macro to check if a node is read-only. */
-#define VFS_NODE_IS_RDONLY(node)	((node)->mount && (node)->mount->flags & VFS_MOUNT_RDONLY)
-
-/** Behaviour flags for both FS handle types. */
-#define FS_HANDLE_NONBLOCK	(1<<0)	/**< I/O operations on the handle should not block. */
-
-/** Behaviour flags for fs_file_open(). */
-#define FS_FILE_READ		(1<<1)	/**< Open for reading. */
-#define FS_FILE_WRITE		(1<<2)	/**< Open for writing. */
-#define FS_FILE_APPEND		(1<<3)	/**< Before each write, offset is set to the end of the file. */
-
-/** Operations for fs_handle_seek(). */
-#define FS_SEEK_SET		1	/**< Set the offset to the exact position specified. */
-#define FS_SEEK_ADD		2	/**< Add the supplied value to the current offset. */
-#define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
+#define VFS_NODE_IS_RDONLY(node)	((node)->mount && (node)->mount->flags & FS_MOUNT_RDONLY)
 
 extern vfs_mount_t *vfs_root_mount;
 
@@ -323,10 +293,10 @@ extern int vfs_file_resize(object_handle_t *handle, file_size_t size);
 extern void vfs_dir_entry_add(vfs_node_t *node, node_id_t id, const char *name);
 extern int vfs_dir_create(const char *path);
 extern int vfs_dir_open(const char *path, int flags, object_handle_t **handlep);
-extern int vfs_dir_read(object_handle_t *handle, vfs_dir_entry_t *buf, size_t size, offset_t index);
+extern int vfs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size, offset_t index);
 
 extern int vfs_handle_seek(object_handle_t *handle, int action, offset_t offset, offset_t *newp);
-extern int vfs_handle_info(object_handle_t *handle, vfs_info_t *info);
+extern int vfs_handle_info(object_handle_t *handle, fs_info_t *info);
 extern int vfs_handle_sync(object_handle_t *handle);
 
 extern int vfs_symlink_create(const char *path, const char *target);
@@ -334,7 +304,7 @@ extern int vfs_symlink_read(const char *path, char *buf, size_t size);
 
 extern int vfs_mount(const char *dev, const char *path, const char *type, int flags);
 extern int vfs_unmount(const char *path);
-extern int vfs_info(const char *path, bool follow, vfs_info_t *info);
+extern int vfs_info(const char *path, bool follow, fs_info_t *info);
 //extern int vfs_link(const char *source, const char *dest);
 extern int vfs_unlink(const char *path);
 //extern int vfs_rename(const char *source, const char *dest);
@@ -345,32 +315,5 @@ extern void vfs_init(void);
 extern int kdbg_cmd_mounts(int argc, char **argv);
 extern int kdbg_cmd_vnodes(int argc, char **argv);
 extern int kdbg_cmd_vnode(int argc, char **argv);
-
-extern int sys_fs_file_create(const char *path);
-extern handle_t sys_fs_file_open(const char *path, int flags);
-extern int sys_fs_file_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int sys_fs_file_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int sys_fs_file_resize(handle_t handle, file_size_t size);
-
-extern int sys_fs_dir_create(const char *path);
-extern handle_t sys_fs_dir_open(const char *path, int flags);
-extern int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t index);
-
-extern int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *newp);
-extern int sys_fs_handle_info(handle_t handle, vfs_info_t *info);
-extern int sys_fs_handle_sync(handle_t handle);
-
-extern int sys_fs_symlink_create(const char *path, const char *target);
-extern int sys_fs_symlink_read(const char *path, char *buf, size_t size);
-
-extern int sys_fs_mount(const char *dev, const char *path, const char *type, int flags);
-extern int sys_fs_unmount(const char *path);
-extern int sys_fs_getcwd(char *buf, size_t size);
-extern int sys_fs_setcwd(const char *path);
-extern int sys_fs_setroot(const char *path);
-extern int sys_fs_info(const char *path, bool follow, vfs_info_t *info);
-extern int sys_fs_link(const char *source, const char *dest);
-extern int sys_fs_unlink(const char *path);
-extern int sys_fs_rename(const char *source, const char *dest);
 
 #endif /* __IO_VFS_H */

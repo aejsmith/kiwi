@@ -30,6 +30,8 @@
 #include <lib/list.h>
 #include <lib/refcount.h>
 
+#include <public/thread.h>
+
 #include <sync/spinlock.h>
 
 #include <object.h>
@@ -129,11 +131,5 @@ extern int kdbg_cmd_thread(int argc, char **argv);
 
 extern void thread_init(void);
 extern void thread_reaper_init(void);
-
-extern handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg1);
-extern handle_t sys_thread_open(thread_id_t id);
-extern thread_id_t sys_thread_id(handle_t handle);
-extern void sys_thread_exit(int status);
-extern int sys_thread_usleep(useconds_t us);
 
 #endif /* __PROC_THREAD_H */

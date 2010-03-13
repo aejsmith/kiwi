@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -24,6 +24,7 @@
 #include <arch/memmap.h>
 #include <cpu/cpu.h>
 #include <mm/page.h>
+#include <public/vm.h>
 #include <sync/mutex.h>
 #include <object.h>
 
@@ -92,16 +93,6 @@ typedef struct vm_aspace {
 #define VM_REGION_STACK		(1<<4)	/**< Region contains a stack and should have a guard page. */
 #define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
 
-/** Behaviour flags for vm_map_* functions.
- * @note		Flags that have a region equivalent are defined to the
- *			same value as the region flag. */
-#define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
-#define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */
-#define VM_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
-#define VM_MAP_PRIVATE		(1<<3)	/**< Modifications to the mapping should not be visible to other processes. */
-#define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
-#define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
-
 /** Page fault reason codes. */
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
 #define VM_FAULT_PROTECTION	2	/**< Fault caused by a protection violation. */
@@ -131,18 +122,5 @@ extern void vm_aspace_destroy(vm_aspace_t *as);
 extern void vm_init(void);
 
 extern int kdbg_cmd_aspace(int argc, char **argv);
-
-/** Structure containing arguments for sys_vm_map(). */
-typedef struct vm_map_args {
-	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
-	size_t size;			/**< Size of area to map (multiple of page size). */
-	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for file/device to map. */
-	offset_t offset;		/**< Offset in the file/device to map from. */
-	void **addrp;			/**< Where to store address mapped to. */
-} vm_map_args_t;
-
-extern int sys_vm_map(vm_map_args_t *args);
-extern int sys_vm_unmap(void *start, size_t size);
 
 #endif /* __MM_VM_H */

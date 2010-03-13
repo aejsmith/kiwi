@@ -20,8 +20,6 @@
 
 #include <kernel/vm.h>
 
-extern int _vm_map(vm_map_args_t *args);
-
 /** Map an object into memory.
  *
  * Creates a new memory mapping within an address space that maps either an

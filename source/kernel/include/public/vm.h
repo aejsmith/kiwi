@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Virtual memory functions.
+ * @brief		Virtual memory manager.
  */
 
 #ifndef __KERNEL_VM_H
@@ -25,19 +25,25 @@
 extern "C" {
 #endif
 
-#include <kernel/types.h>
+#ifdef KERNEL
+# include <public/types.h>
+#else
+# include <kernel/types.h>
+#endif
 
-/** Structure containing arguments for _vm_map(). */
+/** Structure containing arguments for vm_map(). */
 typedef struct vm_map_args {
-	void *start;			/**< Address to map at (if not AS_REGION_FIXED). */
+	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
 	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for file to map. */
-	offset_t offset;		/**< Offset in the file to map from. */
+	handle_t handle;		/**< Handle for file/device to map. */
+	offset_t offset;		/**< Offset in the file/device to map from. */
 	void **addrp;			/**< Where to store address mapped to. */
 } vm_map_args_t;
 
-/** Behaviour flags for vm_map_* functions. */
+/** Behaviour flags for vm_map_* functions.
+ * @note		Flags that have a region equivalent are defined to the
+ *			same value as the region flag. */
 #define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */
 #define VM_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
@@ -45,8 +51,13 @@ typedef struct vm_map_args {
 #define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
 #define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
 
-extern int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
-extern int vm_unmap(void *start, size_t size);
+#ifdef KERNEL
+extern int SYSCALL(vm_map)(vm_map_args_t *args);
+#else
+extern int SYSCALL(_vm_map)(vm_map_args_t *args);
+extern int SYSCALL(vm_map)(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
+#endif
+extern int SYSCALL(vm_unmap)(void *start, size_t size);
 
 #ifdef __cplusplus
 }

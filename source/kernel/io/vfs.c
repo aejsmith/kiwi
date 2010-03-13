@@ -865,11 +865,11 @@ out:
 /** Get information about a node.
  * @param node		Node to get information for.
  * @param info		Structure to store information in. */
-static void vfs_node_info(vfs_node_t *node, vfs_info_t *info) {
+static void vfs_node_info(vfs_node_t *node, fs_info_t *info) {
 	mutex_lock(&node->lock);
 
 	/* Fill in default values for everything. */
-	memset(info, 0, sizeof(vfs_info_t));
+	memset(info, 0, sizeof(fs_info_t));
 	info->id = node->id;
 	info->mount = (node->mount) ? node->mount->id : -1;
 	info->blksize = PAGE_SIZE;
@@ -1639,7 +1639,7 @@ static int vfs_dir_cache_entries(vfs_node_t *node) {
  * @param idp		Where to store ID of node.
  * @return		0 on success, negative error code on failure. */
 static int vfs_dir_entry_get(vfs_node_t *node, const char *name, node_id_t *idp) {
-	vfs_dir_entry_t *entry;
+	fs_dir_entry_t *entry;
 	int ret;
 
 	assert(node->type == VFS_NODE_DIR);
@@ -1669,11 +1669,11 @@ static int vfs_dir_entry_get(vfs_node_t *node, const char *name, node_id_t *idp)
  * @param name		Name of entry.
  */
 void vfs_dir_entry_add(vfs_node_t *node, node_id_t id, const char *name) {
-	vfs_dir_entry_t *entry;
+	fs_dir_entry_t *entry;
 	size_t len;
 
 	/* Work out the length we need. */
-	len = sizeof(vfs_dir_entry_t) + strlen(name) + 1;
+	len = sizeof(fs_dir_entry_t) + strlen(name) + 1;
 
 	/* Allocate the buffer for it and fill it in. */
 	entry = kmalloc(len, MM_SLEEP);
@@ -1749,8 +1749,8 @@ int vfs_dir_open(const char *path, int flags, object_handle_t **handlep) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int vfs_dir_read(object_handle_t *handle, vfs_dir_entry_t *buf, size_t size, offset_t index) {
-	vfs_dir_entry_t *entry = NULL;
+int vfs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size, offset_t index) {
+	fs_dir_entry_t *entry = NULL;
 	vfs_node_t *child, *node;
 	bool update = false;
 	vfs_handle_t *data;
@@ -1791,7 +1791,7 @@ int vfs_dir_read(object_handle_t *handle, vfs_dir_entry_t *buf, size_t size, off
 	/* Iterate through the tree to find the entry. */
 	RADIX_TREE_FOREACH(&node->dir_entries, iter) {
 		if(i++ == index) {
-			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+			entry = radix_tree_entry(iter, fs_dir_entry_t);
 			break;
 		}
 	}
@@ -1927,7 +1927,7 @@ int vfs_handle_seek(object_handle_t *handle, int action, offset_t offset, offset
  * @param handle	Handle to file/directory to get information on.
  * @param info		Information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-int vfs_handle_info(object_handle_t *handle, vfs_info_t *info) {
+int vfs_handle_info(object_handle_t *handle, fs_info_t *info) {
 	if(!handle || !info) {
 		return -ERR_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
@@ -2070,7 +2070,7 @@ static vfs_mount_t *vfs_mount_lookup(mount_id_t id) {
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * Some filesystem types are read-only by design - when mounting these the
- * VFS_MOUNT_RDONLY flag will automatically be set. It may also be set if the
+ * FS_MOUNT_RDONLY flag will automatically be set. It may also be set if the
  * device the filesystem resides on is read-only. Mounting multiple filesystems
  * on one directory at a time is not allowed.
  *
@@ -2187,7 +2187,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 
 	/* If the type is read-only, set read-only in the mount flags. */
 	if(mount->type->flags & VFS_TYPE_RDONLY) {
-		mount->flags |= VFS_MOUNT_RDONLY;
+		mount->flags |= FS_MOUNT_RDONLY;
 	}
 
 	/* Call the filesystem's mount operation. */
@@ -2355,7 +2355,7 @@ fail:
  *			link.
  * @param info		Information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-int vfs_info(const char *path, bool follow, vfs_info_t *info) {
+int vfs_info(const char *path, bool follow, fs_info_t *info) {
 	vfs_node_t *node;
 	int ret;
 
@@ -2383,7 +2383,7 @@ int vfs_info(const char *path, bool follow, vfs_info_t *info) {
  */
 int vfs_unlink(const char *path) {
 	vfs_node_t *parent = NULL, *node = NULL;
-	vfs_dir_entry_t *entry;
+	fs_dir_entry_t *entry;
 	char *dir, *name;
 	int ret;
 
@@ -2421,7 +2421,7 @@ int vfs_unlink(const char *path) {
 		}
 
 		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
-			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+			entry = radix_tree_entry(iter, fs_dir_entry_t);
 
 			if(strcmp(entry->name, "..") && strcmp(entry->name, ".")) {
 				ret = -ERR_IN_USE;
@@ -2547,7 +2547,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
  * @param argv		Argument array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_vnode(int argc, char **argv) {
-	vfs_dir_entry_t *entry;
+	fs_dir_entry_t *entry;
 	vfs_mount_t *mount;
 	vfs_node_t *node;
 	vm_page_t *page;
@@ -2631,7 +2631,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		kprintf(LOG_NONE, "\nCached directory entries:\n");
 
 		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
-			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+			entry = radix_tree_entry(iter, fs_dir_entry_t);
 
 			kprintf(LOG_NONE, "  Entry %p - %" PRId32 "(%s)\n",
 			        entry, entry->id, entry->name);
@@ -2911,8 +2911,8 @@ handle_t sys_fs_dir_open(const char *path, int flags) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_fs_dir_read(handle_t handle, vfs_dir_entry_t *buf, size_t size, offset_t index) {
-	vfs_dir_entry_t *kbuf;
+int sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size, offset_t index) {
+	fs_dir_entry_t *kbuf;
 	object_handle_t *obj;
 	int ret;
 
@@ -2974,9 +2974,9 @@ int sys_fs_handle_seek(handle_t handle, int action, offset_t offset, offset_t *n
  * @param handle	Handle to file/directory to get information on.
  * @param info		Information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-int sys_fs_handle_info(handle_t handle, vfs_info_t *info) {
+int sys_fs_handle_info(handle_t handle, fs_info_t *info) {
 	object_handle_t *obj;
-	vfs_info_t kinfo;
+	fs_info_t kinfo;
 	int ret;
 
 	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
@@ -2984,7 +2984,7 @@ int sys_fs_handle_info(handle_t handle, vfs_info_t *info) {
 	}
 
 	if((ret = vfs_handle_info(obj, &kinfo)) == 0) {
-		ret = memcpy_to_user(info, &kinfo, sizeof(vfs_info_t));
+		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
 	object_handle_release(obj);
 	return ret;
@@ -3074,7 +3074,7 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * Some filesystem types are read-only by design - when mounting these the
- * VFS_MOUNT_RDONLY flag will automatically be set. It may also be set if the
+ * FS_MOUNT_RDONLY flag will automatically be set. It may also be set if the
  * device the filesystem resides on is read-only. Mounting multiple filesystems
  * on one directory at a time is not allowed.
  *
@@ -3142,7 +3142,7 @@ int sys_fs_unmount(const char *path) {
  * @return		0 on success, negative error code on failure. */
 int sys_fs_getcwd(char *buf, size_t size) {
 	char *kbuf = NULL, *tmp, path[3];
-	vfs_dir_entry_t *entry;
+	fs_dir_entry_t *entry;
 	vfs_node_t *node;
 	size_t len = 0;
 	node_id_t id;
@@ -3186,7 +3186,7 @@ int sys_fs_getcwd(char *buf, size_t size) {
 		}
 		entry = NULL;
 		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
-			entry = radix_tree_entry(iter, vfs_dir_entry_t);
+			entry = radix_tree_entry(iter, fs_dir_entry_t);
 			if(entry->id == id) {
 				break;
 			} else {
@@ -3299,8 +3299,8 @@ int sys_fs_setroot(const char *path) {
  *			link.
  * @param info		Information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-int sys_fs_info(const char *path, bool follow, vfs_info_t *info) {
-	vfs_info_t kinfo;
+int sys_fs_info(const char *path, bool follow, fs_info_t *info) {
+	fs_info_t kinfo;
 	char *kpath;
 	int ret;
 
@@ -3309,7 +3309,7 @@ int sys_fs_info(const char *path, bool follow, vfs_info_t *info) {
 	}
 
 	if((ret = vfs_info(kpath, follow, &kinfo)) == 0) {
-		ret = memcpy_to_user(info, &kinfo, sizeof(vfs_info_t));
+		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
 	kfree(kpath);
 	return ret;

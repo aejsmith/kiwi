@@ -26,6 +26,8 @@
 #include <lib/list.h>
 #include <lib/refcount.h>
 
+#include <public/object.h>
+
 #include <sync/rwlock.h>
 
 struct object_handle;
@@ -33,15 +35,6 @@ struct object_wait;
 struct process;
 struct vm_page;
 struct vm_region;
-
-/** Handle type ID definitions. */
-#define OBJECT_TYPE_FILE	1	/**< File. */
-#define OBJECT_TYPE_DIR		2	/**< Directory. */
-#define OBJECT_TYPE_DEVICE	3	/**< Device. */
-#define OBJECT_TYPE_PROCESS	4	/**< Process. */
-#define OBJECT_TYPE_THREAD	5	/**< Thread. */
-#define OBJECT_TYPE_PORT	6	/**< IPC port. */
-#define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 
 /** Kernel object type structure. */
 typedef struct object_type {
@@ -162,10 +155,5 @@ extern void handle_table_destroy(handle_table_t *table);
 extern int kdbg_cmd_handles(int argc, char **argv);
 
 extern void handle_cache_init(void);
-
-extern int sys_object_type(handle_t handle);
-extern int sys_object_wait(handle_t handle, int event, useconds_t timeout);
-extern int sys_object_wait_multiple(handle_t *handle, int *events, size_t count, useconds_t timeout);
-extern int sys_handle_close(handle_t handle);
 
 #endif /* __OBJECT_H */

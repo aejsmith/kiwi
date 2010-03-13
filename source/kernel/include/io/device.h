@@ -22,6 +22,7 @@
 #define __IO_DEVICE_H
 
 #include <lib/radix.h>
+#include <public/device.h>
 #include <sync/mutex.h>
 #include <object.h>
 
@@ -160,12 +161,6 @@ typedef int (*device_iterate_t)(device_t *device, void *data);
 #define DEVICE_NAME_MAX			32	/**< Maximum length of a device name/device attribute name. */
 #define DEVICE_ATTR_MAX			256	/**< Maximum length of a device attribute string value. */
 
-/** Generic device events. */
-#define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */
-#define DEVICE_EVENT_WRITABLE		1	/**< Wait for the device to be writable. */
-//#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
-//#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
-
 /** Start of class-specific event/request numbers. */
 #define DEVICE_CLASS_EVENT_START	32
 #define DEVICE_CLASS_REQUEST_START	32
@@ -201,21 +196,5 @@ extern int device_write(object_handle_t *handle, const void *buf, size_t count, 
 extern int device_request(object_handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);
-
-/** Arguments for sys_device_request(). */
-typedef struct device_request_args {
-	handle_t handle;		/**< Handle to device. */
-	int request;			/**< Request number. */
-	void *in;			/**< Input buffer. */
-	size_t insz;			/**< Input buffer size. */
-	void *out;			/**< Output buffer. */
-	size_t outsz;			/**< Output buffer size. */
-	size_t *bytesp;			/**< Where to store number of bytes returned. */
-} device_request_args_t;
-
-extern handle_t sys_device_open(const char *path);
-extern int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int sys_device_request(device_request_args_t *args);
 
 #endif /* __IO_DEVICE_H */
