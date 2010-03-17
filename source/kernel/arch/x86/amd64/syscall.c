@@ -58,7 +58,7 @@ void __init_text syscall_arch_init(void) {
 	sysreg_msr_write(SYSREG_MSR_STAR, star);
 
 	kprintf(LOG_NORMAL, "syscall: set up SYSCALL MSRs on CPU %" PRIu32 ":\n", curr_cpu->id);
-	kprintf(LOG_NORMAL, "  FMASK: 0x%" PRIx64 "\n", fmask);
-	kprintf(LOG_NORMAL, "  LSTAR: 0x%" PRIx64 "\n", lstar);
-	kprintf(LOG_NORMAL, "  STAR:  0x%" PRIx64 "\n", star);
+	kprintf(LOG_NORMAL, " FMASK: 0x%" PRIx64 "\n", fmask);
+	kprintf(LOG_NORMAL, " LSTAR: 0x%" PRIx64 "\n", lstar);
+	kprintf(LOG_NORMAL, " STAR:  0x%" PRIx64 "\n", star);
 }

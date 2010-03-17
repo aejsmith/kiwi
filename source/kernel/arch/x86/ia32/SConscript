@@ -31,6 +31,6 @@ env['LINKFLAGS'] += ['-Wl,-b,elf32-i386', '-Wl,-m,elf_i386']
 
 # Need to link with libgcc, and force some symbols to be linked in for modules.
 env['LIBS'] += ['gcc']
-env['LINKFLAGS'] += ['--undefined=__moddi3', '--undefined=__divdi3']
+env['LINKFLAGS'] += ['-Wl,--undefined=__moddi3', '-Wl,--undefined=__divdi3']
 
 Return('sources')

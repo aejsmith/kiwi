@@ -103,6 +103,7 @@ static struct {
 	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
+	{ "page",	"Print details about physical memory usage.",	kdbg_cmd_page },
 	//{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },

@@ -58,11 +58,11 @@ static bool paging_inited = false;
  * @param mmflag	Allocation flags. PM_ZERO will be added.
  * @return		Address of structure on success, 0 on failure. */
 static phys_ptr_t page_structure_alloc(int mmflag) {
-	if(paging_inited) {
+	if(likely(paging_inited)) {
 		return page_alloc(1, mmflag | PM_ZERO);
 	} else {
 		/* During initialisation we only have 1GB of physical mapping. */
-		return page_xalloc(1, 0, 0, 0, 0, 0x40000000, mmflag | PM_ZERO);
+		return page_xalloc(1, 0, 0, 0x40000000, mmflag | PM_ZERO);
 	}
 }
 
@@ -484,7 +484,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 		return NULL;
 	}
 
-	if(paging_inited) {
+	if(likely(paging_inited)) {
 		return (void *)(KERNEL_PMAP_BASE + addr);
 	} else {
 		/* During boot there is a 1GB identity mapping. */

@@ -29,18 +29,38 @@
 #include <object.h>
 
 struct device;
+struct page_queue;
 struct vfs_node;
+struct vm_amap;
 struct vm_aspace;
 struct vm_region;
 
-/** Structure tracking a page being used within the VM system. */
+/** Structure describing a page in memory. */
 typedef struct vm_page {
-	list_t header;			/**< Link to page lists. */
+	list_t header;			/**< Link to page queue. */
+	struct page_queue *queue;	/**< Queue that the page is in. */
+
+	/** Basic page information. */
 	phys_ptr_t addr;		/**< Physical address of the page. */
-	refcount_t count;		/**< Reference count of the page. */
-	offset_t offset;		/**< Offset into the object it belongs to. */
-	int flags;			/**< Flags specifying information about the page. */
+	bool zeroed : 1;		/**< Whether the page is zeroed. */
+	bool modified : 1;		/**< Whether the page has been modified. */
+	uint8_t unused: 6;
+
+	/** Information about how the page is being used.
+	 * @note		Use of count/offset are up to the page owner.
+	 * @note		Should not have both object and amap set. */
+	refcount_t count;		/**< Reference count of the page (use is up to page user). */
+	object_t *object;		/**< Object that the page belongs to. */
+	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
+	offset_t offset;		/**< Offset into the object belongs to. */
 } vm_page_t;
+
+/** Page queue numbers. */
+#define PAGE_QUEUE_NONZERO	0	/**< Free but not zeroed pages. */
+#define PAGE_QUEUE_MODIFIED	1	/**< Pages that need to be written. */
+#define PAGE_QUEUE_CACHED	2	/**< Pages that are held in caches. */
+#define PAGE_QUEUE_PAGEABLE	3	/**< Pages that are mapped but can be paged out. */
+#define PAGE_QUEUE_COUNT	4	/**< Number of page lists. */
 
 /** Structure containing an anonymous memory map. */
 typedef struct vm_amap {
@@ -68,6 +88,14 @@ typedef struct vm_region {
 	avl_tree_node_t *node;		/**< AVL tree node for the region. */
 } vm_region_t;
 
+/** Flags for the vm_region_t structure. */
+#define VM_REGION_READ		(1<<0)	/**< Region is readable. */
+#define VM_REGION_WRITE		(1<<1)	/**< Region is writable. */
+#define VM_REGION_EXEC		(1<<2)	/**< Region is executable. */
+#define VM_REGION_PRIVATE	(1<<3)	/**< Modifications to this region should not be visible to other processes. */
+#define VM_REGION_STACK		(1<<4)	/**< Region contains a stack and should have a guard page. */
+#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
+
 /** Structure containing a virtual address space. */
 typedef struct vm_aspace {
 	mutex_t lock;			/**< Lock to protect address space. */
@@ -82,17 +110,6 @@ typedef struct vm_aspace {
 /** Macro that expands to a pointer to the current address space. */
 #define curr_aspace		(curr_cpu->aspace)
 
-/** Flags for the vm_page_t structure. */
-#define VM_PAGE_DIRTY		(1<<0)	/**< Page is currently dirty. */
-
-/** Flags for the vm_region_t structure. */
-#define VM_REGION_READ		(1<<0)	/**< Region is readable. */
-#define VM_REGION_WRITE		(1<<1)	/**< Region is writable. */
-#define VM_REGION_EXEC		(1<<2)	/**< Region is executable. */
-#define VM_REGION_PRIVATE	(1<<3)	/**< Modifications to this region should not be visible to other processes. */
-#define VM_REGION_STACK		(1<<4)	/**< Region contains a stack and should have a guard page. */
-#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
-
 /** Page fault reason codes. */
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
 #define VM_FAULT_PROTECTION	2	/**< Fault caused by a protection violation. */
@@ -104,9 +121,12 @@ typedef struct vm_aspace {
 #define VM_FAULT_WRITE		(1<<1)	/**< Fault caused by a write. */
 #define VM_FAULT_EXEC		(1<<2)	/**< Fault when trying to execute. */
 
+extern vm_page_t *vm_page_alloc(size_t count, int pmflag);
+extern void vm_page_free(vm_page_t *pages, size_t count);
 extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
-extern vm_page_t *vm_page_alloc(int pmflag);
-extern void vm_page_free(vm_page_t *page);
+extern void vm_page_queue(vm_page_t *page, size_t queue);
+extern void vm_page_dequeue(vm_page_t *page);
+extern vm_page_t *vm_page_lookup(phys_ptr_t addr);
 
 extern bool vm_fault(ptr_t addr, int reason, int access);
 
@@ -119,6 +139,7 @@ extern void vm_aspace_switch(vm_aspace_t *as);
 extern vm_aspace_t *vm_aspace_create(void);
 extern void vm_aspace_destroy(vm_aspace_t *as);
 
+extern void vm_page_init(void);
 extern void vm_init(void);
 
 extern int kdbg_cmd_aspace(int argc, char **argv);

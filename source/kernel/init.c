@@ -348,6 +348,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		page_init(args);
 		slab_init();
 		kheap_init();
+		vm_page_init();
 		malloc_init();
 		vm_init();
 

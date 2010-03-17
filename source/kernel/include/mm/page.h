@@ -23,8 +23,19 @@
 
 #include <arch/page.h>
 #include <mm/flags.h>
+#include <sync/spinlock.h>
 
 struct kernel_args;
+
+/** Structure containing physical memory usage statistics. */
+typedef struct page_stats {
+	uint64_t total;			/**< Total available memory. */
+	uint64_t allocated;		/**< Amount of memory in-use. */
+	uint64_t modified;		/**< Amount of memory containing modified data. */
+	uint64_t cached;		/**< Amount of memory being used by caches. */
+	uint64_t nonzero;		/**< Amount of free but non-zero memory. */
+	uint64_t free;			/**< Amount of free, zeroed memory. */
+} page_stats_t;
 
 /** Flags to modify page allocation behaviour. */
 #define PM_ZERO			(1<<10)	/**< Clear the page contents before returning. */
@@ -43,16 +54,15 @@ extern void page_map_destroy(page_map_t *map);
 extern void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag);
 extern void page_phys_unmap(void *addr, size_t size, bool shared);
 
-extern phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t phase,
-                              phys_ptr_t nocross, phys_ptr_t minaddr,
+extern phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
                               phys_ptr_t maxaddr, int pmflag);
-extern void page_xfree(phys_ptr_t base, size_t count);
-
 extern phys_ptr_t page_alloc(size_t count, int pmflag);
 extern void page_free(phys_ptr_t base, size_t count);
-
-extern int page_zero(phys_ptr_t addr, int mmflag);
 extern int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
+
+extern void page_stats_get(page_stats_t *stats);
+
+extern int kdbg_cmd_page(int argc, char **argv);
 
 extern void page_arch_init(struct kernel_args *args);
 extern void page_init(struct kernel_args *args);

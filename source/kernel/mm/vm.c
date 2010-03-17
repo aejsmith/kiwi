@@ -78,7 +78,6 @@
 static slab_cache_t *vm_aspace_cache;
 static slab_cache_t *vm_region_cache;
 static slab_cache_t *vm_amap_cache;
-static slab_cache_t *vm_page_cache;
 
 /** Constructor for address space objects.
  * @param obj		Pointer to object.
@@ -104,102 +103,6 @@ static int vm_amap_ctor(void *obj, void *data, int kmflag) {
 
 	mutex_init(&map->lock, "vm_amap_lock", 0);
 	return 0;
-}
-
-/** Constructor for page objects.
- * @param obj		Pointer to object.
- * @param data		Ignored.
- * @param kmflag	Allocation flags.
- * @return		0 on success, -1 on failure. */
-static int vm_page_ctor(void *obj, void *data, int kmflag) {
-	vm_page_t *page = obj;
-
-	list_init(&page->header);
-	refcount_set(&page->count, 0);
-	page->offset = 0;
-	page->flags = 0;
-
-	/* Cache page allocations. Thanks to the magic of slab reclaiming,
-	 * this won't starve the kernel itself of pages! */
-	if(!(page->addr = page_alloc(1, kmflag & MM_FLAG_MASK))) {
-		return -1;
-	}
-
-	return 0;
-}
-
-/** Destructor for page objects.
- * @param obj		Pointer to object.
- * @param data		Ignored. */
-static void vm_page_dtor(void *obj, void *data) {
-	vm_page_t *page = obj;
-
-	page_free(page->addr, 1);
-}
-
-/** Copy a VM page.
- *
- * Allocates a new page and copies the contents of the specified page to it,
- * and returns a pointer to the new page's structure. The new page does not
- * inherit anything (flags, etc) from the old page, other than the data within
- * the page.
- *
- * @param page		Structure for page to copy.
- * @param mmflag	Allocation flags.
- *
- * @return		Pointer to page structure on success, NULL on failure.
- */
-vm_page_t *vm_page_copy(vm_page_t *page, int mmflag) {
-	vm_page_t *copy;
-
-	/* Clear out anything we don't want, such as PM_ZERO. */
-	mmflag &= MM_FLAG_MASK;
-
-	if(!(copy = slab_cache_alloc(vm_page_cache, mmflag))) {
-		return NULL;
-	} else if(page_copy(copy->addr, page->addr, mmflag) != 0) {
-		slab_cache_free(vm_page_cache, copy);
-		return NULL;
-	}
-
-	refcount_inc(&copy->count);
-	return copy;
-}
-
-/** Allocate a VM page.
- *
- * Allocates a page and a structure for it that can be used by the VM system.
- * If specified, the page will be zeroed. The returned page will have one
- * reference on it.
- *
- * @param pmflag	Allocation flags.
- *
- * @return		Pointer to page structure on success, NULL on failure.
- */
-vm_page_t *vm_page_alloc(int pmflag) {
-	vm_page_t *page;
-
-	if(!(page = slab_cache_alloc(vm_page_cache, pmflag & MM_FLAG_MASK))) {
-		return NULL;
-	}
-
-	/* Zero the page if required. */
-	if(pmflag & PM_ZERO) {
-		if(page_zero(page->addr, pmflag & MM_FLAG_MASK) != 0) {
-			slab_cache_free(vm_page_cache, page);
-			return NULL;
-		}
-	}
-
-	refcount_inc(&page->count);
-	return page;
-}
-
-/** Free a VM page.
- * @param page		Page to free. */
-void vm_page_free(vm_page_t *page) {
-	assert(refcount_get(&page->count) == 0);
-	slab_cache_free(vm_page_cache, page);
 }
 
 /** Create an anonymous map.
@@ -431,7 +334,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 				dprintf("vm: anon object rref %zu reached 0, freeing 0x%" PRIpp " (amap: %p)\n",
 				        i, region->amap->pages[i]->addr, region->amap);
 				if(refcount_dec(&region->amap->pages[i]->count) == 0) {
-					vm_page_free(region->amap->pages[i]);
+					vm_page_free(region->amap->pages[i], 1);
 				}
 				region->amap->pages[i] = NULL;
 				region->amap->curr_size--;
@@ -698,7 +601,8 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 	if(!amap->pages[i] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
-		amap->pages[i] = vm_page_alloc(MM_SLEEP | PM_ZERO);
+		amap->pages[i] = vm_page_alloc(1, MM_SLEEP | PM_ZERO);
+		refcount_inc(&amap->pages[i]->count);
 		amap->curr_size++;
 		paddr = amap->pages[i]->addr;
 	} else if(access == VM_MAP_WRITE) {
@@ -720,7 +624,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 				 * could have released the page while we were
 				 * copying. */
 				if(refcount_dec(&amap->pages[i]->count) == 0) {
-					vm_page_free(amap->pages[i]);
+					vm_page_free(amap->pages[i], 1);
 				}
 
 				amap->pages[i] = page;
@@ -752,10 +656,11 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 			dprintf("vm:  anon write fault: copying page 0x%" PRIpp " from %p\n",
 			        paddr, handle->object);
 
-			page = vm_page_alloc(MM_SLEEP);
+			page = vm_page_alloc(1, MM_SLEEP);
 			page_copy(page->addr, paddr, MM_SLEEP);
 
 			/* Add the page and release the old one. */
+			refcount_inc(&page->count);
 			amap->pages[i] = page;
 			if(handle->object->type->page_release) {
 				handle->object->type->page_release(handle, offset + region->obj_offset, paddr);
@@ -862,13 +767,13 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	 * dirty when it gets written to. */
 	write = region->flags & VM_REGION_WRITE;
 	if(access != VM_MAP_WRITE) {
-		if(!(page->flags & VM_PAGE_DIRTY)) {
-			dprintf("vm:  page 0x%" PRIpp " not dirty yet, mapping read-only\n", page->addr);
+		if(!page->modified) {
+			dprintf("vm:  page 0x%" PRIpp " not modified yet, mapping read-only\n", page->addr);
 			write = false;
 		}
 	} else {
-		page->flags |= VM_PAGE_DIRTY;
-		dprintf("vm:  flagged page 0x%" PRIpp " as dirty\n", page->addr);
+		page->modified = true;
+		dprintf("vm:  flagged page 0x%" PRIpp " as modified\n", page->addr);
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
@@ -1187,9 +1092,6 @@ void __init_text vm_init(void) {
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
 	                                  0, vm_amap_ctor, NULL, NULL,
 	                                  NULL, SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
-	vm_page_cache = slab_cache_create("vm_page_cache", sizeof(vm_page_t),
-	                                  0, vm_page_ctor, vm_page_dtor, NULL,
-	                                  NULL, 0, NULL, 0, MM_FATAL);
 }
 
 /** Dump an address space.

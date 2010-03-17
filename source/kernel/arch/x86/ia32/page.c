@@ -76,9 +76,9 @@ static phys_ptr_t page_structure_alloc(int mmflag) {
 	/* Prefer allocating structures below 1GB because pages in the first
 	 * 1GB of memory are always mapped in. During initialisation, must
 	 * always allocate below 1GB because the heap is not set up. */
-	page = page_xalloc(1, 0, 0, 0, 0, 0x40000000, (paging_inited) ? (mmflag & ~MM_FATAL) : mmflag);
+	page = page_xalloc(1, 0, 0, 0x40000000, (paging_inited) ? (mmflag & ~MM_FATAL) : mmflag);
 	if(!page) {
-		page = page_xalloc(1, 0, 0, 0, 0, 0x100000000LL, mmflag);
+		page = page_xalloc(1, 0, 0, 0x100000000LL, mmflag);
 	}
 
 	return page;
@@ -440,11 +440,11 @@ int page_map_init(page_map_t *map, int mmflag) {
 
 	/* Duplicate the kernel mappings. */
 	if(!(kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag))) {
-		page_xfree(map->cr3, 1);
+		page_free(map->cr3, 1);
 		return -ERR_NO_MEMORY;
 	} else if(!(pdp = page_structure_map(map, map->cr3, mmflag))) {
 		page_structure_unmap(map, kpdp);
-		page_xfree(map->cr3, 1);
+		page_free(map->cr3, 1);
 		return -ERR_NO_MEMORY;
 	}
 

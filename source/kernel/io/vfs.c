@@ -335,7 +335,7 @@ static int vfs_node_flush(vfs_node_t *node, bool destroy) {
 			/* Destroy the page if required. */
 			if(destroy) {
 				avl_tree_remove(&node->pages, (key_t)page->offset);
-				vm_page_free(page);
+				vm_page_free(page, 1);
 			}
 		}
 	}
@@ -966,7 +966,7 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 		/* If a read operation is provided, read the page data into an
 		 * unzeroed page. Otherwise get a zeroed page. */
 		if(node->mount && node->mount->type->page_read) {
-			page = vm_page_alloc(MM_SLEEP);
+			page = vm_page_alloc(1, MM_SLEEP);
 
 			/* When reading in page data we cannot guarantee that
 			 * the mapping won't be shared, because it's possible
@@ -976,20 +976,20 @@ static int vfs_file_page_get_internal(vfs_node_t *node, offset_t offset, bool ov
 
 			if((ret = node->mount->type->page_read(node, mapping, offset, false)) != 0) {
 				page_phys_unmap(mapping, PAGE_SIZE, true);
-				refcount_dec(&page->count);
-				vm_page_free(page);
+				vm_page_free(page, 1);
 				mutex_unlock(&node->lock);
 				return ret;
 			}
 		} else {
-			page = vm_page_alloc(MM_SLEEP | PM_ZERO);
+			page = vm_page_alloc(1, MM_SLEEP | PM_ZERO);
 		}
 	} else {
 		/* Overwriting - allocate a new page, don't have to zero. */
-		page = vm_page_alloc(MM_SLEEP);
+		page = vm_page_alloc(1, MM_SLEEP);
 	}
 
 	/* Cache the page and unlock. */
+	refcount_inc(&page->count);
 	page->offset = offset;
 	avl_tree_insert(&node->pages, (key_t)offset, page, NULL);
 	mutex_unlock(&node->lock);
@@ -1041,7 +1041,7 @@ static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bo
 
 	/* Mark as dirty if requested. */
 	if(dirty) {
-		page->flags |= VM_PAGE_DIRTY;
+		page->modified = true;
 	}
 
 	/* Decrease the reference count. If it reaches 0, and the page is
@@ -1049,7 +1049,7 @@ static void vfs_file_page_release_internal(vfs_node_t *node, offset_t offset, bo
 	 * use), discard it. */
 	if(refcount_dec(&page->count) == 0 && (file_size_t)offset >= node->size) {
 		avl_tree_remove(&node->pages, (key_t)offset);
-		vm_page_free(page);
+		vm_page_free(page, 1);
 	}
 
 	mutex_unlock(&node->lock);
@@ -1066,7 +1066,7 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 	/* If the page is outside of the file, it may be there because the file
 	 * was truncated but with the page in use. Ignore this. Also ignore
 	 * pages that aren't dirty. */
-	if((file_size_t)page->offset >= node->size || !(page->flags & VM_PAGE_DIRTY)) {
+	if((file_size_t)page->offset >= node->size || !page->modified) {
 		return 0;
 	}
 
@@ -1082,7 +1082,7 @@ static int vfs_file_page_flush(vfs_node_t *node, vm_page_t *page) {
 			 * address space as read-write, but has not yet been
 			 * written to. */
 			if(refcount_get(&page->count) == 0) {
-				page->flags &= ~VM_PAGE_DIRTY;
+				page->modified = false;
 			}
 		}
 
@@ -1588,7 +1588,7 @@ int vfs_file_resize(object_handle_t *handle, file_size_t size) {
 
 			if((file_size_t)page->offset >= size && refcount_get(&page->count) == 0) {
 				avl_tree_remove(&node->pages, (key_t)page->offset);
-				vm_page_free(page);
+				vm_page_free(page, 1);
 			}
 		}
 	}
@@ -2642,8 +2642,8 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		AVL_TREE_FOREACH(&node->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
-			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRId64 " Flags: %-4d Count: %d\n",
-			        page->addr, page->offset, page->flags, refcount_get(&page->count));
+			kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRId64 " Modified: %-1d Count: %d\n",
+			        page->addr, page->offset, page->modified, refcount_get(&page->count));
 		}
 	}
 
