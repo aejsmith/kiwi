@@ -30,6 +30,7 @@
 
 #include <mm/page.h>
 #include <mm/tlb.h>
+#include <mm/vm.h>
 
 #include <assert.h>
 #include <console.h>
@@ -292,6 +293,8 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
  * @param physp		Where to store physical address that was mapped.
  * @return		Whether the address was mapped. */
 bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
+	phys_ptr_t paddr;
+	vm_page_t *page;
 	uint64_t *ptbl;
 	int pte;
 
@@ -300,27 +303,31 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
+	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
 	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
 		mutex_unlock(&map->lock);
 		return false;
-	}
-
-	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
-	if(ptbl[pte] & PG_PRESENT) {
-		/* Store the physical address if required. */
-		if(physp) {
-			*physp = ptbl[pte] & PAGE_MASK;
-		}
-
-		/* Clear the entry. */
-		ptbl[pte] = 0;
-		memory_barrier();
-		mutex_unlock(&map->lock);
-		return true;
-	} else {
+	} else if(!ptbl[pte] & PG_PRESENT) {
 		mutex_unlock(&map->lock);
 		return false;
 	}
+
+	paddr = ptbl[pte] & PAGE_MASK;
+
+	/* If the entry is dirty, set the modified flag on the page. */
+	if(ptbl[pte] & PG_DIRTY && (page = vm_page_lookup(paddr))) {
+		page->modified = true;
+	}
+
+	/* Clear the entry. */
+	ptbl[pte] = 0;
+	memory_barrier();
+
+	if(physp) {
+		*physp = paddr;
+	}
+	mutex_unlock(&map->lock);
+	return true;
 }
 
 /** Find the page a virtual address is mapped to.

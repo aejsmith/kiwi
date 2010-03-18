@@ -119,6 +119,36 @@ static size_t page_range_count = 0;
 /** Array of page queues. */
 static page_queue_t page_queues[PAGE_QUEUE_COUNT];
 
+#if CONFIG_DEBUG
+/** Ensure that a free page is in the correct state.
+ * @param page		Page to check. */
+static inline void check_free_page(vm_page_t *page) {
+	assert(!(page->addr % PAGE_SIZE));
+	assert(!refcount_get(&page->count));
+	assert(!page->modified);
+	assert(!page->object);
+	assert(!page->amap);
+	assert(!page->queue);
+	assert(list_empty(&page->header));
+}
+
+/** Ensure that a range of free pages are in the correct state.
+ * @param base		Base of page range.
+ * @param count		Number of pages in range. */
+static inline void check_free_pages(phys_ptr_t base, size_t count) {
+	vm_page_t *pages;
+	size_t i;
+
+	/* Check that all pages in the range have the correct state. */
+	pages = vm_page_lookup(base);
+	if(likely(pages)) {
+		for(i = 0; i < count; i++) {
+			check_free_page(&pages[i]);
+		}
+	}
+}
+#endif
+
 /** Allocate a range of pages.
  * @param count		Number of pages to allocate.
  * @param pmflag	Flags to control allocation behaviour.
@@ -150,16 +180,12 @@ vm_page_t *vm_page_alloc(size_t count, int pmflag) {
 void vm_page_free(vm_page_t *pages, size_t count) {
 	size_t i;
 
-	/* Perform checks and clear any flags that shouldn't be set. */
+	/* Clear any flags that shouldn't be set and perform checks. */
 	for(i = 0; i < count; i++) {
-		assert(!(pages[i].addr % PAGE_SIZE));
-		assert(!refcount_get(&pages[i].count));
-		assert(!pages[i].object);
-		assert(!pages[i].amap);
-		assert(!pages[i].queue);
-		assert(list_empty(&pages[i].header));
-
 		pages[i].modified = false;
+#if CONFIG_DEBUG
+		check_free_page(&pages[i]);
+#endif
 	}
 
 	vmem_free(&page_arena, pages[0].addr, count * PAGE_SIZE);
@@ -223,6 +249,9 @@ vm_page_t *vm_page_lookup(phys_ptr_t addr) {
 
 	for(i = 0; i < page_range_count; i++) {
 		if(addr >= page_ranges[i].start && addr < page_ranges[i].end) {
+			if(!page_ranges[i].pages) {
+				return NULL;
+			}
 			return &page_ranges[i].pages[(addr - page_ranges[i].start) / PAGE_SIZE];
 		}
 	}
@@ -257,7 +286,11 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 		}
 		return 0;
 	}
-
+#if CONFIG_DEBUG
+	/* Perform checks on the page range to ensure that the pages are in
+	 * the correct state. */
+	check_free_pages(base, count);
+#endif
 	/* Map all of the pages into memory and zero them if needed. */
 	if(pmflag & PM_ZERO) {
 		thread_wire(curr_thread);

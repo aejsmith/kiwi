@@ -729,9 +729,10 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
  * @param access	Type of access that caused the fault.
  * @return		Whether the fault was successfully handled. */
 static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
+	phys_ptr_t paddr;
+	bool write, exec;
 	vm_page_t *page;
 	offset_t offset;
-	bool write;
 	int ret;
 
 	assert(region->handle);
@@ -745,40 +746,27 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 		return false;
 	}
 
-	/* Protection faults must be write faults. We check protection flags
-	 * above, and the only protection fault we intentionally cause is a
-	 * write one. */
-	if(reason == VM_FAULT_PROTECTION) {
-		if(access != VM_MAP_WRITE) {
-			fatal("Non-write protection fault at %p", addr);
+	/* Check if a mapping already exists. This is possible if two threads
+	 * in a process on different CPUs fault on the same address
+	 * simultaneously. */
+	if(page_map_find(&region->as->pmap, addr, &paddr)) {
+		if(paddr != page->addr) {
+			fatal("Incorrect existing mapping found (found %" PRIpp", should be %" PRIpp ")",
+			      paddr, page->addr);
+		} else if(region->handle->object->type->page_release) {
+			region->handle->object->type->page_release(region->handle, offset, page->addr);
 		}
-
-		/* Unmap previous entry. */
-		if(unlikely(!page_map_remove(&region->as->pmap, addr, NULL))) {
-			fatal("Could not remove previous mapping for %p", addr);
-		}
-
-		/* Invalidate the TLB entries. */
-		tlb_invalidate(region->as, addr, addr);
+		return true;
 	}
 
-	/* Work out the flags to map with. If we're not writing, and the page
-	 * is not already dirty, mark it as read-only, so we can make the page
-	 * dirty when it gets written to. */
+	/* Work out the flags to map with. */
 	write = region->flags & VM_REGION_WRITE;
-	if(access != VM_MAP_WRITE) {
-		if(!page->modified) {
-			dprintf("vm:  page 0x%" PRIpp " not modified yet, mapping read-only\n", page->addr);
-			write = false;
-		}
-	} else {
-		page->modified = true;
-		dprintf("vm:  flagged page 0x%" PRIpp " as modified\n", page->addr);
-	}
+	exec = region->flags & VM_REGION_EXEC;
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(&region->as->pmap, addr, page->addr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
-	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n", page->addr, addr, region->as, write);
+	page_map_insert(&region->as->pmap, addr, page->addr, write, exec, MM_SLEEP);
+	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
+	        page->addr, addr, region->as, write, exec);
 	return true;
 }
 
