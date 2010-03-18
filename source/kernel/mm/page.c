@@ -417,6 +417,9 @@ int kdbg_cmd_page(int argc, char **argv) {
 	if(argc == 2) {
 		if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
+		} else if(addr % PAGE_SIZE) {
+			kprintf(LOG_NONE, "Address must be page aligned\n");
+			return KDBG_FAIL;
 		} else if(!(page = vm_page_lookup(addr))) {
 			kprintf(LOG_NONE, "404 Page Not Found\n");
 			return KDBG_FAIL;
