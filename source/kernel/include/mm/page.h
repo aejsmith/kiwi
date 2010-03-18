@@ -33,8 +33,7 @@ typedef struct page_stats {
 	uint64_t allocated;		/**< Amount of memory in-use. */
 	uint64_t modified;		/**< Amount of memory containing modified data. */
 	uint64_t cached;		/**< Amount of memory being used by caches. */
-	uint64_t nonzero;		/**< Amount of free but non-zero memory. */
-	uint64_t free;			/**< Amount of free, zeroed memory. */
+	uint64_t free;			/**< Amount of free memory. */
 } page_stats_t;
 
 /** Flags to modify page allocation behaviour. */

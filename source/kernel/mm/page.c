@@ -34,11 +34,6 @@
  * Thirdly, there are a number of queues that a page can be placed in depending
  * on its state, and these queues are used for various purposes. Below is a
  * description of each queue:
- *  - Non-zero: A queue of free, but non-zero pages. When there are no threads
- *    runnable pages are taken off this queue and then zeroed until either the
- *    queue is emptied or a thread becomes runnable. This helps to speed up
- *    allocations which require zeroed pages, as it makes it less likely that
- *    an allocation will need to zero a page.
  *  - Modified: A queue of pages which have been modified and need to be
  *    written to their source. There is a special thread (the page writer) that
  *    periodically takes pages off this queue and writes them. This
@@ -52,12 +47,9 @@
  *    space, but can be paged out if necessary. When the system is low on
  *    free pages, and the cached/modified queues are empty, pages will start
  *    being taken from this queue and paged out.
- * When a page is allocated but not pageable, or free and zeroed, it will not
- * be in any queues.
- *
- * The movement of pages between queues is mostly left up to the users of the
- * pages, with the exception of the non-zero queue, which is managed by this
- * code when pages are allocated or freed.
+ * When a page is free, or allocated but not pageable it will not be in any
+ * queues.  The movement of pages between queues is mostly left up to the users
+ * of the pages.
  *
  * There are two sets of functions for allocating/freeing pages. Firstly, there
  * are the functions defined in mm/page.h, which return physical addresses,
@@ -127,93 +119,6 @@ static size_t page_range_count = 0;
 /** Array of page queues. */
 static page_queue_t page_queues[PAGE_QUEUE_COUNT];
 
-/** Whether the page structures have been initialised. */
-static bool vm_page_inited = false;
-
-/** Common page allocation code.
- * @param base		Base of the allocation that was made.
- * @param count		Number of pages in the allocation.
- * @param pmflag	Allocation flags.
- * @param pagep		Where to store pointer to page structure for base of
- *			allocation. Can be NULL.
- * @return		Whether successful. On failure the allocation will
- *			be freed. */
-static bool page_alloc_common(phys_ptr_t base, size_t count, int pmflag, vm_page_t **pagep) {
-	vm_page_t *pages = NULL;
-	void *mapping;
-	size_t i = 0;
-
-	thread_wire(curr_thread);
-
-	/* If initialisation has not been completed then don't bother trying
-	 * to do anything with page structures. */
-	if(unlikely(!vm_page_inited)) {
-		if(pagep) {
-			fatal("Using vm_page_alloc too early");
-		}
-
-		if(pmflag & PM_ZERO) {
-			mapping = page_phys_map(base, count * PAGE_SIZE,
-			                        (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
-			if(!mapping) {
-				goto fail;
-			}
-			memset(mapping, 0, count * PAGE_SIZE);
-			page_phys_unmap(mapping, count * PAGE_SIZE, false);
-		}
-
-		dprintf("page: allocated page range [0x%" PRIpp ",0x%" PRIpp ") (early)\n",
-			base, base + (count * PAGE_SIZE));
-		thread_unwire(curr_thread);
-		return true;
-	}
-
-	/* Look up the base of the allocation. */
-	pages = vm_page_lookup(base);
-	assert(pages);
-
-	/* Detach all the pages from any queues they may be in and zero them
-	 * if required. */
-	for(i = 0; i < count; i++) {
-		vm_page_dequeue(&pages[i]);
-		if(!pages[i].zeroed && pmflag & PM_ZERO) {
-			mapping = page_phys_map(pages[i].addr, PAGE_SIZE,
-			                        (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
-			if(!mapping) {
-				goto fail;
-			}
-
-			memset(mapping, 0, PAGE_SIZE);
-			page_phys_unmap(mapping, PAGE_SIZE, false);
-		}
-
-		/* Clear the zeroed flag because the page is now allocated so
-		 * it'll have something written to it. */
-		pages[i].zeroed = false;
-		pages[i].modified = false;
-	}
-
-	dprintf("page: allocated page range [0x%" PRIpp ",0x%" PRIpp ")\n",
-	        base, base + (count * PAGE_SIZE));
-	thread_unwire(curr_thread);
-	if(pagep) {
-		*pagep = pages;
-	}
-	return true;
-fail:
-	if(pmflag & MM_FATAL) {
-		fatal("Could not perform mandatory allocation of %zu pages (2)", count);
-	}
-
-	while(i--) {
-		vm_page_queue(&pages[i], PAGE_QUEUE_NONZERO);
-	}
-
-	vmem_free(&page_arena, base, count * PAGE_SIZE);
-	thread_unwire(curr_thread);
-	return false;
-}
-
 /** Allocate a range of pages.
  * @param count		Number of pages to allocate.
  * @param pmflag	Flags to control allocation behaviour.
@@ -223,18 +128,14 @@ vm_page_t *vm_page_alloc(size_t count, int pmflag) {
 	vm_page_t *pages;
 	phys_ptr_t base;
 
-	if(!(base = vmem_alloc(&page_arena, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
-		if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
-		}
-		return 0;
+	if(!(base = page_xalloc(count, 0, 0, 0, pmflag))) {
+		return NULL;
+	} else if(unlikely(!(pages = vm_page_lookup(base)))) {
+		fatal("Could not look up pages for [%" PRIpp ", %" PRIpp ")",
+		      base, base + (count * PAGE_SIZE));
 	}
 
-	if(page_alloc_common(base, count, pmflag, &pages)) {
-		return pages;
-	} else {
-		return NULL;
-	}
+	return pages;
 }
 
 /** Free a range of pages.
@@ -249,14 +150,16 @@ vm_page_t *vm_page_alloc(size_t count, int pmflag) {
 void vm_page_free(vm_page_t *pages, size_t count) {
 	size_t i;
 
+	/* Perform checks and clear any flags that shouldn't be set. */
 	for(i = 0; i < count; i++) {
 		assert(!(pages[i].addr % PAGE_SIZE));
 		assert(!refcount_get(&pages[i].count));
 		assert(!pages[i].object);
 		assert(!pages[i].amap);
+		assert(!pages[i].queue);
+		assert(list_empty(&pages[i].header));
 
-		pages[i].zeroed = false;
-		vm_page_queue(&pages[i], PAGE_QUEUE_NONZERO);
+		pages[i].modified = false;
 	}
 
 	vmem_free(&page_arena, pages[0].addr, count * PAGE_SIZE);
@@ -316,7 +219,7 @@ void vm_page_dequeue(vm_page_t *page) {
 vm_page_t *vm_page_lookup(phys_ptr_t addr) {
 	size_t i;
 
-	assert(vm_page_inited);
+	assert(!(addr % PAGE_SIZE));
 
 	for(i = 0; i < page_range_count; i++) {
 		if(addr >= page_ranges[i].start && addr < page_ranges[i].end) {
@@ -345,6 +248,7 @@ vm_page_t *vm_page_lookup(phys_ptr_t addr) {
 phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
                        phys_ptr_t maxaddr, int pmflag) {
 	phys_ptr_t base;
+	void *mapping;
 
 	if(!(base = vmem_xalloc(&page_arena, count * PAGE_SIZE, align, 0, 0, minaddr,
 	                        maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
@@ -354,7 +258,29 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 		return 0;
 	}
 
-	return (page_alloc_common(base, count, pmflag, NULL)) ? base : 0;
+	/* Map all of the pages into memory and zero them if needed. */
+	if(pmflag & PM_ZERO) {
+		thread_wire(curr_thread);
+
+		mapping = page_phys_map(base, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
+		if(!mapping) {
+			if(pmflag & MM_FATAL) {
+				fatal("Could not perform mandatory allocation of %zu pages (2)", count);
+			}
+
+			thread_unwire(curr_thread);
+			vmem_free(&page_arena, base, count * PAGE_SIZE);
+			return 0;
+		}
+
+		memset(mapping, 0, count * PAGE_SIZE);
+		page_phys_unmap(mapping, count * PAGE_SIZE, false);
+		thread_unwire(curr_thread);
+	}
+
+	dprintf("page: allocated page range [0x%" PRIpp ",0x%" PRIpp ")\n",
+		base, base + (count * PAGE_SIZE));
+	return base;
 }
 
 /** Allocate a range of pages.
@@ -363,16 +289,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
  * @return		Base address of range allocated or 0 if unable to
  *			allocate. */
 phys_ptr_t page_alloc(size_t count, int pmflag) {
-	phys_ptr_t base;
-
-	if(!(base = vmem_alloc(&page_arena, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
-		if(pmflag & MM_FATAL) {
-			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
-		}
-		return 0;
-	}
-
-	return (page_alloc_common(base, count, pmflag, NULL)) ? base : 0;
+	return page_xalloc(count, 0, 0, 0, pmflag);
 }
 
 /** Free a range of pages.
@@ -389,12 +306,14 @@ void page_free(phys_ptr_t base, size_t count) {
 
 	assert(!(base % PAGE_SIZE));
 
+	/* Go through vm_page_free() here as that performs various checks and
+	 * ensures that all free pages are in exactly the same state. */
 	if(!(page = vm_page_lookup(base))) {
 		/* Assume if the page is not found then vm_page_init() hasn't
 		 * been called yet. If the caller is passing in crap,
 		 * vmem_free() will pick it up. */
 		vmem_free(&page_arena, (vmem_resource_t)base, count * PAGE_SIZE);
-		dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ") (early)\n",
+		dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ")\n",
 			base, base + (count * PAGE_SIZE));
 	} else {
 		vm_page_free(page, count);
@@ -436,8 +355,7 @@ void page_stats_get(page_stats_t *stats) {
 	stats->total = page_arena.total_size;
 	stats->modified = page_queues[PAGE_QUEUE_MODIFIED].count * PAGE_SIZE;
 	stats->cached = page_queues[PAGE_QUEUE_CACHED].count * PAGE_SIZE;
-	stats->nonzero = page_queues[PAGE_QUEUE_NONZERO].count * PAGE_SIZE;
-	stats->free = page_arena.total_size - page_arena.used_size - stats->nonzero;
+	stats->free = page_arena.total_size - page_arena.used_size;
 	stats->allocated = page_arena.used_size - stats->modified - stats->cached;
 }
 
@@ -479,7 +397,6 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Page 0x%" PRIpp " (%p)\n", page->addr, page);
 		kprintf(LOG_NONE, "=================================================\n");
 		kprintf(LOG_NONE, "Queue:    %d (%p)\n", queue, page->queue);
-		kprintf(LOG_NONE, "Zeroed:   %d\n", page->zeroed);
 		kprintf(LOG_NONE, "Modified: %d\n", page->modified);
 		kprintf(LOG_NONE, "Count:    %d\n", page->count);
 		kprintf(LOG_NONE, "Object:   %p\n", page->object);
@@ -505,9 +422,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Allocated: %" PRIu64 " KiB\n", stats.allocated / 1024);
 		kprintf(LOG_NONE, "Modified:  %" PRIu64 " KiB\n", stats.modified / 1024);
 		kprintf(LOG_NONE, "Cached:    %" PRIu64 " KiB\n", stats.cached / 1024);
-		kprintf(LOG_NONE, "Free:      %" PRIu64 " KiB\n", (stats.nonzero + stats.free) / 1024);
-		kprintf(LOG_NONE, " Non-zero: %" PRIu64 " KiB\n", stats.nonzero / 1024);
-		kprintf(LOG_NONE, " Zero:     %" PRIu64 " KiB\n", stats.free / 1024);
+		kprintf(LOG_NONE, "Free:      %" PRIu64 " KiB\n", stats.free / 1024);
 	}
 
 	return KDBG_OK;
@@ -575,8 +490,6 @@ void __init_text page_init(kernel_args_t *args) {
 /** Set up structures for each usable page. */
 void __init_text vm_page_init(void) {
 	size_t i, j, count, size;
-	vmem_btag_t *btag;
-	vm_page_t *pages;
 	phys_ptr_t phys;
 
 	/* Initialise page queue structures. */
@@ -599,27 +512,6 @@ void __init_text vm_page_init(void) {
 		for(j = 0; j < count; j++) {
 			list_init(&page_ranges[i].pages[j].header);
 			page_ranges[i].pages[j].addr = page_ranges[i].start + (j * PAGE_SIZE);
-		}
-	}
-
-	/* The allocation functions can now modify the state of the page
-	 * structures. */
-	vm_page_inited = true;
-
-	/* Now that all allocations have been done, we can go through and
-	 * queue free pages in the non-zero queue. Prod at the insides of the
-	 * arena to determine what's been allocated. */
-	LIST_FOREACH(&page_arena.btags, iter) {
-		btag = list_entry(iter, vmem_btag_t, header);
-		if(btag->type != VMEM_BTAG_FREE) {
-			continue;
-		}
-
-		pages = vm_page_lookup(btag->base);
-		assert(pages);
-
-		for(i = 0; i < (btag->size / PAGE_SIZE); i++) {
-			vm_page_queue(&pages[i], PAGE_QUEUE_NONZERO);
 		}
 	}
 }

@@ -42,25 +42,23 @@ typedef struct vm_page {
 
 	/** Basic page information. */
 	phys_ptr_t addr;		/**< Physical address of the page. */
-	bool zeroed : 1;		/**< Whether the page is zeroed. */
 	bool modified : 1;		/**< Whether the page has been modified. */
-	uint8_t unused: 6;
+	uint8_t unused: 7;
 
 	/** Information about how the page is being used.
-	 * @note		Use of count/offset are up to the page owner.
+	 * @note		Use of count is up to the page owner.
 	 * @note		Should not have both object and amap set. */
 	refcount_t count;		/**< Reference count of the page (use is up to page user). */
 	object_t *object;		/**< Object that the page belongs to. */
 	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
-	offset_t offset;		/**< Offset into the object belongs to. */
+	offset_t offset;		/**< Offset into the object of the page. */
 } vm_page_t;
 
 /** Page queue numbers. */
-#define PAGE_QUEUE_NONZERO	0	/**< Free but not zeroed pages. */
-#define PAGE_QUEUE_MODIFIED	1	/**< Pages that need to be written. */
-#define PAGE_QUEUE_CACHED	2	/**< Pages that are held in caches. */
-#define PAGE_QUEUE_PAGEABLE	3	/**< Pages that are mapped but can be paged out. */
-#define PAGE_QUEUE_COUNT	4	/**< Number of page lists. */
+#define PAGE_QUEUE_MODIFIED	0	/**< Pages that need to be written. */
+#define PAGE_QUEUE_CACHED	1	/**< Pages that are held in caches. */
+#define PAGE_QUEUE_PAGEABLE	2	/**< Pages that are mapped but can be paged out. */
+#define PAGE_QUEUE_COUNT	3	/**< Number of page lists. */
 
 /** Structure containing an anonymous memory map. */
 typedef struct vm_amap {
