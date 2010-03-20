@@ -28,8 +28,8 @@
 #include <assert.h>
 #include <fatal.h>
 
-/** Size of the heap (64KB). */
-#define HEAP_SIZE		0x10000
+/** Size of the heap (128KB). */
+#define HEAP_SIZE		0x20000
 
 /** Structure used to represent a physical memory range internally. */
 typedef struct memory_range {

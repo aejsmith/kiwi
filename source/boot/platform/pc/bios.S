@@ -79,8 +79,8 @@ bios_interrupt:
 	mov	%ax, %gs
 	mov	%ax, %ss
 
-	/* Get the registers/flags to use. */
-	popfl
+	/* Get the registers to use. */
+	pop	%eax
 	movl	28(%esp), %eax
 	mov	%ax, %es
 	movl	0(%esp), %eax
