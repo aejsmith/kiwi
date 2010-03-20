@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		x86 atomic operations.
+ * @brief		Atomic operations.
  */
 
 #ifndef __LIB_ATOMIC_H

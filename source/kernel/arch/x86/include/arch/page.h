@@ -54,11 +54,19 @@
 
 #include <sync/mutex.h>
 
+/** Size of TLB flush array. */
+#define INVALIDATE_ARRAY_SIZE	128
+
 /** Architecture-specific page map structure. */
 typedef struct page_map {
 	mutex_t lock;			/**< Lock to protect page map. */
 	phys_ptr_t cr3;			/**< Value to load into the CR3 register. */
-	bool user;			/**< Whether pages mapped should be userspace accessible. */
+
+	/** Array of TLB entries to flush when unlocking page map.
+	 * @note		If the count becomes greater than the array
+	 *			size, then the entire TLB will be flushed. */
+	ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
+	size_t invalidate_count;
 } page_map_t;
 
 #endif /* __ASM__/LOADER */

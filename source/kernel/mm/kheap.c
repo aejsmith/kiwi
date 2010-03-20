@@ -45,7 +45,6 @@
 
 #include <mm/kheap.h>
 #include <mm/page.h>
-#include <mm/tlb.h>
 
 #include <assert.h>
 #include <console.h>
@@ -63,6 +62,7 @@ vmem_t kheap_va_arena;			/**< Heap arena that provides quantum caching. */
 vmem_t kheap_arena;			/**< Heap arena that backs allocated ranges with anonymous pages. */
 
 /** Unmap a range on the kernel heap.
+ * @note		Kernel page map should be locked.
  * @param start		Start of range.
  * @param end		End of range.
  * @param free		Whether to free the pages.
@@ -72,7 +72,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 	ptr_t i;
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(!page_map_remove(&kernel_page_map, i, &page)) {
+		if(!page_map_remove(&kernel_page_map, i, shared, &page)) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
@@ -80,12 +80,6 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 		}
 
 		dprintf("kheap: unmapped page 0x%" PRIpp " from %p\n", page, i);
-	}
-
-	if(shared) {
-		tlb_invalidate(NULL, start, end);
-	} else {
-		tlb_arch_invalidate(start, end);
 	}
 }
 
@@ -112,6 +106,8 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		return 0;
 	}
 
+	page_map_lock(&kernel_page_map);
+
 	/* Back the allocation with anonymous pages. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(1, vmflag & MM_FLAG_MASK);
@@ -131,10 +127,12 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", page, ret + i);
 	}
 
+	page_map_unlock(&kernel_page_map);
 	return ret;
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true, true);
+	page_map_unlock(&kernel_page_map);
 	vmem_free(source, ret, size);
 	return 0;
 }
@@ -151,7 +149,9 @@ void kheap_anon_ffunc(vmem_t *source, vmem_resource_t addr, vmem_resource_t size
 	assert(!(size % PAGE_SIZE));
 
 	/* Unmap pages covering the range and free back to the source. */
+	page_map_lock(&kernel_page_map);
 	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + (ptr_t)size, true, true);
+	page_map_unlock(&kernel_page_map);
 	vmem_free(source, addr, size);
 }
 
@@ -203,8 +203,10 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 
 	ret = (ptr_t)vmem_alloc(&kheap_va_arena, size, vmflag);
 	if(!ret) {
-		return 0;
+		return NULL;
 	}
+
+	page_map_lock(&kernel_page_map);
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE, base += PAGE_SIZE) {
@@ -217,10 +219,12 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 		dprintf("kheap: mapped page 0x%" PRIpp " at %p\n", base, ret + i);
 	}
 
+	page_map_unlock(&kernel_page_map);
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true, true);
+	page_map_unlock(&kernel_page_map);
 	vmem_free(&kheap_va_arena, ret, size);
 	return NULL;
 }
@@ -240,7 +244,9 @@ fail:
  *			physical mappings.
  */
 void kheap_unmap_range(void *addr, size_t size, bool shared) {
+	page_map_lock(&kernel_page_map);
 	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + size, false, shared);
+	page_map_unlock(&kernel_page_map);
 	vmem_free(&kheap_va_arena, (ptr_t)addr, size);
 }
 

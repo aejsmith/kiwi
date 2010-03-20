@@ -300,8 +300,10 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 	ptr_t i;
 
 	for(i = 0; i < size; i += PAGE_SIZE) {
+		page_map_lock(&kernel_page_map);
 		page_map_insert(&kernel_page_map, (ptr_t)bios_mem_mapping + addr + i,
 		                phys + i, true, true, MM_SLEEP);
+		page_map_unlock(&kernel_page_map);
 	}
 }
 

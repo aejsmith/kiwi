@@ -27,7 +27,6 @@
 #include <cpu/intr.h>
 
 #include <mm/page.h>
-#include <mm/tlb.h>
 
 #include <assert.h>
 #include <console.h>

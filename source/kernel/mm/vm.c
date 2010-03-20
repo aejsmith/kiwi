@@ -57,7 +57,6 @@
 #include <mm/page.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
-#include <mm/tlb.h>
 #include <mm/vm.h>
 
 #include <proc/process.h>
@@ -316,9 +315,11 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		mutex_lock(&region->amap->lock);
 	}
 
+	page_map_lock(&region->as->pmap);
+
 	for(vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
 		/* Unmap the page and release it from its source. */
-		if(page_map_remove(&region->as->pmap, vaddr, &paddr)) {
+		if(page_map_remove(&region->as->pmap, vaddr, true, &paddr)) {
 			vm_region_page_release(region, (offset_t)vaddr - region->start, paddr);
 		}
 
@@ -342,12 +343,11 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		}
 	}
 
+	page_map_unlock(&region->as->pmap);
+
 	if(region->amap) {
 		mutex_unlock(&region->amap->lock);
 	}
-
-	/* Invalidate the TLB entries on all CPUs using the address space. */
-	tlb_invalidate(region->as, start, end);
 }
 
 /** Shrink a region.
@@ -590,7 +590,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 	 * faults should never occur on non-private regions, either. */
 	if(reason == VM_FAULT_PROTECTION) {
 		if(unlikely(access != VM_FAULT_WRITE)) {
-			fatal("Non-write protection fault at %p on %p", addr, amap);
+			fatal("Non-write protection fault at %p on %p (%d)", addr, amap, access);
 		} else if(unlikely(!(region->flags & VM_REGION_PRIVATE))) {
 			fatal("Copy-on-write fault at %p on non-private region", addr);
 		}
@@ -706,12 +706,9 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 	 * set correctly. If this is a protection fault, remove existing
 	 * mappings. */
 	if(reason == VM_FAULT_PROTECTION) {
-		if(unlikely(!page_map_remove(&region->as->pmap, addr, NULL))) {
+		if(unlikely(!page_map_remove(&region->as->pmap, addr, true, NULL))) {
 			fatal("Could not remove previous mapping for %p", addr);
 		}
-
-		/* Invalidate the TLB entries. */
-		tlb_invalidate(region->as, addr, addr);
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
@@ -820,6 +817,9 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 		return false;
 	}
 
+	/* Lock the page map. */
+	page_map_lock(&as->pmap);
+
 	/* Call the anonymous fault handler if there is an anonymous map, or
 	 * pass the fault through to the object if it has its own fault
 	 * handler. */
@@ -830,6 +830,8 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	} else {
 		ret = vm_generic_fault(region, addr, reason, access);
 	}
+
+	page_map_unlock(&as->pmap);
 out:
 	mutex_unlock(&as->lock);
 	return ret;

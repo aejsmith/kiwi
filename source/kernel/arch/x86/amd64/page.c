@@ -24,13 +24,15 @@
 #include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
+#include <cpu/ipi.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/page.h>
-#include <mm/tlb.h>
 #include <mm/vm.h>
+
+#include <proc/thread.h>
 
 #include <assert.h>
 #include <console.h>
@@ -44,6 +46,16 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Check if a page map is the kernel page map. */
+#define IS_KERNEL_MAP(map)	(map == &kernel_page_map)
+
+/** Return flags to map a PDP/page directory/page table with. */
+#define TABLE_MAPPING_FLAGS(map)	\
+	(IS_KERNEL_MAP(map) ? (PG_PRESENT | PG_WRITE) : (PG_PRESENT | PG_WRITE | PG_USER))
+
+/** Determine if a page map is the current page map. */
+#define IS_CURRENT_MAP(map)	(IS_KERNEL_MAP(map) || map == &curr_aspace->pmap)
+
 extern char __text_start[], __text_end[];
 extern char __init_start[], __init_end[];
 extern char __rodata_start[], __rodata_end[];
@@ -54,6 +66,12 @@ page_map_t kernel_page_map;
 
 /** Whether the kernel page map has been initialised. */
 static bool paging_inited = false;
+
+/** Invalidate a TLB entry.
+ * @param addr		Address to invalidate. */
+static inline void invlpg(ptr_t addr) {
+	__asm__ volatile("invlpg (%0)" :: "r"(addr));
+}
 
 /** Allocate a paging structure.
  * @param mmflag	Allocation flags. PM_ZERO will be added.
@@ -110,7 +128,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 				}
 
 				/* Map it into the PML4. */
-				pml4[pml4e] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+				pml4[pml4e] = page | TABLE_MAPPING_FLAGS(map);
 			}
 		} else {
 			return NULL;
@@ -136,7 +154,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 				}
 
 				/* Map it into the PDP. */
-				pdp[pdpe] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+				pdp[pdpe] = page | TABLE_MAPPING_FLAGS(map);
 			}
 		} else {
 			return NULL;
@@ -179,7 +197,7 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 				}
 
 				/* Map it into the page directory. */
-				pdir[pde] = page | PG_PRESENT | PG_WRITE | ((map->user) ? PG_USER : 0);
+				pdir[pde] = page | TABLE_MAPPING_FLAGS(map);
 			}
 		} else {
 			return NULL;
@@ -191,52 +209,102 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	return page_structure_map(pdir[pde] & PAGE_MASK);
 }
 
-/** Map a large page into a page map.
- * @param map		Page map to map into.
- * @param virt		Virtual address to map (multiple of LARGE_PAGE_SIZE).
- * @param phys		Page to map to (multiple of LARGE_PAGE_SIZE).
- * @param write		Whether to make the mapping writable.
- * @param exec		Whether to make the mapping executable.
- * @param mmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-static int page_map_insert_large(page_map_t *map, ptr_t virt, phys_ptr_t phys,
-                                 bool write, bool exec, int mmflag) {
-	uint64_t *pdir, flags;
-	int pde;
-
-	assert(!(virt % LARGE_PAGE_SIZE));
-	assert(!(phys % LARGE_PAGE_SIZE));
-
+/** Lock a page map.
+ *
+ * Locks the specified page map. This must be done before performing any
+ * operations on it, and it must be unlocked with page_map_unlock() after
+ * operations have bene performed. Locks can be nested (implemented using a
+ * recursive mutex).
+ *
+ * @param map		Map to lock.
+ */
+void page_map_lock(page_map_t *map) {
+	thread_wire(curr_thread);
 	mutex_lock(&map->lock);
+}
 
-	/* Find the page directory for the entry. */
-	if(!(pdir = page_map_get_pdir(map, virt, true, mmflag))) {
-		mutex_unlock(&map->lock);
-		return -ERR_NO_MEMORY;
+/** TLB invalidation IPI handler.
+ * @param d1		Address of page map structure.
+ * @return		Always returns 0. */
+static int tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
+	page_map_t *map = (page_map_t *)((ptr_t)d1);
+	size_t i;
+
+	/* Don't need to do anything if we aren't using the page map - the
+	 * CPU may have switched address space between sending the IPI and
+	 * receiving it. */
+	if(IS_CURRENT_MAP(map)) {
+		/* If the number of pages to invalidate is larger than the size
+		 * of the address array, perform a complete TLB flush. */
+		if(map->invalidate_count > INVALIDATE_ARRAY_SIZE) {
+			dprintf("page: performing full TLB flush for map %p on %u\n",
+			        map, curr_cpu->id);
+
+			/* For the kernel page map, we must disable PGE and
+			 * reenable it to perform a complete TLB flush. */
+			if(IS_KERNEL_MAP(map)) {
+				sysreg_cr4_write(sysreg_cr4_read() & ~SYSREG_CR4_PGE);
+				sysreg_cr4_write(sysreg_cr4_read() | SYSREG_CR4_PGE);
+			} else {
+				sysreg_cr3_write(sysreg_cr3_read());
+			}
+		} else {
+			for(i = 0; i < map->invalidate_count; i++) {
+				dprintf("page: invalidating address %p for map %p on %u\n",
+				        map->pages_to_invalidate[i], map, curr_cpu->id);
+				invlpg(map->pages_to_invalidate[i]);
+			}
+		}
 	}
 
-	/* Check that the mapping doesn't already exist. */
-	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
-	if(pdir[pde] & PG_PRESENT) {
-		fatal("Mapping %p which is already mapped", virt);
-	}
-
-	/* Determine the flags to map with. Kernel mappings are created with
-	 * the global flag. */
-	flags = PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL) | PG_LARGE;
-	if(write) {
-		flags |= PG_WRITE;
-	}
-#if CONFIG_X86_NX
-	if(!exec && CPU_HAS_XD(curr_cpu)) {
-		flags |= PG_NOEXEC;
-	}
-#endif
-	/* Create the mapping. */
-	pdir[pde] = phys | flags;
-	memory_barrier();
-	mutex_unlock(&map->lock);
 	return 0;
+}
+
+/** Send invalidation IPIs.
+ * @param map		Map to send for. */
+static void page_map_flush(page_map_t *map) {
+	cpu_t *cpu;
+
+	/* Check if anything needs to be done. */
+	if(cpu_count < 2 || !map->invalidate_count) {
+		map->invalidate_count = 0;
+		return;
+	}
+
+	/* If this is the kernel page map, perform changes on all other CPUs,
+	 * else perform it on each CPU using the map. */
+	if(IS_KERNEL_MAP(map)) {
+		ipi_broadcast(tlb_invalidate_ipi, (unative_t)map, 0, 0, 0, IPI_SEND_SYNC);
+	} else {
+		/* TODO: Multicast. */
+		LIST_FOREACH(&cpus_running, iter) {
+			cpu = list_entry(iter, cpu_t, header);
+			if(cpu == curr_cpu || map != &cpu->aspace->pmap) {
+				continue;
+			}
+
+			/* CPU is using this address space. */
+			if(ipi_send(cpu->id, tlb_invalidate_ipi, (unative_t)map,
+			            0, 0, 0, IPI_SEND_SYNC) != 0) {
+				fatal("Could not send TLB invalidation IPI");
+			}
+		}
+	}
+
+	map->invalidate_count = 0;
+}
+
+/** Unlock a page map.
+ * @param map		Map to unlock. */
+void page_map_unlock(page_map_t *map) {
+	/* If the lock is being released (recursion count currently 1), and
+	 * flush queued TLB changes. */
+	if(mutex_recursion(&map->lock) == 1) {
+		page_map_flush(map);
+	}
+
+	mutex_unlock(&map->lock);
+	thread_unwire(curr_thread);
 }
 
 /** Map a page into a page map.
@@ -247,19 +315,16 @@ static int page_map_insert_large(page_map_t *map, ptr_t virt, phys_ptr_t phys,
  * @param exec		Whether to make the mapping executable.
  * @param mmflag	Allocation flags.
  * @return		0 on success, negative error code on failure. */
-int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
-                    bool exec, int mmflag) {
+int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bool exec, int mmflag) {
 	uint64_t *ptbl, flags;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(!(phys % PAGE_SIZE));
 
-	mutex_lock(&map->lock);
-
 	/* Find the page table for the entry. */
 	if(!(ptbl = page_map_get_ptbl(map, virt, true, mmflag))) {
-		mutex_unlock(&map->lock);
 		return -ERR_NO_MEMORY;
 	}
 
@@ -269,9 +334,8 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
 		fatal("Mapping %p which is already mapped", virt);
 	}
 
-	/* Determine the flags to map with. Kernel mappings are created with
-	 * the global flag. */
-	flags = PG_PRESENT | ((map->user) ? PG_USER : PG_GLOBAL);
+	/* Determine mapping flags. Kernel mappings have the global flag set. */
+	flags = PG_PRESENT;
 	if(write) {
 		flags |= PG_WRITE;
 	}
@@ -280,35 +344,40 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
 		flags |= PG_NOEXEC;
 	}
 #endif
-	/* Create the mapping. */
+	if(IS_KERNEL_MAP(map)) {
+		flags |= PG_GLOBAL;
+	} else {
+		flags |= PG_USER;
+	}
+
+	/* Set the PTE. */
 	ptbl[pte] = phys | flags;
 	memory_barrier();
-	mutex_unlock(&map->lock);
 	return 0;
 }
 
 /** Unmap a page.
- * @param map		Page map to unmap from in.
+ * @param map		Page map to unmap from.
  * @param virt		Virtual address to unmap.
+ * @param shared	Whether the mapping was shared across multiple CPUs.
+ *			Used as an optimisation to not perform remote TLB
+ *			invalidations if not necessary.
  * @param physp		Where to store physical address that was mapped.
  * @return		Whether the address was mapped. */
-bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
+bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp) {
 	phys_ptr_t paddr;
 	vm_page_t *page;
 	uint64_t *ptbl;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
-
-	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
 	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
 	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
-		mutex_unlock(&map->lock);
 		return false;
 	} else if(!ptbl[pte] & PG_PRESENT) {
-		mutex_unlock(&map->lock);
 		return false;
 	}
 
@@ -319,6 +388,19 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		page->modified = true;
 	}
 
+	/* If the entry has been accessed, need to flush TLB entries. */
+	if(ptbl[pte] & PG_ACCESSED) {
+		if(IS_CURRENT_MAP(map)) {
+			invlpg(virt);
+		}
+		if(shared) {
+			if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
+				map->pages_to_invalidate[map->invalidate_count] = virt;
+			}
+			map->invalidate_count++;
+		}
+	}
+
 	/* Clear the entry. */
 	ptbl[pte] = 0;
 	memory_barrier();
@@ -326,7 +408,6 @@ bool page_map_remove(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	if(physp) {
 		*physp = paddr;
 	}
-	mutex_unlock(&map->lock);
 	return true;
 }
 
@@ -339,71 +420,20 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	uint64_t *ptbl;
 	int pte;
 
+	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
-
-	mutex_lock(&map->lock);
 
 	/* Find the page table for the entry. */
 	if((ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;
-			mutex_unlock(&map->lock);
 			return true;
 		}
 	}
 
-	mutex_unlock(&map->lock);
 	return false;
-}
-
-/** Modify the protection flags on a range.
- *
- * Modifies the protection flags on a range in a page map. Any entries that are
- * not currently mapped will be ignored.
- *
- * @param map		Page map to modify.
- * @param start		Start of range to modify.
- * @param end		End of range to modify.
- * @param write		Whether the range should be writable.
- * @param exec		Whether the range should be executable.
- */
-void page_map_remap(page_map_t *map, ptr_t start, ptr_t end, bool write, bool exec) {
-	uint64_t *ptbl, flags;
-	ptr_t i;
-	int pte;
-
-	assert(!(start % PAGE_SIZE));
-	assert(!(end % PAGE_SIZE));
-
-	mutex_lock(&map->lock);
-
-	for(i = start; i < end; i += PAGE_SIZE) {
-		pte = (i % LARGE_PAGE_SIZE) / PAGE_SIZE;
-
-		if(!(ptbl = page_map_get_ptbl(map, i, false, MM_SLEEP))) {
-			continue;
-		} else if(!(ptbl[pte] & PG_PRESENT)) {
-			continue;
-		}
-
-		/* Work out the new flags to set. */
-		flags = 0;
-		if(write) {
-			flags |= PG_WRITE;
-		}
-#if CONFIG_X86_NX
-		if(!exec && CPU_HAS_XD(curr_cpu)) {
-			flags |= PG_NOEXEC;
-		}
-#endif
-		/* Clear out original flags, and set the new flags. */
-		ptbl[pte] = (ptbl[pte] & ~(PG_WRITE | PG_NOEXEC)) | flags;
-		memory_barrier();
-	}
-
-	mutex_unlock(&map->lock);
 }
 
 /** Switch to a page map.
@@ -421,16 +451,19 @@ int page_map_init(page_map_t *map, int mmflag) {
 	uint64_t *kpml4, *pml4;
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
-	map->user = true;
+	map->invalidate_count = 0;
 
 	if(!(map->cr3 = page_structure_alloc(mmflag))) {
 		return -ERR_NO_MEMORY;
 	}
 
-	/* Get the kernel mappings into the new PML4. */
-	kpml4 = page_structure_map(kernel_page_map.cr3);
-	pml4 = page_structure_map(map->cr3);
-	pml4[511] = kpml4[511] & ~PG_ACCESSED;
+	if(!IS_KERNEL_MAP(map)) {
+		/* Get the kernel mappings into the new PML4. */
+		kpml4 = page_structure_map(kernel_page_map.cr3);
+		pml4 = page_structure_map(map->cr3);
+		pml4[511] = kpml4[511] & ~PG_ACCESSED;
+	}
+
 	return 0;
 }
 
@@ -445,7 +478,7 @@ void page_map_destroy(page_map_t *map) {
 	uint64_t *pml4, *pdp, *pdir;
 	int i, j, k;
 
-	assert(map->user);
+	assert(!IS_KERNEL_MAP(map));
 
 	/* Free all structures in the bottom half of the PML4 (user memory). */
 	pml4 = page_structure_map(map->cr3);
@@ -538,13 +571,12 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 /** Perform AMD64 paging initialisation.
  * @param args		Kernel arguments pointer. */
 void __init_text page_arch_init(kernel_args_t *args) {
-	uint64_t *pml4, *bpml4;
-	phys_ptr_t i;
+	uint64_t *pml4, *bpml4, *pdir;
+	phys_ptr_t i, j;
 
 	/* Initialise the kernel page map structure. */
-	mutex_init(&kernel_page_map.lock, "kernel_page_map_lock", MUTEX_RECURSIVE);
-	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);
-	kernel_page_map.user = false;
+	page_map_init(&kernel_page_map, MM_FATAL);
+	page_map_lock(&kernel_page_map);
 
 	/* Map the kernel in. The following mappings are made:
 	 *  .text      - R/X
@@ -557,9 +589,11 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	page_map_kernel_range(args, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
 
 	/* Create 4GB of physical mapping for now. FIXME. */
-	for(i = 0; i < 0x100000000; i += LARGE_PAGE_SIZE) {
-		page_map_insert_large(&kernel_page_map, i + KERNEL_PMAP_BASE,
-		                      i, true, true, MM_FATAL);
+	for(i = 0; i < 0x100000000; i += 0x40000000) {
+		pdir = page_map_get_pdir(&kernel_page_map, i + KERNEL_PMAP_BASE, true, MM_FATAL);
+		for(j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
+			pdir[j / LARGE_PAGE_SIZE] = (i + j) | PG_PRESENT | PG_WRITE | PG_GLOBAL | PG_LARGE;
+		}
 	}
 
 	/* The temporary identity mapping is still required as all the CPUs'
@@ -572,6 +606,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	bpml4 = page_structure_map(sysreg_cr3_read() & PAGE_MASK);
 	pml4[0] = bpml4[0];
 
+	page_map_unlock(&kernel_page_map);
 	dprintf("page: initialised kernel page map (pml4: 0x%" PRIpp ")\n",
 	        kernel_page_map.cr3);
 
@@ -580,6 +615,13 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* The physical map area can now be used. */
 	paging_inited = true;
+}
+
+/** TLB flush IPI handler.
+ * @return		Always returns 0. */
+static int tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
+	sysreg_cr3_write(sysreg_cr3_read());
+	return 0;
 }
 
 /** Perform late AMD64 paging initialisation. */
@@ -591,5 +633,6 @@ void page_arch_late_init(void) {
 	 * mapping and flush the TLB on all CPUs. */
 	pml4 = page_structure_map(kernel_page_map.cr3);
 	pml4[0] = 0;
-	tlb_invalidate(NULL, 0, 0);
+	sysreg_cr3_write(sysreg_cr3_read());
+	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
 }
