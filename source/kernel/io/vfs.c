@@ -365,7 +365,7 @@ static int vfs_node_free(vfs_node_t *node) {
 
 	/* Flush cached data and metadata. */
 	if((ret = vfs_node_flush(node, true)) != 0) {
-		kprintf(LOG_WARN, "vfs: warning: failed to flush data for %p(%" PRId32 ":%" PRId32 ") (%d)\n",
+		kprintf(LOG_WARN, "vfs: warning: failed to flush data for %p(%" PRIu16 ":%" PRIu64 ") (%d)\n",
 		        node, (node->mount) ? node->mount->id : -1, node->id, ret);
 		mutex_unlock(&node->lock);
 		if(node->mount) {
@@ -391,7 +391,7 @@ static int vfs_node_free(vfs_node_t *node) {
 	}
 	object_destroy(&node->obj);
 
-	dprintf("vfs: freed node %p(%" PRId32 ":%" PRId32 ")\n", node,
+	dprintf("vfs: freed node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
 	        (node->mount) ? node->mount->id : -1, node->id);
 	mutex_unlock(&node->lock);
 	slab_cache_free(vfs_node_cache, node);
@@ -475,7 +475,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				return ret;
 			}
 
-			dprintf("vfs: following symbolic link %" PRId32 ":%" PRId32 " to %s\n",
+			dprintf("vfs: following symbolic link %" PRIu16 ":%" PRIu64 " to %s\n",
 			        node->mount->id, node->id, node->link_dest);
 
 			/* Duplicate the link destination as the lookup needs
@@ -496,7 +496,7 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 				return ret;
 			}
 
-			dprintf("vfs: followed %s to %" PRId32 ":%" PRId32 "\n",
+			dprintf("vfs: followed %s to %" PRIu16 ":%" PRIu64 "\n",
 			        prev->link_dest, node->mount->id, node->id);
 			kfree(link);
 
@@ -580,7 +580,8 @@ static int vfs_node_lookup_internal(char *path, vfs_node_t *node, bool follow, i
 		prev = node;
 
 		/* Check if the node is cached in the mount. */
-		dprintf("vfs: looking for node %" PRId32 " in cache for mount %" PRId32 " (%s)\n", id, mount->id, tok);
+		dprintf("vfs: looking for node %" PRIu64 " in cache for mount %" PRIu16 " (%s)\n",
+		        id, mount->id, tok);
 		node = avl_tree_lookup(&mount->nodes, (key_t)id);
 		if(node) {
 			assert(node->mount == mount);
@@ -711,7 +712,7 @@ void vfs_node_get(vfs_node_t *node) {
 	int val = refcount_inc(&node->count);
 
 	if(val == 1) {
-		fatal("Called vfs_node_get on unused node %" PRId32 ":%" PRId32,
+		fatal("Called vfs_node_get on unused node %" PRIu16 ":%" PRIu64,
 		      (node->mount) ? node->mount->id : -1, node->id);
 	}
 }
@@ -842,7 +843,7 @@ static int vfs_node_create(const char *path, vfs_node_t *node) {
 	/* Insert the node into the parent's entry cache. */
 	vfs_dir_entry_add(parent, node->id, name);
 
-	dprintf("vfs: created %s (node: %" PRId32 ":%" PRId32 ", parent: %" PRId32 ":%" PRId32 ")\n",
+	dprintf("vfs: created %s (node: %" PRIu16 ":%" PRIu64 ", parent: %" PRIu16 ":%" PRIu64 ")\n",
 	        path, node->mount->id, node->id, parent->mount->id, parent->id);
 	ret = 0;
 out:
@@ -1314,10 +1315,10 @@ int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t off
 	mutex_lock(&node->lock);
 
 	/* Ensure that we do not go pass the end of the node. */
-	if(offset > (offset_t)node->size) {
+	if(offset >= (offset_t)node->size) {
 		mutex_unlock(&node->lock);
 		goto out;
-	} else if((offset + (offset_t)count) > (offset_t)node->size) {
+	} else if((offset + (offset_t)count) >= (offset_t)node->size) {
 		count = (size_t)((offset_t)node->size - offset);
 	}
 
@@ -1365,7 +1366,7 @@ int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t off
 		total += count;
 	}
 
-	dprintf("vfs: read %zu bytes from offset 0x%" PRIx64 " in %p(%" PRId32 ":%" PRId32 ")\n",
+	dprintf("vfs: read %zu bytes from offset 0x%" PRIx64 " in %p(%" PRIu16 ":%" PRIu64 ")\n",
 	        total, offset, node, (node->mount) ? node->mount->id : -1, node->id);
 	ret = 0;
 out:
@@ -1451,11 +1452,11 @@ int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offse
 	mutex_lock(&node->lock);
 
 	/* Attempt to resize the node if necessary. */
-	if((offset + (offset_t)count) > (offset_t)node->size) {
+	if((offset + (offset_t)count) >= (offset_t)node->size) {
 		/* If the resize operation is not provided, we can only write
 		 * within the space that we have. */
 		if(!node->mount || !node->mount->type->file_resize) {
-			if(offset > (offset_t)node->size) {
+			if(offset >= (offset_t)node->size) {
 				ret = 0;
 				mutex_unlock(&node->lock);
 				goto out;
@@ -1520,7 +1521,7 @@ int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offse
 		total += count;
 	}
 
-	dprintf("vfs: wrote %zu bytes to offset 0x%" PRIx64 " in %p(%" PRId32 ":%" PRId32 ")\n",
+	dprintf("vfs: wrote %zu bytes to offset 0x%" PRIx64 " in %p(%" PRIu16 ":%" PRIu64 ")\n",
 	        total, offset, node, (node->mount) ? node->mount->id : -1, node->id);
 	ret = 0;
 out:
@@ -2221,7 +2222,7 @@ int vfs_mount(const char *dev, const char *path, const char *type, int flags) {
 	}
 	mutex_unlock(&vfs_mount_lock);
 
-	dprintf("vfs: mounted %s on %s (mount: %p:%" PRId32 ", root: %p, device: %s)\n",
+	dprintf("vfs: mounted %s on %s (mount: %p(%" PRIu16 "), root: %p, device: %s)\n",
 	        mount->type->name, path, mount, mount->id, mount->root,
 	        (dev) ? dev : "<none>");
 	return 0;
@@ -2469,7 +2470,7 @@ int kdbg_cmd_mounts(int argc, char **argv) {
 	LIST_FOREACH(&vfs_mount_list, iter) {
 		mount = list_entry(iter, vfs_mount_t, header);
 
-		kprintf(LOG_NONE, "%-5" PRId32 " %-5d %-10s %-18p %-18p %-18p\n",
+		kprintf(LOG_NONE, "%-5" PRIu16 " %-5d %-10s %-18p %-18p %-18p\n",
 		        mount->id, mount->flags, (mount->type) ? mount->type->name : "invalid",
 		        mount->data, mount->root, mount->mountpoint);
 	}
@@ -2509,7 +2510,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 
 	/* Search for the mount. */
 	if(!(mount = vfs_mount_lookup((mount_id_t)id))) {
-		kprintf(LOG_NONE, "Unknown mount ID %" PRId32 ".\n", id);
+		kprintf(LOG_NONE, "Unknown mount ID %" PRIun ".\n", id);
 		return KDBG_FAIL;
 	}
 
@@ -2522,7 +2523,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		LIST_FOREACH(list, iter) {
 			node = list_entry(iter, vfs_node_t, mount_link);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
+			kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
 			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
@@ -2532,7 +2533,7 @@ int kdbg_cmd_vnodes(int argc, char **argv) {
 		AVL_TREE_FOREACH(&mount->nodes, iter) {
 			node = avl_tree_entry(iter, vfs_node_t);
 
-			kprintf(LOG_NONE, "%-8" PRId32 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
+			kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-5d %-6d %-4d %-12" PRIu64 " %-10zu %-7zu %p\n",
 			        node->id, node->flags, refcount_get(&node->count),
 			        atomic_get(&node->lock.locked), node->type, node->size,
 			        (size_t)(ROUND_UP(node->size, PAGE_SIZE) / PAGE_SIZE),
@@ -2568,7 +2569,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 			return KDBG_FAIL;
 		}
 		if(!(mount = vfs_mount_lookup((mount_id_t)val))) {
-			kprintf(LOG_NONE, "Unknown mount ID %" PRId32 ".\n", val);
+			kprintf(LOG_NONE, "Unknown mount ID %" PRIun ".\n", val);
 			return KDBG_FAIL;
 		}
 
@@ -2577,7 +2578,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 			return KDBG_FAIL;
 		}
 		if(!(node = avl_tree_lookup(&mount->nodes, (key_t)val))) {
-			kprintf(LOG_NONE, "Unknown node ID %" PRId32 ".\n", val);
+			kprintf(LOG_NONE, "Unknown node ID %" PRIun ".\n", val);
 			return KDBG_FAIL;
 		}
 	} else if(argc == 2) {
@@ -2593,7 +2594,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 	}
 
 	/* Print out basic node information. */
-	kprintf(LOG_NONE, "Node %p(%" PRIu32 ":%" PRIu32 ")\n", node,
+	kprintf(LOG_NONE, "Node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
 	        (node->mount) ? node->mount->id : -1, node->id);
 	kprintf(LOG_NONE, "=================================================\n");
 
@@ -2620,7 +2621,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 	if(node->type == VFS_NODE_DIR) {
 		kprintf(LOG_NONE, "Entries:      %zu\n", node->entry_count);
 		if(node->mounted) {
-			kprintf(LOG_NONE, "Mounted:      %p(%" PRId32 ")\n", node->mounted,
+			kprintf(LOG_NONE, "Mounted:      %p(%" PRIu16 ")\n", node->mounted,
 			        node->mounted->id);
 		}
 	}
@@ -2633,7 +2634,7 @@ int kdbg_cmd_vnode(int argc, char **argv) {
 		RADIX_TREE_FOREACH(&node->dir_entries, iter) {
 			entry = radix_tree_entry(iter, fs_dir_entry_t);
 
-			kprintf(LOG_NONE, "  Entry %p - %" PRId32 "(%s)\n",
+			kprintf(LOG_NONE, "  Entry %p - %" PRIu64 "(%s)\n",
 			        entry, entry->id, entry->name);
 		}
 	} else if(node->type == VFS_NODE_FILE) {
@@ -3169,8 +3170,8 @@ int sys_fs_getcwd(char *buf, size_t size) {
 			kfree(kbuf);
 			return ret;
 		} else if(node->type != VFS_NODE_DIR) {
-			dprintf("vfs: node %p(%" PRId32 ") should be a directory but it isn't!\n",
-			        node, node->mount->id);
+			dprintf("vfs: node %p(%" PRIu64 ") should be a directory but it isn't!\n",
+			        node, node->id);
 			mutex_unlock(&node->lock);
 			vfs_node_release(node);
 			kfree(kbuf);

@@ -437,7 +437,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Count:    %d\n", page->count);
 		kprintf(LOG_NONE, "Object:   %p\n", page->object);
 		if(page->object) {
-			kprintf(LOG_NONE, " Type: %p (%u)\n", page->object->type, page->object->type->id);
+			kprintf(LOG_NONE, " Type: %p (%d)\n", page->object->type, page->object->type->id);
 		}
 		kprintf(LOG_NONE, "Amap:     %p\n", page->amap);
 		kprintf(LOG_NONE, "Offset:   %" PRId64 "\n", page->offset);

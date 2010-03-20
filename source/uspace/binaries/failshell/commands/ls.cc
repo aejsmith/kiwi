@@ -87,7 +87,7 @@ public:
 				return ret;
 			}
 
-			printf("%-5d %-6zu %-10llu ", info.id, info.links, info.size);
+			printf("%-5llu %-6zu %-10llu ", info.id, info.links, info.size);
 			if((ret = fs_symlink_read(path, path, 4096)) > 0) {
 				printf("%s -> %s\n", entry->name, path);
 			} else {
