@@ -84,16 +84,15 @@ typedef struct device_ops {
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct device *device, void *data, object_wait_t *wait);
 
-	/** Fault handler for memory regions mapping the device.
+	/** Get a page for the device (for memory-mapping the device).
 	 * @note		If this operation is not specified then the
 	 *			device won't be allowed to be memory-mapped.
-	 * @param device	Device fault occurred on.
+	 * @param device	Device to get page from.
 	 * @param data		Handle-specific data pointer.
-	 * @param offset	Offset into device fault occurred at (page
-	 *			aligned).
+	 * @param offset	Offset into device of page to get.
 	 * @param physp		Where to store address of page to map.
 	 * @return		0 on success, negative error code on failure. */
-	int (*fault)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
+	int (*page_get)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.

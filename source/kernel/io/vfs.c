@@ -1148,10 +1148,18 @@ static int vfs_file_object_mappable(object_handle_t *handle, int flags) {
 /** Get a page from a file object.
  * @param handle	Handle to file to get page from.
  * @param offset	Offset of page to get.
- * @param pagep		Where to store pointer to page structure.
+ * @param physp		Where to store physical address of page.
  * @return		0 on success, negative error code on failure. */
-static int vfs_file_object_page_get(object_handle_t *handle, offset_t offset, vm_page_t **pagep) {
-	return vfs_file_page_get_internal((vfs_node_t *)handle->object, offset, false, pagep, NULL, NULL);
+static int vfs_file_object_page_get(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
+	vm_page_t *page;
+	int ret;
+
+	ret = vfs_file_page_get_internal((vfs_node_t *)handle->object, offset, false, &page, NULL, NULL);
+	if(ret == 0) {
+		*physp = page->addr;
+	}
+
+	return ret;
 }
 
 /** Release a page from a file VM object.

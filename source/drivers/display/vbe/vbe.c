@@ -40,7 +40,7 @@ static display_device_t *vbe_display_dev;
  * @param offset	Offset into the framebuffer.
  * @param physp		Where to store physical address.
  * @return		0 on success, negative error code on failure. */
-static int vbe_display_fault(display_device_t *_dev, offset_t offset, phys_ptr_t *physp) {
+static int vbe_display_page_get(display_device_t *_dev, offset_t offset, phys_ptr_t *physp) {
 	vbe_device_t *device = _dev->data;
 
 	if(offset > (offset_t)device->size || offset < 0) {
@@ -77,7 +77,7 @@ static int vbe_display_mode_set(display_device_t *_dev, display_mode_t *mode) {
 
 /** VBE display operations. */
 static display_ops_t vbe_display_ops = {
-	.fault = vbe_display_fault,
+	.page_get = vbe_display_page_get,
 	.mode_set = vbe_display_mode_set,
 };
 

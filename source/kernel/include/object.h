@@ -57,41 +57,21 @@ typedef struct object_type {
 	void (*unwait)(struct object_wait *wait);
 
 	/** Check if an object can be memory-mapped.
-	 * @note		If this function is implemented, either the
-	 *			fault or page_get operation MUST be implemented.
-	 *			If it is not, then the object will be classed
-	 *			as mappable if either of those two functions is
-	 *			implemented.
+	 * @note		If this function is implemented, the page_get
+	 *			operation MUST be implemented. If it is not,
+	 *			then the object will be classed as mappable if
+	 *			page_get is implemented.
 	 * @param handle	Handle to object.
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		0 if can be mapped, negative error code if not. */
 	int (*mappable)(struct object_handle *handle, int flags);
 
-	/** Non-standard fault handling.
-	 * @note		If this operation is specified, it is called
-	 *			on all faults on memory regions using the
-	 *			object rather than using the standard fault
-	 *			handling mechanism. In this case, the page_get
-	 *			operation is not needed.
-	 * @note		When this is called, the main fault handler
-	 *			will have verified that the fault is allowed by
-	 *			the region's access flags.
-	 * @param region	Region fault occurred in.
-	 * @param addr		Virtual address of fault (rounded down to base
-	 *			of page).
-	 * @param reason	Reason for the fault.
-	 * @param access	Type of access that caused the fault.
-	 * @return		Whether succeeded in handling the fault. */
-	bool (*fault)(struct vm_region *region, ptr_t addr, int reason, int access);
-
 	/** Get a page from the object.
 	 * @param handle	Handle to object to get page from.
-	 * @param offset	Offset to get page from (the offset into the
-	 *			region the fault occurred at, plus the offset
-	 *			of the region into the object).
-	 * @param pagep		Where to store pointer to page structure.
+	 * @param offset	Offset into object to get page from.
+	 * @param physp		Where to store physical address of page.
 	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct object_handle *handle, offset_t offset, struct vm_page **pagep);
+	int (*page_get)(struct object_handle *handle, offset_t offset, phys_ptr_t *physp);
 
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.

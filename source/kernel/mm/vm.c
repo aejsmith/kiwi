@@ -262,8 +262,8 @@ static vm_region_t *vm_region_next(vm_region_t *region) {
 /** Release a page that was mapped in a region.
  * @param region	Region that the page was mapped in.
  * @param offset	Offset into the region the page was mapped at.
- * @param paddr		Physical address that was unmapped. */
-static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_ptr_t paddr) {
+ * @param phys		Physical address that was unmapped. */
+static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_ptr_t phys) {
 	size_t i;
 
 	if(region->amap) {
@@ -274,7 +274,7 @@ static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_pt
 
 		/* If page is in the object, then do nothing. */
 		if(region->amap->pages[i]) {
-			assert(region->amap->pages[i]->addr == paddr);
+			assert(region->amap->pages[i]->addr == phys);
 			return;
 		}
 
@@ -283,10 +283,10 @@ static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_pt
 		assert(region->handle->object->type->page_release);
 
 		offset += region->obj_offset;
-		region->handle->object->type->page_release(region->handle, offset, paddr);
+		region->handle->object->type->page_release(region->handle, offset, phys);
 	} else if(region->handle->object->type->page_release) {
 		offset += region->obj_offset;
-		region->handle->object->type->page_release(region->handle, offset, paddr);
+		region->handle->object->type->page_release(region->handle, offset, phys);
 	}
 }
 
@@ -302,7 +302,7 @@ static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_pt
  * @param start		Start of range to unmap.
  * @param end		End of range to unmap. */
 static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
-	phys_ptr_t paddr;
+	phys_ptr_t phys;
 	offset_t offset;
 	ptr_t vaddr;
 	size_t i;
@@ -319,8 +319,8 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 
 	for(vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
 		/* Unmap the page and release it from its source. */
-		if(page_map_remove(&region->as->pmap, vaddr, true, &paddr)) {
-			vm_region_page_release(region, (offset_t)vaddr - region->start, paddr);
+		if(page_map_remove(&region->as->pmap, vaddr, true, &phys)) {
+			vm_region_page_release(region, (offset_t)vaddr - region->start, phys);
 		}
 
 		/* Update the region reference count on the anonymous map. */
@@ -644,13 +644,12 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 			} else {
 				assert(handle->object->type->page_get);
 
-				ret = handle->object->type->page_get(handle, offset + region->obj_offset, &page);
+				ret = handle->object->type->page_get(handle, offset + region->obj_offset, &paddr);
 				if(unlikely(ret != 0)) {
 					dprintf("vm:  could not read page from source (%d)\n", ret);
 					mutex_unlock(&amap->lock);
 					return false;
 				}
-				paddr = page->addr;
 			}
 
 			dprintf("vm:  anon write fault: copying page 0x%" PRIpp " from %p\n",
@@ -687,14 +686,12 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 			assert(handle->object->type->page_get);
 
 			/* Get the page from the source, and map read-only. */
-			ret = handle->object->type->page_get(handle, offset + region->obj_offset, &page);
+			ret = handle->object->type->page_get(handle, offset + region->obj_offset, &paddr);
 			if(unlikely(ret != 0)) {
 				dprintf("vm:  could not read page from source (%d)\n", ret);
 				mutex_unlock(&amap->lock);
 				return false;
 			}
-
-			paddr = page->addr;
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIpp " from %p as read-only\n",
 			        paddr, handle->object);
@@ -726,9 +723,8 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
  * @param access	Type of access that caused the fault.
  * @return		Whether the fault was successfully handled. */
 static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	phys_ptr_t paddr;
+	phys_ptr_t phys, exist;
 	bool write, exec;
-	vm_page_t *page;
 	offset_t offset;
 	int ret;
 
@@ -737,7 +733,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 
 	/* Get a page from the object. */
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
-	ret = region->handle->object->type->page_get(region->handle, offset, &page);
+	ret = region->handle->object->type->page_get(region->handle, offset, &phys);
 	if(unlikely(ret != 0)) {
 		dprintf("vm:  failed to get page for %p (%d)\n", addr, ret);
 		return false;
@@ -746,12 +742,12 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	/* Check if a mapping already exists. This is possible if two threads
 	 * in a process on different CPUs fault on the same address
 	 * simultaneously. */
-	if(page_map_find(&region->as->pmap, addr, &paddr)) {
-		if(paddr != page->addr) {
+	if(page_map_find(&region->as->pmap, addr, &exist)) {
+		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIpp", should be %" PRIpp ")",
-			      paddr, page->addr);
+			      exist, phys);
 		} else if(region->handle->object->type->page_release) {
-			region->handle->object->type->page_release(region->handle, offset, page->addr);
+			region->handle->object->type->page_release(region->handle, offset, phys);
 		}
 		return true;
 	}
@@ -761,7 +757,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	exec = region->flags & VM_REGION_EXEC;
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(&region->as->pmap, addr, page->addr, write, exec, MM_SLEEP);
+	page_map_insert(&region->as->pmap, addr, phys, write, exec, MM_SLEEP);
 	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
 	        page->addr, addr, region->as, write, exec);
 	return true;
@@ -820,13 +816,10 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	/* Lock the page map. */
 	page_map_lock(&as->pmap);
 
-	/* Call the anonymous fault handler if there is an anonymous map, or
-	 * pass the fault through to the object if it has its own fault
-	 * handler. */
+	/* Call the anonymous fault handler if there is an anonymous map, else
+	 * use the generic fault handler. */
 	if(region->amap) {
 		ret = vm_anon_fault(region, addr, reason, access);
-	} else if(region->handle->object->type->fault) {
-		ret = region->handle->object->type->fault(region, addr, reason, access);
 	} else {
 		ret = vm_generic_fault(region, addr, reason, access);
 	}
@@ -914,20 +907,14 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 		return -ERR_PARAM_INVAL;
 	}
 	if(handle) {
-		/* Cannot create private mappings to objects requiring special
-		 * fault handling. */
-		if(flags & VM_MAP_PRIVATE && handle->object->type->fault) {
-			return -ERR_NOT_SUPPORTED;
-		}
-
 		/* Check if the object can be mapped in with the given flags. */
 		if(handle->object->type->mappable) {
-			assert(handle->object->type->page_get || handle->object->type->fault);
+			assert(handle->object->type->page_get);
 			if((ret = handle->object->type->mappable(handle, flags)) != 0) {
 				return ret;
 			}
 		} else {
-			if(!handle->object->type->page_get && !handle->object->type->fault) {
+			if(!handle->object->type->page_get) {
 				return -ERR_NOT_SUPPORTED;
 			}
 		}

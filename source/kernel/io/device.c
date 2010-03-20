@@ -85,34 +85,34 @@ static void device_object_unwait(object_wait_t *wait) {
  * @return		0 if can be mapped, negative error code if not. */
 static int device_object_mappable(object_handle_t *handle, int flags) {
 	device_t *device = (device_t *)handle->object;
-	return (device->ops->fault) ? 0 : -ERR_NOT_SUPPORTED;
-}
 
-/** Handle a page fault on a device-backed region.
- * @param region	Region fault occurred in.
- * @param addr		Virtual address of fault (rounded down to base of page).
- * @param reason	Reason for the fault.
- * @param access	Type of access that caused the fault.
- * @return		Whether fault was handled. */
-static bool device_object_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	offset_t offset = region->obj_offset + (addr - region->start);
-	device_t *device = (device_t *)region->handle->object;
-	phys_ptr_t page;
-	int ret;
-
-	assert(device->ops && device->ops->fault);
-
-	/* Ask the device for a page. */
-	if((ret = device->ops->fault(device, region->handle->data, offset, &page)) != 0) {
-		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
-		        offset, device, device->name, ret);
-		return false;
+	/* Cannot create private mappings to devices. */
+	if(flags & VM_MAP_PRIVATE) {
+		return -ERR_NOT_SUPPORTED;
 	}
 
-	/* Insert into page map. */
-	page_map_insert(&region->as->pmap, addr, page, region->flags & VM_REGION_WRITE,
-	                region->flags & VM_REGION_EXEC, MM_SLEEP);
-	return true;
+	return (device->ops->page_get) ? 0 : -ERR_NOT_SUPPORTED;
+}
+
+/** Get a page from a device.
+ * @param handle	Handle to device to get page from.
+ * @param offset	Offset into device to get page from.
+ * @param physp		Where to store physical address of page.
+ * @return		0 on success, negative error code on failure. */
+static int device_object_page_get(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
+	device_t *device = (device_t *)handle->object;
+	int ret;
+
+	assert(device->ops && device->ops->page_get);
+
+	/* Ask the device for a page. */
+	if((ret = device->ops->page_get(device, handle->data, offset, physp)) != 0) {
+		dprintf("device: failed to get page from offset %" PRId64 " in %p(%s) (%d)\n",
+		        offset, device, device->name, ret);
+		return ret;
+	}
+
+	return 0;
 }
 
 /** Device object type structure. */
@@ -122,7 +122,7 @@ static object_type_t device_object_type = {
 	.wait = device_object_wait,
 	.unwait = device_object_unwait,
 	.mappable = device_object_mappable,
-	.fault = device_object_fault,
+	.page_get = device_object_page_get,
 };
 
 /** Create a new device tree node.
