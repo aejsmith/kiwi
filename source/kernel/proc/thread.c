@@ -28,6 +28,7 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 #include <proc/sched.h>

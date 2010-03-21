@@ -43,7 +43,7 @@ static display_device_t *vbe_display_dev;
 static int vbe_display_get_page(display_device_t *_dev, offset_t offset, phys_ptr_t *physp) {
 	vbe_device_t *device = _dev->data;
 
-	if(offset > (offset_t)device->size || offset < 0) {
+	if(offset > (offset_t)device->size) {
 		return -ERR_NOT_FOUND;
 	}
 

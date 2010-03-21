@@ -21,20 +21,20 @@
 #ifndef __IO_CONTEXT_H
 #define __IO_CONTEXT_H
 
-#include <io/vfs.h>
+//#include <io/vfs.h>
 
 #include <sync/mutex.h>
 
 /** Structure containing an I/O context. */
 typedef struct io_context {
 	mutex_t lock;			/**< Lock to protect context. */
-	vfs_node_t *root_dir;		/**< Root directory. */
-	vfs_node_t *curr_dir;		/**< Current working directory. */
+	//vfs_node_t *root_dir;		/**< Root directory. */
+	//vfs_node_t *curr_dir;		/**< Current working directory. */
 } io_context_t;
 
 extern void io_context_init(io_context_t *context, io_context_t *parent);
 extern void io_context_destroy(io_context_t *context);
-extern int io_context_setcwd(io_context_t *context, vfs_node_t *node);
-extern int io_context_setroot(io_context_t *context, vfs_node_t *node);
+//extern int io_context_setcwd(io_context_t *context, vfs_node_t *node);
+//extern int io_context_setroot(io_context_t *context, vfs_node_t *node);
 
 #endif /* __IO_CONTEXT_H */

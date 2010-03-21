@@ -23,6 +23,9 @@
 #include <lib/avl.h>
 #include <lib/string.h>
 
+// replace me
+#include <limits.h>
+
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>

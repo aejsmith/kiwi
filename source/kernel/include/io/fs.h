@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Virtual file system (VFS).
+ * @brief		Filesystem interface.
  */
 
-#ifndef __IO_VFS_H
-#define __IO_VFS_H
+#ifndef __IO_FS_H
+#define __IO_FS_H
 
 #include <lib/avl.h>
 #include <lib/radix.h>
@@ -34,11 +34,53 @@
 #include <limits.h>
 #include <object.h>
 
-struct kernel_args;
+struct fs_mount;
+struct fs_node;
+
+/** Structure containing a filesystem mount option. */
+struct fs_mount_option {
+	const char *name;		/**< Argument name. */
+	const char *value;		/**< Argument value (can be NULL). */
+} fs_mount_option_t;
+
+/** Filesystem type description structure. */
+typedef struct fs_type {
+	list_t header;			/**< Link to types list. */
+
+	const char *name;		/**< Name of the filesystem type. */
+	refcount_t count;		/**< Number of mounts using this type. */
+
+	/** Check whether a device contains this FS type.
+	 * @note		If a filesystem type does not provide this
+	 *			function, then it is assumed that the FS does
+	 *			not use a backing device (e.g. RamFS).
+	 * @param device	Handle to device to check.
+	 * @return		Whether the device contains this FS type. */
+	bool (*probe)(object_handle_t *device);
+
+	/** Mount an instance of this FS type.
+	 * @note		It is guaranteed that the device will contain
+	 *			the correct FS type when this is called, as
+	 *			the probe operation is called prior to this.
+	 * @note		This function should create the root node for
+	 *			the filesystem and store it in mount->root, as
+	 *			though get_node was called for it.
+	 * @param mount		Mount structure for the FS, containing details
+	 *			of the filesystem to mount.
+	 * @param opts		Array of options passed to the mount call.
+	 * @param count		Number of options in the array.
+	 * @return		0 on success, negative error code on failure. */
+	int (*mount)(struct fs_mount *mount, fs_mount_option_t *opts, size_t count);
+} fs_type_t;
+
+/** Mount behaviour flags. */
+#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
+
+
+#if 0
 struct vfs_info;
 struct vfs_mount;
 struct vfs_node;
-
 /** Filesystem type description structure.
  * @note		When adding new required operations to this structure,
  *			add a check to vfs_type_register(). */
@@ -232,17 +274,6 @@ typedef struct vfs_mount {
 	list_t unused_nodes;		/**< List of unused nodes (in LRU order). */
 } vfs_mount_t;
 
-/** Type of a filesystem node. */
-typedef enum vfs_node_type {
-	VFS_NODE_FILE,			/**< Regular file. */
-	VFS_NODE_DIR,			/**< Directory. */
-	VFS_NODE_SYMLINK,		/**< Symbolic link. */
-	VFS_NODE_BLKDEV,		/**< Block device. */
-	VFS_NODE_CHRDEV,		/**< Character device. */
-	VFS_NODE_FIFO,			/**< FIFO (named pipe). */
-	VFS_NODE_SOCK,			/**< Socket. */
-} vfs_node_type_t;
-
 /** Structure describing a node in the filesystem. */
 typedef struct vfs_node {
 	object_t obj;                   /**< Object header. */
@@ -315,5 +346,6 @@ extern void vfs_init(void);
 extern int kdbg_cmd_mounts(int argc, char **argv);
 extern int kdbg_cmd_vnodes(int argc, char **argv);
 extern int kdbg_cmd_vnode(int argc, char **argv);
+#endif
 
 #endif /* __IO_VFS_H */

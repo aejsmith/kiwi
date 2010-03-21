@@ -164,7 +164,7 @@ vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs) {
  * @param size		Size of the file data (if a file).
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to node structure. */
-vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, file_size_t size, void *data) {
+vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, offset_t size, void *data) {
 	vfs_node_t *node = kmalloc(sizeof(vfs_node_t));
 
 	list_init(&node->header);
@@ -383,7 +383,7 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
  * @param buf		Buffer to read into.
  * @param lba		Block number to read.
  * @return		Whether reading succeeded. */
-static bool partition_block_read(disk_t *disk, void *buf, offset_t lba) {
+static bool partition_block_read(disk_t *disk, void *buf, uint64_t lba) {
 	disk_t *parent = disk->data;
 	return parent->ops->block_read(parent, buf, lba + disk->offset);
 }
@@ -398,7 +398,7 @@ static disk_ops_t partition_disk_ops = {
  * @param id		ID of partition.
  * @param lba		Block number that the partitions starts at.
  * @param blocks	Number of blocks the partition takes up. */
-void disk_partition_add(disk_t *disk, int id, offset_t lba, file_size_t blocks) {
+void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks) {
 	disk_t *child = kmalloc(sizeof(disk_t));
 	vfs_filesystem_t *fs;
 
@@ -431,7 +431,7 @@ void disk_partition_add(disk_t *disk, int id, offset_t lba, file_size_t blocks) 
  * @param boot		Whether the disk is the boot device.
  * @return		Pointer to disk structure, or NULL if disk contained
  *			nothing usable. */
-disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops, void *data, bool boot) {
+disk_t *disk_add(uint8_t id, size_t blksize, uint64_t blocks, disk_ops_t *ops, void *data, bool boot) {
 	disk_t *disk = kmalloc(sizeof(disk_t));
 	vfs_filesystem_t *fs;
 	size_t i;

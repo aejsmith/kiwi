@@ -36,21 +36,21 @@ typedef struct disk_ops_t {
 	 * @param id		ID of partition.
 	 * @param lba		Block that the partition starts at.
 	 * @return		Whether partition is a boot partition. */
-	bool (*is_boot_partition)(struct disk *disk, int id, offset_t lba);
+	bool (*is_boot_partition)(struct disk *disk, int id, uint64_t lba);
 
 	/** Read a block from the disk.
 	 * @param disk		Disk being read from.
 	 * @param buf		Buffer to read into.
 	 * @param lba		Block number to read.
 	 * @return		Whether reading succeeded. */
-	bool (*block_read)(struct disk *disk, void *buf, offset_t lba);
+	bool (*block_read)(struct disk *disk, void *buf, uint64_t lba);
 } disk_ops_t;
 
 /** Structure representing a disk device. */
 typedef struct disk {
 	uint8_t id;			/**< ID of the disk. */
 	size_t blksize;			/**< Size of one block on the disk. */
-	file_size_t blocks;		/**< Number of blocks on the disk. */
+	uint64_t blocks;		/**< Number of blocks on the disk. */
 	disk_ops_t *ops;		/**< Pointer to operations structure. */
 	union {
 		void *data;		/**< Implementation-specific data pointer. */
@@ -58,7 +58,7 @@ typedef struct disk {
 	};
 	char *partial_block;		/**< Block for partial transfers. */
 	bool boot;			/**< Whether the disk is the boot disk. */
-	offset_t offset;		/**< Starting block (if a partition). */
+	uint64_t offset;		/**< Starting block (if a partition). */
 } disk_t;
 
 /** Structure containing operations for a filesystem. */
@@ -115,7 +115,7 @@ typedef struct vfs_node {
 	} type;
 
 	refcount_t count;		/**< Reference count. */
-	file_size_t size;		/**< Size of the file. */
+	offset_t size;			/**< Size of the file. */
 	void *data;			/**< Implementation-specific data pointer. */
 
 	list_t entries;			/**< Directory entries. */
@@ -136,7 +136,7 @@ extern char *boot_path_override;
 extern vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path);
 extern vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs);
 
-extern vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, file_size_t size, void *data);
+extern vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, offset_t size, void *data);
 extern void vfs_node_acquire(vfs_node_t *node);
 extern void vfs_node_release(vfs_node_t *node);
 
@@ -147,8 +147,8 @@ extern vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path);
 extern vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev);
 
 extern bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset);
-extern void disk_partition_add(disk_t *disk, int id, offset_t lba, file_size_t blocks);
-extern disk_t *disk_add(uint8_t id, size_t blksize, file_size_t blocks, disk_ops_t *ops,
+extern void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks);
+extern disk_t *disk_add(uint8_t id, size_t blksize, uint64_t blocks, disk_ops_t *ops,
                         void *data, bool boot);
 
 extern void platform_disk_detect(void);

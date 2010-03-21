@@ -38,20 +38,29 @@ typedef struct fs_dir_entry {
 	char name[];			/**< Name of entry. */
 } fs_dir_entry_t;
 
+/** Possible filesystem node types. */
+typedef enum fs_node_type {
+	VFS_NODE_FILE,			/**< Regular file. */
+	VFS_NODE_DIR,			/**< Directory. */
+	VFS_NODE_SYMLINK,		/**< Symbolic link. */
+	VFS_NODE_BLKDEV,		/**< Block device. */
+	VFS_NODE_CHRDEV,		/**< Character device. */
+	VFS_NODE_FIFO,			/**< FIFO (named pipe). */
+	VFS_NODE_SOCK,			/**< Socket. */
+} fs_node_type_t;
+
 /** Filesystem node information structure. */
 typedef struct fs_info {
 	node_id_t id;			/**< Node ID. */
 	mount_id_t mount;		/**< Mount ID. */
+	fs_node_type_t type;		/**< Type of the node. */
 	size_t blksize;			/**< I/O block size. */
-	file_size_t size;		/**< Total size of node data on filesystem. */
+	offset_t size;			/**< Total size of file on filesystem. */
 	size_t links;			/**< Number of links to the node. */
 } fs_info_t;
 
-/** Mount behaviour flags. */
-#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
-
 /** Behaviour flags for both FS handle types. */
-#define FS_HANDLE_NONBLOCK	(1<<0)	/**< I/O operations on the handle should not block. */
+#define FS_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
 
 /** Behaviour flags for fs_file_open(). */
 #define FS_FILE_READ		(1<<1)	/**< Open for reading. */
@@ -63,6 +72,7 @@ typedef struct fs_info {
 #define FS_SEEK_ADD		2	/**< Add the supplied value to the current offset. */
 #define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
 
+#if 0
 extern int SYSCALL(fs_file_create)(const char *path);
 extern handle_t SYSCALL(fs_file_open)(const char *path, int flags);
 extern int SYSCALL(fs_file_read)(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
@@ -89,6 +99,7 @@ extern int SYSCALL(fs_info)(const char *path, bool follow, fs_info_t *info);
 extern int SYSCALL(fs_link)(const char *source, const char *dest);
 extern int SYSCALL(fs_unlink)(const char *path);
 extern int SYSCALL(fs_rename)(const char *source, const char *dest);
+#endif
 
 #ifdef __cplusplus
 }

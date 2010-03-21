@@ -357,9 +357,9 @@ static vfs_node_t *iso9660_node_get(vfs_filesystem_t *fs, node_id_t id) {
 static bool iso9660_file_read(vfs_node_t *node, void *buf, size_t size, offset_t offset) {
 	iso9660_node_t *data = node->data;
 
-	if(!size || (file_size_t)offset > data->data_len) {
+	if(!size || offset > data->data_len) {
 		return 0;
-	} else if(((file_size_t)offset + size) > data->data_len) {
+	} else if((offset + size) > data->data_len) {
 		return 0;
 	}
 

@@ -65,10 +65,10 @@ extern uint64_t boot_part_offset;
  * @param id		ID of partition.
  * @param lba		Block that the partition starts at.
  * @return		Whether partition is a boot partition. */
-static bool bios_disk_is_boot_partition(disk_t *disk, int id, offset_t lba) {
+static bool bios_disk_is_boot_partition(disk_t *disk, int id, uint64_t lba) {
 	if(multiboot_magic == MB_LOADER_MAGIC && (uint64_t)id == boot_part_offset) {
 		return true;
-	} else if(lba == (offset_t)boot_part_offset) {
+	} else if(lba == boot_part_offset) {
 		return true;
 	} else {
 		return false;
@@ -80,7 +80,7 @@ static bool bios_disk_is_boot_partition(disk_t *disk, int id, offset_t lba) {
  * @param buf		Buffer to read into.
  * @param lba		Block number to read.
  * @return		Whether the read succeeded. */
-static bool bios_disk_block_read(disk_t *disk, void *buf, offset_t lba) {
+static bool bios_disk_block_read(disk_t *disk, void *buf, uint64_t lba) {
 	disk_address_packet_t *dap = (disk_address_packet_t *)BIOS_MEM_BASE;
 	bios_regs_t regs;
 

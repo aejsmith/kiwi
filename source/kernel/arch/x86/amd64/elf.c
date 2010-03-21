@@ -62,7 +62,7 @@ int elf_module_relocate(module_t *module, bool external) {
 
 		/* Loop through all the relocations. */
 		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
-			offset = (offset_t)sect->sh_offset + (r * sect->sh_entsize);
+			offset = sect->sh_offset + (r * sect->sh_entsize);
 			if((ret = vfs_file_read(module->handle, &rel, sizeof(Elf64_Rela), offset, &bytes)) != 0) {
 				return ret;
 			} else if(bytes != sizeof(Elf64_Rela)) {

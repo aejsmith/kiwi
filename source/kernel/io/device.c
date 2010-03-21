@@ -24,6 +24,7 @@
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 
@@ -107,7 +108,7 @@ static int device_object_get_page(object_handle_t *handle, offset_t offset, phys
 
 	/* Ask the device for a page. */
 	if((ret = device->ops->get_page(device, handle->data, offset, physp)) != 0) {
-		dprintf("device: failed to get page from offset %" PRId64 " in %p(%s) (%d)\n",
+		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
 		        offset, device, device->name, ret);
 		return ret;
 	}
@@ -494,7 +495,7 @@ int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offse
 	size_t bytes;
 	int ret;
 
-	if(!handle || !buf || offset < 0) {
+	if(!handle || !buf) {
 		return -ERR_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return -ERR_TYPE_INVAL;
@@ -537,7 +538,7 @@ int device_write(object_handle_t *handle, const void *buf, size_t count, offset_
 	size_t bytes;
 	int ret;
 
-	if(!handle || !buf || offset < 0) {
+	if(!handle || !buf) {
 		return -ERR_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return -ERR_TYPE_INVAL;

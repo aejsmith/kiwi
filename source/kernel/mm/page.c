@@ -438,7 +438,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 			kprintf(LOG_NONE, " Type: %p (%d)\n", page->object->type, page->object->type->id);
 		}
 		kprintf(LOG_NONE, "Amap:     %p\n", page->amap);
-		kprintf(LOG_NONE, "Offset:   %" PRId64 "\n", page->offset);
+		kprintf(LOG_NONE, "Offset:   %" PRIu64 "\n", page->offset);
 	} else {
 		kprintf(LOG_NONE, "Start              End                Pages\n");
 		kprintf(LOG_NONE, "=====              ===                =====\n");

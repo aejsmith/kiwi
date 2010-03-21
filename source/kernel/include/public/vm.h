@@ -36,8 +36,8 @@ typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
 	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for file/device to map. */
-	offset_t offset;		/**< Offset in the file/device to map from. */
+	handle_t handle;		/**< Handle for object to map. */
+	offset_t offset;		/**< Offset in the object to map from. */
 	void **addrp;			/**< Where to store address mapped to. */
 } vm_map_args_t;
 

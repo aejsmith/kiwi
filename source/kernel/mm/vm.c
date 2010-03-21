@@ -301,7 +301,7 @@ static void vm_region_release_page(vm_region_t *region, offset_t offset, phys_pt
 static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 	phys_ptr_t phys;
 	offset_t offset;
-	ptr_t vaddr;
+	ptr_t addr;
 	size_t i;
 
 	assert(!(region->flags & VM_REGION_RESERVED));
@@ -314,15 +314,17 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 
 	page_map_lock(&region->as->pmap);
 
-	for(vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
+	for(addr = start; addr < end; addr += PAGE_SIZE) {
+		offset = (offset_t)(addr - region->start);
+
 		/* Unmap the page and release it from its source. */
-		if(page_map_remove(&region->as->pmap, vaddr, true, &phys)) {
-			vm_region_release_page(region, (offset_t)vaddr - region->start, phys);
+		if(page_map_remove(&region->as->pmap, addr, true, &phys)) {
+			vm_region_release_page(region, offset, phys);
 		}
 
 		/* Update the region reference count on the anonymous map. */
 		if(region->amap) {
-			offset = (offset_t)(vaddr - region->start) + region->amap_offset;
+			offset += region->amap_offset;
 			i = (size_t)(offset >> PAGE_WIDTH);
 
 			assert(i < region->amap->max_size);
@@ -904,6 +906,11 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 		return -ERR_PARAM_INVAL;
 	}
 	if(handle) {
+		/* Check for overflow. */
+		if((offset + size) < offset) {
+			return -ERR_PARAM_INVAL;
+		}
+
 		/* Check if the object can be mapped in with the given flags. */
 		if(handle->object->type->mappable) {
 			assert(handle->object->type->get_page);
@@ -1118,7 +1125,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	AVL_TREE_FOREACH(&as->regions, iter) {
 		region = avl_tree_entry(iter, vm_region_t);
 
-		kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %-10" PRId64 " %-18p %" PRId64 "\n",
+		kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
 		        region->start, region->end, region->flags,
 		        region->handle, region->obj_offset, region->amap,
 		        region->amap_offset);
