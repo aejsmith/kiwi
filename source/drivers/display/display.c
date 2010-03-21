@@ -176,9 +176,9 @@ static void display_device_unwait(device_t *_dev, void *data, object_wait_t *wai
  * @param offset	Offset into device of page to get.
  * @param physp		Where to store address of page.
  * @return		0 on success, negative error code on failure. */
-static int display_device_page_get(device_t *_dev, void *data, offset_t offset, phys_ptr_t *physp) {
+static int display_device_get_page(device_t *_dev, void *data, offset_t offset, phys_ptr_t *physp) {
 	display_device_t *device = _dev->data;
-	return device->ops->page_get(device, offset, physp);
+	return device->ops->get_page(device, offset, physp);
 }
 
 /** Handler for display device requests.
@@ -277,7 +277,7 @@ static int display_device_request(device_t *_dev, void *data, int request, void 
 			/* Set this device as the kernel console if there
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
-				if((ret = device->ops->page_get(device, mode->offset, &phys)) != 0) {
+				if((ret = device->ops->get_page(device, mode->offset, &phys)) != 0) {
 					fatal("Could not get video device framebuffer (%d)", ret);
 				}
 
@@ -317,7 +317,7 @@ static device_ops_t display_device_ops = {
 	.close = display_device_close,
 	.wait = display_device_wait,
 	.unwait = display_device_unwait,
-	.page_get = display_device_page_get,
+	.get_page = display_device_get_page,
 	.request = display_device_request,
 };
 

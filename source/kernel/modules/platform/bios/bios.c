@@ -23,6 +23,7 @@
 
 #include <mm/kheap.h>
 #include <mm/malloc.h>
+#include <mm/page.h>
 
 #include <platform/bios.h>
 

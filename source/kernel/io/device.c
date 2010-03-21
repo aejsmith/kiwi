@@ -91,7 +91,7 @@ static int device_object_mappable(object_handle_t *handle, int flags) {
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	return (device->ops->page_get) ? 0 : -ERR_NOT_SUPPORTED;
+	return (device->ops->get_page) ? 0 : -ERR_NOT_SUPPORTED;
 }
 
 /** Get a page from a device.
@@ -99,14 +99,14 @@ static int device_object_mappable(object_handle_t *handle, int flags) {
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
  * @return		0 on success, negative error code on failure. */
-static int device_object_page_get(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static int device_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	device_t *device = (device_t *)handle->object;
 	int ret;
 
-	assert(device->ops && device->ops->page_get);
+	assert(device->ops && device->ops->get_page);
 
 	/* Ask the device for a page. */
-	if((ret = device->ops->page_get(device, handle->data, offset, physp)) != 0) {
+	if((ret = device->ops->get_page(device, handle->data, offset, physp)) != 0) {
 		dprintf("device: failed to get page from offset %" PRId64 " in %p(%s) (%d)\n",
 		        offset, device, device->name, ret);
 		return ret;
@@ -122,7 +122,7 @@ static object_type_t device_object_type = {
 	.wait = device_object_wait,
 	.unwait = device_object_unwait,
 	.mappable = device_object_mappable,
-	.page_get = device_object_page_get,
+	.get_page = device_object_get_page,
 };
 
 /** Create a new device tree node.

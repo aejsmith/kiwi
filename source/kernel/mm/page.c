@@ -73,8 +73,6 @@
 #include <lib/utility.h>
 
 #include <mm/page.h>
-#include <mm/slab.h>
-#include <mm/vm.h>
 
 #include <proc/thread.h>
 

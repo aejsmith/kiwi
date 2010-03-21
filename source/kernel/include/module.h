@@ -21,12 +21,11 @@
 #ifndef __MODULE_H
 #define __MODULE_H
 
-#include <io/vfs.h>
-
 #include <lib/list.h>
 #include <lib/refcount.h>
 
 #include <elf.h>
+#include <object.h>
 #include <symbol.h>
 
 /** Maximum length of a module name. */

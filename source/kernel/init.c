@@ -24,7 +24,7 @@
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
 
-#include <io/vfs.h>
+//#include <io/vfs.h>
 
 #include <lib/string.h>
 
@@ -68,12 +68,12 @@ static atomic_t init_rendezvous_2 __init_data = 0;
 static atomic_t init_rendezvous_3 __init_data = 0;
 
 /** The amount to increment the boot progress for each module. */
-static int init_current_progress __init_data = 10;
-static int init_progress_per_module __init_data;
+//static int init_current_progress __init_data = 10;
+//static int init_progress_per_module __init_data;
 
 /** Lock to serialise the SMP boot. */
 static SPINLOCK_DECLARE(smp_boot_spinlock);
-
+#if 0
 /** List of modules from the bootloader. */
 static LIST_DECLARE(boot_module_list);
 
@@ -274,7 +274,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		}
 	}
 }
-
+#endif
 /** Wait until all CPUs reach a certain point.
  * @param args		Kernel arguments structure.
  * @param var		Variable to wait on. */
@@ -294,7 +294,7 @@ static void init_thread(void *args, void *arg2) {
 
 	/* Initialise other things. */
 	handle_cache_init();
-	vfs_init();
+	//vfs_init();
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their
 	 * initialisation, the second waits for them to complete. */
@@ -309,8 +309,8 @@ static void init_thread(void *args, void *arg2) {
 	console_update_boot_progress(10);
 
 	/* Load modules and mount the root filesystem. */
-	load_modules(args);
-	vfs_mount_root(args);
+	//load_modules(args);
+	//vfs_mount_root(args);
 
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();

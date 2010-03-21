@@ -92,7 +92,7 @@ typedef struct device_ops {
 	 * @param offset	Offset into device of page to get.
 	 * @param physp		Where to store address of page to map.
 	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
+	int (*get_page)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.

@@ -48,9 +48,6 @@
 
 #include <cpu/intr.h>
 
-#include <io/device.h>
-#include <io/vfs.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -263,7 +260,7 @@ static vm_region_t *vm_region_next(vm_region_t *region) {
  * @param region	Region that the page was mapped in.
  * @param offset	Offset into the region the page was mapped at.
  * @param phys		Physical address that was unmapped. */
-static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_ptr_t phys) {
+static void vm_region_release_page(vm_region_t *region, offset_t offset, phys_ptr_t phys) {
 	size_t i;
 
 	if(region->amap) {
@@ -280,13 +277,13 @@ static void vm_region_page_release(vm_region_t *region, offset_t offset, phys_pt
 
 		/* Page must have come from source, release it there. */
 		assert(region->handle);
-		assert(region->handle->object->type->page_release);
+		assert(region->handle->object->type->release_page);
 
 		offset += region->obj_offset;
-		region->handle->object->type->page_release(region->handle, offset, phys);
-	} else if(region->handle->object->type->page_release) {
+		region->handle->object->type->release_page(region->handle, offset, phys);
+	} else if(region->handle->object->type->release_page) {
 		offset += region->obj_offset;
-		region->handle->object->type->page_release(region->handle, offset, phys);
+		region->handle->object->type->release_page(region->handle, offset, phys);
 	}
 }
 
@@ -320,7 +317,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 	for(vaddr = start; vaddr < end; vaddr += PAGE_SIZE) {
 		/* Unmap the page and release it from its source. */
 		if(page_map_remove(&region->as->pmap, vaddr, true, &phys)) {
-			vm_region_page_release(region, (offset_t)vaddr - region->start, phys);
+			vm_region_release_page(region, (offset_t)vaddr - region->start, phys);
 		}
 
 		/* Update the region reference count on the anonymous map. */
@@ -642,9 +639,9 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 					fatal("No mapping for %p, but protection fault on it", addr);
 				}
 			} else {
-				assert(handle->object->type->page_get);
+				assert(handle->object->type->get_page);
 
-				ret = handle->object->type->page_get(handle, offset + region->obj_offset, &paddr);
+				ret = handle->object->type->get_page(handle, offset + region->obj_offset, &paddr);
 				if(unlikely(ret != 0)) {
 					dprintf("vm:  could not read page from source (%d)\n", ret);
 					mutex_unlock(&amap->lock);
@@ -661,8 +658,8 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 			/* Add the page and release the old one. */
 			refcount_inc(&page->count);
 			amap->pages[i] = page;
-			if(handle->object->type->page_release) {
-				handle->object->type->page_release(handle, offset + region->obj_offset, paddr);
+			if(handle->object->type->release_page) {
+				handle->object->type->release_page(handle, offset + region->obj_offset, paddr);
 			}
 
 			amap->curr_size++;
@@ -683,10 +680,10 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 		} else {
 			assert(region->flags & VM_REGION_PRIVATE);
 			assert(handle);
-			assert(handle->object->type->page_get);
+			assert(handle->object->type->get_page);
 
 			/* Get the page from the source, and map read-only. */
-			ret = handle->object->type->page_get(handle, offset + region->obj_offset, &paddr);
+			ret = handle->object->type->get_page(handle, offset + region->obj_offset, &paddr);
 			if(unlikely(ret != 0)) {
 				dprintf("vm:  could not read page from source (%d)\n", ret);
 				mutex_unlock(&amap->lock);
@@ -729,11 +726,11 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	int ret;
 
 	assert(region->handle);
-	assert(region->handle->object->type->page_get);
+	assert(region->handle->object->type->get_page);
 
 	/* Get a page from the object. */
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
-	ret = region->handle->object->type->page_get(region->handle, offset, &phys);
+	ret = region->handle->object->type->get_page(region->handle, offset, &phys);
 	if(unlikely(ret != 0)) {
 		dprintf("vm:  failed to get page for %p (%d)\n", addr, ret);
 		return false;
@@ -746,8 +743,8 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIpp", should be %" PRIpp ")",
 			      exist, phys);
-		} else if(region->handle->object->type->page_release) {
-			region->handle->object->type->page_release(region->handle, offset, phys);
+		} else if(region->handle->object->type->release_page) {
+			region->handle->object->type->release_page(region->handle, offset, phys);
 		}
 		return true;
 	}
@@ -909,12 +906,12 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 	if(handle) {
 		/* Check if the object can be mapped in with the given flags. */
 		if(handle->object->type->mappable) {
-			assert(handle->object->type->page_get);
+			assert(handle->object->type->get_page);
 			if((ret = handle->object->type->mappable(handle, flags)) != 0) {
 				return ret;
 			}
 		} else {
-			if(!handle->object->type->page_get) {
+			if(!handle->object->type->get_page) {
 				return -ERR_NOT_SUPPORTED;
 			}
 		}

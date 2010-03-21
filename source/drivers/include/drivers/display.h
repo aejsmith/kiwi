@@ -80,7 +80,7 @@ typedef struct display_ops {
 	 * @param offset	Offset into the framebuffer.
 	 * @param physp		Where to store physical address.
 	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct display_device *device, offset_t offset, phys_ptr_t *physp);
+	int (*get_page)(struct display_device *device, offset_t offset, phys_ptr_t *physp);
 
 	/** Set the display mode.
 	 * @param device	Device to set mode of.

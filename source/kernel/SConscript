@@ -25,10 +25,10 @@ sources = map(File, [
 	'cpu/ipi.c',
 	'cpu/irq.c',
 
-	'io/context.c',
+	#'io/context.c',
 	'io/device.c',
-	'io/ramfs.c',
-	'io/vfs.c',
+	#'io/ramfs.c',
+	#'io/vfs.c',
 
 	'ipc/ipc.c',
 	'ipc/pipe.c',
@@ -42,6 +42,7 @@ sources = map(File, [
 	'lib/radix.c',
 	'lib/string.c',
 
+	#'mm/cache.c',
 	'mm/kheap.c',
 	'mm/malloc.c',
 	'mm/page.c',
@@ -61,7 +62,7 @@ sources = map(File, [
 	'sync/spinlock.c',
 	'sync/waitq.c',
 
-	'elf.c',
+	#'elf.c',
 	'fatal.c',
 	'init.c',
 	'kdbg.c',

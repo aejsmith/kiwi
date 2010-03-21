@@ -57,10 +57,10 @@ typedef struct object_type {
 	void (*unwait)(struct object_wait *wait);
 
 	/** Check if an object can be memory-mapped.
-	 * @note		If this function is implemented, the page_get
+	 * @note		If this function is implemented, the get_page
 	 *			operation MUST be implemented. If it is not,
 	 *			then the object will be classed as mappable if
-	 *			page_get is implemented.
+	 *			get_page is implemented.
 	 * @param handle	Handle to object.
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		0 if can be mapped, negative error code if not. */
@@ -71,13 +71,13 @@ typedef struct object_type {
 	 * @param offset	Offset into object to get page from.
 	 * @param physp		Where to store physical address of page.
 	 * @return		0 on success, negative error code on failure. */
-	int (*page_get)(struct object_handle *handle, offset_t offset, phys_ptr_t *physp);
+	int (*get_page)(struct object_handle *handle, offset_t offset, phys_ptr_t *physp);
 
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.
 	 * @param offset	Offset of page in object.
 	 * @param paddr		Physical address of page that was unmapped. */
-	void (*page_release)(struct object_handle *handle, offset_t offset, phys_ptr_t paddr);
+	void (*release_page)(struct object_handle *handle, offset_t offset, phys_ptr_t paddr);
 } object_type_t;
 
 /** Structure defining a kernel object.

@@ -1175,8 +1175,8 @@ static object_type_t vfs_file_object_type = {
 	.id = OBJECT_TYPE_FILE,
 	.close = vfs_file_object_close,
 	.mappable = vfs_file_object_mappable,
-	.page_get = vfs_file_object_page_get,
-	.page_release = vfs_file_object_page_release,
+	.get_page = vfs_file_object_page_get,
+	.release_page = vfs_file_object_page_release,
 };
 
 /** Create a regular file in the file system.
