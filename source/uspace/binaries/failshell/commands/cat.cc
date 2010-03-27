@@ -23,6 +23,7 @@
 #include <kernel/object.h>
 
 #include <iostream>
+#include <stdio.h>
 
 #include "../failshell.h"
 
@@ -39,9 +40,10 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
 		handle_t handle;
+		fs_info_t info;
 		size_t bytes;
+		char *block;
 		int i, ret;
-		char ch;
 
 		if(SHELL_HELP(argc, argv) || argc < 2) {
 			cout << "Usage: " << argv[0] << " <file1> [<file2> ...]" << endl;
@@ -65,21 +67,28 @@ public:
 			if((handle = fs_file_open(argv[i], FS_FILE_READ)) < 0) {
 				cout << "Failed to open " << argv[i] << " (" << handle << ")" << endl;
 				return handle;
+			} else if((ret = fs_handle_info(handle, &info)) != 0) {
+				cout << "Failed to get information on " << argv[i] << " (" << ret << ")" << endl;
+				handle_close(handle);
+				return ret;
 			}
 
+			block = new char[info.blksize];
 			while(true) {
-				if((ret = fs_file_read(handle, &ch, 1, &bytes)) != 0) {
+				if((ret = fs_file_read(handle, block, info.blksize, &bytes)) != 0) {
 					cout << "Failed to read " << argv[i] << " (" << ret << ")" << endl;
 					handle_close(handle);
+					delete[] block;
 					return ret;
 				} else if(bytes == 0) {
 					break;
 				}
 
-				putchar(ch);
+				fwrite(block, bytes, 1, stdout);
 			}
 
 			handle_close(handle);
+			delete[] block;
 		}
 
 		return 0;
