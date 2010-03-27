@@ -883,10 +883,15 @@ static int file_cache_read_page(vm_cache_t *cache, void *buf, offset_t offset, b
 static int file_cache_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
 	fs_node_t *node = cache->data;
 
+	assert(!FS_NODE_IS_RDONLY(node));
+
 	if(node->ops->write_page) {
 		return node->ops->write_page(node, buf, offset, nonblock);
 	} else {
-		return -ERR_NOT_SUPPORTED;
+		/* Unless the cache is being destroyed, return an error, which
+		 * will cause the page to remain in the modified queue, so that
+		 * the page daemon won't ever try to evict the page. */
+		return (cache->deleted) ? 0 : -ERR_NOT_SUPPORTED;
 	}
 }
 
@@ -898,7 +903,8 @@ static bool file_cache_evict_page(vm_cache_t *cache, vm_page_t *page) {
 	fs_node_t *node = cache->data;
 
 	/* If the file's pages should remain in memory, they will always remain
-	 * in the modified queue and will never end up in the pageable queue. */
+	 * in the modified queue and will never end up in the cached or
+	 * pageable queues. */
 	assert(node->ops->write_page);
 
 	return true;

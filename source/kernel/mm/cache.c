@@ -230,6 +230,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		} else if(page->modified && cache->ops->write_page) {
 			vm_page_queue(page, PAGE_QUEUE_MODIFIED);
 		} else {
+			page->modified = false;
 			vm_page_queue(page, PAGE_QUEUE_CACHED);
 		}
 	}
@@ -489,11 +490,63 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 	mutex_unlock(&cache->lock);
 }
 
+/** Flush changes to a cache page.
+ * @param cache		Cache page belongs to.
+ * @param page		Page to flush.
+ * @return		0 on success, negative error code on failure. */
+static int vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
+	void *mapping;
+	int ret = 0;
+
+	/* If the page is outside of the cache, it may be there because the
+	 * cache was shrunk but with the page in use. Ignore this. Also ignore
+	 * pages that aren't modified. */
+	if(page->offset >= cache->size || !page->modified) {
+		return 0;
+	}
+
+	/* Should only end up here if the page is writable - when releasing
+	 * pages the modified flag is cleared if there is no write operation. */
+	assert(cache->ops->write_page);
+
+	mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+
+	if((ret = cache->ops->write_page(cache, mapping, page->offset, false)) == 0) {
+		/* Clear modified flag only if the page reference count is
+		 * zero. This is because the page may be mapped into an address
+		 * space as read-write. */
+		if(refcount_get(&page->count) == 0) {
+			page->modified = false;
+			vm_page_queue(page, PAGE_QUEUE_CACHED); 
+		}
+	}
+
+	page_phys_unmap(mapping, PAGE_SIZE, true);
+	return ret;
+}
+
 /** Flush modifications to a cache.
  * @param cache		Cache to flush.
- * @return		0 on success, negative error code on failure. */
+ * @return		0 on success, negative error code on failure. If a
+ *			failure occurs, the function carries on attempting to
+ *			flush, but still returns an error. If multiple errors
+ *			occur, it is the most recent that is returned. */
 int vm_cache_flush(vm_cache_t *cache) {
-	return -ERR_NOT_IMPLEMENTED;
+	int err = 0, ret;
+	vm_page_t *page;
+
+	mutex_lock(&cache->lock);
+
+	/* Flush all pages. */
+	AVL_TREE_FOREACH(&cache->pages, iter) {
+		page = avl_tree_entry(iter, vm_page_t);
+
+		if((err = vm_cache_flush_page_internal(cache, page)) != 0) {
+			ret = err;
+		}
+	}
+
+	return err;
 }
 
 /** Destroy a cache.
@@ -502,6 +555,36 @@ int vm_cache_flush(vm_cache_t *cache) {
  *			always succeed if true.
  * @return		0 on success, negative error code on failure. */
 int vm_cache_destroy(vm_cache_t *cache, bool discard) {
+	vm_page_t *page;
+	int ret;
+
+	mutex_lock(&cache->lock);
+	cache->deleted = true;
+
+	/* Free all pages. */
+	AVL_TREE_FOREACH(&cache->pages, iter) {
+		page = avl_tree_entry(iter, vm_page_t);
+
+		if(refcount_get(&page->count) != 0) {
+			fatal("Cache page still in use while destroying");
+		} else if((ret = vm_cache_flush_page_internal(cache, page)) != 0) {
+			cache->deleted = false;
+			mutex_unlock(&cache->lock);
+			return ret;
+		}
+
+		avl_tree_remove(&cache->pages, (key_t)page->offset);
+		vm_page_dequeue(page);
+		vm_page_free(page, 1);
+	}
+
+	/* Unlock and relock the cache to allow any attempts to flush or evict
+	 * a page see the deleted flag. */
+	mutex_unlock(&cache->lock);
+	mutex_lock(&cache->lock);
+	mutex_unlock(&cache->lock);
+
+	slab_cache_free(vm_cache_cache, cache);
 	return 0;
 }
 
