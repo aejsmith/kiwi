@@ -72,6 +72,7 @@ void io_context_init(io_context_t *context, io_context_t *parent) {
  * @param context	Context to destroy. */
 void io_context_destroy(io_context_t *context) {
 	fs_node_release(context->curr_dir);
+	fs_node_release(context->root_dir);
 }
 
 /** Set the current directory of an I/O context.
@@ -99,7 +100,7 @@ int io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	context->curr_dir = node;
 	rwlock_unlock(&context->lock);
 
-	fs_node_release(node);
+	fs_node_release(old);
 	return 0;
 }
 

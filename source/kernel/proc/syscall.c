@@ -21,7 +21,7 @@
 #include <arch/syscall.h>
 
 #include <io/device.h>
-//#include <io/vfs.h>
+#include <io/fs.h>
 
 //#include <ipc/ipc.h>
 
@@ -64,11 +64,12 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_object_wait,
 	(syscall_handler_t)sys_object_wait_multiple,
 	(syscall_handler_t)sys_handle_close,
-#if 0
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,
 	(syscall_handler_t)sys_fs_file_read,
+	(syscall_handler_t)sys_fs_file_pread,
 	(syscall_handler_t)sys_fs_file_write,
+	(syscall_handler_t)sys_fs_file_pwrite,
 	(syscall_handler_t)sys_fs_file_resize,
 	(syscall_handler_t)sys_fs_dir_create,
 	(syscall_handler_t)sys_fs_dir_open,
@@ -80,6 +81,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_fs_symlink_read,
 	(syscall_handler_t)sys_fs_mount,
 	(syscall_handler_t)sys_fs_unmount,
+	(syscall_handler_t)sys_fs_sync,
 	(syscall_handler_t)sys_fs_getcwd,
 	(syscall_handler_t)sys_fs_setcwd,
 	(syscall_handler_t)sys_fs_setroot,
@@ -87,7 +89,6 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_fs_link,
 	(syscall_handler_t)sys_fs_unlink,
 	(syscall_handler_t)sys_fs_rename,
-#endif
 	(syscall_handler_t)sys_vm_map,
 	(syscall_handler_t)sys_vm_unmap,
 	(syscall_handler_t)sys_process_create,

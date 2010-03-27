@@ -449,10 +449,10 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			dprintf("fs: followed %s to %" PRIu16 ":%" PRIu64 "\n",
 			        prev->link_cache, node->mount->id, node->id);
 			kfree(link);
-		}
-
-		/* Previous node no longer needed. */
-		if(prev) {
+		} else if(node->type == FS_NODE_SYMLINK) {
+			/* The new node is a symbolic link but we do not want
+			 * to follow it. We must release the previous node. */
+			assert(prev != node);
 			mutex_unlock(&node->lock);
 			fs_node_release(prev);
 			mutex_lock(&node->lock);
@@ -572,6 +572,12 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			avl_tree_insert(&mount->nodes, (key_t)id, node, NULL);
 			list_append(&mount->used_nodes, &node->mount_link);
 			mutex_unlock(&mount->lock);
+		}
+
+		/* Do not release the previous node if the current node is a
+		 * symbolic link, as the symbolic link code requires it. */
+		if(node->type != FS_NODE_SYMLINK) {
+			fs_node_release(prev);
 		}
 
 		/* Lock the new node. We do not release the previous node yet
