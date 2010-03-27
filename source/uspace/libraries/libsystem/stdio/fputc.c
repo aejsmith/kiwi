@@ -42,7 +42,7 @@ int fputc(int ch, FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_file_write(stream->handle, &val, 1, -1, &bytes) != 0) {
+		if(fs_file_write(stream->handle, &val, 1, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {

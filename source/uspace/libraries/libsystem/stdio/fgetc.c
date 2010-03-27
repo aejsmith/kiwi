@@ -45,7 +45,7 @@ int fgetc(FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_file_read(stream->handle, &ch, 1, -1, &bytes) != 0) {
+		if(fs_file_read(stream->handle, &ch, 1, &bytes) != 0) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {

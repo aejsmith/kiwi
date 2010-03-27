@@ -37,32 +37,19 @@ public:
 	 * @param argv		Argument array.
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
-		char *dev, *path, *type;
-		int flags = 0;
+		char *dev, *path, *type, *opts;
 
 		if(SHELL_HELP(argc, argv) || (argc != 4 && argc != 5)) {
-			cout << "Usage: " << argv[0] << " [--rdonly] <dev> <path> <type>" << endl;
+			cout << "Usage: " << argv[0] << " <dev> <path> <type> [<opts>]" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 
-		if(argc == 5) {
-			if(strcmp(argv[1], "--rdonly") == 0) {
-				flags |= FS_MOUNT_RDONLY;
-			} else {
-				cout << "Unknown option '" << argv[1] << "'" << endl;
-				return -ERR_PARAM_INVAL;
-			}
+		dev = argv[1];
+		path = argv[2];
+		type = argv[3];
+		opts = (argc == 5) ? argv[4] : 0;
 
-			dev = argv[2];
-			path = argv[3];
-			type = argv[4];
-		} else {
-			dev = argv[1];
-			path = argv[2];
-			type = argv[3];
-		}
-
-		return fs_mount(dev, path, type, flags);
+		return fs_mount(dev, path, type, opts);
 	}
 };
 

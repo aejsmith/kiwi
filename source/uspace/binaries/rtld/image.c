@@ -64,7 +64,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	}
 
 	/* Read in its header and ensure that it is valid. */
-	if((ret = fs_file_read(handle, &ehdr, sizeof(ehdr), 0, &bytes)) != 0) {
+	if((ret = fs_file_pread(handle, &ehdr, sizeof(ehdr), 0, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != sizeof(ehdr)) {
 		ret = -ERR_FORMAT_INVAL;
@@ -108,7 +108,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	 * heap space. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
 	phdrs = alloca(size);
-	if((ret = fs_file_read(handle, phdrs, size, ehdr.e_phoff, &bytes)) != 0) {
+	if((ret = fs_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != size) {
 		ret = -ERR_FORMAT_INVAL;

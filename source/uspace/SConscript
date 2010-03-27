@@ -65,5 +65,4 @@ def sysgen_emitter(target, source, env):
 env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
 
 # Visit subdirectories.
-#SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
-SConscript(dirs=['libraries'], exports=['env'])
+SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])

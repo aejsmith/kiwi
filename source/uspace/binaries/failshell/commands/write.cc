@@ -75,7 +75,7 @@ public:
 			} else {
 				strcat(buf, " ");
 			}
-			if((ret = fs_file_write(handle, buf, strlen(buf), off, &bytes)) != 0) {
+			if((ret = fs_file_pwrite(handle, buf, strlen(buf), off, &bytes)) != 0) {
 				cout << "Write failed (" << ret << ")" << endl;
 				return ret;
 			} else if(bytes != strlen(buf)) {

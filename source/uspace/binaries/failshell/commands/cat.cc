@@ -68,7 +68,7 @@ public:
 			}
 
 			while(true) {
-				if((ret = fs_file_read(handle, &ch, 1, -1, &bytes)) != 0) {
+				if((ret = fs_file_read(handle, &ch, 1, &bytes)) != 0) {
 					cout << "Failed to read " << argv[i] << " (" << ret << ")" << endl;
 					handle_close(handle);
 					return ret;

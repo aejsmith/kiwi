@@ -64,7 +64,7 @@ public:
 		printf("==    =====  ====       ====\n");
 
 		while(true) {
-			if((ret = fs_dir_read(handle, entry, 4096, -1)) != 0) {
+			if((ret = fs_dir_read(handle, entry, 4096)) != 0) {
 				handle_close(handle);
 				free(entry);
 
