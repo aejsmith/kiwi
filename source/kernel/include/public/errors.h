@@ -46,5 +46,6 @@
 #define ERR_DEST_UNREACHABLE	22	/**< Cannot reach destination. */
 #define ERR_TIMED_OUT		23	/**< Timed out while waiting. */
 #define ERR_DEVICE_ERROR	24	/**< There was an error on the device. */
+#define ERR_OVERFLOW		25	/**< Integer overflow. */
 
 #endif /* __KERNEL_ERRORS_H */

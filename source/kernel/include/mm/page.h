@@ -29,9 +29,9 @@
 #include <sync/spinlock.h>
 
 struct kernel_args;
-struct object;
 struct page_queue;
 struct vm_amap;
+struct vm_cache;
 
 /** Structure containing physical memory usage statistics. */
 typedef struct page_stats {
@@ -54,11 +54,11 @@ typedef struct vm_page {
 
 	/** Information about how the page is being used.
 	 * @note		Use of count is up to the page owner.
-	 * @note		Should not have both object and amap set. */
+	 * @note		Should not have both cache and amap set. */
 	refcount_t count;		/**< Reference count of the page (use is up to page user). */
-	struct object *object;		/**< Object that the page belongs to. */
+	struct vm_cache *cache;		/**< Cache that the page belongs to. */
 	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
-	offset_t offset;		/**< Offset into the object of the page. */
+	offset_t offset;		/**< Offset into the owner of the page. */
 } vm_page_t;
 
 /** Page queue numbers. */
@@ -103,8 +103,8 @@ extern void page_stats_get(page_stats_t *stats);
 extern int kdbg_cmd_page(int argc, char **argv);
 
 extern void page_arch_init(struct kernel_args *args);
-extern void page_init(struct kernel_args *args);
-extern void vm_page_init(void);
+extern void page_early_init(struct kernel_args *args);
+extern void page_init(void);
 extern void page_arch_late_init(void);
 extern void page_late_init(void);
 

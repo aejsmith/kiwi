@@ -34,7 +34,6 @@
 
 #include <object.h>
 
-struct vfs_node;
 struct vm_aspace;
 
 /** Structure containing details about a process. */

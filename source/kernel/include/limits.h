@@ -23,5 +23,6 @@
 
 /** Kernel limit definitions. */
 #define PATH_MAX		4096	/**< Maximum length of a path string. */
+#define SYMLOOP_MAX		16	/**< Maximum number of nested symbolic links. */
 
 #endif /* __LIMITS_H */

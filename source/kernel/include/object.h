@@ -76,8 +76,8 @@ typedef struct object_type {
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.
 	 * @param offset	Offset of page in object.
-	 * @param paddr		Physical address of page that was unmapped. */
-	void (*release_page)(struct object_handle *handle, offset_t offset, phys_ptr_t paddr);
+	 * @param phys		Physical address of page that was unmapped. */
+	void (*release_page)(struct object_handle *handle, offset_t offset, phys_ptr_t phys);
 } object_type_t;
 
 /** Structure defining a kernel object.

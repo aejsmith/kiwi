@@ -23,8 +23,7 @@
 #include <lib/avl.h>
 #include <lib/string.h>
 
-// replace me
-#include <limits.h>
+#include <io/fs.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
@@ -131,7 +130,7 @@ static int process_alloc(const char *name, process_id_t id, int flags, int cflag
 	/* Initialise other information for the process. Do this after all the
 	 * steps that can fail to make life easier when handling failure. */
 	object_init(&process->obj, &process_object_type);
-	//io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
@@ -221,7 +220,7 @@ static object_type_t process_object_type = {
 	.unwait = process_object_unwait,
 	.close = process_object_close,
 };
-#if 0
+
 /** Copy the data contained in a string array to the argument block.
  * @param dest		Array to store addresses copied to in.
  * @param source	Array to copy data of.
@@ -288,12 +287,11 @@ static int copy_arguments(const char *kpath, const char **kargs, const char **ke
 	addr += copy_argument_strings(uargs->env, kenv, envc, addr);
 	return 0;
 }
-#endif
+
 /** Main thread for creating a new process.
  * @param arg1		Pointer to creation information structure.
  * @param arg2		Unused. */
 static void process_create_thread(void *arg1, void *arg2) {
-#if 0
 	process_create_info_t *info = arg1;
 	object_handle_t *handle = NULL;
 	ptr_t stack, entry, uargs;
@@ -306,7 +304,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 	assert(curr_proc->aspace == curr_aspace);
 
 	/* Open a handle to the binary. */
-	if((ret = vfs_file_open(info->path, FS_FILE_READ, &handle)) != 0) {
+	if((ret = fs_file_open(info->path, FS_FILE_READ, &handle)) != 0) {
 		goto fail;
 	}
 
@@ -351,8 +349,6 @@ fail:
 	}
 	info->ret = ret;
 	semaphore_up(&info->sem, 1);
-#endif
-	fatal("Not implemented");
 }
 
 /** Attach a thread to a process.
@@ -399,7 +395,7 @@ void process_detach(thread_t *thread) {
 			process->aspace = NULL;
 		}
 		handle_table_destroy(&process->handles);
-		//io_context_destroy(&process->ioctx);
+		io_context_destroy(&process->ioctx);
 	} else {
 		mutex_unlock(&process->lock);
 	}
@@ -706,7 +702,6 @@ fail:
  *			on failure.
  */
 int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags) {
-#if 0
 	const char **kargs, **kenv, *kpath;
 	object_handle_t *handle = NULL;
 	vm_aspace_t *as = NULL, *old;
@@ -727,7 +722,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 	}
 
 	/* Open a handle to the binary. */
-	if((ret = vfs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
+	if((ret = fs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
 		goto fail;
 	}
 
@@ -792,8 +787,6 @@ fail:
 	}
 	sys_process_arg_free(kpath, kargs, kenv);
 	return ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Create a duplicate of the calling process.

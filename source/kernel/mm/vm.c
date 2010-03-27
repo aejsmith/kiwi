@@ -35,8 +35,8 @@
  *    remapped as read-write (if the region is VM_REGION_WRITE, that is).
  *  - Each object also contains an array of reference counts for each page that
  *    the object can cover. This array is used to track how many regions are
- *    mapping each page of the
- *    object, allowing pages to be freed when no more regions refer to them.
+ *    mapping each page of the object, allowing pages to be freed when no more
+ *    regions refer to them.
  *
  * @todo		The anonymous object page array could be changed into a
  *			two-level array, which would reduce memory consumption
@@ -50,8 +50,8 @@
 
 #include <lib/string.h>
 
+#include <mm/cache.h>
 #include <mm/malloc.h>
-#include <mm/page.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
@@ -758,7 +758,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
 	page_map_insert(&region->as->pmap, addr, phys, write, exec, MM_SLEEP);
 	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
-	        page->addr, addr, region->as, write, exec);
+	        phys, addr, region->as, write, exec);
 	return true;
 }
 
@@ -1071,8 +1071,10 @@ void __init_text vm_init(void) {
 	                                    0, NULL, NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
 	                                    NULL, 0, MM_FATAL);
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
-	                                  0, vm_amap_ctor, NULL, NULL,
-	                                  NULL, SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+	                                  0, vm_amap_ctor, NULL, NULL, NULL,
+	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+
+	vm_cache_init();
 }
 
 /** Dump an address space.

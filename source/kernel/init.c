@@ -24,7 +24,7 @@
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
 
-//#include <io/vfs.h>
+#include <io/fs.h>
 
 #include <lib/string.h>
 
@@ -61,6 +61,7 @@ typedef struct boot_module {
 
 extern void kmain(kernel_args_t *args, uint32_t cpu);
 extern initcall_t __initcall_start[], __initcall_end[];
+extern fs_mount_t *root_mount;
 
 /** Rendezvous variables for SMP boot. */
 static atomic_t init_rendezvous_1 __init_data = 0;
@@ -68,12 +69,12 @@ static atomic_t init_rendezvous_2 __init_data = 0;
 static atomic_t init_rendezvous_3 __init_data = 0;
 
 /** The amount to increment the boot progress for each module. */
-//static int init_current_progress __init_data = 10;
-//static int init_progress_per_module __init_data;
+static int current_init_progress __init_data = 10;
+static int progress_per_module __init_data;
 
 /** Lock to serialise the SMP boot. */
 static SPINLOCK_DECLARE(smp_boot_spinlock);
-#if 0
+
 /** List of modules from the bootloader. */
 static LIST_DECLARE(boot_module_list);
 
@@ -88,8 +89,8 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	kfree(mod);
 
 	/* Update progress. */
-	init_current_progress += init_progress_per_module;
-	console_update_boot_progress(init_current_progress);
+	current_init_progress += progress_per_module;
+	console_update_boot_progress(current_init_progress);
 }
 
 /** Look up a kernel module in the boot module list.
@@ -122,7 +123,7 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 
 	/* Get the size of the data. */
 	buf = hdr = kmalloc(mod->size, MM_FATAL);
-	if(vfs_file_read(mod->handle, buf, mod->size, 0, &bytes) != 0 || bytes != mod->size) {
+	if(fs_file_read(mod->handle, buf, mod->size, &bytes) != 0 || bytes != mod->size) {
 		fatal("Could not read TAR file data");
 	}
 
@@ -134,8 +135,8 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 
 	/* If any TAR files are loaded it means we should mount a RamFS at the
 	 * root, if this has not already been done. */
-	if(!vfs_root_mount) {
-		if((ret = vfs_mount(NULL, "/", "ramfs", 0)) != 0) {
+	if(!root_mount) {
+		if((ret = fs_mount(NULL, "/", "ramfs", NULL)) != 0) {
 			fatal("Could not mount RamFS at root (%d)", ret);
 		}
 	}
@@ -154,11 +155,11 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 		switch(hdr->typeflag) {
 		case REGTYPE:
 		case AREGTYPE:
-			if((ret = vfs_file_create(hdr->name)) != 0) {
+			if((ret = fs_file_create(hdr->name)) != 0) {
 				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
-			} else if((ret = vfs_file_open(hdr->name, FS_FILE_WRITE, &handle)) != 0) {
+			} else if((ret = fs_file_open(hdr->name, FS_FILE_WRITE, &handle)) != 0) {
 				fatal("Failed to open file %s (%d)", hdr->name, ret);
-			} else if((ret = vfs_file_write(handle, (void *)((ptr_t)hdr + 512), size, 0, &bytes)) != 0) {
+			} else if((ret = fs_file_write(handle, (void *)((ptr_t)hdr + 512), size, &bytes)) != 0) {
 				fatal("Failed to write file %s (%d)", hdr->name, ret);
 			} else if((int64_t)bytes != size) {
 				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
@@ -166,12 +167,12 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 			object_handle_release(handle);
 			break;
 		case DIRTYPE:
-			if((ret = vfs_dir_create(hdr->name)) != 0) {
+			if((ret = fs_dir_create(hdr->name)) != 0) {
 				fatal("Failed to create directory %s (%d)", hdr->name, ret);
 			}
 			break;
 		case SYMTYPE:
-			if((ret = vfs_symlink_create(hdr->name, hdr->linkname)) != 0) {
+			if((ret = fs_symlink_create(hdr->name, hdr->linkname)) != 0) {
 				fatal("Failed to create symbolic link %s (%d)", hdr->name, ret);
 			}
 			break;
@@ -205,7 +206,7 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 		} else if(ret == -ERR_TYPE_INVAL) {
 			return false;
 		} else if(ret != -ERR_DEP_MISSING) {
-			fatal("Could not load module %s (%d)", mod->name, ret);
+			fatal("Could not load module %s (%d)", (mod->name) ? mod->name : "<noname>", ret);
 		}
 
 		/* Unloaded dependency, try to find it and load it. */
@@ -240,9 +241,9 @@ static void __init_text load_modules(kernel_args_t *args) {
 		mod->name = NULL;
 		mod->size = amod->size;
 
-		/* Map in the data and convert it into a VFS node. */
+		/* Map in the data and create a FS node from it. */
 		mapping = page_phys_map(amod->base, amod->size, MM_FATAL);
-		if(vfs_file_from_memory(mapping, amod->size, FS_FILE_READ, &mod->handle) != 0) {
+		if(fs_file_from_memory(mapping, amod->size, FS_FILE_READ, &mod->handle) != 0) {
 			fatal("Failed to create node from module data");
 		}
 		page_phys_unmap(mapping, amod->size, true);
@@ -264,7 +265,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 
 	/* Determine how much to increase the boot progress by for each
 	 * module loaded. */
-	init_progress_per_module = 80 / args->module_count;
+	progress_per_module = 80 / args->module_count;
 
 	/* Now keep on loading until all modules have been loaded. */
 	while(!list_empty(&boot_module_list)) {
@@ -274,7 +275,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		}
 	}
 }
-#endif
+
 /** Wait until all CPUs reach a certain point.
  * @param args		Kernel arguments structure.
  * @param var		Variable to wait on. */
@@ -294,7 +295,7 @@ static void init_thread(void *args, void *arg2) {
 
 	/* Initialise other things. */
 	handle_cache_init();
-	//vfs_init();
+	fs_init();
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their
 	 * initialisation, the second waits for them to complete. */
@@ -309,8 +310,8 @@ static void init_thread(void *args, void *arg2) {
 	console_update_boot_progress(10);
 
 	/* Load modules and mount the root filesystem. */
-	//load_modules(args);
-	//vfs_mount_root(args);
+	load_modules(args);
+	fs_mount_root(args);
 
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();
@@ -341,16 +342,15 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		arch_premm_init(args);
 		platform_premm_init(args);
 
-		/* Initialise memory management subsystems. */
+		/* Initialise kernel memory management subsystems. */
 		vmem_early_init();
 		kheap_early_init();
+		page_early_init(args);
 		vmem_init();
-		page_init(args);
 		slab_init();
 		kheap_init();
-		vm_page_init();
+		page_init();
 		malloc_init();
-		vm_init();
 
 		/* Set up the console. */
 		console_init(args);
@@ -374,6 +374,9 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		 * regsitered, the slab allocator's reclaim thread can be
 		 * started and the magazine layer can be enabled. */
 		slab_late_init();
+
+		/* Bring up the VM system. */
+		vm_init();
 
 		/* Create the second stage initialisation thread. */
 		if(thread_create("init", kernel_proc, 0, init_thread, args, NULL, &thread) != 0) {

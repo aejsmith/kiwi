@@ -124,7 +124,7 @@ static inline void check_free_page(vm_page_t *page) {
 	assert(!(page->addr % PAGE_SIZE));
 	assert(!refcount_get(&page->count));
 	assert(!page->modified);
-	assert(!page->object);
+	assert(!page->cache);
 	assert(!page->amap);
 	assert(!page->queue);
 	assert(list_empty(&page->header));
@@ -181,6 +181,8 @@ void vm_page_free(vm_page_t *pages, size_t count) {
 	/* Clear any flags that shouldn't be set and perform checks. */
 	for(i = 0; i < count; i++) {
 		pages[i].modified = false;
+		pages[i].cache = NULL;
+		pages[i].amap = NULL;
 #if CONFIG_DEBUG
 		check_free_page(&pages[i]);
 #endif
@@ -433,10 +435,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Queue:    %d (%p)\n", queue, page->queue);
 		kprintf(LOG_NONE, "Modified: %d\n", page->modified);
 		kprintf(LOG_NONE, "Count:    %d\n", page->count);
-		kprintf(LOG_NONE, "Object:   %p\n", page->object);
-		if(page->object) {
-			kprintf(LOG_NONE, " Type: %p (%d)\n", page->object->type, page->object->type->id);
-		}
+		kprintf(LOG_NONE, "Cache:    %p\n", page->cache);
 		kprintf(LOG_NONE, "Amap:     %p\n", page->amap);
 		kprintf(LOG_NONE, "Offset:   %" PRIu64 "\n", page->offset);
 	} else {
@@ -487,7 +486,7 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 
 /** Initialise the physical memory manager.
  * @param args		Kernel arguments. */
-void __init_text page_init(kernel_args_t *args) {
+void __init_text page_early_init(kernel_args_t *args) {
 	phys_ptr_t start, end;
 	uint32_t i;
 
@@ -522,7 +521,7 @@ void __init_text page_init(kernel_args_t *args) {
 }
 
 /** Set up structures for each usable page. */
-void __init_text vm_page_init(void) {
+void __init_text page_init(void) {
 	size_t i, j, count, size;
 	phys_ptr_t phys;
 

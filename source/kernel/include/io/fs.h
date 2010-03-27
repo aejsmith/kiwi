@@ -25,7 +25,7 @@
 #include <lib/radix.h>
 #include <lib/refcount.h>
 
-#include <mm/vm.h>
+#include <mm/cache.h>
 
 #include <public/fs.h>
 
@@ -34,11 +34,12 @@
 #include <limits.h>
 #include <object.h>
 
+struct fs_info;
 struct fs_mount;
 struct fs_node;
 
 /** Structure containing a filesystem mount option. */
-struct fs_mount_option {
+typedef struct fs_mount_option {
 	const char *name;		/**< Argument name. */
 	const char *value;		/**< Argument value (can be NULL). */
 } fs_mount_option_t;
@@ -47,7 +48,8 @@ struct fs_mount_option {
 typedef struct fs_type {
 	list_t header;			/**< Link to types list. */
 
-	const char *name;		/**< Name of the filesystem type. */
+	const char *name;		/**< Short name of the filesystem type. */
+	const char *description;	/**< Long name of the type. */
 	refcount_t count;		/**< Number of mounts using this type. */
 
 	/** Check whether a device contains this FS type.
@@ -55,297 +57,283 @@ typedef struct fs_type {
 	 *			function, then it is assumed that the FS does
 	 *			not use a backing device (e.g. RamFS).
 	 * @param device	Handle to device to check.
+	 * @param uuid		If not NULL, the function should only return
+	 *			true if the filesystem also has this UUID.
 	 * @return		Whether the device contains this FS type. */
-	bool (*probe)(object_handle_t *device);
+	bool (*probe)(object_handle_t *device, const char *uuid);
 
 	/** Mount an instance of this FS type.
 	 * @note		It is guaranteed that the device will contain
 	 *			the correct FS type when this is called, as
 	 *			the probe operation is called prior to this.
-	 * @note		This function should create the root node for
-	 *			the filesystem and store it in mount->root, as
-	 *			though get_node was called for it.
-	 * @param mount		Mount structure for the FS, containing details
-	 *			of the filesystem to mount.
+	 * @note		This function must also create the root node
+	 *			and store a pointer to it in the mount
+	 *			structure, as though read_node was called
+	 *			on it.
+	 * @param mount		Mount structure for the mount.
 	 * @param opts		Array of options passed to the mount call.
 	 * @param count		Number of options in the array.
 	 * @return		0 on success, negative error code on failure. */
 	int (*mount)(struct fs_mount *mount, fs_mount_option_t *opts, size_t count);
 } fs_type_t;
 
-/** Mount behaviour flags. */
-#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
+/** Mount operations structure. */
+typedef struct fs_mount_ops {
+	/** Unmount the filesystem.
+	 * @note		Flush is NOT called before this function.
+	 * @param mount		Filesystem being unmounted. Filesystem-specific
+	 *			data should be freed, but not the structure
+	 *			itself. */
+	void (*unmount)(struct fs_mount *mount);
 
-
-#if 0
-struct vfs_info;
-struct vfs_mount;
-struct vfs_node;
-/** Filesystem type description structure.
- * @note		When adding new required operations to this structure,
- *			add a check to vfs_type_register(). */
-typedef struct vfs_type {
-	list_t header;			/**< Link to types list. */
-
-	const char *name;		/**< Name of the FS type. */
-	refcount_t count;		/**< Reference count of mounts using this FS type. */
-	int flags;			/**< Flags specifying traits of this FS type. */
-
-	/**
-	 * Main operations.
-	 */
-
-	/** Check whether a device contains this filesystem type.
-	 * @note		If a filesystem type does not provide this
-	 *			function, then it is assumed that the FS does
-	 *			not use a backing device (e.g. RamFS).
-	 * @param handle	Handle to device to check.
-	 * @return		True if the device contains a FS of this type,
-	 *			false if not. */
-	bool (*probe)(object_handle_t *device);
-
-	/** Mount an instance of this filesystem type.
-	 * @note		It is guaranteed that the device will contain
-	 *			the correct FS type when this is called, as
-	 *			the probe operation is called prior to this.
-	 * @note		This function should create the root node for
-	 *			the filesystem and store it in mount->root, as
-	 *			though node_get was called for it.
-	 * @param mount		Mount structure for the FS. This structure will
-	 *			contain a pointer to the device the FS resides
-	 *			on (if the filesystem has no source, the device
-	 *			pointer will be NULL).
+	/** Flush changes to filesystem metadata.
+	 * @param mount		Mount to flush.
 	 * @return		0 on success, negative error code on failure. */
-	int (*mount)(struct vfs_mount *mount);
-
-	/** Unmount an instance of this filesystem.
-	 * @param mount		Mount that's being unmounted. */
-	void (*unmount)(struct vfs_mount *mount);
-
-	/**
-	 * Data modification functions.
-	 */
-
-	/** Read a page of data from a node.
-	 * @note		If the page straddles across the end of the
-	 *			file, then only the part of the file that
-	 *			exists should be read.
-	 * @note		If not provided, then pages will be filled with
-	 *			zeros.
-	 * @param node		Node to read data read from.
-	 * @param page		Pointer to mapped page to read into.
-	 * @param offset	Offset within the file to read from (multiple
-	 *			of PAGE_SIZE).
-	 * @param nonblock	Whether the read is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*page_read)(struct vfs_node *node, void *page, offset_t offset, bool nonblock);
-
-	/** Flush changes to a page within a node.
-	 * @note		If the page straddles across the end of the
-	 *			file, then only the part of the file that
-	 *			exists should be written back. If it is desired
-	 *			to resize the file, the file_resize operation
-	 *			must be called.
-	 * @note		If this operation is not provided, then it
-	 *			is assumed that modified pages should always
-	 *			remain in the cache until its destruction (for
-	 *			example, RamFS does this).
-	 * @param node		Node being written to.
-	 * @param page		Pointer to mapped page being written.
-	 * @param offset	Offset within the file to write to.
-	 * @param nonblock	Whether the write is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*page_flush)(struct vfs_node *node, const void *page, offset_t offset, bool nonblock);
-
-	/**
-	 * Node manipulation functions.
-	 */
+	int (*flush)(struct fs_mount *mount);
 
 	/** Read a node from the filesystem.
 	 * @param mount		Mount to obtain node from.
 	 * @param id		ID of node to get.
 	 * @param nodep		Where to store pointer to node structure.
 	 * @return		0 on success, negative error code on failure. */
-	int (*node_get)(struct vfs_mount *mount, node_id_t id, struct vfs_node **nodep);
+	int (*read_node)(struct fs_mount *mount, node_id_t id, struct fs_node **nodep);
+} fs_mount_ops_t;
 
-	/** Flush changes to node metadata.
-	 * @param node		Node to flush.
-	 * @return		0 on success, negative error code on failure. */
-	int (*node_flush)(struct vfs_node *node);
-
+/** Node operations structure. */
+typedef struct fs_node_ops {
 	/** Clean up data associated with a node structure.
 	 * @note		This should remove the node from the filesystem
 	 *			if the link count is 0.
 	 * @param node		Node to clean up. */
-	void (*node_free)(struct vfs_node *node);
+	void (*free)(struct fs_node *node);
 
-	/** Create a new filesystem node.
-	 * @note		It is up to this function to create the
-	 *			directory entry for the node on the real
-	 *			filesystem. The VFS will handle adding the
-	 *			entry to the directory entry cache.
-	 * @note		When this function returns success, details in 
-	 *			the node structure should be filled in
-	 *			(including a node ID) as though node_get had
-	 *			also been called on it.
-	 * @param parent	Parent directory of the node.
-	 * @param name		Name to give node in the parent directory.
-	 * @param node		Node structure describing the node being
-	 *			created. For symbolic links, the link_dest
-	 *			pointer in the node will point to a string
-	 *			containing the link destination.
+	/** Flush changes to node metadata.
+	 * @param node		Node to flush.
 	 * @return		0 on success, negative error code on failure. */
-	int (*node_create)(struct vfs_node *parent, const char *name, struct vfs_node *node);
+	int (*flush)(struct fs_node *node);
 
-	/** Decrease the link count of a filesystem node.
-	 * @note		If the count reaches 0, this should set the
-	 *			VFS_NODE_REMOVED flag on the node, but not
-	 *			remove it from the filesystem, as it may still
-	 *			be in use. This flag will cause the node to be
-	 *			freed immediately when the reference count
-	 *			reaches 0 - it is up to the node_free operation
-	 *			to remove the node from the FS if necessary.
-	 *			Also note that if the VFS_NODE_REMOVED flag is
-	 *			set, then the node's metadata and cached data
-	 *			will NOT be flushed when the node is freed.
-	 * @param parent	Directory containing the node.
-	 * @param name		Name of the node in the directory.
-	 * @param node		Node being unlinked.
+	/** Read a page of data from a file.
+	 * @note		If the page straddles across the end of the
+	 *			file, then only the part of the file that
+	 *			exists should be read.
+	 * @note		If not provided, then pages will be filled with
+	 *			zeros.
+	 * @param node		Node to read from.
+	 * @param buf		Buffer to read into.
+	 * @param offset	Offset within the file to read from (multiple
+	 *			of PAGE_SIZE).
+	 * @param nonblock	Whether the read is required to not block.
 	 * @return		0 on success, negative error code on failure. */
-	int (*node_unlink)(struct vfs_node *parent, const char *name, struct vfs_node *node);
+	int (*read_page)(struct fs_node *node, void *buf, offset_t offset, bool nonblock);
 
-	/** Get information about a node.
-	 * @param node		Node to get information on.
-	 * @param info		Information structure to fill in. */
-	void (*node_info)(struct vfs_node *node, struct fs_info *info);
-
-	/**
-	 * Regular file functions.
-	 */
+	/** Write a page of data to a file.
+	 * @note		If the page straddles across the end of the
+	 *			file, then only the part of the file that
+	 *			exists should be written back.
+	 * @note		If this operation is not provided, then it
+	 *			is assumed that pages should always remain in
+	 *			the cache until its destruction (for example,
+	 *			RamFS does this).
+	 * @param node		Node to write to.
+	 * @param buf		Buffer containing data to write.
+	 * @param offset	Offset within the file to write to (multiple
+	 *			of PAGE_SIZE).
+	 * @param nonblock	Whether the write is required to not block.
+	 * @return		0 on success, negative error code on failure. */
+	int (*write_page)(struct fs_node *node, const void *buf, offset_t offset, bool nonblock);
 
 	/** Modify the size of a file.
 	 * @param node		Node being resized.
 	 * @param size		New size of the node.
 	 * @return		0 on success, negative error code on failure. */
-	int (*file_resize)(struct vfs_node *node, file_size_t size);
+	int (*resize)(struct fs_node *node, offset_t size);
 
-	/**
-	 * Directory functions.
-	 */
+	/** Ensure that space is allocated for a range in a file.
+	 * @param node		Node to allocate for.
+	 * @param offset	Offset into file to allocate from.
+	 * @param size		Size of range to allocate.
+	 * @return		0 on success, negative error code on failure. */
+	int (*allocate)(struct fs_node *node, offset_t offset, size_t size);
+
+	/** Create a new node as a child of an existing directory.
+	 * @note		This function only has to create the directory
+	 *			entry on the filesystem - the entry will be
+	 *			cached when the function returns.
+	 * @note		When this function returns success, details in 
+	 *			the node structure should be filled in
+	 *			(including a node ID) as though get_node had
+	 *			also been called on it.
+	 * @param parent	Directory to create in.
+	 * @param name		Name to give directory entry.
+	 * @param node		Node structure describing the node being
+	 *			created. For symbolic links, the link_dest
+	 *			pointer in the node will point to a string
+	 *			containing the link destination.
+	 * @return		0 on success, negative error code on failure. */
+	int (*create)(struct fs_node *parent, const char *name, struct fs_node *node);
+
+	/** Decrease the link count of a filesystem node.
+	 * @note		If the count reaches 0, this function should
+	 *			call fs_node_remove() on the node, but not
+	 *			remove it from the filesystem, as it may still
+	 *			be in use. The node will be freed as soon as
+	 *			it has no users (it is up to the free operation
+	 *			to remove the node from the filesystem).
+	 * @param parent	Directory containing the node.
+	 * @param name		Name of the node in the directory.
+	 * @param node		Node being unlinked.
+	 * @return		0 on success, negative error code on failure. */
+	int (*unlink)(struct fs_node *parent, const char *name, struct fs_node *node);
+
+	/** Get information about a node.
+	 * @param node		Node to get information on.
+	 * @param info		Information structure to fill in. */
+	void (*info)(struct fs_node *node, struct fs_info *info);
 
 	/** Cache directory contents.
 	 * @note		In order to add a directory entry to the cache,
-	 *			the vfs_dir_entry_add() function should be
+	 *			the fs_dir_insert() function should be
 	 *			used.
 	 * @param node		Node to cache contents of.
 	 * @return		0 on success, negative error code on failure. */
-	int (*dir_cache)(struct vfs_node *node);
+	int (*cache_children)(struct fs_node *node);
 
-	/**
-	 * Symbolic link functions.
-	 */
-
-	/** Get the destination of a symbolic link.
-	 * @param node		Symbolic link to get destination of.
-	 * @param bufp		Where to store pointer to string containing
-	 *			link destination. This buffer must have been
-	 *			allocated using kmalloc() (or kstrdup(), as it
-	 *			is implemented using kmalloc()).
+	/** Store the destination of a symbolic link.
+	 * @note		This function should set the link_cache pointer
+	 *			in the node structure to a pointer to a string,
+	 *			allocated using kmalloc() or a kmalloc()-based
+	 *			function, which contains the link destination.
+	 * @param node		Symbolic link to cache destination of.
 	 * @return		0 on success, negative error code on failure. */
-	int (*symlink_read)(struct vfs_node *node, char **bufp);
-} vfs_type_t;
+	int (*cache_dest)(struct fs_node *node);
+} fs_node_ops_t;
 
-/** Structure describing a mounted filesystem. */
-typedef struct vfs_mount {
-	list_t header;			/**< Link to mounts list. */
-
+/** Structure containing details of a mounted filesystem. */
+typedef struct fs_mount {
 	mutex_t lock;			/**< Lock to protect structure. */
-	mount_id_t id;			/**< Mount ID. */
-	vfs_type_t *type;		/**< Filesystem type. */
-	void *data;			/**< Filesystem type data. */
-	object_handle_t *device;	/**< Handle to device that the filesystem resides on. */
-	int flags;			/**< Flags for the mount. */
-
-	struct vfs_node *root;		/**< Root node for the mount. */
-	struct vfs_node *mountpoint;	/**< Directory that this mount is mounted on. */
 
 	avl_tree_t nodes;		/**< Tree mapping node IDs to node structures. */
 	list_t used_nodes;		/**< List of in-use nodes. */
 	list_t unused_nodes;		/**< List of unused nodes (in LRU order). */
-} vfs_mount_t;
 
-/** Structure describing a node in the filesystem. */
-typedef struct vfs_node {
+	int flags;			/**< Flags for the mount. */
+	fs_mount_ops_t *ops;		/**< Mount operations. */
+	void *data;			/**< Implementation data pointer. */
+	object_handle_t *device;	/**< Handle to device that the filesystem resides on. */
+
+	struct fs_node *root;		/**< Root node for the mount. */
+	struct fs_node *mountpoint;	/**< Directory that this mount is mounted on. */
+
+	mount_id_t id;			/**< Mount ID. */
+	fs_type_t *type;		/**< Filesystem type. */
+	list_t header;			/**< Link to mounts list. */
+} fs_mount_t;
+
+/** Mount behaviour flags. */
+#define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
+
+/** Structure containing a directory entry cache. */
+typedef struct fs_dir_cache {
+	radix_tree_t entries;		/**< Tree of name to entry mappings. */
+	size_t count;			/**< Number of entries. */
+} fs_dir_cache_t;
+
+/** Structure containing details of a filesystem node. */
+typedef struct fs_node {
 	object_t obj;                   /**< Object header. */
 
 	mutex_t lock;			/**< Lock to protect the node. */
+	refcount_t count;		/**< Number of references to the node. */
 	list_t mount_link;		/**< Link to mount's node lists. */
-	refcount_t count;		/**< Reference count to track users of the node. */
-	node_id_t id;			/**< Identifier of the node. */
-	vfs_node_type_t type;		/**< Type of the node. */
-	vfs_mount_t *mount;		/**< Mount that the node resides on. */
-	void *data;			/**< Internal data pointer for filesystem type. */
+	node_id_t id;			/**< ID of the node. */
+	fs_node_type_t type;		/**< Type of the node. */
 	int flags;			/**< Behaviour flags for the node. */
-	vfs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
+	fs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 
-	avl_tree_t pages;		/**< Tree of cached data pages (VFS_NODE_FILE). */
-	file_size_t size;		/**< Total size of node data on filesystem. */
-	radix_tree_t dir_entries;	/**< Tree of cached directory entries (VFS_NODE_DIR). */
-	size_t entry_count;		/**< Number of cached directory entries. */
-	char *link_dest;		/**< Cached symlink destination (VFS_NODE_SYMLINK). */
-} vfs_node_t;
+	fs_node_ops_t *ops;		/**< Node operations. */
+	void *data;			/**< Internal data pointer for filesystem type. */
+	fs_mount_t *mount;		/**< Mount that the node resides on. */
 
-/** Filesystem type trait flags. */
-#define VFS_TYPE_RDONLY		(1<<0)	/**< Filesystem type is read-only. */
-#define VFS_TYPE_CACHE_BASED	(1<<1)	/**< Filesystem type is cache-based - all nodes will remain in memory. */
+	/** Pointers to cached data. */
+	union {
+		/** Data cache (FS_NODE_FILE). */
+		vm_cache_t *data_cache;
+
+		/** Directory entry cache (FS_NODE_DIR). */
+		fs_dir_cache_t *entry_cache;
+
+		/** Symbolic link destination (FS_NODE_SYMLINK). */
+		char *link_cache;
+	};
+} fs_node_t;
 
 /** Node behaviour flags. */
-#define VFS_NODE_REMOVED	(1<<0)	/**< Node should be freed immediately when its reference count reaches 0. */
+#define FS_NODE_REMOVED		(1<<0)	/**< Node has been removed from the filesystem. */
 
 /** Macro to check if a node is read-only. */
-#define VFS_NODE_IS_RDONLY(node)	((node)->mount && (node)->mount->flags & FS_MOUNT_RDONLY)
+#define FS_NODE_IS_RDONLY(node)	\
+	((node)->mount && (node)->mount->flags & FS_MOUNT_RDONLY)
 
-extern vfs_mount_t *vfs_root_mount;
+/**
+ * Functions for use by filesystem implementations.
+ */
 
-extern int vfs_type_register(vfs_type_t *type);
-extern int vfs_type_unregister(vfs_type_t *type);
+extern int fs_type_register(fs_type_t *type);
+extern int fs_type_unregister(fs_type_t *type);
 
-extern vfs_node_t *vfs_node_alloc(vfs_mount_t *mount, vfs_node_type_t type);
-extern void vfs_node_get(vfs_node_t *node);
-extern void vfs_node_release(vfs_node_t *node);
+extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
+                                fs_node_ops_t *ops, void *data);
+extern void fs_node_release(fs_node_t *node);
+extern void fs_node_remove(fs_node_t *node);
 
-extern int vfs_file_create(const char *path);
-extern int vfs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep);
-extern int vfs_file_open(const char *path, int flags, object_handle_t **handlep);
-extern int vfs_file_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int vfs_file_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int vfs_file_resize(object_handle_t *handle, file_size_t size);
+extern void fs_dir_insert(fs_node_t *node, const char *name, node_id_t id);
 
-extern void vfs_dir_entry_add(vfs_node_t *node, node_id_t id, const char *name);
-extern int vfs_dir_create(const char *path);
-extern int vfs_dir_open(const char *path, int flags, object_handle_t **handlep);
-extern int vfs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size, offset_t index);
+/**
+ * Kernel interface.
+ */
 
-extern int vfs_handle_seek(object_handle_t *handle, int action, offset_t offset, offset_t *newp);
-extern int vfs_handle_info(object_handle_t *handle, fs_info_t *info);
-extern int vfs_handle_sync(object_handle_t *handle);
+extern int fs_file_create(const char *path);
+extern int fs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep);
+extern int fs_file_open(const char *path, int flags, object_handle_t **handlep);
+extern int fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
+extern int fs_file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset,
+                         size_t *bytesp);
+extern int fs_file_write(object_handle_t *handle, const void *buf, size_t count, size_t *bytesp);
+extern int fs_file_pwrite(object_handle_t *handle, const void *buf, size_t count,
+                          offset_t offset, size_t *bytesp);
+extern int fs_file_resize(object_handle_t *handle, offset_t size);
 
-extern int vfs_symlink_create(const char *path, const char *target);
-extern int vfs_symlink_read(const char *path, char *buf, size_t size);
+extern int fs_dir_create(const char *path);
+extern int fs_dir_open(const char *path, int flags, object_handle_t **handlep);
+extern int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size);
 
-extern int vfs_mount(const char *dev, const char *path, const char *type, int flags);
-extern int vfs_unmount(const char *path);
-extern int vfs_info(const char *path, bool follow, fs_info_t *info);
-//extern int vfs_link(const char *source, const char *dest);
-extern int vfs_unlink(const char *path);
-//extern int vfs_rename(const char *source, const char *dest);
+extern int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp);
+extern int fs_handle_info(object_handle_t *handle, fs_info_t *info);
+extern int fs_handle_sync(object_handle_t *handle);
 
-extern void vfs_mount_root(struct kernel_args *args);
-extern void vfs_init(void);
+extern int fs_symlink_create(const char *path, const char *target);
+extern int fs_symlink_read(const char *path, char *buf, size_t size);
 
-extern int kdbg_cmd_mounts(int argc, char **argv);
-extern int kdbg_cmd_vnodes(int argc, char **argv);
-extern int kdbg_cmd_vnode(int argc, char **argv);
-#endif
+extern int fs_mount(const char *dev, const char *path, const char *type, const char *opts);
+extern int fs_unmount(const char *path);
+//extern int fs_sync(void);
+extern int fs_info(const char *path, bool follow, fs_info_t *info);
+//extern int fs_link(const char *source, const char *dest);
+extern int fs_unlink(const char *path);
+//extern int fs_rename(const char *source, const char *dest);
 
-#endif /* __IO_VFS_H */
+/**
+ * Debugger commands.
+ */
+
+extern int kdbg_cmd_mount(int argc, char **argv);
+extern int kdbg_cmd_node(int argc, char **argv);
+
+/**
+ * Initialisation functions.
+ */
+
+extern void fs_mount_root(struct kernel_args *args);
+extern void fs_init(void);
+
+#endif /* __IO_FS_H */

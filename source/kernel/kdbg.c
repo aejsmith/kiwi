@@ -36,11 +36,12 @@
 //#include <ipc/ipc.h>
 
 #include <io/device.h>
-//#include <io/vfs.h>
+#include <io/fs.h>
 
 #include <lib/ctype.h>
 #include <lib/string.h>
 
+#include <mm/cache.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 
@@ -90,6 +91,7 @@ static struct {
 	{ "aspace",	"Print the contents of an address space.",	kdbg_cmd_aspace },
 	{ "backtrace",	"Print a backtrace.",				kdbg_cmd_backtrace },
 	{ "break",	"Create a breakpoint.",				kdbg_cmd_break },
+	{ "cache",	"Print information about a VM cache.",		kdbg_cmd_cache },
 	{ "continue",	"Exit KDBG and continue execution.",		kdbg_cmd_continue },
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "delete",	"Delete a breakpoint/watchpoint.",		kdbg_cmd_delete },
@@ -102,7 +104,8 @@ static struct {
 	{ "list",	"List breakpoints/watchpoints.",		kdbg_cmd_list },
 	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
-	//{ "mounts",	"Print a list of mounted filesystems.",		kdbg_cmd_mounts },
+	{ "mount",	"Print a list of mounted filesystems.",		kdbg_cmd_mount },
+	{ "node",	"Print information about a filesystem node.",	kdbg_cmd_node },
 	{ "page",	"Print details about physical memory usage.",	kdbg_cmd_page },
 	//{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
@@ -115,8 +118,6 @@ static struct {
 	{ "timers",	"Dumps a list of timers.",			kdbg_cmd_timers },
 	{ "uptime",	"Prints the system uptime.",			kdbg_cmd_uptime },
 	{ "vmem",	"Show information about Vmem arenas.",		kdbg_cmd_vmem },
-	//{ "vnodes",	"Print a list of nodes on a mount.",		kdbg_cmd_vnodes },
-	//{ "vnode",	"Print information about a filesystem node.",	kdbg_cmd_vnode },
 	{ "watch",	"Create a watchpoint.",				kdbg_cmd_watch },
 };
 

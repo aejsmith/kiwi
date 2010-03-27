@@ -20,7 +20,7 @@
 
 #include <arch/memmap.h>
 
-//#include <io/vfs.h>
+#include <io/fs.h>
 
 #include <mm/kheap.h>
 #include <mm/malloc.h>
@@ -82,7 +82,6 @@ void *module_mem_alloc(size_t size, int mmflag) {
 /** Free memory holding a module.
  * @param base		Base of the allocation.
  * @param size		Size of the allocation. */
-#if 0
 static void module_mem_free(void *base, size_t size) {
 	vmem_free(module_arena, (vmem_resource_t)((ptr_t)base), ROUND_UP(size, PAGE_SIZE));
 }
@@ -154,14 +153,13 @@ static int module_check_deps(module_t *module, char *depbuf) {
 
 	return 0;
 }
-#endif
+
 /** Get the name of a kernel module.
  * @param handle	Handle to file containing module.
  * @param namebuf	Buffer to store name in (should be MODULE_NAME_MAX + 1
  *			bytes long).
  * @return		0 on success, negative error code on failure. */
 int module_name(object_handle_t *handle, char *namebuf) {
-#if 0
 	module_t *module;
 	symbol_t *sym;
 	int ret = 0;
@@ -210,8 +208,6 @@ out:
 
 	mutex_unlock(&module_lock);
 	return ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Load a kernel module.
@@ -231,7 +227,6 @@ out:
  *			error code is returned.
  */
 int module_load(object_handle_t *handle, char *depbuf) {
-#if 0
 	module_t *module;
 	symbol_t *sym;
 	int ret;
@@ -331,8 +326,6 @@ fail:
 
 	mutex_unlock(&module_lock);
 	return ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Look up symbol from address.
@@ -439,7 +432,6 @@ int kdbg_cmd_modules(int argc, char **argv) {
  *			error code is returned.
  */
 int sys_module_load(const char *path, char *depbuf) {
-#if 0
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
 	object_handle_t *handle;
 	int ret, err;
@@ -450,7 +442,7 @@ int sys_module_load(const char *path, char *depbuf) {
 	}
 
 	/* Open a handle to the file. */
-	if((ret = vfs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
+	if((ret = fs_file_open(kpath, FS_FILE_READ, &handle)) != 0) {
 		kfree(kpath);
 		return ret;
 	}
@@ -465,6 +457,4 @@ int sys_module_load(const char *path, char *depbuf) {
 	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
-#endif
-	return -ERR_NOT_IMPLEMENTED;
 }

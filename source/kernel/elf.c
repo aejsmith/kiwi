@@ -18,11 +18,14 @@
  * @brief		ELF binary loader.
  */
 
+#include <io/fs.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 
@@ -64,7 +67,7 @@ static bool elf_check_file(object_handle_t *handle, int type) {
 	size_t bytes;
 
 	/* Read the ELF header in from the file. */
-	if(vfs_file_read(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes) != 0) {
+	if(fs_file_pread(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes) != 0) {
 		return false;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
 		return false;
@@ -202,7 +205,7 @@ static int elf_binary_load_internal(object_handle_t *handle, vm_aspace_t *as, bo
 	binary->as = as;
 
 	/* Read in the ELF header and check it. */
-	if((ret = vfs_file_read(handle, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
+	if((ret = fs_file_pread(handle, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
 		ret = -ERR_FORMAT_INVAL;
@@ -224,7 +227,7 @@ static int elf_binary_load_internal(object_handle_t *handle, vm_aspace_t *as, bo
 	/* Allocate some memory for the program headers and load them too. */
 	size = binary->ehdr.e_phnum * binary->ehdr.e_phentsize;
 	binary->phdrs = kmalloc(size, MM_SLEEP);
-	if((ret = vfs_file_read(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes)) != 0) {
+	if((ret = fs_file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes)) != 0) {
 		goto fail;
 	} else if(bytes != size) {
 		ret = -ERR_FORMAT_INVAL;
@@ -244,7 +247,7 @@ static int elf_binary_load_internal(object_handle_t *handle, vm_aspace_t *as, bo
 
 		/* Read in the interpreter path. */
 		path = kmalloc(binary->phdrs[i].p_filesz, MM_SLEEP);
-		if((ret = vfs_file_read(handle, path, binary->phdrs[i].p_filesz,
+		if((ret = fs_file_pread(handle, path, binary->phdrs[i].p_filesz,
 		                        binary->phdrs[i].p_offset, &bytes)) != 0) {
 			kfree(path);
 			goto fail;
@@ -268,7 +271,7 @@ static int elf_binary_load_internal(object_handle_t *handle, vm_aspace_t *as, bo
 		kfree(binary);
 
 		/* Look up the interpreter on the FS. */
-		ret = vfs_file_open(path, FS_FILE_READ, &handle);
+		ret = fs_file_open(path, FS_FILE_READ, &handle);
 		kfree(path);
 		if(ret != 0) {
 			return ret;
@@ -501,7 +504,7 @@ static int elf_module_load_sections(module_t *module) {
 			        i, dest, sect->sh_size, sect->sh_type);
 
 			/* Read the section data in. */
-			if((ret = vfs_file_read(module->handle, dest, sect->sh_size,
+			if((ret = fs_file_pread(module->handle, dest, sect->sh_size,
 			                        sect->sh_offset, &bytes)) != 0) {
 				return ret;
 			} else if(bytes != sect->sh_size) {
@@ -579,7 +582,7 @@ int elf_module_load(module_t *module) {
 	int ret;
 
 	/* Read the ELF header in from the file. */
-	if((ret = vfs_file_read(module->handle, &module->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
+	if((ret = fs_file_pread(module->handle, &module->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
 		return ret;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
 		return -ERR_FORMAT_INVAL;
@@ -592,7 +595,7 @@ int elf_module_load(module_t *module) {
 	module->shdrs = kmalloc(size, MM_SLEEP);
 
 	/* Read the headers in. */
-	if((ret = vfs_file_read(module->handle, module->shdrs, size, module->ehdr.e_shoff, &bytes)) != 0) {
+	if((ret = fs_file_pread(module->handle, module->shdrs, size, module->ehdr.e_shoff, &bytes)) != 0) {
 		return ret;
 	} else if(bytes != size) {
 		return -ERR_FORMAT_INVAL;

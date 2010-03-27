@@ -18,6 +18,8 @@
  * @brief		AMD64 ELF helper functions.
  */
 
+#include <io/fs.h>
+
 #include <lib/utility.h>
 
 #include <console.h>
@@ -63,7 +65,7 @@ int elf_module_relocate(module_t *module, bool external) {
 		/* Loop through all the relocations. */
 		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
 			offset = sect->sh_offset + (r * sect->sh_entsize);
-			if((ret = vfs_file_read(module->handle, &rel, sizeof(Elf64_Rela), offset, &bytes)) != 0) {
+			if((ret = fs_file_pread(module->handle, &rel, sizeof(Elf64_Rela), offset, &bytes)) != 0) {
 				return ret;
 			} else if(bytes != sizeof(Elf64_Rela)) {
 				return -ERR_FORMAT_INVAL;
