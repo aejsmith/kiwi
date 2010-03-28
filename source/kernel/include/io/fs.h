@@ -34,7 +34,6 @@
 #include <limits.h>
 #include <object.h>
 
-struct fs_info;
 struct fs_mount;
 struct fs_node;
 
@@ -112,6 +111,51 @@ typedef struct fs_node_ops {
 	 * @return		0 on success, negative error code on failure. */
 	int (*flush)(struct fs_node *node);
 
+	/** Read from a file.
+	 * @note		This function is provided to allow special
+	 *			handling for read operations to be done. If
+	 *			not provided, the file cache will be used.
+	 *			This function does not have to read the data,
+	 *			as depending on the return code the file cache
+	 *			may be used to read the data.
+	 * @param node		Node to read from.
+	 * @param buf		Buffer to read into.
+	 * @param count		Number of bytes to read.
+	 * @param offset	Offset into file to read from.
+	 * @param nonblock	Whether the write is required to not block.
+	 * @param bytesp	Where to store number of bytes read.
+	 * @return		If 1 is returned, then the function should have
+	 *			handled the entire operation itself and the
+	 *			file cache will not be used. If 0 is returned,
+	 *			the file cache will be used to perform the
+	 *			read. If a negative value is returned, then it
+	 *			is taken as an error. */
+	int (*read)(struct fs_node *node, void *buf, size_t count, offset_t offset,
+	            bool nonblock, size_t *bytesp);
+
+	/** Write to a file.
+	 * @note		This function is provided to allow special
+	 *			handling for write operations to be done (such
+	 *			as ensuring enough space is reserved on the
+	 *			filesystem). If not provided, the file cache
+	 *			will be used. This function does not have to
+	 *			write the data, as depending on the return code
+	 *			the file cache may be used to write the data.
+	 * @param node		Node to write to.
+	 * @param buf		Buffer containing data to write.
+	 * @param count		Number of bytes to write.
+	 * @param offset	Offset into file to write to.
+	 * @param nonblock	Whether the write is required to not block.
+	 * @param bytesp	Where to store number of bytes written.
+	 * @return		If 1 is returned, then the function should have
+	 *			handled the entire operation itself and the
+	 *			file cache will not be used. If 0 is returned,
+	 *			the file cache will be used to perform the
+	 *			write. If a negative value is returned, then it
+	 *			is taken as an error. */
+	int (*write)(struct fs_node *node, const void *buf, size_t count, offset_t offset,
+	             bool nonblock, size_t *bytesp);
+
 	/** Read a page of data from a file.
 	 * @note		If the page straddles across the end of the
 	 *			file, then only the part of the file that
@@ -148,13 +192,6 @@ typedef struct fs_node_ops {
 	 * @return		0 on success, negative error code on failure. */
 	int (*resize)(struct fs_node *node, offset_t size);
 
-	/** Ensure that space is allocated for a range in a file.
-	 * @param node		Node to allocate for.
-	 * @param offset	Offset into file to allocate from.
-	 * @param size		Size of range to allocate.
-	 * @return		0 on success, negative error code on failure. */
-	int (*allocate)(struct fs_node *node, offset_t offset, size_t size);
-
 	/** Create a new node as a child of an existing directory.
 	 * @note		This function only has to create the directory
 	 *			entry on the filesystem - the entry will be
@@ -188,7 +225,7 @@ typedef struct fs_node_ops {
 	/** Get information about a node.
 	 * @param node		Node to get information on.
 	 * @param info		Information structure to fill in. */
-	void (*info)(struct fs_node *node, struct fs_info *info);
+	void (*info)(struct fs_node *node, fs_info_t *info);
 
 	/** Cache directory contents.
 	 * @note		In order to add a directory entry to the cache,

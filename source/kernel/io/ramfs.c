@@ -31,11 +31,24 @@ typedef struct ramfs_mount {
 	node_id_t next_id;		/**< Next node ID. */
 } ramfs_mount_t;
 
+/** RamFS node information structure. */
+typedef struct ramfs_node {
+	offset_t size;			/**< Size of the file. */
+} ramfs_node_t;
+
+/** Free a RamFS node.
+ * @param node		Node to free. */
+static void ramfs_node_free(fs_node_t *node) {
+	kfree(node->data);
+}
+
 /** Resize a RamFS file.
  * @param node		Node to resize.
  * @param size		New size of the node.
  * @return		Always returns 0. */
 static int ramfs_node_resize(fs_node_t *node, offset_t size) {
+	ramfs_node_t *data = node->data;
+	data->size = size;
 	return 0;
 }
 
@@ -46,6 +59,7 @@ static int ramfs_node_resize(fs_node_t *node, offset_t size) {
  * @return		0 on success, negative error code on failure. */
 static int ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t *node) {
 	ramfs_mount_t *mount = parent->mount->data;
+	ramfs_node_t *data;
 
 	/* Allocate a unique ID for the node. I would just test whether
 	 * (next ID + 1) < next ID, but according to GCC, signed overflow
@@ -58,6 +72,10 @@ static int ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t *nod
 	}
 	node->id = mount->next_id++;
 	mutex_unlock(&mount->lock);
+
+	/* Create the information structure. */
+	data = node->data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
+	data->size = 0;
 
 	/* If we're creating a directory, add '.' and '..' entries to it. Other
 	 * directory entries will be maintained by the FS layer. */
@@ -78,11 +96,21 @@ static int ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t *nod
 	return 0;
 }
 
+/** Get information about a RamFS node.
+ * @param node		Node to get information on.
+ * @param info		Information structure to fill in. */
+static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
+	ramfs_node_t *data = node->data;
+	info->size = data->size;
+}
+
 /** RamFS node operations structure. */
 static fs_node_ops_t ramfs_node_ops = {
+	.free = ramfs_node_free,
 	.resize = ramfs_node_resize,
 	.create = ramfs_node_create,
 	.unlink = ramfs_node_unlink,
+	.info = ramfs_node_info,
 };
 
 /** Unmount a RamFS.
@@ -111,6 +139,7 @@ static int ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count)
 
 	/* Create the root directory, and add '.' and '..' entries. */
 	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &ramfs_node_ops, NULL);
+	mount->root->data = kcalloc(1, sizeof(ramfs_node_t), MM_SLEEP);
 	fs_dir_insert(mount->root, ".", mount->root->id);
 	fs_dir_insert(mount->root, "..", mount->root->id);
 	return 0;

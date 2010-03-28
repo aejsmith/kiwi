@@ -60,6 +60,13 @@
 /** Get the highest value out of a pair of values. */
 #define MAX(a, b)	((a) < (b) ? (b) : (a))
 
+/** Check if a value is a power of 2.
+ * @param val		Value to check.
+ * @return		Whether value is a power of 2. */
+static inline bool is_pow2(uint64_t val) {
+	return (val && (val & (val - 1)) == 0);
+}
+
 /** Get log base 2 (high bit) of a value.
  * @param val		Value to get high bit from.
  * @return		High bit + 1. */

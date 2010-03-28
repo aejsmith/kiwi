@@ -28,6 +28,9 @@
  *
  * @todo		Could probably use an rwlock on nodes.
  * @todo		Node cache reclaim.
+ * @todo		Attempting to map files that handle read/write
+ *			themselves and don't use the file cache should be
+ *			rejected.
  */
 
 #include <io/device.h>
@@ -833,11 +836,7 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
 		node->ops->info(node, info);
 	} else {
 		info->links = 1;
-		if(node->type == FS_NODE_FILE && node->data_cache) {
-			info->size = node->data_cache->size;
-		} else {
-			info->size = 0;
-		}
+		info->size = 0;
 	}
 }
 
@@ -889,6 +888,8 @@ static int file_cache_read_page(vm_cache_t *cache, void *buf, offset_t offset, b
 static int file_cache_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
 	fs_node_t *node = cache->data;
 
+	/* If the node is read-only no modifications should have be made to
+	 * the page. */
 	assert(!FS_NODE_IS_RDONLY(node));
 
 	if(node->ops->write_page) {
@@ -1163,6 +1164,21 @@ static int fs_file_read_internal(object_handle_t *handle, void *buf, size_t coun
 		rwlock_unlock(&data->lock);
 	}
 
+	/* If the node has a read operation, then first call that. */
+	if(node->ops->read) {
+		ret = node->ops->read(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
+
+		/* If the return value is 0, then we should use the file cache.
+		 * If it is 1, the function handled the read itself, so we
+		 * should return success. */
+		if(ret != 0) {
+			if(ret == 1) {
+				ret = 0;
+			}
+			goto out;
+		}
+	}
+
 	/* Get the node's data cache. */
 	mutex_lock(&node->lock);
 	cache = fs_file_get_cache(node);
@@ -1245,6 +1261,7 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 	vm_cache_t *cache;
 	size_t total = 0;
 	fs_node_t *node;
+	fs_info_t info;
 	int ret = 0;
 
 	if(!handle || !buf) {
@@ -1270,28 +1287,28 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 	rwlock_write_lock(&data->lock);
 	mutex_lock(&node->lock);
 
-	/* Get the node's data cache. */
-	cache = fs_file_get_cache(node);
+	/* Get node information so that we know the file size. */
+	fs_node_info(node, &info);
 
 	/* Pull the offset out of the handle structure, and handle the
 	 * FS_FILE_APPEND flag. */
 	if(data->flags & FS_FILE_APPEND) {
-		data->offset = cache->size;
+		data->offset = info.size;
 	}
 	offset = data->offset;
 	rwlock_unlock(&data->lock);
 
 	/* Attempt to resize the node if necessary. */
-	if((offset + count) >= cache->size) {
+	if((offset + count) > info.size) {
 		/* If the resize operation is not provided, we can only write
 		 * within the space that we have. */
 		if(!node->ops->resize) {
-			if(offset >= cache->size) {
+			if(offset >= info.size) {
 				ret = 0;
 				mutex_unlock(&node->lock);
 				goto out;
 			} else {
-				count = (size_t)(cache->size - offset);
+				count = (size_t)(info.size - offset);
 			}
 		} else {
 			if((ret = node->ops->resize(node, offset + count)) != 0) {
@@ -1299,20 +1316,33 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 				goto out;
 			}
 
-			vm_cache_resize(cache, offset + count);
+			/* Resize the cache if there is one. */
+			if(node->data_cache) {
+				vm_cache_resize(node->data_cache, offset + count);
+			}
 		}
 	}
 
-	/* Ensure that space is allocated in the filesystem. */
-	if(node->ops->allocate) {
-		/* FIXME: On failure, should this restore the original file
-		 * size? */
-		if((ret = node->ops->allocate(node, offset, count)) != 0) {
-			mutex_unlock(&node->lock);
+	mutex_unlock(&node->lock);
+
+	/* If the node has a write operation, then first call that. */
+	if(node->ops->write) {
+		ret = node->ops->write(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
+
+		/* If the return value is 0, then we should use the file cache.
+		 * If it is 1, the function handled the write itself, so we
+		 * should return success. */
+		if(ret != 0) {
+			if(ret == 1) {
+				ret = 0;
+			}
 			goto out;
 		}
 	}
 
+	/* Get the node's data cache. */
+	mutex_lock(&node->lock);
+	cache = fs_file_get_cache(node);
 	mutex_unlock(&node->lock);
 
 	/* Write the data to the cache. */
@@ -1719,10 +1749,10 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
  * @return		0 on success, negative error code on failure.
  */
 int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
-	fs_dir_cache_t *dcache;
+	fs_dir_cache_t *cache;
 	fs_handle_t *data;
-	vm_cache_t *cache;
 	fs_node_t *node;
+	fs_info_t info;
 	int ret = 0;
 
 	if(!handle || (action != FS_SEEK_SET && action != FS_SEEK_ADD && action != FS_SEEK_END)) {
@@ -1749,16 +1779,16 @@ int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, off
 
 		if(node->type == FS_NODE_DIR) {
 			/* We must cache the entries to know the entry count. */
-			if((ret = fs_dir_get_cache(node, &dcache)) != 0) {
+			if((ret = fs_dir_get_cache(node, &cache)) != 0) {
 				mutex_unlock(&node->lock);
 				rwlock_unlock(&data->lock);
 				return ret;
 			}
-			data->offset = (offset_t)dcache->count + offset;
+			data->offset = (offset_t)cache->count + offset;
 		} else {
-			/* Get the data cache so we can get the size. */
-			cache = fs_file_get_cache(node);
-			data->offset = cache->size + offset;
+			/* Get the node information to find the size. */
+			fs_node_info(node, &info);
+			data->offset = info.size + offset;
 		}
 
 		mutex_unlock(&node->lock);
