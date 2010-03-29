@@ -448,8 +448,8 @@ static bool ext2_probe(object_handle_t *handle, const char *uuid) {
 
 	/* Check for incompatible features. */
 	if(EXT2_HAS_INCOMPAT_FEATURE(sb, ~(EXT2_FEATURE_INCOMPAT_RO_SUPP | EXT2_FEATURE_INCOMPAT_SUPP))) {
-		dprintf("ext2: device %s has unsupported incompatible features\n",
-		        device_name(handle));
+		dprintf("ext2: device %s has unsupported incompatible features %u\n",
+		        device_name(handle), sb->s_feature_incompat);
 		kfree(sb);
 		return false;
 	}
