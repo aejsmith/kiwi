@@ -21,9 +21,11 @@
 #ifndef __EXT2_PRIV_H
 #define __EXT2_PRIV_H
 
-#ifndef LOADER
-# include <io/device.h>
-# include <io/vfs.h>
+#ifdef LOADER
+# include <boot/vfs.h>
+#else
+# include <io/fs.h>
+# include <io/map.h>
 # include <sync/rwlock.h>
 # include <console.h>
 # if CONFIG_MODULE_FS_EXT2_DEBUG
@@ -31,10 +33,9 @@
 # else
 #  define dprintf(fmt...)		
 # endif
-#else
-# include <boot/vfs.h>
-# include <types.h>
 #endif
+#include <endian.h>
+#include <types.h>
 
 /** Ext2 filesystem magic number. */
 #define EXT2_MAGIC		0xEF53
@@ -104,8 +105,38 @@
 /** Limitations. */
 #define EXT2_NAME_MAX		256		/**< Maximum file name length. */
 
-/* Inode flags. */
+/** Inode flags. */
 #define EXT4_EXTENTS_FL		0x00080000	/**< Inode uses extents. */
+
+/** Feature check macros. */
+#define EXT2_HAS_COMPAT_FEATURE(sb, mask)	\
+	(le32_to_cpu((sb)->s_feature_compat) & (mask))
+#define EXT2_HAS_RO_COMPAT_FEATURE(sb, mask)	\
+	(le32_to_cpu((sb)->s_feature_ro_compat) & (mask))
+#define EXT2_HAS_INCOMPAT_FEATURE(sb, mask)	\
+	(le32_to_cpu((sb)->s_feature_incompat) & (mask))
+
+/** Feature definitions. */
+#define EXT2_FEATURE_COMPAT_EXT_ATTR		0x0008
+#define EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER	0x0001
+#define EXT2_FEATURE_RO_COMPAT_LARGE_FILE	0x0002
+#define EXT2_FEATURE_RO_COMPAT_BTREE_DIR	0x0004
+#define EXT2_FEATURE_INCOMPAT_FILETYPE		0x0002
+#define EXT2_FEATURE_INCOMPAT_META_BG		0x0010
+#define EXT4_FEATURE_INCOMPAT_EXTENTS		0x0040
+
+/** Features that we support. */
+#define EXT2_FEATURE_COMPAT_SUPP	\
+	(EXT2_FEATURE_COMPAT_EXT_ATTR)
+#define EXT2_FEATURE_RO_COMPAT_SUPP	\
+	(EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER | \
+	 EXT2_FEATURE_RO_COMPAT_LARGE_FILE | \
+	 EXT2_FEATURE_RO_COMPAT_BTREE_DIR)
+#define EXT2_FEATURE_INCOMPAT_SUPP	\
+	(EXT2_FEATURE_INCOMPAT_FILETYPE | \
+	 EXT2_FEATURE_INCOMPAT_META_BG)
+#define EXT2_FEATURE_INCOMPAT_RO_SUPP	\
+	(EXT4_FEATURE_INCOMPAT_EXTENTS)
 
 /** Superblock of an Ext2 filesystem. */
 typedef struct ext2_superblock {
@@ -262,40 +293,41 @@ typedef struct ext4_extent_header {
 #ifndef LOADER
 /** Data for an Ext2 mount. */
 typedef struct ext2_mount {
-	rwlock_t lock;				/**< Lock to protect filesystem structures. */
+	rwlock_t lock;			/**< Lock to protect filesystem structures. */
 
-	ext2_superblock_t sb;			/**< Superblock of the filesystem. */
-	ext2_group_desc_t *group_tbl;		/**< Pointer to block group descriptor table. */
-	vfs_mount_t *parent;			/**< Pointer to mount structure. */
-	object_handle_t *device;		/**< Handle to backing device. */
+	ext2_superblock_t sb;		/**< Superblock of the filesystem. */
+	ext2_group_desc_t *group_tbl;	/**< Pointer to block group descriptor table. */
+	fs_mount_t *parent;		/**< Pointer to mount structure. */
+	object_handle_t *device;	/**< Handle to backing device. */
 
-	uint32_t inodes_per_group;		/**< Inodes per group. */
-	uint32_t inodes_count;			/**< Inodes count. */
-	uint32_t blocks_per_group;		/**< Blocks per group. */
-	uint32_t blocks_count;			/**< Blocks count. */
-	size_t blk_size;			/**< Size of a block on the filesystem. */
-	size_t blk_groups;			/**< Number of block groups. */
-	size_t in_size;				/**< Size of an inode. */
-	offset_t group_tbl_off;			/**< Offset of the group table. */
-	size_t group_tbl_size;			/**< Size of the group table. */
+	uint32_t revision;		/**< Filesystem revision. */
+	uint32_t inodes_per_group;	/**< Inodes per group. */
+	uint32_t inode_count;		/**< Inodes count. */
+	uint32_t blocks_per_group;	/**< Blocks per group. */
+	uint32_t block_count;		/**< Blocks count. */
+	size_t block_size;		/**< Size of a block on the filesystem. */
+	size_t block_groups;		/**< Number of block groups. */
+	size_t inode_size;		/**< Size of an inode. */
+	offset_t group_tbl_offset;	/**< Offset of the group table. */
+	size_t group_tbl_size;		/**< Size of the group table. */
 } ext2_mount_t;
 
-/** In-memory inode structure. */
+/** In-memory node structure. */
 typedef struct ext2_inode {
-	rwlock_t lock;				/**< Lock to protect the inode and its data. */
-	uint32_t num;				/**< Inode number. */
-	bool dirty;				/**< Whether the structure is dirty. */
-	size_t size;				/**< Size of the inode structure on disk. */
-	offset_t offset;			/**< Offset into the device. */
-	ext2_mount_t *mount;			/**< Pointer to mount data structure. */
-	ext2_disk_inode_t disk;			/**< On-disk inode structure. */
+	rwlock_t lock;			/**< Lock to protect the inode and its data. */
+	ext2_disk_inode_t disk;		/**< On-disk inode structure. */
+	block_map_t *block_map;		/**< Cache of block numbers. */
+	node_id_t num;			/**< Inode number. */
+	size_t disk_size;		/**< Size of the inode structure on disk. */
+	offset_t disk_offset;		/**< Offset into the device. */
+	ext2_mount_t *mount;		/**< Pointer to mount data structure. */
 } ext2_inode_t;
 
 /** Macros to increment/decrement i_blocks. */
 #define I_BLOCKS_INC(i)			\
-	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) + ((i)->mount->blk_size / 512)))
+	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) + ((i)->mount->block_size / 512)))
 #define I_BLOCKS_DEC(i)			\
-	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) - ((i)->mount->blk_size / 512)))
+	((i)->disk.i_blocks = cpu_to_le32(le32_to_cpu((i)->disk.i_blocks) - ((i)->mount->block_size / 512)))
 
 /** Convert an inode type to a directory entry type.
  * @param mode		Inode's mode value.
@@ -315,10 +347,10 @@ static inline uint8_t ext2_type_to_dirent(uint16_t mode) {
 
 extern int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp);
 extern int ext2_block_free(ext2_mount_t *mount, uint32_t num);
-extern int ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t block, bool nonblock);
-extern int ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block, bool nonblock);
+extern int ext2_block_read(ext2_mount_t *mount, void *buf, uint64_t block, bool nonblock);
+extern int ext2_block_write(ext2_mount_t *mount, const void *buf, uint64_t block, bool nonblock);
 
-extern int ext2_dir_cache(vfs_node_t *node);
+extern int ext2_dir_cache(fs_node_t *node);
 extern int ext2_dir_insert(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
 extern int ext2_dir_remove(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
 
@@ -329,10 +361,11 @@ extern int ext2_inode_flush(ext2_inode_t *inode);
 extern void ext2_inode_release(ext2_inode_t *inode);
 extern int ext2_inode_read(ext2_inode_t *inode, void *buf, uint32_t block, size_t count, bool nonblock);
 extern int ext2_inode_write(ext2_inode_t *inode, const void *buf, uint32_t block, size_t count, bool nonblock);
-extern int ext2_inode_resize(ext2_inode_t *inode, file_size_t size);
+extern int ext2_inode_resize(ext2_inode_t *inode, offset_t size);
 
 extern void ext2_mount_flush(ext2_mount_t *mount);
 #else
 extern vfs_filesystem_ops_t ext2_filesystem_ops;
 #endif /* LOADER */
+
 #endif /* __EXT2_PRIV_H */
