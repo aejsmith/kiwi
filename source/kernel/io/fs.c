@@ -1969,6 +1969,11 @@ static void parse_mount_options(const char *str, fs_mount_option_t **optsp, size
 
 		while((value = strsep(&dup, ","))) {
 			name = strsep(&value, "=");
+			if(strlen(name) == 0) {
+				continue;
+			} else if(value && strlen(value) == 0) {
+				value = NULL;
+			}
 
 			/* Handle arguments recognised by us. */
 			if(strcmp(name, "ro") == 0) {

@@ -24,8 +24,14 @@
 #include <lib/list.h>
 #include <types.h>
 
+/** Convert microseconds to seconds. */
+#define USECS2SECS(secs)	(secs / 1000000)
+
 /** Convert seconds to microseconds. */
 #define SECS2USECS(secs)	((useconds_t)secs * 1000000)
+
+/** Convert microseconds to milliseconds. */
+#define USECS2MSECS(msecs)	(msecs / 1000)
 
 /** Convert milliseconds to microseconds. */
 #define MSECS2USECS(msecs)	((useconds_t)msecs * 1000)

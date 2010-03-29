@@ -209,13 +209,14 @@ typedef struct fs_node_ops {
 	 * @return		0 on success, negative error code on failure. */
 	int (*create)(struct fs_node *parent, const char *name, struct fs_node *node);
 
-	/** Decrease the link count of a filesystem node.
-	 * @note		If the count reaches 0, this function should
-	 *			call fs_node_remove() on the node, but not
-	 *			remove it from the filesystem, as it may still
-	 *			be in use. The node will be freed as soon as
-	 *			it has no users (it is up to the free operation
-	 *			to remove the node from the filesystem).
+	/** Remove an entry from a directory.
+	 * @note		If the node's link count reaches 0, this
+	 *			function should call fs_node_remove() on the
+	 *			node, but not remove it from the filesystem, as
+	 *			it may still be in use. The node will be freed
+	 *			as soon as it has no users (it is up to the
+	 *			free operation to remove the node from the
+	 *			filesystem).
 	 * @param parent	Directory containing the node.
 	 * @param name		Name of the node in the directory.
 	 * @param node		Node being unlinked.
