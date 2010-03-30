@@ -535,9 +535,12 @@ static int ext2_inode_truncate(ext2_inode_t *inode, uint32_t size) {
 /** Allocate a new inode on an Ext2 filesystem.
  * @param mount		Mount to allocate on.
  * @param mode		Mode for inode.
+ * @param uid		User ID for the inode.
+ * @param gid		Group ID for the inode.
  * @param inodep	Where to store pointer to new inode.
  * @return		0 on success, negative error code on failure. */
-int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, ext2_inode_t **inodep) {
+int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t gid,
+                     ext2_inode_t **inodep) {
 	uint32_t *block, num, in, count, i, j;
 	ext2_group_desc_t *group;
 	ext2_inode_t *inode;
@@ -623,8 +626,8 @@ found:
 	}
 
 	time = USECS2SECS(time_since_epoch());
-	inode->disk.i_uid = 0;
-	inode->disk.i_gid = 0;
+	inode->disk.i_uid = cpu_to_le16(uid);
+	inode->disk.i_gid = cpu_to_le16(gid);
 	inode->disk.i_mode = cpu_to_le16(mode);
 	inode->disk.i_size = 0;
 	inode->disk.i_atime = cpu_to_le32(time);

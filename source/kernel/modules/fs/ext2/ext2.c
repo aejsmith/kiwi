@@ -147,8 +147,9 @@ static int ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t *nod
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	/* Allocate the inode. */
-	if((ret = ext2_inode_alloc(parent->mount, mode, &inode)) != 0) {
+	/* Allocate the inode. Use the parent's UID/GID for now. */
+	if((ret = ext2_inode_alloc(parent->mount, mode, parent->disk.i_uid,
+	                           parent->disk.i_gid, &inode)) != 0) {
 		return ret;
 	}
 	rwlock_write_lock(&inode->lock);

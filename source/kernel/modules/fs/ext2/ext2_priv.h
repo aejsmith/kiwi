@@ -356,7 +356,8 @@ extern int ext2_dir_cache(fs_node_t *node);
 extern int ext2_dir_insert(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
 extern int ext2_dir_remove(ext2_inode_t *dir, ext2_inode_t *inode, const char *name);
 
-extern int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, ext2_inode_t **inodep);
+extern int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t gid,
+                            ext2_inode_t **inodep);
 extern int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode);
 extern int ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep);
 extern int ext2_inode_flush(ext2_inode_t *inode);

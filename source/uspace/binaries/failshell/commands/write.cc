@@ -60,6 +60,7 @@ public:
 					handle = fs_file_open(argv[1], FS_FILE_WRITE);
 				} else {
 					cout << "Create failed (" << ret << ")" << endl;
+					return ret;
 				}
 			}
 			if(handle < 0) {

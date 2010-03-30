@@ -227,7 +227,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 
 	node = slab_cache_alloc(fs_node_cache, MM_SLEEP);
 	refcount_set(&node->count, 1);
-	node->id = 0;
+	node->id = id;
 	node->type = type;
 	node->flags = 0;
 	node->mounted = NULL;
@@ -326,13 +326,15 @@ static int fs_node_free(fs_node_t *node) {
 	}
 
 	/* Call the implementation to flush any changes and free up its data. */
-	if(!FS_NODE_IS_RDONLY(node) && !(node->flags & FS_NODE_REMOVED) && node->ops->flush) {
-		if((ret = node->ops->flush(node)) != 0) {
-			return ret;
+	if(node->ops) {
+		if(!FS_NODE_IS_RDONLY(node) && !(node->flags & FS_NODE_REMOVED) && node->ops->flush) {
+			if((ret = node->ops->flush(node)) != 0) {
+				return ret;
+			}
 		}
-	}
-	if(node->ops->free) {
-		node->ops->free(node);
+		if(node->ops->free) {
+			node->ops->free(node);
+		}
 	}
 
 	/* If the node has a mount, detach it from the node tree/lists. */
@@ -439,18 +441,18 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			 * for us. */
 			tmp = node; node = prev; prev = tmp;
 			mutex_unlock(&prev->lock);
+			fs_node_release(prev);
 			mutex_lock(&node->lock);
 
 			/* Recurse to find the link destination. The check
 			 * above ensures we do not infinitely recurse. */
 			if((ret = fs_node_lookup_internal(link, node, true, nest, &node)) != 0) {
-				fs_node_release(prev);
 				kfree(link);
 				return ret;
 			}
 
 			dprintf("fs: followed %s to %" PRIu16 ":%" PRIu64 "\n",
-			        prev->link_cache, node->mount->id, node->id);
+			        link, node->mount->id, node->id);
 			kfree(link);
 		} else if(node->type == FS_NODE_SYMLINK) {
 			/* The new node is a symbolic link but we do not want
@@ -1292,10 +1294,12 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 
 	/* Pull the offset out of the handle structure, and handle the
 	 * FS_FILE_APPEND flag. */
-	if(data->flags & FS_FILE_APPEND) {
-		data->offset = info.size;
+	if(usehnd) {
+		if(data->flags & FS_FILE_APPEND) {
+			data->offset = info.size;
+		}
+		offset = data->offset;
 	}
-	offset = data->offset;
 	rwlock_unlock(&data->lock);
 
 	/* Attempt to resize the node if necessary. */
