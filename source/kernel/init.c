@@ -345,11 +345,10 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		/* Initialise kernel memory management subsystems. */
 		vmem_early_init();
 		kheap_early_init();
-		page_early_init(args);
+		page_init(args);
 		vmem_init();
 		slab_init();
 		kheap_init();
-		page_init();
 		malloc_init();
 
 		/* Set up the console. */

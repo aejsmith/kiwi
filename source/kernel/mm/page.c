@@ -72,8 +72,10 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/cache.h>
 #include <mm/page.h>
 
+#include <proc/process.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -82,6 +84,7 @@
 #include <fatal.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <time.h>
 #include <vmem.h>
 
 #if CONFIG_PAGE_DEBUG
@@ -105,6 +108,10 @@ typedef struct page_queue {
 	spinlock_t lock;		/**< Lock to protect the queue. */
 } page_queue_t;
 
+/** Page writer settings. */
+#define PAGE_WRITER_INTERVAL		SECS2USECS(4)
+#define PAGE_WRITER_MAX_PER_RUN		128
+
 extern char __init_start[], __init_end[];
 
 /** Arena used for page allocations. */
@@ -116,6 +123,50 @@ static size_t page_range_count = 0;
 
 /** Array of page queues. */
 static page_queue_t page_queues[PAGE_QUEUE_COUNT];
+
+/** Page writer/page daemon threads. */
+static thread_t *page_writer_thread;
+//static thread_t *page_daemon_thread;
+
+/** Page writer thread.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void page_writer(void *arg1, void *arg2) {
+	page_queue_t *queue = &page_queues[PAGE_QUEUE_MODIFIED];
+	LIST_DECLARE(marker);
+	vm_page_t *page;
+	size_t written;
+
+	while(true) {
+		usleep(PAGE_WRITER_INTERVAL);
+
+		/* Place the marker at the beginning of the queue to begin with. */
+		written = 0;
+		spinlock_lock(&queue->lock);
+		list_prepend(&queue->pages, &marker);
+
+		/* Write pages until we've reached the maximum number of pages
+		 * per iteration, or until we reach the end of the queue. */
+		while(written < PAGE_WRITER_MAX_PER_RUN && marker.next != &queue->pages) {
+			/* Take the page and move the marker after it. */
+			page = list_entry(marker.next, vm_page_t, header);
+			list_add_after(&page->header, &marker);
+			spinlock_unlock(&queue->lock);
+
+			/* Write out the page. */
+			if(vm_cache_flush_page(page)) {
+				dprintf("page: page writer wrote page 0x%" PRIpp "\n", page->addr);
+				written++;
+			}
+
+			spinlock_lock(&queue->lock);
+		}
+
+		/* Remove the marker and unlock. */
+		list_remove(&marker);
+		spinlock_unlock(&queue->lock);
+	}
+}
 
 #if CONFIG_DEBUG
 /** Ensure that a free page is in the correct state.
@@ -486,7 +537,7 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 
 /** Initialise the physical memory manager.
  * @param args		Kernel arguments. */
-void __init_text page_early_init(kernel_args_t *args) {
+void __init_text page_init(kernel_args_t *args) {
 	phys_ptr_t start, end;
 	uint32_t i;
 
@@ -521,9 +572,10 @@ void __init_text page_early_init(kernel_args_t *args) {
 }
 
 /** Set up structures for each usable page. */
-void __init_text page_init(void) {
+void __init_text vm_page_init(void) {
 	size_t i, j, count, size;
 	phys_ptr_t phys;
+	int ret;
 
 	/* Initialise page queue structures. */
 	for(i = 0; i < PAGE_QUEUE_COUNT; i++) {
@@ -547,6 +599,13 @@ void __init_text page_init(void) {
 			page_ranges[i].pages[j].addr = page_ranges[i].start + (j * PAGE_SIZE);
 		}
 	}
+
+	/* Set up the page writer and page daemon. */
+	if((ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
+	                        NULL, &page_writer_thread)) != 0) {
+		fatal("Could not start page writer (%d)", ret);
+	}
+	thread_run(page_writer_thread);
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */

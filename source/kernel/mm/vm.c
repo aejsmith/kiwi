@@ -1074,6 +1074,7 @@ void __init_text vm_init(void) {
 	                                  0, vm_amap_ctor, NULL, NULL, NULL,
 	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 
+	vm_page_init();
 	vm_cache_init();
 }
 

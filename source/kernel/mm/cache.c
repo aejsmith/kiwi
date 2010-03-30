@@ -595,9 +595,26 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
  * else.
  *
  * @param page		Page to flush.
+ *
+ * @return		Whether the page was removed from the queue.
  */
-void vm_cache_flush_page(vm_page_t *page) {
+bool vm_cache_flush_page(vm_page_t *page) {
+	vm_cache_t *cache;
+	bool ret;
 
+	/* Must be careful - another thread could be destroying the cache. */
+	if(!(cache = page->cache)) {
+		return true;
+	}
+	mutex_lock(&cache->lock);
+	if(cache->deleted) {
+		mutex_unlock(&cache->lock);
+		return true;
+	}
+
+	ret = vm_cache_flush_page_internal(cache, page) == 0;
+	mutex_unlock(&cache->lock);
+	return ret;
 }
 
 /** Evict a page in a cache from memory.
@@ -608,9 +625,9 @@ void vm_cache_flush_page(vm_page_t *page) {
  *
  * @param page		Page to evict.
  */
-void vm_cache_evict_page(vm_page_t *page) {
-
-}
+//void vm_cache_evict_page(vm_page_t *page) {
+//	fatal("Not implemented");
+//}
 
 /** Print information about a cache.
  * @param argc		Argument count.

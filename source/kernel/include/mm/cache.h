@@ -80,8 +80,8 @@ extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
 extern int vm_cache_flush(vm_cache_t *cache);
 extern int vm_cache_destroy(vm_cache_t *cache, bool discard);
 
-extern void vm_cache_flush_page(vm_page_t *page);
-extern void vm_cache_evict_page(vm_page_t *page);
+extern bool vm_cache_flush_page(vm_page_t *page);
+//extern void vm_cache_evict_page(vm_page_t *page);
 
 extern int kdbg_cmd_cache(int argc, char **argv);
 
