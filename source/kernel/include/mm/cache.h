@@ -52,7 +52,7 @@ typedef struct vm_cache_ops {
 
 	/** Determine whether a page can be evicted.
 	 * @note		If not provided, then behaviour will be as
-	 *			though the function returns false.
+	 *			though the function returns true.
 	 * @param cache		Cache the page belongs to.
 	 * @param page	 	Page to check.
 	 * @return		Whether the page can be evicted. */

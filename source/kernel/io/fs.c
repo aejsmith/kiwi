@@ -28,9 +28,6 @@
  *
  * @todo		Could probably use an rwlock on nodes.
  * @todo		Node cache reclaim.
- * @todo		Attempting to map files that handle read/write
- *			themselves and don't use the file cache should be
- *			rejected.
  */
 
 #include <io/device.h>
@@ -38,6 +35,7 @@
 
 #include <lib/string.h>
 
+#include <mm/cache.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -66,7 +64,6 @@ typedef struct fs_handle {
 
 extern void fs_node_get(fs_node_t *node);
 static int fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
-static int fs_symlink_cache(fs_node_t *node);
 static object_type_t file_object_type;
 static object_type_t dir_object_type;
 
@@ -234,9 +231,6 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	node->ops = ops;
 	node->data = data;
 	node->mount = mount;
-	node->data_cache = NULL;
-	node->entry_cache = NULL;
-	node->link_cache = NULL;
 
 	/* Initialise the node's object header. */
 	switch(type) {
@@ -269,9 +263,6 @@ static int fs_node_flush(fs_node_t *node) {
 	assert(mutex_held(&node->lock));
 
 	if(!FS_NODE_IS_RDONLY(node)) {
-		if(node->type == FS_NODE_FILE && node->data_cache) {
-			vm_cache_flush(node->data_cache);
-		}
 		if(node->ops->flush) {
 			if((err = node->ops->flush(node)) != 0) {
 				ret = err;
@@ -297,33 +288,6 @@ static int fs_node_free(fs_node_t *node) {
 	assert(refcount_get(&node->count) == 0);
 	assert(!node->mount || mutex_held(&node->mount->lock));
 	assert(mutex_held(&node->lock));
-
-	/* Flush and destroy the node's caches, if any. */
-	switch(node->type) {
-	case FS_NODE_FILE:
-		if(node->data_cache) {
-			if((ret = vm_cache_destroy(node->data_cache, node->flags & FS_NODE_REMOVED)) != 0) {
-				return ret;
-			}
-			node->data_cache = NULL;
-		}
-		break;
-	case FS_NODE_DIR:
-		if(node->entry_cache) {
-			radix_tree_clear(&node->entry_cache->entries, kfree);
-			kfree(node->entry_cache);
-			node->entry_cache = NULL;
-		}
-		break;
-	case FS_NODE_SYMLINK:
-		if(node->link_cache) {
-			kfree(node->link_cache);
-			node->link_cache = NULL;
-		}
-		break;
-	default:
-		break;
-	}
 
 	/* Call the implementation to flush any changes and free up its data. */
 	if(node->ops) {
@@ -421,8 +385,9 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 				return -ERR_LINK_LIMIT;
 			}
 
-			/* Ensure that the link destination is cached. */
-			if((ret = fs_symlink_cache(node)) != 0) {
+			/* Obtain the link destination. */
+			assert(node->ops->read_link);
+			if((ret = node->ops->read_link(node, &link)) != 0) {
 				mutex_unlock(&node->lock);
 				fs_node_release(prev);
 				fs_node_release(node);
@@ -430,11 +395,7 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			}
 
 			dprintf("fs: following symbolic link %" PRIu16 ":%" PRIu64 " to %s\n",
-			        node->mount->id, node->id, node->link_cache);
-
-			/* Duplicate the link destination as the lookup needs
-			 * to modify it. */
-			link = kstrdup(node->link_cache, MM_SLEEP);
+			        node->mount->id, node->id, link);
 
 			/* Move up to the parent node. The previous iteration
 			 * of the loop left a reference on the previous node
@@ -509,7 +470,7 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			}
 		}
 
-		/* Look up this name within the directory entry cache. */
+		/* Look up this name within the directory. */
 		if((ret = fs_dir_lookup(node, tok, &id)) != 0) {
 			mutex_unlock(&node->lock);
 			fs_node_release(node);
@@ -733,15 +694,14 @@ void fs_node_remove(fs_node_t *node) {
 
 /** Common node creation code.
  * @param path		Path to node to create.
- * @param node		Node structure describing the node to be created.
+ * @param type		Type to give the new node.
+ * @param target	For symbolic links, the target of the link.
  * @return		0 on success, negative error code on failure. */
-static int fs_node_create(const char *path, fs_node_t *node) {
-	fs_node_t *parent = NULL;
+static int fs_node_create(const char *path, fs_node_type_t type, const char *target) {
+	fs_node_t *parent = NULL, *node = NULL;
 	char *dir, *name;
 	node_id_t id;
 	int ret;
-
-	assert(!node->mount);
 
 	/* Split path into directory/name. */
 	dir = kdirname(path, MM_SLEEP);
@@ -790,9 +750,7 @@ static int fs_node_create(const char *path, fs_node_t *node) {
 	}
 
 	/* We can now call into the filesystem to create the node. */
-	node->ops = parent->ops;
-	node->mount = parent->mount;
-	if((ret = node->ops->create(parent, name, node)) != 0) {
+	if((ret = parent->ops->create(parent, name, type, target, &node)) != 0) {
 		goto out;
 	}
 
@@ -800,26 +758,19 @@ static int fs_node_create(const char *path, fs_node_t *node) {
 	avl_tree_insert(&node->mount->nodes, (key_t)node->id, node, NULL);
 	list_append(&node->mount->used_nodes, &node->mount_link);
 
-	/* Insert the node into the parent's entry cache. */
-	fs_dir_insert(parent, name, node->id);
-
 	dprintf("fs: created %s (node: %" PRIu16 ":%" PRIu64 ", parent: %" PRIu16 ":%" PRIu64 ")\n",
 	        path, node->mount->id, node->id, parent->mount->id, parent->id);
-	ret = 0;
 out:
 	if(parent) {
 		mutex_unlock(&parent->lock);
 		mutex_unlock(&parent->mount->lock);
 		fs_node_release(parent);
 	}
+	if(node) {
+		fs_node_release(node);
+	}
 	kfree(dir);
 	kfree(name);
-
-	/* Reset mount pointer to NULL in node so that the caller can free it
-	 * properly. */
-	if(ret != 0) {
-		node->mount = NULL;
-	}
 	return ret;
 }
 
@@ -833,12 +784,41 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
 	info->id = node->id;
 	info->mount = (node->mount) ? node->mount->id : 0;
 	info->type = node->type;
-	info->blksize = PAGE_SIZE;
 	if(node->ops->info) {
 		node->ops->info(node, info);
 	} else {
 		info->links = 1;
 		info->size = 0;
+		info->blksize = PAGE_SIZE;
+	}
+}
+
+/** Get the name of a node in its parent directory.
+ * @param parent	Directory containing node.
+ * @param id		ID of node to get name of.
+ * @param namep		Where to store pointer to string containing node name.
+ * @return		0 on success, negative error code on failure. */
+static int fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
+	fs_dir_entry_t *entry;
+	offset_t index = 0;
+	int ret;
+
+	if(!parent->ops->read_entry) {
+		return -ERR_NOT_SUPPORTED;
+	}
+
+	while(true) {
+		if((ret = parent->ops->read_entry(parent, index++, &entry)) != 0) {
+			return ret;
+		}
+
+		if(entry->id == id) {
+			*namep = kstrdup(entry->name, MM_SLEEP);
+			kfree(entry);
+			return 0;
+		}
+
+		kfree(entry);
 	}
 }
 
@@ -864,86 +844,6 @@ static object_handle_t *fs_handle_create(fs_node_t *node, int flags) {
 	return handle;
 }
 
-/** Read a page of data from a file.
- * @param cache		Cache being read from.
- * @param buf		Buffer to read into.
- * @param offset	Offset to read from.
- * @param nonblock	Whether the operation is required to not block.
- * @return		0 on success, negative error code on failure. */
-static int file_cache_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonblock) {
-	fs_node_t *node = cache->data;
-
-	if(node->ops->read_page) {
-		return node->ops->read_page(node, buf, offset, nonblock);
-	} else {
-		memset(buf, 0, PAGE_SIZE);
-		return 0;
-	}
-}
-
-/** Write a page of data to a file.
- * @param cache		Cache to write to.
- * @param buf		Buffer containing data to write.
- * @param offset	Offset to write from.
- * @param nonblock	Whether the operation is required to not block.
- * @return		0 on success, negative error code on failure. */
-static int file_cache_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
-	fs_node_t *node = cache->data;
-
-	/* If the node is read-only no modifications should have be made to
-	 * the page. */
-	assert(!FS_NODE_IS_RDONLY(node));
-
-	if(node->ops->write_page) {
-		return node->ops->write_page(node, buf, offset, nonblock);
-	} else {
-		/* Unless the cache is being destroyed, return an error, which
-		 * will cause the page to remain in the modified queue, so that
-		 * the page daemon won't ever try to evict the page. */
-		return (cache->deleted) ? 0 : -ERR_NOT_SUPPORTED;
-	}
-}
-
-/** Determine whether a file page can be evicted.
- * @param cache		Cache that the page belongs to.
- * @param page	 	Page to check.
- * @return		Always returns true. */
-static bool file_cache_evict_page(vm_cache_t *cache, vm_page_t *page) {
-	fs_node_t *node = cache->data;
-
-	/* If the file's pages should remain in memory, they will always remain
-	 * in the modified queue and will never end up in the cached or
-	 * pageable queues. */
-	assert(node->ops->write_page);
-
-	return true;
-}
-
-/** File data cache operations. */
-static vm_cache_ops_t file_cache_ops = {
-	.read_page = file_cache_read_page,
-	.write_page = file_cache_write_page,
-	.evict_page = file_cache_evict_page,
-};
-
-/** Get the data cache for a file.
- * @param node		Node to get data cache for.
- * @return		Pointer to node's data cache. */
-static vm_cache_t *fs_file_get_cache(fs_node_t *node) {
-	fs_info_t info;
-
-	assert(mutex_held(&node->lock));
-	assert(node->type == FS_NODE_FILE);
-
-	if(!node->data_cache) {
-		/* Create a new data cache. We first need to get the size. */
-		fs_node_info(node, &info);
-		node->data_cache = vm_cache_create(info.size, &file_cache_ops, node);
-	}
-
-	return node->data_cache;
-}
-
 /** Close a handle to a file.
  * @param handle	Handle to close. */
 static void file_object_close(object_handle_t *handle) {
@@ -956,11 +856,14 @@ static void file_object_close(object_handle_t *handle) {
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		0 if can be mapped, negative error code if not. */
 static int file_object_mappable(object_handle_t *handle, int flags) {
+	fs_node_t *node = (fs_node_t *)handle->object;
 	fs_handle_t *data = handle->data;
 
-	/* If shared write access is required, ensure that the handle flags
-	 * allow this. */
-	if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && !(data->flags & FS_FILE_WRITE)) {
+	/* Check whether the filesystem supports memory-mapping, and if shared
+	 * write access is requested, ensure that the handle flags allow it. */
+	if(!node->ops->get_cache) {
+		return -ERR_NOT_SUPPORTED;
+	} else if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && !(data->flags & FS_FILE_WRITE)) {
 		return -ERR_PERM_DENIED;
 	} else {
 		return 0;
@@ -976,9 +879,9 @@ static int file_object_get_page(object_handle_t *handle, offset_t offset, phys_p
 	fs_node_t *node = (fs_node_t *)handle->object;
 	vm_cache_t *cache;
 
-	mutex_lock(&node->lock);
-	cache = fs_file_get_cache(node);
-	mutex_unlock(&node->lock);
+	assert(node->ops->get_cache);
+
+	cache = node->ops->get_cache(node);
 	return vm_cache_get_page(cache, offset, physp);
 }
 
@@ -990,9 +893,9 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 	fs_node_t *node = (fs_node_t *)handle->object;
 	vm_cache_t *cache;
 
-	mutex_lock(&node->lock);
-	cache = fs_file_get_cache(node);
-	mutex_unlock(&node->lock);
+	assert(node->ops->get_cache);
+
+	cache = node->ops->get_cache(node);
 	vm_cache_release_page(cache, offset, phys);
 }
 
@@ -1009,93 +912,93 @@ static object_type_t file_object_type = {
  * @param path		Path to file to create.
  * @return		0 on success, negative error code on failure. */
 int fs_file_create(const char *path) {
-	fs_node_t *node;
-	int ret;
-
-	/* Allocate a new node and fill in some details. */
-	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, NULL, NULL);
-
-	/* Call the common creation code. */
-	ret = fs_node_create(path, node);
-	fs_node_release(node);
-	return ret;
+	return fs_node_create(path, FS_NODE_FILE, NULL);
 }
 
-/** Free an in-memory node.
+/** Structure containing details of a memory file. */
+typedef struct memory_file {
+	char *data;			/**< Data for the file. */
+	size_t size;			/**< Size of the file. */
+} memory_file_t;
+
+/** Free a memory file.
  * @param node		Node to free. */
-static void memory_node_free(fs_node_t *node) {
-	kfree(node->data);
+static void memory_file_free(fs_node_t *node) {
+	memory_file_t *file = node->data;
+
+	kfree(file->data);
+	kfree(file);
 }
 
-/** Modify the size of a file.
- * @param node		Node being resized.
- * @param size		New size of the node.
+/** Read from a memory file.
+ * @param node		Node to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset into file to read from.
+ * @param nonblock	Whether the write is required to not block.
+ * @param bytesp	Where to store number of bytes read.
  * @return		0 on success, negative error code on failure. */
-static int memory_node_resize(fs_node_t *node, offset_t size) {
-	*(offset_t *)node->data = size;
+static int memory_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset,
+                            bool nonblock, size_t *bytesp) {
+	memory_file_t *file = node->data;
+
+	if(offset >= file->size) {
+		*bytesp = 0;
+		return 0;
+	} else if((offset + count) > file->size) {
+		count = file->size - offset;
+	}
+
+	memcpy(buf, file->data + offset, count);
+	*bytesp = count;
 	return 0;
 }
 
-/** Get information about an in-memory node.
- * @param node		Node to get information on.
- * @param info		Information structure to fill in. */
-static void memory_node_info(fs_node_t *node, fs_info_t *info) {
-	info->size = *(offset_t *)node->data;
-}
-
-/** Operations for an in-memory node. */
-static fs_node_ops_t memory_node_ops = {
-	.free = memory_node_free,
-	.resize = memory_node_resize,
-	.info = memory_node_info,
+/** Operations for an in-memory file. */
+static fs_node_ops_t memory_file_ops = {
+	.free = memory_file_free,
+	.read = memory_file_read,
 };
 
-/** Create a special file backed by a chunk of memory.
+/** Create a read-only file backed by a chunk of memory.
  *
- * Creates a special file that is backed by the specified chunk of memory.
- * This is useful to pass data stored in memory to code that expects to be
- * operating on filesystem entries, such as the module loader.
+ * Creates a special read-only file that is backed by the specified chunk of
+ * memory. This is useful to pass data stored in memory to code that expects
+ * to be operating on filesystem entries, such as the module loader.
  *
- * When the file is created, the data in the given memory area is duplicated
- * into its data cache, so updates to the memory area after this function has
- * been called will not show on reads from the file. Similarly, writes to the
- * file will not be written back to the memory area.
+ * When the file is created, the data in the given memory area is duplicated,
+ * so updates to the memory area after this function has been called will not
+ * show on reads from the file.
  *
  * The file is not attached anywhere in the filesystem, and therefore when the
  * handle is closed, it will be immediately destroyed.
  *
+ * @note		Files created with this function do not support being
+ *			memory-mapped.
+ *
  * @param buf		Pointer to memory area to use.
  * @param size		Size of memory area.
- * @param flags		Flags for the handle.
- * @param handlep	Where to store handle to file.
+ * @param handlep	Where to store handle to file. The handle will be
+ *			created with the FS_FILE_READ flag.
  *
  * @return		0 on success, negative error code on failure.
  */
-int fs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep) {
-	object_handle_t *handle;
+int fs_file_from_memory(const void *buf, size_t size, object_handle_t **handlep) {
+	memory_file_t *file;
 	fs_node_t *node;
-	offset_t *data;
-	int ret;
 
-	if(!buf || !size || !flags || !handlep) {
+	if(!buf || !size || !handlep) {
 		return -ERR_PARAM_INVAL;
 	}
 
 	/* Create a node to store the data. */
-	data = kmalloc(sizeof(offset_t), MM_SLEEP);
-	*data = (offset_t)size;
-	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &memory_node_ops, data);
-
-	/* Create a temporary handle to the file with write permission and
-	 * write the data to the file. */
-	handle = fs_handle_create(node, FS_FILE_WRITE);
-	if((ret = fs_file_write(handle, buf, size, NULL)) == 0) {
-		*handlep = fs_handle_create(node, flags);
-	}
-
-	object_handle_release(handle);
+	file = kmalloc(sizeof(memory_file_t), MM_SLEEP);
+	file->data = kmemdup(buf, size, MM_SLEEP);
+	file->size = size;
+	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &memory_file_ops, file);
+	*handlep = fs_handle_create(node, FS_FILE_READ);
 	fs_node_release(node);
-	return ret;
+	return 0;
 }
 
 /** Open a handle to a file.
@@ -1135,7 +1038,6 @@ int fs_file_open(const char *path, int flags, object_handle_t **handlep) {
 static int fs_file_read_internal(object_handle_t *handle, void *buf, size_t count,
                                  offset_t offset, bool usehnd, size_t *bytesp) {
 	fs_handle_t *data;
-	vm_cache_t *cache;
 	size_t total = 0;
 	fs_node_t *node;
 	int ret = 0;
@@ -1155,6 +1057,9 @@ static int fs_file_read_internal(object_handle_t *handle, void *buf, size_t coun
 	if(!(data->flags & FS_FILE_READ)) {
 		ret = -ERR_PERM_DENIED;
 		goto out;
+	} else if(!node->ops->read) {
+		ret = -ERR_NOT_SUPPORTED;
+		goto out;
 	} else if(!count) {
 		goto out;
 	}
@@ -1166,28 +1071,7 @@ static int fs_file_read_internal(object_handle_t *handle, void *buf, size_t coun
 		rwlock_unlock(&data->lock);
 	}
 
-	/* If the node has a read operation, then first call that. */
-	if(node->ops->read) {
-		ret = node->ops->read(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
-
-		/* If the return value is 0, then we should use the file cache.
-		 * If it is 1, the function handled the read itself, so we
-		 * should return success. */
-		if(ret != 0) {
-			if(ret == 1) {
-				ret = 0;
-			}
-			goto out;
-		}
-	}
-
-	/* Get the node's data cache. */
-	mutex_lock(&node->lock);
-	cache = fs_file_get_cache(node);
-	mutex_unlock(&node->lock);
-
-	/* Read the data from the cache. */
-	ret = vm_cache_read(cache, buf, count, offset, data->flags & FS_NONBLOCK, &total);
+	ret = node->ops->read(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
 out:
 	if(total) {
 		dprintf("fs: read %zu bytes from offset 0x%" PRIx64 " in %p(%" PRIu16 ":%" PRIu64 ")\n",
@@ -1260,7 +1144,6 @@ int fs_file_pread(object_handle_t *handle, void *buf, size_t count, offset_t off
 static int fs_file_write_internal(object_handle_t *handle, const void *buf, size_t count,
                                   offset_t offset, bool usehnd, size_t *bytesp) {
 	fs_handle_t *data;
-	vm_cache_t *cache;
 	size_t total = 0;
 	fs_node_t *node;
 	fs_info_t info;
@@ -1281,76 +1164,30 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 	if(!(data->flags & FS_FILE_WRITE)) {
 		ret = -ERR_PERM_DENIED;
 		goto out;
+	} else if(!node->ops->write) {
+		ret = -ERR_NOT_SUPPORTED;
+		goto out;
 	} else if(!count) {
 		goto out;
 	}
 
-	/* Locking order - handle lock before node lock. */
-	rwlock_write_lock(&data->lock);
-	mutex_lock(&node->lock);
-
-	/* Get node information so that we know the file size. */
-	fs_node_info(node, &info);
-
 	/* Pull the offset out of the handle structure, and handle the
 	 * FS_FILE_APPEND flag. */
 	if(usehnd) {
+		rwlock_write_lock(&data->lock);
 		if(data->flags & FS_FILE_APPEND) {
+			/* Get node information so that we know the file size. */
+			mutex_lock(&node->lock);
+			fs_node_info(node, &info);
+			mutex_unlock(&node->lock);
+
 			data->offset = info.size;
 		}
 		offset = data->offset;
-	}
-	rwlock_unlock(&data->lock);
-
-	/* Attempt to resize the node if necessary. */
-	if((offset + count) > info.size) {
-		/* If the resize operation is not provided, we can only write
-		 * within the space that we have. */
-		if(!node->ops->resize) {
-			if(offset >= info.size) {
-				ret = 0;
-				mutex_unlock(&node->lock);
-				goto out;
-			} else {
-				count = (size_t)(info.size - offset);
-			}
-		} else {
-			if((ret = node->ops->resize(node, offset + count)) != 0) {
-				mutex_unlock(&node->lock);
-				goto out;
-			}
-
-			/* Resize the cache if there is one. */
-			if(node->data_cache) {
-				vm_cache_resize(node->data_cache, offset + count);
-			}
-		}
+		rwlock_unlock(&data->lock);
 	}
 
-	mutex_unlock(&node->lock);
-
-	/* If the node has a write operation, then first call that. */
-	if(node->ops->write) {
-		ret = node->ops->write(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
-
-		/* If the return value is 0, then we should use the file cache.
-		 * If it is 1, the function handled the write itself, so we
-		 * should return success. */
-		if(ret != 0) {
-			if(ret == 1) {
-				ret = 0;
-			}
-			goto out;
-		}
-	}
-
-	/* Get the node's data cache. */
-	mutex_lock(&node->lock);
-	cache = fs_file_get_cache(node);
-	mutex_unlock(&node->lock);
-
-	/* Write the data to the cache. */
-	ret = vm_cache_write(cache, buf, count, offset, data->flags & FS_NONBLOCK, &total);
+	ret = node->ops->write(node, buf, count, offset, data->flags & FS_NONBLOCK, &total);
 out:
 	if(total) {
 		dprintf("fs: wrote %zu bytes to offset 0x%" PRIx64 " in %p(%" PRIu16 ":%" PRIu64 ")\n",
@@ -1451,17 +1288,21 @@ int fs_file_resize(object_handle_t *handle, offset_t size) {
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	if((ret = node->ops->resize(node, size)) != 0) {
-		mutex_unlock(&node->lock);
-		return ret;
-	}
-
-	/* If the node has a data cache, resize it. */
-	if(node->data_cache) {
-		vm_cache_resize(node->data_cache, size);
-	}
+	ret = node->ops->resize(node, size);
 	mutex_unlock(&node->lock);
-	return 0;
+	return ret;
+}
+
+/** Look up an entry in a directory.
+ * @param node		Node to look up in.
+ * @param name		Name of entry to look up.
+ * @param idp		Where to store ID of node entry maps to.
+ * @return		0 on success, negative error code on failure. */
+static int fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
+	if(!node->ops->lookup_entry) {
+		return -ERR_NOT_SUPPORTED;
+	}
+	return node->ops->lookup_entry(node, name, idp);
 }
 
 /** Close a handle to a directory.
@@ -1477,127 +1318,11 @@ static object_type_t dir_object_type = {
 	.close = dir_object_close,
 };
 
-/** Ensure a directory's entry cache is allocated.
- * @param node		Node to allocate for. */
-static void fs_dir_alloc_cache(fs_node_t *node) {
-	if(!node->entry_cache) {
-		node->entry_cache = kmalloc(sizeof(fs_dir_cache_t), MM_SLEEP);
-		radix_tree_init(&node->entry_cache->entries);
-		node->entry_cache->count = 0;
-	}
-}
-
-/** Get a directory's entry cache.
- * @param node		Node of directory.
- * @param cachep	Where to store pointer to cache.
- * @return		0 on success, negative error code on failure. */
-static int fs_dir_get_cache(fs_node_t *node, fs_dir_cache_t **cachep) {
-	int ret;
-
-	assert(node->type == FS_NODE_DIR);
-	assert(node->ops);
-
-	/* Create a new cache if there isn't one yet. */
-	fs_dir_alloc_cache(node);
-	if(!node->entry_cache->count) {
-		if(likely(node->ops->cache_children)) {
-			if((ret = node->ops->cache_children(node)) != 0) {
-				radix_tree_clear(&node->entry_cache->entries, kfree);
-				kfree(node->entry_cache);
-				node->entry_cache = NULL;
-				return ret;
-			}
-		} else {
-			kprintf(LOG_WARN, "fs: entry cache empty, but operations lack cache_children (type: %s)\n",
-			        (node->mount) ? node->mount->type->name : "none");
-			return -ERR_NOT_FOUND;
-		}
-	}
-
-	*cachep = node->entry_cache;
-	return 0;
-}
-
-/** Look up a directory entry.
- * @param node		Node of directory (should be locked).
- * @param name		Name of entry to get.
- * @param idp		Where to store ID of node.
- * @return		0 on success, negative error code on failure. */
-static int fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
-	fs_dir_cache_t *cache;
-	fs_dir_entry_t *entry;
-	int ret;
-
-	/* Get the populated entry cache. */
-	if((ret = fs_dir_get_cache(node, &cache)) != 0) {
-		return ret;
-	}
-
-	/* Look up the entry. */
-	if((entry = radix_tree_lookup(&cache->entries, name))) {
-		*idp = entry->id;
-		return 0;
-	} else {
-		return -ERR_NOT_FOUND;
-	}
-}
-
-/** Add an entry to a directory's entry cache.
- *
- * Adds an entry to a directory node's entry cache. This function should only
- * be used by filesystem type operations.
- *
- * @param node		Node to add entry to.
- * @param name		Name of entry.
- * @param id		ID of node entry points to.
- */
-void fs_dir_insert(fs_node_t *node, const char *name, node_id_t id) {
-	fs_dir_entry_t *entry;
-	size_t len;
-
-	assert(node->type == FS_NODE_DIR);
-
-	/* Ensure the cache is created. */
-	fs_dir_alloc_cache(node);
-
-	/* Work out the length we need. */
-	len = sizeof(fs_dir_entry_t) + strlen(name) + 1;
-
-	/* Allocate the buffer for it and fill it in. */
-	entry = kmalloc(len, MM_SLEEP);
-	entry->length = len;
-	entry->id = id;
-	strcpy(entry->name, name);
-
-	/* Insert into the cache. */
-	radix_tree_insert(&node->entry_cache->entries, name, entry);
-	node->entry_cache->count++;
-}
-
-/** Remove an entry from a directory's entry cache.
- * @param node		Node to remove entry from.
- * @param name		Name of entry to remove. */
-static void fs_dir_remove(fs_node_t *node, const char *name) {
-	if(node->entry_cache) {
-		radix_tree_remove(&node->entry_cache->entries, name, kfree);
-		node->entry_cache->count--;
-	}
-}
-
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
  * @return		0 on success, negative error code on failure. */
 int fs_dir_create(const char *path) {
-	fs_node_t *node;
-	int ret;
-
-	/* Allocate a new node and fill in some details. */
-	node = fs_node_alloc(NULL, 0, FS_NODE_DIR, NULL, NULL);
-
-	/* Call the common creation code. */
-	ret = fs_node_create(path, node);
-	fs_node_release(node);
-	return ret;
+	return fs_node_create(path, FS_NODE_DIR, NULL);
 }
 
 /** Open a handle to a directory.
@@ -1637,11 +1362,10 @@ int fs_dir_open(const char *path, int flags, object_handle_t **handlep) {
  *			-ERR_NOT_FOUND will be returned.
  */
 int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
-	fs_dir_entry_t *entry = NULL;
 	fs_node_t *child, *node;
-	fs_dir_cache_t *cache;
-	offset_t i = 0, index;
+	fs_dir_entry_t *entry;
 	fs_handle_t *data;
+	offset_t index;
 	int ret;
 
 	if(!handle || !buf) {
@@ -1659,46 +1383,27 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	index = data->offset;
 	rwlock_unlock(&data->lock);
 
-	mutex_lock(&node->lock);
-
-	/* Obtain the entry cache for the directory, and ensure the index is
-	 * within the directory. */
-	if((ret = fs_dir_get_cache(node, &cache)) != 0) {
-		mutex_unlock(&node->lock);
+	/* Ask the filesystem to read the entry. */
+	if(!node->ops->read_entry) {
+		return -ERR_NOT_SUPPORTED;
+	} else if((ret = node->ops->read_entry(node, index, &entry)) != 0) {
 		return ret;
-	} else if(index >= (offset_t)cache->count) {
-		mutex_unlock(&node->lock);
-		return -ERR_NOT_FOUND;
 	}
 
-	/* Iterate through the tree to find the entry. */
-	RADIX_TREE_FOREACH(&cache->entries, iter) {
-		if(i++ == index) {
-			entry = radix_tree_entry(iter, fs_dir_entry_t);
-			break;
-		}
-	}
-
-	/* We should have it because we checked against the entry count. */
-	if(!entry) {
-		fatal("Entry %" PRIu64 " within size but not found (%p)", index, node);
-	}
-
-	/* Check that the buffer is large enough. */
-	if(size < entry->length) {
-		mutex_unlock(&node->lock);
+	/* Copy the entry across. */
+	if(entry->length > size) {
+		kfree(entry);
 		return -ERR_BUF_TOO_SMALL;
 	}
-
-	/* Copy it to the buffer. */
 	memcpy(buf, entry, entry->length);
+	kfree(entry);
 
-	mutex_unlock(&node->lock);
 	mutex_lock(&node->mount->lock);
 	mutex_lock(&node->lock);
 
 	/* Fix up the entry. */
-	if(node == node->mount->root && strcmp(entry->name, "..") == 0) {
+	buf->mount = node->mount->id;
+	if(node == node->mount->root && strcmp(buf->name, "..") == 0) {
 		/* This is the '..' entry, and the node is the root of its
 		 * mount. Change the node ID to be the ID of the mountpoint,
 		 * if any. */
@@ -1710,6 +1415,7 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 				mutex_unlock(&node->lock);
 				return ret;
 			}
+			buf->mount = node->mount->mountpoint->mount->id;
 			mutex_unlock(&node->mount->mountpoint->lock);
 		}
 	} else {
@@ -1723,6 +1429,7 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 				mutex_lock(&child->lock);
 				if(child->type == FS_NODE_DIR && child->mounted) {
 					buf->id = child->mounted->root->id;
+					buf->mount = child->mounted->id;
 				}
 				mutex_unlock(&child->lock);
 			}
@@ -1753,11 +1460,9 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
  * @return		0 on success, negative error code on failure.
  */
 int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
-	fs_dir_cache_t *cache;
 	fs_handle_t *data;
 	fs_node_t *node;
 	fs_info_t info;
-	int ret = 0;
 
 	if(!handle || (action != FS_SEEK_SET && action != FS_SEEK_ADD && action != FS_SEEK_END)) {
 		return -ERR_PARAM_INVAL;
@@ -1782,13 +1487,10 @@ int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, off
 		mutex_lock(&node->lock);
 
 		if(node->type == FS_NODE_DIR) {
-			/* We must cache the entries to know the entry count. */
-			if((ret = fs_dir_get_cache(node, &cache)) != 0) {
-				mutex_unlock(&node->lock);
-				rwlock_unlock(&data->lock);
-				return ret;
-			}
-			data->offset = (offset_t)cache->count + offset;
+			/* FIXME. */
+			mutex_unlock(&node->lock);
+			rwlock_unlock(&data->lock);
+			return -ERR_NOT_IMPLEMENTED;
 		} else {
 			/* Get the node information to find the size. */
 			fs_node_info(node, &info);
@@ -1853,33 +1555,6 @@ int fs_handle_sync(object_handle_t *handle) {
 	return ret;
 }
 
-/** Ensure that a symbolic link's destination is cached.
- * @param node		Node of link (should be locked).
- * @return		0 on success, negative error code on failure. */
-static int fs_symlink_cache(fs_node_t *node) {
-	int ret;
-
-	assert(node->type == FS_NODE_SYMLINK);
-
-	if(!node->link_cache) {
-		if(!node->ops->cache_dest) {
-			kprintf(LOG_WARN, "fs: cache_dest should be implemented on FS with symlinks (type: %s)\n",
-			        (node->mount) ? node->mount->type->name : "none");
-			return -ERR_NOT_SUPPORTED;
-		} else if((ret = node->ops->cache_dest(node)) != 0) {
-			return ret;
-		}
-
-		if(!node->link_cache) {
-			kprintf(LOG_WARN, "fs: cache_dest did not set link_cache (type: %s)\n",
-			        (node->mount) ? node->mount->type->name : "none");
-			return -ERR_NOT_SUPPORTED;
-		}
-	}
-
-	return 0;
-}
-
 /** Create a symbolic link.
  * @param path		Path to symbolic link to create.
  * @param target	Target for the symbolic link (does not have to exist).
@@ -1887,23 +1562,13 @@ static int fs_symlink_cache(fs_node_t *node) {
  *			directory containing the link.
  * @return		0 on success, negative error code on failure. */
 int fs_symlink_create(const char *path, const char *target) {
-	fs_node_t *node;
-	int ret;
-
-	/* Allocate a new node and fill in some details. */
-	node = fs_node_alloc(NULL, 0, FS_NODE_SYMLINK, NULL, NULL);
-	node->link_cache = kstrdup(target, MM_SLEEP);
-
-	/* Call the common creation code. */
-	ret = fs_node_create(path, node);
-	fs_node_release(node);
-	return ret;
+	return fs_node_create(path, FS_NODE_SYMLINK, target);
 }
 
 /** Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
- * be placed at the end of the buffer, unless the buffer is too small.
+ * always be placed at the end of the buffer, even if it is too small.
  *
  * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
@@ -1915,6 +1580,7 @@ int fs_symlink_create(const char *path, const char *target) {
  */
 int fs_symlink_read(const char *path, char *buf, size_t size) {
 	fs_node_t *node;
+	char *dest;
 	size_t len;
 	int ret;
 
@@ -1924,19 +1590,22 @@ int fs_symlink_read(const char *path, char *buf, size_t size) {
 		return ret;
 	}
 
-	mutex_lock(&node->lock);
-
-	/* Ensure destination is cached. */
-	if((ret = fs_symlink_cache(node)) != 0) {
-		mutex_unlock(&node->lock);
+	/* Read the link destination. */
+	if(!node->ops->read_link) {
+		return -ERR_NOT_SUPPORTED;
+	} else if((ret = node->ops->read_link(node, &dest)) != 0) {
 		return ret;
 	}
-
-	len = ((len = strlen(node->link_cache) + 1) > size) ? size : len;
-	memcpy(buf, node->link_cache, len);
-	mutex_unlock(&node->lock);
 	fs_node_release(node);
-	return (int)len;
+
+	len = strlen(dest);
+	if((len + 1) > size) {
+		len = size - 1;
+	}
+	memcpy(buf, dest, len);
+	buf[len] = 0;
+	kfree(dest);
+	return (int)len + 1;
 }
 
 /** Look up a mount by ID.
@@ -2329,8 +1998,6 @@ int fs_info(const char *path, bool follow, fs_info_t *info) {
  */
 int fs_unlink(const char *path) {
 	fs_node_t *parent = NULL, *node = NULL;
-	fs_dir_cache_t *cache;
-	fs_dir_entry_t *entry;
 	char *dir, *name;
 	int ret;
 
@@ -2361,27 +2028,7 @@ int fs_unlink(const char *path) {
 		goto out;
 	}
 
-	/* If it is a directory, ensure that it is empty. */
-	if(node->type == FS_NODE_DIR) {
-		if((ret = fs_dir_get_cache(node, &cache)) != 0) {
-			goto out;
-		}
-
-		RADIX_TREE_FOREACH(&cache->entries, iter) {
-			entry = radix_tree_entry(iter, fs_dir_entry_t);
-
-			if(strcmp(entry->name, "..") && strcmp(entry->name, ".")) {
-				ret = -ERR_IN_USE;
-				goto out;
-			}
-		}
-	}
-
-	/* Call the filesystem's unlink operation. */
-	if((ret = node->ops->unlink(parent, name, node)) == 0) {
-		/* Update the directory entry cache. */
-		fs_dir_remove(parent, name);
-	}
+	ret = node->ops->unlink(parent, name, node);
 out:
 	if(node) {
 		mutex_unlock(&node->lock);
@@ -2431,7 +2078,6 @@ int kdbg_cmd_mount(int argc, char **argv) {
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_node(int argc, char **argv) {
 	fs_node_t *node = NULL;
-	fs_dir_entry_t *entry;
 	list_t *list = NULL;
 	fs_mount_t *mount;
 	unative_t val;
@@ -2502,21 +2148,6 @@ int kdbg_cmd_node(int argc, char **argv) {
 		if(node->mounted) {
 			kprintf(LOG_NONE, "Mounted:      %p(%" PRIu16 ")\n", node->mounted,
 			        node->mounted->id);
-		}
-		if(node->type == FS_NODE_DIR) {
-			if(node->entry_cache) {
-				kprintf(LOG_NONE, "\nCached directory entries:\n");
-				RADIX_TREE_FOREACH(&node->entry_cache->entries, iter) {
-					entry = radix_tree_entry(iter, fs_dir_entry_t);
-					kprintf(LOG_NONE, "  Entry %p - %" PRIu64 "(%s)\n",
-					        entry, entry->id, entry->name);
-				}
-			}
-		} else if(node->type == FS_NODE_SYMLINK) {
-			kprintf(LOG_NONE, "Destination:  %p(%s)\n", node->link_cache,
-			        (node->link_cache) ? node->link_cache : "<not cached>");
-		} else if(node->type == FS_NODE_FILE) {
-			kprintf(LOG_NONE, "Cache:        %p\n", node->data_cache);
 		}
 	} else {
 		if(argc == 3) {
@@ -3047,9 +2678,9 @@ int sys_fs_symlink_create(const char *path, const char *target) {
 /** Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
- * be placed at the end of the buffer, unless the buffer is too small.
+ * always be placed at the end of the buffer, even if it is too small.
  *
- * @param path		Path to symbolic link.
+ * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
  * @param size		Size of buffer (destination will be truncated if buffer
  *			is too small).
@@ -3170,9 +2801,7 @@ int sys_fs_sync(void) {
  * @param size		Size of buffer.
  * @return		0 on success, negative error code on failure. */
 int sys_fs_getcwd(char *buf, size_t size) {
-	char *kbuf = NULL, *tmp, path[3];
-	fs_dir_cache_t *cache;
-	fs_dir_entry_t *entry;
+	char *kbuf = NULL, *tmp, *name, path[3];
 	fs_node_t *node;
 	size_t len = 0;
 	node_id_t id;
@@ -3207,29 +2836,16 @@ int sys_fs_getcwd(char *buf, size_t size) {
 			goto fail;
 		}
 
-		/* Now try to find the old node in this directory. */
-		if((ret = fs_dir_get_cache(node, &cache)) != 0) {
-			goto fail;
-		}
-		entry = NULL;
-		RADIX_TREE_FOREACH(&cache->entries, iter) {
-			entry = radix_tree_entry(iter, fs_dir_entry_t);
-			if(entry->id == id) {
-				break;
-			} else {
-				entry = NULL;
-			}
-		}
-		if(!entry) {
-			/* Directory has probably been unlinked. */
-			ret = -ERR_NOT_FOUND;
+		/* Look up the name of the child in this directory. */
+		if((ret = fs_node_name(node, id, &name)) != 0) {
 			goto fail;
 		}
 
 		/* Add the entry name on to the beginning of the path. */
-		len += ((kbuf) ? strlen(entry->name) + 1 : strlen(entry->name));
+		len += ((kbuf) ? strlen(name) + 1 : strlen(name));
 		tmp = kmalloc(len + 1, MM_SLEEP);
-		strcpy(tmp, entry->name);
+		strcpy(tmp, name);
+		kfree(name);
 		if(kbuf) {
 			strcat(tmp, "/");
 			strcat(tmp, kbuf);

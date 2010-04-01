@@ -47,5 +47,6 @@
 #define ERR_TIMED_OUT		23	/**< Timed out while waiting. */
 #define ERR_DEVICE_ERROR	24	/**< There was an error on the device. */
 #define ERR_OVERFLOW		25	/**< Integer overflow. */
+#define ERR_NOT_EMPTY		26	/**< Directory is not empty. */
 
 #endif /* __KERNEL_ERRORS_H */

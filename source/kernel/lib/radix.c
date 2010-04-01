@@ -502,22 +502,6 @@ void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helper) {
 	radix_tree_node_clear(&tree->root, helper);
 }
 
-/** Destroy a radix tree.
- *
- * Destroys a radix tree structure. The tree MUST be empty.
- *
- * @param tree		Tree to destroy.
- */
-void radix_tree_destroy(radix_tree_t *tree) {
-	size_t i;
-
-	for(i = 0; i < ARRAYSZ(tree->root.children); i++) {
-		if(tree->root.children[i] != NULL) {
-			fatal("Destroying non-empty radix tree %p", tree);
-		}
-	}
-}
-
 /** Get the node following a node in a radix tree.
  *
  * Gets the node with a key that follows another node's key in a radix tree.

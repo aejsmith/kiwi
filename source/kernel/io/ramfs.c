@@ -18,10 +18,15 @@
  * @brief		RAM-based temporary filesystem.
  */
 
+#include <io/entry_cache.h>
 #include <io/fs.h>
 
+#include <lib/string.h>
+
+#include <mm/cache.h>
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <errors.h>
 #include <init.h>
 
@@ -33,65 +38,96 @@ typedef struct ramfs_mount {
 
 /** RamFS node information structure. */
 typedef struct ramfs_node {
-	offset_t size;			/**< Size of the file. */
+	union {
+		vm_cache_t *cache;	/**< Data cache. */
+		entry_cache_t *entries;	/**< Directory entry store. */
+		char *target;		/**< Symbolic link destination. */
+	};
 } ramfs_node_t;
 
 /** Free a RamFS node.
  * @param node		Node to free. */
 static void ramfs_node_free(fs_node_t *node) {
-	kfree(node->data);
-}
-
-/** Resize a RamFS file.
- * @param node		Node to resize.
- * @param size		New size of the node.
- * @return		Always returns 0. */
-static int ramfs_node_resize(fs_node_t *node, offset_t size) {
 	ramfs_node_t *data = node->data;
-	data->size = size;
-	return 0;
+
+	/* Destroy the data caches. */
+	switch(node->type) {
+	case FS_NODE_FILE:
+		vm_cache_destroy(data->cache, true);
+		break;
+	case FS_NODE_DIR:
+		entry_cache_destroy(data->entries);
+		break;
+	case FS_NODE_SYMLINK:
+		kfree(data->target);
+		break;
+	default:
+		break;
+	}
+
+	kfree(data);
 }
 
 /** Create a RamFS filesystem node.
  * @param parent	Parent directory of the node.
  * @param name		Name to give the node.
- * @param node		Node structure describing the node being created.
+ * @param type		Type to give the new node.
+ * @param target	For symbolic links, the target of the link.
+ * @param nodep		Where to store pointer to node structure for created
+ *			entry.
  * @return		0 on success, negative error code on failure. */
-static int ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t *node) {
+static int ramfs_node_create(fs_node_t *parent, const char *name, fs_node_type_t type,
+                             const char *target, fs_node_t **nodep) {
 	ramfs_mount_t *mount = parent->mount->data;
-	ramfs_node_t *data;
+	ramfs_node_t *pdata = parent->data, *data;
+	node_id_t id;
 
-	/* Allocate a unique ID for the node. I would just test whether
-	 * (next ID + 1) < next ID, but according to GCC, signed overflow
-	 * doesn't happen...
-	 * http://archives.postgresql.org/pgsql-hackers/2005-12/msg00635.php */
-	mutex_lock(&mount->lock);
-	if(mount->next_id == INT32_MAX) {
-		mutex_unlock(&mount->lock);
-		return -ERR_NO_SPACE;
-	}
-	node->id = mount->next_id++;
-	mutex_unlock(&mount->lock);
+	assert(parent->type == FS_NODE_DIR);
 
 	/* Create the information structure. */
-	data = node->data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
-	data->size = 0;
+	data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
 
-	/* If we're creating a directory, add '.' and '..' entries to it. Other
-	 * directory entries will be maintained by the FS layer. */
-	if(node->type == FS_NODE_DIR) {
-		fs_dir_insert(node, ".", node->id);
-		fs_dir_insert(node, "..", parent->id);
+	/* Allocate a unique ID for the node. */
+	mutex_lock(&mount->lock);
+	id = mount->next_id++;
+	mutex_unlock(&mount->lock);
+
+	/* Create data stores. */
+	switch(type) {
+	case FS_NODE_FILE:
+		data->cache = vm_cache_create(0, NULL, NULL);
+		break;
+	case FS_NODE_DIR:
+		data->entries = entry_cache_create(NULL, NULL);
+
+		/* Add '.' and '..' entries to the cache. */
+		entry_cache_insert(data->entries, ".", id);
+		entry_cache_insert(data->entries, "..", parent->id);
+		break;
+	case FS_NODE_SYMLINK:
+		data->target = kstrdup(target, MM_SLEEP);
+		break;
+	default:
+		kfree(data);
+		return -ERR_NOT_SUPPORTED;
 	}
+
+	entry_cache_insert(pdata->entries, name, id);
+	*nodep = fs_node_alloc(parent->mount, id, type, parent->ops, data);
 	return 0;
 }
 
 /** Unlink a RamFS filesystem node.
  * @param parent	Parent directory of the node.
- * @param name		Name to give the node.
+ * @param name		Name of the node in the directory.
  * @param node		Node structure describing the node being created.
  * @return		0 on success, negative error code on failure. */
 static int ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t *node) {
+	ramfs_node_t *pdata = parent->data;
+
+	assert(parent->type == FS_NODE_DIR);
+
+	entry_cache_remove(pdata->entries, name);
 	fs_node_remove(node);
 	return 0;
 }
@@ -101,16 +137,138 @@ static int ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t *nod
  * @param info		Information structure to fill in. */
 static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
 	ramfs_node_t *data = node->data;
-	info->size = data->size;
+
+	info->links = 1;
+	info->size = (node->type == FS_NODE_FILE) ? data->cache->size : 0;
+	info->blksize = PAGE_SIZE;
+}
+
+/** Read from a RamFS file.
+ * @param node		Node to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset into file to read from.
+ * @param nonblock	Whether the write is required to not block.
+ * @param bytesp	Where to store number of bytes read.
+ * @return		0 on success, negative error code on failure. */
+static int ramfs_node_read(fs_node_t *node, void *buf, size_t count, offset_t offset,
+                           bool nonblock, size_t *bytesp) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_FILE);
+	return vm_cache_read(data->cache, buf, count, offset, nonblock, bytesp);
+}
+
+/** Write to a RamFS file.
+ * @param node		Node to write to.
+ * @param buf		Buffer containing data to write.
+ * @param count		Number of bytes to write.
+ * @param offset	Offset into file to write to.
+ * @param nonblock	Whether the write is required to not block.
+ * @param bytesp	Where to store number of bytes written.
+ * @return		0 on success, negative error code on failure. */
+static int ramfs_node_write(fs_node_t *node, const void *buf, size_t count, offset_t offset,
+                            bool nonblock, size_t *bytesp) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_FILE);
+
+	if((offset + count) > data->cache->size) {
+		vm_cache_resize(data->cache, offset + count);
+	}
+	return vm_cache_write(data->cache, buf, count, offset, nonblock, bytesp);
+}
+
+/** Get the data cache for a RamFS file.
+ * @param node		Node to get cache for.
+ * @return		Pointer to node's VM cache. */
+static vm_cache_t *ramfs_node_get_cache(fs_node_t *node) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_FILE);
+	return data->cache;
+}
+
+/** Resize a RamFS file.
+ * @param node		Node to resize.
+ * @param size		New size of the node.
+ * @return		Always returns 0. */
+static int ramfs_node_resize(fs_node_t *node, offset_t size) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_FILE);
+
+	vm_cache_resize(data->cache, size);
+	return 0;
+}
+
+/** Read a RamFS directory entry.
+ * @param node		Node to read from.
+ * @param index		Index of entry to read.
+ * @param entryp	Where to store pointer to directory entry structure.
+ * @return		0 on success, negative error code on failure. */
+static int ramfs_node_read_entry(fs_node_t *node, offset_t index, fs_dir_entry_t **entryp) {
+	ramfs_node_t *data = node->data;
+	fs_dir_entry_t *entry;
+	offset_t i = 0;
+
+	assert(node->type == FS_NODE_DIR);
+
+	mutex_lock(&data->entries->lock);
+
+	RADIX_TREE_FOREACH(&data->entries->entries, iter) {
+		entry = radix_tree_entry(iter, fs_dir_entry_t);
+
+		if(i++ == index) {
+			*entryp = kmemdup(entry, entry->length, MM_SLEEP);
+			mutex_unlock(&data->entries->lock);
+			return 0;
+		}
+	}
+
+	mutex_unlock(&data->entries->lock);
+	return -ERR_NOT_FOUND;
+}
+
+/** Look up a RamFS directory entry.
+ * @param node		Node to look up in.
+ * @param name		Name of entry to look up.
+ * @param idp		Where to store ID of node entry points to.
+ * @return		0 on success, negative error code on failure. */
+static int ramfs_node_lookup_entry(fs_node_t *node, const char *name, node_id_t *idp) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_DIR);
+	return entry_cache_lookup(data->entries, name, idp);
+}
+
+/** Read the destination of a RamFS symbolic link.
+ * @param node		Node to read from.
+ * @param destp		Where to store pointer to string containing link
+ *			destination.
+ * @return		0 on success, negative error code on failure. */
+static int ramfs_node_read_link(fs_node_t *node, char **destp) {
+	ramfs_node_t *data = node->data;
+
+	assert(node->type == FS_NODE_SYMLINK);
+
+	*destp = kstrdup(data->target, MM_SLEEP);
+	return 0;
 }
 
 /** RamFS node operations structure. */
 static fs_node_ops_t ramfs_node_ops = {
 	.free = ramfs_node_free,
-	.resize = ramfs_node_resize,
 	.create = ramfs_node_create,
 	.unlink = ramfs_node_unlink,
 	.info = ramfs_node_info,
+	.read = ramfs_node_read,
+	.write = ramfs_node_write,
+	.get_cache = ramfs_node_get_cache,
+	.resize = ramfs_node_resize,
+	.read_entry = ramfs_node_read_entry,
+	.lookup_entry = ramfs_node_lookup_entry,
+	.read_link = ramfs_node_read_link,
 };
 
 /** Unmount a RamFS.
@@ -131,6 +289,7 @@ static fs_mount_ops_t ramfs_mount_ops = {
  * @return		0 on success, negative error code on failure. */
 static int ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) {
 	ramfs_mount_t *data;
+	ramfs_node_t *ndata;
 
 	mount->ops = &ramfs_mount_ops,
 	mount->data = data = kmalloc(sizeof(ramfs_mount_t), MM_SLEEP);
@@ -138,10 +297,11 @@ static int ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count)
 	data->next_id = 1;
 
 	/* Create the root directory, and add '.' and '..' entries. */
-	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &ramfs_node_ops, NULL);
-	mount->root->data = kcalloc(1, sizeof(ramfs_node_t), MM_SLEEP);
-	fs_dir_insert(mount->root, ".", mount->root->id);
-	fs_dir_insert(mount->root, "..", mount->root->id);
+	ndata = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
+	ndata->entries = entry_cache_create(NULL, NULL);
+	entry_cache_insert(ndata->entries, ".", 0);
+	entry_cache_insert(ndata->entries, "..", 0);
+	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &ramfs_node_ops, ndata);
 	return 0;
 }
 

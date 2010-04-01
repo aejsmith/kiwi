@@ -57,7 +57,7 @@ static int vm_cache_ctor(void *obj, void *data, int mmflag) {
 
 /** Allocate a new VM cache.
  * @param size		Size of the cache.
- * @param ops		Pointer to operations structure.
+ * @param ops		Pointer to operations structure (optional).
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to cache structure. */
 vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
@@ -141,7 +141,7 @@ static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool o
 	if(!overwrite) {
 		/* If a read operation is provided, read in data, else zero
 		 * the page. */
-		if(cache->ops->read_page) {
+		if(cache->ops && cache->ops->read_page) {
 			/* When reading in page data we cannot guarantee that
 			 * the mapping won't be shared, because it's possible
 			 * that device driver will do work in another thread,
@@ -227,7 +227,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		if(offset >= cache->size) {
 			avl_tree_remove(&cache->pages, (key_t)offset);
 			vm_page_free(page, 1);
-		} else if(page->modified && cache->ops->write_page) {
+		} else if(page->modified && cache->ops && cache->ops->write_page) {
 			vm_page_queue(page, PAGE_QUEUE_MODIFIED);
 		} else {
 			page->modified = false;
@@ -292,7 +292,7 @@ int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
 	mutex_lock(&cache->lock);
 
 	/* Ensure that we do not go pass the end of the cache. */
-	if(offset >= cache->size) {
+	if(offset >= cache->size || count == 0) {
 		mutex_unlock(&cache->lock);
 		goto out;
 	} else if((offset + count) >= cache->size) {
@@ -371,7 +371,7 @@ int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t of
 	mutex_lock(&cache->lock);
 
 	/* Ensure that we do not go pass the end of the cache. */
-	if(offset >= cache->size) {
+	if(offset >= cache->size || count == 0) {
 		mutex_unlock(&cache->lock);
 		goto out;
 	} else if((offset + count) >= cache->size) {
@@ -507,7 +507,7 @@ static int vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
 
 	/* Should only end up here if the page is writable - when releasing
 	 * pages the modified flag is cleared if there is no write operation. */
-	assert(cache->ops->write_page);
+	assert(cache->ops && cache->ops->write_page);
 
 	mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 
@@ -567,7 +567,7 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
 
 		if(refcount_get(&page->count) != 0) {
 			fatal("Cache page still in use while destroying");
-		} else if((ret = vm_cache_flush_page_internal(cache, page)) != 0) {
+		} else if(!discard && (ret = vm_cache_flush_page_internal(cache, page)) != 0) {
 			cache->deleted = false;
 			mutex_unlock(&cache->lock);
 			return ret;

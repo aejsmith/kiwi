@@ -243,7 +243,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 
 		/* Map in the data and create a FS node from it. */
 		mapping = page_phys_map(amod->base, amod->size, MM_FATAL);
-		if(fs_file_from_memory(mapping, amod->size, FS_FILE_READ, &mod->handle) != 0) {
+		if(fs_file_from_memory(mapping, amod->size, &mod->handle) != 0) {
 			fatal("Failed to create node from module data");
 		}
 		page_phys_unmap(mapping, amod->size, true);

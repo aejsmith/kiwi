@@ -25,8 +25,6 @@
 #include <lib/radix.h>
 #include <lib/refcount.h>
 
-#include <mm/cache.h>
-
 #include <public/fs.h>
 
 #include <sync/mutex.h>
@@ -36,6 +34,8 @@
 
 struct fs_mount;
 struct fs_node;
+struct kernel_args;
+struct vm_cache;
 
 /** Structure containing a filesystem mount option. */
 typedef struct fs_mount_option {
@@ -111,103 +111,16 @@ typedef struct fs_node_ops {
 	 * @return		0 on success, negative error code on failure. */
 	int (*flush)(struct fs_node *node);
 
-	/** Read from a file.
-	 * @note		This function is provided to allow special
-	 *			handling for read operations to be done. If
-	 *			not provided, the file cache will be used.
-	 *			This function does not have to read the data,
-	 *			as depending on the return code the file cache
-	 *			may be used to read the data.
-	 * @param node		Node to read from.
-	 * @param buf		Buffer to read into.
-	 * @param count		Number of bytes to read.
-	 * @param offset	Offset into file to read from.
-	 * @param nonblock	Whether the write is required to not block.
-	 * @param bytesp	Where to store number of bytes read.
-	 * @return		If 1 is returned, then the function should have
-	 *			handled the entire operation itself and the
-	 *			file cache will not be used. If 0 is returned,
-	 *			the file cache will be used to perform the
-	 *			read. If a negative value is returned, then it
-	 *			is taken as an error. */
-	int (*read)(struct fs_node *node, void *buf, size_t count, offset_t offset,
-	            bool nonblock, size_t *bytesp);
-
-	/** Write to a file.
-	 * @note		This function is provided to allow special
-	 *			handling for write operations to be done (such
-	 *			as ensuring enough space is reserved on the
-	 *			filesystem). If not provided, the file cache
-	 *			will be used. This function does not have to
-	 *			write the data, as depending on the return code
-	 *			the file cache may be used to write the data.
-	 * @param node		Node to write to.
-	 * @param buf		Buffer containing data to write.
-	 * @param count		Number of bytes to write.
-	 * @param offset	Offset into file to write to.
-	 * @param nonblock	Whether the write is required to not block.
-	 * @param bytesp	Where to store number of bytes written.
-	 * @return		If 1 is returned, then the function should have
-	 *			handled the entire operation itself and the
-	 *			file cache will not be used. If 0 is returned,
-	 *			the file cache will be used to perform the
-	 *			write. If a negative value is returned, then it
-	 *			is taken as an error. */
-	int (*write)(struct fs_node *node, const void *buf, size_t count, offset_t offset,
-	             bool nonblock, size_t *bytesp);
-
-	/** Read a page of data from a file.
-	 * @note		If the page straddles across the end of the
-	 *			file, then only the part of the file that
-	 *			exists should be read.
-	 * @note		If not provided, then pages will be filled with
-	 *			zeros.
-	 * @param node		Node to read from.
-	 * @param buf		Buffer to read into.
-	 * @param offset	Offset within the file to read from (multiple
-	 *			of PAGE_SIZE).
-	 * @param nonblock	Whether the read is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*read_page)(struct fs_node *node, void *buf, offset_t offset, bool nonblock);
-
-	/** Write a page of data to a file.
-	 * @note		If the page straddles across the end of the
-	 *			file, then only the part of the file that
-	 *			exists should be written back.
-	 * @note		If this operation is not provided, then it
-	 *			is assumed that pages should always remain in
-	 *			the cache until its destruction (for example,
-	 *			RamFS does this).
-	 * @param node		Node to write to.
-	 * @param buf		Buffer containing data to write.
-	 * @param offset	Offset within the file to write to (multiple
-	 *			of PAGE_SIZE).
-	 * @param nonblock	Whether the write is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*write_page)(struct fs_node *node, const void *buf, offset_t offset, bool nonblock);
-
-	/** Modify the size of a file.
-	 * @param node		Node being resized.
-	 * @param size		New size of the node.
-	 * @return		0 on success, negative error code on failure. */
-	int (*resize)(struct fs_node *node, offset_t size);
-
 	/** Create a new node as a child of an existing directory.
-	 * @note		This function only has to create the directory
-	 *			entry on the filesystem - the entry will be
-	 *			cached when the function returns.
-	 * @note		When this function returns success, details in 
-	 *			the node structure should be filled in
-	 *			(including a node ID) as though get_node had
-	 *			also been called on it.
 	 * @param parent	Directory to create in.
 	 * @param name		Name to give directory entry.
-	 * @param node		Node structure describing the node being
-	 *			created. For symbolic links, the link_dest
-	 *			pointer in the node will point to a string
-	 *			containing the link destination.
+	 * @param type		Type to give the new node.
+	 * @param target	For symbolic links, the target of the link.
+	 * @param nodep		Where to store pointer to node structure for
+	 *			created entry.
 	 * @return		0 on success, negative error code on failure. */
-	int (*create)(struct fs_node *parent, const char *name, struct fs_node *node);
+	int (*create)(struct fs_node *parent, const char *name, fs_node_type_t type,
+	              const char *target, struct fs_node **nodep);
 
 	/** Remove an entry from a directory.
 	 * @note		If the node's link count reaches 0, this
@@ -217,6 +130,10 @@ typedef struct fs_node_ops {
 	 *			as soon as it has no users (it is up to the
 	 *			free operation to remove the node from the
 	 *			filesystem).
+	 * @note		If the node being unlinked is a directory, this
+	 *			function should ensure that it is empty (except
+	 *			for . and .. entries), and return -ERR_NOT_EMPTY
+	 *			if it isn't.
 	 * @param parent	Directory containing the node.
 	 * @param name		Name of the node in the directory.
 	 * @param node		Node being unlinked.
@@ -228,22 +145,68 @@ typedef struct fs_node_ops {
 	 * @param info		Information structure to fill in. */
 	void (*info)(struct fs_node *node, fs_info_t *info);
 
-	/** Cache directory contents.
-	 * @note		In order to add a directory entry to the cache,
-	 *			the fs_dir_insert() function should be
-	 *			used.
-	 * @param node		Node to cache contents of.
+	/** Read from a file.
+	 * @param node		Node to read from.
+	 * @param buf		Buffer to read into.
+	 * @param count		Number of bytes to read.
+	 * @param offset	Offset into file to read from.
+	 * @param nonblock	Whether the write is required to not block.
+	 * @param bytesp	Where to store number of bytes read.
 	 * @return		0 on success, negative error code on failure. */
-	int (*cache_children)(struct fs_node *node);
+	int (*read)(struct fs_node *node, void *buf, size_t count, offset_t offset,
+	            bool nonblock, size_t *bytesp);
 
-	/** Store the destination of a symbolic link.
-	 * @note		This function should set the link_cache pointer
-	 *			in the node structure to a pointer to a string,
-	 *			allocated using kmalloc() or a kmalloc()-based
-	 *			function, which contains the link destination.
-	 * @param node		Symbolic link to cache destination of.
+	/** Write to a file.
+	 * @note		It is up to this function to resize the file
+	 *			if necessary, resize will not be called before
+	 *			this function.
+	 * @param node		Node to write to.
+	 * @param buf		Buffer containing data to write.
+	 * @param count		Number of bytes to write.
+	 * @param offset	Offset into file to write to.
+	 * @param nonblock	Whether the write is required to not block.
+	 * @param bytesp	Where to store number of bytes written.
 	 * @return		0 on success, negative error code on failure. */
-	int (*cache_dest)(struct fs_node *node);
+	int (*write)(struct fs_node *node, const void *buf, size_t count, offset_t offset,
+	             bool nonblock, size_t *bytesp);
+
+	/** Get the data cache for a file.
+	 * @param node		Node to get cache for.
+	 * @return		Pointer to node's VM cache. If this function is
+	 *			provided, it is assumed that this function will
+	 *			always succeed, otherwise it is assumed that
+	 *			the file cannot be memory-mapped. */
+	struct vm_cache *(*get_cache)(struct fs_node *node);
+
+	/** Modify the size of a file.
+	 * @param node		Node being resized.
+	 * @param size		New size of the node.
+	 * @return		0 on success, negative error code on failure. */
+	int (*resize)(struct fs_node *node, offset_t size);
+
+	/** Read a directory entry.
+	 * @param node		Node to read from.
+	 * @param index		Index of entry to read.
+	 * @param entryp	Where to store pointer to directory entry
+	 *			structure (must be allocated using a
+	 *			kmalloc()-based function).
+	 * @return		0 on success, negative error code on failure. */
+	int (*read_entry)(struct fs_node *node, offset_t index, fs_dir_entry_t **entryp);
+
+	/** Look up a directory entry.
+	 * @param node		Node to look up in.
+	 * @param name		Name of entry to look up.
+	 * @param idp		Where to store ID of node entry points to.
+	 * @return		0 on success, negative error code on failure. */
+	int (*lookup_entry)(struct fs_node *node, const char *name, node_id_t *idp);
+
+	/** Read the destination of a symbolic link.
+	 * @param node		Node to read from.
+	 * @param destp		Where to store pointer to string (must be
+	 *			allocated using a kmalloc()-based function)
+	 *			containing link destination.
+	 * @return		0 on success, negative error code on failure. */
+	int (*read_link)(struct fs_node *node, char **destp);
 } fs_node_ops_t;
 
 /** Structure containing details of a mounted filesystem. */
@@ -270,12 +233,6 @@ typedef struct fs_mount {
 /** Mount behaviour flags. */
 #define FS_MOUNT_RDONLY		(1<<0)	/**< Mount is read-only. */
 
-/** Structure containing a directory entry cache. */
-typedef struct fs_dir_cache {
-	radix_tree_t entries;		/**< Tree of name to entry mappings. */
-	size_t count;			/**< Number of entries. */
-} fs_dir_cache_t;
-
 /** Structure containing details of a filesystem node. */
 typedef struct fs_node {
 	object_t obj;                   /**< Object header. */
@@ -291,18 +248,6 @@ typedef struct fs_node {
 	fs_node_ops_t *ops;		/**< Node operations. */
 	void *data;			/**< Internal data pointer for filesystem type. */
 	fs_mount_t *mount;		/**< Mount that the node resides on. */
-
-	/** Pointers to cached data. */
-	union {
-		/** Data cache (FS_NODE_FILE). */
-		vm_cache_t *data_cache;
-
-		/** Directory entry cache (FS_NODE_DIR). */
-		fs_dir_cache_t *entry_cache;
-
-		/** Symbolic link destination (FS_NODE_SYMLINK). */
-		char *link_cache;
-	};
 } fs_node_t;
 
 /** Node behaviour flags. */
@@ -324,14 +269,13 @@ extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t 
 extern void fs_node_release(fs_node_t *node);
 extern void fs_node_remove(fs_node_t *node);
 
-extern void fs_dir_insert(fs_node_t *node, const char *name, node_id_t id);
 
 /**
  * Kernel interface.
  */
 
 extern int fs_file_create(const char *path);
-extern int fs_file_from_memory(const void *buf, size_t size, int flags, object_handle_t **handlep);
+extern int fs_file_from_memory(const void *buf, size_t size, object_handle_t **handlep);
 extern int fs_file_open(const char *path, int flags, object_handle_t **handlep);
 extern int fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
 extern int fs_file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset,

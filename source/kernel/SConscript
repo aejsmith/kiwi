@@ -27,8 +27,9 @@ sources = map(File, [
 
 	'io/context.c',
 	'io/device.c',
+	'io/entry_cache.c',
+	'io/file_map.c',
 	'io/fs.c',
-	'io/map.c',
 	'io/ramfs.c',
 
 	'ipc/ipc.c',
