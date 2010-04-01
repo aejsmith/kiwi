@@ -18,7 +18,7 @@
  * @brief		File map functions.
  *
  * The functions in this file implement a cache for file block numbers to a
- * raw (i.e. on-disk block number). Also provided are VM cache helper functions
+ * raw (i.e. on-disk) block number. Also provided are VM cache helper functions
  * that can use data in a file map to handle reading and writing of data pages.
  */
 

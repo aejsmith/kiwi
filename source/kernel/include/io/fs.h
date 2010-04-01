@@ -237,21 +237,17 @@ typedef struct fs_mount {
 typedef struct fs_node {
 	object_t obj;                   /**< Object header. */
 
-	mutex_t lock;			/**< Lock to protect the node. */
 	refcount_t count;		/**< Number of references to the node. */
 	list_t mount_link;		/**< Link to mount's node lists. */
 	node_id_t id;			/**< ID of the node. */
 	fs_node_type_t type;		/**< Type of the node. */
-	int flags;			/**< Behaviour flags for the node. */
+	bool removed;			/**< Whether the node has been removed. */
 	fs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 
 	fs_node_ops_t *ops;		/**< Node operations. */
 	void *data;			/**< Internal data pointer for filesystem type. */
 	fs_mount_t *mount;		/**< Mount that the node resides on. */
 } fs_node_t;
-
-/** Node behaviour flags. */
-#define FS_NODE_REMOVED		(1<<0)	/**< Node has been removed from the filesystem. */
 
 /** Macro to check if a node is read-only. */
 #define FS_NODE_IS_RDONLY(node)	\

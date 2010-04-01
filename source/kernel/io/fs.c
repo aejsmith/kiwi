@@ -17,16 +17,6 @@
  * @file
  * @brief		Filesystem layer.
  *
- * @note		Mount locks should be taken before node locks. If a
- *			node lock is held and it is desired to lock its mount,
- *			you should unlock the node, lock the mount, then relock
- *			the node. If the node lock is taken first, a deadlock
- *			can occur (lock node, attempt to lock mount which
- *			blocks because node is being searched for, search
- *			attempts to lock node, deadlock).
- * @note		Handle locks should be taken before node locks.
- *
- * @todo		Could probably use an rwlock on nodes.
  * @todo		Node cache reclaim.
  */
 
@@ -204,7 +194,6 @@ int fs_type_unregister(fs_type_t *type) {
 static int fs_node_ctor(void *obj, void *data, int kmflag) {
 	fs_node_t *node = obj;
 
-	mutex_init(&node->lock, "fs_node_lock", 0);
 	list_init(&node->mount_link);
 	return 0;
 }
@@ -226,7 +215,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	refcount_set(&node->count, 1);
 	node->id = id;
 	node->type = type;
-	node->flags = 0;
+	node->removed = false;
 	node->mounted = NULL;
 	node->ops = ops;
 	node->data = data;
@@ -248,37 +237,10 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	return node;
 }
 
-/** Flush all changes to a node.
- * @param node		Node to flush. Both the node and its mount should be
- *			locked.
- * @return		0 on success, negative error code on failure. If a
- *			failure occurs while flushing file data, the function
- *			carries on attempting to flush, but still returns an
- *			error. If multiple errors occur, it is the most recent
- *			that is returned. */
-static int fs_node_flush(fs_node_t *node) {
-	int ret = 0, err;
-
-	assert(!node->mount || mutex_held(&node->mount->lock));
-	assert(mutex_held(&node->lock));
-
-	if(!FS_NODE_IS_RDONLY(node)) {
-		if(node->ops->flush) {
-			if((err = node->ops->flush(node)) != 0) {
-				ret = err;
-			}
-		}
-	}
-
-	return ret;
-}
-
 /** Flush changes to a node and free it.
  * @note		Never call this function unless it is necessary. Use
  *			fs_node_release().
- * @note		Mount lock (if there is a mount) and node lock must be
- *			held. Mount lock will still be locked when the function
- *			returns (or both on failure).
+ * @note		Mount lock (if there is a mount) must be held.
  * @param node		Node to free. Should be unused (zero reference count).
  * @return		0 on success, negative error code on failure (this can
  *			happen if an error occurs flushing the node data). */
@@ -287,11 +249,10 @@ static int fs_node_free(fs_node_t *node) {
 
 	assert(refcount_get(&node->count) == 0);
 	assert(!node->mount || mutex_held(&node->mount->lock));
-	assert(mutex_held(&node->lock));
 
 	/* Call the implementation to flush any changes and free up its data. */
 	if(node->ops) {
-		if(!FS_NODE_IS_RDONLY(node) && !(node->flags & FS_NODE_REMOVED) && node->ops->flush) {
+		if(!FS_NODE_IS_RDONLY(node) && !node->removed && node->ops->flush) {
 			if((ret = node->ops->flush(node)) != 0) {
 				return ret;
 			}
@@ -310,24 +271,22 @@ static int fs_node_free(fs_node_t *node) {
 	object_destroy(&node->obj);
 	dprintf("fs: freed node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
 	        (node->mount) ? node->mount->id : 0, node->id);
-	mutex_unlock(&node->lock);
 	slab_cache_free(fs_node_cache, node);
 	return 0;
 }
 
 /** Look up a node in the filesystem.
  * @param path		Path string to look up.
- * @param node		Node to begin lookup at (locked and referenced).
- *			Ignored if path is absolute.
+ * @param node		Node to begin lookup at (referenced). Ignored if path
+ *			is absolute.
  * @param follow	Whether to follow last path component if it is a
  *			symbolic link.
  * @param nest		Symbolic link nesting count.
- * @param nodep		Where to store pointer to node found (referenced and
- *			locked).
+ * @param nodep		Where to store pointer to node found (referenced).
  * @return		0 on success, negative error code on failure. */
 static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int nest,
                                    fs_node_t **nodep) {
-	fs_node_t *prev = NULL, *tmp;
+	fs_node_t *prev = NULL;
 	fs_mount_t *mount;
 	char *tok, *link;
 	node_id_t id;
@@ -339,7 +298,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 	if(path[0] == '/') {
 		/* Drop the node we were provided, if any. */
 		if(node != NULL) {
-			mutex_unlock(&node->lock);
 			fs_node_release(node);
 		}
 
@@ -351,7 +309,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 		/* Get the root node of the current process. */
 		assert(curr_proc->ioctx.root_dir);
 		node = curr_proc->ioctx.root_dir;
-		mutex_lock(&node->lock);
 		fs_node_get(node);
 
 		assert(node->type == FS_NODE_DIR);
@@ -379,7 +336,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 
 			/* Check whether the nesting count is too deep. */
 			if(++nest > SYMLOOP_MAX) {
-				mutex_unlock(&node->lock);
 				fs_node_release(prev);
 				fs_node_release(node);
 				return -ERR_LINK_LIMIT;
@@ -388,7 +344,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			/* Obtain the link destination. */
 			assert(node->ops->read_link);
 			if((ret = node->ops->read_link(node, &link)) != 0) {
-				mutex_unlock(&node->lock);
 				fs_node_release(prev);
 				fs_node_release(node);
 				return ret;
@@ -400,10 +355,8 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			/* Move up to the parent node. The previous iteration
 			 * of the loop left a reference on the previous node
 			 * for us. */
-			tmp = node; node = prev; prev = tmp;
-			mutex_unlock(&prev->lock);
-			fs_node_release(prev);
-			mutex_lock(&node->lock);
+			fs_node_release(node);
+			node = prev;
 
 			/* Recurse to find the link destination. The check
 			 * above ensures we do not infinitely recurse. */
@@ -419,9 +372,7 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			/* The new node is a symbolic link but we do not want
 			 * to follow it. We must release the previous node. */
 			assert(prev != node);
-			mutex_unlock(&node->lock);
 			fs_node_release(prev);
-			mutex_lock(&node->lock);
 		}
 
 		if(tok == NULL) {
@@ -433,7 +384,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			/* The previous token was not a directory: this means
 			 * the path string is trying to treat a non-directory
 			 * as a directory. Reject this. */
-			mutex_unlock(&node->lock);
 			fs_node_release(node);
 			return -ERR_TYPE_INVAL;
 		} else if(!tok[0]) {
@@ -464,15 +414,12 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 				prev = node;
 				node = prev->mount->mountpoint;
 				fs_node_get(node);
-				mutex_unlock(&prev->lock);
 				fs_node_release(prev);
-				mutex_lock(&node->lock);
 			}
 		}
 
 		/* Look up this name within the directory. */
 		if((ret = fs_dir_lookup(node, tok, &id)) != 0) {
-			mutex_unlock(&node->lock);
 			fs_node_release(node);
 			return ret;
 		}
@@ -483,10 +430,8 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			continue;
 		}
 
-		/* Acquire the mount lock. See note in file header about
-		 * locking order. */
+		/* Acquire the mount lock. */
 		mount = node->mount;
-		mutex_unlock(&node->lock);
 		mutex_lock(&mount->lock);
 
 		prev = node;
@@ -501,7 +446,10 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 
 			/* Check if the node has a mount on top of it. Only
 			 * need to do this if the node was cached because nodes
-			 * with mounts on will always be in the cache. */
+			 * with mounts on will always be in the cache. Note
+			 * that fs_unmount() takes the parent mount lock before
+			 * changing node->mounted, therefore it is protected as
+			 * we hold the mount lock. */
 			if(node->mounted) {
 				node = node->mounted->root;
 
@@ -540,15 +488,11 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			mutex_unlock(&mount->lock);
 		}
 
-		/* Do not release the previous node if the current node is a
-		 * symbolic link, as the symbolic link code requires it. */
+		/* Do not release the previous node if the new node is a
+		 * symbolic link, as the symbolic link lookup requires it. */
 		if(node->type != FS_NODE_SYMLINK) {
 			fs_node_release(prev);
 		}
-
-		/* Lock the new node. We do not release the previous node yet
-		 * as it may be needed by the symbolic link code. */
-		mutex_lock(&node->lock);
 	}
 }
 
@@ -570,8 +514,7 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
  *			specified whether to follow the link or return the node
  *			of the link itself.
  * @param type		Required node type (negative will not check the type).
- * @param nodep		Where to store pointer to node found (referenced,
- *			unlocked).
+ * @param nodep		Where to store pointer to node found (referenced).
  *
  * @return		0 on success, negative error code on failure.
  */
@@ -593,7 +536,6 @@ static int fs_node_lookup(const char *path, bool follow, int type, fs_node_t **n
 	if(path[0] != '/') {
 		assert(curr_proc->ioctx.curr_dir);
 		node = curr_proc->ioctx.curr_dir;
-		mutex_lock(&node->lock);
 		fs_node_get(node);
 	}
 
@@ -604,11 +546,9 @@ static int fs_node_lookup(const char *path, bool follow, int type, fs_node_t **n
 	if((ret = fs_node_lookup_internal(dup, node, follow, 0, &node)) == 0) {
 		if(type >= 0 && node->type != (fs_node_type_t)type) {
 			ret = -ERR_TYPE_INVAL;
-			mutex_unlock(&node->lock);
 			fs_node_release(node);
 		} else {
 			*nodep = node;
-			mutex_unlock(&node->lock);
 		}
 	}
 
@@ -645,18 +585,16 @@ void fs_node_release(fs_node_t *node) {
 		mutex_lock(&node->mount->lock);
 		mount = node->mount;
 	}
-	mutex_lock(&node->lock);
 
 	if(refcount_dec(&node->count) == 0) {
 		assert(!node->mounted);
 
 		/* Node has no references remaining, move it to its mount's
 		 * unused list if it has a mount. If the node is not attached
-		 * to anything, then destroy it immediately. */
-		if(mount && !(node->flags & FS_NODE_REMOVED) && !list_empty(&node->mount_link)) {
+		 * to anything or is removed, then destroy it immediately. */
+		if(mount && !node->removed && !list_empty(&node->mount_link)) {
 			list_append(&node->mount->unused_nodes, &node->mount_link);
 			dprintf("fs: transferred node %p to unused list (mount: %p)\n", node, node->mount);
-			mutex_unlock(&node->lock);
 			mutex_unlock(&mount->lock);
 		} else {
 			/* This shouldn't fail - the only thing that can fail
@@ -673,7 +611,6 @@ void fs_node_release(fs_node_t *node) {
 			}
 		}
 	} else {
-		mutex_unlock(&node->lock);
 		if(mount) {
 			mutex_unlock(&mount->lock);
 		}
@@ -689,7 +626,7 @@ void fs_node_release(fs_node_t *node) {
  * @param node		Node to mark as removed.
  */
 void fs_node_remove(fs_node_t *node) {
-	node->flags |= FS_NODE_REMOVED;
+	node->removed = true;
 }
 
 /** Common node creation code.
@@ -728,7 +665,6 @@ static int fs_node_create(const char *path, fs_node_type_t type, const char *tar
 	}
 
 	mutex_lock(&parent->mount->lock);
-	mutex_lock(&parent->lock);
 
 	/* Ensure that we are on a writable filesystem, and that the FS
 	 * supports node creation. */
@@ -762,7 +698,6 @@ static int fs_node_create(const char *path, fs_node_type_t type, const char *tar
 	        path, node->mount->id, node->id, parent->mount->id, parent->id);
 out:
 	if(parent) {
-		mutex_unlock(&parent->lock);
 		mutex_unlock(&parent->mount->lock);
 		fs_node_release(parent);
 	}
@@ -775,11 +710,9 @@ out:
 }
 
 /** Get information about a node.
- * @param node		Node to get information for. Lock must be held.
+ * @param node		Node to get information for.
  * @param info		Structure to store information in. */
 static void fs_node_info(fs_node_t *node, fs_info_t *info) {
-	assert(mutex_held(&node->lock));
-
 	memset(info, 0, sizeof(fs_info_t));
 	info->id = node->id;
 	info->mount = (node->mount) ? node->mount->id : 0;
@@ -1176,11 +1109,7 @@ static int fs_file_write_internal(object_handle_t *handle, const void *buf, size
 	if(usehnd) {
 		rwlock_write_lock(&data->lock);
 		if(data->flags & FS_FILE_APPEND) {
-			/* Get node information so that we know the file size. */
-			mutex_lock(&node->lock);
 			fs_node_info(node, &info);
-			mutex_unlock(&node->lock);
-
 			data->offset = info.size;
 		}
 		offset = data->offset;
@@ -1266,7 +1195,6 @@ int fs_file_pwrite(object_handle_t *handle, const void *buf, size_t count, offse
 int fs_file_resize(object_handle_t *handle, offset_t size) {
 	fs_handle_t *data;
 	fs_node_t *node;
-	int ret;
 
 	if(!handle) {
 		return -ERR_PARAM_INVAL;
@@ -1276,21 +1204,16 @@ int fs_file_resize(object_handle_t *handle, offset_t size) {
 
 	node = (fs_node_t *)handle->object;
 	data = handle->data;
-	mutex_lock(&node->lock);
 	assert(node->type == FS_NODE_FILE);
 
 	/* Check if resizing is allowed. */
 	if(!(data->flags & FS_FILE_WRITE)) {
-		mutex_unlock(&node->lock);
 		return -ERR_PERM_DENIED;
 	} else if(!node->ops->resize) {
-		mutex_unlock(&node->lock);
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	ret = node->ops->resize(node, size);
-	mutex_unlock(&node->lock);
-	return ret;
+	return node->ops->resize(node, size);
 }
 
 /** Look up an entry in a directory.
@@ -1399,7 +1322,6 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	kfree(entry);
 
 	mutex_lock(&node->mount->lock);
-	mutex_lock(&node->lock);
 
 	/* Fix up the entry. */
 	buf->mount = node->mount->id;
@@ -1408,15 +1330,11 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 		 * mount. Change the node ID to be the ID of the mountpoint,
 		 * if any. */
 		if(node->mount->mountpoint) {
-			mutex_lock(&node->mount->mountpoint->lock);
 			if((ret = fs_dir_lookup(node->mount->mountpoint, "..", &buf->id)) != 0) {
-				mutex_unlock(&node->mount->mountpoint->lock);
 				mutex_unlock(&node->mount->lock);
-				mutex_unlock(&node->lock);
 				return ret;
 			}
 			buf->mount = node->mount->mountpoint->mount->id;
-			mutex_unlock(&node->mount->mountpoint->lock);
 		}
 	} else {
 		/* Check if the entry refers to a mountpoint. In this case we
@@ -1426,18 +1344,16 @@ int fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 		 * mountpoint (mountpoints are always in the cache). */
 		if((child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id))) {
 			if(child != node) {
-				mutex_lock(&child->lock);
+				/* Mounted pointer is protected by mount lock. */
 				if(child->type == FS_NODE_DIR && child->mounted) {
 					buf->id = child->mounted->root->id;
 					buf->mount = child->mounted->id;
 				}
-				mutex_unlock(&child->lock);
 			}
 		}
 	}
 
 	mutex_unlock(&node->mount->lock);
-	mutex_unlock(&node->lock);
 
 	/* Update offset in the handle. */
 	rwlock_read_lock(&data->lock);
@@ -1484,20 +1400,14 @@ int fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, off
 		data->offset += offset;
 		break;
 	case FS_SEEK_END:
-		mutex_lock(&node->lock);
-
 		if(node->type == FS_NODE_DIR) {
 			/* FIXME. */
-			mutex_unlock(&node->lock);
 			rwlock_unlock(&data->lock);
 			return -ERR_NOT_IMPLEMENTED;
 		} else {
-			/* Get the node information to find the size. */
 			fs_node_info(node, &info);
 			data->offset = info.size + offset;
 		}
-
-		mutex_unlock(&node->lock);
 		break;
 	}
 
@@ -1524,9 +1434,7 @@ int fs_handle_info(object_handle_t *handle, fs_info_t *info) {
 	}
 
 	node = (fs_node_t *)handle->object;
-	mutex_lock(&node->lock);
 	fs_node_info(node, info);
-	mutex_unlock(&node->lock);
 	return 0;
 }
 
@@ -1535,7 +1443,6 @@ int fs_handle_info(object_handle_t *handle, fs_info_t *info) {
  * @return		0 on success, negative error code on failure. */
 int fs_handle_sync(object_handle_t *handle) {
 	fs_node_t *node;
-	int ret;
 
 	if(!handle) {
 		return -ERR_PARAM_INVAL;
@@ -1545,14 +1452,11 @@ int fs_handle_sync(object_handle_t *handle) {
 	}
 
 	node = (fs_node_t *)handle->object;
-	mutex_lock(&node->mount->lock);
-	mutex_lock(&node->lock);
-
-	ret = fs_node_flush(node);
-
-	mutex_unlock(&node->lock);
-	mutex_unlock(&node->mount->lock);
-	return ret;
+	if(!FS_NODE_IS_RDONLY(node) && node->ops->flush) {
+		return node->ops->flush(node);
+	} else {
+		return 0;
+	}
 }
 
 /** Create a symbolic link.
@@ -1736,8 +1640,6 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 			goto fail;
 		}
 
-		mutex_lock(&node->lock);
-
 		/* Check that it is not being used as a mount point already. */
 		if(node->mount->root == node) {
 			ret = -ERR_IN_USE;
@@ -1821,7 +1723,6 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 	/* Make the mountpoint point to the new mount. */
 	if(mount->mountpoint) {
 		mount->mountpoint->mounted = mount;
-		mutex_unlock(&mount->mountpoint->lock);
 	}
 
 	/* Store mount in mounts list and unlock the mount lock. */
@@ -1852,7 +1753,6 @@ fail:
 		kfree(mount);
 	}
 	if(node) {
-		mutex_unlock(&node->lock);
 		fs_node_release(node);
 	}
 	mutex_unlock(&mounts_lock);
@@ -1898,11 +1798,11 @@ int fs_unmount(const char *path) {
 	mount = node->mount;
 	mutex_lock(&mount->mountpoint->mount->lock);
 	mutex_lock(&mount->lock);
-	mutex_lock(&node->lock);
 
 	/* Get rid of the reference the lookup added, and check if any nodes
 	 * on the mount are in use. */
 	if(refcount_dec(&node->count) != 1) {
+		assert(refcount_get(&node->count));
 		ret = -ERR_IN_USE;
 		goto fail;
 	} else if(node->mount_link.next != &mount->used_nodes || node->mount_link.prev != &mount->used_nodes) {
@@ -1913,11 +1813,7 @@ int fs_unmount(const char *path) {
 	/* Flush all child nodes. */
 	LIST_FOREACH_SAFE(&mount->unused_nodes, iter) {
 		child = list_entry(iter, fs_node_t, mount_link);
-
-		/* On success, the child is unlocked by fs_node_free(). */
-		mutex_lock(&child->lock);
 		if((ret = fs_node_free(child)) != 0) {
-			mutex_unlock(&child->lock);
 			goto fail;
 		}
 	}
@@ -1951,7 +1847,6 @@ int fs_unmount(const char *path) {
 fail:
 	if(node) {
 		if(mount) {
-			mutex_unlock(&node->lock);
 			mutex_unlock(&mount->lock);
 			mutex_unlock(&mount->mountpoint->mount->lock);
 		} else {
@@ -1978,9 +1873,7 @@ int fs_info(const char *path, bool follow, fs_info_t *info) {
 		return ret;
 	}
 
-	mutex_lock(&node->lock);
 	fs_node_info(node, info);
-	mutex_unlock(&node->lock);
 	fs_node_release(node);
 	return 0;
 }
@@ -2014,9 +1907,6 @@ int fs_unlink(const char *path) {
 		goto out;
 	}
 
-	mutex_lock(&parent->lock);
-	mutex_lock(&node->lock);
-
 	if(parent->mount != node->mount) {
 		ret = -ERR_IN_USE;
 		goto out;
@@ -2031,11 +1921,9 @@ int fs_unlink(const char *path) {
 	ret = node->ops->unlink(parent, name, node);
 out:
 	if(node) {
-		mutex_unlock(&node->lock);
-		mutex_unlock(&parent->lock);
 		fs_node_release(node);
-		fs_node_release(parent);
-	} else if(parent) {
+	}
+	if(parent) {
 		fs_node_release(parent);
 	}
 	kfree(dir);
@@ -2131,22 +2019,20 @@ int kdbg_cmd_node(int argc, char **argv) {
 		        (node->mount) ? node->mount->id : 0, node->id);
 		kprintf(LOG_NONE, "=================================================\n");
 
-		kprintf(LOG_NONE, "Count:        %d\n", refcount_get(&node->count));
-		kprintf(LOG_NONE, "Locked:       %d (%" PRId32 ")\n", atomic_get(&node->lock.locked),
-		        (node->lock.holder) ? node->lock.holder->id : -1);
+		kprintf(LOG_NONE, "Count:   %d\n", refcount_get(&node->count));
 		if(node->mount) {
-			kprintf(LOG_NONE, "Mount:        %p (Locked: %d (%" PRId32 "))\n", node->mount,
+			kprintf(LOG_NONE, "Mount:   %p (Locked: %d (%" PRId32 "))\n", node->mount,
 			        atomic_get(&node->mount->lock.locked),
 			        (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
 		} else {
-			kprintf(LOG_NONE, "Mount:        %p\n", node->mount);
+			kprintf(LOG_NONE, "Mount:   %p\n", node->mount);
 		}
-		kprintf(LOG_NONE, "Ops:          %p\n", node->ops);
-		kprintf(LOG_NONE, "Data:         %p\n", node->data);
-		kprintf(LOG_NONE, "Flags:        %d\n", node->flags);
-		kprintf(LOG_NONE, "Type:         %d\n", node->type);
+		kprintf(LOG_NONE, "Ops:     %p\n", node->ops);
+		kprintf(LOG_NONE, "Data:    %p\n", node->data);
+		kprintf(LOG_NONE, "Removed: %d\n", node->removed);
+		kprintf(LOG_NONE, "Type:    %d\n", node->type);
 		if(node->mounted) {
-			kprintf(LOG_NONE, "Mounted:      %p(%" PRIu16 ")\n", node->mounted,
+			kprintf(LOG_NONE, "Mounted: %p(%" PRIu16 ")\n", node->mounted,
 			        node->mounted->id);
 		}
 	} else {
@@ -2161,26 +2047,22 @@ int kdbg_cmd_node(int argc, char **argv) {
 			}
 		}
 
-		kprintf(LOG_NONE, "ID       Flags Count Locked Type Ops                Data               Mount\n");
-		kprintf(LOG_NONE, "==       ===== ===== ====== ==== ===                ====               =====\n");
+		kprintf(LOG_NONE, "ID       Count Removed Type Ops                Data               Mount\n");
+		kprintf(LOG_NONE, "==       ===== ======= ==== ===                ====               =====\n");
 
 		if(list) {
 			LIST_FOREACH(list, iter) {
 				node = list_entry(iter, fs_node_t, mount_link);
-
-				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-5d %-6d %-4d %-18p %-18p %p\n",
-				        node->id, node->flags, refcount_get(&node->count),
-				        atomic_get(&node->lock.locked), node->type, node->ops,
-				        node->data, node->mount);
+				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
+				        node->id, refcount_get(&node->count), node->removed,
+				        node->type, node->ops, node->data, node->mount);
 			}
 		} else {
 			AVL_TREE_FOREACH(&mount->nodes, iter) {
 				node = avl_tree_entry(iter, fs_node_t);
-
-				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-5d %-6d %-4d %-18p %-18p %p\n",
-				        node->id, node->flags, refcount_get(&node->count),
-				        atomic_get(&node->lock.locked), node->type, node->ops,
-				        node->data, node->mount);
+				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
+				        node->id, refcount_get(&node->count), node->removed,
+				        node->type, node->ops, node->data, node->mount);
 			}
 		}
 	}
@@ -2815,7 +2697,6 @@ int sys_fs_getcwd(char *buf, size_t size) {
 
 	/* Get the working directory. */
 	node = curr_proc->ioctx.curr_dir;
-	mutex_lock(&node->lock);
 	fs_node_get(node);
 
 	/* Loop through until we reach the root. */
@@ -2854,7 +2735,6 @@ int sys_fs_getcwd(char *buf, size_t size) {
 		kbuf = tmp;
 	}
 
-	mutex_unlock(&node->lock);
 	fs_node_release(node);
 	rwlock_unlock(&curr_proc->ioctx.lock);
 
@@ -2876,7 +2756,6 @@ int sys_fs_getcwd(char *buf, size_t size) {
 	return ret;
 fail:
 	if(node) {
-		mutex_unlock(&node->lock);
 		fs_node_release(node);
 	}
 	rwlock_unlock(&curr_proc->ioctx.lock);
