@@ -74,6 +74,7 @@ file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data) {
 	}
 
 	map = slab_cache_alloc(file_map_cache, MM_SLEEP);
+	map->block_size = blksize;
 	map->blocks_per_chunk = CHUNK_SIZE / blksize;
 	map->ops = ops;
 	map->data = data;
@@ -149,7 +150,7 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 
 	mutex_lock(&map->lock);
 
-	for(i = start; i < count; i++) {
+	for(i = start; i < (start + count); i++) {
 		if(!(chunk = avl_tree_lookup(&map->chunks, i / map->blocks_per_chunk))) {
 			continue;
 		}
@@ -241,6 +242,14 @@ int file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset, boo
 
 	return 0;
 }
+
+/** VM cache operations using a file map to read/write blocks.
+ * @note		Cache data pointer should be set to a pointer to the
+ *			file map. */
+vm_cache_ops_t file_map_vm_cache_ops = {
+	.read_page = file_map_read_page,
+	.write_page = file_map_write_page,
+};
 
 /** Initialise the file map slab cache. */
 static void __init_text file_map_init(void) {

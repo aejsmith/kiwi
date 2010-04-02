@@ -27,6 +27,7 @@
 #include <sync/mutex.h>
 
 struct file_map;
+struct vm_cache_ops;
 struct vm_cache;
 
 /** Structure containing operations for a file map.
@@ -66,6 +67,8 @@ typedef struct file_map {
 	file_map_ops_t *ops;		/**< Operations for the map. */
 	void *data;			/**< Implementation-specific data pointer. */
 } file_map_t;
+
+extern struct vm_cache_ops file_map_vm_cache_ops;
 
 extern file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data);
 extern void file_map_destroy(file_map_t *map);
