@@ -27,6 +27,7 @@
 #include <endian.h>
 
 #include "ext2.h"
+#include "../../kernel/modules/fs/ext2/ext2.h"
 
 /** Data for an Ext2 mount. */
 typedef struct ext2_mount {

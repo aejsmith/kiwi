@@ -32,112 +32,28 @@
 
 #include "ext2_priv.h"
 
-/** Recurse through the extent index tree to find a leaf.
- * @param mount		Mount being read from.
- * @param header	Extent header to start at.
- * @param num		Block number to get.
- * @param leafp		Where to store pointer to header for leaf.
- * @param freep		Where to store whether to free the block.
- * @return		0 on success, negative error code on failure. */
-static int ext4_find_leaf(ext2_mount_t *mount, ext4_extent_header_t *header,
-                          uint32_t num, ext4_extent_header_t **leafp,
-                          bool *freep) {
-	ext4_extent_idx_t *index;
-	void *block = NULL;
-	uint64_t leaf;
-	uint16_t i;
-	int ret;
-
-	*freep = false;
-	while(true) {
-		index = (ext4_extent_idx_t *)&header[1];
-
-		if(le16_to_cpu(header->eh_magic) != EXT4_EXT_MAGIC) {
-			if(block) { kfree(block); }
-			return -ERR_DEVICE_ERROR;
-		} else if(!le16_to_cpu(header->eh_depth)) {
-			*leafp = header;
-			return 0;
-		}
-
-		for(i = 0; i < le16_to_cpu(header->eh_entries); i++) {
-			if(num < le32_to_cpu(index[i].ei_block)) {
-				break;
-			}
-		}
-
-		if(!i) {
-			if(block) { kfree(block); }
-			return -ERR_DEVICE_ERROR;
-		}
-
-		block = kmalloc(mount->block_size, MM_SLEEP);
-		*freep = true;
-		leaf = le32_to_cpu(index[i - 1].ei_leaf);
-		leaf |= (uint64_t)le16_to_cpu(index[i - 1].ei_leaf_hi) << 32;
-		if((ret = ext2_block_read(mount, block, leaf, false)) != 0) {
-			if(block) { kfree(block); }
-			return ret;
-		}
-		header = (ext4_extent_header_t *)block;
-	}
-}
+/** Get the number of entries per block. */
+#define ENTRIES_PER_BLOCK(i)	((i)->mount->block_size / sizeof(uint32_t))
 
 /** Get the raw block number from an inode block number.
  * @todo		Triple indirect blocks.
- * @param map		Block map to get for.
+ * @param map		File map to get for.
  * @param block		Block number within the inode to get.
- * @param nump		Where to store raw block number.
+ * @param rawp		Where to store raw block number.
  * @return		0 on success, negative error code on failure. */
-static int ext2_block_map_lookup(block_map_t *map, uint64_t block, uint64_t *nump) {
+static int ext2_map_lookup(file_map_t *map, uint64_t block, uint64_t *rawp) {
 	uint32_t *i_block = NULL, *bi_block = NULL;
 	ext2_inode_t *inode = map->data;
-	ext4_extent_header_t *header;
-	ext4_extent_t *extent;
-	uint64_t num;
+	uint32_t num;
 	int ret = 0;
-	uint16_t i;
-	bool free;
 
-	if(le32_to_cpu(inode->disk.i_flags) & EXT4_EXTENTS_FL) {
-		if((ret = ext4_find_leaf(inode->mount, (ext4_extent_header_t *)inode->disk.i_block,
-		                         block, &header, &free)) != 0) {
-			return ret;
-		}
-
-		extent = (ext4_extent_t *)&header[1];
-		for(i = 0; i < le16_to_cpu(header->eh_entries); i++) {
-			if(block < le32_to_cpu(extent[i].ee_block)) {
-				break;
-			}
-		}
-
-		if(!i) {
-			if(free) {
-				kfree(header);
-			}
-			return -ERR_DEVICE_ERROR;
-		}
-
-		block -= le32_to_cpu(extent[i - 1].ee_block);
-		if(block >= le16_to_cpu(extent[i - 1].ee_len)) {
-			*nump = 0;
-		} else {
-			num = le32_to_cpu(extent[i - 1].ee_start);
-			num |= (uint64_t)le16_to_cpu(extent[i - 1].ee_start_hi) << 32;
-			*nump = block + num;
-		}
-
-		if(free) {
-			kfree(header);
-		}
-		return 0;
-	}
+	dprintf("ext2: looking up block %" PRIu64 " within inode %p(%" PRIu32 ")\n",
+	        block, inode, inode->num);
 
 	/* First check if it's a direct block. This is easy to handle, just
 	 * need to get it straight out of the inode structure. */
 	if(block < EXT2_NDIR_BLOCKS) {
-		*nump = (uint64_t)le32_to_cpu(inode->disk.i_block[block]);
+		*rawp = (uint64_t)le32_to_cpu(inode->disk.i_block[block]);
 		goto out;
 	}
 
@@ -147,48 +63,45 @@ static int ext2_block_map_lookup(block_map_t *map, uint64_t block, uint64_t *num
 	/* Check whether the indirect block contains the block number we need.
 	 * The indirect block contains as many 32-bit entries as will fit in
 	 * one block of the filesystem. */
-	if(block < (inode->mount->block_size / sizeof(uint32_t))) {
+	if(block < ENTRIES_PER_BLOCK(inode)) {
 		num = le32_to_cpu(inode->disk.i_block[EXT2_IND_BLOCK]);
 		if(num == 0) {
-			*nump = 0;
+			*rawp = 0;
 			goto out;
-		} else if((ret = ext2_block_read(inode->mount, i_block, num, false)) != 1) {
-			ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		} else if((ret = ext2_block_read(inode->mount, i_block, num, false)) != 0) {
 			goto out;
 		}
 
-		*nump = le32_to_cpu(i_block[block]);
+		*rawp = (uint64_t)le32_to_cpu(i_block[block]);
 		goto out;
 	}
 
-	block -= inode->mount->block_size / sizeof(uint32_t);
+	block -= ENTRIES_PER_BLOCK(inode);
 	bi_block = kmalloc(inode->mount->block_size, MM_SLEEP);
 
 	/* Not in the indirect block, check the bi-indirect blocks. The
 	 * bi-indirect block contains as many 32-bit entries as will fit in
 	 * one block of the filesystem, with each entry pointing to an
 	 * indirect block. */
-	if(block < ((inode->mount->block_size / sizeof(uint32_t)) * (inode->mount->block_size / sizeof(uint32_t)))) {
+	if(block < (ENTRIES_PER_BLOCK(inode) * ENTRIES_PER_BLOCK(inode))) {
 		num = le32_to_cpu(inode->disk.i_block[EXT2_DIND_BLOCK]);
 		if(num == 0) {
-			*nump = 0;
+			*rawp = 0;
 			goto out;
-		} else if((ret = ext2_block_read(inode->mount, bi_block, num, false)) != 1) {
-			ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		} else if((ret = ext2_block_read(inode->mount, bi_block, num, false)) != 0) {
 			goto out;
 		}
 
 		/* Get indirect block inside bi-indirect block. */
-		num = le32_to_cpu(bi_block[block / (inode->mount->block_size / sizeof(uint32_t))]);
+		num = le32_to_cpu(bi_block[block / ENTRIES_PER_BLOCK(inode)]);
 		if(num == 0) {
-			*nump = 0;
+			*rawp = 0;
 			goto out;
-		} else if((ret = ext2_block_read(inode->mount, i_block, num, false)) != 1) {
-			ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		} else if((ret = ext2_block_read(inode->mount, i_block, num, false)) != 0) {
 			goto out;
 		}
 
-		*nump = le32_to_cpu(i_block[block % (inode->mount->block_size / sizeof(uint32_t))]);
+		*rawp = (uint64_t)le32_to_cpu(i_block[block % ENTRIES_PER_BLOCK(inode)]);
 		goto out;
 	}
 
@@ -202,72 +115,66 @@ out:
 	if(i_block) {
 		kfree(i_block);
 	}
-
-	return (ret < 0) ? ret : 0;
+	if(ret == 0) {
+		dprintf("ext2: looked up to %" PRIu64 "\n", *rawp);
+	}
+	return ret;
 }
 
-/** Ext2 block map operations. */
-static block_map_ops_t ext2_block_map_ops = {
-	.lookup = ext2_block_map_lookup,
-};
-
-/** Get an inode from an Ext2 filesystem.
- * @param mount		Mount to read from. Should be locked.
- * @param num		Inode number to read.
- * @param inodep	Where to store pointer to inode structure.
+/** Read a raw Ext2 block.
+ * @param map		Map the read is for.
+ * @param buf		Buffer to read into.
+ * @param num		Raw block number.
+ * @param nonblock	Whether the operation is required to not block.
  * @return		0 on success, negative error code on failure. */
-static int ext2_inode_get_internal(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep) {
-	ext2_inode_t *inode = NULL;
-	size_t group, bytes;
-	offset_t offset;
-	int ret;
+static int ext2_map_read_block(file_map_t *map, void *buf, uint64_t num, bool nonblock) {
+	ext2_inode_t *inode = map->data;
 
-	/* Get the group descriptor table containing the inode. */
-	if((group = (num - 1) / mount->inodes_per_group) >= mount->block_groups) {
-		dprintf("ext2: group number %zu is invalid on mount %p\n", group, mount);
-		return -ERR_FORMAT_INVAL;
+	dprintf("ext2: reading raw block %" PRIu64 " for inode %p(%" PRIu32 ")\n",
+	        num, inode, inode->num);
+
+	if(num == 0) {
+		/* Sparse block, fill with zeros. */
+		memset(buf, 0, inode->mount->block_size);
+		return 0;
+	} else {
+		return ext2_block_read(inode->mount, buf, num, nonblock);
 	}
-
-	/* Get the offset of the inode in the group's inode table. */
-	offset = ((num - 1) % mount->inodes_per_group) * mount->inode_size;
-
-	/* Create a structure to store details of the inode in memory. */
-	inode = kmalloc(sizeof(ext2_inode_t), MM_SLEEP);
-	rwlock_init(&inode->lock, "ext2_inode_lock");
-	inode->num = num;
-	inode->disk_size = MIN(mount->inode_size, sizeof(ext2_disk_inode_t));
-	inode->disk_offset = ((offset_t)le32_to_cpu(mount->group_tbl[group].bg_inode_table) * mount->block_size) + offset;
-	inode->mount = mount;
-
-	/* Read it in. */
-	if((ret = device_read(mount->device, &inode->disk, inode->disk_size,
-	                      inode->disk_offset, &bytes)) != 0) {
-		dprintf("ext2: error occurred while reading inode %" PRIu64 " (%d)\n", num, ret);
-		kfree(inode);
-		return ret;
-	} else if(bytes != inode->disk_size) {
-		kfree(inode);
-		return -ERR_FORMAT_INVAL;
-	}
-
-	/* Create the block map. */
-	inode->block_map = block_map_create(mount->block_size, &ext2_block_map_ops, inode);
-
-	dprintf("ext2: read inode %" PRIu64 " from %" PRIu64 " (group: %zu, block: %zu)\n",
-		num, inode->disk_offset, group,
-		le32_to_cpu(mount->group_tbl[group].bg_inode_table));
-	*inodep = inode;
-	return 0;
 }
+
+/** Write a raw Ext2 block.
+ * @param map		Map the write is for.
+ * @param buf		Buffer containing data to write.
+ * @param num		Raw block number.
+ * @param nonblock	Whether the operation is required to not block.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_map_write_block(file_map_t *map, const void *buf, uint64_t num, bool nonblock) {
+	ext2_inode_t *inode = map->data;
+
+	dprintf("ext2: writing raw block %" PRIu64 " for inode %p(%" PRIu32 ")\n",
+	        num, inode, inode->num);
+
+	if(num != 0) {
+		return ext2_block_write(inode->mount, buf, num, nonblock);
+	} else {
+		return 0;
+	}
+}
+
+/** Ext2 file map operations. */
+static file_map_ops_t ext2_file_map_ops = {
+	.lookup = ext2_map_lookup,
+	.read_block = ext2_map_read_block,
+	.write_block = ext2_map_write_block,
+};
 
 /** Allocate an inode block.
  * @todo		Triple indirect blocks.
- * @param inode		Inode to allocate for. Should be write-locked.
+ * @param inode		Inode to allocate for. Should be locked.
  * @param block		Block number to allocate.
  * @param nonblock	Whether to allow blocking.
- * @param rawp		Where to store raw block number.
  * @return		0 on success, negative error code on failure. */
-static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonblock, uint32_t *rawp) {
+static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonblock) {
 	uint32_t *i_block = NULL, *bi_block = NULL, raw = 0, i_raw, bi_raw;
 	int ret;
 
@@ -276,7 +183,12 @@ static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonb
 	/* Allocate a new raw block. */
 	if((ret = ext2_block_alloc(inode->mount, nonblock, &raw)) != 0) {
 		return ret;
+	} else if((ret = ext2_block_zero(inode->mount, raw)) != 0) {
+		goto out;
 	}
+
+	dprintf("ext2: mapping block %" PRIu32 " within inode %p(%" PRIu32 ") to %" PRIu32 "\n",
+	        block, inode, inode->num, raw);
 
 	/* First check if it's a direct block. This is easy to handle, just
 	 * stick it straight into the inode structure. */
@@ -294,22 +206,22 @@ static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonb
 	i_block = kmalloc(inode->mount->block_size, MM_SLEEP);
 
 	/* Check whether the block is in the indirect block. */
-	if(block < (inode->mount->block_size / sizeof(uint32_t))) {
+	if(block < ENTRIES_PER_BLOCK(inode)) {
 		if((i_raw = le32_to_cpu(inode->disk.i_block[EXT2_IND_BLOCK])) == 0) {
-			dprintf("ext2: allocating indirect block for %p(%" PRIu64 ")\n", inode, inode->num);
+			dprintf("ext2: allocating indirect block for %p(%" PRIu32 ")\n", inode, inode->num);
 
 			/* Allocate a new indirect block. */
 			if((ret = ext2_block_alloc(inode->mount, nonblock, &i_raw)) != 0) {
 				goto out;
 			}
 
-			memset(i_block, 0, inode->mount->block_size);
 			inode->disk.i_block[EXT2_IND_BLOCK] = cpu_to_le32(i_raw);
+
 			I_BLOCKS_INC(inode);
 			ext2_inode_flush(inode);
+			memset(i_block, 0, inode->mount->block_size);
 		} else {
-			if((ret = ext2_block_read(inode->mount, i_block, i_raw, nonblock)) != 1) {
-				ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+			if((ret = ext2_block_read(inode->mount, i_block, i_raw, nonblock)) != 0) {
 				goto out;
 			}
 		}
@@ -317,8 +229,7 @@ static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonb
 		i_block[block] = cpu_to_le32(raw);
 
 		/* Write back the updated block. */
-		if((ret = ext2_block_write(inode->mount, i_block, i_raw, nonblock)) != 1) {
-			ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		if((ret = ext2_block_write(inode->mount, i_block, i_raw, nonblock)) != 0) {
 			goto out;
 		}
 
@@ -327,54 +238,58 @@ static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonb
 		goto out;
 	}
 
-	block -= inode->mount->block_size / sizeof(uint32_t);
+	block -= ENTRIES_PER_BLOCK(inode);
 	bi_block = kmalloc(inode->mount->block_size, MM_SLEEP);
 
 	/* Try the bi-indirect block. */
-	if(block < ((inode->mount->block_size / sizeof(uint32_t)) * (inode->mount->block_size / sizeof(uint32_t)))) {
+	if(block < (ENTRIES_PER_BLOCK(inode) * ENTRIES_PER_BLOCK(inode))) {
 		if((bi_raw = le32_to_cpu(inode->disk.i_block[EXT2_DIND_BLOCK])) == 0) {
-			dprintf("ext2: allocating bi-indirect block for %p(%" PRIu64 ")\n", inode, inode->num);
+			dprintf("ext2: allocating bi-indirect block for %p(%" PRIu32 ")\n", inode, inode->num);
 
 			/* Allocate a new bi-indirect block. */
 			if((ret = ext2_block_alloc(inode->mount, nonblock, &bi_raw)) != 0) {
 				goto out;
 			}
 
-			memset(bi_block, 0, inode->mount->block_size);
 			inode->disk.i_block[EXT2_DIND_BLOCK] = cpu_to_le32(bi_raw);
+
 			I_BLOCKS_INC(inode);
 			ext2_inode_flush(inode);
+			memset(bi_block, 0, inode->mount->block_size);
 		} else {
-			if((ret = ext2_block_read(inode->mount, bi_block, bi_raw, nonblock)) != 1) {
-				ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+			if((ret = ext2_block_read(inode->mount, bi_block, bi_raw, nonblock)) != 0) {
 				goto out;
 			}
 		}
 
-		if((i_raw = le32_to_cpu(bi_block[block / (inode->mount->block_size / sizeof(uint32_t))])) == 0) {
-			dprintf("ext2: allocating indirect block for %p(%" PRIu64 ")\n", inode, inode->num);
+		if((i_raw = le32_to_cpu(bi_block[block / ENTRIES_PER_BLOCK(inode)])) == 0) {
+			dprintf("ext2: allocating indirect block for %p(%" PRIu32 ")\n", inode, inode->num);
 
 			/* Allocate a new indirect block. */
 			if((ret = ext2_block_alloc(inode->mount, nonblock, &i_raw)) != 0) {
 				goto out;
 			}
 
-			memset(i_block, 0, inode->mount->block_size);
-			bi_block[block / (inode->mount->block_size / sizeof(uint32_t))] = cpu_to_le32(i_raw);
+			bi_block[block / ENTRIES_PER_BLOCK(inode)] = cpu_to_le32(i_raw);
+
+			/* Write back the updated block. */
+			if((ret = ext2_block_write(inode->mount, bi_block, bi_raw, nonblock)) != 0) {
+				goto out;
+			}
+
 			I_BLOCKS_INC(inode);
 			ext2_inode_flush(inode);
+			memset(i_block, 0, inode->mount->block_size);
 		} else {
-			if((ret = ext2_block_read(inode->mount, i_block, i_raw, nonblock)) != 1) {
-				ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+			if((ret = ext2_block_read(inode->mount, i_block, i_raw, nonblock)) != 0) {
 				goto out;
 			}
 		}
 
-		i_block[block] = cpu_to_le32(raw);
+		i_block[block % ENTRIES_PER_BLOCK(inode)] = cpu_to_le32(raw);
 
 		/* Write back the updated block. */
-		if((ret = ext2_block_write(inode->mount, i_block, i_raw, nonblock)) != 1) {
-			ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		if((ret = ext2_block_write(inode->mount, i_block, i_raw, nonblock)) != 0) {
 			goto out;
 		}
 
@@ -387,16 +302,20 @@ static int ext2_inode_block_alloc(ext2_inode_t *inode, uint32_t block, bool nonb
 	dprintf("ext2: tri-indirect blocks not yet supported!\n");
 	ret = -ERR_NOT_IMPLEMENTED;
 out:
-	if(bi_block != NULL) { kfree(bi_block); };
-	if(i_block != NULL) { kfree(i_block); };
-	if(ret < 0) {
-		ext2_block_free(inode->mount, raw);
-		return ret;
+	if(ret == 0) {
+		if(bi_block) {
+			file_map_invalidate(inode->map, block + EXT2_NDIR_BLOCKS + ENTRIES_PER_BLOCK(inode), 1);
+		} else if(i_block) {
+			file_map_invalidate(inode->map, block + EXT2_NDIR_BLOCKS, 1);
+		} else {
+			file_map_invalidate(inode->map, block, 1);
+		}
 	} else {
-		block_map_invalidate(inode->block_map, block, 1);
-		*rawp = raw;
-		return 0;
+		ext2_block_free(inode->mount, raw);
 	}
+	if(bi_block) { kfree(bi_block); };
+	if(i_block) { kfree(i_block); };
+	return ret;
 }
 
 /** Free an inode block.
@@ -427,13 +346,13 @@ static int ext2_inode_iblock_free(ext2_inode_t *inode, uint32_t *num) {
 	int ret;
 
 	/* Read in the block. */
-	if((ret = ext2_block_read(inode->mount, block, le32_to_cpu(*num), false)) != 1) {
+	if((ret = ext2_block_read(inode->mount, block, le32_to_cpu(*num), false)) != 0) {
 		kfree(block);
-		return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		return ret;
 	}
 
 	/* Loop through each entry and free the blocks. */
-	for(i = 0; i < (inode->mount->block_size / sizeof(uint32_t)); i++) {
+	for(i = 0; i < ENTRIES_PER_BLOCK(inode); i++) {
 		if(block[i] == 0) {
 			continue;
 		} else if((ret = ext2_inode_block_free(inode, &block[i])) != 0) {
@@ -458,13 +377,13 @@ static int ext2_inode_biblock_free(ext2_inode_t *inode, uint32_t *num) {
 	int ret;
 
 	/* Read in the block. */
-	if((ret = ext2_block_read(inode->mount, block, le32_to_cpu(*num), false)) != 1) {
+	if((ret = ext2_block_read(inode->mount, block, le32_to_cpu(*num), false)) != 0) {
 		kfree(block);
-		return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		return ret;
 	}
 
 	/* Loop through each entry and free the blocks. */
-	for(i = 0; i < (inode->mount->block_size / sizeof(uint32_t)); i++) {
+	for(i = 0; i < ENTRIES_PER_BLOCK(inode); i++) {
 		if(block[i] == 0) {
 			continue;
 		} else if((ret = ext2_inode_iblock_free(inode, &block[i])) != 0) {
@@ -485,18 +404,18 @@ static int ext2_inode_biblock_free(ext2_inode_t *inode, uint32_t *num) {
  * @param inode		Inode to truncate. Should be locked.
  * @param size		New size of node.
  * @return		0 on success, negative error code on failure. */
-static int ext2_inode_truncate(ext2_inode_t *inode, uint32_t size) {
+static int ext2_inode_truncate(ext2_inode_t *inode, offset_t size) {
 	size_t count;
 	int i, ret;
 
 	assert(!(inode->mount->parent->flags & FS_MOUNT_RDONLY));
 
-	if(le32_to_cpu(inode->disk.i_size) <= size) {
+	if(inode->size <= size) {
 		return 0;
 	}
 
 	/* TODO. I'm lazy. */
-	if(size != 0) {
+	if(size > 0) {
 		return -ERR_NOT_IMPLEMENTED;
 	}
 
@@ -506,6 +425,12 @@ static int ext2_inode_truncate(ext2_inode_t *inode, uint32_t size) {
 		dprintf("ext2: tri-indirect blocks not yet supported!\n");
 		return -ERR_NOT_IMPLEMENTED;
 	}
+
+	count = ROUND_UP(inode->size, inode->mount->block_size) / inode->mount->block_size;
+	file_map_invalidate(inode->map, 0, count);
+	vm_cache_resize(inode->cache, size);
+	inode->size = 0;
+	ext2_inode_flush(inode);
 
 	for(i = 0; i < EXT2_N_BLOCKS; i++) {
 		if(le32_to_cpu(inode->disk.i_block[i]) == 0) {
@@ -525,10 +450,6 @@ static int ext2_inode_truncate(ext2_inode_t *inode, uint32_t size) {
 		}
 	}
 
-	count = ROUND_UP(le32_to_cpu(inode->disk.i_size), inode->mount->block_size) / inode->mount->block_size;
-	block_map_invalidate(inode->block_map, 0, count);
-	inode->disk.i_size = 0;
-	ext2_inode_flush(inode);
 	return 0;
 }
 
@@ -549,10 +470,10 @@ int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t 
 
 	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock);
+	mutex_lock(&mount->lock);
 
 	if(le32_to_cpu(mount->sb.s_free_inodes_count) == 0) {
-		rwlock_unlock(&mount->lock);
+		mutex_unlock(&mount->lock);
 		return -ERR_NO_SPACE;
 	}
 
@@ -570,10 +491,10 @@ int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t 
 		/* Iterate through all inodes in the bitmap. */
 		block = kmalloc(mount->block_size, MM_SLEEP);
 		for(i = 0; i < count; i++) {
-			if((ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 1) {
-				rwlock_unlock(&mount->lock);
+			if((ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 0) {
+				mutex_unlock(&mount->lock);
 				kfree(block);
-				return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+				return ret;
 			}
 
 			for(j = 0; j < ((mount->block_size / sizeof(uint32_t)) * 32); j++) {
@@ -588,21 +509,21 @@ int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t 
 		kprintf(LOG_WARN, "ext2: inconsistency: group %" PRIu32 " has %" PRIu16 " inodes free, but none found\n",
 			num, le16_to_cpu(group->bg_free_inodes_count));
 		kfree(block);
-		rwlock_unlock(&mount->lock);
+		mutex_unlock(&mount->lock);
 		return -ERR_DEVICE_ERROR;
 	}
 
 	kprintf(LOG_WARN, "ext2: inconsistency: superblock has %" PRIu32 " inodes free, but none found\n",
 		le32_to_cpu(mount->sb.s_free_inodes_count));
-	rwlock_unlock(&mount->lock);
+	mutex_unlock(&mount->lock);
 	return -ERR_DEVICE_ERROR;
 found:
 	/* Mark the inode as allocated and write back the bitmap block. */
 	block[j / 32] |= (1 << (j % 32));
-	if((ret = ext2_block_write(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 1) {
-		rwlock_unlock(&mount->lock);
+	if((ret = ext2_block_write(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 0) {
+		mutex_unlock(&mount->lock);
 		kfree(block);
-		return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		return ret;
 	}
 
 	kfree(block);
@@ -618,12 +539,14 @@ found:
 	in = (num * mount->inodes_per_group) + (i * (mount->block_size * 8)) + j + 1;
 
 	/* Get the inode and set up information. */
-	if((ret = ext2_inode_get_internal(mount, in, &inode)) != 0) {
+	if((ret = ext2_inode_get(mount, in, &inode)) != 0) {
 		/* Ick. */
-		rwlock_unlock(&mount->lock);
+		mutex_unlock(&mount->lock);
 		ext2_inode_free(mount, in, mode);
 		return ret;
 	}
+
+	inode->size = 0;
 
 	time = USECS2SECS(time_since_epoch());
 	inode->disk.i_uid = cpu_to_le16(uid);
@@ -642,7 +565,7 @@ found:
 	ext2_inode_flush(inode);
 
 	dprintf("ext2: allocated inode %" PRIu32 " on %p (group: %" PRIu32 ")\n", in, mount, num);
-	rwlock_unlock(&mount->lock);
+	mutex_unlock(&mount->lock);
 	*inodep = inode;
 	return 0;
 }
@@ -660,14 +583,14 @@ int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 
 	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 
-	rwlock_write_lock(&mount->lock);
+	mutex_lock(&mount->lock);
 
 	/* Inode numbers are 1-based. */
 	num -= 1;
 
 	/* Work out the group containing the inode. */
 	if((gnum = num / mount->inodes_per_group) >= mount->block_groups) {
-		rwlock_unlock(&mount->lock);
+		mutex_unlock(&mount->lock);
 		return -ERR_PARAM_INVAL;
 	}
 	group = &mount->group_tbl[gnum];
@@ -675,19 +598,19 @@ int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 	/* Get the block within the bitmap that contains the inode. */
 	i = (num % mount->inodes_per_group) / 8 / mount->block_size;
 	block = kmalloc(mount->block_size, MM_SLEEP);
-	if((ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 1) {
-		rwlock_unlock(&mount->lock);
+	if((ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 0) {
+		mutex_unlock(&mount->lock);
 		kfree(block);
-		return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		return ret;
 	}
 
 	/* Mark the block as free and write back the bitmap block. */
 	off = (num % mount->inodes_per_group) - (i * 8 * mount->block_size);
 	block[off / 32] &= ~(1 << (off % 32));
-	if((ret = ext2_block_write(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 1) {
-		rwlock_unlock(&mount->lock);
+	if((ret = ext2_block_write(mount, block, le32_to_cpu(group->bg_inode_bitmap) + i, false)) != 0) {
+		mutex_unlock(&mount->lock);
 		kfree(block);
-		return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
+		return ret;
 	}
 
 	kfree(block);
@@ -702,38 +625,97 @@ int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode) {
 
 	dprintf("ext2: freed inode %u on %p (group: %" PRIu32 ", i: %" PRIu32 ")\n",
 		num + 1, mount, gnum, i);
-	rwlock_unlock(&mount->lock);
+	mutex_unlock(&mount->lock);
 	return 0;
 }
 
 /** Get an inode from an Ext2 filesystem.
+ * @note		Node creation/lookup are protected by the mount lock,
+ *			meaning this function does not need to lock.
  * @param mount		Mount to read from.
  * @param num		Inode number to read.
  * @param inodep	Where to store pointer to inode structure.
  * @return		0 on success, negative error code on failure. */
 int ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep) {
+	ext2_inode_t *inode = NULL;
+	size_t group, bytes;
+	offset_t offset;
 	int ret;
 
-	rwlock_read_lock(&mount->lock);
-	ret = ext2_inode_get_internal(mount, num, inodep);
-	rwlock_unlock(&mount->lock);
-	return ret;
+	/* Get the group descriptor table containing the inode. */
+	if((group = (num - 1) / mount->inodes_per_group) >= mount->block_groups) {
+		dprintf("ext2: group number %zu is invalid on mount %p\n", group, mount);
+		return -ERR_FORMAT_INVAL;
+	}
+
+	/* Get the offset of the inode in the group's inode table. */
+	offset = ((num - 1) % mount->inodes_per_group) * mount->inode_size;
+
+	/* Create a structure to store details of the inode in memory. */
+	inode = kmalloc(sizeof(ext2_inode_t), MM_SLEEP);
+	mutex_init(&inode->lock, "ext2_inode_lock", MUTEX_RECURSIVE);
+	inode->mount = mount;
+	inode->num = num;
+	inode->disk_size = MIN(mount->inode_size, sizeof(ext2_disk_inode_t));
+	inode->disk_offset = ((offset_t)le32_to_cpu(mount->group_tbl[group].bg_inode_table) * mount->block_size) + offset;
+
+	/* Read it in. */
+	if((ret = device_read(mount->device, &inode->disk, inode->disk_size,
+	                      inode->disk_offset, &bytes)) != 0) {
+		dprintf("ext2: error occurred while reading inode %" PRIu32 " (%d)\n", num, ret);
+		kfree(inode);
+		return ret;
+	} else if(bytes != inode->disk_size) {
+		kfree(inode);
+		return -ERR_FORMAT_INVAL;
+	}
+
+	/* Work out the size of the node data. Regular files can be larger than
+	 * 4GB - the high 32-bits of the file size are stored in i_dir_acl. */
+	inode->size = le32_to_cpu(inode->disk.i_size);
+	if(le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFREG) {
+		inode->size |= ((uint64_t)le32_to_cpu(inode->disk.i_dir_acl)) << 32;
+	}
+
+	/* Create the various caches. */
+	inode->map = file_map_create(mount->block_size, &ext2_file_map_ops, inode);
+	inode->cache = vm_cache_create(inode->size, &file_map_vm_cache_ops, inode->map);
+	inode->entries = entry_cache_create(&ext2_entry_cache_ops, inode);
+
+	dprintf("ext2: read inode %" PRIu32 " from %" PRIu64 " (group: %zu, block: %zu)\n",
+		num, inode->disk_offset, group,
+		le32_to_cpu(mount->group_tbl[group].bg_inode_table));
+	*inodep = inode;
+	return 0;
 }
 
 /** Flush changes to an Ext2 inode structure.
- * @note		This is protected by the VFS node/mount locks.
+ * @note		Does not flush the data cache.
  * @param inode		Inode to flush.
  * @return		0 on success, negative error code on failure. */
 int ext2_inode_flush(ext2_inode_t *inode) {
 	size_t bytes;
 	int ret;
 
+	/* Copy the data size back to the inode structure. */
+	inode->disk.i_size = cpu_to_le32(inode->size);
+	if(le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFREG) {
+		if(inode->size >= 0x80000000) {
+			/* Set the large file feature flag if it is not already set. */
+			if(!EXT2_HAS_RO_COMPAT_FEATURE(&inode->mount->sb, EXT2_FEATURE_RO_COMPAT_LARGE_FILE)) {
+				EXT2_SET_RO_COMPAT_FEATURE(&inode->mount->sb, EXT2_FEATURE_RO_COMPAT_LARGE_FILE);
+				ext2_mount_flush(inode->mount);
+			}
+			inode->disk.i_dir_acl = cpu_to_le32(inode->size >> 32);
+		}
+	}
+
 	if((ret = device_write(inode->mount->device, &inode->disk, inode->disk_size,
 	                       inode->disk_offset, &bytes)) != 0) {
-		kprintf(LOG_WARN, "ext2: error occurred while writing inode %" PRIu64 " (%d)\n", inode->num, ret);
+		kprintf(LOG_WARN, "ext2: error occurred while writing inode %" PRIu32 " (%d)\n", inode->num, ret);
 		return ret;
 	} else if(bytes != inode->disk_size) {
-		kprintf(LOG_WARN, "ext2: could not write all data for inode %" PRIu64 "\n", inode->num);
+		kprintf(LOG_WARN, "ext2: could not write all data for inode %" PRIu32 "\n", inode->num);
 		return -ERR_DEVICE_ERROR;
 	}
 
@@ -746,7 +728,7 @@ void ext2_inode_release(ext2_inode_t *inode) {
 	if(le16_to_cpu(inode->disk.i_links_count) == 0) {
 		assert(!(inode->mount->parent->flags & FS_MOUNT_RDONLY));
 
-		dprintf("ext2: inode %p(%" PRIu64 ") has no links remaining, freeing...\n", inode, inode->num);
+		dprintf("ext2: inode %p(%" PRIu32 ") has no links remaining, freeing...\n", inode, inode->num);
 
 		/* Update deletion time and truncate the inode. */
 		inode->disk.i_dtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
@@ -755,97 +737,74 @@ void ext2_inode_release(ext2_inode_t *inode) {
 
 		ext2_inode_free(inode->mount, inode->num, le16_to_cpu(inode->disk.i_mode));
 	}
+
+	entry_cache_destroy(inode->entries);
+	vm_cache_destroy(inode->cache, false);
+	file_map_destroy(inode->map);
 	kfree(inode);
 }
 
-/** Read blocks from an Ext2 inode.
- * @param inode		Inode to read from (read-/write-locked).
+/** Read from an Ext2 inode.
+ * @param inode		Inode to read from.
  * @param buf		Buffer to read into.
- * @param block		Starting block number.
- * @param count		Number of blocks to read.
- * @param nonblock	Whether to allow blocking.
- * @return		Number of blocks read on success, negative error code
- *			on failure. */
-int ext2_inode_read(ext2_inode_t *inode, void *buf, uint32_t block, size_t count, bool nonblock) {
-	uint64_t raw = 0;
-	size_t total, i;
-	int ret;
-
-	total = ROUND_UP(le32_to_cpu(inode->disk.i_size), inode->mount->block_size) / inode->mount->block_size;
-	if(block >= total || !count) {
-		return 0;
-	} else if((block + count) > total) {
-		count = total - block;
-	}
-
-	for(i = 0; i < count; i++, buf += inode->mount->block_size) {
-		if((ret = block_map_lookup(inode->block_map, block + i, &raw)) != 0) {
-			dprintf("ext2: failed to lookup raw block for inode %p(%" PRIu64 ") (%d)\n",
-			        inode, inode->num, ret);
-			return ret;
-		}
-
-		/* If the block number is 0, then it's a sparse block. */
-		if(raw == 0) {
-			memset(buf, 0, inode->mount->block_size);
-		} else {
-			if((ret = ext2_block_read(inode->mount, buf, raw, nonblock)) != 1) {
-				return (ret < 0) ? ret : (int)i;
-			}
-		}
-	}
-
-	return i;
+ * @param count		Number of bytes to read.
+ * @param offset	Offset into inode to read from.
+ * @param nonblock	Whether the operation is required to not block.
+ * @return		0 on success, negative error code on failure. */
+int ext2_inode_read(ext2_inode_t *inode, void *buf, size_t count, offset_t offset,
+                    bool nonblock, size_t *bytesp) {
+	return vm_cache_read(inode->cache, buf, count, offset, nonblock, bytesp);
 }
 
-/** Write blocks to an Ext2 inode.
- * @param inode		Inode to write to (write-locked).
- * @param buf		Buffer to write from.
- * @param block		Starting block number.
- * @param count		Number of blocks to write.
- * @param nonblock	Whether to allow blocking.
- * @return		Number of blocks written on success, negative error
- *			code on failure. */
-int ext2_inode_write(ext2_inode_t *inode, const void *buf, uint32_t block, size_t count, bool nonblock) {
-	uint64_t raw = 0;
-	size_t i, total;
-	uint32_t tmp;
+/** Read to an Ext2 inode.
+ * @param inode		Inode to write to.
+ * @param buf		Buffer containing data to write.
+ * @param count		Number of bytes to write.
+ * @param offset	Offset into inode to write to.
+ * @param nonblock	Whether the operation is required to not block.
+ * @return		0 on success, negative error code on failure. */
+int ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, offset_t offset,
+                     bool nonblock, size_t *bytesp) {
+	uint32_t start, blocks, i;
+	uint64_t raw;
 	int ret;
 
-	total = ROUND_UP(le32_to_cpu(inode->disk.i_size), inode->mount->block_size) / inode->mount->block_size;
-	if(block >= total || !count) {
-		return 0;
-	} else if((block + count) > total) {
-		count = total - block;
+	mutex_lock(&inode->lock);
+
+	/* Attempt to resize the node if necessary. */
+	if((offset + count) > inode->size) {    
+		inode->size = offset + count;
+		vm_cache_resize(inode->cache, inode->size);
+		ext2_inode_flush(inode);
 	}
 
-	for(i = 0; i < count; i++, buf += inode->mount->block_size) {
-		if((ret = block_map_lookup(inode->block_map, block + i, &raw)) != 0) {
-			dprintf("ext2: failed to lookup raw block for inode %p(%" PRIu64 ") (%d)\n",
+	/* Now we need to reserve blocks on the filesystem. */
+	start = offset / inode->mount->block_size;
+	blocks = (ROUND_UP(offset + count, inode->mount->block_size) / inode->mount->block_size) - start;
+	for(i = 0; i < blocks; i++) {
+		if((ret = file_map_lookup(inode->map, start + i, &raw)) != 0) {
+			dprintf("ext2: failed to lookup raw block for inode %p(%" PRIu32 ") (%d)\n",
 			        inode, inode->num, ret);
 			return ret;
 		}
 
 		/* If the block number is 0, then allocate a new block. */
 		if(raw == 0) {
-			if((ret = ext2_inode_block_alloc(inode, block + i, nonblock, &tmp)) != 0) {
-				dprintf("ext2: failed to allocate raw block for inode %p(%" PRIu64 ") (%d)\n",
+			if((ret = ext2_inode_block_alloc(inode, start + i, nonblock)) != 0) {
+				dprintf("ext2: failed to allocate raw block for inode %p(%" PRIu32 ") (%d)\n",
 				        inode, inode->num, ret);
 				return ret;
 			}
-			raw = tmp;
-		}
-
-		if((ret = ext2_block_write(inode->mount, buf, raw, nonblock)) != 1) {
-			return (ret < 0) ? ret : (int)i;
 		}
 	}
 
-	return i;
+	mutex_unlock(&inode->lock);
+
+	return vm_cache_write(inode->cache, buf, count, offset, nonblock, bytesp);
 }
 
 /** Resize an Ext2 inode.
- * @param inode		Node to resize (write-locked).
+ * @param inode		Node to resize.
  * @param size		New size of file.
  * @return		0 on success, negative error code on failure. */
 int ext2_inode_resize(ext2_inode_t *inode, offset_t size) {
@@ -853,16 +812,16 @@ int ext2_inode_resize(ext2_inode_t *inode, offset_t size) {
 
 	assert(!(inode->mount->parent->flags & FS_MOUNT_RDONLY));
 
-	if(size >= ((uint64_t)1<<32)) {
-		return -ERR_NOT_SUPPORTED;
-	}
+	mutex_lock(&inode->lock);
 
-	if(size > le32_to_cpu(inode->disk.i_size)) {
-		inode->disk.i_size = cpu_to_le32((uint32_t)size);
+	if(size > inode->size) {
+		inode->size = size;
+		vm_cache_resize(inode->cache, size);
 		ext2_inode_flush(inode);
-	} else if(size < le32_to_cpu(inode->disk.i_size)) {
+	} else if(size < inode->size) {
 		ret = ext2_inode_truncate(inode, size);
 	}
 
+	mutex_unlock(&inode->lock);
 	return ret;
 }

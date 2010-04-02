@@ -37,103 +37,37 @@ static void ext2_node_free(fs_node_t *node) {
 	ext2_inode_release(node->data);
 }
 
-/** Write to an Ext2 file.
- * @note		This function merely reserves disk space and updates
- *			modification times. The actual write is done using the
- *			page cache.
- * @todo		Allocate space!
- * @param node		Node to write to.
- * @param buf		Buffer containing data to write.
- * @param count		Number of bytes to write.
- * @param offset	Offset into file to write to.
- * @param nonblock	Whether the write is required to not block.
- * @param bytesp	Where to store number of bytes written.
+/** Flush changes to an Ext2 node.
+ * @param node		Node to flush.
  * @return		0 on success, negative error code on failure. */
-static int ext2_node_write(fs_node_t *node, const void *buf, size_t count, offset_t offset,
-                           bool nonblock, size_t *bytesp) {
-	ext2_inode_t *inode = node->data;
-
-	inode->disk.i_mtime = USECS2SECS(time_since_epoch());
-	ext2_inode_flush(inode);
-	return 0;
-}
-
-/** Read a page of data from an Ext2 file.
- * @param node		Node to read from.
- * @param buf		Buffer to read into.
- * @param offset	Offset within the file to read from (multiple of
- *			PAGE_SIZE).
- * @param nonblock	Whether the read is required to not block.
- * @return		0 on success, negative error code on failure. */
-static int ext2_node_read_page(fs_node_t *node, void *buf, offset_t offset, bool nonblock) {
+static int ext2_node_flush(fs_node_t *node) {
 	ext2_inode_t *inode = node->data;
 	int ret;
 
-	assert(node->type == FS_NODE_FILE);
-	assert(inode->mount->block_size <= PAGE_SIZE);
-	assert(!(offset % inode->mount->block_size));
-
-	rwlock_read_lock(&inode->lock);
-	ret = ext2_inode_read(inode, buf, offset / inode->mount->block_size,
-	                      PAGE_SIZE / inode->mount->block_size, nonblock);
-	rwlock_unlock(&inode->lock);
-	return (ret < 0) ? ret : 0;
-}
-
-/** Write a page of data to an Ext2 file.
- * @param node		Node to write to.
- * @param buf		Buffer containing data to write.
- * @param offset	Offset within the file to write to (multiple of
- *			PAGE_SIZE).
- * @param nonblock	Whether the write is required to not block.
- * @return		0 on success, negative error code on failure. */
-static int ext2_node_write_page(fs_node_t *node, const void *buf, offset_t offset, bool nonblock) {
-	ext2_inode_t *inode = node->data;
-	int ret;
-
-	assert(node->type == FS_NODE_FILE);
-	assert(inode->mount->block_size <= PAGE_SIZE);
-	assert(!(offset % inode->mount->block_size));
-
-	rwlock_write_lock(&inode->lock);
-	ret = ext2_inode_write(inode, buf, offset / inode->mount->block_size,
-	                       PAGE_SIZE / inode->mount->block_size, nonblock);
-	rwlock_unlock(&inode->lock);
-	return (ret < 0) ? ret : 0;
-}
-
-/** Modify the size of an Ext2 file.
- * @param node		Node being resized.
- * @param size		New size of the node.
- * @return		0 on success, negative error code on failure. */
-static int ext2_node_resize(fs_node_t *node, offset_t size) {
-	ext2_inode_t *inode = node->data;
-	int ret;
-
-	rwlock_write_lock(&inode->lock);
-	ret = ext2_inode_resize(inode, size);
-	rwlock_unlock(&inode->lock);
-	return ret;
+	if((ret = vm_cache_flush(inode->cache)) != 0) {
+		return ret;
+	}
+	return ext2_inode_flush(inode);
 }
 
 /** Create a new node as a child of an existing directory.
  * @param _parent	Directory to create in.
  * @param name		Name to give directory entry.
- * @param node		Node structure describing the node being
- *			created. For symbolic links, the link_dest
- *			pointer in the node will point to a string
- *			containing the link destination.
+ * @param type		Type to give the new node.
+ * @param target	For symbolic links, the target of the link.
+ * @param nodep		Where to store pointer to node structure for created
+ *			entry.
  * @return		0 on success, negative error code on failure. */
-static int ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t *node) {
+static int ext2_node_create(fs_node_t *_parent, const char *name, fs_node_type_t type,
+                            const char *target, fs_node_t **nodep) {
 	ext2_inode_t *parent = _parent->data, *inode;
-	int ret, count;
+	size_t len, bytes;
 	uint16_t mode;
-	size_t len;
-	void *buf;
+	int ret;
 
 	/* Work out the mode. */
-	mode = (node->type == FS_NODE_DIR) ? 0755 : 0644;
-	switch(node->type) {
+	mode = (type == FS_NODE_DIR) ? 0755 : 0644;
+	switch(type) {
 	case FS_NODE_FILE:
 		mode |= EXT2_S_IFREG;
 		break;
@@ -148,57 +82,48 @@ static int ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t *nod
 	}
 
 	/* Allocate the inode. Use the parent's UID/GID for now. */
-	if((ret = ext2_inode_alloc(parent->mount, mode, parent->disk.i_uid,
-	                           parent->disk.i_gid, &inode)) != 0) {
+	if((ret = ext2_inode_alloc(parent->mount, mode, le16_to_cpu(parent->disk.i_uid),
+	                           le16_to_cpu(parent->disk.i_gid), &inode)) != 0) {
 		return ret;
 	}
-	rwlock_write_lock(&inode->lock);
-	rwlock_write_lock(&parent->lock);
 
-	/* Fill in node structure. */
-	node->id = inode->num;
-	node->data = inode;
+	mutex_lock(&parent->lock);
 
 	/* Add the . and .. entries when creating a directory, and fill in
 	 * link destination when creating a symbolic link. */
-	if(node->type == FS_NODE_DIR) {
-		if((ret = ext2_dir_insert(inode, inode, ".")) != 0) {
+	if(type == FS_NODE_DIR) {
+		if((ret = ext2_dir_insert(inode, ".", inode)) != 0) {
 			goto fail;
-		} else if((ret = ext2_dir_insert(inode, parent, "..")) != 0) {
+		} else if((ret = ext2_dir_insert(inode, "..", parent)) != 0) {
 			goto fail;
 		}
-	} else if(node->type == FS_NODE_SYMLINK) {
-		assert(node->link_cache);
-		len = strlen(node->link_cache);
-
-		inode->disk.i_size = cpu_to_le32(len);
+	} else if(type == FS_NODE_SYMLINK) {
+		len = strlen(target);
 		if(len <= sizeof(inode->disk.i_block)) {
-			memcpy(inode->disk.i_block, node->link_cache, len);
-			//inode->disk.i_mtime = time_get_current();
+			inode->size = len;
+			memcpy(inode->disk.i_block, target, inode->size);
+			inode->disk.i_mtime = le32_to_cpu(USECS2SECS(time_since_epoch()));
+			ext2_inode_flush(inode);
 		} else {
-			buf = kmalloc(inode->mount->block_size, MM_SLEEP);
-			memcpy(buf, node->link_cache, len);
-			count = ROUND_UP(len, inode->mount->block_size) / inode->mount->block_size;
-			if((ret = ext2_inode_write(inode, buf, 0, count, false)) != count) {
-				ret = (ret < 0) ? ret : -ERR_DEVICE_ERROR;
-				kfree(buf);
+			if((ret = ext2_inode_write(inode, target, len, 0, false, &bytes)) != 0) {
+				goto fail;
+			} else if(bytes != len) {
+				ret = -ERR_DEVICE_ERROR;
 				goto fail;
 			}
-			kfree(buf);
 		}
 	}
 
 	/* Add entry to parent. */
-	if((ret = ext2_dir_insert(parent, inode, name)) != 0) {
+	if((ret = ext2_dir_insert(parent, name, inode)) != 0) {
 		goto fail;
 	}
 
-	rwlock_unlock(&inode->lock);
-	rwlock_unlock(&parent->lock);
+	mutex_unlock(&parent->lock);
+	*nodep = fs_node_alloc(_parent->mount, inode->num, type, _parent->ops, inode);
 	return 0;
 fail:
-	rwlock_unlock(&parent->lock);
-	rwlock_unlock(&inode->lock);
+	mutex_unlock(&parent->lock);
 	ext2_inode_release(inode);
 	return ret;
 }
@@ -210,115 +135,179 @@ fail:
  * @return		0 on success, negative error code on failure. */
 static int ext2_node_unlink(fs_node_t *_parent, const char *name, fs_node_t *node) {
 	ext2_inode_t *parent = _parent->data, *inode = node->data;
-	int ret;
+	int ret = 0;
 
-	assert(parent);
-	assert(inode);
-
-	rwlock_write_lock(&parent->lock);
-	rwlock_write_lock(&inode->lock);
+	mutex_lock(&parent->lock);
+	mutex_lock(&inode->lock);
 
 	if(node->type == FS_NODE_DIR) {
-		/* Remove the . and .. entries. The VFS ensures that these are
-		 * the only entries in the directory. */
-		if((ret = ext2_dir_remove(inode, inode, ".")) != 0) {
-			rwlock_unlock(&inode->lock);
-			rwlock_unlock(&parent->lock);
-			return ret;
-		} else if((ret = ext2_dir_remove(inode, parent, "..")) != 0) {
-			rwlock_unlock(&inode->lock);
-			rwlock_unlock(&parent->lock);
-			return ret;
+		/* Ensure that it's empty, and remove the '.' and '..' entries. */
+		if(!ext2_dir_empty(inode)) {
+			ret = -ERR_NOT_EMPTY;
+			goto out;
+		} else if((ret = ext2_dir_remove(inode, ".", inode)) != 0) {
+			goto out;
+		} else if((ret = ext2_dir_remove(inode, "..", parent)) != 0) {
+			goto out;
 		}
 	}
 
 	/* This will decrease link counts as required. The actual removal
 	 * will take place when the ext2_node_free() is called on the node. */
-	if((ret = ext2_dir_remove(parent, inode, name)) == 0) {
+	if((ret = ext2_dir_remove(parent, name, inode)) == 0) {
 		if(le16_to_cpu(inode->disk.i_links_count) == 0) {
 			fs_node_remove(node);
 		}
 	}
-
-	rwlock_unlock(&inode->lock);
-	rwlock_unlock(&parent->lock);
+out:
+	mutex_unlock(&inode->lock);
+	mutex_unlock(&parent->lock);
 	return ret;
 }
 
-/** Get information about a node.
+/** Get information about an Ext2 node.
  * @param node		Node to get information on.
  * @param info		Information structure to fill in. */
 static void ext2_node_info(fs_node_t *node, fs_info_t *info) {
 	ext2_inode_t *inode = node->data;
 
-	rwlock_read_lock(&inode->lock);
-	info->size = le32_to_cpu(inode->disk.i_size);
+	mutex_lock(&inode->lock);
+	info->blksize = PAGE_SIZE;
+	info->size = inode->size;
 	info->links = le16_to_cpu(inode->disk.i_links_count);
-	rwlock_unlock(&inode->lock);
+	mutex_unlock(&inode->lock);
 }
 
-/** Cache directory contents.
- * @param node		Node to cache contents of.
+/** Read from an Ext2 file.
+ * @param node		Node to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset into file to read from.
+ * @param nonblock	Whether the write is required to not block.
+ * @param bytesp	Where to store number of bytes read.
  * @return		0 on success, negative error code on failure. */
-static int ext2_node_cache_children(fs_node_t *node) {
-	return ext2_dir_cache(node);
-}
-
-/** Store the destination of a symbolic link.
- * @param node		Symbolic link to cache destination of.
- * @return		0 on success, negative error code on failure. */
-static int ext2_node_cache_dest(fs_node_t *node) {
+static int ext2_node_read(fs_node_t *node, void *buf, size_t count, offset_t offset,
+                          bool nonblock, size_t *bytesp) {
 	ext2_inode_t *inode = node->data;
-	char *buf, *tmp;
-	int ret, count;
-	size_t size;
+	return ext2_inode_read(inode, buf, count, offset, nonblock, bytesp);
+}
 
-	rwlock_read_lock(&inode->lock);
+/** Write to an Ext2 file.
+ * @param node		Node to write to.
+ * @param buf		Buffer containing data to write.
+ * @param count		Number of bytes to write.
+ * @param offset	Offset into file to write to.
+ * @param nonblock	Whether the write is required to not block.
+ * @param bytesp	Where to store number of bytes written.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_write(fs_node_t *node, const void *buf, size_t count, offset_t offset,
+                           bool nonblock, size_t *bytesp) {
+	ext2_inode_t *inode = node->data;
+	return ext2_inode_write(inode, buf, count, offset, nonblock, bytesp);
+}
 
-	size = le32_to_cpu(inode->disk.i_size);
+/** Get the data cache for an Ext2 file.
+ * @param node		Node to get cache for.
+ * @return		Pointer to node's VM cache. */
+static vm_cache_t *ext2_node_get_cache(fs_node_t *node) {
+	ext2_inode_t *inode = node->data;
+	return inode->cache;
+}
+
+/** Modify the size of an Ext2 file.
+ * @param node		Node being resized.
+ * @param size		New size of the node.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_resize(fs_node_t *node, offset_t size) {
+	ext2_inode_t *inode = node->data;
+	return ext2_inode_resize(inode, size);
+}
+
+/** Directory iteration callback for reading a directory entry.
+ * @param dir		Directory being iterated.
+ * @param header	Pointer to directory entry header.
+ * @param name		Name of entry.
+ * @param offset	Offset of entry.
+ * @param data		Where to store pointer to entry structure.
+ * @return		Always returns false. */
+static bool ext2_read_entry_cb(ext2_inode_t *dir, ext2_dirent_t *header, const char *name,
+                               offset_t offset, void *data) {
+	fs_dir_entry_t *entry;
+	size_t len;
+
+	len = sizeof(fs_dir_entry_t) + strlen(name) + 1;
+	entry = kmalloc(len, MM_SLEEP);
+	entry->length = len;
+	entry->id = le32_to_cpu(header->inode);
+	strcpy(entry->name, name);
+
+	*(fs_dir_entry_t **)data = entry;
+	return false;
+}
+
+/** Read an Ext2 directory entry.
+ * @param node		Node to read from.
+ * @param index		Index of entry to read.
+ * @param entryp	Where to store pointer to directory entry structure.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_read_entry(fs_node_t *node, offset_t index, fs_dir_entry_t **entryp) {
+	ext2_inode_t *inode = node->data;
+	return ext2_dir_iterate(inode, index, ext2_read_entry_cb, entryp);
+}
+
+/** Look up an Ext2 directory entry.
+ * @param node		Node to look up in.
+ * @param name		Name of entry to look up.
+ * @param idp		Where to store ID of node entry points to.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_lookup_entry(fs_node_t *node, const char *name, node_id_t *idp) {
+	ext2_inode_t *inode = node->data;
+	return entry_cache_lookup(inode->entries, name, idp);
+}
+
+/** Read the destination of an Ext2 symbolic link.
+ * @param node		Node to read from.
+ * @param destp		Where to store pointer to string containing link
+ *			destination.
+ * @return		0 on success, negative error code on failure. */
+static int ext2_node_read_link(fs_node_t *node, char **destp) {
+	ext2_inode_t *inode = node->data;
+	size_t bytes;
+	char *dest;
+	int ret;
+
+	dest = kmalloc(inode->size + 1, MM_SLEEP);
 	if(le32_to_cpu(inode->disk.i_blocks) == 0) {
-		buf = kmalloc(size + 1, MM_SLEEP);
-		memcpy(buf, inode->disk.i_block, size);
-		buf[size] = 0;
+		memcpy(dest, inode->disk.i_block, inode->size);
 	} else {
-		if(!(buf = kmalloc(ROUND_UP(size, inode->mount->block_size) + 1, 0))) {
-			rwlock_unlock(&inode->lock);
-			return -ERR_NO_MEMORY;
+		if((ret = ext2_inode_read(inode, dest, inode->size, 0, false, &bytes)) != 0) {
+			kfree(dest);
+			return ret;
+		} else if(bytes != inode->size) {
+			kfree(dest);
+			return -ERR_DEVICE_ERROR;
 		}
-
-		count = ROUND_UP(size, inode->mount->block_size) / inode->mount->block_size;
-		if((ret = ext2_inode_read(inode, buf, 0, count, false)) != count) {
-			kfree(buf);
-			rwlock_unlock(&inode->lock);
-			return (ret < 0) ? ret : -ERR_DEVICE_ERROR;
-		}
-
-		buf[size] = 0;
-		if(!(tmp = krealloc(buf, size + 1, 0))) {
-			kfree(buf);
-			rwlock_unlock(&inode->lock);
-			return -ERR_NO_MEMORY;
-		}
-		buf = tmp;
 	}
 
-	rwlock_unlock(&inode->lock);
-	node->link_cache = buf;
+	dest[inode->size] = 0;
+	*destp = dest;
 	return 0;
 }
 
 /** Ext2 node operations structure. */
 static fs_node_ops_t ext2_node_ops = {
 	.free = ext2_node_free,
-	.write = ext2_node_write,
-	.read_page = ext2_node_read_page,
-	.write_page = ext2_node_write_page,
-	.resize = ext2_node_resize,
+	.flush = ext2_node_flush,
 	.create = ext2_node_create,
 	.unlink = ext2_node_unlink,
 	.info = ext2_node_info,
-	.cache_children = ext2_node_cache_children,
-	.cache_dest = ext2_node_cache_dest,
+	.read = ext2_node_read,
+	.write = ext2_node_write,
+	.get_cache = ext2_node_get_cache,
+	.resize = ext2_node_resize,
+	.read_entry = ext2_node_read_entry,
+	.lookup_entry = ext2_node_lookup_entry,
+	.read_link = ext2_node_read_link,
 };
 
 /** Flush data for an Ext2 mount to disk.
@@ -394,16 +383,16 @@ static int ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **nodep) {
 		type = FS_NODE_FIFO;
 		break;
 	default:
-		dprintf("ext2: inode %" PRIu64 " has invalid type in mode (%" PRIu16 ")\n",
-		        id, le16_to_cpu(inode->disk.i_mode));
+		dprintf("ext2: inode %" PRIu32 " has invalid type in mode (%" PRIu16 ")\n",
+		        inode->num, le16_to_cpu(inode->disk.i_mode));
 		ext2_inode_release(inode);
 		return -ERR_FORMAT_INVAL;
 	}
 
 	/* Sanity check. */
 	if(id == EXT2_ROOT_INO && type != FS_NODE_DIR) {
-		dprintf("ext2: root inode %" PRIu64 " is not a directory (%" PRIu16 ")\n",
-		        id, le16_to_cpu(inode->disk.i_mode));
+		dprintf("ext2: root inode %" PRIu32 " is not a directory (%" PRIu16 ")\n",
+		        inode->num, le16_to_cpu(inode->disk.i_mode));
 		ext2_inode_release(inode);
 		return -ERR_FORMAT_INVAL;
 	}
@@ -448,7 +437,7 @@ static bool ext2_probe(object_handle_t *handle, const char *uuid) {
 	}
 
 	/* Check for incompatible features. */
-	if(EXT2_HAS_INCOMPAT_FEATURE(sb, ~(EXT2_FEATURE_INCOMPAT_RO_SUPP | EXT2_FEATURE_INCOMPAT_SUPP))) {
+	if(EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP)) {
 		dprintf("ext2: device %s has unsupported incompatible features %u\n",
 		        device_name(handle), sb->s_feature_incompat);
 		kfree(sb);
@@ -472,7 +461,7 @@ static int ext2_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) 
 	/* Create a mount structure to track information about the mount. */
 	mount->ops = &ext2_mount_ops;
 	data = mount->data = kcalloc(1, sizeof(ext2_mount_t), MM_SLEEP);
-	rwlock_init(&data->lock, "ext2_mount_lock");
+	mutex_init(&data->lock, "ext2_mount_lock", 0);
 	data->parent = mount;
 	data->device = mount->device;
 
@@ -488,8 +477,7 @@ static int ext2_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) 
 	/* If not mounting read-only, check for read-only features, and whether
 	 * the FS is clean. */
 	if(!(mount->flags & FS_MOUNT_RDONLY)) {
-		if(EXT2_HAS_RO_COMPAT_FEATURE(&data->sb, ~EXT2_FEATURE_RO_COMPAT_SUPP) ||
-		   EXT2_HAS_INCOMPAT_FEATURE(&data->sb, EXT2_FEATURE_INCOMPAT_RO_SUPP)) {
+		if(EXT2_HAS_RO_COMPAT_FEATURE(&data->sb, ~EXT2_FEATURE_RO_COMPAT_SUPP)) {
 			kprintf(LOG_WARN, "ext2: %s has unsupported write features, mounting read-only\n",
 			        device_name(data->device));
 			mount->flags |= FS_MOUNT_RDONLY;

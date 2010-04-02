@@ -15,7 +15,7 @@ Import('env', 'config')
 
 # Work out the modules to build.
 dirs = [
-#	('MODULE_FS_EXT2', 'ext2'),
+	('MODULE_FS_EXT2', 'ext2'),
 #	('MODULE_FS_ISO9660', 'iso9660'),
 ]
 
