@@ -546,6 +546,7 @@ int vm_cache_flush(vm_cache_t *cache) {
 		}
 	}
 
+	mutex_unlock(&cache->lock);
 	return err;
 }
 
