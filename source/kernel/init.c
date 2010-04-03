@@ -47,6 +47,7 @@
 #include <kargs.h>
 #include <module.h>
 #include <object.h>
+#include <symbol.h>
 #include <tar.h>
 #include <time.h>
 #include <version.h>
@@ -361,6 +362,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		platform_postmm_init(args);
 
 		/* Bring up other stuff. */
+		symbol_init();
 		time_init();
 		cpu_init(args);
 		ipi_init();

@@ -31,12 +31,12 @@ for line in sys.stdin.readlines():
 	split = line.split(' ')
 	if len(split) == 4:
 		isglobal = not split[2].islower()
-		print '	{ 0x%s, 0x%s, "%s", %d, true },' \
+		print '	{ { NULL, NULL }, 0x%s, 0x%s, "%s", %d, true },' \
 			% (split[0], split[1], split[3].strip(), isglobal)
 		count += 1
 	elif len(split) == 3:
 		isglobal = not split[1].islower()
-		print '	{ 0x%s, 0x0, "%s", %d, true },' \
+		print '	{ { NULL, NULL }, 0x%s, 0x0, "%s", %d, true },' \
 			% (split[0], split[2].strip(), isglobal)
 		count += 1
 

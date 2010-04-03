@@ -294,21 +294,21 @@ int module_load(object_handle_t *handle, char *depbuf) {
 		goto fail;
 	}
 
-	/* Add the module to the modules list. Do this before calling the
-	 * initialisation function so backtraces will have the correct symbols
-	 * if the call ends up inside KDBG. */
-	list_append(&module_list, &module->header);
+	/* Publish the symbol table. Do this before calling the initialisation
+	 * function so backtraces will have the correct symbols if the call
+	 * ends up inside KDBG. */
+	symbol_table_publish(&module->symtab);
 
 	/* Call the module initialisation function. */
 	dprintf("module: calling init function %p for module %p(%s)...\n",
 		module->init, module, module->name);
 	ret = module->init();
 	if(ret != 0) {
-		list_remove(&module->header);
 		/* FIXME: Leaves a reference on the module's dependencies. */
 		goto fail;
 	}
 
+	list_append(&module_list, &module->header);
 	module->handle = NULL;
 	kprintf(LOG_NORMAL, "module: successfully loaded module %s (%s)\n",
 	        module->name, module->description);
@@ -326,59 +326,6 @@ fail:
 
 	mutex_unlock(&module_lock);
 	return ret;
-}
-
-/** Look up symbol from address.
- *
- * Looks for the symbol corresponding to an address in all module symbol
- * tables, and gets the offset of the address in the symbol.
- *
- * @param addr		Address to lookup.
- * @param offp		Where to store symbol offset (can be NULL).
- *
- * @return		Pointer to the symbol structure, or NULL if not found.
- */
-symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp) {
-	module_t *module;
-	symbol_t *sym;
-
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
-
-		sym = symbol_table_lookup_addr(&module->symtab, addr, offp);
-		if(sym) {
-			return sym;
-		}
-	}
-
-	return NULL;
-}
-
-/** Look up symbol from name.
- *
- * Looks for a symbol with the name specified in all module symbol tables. If
- * specified, will only look for global and/or exported symbols.
- *
- * @param name		Name to lookup.
- * @param global	Whether to only look up global symbols.
- * @param exported	Whether to only look up exported symbols.
- *
- * @return		Pointer to the symbol structure, or NULL if not found.
- */
-symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported) {
-	module_t *module;
-	symbol_t *sym;
-
-	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
-
-		sym = symbol_table_lookup_name(&module->symtab, name, global, exported);
-		if(sym) {
-			return sym;
-		}
-	}
-
-	return NULL;
 }
 
 /** Print a list of loaded kernel modules.

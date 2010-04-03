@@ -94,9 +94,6 @@ extern void *module_mem_alloc(size_t size, int mmflag);
 extern int module_name(object_handle_t *handle, char *namebuf);
 extern int module_load(object_handle_t *handle, char *depbuf);
 
-extern symbol_t *module_symbol_lookup_addr(ptr_t addr, size_t *offp);
-extern symbol_t *module_symbol_lookup_name(const char *name, bool global, bool exported);
-
 extern int kdbg_cmd_modules(int argc, char **argv);
 
 extern int sys_module_load(const char *path, char *depbuf);
