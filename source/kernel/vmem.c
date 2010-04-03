@@ -59,14 +59,16 @@
 # define dprintf(fmt...)	
 #endif
 
-static LIST_DECLARE(vmem_arenas);		/**< List of all Vmem arenas. */
-static MUTEX_DECLARE(vmem_lock, 0);		/**< Lock to protect global Vmem information. */
+/** List of all arenas. */
+static LIST_DECLARE(vmem_arenas);
 
 /** Boundary tag allocation information. */
-static LIST_DECLARE(vmem_btags);		/**< Free boundary tag list. */
-static MUTEX_DECLARE(vmem_refill_lock, 0);	/**< Lock to prevent multiple threads attempting to refill. */
-static size_t vmem_btag_count;			/**< Number of boundary tags available. */
-static vmem_t vmem_btag_arena;			/**< Internal arena for boundary tag allocation. */
+static LIST_DECLARE(vmem_btags);
+static size_t vmem_btag_count;
+static vmem_t vmem_btag_arena;
+
+/** Lock to protect global vmem information. */
+static MUTEX_DECLARE(vmem_lock, 0);
 
 /** Statically allocated boundary tags to use during boot. */
 static vmem_btag_t vmem_boot_tags[VMEM_BOOT_TAG_COUNT];
@@ -106,26 +108,11 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		mutex_unlock(&vmem_lock);
 		mutex_unlock(&vmem->lock);
 
-		/* Take the refill lock, and then check again if a refill is
-		 * necessary. This is to prevent unnecessary allocations of
-		 * new tags if multiple threads try to refill at the same
-		 * time. */
-		mutex_lock(&vmem_refill_lock);
-		mutex_lock(&vmem_lock);
-		if(vmem_btag_count > VMEM_REFILL_THRESHOLD) {
-			mutex_unlock(&vmem_refill_lock);
-			mutex_unlock(&vmem_lock);
-			mutex_lock(&vmem->lock);
-			continue;
-		}
-		mutex_unlock(&vmem_lock);
-
-		/* Allocate a page from the tag arena and split it up into
-		 * tags. */
+		/* We need to allocate new boundary tags. Allocate a page from
+		 * the tag arena and split it up into tags. */
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
-		mutex_lock(&vmem->lock);
 		if(addr == 0) {
-			mutex_unlock(&vmem_refill_lock);
+			mutex_lock(&vmem->lock);
 			return NULL;
 		}
 
@@ -140,7 +127,7 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		}
 
 		mutex_unlock(&vmem_lock);
-		mutex_unlock(&vmem_refill_lock);
+		mutex_lock(&vmem->lock);
 	}
 }
 
