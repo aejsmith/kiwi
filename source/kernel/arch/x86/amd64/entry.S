@@ -18,9 +18,9 @@
  * @brief		AMD64 kernel entry points.
  */
 
+#include <arch/cpu.h>
 #include <arch/descriptor.h>
 #include <arch/stack.h>
-#include <arch/sysreg.h>
 
 /** Push registers onto the stack. */
 .macro PUSH_REGS
@@ -265,7 +265,7 @@ thread_arch_enter_userspace:
 	 *  - RIP. */
 	push	$(SEGMENT_U_DS | 0x03)
 	push	%rsi
-	push	$(SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1)
+	push	$(X86_FLAGS_IF | X86_FLAGS_ALWAYS1)
 	push	$(SEGMENT_U_CS | 0x03)
 	push	%rdi
 	

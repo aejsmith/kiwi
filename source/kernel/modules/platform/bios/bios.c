@@ -18,8 +18,8 @@
  * @brief		PC BIOS interrupt interface.
  */
 
+#include <arch/cpu.h>
 #include <arch/io.h>
-#include <arch/sysreg.h>
 
 #include <mm/kheap.h>
 #include <mm/malloc.h>
@@ -289,7 +289,7 @@ MODULE_EXPORT(bios_interrupt);
  * @param regs		Structure to initialise. */
 void bios_regs_init(bios_regs_t *regs) {
 	memset(regs, 0, sizeof(bios_regs_t));
-	regs->eflags = SYSREG_FLAGS_IF | SYSREG_FLAGS_ALWAYS1;
+	regs->eflags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
 }
 MODULE_EXPORT(bios_regs_init);
 

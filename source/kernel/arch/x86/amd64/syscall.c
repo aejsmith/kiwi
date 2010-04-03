@@ -18,9 +18,9 @@
  * @brief		AMD64 system call setup code.
  */
 
+#include <arch/cpu.h>
 #include <arch/descriptor.h>
 #include <arch/syscall.h>
-#include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
 
@@ -33,7 +33,7 @@ void __init_text syscall_arch_init(void) {
 	uint64_t fmask, lstar, star;
 
 	/* Disable interrupts and clear direction flag upon entry. */
-	fmask = SYSREG_FLAGS_IF | SYSREG_FLAGS_DF;
+	fmask = X86_FLAGS_IF | X86_FLAGS_DF;
 
 	/* Set system call entry address. */
 	lstar = (uint64_t)syscall_entry;
@@ -52,10 +52,10 @@ void __init_text syscall_arch_init(void) {
 	star = ((uint64_t)(SEGMENT_K_DS | 0x03) << 48) | ((uint64_t)SEGMENT_K_CS << 32);
 
 	/* Set System Call Enable (SCE) in EFER and write everything out. */
-	sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_SCE);
-	sysreg_msr_write(SYSREG_MSR_FMASK, fmask);
-	sysreg_msr_write(SYSREG_MSR_LSTAR, lstar);
-	sysreg_msr_write(SYSREG_MSR_STAR, star);
+	x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_SCE);
+	x86_write_msr(X86_MSR_FMASK, fmask);
+	x86_write_msr(X86_MSR_LSTAR, lstar);
+	x86_write_msr(X86_MSR_STAR, star);
 
 	kprintf(LOG_NORMAL, "syscall: set up SYSCALL MSRs on CPU %" PRIu32 ":\n", curr_cpu->id);
 	kprintf(LOG_NORMAL, " FMASK: 0x%" PRIx64 "\n", fmask);

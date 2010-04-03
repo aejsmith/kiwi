@@ -23,9 +23,9 @@
  */
 
 #include <arch/boot.h>
+#include <arch/cpu.h>
 #include <arch/features.h>
 #include <arch/page.h>
-#include <arch/sysreg.h>
 
 #include <boot/cpu.h>
 #include <boot/elf.h>
@@ -170,7 +170,7 @@ void arch_enter_kernel(void) {
 	/* All CPUs should reach this point simultaneously. Reset the TSC to
 	 * 0, so that the kernel's timing functions return a consistent value
 	 * on all CPUs. */
-	sysreg_msr_write(SYSREG_MSR_TSC, 0);
+	x86_write_msr(X86_MSR_TSC, 0);
 
 	if(kernel_is_64bit) {
 		arch_enter_kernel64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);

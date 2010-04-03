@@ -21,7 +21,6 @@
 #include <arch/features.h>
 #include <arch/io.h>
 #include <arch/lapic.h>
-#include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

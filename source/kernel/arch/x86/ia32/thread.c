@@ -18,8 +18,6 @@
  * @brief		IA32 thread functions.
  */
 
-#include <arch/sysreg.h>
-
 #include <cpu/cpu.h>
 
 #include <proc/sched.h>

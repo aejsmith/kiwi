@@ -18,9 +18,9 @@
  * @brief		x86 kernel debugger functions.
  */
 
+#include <arch/cpu.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
-#include <arch/sysreg.h>
 
 #include <cpu/intr.h>
 
@@ -53,14 +53,14 @@ static breakpoint_t kdbg_breakpoints[4];
 static inline void kdbg_setup_dreg(void) {
 	unative_t dr7 = 0;
 
-	sysreg_dr0_write(kdbg_breakpoints[0].addr);
-	sysreg_dr1_write(kdbg_breakpoints[1].addr);
-	sysreg_dr2_write(kdbg_breakpoints[2].addr);
-	sysreg_dr3_write(kdbg_breakpoints[3].addr);
+	x86_write_dr0(kdbg_breakpoints[0].addr);
+	x86_write_dr1(kdbg_breakpoints[1].addr);
+	x86_write_dr2(kdbg_breakpoints[2].addr);
+	x86_write_dr3(kdbg_breakpoints[3].addr);
 
 	dr7 |= (kdbg_breakpoints[0].dr7 | kdbg_breakpoints[1].dr7);
 	dr7 |= (kdbg_breakpoints[2].dr7 | kdbg_breakpoints[3].dr7);
-	sysreg_dr7_write(dr7);
+	x86_write_dr7(dr7);
 }
 
 /** Debug exception handler.
@@ -73,17 +73,16 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	size_t i;
 
 	/* Work out the reason. */
-	dr6 = sysreg_dr6_read();
-	if(!(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 |
-	            SYSREG_DR6_B3 | SYSREG_DR6_BD | SYSREG_DR6_BS |
-	            SYSREG_DR6_BT))) {
+	dr6 = x86_read_dr6();
+	if(!(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3 | X86_DR6_BD |
+	            X86_DR6_BS | X86_DR6_BT))) {
 		/* No bits set, assume this came from from kdbg_enter(), in
 		 * which case the reason will be in EAX. */
 		reason = (unative_t)frame->ax;
 	} else {
-		if(dr6 & SYSREG_DR6_BS) {
+		if(dr6 & X86_DR6_BS) {
 			reason = KDBG_ENTRY_STEPPED;
-		} else if(dr6 & (SYSREG_DR6_B0 | SYSREG_DR6_B1 | SYSREG_DR6_B2 | SYSREG_DR6_B3)) {
+		} else if(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3)) {
 			for(i = 0; i < ARRAYSZ(kdbg_breakpoints); i++) {
 				if(frame->ip == kdbg_breakpoints[i].addr) {
 					reason = KDBG_ENTRY_BREAK;
@@ -99,11 +98,11 @@ bool kdbg_int1_handler(unative_t num, intr_frame_t *frame) {
 	kdbg_enter(reason, frame);
 
 	/* Clear the Debug Status Register (DR6). */
-	sysreg_dr6_write(0);
+	x86_write_dr6(0);
 
 	/* Set the resume flag if resuming from a breakpoint. */
 	if(reason == KDBG_ENTRY_BREAK) {
-		frame->flags |= SYSREG_FLAGS_RF;
+		frame->flags |= X86_FLAGS_RF;
 	}
 
 	return false;
@@ -127,12 +126,12 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
 	}
 
 	/* Disable breakpoints while KDBG is running. */
-	sysreg_dr7_write(0);
+	x86_write_dr7(0);
 
 	if(kdbg_main(reason, frame) == KDBG_STEP) {
-		frame->flags |= SYSREG_FLAGS_TF;
+		frame->flags |= X86_FLAGS_TF;
 	} else {
-		frame->flags &= ~SYSREG_FLAGS_TF;
+		frame->flags &= ~X86_FLAGS_TF;
 	}
 
 	/* Work out a new Debug Control Register value. */

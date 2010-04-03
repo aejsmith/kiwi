@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,10 +18,10 @@
  * @brief		x86 interrupt functions.
  */
 
+#include <arch/cpu.h>
 #include <arch/features.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
-#include <arch/sysreg.h>
 
 #include <cpu/intr.h>
 
@@ -84,7 +84,7 @@ static bool intr_handle_nmi(unative_t num, intr_frame_t *frame) {
 static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
 	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
-	ptr_t addr = sysreg_cr2_read();
+	ptr_t addr = x86_read_cr2();
 
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,26 +18,18 @@
  * @brief		x86 FPU functions.
  */
 
-#include <arch/sysreg.h>
+#include <arch/cpu.h>
 
 #include <cpu/fpu.h>
 
 /** Save FPU state.
- *
- * Saves the FPU state to an FPU context structure.
- *
- * @param ctx		Context to restore.
- */
+ * @param ctx		Context to restore. */
 void fpu_context_save(fpu_context_t *ctx) {
 	__asm__ volatile("fxsave (%0)" :: "r"(ctx->data));
 }
 
 /** Restore FPU state.
- *
- * Restores the FPU state from an FPU context structure.
- *
- * @param ctx		Context to restore.
- */
+ * @param ctx		Context to restore. */
 void fpu_context_restore(fpu_context_t *ctx) {
 	__asm__ volatile("fxrstor (%0)" :: "r"(ctx->data));
 }
@@ -45,17 +37,17 @@ void fpu_context_restore(fpu_context_t *ctx) {
 /** Check whether the FPU is enabled.
  * @return		Whether the FPU is enabled. */
 bool fpu_state(void) {
-	return !(sysreg_cr0_read() & SYSREG_CR0_TS);
+	return !(x86_read_cr0() & X86_CR0_TS);
 }
 
 /** Enable FPU usage. */
 void fpu_enable(void) {
-	sysreg_cr0_write(sysreg_cr0_read() & ~SYSREG_CR0_TS);
+	x86_write_cr0(x86_read_cr0() & ~X86_CR0_TS);
 }
 
 /** Disable FPU usage. */
 void fpu_disable(void) {
-	sysreg_cr0_write(sysreg_cr0_read() | SYSREG_CR0_TS);
+	x86_write_cr0(x86_read_cr0() | X86_CR0_TS);
 }
 
 /** Reset the FPU state. */

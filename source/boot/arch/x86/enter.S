@@ -18,8 +18,8 @@
  * @brief		x86 kernel entry functions.
  */
 
+#include <arch/cpu.h>
 #include <arch/page.h>
-#include <arch/sysreg.h>
 #include <platform/boot.h>
 
 .section .text, "ax", @progbits
@@ -35,7 +35,7 @@ arch_enter_kernel64:
 .code32
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
-	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_OSFXSR), %eax
+	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
 	/* Point CR3 to the boot PML4. */
@@ -43,9 +43,9 @@ arch_enter_kernel64:
 	movl	%eax, %cr3
 
 	/* Enable long mode by setting EFER.LME. */
-	movl	$SYSREG_MSR_EFER, %ecx
+	movl	$X86_MSR_EFER, %ecx
 	rdmsr
-	orl	$SYSREG_EFER_LME, %eax
+	orl	$X86_EFER_LME, %eax
 	wrmsr
 
 	/* Set PG/WP/NE/MP/TS in CR0 (Paging Enable, Write Protect, Numeric
@@ -53,8 +53,8 @@ arch_enter_kernel64:
 	 * Paging will put us in compatibility mode. TS is set because we do
 	 * not want the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
-	andl	$~(SYSREG_CR0_EM), %ecx
+	orl	$(X86_CR0_PG | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP | X86_CR0_TS), %ecx
+	andl	$~(X86_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Jump into the 64-bit code segment. */
@@ -102,7 +102,7 @@ arch_enter_kernel32:
 	 * necessary when PAE is being used, VirtualBox shits itself without
 	 * it, even though every other x86 box I have doesn't. */
 	movl	%cr4, %eax
-	orl	$(SYSREG_CR4_PAE | SYSREG_CR4_PGE | SYSREG_CR4_PSE | SYSREG_CR4_OSFXSR), %eax
+	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_PSE | X86_CR4_OSFXSR), %eax
 	movl	%eax, %cr4
 
 	/* Point CR3 to the boot PDP. */
@@ -113,8 +113,8 @@ arch_enter_kernel32:
 	 * Error, Monitor Coprocessor, Task Switch), and clear EM (Emulation).
 	 * TS is set because we do not want the FPU to be enabled initially. */
 	movl	%cr0, %ecx
-	orl	$(SYSREG_CR0_PG | SYSREG_CR0_WP | SYSREG_CR0_NE | SYSREG_CR0_MP | SYSREG_CR0_TS), %ecx
-	andl	$~(SYSREG_CR0_EM), %ecx
+	orl	$(X86_CR0_PG | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP | X86_CR0_TS), %ecx
+	andl	$~(X86_CR0_EM), %ecx
 	movl	%ecx, %cr0
 
 	/* Retreive the kernel arguments and entry point. */

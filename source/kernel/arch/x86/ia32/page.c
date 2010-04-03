@@ -21,7 +21,6 @@
 #include <arch/barrier.h>
 #include <arch/features.h>
 #include <arch/memmap.h>
-#include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
@@ -164,8 +163,8 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 		/* Newer Intel CPUs seem to cache PDP entries and INVLPG does
 		 * fuck all, completely flush the TLB if we're using this
 		 * page map. */
-		if(paging_inited && (sysreg_cr3_read() & PAGE_MASK) == map->cr3) {
-			sysreg_cr3_write(sysreg_cr3_read());
+		if(paging_inited && (x86_read_cr3() & PAGE_MASK) == map->cr3) {
+			x86_write_cr3(x86_read_cr3());
 		}
 	}
 
@@ -251,10 +250,10 @@ static int tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unative_t d
 			/* For the kernel page map, we must disable PGE and
 			 * reenable it to perform a complete TLB flush. */
 			if(IS_KERNEL_MAP(map)) {
-				sysreg_cr4_write(sysreg_cr4_read() & ~SYSREG_CR4_PGE);
-				sysreg_cr4_write(sysreg_cr4_read() | SYSREG_CR4_PGE);
+				x86_write_cr4(x86_read_cr4() & ~X86_CR4_PGE);
+				x86_write_cr4(x86_read_cr4() | X86_CR4_PGE);
 			} else {
-				sysreg_cr3_write(sysreg_cr3_read());
+				x86_write_cr3(x86_read_cr3());
 			}
 		} else {
 			for(i = 0; i < map->invalidate_count; i++) {
@@ -452,7 +451,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 /** Switch to a page map.
  * @param map		Page map to switch to. */
 void page_map_switch(page_map_t *map) {
-	sysreg_cr3_write(map->cr3);
+	x86_write_cr3(map->cr3);
 }
 
 /** Initialise a page map.
@@ -649,7 +648,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	 * the new physical map page directory because the new one has the
 	 * global flag set on all pages, which makes invalidating the TLB
 	 * entries difficult when removing the mapping. */
-	bpdp = page_phys_map(sysreg_cr3_read() & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	bpdp = page_phys_map(x86_read_cr3() & PAGE_MASK, PAGE_SIZE, MM_FATAL);
 	pdp[0] = bpdp[0];
 	page_phys_unmap(bpdp, PAGE_SIZE, true);
 	page_phys_unmap(pdp, PAGE_SIZE, true);
@@ -668,7 +667,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 /** TLB flush IPI handler.
  * @return		Always returns 0. */
 static int tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
-	sysreg_cr3_write(sysreg_cr3_read());
+	x86_write_cr3(x86_read_cr3());
 	return 0;
 }
 
@@ -682,6 +681,6 @@ void page_arch_late_init(void) {
 	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
 	pdp[0] = 0;
 	page_phys_unmap(pdp, PAGE_SIZE, true);
-	sysreg_cr3_write(sysreg_cr3_read());
+	x86_write_cr3(x86_read_cr3());
 	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
 }

@@ -18,11 +18,11 @@
  * @brief		x86 CPU detection functions.
  */
 
+#include <arch/cpu.h>
 #include <arch/features.h>
 #include <arch/io.h>
 #include <arch/stack.h>
 #include <arch/lapic.h>
-#include <arch/sysreg.h>
 
 #include <boot/console.h>
 #include <boot/cpu.h>
@@ -175,9 +175,9 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 
 	/* Check if CPUID is supported - if we can change EFLAGS.ID, it is
 	 * supported. */
-	flags = sysreg_flags_read();
-	sysreg_flags_write(flags ^ SYSREG_FLAGS_ID);
-	if((sysreg_flags_read() & SYSREG_FLAGS_ID) == (flags & SYSREG_FLAGS_ID)) {
+	flags = x86_read_flags();
+	x86_write_flags(flags ^ X86_FLAGS_ID);
+	if((x86_read_flags() & X86_FLAGS_ID) == (flags & X86_FLAGS_ID)) {
 		fatal("CPU %" PRIu32 " does not support CPUID", booting_cpu->id);
 	}
 
@@ -256,7 +256,7 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 #if CONFIG_X86_NX
 	/* Enable NX/XD if supported. */
 	if(CPU_HAS_XD(booting_cpu)) {
-		sysreg_msr_write(SYSREG_MSR_EFER, sysreg_msr_read(SYSREG_MSR_EFER) | SYSREG_EFER_NXE);
+		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
 	}
 #endif
 	/* Shitty workaround: when running under QEMU the boot CPU's frequency
@@ -283,7 +283,7 @@ static bool cpu_lapic_init(void) {
 
 	/* Get the base address of the LAPIC mapping. If bit 11 is 0, the LAPIC
 	 * is disabled. */
-	base = sysreg_msr_read(SYSREG_MSR_APIC_BASE);
+	base = x86_read_msr(X86_MSR_APIC_BASE);
 	if(!(base & (1<<11))) {
 		return false;
 	}

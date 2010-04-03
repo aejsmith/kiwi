@@ -22,7 +22,6 @@
 #include <arch/memmap.h>
 #include <arch/page.h>
 #include <arch/syscall.h>
-#include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -102,9 +101,9 @@ void __init_text tss_init(void) {
 	/* Set up the doublefault TSS. */
 	memset(&curr_cpu->arch.double_fault_tss, 0, sizeof(tss_t));
 	stack = (ptr_t)curr_cpu->arch.double_fault_stack;
-	curr_cpu->arch.double_fault_tss.cr3 = sysreg_cr3_read();
+	curr_cpu->arch.double_fault_tss.cr3 = x86_read_cr3();
 	curr_cpu->arch.double_fault_tss.eip = (ptr_t)&isr_array[FAULT_DOUBLE];
-	curr_cpu->arch.double_fault_tss.eflags = SYSREG_FLAGS_ALWAYS1;
+	curr_cpu->arch.double_fault_tss.eflags = X86_FLAGS_ALWAYS1;
 	curr_cpu->arch.double_fault_tss.esp = (stack + KSTACK_SIZE) - STACK_DELTA;
 	curr_cpu->arch.double_fault_tss.es = SEGMENT_K_DS;
 	curr_cpu->arch.double_fault_tss.cs = SEGMENT_K_CS;

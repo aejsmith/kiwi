@@ -18,8 +18,6 @@
  * @brief		AMD64 thread functions.
  */
 
-#include <arch/sysreg.h>
-
 #include <cpu/cpu.h>
 
 #include <proc/sched.h>
@@ -33,7 +31,7 @@ void thread_arch_post_switch(thread_t *thread) {
 
 	/* Store the address of the thread's architecture data in the
 	 * KERNEL_GS_BASE MSR for the SYSCALL handler to use. */
-        sysreg_msr_write(SYSREG_MSR_K_GS_BASE, (ptr_t)&thread->arch);
+        x86_write_msr(X86_MSR_K_GS_BASE, (ptr_t)&thread->arch);
 }
 
 /** Initialise AMD64-specific thread data.

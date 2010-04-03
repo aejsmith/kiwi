@@ -21,7 +21,6 @@
 #include <arch/barrier.h>
 #include <arch/features.h>
 #include <arch/memmap.h>
-#include <arch/sysreg.h>
 
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
@@ -243,10 +242,10 @@ static int tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unative_t d
 			/* For the kernel page map, we must disable PGE and
 			 * reenable it to perform a complete TLB flush. */
 			if(IS_KERNEL_MAP(map)) {
-				sysreg_cr4_write(sysreg_cr4_read() & ~SYSREG_CR4_PGE);
-				sysreg_cr4_write(sysreg_cr4_read() | SYSREG_CR4_PGE);
+				x86_write_cr4(x86_read_cr4() & ~X86_CR4_PGE);
+				x86_write_cr4(x86_read_cr4() | X86_CR4_PGE);
 			} else {
-				sysreg_cr3_write(sysreg_cr3_read());
+				x86_write_cr3(x86_read_cr3());
 			}
 		} else {
 			for(i = 0; i < map->invalidate_count; i++) {
@@ -439,7 +438,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 /** Switch to a page map.
  * @param map		Page map to switch to. */
 void page_map_switch(page_map_t *map) {
-	sysreg_cr3_write(map->cr3);
+	x86_write_cr3(map->cr3);
 }
 
 /** Initialise a page map.
@@ -603,7 +602,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	 * on all pages, which makes invalidating the TLB entries difficult
 	 * when removing the mapping. */
 	pml4 = page_structure_map(kernel_page_map.cr3);
-	bpml4 = page_structure_map(sysreg_cr3_read() & PAGE_MASK);
+	bpml4 = page_structure_map(x86_read_cr3() & PAGE_MASK);
 	pml4[0] = bpml4[0];
 
 	page_map_unlock(&kernel_page_map);
@@ -620,7 +619,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 /** TLB flush IPI handler.
  * @return		Always returns 0. */
 static int tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
-	sysreg_cr3_write(sysreg_cr3_read());
+	x86_write_cr3(x86_read_cr3());
 	return 0;
 }
 
@@ -633,6 +632,6 @@ void page_arch_late_init(void) {
 	 * mapping and flush the TLB on all CPUs. */
 	pml4 = page_structure_map(kernel_page_map.cr3);
 	pml4[0] = 0;
-	sysreg_cr3_write(sysreg_cr3_read());
+	x86_write_cr3(x86_read_cr3());
 	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
 }
