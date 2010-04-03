@@ -871,7 +871,8 @@ int sys_device_request(device_request_args_t *args) {
 		}
 	}
 
-	ret = device_request(obj, kargs.request, kin, kargs.insz, &kout, &koutsz);
+	ret = device_request(obj, kargs.request, kin, kargs.insz, (kargs.out) ? &kout : NULL,
+	                     (kargs.out) ? &koutsz : NULL);
 	if(kout) {
 		assert(koutsz);
 		if(koutsz > kargs.outsz) {
