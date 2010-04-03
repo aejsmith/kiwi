@@ -18,10 +18,10 @@
  * @brief		Page-based data cache.
  */
 
-#ifndef __MM_CACHE_H
-#define __MM_CACHE_H
+#ifndef __MM_VM_CACHE_H
+#define __MM_VM_CACHE_H
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 #include <mm/page.h>
 #include <sync/mutex.h>
 
@@ -87,4 +87,4 @@ extern int kdbg_cmd_cache(int argc, char **argv);
 
 extern void vm_cache_init(void);
 
-#endif /* __MM_CACHE_H */
+#endif /* __MM_VM_CACHE_H */

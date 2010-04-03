@@ -32,7 +32,7 @@
  *   http://www.cmcrossroads.com/bradapp/ftp/src/libs/C++/AvlTrees.html
  */
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 
 #include <mm/malloc.h>
 

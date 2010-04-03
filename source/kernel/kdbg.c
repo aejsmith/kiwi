@@ -41,9 +41,9 @@
 #include <lib/ctype.h>
 #include <lib/string.h>
 
-#include <mm/cache.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
+#include <mm/vm_cache.h>
 
 #include <proc/process.h>
 #include <proc/thread.h>

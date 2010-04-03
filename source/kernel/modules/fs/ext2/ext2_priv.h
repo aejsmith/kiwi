@@ -25,7 +25,7 @@
 #include <io/file_map.h>
 #include <io/fs.h>
 
-#include <mm/cache.h>
+#include <mm/vm_cache.h>
 
 #include <console.h>
 #include <endian.h>

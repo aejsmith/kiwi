@@ -21,7 +21,7 @@
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 #include <lib/string.h>
 
 #include <mm/kheap.h>

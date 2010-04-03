@@ -23,8 +23,8 @@
 
 #include <lib/string.h>
 
-#include <mm/cache.h>
 #include <mm/malloc.h>
+#include <mm/vm_cache.h>
 
 #include <assert.h>
 #include <errors.h>

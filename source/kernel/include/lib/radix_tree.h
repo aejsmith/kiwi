@@ -18,8 +18,8 @@
  * @brief		Radix tree implementation.
  */
 
-#ifndef __LIB_RADIX_H
-#define __LIB_RADIX_H
+#ifndef __LIB_RADIX_TREE_H
+#define __LIB_RADIX_TREE_H
 
 #include <types.h>
 
@@ -81,4 +81,4 @@ extern void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helpe
 
 extern radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node);
 
-#endif /* __LIB_RADIX_H */
+#endif /* __LIB_RADIX_TREE_H */

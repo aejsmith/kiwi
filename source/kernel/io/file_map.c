@@ -26,9 +26,9 @@
 
 #include <lib/utility.h>
 
-#include <mm/cache.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
+#include <mm/vm_cache.h>
 
 #include <assert.h>
 #include <fatal.h>

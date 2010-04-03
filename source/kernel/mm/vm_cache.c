@@ -24,8 +24,8 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/cache.h>
 #include <mm/slab.h>
+#include <mm/vm_cache.h>
 
 #include <proc/thread.h>
 

@@ -21,7 +21,7 @@
 #ifndef __OBJECT_H
 #define __OBJECT_H
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 #include <lib/bitmap.h>
 #include <lib/list.h>
 #include <lib/refcount.h>

@@ -20,7 +20,7 @@
  * @todo		Check execute permission on binaries.
  */
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 #include <lib/string.h>
 
 #include <io/fs.h>

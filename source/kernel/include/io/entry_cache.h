@@ -21,7 +21,7 @@
 #ifndef __IO_ENTRY_CACHE_H
 #define __IO_ENTRY_CACHE_H
 
-#include <lib/radix.h>
+#include <lib/radix_tree.h>
 #include <sync/mutex.h>
 
 struct entry_cache;

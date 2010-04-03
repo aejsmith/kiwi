@@ -25,11 +25,11 @@
 
 #include <lib/string.h>
 
-#include <mm/cache.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
+#include <mm/vm_cache.h>
 
 #include <proc/process.h>
 

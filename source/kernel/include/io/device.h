@@ -21,7 +21,7 @@
 #ifndef __IO_DEVICE_H
 #define __IO_DEVICE_H
 
-#include <lib/radix.h>
+#include <lib/radix_tree.h>
 #include <public/device.h>
 #include <sync/mutex.h>
 #include <object.h>

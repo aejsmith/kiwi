@@ -18,8 +18,8 @@
  * @brief		AVL tree implementation.
  */
 
-#ifndef __LIB_AVL_H
-#define __LIB_AVL_H
+#ifndef __LIB_AVL_TREE_H
+#define __LIB_AVL_TREE_H
 
 #include <types.h>
 
@@ -85,4 +85,4 @@ extern avl_tree_node_t *avl_tree_node_last(avl_tree_t *tree);
 extern avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node);
 extern avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node);
 
-#endif /* __LIB_AVL_H */
+#endif /* __LIB_AVL_TREE_H */

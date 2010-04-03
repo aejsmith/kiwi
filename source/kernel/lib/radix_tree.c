@@ -29,7 +29,7 @@
  *   http://en.wikipedia.org/wiki/Radix_tree
  */
 
-#include <lib/radix.h>
+#include <lib/radix_tree.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 

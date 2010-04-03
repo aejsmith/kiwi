@@ -21,8 +21,8 @@
 #ifndef __IO_FS_H
 #define __IO_FS_H
 
-#include <lib/avl.h>
-#include <lib/radix.h>
+#include <lib/avl_tree.h>
+#include <lib/radix_tree.h>
 #include <lib/refcount.h>
 
 #include <public/fs.h>

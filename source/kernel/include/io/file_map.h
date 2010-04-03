@@ -21,7 +21,7 @@
 #ifndef __IO_FILE_MAP_H
 #define __IO_FILE_MAP_H
 
-#include <lib/avl.h>
+#include <lib/avl_tree.h>
 #include <lib/bitmap.h>
 
 #include <sync/mutex.h>
