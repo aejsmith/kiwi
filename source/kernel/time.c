@@ -251,7 +251,7 @@ void timer_stop(timer_t *timer) {
 void spin(useconds_t us) {
 	useconds_t target = time_since_boot() + us;
 	while(time_since_boot() < target) {
-		__asm__ volatile("pause");
+		spin_loop_hint();
 	}
 }
 
