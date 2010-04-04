@@ -40,19 +40,20 @@ public:
 	 * @param argv		Argument array.
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
-		size_t bytes, count, i;
+		size_t bytes, blksize, blocks, i;
 		handle_t handle;
 		offset_t offset;
-		char ch;
+		char *block;
 		int ret;
 
-		if(SHELL_HELP(argc, argv) || argc != 4) {
-			cout << "Usage: " << argv[0] << " <file> <offset> <count>" << endl;
+		if(SHELL_HELP(argc, argv) || argc != 5) {
+			cout << "Usage: " << argv[0] << " <file> <offset> <blocks> <blksize>" << endl;
 			return -ERR_PARAM_INVAL;
 		}
 
 		offset = strtoul(argv[2], NULL, 0);
-		count = strtoul(argv[3], NULL, 0);
+		blocks = strtoul(argv[3], NULL, 0);
+		blksize = strtoul(argv[4], NULL, 0);
 
 		if((handle = fs_file_open(argv[1], FS_FILE_READ)) < 0) {
 			cout << "Failed to open " << argv[1] << " (" << handle << ")" << endl;
@@ -63,19 +64,20 @@ public:
 			return ret;
 		}
 
-		for(i = 0; i < count; i++) {
-			if((ret = fs_file_read(handle, &ch, 1, &bytes)) != 0) {
+		block = new char[blksize];
+		for(i = 0; i < blocks; i++) {
+			if((ret = fs_file_read(handle, block, blksize, &bytes)) != 0) {
 				cout << "Failed to read (" << ret << ")" << endl;
-				handle_close(handle);
-				return ret;
+				break;
 			} else if(bytes == 0) {
 				cout << "Reached end of file" << endl;
 				break;
 			}
 		}
 
+		delete [] block;
 		handle_close(handle);
-		return 0;
+		return ret;
 	}
 };
 
