@@ -142,7 +142,8 @@ def fake_symtab_func(target, source, env):
 	f = open(str(target[0]), 'w')
 	f.write('/* This file is auto-generated, changes will be overwritten. */\n')
 	f.write('#include <symbol.h>\n')
-	f.write('symbol_table_t kernel_symtab = { .symbols = NULL, .count = 0 };\n')
+	f.write('static symbol_t kernel_symtab_array[] = { { { NULL, NULL }, 0x0, 0x0, "dummy", 0, false } };\n')
+	f.write('symbol_table_t kernel_symtab = { .symbols = kernel_symtab_array, .count = 1 };\n')
 	f.close()
 	return None
 
