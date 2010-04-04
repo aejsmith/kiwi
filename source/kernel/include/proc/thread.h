@@ -88,7 +88,7 @@ typedef struct thread {
 	} state;
 
 	/** Information used by user memory functions. */
-	atomic_t in_usermem;		/**< Whether the thread is in the user memory access functions. */
+	bool in_usermem;		/**< Whether the thread is in the user memory access functions. */
 	context_t usermem_context;	/**< Context to restore upon user memory access fault. */
 
 	/** Thread entry function. */

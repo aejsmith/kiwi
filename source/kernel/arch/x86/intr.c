@@ -98,7 +98,7 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
 		if(vm_fault(addr, reason, access)) {
 			return false;
-		} else if(atomic_get(&curr_thread->in_usermem)) {
+		} else if(curr_thread->in_usermem) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			kdbg_enter(KDBG_ENTRY_USER, frame);
 			context_restore_frame(&curr_thread->usermem_context, frame);

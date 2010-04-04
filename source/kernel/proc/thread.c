@@ -392,7 +392,6 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->cpu = NULL;
 
 	object_init(&thread->obj, &thread_object_type);
-	atomic_set(&thread->in_usermem, 0);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
 	thread->wire_count = 0;
@@ -405,6 +404,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->waitq = NULL;
 	thread->interruptible = false;
 	thread->timed_out = false;
+	thread->in_usermem = false;
 	thread->state = THREAD_CREATED;
 	thread->entry = entry;
 	thread->arg1 = arg1;

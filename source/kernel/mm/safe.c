@@ -42,10 +42,9 @@
 /** Common entry code for userspace memory functions. */
 #define USERMEM_ENTER()				\
 	if(context_save(&curr_thread->usermem_context) != 0) { \
-		atomic_set(&curr_thread->in_usermem, 0); \
 		return -ERR_ADDR_INVAL; \
 	} \
-	atomic_set(&curr_thread->in_usermem, 1)
+	curr_thread->in_usermem = true
 
 /** Common entry code for userspace memory functions. */
 #define USERMEM_ENTER_CHECK(addr, count)	\
@@ -56,7 +55,7 @@
 
 /** Common exit code for userspace memory functions. */
 #define USERMEM_EXIT()				\
-	atomic_set(&curr_thread->in_usermem, 0)
+	curr_thread->in_usermem = false;
 
 /** Copy data from userspace.
  *
