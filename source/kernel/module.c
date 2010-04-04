@@ -197,13 +197,13 @@ int module_name(object_handle_t *handle, char *namebuf) {
 		strcpy(namebuf, (char *)sym->addr);
 	}
 out:
+	symbol_table_destroy(&module->symtab);
 	if(module->load_base) {
 		module_mem_free(module->load_base, module->load_size);
 	}
 	if(module->shdrs) {
 		kfree(module->shdrs);
 	}
-	symbol_table_destroy(&module->symtab);
 	kfree(module);
 
 	mutex_unlock(&module_lock);
@@ -315,13 +315,13 @@ int module_load(object_handle_t *handle, char *depbuf) {
 	mutex_unlock(&module_lock);
 	return 0;
 fail:
+	symbol_table_destroy(&module->symtab);
 	if(module->load_base) {
 		module_mem_free(module->load_base, module->load_size);
 	}
 	if(module->shdrs) {
 		kfree(module->shdrs);
 	}
-	symbol_table_destroy(&module->symtab);
 	kfree(module);
 
 	mutex_unlock(&module_lock);
