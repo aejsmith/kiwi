@@ -54,8 +54,10 @@ static uint16_t *vga_mapping = (uint16_t *)0xB8000;
 static int vga_cursor_x = 0;
 static int vga_cursor_y = 0;
 
+#ifdef SERIAL_PORT
 /** Whether the serial console is enabled. */
 static bool serial_enabled = false;
+#endif
 
 /** Check if shift is held.
  * @return		Whether shift is held. */
@@ -224,6 +226,7 @@ console_t main_console = {
 
 /** Initialise the serial console. */
 static void serial_console_init(void) {
+#ifdef SERIAL_PORT
 	uint8_t status;
 
 	/* Only enable the serial port when it is present. */
@@ -238,11 +241,13 @@ static void serial_console_init(void) {
 		out8(SERIAL_PORT + 2, 0xC7);  /* Enable FIFO, clear them, with 14-byte threshold */
 		out8(SERIAL_PORT + 4, 0x0B);  /* IRQs enabled, RTS/DSR set */
 	}
+#endif
 }
 
 /** Write a character to the serial console.
  * @param ch		Character to write. */
 static void serial_console_putch(char ch) {
+#ifdef SERIAL_PORT
 	if(serial_enabled) {
 		while(!(in8(SERIAL_PORT + 5) & 0x20));
 		if(ch == '\n') {
@@ -251,6 +256,7 @@ static void serial_console_putch(char ch) {
 		}
 		out8(SERIAL_PORT, ch);
 	}
+#endif
 }
 
 /** Debug console. */
