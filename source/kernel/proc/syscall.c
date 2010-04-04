@@ -172,7 +172,9 @@ unative_t syscall_handler(syscall_frame_t *frame) {
 	end = time_since_boot();
 
 	symbol = symbol_lookup_addr((ptr_t)service->table[num], NULL);
-	kprintf(LOG_DEBUG, "%s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx) = 0x%lx [%llu microseconds]\n",
+	kprintf(LOG_DEBUG, "[%" PRIu32 "(%s):%" PRIu32 "(%s)] %s(0x%lx, 0x%lx, 0x%lx, "
+	                   "0x%lx, 0x%lx, 0x%lx) = 0x%lx [%llu microseconds]\n",
+	        curr_proc->id, curr_proc->name, curr_thread->id, curr_thread->name,
 	        (symbol) ? symbol->name : "<unknown>", frame->p1, frame->p2,
 	        frame->p3, frame->p4, frame->p5, frame->p6, ret, end - start);
 	return ret;
