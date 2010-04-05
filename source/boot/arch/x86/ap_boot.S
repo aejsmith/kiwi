@@ -18,14 +18,14 @@
  * @brief		AP bootstrap code.
  */
 
+#include <arch/asm.h>
 #include <platform/boot.h>
 
 .section .trampoline, "ax", @progbits
 .code16
 
 /** AP trampoline code. */
-.global ap_trampoline
-.type ap_trampoline, @function
+FUNCTION_START(ap_trampoline)
 	/* Don't want interrupts. */
 	cli
 
@@ -57,4 +57,4 @@
 
 	/* Jump to the kernel. */
 	jmp	loader_ap_main
-.size ap_trampoline, .-ap_trampoline
+FUNCTION_END(ap_trampoline)

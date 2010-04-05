@@ -18,8 +18,10 @@
  * @brief		x86 kernel entry functions.
  */
 
+#include <arch/asm.h>
 #include <arch/cpu.h>
 #include <arch/page.h>
+
 #include <platform/boot.h>
 
 .section .text, "ax", @progbits
@@ -29,9 +31,7 @@
  * @param cpu		CPU ID.
  * @param cr3		Value to load into CR3.
  * @param entry		Entry point address. */
-.global arch_enter_kernel64
-.type arch_enter_kernel64, @function
-arch_enter_kernel64:
+FUNCTION_START(arch_enter_kernel64)
 .code32
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
@@ -87,16 +87,14 @@ arch_enter_kernel64:
 
 	/* Call the kernel. */
 	call	*%rax
-.size arch_enter_kernel64, .-arch_enter_kernel64
+FUNCTION_END(arch_enter_kernel64)
 
 /** Enter a 32-bit kernel.
  * @param args		Kernel arguments.
  * @param cpu		CPU ID.
  * @param cr3		Value to load into CR3.
  * @param entry		Entry point address. */
-.global arch_enter_kernel32
-.type arch_enter_kernel32, @function
-arch_enter_kernel32:
+FUNCTION_START(arch_enter_kernel32)
 .code32
 	/* Enable PAE/PGE/OSFXSR. Also enable PSE because although its not
 	 * necessary when PAE is being used, VirtualBox shits itself without
@@ -133,4 +131,4 @@ arch_enter_kernel32:
 	push	%esi
 	push	%edi
 	call	*%eax
-.size arch_enter_kernel32, .-arch_enter_kernel32
+FUNCTION_END(arch_enter_kernel32)

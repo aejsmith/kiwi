@@ -18,6 +18,7 @@
  * @brief		x86 interrupt service routines.
  */
 
+#include <arch/asm.h>
 #include <platform/boot.h>
 
 .section ".text", "ax", @progbits
@@ -68,9 +69,7 @@
 
 /** Array of ISR handlers, each 16 bytes long. */
 .align 16
-.global isr_array
-.type isr_array, @function
-isr_array:
+FUNCTION_START(isr_array)
 	/* Define the exceptions (0-19) and the reserved interrupts (20-31). */
 	ISR	0
 	ISR	1
@@ -104,11 +103,10 @@ isr_array:
 	ISR	29
 	ISR	30
 	ISR	31
-.size isr_array, .-isr_array
+FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
-.type isr_common, @function
-isr_common:
+PRIVATE_FUNCTION_START(isr_common)
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
@@ -125,4 +123,4 @@ isr_common:
 	/* Pass a pointer to the interrupt stack frame. */
 	push	%esp
 	call	interrupt_handler
-.size isr_common, .-isr_common
+FUNCTION_END(isr_common)

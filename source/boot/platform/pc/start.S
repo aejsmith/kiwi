@@ -18,6 +18,7 @@
  * @brief		x86 bootloader startup code.
  */
 
+#include <arch/asm.h>
 #include <arch/page.h>
 #include <arch/stack.h>
 
@@ -28,9 +29,7 @@
 .section .init.text, "ax", @progbits
 
 /** Real-mode startup function. */
-.global _start
-.type _start, @function
-_start:
+FUNCTION_START(_start)
 .code16
 	/* Don't want interrupts. */
 	cli
@@ -71,14 +70,13 @@ _start:
 
 	/* Jump to the common startup code. */
 	jmp	__loader_entry
-.size _start, .-_start
+FUNCTION_END(_start)
 
 /** Test whether the A20 line is enabled.
  * @note		Partially based on code found at
  *			http://wiki.osdev.org/A20_Line
  * @return		AX = 1 if enabled, AX = 0 if not. */
-.type test_a20, @function
-test_a20:
+PRIVATE_FUNCTION_START(test_a20)
 .code16
 	/* Iterate checking to give time for enabling attempts we make to take
 	 * effect. */
@@ -108,11 +106,10 @@ test_a20:
 2:	mov	$1, %ax
 	pop	%cx
 	ret
-.size test_a20, .-test_a20
+FUNCTION_END(test_a20)
 
 /** Enable the A20 line. */
-.type enable_a20, @function
-enable_a20:
+PRIVATE_FUNCTION_START(enable_a20)
 	mov	$0x100, %cx
 .Lbegin:
 	/* Don't do anything if already enabled. */
@@ -173,11 +170,10 @@ enable_a20:
 2:	test	$2, %al
 	jnz	.Lflush
 	ret
-.size enable_a20, .-enable_a20
+FUNCTION_END(enable_a20)
 
 /** Multiboot header structure. */
 .align 4
-.type multiboot_header, @object
 multiboot_header:
 	.long MB_HEADER_MAGIC
 	.long (MB_HFLAG_KLUDGE | MB_HFLAG_MODALIGN)
@@ -187,11 +183,9 @@ multiboot_header:
 	.long __data_end + MULTIBOOT_LOAD_OFFSET
 	.long __end + MULTIBOOT_LOAD_OFFSET
 	.long __multiboot_entry + MULTIBOOT_LOAD_OFFSET
-.size multiboot_header, .-multiboot_header
 
 /** Multiboot startup function. */
-.type __multiboot_entry, @function
-__multiboot_entry:
+PRIVATE_FUNCTION_START(__multiboot_entry)
 .code32
 	cli
 
@@ -236,11 +230,10 @@ __multiboot_entry:
 
 	/* Jump to the common startup code. */
 	jmp	__loader_entry
-.size __multiboot_entry, .-__multiboot_entry
+FUNCTION_END(__multiboot_entry)
 
 /** Common startup function. */
-.type __loader_entry, @function
-__loader_entry:
+PRIVATE_FUNCTION_START(__loader_entry)
 	/* Set the stack pointer to the physical location of our stack and
 	 * clear the stack frame/EFLAGS. */
 	movl	$boot_stack + KSTACK_SIZE, %esp
@@ -251,42 +244,29 @@ __loader_entry:
 	/* Call the main function. */
 	call	loader_main
 1:	jmp	1b
-.size __loader_entry, .-__loader_entry
+FUNCTION_END(__loader_entry)
 
 /** GDT pointer. */
-.global loader_gdtp
-.type loader_gdtp, @object
-loader_gdtp:
+SYMBOL(loader_gdtp)
         .word .L__gdt_end-__gdt-1
         .long __gdt
-.size loader_gdtp, .-loader_gdtp
 
 /** Boot drive. */
-.global boot_device_id
-.type boot_device_id, @object
-boot_device_id:
+SYMBOL(boot_device_id)
 	.byte 0
-.size boot_device_id, .-boot_device_id
 
 /** Boot partition offset. */
-.global boot_part_offset
-.type boot_part_offset, @object
-boot_part_offset:
+SYMBOL(boot_part_offset)
 	.quad 0
-.size boot_part_offset, .-boot_part_offset
 
 .section .data, "aw", @progbits
 
 /** Stack. */
 .align PAGE_SIZE
-.global boot_stack
-.type boot_stack, @object
-boot_stack:
+SYMBOL(boot_stack)
 	.fill	KSTACK_SIZE
-.size boot_stack, .-boot_stack
 
 /** Global descriptor table. */
-.type __gdt, @object
 __gdt:
 	.quad 0x0000000000000000                /**< NULL descriptor (0x00). */
         .quad 0x00CF9A000000FFFF                /**< 32-bit code     (0x08). */
@@ -295,25 +275,15 @@ __gdt:
 	.quad 0x00AF9A000000FFFF		/**< 64-bit code     (0x20). */
 	.quad 0x008F92000000FFFF		/**< 64-bit data     (0x28). */
 .L__gdt_end:
-.size __gdt, .-__gdt
 
 /** Multiboot magic number. */
-.global multiboot_magic
-.type multiboot_magic, @object
-multiboot_magic:
+SYMBOL(multiboot_magic)
 	.long	0
-.size multiboot_magic, .-multiboot_magic
 
 /** Multiboot information structure. */
-.global multiboot_info
-.type multiboot_info, @object
-multiboot_info:
+SYMBOL(multiboot_info)
 	.fill	MB_INFO_SIZE
-.size multiboot_info, .-multiboot_info
 
 /** Multiboot command line. */
-.global multiboot_cmdline
-.type multiboot_cmdline, @object
-multiboot_cmdline:
+SYMBOL(multiboot_cmdline)
 	.fill	MB_CMDLINE_MAX
-.size multiboot_cmdline, .-multiboot_cmdline

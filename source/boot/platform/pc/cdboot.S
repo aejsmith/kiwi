@@ -18,6 +18,7 @@
  * @brief		x86 CD boot sector.
  */
 
+#include <arch/asm.h>
 #include <platform/boot.h>
 
 /** Various definitions. */
@@ -29,11 +30,9 @@
 .code16
 
 /** Entry function - jumps to the main function. */
-.global _start
-.type _start, @function
-_start:
+FUNCTION_START(_start)
 	jmp	boot
-.size _start, .-_start
+FUNCTION_END(_start)
 
 /** Boot information table. */
 . = _start + 8
@@ -44,9 +43,7 @@ bi_checksum:	.long 0			/**< Checksum. */
 bi_reserved:	.space 40		/**< Reserved. */
 
 /** Main function of the CD boot sector. */
-.global boot
-.type boot, @function
-boot:
+PRIVATE_FUNCTION_START(boot)
 	/* Set up the stack and other segment registers. */
 	xorw	%ax, %ax
 	movw	%ax, %ss
@@ -108,13 +105,11 @@ boot:
 	call	puts
 .Lhalt:
 	jmp	.Lhalt
-.size boot, .-boot
+FUNCTION_END(boot)
 
 /** Display a string on the screen.
  * @param %ds:%si	String to display. */
-.global puts
-.type puts, @function
-puts:
+PRIVATE_FUNCTION_START(puts)
 	pushw	%ax
 	cld
 1:	lodsb
@@ -128,7 +123,7 @@ puts:
 	jmp	1b
 2:	popw	%ax
 	ret
-.size puts, .-puts
+FUNCTION_END(puts)
 
 /** Message strings. */
 msg_loading:		.asciz "Loading... "

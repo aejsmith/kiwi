@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  * 
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,11 +18,8 @@
  * @brief		IA32 CPU context functions.
  */
 
+#include <arch/asm.h>
 #include <arch/context.h>
-
-.global context_save
-.global context_restore
-.global __context_restore_frame
 
 /** Save a context structure.
  *
@@ -34,7 +31,7 @@
  * @return		0 if returning from context_save(), 1 if returning
  *			from context_restore().
  */
-context_save:
+FUNCTION_START(context_save)
 	movl	4(%esp), %edx
 
 	/* Save instruction/stack pointers. */
@@ -51,7 +48,7 @@ context_save:
 	/* Return 0 from context_save(). */
 	xorl	%eax, %eax
 	ret
-.size context_save, .-context_save
+FUNCTION_END(context_save)
 
 /** Restore a context structure.
  *
@@ -62,7 +59,7 @@ context_save:
  *
  * @param ctx		Context structure to restore.
  */
-context_restore:
+FUNCTION_START(context_restore)
 	movl	4(%esp), %edx
 
 	/* Restore new callee-save registers. */
@@ -80,10 +77,10 @@ context_restore:
 	xorl	%eax, %eax
 	inc	%eax
 	ret
-.size context_restore, .-context_restore
+FUNCTION_END(context_restore)
 
 /** Helper for context_restore_frame(). Entered with the context pointer in edx. */
-__context_restore_frame:
+FUNCTION_START(__context_restore_frame)
 	/* Restore new callee-save registers. */
 	movl	CONTEXT_OFF_SI(%edx), %esi
 	movl	CONTEXT_OFF_DI(%edx), %edi
@@ -99,4 +96,4 @@ __context_restore_frame:
 	xorl	%eax, %eax
 	inc	%eax
 	ret
-.size __context_restore_frame, .-__context_restore_frame
+FUNCTION_END(__context_restore_frame)

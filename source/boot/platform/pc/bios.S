@@ -18,6 +18,7 @@
  * @brief		BIOS interrupt functions.
  */
 
+#include <arch/asm.h>
 #include <platform/boot.h>
 
 /** Size of the registers structure. */
@@ -32,9 +33,7 @@
 /** Call a BIOS interrupt.
  * @param num		Interrupt number.
  * @param regs		Registers to use for the interrupt. */
-.global bios_interrupt
-.type bios_interrupt, @function
-bios_interrupt:
+FUNCTION_START(bios_interrupt)
 	/* Save callee-save registers/flags. */
 	push	%ebp
 	push	%ebx
@@ -145,11 +144,9 @@ bios_interrupt:
 	pop	%ebx
 	pop	%ebp
 	ret
-.size bios_interrupt, .-bios_interrupt
+FUNCTION_END(bios_interrupt)
 
 /** IDT pointer for the BIOS IVT. */
-.type bios_idtp, @object
 bios_idtp:
         .word 0x7FF
         .long 0
-.size bios_idtp, .-bios_idtp

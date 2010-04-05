@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  * 
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,6 +18,7 @@
  * @brief		AMD64 CPU context functions.
  */
 
+#include <arch/asm.h>
 #include <arch/context.h>
 
 /** Save a context structure.
@@ -30,9 +31,7 @@
  * @return		0 if returning from context_save(), 1 if returning
  *			from context_restore().
  */
-.global context_save
-.type context_save, @function
-context_save:
+FUNCTION_START(context_save)
 	/* Save instruction/stack pointers. */
 	movq	(%rsp), %rax
 	movq	%rax, CONTEXT_OFF_IP(%rdi)
@@ -49,7 +48,7 @@ context_save:
 	/* Return 0 from context_save(). */
 	xorq	%rax, %rax
 	ret
-.size context_save, .-context_save
+FUNCTION_END(context_save)
 
 /** Restore a context structure.
  *
@@ -60,9 +59,7 @@ context_save:
  *
  * @param ctx		Context structure to restore.
  */
-.global context_restore
-.type context_restore, @function
-context_restore:
+FUNCTION_START(context_restore)
 	/* Restore new callee-save registers. */
 	movq	CONTEXT_OFF_R15(%rdi), %r15
 	movq	CONTEXT_OFF_R14(%rdi), %r14
@@ -80,4 +77,4 @@ context_restore:
 	xorq	%rax, %rax
 	incq	%rax
 	ret
-.size context_restore, .-context_restore
+FUNCTION_END(context_restore)

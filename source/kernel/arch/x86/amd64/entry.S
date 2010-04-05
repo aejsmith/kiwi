@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,6 +18,7 @@
  * @brief		AMD64 kernel entry points.
  */
 
+#include <arch/asm.h>
 #include <arch/cpu.h>
 #include <arch/descriptor.h>
 #include <arch/stack.h>
@@ -90,9 +91,7 @@
 
 /** Array of ISR handlers, each 16 bytes long. */
 .align 16
-.global isr_array
-.type isr_array, @function
-isr_array:
+FUNCTION_START(isr_array)
 	/* Define the exceptions (0-19) and the reserved interrupts (20-31). */
 	ISR	0
 	ISR	1
@@ -133,11 +132,10 @@ isr_array:
 		ISR .Lintr
 		.Lintr = .Lintr+1
 	.endr
-.size isr_array, .-isr_array
+FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
-.type isr_common, @function
-isr_common:
+PRIVATE_FUNCTION_START(isr_common)
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
@@ -160,12 +158,10 @@ isr_common:
 	/* Get rid of the error code and interrupt number. */
 	addq	$16, %rsp
 	iretq
-.size isr_common, .-isr_common
+FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */
-.global syscall_entry
-.type syscall_entry, @function
-syscall_entry:
+FUNCTION_START(syscall_entry)
 	/* Switch to the kernel mode stack. The GS_BASE MSR points to the
 	 * thread's architecture-specific data. Use the SWAPGS instruction
 	 * to get at it, so we can get our stack pointer. The userspace RSP
@@ -247,11 +243,10 @@ syscall_entry:
 
 	/* Return to user-mode. */
 	sysretq
-.size syscall_entry, .-syscall_entry
+FUNCTION_END(syscall_entry)
 
 /** Userspace entry function. */
-.global thread_arch_enter_userspace
-thread_arch_enter_userspace:
+FUNCTION_START(thread_arch_enter_userspace)
 	/* Push a zero return address so the userspace program will not fault
 	 * if it inadvertently returns from its entry function. */
 	subq	$STACK_DELTA, %rsi
@@ -295,4 +290,4 @@ thread_arch_enter_userspace:
 
 	/* Enter userspace. */
 	iretq
-.size thread_arch_enter_userspace, .-thread_arch_enter_userspace
+FUNCTION_END(thread_arch_enter_userspace)
