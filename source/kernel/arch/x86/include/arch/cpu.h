@@ -165,6 +165,11 @@ static inline __noreturn void cpu_halt(void) {
 	}
 }
 
+/** Place the CPU in an idle state until an interrupt occurs. */
+static inline void cpu_idle(void) {
+	__asm__ volatile("sti; hlt; cli");
+}
+
 /** Spin loop hint using the PAUSE instruction.
  * @note		See PAUSE instruction in Intel 64 and IA-32
  *			Architectures Software Developer's Manual, Volume 2B:

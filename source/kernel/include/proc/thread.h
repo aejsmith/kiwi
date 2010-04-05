@@ -110,6 +110,11 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
+extern void thread_arch_post_switch(thread_t *thread);
+extern int thread_arch_init(thread_t *thread);
+extern void thread_arch_destroy(thread_t *thread);
+extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
+
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);

@@ -23,8 +23,6 @@
 
 #include <types.h>
 
-struct thread;
-
 /** x86-specific thread structure. */
 typedef struct thread_arch {
 #ifdef __x86_64__
@@ -33,12 +31,5 @@ typedef struct thread_arch {
 	ptr_t user_rsp;		/**< Saved RSP for returning to userspace. */
 #endif
 } __packed thread_arch_t;
-
-extern void thread_arch_post_switch(struct thread *thread);
-
-extern int thread_arch_init(struct thread *thread);
-extern void thread_arch_destroy(struct thread *thread);
-
-extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
 
 #endif /* __ARCH_THREAD_H */
