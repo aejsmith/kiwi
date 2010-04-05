@@ -271,7 +271,7 @@ extern void fs_node_remove(fs_node_t *node);
  */
 
 extern int fs_file_create(const char *path);
-extern int fs_file_from_memory(const void *buf, size_t size, object_handle_t **handlep);
+extern object_handle_t *fs_file_from_memory(const void *buf, size_t size);
 extern int fs_file_open(const char *path, int flags, object_handle_t **handlep);
 extern int fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
 extern int fs_file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset,

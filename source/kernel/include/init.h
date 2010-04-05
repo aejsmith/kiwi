@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,7 +21,7 @@
 #ifndef __INIT_H
 #define __INIT_H
 
-#include <compiler.h>
+#include <kargs.h>
 
 /** Type of an initcall function. */
 typedef void (*initcall_t)(void);
@@ -32,5 +32,13 @@ typedef void (*initcall_t)(void);
  *			the order that they are in the initcall section. */
 #define INITCALL(func)	\
 	static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
+
+extern void arch_premm_init(kernel_args_t *args);
+extern void arch_postmm_init(kernel_args_t *args);
+extern void arch_ap_init(kernel_args_t *args);
+
+extern void platform_premm_init(kernel_args_t *args);
+extern void platform_postmm_init(kernel_args_t *args);
+extern void platform_ap_init(kernel_args_t *args);
 
 #endif /* __INIT_H */

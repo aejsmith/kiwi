@@ -18,8 +18,6 @@
  * @brief		Kernel initialisation functions.
  */
 
-#include <arch/arch.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
@@ -33,8 +31,6 @@
 #include <mm/page.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
-
-#include <platform/platform.h>
 
 #include <proc/process.h>
 #include <proc/sched.h>
@@ -55,9 +51,10 @@
 /** Structure describing a boot module. */
 typedef struct boot_module {
 	list_t header;			/**< Link to modules list. */
-	object_handle_t *handle;	/**< Handle to in-memory module file. */
-	char *name;			/**< Name of the module. */
+	void *mapping;			/**< Pointer to mapped module data. */
 	size_t size;			/**< Size of the module data. */
+	object_handle_t *handle;	/**< File handle for the module data. */
+	char *name;			/**< Name of the module. */
 } boot_module_t;
 
 extern void kmain(kernel_args_t *args, uint32_t cpu);
@@ -87,6 +84,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 		kfree(mod->name);
 	}
 	object_handle_release(mod->handle);
+	page_phys_unmap(mod->mapping, mod->size, true);
 	kfree(mod);
 
 	/* Update progress. */
@@ -115,22 +113,14 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @param mod		Boot module containing archive.
  * @return		Whether the module was a TAR archive. */
 static bool __init_text boot_module_load_tar(boot_module_t *mod) {
+	tar_header_t *hdr = mod->mapping;
 	object_handle_t *handle;
-	tar_header_t *hdr;
 	int64_t size;
 	size_t bytes;
-	void *buf;
 	int ret;
-
-	/* Get the size of the data. */
-	buf = hdr = kmalloc(mod->size, MM_FATAL);
-	if(fs_file_read(mod->handle, buf, mod->size, &bytes) != 0 || bytes != mod->size) {
-		fatal("Could not read TAR file data");
-	}
 
 	/* Check format of module. */
 	if(strncmp(hdr->magic, "ustar", 5) != 0) {
-		kfree(buf);
 		return false;
 	}
 
@@ -186,7 +176,6 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 		hdr = (tar_header_t *)(ptr_t)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
 	}
 
-	kfree(buf);
 	boot_module_remove(mod);
 	return true;
 }
@@ -223,7 +212,6 @@ static void __init_text load_modules(kernel_args_t *args) {
 	kernel_args_module_t *amod;
 	boot_module_t *mod;
 	phys_ptr_t addr;
-	void *mapping;
 	char *tmp;
 
 	if(!args->module_count) {
@@ -237,20 +225,18 @@ static void __init_text load_modules(kernel_args_t *args) {
 	for(addr = args->modules; addr;) {
 		amod = page_phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
 
+		/* Create a structure for the module and map the data into
+		 * memory. */
 		mod = kmalloc(sizeof(boot_module_t), MM_FATAL);
 		list_init(&mod->header);
 		mod->name = NULL;
 		mod->size = amod->size;
+		mod->mapping = page_phys_map(amod->base, mod->size, MM_FATAL);
+		mod->handle = fs_file_from_memory(mod->mapping, mod->size);
 
-		/* Map in the data and create a FS node from it. */
-		mapping = page_phys_map(amod->base, amod->size, MM_FATAL);
-		if(fs_file_from_memory(mapping, amod->size, &mod->handle) != 0) {
-			fatal("Failed to create node from module data");
-		}
-		page_phys_unmap(mapping, amod->size, true);
-
-		/* Figure out the module name. Do not fail if unable to get
-		 * the name, may be a filesystem image or something. */
+		/* Figure out the module name, which is needed to resolve
+		 * dependencies. Do not fail if unable to get the name, may be
+		 * a filesystem image. */
 		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
 		if(module_name(mod->handle, tmp) != 0) {
 			kfree(tmp);

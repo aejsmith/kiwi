@@ -18,7 +18,6 @@
  * @brief		i8042 keyboard/mouse port driver.
  */
 
-#include <arch/arch.h>
 #include <arch/io.h>
 
 #include <cpu/intr.h>
@@ -30,6 +29,8 @@
 #include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+
+extern void arch_reboot(void);
 
 /** Keyboard device structure. */
 static input_device_t *i8042_kbd_dev;

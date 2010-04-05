@@ -18,7 +18,6 @@
  * @brief		x86 architecture core code.
  */
 
-#include <arch/arch.h>
 #include <arch/io.h>
 #include <arch/lapic.h>
 #include <arch/page.h>
@@ -29,7 +28,10 @@
 
 #include <console.h>
 #include <fatal.h>
+#include <init.h>
 #include <time.h>
+
+extern void arch_reboot(void);
 
 /** x86-specific early initialisation.
  * @param args		Kernel arguments structure. */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,13 +18,17 @@
  * @brief		PC platform core code.
  */
 
-#include <arch/lapic.h>
-
 #include <platform/pic.h>
 #include <platform/pit.h>
-#include <platform/platform.h>
 
 #include <fatal.h>
+#include <init.h>
+
+/** PC platform first stage initialisation.
+ * @param args		Kernel arguments structure. */
+void __init_text platform_premm_init(kernel_args_t *args) {
+	/* Nothing happens. */
+}
 
 /** PC platform second stage initialisation.
  * @param args		Kernel arguments structure. */
@@ -34,4 +38,10 @@ void __init_text platform_postmm_init(kernel_args_t *args) {
 	if(args->arch.lapic_disabled) {
 		timer_device_set(&pit_timer_device);
 	}
+}
+
+/** PC platform AP initialisation.
+ * @param args		Kernel arguments structure. */
+void __init_text platform_ap_init(kernel_args_t *args) {
+	/* Nothing happens. */
 }

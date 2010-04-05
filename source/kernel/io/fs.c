@@ -850,17 +850,14 @@ int fs_file_create(const char *path) {
 
 /** Structure containing details of a memory file. */
 typedef struct memory_file {
-	char *data;			/**< Data for the file. */
+	const char *data;		/**< Data for the file. */
 	size_t size;			/**< Size of the file. */
 } memory_file_t;
 
 /** Free a memory file.
  * @param node		Node to free. */
 static void memory_file_free(fs_node_t *node) {
-	memory_file_t *file = node->data;
-
-	kfree(file->data);
-	kfree(file);
+	kfree(node->data);
 }
 
 /** Read from a memory file.
@@ -899,9 +896,8 @@ static fs_node_ops_t memory_file_ops = {
  * memory. This is useful to pass data stored in memory to code that expects
  * to be operating on filesystem entries, such as the module loader.
  *
- * When the file is created, the data in the given memory area is duplicated,
- * so updates to the memory area after this function has been called will not
- * show on reads from the file.
+ * The given memory area will not be duplicated, and therefore it must remain
+ * in memory for the lifetime of the node.
  *
  * The file is not attached anywhere in the filesystem, and therefore when the
  * handle is closed, it will be immediately destroyed.
@@ -911,27 +907,21 @@ static fs_node_ops_t memory_file_ops = {
  *
  * @param buf		Pointer to memory area to use.
  * @param size		Size of memory area.
- * @param handlep	Where to store handle to file. The handle will be
- *			created with the FS_FILE_READ flag.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Pointer to handle to file (has FS_FILE_READ flag set).
  */
-int fs_file_from_memory(const void *buf, size_t size, object_handle_t **handlep) {
+object_handle_t *fs_file_from_memory(const void *buf, size_t size) {
+	object_handle_t *handle;
 	memory_file_t *file;
 	fs_node_t *node;
 
-	if(!buf || !size || !handlep) {
-		return -ERR_PARAM_INVAL;
-	}
-
-	/* Create a node to store the data. */
 	file = kmalloc(sizeof(memory_file_t), MM_SLEEP);
-	file->data = kmemdup(buf, size, MM_SLEEP);
+	file->data = buf;
 	file->size = size;
 	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &memory_file_ops, file);
-	*handlep = fs_handle_create(node, FS_FILE_READ);
+	handle = fs_handle_create(node, FS_FILE_READ);
 	fs_node_release(node);
-	return 0;
+	return handle;
 }
 
 /** Open a handle to a file.
