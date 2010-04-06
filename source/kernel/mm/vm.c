@@ -411,7 +411,7 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 
 		/* Copy object details into the split. */
 		if((split->handle = region->handle)) {
-			object_handle_get(split->handle);
+			handle_get(split->handle);
 		}
 		if((split->amap = region->amap)) {
 			refcount_inc(&split->amap->count);
@@ -439,7 +439,7 @@ static void vm_region_destroy(vm_region_t *region) {
 			vm_amap_release(region->amap);
 		}
 		if(region->handle) {
-			object_handle_release(region->handle);
+			handle_release(region->handle);
 		}
 	}
 
@@ -566,7 +566,7 @@ static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
  * @param access	Type of access that caused the fault.
  * @return		Whether the fault was successfully handled. */
 static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	object_handle_t *handle = region->handle;
+	handle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t paddr;
 	offset_t offset;
@@ -889,7 +889,7 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
+int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, handle_t *handle,
            offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
 	int rflags, ret;
@@ -945,7 +945,7 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t
 	 * anonymous map if necessary. */
 	region = vm_region_alloc(as, start, start + size, rflags);
 	if((region->handle = handle)) {
-		object_handle_get(region->handle);
+		handle_get(region->handle);
 		region->obj_offset = offset;
 	}
 	if(!handle || (flags & VM_MAP_PRIVATE)) {
@@ -1155,7 +1155,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  * @return		0 on success, negative error code on failure.
  */
 int sys_vm_map(vm_map_args_t *args) {
-	object_handle_t *obj = NULL;
+	handle_t *obj = NULL;
 	vm_map_args_t kargs;
 	int ret, err;
 	ptr_t addr;
@@ -1165,7 +1165,7 @@ int sys_vm_map(vm_map_args_t *args) {
 	} else if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
 		return -ERR_PARAM_INVAL;
 	} else if(kargs.handle >= 0) {
-		if((ret = object_handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
+		if((ret = handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
 			return ret;
 		}
 	}
@@ -1180,7 +1180,7 @@ int sys_vm_map(vm_map_args_t *args) {
 	}
 
 	if(obj) {
-		object_handle_release(obj);
+		handle_release(obj);
 	}
 	return ret;
 }

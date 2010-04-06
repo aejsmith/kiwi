@@ -32,7 +32,7 @@ using namespace std;
 extern EventLoop *global_event_loop;
 
 /** Handle constructor. */
-Handle::Handle(handle_t handle) : m_handle(handle) {}
+Handle::Handle(handle_id_t handle) : m_handle(handle) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
@@ -74,7 +74,7 @@ bool Handle::Wait(int event, useconds_t timeout) const {
 
 /** Get the ID of the handle.
  * @return		ID of the handle. */
-handle_t Handle::GetHandle(void) const {
+handle_id_t Handle::GetHandleID(void) const {
 	return m_handle;
 }
 

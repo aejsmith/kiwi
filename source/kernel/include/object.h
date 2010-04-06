@@ -30,7 +30,7 @@
 
 #include <sync/rwlock.h>
 
-struct object_handle;
+struct handle;
 struct object_wait;
 struct process;
 struct vm_page;
@@ -42,7 +42,7 @@ typedef struct object_type {
 
 	/** Close a handle to an object.
 	 * @param handle	Handle to the object. */
-	void (*close)(struct object_handle *handle);
+	void (*close)(struct handle *handle);
 
 	/** Signal that an object is being waited for.
 	 * @note		If the event being waited for has occurred
@@ -64,20 +64,20 @@ typedef struct object_type {
 	 * @param handle	Handle to object.
 	 * @param flags		Mapping flags (VM_MAP_*).
 	 * @return		0 if can be mapped, negative error code if not. */
-	int (*mappable)(struct object_handle *handle, int flags);
+	int (*mappable)(struct handle *handle, int flags);
 
 	/** Get a page from the object.
 	 * @param handle	Handle to object to get page from.
 	 * @param offset	Offset into object to get page from.
 	 * @param physp		Where to store physical address of page.
 	 * @return		0 on success, negative error code on failure. */
-	int (*get_page)(struct object_handle *handle, offset_t offset, phys_ptr_t *physp);
+	int (*get_page)(struct handle *handle, offset_t offset, phys_ptr_t *physp);
 
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.
 	 * @param offset	Offset of page in object.
 	 * @param phys		Physical address of page that was unmapped. */
-	void (*release_page)(struct object_handle *handle, offset_t offset, phys_ptr_t phys);
+	void (*release_page)(struct handle *handle, offset_t offset, phys_ptr_t phys);
 } object_type_t;
 
 /** Structure defining a kernel object.
@@ -90,15 +90,15 @@ typedef struct object {
 } object_t;
 
 /** Structure containing a handle to a kernel object. */
-typedef struct object_handle {
+typedef struct handle {
 	object_t *object;		/**< Object that the handle refers to. */
 	void *data;			/**< Per-handle data pointer. */
 	refcount_t count;		/**< References to the handle. */
-} object_handle_t;
+} handle_t;
 
 /** Handle waiting information structure. */
 typedef struct object_wait {
-	object_handle_t *handle;	/**< Handle to object being waited for. */
+	handle_t *handle;		/**< Handle to object being waited for. */
 	int event;			/**< Event ID being waited for. */
 	void *priv;			/**< Internal implementation data pointer. */
 	int idx;			/**< Index into array for object_wait_multiple(). */
@@ -117,17 +117,17 @@ extern void object_destroy(object_t *obj);
 //extern void object_acl_insert(object_t *obj,
 //extern void object_acl_remove(object_t *obj,
 
-extern object_handle_t *object_handle_create(object_t *obj, void *data);
-extern void object_handle_get(object_handle_t *handle);
-extern void object_handle_release(object_handle_t *handle);
-extern handle_t object_handle_attach(struct process *process, object_handle_t *handle);
-extern int object_handle_detach(struct process *process, handle_t id);
-extern int object_handle_lookup(struct process *process, handle_t id, int type, object_handle_t **handlep);
+extern handle_t *handle_create(object_t *obj, void *data);
+extern void handle_get(handle_t *handle);
+extern void handle_release(handle_t *handle);
+extern handle_id_t handle_attach(struct process *process, handle_t *handle);
+extern int handle_detach(struct process *process, handle_id_t id);
+extern int handle_lookup(struct process *process, handle_id_t id, int type, handle_t **handlep);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_callback(object_wait_t *wait);
-extern int object_wait(object_handle_t *handle, int event, useconds_t timeout);
-extern int object_wait_multiple(object_handle_t **handles, int *events, size_t count, useconds_t timeout);
+extern int object_wait(handle_t *handle, int event, useconds_t timeout);
+extern int object_wait_multiple(handle_t **handles, int *events, size_t count, useconds_t timeout);
 
 extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);

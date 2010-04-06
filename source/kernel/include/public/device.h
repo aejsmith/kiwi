@@ -33,7 +33,7 @@ extern "C" {
 
 /** Arguments for device_request(). */
 typedef struct device_request_args {
-	handle_t handle;		/**< Handle to device. */
+	handle_id_t handle;		/**< Handle to device. */
 	int request;			/**< Request number. */
 	void *in;			/**< Input buffer. */
 	size_t insz;			/**< Input buffer size. */
@@ -48,14 +48,16 @@ typedef struct device_request_args {
 //#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
 //#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
 
-extern handle_t SYSCALL(device_open)(const char *path);
-extern int SYSCALL(device_read)(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int SYSCALL(device_write)(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
+extern handle_id_t SYSCALL(device_open)(const char *path);
+extern int SYSCALL(device_read)(handle_id_t handle, void *buf, size_t count, offset_t offset,
+                                size_t *bytesp);
+extern int SYSCALL(device_write)(handle_id_t handle, const void *buf, size_t count,
+                                 offset_t offset, size_t *bytesp);
 #ifdef KERNEL
 extern int SYSCALL(device_request)(device_request_args_t *args);
 #else
 extern int SYSCALL(_device_request)(device_request_args_t *args);
-extern int SYSCALL(device_request)(handle_t handle, int request, void *in, size_t insz,
+extern int SYSCALL(device_request)(handle_id_t handle, int request, void *in, size_t insz,
                                    void *out, size_t outsz, size_t *bytesp);
 #endif
 

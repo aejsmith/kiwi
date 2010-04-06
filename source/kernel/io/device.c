@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -49,7 +49,7 @@ device_t *device_bus_dir;
 
 /** Closes a handle to a device.
  * @param handle	Handle to the device. */
-static void device_object_close(object_handle_t *handle) {
+static void device_object_close(handle_t *handle) {
 	device_t *device = (device_t *)handle->object;
 
 	if(device->ops && device->ops->close) {
@@ -84,7 +84,7 @@ static void device_object_unwait(object_wait_t *wait) {
  * @param handle	Handle to device.
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		0 if can be mapped, negative error code if not. */
-static int device_object_mappable(object_handle_t *handle, int flags) {
+static int device_object_mappable(handle_t *handle, int flags) {
 	device_t *device = (device_t *)handle->object;
 
 	/* Cannot create private mappings to devices. */
@@ -100,7 +100,7 @@ static int device_object_mappable(object_handle_t *handle, int flags) {
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
  * @return		0 on success, negative error code on failure. */
-static int device_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static int device_object_get_page(handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	device_t *device = (device_t *)handle->object;
 	int ret;
 
@@ -455,7 +455,7 @@ void device_release(device_t *device) {
  *			reference placed on it.
  * @param handlep	Where to store pointer to handle structure.
  * @return		0 on success, negative error code on failure. */
-int device_open(device_t *device, object_handle_t **handlep) {
+int device_open(device_t *device, handle_t **handlep) {
 	void *data = NULL;
 	int ret;
 
@@ -470,7 +470,7 @@ int device_open(device_t *device, object_handle_t **handlep) {
 	}
 
 	refcount_inc(&device->count);
-	*handlep = object_handle_create(&device->obj, data);
+	*handlep = handle_create(&device->obj, data);
 	mutex_unlock(&device->lock);
 	return 0;
 }
@@ -490,7 +490,7 @@ int device_open(device_t *device, object_handle_t **handlep) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int device_read(handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
 	size_t bytes;
 	int ret;
@@ -533,7 +533,7 @@ int device_read(object_handle_t *handle, void *buf, size_t count, offset_t offse
  *
  * @return		0 on success, negative error code on failure.
  */
-int device_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int device_write(handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
 	size_t bytes;
 	int ret;
@@ -572,7 +572,7 @@ int device_write(object_handle_t *handle, const void *buf, size_t count, offset_
  * @param outszp	Where to store size of data returned.
  * @return		Positive value on success, negative error code on
  *			failure. */
-int device_request(object_handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+int device_request(handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
 	device_t *device;
 
 	if(!handle) {
@@ -712,10 +712,10 @@ INITCALL(device_init);
  *
  * @return		Handle ID on success, negative error code on failure.
  */
-handle_t sys_device_open(const char *path) {
-	object_handle_t *handle;
+handle_id_t sys_device_open(const char *path) {
+	handle_t *handle;
 	device_t *device;
-	handle_t ret;
+	handle_id_t ret;
 
 	if((ret = device_lookup(path, &device)) != 0) {
 		return ret;
@@ -727,8 +727,8 @@ handle_t sys_device_open(const char *path) {
 		return ret;
 	}
 
-	ret = object_handle_attach(curr_proc, handle);
-	object_handle_release(handle);
+	ret = handle_attach(curr_proc, handle);
+	handle_release(handle);
 	return ret;
 }
 
@@ -747,13 +747,13 @@ handle_t sys_device_open(const char *path) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	object_handle_t *obj = NULL;
+int sys_device_read(handle_id_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	handle_t *obj = NULL;
 	size_t bytes = 0;
 	int ret, err;
 	void *kbuf;
 
-	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -778,7 +778,7 @@ int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, s
 	kfree(kbuf);
 out:
 	if(obj) {
-		object_handle_release(obj);
+		handle_release(obj);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
@@ -804,13 +804,13 @@ out:
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	object_handle_t *obj = NULL;
+int sys_device_write(handle_id_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	handle_t *obj = NULL;
 	void *kbuf = NULL;
 	size_t bytes = 0;
 	int ret, err;
 
-	if((ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -833,7 +833,7 @@ out:
 		kfree(kbuf);
 	}
 	if(obj) {
-		object_handle_release(obj);
+		handle_release(obj);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
@@ -852,13 +852,13 @@ out:
 int sys_device_request(device_request_args_t *args) {
 	void *kin = NULL, *kout = NULL;
 	device_request_args_t kargs;
-	object_handle_t *obj;
+	handle_t *obj;
 	size_t koutsz;
 	int ret, err;
 
 	if((ret = memcpy_from_user(&kargs, args, sizeof(device_request_args_t))) != 0) {
 		return ret;
-	} else if((ret = object_handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	} else if((ret = handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
 		return ret;
 	}
 
@@ -892,6 +892,6 @@ out:
 	if(kout) {
 		kfree(kout);
 	}
-	object_handle_release(obj);
+	handle_release(obj);
 	return ret;
 }

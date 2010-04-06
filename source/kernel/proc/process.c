@@ -170,6 +170,16 @@ static void process_destroy(process_t *process) {
 	slab_cache_free(process_cache, process);
 }
 
+/** Closes a handle to a process.
+ * @param handle	Handle to close. */
+static void process_object_close(handle_t *handle) {
+	process_t *process = (process_t *)handle->object;
+
+	if(refcount_dec(&process->count) == 0) {
+		process_destroy(process);
+	}
+}
+
 /** Signal that a process is being waited for.
  * @param wait		Wait information structure.
  * @return		0 on success, negative error code on failure. */
@@ -203,22 +213,12 @@ static void process_object_unwait(object_wait_t *wait) {
 	}
 }
 
-/** Closes a handle to a process.
- * @param handle	Handle to close. */
-static void process_object_close(object_handle_t *handle) {
-	process_t *process = (process_t *)handle->object;
-
-	if(refcount_dec(&process->count) == 0) {
-		process_destroy(process);
-	}
-}
-
 /** Process object type operations. */
 static object_type_t process_object_type = {
 	.id = OBJECT_TYPE_PROCESS,
+	.close = process_object_close,
 	.wait = process_object_wait,
 	.unwait = process_object_unwait,
-	.close = process_object_close,
 };
 
 /** Copy the data contained in a string array to the argument block.
@@ -293,8 +293,8 @@ static int copy_arguments(const char *kpath, const char **kargs, const char **ke
  * @param arg2		Unused. */
 static void process_create_thread(void *arg1, void *arg2) {
 	process_create_info_t *info = arg1;
-	object_handle_t *handle = NULL;
 	ptr_t stack, entry, uargs;
+	handle_t *handle = NULL;
 	void *data = NULL;
 	int ret;
 
@@ -333,7 +333,7 @@ static void process_create_thread(void *arg1, void *arg2) {
 
 	/* Clean up our mess and wake up the caller. */
 	elf_binary_cleanup(data);
-	object_handle_release(handle);
+	handle_release(handle);
 	semaphore_up(&info->sem, 1);
 
 	/* To userspace, and beyond! */
@@ -345,7 +345,7 @@ fail:
 		elf_binary_cleanup(data);
 	}
 	if(handle) {
-		object_handle_release(handle);
+		handle_release(handle);
 	}
 	info->ret = ret;
 	semaphore_up(&info->sem, 1);
@@ -626,12 +626,12 @@ static void sys_process_arg_free(const char *path, const char **args, const char
  * @return		Handle to new process (greater than or equal to 0),
  *			negative error code on failure.
  */
-handle_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags) {
+handle_id_t sys_process_create(const char *path, const char *const args[], const char *const environ[], int flags) {
 	process_create_info_t info;
 	process_t *process = NULL;
-	object_handle_t *handle;
 	thread_t *thread = NULL;
-	handle_t hid = -1;
+	handle_id_t hid = -1;
+	handle_t *handle;
 	int ret;
 
 	if((ret = sys_process_arg_copy(path, args, environ, &info.path, &info.args, &info.environ)) != 0) {
@@ -648,9 +648,9 @@ handle_t sys_process_create(const char *path, const char *const args[], const ch
 	 * leave the new process running, but make the caller think it isn't
 	 * running. */
 	refcount_inc(&process->count);
-	handle = object_handle_create(&process->obj, NULL);
-	hid = object_handle_attach(curr_proc, handle);
-	object_handle_release(handle);
+	handle = handle_create(&process->obj, NULL);
+	hid = handle_attach(curr_proc, handle);
+	handle_release(handle);
 	if(hid < 0) {
 		ret = (int)hid;
 		goto fail;
@@ -677,10 +677,10 @@ handle_t sys_process_create(const char *path, const char *const args[], const ch
 fail:
 	if(hid >= 0) {
 		/* This will handle process destruction. */
-		object_handle_detach(curr_proc, hid);
+		handle_detach(curr_proc, hid);
 	}
 	sys_process_arg_free(info.path, info.args, info.environ);
-	return (handle_t)ret;
+	return (handle_id_t)ret;
 }
 
 /** Replace the current process.
@@ -703,9 +703,9 @@ fail:
  */
 int sys_process_replace(const char *path, const char *const args[], const char *const environ[], int flags) {
 	const char **kargs, **kenv, *kpath;
-	object_handle_t *handle = NULL;
 	vm_aspace_t *as = NULL, *old;
 	ptr_t stack, entry, uargs;
+	handle_t *handle = NULL;
 	void *data = NULL;
 	char *name;
 	int ret;
@@ -768,7 +768,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 
 	/* Clean up our mess. */
 	elf_binary_cleanup(data);
-	object_handle_release(handle);
+	handle_release(handle);
 	sys_process_arg_free(kpath, kargs, kenv);
 
 	/* To userspace, and beyond! */
@@ -783,7 +783,7 @@ fail:
 		vm_aspace_destroy(as);
 	}
 	if(handle) {
-		object_handle_release(handle);
+		handle_release(handle);
 	}
 	sys_process_arg_free(kpath, kargs, kenv);
 	return ret;
@@ -807,16 +807,16 @@ fail:
  *			will be created and a negative error code will be
  *			returned.
  */
-int sys_process_duplicate(handle_t *handlep) {
+int sys_process_duplicate(handle_id_t *handlep) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Open a handle to a process.
  * @param id		Global ID of the process to open. */
-handle_t sys_process_open(process_id_t id) {
-	object_handle_t *handle;
+handle_id_t sys_process_open(process_id_t id) {
 	process_t *process;
-	handle_t ret;
+	handle_t *handle;
+	handle_id_t ret;
 
 	rwlock_read_lock(&process_tree_lock);
 
@@ -831,9 +831,9 @@ handle_t sys_process_open(process_id_t id) {
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	handle = object_handle_create(&process->obj, NULL);
-	ret = object_handle_attach(curr_proc, handle);
-	object_handle_release(handle);
+	handle = handle_create(&process->obj, NULL);
+	ret = handle_attach(curr_proc, handle);
+	handle_release(handle);
 	return ret;
 }
 
@@ -847,17 +847,17 @@ handle_t sys_process_open(process_id_t id) {
  * @return		Process ID on success (greater than or equal to zero),
  *			negative error code on failure.
  */
-process_id_t sys_process_id(handle_t handle) {
-	object_handle_t *obj;
+process_id_t sys_process_id(handle_id_t handle) {
 	process_t *process;
 	process_id_t id;
+	handle_t *obj;
 
 	if(handle == -1) {
 		id = curr_proc->id;
-	} else if(!(id = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &obj))) {
+	} else if(!(id = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &obj))) {
 		process = (process_t *)obj->object;
 		id = process->id;
-		object_handle_release(obj);
+		handle_release(obj);
 	}
 
 	return id;

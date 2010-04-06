@@ -30,7 +30,7 @@ using namespace std;
 /** Constructor for IPCPort.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
-IPCPort::IPCPort(handle_t handle) : Handle(handle) {
+IPCPort::IPCPort(handle_id_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
 		_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
 	}
@@ -115,7 +115,7 @@ bool IPCPort::Register(const char *name) {
  *			progress.
  * @return		Pointer to connection on success, NULL on failure. */
 IPCConnection *IPCPort::Listen(useconds_t timeout) const {
-	handle_t handle;
+	handle_id_t handle;
 
 	if((handle = ipc_port_listen(m_handle, timeout)) < 0) {
 		return 0;

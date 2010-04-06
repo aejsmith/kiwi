@@ -32,7 +32,7 @@
  * @param bytesp	Where to store size of data stored in output buffer.
  * @return		Positive value on success, negative error code on
  *			failure. */
-int device_request(handle_t handle, int request, void *in, size_t insz, void *out, size_t outsz, size_t *bytesp) {
+int device_request(handle_id_t handle, int request, void *in, size_t insz, void *out, size_t outsz, size_t *bytesp) {
 	device_request_args_t args = {
 		.handle = handle,
 		.request = request,

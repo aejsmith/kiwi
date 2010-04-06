@@ -36,7 +36,7 @@ typedef struct vm_map_args {
 	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
 	size_t size;			/**< Size of area to map (multiple of page size). */
 	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for object to map. */
+	handle_id_t handle;		/**< Handle for object to map. */
 	offset_t offset;		/**< Offset in the object to map from. */
 	void **addrp;			/**< Where to store address mapped to. */
 } vm_map_args_t;
@@ -55,7 +55,7 @@ typedef struct vm_map_args {
 extern int SYSCALL(vm_map)(vm_map_args_t *args);
 #else
 extern int SYSCALL(_vm_map)(vm_map_args_t *args);
-extern int SYSCALL(vm_map)(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
+extern int SYSCALL(vm_map)(void *start, size_t size, int flags, handle_id_t handle, offset_t offset, void **addrp);
 #endif
 extern int SYSCALL(vm_unmap)(void *start, size_t size);
 

@@ -32,7 +32,7 @@ using namespace std;
 /** Constructor for IPCConnection.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
-IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
+IPCConnection::IPCConnection(handle_id_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
 		_RegisterEvent(HANDLE_EVENT_READ);
 		_RegisterEvent(IPC_CONNECTION_EVENT_HANGUP);

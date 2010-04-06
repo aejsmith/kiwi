@@ -46,7 +46,7 @@ EventLoop::EventLoop() {
  * @param event		Event to wait for on the handle. */
 void EventLoop::AddHandle(Handle *handle, int event) {
 	m_handles.push_back(handle);
-	m_ids.push_back(handle->GetHandle());
+	m_ids.push_back(handle->GetHandleID());
 	m_events.push_back(event);
 
 	handle->OnClose.Connect(this, &EventLoop::_HandleClosed);

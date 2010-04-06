@@ -57,8 +57,8 @@ typedef struct object_wait_sync {
 	object_wait_t *event;		/**< Handle that received first event (atomically set). */
 } object_wait_sync_t;
 
-/** Cache for object handle structures. */
-static slab_cache_t *object_handle_cache;
+/** Cache for handle structures. */
+static slab_cache_t *handle_cache;
 
 /** Initialise an object structure.
  * @param obj		Object to initialise.
@@ -78,22 +78,22 @@ void object_destroy(object_t *obj) {
 /** Create a handle to an object.
  *
  * Creates a new handle to an object. The handle will have a reference count
- * of one. When it is no longer required, object_handle_release() should be
- * called on it. The handle will not be attached to any process - to attach
- * it to a process, use handle_table_add() on the process' handle table.
+ * of one. When it is no longer required, handle_release() should be called on
+ * it. The handle will not be attached to any process - to attach it to a
+ * process, use handle_attach().
  *
  * @param obj		Object to create handle to.
  * @param data		Data pointer for the object.
  *
  * @return		Pointer to handle structure.
  */
-object_handle_t *object_handle_create(object_t *obj, void *data) {
-	object_handle_t *handle;
+handle_t *handle_create(object_t *obj, void *data) {
+	handle_t *handle;
 
 	assert(obj);
 	assert(obj->type);
 
-	handle = slab_cache_alloc(object_handle_cache, MM_SLEEP);
+	handle = slab_cache_alloc(handle_cache, MM_SLEEP);
 	refcount_set(&handle->count, 1);
 	handle->object = obj;
 	handle->data = data;
@@ -102,13 +102,13 @@ object_handle_t *object_handle_create(object_t *obj, void *data) {
 
 /** Increase the reference count of a handle.
  *
- * Increases the reference count of an object handle to signal that it is being
- * used. When the handle is no longer needed it should be released with
- * object_handle_release().
+ * Increases the reference count of a handle to signal that it is being used.
+ * When the handle is no longer needed it should be released with
+ * handle_release().
  * 
  * @param handle	Handle to increase reference count of.
  */
-void object_handle_get(object_handle_t *handle) {
+void handle_get(handle_t *handle) {
 	assert(handle);
 	refcount_inc(&handle->count);
 }
@@ -120,7 +120,7 @@ void object_handle_get(object_handle_t *handle) {
  *
  * @param handle	Handle to release.
  */
-void object_handle_release(object_handle_t *handle) {
+void handle_release(handle_t *handle) {
 	assert(handle);
 
 	/* If there are no more references we can close it. */
@@ -128,7 +128,7 @@ void object_handle_release(object_handle_t *handle) {
 		if(handle->object->type->close) {
 			handle->object->type->close(handle);
 		}
-		slab_cache_free(object_handle_cache, handle);
+		slab_cache_free(handle_cache, handle);
 	}
 }
 
@@ -142,7 +142,7 @@ void object_handle_release(object_handle_t *handle) {
  *
  * @return		Handle ID on success, negative error code on failure.
  */
-handle_t object_handle_attach(process_t *process, object_handle_t *handle) {
+handle_id_t handle_attach(process_t *process, handle_t *handle) {
 	int ret;
 
 	assert(process);
@@ -157,7 +157,7 @@ handle_t object_handle_attach(process_t *process, object_handle_t *handle) {
 	}
 
 	/* Set the bit and add the handle to the tree. */
-	object_handle_get(handle);
+	handle_get(handle);
 	bitmap_set(&process->handles.bitmap, ret);
 	avl_tree_insert(&process->handles.tree, (key_t)ret, handle, NULL);
 
@@ -177,8 +177,8 @@ handle_t object_handle_attach(process_t *process, object_handle_t *handle) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int object_handle_detach(process_t *process, handle_t id) {
-	object_handle_t *handle;
+int handle_detach(process_t *process, handle_id_t id) {
+	handle_t *handle;
 
 	assert(process);
 
@@ -193,7 +193,7 @@ int object_handle_detach(process_t *process, handle_t id) {
 	/* Remove from the tree and mark the ID as free. */
 	avl_tree_remove(&process->handles.tree, (key_t)id);
 	bitmap_clear(&process->handles.bitmap, id);
-	object_handle_release(handle);
+	handle_release(handle);
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 	        id, process->id);
@@ -206,7 +206,7 @@ int object_handle_detach(process_t *process, handle_t id) {
  * Looks up the handle with the given ID in a process' handle table, ensuring
  * that the object is a certain type. The returned handle will have an extra
  * reference on it - when it is no longer needed, it should be released with
- * object_handle_release().
+ * handle_release().
  *
  * @param process	Process to look up in.
  * @param id		Handle ID to look up.
@@ -216,8 +216,8 @@ int object_handle_detach(process_t *process, handle_t id) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int object_handle_lookup(process_t *process, handle_t id, int type, object_handle_t **handlep) {
-	object_handle_t *handle;
+int handle_lookup(process_t *process, handle_id_t id, int type, handle_t **handlep) {
+	handle_t *handle;
 
 	assert(process);
 	assert(handlep);
@@ -230,11 +230,11 @@ int object_handle_lookup(process_t *process, handle_t id, int type, object_handl
 		return -ERR_NOT_FOUND;
 	}
 
-	object_handle_get(handle);
+	handle_get(handle);
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && handle->object->type->id != type) {
-		object_handle_release(handle);
+		handle_release(handle);
 		rwlock_unlock(&process->handles.lock);
 		return -ERR_TYPE_INVAL;
 	}
@@ -269,7 +269,7 @@ void object_wait_callback(object_wait_t *wait) {
  *			a value of -1 will block indefinitely until the event
  *			happens.
  * @return		0 on success, negative error code on failure. */
-int object_wait(object_handle_t *handle, int event, useconds_t timeout) {
+int object_wait(handle_t *handle, int event, useconds_t timeout) {
 	object_wait_sync_t sync;
 	object_wait_t wait;
 	int ret;
@@ -311,7 +311,7 @@ int object_wait(object_handle_t *handle, int event, useconds_t timeout) {
  *			the events happen.
  * @return		Index of event that occurred on success, negative error
  *			code on failure. */
-int object_wait_multiple(object_handle_t **handles, int *events, size_t count, useconds_t timeout) {
+int object_wait_multiple(handle_t **handles, int *events, size_t count, useconds_t timeout) {
 	object_wait_sync_t sync;
 	object_wait_t *waits;
 	size_t i;
@@ -380,12 +380,12 @@ int handle_table_init(handle_table_t *table, handle_table_t *parent) {
 /** Destroy a handle table.
  * @param table		Table being destroyed. */
 void handle_table_destroy(handle_table_t *table) {
-	object_handle_t *handle;
+	handle_t *handle;
 
 	/* Close all handles. */
 	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
-		handle = avl_tree_entry(iter, object_handle_t);
-		object_handle_release(handle);
+		handle = avl_tree_entry(iter, handle_t);
+		handle_release(handle);
 		avl_tree_remove(&table->tree, iter->key);
 	}
 
@@ -397,8 +397,8 @@ void handle_table_destroy(handle_table_t *table) {
  * @param argv		Argument array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_handles(int argc, char **argv) {
-	object_handle_t *handle;
 	process_t *process;
+	handle_t *handle;
 	unative_t id;
 
 	if(KDBG_HELP(argc, argv)) {
@@ -422,7 +422,7 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	kprintf(LOG_NONE, "==    ======             ====                  =====  ====\n");
 
 	AVL_TREE_FOREACH(&process->handles.tree, iter) {
-		handle = avl_tree_entry(iter, object_handle_t);
+		handle = avl_tree_entry(iter, handle_t);
 		kprintf(LOG_NONE, "%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
 		        iter->key, handle, handle->object->type->id, handle->object->type,
 		        refcount_get(&handle->count), handle->data);
@@ -433,21 +433,22 @@ int kdbg_cmd_handles(int argc, char **argv) {
 
 /** Initialise the object handle cache. */
 void __init_text handle_cache_init(void) {
-	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
-	                                        0, NULL, NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
-	                                        NULL, 0, MM_FATAL);
+	handle_cache = slab_cache_create("handle_cache", sizeof(handle_t), 0, NULL,
+	                                 NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
+	                                 NULL, 0, MM_FATAL);
 }
 
 /** Get the type of an object referred to by a handle.
  * @param handle	Handle to object.
- * @return		Type ID of object. */
-int sys_object_type(handle_t handle) {
-	object_handle_t *obj;
+ * @return		Type ID of object on success, negative error code on
+ *			failure. */
+int sys_object_type(handle_id_t handle) {
+	handle_t *obj;
 	int ret;
 
-	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) == 0) {
+	if((ret = handle_lookup(curr_proc, handle, -1, &obj)) == 0) {
 		ret = obj->object->type->id;
-		object_handle_release(obj);
+		handle_release(obj);
 	}
 	return ret;
 }
@@ -460,16 +461,16 @@ int sys_object_type(handle_t handle) {
  *			a value of -1 will block indefinitely until the event
  *			happens.
  * @return		0 on success, negative error code on failure. */
-int sys_object_wait(handle_t handle, int event, useconds_t timeout) {
-	object_handle_t *obj;
+int sys_object_wait(handle_id_t handle, int event, useconds_t timeout) {
+	handle_t *obj;
 	int ret;
 
-	if((ret = object_handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, -1, &obj)) != 0) {
 		return ret;
 	}
 
 	ret = object_wait(obj, event, timeout);
-	object_handle_release(obj);
+	handle_release(obj);
 	return ret;
 }
 
@@ -489,9 +490,9 @@ int sys_object_wait(handle_t handle, int event, useconds_t timeout) {
  *			the events happen.
  * @return		Index of event that occurred on success, negative error
  *			code on failure. */
-int sys_object_wait_multiple(handle_t *handles, int *events, size_t count, useconds_t timeout) {
-	object_handle_t **kobjs = NULL;
-	handle_t *khandles = NULL;
+int sys_object_wait_multiple(handle_id_t *handles, int *events, size_t count, useconds_t timeout) {
+	handle_id_t *khandles = NULL;
+	handle_t **kobjs = NULL;
 	int *kevents = NULL;
 	size_t i;
 	int ret;
@@ -500,8 +501,8 @@ int sys_object_wait_multiple(handle_t *handles, int *events, size_t count, useco
 		return -ERR_PARAM_INVAL;
 	}
 
-	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);
-	if((ret = memcpy_from_user(khandles, handles, sizeof(handle_t) * count)) != 0) {
+	khandles = kmalloc(sizeof(handle_id_t) * count, MM_SLEEP);
+	if((ret = memcpy_from_user(khandles, handles, sizeof(handle_id_t) * count)) != 0) {
 		goto out;
 	}
 
@@ -510,9 +511,9 @@ int sys_object_wait_multiple(handle_t *handles, int *events, size_t count, useco
 		goto out;
 	}
 
-	kobjs = kcalloc(count, sizeof(object_handle_t *), MM_SLEEP);
+	kobjs = kcalloc(count, sizeof(handle_t *), MM_SLEEP);
 	for(i = 0; i < count; i++) {
-		if((ret = object_handle_lookup(curr_proc, khandles[i], -1, &kobjs[i])) != 0) {
+		if((ret = handle_lookup(curr_proc, khandles[i], -1, &kobjs[i])) != 0) {
 			goto out;
 		}
 	}
@@ -524,7 +525,7 @@ out:
 			if(!kobjs[i]) {
 				break;
 			}
-			object_handle_release(kobjs[i]);
+			handle_release(kobjs[i]);
 		}
 	}
 	if(kevents) {
@@ -539,6 +540,6 @@ out:
 /** Close a handle.
  * @param handle	Handle ID to close.
  * @return		0 on success, negative error code on failure. */
-int sys_handle_close(handle_t handle) {
-	return object_handle_detach(curr_proc, handle);
+int sys_handle_close(handle_id_t handle) {
+	return handle_detach(curr_proc, handle);
 }

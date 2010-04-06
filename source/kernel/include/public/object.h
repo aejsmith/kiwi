@@ -40,10 +40,10 @@ extern "C" {
 #define OBJECT_TYPE_PORT	6	/**< IPC port. */
 #define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 
-extern int SYSCALL(object_type)(handle_t handle);
-extern int SYSCALL(object_wait)(handle_t handle, int event, useconds_t timeout);
-extern int SYSCALL(object_wait_multiple)(handle_t *handle, int *events, size_t count, useconds_t timeout);
-extern int SYSCALL(handle_close)(handle_t handle);
+extern int SYSCALL(object_type)(handle_id_t handle);
+extern int SYSCALL(object_wait)(handle_id_t handle, int event, useconds_t timeout);
+extern int SYSCALL(object_wait_multiple)(handle_id_t *handle, int *events, size_t count, useconds_t timeout);
+extern int SYSCALL(handle_close)(handle_id_t handle);
 
 #ifdef __cplusplus
 }

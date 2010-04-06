@@ -53,7 +53,7 @@ typedef struct boot_module {
 	list_t header;			/**< Link to modules list. */
 	void *mapping;			/**< Pointer to mapped module data. */
 	size_t size;			/**< Size of the module data. */
-	object_handle_t *handle;	/**< File handle for the module data. */
+	handle_t *handle;		/**< File handle for the module data. */
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
@@ -83,7 +83,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	if(mod->name) {
 		kfree(mod->name);
 	}
-	object_handle_release(mod->handle);
+	handle_release(mod->handle);
 	page_phys_unmap(mod->mapping, mod->size, true);
 	kfree(mod);
 
@@ -114,7 +114,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @return		Whether the module was a TAR archive. */
 static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
-	object_handle_t *handle;
+	handle_t *handle;
 	int64_t size;
 	size_t bytes;
 	int ret;
@@ -155,7 +155,7 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 			} else if((int64_t)bytes != size) {
 				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
 			}
-			object_handle_release(handle);
+			handle_release(handle);
 			break;
 		case DIRTYPE:
 			if((ret = fs_dir_create(hdr->name)) != 0) {

@@ -44,7 +44,7 @@ typedef struct module {
 	/** Internally-used information. */
 	symbol_table_t symtab;		/**< Symbol table for the module. */
 	refcount_t count;		/**< Count of modules depending on this module. */
-	object_handle_t *handle;	/**< Handle to module file (only valid while loading). */
+	handle_t *handle;		/**< Handle to module file (only valid while loading). */
 
 	/** Module information. */
 	const char *name;		/**< Name of module. */
@@ -91,8 +91,8 @@ typedef struct module {
 
 extern void *module_mem_alloc(size_t size, int mmflag);
 
-extern int module_name(object_handle_t *handle, char *namebuf);
-extern int module_load(object_handle_t *handle, char *depbuf);
+extern int module_name(handle_t *handle, char *namebuf);
+extern int module_load(handle_t *handle, char *depbuf);
 
 extern int kdbg_cmd_modules(int argc, char **argv);
 
