@@ -36,6 +36,9 @@
 #include <fatal.h>
 #include <kargs.h>
 
+/** Required CPU features (FPU, TSC, PAE, PGE, FXSR). */
+#define REQUIRED_FEATURES	((1<<0) | (1<<4) | (1<<6) | (1<<13) | (1<<24))
+
 extern void arch_enter_kernel64(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint64_t entry) __noreturn;
 extern void arch_enter_kernel32(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint32_t entry) __noreturn;
 
@@ -76,11 +79,11 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 		return false;
 	}
 
-	/* Check for required feature support (long mode, SYSCALL). */
+	/* Check whether long mode is supported. Here I would check for SYSCALL
+	 * support, too, but Intel are twats and don't set the SYSCALL bit in
+	 * the CPUID information unless you're in 64-bit mode. */
 	if(!(kernel_args->arch.extended_edx & (1<<29))) {
 		fatal("64-bit kernel requires 64-bit CPU");
-	} else if(!(kernel_args->arch.extended_edx & (1<<11))) {
-		fatal("Required CPU features not present on all CPUs");
 	}
 
 	load_elf64_kernel(file, &kernel_entry64, &virt_base, &load_size);
@@ -159,12 +162,8 @@ static bool arch_load_kernel32(vfs_node_t *file) {
  * @param file		File containing the kernel. */
 void arch_load_kernel(vfs_node_t *file) {
 	/* Check that features required on both 32- and 64-bit kernels are
-	 * supported. In order: FPU, TSC, PAE, PGE, FXSR. */
-	if(!(kernel_args->arch.standard_edx & (1<<0)) ||
-	   !(kernel_args->arch.standard_edx & (1<<4)) ||
-	   !(kernel_args->arch.standard_edx & (1<<6)) ||
-	   !(kernel_args->arch.standard_edx & (1<<13)) ||
-	   !(kernel_args->arch.standard_edx & (1<<24))) {
+	 * supported. */
+	if((kernel_args->arch.standard_edx & REQUIRED_FEATURES) != REQUIRED_FEATURES) {
 		fatal("Required CPU features not present on all CPUs");
 	}
 
