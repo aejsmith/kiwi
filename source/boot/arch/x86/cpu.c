@@ -19,7 +19,6 @@
  */
 
 #include <arch/cpu.h>
-#include <arch/features.h>
 #include <arch/io.h>
 #include <arch/stack.h>
 #include <arch/lapic.h>
@@ -30,6 +29,7 @@
 
 #include <lib/qsort.h>
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <assert.h>
 #include <fatal.h>
@@ -173,102 +173,90 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 	/* Initialise everything to zero to begin with. */
 	memset(cpu, 0, sizeof(kernel_args_cpu_arch_t));
 
-	/* Check if CPUID is supported - if we can change EFLAGS.ID, it is
-	 * supported. */
+	/* Check if CPUID is supported - if we can change EFLAGS.ID, it is. */
 	flags = x86_read_flags();
 	x86_write_flags(flags ^ X86_FLAGS_ID);
-	if((x86_read_flags() & X86_FLAGS_ID) == (flags & X86_FLAGS_ID)) {
-		fatal("CPU %" PRIu32 " does not support CPUID", booting_cpu->id);
-	}
+	if((x86_read_flags() & X86_FLAGS_ID) != (flags & X86_FLAGS_ID)) {
+		/* Get the highest supported standard level. */
+		x86_cpuid(X86_CPUID_VENDOR_ID, &cpu->highest_standard, &ebx, &ecx, &edx);
+		if(cpu->highest_standard >= X86_CPUID_FEATURE_INFO) {
+			/* Get standard feature information, and then clear any */
+			x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &cpu->standard_ecx, &cpu->standard_edx);
+			cpu->family = (eax >> 8) & 0x0f;
+			cpu->model = (eax >> 4) & 0x0f;
+			cpu->stepping = eax & 0x0f;
 
-	/* Get the highest supported standard level. */
-	cpuid(CPUID_VENDOR_ID, &cpu->largest_standard, &ebx, &ecx, &edx);
-	if(cpu->largest_standard >= CPUID_FEATURE_INFO) {
-		/* Get standard feature information. */
-		cpuid(CPUID_FEATURE_INFO, &eax, &ebx, &cpu->feat_ecx, &cpu->feat_edx);
-		cpu->family = (eax >> 8) & 0x0f;
-		cpu->model = (eax >> 4) & 0x0f;
-		cpu->stepping = eax & 0x0f;
-
-		/* If the CLFLUSH instruction is supported, set the cache line
-		 * size. */
-		if(cpu->feat_edx & (1<<0)) {
-			cpu->cache_alignment = ((ebx >> 8) & 0xFF) * 8;
-		}
-	} else {
-		fatal("CPU %" PRIu32 " does not support CPUID feature information",
-		      booting_cpu->id);
-	}
-
-	/* Get the highest supported extended level. */
-	cpuid(CPUID_EXT_MAX, &cpu->largest_extended, &ebx, &ecx, &edx);
-	if(cpu->largest_extended & (1<<31)) {
-		if(cpu->largest_extended >= CPUID_EXT_FEATURE) {
-			/* Get extended feature information. */
-			cpuid(CPUID_EXT_FEATURE, &eax, &ebx, &cpu->ext_ecx, &cpu->ext_edx);
-		}
-
-		if(cpu->largest_extended >= CPUID_BRAND_STRING3) {
-			/* Get brand information. */
-			ptr = (uint32_t *)cpu->model_name;
-			cpuid(CPUID_BRAND_STRING1, &ptr[0], &ptr[1], &ptr[2],  &ptr[3]);
-			cpuid(CPUID_BRAND_STRING2, &ptr[4], &ptr[5], &ptr[6],  &ptr[7]);
-			cpuid(CPUID_BRAND_STRING3, &ptr[8], &ptr[9], &ptr[10], &ptr[11]);
-
-			/* Some CPUs right-justify the string... */
-			str = cpu->model_name;
-			i = 0; j = 0;
-			while(str[i] == ' ') {
-				i++;
-			}
-			if(i > 0) {
-				while(str[i]) {
-					str[j++] = str[i++];
-				}
-				while(j < sizeof(cpu->model_name)) {
-					str[j++] = 0;
-				}
+			/* If the CLFLUSH instruction is supported, get the
+			 * cache line size. If it is not, a sensible default
+			 * will be chosen later based on whether long mode is
+			 * supported. */
+			if(cpu->standard_edx & (1<<19)) {
+				cpu->cache_alignment = ((ebx >> 8) & 0xFF) * 8;
 			}
 		}
-	} else {
-		cpu->largest_extended = 0;
+
+		/* Get the highest supported extended level. */
+		x86_cpuid(X86_CPUID_EXT_MAX, &cpu->highest_extended, &ebx, &ecx, &edx);
+		if(cpu->highest_extended & (1<<31)) {
+			if(cpu->highest_extended >= X86_CPUID_EXT_FEATURE) {
+				/* Get extended feature information. */
+				x86_cpuid(X86_CPUID_EXT_FEATURE, &eax, &ebx, &cpu->extended_ecx, &cpu->extended_edx);
+			}
+
+			if(cpu->highest_extended >= X86_CPUID_BRAND_STRING3) {
+				/* Get brand information. */
+				ptr = (uint32_t *)cpu->model_name;
+				x86_cpuid(X86_CPUID_BRAND_STRING1, &ptr[0], &ptr[1], &ptr[2],  &ptr[3]);
+				x86_cpuid(X86_CPUID_BRAND_STRING2, &ptr[4], &ptr[5], &ptr[6],  &ptr[7]);
+				x86_cpuid(X86_CPUID_BRAND_STRING3, &ptr[8], &ptr[9], &ptr[10], &ptr[11]);
+
+				/* Some CPUs right-justify the string... */
+				str = cpu->model_name;
+				i = 0; j = 0;
+				while(str[i] == ' ') {
+					i++;
+				}
+				if(i > 0) {
+					while(str[i]) {
+						str[j++] = str[i++];
+					}
+					while(j < sizeof(cpu->model_name)) {
+						str[j++] = 0;
+					}
+				}
+			}
+		} else {
+			cpu->highest_extended = 0;
+		}
 	}
 
 	/* Get a brand string if one wasn't found. */
 	if(!cpu->model_name[0]) {
-		/* TODO: Get this based on the model information. */
+		/* TODO: Get this based on the family/model/stepping. */
 		strcpy(cpu->model_name, "Unknown Model");
 	}
 
 	/* If the cache line size is not set, use a sane default based on
 	 * whether the CPU supports long mode. */
 	if(!cpu->cache_alignment) {
-		cpu->cache_alignment = CPU_HAS_LMODE(booting_cpu) ? 64 : 32;
+		cpu->cache_alignment = (cpu->extended_edx & (1<<29)) ? 64 : 32;
 	}
 
-	/* Check that all required features are supported. */
-	if(!CPU_HAS_FPU(booting_cpu) || !CPU_HAS_TSC(booting_cpu) ||
-	   !CPU_HAS_PAE(booting_cpu) || !CPU_HAS_PGE(booting_cpu) ||
-	   !CPU_HAS_FXSR(booting_cpu)) {
-		fatal("CPU %" PRIu32 " does not support required features",
-		      booting_cpu->id);
-	}
-#if CONFIG_X86_NX
-	/* Enable NX/XD if supported. */
-	if(CPU_HAS_XD(booting_cpu)) {
-		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
-	}
-#endif
-	/* Shitty workaround: when running under QEMU the boot CPU's frequency
-	 * is OK but the others will usually get rubbish. Use the boot CPU's
-	 * frequency on all CPUs under QEMU. */
-	if(strncmp(cpu->model_name, "QEMU", 4) == 0 && booting_cpu != boot_cpu) {
+	/* Find out the CPU frequency. When running under QEMU the boot CPU's
+	 * frequency is OK but the others will usually get rubbish, so as a
+	 * workaround use the boot CPU's frequency on all CPUs under QEMU. */
+	if(strncmp(cpu->model_name, "QEMU", 4) != 0 || booting_cpu == boot_cpu) {
+		cpu->cpu_freq = calculate_frequency(calculate_cpu_frequency);
+	} else {
 		cpu->cpu_freq = boot_cpu->arch.cpu_freq;
-		return;
 	}
 
-	/* Find out the CPU frequency. */
-	cpu->cpu_freq = calculate_frequency(calculate_cpu_frequency);
+	/* Now that we have all information, update the feature set for all CPUs. */
+	kernel_args->arch.standard_ecx &= cpu->standard_ecx;
+	kernel_args->arch.standard_edx &= cpu->standard_edx;
+	kernel_args->arch.extended_ecx &= cpu->extended_ecx;
+	kernel_args->arch.extended_edx &= cpu->extended_edx;
+	kernel_args->arch.cache_alignment = MAX(kernel_args->arch.cache_alignment, cpu->cache_alignment);
 }
 
 /** Initialise the local APIC.
@@ -277,7 +265,7 @@ static bool cpu_lapic_init(void) {
 	uint32_t *mapping;
 	uint64_t base;
 
-	if(!CPU_HAS_APIC(booting_cpu)) {
+	if(!(booting_cpu->arch.standard_edx & (1<<9))) {
 		return false;
 	}
 
@@ -305,14 +293,13 @@ static bool cpu_lapic_init(void) {
 	lapic_mapping[LAPIC_REG_TIMER_DIVIDER] = LAPIC_TIMER_DIV4;
 	lapic_mapping[LAPIC_REG_LVT_TIMER] = (1<<16);
 
-	/* Shitty workaround: see above. */
-	if(strncmp(booting_cpu->arch.model_name, "QEMU", 4) == 0 && booting_cpu != boot_cpu) {
+	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU,
+	 * same applies here. */
+	if(strncmp(booting_cpu->arch.model_name, "QEMU", 4) != 0 || booting_cpu == boot_cpu) {
+		booting_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
+	} else {
 		booting_cpu->arch.lapic_freq = boot_cpu->arch.lapic_freq;
-		return true;
 	}
-
-	/* Calculate the LAPIC tick frequency. */
-	booting_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
 	return true;
 }
 
@@ -382,27 +369,6 @@ static void cpu_boot(kernel_args_cpu_t *cpu) {
 	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
 }
 
-/** Print out CPU information. */
-static void cpu_print_info(void) {
-	kernel_args_cpu_t *cpu;
-	phys_ptr_t addr;
-
-	dprintf("cpu: detected %" PRIu32 " CPU(s):\n", kernel_args->cpu_count);
-
-	for(addr = kernel_args->cpus; addr; addr = cpu->next) {
-		cpu = (kernel_args_cpu_t *)((ptr_t)addr);
-
-		dprintf(" cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
-		        cpu->id, cpu->arch.model_name, cpu->arch.family,
-		        cpu->arch.model, cpu->arch.stepping);
-		dprintf("  cpu_freq:   %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000 / 1000);
-		if(!kernel_args->arch.lapic_disabled) {
-			dprintf("  lapic_freq: %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000 / 1000);
-		}
-		dprintf("  clsize:     %d\n", cpu->arch.cache_alignment);
-	}
-}
-
 /** Spin for a certain amount of time.
  * @param us		Microseconds to delay for. */
 void spin(useconds_t us) {
@@ -433,11 +399,37 @@ void cpu_boot_all(void) {
 		cpu_boot(cpu);
 	}
 
-	cpu_print_info();
+	dprintf("cpu: detected %" PRIu32 " CPU(s):\n", kernel_args->cpu_count);
+
+	for(addr = kernel_args->cpus; addr; addr = cpu->next) {
+		cpu = (kernel_args_cpu_t *)((ptr_t)addr);
+
+		dprintf(" cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
+		        cpu->id, cpu->arch.model_name, cpu->arch.family,
+		        cpu->arch.model, cpu->arch.stepping);
+		dprintf("  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000 / 1000);
+		if(!kernel_args->arch.lapic_disabled) {
+			dprintf("  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000 / 1000);
+		}
+		dprintf("  clsize:      %d\n", cpu->arch.cache_alignment);
+	}
+
+	dprintf("cpu: feature set supported by all CPUs:\n");
+	dprintf(" standard_ecx: 0x%" PRIx32 "\n", kernel_args->arch.standard_ecx);
+	dprintf(" standard_edx: 0x%" PRIx32 "\n", kernel_args->arch.standard_edx);
+	dprintf(" extended_ecx: 0x%" PRIx32 "\n", kernel_args->arch.standard_ecx);
+	dprintf(" extended_edx: 0x%" PRIx32 "\n", kernel_args->arch.standard_edx);
 }
 
 /** Perform early CPU initialisation. */
 void cpu_early_init(void) {
+	/* Set all of the bits in the feature masks to begin with, they will be
+	 * cleared as necessary by cpu_arch_init(). */
+	kernel_args->arch.standard_ecx = 0xFFFFFFFF;
+	kernel_args->arch.standard_edx = 0xFFFFFFFF;
+	kernel_args->arch.extended_ecx = 0xFFFFFFFF;
+	kernel_args->arch.extended_edx = 0xFFFFFFFF;
+
 	/* To begin with add the CPU with an ID of 0. It will be set correctly
 	 * once we have set up the LAPIC. */
 	booting_cpu = kargs_cpu_add(0);
@@ -466,6 +458,9 @@ void cpu_postmenu_init(void) {
 /** Perform AP initialisation. */
 void cpu_ap_init(void) {
 	cpu_arch_init(&booting_cpu->arch);
+
+	/* It is assumed that all secondary CPUs have an LAPIC, seeing as they
+	 * could not have been booted if they didn't. */
 	if(!cpu_lapic_init()) {
 		fatal("CPU %" PRIu32 " APIC could not be enabled", booting_cpu->id);
 	}

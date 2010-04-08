@@ -36,6 +36,8 @@ extern void arch_reboot(void);
 /** x86-specific early initialisation.
  * @param args		Kernel arguments structure. */
 void __init_text arch_premm_init(kernel_args_t *args) {
+	cpu_features_init(&cpu_features, args->arch.standard_ecx, args->arch.standard_edx,
+	                  args->arch.extended_ecx, args->arch.extended_edx);
 	descriptor_init();
 	intr_init();
 }

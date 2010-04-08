@@ -19,7 +19,6 @@
  */
 
 #include <arch/cpu.h>
-#include <arch/features.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
 
@@ -88,7 +87,7 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */
-	if(CPU_HAS_XD(curr_cpu) && frame->err_code & (1<<4)) {
+	if(cpu_features.xd && frame->err_code & (1<<4)) {
 		access = VM_FAULT_EXEC;
 	}
 #endif

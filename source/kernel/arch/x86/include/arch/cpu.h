@@ -99,6 +99,30 @@
 #define X86_EFER_LMA		(1<<10)		/**< Long Mode (IA-32e) Active. */
 #define X86_EFER_NXE		(1<<11)		/**< Execute Disable (XD/NX) Bit Enable. */
 
+
+/** Standard CPUID function definitions. */
+#define X86_CPUID_VENDOR_ID	0x00000000	/**< Vendor ID/Highest Standard Function. */
+#define X86_CPUID_FEATURE_INFO	0x00000001	/**< Feature Information. */
+#define X86_CPUID_CACHE_DESC	0x00000002	/**< Cache Descriptors. */
+#define X86_CPUID_SERIAL_NUM	0x00000003	/**< Processor Serial Number. */
+#define X86_CPUID_CACHE_PARMS	0x00000004	/**< Deterministic Cache Parameters. */
+#define X86_CPUID_MONITOR_MWAIT	0x00000005	/**< MONITOR/MWAIT Parameters. */
+#define X86_CPUID_DTS_POWER	0x00000006	/**< Digital Thermal Sensor and Power Management Parameters. */
+#define X86_CPUID_DCA		0x00000009	/**< Direct Cache Access (DCA) Parameters. */
+#define X86_CPUID_PERFMON	0x0000000A	/**< Architectural Performance Monitor Features. */
+#define X86_CPUID_X2APIC	0x0000000B	/**< x2APIC Features/Processor Topology. */
+#define X86_CPUID_XSAVE		0x0000000D	/**< XSAVE Features. */
+
+/** Extended CPUID function definitions. */
+#define X86_CPUID_EXT_MAX	0x80000000	/**< Largest Extended Function. */
+#define X86_CPUID_EXT_FEATURE	0x80000001	/**< Extended Feature Bits. */
+#define X86_CPUID_BRAND_STRING1	0x80000002	/**< Processor Name/Brand String (Part 1). */
+#define X86_CPUID_BRAND_STRING2	0x80000003	/**< Processor Name/Brand String (Part 2). */
+#define X86_CPUID_BRAND_STRING3	0x80000004	/**< Processor Name/Brand String (Part 3). */
+#define X86_CPUID_L2_CACHE	0x80000006	/**< Extended L2 Cache Features. */
+#define X86_CPUID_ADVANCED_PM	0x80000007	/**< Advanced Power Management. */
+#define X86_CPUID_ADDRESS_SIZE	0x80000008	/**< Virtual/Physical Address Sizes. */
+
 #ifndef __ASM__
 
 #include <types.h>
@@ -111,6 +135,24 @@
 
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;
+
+/** Structure containing CPU feature information. */
+typedef struct cpu_features {
+	/** Standard CPUID Features (EDX). */
+	bool fpu, vme, de, pse, tsc, msr, pae, mce, cx8, apic, sep, mtrr, pge;
+	bool mca, cmov, pat, pse36, psn, clfsh, ds, acpi, mmx, fxsr, sse, sse2;
+	bool ss, htt, tm, pbe;
+
+	/** Standard CPUID Features (ECX). */
+	bool sse3, monitor, dscpl, vmx, smx, est, tm2, ssse3, cnxtid;
+	bool cmpxchg16b, pdcm, dca, sse4_1, sse4_2, popcnt;
+
+	/** Extended CPUID Features (EDX). */
+	bool syscall, xd, lmode;
+
+	/** Extended CPUID Features (ECX). */
+	bool lahf;
+} cpu_features_t;
 
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
@@ -126,7 +168,7 @@ typedef struct cpu_arch {
 #endif
 	void *double_fault_stack;		/**< Pointer to the stack for double faults. */
 
-	/** Basic CPU information. */
+	/** CPU information. */
 	uint64_t cpu_freq;			/**< CPU frequency in Hz. */
 	uint64_t lapic_freq;			/**< LAPIC timer frequency in Hz. */
 	char model_name[64];			/**< CPU model name. */
@@ -134,15 +176,14 @@ typedef struct cpu_arch {
 	uint8_t model;				/**< CPU model. */
 	uint8_t stepping;			/**< CPU stepping. */
 	int cache_alignment;			/**< Cache line size. */
-
-	/** Feature information. */
-	uint32_t largest_standard;		/**< Largest standard function. */
-	uint32_t feat_ecx;			/**< ECX value of function 01h. */
-	uint32_t feat_edx;			/**< EDX value of function 01h. */
-	uint32_t largest_extended;		/**< Largest extended function. */
-	uint32_t ext_ecx;			/**< ECX value of function 80000000h. */
-	uint32_t ext_edx;			/**< ECX value of function 80000000h. */
+	cpu_features_t features;		/**< Features supported by the CPU. */
 } cpu_arch_t;
+
+extern cpu_features_t cpu_features;
+
+extern void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx,
+                              uint32_t standard_edx, uint32_t extended_ecx,
+                              uint32_t extended_edx);
 
 /** Get the current CPU structure pointer from the base of the stack.
  * @return		Pointer to current CPU structure. */
@@ -299,6 +340,16 @@ static inline uint64_t x86_read_msr(uint32_t msr) {
  * @param value		Value to write to the MSR. */
 static inline void x86_write_msr(uint32_t msr, uint64_t value) {
 	__asm__ volatile("wrmsr" :: "a"((uint32_t)value), "d"((uint32_t)(value >> 32)), "c"(msr));
+}
+
+/** Execute the CPUID instruction.
+ * @param level		CPUID level.
+ * @param a		Where to store EAX value.
+ * @param b		Where to store EBX value.
+ * @param c		Where to store ECX value.
+ * @param d		Where to store EDX value. */
+static inline void x86_cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
+	__asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "0"(level));
 }
 
 #endif /* __ASM__ */

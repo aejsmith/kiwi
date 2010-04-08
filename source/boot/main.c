@@ -121,11 +121,12 @@ void loader_main(void) {
 	/* Display the configuration interface if the user requested. */
 	menu_display();
 
-	/* Do post-menu CPU intialisation, and detect all other CPUs if SMP
-	 * was not disabled in the menu. */
+	/* Do post-menu CPU intialisation, and detect/boot all other CPUs if
+	 * SMP was not disabled in the menu. */
 	cpu_postmenu_init();
 	if(!kernel_args->smp_disabled) {
 		cpu_detect();
+		cpu_boot_all();
 	}
 
 	/* Load the kernel and modules. */
@@ -135,9 +136,6 @@ void loader_main(void) {
 	load_kernel(node);
 	load_modules(node);
 	vfs_node_release(node);
-
-	/* Boot all CPUs, and do final CPU setup. */
-	cpu_boot_all();
 
 	/* Set the video mode for the kernel. */
 	platform_video_enable();

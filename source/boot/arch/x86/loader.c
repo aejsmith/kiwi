@@ -24,7 +24,6 @@
 
 #include <arch/boot.h>
 #include <arch/cpu.h>
-#include <arch/features.h>
 #include <arch/page.h>
 
 #include <boot/cpu.h>
@@ -77,10 +76,11 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 		return false;
 	}
 
-	/* Check for long mode support (booting_cpu is still set to the BSP
-	 * at this point). */
-	if(!CPU_HAS_LMODE(booting_cpu)) {
+	/* Check for required feature support (long mode, SYSCALL). */
+	if(!(kernel_args->arch.extended_edx & (1<<29))) {
 		fatal("64-bit kernel requires 64-bit CPU");
+	} else if(!(kernel_args->arch.extended_edx & (1<<11))) {
+		fatal("Required CPU features not present on all CPUs");
 	}
 
 	load_elf64_kernel(file, &kernel_entry64, &virt_base, &load_size);
@@ -158,6 +158,16 @@ static bool arch_load_kernel32(vfs_node_t *file) {
 /** Load the kernel into memory.
  * @param file		File containing the kernel. */
 void arch_load_kernel(vfs_node_t *file) {
+	/* Check that features required on both 32- and 64-bit kernels are
+	 * supported. In order: FPU, TSC, PAE, PGE, FXSR. */
+	if(!(kernel_args->arch.standard_edx & (1<<0)) ||
+	   !(kernel_args->arch.standard_edx & (1<<4)) ||
+	   !(kernel_args->arch.standard_edx & (1<<6)) ||
+	   !(kernel_args->arch.standard_edx & (1<<13)) ||
+	   !(kernel_args->arch.standard_edx & (1<<24))) {
+		fatal("Required CPU features not present on all CPUs");
+	}
+
 	if(!arch_load_kernel64(file)) {
 		if(!arch_load_kernel32(file)) {
 			fatal("Kernel format is invalid");
@@ -171,6 +181,14 @@ void arch_enter_kernel(void) {
 	 * 0, so that the kernel's timing functions return a consistent value
 	 * on all CPUs. */
 	x86_write_msr(X86_MSR_TSC, 0);
+
+#if CONFIG_X86_NX
+	/* Enable NX/XD if supported (only bother if it is supported on all
+	 * CPUs, as the kernel won't use it if it isn't). */
+	if(kernel_args->arch.extended_edx & (1<<20)) {
+		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
+	}
+#endif
 
 	if(kernel_is_64bit) {
 		arch_enter_kernel64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);

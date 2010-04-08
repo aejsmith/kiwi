@@ -19,7 +19,6 @@
  */
 
 #include <arch/barrier.h>
-#include <arch/features.h>
 #include <arch/memmap.h>
 
 #include <cpu/cpu.h>
@@ -339,7 +338,7 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bo
 		flags |= PG_WRITE;
 	}
 #if CONFIG_X86_NX
-	if(!exec && CPU_HAS_XD(curr_cpu)) {
+	if(!exec && cpu_features.xd) {
 		flags |= PG_NOEXEC;
 	}
 #endif

@@ -18,7 +18,6 @@
  * @brief		x86 CPU management.
  */
 
-#include <arch/features.h>
 #include <arch/lapic.h>
 #include <arch/stack.h>
 
@@ -32,15 +31,18 @@
 #include <kargs.h>
 #include <kdbg.h>
 
+/** Double fault handler stack for the boot CPU. */
+static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
+static bool boot_doublefault_stack_used = false;
+
 /** Atomic variable for paused CPUs to wait on. */
 atomic_t cpu_pause_wait = 0;
 
 /** Whether cpu_halt_all() has been called. */
 atomic_t cpu_halting_all = 0;
 
-/** Double fault handler stack for the boot CPU. */
-static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
-static bool boot_doublefault_stack_used = false;
+/** Feature set present on all CPUs. */
+cpu_features_t cpu_features;
 
 /** Pause execution of other CPUs.
  *
@@ -102,6 +104,64 @@ cpu_id_t cpu_current_id(void) {
         return (cpu_id_t)lapic_id();
 }
 
+/** Fill in a CPU features structure.
+ * @param features	Structure to fill in.
+ * @Param standard_ecx	Standard features ECX value.
+ * @Param standard_ecx	Standard features EDX value.
+ * @Param extended_ecx	Extended features ECX value.
+ * @Param extended_ecx	Extended features EDX value. */
+void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx, uint32_t standard_edx,
+                       uint32_t extended_ecx, uint32_t extended_edx) {
+	features->fpu = standard_edx & (1<<0);
+	features->vme = standard_edx & (1<<1);
+	features->de = standard_edx & (1<<2);
+	features->pse = standard_edx & (1<<3);
+	features->tsc = standard_edx & (1<<4);
+	features->msr = standard_edx & (1<<5);
+	features->pae = standard_edx & (1<<6);
+	features->mce = standard_edx & (1<<7);
+	features->cx8 = standard_edx & (1<<8);
+	features->apic = standard_edx & (1<<9);
+	features->sep = standard_edx & (1<<11);
+	features->mtrr = standard_edx & (1<<12);
+	features->pge = standard_edx & (1<<13);
+	features->mca = standard_edx & (1<<14);
+	features->cmov = standard_edx & (1<<15);
+	features->pat = standard_edx & (1<<16);
+	features->pse36 = standard_edx & (1<<17);
+	features->psn = standard_edx & (1<<18);
+	features->clfsh = standard_edx & (1<<19);
+	features->ds = standard_edx & (1<<21);
+	features->acpi = standard_edx & (1<<22);
+	features->mmx = standard_edx & (1<<23);
+	features->fxsr = standard_edx & (1<<24);
+	features->sse = standard_edx & (1<<25);
+	features->sse2 = standard_edx & (1<<26);
+	features->ss = standard_edx & (1<<27);
+	features->htt = standard_edx & (1<<28);
+	features->tm = standard_edx & (1<<29);
+	features->pbe = standard_edx & (1<<31);
+	features->sse3 = standard_ecx & (1<<0);
+	features->monitor = standard_ecx & (1<<3);
+	features->dscpl = standard_ecx & (1<<4);
+	features->vmx = standard_ecx & (1<<5);
+	features->smx = standard_ecx & (1<<6);
+	features->est = standard_ecx & (1<<7);
+	features->tm2 = standard_ecx & (1<<8);
+	features->ssse3 = standard_ecx & (1<<9);
+	features->cnxtid = standard_ecx & (1<<10);
+	features->cmpxchg16b = standard_ecx & (1<<13);
+	features->pdcm = standard_ecx & (1<<15);
+	features->dca = standard_ecx & (1<<18);
+	features->sse4_1 = standard_ecx & (1<<19);
+	features->sse4_2 = standard_ecx & (1<<20);
+	features->popcnt = standard_ecx & (1<<23);
+	features->syscall = extended_edx & (1<<11);
+	features->xd = extended_edx & (1<<20);
+	features->lmode = extended_edx & (1<<29);
+	features->lahf = extended_ecx & (1<<0);
+}
+
 /** Initialise an x86 CPU structure.
  * @param cpu		CPU structure to fill in.
  * @param args		Kernel arguments structure for the CPU. */
@@ -114,12 +174,8 @@ void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
 	cpu->arch.model = args->model;
 	cpu->arch.stepping = args->stepping;
 	cpu->arch.cache_alignment = args->cache_alignment;
-	cpu->arch.largest_standard = args->largest_standard;
-	cpu->arch.feat_ecx = args->feat_ecx;
-	cpu->arch.feat_edx = args->feat_edx;
-	cpu->arch.largest_extended = args->largest_extended;
-	cpu->arch.ext_ecx = args->ext_ecx;
-	cpu->arch.ext_edx = args->ext_edx;
+	cpu_features_init(&cpu->arch.features, args->standard_ecx, args->standard_edx,
+	                  args->extended_ecx, args->extended_edx);
 
 	/* Work out the cycles per µs. */
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;
