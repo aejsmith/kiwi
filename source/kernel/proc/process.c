@@ -103,33 +103,19 @@ static int process_cache_ctor(void *obj, void *data, int kmflag) {
 static int process_alloc(const char *name, process_id_t id, int flags, int cflags,
                          bool aspace, int priority, process_t *parent,
                          process_t **procp) {
-	process_t *process = slab_cache_alloc(process_cache, MM_SLEEP);
-	int ret;
+	process_t *process;
 
 	assert(name);
 	assert(procp);
 	assert(priority >= 0 && priority < PRIORITY_MAX);
 
-	/* Create the address space. */
-	process->aspace = (aspace) ? vm_aspace_create() : NULL;
-
-	/* Initialise the process' handle table. */
-	if(parent && cflags & PROCESS_CREATE_INHERIT) {
-		ret = handle_table_init(&process->handles, &parent->handles);
-	} else {
-		ret = handle_table_init(&process->handles, NULL);
-	}
-	if(ret != 0) {
-		if(process->aspace) {
-			vm_aspace_destroy(process->aspace);
-		}
-		slab_cache_free(process_cache, process);
-		return ret;
-	}
-
-	/* Initialise other information for the process. Do this after all the
-	 * steps that can fail to make life easier when handling failure. */
+	process = slab_cache_alloc(process_cache, MM_SLEEP);
 	object_init(&process->obj, &process_object_type);
+	if(parent && cflags & PROCESS_CREATE_INHERIT) {
+		handle_table_init(&process->handles, &parent->handles);
+	} else {
+		handle_table_init(&process->handles, NULL);
+	}
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
 	notifier_init(&process->death_notifier, process);
 	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
@@ -137,16 +123,16 @@ static int process_alloc(const char *name, process_id_t id, int flags, int cflag
 	process->flags = flags;
 	process->priority = priority;
 	process->state = PROCESS_RUNNING;
+	process->aspace = (aspace) ? vm_aspace_create() : NULL;
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
 	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
 	rwlock_unlock(&process_tree_lock);
 
-	*procp = process;
-
 	dprintf("process: created process %" PRId32 "(%s) (proc: %p)\n",
 		process->id, process->name, process);
+	*procp = process;
 	return 0;
 }
 
@@ -649,7 +635,7 @@ handle_id_t sys_process_create(const char *path, const char *const args[], const
 	 * running. */
 	refcount_inc(&process->count);
 	handle = handle_create(&process->obj, NULL);
-	hid = handle_attach(curr_proc, handle);
+	hid = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	if(hid < 0) {
 		ret = (int)hid;
@@ -832,7 +818,7 @@ handle_id_t sys_process_open(process_id_t id) {
 	rwlock_unlock(&process_tree_lock);
 
 	handle = handle_create(&process->obj, NULL);
-	ret = handle_attach(curr_proc, handle);
+	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	return ret;
 }

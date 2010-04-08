@@ -639,7 +639,7 @@ handle_id_t sys_thread_create(const char *name, void *stack, size_t stacksz, voi
 	/* Try to create the handle for the thread. */
 	refcount_inc(&thread->count);
 	handle = handle_create(&thread->obj, NULL);
-	hid = handle_attach(curr_proc, handle);
+	hid = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	if(hid < 0) {
 		ret = (int)hid;
@@ -691,7 +691,7 @@ handle_id_t sys_thread_open(thread_id_t id) {
 	refcount_inc(&thread->count);
 
 	handle = handle_create(&thread->obj, NULL);
-	ret = handle_attach(curr_proc, handle);
+	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	return ret;
 }

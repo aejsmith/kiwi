@@ -44,17 +44,17 @@ void __libsystem_init(process_args_t *args) {
 	/* Attempt to open streams from existing handles, and open new streams
 	 * if we can't. */
 	if(!fopen_handle(0, stdin)) {
-		if(!fopen_device(console, stdin)) {
+		if(!console || !fopen_device(console, stdin)) {
 			fopen_kconsole(stdin);
 		}
 	}
 	if(!fopen_handle(1, stdout)) {
-		if(!fopen_device(console, stdout)) {
+		if(!console || !fopen_device(console, stdout)) {
 			fopen_kconsole(stdout);
 		}
 	}
 	if(!fopen_handle(2, stderr)) {
-		if(!fopen_device(console, stderr)) {
+		if(!console || !fopen_device(console, stderr)) {
 			fopen_kconsole(stderr);
 		}
 	}

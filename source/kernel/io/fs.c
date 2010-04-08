@@ -2107,7 +2107,7 @@ handle_id_t sys_fs_file_open(const char *path, int flags) {
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle);
+	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	kfree(kpath);
 	return ret;
@@ -2406,7 +2406,7 @@ handle_id_t sys_fs_dir_open(const char *path, int flags) {
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle);
+	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	kfree(kpath);
 	return ret;

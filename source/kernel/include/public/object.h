@@ -31,7 +31,7 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-/** Handle type ID definitions. */
+/** Object type ID definitions. */
 #define OBJECT_TYPE_FILE	1	/**< File. */
 #define OBJECT_TYPE_DIR		2	/**< Directory. */
 #define OBJECT_TYPE_DEVICE	3	/**< Device. */
@@ -40,9 +40,14 @@ extern "C" {
 #define OBJECT_TYPE_PORT	6	/**< IPC port. */
 #define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 
+/** Handle sbehaviour flags. */
+#define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
+
 extern int SYSCALL(object_type)(handle_id_t handle);
 extern int SYSCALL(object_wait)(handle_id_t handle, int event, useconds_t timeout);
 extern int SYSCALL(object_wait_multiple)(handle_id_t *handle, int *events, size_t count, useconds_t timeout);
+extern int SYSCALL(handle_get_flags)(handle_id_t handle);
+extern int SYSCALL(handle_set_flags)(handle_id_t handle, int flags);
 extern int SYSCALL(handle_close)(handle_id_t handle);
 
 #ifdef __cplusplus

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -20,19 +20,19 @@
 
 #include <arch/syscall.h>
 
-#include <io/device.h>
-#include <io/fs.h>
-
-//#include <ipc/ipc.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-#include <mm/vm.h>
 
 #include <proc/process.h>
 #include <proc/syscall.h>
+#include <proc/thread.h>
+
+#include <public/device.h>
+#include <public/fs.h>
+#include <public/object.h>
+#include <public/vm.h>
 
 #include <sync/rwlock.h>
 
@@ -63,6 +63,8 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_object_type,
 	(syscall_handler_t)sys_object_wait,
 	(syscall_handler_t)sys_object_wait_multiple,
+	(syscall_handler_t)sys_handle_get_flags,
+	(syscall_handler_t)sys_handle_set_flags,
 	(syscall_handler_t)sys_handle_close,
 	(syscall_handler_t)sys_fs_file_create,
 	(syscall_handler_t)sys_fs_file_open,

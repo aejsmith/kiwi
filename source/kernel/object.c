@@ -57,6 +57,12 @@ typedef struct object_wait_sync {
 	object_wait_t *event;		/**< Handle that received first event (atomically set). */
 } object_wait_sync_t;
 
+/** Structure linking a handle to a handle table. */
+typedef struct handle_link {
+	handle_t *handle;		/**< Handle the link refers to. */
+	int flags;			/**< Behaviour flags for the handle. */
+} handle_link_t;
+
 /** Cache for handle structures. */
 static slab_cache_t *handle_cache;
 
@@ -73,175 +79,6 @@ void object_init(object_t *obj, object_type_t *type) {
  * @param obj		Object to destroy. */
 void object_destroy(object_t *obj) {
 	/* TODO: Clean ACL. */
-}
-
-/** Create a handle to an object.
- *
- * Creates a new handle to an object. The handle will have a reference count
- * of one. When it is no longer required, handle_release() should be called on
- * it. The handle will not be attached to any process - to attach it to a
- * process, use handle_attach().
- *
- * @param obj		Object to create handle to.
- * @param data		Data pointer for the object.
- *
- * @return		Pointer to handle structure.
- */
-handle_t *handle_create(object_t *obj, void *data) {
-	handle_t *handle;
-
-	assert(obj);
-	assert(obj->type);
-
-	handle = slab_cache_alloc(handle_cache, MM_SLEEP);
-	refcount_set(&handle->count, 1);
-	handle->object = obj;
-	handle->data = data;
-	return handle;
-}
-
-/** Increase the reference count of a handle.
- *
- * Increases the reference count of a handle to signal that it is being used.
- * When the handle is no longer needed it should be released with
- * handle_release().
- * 
- * @param handle	Handle to increase reference count of.
- */
-void handle_get(handle_t *handle) {
-	assert(handle);
-	refcount_inc(&handle->count);
-}
-
-/** Release a handle.
- *
- * Decreases the reference count of a handle. If no more references remain to
- * the handle, it will be destroyed.
- *
- * @param handle	Handle to release.
- */
-void handle_release(handle_t *handle) {
-	assert(handle);
-
-	/* If there are no more references we can close it. */
-	if(refcount_dec(&handle->count) == 0) {
-		if(handle->object->type->close) {
-			handle->object->type->close(handle);
-		}
-		slab_cache_free(handle_cache, handle);
-	}
-}
-
-/** Insert a handle into a process' handle table.
- *
- * Allocates a handle ID for a process and adds a handle to it. On success,
- * the handle will have an extra reference on it.
- *
- * @param process	Process to attach into.
- * @param handle	Handl to attach.
- *
- * @return		Handle ID on success, negative error code on failure.
- */
-handle_id_t handle_attach(process_t *process, handle_t *handle) {
-	int ret;
-
-	assert(process);
-	assert(handle);
-
-	rwlock_write_lock(&process->handles.lock);
-
-	/* Find a handle ID in the table. */
-	if((ret = bitmap_ffz(&process->handles.bitmap)) == -1) {
-		rwlock_unlock(&process->handles.lock);
-		return -ERR_RESOURCE_UNAVAIL;
-	}
-
-	/* Set the bit and add the handle to the tree. */
-	handle_get(handle);
-	bitmap_set(&process->handles.bitmap, ret);
-	avl_tree_insert(&process->handles.tree, (key_t)ret, handle, NULL);
-
-	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
-	        ret, process->id, handle->object, handle->data);
-	rwlock_unlock(&process->handles.lock);
-	return ret;
-}
-
-/** Detach a handle from a process.
- *
- * Removes the specified handle ID from a process' handle table and releases
- * the handle.
- *
- * @param process	Process to remove from.
- * @param id		ID of handle to detach.
- *
- * @return		0 on success, negative error code on failure.
- */
-int handle_detach(process_t *process, handle_id_t id) {
-	handle_t *handle;
-
-	assert(process);
-
-	rwlock_write_lock(&process->handles.lock);
-
-	/* Look up the handle in the tree. */
-	if(!(handle = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
-		rwlock_unlock(&process->handles.lock);
-		return -ERR_NOT_FOUND;
-	}
-
-	/* Remove from the tree and mark the ID as free. */
-	avl_tree_remove(&process->handles.tree, (key_t)id);
-	bitmap_clear(&process->handles.bitmap, id);
-	handle_release(handle);
-
-	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
-	        id, process->id);
-	rwlock_unlock(&process->handles.lock);
-	return 0;
-}
-
-/** Look up a handle in a process' handle table.
- *
- * Looks up the handle with the given ID in a process' handle table, ensuring
- * that the object is a certain type. The returned handle will have an extra
- * reference on it - when it is no longer needed, it should be released with
- * handle_release().
- *
- * @param process	Process to look up in.
- * @param id		Handle ID to look up.
- * @param type		Required object type ID (if negative, no type checking
- *			will be performed).
- * @param handlep	Where to store pointer to handle structure.
- *
- * @return		0 on success, negative error code on failure.
- */
-int handle_lookup(process_t *process, handle_id_t id, int type, handle_t **handlep) {
-	handle_t *handle;
-
-	assert(process);
-	assert(handlep);
-
-	rwlock_read_lock(&process->handles.lock);
-
-	/* Look up the handle in the tree. */
-	if(!(handle = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
-		rwlock_unlock(&process->handles.lock);
-		return -ERR_NOT_FOUND;
-	}
-
-	handle_get(handle);
-
-	/* Check if the type is the type the caller wants. */
-	if(type >= 0 && handle->object->type->id != type) {
-		handle_release(handle);
-		rwlock_unlock(&process->handles.lock);
-		return -ERR_TYPE_INVAL;
-	}
-
-	*handlep = handle;
-	rwlock_unlock(&process->handles.lock);
-	return 0;
 }
 
 /** Notifier function to use for object waiting.
@@ -358,35 +195,233 @@ out:
 	return ret;
 }
 
+/** Create a handle to an object.
+ *
+ * Creates a new handle to an object. The handle will have a reference count
+ * of one. When it is no longer required, handle_release() should be called on
+ * it. The handle will not be attached to any process - to attach it to a
+ * process, use handle_attach().
+ *
+ * @param obj		Object to create handle to.
+ * @param data		Data pointer for the object.
+ *
+ * @return		Pointer to handle structure.
+ */
+handle_t *handle_create(object_t *obj, void *data) {
+	handle_t *handle;
+
+	assert(obj);
+	assert(obj->type);
+
+	handle = slab_cache_alloc(handle_cache, MM_SLEEP);
+	refcount_set(&handle->count, 1);
+	handle->object = obj;
+	handle->data = data;
+	return handle;
+}
+
+/** Increase the reference count of a handle.
+ *
+ * Increases the reference count of a handle to signal that it is being used.
+ * When the handle is no longer needed it should be released with
+ * handle_release().
+ * 
+ * @param handle	Handle to increase reference count of.
+ */
+void handle_get(handle_t *handle) {
+	assert(handle);
+	refcount_inc(&handle->count);
+}
+
+/** Release a handle.
+ *
+ * Decreases the reference count of a handle. If no more references remain to
+ * the handle, it will be destroyed.
+ *
+ * @param handle	Handle to release.
+ */
+void handle_release(handle_t *handle) {
+	assert(handle);
+
+	/* If there are no more references we can close it. */
+	if(refcount_dec(&handle->count) == 0) {
+		if(handle->object->type->close) {
+			handle->object->type->close(handle);
+		}
+		slab_cache_free(handle_cache, handle);
+	}
+}
+
+/** Insert a handle into a process' handle table.
+ *
+ * Allocates a handle ID for a process and adds a handle to it. On success,
+ * the handle will have an extra reference on it.
+ *
+ * @param process	Process to attach into.
+ * @param handle	Handle to attach.
+ * @param flags		Flags for the handle.
+ *
+ * @return		Handle ID on success, negative error code on failure.
+ */
+handle_id_t handle_attach(process_t *process, handle_t *handle, int flags) {
+	handle_link_t *link;
+	int ret;
+
+	assert(process);
+	assert(handle);
+
+	rwlock_write_lock(&process->handles.lock);
+
+	/* Find a handle ID in the table. */
+	if((ret = bitmap_ffz(&process->handles.bitmap)) == -1) {
+		rwlock_unlock(&process->handles.lock);
+		return -ERR_RESOURCE_UNAVAIL;
+	}
+
+	handle_get(handle);
+
+	/* Create a link and add it to the tree. */
+	link = kmalloc(sizeof(handle_link_t), MM_SLEEP);
+	link->handle = handle;
+	link->flags = flags;
+	bitmap_set(&process->handles.bitmap, ret);
+	avl_tree_insert(&process->handles.tree, (key_t)ret, link, NULL);
+
+	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
+	        ret, process->id, handle->object, handle->data);
+	rwlock_unlock(&process->handles.lock);
+	return ret;
+}
+
+/** Detach a handle from a process.
+ *
+ * Removes the specified handle ID from a process' handle table and releases
+ * the handle.
+ *
+ * @param process	Process to remove from.
+ * @param id		ID of handle to detach.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int handle_detach(process_t *process, handle_id_t id) {
+	handle_link_t *link;
+
+	assert(process);
+
+	rwlock_write_lock(&process->handles.lock);
+
+	/* Look up the handle in the tree. */
+	if(!(link = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
+		rwlock_unlock(&process->handles.lock);
+		return -ERR_NOT_FOUND;
+	}
+
+	/* Remove from the tree and mark the ID as free. */
+	avl_tree_remove(&process->handles.tree, (key_t)id);
+	bitmap_clear(&process->handles.bitmap, id);
+
+	/* Release the handle and free the link. */
+	handle_release(link->handle);
+	kfree(link);
+
+	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
+	        id, process->id);
+	rwlock_unlock(&process->handles.lock);
+	return 0;
+}
+
+/** Look up a handle in a process' handle table.
+ *
+ * Looks up the handle with the given ID in a process' handle table, ensuring
+ * that the object is a certain type. The returned handle will have an extra
+ * reference on it - when it is no longer needed, it should be released with
+ * handle_release().
+ *
+ * @param process	Process to look up in.
+ * @param id		Handle ID to look up.
+ * @param type		Required object type ID (if negative, no type checking
+ *			will be performed).
+ * @param handlep	Where to store pointer to handle structure.
+ *
+ * @return		0 on success, negative error code on failure.
+ */
+int handle_lookup(process_t *process, handle_id_t id, int type, handle_t **handlep) {
+	handle_link_t *link;
+
+	assert(process);
+	assert(handlep);
+
+	rwlock_read_lock(&process->handles.lock);
+
+	/* Look up the handle in the tree. */
+	if(!(link = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
+		rwlock_unlock(&process->handles.lock);
+		return -ERR_NOT_FOUND;
+	}
+
+	/* Check if the type is the type the caller wants. */
+	if(type >= 0 && link->handle->object->type->id != type) {
+		rwlock_unlock(&process->handles.lock);
+		return -ERR_TYPE_INVAL;
+	}
+
+	handle_get(link->handle);
+	*handlep = link->handle;
+	rwlock_unlock(&process->handles.lock);
+	return 0;
+}
+
 /** Initialises a handle table.
  *
  * Initialises a handle table structure and duplicates inheritable handles
  * from another handle table into it if required.
  *
- * @todo		Duplicate handles.
- *
  * @param table		Table to initialise.
  * @param parent	Parent process' handle table.
- *
- * @return		0 on success, negative error code on failure.
  */
-int handle_table_init(handle_table_t *table, handle_table_t *parent) {
+void handle_table_init(handle_table_t *table, handle_table_t *parent) {
+	handle_link_t *link, *dup;
+
 	avl_tree_init(&table->tree);
 	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
 	rwlock_init(&table->lock, "handle_table_lock");
-	return 0;
+
+	/* Inherit all inheritable handles in the parent table. */
+	if(parent) {
+		rwlock_read_lock(&parent->lock);
+
+		AVL_TREE_FOREACH(&parent->tree, iter) {
+			link = avl_tree_entry(iter, handle_link_t);
+
+			if(!(link->flags & HANDLE_INHERITABLE)) {
+				continue;
+			}
+
+			/* Create a new link. */
+			handle_get(link->handle);
+			dup = kmalloc(sizeof(handle_link_t), MM_SLEEP);
+			dup->handle = link->handle;
+			dup->flags = link->flags;
+
+			bitmap_set(&table->bitmap, iter->key);
+			avl_tree_insert(&table->tree, iter->key, dup, NULL);
+		}
+
+		rwlock_unlock(&parent->lock);
+	}
 }
 
 /** Destroy a handle table.
  * @param table		Table being destroyed. */
 void handle_table_destroy(handle_table_t *table) {
-	handle_t *handle;
+	handle_link_t *link;
 
 	/* Close all handles. */
 	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
-		handle = avl_tree_entry(iter, handle_t);
-		handle_release(handle);
+		link = avl_tree_entry(iter, handle_link_t);
+		handle_release(link->handle);
 		avl_tree_remove(&table->tree, iter->key);
+		kfree(link);
 	}
 
 	bitmap_destroy(&table->bitmap);
@@ -397,8 +432,8 @@ void handle_table_destroy(handle_table_t *table) {
  * @param argv		Argument array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_handles(int argc, char **argv) {
+	handle_link_t *link;
 	process_t *process;
-	handle_t *handle;
 	unative_t id;
 
 	if(KDBG_HELP(argc, argv)) {
@@ -422,10 +457,11 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	kprintf(LOG_NONE, "==    ======             ====                  =====  ====\n");
 
 	AVL_TREE_FOREACH(&process->handles.tree, iter) {
-		handle = avl_tree_entry(iter, handle_t);
+		link = avl_tree_entry(iter, handle_link_t);
 		kprintf(LOG_NONE, "%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
-		        iter->key, handle, handle->object->type->id, handle->object->type,
-		        refcount_get(&handle->count), handle->data);
+		        iter->key, link->handle->object, link->handle->object->type->id,
+		        link->handle->object->type, refcount_get(&link->handle->count),
+		        link->handle->data);
 	}
 
 	return KDBG_OK;
@@ -535,6 +571,46 @@ out:
 		kfree(khandles);
 	}
 	return ret;
+}
+
+/** Get behaviour flags for a handle.
+ * @param handle	ID of handle to get flags for.
+ * @return		Handle flags on success, negative error code on failure. */
+int sys_handle_get_flags(handle_id_t handle) {
+	handle_link_t *link;
+	int ret;
+
+	rwlock_read_lock(&curr_proc->handles.lock);
+
+	/* Look up the handle in the tree. */
+	if(!(link = avl_tree_lookup(&curr_proc->handles.tree, (key_t)handle))) {
+		rwlock_unlock(&curr_proc->handles.lock);
+		return -ERR_NOT_FOUND;
+	}
+
+	ret = link->flags;
+	rwlock_unlock(&curr_proc->handles.lock);
+	return ret;
+}
+
+/** Set behaviour flags for a handle.
+ * @param handle	ID of handle to set flags for.
+ * @param flags		Flags to set.
+ * @return		0 on success, negative error code on failure. */
+int sys_handle_set_flags(handle_id_t handle, int flags) {
+	handle_link_t *link;
+
+	rwlock_write_lock(&curr_proc->handles.lock);
+
+	/* Look up the handle in the tree. */
+	if(!(link = avl_tree_lookup(&curr_proc->handles.tree, (key_t)handle))) {
+		rwlock_unlock(&curr_proc->handles.lock);
+		return -ERR_NOT_FOUND;
+	}
+
+	link->flags = flags;
+	rwlock_unlock(&curr_proc->handles.lock);
+	return 0;
 }
 
 /** Close a handle.

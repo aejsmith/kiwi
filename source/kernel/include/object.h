@@ -117,19 +117,19 @@ extern void object_destroy(object_t *obj);
 //extern void object_acl_insert(object_t *obj,
 //extern void object_acl_remove(object_t *obj,
 
-extern handle_t *handle_create(object_t *obj, void *data);
-extern void handle_get(handle_t *handle);
-extern void handle_release(handle_t *handle);
-extern handle_id_t handle_attach(struct process *process, handle_t *handle);
-extern int handle_detach(struct process *process, handle_id_t id);
-extern int handle_lookup(struct process *process, handle_id_t id, int type, handle_t **handlep);
-
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_callback(object_wait_t *wait);
 extern int object_wait(handle_t *handle, int event, useconds_t timeout);
 extern int object_wait_multiple(handle_t **handles, int *events, size_t count, useconds_t timeout);
 
-extern int handle_table_init(handle_table_t *table, handle_table_t *parent);
+extern handle_t *handle_create(object_t *obj, void *data);
+extern void handle_get(handle_t *handle);
+extern void handle_release(handle_t *handle);
+extern handle_id_t handle_attach(struct process *process, handle_t *handle, int flags);
+extern int handle_detach(struct process *process, handle_id_t id);
+extern int handle_lookup(struct process *process, handle_id_t id, int type, handle_t **handlep);
+
+extern void handle_table_init(handle_table_t *table, handle_table_t *parent);
 extern void handle_table_destroy(handle_table_t *table);
 
 extern int kdbg_cmd_handles(int argc, char **argv);

@@ -727,7 +727,7 @@ handle_id_t sys_device_open(const char *path) {
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle);
+	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	return ret;
 }
