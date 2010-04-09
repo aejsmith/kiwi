@@ -684,11 +684,15 @@ handle_id_t sys_thread_open(thread_id_t id) {
 	thread_t *thread;
 	handle_id_t ret;
 
-	if(!(thread = thread_lookup(id))) {
+	rwlock_read_lock(&thread_tree_lock);
+
+	if(!(thread = thread_lookup_unsafe(id))) {
+		rwlock_unlock(&thread_tree_lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	refcount_inc(&thread->count);
+	rwlock_unlock(&thread_tree_lock);
 
 	handle = handle_create(&thread->obj, NULL);
 	ret = handle_attach(curr_proc, handle, 0);
