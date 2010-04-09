@@ -319,22 +319,6 @@ handle_id_t handle_attach(process_t *process, handle_t *handle, int flags) {
 	return ret;
 }
 
-/** Create a handle and attach it to a process.
- * @param process	Process to attach to.
- * @param obj		Object to create handle to.
- * @param data		Data pointer for the handle.
- * @param flags		Flags for the handle.
- * @return		Handle ID on success, negative error code on failure. */
-handle_id_t handle_create_attach(process_t *process, object_t *object, void *data, int flags) {
-	handle_t *handle;
-	handle_id_t ret;
-
-	handle = handle_create(object, data);
-	ret = handle_attach(process, handle, flags);
-	handle_release(handle);
-	return ret;
-}
-
 /** Detach a handle from a process.
  *
  * Removes the specified handle ID from a process' handle table and releases

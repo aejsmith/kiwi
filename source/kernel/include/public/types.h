@@ -37,13 +37,18 @@
 # define SYSCALL(name)	name
 #endif
 
-/** Kiwi-specific integer types. */
+/** Type used to store a per-process ID of a handle to an object. */
+typedef int32_t handle_id_t;
+
+/** Object identifier types. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */
 typedef int32_t thread_id_t;		/**< Type used to store a thread ID. */
 typedef int32_t port_id_t;		/**< Type used to store a port ID. */
+typedef int32_t semaphore_id_t;		/**< Type used to store a semaphore ID. */
 typedef uint16_t mount_id_t;		/**< Type used to store a mount ID. */
 typedef uint64_t node_id_t;		/**< Type used to store a filesystem node ID. */
-typedef int32_t handle_id_t;		/**< Type used to store the ID of a handle to an object. */
+
+/** Other integer types. */
 typedef int64_t useconds_t;		/**< Type used to store a time period in microseconds. */
 typedef uint64_t offset_t;		/**< Type used to store an offset into something. */
 typedef int64_t rel_offset_t;		/**< Type used to store a relative offset. */

@@ -32,6 +32,7 @@
 #include <public/device.h>
 #include <public/fs.h>
 #include <public/object.h>
+#include <public/semaphore.h>
 #include <public/vm.h>
 
 #include <sync/rwlock.h>
@@ -109,6 +110,11 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_thread_id,
 	(syscall_handler_t)sys_thread_exit,
 	(syscall_handler_t)sys_thread_usleep,
+	(syscall_handler_t)sys_semaphore_create,
+	(syscall_handler_t)sys_semaphore_open,
+	(syscall_handler_t)sys_semaphore_id,
+	(syscall_handler_t)sys_semaphore_down,
+	(syscall_handler_t)sys_semaphore_up,
 #if 0
 	(syscall_handler_t)sys_ipc_port_create,
 	(syscall_handler_t)sys_ipc_port_open,

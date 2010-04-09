@@ -48,6 +48,8 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
+#include <sync/semaphore.h>
+
 #include <kdbg.h>
 #include <module.h>
 #include <object.h>
@@ -112,6 +114,7 @@ static struct {
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },
 	{ "reboot",	"Reboot the system.",				kdbg_cmd_reboot },
 	{ "regs",	"Print the value of all registers.",		kdbg_cmd_regs },
+	{ "semaphore",	"Print a list of semaphores.",			kdbg_cmd_semaphore },
 	{ "slab",	"Print out a list of all slab caches.",		kdbg_cmd_slab },
 	{ "step",	"Step a certain number of instructions.",	kdbg_cmd_step },
 	{ "thread",	"Print a list of threads.",			kdbg_cmd_thread },

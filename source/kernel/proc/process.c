@@ -634,7 +634,8 @@ handle_id_t sys_process_create(const char *path, const char *const args[],
 	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread = NULL;
-	handle_id_t handle = -1;
+	handle_id_t hid = -1;
+	handle_t *handle;
 	int ret;
 
 	if((ret = process_create_info_init(path, args, env, handles, count, &info)) != 0) {
@@ -655,8 +656,11 @@ handle_id_t sys_process_create(const char *path, const char *const args[],
 		goto fail;
 	}
 	refcount_inc(&process->count);
-	if((handle = handle_create_attach(curr_proc, &process->obj, NULL, 0)) < 0) {
-		ret = handle;
+	handle = handle_create(&process->obj, NULL);
+	hid = handle_attach(curr_proc, handle, 0);
+	handle_release(handle);
+	if(hid < 0) {
+		ret = hid;
 		goto fail;
 	}
 
@@ -669,13 +673,12 @@ handle_id_t sys_process_create(const char *path, const char *const args[],
 	/* Wait for the thread to finish using the information structure. */
 	semaphore_down(&info.sem);
 	process_create_info_free(&info);
-	return handle;
+	return hid;
 fail:
-	if(handle >= 0) {
-		/* This will handle process destruction. */
-		handle_detach(curr_proc, handle);
-	} else if(process) {
-		process_destroy(process);
+	/* If the process was created but failure occurred during handle
+	 * creation, This will handle process destruction. */
+	if(hid >= 0) {
+		handle_detach(curr_proc, hid);
 	}
 	vm_aspace_destroy(info.aspace);
 	process_create_info_free(&info);

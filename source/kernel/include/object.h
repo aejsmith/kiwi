@@ -126,8 +126,6 @@ extern handle_t *handle_create(object_t *obj, void *data);
 extern void handle_get(handle_t *handle);
 extern void handle_release(handle_t *handle);
 extern handle_id_t handle_attach(struct process *process, handle_t *handle, int flags);
-extern handle_id_t handle_create_attach(struct process *process, object_t *object,
-                                        void *data, int flags);
 extern int handle_detach(struct process *process, handle_id_t id);
 extern int handle_lookup(struct process *process, handle_id_t id, int type, handle_t **handlep);
 
