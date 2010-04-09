@@ -56,7 +56,7 @@ typedef struct process {
 
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	list_t threads;			/**< List of threads. */
-	handle_table_t handles;		/**< Table of open handles. */
+	handle_table_t *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
 
 	notifier_t death_notifier;	/**< Notifier for process death (do NOT add to when already dead). */
@@ -76,8 +76,8 @@ extern void process_detach(thread_t *thread);
 
 extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
-extern int process_create(const char **args, const char **environ, int flags, int cflags,
-                          int priority, process_t *parent, process_t **procp);
+extern int process_create(const char **args, const char **env, int flags, int priority,
+                          process_t *parent, process_t **procp);
 extern void process_exit(int status) __noreturn;
 
 extern int kdbg_cmd_process(int argc, char **argv);

@@ -54,9 +54,8 @@ Process::Process(handle_id_t handle) : Handle(handle) {
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
- * @param flags		Process creation flags.
  * @return		True on success, false on failure. */
-bool Process::Create(const char *const args[], const char *const env[], bool usepath, int flags) {
+bool Process::Create(const char *const args[], const char *const env[], bool usepath) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
@@ -95,7 +94,7 @@ bool Process::Create(const char *const args[], const char *const env[], bool use
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			if((m_handle = process_create(buf, args, (env) ? env : environ, flags)) >= 0) {
+			if((m_handle = process_create(buf, args, (env) ? env : environ, 0, NULL, -1)) >= 0) {
 				goto success;
 			} else if(m_handle != -ERR_NOT_FOUND) {
 				return false;
@@ -109,7 +108,7 @@ bool Process::Create(const char *const args[], const char *const env[], bool use
 
 		return false;
 	} else {
-		if((m_handle = process_create(args[0], args, (env) ? env : environ, flags)) < 0) {
+		if((m_handle = process_create(args[0], args, (env) ? env : environ, 0, NULL, -1)) < 0) {
 			return false;
 		}
 	}
@@ -129,9 +128,8 @@ success:
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
- * @param flags		Process creation flags.
  * @return		True on success, false on failure. */
-bool Process::Create(const char *cmdline, const char *const env[], bool usepath, int flags) {
+bool Process::Create(const char *cmdline, const char *const env[], bool usepath) {
 	char *tok, *dup, *orig;
 	vector<char *> args;
 	bool ret;
@@ -157,7 +155,7 @@ bool Process::Create(const char *cmdline, const char *const env[], bool usepath,
 	/* Null-terminate the array. */
 	args.push_back(0);
 
-	ret = Create(&args[0], env, usepath, flags);
+	ret = Create(&args[0], env, usepath);
 	free(orig);
 	return ret;
 }

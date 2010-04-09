@@ -280,8 +280,7 @@ static void init_thread(void *args, void *arg2) {
 	initcall_t *initcall;
 	int ret;
 
-	/* Initialise other things. */
-	handle_cache_init();
+	/* Bring up the filesystem. */
 	fs_init();
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their
@@ -306,7 +305,7 @@ static void init_thread(void *args, void *arg2) {
 	console_update_boot_progress(100);
 
 	/* Run the service manager. */
-	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, 0, PRIORITY_SYSTEM,
+	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_SYSTEM,
 	                         kernel_proc, NULL)) != 0) {
 		fatal("Could not start service manager (%d)", ret);
 	}
@@ -352,6 +351,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		time_init();
 		cpu_init(args);
 		ipi_init();
+		handle_init();
 		process_init();
 		thread_init();
 		sched_init();

@@ -22,8 +22,7 @@
 
 #include <kernel/device.h>
 #include <kernel/object.h>
-
-#include <kiwi/Process.h>
+#include <kernel/process.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -34,6 +33,7 @@
 using namespace kiwi;
 
 extern unsigned char console_font_6x12[];
+extern char **environ;
 
 /** Font information. */
 #define FONT_DATA	console_font_6x12
@@ -92,16 +92,48 @@ Console::~Console() {
 	}
 }
 
-/** Run a command within a console.
- * @param cmdline	Command line to run.
+/** Run a program within a console.
+ * @param path		Path to program to run.
  * @return		Whether command started successfully. */
-bool Console::Run(const char *cmdline) {
+bool Console::Run(const char *path) {
+	handle_id_t ret, map[][2] = {
+		{ 0, 0 },
+		{ 0, 1 },
+		{ 0, 2 },
+	};
+	const char *args[] = { path, NULL };
 	char buf[1024];
-	char *env[] = { const_cast<char *>("PATH=/system/binaries"), buf, NULL };
-	Process proc;
 
-	sprintf(buf, "CONSOLE=/console/%d", m_id);
-	return proc.Create(cmdline, env, true, 0);
+	sprintf(buf, "/console/%d", m_id);
+
+	/* Open handles to the console. */
+	if((map[0][0] = device_open(buf)) < 0) {
+		return map[0][0];
+	} else if((map[1][0] = device_open(buf)) < 0) {
+		handle_close(map[0][0]);
+		return map[1][0];
+	} else if((map[2][0] = device_open(buf)) < 0) {
+		handle_close(map[1][0]);
+		handle_close(map[0][0]);
+		return map[2][0];
+	}
+
+	/* Make the handles inheritable so children of the process get them. */
+	handle_set_flags(map[0][0], HANDLE_INHERITABLE);
+	handle_set_flags(map[1][0], HANDLE_INHERITABLE);
+	handle_set_flags(map[2][0], HANDLE_INHERITABLE);
+
+	ret = process_create(path, args, environ, 0, map, 3);
+	handle_close(map[2][0]);
+	handle_close(map[1][0]);
+	handle_close(map[0][0]);
+	if(ret < 0) {
+		printf("Could not start process (%d)\n", ret);
+		return false;
+	} else {
+		handle_close(ret);
+		return true;
+	}
 }
 
 /** Add input to the console.

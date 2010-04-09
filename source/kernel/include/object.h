@@ -126,14 +126,17 @@ extern handle_t *handle_create(object_t *obj, void *data);
 extern void handle_get(handle_t *handle);
 extern void handle_release(handle_t *handle);
 extern handle_id_t handle_attach(struct process *process, handle_t *handle, int flags);
+extern handle_id_t handle_create_attach(struct process *process, object_t *object,
+                                        void *data, int flags);
 extern int handle_detach(struct process *process, handle_id_t id);
 extern int handle_lookup(struct process *process, handle_id_t id, int type, handle_t **handlep);
 
-extern void handle_table_init(handle_table_t *table, handle_table_t *parent);
+extern int handle_table_create(handle_table_t *parent, handle_id_t map[][2], int count,
+                               handle_table_t **tablep);
 extern void handle_table_destroy(handle_table_t *table);
 
 extern int kdbg_cmd_handles(int argc, char **argv);
 
-extern void handle_cache_init(void);
+extern void handle_init(void);
 
 #endif /* __OBJECT_H */

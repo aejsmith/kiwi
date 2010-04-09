@@ -32,7 +32,7 @@
 static LIST_DECLARE(console_list);
 static SPINLOCK_DECLARE(console_lock);
 
-/** Cyclic kernel log buffer.. */
+/** Cyclic kernel log buffer. */
 static struct {
 	unsigned char level;		/**< Log level. */
 	unsigned char ch;		/**< Character. */

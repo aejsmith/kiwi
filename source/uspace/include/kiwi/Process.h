@@ -21,8 +21,6 @@
 #ifndef __KIWI_PROCESS_H
 #define __KIWI_PROCESS_H
 
-#include <kernel/process.h>
-
 #include <kiwi/Handle.h>
 
 namespace kiwi {
@@ -32,10 +30,8 @@ class Process : public Handle {
 public:
 	Process(handle_id_t handle = -1);
 
-	bool Create(const char *const args[], const char *const env[] = 0,
-	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
-	bool Create(const char *cmdline, const char *const env[] = 0,
-	            bool usepath = true, int flags = PROCESS_CREATE_INHERIT);
+	bool Create(const char *const args[], const char *const env[] = 0, bool usepath = true);
+	bool Create(const char *cmdline, const char *const env[] = 0, bool usepath = true);
 	bool Open(process_id_t id);
 
 	bool WaitTerminate(useconds_t timeout = -1) const;

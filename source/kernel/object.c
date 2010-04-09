@@ -66,6 +66,22 @@ typedef struct handle_link {
 /** Cache for handle structures. */
 static slab_cache_t *handle_cache;
 
+/** Cache for handle table structures. */
+static slab_cache_t *handle_table_cache;
+
+/** Constructor for handle table objects.
+ * @param obj		Object to construct.
+ * @param data		Cache data pointer.
+ * @param kmflag	Allocation flags.
+ * @return		Always returns 0. */
+static int handle_table_ctor(void *obj, void *data, int kmflag) {
+	handle_table_t *table = obj;
+
+	avl_tree_init(&table->tree);
+	rwlock_init(&table->lock, "handle_table_lock");
+	return 0;
+}
+
 /** Initialise an object structure.
  * @param obj		Object to initialise.
  * @param type		Pointer to type structure for object type. Can be NULL,
@@ -203,7 +219,7 @@ out:
  * process, use handle_attach().
  *
  * @param obj		Object to create handle to.
- * @param data		Data pointer for the object.
+ * @param data		Data pointer for the handle.
  *
  * @return		Pointer to handle structure.
  */
@@ -252,44 +268,70 @@ void handle_release(handle_t *handle) {
 	}
 }
 
+/** Insert a handle into a handle table.
+ * @param table		Table to insert into.
+ * @param id		ID to give the handle.
+ * @param handle	Handle to insert.
+ * @param flags		Flags for the handle. */
+static void handle_table_insert(handle_table_t *table, handle_id_t id, handle_t *handle, int flags) {
+	handle_link_t *link;
+
+	handle_get(handle);
+
+	link = kmalloc(sizeof(handle_link_t), MM_SLEEP);
+	link->handle = handle;
+	link->flags = flags;
+
+	bitmap_set(&table->bitmap, id);
+	avl_tree_insert(&table->tree, id, link, NULL);
+}
+
 /** Insert a handle into a process' handle table.
  *
  * Allocates a handle ID for a process and adds a handle to it. On success,
  * the handle will have an extra reference on it.
  *
- * @param process	Process to attach into.
+ * @param process	Process to attach to.
  * @param handle	Handle to attach.
  * @param flags		Flags for the handle.
  *
  * @return		Handle ID on success, negative error code on failure.
  */
 handle_id_t handle_attach(process_t *process, handle_t *handle, int flags) {
-	handle_link_t *link;
 	int ret;
 
 	assert(process);
 	assert(handle);
 
-	rwlock_write_lock(&process->handles.lock);
+	rwlock_write_lock(&process->handles->lock);
 
 	/* Find a handle ID in the table. */
-	if((ret = bitmap_ffz(&process->handles.bitmap)) == -1) {
-		rwlock_unlock(&process->handles.lock);
+	if((ret = bitmap_ffz(&process->handles->bitmap)) == -1) {
+		rwlock_unlock(&process->handles->lock);
 		return -ERR_RESOURCE_UNAVAIL;
 	}
 
-	handle_get(handle);
-
-	/* Create a link and add it to the tree. */
-	link = kmalloc(sizeof(handle_link_t), MM_SLEEP);
-	link->handle = handle;
-	link->flags = flags;
-	bitmap_set(&process->handles.bitmap, ret);
-	avl_tree_insert(&process->handles.tree, (key_t)ret, link, NULL);
+	handle_table_insert(process->handles, ret, handle, flags);
 
 	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
 	        ret, process->id, handle->object, handle->data);
-	rwlock_unlock(&process->handles.lock);
+	rwlock_unlock(&process->handles->lock);
+	return ret;
+}
+
+/** Create a handle and attach it to a process.
+ * @param process	Process to attach to.
+ * @param obj		Object to create handle to.
+ * @param data		Data pointer for the handle.
+ * @param flags		Flags for the handle.
+ * @return		Handle ID on success, negative error code on failure. */
+handle_id_t handle_create_attach(process_t *process, object_t *object, void *data, int flags) {
+	handle_t *handle;
+	handle_id_t ret;
+
+	handle = handle_create(object, data);
+	ret = handle_attach(process, handle, flags);
+	handle_release(handle);
 	return ret;
 }
 
@@ -308,17 +350,17 @@ int handle_detach(process_t *process, handle_id_t id) {
 
 	assert(process);
 
-	rwlock_write_lock(&process->handles.lock);
+	rwlock_write_lock(&process->handles->lock);
 
 	/* Look up the handle in the tree. */
-	if(!(link = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
-		rwlock_unlock(&process->handles.lock);
+	if(!(link = avl_tree_lookup(&process->handles->tree, (key_t)id))) {
+		rwlock_unlock(&process->handles->lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	/* Remove from the tree and mark the ID as free. */
-	avl_tree_remove(&process->handles.tree, (key_t)id);
-	bitmap_clear(&process->handles.bitmap, id);
+	avl_tree_remove(&process->handles->tree, (key_t)id);
+	bitmap_clear(&process->handles->bitmap, id);
 
 	/* Release the handle and free the link. */
 	handle_release(link->handle);
@@ -326,7 +368,7 @@ int handle_detach(process_t *process, handle_id_t id) {
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 	        id, process->id);
-	rwlock_unlock(&process->handles.lock);
+	rwlock_unlock(&process->handles->lock);
 	return 0;
 }
 
@@ -351,64 +393,96 @@ int handle_lookup(process_t *process, handle_id_t id, int type, handle_t **handl
 	assert(process);
 	assert(handlep);
 
-	rwlock_read_lock(&process->handles.lock);
+	rwlock_read_lock(&process->handles->lock);
 
 	/* Look up the handle in the tree. */
-	if(!(link = avl_tree_lookup(&process->handles.tree, (key_t)id))) {
-		rwlock_unlock(&process->handles.lock);
+	if(!(link = avl_tree_lookup(&process->handles->tree, (key_t)id))) {
+		rwlock_unlock(&process->handles->lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && link->handle->object->type->id != type) {
-		rwlock_unlock(&process->handles.lock);
+		rwlock_unlock(&process->handles->lock);
 		return -ERR_TYPE_INVAL;
 	}
 
 	handle_get(link->handle);
 	*handlep = link->handle;
-	rwlock_unlock(&process->handles.lock);
+	rwlock_unlock(&process->handles->lock);
 	return 0;
 }
 
-/** Initialises a handle table.
+/** Create a new handle table.
  *
- * Initialises a handle table structure and duplicates inheritable handles
- * from another handle table into it if required.
+ * Creates a new handle table and duplicates handles from another handle table
+ * into it, either using provided mapping information, or by looking at the
+ * inheritable flag of handles.
  *
- * @param table		Table to initialise.
- * @param parent	Parent process' handle table.
+ * @param parent	Parent process' handle table (can be NULL, in which
+ *			case no handles will be duplicated).
+ * @param map		An array specifying handles to add to the new table.
+ *			The first ID of each entry specifies the handle in the
+ *			parent, and the second specifies the ID to give it in
+ *			the new table. Can be NULL if count <= 0.
+ * @param count		The number of handles in the array. If negative, the
+ *			map will be ignored and all handles with the inheritable
+ *			flag set will be duplicated. If 0, no handles will be
+ *			duplicated.
+ * @param tablep	Where to store pointer to table structure.
+ *
+ * @return		0 on success, negative error code on failure. Failure
+ *			can only occur when handle mappings are specified.
  */
-void handle_table_init(handle_table_t *table, handle_table_t *parent) {
-	handle_link_t *link, *dup;
+int handle_table_create(handle_table_t *parent, handle_id_t map[][2], int count,
+                        handle_table_t **tablep) {
+	handle_table_t *table;
+	handle_link_t *link;
+	int i;
 
-	avl_tree_init(&table->tree);
+	table = slab_cache_alloc(handle_table_cache, MM_SLEEP);
 	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
-	rwlock_init(&table->lock, "handle_table_lock");
 
 	/* Inherit all inheritable handles in the parent table. */
-	if(parent) {
+	if(parent && count != 0) {
 		rwlock_read_lock(&parent->lock);
 
-		AVL_TREE_FOREACH(&parent->tree, iter) {
-			link = avl_tree_entry(iter, handle_link_t);
+		if(count > 0) {
+			assert(map);
 
-			if(!(link->flags & HANDLE_INHERITABLE)) {
-				continue;
+			for(i = 0; i < count; i++) {
+				if(!(link = avl_tree_lookup(&parent->tree, map[i][0]))) {
+					rwlock_unlock(&parent->lock);
+					handle_table_destroy(table);
+					return -ERR_NOT_FOUND;
+				} else if(map[i][1] >= CONFIG_HANDLE_MAX) {
+					rwlock_unlock(&parent->lock);
+					handle_table_destroy(table);
+					return -ERR_PARAM_INVAL;
+				} else if(avl_tree_lookup(&table->tree, map[i][1])) {
+					rwlock_unlock(&parent->lock);
+					handle_table_destroy(table);
+					return -ERR_ALREADY_EXISTS;
+				}
+
+				handle_table_insert(table, map[i][1], link->handle, link->flags);
 			}
+		} else {
+			AVL_TREE_FOREACH(&parent->tree, iter) {
+				link = avl_tree_entry(iter, handle_link_t);
 
-			/* Create a new link. */
-			handle_get(link->handle);
-			dup = kmalloc(sizeof(handle_link_t), MM_SLEEP);
-			dup->handle = link->handle;
-			dup->flags = link->flags;
-
-			bitmap_set(&table->bitmap, iter->key);
-			avl_tree_insert(&table->tree, iter->key, dup, NULL);
+				if(link->flags & HANDLE_INHERITABLE) {
+					handle_table_insert(table, iter->key, link->handle,
+					                    link->flags);
+				}
+			}
 		}
 
 		rwlock_unlock(&parent->lock);
 	}
+
+	*tablep = table;
+	return 0;
 }
 
 /** Destroy a handle table.
@@ -425,6 +499,7 @@ void handle_table_destroy(handle_table_t *table) {
 	}
 
 	bitmap_destroy(&table->bitmap);
+	slab_cache_free(handle_table_cache, table);
 }
 
 /** Print a list of a process' handles.
@@ -456,7 +531,7 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	kprintf(LOG_NONE, "ID    Object             Type                  Count  Data\n");
 	kprintf(LOG_NONE, "==    ======             ====                  =====  ====\n");
 
-	AVL_TREE_FOREACH(&process->handles.tree, iter) {
+	AVL_TREE_FOREACH(&process->handles->tree, iter) {
 		link = avl_tree_entry(iter, handle_link_t);
 		kprintf(LOG_NONE, "%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
 		        iter->key, link->handle->object, link->handle->object->type->id,
@@ -467,11 +542,14 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Initialise the object handle cache. */
-void __init_text handle_cache_init(void) {
+/** Initialise the handle caches. */
+void __init_text handle_init(void) {
 	handle_cache = slab_cache_create("handle_cache", sizeof(handle_t), 0, NULL,
 	                                 NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
 	                                 NULL, 0, MM_FATAL);
+	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
+	                                       0, handle_table_ctor, NULL, NULL, NULL,
+	                                       SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 }
 
 /** Get the type of an object referred to by a handle.
@@ -580,16 +658,16 @@ int sys_handle_get_flags(handle_id_t handle) {
 	handle_link_t *link;
 	int ret;
 
-	rwlock_read_lock(&curr_proc->handles.lock);
+	rwlock_read_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	if(!(link = avl_tree_lookup(&curr_proc->handles.tree, (key_t)handle))) {
-		rwlock_unlock(&curr_proc->handles.lock);
+	if(!(link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle))) {
+		rwlock_unlock(&curr_proc->handles->lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	ret = link->flags;
-	rwlock_unlock(&curr_proc->handles.lock);
+	rwlock_unlock(&curr_proc->handles->lock);
 	return ret;
 }
 
@@ -600,16 +678,16 @@ int sys_handle_get_flags(handle_id_t handle) {
 int sys_handle_set_flags(handle_id_t handle, int flags) {
 	handle_link_t *link;
 
-	rwlock_write_lock(&curr_proc->handles.lock);
+	rwlock_write_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	if(!(link = avl_tree_lookup(&curr_proc->handles.tree, (key_t)handle))) {
-		rwlock_unlock(&curr_proc->handles.lock);
+	if(!(link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle))) {
+		rwlock_unlock(&curr_proc->handles->lock);
 		return -ERR_NOT_FOUND;
 	}
 
 	link->flags = flags;
-	rwlock_unlock(&curr_proc->handles.lock);
+	rwlock_unlock(&curr_proc->handles->lock);
 	return 0;
 }
 

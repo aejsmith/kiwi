@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 	if(!console.Initialised()) {
 		return 1;
 	}
-	console.Run("failshell");
+	console.Run("/system/binaries/failshell");
 
 	/* Finally create the input device. */
 	InputDevice input("/input/0");

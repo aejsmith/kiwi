@@ -334,6 +334,7 @@ int elf_binary_load(handle_t *handle, vm_aspace_t *as, void **datap) {
 ptr_t elf_binary_finish(void *data) {
 	elf_binary_t *binary = (elf_binary_t *)data;
 	void *base;
+	ptr_t ret;
 	size_t i;
 
 	/* Clear the BSS sections. */
@@ -351,16 +352,10 @@ ptr_t elf_binary_finish(void *data) {
 		}
 	}
 
-	return (ptr_t)binary->ehdr.e_entry;
-}
-
-/** Clean up ELF loader data.
- * @param data		Data pointer returned from elf_binary_load(). */
-void elf_binary_cleanup(void *data) {
-	elf_binary_t *binary = data;
-
+	ret = (ptr_t)binary->ehdr.e_entry;
 	kfree(binary->phdrs);
 	kfree(binary);
+	return ret;
 }
 
 #undef dprintf
