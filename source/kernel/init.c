@@ -358,7 +358,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		thread_reaper_init();
 
 		/* Now that the thread system is up and all CPUs have been
-		 * regsitered, the slab allocator's reclaim thread can be
+		 * registered, the slab allocator's reclaim thread can be
 		 * started and the magazine layer can be enabled. */
 		slab_late_init();
 
