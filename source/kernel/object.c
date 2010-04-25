@@ -213,27 +213,57 @@ out:
 
 /** Create a handle to an object.
  *
- * Creates a new handle to an object. The handle will have a reference count
- * of one. When it is no longer required, handle_release() should be called on
- * it. The handle will not be attached to any process - to attach it to a
- * process, use handle_attach().
+ * Creates a new handle to an object. If the process argument is not NULL, the
+ * handle will also be attached to the specified process. If it is not, the
+ * handle can later be attached using handle_attach(). If the handlep argument
+ * is not NULL (it must be if the process argument is NULL), a pointer to the
+ * handle will be stored there, in which case the handle will have an extra
+ * reference on it, and therefore handle_release() must be called when the
+ * handle is no longer needed.
  *
- * @param obj		Object to create handle to.
- * @param data		Data pointer for the handle.
+ * @param obj		Object to create a handle to.
+ * @param data		Per-handle data pointer.
+ * @param process	Process to attach handle to (if any).
+ * @param flags		Flags for the handle table entry (only used if process
+ *			is not NULL).
+ * @param handlep	Where to store pointer to handle created (must not be
+ *			NULL if process is NULL).
  *
- * @return		Pointer to handle structure.
+ * @return		If a process is specified, a handle ID will be returned
+ *			on success, or a negative error code on failure.
+ *			Otherwise, 0 will always be returned, as there are no
+ *			failures that can occur when not attaching to a
+ *			process.
  */
-handle_t *handle_create(object_t *obj, void *data) {
+handle_id_t handle_create(object_t *obj, void *data, process_t *process, int flags,
+                          handle_t **handlep) {
+	handle_id_t ret = 0;
 	handle_t *handle;
 
 	assert(obj);
 	assert(obj->type);
+	assert(process || handlep);
 
 	handle = slab_cache_alloc(handle_cache, MM_SLEEP);
 	refcount_set(&handle->count, 1);
 	handle->object = obj;
 	handle->data = data;
-	return handle;
+
+	if(process) {
+		if((ret = handle_attach(process, handle, flags)) < 0) {
+			/* We do not want the object's close operation to be
+			 * called upon failure, so free the handle directly. */
+			slab_cache_free(handle_cache, handle);
+			return ret;
+		}
+	}
+
+	if(handlep) {
+		*handlep = handle;
+	} else {
+		handle_release(handle);
+	}
+	return ret;
 }
 
 /** Increase the reference count of a handle.

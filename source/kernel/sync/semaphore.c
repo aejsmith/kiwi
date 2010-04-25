@@ -192,7 +192,7 @@ handle_id_t sys_semaphore_create(const char *name, size_t count) {
 	semaphore_init(&sem->sem, (sem->name) ? sem->name : "user_semaphore", count);
 	refcount_set(&sem->count, 1);
 
-	handle = handle_create(&sem->obj, NULL);
+	handle_create(&sem->obj, NULL, NULL, 0, &handle);
 	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	if(ret < 0) {
@@ -225,7 +225,7 @@ handle_id_t sys_semaphore_open(semaphore_id_t id) {
 	refcount_inc(&sem->count);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	handle = handle_create(&sem->obj, NULL);
+	handle_create(&sem->obj, NULL, NULL, 0, &handle);
 	ret = handle_attach(curr_proc, handle, 0);
 	handle_release(handle);
 	return ret;

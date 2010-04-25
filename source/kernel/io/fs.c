@@ -772,7 +772,7 @@ static handle_t *fs_handle_create(fs_node_t *node, int flags) {
 
 	/* Create the handle. */
 	fs_node_get(node);
-	handle = handle_create(&node->obj, data);
+	handle_create(&node->obj, data, NULL, 0, &handle);
 	dprintf("fs: opened handle %p to node %p (data: %p)\n", handle, node, data);
 	return handle;
 }

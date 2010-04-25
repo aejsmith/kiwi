@@ -615,8 +615,7 @@ void __init_text thread_reaper_init(void) {
 handle_id_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
-	handle_id_t hid = -1;
-	handle_t *handle;
+	handle_id_t handle = -1;
 	char *kname;
 	int ret;
 
@@ -631,18 +630,15 @@ handle_id_t sys_thread_create(const char *name, void *stack, size_t stacksz, voi
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 
-	/* Create the thread, but do not run it yet. */
+	/* Create the thread, but do not run it yet. We attempt to create the
+	 * handle to the thread before running it as this allows us to
+	 * terminate it if not successful. */
 	if((ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread)) != 0) {
 		goto fail;
 	}
-
-	/* Try to create the handle for the thread. */
 	refcount_inc(&thread->count);
-	handle = handle_create(&thread->obj, NULL);
-	hid = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
-	if(hid < 0) {
-		ret = (int)hid;
+	if((handle = handle_create(&thread->obj, NULL, curr_proc, 0, NULL)) < 0) {
+		ret = handle;
 		goto fail;
 	}
 
@@ -664,23 +660,24 @@ handle_id_t sys_thread_create(const char *name, void *stack, size_t stacksz, voi
 		args->sp += (stacksz - STACK_DELTA);
 	}
 
-	kfree(kname);
 	thread_run(thread);
-	return hid;
+	kfree(kname);
+	return handle;
 fail:
-	if(hid >= 0) {
+	if(handle >= 0) {
 		/* This will handle thread destruction. */
-		handle_detach(curr_proc, hid);
+		handle_detach(curr_proc, handle);
+	} else if(thread) {
+		thread_destroy(thread);
 	}
 	kfree(args);
 	kfree(kname);
-	return (handle_id_t)ret;
+	return ret;
 }
 
 /** Open a handle to a thread.
  * @param id		Global ID of the thread to open. */
 handle_id_t sys_thread_open(thread_id_t id) {
-	handle_t *handle;
 	thread_t *thread;
 	handle_id_t ret;
 
@@ -694,9 +691,9 @@ handle_id_t sys_thread_open(thread_id_t id) {
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	handle = handle_create(&thread->obj, NULL);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	if((ret = handle_create(&thread->obj, NULL, curr_proc, 0, NULL)) < 0) {
+		thread_destroy(thread);
+	}
 	return ret;
 }
 

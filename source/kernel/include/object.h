@@ -122,7 +122,8 @@ extern void object_wait_callback(object_wait_t *wait);
 extern int object_wait(handle_t *handle, int event, useconds_t timeout);
 extern int object_wait_multiple(handle_t **handles, int *events, size_t count, useconds_t timeout);
 
-extern handle_t *handle_create(object_t *obj, void *data);
+extern handle_id_t handle_create(object_t *obj, void *data, struct process *process,
+                                 int flags, handle_t **handlep);
 extern void handle_get(handle_t *handle);
 extern void handle_release(handle_t *handle);
 extern handle_id_t handle_attach(struct process *process, handle_t *handle, int flags);

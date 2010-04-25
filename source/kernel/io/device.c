@@ -470,7 +470,7 @@ int device_open(device_t *device, handle_t **handlep) {
 	}
 
 	refcount_inc(&device->count);
-	*handlep = handle_create(&device->obj, data);
+	handle_create(&device->obj, data, NULL, 0, handlep);
 	mutex_unlock(&device->lock);
 	return 0;
 }
