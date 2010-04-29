@@ -36,7 +36,7 @@ Port::Port(Service *service) : m_id(-1), m_service(service) {
 /** Set the ID of a port.
  * @param id		New ID.
  * @return		Whether successful. */
-bool Port::SetID(identifier_t id) {
+bool Port::SetID(port_id_t id) {
 	list<IPCConnection *>::iterator it;
 	IPCConnection *conn;
 
@@ -67,7 +67,7 @@ void Port::SendID(IPCConnection *conn) {
 	} else {
 		/* Start it and wait for the port to be registered. */
 		if(m_service->GetState() != Service::Running && !m_service->Start()) {
-			identifier_t ret = -ERR_RESOURCE_UNAVAIL;
+			port_id_t ret = -ERR_RESOURCE_UNAVAIL;
 			conn->Send(SVCMGR_LOOKUP_PORT, &ret, sizeof(ret));
 		} else {
 			m_waiting.push_back(conn);

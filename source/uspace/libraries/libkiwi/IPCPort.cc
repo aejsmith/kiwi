@@ -18,6 +18,8 @@
  * @brief		IPC port class.
  */
 
+#include <kernel/ipc.h>
+
 #include <kiwi/private/svcmgr.h>
 #include <kiwi/IPCPort.h>
 
@@ -32,7 +34,7 @@ using namespace std;
  *			not refer to a handle). */
 IPCPort::IPCPort(handle_id_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
-		_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
+		_RegisterEvent(PORT_EVENT_CONNECTION);
 	}
 }
 
@@ -51,7 +53,7 @@ bool IPCPort::Create() {
 		return false;
 	}
 
-	_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
+	_RegisterEvent(PORT_EVENT_CONNECTION);
 	return true;
 }
 
@@ -66,11 +68,11 @@ bool IPCPort::Create() {
  *
  * @return		Whether creation was successful.
  */
-bool IPCPort::Open(identifier_t id) {
+bool IPCPort::Open(port_id_t id) {
 	if(!Close()) {
 		return false;
 	} else if((m_handle = ipc_port_open(id)) >= 0) {
-		_RegisterEvent(IPC_PORT_EVENT_CONNECTION);
+		_RegisterEvent(PORT_EVENT_CONNECTION);
 		return true;
 	} else {
 		return false;
@@ -124,30 +126,10 @@ IPCConnection *IPCPort::Listen(useconds_t timeout) const {
 	return new IPCConnection(handle);
 }
 
-/** Grant access to the port.
- * @param type		Type of accessor to add.
- * @param id		Process ID for IPC_PORT_ACCESSOR_PROCESS, ignored for
- *			IPC_PORT_ACCESSOR_ALL.
- * @param rights	Bitmap of rights to give to the specified accessor.
- * @return		Whether the operation succeeded. */
-bool IPCPort::GrantAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const {
-	return (ipc_port_acl_add(m_handle, type, id, rights) == 0);
-}
-
-/** Revoke access to the port.
- * @param type		Type of accessor to remove.
- * @param id		Process ID for IPC_PORT_ACCESSOR_PROCESS, ignored for
- *			IPC_PORT_ACCESSOR_ALL.
- * @param rights	Bitmap of rights to revoke from the specified accessor.
- * @return		Whether the operation succeeded. */
-bool IPCPort::RevokeAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const {
-	return (ipc_port_acl_remove(m_handle, type, id, rights) == 0);
-}
-
 /** Get the ID of a port.
  * @return		Port ID, or -1 if an error occurs. */
-identifier_t IPCPort::GetID() const {
-	identifier_t ret;
+port_id_t IPCPort::GetID() const {
+	port_id_t ret;
 
 	ret = ipc_port_id(m_handle);
 	return ((ret >= 0) ? ret : -1);
@@ -157,7 +139,7 @@ identifier_t IPCPort::GetID() const {
  * @param id		Event ID. */
 void IPCPort::_EventReceived(int id) {
 	switch(id) {
-	case IPC_PORT_EVENT_CONNECTION:
+	case PORT_EVENT_CONNECTION:
 		OnConnection(this);
 		break;
 	}

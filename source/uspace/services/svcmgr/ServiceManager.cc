@@ -42,7 +42,6 @@ ServiceManager::ServiceManager() {
 		cerr << "svcmgr: created port (" << m_port.GetID() << ") is not port 1" << endl;
 		throw exception();
 	}
-	m_port.GrantAccess(IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_CONNECT);
 }
 
 /** Add a service to the service manager.
@@ -97,7 +96,7 @@ void ServiceManager::_HandleMessage(IPCConnection *conn) {
 		if((port = LookupPort(name.c_str()))) {
 			port->SendID(conn);
 		} else {
-			identifier_t ret = -ERR_NOT_FOUND;
+			port_id_t ret = -ERR_NOT_FOUND;
 			conn->Send(type, &ret, sizeof(ret));
 		}
 		break;

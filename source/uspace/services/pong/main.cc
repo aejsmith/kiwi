@@ -37,7 +37,6 @@ int main(int argc, char **argv) {
 
 	/* Create the port. */
 	port.Create();
-	port.GrantAccess(IPC_PORT_ACCESSOR_ALL, 0, IPC_PORT_RIGHT_CONNECT);
 	port.Register("org.kiwi.Pong");
 
 	while((conn = port.Listen())) {

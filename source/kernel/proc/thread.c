@@ -679,6 +679,7 @@ fail:
  * @param id		Global ID of the thread to open. */
 handle_id_t sys_thread_open(thread_id_t id) {
 	thread_t *thread;
+	handle_t *handle;
 	handle_id_t ret;
 
 	rwlock_read_lock(&thread_tree_lock);
@@ -691,9 +692,9 @@ handle_id_t sys_thread_open(thread_id_t id) {
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	if((ret = handle_create(&thread->obj, NULL, curr_proc, 0, NULL)) < 0) {
-		thread_destroy(thread);
-	}
+	handle_create(&thread->obj, NULL, NULL, 0, &handle);
+	ret = handle_attach(curr_proc, handle, 0);
+	handle_release(handle);
 	return ret;
 }
 

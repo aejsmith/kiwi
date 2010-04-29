@@ -33,7 +33,7 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
-//#include <ipc/ipc.h>
+#include <ipc/ipc.h>
 
 #include <io/device.h>
 #include <io/fs.h>
@@ -98,7 +98,7 @@ static struct {
 	{ "cpus",	"Print a list of CPUs.",			kdbg_cmd_cpus },
 	{ "delete",	"Delete a breakpoint/watchpoint.",		kdbg_cmd_delete },
 	{ "device",	"Print out information about devices.",		kdbg_cmd_device },
-	//{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
+	{ "endpoint",	"Print information about an IPC endpoint.",	kdbg_cmd_endpoint },
 	{ "examine",	"Examine the contents of memory.",		kdbg_cmd_examine },
 	{ "handles",	"Print a list of a process' open handles.",	kdbg_cmd_handles },
 	{ "help",	"Display this help.",				kdbg_cmd_help },
@@ -109,7 +109,7 @@ static struct {
 	{ "mount",	"Print a list of mounted filesystems.",		kdbg_cmd_mount },
 	{ "node",	"Print information about a filesystem node.",	kdbg_cmd_node },
 	{ "page",	"Print details about physical memory usage.",	kdbg_cmd_page },
-	//{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
+	{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },
 	{ "process",	"Print a list of processes.",			kdbg_cmd_process },
 	{ "reboot",	"Reboot the system.",				kdbg_cmd_reboot },

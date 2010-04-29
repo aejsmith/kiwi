@@ -18,7 +18,7 @@
  * @brief		IPC connection class.
  */
 
-#include <kernel/handle.h>
+#include <kernel/object.h>
 #include <kernel/ipc.h>
 
 #include <kiwi/private/svcmgr.h>
@@ -34,8 +34,8 @@ using namespace std;
  *			not refer to a handle). */
 IPCConnection::IPCConnection(handle_id_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
-		_RegisterEvent(HANDLE_EVENT_READ);
-		_RegisterEvent(IPC_CONNECTION_EVENT_HANGUP);
+		_RegisterEvent(CONNECTION_EVENT_HANGUP);
+		_RegisterEvent(CONNECTION_EVENT_MESSAGE);
 	}
 }
 
@@ -47,19 +47,15 @@ IPCConnection::IPCConnection(handle_id_t handle) : Handle(handle) {
  * new one.
  *
  * @param id		Port ID to connect to.
- * @param timeout	Timeout in microseconds. A timeout of -1 will block
- *			until the connection is accepted, and a timeout of 0
- *			will return immediately if the target is not waiting
- *			for a connection.
- *
+
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(identifier_t id, useconds_t timeout) {
+bool IPCConnection::Connect(port_id_t id) {
 	if(!Close()) {
 		return false;
-	} else if((m_handle = ipc_connection_open(id, timeout)) >= 0) {
-		_RegisterEvent(HANDLE_EVENT_READ);
-		_RegisterEvent(IPC_CONNECTION_EVENT_HANGUP);
+	} else if((m_handle = ipc_connection_open(id)) >= 0) {
+		_RegisterEvent(CONNECTION_EVENT_HANGUP);
+		_RegisterEvent(CONNECTION_EVENT_MESSAGE);
 		return true;
 	} else {
 		return false;
@@ -73,20 +69,14 @@ bool IPCConnection::Connect(identifier_t id, useconds_t timeout) {
  * on whether the failure occurred when closing the old port or creating the
  * new one.
  *
- * @todo		Timeout should be used when looking up the port.
- *
  * @param name		Port name to connect to.
- * @param timeout	Timeout in microseconds. A timeout of -1 will block
- *			until the connection is accepted, and a timeout of 0
- *			will return immediately if the target is not waiting
- *			for a connection.
  *
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(const char *name, useconds_t timeout) {
+bool IPCConnection::Connect(const char *name) {
 	IPCConnection svcmgr;
-	identifier_t id;
 	uint32_t type;
+	port_id_t id;
 	size_t size;
 	char *data;
 
@@ -96,12 +86,12 @@ bool IPCConnection::Connect(const char *name, useconds_t timeout) {
 		return false;
 	} else if(!svcmgr.Receive(type, data, size)) {
 		return false;
-	} else if((id = *(reinterpret_cast<identifier_t *>(data))) < 0) {
+	} else if((id = *(reinterpret_cast<port_id_t *>(data))) < 0) {
 		return false;
 	}
 
 	delete[] data;
-	return Connect(id, timeout);
+	return Connect(id);
 }
 
 /** Send a message on a port.
@@ -124,12 +114,12 @@ bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
  *			received.
  * @return		Whether received successfully. */
 bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
-	if(ipc_message_receive(m_handle, timeout, &type, 0, &size) != 0) {
+	if(ipc_message_peek(m_handle, timeout, &type, &size) != 0) {
 		return false;
 	}
 
 	data = new char[size];
-	if(ipc_message_receive(m_handle, 0, &type, data, &size) != 0) {
+	if(ipc_message_receive(m_handle, 0, 0, data, size) != 0) {
 		delete[] data;
 		return false;
 	}
@@ -141,11 +131,11 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_
  * @param id		Event ID. */
 void IPCConnection::_EventReceived(int id) {
 	switch(id) {
-	case HANDLE_EVENT_READ:
-		OnMessage(this);
-		break;
-	case IPC_CONNECTION_EVENT_HANGUP:
+	case CONNECTION_EVENT_HANGUP:
 		OnHangup(this);
+		break;
+	case CONNECTION_EVENT_MESSAGE:
+		OnMessage(this);
 		break;
 	}
 }

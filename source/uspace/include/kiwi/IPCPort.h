@@ -21,8 +21,6 @@
 #ifndef __KIWI_IPCPORT_H
 #define __KIWI_IPCPORT_H
 
-#include <kernel/ipc.h>
-
 #include <kiwi/Handle.h>
 #include <kiwi/IPCConnection.h>
 
@@ -34,13 +32,11 @@ public:
 	IPCPort(handle_id_t handle = -1);
 
 	bool Create();
-	bool Open(identifier_t id);
+	bool Open(port_id_t id);
 	bool Register(const char *name);
 
 	IPCConnection *Listen(useconds_t timeout = -1) const;
-	bool GrantAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;
-	bool RevokeAccess(ipc_port_accessor_t type, identifier_t id, uint32_t rights) const;
-	identifier_t GetID() const;
+	port_id_t GetID() const;
 
 	Signal<IPCPort *> OnConnection;
 private:

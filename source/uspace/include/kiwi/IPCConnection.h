@@ -30,8 +30,8 @@ class IPCConnection : public Handle {
 public:
 	IPCConnection(handle_id_t handle = -1);
 
-	bool Connect(identifier_t id, useconds_t timeout = -1);
-	bool Connect(const char *name, useconds_t timeout = -1);
+	bool Connect(port_id_t id);
+	bool Connect(const char *name);
 
 	//bool Send(Message &message);
 	bool Send(uint32_t type, const void *buf, size_t size);

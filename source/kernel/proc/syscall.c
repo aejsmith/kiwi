@@ -31,6 +31,7 @@
 
 #include <public/device.h>
 #include <public/fs.h>
+#include <public/ipc.h>
 #include <public/object.h>
 #include <public/semaphore.h>
 #include <public/vm.h>
@@ -115,18 +116,15 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_semaphore_id,
 	(syscall_handler_t)sys_semaphore_down,
 	(syscall_handler_t)sys_semaphore_up,
-#if 0
 	(syscall_handler_t)sys_ipc_port_create,
 	(syscall_handler_t)sys_ipc_port_open,
 	(syscall_handler_t)sys_ipc_port_id,
 	(syscall_handler_t)sys_ipc_port_listen,
-	(syscall_handler_t)sys_ipc_port_acl_add,
-	(syscall_handler_t)sys_ipc_port_acl_remove,
 	(syscall_handler_t)sys_ipc_connection_open,
 	(syscall_handler_t)sys_ipc_message_send,
 	(syscall_handler_t)sys_ipc_message_sendv,
+	(syscall_handler_t)sys_ipc_message_peek,
 	(syscall_handler_t)sys_ipc_message_receive,
-#endif
 };
 
 /** Main kernel system call service. */

@@ -275,8 +275,7 @@ static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
  * @param args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
 static void init_thread(void *args, void *arg2) {
-	//const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
-	const char *pargs[] = { "/system/services/console", NULL }, *penv[] = { NULL };
+	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
 	int ret;
 

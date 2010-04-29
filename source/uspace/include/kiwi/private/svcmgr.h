@@ -25,7 +25,7 @@
 
 /** Message types for the service manager. */
 enum {
-	/** Look up a port (input: char[], output: identifier_t). */
+	/** Look up a port (input: char[], output: port_id_t). */
 	SVCMGR_LOOKUP_PORT = 0,
 
 	/** Register a port (input: svcmgr_register_port_t, output: int). */
@@ -34,7 +34,7 @@ enum {
 
 /** Service manager register port data structure. */
 typedef struct svcmgr_register_port {
-	identifier_t id;		/**< Port ID. */
+	port_id_t id;			/**< Port ID. */
 	char name[];			/**< Port name. */
 } svcmgr_register_port_t;
 

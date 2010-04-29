@@ -33,26 +33,22 @@ Ports
 
 A port is an object which allows a service to be connected to. When a port is
 created, it is assigned a global, unique integer ID, which can be used to refer
-to it. Its creator is also given a handle to the port. A port has an access
-control list, which specifies which processes, users, etc. can access it, and
-what they can do with it. Initially, the port's ACL gives full access to the
-process that created it. Ports must be operated on through a handle to the
-port, rather than operating on the port ID. There are two reasons for this.
-Firstly, it allows ports to be cleaned up easily: just delete them when no more
-handles are open to them. Secondly, it allows them to be waited on using the
-handle waiting interface.
+to it. Its creator is also given a handle to the port. Ports must be operated
+on through a handle to the port, rather than operating on the port ID. There
+are two reasons for this. Firstly, it allows ports to be cleaned up easily:
+just delete them when no more handles are open to them. Secondly, it allows
+them to be waited on using the object waiting interface.
 
 Connections
 -----------
 
 A process opens a connection by calling `ipc_connection_open` with the ID of
-the port it wishes to connect to. This call first checks if the port's ACL
-allows the caller to connect to it, and if it does, will block until either
-until the specified timeout passes, or until the connection is accepted. When a
-connection is established, the processes on each end of the connection are
-given a handle referring to their end of the connection, which can be used to
-send and receive messages. A connection is automatically terminated if the port
-that it is on is deleted.
+the port it wishes to connect to. This call will block until either the
+specified timeout passes, or the connection is accepted. When a connection is
+established, the processes on each end of the connection are given a handle
+referring to their end of the connection, which can be used to send and receive
+messages. A connection is automatically terminated if the port that it is on is
+deleted.
 
 Messages
 --------
@@ -75,7 +71,7 @@ functions and types are defined in the header file `kernel/ipc.h`.
 
 ### Ports
 
-    handle_t ipc_port_create(void);
+    handle_id_t ipc_port_create(void);
 
 The `ipc_port_create` function creates a new IPC port and returns a handle to
 it. The port's ACL is initially set up to give full access to the calling
@@ -86,17 +82,16 @@ When the port is no longer needed, the handle to it should be closed with
 refer to it. Any connections that are open on the port will be terminated if
 this happens.
 
-    handle_t ipc_port_open(identifier_t id);
+    handle_id_t ipc_port_open(port_id_t id);
 
-The `ipc_port_open` function opens a handle to an IPC port. The caller must
-have the right to open it.
+The `ipc_port_open` function opens a handle to an IPC port.
 
-    identifier_t ipc_port_id(handle_t handle);
+    port_id_t ipc_port_id(handle_id_t handle);
 
 The `ipc_port_id` function returns the global ID of the port referred to by
 the given handle.
 
-    handle_t ipc_port_listen(handle_t handle, timeout_t timeout);
+    handle_id_t ipc_port_listen(handle_id_t handle, useconds_t timeout);
 
 The `ipc_port_listen` function listens for a connection on a port. The
 function will block until either a connection is made to the port, or until
@@ -105,36 +100,13 @@ specified in microseconds. If the timeout is specified as -1, the function will
 block indefinitely until a connection is made to the port. The function returns
 a handle referring to caller's end of the connection.
 
-    int ipc_port_acl_add(handle_t handle, ipc_port_accessor_t type,
-                         identifier_t id, uint32_t rights);
-
-The `ipc_port_acl_add` function adds an entry to a port's ACL. The caller must
-have the right to modify the port's ACL. The `type` parameter specifies the
-type of accessor to add - possible types are `IPC_PORT_ACCESSOR_PROCESS` and
-`IPC_PORT_ACCESSOR_ALL`, which add access to a process and to everything
-respectively. `IPC_PORT_ACCESSOR_USER` will be added once multiple users are
-supported. Note that if the process an ACL entry refers to terminates, the
-entry will be removed. The `rights` argument is a bitmap of rights to give the
-specified accessor.
-
-    int ipc_port_acl_remove(handle_t handle, ipc_port_accessor_t type,
-                            identifier_t id, uint32_t rights);
-
-The `ipc_port_acl_remove` function removes rights from the specified accessor
-in a port's ACL. The caller must have the right to modify the port's ACL.
-
 ### Connections
 
-    handle_t ipc_connection_open(identifier_t id, timeout_t timeout);
+    handle_id_t ipc_connection_open(port_id_t id);
 
 The `ipc_connection_open` function opens a connection to a port. Upon
 success, this function returns a handle referring to the caller's end of the
-connection. If the caller does not have the right to connect, an error will be
-returned immediately. Otherwise, the function will block until either the
-connection is accepted, or until the timeout expires, in which case it will
-return an error. The timeout is specified in microseconds. If the timeout is
-specified as -1, the function will block indefinitely until the connection can
-be made.
+connection. The function will block until the connection is accepted.
 
 When the connection is no longer required, the handle should be closed with
 `handle_close`. Doing so will discard all messages queued on the caller's end
@@ -143,7 +115,7 @@ connection after the connection has been closed will return an error.
 
 ### Messages
 
-    int ipc_message_send(handle_t handle, uint32_t type, void *buf,
+    int ipc_message_send(handle_id_t handle, uint32_t type, const void *buf,
                          size_t size);
 
 The `ipc_message_send` function asynchronously sends a message through a
@@ -156,35 +128,40 @@ full, then the caller will block until space is available.
     	size_t size;
     } ipc_message_vector_t;
 
-    int ipc_message_send_vector(handle_t handle, ipc_message_vector_t *vec,
-                                size_t count);
+    int ipc_message_sendv(handle_id_t handle, ipc_message_vector_t *vec,
+                          size_t count);
 
-The `ipc_message_send_vector` function is capable of sending multiple messages
-on a single call. The call should be provided with a pointer to an array of
+The `ipc_message_sendv` function is capable of sending multiple messages on a
+single call. The call should be provided with a pointer to an array of
 `ipc_message_vector_t` structures, which describe the messages to send. The
 messages are sent in the order that they are in the array. The operation is
 atomic: the destination will not receive any of the messages until all have
 been successfully queued, and if a failure occurs, it will receive none of the
 messages.
 
-    int ipc_message_receive(handle_t handle, timeout_t timeout, uint32_t *type,
-                            void *buf, size_t *size);
+    int ipc_message_peek(handle_id_t handle, useconds_t timeout,
+                         uint32_t *typep, size_t *sizep);
+
+The `ipc_message_peek` function waits until a message arrives on a connection,
+and then returns the type and size of the message, leaving the message on the
+queue. The function will block until either a message arrives, or until the
+timeout expires, in which case it will return an error. The timeout is
+specified in microseconds. If the timeout is specified as -1, the function will
+block indefinitely until a message is received.
+
+The purpose of this function is to allow a thread to wait for a message,
+allocate a buffer large enough for the message data and then receive it.
+
+    int ipc_message_receive(handle_id_t handle, useconds_t timeout,
+                            uint32_t *typep, void *buf,
+                            size_t size);
 
 The `ipc_message_receive` function attempts to receive a message from a
-connection. The function will block until either a message is available
-to receive, or until the timeout expires, in which case it will return an
+connection. The function will block until either a message arrives on the
+connection, or until the timeout expires, in which case it will return an
 error. The timeout is specified in microseconds. If the timeout is specified
 as -1, the function will block indefinitely until a message is received.
 
-Since the caller may not know the size of the message it is receiving, the
-function can be called with a NULL buffer pointer. When this is done, the type
-and size of the message will be returned, but the message will remain queued
-on the connection. This allows a process to wait for a message, allocate a
-buffer large enough to store it, and then receive it. It is highly recommended
-that this be done, rather than just passing a buffer and hoping that it is the
-correct size - you cannot be certain that the process you are connected to will
-send a message the size you expect.
-
-If the function is called with `type`, `buf` and `size` set to NULL, the next
-message received will be discarded. This may need to be done if, for example,
-a buffer big enough for a queued message cannot be allocated.
+Note that if the message being received is larger than the provided buffer, the
+extra data will be discarded. This behaviour can be exploited to discard
+an unwanted message, by giving a 0 size.
