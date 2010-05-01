@@ -74,22 +74,22 @@ typedef struct fs_info {
 #define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
 
 extern int SYSCALL(fs_file_create)(const char *path);
-extern handle_id_t SYSCALL(fs_file_open)(const char *path, int flags);
-extern int SYSCALL(fs_file_read)(handle_id_t handle, void *buf, size_t count, size_t *bytesp);
-extern int SYSCALL(fs_file_pread)(handle_id_t handle, void *buf, size_t count, offset_t offset,
+extern handle_t SYSCALL(fs_file_open)(const char *path, int flags);
+extern int SYSCALL(fs_file_read)(handle_t handle, void *buf, size_t count, size_t *bytesp);
+extern int SYSCALL(fs_file_pread)(handle_t handle, void *buf, size_t count, offset_t offset,
                                   size_t *bytesp);
-extern int SYSCALL(fs_file_write)(handle_id_t handle, const void *buf, size_t count, size_t *bytesp);
-extern int SYSCALL(fs_file_pwrite)(handle_id_t handle, const void *buf, size_t count,
+extern int SYSCALL(fs_file_write)(handle_t handle, const void *buf, size_t count, size_t *bytesp);
+extern int SYSCALL(fs_file_pwrite)(handle_t handle, const void *buf, size_t count,
                                    offset_t offset, size_t *bytesp);
-extern int SYSCALL(fs_file_resize)(handle_id_t handle, offset_t size);
+extern int SYSCALL(fs_file_resize)(handle_t handle, offset_t size);
 
 extern int SYSCALL(fs_dir_create)(const char *path);
-extern handle_id_t SYSCALL(fs_dir_open)(const char *path, int flags);
-extern int SYSCALL(fs_dir_read)(handle_id_t handle, fs_dir_entry_t *buf, size_t size);
+extern handle_t SYSCALL(fs_dir_open)(const char *path, int flags);
+extern int SYSCALL(fs_dir_read)(handle_t handle, fs_dir_entry_t *buf, size_t size);
 
-extern int SYSCALL(fs_handle_seek)(handle_id_t handle, int action, rel_offset_t offset, offset_t *newp);
-extern int SYSCALL(fs_handle_info)(handle_id_t handle, fs_info_t *info);
-extern int SYSCALL(fs_handle_sync)(handle_id_t handle);
+extern int SYSCALL(fs_handle_seek)(handle_t handle, int action, rel_offset_t offset, offset_t *newp);
+extern int SYSCALL(fs_handle_info)(handle_t handle, fs_info_t *info);
+extern int SYSCALL(fs_handle_sync)(handle_t handle);
 
 extern int SYSCALL(fs_symlink_create)(const char *path, const char *target);
 extern int SYSCALL(fs_symlink_read)(const char *path, char *buf, size_t size);

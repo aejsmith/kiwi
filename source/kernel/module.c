@@ -159,7 +159,7 @@ static int module_check_deps(module_t *module, char *depbuf) {
  * @param namebuf	Buffer to store name in (should be MODULE_NAME_MAX + 1
  *			bytes long).
  * @return		0 on success, negative error code on failure. */
-int module_name(handle_t *handle, char *namebuf) {
+int module_name(khandle_t *handle, char *namebuf) {
 	module_t *module;
 	symbol_t *sym;
 	int ret = 0;
@@ -226,7 +226,7 @@ out:
  *			required dependency is not loaded, the ERR_DEP_MISSING
  *			error code is returned.
  */
-int module_load(handle_t *handle, char *depbuf) {
+int module_load(khandle_t *handle, char *depbuf) {
 	module_t *module;
 	symbol_t *sym;
 	int ret;
@@ -380,12 +380,12 @@ int kdbg_cmd_modules(int argc, char **argv) {
  */
 int sys_module_load(const char *path, char *depbuf) {
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
-	handle_t *handle;
+	khandle_t *handle;
 	int ret, err;
 
 	/* Copy the path across. */
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
-		return (handle_id_t)ret;
+		return ret;
 	}
 
 	/* Open a handle to the file. */

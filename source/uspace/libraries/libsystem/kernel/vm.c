@@ -45,7 +45,7 @@
  *
  * @return		0 on success, negative error code on failure.
  */
-int vm_map(void *start, size_t size, int flags, handle_id_t handle, offset_t offset, void **addrp) {
+int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
 	vm_map_args_t args = {
 		.start = start,
 		.size = size,

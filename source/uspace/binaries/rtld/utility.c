@@ -44,7 +44,7 @@ static size_t rtld_heap_current = 0;
  * @param offset	Offset into object to map from.
  * @param addrp		Where to store address of mapping.
  * @return		0 on success, negative error code on failure. */
-int vm_map(void *start, size_t size, int flags, handle_id_t handle, offset_t offset, void **addrp) {
+int vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp) {
 	vm_map_args_t args = {
 		.start = start,
 		.size = size,

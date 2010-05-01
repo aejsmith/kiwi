@@ -49,18 +49,18 @@ typedef struct ipc_message_vector {
 #define IPC_QUEUE_MAX			256	/**< Maximum number of messages in a queue at a time. */
 #define IPC_MESSAGE_MAX			16384	/**< Maximum size of a message data buffer. */
 
-extern handle_id_t SYSCALL(ipc_port_create)(void);
-extern handle_id_t SYSCALL(ipc_port_open)(port_id_t id);
-extern port_id_t SYSCALL(ipc_port_id)(handle_id_t handle);
-extern handle_id_t SYSCALL(ipc_port_listen)(handle_id_t handle, useconds_t timeout);
+extern handle_t SYSCALL(ipc_port_create)(void);
+extern handle_t SYSCALL(ipc_port_open)(port_id_t id);
+extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);
+extern handle_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout);
 
-extern handle_id_t SYSCALL(ipc_connection_open)(port_id_t id);
+extern handle_t SYSCALL(ipc_connection_open)(port_id_t id);
 
-extern int SYSCALL(ipc_message_send)(handle_id_t handle, uint32_t type, const void *buf, size_t size);
-extern int SYSCALL(ipc_message_sendv)(handle_id_t handle, ipc_message_vector_t *vec, size_t count);
-extern int SYSCALL(ipc_message_peek)(handle_id_t handle, useconds_t timeout, uint32_t *typep,
+extern int SYSCALL(ipc_message_send)(handle_t handle, uint32_t type, const void *buf, size_t size);
+extern int SYSCALL(ipc_message_sendv)(handle_t handle, ipc_message_vector_t *vec, size_t count);
+extern int SYSCALL(ipc_message_peek)(handle_t handle, useconds_t timeout, uint32_t *typep,
                                      size_t *sizep);
-extern int SYSCALL(ipc_message_receive)(handle_id_t handle, useconds_t timeout, uint32_t *typep,
+extern int SYSCALL(ipc_message_receive)(handle_t handle, useconds_t timeout, uint32_t *typep,
                                         void *buf, size_t size);
 
 #ifdef __cplusplus

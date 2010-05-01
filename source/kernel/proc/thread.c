@@ -166,7 +166,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 
 /** Closes a handle to a thread.
  * @param handle	Handle being closed. */
-static void thread_object_close(handle_t *handle) {
+static void thread_object_close(khandle_t *handle) {
 	thread_destroy((thread_t *)handle->object);
 }
 
@@ -612,10 +612,10 @@ void __init_text thread_reaper_init(void) {
  * @param arg		Argument to pass to thread.
  * @return		Handle to the thread on success, negative error code on
  *			failure. */
-handle_id_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
+handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
-	handle_id_t handle = -1;
+	handle_t handle = -1;
 	char *kname;
 	int ret;
 
@@ -677,10 +677,10 @@ fail:
 
 /** Open a handle to a thread.
  * @param id		Global ID of the thread to open. */
-handle_id_t sys_thread_open(thread_id_t id) {
+handle_t sys_thread_open(thread_id_t id) {
+	khandle_t *handle;
 	thread_t *thread;
-	handle_t *handle;
-	handle_id_t ret;
+	handle_t ret;
 
 	rwlock_read_lock(&thread_tree_lock);
 
@@ -708,17 +708,17 @@ handle_id_t sys_thread_open(thread_id_t id) {
  * @return		Thread ID on success (greater than or equal to zero),
  *			negative error code on failure.
  */
-thread_id_t sys_thread_id(handle_id_t handle) {
+thread_id_t sys_thread_id(handle_t handle) {
+	khandle_t *khandle;
 	thread_t *thread;
 	thread_id_t id;
-	handle_t *obj;
 
 	if(handle == -1) {
 		id = curr_thread->id;
-	} else if((id = handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &obj)) == 0) {
-		thread = (thread_t *)obj->object;
+	} else if((id = handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &khandle)) == 0) {
+		thread = (thread_t *)khandle->object;
 		id = thread->id;
-		handle_release(obj);
+		handle_release(khandle);
 	}
 
 	return id;

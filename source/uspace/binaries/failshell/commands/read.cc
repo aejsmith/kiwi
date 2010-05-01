@@ -41,7 +41,7 @@ public:
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
 		size_t bytes, blksize, blocks, i;
-		handle_id_t handle;
+		handle_t handle;
 		offset_t offset;
 		char *block;
 		int ret;

@@ -31,11 +31,11 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-extern handle_id_t SYSCALL(semaphore_create)(const char *name, size_t count);
-extern handle_id_t SYSCALL(semaphore_open)(semaphore_id_t id);
-extern semaphore_id_t SYSCALL(semaphore_id)(handle_id_t handle);
-extern int SYSCALL(semaphore_down)(handle_id_t handle, useconds_t timeout);
-extern int SYSCALL(semaphore_up)(handle_id_t handle, size_t count);
+extern handle_t SYSCALL(semaphore_create)(const char *name, size_t count);
+extern handle_t SYSCALL(semaphore_open)(semaphore_id_t id);
+extern semaphore_id_t SYSCALL(semaphore_id)(handle_t handle);
+extern int SYSCALL(semaphore_down)(handle_t handle, useconds_t timeout);
+extern int SYSCALL(semaphore_up)(handle_t handle, size_t count);
 
 #ifdef __cplusplus
 }

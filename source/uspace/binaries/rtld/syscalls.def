@@ -14,9 +14,9 @@
 Service(0)
 
 Syscall('putch',		['char'], 0)
-Syscall('handle_close',		['handle_id_t'], 7)
+Syscall('handle_close',		['handle_t'], 7)
 Syscall('fs_file_open',		['ptr_t', 'int'], 9)
-Syscall('fs_file_pread',	['handle_id_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'], 11)
+Syscall('fs_file_pread',	['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'], 11)
 Syscall('_vm_map',		['ptr_t'], 33)
 Syscall('vm_unmap',		['ptr_t', 'size_t'], 34)
 Syscall('process_exit',		['int'], 41)

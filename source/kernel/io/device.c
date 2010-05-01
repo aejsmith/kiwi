@@ -49,7 +49,7 @@ device_t *device_bus_dir;
 
 /** Closes a handle to a device.
  * @param handle	Handle to the device. */
-static void device_object_close(handle_t *handle) {
+static void device_object_close(khandle_t *handle) {
 	device_t *device = (device_t *)handle->object;
 
 	if(device->ops && device->ops->close) {
@@ -84,7 +84,7 @@ static void device_object_unwait(object_wait_t *wait) {
  * @param handle	Handle to device.
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		0 if can be mapped, negative error code if not. */
-static int device_object_mappable(handle_t *handle, int flags) {
+static int device_object_mappable(khandle_t *handle, int flags) {
 	device_t *device = (device_t *)handle->object;
 
 	/* Cannot create private mappings to devices. */
@@ -100,7 +100,7 @@ static int device_object_mappable(handle_t *handle, int flags) {
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
  * @return		0 on success, negative error code on failure. */
-static int device_object_get_page(handle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static int device_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	device_t *device = (device_t *)handle->object;
 	int ret;
 
@@ -455,7 +455,7 @@ void device_release(device_t *device) {
  *			reference placed on it.
  * @param handlep	Where to store pointer to handle structure.
  * @return		0 on success, negative error code on failure. */
-int device_open(device_t *device, handle_t **handlep) {
+int device_open(device_t *device, khandle_t **handlep) {
 	void *data = NULL;
 	int ret;
 
@@ -490,7 +490,7 @@ int device_open(device_t *device, handle_t **handlep) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int device_read(handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
 	size_t bytes;
 	int ret;
@@ -533,7 +533,7 @@ int device_read(handle_t *handle, void *buf, size_t count, offset_t offset, size
  *
  * @return		0 on success, negative error code on failure.
  */
-int device_write(handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+int device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
 	size_t bytes;
 	int ret;
@@ -572,7 +572,7 @@ int device_write(handle_t *handle, const void *buf, size_t count, offset_t offse
  * @param outszp	Where to store size of data returned.
  * @return		Positive value on success, negative error code on
  *			failure. */
-int device_request(handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+int device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
 	device_t *device;
 
 	if(!handle) {
@@ -712,10 +712,10 @@ INITCALL(device_init);
  *
  * @return		Handle ID on success, negative error code on failure.
  */
-handle_id_t sys_device_open(const char *path) {
-	handle_t *handle;
+handle_t sys_device_open(const char *path) {
+	khandle_t *handle;
 	device_t *device;
-	handle_id_t ret;
+	handle_t ret;
 
 	if((ret = device_lookup(path, &device)) != 0) {
 		return ret;
@@ -747,13 +747,13 @@ handle_id_t sys_device_open(const char *path) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_device_read(handle_id_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_t *obj = NULL;
+int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	khandle_t *khandle = NULL;
 	size_t bytes = 0;
 	int ret, err;
 	void *kbuf;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle)) != 0) {
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -768,7 +768,7 @@ int sys_device_read(handle_id_t handle, void *buf, size_t count, offset_t offset
 		goto out;
 	}
 
-	ret = device_read(obj, kbuf, count, offset, &bytes);
+	ret = device_read(khandle, kbuf, count, offset, &bytes);
 	if(bytes) {
 		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
 			ret = err;
@@ -777,8 +777,8 @@ int sys_device_read(handle_id_t handle, void *buf, size_t count, offset_t offset
 	}
 	kfree(kbuf);
 out:
-	if(obj) {
-		handle_release(obj);
+	if(khandle) {
+		handle_release(khandle);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
@@ -804,13 +804,13 @@ out:
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_device_write(handle_id_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	handle_t *obj = NULL;
+int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+	khandle_t *khandle = NULL;
 	void *kbuf = NULL;
 	size_t bytes = 0;
 	int ret, err;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle)) != 0) {
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -827,13 +827,13 @@ int sys_device_write(handle_id_t handle, const void *buf, size_t count, offset_t
 		goto out;
 	}
 
-	ret = device_write(obj, kbuf, count, offset, &bytes);
+	ret = device_write(khandle, kbuf, count, offset, &bytes);
 out:
 	if(kbuf) {
 		kfree(kbuf);
 	}
-	if(obj) {
-		handle_release(obj);
+	if(khandle) {
+		handle_release(khandle);
 	}
 	if(bytesp) {
 		/* TODO: Something better than memcpy_to_user(). */
@@ -852,13 +852,13 @@ out:
 int sys_device_request(device_request_args_t *args) {
 	void *kin = NULL, *kout = NULL;
 	device_request_args_t kargs;
-	handle_t *obj;
+	khandle_t *handle;
 	size_t koutsz;
 	int ret, err;
 
 	if((ret = memcpy_from_user(&kargs, args, sizeof(device_request_args_t))) != 0) {
 		return ret;
-	} else if((ret = handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &obj)) != 0) {
+	} else if((ret = handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &handle)) != 0) {
 		return ret;
 	}
 
@@ -871,7 +871,7 @@ int sys_device_request(device_request_args_t *args) {
 		}
 	}
 
-	ret = device_request(obj, kargs.request, kin, kargs.insz, (kargs.out) ? &kout : NULL,
+	ret = device_request(handle, kargs.request, kin, kargs.insz, (kargs.out) ? &kout : NULL,
 	                     (kargs.out) ? &koutsz : NULL);
 	if(kout) {
 		assert(koutsz);
@@ -892,6 +892,6 @@ out:
 	if(kout) {
 		kfree(kout);
 	}
-	handle_release(obj);
+	handle_release(handle);
 	return ret;
 }

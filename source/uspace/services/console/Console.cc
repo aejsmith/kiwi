@@ -96,7 +96,7 @@ Console::~Console() {
  * @param path		Path to program to run.
  * @return		Whether command started successfully. */
 bool Console::Run(const char *path) {
-	handle_id_t ret, map[][2] = {
+	handle_t ret, map[][2] = {
 		{ 0, 0 },
 		{ 0, 1 },
 		{ 0, 2 },

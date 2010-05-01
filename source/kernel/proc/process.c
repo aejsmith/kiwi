@@ -56,7 +56,7 @@ typedef struct process_create_info {
 	const char *path;		/**< Path to program. */
 	const char **args;		/**< Argument array. */
 	const char **env;		/**< Environment array. */
-	handle_id_t (*handles)[2];	/**< Handle mapping array. */
+	handle_t (*handles)[2];		/**< Handle mapping array. */
 	int count;			/**< Number of handles in the array. */
 	vm_aspace_t *aspace;		/**< Address space for the process. */
 	void *data;			/**< Data pointer for the ELF loader. */
@@ -148,10 +148,10 @@ static void process_release(process_t *process) {
  *			destroyed. */
 static int process_alloc(const char *name, process_id_t id, int flags, int priority,
                          vm_aspace_t *aspace, process_t *parent, int cflags,
-                         handle_id_t handles[][2], int count, process_t **procp,
-                         handle_id_t *handlep) {
+                         handle_t handles[][2], int count, process_t **procp,
+                         handle_t *handlep) {
 	process_t *process;
-	handle_id_t handle;
+	handle_t handle;
 	int ret;
 
 	assert(name);
@@ -198,7 +198,7 @@ static int process_alloc(const char *name, process_id_t id, int flags, int prior
 
 /** Closes a handle to a process.
  * @param handle	Handle to close. */
-static void process_object_close(handle_t *handle) {
+static void process_object_close(khandle_t *handle) {
 	process_release((process_t *)handle->object);
 }
 
@@ -247,7 +247,7 @@ static object_type_t process_object_type = {
  * @param info		Pointer to information structure.
  * @return		0 on success, negative error code on failure. */
 static int load_binary(process_create_info_t *info) {
-	handle_t *handle;
+	khandle_t *handle;
 	size_t size;
 	int ret;
 
@@ -580,7 +580,7 @@ static void process_create_info_free(process_create_info_t *info) {
  * @param info		Pointer to information structure to fill in.
  * @return		0 on success, negative error code on failure. */
 static int process_create_info_init(const char *path, const char *const args[],
-                                    const char *const env[], handle_id_t handles[][2],
+                                    const char *const env[], handle_t handles[][2],
                                     int count, process_create_info_t *info) {
 	size_t size;
 	int ret;
@@ -599,7 +599,7 @@ static int process_create_info_init(const char *path, const char *const args[],
 		process_create_info_free(info);
 		return ret;
 	} else if(count > 0) {
-		size = sizeof(handle_id_t) * 2 * count;
+		size = sizeof(handle_t) * 2 * count;
 		if(!(info->handles = kmalloc(size, 0))) {
 			process_create_info_free(info);
 			return -ERR_NO_MEMORY;
@@ -637,13 +637,13 @@ static int process_create_info_init(const char *path, const char *const args[],
  * @return		Handle to new process (greater than or equal to 0) on
  *			success, negative error code on failure.
  */
-handle_id_t sys_process_create(const char *path, const char *const args[],
-                               const char *const env[], int flags,
-                               handle_id_t handles[][2], int count) {
+handle_t sys_process_create(const char *path, const char *const args[],
+                            const char *const env[], int flags,
+                            handle_t handles[][2], int count) {
 	process_create_info_t info;
 	process_t *process = NULL;
-	handle_id_t handle;
 	thread_t *thread;
+	handle_t handle;
 	int ret;
 
 	if((ret = process_create_info_init(path, args, env, handles, count, &info)) != 0) {
@@ -707,7 +707,7 @@ fail:
  *			on failure.
  */
 int sys_process_replace(const char *path, const char *const args[], const char *const env[],
-                        handle_id_t handles[][2], int count) {
+                        handle_t handles[][2], int count) {
 	handle_table_t *table, *oldtable;
 	process_create_info_t info;
 	thread_t *thread = NULL;
@@ -790,15 +790,15 @@ fail:
  *			will be created and a negative error code will be
  *			returned.
  */
-int sys_process_clone(handle_id_t *handlep) {
+int sys_process_clone(handle_t *handlep) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
 /** Open a handle to a process.
  * @param id		Global ID of the process to open. */
-handle_id_t sys_process_open(process_id_t id) {
+handle_t sys_process_open(process_id_t id) {
 	process_t *process;
-	handle_id_t ret;
+	handle_t ret;
 
 	rwlock_read_lock(&process_tree_lock);
 
@@ -829,17 +829,17 @@ handle_id_t sys_process_open(process_id_t id) {
  * @return		Process ID on success (greater than or equal to zero),
  *			negative error code on failure.
  */
-process_id_t sys_process_id(handle_id_t handle) {
+process_id_t sys_process_id(handle_t handle) {
 	process_t *process;
+	khandle_t *khandle;
 	process_id_t id;
-	handle_t *obj;
 
 	if(handle == -1) {
 		id = curr_proc->id;
-	} else if(!(id = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &obj))) {
-		process = (process_t *)obj->object;
+	} else if(!(id = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle))) {
+		process = (process_t *)khandle->object;
 		id = process->id;
-		handle_release(obj);
+		handle_release(khandle);
 	}
 
 	return id;
@@ -849,23 +849,23 @@ process_id_t sys_process_id(handle_id_t handle) {
  * @param handle	Handle to process.
  * @param statusp	Where to store exit status of process.
  * @return		0 on success, negative error code on failure. */
-int sys_process_status(handle_id_t handle, int *statusp) {
+int sys_process_status(handle_t handle, int *statusp) {
 	process_t *process;
-	handle_t *obj;
+	khandle_t *khandle;
 	int ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle)) != 0) {
 		return ret;
 	}
+	process = (process_t *)khandle->object;
 
-	process = (process_t *)obj->object;
 	if(process->state != PROCESS_DEAD) {
-		handle_release(obj);
+		handle_release(khandle);
 		return -ERR_PROCESS_RUNNING;
 	}
 
 	ret = memcpy_to_user(statusp, &process->status, sizeof(int));
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 

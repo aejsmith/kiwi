@@ -28,7 +28,7 @@ namespace kiwi {
 /** Class providing functionality to create and manipulate processes. */
 class Process : public Handle {
 public:
-	Process(handle_id_t handle = -1);
+	Process(handle_t handle = -1);
 
 	bool Create(const char *const args[], const char *const env[] = 0, bool usepath = true);
 	bool Create(const char *cmdline, const char *const env[] = 0, bool usepath = true);

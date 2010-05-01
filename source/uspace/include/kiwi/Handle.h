@@ -39,17 +39,17 @@ public:
 
 	virtual bool Close();
 	bool Wait(int event, useconds_t timeout = -1) const;
-	handle_id_t GetHandleID(void) const;
+	handle_t GetHandleID(void) const;
 
 	Signal<Handle *> OnClose;
 protected:
-	Handle(handle_id_t handle = -1);
+	Handle(handle_t handle = -1);
 
 	void _RegisterEvent(int event);
 	void _UnregisterEvent(int event);
 	virtual void _EventReceived(int id) = 0;
 
-	handle_id_t m_handle;		/**< Handle ID. */
+	handle_t m_handle;		/**< Handle ID. */
 };
 
 }

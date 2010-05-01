@@ -485,15 +485,15 @@ typedef struct {
 
 #include <arch/elf.h>
 
-struct handle;
+struct khandle;
 struct module;
 struct vm_aspace;
 
-extern bool elf_binary_check(struct handle *handle);
-extern int elf_binary_load(struct handle *handle, struct vm_aspace *as, void **datap);
+extern bool elf_binary_check(struct khandle *handle);
+extern int elf_binary_load(struct khandle *handle, struct vm_aspace *as, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 
-extern bool elf_module_check(struct handle *handle);
+extern bool elf_module_check(struct khandle *handle);
 extern int elf_module_load(struct module *module);
 extern int elf_module_relocate(struct module *module, bool external);
 

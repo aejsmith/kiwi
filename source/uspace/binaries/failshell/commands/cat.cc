@@ -39,7 +39,7 @@ public:
 	 * @param argv		Argument array.
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
-		handle_id_t handle;
+		handle_t handle;
 		fs_info_t info;
 		size_t bytes;
 		char *block;

@@ -44,9 +44,11 @@ int main(int argc, char **argv) {
 		}
 
 		val = *(reinterpret_cast<uint32_t *>(data));
-		cout << "Ping: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
+		//cout << "Ping: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
 		delete[] data;
 
-		val++;
+		if(!(++val % 1000000)) {
+			cout << val << endl;
+		}
 	}
 }

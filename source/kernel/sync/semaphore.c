@@ -143,7 +143,7 @@ int kdbg_cmd_semaphore(int argc, char **argv) {
 
 /** Close a handle to a semaphore object.
  * @param handle	Handle being closed. */
-static void semaphore_object_close(handle_t *handle) {
+static void semaphore_object_close(khandle_t *handle) {
 	user_semaphore_t *sem = (user_semaphore_t *)handle->object;
 
 	if(refcount_dec(&sem->count) == 0) {
@@ -168,10 +168,10 @@ static object_type_t semaphore_object_type = {
  * @param count		Initial count of the semaphore.
  * @return		Handle to the semaphore on success, negative error
  *			code on failure. */
-handle_id_t sys_semaphore_create(const char *name, size_t count) {
+handle_t sys_semaphore_create(const char *name, size_t count) {
 	user_semaphore_t *sem;
-	handle_t *handle;
-	handle_id_t ret;
+	khandle_t *handle;
+	handle_t ret;
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
 	if(!(sem->id = vmem_alloc(semaphore_id_arena, 1, 0))) {
@@ -210,10 +210,10 @@ handle_id_t sys_semaphore_create(const char *name, size_t count) {
  * @param id		ID of the semaphore to open.
  * @return		Handle to the semaphore on success, negative error
  *			code on failure. */
-handle_id_t sys_semaphore_open(semaphore_id_t id) {
+handle_t sys_semaphore_open(semaphore_id_t id) {
 	user_semaphore_t *sem;
-	handle_t *handle;
-	handle_id_t ret;
+	khandle_t *handle;
+	handle_t ret;
 
 	rwlock_read_lock(&semaphore_tree_lock);
 
@@ -235,18 +235,18 @@ handle_id_t sys_semaphore_open(semaphore_id_t id) {
  * @param handle	Handle to semaphore to get ID of.
  * @return		ID of semaphore on success, negative error code on
  *			failure. */
-semaphore_id_t sys_semaphore_id(handle_id_t handle) {
+semaphore_id_t sys_semaphore_id(handle_t handle) {
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
-	handle_t *obj;
+	khandle_t *khandle;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
 		return ret;
 	}
 
-	sem = (user_semaphore_t *)obj->object;
+	sem = (user_semaphore_t *)khandle->object;
 	ret = sem->id;
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -264,18 +264,18 @@ semaphore_id_t sys_semaphore_id(handle_id_t handle) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_semaphore_down(handle_id_t handle, useconds_t timeout) {
+int sys_semaphore_down(handle_t handle, useconds_t timeout) {
 	user_semaphore_t *sem;
-	handle_t *obj;
+	khandle_t *khandle;
 	int ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
 		return ret;
 	}
 
-	sem = (user_semaphore_t *)obj->object;
+	sem = (user_semaphore_t *)khandle->object;
 	ret = semaphore_down_etc(&sem->sem, timeout, SYNC_INTERRUPTIBLE);
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -289,18 +289,18 @@ int sys_semaphore_down(handle_id_t handle, useconds_t timeout) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_semaphore_up(handle_id_t handle, size_t count) {
+int sys_semaphore_up(handle_t handle, size_t count) {
 	user_semaphore_t *sem;
-	handle_t *obj;
+	khandle_t *khandle;
 	int ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
 		return ret;
 	}
 
-	sem = (user_semaphore_t *)obj->object;
+	sem = (user_semaphore_t *)khandle->object;
 	semaphore_up(&sem->sem, count);
-	handle_release(obj);
+	handle_release(khandle);
 	return 0;
 }
 

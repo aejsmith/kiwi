@@ -174,7 +174,7 @@ extern device_t *device_bus_dir;
 /** Get the name of a device from a handle.
  * @param handle	Handle to get name from.
  * @return		Name of the device. */
-static inline const char *device_name(handle_t *handle) {
+static inline const char *device_name(khandle_t *handle) {
 	device_t *device = (device_t *)handle->object;
 	return device->name;
 }
@@ -189,10 +189,10 @@ extern int device_lookup(const char *path, device_t **devicep);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern void device_release(device_t *device);
 
-extern int device_open(device_t *device, handle_t **handlep);
-extern int device_read(handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int device_write(handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int device_request(handle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp);
+extern int device_open(device_t *device, khandle_t **handlep);
+extern int device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
+extern int device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
+extern int device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);
 

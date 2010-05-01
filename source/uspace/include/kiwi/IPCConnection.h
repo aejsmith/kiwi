@@ -28,7 +28,7 @@ namespace kiwi {
 /** Class implementing an IPC connection. */
 class IPCConnection : public Handle {
 public:
-	IPCConnection(handle_id_t handle = -1);
+	IPCConnection(handle_t handle = -1);
 
 	bool Connect(port_id_t id);
 	bool Connect(const char *name);

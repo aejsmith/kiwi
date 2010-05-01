@@ -127,7 +127,7 @@ FILE *fopen(const char *path, const char *mode) {
  *			original stream will not be changed on failure.
  */
 FILE *freopen(const char *path, const char *mode, FILE *stream) {
-	handle_id_t handle;
+	handle_t handle;
 
 	if((handle = fopen_file_internal(path, mode)) < 0) {
 		return NULL;
@@ -148,7 +148,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream) {
  * @param stream	If not NULL, this structure will be used rather than
  *			allocating a new one.
  * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_handle(handle_id_t handle, FILE *stream) {
+FILE *fopen_handle(handle_t handle, FILE *stream) {
 	int type;
 
 	/* Check if the handle can be used. */
@@ -175,7 +175,7 @@ FILE *fopen_handle(handle_id_t handle, FILE *stream) {
  *			allocating a new one.
  * @return		Pointer to stream on success, NULL on failure. */
 FILE *fopen_device(const char *path, FILE *stream) {
-	handle_id_t handle;
+	handle_t handle;
 
 	if((handle = device_open(path)) < 0) {
 		return NULL;

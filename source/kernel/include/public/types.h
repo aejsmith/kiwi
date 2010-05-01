@@ -37,8 +37,8 @@
 # define SYSCALL(name)	name
 #endif
 
-/** Type used to store a per-process ID of a handle to an object. */
-typedef int32_t handle_id_t;
+/** Type used to store a handle to an object. */
+typedef int32_t handle_t;
 
 /** Object identifier types. */
 typedef int32_t process_id_t;		/**< Type used to store a process ID. */

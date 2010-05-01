@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 			}
 
 			val = *(reinterpret_cast<uint32_t *>(data));
-			cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
+			//cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
 
 			if(!conn->Send(2, data, size)) {
 				break;

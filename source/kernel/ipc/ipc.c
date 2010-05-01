@@ -163,7 +163,7 @@ static int ipc_connection_ctor(void *obj, void *data, int mmflag) {
 
 /** Closes a handle to an IPC port.
  * @param handle	Handle being closed. */
-static void port_object_close(handle_t *handle) {
+static void port_object_close(khandle_t *handle) {
 	ipc_port_t *port = (ipc_port_t *)handle->object;
 	ipc_connection_t *conn;
 	size_t i;
@@ -261,7 +261,7 @@ static object_type_t port_object_type = {
 
 /** Closes a handle to a connection.
  * @param handle	Handle being closed. */
-static void connection_object_close(handle_t *handle) {
+static void connection_object_close(khandle_t *handle) {
 	ipc_connection_t *conn = (ipc_connection_t *)handle->object;
 	ipc_endpoint_t *endpoint = handle->data;
 	ipc_message_t *message;
@@ -387,9 +387,9 @@ static object_type_t connection_object_type = {
 /** Create a new IPC port.
  * @return		Handle to the port on success, negative error code on
  *			failure. */
-handle_id_t sys_ipc_port_create(void) {
+handle_t sys_ipc_port_create(void) {
 	ipc_port_t *port;
-	handle_id_t ret;
+	handle_t ret;
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
 	if(!(port->id = vmem_alloc(port_id_arena, 1, 0))) {
@@ -417,10 +417,10 @@ handle_id_t sys_ipc_port_create(void) {
  * @param id		ID of the port to open.
  * @return		Handle to the port on success, negative error code on
  *			failure. */
-handle_id_t sys_ipc_port_open(port_id_t id) {
+handle_t sys_ipc_port_open(port_id_t id) {
+	khandle_t *handle;
 	ipc_port_t *port;
-	handle_t *handle;
-	handle_id_t ret;
+	handle_t ret;
 
 	mutex_lock(&port_tree_lock);
 
@@ -441,18 +441,18 @@ handle_id_t sys_ipc_port_open(port_id_t id) {
 /** Get the ID of a port.
  * @param handle	Handle to port to get ID of.
  * @return		ID of port on success, negative error code on failure. */
-port_id_t sys_ipc_port_id(handle_id_t handle) {
+port_id_t sys_ipc_port_id(handle_t handle) {
+	khandle_t *khandle;
 	ipc_port_t *port;
 	port_id_t ret;
-	handle_t *obj;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle)) != 0) {
 		return ret;
 	}
+	port = (ipc_port_t *)khandle->object;
 
-	port = (ipc_port_t *)obj->object;
 	ret = port->id;
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -464,22 +464,22 @@ port_id_t sys_ipc_port_id(handle_id_t handle) {
  *			indefinitely until a connection is made.
  * @return		Handle to the caller's end of the connection on
  *			success, negative error code on failure. */
-handle_id_t sys_ipc_port_listen(handle_id_t handle, useconds_t timeout) {
+handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
 	ipc_connection_t *conn = NULL;
+	khandle_t *khandle;
 	ipc_port_t *port;
-	handle_id_t ret;
-	handle_t *obj;
+	handle_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle)) != 0) {
 		return ret;
 	}
-	port = (ipc_port_t *)obj->object;
+	port = (ipc_port_t *)khandle->object;
 
 	/* Try to get a connection. FIXME: This does not handle timeout
 	 * properly - implement SYNC_ABSOLUTE. */
 	while(!conn) {
 		if((ret = semaphore_down_etc(&port->conn_sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
-			handle_release(obj);
+			handle_release(khandle);
 			return ret;
 		}
 
@@ -496,7 +496,7 @@ handle_id_t sys_ipc_port_listen(handle_id_t handle, useconds_t timeout) {
 	if((ret = handle_create(&conn->obj, &conn->endpoints[SERVER_ENDPOINT], curr_proc, 0, NULL)) < 0) {
 		semaphore_up(&port->conn_sem, 1);
 		mutex_unlock(&port->lock);
-		handle_release(obj);
+		handle_release(khandle);
 		return ret;
 	}
 
@@ -506,7 +506,7 @@ handle_id_t sys_ipc_port_listen(handle_id_t handle, useconds_t timeout) {
 	/* Wake the thread that made the connection. */
 	semaphore_up(conn->sem, 1);
 	mutex_unlock(&port->lock);
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -514,11 +514,11 @@ handle_id_t sys_ipc_port_listen(handle_id_t handle, useconds_t timeout) {
  * @param id		Port ID to connect to.
  * @return		Handle referring to caller's end of connection on
  *			success, negative error code on failure. */
-handle_id_t sys_ipc_connection_open(port_id_t id) {
+handle_t sys_ipc_connection_open(port_id_t id) {
 	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "ipc_open_sem", 0);
 	ipc_connection_t *conn;
-	handle_id_t handle;
 	ipc_port_t *port;
+	handle_t handle;
 	int i, ret;
 
 	mutex_lock(&port_tree_lock);
@@ -576,6 +576,9 @@ handle_id_t sys_ipc_connection_open(port_id_t id) {
 		return -ERR_NOT_FOUND;
 	}
 
+	dprintf("ipc: opened connection to port %" PRId32 "(%p) (client: %p, server: %p)\n",
+	        id, conn->port, &conn->endpoints[CLIENT_ENDPOINT],
+	        &conn->endpoints[SERVER_ENDPOINT]);
 	return handle;
 }
 
@@ -593,10 +596,10 @@ handle_id_t sys_ipc_connection_open(port_id_t id) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_send(handle_id_t handle, uint32_t type, const void *buf, size_t size) {
+int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
 	ipc_endpoint_t *endpoint = NULL;
+	khandle_t *khandle = NULL;
 	ipc_message_t *message;
-	handle_t *obj = NULL;
 	bool state;
 	int ret;
 
@@ -616,10 +619,10 @@ int sys_ipc_message_send(handle_id_t handle, uint32_t type, const void *buf, siz
 	}
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
 		goto fail;
 	}
-	endpoint = obj->data;
+	endpoint = khandle->data;
 	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for space in the remote message queue. The unlock/wait needs to
@@ -654,12 +657,12 @@ int sys_ipc_message_send(handle_id_t handle, uint32_t type, const void *buf, siz
 	notifier_run(&endpoint->remote->msg_notifier, NULL, false);
 
 	mutex_unlock(&endpoint->conn->lock);
-	handle_release(obj);
+	handle_release(khandle);
 	return 0;
 fail:
-	if(obj) {
+	if(khandle) {
 		mutex_unlock(&endpoint->conn->lock);
-		handle_release(obj);
+		handle_release(khandle);
 	}
 	kfree(message);
 	return ret;
@@ -680,7 +683,7 @@ fail:
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_sendv(handle_id_t handle, ipc_message_vector_t *vec, size_t count) {
+int sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count) {
 	return -ERR_NOT_IMPLEMENTED;
 }
 
@@ -744,23 +747,23 @@ static int wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_me
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_peek(handle_id_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
+int sys_ipc_message_peek(handle_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
 	ipc_endpoint_t *endpoint;
 	ipc_message_t *message;
-	handle_t *obj;
+	khandle_t *khandle;
 	int ret;
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
 		return ret;
 	}
-	endpoint = obj->data;
+	endpoint = khandle->data;
 	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for a message. */
 	if((ret = wait_for_message(endpoint, timeout, &message)) != 0) {
 		mutex_unlock(&endpoint->conn->lock);
-		handle_release(obj);
+		handle_release(khandle);
 		return ret;
 	}
 
@@ -773,7 +776,7 @@ int sys_ipc_message_peek(handle_id_t handle, useconds_t timeout, uint32_t *typep
 out:
 	semaphore_up(&endpoint->data_sem, 1);
 	mutex_unlock(&endpoint->conn->lock);
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -798,11 +801,11 @@ out:
  *
  * @return		0 on success, negative error code on failure.
  */
-int sys_ipc_message_receive(handle_id_t handle, useconds_t timeout, uint32_t *typep,
+int sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
                             void *buf, size_t size) {
 	ipc_message_t *message = NULL;
 	ipc_endpoint_t *endpoint;
-	handle_t *obj;
+	khandle_t *khandle;
 	int ret;
 
 	if(size > 0 && !buf) {
@@ -810,10 +813,10 @@ int sys_ipc_message_receive(handle_id_t handle, useconds_t timeout, uint32_t *ty
 	}
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &obj)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
 		return ret;
 	}
-	endpoint = obj->data;
+	endpoint = khandle->data;
 	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for a message. */
@@ -836,14 +839,14 @@ int sys_ipc_message_receive(handle_id_t handle, useconds_t timeout, uint32_t *ty
 	semaphore_up(&endpoint->space_sem, 1);
 
 	mutex_unlock(&endpoint->conn->lock);
-	handle_release(obj);
+	handle_release(khandle);
 	return 0;
 fail:
 	if(message) {
 		semaphore_up(&endpoint->data_sem, 1);
 	}
 	mutex_unlock(&endpoint->conn->lock);
-	handle_release(obj);
+	handle_release(khandle);
 	return ret;
 }
 

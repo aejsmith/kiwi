@@ -71,7 +71,7 @@ functions and types are defined in the header file `kernel/ipc.h`.
 
 ### Ports
 
-    handle_id_t ipc_port_create(void);
+    handle_t ipc_port_create(void);
 
 The `ipc_port_create` function creates a new IPC port and returns a handle to
 it. The port's ACL is initially set up to give full access to the calling
@@ -82,16 +82,16 @@ When the port is no longer needed, the handle to it should be closed with
 refer to it. Any connections that are open on the port will be terminated if
 this happens.
 
-    handle_id_t ipc_port_open(port_id_t id);
+    handle_t ipc_port_open(port_id_t id);
 
 The `ipc_port_open` function opens a handle to an IPC port.
 
-    port_id_t ipc_port_id(handle_id_t handle);
+    port_id_t ipc_port_id(handle_t handle);
 
 The `ipc_port_id` function returns the global ID of the port referred to by
 the given handle.
 
-    handle_id_t ipc_port_listen(handle_id_t handle, useconds_t timeout);
+    handle_t ipc_port_listen(handle_t handle, useconds_t timeout);
 
 The `ipc_port_listen` function listens for a connection on a port. The
 function will block until either a connection is made to the port, or until
@@ -102,7 +102,7 @@ a handle referring to caller's end of the connection.
 
 ### Connections
 
-    handle_id_t ipc_connection_open(port_id_t id);
+    handle_t ipc_connection_open(port_id_t id);
 
 The `ipc_connection_open` function opens a connection to a port. Upon
 success, this function returns a handle referring to the caller's end of the
@@ -115,7 +115,7 @@ connection after the connection has been closed will return an error.
 
 ### Messages
 
-    int ipc_message_send(handle_id_t handle, uint32_t type, const void *buf,
+    int ipc_message_send(handle_t handle, uint32_t type, const void *buf,
                          size_t size);
 
 The `ipc_message_send` function asynchronously sends a message through a
@@ -128,7 +128,7 @@ full, then the caller will block until space is available.
     	size_t size;
     } ipc_message_vector_t;
 
-    int ipc_message_sendv(handle_id_t handle, ipc_message_vector_t *vec,
+    int ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec,
                           size_t count);
 
 The `ipc_message_sendv` function is capable of sending multiple messages on a
@@ -139,7 +139,7 @@ atomic: the destination will not receive any of the messages until all have
 been successfully queued, and if a failure occurs, it will receive none of the
 messages.
 
-    int ipc_message_peek(handle_id_t handle, useconds_t timeout,
+    int ipc_message_peek(handle_t handle, useconds_t timeout,
                          uint32_t *typep, size_t *sizep);
 
 The `ipc_message_peek` function waits until a message arrives on a connection,
@@ -152,7 +152,7 @@ block indefinitely until a message is received.
 The purpose of this function is to allow a thread to wait for a message,
 allocate a buffer large enough for the message data and then receive it.
 
-    int ipc_message_receive(handle_id_t handle, useconds_t timeout,
+    int ipc_message_receive(handle_t handle, useconds_t timeout,
                             uint32_t *typep, void *buf,
                             size_t size);
 

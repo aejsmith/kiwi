@@ -53,7 +53,7 @@ typedef struct boot_module {
 	list_t header;			/**< Link to modules list. */
 	void *mapping;			/**< Pointer to mapped module data. */
 	size_t size;			/**< Size of the module data. */
-	handle_t *handle;		/**< File handle for the module data. */
+	khandle_t *handle;		/**< File handle for the module data. */
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
@@ -114,7 +114,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @return		Whether the module was a TAR archive. */
 static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
-	handle_t *handle;
+	khandle_t *handle;
 	int64_t size;
 	size_t bytes;
 	int ret;

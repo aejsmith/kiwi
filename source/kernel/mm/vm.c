@@ -566,7 +566,7 @@ static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
  * @param access	Type of access that caused the fault.
  * @return		Whether the fault was successfully handled. */
 static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	handle_t *handle = region->handle;
+	khandle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t paddr;
 	offset_t offset;
@@ -889,7 +889,7 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, handle_t *handle,
+int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
            offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
 	int rflags, ret;
@@ -1155,7 +1155,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  * @return		0 on success, negative error code on failure.
  */
 int sys_vm_map(vm_map_args_t *args) {
-	handle_t *obj = NULL;
+	khandle_t *handle = NULL;
 	vm_map_args_t kargs;
 	int ret, err;
 	ptr_t addr;
@@ -1165,13 +1165,13 @@ int sys_vm_map(vm_map_args_t *args) {
 	} else if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
 		return -ERR_PARAM_INVAL;
 	} else if(kargs.handle >= 0) {
-		if((ret = handle_lookup(curr_proc, kargs.handle, -1, &obj)) != 0) {
+		if((ret = handle_lookup(curr_proc, kargs.handle, -1, &handle)) != 0) {
 			return ret;
 		}
 	}
 
 	ret = vm_map(curr_proc->aspace, (ptr_t)kargs.start, kargs.size, kargs.flags,
-	             obj, kargs.offset, &addr);
+	             handle, kargs.offset, &addr);
 	if(ret == 0 && kargs.addrp) {
 		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
 			vm_unmap(curr_proc->aspace, addr, kargs.size);
@@ -1179,8 +1179,8 @@ int sys_vm_map(vm_map_args_t *args) {
 		}
 	}
 
-	if(obj) {
-		handle_release(obj);
+	if(handle) {
+		handle_release(handle);
 	}
 	return ret;
 }

@@ -62,7 +62,7 @@ static bool elf_check_ehdr(elf_ehdr_t *ehdr, int type) {
  * @param handle	Handle to file to check.
  * @param type		Required ELF type.
  * @return		True if valid, false if not. */
-static bool elf_check_file(handle_t *handle, int type) {
+static bool elf_check_file(khandle_t *handle, int type) {
 	elf_ehdr_t ehdr;
 	size_t bytes;
 
@@ -86,7 +86,7 @@ static bool elf_check_file(handle_t *handle, int type) {
 typedef struct elf_binary {
 	elf_ehdr_t ehdr;		/**< Executable header. */
 	elf_phdr_t *phdrs;		/**< Program headers. */
-	handle_t *handle;		/**< Handle to file being loaded. */
+	khandle_t *handle;		/**< Handle to file being loaded. */
 	vm_aspace_t *as;		/**< Address space to map in to. */
 } elf_binary_t;
 
@@ -181,7 +181,7 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 /** Check whether a file is an ELF binary.
  * @param handle	Handle to file to check.
  * @return		Whether the file is an ELF binary. */
-bool elf_binary_check(handle_t *handle) {
+bool elf_binary_check(khandle_t *handle) {
 	return elf_check_file(handle, ELF_ET_EXEC);
 }
 
@@ -192,7 +192,7 @@ bool elf_binary_check(handle_t *handle) {
  *			interpreter requiring an interpreter).
  * @param datap		Where to store data pointer to pass to other functions.
  * @return		0 on success, negative error code on failure. */
-static int elf_binary_load_internal(handle_t *handle, vm_aspace_t *as, bool interp, void **datap) {
+static int elf_binary_load_internal(khandle_t *handle, vm_aspace_t *as, bool interp, void **datap) {
 	size_t bytes, i, size, load_count = 0;
 	elf_binary_t *binary;
 	char *path;
@@ -324,7 +324,7 @@ fail:
  * @param as		Address space to load into.
  * @param datap		Where to store data pointer to pass to other functions.
  * @return		0 on success, negative error code on failure. */
-int elf_binary_load(handle_t *handle, vm_aspace_t *as, void **datap) {
+int elf_binary_load(khandle_t *handle, vm_aspace_t *as, void **datap) {
 	return elf_binary_load_internal(handle, as, false, datap);
 }
 
@@ -370,7 +370,7 @@ extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_a
 /** Check whether a file is an ELF module.
  * @param handle	Handle to file to check.
  * @return		Whether the file is an ELF module. */
-bool elf_module_check(handle_t *handle) {
+bool elf_module_check(khandle_t *handle) {
 	return elf_check_file(handle, ELF_ET_REL);
 }
 

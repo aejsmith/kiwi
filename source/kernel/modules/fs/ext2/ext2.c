@@ -413,7 +413,7 @@ static fs_mount_ops_t ext2_mount_ops = {
  * @param uuid		If not NULL, UUID to check for.
  * @return		Whether if the device contains an Ext2 FS with the
  *			given UUID. */
-static bool ext2_probe(handle_t *handle, const char *uuid) {
+static bool ext2_probe(khandle_t *handle, const char *uuid) {
 	ext2_superblock_t *sb;
 	uint32_t revision;
 	size_t bytes;

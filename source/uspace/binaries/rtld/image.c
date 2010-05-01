@@ -50,11 +50,11 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 	rtld_image_t *image = NULL, *exist;
 	ElfW(Addr) start, end;
 	size_t bytes, size, i;
-	handle_id_t handle;
 	ElfW(Phdr) *phdrs;
 	Elf32_Word *addr;
 	const char *dep;
 	ElfW(Ehdr) ehdr;
+	handle_t handle;
 	offset_t offset;
 	int ret, flags;
 
@@ -396,7 +396,7 @@ void rtld_image_unload(rtld_image_t *image) {
  * @param path		Path to check.
  * @return		True if exists, false if not. */
 static bool rtld_library_exists(const char *path) {
-	handle_id_t handle;
+	handle_t handle;
 
 	dprintf("  Trying %s... ", path);
 

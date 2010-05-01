@@ -37,7 +37,7 @@ struct __fstream_internal {
 		STREAM_TYPE_DEVICE,	/**< Device. */
 	} type;
 
-	handle_id_t handle;		/**< Handle for file/device streams. */
+	handle_t handle;		/**< Handle for file/device streams. */
 	bool err;			/**< Error indicator. */
 	bool eof;			/**< End of file indicator. */
 	int pushback_ch;		/**< Character pushed back with ungetc(). */
@@ -58,7 +58,7 @@ extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_lis
 extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
 
 extern int fclose_internal(FILE *stream);
-extern FILE *fopen_handle(handle_id_t handle, FILE *stream);
+extern FILE *fopen_handle(handle_t handle, FILE *stream);
 extern FILE *fopen_device(const char *path, FILE *stream);
 extern FILE *fopen_kconsole(FILE *stream);
 

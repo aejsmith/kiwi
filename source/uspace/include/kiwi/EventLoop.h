@@ -51,7 +51,7 @@ private:
 	/** @note Data stored as multiple vectors because it is the format
 	 *        object_wait_multiple() expects. */
 	std::vector<Handle *> m_handles;	/**< Array of handle objects (used for callbacks). */
-	std::vector<handle_id_t> m_ids;		/**< Array of handle IDs. */
+	std::vector<handle_t> m_ids;		/**< Array of handle IDs. */
 	std::vector<int> m_events;		/**< Array of events to wait for. */
 };
 

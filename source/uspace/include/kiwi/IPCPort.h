@@ -29,7 +29,7 @@ namespace kiwi {
 /** Class implementing an IPC port. */
 class IPCPort : public Handle {
 public:
-	IPCPort(handle_id_t handle = -1);
+	IPCPort(handle_t handle = -1);
 
 	bool Create();
 	bool Open(port_id_t id);
