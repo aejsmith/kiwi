@@ -84,9 +84,19 @@ typedef struct device_ops {
 	 * @param wait		Wait information structure. */
 	void (*unwait)(struct device *device, void *data, object_wait_t *wait);
 
+	/** Check if a device can be memory-mapped.
+	 * @note		If this function is implemented, the get_page
+	 *			operation MUST be implemented. If it is not,
+	 *			then the device will be classed as mappable if
+	 *			get_page is implemented.
+	 * @param device	Device to check.
+	 * @param data		Handle-specific data pointer.
+	 * @param flags		Mapping flags (VM_MAP_*).
+	 * @return		0 if can be mapped, negative error code if not. */
+	int (*mappable)(struct device *device, void *data, int flags);
+
 	/** Get a page for the device (for memory-mapping the device).
-	 * @note		If this operation is not specified then the
-	 *			device won't be allowed to be memory-mapped.
+	 * @note		See note for mappable.
 	 * @param device	Device to get page from.
 	 * @param data		Handle-specific data pointer.
 	 * @param offset	Offset into device of page to get.
@@ -195,5 +205,7 @@ extern int device_write(khandle_t *handle, const void *buf, size_t count, offset
 extern int device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);
+
+extern void device_init(void);
 
 #endif /* __IO_DEVICE_H */

@@ -36,19 +36,22 @@ FILE *stderr = &__stderr;
 /** Userspace application initialisation function.
  * @param args		Process arguments structure. */
 void __libsystem_init(process_args_t *args) {
+	int ret;
+
 	environ = args->env;
 
 	/* Attempt to open streams from existing handles, and open new streams
 	 * if we can't. */
 	if(!fopen_handle(0, stdin)) {
-		fopen_kconsole(stdin);
+		fopen_device("/kconsole", stdin);
 	}
 	if(!fopen_handle(1, stdout)) {
-		fopen_kconsole(stdout);
+		fopen_device("/kconsole", stdout);
 	}
 	if(!fopen_handle(2, stderr)) {
-		fopen_kconsole(stderr);
+		fopen_device("/kconsole", stderr);
 	}
 
-	exit(main(args->args_count, args->args, args->env));
+	ret = main(args->args_count, args->args, args->env);
+	exit(ret);
 }

@@ -59,9 +59,6 @@ int fputc(int ch, FILE *stream) {
 			return EOF;
 		}
 		break;
-	case STREAM_TYPE_KCONSOLE:
-		kputch(ch);
-		break;
 	}
 
 	return (int)val;

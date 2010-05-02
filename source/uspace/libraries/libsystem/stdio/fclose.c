@@ -36,8 +36,6 @@ int fclose_internal(FILE *stream) {
 			return ret;
 		}
 		break;
-	case STREAM_TYPE_KCONSOLE:
-		break;
 	}
 
 	return 0;

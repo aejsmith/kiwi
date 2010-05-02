@@ -191,19 +191,3 @@ FILE *fopen_device(const char *path, FILE *stream) {
 	stream->have_pushback = false;
 	return stream;
 }
-
-/** Open a stream to the kernel console.
- * @param stream	If not NULL, this structure will be used rather than
- *			allocating a new one.
- * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_kconsole(FILE *stream) {
-	if(!stream && !(stream = malloc(sizeof(FILE)))) {
-		return NULL;
-	}
-
-	stream->type = STREAM_TYPE_KCONSOLE;
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
-}

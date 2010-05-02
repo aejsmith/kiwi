@@ -50,17 +50,8 @@ static syscall_service_t **syscall_services = NULL;
 static size_t syscall_service_max = 0;
 static RWLOCK_DECLARE(syscall_services_lock);
 
-/** Print a character to the screen.
- * @param ch		Character to print.
- * @return		0 on success, negative error code on failure. */
-static int sys_putch(char ch) {
-	kprintf(LOG_NORMAL, "%c", ch);
-	return 0;
-}
-
 /** Main kernel system call table. */
 static syscall_handler_t kernel_syscall_table[] = {
-	(syscall_handler_t)sys_putch,
 	(syscall_handler_t)sys_module_load,
 	(syscall_handler_t)sys_object_type,
 	(syscall_handler_t)sys_object_wait,

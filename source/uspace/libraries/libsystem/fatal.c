@@ -32,8 +32,6 @@
 static void __libsystem_fatal_helper(char ch, void *data, int *total) {
 	if(data) {
 		fputc(ch, (FILE *)data);
-	} else {
-		kputch(ch);
 	}
 		
 	*total = *total + 1;
@@ -55,8 +53,6 @@ void __libsystem_fatal(const char *fmt, ...) {
 
 	if(stderr) {
 		fputc('\n', stderr);
-	} else {
-		kputch('\n');
 	}
 
 	process_exit(1);

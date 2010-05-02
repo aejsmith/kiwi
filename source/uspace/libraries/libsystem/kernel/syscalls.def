@@ -13,7 +13,6 @@
 
 Service(0)
 
-Syscall('kputch',			['char'])
 Syscall('module_load',			['ptr_t', 'ptr_t'])
 Syscall('object_type',			['handle_t'])
 Syscall('object_wait',			['handle_t', 'int', 'useconds_t'])

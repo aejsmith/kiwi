@@ -32,7 +32,6 @@
 struct __fstream_internal {
 	/** Stream type. */
 	enum {
-		STREAM_TYPE_KCONSOLE,	/**< Kernel console. */
 		STREAM_TYPE_FILE,	/**< File. */
 		STREAM_TYPE_DEVICE,	/**< Device. */
 	} type;
@@ -60,6 +59,5 @@ extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
 extern int fclose_internal(FILE *stream);
 extern FILE *fopen_handle(handle_t handle, FILE *stream);
 extern FILE *fopen_device(const char *path, FILE *stream);
-extern FILE *fopen_kconsole(FILE *stream);
 
 #endif /* __STDIO_PRIV_H */

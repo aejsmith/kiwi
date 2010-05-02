@@ -18,13 +18,21 @@
  * @brief		Kernel console functions.
  */
 
-#include <arch/page.h>
+#include <io/device.h>
 
 #include <lib/printf.h>
+
+#include <mm/page.h>
+#include <mm/vm.h>
+
+#include <public/console.h>
 
 #include <sync/spinlock.h>
 
 #include <console.h>
+#include <errors.h>
+#include <fatal.h>
+#include <init.h>
 #include <kdbg.h>
 #include <types.h>
 
@@ -220,3 +228,77 @@ int kdbg_cmd_log(int argc, char **argv) {
 	}
 	return KDBG_OK;
 }
+
+/** Write to the kernel console device.
+ * @param device	Device to write to.
+ * @param data		Handle-specific data pointer.
+ * @param buf		Buffer containing data to write.
+ * @param count		Number of bytes to write.
+ * @param offset	Unused.
+ * @param bytesp	Where to store number of bytes written.
+ * @return		0 on success, negative error code on failure. */
+static int kconsole_device_write(device_t *device, void *data, const void *buf, size_t count,
+                                 offset_t offset, size_t *bytesp) {
+	const char *str = buf;
+	size_t i;
+
+	spinlock_lock(&console_lock);
+	for(i = 0; i < count; i++) {
+		console_putch_unlocked(LOG_NONE, str[i]);
+	}
+	spinlock_unlock(&console_lock);
+
+	*bytesp = count;
+	return 0;
+}
+
+/** Handler for kernel console device requests.
+ * @param device	Device request is being made on.
+ * @param data		Handle specific data pointer.
+ * @param request	Request number.
+ * @param in		Input buffer.
+ * @param insz		Input buffer size.
+ * @param outp		Where to store pointer to output buffer.
+ * @param outszp	Where to store output buffer size.
+ * @return		Positive value on success, negative error code on
+ *			failure. */
+static int kconsole_device_request(device_t *device, void *data, int request, void *in,
+                                   size_t insz, void **outp, size_t *outszp) {
+	switch(request) {
+	case KCONSOLE_GET_LOG_SIZE:
+		return CONFIG_KLOG_SIZE;
+	case KCONSOLE_READ_LOG:
+		return -ERR_NOT_IMPLEMENTED;
+	case KCONSOLE_CLEAR_LOG:
+		spinlock_lock(&console_lock);
+		klog_start = klog_length = 0;
+		spinlock_unlock(&console_lock);
+		return 0;
+	case KCONSOLE_UPDATE_PROGRESS:
+		if(insz != sizeof(int)) {
+			return -ERR_PARAM_INVAL;
+		}
+
+		console_update_boot_progress(*(int *)in);
+		return 0;
+	default:
+		return -ERR_PARAM_INVAL;
+	}
+}
+
+/** Kernel console device operations structure. */
+static device_ops_t kconsole_device_ops = {
+	.write = kconsole_device_write,
+	.request = kconsole_device_request,
+};
+
+/** Register the kernel console device. */
+static void __init_text kconsole_device_init(void) {
+	int ret;
+
+	if((ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
+	                        NULL, NULL, 0, NULL)) < 0) {
+		fatal("Failed to register kernel console device (%d)", ret);
+	}
+}
+INITCALL(kconsole_device_init);

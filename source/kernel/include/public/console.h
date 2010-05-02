@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,24 +15,16 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		Kernel console device request types.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#ifndef __KERNEL_CONSOLE_H
+#define __KERNEL_CONSOLE_H
 
-#include <kernel/process.h>
+/** Request types for the kernel console device. */
+#define KCONSOLE_GET_LOG_SIZE		32	/**< Get the size of the log buffer. */
+#define KCONSOLE_READ_LOG		33	/**< Read the log buffer. */
+#define KCONSOLE_CLEAR_LOG		34	/**< Clear the log buffer. */
+#define KCONSOLE_UPDATE_PROGRESS	35	/**< Update the boot progress bar. */
 
-#define __need_size_t
-#define __need_NULL
-#include <stddef.h>
-
-extern char **environ;
-
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
-
-extern int main(int argc, char **argv, char **envp);
-
-#endif /* __LIBSYSTEM_H */
+#endif /* __KERNEL_CONSOLE_H */

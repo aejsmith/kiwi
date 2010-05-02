@@ -92,7 +92,12 @@ static int device_object_mappable(khandle_t *handle, int flags) {
 		return -ERR_NOT_SUPPORTED;
 	}
 
-	return (device->ops->get_page) ? 0 : -ERR_NOT_SUPPORTED;
+	if(device->ops->mappable) {
+		assert(device->ops->get_page);
+		return device->ops->mappable(device, handle->data, flags);
+	} else {
+		return (device->ops->get_page) ? 0 : -ERR_NOT_SUPPORTED;
+	}
 }
 
 /** Get a page from a device.
@@ -139,7 +144,7 @@ static object_type_t device_object_type = {
  * @param attrs		Optional array of attributes for the device (will be
  *			duplicated).
  * @param count		Number of attributes.
- * @param devicep	Where to store pointer to device structure.
+ * @param devicep	Where to store pointer to device structure (can be NULL).
  *
  * @return		0 on success, negative error code on failure.
  */
@@ -149,7 +154,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	size_t i;
 	int ret;
 
-	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest || !devicep) {
+	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest) {
 		return -ERR_PARAM_INVAL;
 	}
 
@@ -208,7 +213,9 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 
 	dprintf("device: created device %p(%s) under %p(%s) (ops: %p, data: %p)\n",
 	        device, device->name, parent, parent->name, ops, data);
-	*devicep = device;
+	if(devicep) {
+		*devicep = device;
+	}
 	return 0;
 fail:
 	if(device) {
@@ -228,7 +235,7 @@ fail:
  * @param name		Name to give alias.
  * @param parent	Device to create alias under.
  * @param dest		Destination device.
- * @param devicep	Where to store pointer to alias structure.
+ * @param devicep	Where to store pointer to alias structure (can be NULL).
  *
  * @return		0 on success, negative error code on failure. Can only
  *			fail if device name already exists.
@@ -236,7 +243,7 @@ fail:
 int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
 	device_t *device;
 
-	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest || !devicep) {
+	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
 		return -ERR_PARAM_INVAL;
 	}
 
@@ -268,7 +275,9 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 
 	dprintf("device: created alias %p(%s) under %p(%s) (dest: %p)\n",
 	        device, device->name, parent, parent->name, dest);
-	*devicep = device;
+	if(devicep) {
+		*devicep = device;
+	}
 	return 0;
 }
 
@@ -374,6 +383,8 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
  *
  * @param path		Path to device.
  * @param devicep	Where to store pointer to device structure.
+ *
+ * @return		0 on success, negative error code on failure.
  */
 int device_lookup(const char *path, device_t **devicep) {
 	device_t *device = device_tree_root, *child;
@@ -689,7 +700,7 @@ int kdbg_cmd_device(int argc, char **argv) {
 }
 
 /** Initialise the device manager. */
-static void __init_text device_init(void) {
+void __init_text device_init(void) {
 	device_tree_root = kcalloc(1, sizeof(device_t), MM_FATAL);
 	mutex_init(&device_tree_root->lock, "device_root_lock", 0);
 	refcount_set(&device_tree_root->count, 0);
@@ -700,7 +711,6 @@ static void __init_text device_init(void) {
 		fatal("Could not create bus directory in device tree");
 	}
 }
-INITCALL(device_init);
 
 /** Open a handle to a device.
  *

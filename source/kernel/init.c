@@ -22,6 +22,7 @@
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
 
+#include <io/device.h>
 #include <io/fs.h>
 
 #include <lib/string.h>
@@ -279,7 +280,8 @@ static void init_thread(void *args, void *arg2) {
 	initcall_t *initcall;
 	int ret;
 
-	/* Bring up the filesystem. */
+	/* Bring up the filesystem manager and device manager. */
+	device_init();
 	fs_init();
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their

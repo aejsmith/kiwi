@@ -18,6 +18,9 @@
  * @brief		RTLD utility functions.
  */
 
+#include <kernel/device.h>
+#include <kernel/fs.h>
+#include <kernel/object.h>
 #include <kernel/vm.h>
 
 #include <stdarg.h>
@@ -27,10 +30,11 @@
 #include "args.h"
 #include "utility.h"
 
-extern int putch(char ch);
-
 /** Size of the statically allocated heap. */
 #define RTLD_HEAP_SIZE		16384
+
+/** Output handle to use (stderr). */
+#define OUTPUT_HANDLE		2
 
 static uint8_t rtld_heap[RTLD_HEAP_SIZE];
 static size_t rtld_heap_current = 0;
@@ -253,13 +257,29 @@ char *strsep(char **stringp, const char *delim) {
 	}
 }
 
+/** Print a character.
+ * @param ch		Character to print. */
+static inline void printf_print_char(char ch) {
+	switch(object_type(OUTPUT_HANDLE)) {
+	case OBJECT_TYPE_DEVICE:
+		device_write(OUTPUT_HANDLE, &ch, 1, 0, NULL);
+		break;
+	case OBJECT_TYPE_FILE:
+		fs_file_write(OUTPUT_HANDLE, &ch, 1, NULL);
+		break;
+	}
+}
+
 /** Print a string.
  * @param str		String to print. */
 static inline void printf_print_string(const char *str) {
-	size_t i, len = strlen(str);
-
-	for(i = 0; i < len; i++) {
-		putch(str[i]);
+	switch(object_type(OUTPUT_HANDLE)) {
+	case OBJECT_TYPE_DEVICE:
+		device_write(OUTPUT_HANDLE, str, strlen(str), 0, NULL);
+		break;
+	case OBJECT_TYPE_FILE:
+		fs_file_write(OUTPUT_HANDLE, str, strlen(str), NULL);
+		break;
 	}
 }
 
@@ -313,12 +333,12 @@ static void do_printf(const char *format, va_list args) {
 				state = 1;
 				break;
 			}
-			putch(format[0]);
+			printf_print_char(format[0]);
 			break;
 		case 1:
 			/* Handle literal %. */
 			if(*format == '%') {
-				putch('%');
+				printf_print_char('%');
 				state = 0;
 				break;
 			}
