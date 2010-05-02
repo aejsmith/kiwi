@@ -315,6 +315,11 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 	fb_console_rows = height / FONT_HEIGHT;
 	fb_console_x = fb_console_y = 0;
 
+	/* Disable the splash screen so that the new framebuffer doesn't end
+	 * up with a progress bar on it if something in userspace tries to
+	 * update the boot progress. */
+	splash_enabled = false;
+
 	//spinlock_unlock(&fb_console_lock);
 
 	/* Free the old mapping/buffer if necessary. */
