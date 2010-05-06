@@ -27,4 +27,5 @@ SConscript(dirs=[
 	'libm',
 	'libstdc++',
 	'libkiwi',
+	'rtld',
 ], exports=['env'])

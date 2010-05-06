@@ -42,8 +42,8 @@ diff -urN gcc-4.5.0.orig/gcc/config/i386/kiwi32.h gcc-4.5.0/gcc/config/i386/kiwi
 +  %{!shared: \
 +    %{!static: \
 +      %{rdynamic:-export-dynamic} \
-+      %{m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
-+      %{!m64:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
++      %{m64:%{!dynamic-linker:-dynamic-linker /system/libraries/rtld-amd64}}} \
++      %{!m64:%{!dynamic-linker:-dynamic-linker /system/libraries/rtld-ia32}} \
 +    %{static:-static}}"
 diff -urN gcc-4.5.0.orig/gcc/config/i386/kiwi64.h gcc-4.5.0/gcc/config/i386/kiwi64.h
 --- gcc-4.5.0.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
@@ -77,8 +77,8 @@ diff -urN gcc-4.5.0.orig/gcc/config/i386/kiwi64.h gcc-4.5.0/gcc/config/i386/kiwi
 +  %{!shared: \
 +    %{!static: \
 +      %{rdynamic:-export-dynamic} \
-+      %{!m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-amd64}}} \
-+      %{m32:%{!dynamic-linker:-dynamic-linker /system/binaries/rtld-ia32}} \
++      %{!m32:%{!dynamic-linker:-dynamic-linker /system/libraries/rtld-amd64}}} \
++      %{m32:%{!dynamic-linker:-dynamic-linker /system/libraries/rtld-ia32}} \
 +    %{static:-static}}"
 diff -urN gcc-4.5.0.orig/gcc/config/i386/t-kiwi64 gcc-4.5.0/gcc/config/i386/t-kiwi64
 --- gcc-4.5.0.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100

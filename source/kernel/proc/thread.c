@@ -594,7 +594,7 @@ void __init_text thread_init(void) {
 void __init_text thread_reaper_init(void) {
 	thread_t *thread;
 
-	if(thread_create("reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread) != 0) {
+	if(thread_create("thread_reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread) != 0) {
 		fatal("Could not create thread reaper");
 	}
 	thread_run(thread);

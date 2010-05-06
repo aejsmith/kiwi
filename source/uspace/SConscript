@@ -45,12 +45,13 @@ env.Append(SHLIBEMITTER=[shlib_emitter])
 # up library dependencies for compiler default libraries (SCons doesn't pick
 # these up).
 def program_emitter(target, source, env):
-	# Hack.
-	if target[0].get_dir().get_dir().name == 'services':
-		dist['SERVICES'].append(target[0])
+	if target[0].name == 'rtld-%s' % (config['ARCH']):
+		dist['LIBRARIES'].append(target[0])
 	else:
-		dist['BINARIES'].append(target[0])
-	if target[0].name != 'rtld-%s' % (config['ARCH']):
+		if target[0].get_dir().get_dir().name == 'services':
+			dist['SERVICES'].append(target[0])
+		else:
+			dist['BINARIES'].append(target[0])
 		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
 		if env['SMARTLINK'](source, target, env, None) == '$CXX':
 			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
