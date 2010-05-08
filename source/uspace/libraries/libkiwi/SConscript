@@ -20,5 +20,4 @@ env.SharedLibrary('kiwi', [
 	'IPCPort.cc',
 	'Object.cc',
 	'Process.cc',
-	'Signal.cc',
 ], LIBS=['stdc++'])

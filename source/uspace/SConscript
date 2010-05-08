@@ -21,6 +21,7 @@ env['CPPPATH'] = [Dir('include')]
 env['LIBPATH'] = [Dir('libraries')]
 env['ASFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
 env['CCFLAGS'] += ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])]
+env['CXXFLAGS'] += ['-std=c++0x']
 
 # Set the directory that we want all libraries to be placed in.
 env['LIBOUTDIR'] = Dir('libraries')
