@@ -135,10 +135,12 @@ void InputDevice::_EventReceived(int event) {
 		ch = m_keymap[code];
 	}
 
-	Console::GetActive()->Output(ch);
-	if(ch == '\b') {
-		Console::GetActive()->Output(' ');
-		Console::GetActive()->Output('\b');
+	if(ch) {
+		Console::GetActive()->Output(ch);
+		if(ch == '\b') {
+			Console::GetActive()->Output(' ');
+			Console::GetActive()->Output('\b');
+		}
+		Console::GetActive()->Input(ch);
 	}
-	Console::GetActive()->Input(ch);
 }
