@@ -21,9 +21,8 @@
 #include <arch/intr.h>
 #include <arch/syscall.h>
 
-#include <proc/syscall.h>
-
 #include <fatal.h>
+#include <syscall.h>
 
 /** System call handler function.
  * @param num		Interrupt number.

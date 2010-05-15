@@ -54,7 +54,6 @@ sources = map(File, [
 
 	'proc/process.c',
 	'proc/sched.c',
-	'proc/syscall.c',
 	'proc/thread.c',
 
 	'sync/condvar.c',
@@ -71,6 +70,7 @@ sources = map(File, [
 	'module.c',
 	'object.c',
 	'symbol.c',
+	'syscall.c',
 	'time.c',
 	'version.c',
 	'vmem.c',

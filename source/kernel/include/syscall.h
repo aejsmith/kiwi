@@ -18,8 +18,8 @@
  * @brief		System call dispatcher.
  */
 
-#ifndef __PROC_SYSCALL_H
-#define __PROC_SYSCALL_H
+#ifndef __SYSCALL_H
+#define __SYSCALL_H
 
 #include <types.h>
 
@@ -37,4 +37,4 @@ typedef struct syscall_service {
 extern unative_t syscall_handler(struct syscall_frame *frame);
 extern int syscall_service_register(uint16_t num, syscall_service_t *service);
 
-#endif /* __PROC_SYSCALL_H */
+#endif /* __SYSCALL_H */

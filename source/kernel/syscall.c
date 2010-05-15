@@ -26,7 +26,6 @@
 #include <mm/malloc.h>
 
 #include <proc/process.h>
-#include <proc/syscall.h>
 #include <proc/thread.h>
 
 #include <public/device.h>
@@ -43,6 +42,7 @@
 #include <fatal.h>
 #include <module.h>
 #include <symbol.h>
+#include <syscall.h>
 #include <time.h>
 
 /** Array of system call services. */
