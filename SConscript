@@ -61,6 +61,10 @@ def fs_image_func(target, source, env):
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
 
+	# Copy extras.
+	if len(config['EXTRA_FSIMAGE']) > 0:
+		os.system('cp -R ' + os.path.join(config['EXTRA_FSIMAGE'], '*') + ' ' + tmpdir)
+
 	# Create the TAR file.
 	tar = tarfile.open(str(target[0]), 'w')
 	cwd = os.getcwd()

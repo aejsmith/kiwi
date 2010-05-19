@@ -26,6 +26,8 @@ Option('TOOLCHAIN_DIR', 'Directory to store toolchain builds in.', '/please/chan
 Option('TOOLCHAIN_MAKE_JOBS', 'Argument to pass to -j for make when building toolchain.', 1)
 Option('USE_CLANG', 'Use Clang/LLVM to build the kernel.', False)
 
+Option('EXTRA_FSIMAGE', 'Path to a directory containing extra FS image files.', '')
+
 #######
 Section('Architecture selection')
 #######
