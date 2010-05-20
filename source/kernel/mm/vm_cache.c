@@ -474,7 +474,7 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 	/* Shrink the cache if the new size is smaller. If any pages are in use
 	 * they will get freed once they are released. */
 	if(size < cache->size) {
-		AVL_TREE_FOREACH(&cache->pages, iter) {
+		AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
 			if(page->offset >= size && refcount_get(&page->count) == 0) {
@@ -563,7 +563,7 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
 	cache->deleted = true;
 
 	/* Free all pages. */
-	AVL_TREE_FOREACH(&cache->pages, iter) {
+	AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
 		page = avl_tree_entry(iter, vm_page_t);
 
 		if(refcount_get(&page->count) != 0) {
