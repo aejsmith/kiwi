@@ -17,7 +17,7 @@ subdirs = ['fs', 'platform']
 # Build environment set-up. #
 #############################
 
-Import('envmgr')
+Import('config', 'envmgr')
 
 # Create the module environment.
 env = envmgr.Clone('module', 'kernel', {
@@ -25,6 +25,11 @@ env = envmgr.Clone('module', 'kernel', {
 	'CCFLAGS': ['-fno-common'],
 	'LINKFLAGS': ['-r'],
 })
+
+# Drop link-time optimisation flags.
+if config['USE_LTO']:
+	env['CCFLAGS'].remove('-flto')
+	env['LINKFLAGS'].remove('-flto')
 
 # Not sure if this is the right way to do this (add any modules to the module
 # list in the environment), but an emitter seems to work...
