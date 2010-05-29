@@ -36,7 +36,7 @@ class Handle : public Object, internal::Noncopyable {
 public:
 	virtual ~Handle();
 
-	virtual bool close();
+	virtual void close();
 	bool wait(int event, useconds_t timeout = -1) const;
 	handle_t getHandle(void) const;
 

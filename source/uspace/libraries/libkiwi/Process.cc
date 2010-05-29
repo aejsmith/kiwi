@@ -61,9 +61,7 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 	char *cur, *next;
 	size_t len;
 
-	if(!close()) {
-		return false;
-	}
+	close();
 
 	if(usepath && !strchr(args[0], '/')) {
 		if(!(path = getenv("PATH"))) {
@@ -164,9 +162,9 @@ bool Process::create(const char *cmdline, const char *const env[], bool usepath)
  * @param id		ID of the process to open.
  * @return		True on success, false on failure. */
 bool Process::open(process_id_t id) {
-	if(!close()) {
-		return false;
-	} else if((m_handle = process_open(id)) < 0) {
+	close();
+
+	if((m_handle = process_open(id)) < 0) {
 		return false;
 	}
 

@@ -47,9 +47,9 @@ IPCPort::IPCPort(handle_t handle) : Handle(handle) {
  * @return		Whether creation was successful.
  */
 bool IPCPort::create() {
-	if(!close()) {
-		return false;
-	} else if((m_handle = ipc_port_create()) < 0) {
+	close();
+
+	if((m_handle = ipc_port_create()) < 0) {
 		return false;
 	}
 
@@ -69,14 +69,14 @@ bool IPCPort::create() {
  * @return		Whether creation was successful.
  */
 bool IPCPort::open(port_id_t id) {
-	if(!close()) {
-		return false;
-	} else if((m_handle = ipc_port_open(id)) >= 0) {
-		registerEvent(PORT_EVENT_CONNECTION);
-		return true;
-	} else {
+	close();
+
+	if((m_handle = ipc_port_open(id)) < 0) {
 		return false;
 	}
+
+	registerEvent(PORT_EVENT_CONNECTION);
+	return true;
 }
 
 /** Register the port with the service manager.

@@ -39,23 +39,22 @@ Handle::~Handle() {
 	close();
 }
 
-/** Close the handle.
- * @return		True on success, false on failure. */
-bool Handle::close() {
-	bool ret = true;
-
+/** Close the handle. */
+void Handle::close() {
 	if(m_handle >= 0) {
 		onClose(this);
 
-		if(handle_close(m_handle) == 0) {
-			m_handle = -1;
-		} else {
-			cerr << "Warning: Failed to close handle " << m_handle << " (" << ret << ')' << endl;
-			ret = false;
+		if(handle_close(m_handle) != 0) {
+			/* The only reason for failure in handle_close is the
+			 * handle not existing. Therefore, if we fail, it means
+			 * the programmer has done something funny so we just
+			 * throw up a warning and act as though it has already
+			 * been closed. */
+			cerr << "Warning: Handle " << m_handle << " has already been closed" << endl;
 		}
-	}
 
-	return ret;
+		m_handle = -1;
+	}
 }
 
 /** Wait for an event on the object referred to by the handle.

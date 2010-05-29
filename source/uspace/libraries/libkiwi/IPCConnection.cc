@@ -51,15 +51,15 @@ IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
  * @return		Whether creation was successful.
  */
 bool IPCConnection::connect(port_id_t id) {
-	if(!close()) {
-		return false;
-	} else if((m_handle = ipc_connection_open(id)) >= 0) {
-		registerEvent(CONNECTION_EVENT_HANGUP);
-		registerEvent(CONNECTION_EVENT_MESSAGE);
-		return true;
-	} else {
+	close();
+
+	if((m_handle = ipc_connection_open(id)) < 0) {
 		return false;
 	}
+
+	registerEvent(CONNECTION_EVENT_HANGUP);
+	registerEvent(CONNECTION_EVENT_MESSAGE);
+	return true;
 }
 
 /** Connect to a port.
