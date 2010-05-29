@@ -30,23 +30,23 @@ Service::Service(const char *name, const char *description, const char *cmdline,
 	m_name(name), m_description(description), m_cmdline(cmdline),
 	m_flags(flags), m_state(Stopped)
 {
-	m_process.OnExit.Connect(this, &Service::_ProcessExited);
+	m_process.onExit.connect(this, &Service::processExited);
 }
 
 /** Add a port name to the service.
  * @note		Ports should not be added after the service has been
  *			added to the service manager.
  * @param name		Port name. */
-void Service::AddPort(const char *name) {
+void Service::addPort(const char *name) {
 	m_ports.push_back(name);
 }
 
 /** Start the service.
  * @return		Whether successful. */
-bool Service::Start() {
+bool Service::start() {
 	if(m_state == Running) {
 		return true;
-	} else if(!m_process.Create(m_cmdline.c_str())) {
+	} else if(!m_process.create(m_cmdline.c_str())) {
 		cerr << "svcmgr: failed to start service '" << m_name << "'" << endl;
 		return false;
 	}
@@ -57,9 +57,9 @@ bool Service::Start() {
 
 /** Slot for the process exiting.
  * @param status	Exit status of the process. */
-void Service::_ProcessExited(Process *, int status) {
+void Service::processExited(Process *, int status) {
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
-	m_process.Close();
+	m_process.close();
 	m_state = Stopped;
-	OnStop();
+	onStop();
 }

@@ -44,24 +44,24 @@ public:
 	};
 
 	Service(const char *name, const char *description, const char *cmdline, int flags = 0);
-	void AddPort(const char *name);
-	bool Start();
+	void addPort(const char *name);
+	bool start();
 
 	/** Get the service's flags.
 	 * @return		Behaviour flags for the service. */
-	int GetFlags() const { return m_flags; }
+	int getFlags() const { return m_flags; }
 
 	/** Get the service's state.
 	 * @return		State of the service. */
-	State GetState() const { return m_state; }
+	State getState() const { return m_state; }
 
 	/** Get a reference to the port list.
 	 * @return		Reference to the port list. */
-	const PortList &GetPorts() const { return m_ports; }
+	const PortList &getPorts() const { return m_ports; }
 
-	kiwi::Signal<> OnStop;
+	kiwi::Signal<> onStop;
 private:
-	void _ProcessExited(kiwi::Process *, int status);
+	void processExited(kiwi::Process *, int status);
 
 	std::string m_name;		/**< Name of the service. */
 	std::string m_description;	/**< Description of the service. */

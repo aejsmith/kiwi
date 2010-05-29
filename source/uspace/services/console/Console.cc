@@ -82,7 +82,7 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	ToggleCursor();
 
 	/* Register the console with the event loop. */
-	_RegisterEvent(DEVICE_EVENT_READABLE);
+	registerEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Destructor for the console. */
@@ -299,7 +299,7 @@ void Console::ScrollDown(void) {
 
 /** Event callback function.
  * @param event		Event number received. */
-void Console::_EventReceived(int event) {
+void Console::eventReceived(int event) {
 	unsigned char ch;
 	size_t bytes;
 	int ret;

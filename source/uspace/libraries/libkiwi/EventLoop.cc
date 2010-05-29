@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -44,18 +44,18 @@ EventLoop::EventLoop() {
 /** Add a handle to the event loop.
  * @param handle	Handle to use.
  * @param event		Event to wait for on the handle. */
-void EventLoop::AddHandle(Handle *handle, int event) {
+void EventLoop::addHandle(Handle *handle, int event) {
 	m_handles.push_back(handle);
-	m_ids.push_back(handle->GetHandleID());
+	m_ids.push_back(handle->getHandle());
 	m_events.push_back(event);
 
-	handle->OnClose.Connect(this, &EventLoop::_HandleClosed);
+	handle->onClose.connect(this, &EventLoop::_handleClosed);
 }
 
 /** Remove a handle from the event loop.
  * @param handle	Handle to remove.
  * @param event		Event that should be removed. */
-void EventLoop::RemoveHandle(Handle *handle, int event) {
+void EventLoop::removeHandle(Handle *handle, int event) {
 	vector<Handle *>::iterator it;
 	size_t i;
 
@@ -70,12 +70,12 @@ void EventLoop::RemoveHandle(Handle *handle, int event) {
 
 /** Register an object to be deleted when control returns to the event loop.
  * @param obj		Object to delete. */
-void EventLoop::DeleteObject(Object *obj) {
+void EventLoop::deleteObject(Object *obj) {
 	m_to_delete.push_back(obj);
 }
 
 /** Run the event loop. */
-void EventLoop::Run(void) {
+void EventLoop::run(void) {
 	list<Object *>::iterator it;
 	int ret;
 
@@ -91,12 +91,12 @@ void EventLoop::Run(void) {
 			return;
 		}
 
-		m_handles[ret]->_EventReceived(m_events[ret]);
+		m_handles[ret]->eventReceived(m_events[ret]);
 	}
 }
 
 /** Removes all events registered to a handle being closed. */
-void EventLoop::_HandleClosed(Handle *handle) {
+void EventLoop::_handleClosed(Handle *handle) {
 	vector<Handle *>::iterator it;
 	size_t i;
 

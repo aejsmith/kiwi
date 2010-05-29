@@ -31,12 +31,12 @@
 class Port {
 public:
 	Port(Service *service);
-	bool SetID(port_id_t id);
-	void SendID(kiwi::IPCConnection *conn);
+	bool setID(port_id_t id);
+	void sendID(kiwi::IPCConnection *conn);
 private:
-	void _ServiceStopped();
+	void serviceStopped();
 
-	port_id_t m_id;		/**< Port ID. */
+	port_id_t m_id;			/**< Port ID. */
 	Service *m_service;		/**< Service managing the port. */
 
 	/** List of connections waiting for the port to be registered. */

@@ -32,60 +32,60 @@ using namespace std;
 
 /** Service manager constructor. */
 ServiceManager::ServiceManager() {
-	m_port.OnConnection.Connect(this, &ServiceManager::_HandleConnection);
+	m_port.onConnection.connect(this, &ServiceManager::handleConnection);
 
 	/* Create the port. TODO: Per-user instance. */
-	if(!m_port.Create()) {
+	if(!m_port.create()) {
 		cerr << "svcmgr: could not create port" << endl;
 		throw exception();
-	} else if(m_port.GetID() != 1) {
-		cerr << "svcmgr: created port (" << m_port.GetID() << ") is not port 1" << endl;
+	} else if(m_port.getID() != 1) {
+		cerr << "svcmgr: created port (" << m_port.getID() << ") is not port 1" << endl;
 		throw exception();
 	}
 }
 
 /** Add a service to the service manager.
  * @param service	Service to add. */
-void ServiceManager::AddService(Service *service) {
+void ServiceManager::addService(Service *service) {
 	Service::PortList::const_iterator it;
 
 	/* Register ports. */
-	for(it = service->GetPorts().begin(); it != service->GetPorts().end(); ++it) {
+	for(it = service->getPorts().begin(); it != service->getPorts().end(); ++it) {
 		m_ports.insert(make_pair(*it, new Port(service)));
 	}
 
-	if(!(service->GetFlags() & Service::OnDemand)) {
-		service->Start();
+	if(!(service->getFlags() & Service::OnDemand)) {
+		service->start();
 	}
 }
 
 /** Look up a port name in the port map.
  * @param name		Name to look up.
  * @return		Pointer to port object if found, 0 if not. */
-Port *ServiceManager::LookupPort(const char *name) {
+Port *ServiceManager::lookupPort(const char *name) {
 	PortMap::iterator it = m_ports.find(name);
 	return (it != m_ports.end()) ? it->second : 0;
 }
 
 /** Handle a connection on the service manager port. */
-void ServiceManager::_HandleConnection(IPCPort *) {
+void ServiceManager::handleConnection(IPCPort *) {
 	IPCConnection *conn;
 
-	if((conn = m_port.Listen())) {
-		conn->OnMessage.Connect(this, &ServiceManager::_HandleMessage); 
-		conn->OnHangup.Connect(this, &ServiceManager::_HandleHangup);
+	if((conn = m_port.listen())) {
+		conn->onMessage.connect(this, &ServiceManager::handleMessage); 
+		conn->onHangup.connect(this, &ServiceManager::handleHangup);
 	}
 }
 
 /** Handle a message on a connection to the service manager.
  * @param conn		Connection object. */
-void ServiceManager::_HandleMessage(IPCConnection *conn) {
+void ServiceManager::handleMessage(IPCConnection *conn) {
 	uint32_t type;
 	size_t size;
 	Port *port;
 	char *data;
 
-	if(!conn->Receive(type, data, size)) {
+	if(!conn->receive(type, data, size)) {
 		return;
 	}
 
@@ -93,11 +93,11 @@ void ServiceManager::_HandleMessage(IPCConnection *conn) {
 	case SVCMGR_LOOKUP_PORT:
 	{
 		string name(data, size);
-		if((port = LookupPort(name.c_str()))) {
-			port->SendID(conn);
+		if((port = lookupPort(name.c_str()))) {
+			port->sendID(conn);
 		} else {
 			port_id_t ret = -ERR_NOT_FOUND;
-			conn->Send(type, &ret, sizeof(ret));
+			conn->send(type, &ret, sizeof(ret));
 		}
 		break;
 	}
@@ -108,8 +108,8 @@ void ServiceManager::_HandleMessage(IPCConnection *conn) {
 
 		if(size > sizeof(svcmgr_register_port_t) && args->id > 0) {
 			string name(args->name, size - sizeof(svcmgr_register_port_t));
-			if((port = LookupPort(name.c_str()))) {
-				if(!port->SetID(args->id)) {
+			if((port = lookupPort(name.c_str()))) {
+				if(!port->setID(args->id)) {
 					ret = -ERR_PERM_DENIED;
 				}
 			} else {
@@ -119,7 +119,7 @@ void ServiceManager::_HandleMessage(IPCConnection *conn) {
 			ret = -ERR_PARAM_INVAL;
 		}
 
-		conn->Send(type, &ret, sizeof(ret));
+		conn->send(type, &ret, sizeof(ret));
 		break;
 	}
 	default:
@@ -132,6 +132,6 @@ void ServiceManager::_HandleMessage(IPCConnection *conn) {
 
 /** Handle the connection being hung up.
  * @param conn		Connection object. */
-void ServiceManager::_HandleHangup(IPCConnection *conn) {
-	conn->DeleteLater();
+void ServiceManager::handleHangup(IPCConnection *conn) {
+	conn->deleteLater();
 }

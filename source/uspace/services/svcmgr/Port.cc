@@ -30,17 +30,17 @@ using namespace std;
 
 /** Constructor for a port. */
 Port::Port(Service *service) : m_id(-1), m_service(service) {
-	service->OnStop.Connect(this, &Port::_ServiceStopped);
+	service->onStop.connect(this, &Port::serviceStopped);
 }
 
 /** Set the ID of a port.
  * @param id		New ID.
  * @return		Whether successful. */
-bool Port::SetID(port_id_t id) {
+bool Port::setID(port_id_t id) {
 	list<IPCConnection *>::iterator it;
 	IPCConnection *conn;
 
-	if(m_service->GetState() != Service::Running) {
+	if(m_service->getState() != Service::Running) {
 		return false;
 	}
 
@@ -52,7 +52,7 @@ bool Port::SetID(port_id_t id) {
 	while((it = m_waiting.begin()) != m_waiting.end()) {
 		conn = *it;
 		m_waiting.erase(it);
-		SendID(conn);
+		sendID(conn);
 	}
 
 	return true;
@@ -61,14 +61,14 @@ bool Port::SetID(port_id_t id) {
 /** Send the ID of a port on a connection.
  * @note		The ID may not be sent immediately if the service
  *			needs to be started. */
-void Port::SendID(IPCConnection *conn) {
+void Port::sendID(IPCConnection *conn) {
 	if(m_id >= 0) {
-		conn->Send(SVCMGR_LOOKUP_PORT, &m_id, sizeof(m_id));
+		conn->send(SVCMGR_LOOKUP_PORT, &m_id, sizeof(m_id));
 	} else {
 		/* Start it and wait for the port to be registered. */
-		if(m_service->GetState() != Service::Running && !m_service->Start()) {
+		if(m_service->getState() != Service::Running && !m_service->start()) {
 			port_id_t ret = -ERR_RESOURCE_UNAVAIL;
-			conn->Send(SVCMGR_LOOKUP_PORT, &ret, sizeof(ret));
+			conn->send(SVCMGR_LOOKUP_PORT, &ret, sizeof(ret));
 		} else {
 			m_waiting.push_back(conn);
 		}
@@ -76,6 +76,6 @@ void Port::SendID(IPCConnection *conn) {
 }
 
 /** Handle the service stopping. */
-void Port::_ServiceStopped() {
+void Port::serviceStopped() {
 	m_id = -1;
 }

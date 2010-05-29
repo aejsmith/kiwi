@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -40,7 +40,7 @@ extern char **environ;
  *			not refer to a handle). */
 Process::Process(handle_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
-		_RegisterEvent(PROCESS_EVENT_DEATH);
+		registerEvent(PROCESS_EVENT_DEATH);
 	}
 }
 
@@ -55,13 +55,13 @@ Process::Process(handle_t handle) : Handle(handle) {
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
  * @return		True on success, false on failure. */
-bool Process::Create(const char *const args[], const char *const env[], bool usepath) {
+bool Process::create(const char *const args[], const char *const env[], bool usepath) {
 	char buf[PATH_MAX];
 	const char *path;
 	char *cur, *next;
 	size_t len;
 
-	if(!Close()) {
+	if(!close()) {
 		return false;
 	}
 
@@ -113,7 +113,7 @@ bool Process::Create(const char *const args[], const char *const env[], bool use
 		}
 	}
 success:
-	_RegisterEvent(PROCESS_EVENT_DEATH);
+	registerEvent(PROCESS_EVENT_DEATH);
 	return true;
 }
 
@@ -129,7 +129,7 @@ success:
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
  * @return		True on success, false on failure. */
-bool Process::Create(const char *cmdline, const char *const env[], bool usepath) {
+bool Process::create(const char *cmdline, const char *const env[], bool usepath) {
 	char *tok, *dup, *orig;
 	vector<char *> args;
 	bool ret;
@@ -155,7 +155,7 @@ bool Process::Create(const char *cmdline, const char *const env[], bool usepath)
 	/* Null-terminate the array. */
 	args.push_back(0);
 
-	ret = Create(&args[0], env, usepath);
+	ret = create(&args[0], env, usepath);
 	free(orig);
 	return ret;
 }
@@ -163,14 +163,14 @@ bool Process::Create(const char *cmdline, const char *const env[], bool usepath)
 /** Open an existing process.
  * @param id		ID of the process to open.
  * @return		True on success, false on failure. */
-bool Process::Open(process_id_t id) {
-	if(!Close()) {
+bool Process::open(process_id_t id) {
+	if(!close()) {
 		return false;
 	} else if((m_handle = process_open(id)) < 0) {
 		return false;
 	}
 
-	_RegisterEvent(PROCESS_EVENT_DEATH);
+	registerEvent(PROCESS_EVENT_DEATH);
 	return true;
 }
 
@@ -180,33 +180,32 @@ bool Process::Open(process_id_t id) {
  *			terminated, and a value of -1 (the default) will block
  *			indefinitely until the process terminates.
  * @return		True on success, false on failure. */
-bool Process::WaitTerminate(useconds_t timeout) const {
-	return Wait(PROCESS_EVENT_DEATH, timeout);
+bool Process::waitTerminate(useconds_t timeout) const {
+	return wait(PROCESS_EVENT_DEATH, timeout);
 }
 
 /** Get the ID of the process.
  * @return		ID of the process. */
-process_id_t Process::GetID(void) const {
+process_id_t Process::getID(void) const {
 	return process_id(m_handle);
 }
 
 /** Get the ID of the current process.
  * @return		ID of the current process. */
-process_id_t Process::GetCurrentID(void) {
+process_id_t Process::getCurrentID(void) {
 	return process_id(-1);
 }
 
 /** Callback for an object event being received.
  * @param event		Event ID received. */
-void Process::_EventReceived(int event) {
-	switch(event) {
-	case PROCESS_EVENT_DEATH:
-		/* FIXME: Get status. */
-		OnExit(this, 0);
+void Process::eventReceived(int event) {
+	if(event == PROCESS_EVENT_DEATH) {
+		int status;
+		process_status(m_handle, &status);
+		onExit(this, status);
 
 		/* Unregister the death event so that it doesn't continually
 		 * get signalled. */
-		_UnregisterEvent(PROCESS_EVENT_DEATH);
-		break;
+		unregisterEvent(PROCESS_EVENT_DEATH);
 	}
 }

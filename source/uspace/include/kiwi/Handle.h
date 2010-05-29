@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,23 +31,22 @@ namespace kiwi {
 class EventLoop;
 
 /** Base class for all objects accessed through a handle. */
-class Handle : public Object {
-	KIWI_OBJECT_NONCOPYABLE(Handle);
+class Handle : public Object, internal::Noncopyable {
 	friend class EventLoop;
 public:
 	virtual ~Handle();
 
-	virtual bool Close();
-	bool Wait(int event, useconds_t timeout = -1) const;
-	handle_t GetHandleID(void) const;
+	virtual bool close();
+	bool wait(int event, useconds_t timeout = -1) const;
+	handle_t getHandle(void) const;
 
-	Signal<Handle *> OnClose;
+	Signal<Handle *> onClose;
 protected:
 	Handle(handle_t handle = -1);
 
-	void _RegisterEvent(int event);
-	void _UnregisterEvent(int event);
-	virtual void _EventReceived(int id) = 0;
+	void registerEvent(int event);
+	void unregisterEvent(int event);
+	virtual void eventReceived(int id) = 0;
 
 	handle_t m_handle;		/**< Handle ID. */
 };

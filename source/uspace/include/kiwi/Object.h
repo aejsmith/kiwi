@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,23 +21,27 @@
 #ifndef __KIWI_OBJECT_H
 #define __KIWI_OBJECT_H
 
-#include <list>
-
 namespace kiwi {
+namespace internal {
 
-/** Make an object noncopyable.
- * @param c		Class name. */
-#define KIWI_OBJECT_NONCOPYABLE(c)	\
-	private: \
-		c(const c &); \
-		const c &operator =(const c &);
+/** Base class that prevents derived classes from being copied. */
+class Noncopyable {
+protected:
+	Noncopyable() {}
+	~Noncopyable() {}
+private:
+	Noncopyable(const Noncopyable &);
+	const Noncopyable &operator =(const Noncopyable &);
+};
+
+}
 
 /** Base class for an API object. */
 class Object {
 public:
 	virtual ~Object();
 
-	void DeleteLater();
+	void deleteLater();
 protected:
 	Object();
 };

@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 	IPCConnection conn;
 	uint32_t val = 0;
 
-	if(!conn.Connect("org.kiwi.Pong")) {
+	if(!conn.connect("org.kiwi.Pong")) {
 		return 1;
 	}
 
@@ -37,9 +37,9 @@ int main(int argc, char **argv) {
 		size_t size;
 		char *data;
 
-		if(!conn.Send(1, &val, sizeof(uint32_t))) {
+		if(!conn.send(1, &val, sizeof(uint32_t))) {
 			break;
-		} else if(!conn.Receive(type, data, size)) {
+		} else if(!conn.receive(type, data, size)) {
 			break;
 		}
 

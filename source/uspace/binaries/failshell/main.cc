@@ -224,10 +224,10 @@ void Shell::RunCommand(int argc, char **argv) {
 	}
 
 	/* Run a process. */
-	if(!proc.Create(argv)) {
+	if(!proc.create(argv)) {
 		cout << "Failed to run command '" << argv[0] << "'" << endl;
 	}
-	proc.WaitTerminate();
+	proc.waitTerminate();
 }
 
 /** Main function for FailShell.
@@ -238,6 +238,6 @@ int main(int argc, char **argv) {
 	Shell shell(stdin);
 
 	cout << endl;
-	cout << "Welcome to FailShell! (process " << Process::GetCurrentID() << ")" << endl;
+	cout << "Welcome to FailShell! (process " << Process::getCurrentID() << ")" << endl;
 	return shell.Run();
 }

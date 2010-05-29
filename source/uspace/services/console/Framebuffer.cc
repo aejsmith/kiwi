@@ -139,7 +139,7 @@ Framebuffer::Framebuffer(const char *device) :
 	memset(m_buffer, 0, m_buffer_size);
 
 	/* Register the redraw handler with the event loop. */
-	_RegisterEvent(DISPLAY_EVENT_REDRAW);
+	registerEvent(DISPLAY_EVENT_REDRAW);
 }
 
 /** Framebuffer destructor. */
@@ -232,7 +232,7 @@ void Framebuffer::DrawRect(int x, int y, int width, int height, RGB *buffer) {
 
 /** Event callback function.
  * @param event		Event number. */
-void Framebuffer::_EventReceived(int event) {
+void Framebuffer::eventReceived(int event) {
 	assert(event == DISPLAY_EVENT_REDRAW);
 
 	Header::Instance()->Draw(this);

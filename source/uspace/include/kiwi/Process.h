@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -30,18 +30,18 @@ class Process : public Handle {
 public:
 	Process(handle_t handle = -1);
 
-	bool Create(const char *const args[], const char *const env[] = 0, bool usepath = true);
-	bool Create(const char *cmdline, const char *const env[] = 0, bool usepath = true);
-	bool Open(process_id_t id);
+	bool create(const char *const args[], const char *const env[] = 0, bool usepath = true);
+	bool create(const char *cmdline, const char *const env[] = 0, bool usepath = true);
+	bool open(process_id_t id);
 
-	bool WaitTerminate(useconds_t timeout = -1) const;
-	process_id_t GetID(void) const;
+	bool waitTerminate(useconds_t timeout = -1) const;
+	process_id_t getID(void) const;
 
-	static process_id_t GetCurrentID(void);
+	static process_id_t getCurrentID(void);
 
-	Signal<Process *, int> OnExit;
+	Signal<Process *, int> onExit;
 protected:
-	virtual void _EventReceived(int event);
+	void eventReceived(int event);
 };
 
 }

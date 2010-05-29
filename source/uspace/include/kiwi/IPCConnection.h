@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -30,19 +30,19 @@ class IPCConnection : public Handle {
 public:
 	IPCConnection(handle_t handle = -1);
 
-	bool Connect(port_id_t id);
-	bool Connect(const char *name);
+	bool connect(port_id_t id);
+	bool connect(const char *name);
 
 	//bool Send(Message &message);
-	bool Send(uint32_t type, const void *buf, size_t size);
+	bool send(uint32_t type, const void *buf, size_t size);
 
 	//bool Receive(Message *&message, useconds_t timeout = -1);
-	bool Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
+	bool receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
 
-	Signal<IPCConnection *> OnMessage;
-	Signal<IPCConnection *> OnHangup;
+	Signal<IPCConnection *> onMessage;
+	Signal<IPCConnection *> onHangup;
 protected:
-	void _EventReceived(int id);
+	void eventReceived(int id);
 };
 
 }

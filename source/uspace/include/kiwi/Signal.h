@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -71,7 +71,7 @@ class Signal {
 public:
 	/** Connect a function to this signal.
 	 * @param func		Function to call. */
-	void Connect(void (*func)(A...)) {
+	void connect(void (*func)(A...)) {
 		m_slots.push_back(static_cast<BaseSlot *>(new Slot(func)));
 	}
 
@@ -79,14 +79,14 @@ public:
 	 * @param obj		Object to call function on.
 	 * @param func		Function to call. */
 	template <typename T>
-	void Connect(T *obj, void (T::*func)(A...)) {
+	void connect(T *obj, void (T::*func)(A...)) {
 		m_slots.push_back(static_cast<BaseSlot *>(new MemberSlot<T>(obj, func)));
 	}
 
 	/** Connect this signal to another signal.
 	 * @param signal	Other signal to emit when emitted. */
-	void Connect(Signal<A...> &signal) {
-		Connect(&signal, &Signal<A...>::operator ());
+	void connect(Signal<A...> &signal) {
+		connect(&signal, &Signal<A...>::operator ());
 	}
 
 	/** Invoke all slots connected to the signal.

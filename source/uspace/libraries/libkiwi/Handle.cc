@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -36,16 +36,16 @@ Handle::Handle(handle_t handle) : m_handle(handle) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
-	Close();
+	close();
 }
 
 /** Close the handle.
  * @return		True on success, false on failure. */
-bool Handle::Close() {
+bool Handle::close() {
 	bool ret = true;
 
 	if(m_handle >= 0) {
-		OnClose(this);
+		onClose(this);
 
 		if(handle_close(m_handle) == 0) {
 			m_handle = -1;
@@ -68,28 +68,28 @@ bool Handle::Close() {
  *			happened, and a value of -1 (the default) will block
  *			indefinitely until the event happens.
  * @return		True on success, false on failure. */
-bool Handle::Wait(int event, useconds_t timeout) const {
+bool Handle::wait(int event, useconds_t timeout) const {
 	return (object_wait(m_handle, event, timeout) == 0);
 }
 
 /** Get the ID of the handle.
  * @return		ID of the handle. */
-handle_t Handle::GetHandleID(void) const {
+handle_t Handle::getHandle(void) const {
 	return m_handle;
 }
 
 /** Register an event with the current thread's event loop.
  * @param event		Event ID to register. */
-void Handle::_RegisterEvent(int event) {
+void Handle::registerEvent(int event) {
 	if(global_event_loop) {
-		global_event_loop->AddHandle(this, event);
+		global_event_loop->addHandle(this, event);
 	}
 }
 
 /** Unregister an event with the current thread's event loop.
  * @param event		Event ID to unregister. */
-void Handle::_UnregisterEvent(int event) {
+void Handle::unregisterEvent(int event) {
 	if(global_event_loop) {
-		global_event_loop->RemoveHandle(this, event);
+		global_event_loop->removeHandle(this, event);
 	}
 }

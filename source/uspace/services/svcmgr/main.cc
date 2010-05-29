@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
 
 	/* Add services. TODO: These should be in configuration files. */
 	service = new Service("console", "Service providing a graphical console.", "/system/services/console");
-	svcmgr.AddService(service);
+	svcmgr.addService(service);
 
 	service = new Service("pong", "Service that pongs pings.", "/system/services/pong", Service::OnDemand);
-	service->AddPort("org.kiwi.Pong");
-	svcmgr.AddService(service);
+	service->addPort("org.kiwi.Pong");
+	svcmgr.addService(service);
 
-	svcmgr.Run();
+	svcmgr.run();
 	return 0;
 }

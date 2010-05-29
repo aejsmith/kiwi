@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -34,17 +34,16 @@ namespace kiwi {
  *			should have its own event loop, and handles should be
  *			added to the event loop of the thread they are created
  *			in. */
-class EventLoop : public Object {
-	KIWI_OBJECT_NONCOPYABLE(EventLoop);
+class EventLoop : public Object, internal::Noncopyable {
 public:
 	EventLoop();
 
-	void AddHandle(Handle *handle, int event);
-	void RemoveHandle(Handle *handle, int event);
-	void DeleteObject(Object *obj);
-	void Run();
+	void addHandle(Handle *handle, int event);
+	void removeHandle(Handle *handle, int event);
+	void deleteObject(Object *obj);
+	void run();
 private:
-	void _HandleClosed(Handle *handle);
+	void _handleClosed(Handle *handle);
 
 	std::list<Object *> m_to_delete;	/**< Objects to delete when control returns to the loop. */
 

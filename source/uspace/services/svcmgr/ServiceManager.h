@@ -40,12 +40,12 @@ class ServiceManager : public kiwi::EventLoop {
 public:
 	ServiceManager();
 
-	void AddService(Service *service);
-	Port *LookupPort(const char *name);
+	void addService(Service *service);
+	Port *lookupPort(const char *name);
 private:
-	void _HandleConnection(kiwi::IPCPort *);
-	void _HandleMessage(kiwi::IPCConnection *conn);
-	void _HandleHangup(kiwi::IPCConnection *conn);
+	void handleConnection(kiwi::IPCPort *);
+	void handleMessage(kiwi::IPCConnection *conn);
+	void handleHangup(kiwi::IPCConnection *conn);
 
 	kiwi::IPCPort m_port;			/**< Service manager port. */
 	std::list<Service *> m_services;	/**< List of services. */

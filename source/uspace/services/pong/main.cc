@@ -36,23 +36,23 @@ int main(int argc, char **argv) {
 	fopen_device("/console/0", stdout);
 
 	/* Create the port. */
-	port.Create();
-	port.Register("org.kiwi.Pong");
+	port.create();
+	port.registerName("org.kiwi.Pong");
 
-	while((conn = port.Listen())) {
+	while((conn = port.listen())) {
 		while(true) {
 			uint32_t type, val;
 			size_t size;
 			char *data;
 
-			if(!conn->Receive(type, data, size)) {
+			if(!conn->receive(type, data, size)) {
 				break;
 			}
 
 			val = *(reinterpret_cast<uint32_t *>(data));
 			cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
 
-			if(!conn->Send(2, data, size)) {
+			if(!conn->send(2, data, size)) {
 				break;
 			}
 

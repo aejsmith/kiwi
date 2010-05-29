@@ -81,12 +81,12 @@ InputDevice::InputDevice(const char *path) :
 	}
 
 	/* Register the device with the event loop. */
-	_RegisterEvent(DEVICE_EVENT_READABLE);
+	registerEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Event callback function.
  * @param event		Event number. */
-void InputDevice::_EventReceived(int event) {
+void InputDevice::eventReceived(int event) {
 	unsigned char ch;
 	uint8_t code;
 	size_t bytes;

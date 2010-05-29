@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -34,8 +34,8 @@ using namespace std;
  *			not refer to a handle). */
 IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
 	if(m_handle >= 0) {
-		_RegisterEvent(CONNECTION_EVENT_HANGUP);
-		_RegisterEvent(CONNECTION_EVENT_MESSAGE);
+		registerEvent(CONNECTION_EVENT_HANGUP);
+		registerEvent(CONNECTION_EVENT_MESSAGE);
 	}
 }
 
@@ -50,12 +50,12 @@ IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
 
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(port_id_t id) {
-	if(!Close()) {
+bool IPCConnection::connect(port_id_t id) {
+	if(!close()) {
 		return false;
 	} else if((m_handle = ipc_connection_open(id)) >= 0) {
-		_RegisterEvent(CONNECTION_EVENT_HANGUP);
-		_RegisterEvent(CONNECTION_EVENT_MESSAGE);
+		registerEvent(CONNECTION_EVENT_HANGUP);
+		registerEvent(CONNECTION_EVENT_MESSAGE);
 		return true;
 	} else {
 		return false;
@@ -73,25 +73,25 @@ bool IPCConnection::Connect(port_id_t id) {
  *
  * @return		Whether creation was successful.
  */
-bool IPCConnection::Connect(const char *name) {
+bool IPCConnection::connect(const char *name) {
 	IPCConnection svcmgr;
 	uint32_t type;
 	port_id_t id;
 	size_t size;
 	char *data;
 
-	if(!svcmgr.Connect(1)) {
+	if(!svcmgr.connect(1)) {
 		return false;
-	} else if(!svcmgr.Send(SVCMGR_LOOKUP_PORT, name, strlen(name))) {
+	} else if(!svcmgr.send(SVCMGR_LOOKUP_PORT, name, strlen(name))) {
 		return false;
-	} else if(!svcmgr.Receive(type, data, size)) {
+	} else if(!svcmgr.receive(type, data, size)) {
 		return false;
 	} else if((id = *(reinterpret_cast<port_id_t *>(data))) < 0) {
 		return false;
 	}
 
 	delete[] data;
-	return Connect(id);
+	return connect(id);
 }
 
 /** Send a message on a port.
@@ -99,7 +99,7 @@ bool IPCConnection::Connect(const char *name) {
  * @param buf		Data buffer to send.
  * @param size		Size of data buffer.
  * @return		Whether send was successful. */
-bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
+bool IPCConnection::send(uint32_t type, const void *buf, size_t size) {
 	return (ipc_message_send(m_handle, type, buf, size) == 0);
 }
 
@@ -113,7 +113,7 @@ bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
  *			return immediately if no messages are waiting to be
  *			received.
  * @return		Whether received successfully. */
-bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
+bool IPCConnection::receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
 	if(ipc_message_peek(m_handle, timeout, &type, &size) != 0) {
 		return false;
 	}
@@ -129,13 +129,13 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_
 
 /** Handle an event on the connection.
  * @param id		Event ID. */
-void IPCConnection::_EventReceived(int id) {
+void IPCConnection::eventReceived(int id) {
 	switch(id) {
 	case CONNECTION_EVENT_HANGUP:
-		OnHangup(this);
+		onHangup(this);
 		break;
 	case CONNECTION_EVENT_MESSAGE:
-		OnMessage(this);
+		onMessage(this);
 		break;
 	}
 }
