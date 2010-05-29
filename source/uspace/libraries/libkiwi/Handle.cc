@@ -31,8 +31,19 @@ using namespace std;
 
 extern EventLoop *global_event_loop;
 
-/** Handle constructor. */
-Handle::Handle(handle_t handle) : m_handle(handle) {}
+/** Handle constructor.
+ * @note		ARGH RAGE!!! When a base class constructor is run the
+ *			object acts as though it's an instance of the base
+ *			class, not the derived class. That means that the
+ *			object's vtable will point to Handle's, not the derived
+ *			class's. Because of this, calling setHandle here will
+ *			not register events because the registerEvents that
+ *			will be used is Handle's, not the derived class's. So,
+ *			we must do the setHandle in all derived class's
+ *			constructors.
+ *			http://www.artima.com/cppsource/nevercall.html
+ *			http://www.artima.com/cppsource/pure_virtual.html */
+Handle::Handle() : m_handle(-1) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
@@ -42,14 +53,18 @@ Handle::~Handle() {
 /** Close the handle. */
 void Handle::close() {
 	if(m_handle >= 0) {
+		/* Remove all events for this handle from the event loop and
+		 * run callbacks for the handle being closed. */
+		if(global_event_loop) {
+			global_event_loop->removeHandle(this);
+		}
 		onClose(this);
 
+		/* The only error handle_close() can encounter is the handle
+		 * not existing. Therefore, if we fail, it means the programmer
+		 * has done something funny so we just throw up a warning and
+		 * act as though it has already been closed. */
 		if(handle_close(m_handle) != 0) {
-			/* The only reason for failure in handle_close is the
-			 * handle not existing. Therefore, if we fail, it means
-			 * the programmer has done something funny so we just
-			 * throw up a warning and act as though it has already
-			 * been closed. */
 			cerr << "Warning: Handle " << m_handle << " has already been closed" << endl;
 		}
 
@@ -71,17 +86,30 @@ bool Handle::wait(int event, useconds_t timeout) const {
 	return (object_wait(m_handle, event, timeout) == 0);
 }
 
-/** Get the ID of the handle.
- * @return		ID of the handle. */
+/** Get the kernel handle the handle is using.
+ * @return		Raw handle. */
 handle_t Handle::getHandle(void) const {
 	return m_handle;
 }
+
+/** Set the kernel handle to use.
+ * @param handle	New handle. The current handle (if any) will be closed. */
+void Handle::setHandle(handle_t handle) {
+	close();
+	m_handle = handle;
+	if(m_handle >= 0) {
+		registerEvents();
+	}
+}
+
+/** Register all events that the event loop should poll for. */
+void Handle::registerEvents() {}
 
 /** Register an event with the current thread's event loop.
  * @param event		Event ID to register. */
 void Handle::registerEvent(int event) {
 	if(global_event_loop) {
-		global_event_loop->addHandle(this, event);
+		global_event_loop->addEvent(this, event);
 	}
 }
 
@@ -89,6 +117,6 @@ void Handle::registerEvent(int event) {
  * @param event		Event ID to unregister. */
 void Handle::unregisterEvent(int event) {
 	if(global_event_loop) {
-		global_event_loop->removeHandle(this, event);
+		global_event_loop->removeEvent(this, event);
 	}
 }

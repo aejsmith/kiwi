@@ -25,6 +25,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 using namespace kiwi;
@@ -38,13 +39,16 @@ extern char **environ;
 /** Constructor for Process.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
-Process::Process(handle_t handle) : Handle(handle) {
-	if(m_handle >= 0) {
-		registerEvent(PROCESS_EVENT_DEATH);
-	}
+Process::Process(handle_t handle) {
+	setHandle(handle);
 }
 
 /** Create a new process.
+ *
+ * Creates a new process. If the object currently refers to a process, the old
+ * process will be closed upon success, and the object will refer to the new
+ * process. Upon failure, the old process will remain open.
+ *
  * @param args		NULL-terminated argument array. First entry should be
  *			the path to the program to run.
  * @param env		NULL-terminated environment variable array. A NULL
@@ -54,21 +58,23 @@ Process::Process(handle_t handle) : Handle(handle) {
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
- * @return		True on success, false on failure. */
+ *
+ * @return		Whether creation was successful.
+ */
 bool Process::create(const char *const args[], const char *const env[], bool usepath) {
-	char buf[PATH_MAX];
-	const char *path;
-	char *cur, *next;
-	size_t len;
-
-	close();
+	handle_t handle;
 
 	if(usepath && !strchr(args[0], '/')) {
-		if(!(path = getenv("PATH"))) {
+		const char *path = getenv("PATH");
+		if(!path) {
 			path = "/system/binaries";
 		}
 
+		char *cur, *next;
 		for(cur = const_cast<char *>(path); cur; cur = next) {
+			char buf[PATH_MAX];
+			size_t len;
+
 			if(!(next = strchr(cur, ':'))) {
 				next = cur + strlen(cur);
 			}
@@ -92,9 +98,11 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			if((m_handle = process_create(buf, args, (env) ? env : environ, 0, NULL, -1)) >= 0) {
-				goto success;
-			} else if(m_handle != -ERR_NOT_FOUND) {
+			handle = process_create(buf, args, (env) ? env : environ, 0, NULL, -1);
+			if(handle >= 0) {
+				setHandle(handle);
+				return true;
+			} else if(handle != -ERR_NOT_FOUND) {
 				return false;
 			}
 
@@ -106,16 +114,22 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 
 		return false;
 	} else {
-		if((m_handle = process_create(args[0], args, (env) ? env : environ, 0, NULL, -1)) < 0) {
+		handle = process_create(args[0], args, (env) ? env : environ, 0, NULL, -1);
+		if(handle < 0) {
 			return false;
 		}
+
+		setHandle(handle);
+		return true;
 	}
-success:
-	registerEvent(PROCESS_EVENT_DEATH);
-	return true;
 }
 
 /** Create a new process.
+ *
+ * Creates a new process. If the object currently refers to a process, the old
+ * process will be closed upon success, and the object will refer to the new
+ * process. Upon failure, the old process will remain open.
+ *
  * @param cmdline	Command line string, each argument seperated by a
  *			space character. First part of the string should be the
  *			path to the program to run.
@@ -126,17 +140,17 @@ success:
  *			character, then it will be looked up in all directories
  *			listed in the PATH environment variable. The first
  *			match will be executed (defaults to true).
- * @return		True on success, false on failure. */
+ *
+ * @return		Whether creation was successful.
+ */
 bool Process::create(const char *cmdline, const char *const env[], bool usepath) {
-	char *tok, *dup, *orig;
 	vector<char *> args;
-	bool ret;
+	char *tok, *dup;
 
 	/* Duplicate the command line string so we can modify it. */
-	if(!(orig = strdup(cmdline))) {
-		return false;
-	}
-	dup = orig;
+	auto_ptr<char> orig(new char[strlen(cmdline) + 1]);
+	strcpy(orig.get(), cmdline);
+	dup = orig.get();
 
 	/* Create a vector from each token. */
 	while((tok = strsep(&dup, " "))) {
@@ -153,22 +167,26 @@ bool Process::create(const char *cmdline, const char *const env[], bool usepath)
 	/* Null-terminate the array. */
 	args.push_back(0);
 
-	ret = create(&args[0], env, usepath);
-	free(orig);
-	return ret;
+	return create(&args[0], env, usepath);
 }
 
 /** Open an existing process.
+ *
+ * Opens an existing process. If the object currently refers to a process, the
+ * old process will be closed upon success, and the object will refer to the
+ * new process. Upon failure, the old process will remain open.
+ *
  * @param id		ID of the process to open.
- * @return		True on success, false on failure. */
+ *
+ * @return		Whether opening the process was successful.
+ */
 bool Process::open(process_id_t id) {
-	close();
-
-	if((m_handle = process_open(id)) < 0) {
+	handle_t handle = process_open(id);
+	if(handle < 0) {
 		return false;
 	}
 
-	registerEvent(PROCESS_EVENT_DEATH);
+	setHandle(handle);
 	return true;
 }
 
@@ -194,11 +212,16 @@ process_id_t Process::getCurrentID(void) {
 	return process_id(-1);
 }
 
+/** Register events with the event loop. */
+void Process::registerEvents() {
+	registerEvent(PROCESS_EVENT_DEATH);
+}
+
 /** Callback for an object event being received.
  * @param event		Event ID received. */
 void Process::eventReceived(int event) {
 	if(event == PROCESS_EVENT_DEATH) {
-		int status;
+		int status = 0;
 		process_status(m_handle, &status);
 		onExit(this, status);
 

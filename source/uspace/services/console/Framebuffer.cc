@@ -97,11 +97,13 @@ Framebuffer::Framebuffer(const char *device) :
 	display_mode_t mode;
 	int ret;
 
-	if((m_handle = device_open(device)) < 0) {
+	handle_t handle = device_open(device);
+	if(handle < 0) {
 		printf("Failed to open display device (%d)\n", m_handle);
 		m_init_status = m_handle;
 		return;
 	}
+	setHandle(handle);
 
 	/* Try to get the preferred display mode. */
 	if((ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0,
@@ -137,9 +139,6 @@ Framebuffer::Framebuffer(const char *device) :
 		return;
 	}
 	memset(m_buffer, 0, m_buffer_size);
-
-	/* Register the redraw handler with the event loop. */
-	registerEvent(DISPLAY_EVENT_REDRAW);
 }
 
 /** Framebuffer destructor. */
@@ -228,6 +227,11 @@ void Framebuffer::DrawRect(int x, int y, int width, int height, RGB *buffer) {
 			PutPixel(x + j, y + i, buffer[(i * width) + j]);
 		}
 	}
+}
+
+/** Register events with the event loop. */
+void Framebuffer::registerEvents() {
+	registerEvent(DISPLAY_EVENT_REDRAW);
 }
 
 /** Event callback function.

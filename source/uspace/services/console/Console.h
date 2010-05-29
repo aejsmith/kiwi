@@ -44,7 +44,8 @@ public:
 	 * @return		Pointer to active console. */
 	static Console *GetActive(void) { return m_active; }
 private:
-	virtual void eventReceived(int event);
+	void registerEvents();
+	void eventReceived(int event);
 
 	void ToggleCursor(void);
 	void PutChar(unsigned char ch);

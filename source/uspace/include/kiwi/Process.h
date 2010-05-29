@@ -40,7 +40,8 @@ public:
 	static process_id_t getCurrentID(void);
 
 	Signal<Process *, int> onExit;
-protected:
+private:
+	void registerEvents();
 	void eventReceived(int event);
 };
 

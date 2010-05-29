@@ -38,13 +38,12 @@ class EventLoop : public Object, internal::Noncopyable {
 public:
 	EventLoop();
 
-	void addHandle(Handle *handle, int event);
-	void removeHandle(Handle *handle, int event);
+	void addEvent(Handle *handle, int event);
+	void removeEvent(Handle *handle, int event);
+	void removeHandle(Handle *handle);
 	void deleteObject(Object *obj);
 	void run();
 private:
-	void _handleClosed(Handle *handle);
-
 	std::list<Object *> m_to_delete;	/**< Objects to delete when control returns to the loop. */
 
 	/** @note Data stored as multiple vectors because it is the format

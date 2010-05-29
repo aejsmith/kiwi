@@ -40,6 +40,7 @@ public:
 
 	Signal<IPCPort *> onConnection;
 private:
+	void registerEvents();
 	void eventReceived(int id);
 };
 

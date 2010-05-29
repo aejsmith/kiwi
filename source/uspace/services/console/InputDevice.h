@@ -34,7 +34,8 @@ public:
 	 * @return		Whether initialisation succeeded. */
 	bool Initialised(void) const { return (m_init_status == 0); }
 private:
-	virtual void eventReceived(int event);
+	void registerEvents();
+	void eventReceived(int event);
 
 	static const unsigned char m_keymap[];
 	static const unsigned char m_keymap_shift[];

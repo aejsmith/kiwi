@@ -42,6 +42,7 @@ public:
 	Signal<IPCConnection *> onMessage;
 	Signal<IPCConnection *> onHangup;
 protected:
+	void registerEvents();
 	void eventReceived(int id);
 };
 

@@ -75,12 +75,16 @@ InputDevice::InputDevice(const char *path) :
 	m_shift(false)
 {
 	/* Open the input device. */
-	if((m_handle = device_open(path)) < 0) {
+	handle_t handle = device_open(path);
+	if(handle < 0) {
 		m_init_status = m_handle;
 		return;
 	}
+	setHandle(handle);
+}
 
-	/* Register the device with the event loop. */
+/** Register events with the event loop. */
+void InputDevice::registerEvents() {
 	registerEvent(DEVICE_EVENT_READABLE);
 }
 

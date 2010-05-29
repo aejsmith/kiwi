@@ -32,50 +32,45 @@ using namespace std;
 /** Constructor for IPCPort.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
-IPCPort::IPCPort(handle_t handle) : Handle(handle) {
-	if(m_handle >= 0) {
-		registerEvent(PORT_EVENT_CONNECTION);
-	}
+IPCPort::IPCPort(handle_t handle) {
+	setHandle(handle);
 }
 
 /** Create a new port.
  *
- * Creates a new IPC port, closing any existing port the object refers to.
- * The object may or may not refer to a port upon failure, depending on whether
- * the failure occurred when closing the old port or creating the new one.
+ * Creates a new IPC port. If the object currently refers to a port, the old
+ * port will be closed upon success, and the object will refer to the new port.
+ * Upon failure, the old port will remain open.
  *
  * @return		Whether creation was successful.
  */
 bool IPCPort::create() {
-	close();
-
-	if((m_handle = ipc_port_create()) < 0) {
+	handle_t handle = ipc_port_create();
+	if(handle < 0) {
 		return false;
 	}
 
-	registerEvent(PORT_EVENT_CONNECTION);
+	setHandle(handle);
 	return true;
 }
 
 /** Open an existing port.
  *
- * Opens an existing IPC port, closing any existing port the object refers to.
- * You must have the open right on the port. The object may or may not refer to
- * a port upon failure, depending on whether the failure occurred when closing
- * the old port or creating the new one.
+ * Opens an existing IPC port. If the object currently refers to a port, the
+ * old port will be closed upon success, and the object will refer to the new
+ * port. Upon failure, the old port will remain open.
  *
  * @param id		Port ID to open.
  *
  * @return		Whether creation was successful.
  */
 bool IPCPort::open(port_id_t id) {
-	close();
-
-	if((m_handle = ipc_port_open(id)) < 0) {
+	handle_t handle = ipc_port_open(id);
+	if(handle < 0) {
 		return false;
 	}
 
-	registerEvent(PORT_EVENT_CONNECTION);
+	setHandle(handle);
 	return true;
 }
 
@@ -96,14 +91,12 @@ bool IPCPort::registerName(const char *name) {
 	msg->id = getID();
 	memcpy(msg->name, name, size - sizeof(*msg));
 	if(!svcmgr.connect(1) || !svcmgr.send(SVCMGR_REGISTER_PORT, msg, size)) {
-		close();
 		return false;
 	}
 	delete[] data;
 
 	/* Await the reply. */
 	if(!svcmgr.receive(type, data, size) || *(reinterpret_cast<int *>(data)) != 0) {
-		close();
 		return false;
 	}
 	delete[] data;
@@ -117,9 +110,8 @@ bool IPCPort::registerName(const char *name) {
  *			progress.
  * @return		Pointer to connection on success, NULL on failure. */
 IPCConnection *IPCPort::listen(useconds_t timeout) const {
-	handle_t handle;
-
-	if((handle = ipc_port_listen(m_handle, timeout)) < 0) {
+	handle_t handle = ipc_port_listen(m_handle, timeout);
+	if(handle < 0) {
 		return 0;
 	}
 
@@ -133,6 +125,11 @@ port_id_t IPCPort::getID() const {
 
 	ret = ipc_port_id(m_handle);
 	return ((ret >= 0) ? ret : -1);
+}
+
+/** Register events with the event loop. */
+void IPCPort::registerEvents() {
+	registerEvent(PORT_EVENT_CONNECTION);
 }
 
 /** Handle an event on the port.

@@ -42,8 +42,10 @@ public:
 
 	Signal<Handle *> onClose;
 protected:
-	Handle(handle_t handle = -1);
+	Handle();
 
+	void setHandle(handle_t handle);
+	virtual void registerEvents();
 	void registerEvent(int event);
 	void unregisterEvent(int event);
 	virtual void eventReceived(int id) = 0;

@@ -41,29 +41,40 @@ EventLoop::EventLoop() {
 	global_event_loop = this;
 }
 
-/** Add a handle to the event loop.
- * @param handle	Handle to use.
- * @param event		Event to wait for on the handle. */
-void EventLoop::addHandle(Handle *handle, int event) {
+/** Add an event to the event loop.
+ * @param handle	Handle the event will come from.
+ * @param event		Event to wait for. */
+void EventLoop::addEvent(Handle *handle, int event) {
 	m_handles.push_back(handle);
 	m_ids.push_back(handle->getHandle());
 	m_events.push_back(event);
-
-	handle->onClose.connect(this, &EventLoop::_handleClosed);
 }
 
-/** Remove a handle from the event loop.
- * @param handle	Handle to remove.
+/** Remove an event from the event loop.
+ * @param handle	Handle to event is from.
  * @param event		Event that should be removed. */
-void EventLoop::removeHandle(Handle *handle, int event) {
-	vector<Handle *>::iterator it;
-	size_t i;
-
-	for(i = 0; i < m_handles.size(); i++) {
+void EventLoop::removeEvent(Handle *handle, int event) {
+	for(size_t i = 0; i < m_handles.size(); ) {
 		if(m_handles[i] == handle && m_events[i] == event) {
 			m_handles.erase(m_handles.begin() + i);
 			m_ids.erase(m_ids.begin() + i);
 			m_events.erase(m_events.begin() + i);
+		} else {
+			i++;
+		}
+	}
+}
+
+/** Removes all events for a handle.
+ * @param handle	Handle to remove. */
+void EventLoop::removeHandle(Handle *handle) {
+	for(size_t i = 0; i < m_handles.size(); ) {
+		if(m_handles[i] == handle) {
+			m_handles.erase(m_handles.begin() + i);
+			m_ids.erase(m_ids.begin() + i);
+			m_events.erase(m_events.begin() + i);
+		} else {
+			i++;
 		}
 	}
 }
@@ -76,35 +87,22 @@ void EventLoop::deleteObject(Object *obj) {
 
 /** Run the event loop. */
 void EventLoop::run(void) {
-	list<Object *>::iterator it;
-	int ret;
-
 	while(true) {
 		/* Delete objects scheduled for deletion. */
+		list<Object *>::iterator it;
 		while((it = m_to_delete.begin()) != m_to_delete.end()) {
 			delete *it;
 			m_to_delete.erase(it);
 		}
 
-		if((ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1)) < 0) {
+		/* Wait for any of the events. */
+		int ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1);
+		if(ret < 0) {
 			cerr << "Failed to wait for events (" << ret << ')' << endl;
 			return;
 		}
 
+		/* Signal the handle the event occurred on. */
 		m_handles[ret]->eventReceived(m_events[ret]);
-	}
-}
-
-/** Removes all events registered to a handle being closed. */
-void EventLoop::_handleClosed(Handle *handle) {
-	vector<Handle *>::iterator it;
-	size_t i;
-
-	for(i = 0; i < m_handles.size(); i++) {
-		if(m_handles[i] == handle) {
-			m_handles.erase(m_handles.begin() + i);
-			m_ids.erase(m_ids.begin() + i);
-			m_events.erase(m_events.begin() + i);
-		}
 	}
 }

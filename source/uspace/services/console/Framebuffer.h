@@ -53,7 +53,8 @@ public:
 	void FillRect(int x, int y, int width, int height, RGB colour);
 	void DrawRect(int x, int y, int width, int height, RGB *buffer);
 private:
-	virtual void eventReceived(int event);
+	void registerEvents();
+	void eventReceived(int event);
 
 	int m_init_status;		/**< Initialisation status. */
 	uint8_t *m_buffer;		/**< Mapping of display device memory. */

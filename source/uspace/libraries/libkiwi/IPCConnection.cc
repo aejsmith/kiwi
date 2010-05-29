@@ -32,42 +32,35 @@ using namespace std;
 /** Constructor for IPCConnection.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
-IPCConnection::IPCConnection(handle_t handle) : Handle(handle) {
-	if(m_handle >= 0) {
-		registerEvent(CONNECTION_EVENT_HANGUP);
-		registerEvent(CONNECTION_EVENT_MESSAGE);
-	}
+IPCConnection::IPCConnection(handle_t handle) {
+	setHandle(handle);
 }
 
 /** Connect to a port.
  *
- * Connects to an IPC port, closing any existing connection the object refers
- * to. The object may or may not refer to a connection upon failure, depending
- * on whether the failure occurred when closing the old port or creating the
- * new one.
+ * Connects to an IPC port. If the object currently refers to a connection, the
+ * old connection will be closed upon success, and the object will refer to the
+ * new connection. Upon failure, the old connection will remain open.
  *
  * @param id		Port ID to connect to.
 
- * @return		Whether creation was successful.
+ * @return		Whether connection was successful.
  */
 bool IPCConnection::connect(port_id_t id) {
-	close();
-
-	if((m_handle = ipc_connection_open(id)) < 0) {
+	handle_t handle = ipc_connection_open(id);
+	if(handle < 0) {
 		return false;
 	}
 
-	registerEvent(CONNECTION_EVENT_HANGUP);
-	registerEvent(CONNECTION_EVENT_MESSAGE);
+	setHandle(handle);
 	return true;
 }
 
 /** Connect to a port.
  *
- * Connects to an IPC port, closing any existing connection the object refers
- * to. The object may or may not refer to a connection upon failure, depending
- * on whether the failure occurred when closing the old port or creating the
- * new one.
+ * Connects to an IPC port. If the object currently refers to a connection, the
+ * old connection will be closed upon success, and the object will refer to the
+ * new connection. Upon failure, the old connection will remain open.
  *
  * @param name		Port name to connect to.
  *
@@ -125,6 +118,12 @@ bool IPCConnection::receive(uint32_t &type, char *&data, size_t &size, useconds_
 	}
 
 	return true;
+}
+
+/** Register events with the event loop. */
+void IPCConnection::registerEvents() {
+	registerEvent(CONNECTION_EVENT_HANGUP);
+	registerEvent(CONNECTION_EVENT_MESSAGE);
 }
 
 /** Handle an event on the connection.

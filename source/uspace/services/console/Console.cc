@@ -57,11 +57,16 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	m_scroll_end(m_rows - 1)
 {
 	/* Open the console master. */
-	if((m_handle = device_open("/console/master")) < 0) {
+	handle_t handle = device_open("/console/master");
+	if(handle < 0) {
 		printf("Failed to open console master (%d)\n", m_handle);
 		m_init_status = m_handle;
 		return;
-	} else if((m_id = device_request(m_handle, CONSOLE_MASTER_GET_ID, NULL, 0, NULL, 0, NULL)) < 0) {
+	}
+	setHandle(handle);
+
+	/* Obtain a child console. */
+	if((m_id = device_request(m_handle, CONSOLE_MASTER_GET_ID, NULL, 0, NULL, 0, NULL)) < 0) {
 		printf("Failed to get console ID (%d)\n", m_id);
 		m_init_status = m_id;
 		return;
@@ -80,9 +85,6 @@ Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
 	}
 
 	ToggleCursor();
-
-	/* Register the console with the event loop. */
-	registerEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Destructor for the console. */
@@ -295,6 +297,11 @@ void Console::ScrollDown(void) {
 	}
 
 	Redraw();
+}
+
+/** Register events with the event loop. */
+void Console::registerEvents() {
+	registerEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Event callback function.
