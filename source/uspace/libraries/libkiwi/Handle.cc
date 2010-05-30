@@ -22,12 +22,9 @@
 
 #include <kiwi/EventLoop.h>
 #include <kiwi/Handle.h>
-
-#include <cstdlib>
-#include <iostream>
+#include <kiwi/private/log.h>
 
 using namespace kiwi;
-using namespace std;
 
 extern EventLoop *global_event_loop;
 
@@ -65,7 +62,7 @@ void Handle::close() {
 		 * has done something funny so we just throw up a warning and
 		 * act as though it has already been closed. */
 		if(handle_close(m_handle) != 0) {
-			cerr << "Warning: Handle " << m_handle << " has already been closed" << endl;
+			lkWarning("Handle::close: Handle %d has already been closed\n", m_handle);
 		}
 
 		m_handle = -1;

@@ -21,9 +21,9 @@
 #include <kernel/object.h>
 
 #include <kiwi/EventLoop.h>
+#include <kiwi/private/log.h>
 
 #include <exception>
-#include <iostream>
 
 using namespace kiwi;
 using namespace std;
@@ -98,7 +98,7 @@ void EventLoop::run(void) {
 		/* Wait for any of the events. */
 		int ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1);
 		if(ret < 0) {
-			cerr << "Failed to wait for events (" << ret << ')' << endl;
+			lkWarning("EventLoop::run: Failed to wait for events (%d)\n", ret);
 			return;
 		}
 
