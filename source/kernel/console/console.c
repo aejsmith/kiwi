@@ -244,7 +244,7 @@ static int kconsole_device_write(device_t *device, void *data, const void *buf, 
 
 	spinlock_lock(&console_lock);
 	for(i = 0; i < count; i++) {
-		console_putch_unlocked(LOG_NONE, str[i]);
+		console_putch_unlocked(LOG_NORMAL, str[i]);
 	}
 	spinlock_unlock(&console_lock);
 
