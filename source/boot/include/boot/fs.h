@@ -15,19 +15,19 @@
 
 /**
  * @file
- * @brief		Filesystem classes.
+ * @brief		Filesystem functions.
  */
 
-#ifndef __BOOT_VFS_H
-#define __BOOT_VFS_H
+#ifndef __BOOT_FS_H
+#define __BOOT_FS_H
 
 #include <lib/list.h>
 #include <lib/refcount.h>
 #include <lib/utility.h>
 
 struct disk;
-struct vfs_filesystem;
-struct vfs_node;
+struct fs_mount;
+struct fs_node;
 
 /** Structure containing operations for a disk device. */
 typedef struct disk_ops_t {
@@ -43,7 +43,7 @@ typedef struct disk_ops_t {
 	 * @param buf		Buffer to read into.
 	 * @param lba		Block number to read.
 	 * @return		Whether reading succeeded. */
-	bool (*block_read)(struct disk *disk, void *buf, uint64_t lba);
+	bool (*read_block)(struct disk *disk, void *buf, uint64_t lba);
 } disk_ops_t;
 
 /** Structure representing a disk device. */
@@ -62,17 +62,17 @@ typedef struct disk {
 } disk_t;
 
 /** Structure containing operations for a filesystem. */
-typedef struct vfs_filesystem_ops {
-	/** Create an instance of this filesystem.
-	 * @param fs		Filesystem structure to fill in.
+typedef struct fs_type {
+	/** Mount an instance of this filesystem.
+	 * @param mount		Mount structure to fill in.
 	 * @return		Whether succeeded in mounting. */
-	bool (*mount)(struct vfs_filesystem *fs);
+	bool (*mount)(struct fs_mount *mount);
 
 	/** Read a node from the filesystem.
-	 * @param fs		Filesystem to read from.
+	 * @param mount		Mount to read from.
 	 * @param id		ID of node.
 	 * @return		Pointer to node on success, NULL on failure. */
-	struct vfs_node *(*node_get)(struct vfs_filesystem *fs, node_id_t id);
+	struct fs_node *(*read_node)(struct fs_mount *mount, node_id_t id);
 
 	/** Read from a file.
 	 * @param node		Node referring to file.
@@ -80,38 +80,38 @@ typedef struct vfs_filesystem_ops {
 	 * @param count		Number of bytes to read.
 	 * @param offset	Offset into the file.
 	 * @return		Whether read successfully. */
-	bool (*file_read)(struct vfs_node *node, void *buf, size_t count, offset_t offset);
+	bool (*read_file)(struct fs_node *node, void *buf, size_t count, offset_t offset);
 
 	/** Cache directory entries.
 	 * @param node		Node to cache entries from.
 	 * @return		Whether cached successfully. */
-	bool (*dir_cache)(struct vfs_node *node);
-} vfs_filesystem_ops_t;
+	bool (*read_dir)(struct fs_node *node);
+} fs_type_t;
 
 /** Structure representing a mounted filesystem. */
-typedef struct vfs_filesystem {
-	list_t header;			/**< Link to filesystems list. */
+typedef struct fs_mount {
+	list_t header;			/**< Link to mounts list. */
 
-	vfs_filesystem_ops_t *ops;	/**< Operations for the filesystem. */
+	fs_type_t *type;		/**< Type structure for the filesystem. */
 	void *data;			/**< Implementation-specific data pointer. */
 	disk_t *disk;			/**< Disk that the filesystem resides on. */
 	char *label;			/**< Label of the filesystem. */
 	char *uuid;			/**< UUID of the filesystem. */
-	struct vfs_node *root;		/**< Root of the filesystem. */
+	struct fs_node *root;		/**< Root of the filesystem. */
 	list_t nodes;			/**< List of nodes. */
-} vfs_filesystem_t;
+} fs_mount_t;
 
 /** Structure representing a filesystem node. */
-typedef struct vfs_node {
+typedef struct fs_node {
 	list_t header;			/**< Link to filesystem's node list. */
 
-	vfs_filesystem_t *fs;		/**< Filesystem that the node is on. */
+	fs_mount_t *mount;		/**< Mount that the node is on. */
 	node_id_t id;			/**< Node number. */
 
 	/** Type of the node. */
 	enum {
-		VFS_NODE_FILE,		/**< Regular file. */
-		VFS_NODE_DIR,		/**< Directory. */
+		FS_NODE_FILE,		/**< Regular file. */
+		FS_NODE_DIR,		/**< Directory. */
 	} type;
 
 	refcount_t count;		/**< Reference count. */
@@ -119,32 +119,31 @@ typedef struct vfs_node {
 	void *data;			/**< Implementation-specific data pointer. */
 
 	list_t entries;			/**< Directory entries. */
-} vfs_node_t;
+} fs_node_t;
 
 /** Structure representing a directory entry. */
-typedef struct vfs_dir_entry {
+typedef struct fs_dir_entry {
 	list_t header;			/**< Link to entry list. */
-
 	char *name;			/**< Name of entry. */
 	node_id_t id;			/**< Node ID entry refers to. */
-} vfs_dir_entry_t;
+} fs_dir_entry_t;
 
 extern list_t filesystem_list;
-extern vfs_filesystem_t *boot_filesystem;
+extern fs_mount_t *boot_filesystem;
 extern char *boot_path_override;
 
-extern vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path);
-extern vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs);
+extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, int type, offset_t size, void *data);
+extern void fs_node_get(fs_node_t *node);
+extern void fs_node_release(fs_node_t *node);
 
-extern vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, offset_t size, void *data);
-extern void vfs_node_acquire(vfs_node_t *node);
-extern void vfs_node_release(vfs_node_t *node);
+extern fs_node_t *fs_lookup(fs_mount_t *mount, const char *path);
+extern fs_node_t *fs_find_boot_path(fs_mount_t *mount);
 
-extern bool vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset);
+extern bool fs_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset);
 
-extern void vfs_dir_insert(vfs_node_t *node, char *name, node_id_t id);
-extern vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path);
-extern vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev);
+extern void fs_dir_insert(fs_node_t *node, char *name, node_id_t id);
+extern fs_node_t *fs_dir_lookup(fs_node_t *node, const char *name);
+extern fs_dir_entry_t *fs_dir_iterate(fs_node_t *node, fs_dir_entry_t *prev);
 
 extern bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset);
 extern void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks);
@@ -154,4 +153,4 @@ extern disk_t *disk_add(uint8_t id, size_t blksize, uint64_t blocks, disk_ops_t 
 extern void platform_disk_detect(void);
 extern void disk_init(void);
 
-#endif /* __BOOT_VFS_H */
+#endif /* __BOOT_FS_H */

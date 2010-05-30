@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Console class.
+ * @brief		Console functions.
  */
 
 #include <boot/console.h>

@@ -22,9 +22,9 @@
 
 #include <boot/console.h>
 #include <boot/cpu.h>
+#include <boot/fs.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
-#include <boot/vfs.h>
 
 #include <platform/boot.h>
 
@@ -44,36 +44,36 @@ atomic_t ap_kernel_wait = 0;
 
 /** Load the kernel.
  * @param dir		Directory to load from. */
-static void load_kernel(vfs_node_t *dir) {
-	vfs_node_t *kernel;
+static void load_kernel(fs_node_t *dir) {
+	fs_node_t *kernel;
 
 	/* Get the kernel from the directory. */
-	if(!(kernel = vfs_dir_lookup(dir, "kernel"))) {
+	if(!(kernel = fs_dir_lookup(dir, "kernel"))) {
 		fatal("Couldn't find kernel in boot directory");
 	}
 
 	kprintf("Loading kernel...\n");
 	arch_load_kernel(kernel);
-	vfs_node_release(kernel);
+	fs_node_release(kernel);
 }
 
 /** Load all boot modules.
  * @param dir		Directory to load from. */
-static void load_modules(vfs_node_t *dir) {
-	vfs_dir_entry_t *entry = NULL;
-	vfs_node_t *node;
+static void load_modules(fs_node_t *dir) {
+	fs_dir_entry_t *entry = NULL;
 	phys_ptr_t addr;
+	fs_node_t *node;
 
 	/* Get the modules directory. */
-	if(!(dir = vfs_dir_lookup(dir, "modules"))) {
+	if(!(dir = fs_dir_lookup(dir, "modules"))) {
 		fatal("Could not find modules directory");
 	}
 
-	while((entry = vfs_dir_iterate(dir, entry))) {
-		if(!(node = vfs_dir_lookup(dir, entry->name))) {
+	while((entry = fs_dir_iterate(dir, entry))) {
+		if(!(node = fs_dir_lookup(dir, entry->name))) {
 			fatal("Could not get entry from module directory");
-		} else if(node->type != VFS_NODE_FILE) {
-			vfs_node_release(node);
+		} else if(node->type != FS_NODE_FILE) {
+			fs_node_release(node);
 			continue;
 		}
 
@@ -81,7 +81,7 @@ static void load_modules(vfs_node_t *dir) {
 
 		/* Allocate a chunk of memory to load to. */
 		addr = phys_memory_alloc(ROUND_UP(node->size, PAGE_SIZE), PAGE_SIZE, true);
-		if(!vfs_file_read(node, (void *)((ptr_t)addr), node->size, 0)) {
+		if(!fs_file_read(node, (void *)((ptr_t)addr), node->size, 0)) {
 			fatal("Could not read module %s", entry->name);
 		}
 
@@ -89,15 +89,15 @@ static void load_modules(vfs_node_t *dir) {
 		kargs_module_add(addr, node->size);
 		dprintf("loader: loaded module %s to 0x%" PRIpp " (size: %" PRIu64 ")\n",
 		        entry->name, addr, node->size);
-		vfs_node_release(node);
+		fs_node_release(node);
 	}
 
-	vfs_node_release(dir);
+	fs_node_release(dir);
 }
 
 /** Main function for the Kiwi bootloader. */
 void loader_main(void) {
-	vfs_node_t *node;
+	fs_node_t *node;
 
 	/* Zero BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
@@ -130,12 +130,12 @@ void loader_main(void) {
 	}
 
 	/* Load the kernel and modules. */
-	if(!(node = vfs_filesystem_boot_path(boot_filesystem))) {
+	if(!(node = fs_find_boot_path(boot_filesystem))) {
 		fatal("Couldn't get boot directory");
 	}
 	load_kernel(node);
 	load_modules(node);
-	vfs_node_release(node);
+	fs_node_release(node);
 
 	/* Set the video mode for the kernel. */
 	platform_video_enable();

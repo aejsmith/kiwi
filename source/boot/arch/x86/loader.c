@@ -69,7 +69,7 @@ static uint64_t *allocate_paging_structure(void) {
 /** Load a 64-bit kernel image.
  * @param file		File containing the kernel.
  * @return		Whether the kernel is 64-bit. */
-static bool arch_load_kernel64(vfs_node_t *file) {
+static bool arch_load_kernel64(fs_node_t *file) {
 	uint64_t *pml4, *pdp, *pdir;
 	Elf64_Addr virt_base;
 	size_t load_size, i;
@@ -121,7 +121,7 @@ static bool arch_load_kernel64(vfs_node_t *file) {
 /** Load a 32-bit kernel image.
  * @param file		File containing the kernel.
  * @return		Whether the kernel is 32-bit. */
-static bool arch_load_kernel32(vfs_node_t *file) {
+static bool arch_load_kernel32(fs_node_t *file) {
 	Elf32_Addr virt_base;
 	uint64_t *pdp, *pdir;
 	size_t load_size, i;
@@ -160,7 +160,7 @@ static bool arch_load_kernel32(vfs_node_t *file) {
 
 /** Load the kernel into memory.
  * @param file		File containing the kernel. */
-void arch_load_kernel(vfs_node_t *file) {
+void arch_load_kernel(fs_node_t *file) {
 	/* Check that features required on both 32- and 64-bit kernels are
 	 * supported. */
 	if((kernel_args->arch.standard_edx & REQUIRED_FEATURES) != REQUIRED_FEATURES) {

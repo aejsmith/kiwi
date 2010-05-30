@@ -21,7 +21,7 @@
 #ifndef __FS_ISO9660_H
 #define __FS_ISO9660_H
 
-#include <boot/vfs.h>
+#include <boot/fs.h>
 
 /** Size of an ISO9660 block. */
 #define ISO9660_BLOCK_SIZE		2048
@@ -179,6 +179,6 @@ typedef struct iso9660_directory_record {
         uint8_t file_ident[];			/**< File Identifier. */
 } __packed iso9660_directory_record_t;
 
-extern vfs_filesystem_ops_t iso9660_filesystem_ops;
+extern fs_type_t iso9660_fs_type;
 
 #endif /* __FS_ISO9660_H */

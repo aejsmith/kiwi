@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Virtual file system.
+ * @brief		Filesystem functions.
  */
 
+#include <boot/fs.h>
 #include <boot/memory.h>
-#include <boot/vfs.h>
 
 #include <lib/string.h>
 
@@ -34,7 +34,7 @@
 LIST_DECLARE(filesystem_list);
 
 /** The filesystem being booted from. */
-vfs_filesystem_t *boot_filesystem = NULL;
+fs_mount_t *boot_filesystem = NULL;
 
 /** Boot path override string. */
 char *boot_path_override = NULL;
@@ -46,9 +46,9 @@ static const char *boot_paths[] = {
 };
 
 /** Array of filesystem implementations. */
-static vfs_filesystem_ops_t *filesystem_types[] = {
-	&ext2_filesystem_ops,
-	&iso9660_filesystem_ops,
+static fs_type_t *filesystem_types[] = {
+	&ext2_fs_type,
+	&iso9660_fs_type,
 };
 
 /** Array of partition probe functions. */
@@ -56,121 +56,46 @@ static bool (*partition_probe_funcs[])(disk_t *) = {
 	msdos_partition_probe,
 };
 
-/** Probe a disk for filesystems.
- * @param disk		Disk to probe.
- * @return		Pointer to FS if detected, NULL if not. */
-static vfs_filesystem_t *vfs_filesystem_probe(disk_t *disk) {
-	vfs_filesystem_t *fs;
-	vfs_node_t *node;
-	size_t i;
-
-	fs = kmalloc(sizeof(vfs_filesystem_t));
-	list_init(&fs->header);
-	list_init(&fs->nodes);
-	fs->disk = disk;
-
-	for(i = 0; i < ARRAYSZ(filesystem_types); i++) {
-		fs->ops = filesystem_types[i];
-		if(!fs->ops->mount(fs)) {
-			continue;
-		}
-
-		/* Check if bootable. */
-		if(!(node = vfs_filesystem_boot_path(fs))) {
-			break;
-		}
-		vfs_node_release(node);
-
-		list_append(&filesystem_list, &fs->header);
-		return fs;
-	}
-
-	kfree(fs);
-	return NULL;
-}
-
 /** Look up a node by ID on a filesystem.
- * @param fs		Filesystem to get from.
+ * @param mount		Mount to get from.
  * @param id		ID of node to get.
  * @return		Pointer to node or NULL if not found. */
-static vfs_node_t *vfs_filesystem_get_node(vfs_filesystem_t *fs, node_id_t id) {
-	vfs_node_t *node;
+static fs_node_t *fs_node_read(fs_mount_t *mount, node_id_t id) {
+	fs_node_t *node;
 
 	/* Search in the node cache first. */
-	LIST_FOREACH(&fs->nodes, iter) {
-		node = list_entry(iter, vfs_node_t, header);
+	LIST_FOREACH(&mount->nodes, iter) {
+		node = list_entry(iter, fs_node_t, header);
 		if(node->id == id) {
-			vfs_node_acquire(node);
+			fs_node_get(node);
 			return node;
 		}
 	}
 
-	/* Try to get the node from the filesystem. */
-	if(!(node = fs->ops->node_get(fs, id))) {
+	/* Try to read the node from the filesystem. */
+	if(!(node = mount->type->read_node(mount, id))) {
 		return NULL;
 	}
 
 	/* Cache the retreived node. */
-	list_append(&fs->nodes, &node->header);
+	list_append(&mount->nodes, &node->header);
 	return node;
 }
 
-/** Look up a path on a filesystem.
- * @param fs		Filesystem to look up on.
- * @param path		Path to look up.
- * @return		Pointer to node on success, NULL on failure. */
-vfs_node_t *vfs_filesystem_lookup(vfs_filesystem_t *fs, const char *path) {
-	assert(path[0] == '/');
-	while(path[0] == '/') {
-		path++;
-	}
-	return vfs_dir_lookup(fs->root, path);
-}
-
-/** Get the node referring to the boot directory.
- * @param fs		Filesystem to get from.
- * @return		Node for boot directory, or NULL if not bootable. */
-vfs_node_t *vfs_filesystem_boot_path(vfs_filesystem_t *fs) {
-	vfs_node_t *node;
-	size_t i;
-
-	if(boot_path_override) {
-		if((node = vfs_filesystem_lookup(fs, boot_path_override))) {
-			if(node->type == VFS_NODE_DIR) {
-				return node;
-			}
-			vfs_node_release(node);
-		}
-		return NULL;
-	}
-
-	/* Check whether each of the boot paths exists and is a directory. */
-	for(i = 0; i < ARRAYSZ(boot_paths); i++) {
-		if((node = vfs_filesystem_lookup(fs, boot_paths[i]))) {
-			if(node->type == VFS_NODE_DIR) {
-				return node;
-			}
-			vfs_node_release(node);
-		}
-	}
-
-	return NULL;
-}
-
 /** Allocate a new node structure.
- * @param fs		Filesystem that the node resides on.
+ * @param mount		Mount that the node resides on.
  * @param id		ID of the node.
  * @param type		Type of the node.
  * @param size		Size of the file data (if a file).
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to node structure. */
-vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, offset_t size, void *data) {
-	vfs_node_t *node = kmalloc(sizeof(vfs_node_t));
+fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, int type, offset_t size, void *data) {
+	fs_node_t *node = kmalloc(sizeof(fs_node_t));
 
 	list_init(&node->header);
 	refcount_set(&node->count, 1);
 	list_init(&node->entries);
-	node->fs = fs;
+	node->mount = mount;
 	node->id = id;
 	node->type = type;
 	node->size = size;
@@ -180,13 +105,13 @@ vfs_node_t *vfs_node_alloc(vfs_filesystem_t *fs, node_id_t id, int type, offset_
 
 /** Increase the reference count of a node.
  * @param node		Node to increase count of. */
-void vfs_node_acquire(vfs_node_t *node) {
+void fs_node_get(fs_node_t *node) {
 	node->count++;
 }
 
 /** Decrease the reference count of a node.
  * @param node		Node to decrease count of. */
-void vfs_node_release(vfs_node_t *node) {
+void fs_node_release(fs_node_t *node) {
 	assert(node->count > 0);
 	if(--node->count == 0) {
 		/* FIXME: Don't actually do anything right now, as kfree() is
@@ -195,69 +120,21 @@ void vfs_node_release(vfs_node_t *node) {
 	}
 }
 
-/** Read from a file.
- * @param node		Node to read from.
- * @param buf		Buffer to read into.
- * @param count		Number of bytes to read.
- * @param offset	Offset in the file to read from.
- * @return		Whether the read was successful. */
-bool vfs_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset) {
-	assert(node->type == VFS_NODE_FILE);
-	return node->fs->ops->file_read(node, buf, count, offset);
-}
-
-/** Get a child from a directory.
- * @param node		Node to get from.
- * @param name		Name of entry to get.
- * @param idp		Where to store ID of entry.
- * @return		Whether entry was found. */
-static bool vfs_dir_get_child(vfs_node_t *node, const char *name, node_id_t *idp) {
-	vfs_dir_entry_t *entry;
-
-	if(list_empty(&node->entries)) {
-		if(!node->fs->ops->dir_cache(node)) {
-			return false;
-		}
-	}
-
-	LIST_FOREACH(&node->entries, iter) {
-		entry = list_entry(iter, vfs_dir_entry_t, header);
-		if(strcmp(entry->name, name) == 0) {
-			*idp = entry->id;
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/** Insert an entry into a directory.
- * @param node		Node to add to.
- * @param name		Name of the entry to add (will be duplicated).
- * @param id		ID of the node the entry refers to. */
-void vfs_dir_insert(vfs_node_t *node, char *name, node_id_t id) {
-	vfs_dir_entry_t *entry;
-
-	assert(node->type == VFS_NODE_DIR);
-
-	entry = kmalloc(sizeof(vfs_dir_entry_t));
-	list_init(&entry->header);
-	entry->name = kstrdup(name);
-	entry->id = id;
-
-	list_append(&node->entries, &entry->header);
-}
-
-/** Look up a path relative to a directory.
- * @param node		Node to look up from.
+/** Look up a path on a filesystem.
+ * @param mount		Mount to look up on.
  * @param path		Path to look up.
  * @return		Pointer to node on success, NULL on failure. */
-vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path) {
-	vfs_node_t *child;
+fs_node_t *fs_lookup(fs_mount_t *mount, const char *path) {
+	fs_node_t *node, *child;
 	char *dup, *tok;
-	node_id_t id;
 
-	vfs_node_acquire(node);
+	assert(path[0] == '/');
+	while(path[0] == '/') {
+		path++;
+	}
+
+	node = mount->root;
+	fs_node_get(node);
 
 	/* Loop through each element of the path string. The string must be
 	 * duplicated so that it can be modified. */
@@ -268,46 +145,131 @@ vfs_node_t *vfs_dir_lookup(vfs_node_t *node, const char *path) {
 			/* The last token was the last element of the path
 			 * string, return the node we're currently on. */
 			return node;
-		} else if(node->type != VFS_NODE_DIR) {
+		} else if(node->type != FS_NODE_DIR) {
 			/* The previous node was not a directory: this means
 			 * the path string is trying to treat a non-directory
 			 * as a directory. Reject this. */
-			vfs_node_release(node);
+			fs_node_release(node);
 			return NULL;
 		} else if(!tok[0]) {
 			/* Zero-length path component, do nothing. */
 			continue;
 		}
 
-		/* Look up the token in the directory cache. */
-		if(!vfs_dir_get_child(node, tok, &id)) {
-			vfs_node_release(node);
+		/* Get the entry from the directory. */
+		if(!(child = fs_dir_lookup(node, tok))) {
+			fs_node_release(node);
 			return NULL;
 		}
 
-		/* Get the node from the filesystem. */
-		if(!(child = vfs_filesystem_get_node(node->fs, id))) {
-			vfs_node_release(node);
-			return NULL;
-		}
-
-		vfs_node_release(node);
+		fs_node_release(node);
 		node = child;
 	}
+}
+
+/** Check whether a boot path exists on a filesystem.
+ * @param mount		Mount to check.
+ * @param path		Path to look for.
+ * @return		Node for directory, or NULL if doesn't exist. */
+static fs_node_t *check_boot_path(fs_mount_t *mount, const char *path) {
+	fs_node_t *node;
+
+	if((node = fs_lookup(mount, path))) {
+		if(node->type == FS_NODE_DIR) {
+			return node;
+		}
+		fs_node_release(node);
+	}
+
+	return NULL;
+}
+
+/** Get the node referring to the boot directory.
+ * @param mount		Filesystem to get from.
+ * @return		Node for boot directory, or NULL if not bootable. */
+fs_node_t *fs_find_boot_path(fs_mount_t *mount) {
+	fs_node_t *node;
+	size_t i;
+
+	if(boot_path_override) {
+		return check_boot_path(mount, boot_path_override);
+	} else {
+		for(i = 0; i < ARRAYSZ(boot_paths); i++) {
+			if((node = check_boot_path(mount, boot_paths[i]))) {
+				return node;
+			}
+		}
+
+		return NULL;
+	}
+}
+
+/** Read from a file.
+ * @param node		Node to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset in the file to read from.
+ * @return		Whether the read was successful. */
+bool fs_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset) {
+	assert(node->type == FS_NODE_FILE);
+	return node->mount->type->read_file(node, buf, count, offset);
+}
+
+/** Insert an entry into a directory.
+ * @param node		Node to add to.
+ * @param name		Name of the entry to add (will be duplicated).
+ * @param id		ID of the node the entry refers to. */
+void fs_dir_insert(fs_node_t *node, char *name, node_id_t id) {
+	fs_dir_entry_t *entry;
+
+	assert(node->type == FS_NODE_DIR);
+
+	entry = kmalloc(sizeof(fs_dir_entry_t));
+	list_init(&entry->header);
+	entry->name = kstrdup(name);
+	entry->id = id;
+
+	list_append(&node->entries, &entry->header);
+}
+
+/** Look up an entry in a directory.
+ * @param node		Directory to look up in.
+ * @param name		Name of entry to look up.
+ * @return		Pointer to node on success, NULL on failure. */
+fs_node_t *fs_dir_lookup(fs_node_t *node, const char *name) {
+	fs_dir_entry_t *entry;
+	fs_node_t *child;
+
+	if(list_empty(&node->entries)) {
+		if(!node->mount->type->read_dir(node)) {
+			return NULL;
+		}
+	}
+
+	LIST_FOREACH(&node->entries, iter) {
+		entry = list_entry(iter, fs_dir_entry_t, header);
+		if(strcmp(entry->name, name) == 0) {
+			if(!(child = fs_node_read(node->mount, entry->id))) {
+				return NULL;
+			}
+			return child;
+		}
+	}
+
+	return NULL;
 }
 
 /** Iterate through entries in a directory.
  * @param node		Node for directory.
  * @param prev		Previous entry (or NULL to start from beginning).
  * @return		Pointer to entry structure for next entry. */
-vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev) {
-	assert(node->type == VFS_NODE_DIR);
+fs_dir_entry_t *fs_dir_iterate(fs_node_t *node, fs_dir_entry_t *prev) {
+	assert(node->type == FS_NODE_DIR);
 
 	if(list_empty(&node->entries)) {
-		if(!node->fs->ops->dir_cache(node)) {
+		if(!node->mount->type->read_dir(node)) {
 			return NULL;
-		}
-		if(list_empty(&node->entries)) {
+		} else if(list_empty(&node->entries)) {
 			return NULL;
 		}
 	}
@@ -316,10 +278,43 @@ vfs_dir_entry_t *vfs_dir_iterate(vfs_node_t *node, vfs_dir_entry_t *prev) {
 		if(&prev->header == node->entries.prev) {
 			return NULL;
 		}
-		return list_entry(prev->header.next, vfs_dir_entry_t, header);
+		return list_entry(prev->header.next, fs_dir_entry_t, header);
 	} else {
-		return list_entry(node->entries.next, vfs_dir_entry_t, header);
+		return list_entry(node->entries.next, fs_dir_entry_t, header);
 	}
+}
+
+/** Probe a disk for filesystems.
+ * @param disk		Disk to probe.
+ * @return		Pointer to mount if detected, NULL if not. */
+static fs_mount_t *disk_probe(disk_t *disk) {
+	fs_mount_t *mount;
+	fs_node_t *node;
+	size_t i;
+
+	mount = kmalloc(sizeof(fs_mount_t));
+	list_init(&mount->header);
+	list_init(&mount->nodes);
+	mount->disk = disk;
+
+	for(i = 0; i < ARRAYSZ(filesystem_types); i++) {
+		mount->type = filesystem_types[i];
+		if(!mount->type->mount(mount)) {
+			continue;
+		}
+
+		/* Check if bootable. */
+		if(!(node = fs_find_boot_path(mount))) {
+			break;
+		}
+		fs_node_release(node);
+
+		list_append(&filesystem_list, &mount->header);
+		return mount;
+	}
+
+	kfree(mount);
+	return NULL;
 }
 
 /** Read from a disk.
@@ -348,7 +343,7 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
 	 * If the transfer only goes across one block, this will handle it. */
 	if(offset % blksize) {
 		/* Read the block into the temporary buffer. */
-		if(!disk->ops->block_read(disk, disk->partial_block, start)) {
+		if(!disk->ops->read_block(disk, disk->partial_block, start)) {
 			return false;
 		}
 
@@ -361,14 +356,14 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
 	size = count / blksize;
 	for(i = 0; i < size; i++, buf += blksize, count -= blksize, start++) {
 		/* Read directly into the destination buffer. */
-		if(!disk->ops->block_read(disk, buf, start)) {
+		if(!disk->ops->read_block(disk, buf, start)) {
 			return false;
 		}
 	}
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if(!disk->ops->block_read(disk, disk->partial_block, start)) {
+		if(!disk->ops->read_block(disk, disk->partial_block, start)) {
 			return false;
 		}
 
@@ -383,14 +378,14 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
  * @param buf		Buffer to read into.
  * @param lba		Block number to read.
  * @return		Whether reading succeeded. */
-static bool partition_block_read(disk_t *disk, void *buf, uint64_t lba) {
+static bool partition_read_block(disk_t *disk, void *buf, uint64_t lba) {
 	disk_t *parent = disk->data;
-	return parent->ops->block_read(parent, buf, lba + disk->offset);
+	return parent->ops->read_block(parent, buf, lba + disk->offset);
 }
 
 /** Operations for a partition disk. */
 static disk_ops_t partition_disk_ops = {
-	.block_read = partition_block_read,
+	.read_block = partition_read_block,
 };
 
 /** Add a partition to a disk device.
@@ -400,7 +395,7 @@ static disk_ops_t partition_disk_ops = {
  * @param blocks	Number of blocks the partition takes up. */
 void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks) {
 	disk_t *child = kmalloc(sizeof(disk_t));
-	vfs_filesystem_t *fs;
+	fs_mount_t *mount;
 
 	child->id = id;
 	child->blksize = disk->blksize;
@@ -411,10 +406,10 @@ void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks) {
 	child->boot = false;
 	child->offset = lba;
 
-	if((fs = vfs_filesystem_probe(child))) {
+	if((mount = disk_probe(child))) {
 		if(disk->boot && disk->ops->is_boot_partition) {
 			if(disk->ops->is_boot_partition(child, id, lba)) {
-				boot_filesystem = fs;
+				boot_filesystem = mount;
 			}
 		}
 	} else {
@@ -433,7 +428,7 @@ void disk_partition_add(disk_t *disk, int id, uint64_t lba, uint64_t blocks) {
  *			nothing usable. */
 disk_t *disk_add(uint8_t id, size_t blksize, uint64_t blocks, disk_ops_t *ops, void *data, bool boot) {
 	disk_t *disk = kmalloc(sizeof(disk_t));
-	vfs_filesystem_t *fs;
+	fs_mount_t *mount;
 	size_t i;
 
 	disk->id = id;
@@ -446,9 +441,9 @@ disk_t *disk_add(uint8_t id, size_t blksize, uint64_t blocks, disk_ops_t *ops, v
 	disk->offset = 0;
 
 	/* Probe the disk for filesystems/partitions. */
-	if((fs = vfs_filesystem_probe(disk))) {
+	if((mount = disk_probe(disk))) {
 		if(boot) {
-			boot_filesystem = fs;
+			boot_filesystem = mount;
 		}
 		return disk;
 	} else {

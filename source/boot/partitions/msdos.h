@@ -21,7 +21,7 @@
 #ifndef __PARTITIONS_MSDOS_H
 #define __PARTITIONS_MSDOS_H
 
-#include <boot/vfs.h>
+#include <boot/fs.h>
 
 /** MS-DOS partition table signature. */
 #define MSDOS_SIGNATURE		0xAA55

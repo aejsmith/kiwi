@@ -19,7 +19,7 @@
  */
 
 #include <boot/console.h>
-#include <boot/vfs.h>
+#include <boot/fs.h>
 
 #include <lib/string.h>
 
@@ -80,7 +80,7 @@ static bool bios_disk_is_boot_partition(disk_t *disk, int id, uint64_t lba) {
  * @param buf		Buffer to read into.
  * @param lba		Block number to read.
  * @return		Whether the read succeeded. */
-static bool bios_disk_block_read(disk_t *disk, void *buf, uint64_t lba) {
+static bool bios_disk_read_block(disk_t *disk, void *buf, uint64_t lba) {
 	disk_address_packet_t *dap = (disk_address_packet_t *)BIOS_MEM_BASE;
 	bios_regs_t regs;
 
@@ -111,7 +111,7 @@ static bool bios_disk_block_read(disk_t *disk, void *buf, uint64_t lba) {
 /** Operations for a BIOS disk device. */
 static disk_ops_t bios_disk_ops = {
 	.is_boot_partition = bios_disk_is_boot_partition,
-	.block_read = bios_disk_block_read,
+	.read_block = bios_disk_read_block,
 };
 
 /** Get the number of disks in the system.

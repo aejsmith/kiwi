@@ -15,15 +15,15 @@
 
 /**
  * @file
- * @brief		ELF loader template class.
+ * @brief		ELF loader.
  */
 
 #ifndef __BOOT_ELF_H
 #define __BOOT_ELF_H
 
 #include <boot/console.h>
+#include <boot/fs.h>
 #include <boot/memory.h>
-#include <boot/vfs.h>
 
 #include <lib/string.h>
 
@@ -37,10 +37,10 @@
  * @param endian	ELF endian definition.
  * @param machine	ELF machine definition.
  * @return		Whether the file is this type. */
-static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, uint8_t machine) {
+static inline bool elf_check(fs_node_t *file, uint8_t bitsize, uint8_t endian, uint8_t machine) {
 	Elf32_Ehdr ehdr;
 
-	if(!vfs_file_read(file, &ehdr, sizeof(Elf32_Ehdr), 0)) {
+	if(!fs_file_read(file, &ehdr, sizeof(Elf32_Ehdr), 0)) {
 		return false;
 	} else if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, 4) != 0) {
 		return false;
@@ -63,7 +63,7 @@ static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, 
  * @param _bits		32 or 64.
  * @param _alignment	Alignment for physical memory allocations. */
 #define DEFINE_ELF_LOADER(_name, _bits, _alignment)	\
-	static inline void _name(vfs_node_t *file, Elf##_bits##_Addr *entryp, \
+	static inline void _name(fs_node_t *file, Elf##_bits##_Addr *entryp, \
 	                         Elf##_bits##_Addr *virtp, size_t *sizep) { \
 		Elf##_bits##_Addr virt_base = 0, virt_end = 0; \
 		Elf##_bits##_Phdr *phdrs; \
@@ -71,12 +71,12 @@ static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, 
 		ptr_t dest; \
 		size_t i; \
 		\
-		if(!vfs_file_read(file, &ehdr, sizeof(ehdr), 0)) { \
+		if(!fs_file_read(file, &ehdr, sizeof(ehdr), 0)) { \
 			fatal("Could not read kernel from boot device"); \
 		} \
 		\
 		phdrs = kmalloc(sizeof(*phdrs) * ehdr.e_phnum); \
-		if(!vfs_file_read(file, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
+		if(!fs_file_read(file, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
 			fatal("Could not read kernel from boot device"); \
 		} \
 		\
@@ -103,7 +103,7 @@ static inline bool elf_check(vfs_node_t *file, uint8_t bitsize, uint8_t endian, 
 			} \
 			\
 			dest = (ptr_t)(kernel_args->kernel_phys + (phdrs[i].p_vaddr - virt_base)); \
-			if(!vfs_file_read(file, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
+			if(!fs_file_read(file, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
 				fatal("Could not read kernel from boot device"); \
 			} \
 			\

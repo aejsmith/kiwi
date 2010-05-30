@@ -18,7 +18,7 @@
  * @brief		PC platform startup code.
  */
 
-#include <boot/vfs.h>
+#include <boot/fs.h>
 
 #include <lib/string.h>
 

@@ -19,9 +19,9 @@
  */
 
 #include <boot/console.h>
+#include <boot/fs.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
-#include <boot/vfs.h>
 
 #include <assert.h>
 #include <kargs.h>
@@ -281,8 +281,8 @@ menu_item_t *menu_add_choice(menu_t *menu, const char *name) {
 /** Display the menu interface. */
 void menu_display(void) {
 	menu_t *menu, *options;
-	vfs_filesystem_t *fs;
 	menu_item_t *volume;
+	fs_mount_t *mount;
 
 	/* Give the user a short time to hold down shift. */
 	spin(300000);
@@ -297,8 +297,8 @@ void menu_display(void) {
 	/* Add a list to choose the boot filesystem. */
 	volume = menu_add_choice(menu, "Boot Volume");
 	LIST_FOREACH(&filesystem_list, iter) {
-		fs = list_entry(iter, vfs_filesystem_t, header);
-		menu_item_add_choice(volume, fs->label, fs, fs == boot_filesystem);
+		mount = list_entry(iter, fs_mount_t, header);
+		menu_item_add_choice(volume, mount->label, mount, mount == boot_filesystem);
 	}
 
 	/* Add a menu to set kernel options. */
@@ -315,5 +315,5 @@ void menu_display(void) {
 	menu_display_real(menu, 0);
 
 	/* Pull the boot filesystem option out. */
-	boot_filesystem = (vfs_filesystem_t *)volume->value;
+	boot_filesystem = (fs_mount_t *)volume->value;
 }

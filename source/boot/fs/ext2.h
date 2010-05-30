@@ -21,8 +21,8 @@
 #ifndef __FS_EXT2_H
 #define __FS_EXT2_H
 
-#include <boot/vfs.h>
+#include <boot/fs.h>
 
-extern vfs_filesystem_ops_t ext2_filesystem_ops;
+extern fs_type_t ext2_fs_type;
 
 #endif /* __FS_EXT2_H */

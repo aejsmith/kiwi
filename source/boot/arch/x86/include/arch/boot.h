@@ -21,11 +21,11 @@
 #ifndef __ARCH_BOOT_H
 #define __ARCH_BOOT_H
 
-#include <boot/vfs.h>
+#include <boot/fs.h>
 #include <kargs.h>
 
 extern void idt_init(void);
-extern void arch_load_kernel(vfs_node_t *file);
+extern void arch_load_kernel(fs_node_t *file);
 extern void arch_enter_kernel(void) __noreturn;
 extern void arch_early_init(void);
 

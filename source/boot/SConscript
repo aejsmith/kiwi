@@ -20,11 +20,11 @@ sources = map(File, [
 	'partitions/msdos.c',
 	'console.c',
 	'fatal.c',
+	'fs.c',
 	'kargs.c',
 	'main.c',
 	'memory.c',
 	'menu.c',
-	'vfs.c',
 ])
 
 # Sources to use from the kernel.

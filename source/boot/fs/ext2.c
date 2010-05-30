@@ -33,7 +33,7 @@
 typedef struct ext2_mount {
 	ext2_superblock_t sb;			/**< Superblock of the filesystem. */
 	ext2_group_desc_t *group_tbl;		/**< Pointer to block group descriptor table. */
-	vfs_filesystem_t *parent;		/**< Pointer to FS structure. */
+	fs_mount_t *parent;			/**< Pointer to FS structure. */
 	uint32_t inodes_per_group;		/**< Inodes per group. */
 	uint32_t inodes_count;			/**< Inodes count. */
 	size_t blk_size;			/**< Size of a block on the filesystem. */
@@ -226,11 +226,11 @@ static bool ext2_inode_block_read(ext2_inode_t *inode, void *buf, uint32_t block
 }
 
 /** Read a node from the filesystem.
- * @param fs		Filesystem to read from.
+ * @param _mount	Mount to read from.
  * @param id		ID of node.
  * @return		Pointer to node on success, NULL on failure. */
-static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
-	ext2_mount_t *mount = fs->data;
+static fs_node_t *ext2_read_node(fs_mount_t *_mount, node_id_t id) {
+	ext2_mount_t *mount = _mount->data;
 	ext2_inode_t *inode;
 	size_t group, size;
 	offset_t offset;
@@ -252,7 +252,7 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
 	/* Read it in. */
 	size = (mount->in_size <= sizeof(ext2_disk_inode_t)) ? mount->in_size : sizeof(ext2_disk_inode_t);
 	offset = ((offset_t)le32_to_cpu(mount->group_tbl[group].bg_inode_table) * mount->blk_size) + offset;
-	if(!disk_read(fs->disk, &inode->disk, size, offset)) {
+	if(!disk_read(mount->parent->disk, &inode->disk, size, offset)) {
 		dprintf("ext2: failed to read inode %llu\n", id);
 		kfree(inode);
 		return false;
@@ -261,12 +261,10 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
 	size = le32_to_cpu(inode->disk.i_size);
 	switch(le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFMT) {
 	case EXT2_S_IFREG:
-		type = VFS_NODE_FILE;
+		type = FS_NODE_FILE;
 		break;
 	case EXT2_S_IFDIR:
-		/* For directories size is used internally by the VFS. */
-		size = 0;
-		type = VFS_NODE_DIR;
+		type = FS_NODE_DIR;
 		break;
 	default:
 		dprintf("ext2: unhandled inode type for %llu\n", id);
@@ -274,7 +272,7 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
 		return false;
 	}
 
-	return vfs_node_alloc(fs, id, type, size, inode);
+	return fs_node_alloc(mount->parent, id, type, size, inode);
 }
 
 /** Read from a file.
@@ -283,8 +281,8 @@ static vfs_node_t *ext2_node_get(vfs_filesystem_t *fs, node_id_t id) {
  * @param count		Number of bytes to read.
  * @param offset	Offset into the file.
  * @return		Whether read successfully. */
-static bool ext2_file_read(vfs_node_t *node, void *buf, size_t count, offset_t offset) {
-	ext2_mount_t *mount = node->fs->data;
+static bool ext2_read_file(fs_node_t *node, void *buf, size_t count, offset_t offset) {
+	ext2_mount_t *mount = node->mount->data;
 	ext2_inode_t *inode = node->data;
 	size_t blksize = mount->blk_size;
 	uint32_t start, end, i, size;
@@ -338,7 +336,7 @@ static bool ext2_file_read(vfs_node_t *node, void *buf, size_t count, offset_t o
 /** Cache directory entries.
  * @param node		Node to cache entries from.
  * @return		Whether cached successfully. */
-static bool ext2_dir_cache(vfs_node_t *node) {
+static bool ext2_read_dir(fs_node_t *node) {
 	ext2_inode_t *inode = node->data;
 	char *buf = NULL, *name = NULL;
 	ext2_dirent_t *dirent;
@@ -350,7 +348,7 @@ static bool ext2_dir_cache(vfs_node_t *node) {
 	name = kmalloc(EXT2_NAME_MAX + 1);
 
 	/* Read in all the directory entries required. */
-	if(!ext2_file_read(node, buf, le32_to_cpu(inode->disk.i_size), 0)) {
+	if(!ext2_read_file(node, buf, le32_to_cpu(inode->disk.i_size), 0)) {
 		goto out;
 	}
 
@@ -361,7 +359,7 @@ static bool ext2_dir_cache(vfs_node_t *node) {
 		if(dirent->file_type != EXT2_FT_UNKNOWN && dirent->name_len != 0) {
 			strncpy(name, dirent->name, dirent->name_len);
 			name[dirent->name_len] = 0;
-			vfs_dir_insert(node, name, le32_to_cpu(dirent->inode));
+			fs_dir_insert(node, name, le32_to_cpu(dirent->inode));
 		} else if(!le16_to_cpu(dirent->rec_len)) {
 			break;
 		}
@@ -379,20 +377,20 @@ out:
 }
 
 /** Create an instance of an Ext2 filesystem.
- * @param fs		Filesystem structure to fill in.
+ * @param mount		Mount structure to fill in.
  * @return		Whether succeeded in mounting. */
-static bool ext2_mount(vfs_filesystem_t *fs) {
+static bool ext2_mount(fs_mount_t *_mount) {
 	ext2_mount_t *mount;
 	offset_t offset;
 	size_t size;
 
 	/* Create a mount structure to track information about the mount. */
-	mount = fs->data = kmalloc(sizeof(ext2_mount_t));
-	mount->parent = fs;
+	mount = _mount->data = kmalloc(sizeof(ext2_mount_t));
+	mount->parent = _mount;
 
 	/* Read in the superblock. Must recheck whether we support it as
 	 * something could change between probe and this function. */
-	if(!disk_read(fs->disk, &mount->sb, sizeof(ext2_superblock_t), 1024)) {
+	if(!disk_read(mount->parent->disk, &mount->sb, sizeof(ext2_superblock_t), 1024)) {
 		goto fail;
 	} else if(le16_to_cpu(mount->sb.s_magic) != EXT2_MAGIC) {
 		goto fail;
@@ -416,32 +414,34 @@ static bool ext2_mount(vfs_filesystem_t *fs) {
 	offset = mount->blk_size * (le32_to_cpu(mount->sb.s_first_data_block) + 1);
 	size = ROUND_UP(mount->blk_groups * sizeof(ext2_group_desc_t), mount->blk_size);
 	mount->group_tbl = kmalloc(size);
-	if(!disk_read(fs->disk, mount->group_tbl, size, offset)) {
+	if(!disk_read(mount->parent->disk, mount->group_tbl, size, offset)) {
 		goto fail;
 	}
 
 	/* Now get the root inode (second inode in first group descriptor) */
-	if(!(fs->root = ext2_node_get(fs, EXT2_ROOT_INO))) {
+	if(!(mount->parent->root = ext2_read_node(mount->parent, EXT2_ROOT_INO))) {
 		goto fail;
 	}
 
 	/* Store label and UUID. */
-	fs->label = kstrdup(mount->sb.s_volume_name);
-	fs->uuid = kmalloc(37);
-	sprintf(fs->uuid, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-	         mount->sb.s_uuid[0], mount->sb.s_uuid[1], mount->sb.s_uuid[2],
-	         mount->sb.s_uuid[3], mount->sb.s_uuid[4], mount->sb.s_uuid[5],
-	         mount->sb.s_uuid[6], mount->sb.s_uuid[7], mount->sb.s_uuid[8],
-	         mount->sb.s_uuid[9], mount->sb.s_uuid[10], mount->sb.s_uuid[11],
-	         mount->sb.s_uuid[12], mount->sb.s_uuid[13], mount->sb.s_uuid[14],
-	         mount->sb.s_uuid[15]);
+	mount->parent->label = kstrdup(mount->sb.s_volume_name);
+	mount->parent->uuid = kmalloc(37);
+	sprintf(mount->parent->uuid, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+	        mount->sb.s_uuid[0], mount->sb.s_uuid[1], mount->sb.s_uuid[2],
+	        mount->sb.s_uuid[3], mount->sb.s_uuid[4], mount->sb.s_uuid[5],
+	        mount->sb.s_uuid[6], mount->sb.s_uuid[7], mount->sb.s_uuid[8],
+	        mount->sb.s_uuid[9], mount->sb.s_uuid[10], mount->sb.s_uuid[11],
+	        mount->sb.s_uuid[12], mount->sb.s_uuid[13], mount->sb.s_uuid[14],
+	        mount->sb.s_uuid[15]);
 
-	if(fs->disk->offset) {
+	if(mount->parent->disk->offset) {
 		dprintf("ext2: disk 0x%x partition %u mounted (label: %s, uuid: %s)\n",
-		        fs->disk->parent->id, fs->disk->id, fs->label, fs->uuid);
+		        mount->parent->disk->parent->id, mount->parent->disk->id,
+		        mount->parent->label, mount->parent->uuid);
 	} else {
 		dprintf("ext2: disk 0x%x mounted (label: %s, uuid: %s)\n",
-		        fs->disk->id, fs->label, fs->uuid);
+		        mount->parent->disk->id, mount->parent->label,
+		        mount->parent->uuid);
 	}
 	return true;
 fail:
@@ -450,9 +450,9 @@ fail:
 }
 
 /** Ext2 filesystem operations structure. */
-vfs_filesystem_ops_t ext2_filesystem_ops = {
-	.node_get = ext2_node_get,
-	.file_read = ext2_file_read,
-	.dir_cache = ext2_dir_cache,
+fs_type_t ext2_fs_type = {
+	.read_node = ext2_read_node,
+	.read_file = ext2_read_file,
+	.read_dir = ext2_read_dir,
 	.mount = ext2_mount,
 };
