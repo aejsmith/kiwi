@@ -33,6 +33,10 @@ int main(int argc, char **argv) {
 	service->addPort("org.kiwi.Pong");
 	svcmgr.addService(service);
 
+	service = new Service("shmserver", "Shared memory test server.", "/system/services/shmserver", Service::OnDemand);
+	service->addPort("org.kiwi.SHMServer");
+	svcmgr.addService(service);
+
 	svcmgr.run();
 	return 0;
 }

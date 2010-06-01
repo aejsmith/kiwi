@@ -33,6 +33,7 @@
 #include <public/ipc.h>
 #include <public/object.h>
 #include <public/semaphore.h>
+#include <public/shm.h>
 #include <public/vm.h>
 
 #include <sync/rwlock.h>
@@ -116,6 +117,10 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_ipc_message_sendv,
 	(syscall_handler_t)sys_ipc_message_peek,
 	(syscall_handler_t)sys_ipc_message_receive,
+	(syscall_handler_t)sys_shm_create,
+	(syscall_handler_t)sys_shm_open,
+	(syscall_handler_t)sys_shm_id,
+	(syscall_handler_t)sys_shm_resize,
 };
 
 /** Main kernel system call service. */

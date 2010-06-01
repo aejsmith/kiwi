@@ -40,6 +40,7 @@ extern "C" {
 #define OBJECT_TYPE_PORT	6	/**< IPC port. */
 #define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 #define OBJECT_TYPE_SEMAPHORE	8	/**< Semaphore. */
+#define OBJECT_TYPE_SHM		9	/**< Shared memory area. */
 
 /** Handle sbehaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */

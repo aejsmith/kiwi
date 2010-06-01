@@ -17,4 +17,5 @@ SConscript(dirs=[
 	'dungeon',
 	'failshell',
 	'ping',
+	'shmtest',
 ], exports=['env'])
