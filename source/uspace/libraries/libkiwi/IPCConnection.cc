@@ -120,6 +120,16 @@ bool IPCConnection::receive(uint32_t &type, char *&data, size_t &size, useconds_
 	return true;
 }
 
+/** Wait for the remote end to hang up the connection.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will block
+ *			until the connection is hung up, and a timeout of 0
+ *			will return immediately if the connection is not
+ *			already hung up.
+ * @return		Whether successful. */
+bool IPCConnection::waitHangup(useconds_t timeout) const {
+	return wait(CONNECTION_EVENT_HANGUP, timeout);
+}
+
 /** Register events with the event loop. */
 void IPCConnection::registerEvents() {
 	registerEvent(CONNECTION_EVENT_HANGUP);

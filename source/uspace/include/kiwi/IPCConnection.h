@@ -33,11 +33,10 @@ public:
 	bool connect(port_id_t id);
 	bool connect(const char *name);
 
-	//bool Send(Message &message);
 	bool send(uint32_t type, const void *buf, size_t size);
-
-	//bool Receive(Message *&message, useconds_t timeout = -1);
 	bool receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
+
+	bool waitHangup(useconds_t timeout = -1) const;
 
 	Signal<IPCConnection *> onMessage;
 	Signal<IPCConnection *> onHangup;
