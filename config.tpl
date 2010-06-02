@@ -25,7 +25,7 @@ Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-serial stdio -vga std')
 Option('TOOLCHAIN_DIR', 'Directory to store toolchain builds in.', '/please/change/me')
 Option('TOOLCHAIN_MAKE_JOBS', 'Argument to pass to -j for make when building toolchain.', 1)
 Option('USE_CLANG', 'Use Clang/LLVM to build the kernel.', False)
-Option('USE_LTO', "Use GCC's link-time optimisation on the kernel.", True, {'USE_CLANG': lambda x: not x})
+Option('USE_LTO', "Use GCC's link-time optimisation on the kernel.", False, {'USE_CLANG': lambda x: not x})
 Option('EXTRA_FSIMAGE', 'Path to a directory containing extra FS image files.', '')
 
 #######
