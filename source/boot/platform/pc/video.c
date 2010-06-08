@@ -51,8 +51,8 @@ typedef struct video_mode {
 /** List of video modes. */
 static LIST_DECLARE(video_modes);
 
-/** Detected best video mode. */
-static video_mode_t *best_video_mode = NULL;
+/** Detected video mode. */
+static video_mode_t *detected_video_mode = NULL;
 
 /** Menu choice for the video mode. */
 static menu_item_t *video_mode_choice = NULL;
@@ -82,13 +82,6 @@ static video_mode_t *video_mode_find(int width, int height, int depth) {
 	}
 
 	return ret;
-}
-
-/** Detect the best mode to use via EDID.
- * @todo		Implement this.
- * @return		Best mode to use, or NULL if unable to detect. */
-static video_mode_t *probe_mode_edid(void) {
-	return NULL;
 }
 
 /** Get the mode specified by the override string.
@@ -132,7 +125,7 @@ void platform_add_menu_options(menu_t *menu, menu_t *options) {
 		str = kmalloc(16);
 		sprintf(str, "%dx%dx%d", mode->width, mode->height, mode->bpp);
 
-		menu_item_add_choice(video_mode_choice, str, mode, mode == best_video_mode);
+		menu_item_add_choice(video_mode_choice, str, mode, mode == detected_video_mode);
 	}
 }
 
@@ -219,17 +212,15 @@ void platform_video_init(void) {
 		fatal("No usable video modes detected");
 	}
 
-	/* Try to find the best mode. */
-	if(!(best_video_mode = get_override_mode())) {
-		if(!(best_video_mode = probe_mode_edid())) {
-			if(!(best_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
-			                                       PREFERRED_MODE_HEIGHT,
-			                                       0))) {
-				if(!(best_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
-				                                       FALLBACK_MODE_HEIGHT,
-				                                       0))) {
-					fatal("Could not find video mode to use");
-				}
+	/* Try to find the mode to use. */
+	if(!(detected_video_mode = get_override_mode())) {
+		if(!(detected_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
+		                                           PREFERRED_MODE_HEIGHT,
+		                                           0))) {
+			if(!(detected_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
+			                                           FALLBACK_MODE_HEIGHT,
+			                                           0))) {
+				fatal("Could not find video mode to use");
 			}
 		}
 	}
@@ -245,7 +236,7 @@ void platform_video_enable(void) {
 	if(video_mode_choice) {
 		mode = (video_mode_t *)video_mode_choice->value;
 	} else {
-		mode = best_video_mode;
+		mode = detected_video_mode;
 	}
 
 	/* Set the mode. Bit 14 in the mode ID indicates that we wish to use
