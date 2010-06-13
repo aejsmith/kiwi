@@ -586,8 +586,8 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	page_map_kernel_range(args, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
 	page_map_kernel_range(args, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
 
-	/* Create 4GB of physical mapping for now. FIXME. */
-	for(i = 0; i < 0x100000000; i += 0x40000000) {
+	/* Create 8GB of physical mapping for now. FIXME. */
+	for(i = 0; i < 0x200000000; i += 0x40000000) {
 		pdir = page_map_get_pdir(&kernel_page_map, i + KERNEL_PMAP_BASE, true, MM_FATAL);
 		for(j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
 			pdir[j / LARGE_PAGE_SIZE] = (i + j) | PG_PRESENT | PG_WRITE | PG_GLOBAL | PG_LARGE;
