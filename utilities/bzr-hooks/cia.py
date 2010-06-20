@@ -103,7 +103,7 @@ class CIASubmitter:
 			raise self.CIADeliverError(errmsg)
 
 	def submit(self, revid, revno, dry_run):
-		info("Submitting revision %d to CIA." % (revno))
+		info("Submitting revision %s to CIA." % (revno))
 
 		# Generate the message.
 		msg = self.generate_xml(revid, revno)
@@ -142,10 +142,10 @@ def cia_hook_change_tip(params):
 	# Iterate over each revision in the change set.
 	revisions = params.branch.iter_merge_sorted_revisions(params.new_revid, params.old_revid, 'exclude', 'forward')
 	for revision in revisions:
-		# Ignore merge commits.
 		if revision[1]:
-			continue
-		submitter.submit(revision[0], revision[2][0], dry_run)
+			submitter.submit(revision[0], "%d.%d.%d" % revision[2], dry_run)
+		else:
+			submitter.submit(revision[0], revision[2][0], dry_run)
 
 Branch.hooks.install_named_hook('post_change_branch_tip', cia_hook_change_tip, 'CIA')
 
