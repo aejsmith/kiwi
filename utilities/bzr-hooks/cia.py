@@ -139,6 +139,11 @@ def cia_hook_change_tip(params):
 	# Create the submitter object.
 	submitter = CIASubmitter(params.branch, project)
 
+	# Re-lookup the revision IDs from the revision numbers because for some
+	# reason the IDs given in the parameters are not the correct IDs.
+	params.old_revid = params.branch.get_rev_id(params.old_revno)
+	params.new_revid = params.branch.get_rev_id(params.new_revno)
+
 	# Iterate over each revision in the change set.
 	revisions = params.branch.iter_merge_sorted_revisions(params.new_revid, params.old_revid, 'exclude', 'forward')
 	for revision in revisions:
