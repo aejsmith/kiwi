@@ -47,6 +47,26 @@ static void fatal_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
+/** Structure containing a stack frame. */
+typedef struct stack_frame {
+	struct stack_frame *next;	/**< Pointer to next stack frame. */
+	ptr_t addr;			/**< Function return address. */
+} stack_frame_t;
+
+static void backtrace(void) {
+	stack_frame_t *frame;
+	ptr_t addr = 0;
+
+	__asm__ volatile("mov %%ebp, %0" : "=r"(addr));
+	frame = (stack_frame_t *)addr;
+
+	fatal_printf("\n--- Stacktrace ---\n");
+	while(frame) {
+		fatal_printf("%p\n", frame->addr);
+		frame = frame->next;
+	}
+}
+
 /** Display a fatal error message and halt execution.
  * @param fmt		Format string for error message.
  * @param ...		Arguments to substitute into format. */
@@ -65,5 +85,6 @@ void fatal(const char *fmt, ...) {
 	fatal_printf("not have any malfunctioning hardware. If the problem persists, please\n");
 	fatal_printf("report it to http://kiwi.alex-smith.me.uk/\n");
 
+	backtrace();
 	while(1);
 }

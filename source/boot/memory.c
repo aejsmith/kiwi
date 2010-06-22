@@ -29,7 +29,7 @@
 #include <fatal.h>
 
 /** Size of the heap (128KB). */
-#define HEAP_SIZE		0x20000
+#define HEAP_SIZE		131072
 
 /** Structure used to represent a physical memory range internally. */
 typedef struct memory_range {
@@ -39,11 +39,17 @@ typedef struct memory_range {
 	int type;			/**< Type of range. */
 } memory_range_t;
 
+/** Structure representing an area on the heap. */
+typedef struct heap_chunk {
+	list_t header;			/**< Link to chunklist. */
+	unsigned long size;		/**< Size of chunk including struct (low bit == used). */
+} heap_chunk_t;
+
 extern char __start[], __end[], boot_stack[];
 
 /** Statically allocated heap. */
-static uint8_t loader_heap[HEAP_SIZE] __aligned(PAGE_SIZE);
-static size_t loader_heap_next = 0;
+static uint8_t heap[HEAP_SIZE] __aligned(PAGE_SIZE);
+static LIST_DECLARE(heap_chunks);
 
 /** List of physical memory ranges. */
 static LIST_DECLARE(memory_ranges);
@@ -179,25 +185,126 @@ static void phys_memory_add_internal(phys_ptr_t start, phys_ptr_t end, int type)
 	memory_range_merge(range);
 }
 
+/** Get the size of a heap chunk.
+ * @param chunk		Chunk to get size of.
+ * @return		Size of chunk. */
+static inline size_t heap_chunk_size(heap_chunk_t *chunk) {
+	return (chunk->size & ~(1<<0));
+}
+
+/** Check whether a heap chunk is free.
+ * @param chunk		Chunk to check.
+ * @return		Whether chunk is free. */
+static inline bool heap_chunk_free(heap_chunk_t *chunk) {
+	return !(chunk->size & (1<<0));
+}
+
 /** Allocate memory from the heap.
  * @note		A fatal error will be raised if heap is full.
  * @param size		Size of allocation to make.
  * @return		Address of allocation. */
 void *kmalloc(size_t size) {
-	uint8_t *ret = loader_heap + loader_heap_next;
+	heap_chunk_t *chunk = NULL, *new;
+	size_t total;
 
-	if((loader_heap_next + size) > HEAP_SIZE) {
-		fatal("Exhausted available heap space");
+	if(size == 0) {
+		fatal("Zero-sized allocation!");
 	}
 
-	loader_heap_next += size;
-	return ret;
+	/* Align all allocations to 8 bytes. */
+	size = ROUND_UP(size, 8);
+	total = size + sizeof(heap_chunk_t);
+
+	/* Create the initial free segment if necessary. */
+	if(list_empty(&heap_chunks)) {
+		chunk = (heap_chunk_t *)heap;
+		chunk->size = HEAP_SIZE;
+		list_init(&chunk->header);
+		list_append(&heap_chunks, &chunk->header);
+	} else {
+		/* Search for a free chunk. */
+		LIST_FOREACH(&heap_chunks, iter) {
+			chunk = list_entry(iter, heap_chunk_t, header);
+			if(heap_chunk_free(chunk) && chunk->size >= total) {
+				break;
+			} else {
+				chunk = NULL;
+			}
+		}
+
+		if(!chunk) {
+			fatal("Could not satisfy allocation of %u bytes", size);
+		}
+	}
+
+	/* Resize the segment if it is too big. There must be space for a
+	 * second chunk header afterwards. */
+	if(chunk->size >= (total + sizeof(heap_chunk_t))) {
+		new = (heap_chunk_t *)((char *)chunk + total);
+		new->size = chunk->size - total;
+		list_init(&new->header);
+		list_add_after(&chunk->header, &new->header);
+		chunk->size = total;
+	}
+	chunk->size |= (1<<0);
+	return ((char *)chunk + sizeof(heap_chunk_t));
+}
+
+/** Resize a memory allocation.
+ * @param addr		Address of old allocation.
+ * @param size		New size of allocation.
+ * @return		Address of new allocation, or NULL if size is 0. */
+void *krealloc(void *addr, size_t size) {
+	heap_chunk_t *chunk;
+	void *new;
+
+	if(size == 0) {
+		kfree(addr);
+		return NULL;
+	} else {
+		new = kmalloc(size);
+		if(addr) {
+			chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
+			memcpy(new, addr, MIN(heap_chunk_size(chunk) - sizeof(heap_chunk_t), size));
+			kfree(addr);
+		}
+		return new;
+	}
 }
 
 /** Free memory allocated with kfree().
  * @param addr		Address of allocation. */
 void kfree(void *addr) {
-	/* FIXME: Implement. */
+	heap_chunk_t *chunk, *adj;
+
+	if(!addr) {
+		return;
+	}
+
+	/* Get the chunk and free it. */
+	chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
+	if(heap_chunk_free(chunk)) {
+		fatal("Double free on address %p", addr);
+	}
+	chunk->size &= ~(1<<0);
+
+	/* Coalesce adjacent free segments. */
+	if(chunk->header.next != &heap_chunks) {
+		adj = list_entry(chunk->header.next, heap_chunk_t, header);
+		if(heap_chunk_free(adj)) {
+			assert(adj == (heap_chunk_t *)((char *)chunk + chunk->size));
+			chunk->size += adj->size;
+			list_remove(&adj->header);
+		}
+	}
+	if(chunk->header.prev != &heap_chunks) {
+		adj = list_entry(chunk->header.prev, heap_chunk_t, header);
+		if(heap_chunk_free(adj)) {
+			assert(chunk == (heap_chunk_t *)((char *)adj + adj->size));
+			adj->size += chunk->size;
+			list_remove(&chunk->header);
+		}
+	}
 }
 
 /** Add a range of physical memory.
@@ -257,7 +364,7 @@ void memory_init(void) {
 	phys_memory_add(ROUND_DOWN((phys_ptr_t)((ptr_t)__start), PAGE_SIZE),
 	                (phys_ptr_t)((ptr_t)__end),
 	                PHYS_MEMORY_INTERNAL);
-	phys_memory_add((ptr_t)loader_heap, (ptr_t)loader_heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
+	phys_memory_add((ptr_t)heap, (ptr_t)heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
 
 	/* Mark the boot CPU's stack as reclaimable. */
 	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);

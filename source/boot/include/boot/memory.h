@@ -25,6 +25,7 @@
 #include <kargs.h>
 
 extern void *kmalloc(size_t size);
+extern void *krealloc(void *addr, size_t size);
 extern void kfree(void *addr);
 
 extern void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type);
