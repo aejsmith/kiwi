@@ -34,11 +34,11 @@ typedef struct iso9660_mount {
 	int joliet_level;		/**< Joliet level. */
 } iso9660_mount_t;
 
-/** Structure containing details of an ISO9660 node. */
-typedef struct iso9660_node {
+/** Structure containing details of an ISO9660 handle. */
+typedef struct iso9660_handle {
 	uint32_t data_len;		/**< Data length. */
 	uint32_t extent;		/**< Extent block number. */
-} iso9660_node_t;
+} iso9660_handle_t;
 
 /** Convert a wide character to a multibyte sequence. */
 static int utf8_wctomb(uint8_t *s, uint32_t wc, size_t max) {
@@ -112,23 +112,6 @@ static int wcsntombs_be(uint8_t *s, uint8_t *pwcs, int inlen, int maxlen) {
 		inlen--;
 	}
 	return op - s;
-}
-
-/** Work out an ISO9660 node number.
- * @param extent	Location of extent containing directory record.
- * @param offset	Offset into extent of directory record.
- * @return		Inode number. */
-static node_id_t iso9660_node_num(uint32_t extent, uint32_t offset) {
-	return ((node_id_t)extent << 32) | (node_id_t)offset;
-}
-
-/** Get location of a directory record from a node number.
- * @param num		Node number to convert.
- * @param extentp	Where to store extent containing directory record.
- * @param offsetp	Where to store offset into extent of record. */
-static void iso9660_record_location(node_id_t num, uint32_t *extentp, uint32_t *offsetp) {
-	*extentp = num >> 32;
-	*offsetp = num & 0xFFFFFFFF;
 }
 
 /** Parse a name from a directory record.
@@ -219,19 +202,15 @@ static char *iso9660_make_uuid(iso9660_primary_volume_desc_t *pri) {
 	return uuid;
 }
 
-/** Create a node from a directory record.
+/** Create a handle from a directory record.
  * @param mount		Mount the node is from.
- * @param id		ID to give the node.
  * @param rec		Record to create from.
- * @return		Pointer to node. */
-static fs_node_t *iso9660_node_create(fs_mount_t *mount, node_id_t id, iso9660_directory_record_t *rec) {
-	int type = (rec->file_flags & (1<<1)) ? FS_NODE_DIR : FS_NODE_FILE;
-	iso9660_node_t *node;
-
-	node = kmalloc(sizeof(iso9660_node_t));
-	node->data_len = le32_to_cpu(rec->data_len_le);
-	node->extent = le32_to_cpu(rec->extent_loc_le);
-	return fs_node_alloc(mount, id, type, node->data_len, node);
+ * @return		Pointer to handle. */
+static fs_handle_t *iso9660_handle_create(fs_mount_t *mount, iso9660_directory_record_t *rec) {
+	iso9660_handle_t *data = kmalloc(sizeof(iso9660_handle_t));
+	data->data_len = le32_to_cpu(rec->data_len_le);
+	data->extent = le32_to_cpu(rec->extent_loc_le);
+	return fs_handle_create(mount, (rec->file_flags & (1<<1)), data);
 }
 
 /** Mount an ISO9660 filesystem.
@@ -306,12 +285,12 @@ static bool iso9660_mount(fs_mount_t *mount) {
 	/* Retreive the root node. */
 	if(joliet) {
 		assert(sup);
-		mount->root = iso9660_node_create(mount, 0, (iso9660_directory_record_t *)&sup->root_dir_record);
+		mount->root = iso9660_handle_create(mount, (iso9660_directory_record_t *)&sup->root_dir_record);
 	} else {
-		mount->root = iso9660_node_create(mount, 0, (iso9660_directory_record_t *)&pri->root_dir_record);
+		mount->root = iso9660_handle_create(mount, (iso9660_directory_record_t *)&pri->root_dir_record);
 	}
-	dprintf("iso9660: disk 0x%x mounted (label: %s, joliet: %d, uuid: %s)\n",
-	        mount->disk->id, mount->label, joliet, mount->uuid);
+	dprintf("iso9660: disk %s mounted (label: %s, joliet: %d, uuid: %s)\n",
+	        mount->disk->name, mount->label, joliet, mount->uuid);
 	ret = true;
 out:
 	if(pri) {
@@ -324,59 +303,48 @@ out:
 	return ret;
 }
 
-/** Read a node from a filesystem.
- * @param mount		Mount to get from.
- * @param id		ID of node to read.
- * @return		Pointer to node on success, NULL on failure. */
-static fs_node_t *iso9660_read_node(fs_mount_t *mount, node_id_t id) {
-	iso9660_directory_record_t record;
-	uint32_t extent, offset;
-
-	/* Convert the node number to the directory record location. */
-	iso9660_record_location(id, &extent, &offset);
-
-	/* Read it in. */
-	if(!disk_read(mount->disk, &record, sizeof(iso9660_directory_record_t),
-	              (extent * ISO9660_BLOCK_SIZE) + offset)) {
-		return false;
-	}
-
-	/* Create the node. */
-	return iso9660_node_create(mount, id, &record);
+/** Close an ISO9660 handle.
+ * @param handle	Handle to close. */
+static void iso9660_close(fs_handle_t *handle) {
+	kfree(handle->data);
 }
 
-/** Read data from a file.
- * @param node		Node to read from.
+/** Read from an ISO9660 handle.
+ * @param handle	Handle to read from.
  * @param buf		Buffer to read into.
  * @param size		Size to read.
  * @param offset	Offset to read from.
  * @return		Whether the read succeeded. */
-static bool iso9660_read_file(fs_node_t *node, void *buf, size_t size, offset_t offset) {
-	iso9660_node_t *data = node->data;
+static bool iso9660_read(fs_handle_t *handle, void *buf, size_t size, offset_t offset) {
+	iso9660_handle_t *data = handle->data;
 
-	if(!size || offset > data->data_len) {
+	if(!size || offset >= data->data_len) {
 		return 0;
 	} else if((offset + size) > data->data_len) {
 		return 0;
 	}
 
-	return disk_read(node->mount->disk, buf, size, (data->extent * ISO9660_BLOCK_SIZE) + offset);
+	return disk_read(handle->mount->disk, buf, size, (data->extent * ISO9660_BLOCK_SIZE) + offset);
 }
 
-/** Cache entries in a directory.
- * @param node		Node to cache.
- * @return		Whether succeeded in caching. */
-static bool iso9660_read_dir(fs_node_t *node) {
-	iso9660_mount_t *mount = node->mount->data;
-	iso9660_node_t *data = node->data;
+/** Read directory entries.
+ * @param handle	Handle to directory.
+ * @param cb		Callback to call on each entry.
+ * @param arg		Data to pass to callback.
+ * @return		Whether read successfully. */
+static bool iso9660_read_dir(fs_handle_t *handle, fs_dir_read_cb_t cb, void *arg) {
+	iso9660_mount_t *mount = handle->mount->data;
+	iso9660_handle_t *data = handle->data;
 	iso9660_directory_record_t *rec;
 	char name[ISO9660_NAME_SIZE];
 	uint32_t offset = 0;
+	fs_handle_t *child;
 	char *buf;
+	bool ret;
 
 	/* Read in all the directory data. */
 	buf = kmalloc(data->data_len);
-	if(!disk_read(node->mount->disk, buf, data->data_len, data->extent * ISO9660_BLOCK_SIZE)) {
+	if(!iso9660_read(handle, buf, data->data_len, 0)) {
 		kfree(buf);
 		return false;
 	}
@@ -403,16 +371,22 @@ static bool iso9660_read_dir(fs_node_t *node) {
 			iso9660_parse_name(rec, name);
 		}
 
-		fs_dir_insert(node, name, iso9660_node_num(data->extent, offset - rec->rec_len));
+		child = iso9660_handle_create(handle->mount, rec);
+		ret = cb(name, child, arg);
+		fs_close(child);
+		if(!ret) {
+			break;
+		}
 	}
 
+	kfree(buf);
 	return true;
 }
 
 /** ISO9660 filesystem operations structure. */
 fs_type_t iso9660_fs_type = {
 	.mount = iso9660_mount,
-	.read_node = iso9660_read_node,
-	.read_file = iso9660_read_file,
+	.close = iso9660_close,
+	.read = iso9660_read,
 	.read_dir = iso9660_read_dir,
 };

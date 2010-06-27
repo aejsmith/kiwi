@@ -33,7 +33,7 @@ bool msdos_partition_probe(disk_t *disk) {
 	size_t i;
 
 	/* Read in the MBR, which is in the first block on the device. */
-	if(!disk_read(disk, mbr, 0, 1) || mbr->signature != MSDOS_SIGNATURE) {
+	if(!disk_read(disk, mbr, sizeof(msdos_mbr_t), 0) || mbr->signature != MSDOS_SIGNATURE) {
 		kfree(mbr);
 		return false;
 	}

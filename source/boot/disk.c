@@ -19,10 +19,13 @@
  */
 
 #include <boot/disk.h>
+#include <boot/fs.h>
 #include <boot/memory.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <fatal.h>
 
 #include "partitions/msdos.h"
 
@@ -55,22 +58,85 @@ disk_t *disk_lookup(const char *str) {
 			if(strncmp(disk->name, str + 1, strlen(str) - 2) == 0) {
 				return disk;
 			}
-		} else {
-			/* FIXME. */
+		} else if(disk->fs && disk->fs->uuid) {
+			if(strcmp(disk->fs->uuid, str) == 0) {
+				return disk;
+			}
 		}
 	}
 
 	return NULL;
 }
 
-/** Read blocks from a disk device.
+/** Read from a disk.
  * @param disk		Disk to read from.
  * @param buf		Buffer to read into.
- * @param lba		Starting block number.
- * @param count		Number of blocks to read.
+ * @param count		Number of bytes to read.
+ * @param offset	Offset in the disk to read from.
  * @return		Whether the read was successful. */
-bool disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) {
-	return disk->ops->read(disk, buf, lba, count);
+bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
+	size_t blksize = disk->block_size;
+	uint64_t start, end, size;
+	void *block = NULL;
+
+	if(!count) {
+		return true;
+	}
+
+	/* Allocate a temporary buffer for partial transfers if required. */
+	if(offset % blksize || count % blksize) {
+		block = kmalloc(blksize);
+	}
+
+	/* Now work out the start block and the end block. Subtract one from
+	 * count to prevent end from going onto the next block when the offset
+	 * plus the count is an exact multiple of the block size. */
+	start = offset / blksize;
+	end = (offset + (count - 1)) / blksize;
+
+	/* If we're not starting on a block boundary, we need to do a partial
+	 * transfer on the initial block to get up to a block boundary. 
+	 * If the transfer only goes across one block, this will handle it. */
+	if(offset % blksize) {
+		/* Read the block into the temporary buffer. */
+		if(!disk->ops->read(disk, block, start, 1)) {
+			kfree(block);
+			return false;
+		}
+
+		size = (start == end) ? count : blksize - (size_t)(offset % blksize);
+		memcpy(buf, block + (offset % blksize), size);
+		buf += size; count -= size; start++;
+	}
+
+	/* Handle any full blocks. */
+	size = count / blksize;
+	if(size) {
+		if(!disk->ops->read(disk, buf, start, size)) {
+			if(block) {
+				kfree(block);
+			}
+			return false;
+		}
+		buf += (size * blksize);
+		count -= (size * blksize);
+		start += size;
+	}
+
+	/* Handle anything that's left. */
+	if(count > 0) {
+		if(!disk->ops->read(disk, block, start, 1)) {
+			kfree(block);
+			return false;
+		}
+
+		memcpy(buf, block, count);
+	}
+
+	if(block) {
+		kfree(block);
+	}
+	return true;
 }
 
 /** Probe a disk for filesystems/partitions.
@@ -78,13 +144,13 @@ bool disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) {
 static void disk_probe(disk_t *disk) {
 	size_t i;
 
-	//if(!(disk->fs = fs_probe(disk))) {
+	if(!(disk->fs = fs_probe(disk))) {
 		for(i = 0; i < ARRAYSZ(partition_probe_funcs); i++) {
 			if(partition_probe_funcs[i](disk)) {
 				return;
 			}
 		}
-	//}
+	}
 }
 
 /** Read blocks from a partition.
@@ -123,11 +189,11 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
 
 	/* Probe for filesystems/partitions. */
 	disk_probe(disk);
-	//if(disk->fs && parent->boot && parent->is_boot_partition) {
-	//	if(parent->is_boot_partition(parent, id, lba)) {
-	//		boot_filesystem = disk->fs;
-	//	}
-	//}
+	if(disk->fs && parent->boot && parent->ops->is_boot_partition) {
+		if(parent->ops->is_boot_partition(parent, id, lba)) {
+			boot_filesystem = disk->fs;
+		}
+	}
 
 	list_append(&disk_list, &disk->header);
 }
@@ -153,9 +219,9 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 
 	/* Probe for filesystems/partitions. */
 	disk_probe(disk);
-	//if(disk->fs && boot) {
-	//	boot_filesystem = disk->fs;
-	//}
+	if(disk->fs && boot) {
+		boot_filesystem = disk->fs;
+	}
 
 	list_append(&disk_list, &disk->header);
 }
@@ -163,7 +229,7 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 /** Detect all disk devices. */
 void disk_init(void) {
 	platform_disk_detect();
-	//if(!boot_filesystem) {
-	//	fatal("Could not find boot filesystem");
-	//}
+	if(!boot_filesystem) {
+		fatal("Could not find boot filesystem");
+	}
 }

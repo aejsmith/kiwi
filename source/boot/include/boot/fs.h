@@ -23,12 +23,15 @@
 
 #include <boot/disk.h>
 
-#include <lib/list.h>
-#include <lib/refcount.h>
-#include <lib/utility.h>
-
 struct fs_mount;
-struct fs_node;
+struct fs_handle;
+
+/** Type of a fs_dir_read() callback.
+ * @param name		Name of the entry.
+ * @param handle	Handle to entry.
+ * @param data		Data argument passed to fs_dir_read().
+ * @return		Whether to continue iteration. */
+typedef bool (*fs_dir_read_cb_t)(const char *name, struct fs_handle *handle, void *arg);
 
 /** Structure containing operations for a filesystem. */
 typedef struct fs_type {
@@ -37,81 +40,59 @@ typedef struct fs_type {
 	 * @return		Whether succeeded in mounting. */
 	bool (*mount)(struct fs_mount *mount);
 
-	/** Read a node from the filesystem.
-	 * @param mount		Mount to read from.
-	 * @param id		ID of node.
-	 * @return		Pointer to node on success, NULL on failure. */
-	struct fs_node *(*read_node)(struct fs_mount *mount, node_id_t id);
+	/** Open a file/directory on the filesystem.
+	 * @note		If not provided, a generic implementation will
+	 *			be used that uses read_dir().
+	 * @param mount		Mount to open from.
+	 * @param path		Path to file/directory to open.
+	 * @return		Pointer to handle on success, NULL on failure. */
+	struct fs_handle *(*open)(struct fs_mount *mount, const char *path);
+
+	/** Close a handle.
+	 * @param handle	Handle to close. */
+	void (*close)(struct fs_handle *handle);
 
 	/** Read from a file.
-	 * @param node		Node referring to file.
+	 * @param handle	Handle to the file.
 	 * @param buf		Buffer to read into.
 	 * @param count		Number of bytes to read.
 	 * @param offset	Offset into the file.
 	 * @return		Whether read successfully. */
-	bool (*read_file)(struct fs_node *node, void *buf, size_t count, offset_t offset);
+	bool (*read)(struct fs_handle *handle, void *buf, size_t count, offset_t offset);
 
-	/** Cache directory entries.
-	 * @param node		Node to cache entries from.
-	 * @return		Whether cached successfully. */
-	bool (*read_dir)(struct fs_node *node);
+	/** Read directory entries.
+	 * @param handle	Handle to directory.
+	 * @param cb		Callback to call on each entry.
+	 * @param arg		Data to pass to callback.
+	 * @return		Whether read successfully. */
+	bool (*read_dir)(struct fs_handle *handle, fs_dir_read_cb_t cb, void *arg);
 } fs_type_t;
 
 /** Structure representing a mounted filesystem. */
 typedef struct fs_mount {
-	list_t header;			/**< Link to mounts list. */
-
 	fs_type_t *type;		/**< Type structure for the filesystem. */
+	struct fs_handle *root;		/**< Handle to root of FS (not needed if open() implemented). */
 	void *data;			/**< Implementation-specific data pointer. */
 	disk_t *disk;			/**< Disk that the filesystem resides on. */
 	char *label;			/**< Label of the filesystem. */
 	char *uuid;			/**< UUID of the filesystem. */
-	struct fs_node *root;		/**< Root of the filesystem. */
-	list_t nodes;			/**< List of nodes. */
 } fs_mount_t;
 
-/** Structure representing a filesystem node. */
-typedef struct fs_node {
-	list_t header;			/**< Link to filesystem's node list. */
-
-	fs_mount_t *mount;		/**< Mount that the node is on. */
-	node_id_t id;			/**< Node number. */
-
-	/** Type of the node. */
-	enum {
-		FS_NODE_FILE,		/**< Regular file. */
-		FS_NODE_DIR,		/**< Directory. */
-	} type;
-
-	refcount_t count;		/**< Reference count. */
-	offset_t size;			/**< Size of the file. */
+/** Structure representing a handle to a filesystem entry. */
+typedef struct fs_handle {
+	fs_mount_t *mount;		/**< Mount the entry is on. */
+	bool directory;			/**< Whether the entry is a directory. */
 	void *data;			/**< Implementation-specific data pointer. */
+	int count;			/**< Reference count. */
+} fs_handle_t;
 
-	list_t entries;			/**< Directory entries. */
-} fs_node_t;
-
-/** Structure representing a directory entry. */
-typedef struct fs_dir_entry {
-	list_t header;			/**< Link to entry list. */
-	char *name;			/**< Name of entry. */
-	node_id_t id;			/**< Node ID entry refers to. */
-} fs_dir_entry_t;
-
-extern list_t filesystem_list;
 extern fs_mount_t *boot_filesystem;
-extern char *boot_path_override;
 
-extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, int type, offset_t size, void *data);
-extern void fs_node_get(fs_node_t *node);
-extern void fs_node_release(fs_node_t *node);
-
-extern fs_node_t *fs_lookup(fs_mount_t *mount, const char *path);
-extern fs_node_t *fs_find_boot_path(fs_mount_t *mount);
-
-extern bool fs_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset);
-
-extern void fs_dir_insert(fs_node_t *node, char *name, node_id_t id);
-extern fs_node_t *fs_dir_lookup(fs_node_t *node, const char *name);
-extern fs_dir_entry_t *fs_dir_iterate(fs_node_t *node, fs_dir_entry_t *prev);
+extern fs_handle_t *fs_handle_create(fs_mount_t *mount, bool directory, void *data);
+extern fs_mount_t *fs_probe(disk_t *disk);
+extern fs_handle_t *fs_open(fs_mount_t *mount, const char *path);
+extern void fs_close(fs_handle_t *handle);
+extern bool fs_file_read(fs_handle_t *handle, void *buf, size_t count, offset_t offset);
+extern bool fs_dir_read(fs_handle_t *handle, fs_dir_read_cb_t cb, void *arg);
 
 #endif /* __BOOT_FS_H */

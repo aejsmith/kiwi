@@ -27,6 +27,8 @@
 #include <platform/bios.h>
 #include <platform/multiboot.h>
 
+#include <assert.h>
+
 /** Drive parameters structure. We only care about the EDD 1.x fields. */
 typedef struct drive_parameters {
 	uint16_t size;
@@ -92,6 +94,8 @@ static bool bios_disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) 
 	void *dest = (void *)(BIOS_MEM_BASE + disk->block_size);
 	bios_disk_t *data = disk->data;
 	bios_regs_t regs;
+
+	assert((disk->block_size * (count + 1)) <= BIOS_MEM_SIZE);
 
 	/* Fill in a disk address packet for the transfer. The block is placed
 	 * immediately after the packet. */
