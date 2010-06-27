@@ -28,8 +28,6 @@
 #include "fs/ext2.h"
 #include "fs/iso9660.h"
 
-#include "partitions/msdos.h"
-
 /** List of all detected filesystems. */
 LIST_DECLARE(filesystem_list);
 
@@ -49,11 +47,6 @@ static const char *boot_paths[] = {
 static fs_type_t *filesystem_types[] = {
 	&ext2_fs_type,
 	&iso9660_fs_type,
-};
-
-/** Array of partition probe functions. */
-static bool (*partition_probe_funcs[])(disk_t *) = {
-	msdos_partition_probe,
 };
 
 /** Look up a node by ID on a filesystem.

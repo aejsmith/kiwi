@@ -421,8 +421,8 @@ void cpu_boot_all(void) {
 	dprintf(" extended_edx: 0x%" PRIx32 "\n", kernel_args->arch.standard_edx);
 }
 
-/** Perform early CPU initialisation. */
-void cpu_early_init(void) {
+/** Perform initialisation of the boot CPU. */
+void cpu_init(void) {
 	/* Set all of the bits in the feature masks to begin with, they will be
 	 * cleared as necessary by cpu_arch_init(). */
 	kernel_args->arch.standard_ecx = 0xFFFFFFFF;

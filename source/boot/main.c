@@ -113,7 +113,7 @@ void loader_main(void) {
 	/* Set up the kernel arguments structure and memory manager, and detect
 	 * hardware details. */
 	kargs_init();
-	cpu_early_init();
+	cpu_init();
 	memory_init();
 	disk_init();
 	platform_video_init();

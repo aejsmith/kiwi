@@ -34,7 +34,7 @@ extern uint32_t cpu_current_id(void);
 extern void cpu_detect(void);
 extern void cpu_boot_all(void);
 
-extern void cpu_early_init(void);
+extern void cpu_init(void);
 extern void cpu_postmenu_init(void);
 extern void cpu_ap_init(void);
 

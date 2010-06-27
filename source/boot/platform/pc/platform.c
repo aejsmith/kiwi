@@ -38,7 +38,7 @@ void platform_early_init(void) {
 			if(strncmp(tok, "video-mode=", 11) == 0) {
 				video_mode_override = tok + 11;
 			} else if(strncmp(tok, "boot-path=", 10) == 0) {
-				boot_path_override = tok + 10;
+				//boot_path_override = tok + 10;
 			}
 		}
 	}

@@ -29,10 +29,11 @@
  * @param disk		Device to scan.
  * @return		Whether an MSDOS partition table was found. */
 bool msdos_partition_probe(disk_t *disk) {
-	msdos_mbr_t *mbr = kmalloc(sizeof(msdos_mbr_t));
+	msdos_mbr_t *mbr = kmalloc(disk->block_size);
 	size_t i;
 
-	if(!disk_read(disk, mbr, sizeof(msdos_mbr_t), 0) || mbr->signature != MSDOS_SIGNATURE) {
+	/* Read in the MBR, which is in the first block on the device. */
+	if(!disk_read(disk, mbr, 0, 1) || mbr->signature != MSDOS_SIGNATURE) {
 		kfree(mbr);
 		return false;
 	}
@@ -43,7 +44,7 @@ bool msdos_partition_probe(disk_t *disk) {
 			continue;
 		}
 
-		dprintf("disk: found MSDOS partition %d on device 0x%x\n", i, disk->id);
+		dprintf("disk: found MSDOS partition %d on device %s\n", i, disk->name);
 		dprintf(" type:      0x%x\n", mbr->partitions[i].type);
 		dprintf(" start_lba: %u\n", mbr->partitions[i].start_lba);
 		dprintf(" num_sects: %u\n", mbr->partitions[i].num_sects);

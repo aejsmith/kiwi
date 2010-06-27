@@ -19,7 +19,8 @@
  */
 
 #include <boot/console.h>
-#include <boot/fs.h>
+#include <boot/disk.h>
+#include <boot/memory.h>
 
 #include <lib/string.h>
 
@@ -57,6 +58,11 @@ typedef struct specification_packet {
         uint16_t device_spec;
 } __packed specification_packet_t;
 
+/** Structure used to store details of a BIOS disk. */
+typedef struct bios_disk {
+	uint8_t id;			/**< BIOS device ID. */
+} bios_disk_t;
+
 extern uint8_t boot_device_id;
 extern uint64_t boot_part_offset;
 
@@ -65,7 +71,7 @@ extern uint64_t boot_part_offset;
  * @param id		ID of partition.
  * @param lba		Block that the partition starts at.
  * @return		Whether partition is a boot partition. */
-static bool bios_disk_is_boot_partition(disk_t *disk, int id, uint64_t lba) {
+static bool bios_disk_is_boot_partition(disk_t *disk, uint8_t id, uint64_t lba) {
 	if(multiboot_magic == MB_LOADER_MAGIC && (uint64_t)id == boot_part_offset) {
 		return true;
 	} else if(lba == boot_part_offset) {
@@ -75,43 +81,46 @@ static bool bios_disk_is_boot_partition(disk_t *disk, int id, uint64_t lba) {
 	}
 }
 
-/** Read a block from a disk device.
+/** Read blocks from a BIOS disk device.
  * @param disk		Disk to read from.
  * @param buf		Buffer to read into.
- * @param lba		Block number to read.
+ * @param lba		Starting block number.
+ * @param count		Number of blocks to read.
  * @return		Whether the read succeeded. */
-static bool bios_disk_read_block(disk_t *disk, void *buf, uint64_t lba) {
+static bool bios_disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) {
 	disk_address_packet_t *dap = (disk_address_packet_t *)BIOS_MEM_BASE;
+	void *dest = (void *)(BIOS_MEM_BASE + disk->block_size);
+	bios_disk_t *data = disk->data;
 	bios_regs_t regs;
 
 	/* Fill in a disk address packet for the transfer. The block is placed
 	 * immediately after the packet. */
 	dap->size = sizeof(disk_address_packet_t);
 	dap->reserved1 = 0;
-	dap->block_count = 1;
-	dap->buffer_offset = BIOS_MEM_BASE + disk->blksize;
+	dap->block_count = count;
+	dap->buffer_offset = (ptr_t)dest;
 	dap->buffer_segment = 0;
 	dap->start_lba = lba;
 
 	/* Perform the transfer. */
 	bios_regs_init(&regs);
 	regs.eax = 0x4200;
-	regs.edx = disk->id;
+	regs.edx = data->id;
 	regs.esi = BIOS_MEM_BASE;
 	bios_interrupt(0x13, &regs);
 	if(regs.eflags & (1<<0)) {
 		return false;
 	}
 
-	/* Copy the transferred block to the buffer. */
-	memcpy(buf, (void *)(BIOS_MEM_BASE + disk->blksize), disk->blksize);
+	/* Copy the transferred blocks to the buffer. */
+	memcpy(buf, dest, disk->block_size * count);
 	return true;
 }
 
 /** Operations for a BIOS disk device. */
 static disk_ops_t bios_disk_ops = {
 	.is_boot_partition = bios_disk_is_boot_partition,
-	.read_block = bios_disk_read_block,
+	.read = bios_disk_read,
 };
 
 /** Get the number of disks in the system.
@@ -146,8 +155,13 @@ static bool platform_booted_from_cd(void) {
  * @param id		ID of the device. */
 static void platform_disk_add(uint8_t id) {
 	drive_parameters_t *params = (drive_parameters_t *)BIOS_MEM_BASE;
+	bios_disk_t *data;
 	bios_regs_t regs;
-	disk_t *disk;
+	char name[6];
+
+	/* Create a data structure for the device. */
+	data = kmalloc(sizeof(bios_disk_t));
+	data->id = id;
 
 	/* Probe for information on the device. A big "FUCK YOU" to Intel and
 	 * AMI is required here. When booted from a CD, the INT 13 Extensions
@@ -155,9 +169,8 @@ static void platform_disk_add(uint8_t id) {
 	 * on Intel/AMI BIOSes, yet the Extended Read function still works.
 	 * Work around this by forcing use of extensions when booted from CD. */
 	if(id == boot_device_id && platform_booted_from_cd()) {
-		if((disk = disk_add(id, 2048, ~0LL, &bios_disk_ops, NULL, true))) {
-			dprintf("disk: detected boot CD 0x%x (blksize: %zu)\n", id, disk->blksize);
-		}
+		disk_add(kstrdup("cd0"), 2048, ~0LL, &bios_disk_ops, data, true);
+		dprintf("disk: detected boot CD cd0 (id: 0x%x)\n", id);
 	} else {
 		bios_regs_init(&regs);
 		regs.eax = 0x4100;
@@ -166,6 +179,7 @@ static void platform_disk_add(uint8_t id) {
 		bios_interrupt(0x13, &regs);
 		if(regs.eflags & (1<<0) || (regs.ebx & 0xFFFF) != 0xAA55 || !(regs.ecx & (1<<0))) {
 			dprintf("disk: device 0x%x does not support extensions, ignoring\n", id);
+			kfree(data);
 			return;
 		}
 
@@ -184,12 +198,12 @@ static void platform_disk_add(uint8_t id) {
 			return;
 		}
 
-		/* Create the disk object. */
-		if((disk = disk_add(id, params->sector_size, params->sector_count,
-		                    &bios_disk_ops, NULL, id == boot_device_id))) {
-			dprintf("disk: detected device 0x%x (blocks: %" PRIu64 ", blksize: %zu)\n",
-			        id, disk->blocks, disk->blksize);
-		}
+		/* Register the disk with the disk manager. */
+		sprintf(name, "hd%u", id - 0x80);
+		disk_add(kstrdup(name), params->sector_size, params->sector_count,
+		         &bios_disk_ops, data, id == boot_device_id);
+		dprintf("disk: detected device %s (id: 0x%x, sector_size: %u, sector_count: %zu)\n",
+		        name, id, params->sector_size, params->sector_count);
 	}
 }
 
