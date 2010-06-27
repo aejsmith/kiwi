@@ -17,10 +17,10 @@ sources = map(File, [
 	'ap_boot.S',
 	'arch.c',
 	'cpu.c',
-	'enter.S',
+	#'enter.S',
 	'except.S',
 	'idt.c',
-	'loader.c',
+	#'loader.c',
 ])
 
 # Set build flags.

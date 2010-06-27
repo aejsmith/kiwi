@@ -48,8 +48,8 @@ FUNCTION_START(bios_interrupt)
 	/* Copy the registers structure to the real mode stack. */
 	movl	28(%esp), %esi
 	movl	$REAL_MODE_SP, %edi
-	movl	$REGS_SIZE, %ecx
-	rep movsb
+	movl	$(REGS_SIZE >> 2), %ecx
+	rep movsl
 
 	/* Save the stack pointer at the top of the real mode stack and switch
 	 * to it. */
@@ -134,8 +134,8 @@ FUNCTION_START(bios_interrupt)
 	/* Copy the registers structure back from the real mode stack. */
 	movl	$REAL_MODE_SP, %esi
 	movl	28(%esp), %edi
-	movl	$REGS_SIZE, %ecx
-	rep movsb
+	movl	$(REGS_SIZE >> 2), %ecx
+	rep movsl
 
 	/* Pop callee-save registers/flags and return. */
 	popf

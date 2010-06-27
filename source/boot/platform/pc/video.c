@@ -55,7 +55,7 @@ static LIST_DECLARE(video_modes);
 static video_mode_t *detected_video_mode = NULL;
 
 /** Menu choice for the video mode. */
-static menu_item_t *video_mode_choice = NULL;
+//static menu_item_t *video_mode_choice = NULL;
 
 /** Override for video mode from Multiboot command line. */
 char *video_mode_override = NULL;
@@ -109,6 +109,7 @@ static video_mode_t *get_override_mode(void) {
 	return NULL;
 }
 
+#if 0
 /** Add PC-specific options to the menu.
  * @param menu		Main menu.
  * @param options	Options menu. */
@@ -128,6 +129,7 @@ void platform_add_menu_options(menu_t *menu, menu_t *options) {
 		menu_item_add_choice(video_mode_choice, str, mode, mode == detected_video_mode);
 	}
 }
+#endif
 
 /** Detect available video modes.
  * @todo		Handle VBE not being supported. */
@@ -233,11 +235,14 @@ void platform_video_enable(void) {
 
 	/* Get the video mode to set. If the menu has been displayed, use the
 	 * mode that was selected there, else use the best mode. */
+#if 0
 	if(video_mode_choice) {
 		mode = (video_mode_t *)video_mode_choice->value;
 	} else {
 		mode = detected_video_mode;
 	}
+#endif
+	mode = detected_video_mode;
 
 	/* Set the mode. Bit 14 in the mode ID indicates that we wish to use
 	 * the linear framebuffer model. */

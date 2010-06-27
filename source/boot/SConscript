@@ -24,7 +24,7 @@ sources = map(File, [
 	'kargs.c',
 	'main.c',
 	'memory.c',
-	'menu.c',
+	#'menu.c',
 ])
 
 # Sources to use from the kernel.

@@ -25,11 +25,12 @@
 #include <types.h>
 
 /** Size of arrays in the arguments structure. */
-#define KERNEL_ARGS_RANGES_MAX	64
 #define KERNEL_ARGS_UUID_LEN	64
 
 /** Structure describing a physical memory range. */
 typedef struct kernel_args_memory {
+	phys_ptr_t next;		/**< Pointer to next range structure (0 if last). */
+
 	/** Type of the memory range. */
 	enum {
 		/** Free, usable memory. */
@@ -54,14 +55,14 @@ typedef struct kernel_args_memory {
 
 /** Structure containing details of a CPU passed to the kernel. */
 typedef struct kernel_args_cpu {
-	phys_ptr_t next;		/**< Pointer to next CPU (or 0 if last). */
+	phys_ptr_t next;		/**< Pointer to next CPU (0 if last). */
 	uint32_t id;			/**< ID of the CPU. */
 	kernel_args_cpu_arch_t arch;	/**< Architecture data. */
 } __packed kernel_args_cpu_t;
 
 /** Structure describing a boot module. */
 typedef struct kernel_args_module {
-	phys_ptr_t next;		/**< Pointer to next module structure (or 0 if last). */
+	phys_ptr_t next;		/**< Pointer to next module structure (0 if last). */
 	phys_ptr_t base;		/**< Address of the module. */
 	uint32_t size;			/**< Size of the module. */
 } __packed kernel_args_module_t;
@@ -69,7 +70,7 @@ typedef struct kernel_args_module {
 /** Structure containing arguments passed to the kernel. */
 typedef struct kernel_args {
 	/** Physical memory information. */
-	kernel_args_memory_t phys_ranges[KERNEL_ARGS_RANGES_MAX];
+	phys_ptr_t phys_ranges;		/**< Linked list of physical range structures. */
 	uint32_t phys_range_count;	/**< Number of physical memory ranges. */
 	phys_ptr_t kernel_phys;		/**< Physical base address of the kernel. */
 

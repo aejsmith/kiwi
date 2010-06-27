@@ -42,6 +42,7 @@ extern void loader_ap_main(void);
 atomic_t ap_boot_wait = 0;
 atomic_t ap_kernel_wait = 0;
 
+#if 0
 /** Load the kernel.
  * @param dir		Directory to load from. */
 static void load_kernel(fs_node_t *dir) {
@@ -94,11 +95,10 @@ static void load_modules(fs_node_t *dir) {
 
 	fs_node_release(dir);
 }
+#endif
 
 /** Main function for the Kiwi bootloader. */
 void loader_main(void) {
-	fs_node_t *node;
-
 	/* Zero BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
 
@@ -118,8 +118,10 @@ void loader_main(void) {
 	disk_init();
 	platform_video_init();
 
+	while(true);
+#if 0
 	/* Display the configuration interface if the user requested. */
-	menu_display();
+	//menu_display();
 
 	/* Do post-menu CPU intialisation, and detect/boot all other CPUs if
 	 * SMP was not disabled in the menu. */
@@ -149,6 +151,7 @@ void loader_main(void) {
 	/* Enter the kernel. */
 	atomic_inc(&ap_kernel_wait);
 	arch_enter_kernel();
+#endif
 }
 
 /** Main function for an AP. */
@@ -159,5 +162,6 @@ void loader_ap_main(void) {
 
 	/* Wait until the boot CPU signals that we can boot. */
 	while(!atomic_get(&ap_kernel_wait));
-	arch_enter_kernel();
+	//arch_enter_kernel();
+	while(1);
 }

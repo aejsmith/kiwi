@@ -112,13 +112,16 @@ typedef struct page_queue {
 #define PAGE_WRITER_INTERVAL		SECS2USECS(4)
 #define PAGE_WRITER_MAX_PER_RUN		128
 
+/** Maximum number of page ranges. */
+#define PAGE_RANGES_MAX			64
+
 extern char __init_start[], __init_end[];
 
 /** Arena used for page allocations. */
 static vmem_t page_arena;
 
 /** Array of all page ranges. */
-static page_range_t page_ranges[KERNEL_ARGS_RANGES_MAX];
+static page_range_t page_ranges[PAGE_RANGES_MAX];
 static size_t page_range_count = 0;
 
 /** Array of page queues. */
@@ -517,7 +520,7 @@ int kdbg_cmd_page(int argc, char **argv) {
  * @param end		End of range.
  * @param type		Type of range. */
 static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int type) {
-	if(page_range_count >= KERNEL_ARGS_RANGES_MAX) {
+	if(page_range_count >= PAGE_RANGES_MAX) {
 		fatal("No free page range structures");
 	}
 
@@ -538,24 +541,26 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 /** Initialise the physical memory manager.
  * @param args		Kernel arguments. */
 void __init_text page_init(kernel_args_t *args) {
-	phys_ptr_t start, end;
-	uint32_t i;
+	kernel_args_memory_t *range;
+	phys_ptr_t start, end, addr;
 
 	/* Create the arena and populate it with detected ranges. */
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
 	                  NULL, 0, VMEM_RECLAIM, MM_FATAL);
-	for(i = 0; i < args->phys_range_count; i++) {
-		switch(args->phys_ranges[i].type) {
+	for(addr = args->phys_ranges; addr;) {
+		range = page_phys_map(addr, sizeof(kernel_args_memory_t), MM_FATAL);
+		switch(range->type) {
 		case PHYS_MEMORY_FREE:
 		case PHYS_MEMORY_RECLAIMABLE:
-			page_range_add(args->phys_ranges[i].start,
-			               args->phys_ranges[i].end,
-			               args->phys_ranges[i].type);
+			page_range_add(range->start, range->end, range->type);
 			break;
 		default:
 			/* Don't care about non-usable ranges. */
 			break;
 		}
+
+		addr = range->next;
+		page_phys_unmap(range, sizeof(kernel_args_module_t), true);
 	}
 
 	/* Mark the kernel init section as reclaimable. Since the kernel is

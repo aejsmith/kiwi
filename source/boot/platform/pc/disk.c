@@ -89,7 +89,7 @@ static bool bios_disk_read_block(disk_t *disk, void *buf, uint64_t lba) {
 	dap->size = sizeof(disk_address_packet_t);
 	dap->reserved1 = 0;
 	dap->block_count = 1;
-	dap->buffer_offset = BIOS_MEM_BASE + sizeof(disk_address_packet_t);
+	dap->buffer_offset = BIOS_MEM_BASE + disk->blksize;
 	dap->buffer_segment = 0;
 	dap->start_lba = lba;
 
@@ -104,7 +104,7 @@ static bool bios_disk_read_block(disk_t *disk, void *buf, uint64_t lba) {
 	}
 
 	/* Copy the transferred block to the buffer. */
-	memcpy(buf, (void *)(BIOS_MEM_BASE + sizeof(disk_address_packet_t)), disk->blksize);
+	memcpy(buf, (void *)(BIOS_MEM_BASE + disk->blksize), disk->blksize);
 	return true;
 }
 
