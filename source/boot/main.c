@@ -20,11 +20,13 @@
 
 #include <arch/boot.h>
 
+#include <boot/config.h>
 #include <boot/console.h>
 #include <boot/cpu.h>
 #include <boot/fs.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
+#include <boot/video.h>
 
 #include <platform/boot.h>
 
@@ -116,7 +118,8 @@ void loader_main(void) {
 	cpu_init();
 	memory_init();
 	disk_init();
-	platform_video_init();
+	video_init();
+	config_init();
 
 	while(true);
 #if 0

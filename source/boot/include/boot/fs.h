@@ -60,6 +60,11 @@ typedef struct fs_type {
 	 * @return		Whether read successfully. */
 	bool (*read)(struct fs_handle *handle, void *buf, size_t count, offset_t offset);
 
+	/** Get the size of a file.
+	 * @param handle	Handle to the file.
+	 * @return		Size of the file. */
+	offset_t (*size)(struct fs_handle *handle);
+
 	/** Read directory entries.
 	 * @param handle	Handle to directory.
 	 * @param cb		Callback to call on each entry.
@@ -93,6 +98,7 @@ extern fs_mount_t *fs_probe(disk_t *disk);
 extern fs_handle_t *fs_open(fs_mount_t *mount, const char *path);
 extern void fs_close(fs_handle_t *handle);
 extern bool fs_file_read(fs_handle_t *handle, void *buf, size_t count, offset_t offset);
+extern offset_t fs_file_size(fs_handle_t *handle);
 extern bool fs_dir_read(fs_handle_t *handle, fs_dir_read_cb_t cb, void *arg);
 
 #endif /* __BOOT_FS_H */

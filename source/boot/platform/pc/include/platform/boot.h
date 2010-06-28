@@ -36,8 +36,6 @@
 #ifndef __ASM__
 
 extern void platform_early_init(void);
-extern void platform_video_init(void);
-extern void platform_video_enable(void);
 
 #endif /* __ASM__ */
 #endif /* __PLATFORM_BOOT_H */

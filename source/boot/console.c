@@ -48,6 +48,14 @@ int kprintf(const char *fmt, ...) {
 
 /** Output a formatted message to the debug console.
  * @param fmt		Format string used to create the message.
+ * @param args		Arguments to substitute into format.
+ * @return		Number of characters printed. */
+int dvprintf(const char *fmt, va_list args) {
+	return do_printf(printf_helper, &debug_console, fmt, args);
+}
+
+/** Output a formatted message to the debug console.
+ * @param fmt		Format string used to create the message.
  * @param ...		Arguments to substitute into format.
  * @return		Number of characters printed. */
 int dprintf(const char *fmt, ...) {
@@ -55,7 +63,7 @@ int dprintf(const char *fmt, ...) {
 	int ret;
 
 	va_start(args, fmt);
-	ret = do_printf(printf_helper, &debug_console, fmt, args);
+	ret = dvprintf(fmt, args);
 	va_end(args);
 
 	return ret;

@@ -18,7 +18,7 @@
  * @brief		PC platform startup code.
  */
 
-#include <boot/fs.h>
+#include <boot/config.h>
 
 #include <lib/string.h>
 
@@ -37,8 +37,8 @@ void platform_early_init(void) {
 		while((tok = strsep(&cmdline, " "))) {
 			if(strncmp(tok, "video-mode=", 11) == 0) {
 				video_mode_override = tok + 11;
-			} else if(strncmp(tok, "boot-path=", 10) == 0) {
-				//boot_path_override = tok + 10;
+			} else if(strncmp(tok, "config-file=", 12) == 0) {
+				config_file_override = tok + 12;
 			}
 		}
 	}

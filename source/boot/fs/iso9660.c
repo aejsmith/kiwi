@@ -327,6 +327,14 @@ static bool iso9660_read(fs_handle_t *handle, void *buf, size_t size, offset_t o
 	return disk_read(handle->mount->disk, buf, size, (data->extent * ISO9660_BLOCK_SIZE) + offset);
 }
 
+/** Get the size of an ISO9660 file.
+ * @param handle	Handle to the file.
+ * @return		Size of the file. */
+static offset_t iso9660_size(fs_handle_t *handle) {
+	iso9660_handle_t *data = handle->data;
+	return data->data_len;
+}
+
 /** Read directory entries.
  * @param handle	Handle to directory.
  * @param cb		Callback to call on each entry.
@@ -388,5 +396,6 @@ fs_type_t iso9660_fs_type = {
 	.mount = iso9660_mount,
 	.close = iso9660_close,
 	.read = iso9660_read,
+	.size = iso9660_size,
 	.read_dir = iso9660_read_dir,
 };

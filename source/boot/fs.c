@@ -177,6 +177,14 @@ bool fs_file_read(fs_handle_t *handle, void *buf, size_t count, offset_t offset)
 	return handle->mount->type->read(handle, buf, count, offset);
 }
 
+/** Get the size of a file.
+ * @param handle	Handle to the file.
+ * @return		Size of the file. */
+offset_t fs_file_size(fs_handle_t *handle) {
+	assert(!handle->directory);
+	return handle->mount->type->size(handle);
+}
+
 /** Read directory entries.
  * @param handle	Handle to directory.
  * @param cb		Callback to call on each entry.

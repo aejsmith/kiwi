@@ -18,6 +18,7 @@ sources = map(File, [
 	#'fs/ext2.c',
 	'fs/iso9660.c',
 	'partitions/msdos.c',
+	'config.c',
 	'console.c',
 	'disk.c',
 	'fatal.c',

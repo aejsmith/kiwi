@@ -21,9 +21,9 @@
 #include <boot/console.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
+#include <boot/video.h>
 
 #include <platform/bios.h>
-#include <platform/boot.h>
 #include <platform/vbe.h>
 
 #include <lib/list.h>
@@ -133,7 +133,7 @@ void platform_add_menu_options(menu_t *menu, menu_t *options) {
 
 /** Detect available video modes.
  * @todo		Handle VBE not being supported. */
-void platform_video_init(void) {
+void video_init(void) {
 	vbe_mode_info_t *minfo = (vbe_mode_info_t *)(BIOS_MEM_BASE + sizeof(vbe_info_t));
 	vbe_info_t *info = (vbe_info_t *)(BIOS_MEM_BASE);
 	video_mode_t *mode;
@@ -229,7 +229,7 @@ void platform_video_init(void) {
 }
 
 /** Set the video mode. */
-void platform_video_enable(void) {
+void video_enable(void) {
 	video_mode_t *mode;
 	bios_regs_t regs;
 
