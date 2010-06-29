@@ -62,10 +62,27 @@ typedef struct value {
 /** Structure containing an environment. */
 typedef list_t environ_t;
 
-extern char *config_file_override;
+/** Structure describing a command that can be used in a command list. */
+typedef struct command {
+	const char *name;		/**< Name of the command. */
 
-extern value_t *environ_lookup(const char *name);
-extern void environ_insert(const char *name, value_t *value);
+	/** Execute the command.
+	 * @param args		List of arguments.
+	 * @param env		Environment to execute the command in.
+	 * @return		Whether the command completed successfully. */
+	bool (*func)(value_list_t *args, environ_t *env);
+} command_t;
+
+extern char *config_file_override;
+extern environ_t *root_environ;
+
+extern bool command_list_exec(command_list_t *list, command_t *commands, int count, environ_t *env);
+
+extern environ_t *environ_create(void);
+extern value_t *environ_lookup(environ_t *env, const char *name);
+extern void environ_insert(environ_t *env, const char *name, value_t *value);
+
+extern bool config_cmd_set(value_list_t *args, environ_t *env);
 
 extern void config_init(void);
 

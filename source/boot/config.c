@@ -32,17 +32,17 @@
 #include <fatal.h>
 
 /** Structure containing details of a command to run. */
-typedef struct command {
+typedef struct command_list_entry {
 	list_t header;			/**< Link to command list. */
 	char *name;			/**< Name of the command. */
 	value_list_t *args;		/**< List of arguments. */
-} command_t;
+} command_list_entry_t;
 
 /** Structure containing an environment entry. */
 typedef struct environ_entry {
 	list_t header;			/**< Link to environment. */
 	char *name;			/**< Name of entry. */
-	value_t *value;			/**< Value of the entry. */
+	value_t value;			/**< Value of the entry. */
 } environ_entry_t;
 
 /** Length of the temporary buffer. */
@@ -51,6 +51,10 @@ typedef struct environ_entry {
 /** Character returned from get_next_char() for end-of-file. */
 #define EOF			-1
 
+static void value_list_destroy(value_list_t *list);
+static value_list_t *value_list_copy(value_list_t *source);
+static command_list_t *command_list_copy(command_list_t *source);
+static void command_list_destroy(command_list_t *list);
 static command_list_t *parse_command_list(char endch);
 
 /** Temporary buffer to collect strings in. */
@@ -84,8 +88,16 @@ static const char *config_file_paths[] = {
 	"/loader.cfg",
 };
 
+/** Commands allowed in the top level of the configuration. */
+static command_t top_level_commands[] = {
+	{ "set", config_cmd_set },
+};
+
 /** Overridden configuration file path. */
 char *config_file_override = NULL;
+
+/** Root environment. */
+environ_t *root_environ = NULL;
 
 /** Read a character from the input file.
  * @return		Character read. */
@@ -133,16 +145,108 @@ static void syntax_error(const char *fmt, ...) {
 	dprintf("\n");
 }
 
+/** Copy the contents of one value to another.
+ * @param source	Source value.
+ * @param dest		Destination value. */
+static void value_copy(value_t *source, value_t *dest) {
+	dest->type = source->type;
+	switch(dest->type) {
+	case VALUE_TYPE_INTEGER:
+		dest->integer = source->integer;
+		break;
+	case VALUE_TYPE_STRING:
+		dest->string = kstrdup(source->string);
+		break;
+	case VALUE_TYPE_LIST:
+		dest->list = value_list_copy(source->list);
+		break;
+	case VALUE_TYPE_COMMAND_LIST:
+		dest->cmds = command_list_copy(source->cmds);
+		break;
+	case VALUE_TYPE_POINTER:
+		dest->pointer = source->pointer;
+		break;
+	}
+}
+
+/** Destroy a value.
+ * @param value		Value to destroy. */
+static void value_destroy(value_t *value) {
+	switch(value->type) {
+	case VALUE_TYPE_STRING:
+		kfree(value->string);
+		break;
+	case VALUE_TYPE_LIST:
+		value_list_destroy(value->list);
+		break;
+	case VALUE_TYPE_COMMAND_LIST:
+		command_list_destroy(value->cmds);
+		break;
+	case VALUE_TYPE_INTEGER:
+	case VALUE_TYPE_POINTER:
+		break;
+	}
+}
+
+/** Copy a value list.
+ * @param source	Source list.
+ * @return		Pointer to destination list. */
+static value_list_t *value_list_copy(value_list_t *source) {
+	value_list_t *dest = kmalloc(sizeof(value_list_t));
+	int i;
+
+	dest->values = kmalloc(sizeof(value_t) * source->count);
+	dest->count = source->count;
+	for(i = 0; i < source->count; i++) {
+		value_copy(&source->values[i], &dest->values[i]);
+	}
+	return dest;
+}
+
 /** Destroy an argument list.
  * @param list		List to destroy. */
 static void value_list_destroy(value_list_t *list) {
-	// FIXME
+	int i;
+
+	for(i = 0; i < list->count; i++) {
+		value_destroy(&list->values[i]);
+	}
+
+	kfree(list->values);
+	kfree(list);
+}
+
+/** Copy a command list.
+ * @param source	Source list.
+ * @return		Pointer to destination list. */
+static command_list_t *command_list_copy(command_list_t *source) {
+	command_list_t *dest = kmalloc(sizeof(command_list_t));
+	command_list_entry_t *entry, *copy;
+
+	list_init(dest);
+	LIST_FOREACH(source, iter) {
+		entry = list_entry(iter, command_list_entry_t, header);
+		copy = kmalloc(sizeof(command_list_entry_t));
+		list_init(&copy->header);
+		copy->name = kstrdup(entry->name);
+		copy->args = value_list_copy(entry->args);
+		list_append(dest, &copy->header);
+	}
+	return dest;
 }
 
 /** Destroy a command list.
  * @param list		List to destroy. */
 static void command_list_destroy(command_list_t *list) {
-	// FIXME
+	command_list_entry_t *command;
+
+	LIST_FOREACH_SAFE(list, iter) {
+		command = list_entry(iter, command_list_entry_t, header);
+		list_remove(&command->header);
+		value_list_destroy(command->args);
+		kfree(command->name);
+		kfree(command);
+	}
 }
 
 /** Parse an integer.
@@ -258,9 +362,9 @@ fail:
  * @param endch		Character signalling the end of the list.
  * @return		Pointer to list on success, NULL on failure. */
 static command_list_t *parse_command_list(char endch) {
+	command_list_entry_t *command;
 	bool in_comment = false;
 	command_list_t *list;
-	command_t *command;
 	char ch;
 
 	list = kmalloc(sizeof(command_list_t));
@@ -290,7 +394,7 @@ static command_list_t *parse_command_list(char endch) {
 			}
 
 			/* End of command name, push it onto the list. */
-			command = kmalloc(sizeof(command_t));
+			command = kmalloc(sizeof(command_list_entry_t));
 			list_init(&command->header);
 			command->name = kstrdup(temp_buf);
 			list_append(list, &command->header);
@@ -317,51 +421,13 @@ fail:
 	return NULL;
 }
 
-static void dump_command_list(command_list_t *list, int indent);
-
-static void dump_value_list(value_list_t *list, int indent) {
-	for(int i = 0; i < list->count; i++) {
-		dprintf("%*sArgument %d: ", indent, "", i);
-		switch(list->values[i].type) {
-		case VALUE_TYPE_INTEGER:
-			dprintf("%d\n", list->values[i].integer);
-			break;
-		case VALUE_TYPE_STRING:
-			dprintf("'%s'\n", list->values[i].string);
-			break;
-		case VALUE_TYPE_LIST:
-			dprintf("\n");
-			dump_value_list(list->values[i].list, indent + 1);
-			break;
-		case VALUE_TYPE_COMMAND_LIST:
-			dprintf("\n");
-			dump_command_list(list->values[i].cmds, indent + 1);
-			break;
-		case VALUE_TYPE_POINTER:
-			dprintf("%p\n", list->values[i].pointer);
-			break;
-		}
-	}
-}
-
-static void dump_command_list(command_list_t *list, int indent) {
-	command_t *command;
-	int i = 0;
-
-	LIST_FOREACH(list, iter) {
-		command = list_entry(iter, command_t, header);
-		dprintf("%*sCommand %d: '%s':\n", indent, "", i, command->name);
-		dump_value_list(command->args, indent + 1);
-		i++;
-	}
-}
-
 /** Load a configuration file.
  * @param path		Path of the file (used for debugging).
  * @param buf		Pointer to NULL-terminated buffer containing file data.
  * @return		Whether the file was loaded successfully. */
 static bool config_load_internal(const char *path, const char *buf) {
 	command_list_t *list;
+	bool ret;
 
 	current_file = buf;
 	current_file_path = path;
@@ -374,8 +440,10 @@ static bool config_load_internal(const char *path, const char *buf) {
 		return false;
 	}
 
-	dump_command_list(list, 0);
-	return true;
+	root_environ = environ_create();
+	ret = command_list_exec(list, top_level_commands, ARRAYSZ(top_level_commands), root_environ);
+	command_list_destroy(list);
+	return ret;
 }
 
 /** Load a configuration file.
@@ -406,6 +474,107 @@ static bool config_load(fs_mount_t *mount, const char *path) {
 	return ret;
 }
 
+/** Execute a single command from a command list.
+ * @param entry		Entry to execute.
+ * @param commands	Array of commands that can be used.
+ * @param count		Number of commands.
+ * @param env		Environment to execute command in.
+ * @return		Whether successful. */
+static bool command_exec(command_list_entry_t *entry, command_t *commands, int count, environ_t *env) {
+	int i;
+
+	for(i = 0; i < count; i++) {
+		if(strcmp(commands[i].name, entry->name) == 0) {
+			return commands[i].func(entry->args, env);
+		}
+	}
+
+	dprintf("config: unknown command '%s'\n", entry->name);
+	return false;
+}
+
+/** Execute a command list.
+ * @param list		List of commands.
+ * @param commands	Array of commands that can be used.
+ * @param count		Number of commands.
+ * @param env		Environment to execute commands in.
+ * @return		Whether all of the commands completed successfully. */
+bool command_list_exec(command_list_t *list, command_t *commands, int count, environ_t *env) {
+	command_list_entry_t *entry;
+
+	LIST_FOREACH(list, iter) {
+		entry = list_entry(iter, command_list_entry_t, header);
+		if(!command_exec(entry, commands, count, env)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/** Create a new environment.
+ * @return		Pointer to created environment. */
+environ_t *environ_create(void) {
+	environ_t *env = kmalloc(sizeof(environ_t));
+	list_init(env);
+	return env;
+}
+
+/** Look up an entry in an environment.
+ * @param env		Environment to look up in.
+ * @param name		Name of entry to look up.
+ * @return		Pointer to value if found, NULL if not. */
+value_t *environ_lookup(environ_t *env, const char *name) {
+	environ_entry_t *entry;
+
+	LIST_FOREACH(env, iter) {
+		entry = list_entry(iter, environ_entry_t, header);
+		if(strcmp(entry->name, name) == 0) {
+			return &entry->value;
+		}
+	}
+
+	return NULL;
+}
+
+/** Insert an entry into an environment.
+ * @param env		Environment to insert into.
+ * @param name		Name of entry to look up.
+ * @param value		Value to insert. Will be copied. */
+void environ_insert(environ_t *env, const char *name, value_t *value) {
+	environ_entry_t *entry;
+
+	/* Look for an existing entry with the same name. */
+	LIST_FOREACH(env, iter) {
+		entry = list_entry(iter, environ_entry_t, header);
+		if(strcmp(entry->name, name) == 0) {
+			value_destroy(&entry->value);
+			value_copy(value, &entry->value);
+			return;
+		}
+	}
+
+	/* Create a new entry. */
+	entry = kmalloc(sizeof(environ_entry_t));
+	list_init(&entry->header);
+	entry->name = kstrdup(name);
+	value_copy(value, &entry->value);
+}
+
+/** Set a value in the environment.
+ * @param args		Argument list.
+ * @param env		Environment to set in.
+ * @return		Whether successful. */
+bool config_cmd_set(value_list_t *args, environ_t *env) {
+	if(args->count != 2 || args->values[0].type != VALUE_TYPE_STRING) {
+		dprintf("config: set: invalid arguments\n");
+		return false;
+	}
+
+	environ_insert(env, args->values[0].string, &args->values[1]);
+	return true;
+}
+
 /** Load the bootloader configuration. */
 void config_init(void) {
 	size_t i;
@@ -423,6 +592,8 @@ void config_init(void) {
 		}
 
 		/* No configuration was loaded, use the default. */
-		config_load_internal("<default>", default_config);
+		if(!config_load_internal("<default>", default_config)) {
+			fatal("Could not load default configuration");
+		}
 	}
 }
