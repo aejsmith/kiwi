@@ -21,14 +21,38 @@
 #include <boot/console.h>
 #include <lib/printf.h>
 
-/** Helper for kprintf()/dprintf().
+/** Debug log size. */
+#define DEBUG_LOG_SIZE		8192
+
+/** Debug output log. */
+char debug_log[DEBUG_LOG_SIZE];
+
+/** Offset into the debug log. */
+size_t debug_log_offset = 0;
+
+/** Main console. */
+console_t *main_console = NULL;
+
+/** Debug console. */
+console_t *debug_console = NULL;
+
+/** Helper for kvprintf().
  * @param ch		Character to display.
  * @param data		Console to use.
  * @param total		Pointer to total character count. */
-static void printf_helper(char ch, void *data, int *total) {
-	console_t *console = (console_t *)data;
-	console->putch(ch);
+static void kvprintf_helper(char ch, void *data, int *total) {
+	if(main_console) {
+		main_console->putch(ch);
+	}
 	*total = *total + 1;
+}
+
+/** Output a formatted message to the console.
+ * @param fmt		Format string used to create the message.
+ * @param args		Arguments to substitute into format.
+ * @return		Number of characters printed. */
+int kvprintf(const char *fmt, va_list args) {
+	return do_printf(kvprintf_helper, NULL, fmt, args);
 }
 
 /** Output a formatted message to the console.
@@ -40,10 +64,24 @@ int kprintf(const char *fmt, ...) {
 	int ret;
 
 	va_start(args, fmt);
-	ret = do_printf(printf_helper, &main_console, fmt, args);
+	ret = kvprintf(fmt, args);
 	va_end(args);
 
 	return ret;
+}
+
+/** Helper for dvprintf().
+ * @param ch		Character to display.
+ * @param data		Console to use.
+ * @param total		Pointer to total character count. */
+static void dvprintf_helper(char ch, void *data, int *total) {
+	if(debug_console) {
+		debug_console->putch(ch);
+	}
+	if(debug_log_offset < DEBUG_LOG_SIZE) {
+		debug_log[debug_log_offset++] = ch;
+	}
+	*total = *total + 1;
 }
 
 /** Output a formatted message to the debug console.
@@ -51,7 +89,7 @@ int kprintf(const char *fmt, ...) {
  * @param args		Arguments to substitute into format.
  * @return		Number of characters printed. */
 int dvprintf(const char *fmt, va_list args) {
-	return do_printf(printf_helper, &debug_console, fmt, args);
+	return do_printf(dvprintf_helper, NULL, fmt, args);
 }
 
 /** Output a formatted message to the debug console.

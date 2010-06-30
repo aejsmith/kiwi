@@ -104,9 +104,8 @@ void loader_main(void) {
 	/* Zero BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
 
-	/* Initialise the consoles. */
-	main_console.init();
-	debug_console.init();
+	/* Initialise the console. */
+	console_init();
 
 	/* Perform early architecture/platform initialisation. */
 	arch_early_init();

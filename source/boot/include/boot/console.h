@@ -29,22 +29,12 @@ typedef struct console {
 	int width;		/**< Width of the console (columns). */
 	int height;		/**< Height of the console (rows). */
 
-	/** Initialise the console. */
-	void (*init)(void);
-
-	/** Check if shift is held.
-	 * @return		Whether shift is held. */
-	bool (*shift_held)(void);
-
-	/** Read a character from the console.
-	 * @return		Character read from the console. */
-	uint16_t (*getch)(void);
-
 	/** Write a character to the console.
 	 * @param ch		Character to write. */
 	void (*putch)(char ch);
 
-	/** Clear the console. */
+	/** Clear the console.
+	 * @note		Also resets the scroll region. */
 	void (*clear)(void);
 
 	/** Change the highlight on a portion of the console.
@@ -61,6 +51,25 @@ typedef struct console {
 	 * @param x		New X position.
 	 * @param y		New Y position. */
 	void (*move_cursor)(int x, int y);
+
+	/** Set the scroll region.
+	 * @param y1		First row in the scroll region.
+	 * @param y2		Last row in the scroll region. */
+	void (*set_scroll_region)(int y1, int y2);
+
+	/** Scroll the scroll region up (move contents down). */
+	void (*scroll_up)(void);
+
+	/** Scroll the scroll region down (move contents up). */
+	void (*scroll_down)(void);
+
+	/** Read a keypress from the console.
+	 * @return		Key read from the console. */
+	uint16_t (*get_key)(void);
+
+	/** Check if input is available.
+	 * @return		Whether input is available. */
+	bool (*check_key)(void);
 } console_t;
 
 /** Special key codes. */
@@ -69,11 +78,17 @@ typedef struct console {
 #define CONSOLE_KEY_LEFT	0x102
 #define CONSOLE_KEY_RIGHT	0x103
 
-extern console_t main_console;
-extern console_t debug_console;
+extern char debug_log[];
+extern size_t debug_log_offset;
 
+extern console_t *main_console;
+extern console_t *debug_console;
+
+extern int kvprintf(const char *fmt, va_list args);
 extern int kprintf(const char *fmt, ...) __printf(1, 2);
 extern int dvprintf(const char *fmt, va_list args);
 extern int dprintf(const char *fmt, ...) __printf(1, 2);
+
+extern void console_init(void);
 
 #endif /* __BOOT_CONSOLE_H */

@@ -27,13 +27,21 @@
  * @param data		If not NULL, newlines will be padded.
  * @param total		Pointer to total character count. */
 static void fatal_printf_helper(char ch, void *data, int *total) {
-	debug_console.putch(ch);
-	main_console.putch(ch);
+	if(debug_console) {
+		debug_console->putch(ch);
+	}
+	if(main_console) {
+		main_console->putch(ch);
+	}
 	if(ch == '\n' && data) {
-		debug_console.putch(' ');
-		debug_console.putch(' ');
-		main_console.putch(' ');
-		main_console.putch(' ');
+		if(debug_console) {
+			debug_console->putch(' ');
+			debug_console->putch(' ');
+		}
+		if(main_console) {
+			main_console->putch(' ');
+			main_console->putch(' ');
+		}
 	}
 	*total = *total + 1;
 }
@@ -73,7 +81,9 @@ static void backtrace(void) {
 void fatal(const char *fmt, ...) {
 	va_list args;
 
-	main_console.clear();
+	if(main_console) {
+		main_console->clear();
+	}
 	fatal_printf("\nA fatal error occurred while trying to load Kiwi:\n\n  ");
 
 	va_start(args, fmt);

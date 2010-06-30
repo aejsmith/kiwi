@@ -72,7 +72,8 @@ static int current_col;			/**< Current column in the file (minus 1). */
 /** Default configuration for when no configuration exists. */
 static const char *default_config =
 	"set \"default\" 0\n"
-	"set \"timeout\" 0\n"
+	"set \"timeout\" 1\n"
+	"set \"menu_hidden\" 1\n"
 	"entry \"Kiwi\" {\n"
 #if CONFIG_DEBUG
 	"	set \"splash_disabled\" 0\n"

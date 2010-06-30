@@ -112,7 +112,7 @@ static bool bios_disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) 
 	regs.edx = data->id;
 	regs.esi = BIOS_MEM_BASE;
 	bios_interrupt(0x13, &regs);
-	if(regs.eflags & (1<<0)) {
+	if(regs.eflags & X86_FLAGS_CF) {
 		return false;
 	}
 
@@ -137,7 +137,7 @@ static uint8_t platform_disk_count(void) {
 	regs.eax = 0x800;
 	regs.edx = 0x80;
 	bios_interrupt(0x13, &regs);
-	return (regs.eflags & (1<<0)) ? 0 : (regs.edx & 0xFF);
+	return (regs.eflags & X86_FLAGS_CF) ? 0 : (regs.edx & 0xFF);
 }
 
 /** Check if booted from CD.
@@ -152,7 +152,7 @@ static bool platform_booted_from_cd(void) {
 	regs.edx = boot_device_id;
 	regs.esi = BIOS_MEM_BASE;
 	bios_interrupt(0x13, &regs);
-	return (!(regs.eflags & (1<<0)) && packet->drive_number == boot_device_id);
+	return (!(regs.eflags & X86_FLAGS_CF) && packet->drive_number == boot_device_id);
 }
 
 /** Add the disk with the specified ID.
@@ -181,7 +181,7 @@ static void platform_disk_add(uint8_t id) {
 		regs.ebx = 0x55AA;
 		regs.edx = id;
 		bios_interrupt(0x13, &regs);
-		if(regs.eflags & (1<<0) || (regs.ebx & 0xFFFF) != 0xAA55 || !(regs.ecx & (1<<0))) {
+		if(regs.eflags & X86_FLAGS_CF || (regs.ebx & 0xFFFF) != 0xAA55 || !(regs.ecx & (1<<0))) {
 			dprintf("disk: device 0x%x does not support extensions, ignoring\n", id);
 			kfree(data);
 			return;
@@ -197,7 +197,7 @@ static void platform_disk_add(uint8_t id) {
 		regs.edx = id;
 		regs.esi = BIOS_MEM_BASE;
 		bios_interrupt(0x13, &regs);
-		if(regs.eflags & (1<<0) || !params->sector_count || !params->sector_size) {
+		if(regs.eflags & X86_FLAGS_CF || !params->sector_count || !params->sector_size) {
 			dprintf("disk: failed to obtain device parameters for device 0x%x\n", id);
 			return;
 		}

@@ -18,6 +18,8 @@
  * @brief		PC memory detection code.
  */
 
+#include <arch/cpu.h>
+
 #include <boot/console.h>
 #include <boot/memory.h>
 
@@ -63,7 +65,7 @@ void platform_memory_detect(void) {
 		 * allowed to return a non-zero continuation value in EBX and
 		 * return an error on next call to indicate that the end of the
 		 * list has been reached. */
-		if(regs.eflags & (1<<0)) {
+		if(regs.eflags & X86_FLAGS_CF) {
 			break;
 		}
 
