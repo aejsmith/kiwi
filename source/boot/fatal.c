@@ -82,7 +82,7 @@ void fatal(const char *fmt, ...) {
 	va_list args;
 
 	if(main_console) {
-		main_console->clear();
+		main_console->reset();
 	}
 	fatal_printf("\nA fatal error occurred while trying to load Kiwi:\n\n  ");
 

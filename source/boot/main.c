@@ -27,6 +27,7 @@
 #include <boot/memory.h>
 #include <boot/menu.h>
 #include <boot/video.h>
+#include <boot/ui.h>
 
 #include <platform/boot.h>
 
@@ -118,6 +119,10 @@ void loader_main(void) {
 	memory_init();
 	disk_init();
 	video_init();
+
+	ui_window_t *window = ui_textview_create("Debug Log", debug_log);
+	ui_window_display(window, true);
+
 	config_init();
 
 	while(true);

@@ -24,43 +24,65 @@
 #include <stdarg.h>
 #include <types.h>
 
+/** Structure describing a draw region. */
+typedef struct draw_region {
+	int x;			/**< X position. */
+	int y;			/**< Y position. */
+	int width;		/**< Width of region. */
+	int height;		/**< Height of region. */
+	bool scrollable;	/**< Whether to scroll when cursor reaches the end. */
+} draw_region_t;
+
 /** Structure describing a console. */
 typedef struct console {
 	int width;		/**< Width of the console (columns). */
 	int height;		/**< Height of the console (rows). */
 
+	/** Reset and clear the console. */
+	void (*reset)(void);
+
+	/** Set the draw region.
+	 * @note		Positions the cursor at 0, 0 in the new region.
+	 * @param region	Structure describing the region. */
+	void (*set_region)(draw_region_t *region);
+
+	/** Get the draw region.
+	 * @param region	Draw region structure to fill in. */
+	void (*get_region)(draw_region_t *region);
+
 	/** Write a character to the console.
 	 * @param ch		Character to write. */
 	void (*putch)(char ch);
-
-	/** Clear the console.
-	 * @note		Also resets the scroll region. */
-	void (*clear)(void);
 
 	/** Change the highlight on a portion of the console.
 	 * @note		This reverses whatever the current state of
 	 *			each character is, e.g. if something is already
 	 *			highlighted, it will become unhighlighted.
+	 * @note		Position is relative to the draw region.
 	 * @param x		Start X position.
 	 * @param y		Start Y position.
 	 * @param width		Width of the highlight.
 	 * @param height	Height of the highlight. */
 	void (*highlight)(int x, int y, int width, int height);
 
+	/** Clear a portion of the console.
+	 * @note		Position is relative to the draw region.
+	 * @param x		Start X position.
+	 * @param y		Start Y position.
+	 * @param width		Width of the highlight.
+	 * @param height	Height of the highlight. */
+	void (*clear)(int x, int y, int width, int height);
+
 	/** Move the cursor.
+	 * @note		Position is relative to the draw region.
 	 * @param x		New X position.
 	 * @param y		New Y position. */
 	void (*move_cursor)(int x, int y);
 
-	/** Set the scroll region.
-	 * @param y1		First row in the scroll region.
-	 * @param y2		Last row in the scroll region. */
-	void (*set_scroll_region)(int y1, int y2);
-
-	/** Scroll the scroll region up (move contents down). */
+	/** Scroll the draw region up (move contents down). */
 	void (*scroll_up)(void);
 
-	/** Scroll the scroll region down (move contents up). */
+	/** Scroll the draw region down (move contents up). */
 	void (*scroll_down)(void);
 
 	/** Read a keypress from the console.
@@ -77,9 +99,10 @@ typedef struct console {
 #define CONSOLE_KEY_DOWN	0x101
 #define CONSOLE_KEY_LEFT	0x102
 #define CONSOLE_KEY_RIGHT	0x103
+#define CONSOLE_KEY_F1		0x104
+#define CONSOLE_KEY_F2		0x105
 
 extern char debug_log[];
-extern size_t debug_log_offset;
 
 extern console_t *main_console;
 extern console_t *debug_console;

@@ -26,9 +26,7 @@
 
 /** Debug output log. */
 char debug_log[DEBUG_LOG_SIZE];
-
-/** Offset into the debug log. */
-size_t debug_log_offset = 0;
+static size_t debug_log_offset = 0;
 
 /** Main console. */
 console_t *main_console = NULL;
@@ -78,8 +76,9 @@ static void dvprintf_helper(char ch, void *data, int *total) {
 	if(debug_console) {
 		debug_console->putch(ch);
 	}
-	if(debug_log_offset < DEBUG_LOG_SIZE) {
+	if(debug_log_offset < (DEBUG_LOG_SIZE - 1)) {
 		debug_log[debug_log_offset++] = ch;
+		debug_log[debug_log_offset] = 0;
 	}
 	*total = *total + 1;
 }
