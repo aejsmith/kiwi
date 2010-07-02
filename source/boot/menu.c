@@ -18,302 +18,183 @@
  * @brief		Bootloader menu interface.
  */
 
-#include <boot/console.h>
-#include <boot/fs.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
+#include <boot/ui.h>
+
+#include <lib/string.h>
+#include <lib/utility.h>
 
 #include <assert.h>
 #include <kargs.h>
 #include <time.h>
 
-static void *menu_display_real(menu_t *menu, size_t index);
+/** Structure containing a menu entry. */
+typedef struct menu_entry {
+	ui_entry_t header;		/**< UI entry header. */
+	list_t link;			/**< Link to menu entries list. */
+	char *name;			/**< Name of the entry. */
+	environ_t *env;			/**< Environment for the entry. */
+} menu_entry_t;
 
-/** Print a menu item's title.
- * @param item		Item to print. */
-static void menu_item_print(menu_item_t *item) {
-	menu_item_t *child;
+extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
 
-	switch(item->type) {
-	case MENU_ITEM_SUBMENU:
-		kprintf(" %s...\n", item->name);
-		break;
-	case MENU_ITEM_CHECKBOX:
-		kprintf(" [%c] %s\n", (*item->checked) ? 'x' : ' ', item->name);
-		break;
-	case MENU_ITEM_EXIT:
-		kprintf(" %s\n", item->name);
-		break;
-	case MENU_ITEM_CHOICE:
-		LIST_FOREACH(&item->menu->items, iter) {
-			child = list_entry(iter, menu_item_t, header);
-			if(child->value == item->value) {
-				kprintf(" %s (Current: %s)\n", item->name, child->name);
-				break;
-			}
-		}
-		break;
+/** List of menu entries. */
+static LIST_DECLARE(menu_entries);
+
+/** Selected menu entry. */
+static menu_entry_t *selected_menu_entry = NULL;
+
+/** Commands that can be executed within a menu entry. */
+static command_t menu_entry_commands[] = {
+	{ "set",	config_cmd_set },
+	{ "kiwi",	config_cmd_kiwi },
+};
+
+/** Add a new menu entry.
+ * @param args		Arguments to the command.
+ * @param env		Environment to operate on.
+ * @return		Whether successful. */
+bool config_cmd_entry(value_list_t *args, environ_t *env) {
+	menu_entry_t *entry;
+
+	assert(env == root_environ);
+
+	if(args->count != 2 || args->values[0].type != VALUE_TYPE_STRING ||
+	   args->values[1].type != VALUE_TYPE_COMMAND_LIST) {
+		dprintf("config: entry: invalid arguments\n");
+		return false;
 	}
+
+	entry = kmalloc(sizeof(menu_entry_t));
+	list_init(&entry->link);
+	entry->name = kstrdup(args->values[0].string);
+	entry->env = environ_create();
+
+	/* Execute the command list. */
+	if(!command_list_exec(args->values[1].cmds, menu_entry_commands,
+	                      ARRAYSZ(menu_entry_commands), entry->env)) {
+		//environ_destroy(entry->env);
+		kfree(entry->name);
+		kfree(entry);
+		return false;
+	}
+
+	list_append(&menu_entries, &entry->link);
+	return true;
 }
 
-/** Select a menu item.
- * @param item		Item to select.
- * @param retp		Where to store return value.
- * @return		Whether to exit the menu. */
-static bool menu_item_select(menu_item_t *item, void **retp) {
-	menu_item_t *child;
-	size_t i = 0;
+/** Find the default menu entry.
+ * @return		Default entry. */
+static menu_entry_t *menu_find_default(void) {
+	menu_entry_t *entry;
+	value_t *value;
+	int i = 0;
 
-	switch(item->type) {
-	case MENU_ITEM_SUBMENU:
-		menu_display_real(item->menu, 0);
+	if((value = environ_lookup(root_environ, "default"))) {
+		LIST_FOREACH(&menu_entries, iter) {
+			entry = list_entry(iter, menu_entry_t, link);
+			if(value->type == VALUE_TYPE_INTEGER) {
+				if(i == value->integer) {
+					return entry;
+				}
+			} else if(value->type == VALUE_TYPE_STRING) {
+				if(strcmp(entry->name, value->string) == 0) {
+					return entry;
+				}
+			}
+		}
+	}
+
+	/* No default entry found, return the first list entry. */
+	return list_entry(menu_entries.next, menu_entry_t, link);
+}
+
+/** Check if the menu can be displayed.
+ * @return		Whether the menu can be displayed. */
+static bool menu_can_display(void) {
+	value_t *value;
+
+	if(!main_console) {
 		return false;
-	case MENU_ITEM_CHECKBOX:
-		*item->checked = !*item->checked;
+	} else if((value = environ_lookup(root_environ, "hidden")) && value->integer == 1) {
+		/* Menu hidden, wait half a second for Esc to be pressed. */
+		spin(500000);
+		while(main_console->check_key()) {
+			if(main_console->get_key() == '\e') {
+				return true;
+			}
+		}
+
 		return false;
-	case MENU_ITEM_EXIT:
-		*retp = item->value;
+	} else {
 		return true;
-	case MENU_ITEM_CHOICE:
-		/* Find the index of the selected item. */
-		LIST_FOREACH(&item->menu->items, iter) {
-			child = list_entry(iter, menu_item_t, header);
-			if(child->value == item->value) {
-				break;
-			} else {
-				i++;
-			}
-		}
-		item->value = menu_display_real(item->menu, i);
-		return false;
-	default:
-		return false;
 	}
 }
 
-/** Display a menu.
- * @param menu		Menu to display.
- * @param index		Index of item to be selected initially.
- * @return		Value requested to be returned. */
-static void *menu_display_real(menu_t *menu, size_t index) {
-	size_t total, offset, i;
-	menu_item_t *item;
-	bool exit = false;
-	void *ret = NULL;
-	uint16_t ch;
+/** Select a menu entry.
+ * @param _entry	Entry that was selected.
+ * @return		Always returns INPUT_CLOSE. */
+static input_result_t menu_entry_select(ui_entry_t *_entry) {
+	menu_entry_t *entry = (menu_entry_t *)_entry;
+	selected_menu_entry = entry;
+	return INPUT_CLOSE;
+}
 
-	/* Determine the number of items that can be fit on at a time. */
-	total = main_console.height - 4;
+/** Actions for a menu entry. */
+static ui_action_t menu_entry_actions[] = {
+	{ "Boot", '\n', menu_entry_select },
+};
 
-	/* Set the initial offset based on the selected index. */
-	offset = 0;
-	if(index >= total) {
-		offset = ((index - total) + 1);
-		index -= offset;
+/** Render a menu entry.
+ * @param _entry	Entry to render. */
+static void menu_entry_render(ui_entry_t *_entry) {
+	menu_entry_t *entry = (menu_entry_t *)_entry;
+	kprintf("%s", entry->name);
+}
+
+/** Menu entry UI entry type. */
+static ui_entry_type_t menu_entry_type = {
+	.actions = menu_entry_actions,
+	.action_count = ARRAYSZ(menu_entry_actions),
+	.render = menu_entry_render,
+};
+
+/** Display the menu interface.
+ * @return		Environment for the entry to boot. */
+environ_t *menu_display(void) {
+	menu_entry_t *entry;
+	ui_window_t *window;
+	int timeout = 0;
+	value_t *value;
+
+	if(list_empty(&menu_entries)) {
+		fatal("No entries defined in configuration");
 	}
 
-	/* Loop until an item requests to exit the menu. */
-	while(!exit) {
-		main_console.clear();
+	/* Find the default entry. */
+	selected_menu_entry = menu_find_default();
 
-		/* Display a header. */
-		kprintf("%s", menu->title);
-		main_console.highlight(0, 0, main_console.width, 1);
-
-		/* Add instructions. */
-		main_console.move_cursor(0, main_console.height - 1);
-		kprintf("Enter/Space = Select   Up = Move up   Down = Move down");
-		main_console.highlight(0, main_console.height - 1, main_console.width, 1);
-
-		/* Display each item. */
-		main_console.move_cursor(0, 2);
-		i = 0;
-		LIST_FOREACH(&menu->items, iter) {
-			if(i < offset || ((menu->count - offset) >= total && i >= (offset + total))) {
-				i++;
-				continue;
-			}
-			i++;
-			item = list_entry(iter, menu_item_t, header);
-			menu_item_print(item);
+	if(menu_can_display()) {
+		/* Construct the menu. */
+		window = ui_list_create("Boot Menu", false);
+		LIST_FOREACH(&menu_entries, iter) {
+			entry = list_entry(iter, menu_entry_t, link);
+			ui_entry_init(&entry->header, &menu_entry_type);
+			ui_list_insert(window, &entry->header, entry == selected_menu_entry);
 		}
 
-		/* Loop getting keypresses. */
-		while(true) {
-			/* highlight current entry, get a keypress and then
-			 * unhighlight before modifying anything. */
-			main_console.highlight(1, index + 2, main_console.width - 2, 1);
-			ch = main_console.getch();
-			main_console.highlight(1, index + 2, main_console.width - 2, 1);
-
-			/* Handle the character. */
-			if(ch == CONSOLE_KEY_UP) {
-				if(index) {
-					index--;
-				} else if(offset) {
-					/* Have to redraw after changing offset. */
-					offset--;
-					break;
-				}
-			} else if(ch == CONSOLE_KEY_DOWN) {
-				if((index + offset + 1) < menu->count) {
-					if((index + 1) < total) {
-						index++;
-					} else {
-						/* Have to redraw after changing offset. */
-						offset++;
-						break;
-					}
-				}
-			} else if(ch == '\r' || ch == ' ') {
-				i = 0;
-				LIST_FOREACH(&menu->items, iter) {
-					if(i++ == (index + offset)) {
-						item = list_entry(iter, menu_item_t, header);
-						exit = menu_item_select(item, &ret);
-						break;
-					}
-				}
-				break;
-			}
+		/* Display it. The selected entry pointer will be updated. */
+		if((value = environ_lookup(root_environ, "timeout")) && value->type == VALUE_TYPE_INTEGER) {
+			timeout = value->integer;
 		}
+		ui_window_display(window, timeout);
 	}
 
-	/* Clear the console. */
-	main_console.clear();
-
-	return ret;
+	dprintf("loader: booting menu entry '%s'\n", selected_menu_entry->name);
+	return selected_menu_entry->env;
 }
 
-/** Create a new menu.
- * @param title		Title for the menu.
- * @return		Pointer to the menu structure. */
-static menu_t *menu_create(const char *title) {
-	menu_t *menu = kmalloc(sizeof(menu_t));
-
-	list_init(&menu->items);
-	menu->title = title;
-	menu->count = 0;
-	return menu;
-}
-
-/** Add a choice to a choice menu item.
- * @param item		Item to add to.
- * @param name		Name of the choice.
- * @param value		Value for the choice.
- * @param selected	Whether the item should currently be selected. */
-void menu_item_add_choice(menu_item_t *item, const char *name, void *value, bool selected) {
-	assert(item->type == MENU_ITEM_CHOICE);
-
-	if(list_empty(&item->menu->items) || selected) {
-		item->value = value;
-	}
-	menu_add_exit(item->menu, name, value);
-}
-
-/** Add a submenu to a menu.
- * @param menu		Menu to add to.
- * @param name		Name to give submenu.
- * @return		Pointer to menu structure. */
-menu_t *menu_add_submenu(menu_t *menu, const char *name) {
-	menu_item_t *item = kmalloc(sizeof(menu_item_t));
-
-	list_init(&item->header);
-	item->name = name;
-	item->type = MENU_ITEM_SUBMENU;
-	item->menu = menu_create(name);
-
-	list_append(&menu->items, &item->header);
-	menu->count++;
-	return item->menu;
-}
-
-/** Add a checkbox to a menu.
- * @param menu		Menu to add to.
- * @param name		Name to give the menu entry.
- * @param checkedp	Where to store the value of the checkbox. */
-void menu_add_checkbox(menu_t *menu, const char *name, bool *checkedp) {
-	menu_item_t *item = kmalloc(sizeof(menu_item_t));
-
-	list_init(&item->header);
-	item->name = name;
-	item->type = MENU_ITEM_CHECKBOX;
-	item->checked = checkedp;
-
-	list_append(&menu->items, &item->header);
-	menu->count++;
-}
-
-/** Add an exit button to a menu.
- * @param menu		Menu to add to.
- * @param name		Name to give the menu entry.
- * @param value		Value to make the menu return with. */
-void menu_add_exit(menu_t *menu, const char *name, void *value) {
-	menu_item_t *item = kmalloc(sizeof(menu_item_t));
-
-	list_init(&item->header);
-	item->name = name;
-	item->type = MENU_ITEM_EXIT;
-	item->value = value;
-
-	list_append(&menu->items, &item->header);
-	menu->count++;
-}
-
-/** Add a choice to a menu.
- * @param menu		Menu to add to.
- * @param name		Name to give the menu entry.
- * @return		Pointer to menu item that can have choices added to. */
-menu_item_t *menu_add_choice(menu_t *menu, const char *name) {
-	menu_item_t *item = kmalloc(sizeof(menu_item_t));
-
-	list_init(&item->header);
-	item->name = name;
-	item->type = MENU_ITEM_CHOICE;
-	item->menu = menu_create(name);
-	item->value = NULL;
-
-	list_append(&menu->items, &item->header);
-	menu->count++;
-	return item;
-}
-
-/** Display the menu interface. */
-void menu_display(void) {
-	menu_t *menu, *options;
-	menu_item_t *volume;
-	fs_mount_t *mount;
-
-	/* Give the user a short time to hold down shift. */
-	spin(300000);
-	if(!main_console.shift_held()) {
-		return;
-	}
-
-	/* Build the menu interface. */
-	menu = menu_create("Boot Options");
-	menu_add_exit(menu, "Continue booting", NULL);
-
-	/* Add a list to choose the boot filesystem. */
-	volume = menu_add_choice(menu, "Boot Volume");
-	LIST_FOREACH(&filesystem_list, iter) {
-		mount = list_entry(iter, fs_mount_t, header);
-		menu_item_add_choice(volume, mount->label, mount, mount == boot_filesystem);
-	}
-
-	/* Add a menu to set kernel options. */
-	options = menu_add_submenu(menu, "Kernel Options");
-	menu_add_exit(options, "Return to main menu", NULL);
-	menu_add_checkbox(options, "Disable SMP", &kernel_args->smp_disabled);
-	menu_add_checkbox(options, "Disable boot splash", &kernel_args->splash_disabled);
-
-	/* Add architecture/platform options. */
-	arch_add_menu_options(menu, options);
-	platform_add_menu_options(menu, options);
-
-	/* Display the menu. */
-	menu_display_real(menu, 0);
-
-	/* Pull the boot filesystem option out. */
-	boot_filesystem = (fs_mount_t *)volume->value;
+bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
+	return true;
 }

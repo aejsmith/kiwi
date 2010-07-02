@@ -95,11 +95,11 @@ typedef struct ui_entry {
 extern void ui_action_print(ui_action_t *action);
 
 extern void ui_window_init(ui_window_t *window, ui_window_type_t *type, const char *title);
-extern void ui_window_display(ui_window_t *window);
+extern void ui_window_display(ui_window_t *window, int timeout);
 
 extern ui_window_t *ui_textview_create(const char *title, const char *text);
 
-extern ui_window_t *ui_list_create(const char *title);
+extern ui_window_t *ui_list_create(const char *title, bool exitable);
 extern void ui_list_insert(ui_window_t *window, ui_entry_t *entry, bool selected);
 
 extern void ui_entry_init(ui_entry_t *entry, ui_entry_type_t *type);

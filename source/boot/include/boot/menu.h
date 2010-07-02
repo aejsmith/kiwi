@@ -21,44 +21,10 @@
 #ifndef __BOOT_MENU_H
 #define __BOOT_MENU_H
 
-#include <lib/list.h>
+#include <boot/config.h>
 
-/** Structure representing a menu. */
-typedef struct menu {
-	const char *title;		/**< Title of the menu. */
-	list_t items;			/**< List of items in the menu. */
-	size_t count;			/**< Number of items. */
-} menu_t;
+extern bool config_cmd_entry(value_list_t *args, environ_t *env);
 
-/** Structure representing a menu item. */
-typedef struct menu_item {
-	list_t header;			/**< Link to item list. */
-
-	const char *name;		/**< Name of the item. */
-
-	/** Type of the item. */
-	enum {
-		MENU_ITEM_SUBMENU,	/**< Sub-menu. */
-		MENU_ITEM_CHECKBOX,	/**< Checkbox. */
-		MENU_ITEM_EXIT,		/**< Exit button. */
-		MENU_ITEM_CHOICE,	/**< Multiple choice. */
-	} type;
-
-	void *value;			/**< Pointer for the item's value (choice/exit). */
-	menu_t *menu;			/**< Menu implementing the choice/submenu. */
-	bool *checked;			/**< Where to store checked value. */
-} menu_item_t;
-
-extern void arch_add_menu_options(menu_t *menu, menu_t *options);
-extern void platform_add_menu_options(menu_t *menu, menu_t *options);
-
-extern void menu_item_add_choice(menu_item_t *item, const char *name, void *value, bool selected);
-
-extern menu_t *menu_add_submenu(menu_t *menu, const char *name);
-extern void menu_add_checkbox(menu_t *menu, const char *name, bool *checkedp);
-extern void menu_add_exit(menu_t *menu, const char *name, void *value);
-extern menu_item_t *menu_add_choice(menu_t *menu, const char *name);
-
-extern void menu_display(void);
+extern environ_t *menu_display(void);
 
 #endif /* __BOOT_MENU_H */

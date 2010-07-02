@@ -24,6 +24,7 @@
 #include <boot/console.h>
 #include <boot/fs.h>
 #include <boot/memory.h>
+#include <boot/menu.h>
 
 #include <lib/ctype.h>
 #include <lib/string.h>
@@ -72,8 +73,7 @@ static int current_col;			/**< Current column in the file (minus 1). */
 /** Default configuration for when no configuration exists. */
 static const char *default_config =
 	"set \"default\" 0\n"
-	"set \"timeout\" 1\n"
-	"set \"menu_hidden\" 1\n"
+	"set \"hidden\" 1\n"
 	"entry \"Kiwi\" {\n"
 #if CONFIG_DEBUG
 	"	set \"splash_disabled\" 0\n"
@@ -91,6 +91,7 @@ static const char *config_file_paths[] = {
 
 /** Commands allowed in the top level of the configuration. */
 static command_t top_level_commands[] = {
+	{ "entry", config_cmd_entry },
 	{ "set", config_cmd_set },
 };
 
@@ -513,6 +514,14 @@ bool command_list_exec(command_list_t *list, command_t *commands, int count, env
 	return true;
 }
 
+/** Insert a value into a value list.
+ * @param list		List to insert into.
+ * @param value		Value to insert (will be copied). */
+void value_list_insert(value_list_t *list, value_t *value) {
+	list->values = krealloc(list->values, sizeof(value_t) * (list->count + 1));
+	value_copy(value, &list->values[list->count++]);
+}
+
 /** Create a new environment.
  * @return		Pointer to created environment. */
 environ_t *environ_create(void) {
@@ -560,6 +569,7 @@ void environ_insert(environ_t *env, const char *name, value_t *value) {
 	list_init(&entry->header);
 	entry->name = kstrdup(name);
 	value_copy(value, &entry->value);
+	list_append(env, &entry->header);
 }
 
 /** Set a value in the environment.

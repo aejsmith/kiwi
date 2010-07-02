@@ -78,6 +78,8 @@ extern environ_t *root_environ;
 
 extern bool command_list_exec(command_list_t *list, command_t *commands, int count, environ_t *env);
 
+extern void value_list_insert(value_list_t *list, value_t *value);
+
 extern environ_t *environ_create(void);
 extern value_t *environ_lookup(environ_t *env, const char *name);
 extern void environ_insert(environ_t *env, const char *name, value_t *value);

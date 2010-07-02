@@ -267,7 +267,7 @@ static bool pc_console_check_key(void) {
 	bios_regs_t regs;
 
 	bios_regs_init(&regs);
-	regs.eax = 0x0001;
+	regs.eax = 0x0100;
 	bios_interrupt(0x16, &regs);
 	return !(regs.eflags & X86_FLAGS_ZF);
 }

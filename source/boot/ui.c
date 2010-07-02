@@ -29,6 +29,7 @@
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <time.h>
 
 struct ui_choice;
 struct ui_textbox;
@@ -56,6 +57,7 @@ typedef struct ui_textview {
 /** Structure containing a list window. */
 typedef struct ui_list {
 	ui_window_t header;		/**< Window header. */
+	bool exitable;			/**< Whether the menu can be exited. */
 	ui_entry_t **entries;		/**< Array of entries. */
 	size_t count;			/**< Number of entries. */
 	size_t offset;			/**< Offset of first entry displayed. */
@@ -181,39 +183,68 @@ void ui_window_init(ui_window_t *window, ui_window_type_t *type, const char *tit
 }
 
 /** Render help text for a window.
- * @param window	Window to render help text for. */
-static void ui_window_render_help(ui_window_t *window) {
+ * @param window	Window to render help text for.
+ * @param timeout	Seconds remaining. */
+static void ui_window_render_help(ui_window_t *window, int seconds) {
 	set_help_region(true);
 	window->type->help(window);
+	if(seconds > 0) {
+		main_console->move_cursor(0 - ((seconds >= 10) ? 12 : 11), 0);
+		kprintf("%d second(s)", seconds);
+	}
 	main_console->highlight(0, 0, main_console->width, 1);
 }
 
 /** Render the contents of a window.
  * @note		Draw region will be content region after returning.
- * @param window	Window to render. */
-static void ui_window_render(ui_window_t *window) {
+ * @param window	Window to render.
+ * @param timeout	Seconds remaining. */
+static void ui_window_render(ui_window_t *window, int seconds) {
 	main_console->reset();
 
 	set_title_region(true);
 	kprintf("%s", window->title);
 	main_console->highlight(0, 0, main_console->width, 1);
 
-	ui_window_render_help(window);
+	ui_window_render_help(window, seconds);
 
 	set_content_region(true);
 	window->type->render(window);
 }
 
 /** Display a window.
- * @param window	Window to display. */
-void ui_window_display(ui_window_t *window) {
+ * @param window	Window to display.
+ * @param timeout	Seconds to wait before closing the window if no input.
+ *			If 0, the window will not time out. */
+void ui_window_display(ui_window_t *window, int timeout) {
+	useconds_t us = timeout * 1000000;
 	bool exited = false;
 	input_result_t ret;
 	uint16_t key;
 
 	while(!exited) {
-		ui_window_render(window);
+		ui_window_render(window, timeout);
 		while(true) {
+			/* This is a bit crap. */
+			if(timeout > 0) {
+				if(main_console->check_key()) {
+					timeout = 0;
+				} else {
+					spin(1000);
+					us -= 1000;
+					if(us <= 0) {
+						exited = true;
+						break;
+					}
+
+					if((ROUND_UP(us, 1000000) / 1000000) < timeout) {
+						timeout--;
+						ui_window_render_help(window, timeout);
+					}
+					continue;
+				}
+			}
+
 			key = main_console->get_key();
 			set_content_region(false);
 			if((ret = window->type->input(window, key)) != INPUT_HANDLED) {
@@ -226,7 +257,7 @@ void ui_window_display(ui_window_t *window) {
 			/* Need to re-render help text each key press, for
 			 * example if the action moved to a different list
 			 * entry with different actions. */
-			ui_window_render_help(window);
+			ui_window_render_help(window, timeout);
 		}
 	}
 
@@ -412,7 +443,9 @@ static void ui_list_help(ui_window_t *window) {
 	if(list->selected < (list->count - 1)) {
 		kprintf("Down = Scroll Down  ");
 	}
-	kprintf("Esc = Back");
+	if(list->exitable) {
+		kprintf("Esc = Back");
+	}
 }
 
 /** Handle input on the window.
@@ -462,7 +495,9 @@ static input_result_t ui_list_input(ui_window_t *window, uint16_t key) {
 		}
 		break;
 	case '\e':
-		ret = INPUT_CLOSE;
+		if(list->exitable) {
+			ret = INPUT_CLOSE;
+		}
 		break;
 	default:
 		/* Handle custom actions. */
@@ -495,11 +530,13 @@ static ui_window_type_t ui_list_window_type = {
 
 /** Create a list window.
  * @param title		Title for the window.
+ * @param exitable	Whether the window can be exited.
  * @return		Pointer to created window. */
-ui_window_t *ui_list_create(const char *title) {
+ui_window_t *ui_list_create(const char *title, bool exitable) {
 	ui_list_t *list = kmalloc(sizeof(ui_list_t));
 
 	ui_window_init(&list->header, &ui_list_window_type, title);
+	list->exitable = exitable;
 	list->entries = NULL;
 	list->count = 0;
 	list->offset = 0;
@@ -537,7 +574,7 @@ void ui_entry_init(ui_entry_t *entry, ui_entry_type_t *type) {
  * @return		Input handling result. */
 static input_result_t ui_link_select(ui_entry_t *entry) {
 	ui_link_t *link = (ui_link_t *)entry;
-	ui_window_display(link->window);
+	ui_window_display(link->window, 0);
 	return INPUT_RENDER;
 }
 
@@ -687,7 +724,7 @@ static input_result_t ui_textbox_edit(ui_entry_t *entry) {
 	textbox_edit_update = false;
 
 	/* Display the editor. */
-	ui_window_display(box->editor);
+	ui_window_display(box->editor, 0);
 
 	/* Copy back the new string. */
 	if(textbox_edit_update) {
@@ -761,7 +798,7 @@ ui_entry_t *ui_textbox_create(const char *label, value_t *value) {
  * @return		Input handling result. */
 static input_result_t ui_chooser_change(ui_entry_t *entry) {
 	ui_chooser_t *chooser = (ui_chooser_t *)entry;
-	ui_window_display(chooser->list);
+	ui_window_display(chooser->list, 0);
 	return INPUT_RENDER;
 }
 
@@ -800,7 +837,7 @@ ui_entry_t *ui_chooser_create(const char *label, value_t *value) {
 	chooser->label = label;
 	chooser->selected = NULL;
 	chooser->value = value;
-	chooser->list = ui_list_create(label);
+	chooser->list = ui_list_create(label, true);
 	return &chooser->header;
 }
 
