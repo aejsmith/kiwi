@@ -256,7 +256,8 @@ static uint16_t pc_console_get_key(void) {
 	case 0x3C:
 		return CONSOLE_KEY_F2;
 	default:
-		return ascii;
+		/* Convert CR to LF. */
+		return (ascii == '\r') ? '\n' : ascii;
 	}
 }
 

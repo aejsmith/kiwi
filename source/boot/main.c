@@ -120,9 +120,28 @@ void loader_main(void) {
 	disk_init();
 	video_init();
 
-	ui_window_t *window = ui_textview_create("Debug Log", debug_log);
-	ui_window_display(window, true);
+	value_t val1, val2, val3, val4;
+	val1.type = VALUE_TYPE_INTEGER;
+	val1.integer = 1;
+	val2.type = VALUE_TYPE_INTEGER;
+	val2.integer = 0;
+	val3.type = VALUE_TYPE_STRING;
+	val3.string = kstrdup("Meow Mix is the best cat food ever.");
+	val4.type = VALUE_TYPE_POINTER;
+	val4.pointer = NULL;
 
+	ui_window_t *window = ui_list_create("Hello");
+	ui_list_insert(window, ui_checkbox_create("Item 1", &val1), true);
+	ui_list_insert(window, ui_checkbox_create("Item 2", &val2), false);
+	ui_list_insert(window, ui_textbox_create("Command line", &val3), false);
+	ui_entry_t *chooser = ui_chooser_create("Sponge Type", &val4);
+	ui_chooser_insert(chooser, "Lord Sponge", (void *)0x1234, true);
+	ui_chooser_insert(chooser, "Emperor Sponge", (void *)0x9000, false);
+	ui_chooser_insert(chooser, "King Sponge", (void *)0xdeadbeef, false);
+	ui_list_insert(window, chooser, false);
+	ui_window_display(window);
+
+	dprintf("%p\n", val4.pointer);
 	config_init();
 
 	while(true);

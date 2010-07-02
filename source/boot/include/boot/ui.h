@@ -27,6 +27,13 @@
 struct ui_entry;
 struct ui_window;
 
+/** Return codes for input handling functions. */
+typedef enum input_result {
+	INPUT_HANDLED,			/**< No special action needed. */
+	INPUT_RENDER,			/**< Re-render the window. */
+	INPUT_CLOSE,			/**< Close the window. */
+} input_result_t;
+
 /** Structure defining a window action. */
 typedef struct ui_action {
 	const char *name;		/**< Name of action. */
@@ -34,8 +41,8 @@ typedef struct ui_action {
 
 	/** Callback for the action.
 	 * @param entry		Entry the action was performed on.
-	 * @return		Whether to re-render the window. */
-	bool (*cb)(struct ui_entry *entry);
+	 * @return		Input handling result. */
+	input_result_t (*cb)(struct ui_entry *entry);
 } ui_action_t;
 
 /** Structure defining a window type. */
@@ -55,8 +62,8 @@ typedef struct ui_window_type {
 	 * @note		The draw region will be set to the content area.
 	 * @param window	Window input was performed on.
 	 * @param key		Key that was pressed.
-	 * @return		Whether to re-render the window. */
-	bool (*input)(struct ui_window *window, uint16_t key);
+	 * @return		Input handling result. */
+	input_result_t (*input)(struct ui_window *window, uint16_t key);
 } ui_window_type_t;
 
 /** Window header structure. */
@@ -68,7 +75,7 @@ typedef struct ui_window {
 /** Structure defining a UI list entry type. */
 typedef struct ui_entry_type {
 	ui_action_t *actions;		/**< Actions that can be performed on the entry. */
-	int action_count;		/**< Number of actions in the array. */
+	size_t action_count;		/**< Number of actions in the array. */
 
 	/** Render the entry.
 	 * @note		The draw region will set to where to render.
@@ -78,8 +85,7 @@ typedef struct ui_entry_type {
 
 /** List entry header structure. */
 typedef struct ui_entry {
-	list_t header;			/**< Link to list. */
-	ui_entry_type_t *type;		/**< Type of the widget. */
+	ui_entry_type_t *type;		/**< Type of the entry. */
 } ui_entry_t;
 
 /** Size of the content region. */
@@ -89,7 +95,7 @@ typedef struct ui_entry {
 extern void ui_action_print(ui_action_t *action);
 
 extern void ui_window_init(ui_window_t *window, ui_window_type_t *type, const char *title);
-extern void ui_window_display(ui_window_t *window, bool exitable);
+extern void ui_window_display(ui_window_t *window);
 
 extern ui_window_t *ui_textview_create(const char *title, const char *text);
 
@@ -98,10 +104,10 @@ extern void ui_list_insert(ui_window_t *window, ui_entry_t *entry, bool selected
 
 extern void ui_entry_init(ui_entry_t *entry, ui_entry_type_t *type);
 
-extern ui_entry_t *ui_label_create(const char *text);
+extern ui_entry_t *ui_link_create(ui_window_t *window);
 extern ui_entry_t *ui_checkbox_create(const char *label, value_t *value);
 extern ui_entry_t *ui_textbox_create(const char *label, value_t *value);
-extern ui_entry_t *ui_choice_create(const char *name, value_t *value);
-extern void ui_choice_insert(ui_entry_t *entry, const char *name, void *value);
+extern ui_entry_t *ui_chooser_create(const char *label, value_t *value);
+extern void ui_chooser_insert(ui_entry_t *entry, const char *name, void *value, bool selected);
 
 #endif /* __BOOT_UI_H */
