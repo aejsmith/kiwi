@@ -61,8 +61,8 @@ void kiwi_loader_arch_setup(environ_t *env) {
 	value_t value;
 
 	if(!environ_lookup(env, "lapic_disabled")) {
-		value.type = VALUE_TYPE_INTEGER;
-		value.integer = 0;
+		value.type = VALUE_TYPE_BOOLEAN;
+		value.boolean = false;
 		environ_insert(env, "lapic_disabled", &value);
 	}
 }
@@ -179,7 +179,7 @@ void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env) {
 
 	/* Pull settings out of the environment into the kernel arguments. */
 	value = environ_lookup(env, "lapic_disabled");
-	kernel_args->arch.lapic_disabled = value->integer;
+	kernel_args->arch.lapic_disabled = value->boolean;
 
 	/* Check if the LAPIC is available. */
 	if(!kernel_args->arch.lapic_disabled && cpu_lapic_init()) {

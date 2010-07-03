@@ -73,10 +73,10 @@ static int current_col;			/**< Current column in the file (minus 1). */
 /** Default configuration for when no configuration exists. */
 static const char *default_config =
 	"set \"default\" 0\n"
-	"set \"hidden\" 1\n"
+	"set \"hidden\" true\n"
 	"entry \"Kiwi\" {\n"
 #if CONFIG_DEBUG
-	"	set \"splash_disabled\" 1\n"
+	"	set \"splash_disabled\" true\n"
 #endif
 	"	kiwi\n"
 	"}\n";
@@ -156,6 +156,9 @@ static void value_copy(value_t *source, value_t *dest) {
 	case VALUE_TYPE_INTEGER:
 		dest->integer = source->integer;
 		break;
+	case VALUE_TYPE_BOOLEAN:
+		dest->boolean = source->boolean;
+		break;
 	case VALUE_TYPE_STRING:
 		dest->string = kstrdup(source->string);
 		break;
@@ -176,16 +179,21 @@ static void value_copy(value_t *source, value_t *dest) {
 static void value_destroy(value_t *value) {
 	switch(value->type) {
 	case VALUE_TYPE_STRING:
-		kfree(value->string);
+		if(value->string) {
+			kfree(value->string);
+		}
 		break;
 	case VALUE_TYPE_LIST:
-		value_list_destroy(value->list);
+		if(value->list) {
+			value_list_destroy(value->list);
+		}
 		break;
 	case VALUE_TYPE_COMMAND_LIST:
-		command_list_destroy(value->cmds);
+		if(value->cmds) {
+			command_list_destroy(value->cmds);
+		}
 		break;
-	case VALUE_TYPE_INTEGER:
-	case VALUE_TYPE_POINTER:
+	default:
 		break;
 	}
 }
@@ -245,10 +253,14 @@ static void command_list_destroy(command_list_t *list) {
 	LIST_FOREACH_SAFE(list, iter) {
 		command = list_entry(iter, command_list_entry_t, header);
 		list_remove(&command->header);
-		value_list_destroy(command->args);
+		if(command->args) {
+			value_list_destroy(command->args);
+		}
 		kfree(command->name);
 		kfree(command);
 	}
+
+	kfree(list);
 }
 
 /** Parse an integer.
@@ -318,7 +330,7 @@ static value_list_t *parse_value_list(char endch) {
 			need_space = false;
 			continue;
 		} else if(need_space) {
-			syntax_error("expected space", ch);
+			syntax_error("expected space");
 			goto fail;
 		}
 
@@ -338,6 +350,21 @@ static value_list_t *parse_value_list(char endch) {
 				goto fail;
 			}
 			rewind_input();
+		} else if(ch == 't') {
+			value->type = VALUE_TYPE_BOOLEAN;
+			value->boolean = true;
+			if(get_next_char() != 'r' || get_next_char() != 'u' || get_next_char() != 'e') {
+				syntax_error("unexpected character");
+				goto fail;
+			}
+		} else if(ch == 'f') {
+			value->type = VALUE_TYPE_BOOLEAN;
+			value->boolean = false;
+			if(get_next_char() != 'a' || get_next_char() != 'l' || get_next_char() != 's' ||
+			   get_next_char() != 'e') {
+				syntax_error("unexpected character");
+				goto fail;
+			}
 		} else if(ch == '"') {
 			value->type = VALUE_TYPE_STRING;
 			if(!(value->string = parse_string())) {

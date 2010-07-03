@@ -41,6 +41,7 @@ typedef struct value {
 	enum {
 		/** Types that can be set from the configuration file. */
 		VALUE_TYPE_INTEGER,		/**< Integer. */
+		VALUE_TYPE_BOOLEAN,		/**< Boolean. */
 		VALUE_TYPE_STRING,		/**< String. */
 		VALUE_TYPE_LIST,		/**< List. */
 		VALUE_TYPE_COMMAND_LIST,	/**< Command list. */
@@ -52,6 +53,7 @@ typedef struct value {
 	/** Actual value. */
 	union {
 		int integer;			/**< Integer. */
+		bool boolean;			/**< Boolean. */
 		char *string;			/**< String. */
 		value_list_t *list;		/**< List. */
 		command_list_t *cmds;		/**< Command list. */

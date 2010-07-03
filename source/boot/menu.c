@@ -121,7 +121,7 @@ static bool menu_can_display(void) {
 
 	if(!main_console) {
 		return false;
-	} else if((value = environ_lookup(root_environ, "hidden")) && value->integer == 1) {
+	} else if((value = environ_lookup(root_environ, "hidden")) && value->boolean) {
 		/* Menu hidden, wait half a second for Esc to be pressed. */
 		spin(500000);
 		while(main_console->check_key()) {

@@ -182,9 +182,9 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 
 	/* Pull settings out of the environment into the kernel arguments. */
 	value = environ_lookup(env, "splash_disabled");
-	kernel_args->splash_disabled = value->integer;
+	kernel_args->splash_disabled = value->boolean;
 	value = environ_lookup(env, "smp_disabled");
-	kernel_args->smp_disabled = value->integer;
+	kernel_args->smp_disabled = value->boolean;
 
 	/* Work out where to load everything. */
 	if((value = environ_lookup(env, "kiwi_kernel"))) {
@@ -281,13 +281,13 @@ bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
 
 	/* Add in configuration items. */
 	if(!environ_lookup(env, "splash_disabled")) {
-		value.type = VALUE_TYPE_INTEGER;
-		value.integer = 0;
+		value.type = VALUE_TYPE_BOOLEAN;
+		value.boolean = false;
 		environ_insert(env, "splash_disabled", &value);
 	}
 	if(!environ_lookup(env, "smp_disabled")) {
-		value.type = VALUE_TYPE_INTEGER;
-		value.integer = 0;
+		value.type = VALUE_TYPE_BOOLEAN;
+		value.boolean = false;
 		environ_insert(env, "smp_disabled", &value);
 	}
 	if((exist = environ_lookup(env, "video_mode")) && exist->type == VALUE_TYPE_STRING) {

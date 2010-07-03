@@ -575,7 +575,7 @@ void ui_list_insert_env(ui_window_t *window, environ_t *env, const char *name,
 	value_t *value = environ_lookup(env, name);
 
 	switch(value->type) {
-	case VALUE_TYPE_INTEGER:
+	case VALUE_TYPE_BOOLEAN:
 		ui_list_insert(window, ui_checkbox_create(label, value), selected);
 		break;
 	case VALUE_TYPE_STRING:
@@ -640,7 +640,7 @@ ui_entry_t *ui_link_create(ui_window_t *window) {
  * @return		Input handling result. */
 static input_result_t ui_checkbox_toggle(ui_entry_t *entry) {
 	ui_checkbox_t *box = (ui_checkbox_t *)entry;
-	box->value->integer = !box->value->integer;
+	box->value->boolean = !box->value->boolean;
 	return INPUT_HANDLED;
 }
 
@@ -656,7 +656,7 @@ static void ui_checkbox_render(ui_entry_t *entry) {
 
 	kprintf("%s", box->label);
 	main_console->move_cursor(-3, 0);
-	kprintf("[%c]", (box->value->integer) ? 'x' : ' ');
+	kprintf("[%c]", (box->value->boolean) ? 'x' : ' ');
 }
 
 /** Check box entry type. */
@@ -668,12 +668,12 @@ static ui_entry_type_t ui_checkbox_entry_type = {
 
 /** Create a checkbox entry.
  * @param label		Label for the checkbox.
- * @param value		Value to store state in (should be VALUE_TYPE_INTEGER).
+ * @param value		Value to store state in (should be VALUE_TYPE_BOOLEAN).
  * @return		Pointer to created entry. */
 ui_entry_t *ui_checkbox_create(const char *label, value_t *value) {
 	ui_checkbox_t *box = kmalloc(sizeof(ui_checkbox_t));
 
-	assert(value->type == VALUE_TYPE_INTEGER);
+	assert(value->type == VALUE_TYPE_BOOLEAN);
 
 	ui_entry_init(&box->header, &ui_checkbox_entry_type);
 	box->label = label;
