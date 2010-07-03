@@ -105,6 +105,8 @@ static menu_entry_t *menu_find_default(void) {
 					return entry;
 				}
 			}
+
+			i++;
 		}
 	}
 
