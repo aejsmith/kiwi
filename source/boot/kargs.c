@@ -25,9 +25,6 @@
 /** Arguments structure passed to the kernel. */
 kernel_args_t *kernel_args = NULL;
 
-/** Pointer to the currently booting CPU. */
-kernel_args_cpu_t *booting_cpu = NULL;
-
 /** Pointer to the boot CPU. */
 kernel_args_cpu_t *boot_cpu = NULL;
 

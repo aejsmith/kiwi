@@ -21,6 +21,9 @@
 #ifndef __ARCH_BOOT_H
 #define __ARCH_BOOT_H
 
+#include <types.h>
+
+extern bool cpu_lapic_init(void);
 extern void idt_init(void);
 extern void arch_early_init(void);
 

@@ -15,7 +15,7 @@ Import('env')
 
 sources = map(File, [
 	'loaders/kiwi.c',
-	#'loaders/enter.S',
+	'loaders/enter.S',
 	'ap_boot.S',
 	'arch.c',
 	'cpu.c',

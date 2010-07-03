@@ -181,6 +181,20 @@ void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env) {
 	value = environ_lookup(env, "lapic_disabled");
 	kernel_args->arch.lapic_disabled = value->integer;
 
+	/* Check if the LAPIC is available. */
+	if(!kernel_args->arch.lapic_disabled && cpu_lapic_init()) {
+		/* Set the real ID of the boot CPU. */
+		boot_cpu->id = cpu_current_id();
+		if(boot_cpu->id > kernel_args->highest_cpu_id) {
+			kernel_args->highest_cpu_id = boot_cpu->id;
+		}
+	} else {
+		/* Force SMP to be disabled if the boot CPU does not have a
+		 * local APIC or if it has been manually disabled. */
+		kernel_args->arch.lapic_disabled = true;
+		kernel_args->smp_disabled = true;
+	}
+
 	/* Check that features required on both 32- and 64-bit kernels are
 	 * supported. */
 	if((kernel_args->arch.standard_edx & REQUIRED_FEATURES) != REQUIRED_FEATURES) {
@@ -203,12 +217,6 @@ void kiwi_loader_arch_configure(environ_t *env, ui_window_t *window) {
 
 /** Enter the loaded kernel. */
 void __noreturn kiwi_loader_arch_enter(void) {
-	fatal("Not implemented");
-}
-
-#if 0
-/** Enter the kernel. */
-void arch_enter_kernel(void) {
 	/* All CPUs should reach this point simultaneously. Reset the TSC to
 	 * 0, so that the kernel's timing functions return a consistent value
 	 * on all CPUs. */
@@ -223,9 +231,8 @@ void arch_enter_kernel(void) {
 #endif
 
 	if(kernel_is_64bit) {
-		arch_enter_kernel64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);
+		kiwi_loader_arch_enter64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);
 	} else {
-		arch_enter_kernel32(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry32);
+		kiwi_loader_arch_enter32(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry32);
 	}
 }
-#endif

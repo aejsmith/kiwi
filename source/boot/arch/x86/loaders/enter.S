@@ -26,12 +26,12 @@
 
 .section .text, "ax", @progbits
 
-/** Enter a 64-bit kernel.
+/** Enter a 64-bit Kiwi kernel.
  * @param args		Kernel arguments.
  * @param cpu		CPU ID.
  * @param cr3		Value to load into CR3.
  * @param entry		Entry point address. */
-FUNCTION_START(arch_enter_kernel64)
+FUNCTION_START(kiwi_loader_arch_enter64)
 .code32
 	/* Enable PAE/PGE/OSFXSR. */
 	movl	%cr4, %eax
@@ -87,14 +87,14 @@ FUNCTION_START(arch_enter_kernel64)
 
 	/* Call the kernel. */
 	call	*%rax
-FUNCTION_END(arch_enter_kernel64)
+FUNCTION_END(kiwi_loader_arch_enter64)
 
-/** Enter a 32-bit kernel.
+/** Enter a 32-bit Kiwi kernel.
  * @param args		Kernel arguments.
  * @param cpu		CPU ID.
  * @param cr3		Value to load into CR3.
  * @param entry		Entry point address. */
-FUNCTION_START(arch_enter_kernel32)
+FUNCTION_START(kiwi_loader_arch_enter32)
 .code32
 	/* Enable PAE/PGE/OSFXSR. Also enable PSE because although its not
 	 * necessary when PAE is being used, VirtualBox shits itself without
@@ -131,4 +131,4 @@ FUNCTION_START(arch_enter_kernel32)
 	push	%esi
 	push	%edi
 	call	*%eax
-FUNCTION_END(arch_enter_kernel32)
+FUNCTION_END(kiwi_loader_arch_enter32)

@@ -24,18 +24,13 @@
 #include <lib/atomic.h>
 #include <kargs.h>
 
-extern kernel_args_cpu_t *booting_cpu;
 extern kernel_args_cpu_t *boot_cpu;
-
-extern atomic_t ap_boot_wait;
-extern atomic_t ap_kernel_wait;
 
 extern uint32_t cpu_current_id(void);
 extern void cpu_detect(void);
-extern void cpu_boot_all(void);
+extern void cpu_boot_all(void (*entry)(void));
 
 extern void cpu_init(void);
-extern void cpu_postmenu_init(void);
 extern void cpu_ap_init(void);
 
 #endif /* __BOOT_CPU_H */

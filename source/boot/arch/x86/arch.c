@@ -19,17 +19,6 @@
  */
 
 #include <arch/boot.h>
-#include <boot/menu.h>
-#include <kargs.h>
-
-#if 0
-/** Add x86-specific options to the menu.
- * @param menu		Main menu.
- * @param options	Options menu. */
-void arch_add_menu_options(menu_t *menu, menu_t *options) {
-	menu_add_checkbox(options, "Disable Local APIC usage", &kernel_args->arch.lapic_disabled);
-}
-#endif
 
 /** Perform early architecture initialisation. */
 void arch_early_init(void) {

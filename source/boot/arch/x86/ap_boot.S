@@ -56,5 +56,5 @@ FUNCTION_START(ap_trampoline)
 	lidt	(loader_idtp)
 
 	/* Jump to the kernel. */
-	jmp	loader_ap_main
+	jmp	cpu_ap_entry
 FUNCTION_END(ap_trampoline)

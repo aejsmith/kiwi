@@ -29,6 +29,7 @@
  *    Same as above but auto-detects the boot directory.
  */
 
+#include <boot/cpu.h>
 #include <boot/loader.h>
 #include <boot/memory.h>
 #include <boot/fs.h>
@@ -45,6 +46,9 @@ static const char *kiwi_boot_dirs[] = {
 	"/system/boot",
 	"/kiwi",
 };
+
+/** Variable to wait to enter the kernel on. */
+static atomic_t ap_kernel_wait = 0;
 
 /** Load the Kiwi kernel image.
  * @param path		Path to entry to load.
@@ -162,6 +166,12 @@ static void kiwi_loader_detect_dir(environ_t *env) {
 	fatal("Could not find Kiwi boot directory");
 }
 
+/** AP entry function for booting a Kiwi kernel. */
+static void __noreturn kiwi_loader_ap_entry(void) {
+	while(!atomic_get(&ap_kernel_wait));
+	kiwi_loader_arch_enter();
+}
+
 /** Load Kiwi.
  * @param env		Environment for the entry. */
 static void __noreturn kiwi_loader_load(environ_t *env) {
@@ -199,6 +209,12 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 		kiwi_loader_detect_dir(env);
 	}
 
+	/* If SMP is enabled, detect and boot secondary CPUs. */
+	if(!kernel_args->smp_disabled) {
+		cpu_detect();
+		cpu_boot_all(kiwi_loader_ap_entry);
+	}
+
 	/* Set the video mode. */
 	value = environ_lookup(env, "video_mode");
 	mode = value->pointer;
@@ -208,7 +224,14 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 	kernel_args->fb_depth = mode->bpp;
 	kernel_args->fb_addr = mode->addr;
 
-	while(1);
+	/* Write final details to the kernel arguments structure. */
+	strncpy(kernel_args->boot_fs_uuid, current_fs->uuid, KERNEL_ARGS_UUID_LEN);
+	kernel_args->boot_fs_uuid[KERNEL_ARGS_UUID_LEN - 1] = 0;
+	kernel_args->boot_cpu = cpu_current_id();
+	memory_finalise();
+
+	/* Enter the kernel. */
+	kiwi_loader_arch_enter();
 }
 
 /** Display a configuration menu.

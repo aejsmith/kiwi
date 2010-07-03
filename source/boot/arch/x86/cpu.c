@@ -18,6 +18,7 @@
  * @brief		x86 CPU detection functions.
  */
 
+#include <arch/boot.h>
 #include <arch/cpu.h>
 #include <arch/io.h>
 #include <arch/stack.h>
@@ -42,9 +43,15 @@
 #define FREQUENCY_ATTEMPTS	9
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
+extern void cpu_ap_entry(void);
 
 /** Address of the local APIC. */
 static volatile uint32_t *lapic_mapping = NULL;
+
+/** Variables used in the AP boot process. */
+static void (*ap_entry_func)(void);
+static atomic_t ap_boot_wait = 0;
+static kernel_args_cpu_t *booting_cpu = NULL;
 
 /** Stack pointer for the booting AP. */
 ptr_t ap_stack_ptr = 0;
@@ -261,7 +268,7 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 
 /** Initialise the local APIC.
  * @return		Whether the local APIC is present. */
-static bool cpu_lapic_init(void) {
+bool cpu_lapic_init(void) {
 	uint32_t *mapping;
 	uint64_t base;
 
@@ -386,10 +393,13 @@ uint32_t cpu_current_id(void) {
 	return (kernel_args->arch.lapic_disabled) ? 0 : (lapic_mapping[LAPIC_REG_APIC_ID] >> 24);
 }
 
-/** Boot all CPUs. */
-void cpu_boot_all(void) {
+/** Boot all CPUs.
+ * @param entry		Entry function for the CPUs. */
+void cpu_boot_all(void (*entry)(void)) {
 	kernel_args_cpu_t *cpu;
 	phys_ptr_t addr;
+
+	ap_entry_func = entry;
 
 	for(addr = kernel_args->cpus; addr; addr = cpu->next) {
 		cpu = (kernel_args_cpu_t *)((ptr_t)addr);
@@ -417,8 +427,8 @@ void cpu_boot_all(void) {
 	dprintf("cpu: feature set supported by all CPUs:\n");
 	dprintf(" standard_ecx: 0x%" PRIx32 "\n", kernel_args->arch.standard_ecx);
 	dprintf(" standard_edx: 0x%" PRIx32 "\n", kernel_args->arch.standard_edx);
-	dprintf(" extended_ecx: 0x%" PRIx32 "\n", kernel_args->arch.standard_ecx);
-	dprintf(" extended_edx: 0x%" PRIx32 "\n", kernel_args->arch.standard_edx);
+	dprintf(" extended_ecx: 0x%" PRIx32 "\n", kernel_args->arch.extended_ecx);
+	dprintf(" extended_edx: 0x%" PRIx32 "\n", kernel_args->arch.extended_edx);
 }
 
 /** Perform initialisation of the boot CPU. */
@@ -438,25 +448,8 @@ void cpu_init(void) {
 	cpu_arch_init(&booting_cpu->arch);
 }
 
-/** Perform extra initialisation for the BSP. */
-void cpu_postmenu_init(void) {
-	/* Check if the LAPIC is available. */
-	if(!kernel_args->arch.lapic_disabled && cpu_lapic_init()) {
-		/* Set the real ID of the boot CPU. */
-		booting_cpu->id = cpu_current_id();
-		if(booting_cpu->id > kernel_args->highest_cpu_id) {
-			kernel_args->highest_cpu_id = booting_cpu->id;
-		}
-	} else {
-		/* Force SMP to be disabled if the boot CPU does not have a
-		 * local APIC or if it has been manually disabled. */
-		kernel_args->arch.lapic_disabled = true;
-		kernel_args->smp_disabled = true;
-	}
-}
-
-/** Perform AP initialisation. */
-void cpu_ap_init(void) {
+/** Entry function for an AP. */
+void cpu_ap_entry(void) {
 	cpu_arch_init(&booting_cpu->arch);
 
 	/* It is assumed that all secondary CPUs have an LAPIC, seeing as they
@@ -464,4 +457,7 @@ void cpu_ap_init(void) {
 	if(!cpu_lapic_init()) {
 		fatal("CPU %" PRIu32 " APIC could not be enabled", booting_cpu->id);
 	}
+
+	atomic_inc(&ap_boot_wait);
+	ap_entry_func();
 }
