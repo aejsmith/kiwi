@@ -18,7 +18,6 @@
  * @brief		Configuration file parser.
  *
  * @fixme		The parser is a little bit shit...
- * @todo		Separate boolean type.
  */
 
 #include <boot/config.h>
@@ -78,7 +77,7 @@ static const char *default_config =
 #if CONFIG_DEBUG
 	"	set \"splash_disabled\" true\n"
 #endif
-	"	kiwi\n"
+	"	kiwi \"/kiwi/kernel\" []\n"
 	"}\n";
 
 /** Configuration file paths to try. */
@@ -205,10 +204,14 @@ static value_list_t *value_list_copy(value_list_t *source) {
 	value_list_t *dest = kmalloc(sizeof(value_list_t));
 	size_t i;
 
-	dest->values = kmalloc(sizeof(value_t) * source->count);
 	dest->count = source->count;
-	for(i = 0; i < source->count; i++) {
-		value_copy(&source->values[i], &dest->values[i]);
+	if(source->count) {
+		dest->values = kmalloc(sizeof(value_t) * source->count);
+		for(i = 0; i < source->count; i++) {
+			value_copy(&source->values[i], &dest->values[i]);
+		}
+	} else {
+		dest->values = NULL;
 	}
 	return dest;
 }
