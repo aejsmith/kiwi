@@ -112,7 +112,7 @@ static bool bios_disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) 
 		dap->block_count = num;
 		dap->buffer_offset = (ptr_t)dest;
 		dap->buffer_segment = 0;
-		dap->start_lba = lba;
+		dap->start_lba = lba + (i * BLOCKS_PER_TRANSFER(disk));
 
 		/* Perform the transfer. */
 		bios_regs_init(&regs);
