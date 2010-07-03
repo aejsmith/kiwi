@@ -32,7 +32,7 @@ typedef list_t command_list_t;
 /** Structure containing a list of values. */
 typedef struct value_list {
 	struct value *values;		/**< Array of values. */
-	int count;			/**< Number of arguments. */
+	size_t count;			/**< Number of arguments. */
 } value_list_t;
 
 /** Structure containing a value used in the configuration.  */

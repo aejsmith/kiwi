@@ -29,8 +29,8 @@
 #include "fs/ext2.h"
 #include "fs/iso9660.h"
 
-/** The filesystem being booted from. */
-fs_mount_t *boot_filesystem = NULL;
+/** The filesystem currently in use. */
+fs_mount_t *current_fs = NULL;
 
 /** Array of filesystem implementations. */
 static fs_type_t *filesystem_types[] = {
@@ -98,13 +98,17 @@ static bool fs_open_cb(const char *name, fs_handle_t *handle, void *_data) {
 }
 
 /** Open a handle to a file/directory.
- * @param mount		Mount to open from.
+ * @param mount		Mount to open from. If NULL, current FS will be used.
  * @param path		Path to entry to open.
  * @return		Pointer to handle on success, NULL on failure. */
 fs_handle_t *fs_open(fs_mount_t *mount, const char *path) {
 	char *dup, *orig, *tok;
 	fs_open_data_t data;
 	fs_handle_t *handle;
+
+	if(!mount) {
+		mount = current_fs;
+	}
 
 	/* Use the provided open() implementation if any. */
 	if(mount->type->open) {

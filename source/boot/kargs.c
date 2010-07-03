@@ -90,8 +90,4 @@ kernel_args_module_t *kargs_module_add(phys_ptr_t base, uint32_t size) {
 void kargs_init(void) {
 	kernel_args = kmalloc(sizeof(kernel_args_t));
 	memset(kernel_args, 0, sizeof(kernel_args_t));
-#if CONFIG_DEBUG
-	/* Disable the boot splash by default for debug builds. */
-	kernel_args->splash_disabled = true;
-#endif
 }

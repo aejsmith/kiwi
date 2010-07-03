@@ -14,13 +14,14 @@
 Import('env')
 
 sources = map(File, [
+	'loaders/kiwi.c',
+	#'loaders/enter.S',
 	'ap_boot.S',
 	'arch.c',
 	'cpu.c',
 	#'enter.S',
 	'except.S',
 	'idt.c',
-	#'loader.c',
 ])
 
 # Set build flags.

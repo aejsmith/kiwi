@@ -18,6 +18,7 @@
  * @brief		Bootloader menu interface.
  */
 
+#include <boot/loader.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
 #include <boot/ui.h>
@@ -36,8 +37,6 @@ typedef struct menu_entry {
 	char *name;			/**< Name of the entry. */
 	environ_t *env;			/**< Environment for the entry. */
 } menu_entry_t;
-
-extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
 
 /** List of menu entries. */
 static LIST_DECLARE(menu_entries);
@@ -141,9 +140,26 @@ static input_result_t menu_entry_select(ui_entry_t *_entry) {
 	return INPUT_CLOSE;
 }
 
+/** Configure a menu entry.
+ * @param _entry	Entry that was selected.
+ * @return		Always returns INPUT_RENDER. */
+static input_result_t menu_entry_configure(ui_entry_t *_entry) {
+	menu_entry_t *entry = (menu_entry_t *)_entry;
+	loader_type_t *type = loader_type_get(entry->env);
+
+	type->configure(entry->env);
+	return INPUT_RENDER;
+}
+
 /** Actions for a menu entry. */
 static ui_action_t menu_entry_actions[] = {
 	{ "Boot", '\n', menu_entry_select },
+};
+
+/** Actions for a configurable menu entry. */
+static ui_action_t configurable_menu_entry_actions[] = {
+	{ "Boot", '\n', menu_entry_select },
+	{ "Configure", CONSOLE_KEY_F1, menu_entry_configure },
 };
 
 /** Render a menu entry.
@@ -157,6 +173,13 @@ static void menu_entry_render(ui_entry_t *_entry) {
 static ui_entry_type_t menu_entry_type = {
 	.actions = menu_entry_actions,
 	.action_count = ARRAYSZ(menu_entry_actions),
+	.render = menu_entry_render,
+};
+
+/** Configurable menu entry UI entry type. */
+static ui_entry_type_t configurable_menu_entry_type = {
+	.actions = configurable_menu_entry_actions,
+	.action_count = ARRAYSZ(configurable_menu_entry_actions),
 	.render = menu_entry_render,
 };
 
@@ -180,7 +203,14 @@ environ_t *menu_display(void) {
 		window = ui_list_create("Boot Menu", false);
 		LIST_FOREACH(&menu_entries, iter) {
 			entry = list_entry(iter, menu_entry_t, link);
-			ui_entry_init(&entry->header, &menu_entry_type);
+
+			/* If the entry's loader type has a configure function,
+			 * use the configurable entry type. */
+			if(loader_type_get(entry->env)->configure) {
+				ui_entry_init(&entry->header, &configurable_menu_entry_type);
+			} else {
+				ui_entry_init(&entry->header, &menu_entry_type);
+			}
 			ui_list_insert(window, &entry->header, entry == selected_menu_entry);
 		}
 
@@ -193,8 +223,4 @@ environ_t *menu_display(void) {
 
 	dprintf("loader: booting menu entry '%s'\n", selected_menu_entry->name);
 	return selected_menu_entry->env;
-}
-
-bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
-	return true;
 }

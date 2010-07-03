@@ -17,6 +17,7 @@ Import('config', 'envmgr')
 sources = map(File, [
 	#'fs/ext2.c',
 	'fs/iso9660.c',
+	'loaders/kiwi.c',
 	'partitions/msdos.c',
 	'config.c',
 	'console.c',

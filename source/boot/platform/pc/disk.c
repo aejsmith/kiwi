@@ -23,6 +23,7 @@
 #include <boot/memory.h>
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <platform/bios.h>
 #include <platform/multiboot.h>
@@ -65,6 +66,9 @@ typedef struct bios_disk {
 	uint8_t id;			/**< BIOS device ID. */
 } bios_disk_t;
 
+/** Maximum number of blocks per transfer. */
+#define BLOCKS_PER_TRANSFER(disk)	((BIOS_MEM_SIZE / disk->block_size) - 1)
+
 extern uint8_t boot_device_id;
 extern uint64_t boot_part_offset;
 
@@ -93,31 +97,37 @@ static bool bios_disk_read(disk_t *disk, void *buf, uint64_t lba, size_t count) 
 	disk_address_packet_t *dap = (disk_address_packet_t *)BIOS_MEM_BASE;
 	void *dest = (void *)(BIOS_MEM_BASE + disk->block_size);
 	bios_disk_t *data = disk->data;
+	size_t i, num, transfers;
 	bios_regs_t regs;
 
-	assert((disk->block_size * (count + 1)) <= BIOS_MEM_SIZE);
+	/* Have to split large transfers up as we have limited space to
+	 * transfer to. */
+	transfers = ROUND_UP(count, BLOCKS_PER_TRANSFER(disk)) / BLOCKS_PER_TRANSFER(disk);
+	for(i = 0; i < transfers; i++, buf += disk->block_size * num, count -= num) {
+		num = MIN(count, BLOCKS_PER_TRANSFER(disk));
 
-	/* Fill in a disk address packet for the transfer. The block is placed
-	 * immediately after the packet. */
-	dap->size = sizeof(disk_address_packet_t);
-	dap->reserved1 = 0;
-	dap->block_count = count;
-	dap->buffer_offset = (ptr_t)dest;
-	dap->buffer_segment = 0;
-	dap->start_lba = lba;
+		/* Fill in a disk address packet for the transfer. */
+		dap->size = sizeof(disk_address_packet_t);
+		dap->reserved1 = 0;
+		dap->block_count = num;
+		dap->buffer_offset = (ptr_t)dest;
+		dap->buffer_segment = 0;
+		dap->start_lba = lba;
 
-	/* Perform the transfer. */
-	bios_regs_init(&regs);
-	regs.eax = 0x4200;
-	regs.edx = data->id;
-	regs.esi = BIOS_MEM_BASE;
-	bios_interrupt(0x13, &regs);
-	if(regs.eflags & X86_FLAGS_CF) {
-		return false;
+		/* Perform the transfer. */
+		bios_regs_init(&regs);
+		regs.eax = 0x4200;
+		regs.edx = data->id;
+		regs.esi = BIOS_MEM_BASE;
+		bios_interrupt(0x13, &regs);
+		if(regs.eflags & X86_FLAGS_CF) {
+			return false;
+		}
+
+		/* Copy the transferred blocks to the buffer. */
+		memcpy(buf, dest, disk->block_size * num);
 	}
 
-	/* Copy the transferred blocks to the buffer. */
-	memcpy(buf, dest, disk->block_size * count);
 	return true;
 }
 

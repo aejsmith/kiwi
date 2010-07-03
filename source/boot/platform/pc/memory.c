@@ -135,5 +135,6 @@ void platform_memory_detect(void) {
 	phys_memory_add(0, PAGE_SIZE, PHYS_MEMORY_RESERVED);
 
 	/* Mark the memory area we use for BIOS calls as internal. */
-	phys_memory_add(BIOS_MEM_BASE, BIOS_MEM_BASE + BIOS_MEM_SIZE, PHYS_MEMORY_INTERNAL);
+	phys_memory_add(BIOS_MEM_BASE, BIOS_MEM_BASE + BIOS_MEM_SIZE + PAGE_SIZE,
+	                PHYS_MEMORY_INTERNAL);
 }

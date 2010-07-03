@@ -19,6 +19,7 @@
  *
  * @todo		Allow moving around the buffer in the textbox editor,
  *			rather than only allowing edits at the end.
+ * @todo		Destroy windows.
  */
 
 #include <boot/memory.h>
@@ -559,6 +560,28 @@ void ui_list_insert(ui_window_t *window, ui_entry_t *entry, bool selected) {
 		if(i >= UI_CONTENT_HEIGHT) {
 			list->offset = i - UI_CONTENT_HEIGHT + 1;
 		}
+	}
+}
+
+/** Add a list entry to edit an environment value.
+ * @param window	Window to insert into.
+ * @param env		Environment to operate on.
+ * @param name		Name of environment entry.
+ * @param label		Label to give the entry.
+ * @param selected	Whether the entry should be selected. */
+void ui_list_insert_env(ui_window_t *window, environ_t *env, const char *name,
+                        const char *label, bool selected) {
+	value_t *value = environ_lookup(env, name);
+
+	switch(value->type) {
+	case VALUE_TYPE_INTEGER:
+		ui_list_insert(window, ui_checkbox_create(label, value), selected);
+		break;
+	case VALUE_TYPE_STRING:
+		ui_list_insert(window, ui_textbox_create(label, value), selected);
+		break;
+	default:
+		fatal("Unhandled value type");
 	}
 }
 

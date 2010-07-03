@@ -191,7 +191,7 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
 	disk_probe(disk);
 	if(disk->fs && parent->boot && parent->ops->is_boot_partition) {
 		if(parent->ops->is_boot_partition(parent, id, lba)) {
-			boot_filesystem = disk->fs;
+			current_fs = disk->fs;
 		}
 	}
 
@@ -220,7 +220,7 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 	/* Probe for filesystems/partitions. */
 	disk_probe(disk);
 	if(disk->fs && boot) {
-		boot_filesystem = disk->fs;
+		current_fs = disk->fs;
 	}
 
 	list_append(&disk_list, &disk->header);
@@ -229,7 +229,7 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 /** Detect all disk devices. */
 void disk_init(void) {
 	platform_disk_detect();
-	if(!boot_filesystem) {
+	if(!current_fs) {
 		fatal("Could not find boot filesystem");
 	}
 }

@@ -32,15 +32,15 @@
 #include <kargs.h>
 
 /** Check whether a file is a certain elf type.
- * @param file		File to check.
+ * @param handle	Handle to file to check.
  * @param bitsize	ELF class definition.
  * @param endian	ELF endian definition.
  * @param machine	ELF machine definition.
  * @return		Whether the file is this type. */
-static inline bool elf_check(fs_node_t *file, uint8_t bitsize, uint8_t endian, uint8_t machine) {
+static inline bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t endian, uint8_t machine) {
 	Elf32_Ehdr ehdr;
 
-	if(!fs_file_read(file, &ehdr, sizeof(Elf32_Ehdr), 0)) {
+	if(!fs_file_read(handle, &ehdr, sizeof(Elf32_Ehdr), 0)) {
 		return false;
 	} else if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, 4) != 0) {
 		return false;
@@ -63,7 +63,7 @@ static inline bool elf_check(fs_node_t *file, uint8_t bitsize, uint8_t endian, u
  * @param _bits		32 or 64.
  * @param _alignment	Alignment for physical memory allocations. */
 #define DEFINE_ELF_LOADER(_name, _bits, _alignment)	\
-	static inline void _name(fs_node_t *file, Elf##_bits##_Addr *entryp, \
+	static inline void _name(fs_handle_t *handle, Elf##_bits##_Addr *entryp, \
 	                         Elf##_bits##_Addr *virtp, size_t *sizep) { \
 		Elf##_bits##_Addr virt_base = 0, virt_end = 0; \
 		Elf##_bits##_Phdr *phdrs; \
@@ -71,12 +71,12 @@ static inline bool elf_check(fs_node_t *file, uint8_t bitsize, uint8_t endian, u
 		ptr_t dest; \
 		size_t i; \
 		\
-		if(!fs_file_read(file, &ehdr, sizeof(ehdr), 0)) { \
+		if(!fs_file_read(handle, &ehdr, sizeof(ehdr), 0)) { \
 			fatal("Could not read kernel from boot device"); \
 		} \
 		\
 		phdrs = kmalloc(sizeof(*phdrs) * ehdr.e_phnum); \
-		if(!fs_file_read(file, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
+		if(!fs_file_read(handle, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
 			fatal("Could not read kernel from boot device"); \
 		} \
 		\
@@ -103,7 +103,7 @@ static inline bool elf_check(fs_node_t *file, uint8_t bitsize, uint8_t endian, u
 			} \
 			\
 			dest = (ptr_t)(kernel_args->kernel_phys + (phdrs[i].p_vaddr - virt_base)); \
-			if(!fs_file_read(file, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
+			if(!fs_file_read(handle, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
 				fatal("Could not read kernel from boot device"); \
 			} \
 			\

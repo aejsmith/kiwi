@@ -101,6 +101,8 @@ extern ui_window_t *ui_textview_create(const char *title, const char *text);
 
 extern ui_window_t *ui_list_create(const char *title, bool exitable);
 extern void ui_list_insert(ui_window_t *window, ui_entry_t *entry, bool selected);
+extern void ui_list_insert_env(ui_window_t *window, environ_t *env, const char *name,
+                               const char *label, bool selected);
 
 extern void ui_entry_init(ui_entry_t *entry, ui_entry_type_t *type);
 

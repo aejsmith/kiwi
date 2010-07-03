@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		x86 kernel loader.
+ * @brief		x86 Kiwi kernel loader.
  *
  * Both AMD64 and IA32 create a 1GB identity mapping at the start of the
  * virtual address space. All paging structures are allocated as reclaimable,
@@ -28,6 +28,7 @@
 
 #include <boot/cpu.h>
 #include <boot/elf.h>
+#include <boot/loader.h>
 #include <boot/memory.h>
 
 #include <lib/utility.h>
@@ -39,8 +40,8 @@
 /** Required CPU features (FPU, TSC, PAE, PGE, FXSR). */
 #define REQUIRED_FEATURES	((1<<0) | (1<<4) | (1<<6) | (1<<13) | (1<<24))
 
-extern void arch_enter_kernel64(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint64_t entry) __noreturn;
-extern void arch_enter_kernel32(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint32_t entry) __noreturn;
+extern void kiwi_loader_arch_enter64(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint64_t entry) __noreturn;
+extern void kiwi_loader_arch_enter32(kernel_args_t *args, uint32_t cpu, ptr_t cr3, uint32_t entry) __noreturn;
 
 /** Information on the loaded kernel. */
 static bool kernel_is_64bit = false;
@@ -53,6 +54,18 @@ DEFINE_ELF_LOADER(load_elf32_kernel, 32, LARGE_PAGE_SIZE);
 
 /** AMD64 kernel loader function. */
 DEFINE_ELF_LOADER(load_elf64_kernel, 64, LARGE_PAGE_SIZE);
+
+/** Set up x86-specific Kiwi options in an environment.
+ * @param env		Environment to set up. */
+void kiwi_loader_arch_setup(environ_t *env) {
+	value_t value;
+
+	if(!environ_lookup(env, "lapic_disabled")) {
+		value.type = VALUE_TYPE_INTEGER;
+		value.integer = 0;
+		environ_insert(env, "lapic_disabled", &value);
+	}
+}
 
 /** Allocate a paging structure.
  * @return		Pointer to structure. */
@@ -67,15 +80,15 @@ static uint64_t *allocate_paging_structure(void) {
 }
 
 /** Load a 64-bit kernel image.
- * @param file		File containing the kernel.
+ * @param handle	Handle to file containing kernel.
  * @return		Whether the kernel is 64-bit. */
-static bool arch_load_kernel64(fs_node_t *file) {
+static bool kiwi_loader_arch_load64(fs_handle_t *handle) {
 	uint64_t *pml4, *pdp, *pdir;
 	Elf64_Addr virt_base;
 	size_t load_size, i;
 	int pdpe, pde;
 
-	if(!elf_check(file, ELFCLASS64, ELFDATA2LSB, ELF_EM_X86_64)) {
+	if(!elf_check(handle, ELFCLASS64, ELFDATA2LSB, ELF_EM_X86_64)) {
 		return false;
 	}
 
@@ -86,7 +99,7 @@ static bool arch_load_kernel64(fs_node_t *file) {
 		fatal("64-bit kernel requires 64-bit CPU");
 	}
 
-	load_elf64_kernel(file, &kernel_entry64, &virt_base, &load_size);
+	load_elf64_kernel(handle, &kernel_entry64, &virt_base, &load_size);
 
 	assert(virt_base >= 0xFFFFFFFF80000000LL);
 
@@ -119,19 +132,19 @@ static bool arch_load_kernel64(fs_node_t *file) {
 }
 
 /** Load a 32-bit kernel image.
- * @param file		File containing the kernel.
+ * @param handle	Handle to file containing kernel.
  * @return		Whether the kernel is 32-bit. */
-static bool arch_load_kernel32(fs_node_t *file) {
+static bool kiwi_loader_arch_load32(fs_handle_t *handle) {
 	Elf32_Addr virt_base;
 	uint64_t *pdp, *pdir;
 	size_t load_size, i;
 	int pde;
 
-	if(!elf_check(file, ELFCLASS32, ELFDATA2LSB, ELF_EM_386)) {
+	if(!elf_check(handle, ELFCLASS32, ELFDATA2LSB, ELF_EM_386)) {
 		return false;
 	}
 
-	load_elf32_kernel(file, &kernel_entry32, &virt_base, &load_size);
+	load_elf32_kernel(handle, &kernel_entry32, &virt_base, &load_size);
 
 	assert(virt_base >= 0xC0000000);
 
@@ -158,22 +171,43 @@ static bool arch_load_kernel32(fs_node_t *file) {
 	return true;
 }
 
-/** Load the kernel into memory.
- * @param file		File containing the kernel. */
-void arch_load_kernel(fs_node_t *file) {
+/** Load a Kiwi kernel.
+ * @param handle	Handle to the file to load.
+ * @param env		Environment for the kernel. */
+void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env) {
+	value_t *value;
+
+	/* Pull settings out of the environment into the kernel arguments. */
+	if((value = environ_lookup(env, "lapic_disabled"))) {
+		kernel_args->arch.lapic_disabled = value->integer;
+	}
+
 	/* Check that features required on both 32- and 64-bit kernels are
 	 * supported. */
 	if((kernel_args->arch.standard_edx & REQUIRED_FEATURES) != REQUIRED_FEATURES) {
 		fatal("Required CPU features not present on all CPUs");
 	}
 
-	if(!arch_load_kernel64(file)) {
-		if(!arch_load_kernel32(file)) {
-			fatal("Kernel format is invalid");
+	if(!kiwi_loader_arch_load64(handle)) {
+		if(!kiwi_loader_arch_load32(handle)) {
+			fatal("Kernel image format is invalid");
 		}
 	}
 }
 
+/** Add x86-specific Kiwi options to a configuration window.
+ * @param env		Environment for the kernel.
+ * @param window	List window to add to. */
+void kiwi_loader_arch_configure(environ_t *env, ui_window_t *window) {
+	ui_list_insert_env(window, env, "lapic_disabled", "Disable Local APIC usage", false);
+}
+
+/** Enter the loaded kernel. */
+void __noreturn kiwi_loader_arch_enter(void) {
+	fatal("Not implemented");
+}
+
+#if 0
 /** Enter the kernel. */
 void arch_enter_kernel(void) {
 	/* All CPUs should reach this point simultaneously. Reset the TSC to
@@ -195,3 +229,4 @@ void arch_enter_kernel(void) {
 		arch_enter_kernel32(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry32);
 	}
 }
+#endif

@@ -18,6 +18,7 @@
  * @brief		Configuration file parser.
  *
  * @fixme		The parser is a little bit shit...
+ * @todo		Separate boolean type.
  */
 
 #include <boot/config.h>
@@ -76,7 +77,7 @@ static const char *default_config =
 	"set \"hidden\" 1\n"
 	"entry \"Kiwi\" {\n"
 #if CONFIG_DEBUG
-	"	set \"splash_disabled\" 0\n"
+	"	set \"splash_disabled\" 1\n"
 #endif
 	"	kiwi\n"
 	"}\n";
@@ -195,7 +196,7 @@ static void value_destroy(value_t *value) {
  * @return		Pointer to destination list. */
 static value_list_t *value_list_copy(value_list_t *source) {
 	value_list_t *dest = kmalloc(sizeof(value_list_t));
-	int i;
+	size_t i;
 
 	dest->values = kmalloc(sizeof(value_t) * source->count);
 	dest->count = source->count;
@@ -208,7 +209,7 @@ static value_list_t *value_list_copy(value_list_t *source) {
 /** Destroy an argument list.
  * @param list		List to destroy. */
 static void value_list_destroy(value_list_t *list) {
-	int i;
+	size_t i;
 
 	for(i = 0; i < list->count; i++) {
 		value_destroy(&list->values[i]);
@@ -591,13 +592,13 @@ void config_init(void) {
 	size_t i;
 
 	if(config_file_override) {
-		if(!config_load(boot_filesystem, config_file_override)) {
+		if(!config_load(NULL, config_file_override)) {
 			fatal("Specified configuration file does not exist");
 		}
 	} else {
 		/* Try the various paths. */
 		for(i = 0; i < ARRAYSZ(config_file_paths); i++) {
-			if(config_load(boot_filesystem, config_file_paths[i])) {
+			if(config_load(NULL, config_file_paths[i])) {
 				return;
 			}
 		}

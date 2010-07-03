@@ -91,7 +91,7 @@ typedef struct fs_handle {
 	int count;			/**< Reference count. */
 } fs_handle_t;
 
-extern fs_mount_t *boot_filesystem;
+extern fs_mount_t *current_fs;
 
 extern fs_handle_t *fs_handle_create(fs_mount_t *mount, bool directory, void *data);
 extern fs_mount_t *fs_probe(disk_t *disk);

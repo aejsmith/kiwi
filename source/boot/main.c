@@ -24,6 +24,7 @@
 #include <boot/console.h>
 #include <boot/cpu.h>
 #include <boot/fs.h>
+#include <boot/loader.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
 #include <boot/video.h>
@@ -102,6 +103,11 @@ static void load_modules(fs_node_t *dir) {
 
 /** Main function for the Kiwi bootloader. */
 void loader_main(void) {
+	loader_type_t *type;
+	environ_t *env;
+	value_t *value;
+	disk_t *disk;
+
 	/* Zero BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
 
@@ -122,9 +128,20 @@ void loader_main(void) {
 	config_init();
 
 	/* Display the menu interface. */
-	menu_display();
+	env = menu_display();
 
-	while(true);
+	/* Set the current filesystem. */
+	if((value = environ_lookup(env, "device")) && value->type == VALUE_TYPE_STRING) {
+		if(!(disk = disk_lookup(value->string)) || !disk->fs) {
+			fatal("Could not set device %s", value->string);
+		}
+		current_fs = disk->fs;
+	}
+
+	/* Load the operating system. */
+	type = loader_type_get(env);
+	type->load(env);
+	fatal("Failed to load operating system");
 #if 0
 	/* Do post-menu CPU intialisation, and detect/boot all other CPUs if
 	 * SMP was not disabled in the menu. */

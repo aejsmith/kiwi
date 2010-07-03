@@ -29,7 +29,7 @@
  * @note		Area is actually 60KB, but the last 4KB are used for
  *			the stack. */
 #define BIOS_MEM_BASE		0x1000
-#define BIOS_MEM_SIZE		0xF000
+#define BIOS_MEM_SIZE		0xE000
 
 /** Convert a segment + offset pair to a linear address. */
 #define SEGOFF2LIN(segoff)	(ptr_t)((((segoff) & 0xFFFF0000) >> 12) + ((segoff) & 0xFFFF))
