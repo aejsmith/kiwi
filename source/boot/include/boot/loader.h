@@ -65,7 +65,10 @@ extern void kiwi_loader_arch_setup(environ_t *env);
 extern void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env);
 extern void kiwi_loader_arch_configure(environ_t *env, ui_window_t *window);
 extern void kiwi_loader_arch_enter(void) __noreturn;
-
 extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
+
+#if CONFIG_PLATFORM_PC
+extern bool config_cmd_chainload(value_list_t *args, environ_t *env);
+#endif
 
 #endif /* __BOOT_LOADER_H */

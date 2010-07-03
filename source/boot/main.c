@@ -70,10 +70,10 @@ void loader_main(void) {
 
 	/* Set the current filesystem. */
 	if((value = environ_lookup(env, "device")) && value->type == VALUE_TYPE_STRING) {
-		if(!(disk = disk_lookup(value->string)) || !disk->fs) {
+		if(!(disk = disk_lookup(value->string))) {
 			fatal("Could not set device %s", value->string);
 		}
-		current_fs = disk->fs;
+		current_disk = disk;
 	}
 
 	/* Load the operating system. */

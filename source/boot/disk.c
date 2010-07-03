@@ -37,6 +37,9 @@ static bool (*partition_probe_funcs[])(disk_t *) = {
 	msdos_partition_probe,
 };
 
+/** Current disk device. */
+disk_t *current_disk = NULL;
+
 /** Look up a disk according to a string.
  *
  * Looks up a disk according to the given string. If the string is in the form
@@ -49,13 +52,22 @@ static bool (*partition_probe_funcs[])(disk_t *) = {
  * @return		Pointer to disk structure if found, NULL if not.
  */
 disk_t *disk_lookup(const char *str) {
+	char *name = NULL;
 	disk_t *disk;
+	size_t len;
+
+	if(str[0] == '(') {
+		len = strlen(str) - 2;
+		name = kmalloc(len);
+		memcpy(name, str + 1, len);
+		name[len] = 0;
+	}
 
 	LIST_FOREACH(&disk_list, iter) {
 		disk = list_entry(iter, disk_t, header);
 
-		if(str[0] == '(') {
-			if(strncmp(disk->name, str + 1, strlen(str) - 2) == 0) {
+		if(name) {
+			if(strcmp(disk->name, name) == 0) {
 				return disk;
 			}
 		} else if(disk->fs && disk->fs->uuid) {
@@ -186,12 +198,13 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
 	disk->fs = NULL;
 	disk->parent = parent;
 	disk->offset = lba;
+	disk->id = id;
 
 	/* Probe for filesystems/partitions. */
 	disk_probe(disk);
 	if(disk->fs && parent->boot && parent->ops->is_boot_partition) {
 		if(parent->ops->is_boot_partition(parent, id, lba)) {
-			current_fs = disk->fs;
+			current_disk = disk;
 		}
 	}
 
@@ -220,16 +233,28 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 	/* Probe for filesystems/partitions. */
 	disk_probe(disk);
 	if(disk->fs && boot) {
-		current_fs = disk->fs;
+		current_disk = disk;
 	}
 
 	list_append(&disk_list, &disk->header);
 }
 
+/** Get the parent disk of a partition.
+ * @param disk		Disk to get parent of.
+ * @return		Parent disk (if disk is already the top level, it will
+ *			be returned). */
+disk_t *disk_parent(disk_t *disk) {
+	while(disk->ops == &partition_disk_ops) {
+		disk = disk->parent;
+	}
+
+	return disk;
+}
+
 /** Detect all disk devices. */
 void disk_init(void) {
 	platform_disk_detect();
-	if(!current_fs) {
+	if(!current_disk || !current_disk->fs) {
 		fatal("Could not find boot filesystem");
 	}
 }

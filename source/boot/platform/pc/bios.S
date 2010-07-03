@@ -147,6 +147,6 @@ FUNCTION_START(bios_interrupt)
 FUNCTION_END(bios_interrupt)
 
 /** IDT pointer for the BIOS IVT. */
-bios_idtp:
+SYMBOL(bios_idtp)
         .word 0x7FF
         .long 0

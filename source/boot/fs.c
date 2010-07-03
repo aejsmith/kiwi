@@ -29,9 +29,6 @@
 #include "fs/ext2.h"
 #include "fs/iso9660.h"
 
-/** The filesystem currently in use. */
-fs_mount_t *current_fs = NULL;
-
 /** Array of filesystem implementations. */
 static fs_type_t *filesystem_types[] = {
 	//&ext2_fs_type,
@@ -107,7 +104,9 @@ fs_handle_t *fs_open(fs_mount_t *mount, const char *path) {
 	fs_handle_t *handle;
 
 	if(!mount) {
-		mount = current_fs;
+		if(!(mount = current_disk->fs)) {
+			return NULL;
+		}
 	}
 
 	/* Use the provided open() implementation if any. */

@@ -26,6 +26,7 @@
 #include <lib/utility.h>
 
 #include <platform/bios.h>
+#include <platform/boot.h>
 #include <platform/multiboot.h>
 
 #include <assert.h>
@@ -251,4 +252,15 @@ void platform_disk_detect(void) {
 
 	/* Add the boot device. */
 	platform_disk_add(boot_device_id);
+}
+
+/** Get the ID of a disk.
+ * @param disk		Disk to get ID of (can be a partition). */
+uint8_t bios_disk_id(disk_t *disk) {
+	bios_disk_t *data;
+
+	disk = disk_parent(disk);
+	assert(disk->ops == &bios_disk_ops);
+	data = disk->data;
+	return data->id;
 }

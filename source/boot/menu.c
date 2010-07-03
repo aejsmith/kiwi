@@ -46,8 +46,11 @@ static menu_entry_t *selected_menu_entry = NULL;
 
 /** Commands that can be executed within a menu entry. */
 static command_t menu_entry_commands[] = {
-	{ "set",	config_cmd_set },
+#if CONFIG_PLATFORM_PC
+	{ "chainload",	config_cmd_chainload },
+#endif
 	{ "kiwi",	config_cmd_kiwi },
+	{ "set",	config_cmd_set },
 };
 
 /** Add a new menu entry.

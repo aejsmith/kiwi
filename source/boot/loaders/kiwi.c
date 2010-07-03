@@ -225,7 +225,7 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 	kernel_args->fb_addr = mode->addr;
 
 	/* Write final details to the kernel arguments structure. */
-	strncpy(kernel_args->boot_fs_uuid, current_fs->uuid, KERNEL_ARGS_UUID_LEN);
+	strncpy(kernel_args->boot_fs_uuid, current_disk->fs->uuid, KERNEL_ARGS_UUID_LEN);
 	kernel_args->boot_fs_uuid[KERNEL_ARGS_UUID_LEN - 1] = 0;
 	kernel_args->boot_cpu = cpu_current_id();
 	memory_finalise();

@@ -14,6 +14,8 @@
 Import('envmgr', 'env', 'config')
 
 sources = map(File, [
+	'loaders/chainload.c',
+	'loaders/enter.S',
 	'bios.S',
 	'console.c',
 	'cpu.c',
