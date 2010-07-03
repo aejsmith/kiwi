@@ -197,7 +197,7 @@ environ_t *menu_display(void) {
 	value_t *value;
 
 	if(list_empty(&menu_entries)) {
-		fatal("No entries defined in configuration");
+		boot_error("No entries defined in configuration");
 	}
 
 	/* Find the default entry. */

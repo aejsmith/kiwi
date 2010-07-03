@@ -21,12 +21,6 @@
 #ifndef __FATAL_H
 #define __FATAL_H
 
-#include <types.h>
-
-#ifdef LOADER
-extern void fatal(const char *fmt, ...) __printf(1, 2) __noreturn;
-#else
-
 #include <lib/notifier.h>
 
 struct intr_frame;
@@ -45,5 +39,4 @@ extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn
  */
 #define fatal(fmt...)	_fatal(NULL, fmt)
 
-#endif /* LOADER */
 #endif /* __FATAL_H */

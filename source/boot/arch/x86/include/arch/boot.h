@@ -26,5 +26,6 @@
 extern bool cpu_lapic_init(void);
 extern void idt_init(void);
 extern void arch_early_init(void);
+extern void arch_reboot(void);
 
 #endif /* __ARCH_BOOT_H */

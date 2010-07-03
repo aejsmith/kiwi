@@ -19,6 +19,7 @@
  */
 
 #include <boot/console.h>
+#include <boot/error.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
 #include <boot/video.h>
@@ -28,9 +29,6 @@
 
 #include <lib/list.h>
 #include <lib/string.h>
-
-#include <fatal.h>
-#include <kargs.h>
 
 /** Structure describing a VBE video mode. */
 typedef struct vbe_mode {
@@ -64,9 +62,9 @@ void video_init(void) {
 	regs.edi = BIOS_MEM_BASE;
 	bios_interrupt(0x10, &regs);
 	if((regs.eax & 0xFF) != 0x4F) {
-		fatal("VBE is not supported");
+		boot_error("VBE is not supported");
 	} else if((regs.eax & 0xFF00) != 0) {
-		fatal("Could not obtain VBE information (0x%x)", regs.eax & 0xFFFF);
+		boot_error("Could not obtain VBE information (0x%x)", regs.eax & 0xFFFF);
 	}
 
 	dprintf("vbe: vbe presence was detected:\n");
@@ -88,7 +86,7 @@ void video_init(void) {
 		regs.edi = BIOS_MEM_BASE + sizeof(vbe_info_t);
 		bios_interrupt(0x10, &regs);
 		if((regs.eax & 0xFF00) != 0) {
-			fatal("Could not obtain VBE mode information (0x%x)", regs.eax & 0xFFFF);
+			boot_error("Could not obtain VBE mode information (0x%x)", regs.eax & 0xFFFF);
 		}
 
 		/* Check if the mode is suitable. */
@@ -133,7 +131,7 @@ void video_init(void) {
 			if(!(default_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
 			                                          FALLBACK_MODE_HEIGHT,
 			                                          0))) {
-				fatal("Could not find a usable video mode");
+				boot_error("Could not find a usable video mode");
 			}
 		}
 	}

@@ -21,14 +21,13 @@
 #include <arch/cpu.h>
 
 #include <boot/console.h>
+#include <boot/error.h>
 #include <boot/memory.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <platform/bios.h>
-
-#include <fatal.h>
 
 /** Memory map type values. */
 #define E820_TYPE_FREE		1		/**< Usable memory. */
@@ -74,7 +73,7 @@ void platform_memory_detect(void) {
 
 	/* FIXME: Should handle BIOSen that don't support this. */
 	if(count == 0) {
-		fatal("BIOS does not support E820 memory map");
+		boot_error("BIOS does not support E820 memory map");
 	}
 
 	/* Iterate over the obtained memory map and add the entries to the

@@ -26,6 +26,7 @@
 
 #include <boot/console.h>
 #include <boot/cpu.h>
+#include <boot/error.h>
 #include <boot/memory.h>
 
 #include <lib/qsort.h>
@@ -33,7 +34,6 @@
 #include <lib/utility.h>
 
 #include <assert.h>
-#include <fatal.h>
 #include <time.h>
 
 /** Frequency of the PIT. */
@@ -288,7 +288,7 @@ bool cpu_lapic_init(void) {
 	mapping = (uint32_t *)((ptr_t)base & 0xFFFFF000);
 	if(lapic_mapping) {
 		if(lapic_mapping != mapping) {
-			fatal("CPUs have different LAPIC base addresses");
+			boot_error("CPUs have different LAPIC base addresses");
 		}
 	} else {
 		lapic_mapping = mapping;
@@ -373,7 +373,7 @@ static void cpu_boot(kernel_args_cpu_t *cpu) {
 		spin(10000);
 	}
 
-	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
+	boot_error("CPU %" PRIu32 " timed out while booting", cpu->id);
 }
 
 /** Spin for a certain amount of time.
@@ -455,7 +455,7 @@ void cpu_ap_entry(void) {
 	/* It is assumed that all secondary CPUs have an LAPIC, seeing as they
 	 * could not have been booted if they didn't. */
 	if(!cpu_lapic_init()) {
-		fatal("CPU %" PRIu32 " APIC could not be enabled", booting_cpu->id);
+		boot_error("CPU %" PRIu32 " APIC could not be enabled", booting_cpu->id);
 	}
 
 	atomic_inc(&ap_boot_wait);

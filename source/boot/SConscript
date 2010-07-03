@@ -22,7 +22,7 @@ sources = map(File, [
 	'config.c',
 	'console.c',
 	'disk.c',
-	'fatal.c',
+	'error.c',
 	'fs.c',
 	'kargs.c',
 	'main.c',

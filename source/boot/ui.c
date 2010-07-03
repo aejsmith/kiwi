@@ -369,6 +369,7 @@ ui_window_t *ui_textview_create(const char *title, const char *text) {
 
 	ui_window_init(&view->header, &ui_textview_window_type, title);
 	view->lines = NULL;
+	view->offset = 0;
 	view->count = 0;
 
 	/* Store details of all the lines in the buffer. */
@@ -581,7 +582,7 @@ void ui_list_insert_env(ui_window_t *window, environ_t *env, const char *name,
 		ui_list_insert(window, ui_textbox_create(label, value), selected);
 		break;
 	default:
-		fatal("Unhandled value type");
+		internal_error("Unhandled value type");
 	}
 }
 

@@ -120,7 +120,7 @@ static bool cpu_detect_mps(void) {
 			} else if(cpu->cpu_flags & 2) {
 				/* This is the BSP, do a sanity check. */
 				if(cpu->lapic_id != cpu_current_id()) {
-					fatal("BSP entry does not match current CPU ID");
+					boot_error("BSP entry does not match current CPU ID");
 				}
 				break;
 			}

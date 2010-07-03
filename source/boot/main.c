@@ -23,6 +23,7 @@
 #include <boot/config.h>
 #include <boot/console.h>
 #include <boot/cpu.h>
+#include <boot/error.h>
 #include <boot/fs.h>
 #include <boot/loader.h>
 #include <boot/memory.h>
@@ -33,7 +34,6 @@
 
 #include <lib/string.h>
 
-#include <fatal.h>
 #include <kargs.h>
 
 extern char __bss_start[], __bss_end[];
@@ -71,7 +71,7 @@ void loader_main(void) {
 	/* Set the current filesystem. */
 	if((value = environ_lookup(env, "device")) && value->type == VALUE_TYPE_STRING) {
 		if(!(disk = disk_lookup(value->string))) {
-			fatal("Could not set device %s", value->string);
+			boot_error("Could not find device %s", value->string);
 		}
 		current_disk = disk;
 	}

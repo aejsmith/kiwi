@@ -19,6 +19,7 @@
  */
 
 #include <boot/console.h>
+#include <boot/error.h>
 #include <boot/memory.h>
 
 #include <lib/list.h>
@@ -26,7 +27,6 @@
 #include <lib/utility.h>
 
 #include <assert.h>
-#include <fatal.h>
 
 /** Structure representing an area on the heap. */
 typedef struct heap_chunk {
@@ -67,7 +67,7 @@ static inline bool heap_chunk_free(heap_chunk_t *chunk) {
 }
 
 /** Allocate memory from the heap.
- * @note		A fatal error will be raised if heap is full.
+ * @note		An internal error will be raised if heap is full.
  * @param size		Size of allocation to make.
  * @return		Address of allocation. */
 void *kmalloc(size_t size) {
@@ -75,7 +75,7 @@ void *kmalloc(size_t size) {
 	size_t total;
 
 	if(size == 0) {
-		fatal("Zero-sized allocation!");
+		internal_error("Zero-sized allocation!");
 	}
 
 	/* Align all allocations to 8 bytes. */
@@ -100,7 +100,7 @@ void *kmalloc(size_t size) {
 		}
 
 		if(!chunk) {
-			fatal("Could not satisfy allocation of %u bytes", size);
+			internal_error("Exhausted heap space (want %zu bytes)", size);
 		}
 	}
 
@@ -151,7 +151,7 @@ void kfree(void *addr) {
 	/* Get the chunk and free it. */
 	chunk = (heap_chunk_t *)((char *)addr - sizeof(heap_chunk_t));
 	if(heap_chunk_free(chunk)) {
-		fatal("Double free on address %p", addr);
+		internal_error("Double free on address %p", addr);
 	}
 	chunk->size &= ~(1<<0);
 
@@ -316,7 +316,7 @@ void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type) {
 }
 
 /** Allocate a range of physical memory.
- * @note		If allocation fails, a fatal error will be raised.
+ * @note		If allocation fails, a boot error will be raised.
  * @param size		Size of the range (multiple of the page size).
  * @param align		Alignment of the range (multiple of the page size).
  * @param reclaim	Whether to mark the range as reclaimable.
@@ -348,7 +348,7 @@ phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim) {
 	}
 
 	/* Nothing available in all physical ranges, give an error. */
-	fatal("You do not have enough memory available");
+	boot_error("You do not have enough memory available");
 }
 
 /** Initialise the memory manager. */

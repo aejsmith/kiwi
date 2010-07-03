@@ -28,13 +28,13 @@
 
 #include <boot/cpu.h>
 #include <boot/elf.h>
+#include <boot/error.h>
 #include <boot/loader.h>
 #include <boot/memory.h>
 
 #include <lib/utility.h>
 
 #include <assert.h>
-#include <fatal.h>
 #include <kargs.h>
 
 /** Required CPU features (FPU, TSC, PAE, PGE, FXSR). */
@@ -96,7 +96,7 @@ static bool kiwi_loader_arch_load64(fs_handle_t *handle) {
 	 * support, too, but Intel are twats and don't set the SYSCALL bit in
 	 * the CPUID information unless you're in 64-bit mode. */
 	if(!(kernel_args->arch.extended_edx & (1<<29))) {
-		fatal("64-bit kernel requires 64-bit CPU");
+		boot_error("64-bit kernel requires 64-bit CPU");
 	}
 
 	load_elf64_kernel(handle, &kernel_entry64, &virt_base, &load_size);
@@ -198,12 +198,12 @@ void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env) {
 	/* Check that features required on both 32- and 64-bit kernels are
 	 * supported. */
 	if((kernel_args->arch.standard_edx & REQUIRED_FEATURES) != REQUIRED_FEATURES) {
-		fatal("Required CPU features not present on all CPUs");
+		boot_error("Required CPU features not present on all CPUs");
 	}
 
 	if(!kiwi_loader_arch_load64(handle)) {
 		if(!kiwi_loader_arch_load32(handle)) {
-			fatal("Kernel image format is invalid");
+			boot_error("Kernel image format is invalid");
 		}
 	}
 }

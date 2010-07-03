@@ -22,13 +22,13 @@
 #define __BOOT_ELF_H
 
 #include <boot/console.h>
+#include <boot/error.h>
 #include <boot/fs.h>
 #include <boot/memory.h>
 
 #include <lib/string.h>
 
 #include <elf.h>
-#include <fatal.h>
 #include <kargs.h>
 
 /** Check whether a file is a certain elf type.
@@ -72,12 +72,12 @@ static inline bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t endia
 		size_t i; \
 		\
 		if(!fs_file_read(handle, &ehdr, sizeof(ehdr), 0)) { \
-			fatal("Could not read kernel from boot device"); \
+			boot_error("Could not open kernel image"); \
 		} \
 		\
 		phdrs = kmalloc(sizeof(*phdrs) * ehdr.e_phnum); \
 		if(!fs_file_read(handle, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
-			fatal("Could not read kernel from boot device"); \
+			boot_error("Could not read kernel image"); \
 		} \
 		\
 		for(i = 0; i < ehdr.e_phnum; i++) { \
@@ -104,7 +104,7 @@ static inline bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t endia
 			\
 			dest = (ptr_t)(kernel_args->kernel_phys + (phdrs[i].p_vaddr - virt_base)); \
 			if(!fs_file_read(handle, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
-				fatal("Could not read kernel from boot device"); \
+				boot_error("Could not read kernel image"); \
 			} \
 			\
 			memset((void *)(dest + (ptr_t)phdrs[i].p_filesz), 0, phdrs[i].p_memsz - phdrs[i].p_filesz); \

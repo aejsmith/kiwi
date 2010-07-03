@@ -169,7 +169,6 @@ typedef struct idt_entry {
 #endif
 } __packed idt_entry_t;
 
-#ifndef LOADER
 /** Load a value into TR (Task Register).
  * @param sel		Selector to load. */
 static inline void ltr(uint32_t sel) {
@@ -192,6 +191,7 @@ static inline void lidt(ptr_t base, uint16_t limit) {
 	__asm__ volatile("lidt %0" :: "m"(idtp));
 }
 
+#ifndef LOADER
 #ifndef __x86_64__
 extern void tss_init(void);
 #endif

@@ -23,6 +23,7 @@
 
 #include <boot/config.h>
 #include <boot/console.h>
+#include <boot/error.h>
 #include <boot/fs.h>
 #include <boot/memory.h>
 #include <boot/menu.h>
@@ -30,8 +31,6 @@
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/utility.h>
-
-#include <fatal.h>
 
 /** Structure containing details of a command to run. */
 typedef struct command_list_entry {
@@ -593,7 +592,7 @@ void config_init(void) {
 
 	if(config_file_override) {
 		if(!config_load(NULL, config_file_override)) {
-			fatal("Specified configuration file does not exist");
+			boot_error("Specified configuration file does not exist");
 		}
 	} else {
 		/* Try the various paths. */
@@ -605,7 +604,7 @@ void config_init(void) {
 
 		/* No configuration was loaded, use the default. */
 		if(!config_load_internal("<default>", default_config)) {
-			fatal("Could not load default configuration");
+			internal_error("Could not load default configuration");
 		}
 	}
 }

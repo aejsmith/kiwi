@@ -19,13 +19,12 @@
  */
 
 #include <boot/disk.h>
+#include <boot/error.h>
 #include <boot/fs.h>
 #include <boot/memory.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
-
-#include <fatal.h>
 
 #include "partitions/msdos.h"
 
@@ -255,6 +254,6 @@ disk_t *disk_parent(disk_t *disk) {
 void disk_init(void) {
 	platform_disk_detect();
 	if(!current_disk || !current_disk->fs) {
-		fatal("Could not find boot filesystem");
+		boot_error("Could not find boot filesystem");
 	}
 }

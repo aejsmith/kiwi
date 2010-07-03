@@ -19,8 +19,24 @@
  */
 
 #include <arch/boot.h>
+#include <arch/cpu.h>
+#include <arch/descriptor.h>
+#include <arch/io.h>
+
+#include <time.h>
 
 /** Perform early architecture initialisation. */
 void arch_early_init(void) {
 	idt_init();
+}
+
+/** Reboot the system. */
+void arch_reboot(void) {
+	/* Try the keyboard controller. */
+	out8(0x64, 0xfe);
+	spin(5000);
+
+	/* Fall back on a triple fault. */
+	lidt(0, 0);
+	__asm__ volatile("ud2");
 }

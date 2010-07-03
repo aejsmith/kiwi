@@ -59,7 +59,7 @@ static void kiwi_loader_load_kernel(const char *path, environ_t *env) {
 	kprintf("Loading kernel...\n", path);
 
 	if(!(handle = fs_open(NULL, path))) {
-		fatal("Could not find kernel image (%s)", path);
+		boot_error("Could not find kernel image %s", path);
 	}
 
 	kiwi_loader_arch_load(handle, env);
@@ -83,7 +83,7 @@ static void kiwi_loader_load_module(fs_handle_t *handle, const char *name) {
 	size = fs_file_size(handle);
 	addr = phys_memory_alloc(ROUND_UP(size, PAGE_SIZE), PAGE_SIZE, true);
 	if(!fs_file_read(handle, (void *)((ptr_t)addr), size, 0)) {
-		fatal("Could not read module %s", name);
+		boot_error("Could not read module %s", name);
 	}
 
 	/* Add the module to the kernel arguments. */
@@ -108,15 +108,15 @@ static void kiwi_loader_load_modules(const char *path) {
 	fs_handle_t *handle;
 
 	if(!(handle = fs_open(NULL, path))) {
-		fatal("Could not find module directory (%s)", path);
+		boot_error("Could not find module directory %s", path);
 	} else if(!handle->directory) {
-		fatal("Module directory not directory (%s)", path);
+		boot_error("Module directory %s not directory", path);
 	} else if(!handle->mount->type->read_dir) {
-		fatal("Cannot use module directory on non-listable FS");
+		boot_error("Cannot use module directory on non-listable FS");
 	}
 
 	if(!fs_dir_read(handle, load_modules_cb, NULL)) {
-		fatal("Failed to iterate module directory");
+		boot_error("Failed to iterate module directory");
 	}
 
 	fs_close(handle);
@@ -163,7 +163,7 @@ static void kiwi_loader_detect_dir(environ_t *env) {
 		}
 	}
 
-	fatal("Could not find Kiwi boot directory");
+	boot_error("Could not find Kiwi boot directory");
 }
 
 /** AP entry function for booting a Kiwi kernel. */
@@ -192,7 +192,7 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 		if((value = environ_lookup(env, "kiwi_module_list"))) {
 			for(i = 0; i < value->list->count; i++) {
 				if(!(handle = fs_open(NULL, value->list->values[i].string))) {
-					fatal("Could not open module %s", value->list->values[i].string);
+					boot_error("Could not open module %s", value->list->values[i].string);
 				}
 				kiwi_loader_load_module(
 					handle,

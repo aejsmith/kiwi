@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,27 +15,15 @@
 
 /**
  * @file
- * @brief		Assertion function.
+ * @brief		Boot error handling functions.
  */
 
-#ifndef __ASSERT_H
-#define __ASSERT_H
+#ifndef __BOOT_ERROR_H
+#define __BOOT_ERROR_H
 
-#include <compiler.h>
-#ifdef LOADER
-# include <boot/error.h>
-#else
-# include <fatal.h>
-#endif
+#include <types.h>
 
-#if CONFIG_DEBUG
-# ifdef LOADER
-#  define assert(cond)	if(unlikely(!(cond))) { internal_error("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
-# else
-#  define assert(cond)	if(unlikely(!(cond))) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
-# endif
-#else
-# define assert(cond)	((void)0)
-#endif
+extern void internal_error(const char *fmt, ...) __printf(1, 2) __noreturn;
+extern void boot_error(const char *fmt, ...) __printf(1, 2) __noreturn;
 
-#endif /* __ASSERT_H */
+#endif /* __BOOT_ERROR_H */

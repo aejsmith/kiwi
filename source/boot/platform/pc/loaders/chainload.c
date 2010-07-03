@@ -26,8 +26,6 @@
 #include <platform/bios.h>
 #include <platform/boot.h>
 
-#include <fatal.h>
-
 extern void chain_loader_enter(uint8_t id, ptr_t part) __noreturn;
 
 /** Details of where to load stuff to. */
@@ -52,14 +50,14 @@ static void __noreturn chain_loader_load(environ_t *env) {
 
 	/* Load the boot sector. */
 	if(!disk_read(current_disk, (void *)CHAINLOAD_ADDR, CHAINLOAD_SIZE, 0)) {
-		fatal("Could not read boot sector");
+		boot_error("Could not read boot sector");
 	}
 
 	/* If booting a partition, we must give partition information to it. */
 	if((parent = disk_parent(current_disk)) != current_disk) {
 		if(!disk_read(parent, (void *)PARTITION_TABLE_ADDR, PARTITION_TABLE_SIZE,
 		              PARTITION_TABLE_OFFSET)) {
-			fatal("Could not read partition table");
+			boot_error("Could not read partition table");
 		}
 
 		part_addr = PARTITION_TABLE_ADDR + (current_disk->id << 4);

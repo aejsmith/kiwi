@@ -22,9 +22,9 @@
 #include <arch/descriptor.h>
 #include <arch/intr.h>
 
-#include <platform/boot.h>
+#include <boot/error.h>
 
-#include <fatal.h>
+#include <platform/boot.h>
 
 /** Number of IDT entries. */
 #define IDT_ENTRY_COUNT		32
@@ -63,15 +63,15 @@ void idt_init(void) {
 /** Handle an exception.
  * @param frame		Interrupt frame. */
 void interrupt_handler(intr_frame_t *frame) {
-	fatal("Exception %u (error code %u)\n"
-	      "cs: 0x%04" PRIxn "  ds: 0x%04" PRIxn "  es: 0x%04" PRIxn "  "
-	      "fs: 0x%04" PRIxn "  gs: 0x%04" PRIxn "\n"
-	      "eflags: 0x%08" PRIxn "  esp: 0x%08" PRIxn "\n"
-	      "eax: 0x%08" PRIxn "  ebx: 0x%08" PRIxn "  ecx: 0x%08" PRIxn "  edx: 0x%08" PRIxn "\n"
-	      "edi: 0x%08" PRIxn "  esi: 0x%08" PRIxn "  ebp: 0x%08" PRIxn "  eip: 0x%08" PRIxn,
-	      frame->int_no, frame->err_code, frame->cs, frame->ds, frame->es,
-	      frame->fs, frame->gs, frame->flags, frame->ksp, frame->ax,
-	      frame->bx, frame->cx, frame->dx, frame->di, frame->si, frame->bp,
-	      frame->ip);
+	internal_error("Exception %u (error code %u)\n"
+	               "cs: 0x%04" PRIxn "  ds: 0x%04" PRIxn "  es: 0x%04" PRIxn "  "
+	               "fs: 0x%04" PRIxn "  gs: 0x%04" PRIxn "\n"
+	               "eflags: 0x%08" PRIxn "  esp: 0x%08" PRIxn "\n"
+	               "eax: 0x%08" PRIxn "  ebx: 0x%08" PRIxn "  ecx: 0x%08" PRIxn "  edx: 0x%08" PRIxn "\n"
+	               "edi: 0x%08" PRIxn "  esi: 0x%08" PRIxn "  ebp: 0x%08" PRIxn "  eip: 0x%08" PRIxn,
+	               frame->int_no, frame->err_code, frame->cs, frame->ds, frame->es,
+	               frame->fs, frame->gs, frame->flags, frame->ksp, frame->ax,
+	               frame->bx, frame->cx, frame->dx, frame->di, frame->si, frame->bp,
+	               frame->ip);
 	while(1);
 }
