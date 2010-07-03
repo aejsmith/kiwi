@@ -71,13 +71,12 @@ static int current_col;			/**< Current column in the file (minus 1). */
 
 /** Default configuration for when no configuration exists. */
 static const char *default_config =
-	"set \"default\" 0\n"
 	"set \"hidden\" true\n"
 	"entry \"Kiwi\" {\n"
 #if CONFIG_DEBUG
 	"	set \"splash_disabled\" true\n"
 #endif
-	"	kiwi \"/kiwi/kernel\" []\n"
+	"	kiwi\n"
 	"}\n";
 
 /** Configuration file paths to try. */
