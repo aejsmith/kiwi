@@ -231,6 +231,7 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 	memory_finalise();
 
 	/* Enter the kernel. */
+	atomic_inc(&ap_kernel_wait);
 	kiwi_loader_arch_enter();
 }
 
