@@ -29,6 +29,7 @@ sources = map(File, [
 	'memory.c',
 	'menu.c',
 	'ui.c',
+	'video.c',
 ])
 
 # Sources to use from the kernel.

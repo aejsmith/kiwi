@@ -141,7 +141,6 @@ void loader_main(void) {
 	/* Load the operating system. */
 	type = loader_type_get(env);
 	type->load(env);
-	fatal("Failed to load operating system");
 #if 0
 	/* Do post-menu CPU intialisation, and detect/boot all other CPUs if
 	 * SMP was not disabled in the menu. */

@@ -421,7 +421,7 @@ static void ui_list_render(ui_window_t *window) {
 	size_t i;
 
 	/* Render each entry. */
-	for(i = list->offset; i < MIN(list->offset + UI_CONTENT_HEIGHT, list->count - list->offset); i++) {
+	for(i = list->offset; i < MIN(list->offset + UI_CONTENT_HEIGHT, list->count); i++) {
 		ui_list_render_entry(list->entries[i], i - list->offset, list->selected == i);
 	}
 }
@@ -558,7 +558,7 @@ void ui_list_insert(ui_window_t *window, ui_entry_t *entry, bool selected) {
 	if(selected) {
 		list->selected = i;
 		if(i >= UI_CONTENT_HEIGHT) {
-			list->offset = i - UI_CONTENT_HEIGHT + 1;
+			list->offset = (i - UI_CONTENT_HEIGHT) + 1;
 		}
 	}
 }

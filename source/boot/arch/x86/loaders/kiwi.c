@@ -178,9 +178,8 @@ void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env) {
 	value_t *value;
 
 	/* Pull settings out of the environment into the kernel arguments. */
-	if((value = environ_lookup(env, "lapic_disabled"))) {
-		kernel_args->arch.lapic_disabled = value->integer;
-	}
+	value = environ_lookup(env, "lapic_disabled");
+	kernel_args->arch.lapic_disabled = value->integer;
 
 	/* Check that features required on both 32- and 64-bit kernels are
 	 * supported. */

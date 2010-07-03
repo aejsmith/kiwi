@@ -21,7 +21,30 @@
 #ifndef __BOOT_VIDEO_H
 #define __BOOT_VIDEO_H
 
+#include <boot/ui.h>
+
+#include <lib/list.h>
+
+/** Structure describing a video mode. */
+typedef struct video_mode {
+	list_t header;			/**< Link to video modes list. */
+	char *name;			/**< Name of the mode. */
+
+	/** To be filled in by platform code. */
+	int width;			/**< Mode width. */
+	int height;			/**< Mode height. */
+	int bpp;			/**< Bits per pixel. */
+	phys_ptr_t addr;		/**< Physical address of the framebuffer. */
+} video_mode_t;
+
+extern video_mode_t *default_video_mode;
+
+extern video_mode_t *video_mode_find(int width, int height, int depth);
+extern video_mode_t *video_mode_find_string(const char *mode);
+extern void video_mode_add(video_mode_t *mode);
+extern ui_entry_t *video_mode_chooser(const char *label, value_t *value);
+
 extern void video_init(void);
-extern void video_enable(void);
+extern void video_enable(video_mode_t *mode);
 
 #endif /* __BOOT_VIDEO_H */

@@ -33,6 +33,7 @@
 #include <boot/memory.h>
 #include <boot/fs.h>
 #include <boot/ui.h>
+#include <boot/video.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -165,16 +166,15 @@ static void kiwi_loader_detect_dir(environ_t *env) {
  * @param env		Environment for the entry. */
 static void __noreturn kiwi_loader_load(environ_t *env) {
 	fs_handle_t *handle;
+	video_mode_t *mode;
 	value_t *value;
 	size_t i;
 
 	/* Pull settings out of the environment into the kernel arguments. */
-	if((value = environ_lookup(env, "splash_disabled"))) {
-		kernel_args->splash_disabled = value->integer;
-	}
-	if((value = environ_lookup(env, "smp_disabled"))) {
-		kernel_args->smp_disabled = value->integer;
-	}
+	value = environ_lookup(env, "splash_disabled");
+	kernel_args->splash_disabled = value->integer;
+	value = environ_lookup(env, "smp_disabled");
+	kernel_args->smp_disabled = value->integer;
 
 	/* Work out where to load everything. */
 	if((value = environ_lookup(env, "kiwi_kernel"))) {
@@ -199,6 +199,15 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 		kiwi_loader_detect_dir(env);
 	}
 
+	/* Set the video mode. */
+	value = environ_lookup(env, "video_mode");
+	mode = value->pointer;
+	video_enable(mode);
+	kernel_args->fb_width = mode->width;
+	kernel_args->fb_height = mode->height;
+	kernel_args->fb_depth = mode->bpp;
+	kernel_args->fb_addr = mode->addr;
+
 	while(1);
 }
 
@@ -206,6 +215,7 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
  * @param env		Environment for the entry. */
 static void kiwi_loader_configure(environ_t *env) {
 	ui_window_t *window = ui_list_create("Kiwi Configuration", true);
+	ui_list_insert(window, video_mode_chooser("Video mode", environ_lookup(env, "video_mode")), false);
 	ui_list_insert_env(window, env, "splash_disabled", "Disable splash screen", false);
 	ui_list_insert_env(window, env, "smp_disabled", "Disable SMP", false);
 	kiwi_loader_arch_configure(env, window);
@@ -226,7 +236,8 @@ static loader_type_t kiwi_loader_type = {
  * @param env		Environment for the command.
  * @return		Whether completed successfully. */
 bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
-	value_t value;
+	value_t value, *exist;
+	video_mode_t *mode;
 
 	if(args->count == 2 && vtype(args, 0, VALUE_TYPE_STRING) && vtype(args, 1, VALUE_TYPE_LIST)) {
 		environ_insert(env, "kiwi_kernel", &args->values[0]);
@@ -255,6 +266,15 @@ bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
 		value.integer = 0;
 		environ_insert(env, "smp_disabled", &value);
 	}
+	if((exist = environ_lookup(env, "video_mode")) && exist->type == VALUE_TYPE_STRING) {
+		if((mode = video_mode_find_string(exist->string))) {
+			default_video_mode = mode;
+		}
+	}
+	value.type = VALUE_TYPE_POINTER;
+	value.pointer = default_video_mode;
+	environ_insert(env, "video_mode", &value);
+
 	kiwi_loader_arch_setup(env);
 	return true;
 }

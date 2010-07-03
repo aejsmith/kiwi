@@ -32,15 +32,11 @@
 #include <fatal.h>
 #include <kargs.h>
 
-/** Structure describing a video mode. */
-typedef struct video_mode {
-	list_t header;			/**< Link to mode list. */
+/** Structure describing a VBE video mode. */
+typedef struct vbe_mode {
+	video_mode_t header;		/**< Video mode header structure. */
 	uint16_t id;			/**< ID of the mode. */
-	int width;			/**< Mode width. */
-	int height;			/**< Mode height. */
-	int bpp;			/**< Bits per pixel. */
-	phys_ptr_t addr;		/**< Physical address of the framebuffer. */
-} video_mode_t;
+} vbe_mode_t;
 
 /** Preferred/fallback video modes. */
 #define PREFERRED_MODE_WIDTH		1024
@@ -48,97 +44,17 @@ typedef struct video_mode {
 #define FALLBACK_MODE_WIDTH		800
 #define FALLBACK_MODE_HEIGHT		600
 
-/** List of video modes. */
-static LIST_DECLARE(video_modes);
-
-/** Detected video mode. */
-static video_mode_t *detected_video_mode = NULL;
-
-/** Menu choice for the video mode. */
-//static menu_item_t *video_mode_choice = NULL;
-
 /** Override for video mode from Multiboot command line. */
 char *video_mode_override = NULL;
-
-/** Search for a video mode.
- * @param width		Width to search for.
- * @param height	Height to search for.
- * @param depth		Depth to search for or 0 to use the highest depth found.
- * @return		Pointer to mode structure, or NULL if not found. */
-static video_mode_t *video_mode_find(int width, int height, int depth) {
-	video_mode_t *mode, *ret = NULL;
-
-	LIST_FOREACH(&video_modes, iter) {
-		mode = list_entry(iter, video_mode_t, header);
-		if(mode->width == width && mode->height == height) {
-			if(depth) {
-				if(mode->bpp == depth) {
-					return mode;
-				}
-			} else if(!ret || mode->bpp > ret->bpp) {
-				ret = mode;
-			}
-		}
-	}
-
-	return ret;
-}
-
-/** Get the mode specified by the override string.
- * @return		Mode if found, NULL if not. */
-static video_mode_t *get_override_mode(void) {
-	int width = 0, height = 0, depth = 0;
-	char *tok;
-
-	if(video_mode_override) {
-		if((tok = strsep(&video_mode_override, "x"))) {
-			width = strtol(tok, NULL, 0);
-		}
-		if((tok = strsep(&video_mode_override, "x"))) {
-			height = strtol(tok, NULL, 0);
-		}
-		if((tok = strsep(&video_mode_override, "x"))) {
-			depth = strtol(tok, NULL, 0);
-		}
-
-		if(width && height) {
-			return video_mode_find(width, height, depth);
-		}
-	}
-
-	return NULL;
-}
-
-#if 0
-/** Add PC-specific options to the menu.
- * @param menu		Main menu.
- * @param options	Options menu. */
-void platform_add_menu_options(menu_t *menu, menu_t *options) {
-	video_mode_t *mode;
-	char *str;
-
-	/* Add a list to choose the video mode. */
-	video_mode_choice = menu_add_choice(menu, "Video Mode");
-	LIST_FOREACH(&video_modes, iter) {
-		mode = list_entry(iter, video_mode_t, header);
-
-		/* Create a string for the mode. */
-		str = kmalloc(16);
-		sprintf(str, "%dx%dx%d", mode->width, mode->height, mode->bpp);
-
-		menu_item_add_choice(video_mode_choice, str, mode, mode == detected_video_mode);
-	}
-}
-#endif
 
 /** Detect available video modes.
  * @todo		Handle VBE not being supported. */
 void video_init(void) {
 	vbe_mode_info_t *minfo = (vbe_mode_info_t *)(BIOS_MEM_BASE + sizeof(vbe_info_t));
 	vbe_info_t *info = (vbe_info_t *)(BIOS_MEM_BASE);
-	video_mode_t *mode;
 	uint16_t *location;
 	bios_regs_t regs;
+	vbe_mode_t *mode;
 	size_t i;
 
 	/* Try to get controller information. */
@@ -200,63 +116,42 @@ void video_init(void) {
 		}
 
 		/* Add the mode to the list. */
-		mode = kmalloc(sizeof(video_mode_t));
-		list_init(&mode->header);
+		mode = kmalloc(sizeof(vbe_mode_t));
 		mode->id = location[i];
-		mode->width = minfo->x_resolution;
-		mode->height = minfo->y_resolution;
-		mode->bpp = minfo->bits_per_pixel;
-		mode->addr = minfo->phys_base_ptr;
-		list_append(&video_modes, &mode->header);
-	}
-
-	if(list_empty(&video_modes)) {
-		fatal("No usable video modes detected");
+		mode->header.width = minfo->x_resolution;
+		mode->header.height = minfo->y_resolution;
+		mode->header.bpp = minfo->bits_per_pixel;
+		mode->header.addr = minfo->phys_base_ptr;
+		video_mode_add(&mode->header);
 	}
 
 	/* Try to find the mode to use. */
-	if(!(detected_video_mode = get_override_mode())) {
-		if(!(detected_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
-		                                           PREFERRED_MODE_HEIGHT,
-		                                           0))) {
-			if(!(detected_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
-			                                           FALLBACK_MODE_HEIGHT,
-			                                           0))) {
-				fatal("Could not find video mode to use");
+	if(!video_mode_override || !(default_video_mode = video_mode_find_string(video_mode_override))) {
+		if(!(default_video_mode = video_mode_find(PREFERRED_MODE_WIDTH,
+		                                          PREFERRED_MODE_HEIGHT,
+		                                          0))) {
+			if(!(default_video_mode = video_mode_find(FALLBACK_MODE_WIDTH,
+			                                          FALLBACK_MODE_HEIGHT,
+			                                          0))) {
+				fatal("Could not find a usable video mode");
 			}
 		}
 	}
 }
 
-/** Set the video mode. */
-void video_enable(void) {
-	video_mode_t *mode;
+/** Set the video mode.
+ * @param mode		Mode to set. */
+void video_enable(video_mode_t *mode) {
+	vbe_mode_t *vmode = (vbe_mode_t *)mode;
 	bios_regs_t regs;
-
-	/* Get the video mode to set. If the menu has been displayed, use the
-	 * mode that was selected there, else use the best mode. */
-#if 0
-	if(video_mode_choice) {
-		mode = (video_mode_t *)video_mode_choice->value;
-	} else {
-		mode = detected_video_mode;
-	}
-#endif
-	mode = detected_video_mode;
 
 	/* Set the mode. Bit 14 in the mode ID indicates that we wish to use
 	 * the linear framebuffer model. */
 	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_SET_MODE;
-	regs.ebx = mode->id | (1<<14);
+	regs.ebx = vmode->id | (1<<14);
 	bios_interrupt(0x10, &regs);
 
 	dprintf("video: set video mode %dx%dx%d (framebuffer: 0x%" PRIpp ")\n",
 	        mode->width, mode->height, mode->bpp, mode->addr);
-
-	/* Write mode information to the kernel arguments. */
-	kernel_args->fb_width = mode->width;
-	kernel_args->fb_height = mode->height;
-	kernel_args->fb_depth = mode->bpp;
-	kernel_args->fb_addr = mode->addr;
 }
