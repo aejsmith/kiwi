@@ -69,7 +69,7 @@ static void backtrace(void) {
 	frame = (stack_frame_t *)addr;
 
 	while(frame) {
-		internal_error(" %p\n", frame->addr);
+		internal_error_printf(" %p\n", frame->addr);
 		frame = frame->next;
 	}
 }
