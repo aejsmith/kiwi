@@ -91,6 +91,9 @@ typedef struct fs_handle {
 	int count;			/**< Reference count. */
 } fs_handle_t;
 
+extern fs_type_t ext2_fs_type;
+extern fs_type_t iso9660_fs_type;
+
 extern fs_handle_t *fs_handle_create(fs_mount_t *mount, bool directory, void *data);
 extern fs_mount_t *fs_probe(disk_t *disk);
 extern fs_handle_t *fs_open(fs_mount_t *mount, const char *path);

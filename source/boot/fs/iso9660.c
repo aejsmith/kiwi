@@ -19,6 +19,7 @@
  */
 
 #include <boot/console.h>
+#include <boot/fs.h>
 #include <boot/memory.h>
 
 #include <lib/ctype.h>

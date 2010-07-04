@@ -26,12 +26,9 @@
 
 #include <assert.h>
 
-#include "fs/ext2.h"
-#include "fs/iso9660.h"
-
 /** Array of filesystem implementations. */
 static fs_type_t *filesystem_types[] = {
-	//&ext2_fs_type,
+	&ext2_fs_type,
 	&iso9660_fs_type,
 };
 
