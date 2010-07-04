@@ -240,7 +240,7 @@ void disk_add(const char *name, size_t block_size, uint64_t blocks, disk_ops_t *
 	}
 
 	/* Set the disk as the current if it is the boot disk. */
-	if(boot) {
+	if(disk->fs && boot) {
 		current_disk = disk;
 	}
 
