@@ -24,11 +24,11 @@
 #include <boot/menu.h>
 #include <boot/video.h>
 
-#include <platform/bios.h>
-#include <platform/vbe.h>
-
 #include <lib/list.h>
 #include <lib/string.h>
+
+#include "bios.h"
+#include "vbe.h"
 
 /** Structure describing a VBE video mode. */
 typedef struct vbe_mode {

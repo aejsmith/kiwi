@@ -25,11 +25,12 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <platform/bios.h>
 #include <platform/boot.h>
-#include <platform/multiboot.h>
 
 #include <assert.h>
+
+#include "bios.h"
+#include "multiboot.h"
 
 /** Drive parameters structure. We only care about the EDD 1.x fields. */
 typedef struct drive_parameters {

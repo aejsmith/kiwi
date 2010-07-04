@@ -19,11 +19,9 @@
  */
 
 #include <boot/config.h>
-
 #include <lib/string.h>
-
 #include <platform/boot.h>
-#include <platform/multiboot.h>
+#include "multiboot.h"
 
 extern char *video_mode_override;
 

@@ -26,7 +26,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <platform/bios.h>
+#include "bios.h"
 
 /** Convert the serial port number from the configuration to a port number. */
 #if CONFIG_X86_SERIAL_PORT == 1

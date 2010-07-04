@@ -23,7 +23,8 @@
 #include <arch/stack.h>
 
 #include <platform/boot.h>
-#include <platform/multiboot.h>
+
+#include "multiboot.h"
 
 /* Ensure that this code is linked in first. */
 .section .init.text, "ax", @progbits
