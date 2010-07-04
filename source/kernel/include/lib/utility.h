@@ -92,4 +92,19 @@ static inline int highbit(uint64_t val) {
 #endif
 }
 
+/** Checksum a memory range.
+ * @param start		Start of range to check.
+ * @param size		Size of range to check.
+ * @return		True if checksum is equal to 0, false if not. */
+static inline bool checksum_range(void *start, size_t size) {
+	uint8_t *range = (uint8_t *)start;
+	uint8_t checksum = 0;
+	size_t i;
+
+	for(i = 0; i < size; i++) {
+		checksum += range[i];
+	}
+	return (checksum == 0);
+}
+
 #endif /* __LIB_UTILITY_H */

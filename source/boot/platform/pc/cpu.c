@@ -22,26 +22,12 @@
 #include <boot/cpu.h>
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <assert.h>
 
 #include "acpi.h"
 #include "mps.h"
-
-/** Checksum a memory range.
- * @param start		Start of range to check.
- * @param size		Size of range to check.
- * @return		True if checksum is correct, false if not. */
-static inline bool checksum_range(ptr_t start, size_t size) {
-	uint8_t *range = (uint8_t *)start;
-	uint8_t checksum = 0;
-	size_t i;
-
-	for(i = 0; i < size; i++) {
-		checksum += range[i];
-	}
-	return (checksum == 0);
-}
 
 /** Search for the MP Floating Pointer in a given range.
  * @param start		Start of range to check.
@@ -61,7 +47,7 @@ static mp_floating_pointer_t *mps_find_floating_pointer(ptr_t start, size_t size
 		/* Check if the signature and checksum are correct. */
 		if(strncmp(fp->signature, "_MP_", 4) != 0) {
 			continue;
-		} else if(!checksum_range((ptr_t)fp, (fp->length * 16))) {
+		} else if(!checksum_range(fp, (fp->length * 16))) {
 			continue;
 		}
 
@@ -99,7 +85,7 @@ static bool cpu_detect_mps(void) {
 	cfg = (mp_config_table_t *)fp->phys_addr_ptr;
 	if(strncmp(cfg->signature, "PCMP", 4) != 0) {
 		return false;
-	} else if(!checksum_range((ptr_t)cfg, cfg->length)) {
+	} else if(!checksum_range(cfg, cfg->length)) {
 		return false;
 	}
 
@@ -151,14 +137,14 @@ static acpi_rsdp_t *acpi_find_rsdp(ptr_t start, size_t size) {
 		/* Check if the signature and checksum are correct. */
 		if(strncmp((char *)rsdp->signature, ACPI_RSDP_SIGNATURE, 8) != 0) {
 			continue;
-		} else if(!checksum_range((ptr_t)rsdp, 20)) {
+		} else if(!checksum_range(rsdp, 20)) {
 			continue;
 		}
 
 		/* If the revision is 2 or higher, then checksum the extended
 		 * fields as well. */
 		if(rsdp->revision >= 2) {
-			if(!checksum_range((ptr_t)rsdp, rsdp->length)) {
+			if(!checksum_range(rsdp, rsdp->length)) {
 				continue;
 			}
 		}
@@ -184,7 +170,7 @@ static void *acpi_search_xsdt(ptr_t addr, const char *signature) {
 	if(strncmp((char *)xsdt->header.signature, ACPI_XSDT_SIGNATURE, 4) != 0) {
 		dprintf("cpu: XSDT signature does not match expected signature\n");
 		return NULL;
-	} else if(!checksum_range(addr, xsdt->header.length)) {
+	} else if(!checksum_range(xsdt, xsdt->header.length)) {
 		dprintf("cpu: XSDT checksum is incorrect\n");
 		return NULL;
 	}
@@ -195,7 +181,7 @@ static void *acpi_search_xsdt(ptr_t addr, const char *signature) {
 		table = (acpi_header_t *)((ptr_t)xsdt->entry[i]);
 		if(strncmp((char *)table->signature, signature, 4) != 0) {
 			continue;
-		} else if(!checksum_range(xsdt->entry[i], table->length)) {
+		} else if(!checksum_range(table, table->length)) {
 			continue;
 		}
 
@@ -218,7 +204,7 @@ static void *acpi_search_rsdt(ptr_t addr, const char *signature) {
 	if(strncmp((char *)rsdt->header.signature, ACPI_RSDT_SIGNATURE, 4) != 0) {
 		dprintf("cpu: RSDT signature does not match expected signature\n");
 		return NULL;
-	} else if(!checksum_range(addr, rsdt->header.length)) {
+	} else if(!checksum_range(rsdt, rsdt->header.length)) {
 		dprintf("cpu: RSDT checksum is incorrect\n");
 		return NULL;
 	}
@@ -229,7 +215,7 @@ static void *acpi_search_rsdt(ptr_t addr, const char *signature) {
 		table = (acpi_header_t *)((ptr_t)rsdt->entry[i]);
 		if(strncmp((char *)table->signature, signature, 4) != 0) {
 			continue;
-		} else if(!checksum_range(rsdt->entry[i], table->length)) {
+		} else if(!checksum_range(table, table->length)) {
 			continue;
 		}
 
