@@ -233,7 +233,7 @@ symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
 	symbol_table_t *table;
 	symbol_t *sym;
 
-	if(symbol_tree) {
+	if(!list_empty(&symbol_tables)) {
 		LIST_FOREACH(&symbol_tables, iter) {
 			table = list_entry(iter, symbol_table_t, header);
 
