@@ -37,6 +37,10 @@
 #define PXENV_EXIT_SUCCESS		0x0000	/**< Success. */
 #define PXENV_EXIT_FAILURE		0x0001	/**< Failure. */
 
+/** TFTP connection settings. */
+#define PXENV_TFTP_PORT			69	/**< Port number. */
+#define PXENV_TFTP_PACKET_SIZE		512	/**< Requested packet size. */
+
 /** Type containing a segment/offset. */
 typedef union pxe_segoff {
 	uint32_t addr;

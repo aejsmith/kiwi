@@ -196,7 +196,7 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 				}
 				kiwi_loader_load_module(
 					handle,
-		                        strrchr(value->list->values[i].string, '/') - 1
+		                        strrchr(value->list->values[i].string, '/') + 1
 				);
 				fs_close(handle);
 			}

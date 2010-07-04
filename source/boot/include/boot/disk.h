@@ -79,7 +79,7 @@ extern disk_t *current_disk;
 extern disk_t *disk_lookup(const char *str);
 extern bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset);
 extern void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t blocks);
-extern void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops,
+extern void disk_add(const char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops,
                      void *data, struct fs_mount *fs, bool boot);
 extern disk_t *disk_parent(disk_t *disk);
 

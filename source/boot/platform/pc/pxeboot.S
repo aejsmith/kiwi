@@ -16,6 +16,11 @@
 /**
  * @file
  * @brief		PXE loader wrapper.
+ *
+ * There is supposedly a 32KB limit on the boot file size. However, gPXE and
+ * none of my real hardware actually imposes this limit. Therefore, I'm
+ * ignoring it. If we encounter any hardware that actually has this limit,
+ * this will have to be done a different way...
  */
 
 #include <arch/asm.h>

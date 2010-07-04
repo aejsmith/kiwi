@@ -213,7 +213,7 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
 }
 
 /** Register a disk device.
- * @param name		Name of the disk (should be a kmalloc()'d string).
+ * @param name		Name of the disk (will be duplicated).
  * @param block_size	Size of 1 block on the device.
  * @param blocks	Number of blocks on the device.
  * @param ops		Operations structure. Can be NULL.
@@ -221,12 +221,12 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
  * @param fs		Pre-detected filesystem (used when device contains a
  *			filesystem that cannot be autodetected, such as TFTP).
  * @param boot		Whether the disk is the boot disk. */
-void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops,
+void disk_add(const char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops,
               void *data, fs_mount_t *fs, bool boot) {
 	disk_t *disk = kmalloc(sizeof(disk_t));
 
 	list_init(&disk->header);
-	disk->name = name;
+	disk->name = kstrdup(name);
 	disk->block_size = block_size;
 	disk->blocks = blocks;
 	disk->ops = ops;
