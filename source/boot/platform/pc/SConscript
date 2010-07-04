@@ -22,17 +22,24 @@ sources = map(File, [
 	'disk.c',
 	'memory.c',
 	'platform.c',
+	'pxe.c',
 	'start.S',
 	'video.c',
 ])
 
+# Build the stage 1 loaders. Make the loader depend on them to ensure they
+# always get built.
+stage1s = ['cdboot', 'pxeboot']
+for f in stage1s:
+	env.Program('%s.elf' % (f), '%s.S' % (f), LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-Ttext,0x7C00', '-Wl,-N'])
+	env.Command(f, '%s.elf' % (f), Action(
+		"$OBJCOPY -O binary --strip-all -R '.note.*' -R .comment $SOURCE $TARGET",
+		'$GENCOMSTR'
+	))
+	Depends(envmgr['dist']['LOADER'], File(f))
+
 # Set the linker script path.
 env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
-
-# Build the stage 1 loaders.
-env.Program('cdboot.elf', 'cdboot.S', LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-Ttext,0x7C00', '-Wl,-N'])
-env.Command('cdboot', 'cdboot.elf', Action("$OBJCOPY -O binary --strip-all -R '.note.*' -R .comment $SOURCE $TARGET", '$GENCOMSTR'))
-envmgr['dist']['CDBOOT'] = File('cdboot')
 
 # Function to generate an ISO image.
 def iso_image_func(target, source, env):
@@ -75,6 +82,7 @@ def iso_image_func(target, source, env):
 	return 0
 def iso_image_emitter(target, source, env):
 	return (target, source + [env['KERNEL'], env['LOADER'], env['CDBOOT'], env['FSIMAGE']] + env['MODULES'])
+envmgr['dist']['CDBOOT'] = File('cdboot')
 envmgr['dist']['BUILDERS']['ISOImage'] = Builder(action=Action(iso_image_func, '$GENCOMSTR'), emitter=iso_image_emitter)
 
 Return('sources')

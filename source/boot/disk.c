@@ -90,7 +90,9 @@ bool disk_read(disk_t *disk, void *buf, size_t count, offset_t offset) {
 	uint64_t start, end, size;
 	void *block = NULL;
 
-	if(!count) {
+	if(!disk->ops || !disk->ops->read) {
+		return false;
+	} else if(!count) {
 		return true;
 	}
 
@@ -214,10 +216,13 @@ void disk_partition_add(disk_t *parent, uint8_t id, uint64_t lba, uint64_t block
  * @param name		Name of the disk (should be a kmalloc()'d string).
  * @param block_size	Size of 1 block on the device.
  * @param blocks	Number of blocks on the device.
- * @param ops		Operations structure.
+ * @param ops		Operations structure. Can be NULL.
  * @param data		Implementation-specific data pointer.
+ * @param fs		Pre-detected filesystem (used when device contains a
+ *			filesystem that cannot be autodetected, such as TFTP).
  * @param boot		Whether the disk is the boot disk. */
-void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, void *data, bool boot) {
+void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops,
+              void *data, fs_mount_t *fs, bool boot) {
 	disk_t *disk = kmalloc(sizeof(disk_t));
 
 	list_init(&disk->header);
@@ -225,13 +230,17 @@ void disk_add(char *name, size_t block_size, uint64_t blocks, disk_ops_t *ops, v
 	disk->block_size = block_size;
 	disk->blocks = blocks;
 	disk->ops = ops;
-	disk->fs = NULL;
+	disk->fs = fs;
 	disk->data = data;
 	disk->boot = boot;
 
-	/* Probe for filesystems/partitions. */
-	disk_probe(disk);
-	if(disk->fs && boot) {
+	/* Probe for filesystems/partitions if necessary. */
+	if(!disk->fs) {
+		disk_probe(disk);
+	}
+
+	/* Set the disk as the current if it is the boot disk. */
+	if(boot) {
 		current_disk = disk;
 	}
 

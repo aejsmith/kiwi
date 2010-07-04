@@ -34,6 +34,9 @@
 /** Convert a segment + offset pair to a linear address. */
 #define SEGOFF2LIN(segoff)	(ptr_t)((((segoff) & 0xFFFF0000) >> 12) + ((segoff) & 0xFFFF))
 
+/** Convert a linear address to a segment + offset pair. */
+#define LIN2SEGOFF(lin)		(uint32_t)(((lin & 0xFFFFFFF0) << 12) + (lin & 0xF))
+
 /** Structure describing registers to pass to a BIOS interrupt. */
 typedef struct bios_regs {
 	uint32_t eflags, eax, ebx, ecx, edx, edi, esi, ebp, es;

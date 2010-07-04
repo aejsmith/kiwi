@@ -31,6 +31,7 @@
 
 #include "bios.h"
 #include "multiboot.h"
+#include "pxe.h"
 
 /** Drive parameters structure. We only care about the EDD 1.x fields. */
 typedef struct drive_parameters {
@@ -185,7 +186,7 @@ static void platform_disk_add(uint8_t id) {
 	 * on Intel/AMI BIOSes, yet the Extended Read function still works.
 	 * Work around this by forcing use of extensions when booted from CD. */
 	if(id == boot_device_id && platform_booted_from_cd()) {
-		disk_add(kstrdup("cd0"), 2048, ~0LL, &bios_disk_ops, data, true);
+		disk_add(kstrdup("cd0"), 2048, ~0LL, &bios_disk_ops, data, NULL, true);
 		dprintf("disk: detected boot CD cd0 (id: 0x%x)\n", id);
 	} else {
 		bios_regs_init(&regs);
@@ -217,7 +218,7 @@ static void platform_disk_add(uint8_t id) {
 		/* Register the disk with the disk manager. */
 		sprintf(name, "hd%u", id - 0x80);
 		disk_add(kstrdup(name), params->sector_size, params->sector_count,
-		         &bios_disk_ops, data, id == boot_device_id);
+		         &bios_disk_ops, data, NULL, id == boot_device_id);
 		dprintf("disk: detected device %s (id: 0x%x, sector_size: %u, sector_count: %zu)\n",
 		        name, id, params->sector_size, params->sector_count);
 	}
@@ -251,8 +252,10 @@ void platform_disk_detect(void) {
 		platform_disk_add(id);
 	}
 
-	/* Add the boot device. */
-	platform_disk_add(boot_device_id);
+	/* If not booted from PXE, add the boot device. */
+	if(!pxe_detect()) {
+		platform_disk_add(boot_device_id);
+	}
 }
 
 /** Get the ID of a disk.
