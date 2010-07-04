@@ -35,7 +35,8 @@
 #define PROT_TO_REAL	\
 	/* Save the stack pointer at the top of the real mode stack and switch \
 	 * to it. */ \
-	pushf; \
+	pushfl; \
+	cli; \
 	movl	%esp, (REAL_MODE_STACK); \
 	movl	$REAL_MODE_SP, %esp; \
 	\
@@ -59,24 +60,21 @@
 	mov	%ax, %es; \
 	mov	%ax, %fs; \
 	mov	%ax, %gs; \
-	mov	%ax, %ss; \
-	\
-	/* Re-enable interrupts. */ \
-	sti
+	mov	%ax, %ss
 
 /** Macro to switch to protected mode.
  * @note		Trashes EAX. */
 #define REAL_TO_PROT	\
-	/* Disable interrupts again. */ \
+	/* Ensure interrupts are disabled. */ \
 	cli; \
 	\
 	/* Return to protected mode. */ \
 	movl	%cr0, %eax; \
 	orl	$(1<<0), %eax; \
 	movl	%eax, %cr0; \
-	data32 ljmp $SEGMENT_CS, $1f; \
+	data32 ljmp $SEGMENT_CS, $3f; \
 .code32 \
-1: \
+3: \
 	mov	$SEGMENT_DS, %ax; \
 	mov	%ax, %ds; \
 	mov	%ax, %es; \
@@ -89,7 +87,7 @@
 	\
 	/* Restore stack pointer. */ \
 	mov	(REAL_MODE_STACK), %esp; \
-	popf
+	popfl
 
 /** Call a BIOS interrupt.
  * @param num		Interrupt number.
@@ -125,6 +123,9 @@ FUNCTION_START(bios_interrupt)
 	movl	16(%esp), %edi
 	movl	20(%esp), %esi
 	movl	24(%esp), %ebp
+
+	/* Enable interrupts across the interrupt. */
+	sti
 
 	/* Hard-code in an INT instruction that gets modified above to contain
 	 * the correct interrupt number. */
@@ -173,13 +174,15 @@ FUNCTION_START(pxe_call_real)
 	/* Switch to real mode. */
 	PROT_TO_REAL
 
+	/* Enable interrupts across the call. */
+	sti
+
 	/* Call the entry point. */
         pushl	%ebx
         pushl	%edx
         pushw	%cx
        	movw	%sp, %bx
         lcall	*%ss:6(%bx)
-        cld
         addw	$10, %sp
         movzwl	%ax, %ecx
 
