@@ -41,7 +41,7 @@ extern unsigned char copyright_ppm[];
 /** Colour and size of the splash progress bar. */
 #define SPLASH_PROGRESS_FG	0x78cc00
 #define SPLASH_PROGRESS_BG	0x555555
-#define SPLASH_PROGRESS_WIDTH	300
+#define SPLASH_PROGRESS_WIDTH	250
 #define SPLASH_PROGRESS_HEIGHT	3
 
 /** Size of one row in bytes. */
@@ -362,7 +362,7 @@ void __init_text console_init(kernel_args_t *args) {
 
 		/* Determine where to draw the progress bar. */
 		splash_progress_x = (fb_console_width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
-		splash_progress_y = (fb_console_height / 2) + (height / 2) + 10;
+		splash_progress_y = (fb_console_height / 2) + (height / 2) + 20;
 
 		/* Draw logo. */
 		fb_console_draw_ppm(logo_ppm, (fb_console_width / 2) - (width / 2),
