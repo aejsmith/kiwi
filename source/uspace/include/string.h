@@ -61,9 +61,6 @@ extern int strncasecmp(const char *s1, const char *s2, size_t n);
 extern char *strerror(int err);
 
 #ifdef __cplusplus
-#endif
-
-#ifdef __cplusplus
 }
 #endif
 
