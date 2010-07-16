@@ -76,7 +76,9 @@ if config.configured() and not 'config' in COMMAND_LINE_TARGETS:
 	if toolchain.check() != 0:
 		RequireTarget('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
 	else:
-		Export('envmgr', 'config')
+		Export('config', 'envmgr')
+		env = envmgr['host']
+		SConscript('utilities/SConscript', build_dir=os.path.join('build', 'host'), exports=['env'])
 		SConscript('SConscript', build_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
 else:
 	# Configuration does not exist. All we can do is configure.

@@ -33,6 +33,46 @@ class EnvironmentManager(dict):
 		# Create the base environment.
 		self.base = Environment(platform='posix', ENV=os.environ)
 
+		# Set compilation flags.
+		self.base['CCFLAGS'] = [
+			'-Wall', '-Wextra', '-Werror', '-Wcast-align',
+			'-Wno-variadic-macros', '-Wno-unused-parameter',
+			'-Wwrite-strings', '-Wmissing-declarations',
+			'-Wredundant-decls', '-Wno-format', '-gdwarf-2', '-pipe'
+		]
+		self.base['CFLAGS'] = ['-std=gnu99']
+		self.base['CXXFLAGS'] = ['-Wold-style-cast', '-Wsign-promo']
+		self.base['ASFLAGS'] = ['-D__ASM__']
+		self.base['YACCFLAGS'] = ['-d']
+
+		# Make the build quiet if we haven't been told to make it verbose.
+		self.base['ARCOMSTR'] = self.GetCompileString('AR', '$TARGET')
+		self.base['ASCOMSTR'] = self.GetCompileString('ASM', '$SOURCE')
+		self.base['ASPPCOMSTR'] = self.GetCompileString('ASM', '$SOURCE')
+		self.base['CCCOMSTR'] = self.GetCompileString('CC', '$SOURCE')
+		self.base['SHCCCOMSTR'] = self.GetCompileString('CC', '$SOURCE')
+		self.base['CXXCOMSTR'] = self.GetCompileString('CXX', '$SOURCE')
+		self.base['SHCXXCOMSTR'] = self.GetCompileString('CXX', '$SOURCE')
+		self.base['YACCCOMSTR'] = self.GetCompileString('YACC', '$SOURCE')
+		self.base['LEXCOMSTR'] = self.GetCompileString('LEX', '$SOURCE')
+		self.base['LINKCOMSTR'] = self.GetCompileString('LINK', '$TARGET')
+		self.base['SHLINKCOMSTR'] = self.GetCompileString('SHLINK', '$TARGET')
+		self.base['RANLIBCOMSTR'] = self.GetCompileString('RANLIB', '$TARGET')
+		self.base['GENCOMSTR'] = self.GetCompileString('GEN', '$TARGET')
+		self.base['STRIPCOMSTR'] = self.GetCompileString('STRIP', '$TARGET')
+
+		# Add in extra compilation flags from the configuration.
+		self.base['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()
+		self.base['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
+		self.base['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
+
+		# Import version information.
+		for k, v in version.items():
+			self.base[k] = v
+
+		# Fork off the host environment.
+		self.Create('host')
+
 		# Set paths to toolchain components.
 		if os.environ.has_key('CC') and os.path.basename(os.environ['CC']) == 'ccc-analyzer':
 			self.base['CC'] = os.environ['CC']
@@ -54,46 +94,12 @@ class EnvironmentManager(dict):
 		self.base['GENSYMTAB'] = os.path.join(os.getcwd(), 'utilities', 'gensymtab.py')
 		self.base['BIN2HEX'] = os.path.join(os.getcwd(), 'utilities', 'bin2hex.py')
 
-		# Set compilation flags.
-		self.base['CCFLAGS'] = [
-			'-Wall', '-Wextra', '-Werror', '-Wcast-align',
-			'-Wno-variadic-macros', '-Wno-unused-parameter',
-			'-Wwrite-strings', '-Wmissing-declarations',
-			'-Wredundant-decls', '-Wno-format', '-gdwarf-2', '-pipe'
-		]
-		self.base['CFLAGS'] = ['-std=gnu99']
-		self.base['CXXFLAGS'] = ['-Wold-style-cast', '-Wsign-promo']
-		self.base['ASFLAGS'] = ['-D__ASM__']
-
-		# Add in extra compilation flags from the configuration.
-		self.base['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()
-		self.base['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
-		self.base['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
-
 		# Set shared library compilation flags.
 		self.base['SHCCFLAGS'] = '$CCFLAGS -fPIC -DSHARED'
 		self.base['SHLINKFLAGS'] = '$LINKFLAGS -shared -Wl,-soname,${TARGET.name}'
 
 		# Override the default assembler - it uses as directly, we want to use GCC.
 		self.base['ASCOM'] = '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES'
-
-		# Make the build quiet if we haven't been told to make it verbose.
-		self.base['ARCOMSTR'] = self.GetCompileString('AR', '$TARGET')
-		self.base['ASCOMSTR'] = self.GetCompileString('ASM', '$SOURCE')
-		self.base['ASPPCOMSTR'] = self.GetCompileString('ASM', '$SOURCE')
-		self.base['CCCOMSTR'] = self.GetCompileString('CC', '$SOURCE')
-		self.base['SHCCCOMSTR'] = self.GetCompileString('CC', '$SOURCE')
-		self.base['CXXCOMSTR'] = self.GetCompileString('CXX', '$SOURCE')
-		self.base['SHCXXCOMSTR'] = self.GetCompileString('CXX', '$SOURCE')
-		self.base['LINKCOMSTR'] = self.GetCompileString('LINK', '$TARGET')
-		self.base['SHLINKCOMSTR'] = self.GetCompileString('SHLINK', '$TARGET')
-		self.base['RANLIBCOMSTR'] = self.GetCompileString('RANLIB', '$TARGET')
-		self.base['GENCOMSTR'] = self.GetCompileString('GEN', '$TARGET')
-		self.base['STRIPCOMSTR'] = self.GetCompileString('STRIP', '$TARGET')
-
-		# Import version information.
-		for k, v in version.items():
-			self.base[k] = v
 
 		# Add a builder for linker scripts.
 		self.base['BUILDERS']['LDScript'] = Builder(action=Action(
