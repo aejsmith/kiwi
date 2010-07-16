@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 	port.create();
 	port.registerName("org.kiwi.Pong");
 
-	while((conn = port.listen())) {
+	while(port.listen(conn)) {
 		while(true) {
 			uint32_t type, val;
 			size_t size;

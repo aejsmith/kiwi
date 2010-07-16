@@ -71,7 +71,7 @@ Port *ServiceManager::lookupPort(const char *name) {
 void ServiceManager::handleConnection(IPCPort *) {
 	IPCConnection *conn;
 
-	if((conn = m_port.listen())) {
+	if(m_port.listen(conn)) {
 		conn->onMessage.connect(this, &ServiceManager::handleMessage); 
 		conn->onHangup.connect(this, &ServiceManager::handleHangup);
 	}

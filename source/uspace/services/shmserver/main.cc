@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	port.registerName("org.kiwi.SHMServer");
 
 	/* Send the area ID to any client that connects. */
-	while((conn = port.listen())) {
+	while(port.listen(conn)) {
 		conn->send(0, &id, sizeof(id));
 		conn->waitHangup();
 	}

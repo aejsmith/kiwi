@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,36 +15,34 @@
 
 /**
  * @file
- * @brief		IPC port class.
+ * @brief		IPC server class.
  */
 
-#ifndef __KIWI_IPCPORT_H
-#define __KIWI_IPCPORT_H
+#ifndef __KIWI_IPCSERVER_H
+#define __KIWI_IPCSERVER_H
 
-#include <kiwi/Handle.h>
-#include <kiwi/IPCConnection.h>
+#include <kiwi/EventLoop.h>
+#include <kiwi/IPCPort.h>
 
 namespace kiwi {
 
-/** Class implementing an IPC port. */
-class IPCPort : public Handle {
+/** IPC server class. */
+class IPCServer : public EventLoop {
 public:
-	IPCPort(handle_t handle = -1);
+	IPCServer();
+	IPCServer(const char *name);
 
-	bool create();
-	bool open(port_id_t id);
-	bool registerName(const char *name);
-
-	bool listen(IPCConnection *&conn, useconds_t timeout = -1) const;
-	handle_t listen(useconds_t timeout = -1) const;
-	port_id_t getID() const;
-
-	Signal<IPCPort *> onConnection;
+	/** Get the port ID.
+	 * @return		Port ID. */
+	port_id_t getPortID() const { return m_port.getID(); }
+protected:
+	virtual void handleConnection(handle_t handle) = 0;
 private:
-	void registerEvents();
-	void eventReceived(int id);
+	void _handleConnection(IPCPort *port);
+
+	IPCPort m_port;			/**< Port the server is using. */
 };
 
 }
 
-#endif /* __KIWI_IPCPORT_H */
+#endif /* __KIWI_IPCSERVER_H */

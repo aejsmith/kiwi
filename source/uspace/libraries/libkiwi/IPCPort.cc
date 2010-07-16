@@ -104,18 +104,31 @@ bool IPCPort::registerName(const char *name) {
 }
 
 /** Block until a connection is made to the port.
+ * @param conn		Where to store pointer to connection object.
  * @param timeout	Timeout in microseconds. A timeout of -1 will block
  *			until a connection is made, and a timeout of 0 will
  *			return immediately if no connection attempts are in
  *			progress.
- * @return		Pointer to connection on success, NULL on failure. */
-IPCConnection *IPCPort::listen(useconds_t timeout) const {
+ * @return		Whether successful. */
+bool IPCPort::listen(IPCConnection *&conn, useconds_t timeout) const {
 	handle_t handle = ipc_port_listen(m_handle, timeout);
 	if(handle < 0) {
-		return 0;
+		return false;
 	}
 
-	return new IPCConnection(handle);
+	conn = new IPCConnection(handle);
+	return true;
+}
+
+/** Block until a connection is made to the port.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will block
+ *			until a connection is made, and a timeout of 0 will
+ *			return immediately if no connection attempts are in
+ *			progress.
+ * @return		Handle to connection on success, -1 on failure. */
+handle_t IPCPort::listen(useconds_t timeout) const {
+	handle_t handle = ipc_port_listen(m_handle, timeout);
+	return (handle < 0) ? -1 : handle;
 }
 
 /** Get the ID of a port.
