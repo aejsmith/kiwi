@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,12 +11,23 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
+service org.kiwi.KittenServer;
+version 1;
 
-SConscript(dirs=[
-	'dungeon',
-	'failshell',
-	'kittens',
-	'ping',
-	'shmtest',
-], exports=['env'])
+# Types used by the protocol.
+type KittenID uint16;
+
+# Structure containing a colour.
+struct Colour {
+	uint8 red;
+	uint8 green;
+	uint8 blue;
+};
+
+function createKitten(string name, Colour colour, out KittenID id);
+function setCurrentKitten(KittenID id);
+function getName(out string name);
+function getColour(out Colour colour);
+function stroke(int32 duration);
+
+event onPurr(int32 duration);

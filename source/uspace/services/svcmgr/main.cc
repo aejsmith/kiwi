@@ -37,6 +37,10 @@ int main(int argc, char **argv) {
 	service->addPort("org.kiwi.SHMServer");
 	svcmgr.addService(service);
 
+	service = new Service("kittenserver", "Kitten server.", "/system/services/kittenserver", Service::OnDemand);
+	service->addPort("org.kiwi.KittenServer");
+	svcmgr.addService(service);
+
 	svcmgr.run();
 	return 0;
 }
