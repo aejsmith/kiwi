@@ -55,7 +55,7 @@ void __libsystem_fatal(const char *fmt, ...) {
 		fputc('\n', stderr);
 	}
 
-	process_exit(1);
+	abort();
 }
 
 /** Print out a fatal error for a stub function being called.

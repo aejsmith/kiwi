@@ -22,6 +22,7 @@
 
 #include <cstring>
 #include <endian.h>
+#include <sstream>
 #include <stdexcept>
 
 using namespace kiwi;
@@ -44,7 +45,19 @@ RPCMessageBuffer::RPCMessageBuffer(char *buf, size_t size) :
 
 /** Destroy a message buffer. */
 RPCMessageBuffer::~RPCMessageBuffer() {
-	delete[] m_buffer;
+	reset();
+}
+
+/** Reset a message buffer.
+ * @param buf		New buffer to use. Will be taken over by the object.
+ * @param size		Size of the buffer. */
+void RPCMessageBuffer::reset(char *buf, size_t size) {
+	if(m_buffer) {
+		delete[] m_buffer;
+	}
+	m_buffer = buf;
+	m_size = size;
+	m_offset = 0;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(bool val) {
@@ -167,7 +180,7 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(uint8_t &val) {
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint16_t &val) {
 	uint16_t rval;
-	popEntry(TYPE_UINT64, rval);
+	popEntry(TYPE_UINT16, rval);
 	val = le16_to_cpu(rval);
 	return *this;
 }
@@ -203,7 +216,7 @@ void RPCMessageBuffer::popEntry(TypeID type, T &entry) {
 	size_t size;
 	popEntry(type, buf, size);
 	if(size != sizeof(T)) {
-		throw std::runtime_error("Messag entry size not as expected");
+		throw std::runtime_error("Message entry size not as expected");
 	}
 	entry = *reinterpret_cast<const T *>(buf);
 }
@@ -221,7 +234,7 @@ void RPCMessageBuffer::pushEntry(TypeID type, const char *data, size_t size) {
 	if((m_offset + total) > m_size) {
 		char *nbuf = new char[m_offset + total];
 		memcpy(nbuf, m_buffer, m_size);
-		delete m_buffer;
+		delete[] m_buffer;
 		m_buffer = nbuf;
 		m_size = m_offset + total;
 	}
@@ -243,7 +256,10 @@ void RPCMessageBuffer::popEntry(TypeID type, const char *&data, size_t &size) {
 
 	TypeID rtype = static_cast<TypeID>(*reinterpret_cast<uint8_t *>(&m_buffer[m_offset]));
 	if(rtype != type) {
-		throw std::runtime_error("Message entry type not as expected");
+		std::ostringstream msg;
+		msg << "Message entry type (" << static_cast<int>(rtype);
+		msg << ") not as expected (" << static_cast<int>(type) << ')';
+		throw std::runtime_error(msg.str());
 	}
 
 	size = static_cast<size_t>(*reinterpret_cast<uint32_t *>(&m_buffer[m_offset + 1]));

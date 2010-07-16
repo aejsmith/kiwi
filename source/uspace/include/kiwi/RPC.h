@@ -36,7 +36,7 @@ typedef int32_t RPCResult;
 typedef ::std::pair<const char *, size_t> RPCByteString;
 
 /** Class used to store a message buffer. */
-class RPCMessageBuffer {
+class RPCMessageBuffer : internal::Noncopyable {
 	/** Type IDs. */
 	enum TypeID {
 		TYPE_BOOL = 0,
@@ -55,6 +55,8 @@ public:
 	RPCMessageBuffer();
 	RPCMessageBuffer(char *buf, size_t size);
 	~RPCMessageBuffer();
+
+	void reset(char *buf = NULL, size_t size = 0);
 
 	RPCMessageBuffer &operator <<(bool val);
 	RPCMessageBuffer &operator <<(const std::string &str);
@@ -128,7 +130,7 @@ class RPCClientConnection : public Object {
 protected:
 	RPCClientConnection(const char *name, uint32_t version, handle_t handle);
 
-	void sendEvent(uint32_t id, RPCMessageBuffer &buf);
+	void sendMessage(uint32_t id, RPCMessageBuffer &buf);
 	virtual void handleMessage(uint32_t id, RPCMessageBuffer &buf) = 0;
 	virtual void handleHangup();
 private:

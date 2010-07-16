@@ -93,7 +93,7 @@ void RPCServerConnection::receiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
 		throw std::runtime_error("Failed to receive message");
 	}
 
-	buf = RPCMessageBuffer(data, size);
+	buf.reset(data, size);
 }
 
 /** Handle a message on the connection.

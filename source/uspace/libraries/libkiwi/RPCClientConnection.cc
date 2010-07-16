@@ -40,22 +40,21 @@ RPCClientConnection::RPCClientConnection(const char *name, uint32_t version, han
 	RPCMessageBuffer buf;
 	buf << std::string(m_name);
 	buf << version;
-	sendEvent(0, buf);
+	sendMessage(0, buf);
 }
 
-/** Send an event to the client.
- * @param id		ID of the event.
+/** Send a message to the client.
+ * @param id		ID of the message.
  * @param buf		Message buffer. */
-void RPCClientConnection::sendEvent(uint32_t id, RPCMessageBuffer &buf) {
+void RPCClientConnection::sendMessage(uint32_t id, RPCMessageBuffer &buf) {
 	m_conn.send(id, buf.getBuffer(), buf.getSize());
 }
 
 /** Handle the connection being hung up.
- * @note		The default version of this function does nothing.
- *			Ideally the real implementation should clean up and
- *			delete the connection. */
+ * @note		The default version of this function calls deleteLater()
+ *			on the connection. */
 void RPCClientConnection::handleHangup() {
-	/* Nothing happens. */
+	deleteLater();
 }
 
 /** Signal handler for a message being received.
@@ -70,6 +69,7 @@ void RPCClientConnection::_handleMessage(IPCConnection *conn) {
 
 	RPCMessageBuffer buf(data, size);
 	handleMessage(id, buf);
+	sendMessage(id, buf);
 }
 
 /** Signal handler for the remote end being hung up.
