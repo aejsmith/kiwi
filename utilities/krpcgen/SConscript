@@ -27,7 +27,8 @@ envmgr.base['KRPCGEN'] = env.Program('krpcgen', [
 # Add builders to generate RPC server/client code.
 def rpc_emitter(target, source, env):
 	target.append(File(os.path.splitext(str(target[0]))[0] + '.h'))
-	Depends(target[0], env['KRPCGEN'])
+	env.Depends(target[0], env['KRPCGEN'])
+	env.Depends(target[1], env['KRPCGEN'])
 	return target, source
 envmgr.base['BUILDERS']['RPCServer'] = Builder(
 	action=Action('$KRPCGEN -s $TARGET $SOURCE', '$GENCOMSTR'),
