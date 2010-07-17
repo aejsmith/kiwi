@@ -90,11 +90,12 @@ void video_mode_add(video_mode_t *mode) {
  * @return		Pointer to chooser. */
 ui_entry_t *video_mode_chooser(const char *label, value_t *value) {
 	ui_entry_t *chooser = ui_chooser_create(label, value);
+	void *current = value->pointer;
 	video_mode_t *mode;
 
 	LIST_FOREACH(&video_modes, iter) {
 		mode = list_entry(iter, video_mode_t, header);
-		ui_chooser_insert(chooser, mode->name, mode, mode == default_video_mode);
+		ui_chooser_insert(chooser, mode->name, mode, mode == current);
 	}
 
 	return chooser;

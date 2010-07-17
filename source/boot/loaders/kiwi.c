@@ -260,8 +260,8 @@ static loader_type_t kiwi_loader_type = {
  * @param env		Environment for the command.
  * @return		Whether completed successfully. */
 bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
+	video_mode_t *mode = NULL;
 	value_t value, *exist;
-	video_mode_t *mode;
 
 	if(args->count == 2 && vtype(args, 0, VALUE_TYPE_STRING) && vtype(args, 1, VALUE_TYPE_LIST)) {
 		environ_insert(env, "kiwi_kernel", &args->values[0]);
@@ -291,12 +291,10 @@ bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
 		environ_insert(env, "smp_disabled", &value);
 	}
 	if((exist = environ_lookup(env, "video_mode")) && exist->type == VALUE_TYPE_STRING) {
-		if((mode = video_mode_find_string(exist->string))) {
-			default_video_mode = mode;
-		}
+		mode = video_mode_find_string(exist->string);
 	}
 	value.type = VALUE_TYPE_POINTER;
-	value.pointer = default_video_mode;
+	value.pointer = (mode) ? mode : default_video_mode;
 	environ_insert(env, "video_mode", &value);
 
 	kiwi_loader_arch_setup(env);
