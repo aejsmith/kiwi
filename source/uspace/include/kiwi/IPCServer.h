@@ -29,8 +29,7 @@ namespace kiwi {
 /** IPC server class. */
 class IPCServer : public EventLoop {
 public:
-	IPCServer();
-	IPCServer(const char *name);
+	IPCServer(handle_t handle = 3);
 
 	/** Get the port ID.
 	 * @return		Port ID. */

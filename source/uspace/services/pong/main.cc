@@ -30,14 +30,10 @@ extern "C" FILE *fopen_device(const char *path, FILE *stream);
 
 int main(int argc, char **argv) {
 	IPCConnection *conn;
-	IPCPort port;
+	IPCPort port(3);
 
 	/* Use the console for output. */
 	fopen_device("/console/0", stdout);
-
-	/* Create the port. */
-	port.create();
-	port.registerName("org.kiwi.Pong");
 
 	while(port.listen(conn)) {
 		while(true) {

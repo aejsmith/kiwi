@@ -25,4 +25,8 @@ env.SharedLibrary('kiwi', [
 	'RPCClientConnection.cc',
 	'RPCMessageBuffer.cc',
 	'RPCServerConnection.cc',
+	'svcmgr.cc',
 ], LIBS=['stdc++'])
+
+# Generate the service manager interface code.
+env.RPCClient('svcmgr.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')

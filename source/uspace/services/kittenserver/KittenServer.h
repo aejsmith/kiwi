@@ -25,8 +25,6 @@
 
 /** Class implementing the kitten server. */
 class KittenServer : public kiwi::IPCServer {
-public:
-	KittenServer();
 private:
 	void handleConnection(handle_t handle);
 };

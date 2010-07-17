@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,10 +21,8 @@
 #ifndef __SERVICEMANAGER_H
 #define __SERVICEMANAGER_H
 
-#include <kiwi/private/svcmgr.h>
-#include <kiwi/EventLoop.h>
+#include <kiwi/IPCServer.h>
 #include <kiwi/IPCConnection.h>
-#include <kiwi/IPCPort.h>
 
 #include <map>
 #include <list>
@@ -34,22 +32,25 @@
 #include "Service.h"
 
 /** Class implementing the service manager. */
-class ServiceManager : public kiwi::EventLoop {
+class ServiceManager : public kiwi::IPCServer {
 	/** Type for the port map. */
 	typedef std::map<std::string, Port *> PortMap;
 public:
 	ServiceManager();
 
 	void addService(Service *service);
-	Port *lookupPort(const char *name);
-private:
-	void handleConnection(kiwi::IPCPort *);
-	void handleMessage(kiwi::IPCConnection *conn);
-	void handleHangup(kiwi::IPCConnection *conn);
+	Port *lookupPort(const std::string &name);
 
-	kiwi::IPCPort m_port;			/**< Service manager port. */
+	/** Get the instance of the service manager.
+	 * @return		Reference to service manager instance. */
+	static ServiceManager &instance() { return *s_instance; }
+private:
+	void handleConnection(handle_t handle);
+
 	std::list<Service *> m_services;	/**< List of services. */
 	PortMap m_ports;			/**< Map of port names to port objects. */
+
+	static ServiceManager *s_instance;
 };
 
 #endif /* __SERVICEMANAGER_H */

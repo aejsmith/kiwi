@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,42 +18,39 @@
  * @brief		Service manager.
  */
 
-#include <kernel/errors.h>
-
-#include <kiwi/Process.h>
-
-#include "ServiceManager.h"
-
-#include <exception>
 #include <iostream>
+#include <sstream>
+#include <stdexcept>
+
+#include "Connection.h"
+#include "ServiceManager.h"
 
 using namespace kiwi;
 using namespace std;
 
-/** Service manager constructor. */
-ServiceManager::ServiceManager() {
-	m_port.onConnection.connect(this, &ServiceManager::handleConnection);
+/** Instance of the service manager. */
+ServiceManager *ServiceManager::s_instance = NULL;
 
-	/* Create the port. TODO: Per-user instance. */
-	if(!m_port.create()) {
-		cerr << "svcmgr: could not create port" << endl;
-		throw exception();
-	} else if(m_port.getID() != 1) {
-		cerr << "svcmgr: created port (" << m_port.getID() << ") is not port 1" << endl;
-		throw exception();
+/** Service manager constructor. */
+ServiceManager::ServiceManager() : IPCServer(-1) {
+	s_instance = this;
+	if(getPortID() != 1) {
+		ostringstream msg;
+		msg << "Created port (" << getPortID() << ") is not port 1.";
+		throw std::runtime_error(msg.str());
 	}
 }
 
 /** Add a service to the service manager.
  * @param service	Service to add. */
 void ServiceManager::addService(Service *service) {
-	Service::PortList::const_iterator it;
-
-	/* Register ports. */
-	for(it = service->getPorts().begin(); it != service->getPorts().end(); ++it) {
-		m_ports.insert(make_pair(*it, new Port(service)));
+	/* Register port. */
+	Port *port = service->getPort();
+	if(port) {
+		m_ports.insert(make_pair(port->getName(), port));
 	}
 
+	/* Start the service if it is not on-demand. */
 	if(!(service->getFlags() & Service::OnDemand)) {
 		service->start();
 	}
@@ -62,76 +59,51 @@ void ServiceManager::addService(Service *service) {
 /** Look up a port name in the port map.
  * @param name		Name to look up.
  * @return		Pointer to port object if found, 0 if not. */
-Port *ServiceManager::lookupPort(const char *name) {
+Port *ServiceManager::lookupPort(const string &name) {
 	PortMap::iterator it = m_ports.find(name);
 	return (it != m_ports.end()) ? it->second : 0;
 }
 
 /** Handle a connection on the service manager port. */
-void ServiceManager::handleConnection(IPCPort *) {
-	IPCConnection *conn;
-
-	if(m_port.listen(conn)) {
-		conn->onMessage.connect(this, &ServiceManager::handleMessage); 
-		conn->onHangup.connect(this, &ServiceManager::handleHangup);
-	}
+void ServiceManager::handleConnection(handle_t handle) {
+	new Connection(handle);
 }
 
-/** Handle a message on a connection to the service manager.
- * @param conn		Connection object. */
-void ServiceManager::handleMessage(IPCConnection *conn) {
-	uint32_t type;
-	size_t size;
-	Port *port;
-	char *data;
+/** Main function for the service manager.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		Should not return. */
+int main(int argc, char **argv) {
+	ServiceManager svcmgr;
 
-	if(!conn->receive(type, data, size)) {
-		return;
-	}
+	/* Add services. TODO: These should be in configuration files. */
+	svcmgr.addService(new Service(
+		"console",
+		"Service providing a graphical console.",
+		"/system/services/console"
+	));
+	svcmgr.addService(new Service(
+		"pong",
+		"Service that pongs pings.",
+		"/system/services/pong",
+		Service::OnDemand,
+		"org.kiwi.Pong"
+	));
+	svcmgr.addService(new Service(
+		"shmserver",
+		"Shared memory test server.",
+		"/system/services/shmserver",
+		Service::OnDemand,
+		"org.kiwi.SHMServer"
+	));
+	svcmgr.addService(new Service(
+		"kittenserver",
+		"Kitten server.",
+		"/system/services/kittenserver",
+		Service::OnDemand,
+		"org.kiwi.KittenServer"
+	));
 
-	switch(type) {
-	case SVCMGR_LOOKUP_PORT:
-	{
-		string name(data, size);
-		if((port = lookupPort(name.c_str()))) {
-			port->sendID(conn);
-		} else {
-			port_id_t ret = -ERR_NOT_FOUND;
-			conn->send(type, &ret, sizeof(ret));
-		}
-		break;
-	}
-	case SVCMGR_REGISTER_PORT:
-	{
-		svcmgr_register_port_t *args = reinterpret_cast<svcmgr_register_port_t *>(data);
-		int ret = 0;
-
-		if(size > sizeof(svcmgr_register_port_t) && args->id > 0) {
-			string name(args->name, size - sizeof(svcmgr_register_port_t));
-			if((port = lookupPort(name.c_str()))) {
-				if(!port->setID(args->id)) {
-					ret = -ERR_PERM_DENIED;
-				}
-			} else {
-				ret = -ERR_NOT_FOUND;
-			}
-		} else {
-			ret = -ERR_PARAM_INVAL;
-		}
-
-		conn->send(type, &ret, sizeof(ret));
-		break;
-	}
-	default:
-		/* Just ignore it. */
-		break;
-	}
-
-	delete[] data;
-}
-
-/** Handle the connection being hung up.
- * @param conn		Connection object. */
-void ServiceManager::handleHangup(IPCConnection *conn) {
-	conn->deleteLater();
+	svcmgr.run();
+	return 0;
 }

@@ -33,7 +33,6 @@ public:
 
 	bool create();
 	bool open(port_id_t id);
-	bool registerName(const char *name);
 
 	bool listen(IPCConnection *&conn, useconds_t timeout = -1) const;
 	handle_t listen(useconds_t timeout = -1) const;

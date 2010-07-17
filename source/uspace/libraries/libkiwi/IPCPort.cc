@@ -20,7 +20,6 @@
 
 #include <kernel/ipc.h>
 
-#include <kiwi/private/svcmgr.h>
 #include <kiwi/IPCPort.h>
 
 #include <cstdlib>
@@ -71,35 +70,6 @@ bool IPCPort::open(port_id_t id) {
 	}
 
 	setHandle(handle);
-	return true;
-}
-
-/** Register the port with the service manager.
- * @param name		Port name to register with.
- * @return		Whether registration was successful. */
-bool IPCPort::registerName(const char *name) {
-	svcmgr_register_port_t *msg;
-	IPCConnection svcmgr;
-	uint32_t type;
-	size_t size;
-	char *data;
-
-	/* Send the message. */
-	size = sizeof(*msg) + strlen(name);
-	data = new char[size];
-	msg = reinterpret_cast<svcmgr_register_port_t *>(data);
-	msg->id = getID();
-	memcpy(msg->name, name, size - sizeof(*msg));
-	if(!svcmgr.connect(1) || !svcmgr.send(SVCMGR_REGISTER_PORT, msg, size)) {
-		return false;
-	}
-	delete[] data;
-
-	/* Await the reply. */
-	if(!svcmgr.receive(type, data, size) || *(reinterpret_cast<int *>(data)) != 0) {
-		return false;
-	}
-	delete[] data;
 	return true;
 }
 

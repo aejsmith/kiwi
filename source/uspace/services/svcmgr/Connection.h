@@ -15,23 +15,20 @@
 
 /**
  * @file
- * @brief		RPC test server.
+ * @brief		Service manager connection class.
  */
 
-#include "Connection.h"
-#include "KittenServer.h"
+#ifndef __CONNECTION_H
+#define __CONNECTION_H
 
-/** Handle a connection to the kitten server.
- * @param handle	Handle to the connection. */
-void KittenServer::handleConnection(handle_t handle) {
-	new Connection(handle);
-}
+#include "ClientConnection.h"
 
-/** Main function for the kitten server.
- * @param argc		Argument count.
- * @param argv		Argument array. */
-int main(int argc, char **argv) {
-	KittenServer server;
-	server.run();
-	return 0;
-}
+/** Class representing a client of the service manager. */
+class Connection : public org::kiwi::ServiceManager::ClientConnection {
+public:
+	Connection(handle_t handle);
+private:
+	kiwi::RPCResult lookupPort(std::string name, port_id_t &id);
+};
+
+#endif /* __CONNECTION_H */

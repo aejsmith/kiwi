@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,32 +15,35 @@
 
 /**
  * @file
- * @brief		Service manager.
+ * @brief		Service manager port class.
  */
 
 #ifndef __PORT_H
 #define __PORT_H
 
-#include <kiwi/IPCConnection.h>
+#include <kiwi/IPCPort.h>
+#include <string>
 
-#include <list>
-
-#include "Service.h"
+class Service;
 
 /** Class containing details of a port. */
 class Port {
 public:
-	Port(Service *service);
-	bool setID(port_id_t id);
-	void sendID(kiwi::IPCConnection *conn);
+	Port(const char *name, Service *service);
+
+	/** Get the name of the port.
+	 * @return		Name of the port. */
+	const std::string &getName() const { return m_name; }
+
+	/** Get the ID of the port.
+	 * @return		ID of the port. */
+	port_id_t getID() const { return m_port.getID(); }
 private:
-	void serviceStopped();
+	void handleConnection(kiwi::IPCPort *port);
 
-	port_id_t m_id;			/**< Port ID. */
-	Service *m_service;		/**< Service managing the port. */
-
-	/** List of connections waiting for the port to be registered. */
-	std::list<kiwi::IPCConnection *> m_waiting;
+	std::string m_name;		/**< Name of the port. */
+	kiwi::IPCPort m_port;		/**< Handle to the port. */
+	Service *m_service;		/**< Service that the port belongs to. */
 };
 
 #endif /* __PORT_H */

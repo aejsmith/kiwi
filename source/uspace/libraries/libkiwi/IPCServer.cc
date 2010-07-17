@@ -19,25 +19,20 @@
  */
 
 #include <kiwi/IPCServer.h>
+#include <cstring>
 #include <stdexcept>
 
 using namespace kiwi;
 
-/** Initialise the server with a new unnamed port. */
-IPCServer::IPCServer() {
-	if(!m_port.create()) {
-		throw std::runtime_error("Failed to create port");
-	}
-	m_port.onConnection.connect(this, &IPCServer::_handleConnection);
-}
-
-/** Initialise the server with a new named port.
- * @param name		Name to register port with. */
-IPCServer::IPCServer(const char *name) {
-	if(!m_port.create()) {
-		throw std::runtime_error("Failed to create port");
-	} else if(!m_port.registerName(name)) {
-		throw std::runtime_error("Failed to register port");
+/** Initialise the server from a port handle.
+ * @param handle	Handle to the port. This defaults to 3, which is the
+ *			handle ID that the service manager passes the port
+ *			handle as. If < 0, a new unnamed port will be created. */
+IPCServer::IPCServer(handle_t handle) : m_port(handle) {
+	if(handle < 0) {
+		if(!m_port.create()) {
+			throw std::runtime_error("Failed to create port");
+		}
 	}
 	m_port.onConnection.connect(this, &IPCServer::_handleConnection);
 }

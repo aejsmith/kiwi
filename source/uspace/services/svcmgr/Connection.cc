@@ -15,23 +15,34 @@
 
 /**
  * @file
- * @brief		RPC test server.
+ * @brief		Service manager connection class.
  */
 
+#include <kernel/errors.h>
+#include <iostream>
+#include "ServiceManager.h"
 #include "Connection.h"
-#include "KittenServer.h"
 
-/** Handle a connection to the kitten server.
+using namespace std;
+using namespace kiwi;
+
+/** Construct a connection object.
  * @param handle	Handle to the connection. */
-void KittenServer::handleConnection(handle_t handle) {
-	new Connection(handle);
+Connection::Connection(handle_t handle) :
+	org::kiwi::ServiceManager::ClientConnection(handle)
+{
 }
 
-/** Main function for the kitten server.
- * @param argc		Argument count.
- * @param argv		Argument array. */
-int main(int argc, char **argv) {
-	KittenServer server;
-	server.run();
+/** Look up a port.
+ * @param name		Name of port to look up.
+ * @param id		Where to store ID of port.
+ * @return		0 on success, error code on failure. */
+RPCResult Connection::lookupPort(string name, port_id_t &id) {
+	Port *port = ServiceManager::instance().lookupPort(name);
+	if(!port) {
+		return ERR_NOT_FOUND;
+	}
+
+	id = port->getID();
 	return 0;
 }

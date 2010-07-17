@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Service manager.
+ * @brief		Service manager service class.
  */
 
 #ifndef __SERVICE_H
@@ -26,12 +26,11 @@
 #include <list>
 #include <string>
 
+#include "Port.h"
+
 /** Class defining a service known to the service manager. */
 class Service {
 public:
-	/** Type for the port list. */
-	typedef std::list<std::string> PortList;
-
 	/** Possible service states. */
 	enum State {
 		Stopped,			/**< Service is stopped. */
@@ -43,8 +42,7 @@ public:
 		OnDemand = 1,			/**< Should only be started when a port is needed. */
 	};
 
-	Service(const char *name, const char *description, const char *cmdline, int flags = 0);
-	void addPort(const char *name);
+	Service(const char *name, const char *desc, const char *cmdline, int flags = 0, const char *port = 0);
 	bool start();
 
 	/** Get the service's flags.
@@ -57,9 +55,7 @@ public:
 
 	/** Get a reference to the port list.
 	 * @return		Reference to the port list. */
-	const PortList &getPorts() const { return m_ports; }
-
-	kiwi::Signal<> onStop;
+	Port *getPort() const { return m_port; }
 private:
 	void processExited(kiwi::Process *, int status);
 
@@ -67,7 +63,7 @@ private:
 	std::string m_description;	/**< Description of the service. */
 	std::string m_cmdline;		/**< Command line for the service. */
 	int m_flags;			/**< Behaviour flags. */
-	PortList m_ports;		/**< Port names for the service. */
+	Port *m_port;			/**< Port for this service. */
 
 	State m_state;			/**< State of the service. */
 	kiwi::Process m_process;	/**< Process for the service. */

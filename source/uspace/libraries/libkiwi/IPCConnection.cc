@@ -21,12 +21,14 @@
 #include <kernel/object.h>
 #include <kernel/ipc.h>
 
-#include <kiwi/private/svcmgr.h>
 #include <kiwi/IPCConnection.h>
 
 #include <cstring>
 
+#include "svcmgr.h"
+
 using namespace kiwi;
+using namespace org::kiwi::ServiceManager;
 using namespace std;
 
 /** Constructor for IPCConnection.
@@ -67,23 +69,17 @@ bool IPCConnection::connect(port_id_t id) {
  * @return		Whether creation was successful.
  */
 bool IPCConnection::connect(const char *name) {
-	IPCConnection svcmgr;
-	uint32_t type;
-	port_id_t id;
-	size_t size;
-	char *data;
-
+	ServerConnection svcmgr;
 	if(!svcmgr.connect(1)) {
-		return false;
-	} else if(!svcmgr.send(SVCMGR_LOOKUP_PORT, name, strlen(name))) {
-		return false;
-	} else if(!svcmgr.receive(type, data, size)) {
-		return false;
-	} else if((id = *(reinterpret_cast<port_id_t *>(data))) < 0) {
 		return false;
 	}
 
-	delete[] data;
+	/* Look up the port ID. */
+	port_id_t id;
+	if(svcmgr.lookupPort(name, id) != 0) {
+		return false;
+	}
+
 	return connect(id);
 }
 

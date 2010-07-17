@@ -22,16 +22,25 @@
 #define __KIWI_PROCESS_H
 
 #include <kiwi/Handle.h>
+#include <utility>
+#include <vector>
+
+extern char **environ;
 
 namespace kiwi {
 
 /** Class providing functionality to create and manipulate processes. */
 class Process : public Handle {
 public:
+	/** Type of the handle map. */
+	typedef std::vector<std::pair<handle_t, handle_t> > HandleMap;
+
 	Process(handle_t handle = -1);
 
-	bool create(const char *const args[], const char *const env[] = 0, bool usepath = true);
-	bool create(const char *cmdline, const char *const env[] = 0, bool usepath = true);
+	bool create(const char *const args[], const char *const env[] = environ,
+	            HandleMap *handles = 0);
+	bool create(const char *cmdline, const char *const env[] = environ,
+	            HandleMap *handles = 0);
 	bool open(process_id_t id);
 
 	bool waitTerminate(useconds_t timeout = -1) const;

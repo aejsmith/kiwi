@@ -32,9 +32,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
 	IPCConnection *conn;
+	IPCPort port(3);
 	handle_t handle;
 	void *mapping;
-	IPCPort port;
 	shm_id_t id;
 	int ret;
 
@@ -53,10 +53,6 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	strcpy(reinterpret_cast<char *>(mapping), "This is some data in shared memory!");
-
-	/* Create the port. */
-	port.create();
-	port.registerName("org.kiwi.SHMServer");
 
 	/* Send the area ID to any client that connects. */
 	while(port.listen(conn)) {

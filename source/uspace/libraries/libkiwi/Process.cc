@@ -26,12 +26,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <vector>
 
 using namespace kiwi;
 using namespace std;
-
-extern char **environ;
 
 /* FIXME. */
 #define PATH_MAX 4096
@@ -54,17 +51,33 @@ Process::Process(handle_t handle) {
  * @param env		NULL-terminated environment variable array. A NULL
  *			value for this argument will result in the new process
  *			inheriting the current environment (the default).
- * @param usepath	If true, and the program path does not contain a '/'
- *			character, then it will be looked up in all directories
- *			listed in the PATH environment variable. The first
- *			match will be executed (defaults to true).
+ * @param handles	Pointer to map describing how to duplicate handles from
+ *			the calling process into the new process. If NULL, all
+ *			inheritable handles will be duplicated to the new
+ *			process.
  *
  * @return		Whether creation was successful.
  */
-bool Process::create(const char *const args[], const char *const env[], bool usepath) {
+bool Process::create(const char *const args[], const char *const env[], HandleMap *handles) {
+	handle_t (*map)[2] = 0;
+	size_t mapsz = -1;
 	handle_t handle;
 
-	if(usepath && !strchr(args[0], '/')) {
+	/* If a handle map was provided, convert it into the format expected
+	 * by the kernel. */
+	if(handles) {
+		mapsz = handles->size();
+		if(mapsz) {
+			map = new handle_t[mapsz][2];
+			size_t i = 0;
+			for(HandleMap::iterator it = handles->begin(); it != handles->end(); ++it) {
+				map[i][0] = it->first;
+				map[i++][1] = it->second;
+			}
+		}
+	}
+
+	if(!strchr(args[0], '/')) {
 		const char *path = getenv("PATH");
 		if(!path) {
 			path = "/system/binaries";
@@ -84,7 +97,7 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 				cur--;
 			} else {
 				if((next - cur) >= (PATH_MAX - 3)) {
-					return false;
+					goto fail;
 				}
 
 				memcpy(buf, cur, next - cur);
@@ -93,17 +106,16 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 			buf[next - cur] = '/';
 			len = strlen(args[0]);
 			if(len + (next - cur) >= (PATH_MAX - 2)) {
-				return false;
+				goto fail;
 			}
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			handle = process_create(buf, args, (env) ? env : environ, 0, NULL, -1);
+			handle = process_create(buf, args, (env) ? env : environ, 0, map, mapsz);
 			if(handle >= 0) {
-				setHandle(handle);
-				return true;
+				goto success;
 			} else if(handle != -ERR_NOT_FOUND) {
-				return false;
+				goto fail;
 			}
 
 			if(*next == 0) {
@@ -112,16 +124,22 @@ bool Process::create(const char *const args[], const char *const env[], bool use
 			next++;
 		}
 
-		return false;
+		goto fail;
 	} else {
-		handle = process_create(args[0], args, (env) ? env : environ, 0, NULL, -1);
+		handle = process_create(args[0], args, (env) ? env : environ, 0, map, mapsz);
 		if(handle < 0) {
-			return false;
+			goto fail;
 		}
 
-		setHandle(handle);
-		return true;
+		goto success;
 	}
+success:
+	if(map) { delete[] map; }
+	setHandle(handle);
+	return true;
+fail:
+	if(map) { delete[] map; }
+	return false;
 }
 
 /** Create a new process.
@@ -136,14 +154,14 @@ bool Process::create(const char *const args[], const char *const env[], bool use
  * @param env		NULL-terminated environment variable array. A NULL
  *			value for this argument will result in the new process
  *			inheriting the current environment (the default).
- * @param usepath	If true, and the program path does not contain a '/'
- *			character, then it will be looked up in all directories
- *			listed in the PATH environment variable. The first
- *			match will be executed (defaults to true).
+ * @param handles	Pointer to map describing how to duplicate handles from
+ *			the calling process into the new process. If NULL, all
+ *			inheritable handles will be duplicated to the new
+ *			process.
  *
  * @return		Whether creation was successful.
  */
-bool Process::create(const char *cmdline, const char *const env[], bool usepath) {
+bool Process::create(const char *cmdline, const char *const env[], HandleMap *handles) {
 	vector<char *> args;
 	char *tok, *dup;
 
@@ -167,7 +185,7 @@ bool Process::create(const char *cmdline, const char *const env[], bool usepath)
 	/* Null-terminate the array. */
 	args.push_back(0);
 
-	return create(&args[0], env, usepath);
+	return create(&args[0], env, handles);
 }
 
 /** Open an existing process.
