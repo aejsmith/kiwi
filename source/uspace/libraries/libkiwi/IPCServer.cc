@@ -37,9 +37,8 @@ IPCServer::IPCServer(handle_t handle) : m_port(handle) {
 	m_port.onConnection.connect(this, &IPCServer::_handleConnection);
 }
 
-/** Signal handler for a connection.
- * @param port		Port the connection was received on. */
-void IPCServer::_handleConnection(IPCPort *port) {
+/** Signal handler for a connection. */
+void IPCServer::_handleConnection() {
 	handle_t handle = m_port.listen();
 	if(handle >= 0) {
 		handleConnection(handle);

@@ -137,10 +137,10 @@ void IPCConnection::registerEvents() {
 void IPCConnection::eventReceived(int id) {
 	switch(id) {
 	case CONNECTION_EVENT_HANGUP:
-		onHangup(this);
+		onHangup();
 		break;
 	case CONNECTION_EVENT_MESSAGE:
-		onMessage(this);
+		onMessage();
 		break;
 	}
 }

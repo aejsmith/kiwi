@@ -38,7 +38,7 @@ public:
 	handle_t listen(useconds_t timeout = -1) const;
 	port_id_t getID() const;
 
-	Signal<IPCPort *> onConnection;
+	Signal<> onConnection;
 private:
 	void registerEvents();
 	void eventReceived(int id);

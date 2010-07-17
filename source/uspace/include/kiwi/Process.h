@@ -48,7 +48,7 @@ public:
 
 	static process_id_t getCurrentID(void);
 
-	Signal<Process *, int> onExit;
+	Signal<int> onExit;
 private:
 	void registerEvents();
 	void eventReceived(int event);

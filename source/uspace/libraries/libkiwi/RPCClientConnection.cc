@@ -34,7 +34,7 @@ RPCClientConnection::RPCClientConnection(const char *name, uint32_t version, han
 {
 	/* Hook up the signal handlers. */
 	m_conn.onMessage.connect(this, &RPCClientConnection::_handleMessage);
-	m_conn.onHangup.connect(this, &RPCClientConnection::_handleHangup);
+	m_conn.onHangup.connect(this, &RPCClientConnection::handleHangup);
 
 	/* Send the version to the client. */
 	RPCMessageBuffer buf;
@@ -57,9 +57,8 @@ void RPCClientConnection::handleHangup() {
 	deleteLater();
 }
 
-/** Signal handler for a message being received.
- * @param conn		Connection the message was received on. */
-void RPCClientConnection::_handleMessage(IPCConnection *conn) {
+/** Signal handler for a message being received. */
+void RPCClientConnection::_handleMessage() {
 	uint32_t id;
 	size_t size;
 	char *data;
@@ -70,11 +69,4 @@ void RPCClientConnection::_handleMessage(IPCConnection *conn) {
 	RPCMessageBuffer buf(data, size);
 	handleMessage(id, buf);
 	sendMessage(id, buf);
-}
-
-/** Signal handler for the remote end being hung up.
- * @fixme		Get rid of this, connect to handleHangup() directly.
- * @param conn		Connection that was hung up. */
-void RPCClientConnection::_handleHangup(IPCConnection *conn) {
-	handleHangup();
 }

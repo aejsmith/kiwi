@@ -38,7 +38,7 @@ Port::Port(const char *name, Service *service) :
 }
 
 /** Handle a connection on the port. */
-void Port::handleConnection(IPCPort *port) {
+void Port::handleConnection() {
 	/* If the service is not running, we must start it. */
 	if(m_service->getState() != Service::Running) {
 		m_service->start();

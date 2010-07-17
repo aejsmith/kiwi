@@ -55,7 +55,7 @@ void Handle::close() {
 		if(global_event_loop) {
 			global_event_loop->removeHandle(this);
 		}
-		onClose(this);
+		onClose();
 
 		/* The only error handle_close() can encounter is the handle
 		 * not existing. Therefore, if we fail, it means the programmer

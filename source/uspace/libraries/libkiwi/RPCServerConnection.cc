@@ -96,9 +96,8 @@ void RPCServerConnection::receiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
 	buf.reset(data, size);
 }
 
-/** Handle a message on the connection.
- * @param conn		Connection message was received on. */
-void RPCServerConnection::_handleMessage(IPCConnection *conn) {
+/** Handle a message on the connection. */
+void RPCServerConnection::_handleMessage() {
 	RPCMessageBuffer buf;
 	uint32_t id;
 	receiveMessage(id, buf);

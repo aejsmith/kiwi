@@ -39,7 +39,7 @@ public:
 	 * @return		ID of the port. */
 	port_id_t getID() const { return m_port.getID(); }
 private:
-	void handleConnection(kiwi::IPCPort *port);
+	void handleConnection();
 
 	std::string m_name;		/**< Name of the port. */
 	kiwi::IPCPort m_port;		/**< Handle to the port. */

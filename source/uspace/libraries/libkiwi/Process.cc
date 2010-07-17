@@ -241,7 +241,7 @@ void Process::eventReceived(int event) {
 	if(event == PROCESS_EVENT_DEATH) {
 		int status = 0;
 		process_status(m_handle, &status);
-		onExit(this, status);
+		onExit(status);
 
 		/* Unregister the death event so that it doesn't continually
 		 * get signalled. */

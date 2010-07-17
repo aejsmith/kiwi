@@ -37,7 +37,7 @@ public:
 protected:
 	virtual void handleConnection(handle_t handle) = 0;
 private:
-	void _handleConnection(IPCPort *port);
+	void _handleConnection();
 
 	IPCPort m_port;			/**< Port the server is using. */
 };

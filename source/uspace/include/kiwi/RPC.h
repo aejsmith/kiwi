@@ -117,7 +117,7 @@ protected:
 	void receiveMessage(uint32_t &id, RPCMessageBuffer &buf);
 	virtual void handleEvent(uint32_t id, RPCMessageBuffer &buf) = 0;
 private:
-	void _handleMessage(IPCConnection *conn);
+	void _handleMessage();
 	bool checkVersion();
 
 	IPCConnection m_conn;		/**< Real connection to the server. */
@@ -134,8 +134,7 @@ protected:
 	virtual void handleMessage(uint32_t id, RPCMessageBuffer &buf) = 0;
 	virtual void handleHangup();
 private:
-	void _handleMessage(IPCConnection *conn);
-	void _handleHangup(IPCConnection *conn);
+	void _handleMessage();
 
 	IPCConnection m_conn;		/**< Real connection to the client. */
 	const char *m_name;		/**< Name of the service. */

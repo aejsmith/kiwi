@@ -82,7 +82,7 @@ bool Service::start() {
 
 /** Slot for the process exiting.
  * @param status	Exit status of the process. */
-void Service::processExited(Process *, int status) {
+void Service::processExited(int status) {
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
 	m_process.close();
 	m_state = Stopped;

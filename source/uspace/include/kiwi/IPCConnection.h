@@ -38,8 +38,8 @@ public:
 
 	bool waitHangup(useconds_t timeout = -1) const;
 
-	Signal<IPCConnection *> onMessage;
-	Signal<IPCConnection *> onHangup;
+	Signal<> onMessage;
+	Signal<> onHangup;
 protected:
 	void registerEvents();
 	void eventReceived(int id);

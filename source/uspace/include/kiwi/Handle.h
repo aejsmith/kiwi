@@ -40,7 +40,7 @@ public:
 	bool wait(int event, useconds_t timeout = -1) const;
 	handle_t getHandle(void) const;
 
-	Signal<Handle *> onClose;
+	Signal<> onClose;
 protected:
 	Handle();
 

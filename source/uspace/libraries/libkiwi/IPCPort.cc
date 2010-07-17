@@ -120,7 +120,7 @@ void IPCPort::registerEvents() {
 void IPCPort::eventReceived(int id) {
 	switch(id) {
 	case PORT_EVENT_CONNECTION:
-		onConnection(this);
+		onConnection();
 		break;
 	}
 }
