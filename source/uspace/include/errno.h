@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -25,10 +25,12 @@
 extern "C" {
 #endif
 
+#include <kernel/errors.h>
+
 /** Standard C error number definitions. */
-#define ERANGE			1	/**< Out of range. */
-#define EILSEQ			2	/**< Illegal character sequence. */
-#define EDOM			3	/**< Outside domain of function. */
+#define ERANGE			ERR_OUT_OF_RANGE
+#define EILSEQ			ERR_ILLEGAL_SEQUENCE
+#define EDOM			ERR_OUTSIDE_DOMAIN
 
 extern int *__libsystem_errno_location(void);
 #define errno (*__libsystem_errno_location())

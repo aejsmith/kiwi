@@ -164,8 +164,8 @@ thread_arch_enter_userspace:
 	subl	$STACK_DELTA, %esi
 	movl	%eax, (%esi)
 
-	/* Push a zero return address so the userspace program will not fault
-	 * if it inadvertently returns from its entry function. */
+	/* Push a zero return address so the userspace program will fault if it
+	 * inadvertently returns from its entry function. */
 	subl	$STACK_DELTA, %esi
 	movl	$0, (%esi)
 

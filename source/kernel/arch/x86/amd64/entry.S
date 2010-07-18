@@ -247,8 +247,8 @@ FUNCTION_END(syscall_entry)
 
 /** Userspace entry function. */
 FUNCTION_START(thread_arch_enter_userspace)
-	/* Push a zero return address so the userspace program will not fault
-	 * if it inadvertently returns from its entry function. */
+	/* Push a zero return address so the userspace program will fault if it
+	 * inadvertently returns from its entry function. */
 	subq	$STACK_DELTA, %rsi
 	movq	$0, (%rsi)
 

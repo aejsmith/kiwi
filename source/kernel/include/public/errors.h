@@ -49,5 +49,8 @@
 #define ERR_OVERFLOW		25	/**< Integer overflow. */
 #define ERR_NOT_EMPTY		26	/**< Directory is not empty. */
 #define ERR_PROCESS_RUNNING	27	/**< Process is still running. */
+#define ERR_OUT_OF_RANGE	28	/**< Out of range. */
+#define ERR_ILLEGAL_SEQUENCE	29	/**< Illegal character sequence. */
+#define ERR_OUTSIDE_DOMAIN	30	/**< Outside domain of function. */
 
 #endif /* __KERNEL_ERRORS_H */
