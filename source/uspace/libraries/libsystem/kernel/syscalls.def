@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,73 +11,73 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Service(0)
+service 0;
 
-Syscall('module_load',			['ptr_t', 'ptr_t'])
-Syscall('object_type',			['handle_t'])
-Syscall('object_wait',			['handle_t', 'int', 'useconds_t'])
-Syscall('object_wait_multiple',		['ptr_t', 'ptr_t', 'size_t', 'useconds_t'])
-Syscall('handle_get_flags',		['handle_t'])
-Syscall('handle_set_flags',		['handle_t', 'int'])
-Syscall('handle_close',			['handle_t'])
-Syscall('fs_file_create',		['ptr_t'])
-Syscall('fs_file_open',			['ptr_t', 'int'])
-Syscall('fs_file_read',			['handle_t', 'ptr_t', 'size_t', 'ptr_t'])
-Syscall('fs_file_pread',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
-Syscall('fs_file_write',		['handle_t', 'ptr_t', 'size_t', 'ptr_t'])
-Syscall('fs_file_pwrite',		['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
-Syscall('fs_file_resize',		['handle_t', 'offset_t'])
-Syscall('fs_dir_create',		['ptr_t'])
-Syscall('fs_dir_open',			['ptr_t', 'int'])
-Syscall('fs_dir_read',			['handle_t', 'ptr_t', 'size_t', 'offset_t'])
-Syscall('fs_handle_seek',		['handle_t', 'int', 'rel_offset_t', 'ptr_t'])
-Syscall('fs_handle_info',		['handle_t', 'ptr_t'])
-Syscall('fs_handle_sync',		['handle_t'])
-Syscall('fs_symlink_create',		['ptr_t', 'ptr_t'])
-Syscall('fs_symlink_read',		['ptr_t', 'ptr_t', 'size_t'])
-Syscall('fs_mount',			['ptr_t', 'ptr_t', 'ptr_t', 'int'])
-Syscall('fs_unmount',			['ptr_t'])
-Syscall('fs_sync',			[])
-Syscall('fs_getcwd',			['ptr_t', 'size_t'])
-Syscall('fs_setcwd',			['ptr_t'])
-Syscall('fs_setroot',			['ptr_t'])
-Syscall('fs_info',			['ptr_t', 'bool', 'ptr_t'])
-Syscall('fs_link',			['ptr_t', 'ptr_t'])
-Syscall('fs_unlink',			['ptr_t'])
-Syscall('fs_rename',			['ptr_t', 'ptr_t'])
-Syscall('_vm_map',			['ptr_t'])
-Syscall('vm_unmap',			['ptr_t', 'size_t'])
-Syscall('process_create',		['ptr_t', 'ptr_t', 'ptr_t', 'int', 'ptr_t', 'int'])
-Syscall('process_replace',		['ptr_t', 'ptr_t', 'ptr_t', 'ptr_t', 'int'])
-Syscall('process_clone',		['ptr_t'])
-Syscall('process_open',			['process_id_t'])
-Syscall('process_id',			['handle_t'])
-Syscall('process_status',		['handle_t', 'ptr_t'])
-Syscall('process_exit',			['int'])
-Syscall('device_open',			['ptr_t'])
-Syscall('device_read',			['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
-Syscall('device_write',			['handle_t', 'ptr_t', 'size_t', 'offset_t', 'ptr_t'])
-Syscall('_device_request',		['ptr_t'])
-Syscall('thread_create',		['ptr_t', 'ptr_t', 'size_t', 'ptr_t', 'ptr_t'])
-Syscall('thread_open',			['thread_id_t'])
-Syscall('thread_id',			['handle_t'])
-Syscall('thread_exit',			['int'])
-Syscall('thread_usleep',		['useconds_t'])
-Syscall('semaphore_create',		['ptr_t', 'size_t'])
-Syscall('semaphore_open',		['ptr_t', 'size_t'])
-Syscall('semaphore_id',			['handle_t'])
-Syscall('semaphore_down',		['handle_t', 'useconds_t'])
-Syscall('semaphore_up',			['handle_t', 'size_t'])
-Syscall('ipc_port_create',		[])
-Syscall('ipc_port_open',		['port_id_t'])
-Syscall('ipc_port_id',			['handle_t'])
-Syscall('ipc_port_listen',		['handle_t', 'useconds_t'])
-Syscall('ipc_connection_open',		['port_id_t'])
-Syscall('ipc_message_send',		['handle_t', 'uint32_t', 'ptr_t', 'size_t'])
-Syscall('ipc_message_sendv',		['handle_t', 'ptr_t', 'size_t'])
-Syscall('ipc_message_peek',		['handle_t', 'useconds_t', 'ptr_t', 'ptr_t'])
-Syscall('ipc_message_receive',		['handle_t', 'useconds_t', 'ptr_t', 'ptr_t', 'size_t'])
-Syscall('shm_create',			['size_t'])
-Syscall('shm_open',			['shm_id_t'])
-Syscall('shm_id',			['handle_t'])
-Syscall('shm_resize',			['handle_t', 'size_t'])
+int module_load(ptr_t, ptr_t);
+int object_type(handle_t);
+int object_wait(handle_t, int, useconds_t);
+int object_wait_multiple(ptr_t, ptr_t, size_t, useconds_t);
+int handle_get_flags(handle_t);
+int handle_set_flags(handle_t, int);
+int handle_close(handle_t);
+int fs_file_create(ptr_t);
+handle_t fs_file_open(ptr_t, int);
+int fs_file_read(handle_t, ptr_t, size_t, ptr_t);
+int fs_file_pread(handle_t, ptr_t, size_t, offset_t, ptr_t);
+int fs_file_write(handle_t, ptr_t, size_t, ptr_t);
+int fs_file_pwrite(handle_t, ptr_t, size_t, offset_t, ptr_t);
+int fs_file_resize(handle_t, offset_t);
+int fs_dir_create(ptr_t);
+handle_t fs_dir_open(ptr_t, int);
+int fs_dir_read(handle_t, ptr_t, size_t, offset_t);
+int fs_handle_seek(handle_t, int, rel_offset_t, ptr_t);
+int fs_handle_info(handle_t, ptr_t);
+int fs_handle_sync(handle_t);
+int fs_symlink_create(ptr_t, ptr_t);
+int fs_symlink_read(ptr_t, ptr_t, size_t);
+int fs_mount(ptr_t, ptr_t, ptr_t, int);
+int fs_unmount(ptr_t);
+int fs_sync();
+int fs_getcwd(ptr_t, size_t);
+int fs_setcwd(ptr_t);
+int fs_setroot(ptr_t);
+int fs_info(ptr_t, bool, ptr_t);
+int fs_link(ptr_t, ptr_t);
+int fs_unlink(ptr_t);
+int fs_rename(ptr_t, ptr_t);
+int _vm_map(ptr_t);
+int vm_unmap(ptr_t, size_t);
+handle_t process_create(ptr_t, ptr_t, ptr_t, int, ptr_t, int);
+int process_replace(ptr_t, ptr_t, ptr_t, ptr_t, int);
+int process_clone(ptr_t);
+handle_t process_open(process_id_t);
+process_id_t process_id(handle_t);
+int process_status(handle_t, ptr_t);
+void process_exit(int);
+handle_t device_open(ptr_t);
+int device_read(handle_t, ptr_t, size_t, offset_t, ptr_t);
+int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t);
+int _device_request(ptr_t);
+handle_t thread_create(ptr_t, ptr_t, size_t, ptr_t, ptr_t);
+handle_t thread_open(thread_id_t);
+thread_id_t thread_id(handle_t);
+void thread_exit(int);
+int thread_usleep(useconds_t);
+handle_t semaphore_create(ptr_t, size_t);
+handle_t semaphore_open(ptr_t, size_t);
+semaphore_id_t semaphore_id(handle_t);
+int semaphore_down(handle_t, useconds_t);
+int semaphore_up(handle_t, size_t);
+handle_t ipc_port_create();
+handle_t ipc_port_open(port_id_t);
+port_id_t ipc_port_id(handle_t);
+handle_t ipc_port_listen(handle_t, useconds_t);
+handle_t ipc_connection_open(port_id_t);
+int ipc_message_send(handle_t, uint32_t, ptr_t, size_t);
+int ipc_message_sendv(handle_t, ptr_t, size_t);
+int ipc_message_peek(handle_t, useconds_t, ptr_t, ptr_t);
+int ipc_message_receive(handle_t, useconds_t, ptr_t, ptr_t, size_t);
+handle_t shm_create(size_t);
+handle_t shm_open(shm_id_t);
+shm_id_t shm_id(handle_t);
+int shm_resize(handle_t, size_t);

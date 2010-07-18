@@ -90,7 +90,6 @@ class EnvironmentManager(dict):
 		self.base['OBJCOPY'] = self.GetToolPath('objcopy')
 
 		# Set paths to build utilities.
-		self.base['SYSGEN'] = os.path.join(os.getcwd(), 'utilities', 'sysgen.py')
 		self.base['GENSYMTAB'] = os.path.join(os.getcwd(), 'utilities', 'gensymtab.py')
 		self.base['BIN2HEX'] = os.path.join(os.getcwd(), 'utilities', 'bin2hex.py')
 

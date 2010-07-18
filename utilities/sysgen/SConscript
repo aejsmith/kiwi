@@ -11,14 +11,23 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-service 0;
+import os.path
+Import('config', 'env', 'envmgr')
 
-int object_type(handle_t) = 1;
-int handle_close(handle_t) = 6;
-handle_t fs_file_open(ptr_t, int) = 8;
-int fs_file_pread(handle_t, ptr_t, size_t, offset_t, ptr_t) = 10;
-int fs_file_write(handle_t, ptr_t, size_t, ptr_t) = 11;
-int _vm_map(ptr_t) = 32;
-int vm_unmap(ptr_t, size_t) = 33;
-void process_exit(int) = 40;
-int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t) = 43;
+envmgr.base['SYSGEN'] = env.Program('sysgen', [
+	'AMD64Target.cc',
+	'IA32Target.cc',
+	'parser.y',
+	'lexer.l',
+	'main.cc',
+], CXXFLAGS=env['CXXFLAGS'] + env['CCFLAGS'], CCFLAGS=[], CFLAGS=[])
+
+# Add builders to generate system call code.
+def sysgen_emitter(target, source, env):
+	source.insert(0, env['SYSINC'])
+	env.Depends(target[0], env['SYSGEN'])
+	return target, source
+envmgr.base['BUILDERS']['Sysgen'] = Builder(
+	action=Action('$SYSGEN -o $TARGET %s $SOURCES' % (config['ARCH']), '$GENCOMSTR'),
+	emitter=sysgen_emitter
+)

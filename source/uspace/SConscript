@@ -59,12 +59,8 @@ def program_emitter(target, source, env):
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 
-# Add a builder to generate system call functions.
-env['SYSINC'] = File('libraries/libsystem/arch/%s/syscalls.inc' % (config['ARCH']))
-def sysgen_emitter(target, source, env):
-	source.insert(0, env['SYSINC'])
-	return target, source
-env['BUILDERS']['Sysgen'] = Builder(action=Action('$SYSGEN $TARGET $SOURCES', '$GENCOMSTR'), emitter=sysgen_emitter)
+# Set the path to the system call include file.
+env['SYSINC'] = File('libraries/libsystem/kernel/syscalls.inc')
 
 # Visit subdirectories.
 SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])

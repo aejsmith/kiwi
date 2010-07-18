@@ -11,14 +11,15 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-service 0;
-
-int object_type(handle_t) = 1;
-int handle_close(handle_t) = 6;
-handle_t fs_file_open(ptr_t, int) = 8;
-int fs_file_pread(handle_t, ptr_t, size_t, offset_t, ptr_t) = 10;
-int fs_file_write(handle_t, ptr_t, size_t, ptr_t) = 11;
-int _vm_map(ptr_t) = 32;
-int vm_unmap(ptr_t, size_t) = 33;
-void process_exit(int) = 40;
-int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t) = 43;
+# Kernel type definitions.
+type handle_t int32_t;
+type process_id_t int32_t;
+type thread_id_t int32_t;
+type port_id_t int32_t;
+type semaphore_id_t int32_t;
+type shm_id_t int32_t;
+type mount_id_t uint16_t;
+type node_id_t uint64_t;
+type useconds_t int64_t;
+type offset_t uint64_t;
+type rel_offset_t int64_t;
