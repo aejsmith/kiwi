@@ -62,5 +62,10 @@ env.Append(PROGEMITTER=[program_emitter])
 # Set the path to the system call include file.
 env['SYSINC'] = File('libraries/libsystem/kernel/syscalls.inc')
 
+# Add an action for ASM files in a shared library.
+from SCons.Tool import createObjBuilders
+static_obj, shared_obj = createObjBuilders(env)
+shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
+
 # Visit subdirectories.
 SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
