@@ -28,7 +28,7 @@ class IA32Target : public Target {
 public:
 	void addTypes(TypeMap &map);
 	size_t maxParameters();
-	void generate(std::ostream &stream, const SyscallList &calls);
+	void generate(std::ostream &stream, const SyscallList &calls, bool use_errno);
 };
 
 #endif /* __IA32TARGET_H */

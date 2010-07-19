@@ -24,7 +24,7 @@ sources = map(File, [
 ])
 
 # Generate the system call functions.
-env.Sysgen('syscalls.S', 'syscalls.def')
+env.Sysgen('syscalls.S', 'syscalls.def', SYSGENFLAGS=['--no-errno'])
 
 # Get the list of architecture-specific source files.
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])

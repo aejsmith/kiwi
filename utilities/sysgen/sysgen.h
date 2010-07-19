@@ -79,7 +79,7 @@ class Target {
 public:
 	virtual void addTypes(TypeMap &map) = 0;
 	virtual size_t maxParameters() = 0;
-	virtual void generate(std::ostream &stream, const SyscallList &calls) = 0;
+	virtual void generate(std::ostream &stream, const SyscallList &calls, bool use_errno) = 0;
 };
 
 extern "C" {

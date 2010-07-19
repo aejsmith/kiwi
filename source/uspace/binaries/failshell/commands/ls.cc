@@ -22,6 +22,7 @@
 #include <kernel/fs.h>
 #include <kernel/object.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <iostream>
 
@@ -68,7 +69,7 @@ public:
 				handle_close(handle);
 				free(entry);
 
-				if(ret != -ERR_NOT_FOUND) {
+				if(errno != ERR_NOT_FOUND) {
 					cout << "Failed to read directory (" << ret << ")" << endl;
 					return ret;
 				}

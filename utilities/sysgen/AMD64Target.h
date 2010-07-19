@@ -28,7 +28,7 @@ class AMD64Target : public Target {
 public:
 	void addTypes(TypeMap &map);
 	size_t maxParameters();
-	void generate(std::ostream &stream, const SyscallList &calls);
+	void generate(std::ostream &stream, const SyscallList &calls, bool use_errno);
 };
 
 #endif /* __AMD64TARGET_H */

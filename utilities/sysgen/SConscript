@@ -22,12 +22,15 @@ envmgr.base['SYSGEN'] = env.Program('sysgen', [
 	'main.cc',
 ], CXXFLAGS=env['CXXFLAGS'] + env['CCFLAGS'], CCFLAGS=[], CFLAGS=[])
 
+# Set default flags.
+envmgr.base['SYSGENFLAGS'] = []
+
 # Add builders to generate system call code.
 def sysgen_emitter(target, source, env):
 	source.insert(0, env['SYSINC'])
 	env.Depends(target[0], env['SYSGEN'])
 	return target, source
 envmgr.base['BUILDERS']['Sysgen'] = Builder(
-	action=Action('$SYSGEN -o $TARGET %s $SOURCES' % (config['ARCH']), '$GENCOMSTR'),
+	action=Action('$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']), '$GENCOMSTR'),
 	emitter=sysgen_emitter
 )

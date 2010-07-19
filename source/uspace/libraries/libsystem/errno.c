@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -16,13 +16,17 @@
 /**
  * @file
  * @brief		Error numbers.
+ *
+ * @todo		Make this thread-local.
  */
 
 #include <errno.h>
 #undef errno
 
-static int errno;
+static int __libsystem_errno;
 
+/** Get the location of errno.
+ * @return		Pointer to errno. */
 int *__libsystem_errno_location(void) {
-	return &errno;
+	return &__libsystem_errno;
 }

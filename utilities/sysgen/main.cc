@@ -193,8 +193,9 @@ void add_syscall(const char *type, const char *name, parameter_t *params, int nu
  * @param stream	Stream to output to.
  * @param progname	Program name. */
 static void usage(ostream &stream, const char *progname) {
-	stream << "Usage: " << progname << " [-o <output>] <target> <input...>" << endl;
+	stream << "Usage: " << progname << " [--no-errno] [-o <output>] <target> <input...>" << endl;
 	stream << "Options:" << endl;
+	stream << " --no-errno  - The generated code should not set errno." << endl;
 	stream << " -o <output> - File to write generated code to." << endl;
 	stream << " <target>    - Target architecture to generate code for." << endl;
 	stream << " <input...>  - Input files." << endl;
@@ -207,6 +208,7 @@ static void usage(ostream &stream, const char *progname) {
  * @param argv		Argument array.
  * @return		0 on success, 1 on failure. */
 int main(int argc, char **argv) {
+	bool use_errno = true;
 	string output("-");
 	int i;
 
@@ -217,6 +219,8 @@ int main(int argc, char **argv) {
 			return 0;
 		} else if(strcmp(argv[i], "--verbose") == 0 || strcmp(argv[i], "-v") == 0) {
 			verbose_mode = true;
+		} else if(strcmp(argv[i], "--no-errno") == 0) {
+			use_errno = false;
 		} else if(strcmp(argv[i], "-o") == 0) {
 			if(++i == argc || argv[i][0] == 0) {
 				cerr << "Option '-o' requires an argument." << endl;
@@ -274,7 +278,7 @@ int main(int argc, char **argv) {
 
 	/* Open the output file and generate the code. */
 	if(output == "-") {
-		code_target->generate(cout, syscall_list);
+		code_target->generate(cout, syscall_list, use_errno);
 	} else {
 		ofstream stream;
 		stream.open(output.c_str(), ofstream::trunc);
@@ -283,7 +287,7 @@ int main(int argc, char **argv) {
 			return 1;
 		}
 
-		code_target->generate(stream, syscall_list);
+		code_target->generate(stream, syscall_list, use_errno);
 		stream.close();
 	}
 

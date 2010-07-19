@@ -23,6 +23,7 @@
 
 #include <kiwi/Process.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -114,7 +115,7 @@ bool Process::create(const char *const args[], const char *const env[], HandleMa
 			handle = process_create(buf, args, (env) ? env : environ, 0, map, mapsz);
 			if(handle >= 0) {
 				goto success;
-			} else if(handle != -ERR_NOT_FOUND) {
+			} else if(errno != ERR_NOT_FOUND) {
 				goto fail;
 			}
 

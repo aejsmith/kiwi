@@ -22,6 +22,7 @@
 #include <kernel/fs.h>
 #include <kernel/object.h>
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -55,7 +56,7 @@ public:
 		off = strtoul(argv[2], NULL, 10);
 
 		if((handle = fs_file_open(argv[1], FS_FILE_WRITE)) < 0) {
-			if(handle == -ERR_NOT_FOUND) {
+			if(errno == ERR_NOT_FOUND) {
 				if((ret = fs_file_create(argv[1])) == 0) {
 					handle = fs_file_open(argv[1], FS_FILE_WRITE);
 				} else {

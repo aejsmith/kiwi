@@ -39,7 +39,6 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 	symtab = (ElfW(Sym) *)image->dynamic[ELF_DT_SYMTAB];
 	strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
 
-	/* First perform RELA relocations. */
 	for(i = 0; i < size / sizeof(ElfW(ELF_REL_TYPE)); i++) {
 		type   = ELF64_R_TYPE(relocs[i].r_info);
 		addr   = (ElfW(Addr) *)(image->load_base + relocs[i].r_offset);
