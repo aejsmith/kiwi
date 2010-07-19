@@ -28,7 +28,7 @@ class Connection : public org::kiwi::ServiceManager::ClientConnection {
 public:
 	Connection(handle_t handle);
 private:
-	kiwi::RPCResult lookupPort(std::string name, port_id_t &id);
+	kiwi::RPCResult lookupPort(const std::string &name, port_id_t &id);
 };
 
 #endif /* __CONNECTION_H */

@@ -37,7 +37,7 @@ Connection::Connection(handle_t handle) :
  * @param name		Name of port to look up.
  * @param id		Where to store ID of port.
  * @return		0 on success, error code on failure. */
-RPCResult Connection::lookupPort(string name, port_id_t &id) {
+RPCResult Connection::lookupPort(const string &name, port_id_t &id) {
 	Port *port = ServiceManager::instance().lookupPort(name);
 	if(!port) {
 		return ERR_NOT_FOUND;

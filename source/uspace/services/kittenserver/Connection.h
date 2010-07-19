@@ -29,7 +29,7 @@ class Connection : public org::kiwi::KittenServer::ClientConnection {
 public:
 	Connection(handle_t handle);
 private:
-	kiwi::RPCResult createKitten(std::string name, Kitten::Colour colour, Kitten::ID &id);
+	kiwi::RPCResult createKitten(const std::string &name, Kitten::Colour colour, Kitten::ID &id);
 	kiwi::RPCResult setCurrentKitten(Kitten::ID id);
 	kiwi::RPCResult getName(std::string &name);
 	kiwi::RPCResult getColour(Kitten::Colour &colour);

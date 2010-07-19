@@ -39,7 +39,7 @@ Connection::Connection(handle_t handle) :
  * @param colour	Colour of the kitten.
  * @param id		Where to store ID of kitten.
  * @return		Result of the call. */
-RPCResult Connection::createKitten(std::string name, Kitten::Colour colour, Kitten::ID &id) {
+RPCResult Connection::createKitten(const string &name, Kitten::Colour colour, Kitten::ID &id) {
 	Kitten *kitten;
 
 	cout << "Connection::createKitten(" << name << ", {" << static_cast<int>(colour.red) << ',';
@@ -71,7 +71,7 @@ RPCResult Connection::setCurrentKitten(Kitten::ID id) {
 /** Get the name of the current kitten.
  * @param name		Where to store name of kitten.
  * @return		Result of the call. */
-RPCResult Connection::getName(std::string &name) {
+RPCResult Connection::getName(string &name) {
 	cout << "Connection::getName()" << endl;
 	if(!m_current_kitten) {
 		return ERR_NOT_FOUND;

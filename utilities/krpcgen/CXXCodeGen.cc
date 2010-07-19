@@ -426,8 +426,15 @@ string CXXCodeGen::getFunctionParams(const Function *func) {
 
 	BOOST_FOREACH(const Function::Parameter &p, func->getParameters()) {
 		if(!first) { str << ", "; }
-		str << getCXXType(p.type) << ' ';
-		if(p.out) { str << '&'; }
+		if(p.out) {
+			str << getCXXType(p.type) << " &";
+		} else {
+			if(dynamic_cast<StringType *>(p.type)) {
+				str << "const ::std::string &";
+			} else {
+				str << getCXXType(p.type) << ' ';
+			}
+		}
 		str << p.name;
 		first = false;
 	}
@@ -444,7 +451,11 @@ string CXXCodeGen::getEventParams(const Function *event) {
 
 	BOOST_FOREACH(const Function::Parameter &p, event->getParameters()) {
 		if(!first) { str << ", "; }
-		str << getCXXType(p.type);
+		if(dynamic_cast<StringType *>(p.type)) {
+			str << "const ::std::string &";
+		} else {
+			str << getCXXType(p.type);
+		}
 		first = false;
 	}
 
