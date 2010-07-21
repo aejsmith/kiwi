@@ -18,6 +18,8 @@
  * @brief		Userspace application startup code.
  */
 
+#include <kernel/process.h>
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,8 +38,10 @@ FILE *stderr = &__stderr;
 /** Userspace application initialisation function.
  * @param args		Process arguments structure. */
 void __libsystem_init(process_args_t *args) {
-	int ret;
-
+	/* We're loaded, unblock any process_create() calls waiting on us. */
+	process_loaded();
+	
+	/* Save the environment pointer. */
 	environ = args->env;
 
 	/* Attempt to open streams from existing handles, and open new streams
@@ -52,6 +56,6 @@ void __libsystem_init(process_args_t *args) {
 		fopen_device("/kconsole", stderr);
 	}
 
-	ret = main(args->args_count, args->args, args->env);
-	exit(ret);
+	/* Call the main function. */
+	exit(main(args->args_count, args->args, args->env));
 }

@@ -54,6 +54,7 @@ handle_t process_open(process_id_t);
 process_id_t process_id(handle_t);
 int process_status(handle_t, ptr_t);
 void process_exit(int);
+void process_loaded();
 handle_t device_open(ptr_t);
 int device_read(handle_t, ptr_t, size_t, offset_t, ptr_t);
 int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t);

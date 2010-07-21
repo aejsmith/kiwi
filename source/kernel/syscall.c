@@ -94,6 +94,7 @@ static syscall_handler_t kernel_syscall_table[] = {
 	(syscall_handler_t)sys_process_id,
 	(syscall_handler_t)sys_process_status,
 	(syscall_handler_t)sys_process_exit,
+	(syscall_handler_t)sys_process_loaded,
 	(syscall_handler_t)sys_device_open,
 	(syscall_handler_t)sys_device_read,
 	(syscall_handler_t)sys_device_write,

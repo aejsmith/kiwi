@@ -96,5 +96,7 @@ fail:
 		image = list_entry(rtld_loaded_images.next, rtld_image_t, header);
 		rtld_image_unload(image);
 	}
-	process_exit(-ret);
+
+	/* This will cause the process_create() call to return our error code. */
+	process_exit(ret);
 }

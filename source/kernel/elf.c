@@ -58,24 +58,6 @@ static bool elf_check_ehdr(elf_ehdr_t *ehdr, int type) {
 	return (ehdr->e_type == type);
 }
 
-/** Check whether a file contains a valid ELF header.
- * @param handle	Handle to file to check.
- * @param type		Required ELF type.
- * @return		True if valid, false if not. */
-static bool elf_check_file(khandle_t *handle, int type) {
-	elf_ehdr_t ehdr;
-	size_t bytes;
-
-	/* Read the ELF header in from the file. */
-	if(fs_file_pread(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes) != 0) {
-		return false;
-	} else if(bytes != sizeof(elf_ehdr_t)) {
-		return false;
-	}
-
-	return elf_check_ehdr(&ehdr, type);
-}
-
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
 #else
@@ -176,13 +158,6 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 	/* Map the data in. We do not need to check whether the supplied
 	 * addresses are valid - vm_map() will reject the call if they are. */
 	return vm_map(binary->as, start, size, flags, binary->handle, offset, NULL);
-}
-
-/** Check whether a file is an ELF binary.
- * @param handle	Handle to file to check.
- * @return		Whether the file is an ELF binary. */
-bool elf_binary_check(khandle_t *handle) {
-	return elf_check_file(handle, ELF_ET_EXEC);
 }
 
 /** Load an ELF binary into an address space.
@@ -366,13 +341,6 @@ ptr_t elf_binary_finish(void *data) {
 #endif
 
 extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
-
-/** Check whether a file is an ELF module.
- * @param handle	Handle to file to check.
- * @return		Whether the file is an ELF module. */
-bool elf_module_check(khandle_t *handle) {
-	return elf_check_file(handle, ELF_ET_REL);
-}
 
 /** Find a section in an ELF module.
  * @param module	Module to find in.

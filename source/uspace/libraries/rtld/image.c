@@ -313,9 +313,10 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		}
 
 		dprintf("RTLD: Image %s depends on %s, loading...\n", path, dep);
-		if((ret = rtld_library_load(dep, image, NULL)) != 0) {
-			if(ret == -ERR_DEP_MISSING) {
+		if((ret = rtld_library_load(dep, image, NULL)) != 1) {
+			if(ret == 0) {
 				printf("RTLD: Could not find required library: %s\n", dep);
+				ret = -ERR_DEP_MISSING;
 			}
 			goto fail;
 		}
@@ -416,10 +417,12 @@ static bool rtld_library_exists(const char *path) {
  * @param name		Name of library to load.
  * @param req		Image that requires this library.
  * @param imagep	Where to store pointer to image structure.
- * @return		0 on success, negative error code on failure. */
+ * @return		1 on success, 0 if the library is missing, negative
+ *                      error code on failure. */
 int rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
 	char buf[4096];
 	size_t i;
+	int ret;
 
 	/* Look for the library in the search paths. */
 	for(i = 0; rtld_extra_libpaths[i]; i++) {
@@ -427,7 +430,8 @@ int rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep
 		strcat(buf, "/");
 		strcat(buf, name);
 		if(rtld_library_exists(buf)) {
-			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
+			ret = rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
+			return (ret < 0) ? ret : 1;
 		}
 	}
 	for(i = 0; rtld_library_dirs[i]; i++) {
@@ -435,9 +439,10 @@ int rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep
 		strcat(buf, "/");
 		strcat(buf, name);
 		if(rtld_library_exists(buf)) {
-			return rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
+			ret = rtld_image_load(buf, req, ELF_ET_DYN, NULL, imagep);
+			return (ret < 0) ? ret : 1;
 		}
 	}
 
-	return -ERR_DEP_MISSING;
+	return 0;
 }

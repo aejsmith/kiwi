@@ -43,7 +43,7 @@ static void rtld_args_parse_pathlist(const char *str, char **arr, size_t max) {
 	if(strlen(str) == 0) {
 		return;
 	} else if(!(dup = strdup(str))) {
-		process_exit(ERR_NO_MEMORY);
+		process_exit(-ERR_NO_MEMORY);
 	}
 
 	while((tok = strsep(&dup, ":"))) {

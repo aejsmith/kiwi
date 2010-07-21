@@ -51,22 +51,6 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Structure containing process creation information. */
-typedef struct process_create_info {
-	const char *path;		/**< Path to program. */
-	const char **args;		/**< Argument array. */
-	const char **env;		/**< Environment array. */
-	handle_t (*handles)[2];		/**< Handle mapping array. */
-	int count;			/**< Number of handles in the array. */
-	vm_aspace_t *aspace;		/**< Address space for the process. */
-	void *data;			/**< Data pointer for the ELF loader. */
-	int argc;			/**< Argument count. */
-	int envc;			/**< Environment variable count. */
-	ptr_t arg_block;		/**< Address of argument block mapping. */
-	ptr_t stack;			/**< Address of stack mapping. */
-	semaphore_t sem;		/**< Semaphore to wait for completion on. */
-} process_create_info_t;
-
 static object_type_t process_object_type;
 
 /** Tree of all processes. */
@@ -141,8 +125,8 @@ static void process_release(process_t *process) {
  * @param handles	Array of handle mappings (see handle_table_init()).
  * @param count		Number of handles in mapping array.
  * @param procp		Where to store pointer to structure.
- * @param handlep	Where to store ID of handle to process in parent
- *			(can be NULL, in which case no handle will be created).
+ * @param handlep	Where to store handle to process in parent (can be NULL,
+ *			in which case no handle will be created).
  * @return		0 on success, negative error code on failure. Note that
  *			on failure the supplied address space will NOT be
  *			destroyed. */
@@ -167,12 +151,14 @@ static int process_alloc(const char *name, process_id_t id, int flags, int prior
 	object_init(&process->obj, &process_object_type);
 	refcount_set(&process->count, (handlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
-	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
-	process->name = kstrdup(name, MM_SLEEP);
 	process->flags = flags;
 	process->priority = priority;
-	process->state = PROCESS_RUNNING;
 	process->aspace = aspace;
+	process->state = PROCESS_RUNNING;
+	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
+	process->name = kstrdup(name, MM_SLEEP);
+	process->status = -1;
+	process->create = NULL;
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
@@ -251,6 +237,9 @@ static int load_binary(process_create_info_t *info) {
 	size_t size;
 	int ret;
 
+	semaphore_init(&info->sem, "process_create_sem", 0);
+	info->aspace = vm_aspace_create();
+
 	/* Load the binary into the new address space. */
 	if((ret = fs_file_open(info->path, FS_FILE_READ, &handle)) != 0) {
 		return ret;
@@ -284,7 +273,7 @@ static int load_binary(process_create_info_t *info) {
  * @param count		Number of array entries.
  * @param base		Base address to copy to.
  * @return		Total size copied. */
-static size_t copy_argument_strings(char **dest, const char **source, size_t count, ptr_t base) {
+static size_t copy_argument_strings(char **dest, const char *const source[], size_t count, ptr_t base) {
 	size_t i, len, total = 0;
 
 	for(i = 0; i < count; i++) {
@@ -333,8 +322,11 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	/* Get the ELF loader to clear BSS and get the entry pointer. */
 	entry = elf_binary_finish(info->data);
 
-	/* Wake up the caller. */
-	semaphore_up(&info->sem, 1);
+	/* If there the information structure pointer is NULL, process_replace()
+	 * is being used and we don't need to wait for the loader to complete. */
+	if(!curr_proc->create) {
+		semaphore_up(&info->sem, 1);
+	}
 
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in new process (entry: %p, stack: %p)\n", entry, stack);
@@ -370,8 +362,17 @@ void process_detach(thread_t *thread) {
 		assert(process->state != PROCESS_DEAD);
 		process->state = PROCESS_DEAD;
 
+		/* If the create info pointer is not NULL, a process_create()
+		 * call is waiting. Make it return with the process' exit code. */
+		if(process->create) {
+			process->create->status = process->status;
+			semaphore_up(&process->create->sem, 1);
+			process->create = NULL;
+		}
+
 		mutex_unlock(&process->lock);
 
+		/* Drop dead if a critical process terminates. */
 		if(process->flags & PROCESS_CRITICAL) {
 			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
 		}
@@ -422,8 +423,8 @@ process_t *process_lookup(process_id_t id) {
  *
  * @return		0 on success, negative error code on failure.
  */
-int process_create(const char **args, const char **env, int flags, int priority,
-                   process_t *parent, process_t **procp) {
+int process_create(const char *const args[], const char *const env[], int flags,
+                   int priority, process_t *parent, process_t **procp) {
 	process_create_info_t info;
 	process_t *process;
 	thread_t *thread;
@@ -433,11 +434,9 @@ int process_create(const char **args, const char **env, int flags, int priority,
 		return -ERR_PARAM_INVAL;
 	}
 
-	semaphore_init(&info.sem, "process_create_sem", 0);
 	info.path = args[0];
 	info.args = args;
 	info.env = env;
-	info.aspace = vm_aspace_create();
 
 	/* Map the binary into the new address space. */
 	if((ret = load_binary(&info)) != 0) {
@@ -455,6 +454,7 @@ int process_create(const char **args, const char **env, int flags, int priority,
 		process_destroy(process);
 		return ret;
 	}
+	process->create = &info;
 	thread_run(thread);
 
 	/* Wait for the thread to finish using the information structure. */
@@ -462,7 +462,7 @@ int process_create(const char **args, const char **env, int flags, int priority,
 	if(procp) {
 		*procp = process;
 	}
-	return 0;
+	return info.status;
 }
 
 /** Terminate the calling process.
@@ -548,23 +548,23 @@ void __init_text process_init(void) {
 /** Helper to free information copied from userspace.
  * @note		Does not free the address space.
  * @param info		Structure containing copied information. */
-static void process_create_info_free(process_create_info_t *info) {
+static void process_create_args_free(process_create_info_t *info) {
 	int i;
 
 	if(info->path) {
-		kfree((char *)info->path);
+		kfree((void *)info->path);
 	}
 	if(info->args) {
 		for(i = 0; info->args[i]; i++) {
-			kfree((char *)info->args[i]);
+			kfree((void *)info->args[i]);
 		}
-		kfree(info->args);
+		kfree((void *)info->args);
 	}
 	if(info->env) {
 		for(i = 0; info->env[i]; i++) {
-			kfree((char *)info->env[i]);
+			kfree((void *)info->env[i]);
 		}
-		kfree(info->env);
+		kfree((void *)info->env);
 	}
 	if(info->handles) {
 		kfree(info->handles);
@@ -579,7 +579,7 @@ static void process_create_info_free(process_create_info_t *info) {
  * @param count		Size of handle array.
  * @param info		Pointer to information structure to fill in.
  * @return		0 on success, negative error code on failure. */
-static int process_create_info_init(const char *path, const char *const args[],
+static int process_create_args_copy(const char *path, const char *const args[],
                                     const char *const env[], handle_t handles[][2],
                                     int count, process_create_info_t *info) {
 	size_t size;
@@ -593,24 +593,21 @@ static int process_create_info_init(const char *path, const char *const args[],
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, (char **)&info->path)) != 0) {
 		return ret;
 	} else if((ret = arrcpy_from_user(args, (char ***)&info->args)) != 0) {
-		process_create_info_free(info);
+		process_create_args_free(info);
 		return ret;
 	} else if((ret = arrcpy_from_user(env, (char ***)&info->env)) != 0) {
-		process_create_info_free(info);
+		process_create_args_free(info);
 		return ret;
 	} else if(count > 0) {
 		size = sizeof(handle_t) * 2 * count;
 		if(!(info->handles = kmalloc(size, 0))) {
-			process_create_info_free(info);
+			process_create_args_free(info);
 			return -ERR_NO_MEMORY;
 		} else if((ret = memcpy_from_user(info->handles, handles, size)) != 0) {
-			process_create_info_free(info);
+			process_create_args_free(info);
 			return ret;
 		}
 	}
-
-	semaphore_init(&info->sem, "process_create_sem", 0);
-	info->aspace = vm_aspace_create();
 	return 0;
 }
 
@@ -646,7 +643,7 @@ handle_t sys_process_create(const char *path, const char *const args[],
 	handle_t handle;
 	int ret;
 
-	if((ret = process_create_info_init(path, args, env, handles, count, &info)) != 0) {
+	if((ret = process_create_args_copy(path, args, env, handles, count, &info)) != 0) {
 		return ret;
 	}
 
@@ -661,6 +658,7 @@ handle_t sys_process_create(const char *path, const char *const args[],
 	                        &handle)) != 0) {
 		goto fail;
 	}
+	process->create = &info;
 
 	/* Create the entry thread to finish loading the program. */
 	if((ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread)) != 0) {
@@ -670,7 +668,11 @@ handle_t sys_process_create(const char *path, const char *const args[],
 
 	/* Wait for the thread to finish using the information structure. */
 	semaphore_down(&info.sem);
-	process_create_info_free(&info);
+	process->create = NULL;
+	process_create_args_free(&info);
+	if((ret = info.status) < 0) {
+		goto fail;
+	}
 	return handle;
 fail:
 	/* The handle_detach() call will destroy the process. */
@@ -679,7 +681,7 @@ fail:
 	} else {
 		vm_aspace_destroy(info.aspace);
 	}
-	process_create_info_free(&info);
+	process_create_args_free(&info);
 	return ret;
 }
 
@@ -720,7 +722,7 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 		return -ERR_NOT_IMPLEMENTED;
 	}
 
-	if((ret = process_create_info_init(path, args, env, handles, count, &info)) != 0) {
+	if((ret = process_create_args_copy(path, args, env, handles, count, &info)) != 0) {
 		return ret;
 	}
 
@@ -761,14 +763,14 @@ int sys_process_replace(const char *path, const char *const args[], const char *
 	 * exit this thread. */
 	thread_run(thread);
 	semaphore_down(&info.sem);
-	process_create_info_free(&info);
+	process_create_args_free(&info);
 	thread_exit();
 fail:
 	if(thread) {
 		thread_destroy(thread);
 	}
 	vm_aspace_destroy(info.aspace);
-	process_create_info_free(&info);
+	process_create_args_free(&info);
 	return ret;
 }
 
@@ -879,4 +881,15 @@ int sys_process_status(handle_t handle, int *statusp) {
  */
 void sys_process_exit(int status) {
 	process_exit(status);
+}
+
+/** Signal that the process has been loaded. */
+void sys_process_loaded(void) {
+	mutex_lock(&curr_proc->lock);
+	if(curr_proc->create) {
+		curr_proc->create->status = 0;
+		semaphore_up(&curr_proc->create->sem, 1);
+		curr_proc->create = NULL;
+	}
+	mutex_unlock(&curr_proc->lock);
 }

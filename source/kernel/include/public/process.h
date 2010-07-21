@@ -54,6 +54,7 @@ extern handle_t SYSCALL(process_open)(process_id_t id);
 extern process_id_t SYSCALL(process_id)(handle_t handle);
 extern int SYSCALL(process_status)(handle_t handle, int *statusp);
 extern void SYSCALL(process_exit)(int status) __attribute__((noreturn));
+extern void SYSCALL(process_loaded)(void);
 
 #ifdef __cplusplus
 }

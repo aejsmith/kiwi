@@ -166,8 +166,6 @@ int module_name(khandle_t *handle, char *namebuf) {
 
 	if(!handle || !namebuf) {
 		return -ERR_PARAM_INVAL;
-	} else if(!elf_module_check(handle)) {
-		return -ERR_TYPE_INVAL;
 	}
 
 	/* Create a module structure for the module. */
@@ -233,8 +231,6 @@ int module_load(khandle_t *handle, char *depbuf) {
 
 	if(!handle || !depbuf) {
 		return -ERR_PARAM_INVAL;
-	} else if(!elf_module_check(handle)) {
-		return -ERR_TYPE_INVAL;
 	}
 
 	/* Create a module structure for the module. */

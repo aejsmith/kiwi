@@ -21,4 +21,4 @@ int fs_file_write(handle_t, ptr_t, size_t, ptr_t) = 11;
 int _vm_map(ptr_t) = 32;
 int vm_unmap(ptr_t, size_t) = 33;
 void process_exit(int) = 40;
-int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t) = 43;
+int device_write(handle_t, ptr_t, size_t, offset_t, ptr_t) = 44;
