@@ -462,7 +462,7 @@ int process_create(const char *const args[], const char *const env[], int flags,
 	if(procp) {
 		*procp = process;
 	}
-	return info.status;
+	return (info.status < 0) ? info.status : 0;
 }
 
 /** Terminate the calling process.
