@@ -26,8 +26,6 @@
 
 using namespace kiwi;
 
-extern EventLoop *global_event_loop;
-
 /** Handle constructor.
  * @note		ARGH RAGE!!! When a base class constructor is run the
  *			object acts as though it's an instance of the base
@@ -52,8 +50,9 @@ void Handle::close() {
 	if(m_handle >= 0) {
 		/* Remove all events for this handle from the event loop and
 		 * run callbacks for the handle being closed. */
-		if(global_event_loop) {
-			global_event_loop->removeHandle(this);
+		EventLoop *loop = EventLoop::instance();
+		if(loop) {
+			loop->removeHandle(this);
 		}
 		onClose();
 
@@ -105,15 +104,17 @@ void Handle::registerEvents() {}
 /** Register an event with the current thread's event loop.
  * @param event		Event ID to register. */
 void Handle::registerEvent(int event) {
-	if(global_event_loop) {
-		global_event_loop->addEvent(this, event);
+	EventLoop *loop = EventLoop::instance();
+	if(loop) {
+		loop->addEvent(this, event);
 	}
 }
 
 /** Unregister an event with the current thread's event loop.
  * @param event		Event ID to unregister. */
 void Handle::unregisterEvent(int event) {
-	if(global_event_loop) {
-		global_event_loop->removeEvent(this, event);
+	EventLoop *loop = EventLoop::instance();
+	if(loop) {
+		loop->removeEvent(this, event);
 	}
 }

@@ -35,8 +35,6 @@ static void lkPrintMessage(FILE *stream, const char *prefix, const char *fmt,
                            va_list args, bool terminate) {
 	fprintf(stream, "*** libkiwi-%s: ", prefix);
 	vfprintf(stream, fmt, args);
-
-	/* FIXME: Would it be better to do this by throwing an exception? */
 	if(terminate) {
 		abort();
 	}

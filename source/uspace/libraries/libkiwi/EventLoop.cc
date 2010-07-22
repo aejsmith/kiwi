@@ -20,25 +20,34 @@
 
 #include <kernel/object.h>
 
-#include <kiwi/EventLoop.h>
 #include <kiwi/private/log.h>
+#include <kiwi/EventLoop.h>
+#include <kiwi/Exception.h>
 
-#include <exception>
+#include <cerrno>
+#include <cstring>
 
 using namespace kiwi;
 using namespace std;
 
-/* FIXME. */
-EventLoop *global_event_loop = 0;
+/** Pointer to the current thread's event loop.
+ * @todo		Move this to TLS. */
+static EventLoop *event_loop_instance = 0;
 
 /** EventLoop constructor. */
 EventLoop::EventLoop() {
-	if(global_event_loop) {
-		/* FIXME. */
-		throw std::exception();
+	if(instance()) {
+		throw Exception("Can only have 1 EventLoop per thread");
 	}
 
-	global_event_loop = this;
+	event_loop_instance = this;
+}
+
+/** Get the current thread's event loop.
+ * @return		Pointer to the current thread's event loop, or NULL if
+ *			the thread does not have an event loop. */
+EventLoop *EventLoop::instance() {
+	return event_loop_instance;
 }
 
 /** Add an event to the event loop.
@@ -98,7 +107,7 @@ void EventLoop::run(void) {
 		/* Wait for any of the events. */
 		int ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1);
 		if(ret < 0) {
-			lkWarning("EventLoop::run: Failed to wait for events (%d)\n", ret);
+			lkWarning("EventLoop::run: Failed to wait for events: %s\n", strerror(errno));
 			return;
 		}
 

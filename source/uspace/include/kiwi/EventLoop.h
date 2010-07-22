@@ -38,6 +38,8 @@ class EventLoop : public Object, internal::Noncopyable {
 public:
 	EventLoop();
 
+	static EventLoop *instance();
+
 	void addEvent(Handle *handle, int event);
 	void removeEvent(Handle *handle, int event);
 	void removeHandle(Handle *handle);

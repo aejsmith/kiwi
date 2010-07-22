@@ -26,7 +26,7 @@ namespace kiwi {
 #if CONFIG_DEBUG
 extern void lkDebug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 #else
-# define k_debug()	
+# define lkDebug()	
 #endif
 
 extern void lkWarning(const char *fmt, ...) __attribute__((format(printf, 1, 2)));

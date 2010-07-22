@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,25 +15,24 @@
 
 /**
  * @file
- * @brief		API object base class.
+ * @brief		Kiwi library exceptions.
  */
 
-#include <kiwi/EventLoop.h>
-#include <kiwi/Object.h>
+#include <kiwi/Exception.h>
+#include <cstring>
+#include <sstream>
 
 using namespace kiwi;
+using namespace std;
 
-/** Constructor for Object.
- * @note		Protected - Object cannot be instantiated directly. */
-Object::Object() {}
+/** Construct an Exception object. */
+Exception::Exception(const string &msg) : m_string(msg) {}
 
-/** Destructor for Object. */
-Object::~Object() {}
+/** Destroy an Exception object. */
+Exception::~Exception() throw() {}
 
-/** Schedule the object for deletion when control returns to the event loop. */
-void Object::deleteLater() {
-	EventLoop *loop = EventLoop::instance();
-	if(loop) {
-		loop->deleteObject(this);
-	}
+/** Return the string associated with the exception.
+ * @return		String associated with the exception. */
+const char *Exception::what() const throw() {
+	return m_string.c_str();
 }
