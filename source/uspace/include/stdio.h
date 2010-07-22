@@ -103,7 +103,7 @@ extern int getchar(void);
 /* int getchar_unlocked(void); */
 extern char *gets(char *s);
 /* int      pclose(FILE *); */
-//extern void perror(const char *s);
+extern void perror(const char *s);
 /* FILE    *popen(const char *, const char *); */
 extern int printf(const char *fmt, ...);
 extern int putc(int ch, FILE *stream);
@@ -135,7 +135,6 @@ extern int vsscanf(const char *buf, const char *fmt, va_list args);
 #ifdef __cplusplus
 extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);
-extern void perror(const char *s);
 extern int remove(const char *path);
 extern int rename(const char *source, const char *dest);
 extern void setbuf(FILE *, char *);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -22,6 +22,7 @@
 #include <kernel/errors.h>
 #include <kernel/fs.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,8 +32,8 @@
 /** Internal part of fopen() and freopen() for files.
  * @param path		Path to open.
  * @param mode		Mode string.
- * @return		Handle on success, negative error code on failure. */
-static int fopen_file_internal(const char *path, const char *mode) {
+ * @return		Handle on success, -1 on failure. */
+static handle_t fopen_file_internal(const char *path, const char *mode) {
 	int flags;
 
 	if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
@@ -51,7 +52,8 @@ static int fopen_file_internal(const char *path, const char *mode) {
 	} else if(strcmp(mode, "a+") == 0 || strcmp(mode, "a+b") == 0 || strcmp(mode, "ab+") == 0) {
 		flags = FS_FILE_READ | FS_FILE_WRITE | FS_FILE_APPEND;
 	} else {
-		return -ERR_PARAM_INVAL;
+		errno = ERR_PARAM_INVAL;
+		return -1;
 	}
 
 	return fs_file_open(path, flags);
@@ -132,6 +134,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream) {
 	if((handle = fopen_file_internal(path, mode)) < 0) {
 		return NULL;
 	} else if(fclose_internal(stream) != 0) {
+		handle_close(handle);
 		return NULL;
 	}
 
@@ -154,6 +157,7 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 	/* Check if the handle can be used. */
 	type = object_type(handle);
 	if(type != OBJECT_TYPE_FILE && type != OBJECT_TYPE_DEVICE) {
+		errno = ERR_NOT_SUPPORTED;
 		return NULL;
 	}
 
@@ -161,7 +165,7 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 		return NULL;
 	}
 
-	stream->type = (type == OBJECT_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : OBJECT_TYPE_FILE;
+	stream->type = (type == OBJECT_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : STREAM_TYPE_FILE;
 	stream->handle = handle;
 	stream->err = false;
 	stream->eof = false;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -25,15 +25,13 @@
 
 /** Internal part of fclose(), does not free structure.
  * @param stream	Stream to close.
- * @return		0 on success, negative error code on failure. */
+ * @return		0 on success, EOF on failure. */
 int fclose_internal(FILE *stream) {
-	int ret;
-
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
 	case STREAM_TYPE_DEVICE:
-		if((ret = handle_close(stream->handle)) != 0) {
-			return ret;
+		if(handle_close(stream->handle) != 0) {
+			return EOF;
 		}
 		break;
 	}
@@ -42,18 +40,12 @@ int fclose_internal(FILE *stream) {
 }
 
 /** Close a file stream.
- *
- * Closes an open file stream.
- *
  * @param stream	File stream to close.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, EOF on failure. */
 int fclose(FILE *stream) {
-	int ret;
-
-	if((ret = fclose_internal(stream)) == 0) {
-		free(stream);
+	if(fclose_internal(stream) != 0) {
+		return EOF;
 	}
-	return ret;
+	free(stream);
+	return 0;
 }

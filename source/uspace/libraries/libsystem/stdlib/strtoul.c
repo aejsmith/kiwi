@@ -19,10 +19,12 @@
  */
 
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 
 /** Macro to implement strtoul() and strtoull(). */
-#define __strtoux(type, cp, endp, base)		\
+#define __strtoux(type, max, cp, endp, base) \
 	__extension__ \
 	({ \
 		type result = 0, value; \
@@ -37,10 +39,17 @@
 			} else { \
 				base = 10; \
 			} \
+		} else if(base == 8) { \
+			if(cp[0] == '0') { \
+				cp++; \
+			} \
 		} else if(base == 16) { \
 			if(cp[0] == '0' && tolower(cp[1]) == 'x') { \
 				cp += 2; \
 			} \
+		} else if(base != 10) { \
+			errno = ERR_PARAM_INVAL; \
+			return max; \
 		} \
 		while(isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : tolower(*cp) - 'a' + 10) < (unsigned int)base) { \
 			result = result * (unsigned int)base + value; \
@@ -63,7 +72,7 @@
  * @return		Converted value.
  */
 unsigned long strtoul(const char *cp, char **endp, int base) {
-	return __strtoux(unsigned long, cp, endp, base);
+	return __strtoux(unsigned long, ULONG_MAX, cp, endp, base);
 }
 
 /** Convert a string to a signed long.
@@ -94,7 +103,7 @@ long strtol(const char *cp, char **endp, int base) {
  * @return		Converted value.
  */
 unsigned long long int strtoull(const char *cp, char **endp, int base) {
-	return __strtoux(unsigned long long int, cp, endp, base);
+	return __strtoux(unsigned long long int, ULLONG_MAX, cp, endp, base);
 }
 
 /** Convert a string to an signed long long.

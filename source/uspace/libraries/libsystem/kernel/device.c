@@ -30,8 +30,7 @@
  *			operation expects an output buffer.
  * @param outsz		Size of output buffer.
  * @param bytesp	Where to store size of data stored in output buffer.
- * @return		Positive value on success, negative error code on
- *			failure. */
+ * @return		Positive value on success, -1 on failure. */
 int device_request(handle_t handle, int request, void *in, size_t insz, void *out, size_t outsz, size_t *bytesp) {
 	device_request_args_t args = {
 		.handle = handle,

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,6 +18,7 @@
  * @brief		Environment variable functions.
  */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -26,9 +27,37 @@
 
 #include "../libsystem.h"
 
+/** Pointer to the environment variable array. */
 char **environ;
 
-static bool __environ_alloced = false;
+/** Whether the environment array has been allocated. */
+static bool __libsystem_environ_alloced = false;
+
+/** Reallocate the contents of the environment if necessary.
+ * @return		Whether succesful. */
+static bool ensure_environ_alloced(void) {
+	size_t count;
+	char **new;
+
+	/* If not previously allocated, the environment is still on the stack
+	 * so we cannot modify it. Duplicate it and point environ to the
+	 * new location. */
+	if(!__libsystem_environ_alloced) {
+		/* Get a count of what to copy. */
+		for(count = 0; environ[count] != NULL; count++);
+
+		new = malloc((count + 1) * sizeof(char *));
+		if(new == NULL) {
+			return false;
+		}
+
+		memcpy(new, environ, (count + 1) * sizeof(char *));
+		environ = new;
+		__libsystem_environ_alloced = true;
+	}
+
+	return true;
+}
 
 /** Get the value of an environment variable.
  *
@@ -74,35 +103,24 @@ char *getenv(const char *name) {
  *
  * @param str		String to add.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		0 on success, -1 on failure.
  */
 int putenv(char *str) {
 	size_t count, len, tmp, i;
 	char **new;
 
-	if(strchr(str, '=') == NULL) {
-		//errno = EINVAL;
+	if(!str || strchr(str, '=') == NULL) {
+		errno = ERR_PARAM_INVAL;
+		return -1;
+	} else if((len = strchr(str, '=') - str) == 0) {
+		errno = ERR_PARAM_INVAL;
 		return -1;
 	}
 
-	/* If not previously allocated, the environment is still on the stack
-	 * so we cannot modify it. Duplicate it and point environ to the
-	 * new location. */
-	if(!__environ_alloced) {
-		/* Get a count of what to copy. */
-		for(count = 0; environ[count] != NULL; count++);
-
-		new = malloc((count + 1) * sizeof(char *));
-		if(new == NULL) {
-			return -1;
-		}
-
-		memcpy(new, environ, (count + 1) * sizeof(char *));
-		environ = new;
-		__environ_alloced = true;
+	/* Ensure the environment array can be modified. */
+	if(!ensure_environ_alloced()) {
+		return -1;
 	}
-
-	len = strchr(str, '=') - str;
 
 	/* Check for an existing entry with the same name. */
 	for(i = 0; environ[i] != NULL; i++) {
@@ -127,7 +145,6 @@ int putenv(char *str) {
 	/* Set new entry. */
 	environ[count] = str;
 	environ[count + 1] = NULL;
-
 	return 0;
 }
 
@@ -146,26 +163,14 @@ int setenv(const char *name, const char *value, int overwrite) {
 	char **new, *exist, *val;
 	size_t count, len;
 
-	if(strchr(name, '=') != NULL) {
-		//errno = EINVAL;
+	if(!name || name[0] == 0 || strchr(name, '=') != NULL) {
+		errno = ERR_PARAM_INVAL;
 		return -1;
 	}
 
-	/* If not previously allocated, the environment is still on the stack
-	 * so we cannot modify it. Duplicate it and point environ to the
-	 * new location. */
-	if(!__environ_alloced) {
-		/* Get a count of what to copy. */
-		for(count = 0; environ[count] != NULL; count++);
-
-		new = malloc((count + 1) * sizeof(char *));
-		if(new == NULL) {
-			return -1;
-		}
-
-		memcpy(new, environ, (count + 1) * sizeof(char *));
-		environ = new;
-		__environ_alloced = true;
+	/* Ensure the environment array can be modified. */
+	if(!ensure_environ_alloced()) {
+		return -1;
 	}
 
 	/* Work out total length. */
@@ -222,6 +227,5 @@ int setenv(const char *name, const char *value, int overwrite) {
 	/* Set new entry. */
 	environ[count] = val;
 	environ[count + 1] = NULL;
-
 	return 0;
 }

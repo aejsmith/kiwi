@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -22,14 +22,9 @@
 
 #include "stdio_priv.h"
 
-/** Flush file stream buffer.
- *
- * Flushes a file stream's buffer.
- *
+/** Flush a file stream's buffer.
  * @param stream	File stream to flush.
- *
- * @return		0 on success, negative error code on failure.
- */
+ * @return		0 on success, EOF on failure. */
 int fflush(FILE *stream) {
 	/* TODO */
 	return 0;

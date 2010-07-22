@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,18 +15,26 @@
 
 /**
  * @file
- * @brief		Error string function.
+ * @brief		Print error function.
  */
 
+#include <errno.h>
+#include <stdio.h>
 #include <string.h>
-#include "../libsystem.h"
 
-/** Get string representation of an error number.
- * @param err		Error number.
- * @return		Pointer to string (should NOT be modified). */
-char *strerror(int err) {
-	if((size_t)err >= __libsystem_error_size || __libsystem_error_list[err] == NULL) {
-		return (char *)"Unknown error";
+/** Print an error message.
+ *
+ * Prints the given error message followed by the string returned from
+ * strerror() for the current errno value and a newline character to stderr. If
+ * the message given is NULL, then only the string given by strerror() is
+ * printed.
+ *
+ * @param s             Error message to print.
+ */
+void perror(const char *s) {
+	if(s != NULL && s[0]) {
+		fprintf(stderr, "%s: %s\n", s, strerror(errno));
+	} else {
+		fprintf(stderr, "%s\n", strerror(errno));
 	}
-	return (char *)__libsystem_error_list[err];
 }

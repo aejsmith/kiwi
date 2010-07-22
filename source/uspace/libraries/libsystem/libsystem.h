@@ -28,6 +28,8 @@
 #include <stddef.h>
 
 extern char **environ;
+extern const char *__libsystem_error_list[];
+extern size_t __libsystem_error_size;
 
 extern void __libsystem_init(process_args_t *args);
 extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));

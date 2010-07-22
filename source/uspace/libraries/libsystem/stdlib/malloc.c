@@ -1,5 +1,6 @@
 #include <kernel/vm.h>
 
+#include <errno.h>
 #include <stddef.h>
 
 #include "../libsystem.h"
@@ -8,7 +9,6 @@
 #define LACKS_SYS_MMAN_H
 #define LACKS_SYS_TYPES_H
 #define LACKS_FCNTL_H
-#define LACKS_ERRNO_H
 #define LACKS_UNISTD_H
 #define LACKS_STDLIB_H
 
@@ -23,7 +23,7 @@
 #define USAGE_ERROR_ACTION(m, p)	\
 	__libsystem_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
                           __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
-#define MALLOC_FAILURE_ACTION
+#define MALLOC_FAILURE_ACTION		errno = ERR_NO_MEMORY;
 #define malloc_getpagesize		((size_t)0x1000)
 
 /** Temporary. */

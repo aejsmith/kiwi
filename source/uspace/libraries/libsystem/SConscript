@@ -51,6 +51,7 @@ sources = map(File, [
 	'stdio/fseek.c',
 	'stdio/fstatus.c',
 	'stdio/fwrite.c',
+	'stdio/perror.c',
 	'stdio/vfprintf.c',
 	'stdio/vfscanf.c',
 	'stdio/vsnprintf.c',
@@ -96,6 +97,7 @@ sources = map(File, [
 	'time/strftime.c',
 
 	'errno.c',
+	'error_list.c',
 	'fatal.c',
 	'init.c',
 	'rtld.c',
@@ -103,6 +105,13 @@ sources = map(File, [
 
 # Generate the system call functions.
 env.Sysgen('kernel/syscalls.S', 'kernel/syscalls.def')
+
+# Generate the error string list.
+env.Command(
+	'error_list.c',
+	['../../include/kernel/errors.h'],
+	Action('$GENERRLIST $SOURCE __libsystem_error_list __libsystem_error_size > $TARGET', '$GENCOMSTR')
+)
 
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])

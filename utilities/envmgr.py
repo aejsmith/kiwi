@@ -91,6 +91,7 @@ class EnvironmentManager(dict):
 
 		# Set paths to build utilities.
 		self.base['GENSYMTAB'] = os.path.join(os.getcwd(), 'utilities', 'gensymtab.py')
+		self.base['GENERRLIST'] = os.path.join(os.getcwd(), 'utilities', 'generrlist.py')
 		self.base['BIN2HEX'] = os.path.join(os.getcwd(), 'utilities', 'bin2hex.py')
 
 		# Set shared library compilation flags.

@@ -16,6 +16,12 @@
 /**
  * @file
  * @brief		Error number definitions.
+ *
+ * @note		All definitions in this file should be followed by a
+ *			Doxygen comment on the same line containing the string
+ *			version of the error, and errors should either be
+ *			defined to a positive integer or to another error code
+ *			name. This is what is expected by generrlist.
  */
 
 #ifndef __KERNEL_ERRORS_H
