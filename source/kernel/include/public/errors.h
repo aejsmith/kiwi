@@ -59,4 +59,7 @@
 #define ERR_ILLEGAL_SEQUENCE	29	/**< Illegal character sequence. */
 #define ERR_OUTSIDE_DOMAIN	30	/**< Outside domain of function. */
 
+/** Highest possible kernel error number. */
+#define KERNEL_ERROR_END	0xfff
+
 #endif /* __KERNEL_ERRORS_H */
