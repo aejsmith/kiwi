@@ -78,8 +78,8 @@ if config.configured() and not 'config' in COMMAND_LINE_TARGETS:
 	else:
 		Export('config', 'envmgr')
 		env = envmgr['host']
-		SConscript('utilities/SConscript', build_dir=os.path.join('build', 'host'), exports=['env'])
-		SConscript('SConscript', build_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
+		SConscript('utilities/SConscript', variant_dir=os.path.join('build', 'host'), exports=['env'])
+		SConscript('SConscript', variant_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
 else:
 	# Configuration does not exist. All we can do is configure.
 	RequireTarget('config', "Build configuration doesn't exist. Please create using 'config' target.")
