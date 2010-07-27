@@ -68,4 +68,5 @@ static_obj, shared_obj = createObjBuilders(env)
 shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
 
 # Visit subdirectories.
-SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
+#SConscript(dirs=['libraries', 'binaries', 'services'], exports=['env'])
+SConscript(dirs=['libraries'], exports=['env'])
