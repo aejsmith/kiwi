@@ -59,9 +59,6 @@ def program_emitter(target, source, env):
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 
-# Set the path to the system call include file.
-env['SYSINC'] = File('libraries/libsystem/kernel/syscalls.inc')
-
 # Add an action for ASM files in a shared library.
 from SCons.Tool import createObjBuilders
 static_obj, shared_obj = createObjBuilders(env)

@@ -43,6 +43,7 @@
 #include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <time.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -100,6 +101,9 @@ static void thread_trampoline(void) {
 
 	dprintf("thread: entered thread %" PRId32 "(%s) on CPU %" PRIu32 "\n",
 		curr_thread->id, curr_thread->name, curr_cpu->id);
+
+	/* Set the last time to now so that accounting information is correct. */
+	curr_thread->last_time = time_since_boot();
 
 	/* Run the thread's main function and then exit when it returns. */
 	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
@@ -301,8 +305,26 @@ void thread_rename(thread_t *thread, const char *name) {
 	spinlock_unlock(&thread->lock);
 }
 
+/** Perform tasks necessary when a thread is entering the kernel. */
+void thread_at_kernel_entry(void) {
+	useconds_t now;
+
+	/* Update accounting information. */
+	now = time_since_boot();
+	curr_thread->user_time += now - curr_thread->last_time;
+	curr_thread->last_time = now;
+}
+
 /** Perform tasks necessary when a thread is returning to userspace. */
 void thread_at_kernel_exit(void) {
+	useconds_t now;
+
+	/* Update accounting information. */
+	now = time_since_boot();
+	curr_thread->kernel_time += now - curr_thread->last_time;
+	curr_thread->last_time = now;
+
+	/* Terminate the thread if killed. */
 	if(curr_thread->killed) {
 		thread_exit();
 	}
@@ -404,6 +426,9 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 	thread->waitq = NULL;
 	thread->interruptible = false;
 	thread->timed_out = false;
+	thread->last_time = 0;
+	thread->kernel_time = 0;
+	thread->user_time = 0;
 	thread->in_usermem = false;
 	thread->state = THREAD_CREATED;
 	thread->entry = entry;

@@ -21,7 +21,6 @@
 #include <arch/io.h>
 #include <arch/lapic.h>
 #include <arch/page.h>
-#include <arch/syscall.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -31,6 +30,7 @@
 #include <init.h>
 #include <time.h>
 
+extern void syscall_arch_init(void);
 extern void arch_reboot(void);
 
 /** x86-specific early initialisation.

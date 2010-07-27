@@ -23,12 +23,11 @@
 
 #include "sysgen.h"
 
-/** C++ code generator class. */
+/** IA32 target class. */
 class IA32Target : public Target {
 public:
 	void addTypes(TypeMap &map);
-	size_t maxParameters();
-	void generate(std::ostream &stream, const SyscallList &calls, bool use_errno);
+	void generate(std::ostream &stream, const SyscallList &calls);
 };
 
 #endif /* __IA32TARGET_H */

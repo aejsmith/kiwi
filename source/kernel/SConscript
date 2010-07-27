@@ -71,7 +71,7 @@ sources = map(File, [
 	'module.c',
 	'object.c',
 	'symbol.c',
-	'syscall.c',
+	'syscall_table.c',
 	'time.c',
 	'version.c',
 	'vmem.c',
@@ -137,6 +137,9 @@ env.Command('console/logo.c', ['console/logo.ppm'],
             Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
 env.Command('console/copyright.c', ['console/copyright.ppm'],
             Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
+
+# Generate the system call table.
+env.SyscallTable('syscall_table.c', 'syscalls.def', TABLE='syscall_table')
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])

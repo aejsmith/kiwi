@@ -20,12 +20,12 @@
 
 #include <arch/cpu.h>
 #include <arch/descriptor.h>
-#include <arch/syscall.h>
 
 #include <cpu/cpu.h>
 
 #include <console.h>
 
+extern void syscall_arch_init(void);
 extern void syscall_entry(void);
 
 /** Set up SYSCALL/SYSRET support for AMD64. */

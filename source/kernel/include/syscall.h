@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -23,18 +23,10 @@
 
 #include <types.h>
 
-struct syscall_frame;
-
-/** Function type for a system call handler. */
-typedef unative_t (*syscall_handler_t)(unative_t, unative_t, unative_t, unative_t, unative_t, unative_t);
-
-/** System call service definition structure. */
-typedef struct syscall_service {
-	syscall_handler_t *table;	/**< Handler table. */
-	size_t size;			/**< Size of handler array. */
-} syscall_service_t;
-
-extern unative_t syscall_handler(struct syscall_frame *frame);
-extern int syscall_service_register(uint16_t num, syscall_service_t *service);
+/** Structure describing a system call handler. */
+typedef struct syscall {
+	ptr_t addr;			/**< Address of handler. */
+	size_t count;			/**< Number of arguments. */
+} __packed syscall_t;
 
 #endif /* __SYSCALL_H */

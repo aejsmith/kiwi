@@ -31,8 +31,8 @@ static void yyerror(const char *msg);
 	parameter_t *param;
 }
 
-%token TOK_SERVICE
 %token TOK_TYPE
+%token TOK_SYSCALL
 
 %token <str> TOK_IDENTIFIER;
 %token <num> TOK_NUMBER;
@@ -49,14 +49,8 @@ input
 	;
 
 statement
-	: service_stmt ';'
-	| type_stmt ';'
+	: type_stmt ';'
 	| syscall_stmt ';'
-	;
-
-service_stmt
-	: TOK_SERVICE TOK_NUMBER
-		{ set_service_number($2); }
 	;
 
 type_stmt
@@ -65,14 +59,14 @@ type_stmt
 	;
 
 syscall_stmt
-	: TOK_IDENTIFIER TOK_IDENTIFIER '(' parameter_list ')' '=' TOK_NUMBER
-		{ add_syscall($1, $2, $4, $7); }
-	| TOK_IDENTIFIER TOK_IDENTIFIER '(' ')' '=' TOK_NUMBER
-		{ add_syscall($1, $2, NULL, $6); }
-	| TOK_IDENTIFIER TOK_IDENTIFIER '(' parameter_list ')'
-		{ add_syscall($1, $2, $4, -1); }
-	| TOK_IDENTIFIER TOK_IDENTIFIER '(' ')'
-		{ add_syscall($1, $2, NULL, -1); }
+	: TOK_SYSCALL TOK_IDENTIFIER '(' parameter_list ')' '=' TOK_NUMBER
+		{ add_syscall($2, $4, $7); }
+	| TOK_SYSCALL TOK_IDENTIFIER '(' ')' '=' TOK_NUMBER
+		{ add_syscall($2, NULL, $6); }
+	| TOK_SYSCALL TOK_IDENTIFIER '(' parameter_list ')'
+		{ add_syscall($2, $4, -1); }
+	| TOK_SYSCALL TOK_IDENTIFIER '(' ')'
+		{ add_syscall($2, NULL, -1); }
 	;
 
 parameter_list

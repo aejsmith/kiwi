@@ -78,6 +78,11 @@ typedef struct thread {
 	bool timed_out;			/**< Whether the sleep timed out. */
 	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
 
+	/** Accounting information. */
+	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */
+	useconds_t kernel_time;		/**< Total time the thread has spent in the kernel. */
+	useconds_t user_time;		/**< Total time the thread has spent in user mode. */
+
 	/** State of the thread. */
 	enum {
 		THREAD_CREATED,		/**< Thread is newly created. */
@@ -120,7 +125,7 @@ extern void thread_unwire(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
-
+extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);
 extern void thread_exit(void) __noreturn;
 

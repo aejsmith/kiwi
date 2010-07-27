@@ -195,6 +195,11 @@ void intr_handler(intr_frame_t *frame) {
 	unative_t num = frame->int_no;
 	bool schedule;
 
+	/* Do entry stuff if coming from user mode. */
+	if(frame->cs & 3) {
+		thread_at_kernel_entry();
+	}
+
 	if(unlikely(atomic_get(&kdbg_running) == 2)) {
 		kdbg_except_handler(num, (num < 32) ? fault_names[num] : "Unknown", frame);
 		return;

@@ -27,10 +27,14 @@ envmgr.base['SYSGENFLAGS'] = []
 
 # Add builders to generate system call code.
 def sysgen_emitter(target, source, env):
-	source.insert(0, env['SYSINC'])
 	env.Depends(target[0], env['SYSGEN'])
 	return target, source
-envmgr.base['BUILDERS']['Sysgen'] = Builder(
+envmgr.base['BUILDERS']['SyscallTable'] = Builder(
+	action=Action('$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']), '$GENCOMSTR'),
+	emitter=sysgen_emitter
+)
+envmgr.base['BUILDERS']['Syscalls'] = Builder(
 	action=Action('$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']), '$GENCOMSTR'),
+	suffix='.S',
 	emitter=sysgen_emitter
 )

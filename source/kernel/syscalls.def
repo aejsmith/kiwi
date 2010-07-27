@@ -11,7 +11,6 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-# Kernel type definitions.
 type handle_t int32_t;
 type process_id_t int32_t;
 type thread_id_t int32_t;
@@ -23,3 +22,14 @@ type node_id_t uint64_t;
 type useconds_t int64_t;
 type offset_t uint64_t;
 type rel_offset_t int64_t;
+
+syscall test_call3(int, int, int);
+syscall test_call0();
+syscall test_call6(int, int, int, int, int, int);
+syscall test_call1(int);
+syscall test_call4(int, int, int, int);
+syscall test_call2(int, int);
+syscall test_call5(int, int, int, int, int);
+syscall test_call7(int, int, int, int, int, int, int);
+syscall test_call9(int, int, int, int, int, int, int, int, int);
+syscall test_call8(int, int, int, int, int, int, int, int);

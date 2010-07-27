@@ -33,41 +33,38 @@
 
 /** Structure representing a type. */
 struct Type {
-	Type(size_t w, size_t c, bool s) : width(w), count(c), is_signed(s) {}
-
-	size_t width;			/**< Width of the type in bits. */
+	Type(size_t c = 0) : count(c) {}
 	size_t count;			/**< Number of parameters this type takes. */
-	bool is_signed;			/**< Whether the type is signed. */
 };
 
 /** Type of the type map. */
-typedef std::map<std::string, Type *> TypeMap;
+typedef std::map<std::string, Type> TypeMap;
 
 /** Class representing a system call. */
 class Syscall {
 public:
-	Syscall(const char *name, Type *ret, uint16_t service, uint16_t id);
-	bool addParameter(Type *type);
+	Syscall(const char *name, unsigned long id) : m_name(name), m_id(id) {}
+
+	/** Add a parameter to the call.
+	 * @param type		Type of the call. */
+	void addParameter(Type type) {
+		m_param_count += type.count;
+	}
 
 	/** Get the name of the call.
 	 * @return		Reference to call name. */
 	const std::string &getName() const { return m_name; }
 
-	/** Get the return value type of the call.
-	 * @return		Return value type of the call. */
-	Type *getReturnType() const { return m_return_type; }
-
 	/** Get the ID of the call.
 	 * @return		ID of the function. */
-	uint32_t getID() const { return m_id; }
+	unsigned long getID() const { return m_id; }
 
 	/** Get the parameter count.
 	 * @return		Number of parameters. */
 	size_t getParameterCount() const { return m_param_count; }
 private:
 	std::string m_name;		/**< Name of the call. */
-	Type *m_return_type;		/**< Return value type. */
-	uint32_t m_id;			/**< ID of the call. */
+	unsigned long m_id;		/**< ID of the call. */
 	size_t m_param_count;		/**< Number of parameters. */
 };
 
@@ -77,9 +74,14 @@ typedef std::list<Syscall *> SyscallList;
 /** Base class for a code generation target. */
 class Target {
 public:
+	/** Add the target's basic types to the type map.
+	 * @param map		Map to add to. */
 	virtual void addTypes(TypeMap &map) = 0;
-	virtual size_t maxParameters() = 0;
-	virtual void generate(std::ostream &stream, const SyscallList &calls, bool use_errno) = 0;
+
+	/** Generate system call functions.
+	 * @param stream	Stream to write to.
+	 * @param calls		List of calls to generate. */
+	virtual void generate(std::ostream &stream, const SyscallList &calls) = 0;
 };
 
 extern "C" {
@@ -96,10 +98,8 @@ extern const char *current_file;
 extern size_t current_line;
 
 extern parameter_t *new_parameter(const char *type, parameter_t *next);
-
-extern void set_service_number(unsigned long num);
 extern void add_type(const char *name, const char *target);
-extern void add_syscall(const char *type, const char *name, parameter_t *params, int num);
+extern void add_syscall(const char *name, parameter_t *params, long num);
 
 extern int yylex(void);
 extern int yyparse(void);

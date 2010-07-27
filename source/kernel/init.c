@@ -77,6 +77,58 @@ static SPINLOCK_DECLARE(smp_boot_spinlock);
 /** List of modules from the bootloader. */
 static LIST_DECLARE(boot_module_list);
 
+extern error_t sys_test_call0();
+extern error_t sys_test_call1(int arg1);
+extern error_t sys_test_call2(int arg1, int arg2);
+extern error_t sys_test_call3(int arg1, int arg2, int arg3);
+extern error_t sys_test_call4(int arg1, int arg2, int arg3, int arg4);
+extern error_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5);
+extern error_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);
+extern error_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7);
+extern error_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8);
+extern error_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9);
+
+error_t sys_test_call0() {
+	kprintf(LOG_NORMAL, "sys_test_call0()\n");
+	return 5;
+}
+error_t sys_test_call1(int arg1) {
+	kprintf(LOG_NORMAL, "sys_test_call1(%d)\n", arg1);
+	return 6;
+}
+error_t sys_test_call2(int arg1, int arg2) {
+	kprintf(LOG_NORMAL, "sys_test_call2(%d, %d)\n", arg1, arg2);
+	return 7;
+}
+error_t sys_test_call3(int arg1, int arg2, int arg3) {
+	kprintf(LOG_NORMAL, "sys_test_call3(%d, %d, %d)\n", arg1, arg2, arg3);
+	return 8;
+}
+error_t sys_test_call4(int arg1, int arg2, int arg3, int arg4) {
+	kprintf(LOG_NORMAL, "sys_test_call4(%d, %d, %d, %d)\n", arg1, arg2, arg3, arg4);
+	return 9;
+}
+error_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5) {
+	kprintf(LOG_NORMAL, "sys_test_call5(%d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5);
+	return 10;
+}
+error_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6) {
+	kprintf(LOG_NORMAL, "sys_test_call6(%d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6);
+	return 11;
+}
+error_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7) {
+	kprintf(LOG_NORMAL, "sys_test_call7(%d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+	return 12;
+}
+error_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8) {
+	kprintf(LOG_NORMAL, "sys_test_call8(%d, %d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+	return 13;
+}
+error_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9) {
+	kprintf(LOG_NORMAL, "sys_test_call9(%d, %d, %d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+	return 14;
+}
+
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
 static void __init_text boot_module_remove(boot_module_t *mod) {

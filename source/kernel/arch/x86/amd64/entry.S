@@ -23,6 +23,8 @@
 #include <arch/descriptor.h>
 #include <arch/stack.h>
 
+#include <errors.h>
+
 /** Push registers onto the stack. */
 .macro PUSH_REGS
 	push	%rax
@@ -185,55 +187,53 @@ FUNCTION_START(syscall_entry)
 	push	%rcx
 	push	%r11
 
-	/* Push the callee-save registers. We must push callee-save registers
-	 * despite the fact that they are not modified by this function, as it
-	 * must be possible to duplicate a thread using a system call frame. */
-	push	%r12
-	push	%r13
-	push	%r14
-	push	%r15
-	push	%rbx
-	push	%rbp
-
-	/* Push arguments. R10 is used over RCX for the fourth argument, as
-	 * RCX is used by SYSCALL to store the return address. */
+	/* Save the arguments while we do kernel entry work and get the system
+	 * call details. */
 	push	%r9
 	push	%r8
 	push	%r10
 	push	%rdx
 	push	%rsi
 	push	%rdi
-
-	/* Push system call ID. */
 	push	%rax
 
-	/* Store a pointer to the system call frame as the first argument
-	 * and call the system call dispatcher. Interrupts are enabled across
-	 * the call as it is not necessary to have them disabled. */
-	sti
-	movq	%rsp, %rdi
-	call	syscall_handler
-	cli
+	/* Perform kernel entry work. */
+	call	thread_at_kernel_entry
 
+	/* Get back the call number and check whether it is valid. */
+	pop	%rax
+	cmp	syscall_table_size, %rax
+	jae	.Linval
+
+	/* Check the argument count. If there are more than 6 arguments, we
+	 * must copy from the stack. */
+	shl	$4, %rax
+	movq	syscall_table + 8(,%rax,1), %rdx
+	cmpq	$6, %rdx
+	ja	.Lstackargs
+
+	/* Restore arguments and perform the call. */
+	pop	%rdi
+	pop	%rsi
+	pop	%rdx
+	pop	%rcx
+	pop	%r8
+	pop	%r9
+	call	*syscall_table(,%rax,1)
+.Lreturn:
 	/* Perform kernel exit work. Preserve the system call's return value. */
 	push	%rax
 	call	thread_at_kernel_exit
 	pop	%rax
 
-	/* Restore saved state. Restore arguments as we do not want to leak
-	 * values stored by the kernel back to userspace. */
-	addq	$8, %rsp
-	pop	%rdi
-	pop	%rsi
-	pop	%rdx
-	pop	%r10
-	pop	%r8
-	pop	%r9
-
-	/* Do not need to restore callee-save registers as they are preserved
-	 * across the call to syscall_handler() - see comment above about why
-	 * they are saved in the first place. */
-	addq	$48, %rsp
+	/* Clear all non-callee-save registers as we do not want to leak values
+	 * used in the kernel to userspace.  */
+	xorq	%rdi, %rdi
+	xorq	%rsi, %rsi
+	xorq	%rdx, %rdx
+	xorq	%r10, %r10
+	xorq	%r8, %r8
+	xorq	%r9, %r9
 
 	/* Restore RFLAGS and RIP for SYSRET to use, as well as the stack
 	 * pointer. */
@@ -243,6 +243,49 @@ FUNCTION_START(syscall_entry)
 
 	/* Return to user-mode. */
 	sysretq
+.Lstackargs:
+	/* Work out how many bytes to copy, save the call table offset and
+	 * current stack pointer, then work out where to copy to. */
+	sub	$6, %rdx
+	shl	$3, %rdx
+	push	%rax
+	push	%rbx
+	movq	%rsp, %rbx
+	sub	%rdx, %rsp
+
+	/* Copy the arguments. The source is the userspace stack pointer + 8. */
+	movq	%rsp, %rdi
+	movq	80(%rbx), %rsi
+	add	$8, %rsi
+	call	memcpy_from_user
+	cmp	$0, %eax
+	jne	.Lcpyfail
+
+	/* Restore the arguments passed in registers and perform the call. */
+	movq	16(%rbx), %rdi
+	movq	24(%rbx), %rsi
+	movq	32(%rbx), %rdx
+	movq	40(%rbx), %rcx
+	movq	48(%rbx), %r8
+	movq	56(%rbx), %r9
+	movq	8(%rbx), %rax
+	call	*syscall_table(,%rax,1)
+
+	/* Restore stack pointer and old value of RBX then return. */
+	movq	%rbx, %rsp
+	pop	%rbx
+	add	$56, %rsp
+	jmp	.Lreturn
+.Lcpyfail:
+	movq	$ERR_ADDR_INVAL, %rax
+	movq	%rbx, %rsp
+	pop	%rbx
+	add	$56, %rsp
+	jmp	.Lreturn
+.Linval:
+	movq	$ERR_SYSCALL_INVAL, %rax
+	add	$48, %rsp
+	jmp	.Lreturn
 FUNCTION_END(syscall_entry)
 
 /** Userspace entry function. */
