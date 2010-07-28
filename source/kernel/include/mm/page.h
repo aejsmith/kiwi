@@ -22,10 +22,12 @@
 #define __MM_PAGE_H
 
 #include <arch/page.h>
+
 #include <lib/list.h>
 #include <lib/refcount.h>
 
 #include <mm/flags.h>
+
 #include <sync/spinlock.h>
 
 struct kernel_args;
@@ -74,12 +76,12 @@ extern page_map_t kernel_page_map;
 
 extern void page_map_lock(page_map_t *map);
 extern void page_map_unlock(page_map_t *map);
-extern int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
-                           bool exec, int mmflag);
+extern status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
+                                bool exec, int mmflag);
 extern bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp);
 extern bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp);
 extern void page_map_switch(page_map_t *map);
-extern int page_map_init(page_map_t *map, int mmflag);
+extern status_t page_map_init(page_map_t *map, int mmflag);
 extern void page_map_destroy(page_map_t *map);
 
 extern void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag);
@@ -96,7 +98,7 @@ extern phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr
                               phys_ptr_t maxaddr, int pmflag);
 extern phys_ptr_t page_alloc(size_t count, int pmflag);
 extern void page_free(phys_ptr_t base, size_t count);
-extern int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
+extern bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
 
 extern void page_stats_get(page_stats_t *stats);
 

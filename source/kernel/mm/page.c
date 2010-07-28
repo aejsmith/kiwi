@@ -411,8 +411,9 @@ void page_free(phys_ptr_t base, size_t count) {
  * @param dest		Destination page.
  * @param source	Source page.
  * @param mmflag	Allocation flags for mapping page in memory.
- * @return		0 on success, negative error code on failure. */
-int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
+ * @return		True if successful, false if unable to map pages into
+ *			memory (cannot happen if MM_SLEEP is specified). */
+bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 	void *mdest, *msrc;
 
 	assert(!(dest % PAGE_SIZE));
@@ -422,18 +423,18 @@ int page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 
 	if(!(mdest = page_phys_map(dest, PAGE_SIZE, mmflag))) {
 		thread_unwire(curr_thread);
-		return -ERR_NO_MEMORY;
+		return false;
 	} else if(!(msrc = page_phys_map(source, PAGE_SIZE, mmflag))) {
 		page_phys_unmap(mdest, PAGE_SIZE, false);
 		thread_unwire(curr_thread);
-		return -ERR_NO_MEMORY;
+		return false;
 	}
 
 	memcpy(mdest, msrc, PAGE_SIZE);
 	page_phys_unmap(msrc, PAGE_SIZE, false);
 	page_phys_unmap(mdest, PAGE_SIZE, false);
 	thread_unwire(curr_thread);
-	return 0;
+	return true;
 }
 
 /** Get physical memory usage statistics.

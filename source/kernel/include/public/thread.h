@@ -31,12 +31,13 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-extern handle_t SYSCALL(thread_create)(const char *name, void *stack, size_t stacksz,
-                                       void (*func)(void *), void *arg1);
-extern handle_t SYSCALL(thread_open)(thread_id_t id);
+extern status_t SYSCALL(thread_create)(const char *name, void *stack, size_t stacksz,
+                                       void (*func)(void *), void *arg1,
+                                       handle_t *handlep);
+extern status_t SYSCALL(thread_open)(thread_id_t id, handle_t *handlep);
 extern thread_id_t SYSCALL(thread_id)(handle_t handle);
 extern void SYSCALL(thread_exit)(int status) __attribute__((noreturn));
-extern int SYSCALL(thread_usleep)(useconds_t us);
+extern status_t SYSCALL(thread_usleep)(useconds_t us);
 
 #ifdef __cplusplus
 }

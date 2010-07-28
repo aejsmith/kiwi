@@ -23,7 +23,7 @@
 #include <arch/descriptor.h>
 #include <arch/stack.h>
 
-#include <errors.h>
+#include <status.h>
 
 /** Push registers onto the stack. */
 .macro PUSH_REGS
@@ -277,13 +277,13 @@ FUNCTION_START(syscall_entry)
 	add	$56, %rsp
 	jmp	.Lreturn
 .Lcpyfail:
-	movq	$ERR_ADDR_INVAL, %rax
+	movq	$STATUS_ADDR_INVAL, %rax
 	movq	%rbx, %rsp
 	pop	%rbx
 	add	$56, %rsp
 	jmp	.Lreturn
 .Linval:
-	movq	$ERR_SYSCALL_INVAL, %rax
+	movq	$STATUS_SYSCALL_INVAL, %rax
 	add	$48, %rsp
 	jmp	.Lreturn
 FUNCTION_END(syscall_entry)

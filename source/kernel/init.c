@@ -77,54 +77,54 @@ static SPINLOCK_DECLARE(smp_boot_spinlock);
 /** List of modules from the bootloader. */
 static LIST_DECLARE(boot_module_list);
 
-extern error_t sys_test_call0();
-extern error_t sys_test_call1(int arg1);
-extern error_t sys_test_call2(int arg1, int arg2);
-extern error_t sys_test_call3(int arg1, int arg2, int arg3);
-extern error_t sys_test_call4(int arg1, int arg2, int arg3, int arg4);
-extern error_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5);
-extern error_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);
-extern error_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7);
-extern error_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8);
-extern error_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9);
+extern status_t sys_test_call0();
+extern status_t sys_test_call1(int arg1);
+extern status_t sys_test_call2(int arg1, int arg2);
+extern status_t sys_test_call3(int arg1, int arg2, int arg3);
+extern status_t sys_test_call4(int arg1, int arg2, int arg3, int arg4);
+extern status_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5);
+extern status_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);
+extern status_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7);
+extern status_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8);
+extern status_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9);
 
-error_t sys_test_call0() {
+status_t sys_test_call0() {
 	kprintf(LOG_NORMAL, "sys_test_call0()\n");
 	return 5;
 }
-error_t sys_test_call1(int arg1) {
+status_t sys_test_call1(int arg1) {
 	kprintf(LOG_NORMAL, "sys_test_call1(%d)\n", arg1);
 	return 6;
 }
-error_t sys_test_call2(int arg1, int arg2) {
+status_t sys_test_call2(int arg1, int arg2) {
 	kprintf(LOG_NORMAL, "sys_test_call2(%d, %d)\n", arg1, arg2);
 	return 7;
 }
-error_t sys_test_call3(int arg1, int arg2, int arg3) {
+status_t sys_test_call3(int arg1, int arg2, int arg3) {
 	kprintf(LOG_NORMAL, "sys_test_call3(%d, %d, %d)\n", arg1, arg2, arg3);
 	return 8;
 }
-error_t sys_test_call4(int arg1, int arg2, int arg3, int arg4) {
+status_t sys_test_call4(int arg1, int arg2, int arg3, int arg4) {
 	kprintf(LOG_NORMAL, "sys_test_call4(%d, %d, %d, %d)\n", arg1, arg2, arg3, arg4);
 	return 9;
 }
-error_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5) {
+status_t sys_test_call5(int arg1, int arg2, int arg3, int arg4, int arg5) {
 	kprintf(LOG_NORMAL, "sys_test_call5(%d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5);
 	return 10;
 }
-error_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6) {
+status_t sys_test_call6(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6) {
 	kprintf(LOG_NORMAL, "sys_test_call6(%d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6);
 	return 11;
 }
-error_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7) {
+status_t sys_test_call7(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7) {
 	kprintf(LOG_NORMAL, "sys_test_call7(%d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 	return 12;
 }
-error_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8) {
+status_t sys_test_call8(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8) {
 	kprintf(LOG_NORMAL, "sys_test_call8(%d, %d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 	return 13;
 }
-error_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9) {
+status_t sys_test_call9(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9) {
 	kprintf(LOG_NORMAL, "sys_test_call9(%d, %d, %d, %d, %d, %d, %d, %d, %d)\n", arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 	return 14;
 }
@@ -237,6 +237,7 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
  * @param mod		Module to load.
  * @return		Whether the file was a kernel module. */
 static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
+#if 0
 	char name[MODULE_NAME_MAX + 1];
 	boot_module_t *dep;
 	int ret;
@@ -257,6 +258,8 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 			fatal("Dependency on '%s' which is not available", name);
 		}
 	}
+#endif
+	return false;
 }
 
 /** Load modules loaded by the bootloader.
@@ -290,12 +293,14 @@ static void __init_text load_modules(kernel_args_t *args) {
 		/* Figure out the module name, which is needed to resolve
 		 * dependencies. Do not fail if unable to get the name, may be
 		 * a filesystem image. */
+#if 0
 		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
 		if(module_name(mod->handle, tmp) != 0) {
 			kfree(tmp);
 		} else {
 			mod->name = tmp;
 		}
+#endif
 
 		list_append(&boot_module_list, &mod->header);
 

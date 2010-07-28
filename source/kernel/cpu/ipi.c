@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -29,7 +29,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <status.h>
 
 extern void ipi_process_pending(void);
 
@@ -48,7 +48,7 @@ typedef struct ipi_message {
 	unative_t data4;		/**< Fourth handler argument. */
 
 	atomic_t acked;			/**< Whether the message has been acknowledged. */
-	int status;			/**< Status code to return to sender. */
+	status_t status;		/**< Status code to return to sender. */
 	refcount_t count;		/**< Reference count to track stuffs. */
 } ipi_message_t;
 
@@ -94,7 +94,6 @@ static ipi_message_t *ipi_message_get(void) {
 	 * account for both the destination and the sender. */
 	atomic_set(&message->acked, 0);
 	refcount_set(&message->count, 2);
-	message->status = 0;
 
 	return message;
 }
@@ -137,7 +136,7 @@ static void ipi_message_queue(ipi_message_t *message, cpu_t *cpu) {
 /** Process pending IPI messages to the current CPU. */
 void ipi_process_pending(void) {
 	ipi_message_t *message;
-	int ret;
+	status_t ret;
 
 	assert(ipi_enabled);
 
@@ -162,7 +161,7 @@ void ipi_process_pending(void) {
 			ret = message->handler(message, message->data1, message->data2,
 			                       message->data3, message->data4);
 		} else {
-			ret = 0;
+			ret = STATUS_SUCCESS;
 		}
 
 		/* If the handler has not already been acknowledged, then
@@ -199,28 +198,29 @@ void ipi_process_pending(void) {
  * @param data4		Fourth handler argument.
  * @param flags		Behaviour flags.
  *
- * @return		The only error code that this function can return is
- *			ERR_NOT_FOUND. Otherwise, the return value depends
+ * @return		If the specified CPU does not exist, STATUS_NOT_FOUND
+ *			will be returned. Otherwise, the status code depends
  *			on the behaviour flags: if IPI_SEND_SYNC was specified,
- *			then the return value is the return value passed to
- *			ipi_acknowledge(). Otherwise, it is 0.
+ *			then the status code is the value returned by the
+ *			handler or set with ipi_acknowledge(). Otherwise, it is
+ *			STATUS_SUCCESS.
  */
-int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
-             unative_t data3, unative_t data4, int flags) {
+status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
+                  unative_t data3, unative_t data4, int flags) {
 	bool state = intr_disable();
 	ipi_message_t *message;
-	int ret;
+	status_t ret;
 
 	/* Don't do anything if the IPI system isn't enabled. */
 	if(!ipi_enabled) {
 		intr_restore(state);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Check if the destination exists. */
 	if(dest > cpu_id_max || !cpus[dest]) {
 		intr_restore(state);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	/* Get a message structure for the message. */
@@ -248,7 +248,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
 		/* Asynchronous, drop count on the message and return. */
 		ipi_message_release(message);
 		intr_restore(state);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 }
 
@@ -262,7 +262,7 @@ int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t da
  * will return immediately after sending the message.
  *
  * @note		Because this function can send to many destinations, it
- *			is not possible for a return value to propagate back
+ *			is not possible for a status code to propagate back
  *			from the CPUs to this function. If this is required,
  *			then ipi_send() should be used to individually send an
  *			IPI to each CPU in the cpus_running list.
@@ -358,7 +358,7 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
  *			to handler function).
  * @param status	Status code to return to sender.
  */
-void ipi_acknowledge(void *ptr, int status) {
+void ipi_acknowledge(void *ptr, status_t status) {
 	ipi_message_t *message = ptr;
 
 	message->status = status;

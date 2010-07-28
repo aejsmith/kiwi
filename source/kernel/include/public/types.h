@@ -37,8 +37,8 @@
 # define SYSCALL(name)	name
 #endif
 
-/** Type storing the return value from kernel functions. */
-typedef uint32_t error_t;
+/** Type used to store a kernel status code. */
+typedef uint32_t status_t;
 
 /** Type used to store a handle to an object. */
 typedef int32_t handle_t;

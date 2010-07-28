@@ -31,10 +31,10 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-extern handle_t SYSCALL(shm_create)(size_t size);
-extern handle_t SYSCALL(shm_open)(shm_id_t id);
+extern status_t SYSCALL(shm_create)(size_t size, handle_t *handlep);
+extern status_t SYSCALL(shm_open)(shm_id_t id, handle_t *handlep);
 extern shm_id_t SYSCALL(shm_id)(handle_t handle);
-extern int SYSCALL(shm_resize)(handle_t handle, size_t size);
+extern status_t SYSCALL(shm_resize)(handle_t handle, size_t size);
 
 #ifdef __cplusplus
 }

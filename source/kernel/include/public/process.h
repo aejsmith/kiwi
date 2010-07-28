@@ -43,16 +43,16 @@ typedef struct process_args {
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
-extern handle_t SYSCALL(process_create)(const char *path, const char *const args[],
+extern status_t SYSCALL(process_create)(const char *path, const char *const args[],
                                         const char *const env[], int flags,
-                                        handle_t handles[][2], int count);
-extern int SYSCALL(process_replace)(const char *path, const char *const args[],
-                                    const char *const env[], handle_t handles[][2],
-                                    int count);
-extern int SYSCALL(process_clone)(handle_t *handlep);
-extern handle_t SYSCALL(process_open)(process_id_t id);
+                                        handle_t map[][2], int count,
+                                        handle_t *handlep);
+extern status_t SYSCALL(process_replace)(const char *path, const char *const args[],
+                                         const char *const env[], handle_t map[][2],
+                                         int count);
+extern status_t SYSCALL(process_open)(process_id_t id, handle_t *handlep);
 extern process_id_t SYSCALL(process_id)(handle_t handle);
-extern int SYSCALL(process_status)(handle_t handle, int *statusp);
+extern status_t SYSCALL(process_status)(handle_t handle, int *statusp);
 extern void SYSCALL(process_exit)(int status) __attribute__((noreturn));
 extern void SYSCALL(process_loaded)(void);
 

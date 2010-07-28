@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,16 +31,6 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-/** Structure containing arguments for vm_map(). */
-typedef struct vm_map_args {
-	void *start;			/**< Address to map at (if not VM_MAP_FIXED). */
-	size_t size;			/**< Size of area to map (multiple of page size). */
-	int flags;			/**< Flags controlling the mapping. */
-	handle_t handle;		/**< Handle for object to map. */
-	offset_t offset;		/**< Offset in the object to map from. */
-	void **addrp;			/**< Where to store address mapped to. */
-} vm_map_args_t;
-
 /** Behaviour flags for vm_map_* functions.
  * @note		Flags that have a region equivalent are defined to the
  *			same value as the region flag. */
@@ -51,13 +41,8 @@ typedef struct vm_map_args {
 #define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
 #define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
 
-#ifdef KERNEL
-extern int SYSCALL(vm_map)(vm_map_args_t *args);
-#else
-extern int SYSCALL(_vm_map)(vm_map_args_t *args);
-extern int SYSCALL(vm_map)(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
-#endif
-extern int SYSCALL(vm_unmap)(void *start, size_t size);
+extern status_t SYSCALL(vm_map)(void *start, size_t size, int flags, handle_t handle, offset_t offset, void **addrp);
+extern status_t SYSCALL(vm_unmap)(void *start, size_t size);
 
 #ifdef __cplusplus
 }

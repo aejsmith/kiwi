@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -29,13 +29,13 @@
 #define IPI_SEND_SYNC		(1<<0)	/**< Send message synchronously rather than asynchronously. */
 
 /** Type of a function to handle an IPI. */
-typedef int (*ipi_handler_t)(void *, unative_t, unative_t, unative_t, unative_t);
+typedef status_t (*ipi_handler_t)(void *, unative_t, unative_t, unative_t, unative_t);
 
-extern int ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
-                    unative_t data3, unative_t data4, int flags);
+extern status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
+                         unative_t data3, unative_t data4, int flags);
 extern void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
                           unative_t data3, unative_t data4, int flags);
-extern void ipi_acknowledge(void *message, int status);
+extern void ipi_acknowledge(void *message, status_t status);
 
 extern void ipi_init(void);
 

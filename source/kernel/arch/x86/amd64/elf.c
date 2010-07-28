@@ -38,8 +38,8 @@ extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_a
 /** Perform relocations for an ELF module.
  * @param module	Module to relocate.
  * @param external	Whether to handle external or internal symbols.
- * @return		0 on success, negative error code on failure. */
-int elf_module_relocate(module_t *module, bool external) {
+ * @return		Status code describing result of operation. */
+status_t elf_module_relocate(module_t *module, bool external) {
 	Elf64_Addr *where64, val = 0;
 	Elf64_Shdr *sect, *targ;
 	Elf32_Addr *where32;
