@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -28,11 +28,11 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
-#include <errors.h>
+#include <status.h>
 
 /** Check if an address is valid. */
 #if USER_MEMORY_BASE == 0
-# define VALID(addr, count)			\
+# define VALID(addr, count)		\
 	(((addr) + (count)) <= USER_MEMORY_SIZE && ((addr) + (count)) >= (addr))
 #else
 # define VALID(addr, count)			\
@@ -40,22 +40,31 @@
 #endif
 
 /** Common entry code for userspace memory functions. */
-#define USERMEM_ENTER()				\
+#define USERMEM_ENTER()			\
 	if(context_save(&curr_thread->usermem_context) != 0) { \
-		return -ERR_ADDR_INVAL; \
+		return STATUS_ADDR_INVAL; \
 	} \
 	curr_thread->in_usermem = true
 
-/** Common entry code for userspace memory functions. */
-#define USERMEM_ENTER_CHECK(addr, count)	\
-	if(!VALID((ptr_t)addr, count)) { \
-		return -ERR_ADDR_INVAL; \
-	} \
-	USERMEM_ENTER()
-
 /** Common exit code for userspace memory functions. */
-#define USERMEM_EXIT()				\
-	curr_thread->in_usermem = false;
+#define USERMEM_EXIT(status)		\
+	curr_thread->in_usermem = false; \
+	return (status)
+
+/** Return success from a userspace memory function. */
+#define USERMEM_SUCCESS()		USERMEM_EXIT(STATUS_SUCCESS)
+
+/** Return failure from a userspace memory function. */
+#define USERMEM_FAIL()			USERMEM_EXIT(STATUS_ADDR_INVAL)
+
+/** Code to check parameters execute a statement. */
+#define USERMEM_WRAP(addr, count, stmt)	\
+	if(!VALID((ptr_t)addr, count)) { \
+		return STATUS_ADDR_INVAL; \
+	} \
+	USERMEM_ENTER(); \
+	stmt; \
+	USERMEM_SUCCESS()
 
 /** Copy data from userspace.
  *
@@ -65,15 +74,10 @@
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
  *
- * @return		0 on success, -ERR_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
  */
-int memcpy_from_user(void *dest, const void *src, size_t count) {
-	USERMEM_ENTER_CHECK(src, count);
-
-	memcpy(dest, src, count);
-
-	USERMEM_EXIT();
-	return 0;
+status_t memcpy_from_user(void *dest, const void *src, size_t count) {
+	USERMEM_WRAP(src, count, memcpy(dest, src, count));
 }
 
 /** Copy data to userspace.
@@ -84,15 +88,10 @@ int memcpy_from_user(void *dest, const void *src, size_t count) {
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
  *
- * @return		0 on success, -ERR_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
  */
-int memcpy_to_user(void *dest, const void *src, size_t count) {
-	USERMEM_ENTER_CHECK(dest, count);
-
-	memcpy(dest, src, count);
-
-	USERMEM_EXIT();
-	return 0;
+status_t memcpy_to_user(void *dest, const void *src, size_t count) {
+	USERMEM_WRAP(dest, count, memcpy(dest, src, count));
 }
 
 /** Fill a userspace memory area.
@@ -103,15 +102,10 @@ int memcpy_to_user(void *dest, const void *src, size_t count) {
  * @param val		The value to fill with.
  * @param count		The number of bytes to fill.
  *
- * @return		0 on success, -ERR_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
  */
-int memset_user(void *dest, int val, size_t count) {
-	USERMEM_ENTER_CHECK(dest, count);
-
-	memset(dest, val, count);
-
-	USERMEM_EXIT();
-	return 0;
+status_t memset_user(void *dest, int val, size_t count) {
+	USERMEM_WRAP(dest, count, memset(dest, val, count));
 }
 
 /** Get length of userspace string.
@@ -122,9 +116,9 @@ int memset_user(void *dest, int val, size_t count) {
  * @param str		Pointer to the string.
  * @param lenp		Where to store string length.
  * 
- * @return		0 on success, -ERR_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
  */
-int strlen_user(const char *str, size_t *lenp) {
+status_t strlen_user(const char *str, size_t *lenp) {
 	size_t retval = 0;
 
 	USERMEM_ENTER();
@@ -132,8 +126,7 @@ int strlen_user(const char *str, size_t *lenp) {
 	/* Yeah... this is horrible. */
 	while(true) {
 		if(!VALID((ptr_t)str, retval + 1)) {
-			USERMEM_EXIT();
-			return -ERR_ADDR_INVAL;
+			USERMEM_FAIL();
 		} else if(str[retval] == 0) {
 			break;
 		}
@@ -141,38 +134,8 @@ int strlen_user(const char *str, size_t *lenp) {
 		retval++;
 	}
 
-	USERMEM_EXIT();
 	*lenp = retval;
-	return 0;
-}
-
-/** Copy a string from userspace.
- *
- * Copies a string from a userspace memory area to a kernel buffer. Assumes
- * that the destination is big enough to hold the string.
- *
- * @param dest		Pointer to the destination buffer.
- * @param src		Pointer to the source buffer.
- * 
- * @return		0 on success, -ERR_ADDR_INVAL on failure.
- */
-int strcpy_from_user(char *dest, const char *src) {
-	size_t i = 0;
-
-	USERMEM_ENTER();
-
-	/* Yeah... this is horrible. */
-	while(1) {
-		if(!VALID((ptr_t)src, i + 1)) {
-			USERMEM_EXIT();
-			return -ERR_ADDR_INVAL;
-		} else if((*dest++ = src[i++]) == 0) {
-			break;
-		}
-	}
-
-	USERMEM_EXIT();
-	return 0;
+	USERMEM_SUCCESS();
 }
 
 /** Duplicate string from userspace.
@@ -183,35 +146,34 @@ int strcpy_from_user(char *dest, const char *src) {
  * @param mmflag	Allocation flags.
  * @param destp		Pointer to buffer in which to store destination.
  *
- * @return		0 on success, negative error code on failure.
- *			Returns -ERR_PARAM_INVAL if the string is zero-length.
+ * @return		Status code describing result of the operation.
+ *			Returns STATUS_PARAM_INVAL if the string is zero-length.
  */
-int strdup_from_user(const void *src, int mmflag, char **destp) {
+status_t strdup_from_user(const void *src, int mmflag, char **destp) {
 	size_t len;
 	char *d;
-	int ret;
+	status_t ret;
 
 	ret = strlen_user(src, &len);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	d = kmalloc(len + 1, mmflag);
 	if(d == NULL) {
-		return -ERR_NO_MEMORY;
+		return STATUS_NO_MEMORY;
 	}
 
 	ret = memcpy_from_user(d, src, len);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		kfree(d);
 		return ret;
 	}
 	d[len] = 0;
-
 	*destp = d;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Duplicate string from userspace.
@@ -225,26 +187,26 @@ int strdup_from_user(const void *src, int mmflag, char **destp) {
  * @param mmflag	Allocation flags.
  * @param destp		Pointer to buffer in which to store destination.
  *
- * @return		0 on success, negative error code on failure.
- *			Returns -ERR_PARAM_INVAL if the string is zero-length.
+ * @return		Status code describing result of the operation.
+ *			Returns STATUS_PARAM_INVAL if the string is zero-length.
  */
-int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
+status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
+	status_t ret;
 	size_t len;
 	char *d;
-	int ret;
 
 	ret = strlen_user(src, &len);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(len > max) {
-		return -ERR_STR_TOO_LONG;
+		return STATUS_TOO_LONG;
 	}
 
 	d = kmalloc(len + 1, mmflag);
 	if(d == NULL) {
-		return -ERR_NO_MEMORY;
+		return STATUS_NO_MEMORY;
 	}
 
 	ret = memcpy_from_user(d, src, len);
@@ -253,9 +215,8 @@ int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
 		return ret;
 	}
 	d[len] = 0;
-
 	*destp = d;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Copy a NULL-terminated array of strings from userspace.
@@ -267,43 +228,45 @@ int strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
  * @param src		Array to copy.
  * @param arrayp	Pointer to set to new array location.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int arrcpy_from_user(const char *const src[], char ***arrayp) {
+status_t arrcpy_from_user(const char *const src[], char ***arrayp) {
 	char **array = NULL, **narr;
-	int ret, i;
+	status_t ret;
+	int i;
 
 	/* Copy the arrays across. */
 	for(i = 0; ; i++) {
 		if(!(narr = krealloc(array, sizeof(char *) * (i + 1), 0))) {
-			ret = -ERR_NO_MEMORY;
+			ret = STATUS_NO_MEMORY;
 			goto fail;
 		}
 
 		array = narr;
 		array[i] = NULL;
 
-		if((ret = memcpy_from_user(&array[i], &src[i], sizeof(char *))) != 0) {
+		ret = memcpy_from_user(&array[i], &src[i], sizeof(char *));
+		if(ret != STATUS_SUCCESS) {
 			array[i] = NULL;
 			goto fail;
 		} else if(array[i] == NULL) {
 			break;
 		}
 
-		if((ret = strdup_from_user(array[i], 0, &array[i])) != 0) {
+		ret = strdup_from_user(array[i], 0, &array[i]);
+		if(ret != STATUS_SUCCESS) {
 			array[i] = NULL;
 			goto fail;
 		}
 	}
 
 	*arrayp = array;
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(array) {
 		for(i = 0; array[i] != NULL; i++) {
 			kfree(array[i]);
 		}
-
 		kfree(array);
 	}
 	return ret;

@@ -45,7 +45,7 @@
 #define STATUS_IN_USE			15	/**< Object is in use. */
 #  define STATUS_NO_SPACE		16	/**< No space is available. */
 #define STATUS_PERM_DENIED		17	/**< Permission denied. */
-#  define STATUS_STR_TOO_LONG		18	/**< String is too long. */
+#define STATUS_TOO_LONG			18	/**< Provided string is too long. */
 #define STATUS_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
 #  define STATUS_BUF_TOO_SMALL		20	/**< Provided buffer is too small. */
 #define STATUS_SYSCALL_INVAL		21	/**< Invalid system call number. */

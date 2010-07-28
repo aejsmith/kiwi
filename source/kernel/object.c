@@ -41,9 +41,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kdbg.h>
 #include <object.h>
+#include <status.h>
 
 #if CONFIG_OBJECT_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -118,17 +118,17 @@ void object_wait_callback(object_wait_t *wait) {
  * @param handle	Handle to wait on.
  * @param event		Event ID to wait for (specific to object type).
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			return immediately if the event has not happened, and
- *			a value of -1 will block indefinitely until the event
- *			happens.
- * @return		0 on success, negative error code on failure. */
-int object_wait(khandle_t *handle, int event, useconds_t timeout) {
+ *			cause the function to return immediately if the event
+ *			has not happened, and a value of -1 will block
+ *			indefinitely until the event happens.
+ * @return		Status code describing result of the operation. */
+status_t object_wait(khandle_t *handle, int event, useconds_t timeout) {
 	object_wait_sync_t sync;
 	object_wait_t wait;
-	int ret;
+	status_t ret;
 
 	if(!handle) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -138,8 +138,8 @@ int object_wait(khandle_t *handle, int event, useconds_t timeout) {
 	wait.priv = &sync;
 
 	if(!handle->object->type->wait || !handle->object->type->unwait) {
-		return -ERR_NOT_SUPPORTED;
-	} else if((ret = handle->object->type->wait(&wait)) != 0) {
+		return STATUS_NOT_SUPPORTED;
+	} else if((ret = handle->object->type->wait(&wait)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -159,19 +159,20 @@ int object_wait(khandle_t *handle, int event, useconds_t timeout) {
  *			in the arrays.
  * @param count		Number of handles.
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			return immediately if none of the events have happened,
- *			and a value of -1 will block indefinitely until one of
- *			the events happen.
- * @return		Index of event that occurred on success, negative error
- *			code on failure. */
-int object_wait_multiple(khandle_t **handles, int *events, size_t count, useconds_t timeout) {
+ *			cause the function to return immediately if the event
+ *			has not happened, and a value of -1 will block
+ *			indefinitely until the event happens.
+ * @param indexp	Where to store index of event that occurred.
+ * @return		Status code describing result of the operation. */
+status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, useconds_t timeout,
+                              int *indexp) {
 	object_wait_sync_t sync;
 	object_wait_t *waits;
+	status_t ret;
 	size_t i;
-	int ret;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -181,10 +182,10 @@ int object_wait_multiple(khandle_t **handles, int *events, size_t count, usecond
 	waits = kmalloc(sizeof(object_wait_t) * count, MM_SLEEP);
 	for(i = 0; i < count; i++) {
 		if(!handles[i]) {
-			ret = -ERR_PARAM_INVAL;
+			ret = STATUS_PARAM_INVAL;
 			goto out;
 		} else if(!handles[i]->object->type->wait || !handles[i]->object->type->unwait) {
-			ret = -ERR_NOT_SUPPORTED;
+			ret = STATUS_NOT_SUPPORTED;
 			goto out;
 		}
 
@@ -193,19 +194,23 @@ int object_wait_multiple(khandle_t **handles, int *events, size_t count, usecond
 		waits[i].priv = &sync;
 		waits[i].idx = i;
 
-		if((ret = handles[i]->object->type->wait(&waits[i])) != 0) {
+		ret = handles[i]->object->type->wait(&waits[i]);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 
+	/* Wait for any of the events to be signalled. */
 	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
+	if(ret == STATUS_SUCCESS) {
+		assert(sync.event);
+		if(indexp) {
+			*indexp = sync.event->idx;
+		}
+	}
 out:
 	while(i--) {
 		handles[i]->object->type->unwait(&waits[i]);
-	}
-	if(ret == 0) {
-		assert(sync.event);
-		ret = sync.event->idx;
 	}
 	kfree(waits);
 	return ret;
@@ -213,56 +218,49 @@ out:
 
 /** Create a handle to an object.
  *
- * Creates a new handle to an object. If the process argument is not NULL, the
- * handle will also be attached to the specified process. If it is not, the
- * handle can later be attached using handle_attach(). If the handlep argument
- * is not NULL (it must be if the process argument is NULL), a pointer to the
- * handle will be stored there, in which case the handle will have an extra
- * reference on it, and therefore handle_release() must be called when the
- * handle is no longer needed.
+ * Creates a new handle to an object. This handle will not be attached to any
+ * process: it can later be attached using handle_attach(). Alternatively,
+ * handle_create_and_attach() can be used.
  *
  * @param obj		Object to create a handle to.
  * @param data		Per-handle data pointer.
- * @param process	Process to attach handle to (if any).
- * @param flags		Flags for the handle table entry (only used if process
- *			is not NULL).
- * @param handlep	Where to store pointer to handle created (must not be
- *			NULL if process is NULL).
  *
- * @return		If a process is specified, a handle ID will be returned
- *			on success, or a negative error code on failure.
- *			Otherwise, 0 will always be returned, as there are no
- *			failures that can occur when not attaching to a
- *			process.
+ * @return		Pointer to handle structure created.
  */
-handle_t handle_create(object_t *obj, void *data, process_t *process, int flags,
-                       khandle_t **handlep) {
+khandle_t *handle_create(object_t *obj, void *data) {
 	khandle_t *handle;
-	handle_t ret = 0;
 
 	assert(obj);
 	assert(obj->type);
-	assert(process || handlep);
 
 	handle = slab_cache_alloc(khandle_cache, MM_SLEEP);
 	refcount_set(&handle->count, 1);
 	handle->object = obj;
 	handle->data = data;
+	return handle;
+}
 
-	if(process) {
-		if((ret = handle_attach(process, handle, flags)) < 0) {
-			/* We do not want the object's close operation to be
-			 * called upon failure, so free the handle directly. */
-			slab_cache_free(khandle_cache, handle);
-			return ret;
-		}
-	}
+/** Create a handle to an object in a process.
+ * @param obj		Object to create a handle to.
+ * @param data		Per-handle data pointer.
+ * @param process	Process to attach to.
+ * @param flags		Flags for the handle table entry.
+ * @param handlep	Where to store ID of handle created.
+ * @return		Status code describing result of the operation. */
+status_t handle_create_and_attach(object_t *obj, void *data, process_t *process, int flags,
+                                  handle_t *handlep) {
+	khandle_t *handle = handle_create(obj, data);
+	status_t ret;
 
-	if(handlep) {
-		*handlep = handle;
-	} else {
+	ret = handle_attach(process, handle, flags, handlep);
+	if(ret == STATUS_SUCCESS) {
 		handle_release(handle);
+	} else {
+		/* We do not want the object's close operation to be called
+		 * upon failure, so free the handle directly. */
+		slab_cache_free(khandle_cache, handle);
 	}
+
 	return ret;
 }
 
@@ -324,29 +322,33 @@ static void handle_table_insert(handle_table_t *table, handle_t id, khandle_t *h
  * @param process	Process to attach to.
  * @param handle	Handle to attach.
  * @param flags		Flags for the handle.
+ * @param handlep	Where to store ID of handle created.
  *
- * @return		Handle ID on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-handle_t handle_attach(process_t *process, khandle_t *handle, int flags) {
-	int ret;
+status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_t *handlep) {
+	handle_t id;
 
 	assert(process);
 	assert(handle);
+	assert(handlep);
 
 	rwlock_write_lock(&process->handles->lock);
 
 	/* Find a handle ID in the table. */
-	if((ret = bitmap_ffz(&process->handles->bitmap)) == -1) {
+	id = bitmap_ffz(&process->handles->bitmap);
+	if(id < 0) {
 		rwlock_unlock(&process->handles->lock);
-		return -ERR_RESOURCE_UNAVAIL;
+		return STATUS_RESOURCE_UNAVAIL;
 	}
 
-	handle_table_insert(process->handles, ret, handle, flags);
+	handle_table_insert(process->handles, id, handle, flags);
+	rwlock_unlock(&process->handles->lock);
 
 	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
-	        ret, process->id, handle->object, handle->data);
-	rwlock_unlock(&process->handles->lock);
-	return ret;
+	        id, process->id, handle->object, handle->data);
+	*handlep = id;
+	return STATUS_SUCCESS;
 }
 
 /** Detach a handle from a process.
@@ -357,9 +359,9 @@ handle_t handle_attach(process_t *process, khandle_t *handle, int flags) {
  * @param process	Process to remove from.
  * @param id		ID of handle to detach.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int handle_detach(process_t *process, handle_t id) {
+status_t handle_detach(process_t *process, handle_t id) {
 	handle_link_t *link;
 
 	assert(process);
@@ -369,7 +371,7 @@ int handle_detach(process_t *process, handle_t id) {
 	/* Look up the handle in the tree. */
 	if(!(link = avl_tree_lookup(&process->handles->tree, (key_t)id))) {
 		rwlock_unlock(&process->handles->lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	/* Remove from the tree and mark the ID as free. */
@@ -383,7 +385,7 @@ int handle_detach(process_t *process, handle_t id) {
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 	        id, process->id);
 	rwlock_unlock(&process->handles->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Look up a handle in a process' handle table.
@@ -399,9 +401,9 @@ int handle_detach(process_t *process, handle_t id) {
  *			will be performed).
  * @param handlep	Where to store pointer to handle structure.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int handle_lookup(process_t *process, handle_t id, int type, khandle_t **handlep) {
+status_t handle_lookup(process_t *process, handle_t id, int type, khandle_t **handlep) {
 	handle_link_t *link;
 
 	assert(process);
@@ -412,19 +414,19 @@ int handle_lookup(process_t *process, handle_t id, int type, khandle_t **handlep
 	/* Look up the handle in the tree. */
 	if(!(link = avl_tree_lookup(&process->handles->tree, (key_t)id))) {
 		rwlock_unlock(&process->handles->lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && link->handle->object->type->id != type) {
 		rwlock_unlock(&process->handles->lock);
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	handle_get(link->handle);
 	*handlep = link->handle;
 	rwlock_unlock(&process->handles->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Create a new handle table.
@@ -445,11 +447,11 @@ int handle_lookup(process_t *process, handle_t id, int type, khandle_t **handlep
  *			duplicated.
  * @param tablep	Where to store pointer to table structure.
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			can only occur when handle mappings are specified.
  */
-int handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-                        handle_table_t **tablep) {
+status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
+                             handle_table_t **tablep) {
 	handle_table_t *table;
 	handle_link_t *link;
 	int i;
@@ -468,15 +470,15 @@ int handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
 				if(!(link = avl_tree_lookup(&parent->tree, map[i][0]))) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
-					return -ERR_NOT_FOUND;
+					return STATUS_NOT_FOUND;
 				} else if(map[i][1] >= CONFIG_HANDLE_MAX) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
-					return -ERR_PARAM_INVAL;
+					return STATUS_PARAM_INVAL;
 				} else if(avl_tree_lookup(&table->tree, map[i][1])) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
-					return -ERR_ALREADY_EXISTS;
+					return STATUS_ALREADY_EXISTS;
 				}
 
 				handle_table_insert(table, map[i][1], link->handle, link->flags);
@@ -496,7 +498,7 @@ int handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
 	}
 
 	*tablep = table;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Destroy a handle table.
@@ -568,16 +570,18 @@ void __init_text handle_init(void) {
 
 /** Get the type of an object referred to by a handle.
  * @param handle	Handle to object.
- * @return		Type ID of object on success, negative error code on
- *			failure. */
+ * @return		Type ID of object on success, -1 if the handle was not
+ *			found. */
 int sys_object_type(handle_t handle) {
 	khandle_t *khandle;
 	int ret;
 
-	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) == 0) {
-		ret = khandle->object->type->id;
-		handle_release(khandle);
+	if(handle_lookup(curr_proc, handle, -1, &khandle) != STATUS_SUCCESS) {
+		return -1;
 	}
+
+	ret = khandle->object->type->id;
+	handle_release(khandle);
 	return ret;
 }
 
@@ -585,15 +589,15 @@ int sys_object_type(handle_t handle) {
  * @param handle	Handle ID to wait on.
  * @param event		Event ID to wait for (specific to object type).
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			return immediately if the event has not happened, and
- *			a value of -1 will block indefinitely until the event
- *			happens.
- * @return		0 on success, negative error code on failure. */
-int sys_object_wait(handle_t handle, int event, useconds_t timeout) {
+ *			cause the function to return immediately if the event
+ *			has not happened, and a value of -1 will block
+ *			indefinitely until the event happens.
+ * @return		Status code describing result of the operation. */
+status_t sys_object_wait(handle_t handle, int event, useconds_t timeout) {
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != 0) {
+	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -613,40 +617,48 @@ int sys_object_wait(handle_t handle, int event, useconds_t timeout) {
  *			in the arrays.
  * @param count		Number of handles.
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			return immediately if none of the events have happened,
- *			and a value of -1 will block indefinitely until one of
- *			the events happen.
- * @return		Index of event that occurred on success, negative error
- *			code on failure. */
-int sys_object_wait_multiple(handle_t *handles, int *events, size_t count, useconds_t timeout) {
+ *			cause the function to return immediately if the event
+ *			has not happened, and a value of -1 will block
+ *			indefinitely until the event happens.
+ * @param indexp	Where to store index of event that occurred.
+ * @return		Status code describing result of the operation. */
+status_t sys_object_wait_multiple(handle_t *handles, int *events, size_t count,
+                                  useconds_t timeout, int *indexp) {
 	handle_t *khandles = NULL;
 	khandle_t **kobjs = NULL;
 	int *kevents = NULL;
+	status_t ret;
+	int kindex;
 	size_t i;
-	int ret;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);
-	if((ret = memcpy_from_user(khandles, handles, sizeof(handle_t) * count)) != 0) {
+	ret = memcpy_from_user(khandles, handles, sizeof(handle_t) * count);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
 	kevents = kmalloc(sizeof(int) * count, MM_SLEEP);
-	if((ret = memcpy_from_user(kevents, events, sizeof(int) * count)) != 0) {
+	ret = memcpy_from_user(kevents, events, sizeof(int) * count);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
 	kobjs = kcalloc(count, sizeof(khandle_t *), MM_SLEEP);
 	for(i = 0; i < count; i++) {
-		if((ret = handle_lookup(curr_proc, khandles[i], -1, &kobjs[i])) != 0) {
+		ret = handle_lookup(curr_proc, khandles[i], -1, &kobjs[i]);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 
-	ret = object_wait_multiple(kobjs, kevents, count, timeout);
+	ret = object_wait_multiple(kobjs, kevents, count, timeout, &kindex);
+	if(ret == STATUS_SUCCESS && indexp) {
+		ret = memcpy_to_user(indexp, &kindex, sizeof(int));
+	}
 out:
 	if(kobjs) {
 		for(i = 0; i < count; i++) {
@@ -667,20 +679,21 @@ out:
 
 /** Get behaviour flags for a handle.
  * @param handle	ID of handle to get flags for.
- * @return		Handle flags on success, negative error code on failure. */
-int sys_handle_get_flags(handle_t handle) {
+ * @param flagsp	Where to store handle flags.
+ * @return		Status code describing result of the operation. */
+status_t sys_handle_get_flags(handle_t handle, int *flagsp) {
 	handle_link_t *link;
-	int ret;
+	status_t ret;
 
 	rwlock_read_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
 	if(!(link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle))) {
 		rwlock_unlock(&curr_proc->handles->lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
-	ret = link->flags;
+	ret = memcpy_to_user(flagsp, &link->flags, sizeof(int));
 	rwlock_unlock(&curr_proc->handles->lock);
 	return ret;
 }
@@ -688,8 +701,8 @@ int sys_handle_get_flags(handle_t handle) {
 /** Set behaviour flags for a handle.
  * @param handle	ID of handle to set flags for.
  * @param flags		Flags to set.
- * @return		0 on success, negative error code on failure. */
-int sys_handle_set_flags(handle_t handle, int flags) {
+ * @return		Status code describing result of the operation. */
+status_t sys_handle_set_flags(handle_t handle, int flags) {
 	handle_link_t *link;
 
 	rwlock_write_lock(&curr_proc->handles->lock);
@@ -697,17 +710,19 @@ int sys_handle_set_flags(handle_t handle, int flags) {
 	/* Look up the handle in the tree. */
 	if(!(link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle))) {
 		rwlock_unlock(&curr_proc->handles->lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	link->flags = flags;
 	rwlock_unlock(&curr_proc->handles->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Close a handle.
  * @param handle	Handle ID to close.
- * @return		0 on success, negative error code on failure. */
-int sys_handle_close(handle_t handle) {
+ * @return		Status code describing result of the operation.
+ *			The only reason for failure is an invalid handle being
+ *			specified. */
+status_t sys_handle_close(handle_t handle) {
 	return handle_detach(curr_proc, handle);
 }

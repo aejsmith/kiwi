@@ -47,7 +47,8 @@ extern "C" {
 
 extern int SYSCALL(object_type)(handle_t handle);
 extern status_t SYSCALL(object_wait)(handle_t handle, int event, useconds_t timeout);
-extern status_t SYSCALL(object_wait_multiple)(handle_t *handle, int *events, size_t count, useconds_t timeout);
+extern status_t SYSCALL(object_wait_multiple)(handle_t *handle, int *events, size_t count,
+                                              useconds_t timeout, int *indexp);
 extern status_t SYSCALL(handle_get_flags)(handle_t handle, int *flagsp);
 extern status_t SYSCALL(handle_set_flags)(handle_t handle, int flags);
 extern status_t SYSCALL(handle_close)(handle_t handle);

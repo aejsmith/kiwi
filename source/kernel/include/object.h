@@ -49,8 +49,8 @@ typedef struct object_type {
 	 *			already, this function should call the callback
 	 *			function and return success.
 	 * @param wait		Wait information structure.
-	 * @return		0 on success, negative error code on failure. */
-	int (*wait)(struct object_wait *wait);
+	 * @return		Status code describing result of the operation. */
+	status_t (*wait)(struct object_wait *wait);
 
 	/** Stop waiting for an object.
 	 * @param wait		Wait information structure. */
@@ -63,15 +63,16 @@ typedef struct object_type {
 	 *			get_page is implemented.
 	 * @param handle	Handle to object.
 	 * @param flags		Mapping flags (VM_MAP_*).
-	 * @return		0 if can be mapped, negative error code if not. */
-	int (*mappable)(struct khandle *handle, int flags);
+	 * @return		STATUS_SUCCESS if can be mapped, or a status
+	 *			code explaining why it cannot be mapped. */
+	status_t (*mappable)(struct khandle *handle, int flags);
 
 	/** Get a page from the object.
 	 * @param handle	Handle to object to get page from.
 	 * @param offset	Offset into object to get page from.
 	 * @param physp		Where to store physical address of page.
-	 * @return		0 on success, negative error code on failure. */
-	int (*get_page)(struct khandle *handle, offset_t offset, phys_ptr_t *physp);
+	 * @return		Status code describing result of the operation. */
+	status_t (*get_page)(struct khandle *handle, offset_t offset, phys_ptr_t *physp);
 
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.
@@ -119,19 +120,21 @@ extern void object_destroy(object_t *obj);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_callback(object_wait_t *wait);
-extern int object_wait(khandle_t *handle, int event, useconds_t timeout);
-extern int object_wait_multiple(khandle_t **handles, int *events, size_t count, useconds_t timeout);
+extern status_t object_wait(khandle_t *handle, int event, useconds_t timeout);
+extern status_t object_wait_multiple(khandle_t **handles, int *events, size_t count,
+                                     useconds_t timeout, int *indexp);
 
-extern handle_t handle_create(object_t *obj, void *data, struct process *process,
-                              int flags, khandle_t **handlep);
+extern khandle_t *handle_create(object_t *obj, void *data);
+extern status_t handle_create_and_attach(object_t *obj, void *data, struct process *process,
+                                         int flags, handle_t *handlep);
 extern void handle_get(khandle_t *handle);
 extern void handle_release(khandle_t *handle);
-extern handle_t handle_attach(struct process *process, khandle_t *handle, int flags);
-extern int handle_detach(struct process *process, handle_t id);
-extern int handle_lookup(struct process *process, handle_t id, int type, khandle_t **handlep);
+extern status_t handle_attach(struct process *process, khandle_t *handle, int flags, handle_t *handlep);
+extern status_t handle_detach(struct process *process, handle_t id);
+extern status_t handle_lookup(struct process *process, handle_t id, int type, khandle_t **handlep);
 
-extern int handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-                               handle_table_t **tablep);
+extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
+                                    handle_table_t **tablep);
 extern void handle_table_destroy(handle_table_t *table);
 
 extern int kdbg_cmd_handles(int argc, char **argv);

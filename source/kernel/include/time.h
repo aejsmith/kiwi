@@ -88,7 +88,7 @@ extern void timer_init(timer_t *timer, timer_func_t func, void *data);
 extern void timer_start(timer_t *timer, useconds_t length);
 extern void timer_stop(timer_t *timer);
 
-extern int usleep_etc(useconds_t us, int flags);
+extern status_t usleep_etc(useconds_t us, int flags);
 extern void usleep(useconds_t us);
 
 extern int kdbg_cmd_timers(int argc, char **argv);

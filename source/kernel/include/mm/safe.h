@@ -25,14 +25,13 @@
 
 #include <types.h>
 
-extern int memcpy_from_user(void *dest, const void *src, size_t count);
-extern int memcpy_to_user(void *dest, const void *src, size_t count);
-extern int memset_user(void *dest, int val, size_t count);
-extern int strlen_user(const char *str, size_t *lenp);
-extern int strcpy_from_user(char *dest, const char *src);
+extern status_t memcpy_from_user(void *dest, const void *src, size_t count);
+extern status_t memcpy_to_user(void *dest, const void *src, size_t count);
+extern status_t memset_user(void *dest, int val, size_t count);
+extern status_t strlen_user(const char *str, size_t *lenp);
 
-extern int strdup_from_user(const void *src, int mmflag, char **destp);
-extern int strndup_from_user(const void *src, size_t max, int mmflag, char **destp);
-extern int arrcpy_from_user(const char *const src[], char ***arrayp);
+extern status_t strdup_from_user(const void *src, int mmflag, char **destp);
+extern status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp);
+extern status_t arrcpy_from_user(const char *const src[], char ***arrayp);
 
 #endif /* __MM_SAFE_H */

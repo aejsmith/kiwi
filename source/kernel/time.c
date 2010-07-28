@@ -27,8 +27,8 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kdbg.h>
+#include <status.h>
 #include <time.h>
 
 /** Check if a year is a leap year. */
@@ -258,16 +258,16 @@ void spin(useconds_t us) {
 /** Sleep for a certain amount of time.
  * @param us		Microseconds to sleep for.
  * @param flags		Flags modifying sleep behaviour (see sync/flags.h).
- * @return		0 on success, negative error code on failure. */
-int usleep_etc(useconds_t us, int flags) {
+ * @return		Status code describing result of the operation. */
+status_t usleep_etc(useconds_t us, int flags) {
 	waitq_t queue;
-	int ret;
+	status_t ret;
 
 	assert(us >= 0);
 
 	waitq_init(&queue, "usleep");
 	ret = waitq_sleep(&queue, us, flags);
-	return (ret == -ERR_WOULD_BLOCK || ret == -ERR_TIMED_OUT) ? 0 : ret;
+	return (ret == STATUS_WOULD_BLOCK || ret == STATUS_TIMED_OUT) ? 0 : ret;
 }
 
 /** Sleep for a certain amount of time.
