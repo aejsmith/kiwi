@@ -41,13 +41,13 @@
  *			true.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_t timeout, int flags) {
+status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_t timeout, int flags) {
+	status_t ret;
 	bool state;
-	int ret;
 
 	assert(!!mtx ^ !!sl);
 

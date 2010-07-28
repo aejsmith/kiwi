@@ -37,12 +37,12 @@
 #include <sync/semaphore.h>
 
 #include <console.h>
-#include <errors.h>
 #include <init.h>
 #include <kdbg.h>
 #include <object.h>
+#include <status.h>
 #include <vmem.h>
-
+#if 0
 /** Structure containing a userspace semaphore. */
 typedef struct user_semaphore {
 	object_t obj;			/**< Object header. */
@@ -59,7 +59,7 @@ static vmem_t *semaphore_id_arena;
 /** Tree of userspace semaphores. */
 static AVL_TREE_DECLARE(semaphore_tree);
 static RWLOCK_DECLARE(semaphore_tree_lock);
-
+#endif
 /** Down a semaphore.
  * @param sem		Semaphore to down.
  * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
@@ -67,10 +67,10 @@ static RWLOCK_DECLARE(semaphore_tree_lock);
  *			of 0 will return an error immediately if unable to down
  *			the semaphore.
  * @param flags		Synchronization flags.
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set. */
-int semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
+status_t semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
 	bool state;
 
 	state = waitq_sleep_prepare(&sem->queue);
@@ -78,7 +78,7 @@ int semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
 		--sem->count;
 		spinlock_unlock_ni(&sem->queue.lock);
 		intr_restore(state);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	return waitq_sleep_unsafe(&sem->queue, timeout, flags, state);
@@ -113,7 +113,7 @@ void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
 	waitq_init(&sem->queue, name);
 	sem->count = initial;
 }
-
+#if 0
 /** Print a list of semaphores.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -310,3 +310,4 @@ static void __init_text semaphore_id_init(void) {
 	                                 NULL, NULL, 0, 0, MM_FATAL);
 }
 INITCALL(semaphore_id_init);
+#endif

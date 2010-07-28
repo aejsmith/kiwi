@@ -27,7 +27,7 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <status.h>
 #include <time.h>
 
 extern void sched_internal(bool state);
@@ -85,9 +85,9 @@ bool waitq_sleep_prepare(waitq_t *queue) {
  *			will block indefinitely until the thread is woken.
  * @param flags		Flags to modify behaviour (see sync/flags.h).
  * @param state		Interrupt state returned from waitq_sleep_prepare().
- * @return		0 on success, negative error code on failure. */
-int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
-	int ret;
+ * @return		Status code describing result of the operation. */
+status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
+	status_t ret;
 
 	assert(spinlock_held(&queue->lock));
 	assert(!intr_state());
@@ -95,7 +95,7 @@ int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state
 	if(!timeout) {
 		spinlock_unlock_ni(&queue->lock);
 		intr_restore(state);
-		return -ERR_WOULD_BLOCK;
+		return STATUS_WOULD_BLOCK;
 	}
 
 	spinlock_lock_ni(&curr_thread->lock);
@@ -107,7 +107,7 @@ int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state
 	 * be restored if sleep is interrupted. */
 	if(flags & SYNC_INTERRUPTIBLE || timeout > 0) {
 		if(context_save(&curr_thread->sleep_context) != 0) {
-			ret = (curr_thread->timed_out) ? -ERR_TIMED_OUT : -ERR_INTERRUPTED;
+			ret = (curr_thread->timed_out) ? STATUS_TIMED_OUT : STATUS_INTERRUPTED;
 			sched_post_switch(state);
 			return ret;
 		}
@@ -128,7 +128,7 @@ int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
 	sched_internal(state);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Sleep on a wait queue.
@@ -143,11 +143,11 @@ int waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state
  *			will block indefinitely until the thread is woken.
  * @param flags		Flags to modify behaviour (see sync/flags.h).
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int waitq_sleep(waitq_t *queue, useconds_t timeout, int flags) {
+status_t waitq_sleep(waitq_t *queue, useconds_t timeout, int flags) {
 	return waitq_sleep_unsafe(queue, timeout, flags, waitq_sleep_prepare(queue));
 }
 

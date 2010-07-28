@@ -51,8 +51,8 @@ static inline bool spinlock_held(spinlock_t *lock) {
 	return atomic_get(&lock->locked);
 }
 
-extern int spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags);
-extern int spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags);
+extern status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags);
+extern status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags);
 extern void spinlock_lock(spinlock_t *lock);
 extern void spinlock_lock_ni(spinlock_t *lock);
 extern void spinlock_unlock(spinlock_t *lock);

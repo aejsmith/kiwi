@@ -24,6 +24,7 @@
 #include <cpu/intr.h>
 #include <proc/thread.h>
 #include <sync/rwlock.h>
+#include <status.h>
 
 extern void thread_wake(thread_t *thread);
 
@@ -86,11 +87,11 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
+status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	bool state = intr_disable();
 
 	curr_thread->rwlock_writer = false;
@@ -112,7 +113,7 @@ int rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	lock->readers++;
 	spinlock_unlock_ni(&lock->queue.lock);
 	intr_restore(state);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Acquire a readers-writer lock for writing.
@@ -128,20 +129,21 @@ int rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
  *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
+status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
+	status_t ret = STATUS_SUCCESS;
 	bool state = intr_disable();
-	int ret = 0;
 
 	curr_thread->rwlock_writer = true;
 	spinlock_lock_ni(&lock->queue.lock);
 
 	/* Just acquire the exclusive lock. */
 	if(lock->held) {
-		if((ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state)) != 0) {
+		ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
+		if(ret != STATUS_SUCCESS) {
 			/* Failed to acquire the lock. In this case, there may
 			 * be a reader queued behind us that can be let in. */
 			spinlock_lock(&lock->queue.lock);

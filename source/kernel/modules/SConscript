@@ -44,7 +44,7 @@ env['BUILDERS']['Module'] = Builder(
 	emitter=module_emitter)
 
 # Get all of the modules and include directories into the array.
-SConscript(dirs=subdirs, exports=['env'])
+#SConscript(dirs=subdirs, exports=['env'])
 
 # Let the distribution environment know where the modules are.
 envmgr['dist']['MODULES'] = env['MODULES']

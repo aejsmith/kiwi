@@ -61,7 +61,7 @@ static inline int mutex_recursion(mutex_t *lock) {
 	return atomic_get(&lock->locked);
 }
 
-extern int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags);
+extern status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags);
 extern void mutex_lock(mutex_t *lock);
 extern void mutex_unlock(mutex_t *lock);
 extern void mutex_init(mutex_t *lock, const char *name, int flags);

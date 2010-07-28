@@ -26,22 +26,22 @@
 #include <sync/spinlock.h>
 
 #include <assert.h>
-#include <errors.h>
 #include <fatal.h>
+#include <status.h>
 
 /** Internal part of spinlock_lock_etc()/spinlock_lock_ni_etc().
  * @param lock		Spinlock to lock.
  * @param timeout	Timeout.
  * @param flags		Synchronization flags.
- * @return		0 on success, negative error code on failure. */
-static inline int spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, int flags) {
+ * @return		Status code describing result of the operation. */
+static inline status_t spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, int flags) {
 	/* When running on a single processor there is no need for us to
 	 * spin as there should only ever be one thing here at any one time.
 	 * so just die if it's already locked. */
 	if(cpu_count > 1) {
 		if(!timeout) {
 			if(!atomic_cmp_set(&lock->locked, 0, 1)) {
-				return -ERR_WOULD_BLOCK;
+				return STATUS_WOULD_BLOCK;
 			}
 		} else {
 			while(!atomic_cmp_set(&lock->locked, 0, 1)) {
@@ -54,7 +54,7 @@ static inline int spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, i
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Lock a spinlock.
@@ -76,26 +76,27 @@ static inline int spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, i
  * @param flags		Synchronization flags (the SYNC_INTERRUPTIBLE flag is
  *			not supported).
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1.
  */
-int spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
+status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
+	status_t ret;
 	bool state;
-	int ret;
 
 	/* Disable interrupts while locked to ensure that nothing else
 	 * will run on the current CPU for the duration of the lock. */
 	state = intr_disable();
 
 	/* Take the lock. */
-	if((ret = spinlock_lock_internal(lock, timeout, flags)) != 0) {
+	ret = spinlock_lock_internal(lock, timeout, flags);
+	if(ret != STATUS_SUCCESS) {
 		intr_restore(state);
 		return ret;
 	}
 
 	lock->state = state;
 	enter_cs_barrier();
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Lock a spinlock without changing interrupt state.
@@ -121,21 +122,22 @@ int spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
  * @param flags		Synchronization flags (the SYNC_INTERRUPTIBLE flag is
  *			not supported).
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1.
  */
-int spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
-	int ret;
+status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
+	status_t ret;
 
 	assert(!intr_state());
 
 	/* Take the lock. */
-	if((ret = spinlock_lock_internal(lock, timeout, flags)) != 0) {
+	ret = spinlock_lock_internal(lock, timeout, flags);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	enter_cs_barrier();
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Lock a spinlock.

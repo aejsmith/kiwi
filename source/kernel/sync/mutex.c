@@ -25,8 +25,8 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
-#include <errors.h>
 #include <fatal.h>
+#include <status.h>
 
 /** Lock a mutex.
  *
@@ -41,13 +41,13 @@
  *			the lock.
  * @param flags		Synchronization flags.
  *
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
+status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
+	status_t ret;
 	bool state;
-	int ret;
 
 	/* Try to take the lock. */
 	if(!atomic_cmp_set(&lock->locked, 0, 1)) {
@@ -56,7 +56,7 @@ int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 			 * thread the MUTEX_RECURSIVE flag should be set. */
 			if(likely(lock->flags & MUTEX_RECURSIVE)) {
 				atomic_inc(&lock->locked);
-				return 0;
+				return STATUS_SUCCESS;
 			} else {
 				fatal("Recursive locking of non-recursive mutex %p(%s)",
 				      lock, lock->queue.name);
@@ -72,7 +72,8 @@ int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 			} else {
 				/* If sleep is successful, lock ownership will
 				 * have been transferred to us. */
-				if((ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state)) != 0) {
+				ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
+				if(ret != STATUS_SUCCESS) {
 					return ret;
 				}
 			}
@@ -80,7 +81,7 @@ int mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 	}
 
 	lock->holder = curr_thread;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Lock a mutex.
