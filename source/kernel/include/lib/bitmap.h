@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -35,7 +35,7 @@ typedef struct bitmap {
 /** Get the number of bytes required for a bitmap. */
 #define BITMAP_BYTES(bits)	(ROUND_UP(bits, 8) / 8)
 
-extern int bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int kmflag);
+extern status_t bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int mmflag);
 extern void bitmap_destroy(bitmap_t *bitmap);
 
 extern void bitmap_set(bitmap_t *bitmap, int bit);

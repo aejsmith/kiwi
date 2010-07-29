@@ -42,7 +42,7 @@
 #include <object.h>
 #include <status.h>
 #include <vmem.h>
-#if 0
+
 /** Structure containing a userspace semaphore. */
 typedef struct user_semaphore {
 	object_t obj;			/**< Object header. */
@@ -59,7 +59,7 @@ static vmem_t *semaphore_id_arena;
 /** Tree of userspace semaphores. */
 static AVL_TREE_DECLARE(semaphore_tree);
 static RWLOCK_DECLARE(semaphore_tree_lock);
-#endif
+
 /** Down a semaphore.
  * @param sem		Semaphore to down.
  * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
@@ -113,7 +113,7 @@ void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
 	waitq_init(&sem->queue, name);
 	sem->count = initial;
 }
-#if 0
+
 /** Print a list of semaphores.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -166,20 +166,22 @@ static object_type_t semaphore_object_type = {
 /** Create a new semaphore.
  * @param name		Optional name for the semaphore, for debugging purposes.
  * @param count		Initial count of the semaphore.
- * @return		Handle to the semaphore on success, negative error
- *			code on failure. */
-handle_t sys_semaphore_create(const char *name, size_t count) {
+ * @param handlep	Where to store handle to the semaphore.
+ * @return		Status code describing result of the operation. */
+status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep) {
 	user_semaphore_t *sem;
-	khandle_t *handle;
-	handle_t ret;
+	khandle_t *khandle;
+	handle_t uhandle;
+	status_t ret;
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
 	if(!(sem->id = vmem_alloc(semaphore_id_arena, 1, 0))) {
 		kfree(sem);
-		return -ERR_RESOURCE_UNAVAIL;
+		return STATUS_RESOURCE_UNAVAIL;
 	}
 	if(name) {
-		if((ret = strdup_from_user(name, 0, &sem->name)) != 0) {
+		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, 0, &sem->name);
+		if(ret != STATUS_SUCCESS) {
 			vmem_free(semaphore_id_arena, sem->id, 1);
 			kfree(sem);
 			return ret;
@@ -192,56 +194,62 @@ handle_t sys_semaphore_create(const char *name, size_t count) {
 	semaphore_init(&sem->sem, (sem->name) ? sem->name : "user_semaphore", count);
 	refcount_set(&sem->count, 1);
 
-	handle_create(&sem->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
-	if(ret < 0) {
-		/* The handle_release call frees the semaphore. */
-		return ret;
-	}
-
 	rwlock_write_lock(&semaphore_tree_lock);
 	avl_tree_insert(&semaphore_tree, sem->id, sem, NULL);
 	rwlock_unlock(&semaphore_tree_lock);
+
+	khandle = handle_create(&sem->obj, NULL);
+	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
+		if(ret != STATUS_SUCCESS) {
+			handle_detach(curr_proc, uhandle);
+		}
+	}
+	handle_release(khandle);
 	return ret;
 }
 
 /** Open a handle to a semaphore.
  * @param id		ID of the semaphore to open.
- * @return		Handle to the semaphore on success, negative error
- *			code on failure. */
-handle_t sys_semaphore_open(semaphore_id_t id) {
+ * @param handlep	Where to store handle to semaphore.
+ * @return		Status code describing result of the operation. */
+status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	user_semaphore_t *sem;
-	khandle_t *handle;
-	handle_t ret;
+	khandle_t *khandle;
+	handle_t uhandle;
+	status_t ret;
 
 	rwlock_read_lock(&semaphore_tree_lock);
 
 	if(!(sem = avl_tree_lookup(&semaphore_tree, id))) {
 		rwlock_unlock(&semaphore_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	refcount_inc(&sem->count);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	handle_create(&sem->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	khandle = handle_create(&sem->obj, NULL);
+	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
+		if(ret != STATUS_SUCCESS) {
+			handle_detach(curr_proc, uhandle);
+		}
+	}
+	handle_release(khandle);
 	return ret;
 }
 
 /** Get the ID of a semaphore.
  * @param handle	Handle to semaphore to get ID of.
- * @return		ID of semaphore on success, negative error code on
- *			failure. */
+ * @return		ID of semaphore on success, -1 if handle is invalid. */
 semaphore_id_t sys_semaphore_id(handle_t handle) {
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
 	khandle_t *khandle;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
-		return ret;
+	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle) != STATUS_SUCCESS) {
+		return -1;
 	}
 
 	sem = (user_semaphore_t *)khandle->object;
@@ -262,14 +270,15 @@ semaphore_id_t sys_semaphore_id(handle_t handle) {
  *			of 0 will return an error immediately if unable to down
  *			the semaphore.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_semaphore_down(handle_t handle, useconds_t timeout) {
+status_t sys_semaphore_down(handle_t handle, useconds_t timeout) {
 	user_semaphore_t *sem;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -287,21 +296,22 @@ int sys_semaphore_down(handle_t handle, useconds_t timeout) {
  * @param handle	Handle to semaphore to up.
  * @param count		Value to up the semaphore by.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_semaphore_up(handle_t handle, size_t count) {
+status_t sys_semaphore_up(handle_t handle, size_t count) {
 	user_semaphore_t *sem;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	semaphore_up(&sem->sem, count);
 	handle_release(khandle);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Initialise the semaphore ID allocator. */
@@ -310,4 +320,3 @@ static void __init_text semaphore_id_init(void) {
 	                                 NULL, NULL, 0, 0, MM_FATAL);
 }
 INITCALL(semaphore_id_init);
-#endif

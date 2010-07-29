@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -77,6 +77,6 @@ extern void hash_insert(hash_t *hash, list_t *entry);
 extern bool hash_insert_unique(hash_t *hash, list_t *entry);
 extern void hash_remove(list_t *entry);
 extern list_t *hash_lookup(hash_t *hash, key_t key);
-extern int hash_init(hash_t *hash, size_t entries, hash_ops_t *ops);
+extern status_t hash_init(hash_t *hash, size_t entries, hash_ops_t *ops, int mmflag);
 
 #endif /* __LIB_HASH_H */

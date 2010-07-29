@@ -37,9 +37,6 @@
 #include <object.h>
 #include <time.h>
 
-/** Maximum length of a thread name. */
-#define THREAD_NAME_MAX		32
-
 struct process;
 struct waitq;
 
@@ -116,7 +113,7 @@ typedef struct thread {
 #define curr_thread		(curr_cpu->thread)
 
 extern void thread_arch_post_switch(thread_t *thread);
-extern int thread_arch_init(thread_t *thread);
+extern status_t thread_arch_init(thread_t *thread);
 extern void thread_arch_destroy(thread_t *thread);
 extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
 
@@ -131,8 +128,9 @@ extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
-extern int thread_create(const char *name, struct process *owner, int flags,
-                         thread_func_t entry, void *arg1, void *arg2, thread_t **threadp);
+extern status_t thread_create(const char *name, struct process *owner, int flags,
+                              thread_func_t entry, void *arg1, void *arg2,
+                              thread_t **threadp);
 extern void thread_run(thread_t *thread);
 extern void thread_destroy(thread_t *thread);
 

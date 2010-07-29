@@ -23,6 +23,8 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <status.h>
+
 /** AMD64-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
 	/* Set the RSP0 field in the TSS to point to the new thread's
@@ -36,11 +38,11 @@ void thread_arch_post_switch(thread_t *thread) {
 
 /** Initialise AMD64-specific thread data.
  * @param thread	Thread to initialise.
- * @return		Always returns 0. */
-int thread_arch_init(thread_t *thread) {
+ * @return		Always returns STATUS_SUCCESS. */
+status_t thread_arch_init(thread_t *thread) {
 	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
 	thread->arch.user_rsp = 0;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Clean up AMD64-specific thread data.

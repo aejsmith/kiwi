@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -25,7 +25,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <status.h>
 
 /* Credit for primes table: Aaron Krowne
  *  http://br.endernet.org/~akrowne/
@@ -177,15 +177,14 @@ list_t *hash_lookup(hash_t *hash, key_t key) {
  * @param hash		Hash table to initialise.
  * @param entries	Estimated number of entries.
  * @param ops		Hash table operations structure.
+ * @param mmflag	Allocation flags.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int hash_init(hash_t *hash, size_t entries, hash_ops_t *ops) {
+status_t hash_init(hash_t *hash, size_t entries, hash_ops_t *ops, int mmflag) {
 	size_t i;
 
-	if(entries == 0) {
-		return -ERR_PARAM_INVAL;
-	}
+	assert(entries);
 
 	/* Pick a prime that's at least the estimated number of entries. */
 	for(i = 0; i < ARRAYSZ(primes); i++) {
@@ -196,9 +195,9 @@ int hash_init(hash_t *hash, size_t entries, hash_ops_t *ops) {
 	}
 
 	/* Allocate and initialise buckets. */
-	hash->buckets = kmalloc(sizeof(list_t) * hash->entries, 0);
+	hash->buckets = kmalloc(sizeof(list_t) * hash->entries, mmflag);
 	if(hash->buckets == NULL) {
-		return -ERR_NO_MEMORY;
+		return STATUS_NO_MEMORY;
 	}
 
 	for(i = 0; i < hash->entries; i++) {
@@ -206,5 +205,5 @@ int hash_init(hash_t *hash, size_t entries, hash_ops_t *ops) {
 	}
 
 	hash->ops = ops;
-	return 0;
+	return STATUS_SUCCESS;
 }

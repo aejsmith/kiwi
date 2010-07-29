@@ -25,7 +25,6 @@
 
 #include <lib/notifier.h>
 
-#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <public/process.h>
@@ -43,7 +42,7 @@ typedef struct process_create_info {
 	const char *path;		/**< Path to program. */
 	const char *const *args;	/**< Argument array. */
 	const char *const *env;		/**< Environment array. */
-	handle_t (*handles)[2];		/**< Handle mapping array. */
+	handle_t (*map)[2];		/**< Handle mapping array. */
 	int count;			/**< Number of handles in the array. */
 
 	/** Information used internally by the loader. */
@@ -99,8 +98,8 @@ extern void process_detach(thread_t *thread);
 
 extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
-extern int process_create(const char *const args[], const char *const env[], int flags,
-                          int priority, process_t *parent, process_t **procp);
+extern status_t process_create(const char *const args[], const char *const env[], int flags,
+                               int priority, process_t *parent, process_t **procp);
 extern void process_exit(int status) __noreturn;
 
 extern int kdbg_cmd_process(int argc, char **argv);

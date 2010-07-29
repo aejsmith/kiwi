@@ -31,6 +31,9 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
+/** Maximum length of a semaphore name. */
+#define SEMAPHORE_NAME_MAX	32
+
 extern status_t SYSCALL(semaphore_create)(const char *name, size_t count, handle_t *handlep);
 extern status_t SYSCALL(semaphore_open)(semaphore_id_t id, handle_t *handlep);
 extern semaphore_id_t SYSCALL(semaphore_id)(handle_t handle);

@@ -743,6 +743,9 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 		return ret;
 	} else if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
 		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
+		if(ret != STATUS_SUCCESS) {
+			handle_detach(curr_proc, uhandle);
+		}
 	}
 	handle_release(khandle);
 	return ret;

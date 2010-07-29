@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -27,7 +27,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <status.h>
 
 /** Initialise a bitmap.
  *
@@ -41,27 +41,29 @@
  * @param bitmap	Bitmap to initialise.
  * @param bits		Number of bits the bitmap should be able to hold.
  * @param data		Pointer to preallocated memory (if any).
- * @param kmflag	Allocation flags to use if allocating memory.
+ * @param mmflag	Allocation flags to use if allocating memory.
  *
- * @return		0 on success, negative error code on failure (always
+ * @return		Status code describing result of the operation. Always
  *			succeeds if using preallocated memory).
  */
-int bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int kmflag) {
+status_t bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int mmflag) {
+	assert(bits > 0);
+
 	if(data) {
 		bitmap->allocated = false;
 		bitmap->data = data;
 	} else {
 		bitmap->allocated = true;
-		bitmap->data = kmalloc(BITMAP_BYTES(bits), kmflag);
+		bitmap->data = kmalloc(BITMAP_BYTES(bits), mmflag);
 		if(bitmap->data == NULL) {
-			return -ERR_NO_MEMORY;
+			return STATUS_NO_MEMORY;
 		}
 
 		memset(bitmap->data, 0, BITMAP_BYTES(bits));
 	}
 
 	bitmap->count = bits;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Destroy a bitmap.

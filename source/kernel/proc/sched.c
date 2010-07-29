@@ -63,6 +63,7 @@
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
+#include <status.h>
 #include <time.h>
 
 #if CONFIG_SCHED_DEBUG
@@ -552,6 +553,7 @@ void sched_preempt_enable(void) {
 /** Initialise the scheduler for the current CPU. */
 void __init_text sched_init(void) {
 	char name[THREAD_NAME_MAX];
+	status_t ret;
 	int i;
 
 	/* Create the per-CPU information structure. */
@@ -561,9 +563,10 @@ void __init_text sched_init(void) {
 
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-	if(thread_create(name, kernel_proc, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
-	                 sched_idle_thread, NULL, NULL, &curr_cpu->sched->idle_thread) != 0) {
-		fatal("Could not create idle thread for %" PRIu32, curr_cpu->id);
+	ret = thread_create(name, kernel_proc, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
+	                    sched_idle_thread, NULL, NULL, &curr_cpu->sched->idle_thread);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create idle thread for %" PRIu32 " (%d)", curr_cpu->id, ret);
 	}
 	thread_wire(curr_cpu->sched->idle_thread);
 
@@ -586,9 +589,11 @@ void __init_text sched_init(void) {
 	/* Create the load-balancing thread if there is more than one CPU. */
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
-		if(thread_create(name, kernel_proc,THREAD_UNPREEMPTABLE, sched_balancer_thread,
-		                 NULL, NULL, &curr_cpu->sched->balancer_thread) != 0) {
-			fatal("Could not create load balancer thread for %" PRIu32, curr_cpu->id);
+		ret = thread_create(name, kernel_proc, THREAD_UNPREEMPTABLE, sched_balancer_thread,
+		                    NULL, NULL, &curr_cpu->sched->balancer_thread);
+		if(ret != STATUS_SUCCESS) {
+			fatal("Could not create load balancer thread for %" PRIu32 " (%d)",
+			      curr_cpu->id, ret);
 		}
 		thread_wire(curr_cpu->sched->balancer_thread);
 		thread_run(curr_cpu->sched->balancer_thread);

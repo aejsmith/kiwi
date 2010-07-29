@@ -40,9 +40,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <status.h>
 #include <time.h>
 
 #if CONFIG_PROC_DEBUG
@@ -79,17 +79,14 @@ static SEMAPHORE_DECLARE(dead_thread_sem, 0);
 
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
- * @param data		Ignored.
- * @param kmflag	Allocation flags.
- * @return		0 on success, -1 on failure. */
-static int thread_cache_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Ignored. */
+static void thread_cache_ctor(void *obj, void *data) {
 	thread_t *thread = (thread_t *)obj;
 
 	spinlock_init(&thread->lock, "thread_lock");
 	list_init(&thread->runq_link);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
-	return 0;
 }
 
 /** Thread entry function wrapper. */
@@ -376,15 +373,15 @@ thread_t *thread_lookup(thread_id_t id) {
  * @param arg2		Second argument to pass to entry function.
  * @param threadp	Where to store pointer to thread structure.
  *
- * @return		0 on success, a negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
-                  void *arg1, void *arg2, thread_t **threadp) {
+status_t thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
+                       void *arg1, void *arg2, thread_t **threadp) {
 	thread_t *thread;
-	int ret;
+	status_t ret;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Allocate a thread structure from the cache. The thread constructor
@@ -400,7 +397,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	/* Initialise architecture-specific data. */
 	ret = thread_arch_init(thread);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		kheap_free(thread->kstack, KSTACK_SIZE);
 		slab_cache_free(thread_cache, thread);
 		return ret;
@@ -447,7 +444,7 @@ int thread_create(const char *name, process_t *owner, int flags, thread_func_t e
 
 	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Run a newly-created thread.
@@ -635,18 +632,22 @@ void __init_text thread_reaper_init(void) {
  *			stack of the default size will be allocated.
  * @param func		Function to execute.
  * @param arg		Argument to pass to thread.
- * @return		Handle to the thread on success, negative error code on
- *			failure. */
-handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *), void *arg) {
+ * @param handlep	Where to store handle to the thread.
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
+                           void *arg, handle_t *handlep) {
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
 	handle_t handle = -1;
+	status_t ret;
 	char *kname;
-	int ret;
 
 	if(stack && (stacksz < STACK_DELTA)) {
-		return -ERR_PARAM_INVAL;
-	} else if((ret = strndup_from_user(name, THREAD_NAME_MAX, MM_SLEEP, &kname)) != 0) {
+		return STATUS_PARAM_INVAL;
+	}
+
+	ret = strndup_from_user(name, THREAD_NAME_MAX, MM_SLEEP, &kname);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -658,12 +659,13 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
 	 * terminate it if not successful. */
-	if((ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread)) != 0) {
+	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 	refcount_inc(&thread->count);
-	if((handle = handle_create(&thread->obj, NULL, curr_proc, 0, NULL)) < 0) {
-		ret = handle;
+	ret = handle_create_and_attach(&thread->obj, NULL, curr_proc, 0, &handle);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
@@ -677,17 +679,21 @@ handle_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 			stacksz = USTACK_SIZE;
 		}
 
-		if((ret = vm_map(curr_proc->aspace, 0, stacksz,
-		                 VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-		                 NULL, 0, &args->sp)) != 0) {
+		ret = vm_map(curr_proc->aspace, 0, stacksz,
+		             VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
+		             NULL, 0, &args->sp);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 		args->sp += (stacksz - STACK_DELTA);
 	}
 
+	if((ret = memcpy_to_user(handlep, &handle, sizeof(handle_t))) != STATUS_SUCCESS) {
+		goto fail;
+	}
 	thread_run(thread);
 	kfree(kname);
-	return handle;
+	return ret;
 fail:
 	if(handle >= 0) {
 		/* This will handle thread destruction. */
@@ -701,25 +707,33 @@ fail:
 }
 
 /** Open a handle to a thread.
- * @param id		Global ID of the thread to open. */
-handle_t sys_thread_open(thread_id_t id) {
-	khandle_t *handle;
+ * @param id		ID of the thread to open.
+ * @param handlep	Where to store handle to thread.
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
+	khandle_t *khandle;
 	thread_t *thread;
-	handle_t ret;
+	handle_t uhandle;
+	status_t ret;
 
 	rwlock_read_lock(&thread_tree_lock);
 
 	if(!(thread = thread_lookup_unsafe(id))) {
 		rwlock_unlock(&thread_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	handle_create(&thread->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	khandle = handle_create(&thread->obj, NULL);
+	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
+		if(ret != STATUS_SUCCESS) {
+			handle_detach(curr_proc, uhandle);
+		}
+	}
+	handle_release(khandle);
 	return ret;
 }
 
@@ -730,17 +744,16 @@ handle_t sys_thread_open(thread_id_t id) {
  *
  * @param handle	Handle for thread to get ID of.
  *
- * @return		Thread ID on success (greater than or equal to zero),
- *			negative error code on failure.
+ * @return		Thread ID, or -1 if the handle is invalid.
  */
 thread_id_t sys_thread_id(handle_t handle) {
+	thread_id_t id = -1;
 	khandle_t *khandle;
 	thread_t *thread;
-	thread_id_t id;
 
 	if(handle == -1) {
 		id = curr_thread->id;
-	} else if((id = handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &khandle)) == 0) {
+	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &khandle) == STATUS_SUCCESS) {
 		thread = (thread_t *)khandle->object;
 		id = thread->id;
 		handle_release(khandle);
@@ -759,10 +772,10 @@ void sys_thread_exit(int status) {
 /** Sleep for a certain amount of time.
  * @param us		Number of microseconds to sleep for. Must be 0 or
  *			higher.
- * @return		0 on success, negative error code on failure. */
-int sys_thread_usleep(useconds_t us) {
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_usleep(useconds_t us) {
 	if(us < 0) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 	return usleep_etc(us, SYNC_INTERRUPTIBLE);
 }

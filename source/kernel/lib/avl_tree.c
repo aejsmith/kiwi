@@ -37,7 +37,6 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <errors.h>
 
 /** Get the height of a subtree. Assumes that child heights are up-to-date.
  * @param node		Root node of subtree.

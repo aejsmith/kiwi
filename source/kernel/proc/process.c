@@ -40,9 +40,9 @@
 #include <assert.h>
 #include <console.h>
 #include <elf.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <status.h>
 #include <vmem.h>
 
 #if CONFIG_PROC_DEBUG
@@ -68,16 +68,13 @@ process_t *kernel_proc;
 
 /** Constructor for process objects.
  * @param obj		Pointer to object.
- * @param data		Ignored.
- * @param kmflag	Allocation flags.
- * @return		0 on success, -1 on failure. */
-static int process_cache_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Ignored. */
+static void process_cache_ctor(void *obj, void *data) {
 	process_t *process = (process_t *)obj;
 
 	mutex_init(&process->lock, "process_lock", 0);
 	list_init(&process->threads);
 	notifier_init(&process->death_notifier, process);
-	return 0;
 }
 
 /** Destroy a process structure.
@@ -122,29 +119,29 @@ static void process_release(process_t *process) {
  * @param aspace	Address space for the process.
  * @param parent	Process to inherit information from.
  * @param cflags	Creation flags for the process.
- * @param handles	Array of handle mappings (see handle_table_init()).
+ * @param map		Array of handle mappings (see handle_table_init()).
  * @param count		Number of handles in mapping array.
  * @param procp		Where to store pointer to structure.
  * @param handlep	Where to store handle to process in parent (can be NULL,
  *			in which case no handle will be created).
- * @return		0 on success, negative error code on failure. Note that
- *			on failure the supplied address space will NOT be
+ * @return		Status code describing result of the operation. Note
+ *			that on failure the supplied address space will NOT be
  *			destroyed. */
-static int process_alloc(const char *name, process_id_t id, int flags, int priority,
-                         vm_aspace_t *aspace, process_t *parent, int cflags,
-                         handle_t handles[][2], int count, process_t **procp,
-                         handle_t *handlep) {
+static status_t process_alloc(const char *name, process_id_t id, int flags, int priority,
+                              vm_aspace_t *aspace, process_t *parent, int cflags,
+                              handle_t map[][2], int count, process_t **procp,
+                              handle_t *handlep) {
 	process_t *process;
-	handle_t handle;
-	int ret;
+	status_t ret;
 
 	assert(name);
 	assert(procp);
 	assert(priority >= 0 && priority < PRIORITY_MAX);
 
 	process = slab_cache_alloc(process_cache, MM_SLEEP);
-	if((ret = handle_table_create((parent) ? parent->handles : NULL, handles,
-	                              count, &process->handles)) != 0) {
+	ret = handle_table_create((parent) ? parent->handles : NULL, map, count,
+	                          &process->handles);
+	if(ret != STATUS_SUCCESS) {
 		slab_cache_free(process_cache, process);
 		return ret;
 	}
@@ -168,18 +165,18 @@ static int process_alloc(const char *name, process_id_t id, int flags, int prior
 	/* Create a handle to the process if required. */
 	if(handlep) {
 		assert(parent);
-		if((handle = handle_create(&process->obj, NULL, parent, 0, NULL)) < 0) {
+		ret = handle_create_and_attach(&process->obj, NULL, parent, 0, handlep);
+		if(ret != STATUS_SUCCESS) {
 			process->aspace = NULL;
 			process_release(process);
-			return handle;
+			return ret;
 		}
-		*handlep = handle;
 	}
 
 	dprintf("process: created process %" PRId32 "(%s) (proc: %p)\n",
 		process->id, process->name, process);
 	*procp = process;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Closes a handle to a process.
@@ -190,8 +187,8 @@ static void process_object_close(khandle_t *handle) {
 
 /** Signal that a process is being waited for.
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int process_object_wait(object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t process_object_wait(object_wait_t *wait) {
 	process_t *process = (process_t *)wait->handle->object;
 
 	switch(wait->event) {
@@ -203,9 +200,9 @@ static int process_object_wait(object_wait_t *wait) {
 			notifier_register(&process->death_notifier, object_wait_notifier, wait);
 		}
 		mutex_unlock(&process->lock);
-		return 0;
+		return STATUS_SUCCESS;
 	default:
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 }
 
@@ -231,17 +228,19 @@ static object_type_t process_object_type = {
 
 /** Map a program into a new address space.
  * @param info		Pointer to information structure.
- * @return		0 on success, negative error code on failure. */
-static int load_binary(process_create_info_t *info) {
+ * @return		Status code describing result of the operation. */
+static status_t load_binary(process_create_info_t *info) {
+	// FIXME Make error return paths destroy aspace.
+#if 0
 	khandle_t *handle;
+	status_t ret;
 	size_t size;
-	int ret;
 
 	semaphore_init(&info->sem, "process_create_sem", 0);
 	info->aspace = vm_aspace_create();
 
 	/* Load the binary into the new address space. */
-	if((ret = fs_file_open(info->path, FS_FILE_READ, &handle)) != 0) {
+	if((ret = fs_file_open(info->path, FS_FILE_READ, &handle)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = elf_binary_load(handle, info->aspace, &info->data)) != 0) {
 		handle_release(handle);
@@ -265,6 +264,8 @@ static int load_binary(process_create_info_t *info) {
 	return vm_map(info->aspace, 0, USTACK_SIZE,
 	              VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
 	              NULL, 0, &info->stack);
+#endif
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Copy the data contained in a string array to the argument block.
@@ -320,7 +321,8 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	*(ptr_t *)stack = info->arg_block;
 
 	/* Get the ELF loader to clear BSS and get the entry pointer. */
-	entry = elf_binary_finish(info->data);
+	//entry = elf_binary_finish(info->data);
+	fatal("Meow");
 
 	/* If there the information structure pointer is NULL, process_replace()
 	 * is being used and we don't need to wait for the loader to complete. */
@@ -421,17 +423,17 @@ process_t *process_lookup(process_id_t id) {
  * @param parent	Parent for the process.
  * @param procp		Where to store pointer to new process.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int process_create(const char *const args[], const char *const env[], int flags,
-                   int priority, process_t *parent, process_t **procp) {
+status_t process_create(const char *const args[], const char *const env[], int flags,
+                        int priority, process_t *parent, process_t **procp) {
 	process_create_info_t info;
 	process_t *process;
 	thread_t *thread;
-	int ret;
+	status_t ret;
 
 	if(!args || !args[0] || !env || priority < 0 || priority >= PRIORITY_MAX) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	info.path = args[0];
@@ -439,18 +441,17 @@ int process_create(const char *const args[], const char *const env[], int flags,
 	info.env = env;
 
 	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != 0) {
-		vm_aspace_destroy(info.aspace);
+	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Create the new process and run the process entry thread in it. */
 	if((ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent,
-	                        0, NULL, 0, &process, NULL)) != 0) {
+	                        0, NULL, 0, &process, NULL)) != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
 		return ret;
 	} else if((ret = thread_create("main", process, 0, process_entry_thread,
-	                               &info, NULL, &thread)) != 0) {
+	                               &info, NULL, &thread)) != STATUS_SUCCESS) {
 		process_destroy(process);
 		return ret;
 	}
@@ -462,14 +463,14 @@ int process_create(const char *const args[], const char *const env[], int flags,
 	if(procp) {
 		*procp = process;
 	}
-	return (info.status < 0) ? info.status : 0;
+	return info.status;
 }
 
 /** Terminate the calling process.
  *
  * Terminates the calling process. All threads in the process will also be
  * terminated. The status code given can be retrieved by any processes with a
- * handle to the process.
+ * handle to the process with process_status().
  *
  * @param status	Exit status code.
  */
@@ -529,7 +530,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 
 /** Initialise the process table and slab cache. */
 void __init_text process_init(void) {
-	int ret;
+	status_t ret;
 
 	/* Create the process slab cache and ID vmem arena. */
 	process_id_arena = vmem_create("process_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
@@ -540,7 +541,7 @@ void __init_text process_init(void) {
 	/* Create the kernel process. */
 	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
 	                        PRIORITY_KERNEL, NULL, NULL, 0, NULL, 0,
-	                        &kernel_proc, NULL)) != 0) {
+	                        &kernel_proc, NULL)) != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
@@ -566,8 +567,8 @@ static void process_create_args_free(process_create_info_t *info) {
 		}
 		kfree((void *)info->env);
 	}
-	if(info->handles) {
-		kfree(info->handles);
+	if(info->map) {
+		kfree(info->map);
 	}
 }
 
@@ -575,40 +576,44 @@ static void process_create_args_free(process_create_info_t *info) {
  * @param path		Path to copy.
  * @param args		Argument array to copy.
  * @param env		Environment array to copy.
- * @param handles	Handle array to copy.
+ * @param map		Handle array to copy.
  * @param count		Size of handle array.
  * @param info		Pointer to information structure to fill in.
- * @return		0 on success, negative error code on failure. */
-static int process_create_args_copy(const char *path, const char *const args[],
-                                    const char *const env[], handle_t handles[][2],
-                                    int count, process_create_info_t *info) {
+ * @return		Status code describing result of the operation. */
+static status_t process_create_args_copy(const char *path, const char *const args[],
+                                         const char *const env[], handle_t map[][2],
+                                         int count, process_create_info_t *info) {
+	status_t ret;
 	size_t size;
-	int ret;
+
+	if(!path || !args || !env || (count > 0 && !map)) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	info->path = NULL;
 	info->args = NULL;
 	info->env = NULL;
-	info->handles = NULL;
+	info->map = NULL;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, (char **)&info->path)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, (char **)&info->path)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = arrcpy_from_user(args, (char ***)&info->args)) != 0) {
+	} else if((ret = arrcpy_from_user(args, (char ***)&info->args)) != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
-	} else if((ret = arrcpy_from_user(env, (char ***)&info->env)) != 0) {
+	} else if((ret = arrcpy_from_user(env, (char ***)&info->env)) != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
 	} else if(count > 0) {
 		size = sizeof(handle_t) * 2 * count;
-		if(!(info->handles = kmalloc(size, 0))) {
+		if(!(info->map = kmalloc(size, 0))) {
 			process_create_args_free(info);
-			return -ERR_NO_MEMORY;
-		} else if((ret = memcpy_from_user(info->handles, handles, size)) != 0) {
+			return STATUS_NO_MEMORY;
+		} else if((ret = memcpy_from_user(info->map, map, size)) != STATUS_SUCCESS) {
 			process_create_args_free(info);
 			return ret;
 		}
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Create a new process.
@@ -625,43 +630,46 @@ static int process_create_args_copy(const char *path, const char *const args[],
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
  * @param flags		Flags modifying creation behaviour.
- * @param handles	Array containing handle mappings (can be NULL if count
+ * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
  *			specifies the ID to give it in the child.
  * @param count		Number of entries in handle mapping array.
+ * @param handlep	Where to store handle to process.
  *
- * @return		Handle to new process (greater than or equal to 0) on
- *			success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-handle_t sys_process_create(const char *path, const char *const args[],
-                            const char *const env[], int flags,
-                            handle_t handles[][2], int count) {
+status_t sys_process_create(const char *path, const char *const args[], const char *const env[],
+                            int flags, handle_t map[][2], int count, handle_t *handlep) {
 	process_create_info_t info;
 	process_t *process = NULL;
 	thread_t *thread;
 	handle_t handle;
-	int ret;
+	status_t ret;
 
-	if((ret = process_create_args_copy(path, args, env, handles, count, &info)) != 0) {
+	ret = process_create_args_copy(path, args, env, map, count, &info);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != 0) {
+	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
 		goto fail;
 	}
 
 	/* Create the new process and a handle to it. */
 	if((ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace,
-	                        curr_proc, flags, info.handles, count, &process,
-	                        &handle)) != 0) {
+	                        curr_proc, flags, info.map, count, &process,
+	                        &handle)) != STATUS_SUCCESS) {
+		goto fail;
+	} else if((ret = memcpy_to_user(handlep, &handle, sizeof(handle_t))) != STATUS_SUCCESS) {
 		goto fail;
 	}
 	process->create = &info;
 
 	/* Create the entry thread to finish loading the program. */
-	if((ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread)) != 0) {
+	if((ret = thread_create("main", process, 0, process_entry_thread, &info,
+	                        NULL, &thread)) != STATUS_SUCCESS) {
 		goto fail;
 	}
 	thread_run(thread);
@@ -670,10 +678,10 @@ handle_t sys_process_create(const char *path, const char *const args[],
 	semaphore_down(&info.sem);
 	process->create = NULL;
 	process_create_args_free(&info);
-	if((ret = info.status) < 0) {
+	if((ret = info.status) != STATUS_SUCCESS) {
 		goto fail;
 	}
-	return handle;
+	return ret;
 fail:
 	/* The handle_detach() call will destroy the process. */
 	if(process) {
@@ -699,45 +707,48 @@ fail:
  *			(NULL-terminated).
  * @param env		Array of environment variables for the program
  *			(NULL-terminated).
- * @param handles	Array containing handle mappings (can be NULL if count
+ * @param map		Array containing handle mappings (can be NULL if count
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
  *			specifies the ID to move it to.
  * @param count		Number of entries in handle mapping array.
  *
- * @return		Does not return on success, returns negative error code
- *			on failure.
+ * @return		Does not return on success, returns status code on
+ *			failure.
  */
-int sys_process_replace(const char *path, const char *const args[], const char *const env[],
-                        handle_t handles[][2], int count) {
+status_t sys_process_replace(const char *path, const char *const args[], const char *const env[],
+                             handle_t map[][2], int count) {
 	handle_table_t *table, *oldtable;
 	process_create_info_t info;
 	thread_t *thread = NULL;
 	vm_aspace_t *oldas;
 	char *oldname;
-	int ret;
+	status_t ret;
 
 	if(curr_proc->threads.next->next != &curr_proc->threads) {
 		kprintf(LOG_WARN, "TODO: Terminate other threads\n");
-		return -ERR_NOT_IMPLEMENTED;
+		return STATUS_NOT_IMPLEMENTED;
 	}
 
-	if((ret = process_create_args_copy(path, args, env, handles, count, &info)) != 0) {
+	ret = process_create_args_copy(path, args, env, map, count, &info);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != 0) {
+	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
 		goto fail;
 	}
 
 	/* Create the entry thread to finish loading the program. */
-	if((ret = thread_create("main", curr_proc, 0, process_entry_thread, &info, NULL, &thread)) != 0) {
+	ret = thread_create("main", curr_proc, 0, process_entry_thread, &info, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
 	/* Create a new handle table for the process. */
-	if((ret = handle_table_create(curr_proc->handles, info.handles, count, &table)) != 0) {
+	ret = handle_table_create(curr_proc->handles, info.map, count, &table);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
@@ -774,50 +785,37 @@ fail:
 	return ret;
 }
 
-/** Create a duplicate of the calling process.
- *
- * Creates a new process that is a duplicate of the calling process. Any shared
- * memory regions in the parent's address space are shared between the parent
- * and the child. Private regions are made copy-on-write in the parent and the
- * child, so they both share the pages in the regions until either of them
- * write to them. Note that use of this function is not allowed if the calling
- * process has more than 1 thread.
- *
- * @param handlep	On success, a handle to the created process will be
- *			stored here in the parent.
- *
- * @return		Upon success, 0 will be returned in the parent (with
- *			a handle to the process stored in handlep), and 1 will
- *			be returned in the child. Upon failure no child process
- *			will be created and a negative error code will be
- *			returned.
- */
-int sys_process_clone(handle_t *handlep) {
-	return -ERR_NOT_IMPLEMENTED;
-}
-
 /** Open a handle to a process.
- * @param id		Global ID of the process to open. */
-handle_t sys_process_open(process_id_t id) {
+ * @param id		ID of the process to open.
+ * @param handlep	Where to store handle to process.
+ * @return		Status code describing result of the operation. */
+status_t sys_process_open(process_id_t id, handle_t *handlep) {
+	khandle_t *khandle;
 	process_t *process;
-	handle_t ret;
+	handle_t uhandle;
+	status_t ret;
 
 	rwlock_read_lock(&process_tree_lock);
 
 	if(!(process = avl_tree_lookup(&process_tree, (key_t)id))) {
 		rwlock_unlock(&process_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	} else if(process->state == PROCESS_DEAD || process == kernel_proc) {
 		rwlock_unlock(&process_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	if((ret = handle_create(&process->obj, NULL, curr_proc, 0, NULL)) < 0) {
-		process_release(process);
+	khandle = handle_create(&process->obj, NULL);
+	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
+		if(ret != STATUS_SUCCESS) {
+			handle_detach(curr_proc, uhandle);
+		}
 	}
+	handle_release(khandle);
 	return ret;
 }
 
@@ -828,17 +826,16 @@ handle_t sys_process_open(process_id_t id) {
  *
  * @param handle	Handle for process to get ID of.
  *
- * @return		Process ID on success (greater than or equal to zero),
- *			negative error code on failure.
+ * @return		Process ID on success, -1 if handle is invalid.
  */
 process_id_t sys_process_id(handle_t handle) {
+	process_id_t id = -1;
 	process_t *process;
 	khandle_t *khandle;
-	process_id_t id;
 
 	if(handle == -1) {
 		id = curr_proc->id;
-	} else if(!(id = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle))) {
+	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->id;
 		handle_release(khandle);
@@ -850,20 +847,21 @@ process_id_t sys_process_id(handle_t handle) {
 /** Query the exit status of a process.
  * @param handle	Handle to process.
  * @param statusp	Where to store exit status of process.
- * @return		0 on success, negative error code on failure. */
-int sys_process_status(handle_t handle, int *statusp) {
+ * @return		Status code describing result of the operation. */
+status_t sys_process_status(handle_t handle, int *statusp) {
 	process_t *process;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 	process = (process_t *)khandle->object;
 
 	if(process->state != PROCESS_DEAD) {
 		handle_release(khandle);
-		return -ERR_PROCESS_RUNNING;
+		return STATUS_PROCESS_RUNNING;
 	}
 
 	ret = memcpy_to_user(statusp, &process->status, sizeof(int));

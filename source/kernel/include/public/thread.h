@@ -31,8 +31,11 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
+/** Maximum length of a thread name. */
+#define THREAD_NAME_MAX		32
+
 extern status_t SYSCALL(thread_create)(const char *name, void *stack, size_t stacksz,
-                                       void (*func)(void *), void *arg1,
+                                       void (*func)(void *), void *arg,
                                        handle_t *handlep);
 extern status_t SYSCALL(thread_open)(thread_id_t id, handle_t *handlep);
 extern thread_id_t SYSCALL(thread_id)(handle_t handle);
