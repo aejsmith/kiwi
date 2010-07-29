@@ -80,7 +80,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kargs.h>
 #include <kdbg.h>
@@ -257,7 +256,7 @@ vm_page_t *vm_page_copy(vm_page_t *page, int mmflag) {
 
 	if(!(dest = vm_page_alloc(1, mmflag))) {
 		return NULL;
-	} else if(page_copy(dest->addr, page->addr, mmflag) != 0) {
+	} else if(!page_copy(dest->addr, page->addr, mmflag)) {
 		vm_page_free(dest, 1);
 		return NULL;
 	}
@@ -581,7 +580,7 @@ void __init_text page_init(kernel_args_t *args) {
 void __init_text vm_page_init(void) {
 	size_t i, j, count, size;
 	phys_ptr_t phys;
-	int ret;
+	status_t ret;
 
 	/* Initialise page queue structures. */
 	for(i = 0; i < PAGE_QUEUE_COUNT; i++) {
@@ -608,7 +607,7 @@ void __init_text vm_page_init(void) {
 
 	/* Set up the page writer and page daemon. */
 	if((ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
-	                        NULL, &page_writer_thread)) != 0) {
+	                        NULL, &page_writer_thread)) != STATUS_SUCCESS) {
 		fatal("Could not start page writer (%d)", ret);
 	}
 	thread_run(page_writer_thread);

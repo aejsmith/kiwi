@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -22,12 +22,13 @@
 #define __CPU_CONTEXT_H
 
 #include <arch/context.h>
+#include <types.h>
 
 struct intr_frame;
 
 extern void context_init(context_t *ctx, ptr_t ip, unative_t *stack);
 extern void context_destroy(context_t *ctx);
-extern int context_save(context_t *ctx);
+extern bool context_save(context_t *ctx);
 extern void context_restore(context_t *ctx) __noreturn;
 extern void context_restore_frame(context_t *ctx, struct intr_frame *frame);
 

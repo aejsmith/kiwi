@@ -30,10 +30,10 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <init.h>
 #include <kdbg.h>
+#include <status.h>
 
 #if CONFIG_DEVICE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -61,14 +61,14 @@ static void device_object_close(khandle_t *handle) {
 
 /** Signal that a device is being waited for.
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int device_object_wait(object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t device_object_wait(object_wait_t *wait) {
 	device_t *device = (device_t *)wait->handle->object;
 
 	if(device->ops && device->ops->wait && device->ops->unwait) {
 		return device->ops->wait(device, wait->handle->data, wait);
 	} else {
-		return -ERR_NOT_IMPLEMENTED;
+		return STATUS_NOT_IMPLEMENTED;
 	}
 }
 
@@ -83,20 +83,21 @@ static void device_object_unwait(object_wait_t *wait) {
 /** Check if a device can be memory-mapped.
  * @param handle	Handle to device.
  * @param flags		Mapping flags (VM_MAP_*).
- * @return		0 if can be mapped, negative error code if not. */
-static int device_object_mappable(khandle_t *handle, int flags) {
+ * @return		STATUS_SUCCESS if can be mapped, status code explaining
+ *			why if not. */
+static status_t device_object_mappable(khandle_t *handle, int flags) {
 	device_t *device = (device_t *)handle->object;
 
 	/* Cannot create private mappings to devices. */
 	if(flags & VM_MAP_PRIVATE) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	if(device->ops->mappable) {
 		assert(device->ops->get_page);
 		return device->ops->mappable(device, handle->data, flags);
 	} else {
-		return (device->ops->get_page) ? 0 : -ERR_NOT_SUPPORTED;
+		return (device->ops->get_page) ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
 	}
 }
 
@@ -104,21 +105,21 @@ static int device_object_mappable(khandle_t *handle, int flags) {
  * @param handle	Handle to device to get page from.
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
- * @return		0 on success, negative error code on failure. */
-static int device_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+ * @return		Status code describing result of the operation. */
+static status_t device_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	device_t *device = (device_t *)handle->object;
-	int ret;
+	status_t ret;
 
 	assert(device->ops && device->ops->get_page);
 
 	/* Ask the device for a page. */
-	if((ret = device->ops->get_page(device, handle->data, offset, physp)) != 0) {
+	ret = device->ops->get_page(device, handle->data, offset, physp);
+	if(ret != STATUS_SUCCESS) {
 		dprintf("device: failed to get page from offset %" PRIu64 " in %p(%s) (%d)\n",
 		        offset, device, device->name, ret);
-		return ret;
 	}
 
-	return 0;
+	return ret;
 }
 
 /** Device object type structure. */
@@ -139,29 +140,29 @@ static object_type_t device_object_type = {
  *
  * @param name		Name of device to create (will be duplicated).
  * @param parent	Parent device. Must not be an alias.
- * @param ops		Operations for the device (can be NULL).
- * @param data		Data used by the device operations.
+ * @param ops		Pointer to operations for the device (can be NULL).
+ * @param data		Implementation-specific data pointer.
  * @param attrs		Optional array of attributes for the device (will be
  *			duplicated).
  * @param count		Number of attributes.
  * @param devicep	Where to store pointer to device structure (can be NULL).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
-                  device_attr_t *attrs, size_t count, device_t **devicep) {
+status_t device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
+                       device_attr_t *attrs, size_t count, device_t **devicep) {
 	device_t *device = NULL;
+	status_t ret;
 	size_t i;
-	int ret;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock);
 	if(radix_tree_lookup(&parent->children, name)) {
-		ret = -ERR_ALREADY_EXISTS;
+		ret = STATUS_ALREADY_EXISTS;
 		goto fail;
 	}
 
@@ -175,18 +176,17 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	device->dest = NULL;
 	device->ops = ops;
 	device->data = data;
-
 	if(attrs) {
 		/* Ensure the attribute structures are valid. Do validity
 		 * checking before allocating anything to make it easier to
 		 * clean up if an invalid structure is found. */
 		for(i = 0; i < count; i++) {
 			if(!attrs[i].name || strlen(attrs[i].name) >= DEVICE_NAME_MAX) {
-				ret = -ERR_PARAM_INVAL;
+				ret = STATUS_PARAM_INVAL;
 				goto fail;
 			} else if(attrs[i].type == DEVICE_ATTR_STRING) {
 				if(!attrs[i].value.string || strlen(attrs[i].value.string) >= DEVICE_ATTR_MAX) {
-					ret = -ERR_PARAM_INVAL;
+					ret = STATUS_PARAM_INVAL;
 					goto fail;
 				}
 			}
@@ -216,7 +216,7 @@ int device_create(const char *name, device_t *parent, device_ops_t *ops, void *d
 	if(devicep) {
 		*devicep = device;
 	}
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(device) {
 		kfree(device->name);
@@ -237,21 +237,20 @@ fail:
  * @param dest		Destination device.
  * @param devicep	Where to store pointer to alias structure (can be NULL).
  *
- * @return		0 on success, negative error code on failure. Can only
- *			fail if device name already exists.
+ * @return		Status code describing result of the operation.
  */
-int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
+status_t device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
 	device_t *device;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock);
 	if(radix_tree_lookup(&parent->children, name)) {
 		mutex_unlock(&parent->lock);
-		return -ERR_ALREADY_EXISTS;
+		return STATUS_ALREADY_EXISTS;
 	}
 
 	refcount_inc(&dest->count);
@@ -278,7 +277,7 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
 	if(devicep) {
 		*devicep = device;
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Remove a device from the device tree.
@@ -291,10 +290,10 @@ int device_alias(const char *name, device_t *parent, device_t *dest, device_t **
  *
  * @param device	Device to remove.
  *
- * @return		0 on success, negative error code on failure. Cannot
- *			fail for aliases.
+ * @return		Status code describing result of the operation. Cannot
+ *			fail if the device being removed is an alias.
  */
-int device_destroy(device_t *device) {
+status_t device_destroy(device_t *device) {
 	size_t i;
 
 	assert(device->parent);
@@ -305,7 +304,7 @@ int device_destroy(device_t *device) {
 	if(refcount_get(&device->count) != 0) {
 		mutex_unlock(&device->lock);
 		mutex_unlock(&device->parent->lock);
-		return -ERR_IN_USE;
+		return STATUS_IN_USE;
 	}
 
 	radix_tree_remove(&device->parent->children, device->name, NULL);
@@ -332,7 +331,7 @@ int device_destroy(device_t *device) {
 	object_destroy(&device->obj);
 	kfree(device->name);
 	kfree(device);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Internal iteration function.
@@ -382,16 +381,17 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
  * the device is no longer needed it should be released with device_release().
  *
  * @param path		Path to device.
- * @param devicep	Where to store pointer to device structure.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Pointer to device if found, NULL if not.
  */
-int device_lookup(const char *path, device_t **devicep) {
+device_t *device_lookup(const char *path) {
 	device_t *device = device_tree_root, *child;
 	char *dup, *orig, *tok;
 
-	if(!path || !path[0] || path[0] != '/' || !devicep) {
-		return -ERR_PARAM_INVAL;
+	assert(path);
+
+	if(!path[0] || path[0] != '/') {
+		return NULL;
 	}
 
 	dup = orig = kstrdup(path, MM_SLEEP);
@@ -403,7 +403,7 @@ int device_lookup(const char *path, device_t **devicep) {
 		} else if(!(child = radix_tree_lookup(&device->children, tok))) {
 			mutex_unlock(&device->lock);
 			kfree(orig);
-			return -ERR_NOT_FOUND;
+			return NULL;
 		}
 
 		/* Move down to the device and then iterate through until we
@@ -417,8 +417,7 @@ int device_lookup(const char *path, device_t **devicep) {
 
 	refcount_inc(&device->count);
 	mutex_unlock(&device->lock);
-	*devicep = device;
-	return 0;
+	return device;
 }
 
 /** Get a device attribute.
@@ -462,28 +461,36 @@ void device_release(device_t *device) {
 }
 
 /** Create a handle to a device.
- * @param device	Device to create handle to. Will have an extra
- *			reference placed on it.
+ * @param path		Path to device to open.
  * @param handlep	Where to store pointer to handle structure.
- * @return		0 on success, negative error code on failure. */
-int device_open(device_t *device, khandle_t **handlep) {
+ * @return		Status code describing result of the operation. */
+status_t device_open(const char *path, khandle_t **handlep) {
 	void *data = NULL;
-	int ret;
+	device_t *device;
+	status_t ret;
 
-	assert(device);
+	assert(path);
 	assert(handlep);
+
+	device = device_lookup(path);
+	if(device == NULL) {
+		return STATUS_NOT_FOUND;
+	}
 
 	mutex_lock(&device->lock);
 
-	if(device->ops && device->ops->open && (ret = device->ops->open(device, &data)) != 0) {
-		mutex_unlock(&device->lock);
-		return ret;
+	if(device->ops && device->ops->open) {
+		if((ret = device->ops->open(device, &data)) != STATUS_SUCCESS) {
+			mutex_unlock(&device->lock);
+			device_release(device);
+			return ret;
+		}
 	}
 
-	refcount_inc(&device->count);
-	handle_create(&device->obj, data, NULL, 0, handlep);
+	/* No need to reference device, was already referenced by the lookup. */
+	*handlep = handle_create(&device->obj, data);
 	mutex_unlock(&device->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Read from a device.
@@ -499,27 +506,27 @@ int device_open(device_t *device, khandle_t **handlep) {
  *			certain device types).
  * @param bytesp	Where to store number of bytes read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
+	status_t ret;
 	size_t bytes;
-	int ret;
 
 	if(!handle || !buf) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->read) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
 			*bytesp = 0;
 		}
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	ret = device->ops->read(device, handle->data, buf, count, offset, &bytes);
@@ -542,27 +549,27 @@ int device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, siz
  *			certain device types).
  * @param bytesp	Where to store number of bytes read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
+	status_t ret;
 	size_t bytes;
-	int ret;
 
 	if(!handle || !buf) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->write) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	} else if(!count) {
 		if(bytesp) {
 			*bytesp = 0;
 		}
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	ret = device->ops->write(device, handle->data, buf, count, offset, &bytes);
@@ -581,20 +588,20 @@ int device_write(khandle_t *handle, const void *buf, size_t count, offset_t offs
  * @param outp		Where to store pointer to data returned by the
  *			operation handler (optional).
  * @param outszp	Where to store size of data returned.
- * @return		Positive value on success, negative error code on
- *			failure. */
-int device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp) {
+ * @return		Status code describing result of the operation. */
+status_t device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp,
+                        size_t *outszp) {
 	device_t *device;
 
 	if(!handle) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->request) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
@@ -719,26 +726,25 @@ void __init_text device_init(void) {
  * handle_close().
  *
  * @param path		Device tree path for device to open.
+ * @param handlep	Where to store handle to the device.
  *
- * @return		Handle ID on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-handle_t sys_device_open(const char *path) {
-	khandle_t *handle;
-	device_t *device;
-	handle_t ret;
+status_t sys_device_open(const char *path, handle_t *handlep) {
+	khandle_t *khandle;
+	handle_t uhandle;
+	status_t ret;
+	char *kpath;
 
-	if((ret = device_lookup(path, &device)) != 0) {
+	if((ret = strdup_from_user(path, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	}
-
-	ret = device_open(device, &handle);
-	device_release(device);
-	if(ret != 0) {
+	} else if((ret = device_open(kpath, &khandle)) != STATUS_SUCCESS) {
+		kfree(kpath);
 		return ret;
+	} else if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
+		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
 	}
-
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	handle_release(khandle);
 	return ret;
 }
 
@@ -755,17 +761,22 @@ handle_t sys_device_open(const char *path) {
  *			certain device types).
  * @param bytesp	Where to store number of bytes read (can be NULL).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
+                         size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	size_t bytes = 0;
-	int ret, err;
 	void *kbuf;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to read. */
+	if(!count) {
 		goto out;
 	}
 
@@ -773,14 +784,14 @@ int sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset, s
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
 
 	ret = device_read(khandle, kbuf, count, offset, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
+		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
 			ret = err;
 			bytes = 0;
 		}
@@ -791,8 +802,7 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -812,17 +822,22 @@ out:
  *			certain device types).
  * @param bytesp	Where to store number of bytes read (can be NULL).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset,
+                          size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
-	int ret, err;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to write. */
+	if(!count) {
 		goto out;
 	}
 
@@ -830,10 +845,10 @@ int sys_device_write(handle_t handle, const void *buf, size_t count, offset_t of
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != 0) {
+	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -846,51 +861,53 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
-			bytes = 0;
 		}
 	}
 	return ret;
 }
 
 /** Perform a device-specific operation.
- * @param args		Pointer to arguments structure.
- * @return		Positive value on success, negative error code on
- *			failure. */
-int sys_device_request(device_request_args_t *args) {
+ * @param handle	Handle to device to perform operation on.
+ * @param request	Operation number to perform.
+ * @param in		Optional input buffer containing data to pass to the
+ *			operation handler.
+ * @param insz		Size of input buffer.
+ * @param outp		Where to store pointer to data returned by the
+ *			operation handler (optional).
+ * @param outszp	Where to store size of data returned.
+ * @return		Status code describing result of the operation. */
+status_t sys_device_request(handle_t handle, int request, void *in, size_t insz, void *out,
+                            size_t outsz, size_t *bytesp) {
 	void *kin = NULL, *kout = NULL;
-	device_request_args_t kargs;
-	khandle_t *handle;
+	khandle_t *khandle;
+	status_t ret, err;
 	size_t koutsz;
-	int ret, err;
 
-	if((ret = memcpy_from_user(&kargs, args, sizeof(device_request_args_t))) != 0) {
-		return ret;
-	} else if((ret = handle_lookup(curr_proc, kargs.handle, OBJECT_TYPE_DEVICE, &handle)) != 0) {
-		return ret;
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		goto out;
 	}
 
-	if(kargs.in && kargs.insz) {
-		if(!(kin = kmalloc(kargs.insz, 0))) {
-			ret = -ERR_NO_MEMORY;
+	if(in && insz) {
+		if((kin = kmalloc(insz, 0)) == NULL) {
+			ret = STATUS_NO_MEMORY;
 			goto out;
-		} else if((ret = memcpy_from_user(kin, kargs.in, kargs.insz)) != 0) {
+		} else if((ret = memcpy_from_user(kin, in, insz)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 
-	ret = device_request(handle, kargs.request, kin, kargs.insz, (kargs.out) ? &kout : NULL,
-	                     (kargs.out) ? &koutsz : NULL);
+	ret = device_request(khandle, request, kin, insz, (out) ? &kout : NULL, (out) ? &koutsz : NULL);
 	if(kout) {
 		assert(koutsz);
-		if(koutsz > kargs.outsz) {
-			ret = -ERR_BUF_TOO_SMALL;
-		} else if((err = memcpy_to_user(kargs.out, kout, koutsz)) != 0) {
+		if(koutsz > outsz) {
+			ret = STATUS_BUF_TOO_SMALL;
+		} else if((err = memcpy_to_user(out, kout, koutsz)) != STATUS_SUCCESS) {
 			ret = err;
-		} else if(kargs.bytesp) {
-			if((err = memcpy_to_user(kargs.bytesp, &koutsz, sizeof(size_t))) != 0) {
+		} else if(bytesp) {
+			if((err = memcpy_to_user(bytesp, &koutsz, sizeof(size_t))) != STATUS_SUCCESS) {
 				ret = err;
 			}
 		}
@@ -902,6 +919,6 @@ out:
 	if(kout) {
 		kfree(kout);
 	}
-	handle_release(handle);
+	handle_release(khandle);
 	return ret;
 }

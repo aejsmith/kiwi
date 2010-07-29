@@ -41,7 +41,7 @@
 
 /** Common entry code for userspace memory functions. */
 #define USERMEM_ENTER()			\
-	if(context_save(&curr_thread->usermem_context) != 0) { \
+	if(context_save(&curr_thread->usermem_context)) { \
 		return STATUS_ADDR_INVAL; \
 	} \
 	curr_thread->in_usermem = true
@@ -210,7 +210,7 @@ status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp
 	}
 
 	ret = memcpy_from_user(d, src, len);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		kfree(d);
 		return ret;
 	}

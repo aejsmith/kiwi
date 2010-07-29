@@ -32,8 +32,8 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
+#include <status.h>
 
 /** Structure describing a handler for an IRQ. */
 typedef struct irq_handler {
@@ -97,16 +97,16 @@ static void irq_thread(void *_handler, void *arg2) {
  *			requested by the top-half handler.
  * @param data		Data argument to pass to the handlers.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
+status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
 	irq_handler_t *handler, *exist;
 	char name[THREAD_NAME_MAX];
+	status_t ret;
 	bool enable;
-	int ret;
 
 	if(num >= IRQ_COUNT || (!top && !bottom)) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	handler = kmalloc(sizeof(irq_handler_t), MM_SLEEP);
@@ -121,7 +121,8 @@ int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) 
 	/* Create a handler thread if necessary. */
 	if(handler->bottom) {
 		sprintf(name, "irq-%" PRIun, num);
-		if((ret = thread_create(name, kernel_proc, 0, irq_thread, handler, NULL, &handler->thread)) != 0) {
+		if((ret = thread_create(name, kernel_proc, 0, irq_thread, handler, NULL,
+		                        &handler->thread)) != STATUS_SUCCESS) {
 			kfree(handler);
 			return ret;
 		}
@@ -139,7 +140,7 @@ int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) 
 				thread_destroy(handler->thread);
 			}
 			kfree(handler);
-			return -ERR_ALREADY_EXISTS;
+			return STATUS_ALREADY_EXISTS;
 		}
 	}
 
@@ -157,7 +158,7 @@ int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) 
 	if(handler->thread) {
 		thread_run(handler->thread);
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Removes an IRQ handler.
@@ -171,13 +172,13 @@ int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) 
  * @param bottom	Bottom-half function handler was registered with.
  * @param data		Data argument handler was registered with.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
+status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
 	irq_handler_t *handler;
 
 	if(num >= IRQ_COUNT) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	spinlock_lock(&irq_table[num].lock);
@@ -207,22 +208,17 @@ int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data
 		} else {
 			kfree(handler);
 		}
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	spinlock_unlock(&irq_table[num].lock);
-	return -ERR_NOT_FOUND;
+	return STATUS_NOT_FOUND;
 }
 
 /** Hardware interrupt handler.
- *
- * Handles a hardware interrupt by running necessary handlers for it.
- *
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
- *
- * @return		Whether to reschedule.
- */
+ * @return		Whether to reschedule. */
 bool irq_handler(unative_t num, intr_frame_t *frame) {
 	bool level, schedule = false;
 	irq_handler_t *handler;

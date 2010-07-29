@@ -46,7 +46,7 @@ struct slab_bufctl;
 #define SLAB_DEFAULT_PRIORITY	100
 
 /** Slab constructor callback function. */
-typedef int (*slab_ctor_t)(void *obj, void *data, int kmflag);
+typedef void (*slab_ctor_t)(void *obj, void *data);
 
 /** Slab destructor callback function. */
 typedef void (*slab_dtor_t)(void *obj, void *data);

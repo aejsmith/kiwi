@@ -63,8 +63,8 @@ typedef struct object_type {
 	 *			get_page is implemented.
 	 * @param handle	Handle to object.
 	 * @param flags		Mapping flags (VM_MAP_*).
-	 * @return		STATUS_SUCCESS if can be mapped, or a status
-	 *			code explaining why it cannot be mapped. */
+	 * @return		STATUS_SUCCESS if can be mapped, status code
+	 *			explaining why if not. */
 	status_t (*mappable)(struct khandle *handle, int flags);
 
 	/** Get a page from the object.

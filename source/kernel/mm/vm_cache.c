@@ -30,8 +30,8 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <errors.h>
 #include <kdbg.h>
+#include <status.h>
 
 #if CONFIG_CACHE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -44,15 +44,12 @@ static slab_cache_t *vm_cache_cache;
 
 /** Constructor for VM cache structures.
  * @param obj		Object to construct.
- * @param data		Unused.
- * @param mmflag	Allocation flags.
- * @return		Always returns 0. */
-static int vm_cache_ctor(void *obj, void *data, int mmflag) {
+ * @param data		Unused. */
+static void vm_cache_ctor(void *obj, void *data) {
 	vm_cache_t *cache = obj;
 
 	mutex_init(&cache->lock, "vm_cache_lock", 0);
 	avl_tree_init(&cache->pages);
-	return 0;
 }
 
 /** Allocate a new VM cache.
@@ -85,14 +82,14 @@ vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
  *			the function returns.
  * @param sharedp	Where to store value stating whether a mapping had to
  *			be shared. Only used if mappingp is set.
- * @return		0 on success, negative error code on failure. */
-static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool overwrite,
-                                      bool nonblock, vm_page_t **pagep, void **mappingp,
-                                      bool *sharedp) {
+ * @return		Status code describing result of the operation. */
+static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool overwrite,
+                                           bool nonblock, vm_page_t **pagep, void **mappingp,
+                                           bool *sharedp) {
 	void *mapping = NULL;
 	bool shared = false;
 	vm_page_t *page;
-	int ret;
+	status_t ret;
 
 	assert((pagep && !mappingp) || (mappingp && !pagep));
 	assert(!(offset % PAGE_SIZE));
@@ -104,7 +101,7 @@ static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool o
 	/* Check whether it is within the size of the cache. */
 	if(offset >= cache->size) {
 		mutex_unlock(&cache->lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	/* Check if we have it cached. */
@@ -130,7 +127,7 @@ static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool o
 
 		dprintf("cache: retreived cached page 0x%" PRIpp " from offset 0x%" PRIx64 " in %p\n",
 		        page->addr, offset, cache);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Allocate a new page. */
@@ -149,7 +146,8 @@ static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool o
 			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 			shared = true;
 
-			if((ret = cache->ops->read_page(cache, mapping, offset, nonblock)) != 0) {
+			ret = cache->ops->read_page(cache, mapping, offset, nonblock);
+			if(ret != STATUS_SUCCESS) {
 				page_phys_unmap(mapping, PAGE_SIZE, true);
 				vm_page_free(page, 1);
 				mutex_unlock(&cache->lock);
@@ -193,11 +191,11 @@ static int vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool o
 		}
 		*pagep = page;
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Release a page from a cache.
- * @param Cache		Cache that the page belongs to.
+ * @param cache		Cache that the page belongs to.
  * @param offset	Offset of page to release.
  * @param dirty		Whether the page has been dirtied. */
 static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, bool dirty) {
@@ -248,9 +246,9 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
  * @param addrp		Where to store address of mapping.
  * @param sharedp	Where to store value stating whether a mapping had to
  *			be shared.
- * @return		0 on success, negative error code on failure. */
-static int vm_cache_map_page(vm_cache_t *cache, offset_t offset, bool overwrite,
-                             bool nonblock, void **addrp, bool *sharedp) {
+ * @return		Status code describing result of the operation. */
+static status_t vm_cache_map_page(vm_cache_t *cache, offset_t offset, bool overwrite,
+                                  bool nonblock, void **addrp, bool *sharedp) {
 	assert(addrp && sharedp);
 	return vm_cache_get_page_internal(cache, offset, overwrite, nonblock, NULL, addrp, sharedp);
 }
@@ -277,17 +275,17 @@ static void vm_cache_unmap_page(vm_cache_t *cache, void *mapping, offset_t offse
  * @param offset	Offset into cache to read from.
  * @param nonblock	Whether the operation is required to not block.
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. Upon
+ * @return		Status code describing result of the operation. Upon
  *			failure, part of the data may have been read, in which
  *			case the number of bytes read successfully are stored
  *			in bytesp. */
-int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
-                  bool nonblock, size_t *bytesp) {
+status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
+                       bool nonblock, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	offset_t start, end, i, size;
 	size_t total = 0;
 	void *mapping;
 	bool shared;
-	int ret = 0;
 
 	mutex_lock(&cache->lock);
 
@@ -311,7 +309,8 @@ int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -324,7 +323,8 @@ int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
 	/* Handle any full pages. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -334,7 +334,8 @@ int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -356,17 +357,17 @@ out:
  * @param offset	Offset into cache to write to.
  * @param nonblock	Whether the operation is required to not block.
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. Upon
+ * @return		Status code describing result of the operation. Upon
  *			failure, part of the data may have been read, in which
  *			case the number of bytes read successfully are stored
  *			in bytesp. */
-int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t offset,
-                   bool nonblock, size_t *bytesp) {
+status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t offset,
+                        bool nonblock, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	offset_t start, end, i, size;
 	size_t total = 0;
 	void *mapping;
 	bool shared;
-	int ret = 0;
 
 	mutex_lock(&cache->lock);
 
@@ -390,7 +391,8 @@ int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t of
 	 * transfer on the initial page to get us up to a page boundary. 
 	 * If the transfer only goes across one page, this will handle it. */
 	if(offset % PAGE_SIZE) {
-		if((ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -406,7 +408,8 @@ int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t of
 	 * would not be necessary. */
 	size = count / PAGE_SIZE;
 	for(i = 0; i < size; i++, total += PAGE_SIZE, buf += PAGE_SIZE, count -= PAGE_SIZE, start += PAGE_SIZE) {
-		if((ret = vm_cache_map_page(cache, start, true, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, true, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -416,7 +419,8 @@ int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t of
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared)) != 0) {
+		ret = vm_cache_map_page(cache, start, false, nonblock, &mapping, &shared);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -440,14 +444,14 @@ out:
  * @param offset	Offset into cache to get page from.
  * @param physp		Where to store physical address of page.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp) {
+status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp) {
 	vm_page_t *page;
-	int ret;
+	status_t ret;
 
 	ret = vm_cache_get_page_internal(cache, offset, false, false, &page, NULL, NULL);
-	if(ret == 0) {
+	if(ret == STATUS_SUCCESS) {
 		*physp = page->addr;
 	}
 
@@ -493,16 +497,16 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 /** Flush changes to a cache page.
  * @param cache		Cache page belongs to.
  * @param page		Page to flush.
- * @return		0 on success, negative error code on failure. */
-static int vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
+ * @return		Status code describing result of the operation. */
+static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
 	void *mapping;
-	int ret = 0;
+	status_t ret;
 
 	/* If the page is outside of the cache, it may be there because the
 	 * cache was shrunk but with the page in use. Ignore this. Also ignore
 	 * pages that aren't modified. */
 	if(page->offset >= cache->size || !page->modified) {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Should only end up here if the page is writable - when releasing
@@ -510,8 +514,8 @@ static int vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
 	assert(cache->ops && cache->ops->write_page);
 
 	mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
-
-	if((ret = cache->ops->write_page(cache, mapping, page->offset, false)) == 0) {
+	ret = cache->ops->write_page(cache, mapping, page->offset, false);
+	if(ret == STATUS_SUCCESS) {
 		/* Clear modified flag only if the page reference count is
 		 * zero. This is because the page may be mapped into an address
 		 * space as read-write. */
@@ -520,19 +524,18 @@ static int vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
 			vm_page_queue(page, PAGE_QUEUE_CACHED); 
 		}
 	}
-
 	page_phys_unmap(mapping, PAGE_SIZE, true);
 	return ret;
 }
 
 /** Flush modifications to a cache.
  * @param cache		Cache to flush.
- * @return		0 on success, negative error code on failure. If a
+ * @return		Status code describing result of the operation. If a
  *			failure occurs, the function carries on attempting to
  *			flush, but still returns an error. If multiple errors
  *			occur, it is the most recent that is returned. */
-int vm_cache_flush(vm_cache_t *cache) {
-	int err = 0, ret;
+status_t vm_cache_flush(vm_cache_t *cache) {
+	status_t ret = 0, err;
 	vm_page_t *page;
 
 	mutex_lock(&cache->lock);
@@ -541,23 +544,23 @@ int vm_cache_flush(vm_cache_t *cache) {
 	AVL_TREE_FOREACH(&cache->pages, iter) {
 		page = avl_tree_entry(iter, vm_page_t);
 
-		if((err = vm_cache_flush_page_internal(cache, page)) != 0) {
+		if((err = vm_cache_flush_page_internal(cache, page)) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
 
 	mutex_unlock(&cache->lock);
-	return err;
+	return ret;
 }
 
 /** Destroy a cache.
  * @param cache		Cache to destroy. Should NOT be in use.
  * @param discard	Whether to discard modifications. The function will
  *			always succeed if true.
- * @return		0 on success, negative error code on failure. */
-int vm_cache_destroy(vm_cache_t *cache, bool discard) {
+ * @return		Status code describing result of the operation. */
+status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 	vm_page_t *page;
-	int ret;
+	status_t ret;
 
 	mutex_lock(&cache->lock);
 	cache->deleted = true;
@@ -568,10 +571,13 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
 
 		if(refcount_get(&page->count) != 0) {
 			fatal("Cache page still in use while destroying");
-		} else if(!discard && (ret = vm_cache_flush_page_internal(cache, page)) != 0) {
-			cache->deleted = false;
-			mutex_unlock(&cache->lock);
-			return ret;
+		} else if(!discard) {
+			ret = vm_cache_flush_page_internal(cache, page);
+			if(ret != STATUS_SUCCESS) {
+				cache->deleted = false;
+				mutex_unlock(&cache->lock);
+				return ret;
+			}
 		}
 
 		avl_tree_remove(&cache->pages, (key_t)page->offset);
@@ -586,7 +592,7 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
 	mutex_unlock(&cache->lock);
 
 	slab_cache_free(vm_cache_cache, cache);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Flush changes to a page from a cache.
@@ -601,7 +607,7 @@ int vm_cache_destroy(vm_cache_t *cache, bool discard) {
  */
 bool vm_cache_flush_page(vm_page_t *page) {
 	vm_cache_t *cache;
-	bool ret;
+	status_t ret;
 
 	/* Must be careful - another thread could be destroying the cache. */
 	if(!(cache = page->cache)) {
@@ -613,9 +619,9 @@ bool vm_cache_flush_page(vm_page_t *page) {
 		return true;
 	}
 
-	ret = vm_cache_flush_page_internal(cache, page) == 0;
+	ret = vm_cache_flush_page_internal(cache, page);
 	mutex_unlock(&cache->lock);
-	return ret;
+	return (ret == STATUS_SUCCESS);
 }
 
 /** Evict a page in a cache from memory.

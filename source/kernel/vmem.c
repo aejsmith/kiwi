@@ -48,7 +48,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
 #include <vmem.h>
@@ -704,18 +703,13 @@ void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 }
 
 /** Add a new span to an arena.
- *
- * Adds a new span to a Vmem arena with a free segment covering the entire
- * span.
- *
  * @param vmem		Arena to add to.
  * @param base		Base of the new span.
  * @param size		Size of the new span.
  * @param vmflag	Allocation flags.
- *
- * @return		0 on success, negative error code on failure.
- */
-int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag) {
+ * @return		Whether the span was added. Failure can only occur if
+ *			MM_SLEEP/MM_FATAL are not specified. */
+bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag) {
 	vmem_btag_t *span, *seg;
 
 	mutex_lock(&vmem->lock);
@@ -730,7 +724,7 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	span = vmem_add_real(vmem, base, size, false, vmflag);
 	if(span == NULL) {
 		mutex_unlock(&vmem->lock);
-		return -ERR_NO_MEMORY;
+		return false;
 	}
 
 	/* Create a free segment. */
@@ -738,7 +732,7 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	if(seg == NULL) {
 		vmem_btag_free(span);
 		mutex_unlock(&vmem->lock);
-		return -ERR_NO_MEMORY;
+		return false;
 	}
 
 	seg->base = base;
@@ -753,7 +747,7 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
 	dprintf("vmem: added span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p(%s)\n",
 	        base, base + size, vmem, vmem->name);
 	mutex_unlock(&vmem->lock);
-	return 0;
+	return true;
 }
 
 /** Initialise a Vmem arena.
@@ -773,11 +767,11 @@ int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfla
  * @param flags		Behaviour flags for the arena.
  * @param vmflag	Allocation flags.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Whether the arena was created successfully.
  */
-int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
-              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
-              vmem_t *source, size_t qcache_max, int flags, int vmflag) {
+bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
+                       size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
+                       size_t qcache_max, int flags, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
 
@@ -848,10 +842,7 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 
 	/* Add initial span, if any.*/
 	if(size > 0) {
-		if(vmem_add(vmem, base, size, vmflag) != 0) {
-			if(vmflag & MM_FATAL) {
-				fatal("Could not initialise required arena %s", vmem->name);
-			}
+		if(!vmem_add(vmem, base, size, vmflag & ~MM_FATAL)) {
 			goto fail;
 		}
 	}
@@ -871,19 +862,19 @@ int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem
 
 	dprintf("vmem: created arena %p(%s) (quantum: %zu, source: %p)\n",
 		vmem, vmem->name, quantum, source);
-	return 0;
+	return true;
 fail:
+	if(vmflag & MM_FATAL) {
+		fatal("Could not initialise required arena %s", vmem->name);
+	}
+
 	/* Destroy the quantum caches. */
 	for(i = 0; i < (vmem->qcache_max / vmem->quantum); i++) {
 		if(vmem->qcache[i]) {
 			slab_cache_destroy(vmem->qcache[i]);
 		}
 	}
-
-	if(vmflag & MM_FATAL) {
-		fatal("Could not initialise required arena %s", vmem->name);
-	}
-	return -ERR_NO_MEMORY;	
+	return false;	
 }
 
 /** Allocate and initialise a Vmem arena.
@@ -914,7 +905,8 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 		return NULL;
 	}
 
-	if(vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source, qcache_max, flags, vmflag) != 0) {
+	if(!vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source,
+	                      qcache_max, flags, vmflag)) {
 		kfree(vmem);
 		return NULL;
 	}

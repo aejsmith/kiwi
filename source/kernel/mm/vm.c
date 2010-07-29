@@ -61,8 +61,8 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kdbg.h>
+#include <status.h>
 
 #if CONFIG_VM_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -77,28 +77,22 @@ static slab_cache_t *vm_amap_cache;
 
 /** Constructor for address space objects.
  * @param obj		Pointer to object.
- * @param data		Ignored.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int vm_aspace_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Ignored. */
+static void vm_aspace_ctor(void *obj, void *data) {
 	vm_aspace_t *as = obj;
 
 	mutex_init(&as->lock, "vm_aspace_lock", 0);
 	refcount_set(&as->count, 0);
 	avl_tree_init(&as->regions);
-	return 0;
 }
 
 /** Constructor for anonymous map objects.
  * @param obj		Pointer to object.
- * @param data		Ignored.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int vm_amap_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Ignored. */
+static void vm_amap_ctor(void *obj, void *data) {
 	vm_amap_t *map = obj;
 
 	mutex_init(&map->lock, "vm_amap_lock", 0);
-	return 0;
 }
 
 /** Create an anonymous map.
@@ -136,8 +130,8 @@ static void vm_amap_release(vm_amap_t *map) {
  * @param map		Map to increase count on.
  * @param offset	Offset into the map to reference from.
  * @param size		Size of the range to reference.
- * @return		0 on success, negative error code on failure. */
-static int vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
+ * @return		Status code describing result of the operation. */
+static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 	size_t i, j, start, end;
 
 	mutex_lock(&map->lock);
@@ -159,13 +153,13 @@ static int vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 				map->rref[j]--;
 			}
 			mutex_unlock(&map->lock);
-			return -ERR_RESOURCE_UNAVAIL;
+			return STATUS_RESOURCE_UNAVAIL;
 		}
 		map->rref[i]++;
 	}
 
 	mutex_unlock(&map->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Check if a region fits in the user memory area.
@@ -571,9 +565,9 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 	phys_ptr_t paddr;
 	offset_t offset;
 	vm_page_t *page;
+	status_t ret;
 	bool write;
 	size_t i;
-	int ret;
 
 	/* Work out the offset into the object. */
 	offset = region->amap_offset + (addr - region->start);
@@ -644,7 +638,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 				assert(handle->object->type->get_page);
 
 				ret = handle->object->type->get_page(handle, offset + region->obj_offset, &paddr);
-				if(unlikely(ret != 0)) {
+				if(unlikely(ret != STATUS_SUCCESS)) {
 					dprintf("vm:  could not read page from source (%d)\n", ret);
 					mutex_unlock(&amap->lock);
 					return false;
@@ -686,7 +680,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 
 			/* Get the page from the source, and map read-only. */
 			ret = handle->object->type->get_page(handle, offset + region->obj_offset, &paddr);
-			if(unlikely(ret != 0)) {
+			if(unlikely(ret != STATUS_SUCCESS)) {
 				dprintf("vm:  could not read page from source (%d)\n", ret);
 				mutex_unlock(&amap->lock);
 				return false;
@@ -725,7 +719,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	phys_ptr_t phys, exist;
 	bool write, exec;
 	offset_t offset;
-	int ret;
+	status_t ret;
 
 	assert(region->handle);
 	assert(region->handle->object->type->get_page);
@@ -733,7 +727,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	/* Get a page from the object. */
 	offset = (offset_t)(addr - region->start) + region->obj_offset;
 	ret = region->handle->object->type->get_page(region->handle, offset, &phys);
-	if(unlikely(ret != 0)) {
+	if(unlikely(ret != STATUS_SUCCESS)) {
 		dprintf("vm:  failed to get page for %p (%d)\n", addr, ret);
 		return false;
 	}
@@ -840,13 +834,13 @@ out:
  * @param start		Start of region to reserve.
  * @param size		Size of region to reserve.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
+status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	vm_region_t *region;
 
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	mutex_lock(&as->lock);
@@ -860,7 +854,7 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 
 	dprintf("vm: reserved region [%p,%p) (as: %p)\n",region->start, region->end, as);
 	mutex_unlock(&as->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Map an object into memory.
@@ -887,40 +881,40 @@ int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
  * @param offset	Offset into object to map from.
  * @param addrp		Where to store address of mapping.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
-           offset_t offset, ptr_t *addrp) {
+status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
+                offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
-	int rflags, ret;
+	status_t ret;
+	int rflags;
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 	if(flags & VM_MAP_FIXED) {
 		if(start % PAGE_SIZE || !vm_region_fits(start, size)) {
-			return -ERR_PARAM_INVAL;
+			return STATUS_PARAM_INVAL;
 		}
 	} else if(!addrp) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 	if(handle) {
 		/* Check for overflow. */
 		if((offset + size) < offset) {
-			return -ERR_PARAM_INVAL;
+			return STATUS_PARAM_INVAL;
 		}
 
 		/* Check if the object can be mapped in with the given flags. */
 		if(handle->object->type->mappable) {
 			assert(handle->object->type->get_page);
-			if((ret = handle->object->type->mappable(handle, flags)) != 0) {
+			ret = handle->object->type->mappable(handle, flags);
+			if(ret != STATUS_SUCCESS) {
 				return ret;
 			}
-		} else {
-			if(!handle->object->type->get_page) {
-				return -ERR_NOT_SUPPORTED;
-			}
+		} else if(!handle->object->type->get_page) {
+			return STATUS_NOT_SUPPORTED;
 		}
 	}
 
@@ -937,14 +931,15 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *hand
 	} else {
 		if(!vm_find_free(as, size, &start)) {
 			mutex_unlock(&as->lock);
-			return -ERR_NO_MEMORY;
+			return STATUS_NO_MEMORY;
 		}
 	}
 
 	/* Create the region structure, attach the object to it, and create an
 	 * anonymous map if necessary. */
 	region = vm_region_alloc(as, start, start + size, rflags);
-	if((region->handle = handle)) {
+	if(handle) {
+		region->handle = handle;
 		handle_get(region->handle);
 		region->obj_offset = offset;
 	}
@@ -952,7 +947,7 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *hand
 		region->amap = vm_amap_create(size);
 
 		/* Should not fail to reference since it is newly created. */
-		if(vm_amap_map(region->amap, 0, size) != 0) {
+		if(vm_amap_map(region->amap, 0, size) != STATUS_SUCCESS) {
 			fatal("Could not reference new anonymous map");
 		}
 	}
@@ -966,7 +961,7 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *hand
 		*addrp = region->start;
 	}
 	mutex_unlock(&as->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Unmaps a region of memory.
@@ -977,11 +972,11 @@ int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *hand
  * @param start		Start of region to free.
  * @param size		Size of region to free.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
+status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	mutex_lock(&as->lock);
@@ -989,7 +984,7 @@ int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 	mutex_unlock(&as->lock);
 
 	dprintf("vm: unmapped region [%p,%p) (as: %p)\n", start, start + size, as);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Switch to another address space.
@@ -1022,7 +1017,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
  * @return		Pointer to address space structure. */
 vm_aspace_t *vm_aspace_create(void) {
 	vm_aspace_t *as;
-	int ret;
+	status_t ret;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
 	page_map_init(&as->pmap, MM_SLEEP);
@@ -1031,7 +1026,7 @@ vm_aspace_t *vm_aspace_create(void) {
 	/* Mark the first page of the address space as reserved to catch NULL
 	 * pointer accesses. This should not fail. */
 	ret = vm_reserve(as, 0x0, PAGE_SIZE);
-	assert(ret == 0);
+	assert(ret == STATUS_SUCCESS);
 	return as;
 }
 
@@ -1062,7 +1057,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	slab_cache_free(vm_aspace_cache, as);
 }
 
-/** Initialise the address space caches. */
+/** Initialise the VM system. */
 void __init_text vm_init(void) {
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
 	                                    0, vm_aspace_ctor, NULL, NULL, NULL,
@@ -1073,7 +1068,6 @@ void __init_text vm_init(void) {
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
 	                                  0, vm_amap_ctor, NULL, NULL, NULL,
 	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
-
 	vm_page_init();
 	vm_cache_init();
 }
@@ -1150,37 +1144,41 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  * VM_MAP_PRIVATE flag is not specified and the address space is duplicated,
  * changes made in either address space will be visible in the other.
  *
- * @param args		Pointer to arguments structure.
+ * @param start		Start address of region (if VM_MAP_FIXED). Must be a
+ *			multiple of the system page size.
+ * @param size		Size of region to map. Must be a multiple of the system
+ *			page size.
+ * @param flags		Flags to control mapping behaviour (VM_MAP_*).
+ * @param handle	Handle to object to map in. If negative, then the
+ *			region will be an anonymous memory mapping.
+ * @param offset	Offset into object to map from.
+ * @param addrp		Where to store address of mapping.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_vm_map(vm_map_args_t *args) {
-	khandle_t *handle = NULL;
-	vm_map_args_t kargs;
-	int ret, err;
+extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
+                           offset_t offset, void **addrp) {
+	khandle_t *khandle = NULL;
+	status_t ret;
 	ptr_t addr;
 
-	if((ret = memcpy_from_user(&kargs, args, sizeof(vm_map_args_t))) != 0) {
-		return ret;
-	} else if(!(kargs.flags & VM_MAP_FIXED) && !kargs.addrp) {
-		return -ERR_PARAM_INVAL;
-	} else if(kargs.handle >= 0) {
-		if((ret = handle_lookup(curr_proc, kargs.handle, -1, &handle)) != 0) {
+	if(!(flags & VM_MAP_FIXED) && !addrp) {
+		return STATUS_PARAM_INVAL;
+	} else if(handle >= 0) {
+		if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
 
-	ret = vm_map(curr_proc->aspace, (ptr_t)kargs.start, kargs.size, kargs.flags,
-	             handle, kargs.offset, &addr);
-	if(ret == 0 && kargs.addrp) {
-		if((err = memcpy_to_user(kargs.addrp, &addr, sizeof(void *))) != 0) {
-			vm_unmap(curr_proc->aspace, addr, kargs.size);
-			ret = err;
+	ret = vm_map(curr_proc->aspace, (ptr_t)start, size, flags, khandle, offset, &addr);
+	if(ret == STATUS_SUCCESS && addrp) {
+		if((ret = memcpy_to_user(addrp, &addr, sizeof(void *))) != STATUS_SUCCESS) {
+			vm_unmap(curr_proc->aspace, addr, size);
 		}
 	}
 
-	if(handle) {
-		handle_release(handle);
+	if(khandle) {
+		handle_release(khandle);
 	}
 	return ret;
 }
@@ -1193,8 +1191,8 @@ int sys_vm_map(vm_map_args_t *args) {
  * @param start		Start of region to free.
  * @param size		Size of region to free.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_vm_unmap(void *start, size_t size) {
+status_t sys_vm_unmap(void *start, size_t size) {
 	return vm_unmap(curr_proc->aspace, (ptr_t)start, size);
 }

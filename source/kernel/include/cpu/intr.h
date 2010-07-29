@@ -71,8 +71,8 @@ typedef void (*irq_bottom_t)(unative_t num, void *data);
 
 extern irq_ops_t *irq_ops;
 
-extern int irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
-extern int irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
+extern status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
+extern status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
 
 extern bool irq_handler(unative_t num, intr_frame_t *frame);
 

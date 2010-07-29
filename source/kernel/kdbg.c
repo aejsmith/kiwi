@@ -543,8 +543,7 @@ static int kdbg_process_input(char *input) {
 		/* Set kdbg_running to 2 to signify that we're in a command. */
 		atomic_set(&kdbg_running, 2);
 
-		ret = context_save(&kdbg_fault_context);
-		if(ret != 0) {
+		if(context_save(&kdbg_fault_context)) {
 			/* Fault occurred. */
 			ret = KDBG_FAIL;
 		} else {

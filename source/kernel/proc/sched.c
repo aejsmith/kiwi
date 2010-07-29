@@ -465,7 +465,7 @@ void sched_internal(bool state) {
 		fpu_disable();
 
 		/* Switch to the new CPU context. */
-		if(context_save(&cpu->prev_thread->context) == 0) {
+		if(!context_save(&cpu->prev_thread->context)) {
 			context_restore(&curr_thread->context);
 		}
 	}

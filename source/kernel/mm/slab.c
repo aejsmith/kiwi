@@ -52,9 +52,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <status.h>
 #include <vmem.h>
 
 #if CONFIG_SLAB_DEBUG
@@ -398,12 +398,8 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 	 * the constructor as it may cause a reclaim. */
 	mutex_unlock(&cache->slab_lock);
 	if(cache->ctor) {
-		if(cache->ctor(obj, cache->data, kmflag) != 0) {
-			slab_obj_free(cache, obj);
-			return NULL;
-		}
+		cache->ctor(obj, cache->data, kmflag);
 	}
-
 	return obj;
 }
 
@@ -583,15 +579,17 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 }
 
 /** Create the CPU cache for a slab cache.
- * @param cache		Cache to create for. */
-static int slab_cpu_cache_init(slab_cache_t *cache) {
+ * @param cache		Cache to create for.
+ * @param kmflag	Allocation flags.
+ * @return		Whether the cache was created. */
+static bool slab_cpu_cache_init(slab_cache_t *cache, int kmflag) {
 	size_t i;
 
 	assert(slab_inited);
 
-	cache->cpu_caches = kcalloc(cpu_id_max + 1, sizeof(slab_cpu_cache_t), 0);
+	cache->cpu_caches = kcalloc(cpu_id_max + 1, sizeof(slab_cpu_cache_t), kmflag);
 	if(!cache->cpu_caches) {
-		return -ERR_NO_MEMORY;
+		return false;
 	}
 
 	/* Initialise the cache structures. */
@@ -599,7 +597,7 @@ static int slab_cpu_cache_init(slab_cache_t *cache) {
 		mutex_init(&cache->cpu_caches[i].lock, "cpu_cache_lock", 0);
 	}
 
-	return 0;
+	return true;
 }
 
 /** Reclaim memory from a slab cache.
@@ -647,16 +645,11 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	return ret;
 }
 
-/** Allocate from a slab cache.
- *
- * Allocates a constructed object from a slab cache.
- *
+/** Allocate a constructed object from a slab cache.
  * @param cache		Cache to allocate from.
  * @param kmflag	Allocation behaviour flags.
- *
  * @return		Pointer to allocated object or NULL if unable to
- *			allocate.
- */
+ *			allocate.  */
 void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 	void *ret;
 
@@ -688,12 +681,8 @@ void *slab_cache_alloc(slab_cache_t *cache, int kmflag) {
 }
 
 /** Free an object to a slab cache.
- *
- * Frees the given object to a slab cache.
- *
  * @param cache		Cache to free to.
- * @param obj		Object to free.
- */
+ * @param obj		Object to free. */
 void slab_cache_free(slab_cache_t *cache, void *obj) {
 	assert(cache);
 
@@ -732,10 +721,11 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  * @param source	Vmem arena used to allocate memory. If NULL, the
  *			kernel heap arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
- * @return		0 on success, negative error code on failure. */
-static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
-                           slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
-                           void *data, int priority, vmem_t *source, int flags) {
+ * @param kmflag	Allocation flags.
+ * @return		Whether the cache was successfully initialised. */
+static bool slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
+                            slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
+                            void *data, int priority, vmem_t *source, int flags, int kmflag) {
 	slab_cache_t *exist;
 
 	assert(size);
@@ -789,8 +779,8 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	/* Create the CPU cache if required. */
 	if(!(flags & SLAB_CACHE_NOMAG)) {
-		if(slab_cpu_cache_init(cache) != 0) {
-			return -ERR_NO_MEMORY;
+		if(!slab_cpu_cache_init(cache, kmflag)) {
+			return false;
 		}
 	}
 
@@ -833,7 +823,7 @@ static int slab_cache_init(slab_cache_t *cache, const char *name, size_t size, s
 
 	dprintf("slab: created slab cache %p(%s) (objsize: %u, slabsize: %u, align: %u)\n",
 		cache, cache->name, cache->obj_size, cache->slab_size, cache->align);
-	return 0;
+	return true;
 }
 
 /** Create a slab cache.
@@ -871,7 +861,8 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 		return cache;
 	}
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data, priority, source, flags) != 0) {
+	if(!slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data,
+	                    priority, source, flags, kmflag)) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -930,7 +921,7 @@ static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
 void slab_reclaim(void) {
 	/* If the reclaim lock cannot be taken immediately a reclaim is already
 	 * being scheduled or in progress. */
-	if(!slab_reclaim_thread || mutex_lock_etc(&slab_reclaim_lock, 0, 0) != 0) {
+	if(!slab_reclaim_thread || mutex_lock_etc(&slab_reclaim_lock, 0, 0) != STATUS_SUCCESS) {
 		return;
 	}
 
@@ -983,7 +974,7 @@ int kdbg_cmd_slab(int argc, char **argv) {
 /** Enable the magazine layer and start the reclaim thread. */
 void __init_text slab_late_init(void) {
 	slab_cache_t *cache;
-	int ret;
+	status_t ret;
 
 	mutex_lock(&slab_caches_lock);
 
@@ -993,11 +984,7 @@ void __init_text slab_late_init(void) {
 
 		if(cache->flags & SLAB_CACHE_LATEMAG) {
 			assert(cache->flags & SLAB_CACHE_NOMAG);
-
-			if(slab_cpu_cache_init(cache) != 0) {
-				fatal("Could not enable CPU cache for %s", cache->name);
-			}
-
+			slab_cpu_cache_init(cache, MM_FATAL);
 			cache->flags &= ~(SLAB_CACHE_LATEMAG | SLAB_CACHE_NOMAG);
 		}
 	}
@@ -1005,8 +992,8 @@ void __init_text slab_late_init(void) {
 	mutex_unlock(&slab_caches_lock);
 
 	/* Create the reclaim thread. */
-	if((ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry,
-	                        NULL, NULL, &slab_reclaim_thread)) != 0) {
+	if((ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry, NULL,
+	                        NULL, &slab_reclaim_thread)) != STATUS_SUCCESS) {
 		fatal("Could not create reclaim thread (%d)", ret);
 	}
 	thread_run(slab_reclaim_thread);
@@ -1020,18 +1007,15 @@ void __init_text slab_init(void) {
 	                  0, MM_FATAL);
 
 	/* Initialise statically allocated internal caches. */
-	if(slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0, NULL,
-	                   NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 3, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_cache_cache");
-	} else if(slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_bufctl_cache");
-	} else if(slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0) != 0) {
-		fatal("Could not initialise slab_slab_cache");
-	} else if(slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
-	                          NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 5, &slab_metadata_arena,
-	                          SLAB_CACHE_NOMAG) != 0) {
-		fatal("Could not initialise slab_mag_cache");
-	}
+	slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0, NULL,
+	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 3, &slab_metadata_arena, 0,
+	                MM_FATAL);
+	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0, NULL,
+	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0,
+	                MM_FATAL);
+	slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0, NULL, NULL, NULL,
+	                NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0, MM_FATAL);
+	slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
+	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 5, &slab_metadata_arena,
+	                SLAB_CACHE_NOMAG, MM_FATAL);
 }

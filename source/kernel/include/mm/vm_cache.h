@@ -37,8 +37,8 @@ typedef struct vm_cache_ops {
 	 * @param buf		Buffer to read into.
 	 * @param offset	Offset to read from.
 	 * @param nonblock	Whether the operation is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*read_page)(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
+	 * @return		Status code describing result of operation. */
+	status_t (*read_page)(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
 
 	/** Write a page of data to the source.
 	 * @note		If not provided, pages in the cache will never
@@ -47,8 +47,8 @@ typedef struct vm_cache_ops {
 	 * @param buf		Buffer containing data to write.
 	 * @param offset	Offset to write from.
 	 * @param nonblock	Whether the operation is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
+	 * @return		Status code describing result of operation. */
+	status_t (*write_page)(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
 
 	/** Determine whether a page can be evicted.
 	 * @note		If not provided, then behaviour will be as
@@ -70,15 +70,15 @@ typedef struct vm_cache {
 } vm_cache_t;
 
 extern vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data);
-extern int vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
-                         bool nonblock, size_t *bytesp);
-extern int vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t offset,
-                          bool nonblock, size_t *bytesp);
-extern int vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp);
+extern status_t vm_cache_read(vm_cache_t *cache, void *buf, size_t count, offset_t offset,
+                              bool nonblock, size_t *bytesp);
+extern status_t vm_cache_write(vm_cache_t *cache, const void *buf, size_t count, offset_t offset,
+                               bool nonblock, size_t *bytesp);
+extern status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp);
 extern void vm_cache_release_page(vm_cache_t *cache, offset_t offset, phys_ptr_t phys);
 extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
-extern int vm_cache_flush(vm_cache_t *cache);
-extern int vm_cache_destroy(vm_cache_t *cache, bool discard);
+extern status_t vm_cache_flush(vm_cache_t *cache);
+extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
 extern bool vm_cache_flush_page(vm_page_t *page);
 //extern void vm_cache_evict_page(vm_page_t *page);

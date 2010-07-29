@@ -106,7 +106,7 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
 	/* Set up interruption/timeout context if necessary. This context will
 	 * be restored if sleep is interrupted. */
 	if(flags & SYNC_INTERRUPTIBLE || timeout > 0) {
-		if(context_save(&curr_thread->sleep_context) != 0) {
+		if(context_save(&curr_thread->sleep_context)) {
 			ret = (curr_thread->timed_out) ? STATUS_TIMED_OUT : STATUS_INTERRUPTED;
 			sched_post_switch(state);
 			return ret;

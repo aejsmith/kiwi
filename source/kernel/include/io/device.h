@@ -34,8 +34,8 @@ typedef struct device_ops {
 	 * @note		Called with device lock held.
 	 * @param device	Device being opened.
 	 * @param datap		Where to store handle-specific data pointer.
-	 * @return		0 on success, negative error code on failure. */
-	int (*open)(struct device *device, void **datap);
+	 * @return		Status code describing result of operation. */
+	status_t (*open)(struct device *device, void **datap);
 
 	/** Handler for close calls.
 	 * @note		Called with device lock held.
@@ -52,9 +52,9 @@ typedef struct device_ops {
 	 * @param offset	Offset to write to (only valid for certain
 	 *			device types).
 	 * @param bytesp	Where to store number of bytes read.
-	 * @return		0 on success, negative error code on failure. */
-	int (*read)(struct device *device, void *data, void *buf, size_t count,
-	            offset_t offset, size_t *bytesp);
+	 * @return		Status code describing result of operation. */
+	status_t (*read)(struct device *device, void *data, void *buf, size_t count,
+	                 offset_t offset, size_t *bytesp);
 
 	/** Write to a device.
 	 * @param device	Device to write to.
@@ -64,9 +64,9 @@ typedef struct device_ops {
 	 * @param offset	Offset to write to (only valid for certain
 	 *			device types).
 	 * @param bytesp	Where to store number of bytes written.
-	 * @return		0 on success, negative error code on failure. */
-	int (*write)(struct device *device, void *data, const void *buf, size_t count,
-	             offset_t offset, size_t *bytesp);
+	 * @return		Status code describing result of operation. */
+	status_t (*write)(struct device *device, void *data, const void *buf, size_t count,
+	                  offset_t offset, size_t *bytesp);
 
 	/** Signal that a device event is being waited for.
 	 * @note		If the event being waited for has occurred
@@ -75,8 +75,8 @@ typedef struct device_ops {
 	 * @param device	Device to wait for.
 	 * @param data		Handle-specific data pointer.
 	 * @param wait		Wait information structure.
-	 * @return		0 on success, negative error code on failure. */
-	int (*wait)(struct device *device, void *data, object_wait_t *wait);
+	 * @return		Status code describing result of operation. */
+	status_t (*wait)(struct device *device, void *data, object_wait_t *wait);
 
 	/** Stop waiting for a device event.
 	 * @param device	Device to stop waiting for.
@@ -92,8 +92,9 @@ typedef struct device_ops {
 	 * @param device	Device to check.
 	 * @param data		Handle-specific data pointer.
 	 * @param flags		Mapping flags (VM_MAP_*).
-	 * @return		0 if can be mapped, negative error code if not. */
-	int (*mappable)(struct device *device, void *data, int flags);
+	 * @return		STATUS_SUCCESS if can be mapped, status code
+	 *			explaining why if not. */
+	status_t (*mappable)(struct device *device, void *data, int flags);
 
 	/** Get a page for the device (for memory-mapping the device).
 	 * @note		See note for mappable.
@@ -101,8 +102,8 @@ typedef struct device_ops {
 	 * @param data		Handle-specific data pointer.
 	 * @param offset	Offset into device of page to get.
 	 * @param physp		Where to store address of page to map.
-	 * @return		0 on success, negative error code on failure. */
-	int (*get_page)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
+	 * @return		Status code describing result of operation. */
+	status_t (*get_page)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.
@@ -112,10 +113,9 @@ typedef struct device_ops {
 	 * @param insz		Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
-	 * @return		Positive value on success, negative error code
-	 *			on failure. */
-	int (*request)(struct device *device, void *data, int request, void *in,
-	               size_t insz, void **outp, size_t *outszp);
+	 * @return		Status code describing result of operation. */
+	status_t (*request)(struct device *device, void *data, int request, void *in,
+	                    size_t insz, void **outp, size_t *outszp);
 } device_ops_t;
 
 /** Device attribute structure. */
@@ -189,20 +189,25 @@ static inline const char *device_name(khandle_t *handle) {
 	return device->name;
 }
 
-extern int device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
-                         device_attr_t *attrs, size_t count, device_t **devicep);
-extern int device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep);
-extern int device_destroy(device_t *device);
+extern status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
+                              void *data, device_attr_t *attrs, size_t count,
+                              device_t **devicep);
+extern status_t device_alias(const char *name, device_t *parent, device_t *dest,
+                             device_t **devicep);
+extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
-extern int device_lookup(const char *path, device_t **devicep);
+extern device_t *device_lookup(const char *path);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern void device_release(device_t *device);
 
-extern int device_open(device_t *device, khandle_t **handlep);
-extern int device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern int device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp, size_t *outszp);
+extern status_t device_open(const char *path, khandle_t **handlep);
+extern status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset,
+                            size_t *bytesp);
+extern status_t device_write(khandle_t *handle, const void *buf, size_t count,
+                             offset_t offset, size_t *bytesp);
+extern status_t device_request(khandle_t *handle, int request, void *in, size_t insz,
+                               void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);
 

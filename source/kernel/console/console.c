@@ -30,10 +30,10 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <init.h>
 #include <kdbg.h>
+#include <status.h>
 #include <types.h>
 
 /** List of kernel consoles. */
@@ -236,9 +236,9 @@ int kdbg_cmd_log(int argc, char **argv) {
  * @param count		Number of bytes to write.
  * @param offset	Unused.
  * @param bytesp	Where to store number of bytes written.
- * @return		0 on success, negative error code on failure. */
-static int kconsole_device_write(device_t *device, void *data, const void *buf, size_t count,
-                                 offset_t offset, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t kconsole_device_write(device_t *device, void *data, const void *buf, size_t count,
+                                      offset_t offset, size_t *bytesp) {
 	const char *str = buf;
 	size_t i;
 
@@ -249,7 +249,7 @@ static int kconsole_device_write(device_t *device, void *data, const void *buf, 
 	spinlock_unlock(&console_lock);
 
 	*bytesp = count;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Handler for kernel console device requests.
@@ -260,10 +260,11 @@ static int kconsole_device_write(device_t *device, void *data, const void *buf, 
  * @param insz		Input buffer size.
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
- * @return		Positive value on success, negative error code on
- *			failure. */
-static int kconsole_device_request(device_t *device, void *data, int request, void *in,
-                                   size_t insz, void **outp, size_t *outszp) {
+ * @return		Status code describing result of the operation. */
+static status_t kconsole_device_request(device_t *device, void *data, int request, void *in,
+                                        size_t insz, void **outp, size_t *outszp) {
+	return STATUS_NOT_IMPLEMENTED;
+#if 0
 	switch(request) {
 	case KCONSOLE_GET_LOG_SIZE:
 		return CONFIG_KLOG_SIZE;
@@ -284,6 +285,7 @@ static int kconsole_device_request(device_t *device, void *data, int request, vo
 	default:
 		return -ERR_PARAM_INVAL;
 	}
+#endif
 }
 
 /** Kernel console device operations structure. */
@@ -294,10 +296,10 @@ static device_ops_t kconsole_device_ops = {
 
 /** Register the kernel console device. */
 static void __init_text kconsole_device_init(void) {
-	int ret;
+	status_t ret;
 
 	if((ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
-	                        NULL, NULL, 0, NULL)) < 0) {
+	                        NULL, NULL, 0, NULL)) != STATUS_SUCCESS) {
 		fatal("Failed to register kernel console device (%d)", ret);
 	}
 }

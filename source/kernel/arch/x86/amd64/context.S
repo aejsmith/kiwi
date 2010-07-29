@@ -28,8 +28,8 @@
  *
  * @param ctx		Context structure to save to.
  *
- * @return		0 if returning from context_save(), 1 if returning
- *			from context_restore().
+ * @return		True if returning from context_restore(), false if
+ *			returning from context_save().
  */
 FUNCTION_START(context_save)
 	/* Save instruction/stack pointers. */
@@ -45,7 +45,7 @@ FUNCTION_START(context_save)
 	movq	%r14, CONTEXT_OFF_R14(%rdi)
 	movq	%r15, CONTEXT_OFF_R15(%rdi)
 
-	/* Return 0 from context_save(). */
+	/* Return false from context_save(). */
 	xorq	%rax, %rax
 	ret
 FUNCTION_END(context_save)
@@ -54,7 +54,7 @@ FUNCTION_END(context_save)
  *
  * Restores the CPU context stored in the given context structure. If the
  * context was stored with context_save(), then execution will resume after
- * the context_save() call, with a return value of 1. This function does not
+ * the context_save() call, with a return value of true. This function does not
  * return to its caller.
  *
  * @param ctx		Context structure to restore.
@@ -73,7 +73,7 @@ FUNCTION_START(context_restore)
 	movq	CONTEXT_OFF_IP(%rdi), %rax
 	movq	%rax, (%rsp)
 
-	/* Cause context_save() to return with 1. */
+	/* Cause context_save() to return true. */
 	xorq	%rax, %rax
 	incq	%rax
 	ret

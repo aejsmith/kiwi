@@ -126,11 +126,11 @@ extern void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size)
 extern vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag);
 extern void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
 
-extern int vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
+extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
 
-extern int vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
-                             size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
-                             vmem_t *source, size_t qcache_max, int flags, int vmflag);
+extern bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
+                              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
+                              vmem_t *source, size_t qcache_max, int flags, int vmflag);
 extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                            vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
                            size_t qcache_max, int flags, int vmflag);

@@ -27,7 +27,6 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <errors.h>
 #include <kargs.h>
 
 extern unsigned char console_font[];

@@ -91,10 +91,10 @@ typedef struct vm_aspace {
 
 extern bool vm_fault(ptr_t addr, int reason, int access);
 
-extern int vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
-extern int vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
-                  offset_t offset, ptr_t *addrp);
-extern int vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
+extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
+extern status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
+                       offset_t offset, ptr_t *addrp);
+extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);
 extern vm_aspace_t *vm_aspace_create(void);
