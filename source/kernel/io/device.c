@@ -735,6 +735,10 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 	status_t ret;
 	char *kpath;
 
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
+
 	if((ret = strdup_from_user(path, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = device_open(kpath, &handle)) != STATUS_SUCCESS) {

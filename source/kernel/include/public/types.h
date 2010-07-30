@@ -38,7 +38,7 @@
 #endif
 
 /** Type used to store a kernel status code. */
-typedef int32_t status_t;
+typedef int status_t;
 
 /** Type used to store a handle to an object. */
 typedef int32_t handle_t;

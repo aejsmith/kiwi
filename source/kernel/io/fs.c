@@ -2121,6 +2121,10 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 	khandle_t *handle;
 	status_t ret;
 
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
+
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = fs_file_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
@@ -2433,6 +2437,10 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 	char *kpath = NULL;
 	khandle_t *handle;
 	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;

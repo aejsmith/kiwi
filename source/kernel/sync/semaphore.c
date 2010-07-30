@@ -176,6 +176,10 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	user_semaphore_t *sem;
 	status_t ret;
 
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
+
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
 	if(!(sem->id = vmem_alloc(semaphore_id_arena, 1, 0))) {
 		kfree(sem);
@@ -214,6 +218,10 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	user_semaphore_t *sem;
 	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	rwlock_read_lock(&semaphore_tree_lock);
 

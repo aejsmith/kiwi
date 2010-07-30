@@ -32,8 +32,8 @@ sources = map(File, [
 	'io/fs.c',
 	'io/ramfs.c',
 
-	#'ipc/ipc.c',
-	#'ipc/pipe.c',
+	'ipc/ipc.c',
+	'ipc/pipe.c',
 
 	'lib/avl_tree.c',
 	'lib/bitmap.c',

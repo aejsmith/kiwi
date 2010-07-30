@@ -145,7 +145,7 @@ status_t sys_shm_create(size_t size, handle_t *handlep) {
 	status_t ret;
 	shm_t *area;
 
-	if(size == 0 || size % PAGE_SIZE) {
+	if(size == 0 || size % PAGE_SIZE || !handlep) {
 		return STATUS_PARAM_INVAL;
 	}
 
@@ -178,6 +178,10 @@ status_t sys_shm_open(shm_id_t id, handle_t *handlep) {
 	status_t ret;
 	shm_t *area;
 
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
+
 	rwlock_read_lock(&shm_tree_lock);
 
 	if(!(area = avl_tree_lookup(&shm_tree, id))) {
@@ -203,8 +207,7 @@ shm_id_t sys_shm_id(handle_t handle) {
 	shm_id_t ret;
 	shm_t *area;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 

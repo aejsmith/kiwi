@@ -24,19 +24,17 @@
 #include <mm/slab.h>
 
 #include <assert.h>
-#include <errors.h>
 #include <init.h>
 #include <object.h>
+#include <status.h>
 
 /** Cache for pipe structures. */
 static slab_cache_t *pipe_cache;
 
 /** Constructor for pipe structures.
  * @param obj		Object to construct.
- * @param data		Unused.
- * @param kmflag	Allocation flags (unused).
- * @return		Always returns 0. */
-static int pipe_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Unused. */
+static void pipe_ctor(void *obj, void *data) {
 	pipe_t *pipe = obj;
 
 	mutex_init(&pipe->reader, "pipe_reader_lock", 0);
@@ -46,7 +44,6 @@ static int pipe_ctor(void *obj, void *data, int kmflag) {
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
 	notifier_init(&pipe->space_notifier, pipe);
 	notifier_init(&pipe->data_notifier, pipe);
-	return 0;
 }
 
 /** Read a byte from a pipe.
@@ -90,19 +87,20 @@ static inline void pipe_insert(pipe_t *pipe, char ch) {
  * @param nonblock	Whether to allow blocking.
  * @param bytesp	Where to store number of bytes read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp) {
+status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	size_t i = 0;
-	int ret;
 
 	mutex_lock(&pipe->reader);
 
 	if(count <= PIPE_SIZE) {
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                             SYNC_INTERRUPTIBLE)) != 0) {
+			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
+			                         SYNC_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->data_sem, i);
 				i = 0;
 				goto out;
@@ -117,8 +115,9 @@ int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *byte
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
-			                             SYNC_INTERRUPTIBLE)) != 0) {
+			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
+			                         SYNC_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
 
@@ -128,8 +127,6 @@ int pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *byte
 			mutex_unlock(&pipe->lock);
 		}
 	}
-
-	ret = 0;
 out:
 	mutex_unlock(&pipe->reader);
 	if(bytesp) {
@@ -152,19 +149,20 @@ out:
  * @param nonblock	Whether to allow blocking.
  * @param bytesp	Where to store number of bytes written.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp) {
+status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	size_t i = 0;
-	int ret;
 
 	mutex_lock(&pipe->writer);
 
 	if(count <= PIPE_SIZE) {
 		/* Try to get all required space before writing. */
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                             SYNC_INTERRUPTIBLE)) != 0) {
+			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
+			                         SYNC_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS) {
 				semaphore_up(&pipe->space_sem, i);
 				i = 0;
 				goto out;
@@ -181,8 +179,9 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 		mutex_unlock(&pipe->lock);
 	} else {
 		for(i = 0; i < count; i++) {
-			if((ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
-			                             SYNC_INTERRUPTIBLE)) != 0) {
+			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
+			                         SYNC_INTERRUPTIBLE);
+			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
 
@@ -192,8 +191,6 @@ int pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_
 			mutex_unlock(&pipe->lock);
 		}
 	}
-
-	ret = 0;
 out:
 	mutex_unlock(&pipe->writer);
 	if(bytesp) {

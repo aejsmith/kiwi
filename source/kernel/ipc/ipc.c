@@ -51,10 +51,10 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <init.h>
 #include <object.h>
 #include <kdbg.h>
+#include <status.h>
 #include <vmem.h>
 
 #if CONFIG_IPC_DEBUG
@@ -125,10 +125,8 @@ static MUTEX_DECLARE(port_tree_lock, 0);
 
 /** Port object constructor.
  * @param obj		Object to construct.
- * @param data		Cache data (unused).
- * @param mmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-static int ipc_port_ctor(void *obj, void *data, int mmflag) {
+ * @param data		Cache data (unused). */
+static void ipc_port_ctor(void *obj, void *data) {
 	ipc_port_t *port = obj;
 
 	mutex_init(&port->lock, "ipc_port_lock", 0);
@@ -137,34 +135,11 @@ static int ipc_port_ctor(void *obj, void *data, int mmflag) {
 	semaphore_init(&port->conn_sem, "ipc_listen_sem", 0);
 	semaphore_init(&port->conn_sem, "ipc_conn_sem", 0);
 	notifier_init(&port->conn_notifier, port);
-	return 0;
 }
 
-/** Connection object constructor.
- * @param obj		Object to construct.
- * @param data		Cache data (unused).
- * @param mmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-static int ipc_connection_ctor(void *obj, void *data, int mmflag) {
-	ipc_connection_t *conn = obj;
-	size_t i;
-
-	list_init(&conn->header);
-	mutex_init(&conn->lock, "ipc_connection_lock", 0);
-	for(i = 0; i < 2; i++) {
-		list_init(&conn->endpoints[i].messages);
-		semaphore_init(&conn->endpoints[i].space_sem, "ipc_space_sem", IPC_QUEUE_MAX);
-		semaphore_init(&conn->endpoints[i].data_sem, "ipc_data_sem", 0);
-		notifier_init(&conn->endpoints[i].msg_notifier, &conn->endpoints[i]);
-		notifier_init(&conn->endpoints[i].hangup_notifier, &conn->endpoints[i]);
-	}
-	return 0;
-}
-
-/** Closes a handle to an IPC port.
- * @param handle	Handle being closed. */
-static void port_object_close(khandle_t *handle) {
-	ipc_port_t *port = (ipc_port_t *)handle->object;
+/** Release an IPC port object.
+ * @param port		Port to release. */
+static void ipc_port_release(ipc_port_t *port) {
 	ipc_connection_t *conn;
 	size_t i;
 
@@ -213,12 +188,36 @@ static void port_object_close(khandle_t *handle) {
 	}
 }
 
+/** Connection object constructor.
+ * @param obj		Object to construct.
+ * @param data		Cache data (unused). */
+static void ipc_connection_ctor(void *obj, void *data) {
+	ipc_connection_t *conn = obj;
+	size_t i;
+
+	list_init(&conn->header);
+	mutex_init(&conn->lock, "ipc_connection_lock", 0);
+	for(i = 0; i < 2; i++) {
+		list_init(&conn->endpoints[i].messages);
+		semaphore_init(&conn->endpoints[i].space_sem, "ipc_space_sem", IPC_QUEUE_MAX);
+		semaphore_init(&conn->endpoints[i].data_sem, "ipc_data_sem", 0);
+		notifier_init(&conn->endpoints[i].msg_notifier, &conn->endpoints[i]);
+		notifier_init(&conn->endpoints[i].hangup_notifier, &conn->endpoints[i]);
+	}
+}
+
+/** Closes a handle to an IPC port.
+ * @param handle	Handle being closed. */
+static void port_object_close(khandle_t *handle) {
+	ipc_port_release((ipc_port_t *)handle->object);
+}
+
 /** Signal that a port event is being waited for.
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int port_object_wait(object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t port_object_wait(object_wait_t *wait) {
 	ipc_port_t *port = (ipc_port_t *)wait->handle->object;
-	int ret = 0;
+	status_t ret = STATUS_SUCCESS;
 
 	mutex_lock(&port->lock);
 
@@ -231,7 +230,7 @@ static int port_object_wait(object_wait_t *wait) {
 		}
 		break;
 	default:
-		ret = -ERR_PARAM_INVAL;
+		ret = STATUS_PARAM_INVAL;
 		break;
 	}
 
@@ -328,11 +327,11 @@ static void connection_object_close(khandle_t *handle) {
 
 /** Signal that a connection event is being waited for.
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int connection_object_wait(object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t connection_object_wait(object_wait_t *wait) {
 	ipc_connection_t *conn = (ipc_connection_t *)wait->handle->object;
 	ipc_endpoint_t *endpoint = wait->handle->data;
-	int ret = 0;
+	status_t ret = STATUS_SUCCESS;
 
 	mutex_lock(&conn->lock);
 
@@ -353,7 +352,7 @@ static int connection_object_wait(object_wait_t *wait) {
 		break;
 
 	default:
-		ret = -ERR_PARAM_INVAL;
+		ret = STATUS_PARAM_INVAL;
 		break;
 	}
 
@@ -385,72 +384,79 @@ static object_type_t connection_object_type = {
 };
 
 /** Create a new IPC port.
- * @return		Handle to the port on success, negative error code on
- *			failure. */
-handle_t sys_ipc_port_create(void) {
+ * @param handlep	Where to store handle to port.
+ * @return		Status code describing result of the operation. */
+status_t sys_ipc_port_create(handle_t *handlep) {
 	ipc_port_t *port;
-	handle_t ret;
+	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
 	if(!(port->id = vmem_alloc(port_id_arena, 1, 0))) {
 		slab_cache_free(ipc_port_cache, port);
-		return -ERR_RESOURCE_UNAVAIL;
+		return STATUS_RESOURCE_UNAVAIL;
 	}
+
 	object_init(&port->obj, &port_object_type);
 	refcount_set(&port->count, 1);
-
-	if((ret = handle_create(&port->obj, NULL, curr_proc, 0, NULL)) < 0) {
-		object_destroy(&port->obj);
-		vmem_free(port_id_arena, port->id, 1);
-		slab_cache_free(ipc_port_cache, port);
-		return ret;
-	}
 
 	mutex_lock(&port_tree_lock);
 	avl_tree_insert(&port_tree, port->id, port, NULL);
 	dprintf("ipc: created port %d(%p) (process: %d)\n", port->id, port, curr_proc->id);
 	mutex_unlock(&port_tree_lock);
+
+	ret = handle_create_and_attach(curr_proc, &port->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		ipc_port_release(port);
+	}
 	return ret;
 }
 
 /** Open a handle to an IPC port.
  * @param id		ID of the port to open.
- * @return		Handle to the port on success, negative error code on
- *			failure. */
-handle_t sys_ipc_port_open(port_id_t id) {
-	khandle_t *handle;
+ * @param handlep	Where to store handle to port.
+ * @return		Status code describing result of the operation. */
+status_t sys_ipc_port_open(port_id_t id, handle_t *handlep) {
 	ipc_port_t *port;
-	handle_t ret;
+	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	mutex_lock(&port_tree_lock);
 
 	if(!(port = avl_tree_lookup(&port_tree, id))) {
 		mutex_unlock(&port_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	refcount_inc(&port->count);
 	mutex_unlock(&port_tree_lock);
 
-	handle_create(&port->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	ret = handle_create_and_attach(curr_proc, &port->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		ipc_port_release(port);
+	}
 	return ret;
 }
 
 /** Get the ID of a port.
  * @param handle	Handle to port to get ID of.
- * @return		ID of port on success, negative error code on failure. */
+ * @return		ID of port on success, -1 if handle is invalid. */
 port_id_t sys_ipc_port_id(handle_t handle) {
 	khandle_t *khandle;
 	ipc_port_t *port;
 	port_id_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle)) != 0) {
-		return ret;
+	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle) != STATUS_SUCCESS) {
+		return -1;
 	}
-	port = (ipc_port_t *)khandle->object;
 
+	port = (ipc_port_t *)khandle->object;
 	ret = port->id;
 	handle_release(khandle);
 	return ret;
@@ -462,15 +468,20 @@ port_id_t sys_ipc_port_id(handle_t handle) {
  *			immediately if nothing is currently attempting to
  *			connect to the port. If -1, the function will block
  *			indefinitely until a connection is made.
- * @return		Handle to the caller's end of the connection on
- *			success, negative error code on failure. */
-handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
+ * @param connp		Where to store handle to caller's end of the connection.
+ * @return		Status code describing result of the operation. */
+status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp) {
 	ipc_connection_t *conn = NULL;
 	khandle_t *khandle;
 	ipc_port_t *port;
-	handle_t ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle)) != 0) {
+	if(!connp) {
+		return STATUS_PARAM_INVAL;
+	}
+
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 	port = (ipc_port_t *)khandle->object;
@@ -478,7 +489,8 @@ handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
 	/* Try to get a connection. FIXME: This does not handle timeout
 	 * properly - implement SYNC_ABSOLUTE. */
 	while(!conn) {
-		if((ret = semaphore_down_etc(&port->conn_sem, timeout, SYNC_INTERRUPTIBLE)) != 0) {
+		ret = semaphore_down_etc(&port->conn_sem, timeout, SYNC_INTERRUPTIBLE);
+		if(ret != STATUS_SUCCESS) {
 			handle_release(khandle);
 			return ret;
 		}
@@ -493,7 +505,10 @@ handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
 
 	/* Create a handle to the endpoint. */
 	refcount_inc(&conn->count);
-	if((ret = handle_create(&conn->obj, &conn->endpoints[SERVER_ENDPOINT], curr_proc, 0, NULL)) < 0) {
+	ret = handle_create_and_attach(curr_proc, &conn->obj, &conn->endpoints[SERVER_ENDPOINT],
+	                               0, NULL, connp);
+	if(ret != STATUS_SUCCESS) {
+		refcount_dec(&conn->count);
 		semaphore_up(&port->conn_sem, 1);
 		mutex_unlock(&port->lock);
 		handle_release(khandle);
@@ -512,20 +527,25 @@ handle_t sys_ipc_port_listen(handle_t handle, useconds_t timeout) {
 
 /** Open an IPC connection to a port.
  * @param id		Port ID to connect to.
- * @return		Handle referring to caller's end of connection on
- *			success, negative error code on failure. */
-handle_t sys_ipc_connection_open(port_id_t id) {
+ * @param handlep	Where to store handle to caller's end of the connection.
+ * @return		Status code describing result of the operation. */
+status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "ipc_open_sem", 0);
 	ipc_connection_t *conn;
 	ipc_port_t *port;
 	handle_t handle;
-	int i, ret;
+	status_t ret;
+	int i;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	mutex_lock(&port_tree_lock);
 
 	if(!(port = avl_tree_lookup(&port_tree, id))) {
 		mutex_unlock(&port_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	mutex_lock(&port->lock);
@@ -544,11 +564,13 @@ handle_t sys_ipc_connection_open(port_id_t id) {
 
 	/* Create a handle now, as we do not want to find that we cannot create
 	 * the handle after the connection has been accepted. */
-	if((handle = handle_create(&conn->obj, &conn->endpoints[CLIENT_ENDPOINT], curr_proc, 0, NULL)) < 0) {
+	ret = handle_create_and_attach(curr_proc, &conn->obj, &conn->endpoints[CLIENT_ENDPOINT],
+	                               0, &handle, handlep);
+	if(ret != STATUS_SUCCESS) {
 		object_destroy(&conn->obj);
 		slab_cache_free(ipc_connection_cache, conn);
 		mutex_unlock(&port->lock);
-		return handle;
+		return ret;
 	}
 
 	/* Place the connection in the port's waiting list. */
@@ -558,7 +580,8 @@ handle_t sys_ipc_connection_open(port_id_t id) {
 	mutex_unlock(&port->lock);
 
 	/* Wait for the connection to be accepted. */
-	if((ret = semaphore_down_etc(&sem, -1, SYNC_INTERRUPTIBLE)) != 0) {
+	ret = semaphore_down_etc(&sem, -1, SYNC_INTERRUPTIBLE);
+	if(ret != STATUS_SUCCESS) {
 		/* Take the port tree lock to ensure that the port doesn't get
 		 * freed. This is a bit naff, but oh well. */
 		mutex_lock(&port_tree_lock);
@@ -571,15 +594,15 @@ handle_t sys_ipc_connection_open(port_id_t id) {
 		mutex_unlock(&port_tree_lock);
 		handle_detach(curr_proc, handle);
 		return ret;
-	} else if(conn->port == NULL) {
+	} else if(!conn->port) {
 		handle_detach(curr_proc, handle);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	dprintf("ipc: opened connection to port %" PRId32 "(%p) (client: %p, server: %p)\n",
 	        id, conn->port, &conn->endpoints[CLIENT_ENDPOINT],
 	        &conn->endpoints[SERVER_ENDPOINT]);
-	return handle;
+	return STATUS_SUCCESS;
 }
 
 /** Send a message on a connection.
@@ -594,17 +617,17 @@ handle_t sys_ipc_connection_open(port_id_t id) {
  *			size is 0.
  * @param size		Size of data buffer (can be 0).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
+status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
 	ipc_endpoint_t *endpoint = NULL;
 	khandle_t *khandle = NULL;
 	ipc_message_t *message;
+	status_t ret;
 	bool state;
-	int ret;
 
 	if((!buf && size) || size > IPC_MESSAGE_MAX) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Allocate a message structure, and copy the data buffer into it. */
@@ -613,13 +636,14 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 	message->type = type;
 	message->size = size;
 	if(size) {
-		if((ret = memcpy_from_user(message->data, buf, size)) != 0) {
+		if((ret = memcpy_from_user(message->data, buf, size)) != STATUS_SUCCESS) {
 			goto fail;
 		}
 	}
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 	endpoint = khandle->data;
@@ -638,7 +662,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 			mutex_unlock(&endpoint->conn->lock);
 			ret = waitq_sleep_unsafe(&endpoint->remote->space_sem.queue, -1, SYNC_INTERRUPTIBLE, state);
 			mutex_lock(&endpoint->conn->lock);
-			if(ret != 0) {
+			if(ret != STATUS_SUCCESS) {
 				goto fail;
 			}
 		}
@@ -647,7 +671,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 	/* If remote is now NULL the remote process has hung up or the port
 	 * has disappeared */
 	if(!endpoint->remote) {
-		ret = -ERR_DEST_UNREACHABLE;
+		ret = STATUS_DEST_UNREACHABLE;
 		goto fail;
 	}
 
@@ -658,7 +682,7 @@ int sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t
 
 	mutex_unlock(&endpoint->conn->lock);
 	handle_release(khandle);
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(khandle) {
 		mutex_unlock(&endpoint->conn->lock);
@@ -681,24 +705,24 @@ fail:
  * @param vec		Array of structures describing messages to send.
  * @param count		Number of messages in array.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count) {
-	return -ERR_NOT_IMPLEMENTED;
+status_t sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Wait until a message arrives.
  * @param endpoint	Endpoint to wait on. Connection should be locked.
  * @param timeout	Timeout.
  * @param messagep	Where to store pointer to message structure.
- * @return		0 on success, negative error code on failure. */
-static int wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_message_t **messagep) {
+ * @return		Status code describing result of the operation. */
+static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_message_t **messagep) {
+	status_t ret;
 	bool state;
-	int ret;
 
 	/* Check if anything can send us a message. */
 	if(!endpoint->remote) {
-		return -ERR_DEST_UNREACHABLE;
+		return STATUS_DEST_UNREACHABLE;
 	}
 
 	/* Wait for data in our message queue. The unlock/wait needs to be
@@ -713,7 +737,7 @@ static int wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_me
 		mutex_unlock(&endpoint->conn->lock);
 		ret = waitq_sleep_unsafe(&endpoint->data_sem.queue, timeout, SYNC_INTERRUPTIBLE, state);
 		mutex_lock(&endpoint->conn->lock);
-		if(ret != 0) {
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
@@ -724,12 +748,12 @@ static int wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_me
 		if(!list_empty(&endpoint->messages)) {
 			semaphore_up(&endpoint->data_sem, 1);
 		}
-		return -ERR_DEST_UNREACHABLE;
+		return STATUS_DEST_UNREACHABLE;
 	}
 
 	assert(!list_empty(&endpoint->messages));
 	*messagep = list_entry(endpoint->messages.next, ipc_message_t, header);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Get details of the next message on a connection.
@@ -745,33 +769,42 @@ static int wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_me
  * @param typep		Where to store message type ID.
  * @param sizep		Where to store message data size.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_ipc_message_peek(handle_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
+status_t sys_ipc_message_peek(handle_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
 	ipc_endpoint_t *endpoint;
 	ipc_message_t *message;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 	endpoint = khandle->data;
 	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for a message. */
-	if((ret = wait_for_message(endpoint, timeout, &message)) != 0) {
+	ret = wait_for_message(endpoint, timeout, &message);
+	if(ret != STATUS_SUCCESS) {
 		mutex_unlock(&endpoint->conn->lock);
 		handle_release(khandle);
 		return ret;
 	}
 
-	if(typep && (ret = memcpy_to_user(typep, &message->type, sizeof(uint32_t))) != 0) {
-		goto out;
+	/* Copy requested information back to the caller. */
+	if(typep) {
+		ret = memcpy_to_user(typep, &message->type, sizeof(uint32_t));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
 	}
-	if(sizep && (ret = memcpy_to_user(sizep, &message->size, sizeof(size_t))) != 0) {
-		goto out;
+	if(sizep) {
+		ret = memcpy_to_user(sizep, &message->size, sizeof(size_t));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
 	}
 out:
 	semaphore_up(&endpoint->data_sem, 1);
@@ -799,36 +832,43 @@ out:
  *			specified as 0).
  * @param size		Size of supplied buffer.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
-                            void *buf, size_t size) {
+status_t sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
+                                 void *buf, size_t size) {
 	ipc_message_t *message = NULL;
 	ipc_endpoint_t *endpoint;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
 	if(size > 0 && !buf) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Look up the handle. */
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_CONNECTION, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 	endpoint = khandle->data;
 	mutex_lock(&endpoint->conn->lock);
 
 	/* Wait for a message. */
-	if((ret = wait_for_message(endpoint, timeout, &message)) != 0) {
+	ret = wait_for_message(endpoint, timeout, &message);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
-	if(typep && (ret = memcpy_to_user(typep, &message->type, sizeof(uint32_t))) != 0) {
-		goto fail;
+	/* Copy the message back to the caller. */
+	if(typep) {
+		ret = memcpy_to_user(typep, &message->type, sizeof(uint32_t));
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
 	}
-	if(size > 0) {
-		if((ret = memcpy_to_user(buf, message->data, message->size)) != 0) {
+	if(size && message->size) {
+		ret = memcpy_to_user(buf, message->data, MIN(size, message->size));
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 	}
@@ -840,7 +880,7 @@ int sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *typep
 
 	mutex_unlock(&endpoint->conn->lock);
 	handle_release(khandle);
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(message) {
 		semaphore_up(&endpoint->data_sem, 1);
