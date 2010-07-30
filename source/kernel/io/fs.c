@@ -1769,7 +1769,7 @@ fail:
 status_t fs_unmount(const char *path) {
 	fs_node_t *node = NULL, *child;
 	fs_mount_t *mount = NULL;
-	int ret;
+	status_t ret;
 
 	if(!path) {
 		return STATUS_PARAM_INVAL;
@@ -2416,10 +2416,10 @@ status_t sys_fs_file_resize(handle_t handle, offset_t size) {
  * @param path		Path to directory to create.
  * @return		Status code describing result of the operation. */
 status_t sys_fs_dir_create(const char *path) {
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2475,7 +2475,7 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	fs_dir_entry_t *kbuf;
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
 	if(!size) {
 		return STATUS_BUF_TOO_SMALL;

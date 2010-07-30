@@ -283,7 +283,7 @@ static void page_map_flush(page_map_t *map) {
 
 			/* CPU is using this address space. */
 			if(ipi_send(cpu->id, tlb_invalidate_ipi, (unative_t)map,
-			            0, 0, 0, IPI_SEND_SYNC) != 0) {
+			            0, 0, 0, IPI_SEND_SYNC) != STATUS_SUCCESS) {
 				fatal("Could not send TLB invalidation IPI");
 			}
 		}

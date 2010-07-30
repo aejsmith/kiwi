@@ -69,56 +69,73 @@ statement
 	;
 
 service_stmt
-	: TOK_SERVICE TOK_NAMESPACE				{ set_service_name($2); }
+	: TOK_SERVICE TOK_NAMESPACE
+		{ set_service_name($2); }
 	;
 
 version_stmt
-	: TOK_VERSION TOK_NUMBER				{ set_service_version($2); }
+	: TOK_VERSION TOK_NUMBER
+		{ set_service_version($2); }
 	;
 
 type_stmt
-	: TOK_TYPE TOK_IDENTIFIER TOK_IDENTIFIER		{ add_type($2, $3); }
+	: TOK_TYPE TOK_IDENTIFIER TOK_IDENTIFIER
+		{ add_type($2, $3); }
 	;
 
 struct_stmt
-	: TOK_STRUCT TOK_IDENTIFIER '{' struct_body '}'		{ add_struct($2, $4); }
+	: TOK_STRUCT TOK_IDENTIFIER '{' struct_body '}'	
+		{ add_struct($2, $4); }
 	;
 
 struct_body
-	: struct_entry struct_body				{ $$ = $1; $$->next = $2; }
-	| struct_entry						{ $$ = $1; }
+	: struct_entry struct_body
+		{ $$ = $1; $$->next = $2; }
+	| struct_entry
+		{ $$ = $1; }
 	;
 
 struct_entry
-	: TOK_IDENTIFIER TOK_IDENTIFIER ';'			{ $$ = new_variable($2, $1, false); }
+	: TOK_IDENTIFIER TOK_IDENTIFIER ';'
+		{ $$ = new_variable($2, $1, false); }
 	;
 
 function_stmt
-	: TOK_FUNCTION TOK_IDENTIFIER '(' func_param_list ')'	{ add_function($2, $4); }
-	| TOK_FUNCTION TOK_IDENTIFIER '(' ')'			{ add_function($2, NULL); }
+	: TOK_FUNCTION TOK_IDENTIFIER '(' func_param_list ')'
+		{ add_function($2, $4); }
+	| TOK_FUNCTION TOK_IDENTIFIER '(' ')'
+		{ add_function($2, NULL); }
 	;
 
 func_param_list
-	: func_param ',' func_param_list			{ $$ = $1; $$->next = $3; }
-	| func_param						{ $$ = $1; }
+	: func_param ',' func_param_list
+		{ $$ = $1; $$->next = $3; }
+	| func_param
+		{ $$ = $1; }
 	;
 
 func_param
-	: TOK_IDENTIFIER TOK_IDENTIFIER				{ $$ = new_variable($2, $1, false); }
-	| TOK_OUT TOK_IDENTIFIER TOK_IDENTIFIER			{ $$ = new_variable($3, $2, true); }
+	: TOK_IDENTIFIER TOK_IDENTIFIER
+		{ $$ = new_variable($2, $1, false); }
+	| TOK_OUT TOK_IDENTIFIER TOK_IDENTIFIER
+		{ $$ = new_variable($3, $2, true); }
 	;
 
 event_stmt
-	: TOK_EVENT TOK_IDENTIFIER '(' event_param_list ')'	{ add_event($2, $4); }
+	: TOK_EVENT TOK_IDENTIFIER '(' event_param_list ')'
+		{ add_event($2, $4); }
 	;
 
 event_param_list
-	: event_param ',' event_param_list			{ $$ = $1; $$->next = $3; }
-	| event_param						{ $$ = $1; }
+	: event_param ',' event_param_list
+		{ $$ = $1; $$->next = $3; }
+	| event_param
+		{ $$ = $1; }
 	;
 
 event_param
-	: TOK_IDENTIFIER TOK_IDENTIFIER				{ $$ = new_variable($2, $1, false); }
+	: TOK_IDENTIFIER TOK_IDENTIFIER
+		{ $$ = new_variable($2, $1, false); }
 	;
 
 %%

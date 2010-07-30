@@ -264,7 +264,7 @@ static void connection_object_close(khandle_t *handle) {
 	ipc_connection_t *conn = (ipc_connection_t *)handle->object;
 	ipc_endpoint_t *endpoint = handle->data;
 	ipc_message_t *message;
-	int ret;
+	status_t ret;
 
 	assert(endpoint->conn == conn);
 
@@ -289,7 +289,7 @@ static void connection_object_close(khandle_t *handle) {
 		 * being freed as they are initialised in the slab constructor
 		 * rather than after being allocated. */
 		ret = semaphore_down_etc(&endpoint->data_sem, 0, 0);
-		assert(ret == 0);
+		assert(ret == STATUS_SUCCESS);
 		semaphore_up(&endpoint->space_sem, 1);
 
 		list_remove(&message->header);

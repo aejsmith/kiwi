@@ -117,8 +117,8 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
 	khandle_t *handle;
 	int64_t size;
+	status_t ret;
 	size_t bytes;
-	int ret;
 
 	/* Check format of module. */
 	if(strncmp(hdr->magic, "ustar", 5) != 0) {
@@ -128,7 +128,8 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 	/* If any TAR files are loaded it means we should mount a RamFS at the
 	 * root, if this has not already been done. */
 	if(!root_mount) {
-		if((ret = fs_mount(NULL, "/", "ramfs", NULL)) != 0) {
+		ret = fs_mount(NULL, "/", "ramfs", NULL);
+		if(ret != STATUS_SUCCESS) {
 			fatal("Could not mount RamFS at root (%d)", ret);
 		}
 	}
@@ -147,24 +148,34 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 		switch(hdr->typeflag) {
 		case REGTYPE:
 		case AREGTYPE:
-			if((ret = fs_file_create(hdr->name)) != 0) {
+			ret = fs_file_create(hdr->name);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
-			} else if((ret = fs_file_open(hdr->name, FS_FILE_WRITE, &handle)) != 0) {
+			}
+
+			ret = fs_file_open(hdr->name, FS_FILE_WRITE, &handle);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to open file %s (%d)", hdr->name, ret);
-			} else if((ret = fs_file_write(handle, (void *)((ptr_t)hdr + 512), size, &bytes)) != 0) {
+			}
+
+			ret = fs_file_write(handle, (void *)((ptr_t)hdr + 512), size, &bytes);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to write file %s (%d)", hdr->name, ret);
 			} else if((int64_t)bytes != size) {
 				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
 			}
+
 			handle_release(handle);
 			break;
 		case DIRTYPE:
-			if((ret = fs_dir_create(hdr->name)) != 0) {
+			ret = fs_dir_create(hdr->name);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to create directory %s (%d)", hdr->name, ret);
 			}
 			break;
 		case SYMTYPE:
-			if((ret = fs_symlink_create(hdr->name, hdr->linkname)) != 0) {
+			ret = fs_symlink_create(hdr->name, hdr->linkname);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to create symbolic link %s (%d)", hdr->name, ret);
 			}
 			break;
@@ -283,7 +294,7 @@ static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
 static void init_thread(void *args, void *arg2) {
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
-	int ret;
+	status_t ret;
 
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
@@ -311,8 +322,8 @@ static void init_thread(void *args, void *arg2) {
 	console_update_boot_progress(100);
 
 	/* Run the service manager. */
-	if((ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_SYSTEM,
-	                         kernel_proc, NULL)) != 0) {
+	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_SYSTEM, kernel_proc, NULL);
+	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start service manager (%d)", ret);
 	}
 }
@@ -322,6 +333,7 @@ static void init_thread(void *args, void *arg2) {
  * @param cpu           CPU that the function is running on. */
 void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	thread_t *thread;
+	status_t ret;
 
 	/* Wait for all CPUs to enter the kernel. */
 	init_rendezvous(args, &init_rendezvous_1);
@@ -372,7 +384,8 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		vm_init();
 
 		/* Create the second stage initialisation thread. */
-		if(thread_create("init", kernel_proc, 0, init_thread, args, NULL, &thread) != 0) {
+		ret = thread_create("init", kernel_proc, 0, init_thread, args, NULL, &thread);
+		if(ret != STATUS_SUCCESS) {
 			fatal("Could not create second-stage initialisation thread");
 		}
 		thread_run(thread);

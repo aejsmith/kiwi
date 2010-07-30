@@ -292,11 +292,11 @@ extern status_t fs_symlink_read(const char *path, char *buf, size_t size);
 
 extern status_t fs_mount(const char *device, const char *path, const char *type, const char *opts);
 extern status_t fs_unmount(const char *path);
-//extern int fs_sync(void);
+//extern status_t fs_sync(void);
 extern status_t fs_info(const char *path, bool follow, fs_info_t *info);
-//extern int fs_link(const char *source, const char *dest);
+//extern status_t fs_link(const char *source, const char *dest);
 extern status_t fs_unlink(const char *path);
-//extern int fs_rename(const char *source, const char *dest);
+//extern status_t fs_rename(const char *source, const char *dest);
 
 /**
  * Debugger commands.

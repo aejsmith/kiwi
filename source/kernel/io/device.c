@@ -341,10 +341,10 @@ status_t device_destroy(device_t *device) {
  * @return		Whether to continue lookup. */
 static bool device_iterate_internal(device_t *device, device_iterate_t func, void *data) {
 	device_t *child;
-	int ret;
 
-	if((ret = func(device, data)) != 1) {
-		return (ret == 0) ? false : true;
+	switch(func(device, data)) {
+	case 0: return false;
+	case 2: return true;
 	}
 
 	RADIX_TREE_FOREACH(&device->children, iter) {
@@ -708,14 +708,19 @@ int kdbg_cmd_device(int argc, char **argv) {
 
 /** Initialise the device manager. */
 void __init_text device_init(void) {
+	status_t ret;
+
+	/* Create the root node of the device tree. */
 	device_tree_root = kcalloc(1, sizeof(device_t), MM_FATAL);
 	mutex_init(&device_tree_root->lock, "device_root_lock", 0);
 	refcount_set(&device_tree_root->count, 0);
 	radix_tree_init(&device_tree_root->children);
 	device_tree_root->name = (char *)"<root>";
 
-	if(device_create("bus", device_tree_root, NULL, NULL, NULL, 0, &device_bus_dir) != 0) {
-		fatal("Could not create bus directory in device tree");
+	/* Create standard device directories. */
+	ret = device_create("bus", device_tree_root, NULL, NULL, NULL, 0, &device_bus_dir);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create bus directory in device tree (%d)", ret);
 	}
 }
 

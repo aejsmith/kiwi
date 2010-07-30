@@ -153,7 +153,8 @@ static inline int sched_migrate_cpu(sched_cpu_t *cpu, int priority, int max) {
 	LIST_FOREACH_SAFE(&cpu->queues[priority], iter) {
 		thread = list_entry(iter, thread_t, runq_link);
 
-		if((count -= sched_migrate_thread(cpu, thread)) == 0) {
+		count -= sched_migrate_thread(cpu, thread);
+		if(count == 0) {
 			break;
 		}
 	}
