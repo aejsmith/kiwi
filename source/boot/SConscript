@@ -75,6 +75,12 @@ env = envmgr.Create('boot', {
 	},
 })
 
+# Override any optimisation level specified, we want to optimise for size.
+for flag in env['CCFLAGS']:
+	if flag[0:2] == '-O':
+		env['CCFLAGS'].remove(flag)
+env['CCFLAGS'] += ['-Os']
+
 # Let the distribution environment know where the loader is.
 envmgr['dist']['LOADER'] = File('loader')
 
