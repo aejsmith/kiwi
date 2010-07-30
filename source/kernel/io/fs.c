@@ -35,9 +35,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <status.h>
 
 #if CONFIG_FS_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -53,7 +53,7 @@ typedef struct fs_handle {
 } fs_handle_t;
 
 extern void fs_node_get(fs_node_t *node);
-static int fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
+static status_t fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
 static object_type_t file_object_type;
 static object_type_t dir_object_type;
 
@@ -135,11 +135,11 @@ static fs_type_t *fs_type_probe(khandle_t *handle, const char *uuid) {
 
 /** Register a new filesystem type.
  * @param type		Pointer to type structure to register.
- * @return		0 on success, negative error code on failure. */
-int fs_type_register(fs_type_t *type) {
+ * @return		Status code describing result of the operation. */
+status_t fs_type_register(fs_type_t *type) {
 	/* Check whether the structure is valid. */
 	if(!type || !type->name || !type->description || !type->mount) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	mutex_lock(&fs_types_lock);
@@ -147,7 +147,7 @@ int fs_type_register(fs_type_t *type) {
 	/* Check if this type already exists. */
 	if(fs_type_lookup_internal(type->name) != NULL) {
 		mutex_unlock(&fs_types_lock);
-		return -ERR_ALREADY_EXISTS;
+		return STATUS_ALREADY_EXISTS;
 	}
 
 	refcount_set(&type->count, 0);
@@ -157,7 +157,7 @@ int fs_type_register(fs_type_t *type) {
 	kprintf(LOG_NORMAL, "fs: registered filesystem type %s (%s)\n",
 	        type->name, type->description);
 	mutex_unlock(&fs_types_lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Remove a filesystem type.
@@ -167,35 +167,23 @@ int fs_type_register(fs_type_t *type) {
  *
  * @param type		Type to remove.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_type_unregister(fs_type_t *type) {
+status_t fs_type_unregister(fs_type_t *type) {
 	mutex_lock(&fs_types_lock);
 
 	/* Check that the type is actually there. */
 	if(fs_type_lookup_internal(type->name) != type) {
 		mutex_unlock(&fs_types_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	} else if(refcount_get(&type->count) > 0) {
 		mutex_unlock(&fs_types_lock);
-		return -ERR_IN_USE;
+		return STATUS_IN_USE;
 	}
 
 	list_remove(&type->header);
 	mutex_unlock(&fs_types_lock);
-	return 0;
-}
-
-/** FS node object constructor.
- * @param obj		Object to construct.
- * @param data		Cache data (unused).
- * @param kmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-static int fs_node_ctor(void *obj, void *data, int kmflag) {
-	fs_node_t *node = obj;
-
-	list_init(&node->mount_link);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Allocate a filesystem node structure.
@@ -213,6 +201,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 
 	node = slab_cache_alloc(fs_node_cache, MM_SLEEP);
 	refcount_set(&node->count, 1);
+	list_init(&node->mount_link);
 	node->id = id;
 	node->type = type;
 	node->removed = false;
@@ -242,10 +231,9 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
  *			fs_node_release().
  * @note		Mount lock (if there is a mount) must be held.
  * @param node		Node to free. Should be unused (zero reference count).
- * @return		0 on success, negative error code on failure (this can
- *			happen if an error occurs flushing the node data). */
-static int fs_node_free(fs_node_t *node) {
-	int ret;
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_free(fs_node_t *node) {
+	status_t ret;
 
 	assert(refcount_get(&node->count) == 0);
 	assert(!node->mount || mutex_held(&node->mount->lock));
@@ -253,7 +241,8 @@ static int fs_node_free(fs_node_t *node) {
 	/* Call the implementation to flush any changes and free up its data. */
 	if(node->ops) {
 		if(!FS_NODE_IS_RDONLY(node) && !node->removed && node->ops->flush) {
-			if((ret = node->ops->flush(node)) != 0) {
+			ret = node->ops->flush(node);
+			if(ret != STATUS_SUCCESS) {
 				return ret;
 			}
 		}
@@ -272,7 +261,7 @@ static int fs_node_free(fs_node_t *node) {
 	dprintf("fs: freed node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
 	        (node->mount) ? node->mount->id : 0, node->id);
 	slab_cache_free(fs_node_cache, node);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Look up a node in the filesystem.
@@ -283,18 +272,16 @@ static int fs_node_free(fs_node_t *node) {
  *			symbolic link.
  * @param nest		Symbolic link nesting count.
  * @param nodep		Where to store pointer to node found (referenced).
- * @return		0 on success, negative error code on failure. */
-static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int nest,
-                                   fs_node_t **nodep) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int nest,
+                                        fs_node_t **nodep) {
 	fs_node_t *prev = NULL;
 	fs_mount_t *mount;
 	char *tok, *link;
 	node_id_t id;
-	int ret;
+	status_t ret;
 
-	/* Handle absolute paths here rather than in fs_node_lookup() because
-	 * the symbolic link resolution code below calls this function directly
-	 * rather than fs_node_lookup(). */
+	/* Check whether the path is an absolute path. */
 	if(path[0] == '/') {
 		/* Drop the node we were provided, if any. */
 		if(node != NULL) {
@@ -316,7 +303,7 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 		/* Return the root node if the end of the path has been reached. */
 		if(!path[0]) {
 			*nodep = node;
-			return 0;
+			return STATUS_SUCCESS;
 		}
 	} else {
 		assert(node->type == FS_NODE_DIR);
@@ -338,12 +325,13 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			if(++nest > SYMLOOP_MAX) {
 				fs_node_release(prev);
 				fs_node_release(node);
-				return -ERR_LINK_LIMIT;
+				return STATUS_LINK_LIMIT;
 			}
 
 			/* Obtain the link destination. */
 			assert(node->ops->read_link);
-			if((ret = node->ops->read_link(node, &link)) != 0) {
+			ret = node->ops->read_link(node, &link);
+			if(ret != STATUS_SUCCESS) {
 				fs_node_release(prev);
 				fs_node_release(node);
 				return ret;
@@ -360,7 +348,8 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 
 			/* Recurse to find the link destination. The check
 			 * above ensures we do not infinitely recurse. */
-			if((ret = fs_node_lookup_internal(link, node, true, nest, &node)) != 0) {
+			ret = fs_node_lookup_internal(link, node, true, nest, &node);
+			if(ret != STATUS_SUCCESS) {
 				kfree(link);
 				return ret;
 			}
@@ -379,13 +368,14 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			/* The last token was the last element of the path
 			 * string, return the node we're currently on. */
 			*nodep = node;
-			return 0;
+			return STATUS_SUCCESS;
 		} else if(node->type != FS_NODE_DIR) {
 			/* The previous token was not a directory: this means
 			 * the path string is trying to treat a non-directory
 			 * as a directory. Reject this. */
 			fs_node_release(node);
-			return -ERR_TYPE_INVAL;
+			// FIXME: better error code 
+			return STATUS_TYPE_INVAL;
 		} else if(!tok[0]) {
 			/* Zero-length path component, do nothing. */
 			continue;
@@ -397,7 +387,6 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			}
 
 			assert(node != root_mount->root);
-
 			if(node == node->mount->root) {
 				assert(node->mount->mountpoint);
 				assert(node->mount->mountpoint->type == FS_NODE_DIR);
@@ -419,7 +408,8 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 		}
 
 		/* Look up this name within the directory. */
-		if((ret = fs_dir_lookup(node, tok, &id)) != 0) {
+		ret = fs_dir_lookup(node, tok, &id);
+		if(ret != STATUS_SUCCESS) {
 			fs_node_release(node);
 			return ret;
 		}
@@ -473,8 +463,11 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
 			if(!mount->ops->read_node) {
 				mutex_unlock(&mount->lock);
 				fs_node_release(prev);
-				return -ERR_NOT_SUPPORTED;
-			} else if((ret = mount->ops->read_node(mount, id, &node)) != 0) {
+				return STATUS_NOT_SUPPORTED;
+			}
+
+			ret = mount->ops->read_node(mount, id, &node);
+			if(ret != STATUS_SUCCESS) {
 				mutex_unlock(&mount->lock);
 				fs_node_release(prev);
 				return ret;
@@ -516,18 +509,18 @@ static int fs_node_lookup_internal(char *path, fs_node_t *node, bool follow, int
  * @param type		Required node type (negative will not check the type).
  * @param nodep		Where to store pointer to node found (referenced).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-static int fs_node_lookup(const char *path, bool follow, int type, fs_node_t **nodep) {
+static status_t fs_node_lookup(const char *path, bool follow, int type, fs_node_t **nodep) {
 	fs_node_t *node = NULL;
+	status_t ret;
 	char *dup;
-	int ret;
 
 	assert(path);
 	assert(nodep);
 
 	if(!path[0]) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	rwlock_read_lock(&curr_proc->ioctx.lock);
@@ -543,9 +536,10 @@ static int fs_node_lookup(const char *path, bool follow, int type, fs_node_t **n
 	dup = kstrdup(path, MM_SLEEP);
 
 	/* Look up the path string. */
-	if((ret = fs_node_lookup_internal(dup, node, follow, 0, &node)) == 0) {
+	ret = fs_node_lookup_internal(dup, node, follow, 0, &node);
+	if(ret == STATUS_SUCCESS) {
 		if(type >= 0 && node->type != (fs_node_type_t)type) {
-			ret = -ERR_TYPE_INVAL;
+			ret = STATUS_TYPE_INVAL;
 			fs_node_release(node);
 		} else {
 			*nodep = node;
@@ -579,7 +573,7 @@ void fs_node_get(fs_node_t *node) {
  */
 void fs_node_release(fs_node_t *node) {
 	fs_mount_t *mount = NULL;
-	int ret;
+	status_t ret;
 
 	if(node->mount) {
 		mutex_lock(&node->mount->lock);
@@ -601,7 +595,7 @@ void fs_node_release(fs_node_t *node) {
 			 * in fs_node_free() is flushing data. Since this node
 			 * has no source to flush to, or has been removed, this
 			 * should not fail. */
-			if((ret = fs_node_free(node)) != 0) {
+			if((ret = fs_node_free(node)) != STATUS_SUCCESS) {
 				fatal("Could not destroy %s (%d)",
 				      (mount) ? "removed node" : "node with no mount",
 				      ret);
@@ -633,12 +627,12 @@ void fs_node_remove(fs_node_t *node) {
  * @param path		Path to node to create.
  * @param type		Type to give the new node.
  * @param target	For symbolic links, the target of the link.
- * @return		0 on success, negative error code on failure. */
-static int fs_node_create(const char *path, fs_node_type_t type, const char *target) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_create(const char *path, fs_node_type_t type, const char *target) {
 	fs_node_t *parent = NULL, *node = NULL;
 	char *dir, *name;
 	node_id_t id;
-	int ret;
+	status_t ret;
 
 	/* Split path into directory/name. */
 	dir = kdirname(path, MM_SLEEP);
@@ -647,7 +641,7 @@ static int fs_node_create(const char *path, fs_node_type_t type, const char *tar
 	/* It is possible for kbasename() to return a string with a '/'
 	 * character if the path refers to the root of the FS. */
 	if(strchr(name, '/')) {
-		ret = -ERR_ALREADY_EXISTS;
+		ret = STATUS_ALREADY_EXISTS;
 		goto out;
 	}
 
@@ -655,12 +649,13 @@ static int fs_node_create(const char *path, fs_node_type_t type, const char *tar
 
 	/* Check for disallowed names. */
 	if(strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
-                ret = -ERR_ALREADY_EXISTS;
+                ret = STATUS_ALREADY_EXISTS;
 		goto out;
         }
 
 	/* Look up the parent node. */
-	if((ret = fs_node_lookup(dir, true, FS_NODE_DIR, &parent)) != 0) {
+	ret = fs_node_lookup(dir, true, FS_NODE_DIR, &parent);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -669,24 +664,26 @@ static int fs_node_create(const char *path, fs_node_type_t type, const char *tar
 	/* Ensure that we are on a writable filesystem, and that the FS
 	 * supports node creation. */
 	if(FS_NODE_IS_RDONLY(parent)) {
-		ret = -ERR_READ_ONLY;
+		ret = STATUS_READ_ONLY;
 		goto out;
 	} else if(!parent->ops->create) {
-		ret = -ERR_NOT_SUPPORTED;
+		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	}
 
 	/* Check if the name we're creating already exists. This will populate
 	 * the entry cache so it will be OK to add the node to it. */
-	if((ret = fs_dir_lookup(parent, name, &id)) != -ERR_NOT_FOUND) {
-		if(ret == 0) {
-			ret = -ERR_ALREADY_EXISTS;
+	ret = fs_dir_lookup(parent, name, &id);
+	if(ret != STATUS_NOT_FOUND) {
+		if(ret == STATUS_SUCCESS) {
+			ret = STATUS_ALREADY_EXISTS;
 		}
 		goto out;
 	}
 
 	/* We can now call into the filesystem to create the node. */
-	if((ret = parent->ops->create(parent, name, type, target, &node)) != 0) {
+	ret = parent->ops->create(parent, name, type, target, &node);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -730,25 +727,26 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
  * @param parent	Directory containing node.
  * @param id		ID of node to get name of.
  * @param namep		Where to store pointer to string containing node name.
- * @return		0 on success, negative error code on failure. */
-static int fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
 	fs_dir_entry_t *entry;
 	offset_t index = 0;
-	int ret;
+	status_t ret;
 
 	if(!parent->ops->read_entry) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	while(true) {
-		if((ret = parent->ops->read_entry(parent, index++, &entry)) != 0) {
+		ret = parent->ops->read_entry(parent, index++, &entry);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 
 		if(entry->id == id) {
 			*namep = kstrdup(entry->name, MM_SLEEP);
 			kfree(entry);
-			return 0;
+			return STATUS_SUCCESS;
 		}
 
 		kfree(entry);
@@ -772,7 +770,7 @@ static khandle_t *fs_handle_create(fs_node_t *node, int flags) {
 
 	/* Create the handle. */
 	fs_node_get(node);
-	handle_create(&node->obj, data, NULL, 0, &handle);
+	handle = handle_create(&node->obj, data);
 	dprintf("fs: opened handle %p to node %p (data: %p)\n", handle, node, data);
 	return handle;
 }
@@ -787,19 +785,19 @@ static void file_object_close(khandle_t *handle) {
 /** Check if a file can be memory-mapped.
  * @param handle	Handle to file.
  * @param flags		Mapping flags (VM_MAP_*).
- * @return		0 if can be mapped, negative error code if not. */
-static int file_object_mappable(khandle_t *handle, int flags) {
+ * @return		STATUS_SUCCESS if mappable, other STATUS_CODE if not. */
+static status_t file_object_mappable(khandle_t *handle, int flags) {
 	fs_node_t *node = (fs_node_t *)handle->object;
 	fs_handle_t *data = handle->data;
 
 	/* Check whether the filesystem supports memory-mapping, and if shared
 	 * write access is requested, ensure that the handle flags allow it. */
 	if(!node->ops->get_cache) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	} else if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && !(data->flags & FS_FILE_WRITE)) {
-		return -ERR_PERM_DENIED;
+		return STATUS_PERM_DENIED;
 	} else {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 }
 
@@ -807,8 +805,8 @@ static int file_object_mappable(khandle_t *handle, int flags) {
  * @param handle	Handle to file.
  * @param offset	Offset of page to get.
  * @param physp		Where to store physical address of page.
- * @return		0 on success, negative error code on failure. */
-static int file_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+ * @return		Status code describing result of the operation. */
+static status_t file_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	fs_node_t *node = (fs_node_t *)handle->object;
 	vm_cache_t *cache;
 
@@ -843,8 +841,8 @@ static object_type_t file_object_type = {
 
 /** Create a regular file in the file system.
  * @param path		Path to file to create.
- * @return		0 on success, negative error code on failure. */
-int fs_file_create(const char *path) {
+ * @return		Status code describing result of the operation. */
+status_t fs_file_create(const char *path) {
 	return fs_node_create(path, FS_NODE_FILE, NULL);
 }
 
@@ -867,21 +865,21 @@ static void memory_file_free(fs_node_t *node) {
  * @param offset	Offset into file to read from.
  * @param nonblock	Whether the write is required to not block.
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. */
-static int memory_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset,
-                            bool nonblock, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t memory_file_read(fs_node_t *node, void *buf, size_t count, offset_t offset,
+                                 bool nonblock, size_t *bytesp) {
 	memory_file_t *file = node->data;
 
 	if(offset >= file->size) {
 		*bytesp = 0;
-		return 0;
+		return STATUS_SUCCESS;
 	} else if((offset + count) > file->size) {
 		count = file->size - offset;
 	}
 
 	memcpy(buf, file->data + offset, count);
 	*bytesp = count;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Operations for an in-memory file. */
@@ -928,22 +926,23 @@ khandle_t *fs_file_from_memory(const void *buf, size_t size) {
  * @param path		Path to file to open.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
- * @return		0 on success, negative error code on failure. */
-int fs_file_open(const char *path, int flags, khandle_t **handlep) {
+ * @return		Status code describing result of the operation. */
+status_t fs_file_open(const char *path, int flags, khandle_t **handlep) {
 	fs_node_t *node;
-	int ret;
+	status_t ret;
 
 	/* Look up the filesystem node and check if it is suitable. */
-	if((ret = fs_node_lookup(path, true, FS_NODE_FILE, &node)) != 0) {
+	ret = fs_node_lookup(path, true, FS_NODE_FILE, &node);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(flags & FS_FILE_WRITE && FS_NODE_IS_RDONLY(node)) {
 		fs_node_release(node);
-		return -ERR_READ_ONLY;
+		return STATUS_READ_ONLY;
 	}
 
 	*handlep = fs_handle_create(node, flags);
 	fs_node_release(node);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Read from a file.
@@ -956,20 +955,19 @@ int fs_file_open(const char *path, int flags, khandle_t **handlep) {
  * @param bytesp	Where to store number of bytes read (optional). This
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
- * @return		0 on success, negative error code on failure.
- */
-static int fs_file_read_internal(khandle_t *handle, void *buf, size_t count, offset_t offset,
-                                 bool usehnd, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_file_read_internal(khandle_t *handle, void *buf, size_t count,
+                                      offset_t offset, bool usehnd, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	fs_handle_t *data;
 	size_t total = 0;
 	fs_node_t *node;
-	int ret = 0;
 
 	if(!handle || !buf) {
-		ret = -ERR_PARAM_INVAL;
+		ret = STATUS_PARAM_INVAL;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		ret = -ERR_TYPE_INVAL;
+		ret = STATUS_TYPE_INVAL;
 		goto out;
 	}
 
@@ -978,10 +976,10 @@ static int fs_file_read_internal(khandle_t *handle, void *buf, size_t count, off
 	assert(node->type == FS_NODE_FILE);
 
 	if(!(data->flags & FS_FILE_READ)) {
-		ret = -ERR_PERM_DENIED;
+		ret = STATUS_PERM_DENIED;
 		goto out;
 	} else if(!node->ops->read) {
-		ret = -ERR_NOT_SUPPORTED;
+		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -1005,7 +1003,6 @@ out:
 			rwlock_unlock(&data->lock);
 		}
 	}
-
 	if(bytesp) {
 		*bytesp = total;
 	}
@@ -1026,9 +1023,9 @@ out:
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp) {
+status_t fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp) {
 	return fs_file_read_internal(handle, buf, count, 0, true, bytesp);
 }
 
@@ -1046,9 +1043,9 @@ int fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp) {
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	return fs_file_read_internal(handle, buf, count, offset, false, bytesp);
 }
 
@@ -1062,21 +1059,20 @@ int fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offset, s
  * @param bytesp	Where to store number of bytes written (optional). This
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
- * @return		0 on success, negative error code on failure.
- */
-static int fs_file_write_internal(khandle_t *handle, const void *buf, size_t count, offset_t offset,
-                                  bool usehnd, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_file_write_internal(khandle_t *handle, const void *buf, size_t count,
+                                       offset_t offset, bool usehnd, size_t *bytesp) {
+	status_t ret = STATUS_SUCCESS;
 	fs_handle_t *data;
 	size_t total = 0;
 	fs_node_t *node;
 	fs_info_t info;
-	int ret = 0;
 
 	if(!handle || !buf) {
-		ret = -ERR_PARAM_INVAL;
+		ret = STATUS_PARAM_INVAL;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		ret = -ERR_TYPE_INVAL;
+		ret = STATUS_TYPE_INVAL;
 		goto out;
 	}
 
@@ -1085,10 +1081,10 @@ static int fs_file_write_internal(khandle_t *handle, const void *buf, size_t cou
 	assert(node->type == FS_NODE_FILE);
 
 	if(!(data->flags & FS_FILE_WRITE)) {
-		ret = -ERR_PERM_DENIED;
+		ret = STATUS_PERM_DENIED;
 		goto out;
 	} else if(!node->ops->write) {
-		ret = -ERR_NOT_SUPPORTED;
+		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	} else if(!count) {
 		goto out;
@@ -1117,7 +1113,6 @@ out:
 			rwlock_unlock(&data->lock);
 		}
 	}
-
 	if(bytesp) {
 		*bytesp = total;
 	}
@@ -1143,9 +1138,9 @@ out:
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t *bytesp) {
+status_t fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t *bytesp) {
 	return fs_file_write_internal(handle, buf, count, 0, true, bytesp);
 }
 
@@ -1164,9 +1159,9 @@ int fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t *byte
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	return fs_file_write_internal(handle, buf, count, offset, false, bytesp);
 }
 
@@ -1180,16 +1175,16 @@ int fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset_t of
  * @param handle	Handle to file to resize.
  * @param size		New size of the file.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_file_resize(khandle_t *handle, offset_t size) {
+status_t fs_file_resize(khandle_t *handle, offset_t size) {
 	fs_handle_t *data;
 	fs_node_t *node;
 
 	if(!handle) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1198,9 +1193,9 @@ int fs_file_resize(khandle_t *handle, offset_t size) {
 
 	/* Check if resizing is allowed. */
 	if(!(data->flags & FS_FILE_WRITE)) {
-		return -ERR_PERM_DENIED;
+		return STATUS_PERM_DENIED;
 	} else if(!node->ops->resize) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	return node->ops->resize(node, size);
@@ -1210,10 +1205,10 @@ int fs_file_resize(khandle_t *handle, offset_t size) {
  * @param node		Node to look up in.
  * @param name		Name of entry to look up.
  * @param idp		Where to store ID of node entry maps to.
- * @return		0 on success, negative error code on failure. */
-static int fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
+ * @return		Status code describing result of the operation. */
+static status_t fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
 	if(!node->ops->lookup_entry) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 	return node->ops->lookup_entry(node, name, idp);
 }
@@ -1233,8 +1228,8 @@ static object_type_t dir_object_type = {
 
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
- * @return		0 on success, negative error code on failure. */
-int fs_dir_create(const char *path) {
+ * @return		Status code describing result of the operation. */
+status_t fs_dir_create(const char *path) {
 	return fs_node_create(path, FS_NODE_DIR, NULL);
 }
 
@@ -1242,19 +1237,20 @@ int fs_dir_create(const char *path) {
  * @param path		Path to directory to open.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
- * @return		0 on success, negative error code on failure. */
-int fs_dir_open(const char *path, int flags, khandle_t **handlep) {
+ * @return		Status code describing result of the operation. */
+status_t fs_dir_open(const char *path, int flags, khandle_t **handlep) {
 	fs_node_t *node;
-	int ret;
+	status_t ret;
 
 	/* Look up the filesystem node. */
-	if((ret = fs_node_lookup(path, true, FS_NODE_DIR, &node)) != 0) {
+	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	*handlep = fs_handle_create(node, flags);
 	fs_node_release(node);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Read a directory entry.
@@ -1267,29 +1263,32 @@ int fs_dir_open(const char *path, int flags, khandle_t **handlep) {
  *
  * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
- * @param size		Size of buffer (if not large enough, -ERR_BUF_TOO_SMALL
- *			will be returned).
+ * @param size		Size of buffer (if not large enough, the function will
+ *			return STATUS_BUF_TOO_SMALL).
  *
- * @return		0 on success, negative error code on failure. If the
+ * @return		Status code describing result of the operation. If the
  *			handle's offset is past the end of the directory,
- *			-ERR_NOT_FOUND will be returned.
+ *			STATUS_NOT_FOUND will be returned.
  */
-int fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
+status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	fs_node_t *child, *node;
 	fs_dir_entry_t *entry;
 	fs_handle_t *data;
 	offset_t index;
-	int ret;
+	status_t ret;
 
 	if(!handle || !buf) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	node = (fs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == FS_NODE_DIR);
+	if(!node->ops->read_entry) {
+		return STATUS_NOT_SUPPORTED;
+	}
 
 	/* Pull the offset out of the handle structure. */
 	rwlock_read_lock(&data->lock);
@@ -1297,16 +1296,15 @@ int fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	rwlock_unlock(&data->lock);
 
 	/* Ask the filesystem to read the entry. */
-	if(!node->ops->read_entry) {
-		return -ERR_NOT_SUPPORTED;
-	} else if((ret = node->ops->read_entry(node, index, &entry)) != 0) {
+	ret = node->ops->read_entry(node, index, &entry);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Copy the entry across. */
 	if(entry->length > size) {
 		kfree(entry);
-		return -ERR_BUF_TOO_SMALL;
+		return STATUS_BUF_TOO_SMALL;
 	}
 	memcpy(buf, entry, entry->length);
 	kfree(entry);
@@ -1320,7 +1318,8 @@ int fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 		 * mount. Change the node ID to be the ID of the mountpoint,
 		 * if any. */
 		if(node->mount->mountpoint) {
-			if((ret = fs_dir_lookup(node->mount->mountpoint, "..", &buf->id)) != 0) {
+			ret = fs_dir_lookup(node->mount->mountpoint, "..", &buf->id);
+			if(ret != STATUS_SUCCESS) {
 				mutex_unlock(&node->mount->lock);
 				return ret;
 			}
@@ -1349,7 +1348,7 @@ int fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	rwlock_read_lock(&data->lock);
 	data->offset++;
 	rwlock_unlock(&data->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Set the offset of a file/directory handle.
@@ -1363,18 +1362,18 @@ int fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
  * @param offset	Value to perform operation with.
  * @param newp		Where to store new offset value (optional).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
+status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
 	fs_handle_t *data;
 	fs_node_t *node;
 	fs_info_t info;
 
 	if(!handle || (action != FS_SEEK_SET && action != FS_SEEK_ADD && action != FS_SEEK_END)) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1393,7 +1392,7 @@ int fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t 
 		if(node->type == FS_NODE_DIR) {
 			/* FIXME. */
 			rwlock_unlock(&data->lock);
-			return -ERR_NOT_IMPLEMENTED;
+			return STATUS_NOT_IMPLEMENTED;
 		} else {
 			fs_node_info(node, &info);
 			data->offset = info.size + offset;
@@ -1406,46 +1405,46 @@ int fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t 
 		*newp = data->offset;
 	}
 	rwlock_unlock(&data->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Get information about a file or directory.
  * @param handle	Handle to file/directory to get information on.
  * @param info		Information structure to fill in.
- * @return		0 on success, negative error code on failure. */
-int fs_handle_info(khandle_t *handle, fs_info_t *info) {
+ * @return		Status code describing result of the operation. */
+status_t fs_handle_info(khandle_t *handle, fs_info_t *info) {
 	fs_node_t *node;
 
 	if(!handle || !info) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	node = (fs_node_t *)handle->object;
 	fs_node_info(node, info);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Flush changes to a filesystem node to the FS.
  * @param handle	Handle to node to flush.
- * @return		0 on success, negative error code on failure. */
-int fs_handle_sync(khandle_t *handle) {
+ * @return		Status code describing result of the operation. */
+status_t fs_handle_sync(khandle_t *handle) {
 	fs_node_t *node;
 
 	if(!handle) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	node = (fs_node_t *)handle->object;
 	if(!FS_NODE_IS_RDONLY(node) && node->ops->flush) {
 		return node->ops->flush(node);
 	} else {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 }
 
@@ -1454,52 +1453,61 @@ int fs_handle_sync(khandle_t *handle) {
  * @param target	Target for the symbolic link (does not have to exist).
  *			If the path is relative, it is relative to the
  *			directory containing the link.
- * @return		0 on success, negative error code on failure. */
-int fs_symlink_create(const char *path, const char *target) {
+ * @return		Status code describing result of the operation. */
+status_t fs_symlink_create(const char *path, const char *target) {
 	return fs_node_create(path, FS_NODE_SYMLINK, target);
 }
 
 /** Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
- * always be placed at the end of the buffer, even if it is too small.
+ * always be placed at the end of the string.
  *
  * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
- * @param size		Size of buffer (destination will be truncated if buffer
- *			is too small).
+ * @param size		Size of buffer. If this is too small, the function will
+ *			return STATUS_BUF_TOO_SMALL.
  *
- * @return		Number of bytes read on success, negative error code
- *			on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_symlink_read(const char *path, char *buf, size_t size) {
+status_t fs_symlink_read(const char *path, char *buf, size_t size) {
 	fs_node_t *node;
+	status_t ret;
 	char *dest;
 	size_t len;
-	int ret;
 
 	if(!path || !buf || !size) {
-		return -ERR_PARAM_INVAL;
-	} else if((ret = fs_node_lookup(path, false, FS_NODE_SYMLINK, &node)) != 0) {
+		return STATUS_PARAM_INVAL;
+	}
+
+	/* Find the link node. */
+	ret = fs_node_lookup(path, false, FS_NODE_SYMLINK, &node);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
+	} else if(!node->ops->read_link) {
+		fs_node_release(node);
+		return STATUS_NOT_SUPPORTED;
 	}
 
 	/* Read the link destination. */
-	if(!node->ops->read_link) {
-		return -ERR_NOT_SUPPORTED;
-	} else if((ret = node->ops->read_link(node, &dest)) != 0) {
+	ret = node->ops->read_link(node, &dest);
+	fs_node_release(node);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
-	fs_node_release(node);
 
+	/* Check that the provided buffer is large enough. */
 	len = strlen(dest);
 	if((len + 1) > size) {
-		len = size - 1;
+		kfree(dest);
+		return STATUS_BUF_TOO_SMALL;
 	}
+
+	/* Copy the string across. */
 	memcpy(buf, dest, len);
 	buf[len] = 0;
 	kfree(dest);
-	return (int)len + 1;
+	return STATUS_SUCCESS;
 }
 
 /** Look up a mount by ID.
@@ -1582,12 +1590,12 @@ static void free_mount_options(fs_mount_option_t *opts, size_t count) {
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * The opts parameter allows a string containing a list of comma-seperated
- * mount options to be passed. Some options are recognised by this file system:
+ * mount options to be passed. Some options are recognised by this function:
  *  - ro - Mount the filesystem read-only.
  * All other options are passed through to the filesystem implementation.
  * Mounting multiple filesystems on one directory at a time is not allowed.
  *
- * @param dev		Device tree path to device filesystem resides on (can
+ * @param device	Device tree path to device filesystem resides on (can
  *			be NULL if the filesystem does not require a device).
  * @param path		Path to directory to mount on.
  * @param type		Name of filesystem type (if not specified, device will
@@ -1595,18 +1603,18 @@ static void free_mount_options(fs_mount_option_t *opts, size_t count) {
  *			a device must be specified).
  * @param opts		Options string.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_mount(const char *dev, const char *path, const char *type, const char *opts) {
+status_t fs_mount(const char *device, const char *path, const char *type, const char *opts) {
 	fs_mount_option_t *optarr;
 	fs_mount_t *mount = NULL;
 	fs_node_t *node = NULL;
-	device_t *device;
-	int ret, flags;
+	status_t ret;
 	size_t count;
+	int flags;
 
-	if(!path || (!dev && !type)) {
-		return -ERR_PARAM_INVAL;
+	if(!path || (!device && !type)) {
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Parse the options string. */
@@ -1621,18 +1629,19 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 	if(!root_mount) {
 		assert(curr_proc == kernel_proc);
 		if(strcmp(path, "/") != 0) {
-			ret = -ERR_NOT_FOUND;
+			ret = STATUS_NOT_FOUND;
 			goto fail;
 		}
 	} else {
 		/* Look up the destination directory. */
-		if((ret = fs_node_lookup(path, true, FS_NODE_DIR, &node)) != 0) {
+		ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 
 		/* Check that it is not being used as a mount point already. */
 		if(node->mount->root == node) {
-			ret = -ERR_IN_USE;
+			ret = STATUS_IN_USE;
 			goto fail;
 		}
 	}
@@ -1651,14 +1660,9 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 	mount->type = NULL;
 
 	/* Look up the device, if any. */
-	if(dev) {
-		if((ret = device_lookup(dev, &device)) != 0) {
-			goto fail;
-		}
-
+	if(device) {
 		ret = device_open(device, &mount->device);
-		device_release(device);
-		if(ret != 0) {
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 	}
@@ -1667,7 +1671,7 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 	 * for one. */
 	if(type) {
 		if(!(mount->type = fs_type_lookup(type))) {
-			ret = -ERR_NOT_FOUND;
+			ret = STATUS_NOT_FOUND;
 			goto fail;
 		}
 
@@ -1679,28 +1683,30 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 				mount->device = NULL;
 			}
 		} else if(!mount->device) {
-			ret = -ERR_PARAM_INVAL;
+			// FIXME better code
+			ret = STATUS_PARAM_INVAL;
 			goto fail;
 		} else if(!mount->type->probe(mount->device, NULL)) {
-			ret = -ERR_FORMAT_INVAL;
+			ret = STATUS_FORMAT_INVAL;
 			goto fail;
 		}
 	} else {
 		if(!(mount->type = fs_type_probe(mount->device, NULL))) {
-			ret = -ERR_FORMAT_INVAL;
+			ret = STATUS_FORMAT_INVAL;
 			goto fail;
 		}
 	}
 
 	/* Allocate a mount ID. */
 	if(next_mount_id == UINT16_MAX) {
-		ret = -ERR_RESOURCE_UNAVAIL;
+		ret = STATUS_RESOURCE_UNAVAIL;
 		goto fail;
 	}
 	mount->id = next_mount_id++;
 
 	/* Call the filesystem's mount operation. */
-	if((ret = mount->type->mount(mount, optarr, count)) != 0) {
+	ret = mount->type->mount(mount, optarr, count);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(!mount->ops || !mount->root) {
 		fatal("Mount (%s) did not set ops/root", mount->type->name);
@@ -1731,7 +1737,7 @@ int fs_mount(const char *dev, const char *path, const char *type, const char *op
 	        (dev) ? dev : "<none>", path, mount, mount->root);
 	mutex_unlock(&mounts_lock);
 	free_mount_options(optarr, count);
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(mount) {
 		if(mount->device) {
@@ -1758,28 +1764,30 @@ fail:
  *
  * @param path		Path to mount point of filesystem.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_unmount(const char *path) {
+status_t fs_unmount(const char *path) {
 	fs_node_t *node = NULL, *child;
 	fs_mount_t *mount = NULL;
 	int ret;
 
 	if(!path) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	/* Serialise mount/unmount operations. */
 	mutex_lock(&mounts_lock);
 
-	/* Look up the destination directory. */
-	if((ret = fs_node_lookup(path, true, FS_NODE_DIR, &node)) != 0) {
-		goto fail;
-	} else if(!node->mount->mountpoint) {
-		ret = -ERR_IN_USE;
+	/* Look up the destination directory and check if it can be unmounted. */
+	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(node != node->mount->root) {
-		ret = -ERR_PARAM_INVAL;
+		// FIXME better code?
+		ret = STATUS_PARAM_INVAL;
+		goto fail;
+	} else if(!node->mount->mountpoint) {
+		ret = STATUS_IN_USE;
 		goto fail;
 	}
 
@@ -1793,24 +1801,27 @@ int fs_unmount(const char *path) {
 	 * on the mount are in use. */
 	if(refcount_dec(&node->count) != 1) {
 		assert(refcount_get(&node->count));
-		ret = -ERR_IN_USE;
+		ret = STATUS_IN_USE;
 		goto fail;
 	} else if(node->mount_link.next != &mount->used_nodes || node->mount_link.prev != &mount->used_nodes) {
-		ret = -ERR_IN_USE;
+		ret = STATUS_IN_USE;
 		goto fail;
 	}
 
-	/* Flush all child nodes. */
+	/* Flush and free all nodes in the unused list. */
 	LIST_FOREACH_SAFE(&mount->unused_nodes, iter) {
 		child = list_entry(iter, fs_node_t, mount_link);
-		if((ret = fs_node_free(child)) != 0) {
+
+		ret = fs_node_free(child);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 	}
 
 	/* Free the root node itself. */
 	refcount_dec(&node->count);
-	if((ret = fs_node_free(node)) != 0) {
+	ret = fs_node_free(node);
+	if(ret != STATUS_SUCCESS) {
 		refcount_inc(&node->count);
 		goto fail;
 	}
@@ -1833,7 +1844,7 @@ int fs_unmount(const char *path) {
 	mutex_unlock(&mounts_lock);
 	mutex_unlock(&mount->lock);
 	kfree(mount);
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(node) {
 		if(mount) {
@@ -1852,20 +1863,23 @@ fail:
  * @param follow	Whether to follow if last path component is a symbolic
  *			link.
  * @param info		Information structure to fill in.
- * @return		0 on success, negative error code on failure. */
-int fs_info(const char *path, bool follow, fs_info_t *info) {
+ * @return		Status code describing result of the operation. */
+status_t fs_info(const char *path, bool follow, fs_info_t *info) {
 	fs_node_t *node;
-	int ret;
+	status_t ret;
 
 	if(!path || !info) {
-		return -ERR_PARAM_INVAL;
-	} else if((ret = fs_node_lookup(path, follow, -1, &node)) != 0) {
+		return STATUS_PARAM_INVAL;
+	}
+
+	ret = fs_node_lookup(path, follow, -1, &node);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	fs_node_info(node, info);
 	fs_node_release(node);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Decrease the link count of a filesystem node.
@@ -1877,12 +1891,12 @@ int fs_info(const char *path, bool follow, fs_info_t *info) {
  *
  * @param path		Path to node to decrease link count of.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int fs_unlink(const char *path) {
+status_t fs_unlink(const char *path) {
 	fs_node_t *parent = NULL, *node = NULL;
 	char *dir, *name;
-	int ret;
+	status_t ret;
 
 	/* Split path into directory/name. */
 	dir = kdirname(path, MM_SLEEP);
@@ -1891,20 +1905,24 @@ int fs_unlink(const char *path) {
 	dprintf("fs: unlink(%s) - dirname is '%s', basename is '%s'\n", path, dir, name);
 
 	/* Look up the parent node and the node to unlink. */
-	if((ret = fs_node_lookup(dir, true, FS_NODE_DIR, &parent)) != 0) {
+	ret = fs_node_lookup(dir, true, FS_NODE_DIR, &parent);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if((ret = fs_node_lookup(path, false, -1, &node)) != 0) {
+	}
+	ret = fs_node_lookup(path, false, -1, &node);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
+	/* Check whether the node can be unlinked. */
 	if(parent->mount != node->mount) {
-		ret = -ERR_IN_USE;
+		ret = STATUS_IN_USE;
 		goto out;
 	} else if(FS_NODE_IS_RDONLY(node)) {
-		ret = -ERR_READ_ONLY;
+		ret = STATUS_READ_ONLY;
 		goto out;
 	} else if(!node->ops->unlink) {
-		ret = -ERR_NOT_SUPPORTED;
+		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	}
 
@@ -2070,19 +2088,21 @@ void __init_text fs_mount_root(kernel_args_t *args) {
 
 /** Create the filesystem node cache. */
 void __init_text fs_init(void) {
+	/* The filesystem node cache has a reclaim priority of 1. This means
+	 * that filesystem nodes will be reclaimed before anything else. */
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
-	                                  fs_node_ctor, NULL, NULL,
-	                                  NULL, 1, NULL, 0, MM_FATAL);
+	                                  NULL, NULL, NULL, NULL, 1, NULL, 0,
+	                                  MM_FATAL);
 }
 
 /** Create a regular file in the file system.
  * @param path		Path to file to create.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_file_create(const char *path) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_file_create(const char *path) {
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2094,20 +2114,21 @@ int sys_fs_file_create(const char *path) {
 /** Open a handle to a file.
  * @param path		Path to file to open.
  * @param flags		Behaviour flags for the handle.
- * @return		Handle ID on success, negative error code on failure. */
-handle_t sys_fs_file_open(const char *path, int flags) {
+ * @param handlep	Where to store handle to file.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 	char *kpath = NULL;
 	khandle_t *handle;
-	handle_t ret;
+	status_t ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_file_open(kpath, flags, &handle)) != 0) {
+	} else if((ret = fs_file_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle, 0);
+	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
 	handle_release(handle);
 	kfree(kpath);
 	return ret;
@@ -2127,17 +2148,21 @@ handle_t sys_fs_file_open(const char *path, int flags) {
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp) {
+status_t sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	size_t bytes = 0;
-	int ret, err;
 	void *kbuf;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to read. */
+	if(!count) {
 		goto out;
 	}
 
@@ -2145,15 +2170,15 @@ int sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp) {
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
 
 	/* Perform the actual read. */
 	ret = fs_file_read(khandle, kbuf, count, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
+		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2163,8 +2188,7 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2185,17 +2209,21 @@ out:
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	size_t bytes = 0;
-	int ret, err;
 	void *kbuf;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to read. */
+	if(!count) {
 		goto out;
 	}
 
@@ -2203,15 +2231,15 @@ int sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t offset,
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
 
 	/* Perform the actual read. */
 	ret = fs_file_pread(khandle, kbuf, count, offset, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != 0) {
+		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2221,8 +2249,7 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2248,17 +2275,21 @@ out:
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_t *bytesp) {
+status_t sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
-	int ret, err;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to write. */
+	if(!count) {
 		goto out;
 	}
 
@@ -2266,10 +2297,10 @@ int sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_t *by
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != 0) {
+	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -2283,8 +2314,7 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2306,17 +2336,21 @@ out:
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_file_pwrite(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t sys_fs_file_pwrite(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	khandle_t *khandle = NULL;
+	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
-	int ret, err;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
-	} else if(!count) {
+	}
+
+	/* Don't do anything if there are no bytes to write. */
+	if(!count) {
 		goto out;
 	}
 
@@ -2324,10 +2358,10 @@ int sys_fs_file_pwrite(handle_t handle, const void *buf, size_t count, offset_t 
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(count, 0))) {
-		ret = -ERR_NO_MEMORY;
+	if((kbuf = kmalloc(count, 0)) == NULL) {
+		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != 0) {
+	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -2341,8 +2375,7 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		/* TODO: Something better than memcpy_to_user(). */
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != 0) {
+		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2359,13 +2392,14 @@ out:
  * @param handle	Handle to file to resize.
  * @param size		New size of the file.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_file_resize(handle_t handle, offset_t size) {
+status_t sys_fs_file_resize(handle_t handle, offset_t size) {
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2376,8 +2410,8 @@ int sys_fs_file_resize(handle_t handle, offset_t size) {
 
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_dir_create(const char *path) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_dir_create(const char *path) {
 	char *kpath;
 	int ret;
 
@@ -2391,22 +2425,23 @@ int sys_fs_dir_create(const char *path) {
 }
 
 /** Open a handle to a directory.
- * @param path		Path to directory to open.
+ * @param path		Path to file to open.
  * @param flags		Behaviour flags for the handle.
- * @return		Handle ID on success, negative error code on failure. */
-handle_t sys_fs_dir_open(const char *path, int flags) {
+ * @param handlep	Where to store handle to directory.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 	char *kpath = NULL;
 	khandle_t *handle;
-	handle_t ret;
+	status_t ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_dir_open(kpath, flags, &handle)) != 0) {
+	} else if((ret = fs_dir_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle, 0);
+	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
 	handle_release(handle);
 	kfree(kpath);
 	return ret;
@@ -2422,21 +2457,24 @@ handle_t sys_fs_dir_open(const char *path, int flags) {
  *
  * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
- * @param size		Size of buffer (if not large enough, -ERR_BUF_TOO_SMALL
- *			will be returned).
+ * @param size		Size of buffer (if not large enough, the function will
+ *			return STATUS_BUF_TOO_SMALL).
  *
- * @return		0 on success, negative error code on failure. If the
+ * @return		Status code describing result of the operation. If the
  *			handle's offset is past the end of the directory,
- *			-ERR_NOT_FOUND will be returned.
+ *			STATUS_NOT_FOUND will be returned.
  */
-int sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
+status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	fs_dir_entry_t *kbuf;
 	khandle_t *khandle;
 	int ret;
 
 	if(!size) {
-		return -ERR_BUF_TOO_SMALL;
-	} else if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DIR, &khandle)) != 0) {
+		return STATUS_BUF_TOO_SMALL;
+	}
+
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DIR, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2444,13 +2482,14 @@ int sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if(!(kbuf = kmalloc(size, 0))) {
+	if((kbuf = kmalloc(size, 0)) == NULL) {
 		handle_release(khandle);
-		return -ERR_NO_MEMORY;
+		return STATUS_NO_MEMORY;
 	}
 
 	/* Perform the actual read. */
-	if((ret = fs_dir_read(khandle, kbuf, size)) == 0) {
+	ret = fs_dir_read(khandle, kbuf, size);
+	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(buf, kbuf, kbuf->length);
 	}
 
@@ -2470,18 +2509,20 @@ int sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
  * @param offset	Value to perform operation with.
  * @param newp		Where to store new offset value (optional).
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, offset_t *newp) {
+status_t sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, offset_t *newp) {
 	khandle_t *khandle;
+	status_t ret;
 	offset_t new;
-	int ret;
 
-	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	if((ret = fs_handle_seek(khandle, action, offset, &new)) == 0 && newp) {
+	ret = fs_handle_seek(khandle, action, offset, &new);
+	if(ret == STATUS_SUCCESS && newp) {
 		ret = memcpy_to_user(newp, &new, sizeof(offset_t));
 	}
 	handle_release(khandle);
@@ -2491,17 +2532,19 @@ int sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, offset_
 /** Get information about a file or directory.
  * @param handle	Handle to file/directory to get information on.
  * @param info		Information structure to fill in.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_handle_info(handle_t handle, fs_info_t *info) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_handle_info(handle_t handle, fs_info_t *info) {
 	khandle_t *khandle;
 	fs_info_t kinfo;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	if((ret = fs_handle_info(khandle, &kinfo)) == 0) {
+	ret = fs_handle_info(khandle, &kinfo);
+	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
 	handle_release(khandle);
@@ -2510,12 +2553,13 @@ int sys_fs_handle_info(handle_t handle, fs_info_t *info) {
 
 /** Flush changes to a filesystem node to the FS.
  * @param handle	Handle to node to flush.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_handle_sync(handle_t handle) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_handle_sync(handle_t handle) {
 	khandle_t *khandle;
-	int ret;
+	status_t ret;
 
-	if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2529,14 +2573,14 @@ int sys_fs_handle_sync(handle_t handle) {
  * @param target	Target for the symbolic link (does not have to exist).
  *			If the path is relative, it is relative to the
  *			directory containing the link.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_symlink_create(const char *path, const char *target) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_symlink_create(const char *path, const char *target) {
 	char *kpath, *ktarget;
-	int ret;
+	status_t ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = strndup_from_user(target, PATH_MAX, MM_SLEEP, &ktarget)) != 0) {
+	} else if((ret = strndup_from_user(target, PATH_MAX, MM_SLEEP, &ktarget)) != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2550,37 +2594,34 @@ int sys_fs_symlink_create(const char *path, const char *target) {
 /** Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
- * always be placed at the end of the buffer, even if it is too small.
+ * always be placed at the end of the string.
  *
  * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
- * @param size		Size of buffer (destination will be truncated if buffer
- *			is too small).
+ * @param size		Size of buffer. If this is too small, the function will
+ *			return STATUS_BUF_TOO_SMALL.
  *
- * @return		Number of bytes read on success, negative error code
- *			on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
+status_t sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 	char *kpath, *kbuf;
-	int ret, err;
+	status_t ret;
 
 	/* Copy the path across. */
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Allocate a buffer to read into. See comment in sys_fs_file_read()
 	 * about not using MM_SLEEP. */
-	if(!(kbuf = kmalloc(size, 0))) {
+	if((kbuf = kmalloc(size, 0)) == NULL) {
 		kfree(kpath);
-		return -ERR_NO_MEMORY;
+		return STATUS_NO_MEMORY;
 	}
 
 	ret = fs_symlink_read(kpath, kbuf, size);
-	if(ret > 0) {
-		if((err = memcpy_to_user(buf, kbuf, size)) != 0) {
-			ret = err;
-		}
+	if(ret == STATUS_SUCCESS) {
+		ret = memcpy_to_user(buf, kbuf, size);
 	}
 
 	kfree(kpath);
@@ -2592,12 +2633,12 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * The opts parameter allows a string containing a list of comma-seperated
- * mount options to be passed. Some options are recognised by this file system:
+ * mount options to be passed. Some options are recognised by this function:
  *  - ro - Mount the filesystem read-only.
  * All other options are passed through to the filesystem implementation.
  * Mounting multiple filesystems on one directory at a time is not allowed.
  *
- * @param dev		Device tree path to device filesystem resides on (can
+ * @param device	Device tree path to device filesystem resides on (can
  *			be NULL if the filesystem does not require a device).
  * @param path		Path to directory to mount on.
  * @param type		Name of filesystem type (if not specified, device will
@@ -2605,35 +2646,35 @@ int sys_fs_symlink_read(const char *path, char *buf, size_t size) {
  *			a device must be specified).
  * @param opts		Options string.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_mount(const char *dev, const char *path, const char *type, const char *opts) {
-	char *kdev = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
-	int ret;
+status_t sys_fs_mount(const char *dev, const char *path, const char *type, const char *opts) {
+	char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
+	status_t ret;
 
 	/* Copy string arguments across from userspace. */
 	if(dev) {
-		if((ret = strndup_from_user(dev, PATH_MAX, MM_SLEEP, &kdev)) != 0) {
+		if((ret = strndup_from_user(dev, PATH_MAX, MM_SLEEP, &kdevice)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		goto out;
 	}
 	if(type) {
-		if((ret = strndup_from_user(type, PATH_MAX, MM_SLEEP, &ktype)) != 0) {
+		if((ret = strndup_from_user(type, PATH_MAX, MM_SLEEP, &ktype)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 	if(opts) {
-		if((ret = strndup_from_user(opts, PATH_MAX, MM_SLEEP, &kopts)) != 0) {
+		if((ret = strndup_from_user(opts, PATH_MAX, MM_SLEEP, &kopts)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 
-	ret = fs_mount(kdev, kpath, ktype, kopts);
+	ret = fs_mount(kdevice, kpath, ktype, kopts);
 out:
-	if(kdev) { kfree(kdev); }
+	if(kdevice) { kfree(kdevice); }
 	if(kpath) { kfree(kpath); }
 	if(ktype) { kfree(ktype); }
 	if(kopts) { kfree(kopts); }
@@ -2648,13 +2689,13 @@ out:
  *
  * @param path		Path to mount point of filesystem.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_unmount(const char *path) {
+status_t sys_fs_unmount(const char *path) {
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2664,23 +2705,23 @@ int sys_fs_unmount(const char *path) {
 }
 
 /** Flush all cached filesystem changes. */
-int sys_fs_sync(void) {
-	return -ERR_NOT_IMPLEMENTED;
+status_t sys_fs_sync(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Get the path to the current working directory.
  * @param buf		Buffer to store in.
  * @param size		Size of buffer.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_getcwd(char *buf, size_t size) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_getcwd(char *buf, size_t size) {
 	char *kbuf = NULL, *tmp, *name, path[3];
 	fs_node_t *node;
 	size_t len = 0;
 	node_id_t id;
-	int ret;
+	status_t ret;
 
 	if(!buf || !size) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	rwlock_read_lock(&curr_proc->ioctx.lock);
@@ -2697,18 +2738,20 @@ int sys_fs_getcwd(char *buf, size_t size) {
 
 		/* Get the parent of the node. */
 		strcpy(path, "..");
-		if((ret = fs_node_lookup_internal(path, node, false, 0, &node)) != 0) {
+		ret = fs_node_lookup_internal(path, node, false, 0, &node);
+		if(ret != STATUS_SUCCESS) {
 			node = NULL;
 			goto fail;
 		} else if(node->type != FS_NODE_DIR) {
 			dprintf("fs: node %p(%" PRIu64 ") should be a directory but it isn't!\n",
 			        node, node->id);
-			ret = -ERR_TYPE_INVAL;
+			ret = STATUS_TYPE_INVAL;
 			goto fail;
 		}
 
 		/* Look up the name of the child in this directory. */
-		if((ret = fs_node_name(node, id, &name)) != 0) {
+		ret = fs_node_name(node, id, &name);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 
@@ -2738,7 +2781,7 @@ int sys_fs_getcwd(char *buf, size_t size) {
 	kbuf = tmp;
 
 	if(len >= size) {
-		ret = -ERR_BUF_TOO_SMALL;
+		ret = STATUS_BUF_TOO_SMALL;
 	} else {
 		ret = memcpy_to_user(buf, kbuf, len + 1);
 	}
@@ -2755,16 +2798,18 @@ fail:
 
 /** Set the current working directory.
  * @param path		Path to change to.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_setcwd(const char *path) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_setcwd(const char *path) {
 	fs_node_t *node;
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	/* Get the path and look it up. */
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_node_lookup(kpath, true, FS_NODE_DIR, &node)) != 0) {
+	}
+
+	ret = fs_node_lookup(kpath, true, FS_NODE_DIR, &node);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2789,17 +2834,19 @@ int sys_fs_setcwd(const char *path) {
  *
  * @param path		Path to directory to change to.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_setroot(const char *path) {
+status_t sys_fs_setroot(const char *path) {
 	fs_node_t *node;
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	/* Get the path and look it up. */
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_node_lookup(kpath, true, FS_NODE_DIR, &node)) != 0) {
+	}
+
+	ret = fs_node_lookup(kpath, true, FS_NODE_DIR, &node);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2817,25 +2864,26 @@ int sys_fs_setroot(const char *path) {
  * @param follow	Whether to follow if last path component is a symbolic
  *			link.
  * @param info		Information structure to fill in.
- * @return		0 on success, negative error code on failure. */
-int sys_fs_info(const char *path, bool follow, fs_info_t *info) {
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_info(const char *path, bool follow, fs_info_t *info) {
 	fs_info_t kinfo;
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	if((ret = fs_info(kpath, follow, &kinfo)) == 0) {
+	ret = fs_info(kpath, follow, &kinfo);
+	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
 	kfree(kpath);
 	return ret;
 }
 
-int sys_fs_link(const char *source, const char *dest) {
-	return -ERR_NOT_IMPLEMENTED;
+status_t sys_fs_link(const char *source, const char *dest) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Decrease the link count of a filesystem node.
@@ -2847,13 +2895,13 @@ int sys_fs_link(const char *source, const char *dest) {
  *
  * @param path		Path to node to decrease link count of.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int sys_fs_unlink(const char *path) {
+status_t sys_fs_unlink(const char *path) {
+	status_t ret;
 	char *kpath;
-	int ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != 0) {
+	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2862,6 +2910,6 @@ int sys_fs_unlink(const char *path) {
 	return ret;
 }
 
-int sys_fs_rename(const char *source, const char *dest) {
-	return -ERR_NOT_IMPLEMENTED;
+status_t sys_fs_rename(const char *source, const char *dest) {
+	return STATUS_NOT_IMPLEMENTED;
 }

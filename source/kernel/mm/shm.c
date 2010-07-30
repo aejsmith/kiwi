@@ -25,6 +25,7 @@
 #include <lib/refcount.h>
 
 #include <mm/page.h>
+#include <mm/safe.h>
 #include <mm/slab.h>
 
 #include <proc/process.h>
@@ -34,9 +35,9 @@
 #include <sync/mutex.h>
 #include <sync/rwlock.h>
 
-#include <errors.h>
 #include <init.h>
 #include <object.h>
+#include <status.h>
 #include <vmem.h>
 
 /** Structure containing details of a shared memory area. */
@@ -62,21 +63,17 @@ static RWLOCK_DECLARE(shm_tree_lock);
 
 /** Constructor for shared memory area structures.
  * @param obj		Object to construct.
- * @param data		Unused.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int shm_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Unused. */
+static void shm_ctor(void *obj, void *data) {
 	shm_t *area = obj;
 
 	mutex_init(&area->lock, "shm_lock", 0);
 	avl_tree_init(&area->pages);
-	return 0;
 }
 
-/** Close a handle to a shared memory area.
- * @param handle	Handle to the area. */
-static void shm_object_close(khandle_t *handle) {
-	shm_t *area = (shm_t *)handle->object;
+/** Release a shared memory area.
+ * @param area		Area to release. */
+static void shm_release(shm_t *area) {
 	vm_page_t *page;
 
 	if(refcount_dec(&area->count) == 0) {
@@ -98,12 +95,18 @@ static void shm_object_close(khandle_t *handle) {
 	}
 }
 
+/** Close a handle to a shared memory area.
+ * @param handle	Handle to the area. */
+static void shm_object_close(khandle_t *handle) {
+	shm_release((shm_t *)handle->object);
+}
+
 /** Get a page from the object.
  * @param handle	Handle to object to get page from.
  * @param offset	Offset into object to get page from.
  * @param physp		Where to store physical address of page.
- * @return		0 on success, negative error code on failure. */
-static int shm_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+ * @return		Status code describing result of the operation. */
+static status_t shm_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	shm_t *area = (shm_t *)handle->object;
 	vm_page_t *page;
 
@@ -112,7 +115,7 @@ static int shm_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *p
 	/* Ensure that the requested page is within the area. */
 	if(offset >= (offset_t)area->size) {
 		mutex_unlock(&area->lock);
-		return -ERR_ADDR_INVAL;
+		return STATUS_ADDR_INVAL;
 	}
 
 	/* If the page is not already in the object, allocate a new page. */
@@ -124,7 +127,7 @@ static int shm_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *p
 
 	*physp = page->addr;
 	mutex_unlock(&area->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Shared memory object type. */
@@ -136,76 +139,73 @@ static object_type_t shm_object_type = {
 
 /** Create a new shared memory area.
  * @param size		Size of the area (multiple of system page size).
- * @return		Handle to area on success, negative error code on
- *			failure. */
-handle_t sys_shm_create(size_t size) {
-	khandle_t *handle;
-	handle_t ret;
+ * @param handlep	Where to store handle to area.
+ * @return		Status code describing result of the operation. */
+status_t sys_shm_create(size_t size, handle_t *handlep) {
+	status_t ret;
 	shm_t *area;
 
 	if(size == 0 || size % PAGE_SIZE) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
 	area = slab_cache_alloc(shm_cache, MM_SLEEP);
 	if(!(area->id = vmem_alloc(shm_id_arena, 1, 0))) {
 		slab_cache_free(shm_cache, area);
-		return -ERR_RESOURCE_UNAVAIL;
+		return STATUS_RESOURCE_UNAVAIL;
 	}
 
 	object_init(&area->obj, &shm_object_type);
 	refcount_set(&area->count, 1);
 	area->size = size;
 
-	handle_create(&area->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
-	if(ret < 0) {
-		/* The handle_release() call frees the area. */
-		return ret;
-	}
-
 	rwlock_write_lock(&shm_tree_lock);
 	avl_tree_insert(&shm_tree, area->id, area, NULL);
 	rwlock_unlock(&shm_tree_lock);
+
+	ret = handle_create_and_attach(curr_proc, &area->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		shm_release(area);
+	}
 	return ret;
 }
 
 /** Open a handle to a shared memory area.
  * @param id		ID of area to open.
- * @return		Handle to area on success, negative error code on
- *			failure. */
-handle_t sys_shm_open(shm_id_t id) {
-	khandle_t *handle;
-	handle_t ret;
+ * @param handlep	Where to store handle to area.
+ * @return		Status code describing result of the operation. */
+status_t sys_shm_open(shm_id_t id, handle_t *handlep) {
+	status_t ret;
 	shm_t *area;
 
 	rwlock_read_lock(&shm_tree_lock);
 
 	if(!(area = avl_tree_lookup(&shm_tree, id))) {
 		rwlock_unlock(&shm_tree_lock);
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	refcount_inc(&area->count);
 	rwlock_unlock(&shm_tree_lock);
 
-	handle_create(&area->obj, NULL, NULL, 0, &handle);
-	ret = handle_attach(curr_proc, handle, 0);
-	handle_release(handle);
+	ret = handle_create_and_attach(curr_proc, &area->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		shm_release(area);
+	}
 	return ret;
 }
 
 /** Get the ID of a shared memory area.
  * @param handle	Handle to area.
- * @return		ID of area on success, negative error code on failure. */
+ * @return		ID of area on success, -1 if handle is invalid. */
 shm_id_t sys_shm_id(handle_t handle) {
 	khandle_t *khandle;
 	shm_id_t ret;
 	shm_t *area;
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle)) != 0) {
-		return ret;
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		return -1;
 	}
 
 	area = (shm_t *)khandle->object;
@@ -218,23 +218,24 @@ shm_id_t sys_shm_id(handle_t handle) {
  * @todo		Support shrinking areas.
  * @param handle	Handle to area.
  * @param size		New size of the area.
- * @return		0 on success, negative error code on failure. */
-int sys_shm_resize(handle_t handle, size_t size) {
+ * @return		Status code describing result of the operation. */
+status_t sys_shm_resize(handle_t handle, size_t size) {
 	khandle_t *khandle;
+	status_t ret;
 	shm_t *area;
-	int ret;
 
 	if(size == 0 || size % PAGE_SIZE) {
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 
-	if((ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle)) != 0) {
+	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	area = (shm_t *)khandle->object;
 	if(size < area->size) {
-		ret = -ERR_NOT_IMPLEMENTED;
+		ret = STATUS_NOT_IMPLEMENTED;
 	} else {
 		area->size = size;
 	}

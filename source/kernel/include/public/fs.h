@@ -94,7 +94,7 @@ extern status_t SYSCALL(fs_handle_sync)(handle_t handle);
 extern status_t SYSCALL(fs_symlink_create)(const char *path, const char *target);
 extern status_t SYSCALL(fs_symlink_read)(const char *path, char *buf, size_t size);
 
-extern status_t SYSCALL(fs_mount)(const char *dev, const char *path, const char *type, const char *opts);
+extern status_t SYSCALL(fs_mount)(const char *device, const char *path, const char *type, const char *opts);
 extern status_t SYSCALL(fs_unmount)(const char *path);
 extern status_t SYSCALL(fs_sync)(void);
 extern status_t SYSCALL(fs_getcwd)(char *buf, size_t size);

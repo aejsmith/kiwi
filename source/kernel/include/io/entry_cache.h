@@ -32,8 +32,8 @@ typedef struct entry_cache_ops {
 	 * @param cache		Cache to look up for.
 	 * @param name		Name of entry to look up.
 	 * @param idp		Where to store ID of node entry maps to.
-	 * @return		0 on success, negative error code on failure. */
-	int (*lookup)(struct entry_cache *cache, const char *name, node_id_t *idp);
+	 * @return		Status code describing result of the operation. */
+	status_t (*lookup)(struct entry_cache *cache, const char *name, node_id_t *idp);
 } entry_cache_ops_t;
 
 /** Structure containing a directory entry cache. */
@@ -47,7 +47,7 @@ typedef struct entry_cache {
 extern entry_cache_t *entry_cache_create(entry_cache_ops_t *ops, void *data);
 extern void entry_cache_destroy(entry_cache_t *cache);
 
-extern int entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp);
+extern status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp);
 extern void entry_cache_insert(entry_cache_t *cache, const char *name, node_id_t id);
 extern void entry_cache_remove(entry_cache_t *cache, const char *name);
 

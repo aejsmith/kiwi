@@ -731,23 +731,20 @@ void __init_text device_init(void) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_device_open(const char *path, handle_t *handlep) {
-	khandle_t *khandle;
-	handle_t uhandle;
+	khandle_t *handle;
 	status_t ret;
 	char *kpath;
 
 	if((ret = strdup_from_user(path, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = device_open(kpath, &khandle)) != STATUS_SUCCESS) {
+	} else if((ret = device_open(kpath, &handle)) != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
-	} else if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
-		if(ret != STATUS_SUCCESS) {
-			handle_detach(curr_proc, uhandle);
-		}
 	}
-	handle_release(khandle);
+
+	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
+	handle_release(handle);
+	kfree(kpath);
 	return ret;
 }
 

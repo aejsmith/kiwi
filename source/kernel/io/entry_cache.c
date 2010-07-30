@@ -30,24 +30,21 @@
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
-#include <errors.h>
 #include <fatal.h>
 #include <init.h>
+#include <status.h>
 
 /** Slab cache for entry cache structures. */
 static slab_cache_t *entry_cache_cache;
 
 /** Entry cache constructor.
  * @param obj		Object to construct.
- * @param data		Unused.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int entry_cache_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Unused. */
+static void entry_cache_ctor(void *obj, void *data) {
 	entry_cache_t *cache = obj;
 
 	mutex_init(&cache->lock, "entry_cache_lock", 0);
 	radix_tree_init(&cache->entries);
-	return 0;
 }
 
 /** Create a new entry cache.
@@ -92,11 +89,11 @@ static fs_dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const c
  * @param cache		Cache to look up in.
  * @param name		Name of entry to look up.
  * @param idp		Where to store ID of node entry points to.
- * @return		0 on success, negative error code on failure. */
-int entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
+ * @return		Status code describing result of the operation. */
+status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
 	fs_dir_entry_t *entry;
 	node_id_t id;
-	int ret;
+	status_t ret;
 
 	mutex_lock(&cache->lock);
 
@@ -104,8 +101,8 @@ int entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
 	if(!(entry = radix_tree_lookup(&cache->entries, name))) {
 		if(!cache->ops || !cache->ops->lookup) {
 			mutex_unlock(&cache->lock);
-			return -ERR_NOT_FOUND;
-		} else if((ret = cache->ops->lookup(cache, name, &id)) != 0) {
+			return STATUS_NOT_FOUND;
+		} else if((ret = cache->ops->lookup(cache, name, &id)) != STATUS_SUCCESS) {
 			mutex_unlock(&cache->lock);
 			return ret;
 		}
@@ -115,7 +112,7 @@ int entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
 
 	*idp = entry->id;
 	mutex_unlock(&cache->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Insert an entry into an entry cache.

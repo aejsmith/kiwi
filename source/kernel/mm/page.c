@@ -83,6 +83,7 @@
 #include <fatal.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <status.h>
 #include <time.h>
 #include <vmem.h>
 

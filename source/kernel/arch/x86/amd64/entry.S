@@ -258,7 +258,7 @@ FUNCTION_START(syscall_entry)
 	movq	80(%rbx), %rsi
 	add	$8, %rsi
 	call	memcpy_from_user
-	cmp	$0, %eax
+	cmp	$STATUS_SUCCESS, %eax
 	jne	.Lcpyfail
 
 	/* Restore the arguments passed in registers and perform the call. */

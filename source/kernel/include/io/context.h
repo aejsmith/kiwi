@@ -34,7 +34,7 @@ typedef struct io_context {
 
 extern void io_context_init(io_context_t *context, io_context_t *parent);
 extern void io_context_destroy(io_context_t *context);
-extern int io_context_setcwd(io_context_t *context, struct fs_node *node);
-extern int io_context_setroot(io_context_t *context, struct fs_node *node);
+extern status_t io_context_setcwd(io_context_t *context, struct fs_node *node);
+extern status_t io_context_setroot(io_context_t *context, struct fs_node *node);
 
 #endif /* __IO_CONTEXT_H */

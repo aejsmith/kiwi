@@ -472,7 +472,8 @@ void thread_run(thread_t *thread) {
 /** Destroy a thread.
  *
  * Decreases the reference count of a thread, and queues it for deletion if it
- * reaches 0.
+ * reaches 0. Do NOT use on threads that are running, for this use thread_kill()
+ * or call thread_exit() from the thread.
  *
  * @note		Because avl_tree_remove() uses kfree(), we cannot
  *			remove the thread from the thread tree here as it can
@@ -642,7 +643,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	status_t ret;
 	char *kname;
 
-	if(stack && (stacksz < STACK_DELTA)) {
+	if(!handlep || !func || (stack && stacksz < PAGE_SIZE)) {
 		return STATUS_PARAM_INVAL;
 	}
 
@@ -664,7 +665,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 		goto fail;
 	}
 	refcount_inc(&thread->count);
-	ret = handle_create_and_attach(&thread->obj, NULL, curr_proc, 0, &handle);
+	ret = handle_create_and_attach(curr_proc, &thread->obj, NULL, 0, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
@@ -688,9 +689,6 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 		args->sp += (stacksz - STACK_DELTA);
 	}
 
-	if((ret = memcpy_to_user(handlep, &handle, sizeof(handle_t))) != STATUS_SUCCESS) {
-		goto fail;
-	}
 	thread_run(thread);
 	kfree(kname);
 	return ret;
@@ -711,10 +709,12 @@ fail:
  * @param handlep	Where to store handle to thread.
  * @return		Status code describing result of the operation. */
 status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
-	khandle_t *khandle;
 	thread_t *thread;
-	handle_t uhandle;
 	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	rwlock_read_lock(&thread_tree_lock);
 
@@ -726,14 +726,10 @@ status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	khandle = handle_create(&thread->obj, NULL);
-	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
-		if(ret != STATUS_SUCCESS) {
-			handle_detach(curr_proc, uhandle);
-		}
+	ret = handle_create_and_attach(curr_proc, &thread->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		thread_destroy(thread);
 	}
-	handle_release(khandle);
 	return ret;
 }
 

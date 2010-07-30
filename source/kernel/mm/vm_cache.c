@@ -101,7 +101,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	/* Check whether it is within the size of the cache. */
 	if(offset >= cache->size) {
 		mutex_unlock(&cache->lock);
-		return STATUS_NOT_FOUND;
+		return STATUS_ADDR_INVAL;
 	}
 
 	/* Check if we have it cached. */
@@ -535,7 +535,7 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page)
  *			flush, but still returns an error. If multiple errors
  *			occur, it is the most recent that is returned. */
 status_t vm_cache_flush(vm_cache_t *cache) {
-	status_t ret = 0, err;
+	status_t ret = STATUS_SUCCESS, err;
 	vm_page_t *page;
 
 	mutex_lock(&cache->lock);

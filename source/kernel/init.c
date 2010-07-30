@@ -38,12 +38,12 @@
 #include <proc/thread.h>
 
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <init.h>
 #include <kargs.h>
 #include <module.h>
 #include <object.h>
+#include <status.h>
 #include <symbol.h>
 #include <tar.h>
 #include <time.h>
@@ -144,7 +144,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	current_init_progress += progress_per_module;
 	console_update_boot_progress(current_init_progress);
 }
-
+#if 0
 /** Look up a kernel module in the boot module list.
  * @param name		Name to look for.
  * @return		Pointer to module if found, NULL if not. */
@@ -161,7 +161,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
 
 	return NULL;
 }
-
+#endif
 /** Extract a TAR archive to the root FS.
  * @param mod		Boot module containing archive.
  * @return		Whether the module was a TAR archive. */
@@ -268,7 +268,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 	kernel_args_module_t *amod;
 	boot_module_t *mod;
 	phys_ptr_t addr;
-	char *tmp;
+	//char *tmp;
 
 	if(!args->module_count) {
 		fatal("No modules were provided, cannot do anything!");

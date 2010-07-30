@@ -38,24 +38,24 @@ typedef struct file_map_ops {
 	 * @param map		Map being looked up in.
 	 * @param num		File block number to look up.
 	 * @param rawp		Where to store the raw block number.
-	 * @return		0 on success, negative error code on failure. */
-	int (*lookup)(struct file_map *map, uint64_t num, uint64_t *rawp);
+	 * @return		Status code describing result of the operation. */
+	status_t (*lookup)(struct file_map *map, uint64_t num, uint64_t *rawp);
 
 	/** Read a block from the source device.
 	 * @param map		Map the read is for.
 	 * @param buf		Buffer to read into.
 	 * @param num		Raw block number.
 	 * @param nonblock	Whether the operation is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*read_block)(struct file_map *map, void *buf, uint64_t num, bool nonblock);
+	 * @return		Status code describing result of the operation. */
+	status_t (*read_block)(struct file_map *map, void *buf, uint64_t num, bool nonblock);
 
 	/** Write a block to the source device.
 	 * @param map		Map the write is for.
 	 * @param buf		Buffer containing data to write.
 	 * @param num		Raw block number.
 	 * @param nonblock	Whether the operation is required to not block.
-	 * @return		0 on success, negative error code on failure. */
-	int (*write_block)(struct file_map *map, const void *buf, uint64_t num, bool nonblock);
+	 * @return		Status code describing result of the operation. */
+	status_t (*write_block)(struct file_map *map, const void *buf, uint64_t num, bool nonblock);
 } file_map_ops_t;
 
 /** Structure containing a file map. */
@@ -73,10 +73,10 @@ extern struct vm_cache_ops file_map_vm_cache_ops;
 extern file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data);
 extern void file_map_destroy(file_map_t *map);
 
-extern int file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp);
+extern status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp);
 extern void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count);
 
-extern int file_map_read_page(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
-extern int file_map_write_page(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
+extern status_t file_map_read_page(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
+extern status_t file_map_write_page(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
 
 #endif /* __IO_FILE_MAP_H */

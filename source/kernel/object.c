@@ -71,15 +71,12 @@ static slab_cache_t *handle_table_cache;
 
 /** Constructor for handle table objects.
  * @param obj		Object to construct.
- * @param data		Cache data pointer.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int handle_table_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Cache data pointer. */
+static void handle_table_ctor(void *obj, void *data) {
 	handle_table_t *table = obj;
 
 	avl_tree_init(&table->tree);
 	rwlock_init(&table->lock, "handle_table_lock");
-	return 0;
 }
 
 /** Initialise an object structure.
@@ -241,18 +238,19 @@ khandle_t *handle_create(object_t *obj, void *data) {
 }
 
 /** Create a handle to an object in a process.
+ * @param process	Process to attach to.
  * @param obj		Object to create a handle to.
  * @param data		Per-handle data pointer.
- * @param process	Process to attach to.
  * @param flags		Flags for the handle table entry.
- * @param handlep	Where to store ID of handle created.
+ * @param idp		Where to store ID of handle created.
+ * @param uidp		If not NULL, a user-mode pointer to copy handle ID to.
  * @return		Status code describing result of the operation. */
-status_t handle_create_and_attach(object_t *obj, void *data, process_t *process, int flags,
-                                  handle_t *handlep) {
+status_t handle_create_and_attach(process_t *process, object_t *obj, void *data, int flags,
+                                  handle_t *idp, handle_t *uidp) {
 	khandle_t *handle = handle_create(obj, data);
 	status_t ret;
 
-	ret = handle_attach(process, handle, flags, handlep);
+	ret = handle_attach(process, handle, flags, idp, uidp);
 	if(ret == STATUS_SUCCESS) {
 		handle_release(handle);
 	} else {
@@ -322,16 +320,18 @@ static void handle_table_insert(handle_table_t *table, handle_t id, khandle_t *h
  * @param process	Process to attach to.
  * @param handle	Handle to attach.
  * @param flags		Flags for the handle.
- * @param handlep	Where to store ID of handle created.
+ * @param idp		Where to store ID of handle created.
+ * @param uidp		If not NULL, a user-mode pointer to copy handle ID to.
  *
  * @return		Status code describing result of the operation.
  */
-status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_t *handlep) {
+status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_t *idp, handle_t *uidp) {
+	status_t ret;
 	handle_t id;
 
 	assert(process);
 	assert(handle);
-	assert(handlep);
+	assert(idp || uidp);
 
 	rwlock_write_lock(&process->handles->lock);
 
@@ -342,12 +342,23 @@ status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_
 		return STATUS_RESOURCE_UNAVAIL;
 	}
 
+	/* Copy the handle ID before actually attempting to insert so we don't
+	 * have to detach if it fails. */
+	if(uidp) {
+		if((ret = memcpy_to_user(uidp, &id, sizeof(handle_t))) != STATUS_SUCCESS) {
+			rwlock_unlock(&process->handles->lock);
+			return ret;
+		}
+	}
+
 	handle_table_insert(process->handles, id, handle, flags);
 	rwlock_unlock(&process->handles->lock);
 
 	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
 	        id, process->id, handle->object, handle->data);
-	*handlep = id;
+	if(idp) {
+		*idp = id;
+	}
 	return STATUS_SUCCESS;
 }
 

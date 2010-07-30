@@ -125,11 +125,12 @@ extern status_t object_wait_multiple(khandle_t **handles, int *events, size_t co
                                      useconds_t timeout, int *indexp);
 
 extern khandle_t *handle_create(object_t *obj, void *data);
-extern status_t handle_create_and_attach(object_t *obj, void *data, struct process *process,
-                                         int flags, handle_t *handlep);
+extern status_t handle_create_and_attach(struct process *process, object_t *obj, void *data,
+                                         int flags, handle_t *idp, handle_t *uidp);
 extern void handle_get(khandle_t *handle);
 extern void handle_release(khandle_t *handle);
-extern status_t handle_attach(struct process *process, khandle_t *handle, int flags, handle_t *handlep);
+extern status_t handle_attach(struct process *process, khandle_t *handle, int flags,
+                              handle_t *idp, handle_t *uidp);
 extern status_t handle_detach(struct process *process, handle_t id);
 extern status_t handle_lookup(struct process *process, handle_t id, int type, khandle_t **handlep);
 

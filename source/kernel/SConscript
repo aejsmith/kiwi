@@ -48,7 +48,7 @@ sources = map(File, [
 	'mm/malloc.c',
 	'mm/page.c',
 	'mm/safe.c',
-	#'mm/shm.c',
+	'mm/shm.c',
 	'mm/slab.c',
 	'mm/vm.c',
 	'mm/vm_cache.c',

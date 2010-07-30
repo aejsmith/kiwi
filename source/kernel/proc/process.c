@@ -112,6 +112,11 @@ static void process_release(process_t *process) {
 }
 
 /** Allocate a process structure and initialise it.
+ *
+ * Allocates a new process structure and initialises it. If either handlep or
+ * uhandlep is not NULL, then a handle to the process will be created in the
+ * parent, and it will be placed in the location(s) specified.
+ *
  * @param name		Name to give the process.
  * @param id		ID for the process (if negative, one will be allocated).
  * @param flags		Behaviour flags for the process.
@@ -122,15 +127,17 @@ static void process_release(process_t *process) {
  * @param map		Array of handle mappings (see handle_table_init()).
  * @param count		Number of handles in mapping array.
  * @param procp		Where to store pointer to structure.
- * @param handlep	Where to store handle to process in parent (can be NULL,
- *			in which case no handle will be created).
+ * @param handlep	Where to store handle to process.
+ * @param uhandlep	Userspace location to store handle to process in.
+ *
  * @return		Status code describing result of the operation. Note
  *			that on failure the supplied address space will NOT be
- *			destroyed. */
+ *			destroyed.
+ */
 static status_t process_alloc(const char *name, process_id_t id, int flags, int priority,
                               vm_aspace_t *aspace, process_t *parent, int cflags,
                               handle_t map[][2], int count, process_t **procp,
-                              handle_t *handlep) {
+                              handle_t *handlep, handle_t *uhandlep) {
 	process_t *process;
 	status_t ret;
 
@@ -163,9 +170,9 @@ static status_t process_alloc(const char *name, process_id_t id, int flags, int 
 	rwlock_unlock(&process_tree_lock);
 
 	/* Create a handle to the process if required. */
-	if(handlep) {
+	if(handlep || uhandlep) {
 		assert(parent);
-		ret = handle_create_and_attach(&process->obj, NULL, parent, 0, handlep);
+		ret = handle_create_and_attach(parent, &process->obj, NULL, 0, handlep, uhandlep);
 		if(ret != STATUS_SUCCESS) {
 			process->aspace = NULL;
 			process_release(process);
@@ -446,8 +453,8 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	}
 
 	/* Create the new process and run the process entry thread in it. */
-	if((ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent,
-	                        0, NULL, 0, &process, NULL)) != STATUS_SUCCESS) {
+	if((ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent, 0,
+	                        NULL, 0, &process, NULL, NULL)) != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
 		return ret;
 	} else if((ret = thread_create("main", process, 0, process_entry_thread,
@@ -541,7 +548,7 @@ void __init_text process_init(void) {
 	/* Create the kernel process. */
 	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
 	                        PRIORITY_KERNEL, NULL, NULL, 0, NULL, 0,
-	                        &kernel_proc, NULL)) != STATUS_SUCCESS) {
+	                        &kernel_proc, NULL, NULL)) != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
@@ -647,6 +654,10 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	handle_t handle;
 	status_t ret;
 
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
+
 	ret = process_create_args_copy(path, args, env, map, count, &info);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
@@ -660,9 +671,7 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	/* Create the new process and a handle to it. */
 	if((ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace,
 	                        curr_proc, flags, info.map, count, &process,
-	                        &handle)) != STATUS_SUCCESS) {
-		goto fail;
-	} else if((ret = memcpy_to_user(handlep, &handle, sizeof(handle_t))) != STATUS_SUCCESS) {
+	                        &handle, handlep)) != STATUS_SUCCESS) {
 		goto fail;
 	}
 	process->create = &info;
@@ -790,10 +799,12 @@ fail:
  * @param handlep	Where to store handle to process.
  * @return		Status code describing result of the operation. */
 status_t sys_process_open(process_id_t id, handle_t *handlep) {
-	khandle_t *khandle;
 	process_t *process;
-	handle_t uhandle;
 	status_t ret;
+
+	if(!handlep) {
+		return STATUS_PARAM_INVAL;
+	}
 
 	rwlock_read_lock(&process_tree_lock);
 
@@ -808,14 +819,10 @@ status_t sys_process_open(process_id_t id, handle_t *handlep) {
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	khandle = handle_create(&process->obj, NULL);
-	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
-		if(ret != STATUS_SUCCESS) {
-			handle_detach(curr_proc, uhandle);
-		}
+	ret = handle_create_and_attach(curr_proc, &process->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		process_release(process);
 	}
-	handle_release(khandle);
 	return ret;
 }
 

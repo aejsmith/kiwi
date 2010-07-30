@@ -17,8 +17,8 @@
  * @file
  * @brief		File map functions.
  *
- * The functions in this file implement a cache for file block numbers to a
- * raw (i.e. on-disk) block number. Also provided are VM cache helper functions
+ * The functions in this file implement a cache for file block numbers to raw
+ * (i.e. on-disk) block numbers. Also provided are VM cache helper functions
  * that can use data in a file map to handle reading and writing of data pages.
  */
 
@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <fatal.h>
 #include <init.h>
+#include <status.h>
 
 /** Structure containing a single range in a file map. */
 typedef struct file_map_chunk {
@@ -48,15 +49,12 @@ static slab_cache_t *file_map_cache;
 
 /** File map constructor.
  * @param obj		Object to construct.
- * @param data		Unused.
- * @param kmflag	Allocation flags.
- * @return		Always returns 0. */
-static int file_map_ctor(void *obj, void *data, int kmflag) {
+ * @param data		Unused. */
+static void file_map_ctor(void *obj, void *data) {
 	file_map_t *map = obj;
 
 	mutex_init(&map->lock, "file_map_lock", 0);
 	avl_tree_init(&map->chunks);
-	return 0;
 }
 
 /** Create a new file map.
@@ -101,12 +99,12 @@ void file_map_destroy(file_map_t *map) {
  * @param map		Map to look up in.
  * @param num		Block number to look up.
  * @param rawp		Where to store raw block number.
- * @return		0 on success, negative error code on failure. */
-int file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
+ * @return		Status code describing result of the operation. */
+status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	file_map_chunk_t *chunk;
 	size_t chunk_entry;
 	key_t chunk_num;
-	int ret;
+	status_t ret;
 
 	mutex_lock(&map->lock);
 
@@ -119,7 +117,7 @@ int file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 		if(bitmap_test(&chunk->bitmap, chunk_entry)) {
 			*rawp = chunk->blocks[chunk_entry];
 			mutex_unlock(&map->lock);
-			return 0;
+			return STATUS_SUCCESS;
 		}
 	} else {
 		chunk = kmalloc(sizeof(file_map_chunk_t), MM_SLEEP);
@@ -129,7 +127,7 @@ int file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	}
 
 	/* Look up the block. */
-	if((ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry])) != 0) {
+	if((ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry])) != STATUS_SUCCESS) {
 		mutex_unlock(&map->lock);
 		return ret;
 	}
@@ -137,7 +135,7 @@ int file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	bitmap_set(&chunk->bitmap, chunk_entry);
 	*rawp = chunk->blocks[chunk_entry];
 	mutex_unlock(&map->lock);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Invalidate entries in a file map.
@@ -181,13 +179,13 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
  * @param offset	Offset into the file to read from.
  * @param nonblock	Whether the operation is required to not block.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonblock) {
+status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonblock) {
 	file_map_t *map = cache->data;
 	uint64_t start, raw;
 	size_t count, i;
-	int ret;
+	status_t ret;
 
 	assert(map);
 	assert(map->ops->read_block);
@@ -196,14 +194,14 @@ int file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonbl
 	count = PAGE_SIZE / map->block_size;
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
-		if((ret = file_map_lookup(map, start + i, &raw)) != 0) {
+		if((ret = file_map_lookup(map, start + i, &raw)) != STATUS_SUCCESS) {
 			return ret;
-		} else if((ret = map->ops->read_block(map, buf, raw, nonblock)) != 0) {
+		} else if((ret = map->ops->read_block(map, buf, raw, nonblock)) != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Write a page to a file using a file map.
@@ -218,13 +216,13 @@ int file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool nonbl
  * @param offset	Offset into the file to write to.
  * @param nonblock	Whether the operation is required to not block.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
+status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset, bool nonblock) {
 	file_map_t *map = cache->data;
 	uint64_t start, raw;
 	size_t count, i;
-	int ret;
+	status_t ret;
 
 	assert(map);
 	assert(map->ops->write_block);
@@ -233,14 +231,14 @@ int file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset, boo
 	count = PAGE_SIZE / map->block_size;
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
-		if((ret = file_map_lookup(map, start + i, &raw)) != 0) {
+		if((ret = file_map_lookup(map, start + i, &raw)) != STATUS_SUCCESS) {
 			return ret;
-		} else if((ret = map->ops->write_block(map, buf, raw, nonblock)) != 0) {
+		} else if((ret = map->ops->write_block(map, buf, raw, nonblock)) != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** VM cache operations using a file map to read/write blocks.

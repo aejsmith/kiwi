@@ -398,7 +398,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 	 * the constructor as it may cause a reclaim. */
 	mutex_unlock(&cache->slab_lock);
 	if(cache->ctor) {
-		cache->ctor(obj, cache->data, kmflag);
+		cache->ctor(obj, cache->data);
 	}
 	return obj;
 }

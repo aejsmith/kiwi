@@ -23,7 +23,7 @@
 #include <proc/process.h>
 
 #include <assert.h>
-#include <errors.h>
+#include <status.h>
 
 extern void fs_node_get(fs_node_t *node);
 extern fs_mount_t *root_mount;
@@ -84,13 +84,13 @@ void io_context_destroy(io_context_t *context) {
  * @param context	Context to set directory of.
  * @param node		Node to set to.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int io_context_setcwd(io_context_t *context, fs_node_t *node) {
+status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old;
 
 	if(node->type != FS_NODE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	fs_node_get(node);
@@ -101,7 +101,7 @@ int io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	rwlock_unlock(&context->lock);
 
 	fs_node_release(old);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Set the root directory of an I/O context.
@@ -112,13 +112,13 @@ int io_context_setcwd(io_context_t *context, fs_node_t *node) {
  * @param context	Context to set in.
  * @param node		Node to set to.
  *
- * @return		0 on success, negative error code on failure.
+ * @return		Status code describing result of the operation.
  */
-int io_context_setroot(io_context_t *context, fs_node_t *node) {
+status_t io_context_setroot(io_context_t *context, fs_node_t *node) {
 	fs_node_t *oldr, *oldc;
 
 	if(node->type != FS_NODE_DIR) {
-		return -ERR_TYPE_INVAL;
+		return STATUS_TYPE_INVAL;
 	}
 
 	/* Get twice: one for root, one for current. */
@@ -134,5 +134,5 @@ int io_context_setroot(io_context_t *context, fs_node_t *node) {
 
 	fs_node_release(oldc);
 	fs_node_release(oldr);
-	return 0;
+	return STATUS_SUCCESS;
 }

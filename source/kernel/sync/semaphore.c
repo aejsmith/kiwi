@@ -141,11 +141,9 @@ int kdbg_cmd_semaphore(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Close a handle to a semaphore object.
- * @param handle	Handle being closed. */
-static void semaphore_object_close(khandle_t *handle) {
-	user_semaphore_t *sem = (user_semaphore_t *)handle->object;
-
+/** Release a user semaphore.
+ * @param sem		Semaphore to release. */
+static void user_semaphore_release(user_semaphore_t *sem) {
 	if(refcount_dec(&sem->count) == 0) {
 		rwlock_write_lock(&semaphore_tree_lock);
 		avl_tree_remove(&semaphore_tree, sem->id);
@@ -155,6 +153,12 @@ static void semaphore_object_close(khandle_t *handle) {
 		vmem_free(semaphore_id_arena, sem->id, 1);
 		kfree(sem);
 	}
+}
+
+/** Close a handle to a semaphore object.
+ * @param handle	Handle being closed. */
+static void semaphore_object_close(khandle_t *handle) {
+	user_semaphore_release((user_semaphore_t *)handle->object);
 }
 
 /** Semaphore object type. */
@@ -170,8 +174,6 @@ static object_type_t semaphore_object_type = {
  * @return		Status code describing result of the operation. */
 status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep) {
 	user_semaphore_t *sem;
-	khandle_t *khandle;
-	handle_t uhandle;
 	status_t ret;
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
@@ -198,14 +200,10 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	avl_tree_insert(&semaphore_tree, sem->id, sem, NULL);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	khandle = handle_create(&sem->obj, NULL);
-	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
-		if(ret != STATUS_SUCCESS) {
-			handle_detach(curr_proc, uhandle);
-		}
+	ret = handle_create_and_attach(curr_proc, &sem->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		user_semaphore_release(sem);
 	}
-	handle_release(khandle);
 	return ret;
 }
 
@@ -215,8 +213,6 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
  * @return		Status code describing result of the operation. */
 status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	user_semaphore_t *sem;
-	khandle_t *khandle;
-	handle_t uhandle;
 	status_t ret;
 
 	rwlock_read_lock(&semaphore_tree_lock);
@@ -229,14 +225,10 @@ status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	refcount_inc(&sem->count);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	khandle = handle_create(&sem->obj, NULL);
-	if((ret = handle_attach(curr_proc, khandle, 0, &uhandle)) == STATUS_SUCCESS) {
-		ret = memcpy_to_user(handlep, &uhandle, sizeof(handle_t));
-		if(ret != STATUS_SUCCESS) {
-			handle_detach(curr_proc, uhandle);
-		}
+	ret = handle_create_and_attach(curr_proc, &sem->obj, NULL, 0, NULL, handlep);
+	if(ret != STATUS_SUCCESS) {
+		user_semaphore_release(sem);
 	}
-	handle_release(khandle);
 	return ret;
 }
 
