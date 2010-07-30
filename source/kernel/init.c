@@ -364,11 +364,17 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		arch_postmm_init(args);
 		platform_postmm_init(args);
 
-		/* Bring up other stuff. */
+		/* Bring up symbol manager and CPU-related stuff. */
 		symbol_init();
 		time_init();
 		cpu_init(args);
 		ipi_init();
+#if CONFIG_DEBUGGER_DELAY > 0
+		/* Delay to allow GDB to be connected. */
+		kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
+		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
+#endif
+		/* Bring up process/thread-related stuff. */
 		handle_init();
 		process_init();
 		thread_init();

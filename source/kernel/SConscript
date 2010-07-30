@@ -116,11 +116,6 @@ if config['USE_CLANG']:
 	else:
 		env['CC'] = 'clang'
 
-# Set up stuff for using link-time optimisation.
-if config['USE_LTO']:
-	env['CCFLAGS'] += ['-flto']
-	env['LINKFLAGS'] += ['-flto']
-
 # Generate the version information file.
 def gen_version_c(target, source, env):
 	f = open(str(target[0]), 'w')

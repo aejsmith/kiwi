@@ -20,12 +20,11 @@ Option('EXTRA_CFLAGS', 'Extra compiler options for C sources.', '')
 Option('EXTRA_CXXFLAGS', 'Extra compiler options for C++ sources.', '')
 
 Option('QEMU_BINARY', 'Path to QEMU binary to use for the qtest target.', 'qemu')
-Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-serial stdio -vga std')
+Option('QEMU_OPTS', 'Extra options to pass to QEMU.', '-serial stdio -vga std -s')
 
 Option('TOOLCHAIN_DIR', 'Directory to store toolchain builds in.', '/please/change/me')
 Option('TOOLCHAIN_MAKE_JOBS', 'Argument to pass to -j for make when building toolchain.', 1)
 Option('USE_CLANG', 'Use Clang/LLVM to build the kernel.', False)
-Option('USE_LTO', "Use GCC's link-time optimisation on the kernel.", False, {'USE_CLANG': lambda x: not x})
 Option('EXTRA_FSIMAGE', 'Path to a directory containing extra FS image files.', '')
 
 #######
@@ -67,6 +66,7 @@ Section('Kernel debugging')
 #######
 
 Option('SLAB_STATS', 'Slab allocator statistics.', False)
+Option('DEBUGGER_DELAY', 'How long the kernel will wait upon entry for a debugger.', 0)
 Option('DEBUG', 'Basic debugging output.', True)
 Option('PAGE_DEBUG', 'Physical memory manager debug output (VERY excessive).', False, {'DEBUG': lambda x: x})
 Option('VMEM_DEBUG', 'Vmem allocator debug output.', False, {'DEBUG': lambda x: x})
