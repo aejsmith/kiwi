@@ -322,7 +322,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 			assert(prev->type == FS_NODE_DIR);
 
 			/* Check whether the nesting count is too deep. */
-			if(++nest > SYMLOOP_MAX) {
+			if(++nest > FS_NESTED_LINK_MAX) {
 				fs_node_release(prev);
 				fs_node_release(node);
 				return STATUS_LINK_LIMIT;
@@ -2102,7 +2102,7 @@ status_t sys_fs_file_create(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2125,7 +2125,7 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 		return STATUS_PARAM_INVAL;
 	}
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = fs_file_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
 		kfree(kpath);
@@ -2419,7 +2419,7 @@ status_t sys_fs_dir_create(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2442,7 +2442,7 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 		return STATUS_PARAM_INVAL;
 	}
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = fs_dir_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
 		kfree(kpath);
@@ -2586,9 +2586,9 @@ status_t sys_fs_symlink_create(const char *path, const char *target) {
 	char *kpath, *ktarget;
 	status_t ret;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = strndup_from_user(target, PATH_MAX, MM_SLEEP, &ktarget)) != STATUS_SUCCESS) {
+	} else if((ret = strndup_from_user(target, FS_PATH_MAX, MM_SLEEP, &ktarget)) != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2616,7 +2616,7 @@ status_t sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 	status_t ret;
 
 	/* Copy the path across. */
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2662,20 +2662,20 @@ status_t sys_fs_mount(const char *dev, const char *path, const char *type, const
 
 	/* Copy string arguments across from userspace. */
 	if(dev) {
-		if((ret = strndup_from_user(dev, PATH_MAX, MM_SLEEP, &kdevice)) != STATUS_SUCCESS) {
+		if((ret = strndup_from_user(dev, FS_PATH_MAX, MM_SLEEP, &kdevice)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		goto out;
 	}
 	if(type) {
-		if((ret = strndup_from_user(type, PATH_MAX, MM_SLEEP, &ktype)) != STATUS_SUCCESS) {
+		if((ret = strndup_from_user(type, FS_PATH_MAX, MM_SLEEP, &ktype)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 	if(opts) {
-		if((ret = strndup_from_user(opts, PATH_MAX, MM_SLEEP, &kopts)) != STATUS_SUCCESS) {
+		if((ret = strndup_from_user(opts, FS_PATH_MAX, MM_SLEEP, &kopts)) != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
@@ -2703,7 +2703,7 @@ status_t sys_fs_unmount(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2812,7 +2812,7 @@ status_t sys_fs_setcwd(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2849,7 +2849,7 @@ status_t sys_fs_setroot(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2878,7 +2878,7 @@ status_t sys_fs_info(const char *path, bool follow, fs_info_t *info) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2909,7 +2909,7 @@ status_t sys_fs_unlink(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
 		return ret;
 	}
 

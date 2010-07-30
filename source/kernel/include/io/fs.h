@@ -29,7 +29,6 @@
 
 #include <sync/mutex.h>
 
-#include <limits.h>
 #include <object.h>
 
 struct fs_mount;

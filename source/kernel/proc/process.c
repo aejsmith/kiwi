@@ -602,7 +602,7 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	info->env = NULL;
 	info->map = NULL;
 
-	if((ret = strndup_from_user(path, PATH_MAX, MM_SLEEP, (char **)&info->path)) != STATUS_SUCCESS) {
+	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, (char **)&info->path)) != STATUS_SUCCESS) {
 		return ret;
 	} else if((ret = arrcpy_from_user(args, (char ***)&info->args)) != STATUS_SUCCESS) {
 		process_create_args_free(info);

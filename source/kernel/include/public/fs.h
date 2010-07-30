@@ -60,6 +60,10 @@ typedef struct fs_info {
 	size_t links;			/**< Number of links to the node. */
 } fs_info_t;
 
+/** Limitations for the filesystem. */
+#define FS_PATH_MAX		4096	/**< Maximum length of a path string. */
+#define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
+
 /** Behaviour flags for both FS handle types. */
 #define FS_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
 
