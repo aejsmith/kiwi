@@ -161,9 +161,6 @@ static bool tftp_read(fs_handle_t *handle, void *buf, size_t count, offset_t off
 	tftp_handle_t *data = handle->data;
 	uint32_t start, end, i, size;
 
-	/* Get the start packet number. */
-	start = offset / data->packet_size;
-
 	/* If the file is not already open, just open it - we will be at the
 	 * beginning of the file. If it is open, and the current packet is
 	 * greater than the start packet, we must re-open it. */

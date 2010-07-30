@@ -321,7 +321,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	/* Copy path string, arguments and environment variables. */
 	strcpy(uargs->path, info->path);
 	addr += copy_argument_strings(uargs->args, info->args, info->argc, addr);
-	addr += copy_argument_strings(uargs->env, info->env, info->envc, addr);
+	copy_argument_strings(uargs->env, info->env, info->envc, addr);
 
 	/* Place the argument block address on the stack (TODO: Stack direction). */
 	stack = info->stack + (USTACK_SIZE - STACK_DELTA);
