@@ -31,14 +31,17 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
-/** Process arguments structure. */
+/** Arguments passed to the userspace loader. */
 typedef struct process_args {
 	char *path;			/**< Path to program. */
 	char **args;			/**< Argument array. */
 	char **env;			/**< Environment variable array. */
-	int args_count;			/**< Number of entries in argument array (excluding NULL-terminator). */
-	int env_count;			/**< Number of entries in environment array (excluding NULL-terminator). */
+	int args_count;			/**< Number of entries in argument array (excluding NULL). */
+	int env_count;			/**< Number of entries in environment array (excluding NULL). */
 } process_args_t;
+
+/** Expected path to libkernel. */
+#define LIBKERNEL_PATH		"/system/libraries/libkernel.so"
 
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */

@@ -39,6 +39,8 @@
 #if __x86_64__
 # define USER_MEMORY_BASE	0x0000000000000000	/**< User memory base. */
 # define USER_MEMORY_SIZE	0x0000800000000000	/**< User memory size (128TB). */
+# define LIBKERNEL_BASE		0x00007FFFF0000000	/**< Location of kernel library. */
+# define LIBKERNEL_SIZE		0x0000000010000000	/**< Maximum size of kernel library. */
 # define KERNEL_PMAP_BASE	0xFFFFFF8000000000	/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
 # define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
@@ -49,6 +51,8 @@
 #else
 # define USER_MEMORY_BASE	0x00000000		/**< User memory base. */
 # define USER_MEMORY_SIZE	0x80000000		/**< User memory size (2GB). */
+# define LIBKERNEL_BASE		0x7FFF0000		/**< Location of kernel library. */
+# define LIBKERNEL_SIZE		0x00010000		/**< Maximum size of kernel library. */
 # define KERNEL_PMAP_BASE	0x80000000		/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x40000000		/**< Physical map area size (1GB). */
 # define KERNEL_HEAP_BASE	0xC0000000		/**< Kernel heap base. */

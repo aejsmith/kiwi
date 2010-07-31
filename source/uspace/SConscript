@@ -35,9 +35,11 @@ def lib_emitter(target, source, env):
 	return target, source
 def shlib_emitter(target, source, env):
 	lib_emitter(target, source, env)
-	Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
-	if target[0].name != 'libsystem.so':
-		Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
+	if target[0].name != 'libkernel.so':
+		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+		Depends(target[0], env['LIBOUTDIR'].File('libkernel.so'))
+		if target[0].name != 'libsystem.so':
+			Depends(target[0], env['LIBOUTDIR'].File('libsystem.so'))
 	return target, source
 env.Append(LIBEMITTER=[lib_emitter])
 env.Append(SHLIBEMITTER=[shlib_emitter])

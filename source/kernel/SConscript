@@ -134,7 +134,8 @@ env.Command('console/copyright.c', ['console/copyright.ppm'],
             Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
 
 # Generate the system call table.
-env.SyscallTable('syscall_table.c', 'syscalls.def', TABLE='syscall_table')
+env['SYSCALLS'] = File('syscalls.def')
+env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE='syscall_table')
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])

@@ -172,7 +172,7 @@ int rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp
 		}
 
 		/* Map the BSS if required. */
-		if(phdrs[i].p_filesz != phdrs[i].p_memsz) {
+		if(phdrs[i].p_memsz > phdrs[i].p_filesz) {
 			start = (ElfW(Addr))image->load_base + ROUND_DOWN(phdrs[i].p_vaddr + phdrs[i].p_filesz, PAGE_SIZE);
 			end = (ElfW(Addr))image->load_base + ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
 			size = end - start;

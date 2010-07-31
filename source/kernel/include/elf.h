@@ -489,7 +489,8 @@ struct khandle;
 struct module;
 struct vm_aspace;
 
-extern status_t elf_binary_load(struct khandle *handle, struct vm_aspace *as, void *addr, void **datap);
+extern status_t elf_binary_reserve(struct khandle *handle, struct vm_aspace *as);
+extern status_t elf_binary_load(struct khandle *handle, struct vm_aspace *as, ptr_t dest, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 
 extern status_t elf_module_apply_rel(struct module *module, elf_rel_t *rel, elf_shdr_t *target);

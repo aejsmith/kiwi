@@ -20,6 +20,8 @@
  * @todo		Check execute permission on binaries.
  */
 
+#include <arch/memmap.h>
+
 #include <lib/avl_tree.h>
 #include <lib/string.h>
 
@@ -62,6 +64,9 @@ static vmem_t *process_id_arena;
 
 /** Cache for process structures. */
 static slab_cache_t *process_cache;
+
+/** Handle to the kernel library. */
+static khandle_t *kernel_library = NULL;
 
 /** Process containing all kernel-mode threads. */
 process_t *kernel_proc;
@@ -233,12 +238,10 @@ static object_type_t process_object_type = {
 	.unwait = process_object_unwait,
 };
 
-/** Map a program into a new address space.
+/** Set up a new address space for a process.
  * @param info		Pointer to information structure.
  * @return		Status code describing result of the operation. */
-static status_t load_binary(process_create_info_t *info) {
-	// FIXME Make error return paths destroy aspace.
-#if 0
+static status_t process_aspace_create(process_create_info_t *info) {
 	khandle_t *handle;
 	status_t ret;
 	size_t size;
@@ -246,14 +249,38 @@ static status_t load_binary(process_create_info_t *info) {
 	semaphore_init(&info->sem, "process_create_sem", 0);
 	info->aspace = vm_aspace_create();
 
-	/* Load the binary into the new address space. */
-	if((ret = fs_file_open(info->path, FS_FILE_READ, &handle)) != STATUS_SUCCESS) {
-		return ret;
-	} else if((ret = elf_binary_load(handle, info->aspace, &info->data)) != 0) {
-		handle_release(handle);
-		return ret;
+	/* Reserve space for the binary being loaded in the address space. The
+	 * actual loading of it is done by the kernel library's loader, however
+	 * we must reserve space to ensure that the mappings we create below
+	 * for the arguments/stack don't end up placed where the binary wants
+	 * to be. */
+	ret = fs_file_open(info->path, FS_FILE_READ, &handle);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
 	}
+	ret = elf_binary_reserve(handle, info->aspace);
 	handle_release(handle);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
+	}
+
+	/* If the kernel library has not been opened, open it now. We keep a
+	 * handle to it open all the time so that if it gets replaced by a new
+	 * version, the new version won't actually be used until the system is
+	 * rebooted. This avoids problems if a new kernel is not ABI-compatible
+	 * with the previous kernel. */
+	if(!kernel_library) {
+		ret = fs_file_open(LIBKERNEL_PATH, FS_FILE_READ, &kernel_library);
+		if(ret != STATUS_SUCCESS) {
+			fatal("Could not open kernel library (%d)", ret);
+		}
+	}
+
+	/* Map the kernel library. */
+	ret = elf_binary_load(kernel_library, info->aspace, LIBKERNEL_BASE, &info->data);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
+	}
 
 	/* Determine the size of the argument block. */
 	size = sizeof(process_args_t) + (sizeof(char *) * 2) + strlen(info->path);
@@ -262,17 +289,25 @@ static status_t load_binary(process_create_info_t *info) {
 	size = ROUND_UP(size, PAGE_SIZE);
 
 	/* Create a mapping for it. */
-	if((ret = vm_map(info->aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
-	                 NULL, 0, &info->arg_block)) != 0) {
+	ret = vm_map(info->aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
+	             NULL, 0, &info->arg_block);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Create a stack mapping. */
-	return vm_map(info->aspace, 0, USTACK_SIZE,
-	              VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-	              NULL, 0, &info->stack);
-#endif
-	return STATUS_NOT_IMPLEMENTED;
+	ret = vm_map(info->aspace, 0, USTACK_SIZE,
+	             VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
+	             NULL, 0, &info->stack);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
+	}
+
+	return STATUS_SUCCESS;
+fail:
+	vm_aspace_destroy(info->aspace);
+	info->aspace = NULL;
+	return ret;
 }
 
 /** Copy the data contained in a string array to the argument block.
@@ -328,8 +363,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	*(ptr_t *)stack = info->arg_block;
 
 	/* Get the ELF loader to clear BSS and get the entry pointer. */
-	//entry = elf_binary_finish(info->data);
-	fatal("Meow");
+	entry = elf_binary_finish(info->data);
 
 	/* If there the information structure pointer is NULL, process_replace()
 	 * is being used and we don't need to wait for the loader to complete. */
@@ -447,25 +481,30 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	info.args = args;
 	info.env = env;
 
-	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
+	/* Create the address space for the process. */
+	ret = process_aspace_create(&info);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	/* Create the new process and run the process entry thread in it. */
-	if((ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent, 0,
-	                        NULL, 0, &process, NULL, NULL)) != STATUS_SUCCESS) {
+	/* Create the new process. */
+	ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent, 0,
+	                    NULL, 0, &process, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
 		return ret;
-	} else if((ret = thread_create("main", process, 0, process_entry_thread,
-	                               &info, NULL, &thread)) != STATUS_SUCCESS) {
+	}
+
+	/* Create and run the entry thread. */
+	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
 		process_destroy(process);
 		return ret;
 	}
 	process->create = &info;
 	thread_run(thread);
 
-	/* Wait for the thread to finish using the information structure. */
+	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
 	if(procp) {
 		*procp = process;
@@ -546,9 +585,10 @@ void __init_text process_init(void) {
 	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
 
 	/* Create the kernel process. */
-	if((ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
-	                        PRIORITY_KERNEL, NULL, NULL, 0, NULL, 0,
-	                        &kernel_proc, NULL, NULL)) != STATUS_SUCCESS) {
+	ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
+	                    PRIORITY_KERNEL, NULL, NULL, 0, NULL, 0,
+	                    &kernel_proc, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
 }
@@ -601,6 +641,7 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	info->args = NULL;
 	info->env = NULL;
 	info->map = NULL;
+	info->aspace = NULL;
 
 	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, (char **)&info->path)) != STATUS_SUCCESS) {
 		return ret;
@@ -663,39 +704,41 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 		return ret;
 	}
 
-	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
+	/* Create the address space for the process. */
+	ret = process_aspace_create(&info);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
 	/* Create the new process and a handle to it. */
-	if((ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace,
-	                        curr_proc, flags, info.map, count, &process,
-	                        &handle, handlep)) != STATUS_SUCCESS) {
+	ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace, curr_proc,
+	                    flags, info.map, count, &process, &handle, handlep);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 	process->create = &info;
 
-	/* Create the entry thread to finish loading the program. */
-	if((ret = thread_create("main", process, 0, process_entry_thread, &info,
-	                        NULL, &thread)) != STATUS_SUCCESS) {
+	/* Create and run the entry thread. */
+	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
+	process->create = &info;
 	thread_run(thread);
 
-	/* Wait for the thread to finish using the information structure. */
+	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
-	process->create = NULL;
-	process_create_args_free(&info);
-	if((ret = info.status) != STATUS_SUCCESS) {
+	ret = info.status;
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
+	process_create_args_free(&info);
 	return ret;
 fail:
 	/* The handle_detach() call will destroy the process. */
 	if(process) {
 		handle_detach(curr_proc, handle);
-	} else {
+	} else if(info.aspace) {
 		vm_aspace_destroy(info.aspace);
 	}
 	process_create_args_free(&info);
@@ -744,8 +787,9 @@ status_t sys_process_replace(const char *path, const char *const args[], const c
 		return ret;
 	}
 
-	/* Map the binary into the new address space. */
-	if((ret = load_binary(&info)) != STATUS_SUCCESS) {
+	/* Create the new address space for the process. */
+	ret = process_aspace_create(&info);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
@@ -789,7 +833,9 @@ fail:
 	if(thread) {
 		thread_destroy(thread);
 	}
-	vm_aspace_destroy(info.aspace);
+	if(info.aspace) {
+		vm_aspace_destroy(info.aspace);
+	}
 	process_create_args_free(&info);
 	return ret;
 }

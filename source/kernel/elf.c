@@ -62,68 +62,114 @@ static bool elf_ehdr_check(elf_ehdr_t *ehdr) {
 # define dprintf(fmt...)	
 #endif
 
-#if 0
 /** ELF loader binary data structure. */
 typedef struct elf_binary {
 	elf_ehdr_t ehdr;		/**< Executable header. */
 	elf_phdr_t *phdrs;		/**< Program headers. */
 	khandle_t *handle;		/**< Handle to file being loaded. */
 	vm_aspace_t *as;		/**< Address space to map in to. */
+	ptr_t load_base;		/**< Load base for ET_DYN binaries. */
+	size_t load_size;		/**< Load size for ET_DYN. */
 } elf_binary_t;
 
-/** Reserve space for a binary in an address space.
- * @param binary	Binary to reserve space for.
- * @return		0 on success, negative error code on failure. */
-static int elf_binary_reserve_space(elf_binary_t *binary) {
+/** Reserve space for an ELF binary in an address space.
+ * @param handle	Handle to binary.
+ * @param as		Address space to reserve in.
+ * @return		Status code describing result of the operation. */
+status_t elf_binary_reserve(khandle_t *handle, vm_aspace_t *as) {
+	size_t bytes, i, size;
+	elf_phdr_t *phdrs;
 	ptr_t start, end;
-	size_t i, size;
-	int ret;
+	elf_ehdr_t ehdr;
+	status_t ret;
 
-	for(i = 0; i < binary->ehdr.e_phnum; i++) {
-		if(binary->phdrs[i].p_type != ELF_PT_LOAD) {
+	/* Read the ELF header in from the file. */
+	ret = fs_file_pread(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	} else if(bytes != sizeof(elf_ehdr_t)) {
+		return STATUS_FORMAT_INVAL;
+	} else if(!elf_ehdr_check(&ehdr)) {
+		return STATUS_FORMAT_INVAL;
+	}
+
+	/* If the binary's type is ET_DYN, we don't need to reserve space,
+	 * as it can be loaded to anywhere. */
+	if(ehdr.e_type == ELF_ET_DYN) {
+		return STATUS_SUCCESS;
+	} else if(ehdr.e_type != ELF_ET_EXEC) {
+		return STATUS_FORMAT_INVAL;
+	}
+
+	/* Check that program headers are the right size... */
+	if(ehdr.e_phentsize != sizeof(elf_phdr_t)) {
+		return STATUS_FORMAT_INVAL;
+	}
+
+	/* Allocate some memory for the program headers and load them too. */
+	size = ehdr.e_phnum * ehdr.e_phentsize;
+	phdrs = kmalloc(size, MM_SLEEP);
+	ret = fs_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
+	if(ret != STATUS_SUCCESS) {
+		kfree(phdrs);
+		return ret;
+	} else if(bytes != size) {
+		kfree(phdrs);
+		return STATUS_FORMAT_INVAL;
+	}
+
+	/* Reserve space for each LOAD header. */
+	for(i = 0; i < ehdr.e_phnum; i++) {
+		if(phdrs[i].p_type != ELF_PT_LOAD) {
 			continue;
 		}
 
-		start = ROUND_DOWN(binary->phdrs[i].p_vaddr, PAGE_SIZE);
-		end = ROUND_UP(binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz, PAGE_SIZE);
+		start = ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
+		end = ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
 		size = end - start;
 
-		if((ret = vm_reserve(binary->as, start, size)) != 0) {
+		ret = vm_reserve(as, start, size);
+		if(ret != STATUS_SUCCESS) {
+			kfree(phdrs);
 			return ret;
 		}
 	}
 
-	return 0;
+	kfree(phdrs);
+	return STATUS_SUCCESS;
 }
 
 /** Handle an ELF_PT_LOAD program header.
  * @param binary	ELF binary data structure.
  * @param phdr		Program header to load.
  * @param i		Index of program header.
- * @return		0 on success, negative error code on failure. */
-static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i) {
-	int ret, flags = 0;
+ * @return		Status code describing result of the operation. */
+static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i) {
 	ptr_t start, end;
 	offset_t offset;
+	status_t ret;
 	size_t size;
+	int flags;
 
 	/* Work out the protection flags to use. */
-	flags |= ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
+	flags  = ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
 	flags |= ((phdr->p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
 	flags |= ((phdr->p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
 	if(flags == 0) {
 		dprintf("elf: program header %zu has no protection flags set\n", i);
-		return -ERR_FORMAT_INVAL;
+		return STATUS_FORMAT_INVAL;
 	}
 
-	/* Set the private and fixed flags - we always want to insert at the
-	 * position we say, and not share stuff. */
-	flags |= (VM_MAP_FIXED | VM_MAP_PRIVATE);
+	/* Set the fixed flag, and the private flag if mapping as writeable. */
+	flags |= VM_MAP_FIXED;
+	if(flags & VM_MAP_WRITE) {
+		flags |= VM_MAP_PRIVATE;
+	}
 
 	/* Map an anonymous region if memory size is greater than file size. */
 	if(phdr->p_memsz > phdr->p_filesz) {
-		start = ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
-		end = ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+		start = binary->load_base + ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+		end = binary->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
 		size = end - start;
 
 		dprintf("elf: loading BSS for %zu to %p (size: %zu)\n", i, start, size);
@@ -132,45 +178,46 @@ static int elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, size_t i
 		 * later on. */
 		if((flags & VM_MAP_WRITE) == 0) {
 			dprintf("elf: program header %zu should be writeable\n", i);
-			return -ERR_FORMAT_INVAL;
+			return STATUS_FORMAT_INVAL;
 		}
 
 		/* Create an anonymous memory region for it. */
-		if((ret = vm_map(binary->as, start, size, flags, NULL, 0, NULL)) != 0) {
+		ret = vm_map(binary->as, start, size, flags, NULL, 0, NULL);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
 
 	/* If file size is zero then this header is just uninitialised data. */
 	if(phdr->p_filesz == 0) {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Work out the address to map to and the offset in the file. */
-	start = ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
-	end = ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+	start = binary->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
+	end = binary->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
 	size = end - start;
 	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
 
 	dprintf("elf: loading program header %zu to %p (size: %zu)\n", i, start, size);
 
 	/* Map the data in. We do not need to check whether the supplied
-	 * addresses are valid - vm_map() will reject the call if they are. */
+	 * addresses are valid - vm_map() will reject the call if they aren't. */
 	return vm_map(binary->as, start, size, flags, binary->handle, offset, NULL);
 }
 
 /** Load an ELF binary into an address space.
  * @param handle	Handle to file being loaded.
  * @param as		Address space to load into.
- * @param interp	Whether this binary is an interpreter (to prevent an
- *			interpreter requiring an interpreter).
- * @param datap		Where to store data pointer to pass to other functions.
- * @return		0 on success, negative error code on failure. */
-static int elf_binary_load_internal(khandle_t *handle, vm_aspace_t *as, bool interp, void **datap) {
+ * @param dest		If not 0, an address to load the binary to. This
+ *			requires the binary to be ELF_ET_DYN.
+ * @param datap		Where to store data pointer to pass to elf_binary_finish().
+ * @return		Status code describing result of the operation. */
+status_t elf_binary_load(khandle_t *handle, vm_aspace_t *as, ptr_t dest, void **datap) {
 	size_t bytes, i, size, load_count = 0;
 	elf_binary_t *binary;
-	char *path;
-	int ret;
+	status_t ret;
+	int flags;
 
 	/* Allocate a structure to store data about the binary. */
 	binary = kmalloc(sizeof(elf_binary_t), MM_SLEEP);
@@ -178,89 +225,78 @@ static int elf_binary_load_internal(khandle_t *handle, vm_aspace_t *as, bool int
 	binary->handle = handle;
 	binary->as = as;
 
-	/* Read in the ELF header and check it. */
-	if((ret = fs_file_pread(handle, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes)) != 0) {
+	/* Read the ELF header in from the file. */
+	ret = fs_file_pread(handle, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != sizeof(elf_ehdr_t)) {
-		ret = -ERR_FORMAT_INVAL;
+		ret = STATUS_FORMAT_INVAL;
 		goto fail;
-	} else if(!elf_check_ehdr(&binary->ehdr, ELF_ET_EXEC)) {
-		if(interp) {
-			dprintf("elf: interpreter is not valid ELF file\n");
-		}
-		ret = -ERR_FORMAT_INVAL;
+	} else if(!elf_ehdr_check(&binary->ehdr)) {
+		ret = STATUS_FORMAT_INVAL;
+		goto fail;
+	}
+
+	/* Ensure that it is a type that we can load. If loading to a specific
+	 * address, it must be ELF_ET_DYN. */
+	if((dest || binary->ehdr.e_type != ELF_ET_EXEC) && binary->ehdr.e_type != ELF_ET_DYN) {
+		ret = STATUS_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Check that program headers are the right size... */
 	if(binary->ehdr.e_phentsize != sizeof(elf_phdr_t)) {
-		ret = -ERR_FORMAT_INVAL;
+		ret = STATUS_FORMAT_INVAL;
 		goto fail;
 	}
 
 	/* Allocate some memory for the program headers and load them too. */
 	size = binary->ehdr.e_phnum * binary->ehdr.e_phentsize;
 	binary->phdrs = kmalloc(size, MM_SLEEP);
-	if((ret = fs_file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes)) != 0) {
+	ret = fs_file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes);
+	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != size) {
-		ret = -ERR_FORMAT_INVAL;
+		ret = STATUS_FORMAT_INVAL;
 		goto fail;
 	}
 
-	/* Look for an interpreter header, and load the interpreter instead if
-	 * there is one. */
-	for(i = 0; i < binary->ehdr.e_phnum; i++) {
-		if(binary->phdrs[i].p_type != ELF_PT_INTERP) {
-			continue;
-		} else if(interp) {
-			dprintf("elf: interpreter requires an interpreter\n");
-			ret = -ERR_FORMAT_INVAL;
-			goto fail;
+	/* If loading an ET_DYN binary, work out how much space is required and
+	 * map a chunk into the address space for it. */
+	if(binary->ehdr.e_type == ELF_ET_DYN) {
+		for(i = 0, binary->load_size = 0; i < binary->ehdr.e_phnum; i++) {
+			if(binary->phdrs[i].p_type != ELF_PT_LOAD) {
+				continue;
+			}
+			if((binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz) > binary->load_size) {
+				binary->load_size = ROUND_UP(
+					binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz,
+					PAGE_SIZE
+				);
+			}
 		}
 
-		/* Read in the interpreter path. */
-		path = kmalloc(binary->phdrs[i].p_filesz, MM_SLEEP);
-		if((ret = fs_file_pread(handle, path, binary->phdrs[i].p_filesz,
-		                        binary->phdrs[i].p_offset, &bytes)) != 0) {
-			kfree(path);
-			goto fail;
-		} else if(bytes != binary->phdrs[i].p_filesz) {
-			kfree(path);
-			ret = -ERR_FORMAT_INVAL;
-			goto fail;
-		}
-		dprintf("elf: got interpreter path %s\n", path);
-
-		/* Reserve space for the real binary to be loaded into, so that
-		 * the VM system doesn't put the stack or argument block where
-		 * the binary needs to go. */
-		if((ret = elf_binary_reserve_space(binary)) != 0) {
-			kfree(path);
-			goto fail;
+		/* If a location is specified, force the binary to be there. */
+		flags = VM_MAP_READ | VM_MAP_PRIVATE;
+		if(dest) {
+			flags |= VM_MAP_FIXED;
 		}
 
-		/* Clean up old state data. */
-		kfree(binary->phdrs);
-		kfree(binary);
-
-		/* Look up the interpreter on the FS. */
-		ret = fs_file_open(path, FS_FILE_READ, &handle);
-		kfree(path);
-		if(ret != 0) {
-			return ret;
+		ret = vm_map(binary->as, dest, binary->load_size, flags, NULL, 0, &binary->load_base);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
 		}
-
-		ret = elf_binary_load_internal(handle, as, true, datap);
-		handle_release(handle);
-		return ret;
+	} else {
+		binary->load_base = 0;
+		binary->load_size = 0;
 	}
 
 	/* Handle all the program headers. */
 	for(i = 0; i < binary->ehdr.e_phnum; i++) {
 		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			if((ret = elf_binary_phdr_load(binary, &binary->phdrs[i], i)) != 0) {
+			ret = elf_binary_phdr_load(binary, &binary->phdrs[i], i);
+			if(ret != STATUS_SUCCESS) {
 				goto fail;
 			}
 			load_count++;
@@ -270,6 +306,12 @@ static int elf_binary_load_internal(khandle_t *handle, vm_aspace_t *as, bool int
 		case ELF_PT_NOTE:
 			/* These can be ignored without warning. */
 			break;
+		case ELF_PT_INTERP:
+			/* This code is used to load the kernel library, which
+			 * must not have an interpreter. */
+			dprintf("elf: cannot handle interpreter!\n");
+			ret = STATUS_FORMAT_INVAL;
+			goto fail;
 		default:
 			dprintf("elf: unknown program header type %u, ignoring\n", binary->phdrs[i].p_type);
 			break;
@@ -279,12 +321,12 @@ static int elf_binary_load_internal(khandle_t *handle, vm_aspace_t *as, bool int
 	/* Check if we actually loaded anything. */
 	if(!load_count) {
 		dprintf("elf: binary did not have any loadable program headers\n");
-		ret = -ERR_FORMAT_INVAL;
+		ret = STATUS_FORMAT_INVAL;
 		goto fail;
 	}
 
 	*datap = binary;
-	return 0;
+	return STATUS_SUCCESS;
 fail:
 	if(binary->phdrs) {
 		kfree(binary->phdrs);
@@ -293,22 +335,12 @@ fail:
 	return ret;
 }
 
-/** Load an ELF binary into an address space.
- * @param handle	Handle to file being loaded.
- * @param as		Address space to load into.
- * @param datap		Where to store data pointer to pass to other functions.
- * @return		0 on success, negative error code on failure. */
-int elf_binary_load(khandle_t *handle, vm_aspace_t *as, void **datap) {
-	return elf_binary_load_internal(handle, as, false, datap);
-}
-
 /** Finish binary loading, after address space is switched.
  * @param data		Data pointer returned from elf_binary_load().
- * @return		Address of program entry point. */
+ * @return		Address of entry point. */
 ptr_t elf_binary_finish(void *data) {
 	elf_binary_t *binary = (elf_binary_t *)data;
-	void *base;
-	ptr_t ret;
+	ptr_t ret, base;
 	size_t i;
 
 	/* Clear the BSS sections. */
@@ -319,19 +351,18 @@ ptr_t elf_binary_finish(void *data) {
 				break;
 			}
 
-			base = (void *)(binary->phdrs[i].p_vaddr + binary->phdrs[i].p_filesz);
+			base = binary->load_base + binary->phdrs[i].p_vaddr + binary->phdrs[i].p_filesz;
 			dprintf("elf: clearing BSS for program header %zu at %p\n", i, base);
-			memset(base, 0, binary->phdrs[i].p_memsz - binary->phdrs[i].p_filesz);
+			memset((void *)base, 0, binary->phdrs[i].p_memsz - binary->phdrs[i].p_filesz);
 			break;
 		}
 	}
 
-	ret = (ptr_t)binary->ehdr.e_entry;
+	ret = binary->load_base + binary->ehdr.e_entry;
 	kfree(binary->phdrs);
 	kfree(binary);
 	return ret;
 }
-#endif
 
 #undef dprintf
 #if CONFIG_MODULE_DEBUG
