@@ -25,12 +25,12 @@
 extern "C" {
 #endif
 
-#include <kernel/errors.h>
+//#include <kernel/errors.h>
 
 /** Standard C error number definitions. */
-#define ERANGE			ERR_OUT_OF_RANGE
-#define EILSEQ			ERR_ILLEGAL_SEQUENCE
-#define EDOM			ERR_OUTSIDE_DOMAIN
+//#define ERANGE			ERR_OUT_OF_RANGE
+//#define EILSEQ			ERR_ILLEGAL_SEQUENCE
+//#define EDOM			ERR_OUTSIDE_DOMAIN
 
 extern int *__libsystem_errno_location(void);
 #define errno (*__libsystem_errno_location())
