@@ -158,10 +158,10 @@ status_t module_name(khandle_t *handle, char *namebuf) {
 	/* Retrieve the name. */
 	sym = symbol_table_lookup_name(&module->symtab, "__module_name", false, false);
 	if(!sym) {
-		ret = STATUS_FORMAT_INVAL;
+		ret = STATUS_MALFORMED_IMAGE;
 		goto out;
 	} else if(strnlen((char *)sym->addr, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
-		ret = STATUS_FORMAT_INVAL;
+		ret = STATUS_MALFORMED_IMAGE;
 		goto out;
 	}
 
@@ -176,7 +176,7 @@ out:
  * @param module	Module to check.
  * @param depbuf	Buffer to store name of missing dependency in.
  * @return		STATUS_SUCCESS if dependencies satisfied,
- *			STATUS_DEP_MISSING if not. */
+ *			STATUS_MISSING_LIBRARY if not. */
 static status_t module_check_deps(module_t *module, char *depbuf) {
 	module_t *dep;
 	symbol_t *sym;
@@ -197,7 +197,7 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
 			kprintf(LOG_NORMAL, "module: module %s depends on itself\n", module, module->name);
-			return STATUS_FORMAT_INVAL;
+			return STATUS_MALFORMED_IMAGE;
 		}
 
 		dep = module_find(module->deps[i]);
@@ -206,7 +206,7 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 			if(depbuf != NULL) {
 				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX + 1);
 			}
-			return STATUS_DEP_MISSING;
+			return STATUS_MISSING_LIBRARY;
 		}
 	}
 
@@ -235,7 +235,7 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
  *
  * @return		Status code describing result of the operation. If a
  *			required dependency is not loaded, the function will
- *			return STATUS_DEP_MISSING.
+ *			return STATUS_MISSING_LIBRARY.
  */
 status_t module_load(khandle_t *handle, char *depbuf) {
 	module_t *module;
@@ -269,11 +269,11 @@ status_t module_load(khandle_t *handle, char *depbuf) {
 	/* Check if it is valid. */
 	if(!module->name || !module->description || !module->init) {
 		kprintf(LOG_NORMAL, "module: information for module %p is invalid\n", module);
-		ret = STATUS_FORMAT_INVAL;
+		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
 		kprintf(LOG_NORMAL, "module: name of module %p is too long\n", module);
-		ret = STATUS_FORMAT_INVAL;
+		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	}
 
@@ -325,15 +325,9 @@ fail:
 }
 
 /** Print a list of loaded kernel modules.
- *
- * Prints a list of currently loaded kernel modules and information about
- * them.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		Always returns KDBG_OK.
- */
+ * @return		Always returns KDBG_OK. */
 int kdbg_cmd_modules(int argc, char **argv) {
 	module_t *module;
 
@@ -370,11 +364,11 @@ int kdbg_cmd_modules(int argc, char **argv) {
  * @param depbuf	Where to store name of unmet dependency (should be
  *			MODULE_NAME_MAX + 1 bytes long).
  *
- * @return		0 on success, negative error code on failure. If a
- *			required dependency is not loaded, the ERR_DEP_MISSING
- *			error code is returned.
+ * @return		Status code describing result of the operation. If a
+ *			required dependency is not loaded, the function will
+ *			return STATUS_MISSING_LIBRARY.
  */
-int sys_module_load(const char *path, char *depbuf) {
+status_t sys_module_load(const char *path, char *depbuf) {
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
 	khandle_t *handle;
 	status_t ret, err;
@@ -392,7 +386,7 @@ int sys_module_load(const char *path, char *depbuf) {
 	}
 
 	ret = module_load(handle, kdepbuf);
-	if(ret == STATUS_DEP_MISSING) {
+	if(ret == STATUS_MISSING_LIBRARY) {
 		if((err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1)) != STATUS_SUCCESS) {
 			ret = err;
 		}

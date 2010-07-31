@@ -15,12 +15,33 @@
 
 /**
  * @file
- * @brief		Kernel library header.
+ * @brief		Kernel module functions.
  */
 
-#ifndef __LIBKERNEL_H
-#define __LIBKERNEL_H
+#ifndef __KERNEL_MODULE_H
+#define __KERNEL_MODULE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+#ifdef KERNEL
+# include <public/types.h>
+#else
+# include <kernel/types.h>
+#endif
 
-#endif /* __LIBKERNEL_H */
+/** Maximum length of a module name. */
+#define MODULE_NAME_MAX		16
+
+/** Module information section names. */
+#define MODULE_INFO_SECTION	".modinfo"
+#define MODULE_EXPORT_SECTION	".modexport"
+
+extern status_t SYSCALL(module_load)(const char *path, char *depbuf);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __KERNEL_MODULE_H */

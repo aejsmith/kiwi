@@ -206,9 +206,9 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 		if(ret == STATUS_SUCCESS) {
 			boot_module_remove(mod);
 			return true;
-		} else if(ret == STATUS_FORMAT_INVAL) {
+		} else if(ret == STATUS_UNKNOWN_IMAGE) {
 			return false;
-		} else if(ret != STATUS_DEP_MISSING) {
+		} else if(ret != STATUS_MISSING_LIBRARY) {
 			fatal("Could not load module %s (%d)", (mod->name) ? mod->name : "<noname>", ret);
 		}
 

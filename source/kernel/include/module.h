@@ -24,6 +24,8 @@
 #include <lib/list.h>
 #include <lib/refcount.h>
 
+#include <public/module.h>
+
 #include <elf.h>
 #include <object.h>
 #include <symbol.h>
@@ -57,13 +59,6 @@ typedef struct module {
 	size_t load_size;		/**< Size of allocation module is loaded to. */
 } module_t;
 
-/** Maximum length of a module name. */
-#define MODULE_NAME_MAX		16
-
-/** Module information section names. */
-#define MODULE_INFO_SECTION	".modinfo"
-#define MODULE_EXPORT_SECTION	".modexport"
-
 /** Set the name of a module. */
 #define MODULE_NAME(mname)		\
 	static char __used __section(MODULE_INFO_SECTION) __module_name[] = mname
@@ -95,7 +90,5 @@ extern status_t module_name(khandle_t *handle, char *namebuf);
 extern status_t module_load(khandle_t *handle, char *depbuf);
 
 extern int kdbg_cmd_modules(int argc, char **argv);
-
-extern int sys_module_load(const char *path, char *depbuf);
 
 #endif /* __MODULE_H */

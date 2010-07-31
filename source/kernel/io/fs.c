@@ -1687,12 +1687,12 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 			ret = STATUS_PARAM_INVAL;
 			goto fail;
 		} else if(!mount->type->probe(mount->device, NULL)) {
-			ret = STATUS_FORMAT_INVAL;
+			ret = STATUS_UNKNOWN_FS;
 			goto fail;
 		}
 	} else {
 		if(!(mount->type = fs_type_probe(mount->device, NULL))) {
-			ret = STATUS_FORMAT_INVAL;
+			ret = STATUS_UNKNOWN_FS;
 			goto fail;
 		}
 	}

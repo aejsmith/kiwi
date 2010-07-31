@@ -79,7 +79,7 @@ status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *ta
 		break;
 	default:
 		dprintf("elf: encountered unknown relocation type: %lu\n", ELF64_R_TYPE(rel->r_info));
-		return STATUS_FORMAT_INVAL;
+		return STATUS_MALFORMED_IMAGE;
 	}
 
 	return STATUS_SUCCESS;

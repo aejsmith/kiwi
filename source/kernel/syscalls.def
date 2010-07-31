@@ -23,7 +23,7 @@ type useconds_t int64_t;
 type offset_t uint64_t;
 type rel_offset_t int64_t;
 
-#syscall module_load(ptr_t, ptr_t);
+syscall module_load(ptr_t, ptr_t);
 syscall object_type(handle_t);
 syscall object_wait(handle_t, int, useconds_t);
 syscall object_wait_multiple(ptr_t, ptr_t, size_t, useconds_t, ptr_t);

@@ -34,26 +34,29 @@
 #define STATUS_INTERRUPTED		4	/**< Interrupted while blocking. */
 #define STATUS_NOT_IMPLEMENTED		5	/**< Operation not implemented. */
 #define STATUS_NOT_SUPPORTED		6	/**< Operation not supported. */
-#define STATUS_DEP_MISSING		7	/**< Required dependency not found. */
-#  define STATUS_FORMAT_INVAL		8	/**< Object's format is incorrect. */
-#  define STATUS_ALREADY_EXISTS		9	/**< Object already exists. */
-#  define STATUS_NOT_FOUND		10	/**< Requested object not found. */
-#  define STATUS_TYPE_INVAL		11	/**< Object type is invalid. */
-#define STATUS_READ_ONLY		12	/**< Object cannot be modified. */
-#define STATUS_ADDR_INVAL		13	/**< A bad memory location was specified. */
-#define STATUS_RESOURCE_UNAVAIL		14	/**< Resource is temporarily unavailable. */
-#define STATUS_IN_USE			15	/**< Object is in use. */
-#  define STATUS_NO_SPACE		16	/**< No space is available. */
-#define STATUS_PERM_DENIED		17	/**< Permission denied. */
-#define STATUS_TOO_LONG			18	/**< Provided string is too long. */
-#define STATUS_LINK_LIMIT		19	/**< Exceeded nested symbolic link limit. */
-#  define STATUS_BUF_TOO_SMALL		20	/**< Provided buffer is too small. */
-#define STATUS_SYSCALL_INVAL		21	/**< Invalid system call number. */
-#define STATUS_DEST_UNREACHABLE		22	/**< Cannot reach destination. */
-#define STATUS_TIMED_OUT		23	/**< Timed out while waiting. */
-#  define STATUS_DEVICE_ERROR		24	/**< There was an error on the device. */
-#define STATUS_OVERFLOW			25	/**< Integer overflow. */
-#  define STATUS_NOT_EMPTY		26	/**< Directory is not empty. */
-#define STATUS_PROCESS_RUNNING		27	/**< Process is still running. */
+#  define STATUS_ALREADY_EXISTS		7	/**< Object already exists. */
+#  define STATUS_NOT_FOUND		8	/**< Requested object not found. */
+#  define STATUS_TYPE_INVAL		9	/**< Object type is invalid. */
+#define STATUS_READ_ONLY		10	/**< Object cannot be modified. */
+#define STATUS_ADDR_INVAL		11	/**< A bad memory location was specified. */
+#define STATUS_RESOURCE_UNAVAIL		12	/**< Resource is temporarily unavailable. */
+#define STATUS_IN_USE			13	/**< Object is in use. */
+#  define STATUS_NO_SPACE		14	/**< No space is available. */
+#define STATUS_PERM_DENIED		15	/**< Permission denied. */
+#define STATUS_TOO_LONG			16	/**< Provided string is too long. */
+#define STATUS_LINK_LIMIT		17	/**< Exceeded nested symbolic link limit. */
+#  define STATUS_BUF_TOO_SMALL		18	/**< Provided buffer is too small. */
+#define STATUS_SYSCALL_INVAL		19	/**< Invalid system call number. */
+#define STATUS_DEST_UNREACHABLE		20	/**< Cannot reach destination. */
+#define STATUS_TIMED_OUT		21	/**< Timed out while waiting. */
+#  define STATUS_DEVICE_ERROR		22	/**< There was an error on the device. */
+#define STATUS_OVERFLOW			23	/**< Integer overflow. */
+#  define STATUS_NOT_EMPTY		24	/**< Directory is not empty. */
+#define STATUS_PROCESS_RUNNING		25	/**< Process is still running. */
+#define STATUS_UNKNOWN_IMAGE		26	/**< Executable image has an unrecognised format. */
+#define STATUS_MALFORMED_IMAGE		27	/**< Executable image format is incorrect. */
+#define STATUS_MISSING_LIBRARY		28	/**< Required library not found. */
+#define STATUS_MISSING_SYMBOL		29	/**< Referenced symbol not found. */
+#define STATUS_UNKNOWN_FS		30	/**< Filesystem has an unrecognised format. */
 
 #endif /* __KERNEL_STATUS_H */
