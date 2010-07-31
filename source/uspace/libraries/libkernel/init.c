@@ -22,21 +22,21 @@
 #include <stdio.h>
 #include "libkernel.h"
 
+extern void libkernel_init_stage2(process_args_t *args);
+
 extern elf_dyn_t _DYNAMIC[];
 
-/** Kernel library initialisation function.
+/** Kernel library 1st stage initialisation.
  *
- * The first job of this function is to relocate the the library. The kernel
- * just loads us somewhere and does not perform any relocations. We must
- * therefore relocate ourselves before we can make any calls to exported
- * functions - this means no system calls. Since our internal functions are
- * marked as hidden, we can call these (they are not called via the PLT).
+ * The job of this function is to relocate the the library. The kernel just
+ * loads us somewhere and does not perform any relocations. We must therefore
+ * relocate ourselves before we can make any calls to exported functions or
+ * use global variables.
  *
  * @param args		Process argument block.
  */
 void libkernel_init(process_args_t *args) {
 	rtld_image_t *image;
-	handle_t handle;
 	int i;
 
 	/* Work out the correct location of the libkernel image structure and
@@ -69,6 +69,18 @@ void libkernel_init(process_args_t *args) {
 
 	/* Get the architecture to relocate us. */
 	libkernel_arch_init(args, image);
+
+	/* Jump to the second stage initialisation. Annoyingly, GCC caches the
+	 * location of libkernel_image, so if we try to get at it from this
+	 * function it will use the old address. So, we must continue in a
+	 * separate function (global, to prevent GCC from inlining it). */
+	libkernel_init_stage2(args);
+}
+
+/** Second stage initialisation.
+ * @param args		Process argument block. */
+void libkernel_init_stage2(process_args_t *args) {
+	handle_t handle;
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(process_id(-1) == 1) {
