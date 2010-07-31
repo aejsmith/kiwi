@@ -412,15 +412,11 @@ void process_detach(thread_t *thread) {
 			process->create->status = process->status;
 			semaphore_up(&process->create->sem, 1);
 			process->create = NULL;
-		}
-
-		mutex_unlock(&process->lock);
-
-		/* Drop dead if a critical process terminates. */
-		if(process->flags & PROCESS_CRITICAL) {
+		} else if(process->flags & PROCESS_CRITICAL) {
 			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
 		}
 
+		mutex_unlock(&process->lock);
 		notifier_run(&process->death_notifier, NULL, true);
 	} else {
 		mutex_unlock(&process->lock);

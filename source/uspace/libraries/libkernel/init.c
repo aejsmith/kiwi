@@ -19,7 +19,10 @@
  */
 
 #include <kernel/device.h>
+#include <kernel/status.h>
+
 #include <stdio.h>
+
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
@@ -93,5 +96,6 @@ void libkernel_init_stage2(process_args_t *args) {
 	libkernel_heap_init();
 
 	printf("libkernel: loading program %s...\n", args->path);
+	process_exit(STATUS_NOT_IMPLEMENTED);
 	while(1);
 }
