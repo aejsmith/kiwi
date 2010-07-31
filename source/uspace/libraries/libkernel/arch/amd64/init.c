@@ -21,21 +21,22 @@
 #include "../../libkernel.h"
 
 /** Kernel library architecture initialisation function.
- * @param args		Process argument block. */
-void libkernel_arch_init(process_args_t *args) {
-	ElfW(Rela) *relocs;
-	ElfW(Addr) *addr;
+ * @param args		Process argument block.
+ * @param image		Kernel library image structure. */
+void libkernel_arch_init(process_args_t *args, rtld_image_t *image) {
+	elf_rela_t *relocs;
+	elf_addr_t *addr;
 	size_t count, i;
 
 	/* First perform RELA relocations. */
-	count = libkernel_image.dynamic[ELF_DT_RELSZ_TYPE] / sizeof(ElfW(Rela));
-	relocs = (ElfW(Rela) *)libkernel_image.dynamic[ELF_DT_REL_TYPE];
+	count = image->dynamic[ELF_DT_RELSZ_TYPE] / sizeof(elf_rela_t);
+	relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
 	for(i = 0; i < count; i++) {
 		if(ELF64_R_TYPE(relocs[i].r_info) != ELF_R_X86_64_RELATIVE) {
 			continue;
 		}
 
-		addr = (ElfW(Addr) *)(libkernel_image.load_base + relocs[i].r_offset);
-		*addr = (ElfW(Addr))libkernel_image.load_base + relocs[i].r_addend;
+		addr = (elf_addr_t *)(image->load_base + relocs[i].r_offset);
+		*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
 	}
 }

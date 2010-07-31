@@ -23,10 +23,6 @@
 
 #include <elf.h>
 
-/** Macro to get the correct ELF type. */
-#define _ElfW(type)		Elf64_##type
-#define ElfW(type)		_ElfW(type)
-
 /** Relocation types. */
 #define ELF_DT_REL_TYPE		ELF_DT_RELA
 #define ELF_DT_RELSZ_TYPE	ELF_DT_RELASZ
@@ -38,5 +34,15 @@
 
 /* FIXME: Better place for this. */
 #define PAGE_SIZE		0x1000
+
+/** ELF type definitions. */
+typedef Elf64_Ehdr elf_ehdr_t;		/**< ELF executable header. */
+typedef Elf64_Phdr elf_phdr_t;		/**< ELF program header. */
+typedef Elf64_Shdr elf_shdr_t;		/**< ELF section header. */
+typedef Elf64_Sym  elf_sym_t;		/**< ELF symbol structure. */
+typedef Elf64_Addr elf_addr_t;		/**< ELF address type. */
+typedef Elf64_Rel  elf_rel_t;		/**< ELF REL type. */
+typedef Elf64_Rela elf_rela_t;		/**< ELF RELA type. */
+typedef Elf64_Dyn  elf_dyn_t;		/**< ELF dynamic section type. */
 
 #endif /* __LIBKERNEL_ARCH_H */

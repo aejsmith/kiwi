@@ -352,6 +352,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	addr += (info->envc + 1) * sizeof(char *);
 	uargs->args_count = info->argc;
 	uargs->env_count = info->envc;
+	uargs->load_base = (void *)LIBKERNEL_BASE;
 
 	/* Copy path string, arguments and environment variables. */
 	strcpy(uargs->path, info->path);

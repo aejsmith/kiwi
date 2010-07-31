@@ -27,10 +27,15 @@
 #include <list.h>
 
 /** Compiler attribute/builtin macros. */
-#define __internal		__attribute__((visibility("hidden")))
-#define __export		
+#define __export		__attribute__((visibility("default")))
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)
+
+/** Whether to enable debug output. */
+#define LIBKERNEL_DEBUG		1
+
+/** Size of the heap. */
+#define LIBKERNEL_HEAP_SIZE	16384
 
 #include "arch.h"
 
@@ -41,8 +46,8 @@ typedef struct rtld_image {
 	const char *name;		/**< Shared object name of the library. */
 	const char *path;		/**< Full path to image file. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
-	ElfW(Addr) dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
-	ElfW(Dyn) *dyntab;		/**< Pointer to unmodified dynamic section. */
+	elf_addr_t dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
+	elf_dyn_t *dyntab;		/**< Pointer to unmodified dynamic section. */
 
 	void *load_base;		/**< Base address for the image. */
 	size_t load_size;		/**< Size of the image's memory region. */
@@ -59,11 +64,12 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
-extern list_t __internal rtld_loaded_images;
-//extern rtld_image_t __internal application_image;
-extern rtld_image_t __internal libkernel_image;
+extern list_t rtld_loaded_images;
+//extern rtld_image_t application_image;
+extern rtld_image_t libkernel_image;
 
-extern void libkernel_arch_init(process_args_t *args) __internal;
-extern void libkernel_init(process_args_t *args) __internal;
+extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
+extern void libkernel_heap_init(void);
+extern void libkernel_init(process_args_t *args);
 
 #endif /* __LIBKERNEL_H */

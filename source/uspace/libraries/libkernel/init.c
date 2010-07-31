@@ -19,9 +19,10 @@
  */
 
 #include <kernel/device.h>
+#include <stdio.h>
 #include "libkernel.h"
 
-extern ElfW(Dyn) _DYNAMIC[];
+extern elf_dyn_t _DYNAMIC[];
 
 /** Kernel library initialisation function.
  *
@@ -34,40 +35,51 @@ extern ElfW(Dyn) _DYNAMIC[];
  * @param args		Process argument block.
  */
 void libkernel_init(process_args_t *args) {
+	rtld_image_t *image;
+	handle_t handle;
 	int i;
 
-	/* Fill in the libkernel image structure with information we have. */
-	libkernel_image.load_base = args->load_base;
-	libkernel_image.dyntab = (ElfW(Dyn) *)((ElfW(Addr))_DYNAMIC + (ElfW(Addr))args->load_base);
+	/* Work out the correct location of the libkernel image structure and
+	 * fill it in with information we have. */
+	image = (rtld_image_t *)((elf_addr_t)&libkernel_image + (elf_addr_t)args->load_base);
+	image->load_base = args->load_base;
+	image->dyntab = (elf_dyn_t *)((elf_addr_t)_DYNAMIC + (elf_addr_t)args->load_base);
 
 	/* Fix up addresses in our DYNAMIC section. */
-	for(i = 0; libkernel_image.dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		switch(libkernel_image.dyntab[i].d_tag) {
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		switch(image->dyntab[i].d_tag) {
 		case ELF_DT_HASH:
 		case ELF_DT_PLTGOT:
 		case ELF_DT_STRTAB:
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			libkernel_image.dyntab[i].d_un.d_ptr += (ElfW(Addr))args->load_base;
+			image->dyntab[i].d_un.d_ptr += (elf_addr_t)args->load_base;
                         break;
                 }
         }
 
 	/* Populate the dynamic table in the image structure. */
-	for(i = 0; libkernel_image.dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(libkernel_image.dyntab[i].d_tag >= ELF_DT_NUM || libkernel_image.dyntab[i].d_tag == ELF_DT_NEEDED) {
+	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
 			continue;
 		}
-		libkernel_image.dynamic[libkernel_image.dyntab[i].d_tag] = libkernel_image.dyntab[i].d_un.d_ptr;
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
         }
 
 	/* Get the architecture to relocate us. */
-	libkernel_arch_init(args);
+	libkernel_arch_init(args, image);
 
-	handle_t handle;
+	/* If we're the first process, open handles to the kernel console. */
+	if(process_id(-1) == 1) {
+		device_open("/kconsole", &handle);
+		device_open("/kconsole", &handle);
+		device_open("/kconsole", &handle);
+	}
 
-	device_open("/kconsole", &handle);
-	device_write(handle, "Hello World\n", 12, 0, NULL);
+	/* Initialise the heap. */
+	libkernel_heap_init();
+
+	printf("libkernel: loading program %s...\n", args->path);
 	while(1);
 }

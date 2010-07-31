@@ -15,6 +15,9 @@ Import('env', 'envmgr', 'config')
 
 sources = map(File, [
 	'rtld/image.c',
+	'support/heap.c',
+	'support/printf.c',
+	'support/string.c',
 	'init.c',
 	'syscalls.S',
 ])
@@ -28,10 +31,11 @@ arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 # Copy the architecture header in.
 Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
 
-# Build the library from this.
+# Build the library. The default visibility is set to hidden, as the majority
+# of functions in this library should not be exported.
 env.SharedLibrary(
 	'kernel',
 	arch_sources + sources,
 	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,__libkernel_entry', '-Wl,-Bsymbolic'],
-	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding']
+	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
 )
