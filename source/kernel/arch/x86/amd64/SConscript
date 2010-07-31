@@ -16,7 +16,7 @@ Import('env')
 sources = map(File, [
 	'context.S',
 	'descriptor.c',
-	#'elf.c',
+	'elf.c',
 	'entry.S',
 	'kdbg.c',
 	'page.c',

@@ -31,9 +31,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+#include <status.h>
 #include <vmem.h>
 
 #include "x86emu/x86emu.h"
@@ -309,8 +309,8 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 }
 
 /** Initialisation function for the BIOS module.
- * @return		0 on success, negative error code on failure. */
-static int bios_init(void) {
+ * @return		Status code describing result of the operation. */
+static status_t bios_init(void) {
 	/* Allocate a chunk of heap space and map stuff into it. */
 	bios_mem_mapping = (void *)((ptr_t)vmem_alloc(&kheap_va_arena, 0x100000, MM_SLEEP));
 	bios_mem_pages = page_alloc(BIOS_MEM_SIZE / PAGE_SIZE, MM_SLEEP);
@@ -325,13 +325,13 @@ static int bios_init(void) {
 	/* Initialise the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);
 	X86EMU_setupMemFuncs(&x86emu_mem_funcs);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Unloading function for the BIOS module.
- * @return		0 on success, negative error code on failure. */
-static int bios_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t bios_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("bios");

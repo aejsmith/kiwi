@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -489,10 +489,13 @@ struct khandle;
 struct module;
 struct vm_aspace;
 
-extern status_t elf_binary_load(struct khandle *handle, struct vm_aspace *as, void **datap);
+extern status_t elf_binary_load(struct khandle *handle, struct vm_aspace *as, void *addr, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 
+extern status_t elf_module_apply_rel(struct module *module, elf_rel_t *rel, elf_shdr_t *target);
+extern status_t elf_module_apply_rela(struct module *module, elf_rela_t *rela, elf_shdr_t *target);
+extern status_t elf_module_lookup_symbol(struct module *module, size_t num, elf_addr_t *valp);
 extern status_t elf_module_load(struct module *module);
-extern status_t elf_module_relocate(struct module *module, bool external);
+extern status_t elf_module_finish(struct module *module);
 
 #endif /* __ELF_H */

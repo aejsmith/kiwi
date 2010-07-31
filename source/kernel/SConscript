@@ -64,11 +64,11 @@ sources = map(File, [
 	'sync/spinlock.c',
 	'sync/waitq.c',
 
-	#'elf.c',
+	'elf.c',
 	'fatal.c',
 	'init.c',
 	'kdbg.c',
-	#'module.c',
+	'module.c',
 	'object.c',
 	'symbol.c',
 	'syscall_table.c',

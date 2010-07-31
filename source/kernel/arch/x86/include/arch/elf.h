@@ -43,12 +43,16 @@ typedef Elf64_Phdr elf_phdr_t;		/**< ELF program header. */
 typedef Elf64_Shdr elf_shdr_t;		/**< ELF section header. */
 typedef Elf64_Sym  elf_sym_t;		/**< ELF symbol structure. */
 typedef Elf64_Addr elf_addr_t;		/**< ELF address type. */
+typedef Elf64_Rel  elf_rel_t;		/**< ELF REL type. */
+typedef Elf64_Rela elf_rela_t;		/**< ELF RELA type. */
 #else
 typedef Elf32_Ehdr elf_ehdr_t;		/**< ELF executable header. */
 typedef Elf32_Phdr elf_phdr_t;		/**< ELF program header. */
 typedef Elf32_Shdr elf_shdr_t;		/**< ELF section header. */
 typedef Elf32_Sym  elf_sym_t;		/**< ELF symbol structure. */
 typedef Elf32_Addr elf_addr_t;		/**< ELF address type. */
+typedef Elf32_Rel  elf_rel_t;		/**< ELF REL type. */
+typedef Elf32_Rela elf_rela_t;		/**< ELF RELA type. */
 #endif
 
 #endif /* __ARCH_ELF_H */

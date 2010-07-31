@@ -105,7 +105,7 @@ static struct {
 	{ "kill",	"Kill a thread.",				kdbg_cmd_kill },
 	{ "list",	"List breakpoints/watchpoints.",		kdbg_cmd_list },
 	{ "log",	"Print out the kernel log buffer.",		kdbg_cmd_log },
-	//{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
+	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mount",	"Print a list of mounted filesystems.",		kdbg_cmd_mount },
 	{ "node",	"Print information about a filesystem node.",	kdbg_cmd_node },
 	{ "page",	"Print details about physical memory usage.",	kdbg_cmd_page },

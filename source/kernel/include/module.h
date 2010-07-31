@@ -28,14 +28,11 @@
 #include <object.h>
 #include <symbol.h>
 
-/** Maximum length of a module name. */
-#define MODULE_NAME_MAX		16
-
 /** Module initialisation function type. */
-typedef int (*module_init_t)(void);
+typedef status_t (*module_init_t)(void);
 
 /** Module unload function type. */
-typedef int (*module_unload_t)(void);
+typedef status_t (*module_unload_t)(void);
 
 /** Structure defining a kernel module. */
 typedef struct module {
@@ -60,26 +57,29 @@ typedef struct module {
 	size_t load_size;		/**< Size of allocation module is loaded to. */
 } module_t;
 
-/** Get a section header from a module structure. */
-#define MODULE_ELF_SECT(m, i)		\
-	((elf_shdr_t *)(((ptr_t)((m)->shdrs)) + (m)->ehdr.e_shentsize * (i)))
+/** Maximum length of a module name. */
+#define MODULE_NAME_MAX		16
+
+/** Module information section names. */
+#define MODULE_INFO_SECTION	".modinfo"
+#define MODULE_EXPORT_SECTION	".modexport"
 
 /** Set the name of a module. */
 #define MODULE_NAME(mname)		\
-	static char __used __module_name[] = mname
+	static char __used __section(MODULE_INFO_SECTION) __module_name[] = mname
 
 /** Set the description of a module. */
 #define MODULE_DESC(mdesc)              \
-        static char __used __module_desc[] = mdesc
+        static char __used __section(MODULE_INFO_SECTION) __module_desc[] = mdesc
 
 /** Set the module hook functions. */
 #define MODULE_FUNCS(minit, munload)    \
-	static module_init_t __used __module_init = minit; \
-	static module_unload_t __used __module_unload = munload
+	static module_init_t __section(MODULE_INFO_SECTION) __used __module_init = minit; \
+	static module_unload_t __section(MODULE_INFO_SECTION) __used __module_unload = munload
 
 /** Define a module's dependencies. */
 #define MODULE_DEPS(mdeps...)           \
-        static const char * __used __module_deps[] = { \
+        static const char * __section(MODULE_INFO_SECTION) __used __module_deps[] = { \
                 mdeps, \
                 NULL \
         }
@@ -87,12 +87,12 @@ typedef struct module {
 /** Export a symbol from a module. */
 #define MODULE_EXPORT(msym)             \
         static const char *__module_export_##msym \
-                __section(".modexports") __used = #msym
+                __section(MODULE_EXPORT_SECTION) __used = #msym
 
-extern void *module_mem_alloc(size_t size, int mmflag);
+extern void *module_mem_alloc(size_t size);
 
-extern int module_name(khandle_t *handle, char *namebuf);
-extern int module_load(khandle_t *handle, char *depbuf);
+extern status_t module_name(khandle_t *handle, char *namebuf);
+extern status_t module_load(khandle_t *handle, char *depbuf);
 
 extern int kdbg_cmd_modules(int argc, char **argv);
 

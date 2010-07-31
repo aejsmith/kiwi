@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,14 +18,12 @@
  * @brief		AMD64 ELF helper functions.
  */
 
-#include <io/fs.h>
-
 #include <lib/utility.h>
 
 #include <console.h>
 #include <elf.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 
 #if CONFIG_MODULE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -33,78 +31,56 @@
 # define dprintf(fmt...)	
 #endif
 
-extern int elf_module_get_sym(module_t *module, size_t num, bool external, elf_addr_t *valp);
-
-/** Perform relocations for an ELF module.
+/** Perform a REL relocation on an ELF module.
  * @param module	Module to relocate.
- * @param external	Whether to handle external or internal symbols.
- * @return		Status code describing result of operation. */
-status_t elf_module_relocate(module_t *module, bool external) {
+ * @param rel		Relocation to perform.
+ * @param target	Section to perform relocation on.
+ * @return		Status code describing result of the operation. */
+status_t elf_module_apply_rel(module_t *module, elf_rel_t *rel, elf_shdr_t *target) {
+	dprintf("elf: ELF_SHT_REL relocation section unsupported\n");
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Perform a RELA relocation on an ELF module.
+ * @param module	Module to relocate.
+ * @param rel		Relocation to perform.
+ * @param target	Section to perform relocation on.
+ * @return		Status code describing result of the operation. */
+status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *target) {
 	Elf64_Addr *where64, val = 0;
-	Elf64_Shdr *sect, *targ;
 	Elf32_Addr *where32;
-	size_t i, r, bytes;
-	offset_t offset;
-	Elf64_Rela rel;
-	int ret;
+	status_t ret;
 
-	/* Look for relocation sections in the module. */
-	for(i = 0; i < module->ehdr.e_shnum; i++) {
-		sect = MODULE_ELF_SECT(module, i);
-		if(sect->sh_type != ELF_SHT_RELA) {
-			if(sect->sh_type == ELF_SHT_REL) {
-				dprintf("elf: ELF_SHT_REL relocation section unsupported\n");
-				return -ERR_NOT_IMPLEMENTED;
-			}
-			continue;
-		}
+	/* Get the location of the relocation. */
+	where64 = (Elf64_Addr *)(target->sh_addr + rel->r_offset);
+	where32 = (Elf32_Addr *)(target->sh_addr + rel->r_offset);
 
-		/* Get the relocation target section. */
-		targ = MODULE_ELF_SECT(module, sect->sh_info);
-
-		/* Loop through all the relocations. */
-		for(r = 0; r < (sect->sh_size / sect->sh_entsize); r++) {
-			offset = sect->sh_offset + (r * sect->sh_entsize);
-			if((ret = fs_file_pread(module->handle, &rel, sizeof(Elf64_Rela), offset, &bytes)) != 0) {
-				return ret;
-			} else if(bytes != sizeof(Elf64_Rela)) {
-				return -ERR_FORMAT_INVAL;
-			}
-
-			/* Get the location of the relocation. */
-			where64 = (Elf64_Addr *)(targ->sh_addr + rel.r_offset);
-			where32 = (Elf32_Addr *)(targ->sh_addr + rel.r_offset);
-
-			ret = elf_module_get_sym(module, ELF64_R_SYM(rel.r_info), external, &val);
-			if(ret < 0) {
-				return ret;
-			} else if(ret == 0) {
-				continue;
-			}
-
-			/* Perform the actual relocation. */
-			switch(ELF64_R_TYPE(rel.r_info)) {
-			case ELF_R_X86_64_NONE:
-				break;
-			case ELF_R_X86_64_32:
-				*where32 = val + rel.r_addend;
-				break;
-			case ELF_R_X86_64_64:
-				*where64 = val + rel.r_addend;
-				break;
-			case ELF_R_X86_64_PC32:
-				*where32 = (val + rel.r_addend) - (ptr_t)where32;
-				break;
-			case ELF_R_X86_64_32S:
-				*where32 = val + rel.r_addend;
-				break;
-			default:
-				dprintf("module: encountered unknown relocation type: %lu\n",
-				        ELF64_R_TYPE(rel.r_info));
-				return -ERR_FORMAT_INVAL;
-			}
-		}
+	/* Obtain the symbol value. */
+	ret = elf_module_lookup_symbol(module, ELF64_R_SYM(rel->r_info), &val);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
 	}
 
-	return 0;
+	/* Perform the relocation. */
+	switch(ELF64_R_TYPE(rel->r_info)) {
+	case ELF_R_X86_64_NONE:
+		break;
+	case ELF_R_X86_64_32:
+		*where32 = val + rel->r_addend;
+		break;
+	case ELF_R_X86_64_64:
+		*where64 = val + rel->r_addend;
+		break;
+	case ELF_R_X86_64_PC32:
+		*where32 = (val + rel->r_addend) - (ptr_t)where32;
+		break;
+	case ELF_R_X86_64_32S:
+		*where32 = val + rel->r_addend;
+		break;
+	default:
+		dprintf("elf: encountered unknown relocation type: %lu\n", ELF64_R_TYPE(rel->r_info));
+		return STATUS_FORMAT_INVAL;
+	}
+
+	return STATUS_SUCCESS;
 }

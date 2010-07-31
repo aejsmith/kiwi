@@ -92,7 +92,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	current_init_progress += progress_per_module;
 	console_update_boot_progress(current_init_progress);
 }
-#if 0
+
 /** Look up a kernel module in the boot module list.
  * @param name		Name to look for.
  * @return		Pointer to module if found, NULL if not. */
@@ -109,7 +109,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
 
 	return NULL;
 }
-#endif
+
 /** Extract a TAR archive to the root FS.
  * @param mod		Boot module containing archive.
  * @return		Whether the module was a TAR archive. */
@@ -196,19 +196,19 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
  * @param mod		Module to load.
  * @return		Whether the file was a kernel module. */
 static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
-#if 0
 	char name[MODULE_NAME_MAX + 1];
 	boot_module_t *dep;
-	int ret;
+	status_t ret;
 
 	/* Try to load the module and all dependencies. */
 	while(true) {
-		if((ret = module_load(mod->handle, name)) == 0) {
+		ret = module_load(mod->handle, name);
+		if(ret == STATUS_SUCCESS) {
 			boot_module_remove(mod);
 			return true;
-		} else if(ret == -ERR_TYPE_INVAL) {
+		} else if(ret == STATUS_FORMAT_INVAL) {
 			return false;
-		} else if(ret != -ERR_DEP_MISSING) {
+		} else if(ret != STATUS_DEP_MISSING) {
 			fatal("Could not load module %s (%d)", (mod->name) ? mod->name : "<noname>", ret);
 		}
 
@@ -217,8 +217,6 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 			fatal("Dependency on '%s' which is not available", name);
 		}
 	}
-#endif
-	return false;
 }
 
 /** Load modules loaded by the bootloader.
@@ -227,7 +225,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 	kernel_args_module_t *amod;
 	boot_module_t *mod;
 	phys_ptr_t addr;
-	//char *tmp;
+	char *tmp;
 
 	if(!args->module_count) {
 		fatal("No modules were provided, cannot do anything!");
@@ -252,14 +250,12 @@ static void __init_text load_modules(kernel_args_t *args) {
 		/* Figure out the module name, which is needed to resolve
 		 * dependencies. Do not fail if unable to get the name, may be
 		 * a filesystem image. */
-#if 0
 		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
-		if(module_name(mod->handle, tmp) != 0) {
+		if(module_name(mod->handle, tmp) != STATUS_SUCCESS) {
 			kfree(tmp);
 		} else {
 			mod->name = tmp;
 		}
-#endif
 
 		list_append(&boot_module_list, &mod->header);
 
@@ -275,7 +271,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 	while(!list_empty(&boot_module_list)) {
 		mod = list_entry(boot_module_list.next, boot_module_t, header);
 		if(!boot_module_load_tar(mod) && !boot_module_load_kmod(mod)) {
-			fatal("Module with unknown format in module list");
+			fatal("A boot module has an unknown format");
 		}
 	}
 }
