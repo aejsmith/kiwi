@@ -15,12 +15,15 @@
 
 /**
  * @file
- * @brief		Kernel library header.
+ * @brief		RTLD image management.
  */
 
-#ifndef __LIBKERNEL_H
-#define __LIBKERNEL_H
+#include "../libkernel.h"
 
-
-
-#endif /* __LIBKERNEL_H */
+/** Image structure representing the kernel library. */
+rtld_image_t libkernel_image = {
+	.name = "libkernel.so",
+	.path = LIBKERNEL_PATH,
+	.refcount = 0,
+	.state = RTLD_IMAGE_LOADED,
+};

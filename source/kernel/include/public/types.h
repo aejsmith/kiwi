@@ -25,6 +25,7 @@
 # include <arch/types.h>
 #else
 # define __need_size_t
+# define __need_NULL
 # include <stddef.h>
 # include <stdbool.h>
 # include <stdint.h>

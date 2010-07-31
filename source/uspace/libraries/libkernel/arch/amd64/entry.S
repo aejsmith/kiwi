@@ -15,21 +15,22 @@
 
 /**
  * @file
- * @brief		AMD64 userspace entry point.
+ * @brief		AMD64 userspace entry points.
  */
 
 .section .text
 
-/** Entry point for a userspace application. */
+.hidden libkernel_init
+
+/** Main entry point for a userspace application. */
 .global __libkernel_entry
 .type __libkernel_entry, @function
 .hidden __libkernel_entry
 __libkernel_entry:
-1:	jmp	1b
 	/* Get pointer to arguments structure and call the main function. */
-	//movq	8(%rsp), %rdi
-	//callq	rtld_main
+	movq	8(%rsp), %rdi
+	callq	libkernel_init
 
 	/* Entry address is now in %rax, jump to it. */
-	//jmp	*%rax
+	jmp	*%rax
 .size __libkernel_entry, .-__libkernel_entry

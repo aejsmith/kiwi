@@ -12,7 +12,8 @@
 # for complete terms.
 
 sources = map(File, [
-	'start.S',
+	'entry.S',
+	'init.c',
 ])
 
 Return('sources')

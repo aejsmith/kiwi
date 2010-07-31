@@ -38,6 +38,7 @@ typedef struct process_args {
 	char **env;			/**< Environment variable array. */
 	int args_count;			/**< Number of entries in argument array (excluding NULL). */
 	int env_count;			/**< Number of entries in environment array (excluding NULL). */
+	void *load_base;		/**< Base address that kernel library was loaded to. */
 } process_args_t;
 
 /** Expected path to libkernel. */

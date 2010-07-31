@@ -14,6 +14,8 @@
 Import('env', 'envmgr', 'config')
 
 sources = map(File, [
+	'rtld/image.c',
+	'init.c',
 	'syscalls.S',
 ])
 
@@ -23,9 +25,13 @@ env.Syscalls('syscalls.S', envmgr['kernel']['SYSCALLS'])
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 
+# Copy the architecture header in.
+Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
+
 # Build the library from this.
 env.SharedLibrary(
 	'kernel',
 	arch_sources + sources,
-	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,__libkernel_entry']
+	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,__libkernel_entry', '-Wl,-Bsymbolic'],
+	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding']
 )
