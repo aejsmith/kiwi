@@ -19,10 +19,6 @@
  */
 
 #include <kernel/device.h>
-#include <kernel/status.h>
-
-#include <stdio.h>
-
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
@@ -48,8 +44,15 @@ void libkernel_init(process_args_t *args) {
 	image->load_base = args->load_base;
 	image->dyntab = (elf_dyn_t *)((elf_addr_t)_DYNAMIC + (elf_addr_t)args->load_base);
 
-	/* Fix up addresses in our DYNAMIC section. */
+	/* Populate the dynamic table and do address fixups. */
 	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
+		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
+			continue;
+		}
+
+		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
+
+		/* Do address fixups. */
 		switch(image->dyntab[i].d_tag) {
 		case ELF_DT_HASH:
 		case ELF_DT_PLTGOT:
@@ -57,18 +60,10 @@ void libkernel_init(process_args_t *args) {
 		case ELF_DT_SYMTAB:
 		case ELF_DT_JMPREL:
 		case ELF_DT_REL_TYPE:
-			image->dyntab[i].d_un.d_ptr += (elf_addr_t)args->load_base;
-                        break;
-                }
-        }
-
-	/* Populate the dynamic table in the image structure. */
-	for(i = 0; image->dyntab[i].d_tag != ELF_DT_NULL; i++) {
-		if(image->dyntab[i].d_tag >= ELF_DT_NUM || image->dyntab[i].d_tag == ELF_DT_NEEDED) {
-			continue;
+			image->dynamic[image->dyntab[i].d_tag] += (elf_addr_t)image->load_base;
+			break;
 		}
-		image->dynamic[image->dyntab[i].d_tag] = image->dyntab[i].d_un.d_ptr;
-        }
+	}
 
 	/* Get the architecture to relocate us. */
 	libkernel_arch_init(args, image);
@@ -83,6 +78,7 @@ void libkernel_init(process_args_t *args) {
 /** Second stage initialisation.
  * @param args		Process argument block. */
 void libkernel_init_stage2(process_args_t *args) {
+	void (*entry)(process_args_t *);
 	handle_t handle;
 
 	/* If we're the first process, open handles to the kernel console. */
@@ -95,7 +91,14 @@ void libkernel_init_stage2(process_args_t *args) {
 	/* Initialise the heap. */
 	libkernel_heap_init();
 
-	printf("libkernel: loading program %s...\n", args->path);
-	process_exit(STATUS_NOT_IMPLEMENTED);
-	while(1);
+	/* Initialise the runtime loader and load the program. */
+	entry = (void (*)(process_args_t *))rtld_init(args);
+
+	/* Signal to the kernel that we've completed loading at call the entry
+	 * point for the program. */
+	process_loaded();
+	dprintf("libkernel: beginning program execution at %p...\n", entry);
+	entry(args);
+	dprintf("libkernel: program entry point returned\n");
+	process_exit(0);
 }

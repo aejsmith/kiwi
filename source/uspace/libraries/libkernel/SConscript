@@ -15,6 +15,7 @@ Import('env', 'envmgr', 'config')
 
 sources = map(File, [
 	'rtld/image.c',
+	'rtld/symbol.c',
 	'support/heap.c',
 	'support/printf.c',
 	'support/string.c',

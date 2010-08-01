@@ -19,11 +19,7 @@
  */
 
 #include <kernel/semaphore.h>
-#include <kernel/status.h>
-
-#include <stdio.h>
 #include <stdlib.h>
-
 #include "../libkernel.h"
 
 /** Statically allocated heap. */
@@ -65,7 +61,7 @@ void libkernel_heap_init(void) {
 	/* Create the semaphore that protects the heap. */
 	ret = semaphore_create("libkernel_heap_lock", 1, &libkernel_heap_lock);
 	if(ret != STATUS_SUCCESS) {
-		printf("libkernel: could not create heap lock (%d)\n", ret);
+		dprintf("libkernel: could not create heap lock (%d)\n", ret);
 		process_exit(ret);
 	}
 }

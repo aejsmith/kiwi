@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,8 +18,11 @@
  * @brief		Linked list implementation.
  */
 
-#ifndef __RTLD_LIST_H
-#define __RTLD_LIST_H
+#ifndef __LIST_H
+#define __LIST_H
+
+#define __need_offsetof
+#include <stddef.h>
 
 /** Structure containing a circular doubly linked list. */
 typedef struct list {
@@ -152,4 +155,4 @@ static inline void list_remove(list_t *entry) {
 	list_init(entry);
 }
 
-#endif /* __RTLD_LIST_H */
+#endif /* __LIST_H */

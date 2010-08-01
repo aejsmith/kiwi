@@ -22,14 +22,39 @@
 #define __LIBKERNEL_H
 
 #include <kernel/process.h>
+#include <kernel/status.h>
 
 #include <elf.h>
 #include <list.h>
+#include <stdio.h>
 
 /** Compiler attribute/builtin macros. */
 #define __export		__attribute__((visibility("default")))
 #define likely(x)		__builtin_expect(!!(x), 1)
 #define unlikely(x)		__builtin_expect(!!(x), 0)
+
+/** Round a value up. */
+#define ROUND_UP(value, nearest) \
+	__extension__ \
+	({ \
+		typeof(value) __n = value; \
+		if(__n % (nearest)) { \
+			__n -= __n % (nearest); \
+			__n += nearest; \
+		} \
+		__n; \
+	})
+
+/** Round a value down. */
+#define ROUND_DOWN(value, nearest) \
+	__extension__ \
+	({ \
+		typeof(value) __n = value; \
+		if(__n % (nearest)) { \
+			__n -= __n % (nearest); \
+		} \
+		__n; \
+	})
 
 /** Whether to enable debug output. */
 #define LIBKERNEL_DEBUG		1
@@ -64,9 +89,22 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
-extern list_t rtld_loaded_images;
-//extern rtld_image_t application_image;
+extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
+extern rtld_image_t *application_image;
+
+#if LIBKERNEL_DEBUG
+# define dprintf(fmt...)	printf(fmt)
+#else
+# define dprintf(fmt...)	
+#endif
+
+extern status_t rtld_image_relocate(rtld_image_t *image);
+extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep);
+extern void rtld_image_unload(rtld_image_t *image);
+extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp);
+extern void rtld_symbol_init(rtld_image_t *image);
+extern void *rtld_init(process_args_t *args);
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
 extern void libkernel_heap_init(void);

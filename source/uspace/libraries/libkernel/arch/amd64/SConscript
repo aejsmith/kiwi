@@ -14,6 +14,7 @@
 sources = map(File, [
 	'entry.S',
 	'init.c',
+	'rtld.c',
 ])
 
 Return('sources')

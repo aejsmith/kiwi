@@ -23,7 +23,6 @@
 #include <kernel/object.h>
 
 #include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "../libkernel.h"
@@ -31,7 +30,6 @@
 /** Output handle to use (stderr). */
 #define OUTPUT_HANDLE		2
 
-#if LIBKERNEL_DEBUG
 /** Print a character.
  * @param ch		Character to print. */
 static inline void printf_print_char(char ch) {
@@ -144,24 +142,25 @@ static void do_printf(const char *format, va_list args) {
 				ptr = va_arg(args, void *);
 				printf_print_base16((unsigned long)ptr);
 				break;
+			case 'z':
+				continue;
 			}
 			state = 0;
 			break;
 		}
 	}
 }
-#endif
+
 /** Quick and dirty printf()-style function.
  * @note		Does not return the right value.
  * @param format	Format string.
  * @param ...		Format arguments. */
 int printf(const char *format, ...) {
-#if LIBKERNEL_DEBUG
 	va_list args;
 
 	va_start(args, format);
 	do_printf(format, args);
 	va_end(args);
-#endif
+
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,33 +15,30 @@
 
 /**
  * @file
- * @brief		RTLD AMD64 relocation code.
+ * @brief		AMD64 RTLD relocation code.
  */
 
-#include <kernel/errors.h>
-
-#include "../../image.h"
-#include "../../symbol.h"
-#include "../../utility.h"
+#include <string.h>
+#include "../../libkernel.h"
 
 /** Internal part of relocation.
  * @param image		Image to relocate.
  * @param relocs	Relocation table.
  * @param size		Size of relocations.
- * @return		0 on success, negative error code on failure. */
-static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) *relocs, size_t size) {
-	ElfW(Addr) *addr, sym_addr;
+ * @return		Status code describing result of the operation. */
+static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *relocs, size_t size) {
+	elf_addr_t *addr, sym_addr;
 	const char *strtab, *name;
 	int type, symidx, bind;
-	ElfW(Sym) *symtab;
+	elf_sym_t *symtab;
 	size_t i;
 
-	symtab = (ElfW(Sym) *)image->dynamic[ELF_DT_SYMTAB];
+	symtab = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
 	strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
 
-	for(i = 0; i < size / sizeof(ElfW(ELF_REL_TYPE)); i++) {
+	for(i = 0; i < size / sizeof(elf_rela_t); i++) {
 		type   = ELF64_R_TYPE(relocs[i].r_info);
-		addr   = (ElfW(Addr) *)(image->load_base + relocs[i].r_offset);
+		addr   = (elf_addr_t *)(image->load_base + relocs[i].r_offset);
 		symidx = ELF64_R_SYM(relocs[i].r_info);
 		name   = strtab + symtab[symidx].st_name;
 		bind   = ELF_ST_BIND(symtab[symidx].st_info);
@@ -49,8 +46,8 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 
 		if(symidx != 0) {
 			if(!rtld_symbol_lookup(image, name, &sym_addr) && bind != ELF_STB_WEAK) {
-				printf("RTLD: Cannot resolve symbol %s in %s\n", name, image->name);
-				return -ERR_FORMAT_INVAL;
+				printf("rtld: %s: cannot resolve symbol %s\n", image->name, name);
+				return STATUS_MISSING_SYMBOL;
 			}
 		}
 
@@ -69,7 +66,7 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 			*addr = sym_addr + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_RELATIVE:
-			*addr = (ElfW(Addr))image->load_base + relocs[i].r_addend;
+			*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
 			break;
 		case ELF_R_X86_64_COPY:
 			if(sym_addr) {
@@ -77,32 +74,29 @@ static int rtld_image_relocate_internal(rtld_image_t *image, ElfW(ELF_REL_TYPE) 
 			}
 			break;
 		default:
-			dprintf("RTLD: Unhandled relocation type %u for %s!\n", type, image->name);
-			return -ERR_NOT_SUPPORTED;
+			dprintf("rtld: %s: unhandled relocation type %d\n", image->name, type);
+			return STATUS_NOT_SUPPORTED;
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Perform relocations for am image.
  * @param image		Image to relocate.
- * @return		0 on success, negative error code on failure. */
-int rtld_image_relocate(rtld_image_t *image) {
-	ElfW(ELF_REL_TYPE) *relocs;
-	int ret;
+ * @return		Status code describing result of the operation. */
+status_t rtld_image_relocate(rtld_image_t *image) {
+	elf_rela_t *relocs;
+	status_t ret;
 
 	/* First perform RELA relocations. */
-	relocs = (ElfW(ELF_REL_TYPE) *)image->dynamic[ELF_DT_REL_TYPE];
-	if((ret = rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_RELSZ_TYPE])) != 0) {
+	relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
+	ret = rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_RELSZ_TYPE]);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Then PLT relocations. */
-	relocs = (ElfW(ELF_REL_TYPE) *)image->dynamic[ELF_DT_JMPREL];
-	if((ret = rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_PLTRELSZ])) != 0) {
-		return ret;
-	}
-
-	return 0;
+	relocs = (elf_rela_t *)image->dynamic[ELF_DT_JMPREL];
+	return rtld_image_relocate_internal(image, relocs, image->dynamic[ELF_DT_PLTRELSZ]);
 }

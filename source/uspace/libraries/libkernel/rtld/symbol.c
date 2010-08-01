@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,9 +18,8 @@
  * @brief		RTLD symbol functions.
  */
 
-#include "export.h"
-#include "symbol.h"
-#include "utility.h"
+#include <string.h>
+#include "../libkernel.h"
 
 /** Work out the ELF hash for a symbol name.
  * @param name		Name to get hash of.
@@ -44,21 +43,13 @@ static unsigned long rtld_symbol_hash(const unsigned char *name) {
  * @param name		Name of symbol to look up.
  * @param addrp		Where to store address of symbol.
  * @return		True if found, false if not. */
-bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp) {
+bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp) {
 	rtld_image_t *image;
 	unsigned long hash;
 	const char *strtab;
-	ElfW(Sym) *symtab;
+	elf_sym_t *symtab;
 	Elf32_Word i;
 	list_t *iter;
-
-	/* Check if it matches an exported symbol. */
-	for(i = 0; i < RTLD_EXPORT_COUNT; i++) {
-		if(strcmp(rtld_exported_funcs[i].name, name) == 0) {
-			*addrp = (ElfW(Addr))rtld_exported_funcs[i].addr;
-			return true;
-		}
-	}
 
 	hash = rtld_symbol_hash((const unsigned char *)name);
 
@@ -66,7 +57,7 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp
 	 * that requires the symbol. */
 	iter = start->header.next;
 	do {
-		if(iter == &rtld_loaded_images) {
+		if(iter == &loaded_images) {
 			iter = iter->next;
 			continue;
 		}
@@ -79,28 +70,48 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, ElfW(Addr) *addrp
 			continue;
 		}
 
-		symtab = (ElfW(Sym) *)image->dynamic[ELF_DT_SYMTAB];
+		symtab = (elf_sym_t *)image->dynamic[ELF_DT_SYMTAB];
 		strtab = (const char *)image->dynamic[ELF_DT_STRTAB];
 
 		/* Loop through all hash table entries. */
-		for(i = image->h_buckets[hash % image->h_nbucket]; i != ELF_STN_UNDEF; i = image->h_chains[i]) {
+		for(i = image->h_buckets[hash % image->h_nbucket];
+		    i != ELF_STN_UNDEF;
+		    i = image->h_chains[i])
+		{
 			if(symtab[i].st_shndx == ELF_SHN_UNDEF || symtab[i].st_value == 0) {
 				continue;
-			} else if(ELF_ST_TYPE(symtab[i].st_info) > ELF_STT_FUNC && ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_COMMON) {
+			} else if(ELF_ST_TYPE(symtab[i].st_info) > ELF_STT_FUNC &&
+			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_COMMON) {
 				continue;
 			} else if(strcmp(strtab + symtab[i].st_name, name) != 0) {
 				continue;
 			}
 
 			/* Cannot look up non-global symbols. */
-			if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL && ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
+			if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL &&
+			   ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
 				break;
 			}
 
-			*addrp = (ElfW(Addr))image->load_base + symtab[i].st_value;
+			*addrp = (elf_addr_t)image->load_base + symtab[i].st_value;
 			return true;
 		}
 	} while(iter != start->header.next);
 
 	return false;
+}
+
+/** Initialise symbol fields in an image.
+ * @param image		Image to initialise. */
+void rtld_symbol_init(rtld_image_t *image) {
+	Elf32_Word *addr;
+
+	if(image->dynamic[ELF_DT_HASH]) {
+		addr = (Elf32_Word *)image->dynamic[ELF_DT_HASH];
+		image->h_nbucket = *addr++;
+		image->h_nchain  = *addr++;
+		image->h_buckets = addr;
+		addr += image->h_nbucket;
+		image->h_chains = addr;
+	}
 }
