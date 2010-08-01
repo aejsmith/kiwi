@@ -30,6 +30,7 @@
  * @return		Whether an MSDOS partition table was found. */
 bool msdos_partition_probe(disk_t *disk) {
 	msdos_mbr_t *mbr = kmalloc(disk->block_size);
+	msdos_part_t *part;
 	size_t i;
 
 	/* Read in the MBR, which is in the first block on the device. */
@@ -40,16 +41,21 @@ bool msdos_partition_probe(disk_t *disk) {
 
 	/* Loop through all partitions in the table. */
 	for(i = 0; i < ARRAYSZ(mbr->partitions); i++) {
-		if(mbr->partitions[i].type == 0) {
+		part = &mbr->partitions[i];
+		if(part->type == 0 || (part->bootable != 0 && part->bootable != 0x80)) {
+			continue;
+		} else if(part->start_lba >= disk->blocks) {
+			continue;
+		} else if(part->start_lba + part->num_sects > disk->blocks) {
 			continue;
 		}
 
 		dprintf("disk: found MSDOS partition %d on device %s\n", i, disk->name);
-		dprintf(" type:      0x%x\n", mbr->partitions[i].type);
-		dprintf(" start_lba: %u\n", mbr->partitions[i].start_lba);
-		dprintf(" num_sects: %u\n", mbr->partitions[i].num_sects);
+		dprintf(" type:      0x%x\n", part->type);
+		dprintf(" start_lba: %u\n", part->start_lba);
+		dprintf(" num_sects: %u\n", part->num_sects);
 
-		disk_partition_add(disk, i, mbr->partitions[i].start_lba, mbr->partitions[i].num_sects);
+		disk_partition_add(disk, i, part->start_lba, part->num_sects);
 	}
 
 	kfree(mbr);

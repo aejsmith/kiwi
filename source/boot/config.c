@@ -492,12 +492,13 @@ static bool config_load(fs_mount_t *mount, const char *path) {
 	}
 
 	size = fs_file_size(handle);
-	buf = kmalloc(size);
+	buf = kmalloc(size + 1);
 	if(!fs_file_read(handle, buf, size, 0)) {
 		kfree(buf);
 		fs_close(handle);
 		return false;
 	}
+	buf[size] = 0;
 
 	ret = config_load_internal(path, buf);
 	kfree(buf);

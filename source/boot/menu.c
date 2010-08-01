@@ -156,15 +156,29 @@ static input_result_t menu_entry_configure(ui_entry_t *_entry) {
 	return INPUT_RENDER;
 }
 
+/** Show a debug log window.
+ * @param _entry	Entry that was selected.
+ * @return		Always returns INPUT_RENDER. */
+static input_result_t menu_entry_debug(ui_entry_t *_entry) {
+	ui_window_t *window;
+
+	/* Create the debug log window. */
+	window = ui_textview_create("Debug Log", debug_log);
+	ui_window_display(window, 0);
+	return INPUT_RENDER;
+}
+
 /** Actions for a menu entry. */
 static ui_action_t menu_entry_actions[] = {
 	{ "Boot", '\n', menu_entry_select },
+	{ "Debug Log", CONSOLE_KEY_F2, menu_entry_debug },
 };
 
 /** Actions for a configurable menu entry. */
 static ui_action_t configurable_menu_entry_actions[] = {
 	{ "Boot", '\n', menu_entry_select },
 	{ "Configure", CONSOLE_KEY_F1, menu_entry_configure },
+	{ "Debug Log", CONSOLE_KEY_F2, menu_entry_debug },
 };
 
 /** Render a menu entry.
