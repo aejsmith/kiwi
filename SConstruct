@@ -246,6 +246,10 @@ class EnvironmentManager(dict):
 		env['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
 		env['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
 
+		# If doing a debug build, set -fno-omit-frame-pointer.
+		if config['DEBUG']:
+			env['CCFLAGS'] += ['-fno-omit-frame-pointer']
+
 		# Set paths to toolchain components.
 		def ToolPath(name):
 			return os.path.join(
