@@ -180,9 +180,3 @@ Depends('kernel', ['kernel.lst', 'kernel.rde', 'kernel.sym'])
 
 # Let the distribution environment know where the kernel is.
 envmgr['dist']['KERNEL'] = File('kernel')
-
-###########
-# Modules #
-###########
-
-#SConscript(dirs=['modules'])

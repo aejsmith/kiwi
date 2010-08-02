@@ -13,7 +13,7 @@
 
 Import('envmgr')
 
-SConscript(dirs=['boot', 'kernel'])
+SConscript(dirs=['boot', 'kernel', 'modules'])
 
 # Build libkernel using the userspace environment.
 env = envmgr['uspace']

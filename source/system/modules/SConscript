@@ -13,6 +13,7 @@
 
 #subdirs = ['fs', 'platform']
 subdirs = ['platform']
+
 #############################
 # Build environment set-up. #
 #############################
@@ -26,20 +27,18 @@ env = envmgr.Clone('module', 'kernel', {
 	'LINKFLAGS': ['-r'],
 })
 
-# Not sure if this is the right way to do this (add any modules to the module
-# list in the environment), but an emitter seems to work...
+# Add a builder to create kernel modules. The emitter adds all modules to the
+# distribution environment's module list.
 def module_emitter(target, source, env):
-	env['MODULES'].append(target[0])
+	envmgr['dist']['MODULES'].append(target[0])
 	return target, source
 env['BUILDERS']['Module'] = Builder(
 	action=Action('$LINKCOM && $STRIP --strip-debug $TARGET', '$LINKCOMSTR'),
 	suffix='.km',
 	src_suffix='$OBJSUFFIX',
 	src_builder='Object',
-	emitter=module_emitter)
+	emitter=module_emitter
+)
 
 # Get all of the modules and include directories into the array.
 SConscript(dirs=subdirs, exports=['env'])
-
-# Let the distribution environment know where the modules are.
-envmgr['dist']['MODULES'] = env['MODULES']

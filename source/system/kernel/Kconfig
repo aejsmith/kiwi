@@ -162,7 +162,7 @@ config IPC_DEBUG
 endmenu
 #######
 
-source "source/system/kernel/modules/Kconfig"
+source "source/system/modules/Kconfig"
 
 #######
 endmenu
