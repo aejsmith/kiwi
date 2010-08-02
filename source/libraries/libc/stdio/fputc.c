@@ -20,11 +20,11 @@
 
 #include <kernel/device.h>
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../libsystem.h"
 #include "stdio_priv.h"
 
 /** Write character to a stream.
@@ -42,7 +42,7 @@ int fputc(int ch, FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_file_write(stream->handle, &val, 1, &bytes) != 0) {
+		if(fs_file_write(stream->handle, &val, 1, &bytes) != STATUS_SUCCESS) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
@@ -51,7 +51,7 @@ int fputc(int ch, FILE *stream) {
 		}
 		break;
 	case STREAM_TYPE_DEVICE:
-		if(device_write(stream->handle, &val, 1, 0, &bytes) != 0) {
+		if(device_write(stream->handle, &val, 1, 0, &bytes) != STATUS_SUCCESS) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {

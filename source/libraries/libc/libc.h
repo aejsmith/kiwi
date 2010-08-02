@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,26 +15,32 @@
 
 /**
  * @file
- * @brief		Internal libsystem functions.
+ * @brief		Internal C library functions.
  */
 
-#ifndef __LIBSYSTEM_H
-#define __LIBSYSTEM_H
+#ifndef __LIBC_H
+#define __LIBC_H
 
-#include <kernel/process.h>
+/** Compiler attribute/builtin macros. */
+#define __hidden		__attribute__((visibility("hidden")))
+#define __noreturn		__attribute__((noreturn))
+#define likely(x)		__builtin_expect(!!(x), 1)
+#define unlikely(x)		__builtin_expect(!!(x), 0)
 
 #define __need_size_t
 #define __need_NULL
 #include <stddef.h>
 
-extern char **environ;
-extern const char *__libsystem_error_list[];
-extern size_t __libsystem_error_size;
+struct process_args;
 
-extern void __libsystem_init(process_args_t *args);
-extern void __libsystem_fatal(const char *fmt, ...) __attribute__((noreturn));
-extern void __libsystem_stub(const char *name) __attribute__((noreturn));
+extern char **environ;
+extern const char *__libc_error_list[];
+extern size_t __libc_error_size;
+
+extern void __libc_init(struct process_args *args);
+extern void __libc_fatal(const char *fmt, ...) __noreturn __hidden;
+extern void __libc_stub(const char *name) __noreturn __hidden;
 
 extern int main(int argc, char **argv, char **envp);
 
-#endif /* __LIBSYSTEM_H */
+#endif /* __LIBC_H */

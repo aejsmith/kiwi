@@ -19,8 +19,8 @@
  */
 
 #include <kernel/device.h>
-#include <kernel/errors.h>
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -32,8 +32,9 @@
 /** Internal part of fopen() and freopen() for files.
  * @param path		Path to open.
  * @param mode		Mode string.
- * @return		Handle on success, -1 on failure. */
-static handle_t fopen_file_internal(const char *path, const char *mode) {
+ * @param handlep	Where to store handle to file.
+ * @return		Status code describing result of the operation. */
+static status_t fopen_file_internal(const char *path, const char *mode, handle_t *handlep) {
 	int flags;
 
 	if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
@@ -52,11 +53,11 @@ static handle_t fopen_file_internal(const char *path, const char *mode) {
 	} else if(strcmp(mode, "a+") == 0 || strcmp(mode, "a+b") == 0 || strcmp(mode, "ab+") == 0) {
 		flags = FS_FILE_READ | FS_FILE_WRITE | FS_FILE_APPEND;
 	} else {
-		errno = ERR_PARAM_INVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
-	return fs_file_open(path, flags);
+	return fs_file_open(path, flags, handlep);
 }
 
 /** Open file stream.
@@ -86,9 +87,12 @@ static handle_t fopen_file_internal(const char *path, const char *mode) {
 FILE *fopen(const char *path, const char *mode) {
 	FILE *stream;
 
-	if(!(stream = malloc(sizeof(FILE)))) {
+	stream = malloc(sizeof(FILE));
+	if(!stream) {
 		return NULL;
-	} else if((stream->handle = fopen_file_internal(path, mode)) < 0) {
+	}
+
+	if(fopen_file_internal(path, mode, &stream->handle) != STATUS_SUCCESS) {
 		free(stream);
 		return NULL;
 	}
@@ -131,7 +135,7 @@ FILE *fopen(const char *path, const char *mode) {
 FILE *freopen(const char *path, const char *mode, FILE *stream) {
 	handle_t handle;
 
-	if((handle = fopen_file_internal(path, mode)) < 0) {
+	if(fopen_file_internal(path, mode, &handle) != STATUS_SUCCESS) {
 		return NULL;
 	} else if(fclose_internal(stream) != 0) {
 		handle_close(handle);
@@ -157,12 +161,15 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 	/* Check if the handle can be used. */
 	type = object_type(handle);
 	if(type != OBJECT_TYPE_FILE && type != OBJECT_TYPE_DEVICE) {
-		errno = ERR_NOT_SUPPORTED;
+		errno = ENOTSUP;
 		return NULL;
 	}
 
-	if(!stream && !(stream = malloc(sizeof(FILE)))) {
-		return NULL;
+	if(!stream) {
+		stream = malloc(sizeof(FILE));
+		if(!stream) {
+			return NULL;
+		}
 	}
 
 	stream->type = (type == OBJECT_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : STREAM_TYPE_FILE;
@@ -181,11 +188,14 @@ FILE *fopen_handle(handle_t handle, FILE *stream) {
 FILE *fopen_device(const char *path, FILE *stream) {
 	handle_t handle;
 
-	if((handle = device_open(path)) < 0) {
+	if(device_open(path, &handle) != STATUS_SUCCESS) {
 		return NULL;
-	} else if(!stream && !(stream = malloc(sizeof(FILE)))) {
-		handle_close(handle);
-		return NULL;
+	} else if(!stream) {
+		stream = malloc(sizeof(FILE));
+		if(!stream) {
+			handle_close(handle);
+			return NULL;
+		}
 	}
 
 	stream->type = STREAM_TYPE_DEVICE;

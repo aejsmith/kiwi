@@ -14,11 +14,18 @@
 Import('config', 'envmgr')
 import tarfile, glob, os, tempfile, shutil, sys
 
-# Generate the configuration header. This is a little bit of a hack to get
-# the header updated no matter what.
-target = envmgr['host'].ConfigHeader('config.h', ['../../Kconfig'])
-AlwaysBuild(target)
-BUILD_TARGETS.insert(0, target[0])
+# Generate the configuration header. We don't generate with Kconfig because its
+# too much of a pain to get SCons to do it properly.
+f = open('config.h', 'w')
+f.write('/* This file is automatically-generated, do not edit. */\n\n')
+for (k, v) in config.items():
+	if isinstance(v, str):
+		f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
+	elif isinstance(v, bool) or isinstance(v, int):
+		f.write("#define CONFIG_%s %d\n" % (k, int(v)))
+	else:
+		raise Exception, "Unsupported type %s in config" % (type(v))
+f.close()
 
 # Create the distribution environment.
 dist = envmgr.Create('dist', {

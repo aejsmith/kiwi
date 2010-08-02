@@ -48,7 +48,7 @@
 				cp += 2; \
 			} \
 		} else if(base != 10) { \
-			errno = ERR_PARAM_INVAL; \
+			errno = EINVAL; \
 			return max; \
 		} \
 		while(isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : tolower(*cp) - 'a' + 10) < (unsigned int)base) { \

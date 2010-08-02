@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Userspace application startup code.
+ * @brief		C library startup code.
  */
 
 #include <kernel/process.h>
@@ -24,23 +24,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libsystem.h"
+#include "libc.h"
 #include "stdio/stdio_priv.h"
 
 /** Preallocated file structures to use for standard I/O. */
-FILE __stdin, __stdout, __stderr;
+static FILE __stdin, __stdout, __stderr;
 
 /** Standard input/output streams. */
 FILE *stdin = &__stdin;
 FILE *stdout = &__stdout;
 FILE *stderr = &__stderr;
 
-/** Userspace application initialisation function.
+/** C library initialisation function.
  * @param args		Process arguments structure. */
-void __libsystem_init(process_args_t *args) {
-	/* We're loaded, unblock any process_create() calls waiting on us. */
-	process_loaded();
-	
+void __libc_init(process_args_t *args) {
 	/* Save the environment pointer. */
 	environ = args->env;
 

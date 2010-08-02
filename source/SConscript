@@ -11,4 +11,53 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-SConscript(dirs=['system', 'libraries'])
+Import('envmgr', 'config')
+
+dist = envmgr['dist']
+
+# Set up the userspace build environment.
+env = envmgr.Create('uspace', {
+	'CPPPATH': [Dir('include')],
+	'LIBPATH': [Dir('libraries')],
+	'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+	'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
+	'CXXFLAGS': ['-std=c++0x'],
+	'LIBOUTDIR': Dir('libraries')
+})
+
+# Set up a shared library emitter to modify the target path so that libraries
+# are placed in the correct location, add the library to the libraries array,
+# and set dependencies on default libraries.
+def shlib_emitter(target, source, env):
+	target[0] = File('%s/%s' % (str(env['LIBOUTDIR']), str(target[0])))
+	dist['LIBRARIES'].append(target[0])
+	if target[0].name != 'libkernel.so':
+		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+		Depends(target[0], env['LIBOUTDIR'].File('libkernel.so'))
+		if target[0].name != 'libc.so':
+			Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+	return target, source
+env.Append(SHLIBEMITTER=[shlib_emitter])
+
+# Set up a program emitter to add binaries to the binaries array and set
+# up library dependencies for compiler default libraries.
+def program_emitter(target, source, env):
+	# Yay hax.
+	if target[0].get_dir().get_dir().name == 'services':
+		dist['SERVICES'].append(target[0])
+	else:
+		dist['BINARIES'].append(target[0])
+	Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+	if env['SMARTLINK'](source, target, env, None) == '$CXX':
+		Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
+	return target, source
+env.Append(PROGEMITTER=[program_emitter])
+
+# Add an action for ASM files in a shared library.
+from SCons.Tool import createObjBuilders
+static_obj, shared_obj = createObjBuilders(env)
+shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
+
+# Visit subdirectories.
+SConscript(dirs=['system'])
+SConscript(dirs=['libraries'], exports=['env'])

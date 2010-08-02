@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,21 +15,21 @@
 
 /**
  * @file
- * @brief		Fatal error function.
+ * @brief		C library fatal error functions.
  */
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libsystem.h"
+#include "libc.h"
 #include "stdio/stdio_priv.h"
 
-/** Helper for __libsystem_fatal().
+/** Helper for __libc_fatal().
  * @param ch		Character to print.
  * @param data		Pointer to file stream.
  * @param total		Pointer to total character count. */
-static void __libsystem_fatal_helper(char ch, void *data, int *total) {
+static void __libc_fatal_helper(char ch, void *data, int *total) {
 	if(data) {
 		fputc(ch, (FILE *)data);
 	}
@@ -40,15 +40,15 @@ static void __libsystem_fatal_helper(char ch, void *data, int *total) {
 /** Print out a fatal error and terminate the process.
  * @param fmt		Format string.
  * @param ...		Arguments to substitute into format. */
-void __libsystem_fatal(const char *fmt, ...) {
+void __libc_fatal(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
-	do_printf(__libsystem_fatal_helper, stderr, "*** libsystem fatal: ", args);
+	do_printf(__libc_fatal_helper, stderr, "*** libc fatal: ", args);
 	va_end(args);
 
 	va_start(args, fmt);
-	do_printf(__libsystem_fatal_helper, stderr, fmt, args);
+	do_printf(__libc_fatal_helper, stderr, fmt, args);
 	va_end(args);
 
 	if(stderr) {
@@ -60,8 +60,8 @@ void __libsystem_fatal(const char *fmt, ...) {
 
 /** Print out a fatal error for a stub function being called.
  * @param name		Name of function. */
-void __libsystem_stub(const char *name) {
-	__libsystem_fatal("unimplemented function: %s", name);
+void __libc_stub(const char *name) {
+	__libc_fatal("unimplemented function: %s", name);
 }
 
 /** Print out an assertion fail message.

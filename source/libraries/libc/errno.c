@@ -15,18 +15,18 @@
 
 /**
  * @file
- * @brief		Error string function.
+ * @brief		Error numbers.
+ *
+ * @todo		Make this thread-local.
  */
 
-#include <string.h>
-#include "../libsystem.h"
+#include <errno.h>
+#undef errno
 
-/** Get string representation of an error number.
- * @param err		Error number.
- * @return		Pointer to string (should NOT be modified). */
-char *strerror(int err) {
-	if((size_t)err >= __libsystem_error_size || __libsystem_error_list[err] == NULL) {
-		return (char *)"Unknown error";
-	}
-	return (char *)__libsystem_error_list[err];
+static int __libc_errno;
+
+/** Get the location of errno.
+ * @return		Pointer to errno. */
+int *__libc_errno_location(void) {
+	return &__libc_errno;
 }

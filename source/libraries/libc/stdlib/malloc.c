@@ -1,9 +1,10 @@
+#include <kernel/status.h>
 #include <kernel/vm.h>
 
 #include <errno.h>
 #include <stddef.h>
 
-#include "../libsystem.h"
+#include "../libc.h"
 
 #define LACKS_SYS_PARAM_H
 #define LACKS_SYS_MMAN_H
@@ -19,11 +20,11 @@
 #define NO_MALLINFO			1
 
 /* Misc macro defines. */
-#define ABORT				__libsystem_fatal("dlmalloc abort");
+#define ABORT				__libc_fatal("dlmalloc abort");
 #define USAGE_ERROR_ACTION(m, p)	\
-	__libsystem_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
-                          __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
-#define MALLOC_FAILURE_ACTION		errno = ERR_NO_MEMORY;
+	__libc_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
+                     __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
+#define MALLOC_FAILURE_ACTION		errno = ENOMEM;
 #define malloc_getpagesize		((size_t)0x1000)
 
 /** Temporary. */
@@ -31,11 +32,11 @@
 
 /** Wrapper for allocations. */
 static inline void *mmap_wrapper(size_t size) {
+	status_t ret;
 	void *addr;
-	int ret;
 
 	ret = vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &addr);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		return (void *)-1;
 	}
 

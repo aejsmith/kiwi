@@ -23,9 +23,9 @@ env.Command(target, source,
             Action('$CC $SHLINKFLAGS -o $TARGET -Wl,--whole-archive $SOURCE -Wl,--no-whole-archive -lm',
                    '$SHLINKCOMSTR'))
 
-# Depend on libm and libsystem.
+# Depend on libm and libc.
 Depends(target, env['LIBOUTDIR'].File('libm.so'))
-Depends(target, env['LIBOUTDIR'].File('libsystem.so'))
+Depends(target, env['LIBOUTDIR'].File('libc.so'))
 
 # Add the library to the libraries array.
 envmgr['dist']['LIBRARIES'].append(target)

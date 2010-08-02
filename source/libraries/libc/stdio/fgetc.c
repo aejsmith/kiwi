@@ -20,6 +20,7 @@
 
 #include <kernel/device.h>
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +46,7 @@ int fgetc(FILE *stream) {
 
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_file_read(stream->handle, &ch, 1, &bytes) != 0) {
+		if(fs_file_read(stream->handle, &ch, 1, &bytes) != STATUS_SUCCESS) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {
@@ -54,7 +55,7 @@ int fgetc(FILE *stream) {
 		}
 		break;
 	case STREAM_TYPE_DEVICE:
-		if(device_read(stream->handle, &ch, 1, 0, &bytes) != 0) {
+		if(device_read(stream->handle, &ch, 1, 0, &bytes) != STATUS_SUCCESS) {
 			stream->err = true;
 			return EOF;
 		} else if(bytes != 1) {

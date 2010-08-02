@@ -19,6 +19,7 @@
  */
 
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -39,7 +40,7 @@
 int fseek(FILE *stream, long off, int act) {
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
-		if(fs_handle_seek(stream->handle, act, (offset_t)off, NULL) != 0) {
+		if(fs_handle_seek(stream->handle, act, (offset_t)off, NULL) != STATUS_SUCCESS) {
 			return -1;
 		}
 		return 0;

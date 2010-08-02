@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -22,7 +22,7 @@
 #include <locale.h>
 
 /** Structure defining the C locale. */
-static const struct lconv __libsystem_locale = {
+static const struct lconv __libc_locale = {
 	.currency_symbol = (char *)"",
 	.decimal_point = (char *)".",
 	.frac_digits = CHAR_MAX,
@@ -56,5 +56,5 @@ static const struct lconv __libsystem_locale = {
  * @return		Pointer to locale information structure.
  */
 struct lconv *localeconv(void) {
-	return (struct lconv *)&__libsystem_locale;
+	return (struct lconv *)&__libc_locale;
 }

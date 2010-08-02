@@ -18,6 +18,8 @@
  * @brief		File close function.
  */
 
+#include <kernel/status.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -30,7 +32,7 @@ int fclose_internal(FILE *stream) {
 	switch(stream->type) {
 	case STREAM_TYPE_FILE:
 	case STREAM_TYPE_DEVICE:
-		if(handle_close(stream->handle) != 0) {
+		if(handle_close(stream->handle) != STATUS_SUCCESS) {
 			return EOF;
 		}
 		break;

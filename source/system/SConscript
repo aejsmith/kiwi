@@ -11,4 +11,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
+Import('envmgr')
+
 SConscript(dirs=['boot', 'kernel'])
+
+# Build libkernel using the userspace environment.
+env = envmgr['uspace']
+SConscript(dirs=['libkernel'], exports=['env'])

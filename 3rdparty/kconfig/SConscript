@@ -39,7 +39,7 @@ def lxdialog_ccflags():
 # Build the menu configuration utility.
 env['MCONF'] = env.Program('mconf', [
 	'mconf.c',
-	'zconf.tab.o',
+	'zconf.tab.c',
 	'lxdialog/checklist.c',
 	'lxdialog/util.c',
 	'lxdialog/inputbox.c',
@@ -48,12 +48,5 @@ env['MCONF'] = env.Program('mconf', [
 	'lxdialog/menubox.c',
 ], CCFLAGS=lxdialog_ccflags(), LIBS=lxdialog_libs())
 
-# Build the menu configuration utility.
-env['KCONFIG'] = env.Program('conf', [
-	'conf.c',
-	'zconf.tab.c',
-])
-
-# Add a config menu builders.
+# Add a config menu builder.
 envmgr.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))
-envmgr.AddTool('ConfigHeader', env['KCONFIG'], Action('KCONFIG_AUTOHEADER=$TARGET $KCONFIG -s $SOURCE', None))

@@ -31,10 +31,6 @@ sources = map(File, [
 	'ctype/tolower.c',
 	'ctype/toupper.c',
 
-	'kernel/device.c',
-	'kernel/syscalls.S',
-	'kernel/vm.c',
-
 	'locale/localeconv.c',
 	'locale/setlocale.c',
 
@@ -100,21 +96,17 @@ sources = map(File, [
 	'error_list.c',
 	'fatal.c',
 	'init.c',
-	'rtld.c',
 ])
-
-# Generate the system call functions.
-env.Sysgen('kernel/syscalls.S', 'kernel/syscalls.def')
 
 # Generate the error string list.
 env.Command(
 	'error_list.c',
-	['../../include/kernel/errors.h'],
-	Action('$GENERRLIST $SOURCE __libsystem_error_list __libsystem_error_size > $TARGET', '$GENCOMSTR')
+	['../../include/errno.h'],
+	Action('$GENERRLIST $SOURCE __libc_error_list __libc_error_size > $TARGET', '$GENCOMSTR')
 )
 
 # Get a list of architecture-specific source files.
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 
 # Build the library from this.
-env.SharedLibrary('system', arch_sources + sources, LINKFLAGS='-nodefaultlibs')
+env.SharedLibrary('c', arch_sources + sources, LINKFLAGS='-nodefaultlibs', LIBS=['kernel'])

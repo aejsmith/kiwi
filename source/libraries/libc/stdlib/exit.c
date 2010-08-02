@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -22,11 +22,11 @@
 
 #include <kernel/process.h>
 
+#include <list.h>
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "../libsystem.h"
-#include "../list.h"
+#include "../libc.h"
 
 extern void *__dso_handle __attribute__((__weak__));
 
@@ -72,7 +72,7 @@ static atexit_func_t *__atexit_alloc(void) {
 
 	if(__atexit_free_count) {
 		if(list_empty(&__atexit_free_funcs)) {
-			__libsystem_fatal("atexit data is corrupted");
+			__libc_fatal("atexit data is corrupted");
 		}
 
 		func = list_entry(__atexit_free_funcs.next, atexit_func_t, header);

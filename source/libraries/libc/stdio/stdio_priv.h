@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -28,6 +28,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "../libc.h"
+
 /** Internal structure of an I/O stream (FILE). */
 struct __fstream_internal {
 	/** Stream type. */
@@ -53,11 +55,11 @@ struct scanf_args {
 /** Type for a do_printf() helper function. */
 typedef void (*printf_helper_t)(char, void *, int *);
 
-extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args);
-extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args);
+extern int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args) __hidden;
+extern int do_scanf(struct scanf_args *data, const char *fmt, va_list args) __hidden;
 
-extern int fclose_internal(FILE *stream);
-extern FILE *fopen_handle(handle_t handle, FILE *stream);
-extern FILE *fopen_device(const char *path, FILE *stream);
+extern int fclose_internal(FILE *stream) __hidden;
+extern FILE *fopen_handle(handle_t handle, FILE *stream) __hidden;
+extern FILE *fopen_device(const char *path, FILE *stream) __hidden;
 
 #endif /* __STDIO_PRIV_H */

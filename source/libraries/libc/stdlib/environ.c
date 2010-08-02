@@ -25,13 +25,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../libsystem.h"
+#include "../libc.h"
 
 /** Pointer to the environment variable array. */
 char **environ;
 
 /** Whether the environment array has been allocated. */
-static bool __libsystem_environ_alloced = false;
+static bool __libc_environ_alloced = false;
 
 /** Reallocate the contents of the environment if necessary.
  * @return		Whether succesful. */
@@ -42,7 +42,7 @@ static bool ensure_environ_alloced(void) {
 	/* If not previously allocated, the environment is still on the stack
 	 * so we cannot modify it. Duplicate it and point environ to the
 	 * new location. */
-	if(!__libsystem_environ_alloced) {
+	if(!__libc_environ_alloced) {
 		/* Get a count of what to copy. */
 		for(count = 0; environ[count] != NULL; count++);
 
@@ -53,7 +53,7 @@ static bool ensure_environ_alloced(void) {
 
 		memcpy(new, environ, (count + 1) * sizeof(char *));
 		environ = new;
-		__libsystem_environ_alloced = true;
+		__libc_environ_alloced = true;
 	}
 
 	return true;
@@ -81,7 +81,7 @@ char *getenv(const char *name) {
 		val = strchr(key, '=');
 
 		if(val == NULL) {
-			__libsystem_fatal("value '%s' found in environment without an =", key);
+			__libc_fatal("value '%s' found in environment without an =", key);
 		}
 
 		len = strlen(name);
@@ -110,10 +110,10 @@ int putenv(char *str) {
 	char **new;
 
 	if(!str || strchr(str, '=') == NULL) {
-		errno = ERR_PARAM_INVAL;
+		errno = EINVAL;
 		return -1;
 	} else if((len = strchr(str, '=') - str) == 0) {
-		errno = ERR_PARAM_INVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -164,7 +164,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 	size_t count, len;
 
 	if(!name || name[0] == 0 || strchr(name, '=') != NULL) {
-		errno = ERR_PARAM_INVAL;
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -205,7 +205,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 			return 0;
 		}
 
-		__libsystem_fatal("shouldn't get here in setenv");
+		__libc_fatal("shouldn't get here in setenv");
 	}
 
 	/* Fill out the new entry. */

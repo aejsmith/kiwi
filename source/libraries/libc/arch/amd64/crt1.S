@@ -15,18 +15,23 @@
 
 /**
  * @file
- * @brief		Error numbers.
- *
- * @todo		Make this thread-local.
+ * @brief		AMD64 application startup code.
  */
 
-#include <errno.h>
-#undef errno
+.section .text
 
-static int __libsystem_errno;
+/** Main program entry point. */
+.global _start
+.type _start, @function
+_start:
+	/* Call the real C library initialisation function. The libkernel
+	 * initialisation code calls us with a pointer to the process argument
+	 * block as the first argument, so this will be passed through. */
+	callq	__libc_init
 
-/** Get the location of errno.
- * @return		Pointer to errno. */
-int *__libsystem_errno_location(void) {
-	return &__libsystem_errno;
-}
+	/* If we got here then something has broken (we should have exited).
+	 * Die horribly. */
+	movq	$0xDEADBEEF, %rax
+	ud2a
+1:	jmp	1b
+.size _start, .-_start
