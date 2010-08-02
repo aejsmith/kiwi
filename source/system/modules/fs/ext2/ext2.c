@@ -330,8 +330,8 @@ static fs_node_ops_t ext2_node_ops = {
  * @note		Mount should be write locked.
  * @param mount         Mount to flush. */
 void ext2_mount_flush(ext2_mount_t *mount) {
+	status_t ret;
 	size_t bytes;
-	int ret;
 
 	assert(!(mount->parent->flags & FS_MOUNT_RDONLY));
 

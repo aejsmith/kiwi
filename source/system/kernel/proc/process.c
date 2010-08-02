@@ -935,7 +935,7 @@ void sys_process_exit(int status) {
 void sys_process_loaded(void) {
 	mutex_lock(&curr_proc->lock);
 	if(curr_proc->create) {
-		curr_proc->create->status = 0;
+		curr_proc->create->status = STATUS_SUCCESS;
 		semaphore_up(&curr_proc->create->sem, 1);
 		curr_proc->create = NULL;
 	}
