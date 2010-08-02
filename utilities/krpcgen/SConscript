@@ -14,7 +14,8 @@
 import os.path
 Import('env', 'envmgr')
 
-envmgr.base['KRPCGEN'] = env.Program('krpcgen', [
+# Add krpcgen to the build environments.
+envmgr.AddVariable('KRPCGEN', env.Program('krpcgen', [
 	'CXXCodeGen.cc',
 	'Function.cc',
 	'Service.cc',
@@ -22,7 +23,7 @@ envmgr.base['KRPCGEN'] = env.Program('krpcgen', [
 	'parser.y',
 	'lexer.l',
 	'main.cc',
-], CXXFLAGS=env['CXXFLAGS'] + env['CCFLAGS'], CCFLAGS=[], CFLAGS=[])
+]))
 
 # Add builders to generate RPC server/client code.
 def rpc_emitter(target, source, env):
@@ -30,11 +31,11 @@ def rpc_emitter(target, source, env):
 	env.Depends(target[0], env['KRPCGEN'])
 	env.Depends(target[1], env['KRPCGEN'])
 	return target, source
-envmgr.base['BUILDERS']['RPCServer'] = Builder(
+envmgr.AddBuilder('RPCServer', Builder(
 	action=Action('$KRPCGEN -s $TARGET $SOURCE', '$GENCOMSTR'),
 	emitter=rpc_emitter
-)
-envmgr.base['BUILDERS']['RPCClient'] = Builder(
+))
+envmgr.AddBuilder('RPCClient', Builder(
 	action=Action('$KRPCGEN -c $TARGET $SOURCE', '$GENCOMSTR'),
 	emitter=rpc_emitter
-)
+))

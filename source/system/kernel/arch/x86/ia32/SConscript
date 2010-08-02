@@ -26,7 +26,7 @@ sources = map(File, [
 
 # Set IA32-specific compilation flags.
 env['ASFLAGS'] += ['-m32']
-env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer', '-march=i686']
+env['CCFLAGS'] += ['-m32', '-fno-omit-frame-pointer']
 env['LINKFLAGS'] += ['-Wl,-b,elf32-i386', '-Wl,-m,elf_i386']
 
 # Need to link with libgcc, and force some symbols to be linked in for modules.

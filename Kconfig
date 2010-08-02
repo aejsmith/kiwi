@@ -1,0 +1,135 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+mainmenu "Kiwi Configuration"
+
+config KERNELVERSION
+        string
+	option env="KERNELVERSION"
+
+####################
+menu "Build options"
+####################
+
+config TOOLCHAIN_DIR
+	string "Toolchain directory"
+	default "/please/change/me"
+	help
+	  Path to directory to store toolchain downloads and builds in.
+
+config TOOLCHAIN_MAKE_JOBS
+	int "Toolchain parallel build jobs"
+	default 1
+	help
+	  Argument to pass to -j for make when building the toolchain.
+
+config USE_CLANG
+	bool "Build kernel with clang"
+	default n
+	help
+	  Whether to build the kernel and modules with clang.
+
+config EXTRA_CCFLAGS
+	string "Extra CCFLAGS"
+	default "-O2"
+	default "-O2 -march=i686" if ARCH_IA32
+	help
+	  Extra compiler options for both C and C++ code.
+
+config EXTRA_CFLAGS
+	string "Extra CFLAGS"
+	default ""
+	help
+	  Extra compiler options for C code.
+
+config EXTRA_CXXFLAGS
+	string "Extra CXXFLAGS"
+	default ""
+	help
+	  Extra compiler options for C++ code.
+
+config QEMU_BINARY
+	string "QEMU binary"
+	default "qemu"
+	help
+	  Path to the QEMU binary to use for the qtest build target.
+
+config QEMU_OPTS
+	string "Extra QEMU options"
+	default "-serial stdio -vga std -s"
+	help
+	  Extra options to pass to QEMU.
+
+config EXTRA_FSIMAGE
+	string "Extra filesystem image contents"
+	default ""
+	help
+	  Path to a directory containing extra files to copy in to the generated
+	  filesystem image.
+
+#######
+endmenu
+#######
+
+comment "Target system selection"
+
+choice
+	prompt "Architecture"
+	default ARCH_X86
+
+config ARCH_AMD64
+	bool "AMD64"
+	help
+	  Target the built system to 64-bit x86 processors.
+
+config ARCH_IA32
+	bool "IA32"
+	help
+	  Target the built system to 32-bit x86 processors.
+
+endchoice
+
+config ARCH
+        string
+        default "amd64" if ARCH_AMD64
+        default "ia32" if ARCH_IA32
+
+choice
+	prompt "Platform"
+	default PLATFORM_PC if ARCH_AMD64 || ARCH_X86
+
+config PLATFORM_PC
+	bool "Standard PC"
+	help
+	  Target the built system to standard PCs (nearly all x86 computers).
+
+endchoice
+
+config PLATFORM
+        string
+        default "pc" if PLATFORM_PC
+
+comment "System configuration"
+
+config DEBUG
+	bool "Debug build"
+	default y
+	help
+	  Enable various sections of debugging code and extra checks. For the
+	  kernel, this enables assertions and messages with the LOG_DEBUG log
+	  level. It also disables the boot splash screen by default. The built
+	  system will generally be slower, so don't enable it unless you are
+	  doing kernel development or have another reason to.
+
+source "source/system/kernel/Kconfig"
+source "source/drivers/Kconfig"

@@ -19,13 +19,12 @@ sources = map(File, [
 	'ap_boot.S',
 	'arch.c',
 	'cpu.c',
-	#'enter.S',
 	'except.S',
 	'idt.c',
 ])
 
 # Set build flags.
-env['CCFLAGS'] += ['-m32', '-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow', '-march=i686']
+env['CCFLAGS'] += ['-m32', '-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
 env['ASFLAGS'] += ['-m32']
 env['LINKFLAGS'] += ['-m32']
 env['LIBS'] = ['gcc']

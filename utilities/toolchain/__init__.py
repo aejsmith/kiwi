@@ -46,8 +46,8 @@ class ToolchainManager:
 		self.remove('%s/%s/lib' % (self.destdir, self.target))
 
 		# Link into the source tree.
-		os.symlink('%s/source/uspace/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
-		os.symlink('%s/build/%s-%s/source/uspace/libraries' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
+		os.symlink('%s/source/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
+		os.symlink('%s/build/%s-%s/source/libraries' % (os.getcwd(), self.config['ARCH'], self.config['PLATFORM']),
 		           '%s/%s/lib' % (self.destdir, self.target))
 
 	# Remove a file, symbolic link or directory tree.
@@ -101,7 +101,7 @@ class ToolchainManager:
 		# Create new destination directory, and set up the include link
 		# into the source tree.
 		os.makedirs('%s/%s' % (self.destdir, self.target))
-		os.symlink('%s/source/uspace/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
+		os.symlink('%s/source/include' % (os.getcwd()), '%s/%s/sys-include' % (self.destdir, self.target))
 
 		# Build necessary components.
 		try:

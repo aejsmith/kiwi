@@ -11,28 +11,23 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
+Import('config', 'envmgr')
 import tarfile, glob, os, tempfile, shutil, sys
 
-Import('config', 'envmgr')
-
-# Create the build configuration header.
-f = open('config.h', 'w')
-f.write('/* This file is automatically-generated, do not edit. */\n\n')
-for (k, v) in config.items():
-	if isinstance(v, str):
-		f.write("#define CONFIG_%s \"%s\"\n" % (k, v))
-	elif isinstance(v, bool) or isinstance(v, int):
-		f.write("#define CONFIG_%s %d\n" % (k, int(v)))
-	else:
-		raise Exception, "Unsupported type %s in build.conf" % (type(v))
-f.close()
+# Generate the configuration header. This is a little bit of a hack to get
+# the header updated no matter what.
+target = envmgr['host'].ConfigHeader('config.h', ['../../Kconfig'])
+AlwaysBuild(target)
+BUILD_TARGETS.insert(0, target[0])
 
 # Create the distribution environment.
-dist = envmgr.Create('dist')
-dist['DATA'] = {}
-dist['LIBRARIES'] = []
-dist['BINARIES'] = []
-dist['SERVICES'] = []
+dist = envmgr.Create('dist', {
+	'DATA': {},
+	'MODULES': [],
+	'LIBRARIES': [],
+	'BINARIES': [],
+	'SERVICES': [],
+})
 
 # Visit subdirectories.
 SConscript(dirs=['source'])
@@ -56,7 +51,7 @@ def fs_image_func(target, source, env):
 		shutil.copy(str(lib), os.path.join(tmpdir, 'system', 'libraries'))
 	for mod in env['MODULES']:
 		shutil.copy(str(mod), os.path.join(tmpdir, 'system', 'modules'))
-	for app, files in env['DATA'].items():
+	for (app, files) in env['DATA'].items():
 		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
@@ -76,8 +71,11 @@ def fs_image_func(target, source, env):
 
 	# Clean up.
 	shutil.rmtree(tmpdir)
-dist['BUILDERS']['FSImage'] = Builder(action=Action(fs_image_func, '$GENCOMSTR'))
-dist.FSImage('fsimage.tar', dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'])
+dist.Command(
+	'fsimage.tar',
+	dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'],
+	Action(fs_image_func, '$GENCOMSTR')
+)
 dist['FSIMAGE'] = File('fsimage.tar')
 
 # Add aliases and set the default target.
@@ -91,5 +89,7 @@ Alias('fsimage', dist['FSIMAGE'])
 Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
 # Target to run in QEMU.
-Alias('qtest', dist.Command('qtest', ['cdrom.iso'],
-      Action(config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'], None)))
+Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
+	config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
+	None
+)))

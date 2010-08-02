@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -25,7 +25,6 @@
 extern int kiwi_ver_release;		/**< Kiwi release number. */
 extern int kiwi_ver_update;		/**< Release update number. */
 extern int kiwi_ver_revision;		/**< Release revision number. */
-extern const char *kiwi_ver_codename;	/**< Release codename. */
 extern const char *kiwi_ver_string;	/**< String of version number. */
 
 #endif /* __VERSION_H */

@@ -11,24 +11,33 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'env', 'envmgr')
+choice
+	prompt "Serial port"
+	default PC_SERIAL_PORT_COM1
+	help
+	  Which serial port to use for kernel console output.
 
-# Add sysgen to the build environments.
-envmgr.AddVariable('SYSGEN', env.Program('sysgen', [
-	'AMD64Target.cc',
-	'IA32Target.cc',
-	'parser.y',
-	'lexer.l',
-	'main.cc',
-]))
-envmgr.AddVariable('SYSGENFLAGS', [])
+config PC_SERIAL_PORT_DISABLED
+	bool "Disabled"
 
-# Add builders to generate system call code.
-envmgr.AddTool('SyscallTable', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
-envmgr.AddTool('Syscalls', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
+config PC_SERIAL_PORT_COM1
+	bool "COM1"
+
+config PC_SERIAL_PORT_COM2
+	bool "COM2"
+
+config PC_SERIAL_PORT_COM3
+	bool "COM3"
+
+config PC_SERIAL_PORT_COM4
+	bool "COM4"
+
+endchoice
+
+config PC_SERIAL_PORT
+	int
+	default 0 if PC_SERIAL_PORT_DISABLED
+	default 1 if PC_SERIAL_PORT_COM1
+	default 2 if PC_SERIAL_PORT_COM2
+	default 3 if PC_SERIAL_PORT_COM3
+	default 4 if PC_SERIAL_PORT_COM4

@@ -1,0 +1,59 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'envmgr')
+import os
+
+# Find out the name of the ncurses library.
+def lxdialog_libs():
+	for ext in ['so', 'a', 'dylib']:
+		for lib in ['ncursesw', 'ncurses', 'curses']:
+			ret = os.system(
+				'%s -print-file-name=lib%s.%s | grep -q /' % (env['CC'], lib, ext)
+			)
+			if ret == 0:
+				return [lib]
+	return []
+
+# Find the path to the ncurses header.
+def lxdialog_ccflags():
+	if os.path.exists('/usr/include/ncurses/ncurses.h'):
+		return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses.h>"'
+	elif os.path.exists('/usr/include/ncurses/curses.h'):
+		return '-I/usr/include/ncurses -DCURSES_LOC="<ncurses/curses.h>"'
+	elif os.path.exists('/usr/include/ncurses.h'):
+		return '-DCURSES_LOC="<ncurses.h>"'
+	else:
+		return '-DCURSES_LOC="<curses.h>"'
+
+# Build the menu configuration utility.
+env['MCONF'] = env.Program('mconf', [
+	'mconf.c',
+	'zconf.tab.o',
+	'lxdialog/checklist.c',
+	'lxdialog/util.c',
+	'lxdialog/inputbox.c',
+	'lxdialog/textbox.c',
+	'lxdialog/yesno.c',
+	'lxdialog/menubox.c',
+], CCFLAGS=lxdialog_ccflags(), LIBS=lxdialog_libs())
+
+# Build the menu configuration utility.
+env['KCONFIG'] = env.Program('conf', [
+	'conf.c',
+	'zconf.tab.c',
+])
+
+# Add a config menu builders.
+envmgr.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))
+envmgr.AddTool('ConfigHeader', env['KCONFIG'], Action('KCONFIG_AUTOHEADER=$TARGET $KCONFIG -s $SOURCE', None))

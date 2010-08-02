@@ -13,7 +13,8 @@
 
 import os
 
-Import('env', 'config')
+#Import('env', 'config')
+Import('config')
 
 # Create a link to the toolchain's linker script directory.
 if os.path.exists('ldscripts'):
@@ -22,10 +23,10 @@ os.symlink('%s/%s/%s/toolchain-lib/ldscripts' % (config['TOOLCHAIN_DIR'], config
            'ldscripts')
 
 # Build all the libraries.
-SConscript(dirs=[
+#SConscript(dirs=[
 #	'libsystem',
 #	'libm',
 #	'libstdc++',
 #	'libkiwi',
-	'libkernel',
-], exports=['env'])
+#	'libkernel',
+#], exports=['env'])

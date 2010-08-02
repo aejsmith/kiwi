@@ -11,24 +11,30 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'env', 'envmgr')
+config SRCARCH
+	string
+	default "x86"
 
-# Add sysgen to the build environments.
-envmgr.AddVariable('SYSGEN', env.Program('sysgen', [
-	'AMD64Target.cc',
-	'IA32Target.cc',
-	'parser.y',
-	'lexer.l',
-	'main.cc',
-]))
-envmgr.AddVariable('SYSGENFLAGS', [])
+config TOOLCHAIN_TARGET
+	string
+	default "x86_64-kiwi" if ARCH_AMD64
+	default "i686-kiwi" if ARCH_IA32
 
-# Add builders to generate system call code.
-envmgr.AddTool('SyscallTable', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
-envmgr.AddTool('Syscalls', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
+config ARCH_X86
+	def_bool y
+
+config ARCH_32BIT
+	def_bool ARCH_IA32
+
+config ARCH_64BIT
+	def_bool ARCH_AMD64
+
+config ARCH_LITTLE_ENDIAN
+	def_bool y
+
+config X86_NX
+	bool "No-Execute (NX) support"
+	default y
+	help
+	  Enable support for the No-Execute/Execute-Disable bit supported by
+	  recent CPUs.

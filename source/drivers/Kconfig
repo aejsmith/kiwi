@@ -1,0 +1,55 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+##############
+menu "Drivers"
+##############
+
+comment "Bus managers"
+
+config DRIVER_BUS_PCI
+	bool "PCI bus manager"
+	default y
+	help
+	  Enable the PCI bus manager driver.
+
+comment "Disk devices"
+
+config DRIVER_DISK_ATA
+	bool "Generic ATA device driver"
+	default y
+	depends on DRIVER_BUS_PCI
+	help
+	  Enable the generic ATA disk device driver.
+
+comment "Display devices"
+
+config DRIVER_DISPLAY_VBE
+	bool "VBE display device driver"
+	default y
+	depends on MODULE_PLATFORM_BIOS
+	help
+	  Enable the VBE display device driver.
+
+comment "Input devices"
+
+config DRIVER_INPUT_I8042
+	bool "i8042 keyboard/mouse port driver"
+	default y
+	depends on ARCH_X86
+ 	help
+	  Enable the i8042 (PS/2) keyboard/mouse port driver.
+
+#######
+endmenu
+#######

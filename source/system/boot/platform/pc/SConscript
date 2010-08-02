@@ -69,7 +69,7 @@ def iso_image_func(target, source, env):
 	f.close()
 
 	# Create the ISO.
-	verbose = envmgr.verbose and '' or '>> /dev/null 2>&1'
+	verbose = (ARGUMENTS.get('V') == '1') and '' or '>> /dev/null 2>&1'
 	if os.system('mkisofs -J -R -l -b boot/cdboot.img -V "Kiwi CDROM" ' + \
 	             '-boot-load-size 4 -boot-info-table -no-emul-boot ' + \
 	             '-o %s %s %s' % (target[0], tmpdir, verbose)) != 0:

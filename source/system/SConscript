@@ -11,24 +11,4 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('config', 'env', 'envmgr')
-
-# Add sysgen to the build environments.
-envmgr.AddVariable('SYSGEN', env.Program('sysgen', [
-	'AMD64Target.cc',
-	'IA32Target.cc',
-	'parser.y',
-	'lexer.l',
-	'main.cc',
-]))
-envmgr.AddVariable('SYSGENFLAGS', [])
-
-# Add builders to generate system call code.
-envmgr.AddTool('SyscallTable', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
-envmgr.AddTool('Syscalls', env['SYSGEN'], Action(
-	'$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
-	'$GENCOMSTR'
-))
+SConscript(dirs=['boot', 'kernel'])

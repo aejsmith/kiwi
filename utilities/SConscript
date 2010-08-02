@@ -11,5 +11,12 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
-SConscript(dirs=['krpcgen', 'sysgen'], exports=['env'])
+Import('env', 'envmgr')
+
+# Set paths to build utilities.
+envmgr.AddVariable('GENSYMTAB', File('../../utilities/gensymtab.py'))
+envmgr.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
+envmgr.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
+
+# Visit subdirectories.
+SConscript(dirs=['kconfig', 'krpcgen', 'sysgen'], exports=['env'])

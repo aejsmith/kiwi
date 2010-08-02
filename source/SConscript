@@ -11,4 +11,4 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-SConscript(dirs=['boot', 'kernel', 'drivers', 'uspace'])
+SConscript(dirs=['system', 'libraries'])
