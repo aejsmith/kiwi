@@ -26,7 +26,7 @@
 
 #include <assert.h>
 #include <endian.h>
-#include <errors.h>
+#include <status.h>
 
 #include "ext2_priv.h"
 
@@ -35,28 +35,31 @@
  * @param buf		Buffer to read into.
  * @param offset	Offset to read from.
  * @param name		If not NULL, buffer to read name into (EXT2_NAME_MAX + 1).
- * @return		0 on success, negative error code on failure. */
-static int ext2_dirent_read(ext2_inode_t *dir, ext2_dirent_t *buf, offset_t offset, char *name) {
+ * @return		Status code describing result of the operation. */
+static status_t ext2_dirent_read(ext2_inode_t *dir, ext2_dirent_t *buf, offset_t offset,
+                                 char *name) {
+	status_t ret;
 	size_t bytes;
-	int ret;
 
-	if((ret = ext2_inode_read(dir, buf, sizeof(ext2_dirent_t), offset, false, &bytes)) != 0) {
+	ret = ext2_inode_read(dir, buf, sizeof(ext2_dirent_t), offset, false, &bytes);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(bytes != sizeof(ext2_dirent_t)) {
-		return -ERR_DEVICE_ERROR;
+		return STATUS_CORRUPT_FS;
 	}
 
 	if(name) {
 		offset += sizeof(ext2_dirent_t);
-		if((ret = ext2_inode_read(dir, name, buf->name_len, offset, false, &bytes)) != 0) {
+		ret = ext2_inode_read(dir, name, buf->name_len, offset, false, &bytes);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		} else if(bytes != buf->name_len) {
-			return -ERR_DEVICE_ERROR;
+			return STATUS_CORRUPT_FS;
 		}
 		name[buf->name_len] = 0;
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Write a directory entry.
@@ -65,27 +68,30 @@ static int ext2_dirent_read(ext2_inode_t *dir, ext2_dirent_t *buf, offset_t offs
  * @param offset	Offset to write to.
  * @param name		If not NULL, buffer containing new name to write. If
  *			NULL, the name will not be changed.
- * @return		0 on success, negative error code on failure. */
-static int ext2_dirent_write(ext2_inode_t *dir, const ext2_dirent_t *buf, offset_t offset, const char *name) {
+ * @return		Status code describing result of the operation. */
+static status_t ext2_dirent_write(ext2_inode_t *dir, const ext2_dirent_t *buf, offset_t offset,
+                                  const char *name) {
+	status_t ret;
 	size_t bytes;
-	int ret;
 
-	if((ret = ext2_inode_write(dir, buf, sizeof(ext2_dirent_t), offset, false, &bytes)) != 0) {
+	ret = ext2_inode_write(dir, buf, sizeof(ext2_dirent_t), offset, false, &bytes);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(bytes != sizeof(ext2_dirent_t)) {
-		return -ERR_DEVICE_ERROR;
+		return STATUS_CORRUPT_FS;
 	}
 
 	if(name) {
 		offset += sizeof(ext2_dirent_t);
-		if((ret = ext2_inode_write(dir, name, buf->name_len, offset, false, &bytes)) != 0) {
+		ret = ext2_inode_write(dir, name, buf->name_len, offset, false, &bytes);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		} else if(bytes != buf->name_len) {
-			return -ERR_DEVICE_ERROR;
+			return STATUS_CORRUPT_FS;
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Iterate through entries in an Ext2 directory.
@@ -93,12 +99,12 @@ static int ext2_dirent_write(ext2_inode_t *dir, const ext2_dirent_t *buf, offset
  * @param index		Index of entry to begin at.
  * @param cb		Callback function.
  * @param data		Argument to pass to callback.
- * @return		0 on success, negative error code on failure. */
-int ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb, void *data) {
+ * @return		Status code describing result of the operation. */
+status_t ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb, void *data) {
 	offset_t offset = 0, i = 0;
 	ext2_dirent_t entry;
 	bool found = false;
-	int ret = 0;
+	status_t ret;
 	char *name;
 
 	mutex_lock(&dir->lock);
@@ -108,7 +114,8 @@ int ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb
 		if(i++ >= index) {
 			found = true;
 
-			if((ret = ext2_dirent_read(dir, &entry, offset, name)) != 0) {
+			ret = ext2_dirent_read(dir, &entry, offset, name);
+			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
 
@@ -118,7 +125,8 @@ int ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb
 				}
 			}
 		} else {
-			if((ret = ext2_dirent_read(dir, &entry, offset, NULL)) != 0) {
+			ret = ext2_dirent_read(dir, &entry, offset, NULL);
+			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
 		}
@@ -126,13 +134,15 @@ int ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb
 		assert(entry.rec_len);
 		offset += le16_to_cpu(entry.rec_len);
 	}
+
+	ret = STATUS_SUCCESS;
 out:
 	kfree(name);
 	mutex_unlock(&dir->lock);
-	if(ret < 0) {
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else {
-		return (found) ? 0 : -ERR_NOT_FOUND;
+		return (found) ? STATUS_SUCCESS : STATUS_NOT_FOUND;
 	}
 }
 
@@ -141,14 +151,14 @@ out:
  * @param dir		Directory to insert into.
  * @param name		Name to give the entry.
  * @param inode		Inode to insert.
- * @return		0 on success, negative error code on failure. */
-int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
+ * @return		Status code describing result of the operation. */
+status_t ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 	size_t name_len, rec_len, exist_len;
 	offset_t offset = 0;
 	ext2_dirent_t entry;
 	uint32_t raw;
+	status_t ret;
 	size_t i;
-	int ret;
 
 	assert((le16_to_cpu(dir->disk.i_mode) & EXT2_S_IFMT) == EXT2_S_IFDIR);
 	assert(!(dir->mount->parent->flags & FS_MOUNT_RDONLY));
@@ -158,7 +168,7 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 	 * processor'. */
 	name_len = strlen(name);
 	if(name_len > EXT2_NAME_MAX) {
-		return -ERR_NOT_SUPPORTED;
+		return STATUS_NOT_SUPPORTED;
 	}
 	rec_len = ROUND_UP(sizeof(ext2_dirent_t) + name_len, 4);
 
@@ -166,7 +176,8 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 	        name, inode->num, dir->num, name_len, rec_len);
 
 	while(offset < dir->size) {
-		if((ret = ext2_dirent_read(dir, &entry, offset, NULL)) != 0) {
+		ret = ext2_dirent_read(dir, &entry, offset, NULL);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 
@@ -188,7 +199,8 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 			/* Split the entry in two. */
 			rec_len = le16_to_cpu(entry.rec_len) - exist_len;
 			entry.rec_len = cpu_to_le16(exist_len);
-			if((ret = ext2_dirent_write(dir, &entry, offset, NULL)) != 0) {
+			ret = ext2_dirent_write(dir, &entry, offset, NULL);
+			if(ret != STATUS_SUCCESS) {
 				return ret;
 			}
 			offset += exist_len;
@@ -200,21 +212,25 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 		entry.file_type = ext2_type_to_dirent(le16_to_cpu(inode->disk.i_mode));
 
 		/* Write back the entry. */
-		if((ret = ext2_dirent_write(dir, &entry, offset, name)) != 0) {
+		ret = ext2_dirent_write(dir, &entry, offset, name);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 
 		/* Update inode link count. */
 		inode->disk.i_links_count = cpu_to_le16(le16_to_cpu(inode->disk.i_links_count) + 1);
 		ext2_inode_flush(inode);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Couldn't find a spare entry. Allocate a block for a new one. */
 	for(i = 0; i < EXT2_NDIR_BLOCKS; i++) {
 		if(le32_to_cpu(dir->disk.i_block[i]) != 0) {
 			continue;
-		} else if((ret = ext2_block_alloc(dir->mount, false, &raw)) != 0) {
+		}
+
+		ret = ext2_block_alloc(dir->mount, false, &raw);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 		dir->disk.i_block[i] = cpu_to_le32(raw);
@@ -229,7 +245,8 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 		ext2_inode_flush(dir);
 
 		/* Write back the entry. */
-		if((ret = ext2_dirent_write(dir, &entry, i * inode->mount->block_size, name)) != 0) {
+		ret = ext2_dirent_write(dir, &entry, i * inode->mount->block_size, name);
+		if(ret != STATUS_SUCCESS) {
 			dir->disk.i_block[i] = 0;
 			ext2_block_free(dir->mount, raw);
 			return ret;
@@ -237,17 +254,17 @@ int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 
 		inode->disk.i_links_count = cpu_to_le16(le16_to_cpu(inode->disk.i_links_count) + 1);
 		ext2_inode_flush(inode);
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
-	return -ERR_NO_SPACE;
+	return STATUS_DIR_FULL;
 }
 
 /** Structure containing data for ext2_dir_remove(). */
 typedef struct ext2_dir_remove {
 	const char *name;		/**< Name of entry being removed. */
 	offset_t previous;		/**< Offset of previous entry. */
-	int ret;			/**< Return code. */
+	status_t ret;			/**< Status code. */
 } ext2_dir_remove_t;
 
 /** Iteration callback to remove an entry.
@@ -269,7 +286,8 @@ static bool ext2_dir_remove_cb(ext2_inode_t *dir, ext2_dirent_t *header, const c
 
 	/* If this is not the first entry, we can resize the previous one. */
 	if(offset) {
-		if((data->ret = ext2_dirent_read(dir, &prev, data->previous, NULL)) != 0) {
+		data->ret = ext2_dirent_read(dir, &prev, data->previous, NULL);
+		if(data->ret != STATUS_SUCCESS) {
 			return false;
 		}
 		prev.rec_len = cpu_to_le16(le16_to_cpu(prev.rec_len) + le16_to_cpu(header->rec_len));
@@ -287,24 +305,25 @@ static bool ext2_dir_remove_cb(ext2_inode_t *dir, ext2_dirent_t *header, const c
  * @param dir		Directory to remove from.
  * @param name		Name of the entry to remove.
  * @param inode		Inode corresponding to the entry.
- * @return		0 on success, negative error code on failure. */
-int ext2_dir_remove(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
+ * @return		Status code describing result of the operation. */
+status_t ext2_dir_remove(ext2_inode_t *dir, const char *name, ext2_inode_t *inode) {
 	ext2_dir_remove_t data = {
 		.name = name,
 		.previous = 0,
-		.ret = -ERR_DEVICE_ERROR,
+		.ret = STATUS_CORRUPT_FS,
 	};
-	int ret;
+	status_t ret;
 
-	if((ret = ext2_dir_iterate(dir, 0, ext2_dir_remove_cb, &data)) != 0) {
+	ret = ext2_dir_iterate(dir, 0, ext2_dir_remove_cb, &data);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(data.ret != 0) {
+	} else if(data.ret != STATUS_SUCCESS) {
 		return data.ret;
 	}
 
 	inode->disk.i_links_count = cpu_to_le16(le16_to_cpu(inode->disk.i_links_count) - 1);
 	ext2_inode_flush(inode);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Iteration callback for checking if a directory is empty.
@@ -330,7 +349,7 @@ static bool ext2_dir_empty_cb(ext2_inode_t *dir, ext2_dirent_t *header, const ch
 bool ext2_dir_empty(ext2_inode_t *dir) {
 	bool empty = true;
 
-	if(ext2_dir_iterate(dir, 0, ext2_dir_empty_cb, &empty) != 0) {
+	if(ext2_dir_iterate(dir, 0, ext2_dir_empty_cb, &empty) != STATUS_SUCCESS) {
 		return false;
 	}
 
@@ -368,22 +387,23 @@ static bool ext2_dir_lookup_cb(ext2_inode_t *dir, ext2_dirent_t *header, const c
  * @param cache		Cache to look up for.
  * @param name		Name of entry to look up.
  * @param idp		Where to store ID of node entry maps to.
- * @return		0 on success, negative error code on failure. */
-static int ext2_dir_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
+ * @return		Status code describing result of the operation. */
+static status_t ext2_dir_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
 	ext2_dir_lookup_t data = {
 		.name = name,
 		.idp = idp,
 		.found = false,
 	};
-	int ret;
+	status_t ret;
 
-	if((ret = ext2_dir_iterate(cache->data, 0, ext2_dir_lookup_cb, &data)) != 0) {
+	ret = ext2_dir_iterate(cache->data, 0, ext2_dir_lookup_cb, &data);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(!data.found) {
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Ext2 entry cache operations structure. */

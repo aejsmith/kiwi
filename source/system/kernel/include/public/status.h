@@ -41,7 +41,7 @@
 #define STATUS_ADDR_INVAL		11	/**< A bad memory location was specified. */
 #define STATUS_RESOURCE_UNAVAIL		12	/**< Resource is temporarily unavailable. */
 #define STATUS_IN_USE			13	/**< Object is in use. */
-#  define STATUS_NO_SPACE		14	/**< No space is available. */
+#define STATUS_FS_FULL			14	/**< No space is available on the filesystem. */
 #define STATUS_PERM_DENIED		15	/**< Permission denied. */
 #define STATUS_TOO_LONG			16	/**< Provided string is too long. */
 #define STATUS_LINK_LIMIT		17	/**< Exceeded nested symbolic link limit. */
@@ -49,7 +49,7 @@
 #define STATUS_SYSCALL_INVAL		19	/**< Invalid system call number. */
 #define STATUS_DEST_UNREACHABLE		20	/**< Cannot reach destination. */
 #define STATUS_TIMED_OUT		21	/**< Timed out while waiting. */
-#  define STATUS_DEVICE_ERROR		22	/**< There was an error on the device. */
+#define STATUS_DEVICE_ERROR		22	/**< An error occurred during a hardware operation. */
 #define STATUS_OVERFLOW			23	/**< Integer overflow. */
 #  define STATUS_NOT_EMPTY		24	/**< Directory is not empty. */
 #define STATUS_PROCESS_RUNNING		25	/**< Process is still running. */
@@ -58,5 +58,7 @@
 #define STATUS_MISSING_LIBRARY		28	/**< Required library not found. */
 #define STATUS_MISSING_SYMBOL		29	/**< Referenced symbol not found. */
 #define STATUS_UNKNOWN_FS		30	/**< Filesystem has an unrecognised format. */
+#define STATUS_CORRUPT_FS		31	/**< Corruption detected on the filesystem. */
+#define STATUS_DIR_FULL			32	/**< Directory is full. */
 
 #endif /* __KERNEL_STATUS_H */

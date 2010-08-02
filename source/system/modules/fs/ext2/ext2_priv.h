@@ -111,28 +111,28 @@ static inline uint8_t ext2_type_to_dirent(uint16_t mode) {
 
 extern entry_cache_ops_t ext2_entry_cache_ops;
 
-extern int ext2_block_zero(ext2_mount_t *mount, uint32_t block);
-extern int ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp);
-extern int ext2_block_free(ext2_mount_t *mount, uint32_t num);
-extern int ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t block, bool nonblock);
-extern int ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block, bool nonblock);
+extern status_t ext2_block_zero(ext2_mount_t *mount, uint32_t block);
+extern status_t ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp);
+extern status_t ext2_block_free(ext2_mount_t *mount, uint32_t num);
+extern status_t ext2_block_read(ext2_mount_t *mount, void *buf, uint32_t block, bool nonblock);
+extern status_t ext2_block_write(ext2_mount_t *mount, const void *buf, uint32_t block, bool nonblock);
 
-extern int ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb, void *data);
-extern int ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode);
-extern int ext2_dir_remove(ext2_inode_t *dir, const char *name, ext2_inode_t *inode);
+extern status_t ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb_t cb, void *data);
+extern status_t ext2_dir_insert(ext2_inode_t *dir, const char *name, ext2_inode_t *inode);
+extern status_t ext2_dir_remove(ext2_inode_t *dir, const char *name, ext2_inode_t *inode);
 extern bool ext2_dir_empty(ext2_inode_t *dir);
 
-extern int ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t gid,
-                            ext2_inode_t **inodep);
-extern int ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode);
-extern int ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep);
-extern int ext2_inode_flush(ext2_inode_t *inode);
+extern status_t ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t gid,
+                                 ext2_inode_t **inodep);
+extern status_t ext2_inode_free(ext2_mount_t *mount, uint32_t num, uint16_t mode);
+extern status_t ext2_inode_get(ext2_mount_t *mount, uint32_t num, ext2_inode_t **inodep);
+extern status_t ext2_inode_flush(ext2_inode_t *inode);
 extern void ext2_inode_release(ext2_inode_t *inode);
-extern int ext2_inode_read(ext2_inode_t *inode, void *buf, size_t count, offset_t offset,
-                           bool nonblock, size_t *bytesp);
-extern int ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, offset_t offset,
-                            bool nonblock, size_t *bytesp);
-extern int ext2_inode_resize(ext2_inode_t *inode, offset_t size);
+extern status_t ext2_inode_read(ext2_inode_t *inode, void *buf, size_t count, offset_t offset,
+                                bool nonblock, size_t *bytesp);
+extern status_t ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, offset_t offset,
+                                 bool nonblock, size_t *bytesp);
+extern status_t ext2_inode_resize(ext2_inode_t *inode, offset_t size);
 
 extern void ext2_mount_flush(ext2_mount_t *mount);
 
