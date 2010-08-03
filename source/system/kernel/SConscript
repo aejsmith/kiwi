@@ -85,7 +85,7 @@ sources = map(File, [
 env = envmgr.Create('kernel', {
 	'LIBS': [],
 	'CPPPATH': [
-		Dir('include'),
+		Dir('../include'),
 		Dir('arch/%s/include' % (config['SRCARCH'])),
 		Dir('platform/%s/include' % (config['PLATFORM'])),
 	],
