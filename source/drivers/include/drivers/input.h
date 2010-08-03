@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -16,6 +16,12 @@
 /**
  * @file
  * @brief		Input device class.
+ *
+ * The kernel side of input handling is very simple - most of the work is
+ * offloaded to userspace. All we do is publish a device with attributes to
+ * specify what type of device it is and what protocol it is using, and provide
+ * raw data from the device to read calls on the device. We also provide
+ * requests to do things such as set keyboard LED state, etc.
  */
 
 #ifndef __DRIVERS_INPUT_H
@@ -35,14 +41,14 @@
 #define INPUT_PROTOCOL_AT	0	/**< AT keyboard. */
 
 /** Input device request codes. */
-#define INPUT_KB_SET_LEDS	32	/**< Set keyboard LED state. */
+#define KEYBOARD_SET_LEDS	32	/**< Set keyboard LED state. */
 
 /** Structure describing LED state to set. */
-typedef struct input_kb_led_state {
+typedef struct keyboard_led_state {
 	bool caps;			/**< Caps Lock LED state. */
 	bool num;			/**< Num Lock LED state. */
 	bool scroll;			/**< Scroll Lock LED state. */
-} input_kb_led_state_t;
+} keyboard_led_state_t;
 
 #ifdef KERNEL
 
@@ -60,7 +66,7 @@ struct input_type;
 #define INPUT_BUFFER_SIZE	128
 
 /** Keyboard device operations structure. */
-typedef struct input_kb_ops {
+typedef struct keyboard_ops {
 	/** Handler for device-specific requests.
 	 * @note		This is called when a device request ID is
 	 *			received that is greater than or equal to
@@ -71,19 +77,18 @@ typedef struct input_kb_ops {
 	 * @param insz		Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
-	 * @return		Positive value on success, negative error code
-	 *			on failure. */
-	int (*request)(struct input_device *device, int request, void *in, size_t insz,
-	               void **outp, size_t *outszp);
+	 * @return		Status code describing result of operation. */
+	status_t (*request)(struct input_device *device, int request, void *in,
+	                    size_t insz, void **outp, size_t *outszp);
 
 	/** Set LED state.
 	 * @param device	Device to set state of.
 	 * @param state		State structure. */
-	void (*set_leds)(struct input_device *device, input_kb_led_state_t *state);
-} input_kb_ops_t;
+	void (*set_leds)(struct input_device *device, keyboard_led_state_t *state);
+} keyboard_ops_t;
 
 /** Mouse device operations structure. */
-typedef struct input_mouse_ops {
+typedef struct mouse_ops {
 	/** Handler for device-specific requests.
 	 * @note		This is called when a device request ID is
 	 *			received that is greater than or equal to
@@ -94,11 +99,10 @@ typedef struct input_mouse_ops {
 	 * @param insz		Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
-	 * @return		Positive value on success, negative error code
-	 *			on failure. */
-	int (*request)(struct input_device *device, int request, void *in, size_t insz,
-	               void **outp, size_t *outszp);
-} input_mouse_ops_t;
+	 * @return		Status code describing result of operation. */
+	status_t (*request)(struct input_device *device, int request, void *in,
+	                    size_t insz, void **outp, size_t *outszp);
+} mouse_ops_t;
 
 /** Input device structure. */
 typedef struct input_device {
@@ -106,8 +110,15 @@ typedef struct input_device {
 	device_t *device;		/**< Device tree entry. */
 	device_t *alias;		/**< Alias if main device is under a different directory. */
 	struct input_type *type;	/**< Input device type. */
-	void *ops;			/**< Operations for the device. */
-	void *data;			/**< Data for the device code. */
+
+	/** Operations for the device. */
+	union {
+		keyboard_ops_t *kops;
+		mouse_ops_t *mops;
+		void *ops;
+	};
+
+	void *data;			/**< Implementation-specific data pointer. */
 	atomic_t open;			/**< Whether the device is open. */
 
 	spinlock_t lock;		/**< Input buffer lock. */
@@ -122,10 +133,12 @@ typedef struct input_device {
 
 extern void input_device_input(input_device_t *device, uint8_t value);
 
-extern int input_device_create(const char *name, device_t *parent, uint8_t type,
-                               uint8_t protocol, void *ops, void *data,
-                               input_device_t **devicep);
-extern int input_device_destroy(input_device_t *device);
+extern status_t keyboard_device_create(const char *name, device_t *parent, uint8_t protocol,
+                                       keyboard_ops_t *ops, void *data,
+                                       input_device_t **devicep);
+extern status_t mouse_device_create(const char *name, device_t *parent, uint8_t protocol,
+                                    mouse_ops_t *ops, void *data, input_device_t **devicep);
+extern status_t input_device_destroy(input_device_t *device);
 
 #endif /* KERNEL */
 #endif /* __DRIVERS_INPUT_H */
