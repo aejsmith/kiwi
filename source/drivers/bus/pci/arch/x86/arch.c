@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -32,10 +32,10 @@
 #include <sync/spinlock.h>
 
 #include <endian.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 
-extern int pci_arch_init(void);
+extern status_t pci_arch_init(void);
 
 /** PCI configuration registers. */
 #define PCI_CONFIG_ADDRESS	0xCF8	/**< Configuration Address Register. */
@@ -123,8 +123,8 @@ uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) 
 MODULE_EXPORT(pci_config_read32);
 
 /** Check for PCI presence.
- * @return		True if PCI is OK, false if not. */
-int pci_arch_init(void) {
+ * @return		STATUS_SUCCESS if present, other code if not. */
+status_t pci_arch_init(void) {
 	out32(PCI_CONFIG_ADDRESS, 0x80000000);
-	return (in32(PCI_CONFIG_ADDRESS) != 0x80000000) ? -ERR_NOT_SUPPORTED : 0;
+	return (in32(PCI_CONFIG_ADDRESS) != 0x80000000) ? STATUS_NOT_SUPPORTED : STATUS_SUCCESS;
 }

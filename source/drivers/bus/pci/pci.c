@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -38,8 +38,8 @@
 #include <io/device.h>
 
 #include <console.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 
 /** Structure to store information about a PCI device. */
 typedef struct pci_device {
@@ -48,8 +48,8 @@ typedef struct pci_device {
 	uint8_t func;			/**< Function number. */
 } pci_device_t;
 
-extern int pci_arch_init(void);
-static int pci_bus_scan(int id);
+extern status_t pci_arch_init(void);
+static status_t pci_bus_scan(int id, int indent);
 
 /** PCI bus directory. */
 static device_t *pci_bus_dir;
@@ -59,8 +59,9 @@ static device_t *pci_bus_dir;
  * @param id		Bus ID.
  * @param dev		Device number to scan.
  * @param func		Function number to scan.
- * @return		0 on success, negative error code on failure. */
-static int pci_device_scan(device_t *bus, int id, int dev, int func) {
+ * @param indent	Output indentation level.
+ * @return		Status code describing result of the operation. */
+static status_t pci_device_scan(device_t *bus, int id, int dev, int func, int indent) {
 	device_attr_t attr[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "pci-device" } },
 		{ "pci.vendor-id", DEVICE_ATTR_UINT16,
@@ -85,12 +86,12 @@ static int pci_device_scan(device_t *bus, int id, int dev, int func) {
 	char name[DEVICE_NAME_MAX];
 	pci_device_t *info;
 	device_t *device;
+	status_t ret;
 	uint8_t dest;
-	int ret;
 
 	/* Check vendor ID to determine if device exists. */
 	if(attr[1].value.uint16 == 0xFFFF) {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 
 	/* Create a structure to store bus/device/function numbers, so we don't
@@ -102,56 +103,63 @@ static int pci_device_scan(device_t *bus, int id, int dev, int func) {
 
 	/* Create a device tree node for it. */
 	sprintf(name, "%02x.%d", dev, func);
-	if((ret = device_create(name, bus, NULL, info, attr, ARRAYSZ(attr), &device)) != 0) {
+	ret = device_create(name, bus, NULL, info, attr, ARRAYSZ(attr), &device);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	kprintf(LOG_NORMAL, "pci: got device %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
-	        id, dev, func, attr[1].value.uint16, attr[2].value.uint16,
+	kprintf(LOG_NORMAL, "pci: %*sdevice %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
+	        indent, "", id, dev, func, attr[1].value.uint16, attr[2].value.uint16,
 	        attr[5].value.uint8, attr[6].value.uint8);
 
 	/* Check for a PCI-to-PCI bridge. */
 	if(attr[5].value.uint8 == 0x06 && attr[6].value.uint8 == 0x04) {
 		dest = pci_config_read8(id, dev, func, 0x19);
-		kprintf(LOG_NORMAL, "pci: device %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
-		        id, dev, func, dest);
-		pci_bus_scan(dest);
+		kprintf(LOG_NORMAL, "pci: %*sdevice %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
+		        indent + 2, "", id, dev, func, dest);
+		pci_bus_scan(dest, indent + 2);
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Scan a PCI bus for devices.
  * @param id		Bus number to scan.
- * @return		0 on success, negative error code on failure. */
-static int pci_bus_scan(int id) {
+ * @param indent	Output indentation level.
+ * @return		Status code describing result of the operation. */
+static status_t pci_bus_scan(int id, int indent) {
 	device_attr_t attr = { "type", DEVICE_ATTR_STRING, { .string = "pci-bus" } };
 	char name[DEVICE_NAME_MAX];
 	device_t *device;
-	int i, j, ret;
+	status_t ret;
+	int i, j;
 
 	sprintf(name, "%d", id);
-	if((ret = device_create(name, pci_bus_dir, NULL, NULL, &attr, 1, &device)) != 0) {
+	ret = device_create(name, pci_bus_dir, NULL, NULL, &attr, 1, &device);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
-	kprintf(LOG_NORMAL, "pci: scanning bus %d for devices...\n", id);
+	kprintf(LOG_NORMAL, "pci: %*sscanning bus %d for devices...\n", indent, "", id);
 	for(i = 0; i < 32; i++) {
 		if(pci_config_read8(id, i, 0, PCI_DEVICE_HEADER_TYPE) & 0x80) {
+			/* Multifunction device. */
 			for(j = 0; j < 8; j++) {
-				if((ret = pci_device_scan(device, id, i, j)) != 0) {
+				ret = pci_device_scan(device, id, i, j, indent + 2);
+				if(ret != STATUS_SUCCESS) {
 					kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x.%d (%d)\n",
 						id, i, j, ret);
 				}
 			}
 		} else {
-			if((ret = pci_device_scan(device, id, i, 0)) != 0) {
+			ret = pci_device_scan(device, id, i, 0, indent + 2);
+			if(ret != STATUS_SUCCESS) {
 				kprintf(LOG_WARN, "pci: warning: failed to scan device %d:%x (%d)\n",
 					id, i, ret);
 			}
 		}
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Read an 8-bit value from a device's configuration space.
@@ -167,7 +175,8 @@ uint8_t pci_device_read8(device_t *device, uint8_t reg) {
 	pci_device_t *info = device->data;
 	device_attr_t *attr;
 
-	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+	attr = device_attr(device, "type", DEVICE_ATTR_STRING);
+	if(!attr || strcmp(attr->value.string, "pci-device")) {
 		return 0;
 	}
 
@@ -189,7 +198,8 @@ uint16_t pci_device_read16(device_t *device, uint8_t reg) {
 	pci_device_t *info = device->data;
 	device_attr_t *attr;
 
-	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+	attr = device_attr(device, "type", DEVICE_ATTR_STRING);
+	if(!attr || strcmp(attr->value.string, "pci-device")) {
 		return 0;
 	}
 
@@ -211,7 +221,8 @@ uint32_t pci_device_read32(device_t *device, uint8_t reg) {
 	pci_device_t *info = device->data;
 	device_attr_t *attr;
 
-	if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING)) || strcmp(attr->value.string, "pci-device")) {
+	attr = device_attr(device, "type", DEVICE_ATTR_STRING);
+	if(!attr || strcmp(attr->value.string, "pci-device")) {
 		return 0;
 	}
 
@@ -241,7 +252,10 @@ static int pci_device_lookup_func(device_t *device, void *data) {
 
 	if(device == pci_bus_dir) {
 		return 1;
-	} else if(!(attr = device_attr(device, "type", DEVICE_ATTR_STRING))) {
+	}
+
+	attr = device_attr(device, "type", DEVICE_ATTR_STRING);
+	if(!attr) {
 		/* We don't visit device children so this won't be triggered
 		 * by other drivers not putting a type attribute on. */
 		fatal("Missing type attribute in PCI tree (%p)", device);
@@ -306,29 +320,31 @@ bool pci_device_lookup(pci_device_id_t *ids, size_t count, pci_lookup_t cb) {
 MODULE_EXPORT(pci_device_lookup);
 
 /** Initialisation function for the PCI module.
- * @return		0 on success, negative error code on failure. */
-static int pci_init(void) {
-	int ret;
+ * @return		Status code describing result of the operation. */
+static status_t pci_init(void) {
+	status_t ret;
 
 	/* Get the architecture to detect PCI presence. */
-	if((ret = pci_arch_init()) != 0) {
+	ret = pci_arch_init();
+	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_NORMAL, "pci: PCI is not present or not usable (%d)\n", ret);
 		return ret;
 	}
 
 	/* Create the PCI bus directory. */
-	if((ret = device_create("pci", device_bus_dir, NULL, NULL, NULL, 0, &pci_bus_dir)) != 0) {
+	ret = device_create("pci", device_bus_dir, NULL, NULL, NULL, 0, &pci_bus_dir);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Scan the main bus. */
-	return pci_bus_scan(0);
+	return pci_bus_scan(0, 0);
 }
 
 /** Unload function for the PCI module.
- * @return		0 on success, negative error code on failure. */
-static int pci_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t pci_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("pci");
