@@ -78,11 +78,13 @@ def fs_image_func(target, source, env):
 
 	# Clean up.
 	shutil.rmtree(tmpdir)
-dist.Command(
+target = dist.Command(
 	'fsimage.tar',
 	dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'],
 	Action(fs_image_func, '$GENCOMSTR')
 )
+if len(config['EXTRA_FSIMAGE']) > 0:
+	AlwaysBuild(target)
 dist['FSIMAGE'] = File('fsimage.tar')
 
 # Add aliases and set the default target.
