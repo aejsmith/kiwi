@@ -38,6 +38,29 @@ static device_t *input_device_dir;
 /** Next device ID. */
 static atomic_t next_input_id = 0;
 
+/** Destroy an input device.
+ * @param _device	Device to destroy. */
+static void input_device_destroy(device_t *_device) {
+	input_device_t *device = _device->data;
+
+	assert(!device->open);
+
+	switch(device->type) {
+	case INPUT_TYPE_KEYBOARD:
+		if(device->kops->destroy) {
+			device->kops->destroy(device);
+		}
+		break;
+	case INPUT_TYPE_MOUSE:
+		if(device->mops->destroy) {
+			device->mops->destroy(device);
+		}
+		break;
+	}
+
+	kfree(device);
+}
+
 /** Open an input device.
  * @param _device	Device being opened.
  * @param datap		Where to store handle-specific data pointer (unused).
@@ -191,6 +214,7 @@ static status_t mouse_device_request(device_t *_device, void *data, int request,
 
 /** Keyboard device operations. */
 static device_ops_t keyboard_device_ops = {
+	.destroy = input_device_destroy,
 	.open = input_device_open,
 	.close = input_device_close,
 	.read = input_device_read,
@@ -201,6 +225,7 @@ static device_ops_t keyboard_device_ops = {
 
 /** Mouse device operations. */
 static device_ops_t mouse_device_ops = {
+	.destroy = input_device_destroy,
 	.open = input_device_open,
 	.close = input_device_close,
 	.read = input_device_read,
@@ -217,7 +242,9 @@ static device_ops_t mouse_device_ops = {
  * @param device	Device to add to.
  * @param value		Value to add.
  */
-void input_device_input(input_device_t *device, uint8_t value) {
+void input_device_input(device_t *_device, uint8_t value) {
+	input_device_t *device = _device->data;
+
 	spinlock_lock(&device->lock);
 
 	/* Drop the input if full or device is not open. */
@@ -247,7 +274,7 @@ MODULE_EXPORT(input_device_input);
  * @return		Status code describing result of the operation. */
 static status_t input_device_create(const char *name, device_t *parent, uint8_t type,
                                     uint8_t protocol, void *ops, void *data,
-                                    input_device_t **devicep) {
+                                    device_t **devicep) {
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "input" } },
 		{ "input.type", DEVICE_ATTR_UINT8, { .uint8 = type } },
@@ -256,7 +283,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	char dname[DEVICE_NAME_MAX];
 	input_device_t *device;
 	device_ops_t *iops;
-	int ret;
+	status_t ret;
 
 	if((parent && !name) || (name && !parent) || !devicep) {
 		return STATUS_PARAM_INVAL;
@@ -270,6 +297,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	device->ops = ops;
 	device->data = data;
 	device->open = 0;
+	device->type = type;
 	device->start = 0;
 	device->size = 0;
 
@@ -277,13 +305,13 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	iops = (type == INPUT_TYPE_KEYBOARD) ? &keyboard_device_ops : &mouse_device_ops;
 	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
-		ret = device_create(name, parent, iops, device, attrs, ARRAYSZ(attrs), &device->device);
+		ret = device_create(name, parent, iops, device, attrs, ARRAYSZ(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
 		}
 
-		ret = device_alias(dname, input_device_dir, device->device, &device->alias);
+		ret = device_alias(dname, input_device_dir, *devicep, NULL);
 		if(ret != STATUS_SUCCESS) {
 			/* Should not fail - only possible failure is if name
 			 * already exists, and ID should be unique. Note that
@@ -293,15 +321,13 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 		}
 	} else {
 		ret = device_create(dname, input_device_dir, iops, device, attrs,
-	                            ARRAYSZ(attrs), &device->device);
+	                            ARRAYSZ(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
 		}
-		device->alias = NULL;
 	}
 
-	*devicep = device;
 	return STATUS_SUCCESS;
 }
 
@@ -325,7 +351,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
  * @return		Status code describing result of the operation.
  */
 status_t keyboard_device_create(const char *name, device_t *parent, uint8_t protocol,
-                                keyboard_ops_t *ops, void *data, input_device_t **devicep) {
+                                keyboard_ops_t *ops, void *data, device_t **devicep) {
 	return input_device_create(name, parent, INPUT_TYPE_KEYBOARD, protocol, ops, data, devicep);
 }
 MODULE_EXPORT(keyboard_device_create);
@@ -350,32 +376,10 @@ MODULE_EXPORT(keyboard_device_create);
  * @return		Status code describing result of the operation.
  */
 status_t mouse_device_create(const char *name, device_t *parent, uint8_t protocol,
-                             mouse_ops_t *ops, void *data, input_device_t **devicep) {
+                             mouse_ops_t *ops, void *data, device_t **devicep) {
 	return input_device_create(name, parent, INPUT_TYPE_MOUSE, protocol, ops, data, devicep);
 }
 MODULE_EXPORT(mouse_device_create);
-
-/** Remove an input device.
- * @param device	Device to remove.
- * @return		Status code describing result of the operation. */
-status_t input_device_destroy(input_device_t *device) {
-	status_t ret;
-
-	assert(!device->open);
-
-	if(device->alias) {
-		device_destroy(device->alias);
-	}
-
-	ret = device_destroy(device->device);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	kfree(device);
-	return STATUS_SUCCESS;
-}
-MODULE_EXPORT(input_device_destroy);
 
 /** Initialisation function for the input module.
  * @return		Status code describing result of the operation. */

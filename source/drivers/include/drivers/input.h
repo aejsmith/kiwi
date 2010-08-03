@@ -60,13 +60,16 @@ typedef struct keyboard_led_state {
 #include <sync/spinlock.h>
 
 struct input_device;
-struct input_type;
 
 /** Size of an input device buffer. */
 #define INPUT_BUFFER_SIZE	128
 
 /** Keyboard device operations structure. */
 typedef struct keyboard_ops {
+	/** Destroy data associated with the device.
+	 * @param device	Device to destroy. */
+	void (*destroy)(struct input_device *device);
+
 	/** Handler for device-specific requests.
 	 * @note		This is called when a device request ID is
 	 *			received that is greater than or equal to
@@ -89,6 +92,11 @@ typedef struct keyboard_ops {
 
 /** Mouse device operations structure. */
 typedef struct mouse_ops {
+	/** Destroy data associated with the device.
+	 * @param device	Device to destroy.
+	 * @return		Status code describing result of operation. */
+	status_t (*destroy)(struct input_device *device);
+
 	/** Handler for device-specific requests.
 	 * @note		This is called when a device request ID is
 	 *			received that is greater than or equal to
@@ -107,9 +115,6 @@ typedef struct mouse_ops {
 /** Input device structure. */
 typedef struct input_device {
 	int id;				/**< Device ID. */
-	device_t *device;		/**< Device tree entry. */
-	device_t *alias;		/**< Alias if main device is under a different directory. */
-	struct input_type *type;	/**< Input device type. */
 
 	/** Operations for the device. */
 	union {
@@ -120,6 +125,7 @@ typedef struct input_device {
 
 	void *data;			/**< Implementation-specific data pointer. */
 	atomic_t open;			/**< Whether the device is open. */
+	uint8_t type;			/**< Type of the device. */
 
 	spinlock_t lock;		/**< Input buffer lock. */
 	semaphore_t sem;		/**< Semaphore to wait for input on. */
@@ -131,14 +137,12 @@ typedef struct input_device {
 	uint8_t buffer[INPUT_BUFFER_SIZE];
 } input_device_t;
 
-extern void input_device_input(input_device_t *device, uint8_t value);
+extern void input_device_input(device_t *device, uint8_t value);
 
 extern status_t keyboard_device_create(const char *name, device_t *parent, uint8_t protocol,
-                                       keyboard_ops_t *ops, void *data,
-                                       input_device_t **devicep);
+                                       keyboard_ops_t *ops, void *data, device_t **devicep);
 extern status_t mouse_device_create(const char *name, device_t *parent, uint8_t protocol,
-                                    mouse_ops_t *ops, void *data, input_device_t **devicep);
-extern status_t input_device_destroy(input_device_t *device);
+                                    mouse_ops_t *ops, void *data, device_t **devicep);
 
 #endif /* KERNEL */
 #endif /* __DRIVERS_INPUT_H */

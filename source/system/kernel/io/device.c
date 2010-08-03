@@ -171,6 +171,7 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
+	list_init(&device->aliases);
 	device->name = kstrdup(name, MM_SLEEP);
 	device->parent = parent;
 	device->dest = NULL;
@@ -228,13 +229,13 @@ fail:
 
 /** Create an alias for a device.
  *
- * Creates an alias for another device in the device tree. Any attempts to get
- * the alias will return the device it is an alias for. Any aliases created
- * for a device should be destroyed before destroying the device itself.
+ * Creates an alias for another device in the device tree. Any attempts to open
+ * the alias will open the device it is an alias for.
  *
  * @param name		Name to give alias.
  * @param parent	Device to create alias under.
- * @param dest		Destination device.
+ * @param dest		Destination device. If this is an alias, the new alias
+ *			will refer to the destination, not the alias itself.
  * @param devicep	Where to store pointer to alias structure (can be NULL).
  *
  * @return		Status code describing result of the operation.
@@ -246,6 +247,11 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 		return STATUS_PARAM_INVAL;
 	}
 
+	/* If the destination is an alias, use it's destination. */
+	if(dest->dest) {
+		dest = dest->dest;
+	}
+
 	/* Check if a child already exists with this name. */
 	mutex_lock(&parent->lock);
 	if(radix_tree_lookup(&parent->children, name)) {
@@ -253,13 +259,12 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 		return STATUS_ALREADY_EXISTS;
 	}
 
-	refcount_inc(&dest->count);
-
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
 	object_init(&device->obj, &device_object_type);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
+	list_init(&device->dest_link);
 	device->name = kstrdup(name, MM_SLEEP);
 	device->parent = parent;
 	device->dest = dest;
@@ -271,6 +276,11 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	refcount_inc(&parent->count);
 	radix_tree_insert(&parent->children, device->name, device);
 	mutex_unlock(&parent->lock);
+
+	/* Add the device to the destination's alias list. */
+	mutex_lock(&dest->lock);
+	list_append(&dest->aliases, &device->dest_link);
+	mutex_unlock(&dest->lock);
 
 	dprintf("device: created alias %p(%s) under %p(%s) (dest: %p)\n",
 	        device, device->name, parent, parent->name, dest);
@@ -287,6 +297,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
  *
  * @todo		Sometime we'll need to allow devices to be removed when
  *			they have users, for example for hotplugging.
+ * @fixme		I don't think alias removal is entirely thread-safe.
  *
  * @param device	Device to remove.
  *
@@ -294,6 +305,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
  *			fail if the device being removed is an alias.
  */
 status_t device_destroy(device_t *device) {
+	device_t *alias;
 	size_t i;
 
 	assert(device->parent);
@@ -307,13 +319,22 @@ status_t device_destroy(device_t *device) {
 		return STATUS_IN_USE;
 	}
 
+	/* Call the device's destroy operation, if any. */
+	if(device->ops && device->ops->destroy) {
+		device->ops->destroy(device);
+	}
+
+	/* Remove all aliases to the device. */
+	if(!device->dest) {
+		LIST_FOREACH(&device->aliases, iter) {
+			alias = list_entry(iter, device_t, dest_link);
+			device_destroy(alias);
+		}
+	}
+
 	radix_tree_remove(&device->parent->children, device->name, NULL);
 	refcount_dec(&device->parent->count);
 	mutex_unlock(&device->parent->lock);
-
-	if(device->dest) {
-		refcount_dec(&device->dest->count);
-	}
 
 	/* Free up attributes if any. */
 	if(device->attrs) {

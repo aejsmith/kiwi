@@ -13,12 +13,12 @@
 
 Import('env', 'config')
 
+# Build the input device manager.
+env.Module('input', ['input.c'])
+
 # Work out the drivers to build.
 dirs = [
 	('DRIVER_INPUT_I8042', 'i8042'),
 ]
 
 SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
-
-# Build the input device manager.
-env.Module('input', ['input.c'])

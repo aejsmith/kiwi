@@ -30,6 +30,10 @@ struct device;
 
 /** Structure containing device operations. */
 typedef struct device_ops {
+	/** Clean up all data associated with a device.
+	 * @param device	Device to destroy. */
+	void (*destroy)(struct device *device);
+
 	/** Handler for open calls.
 	 * @note		Called with device lock held.
 	 * @param device	Device being opened.
@@ -152,6 +156,10 @@ typedef struct device {
 	struct device *parent;			/**< Parent tree entry. */
 	radix_tree_t children;			/**< Child devices. */
 	struct device *dest;			/**< Destination device if this is an alias. */
+	union {
+		list_t aliases;			/**< Aliases for this device. */
+		list_t dest_link;		/**< Link to destination's aliases list. */
+	};
 
 	device_ops_t *ops;			/**< Operations structure for the device. */
 	void *data;				/**< Data used by the device's creator. */
