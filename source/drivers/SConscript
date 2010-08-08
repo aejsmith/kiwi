@@ -17,7 +17,7 @@ subdirs = [
 	'bus',
 	#'console',
 	'disk',
-	#'display',
+	'display',
 	'input',
 ]
 

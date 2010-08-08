@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -26,36 +26,36 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+#include <status.h>
 
 #include "vbe_priv.h"
 
 /** Display device structure. */
-static display_device_t *vbe_display_dev;
+static device_t *vbe_display_device;
 
 /** Get a framebuffer address.
- * @param _dev		Device to get address from.
+ * @param _device	Device to get address from.
  * @param offset	Offset into the framebuffer.
  * @param physp		Where to store physical address.
- * @return		0 on success, negative error code on failure. */
-static int vbe_display_get_page(display_device_t *_dev, offset_t offset, phys_ptr_t *physp) {
-	vbe_device_t *device = _dev->data;
+ * @return		Status code describing result of the operation. */
+static status_t vbe_display_get_page(display_device_t *_device, offset_t offset, phys_ptr_t *physp) {
+	vbe_device_t *device = _device->data;
 
 	if(offset > (offset_t)device->size) {
-		return -ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
 	*physp = device->phys + offset;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Set the display mode.
  * @param _dev		Device to set mode of.
  * @param mode		Mode structure for mode to set.
- * @return		0 on success, negative error code on failure. */
-static int vbe_display_mode_set(display_device_t *_dev, display_mode_t *mode) {
+ * @return		Status code describing result of the operation. */
+static status_t vbe_display_set_mode(display_device_t *_device, display_mode_t *mode) {
 	bios_regs_t regs;
 
 	if(mode) {
@@ -69,21 +69,21 @@ static int vbe_display_mode_set(display_device_t *_dev, display_mode_t *mode) {
 	bios_interrupt(0x10, &regs);
 	if((regs.eax & 0xFF00) != 0) {
 		kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
-		return -ERR_DEVICE_ERROR;
+		return STATUS_DEVICE_ERROR;
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** VBE display operations. */
 static display_ops_t vbe_display_ops = {
 	.get_page = vbe_display_get_page,
-	.mode_set = vbe_display_mode_set,
+	.set_mode = vbe_display_set_mode,
 };
 
 /** Initialisation function for the VBE driver.
- * @return		0 on success, negative error code on failure. */
-static int vbe_init(void) {
+ * @return		Status code describing result of the operation. */
+static status_t vbe_init(void) {
 	vbe_device_t *device = kmalloc(sizeof(vbe_device_t), MM_SLEEP);
 	vbe_mode_info_t *minfo = NULL;
 	display_mode_t *modes = NULL;
@@ -91,7 +91,7 @@ static int vbe_init(void) {
 	size_t count = 0, i;
 	uint16_t *location;
 	bios_regs_t regs;
-	int ret;
+	status_t ret;
 
 	/* Detect VBE presence by trying to get controller information. */
 	info = bios_mem_alloc(sizeof(vbe_info_t), MM_SLEEP);
@@ -102,11 +102,11 @@ static int vbe_init(void) {
 	bios_interrupt(0x10, &regs);
 	if((regs.eax & 0x00FF) != 0x4F) {
 		kprintf(LOG_DEBUG, "vbe: VBE is not supported!\n");
-		ret = -ERR_NOT_SUPPORTED;
+		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	} else if((regs.eax & 0xFF00) != 0) {
 		kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
-		ret = -ERR_DEVICE_ERROR;
+		ret = STATUS_DEVICE_ERROR;
 		goto out;
 	}
 
@@ -126,8 +126,9 @@ static int vbe_init(void) {
 	device->phys = ~((phys_ptr_t)0);
 	device->size = (info->total_memory * 64) * 1024;
 
-	if(!(location = bios_mem_phys2virt(SEGOFF2LIN(device->info.video_mode_ptr)))) {
-		ret = -ERR_DEVICE_ERROR;
+	location = bios_mem_phys2virt(SEGOFF2LIN(device->info.video_mode_ptr));
+	if(!location) {
+		ret = STATUS_DEVICE_ERROR;
 		goto out;
 	}
 
@@ -145,7 +146,7 @@ static int vbe_init(void) {
 		bios_interrupt(0x10, &regs);
 		if((regs.eax & 0xFF00) != 0) {
 			kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
-			ret = -ERR_DEVICE_ERROR;
+			ret = STATUS_DEVICE_ERROR;
 			goto out;
 		}
 
@@ -195,7 +196,8 @@ static int vbe_init(void) {
 	}
 
 	/* Add the display device. */
-	if((ret = display_device_create(NULL, NULL, &vbe_display_ops, device, modes, count, &vbe_display_dev)) != 0) {
+	ret = display_device_create(NULL, NULL, &vbe_display_ops, device, modes, count, &vbe_display_device);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 out:
@@ -209,9 +211,9 @@ out:
 }
 
 /** Unloading function for the VBE driver.
- * @return		0 on success, negative error code on failure. */
-static int vbe_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t vbe_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("vbe");

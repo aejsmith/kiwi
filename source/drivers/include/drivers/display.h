@@ -46,7 +46,7 @@ typedef struct display_mode {
 #define DISPLAY_SET_MODE		35	/**< Set the display mode. */
 
 /** Display device event types. */
-#define DISPLAY_EVENT_REDRAW	32	/**< Wait until a redraw is required. */
+#define DISPLAY_EVENT_REDRAW		32	/**< Wait until a redraw is required. */
 
 #ifdef KERNEL
 
@@ -68,10 +68,9 @@ typedef struct display_ops {
 	 * @param insz		Input buffer size.
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
-	 * @return		Positive value on success, negative error code
-	 *			on failure. */
-	int (*request)(struct display_device *device, int request, void *in, size_t insz,
-	               void **outp, size_t *outszp);
+	 * @return		Status code describing result of operation. */
+	status_t (*request)(struct display_device *device, int request, void *in, size_t insz,
+	                    void **outp, size_t *outszp);
 
 	/** Get a framebuffer address.
 	 * @note		This should check that the offset is within the
@@ -79,22 +78,20 @@ typedef struct display_ops {
 	 * @param device	Device to get address from.
 	 * @param offset	Offset into the framebuffer.
 	 * @param physp		Where to store physical address.
-	 * @return		0 on success, negative error code on failure. */
-	int (*get_page)(struct display_device *device, offset_t offset, phys_ptr_t *physp);
+	 * @return		Status code describing result of operation. */
+	status_t (*get_page)(struct display_device *device, offset_t offset, phys_ptr_t *physp);
 
 	/** Set the display mode.
 	 * @param device	Device to set mode of.
 	 * @param mode		Mode structure for mode to set.
-	 * @return		0 on success, negative error code on failure. */
-	int (*mode_set)(struct display_device *device, display_mode_t *mode);
+	 * @return		Status code describing result of operation. */
+	status_t (*set_mode)(struct display_device *device, display_mode_t *mode);
 } display_ops_t;
 
 /** Structure describing a display device. */
 typedef struct display_device {
 	mutex_t lock;			/**< Lock to protect device. */
 	int id;				/**< Device ID. */
-	device_t *device;		/**< Device tree node. */
-	device_t *alias;		/**< Alias if main device under different directory. */
 	display_ops_t *ops;		/**< Device operations structure. */
 	void *data;			/**< Driver data structure. */
 	atomic_t open;			/**< Whether the device is open. */
@@ -107,10 +104,9 @@ typedef struct display_device {
 	bool redraw;			/**< Whether any redraw requests have been missed. */
 } display_device_t;
 
-extern int display_device_create(const char *name, device_t *parent, display_ops_t *ops,
-                                 void *data, display_mode_t *modes, size_t count,
-                                 display_device_t **devicep);
-extern int display_device_destroy(display_device_t *device);
+extern status_t display_device_create(const char *name, device_t *parent, display_ops_t *ops,
+                                      void *data, display_mode_t *modes, size_t count,
+                                      device_t **devicep);
 
 #endif /* KERNEL */
 #endif /* __DRIVERS_DISPLAY_H */
