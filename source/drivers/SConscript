@@ -15,7 +15,7 @@ Import('envmgr')
 
 subdirs = [
 	'bus',
-	#'console',
+	'console',
 	'disk',
 	'display',
 	'input',

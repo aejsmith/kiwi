@@ -29,8 +29,8 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 
 /** Console device data structure. */
 typedef struct console_device {
@@ -45,7 +45,7 @@ static device_t *console_device_dir;
 static device_t *console_master_device;
 
 /** Next console ID. */
-static atomic_t console_next_id = 0;
+static atomic_t next_console_id = 0;
 
 /** Read from a console slave device.
  * @param device	Device to read from.
@@ -54,9 +54,9 @@ static atomic_t console_next_id = 0;
  * @param count		Number of bytes to read.
  * @param offset	Offset to write to (unused).
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. */
-static int console_slave_read(device_t *device, void *data, void *buf, size_t count,
-                              offset_t offset, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t console_slave_read(device_t *device, void *data, void *buf, size_t count,
+                                   offset_t offset, size_t *bytesp) {
 	console_device_t *console = device->data;
 	return pipe_read(console->input, buf, count, false, bytesp);
 }
@@ -68,9 +68,9 @@ static int console_slave_read(device_t *device, void *data, void *buf, size_t co
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to (unused).
  * @param bytesp	Where to store number of bytes written.
- * @return		0 on success, negative error code on failure. */
-static int console_slave_write(device_t *device, void *data, const void *buf, size_t count,
-                               offset_t offset, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t console_slave_write(device_t *device, void *data, const void *buf, size_t count,
+                                    offset_t offset, size_t *bytesp) {
 	console_device_t *console = device->data;
 	return pipe_write(console->output, buf, count, false, bytesp);
 }
@@ -79,19 +79,19 @@ static int console_slave_write(device_t *device, void *data, const void *buf, si
  * @param device	Device to wait for.
  * @param data		Handle-specific data pointer (unused).
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int console_slave_wait(device_t *device, void *data, object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t console_slave_wait(device_t *device, void *data, object_wait_t *wait) {
 	console_device_t *console = device->data;
 
 	switch(wait->event) {
 	case DEVICE_EVENT_READABLE:
 		pipe_wait(console->input, false, wait);
-		return 0;
+		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
 		pipe_wait(console->output, true, wait);
-		return 0;
+		return STATUS_SUCCESS;
 	default:
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 }
 
@@ -123,27 +123,28 @@ static device_ops_t console_slave_ops = {
 /** Open the console master device.
  * @param device	Device being obtained.
  * @param datap		Where to store handle-specific data pointer.
- * @return		0 on success, negative error code on failure. */
-static int console_master_open(device_t *device, void **datap) {
+ * @return		Status code describing result of the operation. */
+static status_t console_master_open(device_t *device, void **datap) {
 	char name[DEVICE_NAME_MAX];
 	console_device_t *console;
-	int ret;
+	status_t ret;
 
 	/* Create a new console .*/
 	console = kmalloc(sizeof(console_device_t), MM_SLEEP);
-	console->id = atomic_inc(&console_next_id);
+	console->id = atomic_inc(&next_console_id);
 	console->input = pipe_create();
 	console->output = pipe_create();
 	
 	sprintf(name, "%d", console->id); 
-	if((ret = device_create(name, console_device_dir, &console_slave_ops, console, NULL,
-	                        0, &console->slave)) != 0) {
+	ret = device_create(name, console_device_dir, &console_slave_ops, console, NULL,
+	                    0, &console->slave);
+	if(ret != STATUS_SUCCESS) {
 		kfree(console);
 		return ret;
 	}
 
 	*datap = console;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Close the console master device.
@@ -153,7 +154,7 @@ static void console_master_close(device_t *device, void *data) {
 	console_device_t *console = data;
 
 	/* FIXME: Device manager doesn't allow removal of in-use devices yet. */
-	if(device_destroy(console->slave) == 0) {
+	if(device_destroy(console->slave) == STATUS_SUCCESS) {
 		pipe_destroy(console->input);
 		pipe_destroy(console->output);
 		kfree(console);
@@ -167,9 +168,9 @@ static void console_master_close(device_t *device, void *data) {
  * @param count		Number of bytes to read.
  * @param offset	Offset to write to (unused).
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. */
-static int console_master_read(device_t *device, void *data, void *buf, size_t count,
-                               offset_t offset, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t console_master_read(device_t *device, void *data, void *buf, size_t count,
+                                    offset_t offset, size_t *bytesp) {
 	console_device_t *console = data;
 	return pipe_read(console->output, buf, count, false, bytesp);
 }
@@ -181,9 +182,9 @@ static int console_master_read(device_t *device, void *data, void *buf, size_t c
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to (unused).
  * @param bytesp	Where to store number of bytes written.
- * @return		0 on success, negative error code on failure. */
-static int console_master_write(device_t *device, void *data, const void *buf, size_t count,
-                                offset_t offset, size_t *bytesp) {
+ * @return		Status code describing result of the operation. */
+static status_t console_master_write(device_t *device, void *data, const void *buf, size_t count,
+                                     offset_t offset, size_t *bytesp) {
 	console_device_t *console = data;
 	return pipe_write(console->input, buf, count, false, bytesp);
 }
@@ -192,19 +193,19 @@ static int console_master_write(device_t *device, void *data, const void *buf, s
  * @param device	Device to wait for.
  * @param data		Pointer to console structure.
  * @param wait		Wait information structure.
- * @return		0 on success, negative error code on failure. */
-static int console_master_wait(device_t *device, void *data, object_wait_t *wait) {
+ * @return		Status code describing result of the operation. */
+static status_t console_master_wait(device_t *device, void *data, object_wait_t *wait) {
 	console_device_t *console = data;
 
 	switch(wait->event) {
 	case DEVICE_EVENT_READABLE:
 		pipe_wait(console->output, false, wait);
-		return 0;
+		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
 		pipe_wait(console->input, true, wait);
-		return 0;
+		return STATUS_SUCCESS;
 	default:
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 }
 
@@ -233,17 +234,18 @@ static void console_master_unwait(device_t *device, void *data, object_wait_t *w
  * @param insz		Input buffer size.
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
- * @return		Positive value on success, negative error code on
- *			failure. */
-static int console_master_request(device_t *manager, void *data, int request, void *in,
-                                  size_t insz, void **outp, size_t *outszp) {
+ * @return		Status code describing result of the operation. */
+static status_t console_master_request(device_t *device, void *data, int request, void *in,
+                                       size_t insz, void **outp, size_t *outszp) {
 	console_device_t *console = data;
 
 	switch(request) {
 	case CONSOLE_MASTER_GET_ID:
-		return console->id;
+		*outp = kmemdup(&console->id, sizeof(console->id), MM_SLEEP);
+		*outszp = sizeof(console->id);
+		return STATUS_SUCCESS;
 	default:
-		return -ERR_PARAM_INVAL;
+		return STATUS_PARAM_INVAL;
 	}
 }
 
@@ -259,30 +261,31 @@ static device_ops_t console_master_ops = {
 };
 
 /** Initialisation function for the console driver.
- * @return		0 on success, negative error code on failure. */
-static int console_init(void) {
-	int ret;
+ * @return		Status code describing result of the operation. */
+static status_t console_init(void) {
+	status_t ret;
 
 	/* Create console directory. */
-	if((ret = device_create("console", device_tree_root, NULL, NULL, NULL, 0,
-	                        &console_device_dir)) != 0) {
+	ret = device_create("console", device_tree_root, NULL, NULL, NULL, 0, &console_device_dir);	
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Create console manager device. */
-	if((ret = device_create("master", console_device_dir, &console_master_ops,
-	                        NULL, NULL, 0, &console_master_device)) != 0) {
+	ret = device_create("master", console_device_dir, &console_master_ops,
+	                    NULL, NULL, 0, &console_master_device);
+	if(ret != STATUS_SUCCESS) {
 		device_destroy(console_device_dir);
 		return ret;
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Unloading function for the console driver.
- * @return		0 on success, negative error code on failure. */
-static int console_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t console_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("console");
