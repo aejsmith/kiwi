@@ -85,7 +85,7 @@ sources = map(File, [
 env = envmgr.Create('kernel', {
 	'LIBS': [],
 	'CPPPATH': [
-		Dir('../include'),
+		Dir('include'),
 		Dir('arch/%s/include' % (config['SRCARCH'])),
 		Dir('platform/%s/include' % (config['PLATFORM'])),
 	],
@@ -180,3 +180,6 @@ Depends('kernel', ['kernel.lst', 'kernel.rde', 'kernel.sym'])
 
 # Let the distribution environment know where the kernel is.
 envmgr['dist']['KERNEL'] = File('kernel')
+
+# Build kernel modules.
+SConscript(dirs=['modules'])

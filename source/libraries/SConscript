@@ -24,6 +24,7 @@ os.symlink('%s/%s/%s/toolchain-lib/ldscripts' % (config['TOOLCHAIN_DIR'], config
 # Build all the libraries.
 SConscript(dirs=[
 	'libc',
+	'libkernel',
 	'libm',
 	'libstdc++',
 #	'libkiwi',

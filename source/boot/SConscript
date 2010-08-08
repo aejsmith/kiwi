@@ -50,7 +50,7 @@ env = envmgr.Create('boot', {
 		Dir('include'),
 		Dir('arch/%s/include' % (config['SRCARCH'])),
 		Dir('platform/%s/include' % (config['PLATFORM'])),
-		Dir('../include'),
+		Dir('../kernel/include'),
 		Dir('../kernel/arch/%s/include' % (config['SRCARCH'])),
 		Dir('../kernel/platform/%s/include' % (config['PLATFORM'])),
 	],
