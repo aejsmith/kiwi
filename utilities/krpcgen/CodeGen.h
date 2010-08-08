@@ -32,12 +32,12 @@ public:
 	/** Generate server code.
 	 * @param path		Path to output file.
 	 * @return		Whether generated successfully. */
-	virtual bool generateServer(const std::string &path) = 0;
+	virtual bool GenerateServer(const std::string &path) = 0;
 
 	/** Generate client code.
 	 * @param path		Path to output file.
 	 * @return		Whether generated successfully. */
-	virtual bool generateClient(const std::string &path) = 0;
+	virtual bool GenerateClient(const std::string &path) = 0;
 protected:
 	Service *m_service;		/**< Service to generate for. */
 };

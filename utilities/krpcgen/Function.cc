@@ -25,13 +25,13 @@
 using namespace std;
 
 /** Dump information about the function. */
-void Function::dump() const {
+void Function::Dump() const {
 	cout << ' ' << m_name << '(';
 	for(ParameterList::const_iterator it = m_params.begin(); it != m_params.end(); ) {
 		if(it->out) {
 			cout << "out ";
 		}
-		cout << it->type->getName() << ' ' << it->name;
+		cout << it->type->GetName() << ' ' << it->name;
 		if(++it != m_params.end()) {
 			cout << ", ";
 		}
@@ -46,7 +46,7 @@ void Function::dump() const {
  * @param out		Whether the parameter is for output.
  * @return		True if added, false if parameter already exists with
  *			the same name. */
-bool Function::addParameter(Type *type, const char *name, bool out) {
+bool Function::AddParameter(Type *type, const char *name, bool out) {
 	BOOST_FOREACH(const Parameter &param, m_params) {
 		if(param.name == name) {
 			return false;

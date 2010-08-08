@@ -29,27 +29,27 @@ class CXXCodeGen : public CodeGen {
 public:
 	CXXCodeGen(Service *service);
 
-	bool generateServer(const std::string &path);
-	bool generateClient(const std::string &path);
+	bool GenerateServer(const std::string &path);
+	bool GenerateClient(const std::string &path);
 private:
-	bool generateServerHeader(const std::string &path);
-	bool generateServerCode(const std::string &path);
-	bool generateClientHeader(const std::string &path);
-	bool generateClientCode(const std::string &path);
+	bool GenerateServerHeader(const std::string &path);
+	bool GenerateServerCode(const std::string &path);
+	bool GenerateClientHeader(const std::string &path);
+	bool GenerateClientCode(const std::string &path);
 
-	bool beginHeader(const std::string &path, std::ofstream &stream);
-	void endHeader(std::ofstream &stream);
-	bool beginCode(const std::string &path, std::ofstream &stream);
-	void endCode(std::ofstream &stream);
+	bool BeginHeader(const std::string &path, std::ofstream &stream);
+	void EndHeader(std::ofstream &stream);
+	bool BeginCode(const std::string &path, std::ofstream &stream);
+	void EndCode(std::ofstream &stream);
 
-	void startNamespace(std::ofstream &stream);
-	void endNamespace(std::ofstream &stream);
+	void StartNamespace(std::ofstream &stream);
+	void EndNamespace(std::ofstream &stream);
 
-	std::string getHeaderPath(const std::string &fpath);
-	std::string getCXXType(Type *type);
-	std::string getFunctionParams(const Function *func);
-	std::string getEventParams(const Function *event);
-	std::string getHandlerCall(const Function *func);
+	std::string GetHeaderPath(const std::string &fpath);
+	std::string GetCXXType(Type *type);
+	std::string GetFunctionParams(const Function *func);
+	std::string GetEventParams(const Function *event);
+	std::string GetHandlerCall(const Function *func);
 };
 
 #endif /* __CXXCODEGEN_H */

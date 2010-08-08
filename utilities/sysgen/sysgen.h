@@ -47,21 +47,21 @@ public:
 
 	/** Add a parameter to the call.
 	 * @param type		Type of the call. */
-	void addParameter(Type type) {
+	void AddParameter(Type type) {
 		m_param_count += type.count;
 	}
 
 	/** Get the name of the call.
 	 * @return		Reference to call name. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 
 	/** Get the ID of the call.
 	 * @return		ID of the function. */
-	unsigned long getID() const { return m_id; }
+	unsigned long GetID() const { return m_id; }
 
 	/** Get the parameter count.
 	 * @return		Number of parameters. */
-	size_t getParameterCount() const { return m_param_count; }
+	size_t GetParameterCount() const { return m_param_count; }
 private:
 	std::string m_name;		/**< Name of the call. */
 	unsigned long m_id;		/**< ID of the call. */
@@ -76,12 +76,12 @@ class Target {
 public:
 	/** Add the target's basic types to the type map.
 	 * @param map		Map to add to. */
-	virtual void addTypes(TypeMap &map) = 0;
+	virtual void AddTypes(TypeMap &map) = 0;
 
 	/** Generate system call functions.
 	 * @param stream	Stream to write to.
 	 * @param calls		List of calls to generate. */
-	virtual void generate(std::ostream &stream, const SyscallList &calls) = 0;
+	virtual void Generate(std::ostream &stream, const SyscallList &calls) = 0;
 };
 
 extern "C" {

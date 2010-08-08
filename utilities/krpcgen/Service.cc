@@ -31,40 +31,40 @@ Service::Service() :
 	m_version(0), m_next_id(1)
 {
 	/* Add built-in types. */
-	addType(new BytesType("bytes"));
-	addType(new BooleanType("bool"));
-	addType(new StringType("string"));
-	addType(new IntegerType("int8", 8, true));
-	addType(new IntegerType("int16", 16, true));
-	addType(new IntegerType("int32", 32, true));
-	addType(new IntegerType("int64", 64, true));
-	addType(new IntegerType("uint8", 8, false));
-	addType(new IntegerType("uint16", 16, false));
-	addType(new IntegerType("uint32", 32, false));
-	addType(new IntegerType("uint64", 64, false));
+	AddType(new BytesType("bytes"));
+	AddType(new BooleanType("bool"));
+	AddType(new StringType("string"));
+	AddType(new IntegerType("int8", 8, true));
+	AddType(new IntegerType("int16", 16, true));
+	AddType(new IntegerType("int32", 32, true));
+	AddType(new IntegerType("int64", 64, true));
+	AddType(new IntegerType("uint8", 8, false));
+	AddType(new IntegerType("uint16", 16, false));
+	AddType(new IntegerType("uint32", 32, false));
+	AddType(new IntegerType("uint64", 64, false));
 }
 
 /** Dump the state of the service. */
-void Service::dump() const {
+void Service::Dump() const {
 	cout << "Name: " << m_name << endl;
 	cout << "Version: " << m_version << endl;
 	cout << "Types:" << endl;
 	BOOST_FOREACH(const TypeMap::value_type &type, m_types) {
-		type.second->dump();
+		type.second->Dump();
 	}
 	cout << "Functions:" << endl;
 	BOOST_FOREACH(const Function *func, m_functions) {
-		func->dump();
+		func->Dump();
 	}
 	cout << "Events:" << endl;
 	BOOST_FOREACH(const Function *event, m_events) {
-		event->dump();
+		event->Dump();
 	}
 }
 
 /** Split the service namespace into tokens.
  * @param tokens	Vector to place tokens into. */
-void Service::tokeniseName(vector<string> &tokens) const {
+void Service::TokeniseName(vector<string> &tokens) const {
 	size_t last = 0, pos = m_name.find_first_of('.');
 	while(pos != string::npos || last != string::npos) {
 		tokens.push_back(m_name.substr(last, pos - last));
@@ -76,7 +76,7 @@ void Service::tokeniseName(vector<string> &tokens) const {
 /** Set the name of the service.
  * @param name		Name to set.
  * @return		True if OK, false if name was already set. */
-bool Service::setName(const char *name) {
+bool Service::SetName(const char *name) {
 	if(m_name.length() > 0) {
 		return false;
 	}
@@ -88,7 +88,7 @@ bool Service::setName(const char *name) {
 /** Set the version of the service.
  * @param ver		Version to set.
  * @return		True if OK, false if version was already set. */
-bool Service::setVersion(unsigned long ver) {
+bool Service::SetVersion(unsigned long ver) {
 	if(m_version > 0) {
 		return false;
 	}
@@ -101,19 +101,19 @@ bool Service::setVersion(unsigned long ver) {
  * @param type		Type to add.
  * @return		True if added, false if there is already a type with
  *			the same name. */
-bool Service::addType(Type *type) {
-	if(getType(type->getName().c_str())) {
+bool Service::AddType(Type *type) {
+	if(GetType(type->GetName().c_str())) {
 		return false;
 	}
 
-	m_types[type->getName()] = type;
+	m_types[type->GetName()] = type;
 	return true;
 }
 
 /** Look up a type in a service.
  * @param name		Name of the type to find.
  * @return		Pointer to type if found, NULL if not. */
-Type *Service::getType(const char *name) const {
+Type *Service::GetType(const char *name) const {
 	TypeMap::const_iterator it = m_types.find(name);
 	if(it == m_types.end()) {
 		return NULL;
@@ -127,14 +127,14 @@ Type *Service::getType(const char *name) const {
  * @param list		List to add to.
  * @return		True if added, false if function with same name already
  *			exists. */
-bool Service::addFunctionToList(Function *func, FunctionList &list) {
-	NameMap::iterator it = m_func_names.find(func->getName());
+bool Service::AddFunctionToList(Function *func, FunctionList &list) {
+	NameMap::iterator it = m_func_names.find(func->GetName());
 	if(it != m_func_names.end()) {
 		return false;
 	}
 
-	func->setMessageID(m_next_id++);
+	func->SetMessageID(m_next_id++);
 	list.push_back(func);
-	m_func_names.insert(make_pair(func->getName(), func));
+	m_func_names.insert(make_pair(func->GetName(), func));
 	return true;
 }

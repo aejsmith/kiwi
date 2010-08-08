@@ -31,11 +31,11 @@ class Type {
 public:
 	Type(const char *name) : m_name(name) {}
 	virtual ~Type() {};
-	virtual void dump() const;
+	virtual void Dump() const;
 
 	/** Get the name of the type.
 	 * @return		Reference to type name. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 protected:
 	std::string m_name;		/**< Name of the type. */
 };
@@ -69,15 +69,15 @@ public:
 		Type(name), m_width(width), m_is_signed(is_signed)
 	{}
 
-	virtual void dump() const;
+	virtual void Dump() const;
 
 	/** Get the width of the type.
 	 * @return		Width of the type. */
-	size_t getWidth() const { return m_width; }
+	size_t GetWidth() const { return m_width; }
 
 	/** Check if the type is signed.
 	 * @return		Whether the type is signed. */
-	bool isSigned() const { return m_is_signed; }
+	bool IsSigned() const { return m_is_signed; }
 private:
 	size_t m_width;			/**< Width of the type. */
 	bool m_is_signed;		/**< Whether the type is signed. */
@@ -87,11 +87,11 @@ private:
 class AliasType : public Type {
 public:
 	AliasType(const char *name, Type *dest);
-	virtual void dump() const;
+	virtual void Dump() const;
 
 	/** Get the real type this alias refers to.
 	 * @return		Pointer to type (never another alias. */
-	Type *resolve() const { return m_dest; }
+	Type *Resolve() const { return m_dest; }
 private:
 	Type *m_dest;			/**< Type the alias refers to. */
 };
@@ -103,12 +103,12 @@ public:
 	typedef std::list<std::pair<Type *, std::string> > EntryList;
 
 	StructType(const char *name) : Type(name) {}
-	virtual void dump() const;
-	bool addEntry(Type *type, const char *name);
+	virtual void Dump() const;
+	bool AddEntry(Type *type, const char *name);
 
 	/** Get the entry list.
 	 * @return		Reference to entry list. */
-	const EntryList &getEntries() const { return m_entries; }
+	const EntryList &GetEntries() const { return m_entries; }
 private:
 	EntryList m_entries;		/**< List of entries in the type. */
 };

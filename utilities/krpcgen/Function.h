@@ -44,24 +44,24 @@ public:
 	 * @param name		Name of the function.  */
 	Function(const char *name) : m_name(name) {}
 
-	void dump() const;
-	bool addParameter(Type *type, const char *name, bool out);
+	void Dump() const;
+	bool AddParameter(Type *type, const char *name, bool out);
 
 	/** Get the name of the function.
 	 * @return		Reference to type name. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 
 	/** Get the message ID of the function.
 	 * @return		Message ID of the function. */
-	uint32_t getMessageID() const { return m_id; }
+	uint32_t GetMessageID() const { return m_id; }
 
 	/** Set the message ID of the function.
 	 * @param id		ID to set. */
-	void setMessageID(uint32_t id) { m_id = id; }
+	void SetMessageID(uint32_t id) { m_id = id; }
 
 	/** Get the argument list.
 	 * @return		Reference to argument list. */
-	const ParameterList &getParameters() const { return m_params; }
+	const ParameterList &GetParameters() const { return m_params; }
 private:
 	std::string m_name;		/**< Name of the function. */
 	uint32_t m_id;			/**< Message ID of the function. */

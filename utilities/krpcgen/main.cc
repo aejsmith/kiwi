@@ -89,7 +89,7 @@ variable_t *new_variable(const char *name, const char *type, bool out) {
 void set_service_name(const char *name) {
 	DEBUG("set_service_name(" << name << ")");
 
-	if(!current_service->setName(name)) {
+	if(!current_service->SetName(name)) {
 		COMPILE_ERROR("Service name has already been set.");
 	}
 }
@@ -101,7 +101,7 @@ void set_service_version(unsigned long ver) {
 
 	if(ver == 0) {
 		COMPILE_ERROR("Service version must be greater than 0.");
-	} else if(!current_service->setVersion(ver)) {
+	} else if(!current_service->SetVersion(ver)) {
 		COMPILE_ERROR("Service version has already been set.");
 	}
 }
@@ -112,14 +112,14 @@ void set_service_version(unsigned long ver) {
 void add_type(const char *name, const char *target) {
 	DEBUG("add_type(" << name << ", " << target << ")");
 
-	Type *dest = current_service->getType(target);
+	Type *dest = current_service->GetType(target);
 	if(!dest) {
 		COMPILE_ERROR("Alias target `" << target << "' does not exist.");
 		return;
 	}
 
 	Type *alias = new AliasType(name, dest);
-	if(!current_service->addType(alias)) {
+	if(!current_service->AddType(alias)) {
 		COMPILE_ERROR("Type `" << name << "' already exists.");
 		delete alias;
 	}
@@ -133,12 +133,12 @@ void add_struct(const char *name, variable_t *entries) {
 
 	StructType *str = new StructType(name);
 	while(entries) {
-		Type *type = current_service->getType(entries->type);
+		Type *type = current_service->GetType(entries->type);
 		if(!type) {
 			COMPILE_ERROR_AT(entries->line, "Entry type `" << entries->type << "' does not exist.");
 			delete str;
 			return;
-		} else if(!str->addEntry(type, entries->name)) {
+		} else if(!str->AddEntry(type, entries->name)) {
 			COMPILE_ERROR_AT(entries->line, "Duplicate entry name `" << entries->name << "'.");
 			delete str;
 			return;
@@ -147,7 +147,7 @@ void add_struct(const char *name, variable_t *entries) {
 		entries = entries->next;
 	}
 
-	if(!current_service->addType(str)) {
+	if(!current_service->AddType(str)) {
 		COMPILE_ERROR("Type `" << name << "' already exists.");
 		delete str;
 	}
@@ -161,11 +161,11 @@ void add_function(const char *name, variable_t *params) {
 
 	Function *func = new Function(name);
 	while(params) {
-		Type *type = current_service->getType(params->type);
+		Type *type = current_service->GetType(params->type);
 		if(!type) {
 			COMPILE_ERROR_AT(params->line, "Parameter type `" << params->type << "' does not exist.");
 			return;
-		} else if(!func->addParameter(type, params->name, params->out)) {
+		} else if(!func->AddParameter(type, params->name, params->out)) {
 			COMPILE_ERROR_AT(params->line, "Duplicate parameter name `" << params->name << "'.");
 			return;
 		}
@@ -173,7 +173,7 @@ void add_function(const char *name, variable_t *params) {
 		params = params->next;
 	}
 
-	if(!current_service->addFunction(func)) {
+	if(!current_service->AddFunction(func)) {
 		COMPILE_ERROR("Duplicate function/event name `" << name << "'.");
 	}
 }
@@ -186,11 +186,11 @@ void add_event(const char *name, variable_t *params) {
 
 	Function *func = new Function(name);
 	while(params) {
-		Type *type = current_service->getType(params->type);
+		Type *type = current_service->GetType(params->type);
 		if(!type) {
 			COMPILE_ERROR_AT(params->line, "Parameter type `" << params->type << "' does not exist.");
 			return;
-		} else if(!func->addParameter(type, params->name, false)) {
+		} else if(!func->AddParameter(type, params->name, false)) {
 			COMPILE_ERROR_AT(params->line, "Duplicate parameter name `" << params->name << "'.");
 			return;
 		}
@@ -198,7 +198,7 @@ void add_event(const char *name, variable_t *params) {
 		params = params->next;
 	}
 
-	if(!current_service->addEvent(func)) {
+	if(!current_service->AddEvent(func)) {
 		COMPILE_ERROR("Duplicate function/event name `" << name << "'.");
 	}
 }
@@ -288,11 +288,11 @@ int main(int argc, char **argv) {
 	fclose(yyin);
 
 	/* Check whether enough information has been given. */
-	if(current_service->getName().length() == 0) {
+	if(current_service->GetName().length() == 0) {
 		COMPILE_ERROR("Service name has not been set.");
-	} else if(current_service->getVersion() == 0) {
+	} else if(current_service->GetVersion() == 0) {
 		COMPILE_ERROR("Service version has not been set.");
-	} else if(current_service->getFunctions().empty() && current_service->getEvents().empty()) {
+	} else if(current_service->GetFunctions().empty() && current_service->GetEvents().empty()) {
 		COMPILE_ERROR("Service must have at least 1 function/event.");
 	}
 
@@ -304,7 +304,7 @@ int main(int argc, char **argv) {
 
 	/* Dump the service if in verbose mode. */
 	if(verbose_mode) {
-		current_service->dump();
+		current_service->Dump();
 	}
 
 	/* Determine which code generator to use. */
@@ -318,12 +318,12 @@ int main(int argc, char **argv) {
 
 	/* Generate the code. */
 	if(server.length() > 0) {
-		if(!cg->generateServer(server)) {
+		if(!cg->GenerateServer(server)) {
 			return 1;
 		}
 	}
 	if(client.length() > 0) {
-		if(!cg->generateClient(client)) {
+		if(!cg->GenerateClient(client)) {
 			return 1;
 		}
 	}

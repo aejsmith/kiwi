@@ -28,7 +28,7 @@
 using namespace std;
 
 /** Dump information about the type. */
-void Type::dump() const {
+void Type::Dump() const {
 	const char *name = typeid(*this).name();
 	while(isdigit(*name)) {
 		name++;
@@ -37,7 +37,7 @@ void Type::dump() const {
 }
 
 /** Dump information about an integer type. */
-void IntegerType::dump() const {
+void IntegerType::Dump() const {
 	cout << ' ' << m_name << ": IntegerType(" << m_width << ", " << m_is_signed << ')' << endl;
 }
 
@@ -48,24 +48,23 @@ AliasType::AliasType(const char *name, Type *dest) :
 	Type(name)
 {
 	/* If the type is an alias, get the type it refers to. */
-	AliasType *alias = dynamic_cast<AliasType *>(dest);
-	if(alias != NULL) {
-		m_dest = alias->resolve();
+	if(AliasType *alias = dynamic_cast<AliasType *>(dest)) {
+		m_dest = alias->Resolve();
 	} else {
 		m_dest = dest;
 	}
 }
 
 /** Dump information about an alias type. */
-void AliasType::dump() const {
-	cout << ' ' << m_name << ": AliasType(" << m_dest->getName() << ')' << endl;
+void AliasType::Dump() const {
+	cout << ' ' << m_name << ": AliasType(" << m_dest->GetName() << ')' << endl;
 }
 
 /** Dump information about a structure. */
-void StructType::dump() const {
+void StructType::Dump() const {
 	cout << ' ' << m_name << ": StructType" << endl;
 	BOOST_FOREACH(const EntryList::value_type &ent, m_entries) {
-		cout << "  " << ent.first->getName() << ' ' << ent.second << endl;
+		cout << "  " << ent.first->GetName() << ' ' << ent.second << endl;
 	}
 }
 
@@ -74,13 +73,13 @@ void StructType::dump() const {
  * @param name		Name of entry.
  * @return		True if added, false if entry with same name exists
  *			already. */
-bool StructType::addEntry(Type *type, const char *name) {
+bool StructType::AddEntry(Type *type, const char *name) {
 	BOOST_FOREACH(EntryList::value_type &ent, m_entries) {
 		if(ent.second == name) {
 			return false;
 		}
 	}
 
-	m_entries.push_back(std::make_pair(type, name));
+	m_entries.push_back(make_pair(type, name));
 	return true;
 }

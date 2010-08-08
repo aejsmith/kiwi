@@ -126,7 +126,7 @@ void add_syscall(const char *name, parameter_t *params, long num) {
 			COMPILE_ERROR("Parameter type `" << params->type << "' does not exist.");
 			return;
 		}
-		call->addParameter(it->second);
+		call->AddParameter(it->second);
 		params = params->next;
 	}
 
@@ -143,13 +143,13 @@ static void generate_kernel_table(ostream &stream, const string &name) {
 	stream << "#include <syscall.h>" << endl;
 
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		stream << "extern void sys_" << call->getName() << "(void);" << endl;
+		stream << "extern void sys_" << call->GetName() << "(void);" << endl;
 	}
 
 	stream << "syscall_t " << name << "[] = {" << endl;
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		stream << "	[" << call->getID() << "] = { .addr = (ptr_t)sys_" << call->getName();
-		stream << ", .count = " << call->getParameterCount() << " }," << endl;
+		stream << "	[" << call->GetID() << "] = { .addr = (ptr_t)sys_" << call->GetName();
+		stream << ", .count = " << call->GetParameterCount() << " }," << endl;
 	}
 	stream << "};" << endl;
 	stream << "size_t " << name << "_size = ARRAYSZ(" << name << ");" << endl;
@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
 		cerr << "Unrecognised target `" << argv[i] << "'." << endl;
 		return 1;
 	}
-	target->addTypes(type_map);
+	target->AddTypes(type_map);
 
 	/* Parse the input file. */
 	current_file = argv[++i];
@@ -248,7 +248,7 @@ int main(int argc, char **argv) {
 		if(table.length()) {
 			generate_kernel_table(cout, table);
 		} else {
-			target->generate(cout, syscall_list);
+			target->Generate(cout, syscall_list);
 		}
 	} else {
 		ofstream stream;
@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
 		if(table.length()) {
 			generate_kernel_table(stream, table);
 		} else {
-			target->generate(stream, syscall_list);
+			target->Generate(stream, syscall_list);
 		}
 		stream.close();
 	}

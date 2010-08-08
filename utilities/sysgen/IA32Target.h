@@ -26,8 +26,8 @@
 /** IA32 target class. */
 class IA32Target : public Target {
 public:
-	void addTypes(TypeMap &map);
-	void generate(std::ostream &stream, const SyscallList &calls);
+	void AddTypes(TypeMap &map);
+	void Generate(std::ostream &stream, const SyscallList &calls);
 };
 
 #endif /* __IA32TARGET_H */

@@ -26,8 +26,8 @@
 /** AMD64 target class. */
 class AMD64Target : public Target {
 public:
-	void addTypes(TypeMap &map);
-	void generate(std::ostream &stream, const SyscallList &calls);
+	void AddTypes(TypeMap &map);
+	void Generate(std::ostream &stream, const SyscallList &calls);
 };
 
 #endif /* __AMD64TARGET_H */

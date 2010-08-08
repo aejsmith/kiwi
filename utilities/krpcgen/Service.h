@@ -42,46 +42,46 @@ public:
 
 	Service();
 
-	void dump() const;
-	void tokeniseName(std::vector<std::string> &tokens) const;
-	bool setName(const char *name);
-	bool setVersion(unsigned long ver);
-	bool addType(Type *type);
-	Type *getType(const char *name) const;
+	void Dump() const;
+	void TokeniseName(std::vector<std::string> &tokens) const;
+	bool SetName(const char *name);
+	bool SetVersion(unsigned long ver);
+	bool AddType(Type *type);
+	Type *GetType(const char *name) const;
 
 	/** Add a function to the service.
 	 * @param func		Function to add.
 	 * @return		True if added, false if function with same name
 	 *			already exists. */
-	bool addFunction(Function *func) { return addFunctionToList(func, m_functions); }
+	bool AddFunction(Function *func) { return AddFunctionToList(func, m_functions); }
 
 	/** Add an event to the service.
 	 * @param event		Function to add.
 	 * @return		True if added, false if event with same name
 	 *			already exists. */
-	bool addEvent(Function *event) { return addFunctionToList(event, m_events); }
+	bool AddEvent(Function *event) { return AddFunctionToList(event, m_events); }
 
 	/** Get the name of the service.
 	 * @return		Name of the service. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 
 	/** Get the version of the service.
 	 * @return		Version of the service. */
-	unsigned long getVersion() const { return m_version; }
+	unsigned long GetVersion() const { return m_version; }
 
 	/** Get a reference to the type map.
 	 * @return		Reference to type map. */
-	const TypeMap &getTypes() const { return m_types; }
+	const TypeMap &GetTypes() const { return m_types; }
 
 	/** Get a reference to the function list.
 	 * @return		Reference to function list. */
-	const FunctionList &getFunctions() const { return m_functions; }
+	const FunctionList &GetFunctions() const { return m_functions; }
 
 	/** Get a reference to the event list.
 	 * @return		Reference to event list. */
-	const FunctionList &getEvents() const { return m_events; }
+	const FunctionList &GetEvents() const { return m_events; }
 private:
-	bool addFunctionToList(Function *func, FunctionList &list);
+	bool AddFunctionToList(Function *func, FunctionList &list);
 
 	std::string m_name;		/**< Name of the service. */
 	unsigned long m_version;	/**< Service version number. */
