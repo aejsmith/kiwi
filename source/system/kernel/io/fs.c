@@ -1670,7 +1670,8 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	/* Look up the filesystem type. If there is not a type specified, probe
 	 * for one. */
 	if(type) {
-		if(!(mount->type = fs_type_lookup(type))) {
+		mount->type = fs_type_lookup(type);
+		if(!mount->type) {
 			ret = STATUS_NOT_FOUND;
 			goto fail;
 		}
@@ -1691,7 +1692,8 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 			goto fail;
 		}
 	} else {
-		if(!(mount->type = fs_type_probe(mount->device, NULL))) {
+		mount->type = fs_type_probe(mount->device, NULL);
+		if(!mount->type) {
 			ret = STATUS_UNKNOWN_FS;
 			goto fail;
 		}

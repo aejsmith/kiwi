@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,8 +33,8 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 
 #include "ata_priv.h"
 
@@ -67,7 +67,8 @@ static bool ata_pci_lookup_func(device_t *device, pci_device_id_t *id) {
 	ctl = ATA_IS_COMPAT(pri_pi) ? 0x3F0 : pci_device_read32(device, PCI_DEVICE_BAR0);
 	cmd = ATA_IS_COMPAT(pri_pi) ? 0x1F0 : pci_device_read32(device, PCI_DEVICE_BAR1);
 	irq = ATA_IS_COMPAT(pri_pi) ? 14    : pci_device_read8 (device, PCI_DEVICE_INTERRUPT_LINE);
-	if((controller = ata_controller_add(device, ctl, cmd, irq))) {
+	controller = ata_controller_add(device, ctl, cmd, irq);
+	if(controller) {
 		kprintf(LOG_NORMAL, " primary:   %" PRId32 " (controller: %p, pi: %s)\n",
 			controller->id, controller, ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI");
 	}
@@ -76,7 +77,8 @@ static bool ata_pci_lookup_func(device_t *device, pci_device_id_t *id) {
 	ctl = ATA_IS_COMPAT(sec_pi) ? 0x370 : pci_device_read32(device, PCI_DEVICE_BAR2);
 	cmd = ATA_IS_COMPAT(sec_pi) ? 0x170 : pci_device_read32(device, PCI_DEVICE_BAR3);
 	irq = ATA_IS_COMPAT(sec_pi) ? 15    : pci_device_read8 (device, PCI_DEVICE_INTERRUPT_LINE);
-	if((controller = ata_controller_add(device, ctl, cmd, irq))) {
+	controller = ata_controller_add(device, ctl, cmd, irq);
+	if(controller) {
 		kprintf(LOG_NORMAL, " secondary: %" PRId32 " (controller: %p, pi: %s)\n",
 			controller->id, controller, ATA_IS_COMPAT(sec_pi) ? "compat" : "native-PCI");
 	}
@@ -90,17 +92,16 @@ static pci_device_id_t ata_pci_ids[] = {
 };
 
 /** Initialisation function for the ATA driver.
- * @return		0 on success, negative error code on failure. */
-static int ata_init(void) {
-	/* Scan for devices. */
+ * @return		Status code describing result of the operation. */
+static status_t ata_init(void) {
 	pci_device_lookup(ata_pci_ids, ARRAYSZ(ata_pci_ids), ata_pci_lookup_func);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Unloading function for the ATA driver.
- * @return		0 on success, negative error code on failure. */
-static int ata_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t ata_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("ata");

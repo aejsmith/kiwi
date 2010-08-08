@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -37,8 +37,8 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <module.h>
+#include <status.h>
 #include <time.h>
 
 #include "ata_priv.h"
@@ -48,7 +48,7 @@ static LIST_DECLARE(ata_controllers);
 static MUTEX_DECLARE(ata_controllers_lock, 0);
 
 /** Next controller ID. */
-static atomic_t ata_next_id = 0;
+static atomic_t next_controller_id = 0;
 
 /** Handle an IRQ on an ATA controller.
  * @param num		Interrupt number.
@@ -93,9 +93,9 @@ uint8_t ata_controller_error(ata_controller_t *controller) {
  * @param any		Wait for any bit in set to be set.
  * @param error		Check for errors/faults.
  * @param timeout	Timeout in microseconds.
- * @return		0 on success, negative error code on failure. */
-int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear,
-                        bool any, bool error, useconds_t timeout) {
+ * @return		Status code describing result of the operation. */
+status_t ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear,
+                             bool any, bool error, useconds_t timeout) {
 	useconds_t elapsed = 0, i;
 	uint8_t status;
 
@@ -105,11 +105,11 @@ int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear
 		status = ata_controller_status(controller);
 		if(error) {
 			if(!(status & ATA_STATUS_BSY) && (status & ATA_STATUS_ERR || status & ATA_STATUS_DF)) {
-				return -ERR_DEVICE_ERROR;
+				return STATUS_DEVICE_ERROR;
 			}
 		}
 		if(!(status & clear) && ((any && (status & set)) || (status & set) == set)) {
-			return 0;
+			return STATUS_SUCCESS;
 		}
 
 		i = (timeout < 1000) ? timeout : 1000;
@@ -117,7 +117,7 @@ int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear
 		elapsed += i;
 	}
 
-	return -ERR_TIMED_OUT;
+	return STATUS_TIMED_OUT;
 }
 
 /** Write a command.
@@ -164,7 +164,7 @@ void ata_controller_pio_write(ata_controller_t *controller, const void *buf, siz
 ata_controller_t *ata_controller_add(device_t *device, uint32_t ctl, uint32_t cmd, uint32_t irq) {
 	ata_controller_t *controller;
 	char name[DEVICE_NAME_MAX];
-	int ret;
+	status_t ret;
 
 	/* Check controller presence by writing a value to the low LBA port
 	 * on the controller, then read back. If the value is the same, the
@@ -180,7 +180,7 @@ ata_controller_t *ata_controller_add(device_t *device, uint32_t ctl, uint32_t cm
 	list_init(&controller->devices);
 	spinlock_init(&controller->irq_lock, "ata_controller_irq_lock");
 	condvar_init(&controller->irq_cv, "ata_controller_irq_cv");
-	controller->id = atomic_inc(&ata_next_id);
+	controller->id = atomic_inc(&next_controller_id);
 	controller->pci = device;
 	controller->ctl_base = ctl;
 	controller->cmd_base = cmd;
@@ -194,8 +194,9 @@ ata_controller_t *ata_controller_add(device_t *device, uint32_t ctl, uint32_t cm
 	//}
 
 	/* Add it under the PCI device node. */
-	sprintf(name, "ata%" PRId32, controller->id);
-	if((ret = device_create(name, controller->pci, NULL, NULL, NULL, 0, &controller->device)) != 0) {
+	sprintf(name, "ata%d", controller->id);
+	ret = device_create(name, controller->pci, NULL, NULL, NULL, 0, &controller->device);
+	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ata: could not create device node for %" PRId32 " (%d)\n",
 			controller->id, ret);
 		//irq_unregister(irq, ata_controller_irq, NULL, controller);

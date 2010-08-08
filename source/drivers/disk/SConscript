@@ -13,16 +13,15 @@
 
 Import('env', 'config')
 
-# Work out the drivers to build.
 dirs = [
 	('DRIVER_DISK_ATA', 'ata'),
 ]
 
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])
-
 # Build the disk device manager.
 env.Module('disk', [
 	'disk.c',
-	'part-msdos.c',
 	'partition.c',
+	'part-msdos.c',
 ])
+
+SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])

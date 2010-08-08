@@ -38,11 +38,17 @@
 #include <assert.h>
 #include <console.h>
 #include <endian.h>
-#include <errors.h>
 #include <kdbg.h>
 #include <module.h>
+#include <status.h>
 
 #include "ata_priv.h"
+
+/** Highest block number for LBA-28 transfers. */
+#define LBA28_MAX_BLOCK		((uint64_t)1<<28)
+
+/** Highest block number for LBA-28 transfers. */
+#define LBA48_MAX_BLOCK		((uint64_t)1<<48)
 
 /** Copy an ATA identification string.
  * @note		Modifies the source string.
@@ -75,21 +81,31 @@ static void ata_copy_string(char *dest, char *src, size_t size) {
 
 /** Begin a block transfer.
  * @param device	Device to transfer on.
- * @param lba		Block number to write.
- * @return		Whether block is within range. */
-static int ata_device_transfer_begin(ata_device_t *device, uint64_t lba) {
+ * @param lba		Block number to start transfer at.
+ * @param count		Number of blocks to transfer.
+ * @return		Number of blocks that will be transferred. If 0 is
+ *			returned, an error occurred. */
+static size_t ata_device_transfer_begin(ata_device_t *device, uint64_t lba, size_t count) {
 	ata_controller_t *controller = device->parent;
 
-	if(lba >= device->blocks) {
-		return false;
-	}
+	/* The disk device layer should ensure that reads are within the size
+	 * of the device. */
+	assert((lba + count) <= device->blocks);
 
-	if(lba < ((uint64_t)1<<28)) {
+	if(lba < LBA28_MAX_BLOCK) {
+		/* Check how many blocks we can transfer. */
+		if((lba + count) > LBA28_MAX_BLOCK) {
+			count = LBA28_MAX_BLOCK - lba;
+		}
+		if(count > UINT8_MAX) {
+			count = UINT8_MAX;
+		}
+
 		/* Send a NULL to the feature register. */
 		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
 
-		/* We want to read 1 block. */
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, 0x01);
+		/* Write out the number of blocks to read. */
+		out8(controller->cmd_base + ATA_CMD_REG_COUNT, count);
 
 		/* Specify the address of the block. */
 		out8(controller->cmd_base + ATA_CMD_REG_LBA_LOW, lba & 0xff);
@@ -98,20 +114,28 @@ static int ata_device_transfer_begin(ata_device_t *device, uint64_t lba) {
 
 		/* Drive number and rest of address. */
 		out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4) | ((lba >> 24) & 0xff));
-		return true;
-	} else if(lba < ((uint64_t)1<<48)) {
+		return count;
+	} else if(lba < LBA48_MAX_BLOCK) {
 		if(!(device->flags & ATA_DEVICE_LBA48)) {
 			kprintf(LOG_WARN, "ata: attempted LBA48 read (%llu) on non-LBA48 device\n", lba);
-			return false;
+			return 0;
+		}
+
+		/* Check how many blocks we can transfer. */
+		if((lba + count) > LBA48_MAX_BLOCK) {
+			count = LBA48_MAX_BLOCK - lba;
+		}
+		if(count > UINT16_MAX) {
+			count = UINT16_MAX;
 		}
 
 		/* Send 2 NULLs to the feature register. */
 		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
 		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
 
-		/* We want to read 1 block. */
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, 0x00);
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, 0x01);
+		/* Write out the number of blocks to read. */
+		out8(controller->cmd_base + ATA_CMD_REG_COUNT, (count >> 8) & 0xff);
+		out8(controller->cmd_base + ATA_CMD_REG_COUNT, count & 0xff);
 
 		/* Specify the address of the block. */
 		out8(controller->cmd_base + ATA_CMD_REG_LBA_LOW, (lba >> 24) & 0xff);
@@ -123,103 +147,114 @@ static int ata_device_transfer_begin(ata_device_t *device, uint64_t lba) {
 
 		/* Drive number. */
 		out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4));
-		return true;
+		return count;
 	} else {
 		kprintf(LOG_WARN, "ata: attempted out of range transfer (%llu)\n", lba);
-		return false;
+		return 0;
 	}
 }
 
 /** Read from an ATA device.
- * @param _dev		Device to read from.
+ * @param _device	Device to read from.
  * @param buf		Buffer to read into.
- * @param lba		Block number to read.
- * @return		1 if read successfully, 0 if block doesn't exist,
- *			negative error code on failure. */
-static int ata_device_block_read(disk_device_t *_dev, void *buf, uint64_t lba) {
-	ata_device_t *device = _dev->data;
-	uint8_t cmd;
-	int ret;
+ * @param lba		Block number to read from.
+ * @param count		Number of blocks to read.
+ * @return		Status code describing result of the operation. */
+static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+	ata_device_t *device = _device->data;
+	uint8_t cmd, error;
+	size_t current;
+	status_t ret;
 
 	mutex_lock(&device->parent->lock);
 
-	/* Set up the address registers and select the device. */
-	if(!ata_device_transfer_begin(device, lba)) {
-		mutex_unlock(&device->parent->lock);
-		return 0;
-	}
-
-	/* For LBA48 transfers we must use READ SECTORS EXT. Do not need to
-	 * check if LBA48 is supported because the previous function call picks
-	 * up LBA48 addresses on non-LBA48 devices. */
-	cmd = (lba >= ((uint64_t)1<<28)) ? ATA_CMD_READ_SECTORS_EXT : ATA_CMD_READ_SECTORS;
-
-	/* Start the transfer and wait for it to complete. */
-	ata_controller_command(device->parent, cmd);
-	if((ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000)) != 0) {
-		if(ret == -ERR_DEVICE_ERROR && ata_controller_error(device->parent) & (ATA_ERR_ABRT | ATA_ERR_IDNF)) {
-			ret = 0;
-		} else {
-			kprintf(LOG_WARN, "ata: read on device %" PRId32 ":%" PRIu8 " failed (%d)\n",
-				device->parent->id, device->num, ret);
+	while(count) {
+		/* Set up the address registers and select the device. */
+		current = ata_device_transfer_begin(device, lba, count);
+		if(!current) {
+			mutex_unlock(&device->parent->lock);
+			return STATUS_DEVICE_ERROR;
 		}
 
-		mutex_unlock(&device->parent->lock);
-		return ret;
+		/* For LBA48 transfers we must use READ SECTORS EXT. Do not
+		 * need to check if LBA48 is supported because the previous
+		 * function call picks up LBA48 addresses on non-LBA48
+		 * devices. */
+		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_READ_SECTORS_EXT : ATA_CMD_READ_SECTORS;
+
+		/* Start the transfer and wait for it to complete. */
+		ata_controller_command(device->parent, cmd);
+		ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+		if(ret != STATUS_SUCCESS) {
+			error = ata_controller_error(device->parent);
+			kprintf(LOG_WARN, "ata: read on device %" PRId32 ":%" PRIu8 " failed (status: %d, error: %" PRIu8 ")\n",
+				device->parent->id, device->num, ret, error);
+			mutex_unlock(&device->parent->lock);
+			return ret;
+		}
+
+		/* Read the data. */
+		ata_controller_pio_read(device->parent, buf, _device->block_size * current);
+		buf += _device->block_size * current;
+		count -= current;
+		lba += current;
 	}
 
-	/* Read the data. */
-	ata_controller_pio_read(device->parent, buf, _dev->blksize);
 	mutex_unlock(&device->parent->lock);
-	return 1;
+	return STATUS_SUCCESS;
 }
 
 /** Write to an ATA device.
- * @param _dev		Device to write to.
+ * @param _device	Device to write to.
  * @param buf		Buffer to write from.
- * @param lba		Block number to write.
- * @return		1 if written successfully, 0 if block doesn't exist,
- *			negative error code on failure. */
-static int ata_device_block_write(disk_device_t *_dev, const void *buf, uint64_t lba) {
-	ata_device_t *device = _dev->data;
-	uint8_t cmd;
-	int ret;
+ * @param lba		Block number to write to.
+ * @param count		Number of blocks to write.
+ * @return		Status code describing result of the operation. */
+static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+	ata_device_t *device = _device->data;
+	uint8_t cmd, error;
+	size_t current;
+	status_t ret;
 
 	mutex_lock(&device->parent->lock);
 
-	/* Set up the address registers and select the device. */
-	if(!ata_device_transfer_begin(device, lba)) {
-		mutex_unlock(&device->parent->lock);
-		return 0;
-	}
-
-	/* For LBA48 transfers we must use WRITE SECTORS EXT. */
-	cmd = (lba >= ((uint64_t)1<<28)) ? ATA_CMD_WRITE_SECTORS_EXT : ATA_CMD_WRITE_SECTORS;
-
-	/* Start the transfer and wait for it to complete. */
-	ata_controller_command(device->parent, cmd);
-	if((ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000)) != 0) {
-		if(ret == -ERR_DEVICE_ERROR && ata_controller_error(device->parent) & (ATA_ERR_ABRT | ATA_ERR_IDNF)) {
-			ret = 0;
-		} else {
-			kprintf(LOG_WARN, "ata: write on device %" PRId32 ":%" PRIu8 " failed (%d)\n",
-				device->parent->id, device->num, ret);
+	while(count) {
+		/* Set up the address registers and select the device. */
+		current = ata_device_transfer_begin(device, lba, count);
+		if(!current) {
+			mutex_unlock(&device->parent->lock);
+			return STATUS_DEVICE_ERROR;
 		}
 
-		mutex_unlock(&device->parent->lock);
-		return ret;
+		/* For LBA48 transfers we must use WRITE SECTORS EXT. */
+		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_WRITE_SECTORS_EXT : ATA_CMD_WRITE_SECTORS;
+
+		/* Start the transfer and wait for it to complete. */
+		ata_controller_command(device->parent, cmd);
+		ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+		if(ret != STATUS_SUCCESS) {
+			error = ata_controller_error(device->parent);
+			kprintf(LOG_WARN, "ata: write on device %" PRId32 ":%" PRIu8 " failed (status: %d, error: %" PRIu8 ")\n",
+				device->parent->id, device->num, ret, error);
+			mutex_unlock(&device->parent->lock);
+			return ret;
+		}
+
+		/* Write the data. */
+		ata_controller_pio_write(device->parent, buf, _device->block_size * current);
+		buf += _device->block_size * current;
+		count -= current;
+		lba += current;
 	}
 
-	/* Write the data. */
-	ata_controller_pio_write(device->parent, buf, _dev->blksize);
 	mutex_unlock(&device->parent->lock);
-	return 1;
+	return STATUS_SUCCESS;
 }
 
 /** Disk device operations structure. */
 static disk_ops_t ata_device_ops = {
-	.block_read = ata_device_block_read,
-	.block_write = ata_device_block_write,
+	.read = ata_device_read,
+	.write = ata_device_write,
 };
 
 /** Detect a device on a controller.
@@ -231,7 +266,7 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 	uint16_t *ident = NULL;
 	ata_device_t *device;
 	size_t blksize;
-	int ret;
+	status_t ret;
 
 	mutex_lock(&controller->lock);
 
@@ -240,12 +275,14 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 
 	/* Send an IDENTIFY DEVICE command. */
 	ata_controller_command(controller, ATA_CMD_IDENTIFY);
-	if(ata_controller_wait(controller, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 50000) != 0) {
+	if(ata_controller_wait(controller, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true,
+	                       true, 50000) != STATUS_SUCCESS) {
 		goto fail;
 	}
 
 	/* Wait for data. */
-	if(ata_controller_wait(controller, ATA_STATUS_DRQ, ATA_STATUS_BSY, false, true, 500000) != 0) {
+	if(ata_controller_wait(controller, ATA_STATUS_DRQ, ATA_STATUS_BSY, false,
+	                       true, 500000) != STATUS_SUCCESS) {
 		goto fail;
 	}
 
@@ -298,8 +335,9 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 
 	/* Register the device with the disk device manager. */
 	sprintf(name, "%d", num);
-	if((ret = disk_device_create(name, controller->device, &ata_device_ops, device,
-	                             blksize, &device->device)) != 0) {
+	ret = disk_device_create(name, controller->device, &ata_device_ops, device,
+	                         device->blocks, blksize, &device->device);
+	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create ATA disk device %s (%d)", name, ret);
 	}
 

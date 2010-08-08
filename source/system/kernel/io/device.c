@@ -501,7 +501,8 @@ status_t device_open(const char *path, khandle_t **handlep) {
 	mutex_lock(&device->lock);
 
 	if(device->ops && device->ops->open) {
-		if((ret = device->ops->open(device, &data)) != STATUS_SUCCESS) {
+		ret = device->ops->open(device, &data);
+		if(ret != STATUS_SUCCESS) {
 			mutex_unlock(&device->lock);
 			device_release(device);
 			return ret;

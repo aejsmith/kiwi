@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -24,9 +24,10 @@
 
 #include <mm/malloc.h>
 
-#include <errors.h>
+#include <console.h>
 #include <fatal.h>
 #include <module.h>
+#include <status.h>
 
 #include "disk_priv.h"
 
@@ -34,39 +35,48 @@
 static device_t *disk_device_dir;
 
 /** Next device ID. */
-static atomic_t disk_next_id = 0;
+static atomic_t next_disk_id = 0;
+
+/** Destroy a disk device.
+ * @param _device	Device to destroy. */
+static void disk_device_destroy(device_t *_device) {
+	/* TODO: I'm lazy. */
+	kprintf(LOG_WARN, "disk: destroy is not implemented, happily leaking a bunch of memory!\n");
+}
 
 /** Read from a disk device.
- * @param device	Device to read from.
+ * @param _device	Device to read from.
  * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset to read from.
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. */
-static int disk_device__read(device_t *device, void *data, void *buf, size_t count,
-                             offset_t offset, size_t *bytesp) {
-	return disk_device_read(device->data, buf, count, offset, bytesp);
+ * @return		Status code describing result of the operation. */
+static status_t disk_device_read_(device_t *_device, void *data, void *buf, size_t count,
+                                  offset_t offset, size_t *bytesp) {
+	disk_device_t *device = _device->data;
+	return disk_device_read(device, buf, count, offset, bytesp);
 }
 
 /** Write to a disk device.
- * @param device	Device to write to.
+ * @param _device	Device to write to.
  * @param data		Handle-specific data pointer (unused).
  * @param buf		Buffer to write from.
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to.
  * @param bytesp	Where to store number of bytes written.
- * @return		0 on success, negative error code on failure. */
-static int disk_device__write(device_t *device, void *data, const void *buf, size_t count,
-                              offset_t offset, size_t *bytesp) {
-	return disk_device_write(device->data, buf, count, offset, bytesp);
+ * @return		Status code describing result of the operation. */
+static status_t disk_device_write_(device_t *_device, void *data, const void *buf, size_t count,
+                                   offset_t offset, size_t *bytesp) {
+	disk_device_t *device = _device->data;
+	return disk_device_write(device, buf, count, offset, bytesp);
 }
 
 /** Disk device operations structure. */
-static device_ops_t disk_device_ops = {
-	.read = disk_device__read,
-	.write = disk_device__write,
-	//.request = disk_device_request,
+device_ops_t disk_device_ops = {
+	.destroy = disk_device_destroy,
+	.read = disk_device_read_,
+	.write = disk_device_write_,
 };
 
 /** Read from a disk device.
@@ -75,15 +85,20 @@ static device_ops_t disk_device_ops = {
  * @param count		Number of bytes to read.
  * @param offset	Offset to read from.
  * @param bytesp	Where to store number of bytes read.
- * @return		0 on success, negative error code on failure. */
-int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	size_t total = 0, blksize = device->blksize;
-	uint64_t start, end, i, size;
+ * @return		Status code describing result of the operation. */
+status_t disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t offset,
+                          size_t *bytesp) {
+	size_t total = 0, blksize = device->block_size;
+	status_t ret = STATUS_SUCCESS;
+	uint64_t start, end, size;
 	void *block = NULL;
-	int ret;
 
-	if(!device->ops->block_read) {
-		return -ERR_NOT_SUPPORTED;
+	if(!device->ops || !device->ops->read) {
+		return STATUS_NOT_SUPPORTED;
+	} else if(!count || offset >= (device->blocks * device->block_size)) {
+		goto out;
+	} else if((offset + count) > (device->blocks * device->block_size)) {
+		count = (device->blocks * device->block_size) - offset;
 	}
 
 	/* Allocate a temporary buffer for partial transfers if required. */
@@ -102,7 +117,8 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 	 * If the transfer only goes across one block, this will handle it. */
 	if(offset % blksize) {
 		/* Read the block into the temporary buffer. */
-		if((ret = device->ops->block_read(device, block, start)) != 1) {
+		ret = device->ops->read(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -113,16 +129,22 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 
 	/* Handle any full blocks. */
 	size = count / blksize;
-	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start++) {
-		/* Read directly into the destination buffer. */
-		if((ret = device->ops->block_read(device, buf, start)) != 1) {
+	if(size) {
+		ret = device->ops->read(device, buf, start, size);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
+
+		total += (size * blksize);
+		buf += (size * blksize);
+		count -= (size * blksize);
+		start += size;
 	}
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = device->ops->block_read(device, block, start)) != 1) {
+		ret = device->ops->read(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -130,14 +152,12 @@ int disk_device_read(disk_device_t *device, void *buf, size_t count, offset_t of
 		total += count;
 	}
 
-	ret = 0;
+	ret = STATUS_SUCCESS;
 out:
 	if(block) {
 		kfree(block);
 	}
-	if(bytesp) {
-		*bytesp = total;
-	}
+	*bytesp = total;
 	return ret;
 }
 
@@ -147,15 +167,20 @@ out:
  * @param count		Number of bytes to write.
  * @param offset	Offset to write to.
  * @param bytesp	Where to store number of bytes written.
- * @return		0 on success, negative error code on failure. */
-int disk_device_write(disk_device_t *device, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	size_t total = 0, blksize = device->blksize;
-	uint64_t start, end, i, size;
+ * @return		Status code describing result of the operation. */
+status_t disk_device_write(disk_device_t *device, const void *buf, size_t count,
+                           offset_t offset, size_t *bytesp) {
+	size_t total = 0, blksize = device->block_size;
+	status_t ret = STATUS_SUCCESS;
+	uint64_t start, end, size;
 	void *block = NULL;
-	int ret;
 
-	if(!device->ops->block_read || !device->ops->block_write) {
-		return -ERR_NOT_SUPPORTED;
+	if(!device->ops || !device->ops->read || !device->ops->write) {
+		return STATUS_NOT_SUPPORTED;
+	} else if(!count || offset >= (device->blocks * device->block_size)) {
+		goto out;
+	} else if((offset + count) > (device->blocks * device->block_size)) {
+		count = (device->blocks * device->block_size) - offset;
 	}
 
 	/* Allocate a temporary buffer for partial transfers if required. */
@@ -163,7 +188,7 @@ int disk_device_write(disk_device_t *device, const void *buf, size_t count, offs
 		block = kmalloc(blksize, MM_SLEEP);
 	}
 
-	/* Now work out the start page and the end block. Subtract one from
+	/* Now work out the start block and the end block. Subtract one from
 	 * count to prevent end from going onto the next block when the offset
 	 * plus the count is an exact multiple of the block size. */
 	start = offset / blksize;
@@ -175,14 +200,16 @@ int disk_device_write(disk_device_t *device, const void *buf, size_t count, offs
 	if(offset % blksize) {
 		/* Slightly more difficult than the read case, we must read
 		 * the block in, partially overwrite it and write back. */
-		if((ret = device->ops->block_read(device, block, start)) != 1) {
+		ret = device->ops->read(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
 		size = (start == end) ? count : blksize - (size_t)(offset % blksize);
 		memcpy(block + (offset % blksize), buf, size);
 
-		if((ret = device->ops->block_write(device, block, start)) != 1) {
+		ret = device->ops->write(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
@@ -191,41 +218,48 @@ int disk_device_write(disk_device_t *device, const void *buf, size_t count, offs
 
 	/* Handle any full blocks. */
 	size = count / blksize;
-	for(i = 0; i < size; i++, total += blksize, buf += blksize, count -= blksize, start++) {
-		if((ret = device->ops->block_write(device, buf, start)) != 1) {
+	if(size) {
+		ret = device->ops->write(device, buf, start, size);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
+
+		total += (size * blksize);
+		buf += (size * blksize);
+		count -= (size * blksize);
+		start += size;
 	}
 
 	/* Handle anything that's left. */
 	if(count > 0) {
-		if((ret = device->ops->block_read(device, block, start)) != 1) {
+		ret = device->ops->read(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
 		memcpy(block, buf, count);
 
-		if((ret = device->ops->block_write(device, block, start)) != 1) {
+		ret = device->ops->write(device, block, start, 1);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
 		total += count;
 	}
 
-	ret = 0;
+	ret = STATUS_SUCCESS;
 out:
 	if(block) {
 		kfree(block);
 	}
-	if(bytesp) {
-		*bytesp = total;
-	}
+	*bytesp = total;
 	return ret;
 }
 
 /** Create a new disk device.
  *
- * Registers a new disk device with the disk device manager.
+ * Registers a new disk device with the disk device manager and scans it for
+ * partitions.
  *
  * @param name		Name to give device. Only used if parent is specified.
  * @param parent	Optional parent node. If not provided, then the main
@@ -235,86 +269,71 @@ out:
  * @param blksize	Block size of device.
  * @param devicep	Where to store pointer to device structure.
  *
- * @return		0 on success, negative error code on failure. Only
- *			possible failure is if name already exists in parent.
+ * @return		Status code describing result of the operation.
  */
-int disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
-                       void *data, size_t blksize, disk_device_t **devicep) {
+status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
+                            void *data, uint64_t blocks, size_t blksize,
+                            device_t **devicep) {
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "disk" } },
+		{ "disk.blocks", DEVICE_ATTR_UINT64, { .uint64 = blocks } },
 		{ "disk.block-size", DEVICE_ATTR_UINT32, { .uint32 = blksize } },
 	};
 	char dname[DEVICE_NAME_MAX];
 	disk_device_t *device;
-	int ret;
+	status_t ret;
 
-	if((parent && !name) || (name && !parent) || !ops || !blksize || !devicep) {
-		return -ERR_PARAM_INVAL;
+	if((parent && !name) || (name && !parent) || !ops || !blocks || !blksize || !devicep) {
+		return STATUS_PARAM_INVAL;
 	}
 
 	device = kmalloc(sizeof(disk_device_t), MM_SLEEP);
-	mutex_init(&device->lock, "disk_device_lock", 0);
-	list_init(&device->partitions);
-	device->id = atomic_inc(&disk_next_id);
+	device->id = atomic_inc(&next_disk_id);
 	device->ops = ops;
 	device->data = data;
-	device->blksize = blksize;
+	device->blocks = blocks;
+	device->block_size = blksize;
 
 	/* Create the device tree node. */
-	sprintf(dname, "%" PRId32, device->id);
+	sprintf(dname, "%d", device->id);
 	if(parent) {
-		if((ret = device_create(name, parent, &disk_device_ops, device, attrs,
-	                                ARRAYSZ(attrs), &device->device)) != 0) {
+		ret = device_create(name, parent, &disk_device_ops, device, attrs,
+		                    ARRAYSZ(attrs), &device->device);
+		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
-		} else if((ret = device_alias(dname, disk_device_dir, device->device, &device->alias)) != 0) {
-			/* Should not fail - only possible failure is if name
-			 * already exists, and ID should be unique. Note that
-			 * with current ID allocation implementation this can
-			 * happen - FIXME. */
-			fatal("Could not create device alias (%d)", ret);
 		}
+
+		/* Should not fail - only possible failure is if name already
+		 * exists, and ID should be unique. */
+		device_alias(dname, disk_device_dir, device->device, NULL);
 	} else {
-		if((ret = device_create(dname, disk_device_dir, &disk_device_ops, device, attrs,
-	                                ARRAYSZ(attrs), &device->device)) != 0) {
+		ret = device_create(dname, disk_device_dir, &disk_device_ops, device, attrs,
+		                    ARRAYSZ(attrs), &device->device);
+		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
 		}
-		device->alias = NULL;
 	}
 
 	/* Probe for partitions on the device. */
-	disk_partition_probe(device);
-
-	*devicep = device;
-	return 0;
+	partition_probe(device);
+	*devicep = device->device;
+	return STATUS_SUCCESS;
 }
 MODULE_EXPORT(disk_device_create);
 
-/** Destroy a disk device.
- *
- * Removes a disk device and all partitions under it from the device tree.
- *
- * @param device	Device to remove.
- *
- * @return		0 on success, negative error code on failure.
- */
-int disk_device_destroy(disk_device_t *device) {
-	return -ERR_NOT_IMPLEMENTED;
-}
-MODULE_EXPORT(disk_device_destroy);
-
 /** Initialisation function for the disk module.
- * @return		0 on success, negative error code on failure. */
-static int disk_init(void) {
+ * @return		Status code describing result of the operation. */
+static status_t disk_init(void) {
 	/* Create the disk device directory. */
 	return device_create("disk", device_tree_root, NULL, NULL, NULL, 0, &disk_device_dir);
 }
 
 /** Unloading function for the disk module.
- * @return		0 on success, negative error code on failure. */
-static int disk_unload(void) {
-	return -ERR_NOT_IMPLEMENTED;
+ * @return		Status code describing result of the operation. */
+static status_t disk_unload(void) {
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 MODULE_NAME("disk");

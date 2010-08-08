@@ -19,8 +19,11 @@
  */
 
 #include <lib/utility.h>
+
 #include <mm/malloc.h>
+
 #include <console.h>
+#include <status.h>
 
 #include "disk_priv.h"
 
@@ -39,24 +42,26 @@ typedef struct msdos_part {
 	uint8_t  end_cylinder;
 	uint32_t start_lba;
 	uint32_t num_sects;
-} __attribute__((packed)) msdos_part_t;
+} __packed msdos_part_t;
 
 /** MS-DOS partition table. */
 typedef struct msdos_mbr {
 	uint8_t bootcode[446];
 	msdos_part_t partitions[4];
 	uint16_t signature;
-} __attribute__((packed)) msdos_mbr_t;
+} __packed msdos_mbr_t;
 
 /** Probe a disk for an MSDOS partition table.
  * @param device	Device to scan.
  * @return		Whether an MSDOS partition table was found. */
-bool disk_partition_probe_msdos(disk_device_t *device) {
+bool partition_probe_msdos(disk_device_t *device) {
 	msdos_mbr_t *mbr = kmalloc(sizeof(msdos_mbr_t), MM_SLEEP);
+	msdos_part_t *part;
 	size_t bytes, i;
-	int ret;
+	status_t ret;
 
-	if((ret = disk_device_read(device, mbr, sizeof(msdos_mbr_t), 0, &bytes)) != 0 || bytes != sizeof(msdos_mbr_t)) {
+	ret = disk_device_read(device, mbr, sizeof(msdos_mbr_t), 0, &bytes);
+	if(ret != STATUS_SUCCESS || bytes != sizeof(msdos_mbr_t)) {
 		kprintf(LOG_WARN, "disk: could not read MSDOS MBR from %p (%d)\n",
 			device, ret);
 		kfree(mbr);
@@ -68,16 +73,21 @@ bool disk_partition_probe_msdos(disk_device_t *device) {
 
 	/* Loop through all partitions in the table. */
 	for(i = 0; i < ARRAYSZ(mbr->partitions); i++) {
-		if(mbr->partitions[i].type == 0) {
+		part = &mbr->partitions[i];
+		if(part->type == 0 || (part->bootable != 0 && part->bootable != 0x80)) {
+			continue;
+		} else if(part->start_lba >= device->blocks) {
+			continue;
+		} else if(part->start_lba + part->num_sects > device->blocks) {
 			continue;
 		}
 
 		kprintf(LOG_NORMAL, "disk: found MSDOS partition %d on device %p\n", i, device);
-		kprintf(LOG_NORMAL, " type:      0x%x\n", mbr->partitions[i].type);
-		kprintf(LOG_NORMAL, " start_lba: %u\n",   mbr->partitions[i].start_lba);
-		kprintf(LOG_NORMAL, " num_sects: %u\n",   mbr->partitions[i].num_sects);
+		kprintf(LOG_NORMAL, " type:      0x%x\n", part->type);
+		kprintf(LOG_NORMAL, " start_lba: %u\n", part->start_lba);
+		kprintf(LOG_NORMAL, " num_sects: %u\n", part->num_sects);
 
-		disk_partition_add(device, i, mbr->partitions[i].start_lba, mbr->partitions[i].num_sects);
+		partition_add(device, i, part->start_lba, part->num_sects);
 	}
 
 	kfree(mbr);

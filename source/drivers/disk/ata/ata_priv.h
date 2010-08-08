@@ -89,7 +89,7 @@ typedef struct ata_device {
 
 	uint8_t num;				/**< Device number on the controller. */
 	ata_controller_t *parent;		/**< Controller containing the device. */
-	disk_device_t *device;			/**< Device tree node. */
+	device_t *device;			/**< Device tree node. */
 	int flags;				/**< Flags for the device. */
 	char model[41];				/**< Device model number. */
 	char serial[21];			/**< Serial number. */
@@ -102,8 +102,8 @@ typedef struct ata_device {
 
 extern uint8_t ata_controller_status(ata_controller_t *controller);
 extern uint8_t ata_controller_error(ata_controller_t *controller);
-extern int ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear,
-                               bool any, bool error, useconds_t timeout);
+extern status_t ata_controller_wait(ata_controller_t *controller, uint8_t set, uint8_t clear,
+                                    bool any, bool error, useconds_t timeout);
 extern void ata_controller_command(ata_controller_t *controller, uint8_t cmd);
 extern void ata_controller_select(ata_controller_t *controller, uint8_t num);
 extern void ata_controller_pio_read(ata_controller_t *controller, void *buf, size_t count);

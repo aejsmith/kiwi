@@ -311,17 +311,12 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 			return ret;
 		}
 
-		ret = device_alias(dname, input_device_dir, *devicep, NULL);
-		if(ret != STATUS_SUCCESS) {
-			/* Should not fail - only possible failure is if name
-			 * already exists, and ID should be unique. Note that
-			 * with current ID allocation implementation this can
-			 * happen - FIXME. */
-			fatal("Could not create device alias (%d)", ret);
-		}
+		/* Should not fail - only possible failure is if name already
+		 * exists, and ID should be unique. */
+		device_alias(dname, input_device_dir, *devicep, NULL);
 	} else {
 		ret = device_create(dname, input_device_dir, iops, device, attrs,
-	                            ARRAYSZ(attrs), devicep);
+		                    ARRAYSZ(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
