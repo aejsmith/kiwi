@@ -538,7 +538,7 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
 	if(!handle || !buf) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	device = (device_t *)handle->object;
@@ -581,7 +581,7 @@ status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t
 	if(!handle || !buf) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	device = (device_t *)handle->object;
@@ -618,7 +618,7 @@ status_t device_request(khandle_t *handle, int request, void *in, size_t insz, v
 	if(!handle) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	device = (device_t *)handle->object;

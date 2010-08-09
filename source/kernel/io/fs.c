@@ -967,7 +967,7 @@ static status_t fs_file_read_internal(khandle_t *handle, void *buf, size_t count
 		ret = STATUS_INVALID_PARAM;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		ret = STATUS_TYPE_INVAL;
+		ret = STATUS_INVALID_HANDLE;
 		goto out;
 	}
 
@@ -1072,7 +1072,7 @@ static status_t fs_file_write_internal(khandle_t *handle, const void *buf, size_
 		ret = STATUS_INVALID_PARAM;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		ret = STATUS_TYPE_INVAL;
+		ret = STATUS_INVALID_HANDLE;
 		goto out;
 	}
 
@@ -1184,7 +1184,7 @@ status_t fs_file_resize(khandle_t *handle, offset_t size) {
 	if(!handle) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1280,7 +1280,7 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	if(!handle || !buf) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1373,7 +1373,7 @@ status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offs
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1419,7 +1419,7 @@ status_t fs_handle_info(khandle_t *handle, fs_info_t *info) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1437,7 +1437,7 @@ status_t fs_handle_sync(khandle_t *handle) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_INVALID_HANDLE;
 	}
 
 	node = (fs_node_t *)handle->object;
