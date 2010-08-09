@@ -21,9 +21,6 @@
 #ifndef __KERNEL_STATUS_H
 #define __KERNEL_STATUS_H
 
-// TODO: indented lines are to be replaced by more specific error codes or
-// changed.
-
 /** Definitions of status codes returned by kernel functions. */
 #define STATUS_SUCCESS			0	/**< Operation completed successfully. */
 #define STATUS_NOT_IMPLEMENTED		1	/**< Operation not implemented. */
@@ -43,27 +40,28 @@
 #define STATUS_NO_PORTS			15	/**< No ports are available. */
 #define STATUS_NO_SEMAPHORES		16	/**< No semaphores are available. */
 #define STATUS_NO_AREAS			17	/**< No shared memory areas are available. */
-
-#  define STATUS_ALREADY_EXISTS		44	/**< Object already exists. */
-#  define STATUS_NOT_FOUND		45	/**< Requested object not found. */
-#  define STATUS_TYPE_INVAL		46	/**< Object type is invalid. */
-#define STATUS_READ_ONLY		47	/**< Object cannot be modified. */
-#define STATUS_IN_USE			50	/**< Object is in use. */
-#define STATUS_FS_FULL			51	/**< No space is available on the filesystem. */
-#define STATUS_PERM_DENIED		52	/**< Permission denied. */
-#define STATUS_TOO_LONG			53	/**< Provided string is too long. */
-#define STATUS_LINK_LIMIT		54	/**< Exceeded nested symbolic link limit. */
-#  define STATUS_BUF_TOO_SMALL		55	/**< Provided buffer is too small. */
-#define STATUS_DEST_UNREACHABLE		57	/**< Cannot reach destination. */
-#define STATUS_DEVICE_ERROR		58	/**< An error occurred during a hardware operation. */
-#  define STATUS_NOT_EMPTY		60	/**< Directory is not empty. */
-#define STATUS_PROCESS_RUNNING		61	/**< Process is still running. */
-#define STATUS_UNKNOWN_IMAGE		62	/**< Executable image has an unrecognised format. */
-#define STATUS_MALFORMED_IMAGE		63	/**< Executable image format is incorrect. */
-#define STATUS_MISSING_LIBRARY		64	/**< Required library not found. */
-#define STATUS_MISSING_SYMBOL		65	/**< Referenced symbol not found. */
-#define STATUS_UNKNOWN_FS		66	/**< Filesystem has an unrecognised format. */
-#define STATUS_CORRUPT_FS		67	/**< Corruption detected on the filesystem. */
-#define STATUS_DIR_FULL			68	/**< Directory is full. */
+#define STATUS_READ_ONLY		18	/**< Object cannot be modified. */
+#define STATUS_PERM_DENIED		19	/**< Permission denied. */
+#define STATUS_NOT_DIR			20	/**< Path component is not a directory. */
+#define STATUS_NOT_FILE			21	/**< Path does not refer to a file. */
+#define STATUS_NOT_SYMLINK		22	/**< Path does not refer to a symbolic link. */
+#define STATUS_NOT_FOUND		23	/**< Requested object could not be found. */
+#define STATUS_ALREADY_EXISTS		24	/**< Object already exists. */
+#define STATUS_TOO_SMALL		25	/**< Provided buffer is too small. */
+#define STATUS_TOO_LONG			26	/**< Provided string is too long. */
+#define STATUS_DIR_NOT_EMPTY		27	/**< Directory is not empty. */
+#define STATUS_DIR_FULL			28	/**< Directory is full. */
+#define STATUS_UNKNOWN_FS		29	/**< Filesystem has an unrecognised format. */
+#define STATUS_CORRUPT_FS		30	/**< Corruption detected on the filesystem. */
+#define STATUS_FS_FULL			31	/**< No space is available on the filesystem. */
+#define STATUS_SYMLINK_LIMIT		32	/**< Exceeded nested symbolic link limit. */
+#define STATUS_IN_USE			33	/**< Object is in use. */
+#define STATUS_DEVICE_ERROR		34	/**< An error occurred during a hardware operation. */
+#define STATUS_PROCESS_RUNNING		35	/**< Process is still running. */
+#define STATUS_UNKNOWN_IMAGE		36	/**< Executable image has an unrecognised format. */
+#define STATUS_MALFORMED_IMAGE		37	/**< Executable image format is incorrect. */
+#define STATUS_MISSING_LIBRARY		38	/**< Required library not found. */
+#define STATUS_MISSING_SYMBOL		39	/**< Referenced symbol not found. */
+#define STATUS_DEST_UNREACHABLE		40	/**< Cannot reach destination. */
 
 #endif /* __KERNEL_STATUS_H */

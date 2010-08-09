@@ -325,7 +325,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 			if(++nest > FS_NESTED_LINK_MAX) {
 				fs_node_release(prev);
 				fs_node_release(node);
-				return STATUS_LINK_LIMIT;
+				return STATUS_SYMLINK_LIMIT;
 			}
 
 			/* Obtain the link destination. */
@@ -374,8 +374,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 			 * the path string is trying to treat a non-directory
 			 * as a directory. Reject this. */
 			fs_node_release(node);
-			// FIXME: better error code 
-			return STATUS_TYPE_INVAL;
+			return STATUS_NOT_DIR;
 		} else if(!tok[0]) {
 			/* Zero-length path component, do nothing. */
 			continue;
@@ -539,7 +538,16 @@ static status_t fs_node_lookup(const char *path, bool follow, int type, fs_node_
 	ret = fs_node_lookup_internal(dup, node, follow, 0, &node);
 	if(ret == STATUS_SUCCESS) {
 		if(type >= 0 && node->type != (fs_node_type_t)type) {
-			ret = STATUS_TYPE_INVAL;
+			if(type == FS_NODE_FILE) {
+				ret = STATUS_NOT_FILE;
+			} else if(type == FS_NODE_DIR) {
+				ret = STATUS_NOT_DIR;
+			} else if(type == FS_NODE_SYMLINK) {
+				ret = STATUS_NOT_SYMLINK;
+			} else {
+				/* FIXME. */
+				ret = STATUS_NOT_SUPPORTED;
+			}
 			fs_node_release(node);
 		} else {
 			*nodep = node;
@@ -1264,7 +1272,7 @@ status_t fs_dir_open(const char *path, int flags, khandle_t **handlep) {
  * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
- *			return STATUS_BUF_TOO_SMALL).
+ *			return STATUS_TOO_SMALL).
  *
  * @return		Status code describing result of the operation. If the
  *			handle's offset is past the end of the directory,
@@ -1304,7 +1312,7 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	/* Copy the entry across. */
 	if(entry->length > size) {
 		kfree(entry);
-		return STATUS_BUF_TOO_SMALL;
+		return STATUS_TOO_SMALL;
 	}
 	memcpy(buf, entry, entry->length);
 	kfree(entry);
@@ -1466,7 +1474,7 @@ status_t fs_symlink_create(const char *path, const char *target) {
  * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
  * @param size		Size of buffer. If this is too small, the function will
- *			return STATUS_BUF_TOO_SMALL.
+ *			return STATUS_TOO_SMALL.
  *
  * @return		Status code describing result of the operation.
  */
@@ -1500,7 +1508,7 @@ status_t fs_symlink_read(const char *path, char *buf, size_t size) {
 	len = strlen(dest);
 	if((len + 1) > size) {
 		kfree(dest);
-		return STATUS_BUF_TOO_SMALL;
+		return STATUS_TOO_SMALL;
 	}
 
 	/* Copy the string across. */
@@ -2468,7 +2476,7 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
  * @param handle	Handle to directory to read from.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
- *			return STATUS_BUF_TOO_SMALL).
+ *			return STATUS_TOO_SMALL).
  *
  * @return		Status code describing result of the operation. If the
  *			handle's offset is past the end of the directory,
@@ -2480,7 +2488,7 @@ status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	status_t ret;
 
 	if(!size) {
-		return STATUS_BUF_TOO_SMALL;
+		return STATUS_TOO_SMALL;
 	}
 
 	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DIR, &khandle);
@@ -2609,7 +2617,7 @@ status_t sys_fs_symlink_create(const char *path, const char *target) {
  * @param path		Path to the symbolic link to read.
  * @param buf		Buffer to read into.
  * @param size		Size of buffer. If this is too small, the function will
- *			return STATUS_BUF_TOO_SMALL.
+ *			return STATUS_TOO_SMALL.
  *
  * @return		Status code describing result of the operation.
  */
@@ -2753,9 +2761,9 @@ status_t sys_fs_getcwd(char *buf, size_t size) {
 			node = NULL;
 			goto fail;
 		} else if(node->type != FS_NODE_DIR) {
-			dprintf("fs: node %p(%" PRIu64 ") should be a directory but it isn't!\n",
-			        node, node->id);
-			ret = STATUS_TYPE_INVAL;
+			kprintf(LOG_WARN, "fs: node %" PRIu16 ":%" PRIu64 " should be a directory but it isn't!\n",
+			        node->mount->id, node->id);
+			ret = STATUS_NOT_DIR;
 			goto fail;
 		}
 
@@ -2791,7 +2799,7 @@ status_t sys_fs_getcwd(char *buf, size_t size) {
 	kbuf = tmp;
 
 	if(len >= size) {
-		ret = STATUS_BUF_TOO_SMALL;
+		ret = STATUS_TOO_SMALL;
 	} else {
 		ret = memcpy_to_user(buf, kbuf, len + 1);
 	}

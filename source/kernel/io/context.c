@@ -90,7 +90,7 @@ status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old;
 
 	if(node->type != FS_NODE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_NOT_DIR;
 	}
 
 	fs_node_get(node);
@@ -118,7 +118,7 @@ status_t io_context_setroot(io_context_t *context, fs_node_t *node) {
 	fs_node_t *oldr, *oldc;
 
 	if(node->type != FS_NODE_DIR) {
-		return STATUS_TYPE_INVAL;
+		return STATUS_NOT_DIR;
 	}
 
 	/* Get twice: one for root, one for current. */

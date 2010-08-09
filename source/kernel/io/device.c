@@ -421,7 +421,10 @@ device_t *device_lookup(const char *path) {
 	while((tok = strsep(&dup, "/"))) {
 		if(!tok[0]) {
 			continue;
-		} else if(!(child = radix_tree_lookup(&device->children, tok))) {
+		}
+
+		child = radix_tree_lookup(&device->children, tok);
+		if(!child) {
 			mutex_unlock(&device->lock);
 			kfree(orig);
 			return NULL;
@@ -766,9 +769,13 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 		return STATUS_INVALID_PARAM;
 	}
 
-	if((ret = strdup_from_user(path, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strdup_from_user(path, MM_SLEEP, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = device_open(kpath, &handle)) != STATUS_SUCCESS) {
+	}
+
+	ret = device_open(kpath, &handle);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -815,14 +822,16 @@ status_t sys_device_read(handle_t handle, void *buf, size_t count, offset_t offs
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
 
 	ret = device_read(khandle, kbuf, count, offset, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
+		err = memcpy_to_user(buf, kbuf, bytes);	
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 			bytes = 0;
 		}
@@ -833,7 +842,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -876,10 +886,13 @@ status_t sys_device_write(handle_t handle, const void *buf, size_t count, offset
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
+	}
+	ret = memcpy_from_user(kbuf, buf, count);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -892,7 +905,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -922,10 +936,13 @@ status_t sys_device_request(handle_t handle, int request, void *in, size_t insz,
 	}
 
 	if(in && insz) {
-		if((kin = kmalloc(insz, 0)) == NULL) {
+		kin = kmalloc(insz, 0);
+		if(!kin) {
 			ret = STATUS_NO_MEMORY;
 			goto out;
-		} else if((ret = memcpy_from_user(kin, in, insz)) != STATUS_SUCCESS) {
+		}
+		ret = memcpy_from_user(kin, in, insz);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
@@ -934,11 +951,19 @@ status_t sys_device_request(handle_t handle, int request, void *in, size_t insz,
 	if(kout) {
 		assert(koutsz);
 		if(koutsz > outsz) {
-			ret = STATUS_BUF_TOO_SMALL;
-		} else if((err = memcpy_to_user(out, kout, koutsz)) != STATUS_SUCCESS) {
+			ret = STATUS_TOO_SMALL;
+			goto out;
+		}
+
+		err = memcpy_to_user(out, kout, koutsz);
+		if(err != STATUS_SUCCESS) {
 			ret = err;
-		} else if(bytesp) {
-			if((err = memcpy_to_user(bytesp, &koutsz, sizeof(size_t))) != STATUS_SUCCESS) {
+			goto out;
+		}
+
+		if(bytesp) {
+			err = memcpy_to_user(bytesp, &koutsz, sizeof(size_t));
+			if(err != STATUS_SUCCESS) {
 				ret = err;
 			}
 		}

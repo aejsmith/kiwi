@@ -131,8 +131,8 @@ typedef struct fs_node_ops {
 	 *			filesystem).
 	 * @note		If the node being unlinked is a directory, this
 	 *			function should ensure that it is empty (except
-	 *			for . and .. entries), and return -ERR_NOT_EMPTY
-	 *			if it isn't.
+	 *			for . and .. entries), and return
+	 *			STATUS_DIR_NOT_EMPTY if it isn't.
 	 * @param parent	Directory containing the node.
 	 * @param name		Name of the node in the directory.
 	 * @param node		Node being unlinked.

@@ -150,7 +150,7 @@ static status_t ext2_node_unlink(fs_node_t *_parent, const char *name, fs_node_t
 	if(node->type == FS_NODE_DIR) {
 		/* Ensure that it's empty. */
 		if(!ext2_dir_empty(inode)) {
-			ret = STATUS_NOT_EMPTY;
+			ret = STATUS_DIR_NOT_EMPTY;
 			goto out;
 		}
 
