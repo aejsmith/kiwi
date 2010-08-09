@@ -607,8 +607,9 @@ void __init_text vm_page_init(void) {
 	}
 
 	/* Set up the page writer and page daemon. */
-	if((ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
-	                        NULL, &page_writer_thread)) != STATUS_SUCCESS) {
+	ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
+	                    NULL, &page_writer_thread);
+	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start page writer (%d)", ret);
 	}
 	thread_run(page_writer_thread);

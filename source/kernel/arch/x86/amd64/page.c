@@ -423,7 +423,8 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	assert(physp);
 
 	/* Find the page table for the entry. */
-	if((ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
+	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
+	if(ptbl) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;

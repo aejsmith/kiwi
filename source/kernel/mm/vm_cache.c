@@ -105,7 +105,8 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	}
 
 	/* Check if we have it cached. */
-	if((page = avl_tree_lookup(&cache->pages, (key_t)offset))) {
+	page = avl_tree_lookup(&cache->pages, (key_t)offset);
+	if(page) {
 		if(refcount_inc(&page->count) == 1) {
 			vm_page_dequeue(page);
 		}
@@ -544,7 +545,8 @@ status_t vm_cache_flush(vm_cache_t *cache) {
 	AVL_TREE_FOREACH(&cache->pages, iter) {
 		page = avl_tree_entry(iter, vm_page_t);
 
-		if((err = vm_cache_flush_page_internal(cache, page)) != STATUS_SUCCESS) {
+		err = vm_cache_flush_page_internal(cache, page);
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}

@@ -992,8 +992,9 @@ void __init_text slab_late_init(void) {
 	mutex_unlock(&slab_caches_lock);
 
 	/* Create the reclaim thread. */
-	if((ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry, NULL,
-	                        NULL, &slab_reclaim_thread)) != STATUS_SUCCESS) {
+	ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry, NULL,
+	                    NULL, &slab_reclaim_thread);
+	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create reclaim thread (%d)", ret);
 	}
 	thread_run(slab_reclaim_thread);

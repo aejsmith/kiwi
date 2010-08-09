@@ -98,11 +98,15 @@ status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *i
 	mutex_lock(&cache->lock);
 
 	/* Look up the entry. If it is not found, pull it in. */
-	if(!(entry = radix_tree_lookup(&cache->entries, name))) {
+	entry = radix_tree_lookup(&cache->entries, name);
+	if(!entry) {
 		if(!cache->ops || !cache->ops->lookup) {
 			mutex_unlock(&cache->lock);
 			return STATUS_NOT_FOUND;
-		} else if((ret = cache->ops->lookup(cache, name, &id)) != STATUS_SUCCESS) {
+		}
+
+		ret = cache->ops->lookup(cache, name, &id);
+		if(ret != STATUS_SUCCESS) {
 			mutex_unlock(&cache->lock);
 			return ret;
 		}

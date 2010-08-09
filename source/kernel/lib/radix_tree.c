@@ -515,14 +515,16 @@ radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node) {
 
 	while(node == orig || node->value == NULL) {
 		/* Check if we have a child we can use. */
-		if((tmp = radix_tree_node_first_child(node))) {
+		tmp = radix_tree_node_first_child(node);
+		if(tmp) {
 			node = tmp;
 			continue;
 		}
 
 		/* Go up until we find a parent with a sibling after us. */
 		while(node->parent) {
-			if((tmp = radix_tree_node_next_sibling(node))) {
+			tmp = radix_tree_node_next_sibling(node);
+			if(tmp) {
 				node = tmp;
 				break;
 			}

@@ -388,7 +388,8 @@ status_t sys_module_load(const char *path, char *depbuf) {
 
 	ret = module_load(handle, kdepbuf);
 	if(ret == STATUS_MISSING_LIBRARY) {
-		if((err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1)) != STATUS_SUCCESS) {
+		err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}

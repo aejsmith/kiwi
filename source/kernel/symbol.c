@@ -237,7 +237,8 @@ symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
 		LIST_FOREACH(&symbol_tables, iter) {
 			table = list_entry(iter, symbol_table_t, header);
 
-			if((sym = symbol_table_lookup_addr(table, addr, offp))) {
+			sym = symbol_table_lookup_addr(table, addr, offp);
+			if(sym) {
 				return sym;
 			}
 		}

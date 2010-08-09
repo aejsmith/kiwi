@@ -1165,14 +1165,16 @@ extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
 	if(!(flags & VM_MAP_FIXED) && !addrp) {
 		return STATUS_INVALID_PARAM;
 	} else if(handle >= 0) {
-		if((ret = handle_lookup(curr_proc, handle, -1, &khandle)) != STATUS_SUCCESS) {
+		ret = handle_lookup(curr_proc, handle, -1, &khandle);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
 
 	ret = vm_map(curr_proc->aspace, (ptr_t)start, size, flags, khandle, offset, &addr);
 	if(ret == STATUS_SUCCESS && addrp) {
-		if((ret = memcpy_to_user(addrp, &addr, sizeof(void *))) != STATUS_SUCCESS) {
+		ret = memcpy_to_user(addrp, &addr, sizeof(void *));
+		if(ret != STATUS_SUCCESS) {
 			vm_unmap(curr_proc->aspace, addr, size);
 		}
 	}

@@ -518,7 +518,8 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	 * any space in the arena. */
 	while(true) {
 		/* First try to find a free segment in the arena. */
-		if((seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag))) {
+		seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag);
+		if(seg) {
 			break;
 		}
 

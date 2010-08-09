@@ -637,7 +637,8 @@ status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, s
 	message->type = type;
 	message->size = size;
 	if(size) {
-		if((ret = memcpy_from_user(message->data, buf, size)) != STATUS_SUCCESS) {
+		ret = memcpy_from_user(message->data, buf, size);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
 	}

@@ -113,7 +113,8 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 
 	/* If the chunk is already allocated, see if the block is cached in it,
 	 * else allocate a new chunk. */
-	if((chunk = avl_tree_lookup(&map->chunks, chunk_num))) {
+	chunk = avl_tree_lookup(&map->chunks, chunk_num);
+	if(chunk) {
 		if(bitmap_test(&chunk->bitmap, chunk_entry)) {
 			*rawp = chunk->blocks[chunk_entry];
 			mutex_unlock(&map->lock);
@@ -127,7 +128,8 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	}
 
 	/* Look up the block. */
-	if((ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry])) != STATUS_SUCCESS) {
+	ret = map->ops->lookup(map, num, &chunk->blocks[chunk_entry]);
+	if(ret != STATUS_SUCCESS) {
 		mutex_unlock(&map->lock);
 		return ret;
 	}
@@ -194,9 +196,13 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool 
 	count = PAGE_SIZE / map->block_size;
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
-		if((ret = file_map_lookup(map, start + i, &raw)) != STATUS_SUCCESS) {
+		ret = file_map_lookup(map, start + i, &raw);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
-		} else if((ret = map->ops->read_block(map, buf, raw, nonblock)) != STATUS_SUCCESS) {
+		}
+
+		ret = map->ops->read_block(map, buf, raw, nonblock);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
@@ -231,9 +237,13 @@ status_t file_map_write_page(vm_cache_t *cache, const void *buf, offset_t offset
 	count = PAGE_SIZE / map->block_size;
 
 	for(i = 0; i < count; i++, buf += map->block_size) {
-		if((ret = file_map_lookup(map, start + i, &raw)) != STATUS_SUCCESS) {
+		ret = file_map_lookup(map, start + i, &raw);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
-		} else if((ret = map->ops->write_block(map, buf, raw, nonblock)) != STATUS_SUCCESS) {
+		}
+
+		ret = map->ops->write_block(map, buf, raw, nonblock);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
