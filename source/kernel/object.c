@@ -342,7 +342,7 @@ status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_
 	id = bitmap_ffz(&process->handles->bitmap);
 	if(id < 0) {
 		rwlock_unlock(&process->handles->lock);
-		return STATUS_RESOURCE_UNAVAIL;
+		return STATUS_NO_HANDLES;
 	}
 
 	/* Copy the handle ID before actually attempting to insert so we don't

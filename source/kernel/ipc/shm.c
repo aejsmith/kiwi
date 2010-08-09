@@ -150,9 +150,10 @@ status_t sys_shm_create(size_t size, handle_t *handlep) {
 	}
 
 	area = slab_cache_alloc(shm_cache, MM_SLEEP);
-	if(!(area->id = vmem_alloc(shm_id_arena, 1, 0))) {
+	area->id = vmem_alloc(shm_id_arena, 1, 0);
+	if(!area->id) {
 		slab_cache_free(shm_cache, area);
-		return STATUS_RESOURCE_UNAVAIL;
+		return STATUS_NO_AREAS;
 	}
 
 	object_init(&area->obj, &shm_object_type);

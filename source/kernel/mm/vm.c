@@ -153,7 +153,7 @@ static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 				map->rref[j]--;
 			}
 			mutex_unlock(&map->lock);
-			return STATUS_RESOURCE_UNAVAIL;
+			return STATUS_NO_MEMORY;
 		}
 		map->rref[i]++;
 	}

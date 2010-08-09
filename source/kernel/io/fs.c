@@ -1701,7 +1701,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 
 	/* Allocate a mount ID. */
 	if(next_mount_id == UINT16_MAX) {
-		ret = STATUS_RESOURCE_UNAVAIL;
+		ret = STATUS_FS_FULL;
 		goto fail;
 	}
 	mount->id = next_mount_id++;

@@ -24,8 +24,6 @@
 // TODO: indented lines are to be replaced by more specific error codes or
 // changed.
 
-// TODO: Rename _INVAL codes to _INVALID_BLAH
-
 /** Definitions of status codes returned by kernel functions. */
 #define STATUS_SUCCESS			0	/**< Operation completed successfully. */
 #define STATUS_NOT_IMPLEMENTED		1	/**< Operation not implemented. */
@@ -39,13 +37,17 @@
 #define STATUS_INVALID_ADDR		9	/**< Invalid memory location specified. */
 #define STATUS_INVALID_REQUEST		10	/**< Invalid device request specified. */
 #define STATUS_INVALID_EVENT		11	/**< Invalid object event specified. */
+#define STATUS_OVERFLOW			12	/**< Integer overflow. */
+#define STATUS_NO_MEMORY		13	/**< Out of memory. */
+#define STATUS_NO_HANDLES		14	/**< No handles are available. */
+#define STATUS_NO_PORTS			15	/**< No ports are available. */
+#define STATUS_NO_SEMAPHORES		16	/**< No semaphores are available. */
+#define STATUS_NO_AREAS			17	/**< No shared memory areas are available. */
 
-#define STATUS_NO_MEMORY		42	/**< No memory available. */
 #  define STATUS_ALREADY_EXISTS		44	/**< Object already exists. */
 #  define STATUS_NOT_FOUND		45	/**< Requested object not found. */
 #  define STATUS_TYPE_INVAL		46	/**< Object type is invalid. */
 #define STATUS_READ_ONLY		47	/**< Object cannot be modified. */
-#define STATUS_RESOURCE_UNAVAIL		49	/**< Resource is temporarily unavailable. */
 #define STATUS_IN_USE			50	/**< Object is in use. */
 #define STATUS_FS_FULL			51	/**< No space is available on the filesystem. */
 #define STATUS_PERM_DENIED		52	/**< Permission denied. */
@@ -54,7 +56,6 @@
 #  define STATUS_BUF_TOO_SMALL		55	/**< Provided buffer is too small. */
 #define STATUS_DEST_UNREACHABLE		57	/**< Cannot reach destination. */
 #define STATUS_DEVICE_ERROR		58	/**< An error occurred during a hardware operation. */
-#define STATUS_OVERFLOW			59	/**< Integer overflow. */
 #  define STATUS_NOT_EMPTY		60	/**< Directory is not empty. */
 #define STATUS_PROCESS_RUNNING		61	/**< Process is still running. */
 #define STATUS_UNKNOWN_IMAGE		62	/**< Executable image has an unrecognised format. */

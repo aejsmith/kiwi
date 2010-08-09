@@ -181,9 +181,10 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
-	if(!(sem->id = vmem_alloc(semaphore_id_arena, 1, 0))) {
+	sem->id = vmem_alloc(semaphore_id_arena, 1, 0);
+	if(!sem->id) {
 		kfree(sem);
-		return STATUS_RESOURCE_UNAVAIL;
+		return STATUS_NO_SEMAPHORES;
 	}
 	if(name) {
 		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, 0, &sem->name);

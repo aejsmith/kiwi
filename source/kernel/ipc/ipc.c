@@ -395,9 +395,10 @@ status_t sys_ipc_port_create(handle_t *handlep) {
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
-	if(!(port->id = vmem_alloc(port_id_arena, 1, 0))) {
+	port->id = vmem_alloc(port_id_arena, 1, 0);
+	if(!port->id) {
 		slab_cache_free(ipc_port_cache, port);
-		return STATUS_RESOURCE_UNAVAIL;
+		return STATUS_NO_PORTS;
 	}
 
 	object_init(&port->obj, &port_object_type);
