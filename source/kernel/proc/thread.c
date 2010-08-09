@@ -649,7 +649,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 		return STATUS_INVALID_PARAM;
 	}
 
-	ret = strndup_from_user(name, THREAD_NAME_MAX, MM_SLEEP, &kname);
+	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

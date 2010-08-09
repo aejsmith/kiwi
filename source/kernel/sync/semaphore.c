@@ -187,7 +187,7 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 		return STATUS_NO_SEMAPHORES;
 	}
 	if(name) {
-		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, 0, &sem->name);
+		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, &sem->name);
 		if(ret != STATUS_SUCCESS) {
 			vmem_free(semaphore_id_arena, sem->id, 1);
 			kfree(sem);

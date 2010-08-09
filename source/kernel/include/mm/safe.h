@@ -30,8 +30,8 @@ extern status_t memcpy_to_user(void *dest, const void *src, size_t count);
 extern status_t memset_user(void *dest, int val, size_t count);
 extern status_t strlen_user(const char *str, size_t *lenp);
 
-extern status_t strdup_from_user(const void *src, int mmflag, char **destp);
-extern status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp);
+extern status_t strdup_from_user(const void *src, char **destp);
+extern status_t strndup_from_user(const void *src, size_t max, char **destp);
 extern status_t arrcpy_from_user(const char *const src[], char ***arrayp);
 
 #endif /* __MM_SAFE_H */

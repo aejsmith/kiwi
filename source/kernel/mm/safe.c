@@ -143,19 +143,21 @@ status_t strlen_user(const char *str, size_t *lenp) {
 /** Duplicate string from userspace.
  *
  * Allocates a buffer large enough and copies across a string from userspace.
+ * The allocation is not made using MM_SLEEP, as there is no length limit and
+ * therefore the length could be too large to fit in the heap. Use of
+ * strndup_from_user() is preferred to this.
  *
  * @param src		Location to copy from.
- * @param mmflag	Allocation flags.
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
  *			Returns STATUS_INVALID_PARAM if the string is
  *			zero-length.
  */
-status_t strdup_from_user(const void *src, int mmflag, char **destp) {
+status_t strdup_from_user(const void *src, char **destp) {
+	status_t ret;
 	size_t len;
 	char *d;
-	status_t ret;
 
 	ret = strlen_user(src, &len);
 	if(ret != STATUS_SUCCESS) {
@@ -164,8 +166,8 @@ status_t strdup_from_user(const void *src, int mmflag, char **destp) {
 		return STATUS_INVALID_PARAM;
 	}
 
-	d = kmalloc(len + 1, mmflag);
-	if(d == NULL) {
+	d = kmalloc(len + 1, 0);
+	if(!d) {
 		return STATUS_NO_MEMORY;
 	}
 
@@ -183,18 +185,18 @@ status_t strdup_from_user(const void *src, int mmflag, char **destp) {
  *
  * Allocates a buffer large enough and copies across a string from userspace.
  * If the string is longer than the maximum length, then an error will be
- * returned.
+ * returned. Because a length limit is provided, the allocation is made using
+ * MM_SLEEP - it is assumed that the limit is sensible.
  *
  * @param src		Location to copy from.
  * @param max		Maximum length allowed.
- * @param mmflag	Allocation flags.
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
  *			Returns STATUS_INVALID_PARAM if the string is
  *			zero-length.
  */
-status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
+status_t strndup_from_user(const void *src, size_t max, char **destp) {
 	status_t ret;
 	size_t len;
 	char *d;
@@ -208,11 +210,7 @@ status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp
 		return STATUS_TOO_LONG;
 	}
 
-	d = kmalloc(len + 1, mmflag);
-	if(d == NULL) {
-		return STATUS_NO_MEMORY;
-	}
-
+	d = kmalloc(len + 1, MM_SLEEP);
 	ret = memcpy_from_user(d, src, len);
 	if(ret != STATUS_SUCCESS) {
 		kfree(d);
@@ -241,7 +239,8 @@ status_t arrcpy_from_user(const char *const src[], char ***arrayp) {
 
 	/* Copy the arrays across. */
 	for(i = 0; ; i++) {
-		if(!(narr = krealloc(array, sizeof(char *) * (i + 1), 0))) {
+		narr = krealloc(array, sizeof(char *) * (i + 1), 0);
+		if(!narr) {
 			ret = STATUS_NO_MEMORY;
 			goto fail;
 		}
@@ -257,7 +256,7 @@ status_t arrcpy_from_user(const char *const src[], char ***arrayp) {
 			break;
 		}
 
-		ret = strdup_from_user(array[i], 0, &array[i]);
+		ret = strdup_from_user(array[i], &array[i]);
 		if(ret != STATUS_SUCCESS) {
 			array[i] = NULL;
 			goto fail;

@@ -769,7 +769,7 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 		return STATUS_INVALID_PARAM;
 	}
 
-	ret = strdup_from_user(path, MM_SLEEP, &kpath);
+	ret = strndup_from_user(path, DEVICE_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

@@ -640,20 +640,30 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	info->map = NULL;
 	info->aspace = NULL;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, (char **)&info->path)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, (char **)&info->path);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = arrcpy_from_user(args, (char ***)&info->args)) != STATUS_SUCCESS) {
+	}
+
+	ret = arrcpy_from_user(args, (char ***)&info->args);
+	if(ret != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
-	} else if((ret = arrcpy_from_user(env, (char ***)&info->env)) != STATUS_SUCCESS) {
+	}
+	ret = arrcpy_from_user(env, (char ***)&info->env);
+	if(ret != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
-	} else if(count > 0) {
+	}
+	if(count > 0) {
 		size = sizeof(handle_t) * 2 * count;
-		if(!(info->map = kmalloc(size, 0))) {
+		info->map = kmalloc(size, 0);
+		if(!info->map) {
 			process_create_args_free(info);
 			return STATUS_NO_MEMORY;
-		} else if((ret = memcpy_from_user(info->map, map, size)) != STATUS_SUCCESS) {
+		}
+		ret = memcpy_from_user(info->map, map, size);
+		if(ret != STATUS_SUCCESS) {
 			process_create_args_free(info);
 			return ret;
 		}

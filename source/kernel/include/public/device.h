@@ -31,6 +31,9 @@ extern "C" {
 # include <kernel/types.h>
 #endif
 
+/** Various device manager limitations. */
+#define DEVICE_PATH_MAX			4096	/**< Maximum length of a device tree path. */
+
 /** Generic device events. */
 #define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */
 #define DEVICE_EVENT_WRITABLE		1	/**< Wait for the device to be writable. */

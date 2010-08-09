@@ -374,7 +374,8 @@ status_t sys_module_load(const char *path, char *depbuf) {
 	status_t ret, err;
 
 	/* Copy the path across. */
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 

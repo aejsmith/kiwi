@@ -97,7 +97,8 @@ static fs_type_t *fs_type_lookup(const char *name) {
 
 	mutex_lock(&fs_types_lock);
 
-	if((type = fs_type_lookup_internal(name))) {
+	type = fs_type_lookup_internal(name);
+	if(type) {
 		refcount_inc(&type->count);
 	}
 
@@ -603,7 +604,8 @@ void fs_node_release(fs_node_t *node) {
 			 * in fs_node_free() is flushing data. Since this node
 			 * has no source to flush to, or has been removed, this
 			 * should not fail. */
-			if((ret = fs_node_free(node)) != STATUS_SUCCESS) {
+			ret = fs_node_free(node);
+			if(ret != STATUS_SUCCESS) {
 				fatal("Could not destroy %s (%d)",
 				      (mount) ? "removed node" : "node with no mount",
 				      ret);
@@ -1339,7 +1341,8 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 		 * root, rather than the mountpoint. If the node the entry
 		 * currently points to is not in the cache, then it won't be a
 		 * mountpoint (mountpoints are always in the cache). */
-		if((child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id))) {
+		child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id);
+		if(child) {
 			if(child != node) {
 				/* Mounted pointer is protected by mount lock. */
 				if(child->type == FS_NODE_DIR && child->mounted) {
@@ -2112,7 +2115,8 @@ status_t sys_fs_file_create(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2135,9 +2139,13 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 		return STATUS_INVALID_PARAM;
 	}
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_file_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
+	}
+
+	ret = fs_file_open(kpath, flags, &handle);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2184,7 +2192,8 @@ status_t sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *byte
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
@@ -2192,7 +2201,8 @@ status_t sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *byte
 	/* Perform the actual read. */
 	ret = fs_file_read(khandle, kbuf, count, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
+		err = memcpy_to_user(buf, kbuf, bytes);
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2202,7 +2212,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2245,7 +2256,8 @@ status_t sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t of
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
 	}
@@ -2253,7 +2265,8 @@ status_t sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t of
 	/* Perform the actual read. */
 	ret = fs_file_pread(khandle, kbuf, count, offset, &bytes);
 	if(bytes) {
-		if((err = memcpy_to_user(buf, kbuf, bytes)) != STATUS_SUCCESS) {
+		err = memcpy_to_user(buf, kbuf, bytes);
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2263,7 +2276,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2311,10 +2325,13 @@ status_t sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
+	}
+	ret = memcpy_from_user(kbuf, buf, count);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -2328,7 +2345,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2372,10 +2390,13 @@ status_t sys_fs_file_pwrite(handle_t handle, const void *buf, size_t count, offs
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(count, 0)) == NULL) {
+	kbuf = kmalloc(count, 0);
+	if(!kbuf) {
 		ret = STATUS_NO_MEMORY;
 		goto out;
-	} else if((ret = memcpy_from_user(kbuf, buf, count)) != STATUS_SUCCESS) {
+	}
+	ret = memcpy_from_user(kbuf, buf, count);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 
@@ -2389,7 +2410,8 @@ out:
 		handle_release(khandle);
 	}
 	if(bytesp) {
-		if((err = memcpy_to_user(bytesp, &bytes, sizeof(size_t))) != STATUS_SUCCESS) {
+		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
+		if(err != STATUS_SUCCESS) {
 			ret = err;
 		}
 	}
@@ -2429,7 +2451,8 @@ status_t sys_fs_dir_create(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2452,9 +2475,13 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 		return STATUS_INVALID_PARAM;
 	}
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = fs_dir_open(kpath, flags, &handle)) != STATUS_SUCCESS) {
+	}
+
+	ret = fs_dir_open(kpath, flags, &handle);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2500,7 +2527,8 @@ status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
-	if((kbuf = kmalloc(size, 0)) == NULL) {
+	kbuf = kmalloc(size, 0);
+	if(!kbuf) {
 		handle_release(khandle);
 		return STATUS_NO_MEMORY;
 	}
@@ -2596,9 +2624,13 @@ status_t sys_fs_symlink_create(const char *path, const char *target) {
 	char *kpath, *ktarget;
 	status_t ret;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if((ret = strndup_from_user(target, FS_PATH_MAX, MM_SLEEP, &ktarget)) != STATUS_SUCCESS) {
+	}
+
+	ret = strndup_from_user(target, FS_PATH_MAX, &ktarget);
+	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
@@ -2625,14 +2657,15 @@ status_t sys_fs_symlink_read(const char *path, char *buf, size_t size) {
 	char *kpath, *kbuf;
 	status_t ret;
 
-	/* Copy the path across. */
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Allocate a buffer to read into. See comment in sys_fs_file_read()
 	 * about not using MM_SLEEP. */
-	if((kbuf = kmalloc(size, 0)) == NULL) {
+	kbuf = kmalloc(size, 0);
+	if(!kbuf) {
 		kfree(kpath);
 		return STATUS_NO_MEMORY;
 	}
@@ -2672,20 +2705,24 @@ status_t sys_fs_mount(const char *dev, const char *path, const char *type, const
 
 	/* Copy string arguments across from userspace. */
 	if(dev) {
-		if((ret = strndup_from_user(dev, FS_PATH_MAX, MM_SLEEP, &kdevice)) != STATUS_SUCCESS) {
+		ret = strndup_from_user(dev, FS_PATH_MAX, &kdevice);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
 	if(type) {
-		if((ret = strndup_from_user(type, FS_PATH_MAX, MM_SLEEP, &ktype)) != STATUS_SUCCESS) {
+		ret = strndup_from_user(type, FS_PATH_MAX, &ktype);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
 	if(opts) {
-		if((ret = strndup_from_user(opts, FS_PATH_MAX, MM_SLEEP, &kopts)) != STATUS_SUCCESS) {
+		ret = strndup_from_user(opts, FS_PATH_MAX, &kopts);
+		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 	}
@@ -2713,7 +2750,8 @@ status_t sys_fs_unmount(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2822,7 +2860,8 @@ status_t sys_fs_setcwd(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2859,7 +2898,8 @@ status_t sys_fs_setroot(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2888,7 +2928,8 @@ status_t sys_fs_info(const char *path, bool follow, fs_info_t *info) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
@@ -2919,7 +2960,8 @@ status_t sys_fs_unlink(const char *path) {
 	status_t ret;
 	char *kpath;
 
-	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
