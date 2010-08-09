@@ -1695,7 +1695,6 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 				mount->device = NULL;
 			}
 		} else if(!mount->device) {
-			// FIXME better code
 			ret = STATUS_INVALID_PARAM;
 			goto fail;
 		} else if(!mount->type->probe(mount->device, NULL)) {
@@ -1796,8 +1795,7 @@ status_t fs_unmount(const char *path) {
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(node != node->mount->root) {
-		// FIXME better code?
-		ret = STATUS_INVALID_PARAM;
+		ret = STATUS_NOT_MOUNT;
 		goto fail;
 	} else if(!node->mount->mountpoint) {
 		ret = STATUS_IN_USE;
