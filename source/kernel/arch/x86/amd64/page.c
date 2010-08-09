@@ -322,7 +322,8 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 	assert(!(phys % PAGE_SIZE));
 
 	/* Find the page table for the entry. */
-	if(!(ptbl = page_map_get_ptbl(map, virt, true, mmflag))) {
+	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
+	if(!ptbl) {
 		return STATUS_NO_MEMORY;
 	}
 
@@ -373,7 +374,8 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 
 	/* Find the page table for the entry. */
 	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
-	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
+	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
+	if(!ptbl) {
 		return false;
 	} else if(!ptbl[pte] & PG_PRESENT) {
 		return false;
@@ -451,8 +453,8 @@ status_t page_map_init(page_map_t *map, int mmflag) {
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
 	map->invalidate_count = 0;
-
-	if(!(map->cr3 = page_structure_alloc(mmflag))) {
+	map->cr3 = page_structure_alloc(mmflag);
+	if(!map->cr3) {
 		return STATUS_NO_MEMORY;
 	}
 

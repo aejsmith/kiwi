@@ -182,6 +182,9 @@ FUNCTION_START(syscall_entry)
 	/* Return to the previous GS value. */
 	swapgs
 
+	/* Clear direction flag. */
+	cld
+
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (RAX = return IP, R11 = original RFLAGS). */
 	push	%rcx

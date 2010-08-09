@@ -21,7 +21,7 @@
 #include <arch/asm.h>
 #include <arch/context.h>
 
-/** Save a context structure.
+/** Save the current CPU context.
  *
  * Saves the current CPU context to the given context structure. Only the
  * callee-save registers and instruction/stack pointers are saved.

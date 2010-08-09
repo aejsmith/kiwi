@@ -359,9 +359,9 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	addr += copy_argument_strings(uargs->args, info->args, info->argc, addr);
 	copy_argument_strings(uargs->env, info->env, info->envc, addr);
 
-	/* Place the argument block address on the stack (TODO: Stack direction). */
+	/* Get the stack pointer and save the argument block pointer. */
 	stack = info->stack + (USTACK_SIZE - STACK_DELTA);
-	*(ptr_t *)stack = info->arg_block;
+	addr = info->arg_block;
 
 	/* Get the ELF loader to clear BSS and get the entry pointer. */
 	entry = elf_binary_finish(info->data);
@@ -373,8 +373,9 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	}
 
 	/* To userspace, and beyond! */
-	dprintf("process: entering userspace in new process (entry: %p, stack: %p)\n", entry, stack);
-	thread_arch_enter_userspace(entry, stack, 0);
+	dprintf("process: entering userspace in new process (entry: %p, stack: %p, args: %p)\n",
+	        entry, stack, addr);
+	thread_arch_enter_userspace(entry, stack, addr);
 	fatal("Failed to enter userspace!");
 }
 
