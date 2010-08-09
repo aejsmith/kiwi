@@ -101,7 +101,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	/* Check whether it is within the size of the cache. */
 	if(offset >= cache->size) {
 		mutex_unlock(&cache->lock);
-		return STATUS_ADDR_INVAL;
+		return STATUS_INVALID_ADDR;
 	}
 
 	/* Check if we have it cached. */

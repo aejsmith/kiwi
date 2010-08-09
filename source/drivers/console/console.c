@@ -91,7 +91,7 @@ static status_t console_slave_wait(device_t *device, void *data, object_wait_t *
 		pipe_wait(console->output, true, wait);
 		return STATUS_SUCCESS;
 	default:
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_EVENT;
 	}
 }
 
@@ -205,7 +205,7 @@ static status_t console_master_wait(device_t *device, void *data, object_wait_t 
 		pipe_wait(console->input, true, wait);
 		return STATUS_SUCCESS;
 	default:
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_EVENT;
 	}
 }
 
@@ -245,7 +245,7 @@ static status_t console_master_request(device_t *device, void *data, int request
 		*outszp = sizeof(console->id);
 		return STATUS_SUCCESS;
 	default:
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_REQUEST;
 	}
 }
 

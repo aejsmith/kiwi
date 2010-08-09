@@ -115,7 +115,7 @@ static status_t shm_object_get_page(khandle_t *handle, offset_t offset, phys_ptr
 	/* Ensure that the requested page is within the area. */
 	if(offset >= (offset_t)area->size) {
 		mutex_unlock(&area->lock);
-		return STATUS_ADDR_INVAL;
+		return STATUS_INVALID_ADDR;
 	}
 
 	/* If the page is not already in the object, allocate a new page. */
@@ -146,7 +146,7 @@ status_t sys_shm_create(size_t size, handle_t *handlep) {
 	shm_t *area;
 
 	if(size == 0 || size % PAGE_SIZE || !handlep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	area = slab_cache_alloc(shm_cache, MM_SLEEP);
@@ -179,7 +179,7 @@ status_t sys_shm_open(shm_id_t id, handle_t *handlep) {
 	shm_t *area;
 
 	if(!handlep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	rwlock_read_lock(&shm_tree_lock);
@@ -228,7 +228,7 @@ status_t sys_shm_resize(handle_t handle, size_t size) {
 	shm_t *area;
 
 	if(size == 0 || size % PAGE_SIZE) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle);

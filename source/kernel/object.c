@@ -125,7 +125,7 @@ status_t object_wait(khandle_t *handle, int event, useconds_t timeout) {
 	status_t ret;
 
 	if(!handle) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -169,7 +169,7 @@ status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, us
 	size_t i;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -179,7 +179,7 @@ status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, us
 	waits = kmalloc(sizeof(object_wait_t) * count, MM_SLEEP);
 	for(i = 0; i < count; i++) {
 		if(!handles[i]) {
-			ret = STATUS_PARAM_INVAL;
+			ret = STATUS_INVALID_PARAM;
 			goto out;
 		} else if(!handles[i]->object->type->wait || !handles[i]->object->type->unwait) {
 			ret = STATUS_NOT_SUPPORTED;
@@ -485,7 +485,7 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 				} else if(map[i][1] >= CONFIG_HANDLE_MAX) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
-					return STATUS_PARAM_INVAL;
+					return STATUS_INVALID_PARAM;
 				} else if(avl_tree_lookup(&table->tree, map[i][1])) {
 					rwlock_unlock(&parent->lock);
 					handle_table_destroy(table);
@@ -643,7 +643,7 @@ status_t sys_object_wait_multiple(handle_t *handles, int *events, size_t count,
 	size_t i;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);

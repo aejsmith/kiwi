@@ -277,13 +277,13 @@ FUNCTION_START(syscall_entry)
 	add	$56, %rsp
 	jmp	.Lreturn
 .Lcpyfail:
-	movq	$STATUS_ADDR_INVAL, %rax
+	movq	$STATUS_INVALID_ADDR, %rax
 	movq	%rbx, %rsp
 	pop	%rbx
 	add	$56, %rsp
 	jmp	.Lreturn
 .Linval:
-	movq	$STATUS_SYSCALL_INVAL, %rax
+	movq	$STATUS_INVALID_SYSCALL, %rax
 	add	$48, %rsp
 	jmp	.Lreturn
 FUNCTION_END(syscall_entry)

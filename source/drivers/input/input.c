@@ -141,7 +141,7 @@ static status_t input_device_wait(device_t *_device, void *data, object_wait_t *
 		}
 		return STATUS_SUCCESS;
 	default:
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_EVENT;
 	}
 }
 
@@ -175,7 +175,7 @@ static status_t keyboard_device_request(device_t *_device, void *data, int reque
 	switch(request) {
 	case KEYBOARD_SET_LEDS:
 		if(insz != sizeof(keyboard_led_state_t)) {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_PARAM;
 		} else if(!device->kops || !device->kops->set_leds) {
 			return STATUS_NOT_SUPPORTED;
 		}
@@ -186,7 +186,7 @@ static status_t keyboard_device_request(device_t *_device, void *data, int reque
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->kops->request) {
 			return device->kops->request(device, request, in, insz, outp, outszp);
 		}
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_REQUEST;
 	}
 }
 
@@ -208,7 +208,7 @@ static status_t mouse_device_request(device_t *_device, void *data, int request,
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->mops->request) {
 			return device->mops->request(device, request, in, insz, outp, outszp);
 		}
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_REQUEST;
 	}
 }
 
@@ -286,7 +286,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	status_t ret;
 
 	if((parent && !name) || (name && !parent) || !devicep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	device = kmalloc(sizeof(input_device_t), MM_SLEEP);

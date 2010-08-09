@@ -42,7 +42,7 @@
 /** Common entry code for userspace memory functions. */
 #define USERMEM_ENTER()			\
 	if(context_save(&curr_thread->usermem_context)) { \
-		return STATUS_ADDR_INVAL; \
+		return STATUS_INVALID_ADDR; \
 	} \
 	curr_thread->in_usermem = true
 
@@ -55,12 +55,12 @@
 #define USERMEM_SUCCESS()		USERMEM_EXIT(STATUS_SUCCESS)
 
 /** Return failure from a userspace memory function. */
-#define USERMEM_FAIL()			USERMEM_EXIT(STATUS_ADDR_INVAL)
+#define USERMEM_FAIL()			USERMEM_EXIT(STATUS_INVALID_ADDR)
 
 /** Code to check parameters execute a statement. */
 #define USERMEM_WRAP(addr, count, stmt)	\
 	if(!VALID((ptr_t)addr, count)) { \
-		return STATUS_ADDR_INVAL; \
+		return STATUS_INVALID_ADDR; \
 	} \
 	USERMEM_ENTER(); \
 	stmt; \
@@ -74,7 +74,7 @@
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
  *
- * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on failure.
  */
 status_t memcpy_from_user(void *dest, const void *src, size_t count) {
 	USERMEM_WRAP(src, count, memcpy(dest, src, count));
@@ -88,7 +88,7 @@ status_t memcpy_from_user(void *dest, const void *src, size_t count) {
  * @param src		The memory area to copy from.
  * @param count		The number of bytes to copy.
  *
- * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on failure.
  */
 status_t memcpy_to_user(void *dest, const void *src, size_t count) {
 	USERMEM_WRAP(dest, count, memcpy(dest, src, count));
@@ -102,7 +102,8 @@ status_t memcpy_to_user(void *dest, const void *src, size_t count) {
  * @param val		The value to fill with.
  * @param count		The number of bytes to fill.
  *
- * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
+ *			failure.
  */
 status_t memset_user(void *dest, int val, size_t count) {
 	USERMEM_WRAP(dest, count, memset(dest, val, count));
@@ -116,7 +117,8 @@ status_t memset_user(void *dest, int val, size_t count) {
  * @param str		Pointer to the string.
  * @param lenp		Where to store string length.
  * 
- * @return		STATUS_SUCCESS on success, STATUS_ADDR_INVAL on failure.
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
+ *			failure.
  */
 status_t strlen_user(const char *str, size_t *lenp) {
 	size_t retval = 0;
@@ -147,7 +149,8 @@ status_t strlen_user(const char *str, size_t *lenp) {
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
- *			Returns STATUS_PARAM_INVAL if the string is zero-length.
+ *			Returns STATUS_INVALID_PARAM if the string is
+ *			zero-length.
  */
 status_t strdup_from_user(const void *src, int mmflag, char **destp) {
 	size_t len;
@@ -158,7 +161,7 @@ status_t strdup_from_user(const void *src, int mmflag, char **destp) {
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	d = kmalloc(len + 1, mmflag);
@@ -188,7 +191,8 @@ status_t strdup_from_user(const void *src, int mmflag, char **destp) {
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
- *			Returns STATUS_PARAM_INVAL if the string is zero-length.
+ *			Returns STATUS_INVALID_PARAM if the string is
+ *			zero-length.
  */
 status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp) {
 	status_t ret;
@@ -199,7 +203,7 @@ status_t strndup_from_user(const void *src, size_t max, int mmflag, char **destp
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(len > max) {
 		return STATUS_TOO_LONG;
 	}

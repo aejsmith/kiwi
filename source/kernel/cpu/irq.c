@@ -106,7 +106,7 @@ status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *d
 	bool enable;
 
 	if(num >= IRQ_COUNT || (!top && !bottom)) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	handler = kmalloc(sizeof(irq_handler_t), MM_SLEEP);
@@ -178,7 +178,7 @@ status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void 
 	irq_handler_t *handler;
 
 	if(num >= IRQ_COUNT) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	spinlock_lock(&irq_table[num].lock);

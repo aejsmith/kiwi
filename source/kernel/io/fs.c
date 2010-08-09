@@ -139,7 +139,7 @@ static fs_type_t *fs_type_probe(khandle_t *handle, const char *uuid) {
 status_t fs_type_register(fs_type_t *type) {
 	/* Check whether the structure is valid. */
 	if(!type || !type->name || !type->description || !type->mount) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	mutex_lock(&fs_types_lock);
@@ -520,7 +520,7 @@ static status_t fs_node_lookup(const char *path, bool follow, int type, fs_node_
 	assert(nodep);
 
 	if(!path[0]) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	rwlock_read_lock(&curr_proc->ioctx.lock);
@@ -964,7 +964,7 @@ static status_t fs_file_read_internal(khandle_t *handle, void *buf, size_t count
 	fs_node_t *node;
 
 	if(!handle || !buf) {
-		ret = STATUS_PARAM_INVAL;
+		ret = STATUS_INVALID_PARAM;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = STATUS_TYPE_INVAL;
@@ -1069,7 +1069,7 @@ static status_t fs_file_write_internal(khandle_t *handle, const void *buf, size_
 	fs_info_t info;
 
 	if(!handle || !buf) {
-		ret = STATUS_PARAM_INVAL;
+		ret = STATUS_INVALID_PARAM;
 		goto out;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = STATUS_TYPE_INVAL;
@@ -1182,7 +1182,7 @@ status_t fs_file_resize(khandle_t *handle, offset_t size) {
 	fs_node_t *node;
 
 	if(!handle) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		return STATUS_TYPE_INVAL;
 	}
@@ -1278,7 +1278,7 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	status_t ret;
 
 	if(!handle || !buf) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_TYPE_INVAL;
 	}
@@ -1370,7 +1370,7 @@ status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offs
 	fs_info_t info;
 
 	if(!handle || (action != FS_SEEK_SET && action != FS_SEEK_ADD && action != FS_SEEK_END)) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_TYPE_INVAL;
@@ -1416,7 +1416,7 @@ status_t fs_handle_info(khandle_t *handle, fs_info_t *info) {
 	fs_node_t *node;
 
 	if(!handle || !info) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_TYPE_INVAL;
@@ -1434,7 +1434,7 @@ status_t fs_handle_sync(khandle_t *handle) {
 	fs_node_t *node;
 
 	if(!handle) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE &&
 	          handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_TYPE_INVAL;
@@ -1477,7 +1477,7 @@ status_t fs_symlink_read(const char *path, char *buf, size_t size) {
 	size_t len;
 
 	if(!path || !buf || !size) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	/* Find the link node. */
@@ -1614,7 +1614,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	int flags;
 
 	if(!path || (!device && !type)) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	/* Parse the options string. */
@@ -1685,7 +1685,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 			}
 		} else if(!mount->device) {
 			// FIXME better code
-			ret = STATUS_PARAM_INVAL;
+			ret = STATUS_INVALID_PARAM;
 			goto fail;
 		} else if(!mount->type->probe(mount->device, NULL)) {
 			ret = STATUS_UNKNOWN_FS;
@@ -1774,7 +1774,7 @@ status_t fs_unmount(const char *path) {
 	status_t ret;
 
 	if(!path) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	/* Serialise mount/unmount operations. */
@@ -1786,7 +1786,7 @@ status_t fs_unmount(const char *path) {
 		goto fail;
 	} else if(node != node->mount->root) {
 		// FIXME better code?
-		ret = STATUS_PARAM_INVAL;
+		ret = STATUS_INVALID_PARAM;
 		goto fail;
 	} else if(!node->mount->mountpoint) {
 		ret = STATUS_IN_USE;
@@ -1871,7 +1871,7 @@ status_t fs_info(const char *path, bool follow, fs_info_t *info) {
 	status_t ret;
 
 	if(!path || !info) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	ret = fs_node_lookup(path, follow, -1, &node);
@@ -2124,7 +2124,7 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
@@ -2441,7 +2441,7 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	if((ret = strndup_from_user(path, FS_PATH_MAX, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {
@@ -2731,7 +2731,7 @@ status_t sys_fs_getcwd(char *buf, size_t size) {
 	status_t ret;
 
 	if(!buf || !size) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	rwlock_read_lock(&curr_proc->ioctx.lock);

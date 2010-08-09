@@ -68,7 +68,7 @@ static status_t device_object_wait(object_wait_t *wait) {
 	if(device->ops && device->ops->wait && device->ops->unwait) {
 		return device->ops->wait(device, wait->handle->data, wait);
 	} else {
-		return STATUS_NOT_IMPLEMENTED;
+		return STATUS_INVALID_EVENT;
 	}
 }
 
@@ -156,7 +156,7 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 	size_t i;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	/* Check if a child already exists with this name. */
@@ -183,11 +183,11 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		 * clean up if an invalid structure is found. */
 		for(i = 0; i < count; i++) {
 			if(!attrs[i].name || strlen(attrs[i].name) >= DEVICE_NAME_MAX) {
-				ret = STATUS_PARAM_INVAL;
+				ret = STATUS_INVALID_PARAM;
 				goto fail;
 			} else if(attrs[i].type == DEVICE_ATTR_STRING) {
 				if(!attrs[i].value.string || strlen(attrs[i].value.string) >= DEVICE_ATTR_MAX) {
-					ret = STATUS_PARAM_INVAL;
+					ret = STATUS_INVALID_PARAM;
 					goto fail;
 				}
 			}
@@ -244,7 +244,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	device_t *device;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	/* If the destination is an alias, use it's destination. */
@@ -536,7 +536,7 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
 	size_t bytes;
 
 	if(!handle || !buf) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_TYPE_INVAL;
 	}
@@ -579,7 +579,7 @@ status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t
 	size_t bytes;
 
 	if(!handle || !buf) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_TYPE_INVAL;
 	}
@@ -616,14 +616,14 @@ status_t device_request(khandle_t *handle, int request, void *in, size_t insz, v
 	device_t *device;
 
 	if(!handle) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_TYPE_INVAL;
 	}
 
 	device = (device_t *)handle->object;
 	if(!device->ops || !device->ops->request) {
-		return STATUS_NOT_SUPPORTED;
+		return STATUS_INVALID_REQUEST;
 	}
 
 	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
@@ -763,7 +763,7 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 	char *kpath;
 
 	if(!handlep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	if((ret = strdup_from_user(path, MM_SLEEP, &kpath)) != STATUS_SUCCESS) {

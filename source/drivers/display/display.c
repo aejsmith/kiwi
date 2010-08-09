@@ -159,7 +159,7 @@ static status_t display_device_wait(device_t *_device, void *data, object_wait_t
 		}
 		return STATUS_SUCCESS;
 	default:
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_EVENT;
 	}
 }
 
@@ -208,21 +208,21 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 	switch(request) {
 	case DISPLAY_MODE_COUNT:
 		if(!outp || !outszp) {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_PARAM;
 		}
 		*outp = kmemdup(&device->count, sizeof(size_t), MM_SLEEP);
 		*outszp = sizeof(size_t);
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_MODES:
 		if(!outp || !outszp) {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_PARAM;
 		}
 		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_SLEEP);
 		*outszp = sizeof(display_mode_t) * device->count;
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_PREFERRED_MODE:
 		if(!outp || !outszp) {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_PARAM;
 		}
 
 		mutex_lock(&device->lock);
@@ -248,7 +248,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 		return STATUS_SUCCESS;
 	case DISPLAY_SET_MODE:
 		if(in && insz != sizeof(uint16_t)) {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_PARAM;
 		} else if(!device->ops->set_mode) {
 			return STATUS_NOT_SUPPORTED;
 		}
@@ -320,7 +320,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			mutex_unlock(&device->lock);
 			return ret;
 		} else {
-			return STATUS_PARAM_INVAL;
+			return STATUS_INVALID_REQUEST;
 		}
 	}
 }
@@ -358,7 +358,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	status_t ret;
 
 	if((parent && !name) || (name && !parent) || !ops || !modes || !count || !devicep) {
-		return STATUS_PARAM_INVAL;
+		return STATUS_INVALID_PARAM;
 	}
 
 	device = kmalloc(sizeof(display_device_t), MM_SLEEP);
