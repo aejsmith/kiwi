@@ -207,9 +207,12 @@ ata_controller_t *ata_controller_add(device_t *device, uint32_t ctl, uint32_t cm
 	mutex_lock(&ata_controllers_lock);
 	list_append(&ata_controllers, &controller->header);
 	mutex_unlock(&ata_controllers_lock);
+	return controller;
+}
 
-	/* Scan for devices. */
+/** Scan a controller for devices.
+ * @param controller	Controller to scan. */
+void ata_controller_scan(ata_controller_t *controller) {
 	ata_device_detect(controller, 0);
 	ata_device_detect(controller, 1);
-	return controller;
 }

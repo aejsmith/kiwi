@@ -109,6 +109,7 @@ extern void ata_controller_select(ata_controller_t *controller, uint8_t num);
 extern void ata_controller_pio_read(ata_controller_t *controller, void *buf, size_t count);
 extern void ata_controller_pio_write(ata_controller_t *controller, const void *buf, size_t count);
 extern ata_controller_t *ata_controller_add(device_t *parent, uint32_t ctl, uint32_t cmd, uint32_t irq);
+extern void ata_controller_scan(ata_controller_t *controller);
 
 extern bool ata_device_detect(ata_controller_t *controller, uint8_t num);
 

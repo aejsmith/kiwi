@@ -46,7 +46,7 @@
  * @param id		ID structure for match.
  * @return		Whether to continue lookup. */
 static bool ata_pci_lookup_func(device_t *device, pci_device_id_t *id) {
-	ata_controller_t *controller;
+	ata_controller_t *pri, *sec;
 	uint32_t ctl, cmd, irq;
 	uint8_t pri_pi, sec_pi;
 
@@ -67,22 +67,27 @@ static bool ata_pci_lookup_func(device_t *device, pci_device_id_t *id) {
 	ctl = ATA_IS_COMPAT(pri_pi) ? 0x3F0 : pci_device_read32(device, PCI_DEVICE_BAR0);
 	cmd = ATA_IS_COMPAT(pri_pi) ? 0x1F0 : pci_device_read32(device, PCI_DEVICE_BAR1);
 	irq = ATA_IS_COMPAT(pri_pi) ? 14    : pci_device_read8 (device, PCI_DEVICE_INTERRUPT_LINE);
-	controller = ata_controller_add(device, ctl, cmd, irq);
-	if(controller) {
-		kprintf(LOG_NORMAL, " primary:   %" PRId32 " (controller: %p, pi: %s)\n",
-			controller->id, controller, ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI");
-	}
+	pri = ata_controller_add(device, ctl, cmd, irq);
 
 	/* Now the secondary controller. */
 	ctl = ATA_IS_COMPAT(sec_pi) ? 0x370 : pci_device_read32(device, PCI_DEVICE_BAR2);
 	cmd = ATA_IS_COMPAT(sec_pi) ? 0x170 : pci_device_read32(device, PCI_DEVICE_BAR3);
 	irq = ATA_IS_COMPAT(sec_pi) ? 15    : pci_device_read8 (device, PCI_DEVICE_INTERRUPT_LINE);
-	controller = ata_controller_add(device, ctl, cmd, irq);
-	if(controller) {
-		kprintf(LOG_NORMAL, " secondary: %" PRId32 " (controller: %p, pi: %s)\n",
-			controller->id, controller, ATA_IS_COMPAT(sec_pi) ? "compat" : "native-PCI");
+	sec = ata_controller_add(device, ctl, cmd, irq);
+
+	/* Print details of the controller. */
+	if(pri) {
+		kprintf(LOG_NORMAL, " primary:   %" PRId32 " (pi: %s)\n", pri->id,
+			ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI");
+	}
+	if(sec) {
+		kprintf(LOG_NORMAL, " secondary: %" PRId32 " (pi: %s)\n", sec->id,
+			ATA_IS_COMPAT(sec_pi) ? "compat" : "native-PCI");
 	}
 
+	/* Scan for devices. */
+	if(pri) { ata_controller_scan(pri); }
+	if(sec) { ata_controller_scan(sec); }
 	return true;
 }
 
