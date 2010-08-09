@@ -21,15 +21,15 @@
 #include <arch/asm.h>
 #include <arch/context.h>
 
-/** Save a context structure.
+/** Save the current CPU context.
  *
  * Saves the current CPU context to the given context structure. Only the
  * callee-save registers and instruction/stack pointers are saved.
  *
  * @param ctx		Context structure to save to.
  *
- * @return		0 if returning from context_save(), 1 if returning
- *			from context_restore().
+ * @return		True if returning from context_restore(), false if
+ *			returning from context_save().
  */
 FUNCTION_START(context_save)
 	movl	4(%esp), %edx
@@ -45,7 +45,7 @@ FUNCTION_START(context_save)
 	movl	%edi, CONTEXT_OFF_DI(%edx)
 	movl	%esi, CONTEXT_OFF_SI(%edx)
 
-	/* Return 0 from context_save(). */
+	/* Return false from context_save(). */
 	xorl	%eax, %eax
 	ret
 FUNCTION_END(context_save)
@@ -54,7 +54,7 @@ FUNCTION_END(context_save)
  *
  * Restores the CPU context stored in the given context structure. If the
  * context was stored with context_save(), then execution will resume after
- * the context_save() call, with a return value of 1. This function does not
+ * the context_save() call, with a return value of true. This function does not
  * return to its caller.
  *
  * @param ctx		Context structure to restore.
@@ -73,7 +73,7 @@ FUNCTION_START(context_restore)
 	movl	CONTEXT_OFF_IP(%edx), %eax
 	movl	%eax, (%esp)
 
-	/* Cause context_save() to return with 1. */
+	/* Cause context_save() to return true. */
 	xorl	%eax, %eax
 	inc	%eax
 	ret
@@ -92,7 +92,7 @@ FUNCTION_START(__context_restore_frame)
 	movl	CONTEXT_OFF_IP(%edx), %eax
 	movl	%eax, (%esp)
 
-	/* Cause context_save() to return with 1. */
+	/* Cause context_save() to return true. */
 	xorl	%eax, %eax
 	inc	%eax
 	ret

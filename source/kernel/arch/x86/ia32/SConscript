@@ -20,7 +20,6 @@ sources = map(File, [
 	'entry.S',
 	'kdbg.c',
 	'page.c',
-	'syscall.c',
 	'thread.c',
 ])
 

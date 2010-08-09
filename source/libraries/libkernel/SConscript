@@ -37,6 +37,6 @@ Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGE
 env.SharedLibrary(
 	'kernel',
 	arch_sources + sources,
-	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,__libkernel_entry', '-Wl,-Bsymbolic'],
+	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
 	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
 )

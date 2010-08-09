@@ -35,9 +35,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <errors.h>
 #include <fatal.h>
 #include <kargs.h>
+#include <status.h>
 
 #if CONFIG_PAGE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -320,8 +320,8 @@ void page_map_unlock(page_map_t *map) {
  * @param write		Whether to make the mapping writable.
  * @param exec		Whether to make the mapping executable.
  * @param mmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. */
-int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bool exec, int mmflag) {
+ * @return		Status code describing result of the operation. */
+status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bool exec, int mmflag) {
 	uint64_t *ptbl, flags;
 	int pte;
 
@@ -330,8 +330,9 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bo
 	assert(!(phys % PAGE_SIZE));
 
 	/* Find the page table for the entry. */
-	if(!(ptbl = page_map_get_ptbl(map, virt, true, mmflag))) {
-		return -ERR_NO_MEMORY;
+	ptbl = page_map_get_ptbl(map, virt, true, mmflag);
+	if(!ptbl) {
+		return STATUS_NO_MEMORY;
 	}
 
 	/* Check that the mapping doesn't already exist. */
@@ -360,7 +361,7 @@ int page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bo
 	ptbl[pte] = phys | flags;
 	memory_barrier();
 	page_structure_unmap(map, ptbl);
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Unmap a page.
@@ -382,7 +383,8 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 
 	/* Find the page table for the entry. */
 	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
-	if(!(ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
+	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
+	if(!ptbl) {
 		return false;
 	} else if(!ptbl[pte] & PG_PRESENT) {
 		page_structure_unmap(map, ptbl);
@@ -435,7 +437,8 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	assert(physp);
 
 	/* Find the page table for the entry. */
-	if((ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP))) {
+	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
+	if(ptbl) {
 		pte = (virt % 0x200000) / PAGE_SIZE;
 		if(ptbl[pte] & PG_PRESENT) {
 			*physp = ptbl[pte] & PAGE_MASK;
@@ -456,27 +459,30 @@ void page_map_switch(page_map_t *map) {
 /** Initialise a page map.
  * @param map		Page map to initialise.
  * @param mmflag	Allocation flags.
- * @return		0 on success, negative error code on failure. Failure
+ * @return		Status code describing result of operation. Failure
  *			can only occur if MM_SLEEP is not specified. */
-int page_map_init(page_map_t *map, int mmflag) {
+status_t page_map_init(page_map_t *map, int mmflag) {
 	uint64_t *kpdp, *pdp;
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
 	map->invalidate_count = 0;
-
-	if(!(map->cr3 = page_structure_alloc(mmflag | PM_ZERO))) {
-		return -ERR_NO_MEMORY;
+	map->cr3 = page_structure_alloc(mmflag | PM_ZERO);
+	if(!map->cr3) {
+		return STATUS_NO_MEMORY;
 	}
 
 	if(!IS_KERNEL_MAP(map)) {
 		/* Duplicate the kernel mappings. */
-		if(!(kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag))) {
+		kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag);
+		if(!kpdp) {
 			page_free(map->cr3, 1);
-			return -ERR_NO_MEMORY;
-		} else if(!(pdp = page_structure_map(map, map->cr3, mmflag))) {
+			return STATUS_NO_MEMORY;
+		}
+		pdp = page_structure_map(map, map->cr3, mmflag);
+		if(!pdp) {
 			page_structure_unmap(map, kpdp);
 			page_free(map->cr3, 1);
-			return -ERR_NO_MEMORY;
+			return STATUS_NO_MEMORY;
 		}
 
 		pdp[2] = kpdp[2] & ~PG_ACCESSED;
@@ -486,7 +492,7 @@ int page_map_init(page_map_t *map, int mmflag) {
 		page_structure_unmap(map, kpdp);
 	}
 
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Destroy a page map.

@@ -21,12 +21,13 @@
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
-#include <arch/syscall.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
 #include <lib/string.h>
+
+extern void syscall_entry(void);
 
 /** ISR array in entry.S. Each handler is aligned to 16 bytes. */
 extern uint8_t isr_array[IDT_ENTRY_COUNT][16];
@@ -114,31 +115,37 @@ void __init_text tss_init(void) {
 	ltr(SEGMENT_TSS);
 }
 
+/** Configure an IDT entry.
+ * @param num		Entry number.
+ * @param addr		Address of the handler.
+ * @param seg		Code segment to execute handler in.
+ * @param flags		Flags for the entry. */
+static inline void idt_set_entry(int num, ptr_t addr, uint16_t seg, uint8_t flags) {
+	kernel_idt[num].base0 = (addr & 0xFFFF);
+	kernel_idt[num].base1 = ((addr >> 16) & 0xFFFF);
+	kernel_idt[num].sel = seg;
+	kernel_idt[num].unused = 0;
+	kernel_idt[num].flags = flags;
+}
+
 /** Initialise the IDT shared by all CPUs. */
 static inline void idt_init(void) {
-	unative_t i;
-	ptr_t addr;
+	int i;
 
 	/* Fill out the handlers in the IDT. */
 	for(i = 0; i < IDT_ENTRY_COUNT; i++) {
-		addr = (ptr_t)&isr_array[i];
-		kernel_idt[i].base0 = (addr & 0xFFFF);
-		kernel_idt[i].base1 = ((addr >> 16) & 0xFFFF);
-		kernel_idt[i].sel = SEGMENT_K_CS;
-		kernel_idt[i].unused = 0;
-		kernel_idt[i].flags = 0x8E;
+		idt_set_entry(i, (ptr_t)&isr_array[i], SEGMENT_K_CS, 0x8E);
 	}
 
 	/* Modify the double fault entry to become a task gate using the
 	 * doublefault TSS. */
-	kernel_idt[FAULT_DOUBLE].flags = 0xE5;
-	kernel_idt[FAULT_DOUBLE].sel = SEGMENT_DF_TSS;
-	kernel_idt[FAULT_DOUBLE].base0 = 0;
-	kernel_idt[FAULT_DOUBLE].base1 = 0;
+	idt_set_entry(FAULT_DOUBLE, 0, SEGMENT_DF_TSS, 0xE5);
 
-	/* Modify the system call entry's DPL to be 3. The system call handler
-	 * is added in arch.c. */
-	kernel_idt[SYSCALL_INT_NO].flags |= 0x60;
+	/* Set up the system call interrupt handler. It does not go through
+	 * the usual route for interrupts because it doesn't need to do some
+	 * things that are done there, and it also needs to do some special
+	 * things. */
+	idt_set_entry(SYSCALL_INT_NO, (ptr_t)syscall_entry, SEGMENT_K_CS, 0xEE);
 }
 
 /** Initialise descriptor tables for the boot CPU. */

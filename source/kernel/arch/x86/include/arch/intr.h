@@ -48,6 +48,9 @@
 #define IRQ_COUNT		16	/**< Total number of IRQs. */
 #define IRQ_BASE		32	/**< IRQ number base. */
 
+/** System call interrupt number. */
+#define SYSCALL_INT_NO		0x80
+
 /** Structure defining an interrupt stack frame. */
 typedef struct intr_frame {
 #ifdef __x86_64__

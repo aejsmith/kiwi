@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -25,12 +25,12 @@
 .type _start, @function
 _start:
 	/* The pointer to the process_args_t structure is on the stack. */
-	movl	8(%esp), %eax
+	movl	4(%esp), %eax
 
 	/* Set up the environment and run the main function. This function
 	 * should exit with the main function's return code. */
 	push	%eax
-	call	__libsystem_init
+	call	__libc_init
 	addl	$4, %esp
 
 	/* If we got here then something has broken (we should have exited).
