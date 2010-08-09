@@ -33,7 +33,7 @@ menu "Architecture options"
 ###########################
 
 if ARCH_AMD64 || ARCH_IA32
-source "source/system/kernel/arch/x86/Kconfig"
+source "source/kernel/arch/x86/Kconfig"
 endif
 
 #######
@@ -45,7 +45,7 @@ menu "Platform options"
 #######################
 
 if PLATFORM_PC
-source "source/system/kernel/platform/pc/Kconfig"
+source "source/kernel/platform/pc/Kconfig"
 endif
 
 #######
@@ -162,7 +162,7 @@ config IPC_DEBUG
 endmenu
 #######
 
-source "source/system/modules/Kconfig"
+source "source/kernel/modules/Kconfig"
 
 #######
 endmenu
