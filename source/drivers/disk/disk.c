@@ -284,7 +284,7 @@ status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 	status_t ret;
 
 	if((parent && !name) || (name && !parent) || !ops || !blocks || !blksize || !devicep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	device = kmalloc(sizeof(disk_device_t), MM_SLEEP);

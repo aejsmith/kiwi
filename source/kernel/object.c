@@ -125,7 +125,7 @@ status_t object_wait(khandle_t *handle, int event, useconds_t timeout) {
 	status_t ret;
 
 	if(!handle) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -172,7 +172,7 @@ status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, us
 	size_t i;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	semaphore_init(&sync.sem, "object_wait_sem", 0);
@@ -182,7 +182,7 @@ status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, us
 	waits = kmalloc(sizeof(object_wait_t) * count, MM_SLEEP);
 	for(i = 0; i < count; i++) {
 		if(!handles[i]) {
-			ret = STATUS_INVALID_PARAM;
+			ret = STATUS_INVALID_ARG;
 			goto out;
 		} else if(!handles[i]->object->type->wait || !handles[i]->object->type->unwait) {
 			ret = STATUS_INVALID_EVENT;
@@ -651,7 +651,7 @@ status_t sys_object_wait_multiple(handle_t *handles, int *events, size_t count,
 	size_t i;
 
 	if(!count || count > 1024 || !handles || !events) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);

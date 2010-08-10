@@ -29,7 +29,7 @@
 #define STATUS_INTERRUPTED		4	/**< Interrupted while blocking. */
 #define STATUS_TIMED_OUT		5	/**< Timed out while waiting. */
 #define STATUS_INVALID_SYSCALL		6	/**< Invalid system call number. */
-#define STATUS_INVALID_PARAM		7	/**< Invalid parameter specified. */
+#define STATUS_INVALID_ARG		7	/**< Invalid argument specified. */
 #define STATUS_INVALID_HANDLE		8	/**< Non-existant handle or handle with incorrect type. */
 #define STATUS_INVALID_ADDR		9	/**< Invalid memory location specified. */
 #define STATUS_INVALID_REQUEST		10	/**< Invalid device request specified. */

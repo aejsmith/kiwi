@@ -156,7 +156,7 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 	size_t i;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || parent->dest) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Check if a child already exists with this name. */
@@ -183,11 +183,11 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		 * clean up if an invalid structure is found. */
 		for(i = 0; i < count; i++) {
 			if(!attrs[i].name || strlen(attrs[i].name) >= DEVICE_NAME_MAX) {
-				ret = STATUS_INVALID_PARAM;
+				ret = STATUS_INVALID_ARG;
 				goto fail;
 			} else if(attrs[i].type == DEVICE_ATTR_STRING) {
 				if(!attrs[i].value.string || strlen(attrs[i].value.string) >= DEVICE_ATTR_MAX) {
-					ret = STATUS_INVALID_PARAM;
+					ret = STATUS_INVALID_ARG;
 					goto fail;
 				}
 			}
@@ -244,7 +244,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	device_t *device;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* If the destination is an alias, use it's destination. */
@@ -539,7 +539,7 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
 	size_t bytes;
 
 	if(!handle || !buf) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
 	}
@@ -582,7 +582,7 @@ status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t
 	size_t bytes;
 
 	if(!handle || !buf) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
 	}
@@ -619,7 +619,7 @@ status_t device_request(khandle_t *handle, int request, void *in, size_t insz, v
 	device_t *device;
 
 	if(!handle) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
 	}
@@ -766,7 +766,7 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 	char *kpath;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	ret = strndup_from_user(path, DEVICE_PATH_MAX, &kpath);

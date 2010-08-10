@@ -381,7 +381,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	status_t ret;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Allocate a thread structure from the cache. The thread constructor
@@ -646,7 +646,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	char *kname;
 
 	if(!handlep || (stack && stacksz < PAGE_SIZE)) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
@@ -715,7 +715,7 @@ status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	rwlock_read_lock(&thread_tree_lock);
@@ -773,7 +773,7 @@ void sys_thread_exit(int status) {
  * @return		Status code describing result of the operation. */
 status_t sys_thread_usleep(useconds_t us) {
 	if(us < 0) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 	return usleep_etc(us, SYNC_INTERRUPTIBLE);
 }

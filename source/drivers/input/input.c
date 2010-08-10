@@ -175,7 +175,7 @@ static status_t keyboard_device_request(device_t *_device, void *data, int reque
 	switch(request) {
 	case KEYBOARD_SET_LEDS:
 		if(insz != sizeof(keyboard_led_state_t)) {
-			return STATUS_INVALID_PARAM;
+			return STATUS_INVALID_ARG;
 		} else if(!device->kops || !device->kops->set_leds) {
 			return STATUS_NOT_SUPPORTED;
 		}
@@ -286,7 +286,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	status_t ret;
 
 	if((parent && !name) || (name && !parent) || !devicep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	device = kmalloc(sizeof(input_device_t), MM_SLEEP);

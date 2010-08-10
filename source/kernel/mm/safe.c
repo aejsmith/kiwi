@@ -151,7 +151,7 @@ status_t strlen_user(const char *str, size_t *lenp) {
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
- *			Returns STATUS_INVALID_PARAM if the string is
+ *			Returns STATUS_INVALID_ARG if the string is
  *			zero-length.
  */
 status_t strdup_from_user(const void *src, char **destp) {
@@ -163,7 +163,7 @@ status_t strdup_from_user(const void *src, char **destp) {
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	d = kmalloc(len + 1, 0);
@@ -193,7 +193,7 @@ status_t strdup_from_user(const void *src, char **destp) {
  * @param destp		Pointer to buffer in which to store destination.
  *
  * @return		Status code describing result of the operation.
- *			Returns STATUS_INVALID_PARAM if the string is
+ *			Returns STATUS_INVALID_ARG if the string is
  *			zero-length.
  */
 status_t strndup_from_user(const void *src, size_t max, char **destp) {
@@ -205,7 +205,7 @@ status_t strndup_from_user(const void *src, size_t max, char **destp) {
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(len == 0) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	} else if(len > max) {
 		return STATUS_TOO_LONG;
 	}

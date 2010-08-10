@@ -391,7 +391,7 @@ status_t sys_ipc_port_create(handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
@@ -425,7 +425,7 @@ status_t sys_ipc_port_open(port_id_t id, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&port_tree_lock);
@@ -478,7 +478,7 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 	status_t ret;
 
 	if(!connp) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PORT, &khandle);
@@ -539,7 +539,7 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	int i;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&port_tree_lock);
@@ -628,7 +628,7 @@ status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, s
 	bool state;
 
 	if((!buf && size) || size > IPC_MESSAGE_MAX) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Allocate a message structure, and copy the data buffer into it. */
@@ -844,7 +844,7 @@ status_t sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *
 	status_t ret;
 
 	if(size > 0 && !buf) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Look up the handle. */

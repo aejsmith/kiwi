@@ -177,7 +177,7 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
@@ -221,7 +221,7 @@ status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	rwlock_read_lock(&semaphore_tree_lock);

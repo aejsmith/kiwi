@@ -840,7 +840,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	vm_region_t *region;
 
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&as->lock);
@@ -891,19 +891,19 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t 
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 	if(flags & VM_MAP_FIXED) {
 		if(start % PAGE_SIZE || !vm_region_fits(start, size)) {
-			return STATUS_INVALID_PARAM;
+			return STATUS_INVALID_ARG;
 		}
 	} else if(!addrp) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 	if(handle) {
 		/* Check for overflow. */
 		if((offset + size) < offset) {
-			return STATUS_INVALID_PARAM;
+			return STATUS_INVALID_ARG;
 		}
 
 		/* Check if the object can be mapped in with the given flags. */
@@ -976,7 +976,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t 
  */
 status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&as->lock);
@@ -1163,7 +1163,7 @@ extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
 	ptr_t addr;
 
 	if(!(flags & VM_MAP_FIXED) && !addrp) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	} else if(handle >= 0) {
 		ret = handle_lookup(curr_proc, handle, -1, &khandle);
 		if(ret != STATUS_SUCCESS) {

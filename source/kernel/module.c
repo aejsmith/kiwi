@@ -142,7 +142,7 @@ status_t module_name(khandle_t *handle, char *namebuf) {
 	status_t ret;
 
 	if(!handle || !namebuf) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Take the module lock to serialise module loading. */
@@ -243,7 +243,7 @@ status_t module_load(khandle_t *handle, char *depbuf) {
 	status_t ret;
 
 	if(!handle || !depbuf) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	/* Take the module lock to serialise module loading. */

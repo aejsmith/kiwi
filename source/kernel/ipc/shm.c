@@ -146,7 +146,7 @@ status_t sys_shm_create(size_t size, handle_t *handlep) {
 	shm_t *area;
 
 	if(size == 0 || size % PAGE_SIZE || !handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	area = slab_cache_alloc(shm_cache, MM_SLEEP);
@@ -180,7 +180,7 @@ status_t sys_shm_open(shm_id_t id, handle_t *handlep) {
 	shm_t *area;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	rwlock_read_lock(&shm_tree_lock);
@@ -229,7 +229,7 @@ status_t sys_shm_resize(handle_t handle, size_t size) {
 	shm_t *area;
 
 	if(size == 0 || size % PAGE_SIZE) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SHM, &khandle);

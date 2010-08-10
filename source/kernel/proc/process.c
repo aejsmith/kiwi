@@ -472,7 +472,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	status_t ret;
 
 	if(!args || !args[0] || !env || priority < 0 || priority >= PRIORITY_MAX) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	info.path = args[0];
@@ -632,7 +632,7 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	size_t size;
 
 	if(!path || !args || !env || (count > 0 && !map)) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	info->path = NULL;
@@ -704,7 +704,7 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	ret = process_create_args_copy(path, args, env, map, count, &info);
@@ -857,7 +857,7 @@ status_t sys_process_open(process_id_t id, handle_t *handlep) {
 	status_t ret;
 
 	if(!handlep) {
-		return STATUS_INVALID_PARAM;
+		return STATUS_INVALID_ARG;
 	}
 
 	rwlock_read_lock(&process_tree_lock);
