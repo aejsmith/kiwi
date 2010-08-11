@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,28 +33,18 @@ using namespace kiwi;
 int main(int argc, char **argv) {
 	EventLoop loop;
 
-	/* Create the framebuffer object. */
+	/* Create the framebuffer object and draw the header on it. */
 	Framebuffer fb("/display/0");
-	if(!fb.Initialised()) {
-		return 1;
-	}
-
-	/* Draw the header. */
-	Header::Instance()->Draw(&fb);
+	Header::Instance().Draw(fb);
 
 	/* Create the console. */
-	Console console(&fb, 0, Header::Instance()->Height(), fb.Width(), fb.Height() - Header::Instance()->Height());
-	if(!console.Initialised()) {
-		return 1;
-	}
+	Console console(&fb, 0, Header::Instance().Height(), fb.Width(), fb.Height() - Header::Instance().Height());
 	console.Run("/system/binaries/failshell");
 
 	/* Finally create the input device. */
 	InputDevice input("/input/0");
-	if(!input.Initialised()) {
-		return 1;
-	}
 
-	loop.run();
+	/* Run the event loop. */
+	loop.Run();
 	return 0;
 }

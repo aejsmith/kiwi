@@ -18,18 +18,25 @@
  * @brief		Framebuffer class.
  */
 
+#include <drivers/display.h>
+
 #include <kernel/device.h>
-#include <kernel/errors.h>
 #include <kernel/object.h>
 #include <kernel/vm.h>
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
+#include <kiwi/Error.h>
+
+#include <cassert>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
 
 #include "Console.h"
 #include "Framebuffer.h"
 #include "Header.h"
+
+using namespace kiwi;
 
 /** Get red colour from RGB value. */
 #define RED(x, bits)		((x >> (24 - bits)) & ((1 << bits) - 1))
@@ -91,33 +98,28 @@ static inline void putpixel_0888(uint32_t *dest, uint32_t colour) {
 
 /** Constructor for a Framebuffer object.
  * @param device	Path to device to use. */
-Framebuffer::Framebuffer(const char *device) :
-	m_init_status(0), m_buffer(0)
-{
-	display_mode_t mode;
-	int ret;
+Framebuffer::Framebuffer(const char *device) : m_buffer(0) {
+	status_t ret;
 
-	handle_t handle = device_open(device);
-	if(handle < 0) {
-		printf("Failed to open display device (%d)\n", m_handle);
-		m_init_status = m_handle;
-		return;
+	/* Open the device. */
+	handle_t handle;
+	ret = device_open(device, &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
-	setHandle(handle);
+	SetHandle(handle);
 
 	/* Try to get the preferred display mode. */
-	if((ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0,
-	                         &mode, sizeof(display_mode_t), NULL)) != 0) {
-		printf("Failed to get preferred display mode (%d)\n", ret);
-		m_init_status = ret;
-		return;
+	display_mode_t mode;
+	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &mode, sizeof(display_mode_t), NULL);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
 
 	/* Set the mode. */
-	if((ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL)) != 0) {
-		printf("Failed to set mode (%d)\n", ret);
-		m_init_status = ret;
-		return;
+	ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
 
 	/* Store mode details. */
@@ -133,10 +135,10 @@ Framebuffer::Framebuffer(const char *device) :
 	}
 
 	/* Create a mapping for the framebuffer and clear it. */
-	if((ret = vm_map(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset,
-	                 reinterpret_cast<void **>(&m_buffer))) != 0) {
-		m_init_status = ret;
-		return;
+	ret = vm_map(0, m_buffer_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset,
+	             reinterpret_cast<void **>(&m_buffer));
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
 	memset(m_buffer, 0, m_buffer_size);
 }
@@ -181,9 +183,7 @@ RGB Framebuffer::GetPixel(int x, int y) {
  * @param colour	Colour to write in. */
 void Framebuffer::PutPixel(int x, int y, RGB colour) {
 	uint8_t *dest = m_buffer + (((y * m_width) + x) * (m_depth / 8));
-	uint32_t rgb;
-
-	rgb = (colour.r << 16) | (colour.g << 8) | colour.b;
+	uint32_t rgb = (colour.r << 16) | (colour.g << 8) | colour.b;
 	switch(m_depth) {
 	case 16:
 		putpixel_565(reinterpret_cast<uint16_t *>(dest), rgb);
@@ -204,10 +204,8 @@ void Framebuffer::PutPixel(int x, int y, RGB colour) {
  * @param height	Height of rectangle.
  * @param colour	Colour to use. */
 void Framebuffer::FillRect(int x, int y, int width, int height, RGB colour) {
-	int i, j;
-
-	for(i = 0; i < height; i++) {
-		for(j = 0; j < width; j++) {
+	for(int i = 0; i < height; i++) {
+		for(int j = 0; j < width; j++) {
 			PutPixel(x + j, y + i, colour);
 		}
 	}
@@ -220,25 +218,23 @@ void Framebuffer::FillRect(int x, int y, int width, int height, RGB colour) {
  * @param height	Height of rectangle.
  * @param buffer	Buffer containing rectangle to write. */
 void Framebuffer::DrawRect(int x, int y, int width, int height, RGB *buffer) {
-	int i, j;
-
-	for(i = 0; i < height; i++) {
-		for(j = 0; j < width; j++) {
+	for(int i = 0; i < height; i++) {
+		for(int j = 0; j < width; j++) {
 			PutPixel(x + j, y + i, buffer[(i * width) + j]);
 		}
 	}
 }
 
 /** Register events with the event loop. */
-void Framebuffer::registerEvents() {
-	registerEvent(DISPLAY_EVENT_REDRAW);
+void Framebuffer::RegisterEvents() {
+	RegisterEvent(DISPLAY_EVENT_REDRAW);
 }
 
 /** Event callback function.
  * @param event		Event number. */
-void Framebuffer::eventReceived(int event) {
+void Framebuffer::EventReceived(int event) {
 	assert(event == DISPLAY_EVENT_REDRAW);
 
-	Header::Instance()->Draw(this);
-	Console::GetActive()->Redraw();
+	Header::Instance().Draw(*this);
+	Console::GetActive().Redraw();
 }

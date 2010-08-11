@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -97,6 +97,6 @@ PPM::~PPM() {
  * @param fb		Framebuffer to write to.
  * @param x		X position to write at.
  * @param y		Y position to write it. */
-void PPM::Draw(Framebuffer *fb, int x, int y) {
-	fb->DrawRect(x, y, m_width, m_height, m_buffer);
+void PPM::Draw(Framebuffer &fb, int x, int y) {
+	fb.DrawRect(x, y, m_width, m_height, m_buffer);
 }

@@ -21,13 +21,16 @@
 #include <kernel/device.h>
 #include <kernel/object.h>
 
-#include <assert.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <kiwi/Error.h>
+
+#include <cassert>
+#include <iostream>
+#include <stdexcept>
 
 #include "Console.h"
 #include "InputDevice.h"
+
+using namespace kiwi;
 
 /** Definition of some keys. */
 #define	L_CTRL		0x1D
@@ -69,36 +72,35 @@ const unsigned char InputDevice::m_keymap_caps[] = {
 };
 
 /** Constructor for an input device.
- * @param device	Device tree path to input device. */
+ * @param device	Device tree path to device. */
 InputDevice::InputDevice(const char *path) :
-	m_init_status(0), m_caps(false), m_ctrl(false), m_alt(false),
-	m_shift(false)
+	m_caps(false), m_ctrl(false), m_alt(false), m_shift(false)
 {
 	/* Open the input device. */
-	handle_t handle = device_open(path);
-	if(handle < 0) {
-		m_init_status = m_handle;
-		return;
+	handle_t handle;
+	status_t ret = device_open(path, &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
-	setHandle(handle);
+
+	SetHandle(handle);
 }
 
 /** Register events with the event loop. */
-void InputDevice::registerEvents() {
-	registerEvent(DEVICE_EVENT_READABLE);
+void InputDevice::RegisterEvents() {
+	RegisterEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Event callback function.
  * @param event		Event number. */
-void InputDevice::eventReceived(int event) {
-	unsigned char ch;
-	uint8_t code;
-	size_t bytes;
-	int ret;
-
+void InputDevice::EventReceived(int event) {
 	assert(event == DEVICE_EVENT_READABLE);
 
-	if((ret = device_read(m_handle, &code, 1, 0, &bytes)) != 0) {
+	/* Read in the keyboard code. */
+	unsigned char code;
+	size_t bytes;
+	status_t ret = device_read(m_handle, &code, 1, 0, &bytes);
+	if(ret != STATUS_SUCCESS) {
 		printf("Failed to read input (%d)\n", ret);
 		return;
 	} else if(bytes != 1) {
@@ -107,6 +109,7 @@ void InputDevice::eventReceived(int event) {
 		return;
 	}
 
+	/* Handle modifier keys. */
 	if(code & 0x80) {
 		code &= 0x7F;
 		if(code == L_SHIFT || code == R_SHIFT) {
@@ -131,6 +134,8 @@ void InputDevice::eventReceived(int event) {
 		return;
 	}
 
+	/* Get the correct key from the keymap. */
+	unsigned char ch;
 	if(m_shift) {
 		ch = m_keymap_shift[code];
 	} else if(m_caps) {
@@ -139,12 +144,13 @@ void InputDevice::eventReceived(int event) {
 		ch = m_keymap[code];
 	}
 
+	/* Write it to the console. */
 	if(ch) {
-		Console::GetActive()->Output(ch);
+		Console::GetActive().Output(ch);
 		if(ch == '\b') {
-			Console::GetActive()->Output(' ');
-			Console::GetActive()->Output('\b');
+			Console::GetActive().Output(' ');
+			Console::GetActive().Output('\b');
 		}
-		Console::GetActive()->Input(ch);
+		Console::GetActive().Input(ch);
 	}
 }

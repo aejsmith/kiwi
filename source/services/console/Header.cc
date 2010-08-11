@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -24,22 +24,19 @@
 Header Header::m_instance;
 
 /** Header constructor. */
-Header::Header() :
-	m_logo(logo_ppm, logo_ppm_size)
-{
-}
+Header::Header() : m_logo(logo_ppm, logo_ppm_size) {}
 
 /** Draw the header to a framebuffer.
  * @param fb		Framebuffer to draw to. */
-void Header::Draw(Framebuffer *fb) {
-	RGB grey = { 0x55, 0x55, 0x55 }, black = { 0, 0, 0 };
-
+void Header::Draw(Framebuffer &fb) {
 	/* Blank the space we're going to occupy. */
-	fb->FillRect(0, 0, fb->Width(), m_logo.Height(), black);
+	RGB black = { 0, 0, 0 };
+	fb.FillRect(0, 0, fb.Width(), m_logo.Height(), black);
 
 	/* Write the logo to the framebuffer. */
 	m_logo.Draw(fb, 0, 0);
 
 	/* Draw a line under the logo. */
-	fb->FillRect(0, m_logo.Height(), fb->Width(), 1, grey);
+	RGB grey = { 0x55, 0x55, 0x55 };
+	fb.FillRect(0, m_logo.Height(), fb.Width(), 1, grey);
 }

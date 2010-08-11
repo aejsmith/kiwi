@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -29,7 +29,7 @@ public:
 	PPM(unsigned char *buf, size_t size);
 	~PPM();
 
-	void Draw(Framebuffer *fb, int x, int y);
+	void Draw(Framebuffer &fb, int x, int y);
 
 	/** Get the width of the image.
 	 * @return		Width of image. */

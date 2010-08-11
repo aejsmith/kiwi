@@ -29,23 +29,18 @@
 class InputDevice : public kiwi::Handle {
 public:
 	InputDevice(const char *path);
-
-	/** Check if initialisation succeeded.
-	 * @return		Whether initialisation succeeded. */
-	bool Initialised(void) const { return (m_init_status == 0); }
 private:
-	void registerEvents();
-	void eventReceived(int event);
+	void RegisterEvents();
+	void EventReceived(int event);
 
-	static const unsigned char m_keymap[];
-	static const unsigned char m_keymap_shift[];
-	static const unsigned char m_keymap_caps[];
-
-	int m_init_status;		/**< Initialisation status. */
 	bool m_caps;			/**< Whether Caps Lock is on. */
 	bool m_ctrl;			/**< Whether Ctrl is held. */
 	bool m_alt;			/**< Whether Alt is held. */
 	bool m_shift;			/**< Whether Shift is held. */
+
+	static const unsigned char m_keymap[];
+	static const unsigned char m_keymap_shift[];
+	static const unsigned char m_keymap_caps[];
 };
 
 #endif /* __INPUTDEVICE_H */

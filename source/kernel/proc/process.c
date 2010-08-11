@@ -691,7 +691,7 @@ static status_t process_create_args_copy(const char *path, const char *const arg
  *			specifies the handle in the caller, and the second
  *			specifies the ID to give it in the child.
  * @param count		Number of entries in handle mapping array.
- * @param handlep	Where to store handle to process.
+ * @param handlep	Where to store handle to process (can be NULL).
  *
  * @return		Status code describing result of the operation.
  */
@@ -702,10 +702,6 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	thread_t *thread;
 	handle_t handle;
 	status_t ret;
-
-	if(!handlep) {
-		return STATUS_INVALID_ARG;
-	}
 
 	ret = process_create_args_copy(path, args, env, map, count, &info);
 	if(ret != STATUS_SUCCESS) {

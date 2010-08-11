@@ -99,12 +99,12 @@ void RPCServerConnection::CheckVersion() {
 	buf >> name;
 	buf >> version;
 	if(name != m_name) {
-		std::stringstream msg;
+		std::ostringstream msg;
 		msg << "Server's service name is incorrect (wanted " << m_name;
 		msg << ", got " << name;
 		throw RPCError(msg.str());
 	} else if(version != m_version) {
-		std::stringstream msg;
+		std::ostringstream msg;
 		msg << "Client/server version mismatch (wanted " << m_version;
 		msg << ", got " << version;
 		throw RPCError(msg.str());

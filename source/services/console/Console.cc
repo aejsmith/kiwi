@@ -24,9 +24,11 @@
 #include <kernel/object.h>
 #include <kernel/process.h>
 
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
+#include <kiwi/Error.h>
+
+#include <cassert>
+#include <cstdio>
+#include <cstring>
 
 #include "Console.h"
 
@@ -40,7 +42,7 @@ extern char **environ;
 #define FONT_WIDTH	6
 #define FONT_HEIGHT	12
 
-/** Current active console. */
+/** Currently active console. */
 Console *Console::m_active = 0;
 
 /** Constructor for the console.
@@ -50,31 +52,29 @@ Console *Console::m_active = 0;
  * @param width		Width.
  * @param height	Height. */
 Console::Console(Framebuffer *fb, int x, int y, int width, int height) :
-	m_init_status(0), m_id(-1), m_fb(fb), m_buffer(0), m_fb_x(x),
-	m_fb_y(y), m_width_px(width), m_height_px(height), m_cursor_x(0),
-	m_cursor_y(0), m_cols(width / FONT_WIDTH),
-	m_rows(height / FONT_HEIGHT), m_scroll_start(0),
-	m_scroll_end(m_rows - 1)
+	m_id(-1), m_fb(fb), m_buffer(0), m_fb_x(x), m_fb_y(y),
+	m_width_px(width), m_height_px(height), m_cursor_x(0), m_cursor_y(0),
+	m_cols(width / FONT_WIDTH), m_rows(height / FONT_HEIGHT),
+	m_scroll_start(0), m_scroll_end(m_rows - 1)
 {
+	status_t ret;
+
 	/* Open the console master. */
-	handle_t handle = device_open("/console/master");
-	if(handle < 0) {
-		printf("Failed to open console master (%d)\n", m_handle);
-		m_init_status = m_handle;
-		return;
+	handle_t handle;
+	ret = device_open("/console/master", &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
-	setHandle(handle);
+	SetHandle(handle);
 
 	/* Obtain a child console. */
-	if((m_id = device_request(m_handle, CONSOLE_MASTER_GET_ID, NULL, 0, NULL, 0, NULL)) < 0) {
-		printf("Failed to get console ID (%d)\n", m_id);
-		m_init_status = m_id;
-		return;
+	ret = device_request(m_handle, CONSOLE_MASTER_GET_ID, NULL, 0, &m_id, sizeof(m_id), NULL);
+	if(ret != STATUS_SUCCESS) {
+		throw OSError(ret);
 	}
 
-	/* Allocate the buffer. */
+	/* Allocate the back buffer and fill it. */
 	m_buffer = new RGB[m_width_px * m_height_px];
-
 	m_fg_colour.r = m_fg_colour.g = m_fg_colour.b = 0xff;
 	m_bg_colour.r = m_bg_colour.g = m_bg_colour.b = 0x0;
 	memset(m_buffer, 0, m_width_px * m_height_px * sizeof(RGB));
@@ -98,26 +98,32 @@ Console::~Console() {
  * @param path		Path to program to run.
  * @return		Whether command started successfully. */
 bool Console::Run(const char *path) {
-	handle_t ret, map[][2] = {
+	handle_t map[][2] = {
 		{ 0, 0 },
 		{ 0, 1 },
 		{ 0, 2 },
 	};
 	const char *args[] = { path, NULL };
 	char buf[1024];
+	status_t ret;
 
 	sprintf(buf, "/console/%d", m_id);
 
 	/* Open handles to the console. */
-	if((map[0][0] = device_open(buf)) < 0) {
-		return map[0][0];
-	} else if((map[1][0] = device_open(buf)) < 0) {
+	ret = device_open(buf, &map[0][0]);
+	if(ret != STATUS_SUCCESS) {
+		return false;
+	}
+	ret = device_open(buf, &map[1][0]);
+	if(ret != STATUS_SUCCESS) {
 		handle_close(map[0][0]);
-		return map[1][0];
-	} else if((map[2][0] = device_open(buf)) < 0) {
+		return false;
+	}
+	ret = device_open(buf, &map[2][0]);
+	if(ret != STATUS_SUCCESS) {
 		handle_close(map[1][0]);
 		handle_close(map[0][0]);
-		return map[2][0];
+		return false;
 	}
 
 	/* Make the handles inheritable so children of the process get them. */
@@ -125,17 +131,16 @@ bool Console::Run(const char *path) {
 	handle_set_flags(map[1][0], HANDLE_INHERITABLE);
 	handle_set_flags(map[2][0], HANDLE_INHERITABLE);
 
-	ret = process_create(path, args, environ, 0, map, 3);
+	ret = process_create(path, args, environ, 0, map, 3, NULL);
 	handle_close(map[2][0]);
 	handle_close(map[1][0]);
 	handle_close(map[0][0]);
-	if(ret < 0) {
+	if(ret != STATUS_SUCCESS) {
 		printf("Could not start process (%d)\n", ret);
 		return false;
-	} else {
-		handle_close(ret);
-		return true;
 	}
+
+	return true;
 }
 
 /** Add input to the console.
@@ -255,9 +260,7 @@ void Console::PutChar(unsigned char ch) {
 
 /** Clear the console. */
 void Console::Clear(void) {
-	int i;
-
-	for(i = 0; i < (m_width_px * m_height_px); i++) {
+	for(int i = 0; i < (m_width_px * m_height_px); i++) {
 		m_buffer[i] = m_bg_colour;
 	}
 
@@ -267,15 +270,12 @@ void Console::Clear(void) {
 
 /** Scroll up one line. */
 void Console::ScrollUp(void) {
-	size_t row, pixels;
-	int i;
-
-	row = m_width_px * FONT_HEIGHT;
-	pixels = (m_width_px * FONT_HEIGHT) * (m_scroll_end - m_scroll_start);
+	size_t row = m_width_px * FONT_HEIGHT;
+	size_t pixels = (m_width_px * FONT_HEIGHT) * (m_scroll_end - m_scroll_start);
 	memmove(&m_buffer[row * (m_scroll_start + 1)], &m_buffer[row * m_scroll_start], pixels * sizeof(RGB));
 
 	/* Fill the first row with blanks. */
-	for(i = 0; i < (FONT_HEIGHT * m_width_px); i++) {
+	for(int i = 0; i < (FONT_HEIGHT * m_width_px); i++) {
 		m_buffer[(m_scroll_start * row) + i] = m_bg_colour;
 	}
 
@@ -284,15 +284,12 @@ void Console::ScrollUp(void) {
 
 /** Scroll down one line. */
 void Console::ScrollDown(void) {
-	size_t row, pixels;
-	int i;
-
-	row = m_width_px * FONT_HEIGHT;
-	pixels = (m_width_px * FONT_HEIGHT) * (m_scroll_end - m_scroll_start);
+	size_t row = m_width_px * FONT_HEIGHT;
+	size_t pixels = (m_width_px * FONT_HEIGHT) * (m_scroll_end - m_scroll_start);
 	memcpy(&m_buffer[row * m_scroll_start], &m_buffer[row * (m_scroll_start + 1)], pixels * sizeof(RGB));
 
 	/* Fill the last row with blanks. */
-	for(i = 0; i < (FONT_HEIGHT * m_width_px); i++) {
+	for(int i = 0; i < (FONT_HEIGHT * m_width_px); i++) {
 		m_buffer[(m_scroll_end * row) + i] = m_bg_colour;
 	}
 
@@ -300,23 +297,19 @@ void Console::ScrollDown(void) {
 }
 
 /** Register events with the event loop. */
-void Console::registerEvents() {
-	registerEvent(DEVICE_EVENT_READABLE);
+void Console::RegisterEvents() {
+	RegisterEvent(DEVICE_EVENT_READABLE);
 }
 
 /** Event callback function.
  * @param event		Event number received. */
-void Console::eventReceived(int event) {
-	unsigned char ch;
-	size_t bytes;
-	int ret;
-
+void Console::EventReceived(int event) {
 	assert(event == DEVICE_EVENT_READABLE);
 
-	if((ret = device_read(m_handle, &ch, 1, 0, &bytes)) != 0) {
-		printf("Failed to read output (%d)\n", ret);
-		return;
-	} else if(bytes != 1) {
+	unsigned char ch;
+	size_t bytes;
+	status_t ret = device_read(m_handle, &ch, 1, 0, &bytes);
+	if(ret != STATUS_SUCCESS || bytes != 1) {
 		return;
 	}
 

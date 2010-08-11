@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -27,15 +27,15 @@
 /** Class containing a console header. */
 class Header {
 public:
-	void Draw(Framebuffer *fb);
+	void Draw(Framebuffer &fb);
 
 	/** Get the header height.
 	 * @return		Height of header. */
 	int Height(void) { return m_logo.Height() + 1; }
 
 	/** Retreive the singleton instance.
-	 * @return		Pointer to instance. */
-	static Header *Instance(void) { return &m_instance; }
+	 * @return		Reference to instance. */
+	static Header &Instance(void) { return m_instance; }
 private:
 	Header();
 

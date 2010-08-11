@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,24 +21,16 @@
 #ifndef __FRAMEBUFFER_H
 #define __FRAMEBUFFER_H
 
-#include <drivers/display.h>
-
 #include <kiwi/Handle.h>
 
 /** RGB colour structure. */
-struct RGB {
-	uint8_t r, g, b;
-} __attribute__((packed));
+struct RGB { uint8_t r, g, b; } __attribute__((packed));
 
 /** Framebuffer class. */
 class Framebuffer : public kiwi::Handle {
 public:
 	Framebuffer(const char *device);
 	~Framebuffer();
-
-	/** Check if initialisation succeeded.
-	 * @return		Whether initialisation succeeded. */
-	bool Initialised(void) const { return (m_init_status == 0); }
 
 	/** Get the framebuffer width.
 	 * @return		Framebuffer width. */
@@ -53,10 +45,9 @@ public:
 	void FillRect(int x, int y, int width, int height, RGB colour);
 	void DrawRect(int x, int y, int width, int height, RGB *buffer);
 private:
-	void registerEvents();
-	void eventReceived(int event);
+	void RegisterEvents();
+	void EventReceived(int event);
 
-	int m_init_status;		/**< Initialisation status. */
 	uint8_t *m_buffer;		/**< Mapping of display device memory. */
 	size_t m_buffer_size;		/**< Size of mapping. */
 	size_t m_width;			/**< Display width. */

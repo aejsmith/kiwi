@@ -14,7 +14,7 @@
 Import('env')
 
 SConscript(dirs=[
-	#'console',
+	'console',
 	#'kittenserver',
 	#'pong',
 	#'shmserver',

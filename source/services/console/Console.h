@@ -31,21 +31,17 @@ public:
 	Console(Framebuffer *fb, int x, int y, int width, int height);
 	~Console();
 
-	/** Check if initialisation succeeded.
-	 * @return		Whether initialisation succeeded. */
-	bool Initialised(void) const { return (m_init_status == 0); }
-
 	bool Run(const char *path);
 	void Input(unsigned char ch);
 	void Output(unsigned char ch);
 	void Redraw(void);
 
 	/** Get the active console.
-	 * @return		Pointer to active console. */
-	static Console *GetActive(void) { return m_active; }
+	 * @return		Reference to the active console. */
+	static Console &GetActive(void) { return *m_active; }
 private:
-	void registerEvents();
-	void eventReceived(int event);
+	void RegisterEvents();
+	void EventReceived(int event);
 
 	void ToggleCursor(void);
 	void PutChar(unsigned char ch);
@@ -53,27 +49,23 @@ private:
 	void ScrollUp(void);
 	void ScrollDown(void);
 
-	static Console *m_active;	/**< Active console. */
-
-	int m_init_status;		/**< Initialisation status. */
 	int m_id;			/**< Console ID. */
-
 	Framebuffer *m_fb;		/**< Framebuffer. */
 	RGB *m_buffer;			/**< Back buffer. */
 	int m_fb_x;			/**< X position of console on framebuffer. */
 	int m_fb_y;			/**< Y position of console on framebuffer. */
 	int m_width_px;			/**< Console width (in pixels). */
 	int m_height_px;		/**< Console height (in pixels). */
-
 	int m_cursor_x;			/**< Cursor X position (in characters). */
 	int m_cursor_y;			/**< Cursor Y position (in characters). */
 	int m_cols;			/**< Number of columns. */
 	int m_rows;			/**< Number of rows. */
 	int m_scroll_start;		/**< First line of scroll region. */
 	int m_scroll_end;		/**< Last line of scroll region. */
-
 	RGB m_fg_colour;		/**< Foreground colour. */
 	RGB m_bg_colour;		/**< Background colour. */
+
+	static Console *m_active;	/**< Active console. */
 };
 
 #endif /* __CONSOLE_H */
