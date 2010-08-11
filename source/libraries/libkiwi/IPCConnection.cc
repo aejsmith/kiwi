@@ -66,7 +66,7 @@ void IPCConnection::Connect(port_id_t id) {
  * @throw IPCError	Thrown if unable to connect.
  */
 void IPCConnection::Connect(const char *name) {
-	ServerConnection svcmgr;
+	ServerConnection svcmgr(1);
 
 	/* Look up the port ID. */
 	port_id_t id;

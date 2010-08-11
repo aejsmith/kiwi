@@ -28,18 +28,16 @@ int main(int argc, char **argv) {
 	IPCConnection conn;
 	uint32_t val = 0;
 
-	if(!conn.connect("org.kiwi.Pong")) {
-		return 1;
-	}
-
+	conn.Connect("org.kiwi.Pong");
 	while(true) {
 		uint32_t type;
 		size_t size;
 		char *data;
 
-		if(!conn.send(1, &val, sizeof(uint32_t))) {
-			break;
-		} else if(!conn.receive(type, data, size)) {
+		try {
+			conn.Send(1, &val, sizeof(uint32_t));
+			conn.Receive(type, data, size);
+		} catch(Error &e) {
 			break;
 		}
 

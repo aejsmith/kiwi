@@ -26,35 +26,26 @@
 using namespace kiwi;
 using namespace std;
 
-extern "C" FILE *fopen_device(const char *path, FILE *stream);
-
 int main(int argc, char **argv) {
 	IPCConnection *conn;
 	IPCPort port(3);
 
-	/* Use the console for output. */
-	fopen_device("/console/0", stdout);
-
-	while(port.listen(conn)) {
+	while(port.Listen(conn)) {
 		while(true) {
-			uint32_t type, val;
-			size_t size;
-			char *data;
+			try {
+				uint32_t type, val;
+				size_t size;
+				char *data;
 
-			if(!conn->receive(type, data, size)) {
+				conn->Receive(type, data, size);
+				val = *(reinterpret_cast<uint32_t *>(data));
+				cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
+				conn->Send(2, data, size);
+				delete data;
+			} catch(Error &e) {
 				break;
 			}
-
-			val = *(reinterpret_cast<uint32_t *>(data));
-			cout << "Pong: Received message type " << type << ": " << val << " (size: " << size << ")" << endl;
-
-			if(!conn->send(2, data, size)) {
-				break;
-			}
-
-			delete data;
 		}
-
 		delete conn;
 	}
 }
