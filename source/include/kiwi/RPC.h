@@ -21,6 +21,7 @@
 #ifndef __KIWI_RPC_H
 #define __KIWI_RPC_H
 
+#include <kiwi/Error.h>
 #include <kiwi/IPCConnection.h>
 #include <kiwi/Signal.h>
 
@@ -29,8 +30,15 @@
 
 namespace kiwi {
 
-/** Type used to store the result of an RPC call. */
-typedef int32_t RPCResult;
+/** Exception thrown for RPC protocol errors. */
+class RPCError : public Error {
+public:
+	explicit RPCError(const std::string &msg);
+	~RPCError() throw();
+	const char *GetDescription() const throw();
+private:
+	std::string m_msg;		/**< Error message. */
+};
 
 /** Type implementing the RPC 'bytes' type. */
 typedef ::std::pair<const char *, size_t> RPCByteString;
@@ -56,7 +64,7 @@ public:
 	RPCMessageBuffer(char *buf, size_t size);
 	~RPCMessageBuffer();
 
-	void reset(char *buf = NULL, size_t size = 0);
+	void Reset(char *buf = 0, size_t size = 0);
 
 	RPCMessageBuffer &operator <<(bool val);
 	RPCMessageBuffer &operator <<(const std::string &str);
@@ -84,20 +92,20 @@ public:
 
 	/** Get the message data buffer.
 	 * @return		Message data buffer. */
-	const char *getBuffer() { return m_buffer; }
+	const char *GetBuffer() { return m_buffer; }
 
 	/** Get the buffer size.
 	 * @return		Message data buffer size. */
-	size_t getSize() { return m_size; }
+	size_t GetSize() { return m_size; }
 private:
 	template <typename T>
-	void pushEntry(TypeID type, T entry);
+	void PushEntry(TypeID type, T entry);
 
 	template <typename T>
-	void popEntry(TypeID type, T &entry);
+	void PopEntry(TypeID type, T &entry);
 
-	void pushEntry(TypeID type, const char *data, size_t size);
-	void popEntry(TypeID type, const char *&data, size_t &size);
+	void PushEntry(TypeID type, const char *data, size_t size);
+	void PopEntry(TypeID type, const char *&data, size_t &size);
 
 	char *m_buffer;			/**< Buffer containing message data. */
 	size_t m_size;			/**< Current buffer size. */
@@ -106,19 +114,15 @@ private:
 
 /** Base class for a connection to a server. */
 class RPCServerConnection : public Object {
-public:
-	bool connect();
-	bool connect(const char *name);
-	bool connect(port_id_t port);
 protected:
-	RPCServerConnection(const char *name, uint32_t version);
+	RPCServerConnection(const char *name, uint32_t version, port_id_t port = -1);
 
-	void sendMessage(uint32_t id, RPCMessageBuffer &buf);
-	void receiveMessage(uint32_t &id, RPCMessageBuffer &buf);
-	virtual void handleEvent(uint32_t id, RPCMessageBuffer &buf) = 0;
+	void SendMessage(uint32_t id, RPCMessageBuffer &buf);
+	void ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf);
+	virtual void HandleEvent(uint32_t id, RPCMessageBuffer &buf) = 0;
 private:
-	void _handleMessage();
-	bool checkVersion();
+	void HandleMessage();
+	void CheckVersion();
 
 	IPCConnection m_conn;		/**< Real connection to the server. */
 	const char *m_name;		/**< Name of the service. */
@@ -130,11 +134,11 @@ class RPCClientConnection : public Object {
 protected:
 	RPCClientConnection(const char *name, uint32_t version, handle_t handle);
 
-	void sendMessage(uint32_t id, RPCMessageBuffer &buf);
-	virtual void handleMessage(uint32_t id, RPCMessageBuffer &buf) = 0;
-	virtual void handleHangup();
+	void SendMessage(uint32_t id, RPCMessageBuffer &buf);
+	virtual void HandleMessage(uint32_t id, RPCMessageBuffer &buf) = 0;
+	virtual void HandleHangup();
 private:
-	void _handleMessage();
+	void _HandleMessage();
 
 	IPCConnection m_conn;		/**< Real connection to the client. */
 	const char *m_name;		/**< Name of the service. */

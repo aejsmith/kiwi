@@ -23,13 +23,24 @@
 #include <cstring>
 #include <endian.h>
 #include <sstream>
-#include <stdexcept>
 
 using namespace kiwi;
 
+/** Construct an RPC error object. */
+RPCError::RPCError(const std::string &msg) : m_msg(msg) {}
+
+/** Destroy an RPC error object. */
+RPCError::~RPCError() throw() {}
+
+/** Get the description of an RPC error.
+ * @return		Description of the error. */
+const char *RPCError::GetDescription() const throw() {
+	return m_msg.c_str();
+}
+
 /** Construct an empty message buffer. */
 RPCMessageBuffer::RPCMessageBuffer() :
-	m_buffer(NULL), m_size(0), m_offset(0)
+	m_buffer(0), m_size(0), m_offset(0)
 {
 }
 
@@ -45,13 +56,13 @@ RPCMessageBuffer::RPCMessageBuffer(char *buf, size_t size) :
 
 /** Destroy a message buffer. */
 RPCMessageBuffer::~RPCMessageBuffer() {
-	reset();
+	Reset();
 }
 
 /** Reset a message buffer.
  * @param buf		New buffer to use. Will be taken over by the object.
  * @param size		Size of the buffer. */
-void RPCMessageBuffer::reset(char *buf, size_t size) {
+void RPCMessageBuffer::Reset(char *buf, size_t size) {
 	if(m_buffer) {
 		delete[] m_buffer;
 	}
@@ -63,70 +74,70 @@ void RPCMessageBuffer::reset(char *buf, size_t size) {
 RPCMessageBuffer &RPCMessageBuffer::operator <<(bool val) {
 	/* Ensure that bool is kept a standard size across machines. */
 	uint8_t rval = static_cast<uint8_t>(val);
-	pushEntry(TYPE_BOOL, rval);
+	PushEntry(TYPE_BOOL, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(const std::string &str) {
-	pushEntry(TYPE_STRING, str.c_str(), str.length());
+	PushEntry(TYPE_STRING, str.c_str(), str.length());
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(RPCByteString &bytes) {
-	pushEntry(TYPE_BYTES, bytes.first, bytes.second);
+	PushEntry(TYPE_BYTES, bytes.first, bytes.second);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int8_t val) {
-	pushEntry(TYPE_INT8, val);
+	PushEntry(TYPE_INT8, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int16_t val) {
 	int16_t rval = cpu_to_le16(val);
-	pushEntry(TYPE_INT16, rval);
+	PushEntry(TYPE_INT16, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int32_t val) {
 	int32_t rval = cpu_to_le32(val);
-	pushEntry(TYPE_INT32, rval);
+	PushEntry(TYPE_INT32, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int64_t val) {
 	int64_t rval = cpu_to_le64(val);
-	pushEntry(TYPE_INT64, rval);
+	PushEntry(TYPE_INT64, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint8_t val) {
-	pushEntry(TYPE_UINT8, val);
+	PushEntry(TYPE_UINT8, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint16_t val) {
 	uint16_t rval = cpu_to_le16(val);
-	pushEntry(TYPE_UINT16, rval);
+	PushEntry(TYPE_UINT16, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint32_t val) {
 	uint32_t rval = cpu_to_le32(val);
-	pushEntry(TYPE_UINT32, rval);
+	PushEntry(TYPE_UINT32, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint64_t val) {
 	uint64_t rval = cpu_to_le64(val);
-	pushEntry(TYPE_UINT64, rval);
+	PushEntry(TYPE_UINT64, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(bool &val) {
 	/* Boolean is transmitted as uint8_t. */
 	uint8_t rval;
-	popEntry(TYPE_BOOL, rval);
+	PopEntry(TYPE_BOOL, rval);
 	val = static_cast<bool>(rval);
 	return *this;
 }
@@ -134,7 +145,7 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(bool &val) {
 RPCMessageBuffer &RPCMessageBuffer::operator >>(std::string &str) {
 	const char *buf;
 	size_t size;
-	popEntry(TYPE_STRING, buf, size);
+	PopEntry(TYPE_STRING, buf, size);
 	str = std::string(buf, size);
 	return *this;
 }
@@ -142,59 +153,59 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(std::string &str) {
 RPCMessageBuffer &RPCMessageBuffer::operator >>(RPCByteString &bytes) {
 	const char *buf;
 	size_t size;
-	popEntry(TYPE_BYTES, buf, size);
+	PopEntry(TYPE_BYTES, buf, size);
 	bytes = RPCByteString(buf, size);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int8_t &val) {
-	popEntry(TYPE_INT8, val);
+	PopEntry(TYPE_INT8, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int16_t &val) {
 	int16_t rval;
-	popEntry(TYPE_INT16, rval);
+	PopEntry(TYPE_INT16, rval);
 	val = le16_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int32_t &val) {
 	int32_t rval;
-	popEntry(TYPE_INT32, rval);
+	PopEntry(TYPE_INT32, rval);
 	val = le32_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int64_t &val) {
 	int64_t rval;
-	popEntry(TYPE_INT64, rval);
+	PopEntry(TYPE_INT64, rval);
 	val = le64_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint8_t &val) {
-	popEntry(TYPE_UINT8, val);
+	PopEntry(TYPE_UINT8, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint16_t &val) {
 	uint16_t rval;
-	popEntry(TYPE_UINT16, rval);
+	PopEntry(TYPE_UINT16, rval);
 	val = le16_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint32_t &val) {
 	uint32_t rval;
-	popEntry(TYPE_UINT32, rval);
+	PopEntry(TYPE_UINT32, rval);
 	val = le32_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint64_t &val) {
 	uint64_t rval;
-	popEntry(TYPE_UINT64, rval);
+	PopEntry(TYPE_UINT64, rval);
 	val = le64_to_cpu(rval);
 	return *this;
 }
@@ -203,20 +214,20 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(uint64_t &val) {
  * @param type		ID of the type of the entry.
  * @param entry		Entry to push. */
 template <typename T>
-void RPCMessageBuffer::pushEntry(TypeID type, T entry) {
-	pushEntry(type, reinterpret_cast<const char *>(&entry), sizeof(entry));
+void RPCMessageBuffer::PushEntry(TypeID type, T entry) {
+	PushEntry(type, reinterpret_cast<const char *>(&entry), sizeof(entry));
 }
 
 /** Pop an entry from the buffer.
  * @param type		ID of the type expected.
  * @param entry		Where to store entry popped. */
 template <typename T>
-void RPCMessageBuffer::popEntry(TypeID type, T &entry) {
+void RPCMessageBuffer::PopEntry(TypeID type, T &entry) {
 	const char *buf;
 	size_t size;
-	popEntry(type, buf, size);
+	PopEntry(type, buf, size);
 	if(size != sizeof(T)) {
-		throw std::runtime_error("Message entry size not as expected");
+		throw RPCError("Message entry size not as expected");
 	}
 	entry = *reinterpret_cast<const T *>(buf);
 }
@@ -225,7 +236,7 @@ void RPCMessageBuffer::popEntry(TypeID type, T &entry) {
  * @param type		ID of the type of the entry.
  * @param data		Data for entry to push.
  * @param size		Size of the entry. */
-void RPCMessageBuffer::pushEntry(TypeID type, const char *data, size_t size) {
+void RPCMessageBuffer::PushEntry(TypeID type, const char *data, size_t size) {
 	/* The entry contains a 1 byte type ID, a 4 byte entry size and the
 	 * data itself. */
 	size_t total = size + 5;
@@ -249,9 +260,9 @@ void RPCMessageBuffer::pushEntry(TypeID type, const char *data, size_t size) {
  * @param type		ID of the type expected.
  * @param data		Where to store pointer to entry data.
  * @param size		Where to store size of the entry. */
-void RPCMessageBuffer::popEntry(TypeID type, const char *&data, size_t &size) {
+void RPCMessageBuffer::PopEntry(TypeID type, const char *&data, size_t &size) {
 	if((m_offset + 5) > m_size) {
-		throw std::runtime_error("Message buffer smaller than expected");
+		throw RPCError("Message buffer smaller than expected");
 	}
 
 	TypeID rtype = static_cast<TypeID>(*reinterpret_cast<uint8_t *>(&m_buffer[m_offset]));
@@ -259,7 +270,7 @@ void RPCMessageBuffer::popEntry(TypeID type, const char *&data, size_t &size) {
 		std::ostringstream msg;
 		msg << "Message entry type (" << static_cast<int>(rtype);
 		msg << ") not as expected (" << static_cast<int>(type) << ')';
-		throw std::runtime_error(msg.str());
+		throw RPCError(msg.str());
 	}
 
 	size = static_cast<size_t>(*reinterpret_cast<uint32_t *>(&m_buffer[m_offset + 1]));

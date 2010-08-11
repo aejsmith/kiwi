@@ -23,10 +23,10 @@
 
 #include <kiwi/IPCConnection.h>
 
-//#include "svcmgr.h"
+#include "svcmgr.h"
 
 using namespace kiwi;
-//using namespace org::kiwi::ServiceManager;
+using namespace org::kiwi::ServiceManager;
 
 /** Constructor for IPCConnection.
  * @param handle	Handle ID (default is -1, which means the object will
@@ -65,7 +65,6 @@ void IPCConnection::Connect(port_id_t id) {
  *
  * @throw IPCError	Thrown if unable to connect.
  */
-#if 0
 void IPCConnection::Connect(const char *name) {
 	ServerConnection svcmgr;
 
@@ -78,7 +77,6 @@ void IPCConnection::Connect(const char *name) {
 
 	return Connect(id);
 }
-#endif
 
 /** Send a message on a port.
  * @param type		Type ID of message to send.

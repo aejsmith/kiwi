@@ -33,40 +33,40 @@ RPCClientConnection::RPCClientConnection(const char *name, uint32_t version, han
 	m_conn(handle), m_name(name), m_version(version)
 {
 	/* Hook up the signal handlers. */
-	m_conn.onMessage.connect(this, &RPCClientConnection::_handleMessage);
-	m_conn.onHangup.connect(this, &RPCClientConnection::handleHangup);
+	m_conn.OnMessage.Connect(this, &RPCClientConnection::_HandleMessage);
+	m_conn.OnHangup.Connect(this, &RPCClientConnection::HandleHangup);
 
 	/* Send the version to the client. */
 	RPCMessageBuffer buf;
 	buf << std::string(m_name);
 	buf << version;
-	sendMessage(0, buf);
+	SendMessage(0, buf);
 }
 
 /** Send a message to the client.
  * @param id		ID of the message.
  * @param buf		Message buffer. */
-void RPCClientConnection::sendMessage(uint32_t id, RPCMessageBuffer &buf) {
-	m_conn.send(id, buf.getBuffer(), buf.getSize());
+void RPCClientConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
+	m_conn.Send(id, buf.GetBuffer(), buf.GetSize());
 }
 
 /** Handle the connection being hung up.
- * @note		The default version of this function calls deleteLater()
+ * @note		The default version of this function calls DeleteLater()
  *			on the connection. */
-void RPCClientConnection::handleHangup() {
-	deleteLater();
+void RPCClientConnection::HandleHangup() {
+	DeleteLater();
 }
 
 /** Signal handler for a message being received. */
-void RPCClientConnection::_handleMessage() {
+void RPCClientConnection::_HandleMessage() {
 	uint32_t id;
 	size_t size;
 	char *data;
-	if(!m_conn.receive(id, data, size)) {
+	if(!m_conn.Receive(id, data, size)) {
 		return;
 	}
 
 	RPCMessageBuffer buf(data, size);
-	handleMessage(id, buf);
-	sendMessage(id, buf);
+	HandleMessage(id, buf);
+	SendMessage(id, buf);
 }

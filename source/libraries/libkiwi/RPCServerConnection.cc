@@ -19,66 +19,49 @@
  */
 
 #include <kiwi/RPC.h>
+
+#include <sstream>
 #include <stdexcept>
 
 using namespace kiwi;
 
-RPCServerConnection::RPCServerConnection(const char *name, uint32_t version) :
+/** Construct an RPC server connection object.
+ * @param name		Name of the service.
+ * @param version	Service version.
+ * @param id		If not negative, this port will be used rather than
+ *			looking up the port name. */
+RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, port_id_t id) :
 	m_name(name), m_version(version)
 {
-	m_conn.onMessage.connect(this, &RPCServerConnection::_handleMessage);
-}
+	m_conn.OnMessage.Connect(this, &RPCServerConnection::HandleMessage);
 
-/** Connect to the server by the default name.
- * @return		Whether successfully connected. */
-bool RPCServerConnection::connect() {
-	return connect(m_name);
-}
-
-/** Connect to the server under a different name.
- * @param name		Name to connect to.
- * @return		Whether successfully connected. */
-bool RPCServerConnection::connect(const char *name) {
-	if(!m_conn.connect(name)) {
-		return false;
-	} else if(!checkVersion()) {
-		m_conn.close();
-		return false;
+	/* Connect to the server. */
+	if(id >= 0) {
+		m_conn.Connect(id);
+	} else {
+		m_conn.Connect(m_name);
 	}
-	return true;
-}
 
-/** Connect to the server on the specified port.
- * @param port		Port ID to connect to.
- * @return		Whether successfully connected. */
-bool RPCServerConnection::connect(port_id_t port) {
-	if(!m_conn.connect(port)) {
-		return false;
-	} else if(!checkVersion()) {
-		m_conn.close();
-		return false;
-	}
-	return true;
+	/* Check the server version. */
+	CheckVersion();
 }
 
 /** Send a message on the connection and get the response.
  * @param id		ID of message to send.
  * @param buf		Buffer containing message to send. Will be replaced
  *			with the response message. */
-void RPCServerConnection::sendMessage(uint32_t id, RPCMessageBuffer &buf) {
-	if(!m_conn.send(id, buf.getBuffer(), buf.getSize())) {
-		throw std::runtime_error("Failed to send message");
-	}
+void RPCServerConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
+	m_conn.Send(id, buf.GetBuffer(), buf.GetSize());
 
 	/* The server may send us events before we get the actual reply. If
-	 * the message ID is not what is expected, pass it to the event handler */
+	 * the ID is not what is expected, pass it to the event handler. */
 	while(true) {
 		uint32_t nid;
-		receiveMessage(nid, buf);
+		ReceiveMessage(nid, buf);
 		if(nid == id) {
 			return;
 		} else {
-			handleEvent(nid, buf);
+			HandleEvent(nid, buf);
 		}
 	}
 }
@@ -86,46 +69,44 @@ void RPCServerConnection::sendMessage(uint32_t id, RPCMessageBuffer &buf) {
 /** Receive a message on the connection.
  * @param id		Where to store ID of message.
  * @param buf		Where to store message buffer. */
-void RPCServerConnection::receiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
+void RPCServerConnection::ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
 	size_t size;
 	char *data;
-	if(!m_conn.receive(id, data, size)) {
-		throw std::runtime_error("Failed to receive message");
-	}
-
-	buf.reset(data, size);
+	m_conn.Receive(id, data, size);
+	buf.Reset(data, size);
 }
 
 /** Handle a message on the connection. */
-void RPCServerConnection::_handleMessage() {
+void RPCServerConnection::HandleMessage() {
 	RPCMessageBuffer buf;
 	uint32_t id;
-	receiveMessage(id, buf);
-	handleEvent(id, buf);
+	ReceiveMessage(id, buf);
+	HandleEvent(id, buf);
 }
 
-/** Check whether the server is the expected version.
- * @return		Whether server is correct version. */
-bool RPCServerConnection::checkVersion() {
-	try {
-		RPCMessageBuffer buf;
-		uint32_t version, id;
-		std::string name;
+/** Check whether the server is the expected version and throw an exception if not. */
+void RPCServerConnection::CheckVersion() {
+	RPCMessageBuffer buf;
+	uint32_t version, id;
+	std::string name;
 
-		/* The server should send us a message containing the service
-		 * name followed by the version when we open the connection. */
-		receiveMessage(id, buf);
-		if(id != 0) {
-			return false;
-		}
-		buf >> name;
-		buf >> version;
-		if(name != m_name || version != m_version) {
-			return false;
-		}
-	} catch(std::runtime_error) {
-		return false;
+	/* The server should send us a message containing the service
+	 * name followed by the version when we open the connection. */
+	ReceiveMessage(id, buf);
+	if(id != 0) {
+		throw RPCError("Server did not send version message");
 	}
-
-	return true;
+	buf >> name;
+	buf >> version;
+	if(name != m_name) {
+		std::stringstream msg;
+		msg << "Server's service name is incorrect (wanted " << m_name;
+		msg << ", got " << name;
+		throw RPCError(msg.str());
+	} else if(version != m_version) {
+		std::stringstream msg;
+		msg << "Client/server version mismatch (wanted " << m_version;
+		msg << ", got " << version;
+		throw RPCError(msg.str());
+	}
 }

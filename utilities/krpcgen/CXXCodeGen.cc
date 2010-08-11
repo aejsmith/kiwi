@@ -28,10 +28,7 @@
 using namespace std;
 
 /** Constructor for a C++ code generator. */
-CXXCodeGen::CXXCodeGen(Service *service) :
-	CodeGen(service)
-{
-}
+CXXCodeGen::CXXCodeGen(Service *service) : CodeGen(service) {}
 
 /** Generate server code.
  * @param path		Path to output file.
@@ -72,11 +69,11 @@ bool CXXCodeGen::GenerateServerHeader(const std::string &path) {
 	stream << "protected:" << endl;
 	stream << "	ClientConnection(handle_t handle);" << endl;
 	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
-		stream << "	virtual ::kiwi::RPCResult " << func->GetName() << '(';
+		stream << "	virtual status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ") = 0;" << endl;
 	}
 	stream << "private:" << endl;
-	stream << "	void handleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
+	stream << "	void HandleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
 	stream << "};" << endl;
 
 	/* Finish the header. */
@@ -106,12 +103,12 @@ bool CXXCodeGen::GenerateServerCode(const std::string &path) {
 		BOOST_FOREACH(const Function::Parameter &param, event->GetParameters()) {
 			stream << "	__buf << " << param.name << ';' << endl;
 		}
-		stream << "	sendMessage(" << event->GetMessageID() << ", __buf);" << endl;
+		stream << "	SendMessage(" << event->GetMessageID() << ", __buf);" << endl;
 		stream << '}' << endl;
 	}
 
 	/* Generate the message handler. */
-	stream << "void ClientConnection::handleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
+	stream << "void ClientConnection::HandleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
 	stream << "	switch(__id) {" << endl;
 	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
 		stream << "	case " << func->GetMessageID() << ": {" << endl;
@@ -123,7 +120,7 @@ bool CXXCodeGen::GenerateServerCode(const std::string &path) {
 			}
 		}
 		stream << "		__buf.reset();" << endl;
-		stream << "		::kiwi::RPCResult __ret = " << GetHandlerCall(func) << ';' << endl;
+		stream << "		status_t __ret = " << GetHandlerCall(func) << ';' << endl;
 		stream << "		__buf << __ret;" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, func->GetParameters()) {
 			if(param.out) {
@@ -154,8 +151,9 @@ bool CXXCodeGen::GenerateClientHeader(const std::string &path) {
 	stream << "class ServerConnection : public ::kiwi::RPCServerConnection {" << endl;
 	stream << "public:" << endl;
 	stream << "	ServerConnection();" << endl;
+	stream << "	ServerConnection(port_id_t id);" << endl;
 	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
-		stream << "	::kiwi::RPCResult " << func->GetName() << '(';
+		stream << "	status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ");" << endl;
 	}
 	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
@@ -163,7 +161,7 @@ bool CXXCodeGen::GenerateClientHeader(const std::string &path) {
 		stream << "> " << event->GetName() << ';' << endl;
 	}
 	stream << "private:" << endl;
-	stream << "	void handleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
+	stream << "	void HandleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
 	stream << "};" << endl;
 
 	/* Finish the header. */
@@ -180,14 +178,17 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 		return false;
 	}
 
-	/* Generate the constructor. */
+	/* Generate the constructors. */
 	stream << "ServerConnection::ServerConnection() : ::kiwi::RPCServerConnection(";
 	stream << '"' << m_service->GetName() << "\", " << m_service->GetVersion();
 	stream << ") {}" << endl;
+	stream << "ServerConnection::ServerConnection(port_id_t id) : ::kiwi::RPCServerConnection(";
+	stream << '"' << m_service->GetName() << "\", " << m_service->GetVersion();
+	stream << ", id) {}" << endl;
 
 	/* Generate the function calls. */
 	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
-		stream << "::kiwi::RPCResult ServerConnection::" << func->GetName() << '(';
+		stream << "status_t ServerConnection::" << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ") {" << endl;
 		stream << "	::kiwi::RPCMessageBuffer __buf;" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, func->GetParameters()) {
@@ -195,8 +196,8 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 				stream << "	__buf << " << param.name << ';' << endl;
 			}
 		}
-		stream << "	sendMessage(" << func->GetMessageID() << ", __buf);" << endl;
-		stream << "	::kiwi::RPCResult __ret;" << endl;
+		stream << "	SendMessage(" << func->GetMessageID() << ", __buf);" << endl;
+		stream << "	status_t __ret;" << endl;
 		stream << "	__buf >> __ret;" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, func->GetParameters()) {
 			if(param.out) {
@@ -208,7 +209,7 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 	}
 
 	/* Generate the event handler. */
-	stream << "void ServerConnection::handleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
+	stream << "void ServerConnection::HandleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
 	stream << "	switch(__id) {" << endl;
 	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
 		stream << "	case " << event->GetMessageID() << ": {" << endl;
@@ -223,7 +224,7 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 	stream << "	default: {" << endl;
 	stream << "		std::stringstream __msg;" << endl;
 	stream << "		__msg << \"Received unknown event ID \" << __id;" << endl;
-	stream << "		throw std::runtime_error(__msg.str());" << endl;
+	stream << "		throw ::kiwi::RPCError(__msg.str());" << endl;
 	stream << "	}" << endl;
 	stream << "	}" << endl;
 	stream << '}' << endl;

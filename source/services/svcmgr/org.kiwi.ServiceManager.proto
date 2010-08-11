@@ -17,4 +17,4 @@ version 1;
 # Types used by the protocol.
 type PortID int32;
 
-function lookupPort(string name, out PortID id);
+function LookupPort(string name, out PortID id);
