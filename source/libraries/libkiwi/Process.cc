@@ -18,12 +18,13 @@
  * @brief		Process class.
  */
 
-#include <kernel/errors.h>
+#include <kernel/fs.h>
 #include <kernel/process.h>
 
+#include <kiwi/Error.h>
 #include <kiwi/Process.h>
 
-#include <cerrno>
+#include <assert.h>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -31,14 +32,25 @@
 using namespace kiwi;
 using namespace std;
 
-/* FIXME. */
-#define PATH_MAX 4096
+/** Construct the process object. It will not refer to a process. */
+Process::Process() {}
 
-/** Constructor for Process.
- * @param handle	Handle ID (default is -1, which means the object will
- *			not refer to a handle). */
-Process::Process(handle_t handle) {
-	setHandle(handle);
+/** Construct the object and create a new process.
+ * @see			Process::Create(). */
+Process::Process(const char *const args[], const char *const env[], HandleMap *handles) {
+	Create(args, env, handles);
+}
+
+/** Construct the object and create a new process.
+ * @see			Process::Create(). */
+Process::Process(const char *cmdline, const char *const env[], HandleMap *handles) {
+	Create(cmdline, env, handles);
+}
+
+/** Construct the object to refer to an existing process.
+ * @see			Process::Open(). */
+Process::Process(process_id_t id) {
+	Open(id);
 }
 
 /** Create a new process.
@@ -49,20 +61,25 @@ Process::Process(handle_t handle) {
  *
  * @param args		NULL-terminated argument array. First entry should be
  *			the path to the program to run.
- * @param env		NULL-terminated environment variable array. A NULL
- *			value for this argument will result in the new process
- *			inheriting the current environment (the default).
+ * @param env		NULL-terminated environment variable array. The default
+ *			is to use the current environment.
  * @param handles	Pointer to map describing how to duplicate handles from
  *			the calling process into the new process. If NULL, all
  *			inheritable handles will be duplicated to the new
- *			process.
+ *			process. Be warned that handles created through the C
+ *			and C++ standard libraries are marked as inheritable to
+ *			support POSIX behaviour.
  *
- * @return		Whether creation was successful.
+ * @throw ProcessError	Thrown if the process could not be created.
  */
-bool Process::create(const char *const args[], const char *const env[], HandleMap *handles) {
+void Process::Create(const char *const args[], const char *const env[], HandleMap *handles) {
 	handle_t (*map)[2] = 0;
 	size_t mapsz = -1;
 	handle_t handle;
+	status_t ret;
+
+	assert(args && args[0]);
+	assert(env);
 
 	/* If a handle map was provided, convert it into the format expected
 	 * by the kernel. */
@@ -86,7 +103,7 @@ bool Process::create(const char *const args[], const char *const env[], HandleMa
 
 		char *cur, *next;
 		for(cur = const_cast<char *>(path); cur; cur = next) {
-			char buf[PATH_MAX];
+			char buf[FS_PATH_MAX];
 			size_t len;
 
 			if(!(next = strchr(cur, ':'))) {
@@ -97,7 +114,8 @@ bool Process::create(const char *const args[], const char *const env[], HandleMa
 				buf[0] = '.';
 				cur--;
 			} else {
-				if((next - cur) >= (PATH_MAX - 3)) {
+				if((next - cur) >= (FS_PATH_MAX - 3)) {
+					ret = STATUS_INVALID_ARG;
 					goto fail;
 				}
 
@@ -106,16 +124,17 @@ bool Process::create(const char *const args[], const char *const env[], HandleMa
 
 			buf[next - cur] = '/';
 			len = strlen(args[0]);
-			if(len + (next - cur) >= (PATH_MAX - 2)) {
+			if(len + (next - cur) >= (FS_PATH_MAX - 2)) {
+				ret = STATUS_INVALID_ARG;
 				goto fail;
 			}
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			handle = process_create(buf, args, (env) ? env : environ, 0, map, mapsz);
-			if(handle >= 0) {
+			ret = process_create(buf, args, (env) ? env : environ, 0, map, mapsz, &handle);
+			if(ret == STATUS_SUCCESS) {
 				goto success;
-			} else if(errno != ERR_NOT_FOUND) {
+			} else if(ret != STATUS_NOT_FOUND && ret != STATUS_NOT_DIR) {
 				goto fail;
 			}
 
@@ -125,22 +144,22 @@ bool Process::create(const char *const args[], const char *const env[], HandleMa
 			next++;
 		}
 
+		ret = STATUS_NOT_FOUND;
 		goto fail;
 	} else {
-		handle = process_create(args[0], args, (env) ? env : environ, 0, map, mapsz);
-		if(handle < 0) {
+		ret = process_create(args[0], args, (env) ? env : environ, 0, map, mapsz, &handle);
+		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
-
 		goto success;
 	}
 success:
 	if(map) { delete[] map; }
-	setHandle(handle);
-	return true;
+	SetHandle(handle);
+	return;
 fail:
 	if(map) { delete[] map; }
-	return false;
+	throw ProcessError(ret);
 }
 
 /** Create a new process.
@@ -152,19 +171,23 @@ fail:
  * @param cmdline	Command line string, each argument seperated by a
  *			space character. First part of the string should be the
  *			path to the program to run.
- * @param env		NULL-terminated environment variable array. A NULL
- *			value for this argument will result in the new process
- *			inheriting the current environment (the default).
+ * @param env		NULL-terminated environment variable array. The default
+ *			is to use the current environment.
  * @param handles	Pointer to map describing how to duplicate handles from
  *			the calling process into the new process. If NULL, all
  *			inheritable handles will be duplicated to the new
- *			process.
+ *			process. Be warned that handles created through the C
+ *			and C++ standard libraries are marked as inheritable to
+ *			support POSIX behaviour.
  *
- * @return		Whether creation was successful.
+ * @throw ProcessError	Thrown if the process could not be created.
  */
-bool Process::create(const char *cmdline, const char *const env[], HandleMap *handles) {
+void Process::Create(const char *cmdline, const char *const env[], HandleMap *handles) {
 	vector<char *> args;
 	char *tok, *dup;
+
+	assert(cmdline && cmdline[0]);
+	assert(env);
 
 	/* Duplicate the command line string so we can modify it. */
 	auto_ptr<char> orig(new char[strlen(cmdline) + 1]);
@@ -179,14 +202,11 @@ bool Process::create(const char *cmdline, const char *const env[], HandleMap *ha
 		args.push_back(tok);
 	}
 
-	if(!args.size()) {
-		return false;
-	}
-
 	/* Null-terminate the array. */
 	args.push_back(0);
 
-	return create(&args[0], env, handles);
+	/* Create the process. */
+	Create(&args[0], env, handles);
 }
 
 /** Open an existing process.
@@ -197,55 +217,63 @@ bool Process::create(const char *cmdline, const char *const env[], HandleMap *ha
  *
  * @param id		ID of the process to open.
  *
- * @return		Whether opening the process was successful.
+ * @throw ProcessError	If the process could not be opened.
  */
-bool Process::open(process_id_t id) {
-	handle_t handle = process_open(id);
-	if(handle < 0) {
-		return false;
+void Process::Open(process_id_t id) {
+	handle_t handle;
+	status_t ret = process_open(id, &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw ProcessError(ret);
 	}
 
-	setHandle(handle);
-	return true;
+	SetHandle(handle);
 }
 
 /** Wait for the process to die.
+ * @param statusp	If not NULL, where to store the exit code of the
+ *			process.
  * @param timeout	Timeout in microseconds. A value of 0 will return an
  *			error immediately if the process has not already
  *			terminated, and a value of -1 (the default) will block
  *			indefinitely until the process terminates.
- * @return		True on success, false on failure. */
-bool Process::waitTerminate(useconds_t timeout) const {
-	return wait(PROCESS_EVENT_DEATH, timeout);
+ * @return		True if successful, false if the timeout expired. */
+bool Process::WaitForExit(int *statusp, useconds_t timeout) const {
+	if(!Wait(PROCESS_EVENT_DEATH, timeout)) {
+		return false;
+	}
+	if(statusp) {
+		process_status(m_handle, statusp);
+	}
+	return true;
 }
 
 /** Get the ID of the process.
  * @return		ID of the process. */
-process_id_t Process::getID(void) const {
+process_id_t Process::GetID(void) const {
 	return process_id(m_handle);
 }
 
 /** Get the ID of the current process.
  * @return		ID of the current process. */
-process_id_t Process::getCurrentID(void) {
+process_id_t Process::GetCurrentID(void) {
 	return process_id(-1);
 }
 
 /** Register events with the event loop. */
-void Process::registerEvents() {
-	registerEvent(PROCESS_EVENT_DEATH);
+void Process::RegisterEvents() {
+	RegisterEvent(PROCESS_EVENT_DEATH);
 }
 
 /** Callback for an object event being received.
  * @param event		Event ID received. */
-void Process::eventReceived(int event) {
+void Process::EventReceived(int event) {
 	if(event == PROCESS_EVENT_DEATH) {
 		int status = 0;
 		process_status(m_handle, &status);
-		onExit(status);
+		OnExit(status);
 
 		/* Unregister the death event so that it doesn't continually
 		 * get signalled. */
-		unregisterEvent(PROCESS_EVENT_DEATH);
+		UnregisterEvent(PROCESS_EVENT_DEATH);
 	}
 }

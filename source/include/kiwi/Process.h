@@ -21,7 +21,9 @@
 #ifndef __KIWI_PROCESS_H
 #define __KIWI_PROCESS_H
 
+#include <kiwi/Error.h>
 #include <kiwi/Handle.h>
+
 #include <utility>
 #include <vector>
 
@@ -29,29 +31,39 @@ extern char **environ;
 
 namespace kiwi {
 
+/** Exception class providing details of a process error.
+ * @todo		Provide details of missing libraries/symbols. */
+class ProcessError : public OSError {
+public:
+	ProcessError(status_t code) : OSError(code) {}
+};
+
 /** Class providing functionality to create and manipulate processes. */
 class Process : public Handle {
 public:
 	/** Type of the handle map. */
 	typedef std::vector<std::pair<handle_t, handle_t> > HandleMap;
 
-	Process(handle_t handle = -1);
+	Process();
+	Process(const char *const args[], const char *const env[] = environ, HandleMap *handles = 0);
+	Process(const char *cmdline, const char *const env[] = environ, HandleMap *handles = 0);
+	Process(process_id_t id);
 
-	bool create(const char *const args[], const char *const env[] = environ,
+	void Create(const char *const args[], const char *const env[] = environ,
 	            HandleMap *handles = 0);
-	bool create(const char *cmdline, const char *const env[] = environ,
+	void Create(const char *cmdline, const char *const env[] = environ,
 	            HandleMap *handles = 0);
-	bool open(process_id_t id);
+	void Open(process_id_t id);
 
-	bool waitTerminate(useconds_t timeout = -1) const;
-	process_id_t getID(void) const;
+	bool WaitForExit(int *statusp = 0, useconds_t timeout = -1) const;
+	process_id_t GetID(void) const;
 
-	static process_id_t getCurrentID(void);
+	static process_id_t GetCurrentID(void);
 
-	Signal<int> onExit;
+	Signal<int> OnExit;
 private:
-	void registerEvents();
-	void eventReceived(int event);
+	void RegisterEvents();
+	void EventReceived(int event);
 };
 
 }

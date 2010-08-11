@@ -22,7 +22,7 @@ env.SharedLibrary('kiwi', [
 	#'IPCServer.cc',
 	'log.cc',
 	'Object.cc',
-	#'Process.cc',
+	'Process.cc',
 	#'RPCClientConnection.cc',
 	#'RPCMessageBuffer.cc',
 	#'RPCServerConnection.cc',
