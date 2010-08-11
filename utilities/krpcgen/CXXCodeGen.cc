@@ -119,7 +119,7 @@ bool CXXCodeGen::GenerateServerCode(const std::string &path) {
 				stream << "		__buf >> " << param.name << ';' << endl;
 			}
 		}
-		stream << "		__buf.reset();" << endl;
+		stream << "		__buf.Reset();" << endl;
 		stream << "		status_t __ret = " << GetHandlerCall(func) << ';' << endl;
 		stream << "		__buf << __ret;" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, func->GetParameters()) {
