@@ -15,13 +15,13 @@ Import('env')
 
 env.SharedLibrary('kiwi', [
 	'Error.cc',
-	#'EventLoop.cc',
-	#'Handle.cc',
+	'EventLoop.cc',
+	'Handle.cc',
 	#'IPCConnection.cc',
 	#'IPCPort.cc',
 	#'IPCServer.cc',
 	'log.cc',
-	#'Object.cc',
+	'Object.cc',
 	#'Process.cc',
 	#'RPCClientConnection.cc',
 	#'RPCMessageBuffer.cc',

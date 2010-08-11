@@ -31,20 +31,19 @@ namespace kiwi {
 
 /** Class implementing a loop for handling object events.
  * @todo		When threading support is implemented, each thread
- *			should have its own event loop, and handles should be
- *			added to the event loop of the thread they are created
- *			in. */
+ *			should have its own event loop, and Instance() should
+ *			return the calling thread's event loop. */
 class EventLoop : public Object, internal::Noncopyable {
 public:
 	EventLoop();
 
-	static EventLoop *instance();
+	void AddEvent(Handle *handle, int event);
+	void RemoveEvent(Handle *handle, int event);
+	void RemoveHandle(Handle *handle);
+	void DeleteObject(Object *obj);
+	void Run();
 
-	void addEvent(Handle *handle, int event);
-	void removeEvent(Handle *handle, int event);
-	void removeHandle(Handle *handle);
-	void deleteObject(Object *obj);
-	void run();
+	static EventLoop *Instance();
 private:
 	std::list<Object *> m_to_delete;	/**< Objects to delete when control returns to the loop. */
 

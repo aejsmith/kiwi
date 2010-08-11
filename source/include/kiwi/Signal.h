@@ -71,7 +71,7 @@ class Signal {
 public:
 	/** Connect a function to this signal.
 	 * @param func		Function to call. */
-	void connect(void (*func)(A...)) {
+	void Connect(void (*func)(A...)) {
 		m_slots.push_back(static_cast<BaseSlot *>(new Slot(func)));
 	}
 
@@ -79,14 +79,14 @@ public:
 	 * @param obj		Object to call function on.
 	 * @param func		Function to call. */
 	template <typename T>
-	void connect(T *obj, void (T::*func)(A...)) {
+	void Connect(T *obj, void (T::*func)(A...)) {
 		m_slots.push_back(static_cast<BaseSlot *>(new MemberSlot<T>(obj, func)));
 	}
 
 	/** Connect this signal to another signal.
 	 * @param signal	Other signal to emit when emitted. */
-	void connect(Signal<A...> &signal) {
-		connect(&signal, &Signal<A...>::operator ());
+	void Connect(Signal<A...> &signal) {
+		Connect(&signal, &Signal<A...>::operator ());
 	}
 
 	/** Invoke all slots connected to the signal.

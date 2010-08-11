@@ -36,19 +36,21 @@ class Handle : public Object, internal::Noncopyable {
 public:
 	virtual ~Handle();
 
-	virtual void close();
-	bool wait(int event, useconds_t timeout = -1) const;
-	handle_t getHandle(void) const;
+	virtual void Close();
+	handle_t GetHandle() const;
 
-	Signal<> onClose;
+	Signal<> OnClose;
 protected:
 	Handle();
 
-	void setHandle(handle_t handle);
-	virtual void registerEvents();
-	void registerEvent(int event);
-	void unregisterEvent(int event);
-	virtual void eventReceived(int id) = 0;
+	bool Wait(int event, useconds_t timeout) const;
+
+	void SetHandle(handle_t handle);
+	void RegisterEvent(int event);
+	void UnregisterEvent(int event);
+
+	virtual void RegisterEvents();
+	virtual void EventReceived(int id);
 
 	handle_t m_handle;		/**< Handle ID. */
 };

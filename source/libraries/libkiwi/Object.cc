@@ -18,6 +18,7 @@
  * @brief		API object base class.
  */
 
+#include <kiwi/private/log.h>
 #include <kiwi/EventLoop.h>
 #include <kiwi/Object.h>
 
@@ -31,9 +32,11 @@ Object::Object() {}
 Object::~Object() {}
 
 /** Schedule the object for deletion when control returns to the event loop. */
-void Object::deleteLater() {
-	EventLoop *loop = EventLoop::instance();
+void Object::DeleteLater() {
+	EventLoop *loop = EventLoop::Instance();
 	if(loop) {
-		loop->deleteObject(this);
+		loop->DeleteObject(this);
+	} else {
+		log::fatal("Object::DeleteLater: Called without an event loop, will not be deleted");
 	}
 }

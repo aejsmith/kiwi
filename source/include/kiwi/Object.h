@@ -41,7 +41,7 @@ class Object {
 public:
 	virtual ~Object();
 
-	void deleteLater();
+	void DeleteLater();
 protected:
 	Object();
 };
