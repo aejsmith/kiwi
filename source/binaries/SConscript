@@ -14,9 +14,9 @@
 Import('env')
 
 SConscript(dirs=[
-	'dungeon',
-	'failshell',
-	'kittens',
-	'ping',
-	'shmtest',
+	#'dungeon',
+	#'failshell',
+	#'kittens',
+	#'ping',
+	#'shmtest',
 ], exports=['env'])

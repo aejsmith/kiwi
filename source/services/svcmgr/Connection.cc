@@ -18,8 +18,8 @@
  * @brief		Service manager connection class.
  */
 
-#include <kernel/errors.h>
 #include <iostream>
+
 #include "ServiceManager.h"
 #include "Connection.h"
 
@@ -30,19 +30,18 @@ using namespace kiwi;
  * @param handle	Handle to the connection. */
 Connection::Connection(handle_t handle) :
 	org::kiwi::ServiceManager::ClientConnection(handle)
-{
-}
+{}
 
 /** Look up a port.
  * @param name		Name of port to look up.
  * @param id		Where to store ID of port.
  * @return		0 on success, error code on failure. */
-RPCResult Connection::lookupPort(const string &name, port_id_t &id) {
-	Port *port = ServiceManager::instance().lookupPort(name);
+status_t Connection::LookupPort(const string &name, port_id_t &id) {
+	Port *port = ServiceManager::Instance().LookupPort(name);
 	if(!port) {
-		return ERR_NOT_FOUND;
+		return STATUS_NOT_FOUND;
 	}
 
-	id = port->getID();
-	return 0;
+	id = port->GetID();
+	return STATUS_SUCCESS;
 }

@@ -34,38 +34,38 @@ ServiceManager *ServiceManager::s_instance = NULL;
 /** Service manager constructor. */
 ServiceManager::ServiceManager() : IPCServer(-1) {
 	s_instance = this;
-	if(getPortID() != 1) {
+	if(GetPortID() != 1) {
 		ostringstream msg;
-		msg << "Created port (" << getPortID() << ") is not port 1.";
+		msg << "Created port (" << GetPortID() << ") is not port 1.";
 		throw std::runtime_error(msg.str());
 	}
 }
 
 /** Add a service to the service manager.
  * @param service	Service to add. */
-void ServiceManager::addService(Service *service) {
+void ServiceManager::AddService(Service *service) {
 	/* Register port. */
-	Port *port = service->getPort();
+	Port *port = service->GetPort();
 	if(port) {
-		m_ports.insert(make_pair(port->getName(), port));
+		m_ports.insert(make_pair(port->GetName(), port));
 	}
 
 	/* Start the service if it is not on-demand. */
-	if(!(service->getFlags() & Service::OnDemand)) {
-		service->start();
+	if(!(service->GetFlags() & Service::kOnDemand)) {
+		service->Start();
 	}
 }
 
 /** Look up a port name in the port map.
  * @param name		Name to look up.
  * @return		Pointer to port object if found, 0 if not. */
-Port *ServiceManager::lookupPort(const string &name) {
+Port *ServiceManager::LookupPort(const string &name) {
 	PortMap::iterator it = m_ports.find(name);
 	return (it != m_ports.end()) ? it->second : 0;
 }
 
 /** Handle a connection on the service manager port. */
-void ServiceManager::handleConnection(handle_t handle) {
+void ServiceManager::HandleConnection(handle_t handle) {
 	new Connection(handle);
 }
 
@@ -77,33 +77,33 @@ int main(int argc, char **argv) {
 	ServiceManager svcmgr;
 
 	/* Add services. TODO: These should be in configuration files. */
-	svcmgr.addService(new Service(
+	svcmgr.AddService(new Service(
 		"console",
 		"Service providing a graphical console.",
 		"/system/services/console"
 	));
-	svcmgr.addService(new Service(
+	svcmgr.AddService(new Service(
 		"pong",
 		"Service that pongs pings.",
 		"/system/services/pong",
-		Service::OnDemand,
+		Service::kOnDemand,
 		"org.kiwi.Pong"
 	));
-	svcmgr.addService(new Service(
+	svcmgr.AddService(new Service(
 		"shmserver",
 		"Shared memory test server.",
 		"/system/services/shmserver",
-		Service::OnDemand,
+		Service::kOnDemand,
 		"org.kiwi.SHMServer"
 	));
-	svcmgr.addService(new Service(
+	svcmgr.AddService(new Service(
 		"kittenserver",
 		"Kitten server.",
 		"/system/services/kittenserver",
-		Service::OnDemand,
+		Service::kOnDemand,
 		"org.kiwi.KittenServer"
 	));
 
-	svcmgr.run();
+	svcmgr.Run();
 	return 0;
 }

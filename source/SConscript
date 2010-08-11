@@ -60,4 +60,4 @@ shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARG
 
 # Visit subdirectories.
 SConscript(dirs=['kernel', 'boot', 'drivers'])
-SConscript(dirs=['libraries'], exports=['env'])
+SConscript(dirs=['libraries', 'services', 'binaries'], exports=['env'])

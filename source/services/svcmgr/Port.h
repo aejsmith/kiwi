@@ -33,13 +33,13 @@ public:
 
 	/** Get the name of the port.
 	 * @return		Name of the port. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 
 	/** Get the ID of the port.
 	 * @return		ID of the port. */
-	port_id_t getID() const { return m_port.getID(); }
+	port_id_t GetID() const { return m_port.GetID(); }
 private:
-	void handleConnection();
+	void HandleConnection();
 
 	std::string m_name;		/**< Name of the port. */
 	kiwi::IPCPort m_port;		/**< Handle to the port. */

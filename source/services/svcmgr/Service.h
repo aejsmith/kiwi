@@ -33,31 +33,31 @@ class Service {
 public:
 	/** Possible service states. */
 	enum State {
-		Stopped,			/**< Service is stopped. */
-		Running,			/**< Service is running. */
+		kStopped,		/**< Service is stopped. */
+		kRunning,		/**< Service is running. */
 	};
 
 	/** Behaviour flags. */
 	enum Flags {
-		OnDemand = 1,			/**< Should only be started when a port is needed. */
+		kOnDemand = 1,		/**< Should only be started when a port is needed. */
 	};
 
 	Service(const char *name, const char *desc, const char *cmdline, int flags = 0, const char *port = 0);
-	bool start();
+	bool Start();
 
 	/** Get the service's flags.
 	 * @return		Behaviour flags for the service. */
-	int getFlags() const { return m_flags; }
+	int GetFlags() const { return m_flags; }
 
 	/** Get the service's state.
 	 * @return		State of the service. */
-	State getState() const { return m_state; }
+	State GetState() const { return m_state; }
 
 	/** Get a reference to the port list.
 	 * @return		Reference to the port list. */
-	Port *getPort() const { return m_port; }
+	Port *GetPort() const { return m_port; }
 private:
-	void processExited(int status);
+	void ProcessExited(int status);
 
 	std::string m_name;		/**< Name of the service. */
 	std::string m_description;	/**< Description of the service. */

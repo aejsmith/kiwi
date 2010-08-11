@@ -38,14 +38,14 @@ class ServiceManager : public kiwi::IPCServer {
 public:
 	ServiceManager();
 
-	void addService(Service *service);
-	Port *lookupPort(const std::string &name);
+	void AddService(Service *service);
+	Port *LookupPort(const std::string &name);
 
 	/** Get the instance of the service manager.
 	 * @return		Reference to service manager instance. */
-	static ServiceManager &instance() { return *s_instance; }
+	static ServiceManager &Instance() { return *s_instance; }
 private:
-	void handleConnection(handle_t handle);
+	void HandleConnection(handle_t handle);
 
 	std::list<Service *> m_services;	/**< List of services. */
 	PortMap m_ports;			/**< Map of port names to port objects. */

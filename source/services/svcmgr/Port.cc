@@ -31,16 +31,14 @@ using namespace std;
 Port::Port(const char *name, Service *service) :
 	m_name(name), m_service(service)
 {
-	if(!m_port.create()) {
-		throw runtime_error("Failed to register new port");
-	}
-	m_port.onConnection.connect(this, &Port::handleConnection);
+	m_port.Create();
+	m_port.OnConnection.Connect(this, &Port::HandleConnection);
 }
 
 /** Handle a connection on the port. */
-void Port::handleConnection() {
+void Port::HandleConnection() {
 	/* If the service is not running, we must start it. */
-	if(m_service->getState() != Service::Running) {
-		m_service->start();
+	if(m_service->GetState() != Service::kRunning) {
+		m_service->Start();
 	}
 }
