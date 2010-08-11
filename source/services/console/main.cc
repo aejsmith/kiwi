@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 
 	/* Create the console. */
 	Console console(&fb, 0, Header::Instance().Height(), fb.Width(), fb.Height() - Header::Instance().Height());
-	console.Run("/system/binaries/ping");
+	console.Run("/system/binaries/dungeon");
 
 	/* Finally create the input device. */
 	InputDevice input("/input/0");
