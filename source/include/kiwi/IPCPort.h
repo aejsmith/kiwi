@@ -31,17 +31,17 @@ class IPCPort : public Handle {
 public:
 	IPCPort(handle_t handle = -1);
 
-	bool create();
-	bool open(port_id_t id);
+	void Create();
+	void Open(port_id_t id);
+	
+	bool Listen(IPCConnection *&conn, useconds_t timeout = -1) const;
+	handle_t Listen(useconds_t timeout = -1) const;
+	port_id_t GetID() const;
 
-	bool listen(IPCConnection *&conn, useconds_t timeout = -1) const;
-	handle_t listen(useconds_t timeout = -1) const;
-	port_id_t getID() const;
-
-	Signal<> onConnection;
+	Signal<> OnConnection;
 private:
-	void registerEvents();
-	void eventReceived(int id);
+	void RegisterEvents();
+	void EventReceived(int id);
 };
 
 }

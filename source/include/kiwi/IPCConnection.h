@@ -21,28 +21,35 @@
 #ifndef __KIWI_IPCCONNECTION_H
 #define __KIWI_IPCCONNECTION_H
 
+#include <kiwi/Error.h>
 #include <kiwi/Handle.h>
 
 namespace kiwi {
+
+/** Exception class providing details of an IPC error. */
+class IPCError : public OSError {
+public:
+	IPCError(status_t code) : OSError(code) {}
+};
 
 /** Class implementing an IPC connection. */
 class IPCConnection : public Handle {
 public:
 	IPCConnection(handle_t handle = -1);
 
-	bool connect(port_id_t id);
-	bool connect(const char *name);
+	void Connect(port_id_t id);
+	void Connect(const char *name);
 
-	bool send(uint32_t type, const void *buf, size_t size);
-	bool receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
+	void Send(uint32_t type, const void *buf, size_t size);
+	bool Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
 
-	bool waitHangup(useconds_t timeout = -1) const;
+	bool WaitForHangup(useconds_t timeout = -1) const;
 
-	Signal<> onMessage;
-	Signal<> onHangup;
+	Signal<> OnMessage;
+	Signal<> OnHangup;
 protected:
-	void registerEvents();
-	void eventReceived(int id);
+	void RegisterEvents();
+	void EventReceived(int id);
 };
 
 }

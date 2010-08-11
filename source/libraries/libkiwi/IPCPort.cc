@@ -19,20 +19,15 @@
  */
 
 #include <kernel/ipc.h>
-
 #include <kiwi/IPCPort.h>
 
-#include <cstdlib>
-#include <cstring>
-
 using namespace kiwi;
-using namespace std;
 
 /** Constructor for IPCPort.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
 IPCPort::IPCPort(handle_t handle) {
-	setHandle(handle);
+	SetHandle(handle);
 }
 
 /** Create a new port.
@@ -41,16 +36,16 @@ IPCPort::IPCPort(handle_t handle) {
  * port will be closed upon success, and the object will refer to the new port.
  * Upon failure, the old port will remain open.
  *
- * @return		Whether creation was successful.
+ * @throw IPCError	If the port could not be created.
  */
-bool IPCPort::create() {
-	handle_t handle = ipc_port_create();
-	if(handle < 0) {
-		return false;
+void IPCPort::Create() {
+	handle_t handle;
+	status_t ret = ipc_port_create(&handle);
+	if(ret != STATUS_SUCCESS) {
+		throw IPCError(ret);
 	}
 
-	setHandle(handle);
-	return true;
+	SetHandle(handle);
 }
 
 /** Open an existing port.
@@ -61,16 +56,16 @@ bool IPCPort::create() {
  *
  * @param id		Port ID to open.
  *
- * @return		Whether creation was successful.
+ * @throw IPCError	If the port could not be opened.
  */
-bool IPCPort::open(port_id_t id) {
-	handle_t handle = ipc_port_open(id);
-	if(handle < 0) {
-		return false;
+void IPCPort::Open(port_id_t id) {
+	handle_t handle;
+	status_t ret = ipc_port_open(id, &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw IPCError(ret);
 	}
 
-	setHandle(handle);
-	return true;
+	SetHandle(handle);
 }
 
 /** Block until a connection is made to the port.
@@ -79,11 +74,17 @@ bool IPCPort::open(port_id_t id) {
  *			until a connection is made, and a timeout of 0 will
  *			return immediately if no connection attempts are in
  *			progress.
- * @return		Whether successful. */
-bool IPCPort::listen(IPCConnection *&conn, useconds_t timeout) const {
-	handle_t handle = ipc_port_listen(m_handle, timeout);
-	if(handle < 0) {
-		return false;
+ * @return		True if connection made within the timeout, false if
+ *			the timeout expired.
+ * @throw IPCError	If any error other than timing out occurred. */
+bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) const {
+	handle_t handle;
+	status_t ret = ipc_port_listen(m_handle, timeout, &handle);
+	if(ret != STATUS_SUCCESS) {
+		if(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
+			return false;
+		}
+		throw IPCError(ret);
 	}
 
 	conn = new IPCConnection(handle);
@@ -95,32 +96,39 @@ bool IPCPort::listen(IPCConnection *&conn, useconds_t timeout) const {
  *			until a connection is made, and a timeout of 0 will
  *			return immediately if no connection attempts are in
  *			progress.
- * @return		Handle to connection on success, -1 on failure. */
-handle_t IPCPort::listen(useconds_t timeout) const {
-	handle_t handle = ipc_port_listen(m_handle, timeout);
-	return (handle < 0) ? -1 : handle;
+ * @return		Handle to connection if made within the timeout, -1 if
+ *			the timeout expired.
+ * @throw IPCError	If any error other than timing out occurred. */
+handle_t IPCPort::Listen(useconds_t timeout) const {
+	handle_t handle;
+	status_t ret = ipc_port_listen(m_handle, timeout, &handle);
+	if(ret != STATUS_SUCCESS) {
+		if(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
+			return -1;
+		}
+		throw IPCError(ret);
+	}
+
+	return handle;
 }
 
 /** Get the ID of a port.
  * @return		Port ID, or -1 if an error occurs. */
-port_id_t IPCPort::getID() const {
-	port_id_t ret;
-
-	ret = ipc_port_id(m_handle);
-	return ((ret >= 0) ? ret : -1);
+port_id_t IPCPort::GetID() const {
+	return ipc_port_id(m_handle);
 }
 
 /** Register events with the event loop. */
-void IPCPort::registerEvents() {
-	registerEvent(PORT_EVENT_CONNECTION);
+void IPCPort::RegisterEvents() {
+	RegisterEvent(PORT_EVENT_CONNECTION);
 }
 
 /** Handle an event on the port.
  * @param id		Event ID. */
-void IPCPort::eventReceived(int id) {
+void IPCPort::EventReceived(int id) {
 	switch(id) {
 	case PORT_EVENT_CONNECTION:
-		onConnection();
+		OnConnection();
 		break;
 	}
 }

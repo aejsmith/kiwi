@@ -33,11 +33,11 @@ public:
 
 	/** Get the port ID.
 	 * @return		Port ID. */
-	port_id_t getPortID() const { return m_port.getID(); }
+	port_id_t GetPortID() const { return m_port.GetID(); }
 protected:
-	virtual void handleConnection(handle_t handle) = 0;
+	virtual void HandleConnection(handle_t handle) = 0;
 private:
-	void _handleConnection();
+	void _HandleConnection();
 
 	IPCPort m_port;			/**< Port the server is using. */
 };

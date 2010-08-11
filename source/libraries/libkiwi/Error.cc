@@ -24,6 +24,8 @@
  * @todo		A display error function to display a notification
  *			window for the error with buttons for each recovery
  *			action.
+ * @todo		Include a function name parameter to OSError to report
+ *			the function the error occurred in?
  */
 
 #include <kiwi/Error.h>

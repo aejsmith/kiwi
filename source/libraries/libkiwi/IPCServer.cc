@@ -30,17 +30,13 @@ using namespace kiwi;
  *			handle as. If < 0, a new unnamed port will be created. */
 IPCServer::IPCServer(handle_t handle) : m_port(handle) {
 	if(handle < 0) {
-		if(!m_port.create()) {
-			throw std::runtime_error("Failed to create port");
-		}
+		m_port.Create();
 	}
-	m_port.onConnection.connect(this, &IPCServer::_handleConnection);
+	m_port.OnConnection.Connect(this, &IPCServer::_HandleConnection);
 }
 
 /** Signal handler for a connection. */
-void IPCServer::_handleConnection() {
-	handle_t handle = m_port.listen();
-	if(handle >= 0) {
-		handleConnection(handle);
-	}
+void IPCServer::_HandleConnection() {
+	handle_t handle = m_port.Listen();
+	HandleConnection(handle);
 }

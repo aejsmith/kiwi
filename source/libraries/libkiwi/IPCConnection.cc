@@ -23,19 +23,16 @@
 
 #include <kiwi/IPCConnection.h>
 
-#include <cstring>
-
-#include "svcmgr.h"
+//#include "svcmgr.h"
 
 using namespace kiwi;
-using namespace org::kiwi::ServiceManager;
-using namespace std;
+//using namespace org::kiwi::ServiceManager;
 
 /** Constructor for IPCConnection.
  * @param handle	Handle ID (default is -1, which means the object will
  *			not refer to a handle). */
 IPCConnection::IPCConnection(handle_t handle) {
-	setHandle(handle);
+	SetHandle(handle);
 }
 
 /** Connect to a port.
@@ -46,16 +43,16 @@ IPCConnection::IPCConnection(handle_t handle) {
  *
  * @param id		Port ID to connect to.
 
- * @return		Whether connection was successful.
+ * @throw IPCError	Thrown if unable to connect.
  */
-bool IPCConnection::connect(port_id_t id) {
-	handle_t handle = ipc_connection_open(id);
-	if(handle < 0) {
-		return false;
+void IPCConnection::Connect(port_id_t id) {
+	handle_t handle;
+	status_t ret = ipc_connection_open(id, &handle);
+	if(ret != STATUS_SUCCESS) {
+		throw IPCError(ret);
 	}
 
-	setHandle(handle);
-	return true;
+	SetHandle(handle);
 }
 
 /** Connect to a port.
@@ -66,30 +63,33 @@ bool IPCConnection::connect(port_id_t id) {
  *
  * @param name		Port name to connect to.
  *
- * @return		Whether creation was successful.
+ * @throw IPCError	Thrown if unable to connect.
  */
-bool IPCConnection::connect(const char *name) {
+#if 0
+void IPCConnection::Connect(const char *name) {
 	ServerConnection svcmgr;
-	if(!svcmgr.connect(1)) {
-		return false;
-	}
 
 	/* Look up the port ID. */
 	port_id_t id;
-	if(svcmgr.lookupPort(name, id) != 0) {
-		return false;
+	status_t ret = svcmgr.LookupPort(name, id);
+	if(ret != STATUS_SUCCESS) {
+		throw IPCError(ret);
 	}
 
-	return connect(id);
+	return Connect(id);
 }
+#endif
 
 /** Send a message on a port.
  * @param type		Type ID of message to send.
  * @param buf		Data buffer to send.
  * @param size		Size of data buffer.
- * @return		Whether send was successful. */
-bool IPCConnection::send(uint32_t type, const void *buf, size_t size) {
-	return (ipc_message_send(m_handle, type, buf, size) == 0);
+ * @throw IPCError	Thrown if unable to send. */
+void IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
+	status_t ret = ipc_message_send(m_handle, type, buf, size);
+	if(ret != STATUS_SUCCESS) {
+		throw IPCError(ret);
+	}
 }
 
 /** Receive a message from a port.
@@ -101,16 +101,23 @@ bool IPCConnection::send(uint32_t type, const void *buf, size_t size) {
  *			until a message is received, and a timeout of 0 will
  *			return immediately if no messages are waiting to be
  *			received.
- * @return		Whether received successfully. */
-bool IPCConnection::receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
-	if(ipc_message_peek(m_handle, timeout, &type, &size) != 0) {
-		return false;
+ * @return		True if message received within the timeout, false if
+ *			the timeout expired.
+ * @throw IPCError	If any error other than timing out occurred. */
+bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
+	status_t ret = ipc_message_peek(m_handle, timeout, &type, &size);
+	if(ret != STATUS_SUCCESS) {
+		if(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
+			return false;
+		}
+		throw IPCError(ret);
 	}
 
 	data = new char[size];
-	if(ipc_message_receive(m_handle, 0, 0, data, size) != 0) {
+	ret = ipc_message_receive(m_handle, 0, 0, data, size);
+	if(ret != STATUS_SUCCESS) {
 		delete[] data;
-		return false;
+		throw IPCError(ret);
 	}
 
 	return true;
@@ -121,26 +128,26 @@ bool IPCConnection::receive(uint32_t &type, char *&data, size_t &size, useconds_
  *			until the connection is hung up, and a timeout of 0
  *			will return immediately if the connection is not
  *			already hung up.
- * @return		Whether successful. */
-bool IPCConnection::waitHangup(useconds_t timeout) const {
-	return wait(CONNECTION_EVENT_HANGUP, timeout);
+ * @return		True if successful, false if the timeout expired. */
+bool IPCConnection::WaitForHangup(useconds_t timeout) const {
+	return Wait(CONNECTION_EVENT_HANGUP, timeout);
 }
 
 /** Register events with the event loop. */
-void IPCConnection::registerEvents() {
-	registerEvent(CONNECTION_EVENT_HANGUP);
-	registerEvent(CONNECTION_EVENT_MESSAGE);
+void IPCConnection::RegisterEvents() {
+	RegisterEvent(CONNECTION_EVENT_HANGUP);
+	RegisterEvent(CONNECTION_EVENT_MESSAGE);
 }
 
 /** Handle an event on the connection.
  * @param id		Event ID. */
-void IPCConnection::eventReceived(int id) {
+void IPCConnection::EventReceived(int id) {
 	switch(id) {
 	case CONNECTION_EVENT_HANGUP:
-		onHangup();
+		OnHangup();
 		break;
 	case CONNECTION_EVENT_MESSAGE:
-		onMessage();
+		OnMessage();
 		break;
 	}
 }
