@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Error handling class.
+ * @brief		Error handling classes.
  *
  * @todo		When we support locales, strings returned should be
  *			localised.
@@ -27,39 +27,45 @@
  */
 
 #include <kiwi/Error.h>
-#include <cstring>
-
-/** Get the number of elements in an array. */
-#define ARRAYSZ(a)	(sizeof((a)) / sizeof((a)[0]))
 
 using namespace kiwi;
-using namespace std;
-
-/** Array of Kiwi API error descriptions. */
-static const char *kiwi_error_descriptions[] = {
-	"Dummy error.",
-};
 
 /** Get the string description of the error.
- * @return		String containing a description of the error. */
-string Error::getDescription() const {
-	if(m_code < KIWI_ERROR_BASE) {
-		return strerror(m_code);
-	}
-
-	size_t code = m_code - KIWI_ERROR_BASE;
-	if(code >= ARRAYSZ(kiwi_error_descriptions)) {
-		return "Unknown error";
-	} else {
-		return kiwi_error_descriptions[code];
-	}
+ * @return		Localised string describing the error that occurred. */
+const char *Error::GetDescription() const throw() {
+	return "Unknown error";
 }
 
 /** Get a recovery suggestion for the error.
- * @return		String containing a recovery suggestion for the error.
- *			If no suggestion is available, an empty string will be
- *			returned. */
-string Error::getRecoverySuggestion() const {
+ * @return		Localised string suggesting a recovery action for the
+ *			error. If no suggestion is available, an empty string
+ *			will be returned. */
+const char *Error::GetRecoverySuggestion() const throw() {
+	return "";
+}
+
+/** Get the error description (function for std::exception compatibility).
+ * @return		String containing a description of the error. */
+const char *Error::what() const throw() {
+	return GetDescription();
+}
+
+/** Get the string description of the error.
+ * @return		Localised string describing the error that occurred. */
+const char *OSError::GetDescription() const throw() {
+	if(m_code < 0 || static_cast<size_t>(m_code) >= __kernel_status_size) {
+		return Error::GetDescription();
+	} else if(!__kernel_status_strings[m_code]) {
+		return Error::GetDescription();
+	}
+	return __kernel_status_strings[m_code];
+}
+
+/** Get a recovery suggestion for the error.
+ * @return		Localised string suggesting a recovery action for the
+ *			error. If no suggestion is available, an empty string
+ *			will be returned. */
+const char *OSError::GetRecoverySuggestion() const throw() {
 	/* TODO. */
-	return string();
+	return "";
 }

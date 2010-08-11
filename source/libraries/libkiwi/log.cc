@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+using namespace kiwi;
+
 /** Print out a message.
  * @param stream	Stream to print to.
  * @param prefix	What to print before the actual message.
@@ -31,7 +33,7 @@
  * @param args		Argument list.
  * @param terminate	Whether to terminate the program after printing the
  *			message. */
-static void lkPrintMessage(FILE *stream, const char *prefix, const char *fmt,
+static void do_log_message(FILE *stream, const char *prefix, const char *fmt,
                            va_list args, bool terminate) {
 	fprintf(stream, "*** libkiwi-%s: ", prefix);
 	vfprintf(stream, fmt, args);
@@ -42,19 +44,19 @@ static void lkPrintMessage(FILE *stream, const char *prefix, const char *fmt,
 
 #if CONFIG_DEBUG
 /** Print a debug message. */
-void kiwi::lkDebug(const char *fmt, ...) {
+void log::debug(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	lkPrintMessage(stdout, "DEBUG", fmt, args, false);
+	do_log_message(stdout, "DEBUG", fmt, args, false);
 	va_end(args);
 }
 #endif
 
 /** Print a warning message. */
-void kiwi::lkWarning(const char *fmt, ...) {
+void log::warning(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	lkPrintMessage(stderr, "WARNING", fmt, args, false);
+	do_log_message(stderr, "WARNING", fmt, args, false);
 	va_end(args);
 }
 
@@ -62,9 +64,9 @@ void kiwi::lkWarning(const char *fmt, ...) {
  * @todo		Fatal error messages should pop up a message box on the
  *			GUI so programs don't just drop dead without any
  *			indication why. */
-void kiwi::lkFatal(const char *fmt, ...) {
+void log::fatal(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	lkPrintMessage(stderr, "FATAL", fmt, args, true);
+	do_log_message(stderr, "FATAL", fmt, args, true);
 	va_end(args);
 }

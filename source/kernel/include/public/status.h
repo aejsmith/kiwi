@@ -65,4 +65,18 @@
 #define STATUS_MISSING_SYMBOL		40	/**< Referenced symbol not found. */
 #define STATUS_DEST_UNREACHABLE		41	/**< Cannot reach destination. */
 
+#if !defined(KERNEL) && !defined(__ASM__)
+#include <kernel/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern const char *__kernel_status_strings[];
+extern size_t __kernel_status_size;
+
+#ifdef __cplusplus
+}
+#endif
+#endif
 #endif /* __KERNEL_STATUS_H */

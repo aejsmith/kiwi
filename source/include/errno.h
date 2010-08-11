@@ -25,6 +25,8 @@
 extern "C" {
 #endif
 
+#define ESUCCESS		0	/**< Success. */
+
 /** Standard C error number definitions. */
 #define ERANGE			1	/**< Numerical result out of range. */
 #define EILSEQ			2	/**< Illegal byte sequence. */

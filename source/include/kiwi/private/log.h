@@ -22,16 +22,17 @@
 #define __KIWI_PRIVATE_LOG_H
 
 namespace kiwi {
+namespace log {
 
 #if CONFIG_DEBUG
-extern void lkDebug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void debug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 #else
-# define lkDebug()	
+static inline void debug(const char *fmt, ...) {};
 #endif
+extern void warning(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void fatal(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
-extern void lkWarning(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-extern void lkFatal(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-
+}
 }
 
 #endif /* __KIWI_PRIVATE_LOG_H */

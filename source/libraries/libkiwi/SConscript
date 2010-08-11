@@ -15,19 +15,18 @@ Import('env')
 
 env.SharedLibrary('kiwi', [
 	'Error.cc',
-	'EventLoop.cc',
-	'Exception.cc',
-	'Handle.cc',
-	'IPCConnection.cc',
-	'IPCPort.cc',
-	'IPCServer.cc',
+	#'EventLoop.cc',
+	#'Handle.cc',
+	#'IPCConnection.cc',
+	#'IPCPort.cc',
+	#'IPCServer.cc',
 	'log.cc',
-	'Object.cc',
-	'Process.cc',
-	'RPCClientConnection.cc',
-	'RPCMessageBuffer.cc',
-	'RPCServerConnection.cc',
-	'svcmgr.cc',
+	#'Object.cc',
+	#'Process.cc',
+	#'RPCClientConnection.cc',
+	#'RPCMessageBuffer.cc',
+	#'RPCServerConnection.cc',
+	#'svcmgr.cc',
 ], LIBS=['stdc++'])
 
 # Generate the service manager interface code.
