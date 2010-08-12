@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Error numbers.
+ * @brief		POSIX error number handling.
  *
  * @todo		Make this thread-local.
  */
@@ -49,7 +49,7 @@ static int status_to_errno_table[] = {
 	[STATUS_NO_SEMAPHORES] =	EAGAIN,
 	[STATUS_NO_AREAS] =		EAGAIN,
 	[STATUS_READ_ONLY] =		EROFS,
-	[STATUS_PERM_DENIED] =		EPERM,
+	[STATUS_PERM_DENIED] =		EACCES,
 	[STATUS_NOT_DIR] =		ENOTDIR,
 	[STATUS_NOT_FILE] =		-1,
 	[STATUS_NOT_SYMLINK] =		EINVAL,

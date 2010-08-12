@@ -58,7 +58,7 @@ extern "C" {
 //extern unsigned int alarm(unsigned int seconds);
 //extern int chdir(const char *path);
 //extern int chown(const char *path, uid_t uid, gid_t gid);
-//extern int close(int fd);
+extern int close(int fd);
 /* size_t confstr(int, char *, size_t); */
 /* char *crypt(const char *, const char *); */
 //extern int dup(int fd);

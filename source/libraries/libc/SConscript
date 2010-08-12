@@ -31,6 +31,8 @@ sources = map(File, [
 	'ctype/tolower.c',
 	'ctype/toupper.c',
 
+	'fcntl/open.c',
+
 	'locale/localeconv.c',
 	'locale/setlocale.c',
 
@@ -91,6 +93,8 @@ sources = map(File, [
 	'time/localtime.c',
 	'time/mktime.c',
 	'time/strftime.c',
+
+	'unistd/close.c',
 
 	'errno.c',
 	'error_list.c',
