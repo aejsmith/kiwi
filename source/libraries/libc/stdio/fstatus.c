@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -20,37 +20,30 @@
 
 #include "stdio_priv.h"
 
-/** Clear stream error status.
- *
- * Clears the error and end-of-file status for a file stream.
- *
- * @param stream	Stream to clear.
- */
+/** Clear stream error and EOF status.
+ * @param stream	Stream to clear. */
 void clearerr(FILE *stream) {
 	stream->eof = false;
 	stream->err = false;
 }
 
 /** Get end-of-file status for file stream.
- *
- * Gets the end-of-file status value for a file stream.
- *
  * @param stream	Stream to get value from.
- *
- * @return		End-of-file status.
- */
+ * @return		End-of-file status. */
 int feof(FILE *stream) {
 	return stream->eof;
 }
 
 /** Get error status for file stream.
- *
- * Gets the error status value for a file stream.
- *
  * @param stream	Stream to get value from.
- *
- * @return		Error status.
- */
+ * @return		Error status. */
 int ferror(FILE *stream) {
 	return stream->err;
+}
+
+/** Get a stream's file descriptor.
+ * @param stream	Stream to get from.
+ * @return		File descriptor that the stream is using. */
+int fileno(FILE *stream) {
+	return stream->fd;
 }

@@ -18,8 +18,6 @@
  * @brief		Get string functions.
  */
 
-#include <stdio.h>
-
 #include "stdio_priv.h"
 
 /** Read string from standard input.

@@ -18,34 +18,16 @@
  * @brief		File close function.
  */
 
-#include <kernel/status.h>
-
-#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "stdio_priv.h"
-
-/** Internal part of fclose(), does not free structure.
- * @param stream	Stream to close.
- * @return		0 on success, EOF on failure. */
-int fclose_internal(FILE *stream) {
-	switch(stream->type) {
-	case STREAM_TYPE_FILE:
-	case STREAM_TYPE_DEVICE:
-		if(handle_close(stream->handle) != STATUS_SUCCESS) {
-			return EOF;
-		}
-		break;
-	}
-
-	return 0;
-}
 
 /** Close a file stream.
  * @param stream	File stream to close.
  * @return		0 on success, EOF on failure. */
 int fclose(FILE *stream) {
-	if(fclose_internal(stream) != 0) {
+	if(close(stream->fd) != 0) {
 		return EOF;
 	}
 	free(stream);

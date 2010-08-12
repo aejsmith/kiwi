@@ -18,46 +18,45 @@
  * @brief		File open function.
  */
 
-#include <kernel/device.h>
-#include <kernel/fs.h>
-#include <kernel/status.h>
+#include <kernel/object.h>
 
 #include <errno.h>
-#include <stdio.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "stdio_priv.h"
 
-/** Internal part of fopen() and freopen() for files.
+/** Standard input/output streams. */
+FILE *stdin, *stdout, *stderr;
+
+/** Internal part of fopen() and freopen().
  * @param path		Path to open.
  * @param mode		Mode string.
  * @param handlep	Where to store handle to file.
- * @return		Status code describing result of the operation. */
-static status_t fopen_file_internal(const char *restrict path, const char *restrict mode, handle_t *handlep) {
+ * @return		New file descriptor or -1 on failure. */
+static int fopen_internal(const char *restrict path, const char *restrict mode) {
 	int flags;
 
 	if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
-		flags = FS_FILE_READ;
+		flags = O_RDONLY;
 	} else if(strcmp(mode, "w") == 0 || strcmp(mode, "wb") == 0) {
-		/* FIXME: Create/truncate. */
-		flags = FS_FILE_WRITE;
+		flags = O_WRONLY | O_CREAT | O_TRUNC;
 	} else if(strcmp(mode, "a") == 0 || strcmp(mode, "ab") == 0) {
-		/* FIXME: Create. */
-		flags = FS_FILE_WRITE | FS_FILE_APPEND;
+		flags = O_WRONLY | O_CREAT | O_APPEND;
 	} else if(strcmp(mode, "r+") == 0 || strcmp(mode, "r+b") == 0 || strcmp(mode, "rb+") == 0) {
-		flags = FS_FILE_READ | FS_FILE_WRITE;
+		flags = O_RDWR;
 	} else if(strcmp(mode, "w+") == 0 || strcmp(mode, "w+b") == 0 || strcmp(mode, "rb+") == 0) {
-		/* FIXME: Create/truncate. */
-		flags = FS_FILE_READ | FS_FILE_WRITE;
+		flags = O_RDWR | O_CREAT | O_TRUNC;
 	} else if(strcmp(mode, "a+") == 0 || strcmp(mode, "a+b") == 0 || strcmp(mode, "ab+") == 0) {
-		flags = FS_FILE_READ | FS_FILE_WRITE | FS_FILE_APPEND;
+		flags = O_RDWR | O_CREAT | O_APPEND;
 	} else {
 		errno = EINVAL;
 		return -1;
 	}
 
-	return fs_file_open(path, flags, handlep);
+	return open(path, flags, 0644);
 }
 
 /** Open file stream.
@@ -92,12 +91,47 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
 		return NULL;
 	}
 
-	if(fopen_file_internal(path, mode, &stream->handle) != STATUS_SUCCESS) {
+	stream->fd = fopen_internal(path, mode);
+	if(stream->fd < 0) {
 		free(stream);
 		return NULL;
 	}
 
-	stream->type = STREAM_TYPE_FILE;
+	stream->err = false;
+	stream->eof = false;
+	stream->have_pushback = false;
+	return stream;
+}
+
+/** Create file stream from file descriptor
+ *
+ * Creates a new file stream referring to an existing file descriptor. The
+ * given mode string should match the access flags of the file descriptor.
+ *
+ * @param fd		File descriptor to create for.
+ * @param mode		Access mode string as described for fopen().
+ *
+ * @return		Pointer to stream on success, NULL on failure.
+ */
+FILE *fdopen(int fd, const char *mode) {
+	FILE *stream;
+
+	/* Check if the file descriptor is valid. */
+	switch(object_type(fd)) {
+	case OBJECT_TYPE_FILE:
+	case OBJECT_TYPE_DEVICE:
+		break;
+	default:
+		errno = EBADF;
+		return NULL;
+	}
+
+	stream = malloc(sizeof(FILE));
+	if(!stream) {
+		return NULL;
+	}
+
+	stream->fd = fd;
 	stream->err = false;
 	stream->eof = false;
 	stream->have_pushback = false;
@@ -133,73 +167,16 @@ FILE *fopen(const char *restrict path, const char *restrict mode) {
  *			original stream will not be changed on failure.
  */
 FILE *freopen(const char *restrict path, const char *restrict mode, FILE *stream) {
-	handle_t handle;
+	int fd;
 
-	if(fopen_file_internal(path, mode, &handle) != STATUS_SUCCESS) {
-		return NULL;
-	} else if(fclose_internal(stream) != 0) {
-		handle_close(handle);
-		return NULL;
-	}
-
-	stream->type = STREAM_TYPE_FILE;
-	stream->handle = handle;
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
-}
-
-/** Create a file stream from an existing handle.
- * @param handle	Handle to open.
- * @param stream	If not NULL, this structure will be used rather than
- *			allocating a new one.
- * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_handle(handle_t handle, FILE *stream) {
-	int type;
-
-	/* Check if the handle can be used. */
-	type = object_type(handle);
-	if(type != OBJECT_TYPE_FILE && type != OBJECT_TYPE_DEVICE) {
-		errno = ENOTSUP;
+	fd = fopen_internal(path, mode);
+	if(fd < 0) {
+		free(stream);
 		return NULL;
 	}
 
-	if(!stream) {
-		stream = malloc(sizeof(FILE));
-		if(!stream) {
-			return NULL;
-		}
-	}
-
-	stream->type = (type == OBJECT_TYPE_DEVICE) ? STREAM_TYPE_DEVICE : STREAM_TYPE_FILE;
-	stream->handle = handle;
-	stream->err = false;
-	stream->eof = false;
-	stream->have_pushback = false;
-	return stream;
-}
-
-/** Open a device stream.
- * @param path		Device path to open.
- * @param stream	If not NULL, this structure will be used rather than
- *			allocating a new one.
- * @return		Pointer to stream on success, NULL on failure. */
-FILE *fopen_device(const char *path, FILE *stream) {
-	handle_t handle;
-
-	if(device_open(path, &handle) != STATUS_SUCCESS) {
-		return NULL;
-	} else if(!stream) {
-		stream = malloc(sizeof(FILE));
-		if(!stream) {
-			handle_close(handle);
-			return NULL;
-		}
-	}
-
-	stream->type = STREAM_TYPE_DEVICE;
-	stream->handle = handle;
+	close(stream->fd);
+	stream->fd = fd;
 	stream->err = false;
 	stream->eof = false;
 	stream->have_pushback = false;

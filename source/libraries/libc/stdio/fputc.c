@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,73 +18,40 @@
  * @brief		Put character functions.
  */
 
-#include <kernel/device.h>
-#include <kernel/fs.h>
-#include <kernel/status.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-
+#include <unistd.h>
 #include "stdio_priv.h"
 
-/** Write character to a stream.
- *
- * Writes a character to a file stream.
- *
+/** Write a character to a stream.
  * @param ch		Character to write.
  * @param stream	Stream to write to.
- *
- * @return		EOF on failure, character written on success.
- */
+ * @return		EOF on failure, character written on success. */
 int fputc(int ch, FILE *stream) {
 	unsigned char val = (unsigned char)ch;
-	size_t bytes;
+	ssize_t ret;
 
-	switch(stream->type) {
-	case STREAM_TYPE_FILE:
-		if(fs_file_write(stream->handle, &val, 1, &bytes) != STATUS_SUCCESS) {
-			stream->err = true;
-			return EOF;
-		} else if(bytes != 1) {
-			stream->eof = true;
-			return EOF;
-		}
-		break;
-	case STREAM_TYPE_DEVICE:
-		if(device_write(stream->handle, &val, 1, 0, &bytes) != STATUS_SUCCESS) {
-			stream->err = true;
-			return EOF;
-		} else if(bytes != 1) {
-			stream->eof = true;
-			return EOF;
-		}
-		break;
+	ret = write(stream->fd, &val, 1);
+	if(ret < 0) {
+		stream->err = 1;
+		return EOF;
+	} else if(ret < 1) {
+		stream->eof = 1;
+		return EOF;
 	}
 
 	return (int)val;
 }
 
 /** Write character to a stream.
- *
- * Writes a character to a file stream.
- *
  * @param ch		Character to write.
  * @param stream	Stream to write to.
- *
- * @return		EOF on failure, character written on success.
- */
+ * @return		EOF on failure, character written on success. */
 int putc(int ch, FILE *stream) {
 	return fputc(ch, stream);
 }
 
 /** Write character to standard output.
- *
- * Writes a character to standard output.
- *
  * @param ch		Character to write.
- *
- * @return		EOF on failure, character written on success.
- */
+ * @return		EOF on failure, character written on success. */
 int putchar(int ch) {
 	return fputc(ch, stdout);
 }

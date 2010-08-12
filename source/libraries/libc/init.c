@@ -20,38 +20,25 @@
 
 #include <kernel/process.h>
 
-#include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <unistd.h>
 
 #include "libc.h"
-#include "stdio/stdio_priv.h"
 
-/** Preallocated file structures to use for standard I/O. */
-static FILE __stdin, __stdout, __stderr;
-
-/** Standard input/output streams. */
-FILE *stdin = &__stdin;
-FILE *stdout = &__stdout;
-FILE *stderr = &__stderr;
+/* Early C library initialisation. */
+static void __attribute__((constructor)) libc_early_init(void) {
+	/* Attempt to open standard I/O streams from existing handles. */
+	stdin = fdopen(STDIN_FILENO, "r");
+	stdout = fdopen(STDOUT_FILENO, "a");
+	stderr = fdopen(STDERR_FILENO, "a");
+}
 
 /** C library initialisation function.
  * @param args		Process arguments structure. */
 void libc_init(process_args_t *args) {
 	/* Save the environment pointer. */
 	environ = args->env;
-
-	/* Attempt to open streams from existing handles, and open new streams
-	 * if we can't. */
-	if(!fopen_handle(0, stdin)) {
-		fopen_device("/kconsole", stdin);
-	}
-	if(!fopen_handle(1, stdout)) {
-		fopen_device("/kconsole", stdout);
-	}
-	if(!fopen_handle(2, stderr)) {
-		fopen_device("/kconsole", stderr);
-	}
 
 	/* Call the main function. */
 	exit(main(args->args_count, args->args, args->env));

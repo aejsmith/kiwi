@@ -18,9 +18,7 @@
  * @brief		Put string functions.
  */
 
-#include <stdio.h>
 #include <string.h>
-
 #include "stdio_priv.h"
 
 /** Write string to a stream.

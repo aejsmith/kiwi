@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,12 +18,7 @@
  * @brief		File seek functions.
  */
 
-#include <kernel/fs.h>
-#include <kernel/status.h>
-
-#include <stdio.h>
-#include <string.h>
-
+#include <unistd.h>
 #include "stdio_priv.h"
 
 /** Reposition file pointer.
@@ -37,48 +32,49 @@
  *
  * @return		0 on success, -1 on failure.
  */
-int fseek(FILE *stream, long off, int act) {
-	switch(stream->type) {
-	case STREAM_TYPE_FILE:
-		if(fs_handle_seek(stream->handle, act, (offset_t)off, NULL) != STATUS_SUCCESS) {
-			return -1;
-		}
-		return 0;
-	default:
-		return 0;
+int fseeko(FILE *stream, off_t off, int act) {
+	off_t ret;
+
+	ret = lseek(stream->fd, off, act);
+	if(ret < 0) {
+		return -1;
 	}
+
+	return 0;
 }
 
-/** Set file pointer to beginning.
+/** Reposition file pointer.
  *
- * Repositions the file pointer of a file stream to the beginning of the
- * file.
+ * Repositions the file pointer for a file stream according to the action
+ * specified.
  *
  * @param stream	Stream to reposition.
+ * @param off		New offset.
+ * @param act		How to set the offset.
+ *
+ * @return		0 on success, -1 on failure.
  */
+int fseek(FILE *stream, long off, int act) {
+	return fseeko(stream, (off_t)off, act);
+}
+
+/** Set file pointer to beginning of file
+ * @param stream	Stream to reposition. */
 void rewind(FILE *stream) {
-	fseek(stream, 0, FS_SEEK_SET);
+	fseek(stream, 0, SEEK_SET);
 	clearerr(stream);
 }
 
 /** Get file pointer.
- *
- * Gets the file pointer for a file stream.
- *
- * @param stream	Stream to reposition.
- *
- * @return		File pointer on success, -1 on failure.
- */
-long ftell(FILE *stream) {
-	offset_t new;
+ * @param stream	Stream to get pointer for.
+ * @return		File pointer on success, -1 on failure. */
+off_t ftello(FILE *stream) {
+	return lseek(stream->fd, 0, SEEK_CUR);
+}
 
-	switch(stream->type) {
-	case STREAM_TYPE_FILE:
-		if(fs_handle_seek(stream->handle, FS_SEEK_ADD, 0, &new) != 0) {
-			return -1;
-		}
-		return new;
-	default:
-		return 0;
-	}
+/** Get file pointer.
+ * @param stream	Stream to get pointer for.
+ * @return		File pointer on success, -1 on failure. */
+long ftell(FILE *stream) {
+	return (long)lseek(stream->fd, 0, SEEK_CUR);
 }

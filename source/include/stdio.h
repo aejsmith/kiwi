@@ -71,13 +71,14 @@ extern void clearerr(FILE *stream);
 /* char *ctermid(char *); */
 /* int dprintf(int, const char *__restrict, ...); */
 extern int fclose(FILE *stream);
+extern FILE *fdopen(int fd, const char *mode);
 extern int feof(FILE *stream);
 extern int ferror(FILE *stream);
 extern int fflush(FILE *stream);
 extern int fgetc(FILE *stream);
 /* int fgetpos(FILE *, fpos_t *); */
 extern char *fgets(char *s, int size, FILE *stream);
-//extern int fileno(FILE *stream);
+extern int fileno(FILE *stream);
 /* void flockfile(FILE *); */
 /* FILE *fmemopen(void *__restrict buf, size_t size, const char *__restrict mode); */
 extern FILE *fopen(const char *__restrict path, const char *__restrict mode);
@@ -88,10 +89,10 @@ extern size_t fread(void *__restrict ptr, size_t size, size_t nmemb, FILE *__res
 extern FILE *freopen(const char *__restrict path, const char *__restrict mode, FILE *__restrict stream);
 extern int fscanf(FILE *__restrict stream, const char *__restrict fmt, ...);
 extern int fseek(FILE *stream, long off, int act);
-/* int fseeko(FILE *, off_t, int); */
+extern int fseeko(FILE *stream, off_t off, int act);
 /* int fsetpos(FILE *, const fpos_t *); */
 extern long ftell(FILE *stream);
-/* off_t ftell(FILE *); */
+extern off_t ftello(FILE *stream);
 /* int ftrylockfile(FILE *); */
 /* void funlockfile(FILE *); */
 extern size_t fwrite(const void *__restrict ptr, size_t size, size_t nmemb, FILE *__restrict stream);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,53 +18,27 @@
  * @brief		Get character functions.
  */
 
-#include <kernel/device.h>
-#include <kernel/fs.h>
-#include <kernel/status.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-
+#include <unistd.h>
 #include "stdio_priv.h"
 
 /** Read character from a stream.
- *
- * Reads the next character from a file stream and returns it.
- *
  * @param stream	Stream to read from.
- *
- * @return		Chararcter read or EOF on failure.
- */
+ * @return		Chararcter read or EOF on failure. */
 int fgetc(FILE *stream) {
 	unsigned char ch;
-	size_t bytes;
+	ssize_t ret;
 
 	if(stream->have_pushback) {
 		stream->have_pushback = false;
 		return stream->pushback_ch;
 	}
 
-	switch(stream->type) {
-	case STREAM_TYPE_FILE:
-		if(fs_file_read(stream->handle, &ch, 1, &bytes) != STATUS_SUCCESS) {
-			stream->err = true;
-			return EOF;
-		} else if(bytes != 1) {
-			stream->eof = true;
-			return EOF;
-		}
-		break;
-	case STREAM_TYPE_DEVICE:
-		if(device_read(stream->handle, &ch, 1, 0, &bytes) != STATUS_SUCCESS) {
-			stream->err = true;
-			return EOF;
-		} else if(bytes != 1) {
-			stream->eof = true;
-			return EOF;
-		}
-		break;
-	default:
+	ret = read(stream->fd, &ch, 1);
+	if(ret < 0) {
 		stream->err = 1;
+		return EOF;
+	} else if(ret < 1) {
+		stream->eof = 1;
 		return EOF;
 	}
 
@@ -72,23 +46,14 @@ int fgetc(FILE *stream) {
 }
 
 /** Read character from a stream.
- *
- * Reads the next character from a file stream and returns it.
- *
  * @param stream	Stream to read from.
- *
- * @return		Chararcter read or EOF on failure.
- */
+ * @return		Chararcter read or EOF on failure. */
 int getc(FILE *stream) {
 	return fgetc(stream);
 }
 
 /** Read character from standard input.
- *
- * Reads the next character from standard input and returns it.
- *
- * @return		Chararcter read or EOF on failure.
- */
+ * @return		Chararcter read or EOF on failure. */
 int getchar(void) {
 	return fgetc(stdin);
 }
@@ -96,8 +61,8 @@ int getchar(void) {
 /** Push a character back to a stream.
  *
  * Pushes the given character back onto the given input stream, to be read
- * by the next call to fgetc(). Only one character is stored: this function
- * will overwrite any existing pushed-back character.
+ * by the next call to fgetc() or fread(). Only one character is stored: this
+ * function will overwrite any existing pushed-back character.
  *
  * @param ch		Character to push.
  * @param stream	Stream to push to.
@@ -107,6 +72,6 @@ int getchar(void) {
 int ungetc(int ch, FILE *stream) {
 	stream->pushback_ch = ch;
 	stream->have_pushback = true;
-	stream->eof = 0;
+	stream->eof = false;
 	return ch;
 }
