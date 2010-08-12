@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -39,7 +39,7 @@ static void vfprintf_helper(char ch, void *data, int *total) {
  *
  * @return		Number of characters printed.
  */
-int vfprintf(FILE *stream, const char *fmt, va_list args) {
+int vfprintf(FILE *restrict stream, const char *restrict fmt, va_list args) {
 	return do_printf(vfprintf_helper, stream, fmt, args);
 }
 
@@ -53,7 +53,7 @@ int vfprintf(FILE *stream, const char *fmt, va_list args) {
  *
  * @return		Number of characters printed.
  */
-int fprintf(FILE *stream, const char *fmt, ...) {
+int fprintf(FILE *restrict stream, const char *restrict fmt, ...) {
 	va_list args;
 	int ret;
 
@@ -73,7 +73,7 @@ int fprintf(FILE *stream, const char *fmt, ...) {
  *
  * @return		Number of characters printed.
  */
-int vprintf(const char *fmt, va_list args) {
+int vprintf(const char *restrict fmt, va_list args) {
 	return vfprintf(stdout, fmt, args);
 }
 
@@ -86,7 +86,7 @@ int vprintf(const char *fmt, va_list args) {
  *
  * @return		Number of characters printed.
  */
-int printf(const char *fmt, ...) {
+int printf(const char *restrict fmt, ...) {
 	va_list args;
 	int ret;
 

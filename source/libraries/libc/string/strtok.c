@@ -33,7 +33,7 @@
  *
  * @return		Pointer to next token, or NULL if no more found.
  */
-char *strtok_r(char *str, const char *delim, char **saveptr) {
+char *strtok_r(char *restrict str, const char *restrict delim, char **restrict saveptr) {
 	char *ret = NULL;
 
 	/* If string is NULL, continue with last operation. */
@@ -66,7 +66,7 @@ char *strtok_r(char *str, const char *delim, char **saveptr) {
  *
  * @return		Pointer to next token, or NULL if no more found.
  */
-char *strtok(char *str, const char *delim) {
+char *strtok(char *restrict str, const char *restrict delim) {
 	static char *strtok_state = NULL;
 
 	return strtok_r(str, delim, &strtok_state);

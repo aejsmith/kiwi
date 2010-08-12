@@ -32,7 +32,7 @@
  *
  * @return		0 on success, EOF on failure or EOF.
  */
-int fputs(const char *s, FILE *stream) {
+int fputs(const char *restrict s, FILE *restrict stream) {
 	if(fwrite(s, strlen(s), 1, stream) != 1) {
 		return EOF;
 	}

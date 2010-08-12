@@ -30,7 +30,7 @@
  * 
  * @return		The value specified for dest.
  */
-char *strcpy(char *dest, const char *src) {
+char *strcpy(char *restrict dest, const char *restrict src) {
 	char *d = dest;
 
 	while((*d++ = *src++));
@@ -48,7 +48,7 @@ char *strcpy(char *dest, const char *src) {
  * 
  * @return		The value specified for dest.
  */
-char *strncpy(char *dest, const char *src, size_t count) {
+char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 	size_t i;
 
 	for(i = 0; i < count; i++) {
@@ -74,7 +74,7 @@ char *strncpy(char *dest, const char *src, size_t count) {
  * @return		Number of bytes required in dest excluding NULL
  *			terminator.
  */
-size_t strxfrm(char *dest, const char *src, size_t count) {
+size_t strxfrm(char *restrict dest, const char *restrict src, size_t count) {
 	size_t i;
 
 	for(i = 0; i < count; i++) {

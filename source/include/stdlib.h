@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,14 +21,15 @@
 #ifndef __STDLIB_H
 #define __STDLIB_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define __need_size_t
 #define __need_wchar_t
 #define __need_NULL
 #include <stddef.h>
+//#include <sys/wait.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define RAND_MAX	32767
 #define ATEXIT_MAX	32
@@ -50,7 +51,7 @@ typedef struct {
 extern void _Exit(int status) __attribute__((noreturn));
 extern void abort(void);
 extern int abs(int j);
-extern int atexit(void (*function)(void));
+extern int atexit(void (*func)(void));
 extern double atof(const char *s);
 extern int atoi(const char *s);
 extern long atol(const char *s);
@@ -61,15 +62,17 @@ extern void *calloc(size_t nmemb, size_t size);
 extern void exit(int status) __attribute__((noreturn));
 extern void free(void *ptr);
 extern char *getenv(const char *name);
+//extern int getsubopt(char **optionp, char *const *keylistp, char **valuep);
 extern long labs(long j);
 //extern ldiv_t ldiv(long numerator, long denominator);
 extern long long llabs(long long j);
 //extern lldiv_t lldiv(long long numerator, long long denominator);
 extern void *malloc(size_t size);
 //extern int mblen(const char *s, size_t n);
-//extern size_t mbstowcs(wchar_t *dest, const char *src, size_t n);
-//extern int mbtowc(wchar_t *pwc, const char *s, size_t n);
+//extern size_t mbstowcs(wchar_t *__restrict dest, const char *__restrict src, size_t n);
+//extern int mbtowc(wchar_t *__restrict pwc, const char *__restrict s, size_t n);
 //extern char *mktemp(char *tpl);
+//extern char *mkdtemp(char *tpl);
 //extern int mkstemp(char *tpl);
 extern int putenv(char *str);
 extern void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
@@ -78,16 +81,16 @@ extern int rand_r(unsigned int *seed);
 extern void *realloc(void *ptr, size_t size);
 extern int setenv(const char *name, const char *value, int overwrite);
 extern void srand(unsigned int seed);
-extern double strtod(const char *s, char **endptr);
-//extern float strtof(const char *s, char **endptr);
-extern long strtol(const char *cp, char **endp, int base);
-//extern long double strtold(const char *str, char **endptr);
-extern long long int strtoll(const char *cp, char **endp, int base);
-extern unsigned long strtoul(const char *cp, char **endp, int base);
-extern unsigned long long int strtoull(const char *cp, char **endp, int base);
+extern double strtod(const char *__restrict s, char **__restrict endptr);
+//extern float strtof(const char *__restrict s, char **__restrict endptr);
+extern long strtol(const char *__restrict cp, char **__restrict endp, int base);
+//extern long double strtold(const char *__restrict str, char **__restrict endptr);
+extern long long int strtoll(const char *__restrict cp, char **__restrict endp, int base);
+extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp, int base);
+extern unsigned long long int strtoull(const char *__restrict cp, char **__restrict endp, int base);
 //extern int system(const char *command);
 //extern int unsetenv(const char *name);
-//extern size_t wcstombs(char *dest, const wchar_t *src, size_t n);
+//extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
 
 #ifdef __cplusplus

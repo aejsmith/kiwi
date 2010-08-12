@@ -21,11 +21,11 @@
 #ifndef __ENDIAN_H
 #define __ENDIAN_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdint.h>
 
 #ifdef __i386__
 # define LITTLE_ENDIAN

@@ -24,6 +24,10 @@
 #define __need_offsetof
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Structure containing a circular doubly linked list. */
 typedef struct list {
 	struct list *prev;		/**< Pointer to previous entry. */
@@ -154,5 +158,9 @@ static inline void list_remove(list_t *entry) {
 	list_real_remove(entry);
 	list_init(entry);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __LIST_H */

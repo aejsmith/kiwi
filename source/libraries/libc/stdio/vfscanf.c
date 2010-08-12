@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -34,7 +34,7 @@
  *
  * @return		Number of input items matched.
  */
-int vfscanf(FILE *stream, const char *fmt, va_list args) {
+int vfscanf(FILE *restrict stream, const char *restrict fmt, va_list args) {
 	struct scanf_args sdata = { (int (*)(void *))fgetc, (int (*)(int, void *))ungetc, stream };
 
 	return do_scanf(&sdata, fmt, args);
@@ -51,7 +51,7 @@ int vfscanf(FILE *stream, const char *fmt, va_list args) {
  *
  * @return		Number of input items matched.
  */
-int fscanf(FILE *stream, const char *fmt, ...) {
+int fscanf(FILE *restrict stream, const char *restrict fmt, ...) {
 	va_list args;
 	int ret;
 
@@ -72,7 +72,7 @@ int fscanf(FILE *stream, const char *fmt, ...) {
  *
  * @return		Number of input items matched.
  */
-int vscanf(const char *fmt, va_list args) {
+int vscanf(const char *restrict fmt, va_list args) {
 	return vfscanf(stdin, fmt, args);
 }
 
@@ -86,7 +86,7 @@ int vscanf(const char *fmt, va_list args) {
  *
  * @return		Number of input items matched.
  */
-int scanf(const char *fmt, ...) {
+int scanf(const char *restrict fmt, ...) {
 	va_list args;
 	int ret;
 

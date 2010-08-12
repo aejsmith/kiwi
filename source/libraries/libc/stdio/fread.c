@@ -32,7 +32,7 @@
  *
  * @return		Number of elements read successfully.
  */
-size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
 	char *buf = (char *)ptr;
 	size_t i;
 	int ch;

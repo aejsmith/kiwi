@@ -80,7 +80,7 @@ static const char *am_pm[] = {
  *
  * @return		Current time.
  */
-size_t strftime(char *buf, size_t max, const char *fmt, const struct tm *tm) {
+size_t strftime(char *restrict buf, size_t max, const char *restrict fmt, const struct tm *restrict tm) {
 	bool modif_e, modif_o;
 	size_t total = 0;
 	int state = 0;

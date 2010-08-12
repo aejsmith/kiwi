@@ -32,7 +32,7 @@ static struct tm __localtime_tm;
  *
  * @return		Pointer to time structure filled in.
  */
-struct tm *localtime_r(const time_t *timep, struct tm *tm) {
+struct tm *localtime_r(const time_t *restrict timep, struct tm *restrict tm) {
 	return gmtime_r(timep, tm);
 }
 

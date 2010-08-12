@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -71,7 +71,7 @@
  *
  * @return		Converted value.
  */
-unsigned long strtoul(const char *cp, char **endp, int base) {
+unsigned long strtoul(const char *restrict cp, char **restrict endp, int base) {
 	return __strtoux(unsigned long, ULONG_MAX, cp, endp, base);
 }
 
@@ -85,7 +85,7 @@ unsigned long strtoul(const char *cp, char **endp, int base) {
  *
  * @return		Converted value.
  */
-long strtol(const char *cp, char **endp, int base) {
+long strtol(const char *restrict cp, char **restrict endp, int base) {
 	if(*cp == '-') {
 		return -strtoul(cp + 1, endp, base);
 	}
@@ -102,7 +102,7 @@ long strtol(const char *cp, char **endp, int base) {
  *
  * @return		Converted value.
  */
-unsigned long long int strtoull(const char *cp, char **endp, int base) {
+unsigned long long int strtoull(const char *restrict cp, char **restrict endp, int base) {
 	return __strtoux(unsigned long long int, ULLONG_MAX, cp, endp, base);
 }
 
@@ -116,7 +116,7 @@ unsigned long long int strtoull(const char *cp, char **endp, int base) {
  *
  * @return		Converted value.
  */
-long long int strtoll(const char *cp, char **endp, int base) {
+long long int strtoll(const char *restrict cp, char **restrict endp, int base) {
 	if(*cp == '-') {
 		return -strtoull(cp + 1, endp, base);
 	}

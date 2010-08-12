@@ -21,11 +21,11 @@
 #ifndef __ELF_H
 #define __ELF_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdint.h>
 
 typedef uint32_t Elf32_Addr;
 typedef uint32_t Elf32_Off;

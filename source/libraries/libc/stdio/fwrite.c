@@ -36,7 +36,7 @@
  *
  * @return		Number of elements written successfully.
  */
-size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
+size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
 	const char *buf = (char *)ptr;
 	size_t i;
 

@@ -34,7 +34,7 @@
  * @param mode		Mode string.
  * @param handlep	Where to store handle to file.
  * @return		Status code describing result of the operation. */
-static status_t fopen_file_internal(const char *path, const char *mode, handle_t *handlep) {
+static status_t fopen_file_internal(const char *restrict path, const char *restrict mode, handle_t *handlep) {
 	int flags;
 
 	if(strcmp(mode, "r") == 0 || strcmp(mode, "rb") == 0) {
@@ -84,7 +84,7 @@ static status_t fopen_file_internal(const char *path, const char *mode, handle_t
  *
  * @return		Pointer to stream on success, NULL on failure.
  */
-FILE *fopen(const char *path, const char *mode) {
+FILE *fopen(const char *restrict path, const char *restrict mode) {
 	FILE *stream;
 
 	stream = malloc(sizeof(FILE));
@@ -132,7 +132,7 @@ FILE *fopen(const char *path, const char *mode) {
  * @return		Pointer to stream on success, NULL on failure. The
  *			original stream will not be changed on failure.
  */
-FILE *freopen(const char *path, const char *mode, FILE *stream) {
+FILE *freopen(const char *restrict path, const char *restrict mode, FILE *stream) {
 	handle_t handle;
 
 	if(fopen_file_internal(path, mode, &handle) != STATUS_SUCCESS) {

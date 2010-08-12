@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -35,7 +35,7 @@
  *
  * @return		Destination location.
  */
-void *memcpy(void *dest, const void *src, size_t count) {
+void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	const char *s = (const char *)src;
 	char *d = (char *)dest;
 	const unsigned long *ns;

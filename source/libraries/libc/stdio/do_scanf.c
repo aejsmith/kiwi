@@ -31,6 +31,6 @@
  *
  * @return		Number of input items matched.
  */
-int do_scanf(struct scanf_args *data, const char *fmt, va_list args) {
+int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) {
 	__libc_stub(__FUNCTION__);
 }

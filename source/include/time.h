@@ -21,19 +21,11 @@
 #ifndef __TIME_H
 #define __TIME_H
 
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define __need_size_t
-#include <stddef.h>
-#include <stdint.h>
-
-/** Type containing a UNIX timestamp. */
-typedef int64_t time_t;
-
-/** Type containing clock ticks since process start. */
-typedef int64_t clock_t;
 
 /** Structure containing a time. */
 struct tm {
@@ -49,18 +41,18 @@ struct tm {
 };
 
 extern char *asctime(const struct tm *tm);
-extern char *asctime_r(const struct tm *tm, char *buf);
+extern char *asctime_r(const struct tm *__restrict tm, char *__restrict buf);
 //extern clock_t clock(void);
 extern char *ctime(const time_t *timep);
 //extern double difftime(time_t, time_t);
 //extern struct tm *getdate(const char *);
 extern struct tm *gmtime(const time_t *timep);
-extern struct tm *gmtime_r(const time_t *timep, struct tm *tm);
+extern struct tm *gmtime_r(const time_t *__restrict timep, struct tm *__restrict tm);
 extern struct tm *localtime(const time_t *timep);
-extern struct tm *localtime_r(const time_t *timep, struct tm *tm);
+extern struct tm *localtime_r(const time_t *__restrict timep, struct tm *__restrict tm);
 extern time_t mktime(struct tm *timep);
-extern size_t strftime(char *buf, size_t max, const char *fmt, const struct tm *tm);
-//extern char *strptime(const char *, const char *, struct tm *);
+extern size_t strftime(char *__restrict buf, size_t max, const char *__restrict fmt, const struct tm *__restrict tm);
+//extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
 //extern time_t time(time_t *timep);
 
 #ifdef __cplusplus

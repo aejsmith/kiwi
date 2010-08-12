@@ -33,7 +33,7 @@ static char asctime_buf[64];
  *
  * @return		Pointer to supplied buffer (or NULL on failure).
  */
-char *asctime_r(const struct tm *tm, char *buf) {
+char *asctime_r(const struct tm *restrict tm, char *restrict buf) {
 	strftime(buf, 26, "%a %b %d %H:%M:%S %Y\n", tm);
 	return buf;
 }

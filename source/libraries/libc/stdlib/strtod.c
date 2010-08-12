@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,7 +31,7 @@
  *
  * @return		Converted number.
  */
-double strtod(const char *s, char **endptr) {
+double strtod(const char *restrict s, char **restrict endptr) {
 	const char *p = s;
 	long double factor, value = 0.L;
 	int sign = 1;

@@ -54,7 +54,7 @@ static struct tm __gmtime_tm;
  *
  * @return		Pointer to time structure filled in.
  */
-struct tm *gmtime_r(const time_t *timep, struct tm *tm) {
+struct tm *gmtime_r(const time_t *restrict timep, struct tm *restrict tm) {
 	time_t i, time;
 
 	time = *timep % (24 * 60 * 60);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -175,7 +175,7 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
  *
  * @return		Number of characters written.
  */
-int do_printf(printf_helper_t helper, void *data, const char *fmt, va_list args) {
+int do_printf(printf_helper_t helper, void *data, const char *restrict fmt, va_list args) {
 	int total = 0, flags, base;
 	long width, precision;
 	unsigned char ch;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -53,7 +53,7 @@ static void vsnprintf_helper(char ch, void *_data, int *total) {
  * @return		The number of characters generated, excluding the
  *			trailing NULL, as per ISO C99.
  */
-int vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
+int vsnprintf(char *restrict buf, size_t size, const char *restrict fmt, va_list args) {
 	struct vsnprintf_data data;
 	int ret;
 
@@ -83,7 +83,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
  * @return		The number of characters generated, excluding the
  *			trailing NULL, as per ISO C99.
  */
-int vsprintf(char *buf, const char *fmt, va_list args) {
+int vsprintf(char *restrict buf, const char *restrict fmt, va_list args) {
 	return vsnprintf(buf, (size_t)-1, fmt, args);
 }
 
@@ -99,7 +99,7 @@ int vsprintf(char *buf, const char *fmt, va_list args) {
  * @return		The number of characters generated, excluding the
  *			trailing NULL, as per ISO C99.
  */
-int snprintf(char *buf, size_t size, const char *fmt, ...) {
+int snprintf(char *restrict buf, size_t size, const char *restrict fmt, ...) {
 	int ret;
 	va_list args;
 
@@ -121,7 +121,7 @@ int snprintf(char *buf, size_t size, const char *fmt, ...) {
  * @return		The number of characters generated, excluding the
  *			trailing NULL, as per ISO C99.
  */
-int sprintf(char *buf, const char *fmt, ...) {
+int sprintf(char *restrict buf, const char *restrict fmt, ...) {
 	int ret;
 	va_list args;
 

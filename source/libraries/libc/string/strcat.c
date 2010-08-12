@@ -29,7 +29,7 @@
  * 
  * @return		Pointer to dest.
  */
-char *strcat(char *dest, const char *src) {
+char *strcat(char *restrict dest, const char *restrict src) {
 	size_t destlen = strlen(dest);
 	char *d = dest + destlen;
 
@@ -48,7 +48,7 @@ char *strcat(char *dest, const char *src) {
  * 
  * @return		Pointer to dest.
  */
-char *strncat(char *dest, const char *src, size_t max) {
+char *strncat(char *restrict dest, const char *restrict src, size_t max) {
 	size_t i, destlen = strlen(dest);
 	char *d = dest + destlen;
 
