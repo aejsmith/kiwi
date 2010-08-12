@@ -25,6 +25,7 @@
 #include <list.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "../libc.h"
 
@@ -162,15 +163,16 @@ void exit(int status) {
 	process_exit(status);
 }
 
-/** Terminate execution.
- *
- * Terminates execution without calling at-exit functions. Equivalent to
- * _exit().
- *
+/** Terminate execution without calling at-exit functions.
  * @param status	Exit status.
- *
- * @return		Does not return.
- */
+ * @return		Does not return. */
+void _exit(int status) {
+	process_exit(status);
+}
+
+/** Terminate execution without calling at-exit functions.
+ * @param status	Exit status.
+ * @return		Does not return. */
 void _Exit(int status) {
 	process_exit(status);
 }

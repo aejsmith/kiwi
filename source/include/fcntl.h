@@ -62,7 +62,7 @@ extern "C" {
 //#define F_SETOWN	10		/**< Set process or process group ID to receive SIGURG signals. */
 
 extern int open(const char *path, int oflag, ...);
-//extern int creat(const char *path, mode_t mode);
+extern int creat(const char *path, mode_t mode);
 //extern int fcntl(int fd, int cmd, ...);
 
 #ifdef __cplusplus

@@ -95,6 +95,8 @@ sources = map(File, [
 	'time/strftime.c',
 
 	'unistd/close.c',
+	'unistd/read.c',
+	'unistd/write.c',
 
 	'errno.c',
 	'error_list.c',

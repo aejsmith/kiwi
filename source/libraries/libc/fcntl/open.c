@@ -136,3 +136,19 @@ retry:
 
 	return (int)handle;
 }
+
+/** Open and possibly create a file.
+ *
+ * Opens a file, creating it if it does not exist. If it does exist, it will be
+ * truncated to zero length.
+ *
+ * @param path		Path to file.
+ * @param mode		Mode to create file with if it doesn't exist.
+ *
+ * @return		File descriptor referring to file (positive value) on
+ *			success, -1 on failure (errno will be set to the error
+ *			reason).
+ */
+int creat(const char *path, mode_t mode) {
+	return open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
+}

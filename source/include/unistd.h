@@ -63,7 +63,7 @@ extern int close(int fd);
 /* char *crypt(const char *, const char *); */
 //extern int dup(int fd);
 //extern int dup2(int fd, int newfd);
-//extern void _exit(int status);
+extern void _exit(int status);
 /* void encrypt(char[64], int); */
 //extern int execl(const char *path, const char *arg, ...);
 /* int execle(const char *, const char *, ...); */
@@ -109,9 +109,9 @@ extern int close(int fd);
 /* long pathconf(const char *, int); */
 /* int pause(void); */
 //extern int pipe(int fds[2]);
-//extern ssize_t pread(int fd, void *buf, size_t count, off_t offset);
-//extern ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-//extern ssize_t read(int fd, void *buf, size_t count);
+extern ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+extern ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+extern ssize_t read(int fd, void *buf, size_t count);
 //extern ssize_t readlink(const char *path, char *buf, size_t size);
 /* ssize_t readlinkat(int, const char *restrict, char *restrict, size_t); */
 //extern int rmdir(const char *path);
@@ -137,7 +137,7 @@ extern int close(int fd);
 /* int ttyname_r(int, char *, size_t); */
 //extern int unlink(const char *path);
 //extern int unlinkat(int, const char *, int);
-//extern ssize_t write(int fd, const void *buf, size_t count);
+extern ssize_t write(int fd, const void *buf, size_t count);
 
 #ifdef __cplusplus
 }
