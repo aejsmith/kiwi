@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,11 +18,12 @@
  * @brief		File read function.
  */
 
+#include <unistd.h>
 #include "stdio_priv.h"
 
 /** Read from a file stream.
  *
- * Reads nmemb elements of data, each size bytes long, from a file steam
+ * Reads nmemb elements of data, each size bytes long, from a file stream
  * into a buffer.
  *
  * @param ptr		Buffer to read into.
@@ -34,16 +35,27 @@
  */
 size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
 	char *buf = (char *)ptr;
-	size_t i;
-	int ch;
+	size_t total, count = 0;
+	ssize_t ret;
 
-	for(i = 0; i < (size * nmemb); i++) {
-		if((ch = fgetc(stream)) == EOF) {
-			break;
-		} else {
-			buf[i] = (char)ch;
+	total = size * nmemb;
+	if(!total) {
+		return 0;
+	}
+
+	/* Read the pushed back character if there is one. */
+	if(stream->have_pushback) {
+		buf[count++] = stream->pushback_ch;
+		stream->have_pushback = false;
+	}
+
+	/* Read remaining data. */
+	if(count < total) {
+		ret = read(stream->fd, &buf[count], total - count);
+		if(ret > 0) {
+			count += ret;
 		}
 	}
 
-	return (size) ? (i / size) : 0;
+	return count / size;
 }

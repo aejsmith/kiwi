@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,10 +18,7 @@
  * @brief		File write function.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
+#include <unistd.h>
 #include "stdio_priv.h"
 
 /** Write to a file stream.
@@ -37,14 +34,16 @@
  * @return		Number of elements written successfully.
  */
 size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
-	const char *buf = (char *)ptr;
-	size_t i;
+	ssize_t ret;
 
-	for(i = 0; i < (size * nmemb); i++) {
-		if(fputc((int)buf[i], stream) == EOF) {
-			break;
-		}
+	if(!size || !nmemb) {
+		return 0;
 	}
 
-	return (size) ? (i / size) : 0;
+	ret = write(stream->fd, ptr, size * nmemb);
+	if(ret <= 0) {
+		return 0;
+	}
+
+	return ret / size;
 }
