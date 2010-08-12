@@ -104,7 +104,7 @@ extern void _exit(int status);
 //extern int link(const char *source, const char *dest);
 /* int linkat(int, const char *, int, const char *, int); */
 /* int lockf(int, int, off_t); */
-//extern off_t lseek(int fd, off_t off, int act);
+extern off_t lseek(int fd, off_t off, int act);
 /* int nice(int); */
 /* long pathconf(const char *, int); */
 /* int pause(void); */
