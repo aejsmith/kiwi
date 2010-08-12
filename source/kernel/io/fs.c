@@ -1394,9 +1394,17 @@ status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offs
 	/* Perform the action. */
 	switch(action) {
 	case FS_SEEK_SET:
+		if(offset < 0) {
+			rwlock_unlock(&data->lock);
+			return STATUS_INVALID_ARG;
+		}
 		data->offset = (offset_t)offset;
 		break;
 	case FS_SEEK_ADD:
+		if(((rel_offset_t)data->offset + offset) < 0) {
+			rwlock_unlock(&data->lock);
+			return STATUS_INVALID_ARG;
+		}
 		data->offset += offset;
 		break;
 	case FS_SEEK_END:
