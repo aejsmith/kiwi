@@ -102,11 +102,13 @@ retry:
 		}
 
 		/* Truncate the file if requested. */
-		ret = fs_file_resize(handle, 0);
-		if(ret != STATUS_SUCCESS) {
-			handle_close(handle);
-			libc_status_to_errno(ret);
-			return -1;
+		if(oflag & O_TRUNC) {
+			ret = fs_file_resize(handle, 0);
+			if(ret != STATUS_SUCCESS) {
+				handle_close(handle);
+				libc_status_to_errno(ret);
+				return -1;
+			}
 		}
 		break;
 	case FS_NODE_DIR:
