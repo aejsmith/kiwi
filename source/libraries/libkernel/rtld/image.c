@@ -77,6 +77,22 @@ static bool rtld_library_exists(const char *path) {
 	return true;
 }
 
+/** Check if a library is already loaded.
+ * @param name		Name of library.
+ * @return		Pointer to image structure if found. */
+static rtld_image_t *rtld_image_lookup(const char *name) {
+	rtld_image_t *image;
+
+	LIST_FOREACH_SAFE(&loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+		if(strcmp(image->name, name) == 0) {
+			return image;
+		}
+	}
+
+	return NULL;
+}
+
 /** Search for a library and then load it.
  * @param name		Name of library to load.
  * @param req		Image that requires this library.
@@ -85,7 +101,21 @@ static bool rtld_library_exists(const char *path) {
  *			found or another status code for failures. */
 static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_image_t **imagep) {
 	char buf[FS_PATH_MAX];
+	rtld_image_t *exist;
 	size_t i;
+
+	/* Check if it's already loaded. */
+	exist = rtld_image_lookup(name);
+	if(exist) {
+		if(exist->state == RTLD_IMAGE_LOADING) {
+			dprintf("rtld: cyclic dependency on %s detected!\n", exist->name);
+			return STATUS_MALFORMED_IMAGE;
+		}
+
+		dprintf("rtld: increasing reference count on %s (%p)\n", exist->name, exist);
+		exist->refcount++;
+		return STATUS_SUCCESS;
+	}
 
 	/* Look for the library in the search paths. */
 	for(i = 0; library_search_dirs[i]; i++) {
@@ -110,7 +140,7 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
  * @param imagep	Where to store pointer to image structure.
  * @return		Status code describing result of the operation. */
 status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep) {
-	rtld_image_t *image = NULL, *exist;
+	rtld_image_t *image = NULL;
 	elf_addr_t start, end;
 	size_t bytes, size, i;
 	elf_phdr_t *phdrs;
@@ -326,27 +356,9 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 	/* Check if the image is already loaded. */
 	if(type == ELF_ET_DYN) {
-		LIST_FOREACH_SAFE(&loaded_images, iter) {
-			exist = list_entry(iter, rtld_image_t, header);
-
-			if(strcmp(exist->name, image->name) != 0) {
-				continue;
-			} else if(exist->state == RTLD_IMAGE_LOADING) {
-				dprintf("rtld: cyclic dependency on %s detected!\n", image->name);
-				ret = STATUS_MALFORMED_IMAGE;
-				goto fail;
-			}
-
-			dprintf("rtld: %s: increasing reference count on %s (%p)\n",
-			        path, image->name, exist);
-			exist->refcount++;
-			if(imagep) {
-				*imagep = exist;
-			}
-
-			/* Use the failure path to clean up as the library must
-			 * be freed. */
-			ret = STATUS_SUCCESS;
+		if(rtld_library_exists(image->name)) {
+			printf("rtld: %s: image with same name already loaded\n", path);
+			ret = STATUS_ALREADY_EXISTS;
 			goto fail;
 		}
 	}
