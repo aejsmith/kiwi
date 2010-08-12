@@ -72,7 +72,7 @@ static atexit_func_t *__atexit_alloc(void) {
 
 	if(__atexit_free_count) {
 		if(list_empty(&__atexit_free_funcs)) {
-			__libc_fatal("atexit data is corrupted");
+			libc_fatal("atexit data is corrupted");
 		}
 
 		func = list_entry(__atexit_free_funcs.next, atexit_func_t, header);

@@ -20,10 +20,10 @@
 #define NO_MALLINFO			1
 
 /* Misc macro defines. */
-#define ABORT				__libc_fatal("dlmalloc abort");
+#define ABORT				libc_fatal("dlmalloc abort");
 #define USAGE_ERROR_ACTION(m, p)	\
-	__libc_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
-                     __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
+	libc_fatal("dlmalloc usage error (%s:%d): %p, %p (ret: %p)\n", \
+                   __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
 #define MALLOC_FAILURE_ACTION		errno = ENOMEM;
 #define malloc_getpagesize		((size_t)0x1000)
 

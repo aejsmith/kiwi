@@ -25,11 +25,11 @@
 #include "libc.h"
 #include "stdio/stdio_priv.h"
 
-/** Helper for __libc_fatal().
+/** Helper for libc_fatal().
  * @param ch		Character to print.
  * @param data		Pointer to file stream.
  * @param total		Pointer to total character count. */
-static void __libc_fatal_helper(char ch, void *data, int *total) {
+static void libc_fatal_helper(char ch, void *data, int *total) {
 	if(data) {
 		fputc(ch, (FILE *)data);
 	}
@@ -40,15 +40,15 @@ static void __libc_fatal_helper(char ch, void *data, int *total) {
 /** Print out a fatal error and terminate the process.
  * @param fmt		Format string.
  * @param ...		Arguments to substitute into format. */
-void __libc_fatal(const char *fmt, ...) {
+void libc_fatal(const char *fmt, ...) {
 	va_list args;
 
 	va_start(args, fmt);
-	do_printf(__libc_fatal_helper, stderr, "*** libc fatal: ", args);
+	do_printf(libc_fatal_helper, stderr, "*** libc fatal: ", args);
 	va_end(args);
 
 	va_start(args, fmt);
-	do_printf(__libc_fatal_helper, stderr, fmt, args);
+	do_printf(libc_fatal_helper, stderr, fmt, args);
 	va_end(args);
 
 	if(stderr) {
@@ -60,8 +60,8 @@ void __libc_fatal(const char *fmt, ...) {
 
 /** Print out a fatal error for a stub function being called.
  * @param name		Name of function. */
-void __libc_stub(const char *name) {
-	__libc_fatal("unimplemented function: %s", name);
+void libc_stub(const char *name) {
+	libc_fatal("unimplemented function: %s", name);
 }
 
 /** Print out an assertion fail message.

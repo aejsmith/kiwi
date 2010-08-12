@@ -30,7 +30,7 @@ _start:
 	/* Set up the environment and run the main function. This function
 	 * should exit with the main function's return code. */
 	push	%eax
-	call	__libc_init
+	call	libc_init
 	addl	$4, %esp
 
 	/* If we got here then something has broken (we should have exited).

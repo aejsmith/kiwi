@@ -31,7 +31,7 @@
 char **environ;
 
 /** Whether the environment array has been allocated. */
-static bool __libc_environ_alloced = false;
+static bool environ_alloced = false;
 
 /** Reallocate the contents of the environment if necessary.
  * @return		Whether succesful. */
@@ -42,7 +42,7 @@ static bool ensure_environ_alloced(void) {
 	/* If not previously allocated, the environment is still on the stack
 	 * so we cannot modify it. Duplicate it and point environ to the
 	 * new location. */
-	if(!__libc_environ_alloced) {
+	if(!environ_alloced) {
 		/* Get a count of what to copy. */
 		for(count = 0; environ[count] != NULL; count++);
 
@@ -53,7 +53,7 @@ static bool ensure_environ_alloced(void) {
 
 		memcpy(new, environ, (count + 1) * sizeof(char *));
 		environ = new;
-		__libc_environ_alloced = true;
+		environ_alloced = true;
 	}
 
 	return true;
@@ -81,7 +81,7 @@ char *getenv(const char *name) {
 		val = strchr(key, '=');
 
 		if(val == NULL) {
-			__libc_fatal("value '%s' found in environment without an =", key);
+			libc_fatal("value '%s' found in environment without an =", key);
 		}
 
 		len = strlen(name);
@@ -205,7 +205,7 @@ int setenv(const char *name, const char *value, int overwrite) {
 			return 0;
 		}
 
-		__libc_fatal("shouldn't get here in setenv");
+		libc_fatal("shouldn't get here in setenv");
 	}
 
 	/* Fill out the new entry. */

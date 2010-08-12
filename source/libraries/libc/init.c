@@ -37,7 +37,7 @@ FILE *stderr = &__stderr;
 
 /** C library initialisation function.
  * @param args		Process arguments structure. */
-void __libc_init(process_args_t *args) {
+void libc_init(process_args_t *args) {
 	/* Save the environment pointer. */
 	environ = args->env;
 
