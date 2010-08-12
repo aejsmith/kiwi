@@ -54,7 +54,7 @@ off_t lseek(int fd, off_t off, int act) {
 		return -1;
 	}
 
-	ret = fs_handle_seek(fd, off, kact, &new);
+	ret = fs_handle_seek(fd, kact, off, &new);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
