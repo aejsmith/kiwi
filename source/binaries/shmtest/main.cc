@@ -33,39 +33,35 @@ int main(int argc, char **argv) {
 	handle_t handle;
 	uint32_t type;
 	void *mapping;
+	status_t ret;
 	shm_id_t id;
 	size_t size;
 	char *data;
-	int ret;
 
-	if(!conn.connect("org.kiwi.SHMServer")) {
-		cerr << "Failed to connect to server" << endl;
-		return 1;
-	}
+	/* Connect to the server. */
+	conn.Connect("org.kiwi.SHMServer");
 
 	/* Receive the area ID from the server. */
-	if(!conn.receive(type, data, size)) {
-		cerr << "Failed to receive message" << endl;
-		return 1;
-	} else if(size != sizeof(id)) {
+	conn.Receive(type, data, size);
+	if(size != sizeof(id)) {
 		cerr << "Incorrect data size received: " << size << endl;
 		return 1;
 	}
 	id = *reinterpret_cast<shm_id_t *>(data);
 	delete[] data;
-	conn.close();
+	conn.Close();
 	cout << "Received area ID " << id << " from server" << endl;
 
 	/* Open the shared memory area. */
-	handle = shm_open(id);
-	if(handle < 0) {
-		cerr << "Failed to open area: " << handle << endl;
+	ret = shm_open(id, &handle);
+	if(ret != STATUS_SUCCESS) {
+		cerr << "Failed to open area: " << ret << endl;
 		return 1;
 	}
 
 	/* Map it in and read the data. */
 	ret = vm_map(NULL, 0x1000, VM_MAP_READ, handle, 0, &mapping);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		cerr << "Failed to map area: " << ret << endl;
 		return 1;
 	}

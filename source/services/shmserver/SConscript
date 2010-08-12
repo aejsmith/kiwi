@@ -13,6 +13,4 @@
 
 Import('env')
 
-env.Program('shmserver', [
-	'main.cc',
-], LIBS=['kiwi'])
+env.Program('shmserver', ['main.cc'], LIBS=['kiwi'])

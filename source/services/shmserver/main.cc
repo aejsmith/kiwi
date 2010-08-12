@@ -35,28 +35,28 @@ int main(int argc, char **argv) {
 	IPCPort port(3);
 	handle_t handle;
 	void *mapping;
+	status_t ret;
 	shm_id_t id;
-	int ret;
 
 	/* Create the shared memory area. */
-	handle = shm_create(0x1000);
-	if(handle < 0) {
-		cerr << "Failed to create area: " << handle << endl;
+	ret = shm_create(0x1000, &handle);
+	if(ret < 0) {
+		cerr << "Failed to create area: " << ret << endl;
 		return 1;
 	}
 	id = shm_id(handle);
 
 	/* Map it in and stick some data in it. */
 	ret = vm_map(NULL, 0x1000, VM_MAP_READ | VM_MAP_WRITE, handle, 0, &mapping);
-	if(ret != 0) {
+	if(ret != STATUS_SUCCESS) {
 		cerr << "Failed to map area: " << ret << endl;
 		return 1;
 	}
 	strcpy(reinterpret_cast<char *>(mapping), "This is some data in shared memory!");
 
 	/* Send the area ID to any client that connects. */
-	while(port.listen(conn)) {
-		conn->send(0, &id, sizeof(id));
-		conn->waitHangup();
+	while(port.Listen(conn)) {
+		conn->Send(0, &id, sizeof(id));
+		conn->WaitForHangup();
 	}
 }

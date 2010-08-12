@@ -23,7 +23,7 @@
 
 /** Handle a connection to the kitten server.
  * @param handle	Handle to the connection. */
-void KittenServer::handleConnection(handle_t handle) {
+void KittenServer::HandleConnection(handle_t handle) {
 	new Connection(handle);
 }
 
@@ -32,6 +32,6 @@ void KittenServer::handleConnection(handle_t handle) {
  * @param argv		Argument array. */
 int main(int argc, char **argv) {
 	KittenServer server;
-	server.run();
+	server.Run();
 	return 0;
 }

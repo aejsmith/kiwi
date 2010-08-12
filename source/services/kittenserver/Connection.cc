@@ -18,7 +18,7 @@
  * @brief		RPC test server.
  */
 
-#include <kernel/errors.h>
+#include <kernel/status.h>
 #include <iostream>
 #include "Connection.h"
 
@@ -39,70 +39,68 @@ Connection::Connection(handle_t handle) :
  * @param colour	Colour of the kitten.
  * @param id		Where to store ID of kitten.
  * @return		Result of the call. */
-RPCResult Connection::createKitten(const string &name, Kitten::Colour colour, Kitten::ID &id) {
-	Kitten *kitten;
-
-	cout << "Connection::createKitten(" << name << ", {" << static_cast<int>(colour.red) << ',';
+status_t Connection::CreateKitten(const string &name, Kitten::Colour colour, Kitten::ID &id) {
+	cout << "Connection::CreateKitten(" << name << ", {" << static_cast<int>(colour.red) << ',';
 	cout << static_cast<int>(colour.green) << ',' << static_cast<int>(colour.blue) << "})" << endl;
-	kitten = new Kitten(name, colour, this);
-	id = kitten->getID();
+
+	Kitten *kitten = new Kitten(name, colour, this);
+	id = kitten->GetID();
 	m_current_kitten = kitten;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Set the current kitten.
  * @param id		ID of kitten to set as current.
  * @return		Result of the call. */
-RPCResult Connection::setCurrentKitten(Kitten::ID id) {
-	Kitten *kitten;
+status_t Connection::SetCurrentKitten(Kitten::ID id) {
+	cout << "Connection::SetCurrentKitten(" << id << ")" << endl;
 
-	cout << "Connection::setCurrentKitten(" << id << ")" << endl;
-	kitten = Kitten::lookup(id);
+	Kitten *kitten = Kitten::Lookup(id);
 	if(!kitten) {
-		return ERR_NOT_FOUND;
-	} else if(!kitten->isOwner(this)) {
-		return ERR_PERM_DENIED;
+		return STATUS_NOT_FOUND;
+	} else if(!kitten->IsOwner(this)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	m_current_kitten = kitten;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 /** Get the name of the current kitten.
  * @param name		Where to store name of kitten.
  * @return		Result of the call. */
-RPCResult Connection::getName(string &name) {
-	cout << "Connection::getName()" << endl;
-	if(!m_current_kitten) {
-		return ERR_NOT_FOUND;
-	}
+status_t Connection::GetName(string &name) {
+	cout << "Connection::GetName()" << endl;
 
-	name = m_current_kitten->getName();
-	return 0;
+	if(!m_current_kitten) {
+		return STATUS_NOT_FOUND;
+	}
+	name = m_current_kitten->GetName();
+	return STATUS_SUCCESS;
 }
 
 /** Get the colour of the current kitten.
  * @param colour	Where to store colour of kitten.
  * @return		Result of the call. */
-RPCResult Connection::getColour(Kitten::Colour &colour) {
-	cout << "Connection::getColour()" << endl;
-	if(!m_current_kitten) {
-		return ERR_NOT_FOUND;
-	}
+status_t Connection::GetColour(Kitten::Colour &colour) {
+	cout << "Connection::GetColour()" << endl;
 
-	colour = m_current_kitten->getColour();
-	return 0;
+	if(!m_current_kitten) {
+		return STATUS_NOT_FOUND;
+	}
+	colour = m_current_kitten->GetColour();
+	return STATUS_SUCCESS;
 }
 
 /** Stroke the current kitten.
  * @param duration	How long to stroke the kitten for (in seconds).
  * @return		Result of the call. */
-RPCResult Connection::stroke(int32_t duration) {
-	cout << "Connection::stroke(" << duration << ")" << endl;
-	if(!m_current_kitten) {
-		return ERR_NOT_FOUND;
-	}
+status_t Connection::Stroke(int32_t duration) {
+	cout << "Connection::Stroke(" << duration << ")" << endl;
 
-	m_current_kitten->stroke(duration);
-	return 0;
+	if(!m_current_kitten) {
+		return STATUS_NOT_FOUND;
+	}
+	m_current_kitten->Stroke(duration);
+	return STATUS_SUCCESS;
 }

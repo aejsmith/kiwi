@@ -41,49 +41,48 @@ int main(int argc, char **argv) {
 	Colour white = { 255, 255, 255 }, black = { 0, 0, 0 };
 	ServerConnection conn;
 	KittenID wid, bid;
-	RPCResult ret;
+	status_t ret;
 	string name;
 
-	conn.connect();
-	conn.onPurr.connect(handlePurr);
+	conn.OnPurr.Connect(handlePurr);
 
-	if((ret = conn.createKitten("Mittens", white, wid)) != 0) {
+	if((ret = conn.CreateKitten("Mittens", white, wid)) != STATUS_SUCCESS) {
 		cout << "Could not create white kitten: " << ret << endl;
 		return 1;
 	}
 	current_kitten = wid;
-	if((ret = conn.getName(name)) != 0) {
+	if((ret = conn.GetName(name)) != STATUS_SUCCESS) {
 		cout << "Could not get kitten name: " << ret << endl;
 		return 1;
 	}
 	cout << "Got back name: " << name << endl;
-	if((ret = conn.getColour(white)) != 0) {
+	if((ret = conn.GetColour(white)) != STATUS_SUCCESS) {
 		cout << "Could not get kitten colour (1): " << ret << endl;
 		return 1;
 	}
 	cout << "Got back colour: " << static_cast<int>(white.red) << ", ";
 	cout << static_cast<int>(white.green) << ", " << static_cast<int>(white.blue) << endl;
-	if((ret = conn.stroke(5)) != 0) {
+	if((ret = conn.Stroke(5)) != STATUS_SUCCESS) {
 		cout << "Could not stroke white kitten: " << ret << endl;
 		return 1;
 	}
 
-	if((ret = conn.createKitten("Jeremy", black, bid)) != 0) {
+	if((ret = conn.CreateKitten("Jeremy", black, bid)) != STATUS_SUCCESS) {
 		cout << "Could not create black kitten: " << ret << endl;
 		return 1;
 	}
 	current_kitten = bid;
-	if((ret = conn.stroke(8)) != 0) {
+	if((ret = conn.Stroke(8)) != STATUS_SUCCESS) {
 		cout << "Could not stroke black kitten: " << ret << endl;
 		return 1;
 	}
 
-	if((ret = conn.setCurrentKitten(wid)) != 0) {
+	if((ret = conn.SetCurrentKitten(wid)) != STATUS_SUCCESS) {
 		cout << "Could not set white kitten: " << ret << endl;
 		return 1;
 	}
 	current_kitten = wid;
-	if((ret = conn.getColour(white)) != 0) {
+	if((ret = conn.GetColour(white)) != STATUS_SUCCESS) {
 		cout << "Could not get kitten colour (2): " << ret << endl;
 		return 1;
 	}

@@ -24,10 +24,10 @@ struct Colour {
 	uint8 blue;
 };
 
-function createKitten(string name, Colour colour, out KittenID id);
-function setCurrentKitten(KittenID id);
-function getName(out string name);
-function getColour(out Colour colour);
-function stroke(int32 duration);
+function CreateKitten(string name, Colour colour, out KittenID id);
+function SetCurrentKitten(KittenID id);
+function GetName(out string name);
+function GetColour(out Colour colour);
+function Stroke(int32 duration);
 
-event onPurr(int32 duration);
+event OnPurr(int32 duration);

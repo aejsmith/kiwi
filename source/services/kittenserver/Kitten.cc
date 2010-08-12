@@ -25,36 +25,34 @@
 using namespace std;
 
 /** Map of IDs to Kittens. */
-Kitten::KittenMap Kitten::s_kitten_map;
+Kitten::KittenMap Kitten::m_kitten_map;
 
 /** Next kitten ID. */
-Kitten::ID Kitten::s_next_id = 0;
+Kitten::ID Kitten::m_next_id = 0;
 
 /** Construct a Kitten.
  * @param name		Name of the kitten.
  * @param colour	Colour of the kitten.
  * @param owner		Connection that created the kitten. */
 Kitten::Kitten(string name, Colour colour, Connection *owner) :
-	m_id(s_next_id++), m_name(name), m_colour(colour), m_owner(owner)
+	m_id(m_next_id++), m_name(name), m_colour(colour), m_owner(owner)
 {
 	/* Add the kitten to the kitten map. */
-	s_kitten_map.insert(make_pair(m_id, this));
+	m_kitten_map.insert(make_pair(m_id, this));
 }
 
 /** Stroke a kitten.
  * @param duration	How long to stroke the kitten for. */
-void Kitten::stroke(int duration) {
-	m_owner->onPurr(duration);
+void Kitten::Stroke(int duration) {
+	m_owner->OnPurr(duration);
 }
 
 /** Look up a kitten by ID.
  * @param id		ID of kitten to look up.
  * @return		Pointer to kitten if found, NULL if not. */
-Kitten *Kitten::lookup(ID id) {
-	KittenMap::iterator it;
-
-	it = s_kitten_map.find(id);
-	if(it == s_kitten_map.end()) {
+Kitten *Kitten::Lookup(ID id) {
+	KittenMap::iterator it = m_kitten_map.find(id);
+	if(it == m_kitten_map.end()) {
 		return NULL;
 	}
 

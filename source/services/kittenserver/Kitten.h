@@ -43,31 +43,31 @@ public:
 
 	/** Get the ID of the kitten.
 	 * @return		ID of the kitten. */
-	ID getID() const { return m_id; }
+	ID GetID() const { return m_id; }
 
 	/** Get the name of the kitten.
 	 * @return		Name of the kitten. */
-	const std::string &getName() const { return m_name; }
+	const std::string &GetName() const { return m_name; }
 
 	/** Get the colour of the kitten.
 	 * @return		Colour of the kitten. */
-	Colour getColour() const { return m_colour; }
+	Colour GetColour() const { return m_colour; }
 
 	/** Check whether a connection is the owner of the kitten.
 	 * @return		Whether the connection owns the kitten. */
-	bool isOwner(Connection *conn) const { return conn == m_owner; }
+	bool IsOwner(Connection *conn) const { return conn == m_owner; }
 
-	void stroke(int duration);
+	void Stroke(int duration);
 
-	static Kitten *lookup(ID id);
+	static Kitten *Lookup(ID id);
 private:
 	ID m_id;			/**< ID of the kitten. */
 	std::string m_name;		/**< Name of the kitten. */
 	Colour m_colour;		/**< Colour of the kitten. */
 	Connection *m_owner;		/**< Owner of the kitten. */
 
-	static KittenMap s_kitten_map;	/**< Map of IDs to Kittens. */
-	static ID s_next_id;		/**< Next kitten ID. */
+	static KittenMap m_kitten_map;	/**< Map of IDs to Kittens. */
+	static ID m_next_id;		/**< Next kitten ID. */
 };
 
 #endif /* __KITTEN_H */

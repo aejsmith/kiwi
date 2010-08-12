@@ -29,11 +29,11 @@ class Connection : public org::kiwi::KittenServer::ClientConnection {
 public:
 	Connection(handle_t handle);
 private:
-	kiwi::RPCResult createKitten(const std::string &name, Kitten::Colour colour, Kitten::ID &id);
-	kiwi::RPCResult setCurrentKitten(Kitten::ID id);
-	kiwi::RPCResult getName(std::string &name);
-	kiwi::RPCResult getColour(Kitten::Colour &colour);
-	kiwi::RPCResult stroke(int32_t duration);
+	status_t CreateKitten(const std::string &name, Kitten::Colour colour, Kitten::ID &id);
+	status_t SetCurrentKitten(Kitten::ID id);
+	status_t GetName(std::string &name);
+	status_t GetColour(Kitten::Colour &colour);
+	status_t Stroke(int32_t duration);
 
 	Kitten *m_current_kitten;	/**< Current kitten. */
 };
