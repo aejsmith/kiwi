@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,9 +18,9 @@
  * @brief		File concatenation command.
  */
 
-#include <kernel/errors.h>
 #include <kernel/fs.h>
 #include <kernel/object.h>
+#include <kernel/status.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -60,14 +60,17 @@ public:
 				cout << " (`-.  `--.)        " << endl;
 				cout << "  `._)----'         " << endl << endl;
 			}
-			return -ERR_PARAM_INVAL;
+			return STATUS_INVALID_ARG;
 		}
 
 		for(i = 1; i < argc; i++) {
-			if((handle = fs_file_open(argv[i], FS_FILE_READ)) < 0) {
-				cout << "Failed to open " << argv[i] << " (" << handle << ")" << endl;
+			ret = fs_file_open(argv[i], FS_FILE_READ, &handle);
+			if(ret != STATUS_SUCCESS) {
+				cout << "Failed to open " << argv[i] << " (" << ret << ")" << endl;
 				return handle;
-			} else if((ret = fs_handle_info(handle, &info)) != 0) {
+			}
+			ret = fs_handle_info(handle, &info);
+			if(ret != STATUS_SUCCESS) {
 				cout << "Failed to get information on " << argv[i] << " (" << ret << ")" << endl;
 				handle_close(handle);
 				return ret;
@@ -75,7 +78,8 @@ public:
 
 			block = new char[info.blksize];
 			while(true) {
-				if((ret = fs_file_read(handle, block, info.blksize, &bytes)) != 0) {
+				ret = fs_file_read(handle, block, info.blksize, &bytes);
+				if(ret != STATUS_SUCCESS) {
 					cout << "Failed to read " << argv[i] << " (" << ret << ")" << endl;
 					handle_close(handle);
 					delete[] block;
@@ -91,7 +95,7 @@ public:
 			delete[] block;
 		}
 
-		return 0;
+		return STATUS_SUCCESS;
 	}
 };
 

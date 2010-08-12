@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,9 +18,9 @@
  * @brief		Directory list command.
  */
 
-#include <kernel/errors.h>
 #include <kernel/fs.h>
 #include <kernel/object.h>
+#include <kernel/status.h>
 
 #include <cerrno>
 #include <cstdlib>
@@ -40,36 +40,40 @@ public:
 	 * @param argv		Argument array.
 	 * @return		0 on success, other value on failure. */
 	int operator ()(int argc, char **argv) {
+		char path[FS_PATH_MAX];
 		fs_dir_entry_t *entry;
 		handle_t handle;
-		char path[4096];
 		const char *dir;
 		fs_info_t info;
-		int ret;
+		status_t ret;
 
 		if(SHELL_HELP(argc, argv) || (argc != 1 && argc != 2)) {
 			cout << "Usage: " << argv[0] << " [<directory>]" << endl;
-			return -ERR_PARAM_INVAL;
+			return 1;
 		}
 
 		dir = (argc == 2) ? argv[1] : ".";
-		if((handle = fs_dir_open(dir, 0)) < 0) {
-			cout << "Failed to open directory (" << handle << ")" << endl;
-			return handle;
-		} else if(!(entry = reinterpret_cast<fs_dir_entry_t *>(malloc(4096)))) {
+		ret = fs_dir_open(dir, 0, &handle);
+		if(ret != STATUS_SUCCESS) {
+			cout << "Failed to open directory (" << ret << ")" << endl;
+			return 1;
+		}
+
+		entry = reinterpret_cast<fs_dir_entry_t *>(malloc(4096));
+		if(!entry) {
 			cout << "Failed to allocate directory entry" << endl;
-			return -ERR_NO_MEMORY;
+			return 1;
 		}
 
 		printf("ID    Links  Size       Name\n");
 		printf("==    =====  ====       ====\n");
 
 		while(true) {
-			if((ret = fs_dir_read(handle, entry, 4096)) != 0) {
+			ret = fs_dir_read(handle, entry, 4096);
+			if(ret != STATUS_SUCCESS) {
 				handle_close(handle);
 				free(entry);
-
-				if(errno != ERR_NOT_FOUND) {
+				if(ret != STATUS_NOT_FOUND) {
 					cout << "Failed to read directory (" << ret << ")" << endl;
 					return ret;
 				}
@@ -81,7 +85,8 @@ public:
 			strcat(path, entry->name);
 
 			/* Get information. */
-			if((ret = fs_info(path, false, &info)) != 0) {
+			ret = fs_info(path, false, &info);
+			if(ret != STATUS_SUCCESS) {
 				cout << "Failed to get entry information (" << ret << ")" << endl;
 				handle_close(handle);
 				free(entry);
@@ -89,7 +94,8 @@ public:
 			}
 
 			printf("%-5llu %-6zu %-10llu ", info.id, info.links, info.size);
-			if((ret = fs_symlink_read(path, path, 4096)) > 0) {
+			ret = fs_symlink_read(path, path, FS_PATH_MAX);
+			if(ret == STATUS_SUCCESS) {
 				printf("%s -> %s\n", entry->name, path);
 			} else {
 				printf("%s\n", entry->name);

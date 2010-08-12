@@ -18,8 +18,8 @@
  * @brief		Sleep command.
  */
 
-#include <kernel/errors.h>
 #include <kernel/thread.h>
+#include <kernel/status.h>
 
 #include <iostream>
 #include <stdlib.h>
@@ -42,7 +42,7 @@ public:
 
 		if(SHELL_HELP(argc, argv) || argc != 2) {
 			cout << "Usage: " << argv[0] << " <seconds>" << endl;
-			return -ERR_PARAM_INVAL;
+			return STATUS_INVALID_ARG;
 		}
 
 		seconds = strtoul(argv[1], NULL, 0);

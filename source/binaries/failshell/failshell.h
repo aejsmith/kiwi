@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -29,6 +29,7 @@
 
 /** Shell class. */
 class Shell {
+	friend class HelpCommand;
 public:
 	/** Command class. */
 	class Command {
@@ -44,11 +45,11 @@ public:
 
 		/** Get the command name.
 		 * @return		Name of command. */
-		const char *Name(void) { return m_name; }
+		const char *GetName(void) { return m_name; }
 
 		/** Get the command description.
 		 * @return		Description of command. */
-		const char *Description(void) { return m_description; }
+		const char *GetDescription(void) { return m_description; }
 
 		/** Implementation of the command.
 		 * @param argc		Argument count.
@@ -66,43 +67,29 @@ public:
 		const char *m_name;		/**< Name of command. */
 		const char *m_description;	/**< Description of command. */
 	};
-
-	/** Add a command to the shell.
-	 * @param cmd		Command to add. */
-	static void AddCommand(Command *cmd);
-
+private:
+	/** Type of the command map. */
+	typedef std::map<std::string, Command *> CommandMap;
+public:
 	/** Constructor. */
 	Shell(FILE *input) : m_input(input), m_exit(false) {}
 
-	/** Main loop for the shell.
-	 * @return		Process exit code. */
 	int Run(void);
 
 	/** Exit the shell after the current command finishes. */
 	void Exit(void) { m_exit = true; }
+
+	static void AddCommand(Command *cmd);
 private:
-	/** Get a line of input.
-	 * @return		Pointer to buffer. */
 	char *ReadLine(void);
-
-	/** Split a line into arguments/count.
-	 * @param line		Line to split (will be modified).
-	 * @param argc		Where to store argument count.
-	 * @param argv		Where to store argument array.
-	 * @return		True on success, false on failure. */
 	bool SplitLine(char *line, int &argc, char **&argv);
-
-	/** Run a command.
-	 * @param argc		Argument count.
-	 * @param argv		Argument array. */
 	void RunCommand(int argc, char **argv);
 
 	FILE *m_input;			/**< Input stream. */
 	bool m_exit;			/**< Whether to exit the shell after the current command. */
 
 	/** List of commands. */
-	static std::map<std::string, Command *> m_commands;
-friend class HelpCommand;
+	static CommandMap m_commands;
 };
 
 /** Helper macro to check if a help message is wanted. */

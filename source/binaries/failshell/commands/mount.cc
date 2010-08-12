@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,8 +18,8 @@
  * @brief		Mount command.
  */
 
-#include <kernel/errors.h>
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <iostream>
 
@@ -41,7 +41,7 @@ public:
 
 		if(SHELL_HELP(argc, argv) || (argc != 4 && argc != 5)) {
 			cout << "Usage: " << argv[0] << " <dev> <path> <type> [<opts>]" << endl;
-			return -ERR_PARAM_INVAL;
+			return STATUS_INVALID_ARG;
 		}
 
 		dev = argv[1];

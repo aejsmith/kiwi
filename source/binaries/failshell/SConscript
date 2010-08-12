@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -19,11 +19,9 @@ env.Program('failshell', [
 	'commands/ls.cc',
 	'commands/mkdir.cc',
 	'commands/mount.cc',
-	'commands/read.cc',
 	'commands/sleep.cc',
 	'commands/symlink.cc',
 	'commands/unlink.cc',
 	'commands/unmount.cc',
-	'commands/write.cc',
 	'main.cc',
 ], LIBS=['kiwi'])

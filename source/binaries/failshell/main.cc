@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -33,7 +33,7 @@ using namespace kiwi;
 using namespace std;
 
 /** Map of shell commands. */
-map<string, Shell::Command *> Shell::m_commands;
+Shell::CommandMap Shell::m_commands;
 
 /** Help command. */
 class HelpCommand : Shell::Command {
@@ -47,15 +47,12 @@ public:
 	 * @param argv		Argument array.
 	 * @return		0 on success, other value on failure. */
 	int operator ()(Shell *shell, int argc, char **argv) {
-		const char *nargs[] = { NULL, "--help", NULL };
-		map<string, Shell::Command *>::iterator it;
-
 		/* If we want a specific command, call it with --help as an
 		 * argument. */
 		if(argc > 1 && !SHELL_HELP(argc, argv)) {
-			nargs[0] = argv[1];
+			const char *nargs[] = { argv[1], "--help", NULL };
 
-			it = Shell::m_commands.find(argv[1]);
+			Shell::CommandMap::iterator it = Shell::m_commands.find(argv[1]);
 			if(it != Shell::m_commands.end()) {
 				(*it->second)(shell, 2, const_cast<char **>(nargs));
 				return 0;
@@ -65,11 +62,15 @@ public:
 			return 1;
 		}
 
+		/* Print a list of all commands instead. */
 		cout << "Command       Info" << endl;
 		cout << "=======       ====" << endl;
 
-		for(it = Shell::m_commands.begin(); it != Shell::m_commands.end(); it++) {
-			printf("%-12s  %s\n", it->second->Name(), it->second->Description());
+		for(Shell::CommandMap::iterator it = Shell::m_commands.begin();
+		    it != Shell::m_commands.end();
+		    ++it)
+		{
+			printf("%-12s  %s\n", it->second->GetName(), it->second->GetDescription());
 		}
 
 		return 0;
@@ -107,7 +108,7 @@ static ExitCommand exit_command;
 /** Add a command to the shell.
  * @param cmd		Command to add. */
 void Shell::AddCommand(Command *cmd) {
-	m_commands.insert(pair<string, Command *>(cmd->Name(), cmd));
+	m_commands.insert(make_pair(cmd->GetName(), cmd));
 }
 
 /** Main loop for the shell.
@@ -117,13 +118,15 @@ int Shell::Run(void) {
 	int argc;
 
 	while(true) {
-		if(fs_getcwd(cwd, 4096) == 0) {
+		if(fs_getcwd(cwd, 4096) == STATUS_SUCCESS) {
 			cout << "Kiwi:" << cwd << "> ";
 		} else {
 			cout << "Kiwi> ";
 		}
-		if(!(line = ReadLine())) {
-			cout << endl << "Out of memory" << endl;
+
+		/* Read in a line of data. */
+		line = ReadLine();
+		if(!line) {
 			return 1;
 		}
 
@@ -144,21 +147,26 @@ int Shell::Run(void) {
 			return 0;
 		}
 	}
-	return 0;
 }
 
 /** Get a line of input.
- * @return		Pointer to buffer, or NULL if out of memory. */
+ * @return		Pointer to buffer, or NULL if could not be read. */
 char *Shell::ReadLine(void) {
 	char *buf = NULL, *tmp;
 	size_t count = 0;
 	int ch;
 
 	do {
-		if((ch = fgetc(m_input)) == EOF) {
+		ch = fgetc(m_input);
+		if(ch == EOF) {
 			free(buf);
 			return NULL;
-		} else if(!(tmp = reinterpret_cast<char *>(realloc(buf, count + 1)))) {
+		}
+
+		/* Reallocate the buffer. */
+		tmp = reinterpret_cast<char *>(realloc(buf, count + 1));
+		if(!tmp) {
+			cout << endl << "Out of memory" << endl;
 			free(buf);
 			return NULL;
 		}
@@ -169,7 +177,7 @@ char *Shell::ReadLine(void) {
 				buf[--count] = 0;
 			}
 		} else {
-			buf[count++] = (ch == '\n') ? 0 : static_cast<unsigned char>(ch);
+			buf[count++] = (ch == '\n') ? 0 : static_cast<char>(ch);
 		}
 	} while(ch != '\n');
 
@@ -191,7 +199,10 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
 	while((tok = strsep(&line, " "))) {
 		if(!tok[0]) {
 			continue;
-		} else if(!(tmp = reinterpret_cast<char **>(realloc(argv, (argc + 2) * sizeof(char *))))) {
+		}
+
+		tmp = reinterpret_cast<char **>(realloc(argv, (argc + 2) * sizeof(char *)));
+		if(!tmp) {
 			free(argv);
 			return false;
 		}
@@ -210,24 +221,23 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
  * @param argc		Argument count.
  * @param argv		Argument array. */
 void Shell::RunCommand(int argc, char **argv) {
-	map<string, Command *>::iterator it;
-	Process proc;
-	int ret;
-
 	/* Try to match it against a built-in command. */
-	it = Shell::m_commands.find(argv[0]);
+	CommandMap::iterator it = Shell::m_commands.find(argv[0]);
 	if(it != Shell::m_commands.end()) {
-		if((ret = (*it->second)(this, argc, argv)) != 0) {
+		int ret = (*it->second)(this, argc, argv);
+		if(ret != 0) {
 			cout << "Command returned error status " << ret << endl;
 		}
 		return;
 	}
 
 	/* Run a process. */
-	if(!proc.create(argv)) {
-		cout << "Failed to run command '" << argv[0] << "'" << endl;
+	try {
+		Process proc(argv);
+		proc.WaitForExit();
+	} catch(Error &e) {
+		cout << "Failed to run command '" << argv[0] << "': " << e.GetDescription() << endl;
 	}
-	proc.waitTerminate();
 }
 
 /** Main function for FailShell.
@@ -238,6 +248,6 @@ int main(int argc, char **argv) {
 	Shell shell(stdin);
 
 	cout << endl;
-	cout << "Welcome to FailShell! (process " << Process::getCurrentID() << ")" << endl;
+	cout << "Welcome to FailShell! (process " << Process::GetCurrentID() << ")" << endl;
 	return shell.Run();
 }

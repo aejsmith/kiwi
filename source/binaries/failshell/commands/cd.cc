@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -18,8 +18,8 @@
  * @brief		Change directory command.
  */
 
-#include <kernel/errors.h>
 #include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <iostream>
 
@@ -39,7 +39,7 @@ public:
 	int operator ()(int argc, char **argv) {
 		if(SHELL_HELP(argc, argv) || argc != 2) {
 			cout << "Usage: " << argv[0] << " <directory>" << endl;
-			return -ERR_PARAM_INVAL;
+			return STATUS_INVALID_ARG;
 		}
 
 		return fs_setcwd(argv[1]);
