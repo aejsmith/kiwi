@@ -51,12 +51,18 @@ extern "C" {
 #define STDOUT_FILENO			1
 #define STDERR_FILENO			2
 
+/** Mode flags for access(). */
+#define F_OK				0	/**< Check for file existance. */
+#define R_OK				0x0001	/**< Check for read permission. */
+#define W_OK				0x0002	/**< Check for write permission. */
+#define X_OK				0x0004	/**< Check for execute permission. */
+
 //extern char *optarg;
 //extern int optind, opterr, optopt;
 
-//extern int access(const char *path, int mode);
+extern int access(const char *path, int mode);
 //extern unsigned int alarm(unsigned int seconds);
-//extern int chdir(const char *path);
+extern int chdir(const char *path);
 //extern int chown(const char *path, uid_t uid, gid_t gid);
 extern int close(int fd);
 /* size_t confstr(int, char *, size_t); */
@@ -79,9 +85,9 @@ extern void _exit(int status);
 /* int fexecve(int, char *const [], char *const []); */
 //extern pid_t fork(void);
 /* long fpathconf(int, int); */
-/* int fsync(int); */
+extern int fsync(int fd);
 /* int ftruncate(int, off_t); */
-//extern char *getcwd(char *buf, size_t size);
+extern char *getcwd(char *buf, size_t size);
 /* gid_t getegid(void); */
 /* uid_t geteuid(void); */
 //extern gid_t getgid(void);
@@ -98,7 +104,7 @@ extern void _exit(int status);
 //extern pid_t getppid(void);
 //extern pid_t getsid(pid_t pid);
 //extern uid_t getuid(void);
-//extern char *getwd(char *buf);
+extern char *getwd(char *buf);
 //extern int isatty(int fd);
 //extern int lchown(const char *path, uid_t uid, gid_t gid);
 //extern int link(const char *source, const char *dest);
@@ -126,16 +132,16 @@ extern ssize_t read(int fd, void *buf, size_t count);
 /* int setuid(uid_t); */
 //extern unsigned int sleep(unsigned int secs);
 /* void swab(const void *restrict, void *restrict, ssize_t); */
-//extern int symlink(const char *dest, const char *path);
+extern int symlink(const char *dest, const char *path);
 /* int symlinkat(const char *, int, const char *); */
-/* void sync(void); */
+extern void sync(void);
 /* long sysconf(int); */
 //extern pid_t tcgetpgrp(int fd);
 //extern int tcsetpgrp(int fd, pid_t pgid);
 /* int truncate(const char *, off_t); */
 /* char *ttyname(int); */
 /* int ttyname_r(int, char *, size_t); */
-//extern int unlink(const char *path);
+extern int unlink(const char *path);
 //extern int unlinkat(int, const char *, int);
 extern ssize_t write(int fd, const void *buf, size_t count);
 

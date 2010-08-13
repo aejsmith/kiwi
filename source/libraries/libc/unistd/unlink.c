@@ -15,18 +15,33 @@
 
 /**
  * @file
- * @brief		Implementation-defined constants.
+ * @brief		POSIX unlink function.
  */
 
-#ifndef __LIMITS_H
-#define __LIMITS_H
+#include <kernel/fs.h>
+#include <kernel/status.h>
 
-/** Various system limitations. */
-#define PATH_MAX		4096	/**< Maximum length of a path string. */
-#define SYMLINK_MAX		4096	/**< Maximum length of a symbolic link destination. */
+#include <unistd.h>
 
-#ifndef _GCC_LIMITS_H_
-# include_next <limits.h>
-#endif
+#include "../libc.h"
 
-#endif /* __LIMITS_H */
+/** Remove a directory entry.
+ *
+ * Removes an entry from a directory in the filesystem. If no more links remain
+ * to the file the entry refers to, it will be removed.
+ *
+ * @param path		Path to unlink.
+ *
+ * @return		0 on success, -1 on failure.
+ */
+int unlink(const char *path) {
+	status_t ret;
+
+	ret = fs_unlink(path);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
+}

@@ -111,7 +111,7 @@ int fcntl(int fd, int cmd, ...) {
 	case F_DUPFD:
 	case F_GETFL:
 	case F_SETFL:
-		errno = ENOSYS;
+		libc_stub("fcntl(F_{DUPFD,GETFL,SETFL})");
 	default:
 		errno = EINVAL;
 	}

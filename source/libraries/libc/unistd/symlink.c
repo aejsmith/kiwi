@@ -15,18 +15,28 @@
 
 /**
  * @file
- * @brief		Implementation-defined constants.
+ * @brief		POSIX symbolic link function.
  */
 
-#ifndef __LIMITS_H
-#define __LIMITS_H
+#include <kernel/fs.h>
+#include <kernel/status.h>
 
-/** Various system limitations. */
-#define PATH_MAX		4096	/**< Maximum length of a path string. */
-#define SYMLINK_MAX		4096	/**< Maximum length of a symbolic link destination. */
+#include <unistd.h>
 
-#ifndef _GCC_LIMITS_H_
-# include_next <limits.h>
-#endif
+#include "../libc.h"
 
-#endif /* __LIMITS_H */
+/** Create a symbolic link.
+ * @param dest		Destination of the link.
+ * @param path		Path name for the link.
+ * @return		0 on success, -1 on failure. */
+int symlink(const char *dest, const char *path) {
+	status_t ret;
+
+	ret = fs_symlink_create(path, dest);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
+}

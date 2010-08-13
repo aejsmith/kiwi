@@ -15,18 +15,33 @@
 
 /**
  * @file
- * @brief		Implementation-defined constants.
+ * @brief		POSIX change directory function.
  */
 
-#ifndef __LIMITS_H
-#define __LIMITS_H
+#include <kernel/fs.h>
+#include <kernel/status.h>
 
-/** Various system limitations. */
-#define PATH_MAX		4096	/**< Maximum length of a path string. */
-#define SYMLINK_MAX		4096	/**< Maximum length of a symbolic link destination. */
+#include <errno.h>
+#include <unistd.h>
 
-#ifndef _GCC_LIMITS_H_
-# include_next <limits.h>
-#endif
+#include "../libc.h"
 
-#endif /* __LIMITS_H */
+/** Set the current working directory.
+ * @param path		Path to change to.
+ * @return		0 on success, -1 on failure with errno set accordingly. */
+int chdir(const char *path) {
+	status_t ret;
+
+	if(!path || !path[0]) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	ret = fs_setcwd(path);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return ret;
+}
