@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,43 +15,48 @@
 
 /**
  * @file
- * @brief		PCI bus module.
+ * @brief		PCI bus manager.
  */
 
 #ifndef __DRIVERS_PCI_H
 #define __DRIVERS_PCI_H
 
-#include <types.h>
+#ifndef KERNEL
+# error "This header is for kernel/driver use only"
+#endif
+
+#include <lib/list.h>
 
 struct device;
+struct pci_device;
 
-/** PCI Device structure fields. */
-#define PCI_DEVICE_VENDOR_ID		0x00	/**< Vendor ID        - 16-bit. */
-#define PCI_DEVICE_DEVICE_ID		0x02	/**< Device ID        - 16-bit. */
-#define PCI_DEVICE_COMMAND		0x04	/**< Command          - 16-bit. */
-#define PCI_DEVICE_STATUS		0x06	/**< Status           - 16-bit. */
-#define PCI_DEVICE_REVISION		0x08	/**< Revision ID      - 8-bit. */
-#define PCI_DEVICE_PI			0x09	/**< Prog. Interface  - 8-bit.  */
-#define PCI_DEVICE_SUB_CLASS		0x0A	/**< Sub-class        - 8-bit.  */
-#define PCI_DEVICE_BASE_CLASS		0x0B	/**< Base class       - 8-bit.  */
-#define PCI_DEVICE_CACHESZ		0x0C	/**< Cache line size  - 8-bit.  */
-#define PCI_DEVICE_LATENCY		0x0D	/**< Latency timer    - 8-bit.  */
-#define PCI_DEVICE_HEADER_TYPE		0x0E	/**< Header type      - 8-bit.  */
-#define PCI_DEVICE_BIST			0x0F	/**< BIST             - 8-bit.  */
-#define PCI_DEVICE_BAR0			0x10	/**< BAR0             - 32-bit. */
-#define PCI_DEVICE_BAR1			0x14	/**< BAR1             - 32-bit. */
-#define PCI_DEVICE_BAR2			0x18	/**< BAR2             - 32-bit. */
-#define PCI_DEVICE_BAR3			0x1C	/**< BAR3             - 32-bit. */
-#define PCI_DEVICE_BAR4			0x20	/**< BAR4             - 32-bit. */
-#define PCI_DEVICE_BAR5			0x24	/**< BAR5             - 32-bit. */
-#define PCI_DEVICE_CARDBUS_CIS		0x28	/**< Cardbus CIS Ptr  - 32-bit. */
-#define PCI_DEVICE_SUBSYS_VENDOR	0x2C	/**< Subsystem vendor - 16-bit. */
-#define PCI_DEVICE_SUBSYS_ID		0x2E	/**< Subsystem ID     - 16-bit. */
-#define PCI_DEVICE_ROM_ADDR		0x30	/**< ROM base address - 32-bit. */
-#define PCI_DEVICE_INTERRUPT_LINE	0x3C	/**< Interrupt line   - 8-bit.  */
-#define PCI_DEVICE_INTERRUPT_PIN	0x3D	/**< Interrupt pin    - 8-bit.  */
-#define PCI_DEVICE_MIN_GRANT		0x3E	/**< Min grant        - 8-bit.  */
-#define PCI_DEVICE_MAX_LATENCY		0x3F	/**< Max latency      - 8-bit.  */
+/** Offsets into PCI configuration space. */
+#define PCI_CONFIG_VENDOR_ID		0x00	/**< Vendor ID        - 16-bit. */
+#define PCI_CONFIG_DEVICE_ID		0x02	/**< Device ID        - 16-bit. */
+#define PCI_CONFIG_COMMAND		0x04	/**< Command          - 16-bit. */
+#define PCI_CONFIG_STATUS		0x06	/**< Status           - 16-bit. */
+#define PCI_CONFIG_REVISION		0x08	/**< Revision ID      - 8-bit. */
+#define PCI_CONFIG_PI			0x09	/**< Prog. Interface  - 8-bit.  */
+#define PCI_CONFIG_SUB_CLASS		0x0A	/**< Sub-class        - 8-bit.  */
+#define PCI_CONFIG_BASE_CLASS		0x0B	/**< Base class       - 8-bit.  */
+#define PCI_CONFIG_CACHE_LINE_SIZE	0x0C	/**< Cache line size  - 8-bit.  */
+#define PCI_CONFIG_LATENCY		0x0D	/**< Latency timer    - 8-bit.  */
+#define PCI_CONFIG_HEADER_TYPE		0x0E	/**< Header type      - 8-bit.  */
+#define PCI_CONFIG_BIST			0x0F	/**< BIST             - 8-bit.  */
+#define PCI_CONFIG_BAR0			0x10	/**< BAR0             - 32-bit. */
+#define PCI_CONFIG_BAR1			0x14	/**< BAR1             - 32-bit. */
+#define PCI_CONFIG_BAR2			0x18	/**< BAR2             - 32-bit. */
+#define PCI_CONFIG_BAR3			0x1C	/**< BAR3             - 32-bit. */
+#define PCI_CONFIG_BAR4			0x20	/**< BAR4             - 32-bit. */
+#define PCI_CONFIG_BAR5			0x24	/**< BAR5             - 32-bit. */
+#define PCI_CONFIG_CARDBUS_CIS		0x28	/**< Cardbus CIS Ptr  - 32-bit. */
+#define PCI_CONFIG_SUBSYS_VENDOR	0x2C	/**< Subsystem vendor - 16-bit. */
+#define PCI_CONFIG_SUBSYS_ID		0x2E	/**< Subsystem ID     - 16-bit. */
+#define PCI_CONFIG_ROM_ADDR		0x30	/**< ROM base address - 32-bit. */
+#define PCI_CONFIG_INTERRUPT_LINE	0x3C	/**< Interrupt line   - 8-bit.  */
+#define PCI_CONFIG_INTERRUPT_PIN	0x3D	/**< Interrupt pin    - 8-bit.  */
+#define PCI_CONFIG_MIN_GRANT		0x3E	/**< Min grant        - 8-bit.  */
+#define PCI_CONFIG_MAX_LATENCY		0x3F	/**< Max latency      - 8-bit.  */
 
 /** Value to match any ID in the structure below. */
 #define PCI_ANY_ID			(~((uint32_t)0))
@@ -65,20 +70,53 @@ typedef struct pci_device_id {
 	void *data;				/**< Driver data. */
 } pci_device_id_t;
 
-/** PCI device lookup callback function.
- * @param dev		Device that matched.
- * @param id		ID structure the device matches.
- * @return		Whether to continue lookup. */
-typedef bool (*pci_lookup_t)(struct device *dev, pci_device_id_t *id);
+/** PCI driver information structure. */
+typedef struct pci_driver {
+	list_t header;				/**< Link to PCI driver list. */
+	list_t devices;				/**< Devices claimed by the driver. */
 
-extern uint8_t pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
-extern uint16_t pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
-extern uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
+	pci_device_id_t *ids;			/**< Array of devices recognised by the driver. */
+	size_t count;				/**< Number of devices in the array. */
 
-extern uint8_t pci_device_read8(struct device *device, uint8_t reg);
-extern uint16_t pci_device_read16(struct device *device, uint8_t reg);
-extern uint32_t pci_device_read32(struct device *device, uint8_t reg);
+	/** Called when a device is matched to the driver.
+	 * @param device	Device that was matched.
+	 * @param data		Data pointer set for the device ID matched.
+	 * @return		Whether the driver has claimed the device. */
+	bool (*add_device)(struct pci_device *device, void *data);
+} pci_driver_t;
 
-extern bool pci_device_lookup(pci_device_id_t *ids, size_t count, pci_lookup_t cb);
+/** PCI device information structure. */
+typedef struct pci_device {
+	/** Linkage to device tree and driver. */
+	list_t header;				/**< Link to driver's devices list. */
+	pci_driver_t *driver;			/**< Driver that has claimed the device. */
+	struct device *node;			/**< Device tree node for the device. */
+
+	/** Location of the device. */
+	uint8_t bus;				/**< Bus ID. */
+	uint8_t device;				/**< Device number. */
+	uint8_t function;			/**< Function number. */
+
+	/** Information about the device. */
+	uint16_t vendor_id;			/**< Vendor ID. */
+	uint16_t device_id;			/**< Device ID. */
+	uint8_t base_class;			/**< Class ID. */
+	uint8_t sub_class;			/**< Sub-class ID. */
+	uint8_t prog_iface;			/**< Programming interface. */
+	uint8_t revision;			/**< Revision. */
+	uint8_t cache_line_size;		/**< Cache line size (number of DWORDs). */
+	uint8_t header_type;			/**< Header type. */
+	uint16_t subsys_vendor;			/**< Subsystem vendor. */
+	uint16_t subsys_id;			/**< Subsystem ID. */
+	uint8_t interrupt_line;			/**< Interrupt line. */
+	uint8_t interrupt_pin;			/**< Interrupt pin. */
+} pci_device_t;
+
+extern uint8_t pci_config_read8(pci_device_t *device, uint8_t reg);
+extern uint16_t pci_config_read16(pci_device_t *device, uint8_t reg);
+extern uint32_t pci_config_read32(pci_device_t *device, uint8_t reg);
+
+extern status_t pci_driver_register(pci_driver_t *driver);
+extern void pci_driver_unregister(pci_driver_t *driver);
 
 #endif /* __DRIVERS_PCI_H */

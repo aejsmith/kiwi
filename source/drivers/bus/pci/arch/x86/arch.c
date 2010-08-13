@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -27,15 +27,13 @@
 
 #include <arch/io.h>
 
-#include <drivers/pci.h>
-
 #include <sync/spinlock.h>
 
 #include <endian.h>
 #include <module.h>
 #include <status.h>
 
-extern status_t pci_arch_init(void);
+#include "../../pci_priv.h"
 
 /** PCI configuration registers. */
 #define PCI_CONFIG_ADDRESS	0xCF8	/**< Configuration Address Register. */
@@ -51,18 +49,12 @@ extern status_t pci_arch_init(void);
 static SPINLOCK_DECLARE(pci_config_lock);
 
 /** Read an 8-bit value from the PCI configuration space.
- *
- * Reads an 8-bit value from the PCI configuration space at the specified
- * location.
- *
  * @param bus		Bus number to read from.
  * @param dev		Device number to read from.
  * @param func		Function number.
  * @param reg		Register to read.
- *
- * @return		Value read.
- */
-uint8_t pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+ * @return		Value read. */
+uint8_t pci_arch_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint8_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -72,21 +64,10 @@ uint8_t pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 
 	return ret;
 }
-MODULE_EXPORT(pci_config_read8);
 
 /** Read a 16-bit value from the PCI configuration space.
- *
- * Reads a 16-bit value from the PCI configuration space at the specified
- * location.
- *
- * @param bus		Bus number to read from.
- * @param dev		Device number to read from.
- * @param func		Function number.
- * @param reg		Register to read.
- *
- * @return		Value read (converted to correct endianness).
- */
-uint16_t pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+ * @return		Value read (converted to correct endianness). */
+uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint16_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -96,21 +77,14 @@ uint16_t pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) 
 
 	return le16_to_cpu(ret);
 }
-MODULE_EXPORT(pci_config_read16);
 
 /** Read a 32-bit value from the PCI configuration space.
- *
- * Reads a 32-bit value from the PCI configuration space at the specified
- * location.
- *
  * @param bus		Bus number to read from.
  * @param dev		Device number to read from.
  * @param func		Function number.
  * @param reg		Register to read.
- *
- * @return		Value read (converted to correct endianness).
- */
-uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+ * @return		Value read (converted to correct endianness). */
+uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint32_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -120,7 +94,6 @@ uint32_t pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) 
 
 	return le32_to_cpu(ret);
 }
-MODULE_EXPORT(pci_config_read32);
 
 /** Check for PCI presence.
  * @return		STATUS_SUCCESS if present, other code if not. */
