@@ -118,8 +118,8 @@ extern int puts(const char *s);
 /* int renameat(int, const char *, int, const char *); */
 extern void rewind(FILE *stream);
 extern int scanf(const char *__restrict fmt, ...);
-/* void setbuf(FILE *__restrict, char *__restrict); */
-/* int setvbuf(FILE *__restrict, char *__restrict, int, size_t); */
+extern void setbuf(FILE *__restrict stream, char *__restrict buf);
+extern int setvbuf(FILE *__restrict stream, char *__restrict buf, int mode, size_t size);
 extern int snprintf(char *__restrict buf, size_t size, const char *__restrict fmt, ...);
 extern int sprintf(char *__restrict buf, const char *__restrict fmt, ...);
 extern int sscanf(const char *__restrict buf, const char *__restrict fmt, ...);
@@ -140,8 +140,6 @@ extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);
 extern int remove(const char *path);
 extern int rename(const char *source, const char *dest);
-extern void setbuf(FILE *__restrict, char *__restrict);
-extern int setvbuf(FILE *__restrict, char *__restrict, int, size_t);
 extern FILE *tmpfile(void);
 extern char *tmpnam(char *);
 #endif

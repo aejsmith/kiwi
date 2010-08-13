@@ -37,6 +37,7 @@ sources = map(File, [
 	'locale/localeconv.c',
 	'locale/setlocale.c',
 
+	'stdio/buffer.c',
 	'stdio/do_printf.c',
 	'stdio/do_scanf.c',
 	'stdio/fclose.c',
