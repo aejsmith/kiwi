@@ -83,15 +83,15 @@ struct stat {
 //extern int chmod(const char *path, mode_t mode);
 //extern int fchmod(int fd, mode_t mode);
 /* int fchmodat(int, const char *, mode_t, int); */
-//extern int fstat(int fd, struct stat *statp);
+extern int fstat(int fd, struct stat *statp);
 /* int fstatat(int, const char *__restrict, struct stat *__restrict, int); */
 /* int futimens(int, const struct timespec [2]); */
-//extern int lstat(const char *__restrict path, struct stat *__restrict statp);
-//extern int mkdir(const char *path, mode_t mode);
+extern int lstat(const char *__restrict path, struct stat *__restrict statp);
+extern int mkdir(const char *path, mode_t mode);
 /* int mkdirat(int, const char *, mode_t); */
 /* int mkfifo(const char *, mode_t); */
 /* int mkfifoat(int, const char *, mode_t); */
-//extern int stat(const char *__restrict path, struct stat *__restrict statp);
+extern int stat(const char *__restrict path, struct stat *__restrict statp);
 //extern mode_t umask(mode_t mask);
 /* int utimensat(int, const char *, const struct timespec [2], int); */
 

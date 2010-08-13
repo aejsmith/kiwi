@@ -89,6 +89,9 @@ sources = map(File, [
 	'string/strstr.c',
 	'string/strtok.c',
 
+	'sys/mkdir.c',
+	'sys/stat.c',
+
 	'time/asctime.c',
 	'time/gmtime.c',
 	'time/localtime.c',

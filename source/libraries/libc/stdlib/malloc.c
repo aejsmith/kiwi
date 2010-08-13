@@ -6,7 +6,6 @@
 
 #include "../libc.h"
 
-#define LACKS_SYS_PARAM_H
 #define LACKS_SYS_MMAN_H
 #define LACKS_UNISTD_H
 #define LACKS_STDLIB_H
