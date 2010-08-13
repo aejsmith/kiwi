@@ -22,7 +22,7 @@ env = envmgr.Create('uspace', {
 	'ASFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
 	'CCFLAGS': ['-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])],
 	'CXXFLAGS': ['-std=c++0x'],
-	'LIBOUTDIR': Dir('libraries')
+	'LIBOUTDIR': Dir('libraries'),
 })
 
 # Set up a shared library emitter to modify the target path so that libraries
