@@ -1,0 +1,263 @@
+diff -urN gcc-4.5.1.orig/config.sub gcc-4.5.1/config.sub
+--- gcc-4.5.1.orig/config.sub	2010-08-13 11:22:28.852918405 +0100
++++ gcc-4.5.1/config.sub	2010-08-13 11:24:46.612543795 +0100
+@@ -1315,7 +1315,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -es* | -kiwi*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)
+diff -urN gcc-4.5.1.orig/gcc/config/i386/kiwi32.h gcc-4.5.1/gcc/config/i386/kiwi32.h
+--- gcc-4.5.1.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.1/gcc/config/i386/kiwi32.h	2010-08-13 11:24:46.613543781 +0100
+@@ -0,0 +1,31 @@
++/* Definitions for Kiwi i386 targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#undef  TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (i386 Kiwi/ELF)");
++
++#undef  LINK_SPEC
++#define LINK_SPEC "%{m64:-m elf_x86_64} %{!m64:-m elf_i386} \
++  %{shared:-shared} \
++  %{!shared: \
++    %{!static: \
++      %{rdynamic:-export-dynamic} \
++      %{m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
++      %{!m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++    %{static:-static}}"
+diff -urN gcc-4.5.1.orig/gcc/config/i386/kiwi64.h gcc-4.5.1/gcc/config/i386/kiwi64.h
+--- gcc-4.5.1.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.1/gcc/config/i386/kiwi64.h	2010-08-13 11:24:46.613543781 +0100
+@@ -0,0 +1,31 @@
++/* Definitions for Kiwi x86-64 targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#undef  TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (x86-64 Kiwi/ELF)");
++
++#undef  LINK_SPEC
++#define LINK_SPEC "%{!m32:-m elf_x86_64} %{m32:-m elf_i386} \
++  %{shared:-shared} \
++  %{!shared: \
++    %{!static: \
++      %{rdynamic:-export-dynamic} \
++      %{!m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
++      %{m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++    %{static:-static}}"
+diff -urN gcc-4.5.1.orig/gcc/config/i386/t-kiwi64 gcc-4.5.1/gcc/config/i386/t-kiwi64
+--- gcc-4.5.1.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.1/gcc/config/i386/t-kiwi64	2010-08-13 11:24:46.614543779 +0100
+@@ -0,0 +1,17 @@
++MULTILIB_OPTIONS = m64/m32
++MULTILIB_DIRNAMES = 64 32
++MULTILIB_OSDIRNAMES = ../lib ../lib32
++
++LIBGCC = stmp-multilib
++INSTALL_LIBGCC = install-multilib
++   
++EXTRA_MULTILIB_PARTS=crtbegin.o crtend.o
++
++# The pushl in CTOR initialization interferes with frame pointer elimination.
++# crtend*.o cannot be compiled without -fno-asynchronous-unwind-tables,
++# because then __FRAME_END__ might not be the last thing in .eh_frame
++# section.
++CRTSTUFF_T_CFLAGS = -fno-omit-frame-pointer -fno-asynchronous-unwind-tables
++
++# Compile libgcc2.a with pic.
++TARGET_LIBGCC2_CFLAGS = -fPIC
+diff -urN gcc-4.5.1.orig/gcc/config/kiwi.h gcc-4.5.1/gcc/config/kiwi.h
+--- gcc-4.5.1.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.1/gcc/config/kiwi.h	2010-08-13 11:24:46.614543779 +0100
+@@ -0,0 +1,40 @@
++/* Definitions for Kiwi targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Specify predefined symbols in preprocessor.  */
++#undef  TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()		\
++	do {					\
++		builtin_define ("__Kiwi__");	\
++	} while (0)
++
++#undef  STARTFILE_SPEC
++#define STARTFILE_SPEC \
++  "%{!shared: %{pg|p|profile:gcrt1.o%s;pie:Scrt1.o%s;:crt1.o%s}} \
++   crti.o%s %{static:crtbeginT.o%s;shared|pie:crtbeginS.o%s;:crtbegin.o%s}"
++
++#undef  ENDFILE_SPEC
++#define ENDFILE_SPEC \
++  "%{shared|pie:crtendS.o%s;:crtend.o%s} crtn.o%s"
++
++#undef  LIB_SPEC
++#define LIB_SPEC "-lc"
++
++/* Make no assumptions about header files. */
++#define NO_IMPLICIT_EXTERN_C
+diff -urN gcc-4.5.1.orig/gcc/config.gcc gcc-4.5.1/gcc/config.gcc
+--- gcc-4.5.1.orig/gcc/config.gcc	2010-08-13 11:22:28.862793783 +0100
++++ gcc-4.5.1/gcc/config.gcc	2010-08-13 11:24:46.617543800 +0100
+@@ -611,6 +611,14 @@
+   default_use_cxa_atexit=yes
+   use_gcc_stdint=wrap
+   ;;
++*-*-kiwi*)
++   extra_parts="crtbegin.o crtend.o crtbeginS.o crtbeginT.o crtendS.o"
++   gas=yes
++   gnu_ld=yes
++   default_use_cxa_atexit=yes
++   tmake_file="t-svr4"
++   tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h kiwi.h"
++   ;;
+ esac
+ 
+ case ${target} in
+@@ -1453,6 +1461,14 @@
+ 		tm_file="${tm_file} dbxcoff.h"
+ 	fi
+ 	;;
++i[34567]86-*-kiwi*)
++	tm_file="${tm_file} i386/kiwi32.h"
++	tmake_file="${tmake_file} i386/t-crtstuff"
++	;;
++x86_64-*-kiwi*)
++	tm_file="${tm_file} i386/x86-64.h i386/kiwi64.h"
++	tmake_file="${tmake_file} i386/t-kiwi64"
++	;;
+ ia64*-*-elf*)
+ 	tm_file="${tm_file} dbxelf.h elfos.h newlib-stdint.h ia64/sysv4.h ia64/elf.h"
+ 	tmake_file="ia64/t-ia64"
+diff -urN gcc-4.5.1.orig/libgcc/config.host gcc-4.5.1/libgcc/config.host
+--- gcc-4.5.1.orig/libgcc/config.host	2010-08-13 11:22:29.319793439 +0100
++++ gcc-4.5.1/libgcc/config.host	2010-08-13 11:24:46.617543800 +0100
+@@ -278,6 +278,10 @@
+ 	;;
+ x86_64-*-elf*)
+ 	;;
++i[34567]86-*-kiwi*)
++	;;
++x86_64-*-kiwi*)
++	;;
+ i[34567]86-*-freebsd*)
+ 	;;
+ x86_64-*-freebsd*)
+diff -urN gcc-4.5.1.orig/libstdc++-v3/configure.host gcc-4.5.1/libstdc++-v3/configure.host
+--- gcc-4.5.1.orig/libstdc++-v3/configure.host	2010-08-13 11:22:29.818793707 +0100
++++ gcc-4.5.1/libstdc++-v3/configure.host	2010-08-13 11:24:46.618919473 +0100
+@@ -256,6 +256,10 @@
+     atomicity_dir=os/irix
+     atomic_word_dir=os/irix
+     ;;
++  kiwi*)
++    error_constants_dir="os/generic"
++    os_include_dir="os/generic"
++    ;;
+   mingw32*)
+     os_include_dir="os/mingw32"
+     error_constants_dir="os/mingw32"
+diff -urN gcc-4.5.1.orig/libstdc++-v3/crossconfig.m4 gcc-4.5.1/libstdc++-v3/crossconfig.m4
+--- gcc-4.5.1.orig/libstdc++-v3/crossconfig.m4	2010-08-13 11:22:29.757793665 +0100
++++ gcc-4.5.1/libstdc++-v3/crossconfig.m4	2010-08-13 11:24:46.619919431 +0100
+@@ -141,6 +141,10 @@
+ 	;;
+     esac
+     ;;
++  *-kiwi*)
++    GLIBCXX_CHECK_COMPILER_FEATURES
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES
+diff -urN gcc-4.5.1.orig/libtool.m4 gcc-4.5.1/libtool.m4
+--- gcc-4.5.1.orig/libtool.m4	2010-08-13 11:22:29.322554420 +0100
++++ gcc-4.5.1/libtool.m4	2010-08-13 11:24:46.623547755 +0100
+@@ -5370,7 +5370,9 @@
+   _LT_LINKER_SHLIBS($1)
+   _LT_SYS_DYNAMIC_LINKER($1)
+   _LT_LINKER_HARDCODE_LIBPATH($1)
+-  LT_SYS_DLOPEN_SELF
++  if test "$cross_compiling" = no; then
++    LT_SYS_DLOPEN_SELF
++  fi
+   _LT_CMD_STRIPLIB
+ 
+   # Report which library types will actually be built
+diff -urN gcc-4.5.1.orig/ltmain.sh gcc-4.5.1/ltmain.sh
+--- gcc-4.5.1.orig/ltmain.sh	2010-08-13 11:22:29.868793790 +0100
++++ gcc-4.5.1/ltmain.sh	2010-08-13 11:24:46.627918604 +0100
+@@ -1451,6 +1451,12 @@
+       removelist="$lobj $libobj ${libobj}T"
+     fi
+ 
++    case $host_os in
++    kiwi*)
++      pic_mode=yes
++      ;;
++    esac
++
+     # On Cygwin there's no "real" PIC flag so we must build both object types
+     case $host_os in
+     cygwin* | mingw* | pw32* | os2* | cegcc*)
+diff -urN gcc-4.5.1.orig/Makefile.in gcc-4.5.1/Makefile.in
+--- gcc-4.5.1.orig/Makefile.in	2010-08-13 11:22:29.284793529 +0100
++++ gcc-4.5.1/Makefile.in	2010-08-13 11:24:46.649918187 +0100
+@@ -58408,7 +58408,6 @@
+ configure-target-libobjc: maybe-configure-target-boehm-gc
+ all-target-libobjc: maybe-all-target-libiberty
+ all-target-libobjc: maybe-all-target-boehm-gc
+-all-target-libstdc++-v3: maybe-all-target-libiberty
+ configure-target-libstdc++-v3: maybe-configure-target-libgomp
+ 
+ configure-stage1-target-libstdc++-v3: maybe-configure-stage1-target-libgomp

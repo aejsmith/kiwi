@@ -16,7 +16,7 @@ from utilities.toolchain.component import ToolchainComponent
 
 class GCCComponent(ToolchainComponent):
 	name = 'gcc'
-	version = '4.5.0'
+	version = '4.5.1'
 	source = [
 		'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-core-' + version + '.tar.bz2',
 		'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-g++-' + version + '.tar.bz2',

@@ -73,37 +73,43 @@ extern "C" {
 #define ENETUNREACH		41	/**< Network unreachable. */
 #define ENFILE			42	/**< Too many files open in system. */
 #define ENOBUFS			43	/**< No buffer space available. */
-#define ENODEV			44	/**< No such device. */
-#define ENOENT			45	/**< No such file or directory. */
-#define ENOEXEC			46	/**< Executable file format error. */
-#define ENOLCK			47	/**< No locks available. */
-#define ENOLINK			48	/**< Reserved. */
-#define ENOMEM			49	/**< Out of memory. */
-#define ENOMSG			50	/**< No message of the desired type. */
-#define ENOPROTOOPT		51	/**< Protocol not available. */
-#define ENOSPC			52	/**< No space left on device. */
-#define ENOSYS			53	/**< Function not implemented. */
-#define ENOTCONN		54	/**< The socket is not connected. */
-#define ENOTDIR			55	/**< Not a directory. */
-#define ENOTEMPTY		56	/**< Directory not empty. */
-#define ENOTSOCK		57	/**< Not a socket. */
-#define ENOTSUP			58	/**< Operation not supported. */
-#define ENOTTY			59	/**< Inappropriate I/O control operation. */
-#define ENXIO			60	/**< No such device or address. */
-#define EOPNOTSUPP		61	/**< Operation not supported on socket. */
-#define EOVERFLOW		62	/**< Value too large to be stored in data type. */
-#define EPERM			63	/**< Operation not permitted. */
-#define EPIPE			64	/**< Broken pipe. */
-#define EPROTO			65	/**< Protocol error. */
-#define EPROTONOSUPPORT		66	/**< Protocol not supported. */
-#define EPROTOTYPE		67	/**< Protocol wrong type for socket. */
-#define EROFS			68	/**< Read-only file system. */
-#define ESPIPE			69	/**< Invalid seek. */
-#define ESRCH			70	/**< No such process. */
-#define ESTALE			71	/**< Reserved. */
-#define ETIMEDOUT		72	/**< Connection timed out. */
-#define ETXTBSY			73	/**< Text file busy. */
-#define EXDEV			74	/**< Cross-device link. */
+#define ENODATA			44	/**< No data available. */
+#define ENODEV			45	/**< No such device. */
+#define ENOENT			46	/**< No such file or directory. */
+#define ENOEXEC			47	/**< Executable file format error. */
+#define ENOLCK			48	/**< No locks available. */
+#define ENOLINK			49	/**< Reserved. */
+#define ENOMEM			50	/**< Out of memory. */
+#define ENOMSG			51	/**< No message of the desired type. */
+#define ENOPROTOOPT		52	/**< Protocol not available. */
+#define ENOSPC			53	/**< No space left on device. */
+#define	ENOSTR			54	/**< Device not a stream. */
+#define	ENOSR			55	/**< Out of streams resources. */
+#define ENOSYS			56	/**< Function not implemented. */
+#define ENOTCONN		57	/**< The socket is not connected. */
+#define ENOTDIR			58	/**< Not a directory. */
+#define ENOTEMPTY		59	/**< Directory not empty. */
+#define ENOTRECOVERABLE		60	/**< State not recoverable. */
+#define ENOTSOCK		61	/**< Not a socket. */
+#define ENOTSUP			62	/**< Operation not supported. */
+#define ENOTTY			63	/**< Inappropriate I/O control operation. */
+#define ENXIO			64	/**< No such device or address. */
+#define EOPNOTSUPP		65	/**< Operation not supported on socket. */
+#define EOVERFLOW		66	/**< Value too large to be stored in data type. */
+#define EOWNERDIED		67	/**< Owner died. */
+#define EPERM			68	/**< Operation not permitted. */
+#define EPIPE			69	/**< Broken pipe. */
+#define EPROTO			70	/**< Protocol error. */
+#define EPROTONOSUPPORT		71	/**< Protocol not supported. */
+#define EPROTOTYPE		72	/**< Protocol wrong type for socket. */
+#define EROFS			73	/**< Read-only file system. */
+#define ESPIPE			74	/**< Invalid seek. */
+#define ESRCH			75	/**< No such process. */
+#define ESTALE			76	/**< Reserved. */
+#define ETIME			77	/**< Timer expired. */
+#define ETIMEDOUT		78	/**< Connection timed out. */
+#define ETXTBSY			79	/**< Text file busy. */
+#define EXDEV			80	/**< Cross-device link. */
 #define EWOULDBLOCK		EAGAIN	/**< Operation would block. */
 
 extern int *__libc_errno_location(void);

@@ -24,7 +24,8 @@
 /** Various system limitations. */
 #define PATH_MAX		4096	/**< Maximum length of a path string. */
 
-/** Pull in GCC's limits.h. */
-#include_next <limits.h>
+#ifndef _GCC_LIMITS_H_
+# include_next <limits.h>
+#endif
 
 #endif /* __LIMITS_H */
