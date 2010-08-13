@@ -162,8 +162,8 @@ static size_t ata_device_transfer_begin(ata_device_t *device, uint64_t lba, size
  * @return		Status code describing result of the operation. */
 static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
 	ata_device_t *device = _device->data;
-	uint8_t cmd, error;
-	size_t current;
+	uint8_t cmd, error, status;
+	size_t current, i;
 	status_t ret;
 
 	mutex_lock(&device->parent->lock);
@@ -182,20 +182,29 @@ static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba,
 		 * devices. */
 		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_READ_SECTORS_EXT : ATA_CMD_READ_SECTORS;
 
-		/* Start the transfer and wait for it to complete. */
+		/* Start the transfer. */
 		ata_controller_command(device->parent, cmd);
-		ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
-		if(ret != STATUS_SUCCESS) {
-			error = ata_controller_error(device->parent);
-			kprintf(LOG_WARN, "ata: read on device %" PRId32 ":%" PRIu8 " failed (status: %d, error: %" PRIu8 ")\n",
-				device->parent->id, device->num, ret, error);
-			mutex_unlock(&device->parent->lock);
-			return ret;
+
+		/* Transfer each sector. */
+		for(i = 0; i < current; i++) {
+			ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+			if(ret != STATUS_SUCCESS) {
+				status = ata_controller_status(device->parent);
+				error = ata_controller_error(device->parent);
+				kprintf(LOG_WARN, "ata: read of %zu block(s) from %" PRIu64 " "
+				        "on %" PRId32 ":%" PRIu8 " failed on block %zu (ret: %d, "
+				        "status: %" PRIu8 ", error: %" PRIu8 ")\n",
+				        current, lba, device->parent->id, device->num, i, ret,
+				        status, error);
+				mutex_unlock(&device->parent->lock);
+				return ret;
+			}
+
+			/* Read the sector. */
+			ata_controller_pio_read(device->parent, buf, _device->block_size);
+			buf += _device->block_size;
 		}
 
-		/* Read the data. */
-		ata_controller_pio_read(device->parent, buf, _device->block_size * current);
-		buf += _device->block_size * current;
 		count -= current;
 		lba += current;
 	}
@@ -212,8 +221,8 @@ static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba,
  * @return		Status code describing result of the operation. */
 static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
 	ata_device_t *device = _device->data;
-	uint8_t cmd, error;
-	size_t current;
+	uint8_t cmd, error, status;
+	size_t current, i;
 	status_t ret;
 
 	mutex_lock(&device->parent->lock);
@@ -229,20 +238,27 @@ static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64
 		/* For LBA48 transfers we must use WRITE SECTORS EXT. */
 		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_WRITE_SECTORS_EXT : ATA_CMD_WRITE_SECTORS;
 
-		/* Start the transfer and wait for it to complete. */
+		/* Start the transfer. */
 		ata_controller_command(device->parent, cmd);
-		ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
-		if(ret != STATUS_SUCCESS) {
-			error = ata_controller_error(device->parent);
-			kprintf(LOG_WARN, "ata: write on device %" PRId32 ":%" PRIu8 " failed (status: %d, error: %" PRIu8 ")\n",
-				device->parent->id, device->num, ret, error);
-			mutex_unlock(&device->parent->lock);
-			return ret;
+
+		/* Transfer each sector. */
+		for(i = 0; i < current; i++) {
+			ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+			if(ret != STATUS_SUCCESS) {
+				status = ata_controller_status(device->parent);
+				error = ata_controller_error(device->parent);
+				kprintf(LOG_WARN, "ata: write of %zu block(s) on %" PRId32 ":%" PRIu8 " failed "
+				        "on block %zu (ret: %d, status: %" PRIu8 ", error: %" PRIu8 ")\n",
+				        current, device->parent->id, device->num, i, ret, status, error);
+				mutex_unlock(&device->parent->lock);
+				return ret;
+			}
+
+			/* Write the sector. */
+			ata_controller_pio_write(device->parent, buf, _device->block_size);
+			buf += _device->block_size;
 		}
 
-		/* Write the data. */
-		ata_controller_pio_write(device->parent, buf, _device->block_size * current);
-		buf += _device->block_size * current;
 		count -= current;
 		lba += current;
 	}

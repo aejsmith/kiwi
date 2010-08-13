@@ -128,6 +128,12 @@ void ata_controller_command(ata_controller_t *controller, uint8_t cmd) {
 }
 
 /** Change selected device on a controller.
+ *
+ * Waits for the controller to become ready (DRQ and BSY set to 0), selects
+ * the specified device and waits for it to become ready again. This implements
+ * the HI1:Check_Status and HI2:Device_Select parts of the Bus idle protocol.
+ * It should be called prior to performing any command.
+ *
  * @param controller	Controller to change on. Should be locked.
  * @param num		Device number to select (0 or 1). */
 void ata_controller_select(ata_controller_t *controller, uint8_t num) {

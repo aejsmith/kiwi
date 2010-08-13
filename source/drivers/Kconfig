@@ -17,6 +17,14 @@ menu "Drivers"
 
 comment "Bus managers"
 
+config DRIVER_BUS_ATA
+	bool "ATA bus manager"
+	default y
+	help
+	  Enable the ATA bus manager. Note that this is not the actual ATA
+	  device driver, it is a generic library used by ATA drivers. You will
+	  need to enable the driver for your ATA device.
+
 config DRIVER_BUS_PCI
 	bool "PCI bus manager"
 	default y
@@ -25,12 +33,12 @@ config DRIVER_BUS_PCI
 
 comment "Disk devices"
 
-config DRIVER_DISK_ATA
-	bool "Generic ATA device driver"
+config DRIVER_DISK_ATA_PCI
+	bool "PCI ATA device driver"
 	default y
-	depends on DRIVER_BUS_PCI
+	depends on DRIVER_BUS_ATA && DRIVER_BUS_PCI
 	help
-	  Enable the generic ATA disk device driver.
+	  Enable the PCI ATA disk device driver.
 
 comment "Display devices"
 

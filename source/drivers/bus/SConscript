@@ -15,6 +15,7 @@ Import('env', 'config')
 
 # Work out the modules to build.
 dirs = [
+	('DRIVER_BUS_ATA', 'ata'),
 	('DRIVER_BUS_PCI', 'pci'),
 ]
 
