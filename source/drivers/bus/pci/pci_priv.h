@@ -24,8 +24,11 @@
 #include <drivers/pci.h>
 
 extern uint8_t pci_arch_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
+extern void pci_arch_config_write8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint8_t val);
 extern uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
+extern void pci_arch_config_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint16_t val);
 extern uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg);
+extern void pci_arch_config_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint32_t val);
 
 extern status_t pci_arch_init(void);
 

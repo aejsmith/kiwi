@@ -12,7 +12,4 @@
 # for complete terms.
 
 Import('env')
-
-env.Module('ata_pci', [
-	'ata_pci.c',
-])
+env.Module('pci_ata', ['pci_ata.c'])

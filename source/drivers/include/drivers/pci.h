@@ -58,6 +58,19 @@ struct pci_device;
 #define PCI_CONFIG_MIN_GRANT		0x3E	/**< Min grant        - 8-bit.  */
 #define PCI_CONFIG_MAX_LATENCY		0x3F	/**< Max latency      - 8-bit.  */
 
+/** Bits in the PCI command register. */
+#define PCI_COMMAND_IO			(1<<0)	/**< I/O Space enable. */
+#define PCI_COMMAND_MEMORY		(1<<1)	/**< Memory Space enable. */
+#define PCI_COMMAND_BUS_MASTER		(1<<2)	/**< Bus Mastering enable. */
+#define PCI_COMMAND_SPECIAL		(1<<3)	/**< Special Cycles enable. */
+#define PCI_COMMAND_MWI			(1<<4)	/**< Memory Write & Invalidate enable. */
+#define PCI_COMMAND_VGA_SNOOP		(1<<5)	/**< VGA Pallette Snoop enable. */
+#define PCI_COMMAND_PARITY		(1<<6)	/**< Parity Check enable. */
+#define PCI_COMMAND_STEPPING		(1<<7)	/**< Stepping enable. */
+#define PCI_COMMAND_SERR		(1<<8)	/**< SERR enable. */
+#define PCI_COMMAND_FASTB2B		(1<<9)	/**< Fast Back-to-Back enable. */
+#define PCI_COMMAND_INT_DISABLE		(1<<10)	/**< I/O interrupt disable. */
+
 /** Value to match any ID in the structure below. */
 #define PCI_ANY_ID			(~((uint32_t)0))
 
@@ -113,8 +126,11 @@ typedef struct pci_device {
 } pci_device_t;
 
 extern uint8_t pci_config_read8(pci_device_t *device, uint8_t reg);
+extern void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val);
 extern uint16_t pci_config_read16(pci_device_t *device, uint8_t reg);
+extern void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val);
 extern uint32_t pci_config_read32(pci_device_t *device, uint8_t reg);
+extern void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val);
 
 extern status_t pci_driver_register(pci_driver_t *driver);
 extern void pci_driver_unregister(pci_driver_t *driver);

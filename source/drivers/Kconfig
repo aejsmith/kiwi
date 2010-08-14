@@ -33,7 +33,7 @@ config DRIVER_BUS_PCI
 
 comment "Disk devices"
 
-config DRIVER_DISK_ATA_PCI
+config DRIVER_DISK_PCI_ATA
 	bool "PCI ATA device driver"
 	default y
 	depends on DRIVER_BUS_ATA && DRIVER_BUS_PCI

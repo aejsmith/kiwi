@@ -170,23 +170,50 @@ uint8_t pci_config_read8(pci_device_t *device, uint8_t reg) {
 }
 MODULE_EXPORT(pci_config_read8);
 
+/** Write an 8-bit value to a device's configuration space.
+ * @param device	Device to write to.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val) {
+	pci_arch_config_write8(device->bus, device->device, device->function, reg, val);
+}
+MODULE_EXPORT(pci_config_write8);
+
 /** Read a 16-bit value from a device's configuration space.
  * @param device	Device to read from.
  * @param reg		Register to read.
- * @return		Value read (converted to correct endianness). */
+ * @return		Value read. */
 uint16_t pci_config_read16(pci_device_t *device, uint8_t reg) {
 	return pci_arch_config_read16(device->bus, device->device, device->function, reg);
 }
 MODULE_EXPORT(pci_config_read16);
 
+/** Write a 16-bit value to a device's configuration space.
+ * @param device	Device to write to.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val) {
+	pci_arch_config_write16(device->bus, device->device, device->function, reg, val);
+}
+MODULE_EXPORT(pci_config_write16);
+
 /** Read a 32-bit value from a device's configuration space.
  * @param device	Device to read from.
  * @param reg		Register to read.
- * @return		Value read (converted to correct endianness). */
+ * @return		Value read. */
 uint32_t pci_config_read32(pci_device_t *device, uint8_t reg) {
 	return pci_arch_config_read32(device->bus, device->device, device->function, reg);
 }
 MODULE_EXPORT(pci_config_read32);
+
+/** Write a 32-bit value to a device's configuration space.
+ * @param device	Device to write to.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val) {
+	pci_arch_config_write32(device->bus, device->device, device->function, reg, val);
+}
+MODULE_EXPORT(pci_config_write32);
 
 /** Device tree iteration callback for driver addition.
  * @param _device	Device iteration is currently at.

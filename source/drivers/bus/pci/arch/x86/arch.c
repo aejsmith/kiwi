@@ -29,7 +29,6 @@
 
 #include <sync/spinlock.h>
 
-#include <endian.h>
 #include <module.h>
 #include <status.h>
 
@@ -65,8 +64,21 @@ uint8_t pci_arch_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t re
 	return ret;
 }
 
+/** Write an 8-bit value to the PCI configuration space.
+ * @param bus		Bus number to write to.
+ * @param dev		Device number to write to.
+ * @param func		Function number.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_arch_config_write8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint8_t val) {
+	spinlock_lock(&pci_config_lock);
+	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
+	out8(PCI_CONFIG_DATA + (reg & 3), val);
+	spinlock_unlock(&pci_config_lock);
+}
+
 /** Read a 16-bit value from the PCI configuration space.
- * @return		Value read (converted to correct endianness). */
+ * @return		Value read. */
 uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint16_t ret;
 
@@ -74,8 +86,20 @@ uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	ret = in16(PCI_CONFIG_DATA + (reg & 2));
 	spinlock_unlock(&pci_config_lock);
+	return ret;
+}
 
-	return le16_to_cpu(ret);
+/** Write a 16-bit value to the PCI configuration space.
+ * @param bus		Bus number to write to.
+ * @param dev		Device number to write to.
+ * @param func		Function number.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_arch_config_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint16_t val) {
+	spinlock_lock(&pci_config_lock);
+	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
+	out16(PCI_CONFIG_DATA + (reg & 2), val);
+	spinlock_unlock(&pci_config_lock);
 }
 
 /** Read a 32-bit value from the PCI configuration space.
@@ -83,7 +107,7 @@ uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
  * @param dev		Device number to read from.
  * @param func		Function number.
  * @param reg		Register to read.
- * @return		Value read (converted to correct endianness). */
+ * @return		Value read. */
 uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint32_t ret;
 
@@ -91,8 +115,20 @@ uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	ret = in32(PCI_CONFIG_DATA);
 	spinlock_unlock(&pci_config_lock);
+	return ret;
+}
 
-	return le32_to_cpu(ret);
+/** Write a 32-bit value to the PCI configuration space.
+ * @param bus		Bus number to write to.
+ * @param dev		Device number to write to.
+ * @param func		Function number.
+ * @param reg		Register to write.
+ * @param val		Value to write. */
+void pci_arch_config_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint32_t val) {
+	spinlock_lock(&pci_config_lock);
+	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
+	out32(PCI_CONFIG_DATA, val);
+	spinlock_unlock(&pci_config_lock);
 }
 
 /** Check for PCI presence.
