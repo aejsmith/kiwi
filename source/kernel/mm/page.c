@@ -549,7 +549,7 @@ void __init_text page_init(kernel_args_t *args) {
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
 	                  NULL, 0, VMEM_RECLAIM, MM_FATAL);
 	for(addr = args->phys_ranges; addr;) {
-		range = page_phys_map(addr, sizeof(kernel_args_memory_t), MM_FATAL);
+		range = page_phys_map(addr, sizeof(*range), MM_FATAL);
 		switch(range->type) {
 		case PHYS_MEMORY_FREE:
 		case PHYS_MEMORY_RECLAIMABLE:
@@ -561,7 +561,7 @@ void __init_text page_init(kernel_args_t *args) {
 		}
 
 		addr = range->next;
-		page_phys_unmap(range, sizeof(kernel_args_module_t), true);
+		page_phys_unmap(range, sizeof(*range), true);
 	}
 
 	/* Mark the kernel init section as reclaimable. Since the kernel is
