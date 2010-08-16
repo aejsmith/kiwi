@@ -70,46 +70,42 @@ static void ata_copy_string(char *dest, char *src, size_t size) {
 	memcpy(dest, src, i + 1);
 	dest[i + 1] = 0;
 }
-#if 0
-/** Begin a block transfer.
+
+/** Begin an I/O operation.
  * @param device	Device to transfer on.
  * @param lba		Block number to start transfer at.
  * @param count		Number of blocks to transfer.
  * @return		Number of blocks that will be transferred. If 0 is
  *			returned, an error occurred. */
-static size_t ata_device_begin_transfer(ata_device_t *device, uint64_t lba, size_t count) {
-	ata_controller_t *controller = device->parent;
-
-	/* The disk device layer should ensure that reads are within the size
-	 * of the device. */
-	assert((lba + count) <= device->blocks);
+static size_t ata_device_begin_io(ata_device_t *device, uint64_t lba, size_t count) {
+	ata_channel_t *channel = device->parent;
 
 	if(lba < LBA28_MAX_BLOCK) {
 		/* Check how many blocks we can transfer. */
 		if((lba + count) > LBA28_MAX_BLOCK) {
 			count = LBA28_MAX_BLOCK - lba;
 		}
-		if(count > UINT8_MAX) {
-			count = UINT8_MAX;
+		if(count > 256) {
+			count = 256;
 		}
 
 		/* Send a NULL to the feature register. */
-		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
 
-		/* Write out the number of blocks to read. */
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, count);
+		/* Write out the number of blocks to read. 0 means 256. */
+		ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, (count == 256) ? 0 : count);
 
 		/* Specify the address of the block. */
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_LOW, lba & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, lba & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
 
-		/* Drive number and rest of address. */
-		out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4) | ((lba >> 24) & 0xff));
+		/* Device number with LBA bit set, and last 4 bits of address. */
+		ata_channel_write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4) | ((lba >> 24) & 0xf));
 		return count;
 	} else if(lba < LBA48_MAX_BLOCK) {
-		if(!(device->flags & ATA_DEVICE_LBA48)) {
-			kprintf(LOG_WARN, "ata: attempted LBA48 read (%llu) on non-LBA48 device\n", lba);
+		if(!device->lba48) {
+			kprintf(LOG_WARN, "ata: attempted LBA48 read (%" PRIu64 ") on non-LBA48 device\n", lba);
 			return 0;
 		}
 
@@ -117,35 +113,40 @@ static size_t ata_device_begin_transfer(ata_device_t *device, uint64_t lba, size
 		if((lba + count) > LBA48_MAX_BLOCK) {
 			count = LBA48_MAX_BLOCK - lba;
 		}
-		if(count > UINT16_MAX) {
-			count = UINT16_MAX;
+		if(count > 65536) {
+			count = 65536;
 		}
 
 		/* Send 2 NULLs to the feature register. */
-		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
-		out8(controller->cmd_base + ATA_CMD_REG_FEAT, 0);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
 
 		/* Write out the number of blocks to read. */
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, (count >> 8) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_COUNT, count & 0xff);
+		if(count == 65536) {
+			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, 0);
+			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, 0);
+		} else {
+			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, (count >> 8) & 0xff);
+			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, count & 0xff);
+		}
 
 		/* Specify the address of the block. */
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_LOW, (lba >> 24) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_LOW, lba & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_MID, (lba >> 32) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_HIGH, (lba >> 40) & 0xff);
-		out8(controller->cmd_base + ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, (lba >> 24) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, lba & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 32) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 40) & 0xff);
+		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
 
-		/* Drive number. */
-		out8(controller->cmd_base + ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4));
+		/* Device number with LBA bit set. */
+		ata_channel_write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4));
 		return count;
 	} else {
-		kprintf(LOG_WARN, "ata: attempted out of range transfer (%llu)\n", lba);
+		kprintf(LOG_WARN, "ata: attempted out of range transfer (%" PRIu64 ")\n", lba);
 		return 0;
 	}
 }
-#endif
+
 /** Read from an ATA disk.
  * @param _device	Device to read from.
  * @param buf		Buffer to read into.
@@ -153,19 +154,18 @@ static size_t ata_device_begin_transfer(ata_device_t *device, uint64_t lba, size
  * @param count		Number of blocks to read.
  * @return		Status code describing result of the operation. */
 static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
-#if 0
 	ata_device_t *device = _device->data;
 	uint8_t cmd, error, status;
 	size_t current, i;
 	status_t ret;
 
-	mutex_lock(&device->parent->lock);
+	ata_channel_begin_command(device->parent, device->num);
 
 	while(count) {
 		/* Set up the address registers and select the device. */
-		current = ata_device_begin_transfer(device, lba, count);
+		current = ata_device_begin_io(device, lba, count);
 		if(!current) {
-			mutex_unlock(&device->parent->lock);
+			ata_channel_finish_command(device->parent);
 			return STATUS_DEVICE_ERROR;
 		}
 
@@ -176,25 +176,21 @@ static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, s
 		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_READ_SECTORS_EXT : ATA_CMD_READ_SECTORS;
 
 		/* Start the transfer. */
-		ata_controller_command(device->parent, cmd);
+		ata_channel_command(device->parent, cmd);
 
 		/* Transfer each sector. */
 		for(i = 0; i < current; i++) {
-			ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+			ret = ata_channel_read_pio(device->parent, buf, _device->block_size);
 			if(ret != STATUS_SUCCESS) {
-				status = ata_controller_status(device->parent);
-				error = ata_controller_error(device->parent);
+				status = ata_channel_status(device->parent);
+				error = ata_channel_error(device->parent);
 				kprintf(LOG_WARN, "ata: read of %zu block(s) from %" PRIu64 " "
-				        "on %" PRId32 ":%" PRIu8 " failed on block %zu (ret: %d, "
-				        "status: %" PRIu8 ", error: %" PRIu8 ")\n",
-				        current, lba, device->parent->id, device->num, i, ret,
-				        status, error);
-				mutex_unlock(&device->parent->lock);
-				return ret;
+				        "on %d:%u failed on block %zu (ret: %d, status: %u, "
+				        "error: %u)\n", current, lba, device->parent->id,
+				        device->num, i, ret, status, error);
+				ata_channel_finish_command(device->parent);
+				return STATUS_DEVICE_ERROR;
 			}
-
-			/* Read the sector. */
-			ata_controller_pio_read(device->parent, buf, _device->block_size);
 			buf += _device->block_size;
 		}
 
@@ -202,10 +198,8 @@ static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, s
 		lba += current;
 	}
 
-	mutex_unlock(&device->parent->lock);
+	ata_channel_finish_command(device->parent);
 	return STATUS_SUCCESS;
-#endif
-	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Write to an ATA device.
@@ -291,18 +285,18 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	ata_channel_command(channel, ATA_CMD_IDENTIFY);
 	if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true,
 	                    true, 50000) != STATUS_SUCCESS) {
-		goto out;
+		goto fail;
 	} else if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
-		goto out;
+		goto fail;
 	}
 
 	/* Check whether we can use the device. */
 	if(le16_to_cpu(ident[0]) & (1<<15)) {
 		kprintf(LOG_DEBUG, "ata: skipping non-ATA device %d:%u\n", channel->id, num);
-		goto out;
+		goto fail;
 	} else if(!(le16_to_cpu(ident[49]) & (1<<9))) {
 		kprintf(LOG_DEBUG, "ata: skipping non-LBA device %d:%u\n", channel->id, num);
-		goto out;
+		goto fail;
 	}
 
 	/* Allocate a device structure and fill it out. */
@@ -344,6 +338,9 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	kprintf(LOG_NORMAL, " blocks:     %u\n", blocks);
 	kprintf(LOG_NORMAL, " size:       %llu\n", (uint64_t)blocks * block_size);
 
+	kfree(ident);
+	ata_channel_finish_command(channel);
+
 	/* Register the device with the disk device manager. */
 	sprintf(name, "%d", num);
 	ret = disk_device_create(name, channel->node, &ata_disk_ops, device, blocks,
@@ -351,7 +348,8 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create ATA disk device %u (%d)", num, ret);
 	}
-out:
+	return;
+fail:
 	kfree(ident);
 	ata_channel_finish_command(channel);
 }

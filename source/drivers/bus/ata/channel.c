@@ -128,6 +128,13 @@ uint8_t ata_channel_status(ata_channel_t *channel) {
 	return ata_channel_read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
 }
 
+/** Get the content of the error register.
+ * @param channel	Channel to get from.
+ * @return		Value of error register. */
+uint8_t ata_channel_error(ata_channel_t *channel) {
+	return ata_channel_read_cmd(channel, ATA_CMD_REG_ERR);
+}
+
 /** Get the currently selected device.
  * @param channel	Channel to get from.
  * @return		Current selected device. */

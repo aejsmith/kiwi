@@ -45,6 +45,7 @@ extern void ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val);
 extern status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count);
 extern status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count);
 extern uint8_t ata_channel_status(ata_channel_t *channel);
+extern uint8_t ata_channel_error(ata_channel_t *channel);
 extern uint8_t ata_channel_selected(ata_channel_t *channel);
 extern void ata_channel_command(ata_channel_t *channel, uint8_t cmd);
 extern void ata_channel_reset(ata_channel_t *channel);
