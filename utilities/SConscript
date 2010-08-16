@@ -12,6 +12,11 @@
 # for complete terms.
 
 Import('env', 'envmgr')
+import os
+
+if os.uname()[0] == 'Darwin':
+	env['CPPPATH'] = ['/opt/local/include']
+	env['LIBPATH'] = ['/opt/local/lib']
 
 # Set paths to build utilities.
 envmgr.AddVariable('GENSYMTAB', File('../../utilities/gensymtab.py'))
