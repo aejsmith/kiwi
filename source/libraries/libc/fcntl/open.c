@@ -90,6 +90,7 @@ retry:
 		kflag |= ((oflag & O_RDONLY) ? FS_FILE_READ : 0);
 		kflag |= ((oflag & O_WRONLY) ? FS_FILE_WRITE : 0);
 		kflag |= ((oflag & O_APPEND) ? FS_FILE_APPEND : 0);
+		kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
 
 		/* Open the file. */
 		ret = fs_file_open(path, kflag, &handle);
@@ -117,7 +118,11 @@ retry:
 			return -1;
 		}
 
-		ret = fs_dir_open(path, 0, &handle);
+		/* Convert the flags to kernel flags. */
+		kflag = 0;
+		kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
+
+		ret = fs_dir_open(path, kflag, &handle);
 		if(ret != STATUS_SUCCESS) {
 			if(ret == STATUS_NOT_FOUND) {
 				goto retry;

@@ -40,7 +40,7 @@ extern "C" {
 
 /** File status flags for open() and fcntl(). */
 #define O_APPEND	0x0040		/**< File offset should be set to end before each write. */
-//#define O_NONBLOCK	0x0080		/**< Non-blocking I/O mode. */
+#define O_NONBLOCK	0x0080		/**< Non-blocking I/O mode. */
 
 /** Other flags for open(). */
 #define O_CLOEXEC	0x0100		/**< Open with FD_CLOEXEC flag set. */
