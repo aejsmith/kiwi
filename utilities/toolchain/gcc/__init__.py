@@ -36,7 +36,6 @@ class GCCComponent(ToolchainComponent):
 		confopts += '--enable-languages=c,c++ '
 		confopts += '--disable-libstdcxx-pch '
 		confopts += '--disable-shared '
-		confopts += '--enable-lto '
 		if os.uname()[0] == 'Darwin':
 			confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'
 
