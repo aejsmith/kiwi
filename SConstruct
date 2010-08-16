@@ -31,11 +31,15 @@ cxx_warning_flags = [
 ]
 
 # Variables to set in host environments. Don't build C code with our normal
-# warning flags, Kconfig and Flex/Bison code won't compile with them.
+# warning flags, Kconfig and Flex/Bison code won't compile with them. Also
+# older host G++ versions don't support some flags.
 host_flags = {
 	'CCFLAGS': ['-pipe'],
 	'CFLAGS': ['-std=gnu99'],
-	'CXXFLAGS': cc_warning_flags + cxx_warning_flags,
+	'CXXFLAGS': cxx_warning_flags + filter(lambda f: f not in [
+		'-Wmissing-declarations',
+		'-Wno-variadic-macros',
+	], cc_warning_flags),
 	'YACCFLAGS': ['-d'],
 }
 
