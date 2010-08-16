@@ -187,8 +187,9 @@ static inline bool vm_region_fits(ptr_t start, size_t size) {
  * @param flags		Flags for the region.
  * @return		Pointer to region structure. */
 static vm_region_t *vm_region_alloc(vm_aspace_t *as, ptr_t start, ptr_t end, int flags) {
-	vm_region_t *region = slab_cache_alloc(vm_region_cache, MM_SLEEP);
+	vm_region_t *region;
 
+	region = slab_cache_alloc(vm_region_cache, MM_SLEEP);
 	region->as = as;
 	region->start = start;
 	region->end = end;
@@ -198,6 +199,79 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, ptr_t start, ptr_t end, int
 	region->amap = NULL;
 	region->amap_offset = 0;
 	return region;
+}
+
+/** Clone a region.
+ * @param src		Region to clone.
+ * @param as		Address space for new region.
+ * @return		Pointer to cloned region. */
+static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
+	size_t i, start, end;
+	vm_region_t *dest;
+
+	dest = vm_region_alloc(as, src->start, src->end, src->flags);
+	if(src->flags & VM_REGION_RESERVED) {
+		return dest;
+	}
+
+	/* Copy the object handle. */
+	if(src->handle) {
+		handle_get(src->handle);
+		dest->handle = src->handle;
+		dest->obj_offset = src->obj_offset;
+	}
+
+	/* If this is not a private mapping, just point the new region at the
+	 * old anonymous map and return. */
+	if(!(src->flags & VM_REGION_PRIVATE)) {
+		if(src->amap) {
+			refcount_inc(&src->amap->count);
+			dest->amap = src->amap;
+			dest->amap_offset = src->amap_offset;
+		}
+		return dest;
+	}
+
+	/* This is a private region. We must create a copy of the area within
+	 * the source anonymous map that the region points to, so work out the
+	 * entries within the map that the region covers. */
+	assert(src->amap);
+	mutex_lock(&src->amap->lock);
+	start = (size_t)(src->amap_offset >> PAGE_WIDTH);
+	end = start + (size_t)((src->end - src->start) >> PAGE_WIDTH);
+	assert(end <= src->amap->max_size);
+
+	/* Create a new map. */
+	dest->amap = slab_cache_alloc(vm_amap_cache, MM_SLEEP);
+	refcount_set(&dest->amap->count, 1);
+	dest->amap->curr_size = 0;
+	dest->amap->max_size = end - start;
+	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(vm_page_t *), MM_SLEEP);
+	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_SLEEP);
+
+	/* Point all of the pages in the new map to the pages from the source
+	 * map: they will be copied when a write fault occurs on either the
+	 * source or the destination. Set the region reference count for each
+	 * page to 1, to account for the destination region. */
+	for(i = start; i < end; i++) {
+		if(src->amap->pages[i]) {
+			refcount_inc(&src->amap->pages[i]->count);
+		}
+		dest->amap->pages[i - start] = src->amap->pages[i];
+		dest->amap->rref[i - start] = 1;
+	}
+
+	/* Write-protect all mappings on the source region. */
+	page_map_lock(&src->as->pmap);
+	for(i = src->start; i < src->end; i += PAGE_SIZE) {
+		page_map_protect(&src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
+	}
+	page_map_unlock(&src->as->pmap);
+
+	dprintf("vm: copied anonymous region %p (map: %p) to %p (map: %p)\n",
+	        src, src->amap, dest, dest->amap);
+	mutex_unlock(&src->amap->lock);
+	return dest;
 }
 
 /** Searches for a region containing an address.
@@ -1028,6 +1102,37 @@ vm_aspace_t *vm_aspace_create(void) {
 	ret = vm_reserve(as, 0x0, PAGE_SIZE);
 	assert(ret == STATUS_SUCCESS);
 	return as;
+}
+
+/** Create a clone of an address space.
+ *
+ * Creates a clone of an existing address space. Non-private regions will be
+ * shared among the two address spaces (modifications in one will affect both),
+ * whereas private regions will be duplicated via copy-on-write.
+ *
+ * @param orig		Original address space.
+ *
+ * @return		Pointer to new address space.
+ */
+vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
+	vm_region_t *region, *rclone;
+	vm_aspace_t *clone;
+
+	clone = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
+	page_map_init(&clone->pmap, MM_SLEEP);
+	clone->find_cache = NULL;
+
+	mutex_lock(&orig->lock);
+
+	/* Clone each region in the original address space. */
+	AVL_TREE_FOREACH(&orig->regions, iter) {
+		region = avl_tree_entry(iter, vm_region_t);
+		rclone = vm_region_clone(region, clone);
+		avl_tree_insert(&clone->regions, (key_t)rclone->start, rclone, &rclone->node);
+	}
+
+	mutex_unlock(&orig->lock);
+	return clone;
 }
 
 /** Destroy an address space.

@@ -78,6 +78,7 @@ extern void page_map_lock(page_map_t *map);
 extern void page_map_unlock(page_map_t *map);
 extern status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write,
                                 bool exec, int mmflag);
+extern void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec);
 extern bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp);
 extern bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp);
 extern void page_map_switch(page_map_t *map);
