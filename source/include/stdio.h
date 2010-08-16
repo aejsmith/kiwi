@@ -113,7 +113,7 @@ extern int putchar(int ch);
 /* int putc_unlocked(int, FILE *); */
 /* int putchar_unlocked(int); */
 extern int puts(const char *s);
-/* int remove(const char *); */
+extern int remove(const char *path);
 /* int rename(const char *, const char *); */
 /* int renameat(int, const char *, int, const char *); */
 extern void rewind(FILE *stream);
@@ -138,7 +138,6 @@ extern int vsscanf(const char *__restrict buf, const char *__restrict fmt, va_li
 #ifdef __cplusplus
 extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);
-extern int remove(const char *path);
 extern int rename(const char *source, const char *dest);
 extern FILE *tmpfile(void);
 extern char *tmpnam(char *);
