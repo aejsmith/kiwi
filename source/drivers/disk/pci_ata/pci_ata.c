@@ -33,6 +33,7 @@
 
 #include <mm/malloc.h>
 
+#include <assert.h>
 #include <console.h>
 #include <module.h>
 #include <status.h>
@@ -41,7 +42,7 @@
 typedef struct pci_ata_channel {
 	pci_device_t *pci_device;	/**< PCI device of the controller. */
 	ata_channel_t *channel;		/**< ATA bus manager channel structure. */
-	uint32_t ctl_base;		/**< Control register base. */
+	uint32_t ctrl_base;		/**< Control register base. */
 	uint32_t cmd_base;		/**< Command register base. */
 	uint32_t irq;			/**< IRQ number. */
 } pci_ata_channel_t;
@@ -49,8 +50,71 @@ typedef struct pci_ata_channel {
 /** Check if a channel is in compatibility mode. */
 #define PCI_ATA_IS_COMPAT(pi)	((pi) == 0x00 || (pi) == 0x02)
 
+/** Read from a control register.
+ * @param channel	Channel to read from.
+ * @param reg		Register to read from.
+ * @return		Value read. */
+static uint8_t pci_ata_channel_read_ctrl(ata_channel_t *channel, int reg) {
+	pci_ata_channel_t *data = channel->data;
+	return in8(data->ctrl_base + reg);
+}
+
+/** Write to a control register.
+ * @param channel	Channel to read from.
+ * @param reg		Register to write to.
+ * @param val		Value to write. */
+static void pci_ata_channel_write_ctrl(ata_channel_t *channel, int reg, uint8_t val) {
+	pci_ata_channel_t *data = channel->data;
+	out8(data->ctrl_base + reg, val);
+}
+
+/** Read from a command register.
+ * @param channel	Channel to read from.
+ * @param reg		Register to read from.
+ * @return		Value read. */
+static uint8_t pci_ata_channel_read_cmd(ata_channel_t *channel, int reg) {
+	pci_ata_channel_t *data = channel->data;
+	return in8(data->cmd_base + reg);
+}
+
+/** Write to a command register.
+ * @param channel	Channel to read from.
+ * @param reg		Register to write to.
+ * @param val		Value to write. */
+static void pci_ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val) {
+	pci_ata_channel_t *data = channel->data;
+	out8(data->cmd_base + reg, val);
+}
+
+/** Perform a PIO data read.
+ * @param channel	Channel to read from.
+ * @param buf		Buffer to read into.
+ * @param count		Number of bytes to read. */
+static void pci_ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count) {
+	pci_ata_channel_t *data = channel->data;
+	assert(!(count % 2));
+	in16s(data->cmd_base + ATA_CMD_REG_DATA, (count / 2), (uint16_t *)buf);
+}
+
+/** Perform a PIO data write.
+ * @param channel	Channel to write to.
+ * @param buf		Buffer to write from.
+ * @param count		Number of bytes to write. */
+static void pci_ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count) {
+	pci_ata_channel_t *data = channel->data;
+	assert(!(count % 2));
+	out16s(data->cmd_base + ATA_CMD_REG_DATA, (count / 2), (const uint16_t *)buf);
+}
+
 /** PCI ATA channel operations. */
-//static ata_channel_ops_t pci_ata_channel_ops;
+static ata_channel_ops_t pci_ata_channel_ops = {
+	.read_ctrl = pci_ata_channel_read_ctrl,
+	.write_ctrl = pci_ata_channel_write_ctrl,
+	.read_cmd = pci_ata_channel_read_cmd,
+	.write_cmd = pci_ata_channel_write_cmd,
+	.read_pio = pci_ata_channel_read_pio,
+	.write_pio = pci_ata_channel_write_pio,
+};
 
 /** Handler for a PCI ATA IRQ.
  * @param num		IRQ number.
@@ -70,22 +134,15 @@ static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_fram
 
 /** Register a new PCI ATA channel.
  * @param pci_device	PCI device the channel is in.
- * @param ctl_base	Control registers base address.
+ * @param ctrl_base	Control registers base address.
  * @param cmd_base	Command registers base address.
  * @param irq		IRQ number.
  * @return		Pointer to ATA channel structure if present. */
-static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctl_base,
+static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctrl_base,
                                           uint32_t cmd_base, uint32_t irq) {
 	uint16_t pci_cmd_old, pci_cmd_new;
 	pci_ata_channel_t *channel;
 	status_t ret;
-
-	/* Check presence by writing a value to the low LBA port on the channel,
-	 * then reading it back. If the value is the same, it is present. */
-	out8(cmd_base + ATA_CMD_REG_LBA_LOW, 0xAB);
-	if(in8(cmd_base + ATA_CMD_REG_LBA_LOW) != 0xAB) {
-		return NULL;
-	}
 
 	/* Configure the PCI device appropriately. */
 	pci_cmd_old = pci_cmd_new = pci_config_read16(pci_device, PCI_CONFIG_COMMAND);
@@ -109,7 +166,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctl
 	channel = kmalloc(sizeof(*channel), MM_SLEEP);
 	channel->channel = NULL;
 	channel->pci_device = pci_device;
-	channel->ctl_base = ctl_base;
+	channel->ctrl_base = ctrl_base;
 	channel->cmd_base = cmd_base;
 	channel->irq = irq;
 
@@ -122,14 +179,14 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctl
 	}
 
 	/* Try to register the ATA channel. */
-	//channel->channel = ata_channel_add(pci_device->node, &pci_ata_channel_ops, channel);
-	//if(!channel->channel) {
+	channel->channel = ata_channel_add(pci_device->node, &pci_ata_channel_ops, channel);
+	if(!channel->channel) {
 		irq_unregister(channel->irq, pci_ata_irq_handler, NULL, channel);
 		kfree(channel);
 		return NULL;
-	//}
+	}
 
-	//return channel->channel;
+	return channel->channel;
 }
 
 /** Add a new PCI ATA device.
@@ -137,7 +194,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctl
  * @param data		Unused.
  * @return		Whether the device has been claimed. */
 static bool pci_ata_add_device(pci_device_t *device, void *data) {
-	uint32_t ctl_base, cmd_base, irq;
+	uint32_t ctrl_base, cmd_base, irq;
 	ata_channel_t *pri, *sec;
 	uint8_t pri_pi, sec_pi;
 
@@ -156,7 +213,7 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	/* Get primary channel details and add it. */
 	if(PCI_ATA_IS_COMPAT(pri_pi)) {
 		/* Compatibility-mode channels always have the same details. */
-		ctl_base = 0x3F6;
+		ctrl_base = 0x3F6;
 		cmd_base = 0x1F0;
 		irq = 14;
 	} else {
@@ -165,39 +222,42 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 		 * allocation the byte at offset 02h is where the Alternate
 		 * Status/Device Control byte is located.". Therefore, add 2
 		 * to the value read. */
-		ctl_base = pci_config_read32(device, PCI_CONFIG_BAR0) + 2;
+		ctrl_base = pci_config_read32(device, PCI_CONFIG_BAR0) + 2;
 		cmd_base = pci_config_read32(device, PCI_CONFIG_BAR1);
 		irq = device->interrupt_line;
 	}
 
 	/* Add the channel. */
-	pri = pci_ata_channel_add(device, ctl_base, cmd_base, irq);
+	pri = pci_ata_channel_add(device, ctrl_base, cmd_base, irq);
 	if(pri) {
-		kprintf(LOG_NORMAL, " primary:   %d (%s, ctl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NORMAL, " primary:   %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
 		        pri->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
-		        ctl_base, cmd_base, irq);
+		        ctrl_base, cmd_base, irq);
 	}
 
 	/* Now the secondary channel. */
 	if(PCI_ATA_IS_COMPAT(sec_pi)) {
-		ctl_base = 0x376;
+		ctrl_base = 0x376;
 		cmd_base = 0x170;
 		irq = 15;
 	} else {
 		/* Same as above. */
-		ctl_base = pci_config_read32(device, PCI_CONFIG_BAR2) + 2;
+		ctrl_base = pci_config_read32(device, PCI_CONFIG_BAR2) + 2;
 		cmd_base = pci_config_read32(device, PCI_CONFIG_BAR3);
 		irq = device->interrupt_line;
 	}
 
 	/* Add channel if present. */
-	sec = pci_ata_channel_add(device, ctl_base, cmd_base, irq);
+	sec = pci_ata_channel_add(device, ctrl_base, cmd_base, irq);
 	if(sec) {
-		kprintf(LOG_NORMAL, " secondary: %d (%s, ctl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NORMAL, " secondary: %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
 		        sec->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
-		        ctl_base, cmd_base, irq);
+		        ctrl_base, cmd_base, irq);
 	}
 
+	/* Scan for devices. */
+	if(pri) { ata_channel_scan(pri); }
+	if(sec) { ata_channel_scan(sec); }
 	return true;
 }
 

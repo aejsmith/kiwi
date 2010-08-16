@@ -57,8 +57,8 @@ struct ata_channel;
 #define ATA_CMD_REG_CMD			7	/**< Command register (W). */
 
 /** ATA Control Registers. */
-#define ATA_CTL_REG_ALT_STATUS		0	/**< Alternate status (R). */
-#define ATA_CTL_REG_DEVCTRL		0	/**< Device control (W). */
+#define ATA_CTRL_REG_ALT_STATUS		0	/**< Alternate status (R). */
+#define ATA_CTRL_REG_DEVCTRL		0	/**< Device control (W). */
 
 /** ATA error register bits. */
 #define ATA_ERR_ABRT			(1<<2)	/**< Command was aborted. */
@@ -71,12 +71,48 @@ struct ata_channel;
 #define ATA_STATUS_DRDY			(1<<6)	/**< Device Ready. */
 #define ATA_STATUS_BSY			(1<<7)	/**< Busy. */
 
+/** ATA device control register bits. */
+#define ATA_DEVCTRL_NIEN		(1<<1)	/**< Disable interrupts. */
+#define ATA_DEVCTRL_SRST		(1<<2)	/**< Software reset. */
+#define ATA_DEVCTRL_HOB			(1<<7)	/**< High order bit. */
+
 /** Structure containing ATA channel operations. */
 typedef struct ata_channel_ops {
+	/** Read from a control register.
+	 * @param channel	Channel to read from.
+	 * @param reg		Register to read from.
+	 * @return		Value read. */
+	uint8_t (*read_ctrl)(struct ata_channel *channel, int reg);
+
 	/** Write to a control register.
+	 * @param channel	Channel to read from.
 	 * @param reg		Register to write to.
 	 * @param val		Value to write. */
-	//void (*write_ctrl
+	void (*write_ctrl)(struct ata_channel *channel, int reg, uint8_t val);
+
+	/** Read from a command register.
+	 * @param channel	Channel to read from.
+	 * @param reg		Register to read from.
+	 * @return		Value read. */
+	uint8_t (*read_cmd)(struct ata_channel *channel, int reg);
+
+	/** Write to a command register.
+	 * @param channel	Channel to read from.
+	 * @param reg		Register to write to.
+	 * @param val		Value to write. */
+	void (*write_cmd)(struct ata_channel *channel, int reg, uint8_t val);
+
+	/** Perform a PIO data read.
+	 * @param channel	Channel to read from.
+	 * @param buf		Buffer to read into.
+	 * @param count		Number of bytes to read. */
+	void (*read_pio)(struct ata_channel *channel, void *buf, size_t count);
+
+	/** Perform a PIO data write.
+	 * @param channel	Channel to write to.
+	 * @param buf		Buffer to write from.
+	 * @param count		Number of bytes to write. */
+	void (*write_pio)(struct ata_channel *channel, const void *buf, size_t count);
 } ata_channel_ops_t;
 
 /** Structure describing an ATA channel. */
@@ -90,27 +126,7 @@ typedef struct ata_channel {
 	condvar_t irq_cv;			/**< Condition variable to wait for IRQ on. */
 } ata_channel_t;
 
-#if 0
-/** Structure describing an ATA device. */
-typedef struct ata_device {
-	list_t header;				/**< Device list header. */
-
-	uint8_t num;				/**< Device number on the controller. */
-	ata_controller_t *parent;		/**< Controller containing the device. */
-	device_t *device;			/**< Device tree node. */
-	int flags;				/**< Flags for the device. */
-	char model[41];				/**< Device model number. */
-	char serial[21];			/**< Serial number. */
-	char revision[8];			/**< Device revision. */
-	uint32_t blocks;			/**< Total number of blocks. */
-} ata_device_t;
-
-
-/** Flags for ATA device structures. */
-#define ATA_DEVICE_LBA48		(1<<1)	/**< Device supports LBA48. */
-#define ATA_DEVICE_DMA
-#endif
-
 extern ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *data);
+extern void ata_channel_scan(ata_channel_t *channel);
 
 #endif /* __DRIVERS_ATA_H */

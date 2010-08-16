@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,20 +15,14 @@
 
 /**
  * @file
- * @brief		Generic ATA device driver.
+ * @brief		ATA device functions.
  *
  * Reference:
- * - PCI IDE Controller Specification
- *   http://suif.stanford.edu/~csapuntz/specs/pciide.ps
  * - AT Attachment with Packet Interface - 7: Volume 1
  *   http://www.t13.org/Documents/UploadedDocuments/docs2007/
  * - AT Attachment with Packet Interface - 7: Volume 2
  *   http://www.t13.org/Documents/UploadedDocuments/docs2007/
  */
-
-#include <arch/io.h>
-
-#include <drivers/pci.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -38,8 +32,6 @@
 #include <assert.h>
 #include <console.h>
 #include <endian.h>
-#include <kdbg.h>
-#include <module.h>
 #include <status.h>
 
 #include "ata_priv.h"
@@ -78,14 +70,14 @@ static void ata_copy_string(char *dest, char *src, size_t size) {
 	memcpy(dest, src, i + 1);
 	dest[i + 1] = 0;
 }
-
+#if 0
 /** Begin a block transfer.
  * @param device	Device to transfer on.
  * @param lba		Block number to start transfer at.
  * @param count		Number of blocks to transfer.
  * @return		Number of blocks that will be transferred. If 0 is
  *			returned, an error occurred. */
-static size_t ata_device_transfer_begin(ata_device_t *device, uint64_t lba, size_t count) {
+static size_t ata_device_begin_transfer(ata_device_t *device, uint64_t lba, size_t count) {
 	ata_controller_t *controller = device->parent;
 
 	/* The disk device layer should ensure that reads are within the size
@@ -153,14 +145,15 @@ static size_t ata_device_transfer_begin(ata_device_t *device, uint64_t lba, size
 		return 0;
 	}
 }
-
-/** Read from an ATA device.
+#endif
+/** Read from an ATA disk.
  * @param _device	Device to read from.
  * @param buf		Buffer to read into.
  * @param lba		Block number to read from.
  * @param count		Number of blocks to read.
  * @return		Status code describing result of the operation. */
-static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
+#if 0
 	ata_device_t *device = _device->data;
 	uint8_t cmd, error, status;
 	size_t current, i;
@@ -170,7 +163,7 @@ static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba,
 
 	while(count) {
 		/* Set up the address registers and select the device. */
-		current = ata_device_transfer_begin(device, lba, count);
+		current = ata_device_begin_transfer(device, lba, count);
 		if(!current) {
 			mutex_unlock(&device->parent->lock);
 			return STATUS_DEVICE_ERROR;
@@ -211,6 +204,8 @@ static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba,
 
 	mutex_unlock(&device->parent->lock);
 	return STATUS_SUCCESS;
+#endif
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Write to an ATA device.
@@ -219,7 +214,8 @@ static status_t ata_device_read(disk_device_t *_device, void *buf, uint64_t lba,
  * @param lba		Block number to write to.
  * @param count		Number of blocks to write.
  * @return		Status code describing result of the operation. */
-static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+static status_t ata_disk_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
+#if 0
 	ata_device_t *device = _device->data;
 	uint8_t cmd, error, status;
 	size_t current, i;
@@ -229,7 +225,7 @@ static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64
 
 	while(count) {
 		/* Set up the address registers and select the device. */
-		current = ata_device_transfer_begin(device, lba, count);
+		current = ata_device_begin_transfer(device, lba, count);
 		if(!current) {
 			mutex_unlock(&device->parent->lock);
 			return STATUS_DEVICE_ERROR;
@@ -265,73 +261,72 @@ static status_t ata_device_write(disk_device_t *_device, const void *buf, uint64
 
 	mutex_unlock(&device->parent->lock);
 	return STATUS_SUCCESS;
+#endif
+	return STATUS_NOT_IMPLEMENTED;
 }
 
-/** Disk device operations structure. */
-static disk_ops_t ata_device_ops = {
-	.read = ata_device_read,
-	.write = ata_device_write,
+/** ATA disk device operations structure. */
+static disk_ops_t ata_disk_ops = {
+	.read = ata_disk_read,
+	.write = ata_disk_write,
 };
 
-/** Detect a device on a controller.
- * @param controller	Controller to detect on.
- * @param num		Device number (0 or 1).
- * @return		Whether device was added. */
-bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
+/** Detect a device on a channel.
+ * @param channel	Channel to detect on.
+ * @param num		Device number (0 or 1). */
+void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	uint16_t *ident = NULL, word;
 	char name[DEVICE_NAME_MAX];
+	size_t block_size, blocks;
 	ata_device_t *device;
-	size_t blksize;
 	status_t ret;
 
-	mutex_lock(&controller->lock);
-
-	/* Set the device. */
-	ata_controller_select(controller, num);
-
-	/* Send an IDENTIFY DEVICE command. */
-	ata_controller_command(controller, ATA_CMD_IDENTIFY);
-	if(ata_controller_wait(controller, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true,
-	                       true, 50000) != STATUS_SUCCESS) {
-		goto fail;
+	if(ata_channel_begin_command(channel, num) != STATUS_SUCCESS) {
+		return;
 	}
 
-	/* Wait for data. */
-	if(ata_controller_wait(controller, ATA_STATUS_DRQ, ATA_STATUS_BSY, false,
-	                       true, 500000) != STATUS_SUCCESS) {
-		goto fail;
-	}
-
-	/* Read in the identify data. */
+	/* Send an IDENTIFY DEVICE command. Perform a manual wait as we don't
+	 * want to wait too long if the device doesn't exist. */
 	ident = kmalloc(512, MM_SLEEP);
-	ata_controller_pio_read(controller, ident, 512);
+	ata_channel_command(channel, ATA_CMD_IDENTIFY);
+	if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true,
+	                    true, 50000) != STATUS_SUCCESS) {
+		goto out;
+	} else if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
+		goto out;
+	}
 
 	/* Check whether we can use the device. */
 	if(le16_to_cpu(ident[0]) & (1<<15)) {
-		kprintf(LOG_DEBUG, "ata: skipping non-ATA device %" PRId32 ":%" PRIu8 "\n", controller->id, num);
-		goto fail;
+		kprintf(LOG_DEBUG, "ata: skipping non-ATA device %d:%u\n", channel->id, num);
+		goto out;
 	} else if(!(le16_to_cpu(ident[49]) & (1<<9))) {
-		kprintf(LOG_DEBUG, "ata: skipping non-LBA device %" PRId32 ":%" PRIu8 "\n", controller->id, num);
-		goto fail;
+		kprintf(LOG_DEBUG, "ata: skipping non-LBA device %d:%u\n", channel->id, num);
+		goto out;
 	}
 
 	/* Allocate a device structure and fill it out. */
-	device = kmalloc(sizeof(ata_device_t), MM_SLEEP);
-	list_init(&device->header);
+	device = kmalloc(sizeof(*device), MM_SLEEP);
 	device->num = num;
-	device->parent = controller;
-	device->flags = (le16_to_cpu(ident[83]) & (1<<10)) ? ATA_DEVICE_LBA48 : 0;
-	device->blocks = le32_to_cpu(*(uint32_t *)(ident + 60));
+	device->parent = channel;
+	if(le16_to_cpu(ident[83]) & (1<<10)) {
+		device->lba48 = true;
+	}
+	// FIXME: DMA
+	device->dma = false;
+
+	/* Get the block count. */
+	blocks = le32_to_cpu(*(uint32_t *)(ident + 60));
 
 	/* Get the block size - "Bit 12 of word 106 shall be set to 1 to
 	 * indicate that the device has been formatted with a logical sector
 	 * size larger than 256 words." */
 	word = le16_to_cpu(ident[106]);
-	if(word & (1<<14) && !(word & (1<<15)) & (1<<12)) {
+	if(word & (1<<14) && !(word & (1<<15)) && word & (1<<12)) {
 		/* Words 117-118: Logical Sector Size. */
-		blksize = le32_to_cpu(*(uint32_t *)(ident + 117)) * 2;
+		block_size = le32_to_cpu(*(uint32_t *)(ident + 117)) * 2;
 	} else {
-		blksize = 512;
+		block_size = 512;
 	}
 
 	/* Copy information across. */
@@ -339,35 +334,24 @@ bool ata_device_detect(ata_controller_t *controller, uint8_t num) {
 	ata_copy_string(device->serial, (char *)(ident + 10), 20);
 	ata_copy_string(device->revision, (char *)(ident + 23), 8);
 
-	kprintf(LOG_NORMAL, "ata: found device %" PRIu8 " on controller %" PRId32 ":\n", num, controller->id);
-	kprintf(LOG_NORMAL, " model:     %s\n", device->model);
-	kprintf(LOG_NORMAL, " serial:    %s\n", device->serial);
-	kprintf(LOG_NORMAL, " revision:  %s\n", device->revision);
-	kprintf(LOG_NORMAL, " flags:     %d\n", device->flags);
-	kprintf(LOG_NORMAL, " blksize:   %u\n", blksize);
-	kprintf(LOG_NORMAL, " blocks:    %u\n", device->blocks);
-	kprintf(LOG_NORMAL, " size:      %llu\n", (uint64_t)device->blocks * blksize);
-
-	mutex_unlock(&controller->lock);
+	kprintf(LOG_NORMAL, "ata: found device %u on channel %d:\n", num, channel->id);
+	kprintf(LOG_NORMAL, " model:      %s\n", device->model);
+	kprintf(LOG_NORMAL, " serial:     %s\n", device->serial);
+	kprintf(LOG_NORMAL, " revision:   %s\n", device->revision);
+	kprintf(LOG_NORMAL, " lba48:      %d\n", device->lba48);
+	//FIXME more info kprintf(LOG_NORMAL, " dma:      %d\n", device->dma);
+	kprintf(LOG_NORMAL, " block_size: %u\n", block_size);
+	kprintf(LOG_NORMAL, " blocks:     %u\n", blocks);
+	kprintf(LOG_NORMAL, " size:       %llu\n", (uint64_t)blocks * block_size);
 
 	/* Register the device with the disk device manager. */
 	sprintf(name, "%d", num);
-	ret = disk_device_create(name, controller->device, &ata_device_ops, device,
-	                         device->blocks, blksize, &device->device);
+	ret = disk_device_create(name, channel->node, &ata_disk_ops, device, blocks,
+	                         block_size, &device->node);
 	if(ret != STATUS_SUCCESS) {
-		fatal("Could not create ATA disk device %s (%d)", name, ret);
+		fatal("Could not create ATA disk device %u (%d)", num, ret);
 	}
-
-	mutex_lock(&controller->lock);
-	list_append(&controller->devices, &device->header);
-
+out:
 	kfree(ident);
-	mutex_unlock(&controller->lock);
-	return true;
-fail:
-	if(ident) {
-		kfree(ident);
-	}
-	mutex_unlock(&controller->lock);
-	return false;
+	ata_channel_finish_command(channel);
 }
