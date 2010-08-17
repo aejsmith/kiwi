@@ -103,6 +103,7 @@ sources = map(File, [
 	'unistd/access.c',
 	'unistd/chdir.c',
 	'unistd/close.c',
+	'unistd/fork.c',
 	'unistd/getcwd.c',
 	'unistd/lseek.c',
 	'unistd/read.c',

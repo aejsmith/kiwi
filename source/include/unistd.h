@@ -83,7 +83,7 @@ extern void _exit(int status);
 /* int fchownat(int, const char *, uid_t, gid_t, int); */
 /* int fdatasync(int); */
 /* int fexecve(int, char *const [], char *const []); */
-//extern pid_t fork(void);
+extern pid_t fork(void);
 /* long fpathconf(int, int); */
 extern int fsync(int fd);
 /* int ftruncate(int, off_t); */
