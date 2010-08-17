@@ -226,6 +226,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	if(!(src->flags & VM_REGION_PRIVATE)) {
 		if(src->amap) {
 			refcount_inc(&src->amap->count);
+			vm_amap_map(src->amap, src->amap_offset, src->end - src->start);
 			dest->amap = src->amap;
 			dest->amap_offset = src->amap_offset;
 		}
@@ -249,6 +250,13 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(vm_page_t *), MM_SLEEP);
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_SLEEP);
 
+	/* Write-protect all mappings on the source region. */
+	page_map_lock(&src->as->pmap);
+	for(i = src->start; i < src->end; i += PAGE_SIZE) {
+		page_map_protect(&src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
+	}
+	page_map_unlock(&src->as->pmap);
+
 	/* Point all of the pages in the new map to the pages from the source
 	 * map: they will be copied when a write fault occurs on either the
 	 * source or the destination. Set the region reference count for each
@@ -256,17 +264,11 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	for(i = start; i < end; i++) {
 		if(src->amap->pages[i]) {
 			refcount_inc(&src->amap->pages[i]->count);
+			dest->amap->curr_size++;
 		}
 		dest->amap->pages[i - start] = src->amap->pages[i];
 		dest->amap->rref[i - start] = 1;
 	}
-
-	/* Write-protect all mappings on the source region. */
-	page_map_lock(&src->as->pmap);
-	for(i = src->start; i < src->end; i += PAGE_SIZE) {
-		page_map_protect(&src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
-	}
-	page_map_unlock(&src->as->pmap);
 
 	dprintf("vm: copied anonymous region %p (map: %p) to %p (map: %p)\n",
 	        src, src->amap, dest, dest->amap);
@@ -685,6 +687,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 				dprintf("vm:  anon write fault: copying page %zu due to refcount > 1\n", i);
 
 				page = vm_page_copy(amap->pages[i], MM_SLEEP);
+				refcount_inc(&page->count);
 
 				/* Decrease the count of the old page. We must
 				 * handle it going to 0 here, as another object
