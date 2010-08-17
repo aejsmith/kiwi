@@ -93,6 +93,7 @@ sources = map(File, [
 
 	'sys/mkdir.c',
 	'sys/stat.c',
+	'sys/wait.c',
 
 	'time/asctime.c',
 	'time/gmtime.c',

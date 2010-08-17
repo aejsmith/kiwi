@@ -20,29 +20,50 @@
 
 #include <kernel/thread.h>
 
+#include <sys/wait.h>
+
+#include <errno.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 int main(int argc, char **argv) {
-	char *str;
-	pid_t ret;
+	int status;
+	pid_t pid;
 
-	str = malloc(32);
-	strcpy(str, "Hello, World!");
-
-	ret = fork();
-	if(ret > 0) {
-		thread_usleep(100000);
-		printf("I'm the parent, child is %d. Memory contains: %s\n", ret, str);
-	} else if(ret == 0) {
-		printf("I'm the child, contains: %s\n", str);
-		strcpy(str, "Meow meow meow meow!");
-		printf("Now contains: %s\n", str);
-	} else {
+	pid = fork();
+	if(pid == 0) {
+		printf("Child 1! Waiting 1 second...\n");
+		thread_usleep(1000000);
+		return 42;
+	} else if(pid < 0) {
 		perror("fork");
 		return 1;
 	}
-	return 0;
+
+	pid = fork();
+	if(pid == 0) {
+		thread_usleep(100000);
+		printf("Child 2! Waiting 2 seconds...\n");
+		thread_usleep(2000000);
+		return 123;
+	} else if(pid < 0) {
+		perror("fork");
+		return 1;
+	}
+
+	while(1) {
+		pid = waitpid(-1, &status, 0);
+		if(pid < 0) {
+			if(errno == ECHILD) {
+				return 0;
+			}
+			perror("waitpid");
+			return 1;
+		}
+
+		if(WIFEXITED(status)) {
+			printf("Child %d exited, status=%d\n", pid, WEXITSTATUS(status));
+		}
+	}
 }

@@ -21,9 +21,21 @@
 #ifndef __UNISTD_PRIV_H
 #define __UNISTD_PRIV_H
 
+
+
 #include <list.h>
 #include <unistd.h>
 
 #include "../libc.h"
+
+/** Structure containing details of a POSIX process. */
+typedef struct posix_process {
+	list_t header;			/**< Link to process list. */
+	handle_t handle;		/**< Handle to process. */
+	pid_t pid;			/**< ID of the process. */
+} posix_process_t;
+
+extern list_t __hidden child_processes;
+extern handle_t __hidden child_processes_lock;
 
 #endif /* __UNISTD_PRIV_H */

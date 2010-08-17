@@ -26,7 +26,7 @@
 
 #include "libc.h"
 
-/* Early C library initialisation. */
+/** Early C library initialisation. */
 static void __attribute__((constructor)) libc_early_init(void) {
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");

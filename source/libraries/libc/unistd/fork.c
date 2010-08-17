@@ -20,13 +20,19 @@
 
 #include <kernel/object.h>
 #include <kernel/process.h>
+#include <kernel/semaphore.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 #include <kernel/vm.h>
 
 #include <setjmp.h>
+#include <stdlib.h>
 
 #include "unistd_priv.h"
+
+/** List of child processes created via fork(). */
+LIST_DECLARE(child_processes);
+handle_t child_processes_lock = 0;
 
 /** Fork entry point.
  * @param arg		Pointer to jump buffer. */
@@ -39,20 +45,36 @@ static void fork_entry(void *arg) {
  * @param stack		Stack allocation.
  * @return		Process ID of child or -1 on failure. */
 static pid_t fork_parent(jmp_buf state, char *stack) {
-	handle_t handle;
+	posix_process_t *proc;
 	status_t ret;
+
+	/* Create a structure to store details of the child. */
+	proc = malloc(sizeof(*proc));
+	if(!proc) {
+		return -1;
+	}
+	list_init(&proc->header);
 
 	/* Clone the process, starting it at our entry function which restores
 	 * the saved process. FIXME: Stack direction. */
-	ret = process_clone(fork_entry, state, &stack[0x1000], &handle);
+	ret = process_clone(fork_entry, state, &stack[0x1000], &proc->handle);
 	vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
+		free(proc);
 		return ret;
 	}
 
-	// TODO: Register child process.
-	return process_id(handle);
+	/* Register the process. */
+	proc->pid = process_id(proc->handle);
+	if(proc->pid < 1) {
+		libc_fatal("could not get ID of child");
+	}
+	semaphore_down(child_processes_lock, -1);
+	list_append(&child_processes, &proc->header);
+	semaphore_up(child_processes_lock, 1);
+
+	return proc->pid;
 }
 
 /** Create a clone of the calling process.
@@ -89,4 +111,12 @@ pid_t fork(void) {
 	}
 
 	return fork_parent(state, stack);
+}
+
+/** Create the child process list lock. */
+static void __attribute__((constructor)) fork_init(void) {
+	status_t ret = semaphore_create("child_processes_lock", 1, &child_processes_lock);
+	if(ret != STATUS_SUCCESS) {
+		libc_fatal("could not create child list lock (%d)", ret);
+	}
 }
