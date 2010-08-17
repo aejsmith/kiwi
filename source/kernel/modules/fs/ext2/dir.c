@@ -112,14 +112,13 @@ status_t ext2_dir_iterate(ext2_inode_t *dir, offset_t index, ext2_dir_iterate_cb
 	name = kmalloc(EXT2_NAME_MAX + 1, MM_SLEEP);
 	while(offset < dir->size) {
 		if(i++ >= index) {
-			found = true;
-
 			ret = ext2_dirent_read(dir, &entry, offset, name);
 			if(ret != STATUS_SUCCESS) {
 				goto out;
 			}
 
 			if(entry.file_type != EXT2_FT_UNKNOWN && entry.name_len != 0) {
+				found = true;
 				if(!cb(dir, &entry, name, offset, data)) {
 					break;
 				}
