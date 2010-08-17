@@ -519,6 +519,34 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 	return STATUS_SUCCESS;
 }
 
+/** Clone a handle table.
+ *
+ * Creates a clone of a handle table. All handles, even non-inheritable ones,
+ * will be copied into the new table. The table entries will all refer to the
+ * same underlying handle as the old table.
+ *
+ * @param src		Source table.
+ *
+ * @return		Pointer to cloned table.
+ */
+handle_table_t *handle_table_clone(handle_table_t *src) {
+	handle_table_t *table;
+	handle_link_t *link;
+
+	table = slab_cache_alloc(handle_table_cache, MM_SLEEP);
+	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
+
+	rwlock_read_lock(&src->lock);
+
+	AVL_TREE_FOREACH(&src->tree, iter) {
+		link = avl_tree_entry(iter, handle_link_t);
+		handle_table_insert(table, iter->key, link->handle, link->flags);
+	}
+
+	rwlock_unlock(&src->lock);
+	return table;
+}
+
 /** Destroy a handle table.
  * @param table		Table being destroyed. */
 void handle_table_destroy(handle_table_t *table) {

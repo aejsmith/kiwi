@@ -54,6 +54,8 @@ extern status_t SYSCALL(process_create)(const char *path, const char *const args
 extern status_t SYSCALL(process_replace)(const char *path, const char *const args[],
                                          const char *const env[], handle_t map[][2],
                                          int count);
+extern status_t SYSCALL(process_clone)(void (*func)(void *), void *arg, void *sp,
+                                       handle_t *handlep);
 extern status_t SYSCALL(process_open)(process_id_t id, handle_t *handlep);
 extern process_id_t SYSCALL(process_id)(handle_t handle);
 extern status_t SYSCALL(process_status)(handle_t handle, int *statusp);

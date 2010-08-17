@@ -43,6 +43,13 @@ struct waitq;
 /** Entry function for a thread. */
 typedef void (*thread_func_t)(void *, void *);
 
+/** Thread creation arguments structure, for thread_uspace_trampoline(). */
+typedef struct thread_uspace_args {
+	ptr_t sp;			/**< Stack pointer. */
+	ptr_t entry;			/**< Entry point address. */
+	ptr_t arg;			/**< Argument. */
+} thread_uspace_args_t;
+
 /** Definition of a thread. */
 typedef struct thread {
 	object_t obj;			/**< Object header. */
@@ -116,6 +123,8 @@ extern void thread_arch_post_switch(thread_t *thread);
 extern status_t thread_arch_init(thread_t *thread);
 extern void thread_arch_destroy(thread_t *thread);
 extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
+
+extern void thread_uspace_trampoline(void *_args, void *arg2);
 
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);

@@ -127,12 +127,19 @@ static void process_release(process_t *process) {
  * @param flags		Behaviour flags for the process.
  * @param priority	Priority to give the process.
  * @param aspace	Address space for the process.
+ * @param table		If not NULL, this handle table will be used, otherwise
+ *			a new table will be created containing either all
+ *			inheritable handles from the parent, or handle mappings
+ *			specified in the mapping array.
  * @param parent	Process to inherit information from.
  * @param cflags	Creation flags for the process.
  * @param map		Array of handle mappings (see handle_table_init()).
  * @param count		Number of handles in mapping array.
  * @param procp		Where to store pointer to structure.
- * @param handlep	Where to store handle to process.
+ * @param handlep	Where to store handle to process. This is the same as
+ *			the ID that will be stored in the userspace location,
+ *			and can be used to detach the handle upon failure in
+ *			the caller.
  * @param uhandlep	Userspace location to store handle to process in.
  *
  * @return		Status code describing result of the operation. Note
@@ -140,8 +147,8 @@ static void process_release(process_t *process) {
  *			destroyed.
  */
 static status_t process_alloc(const char *name, process_id_t id, int flags, int priority,
-                              vm_aspace_t *aspace, process_t *parent, int cflags,
-                              handle_t map[][2], int count, process_t **procp,
+                              vm_aspace_t *aspace, handle_table_t *table, process_t *parent,
+                              int cflags, handle_t map[][2], int count, process_t **procp,
                               handle_t *handlep, handle_t *uhandlep) {
 	process_t *process;
 	status_t ret;
@@ -151,11 +158,15 @@ static status_t process_alloc(const char *name, process_id_t id, int flags, int 
 	assert(priority >= 0 && priority < PRIORITY_MAX);
 
 	process = slab_cache_alloc(process_cache, MM_SLEEP);
-	ret = handle_table_create((parent) ? parent->handles : NULL, map, count,
-	                          &process->handles);
-	if(ret != STATUS_SUCCESS) {
-		slab_cache_free(process_cache, process);
-		return ret;
+	if(table) {
+		process->handles = table;
+	} else {
+		ret = handle_table_create((parent) ? parent->handles : NULL, map,
+		                          count, &process->handles);
+		if(ret != STATUS_SUCCESS) {
+			slab_cache_free(process_cache, process);
+			return ret;
+		}
 	}
 	object_init(&process->obj, &process_object_type);
 	refcount_set(&process->count, (handlep) ? 1 : 0);
@@ -445,7 +456,6 @@ process_t *process_lookup(process_id_t id) {
 	rwlock_read_lock(&process_tree_lock);
 	ret = process_lookup_unsafe(id);
 	rwlock_unlock(&process_tree_lock);
-
 	return ret;
 }
 
@@ -486,7 +496,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	}
 
 	/* Create the new process. */
-	ret = process_alloc(args[0], -1, flags, priority, info.aspace, parent, 0,
+	ret = process_alloc(args[0], -1, flags, priority, info.aspace, NULL, parent, 0,
 	                    NULL, 0, &process, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
@@ -584,7 +594,7 @@ void __init_text process_init(void) {
 
 	/* Create the kernel process. */
 	ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
-	                    PRIORITY_KERNEL, NULL, NULL, 0, NULL, 0,
+	                    PRIORITY_KERNEL, NULL, NULL, NULL, 0, NULL, 0,
 	                    &kernel_proc, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
@@ -715,7 +725,7 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	}
 
 	/* Create the new process and a handle to it. */
-	ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace, curr_proc,
+	ret = process_alloc(info.path, -1, 0, PRIORITY_USER, info.aspace, NULL, curr_proc,
 	                    flags, info.map, count, &process, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
@@ -841,6 +851,67 @@ fail:
 		vm_aspace_destroy(info.aspace);
 	}
 	process_create_args_free(&info);
+	return ret;
+}
+
+/** Clone the calling process.
+ *
+ * Creates a clone of the calling process. The new process will have a clone of
+ * the original process' address space. Data in private mappings will be copied
+ * when either the parent or the child writes to the pages. Non-private mappings
+ * will be shared between the processes: any modifications made be either
+ * process will be visible to the other. The new process will inherit all
+ * handles from the parent, including non-inheritable ones. Threads, however,
+ * are not cloned: the new process will have a single thread which will begin
+ * execution at the address specified on the specified stack.
+ *
+ * @param func		Where to begin execution at in the new process.
+ * @param arg		Argument to pass to entry function.
+ * @param sp		Stack pointer to use. Depending on the architecture,
+ *			this may need to have space to store the argument to
+ *			the function.
+ * @param handlep	Where to store handle to the child process.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, handle_t *handlep) {
+	thread_uspace_args_t *args;
+	process_t *process = NULL;
+	handle_table_t *table;
+	thread_t *thread;
+	vm_aspace_t *as;
+	handle_t handle;
+	status_t ret;
+
+	/* Create a clone of the process' address space and handle table. */
+	as = vm_aspace_clone(curr_proc->aspace);
+	table = handle_table_clone(curr_proc->handles);
+
+	/* Create the new process and a handle to it. */
+	ret = process_alloc(curr_proc->name, -1, 0, PRIORITY_USER, as, table, curr_proc,
+	                    0, NULL, 0, &process, &handle, handlep);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
+	}
+
+	/* Create and run the entry thread. */
+	args = kmalloc(sizeof(*args), MM_SLEEP);
+	args->entry = (ptr_t)func;
+	args->arg = (ptr_t)arg;
+	args->sp = (ptr_t)sp;
+	ret = thread_create("main", process, 0, thread_uspace_trampoline, args, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
+		goto fail;
+	}
+	thread_run(thread);
+	return STATUS_SUCCESS;
+fail:
+	if(process) {
+		handle_detach(curr_proc, handle);
+	} else {
+		handle_table_destroy(table);
+		vm_aspace_destroy(as);
+	}
 	return ret;
 }
 

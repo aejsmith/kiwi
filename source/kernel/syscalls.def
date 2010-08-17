@@ -63,6 +63,7 @@ syscall vm_map(ptr_t, size_t, int, handle_t, offset_t, ptr_t);
 syscall vm_unmap(ptr_t, size_t);
 syscall process_create(ptr_t, ptr_t, ptr_t, int, ptr_t, int, ptr_t);
 syscall process_replace(ptr_t, ptr_t, ptr_t, ptr_t, int);
+syscall process_clone(ptr_t, ptr_t, ptr_t, ptr_t);
 syscall process_open(process_id_t, ptr_t);
 syscall process_id(handle_t);
 syscall process_status(handle_t, ptr_t);

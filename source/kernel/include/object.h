@@ -136,6 +136,7 @@ extern status_t handle_lookup(struct process *process, handle_t id, int type, kh
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
                                     handle_table_t **tablep);
+extern handle_table_t *handle_table_clone(handle_table_t *src);
 extern void handle_table_destroy(handle_table_t *table);
 
 extern int kdbg_cmd_handles(int argc, char **argv);

@@ -51,13 +51,6 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Thread creation arguments structure. */
-typedef struct thread_uspace_args {
-	ptr_t sp;			/**< Stack pointer. */
-	ptr_t entry;			/**< Entry point address. */
-	ptr_t arg;			/**< Argument. */
-} thread_uspace_args_t;
-
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
@@ -110,7 +103,7 @@ static void thread_trampoline(void) {
 /** Entry function for a userspace thread.
  * @param _args		Argument structure pointer.
  * @param arg2		Unused. */
-static void thread_uspace_trampoline(void *_args, void *arg2) {
+void thread_uspace_trampoline(void *_args, void *arg2) {
 	thread_uspace_args_t *args = _args;
 	ptr_t entry, sp, arg;
 
