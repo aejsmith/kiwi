@@ -700,7 +700,8 @@ static status_t process_create_args_copy(const char *path, const char *const arg
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
  *			specifies the ID to give it in the child.
- * @param count		Number of entries in handle mapping array.
+ * @param count		Number of entries in handle mapping array, or -1 if
+ *			array should not be used.
  * @param handlep	Where to store handle to process (can be NULL).
  *
  * @return		Status code describing result of the operation.
@@ -777,7 +778,8 @@ fail:
  *			is less than or equal to 0). The first ID of each entry
  *			specifies the handle in the caller, and the second
  *			specifies the ID to move it to.
- * @param count		Number of entries in handle mapping array.
+ * @param count		Number of entries in handle mapping array, or -1 if
+ *			array should not be used.
  *
  * @return		Does not return on success, returns status code on
  *			failure.

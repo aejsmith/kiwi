@@ -71,12 +71,12 @@ extern int close(int fd);
 //extern int dup2(int fd, int newfd);
 extern void _exit(int status);
 /* void encrypt(char[64], int); */
-//extern int execl(const char *path, const char *arg, ...);
+extern int execl(const char *path, const char *arg, ...);
 /* int execle(const char *, const char *, ...); */
-//extern int execlp(const char *file, const char *arg, ...);
-//extern int execv(const char *path, char *const argv[]);
-//extern int execve(const char *path, char *const argv[], char *const envp[]);
-//extern int execvp(const char *file, char *const argv[]);
+extern int execlp(const char *file, const char *arg, ...);
+extern int execv(const char *path, char *const argv[]);
+extern int execve(const char *path, char *const argv[], char *const envp[]);
+extern int execvp(const char *file, char *const argv[]);
 /* int faccessat(int, const char *, int, int); */
 //extern int fchdir(int fd);
 //extern int fchown(int fd, uid_t uid, gid_t gid);

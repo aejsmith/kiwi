@@ -44,9 +44,10 @@ int main(int argc, char **argv) {
 	pid = fork();
 	if(pid == 0) {
 		thread_usleep(100000);
-		printf("Child 2! Waiting 2 seconds...\n");
+		printf("Child 2! Waiting 2 seconds before executing shell...\n");
 		thread_usleep(2000000);
-		return 123;
+		execl("/system/binaries/failshell", "failshell", NULL);
+		perror("execl");
 	} else if(pid < 0) {
 		perror("fork");
 		return 1;
