@@ -209,19 +209,18 @@ static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, s
  * @param count		Number of blocks to write.
  * @return		Status code describing result of the operation. */
 static status_t ata_disk_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
-#if 0
 	ata_device_t *device = _device->data;
 	uint8_t cmd, error, status;
 	size_t current, i;
 	status_t ret;
 
-	mutex_lock(&device->parent->lock);
+	ata_channel_begin_command(device->parent, device->num);
 
 	while(count) {
 		/* Set up the address registers and select the device. */
-		current = ata_device_begin_transfer(device, lba, count);
+		current = ata_device_begin_io(device, lba, count);
 		if(!current) {
-			mutex_unlock(&device->parent->lock);
+			ata_channel_finish_command(device->parent);
 			return STATUS_DEVICE_ERROR;
 		}
 
@@ -229,23 +228,21 @@ static status_t ata_disk_write(disk_device_t *_device, const void *buf, uint64_t
 		cmd = (lba >= LBA28_MAX_BLOCK) ? ATA_CMD_WRITE_SECTORS_EXT : ATA_CMD_WRITE_SECTORS;
 
 		/* Start the transfer. */
-		ata_controller_command(device->parent, cmd);
+		ata_channel_command(device->parent, cmd);
 
 		/* Transfer each sector. */
 		for(i = 0; i < current; i++) {
-			ret = ata_controller_wait(device->parent, ATA_STATUS_DRQ, 0, false, true, 10000000);
+			ret = ata_channel_write_pio(device->parent, buf, _device->block_size);
 			if(ret != STATUS_SUCCESS) {
-				status = ata_controller_status(device->parent);
-				error = ata_controller_error(device->parent);
-				kprintf(LOG_WARN, "ata: write of %zu block(s) on %" PRId32 ":%" PRIu8 " failed "
-				        "on block %zu (ret: %d, status: %" PRIu8 ", error: %" PRIu8 ")\n",
-				        current, device->parent->id, device->num, i, ret, status, error);
-				mutex_unlock(&device->parent->lock);
-				return ret;
+				status = ata_channel_status(device->parent);
+				error = ata_channel_error(device->parent);
+				kprintf(LOG_WARN, "ata: read of %zu block(s) from %" PRIu64 " "
+				        "on %d:%u failed on block %zu (ret: %d, status: %u, "
+				        "error: %u)\n", current, lba, device->parent->id,
+				        device->num, i, ret, status, error);
+				ata_channel_finish_command(device->parent);
+				return STATUS_DEVICE_ERROR;
 			}
-
-			/* Write the sector. */
-			ata_controller_pio_write(device->parent, buf, _device->block_size);
 			buf += _device->block_size;
 		}
 
@@ -253,10 +250,8 @@ static status_t ata_disk_write(disk_device_t *_device, const void *buf, uint64_t
 		lba += current;
 	}
 
-	mutex_unlock(&device->parent->lock);
+	ata_channel_finish_command(device->parent);
 	return STATUS_SUCCESS;
-#endif
-	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** ATA disk device operations structure. */
