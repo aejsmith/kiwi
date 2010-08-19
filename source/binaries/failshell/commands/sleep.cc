@@ -46,7 +46,7 @@ public:
 		}
 
 		seconds = strtoul(argv[1], NULL, 0);
-		return thread_usleep(seconds * 1000000);
+		return thread_usleep(seconds * 1000000, NULL);
 	}
 };
 

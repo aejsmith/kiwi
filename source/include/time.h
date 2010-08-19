@@ -22,10 +22,18 @@
 #define __TIME_H
 
 #include <sys/types.h>
+#define __need_NULL
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** Time specification structure. */
+struct timespec {
+	time_t tv_sec;			/**< Seconds. */
+	long tv_nsec;			/**< Additional nanoseconds since. */
+};
 
 /** Structure containing a time. */
 struct tm {
@@ -51,6 +59,7 @@ extern struct tm *gmtime_r(const time_t *__restrict timep, struct tm *__restrict
 extern struct tm *localtime(const time_t *timep);
 extern struct tm *localtime_r(const time_t *__restrict timep, struct tm *__restrict tm);
 extern time_t mktime(struct tm *timep);
+extern int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
 extern size_t strftime(char *__restrict buf, size_t max, const char *__restrict fmt, const struct tm *__restrict tm);
 //extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
 //extern time_t time(time_t *timep);

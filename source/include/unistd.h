@@ -130,7 +130,7 @@ extern int rmdir(const char *path);
 /* int setreuid(uid_t, uid_t); */
 //extern pid_t setsid(void);
 /* int setuid(uid_t); */
-//extern unsigned int sleep(unsigned int secs);
+extern unsigned int sleep(unsigned int secs);
 /* void swab(const void *restrict, void *restrict, ssize_t); */
 extern int symlink(const char *dest, const char *path);
 /* int symlinkat(const char *, int, const char *); */

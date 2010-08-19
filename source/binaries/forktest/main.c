@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 	pid = fork();
 	if(pid == 0) {
 		printf("Child 1! Waiting 1 second...\n");
-		thread_usleep(1000000);
+		sleep(1);
 		return 42;
 	} else if(pid < 0) {
 		perror("fork");
@@ -43,9 +43,9 @@ int main(int argc, char **argv) {
 
 	pid = fork();
 	if(pid == 0) {
-		thread_usleep(100000);
+		thread_usleep(100000, NULL);
 		printf("Child 2! Waiting 2 seconds before executing shell...\n");
-		thread_usleep(2000000);
+		sleep(2);
 		execl("/system/binaries/failshell", "failshell", NULL);
 		perror("execl");
 	} else if(pid < 0) {

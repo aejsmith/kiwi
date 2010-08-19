@@ -763,10 +763,28 @@ void sys_thread_exit(int status) {
 /** Sleep for a certain amount of time.
  * @param us		Number of microseconds to sleep for. Must be 0 or
  *			higher.
+ * @param remp		If not NULL, the number of microseconds remaining will
+ *			be stored here if the wait is interrupted.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_usleep(useconds_t us) {
+status_t sys_thread_usleep(useconds_t us, useconds_t *remp) {
+	useconds_t begin, elapsed, rem;
+	status_t ret;
+
 	if(us < 0) {
 		return STATUS_INVALID_ARG;
 	}
-	return usleep_etc(us, SYNC_INTERRUPTIBLE);
+
+	/* FIXME: The method getting remaining time isn't quite accurate. */
+	begin = time_since_boot();
+	ret = usleep_etc(us, SYNC_INTERRUPTIBLE);
+	if(ret == STATUS_INTERRUPTED && remp) {
+		elapsed = time_since_boot() - begin;
+		if(elapsed < us) {
+			rem = us - elapsed;
+			memcpy_to_user(remp, &rem, sizeof(rem));
+		} else {
+			ret = STATUS_SUCCESS;
+		}
+	}
+	return ret;
 }

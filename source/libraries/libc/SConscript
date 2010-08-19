@@ -99,6 +99,7 @@ sources = map(File, [
 	'time/gmtime.c',
 	'time/localtime.c',
 	'time/mktime.c',
+	'time/nanosleep.c',
 	'time/strftime.c',
 
 	'unistd/access.c',
@@ -112,6 +113,7 @@ sources = map(File, [
 	'unistd/lseek.c',
 	'unistd/read.c',
 	'unistd/rmdir.c',
+	'unistd/sleep.c',
 	'unistd/symlink.c',
 	'unistd/sync.c',
 	'unistd/unlink.c',
