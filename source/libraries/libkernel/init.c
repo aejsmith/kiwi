@@ -94,7 +94,7 @@ void libkernel_init_stage2(process_args_t *args) {
 	/* Initialise the runtime loader and load the program. */
 	entry = (void (*)(process_args_t *))rtld_init(args);
 
-	/* Signal to the kernel that we've completed loading at call the entry
+	/* Signal to the kernel that we've completed loading and call the entry
 	 * point for the program. */
 	process_loaded();
 	dprintf("libkernel: beginning program execution at %p...\n", entry);

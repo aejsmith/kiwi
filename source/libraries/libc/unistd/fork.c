@@ -46,18 +46,12 @@ static void fork_entry(void *arg) {
  * @return		Process ID of child or -1 on failure. */
 static pid_t fork_parent(jmp_buf state, char *stack) {
 	posix_process_t *proc;
+	handle_t handle;
 	status_t ret;
-
-	/* Create a structure to store details of the child. */
-	proc = malloc(sizeof(*proc));
-	if(!proc) {
-		return -1;
-	}
-	list_init(&proc->header);
 
 	/* Clone the process, starting it at our entry function which restores
 	 * the saved process. FIXME: Stack direction. */
-	ret = process_clone(fork_entry, state, &stack[0x1000], &proc->handle);
+	ret = process_clone(fork_entry, state, &stack[0x1000], &handle);
 	vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
@@ -65,7 +59,11 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 		return ret;
 	}
 
-	/* Register the process. */
+	/* Create a structure to store details of the child and add it to the
+	 * child list. */
+	proc = malloc(sizeof(*proc));
+	list_init(&proc->header);
+	proc->handle = handle;
 	proc->pid = process_id(proc->handle);
 	if(proc->pid < 1) {
 		libc_fatal("could not get ID of child");
@@ -73,7 +71,6 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 	semaphore_down(child_processes_lock, -1);
 	list_append(&child_processes, &proc->header);
 	semaphore_up(child_processes_lock, 1);
-
 	return proc->pid;
 }
 
