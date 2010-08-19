@@ -60,7 +60,7 @@ config EXTRA_CXXFLAGS
 
 config QEMU_BINARY
 	string "QEMU binary"
-	default "qemu"
+	default "qemu-system-x86_64"
 	help
 	  Path to the QEMU binary to use for the qtest build target.
 
