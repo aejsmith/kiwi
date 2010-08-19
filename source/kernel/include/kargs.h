@@ -45,7 +45,7 @@ typedef struct kernel_args_memory {
 		/** Reserved memory, never usable. */
 		PHYS_MEMORY_RESERVED,
 
-		/** Memory used by the bootloader. */
+		/** Memory used by the bootloader (never reaches the kernel). */
 		PHYS_MEMORY_INTERNAL,
 	} type;
 

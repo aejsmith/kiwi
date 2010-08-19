@@ -29,6 +29,7 @@ extern void *krealloc(void *addr, size_t size);
 extern void kfree(void *addr);
 
 extern void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type);
+extern void phys_memory_protect(phys_ptr_t start, phys_ptr_t end);
 extern phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim);
 
 extern void platform_memory_detect(void);

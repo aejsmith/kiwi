@@ -91,9 +91,10 @@ static inline bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t endia
 				virt_end = phdrs[i].p_vaddr + phdrs[i].p_memsz; \
 			} \
 		} \
+		phys_memory_protect(virt_base, virt_end); \
 		\
 		kernel_args->kernel_phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), \
-		                                               _alignment, false); \
+		                                             _alignment, false); \
 		dprintf("elf: loading kernel image to 0x%" PRIpp " (size: 0x%zx, align: 0x%zx)\n", \
 		        kernel_args->kernel_phys, (size_t)(virt_end - virt_base), _alignment); \
 		\

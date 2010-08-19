@@ -39,7 +39,8 @@ typedef struct list {
 	for(list_t *iter = (list)->prev; iter != (list); iter = iter->prev)
 
 /** Iterates over a list, setting iter to the list entry on each iteration.
- * @note		Safe to use when the loop may modify the list. */
+ * @note		Safe to use when the loop may modify the list - caches
+ *			the next pointer from the entry before the loop body. */
 #define LIST_FOREACH_SAFE(list, iter)		\
 	for(list_t *iter = (list)->next, *_##iter = iter->next; \
 	    iter != (list); iter = _##iter, _##iter = _##iter->next)

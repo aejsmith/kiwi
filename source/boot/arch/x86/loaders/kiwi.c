@@ -86,7 +86,7 @@ static bool kiwi_loader_arch_load64(fs_handle_t *handle) {
 	uint64_t *pml4, *pdp, *pdir;
 	Elf64_Addr virt_base;
 	size_t load_size, i;
-	int pdpe, pde;
+	int pml4e, pdpe, pde;
 
 	if(!elf_check(handle, ELFCLASS64, ELFDATA2LSB, ELF_EM_X86_64)) {
 		return false;
@@ -100,8 +100,9 @@ static bool kiwi_loader_arch_load64(fs_handle_t *handle) {
 	}
 
 	load_elf64_kernel(handle, &kernel_entry64, &virt_base, &load_size);
-
-	assert(virt_base >= 0xFFFFFFFF80000000LL);
+	if(virt_base % LARGE_PAGE_SIZE) {
+		internal_error("Kernel image has bad virtual base");
+	}
 
 	/* Identity map the first 1GB of physical memory. */
 	pml4 = allocate_paging_structure();
@@ -114,12 +115,21 @@ static bool kiwi_loader_arch_load64(fs_handle_t *handle) {
 	}
 
 	/* Map the kernel in. */
-	pml4[511] = (ptr_t)pdp | PG_PRESENT | PG_WRITE;
-	pdir = allocate_paging_structure();
+	pml4e = (virt_base & 0x0000FFFFFFFFF000) / 0x8000000000;
+	if(pml4e != 0) {
+		pdp = allocate_paging_structure();
+		pml4[pml4e] = (ptr_t)pdp | PG_PRESENT | PG_WRITE;
+	}
 	pdpe = (virt_base % 0x8000000000LL) / 0x40000000;
-	pdp[pdpe] = (ptr_t)pdir | PG_PRESENT | PG_WRITE;
+	if(pml4e != 0 || pdpe != 0) {
+		pdir = allocate_paging_structure();
+		pdp[pdpe] = (ptr_t)pdir | PG_PRESENT | PG_WRITE;
+	}
 	pde = (virt_base % 0x40000000) / LARGE_PAGE_SIZE;
 	for(i = 0; i < ROUND_UP(load_size, LARGE_PAGE_SIZE) / LARGE_PAGE_SIZE; i++) {
+		if(pde + i >= 512) {
+			internal_error("Kernel image crosses page directory boundary");
+		}
 		pdir[pde + i] = (kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
 	}
 
@@ -138,15 +148,16 @@ static bool kiwi_loader_arch_load32(fs_handle_t *handle) {
 	Elf32_Addr virt_base;
 	uint64_t *pdp, *pdir;
 	size_t load_size, i;
-	int pde;
+	int pdpe, pde;
 
 	if(!elf_check(handle, ELFCLASS32, ELFDATA2LSB, ELF_EM_386)) {
 		return false;
 	}
 
 	load_elf32_kernel(handle, &kernel_entry32, &virt_base, &load_size);
-
-	assert(virt_base >= 0xC0000000);
+	if(virt_base % LARGE_PAGE_SIZE) {
+		internal_error("Kernel image has bad virtual base");
+	}
 
 	/* Identity map the first 1GB of physical memory. */
 	pdp = allocate_paging_structure();
@@ -157,10 +168,16 @@ static bool kiwi_loader_arch_load32(fs_handle_t *handle) {
 	}
 
 	/* Map the kernel in. */
-	pdir = allocate_paging_structure();
-	pdp[3] = (ptr_t)pdir | PG_PRESENT;
+	pdpe = virt_base / 0x40000000;
+	if(pdpe != 0) {
+		pdir = allocate_paging_structure();
+		pdp[pdpe] = (ptr_t)pdir | PG_PRESENT;
+	}
 	pde = (virt_base % 0x40000000) / LARGE_PAGE_SIZE;
 	for(i = 0; i < ROUND_UP(load_size, LARGE_PAGE_SIZE) / LARGE_PAGE_SIZE; i++) {
+		if(pde + i >= 512) {
+			internal_error("Kernel image crosses page directory boundary");
+		}
 		pdir[pde + i] = (kernel_args->kernel_phys + (i * LARGE_PAGE_SIZE)) | PG_PRESENT | PG_WRITE | PG_LARGE;
 	}
 

@@ -315,6 +315,26 @@ void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type) {
 	        start, end, type);
 }
 
+/** Prevent allocations from being made from a range of physical memory.
+ * @param start		Start of the range.
+ * @param end		End of the range. */
+void phys_memory_protect(phys_ptr_t start, phys_ptr_t end) {
+	memory_range_t *range;
+
+	start = ROUND_DOWN(start, PAGE_SIZE);
+	end = ROUND_UP(end, PAGE_SIZE);
+
+	LIST_FOREACH_SAFE(&memory_ranges, iter) {
+		range = list_entry(iter, memory_range_t, header);
+
+		if(start >= range->ka.start && start < range->ka.end) {
+			phys_memory_add_internal(start, MIN(end, range->ka.end), PHYS_MEMORY_INTERNAL);
+		} else if(end > range->ka.start && end <= range->ka.end) {
+			phys_memory_add_internal(MAX(start, range->ka.start), end, PHYS_MEMORY_INTERNAL);
+		}
+	}
+}
+
 /** Allocate a range of physical memory.
  * @note		If allocation fails, a boot error will be raised.
  * @param size		Size of the range (multiple of the page size).
