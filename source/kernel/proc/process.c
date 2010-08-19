@@ -82,6 +82,21 @@ static void process_cache_ctor(void *obj, void *data) {
 	notifier_init(&process->death_notifier, process);
 }
 
+/** Free a process' resources.
+ * @note		Safe to call multiple times.
+ * @param process	Process to clean up. */
+static void process_cleanup(process_t *process) {
+	if(process->aspace) {
+		vm_aspace_destroy(process->aspace);
+		process->aspace = NULL;
+	}
+	if(process->handles) {
+		handle_table_destroy(process->handles);
+		io_context_destroy(&process->ioctx);
+		process->handles = NULL;
+	}
+}
+
 /** Destroy a process structure.
  * @param process	Process to destroy. */
 static void process_destroy(process_t *process) {
@@ -95,12 +110,7 @@ static void process_destroy(process_t *process) {
 	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
 		process->id, process->name, process, process->status);
 
-	if(process->aspace) {
-		vm_aspace_destroy(process->aspace);
-		process->aspace = NULL;
-	}
-	handle_table_destroy(process->handles);
-	io_context_destroy(&process->ioctx);
+	process_cleanup(process);
 	notifier_clear(&process->death_notifier);
 	object_destroy(&process->obj);
 	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
@@ -417,6 +427,7 @@ void process_detach(thread_t *thread) {
 	if(list_empty(&process->threads)) {
 		assert(process->state != PROCESS_DEAD);
 		process->state = PROCESS_DEAD;
+		process_cleanup(process);
 
 		/* If the create info pointer is not NULL, a process_create()
 		 * call is waiting. Make it return with the process' exit code. */
