@@ -534,7 +534,7 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 	page_range_count++;
 
 	/* If reclaimable, allocate the range to prevent it being allocated. */
-	if(type == PHYS_MEMORY_RECLAIMABLE) {
+	if(type == PHYS_MEMORY_RECLAIMABLE || type == PHYS_MEMORY_ALLOCATED) {
 		vmem_xalloc(&page_arena, end - start, 0, 0, 0, start, end, MM_FATAL);
 	}
 }
@@ -542,8 +542,12 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 /** Initialise the physical memory manager.
  * @param args		Kernel arguments. */
 void __init_text page_init(kernel_args_t *args) {
+	phys_ptr_t init_start, init_end, addr;
 	kernel_args_memory_t *range;
-	phys_ptr_t start, end, addr;
+
+	/* Work out the start and end of the .init section. */
+	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + args->kernel_phys;
+	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + args->kernel_phys;
 
 	/* Create the arena and populate it with detected ranges. */
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
@@ -555,6 +559,17 @@ void __init_text page_init(kernel_args_t *args) {
 		case PHYS_MEMORY_RECLAIMABLE:
 			page_range_add(range->start, range->end, range->type);
 			break;
+		case PHYS_MEMORY_ALLOCATED:
+			/* If this region contains the kernel, mark the part
+			 * containing the init region as reclaimable. */
+			if(init_start >= range->start && init_end <= range->end) {
+				page_range_add(range->start, init_start, range->type);
+				page_range_add(init_start, init_end, PHYS_MEMORY_RECLAIMABLE);
+				page_range_add(init_end, range->end, range->type);
+			} else {
+				page_range_add(range->start, range->end, range->type);
+			}
+			break;
 		default:
 			/* Don't care about non-usable ranges. */
 			break;
@@ -563,14 +578,6 @@ void __init_text page_init(kernel_args_t *args) {
 		addr = range->next;
 		page_phys_unmap(range, sizeof(*range), true);
 	}
-
-	/* Mark the kernel init section as reclaimable. Since the kernel is
-	 * marked as allocated by the bootloader, the range will not have
-	 * been added by the above loop. Therefore, the range must be added
-	 * first. */
-	start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + args->kernel_phys;
-	end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + args->kernel_phys;
-	page_range_add(start, end, PHYS_MEMORY_RECLAIMABLE);
 
 	/* Initialise architecture paging-related things. When this returns,
 	 * we should be on the kernel page map. */
