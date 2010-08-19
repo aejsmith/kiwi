@@ -364,6 +364,51 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 	return STATUS_SUCCESS;
 }
 
+/** Modify protection flags on a mapping.
+ * @param map		Page map to modify in.
+ * @param virt		Virtual address to modify.
+ * @param write		Whether to make the mapping writable.
+ * @param exec		Whether to make the mapping executable. */
+void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec) {
+	uint64_t *ptbl;
+	int pte;
+
+	assert(mutex_held(&map->lock));
+	assert(!(virt % PAGE_SIZE));
+
+	/* Find the page table for the entry. */
+	pte = (virt % LARGE_PAGE_SIZE) / PAGE_SIZE;
+	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
+	if(!ptbl) {
+		return;
+	} else if(!ptbl[pte] & PG_PRESENT) {
+		return;
+	}
+
+	/* Update the entry. */
+	if(write) {
+		ptbl[pte] |= PG_WRITE;
+	} else {
+		ptbl[pte] &= ~PG_WRITE;
+	}
+	if(exec) {
+		ptbl[pte] &= ~PG_NOEXEC;
+	} else {
+		ptbl[pte] |= PG_NOEXEC;
+	}
+	memory_barrier();
+	page_structure_unmap(map, ptbl);
+
+	/* Clear TLB entries. */
+	if(IS_CURRENT_MAP(map)) {
+		invlpg(virt);
+	}
+	if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
+		map->pages_to_invalidate[map->invalidate_count] = virt;
+	}
+	map->invalidate_count++;
+}
+
 /** Unmap a page.
  * @param map		Page map to unmap from.
  * @param virt		Virtual address to unmap.
