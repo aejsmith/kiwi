@@ -186,8 +186,9 @@ FUNCTION_START(syscall_entry)
 	push	%edx
 	push	%eax
 
-	/* Perform kernel entry work. */
+	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
+	sti
 
 	/* Get back the call number and check whether it is valid. */
 	pop	%edi
@@ -205,6 +206,9 @@ FUNCTION_START(syscall_entry)
 	call	*syscall_table(,%edi,1)
 	addl	$8, %esp
 .Lreturn:
+	/* Disable interrupts. */
+	cli
+
 	/* At this point the stack pointer should point to the callee-save
 	 * registers. Restore them. */
 	pop	%edi

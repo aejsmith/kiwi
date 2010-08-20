@@ -200,8 +200,9 @@ FUNCTION_START(syscall_entry)
 	push	%rdi
 	push	%rax
 
-	/* Perform kernel entry work. */
+	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
+	sti
 
 	/* Get back the call number and check whether it is valid. */
 	pop	%rax
@@ -224,6 +225,9 @@ FUNCTION_START(syscall_entry)
 	pop	%r9
 	call	*syscall_table(,%rax,1)
 .Lreturn:
+	/* Clear interrupts. */
+	cli
+
 	/* Perform kernel exit work. Preserve the system call's return value. */
 	push	%rax
 	call	thread_at_kernel_exit
