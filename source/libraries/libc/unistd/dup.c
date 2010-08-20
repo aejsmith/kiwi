@@ -18,8 +18,12 @@
  * @brief		POSIX file descriptor duplication functions.
  */
 
+#include <kernel/object.h>
+#include <kernel/status.h>
+
 #include <fcntl.h>
 #include <unistd.h>
+
 #include "../libc.h"
 
 /** Duplicate a file descriptor.
@@ -35,6 +39,14 @@ int dup(int fd) {
  *			this number, it will be closed).
  * @return		New FD, or -1 on failure. */
 int dup2(int fd, int newfd) {
-	libc_stub("dup2", false);
-	return -1;
+	status_t ret;
+	handle_t new;
+
+	ret = handle_duplicate(fd, newfd, true, &new);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return new;
 }

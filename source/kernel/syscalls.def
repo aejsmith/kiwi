@@ -29,6 +29,7 @@ syscall object_wait(handle_t, int, useconds_t);
 syscall object_wait_multiple(ptr_t, ptr_t, size_t, useconds_t, ptr_t);
 syscall handle_get_flags(handle_t, ptr_t);
 syscall handle_set_flags(handle_t, int);
+syscall handle_duplicate(handle_t, handle_t, bool, ptr_t);
 syscall handle_close(handle_t);
 syscall fs_file_create(ptr_t);
 syscall fs_file_open(ptr_t, int, ptr_t);

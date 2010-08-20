@@ -63,6 +63,23 @@ static int fcntl_setfd(int fd, int flags) {
 	return 0;
 }
 
+/** Perform the F_DUPFD command.
+ * @param fd		File descriptor.
+ * @param dest		Minimum ID for new descriptor.
+ * @return		New FD on success, -1 on failure. */
+static int fcntl_dupfd(int fd, int dest) {
+	status_t ret;
+	handle_t new;
+
+	ret = handle_duplicate(fd, dest, false, &new);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return new;
+}
+
 /** Control file descriptor behaviour.
  *
  * Controls the behaviour of a file descriptor according to the specified
@@ -109,9 +126,12 @@ int fcntl(int fd, int cmd, ...) {
 		ret = fcntl_setfd(fd, arg);
 		break;
 	case F_DUPFD:
+		arg = va_arg(args, int);
+		ret = fcntl_dupfd(fd, arg);
+		break;
 	case F_GETFL:
 	case F_SETFL:
-		libc_stub("fcntl(F_{DUPFD,GETFL,SETFL})", true);
+		libc_stub("fcntl(F_{GETFL,SETFL})", true);
 		return -1;
 	default:
 		errno = EINVAL;

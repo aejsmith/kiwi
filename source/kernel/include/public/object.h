@@ -51,6 +51,7 @@ extern status_t SYSCALL(object_wait_multiple)(handle_t *handles, int *events, si
                                               useconds_t timeout, int *indexp);
 extern status_t SYSCALL(handle_get_flags)(handle_t handle, int *flagsp);
 extern status_t SYSCALL(handle_set_flags)(handle_t handle, int flags);
+extern status_t SYSCALL(handle_duplicate)(handle_t handle, handle_t dest, bool force, handle_t *newp);
 extern status_t SYSCALL(handle_close)(handle_t handle);
 
 #ifdef __cplusplus

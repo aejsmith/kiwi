@@ -366,27 +366,16 @@ status_t handle_attach(process_t *process, khandle_t *handle, int flags, handle_
 	return STATUS_SUCCESS;
 }
 
-/** Detach a handle from a process.
- *
- * Removes the specified handle ID from a process' handle table and releases
- * the handle.
- *
+/** Detach a handle from a process' handle table.
  * @param process	Process to remove from.
  * @param id		ID of handle to detach.
- *
- * @return		Status code describing result of the operation.
- */
-status_t handle_detach(process_t *process, handle_t id) {
+ * @return		Status code describing result of the operation. */
+static status_t handle_detach_unlocked(process_t *process, handle_t id) {
 	handle_link_t *link;
-
-	assert(process);
-
-	rwlock_write_lock(&process->handles->lock);
 
 	/* Look up the handle in the tree. */
 	link = avl_tree_lookup(&process->handles->tree, (key_t)id);
 	if(!link) {
-		rwlock_unlock(&process->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
@@ -400,8 +389,28 @@ status_t handle_detach(process_t *process, handle_t id) {
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
 	        id, process->id);
-	rwlock_unlock(&process->handles->lock);
 	return STATUS_SUCCESS;
+}
+
+/** Detach a handle from a process.
+ *
+ * Removes the specified handle ID from a process' handle table and releases
+ * the handle.
+ *
+ * @param process	Process to remove from.
+ * @param id		ID of handle to detach.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t handle_detach(process_t *process, handle_t id) {
+	status_t ret;
+
+	assert(process);
+
+	rwlock_write_lock(&process->handles->lock);
+	ret = handle_detach_unlocked(process, id);
+	rwlock_unlock(&process->handles->lock);
+	return ret;
 }
 
 /** Look up a handle in a process' handle table.
@@ -765,6 +774,63 @@ status_t sys_handle_set_flags(handle_t handle, int flags) {
 	link->flags = flags;
 	rwlock_unlock(&curr_proc->handles->lock);
 	return STATUS_SUCCESS;
+}
+
+/** Duplicate a handle ID.
+ *
+ * Duplicates an entry in the calling process' handle table. The new handle ID
+ * will refer to the same handle as the source ID.
+ *
+ * @param handle	Handle ID to duplicate.
+ * @param dest		Destination handle ID.
+ * @param force		If true, and the destination handle ID already refers
+ *			to a handle, then that handle will be closed. Otherwise,
+ *			the lowest handle available that is higher than the
+ *			specified ID will be used.
+ * @param newp		Where to store new handle ID.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t sys_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp) {
+	handle_link_t *link;
+
+	if(handle >= CONFIG_HANDLE_MAX || dest >= CONFIG_HANDLE_MAX || !newp) {
+		return STATUS_INVALID_ARG;
+	}
+
+	/* FIXME: Laziness! */
+	if(!force && dest > 0) {
+		return STATUS_NOT_IMPLEMENTED;
+	}
+
+	rwlock_write_lock(&curr_proc->handles->lock);
+
+	/* Look up the handle in the tree. */
+	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
+	if(!link) {
+		rwlock_unlock(&curr_proc->handles->lock);
+		return STATUS_INVALID_HANDLE;
+	}
+
+	/* If forcing, close any existing handle. Otherwise, find a new ID. */
+	if(force) {
+		handle_detach_unlocked(curr_proc, dest);
+	} else {
+		/* See previous FIXME. */
+		dest = bitmap_ffz(&curr_proc->handles->bitmap);
+		if(dest < 0) {
+			rwlock_unlock(&curr_proc->handles->lock);
+			return STATUS_NO_HANDLES;
+		}
+	}
+
+	/* Insert the new handle. */
+	handle_table_insert(curr_proc->handles, dest, link->handle, link->flags);
+
+	dprintf("object: duplicated handle %d to %d in process %" PRId32 " (object: %p, data: %p)\n",
+	        handle, dest, curr_proc->id, link->handle->object, link->handle->data);
+	rwlock_unlock(&curr_proc->handles->lock);
+	return memcpy_to_user(newp, &dest, sizeof(*newp));
 }
 
 /** Close a handle.
