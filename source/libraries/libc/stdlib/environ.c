@@ -229,3 +229,43 @@ int setenv(const char *name, const char *value, int overwrite) {
 	environ[count + 1] = NULL;
 	return 0;
 }
+
+/** Unset an environment variable.
+ * @param name		Name of variable (must not contain an = character).
+ * @return		0 on success, -1 on failure. */
+int unsetenv(const char *name) {
+	char **new, *key, *val;
+	size_t i, len, count;
+
+	if(!name || name[0] == 0 || strchr(name, '=') != NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Ensure the environment array can be modified. */
+	if(!ensure_environ_alloced()) {
+		return -1;
+	}
+
+	for(i = 0; environ[i] != NULL; i++) {
+		key = environ[i];
+		val = strchr(key, '=');
+
+		if(val == NULL) {
+			libc_fatal("value '%s' found in environment without an =", key);
+		}
+
+		len = strlen(name);
+		if(strncmp(key, name, len) == 0 && environ[i][len] == '=') {
+			for(count = 0; environ[count] != NULL; count++);
+			memcpy(&environ[i], &environ[i + 1], (count - i) * sizeof(char *));
+			new = realloc(environ, count * sizeof(char *));
+			if(new) {
+				environ = new;
+			}
+			return 0;
+		}
+	}
+
+	return 0;
+}

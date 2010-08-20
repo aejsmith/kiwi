@@ -67,6 +67,7 @@ sources = map(File, [
 	'stdlib/environ.c',
 	'stdlib/exit.c',
 	'stdlib/malloc.c',
+	'stdlib/mkstemp.c',
 	'stdlib/qsort.c',
 	'stdlib/rand.c',
 	'stdlib/strtod.c',

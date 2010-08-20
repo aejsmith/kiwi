@@ -25,7 +25,7 @@
 #define __need_wchar_t
 #define __need_NULL
 #include <stddef.h>
-//#include <sys/wait.h>
+#include <sys/wait.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,9 +71,9 @@ extern void *malloc(size_t size);
 //extern int mblen(const char *s, size_t n);
 //extern size_t mbstowcs(wchar_t *__restrict dest, const char *__restrict src, size_t n);
 //extern int mbtowc(wchar_t *__restrict pwc, const char *__restrict s, size_t n);
-//extern char *mktemp(char *tpl);
+extern char *mktemp(char *tpl);
 //extern char *mkdtemp(char *tpl);
-//extern int mkstemp(char *tpl);
+extern int mkstemp(char *tpl);
 extern int putenv(char *str);
 extern void qsort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
 extern int rand(void);
@@ -89,7 +89,7 @@ extern long long int strtoll(const char *__restrict cp, char **__restrict endp, 
 extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp, int base);
 extern unsigned long long int strtoull(const char *__restrict cp, char **__restrict endp, int base);
 //extern int system(const char *command);
-//extern int unsetenv(const char *name);
+extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
 
