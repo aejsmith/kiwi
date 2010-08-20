@@ -40,7 +40,7 @@ extern size_t __libc_error_size;
 
 extern void libc_init(struct process_args *args);
 extern void libc_fatal(const char *fmt, ...) __noreturn __hidden;
-extern void libc_stub(const char *name) __noreturn __hidden;
+extern void libc_stub(const char *name, bool fatal) __hidden;
 
 extern void libc_status_to_errno(status_t status) __hidden;
 

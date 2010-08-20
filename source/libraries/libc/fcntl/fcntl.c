@@ -111,7 +111,8 @@ int fcntl(int fd, int cmd, ...) {
 	case F_DUPFD:
 	case F_GETFL:
 	case F_SETFL:
-		libc_stub("fcntl(F_{DUPFD,GETFL,SETFL})");
+		libc_stub("fcntl(F_{DUPFD,GETFL,SETFL})", true);
+		return -1;
 	default:
 		errno = EINVAL;
 	}

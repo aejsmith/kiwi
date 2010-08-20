@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,28 @@
 
 /**
  * @file
- * @brief		String unformatting function.
+ * @brief		Access/modification time functions.
  */
 
-#include "stdio_priv.h"
+#ifndef __UTIME_H
+#define __UTIME_H
 
-/** Unformat a buffer.
- *
- * Unformats a buffer into a list of arguments according to the given format
- * string.
- *
- * @param data		Structure containing helper functions.
- * @param fmt		Format string.
- * @param args		Pointers to values to set to unformatted arguments.
- *
- * @return		Number of input items matched.
- */
-int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) {
-	libc_stub(__FUNCTION__, true);
-	return 0;
+#include <sys/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** POSIX utimbuf structure. */
+struct utimbuf {
+	time_t actime;			/**< Access time. */
+	time_t modtime;			/**< Modification time. */
+};
+
+extern int utime(const char *path, const struct utimbuf *times);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* __UTIME_H */

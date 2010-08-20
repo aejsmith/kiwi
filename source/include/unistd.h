@@ -57,13 +57,13 @@ extern "C" {
 #define W_OK				0x0002	/**< Check for write permission. */
 #define X_OK				0x0004	/**< Check for execute permission. */
 
-//extern char *optarg;
-//extern int optind, opterr, optopt;
+extern char *optarg;
+extern int optind, opterr, optopt;
 
 extern int access(const char *path, int mode);
 //extern unsigned int alarm(unsigned int seconds);
 extern int chdir(const char *path);
-//extern int chown(const char *path, uid_t uid, gid_t gid);
+extern int chown(const char *path, uid_t uid, gid_t gid);
 extern int close(int fd);
 /* size_t confstr(int, char *, size_t); */
 /* char *crypt(const char *, const char *); */
@@ -96,16 +96,16 @@ extern char *getcwd(char *buf, size_t size);
 /* int gethostname(char *, size_t); */
 /* char *getlogin(void); */
 /* int getlogin_r(char *, size_t); */
-//extern int getopt(int argc, char *const argv[], const char *opts);
+extern int getopt(int argc, char *const argv[], const char *opts);
 //extern int getpagesize(void);
 //extern pid_t getpgid(pid_t);
 //extern pid_t getpgrp(void);
-//extern pid_t getpid(void);
+extern pid_t getpid(void);
 //extern pid_t getppid(void);
 //extern pid_t getsid(pid_t pid);
 //extern uid_t getuid(void);
 extern char *getwd(char *buf);
-//extern int isatty(int fd);
+extern int isatty(int fd);
 //extern int lchown(const char *path, uid_t uid, gid_t gid);
 //extern int link(const char *source, const char *dest);
 /* int linkat(int, const char *, int, const char *, int); */

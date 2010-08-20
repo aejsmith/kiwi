@@ -19,6 +19,7 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -58,10 +59,16 @@ void libc_fatal(const char *fmt, ...) {
 	abort();
 }
 
-/** Print out a fatal error for a stub function being called.
- * @param name		Name of function. */
-void libc_stub(const char *name) {
-	libc_fatal("unimplemented function: %s", name);
+/** Handle a call to a stub function.
+ * @param name		Name of function.
+ * @param fatal		Whether the error is considered fatal. */
+void libc_stub(const char *name, bool fatal) {
+	if(fatal) {
+		libc_fatal("unimplemented function: %s", name);
+	} else {
+		fprintf(stderr, "STUB: %s\n", name);
+		errno = ENOSYS;
+	}
 }
 
 /** Print out an assertion fail message.
@@ -70,10 +77,10 @@ void libc_stub(const char *name) {
  * @param line		Line number.
  * @param func		Function name. */
 void __assert_fail(const char *cond, const char *file, unsigned int line, const char *func) {
-	if(func == (__const char *)0) {
-		fprintf(stderr, "assert: Assertion '%s' failed at %s:%d\n", cond, file, line);
+	if(!func) {
+		fprintf(stderr, "Assertion '%s' failed at %s:%d\n", cond, file, line);
 	} else {
-		fprintf(stderr, "assert:%s: Assertion '%s' failed at %s:%d\n", func, cond, file, line);
+		fprintf(stderr, "Assertion '%s' failed at %s:%d (%s)\n", cond, file, line, func);
 	}
 	abort();
 }

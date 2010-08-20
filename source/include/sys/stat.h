@@ -80,7 +80,7 @@ struct stat {
 	blkcnt_t st_blocks;		/**< Number of blocks allocated. */
 };
 
-//extern int chmod(const char *path, mode_t mode);
+extern int chmod(const char *path, mode_t mode);
 //extern int fchmod(int fd, mode_t mode);
 /* int fchmodat(int, const char *, mode_t, int); */
 extern int fstat(int fd, struct stat *statp);
@@ -92,7 +92,7 @@ extern int mkdir(const char *path, mode_t mode);
 /* int mkfifo(const char *, mode_t); */
 /* int mkfifoat(int, const char *, mode_t); */
 extern int stat(const char *__restrict path, struct stat *__restrict statp);
-//extern mode_t umask(mode_t mask);
+extern mode_t umask(mode_t mask);
 /* int utimensat(int, const char *, const struct timespec [2], int); */
 
 #ifdef __cplusplus

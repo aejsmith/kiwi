@@ -42,7 +42,8 @@ int setvbuf(FILE *restrict stream, char *restrict buf, int mode, size_t size) {
 		break;
 	case _IOLBF:
 	case _IOFBF:
-		libc_stub("setvbuf");
+		libc_stub("setvbuf", true);
+		return -1;
 	default:
 		errno = EINVAL;
 		return -1;

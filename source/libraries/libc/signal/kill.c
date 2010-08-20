@@ -26,5 +26,6 @@
  * @param num		Signal number.
  * @return		0 on success, -1 on failure. */
 int kill(pid_t pid, int num) {
-	libc_stub("kill");
+	libc_stub("kill", false);
+	return -1;
 }

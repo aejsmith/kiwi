@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,14 @@
 
 /**
  * @file
- * @brief		String unformatting function.
+ * @brief		POSIX get PID function.
  */
 
-#include "stdio_priv.h"
+#include <kernel/process.h>
+#include <unistd.h>
 
-/** Unformat a buffer.
- *
- * Unformats a buffer into a list of arguments according to the given format
- * string.
- *
- * @param data		Structure containing helper functions.
- * @param fmt		Format string.
- * @param args		Pointers to values to set to unformatted arguments.
- *
- * @return		Number of input items matched.
- */
-int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) {
-	libc_stub(__FUNCTION__, true);
-	return 0;
+/** Get the current process ID.
+ * @return		ID of calling process. */
+pid_t getpid(void) {
+	return process_id(-1);
 }

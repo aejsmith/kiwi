@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,26 @@
 
 /**
  * @file
- * @brief		String unformatting function.
+ * @brief		POSIX isatty() function.
  */
 
-#include "stdio_priv.h"
+#include <kernel/object.h>
 
-/** Unformat a buffer.
- *
- * Unformats a buffer into a list of arguments according to the given format
- * string.
- *
- * @param data		Structure containing helper functions.
- * @param fmt		Format string.
- * @param args		Pointers to values to set to unformatted arguments.
- *
- * @return		Number of input items matched.
- */
-int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) {
-	libc_stub(__FUNCTION__, true);
-	return 0;
+#include <errno.h>
+#include <unistd.h>
+
+/** Check whether a file descriptor refers to a TTY.
+ * @param fd		File descriptor to check.
+ * @return		1 if a TTY, 0 if not. */
+int isatty(int fd) {
+	switch(object_type(fd)) {
+	case OBJECT_TYPE_DEVICE:
+		return 1;
+	case -1:
+		errno = EBADF;
+		return 0;
+	default:
+		errno = ENOTTY;
+		return 0;
+	}
 }

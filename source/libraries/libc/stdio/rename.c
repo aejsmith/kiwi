@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,28 @@
 
 /**
  * @file
- * @brief		String unformatting function.
+ * @brief		Rename file function.
  */
 
-#include "stdio_priv.h"
+#include <kernel/fs.h>
+#include <kernel/status.h>
 
-/** Unformat a buffer.
- *
- * Unformats a buffer into a list of arguments according to the given format
- * string.
- *
- * @param data		Structure containing helper functions.
- * @param fmt		Format string.
- * @param args		Pointers to values to set to unformatted arguments.
- *
- * @return		Number of input items matched.
- */
-int do_scanf(struct scanf_args *data, const char *restrict fmt, va_list args) {
-	libc_stub(__FUNCTION__, true);
+#include <stdio.h>
+
+#include "../libc.h"
+
+/** Rename a filesystem entry.
+ * @param source	Path to rename.
+ * @param dest		Path to rename to.
+ * @return		0 on success, -1 on failure. */
+int rename(const char *source, const char *dest) {
+	status_t ret;
+
+	ret = fs_rename(source, dest);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
 	return 0;
 }
