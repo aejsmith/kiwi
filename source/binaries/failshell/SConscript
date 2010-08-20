@@ -16,6 +16,7 @@ Import('env')
 env.Program('failshell', [
 	'commands/cat.cc',
 	'commands/cd.cc',
+	'commands/date.cc',
 	'commands/ls.cc',
 	'commands/mkdir.cc',
 	'commands/mount.cc',

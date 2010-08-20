@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,29 +15,22 @@
 
 /**
  * @file
- * @brief		POSIX time functions/definitions.
+ * @brief		POSIX time function.
  */
 
-#ifndef __SYS_TIME_H
-#define __SYS_TIME_H
+#include <kernel/time.h>
+#include <sys/time.h>
+#include <errno.h>
 
-//#include <sys/select.h>
-#include <sys/types.h>
+/** Get the current time.
+ * @param tv		Structure to fill with time since epoch.
+ * @param tz		Pointer to timezone (ignored).
+ * @return		0 on success, -1 on failure. */
+int gettimeofday(struct timeval *tv, void *tz) {
+	useconds_t ktime;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** Time value structure. */
-struct timeval {
-	time_t tv_sec;			/**< Seconds. */
-	suseconds_t tv_usec;		/**< Additional microseconds since. */
-};
-
-extern int gettimeofday(struct timeval *tv, void *tz);
-
-#ifdef __cplusplus
+	time_since_epoch(&ktime);
+	tv->tv_sec = ktime / 1000000;
+	tv->tv_usec = ktime % 1000000;
+	return 0;
 }
-#endif
-
-#endif /* __SYS_TIME_H */

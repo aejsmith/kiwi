@@ -15,29 +15,24 @@
 
 /**
  * @file
- * @brief		POSIX time functions/definitions.
+ * @brief		Current time function.
  */
 
-#ifndef __SYS_TIME_H
-#define __SYS_TIME_H
+#include <sys/time.h>
+#include <time.h>
 
-//#include <sys/select.h>
-#include <sys/types.h>
+/** Get the current time as seconds since the UNIX epoch.
+ * @param timep		If not NULL, result will also be stored here.
+ * @return		Current time. */
+time_t time(time_t *timep) {
+	struct timeval tv;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+	if(gettimeofday(&tv, NULL) != 0) {
+		return -1;
+	}
 
-/** Time value structure. */
-struct timeval {
-	time_t tv_sec;			/**< Seconds. */
-	suseconds_t tv_usec;		/**< Additional microseconds since. */
-};
-
-extern int gettimeofday(struct timeval *tv, void *tz);
-
-#ifdef __cplusplus
+	if(timep) {
+		*timep = tv.tv_sec;
+	}
+	return tv.tv_sec;
 }
-#endif
-
-#endif /* __SYS_TIME_H */

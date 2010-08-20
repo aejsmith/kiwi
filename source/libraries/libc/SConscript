@@ -37,6 +37,8 @@ sources = map(File, [
 	'locale/localeconv.c',
 	'locale/setlocale.c',
 
+	'signal/kill.c',
+
 	'stdio/buffer.c',
 	'stdio/do_printf.c',
 	'stdio/do_scanf.c',
@@ -97,11 +99,13 @@ sources = map(File, [
 	'sys/wait.c',
 
 	'time/asctime.c',
+	'time/gettimeofday.c',
 	'time/gmtime.c',
 	'time/localtime.c',
 	'time/mktime.c',
 	'time/nanosleep.c',
 	'time/strftime.c',
+	'time/time.c',
 
 	'unistd/access.c',
 	'unistd/chdir.c',

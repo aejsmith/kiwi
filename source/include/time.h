@@ -62,12 +62,11 @@ extern time_t mktime(struct tm *timep);
 extern int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
 extern size_t strftime(char *__restrict buf, size_t max, const char *__restrict fmt, const struct tm *__restrict tm);
 //extern char *strptime(const char *__restrict, const char *__restrict, struct tm *__restrict);
-//extern time_t time(time_t *timep);
+extern time_t time(time_t *timep);
 
 #ifdef __cplusplus
 extern clock_t clock(void);
 extern double difftime(time_t, time_t);
-extern time_t time(time_t *timep);
 #endif
 
 #ifdef __cplusplus

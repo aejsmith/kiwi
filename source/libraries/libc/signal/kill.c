@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,29 +15,16 @@
 
 /**
  * @file
- * @brief		POSIX time functions/definitions.
+ * @brief		POSIX signal send functions.
  */
 
-#ifndef __SYS_TIME_H
-#define __SYS_TIME_H
+#include <signal.h>
+#include "../libc.h"
 
-//#include <sys/select.h>
-#include <sys/types.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** Time value structure. */
-struct timeval {
-	time_t tv_sec;			/**< Seconds. */
-	suseconds_t tv_usec;		/**< Additional microseconds since. */
-};
-
-extern int gettimeofday(struct timeval *tv, void *tz);
-
-#ifdef __cplusplus
+/** Send a signal to a process.
+ * @param pid		ID of process.
+ * @param num		Signal number.
+ * @return		0 on success, -1 on failure. */
+int kill(pid_t pid, int num) {
+	libc_stub("kill");
 }
-#endif
-
-#endif /* __SYS_TIME_H */
