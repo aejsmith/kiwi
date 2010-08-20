@@ -23,6 +23,10 @@
 
 #include <cpu/cpu.h>
 
+#include <mm/safe.h>
+
+#include <public/time.h>
+
 #include <sync/waitq.h>
 
 #include <assert.h>
@@ -341,4 +345,20 @@ void __init_text time_init(void) {
 
 	/* Initialise the boot time. */
 	boot_unix_time = time_from_hardware() - time_since_boot();
+}
+
+/** Get the system uptime.
+ * @param usp		Where to store number of microseconds since boot.
+ * @return		Status code describing result of the operation. */
+status_t sys_time_since_boot(useconds_t *usp) {
+	useconds_t ret = time_since_boot();
+	return memcpy_to_user(usp, &ret, sizeof(ret));
+}
+
+/** Get the time since the UNIX epoch.
+ * @param usp		Where to store number of microseconds since the epoch.
+ * @return		Status code describing result of the operation. */
+status_t sys_time_since_epoch(useconds_t *usp) {
+	useconds_t ret = time_since_epoch();
+	return memcpy_to_user(usp, &ret, sizeof(ret));
 }

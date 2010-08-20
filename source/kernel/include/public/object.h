@@ -21,14 +21,14 @@
 #ifndef __KERNEL_OBJECT_H
 #define __KERNEL_OBJECT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef KERNEL
 # include <public/types.h>
 #else
 # include <kernel/types.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /** Object type ID definitions. */

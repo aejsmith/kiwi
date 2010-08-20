@@ -21,14 +21,14 @@
 #ifndef __KERNEL_SHM_H
 #define __KERNEL_SHM_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef KERNEL
 # include <public/types.h>
 #else
 # include <kernel/types.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 extern status_t SYSCALL(shm_create)(size_t size, handle_t *handlep);

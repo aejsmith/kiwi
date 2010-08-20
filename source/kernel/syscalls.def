@@ -92,3 +92,5 @@ syscall shm_create(size_t, ptr_t);
 syscall shm_open(shm_id_t, ptr_t);
 syscall shm_id(handle_t);
 syscall shm_resize(handle_t, size_t);
+syscall time_since_boot(ptr_t);
+syscall time_since_epoch(ptr_t);

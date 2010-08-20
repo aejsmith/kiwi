@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Thread management functions.
+ * @brief		Time functions.
  */
 
-#ifndef __KERNEL_THREAD_H
-#define __KERNEL_THREAD_H
+#ifndef __KERNEL_TIME_H
+#define __KERNEL_TIME_H
 
 #ifdef KERNEL
 # include <public/types.h>
@@ -31,19 +31,11 @@
 extern "C" {
 #endif
 
-/** Maximum length of a thread name. */
-#define THREAD_NAME_MAX		32
-
-extern status_t SYSCALL(thread_create)(const char *name, void *stack, size_t stacksz,
-                                       void (*func)(void *), void *arg,
-                                       handle_t *handlep);
-extern status_t SYSCALL(thread_open)(thread_id_t id, handle_t *handlep);
-extern thread_id_t SYSCALL(thread_id)(handle_t handle);
-extern void SYSCALL(thread_exit)(int status) __attribute__((noreturn));
-extern status_t SYSCALL(thread_usleep)(useconds_t us, useconds_t *remp);
+extern status_t SYSCALL(time_since_boot)(useconds_t *usp);
+extern status_t SYSCALL(time_since_epoch)(useconds_t *usp);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_THREAD_H */
+#endif /* __KERNEL_TIME_H */

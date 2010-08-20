@@ -21,14 +21,14 @@
 #ifndef __KERNEL_IPC_H
 #define __KERNEL_IPC_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef KERNEL
 # include <public/types.h>
 #else
 # include <kernel/types.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /** Structure describing a message to send with ipc_message_sendv(). */
