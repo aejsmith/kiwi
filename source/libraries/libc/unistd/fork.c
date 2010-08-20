@@ -55,7 +55,6 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 	vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
-		free(proc);
 		return ret;
 	}
 

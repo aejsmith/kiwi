@@ -18,6 +18,7 @@
  * @brief		Signal handling functions.
  */
 
+#include <errno.h>
 #include <signal.h>
 #include "../libc.h"
 
@@ -26,6 +27,7 @@
  * @param handler	Handler function.
  * @return		Previous handler, or SIG_ERR on failure. */
 void (*signal(int sig, void (*handler)(int)))(int) {
-	libc_stub("signal", false);
+	//libc_stub("signal", false);
+	errno = ENOSYS;
 	return SIG_ERR;
 }

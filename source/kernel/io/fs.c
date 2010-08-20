@@ -1752,7 +1752,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	}
 
 	dprintf("fs: mounted %s:%s on %s (mount: %p, root: %p)\n", mount->type->name,
-	        (dev) ? dev : "<none>", path, mount, mount->root);
+	        (device) ? device : "<none>", path, mount, mount->root);
 	mutex_unlock(&mounts_lock);
 	free_mount_options(optarr, count);
 	return STATUS_SUCCESS;
