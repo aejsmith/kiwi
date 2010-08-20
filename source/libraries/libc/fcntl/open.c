@@ -36,6 +36,7 @@
  *			success, -1 on failure (errno will be set to the error
  *			reason). */
 int open(const char *path, int oflag, ...) {
+	fs_node_type_t type;
 	handle_t handle;
 	fs_info_t info;
 	status_t ret;
@@ -62,6 +63,7 @@ retry:
 			errno = EEXIST;
 			return -1;
 		}
+		type = info.type;
 	} else if(ret == STATUS_NOT_FOUND && (oflag & O_CREAT)) {
 		/* File does not exist. Attempt to create it. */
 		ret = fs_file_create(path);
@@ -72,13 +74,14 @@ retry:
 			libc_status_to_errno(ret);
 			return -1;
 		}
+		type = FS_NODE_FILE;
 	} else {
 		libc_status_to_errno(ret);
 		return -1;
 	}
 
 	/* Open the entry according to the entry type. */
-	switch(info.type) {
+	switch(type) {
 	case FS_NODE_FILE:
 		if(oflag & O_DIRECTORY) {
 			errno = ENOTDIR;
