@@ -31,6 +31,13 @@ sources = map(File, [
 	'ctype/tolower.c',
 	'ctype/toupper.c',
 
+	'dirent/alphasort.c',
+	'dirent/closedir.c',
+	'dirent/opendir.c',
+	'dirent/readdir.c',
+	'dirent/rewinddir.c',
+	'dirent/scandir.c',
+
 	'fcntl/fcntl.c',
 	'fcntl/open.c',
 

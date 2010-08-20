@@ -36,7 +36,7 @@ typedef struct fs_dir_entry {
 	size_t length;			/**< Length of this structure including name. */
 	node_id_t id;			/**< ID of the node for the entry. */
 	mount_id_t mount;		/**< ID of the mount the node is on. */
-	char name[];			/**< Name of entry. */
+	char name[];			/**< Name of entry (NULL-terminated). */
 } fs_dir_entry_t;
 
 /** Possible filesystem node types. */
