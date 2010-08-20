@@ -49,7 +49,7 @@ struct dirent *readdir(DIR *dir) {
 	/* Convert the kernel entry structure to a dirent structure. */
 	dent = (struct dirent *)dir->buf;
 	dent->d_ino = entry->id;
-	dent->d_reclen = sizeof(*dent) + strlen(entry->name);
+	dent->d_reclen = sizeof(*dent) + strlen(entry->name) + 1;
 	strcpy(dent->d_name, entry->name);
 	free(entry);
 	return dent;

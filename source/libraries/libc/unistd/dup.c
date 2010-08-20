@@ -15,25 +15,26 @@
 
 /**
  * @file
- * @brief		POSIX signal send functions.
+ * @brief		POSIX file descriptor duplication functions.
  */
 
-#include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "../libc.h"
 
-/** Send a signal to a process.
- * @param pid		ID of process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
-int kill(pid_t pid, int num) {
-	libc_stub("kill", false);
-	return -1;
+/** Duplicate a file descriptor.
+ * @param fd		File descriptor to duplicate.
+ * @return		New FD, or -1 on failure. */
+int dup(int fd) {
+	return fcntl(fd, F_DUPFD, 0);
 }
 
-/** Send a signal to the current process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
-int raise(int num) {
-	libc_stub("raise", true);
+/** Duplicate a file descriptor.
+ * @param fd		File descriptor to duplicate.
+ * @param newfd		New file descriptor (if a file descriptor exists with
+ *			this number, it will be closed).
+ * @return		New FD, or -1 on failure. */
+int dup2(int fd, int newfd) {
+	libc_stub("dup2", false);
 	return -1;
 }

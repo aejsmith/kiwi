@@ -67,8 +67,8 @@ extern int chown(const char *path, uid_t uid, gid_t gid);
 extern int close(int fd);
 /* size_t confstr(int, char *, size_t); */
 /* char *crypt(const char *, const char *); */
-//extern int dup(int fd);
-//extern int dup2(int fd, int newfd);
+extern int dup(int fd);
+extern int dup2(int fd, int newfd);
 extern void _exit(int status);
 /* void encrypt(char[64], int); */
 extern int execl(const char *path, const char *arg, ...);
@@ -114,7 +114,7 @@ extern off_t lseek(int fd, off_t off, int act);
 /* int nice(int); */
 /* long pathconf(const char *, int); */
 /* int pause(void); */
-//extern int pipe(int fds[2]);
+extern int pipe(int fds[2]);
 extern ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 extern ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 extern ssize_t read(int fd, void *buf, size_t count);

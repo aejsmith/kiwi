@@ -15,25 +15,17 @@
 
 /**
  * @file
- * @brief		POSIX signal send functions.
+ * @brief		Signal handling functions.
  */
 
 #include <signal.h>
 #include "../libc.h"
 
-/** Send a signal to a process.
- * @param pid		ID of process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
-int kill(pid_t pid, int num) {
-	libc_stub("kill", false);
-	return -1;
-}
-
-/** Send a signal to the current process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
-int raise(int num) {
-	libc_stub("raise", true);
-	return -1;
+/** Set the handler of a signal.
+ * @param sig		Signal number.
+ * @param handler	Handler function.
+ * @return		Previous handler, or SIG_ERR on failure. */
+void (*signal(int sig, void (*handler)(int)))(int) {
+	libc_stub("signal", false);
+	return SIG_ERR;
 }

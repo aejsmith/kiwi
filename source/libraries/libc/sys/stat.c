@@ -53,7 +53,7 @@ static void fs_info_to_stat(fs_info_t *info, struct stat *restrict statp) {
 	/* Determine the mode. */
 	switch(info->type) {
 	case FS_NODE_FILE:
-		statp->st_mode = 0644 | S_IFREG;
+		statp->st_mode = 0755 | S_IFREG;
 		break;
 	case FS_NODE_DIR:
 		statp->st_mode = 0755 | S_IFDIR;

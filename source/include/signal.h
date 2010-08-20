@@ -182,7 +182,7 @@ extern int kill(pid_t pid, int num);
 /* int killpg(pid_t, int); */
 /* int pthread_kill(pthread_t, int); */
 /* int pthread_sigmask(int, const sigset_t *, sigset_t *); */
-//extern int raise(int num);
+extern int raise(int num);
 //extern int sigaction(int num, const struct sigaction *act, struct sigaction *oldact);
 //extern int sigaddset(sigset_t *set, int num);
 //extern int sigdelset(sigset_t *set, int num);
@@ -192,7 +192,7 @@ extern int kill(pid_t pid, int num);
 /* int sigignore(int); */
 /* int siginterrupt(int, int); */
 //extern int sigismember(const sigset_t *set, int num);
-//extern void (*signal(int, void (*)(int)))(int);
+extern void (*signal(int sig, void (*handler)(int)))(int);
 /* int sigpause(int); */
 /* int sigpending(sigset_t *); */
 //extern int sigprocmask(int how, const sigset_t *set, sigset_t *oset);

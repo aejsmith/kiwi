@@ -20,6 +20,7 @@ env.Program('failshell', [
 	'commands/ls.cc',
 	'commands/mkdir.cc',
 	'commands/mount.cc',
+	'commands/setroot.cc',
 	'commands/sleep.cc',
 	'commands/symlink.cc',
 	'commands/unlink.cc',

@@ -15,25 +15,16 @@
 
 /**
  * @file
- * @brief		POSIX signal send functions.
+ * @brief		POSIX pipe creation function.
  */
 
-#include <signal.h>
+#include <unistd.h>
 #include "../libc.h"
 
-/** Send a signal to a process.
- * @param pid		ID of process.
- * @param num		Signal number.
+/** Create an interprocess channel.
+ * @param fds		Where to store file descriptors to each end of pipe.
  * @return		0 on success, -1 on failure. */
-int kill(pid_t pid, int num) {
-	libc_stub("kill", false);
-	return -1;
-}
-
-/** Send a signal to the current process.
- * @param num		Signal number.
- * @return		0 on success, -1 on failure. */
-int raise(int num) {
-	libc_stub("raise", true);
+int pipe(int fds[2]) {
+	libc_stub("pipe", false);
 	return -1;
 }

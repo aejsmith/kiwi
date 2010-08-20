@@ -45,6 +45,7 @@ sources = map(File, [
 	'locale/setlocale.c',
 
 	'signal/kill.c',
+	'signal/signal.c',
 
 	'stdio/buffer.c',
 	'stdio/do_printf.c',
@@ -122,6 +123,7 @@ sources = map(File, [
 	'unistd/chdir.c',
 	'unistd/chown.c',
 	'unistd/close.c',
+	'unistd/dup.c',
 	'unistd/execlp.c',
 	'unistd/execve.c',
 	'unistd/execvp.c',
@@ -131,6 +133,7 @@ sources = map(File, [
 	'unistd/getpid.c',
 	'unistd/isatty.c',
 	'unistd/lseek.c',
+	'unistd/pipe.c',
 	'unistd/read.c',
 	'unistd/rmdir.c',
 	'unistd/sleep.c',
