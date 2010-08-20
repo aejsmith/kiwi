@@ -1678,40 +1678,38 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	mount->mountpoint = node;
 	mount->type = NULL;
 
-	/* Look up the device, if any. */
-	if(device) {
-		ret = device_open(device, &mount->device);
-		if(ret != STATUS_SUCCESS) {
-			goto fail;
-		}
-	}
-
-	/* Look up the filesystem type. If there is not a type specified, probe
-	 * for one. */
+	/* If a type is specified, look it up. */
 	if(type) {
 		mount->type = fs_type_lookup(type);
 		if(!mount->type) {
 			ret = STATUS_NOT_FOUND;
 			goto fail;
 		}
+	}
 
-		/* Release the device if it is not needed, and check if the
-		 * device contains the FS type. */
-		if(!mount->type->probe) {
-			if(mount->device) {
-				handle_release(mount->device);
-				mount->device = NULL;
-			}
-		} else if(!mount->device) {
+	/* Look up the device if the type needs one or we need to probe. */
+	if(!type || mount->type->probe) {
+		if(!device) {
 			ret = STATUS_INVALID_ARG;
 			goto fail;
-		} else if(!mount->type->probe(mount->device, NULL)) {
+		}
+
+		ret = device_open(device, &mount->device);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
+	}
+
+	/* Probe for the filesystem type if needed. */
+	if(!type) {
+		mount->type = fs_type_probe(mount->device, NULL);
+		if(!mount->type) {
 			ret = STATUS_UNKNOWN_FS;
 			goto fail;
 		}
 	} else {
-		mount->type = fs_type_probe(mount->device, NULL);
-		if(!mount->type) {
+		/* Check if the device contains the type. */
+		if(mount->type->probe && !mount->type->probe(mount->device, NULL)) {
 			ret = STATUS_UNKNOWN_FS;
 			goto fail;
 		}
