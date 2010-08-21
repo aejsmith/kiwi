@@ -327,7 +327,9 @@ void phys_memory_protect(phys_ptr_t start, phys_ptr_t end) {
 	LIST_FOREACH_SAFE(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
 
-		if(start >= range->ka.start && start < range->ka.end) {
+		if(range->ka.type != PHYS_MEMORY_FREE) {
+			continue;
+		} else if(start >= range->ka.start && start < range->ka.end) {
 			phys_memory_add_internal(start, MIN(end, range->ka.end), PHYS_MEMORY_INTERNAL);
 		} else if(end > range->ka.start && end <= range->ka.end) {
 			phys_memory_add_internal(MAX(start, range->ka.start), end, PHYS_MEMORY_INTERNAL);
