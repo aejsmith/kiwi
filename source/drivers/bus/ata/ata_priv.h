@@ -32,8 +32,9 @@ typedef struct ata_device {
 	char model[41];			/**< Device model number. */
 	char serial[21];		/**< Serial number. */
 	char revision[8];		/**< Device revision. */
+	size_t block_size;		/**< Block size. */
 
-	/** Information about whet the device supports. */
+	/** Information about what the device supports. */
 	unsigned lba48 : 1;		/**< Whether the device supports LBA48. */
 	unsigned dma : 1;		/**< Whether the device supports DMA. */
 } ata_device_t;
@@ -44,6 +45,9 @@ extern uint8_t ata_channel_read_cmd(ata_channel_t *channel, int reg);
 extern void ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val);
 extern status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count);
 extern status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count);
+extern status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count, bool write);
+extern bool ata_channel_perform_dma(ata_channel_t *channel);
+extern status_t ata_channel_finish_dma(ata_channel_t *channel);
 extern uint8_t ata_channel_status(ata_channel_t *channel);
 extern uint8_t ata_channel_error(ata_channel_t *channel);
 extern uint8_t ata_channel_selected(ata_channel_t *channel);

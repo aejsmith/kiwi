@@ -32,23 +32,58 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
+#include <mm/page.h>
 
 #include <assert.h>
 #include <console.h>
 #include <module.h>
 #include <status.h>
 
+/** Structure containing a PRDT entry. */
+typedef struct prdt_entry {
+	uint32_t paddr;				/**< Physical address. */
+	uint16_t bytes;				/**< Bytes to transfer. */
+	uint16_t flags;				/**< Reserved/EOT bits. */
+} __packed prdt_entry_t;
+
 /** Structure containing PCI ATA channel information. */
 typedef struct pci_ata_channel {
-	pci_device_t *pci_device;	/**< PCI device of the controller. */
-	ata_channel_t *channel;		/**< ATA bus manager channel structure. */
-	uint32_t ctrl_base;		/**< Control register base. */
-	uint32_t cmd_base;		/**< Command register base. */
-	uint32_t irq;			/**< IRQ number. */
+	pci_device_t *pci_device;		/**< PCI device of the controller. */
+	ata_channel_t *channel;			/**< ATA bus manager channel structure. */
+	uint32_t ctrl_base;			/**< Control register base. */
+	uint32_t cmd_base;			/**< Command register base. */
+	uint32_t bus_master_base;		/**< Bus master register base. */
+	uint32_t irq;				/**< IRQ number. */
+	prdt_entry_t *prdt;			/**< PRDT mapping. */
+	phys_ptr_t prdt_phys;			/**< PRDT physical address. */
 } pci_ata_channel_t;
 
+/** Size that we allocate for the PRDT. */
+#define PRDT_SIZE			PAGE_SIZE
+#define PRDT_ENTRIES			(PAGE_SIZE / sizeof(prdt_entry_t))
+
+/** PRDT flags. */
+#define PRDT_EOT			(1<<15)
+
 /** Check if a channel is in compatibility mode. */
-#define PCI_ATA_IS_COMPAT(pi)	((pi) == 0x00 || (pi) == 0x02)
+#define PCI_ATA_IS_COMPAT(pi)		((pi) == 0x00 || (pi) == 0x02)
+
+/** Bus master register definitions. */
+#define PCI_ATA_BM_REG_CMD		0x00	/**< Command register. */
+#define PCI_ATA_BM_REG_STATUS		0x02	/**< Status register. */
+#define PCI_ATA_BM_REG_PRDT		0x04	/**< PRDT address. */
+
+/** Bus master command register bit definitions. */
+#define PCI_ATA_BM_CMD_RWC		(1<<3)	/**< Direction (1 = read, 0 = write). */
+#define PCI_ATA_BM_CMD_START		(1<<0)	/**< Start/Stop Bus Master. */
+
+/** Bus master status register bit definitions. */
+#define PCI_ATA_BM_STATUS_ACTIVE	(1<<0)	/**< Bus Master IDE Active. */
+#define PCI_ATA_BM_STATUS_ERROR		(1<<1)	/**< Error. */
+#define PCI_ATA_BM_STATUS_INTERRUPT	(1<<2)	/**< Interrupt. */
+#define PCI_ATA_BM_STATUS_CAPABLE0	(1<<5)	/**< Drive 0 DMA Capable. */
+#define PCI_ATA_BM_STATUS_CAPABLE1	(1<<6)	/**< Drive 1 DMA Capable. */
+#define PCI_ATA_BM_STATUS_SIMPLEX	(1<<7)	/**< Simplex only. */
 
 /** Read from a control register.
  * @param channel	Channel to read from.
@@ -106,6 +141,82 @@ static void pci_ata_channel_write_pio(ata_channel_t *channel, const void *buf, s
 	out16s(data->cmd_base + ATA_CMD_REG_DATA, (count / 2), (const uint16_t *)buf);
 }
 
+/** Prepare a DMA transfer.
+ * @param channel	Channel to perform on.
+ * @param vec		Array of block descriptions. Each block will cover no
+ *			more than 1 page.
+ * @param count		Number of array entries.
+	 * @param write		Whether the transfer is a write.
+ * @return		Status code describing result of operation. */
+static status_t pci_ata_channel_prepare_dma(ata_channel_t *channel, const ata_dma_transfer_t *vec,
+                                            size_t count, bool write) {
+	pci_ata_channel_t *data = channel->data;
+	uint8_t status, command;
+	uint32_t addr;
+	size_t i;
+
+	/* Write each vector entry into the PRDT. */
+	for(i = 0; i < count; i++) {
+		data->prdt[i].paddr = vec[i].phys;
+		data->prdt[i].bytes = vec[i].size;
+		data->prdt[i].flags = ((i + 1) == count) ? PRDT_EOT : 0;
+	}
+
+	/* Write the new PRDT address. */
+	addr = in32(data->bus_master_base + PCI_ATA_BM_REG_PRDT);
+	addr &= 0x3;
+	addr |= data->prdt_phys;
+	out32(data->bus_master_base + PCI_ATA_BM_REG_PRDT, addr);
+
+	/* Clear error and interrupt bits. To clear the status/error bits, you
+	 * have to write a 1 to them (WTF?). */
+	status = in8(data->bus_master_base + PCI_ATA_BM_REG_STATUS);
+	status |= (PCI_ATA_BM_STATUS_ERROR | PCI_ATA_BM_STATUS_INTERRUPT);
+	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, status);
+
+	/* Set transfer direction. */
+	command = in8(data->bus_master_base + PCI_ATA_BM_REG_CMD);
+	if(write) {
+		command &= ~PCI_ATA_BM_CMD_RWC;
+	} else {
+		command |= PCI_ATA_BM_CMD_RWC;
+	}
+	out8(data->bus_master_base + PCI_ATA_BM_REG_CMD, command);
+	return STATUS_SUCCESS;
+}
+
+/** Start a DMA transfer.
+ * @param channel	Channel to start on. */
+static void pci_ata_channel_start_dma(ata_channel_t *channel) {
+	pci_ata_channel_t *data = channel->data;
+	uint8_t command;
+
+	command = in8(data->bus_master_base + PCI_ATA_BM_REG_CMD);
+	command |= PCI_ATA_BM_CMD_START;
+	out8(data->bus_master_base + PCI_ATA_BM_REG_CMD, command);
+}
+
+/** Clean up after a DMA transfer.
+ * @param channel	Channel to clean up on.
+ * @return		Status code describing result of the transfer. */
+static status_t pci_ata_channel_finish_dma(ata_channel_t *channel) {
+	pci_ata_channel_t *data = channel->data;
+	uint8_t status, command;
+
+	status = in8(data->bus_master_base + PCI_ATA_BM_REG_STATUS);
+
+	/* Stop the transfer. */
+	command = in8(data->bus_master_base + PCI_ATA_BM_REG_CMD);
+	command &= ~PCI_ATA_BM_CMD_START;
+	out8(data->bus_master_base + PCI_ATA_BM_REG_CMD, command);
+
+	/* Return the status. */
+	if(status & PCI_ATA_BM_STATUS_ERROR) {
+		return STATUS_DEVICE_ERROR;
+	}
+	return STATUS_SUCCESS;
+}
+
 /** PCI ATA channel operations. */
 static ata_channel_ops_t pci_ata_channel_ops = {
 	.read_ctrl = pci_ata_channel_read_ctrl,
@@ -114,6 +225,9 @@ static ata_channel_ops_t pci_ata_channel_ops = {
 	.write_cmd = pci_ata_channel_write_cmd,
 	.read_pio = pci_ata_channel_read_pio,
 	.write_pio = pci_ata_channel_write_pio,
+	.prepare_dma = pci_ata_channel_prepare_dma,
+	.start_dma = pci_ata_channel_start_dma,
+	.finish_dma = pci_ata_channel_finish_dma,
 };
 
 /** Handler for a PCI ATA IRQ.
@@ -122,26 +236,40 @@ static ata_channel_ops_t pci_ata_channel_ops = {
  * @param frame		Interrupt frame (unused).
  * @return		Whether the IRQ was handled. */
 static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_frame_t *frame) {
-	pci_ata_channel_t *channel = _channel;
+	pci_ata_channel_t *data = _channel;
+	uint8_t status;
 
-	if(!channel->channel) {
+	if(!data->channel) {
 		return IRQ_UNHANDLED;
 	}
 
-	kprintf(LOG_DEBUG, "ata: received PCI IRQ\n");
-	return IRQ_UNHANDLED;
+	/* Check whether this device has raised an interrupt. */
+	status = in8(data->bus_master_base + PCI_ATA_BM_REG_STATUS);
+	if(!(status & PCI_ATA_BM_STATUS_INTERRUPT)) {
+		return IRQ_UNHANDLED;
+	}
+
+	/* Clear interrupt flag. */
+	in8(data->cmd_base + ATA_CMD_REG_STATUS);
+	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, status & ~PCI_ATA_BM_STATUS_INTERRUPT);
+
+	/* Pass the interrupt to the ATA bus manager. */
+	return ata_channel_interrupt(data->channel);
 }
 
 /** Register a new PCI ATA channel.
  * @param pci_device	PCI device the channel is in.
+ * @param idx		Channel index.
  * @param ctrl_base	Control registers base address.
  * @param cmd_base	Command registers base address.
+ * @param bm_base	Bus master base address.
  * @param irq		IRQ number.
  * @return		Pointer to ATA channel structure if present. */
-static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctrl_base,
-                                          uint32_t cmd_base, uint32_t irq) {
+static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uint32_t ctrl_base,
+                                          uint32_t cmd_base, uint32_t bm_base, uint32_t irq) {
 	uint16_t pci_cmd_old, pci_cmd_new;
 	pci_ata_channel_t *channel;
+	bool dma = true;
 	status_t ret;
 
 	/* Configure the PCI device appropriately. */
@@ -168,20 +296,46 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctr
 	channel->pci_device = pci_device;
 	channel->ctrl_base = ctrl_base;
 	channel->cmd_base = cmd_base;
+	channel->bus_master_base = bm_base + (idx * 8);
 	channel->irq = irq;
+	channel->prdt = NULL;
+
+	/* If the bus master is in simplex mode, disable DMA on the second
+	 * channel. According to the Haiku code, Intel controllers use this for
+	 * something other than simplex mode. */
+	if(pci_device->vendor_id != 0x8086) {
+		if(in8(bm_base + PCI_ATA_BM_REG_STATUS) & PCI_ATA_BM_STATUS_SIMPLEX && idx > 1) {
+			dma = false;
+		}
+	}
+
+	/* Allocate a PRDT if necessary. */
+	if(dma) {
+		channel->prdt_phys = page_xalloc(PRDT_SIZE / PAGE_SIZE, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP);
+		channel->prdt = page_phys_map(channel->prdt_phys, PRDT_SIZE, MM_SLEEP);
+	}
 
 	/* Register the IRQ handler. */
 	ret = irq_register(channel->irq, pci_ata_irq_handler, NULL, channel);
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ata: failed to register PCI ATA IRQ handler %u\n", channel->irq);
+		if(dma) {
+			page_phys_unmap(channel->prdt, PRDT_SIZE, true);
+			page_free(channel->prdt_phys, PRDT_SIZE / PAGE_SIZE);
+		}
 		kfree(channel);
 		return NULL;
 	}
 
 	/* Try to register the ATA channel. */
-	channel->channel = ata_channel_add(pci_device->node, &pci_ata_channel_ops, channel);
+	channel->channel = ata_channel_add(pci_device->node, &pci_ata_channel_ops, channel,
+	                                   dma, PRDT_ENTRIES, (phys_ptr_t)0x100000000);
 	if(!channel->channel) {
 		irq_unregister(channel->irq, pci_ata_irq_handler, NULL, channel);
+		if(dma) {
+			page_phys_unmap(channel->prdt, PRDT_SIZE, true);
+			page_free(channel->prdt_phys, PRDT_SIZE / PAGE_SIZE);
+		}
 		kfree(channel);
 		return NULL;
 	}
@@ -194,7 +348,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, uint32_t ctr
  * @param data		Unused.
  * @return		Whether the device has been claimed. */
 static bool pci_ata_add_device(pci_device_t *device, void *data) {
-	uint32_t ctrl_base, cmd_base, irq;
+	uint32_t ctrl_base, cmd_base, bus_master_base, irq;
 	ata_channel_t *pri, *sec;
 	uint8_t pri_pi, sec_pi;
 
@@ -210,9 +364,12 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	pri_pi = (device->prog_iface & 0x0F) & ~0x0C;
 	sec_pi = (device->prog_iface & 0x0F) >> 2;
 
+	/* Get the bus master base. */
+	bus_master_base = pci_config_read32(device, PCI_CONFIG_BAR4) & PCI_IO_ADDRESS_MASK;
+
 	/* Get primary channel details and add it. */
 	if(PCI_ATA_IS_COMPAT(pri_pi)) {
-		/* Compatibility-mode channels always have the same details. */
+		/* Compatibility mode channels always have the same details. */
 		ctrl_base = 0x3F6;
 		cmd_base = 0x1F0;
 		irq = 14;
@@ -222,17 +379,17 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 		 * allocation the byte at offset 02h is where the Alternate
 		 * Status/Device Control byte is located.". Therefore, add 2
 		 * to the value read. */
-		ctrl_base = pci_config_read32(device, PCI_CONFIG_BAR0) + 2;
-		cmd_base = pci_config_read32(device, PCI_CONFIG_BAR1);
+		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR0) & PCI_IO_ADDRESS_MASK) + 2;
+		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR1) & PCI_IO_ADDRESS_MASK);
 		irq = device->interrupt_line;
 	}
 
 	/* Add the channel. */
-	pri = pci_ata_channel_add(device, ctrl_base, cmd_base, irq);
+	pri = pci_ata_channel_add(device, 0, ctrl_base, cmd_base, bus_master_base, irq);
 	if(pri) {
-		kprintf(LOG_NORMAL, " primary:   %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NORMAL, " primary:   %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
 		        pri->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
-		        ctrl_base, cmd_base, irq);
+		        ctrl_base, cmd_base, bus_master_base, irq);
 	}
 
 	/* Now the secondary channel. */
@@ -242,17 +399,17 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 		irq = 15;
 	} else {
 		/* Same as above. */
-		ctrl_base = pci_config_read32(device, PCI_CONFIG_BAR2) + 2;
-		cmd_base = pci_config_read32(device, PCI_CONFIG_BAR3);
+		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR2) & PCI_IO_ADDRESS_MASK) + 2;
+		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR3) & PCI_IO_ADDRESS_MASK);
 		irq = device->interrupt_line;
 	}
 
-	/* Add channel if present. */
-	sec = pci_ata_channel_add(device, ctrl_base, cmd_base, irq);
+	/* Add the channel. */
+	sec = pci_ata_channel_add(device, 1, ctrl_base, cmd_base, bus_master_base, irq);
 	if(sec) {
-		kprintf(LOG_NORMAL, " secondary: %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NORMAL, " secondary: %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
 		        sec->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
-		        ctrl_base, cmd_base, irq);
+		        ctrl_base, cmd_base, bus_master_base, irq);
 	}
 
 	/* Scan for devices. */

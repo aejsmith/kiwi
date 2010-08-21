@@ -217,6 +217,8 @@ bool Shell::SplitLine(char *line, int &argc, char **&argv) {
 	return true;
 }
 
+#include <kernel/time.h>
+
 /** Run a command.
  * @param argc		Argument count.
  * @param argv		Argument array. */
@@ -233,8 +235,12 @@ void Shell::RunCommand(int argc, char **argv) {
 
 	/* Run a process. */
 	try {
+		useconds_t start, end;
+		time_since_boot(&start);
 		Process proc(argv);
 		proc.WaitForExit();
+		time_since_boot(&end);
+		cout << "Time: " << end - start << "us" << endl;
 	} catch(Error &e) {
 		cout << "Failed to run command '" << argv[0] << "': " << e.GetDescription() << endl;
 	}

@@ -25,6 +25,8 @@
 # error "This header is for kernel/driver use only"
 #endif
 
+#include <cpu/intr.h>
+
 #include <io/device.h>
 
 #include <sync/condvar.h>
@@ -33,8 +35,12 @@
 struct ata_channel;
 
 /** ATA Commands. */
+#define ATA_CMD_READ_DMA		0xC8	/**< READ DMA. */
+#define ATA_CMD_READ_DMA_EXT		0x25	/**< READ DMA EXT. */
 #define ATA_CMD_READ_SECTORS		0x20	/**< READ SECTORS. */
 #define ATA_CMD_READ_SECTORS_EXT	0x24	/**< READ SECTORS EXT. */
+#define ATA_CMD_WRITE_DMA		0xCA	/**< WRITE DMA. */
+#define ATA_CMD_WRITE_DMA_EXT		0x35	/**< WRITE DMA EXT. */
 #define ATA_CMD_WRITE_SECTORS		0x30	/**< WRITE SECTORS. */
 #define ATA_CMD_WRITE_SECTORS_EXT	0x34	/**< WRITE SECTORS EXT. */
 #define ATA_CMD_PACKET			0xA0	/**< PACKET. */
@@ -76,6 +82,12 @@ struct ata_channel;
 #define ATA_DEVCTRL_SRST		(1<<2)	/**< Software reset. */
 #define ATA_DEVCTRL_HOB			(1<<7)	/**< High order bit. */
 
+/** Structure containing information of a DMA transfer. */
+typedef struct ata_dma_transfer {
+	phys_ptr_t phys;			/**< Physical destination address. */
+	size_t size;				/**< Number of bytes to transfer. */
+} ata_dma_transfer_t;
+
 /** Structure containing ATA channel operations. */
 typedef struct ata_channel_ops {
 	/** Read from a control register.
@@ -113,6 +125,29 @@ typedef struct ata_channel_ops {
 	 * @param buf		Buffer to write from.
 	 * @param count		Number of bytes to write. */
 	void (*write_pio)(struct ata_channel *channel, const void *buf, size_t count);
+
+	/** Prepare a DMA transfer.
+	 * @param channel	Channel to perform on.
+	 * @param vec		Array of block descriptions. Each block will
+	 *			cover no more than 1 page. The contents of this
+	 *			array are guaranteed to conform to the
+	 *			constraints specified to ata_channel_add().
+	 * @param count		Number of array entries.
+	 * @param write		Whether the transfer is a write.
+	 * @return		Status code describing result of operation. */
+	status_t (*prepare_dma)(struct ata_channel *channel, const ata_dma_transfer_t *vec,
+	                        size_t count, bool write);
+
+	/** Start a DMA transfer.
+	 * @note		This should cause an interrupt to be raised
+	 *			once the transfer is complete.
+	 * @param channel	Channel to start on. */
+	void (*start_dma)(struct ata_channel *channel);
+
+	/** Clean up after a DMA transfer.
+	 * @param channel	Channel to clean up on.
+	 * @return		Status code describing result of the transfer. */
+	status_t (*finish_dma)(struct ata_channel *channel);
 } ata_channel_ops_t;
 
 /** Structure describing an ATA channel. */
@@ -122,11 +157,16 @@ typedef struct ata_channel {
 	device_t *node;				/**< Device tree node. */
 	ata_channel_ops_t *ops;			/**< Operations for the channel. */
 	void *data;				/**< Implementation-specific data pointer. */
+	bool dma;				/**< Whether DMA is supported. */
+	size_t max_dma_bpt;			/**< Maximum number of blocks per DMA transfer. */
+	phys_ptr_t max_dma_addr;		/**< Highest physical address for DMA transfers. */
 	spinlock_t irq_lock;			/**< Lock for IRQs (spinlock so can use in interrupt context). */
 	condvar_t irq_cv;			/**< Condition variable to wait for IRQ on. */
 } ata_channel_t;
 
-extern ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *data);
+extern ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *data,
+                                      bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr);
 extern void ata_channel_scan(ata_channel_t *channel);
+extern irq_result_t ata_channel_interrupt(ata_channel_t *channel);
 
 #endif /* __DRIVERS_ATA_H */
