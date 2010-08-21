@@ -473,26 +473,52 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
  * @param physp		Where to store physical address.
  * @return		Whether the virtual address was mapped. */
 bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
-	bool ret = false;
-	uint64_t *ptbl;
-	int pte;
+	uint64_t *pdp, *pdir, *ptbl;
+	int pdpe, pde, pte;
 
 	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
-	/* Find the page table for the entry. */
-	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
-	if(ptbl) {
-		pte = (virt % 0x200000) / PAGE_SIZE;
-		if(ptbl[pte] & PG_PRESENT) {
-			*physp = ptbl[pte] & PAGE_MASK;
-			ret = true;
-		}
+	/* This function must not use any of the helper functions, as this has
+	 * to work for any virtual address - the helper functions have
+	 * restrictions about which addresses can be looked up in the kernel
+	 * page map. */
+	pdp = page_phys_map(map->cr3, PAGE_SIZE, MM_SLEEP);
+	pdpe = virt / 0x40000000;
+	if(!(pdp[pdpe] & PG_PRESENT)) {
+		page_phys_unmap(pdp, PAGE_SIZE, false);
+		return false;
 	}
 
-	page_structure_unmap(map, ptbl);
-	return ret;
+	/* Find the page directory for the entry. */
+	pdir = page_phys_map(pdp[pdpe] & PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	page_phys_unmap(pdp, PAGE_SIZE, false);
+	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
+	if(!(pdir[pde] & PG_PRESENT)) {
+		page_phys_unmap(pdir, PAGE_SIZE, false);
+		return false;
+	}
+
+	/* Handle large pages. */
+	if(pdir[pde] & PG_LARGE) {
+		*physp = (pdir[pde] & PAGE_MASK) + (virt % 0x200000);
+		page_phys_unmap(pdir, PAGE_SIZE, false);
+		return true;
+	}
+
+	/* Map in the page table. */
+	ptbl = page_phys_map(pdir[pde] & PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	page_phys_unmap(pdir, PAGE_SIZE, false);
+	pte = (virt % 0x200000) / PAGE_SIZE;
+	if(!(ptbl[pte] & PG_PRESENT)) {
+		page_phys_unmap(ptbl, PAGE_SIZE, false);
+		return false;
+	}
+
+	*physp = ptbl[pte] & PAGE_MASK;
+	page_phys_unmap(ptbl, PAGE_SIZE, false);
+	return true;
 }
 
 /** Switch to a page map.

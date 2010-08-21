@@ -461,20 +461,33 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
  * @param physp		Where to store physical address.
  * @return		Whether the virtual address was mapped. */
 bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
-	uint64_t *ptbl;
-	int pte;
+	uint64_t *pdir, *ptbl;
+	int pde, pte;
 
 	assert(mutex_held(&map->lock));
 	assert(!(virt % PAGE_SIZE));
 	assert(physp);
 
-	/* Find the page table for the entry. */
-	ptbl = page_map_get_ptbl(map, virt, false, MM_SLEEP);
-	if(ptbl) {
-		pte = (virt % 0x200000) / PAGE_SIZE;
-		if(ptbl[pte] & PG_PRESENT) {
-			*physp = ptbl[pte] & PAGE_MASK;
-			return true;
+	/* Find the page directory for the entry. */
+	pdir = page_map_get_pdir(map, virt, false, MM_SLEEP);
+	if(pdir) {
+		/* Get the page table number. A page table covers 2MB. */
+		pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
+		if(pdir[pde] & PG_PRESENT) {
+			/* Handle large pages. */
+			if(pdir[pde] & PG_LARGE) {
+				*physp = (pdir[pde] & PAGE_MASK) + (virt % 0x200000);
+				return true;
+			}
+
+			ptbl = page_structure_map(pdir[pde] & PAGE_MASK);
+			if(ptbl) {
+				pte = (virt % 0x200000) / PAGE_SIZE;
+				if(ptbl[pte] & PG_PRESENT) {
+					*physp = ptbl[pte] & PAGE_MASK;
+					return true;
+				}
+			}
 		}
 	}
 
