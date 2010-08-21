@@ -322,7 +322,7 @@ Alias('config', env.ConfigMenu('config', ['Kconfig']))
 if config.Configured() and not 'config' in COMMAND_LINE_TARGETS:
 	# Initialise the toolchain manager and add the toolchain build target.
 	toolchain = ToolchainManager(config)
-	Alias('toolchain', Command('toolchain', [], Action(toolchain.update, None)))
+	Alias('toolchain', Command('__toolchain', [], Action(toolchain.update, None)))
 
 	# If the toolchain is out of date, only allow it to be built.
 	if toolchain.check() != 0:
