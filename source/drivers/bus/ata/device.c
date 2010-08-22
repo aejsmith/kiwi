@@ -292,8 +292,9 @@ static disk_ops_t ata_disk_ops = {
 void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	uint16_t *ident = NULL, word;
 	char name[DEVICE_NAME_MAX];
-	size_t blocks, modes = 0;
 	ata_device_t *device;
+	size_t modes = 0;
+	uint64_t blocks;
 	status_t ret;
 
 	if(ata_channel_begin_command(channel, num) != STATUS_SUCCESS) {
@@ -335,7 +336,11 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	kprintf(LOG_NORMAL, " lba48:      %d\n", device->lba48);
 
 	/* Get the block count. */
-	blocks = le32_to_cpu(*(uint32_t *)(ident + 60));
+	if(device->lba48) {
+		blocks = le64_to_cpu(*(uint64_t *)(ident + 100));
+	} else {
+		blocks = le32_to_cpu(*(uint32_t *)(ident + 60));
+	}
 	kprintf(LOG_NORMAL, " blocks:     %u\n", blocks);
 
 	/* Get the block size - "Bit 12 of word 106 shall be set to 1 to
