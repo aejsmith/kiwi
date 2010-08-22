@@ -56,7 +56,7 @@ static void device_object_close(khandle_t *handle) {
 		device->ops->close(device, handle->data);
 	}
 
-	device_release(device);
+	refcount_dec(&device->count);
 }
 
 /** Signal that a device is being waited for.
@@ -396,16 +396,10 @@ void device_iterate(device_t *start, device_iterate_t func, void *data) {
 	device_iterate_internal(start, func, data);
 }
 
-/** Look up a device.
- *
- * Looks up an entry in the device tree and increases its reference count. Once
- * the device is no longer needed it should be released with device_release().
- *
+/** Look up a device and increase its reference count.
  * @param path		Path to device.
- *
- * @return		Pointer to device if found, NULL if not.
- */
-device_t *device_lookup(const char *path) {
+ * @return		Pointer to device if found, NULL if not. */
+static device_t *device_lookup(const char *path) {
 	device_t *device = device_tree_root, *child;
 	char *dup, *orig, *tok;
 
@@ -473,15 +467,61 @@ device_attr_t *device_attr(device_t *device, const char *name, int type) {
 	return NULL;
 }
 
-/** Release a device.
- *
- * Signal that a device is no longer required. This should be called once a
- * device obtained via device_lookup() is not needed any more.
- *
- * @param device	Device to release.
- */
-void device_release(device_t *device) {
-	refcount_dec(&device->count);
+/** Get the path to a device.
+ * @param device	Device to get path to.
+ * @return		Pointer to kmalloc()'d string containing device path. */
+char *device_path(device_t *device) {
+	char *path = NULL, *tmp;
+	device_t *parent;
+	size_t len = 0;
+
+	while(device != device_tree_root) {
+		mutex_lock(&device->lock);
+		len += strlen(device->name) + 1;
+		tmp = kmalloc(len, MM_SLEEP);
+		strcpy(tmp, "/");
+		strcat(tmp, device->name);
+		strcat(tmp, path);
+		kfree(path);
+		path = tmp;
+		parent = device->parent;
+		mutex_unlock(&device->lock);
+		device = parent;
+	}
+
+	if(!len) {
+		path = kstrdup("/", MM_SLEEP);
+	}
+	return path;
+}
+
+
+/** Get a handle to a device.
+ * @param device	Device to get handle to.
+ * @param handlep	Where to store handle to device.
+ * @return		Status code describing result of the operation. */
+status_t device_get(device_t *device, khandle_t **handlep) {
+	void *data = NULL;
+	status_t ret;
+
+	assert(device);
+	assert(handlep);
+
+	mutex_lock(&device->lock);
+	refcount_inc(&device->count);
+
+	if(device->ops && device->ops->open) {
+		ret = device->ops->open(device, &data);
+		if(ret != STATUS_SUCCESS) {
+			refcount_dec(&device->count);
+			mutex_unlock(&device->lock);
+			return ret;
+		}
+	}
+
+	*handlep = handle_create(&device->obj, data);
+	mutex_unlock(&device->lock);
+	return STATUS_SUCCESS;
 }
 
 /** Create a handle to a device.
@@ -506,8 +546,8 @@ status_t device_open(const char *path, khandle_t **handlep) {
 	if(device->ops && device->ops->open) {
 		ret = device->ops->open(device, &data);
 		if(ret != STATUS_SUCCESS) {
+			refcount_dec(&device->count);
 			mutex_unlock(&device->lock);
-			device_release(device);
 			return ret;
 		}
 	}

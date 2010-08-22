@@ -205,10 +205,10 @@ extern status_t device_alias(const char *name, device_t *parent, device_t *dest,
 extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
-extern device_t *device_lookup(const char *path);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
-extern void device_release(device_t *device);
+extern char *device_path(device_t *device);
 
+extern status_t device_get(device_t *device, khandle_t **handlep);
 extern status_t device_open(const char *path, khandle_t **handlep);
 extern status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset,
                             size_t *bytesp);
