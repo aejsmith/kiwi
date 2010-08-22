@@ -382,8 +382,8 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 		 * allocation the byte at offset 02h is where the Alternate
 		 * Status/Device Control byte is located.". Therefore, add 2
 		 * to the value read. */
-		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR0) & PCI_IO_ADDRESS_MASK) + 2;
-		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR1) & PCI_IO_ADDRESS_MASK);
+		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR1) & PCI_IO_ADDRESS_MASK) + 2;
+		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR0) & PCI_IO_ADDRESS_MASK);
 		irq = device->interrupt_line;
 	}
 
@@ -402,8 +402,8 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 		irq = 15;
 	} else {
 		/* Same as above. */
-		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR2) & PCI_IO_ADDRESS_MASK) + 2;
-		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR3) & PCI_IO_ADDRESS_MASK);
+		ctrl_base = (pci_config_read32(device, PCI_CONFIG_BAR3) & PCI_IO_ADDRESS_MASK) + 2;
+		cmd_base = (pci_config_read32(device, PCI_CONFIG_BAR2) & PCI_IO_ADDRESS_MASK);
 		irq = device->interrupt_line;
 	}
 
@@ -412,7 +412,7 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	if(sec) {
 		kprintf(LOG_NORMAL, " secondary: %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
 		        sec->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
-		        ctrl_base, cmd_base, bus_master_base, irq);
+		        ctrl_base, cmd_base, bus_master_base + 8, irq);
 	}
 
 	/* Scan for devices. */
