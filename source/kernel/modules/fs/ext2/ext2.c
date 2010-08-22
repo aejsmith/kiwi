@@ -433,6 +433,7 @@ static bool ext2_probe(khandle_t *handle, const char *uuid) {
 	ext2_superblock_t *sb;
 	uint32_t revision;
 	size_t bytes;
+	char *tmp;
 
 	sb = kmalloc(sizeof(ext2_superblock_t), MM_SLEEP);
 	if(device_read(handle, sb, sizeof(ext2_superblock_t), 1024, &bytes) != STATUS_SUCCESS) {
@@ -443,10 +444,11 @@ static bool ext2_probe(khandle_t *handle, const char *uuid) {
 		return false;
 	}
 
-	/* Check if the revision is supported. */
+	/* Check if the revision is supported. We require DYNAMIC_REV for UUID
+	 * support. */
 	revision = le32_to_cpu(sb->s_rev_level);
-	if(revision != EXT2_GOOD_OLD_REV && revision != EXT2_DYNAMIC_REV) {
-		dprintf("ext2: device %s has unknown revision %" PRIu32 "\n",
+	if(revision != EXT2_DYNAMIC_REV) {
+		dprintf("ext2: device %s has unsupported revision %" PRIu32 "\n",
 		        device_name(handle), revision);
 		kfree(sb);
 		return false;
@@ -458,6 +460,22 @@ static bool ext2_probe(khandle_t *handle, const char *uuid) {
 		        device_name(handle), sb->s_feature_incompat);
 		kfree(sb);
 		return false;
+	}
+
+	/* Check the UUID if required. */
+	if(uuid) {
+		tmp = kmalloc(37, MM_SLEEP);
+		sprintf(tmp, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		        sb->s_uuid[0], sb->s_uuid[1], sb->s_uuid[2], sb->s_uuid[3], sb->s_uuid[4],
+		        sb->s_uuid[5], sb->s_uuid[6], sb->s_uuid[7], sb->s_uuid[8], sb->s_uuid[9],
+		        sb->s_uuid[10], sb->s_uuid[11], sb->s_uuid[12], sb->s_uuid[13], sb->s_uuid[14],
+		        sb->s_uuid[15]);
+		if(strcmp(tmp, uuid) != 0) {
+			kfree(tmp);
+			kfree(sb);
+			return false;
+		}
+		kfree(tmp);
 	}
 
 	kfree(sb);
