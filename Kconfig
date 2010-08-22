@@ -70,6 +70,12 @@ config QEMU_OPTS
 	help
 	  Extra options to pass to QEMU.
 
+config VBOX_VM
+	string "VirtualBox VM name"
+	default "Kiwi"
+	help
+	  Virtual machine name for the vtest target.
+
 config EXTRA_FSIMAGE
 	string "Extra filesystem image contents"
 	default ""

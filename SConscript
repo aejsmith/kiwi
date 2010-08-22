@@ -102,3 +102,9 @@ Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
 	config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
 	None
 )))
+
+# Target to run in VirtualBox.
+Alias('vtest', dist.Command('vtest', ['cdrom.iso'], Action(
+	'VBoxManage startvm ' + config['VBOX_VM'] + ' --type gui',
+	None
+)))

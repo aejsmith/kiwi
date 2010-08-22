@@ -258,6 +258,8 @@ static int pci_driver_probe(device_t *_device, void *_driver) {
 			continue;
 		} else if(driver->ids[i].sub_class != PCI_ANY_ID && driver->ids[i].sub_class != device->sub_class) {
 			continue;
+		} else if(driver->ids[i].prog_iface != PCI_ANY_ID && driver->ids[i].prog_iface != device->prog_iface) {
+			continue;
 		}
 
 		/* We have a match! Call the driver's add device callback. */

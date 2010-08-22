@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		PCI ATA device driver.
+ * @brief		PCI ATA controller driver.
  *
  * Reference:
  * - PCI IDE Controller Specification
@@ -261,7 +261,7 @@ static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_fram
 }
 
 /** Register a new PCI ATA channel.
- * @param pci_device	PCI device the channel is in.
+ * @param pci_device	PCI device the channel is on.
  * @param idx		Channel index.
  * @param ctrl_base	Control registers base address.
  * @param cmd_base	Command registers base address.
@@ -421,9 +421,9 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	return true;
 }
 
-/** ATA PCI device ID structure. */
+/** ATA PCI device ID table. */
 static pci_device_id_t pci_ata_device_ids[] = {
-	{ PCI_ANY_ID, PCI_ANY_ID, 0x01, 0x01, NULL },
+	{ PCI_ANY_ID, PCI_ANY_ID, 0x01, 0x01, PCI_ANY_ID, NULL },
 };
 
 /** ATA PCI driver structure. */
@@ -447,6 +447,6 @@ static status_t pci_ata_unload(void) {
 }
 
 MODULE_NAME("pci_ata");
-MODULE_DESC("PCI ATA device driver");
+MODULE_DESC("PCI ATA controller driver");
 MODULE_FUNCS(pci_ata_init, pci_ata_unload);
 MODULE_DEPS("ata", "pci");

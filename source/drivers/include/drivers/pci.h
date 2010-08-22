@@ -83,6 +83,7 @@ typedef struct pci_device_id {
 	uint32_t device;			/**< Device ID. */
 	uint32_t base_class;			/**< Base class. */
 	uint32_t sub_class;			/**< Sub class. */
+	uint32_t prog_iface;			/**< Programming interface. */
 	void *data;				/**< Driver data. */
 } pci_device_id_t;
 
