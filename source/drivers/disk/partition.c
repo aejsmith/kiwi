@@ -18,6 +18,8 @@
  * @brief		Disk partition manager.
  */
 
+#include <io/fs.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -70,15 +72,18 @@ static disk_ops_t partition_disk_ops = {
 };
 
 /** Probe a disk for partitions.
- * @param device	Device to probe. */
-void partition_probe(disk_device_t *device) {
+ * @param device	Device to probe.
+ * @return		Whether any partitions were found. */
+bool partition_probe(disk_device_t *device) {
 	size_t i;
 
 	for(i = 0; i < ARRAYSZ(partition_types); i++) {
 		if(partition_types[i](device)) {
-			break;
+			return true;
 		}
 	}
+
+	return false;
 }
 
 /** Add a partition to a disk device.
@@ -110,4 +115,7 @@ void partition_add(disk_device_t *parent, int id, uint64_t offset, uint64_t size
 	if(ret != STATUS_SUCCESS) {
 		kfree(device);
 	}
+
+	/* Probe the partition for filesystems. */
+	fs_probe(device->device);
 }

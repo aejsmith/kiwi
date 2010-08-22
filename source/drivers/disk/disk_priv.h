@@ -32,7 +32,7 @@ extern device_ops_t disk_device_ops;
 
 extern bool partition_probe_msdos(disk_device_t *device);
 
-extern void partition_probe(disk_device_t *device);
+extern bool partition_probe(disk_device_t *device);
 extern void partition_add(disk_device_t *parent, int id, uint64_t offset, uint64_t size);
 
 extern status_t disk_device_read(disk_device_t *device, void *buf, size_t count,

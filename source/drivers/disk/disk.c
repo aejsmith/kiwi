@@ -18,6 +18,8 @@
  * @brief		Disk device manager.
  */
 
+#include <io/fs.h>
+
 #include <lib/atomic.h>
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -316,8 +318,10 @@ status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 		}
 	}
 
-	/* Probe for partitions on the device. */
-	partition_probe(device);
+	/* Probe for partitions/filesystems on the device. */
+	if(!partition_probe(device)) {
+		fs_probe(device->device);
+	}
 	*devicep = device->device;
 	return STATUS_SUCCESS;
 }

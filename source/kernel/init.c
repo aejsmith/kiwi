@@ -74,8 +74,9 @@ static int progress_per_module __init_data;
 /** Lock to serialise the SMP boot. */
 static SPINLOCK_DECLARE(smp_boot_spinlock);
 
-/** List of modules from the bootloader. */
+/** List of modules/FS images from the bootloader. */
 static LIST_DECLARE(boot_module_list);
+static LIST_DECLARE(boot_fsimage_list);
 
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
@@ -111,9 +112,8 @@ static boot_module_t *boot_module_lookup(const char *name) {
 }
 
 /** Extract a TAR archive to the root FS.
- * @param mod		Boot module containing archive.
- * @return		Whether the module was a TAR archive. */
-static bool __init_text boot_module_load_tar(boot_module_t *mod) {
+ * @param mod		Boot module containing archive. */
+static void __init_text load_boot_fsimage(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
 	khandle_t *handle;
 	int64_t size;
@@ -122,7 +122,7 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 
 	/* Check format of module. */
 	if(strncmp(hdr->magic, "ustar", 5) != 0) {
-		return false;
+		fatal("Unknown boot module format");
 	}
 
 	/* If any TAR files are loaded it means we should mount a RamFS at the
@@ -189,13 +189,11 @@ static bool __init_text boot_module_load_tar(boot_module_t *mod) {
 	}
 
 	boot_module_remove(mod);
-	return true;
 }
 
 /** Load a kernel module provided at boot.
- * @param mod		Module to load.
- * @return		Whether the file was a kernel module. */
-static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
+ * @param mod		Module to load. */
+static void __init_text load_boot_kmod(boot_module_t *mod) {
 	char name[MODULE_NAME_MAX + 1];
 	boot_module_t *dep;
 	status_t ret;
@@ -205,17 +203,16 @@ static bool __init_text boot_module_load_kmod(boot_module_t *mod) {
 		ret = module_load(mod->handle, name);
 		if(ret == STATUS_SUCCESS) {
 			boot_module_remove(mod);
-			return true;
-		} else if(ret == STATUS_UNKNOWN_IMAGE) {
-			return false;
+			return;
 		} else if(ret != STATUS_MISSING_LIBRARY) {
 			fatal("Could not load module %s (%d)", (mod->name) ? mod->name : "<noname>", ret);
 		}
 
 		/* Unloaded dependency, try to find it and load it. */
-		if(!(dep = boot_module_lookup(name)) || !boot_module_load_kmod(dep)) {
+		if(!(dep = boot_module_lookup(name))) {
 			fatal("Dependency on '%s' which is not available", name);
 		}
+		load_boot_kmod(dep);
 	}
 }
 
@@ -248,16 +245,16 @@ static void __init_text load_modules(kernel_args_t *args) {
 		mod->handle = fs_file_from_memory(mod->mapping, mod->size);
 
 		/* Figure out the module name, which is needed to resolve
-		 * dependencies. Do not fail if unable to get the name, may be
-		 * a filesystem image. */
+		 * dependencies. If unable to get the name, assume the module
+		 * is a filesystem image. */
 		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
 		if(module_name(mod->handle, tmp) != STATUS_SUCCESS) {
 			kfree(tmp);
+			list_append(&boot_fsimage_list, &mod->header);
 		} else {
 			mod->name = tmp;
+			list_append(&boot_module_list, &mod->header);
 		}
-
-		list_append(&boot_module_list, &mod->header);
 
 		addr = amod->next;
 		page_phys_unmap(amod, sizeof(kernel_args_module_t), true);
@@ -267,12 +264,10 @@ static void __init_text load_modules(kernel_args_t *args) {
 	 * module loaded. */
 	progress_per_module = 80 / args->module_count;
 
-	/* Now keep on loading until all modules have been loaded. */
+	/* Load all kernel modules. */
 	while(!list_empty(&boot_module_list)) {
 		mod = list_entry(boot_module_list.next, boot_module_t, header);
-		if(!boot_module_load_tar(mod) && !boot_module_load_kmod(mod)) {
-			fatal("A boot module has an unknown format");
-		}
+		load_boot_kmod(mod);
 	}
 }
 
@@ -290,11 +285,12 @@ static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
 static void init_thread(void *args, void *arg2) {
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
+	boot_module_t *mod;
 	status_t ret;
 
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
-	fs_init();
+	fs_init(args);
 
 	/* Bring up secondary CPUs. The first rendezvous sets off their
 	 * initialisation, the second waits for them to complete. */
@@ -308,9 +304,25 @@ static void init_thread(void *args, void *arg2) {
 
 	console_update_boot_progress(10);
 
-	/* Load modules and mount the root filesystem. */
+	/* Load modules, then any FS images supplied. Wait until after loading
+	 * kernel modules to do FS images, so that we only load FS images if the
+	 * boot filesystem could not be mounted. */
 	load_modules(args);
-	fs_mount_root(args);
+	if(!root_mount) {
+		if(list_empty(&boot_fsimage_list)) {
+			fatal("Could not find boot filesystem");
+		}
+
+		while(!list_empty(&boot_fsimage_list)) {
+			mod = list_entry(boot_fsimage_list.next, boot_module_t, header);
+			load_boot_fsimage(mod);
+		}
+	} else {
+		while(!list_empty(&boot_fsimage_list)) {
+			mod = list_entry(boot_fsimage_list.next, boot_module_t, header);
+			boot_module_remove(mod);
+		}
+	}
 
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();

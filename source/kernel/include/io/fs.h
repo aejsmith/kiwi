@@ -31,6 +31,7 @@
 
 #include <object.h>
 
+struct device;
 struct fs_mount;
 struct fs_node;
 struct kernel_args;
@@ -289,6 +290,7 @@ extern status_t fs_handle_sync(khandle_t *handle);
 extern status_t fs_symlink_create(const char *path, const char *target);
 extern status_t fs_symlink_read(const char *path, char *buf, size_t size);
 
+extern void fs_probe(struct device *device);
 extern status_t fs_mount(const char *device, const char *path, const char *type, const char *opts);
 extern status_t fs_unmount(const char *path);
 //extern status_t fs_sync(void);
@@ -308,7 +310,6 @@ extern int kdbg_cmd_node(int argc, char **argv);
  * Initialisation functions.
  */
 
-extern void fs_mount_root(struct kernel_args *args);
-extern void fs_init(void);
+extern void fs_init(struct kernel_args *args);
 
 #endif /* __IO_FS_H */

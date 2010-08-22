@@ -57,6 +57,9 @@ static status_t fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp)
 static object_type_t file_object_type;
 static object_type_t dir_object_type;
 
+/** Pointer to the boot FS UUID string. */
+static const char *boot_fs_uuid = NULL;
+
 /** List of registered FS types. */
 static LIST_DECLARE(fs_types);
 static MUTEX_DECLARE(fs_types_lock, 0);
@@ -1605,6 +1608,38 @@ static void free_mount_options(fs_mount_option_t *opts, size_t count) {
 	}
 }
 
+/** Probe a device for filesystems.
+ * @param device	Device to probe. */
+void fs_probe(device_t *device) {
+	khandle_t *handle;
+	fs_type_t *type;
+	status_t ret;
+	char *path;
+
+	if(device_get(device, &handle) != STATUS_SUCCESS) {
+		return;
+	}
+
+	/* Only probe for the boot FS at the moment. TODO: Notifications for
+	 * filesystem detection. */
+	if(!root_mount) {
+		type = fs_type_probe(handle, boot_fs_uuid);
+		if(type) {
+			path = device_path(device);
+			ret = fs_mount(path, "/", type->name, "ro");
+			if(ret != STATUS_SUCCESS) {
+				fatal("Failed to mount boot filesystem (%d)", ret);
+			}
+
+			kprintf(LOG_NORMAL, "fs: mounted boot device %s:%s\n", type->name, path);
+			refcount_dec(&type->count);
+			kfree(path);
+		}
+	}
+
+	handle_release(handle);
+}
+
 /** Mount a filesystem.
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
@@ -2095,21 +2130,17 @@ int kdbg_cmd_node(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Mount the root filesystem.
+/** Initialise the filesystem layer.
  * @param args		Kernel arguments structure. */
-void __init_text fs_mount_root(kernel_args_t *args) {
-	if(!root_mount) {
-		fatal("Root filesystem probe not implemented");
-	}
-}
-
-/** Create the filesystem node cache. */
-void __init_text fs_init(void) {
+void __init_text fs_init(kernel_args_t *args) {
 	/* The filesystem node cache has a reclaim priority of 1. This means
 	 * that filesystem nodes will be reclaimed before anything else. */
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
 	                                  NULL, NULL, NULL, NULL, 1, NULL, 0,
 	                                  MM_FATAL);
+
+	/* Store the boot FS UUID for use by fs_probe(). */
+	boot_fs_uuid = args->boot_fs_uuid;
 }
 
 /** Create a regular file in the file system.

@@ -196,7 +196,7 @@ static size_t ata_device_begin_io(ata_device_t *device, void *buf, uint64_t lba,
  * @param count		Number of blocks to transfer.
  * @param write		Whether the operation is a write.
  * @return		Status code describing result of the operation. */
-static status_t ata_disk_io(ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write) {
+static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write) {
 	uint8_t error, status;
 	size_t current, i;
 	status_t ret;
@@ -266,7 +266,7 @@ static status_t ata_disk_io(ata_device_t *device, void *buf, uint64_t lba, size_
  * @return		Status code describing result of the operation. */
 static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, size_t count) {
 	ata_device_t *device = _device->data;
-	return ata_disk_io(device, buf, lba, count, false);
+	return ata_device_io(device, buf, lba, count, false);
 }
 
 /** Write to an ATA device.
@@ -277,7 +277,7 @@ static status_t ata_disk_read(disk_device_t *_device, void *buf, uint64_t lba, s
  * @return		Status code describing result of the operation. */
 static status_t ata_disk_write(disk_device_t *_device, const void *buf, uint64_t lba, size_t count) {
 	ata_device_t *device = _device->data;
-	return ata_disk_io(device, (void *)buf, lba, count, true);
+	return ata_device_io(device, (void *)buf, lba, count, true);
 }
 
 /** ATA disk device operations structure. */
