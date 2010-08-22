@@ -210,6 +210,10 @@ static status_t pci_ata_channel_finish_dma(ata_channel_t *channel) {
 	command &= ~PCI_ATA_BM_CMD_START;
 	out8(data->bus_master_base + PCI_ATA_BM_REG_CMD, command);
 
+	/* Clear error bit. See above comment. */
+	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS,
+	     status | PCI_ATA_BM_STATUS_ERROR | PCI_ATA_BM_STATUS_INTERRUPT);
+
 	/* Return the status. */
 	if(status & PCI_ATA_BM_STATUS_ERROR) {
 		return STATUS_DEVICE_ERROR;
@@ -251,7 +255,7 @@ static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_fram
 
 	/* Clear interrupt flag. */
 	in8(data->cmd_base + ATA_CMD_REG_STATUS);
-	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, status & ~PCI_ATA_BM_STATUS_INTERRUPT);
+	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, (status & 0xF8) | PCI_ATA_BM_STATUS_INTERRUPT);
 
 	/* Pass the interrupt to the ATA bus manager. */
 	return ata_channel_interrupt(data->channel);

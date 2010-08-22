@@ -134,11 +134,9 @@ static void add_dma_transfer(ata_dma_transfer_t **vecp, size_t *entriesp, ptr_t 
 
 	/* Find the physical address. */
 	pgoff = addr % PAGE_SIZE;
-	page_map_lock(&kernel_page_map);
 	if(!page_map_find(&kernel_page_map, addr - pgoff, &phys)) {
 		fatal("Part of DMA transfer buffer was not mapped");
 	}
-	page_map_unlock(&kernel_page_map);
 
 	*vecp = krealloc(*vecp, sizeof(**vecp) * *entriesp, MM_SLEEP);
 	(*vecp)[i].phys = phys + pgoff;
@@ -160,6 +158,8 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 	ptr_t ibuf = (ptr_t)buf;
 	status_t ret;
 
+	page_map_lock(&kernel_page_map);
+
 	/* Align on a page boundary. */
 	if(ibuf % PAGE_SIZE) {
 		esize = MIN(count, ROUND_UP(ibuf, PAGE_SIZE) - ibuf);
@@ -179,6 +179,8 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 	if(count) {
 		add_dma_transfer(&vec, &entries, ibuf, count);
 	}
+
+	page_map_unlock(&kernel_page_map);
 
 	if(entries > channel->max_dma_bpt) {
 		kprintf(LOG_WARN, "ata: ???\n");
