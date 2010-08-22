@@ -254,7 +254,6 @@ static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_fram
 	}
 
 	/* Clear interrupt flag. */
-	in8(data->cmd_base + ATA_CMD_REG_STATUS);
 	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, (status & 0xF8) | PCI_ATA_BM_STATUS_INTERRUPT);
 
 	/* Pass the interrupt to the ATA bus manager. */

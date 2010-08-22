@@ -462,10 +462,9 @@ irq_result_t ata_channel_interrupt(ata_channel_t *channel) {
 	woken = condvar_broadcast(&channel->irq_cv);
 	spinlock_unlock(&channel->irq_lock);
 
-	if(!woken) {
-		kprintf(LOG_WARN, "ata: received spurious interrupt on channel %d\n",
-		        channel->id);
-	}
+	/* Clear INTRQ. */
+	ata_channel_read_cmd(channel, ATA_CMD_REG_STATUS);
+
 	return (woken) ? IRQ_HANDLED : IRQ_UNHANDLED;
 }
 MODULE_EXPORT(ata_channel_interrupt);
