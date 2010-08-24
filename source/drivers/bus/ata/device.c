@@ -181,6 +181,8 @@ static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, siz
 			ret = ata_channel_finish_dma(device->parent);
 			buf += current * device->block_size;
 		} else {
+			assert(device->parent->pio);
+
 			/* Do a PIO transfer of each sector. */
 			for(i = 0; i < current; i++) {
 				if(write) {
@@ -258,15 +260,38 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 		return;
 	}
 
+	ident = kmalloc(512, MM_SLEEP);
+
+	/* Prepare a DMA transfer if the channel doesn't support PIO. */
+	if(!channel->pio) {
+		if(ata_channel_prepare_dma(channel, ident, 512, false) != STATUS_SUCCESS) {
+			goto fail;
+		}
+	}
+
 	/* Send an IDENTIFY DEVICE command. Perform a manual wait as we don't
 	 * want to wait too long if the device doesn't exist. */
-	ident = kmalloc(512, MM_SLEEP);
 	ata_channel_command(channel, ATA_CMD_IDENTIFY);
-	if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true,
-	                    true, 50000) != STATUS_SUCCESS) {
+	if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 25000) != STATUS_SUCCESS) {
 		goto fail;
-	} else if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
-		goto fail;
+	}
+
+	/* Transfer the IDENTIFY data. */
+	if(channel->pio) {
+		if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
+			goto fail;
+		}
+	} else {
+		if(!ata_channel_perform_dma(channel)) {
+			ata_channel_finish_dma(channel);
+			kprintf(LOG_WARN, "ata: timed out waiting for DMA transfer of IDENTIFY data on %d:%u\n",
+			        channel->id, num);
+			goto fail;
+		} else if(ata_channel_finish_dma(channel) != STATUS_SUCCESS) {
+			kprintf(LOG_WARN, "ata: DMA transfer of IDENTIFY data failed on %d:%u\n",
+			        channel->id, num);
+			goto fail;
+		}
 	}
 
 	/* Check whether we can use the device. */
@@ -332,13 +357,20 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 
 		/* Only one mode should be selected. */
 		if(modes > 1) {
-			kprintf(LOG_WARN, "ata: device %d:%u has more than one DMA mode selected\n",
+			kprintf(LOG_WARN, "ata: device %d:%u has more than one DMA mode selected, not using DMA\n",
 			        num, channel->id);
 		} else if(modes == 1) {
 			device->dma = true;
 		}
 	}
 	kprintf(LOG_NORMAL, " dma:        %d\n", device->dma);
+
+	/* Refuse to use the device if it doesn't support DMA and the channel
+	 * doesn't support PIO. */
+	if(!device->dma && !channel->pio) {
+		kprintf(LOG_WARN, "ata: cannot use non-DMA device on channel not supporting PIO\n");
+		goto fail;
+	}
 
 	kfree(ident);
 	ata_channel_finish_command(channel);

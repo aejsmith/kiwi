@@ -33,12 +33,20 @@ config DRIVER_BUS_PCI
 
 comment "Disk devices"
 
-config DRIVER_DISK_PCI_ATA
-	bool "PCI ATA device driver"
+config DRIVER_DISK_AHCI
+	bool "AHCI controller driver"
 	default y
 	depends on DRIVER_BUS_ATA && DRIVER_BUS_PCI
 	help
-	  Enable the PCI ATA disk device driver.
+	  Enable the AHCI SATA controller driver.
+	
+config DRIVER_DISK_PCI_ATA
+	bool "PCI ATA controller driver"
+	default y
+	depends on DRIVER_BUS_ATA && DRIVER_BUS_PCI
+	help
+	  Enable the PCI ATA controller driver. This supports PATA (IDE)
+	  controllers, and SATA controllers in IDE emulation mode.
 
 comment "Display devices"
 

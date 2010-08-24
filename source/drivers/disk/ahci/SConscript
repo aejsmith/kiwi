@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,18 +11,10 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env', 'config')
+Import('env')
 
-dirs = [
-	('DRIVER_DISK_AHCI', 'ahci'),
-	('DRIVER_DISK_PCI_ATA', 'pci_ata'),
-]
-
-# Build the disk device manager.
-env.Module('disk', [
-	'disk.c',
-	'partition.c',
-	'part-msdos.c',
+env.Module('ahci', [
+	'ahci.c',
+	'hba.c',
+	'port.c',
 ])
-
-SConscript(dirs=[d for (c, d) in dirs if not c or config[c]], exports=['env'])

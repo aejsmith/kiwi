@@ -404,6 +404,7 @@ ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_o
 
 	assert(parent);
 	assert(ops);
+	assert(pio || dma);
 
 	if(!nfmt) {
 		nfmt = "ata%d";

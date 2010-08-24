@@ -71,8 +71,9 @@ struct pci_device;
 #define PCI_COMMAND_FASTB2B		(1<<9)	/**< Fast Back-to-Back enable. */
 #define PCI_COMMAND_INT_DISABLE		(1<<10)	/**< I/O interrupt disable. */
 
-/** Mask to clear special bits from an I/O address. */
+/** Mask to clear special bits from an BAR. */
 #define PCI_IO_ADDRESS_MASK		0xFFFFFFFC
+#define PCI_MEM_ADDRESS_MASK		0xFFFFFFF0
 
 /** Value to match any ID in the structure below. */
 #define PCI_ANY_ID			(~((uint32_t)0))
