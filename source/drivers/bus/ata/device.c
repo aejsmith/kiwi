@@ -36,12 +36,6 @@
 
 #include "ata_priv.h"
 
-/** Highest block number for LBA-28 transfers. */
-#define LBA28_MAX_BLOCK		((uint64_t)1<<28)
-
-/** Highest block number for LBA-28 transfers. */
-#define LBA48_MAX_BLOCK		((uint64_t)1<<48)
-
 /** Copy an ATA identification string.
  * @note		Modifies the source string.
  * @param dest		Destination string.
@@ -92,7 +86,6 @@ static const uint8_t transfer_commands[2][2][2] = {
  * @return		Number of blocks that will be transferred. If 0 is
  *			returned, an error occurred. */
 static size_t ata_device_begin_io(ata_device_t *device, void *buf, uint64_t lba, size_t count, bool write) {
-	ata_channel_t *channel = device->parent;
 	status_t ret;
 
 	if(lba < LBA28_MAX_BLOCK) {
@@ -113,21 +106,8 @@ static size_t ata_device_begin_io(ata_device_t *device, void *buf, uint64_t lba,
 			}
 		}
 
-		/* Send a NULL to the feature register. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
-
-		/* Write out the number of blocks to read. 0 means 256. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, (count == 256) ? 0 : count);
-
-		/* Specify the address of the block. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, lba & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
-
-		/* Device number with LBA bit set, and last 4 bits of address. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4) | ((lba >> 24) & 0xf));
-
 		/* Start the transfer. */
+		ata_channel_lba28_setup(device->parent, device->num, lba, count);
 		ata_channel_command(device->parent, transfer_commands[write][false][device->dma]);
 		return count;
 	} else if(lba < LBA48_MAX_BLOCK) {
@@ -156,31 +136,8 @@ static size_t ata_device_begin_io(ata_device_t *device, void *buf, uint64_t lba,
 			}
 		}
 
-		/* Send 2 NULLs to the feature register. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_FEAT, 0);
-
-		/* Write out the number of blocks to read. */
-		if(count == 65536) {
-			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, 0);
-			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, 0);
-		} else {
-			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, (count >> 8) & 0xff);
-			ata_channel_write_cmd(channel, ATA_CMD_REG_COUNT, count & 0xff);
-		}
-
-		/* Specify the address of the block. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, (lba >> 24) & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, lba & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 32) & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_MID, (lba >> 8) & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 40) & 0xff);
-		ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_HIGH, (lba >> 16) & 0xff);
-
-		/* Device number with LBA bit set. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_DEVICE, 0x40 | (device->num << 4));
-
 		/* Start the transfer. */
+		ata_channel_lba48_setup(device->parent, device->num, lba, count);
 		ata_channel_command(device->parent, transfer_commands[write][true][device->dma]);
 		return count;
 	} else {

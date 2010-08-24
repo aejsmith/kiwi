@@ -222,7 +222,7 @@ static status_t pci_ata_channel_finish_dma(ata_channel_t *channel) {
 }
 
 /** PCI ATA channel operations. */
-static ata_channel_ops_t pci_ata_channel_ops = {
+static ata_sff_channel_ops_t pci_ata_channel_ops = {
 	.read_ctrl = pci_ata_channel_read_ctrl,
 	.write_ctrl = pci_ata_channel_write_ctrl,
 	.read_cmd = pci_ata_channel_read_cmd,
@@ -256,6 +256,9 @@ static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_fram
 	/* Clear interrupt flag. */
 	out8(data->bus_master_base + PCI_ATA_BM_REG_STATUS, (status & 0xF8) | PCI_ATA_BM_STATUS_INTERRUPT);
 
+	/* Clear INTRQ. */
+	in8(data->cmd_base + ATA_CMD_REG_STATUS);
+
 	/* Pass the interrupt to the ATA bus manager. */
 	return ata_channel_interrupt(data->channel);
 }
@@ -277,21 +280,24 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 
 	/* Configure the PCI device appropriately. */
 	pci_cmd_old = pci_cmd_new = pci_config_read16(pci_device, PCI_CONFIG_COMMAND);
-	if(pci_cmd_new & PCI_COMMAND_INT_DISABLE) {
-		pci_cmd_new &= ~PCI_COMMAND_INT_DISABLE;
-	}
-	if(!(pci_cmd_new & PCI_COMMAND_IO)) {
-		pci_cmd_new |= PCI_COMMAND_IO;
-	}
-	if(!(pci_cmd_new & PCI_COMMAND_BUS_MASTER)) {
-		pci_cmd_new |= PCI_COMMAND_BUS_MASTER;
-	}
+	pci_cmd_new &= ~PCI_COMMAND_INT_DISABLE;
+	pci_cmd_new |= (PCI_COMMAND_IO | PCI_COMMAND_BUS_MASTER);
 	if(pci_cmd_new != pci_cmd_old) {
 		pci_config_write16(pci_device, PCI_CONFIG_COMMAND, pci_cmd_new);
 		kprintf(LOG_DEBUG, "ata: reconfigured PCI device %d:%02x.%d (old: 0x%04x, new: 0x%04x)\n",
 		        pci_device->bus, pci_device->device, pci_device->function,
 		        pci_cmd_old, pci_cmd_new);
         }
+
+	/* Check presence by writing a value to the low LBA port on the channel,
+	 * then reading it back. If the value is the same, it is present. */
+	out8(cmd_base + ATA_CMD_REG_LBA_LOW, 0xAB);
+	if(in8(cmd_base + ATA_CMD_REG_LBA_LOW) != 0xAB) {
+		if(pci_cmd_new != pci_cmd_old) {
+			pci_config_write16(pci_device, PCI_CONFIG_COMMAND, pci_cmd_old);
+		}
+		return NULL;
+	}
 
 	/* Allocate our information structure. */
 	channel = kmalloc(sizeof(*channel), MM_SLEEP);
@@ -331,8 +337,8 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	}
 
 	/* Try to register the ATA channel. */
-	channel->channel = ata_channel_add(pci_device->node, &pci_ata_channel_ops, channel,
-	                                   dma, PRDT_ENTRIES, (phys_ptr_t)0x100000000);
+	channel->channel = ata_sff_channel_add(pci_device->node, &pci_ata_channel_ops, channel,
+	                                       dma, PRDT_ENTRIES, (phys_ptr_t)0x100000000);
 	if(!channel->channel) {
 		irq_unregister(channel->irq, pci_ata_irq_handler, NULL, channel);
 		if(dma) {

@@ -42,42 +42,6 @@
 /** Next channel ID. */
 static atomic_t next_channel_id = 0;
 
-/** Read from a control register.
- * @param channel	Channel to read from.
- * @param reg		Register to read from.
- * @return		Value read. */
-uint8_t ata_channel_read_ctrl(ata_channel_t *channel, int reg) {
-	assert(channel->ops->read_ctrl);
-	return channel->ops->read_ctrl(channel, reg);
-}
-
-/** Write to a control register.
- * @param channel	Channel to read from.
- * @param reg		Register to write to.
- * @param val		Value to write. */
-void ata_channel_write_ctrl(ata_channel_t *channel, int reg, uint8_t val) {
-	assert(channel->ops->write_ctrl);
-	channel->ops->write_ctrl(channel, reg, val);
-}
-
-/** Read from a command register.
- * @param channel	Channel to read from.
- * @param reg		Register to read from.
- * @return		Value read. */
-uint8_t ata_channel_read_cmd(ata_channel_t *channel, int reg) {
-	assert(channel->ops->read_cmd);
-	return channel->ops->read_cmd(channel, reg);
-}
-
-/** Write to a command register.
- * @param channel	Channel to read from.
- * @param reg		Register to write to.
- * @param val		Value to write. */
-void ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val) {
-	assert(channel->ops->write_cmd);
-	channel->ops->write_cmd(channel, reg, val);
-}
-
 /** Wait for DRQ and perform a PIO data read.
  * @param channel	Channel to read from.
  * @param buf		Buffer to read into.
@@ -88,6 +52,7 @@ void ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val) {
 status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count) {
 	status_t ret;
 
+	assert(channel->pio);
 	assert(channel->ops->read_pio);
 
 	/* Wait for DRQ to be set and BSY to be clear. */
@@ -110,6 +75,7 @@ status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count) {
 status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count) {
 	status_t ret;
 
+	assert(channel->pio);
 	assert(channel->ops->write_pio);
 
 	/* Wait for DRQ to be set and BSY to be clear. */
@@ -158,6 +124,9 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 	ptr_t ibuf = (ptr_t)buf;
 	status_t ret;
 
+	assert(channel->dma);
+	assert(channel->ops->prepare_dma);
+
 	page_map_lock(&kernel_page_map);
 
 	/* Align on a page boundary. */
@@ -188,7 +157,6 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 	}
 
 	/* Prepare the transfer. */
-	assert(channel->ops->prepare_dma);
 	ret = channel->ops->prepare_dma(channel, vec, entries, write);
 	kfree(vec);
 	return ret;
@@ -202,15 +170,17 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 bool ata_channel_perform_dma(ata_channel_t *channel) {
 	status_t ret;
 
+	assert(channel->dma);
+	assert(channel->ops->start_dma);
+
 	/* The IRQ lock is used to guarantee that we're waiting for the IRQ
 	 * when the IRQ handler calls condvar_broadcast(). */
 	spinlock_lock(&channel->irq_lock);
 
 	/* Enable interrupts. */
-	ata_channel_write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, 0);
+	channel->ops->irq_control(channel, true);
 
 	/* Start off the transfer. */
-	assert(channel->ops->start_dma);
 	channel->ops->start_dma(channel);
 
 	/* Wait for an IRQ to arrive. */
@@ -221,7 +191,7 @@ bool ata_channel_perform_dma(ata_channel_t *channel) {
 	}
 
 	/* Disable interrupts again. */
-	ata_channel_write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_NIEN);
+	channel->ops->irq_control(channel, false);
 
 	spinlock_unlock(&channel->irq_lock);
 	return true;
@@ -232,6 +202,7 @@ bool ata_channel_perform_dma(ata_channel_t *channel) {
  * @return		STATUS_SUCCESS if the DMA transfer was successful,
  *			STATUS_DEVICE_ERROR if not. */
 status_t ata_channel_finish_dma(ata_channel_t *channel) {
+	assert(channel->dma);
 	assert(channel->ops->finish_dma);
 	return channel->ops->finish_dma(channel);
 }
@@ -240,44 +211,61 @@ status_t ata_channel_finish_dma(ata_channel_t *channel) {
  * @param channel	Channel to get from.
  * @return		Value of alternate status register. */
 uint8_t ata_channel_status(ata_channel_t *channel) {
-	return ata_channel_read_ctrl(channel, ATA_CTRL_REG_ALT_STATUS);
+	assert(channel->ops->status);
+	return channel->ops->status(channel);
 }
 
 /** Get the content of the error register.
  * @param channel	Channel to get from.
  * @return		Value of error register. */
 uint8_t ata_channel_error(ata_channel_t *channel) {
-	return ata_channel_read_cmd(channel, ATA_CMD_REG_ERR);
+	assert(channel->ops->error);
+	return channel->ops->error(channel);
 }
 
 /** Get the currently selected device.
  * @param channel	Channel to get from.
  * @return		Current selected device. */
 uint8_t ata_channel_selected(ata_channel_t *channel) {
-	return (ata_channel_read_cmd(channel, ATA_CMD_REG_DEVICE) >> 4) & (1<<0);
+	assert(channel->ops->selected);
+	return channel->ops->selected(channel);
 }
 
 /** Issue a command to the selected device.
  * @param channel	Channel to perform command on.
  * @param cmd		Command to perform. */
 void ata_channel_command(ata_channel_t *channel, uint8_t cmd) {
-	ata_channel_write_cmd(channel, ATA_CMD_REG_CMD, cmd);
+	assert(channel->ops->command);
+	channel->ops->command(channel, cmd);
 	spin(1);
 }
 
-/** Trigger a software reset of both devices.
- * @param channel	Channel to reset. */
-void ata_channel_reset(ata_channel_t *channel) {
-	/* See 11.2 - Software reset protocol (in Volume 2). We wait for longer
-	 * than necessary to be sure it's done. */
-	ata_channel_write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_SRST | ATA_DEVCTRL_NIEN);
-	usleep(20);
-	ata_channel_write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_NIEN);
-	usleep(MSECS2USECS(150));
-	ata_channel_wait(channel, 0, 0, false, false, 1000);
+/** Set up registers for an LBA28 transfer.
+ * @param channel	Channel to set up on.
+ * @param device	Device number to operate on.
+ * @param lba		LBA to transfer from/to.
+ * @param count		Sector count. */
+void ata_channel_lba28_setup(ata_channel_t *channel, uint8_t device, uint64_t lba, size_t count) {
+	assert(channel->ops->lba28_setup);
+	channel->ops->lba28_setup(channel, device, lba, count);
+}
 
-	/* Clear any pending interrupts. */
-	ata_channel_read_cmd(channel, ATA_CMD_REG_STATUS);
+/** Set up registers for an LBA48 transfer.
+ * @param channel	Channel to set up on.
+ * @param device	Device number to operate on.
+ * @param lba		LBA to transfer from/to.
+ * @param count		Sector count. */
+void ata_channel_lba48_setup(ata_channel_t *channel, uint8_t device, uint64_t lba, size_t count) {
+	assert(channel->ops->lba48_setup);
+	channel->ops->lba48_setup(channel, device, lba, count);
+}
+
+/** Trigger a software reset of both devices.
+ * @param channel	Channel to reset.
+ * @return		Status code describing result of the operation. */
+status_t ata_channel_reset(ata_channel_t *channel) {
+	assert(channel->ops->reset);
+	return channel->ops->reset(channel);
 }
 
 /** Wait for device status to change.
@@ -343,7 +331,7 @@ status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bo
 status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
 	bool attempted = false;
 
-	assert(num == 0 || num == 1);
+	assert(num < channel->devices);
 
 	/* Begin by locking the channel, to prevent other devices on it from
 	 * interfering with our operation. */
@@ -372,7 +360,7 @@ status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
 		}
 
 		/* Try to set it and then wait again. */
-		ata_channel_write_cmd(channel, ATA_CMD_REG_DEVICE, num << 4);
+		channel->ops->select(channel, num);
 		spin(1);
 	}
 }
@@ -385,14 +373,22 @@ void ata_channel_finish_command(ata_channel_t *channel) {
 
 /** Register a new ATA channel.
  * @param parent	Parent in the device tree.
+ * @param nfmt		Format for the device name (%d for the channel ID).
  * @param ops		Channel operations structure.
+ * @param sops		SFF operations structure (should be NULL, use
+ *			ata_sff_channel_add() instead).
  * @param data		Implementation-specific data pointer.
+ * @param devices	Maximum number of devices supported by the channel.
+ * @param pio		Whether the channel supports PIO. If false, DMA will be
+ *			used to transfer data for commands that use the PIO
+ *			protocol.
  * @param dma		Whether the channel supports DMA.
  * @param max_dma_bpt	Maximum number of blocks per DMA transfer.
  * @param max_dma_addr	Maximum physical address for a DMA transfer.
  * @return		Pointer to channel structure if added, NULL if not. */
-ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *data, bool dma,
-                               size_t max_dma_bpt, phys_ptr_t max_dma_addr) {
+ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_ops_t *ops,
+                               ata_sff_channel_ops_t *sops, void *data, uint8_t devices,
+                               bool pio, bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr) {
 	device_attr_t attr[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "ata-channel" } },
 	};
@@ -403,30 +399,35 @@ ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *d
 	assert(parent);
 	assert(ops);
 
+	if(!nfmt) {
+		nfmt = "ata%d";
+	}
+
 	/* Create a new channel structure. */
 	channel = kmalloc(sizeof(*channel), MM_SLEEP);
 	mutex_init(&channel->lock, "ata_channel_lock", 0);
 	spinlock_init(&channel->irq_lock, "ata_channel_irq_lock");
 	condvar_init(&channel->irq_cv, "ata_channel_irq_cv");
+	channel->id = atomic_inc(&next_channel_id);
 	channel->ops = ops;
+	channel->sops = sops;
 	channel->data = data;
+	channel->devices = devices;
+	channel->pio = pio;
 	channel->dma = dma;
 	channel->max_dma_bpt = max_dma_bpt;
 	channel->max_dma_addr = max_dma_addr;
 
-	/* Check presence by writing a value to the low LBA port on the channel,
-	 * then reading it back. If the value is the same, it is present. */
-	ata_channel_write_cmd(channel, ATA_CMD_REG_LBA_LOW, 0xAB);
-	if(ata_channel_read_cmd(channel, ATA_CMD_REG_LBA_LOW) != 0xAB) {
+	/* Reset the channel to a decent state. */
+	ret = ata_channel_reset(channel);
+	if(ret != STATUS_SUCCESS) {
+		kprintf(LOG_WARN, "ata: failed to reset channel %d (%d)\n", channel->id, ret);
 		kfree(channel);
 		return NULL;
 	}
 
-	/* Allocate an ID for the controller. */
-	channel->id = atomic_inc(&next_channel_id);
-
 	/* Publish it in the device tree. */
-	sprintf(name, "ata%d", channel->id);
+	sprintf(name, nfmt, channel->id);
 	ret = device_create(name, parent, NULL, NULL, attr, ARRAYSZ(attr), &channel->node);
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ata: could not create device tree node for channel %d (%d)\n",
@@ -435,8 +436,6 @@ ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *d
 		return NULL;
 	}
 
-	/* Reset the channel to a decent state. */
-	ata_channel_reset(channel);
 	return channel;
 }
 MODULE_EXPORT(ata_channel_add);
@@ -444,8 +443,11 @@ MODULE_EXPORT(ata_channel_add);
 /** Scan an ATA channel for devices.
  * @param channel	Channel to scan. */
 void ata_channel_scan(ata_channel_t *channel) {
-	ata_device_detect(channel, 0);
-	ata_device_detect(channel, 1);
+	uint8_t i;
+
+	for(i = 0; i < channel->devices; i++) {
+		ata_device_detect(channel, i);
+	}
 }
 MODULE_EXPORT(ata_channel_scan);
 
@@ -461,9 +463,6 @@ irq_result_t ata_channel_interrupt(ata_channel_t *channel) {
 	spinlock_lock(&channel->irq_lock);
 	woken = condvar_broadcast(&channel->irq_cv);
 	spinlock_unlock(&channel->irq_lock);
-
-	/* Clear INTRQ. */
-	ata_channel_read_cmd(channel, ATA_CMD_REG_STATUS);
 
 	return (woken) ? IRQ_HANDLED : IRQ_UNHANDLED;
 }

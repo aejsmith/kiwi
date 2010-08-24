@@ -17,4 +17,5 @@ env.Module('ata', [
 	'ata.c',
 	'channel.c',
 	'device.c',
+	'sff.c',
 ])

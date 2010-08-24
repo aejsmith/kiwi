@@ -39,10 +39,12 @@ typedef struct ata_device {
 	unsigned dma : 1;		/**< Whether the device supports DMA. */
 } ata_device_t;
 
-extern uint8_t ata_channel_read_ctrl(ata_channel_t *channel, int reg);
-extern void ata_channel_write_ctrl(ata_channel_t *channel, int reg, uint8_t val);
-extern uint8_t ata_channel_read_cmd(ata_channel_t *channel, int reg);
-extern void ata_channel_write_cmd(ata_channel_t *channel, int reg, uint8_t val);
+/** Highest block number for LBA28 transfers. */
+#define LBA28_MAX_BLOCK		((uint64_t)1<<28)
+
+/** Highest block number for LBA48 transfers. */
+#define LBA48_MAX_BLOCK		((uint64_t)1<<48)
+
 extern status_t ata_channel_read_pio(ata_channel_t *channel, void *buf, size_t count);
 extern status_t ata_channel_write_pio(ata_channel_t *channel, const void *buf, size_t count);
 extern status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count, bool write);
@@ -52,7 +54,9 @@ extern uint8_t ata_channel_status(ata_channel_t *channel);
 extern uint8_t ata_channel_error(ata_channel_t *channel);
 extern uint8_t ata_channel_selected(ata_channel_t *channel);
 extern void ata_channel_command(ata_channel_t *channel, uint8_t cmd);
-extern void ata_channel_reset(ata_channel_t *channel);
+extern void ata_channel_lba28_setup(ata_channel_t *channel, uint8_t device, uint64_t lba, size_t count);
+extern void ata_channel_lba48_setup(ata_channel_t *channel, uint8_t device, uint64_t lba, size_t count);
+extern status_t ata_channel_reset(ata_channel_t *channel);
 extern status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bool any,
                                  bool error, useconds_t timeout);
 extern status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num);

@@ -90,6 +90,107 @@ typedef struct ata_dma_transfer {
 
 /** Structure containing ATA channel operations. */
 typedef struct ata_channel_ops {
+	/**
+	 * Operations required by all channels.
+	 */
+
+	/** Reset the channel.
+	 * @param channel	Channel to reset.
+	 * @return		Status code describing result of operation. */
+	status_t (*reset)(struct ata_channel *channel);
+
+	/** Get the content of the status register.
+	 * @note		This should not clear INTRQ, so should read the
+	 *			alternate status register.
+	 * @param channel	Channel to get status from.
+	 * @return		Content of the status register. */
+	uint8_t (*status)(struct ata_channel *channel);
+
+	/** Get the content of the error register.
+	 * @param channel	Channel to get error from.
+	 * @return		Content of the error register. */
+	uint8_t (*error)(struct ata_channel *channel);
+
+	/** Get the selected device on a channel.
+	 * @param channel	Channel to get selected device from.
+	 * @return		Currently selected device number. */
+	uint8_t (*selected)(struct ata_channel *channel);
+
+	/** Change the selected device on a channel.
+	 * @param channel	Channel to select on.
+	 * @param num		Device number to select. */
+	void (*select)(struct ata_channel *channel, uint8_t num);
+
+	/** Enable/disable interrupts.
+	 * @param channel	Channel to operate on.
+	 * @param enable	Whether to enable or disable. */
+	void (*irq_control)(struct ata_channel *channel, bool enable);
+
+	/** Execute a command.
+	 * @param channel	Channel to execute on.
+	 * @param cmd		Command to execute. */
+	void (*command)(struct ata_channel *channel, uint8_t cmd);
+
+	/** Set up registers for an LBA28 transfer.
+	 * @param channel	Channel to set up on.
+	 * @param device	Device number to operate on.
+	 * @param lba		LBA to transfer from/to.
+	 * @param count		Sector count. */
+	void (*lba28_setup)(struct ata_channel *channel, uint8_t device, uint64_t lba, size_t count);
+
+	/** Set up registers for an LBA48 transfer.
+	 * @param channel	Channel to set up on.
+	 * @param device	Device number to operate on.
+	 * @param lba		LBA to transfer from/to.
+	 * @param count		Sector count. */
+	void (*lba48_setup)(struct ata_channel *channel, uint8_t device, uint64_t lba, size_t count);
+
+	/**
+	 * Operations required on channels supporting PIO.
+	 */
+
+	/** Perform a PIO data read.
+	 * @param channel	Channel to read from.
+	 * @param buf		Buffer to read into.
+	 * @param count		Number of bytes to read. */
+	void (*read_pio)(struct ata_channel *channel, void *buf, size_t count);
+
+	/** Perform a PIO data write.
+	 * @param channel	Channel to write to.
+	 * @param buf		Buffer to write from.
+	 * @param count		Number of bytes to write. */
+	void (*write_pio)(struct ata_channel *channel, const void *buf, size_t count);
+
+	/**
+	 * Operations required on channels supporting DMA.
+	 */
+
+	/** Prepare a DMA transfer.
+	 * @param channel	Channel to perform on.
+	 * @param vec		Array of block descriptions. Each block will
+	 *			cover no more than 1 page. The contents of this
+	 *			array are guaranteed to conform to the
+	 *			constraints specified to ata_channel_add().
+	 * @param count		Number of array entries.
+	 * @param write		Whether the transfer is a write.
+	 * @return		Status code describing result of operation. */
+	status_t (*prepare_dma)(struct ata_channel *channel, const ata_dma_transfer_t *vec,
+	                        size_t count, bool write);
+
+	/** Start a DMA transfer.
+	 * @note		This should cause an interrupt to be raised
+	 *			once the transfer is complete.
+	 * @param channel	Channel to start on. */
+	void (*start_dma)(struct ata_channel *channel);
+
+	/** Clean up after a DMA transfer.
+	 * @param channel	Channel to clean up on.
+	 * @return		Status code describing result of the transfer. */
+	status_t (*finish_dma)(struct ata_channel *channel);
+} ata_channel_ops_t;
+
+/** Structure containing ATA channel operations. */
+typedef struct ata_sff_channel_ops {
 	/** Read from a control register.
 	 * @param channel	Channel to read from.
 	 * @param reg		Register to read from.
@@ -148,7 +249,7 @@ typedef struct ata_channel_ops {
 	 * @param channel	Channel to clean up on.
 	 * @return		Status code describing result of the transfer. */
 	status_t (*finish_dma)(struct ata_channel *channel);
-} ata_channel_ops_t;
+} ata_sff_channel_ops_t;
 
 /** Structure describing an ATA channel. */
 typedef struct ata_channel {
@@ -156,7 +257,10 @@ typedef struct ata_channel {
 	mutex_t lock;				/**< Lock to serialise channel access. */
 	device_t *node;				/**< Device tree node. */
 	ata_channel_ops_t *ops;			/**< Operations for the channel. */
+	ata_sff_channel_ops_t *sops;		/**< SFF operations. */
 	void *data;				/**< Implementation-specific data pointer. */
+	uint8_t devices;			/**< Maximum number of devices supported by the channel. */
+	bool pio;				/**< Whether PIO transfers are supported. */
 	bool dma;				/**< Whether DMA is supported. */
 	size_t max_dma_bpt;			/**< Maximum number of blocks per DMA transfer. */
 	phys_ptr_t max_dma_addr;		/**< Highest physical address for DMA transfers. */
@@ -164,8 +268,12 @@ typedef struct ata_channel {
 	condvar_t irq_cv;			/**< Condition variable to wait for IRQ on. */
 } ata_channel_t;
 
-extern ata_channel_t *ata_channel_add(device_t *parent, ata_channel_ops_t *ops, void *data,
-                                      bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr);
+extern ata_channel_t *ata_sff_channel_add(device_t *parent, ata_sff_channel_ops_t *ops, void *data,
+                                          bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr);
+extern ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_ops_t *ops,
+                                      ata_sff_channel_ops_t *sops, void *data, uint8_t devices,
+                                      bool pio, bool dma, size_t max_dma_bpt,
+                                      phys_ptr_t max_dma_addr);
 extern void ata_channel_scan(ata_channel_t *channel);
 extern irq_result_t ata_channel_interrupt(ata_channel_t *channel);
 
