@@ -283,8 +283,8 @@ status_t ata_channel_reset(ata_channel_t *channel) {
  * @return		Status code describing result of the operation. */
 status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bool any,
                           bool error, useconds_t timeout) {
+	useconds_t i, elapsed = 0;
 	uint8_t status;
-	useconds_t i;
 
 	assert(timeout);
 
@@ -307,9 +307,15 @@ status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bo
 			return STATUS_SUCCESS;
 		}
 
-		i = (timeout < 1000) ? timeout : 1000;
-		usleep(i);
+		if(elapsed < 1000) {
+			i = (timeout < 10) ? timeout : 10;
+			spin(i);
+		} else {
+			i = (timeout < 1000) ? timeout : 1000;
+			usleep(i);
+		}
 		timeout -= i;
+		elapsed += i;
 	}
 
 	return STATUS_TIMED_OUT;
