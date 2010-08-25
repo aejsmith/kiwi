@@ -229,6 +229,7 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	port->parent = hba;
 	port->regs = &hba->regs->ports[num];
 	port->error = false;
+	port->channel = NULL;
 
 	/* Ensure that the port is idle. */
 	port->regs->cmd &= ~AHCI_PXCMD_ST;
@@ -312,18 +313,18 @@ void ahci_port_init(ahci_port_t *port) {
 			kprintf(LOG_WARN, "ahci: ignoring unsupported ATAPI device on port %u (TODO)\n", port->num);
 			port->present = false;
 		}
-	}
 
-	/* Register the ATA channel. */
-	sprintf(name, "%u", port->num);
-	port->channel = ata_channel_add(port->parent->node, name, &ahci_ata_channel_ops, NULL, port,
-	                                1, false, true, AHCI_PRD_COUNT, 0);
-	if(!port->channel) {
-		port->regs->cmd &= ~AHCI_PXCMD_ST;
-		return;
-	}
+		/* Register the ATA channel. */
+		sprintf(name, "%u", port->num);
+		port->channel = ata_channel_add(port->parent->node, name, &ahci_ata_channel_ops,
+		                                NULL, port, 1, false, true, AHCI_PRD_COUNT, 0);
+		if(!port->channel) {
+			port->regs->cmd &= ~AHCI_PXCMD_ST;
+			return;
+		}
 
-	ata_channel_scan(port->channel);
+		ata_channel_scan(port->channel);
+	}
 }
 
 /** Reset an AHCI port.
@@ -421,7 +422,7 @@ void ahci_port_interrupt(ahci_port_t *port) {
 	}
 
 	/* Signal the ATA stack if required. */
-	if(signal) {
+	if(signal && port->channel) {
 		ata_channel_interrupt(port->channel);
 	}
 }
