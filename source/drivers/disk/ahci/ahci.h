@@ -249,11 +249,14 @@ typedef struct ahci_port_regs {
 	uint32_t reserved1;			/**< Reserved. */
 
 	/** Task File Data. */
-	struct {
-		uint8_t status;			/**< Status Register. */
-		uint8_t err;			/**< Error Register. */
-		uint16_t reserved;		/**< Reserved. */
-	} __packed tfd;
+	union {
+		struct {
+			uint8_t status;		/**< Status Register. */
+			uint8_t err;		/**< Error Register. */
+			uint16_t reserved;	/**< Reserved. */
+		} __packed tfd;
+		uint32_t _tfd;
+	} __packed;
 
 	uint32_t sig;				/**< Signature. */
 	uint32_t ssts;				/**< Serial ATA Status (SCR0: SStatus). */
@@ -305,6 +308,7 @@ typedef struct ahci_port {
 	phys_ptr_t mem_phys;			/**< Physical address of the port memory. */
 	volatile void *mem_virt;		/**< Virtual address of the port memory. */
 	bool error;				/**< Whether an error was detected during DMA. */
+	bool reset;				/**< Whether the error requires a reset. */
 
 	volatile ahci_port_regs_t *regs;	/**< Registers for this port. */
 	volatile ahci_fis_t *fis;		/**< Received FIS structure. */

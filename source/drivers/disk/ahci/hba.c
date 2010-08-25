@@ -49,7 +49,7 @@ static irq_result_t ahci_irq_handler(unative_t num, void *_hba, intr_frame_t *fr
 	if(pending) {
 		/* Determine which port(s) the interrupt is for. */
 		for(i = 0; i < ARRAYSZ(hba->ports); i++) {
-			if(hba->ports[i]) {
+			if(pending & (1<<i) && hba->ports[i]) {
 				handled = true;
 				ahci_port_interrupt(hba->ports[i]);
 			}

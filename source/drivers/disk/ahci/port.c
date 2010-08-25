@@ -166,8 +166,8 @@ static status_t ahci_ata_prepare_dma(ata_channel_t *channel, const ata_dma_trans
 			return STATUS_NOT_SUPPORTED;
 		}
 
-		port->prdt[i].dbau = (vec[i].phys >> 32) & 0xFFFFFFFF;
 		port->prdt[i].dba = vec[i].phys & 0xFFFFFFFF;
+		port->prdt[i].dbau = (vec[i].phys >> 32) & 0xFFFFFFFF;
 		port->prdt[i].reserved1 = 0;
 		port->prdt[i].dw3 = 0;
 		port->prdt[i].dbc = vec[i].size - 1;
@@ -189,6 +189,10 @@ static status_t ahci_ata_finish_dma(ata_channel_t *channel) {
 	ahci_port_t *port = channel->data;
 
 	if(port->error) {
+		if(port->reset) {
+			ahci_port_reset(port);
+			port->reset = false;
+		}
 		port->error = false;
 		return STATUS_DEVICE_ERROR;
 	} else {
@@ -229,6 +233,7 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	port->parent = hba;
 	port->regs = &hba->regs->ports[num];
 	port->error = false;
+	port->reset = false;
 	port->channel = NULL;
 
 	/* Ensure that the port is idle. */
@@ -268,11 +273,11 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	 * to partial/slumber disabled). */
 	port->regs->sctl |= 0x300;
 
-	/* Clear error bits. */
-	port->regs->serr = port->regs->serr;
-
 	/* Clear interrupt status. */
 	port->regs->is = port->regs->is;
+
+	/* Clear error bits. */
+	port->regs->serr = port->regs->serr;
 
 	/* Power on and spin up the device if necessary. */
 	if(port->regs->cmd & AHCI_PXCMD_CPD) {
@@ -287,10 +292,6 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 
 	/* Enable FIS receive. */
 	port->regs->cmd |= AHCI_PXCMD_FRE;
-
-	/* Set which interrupts we want to know about. */
-	port->regs->ie = AHCI_PORT_INTR_ERROR | AHCI_PXIE_DHRE | AHCI_PXIE_PSE |
-	                 AHCI_PXIE_DSE | AHCI_PXIE_SDBE | AHCI_PXIE_DPE;
 	ahci_port_flush(port);
 	return port;
 }
@@ -299,6 +300,14 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
  * @param port		Port to initialise. */
 void ahci_port_init(ahci_port_t *port) {
 	char name[DEVICE_NAME_MAX];
+
+	/* Start DMA engine. */
+	port->regs->cmd |= AHCI_PXCMD_ST;
+
+	/* Set which interrupts we want to know about. */
+	port->regs->ie = AHCI_PORT_INTR_ERROR | AHCI_PXIE_DHRE | AHCI_PXIE_PSE |
+	                 AHCI_PXIE_DSE | AHCI_PXIE_SDBE | AHCI_PXIE_DPE;
+	ahci_port_flush(port);
 
 	/* Reset the port. */
 	ahci_port_reset(port);
@@ -323,7 +332,11 @@ void ahci_port_init(ahci_port_t *port) {
 			return;
 		}
 
+		port->error = false;
+		port->reset = false;
 		ata_channel_scan(port->channel);
+	} else {
+		port->regs->cmd &= ~AHCI_PXCMD_ST;
 	}
 }
 
@@ -351,23 +364,42 @@ status_t ahci_port_reset(ahci_port_t *port) {
 	/* Wait for communication to be established with device. */
 	if(port->regs->ssts & 1) {
 		if(!wait_for_set(&port->regs->ssts, 0x3, false, MSECS2USECS(600))) {
-			kprintf(LOG_DEBUG, "ahci: device present but no Phy communication\n");
+			kprintf(LOG_WARN, "ahci: device present but no Phy communication\n");
 			return STATUS_DEVICE_ERROR;
 		}
 		port->regs->serr = port->regs->serr;
 		ahci_port_flush(port);
 	}
 
+	/* Wait for the device to come back up. */
+	if((port->regs->tfd.status & 0xFF) == 0xFF) {
+		usleep(MSECS2USECS(500));
+		if((port->regs->tfd.status & 0xFF) == 0xFF) {
+			kprintf(LOG_WARN, "ahci: device did not come back up after reset\n");
+			return STATUS_DEVICE_ERROR;
+		}
+	}
+
+	if(!wait_for_clear(&port->regs->_tfd, ATA_STATUS_BSY, false, SECS2USECS(5))) {
+		kprintf(LOG_WARN, "ahci: device did not become un-busy after reset\n");
+		return STATUS_DEVICE_ERROR;
+	}
+
 	/* Re-enable the DMA engine. */
 	port->regs->cmd |= AHCI_PXCMD_ST;
+	ahci_port_flush(port);
 	return STATUS_SUCCESS;
 }
 
 /** Handle an IRQ on an AHCI port.
  * @param port		Port to handle on. */
 void ahci_port_interrupt(ahci_port_t *port) {
-	bool reset = false, signal = false;
 	uint8_t is = port->regs->is;
+	bool signal = false;
+
+	if(!is) {
+		return;
+	}
 
 	/* Clear pending interrupt. */
 	port->regs->is = is;
@@ -377,14 +409,14 @@ void ahci_port_interrupt(ahci_port_t *port) {
 		port->regs->serr = port->regs->serr;
 		if(is & AHCI_PXIS_UFS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Unknown FIS\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 		}
 		if(is & AHCI_PXIS_IPMS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Incorrect Port Multiplier\n", port->parent->id, port->num);
 		}
 		if(is & AHCI_PXIS_OFS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Overflow\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 			signal = true;
 		}
 		if(is & AHCI_PXIS_INFS) {
@@ -392,28 +424,25 @@ void ahci_port_interrupt(ahci_port_t *port) {
 		}
 		if(is & AHCI_PXIS_IFS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Interface Fatal Error\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 			signal = true;
 		}
 		if(is & AHCI_PXIS_HBDS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Host Bus Data Error\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 			signal = true;
 		}
 		if(is & AHCI_PXIS_HBFS) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Host Bus Fatal Error\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 			signal = true;
 		}
 		if(is & AHCI_PXIS_TFES) {
 			kprintf(LOG_WARN, "ahci: %d:%u: Task File Error\n", port->parent->id, port->num);
-			reset = true;
+			port->reset = true;
 			signal = true;
 		}
 
-		if(reset) {
-			ahci_port_reset(port);
-		}
 		if(signal) {
 			port->error = true;
 		}
