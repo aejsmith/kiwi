@@ -18,6 +18,8 @@
  * @brief		SFF ATA operations.
  */
 
+#include <lib/string.h>
+
 #include <assert.h>
 #include <status.h>
 #include <module.h>
@@ -65,20 +67,11 @@ static uint8_t ata_sff_selected(ata_channel_t *channel) {
 
 /** Change the selected device on a channel.
  * @param channel	Channel to select on.
- * @param num		Device number to select. */
-static void ata_sff_select(ata_channel_t *channel, uint8_t num) {
+ * @param num		Device number to select.
+ * @return		Whether the requested device is present. */
+static bool ata_sff_select(ata_channel_t *channel, uint8_t num) {
 	channel->sops->write_cmd(channel, ATA_CMD_REG_DEVICE, num << 4);
-}
-
-/** Enable/disable interrupts.
- * @param channel	Channel to operate on.
- * @param enable	Whether to enable or disable. */
-static void ata_sff_irq_control(ata_channel_t *channel, bool enable) {
-	if(enable) {
-		channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, 0);
-	} else {
-		channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_NIEN);
-	}
+	return true;
 }
 
 /** Execute a command.
@@ -177,6 +170,9 @@ static status_t ata_sff_prepare_dma(ata_channel_t *channel, const ata_dma_transf
 /** Start a DMA transfer.
  * @param channel	Channel to start on. */
 static void ata_sff_start_dma(ata_channel_t *channel) {
+	/* Enable interrupts. */
+	channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, 0);
+
 	assert(channel->sops->start_dma);
 	channel->sops->start_dma(channel);
 }
@@ -185,6 +181,9 @@ static void ata_sff_start_dma(ata_channel_t *channel) {
  * @param channel	Channel to clean up on.
  * @return		Status code describing result of the transfer. */
 static status_t ata_sff_finish_dma(ata_channel_t *channel) {
+	/* Disable interrupts. */
+	channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_NIEN);
+
 	assert(channel->sops->finish_dma);
 	return channel->sops->finish_dma(channel);
 }
@@ -196,7 +195,6 @@ static ata_channel_ops_t ata_sff_ops = {
 	.error = ata_sff_error,
 	.selected = ata_sff_selected,
 	.select = ata_sff_select,
-	.irq_control = ata_sff_irq_control,
 	.command = ata_sff_command,
 	.lba28_setup = ata_sff_lba28_setup,
 	.lba48_setup = ata_sff_lba48_setup,
@@ -209,14 +207,18 @@ static ata_channel_ops_t ata_sff_ops = {
 
 /** Register a new SFF ATA channel.
  * @param parent	Parent in the device tree.
+ * @param num		Channel number.
  * @param ops		Channel operations structure.
  * @param data		Implementation-specific data pointer.
  * @param dma		Whether the channel supports DMA.
  * @param max_dma_bpt	Maximum number of blocks per DMA transfer.
  * @param max_dma_addr	Maximum physical address for a DMA transfer.
  * @return		Pointer to channel structure if added, NULL if not. */
-ata_channel_t *ata_sff_channel_add(device_t *parent, ata_sff_channel_ops_t *ops, void *data,
-                                   bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr) {
-	return ata_channel_add(parent, NULL, &ata_sff_ops, ops, data, 2, true, dma, max_dma_bpt, max_dma_addr);
+ata_channel_t *ata_sff_channel_add(device_t *parent, uint8_t num, ata_sff_channel_ops_t *ops,
+                                   void *data, bool dma, size_t max_dma_bpt,
+                                   phys_ptr_t max_dma_addr) {
+	char name[DEVICE_NAME_MAX];
+	sprintf(name, "ata%u", num);
+	return ata_channel_add(parent, name, &ata_sff_ops, ops, data, 2, true, dma, max_dma_bpt, max_dma_addr);
 }
 MODULE_EXPORT(ata_sff_channel_add);

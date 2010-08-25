@@ -337,7 +337,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	}
 
 	/* Try to register the ATA channel. */
-	channel->channel = ata_sff_channel_add(pci_device->node, &pci_ata_channel_ops, channel,
+	channel->channel = ata_sff_channel_add(pci_device->node, idx, &pci_ata_channel_ops, channel,
 	                                       dma, PRDT_ENTRIES, (phys_ptr_t)0x100000000);
 	if(!channel->channel) {
 		irq_unregister(channel->irq, pci_ata_irq_handler, NULL, channel);
@@ -396,8 +396,8 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	/* Add the channel. */
 	pri = pci_ata_channel_add(device, 0, ctrl_base, cmd_base, bus_master_base, irq);
 	if(pri) {
-		kprintf(LOG_NORMAL, " primary:   %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
-		        pri->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
+		kprintf(LOG_NORMAL, " primary:   %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
+		        PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
 		        ctrl_base, cmd_base, bus_master_base, irq);
 	}
 
@@ -416,8 +416,8 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	/* Add the channel. */
 	sec = pci_ata_channel_add(device, 1, ctrl_base, cmd_base, bus_master_base, irq);
 	if(sec) {
-		kprintf(LOG_NORMAL, " secondary: %d (%s, ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
-		        sec->id, PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
+		kprintf(LOG_NORMAL, " secondary: %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
+		        PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
 		        ctrl_base, cmd_base, bus_master_base + 8, irq);
 	}
 

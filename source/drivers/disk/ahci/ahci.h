@@ -297,13 +297,14 @@ typedef struct ahci_hba {
 
 /** AHCI port information structure. */
 typedef struct ahci_port {
-	uint8_t id;				/**< ID of the port. */
+	uint8_t num;				/**< Number of the port. */
 	ahci_hba_t *parent;			/**< HBA that the port is on. */
 	device_t *node;				/**< Device tree node. */
 	ata_channel_t *channel;			/**< ATA channel for the port. */
 	bool present;				/**< Whether a device is present. */
 	phys_ptr_t mem_phys;			/**< Physical address of the port memory. */
-	void *mem_virt;				/**< Virtual address of the port memory. */
+	volatile void *mem_virt;		/**< Virtual address of the port memory. */
+	bool error;				/**< Whether an error was detected during DMA. */
 
 	volatile ahci_port_regs_t *regs;	/**< Registers for this port. */
 	volatile ahci_fis_t *fis;		/**< Received FIS structure. */
@@ -343,9 +344,45 @@ static inline bool wait_for_clear(volatile uint32_t *reg, uint32_t bits, bool an
 	return false;
 }
 
+/** Wait for bits to become set.
+ * @param reg		Register to wait on.
+ * @param bits		Bits to wait for.
+ * @param any		Whether to wait for any or all of the bits to be set.
+ * @param timeout	Maximum time to wait.
+ * @return		True if succeeded, false if timed out. */
+static inline bool wait_for_set(volatile uint32_t *reg, uint32_t bits, bool any, useconds_t timeout) {
+	useconds_t i;
+
+	while(timeout) {
+		if((*reg & bits) == bits || (any && (*reg & bits))) {
+			return true;
+		}
+		i = (timeout < 1000) ? timeout : 1000;
+		usleep(i);
+		timeout -= i;
+	}
+	return false;
+}
+
+/** Flush writes to a HBA's registers.
+ * @param hba		HBA to flush. */
+static inline void ahci_hba_flush(ahci_hba_t *hba) {
+	volatile uint32_t val = hba->regs->ghc;
+	val = val;
+}
+
 extern bool ahci_hba_add(pci_device_t *device, void *data);
+
+/** Flush writes to a port's registers.
+ * @param hba		Port to flush. */
+static inline void ahci_port_flush(ahci_port_t *port) {
+	volatile uint32_t val = port->regs->cmd;
+	val = val;
+}
 
 extern ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num);
 extern void ahci_port_init(ahci_port_t *port);
+extern status_t ahci_port_reset(ahci_port_t *port);
+extern void ahci_port_interrupt(ahci_port_t *port);
 
 #endif /* __AHCI_H */

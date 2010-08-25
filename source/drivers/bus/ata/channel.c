@@ -24,7 +24,6 @@
  *   http://www.t13.org/Documents/UploadedDocuments/docs2007/
  */
 
-#include <lib/atomic.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -38,9 +37,6 @@
 #include <time.h>
 
 #include "ata_priv.h"
-
-/** Next channel ID. */
-static atomic_t next_channel_id = 0;
 
 /** Wait for DRQ and perform a PIO data read.
  * @param channel	Channel to read from.
@@ -173,28 +169,12 @@ bool ata_channel_perform_dma(ata_channel_t *channel) {
 	assert(channel->dma);
 	assert(channel->ops->start_dma);
 
-	/* The IRQ lock is used to guarantee that we're waiting for the IRQ
-	 * when the IRQ handler calls condvar_broadcast(). */
-	spinlock_lock(&channel->irq_lock);
-
-	/* Enable interrupts. */
-	channel->ops->irq_control(channel, true);
-
 	/* Start off the transfer. */
 	channel->ops->start_dma(channel);
 
 	/* Wait for an IRQ to arrive. */
-	ret = condvar_wait_etc(&channel->irq_cv, NULL, &channel->irq_lock, SECS2USECS(30), 0);
-	if(ret != STATUS_SUCCESS) {
-		spinlock_unlock(&channel->irq_lock);
-		return false;
-	}
-
-	/* Disable interrupts again. */
-	channel->ops->irq_control(channel, false);
-
-	spinlock_unlock(&channel->irq_lock);
-	return true;
+	ret = semaphore_down_etc(&channel->irq_sem, SECS2USECS(10), 0);
+	return (ret == STATUS_SUCCESS);
 }
 
 /** Clean up after a DMA transfer.
@@ -343,11 +323,14 @@ status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
 	 * interfering with our operation. */
 	mutex_lock(&channel->lock);
 
+	/* Clear any pending interrupts. */
+	while(semaphore_down_etc(&channel->irq_sem, 0, 0) == STATUS_SUCCESS);
+
 	while(true) {
 		/* Wait for BSY and DRQ to be cleared (BSY is checked automatically). */
 		if(ata_channel_wait(channel, 0, ATA_STATUS_DRQ, false, false, SECS2USECS(5)) != STATUS_SUCCESS) {
-			kprintf(LOG_WARN, "ata: timed out while waiting for channel %d to become idle (status: 0x%x)\n",
-			        channel->id, ata_channel_status(channel));
+			kprintf(LOG_WARN, "ata: timed out while waiting for channel %s to become idle (status: 0x%x)\n",
+			        channel->node->name, ata_channel_status(channel));
 			mutex_unlock(&channel->lock);
 			return STATUS_DEVICE_ERROR;
 		}
@@ -359,14 +342,18 @@ status_t ata_channel_begin_command(ata_channel_t *channel, uint8_t num) {
 
 		/* Fail if we've already attempted to set the device. */
 		if(attempted) {
-			kprintf(LOG_WARN, "ata: channel %d did not respond to setting device %u\n",
-			        channel->id, num);
+			kprintf(LOG_WARN, "ata: channel %s did not respond to setting device %u\n",
+			        channel->node->name, num);
 			mutex_unlock(&channel->lock);
 			return STATUS_DEVICE_ERROR;
 		}
 
 		/* Try to set it and then wait again. */
-		channel->ops->select(channel, num);
+		if(!channel->ops->select(channel, num)) {
+			mutex_unlock(&channel->lock);
+			return STATUS_NOT_FOUND;
+		}
+
 		spin(1);
 	}
 }
@@ -379,7 +366,7 @@ void ata_channel_finish_command(ata_channel_t *channel) {
 
 /** Register a new ATA channel.
  * @param parent	Parent in the device tree.
- * @param nfmt		Format for the device name (%d for the channel ID).
+ * @param name		Name to give the device tree entry.
  * @param ops		Channel operations structure.
  * @param sops		SFF operations structure (should be NULL, use
  *			ata_sff_channel_add() instead).
@@ -390,32 +377,27 @@ void ata_channel_finish_command(ata_channel_t *channel) {
  *			protocol.
  * @param dma		Whether the channel supports DMA.
  * @param max_dma_bpt	Maximum number of blocks per DMA transfer.
- * @param max_dma_addr	Maximum physical address for a DMA transfer.
+ * @param max_dma_addr	Maximum physical address for a DMA transfer, or 0 if
+ *			no maximum.
  * @return		Pointer to channel structure if added, NULL if not. */
-ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_ops_t *ops,
+ata_channel_t *ata_channel_add(device_t *parent, const char *name, ata_channel_ops_t *ops,
                                ata_sff_channel_ops_t *sops, void *data, uint8_t devices,
                                bool pio, bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr) {
 	device_attr_t attr[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "ata-channel" } },
 	};
-	char name[DEVICE_NAME_MAX];
 	ata_channel_t *channel;
 	status_t ret;
 
 	assert(parent);
+	assert(name);
 	assert(ops);
 	assert(pio || dma);
-
-	if(!nfmt) {
-		nfmt = "ata%d";
-	}
 
 	/* Create a new channel structure. */
 	channel = kmalloc(sizeof(*channel), MM_SLEEP);
 	mutex_init(&channel->lock, "ata_channel_lock", 0);
-	spinlock_init(&channel->irq_lock, "ata_channel_irq_lock");
-	condvar_init(&channel->irq_cv, "ata_channel_irq_cv");
-	channel->id = atomic_inc(&next_channel_id);
+	semaphore_init(&channel->irq_sem, "ata_channel_irq_sem", 0);
 	channel->ops = ops;
 	channel->sops = sops;
 	channel->data = data;
@@ -428,17 +410,16 @@ ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_o
 	/* Reset the channel to a decent state. */
 	ret = ata_channel_reset(channel);
 	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_WARN, "ata: failed to reset channel %d (%d)\n", channel->id, ret);
+		kprintf(LOG_WARN, "ata: failed to reset channel %s (%d)\n", name, ret);
 		kfree(channel);
 		return NULL;
 	}
 
 	/* Publish it in the device tree. */
-	sprintf(name, nfmt, channel->id);
 	ret = device_create(name, parent, NULL, NULL, attr, ARRAYSZ(attr), &channel->node);
 	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_WARN, "ata: could not create device tree node for channel %d (%d)\n",
-			channel->id, ret);
+		kprintf(LOG_WARN, "ata: could not create device tree node for channel %s (%d)\n",
+			name, ret);
 		kfree(channel);
 		return NULL;
 	}
@@ -465,12 +446,11 @@ MODULE_EXPORT(ata_channel_scan);
  * @param channel	Channel that the interrupt occurred on.
  * @return		IRQ result code. */
 irq_result_t ata_channel_interrupt(ata_channel_t *channel) {
-	bool woken;
-
-	spinlock_lock(&channel->irq_lock);
-	woken = condvar_broadcast(&channel->irq_cv);
-	spinlock_unlock(&channel->irq_lock);
-
-	return (woken) ? IRQ_HANDLED : IRQ_UNHANDLED;
+	if(mutex_held(&channel->lock)) {
+		semaphore_up(&channel->irq_sem, 1);
+		return IRQ_HANDLED;
+	} else {
+		return IRQ_UNHANDLED;
+	}
 }
 MODULE_EXPORT(ata_channel_interrupt);

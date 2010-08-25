@@ -29,8 +29,7 @@
 
 #include <io/device.h>
 
-#include <sync/condvar.h>
-#include <sync/mutex.h>
+#include <sync/semaphore.h>
 
 struct ata_channel;
 
@@ -118,13 +117,9 @@ typedef struct ata_channel_ops {
 
 	/** Change the selected device on a channel.
 	 * @param channel	Channel to select on.
-	 * @param num		Device number to select. */
-	void (*select)(struct ata_channel *channel, uint8_t num);
-
-	/** Enable/disable interrupts.
-	 * @param channel	Channel to operate on.
-	 * @param enable	Whether to enable or disable. */
-	void (*irq_control)(struct ata_channel *channel, bool enable);
+	 * @param num		Device number to select.
+	 * @return		Whether the requested device is present. */
+	bool (*select)(struct ata_channel *channel, uint8_t num);
 
 	/** Execute a command.
 	 * @param channel	Channel to execute on.
@@ -253,7 +248,6 @@ typedef struct ata_sff_channel_ops {
 
 /** Structure describing an ATA channel. */
 typedef struct ata_channel {
-	int id;					/**< ID of the channel. */
 	mutex_t lock;				/**< Lock to serialise channel access. */
 	device_t *node;				/**< Device tree node. */
 	ata_channel_ops_t *ops;			/**< Operations for the channel. */
@@ -264,13 +258,13 @@ typedef struct ata_channel {
 	bool dma;				/**< Whether DMA is supported. */
 	size_t max_dma_bpt;			/**< Maximum number of blocks per DMA transfer. */
 	phys_ptr_t max_dma_addr;		/**< Highest physical address for DMA transfers. */
-	spinlock_t irq_lock;			/**< Lock for IRQs (spinlock so can use in interrupt context). */
-	condvar_t irq_cv;			/**< Condition variable to wait for IRQ on. */
+	semaphore_t irq_sem;			/**< Semaphore for IRQs. */
 } ata_channel_t;
 
-extern ata_channel_t *ata_sff_channel_add(device_t *parent, ata_sff_channel_ops_t *ops, void *data,
-                                          bool dma, size_t max_dma_bpt, phys_ptr_t max_dma_addr);
-extern ata_channel_t *ata_channel_add(device_t *parent, const char *nfmt, ata_channel_ops_t *ops,
+extern ata_channel_t *ata_sff_channel_add(device_t *parent, uint8_t num, ata_sff_channel_ops_t *ops,
+                                          void *data, bool dma, size_t max_dma_bpt,
+                                          phys_ptr_t max_dma_addr);
+extern ata_channel_t *ata_channel_add(device_t *parent, const char *name, ata_channel_ops_t *ops,
                                       ata_sff_channel_ops_t *sops, void *data, uint8_t devices,
                                       bool pio, bool dma, size_t max_dma_bpt,
                                       phys_ptr_t max_dma_addr);

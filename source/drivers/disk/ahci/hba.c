@@ -18,8 +18,6 @@
  * @brief		AHCI HBA functions.
  */
 
-#include <arch/barrier.h>
-
 #include <cpu/intr.h>
 
 #include <lib/string.h>
@@ -41,15 +39,36 @@ static atomic_t next_hba_id = 0;
  * @param _hba		Pointer to HBA structure.
  * @param frame		Interrupt frame (unused).
  * @return		Whether the IRQ was handled. */
-static irq_result_t ahci_irq_handler(unative_t num, void *_channel, intr_frame_t *frame) {
-	kprintf(LOG_DEBUG, "ahci: irq\n");
-	return IRQ_UNHANDLED;
+static irq_result_t ahci_irq_handler(unative_t num, void *_hba, intr_frame_t *frame) {
+	ahci_hba_t *hba = _hba;
+	bool handled = false;
+	uint32_t pending;
+	size_t i;
+
+	pending = hba->regs->is;
+	if(pending) {
+		/* Determine which port(s) the interrupt is for. */
+		for(i = 0; i < ARRAYSZ(hba->ports); i++) {
+			if(hba->ports[i]) {
+				handled = true;
+				ahci_port_interrupt(hba->ports[i]);
+			}
+		}
+
+		/* Clear pending interrupts. */
+		hba->regs->is = pending;
+	}
+
+	return (handled) ? IRQ_HANDLED : IRQ_UNHANDLED;
 }
 
 /** Reset an AHCI HBA.
  * @param hba		HBA to reset.
  * @return		Whether successful in performing the reset. */
 static bool ahci_hba_reset(ahci_hba_t *hba) {
+	uint8_t num_ports;
+	uint16_t pcs;
+
 	/* Set AHCI Enable to 1 before resetting. Not sure if this is necessary,
 	 * but one part of the spec says 'Software may perform an HBA reset
 	 * prior to initializing the HBA by setting GHC.AE to 1 and then
@@ -58,7 +77,7 @@ static bool ahci_hba_reset(ahci_hba_t *hba) {
 
 	/* Set the GHC.HR bit to 1 to reset the HBA. */
 	hba->regs->ghc |= AHCI_GHC_HR;
-	write_barrier();
+	ahci_hba_flush(hba);
 
 	/* Quote: 'If the HBA has not cleared GHC.HR to 0 within 1 second of
 	 * software setting GHC.HR to 1, the HBA is in hung or locked state.' */
@@ -68,7 +87,16 @@ static bool ahci_hba_reset(ahci_hba_t *hba) {
 
 	/* Set AHCI Enable again. */
 	hba->regs->ghc |= AHCI_GHC_AE;
-	write_barrier();
+	ahci_hba_flush(hba);
+
+	/* Set port enable bits in Port Control and Status on Intel controllers. */
+	if(hba->pci_device->vendor_id == 0x8086) {
+		num_ports = 1 + ((hba->regs->cap & AHCI_CAP_NP_MASK) >> AHCI_CAP_NP_SHIFT);
+		pcs = pci_config_read16(hba->pci_device, 0x92);
+		pcs |= 0xff >> (8 - num_ports);
+		pci_config_write16(hba->pci_device, 0x92, pcs);
+       	}
+
 	return true;
 }
 
@@ -108,13 +136,6 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 	hba->regs = NULL;
 	hba->irq = device->interrupt_line;
 
-	/* Register the IRQ handler. */
-	ret = irq_register(hba->irq, ahci_irq_handler, NULL, hba);
-	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_WARN, "ahci: failed to register IRQ handler %u\n", hba->irq);
-		goto fail;
-	}
-
 	/* Obtain the HBA memory registers address and map them. */
 	reg_base = pci_config_read32(device, PCI_CONFIG_BAR5) & PCI_MEM_ADDRESS_MASK;
 	hba->regs = page_phys_map(reg_base, sizeof(ahci_hba_regs_t), MM_SLEEP);
@@ -128,6 +149,13 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 	/* Reset the HBA. */
 	if(!ahci_hba_reset(hba)) {
 		kprintf(LOG_WARN, "ahci: failed to reset HBA, unable to use it\n");
+		goto fail;
+	}
+
+	/* Register the IRQ handler. */
+	ret = irq_register(hba->irq, ahci_irq_handler, NULL, hba);
+	if(ret != STATUS_SUCCESS) {
+		kprintf(LOG_WARN, "ahci: failed to register IRQ handler %u\n", hba->irq);
 		goto fail;
 	}
 
@@ -153,7 +181,7 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 
 	/* Enable interrupts. */
 	hba->regs->ghc |= AHCI_GHC_IE;
-	write_barrier();
+	ahci_hba_flush(hba);
 
 	/* Finish port initialisation. */
 	for(i = 0; i < num_ports; i++) {

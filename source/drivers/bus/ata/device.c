@@ -172,8 +172,8 @@ static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, siz
 			/* Start the DMA transfer and wait for it to finish. */
 			if(!ata_channel_perform_dma(device->parent)) {
 				ata_channel_finish_dma(device->parent);
-				kprintf(LOG_WARN, "ata: timed out waiting for DMA transfer on %d:%u\n",
-				        device->parent->id, device->num);
+				kprintf(LOG_WARN, "ata: timed out waiting for DMA transfer on %s:%u\n",
+				        device->parent->node->name, device->num);
 				ata_channel_finish_command(device->parent);
 				return STATUS_DEVICE_ERROR;
 			}
@@ -202,9 +202,10 @@ static status_t ata_device_io(ata_device_t *device, void *buf, uint64_t lba, siz
 		if(ret != STATUS_SUCCESS) {
 			status = ata_channel_status(device->parent);
 			error = ata_channel_error(device->parent);
-			kprintf(LOG_WARN, "ata: %s of %zu block(s) from %" PRIu64 " on %d:%u failed "
+			kprintf(LOG_WARN, "ata: %s of %zu block(s) from %" PRIu64 " on %s:%u failed "
 			        "(ret: %d, status: %u, error: %u)\n", (write) ? "write" : "read",
-			        current, lba, device->parent->id, device->num, ret, status, error);
+			        current, lba, device->parent->node->name, device->num, ret,
+			        status, error);
 			ata_channel_finish_command(device->parent);
 			return STATUS_DEVICE_ERROR;
 		}
@@ -272,34 +273,33 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	/* Send an IDENTIFY DEVICE command. Perform a manual wait as we don't
 	 * want to wait too long if the device doesn't exist. */
 	ata_channel_command(channel, ATA_CMD_IDENTIFY);
-	if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 25000) != STATUS_SUCCESS) {
-		goto fail;
-	}
 
 	/* Transfer the IDENTIFY data. */
 	if(channel->pio) {
-		if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
+		if(ata_channel_wait(channel, ATA_STATUS_BSY | ATA_STATUS_DRQ, 0, true, true, 25000) != STATUS_SUCCESS) {
+			goto fail;
+		} else if(ata_channel_read_pio(channel, ident, 512) != STATUS_SUCCESS) {
 			goto fail;
 		}
 	} else {
 		if(!ata_channel_perform_dma(channel)) {
 			ata_channel_finish_dma(channel);
-			kprintf(LOG_WARN, "ata: timed out waiting for DMA transfer of IDENTIFY data on %d:%u\n",
-			        channel->id, num);
+			kprintf(LOG_WARN, "ata: timed out waiting for DMA transfer of IDENTIFY data on %s:%u\n",
+			        channel->node->name, num);
 			goto fail;
 		} else if(ata_channel_finish_dma(channel) != STATUS_SUCCESS) {
-			kprintf(LOG_WARN, "ata: DMA transfer of IDENTIFY data failed on %d:%u\n",
-			        channel->id, num);
+			kprintf(LOG_WARN, "ata: DMA transfer of IDENTIFY data failed on %s:%u\n",
+			        channel->node->name, num);
 			goto fail;
 		}
 	}
 
 	/* Check whether we can use the device. */
 	if(le16_to_cpu(ident[0]) & (1<<15)) {
-		kprintf(LOG_DEBUG, "ata: skipping non-ATA device %d:%u\n", channel->id, num);
+		kprintf(LOG_DEBUG, "ata: skipping non-ATA device %s:%u\n", channel->node->name, num);
 		goto fail;
 	} else if(!(le16_to_cpu(ident[49]) & (1<<9))) {
-		kprintf(LOG_DEBUG, "ata: skipping non-LBA device %d:%u\n", channel->id, num);
+		kprintf(LOG_DEBUG, "ata: skipping non-LBA device %s:%u\n", channel->node->name, num);
 		goto fail;
 	}
 
@@ -311,7 +311,7 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	device->num = num;
 	device->parent = channel;
 	device->lba48 = (le16_to_cpu(ident[83]) & (1<<10)) ? true : false;
-	kprintf(LOG_NORMAL, "ata: found device %u on channel %d:\n", num, channel->id);
+	kprintf(LOG_NORMAL, "ata: found device %u on channel %s:\n", num, channel->node->name);
 	kprintf(LOG_NORMAL, " model:      %s\n", device->model);
 	kprintf(LOG_NORMAL, " serial:     %s\n", device->serial);
 	kprintf(LOG_NORMAL, " revision:   %s\n", device->revision);
@@ -357,8 +357,8 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 
 		/* Only one mode should be selected. */
 		if(modes > 1) {
-			kprintf(LOG_WARN, "ata: device %d:%u has more than one DMA mode selected, not using DMA\n",
-			        num, channel->id);
+			kprintf(LOG_WARN, "ata: device %s:%u has more than one DMA mode selected, not using DMA\n",
+			        num, channel->node->name);
 		} else if(modes == 1) {
 			device->dma = true;
 		}
