@@ -83,6 +83,9 @@ static void backtrace(void) {
 void __noreturn internal_error(const char *fmt, ...) {
 	va_list args;
 
+	if(main_console) {
+		main_console->reset();
+	}
 	internal_error_printf("An internal error has occurred:\n\n");
 
 	va_start(args, fmt);
