@@ -281,6 +281,8 @@ bool cpu_lapic_init(void) {
 	base = x86_read_msr(X86_MSR_APIC_BASE);
 	if(!(base & (1<<11))) {
 		return false;
+	} else if(booting_cpu->arch.standard_edx & (1<<21) && base & (1<<10)) {
+		boot_error("CPU %u is in x2APIC mode", booting_cpu->id);
 	}
 
 	/* Store the mapping address, ensuring no CPUs have differing
@@ -324,6 +326,11 @@ static void cpu_ipi(uint8_t dest, uint32_t id, uint8_t mode, uint8_t vector) {
 	 * - Level: Assert (bit 14).
 	 * - Trigger Mode: Edge. */
 	lapic_mapping[LAPIC_REG_ICR0] = (1<<14) | (dest << 18) | (mode << 8) | vector;
+
+	/* Wait for the IPI to be sent (check Delivery Status bit). */
+	while(lapic_mapping[LAPIC_REG_ICR0] & (1<<12)) {
+		__asm__ volatile("pause");
+	}
 }
 
 /** Boot a CPU.

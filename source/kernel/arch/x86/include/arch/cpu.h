@@ -144,8 +144,9 @@ typedef struct cpu_features {
 	bool ss, htt, tm, pbe;
 
 	/** Standard CPUID Features (ECX). */
-	bool sse3, monitor, dscpl, vmx, smx, est, tm2, ssse3, cnxtid;
-	bool cmpxchg16b, pdcm, dca, sse4_1, sse4_2, popcnt;
+	bool sse3, pclmulqdq, dtes64, monitor, dscpl, vmx, smx, est, tm2, ssse3;
+	bool cnxtid, fma, cmpxchg16b, xtpr, pdcm, pcid, dca, sse4_1, sse4_2;
+	bool x2apic, movbe, popcnt, tscd, aes, xsave, osxsave, avx;
 
 	/** Extended CPUID Features (EDX). */
 	bool syscall, xd, lmode;

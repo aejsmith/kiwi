@@ -152,6 +152,11 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	 * - Level: Assert (bit 14).
 	 * - Trigger Mode: Edge. */
 	lapic_write(LAPIC_REG_ICR0, (1<<14) | (dest << 18) | (mode << 8) | vector);
+
+	/* Wait for the IPI to be sent (check Delivery Status bit). */
+	while(lapic_read(LAPIC_REG_ICR0) & (1<<12)) {
+		__asm__ volatile("pause");
+	}
 }
 
 /** Initialise the local APIC on the current CPU.

@@ -141,7 +141,10 @@ void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx, uint32_t
 	features->htt = standard_edx & (1<<28);
 	features->tm = standard_edx & (1<<29);
 	features->pbe = standard_edx & (1<<31);
+
 	features->sse3 = standard_ecx & (1<<0);
+	features->pclmulqdq = standard_ecx & (1<<1);
+	features->dtes64 = standard_ecx & (1<<2);
 	features->monitor = standard_ecx & (1<<3);
 	features->dscpl = standard_ecx & (1<<4);
 	features->vmx = standard_ecx & (1<<5);
@@ -150,15 +153,27 @@ void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx, uint32_t
 	features->tm2 = standard_ecx & (1<<8);
 	features->ssse3 = standard_ecx & (1<<9);
 	features->cnxtid = standard_ecx & (1<<10);
+	features->fma = standard_ecx & (1<<12);
 	features->cmpxchg16b = standard_ecx & (1<<13);
+	features->xtpr = standard_ecx & (1<<14);
 	features->pdcm = standard_ecx & (1<<15);
+	features->pcid = standard_ecx & (1<<17);
 	features->dca = standard_ecx & (1<<18);
 	features->sse4_1 = standard_ecx & (1<<19);
 	features->sse4_2 = standard_ecx & (1<<20);
+	features->x2apic = standard_ecx & (1<<21);
+	features->movbe = standard_ecx & (1<<22);
 	features->popcnt = standard_ecx & (1<<23);
+	features->tscd = standard_ecx & (1<<24);
+	features->aes = standard_ecx & (1<<25);
+	features->xsave = standard_ecx & (1<<26);
+	features->osxsave = standard_ecx & (1<<27);
+	features->avx = standard_ecx & (1<<28);
+
 	features->syscall = extended_edx & (1<<11);
 	features->xd = extended_edx & (1<<20);
 	features->lmode = extended_edx & (1<<29);
+
 	features->lahf = extended_ecx & (1<<0);
 }
 
