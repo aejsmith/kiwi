@@ -297,8 +297,9 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 }
 
 /** Finish AHCI port initialisation.
- * @param port		Port to initialise. */
-void ahci_port_init(ahci_port_t *port) {
+ * @param port		Port to initialise.
+ * @return		Whether the port could be enabled. */
+bool ahci_port_init(ahci_port_t *port) {
 	char name[DEVICE_NAME_MAX];
 
 	/* Start DMA engine. */
@@ -310,7 +311,9 @@ void ahci_port_init(ahci_port_t *port) {
 	ahci_port_flush(port);
 
 	/* Reset the port. */
-	ahci_port_reset(port);
+	if(ahci_port_reset(port) != STATUS_SUCCESS) {
+		return false;
+	}
 
 	/* Check if a device is present. */
 	port->present = (port->regs->ssts & 0xF) == 0x3 &&
@@ -320,7 +323,7 @@ void ahci_port_init(ahci_port_t *port) {
 		// TODO: ATAPI.
 		if(port->regs->sig == 0xEB140101) {
 			kprintf(LOG_WARN, "ahci: ignoring unsupported ATAPI device on port %u (TODO)\n", port->num);
-			port->present = false;
+			return false;
 		}
 
 		/* Register the ATA channel. */
@@ -328,16 +331,42 @@ void ahci_port_init(ahci_port_t *port) {
 		port->channel = ata_channel_add(port->parent->node, name, &ahci_ata_channel_ops,
 		                                NULL, port, 1, false, true, AHCI_PRD_COUNT, 0);
 		if(!port->channel) {
-			port->regs->cmd &= ~AHCI_PXCMD_ST;
-			return;
+			return false;
 		}
 
 		port->error = false;
 		port->reset = false;
 		ata_channel_scan(port->channel);
+		return true;
 	} else {
-		port->regs->cmd &= ~AHCI_PXCMD_ST;
+		return false;
 	}
+}
+
+/** Stop an AHCI port and free data associated with it.
+ * @param port		Port to stop. */
+void ahci_port_destroy(ahci_port_t *port) {
+	/* Disable DMA engine and FIS receive. */
+	port->regs->cmd &= ~(AHCI_PXCMD_ST | AHCI_PXCMD_FRE);
+	ahci_port_flush(port);
+	wait_for_clear(&port->regs->cmd, AHCI_PXCMD_CR | AHCI_PXCMD_FR, false, MSECS2USECS(600));
+
+	/* Disable interrupts and clear any pending. */
+	port->regs->ie = 0;
+	port->regs->is = port->regs->is;
+	ahci_port_flush(port);
+
+	/* Clear addresses of our structures. */
+	port->regs->clb = 0;
+	port->regs->clbu = 0;
+	port->regs->fb = 0;
+	port->regs->fbu = 0;
+	ahci_port_flush(port);
+
+	/* Free the structure. */
+	page_phys_unmap((void *)port->mem_virt, AHCI_PORT_MEM_SIZE, true);
+	page_free(port->mem_phys, AHCI_PORT_MEM_SIZE / PAGE_SIZE);
+	kfree(port);
 }
 
 /** Reset an AHCI port.

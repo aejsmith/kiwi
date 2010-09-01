@@ -186,7 +186,10 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 	/* Finish port initialisation. */
 	for(i = 0; i < num_ports; i++) {
 		if(hba->ports[i]) {
-			ahci_port_init(hba->ports[i]);
+			if(!ahci_port_init(hba->ports[i])) {
+				ahci_port_destroy(hba->ports[i]);
+				hba->ports[i] = NULL;
+			}
 		}
 	}
 	return true;

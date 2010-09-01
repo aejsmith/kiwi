@@ -385,7 +385,8 @@ static inline void ahci_port_flush(ahci_port_t *port) {
 }
 
 extern ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num);
-extern void ahci_port_init(ahci_port_t *port);
+extern bool ahci_port_init(ahci_port_t *port);
+extern void ahci_port_destroy(ahci_port_t *port);
 extern status_t ahci_port_reset(ahci_port_t *port);
 extern void ahci_port_interrupt(ahci_port_t *port);
 
