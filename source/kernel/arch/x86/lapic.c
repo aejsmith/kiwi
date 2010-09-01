@@ -138,11 +138,15 @@ uint32_t lapic_id(void) {
  * @param mode		Delivery Mode.
  * @param vector	Value of vector field. */
 void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
+	bool state;
+
 	/* Must perform this check to prevent problems if fatal() is called
 	 * before we've initialised the LAPIC. */
 	if(!lapic_mapping) {
 		return;
 	}
+
+	state = intr_disable();
 
 	/* Write the destination ID to the high part of the ICR. */
 	lapic_write(LAPIC_REG_ICR1, ((uint32_t)id << 24));
@@ -157,6 +161,8 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	while(lapic_read(LAPIC_REG_ICR0) & (1<<12)) {
 		__asm__ volatile("pause");
 	}
+
+	intr_restore(state);
 }
 
 /** Initialise the local APIC on the current CPU.
@@ -186,9 +192,12 @@ void __init_text lapic_init(kernel_args_t *args) {
 	lapic_write(LAPIC_REG_SPURIOUS, LAPIC_VECT_SPURIOUS | (1<<8));
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
+	/* Accept all interrupts. */
+	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR & 0xFFFFFF00));
+
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
-	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU%u is %u\n",
+	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU %u is %u\n",
 	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv);
 
 	/* Set the timer device. */
