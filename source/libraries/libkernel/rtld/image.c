@@ -127,6 +127,7 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
 		}
 	}
 
+	printf("rtld: could not find required library %s (required by %s)\n", name, req->name);
 	return STATUS_MISSING_LIBRARY;
 }
 
@@ -381,9 +382,6 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		dprintf("rtld: %s: dependency on %s, loading...\n", path, dep);
 		ret = rtld_library_load(dep, image, NULL);
 		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_MISSING_LIBRARY) {
-				printf("rtld: could not find required library: %s\n", dep);
-			}
 			goto fail;
 		}
 	}
