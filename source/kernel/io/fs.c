@@ -60,6 +60,9 @@ static object_type_t dir_object_type;
 /** Pointer to the boot FS UUID string. */
 static const char *boot_fs_uuid = NULL;
 
+/** Whether to force FS image usage. */
+static bool force_fsimage = false;
+
 /** List of registered FS types. */
 static LIST_DECLARE(fs_types);
 static MUTEX_DECLARE(fs_types_lock, 0);
@@ -1622,7 +1625,7 @@ void fs_probe(device_t *device) {
 
 	/* Only probe for the boot FS at the moment. TODO: Notifications for
 	 * filesystem detection. */
-	if(!root_mount) {
+	if(!root_mount && !force_fsimage) {
 		type = fs_type_probe(handle, boot_fs_uuid);
 		if(type) {
 			path = device_path(device);
@@ -2141,6 +2144,7 @@ void __init_text fs_init(kernel_args_t *args) {
 
 	/* Store the boot FS UUID for use by fs_probe(). */
 	boot_fs_uuid = args->boot_fs_uuid;
+	force_fsimage = args->force_fsimage;
 }
 
 /** Create a regular file in the file system.

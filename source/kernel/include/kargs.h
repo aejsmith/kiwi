@@ -96,6 +96,7 @@ typedef struct kernel_args {
 	/** Kernel options. */
 	bool smp_disabled;		/**< Whether SMP is disabled. */
 	bool splash_disabled;		/**< Whether the boot splash is disabled. */
+	bool force_fsimage;		/**< Whether to force FS image usage. */
 
 	/** Architecture-specific arguments. */
 	kernel_args_arch_t arch;

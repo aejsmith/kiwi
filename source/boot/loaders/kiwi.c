@@ -181,10 +181,12 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 	size_t i;
 
 	/* Pull settings out of the environment into the kernel arguments. */
-	value = environ_lookup(env, "splash_disabled");
-	kernel_args->splash_disabled = value->boolean;
 	value = environ_lookup(env, "smp_disabled");
 	kernel_args->smp_disabled = value->boolean;
+	value = environ_lookup(env, "splash_disabled");
+	kernel_args->splash_disabled = value->boolean;
+	value = environ_lookup(env, "force_fsimage");
+	kernel_args->force_fsimage = value->boolean;
 
 	/* Work out where to load everything. */
 	if((value = environ_lookup(env, "kiwi_kernel"))) {
@@ -240,8 +242,9 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 static void kiwi_loader_configure(environ_t *env) {
 	ui_window_t *window = ui_list_create("Kiwi Configuration", true);
 	ui_list_insert(window, video_mode_chooser("Video mode", environ_lookup(env, "video_mode")), false);
-	ui_list_insert_env(window, env, "splash_disabled", "Disable splash screen", false);
 	ui_list_insert_env(window, env, "smp_disabled", "Disable SMP", false);
+	ui_list_insert_env(window, env, "splash_disabled", "Show boot messages", false);
+	ui_list_insert_env(window, env, "force_fsimage", "Force filesystem image usage", false);
 	kiwi_loader_arch_configure(env, window);
 	ui_window_display(window, 0);
 }
@@ -280,15 +283,20 @@ bool config_cmd_kiwi(value_list_t *args, environ_t *env) {
 	loader_type_set(env, &kiwi_loader_type);
 
 	/* Add in configuration items. */
+	if(!environ_lookup(env, "smp_disabled")) {
+		value.type = VALUE_TYPE_BOOLEAN;
+		value.boolean = false;
+		environ_insert(env, "smp_disabled", &value);
+	}
 	if(!environ_lookup(env, "splash_disabled")) {
 		value.type = VALUE_TYPE_BOOLEAN;
 		value.boolean = false;
 		environ_insert(env, "splash_disabled", &value);
 	}
-	if(!environ_lookup(env, "smp_disabled")) {
+	if(!environ_lookup(env, "force_fsimage")) {
 		value.type = VALUE_TYPE_BOOLEAN;
 		value.boolean = false;
-		environ_insert(env, "smp_disabled", &value);
+		environ_insert(env, "force_fsimage", &value);
 	}
 	if((exist = environ_lookup(env, "video_mode")) && exist->type == VALUE_TYPE_STRING) {
 		mode = video_mode_find_string(exist->string);

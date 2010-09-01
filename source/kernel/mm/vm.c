@@ -861,9 +861,8 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	/* Find the region that the fault occurred in - if its a reserved
 	 * region, the memory is unmapped so treat it as though no region is
 	 * there. */
-	if(unlikely(!(region = vm_region_find(as, addr, NULL)))) {
-		goto out;
-	} else if(unlikely(region->flags & VM_REGION_RESERVED)) {
+	region = vm_region_find(as, addr, NULL);
+	if(unlikely(!region) || unlikely(region->flags & VM_REGION_RESERVED)) {
 		goto out;
 	}
 

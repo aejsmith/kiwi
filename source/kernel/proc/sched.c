@@ -63,6 +63,7 @@
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
+#include <kdbg.h>
 #include <status.h>
 #include <time.h>
 
@@ -396,6 +397,8 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 void sched_internal(bool state) {
 	sched_cpu_t *cpu = curr_cpu->sched;
 	thread_t *new;
+
+	assert(!atomic_get(&kdbg_running));
 
 	spinlock_lock_ni(&cpu->lock);
 
