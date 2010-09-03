@@ -29,10 +29,10 @@ static void yyerror(const char *msg);
 	char *str;
 	unsigned long num;
 	variable_t *var;
+	statement_t *stmt;
 }
 
 %token TOK_SERVICE
-%token TOK_VERSION
 %token TOK_TYPE
 %token TOK_STRUCT
 %token TOK_FUNCTION
@@ -43,6 +43,13 @@ static void yyerror(const char *msg);
 %token <str> TOK_IDENTIFIER;
 %token <num> TOK_NUMBER;
 
+%type <stmt> service_body;
+%type <stmt> statement;
+%type <stmt> service_stmt;
+%type <stmt> type_stmt;
+%type <stmt> struct_stmt;
+%type <stmt> function_stmt;
+%type <stmt> event_stmt;
 %type <var> struct_body;
 %type <var> struct_entry;
 %type <var> func_param_list;
@@ -55,37 +62,43 @@ static void yyerror(const char *msg);
 %%
 
 input
-	: statement input
-	| /* Empty. */
+	: TOK_SERVICE TOK_NAMESPACE TOK_NUMBER '{' service_body '}' ';'
+		{ set_service(new_service_stmt($2, $3, $5)); }
+	;
+
+service_body
+	: statement service_body
+		{ $$ = $1; $$->next = $2; }
+	| statement
+		{ $$ = $1; }
 	;
 
 statement
 	: service_stmt ';'
-	| version_stmt ';'
+		{ $$ = $1; }
 	| type_stmt ';'
+		{ $$ = $1; }
 	| struct_stmt ';'
+		{ $$ = $1; }
 	| function_stmt ';'
+		{ $$ = $1; }
 	| event_stmt ';'
+		{ $$ = $1; }
 	;
 
 service_stmt
-	: TOK_SERVICE TOK_NAMESPACE
-		{ set_service_name($2); }
-	;
-
-version_stmt
-	: TOK_VERSION TOK_NUMBER
-		{ set_service_version($2); }
+	: TOK_SERVICE TOK_IDENTIFIER '{' service_body '}'
+		{ $$ = new_service_stmt($2, 0, $4); }
 	;
 
 type_stmt
 	: TOK_TYPE TOK_IDENTIFIER TOK_IDENTIFIER
-		{ add_type($2, $3); }
+		{ $$ = new_type_stmt($2, $3); }
 	;
 
 struct_stmt
 	: TOK_STRUCT TOK_IDENTIFIER '{' struct_body '}'	
-		{ add_struct($2, $4); }
+		{ $$ = new_struct_stmt($2, $4); }
 	;
 
 struct_body
@@ -102,9 +115,9 @@ struct_entry
 
 function_stmt
 	: TOK_FUNCTION TOK_IDENTIFIER '(' func_param_list ')'
-		{ add_function($2, $4); }
+		{ $$ = new_function_stmt($2, $4); }
 	| TOK_FUNCTION TOK_IDENTIFIER '(' ')'
-		{ add_function($2, NULL); }
+		{ $$ = new_function_stmt($2, NULL); }
 	;
 
 func_param_list
@@ -123,7 +136,7 @@ func_param
 
 event_stmt
 	: TOK_EVENT TOK_IDENTIFIER '(' event_param_list ')'
-		{ add_event($2, $4); }
+		{ $$ = new_event_stmt($2, $4); }
 	;
 
 event_param_list

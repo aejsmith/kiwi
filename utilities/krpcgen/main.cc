@@ -18,7 +18,7 @@
  * @brief		Kiwi RPC interface compiler.
  */
 
-
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -43,22 +43,19 @@ static Service *current_service = NULL;
 /** Whether to print debug messages. */
 static bool verbose_mode = false;
 
-/** Macro to print details of an error.
- * @param e		Error to print. */
-#define COMPILE_ERROR(e)	\
-	{ \
-		cerr << current_file << ':' << current_line << ": " << e << endl; \
-		had_error = true; \
-	}
-
 /** Macro to print details of an error on a specific line.
  * @param l		Line the error was on.
  * @param e		Error to print. */
-#define COMPILE_ERROR_AT(l, e)	\
+#define COMPILE_ERROR(l, e)	\
 	{ \
 		cerr << current_file << ':' << l << ": " << e << endl; \
 		had_error = true; \
 	}
+
+/** Macro to print details of an error in a statement.
+ * @param s		Statement the error was in.
+ * @param e		Error to print. */
+#define STATEMENT_ERROR(s, e)	COMPILE_ERROR((s)->line, e)
 
 /** Macro to print a debug message if in verbose mode.
  * @param m		Message to print. */
@@ -84,123 +81,224 @@ variable_t *new_variable(const char *name, const char *type, bool out) {
 	return variable;
 }
 
-/** Set the name of the service.
- * @param name		Name to set. */
-void set_service_name(const char *name) {
-	DEBUG("set_service_name(" << name << ")");
+/** Create a new service statement structure.
+ * @param name		Name of the service.
+ * @param ver		Version number.
+ * @param stmts		List of statements in the service.
+ * @return		Pointer to statement structure. */
+statement_t *new_service_stmt(const char *name, unsigned long ver, statement_t *stmts) {
+	DEBUG("new_service_stmt(" << name << ")");
 
-	if(!current_service->SetName(name)) {
-		COMPILE_ERROR("Service name has already been set.");
-	}
+	statement_t *stmt = new statement_t;
+	stmt->next = NULL;
+	stmt->line = current_line;
+	stmt->type = statement_t::STATEMENT_SERVICE;
+	stmt->data.service.name = strdup(name);
+	stmt->data.service.version = ver;
+	stmt->data.service.stmts = stmts;
+	return stmt;
 }
 
-/** Set the version of the service.
- * @param ver		Version to set. */
-void set_service_version(unsigned long ver) {
-	DEBUG("set_service_version(" << ver << ")");
+/** Create a new type statement structure.
+ * @param name		Name of the type.
+ * @param target	Name of the target type.
+ * @return		Pointer to statement structure. */
+statement_t *new_type_stmt(const char *name, const char *target) {
+	DEBUG("new_type_stmt(" << name << ", " << target << ")");
 
-	if(ver == 0) {
-		COMPILE_ERROR("Service version must be greater than 0.");
-	} else if(!current_service->SetVersion(ver)) {
-		COMPILE_ERROR("Service version has already been set.");
-	}
+	statement_t *stmt = new statement_t;
+	stmt->next = NULL;
+	stmt->line = current_line;
+	stmt->type = statement_t::STATEMENT_TYPE;
+	stmt->data.type.name = strdup(name);
+	stmt->data.type.target = strdup(target);
+	return stmt;
+}
+
+/** Create a new struct statement structure.
+ * @param name		Name of the struct.
+ * @param entries	List of entries in the struct.
+ * @return		Pointer to statement structure. */
+statement_t *new_struct_stmt(const char *name, variable_t *entries) {
+	DEBUG("new_struct_stmt(" << name << ")");
+
+	statement_t *stmt = new statement_t;
+	stmt->next = NULL;
+	stmt->line = current_line;
+	stmt->type = statement_t::STATEMENT_STRUCT;
+	stmt->data.struc.name = strdup(name);
+	stmt->data.struc.entries = entries;
+	return stmt;
+}
+
+/** Create a new function statement structure.
+ * @param name		Name of the service.
+ * @param params	List of parameters to the function.
+ * @return		Pointer to statement structure. */
+statement_t *new_function_stmt(const char *name, variable_t *params) {
+	DEBUG("new_function_stmt(" << name << ")");
+
+	statement_t *stmt = new statement_t;
+	stmt->next = NULL;
+	stmt->line = current_line;
+	stmt->type = statement_t::STATEMENT_FUNCTION;
+	stmt->data.function.name = strdup(name);
+	stmt->data.function.params = params;
+	return stmt;
+}
+
+/** Create a new event statement structure.
+ * @param name		Name of the service.
+ * @param params	List of parameters to the event.
+ * @return		Pointer to statement structure. */
+statement_t *new_event_stmt(const char *name, variable_t *params) {
+	DEBUG("new_event_stmt(" << name << ")");
+
+	statement_t *stmt = new statement_t;
+	stmt->next = NULL;
+	stmt->line = current_line;
+	stmt->type = statement_t::STATEMENT_EVENT;
+	stmt->data.function.name = strdup(name);
+	stmt->data.function.params = params;
+	return stmt;
 }
 
 /** Add a new type alias.
- * @param name		Name of the alias.
- * @param target	Target type for the alias. */
-void add_type(const char *name, const char *target) {
-	DEBUG("add_type(" << name << ", " << target << ")");
-
-	Type *dest = current_service->GetType(target);
+ * @param stmt		Statement to process.
+ * @param service	Service to add to. */
+static void process_type_stmt(statement_t *stmt, Service *service) {
+	Type *dest = service->GetType(stmt->data.type.target);
 	if(!dest) {
-		COMPILE_ERROR("Alias target `" << target << "' does not exist.");
+		STATEMENT_ERROR(stmt, "Alias target `" << stmt->data.type.target << "' does not exist.");
 		return;
 	}
 
-	Type *alias = new AliasType(name, dest);
-	if(!current_service->AddType(alias)) {
-		COMPILE_ERROR("Type `" << name << "' already exists.");
+	Type *alias = new AliasType(stmt->data.type.name, dest);
+	if(!service->AddType(alias)) {
+		STATEMENT_ERROR(stmt, "Name `" << stmt->data.type.name << "' already exists.");
 		delete alias;
 	}
 }
 
 /** Add a new structure.
- * @param name		Name to give structure.
- * @param entries	Entries for the structure. */
-void add_struct(const char *name, variable_t *entries) {
-	DEBUG("add_struct(" << name << ")");
-
-	StructType *str = new StructType(name);
-	while(entries) {
-		Type *type = current_service->GetType(entries->type);
+ * @param stmt		Statement to process.
+ * @param service	Service to add to. */
+static void process_struct_stmt(statement_t *stmt, Service *service) {
+	StructType *struc = new StructType(stmt->data.struc.name);
+	variable_t *entry = stmt->data.struc.entries;
+	while(entry) {
+		Type *type = service->GetType(entry->type);
 		if(!type) {
-			COMPILE_ERROR_AT(entries->line, "Entry type `" << entries->type << "' does not exist.");
-			delete str;
+			COMPILE_ERROR(entry->line, "Entry type `" << entry->type << "' does not exist.");
+			delete struc;
 			return;
-		} else if(!str->AddEntry(type, entries->name)) {
-			COMPILE_ERROR_AT(entries->line, "Duplicate entry name `" << entries->name << "'.");
-			delete str;
+		} else if(!struc->AddEntry(type, entry->name)) {
+			COMPILE_ERROR(entry->line, "Duplicate struct entry name `" << entry->name << "'.");
+			delete struc;
 			return;
 		}
 
-		entries = entries->next;
+		entry = entry->next;
 	}
 
-	if(!current_service->AddType(str)) {
-		COMPILE_ERROR("Type `" << name << "' already exists.");
-		delete str;
+	if(!service->AddType(struc)) {
+		STATEMENT_ERROR(stmt, "Name `" << stmt->data.struc.name << "' already exists.");
+		delete struc;
 	}
 }
 
 /** Add a new function.
- * @param name		Name of the function.
- * @param params	Parameters for the function. */
-void add_function(const char *name, variable_t *params) {
-	DEBUG("add_function(" << name << ")");
-
-	Function *func = new Function(name);
-	while(params) {
-		Type *type = current_service->GetType(params->type);
+ * @param stmt		Statement to process.
+ * @param service	Service to add to. */
+static void process_function_stmt(statement_t *stmt, Service *service) {
+	Function *func = new Function(stmt->data.function.name);
+	variable_t *param = stmt->data.function.params;
+	while(param) {
+		Type *type = service->GetType(param->type);
 		if(!type) {
-			COMPILE_ERROR_AT(params->line, "Parameter type `" << params->type << "' does not exist.");
+			COMPILE_ERROR(param->line, "Parameter type `" << param->type << "' does not exist.");
+			delete func;
 			return;
-		} else if(!func->AddParameter(type, params->name, params->out)) {
-			COMPILE_ERROR_AT(params->line, "Duplicate parameter name `" << params->name << "'.");
+		} else if(!func->AddParameter(type, param->name, param->out)) {
+			COMPILE_ERROR(param->line, "Duplicate parameter name `" << param->name << "'.");
+			delete func;
 			return;
 		}
 
-		params = params->next;
+		param = param->next;
 	}
 
-	if(!current_service->AddFunction(func)) {
-		COMPILE_ERROR("Duplicate function/event name `" << name << "'.");
+	bool ret;
+	if(stmt->type == statement_t::STATEMENT_FUNCTION) {
+		ret = service->AddFunction(func);
+	} else {
+		ret = service->AddEvent(func);
+	}
+	if(!ret) {
+		STATEMENT_ERROR(stmt, "Name `" << stmt->data.function.name << "' already exists.");
+		delete func;
 	}
 }
 
-/** Add a new event.
- * @param name		Name of the event.
- * @param params	Parameters for the event. */
-void add_event(const char *name, variable_t *params) {
-	DEBUG("add_event(" << name << ")");
+/** Process a service statement.
+ * @param stmt		Statement to process.
+ * @param parent	Service to add to.
+ * @return		Pointer to service. */
+static Service *process_service_stmt(statement_t *stmt, Service *parent) {
+	if(!parent && stmt->data.service.version == 0) {
+		STATEMENT_ERROR(stmt, "Version number must be greater than 0.");
+	}
 
-	Function *func = new Function(name);
-	while(params) {
-		Type *type = current_service->GetType(params->type);
-		if(!type) {
-			COMPILE_ERROR_AT(params->line, "Parameter type `" << params->type << "' does not exist.");
-			return;
-		} else if(!func->AddParameter(type, params->name, false)) {
-			COMPILE_ERROR_AT(params->line, "Duplicate parameter name `" << params->name << "'.");
-			return;
+	/* Create a service structure for the new service. */
+	Service *service = new Service(stmt->data.service.name, stmt->data.service.version, parent);
+
+	/* Process all statements in the service. */
+	statement_t *entry = stmt->data.service.stmts;
+	while(entry) {
+		switch(entry->type) {
+		case statement_t::STATEMENT_SERVICE:
+			process_service_stmt(entry, service);
+			break;
+		case statement_t::STATEMENT_TYPE:
+			process_type_stmt(entry, service);
+			break;
+		case statement_t::STATEMENT_STRUCT:
+			process_struct_stmt(entry, service);
+			break;
+		case statement_t::STATEMENT_FUNCTION:
+			process_function_stmt(entry, service);
+			break;
+		case statement_t::STATEMENT_EVENT:
+			process_function_stmt(entry, service);
+			break;
 		}
 
-		params = params->next;
+		entry = entry->next;
 	}
 
-	if(!current_service->AddEvent(func)) {
-		COMPILE_ERROR("Duplicate function/event name `" << name << "'.");
+	if(service->GetFunctions().empty() && service->GetEvents().empty()) {
+		STATEMENT_ERROR(stmt, "Service must have at least 1 function/event.");
 	}
+
+	/* Add the service to the parent. */
+	if(parent) {
+		if(!parent->AddChild(service)) {
+			STATEMENT_ERROR(stmt, "Name `" << stmt->data.service.name << "' already exists.");
+		}
+	}
+
+	return service;
+}
+
+/** Set the top level service.
+ * @param stmt		Service statement. */
+void set_service(statement_t *stmt) {
+	DEBUG("set_service()");
+
+	/* Create a service structure for the new service. */
+	assert(!current_service);
+	assert(stmt->type == statement_t::STATEMENT_SERVICE);
+	current_service = process_service_stmt(stmt, 0);
 }
 
 /** Print usage information and exit.
@@ -278,7 +376,6 @@ int main(int argc, char **argv) {
 	}
 
 	/* Parse the input file. */		
-	current_service = new Service;
 	yyin = fopen(current_file, "r");
 	if(yyin == NULL) {
 		perror(current_file);
@@ -286,15 +383,6 @@ int main(int argc, char **argv) {
 	}
 	yyparse();
 	fclose(yyin);
-
-	/* Check whether enough information has been given. */
-	if(current_service->GetName().length() == 0) {
-		COMPILE_ERROR("Service name has not been set.");
-	} else if(current_service->GetVersion() == 0) {
-		COMPILE_ERROR("Service version has not been set.");
-	} else if(current_service->GetFunctions().empty() && current_service->GetEvents().empty()) {
-		COMPILE_ERROR("Service must have at least 1 function/event.");
-	}
 
 	/* Check for errors. */
 	if(had_error) {
@@ -310,7 +398,7 @@ int main(int argc, char **argv) {
 	/* Determine which code generator to use. */
 	CodeGen *cg;
 	if(target == "cxx") {
-		cg = new CXXCodeGen(current_service);
+		cg = new CXXCodeGen();
 	} else {
 		cerr << "Unrecognised target `" << target << "'." << endl;
 		return 1;
@@ -318,12 +406,12 @@ int main(int argc, char **argv) {
 
 	/* Generate the code. */
 	if(server.length() > 0) {
-		if(!cg->GenerateServer(server)) {
+		if(!cg->GenerateServer(current_service, server)) {
 			return 1;
 		}
 	}
 	if(client.length() > 0) {
-		if(!cg->GenerateClient(client)) {
+		if(!cg->GenerateClient(current_service, client)) {
 			return 1;
 		}
 	}

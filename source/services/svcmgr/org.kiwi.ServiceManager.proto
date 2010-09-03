@@ -11,10 +11,9 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-service org.kiwi.ServiceManager;
-version 1;
+service org.kiwi.ServiceManager 1 {
+	# Types used by the protocol.
+	type PortID int32;
 
-# Types used by the protocol.
-type PortID int32;
-
-function LookupPort(string name, out PortID id);
+	function LookupPort(string name, out PortID id);
+};

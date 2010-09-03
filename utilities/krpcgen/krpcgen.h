@@ -38,18 +38,55 @@ typedef struct variable {
 	size_t line;			/**< Line that the variable was declared on. */
 } variable_t;
 
+/** Structure used to represent a statement during parsing. */
+typedef struct statement {
+	struct statement *next;		/**< Next statement in the list. */
+	size_t line;			/**< Line the statement finished on. */
+
+	/** Type of the statement. */
+	enum {
+		STATEMENT_SERVICE,
+		STATEMENT_TYPE,
+		STATEMENT_STRUCT,
+		STATEMENT_FUNCTION,
+		STATEMENT_EVENT,
+	} type;
+
+	/** Data for the statement. */
+	union {
+		struct {
+			char *name;
+			unsigned long version;
+			struct statement *stmts;
+		} service;
+		struct {
+			char *name;
+			char *target;
+		} type;
+		struct {
+			char *name;
+			variable_t *entries;
+		} struc;
+		struct {
+			char *name;
+			variable_t *params;
+		} function;
+	} data;
+} statement_t;
+
 extern FILE *yyin;
 extern const char *current_file;
 extern size_t current_line;
 
 extern variable_t *new_variable(const char *name, const char *type, bool out);
 
-extern void set_service_name(const char *name);
-extern void set_service_version(unsigned long ver);
-extern void add_type(const char *name, const char *target);
-extern void add_struct(const char *name, variable_t *entries);
-extern void add_function(const char *name, variable_t *params);
-extern void add_event(const char *name, variable_t *params);
+extern statement_t *new_service_stmt(const char *name, unsigned long ver, statement_t *stmts);
+extern statement_t *new_type_stmt(const char *name, const char *target);
+extern statement_t *new_struct_stmt(const char *name, variable_t *entries);
+extern statement_t *new_function_stmt(const char *name, variable_t *params);
+extern statement_t *new_event_stmt(const char *name, variable_t *params);
+
+extern void set_service(statement_t *stmt);
 
 extern int yylex(void);
 extern int yyparse(void);

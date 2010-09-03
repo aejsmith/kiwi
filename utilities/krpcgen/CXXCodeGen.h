@@ -27,23 +27,21 @@
 /** C++ code generator class. */
 class CXXCodeGen : public CodeGen {
 public:
-	CXXCodeGen(Service *service);
-
-	bool GenerateServer(const std::string &path);
-	bool GenerateClient(const std::string &path);
+	bool GenerateServer(Service *service, const std::string &path);
+	bool GenerateClient(Service *service, const std::string &path);
 private:
-	bool GenerateServerHeader(const std::string &path);
-	bool GenerateServerCode(const std::string &path);
-	bool GenerateClientHeader(const std::string &path);
-	bool GenerateClientCode(const std::string &path);
+	void GenerateServerHeader(Service *service, std::ofstream &stream);
+	void GenerateServerCode(Service *service, std::ofstream &stream);
+	void GenerateClientHeader(Service *service, std::ofstream &stream);
+	void GenerateClientCode(Service *service, std::ofstream &stream);
 
-	bool BeginHeader(const std::string &path, std::ofstream &stream);
+	bool BeginHeader(Service *service, const std::string &path, std::ofstream &stream);
 	void EndHeader(std::ofstream &stream);
-	bool BeginCode(const std::string &path, std::ofstream &stream);
+	bool BeginCode(Service *service, const std::string &path, std::ofstream &stream);
 	void EndCode(std::ofstream &stream);
 
-	void StartNamespace(std::ofstream &stream);
-	void EndNamespace(std::ofstream &stream);
+	void BeginNamespace(Service *service, std::ofstream &stream);
+	void EndNamespace(Service *service, std::ofstream &stream);
 
 	std::string GetHeaderPath(const std::string &fpath);
 	std::string GetCXXType(Type *type);

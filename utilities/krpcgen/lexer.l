@@ -25,7 +25,6 @@
 %%
 
 "service"			{ return TOK_SERVICE; }
-"version"			{ return TOK_VERSION; }
 "type"				{ return TOK_TYPE; }
 "struct"			{ return TOK_STRUCT; }
 "function"			{ return TOK_FUNCTION; }

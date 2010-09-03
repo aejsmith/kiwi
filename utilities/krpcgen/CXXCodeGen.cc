@@ -27,48 +27,74 @@
 
 using namespace std;
 
-/** Constructor for a C++ code generator. */
-CXXCodeGen::CXXCodeGen(Service *service) : CodeGen(service) {}
-
 /** Generate server code.
+ * @param service	Service to generate for.
  * @param path		Path to output file.
  * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateServer(const string &path) {
-	if(!GenerateServerHeader(GetHeaderPath(path)) || !GenerateServerCode(path)) {
+bool CXXCodeGen::GenerateServer(Service *service, const string &path) {
+	ofstream stream;
+
+	/* Generate the header file. */
+	if(!BeginHeader(service, GetHeaderPath(path), stream)) {
 		return false;
 	}
+	GenerateServerHeader(service, stream);
+	EndHeader(stream);
+
+	/* Generate the main source file. */
+	if(!BeginCode(service, path, stream)) {
+		return false;
+	}
+	GenerateServerCode(service, stream);
+	EndCode(stream);
 	return true;
 }
 
 /** Generate client code.
+ * @param service	Service to generate for.
  * @param path		Path to output file.
  * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateClient(const string &path) {
-	if(!GenerateClientHeader(GetHeaderPath(path)) || !GenerateClientCode(path)) {
+bool CXXCodeGen::GenerateClient(Service *service, const string &path) {
+	ofstream stream;
+
+	/* Generate the header file. */
+	if(!BeginHeader(service, GetHeaderPath(path), stream)) {
 		return false;
 	}
+	GenerateClientHeader(service, stream);
+	EndHeader(stream);
+
+	/* Generate the main source file. */
+	if(!BeginCode(service, path, stream)) {
+		return false;
+	}
+	GenerateClientCode(service, stream);
+	EndCode(stream);
 	return true;
 }
 
 /** Generate the server header.
- * @param fpath		Path to the header file.
- * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateServerHeader(const std::string &path) {
-	ofstream stream;
-	if(!BeginHeader(path, stream)) {
-		return false;
+ * @param service	Service to generate for.
+ * @param stream	Stream to write to. */
+void CXXCodeGen::GenerateServerHeader(Service *service, std::ofstream &stream) {
+	/* Begin the namespace for this service. */
+	BeginNamespace(service, stream);
+
+	/* Generate code for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		GenerateServerHeader(child, stream);
 	}
 
 	/* Write out the ClientConnection class definition. */
 	stream << "class ClientConnection : public ::kiwi::RPCClientConnection {" << endl;
 	stream << "public:" << endl;
-	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
+	BOOST_FOREACH(const Function *event, service->GetEvents()) {
 		stream << "	void " << event->GetName() << '(';
 		stream << GetFunctionParams(event) << ");" << endl;
 	}
 	stream << "protected:" << endl;
 	stream << "	ClientConnection(handle_t handle);" << endl;
-	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
+	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "	virtual status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ") = 0;" << endl;
 	}
@@ -76,27 +102,29 @@ bool CXXCodeGen::GenerateServerHeader(const std::string &path) {
 	stream << "	void HandleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
 	stream << "};" << endl;
 
-	/* Finish the header. */
-	EndHeader(stream);
-	return true;
+	/* End the namespace. */
+	EndNamespace(service, stream);
 }
 
 /** Generate the server code.
- * @param path		Path to the output file.
- * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateServerCode(const std::string &path) {
-	ofstream stream;
-	if(!BeginCode(path, stream)) {
-		return false;
+ * @param service	Service to generate for.
+ * @param stream	Stream to write to. */
+void CXXCodeGen::GenerateServerCode(Service *service, std::ofstream &stream) {
+	/* Begin the namespace for this service. */
+	BeginNamespace(service, stream);
+
+	/* Generate code for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		GenerateServerCode(child, stream);
 	}
 
 	/* Generate the constructor. */
 	stream << "ClientConnection::ClientConnection(handle_t handle) : ::kiwi::RPCClientConnection(";
-	stream << '"' << m_service->GetName() << "\", " << m_service->GetVersion();
+	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
 	stream << ", handle) {}" << endl;
 
 	/* Generate the event calls. */
-	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
+	BOOST_FOREACH(const Function *event, service->GetEvents()) {
 		stream << "void ClientConnection::" << event->GetName() << '(';
 		stream << GetFunctionParams(event) << ") {" << endl;
 		stream << "	::kiwi::RPCMessageBuffer __buf;" << endl;
@@ -110,7 +138,7 @@ bool CXXCodeGen::GenerateServerCode(const std::string &path) {
 	/* Generate the message handler. */
 	stream << "void ClientConnection::HandleMessage(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
 	stream << "	switch(__id) {" << endl;
-	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
+	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "	case " << func->GetMessageID() << ": {" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, func->GetParameters()) {
 			stream << "		" << GetCXXType(param.type) << ' ';
@@ -133,18 +161,20 @@ bool CXXCodeGen::GenerateServerCode(const std::string &path) {
 	stream << "	}" << endl;
 	stream << '}' << endl;
 
-	/* Finish the code and close the stream. */
-	EndCode(stream);
-	return true;
+	/* End the namespace. */
+	EndNamespace(service, stream);
 }
 
 /** Generate the client header.
- * @param fpath		Path to the header file.
- * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateClientHeader(const std::string &path) {
-	ofstream stream;
-	if(!BeginHeader(path, stream)) {
-		return false;
+ * @param service	Service to generate for.
+ * @param stream	Stream to write to. */
+void CXXCodeGen::GenerateClientHeader(Service *service, std::ofstream &stream) {
+	/* Begin the namespace for this service. */
+	BeginNamespace(service, stream);
+
+	/* Generate code for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		GenerateClientHeader(child, stream);
 	}
 
 	/* Write out the ServerConnection class definition. */
@@ -152,11 +182,11 @@ bool CXXCodeGen::GenerateClientHeader(const std::string &path) {
 	stream << "public:" << endl;
 	stream << "	ServerConnection();" << endl;
 	stream << "	ServerConnection(port_id_t id);" << endl;
-	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
+	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "	status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ");" << endl;
 	}
-	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
+	BOOST_FOREACH(const Function *event, service->GetEvents()) {
 		stream << "	::kiwi::Signal<" << GetEventParams(event);
 		stream << "> " << event->GetName() << ';' << endl;
 	}
@@ -164,30 +194,32 @@ bool CXXCodeGen::GenerateClientHeader(const std::string &path) {
 	stream << "	void HandleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf);" << endl;
 	stream << "};" << endl;
 
-	/* Finish the header. */
-	EndHeader(stream);
-	return true;
+	/* End the namespace. */
+	EndNamespace(service, stream);
 }
 
 /** Generate the client code.
- * @param path		Path to the output file.
- * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateClientCode(const std::string &path) {
-	ofstream stream;
-	if(!BeginCode(path, stream)) {
-		return false;
+ * @param service	Service to generate for.
+ * @param stream	Stream to write to. */
+void CXXCodeGen::GenerateClientCode(Service *service, std::ofstream &stream) {
+	/* Begin the namespace for this service. */
+	BeginNamespace(service, stream);
+
+	/* Generate code for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		GenerateClientCode(child, stream);
 	}
 
 	/* Generate the constructors. */
 	stream << "ServerConnection::ServerConnection() : ::kiwi::RPCServerConnection(";
-	stream << '"' << m_service->GetName() << "\", " << m_service->GetVersion();
+	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
 	stream << ") {}" << endl;
 	stream << "ServerConnection::ServerConnection(port_id_t id) : ::kiwi::RPCServerConnection(";
-	stream << '"' << m_service->GetName() << "\", " << m_service->GetVersion();
+	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
 	stream << ", id) {}" << endl;
 
 	/* Generate the function calls. */
-	BOOST_FOREACH(const Function *func, m_service->GetFunctions()) {
+	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "status_t ServerConnection::" << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ") {" << endl;
 		stream << "	::kiwi::RPCMessageBuffer __buf;" << endl;
@@ -211,7 +243,7 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 	/* Generate the event handler. */
 	stream << "void ServerConnection::HandleEvent(uint32_t __id, ::kiwi::RPCMessageBuffer &__buf) {" << endl;
 	stream << "	switch(__id) {" << endl;
-	BOOST_FOREACH(const Function *event, m_service->GetEvents()) {
+	BOOST_FOREACH(const Function *event, service->GetEvents()) {
 		stream << "	case " << event->GetMessageID() << ": {" << endl;
 		BOOST_FOREACH(const Function::Parameter &param, event->GetParameters()) {
 			stream << "		" << GetCXXType(param.type) << ' ' << param.name << ';' << endl;
@@ -229,43 +261,48 @@ bool CXXCodeGen::GenerateClientCode(const std::string &path) {
 	stream << "	}" << endl;
 	stream << '}' << endl;
 
-	/* Finish the code and close the stream. */
-	EndCode(stream);
-	return true;
+	/* End the namespace. */
+	EndNamespace(service, stream);
 }
 
 /** Open the header file and write the common start.
+ * @param service	Service to generate for.
  * @param path		Path to header file.
  * @param stream	Stream to use. Will refer to the header file when the
  *			function returns.
  * @return		Whether successful in opening the header. */
-bool CXXCodeGen::BeginHeader(const string &path, ofstream &stream) {
-	/* Open the file. */
-	stream.open(path.c_str(), ofstream::trunc);
-	if(stream.fail()) {
-		cerr << "Failed to create header file `" << path << "'." << endl;
-		return false;
-	}
-
-	/* Generate the include guard name. */
-	string guard = "__KRPCGEN_CXX_HEADER_";
-	BOOST_FOREACH(char ch, m_service->GetName()) {
-		if(ch == '.') {
-			guard += '_';
-		} else if(isalnum(ch)) {
-			guard += ch;
+bool CXXCodeGen::BeginHeader(Service *service, const string &path, ofstream &stream) {
+	if(!service->GetParent()) {
+		/* Open the file. */
+		stream.open(path.c_str(), ofstream::trunc);
+		if(stream.fail()) {
+			cerr << "Failed to create header file `" << path << "'." << endl;
+			return false;
 		}
+
+		/* Generate the include guard name. */
+		string guard = "__KRPCGEN_CXX_HEADER_", name;
+		name = service->GetFullName();
+		BOOST_FOREACH(char ch, name) {
+			if(ch == '.') {
+				guard += '_';
+			} else if(isalnum(ch)) {
+				guard += ch;
+			}
+		}
+
+		/* Write the standard preamble. */
+		stream << "/* This file is automatically generated. DO NOT EDIT! */" << endl;
+		stream << "#ifndef " << guard << endl;
+		stream << "#define " << guard << endl;
+		stream << "#include <kiwi/RPC.h>" << endl;
 	}
 
-	/* Write the standard preamble. */
-	stream << "/* This file is automatically generated. DO NOT EDIT! */" << endl;
-	stream << "#ifndef " << guard << endl;
-	stream << "#define " << guard << endl;
-	stream << "#include <kiwi/RPC.h>" << endl;
-	StartNamespace(stream);
+	/* Begin the namespace for the service. */
+	BeginNamespace(service, stream);
 
 	/* Now write out definitions for type aliases and structures. */
-	BOOST_FOREACH(const Service::TypeMap::value_type &type, m_service->GetTypes()) {
+	BOOST_FOREACH(const Service::TypeMap::value_type &type, service->GetTypes()) {
 		AliasType *atype = dynamic_cast<AliasType *>(type.second);
 		if(atype) {
 			stream << "typedef " << GetCXXType(atype->Resolve());
@@ -291,47 +328,63 @@ bool CXXCodeGen::BeginHeader(const string &path, ofstream &stream) {
 		}
 	}
 
+	/* Write information for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		BeginHeader(child, path, stream);
+	}
+
+	/* End the namespace. */
+	EndNamespace(service, stream);
 	return true;
 }
 
 /** Finish and close the header file.
  * @param stream	Stream for the header. */
 void CXXCodeGen::EndHeader(ofstream &stream) {
-	EndNamespace(stream);
 	stream << "#endif" << endl;
 	stream.close();
 }
 
 /** Open the output file and write the common start.
+ * @param service	Service to generate for.
  * @param path		Path to output file.
  * @param stream	Stream to use. Will refer to the file when the function
  *			returns.
  * @return		Whether successful in opening the file. */
-bool CXXCodeGen::BeginCode(const string &path, ofstream &stream) {
-	/* Open the file. */
-	stream.open(path.c_str(), ofstream::trunc);
-	if(stream.fail()) {
-		cerr << "Failed to create output file `" << path << "'." << endl;
-		return false;
+bool CXXCodeGen::BeginCode(Service *service, const string &path, ofstream &stream) {
+	if(!service->GetParent()) {
+		/* Open the file. */
+		stream.open(path.c_str(), ofstream::trunc);
+		if(stream.fail()) {
+			cerr << "Failed to create output file `" << path << "'." << endl;
+			return false;
+		}
+
+		/* Write the standard file beginning. */
+		stream << "/* This file is automatically generated. DO NOT EDIT! */" << endl;
+		stream << "#include <stdexcept>" << endl;
+		stream << "#include <sstream>" << endl;
+		stream << "#include \"";
+		string hpath = GetHeaderPath(path);
+		size_t idx = hpath.find_last_of('/');
+		if(idx != string::npos) {
+			stream << string(hpath, idx + 1);
+		} else {
+			stream << hpath;
+		}
+		stream << "\"" << endl;
 	}
 
-	/* Write the standard file beginning. */
-	stream << "/* This file is automatically generated. DO NOT EDIT! */" << endl;
-	stream << "#include <stdexcept>" << endl;
-	stream << "#include <sstream>" << endl;
-	stream << "#include \"";
-	string hpath = GetHeaderPath(path);
-	size_t idx = hpath.find_last_of('/');
-	if(idx != string::npos) {
-		stream << string(hpath, idx + 1);
-	} else {
-		stream << hpath;
+	/* Begin the namespace for the service. */
+	BeginNamespace(service, stream);
+
+	/* Write code for nested services. */
+	BOOST_FOREACH(Service *child, service->GetChildren()) {
+		BeginCode(child, path, stream);
 	}
-	stream << "\"" << endl;
-	StartNamespace(stream);
 
 	/* Write the struct (un)serialisation functions. */
-	BOOST_FOREACH(const Service::TypeMap::value_type &type, m_service->GetTypes()) {
+	BOOST_FOREACH(const Service::TypeMap::value_type &type, service->GetTypes()) {
 		StructType *stype = dynamic_cast<StructType *>(type.second);
 		if(!stype) {
 			continue;
@@ -354,31 +407,34 @@ bool CXXCodeGen::BeginCode(const string &path, ofstream &stream) {
 		stream << "}" << endl;
 	}
 
+	/* End the namespace. */
+	EndNamespace(service, stream);
 	return true;
 }
 
 /** Finish and close the output file.
  * @param stream	Stream for the file. */
 void CXXCodeGen::EndCode(ofstream &stream) {
-	EndNamespace(stream);
 	stream.close();
 }
 
 /** Write out the namespace start.
+ * @param service	Service to generate for.
  * @param stream	Stream to write to. */
-void CXXCodeGen::StartNamespace(ofstream &stream) {
+void CXXCodeGen::BeginNamespace(Service *service, ofstream &stream) {
 	vector<string> tokens;
-	m_service->TokeniseName(tokens);
+	service->TokeniseName(tokens);
 	BOOST_FOREACH(string &str, tokens) {
 		stream << "namespace " << str << " {" << endl;
 	}
 }
 
 /** Write out the namespace end.
+ * @param service	Service to generate for.
  * @param stream	Stream to write to. */
-void CXXCodeGen::EndNamespace(ofstream &stream) {
+void CXXCodeGen::EndNamespace(Service *service, ofstream &stream) {
 	vector<string> tokens;
-	m_service->TokeniseName(tokens);
+	service->TokeniseName(tokens);
 	BOOST_FOREACH(string &str, tokens) {
 		(void)str;
 		stream << "}" << endl;

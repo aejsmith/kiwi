@@ -11,23 +11,22 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-service org.kiwi.KittenServer;
-version 1;
+service org.kiwi.KittenServer 1 {
+	# Types used by the protocol.
+	type KittenID uint16;
 
-# Types used by the protocol.
-type KittenID uint16;
+	# Structure containing a colour.
+	struct Colour {
+		uint8 red;
+		uint8 green;
+		uint8 blue;
+	};
 
-# Structure containing a colour.
-struct Colour {
-	uint8 red;
-	uint8 green;
-	uint8 blue;
+	function CreateKitten(string name, Colour colour, out KittenID id);
+	function SetCurrentKitten(KittenID id);
+	function GetName(out string name);
+	function GetColour(out Colour colour);
+	function Stroke(int32 duration);
+
+	event OnPurr(int32 duration);
 };
-
-function CreateKitten(string name, Colour colour, out KittenID id);
-function SetCurrentKitten(KittenID id);
-function GetName(out string name);
-function GetColour(out Colour colour);
-function Stroke(int32 duration);
-
-event OnPurr(int32 duration);

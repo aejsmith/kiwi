@@ -26,9 +26,13 @@
 
 using namespace std;
 
-/** Construct a service. */
-Service::Service() :
-	m_version(0), m_next_id(1)
+/** Construct a service.
+ * @param name		Name of the service.
+ * @param ver		Version of the service.
+ * @param parent	Parent of the service. */
+Service::Service(const char *name, unsigned long ver, Service *parent) :
+	m_name(name), m_version((parent) ? parent->m_version : ver),
+	m_parent(parent), m_next_id(1)
 {
 	/* Add built-in types. */
 	AddType(new BytesType("bytes"));
@@ -62,6 +66,18 @@ void Service::Dump() const {
 	}
 }
 
+/** Get the full name of the service.
+ * @return		Full name of the service. */
+std::string Service::GetFullName() const {
+	string str;
+	if(m_parent) {
+		str += m_parent->GetFullName();
+		str += '.';
+	}
+	str += m_name;
+	return str;
+}
+
 /** Split the service namespace into tokens.
  * @param tokens	Vector to place tokens into. */
 void Service::TokeniseName(vector<string> &tokens) const {
@@ -73,36 +89,11 @@ void Service::TokeniseName(vector<string> &tokens) const {
 	}
 }
 
-/** Set the name of the service.
- * @param name		Name to set.
- * @return		True if OK, false if name was already set. */
-bool Service::SetName(const char *name) {
-	if(m_name.length() > 0) {
-		return false;
-	}
-
-	m_name = name;
-	return true;
-}
-
-/** Set the version of the service.
- * @param ver		Version to set.
- * @return		True if OK, false if version was already set. */
-bool Service::SetVersion(unsigned long ver) {
-	if(m_version > 0) {
-		return false;
-	}
-
-	m_version = ver;
-	return true;
-}
-
 /** Add a new type to a service.
  * @param type		Type to add.
- * @return		True if added, false if there is already a type with
- *			the same name. */
+ * @return		True if added, false if the name already exists. */
 bool Service::AddType(Type *type) {
-	if(GetType(type->GetName().c_str())) {
+	if(NameExists(type->GetName())) {
 		return false;
 	}
 
@@ -116,25 +107,48 @@ bool Service::AddType(Type *type) {
 Type *Service::GetType(const char *name) const {
 	TypeMap::const_iterator it = m_types.find(name);
 	if(it == m_types.end()) {
-		return NULL;
+		/* Look up in the parent. */
+		if(m_parent) {
+			return m_parent->GetType(name);
+		} else {
+			return NULL;
+		}
 	}
 
 	return it->second;
 }
 
+/** Add a child to the service.
+ * @param service	Service to add.
+ * @return		True if added, false if the name already exists. */
+bool Service::AddChild(Service *service) {
+	if(NameExists(service->GetName())) {
+		return false;
+	}
+
+	m_children.push_back(service);
+	m_names.insert(service->GetName());
+	return true;
+}
+
+/** Check if a name exists in the service.
+ * @param name		Name to check.
+ * @return		Whether the name exists. */
+bool Service::NameExists(const std::string &name) {
+	return (m_names.find(name) != m_names.end());
+}
+
 /** Add a function to a function list.
  * @param func		Function to add.
  * @param list		List to add to.
- * @return		True if added, false if function with same name already
- *			exists. */
+ * @return		True if added, false if the name already exists. */
 bool Service::AddFunctionToList(Function *func, FunctionList &list) {
-	NameMap::iterator it = m_func_names.find(func->GetName());
-	if(it != m_func_names.end()) {
+	if(NameExists(func->GetName())) {
 		return false;
 	}
 
 	func->SetMessageID(m_next_id++);
 	list.push_back(func);
-	m_func_names.insert(make_pair(func->GetName(), func));
+	m_names.insert(func->GetName());
 	return true;
 }

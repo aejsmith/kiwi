@@ -27,19 +27,17 @@
 /** Base class for a code generator. */
 class CodeGen {
 public:
-	CodeGen(Service *service) : m_service(service) {}
-
 	/** Generate server code.
+	 * @param service	Service to generate for.
 	 * @param path		Path to output file.
 	 * @return		Whether generated successfully. */
-	virtual bool GenerateServer(const std::string &path) = 0;
+	virtual bool GenerateServer(Service *service, const std::string &path) = 0;
 
 	/** Generate client code.
+	 * @param service	Service to generate for.
 	 * @param path		Path to output file.
 	 * @return		Whether generated successfully. */
-	virtual bool GenerateClient(const std::string &path) = 0;
-protected:
-	Service *m_service;		/**< Service to generate for. */
+	virtual bool GenerateClient(Service *service, const std::string &path) = 0;
 };
 
 #endif /* __CODEGEN_H */
