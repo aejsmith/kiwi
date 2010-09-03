@@ -23,7 +23,7 @@
 
 #include <kiwi/IPCConnection.h>
 
-#include "svcmgr.h"
+#include "org.kiwi.ServiceManager.h"
 
 using namespace kiwi;
 using namespace org::kiwi::ServiceManager;

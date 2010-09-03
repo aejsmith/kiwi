@@ -13,26 +13,13 @@
 
 Import('env')
 
-env.SharedLibrary('kiwi', [
+env.Program('app', [
 	'org.kiwi.AppServer.cc',
-	'org.kiwi.ServiceManager.cc',
 	'Application.cc',
-	'Error.cc',
-	'EventLoop.cc',
-	'Handle.cc',
-	'IPCConnection.cc',
-	'IPCPort.cc',
-	'IPCServer.cc',
-	'log.cc',
-	'Object.cc',
-	'Process.cc',
-	'RPCClientConnection.cc',
-	'RPCMessageBuffer.cc',
-	'RPCServerConnection.cc',
-], LIBS=['stdc++'])
+	'AppServer.cc',
+	'Connection.cc',
+	'Session.cc',
+], LIBS=['kiwi'])
 
-# Generate the application server interface code.
-env.RPCClient('org.kiwi.AppServer.cc', '../../services/app/org.kiwi.AppServer.proto')
-
-# Generate the service manager interface code.
-env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
+# Generate the client interface code.
+env.RPCServer('org.kiwi.AppServer.cc', 'org.kiwi.AppServer.proto')

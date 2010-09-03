@@ -13,12 +13,4 @@
 
 Import('env')
 
-SConscript(dirs=[
-	'dungeon',
-	'failshell',
-	'forktest',
-	'kittens',
-	'ping',
-	'shmtest',
-	'uitest',
-], exports=['env'])
+env.Program('uitest', ['main.cc'], LIBS=['kiwi'])

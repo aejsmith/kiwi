@@ -78,9 +78,11 @@ int main(int argc, char **argv) {
 
 	/* Add services. TODO: These should be in configuration files. */
 	svcmgr.AddService(new Service(
-		"console",
-		"Service providing a graphical console.",
-		"/system/services/console"
+		"app",
+		"Application server.",
+		"/system/services/app",
+		0,
+		"org.kiwi.AppServer"
 	));
 	svcmgr.AddService(new Service(
 		"pong",

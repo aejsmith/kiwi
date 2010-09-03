@@ -37,6 +37,11 @@ IPCServer::IPCServer(handle_t handle) : m_port(handle) {
 
 /** Signal handler for a connection. */
 void IPCServer::_HandleConnection() {
-	handle_t handle = m_port.Listen();
+	handle_t handle;
+	try {
+		handle = m_port.Listen();
+	} catch(...) {
+		return;
+	}
 	HandleConnection(handle);
 }
