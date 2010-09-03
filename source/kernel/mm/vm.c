@@ -1071,20 +1071,22 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 void vm_aspace_switch(vm_aspace_t *as) {
 	bool state = intr_disable();
 
-	/* Decrease old address space's reference count, if there is one. */
-	if(curr_aspace) {
-		refcount_dec(&curr_aspace->count);
-	}
+	if(as != curr_aspace) {
+		/* Decrease old address space's reference count, if there is one. */
+		if(curr_aspace) {
+			refcount_dec(&curr_aspace->count);
+		}
 
-	/* If NULL, switch to kernel address space. */
-	if(as) {
-		refcount_inc(&as->count);
-		page_map_switch(&as->pmap);
-	} else {
-		page_map_switch(&kernel_page_map);
-	}
+		/* If NULL, switch to kernel address space. */
+		if(as) {
+			refcount_inc(&as->count);
+			page_map_switch(&as->pmap);
+		} else {
+			page_map_switch(&kernel_page_map);
+		}
 
-	curr_aspace = as;
+		curr_aspace = as;
+	}
 
 	intr_restore(state);
 }
