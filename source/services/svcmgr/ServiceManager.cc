@@ -91,20 +91,6 @@ int main(int argc, char **argv) {
 		Service::kOnDemand,
 		"org.kiwi.Pong"
 	));
-	svcmgr.AddService(new Service(
-		"shmserver",
-		"Shared memory test server.",
-		"/system/services/shmserver",
-		Service::kOnDemand,
-		"org.kiwi.SHMServer"
-	));
-	svcmgr.AddService(new Service(
-		"kittenserver",
-		"Kitten server.",
-		"/system/services/kittenserver",
-		Service::kOnDemand,
-		"org.kiwi.KittenServer"
-	));
 
 	svcmgr.Run();
 	return 0;
