@@ -12,7 +12,7 @@
 # for complete terms.
 
 service org.kiwi.AppServer 1 {
-	# Session ID type.
+	# Session ID type. FIXME: Need kernel type definitions somewhere.
 	type SessionID int32;
 
 	# Session protocol definition. This is what applications connect to the

@@ -35,6 +35,7 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
+#include <proc/session.h>
 #include <proc/thread.h>
 
 #include <console.h>
@@ -384,6 +385,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 #endif
 		/* Bring up process/thread-related stuff. */
 		handle_init();
+		session_init();
 		process_init();
 		thread_init();
 		sched_init();

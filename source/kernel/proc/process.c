@@ -111,6 +111,7 @@ static void process_destroy(process_t *process) {
 		process->id, process->name, process, process->status);
 
 	process_cleanup(process);
+	session_release(process->session);
 	notifier_clear(&process->death_notifier);
 	object_destroy(&process->obj);
 	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
@@ -184,6 +185,12 @@ static status_t process_alloc(const char *name, process_id_t id, int flags, int 
 	process->flags = flags;
 	process->priority = priority;
 	process->aspace = aspace;
+	if(!parent || cflags & PROCESS_CREATE_SESSION) {
+		process->session = session_create();
+	} else {
+		session_get(parent->session);
+		process->session = parent->session;
+	}
 	process->state = PROCESS_RUNNING;
 	process->id = (id < 0) ? (process_id_t)vmem_alloc(process_id_arena, 1, MM_SLEEP) : id;
 	process->name = kstrdup(name, MM_SLEEP);
@@ -572,8 +579,8 @@ int kdbg_cmd_process(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID     State   Prio Flags Count  Aspace             Name\n");
-	kprintf(LOG_NONE, "==     =====   ==== ===== =====  ======             ====\n");
+	kprintf(LOG_NONE, "ID     State   Session Prio Flags Count  Aspace             Name\n");
+	kprintf(LOG_NONE, "==     =====   ======= ==== ===== =====  ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
@@ -585,9 +592,9 @@ int kdbg_cmd_process(int argc, char **argv) {
 		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
 		default:		kprintf(LOG_NONE, "Bad     "); break;
 		}
-		kprintf(LOG_NONE, "%-4d %-5d %-6d %-18p %s\n", process->priority,
-		        process->flags, refcount_get(&process->count),
-			process->aspace, process->name);
+		kprintf(LOG_NONE, "%-7d %-4d %-5d %-6d %-18p %s\n", process->session->id,
+		        process->priority, process->flags, refcount_get(&process->count),
+		        process->aspace, process->name);
 	}
 
 	return KDBG_OK;
@@ -979,6 +986,32 @@ process_id_t sys_process_id(handle_t handle) {
 	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->id;
+		handle_release(khandle);
+	}
+
+	return id;
+}
+
+/** Get the ID of a process' session.
+ *
+ * Gets the ID of the session the process referred to by a handle belongs to.
+ * If the handle is specified as -1, then the session ID of the calling process
+ * will be returned.
+ *
+ * @param handle	Handle for process to get session ID of.
+ *
+ * @return		Session ID on success, -1 if handle is invalid.
+ */
+session_id_t sys_process_session(handle_t handle) {
+	session_id_t id = -1;
+	process_t *process;
+	khandle_t *khandle;
+
+	if(handle == -1) {
+		id = curr_proc->session->id;
+	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
+		process = (process_t *)khandle->object;
+		id = process->session->id;
 		handle_release(khandle);
 	}
 

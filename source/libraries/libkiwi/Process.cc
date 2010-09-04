@@ -253,10 +253,22 @@ process_id_t Process::GetID(void) const {
 	return process_id(m_handle);
 }
 
+/** Get the ID of the process' session.
+ * @return		ID of the process' session. */
+process_id_t Process::GetSessionID(void) const {
+	return process_session(m_handle);
+}
+
 /** Get the ID of the current process.
  * @return		ID of the current process. */
 process_id_t Process::GetCurrentID(void) {
 	return process_id(-1);
+}
+
+/** Get the ID of the current process' session.
+ * @return		ID of the current process' session. */
+process_id_t Process::GetCurrentSessionID(void) {
+	return process_session(-1);
 }
 
 /** Register events with the event loop. */

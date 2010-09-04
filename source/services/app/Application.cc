@@ -46,13 +46,13 @@ Application::~Application() {
 /** Create a new session.
  * @param id		Where ID of new session will be placed.
  * @return		Status code describing result of the operation. */
-status_t Application::CreateSession(Session::ID &id) {
+status_t Application::CreateSession(session_id_t &id) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
 /** Switch to a different session.
  * @param id		ID of session to switch to.
  * @return		Status code describing result of the operation. */
-status_t Application::SwitchSession(Session::ID id) {
+status_t Application::SwitchSession(session_id_t id) {
 	return STATUS_NOT_IMPLEMENTED;
 }

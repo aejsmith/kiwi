@@ -57,8 +57,10 @@ public:
 
 	bool WaitForExit(int *statusp = 0, useconds_t timeout = -1) const;
 	process_id_t GetID(void) const;
+	session_id_t GetSessionID(void) const;
 
 	static process_id_t GetCurrentID(void);
+	static session_id_t GetCurrentSessionID(void);
 
 	Signal<int> OnExit;
 private:

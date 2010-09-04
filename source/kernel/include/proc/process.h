@@ -25,6 +25,7 @@
 
 #include <lib/notifier.h>
 
+#include <proc/session.h>
 #include <proc/thread.h>
 
 #include <public/process.h>
@@ -69,6 +70,7 @@ typedef struct process {
 	refcount_t count;		/**< Number of handles to/threads in the process. */
 	handle_table_t *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
+	session_t *session;		/**< Session the process belongs to. */
 	list_t threads;			/**< List of threads. */
 
 	/** State of the process. */

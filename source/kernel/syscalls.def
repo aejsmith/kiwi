@@ -67,6 +67,7 @@ syscall process_replace(ptr_t, ptr_t, ptr_t, ptr_t, int);
 syscall process_clone(ptr_t, ptr_t, ptr_t, ptr_t);
 syscall process_open(process_id_t, ptr_t);
 syscall process_id(handle_t);
+syscall process_session(handle_t);
 syscall process_status(handle_t, ptr_t);
 syscall process_exit(int);
 syscall process_loaded();

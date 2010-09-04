@@ -35,23 +35,19 @@ class Session : public kiwi::Object {
 	/** Type of the application list. */
 	typedef std::list<Application *> ApplicationList;
 public:
-	/** Type of a session ID. */
-	typedef org::kiwi::AppServer::SessionID ID;
-
-	Session(AppServer *server, ID id);
+	Session(AppServer *server, const char *path);
 	~Session();
 
-	void Run(const char *cmdline);
 	void RemoveApplication(Application *app);
 
 	/** Get the ID of the session.
 	 * @return		ID of the session. */
-	ID GetID() const { return m_id; }
+	session_id_t GetID() const { return m_id; }
 private:
 	void HandleConnection();
 
 	AppServer *m_server;		/**< Server that the connection is for. */
-	ID m_id;			/**< ID of the session. */
+	session_id_t m_id;		/**< ID of the session. */
 	kiwi::IPCPort m_port;		/**< Port for the session. */
 	ApplicationList m_apps;		/**< Applications running in the session. */
 };

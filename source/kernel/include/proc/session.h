@@ -15,15 +15,24 @@
 
 /**
  * @file
- * @brief		UI test.
+ * @brief		Session management.
  */
 
-#include <kiwi/Application.h>
+#ifndef __PROC_SESSION_H
+#define __PROC_SESSION_H
 
-using namespace kiwi;
+#include <lib/refcount.h>
 
-int main(int argc, char **argv) {
-	Application app;
-	app.Run();
-	return 0;
-}
+/** Structure containing details of a session. */
+typedef struct session {
+	session_id_t id;		/**< ID of the session. */
+	refcount_t count;		/**< Number of processes in the session. */
+} session_t;
+
+extern session_t *session_create(void);
+extern void session_get(session_t *session);
+extern void session_release(session_t *session);
+
+extern void __init_text session_init(void);
+
+#endif /* __PROC_SESSION_H */

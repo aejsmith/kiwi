@@ -18,6 +18,9 @@
  * @brief		Session management.
  */
 
+#include <kernel/object.h>
+#include <kernel/process.h>
+
 #include <kiwi/Process.h>
 
 #include <cstdlib>
@@ -31,37 +34,40 @@
 using namespace kiwi;
 using namespace std;
 
-/** Session constructor. */
-Session::Session(AppServer *server, ID id) :
-	m_server(server), m_id(id)
+extern char **environ;
+
+/** Session constructor.
+ * @param server	Server that the session belongs to.
+ * @param path		Path to binary to run as initial session process. */
+Session::Session(AppServer *server, const char *path) :
+	m_server(server), m_id(-1)
 {
 	/* Attempt to create the session port. */
 	m_port.Create();
 	m_port.OnConnection.Connect(this, &Session::HandleConnection);
-}
 
-/** Session destructor. */
-Session::~Session() {
-	m_server->RemoveSession(this);
-}
-
-/** Run a process under the session.
- * @param cmdline	Command line for the process. */
-void Session::Run(const char *cmdline) {
 	/* Set the port number for the app to use. */
 	char str[16];
 	sprintf(str, "%d", m_port.GetID());
 	setenv("APPSERVER_PORT", str, 1);
 
 	/* Execute the process. */
-	try {
-		Process proc(cmdline);
-	} catch(...) {
-		unsetenv("APPSERVER_PORT");
-		throw;
+	handle_t handle;
+	const char *const args[] = { path, NULL };
+	status_t ret = process_create(path, args, environ, PROCESS_CREATE_SESSION, NULL, -1, &handle);
+	unsetenv("APPSERVER_PORT");
+	if(ret != STATUS_SUCCESS) {
+		throw ProcessError(ret);
 	}
 
-	unsetenv("APPSERVER_PORT");
+	/* Save the session ID. */
+	m_id = process_session(handle);
+	handle_close(handle);
+}
+
+/** Session destructor. */
+Session::~Session() {
+	m_server->RemoveSession(this);
 }
 
 /** Remove an application from the session.

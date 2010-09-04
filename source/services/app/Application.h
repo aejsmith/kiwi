@@ -30,8 +30,8 @@ public:
 	Application(Session *session, handle_t handle);
 	~Application();
 private:
-	status_t CreateSession(Session::ID &id);
-	status_t SwitchSession(Session::ID id);
+	status_t CreateSession(session_id_t &id);
+	status_t SwitchSession(session_id_t id);
 
 	Session *m_session;		/**< Session that the application is running under. */
 };

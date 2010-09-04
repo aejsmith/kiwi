@@ -26,15 +26,13 @@
 using namespace std;
 
 /** Construct the application server. */
-AppServer::AppServer() :
-	m_next_session_id(0)
-{
-}
+AppServer::AppServer() {}
 
 /** Create a new session.
+ * @param path		Path to binary to run as initial session process.
  * @return		Pointer to new session. */
-Session *AppServer::CreateSession() {
-	Session *session = new Session(this, m_next_session_id++);
+Session *AppServer::CreateSession(const char *path) {
+	Session *session = new Session(this, path);
 	m_sessions.insert(make_pair(session->GetID(), session));
 
 	/* Notify connections. */
@@ -77,9 +75,9 @@ int main(int argc, char **argv) {
 	AppServer server;
 
 	/* Create the initial session. */
-	Session *session = server.CreateSession();
-	session->Run("/system/binaries/uitest");
+	server.CreateSession("/system/binaries/uitest");
 
+	/* Run the event loop. */
 	server.Run();
 	return 0;
 }

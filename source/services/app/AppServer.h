@@ -31,14 +31,14 @@
 /** Class implementing the application server. */
 class AppServer : public kiwi::IPCServer {
 	/** Type of the session map. */
-	typedef std::map<Session::ID, Session *> SessionMap;
+	typedef std::map<session_id_t, Session *> SessionMap;
 
 	/** Type of the connection list. */
 	typedef std::list<Connection *> ConnectionList;
 public:
 	AppServer();
 
-	Session *CreateSession();
+	Session *CreateSession(const char *path);
 	void RemoveSession(Session *session);
 	void RemoveConnection(Connection *conn);
 private:
@@ -46,7 +46,6 @@ private:
 
 	SessionMap m_sessions;			/**< Map of sessions. */
 	ConnectionList m_connections;		/**< Connections to the server. */
-	Session::ID m_next_session_id;		/**< Next session ID. */
 };
 
 #endif /* __APPSERVER_H */
