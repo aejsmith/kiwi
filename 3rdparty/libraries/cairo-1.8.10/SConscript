@@ -1,0 +1,103 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'config')
+
+# Base sources.
+sources = [
+	'cairo-analysis-surface.c',
+	'cairo-arc.c',
+	'cairo-array.c',
+	'cairo-atomic.c',
+	'cairo-base85-stream.c',
+	'cairo-bentley-ottmann.c',
+	'cairo.c',
+	'cairo-cache.c',
+	'cairo-clip.c',
+	'cairo-color.c',
+	'cairo-debug.c',
+	'cairo-fixed.c',
+	'cairo-font-face.c',
+	'cairo-font-face-twin.c',
+	'cairo-font-face-twin-data.c',
+	'cairo-font-options.c',
+	'cairo-freelist.c',
+	'cairo-gstate.c',
+	'cairo-hash.c',
+	'cairo-hull.c',
+	'cairo-image-surface.c',
+	'cairo-lzw.c',
+	'cairo-matrix.c',
+	'cairo-meta-surface.c',
+	'cairo-misc.c',
+	'cairo-mutex.c',
+	'cairo-output-stream.c',
+	'cairo-paginated-surface.c',
+	'cairo-path-bounds.c',
+	'cairo-path.c',
+	'cairo-path-fill.c',
+	'cairo-path-fixed.c',
+	'cairo-path-stroke.c',
+	'cairo-pattern.c',
+	'cairo-pen.c',
+	'cairo-polygon.c',
+	'cairo-rectangle.c',
+	'cairo-region.c',
+	'cairo-scaled-font.c',
+	'cairo-skiplist.c',
+	'cairo-slope.c',
+	'cairo-spline.c',
+	'cairo-stroke-style.c',
+	'cairo-surface.c',
+	'cairo-surface-fallback.c',
+	'cairo-system.c',
+	'cairo-traps.c',
+	'cairo-unicode.c',
+	'cairo-user-font.c',
+	'cairo-version.c',
+	'cairo-wideint.c',
+	'cairo-cff-subset.c',
+	'cairo-scaled-font-subsets.c',
+	'cairo-truetype-subset.c',
+	'cairo-type1-fallback.c',
+	'cairo-type1-subset.c',
+	'cairo-type3-glyph-surface.c',
+	'cairo-pdf-operators.c',
+	'cairo-png.c',
+	'cairo-ps-surface.c',
+	'cairo-pdf-surface.c',
+	'cairo-deflate-stream.c',
+	'cairo-svg-surface.c',
+]
+
+# Build flags.
+flags = filter(lambda f: f not in ['-Wextra', '-Wall'], env['CCFLAGS']) + [
+	'-Wno-redundant-decls',
+	'-Wno-enum-compare',
+	'-Wno-switch-enum',
+]
+defines = {
+	'HAVE_CONFIG_H': 1,
+	'CAIRO_NO_MUTEX': None,
+}
+incpath = env['CPPPATH'] + [
+	'.',
+	'../../../include/pixman-1',
+	'../../../include/libpng12',
+	'../../../include/cairo',
+]
+
+# Build the library.
+env.SharedLibrary('cairo', map(lambda x: File('src/' + x), sources),
+                  CCFLAGS=flags, CPPPATH=incpath, CPPDEFINES=defines,
+                  LIBS=['z', 'png', 'pixman-1'])

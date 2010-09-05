@@ -1,1 +1,0 @@
-../../3rdparty/libraries/libpng-1.4.3/pngconf.h
