@@ -13,8 +13,21 @@
 
 Import('env')
 
-SConscript(dirs=[
-	'libm',
-	'zlib-1.2.5',
-	'libpng-1.4.3',
-], exports=['env'])
+# Build the library.
+env.SharedLibrary('png', [
+	'png.c',
+	'pngerror.c',
+	'pngget.c',
+	'pngmem.c',
+	'pngpread.c',
+	'pngread.c',
+	'pngrio.c',
+	'pngrtran.c',
+	'pngrutil.c',
+	'pngset.c',
+	'pngtrans.c',
+	'pngwio.c',
+	'pngwrite.c',
+	'pngwtran.c',
+	'pngwutil.c',
+], LIBS=['z', 'm'])
