@@ -42,7 +42,6 @@ config USE_CLANG
 config EXTRA_CCFLAGS
 	string "Extra CCFLAGS"
 	default "-O2"
-	default "-O2 -march=i686" if ARCH_IA32
 	help
 	  Extra compiler options for both C and C++ code.
 

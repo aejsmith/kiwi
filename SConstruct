@@ -55,6 +55,13 @@ target_flags = {
 	'ASCOM': '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES',
 }
 
+# Architecture specific flags.
+arch_target_flags = {
+	'ia32': {
+		'CCFLAGS': ['-march=i686']
+	}
+}
+
 #########################
 # Internal build setup. #
 #########################
@@ -193,7 +200,7 @@ class EnvironmentManager(dict):
 		env.MergeFlags(merge)
 
 	# Perform common setup for an environment.
-	def _SetupEnvironment(self, env, flags, merge):
+	def _SetupEnvironment(self, env, flags):
 		# Add variables/builders.
 		for (k, v) in self.variables.items():
 			env[k] = v
@@ -201,9 +208,6 @@ class EnvironmentManager(dict):
 			env['BUILDERS'][k] = v
 		for (k, v) in flags.items():
 			env[k] = v
-
-		# Merge in other flags.
-		self._MergeFlags(env, merge)
 
 	# Add a variable to all environments and all future environments.
 	def AddVariable(self, name, value):
@@ -230,7 +234,8 @@ class EnvironmentManager(dict):
 	# Create an environment for building for the host system.
 	def CreateHost(self, name, flags=None):
 		env = Environment(ENV=os.environ)
-		self._SetupEnvironment(env, host_flags, flags)
+		self._SetupEnvironment(env, host_flags)
+		self._MergeFlags(env, flags)
 		self[name] = env
 		return env
 
@@ -240,7 +245,10 @@ class EnvironmentManager(dict):
 		assert self.config.Configured()
 
 		env = Environment(platform='posix', ENV=os.environ)
-		self._SetupEnvironment(env, target_flags, flags)
+		self._SetupEnvironment(env, target_flags)
+		if arch_target_flags.has_key(self.config['ARCH']):
+			self._MergeFlags(env, arch_target_flags[self.config['ARCH']])
+		self._MergeFlags(env, flags)
 
 		# Add in extra compilation flags from the configuration.
 		env['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()
