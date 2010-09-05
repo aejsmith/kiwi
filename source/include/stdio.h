@@ -124,7 +124,7 @@ extern int snprintf(char *__restrict buf, size_t size, const char *__restrict fm
 extern int sprintf(char *__restrict buf, const char *__restrict fmt, ...);
 extern int sscanf(const char *__restrict buf, const char *__restrict fmt, ...);
 /* char *tempnam(const char *, const char *); */
-/* FILE *tmpfile(void); */
+extern FILE *tmpfile(void);
 /* char *tmpnam(char *); */
 extern int ungetc(int ch, FILE *stream);
 extern int vfprintf(FILE *__restrict stream, const char *__restrict fmt, va_list args);
@@ -138,7 +138,6 @@ extern int vsscanf(const char *__restrict buf, const char *__restrict fmt, va_li
 #ifdef __cplusplus
 extern int fgetpos(FILE *, fpos_t *);
 extern int fsetpos(FILE *, const fpos_t *);
-extern FILE *tmpfile(void);
 extern char *tmpnam(char *);
 #endif
 

@@ -64,6 +64,7 @@ sources = map(File, [
 	'stdio/perror.c',
 	'stdio/remove.c',
 	'stdio/rename.c',
+	'stdio/tmpfile.c',
 	'stdio/vfprintf.c',
 	'stdio/vfscanf.c',
 	'stdio/vsnprintf.c',
