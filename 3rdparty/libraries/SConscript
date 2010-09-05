@@ -16,5 +16,6 @@ Import('env')
 SConscript(dirs=[
 	'libm',
 	'zlib-1.2.5',
+	'pixman-0.19.2',
 	'libpng-1.4.3',
 ], exports=['env'])

@@ -1,0 +1,81 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'config')
+
+# Base sources.
+sources = [
+	'pixman-access.c',
+	'pixman-access-accessors.c',
+	'pixman-cpu.c',
+	'pixman-gradient-walker.c',
+	'pixman-region16.c',
+	'pixman-region32.c',
+	'pixman-image.c',
+	'pixman-implementation.c',
+	'pixman-combine32.c',
+	'pixman-combine64.c',
+	'pixman-general.c',
+	'pixman.c',
+	'pixman-fast-path.c',
+	'pixman-solid-fill.c',
+	'pixman-conical-gradient.c',
+	'pixman-linear-gradient.c',
+	'pixman-radial-gradient.c',
+	'pixman-bits-image.c',
+	'pixman-utils.c',
+	'pixman-edge.c',
+	'pixman-edge-accessors.c',
+	'pixman-trap.c',
+	'pixman-timer.c',
+	'pixman-matrix.c',
+]
+
+# Architecture-specific feature definitions and sources.
+if config['ARCH'] == 'amd64':
+	defines = {
+		'SIZEOF_LONG': 8,
+		'USE_MMX': 1,
+		'USE_SSE2': 1,
+	}
+	sources += [
+		'pixman-mmx.c',
+		'pixman-sse2.c',
+	]
+elif config['ARCH'] == 'ia32':
+	defines = {
+		'SIZEOF_LONG': 4,
+		'USE_MMX': 1,
+		'USE_SSE2': 1,
+	}
+	sources += [
+		'pixman-mmx.c',
+		'pixman-sse2.c',
+	]
+else:
+	raise Exception, "Architecture support not added."
+
+# Build flags.
+ccflags = filter(lambda f: f not in ['-Wextra'], env['CCFLAGS']) + [
+	'-fno-strict-aliasing',
+	'-fvisibility=hidden',
+	'-Wno-missing-declarations',
+	'-Wno-uninitialized',
+]
+defines['PIXMAN_NO_TLS'] = 1
+defines['HAVE_CONFIG_H'] = 1
+
+# Build the library.
+env.SharedLibrary('pixman-1', map(lambda x: File('pixman/' + x), sources),
+                  CPPPATH=env['CPPPATH'] + ['.', '../../../include/pixman-1'], CPPDEFINES=defines,
+                  CCFLAGS=ccflags, LIBS=['m'])
