@@ -41,30 +41,6 @@ sources = [
 	'pixman-matrix.c',
 ]
 
-# Architecture-specific feature definitions and sources.
-if config['ARCH'] == 'amd64':
-	defines = {
-		'SIZEOF_LONG': 8,
-		'USE_MMX': 1,
-		'USE_SSE2': 1,
-	}
-	sources += [
-		'pixman-mmx.c',
-		'pixman-sse2.c',
-	]
-elif config['ARCH'] == 'ia32':
-	defines = {
-		'SIZEOF_LONG': 4,
-		'USE_MMX': 1,
-		'USE_SSE2': 1,
-	}
-	sources += [
-		'pixman-mmx.c',
-		'pixman-sse2.c',
-	]
-else:
-	raise Exception, "Architecture support not added."
-
 # Build flags.
 ccflags = filter(lambda f: f not in ['-Wextra'], env['CCFLAGS']) + [
 	'-fno-strict-aliasing',
@@ -72,8 +48,26 @@ ccflags = filter(lambda f: f not in ['-Wextra'], env['CCFLAGS']) + [
 	'-Wno-missing-declarations',
 	'-Wno-uninitialized',
 ]
-defines['PIXMAN_NO_TLS'] = 1
-defines['HAVE_CONFIG_H'] = 1
+defines = {
+	'PIXMAN_NO_TLS': 1,
+	'HAVE_CONFIG_H': 1,
+}
+
+# Architecture-specific feature definitions, flags and sources.
+if config['SRCARCH'] == 'x86':
+	if config['ARCH'] == 'amd64':
+		defines['SIZEOF_LONG'] = 8
+	else:
+		defines['SIZEOF_LONG'] = 4
+	defines['USE_MMX'] = 1
+	defines['USE_SSE2'] = 1
+	sources += [
+		'pixman-mmx.c',
+		'pixman-sse2.c',
+	]
+	ccflags += ['-mmmx', '-msse2', '-Winline']
+else:
+	raise Exception, "Architecture support not added."
 
 # Build the library.
 env.SharedLibrary('pixman-1', map(lambda x: File('pixman/' + x), sources),
