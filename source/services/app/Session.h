@@ -50,6 +50,8 @@ private:
 	session_id_t m_id;		/**< ID of the session. */
 	kiwi::IPCPort m_port;		/**< Port for the session. */
 	ApplicationList m_apps;		/**< Applications running in the session. */
+
+	static bool s_initial_created;	/**< Whether the initial session has been created. */
 };
 
 #endif /* __SESSION_H */

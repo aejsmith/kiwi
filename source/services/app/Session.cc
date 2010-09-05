@@ -36,6 +36,9 @@ using namespace std;
 
 extern char **environ;
 
+/** Whether the initial session has been created. */
+bool Session::s_initial_created = false;
+
 /** Session constructor.
  * @param server	Server that the session belongs to.
  * @param path		Path to binary to run as initial session process. */
@@ -54,7 +57,8 @@ Session::Session(AppServer *server, const char *path) :
 	/* Execute the process. */
 	handle_t handle;
 	const char *const args[] = { path, NULL };
-	status_t ret = process_create(path, args, environ, PROCESS_CREATE_SESSION, NULL, -1, &handle);
+	status_t ret = process_create(path, args, environ, (s_initial_created) ? PROCESS_CREATE_SESSION : 0,
+	                              NULL, -1, &handle);
 	unsetenv("APPSERVER_PORT");
 	if(ret != STATUS_SUCCESS) {
 		throw ProcessError(ret);
@@ -63,6 +67,8 @@ Session::Session(AppServer *server, const char *path) :
 	/* Save the session ID. */
 	m_id = process_session(handle);
 	handle_close(handle);
+
+	s_initial_created = true;
 }
 
 /** Session destructor. */
