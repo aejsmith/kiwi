@@ -11,9 +11,30 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-Import('env')
+Import('env', 'envmgr')
 
-SConscript(dirs=[
-	'libm',
-	'zlib-1.2.5',
-], exports=['env'])
+# Build the library.
+env.SharedLibrary('z', [
+	'adler32.c',
+	'compress.c',
+	'crc32.c',
+	'deflate.c',
+	'gzclose.c',
+	'gzlib.c',
+	'gzread.c',
+	'gzwrite.c',
+	'infback.c',
+	'inffast.c',
+	'inflate.c',
+	'inftrees.c',
+	'trees.c',
+	'uncompr.c',
+	'zutil.c',
+])
+
+# Build the minigzip utility.
+env.Program('gzip', ['minigzip.c'], LIBS=['z'])
+
+# Links to minigzip.
+envmgr['dist']['LINKS']['/system/binaries/zcat'] = 'gzip'
+envmgr['dist']['LINKS']['/system/binaries/gunzip'] = 'gzip'

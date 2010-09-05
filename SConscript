@@ -30,6 +30,7 @@ f.close()
 # Create the distribution environment.
 dist = envmgr.Create('dist', {
 	'DATA': {},
+	'LINKS': {},
 	'MODULES': [],
 	'LIBRARIES': [],
 	'BINARIES': [],
@@ -62,6 +63,10 @@ def fs_image_func(target, source, env):
 		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
+	for (source, dest) in env['LINKS'].items():
+		if source[0] == '/':
+			source = source[1:]
+		os.symlink(dest, os.path.join(tmpdir, source))
 
 	# Copy extras.
 	if len(config['EXTRA_FSIMAGE']) > 0:
