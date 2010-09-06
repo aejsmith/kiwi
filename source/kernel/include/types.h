@@ -43,17 +43,17 @@ typedef uint64_t key_t;			/**< Type used to store a key for a container. */
 	__builtin_offsetof(type, member)
 
 /** Type limit macros. */
-#define INT8_MIN	(-0x80)
-#define INT8_MAX	0x7F
-#define UINT8_MAX	0xFFu
-#define INT16_MIN	(-0x8000)
-#define INT16_MAX	0x7FFF
-#define UINT16_MAX	0xFFFFu
-#define INT32_MIN	(-0x80000000)
-#define INT32_MAX	0x7FFFFFFF
-#define UINT32_MAX	0xFFFFFFFFu
-#define INT64_MIN	(-0x8000000000000000ll)
-#define INT64_MAX	0x7FFFFFFFFFFFFFFFll
-#define UINT64_MAX	0xFFFFFFFFFFFFFFFFull
+#define INT8_MIN	(-128)
+#define INT8_MAX	127
+#define UINT8_MAX	255u
+#define INT16_MIN	(-32767-1)
+#define INT16_MAX	32767
+#define UINT16_MAX	65535u
+#define INT32_MIN	(-2147483647-1)
+#define INT32_MAX	2147483647
+#define UINT32_MAX	4294967295u
+#define INT64_MIN	(-9223372036854775807ll-1)
+#define INT64_MAX	9223372036854775807ll
+#define UINT64_MAX	18446744073709551615ull
 
 #endif /* __TYPES_H */

@@ -63,26 +63,26 @@ typedef unsigned long uintmax_t;
 #if !defined(__cplusplus) || defined(__STDC_LIMIT_MACROS)
 
 #ifndef INT8_MIN
-# define INT8_MIN		(-0x80)
-# define INT8_MAX		0x7F
-# define UINT8_MAX		0xFFu
+# define INT8_MIN		(-128)
+# define INT8_MAX		127
+# define UINT8_MAX		255u
 #endif
 
 #ifndef INT16_MIN
-# define INT16_MIN		(-0x8000)
-# define INT16_MAX		0x7FFF
-# define UINT16_MAX		0xFFFFu
+# define INT16_MIN		(-32767-1)
+# define INT16_MAX		32767
+# define UINT16_MAX		65535u
 #endif
 
 #ifndef INT32_MIN
-# define INT32_MIN		(-0x80000000)
-# define INT32_MAX		0x7FFFFFFF
-# define UINT32_MAX		0xFFFFFFFFu
+# define INT32_MIN		(-2147483647-1)
+# define INT32_MAX		2147483647
+# define UINT32_MAX		4294967295u
 #endif
 
-#define INT64_MIN		(-0x8000000000000000ll)
-#define INT64_MAX		0x7FFFFFFFFFFFFFFFll
-#define UINT64_MAX		0xFFFFFFFFFFFFFFFFull
+#define INT64_MIN		(-9223372036854775807ll-1)
+#define INT64_MAX		9223372036854775807ll
+#define UINT64_MAX		18446744073709551615ull
 
 #define INT_LEAST8_MIN		INT8_MIN
 #define INT_LEAST8_MAX		INT8_MAX
