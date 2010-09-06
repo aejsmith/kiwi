@@ -85,7 +85,7 @@ def fs_image_func(target, source, env):
 	shutil.rmtree(tmpdir)
 target = dist.Command(
 	'fsimage.tar',
-	dist['MODULES'] + dist['LIBRARIES'] + dist['BINARIES'] + dist['SERVICES'],
+	dist['MODULES'] + dist['LIBRARIES'] + dist['SERVICES'] + dist['BINARIES'],
 	Action(fs_image_func, '$GENCOMSTR')
 )
 if len(config['EXTRA_FSIMAGE']) > 0:
@@ -97,8 +97,8 @@ Alias('loader', dist['LOADER'])
 Alias('kernel', dist['KERNEL'])
 Alias('modules', dist['MODULES'])
 Alias('libraries', dist['LIBRARIES'])
-Alias('binaries', dist['BINARIES'])
 Alias('services', dist['SERVICES'])
+Alias('binaries', dist['BINARIES'])
 Alias('fsimage', dist['FSIMAGE'])
 Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
