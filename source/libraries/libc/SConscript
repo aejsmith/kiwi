@@ -85,6 +85,7 @@ sources = map(File, [
 	'stdlib/strtod.c',
 	'stdlib/strtoul.c',
 
+	'string/ffs.c',
 	'string/memchr.c',
 	'string/memcmp.c',
 	'string/memcpy.c',

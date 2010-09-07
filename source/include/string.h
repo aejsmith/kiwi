@@ -29,6 +29,7 @@
 extern "C" {
 #endif
 
+extern int ffs(int i);
 extern void *memchr(const void *s, int c, size_t n);
 extern int memcmp(const void *p1, const void *p2, size_t count);
 extern void *memcpy(void *__restrict dest, const void *__restrict src, size_t count);
