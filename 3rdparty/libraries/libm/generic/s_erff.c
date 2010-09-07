@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_erff.c,v 1.4 1995/05/10 20:47:07 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -103,7 +99,7 @@ erff(float x)
 	GET_FLOAT_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(ix>=0x7f800000) {		/* erf(nan)=nan */
-	    i = ((uint32_t)hx>>31)<<1;
+	    i = ((u_int32_t)hx>>31)<<1;
 	    return (float)(1-i)+one/x;	/* erf(+-inf)=+-1 */
 	}
 
@@ -157,7 +153,7 @@ erfcf(float x)
 	ix = hx&0x7fffffff;
 	if(ix>=0x7f800000) {			/* erfc(nan)=nan */
 						/* erfc(+-inf)=0,2 */
-	    return (float)(((uint32_t)hx>>31)<<1)+one/x;
+	    return (float)(((u_int32_t)hx>>31)<<1)+one/x;
 	}
 
 	if(ix < 0x3f580000) {		/* |x|<0.84375 */

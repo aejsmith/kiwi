@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: k_tan.c,v 1.8 1995/05/10 20:46:37 jtc Exp $";
-#endif
-
 /* __kernel_tan( x, y, k )
  * kernel tan function on [-pi/4, pi/4], pi/4 ~ 0.7854
  * Input x is assumed to be bounded by ~pi/4 in magnitude.
@@ -84,7 +80,7 @@ __kernel_tan(double x, double y, int iy)
 	ix = hx & 0x7fffffff;			/* high word of |x| */
 	if (ix < 0x3e300000) {			/* x < 2**-28 */
 		if ((int) x == 0) {		/* generate inexact */
-			uint32_t low;
+			u_int32_t low;
 			GET_LOW_WORD(low, x);
 			if(((ix | low) | (iy + 1)) == 0)
 				return one / fabs(x);

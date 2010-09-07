@@ -1,4 +1,4 @@
-/*	$OpenBSD: s_nan.c,v 1.4 2008/09/07 20:36:09 martynas Exp $	*/
+/*	$OpenBSD: s_nan.c,v 1.6 2008/12/10 01:08:25 martynas Exp $	*/
 /*-
  * Copyright (c) 2007 David Schultz
  * All rights reserved.
@@ -32,7 +32,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
-#include <string.h>
+#include <strings.h>
 
 #include "math_private.h"
 
@@ -63,13 +63,13 @@ _digittoint(int c)
  * consider valid, so we might be violating the C standard. But it's
  * impossible to use nan(3) portably anyway, so this seems good enough.
  */
-static void
+void
 _scan_nan(uint32_t *words, int num_words, const char *s)
 {
 	int si;		/* index into s */
 	int bitpos;	/* index into words (in bits) */
 
-	memset(words, 0, num_words * sizeof(uint32_t));
+	bzero(words, num_words * sizeof(uint32_t));
 
 	/* Allow a leading '0x'. (It's expected, but redundant.) */
 	if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
@@ -80,7 +80,7 @@ _scan_nan(uint32_t *words, int num_words, const char *s)
 		;
 
 	/* Scan backwards, filling in the bits in words[] as we go. */
-#if CONFIG_ARCH_LITTLE_ENDIAN
+#if defined(CONFIG_ARCH_LITTLE_ENDIAN)
 	for (bitpos = 0; bitpos < 32 * num_words; bitpos += 4) {
 #else
 	for (bitpos = 32 * num_words - 4; bitpos >= 0; bitpos -= 4) {
@@ -100,7 +100,7 @@ nan(const char *s)
 	} u;
 
 	_scan_nan(u.bits, 2, s);
-#if CONFIG_ARCH_LITTLE_ENDIAN
+#if defined(CONFIG_ARCH_LITTLE_ENDIAN)
 	u.bits[1] |= 0x7ff80000;
 #else
 	u.bits[0] |= 0x7ff80000;
@@ -120,3 +120,9 @@ nanf(const char *s)
 	u.bits[0] |= 0x7fc00000;
 	return (u.f);
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(nanl, nan);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

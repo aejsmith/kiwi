@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_rint.c,v 1.8 1995/05/10 20:48:04 jtc Exp $";
-#endif
-
 /*
  * rint(x)
  * Return x rounded to integral value according to the prevailing
@@ -24,7 +20,9 @@ static char rcsid[] = "$NetBSD: s_rint.c,v 1.8 1995/05/10 20:48:04 jtc Exp $";
  *	Inexact flag raised if x not equal to rint(x).
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double
@@ -37,7 +35,7 @@ double
 rint(double x)
 {
 	int32_t i0,jj0,sx;
-	uint32_t i,i1;
+	u_int32_t i,i1;
 	double w,t;
 	EXTRACT_WORDS(i0,i1,x);
 	sx = (i0>>31)&1;
@@ -67,7 +65,7 @@ rint(double x)
 	    if(jj0==0x400) return x+x;	/* inf or NaN */
 	    else return x;		/* x is integral */
 	} else {
-	    i = ((uint32_t)(0xffffffff))>>(jj0-20);
+	    i = ((u_int32_t)(0xffffffff))>>(jj0-20);
 	    if((i1&i)==0) return x;	/* x is integral */
 	    i>>=1;
 	    if((i1&i)!=0) i1 = (i1&(~i))|((0x40000000)>>(jj0-20));
@@ -76,3 +74,9 @@ rint(double x)
 	w = TWO52[sx]+x;
 	return w-TWO52[sx];
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(rintl, rint);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

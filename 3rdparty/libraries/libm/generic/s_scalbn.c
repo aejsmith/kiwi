@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_scalbn.c,v 1.8 1995/05/10 20:48:08 jtc Exp $";
-#endif
-
 /* 
  * scalbn (double x, int n)
  * scalbn(x,n) returns x* 2**n  computed by  exponent  
@@ -21,7 +17,9 @@ static char rcsid[] = "$NetBSD: s_scalbn.c,v 1.8 1995/05/10 20:48:08 jtc Exp $";
  * exponentiation or a multiplication.
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double
@@ -56,3 +54,9 @@ scalbn (double x, int n)
 	SET_HIGH_WORD(x,(hx&0x800fffff)|(k<<20));
         return x*twom54;
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(scalbnl, scalbn);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

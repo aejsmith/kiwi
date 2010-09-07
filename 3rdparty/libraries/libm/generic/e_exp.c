@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_exp.c,v 1.8 1995/05/10 20:45:03 jtc Exp $";
-#endif
-
 /* exp(x)
  * Returns the exponential of x.
  *
@@ -104,7 +100,7 @@ exp(double x)	/* default IEEE double exp */
 {
 	double y,hi,lo,c,t;
 	int32_t k,xsb;
-	uint32_t hx;
+	u_int32_t hx;
 
 	GET_HIGH_WORD(hx,x);
 	xsb = (hx>>31)&1;		/* sign bit of x */
@@ -113,7 +109,7 @@ exp(double x)	/* default IEEE double exp */
     /* filter out non-finite argument */
 	if(hx >= 0x40862E42) {			/* if |x|>=709.78... */
             if(hx>=0x7ff00000) {
-	        uint32_t lx;
+	        u_int32_t lx;
 		GET_LOW_WORD(lx,x);
 		if(((hx&0xfffff)|lx)!=0) 
 		     return x+x; 		/* NaN */
@@ -146,12 +142,12 @@ exp(double x)	/* default IEEE double exp */
 	if(k==0) 	return one-((x*c)/(c-2.0)-x); 
 	else 		y = one-((lo-(x*c)/(2.0-c))-hi);
 	if(k >= -1021) {
-	    uint32_t hy;
+	    u_int32_t hy;
 	    GET_HIGH_WORD(hy,y);
 	    SET_HIGH_WORD(y,hy+(k<<20));	/* add k to y's exponent */
 	    return y;
 	} else {
-	    uint32_t hy;
+	    u_int32_t hy;
 	    GET_HIGH_WORD(hy,y);
 	    SET_HIGH_WORD(y,hy+((k+1000)<<20));	/* add k to y's exponent */
 	    return y*twom1000;

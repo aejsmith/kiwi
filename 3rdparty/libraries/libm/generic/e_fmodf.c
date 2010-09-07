@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_fmodf.c,v 1.4 1995/05/10 20:45:10 jtc Exp $";
-#endif
-
 /* 
  * fmodf(x,y)
  * Return x mod y in exact arithmetic
@@ -45,7 +41,7 @@ fmodf(float x, float y)
 	    return (x*y)/(x*y);
 	if(hx<hy) return x;			/* |x|<|y| return x */
 	if(hx==hy)
-	    return Zero[(uint32_t)sx>>31];	/* |x|=|y| return x*0*/
+	    return Zero[(u_int32_t)sx>>31];	/* |x|=|y| return x*0*/
 
     /* determine ix = ilogb(x) */
 	if(hx<0x00800000) {	/* subnormal x */
@@ -78,7 +74,7 @@ fmodf(float x, float y)
 	    if(hz<0){hx = hx+hx;}
 	    else {
 	    	if(hz==0) 		/* return sign(x)*0 */
-		    return Zero[(uint32_t)sx>>31];
+		    return Zero[(u_int32_t)sx>>31];
 	    	hx = hz+hz;
 	    }
 	}
@@ -87,7 +83,7 @@ fmodf(float x, float y)
 
     /* convert back to floating value and restore the sign */
 	if(hx==0) 			/* return sign(x)*0 */
-	    return Zero[(uint32_t)sx>>31];	
+	    return Zero[(u_int32_t)sx>>31];	
 	while(hx<0x00800000) {		/* normalize x */
 	    hx = hx+hx;
 	    iy -= 1;

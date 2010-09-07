@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_remainder.c,v 1.8 1995/05/10 20:46:05 jtc Exp $";
-#endif
-
 /* remainder(x,p)
  * Return :                  
  * 	returns  x REM p  =  x - [x/p]*p as if in infinite 
@@ -33,7 +29,7 @@ double
 remainder(double x, double p)
 {
 	int32_t hx,hp;
-	uint32_t sx,lx,lp;
+	u_int32_t sx,lx,lp;
 	double p_half;
 
 	EXTRACT_WORDS(hx,lx,x);

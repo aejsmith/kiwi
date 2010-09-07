@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_j1f.c,v 1.4 1995/05/10 20:45:31 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -64,7 +60,7 @@ j1f(float x)
 	 * j1(x) = 1/sqrt(pi) * (P(1,x)*cc - Q(1,x)*ss) / sqrt(x)
 	 * y1(x) = 1/sqrt(pi) * (P(1,x)*ss + Q(1,x)*cc) / sqrt(x)
 	 */
-		if((uint32_t)ix>0x80000000U) z = (invsqrtpi*cc)/sqrtf(y);
+		if(ix>0x80000000U) z = (invsqrtpi*cc)/sqrtf(y);
 		else {
 		    u = ponef(y); v = qonef(y);
 		    z = invsqrtpi*(u*cc-v*ss)/sqrtf(y);

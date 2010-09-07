@@ -1,4 +1,4 @@
-/*	$OpenBSD: s_fmax.c,v 1.2 2008/09/11 19:18:12 martynas Exp $	*/
+/*	$OpenBSD: s_fmax.c,v 1.4 2008/12/10 01:08:24 martynas Exp $	*/
 /*-
  * Copyright (c) 2004 David Schultz <das@FreeBSD.ORG>
  * All rights reserved.
@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <float.h>
 #include <math.h>
 
 double
@@ -37,12 +38,17 @@ fmax(double x, double y)
 		return (x);
 
 	/* Handle comparisons of signed zeroes. */
-	if (signbit(x) != signbit(y)) {
+	if (signbit(x) != signbit(y))
 		if (signbit(x))
 			return (y);
 		else
 			return (x);
-	}
 
 	return (x > y ? x : y);
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(fmaxl, fmax);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

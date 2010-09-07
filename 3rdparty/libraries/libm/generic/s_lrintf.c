@@ -28,7 +28,9 @@
  */
 
 #include <sys/types.h>
+#include <sys/limits.h>
 #include <math.h>
+#include <ieeefp.h>
 #include "math_private.h"
 
 #ifndef LRINTNAME
@@ -49,7 +51,7 @@ TWO23[2]={
 RESTYPE
 LRINTNAME(float x)
 {
-	uint32_t i0;
+	u_int32_t i0;
 	int e, s, shift;
 	RESTYPE res;
 

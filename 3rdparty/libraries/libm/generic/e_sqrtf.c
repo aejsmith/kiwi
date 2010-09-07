@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_sqrtf.c,v 1.4 1995/05/10 20:46:19 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -28,7 +24,7 @@ sqrtf(float x)
 	float z;
 	int32_t sign = (int)0x80000000; 
 	int32_t ix,s,q,m,t,i;
-	uint32_t r;
+	u_int32_t r;
 
 	GET_FLOAT_WORD(ix,x);
 

@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_fabsf.c,v 1.4 1995/05/10 20:47:15 jtc Exp $";
-#endif
-
 /*
  * fabsf(x) returns the absolute value of x.
  */
@@ -27,7 +23,7 @@ static char rcsid[] = "$NetBSD: s_fabsf.c,v 1.4 1995/05/10 20:47:15 jtc Exp $";
 float
 fabsf(float x)
 {
-	uint32_t ix;
+	u_int32_t ix;
 	GET_FLOAT_WORD(ix,x);
 	SET_FLOAT_WORD(x,ix&0x7fffffff);
         return x;

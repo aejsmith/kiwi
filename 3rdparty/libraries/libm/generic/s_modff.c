@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_modff.c,v 1.4 1995/05/10 20:47:56 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -26,7 +22,7 @@ float
 modff(float x, float *iptr)
 {
 	int32_t i0,jj0;
-	uint32_t i;
+	u_int32_t i;
 	GET_FLOAT_WORD(i0,x);
 	jj0 = ((i0>>23)&0xff)-0x7f;	/* exponent of x */
 	if(jj0<23) {			/* integer part in x */
@@ -36,7 +32,7 @@ modff(float x, float *iptr)
 	    } else {
 		i = (0x007fffff)>>jj0;
 		if((i0&i)==0) {			/* x is integral */
-		    uint32_t ix;
+		    u_int32_t ix;
 		    *iptr = x;
 		    GET_FLOAT_WORD(ix,x);
 		    SET_FLOAT_WORD(x,ix&0x80000000);	/* return +-0 */
@@ -47,7 +43,7 @@ modff(float x, float *iptr)
 		}
 	    }
 	} else {			/* no fraction part */
-	    uint32_t ix;
+	    u_int32_t ix;
 	    *iptr = x*one;
 	    GET_FLOAT_WORD(ix,x);
 	    SET_FLOAT_WORD(x,ix&0x80000000);	/* return +-0 */

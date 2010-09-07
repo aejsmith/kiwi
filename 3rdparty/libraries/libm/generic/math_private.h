@@ -1,4 +1,4 @@
-/*	$OpenBSD: math_private.h,v 1.10 2008/09/07 20:36:09 martynas Exp $	*/
+/*	$OpenBSD: math_private.h,v 1.11 2008/12/09 20:00:35 martynas Exp $	*/
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -17,7 +17,7 @@
 #ifndef _MATH_PRIVATE_H_
 #define _MATH_PRIVATE_H_
 
-#include <stdint.h>
+#include <sys/types.h>
 
 /* The original fdlibm code used statements like:
 	n0 = ((*(int*)&one)>>29)^1;		* index of high word *
@@ -38,6 +38,8 @@
  * big endian.
  */
 
+typedef uint32_t u_int32_t;
+
 #if defined(CONFIG_ARCH_BIG_ENDIAN) || defined(arm32)
 
 typedef union
@@ -45,8 +47,8 @@ typedef union
   double value;
   struct
   {
-    uint32_t msw;
-    uint32_t lsw;
+    u_int32_t msw;
+    u_int32_t lsw;
   } parts;
 } ieee_double_shape_type;
 
@@ -54,9 +56,9 @@ typedef union
 {
   long double value;
   struct {
-    uint32_t msw;
-    uint32_t nsw;
-    uint32_t lsw;
+    u_int32_t msw;
+    u_int32_t nsw;
+    u_int32_t lsw;
   } parts;
 } ieee_extended_shape_type;
 
@@ -64,22 +66,24 @@ typedef union
 {
   long double value;
   struct {
-    uint32_t mswhi;
-    uint32_t mswlo;
-    uint32_t lswhi;
-    uint32_t lswlo;
+    u_int32_t mswhi;
+    u_int32_t mswlo;
+    u_int32_t lswhi;
+    u_int32_t lswlo;
   } parts;
 } ieee_quad_shape_type;
 
-#elif defined(CONFIG_ARCH_LITTLE_ENDIAN) && !defined(arm32)
+#endif
+
+#if defined(CONFIG_ARCH_LITTLE_ENDIAN) && !defined(arm32)
 
 typedef union
 {
   double value;
   struct
   {
-    uint32_t lsw;
-    uint32_t msw;
+    u_int32_t lsw;
+    u_int32_t msw;
   } parts;
 } ieee_double_shape_type;
 
@@ -87,10 +91,10 @@ typedef union
 {
   long double value;
   struct {
-    uint32_t lswlo;
-    uint32_t lswhi;
-    uint32_t mswlo;
-    uint32_t mswhi;
+    u_int32_t lswlo;
+    u_int32_t lswhi;
+    u_int32_t mswlo;
+    u_int32_t mswhi;
   } parts;
 } ieee_quad_shape_type;
 
@@ -98,14 +102,12 @@ typedef union
 {
   long double value;
   struct {
-    uint32_t lsw;
-    uint32_t nsw;
-    uint32_t msw;
+    u_int32_t lsw;
+    u_int32_t nsw;
+    u_int32_t msw;
   } parts;
 } ieee_extended_shape_type;
 
-#else
-# error "Bad endianness definition"
 #endif
 
 /* Get two 32 bit ints from a double.  */
@@ -172,7 +174,7 @@ do {								\
 typedef union
 {
   float value;
-  uint32_t word;
+  u_int32_t word;
 } ieee_float_shape_type;
 
 /* Get a 32 bit int from a float.  */
@@ -199,7 +201,7 @@ do {								\
  */
 #if FLT_EVAL_METHOD == 0 || __GNUC__ == 0
 #define	STRICT_ASSIGN(type, lval, rval)	((lval) = (rval))
-#else
+#else /* FLT_EVAL_METHOD == 0 || __GNUC__ == 0 */
 #define	STRICT_ASSIGN(type, lval, rval) do {	\
 	volatile type __lval;			\
 						\
@@ -210,15 +212,15 @@ do {								\
 		(lval) = __lval;		\
 	}					\
 } while (0)
-#endif
-#endif
+#endif /* FLT_EVAL_METHOD == 0 || __GNUC__ == 0 */
+#endif /* FLT_EVAL_METHOD */
 
 /* fdlibm kernel function */
 extern int    __ieee754_rem_pio2(double,double*);
 extern double __kernel_sin(double,double,int);
 extern double __kernel_cos(double,double);
 extern double __kernel_tan(double,double,int);
-extern int    __kernel_rem_pio2(double*,double*,int,int,int,const int*);
+extern int    __kernel_rem_pio2(double*,double*,int,int,int);
 
 /* float versions of fdlibm kernel functions */
 extern int   __ieee754_rem_pio2f(float,float*);
@@ -226,6 +228,16 @@ extern float __kernel_sinf(float,float,int);
 extern float __kernel_cosf(float,float);
 extern float __kernel_tanf(float,float,int);
 extern int   __kernel_rem_pio2f(float*,float*,int,int,int,const int*);
+
+/* long double precision kernel functions */
+long double __kernel_sinl(long double, long double, int);
+long double __kernel_cosl(long double, long double);
+long double __kernel_tanl(long double, long double, int);
+
+/*
+ * Common routine to process the arguments to nan(), nanf(), and nanl().
+ */
+void _scan_nan(uint32_t *__words, int __num_words, const char *__s);
 
 /*
  * TRUNC() is a macro that sets the trailing 27 bits in the mantissa

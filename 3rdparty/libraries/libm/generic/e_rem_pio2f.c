@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_rem_pio2f.c,v 1.5 1995/05/10 20:46:03 jtc Exp $";
-#endif
-
 /* __ieee754_rem_pio2f(x,y)
  * 
  * return the remainder of x rem pi/2 in y[0]+y[1] 
@@ -129,11 +125,10 @@ __ieee754_rem_pio2f(float x, float *y)
 	    fn = (float)n;
 	    r  = t-fn*pio2_1;
 	    w  = fn*pio2_1t;	/* 1st round good to 40 bit */
-	    /** NOT SURE ABOUT THIS. */
-	    if(n<32&&(int32_t)(ix&0xffffff00)!=npio2_hw[n-1]) {	
+	    if(n<32&&(ix&0xffffff00)!=npio2_hw[n-1]) {	
 		y[0] = r-w;	/* quick check no cancellation */
 	    } else {
-	        uint32_t high;
+	        u_int32_t high;
 	        j  = ix>>23;
 	        y[0] = r-w; 
 		GET_FLOAT_WORD(high,y[0]);

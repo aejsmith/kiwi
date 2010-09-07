@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_remainderf.c,v 1.4 1995/05/10 20:46:08 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -26,7 +22,7 @@ float
 remainderf(float x, float p)
 {
 	int32_t hx,hp;
-	uint32_t sx;
+	u_int32_t sx;
 	float p_half;
 
 	GET_FLOAT_WORD(hx,x);

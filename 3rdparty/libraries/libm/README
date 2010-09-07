@@ -2,5 +2,5 @@ This is the OpenBSD math library ported to Kiwi with minor modifications
 to fit into the build system and fix compile errors with Kiwi's warning
 flags.
 
-The current version in use was obtained from the URL below on 23/09/08:
-  http://www.openbsd.org/cgi-bin/cvsweb/src/lib/libm/
+The current version in use was obtained from the OPENBSD_4_7 branch of the
+OpenBSD CVS repository on 07/09/10.

@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_atan2.c,v 1.8 1995/05/10 20:44:51 jtc Exp $";
-#endif
-
 /* atan2(y,x)
  * Method :
  *	1. Reduce y to positive by atan2(y,x)=-atan2(-y,x).
@@ -41,7 +37,9 @@ static char rcsid[] = "$NetBSD: e_atan2.c,v 1.8 1995/05/10 20:44:51 jtc Exp $";
  * to produce the hexadecimal values shown.
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double 
@@ -57,7 +55,7 @@ atan2(double y, double x)
 {  
 	double z;
 	int32_t k,m,hx,hy,ix,iy;
-	uint32_t lx,ly;
+	u_int32_t lx,ly;
 
 	EXTRACT_WORDS(hx,lx,x);
 	ix = hx&0x7fffffff;
@@ -110,7 +108,7 @@ atan2(double y, double x)
 	switch (m) {
 	    case 0: return       z  ;	/* atan(+,+) */
 	    case 1: {
-	    	      uint32_t zh;
+	    	      u_int32_t zh;
 		      GET_HIGH_WORD(zh,z);
 		      SET_HIGH_WORD(z,zh ^ 0x80000000);
 		    }
@@ -120,3 +118,9 @@ atan2(double y, double x)
 	    	    return  (z-pi_lo)-pi;/* atan(-,-) */
 	}
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(atan2l, atan2);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

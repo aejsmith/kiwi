@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_atan.c,v 1.8 1995/05/10 20:46:45 jtc Exp $";
-#endif
-
 /* atan(x)
  * Method
  *   1. Reduce x to positive by atan(x) = -atan(-x).
@@ -34,7 +30,9 @@ static char rcsid[] = "$NetBSD: s_atan.c,v 1.8 1995/05/10 20:46:45 jtc Exp $";
  * to produce the hexadecimal values shown.
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double atanhi[] = {
@@ -78,7 +76,7 @@ atan(double x)
 	GET_HIGH_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(ix>=0x44100000) {	/* if |x| >= 2^66 */
-	    uint32_t low;
+	    u_int32_t low;
 	    GET_LOW_WORD(low,x);
 	    if(ix>0x7ff00000||
 		(ix==0x7ff00000&&(low!=0)))
@@ -117,3 +115,9 @@ atan(double x)
 	    return (hx<0)? -z:z;
 	}
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(atanl, atan);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

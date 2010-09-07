@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_cbrtf.c,v 1.4 1995/05/10 20:46:51 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -39,8 +35,8 @@ cbrtf(float x)
 {
 	float r,s,t;
 	int32_t hx;
-	uint32_t sign;
-	uint32_t high;
+	u_int32_t sign;
+	u_int32_t high;
 
 	GET_FLOAT_WORD(hx,x);
 	sign=hx&0x80000000; 		/* sign= sign(x) */

@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_atanh.c,v 1.8 1995/05/10 20:44:55 jtc Exp $";
-#endif
-
 /* atanh(x)
  * Method :
  *    1.Reduced x to positive by atanh(-x) = -atanh(x)
@@ -43,7 +39,7 @@ atanh(double x)
 {
 	double t;
 	int32_t hx,ix;
-	uint32_t lx;
+	u_int32_t lx;
 	EXTRACT_WORDS(hx,lx,x);
 	ix = hx&0x7fffffff;
 	if ((ix|((lx|(-lx))>>31))>0x3ff00000) /* |x|>1 */

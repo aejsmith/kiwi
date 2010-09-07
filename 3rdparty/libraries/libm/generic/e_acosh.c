@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_acosh.c,v 1.9 1995/05/12 04:57:18 jtc Exp $";
-#endif
-
 /* acosh(x)
  * Method :
  *	Based on 
@@ -40,7 +36,7 @@ acosh(double x)
 {	
 	double t;
 	int32_t hx;
-	uint32_t lx;
+	u_int32_t lx;
 	EXTRACT_WORDS(hx,lx,x);
 	if(hx<0x3ff00000) {		/* x < 1 */
 	    return (x-x)/(x-x);

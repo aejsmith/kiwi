@@ -27,13 +27,8 @@
  * SUCH DAMAGE.
  */
 
-/* FIXME */
-#if 0
 #include <sys/types.h>
-#include <sys/limits.h>
 #include <math.h>
-#include <ieeefp.h>
-#include <machine/ieee.h>
 #include "math_private.h"
 
 #ifndef LROUNDNAME
@@ -48,7 +43,7 @@
 RESTYPE
 LROUNDNAME(double x)
 {
-	uint32_t i0, i1;
+	u_int32_t i0, i1;
 	int e, s, shift;
 	RESTYPE res;
 
@@ -88,4 +83,3 @@ LROUNDNAME(double x)
 
 	return (s ? -res : res);
 }
-#endif

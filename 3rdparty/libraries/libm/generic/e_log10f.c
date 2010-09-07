@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_log10f.c,v 1.5 1995/05/10 20:45:53 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -46,7 +42,7 @@ log10f(float x)
         }
 	if (hx >= 0x7f800000) return x+x;
 	k += (hx>>23)-127;
-	i  = ((uint32_t)k&0x80000000)>>31;
+	i  = ((u_int32_t)k&0x80000000)>>31;
         hx = (hx&0x007fffff)|((0x7f-i)<<23);
         y  = (float)(k+i);
 	SET_FLOAT_WORD(x,hx);

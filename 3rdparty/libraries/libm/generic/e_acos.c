@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_acos.c,v 1.9 1995/05/12 04:57:13 jtc Exp $";
-#endif
-
 /* acos(x)
  * Method :                  
  *	acos(x)  = pi/2 - asin(x)
@@ -38,7 +34,9 @@ static char rcsid[] = "$NetBSD: e_acos.c,v 1.9 1995/05/12 04:57:13 jtc Exp $";
  * Function needed: sqrt
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double 
@@ -65,7 +63,7 @@ acos(double x)
 	GET_HIGH_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(ix>=0x3ff00000) {	/* |x| >= 1 */
-	    uint32_t lx;
+	    u_int32_t lx;
 	    GET_LOW_WORD(lx,x);
 	    if(((ix-0x3ff00000)|lx)==0) {	/* |x|==1 */
 		if(hx>0) return 0.0;		/* acos(1) = 0  */
@@ -101,3 +99,9 @@ acos(double x)
 	    return 2.0*(df+w);
 	}
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(acosl, acos);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

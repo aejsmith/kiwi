@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_asin.c,v 1.9 1995/05/12 04:57:22 jtc Exp $";
-#endif
-
 /* asin(x)
  * Method :                  
  *	Since  asin(x) = x + x^3/6 + x^5*3/40 + x^7*15/336 + ...
@@ -44,8 +40,9 @@ static char rcsid[] = "$NetBSD: e_asin.c,v 1.9 1995/05/12 04:57:22 jtc Exp $";
  *
  */
 
+#include <float.h>
+#include <math.h>
 
-#include "math.h"
 #include "math_private.h"
 
 static const double 
@@ -74,7 +71,7 @@ asin(double x)
 	GET_HIGH_WORD(hx,x);
 	ix = hx&0x7fffffff;
 	if(ix>= 0x3ff00000) {		/* |x|>= 1 */
-	    uint32_t lx;
+	    u_int32_t lx;
 	    GET_LOW_WORD(lx,x);
 	    if(((ix-0x3ff00000)|lx)==0)
 		    /* asin(1)=+-pi/2 with inexact */
@@ -110,3 +107,9 @@ asin(double x)
 	}    
 	if(hx>0) return t; else return -t;    
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(asinl, asin);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

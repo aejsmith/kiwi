@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_rintf.c,v 1.4 1995/05/10 20:48:06 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -30,7 +26,7 @@ float
 rintf(float x)
 {
 	int32_t i0,jj0,sx;
-	uint32_t i,i1;
+	u_int32_t i,i1;
 	float w,t;
 	GET_FLOAT_WORD(i0,x);
 	sx = (i0>>31)&1;

@@ -10,22 +10,26 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_fabs.c,v 1.7 1995/05/10 20:47:13 jtc Exp $";
-#endif
-
 /*
  * fabs(x) returns the absolute value of x.
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 double
 fabs(double x)
 {
-	uint32_t high;
+	u_int32_t high;
 	GET_HIGH_WORD(high,x);
 	SET_HIGH_WORD(x,high&0x7fffffff);
         return x;
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(fabsl, fabs);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

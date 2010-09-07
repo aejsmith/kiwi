@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_log10.c,v 1.9 1995/05/10 20:45:51 jtc Exp $";
-#endif
-
 /* log10(x)
  * Return the base 10 logarithm of x
  * 
@@ -63,7 +59,7 @@ log10(double x)
 {
 	double y,z;
 	int32_t i,k,hx;
-	uint32_t lx;
+	u_int32_t lx;
 
 	EXTRACT_WORDS(hx,lx,x);
 
@@ -77,7 +73,7 @@ log10(double x)
         }
 	if (hx >= 0x7ff00000) return x+x;
 	k += (hx>>20)-1023;
-	i  = ((uint32_t)k&0x80000000)>>31;
+	i  = ((u_int32_t)k&0x80000000)>>31;
         hx = (hx&0x000fffff)|((0x3ff-i)<<20);
         y  = (double)(k+i);
 	SET_HIGH_WORD(x,hx);

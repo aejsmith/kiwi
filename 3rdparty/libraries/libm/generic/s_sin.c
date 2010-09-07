@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_sin.c,v 1.7 1995/05/10 20:48:15 jtc Exp $";
-#endif
-
 /* sin(x)
  * Return sine function of x.
  *
@@ -45,7 +41,9 @@ static char rcsid[] = "$NetBSD: s_sin.c,v 1.7 1995/05/10 20:48:15 jtc Exp $";
  *	TRIG(x) returns trig(x) nearly rounded 
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 double
@@ -76,3 +74,9 @@ sin(double x)
 	    }
 	}
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(sinl, sin);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

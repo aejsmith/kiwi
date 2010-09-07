@@ -11,7 +11,6 @@
  */
 
 #if 0
-#include <sys/cdefs.h>
 __FBSDID("$FreeBSD: src/lib/msun/src/s_trunc.c,v 1.1 2004/06/20 09:25:43 das Exp $");
 #endif
 
@@ -33,7 +32,7 @@ double
 trunc(double x)
 {
 	int32_t i0,i1,jj0;
-	uint32_t i;
+	u_int32_t i;
 	EXTRACT_WORDS(i0,i1,x);
 	jj0 = ((i0>>20)&0x7ff)-0x3ff;
 	if(jj0<20) {
@@ -53,7 +52,7 @@ trunc(double x)
 	    if(jj0==0x400) return x+x;	/* inf or NaN */
 	    else return x;		/* x is integral */
 	} else {
-	    i = ((uint32_t)(0xffffffff))>>(jj0-20);
+	    i = ((u_int32_t)(0xffffffff))>>(jj0-20);
 	    if((i1&i)==0) return x;	/* x is integral */
 	    if(huge+x>0.0)		/* raise inexact flag */
 		i1 &= (~i);

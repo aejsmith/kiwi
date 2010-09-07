@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_powf.c,v 1.6 1995/05/12 04:57:35 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -121,7 +117,7 @@ powf(float x, float y)
 	}
     
     /* (x<0)**(non-int) is NaN */
-	if(((((uint32_t)hx>>31)-1)|yisint)==0) return (x-x)/(x-x);
+	if(((((u_int32_t)hx>>31)-1)|yisint)==0) return (x-x)/(x-x);
 
     /* |y| is huge */
 	if(iy>0x4d000000) { /* if |y| > 2**27 */
@@ -192,7 +188,7 @@ powf(float x, float y)
 	}
 
 	s = one; /* s (sign of result -ve**odd) = -1 else = 1 */
-	if(((((uint32_t)hx>>31)-1)|(yisint-1))==0)
+	if(((((u_int32_t)hx>>31)-1)|(yisint-1))==0)
 	    s = -one;	/* (-ve)**(odd int) */
 
     /* split up y into yy1+y2 and compute (yy1+y2)*(t1+t2) */
@@ -209,7 +205,7 @@ powf(float x, float y)
 	}
 	else if ((j&0x7fffffff)>0x43160000)		/* z <= -150 */
 	    return s*tiny*tiny;				/* underflow */
-	else if ((uint32_t)j==0xc3160000){		/* z == -150 */
+	else if (j==0xc3160000){			/* z == -150 */
 	    if(p_l<=z-p_h) return s*tiny*tiny;		/* underflow */
 	}
     /*

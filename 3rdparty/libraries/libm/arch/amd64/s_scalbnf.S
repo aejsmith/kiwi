@@ -1,4 +1,4 @@
-/*	$OpenBSD: s_scalbnf.S,v 1.2 2005/08/02 11:17:31 espie Exp $ */
+/*	$OpenBSD: s_scalbnf.S,v 1.4 2009/04/25 11:03:35 martynas Exp $ */
 /*
  * Written by J.T. Conklin <jtc@NetBSD.org>.
  * Public domain.
@@ -8,11 +8,17 @@
 
 #include "abi.h"
 
+.global ldexpf
+	ldexpf = scalbnf
+
 ENTRY(scalbnf)
-	XMM_TWO_ARG_FLOAT_PROLOGUE
-	fildl	ARG_FLOAT_TWO
-	flds	ARG_FLOAT_ONE
+	movss	%xmm0,-8(%rsp)
+	movl	%edi,-4(%rsp)
+	fildl	-4(%rsp)
+	flds	-8(%rsp)
 	fscale
 	fstp	%st(1)		/* bug fix for fp stack overflow */
-	XMM_FLOAT_EPILOGUE
+	fstps	-8(%rsp)
+	movss	-8(%rsp),%xmm0
 	ret
+

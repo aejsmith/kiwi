@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_jn.c,v 1.9 1995/05/10 20:45:34 jtc Exp $";
-#endif
-
 /*
  * jn(n, x), yn(n, x)
  * floating point Bessel's function of the 1st and 2nd kind
@@ -63,7 +59,7 @@ jn(int n, double x)
 	EXTRACT_WORDS(hx,lx,x);
 	ix = 0x7fffffff&hx;
     /* if J(n,NaN) is NaN */
-	if((ix|((uint32_t)(lx|-lx))>>31)>0x7ff00000) return x+x;
+	if((ix|((u_int32_t)(lx|-lx))>>31)>0x7ff00000) return x+x;
 	if(n<0){		
 		n = -n;
 		x = -x;
@@ -216,7 +212,7 @@ yn(int n, double x)
 	EXTRACT_WORDS(hx,lx,x);
 	ix = 0x7fffffff&hx;
     /* if Y(n,NaN) is NaN */
-	if((ix|((uint32_t)(lx|-lx))>>31)>0x7ff00000) return x+x;
+	if((ix|((u_int32_t)(lx|-lx))>>31)>0x7ff00000) return x+x;
 	if((ix|lx)==0) return -one/zero;
 	if(hx<0) return zero/zero;
 	sign = 1;
@@ -249,7 +245,7 @@ yn(int n, double x)
 		}
 		b = invsqrtpi*temp/sqrt(x);
 	} else {
-	    uint32_t high;
+	    u_int32_t high;
 	    a = y0(x);
 	    b = y1(x);
 	/* quit if b is -inf */

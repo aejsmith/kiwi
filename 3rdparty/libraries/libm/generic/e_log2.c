@@ -31,7 +31,7 @@ log2(double x)
 {
 	double hfsq,f,s,z,R,w,t1,t2,dk;
 	int32_t k,hx,i,j;
-	uint32_t lx;
+	u_int32_t lx;
 
 	EXTRACT_WORDS(hx,lx,x);
 

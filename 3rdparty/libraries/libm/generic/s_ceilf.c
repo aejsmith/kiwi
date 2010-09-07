@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_ceilf.c,v 1.4 1995/05/10 20:46:55 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -26,7 +22,7 @@ float
 ceilf(float x)
 {
 	int32_t i0,jj0;
-	uint32_t i;
+	u_int32_t i;
 
 	GET_FLOAT_WORD(i0,x);
 	jj0 = ((i0>>23)&0xff)-0x7f;

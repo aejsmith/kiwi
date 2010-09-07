@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_frexp.c,v 1.9 1995/05/10 20:47:24 jtc Exp $";
-#endif
-
 /*
  * for non-zero x 
  *	x = frexp(arg,&exp);
@@ -24,7 +20,9 @@ static char rcsid[] = "$NetBSD: s_frexp.c,v 1.9 1995/05/10 20:47:24 jtc Exp $";
  * with *exp=0. 
  */
 
-#include "math.h"
+#include <float.h>
+#include <math.h>
+
 #include "math_private.h"
 
 static const double
@@ -49,3 +47,9 @@ frexp(double x, int *eptr)
 	SET_HIGH_WORD(x,hx);
 	return x;
 }
+
+#if LDBL_MANT_DIG == 53
+#ifdef __weak_alias
+__weak_alias(frexpl, frexp);
+#endif /* __weak_alias */
+#endif /* LDBL_MANT_DIG == 53 */

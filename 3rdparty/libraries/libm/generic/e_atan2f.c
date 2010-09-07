@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_atan2f.c,v 1.4 1995/05/10 20:44:53 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -85,7 +81,7 @@ atan2f(float y, float x)
 	switch (m) {
 	    case 0: return       z  ;	/* atan(+,+) */
 	    case 1: {
-	    	      uint32_t zh;
+	    	      u_int32_t zh;
 		      GET_FLOAT_WORD(zh,z);
 		      SET_FLOAT_WORD(z,zh ^ 0x80000000);
 		    }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: s_fdim.c,v 1.1 2008/09/07 20:36:09 martynas Exp $	*/
+/*	$OpenBSD: s_fdim.c,v 1.4 2009/10/26 21:06:19 kettenis Exp $	*/
 /*-
  * Copyright (c) 2004 David Schultz <das@FreeBSD.ORG>
  * All rights reserved.
@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include <float.h>
 #include <math.h>
 
 #define	DECL(type, fn)			\

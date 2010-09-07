@@ -10,10 +10,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_cosh.c,v 1.7 1995/05/10 20:44:58 jtc Exp $";
-#endif
-
 /* cosh(x)
  * Method : 
  * mathematically cosh(x) if defined to be (exp(x)+exp(-x))/2
@@ -45,7 +41,7 @@ cosh(double x)
 {	
 	double t,w;
 	int32_t ix;
-	uint32_t lx;
+	u_int32_t lx;
 
     /* High word of |x|. */
 	GET_HIGH_WORD(ix,x);
@@ -74,7 +70,7 @@ cosh(double x)
     /* |x| in [log(maxdouble), overflowthresold] */
 	GET_LOW_WORD(lx,x);
 	if (ix<0x408633CE || 
-	      ((ix==0x408633ce)&&(lx<=(uint32_t)0x8fb9f87d))) {
+	      ((ix==0x408633ce)&&(lx<=(u_int32_t)0x8fb9f87d))) {
 	    w = exp(half*fabs(x));
 	    t = half*w;
 	    return t*w;

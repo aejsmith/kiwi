@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -26,6 +26,10 @@ sources += map(File, [
 	'e_scalb.S',
 	'e_sqrt.S',
 	'e_sqrtf.S',
+	'e_sqrtl.S',
+	'invtrig.c',
+	'isnanl.c',
+	'ldexp.c',
 	's_atan.S',
 	's_atanf.S',
 	's_ceil.S',
@@ -34,12 +38,14 @@ sources += map(File, [
 	's_copysignf.S',
 	's_cos.S',
 	's_cosf.S',
-	's_finite.S',
-	's_finitef.S',
 	's_floor.S',
 	's_floorf.S',
 	's_ilogb.S',
 	's_ilogbf.S',
+	's_llrint.S',
+	's_llrintf.S',
+	's_lrint.S',
+	's_lrintf.S',
 	's_log1p.S',
 	's_log1pf.S',
 	's_logb.S',
@@ -54,4 +60,5 @@ sources += map(File, [
 	's_sinf.S',
 	's_tan.S',
 	's_tanf.S',
+	'signbitl.c',
 ])

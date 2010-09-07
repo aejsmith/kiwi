@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: s_frexpf.c,v 1.5 1995/05/10 20:47:26 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -39,9 +35,6 @@ frexpf(float x, int *eptr)
 	}
 	*eptr += (ix>>23)-126;
 	hx = (hx&0x807fffff)|0x3f000000;
-
-	/** NOT SURE ABOUT THIS! */
-	SET_FLOAT_WORD(x, hx);
-	//*(int*)&x = hx;
+	*(int*)&x = hx;
 	return x;
 }

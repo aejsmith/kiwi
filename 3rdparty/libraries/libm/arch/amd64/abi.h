@@ -1,3 +1,4 @@
+/*	$OpenBSD: abi.h,v 1.3 2009/04/08 23:31:34 martynas Exp $	*/
 /*	$NetBSD: abi.h,v 1.2 2003/09/14 21:26:14 fvdl Exp $	*/
 
 /*
@@ -13,8 +14,6 @@
  * Define some prologues and epilogues to store and retrieve
  * xmm regs to local variables.
  */
-
-#ifdef __x86_64__
 
 #define ARG_DOUBLE_ONE		-8(%rsp)
 #define ARG_DOUBLE_TWO		-16(%rsp)
@@ -45,29 +44,3 @@
 
 #define FLDL_VAR(x)	fldl x(%rip)
 
-#else
-
-#define ARG_DOUBLE_ONE		4(%esp)
-#define ARG_DOUBLE_TWO		12(%esp)
-#define ARG_FLOAT_ONE		4(%esp)
-#define ARG_FLOAT_TWO		8(%esp)
-
-#define XMM_ONE_ARG_DOUBLE_PROLOGUE
-#define XMM_TWO_ARG_DOUBLE_PROLOGUE
-#define XMM_ONE_ARG_FLOAT_PROLOGUE
-#define XMM_TWO_ARG_FLOAT_PROLOGUE
-
-#define XMM_DOUBLE_EPILOGUE
-#define XMM_FLOAT_EPILOGUE
-
-#ifdef PIC
-#define FLDL_VAR(x) \
-	PIC_PROLOGUE ; \
-	fldl PIC_GOTOFF(x) ; \
-	PIC_EPILOGUE
-#else
-#define FLDL_VAR(x) \
-	fldl x
-
-#endif
-#endif

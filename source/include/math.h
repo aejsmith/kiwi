@@ -1,16 +1,49 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
  *
- * Kiwi is open source software, released under the terms of the Non-Profit
- * Open Software License 3.0. You should have received a copy of the
- * licensing information along with the source code distribution. If you
- * have not received a copy of the license, please refer to the Kiwi
- * project website.
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice 
+ * is preserved.
+ * ====================================================
+ */
+/*
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
- * Please note that if you modify this file, the license requires you to
- * ADD your name to the list of contributors. This boilerplate is not the
- * license itself; please refer to the copy of the license you have received
- * for complete terms.
+ * This software was developed by the Computer Systems Engineering group
+ * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
+ * contributed to Berkeley.
+ *
+ * All advertising materials mentioning features or use of this software
+ * must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Lawrence Berkeley Laboratory.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /**
@@ -34,6 +67,24 @@ typedef unsigned long u_long;
 
 #if defined(__x86_64__) || defined(__i386__)
 
+#define	SNG_EXPBITS	8
+#define	SNG_FRACBITS	23
+
+#define	DBL_EXPBITS	11
+#define	DBL_FRACHBITS	20
+#define	DBL_FRACLBITS	32
+#define	DBL_FRACBITS	52
+
+#define	EXT_EXPBITS	15
+#define	EXT_FRACHBITS	32
+#define	EXT_FRACLBITS	32
+#define	EXT_FRACBITS	64
+
+#define	EXT_TO_ARRAY32(p, a) do {		\
+	(a)[0] = (uint32_t)(p)->ext_fracl;	\
+	(a)[1] = (uint32_t)(p)->ext_frach;	\
+} while(0)
+
 struct ieee_single {
 	u_int	sng_frac:23;
 	u_int	sng_exp:8;
@@ -52,27 +103,21 @@ struct ieee_ext {
 	u_int	ext_frach;
 	u_int	ext_exp:15;
 	u_int	ext_sign:1;
-	u_int	ext_pad:16;
-#if defined(__x86_64__)
+#ifdef __x86_64__
+	u_int	ext_padl:16;
 	u_int	ext_padh;
+#else
+	u_int	ext_pad:16;
 #endif
 };
-
-#define	DBL_EXPBITS	11
-#define	DBL_FRACHBITS	20
-#define	DBL_FRACLBITS	32
-#define	DBL_FRACBITS	52
-
-#define	SNG_EXPBITS	8
-#define	SNG_FRACBITS	23
-
-#define	SNG_EXP_BIAS	127
-#define	DBL_EXP_BIAS	1023
-#define	EXT_EXP_BIAS	16383
 
 #define	SNG_EXP_INFNAN	255
 #define	DBL_EXP_INFNAN	2047
 #define	EXT_EXP_INFNAN	32767
+
+#define	SNG_EXP_BIAS	127
+#define	DBL_EXP_BIAS	1023
+#define	EXT_EXP_BIAS	16383
 
 #else
 # error "No math definitions for your arch"
@@ -82,98 +127,108 @@ struct ieee_ext {
  * ANSI/POSIX
  */
 extern char __infinity[];
-#define HUGE_VAL        (*(double *)(void *)__infinity)
+#define HUGE_VAL	(*(double *)(void *)__infinity)
 
 /*
  * C99
  */
-typedef double        double_t;
-typedef float        float_t;
+typedef double	double_t;
+typedef	float	float_t;
 
-#define HUGE_VALF        ((float)HUGE_VAL)
-#define HUGE_VALL        ((long double)HUGE_VAL)
-#define INFINITY        HUGE_VALF
-
+#ifdef __vax__
+extern char __infinityf[];
+#define	HUGE_VALF	(*(float *)(void *)__infinityf)
+#else /* __vax__ */
+#define	HUGE_VALF	((float)HUGE_VAL)
+#endif /* __vax__ */
+#define	HUGE_VALL	((long double)HUGE_VAL)
+#define	INFINITY	HUGE_VALF
+#ifndef __vax__
 extern char __nan[];
-#define NAN                (*(float *)(void *)__nan)
+#define	NAN		(*(float *)(void *)__nan)
+#endif /* !__vax__ */
 
-#define FP_INFINITE        0x01
-#define FP_NAN                0x02
-#define FP_NORMAL        0x04
-#define FP_SUBNORMAL        0x08
-#define FP_ZERO                0x10
+#define	FP_INFINITE	0x01
+#define	FP_NAN		0x02
+#define	FP_NORMAL	0x04
+#define	FP_SUBNORMAL	0x08
+#define	FP_ZERO		0x10
 
-#define FP_ILOGB0       (-INT_MAX)
-#define FP_ILOGBNAN     INT_MAX
+#define FP_ILOGB0	(-INT_MAX)
+#define FP_ILOGBNAN	INT_MAX
 
 #define fpclassify(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                __fpclassifyf(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __fpclassify(x) \
-        :        __fpclassifyl(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__fpclassifyf(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__fpclassify(x) \
+	:	__fpclassifyl(x))
 #define isfinite(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                __isfinitef(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __isfinite(x) \
-        :        __isfinitel(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__isfinitef(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__isfinite(x) \
+	:	__isfinitel(x))
 #define isnormal(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                __isnormalf(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __isnormal(x) \
-        :        __isnormall(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__isnormalf(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__isnormal(x) \
+	:	__isnormall(x))
 #define signbit(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                __signbitf(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __signbit(x) \
-        :        __signbitl(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__signbitf(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__signbit(x) \
+	:	__signbitl(x))
 
-#define isgreater(x, y)                (!isunordered((x), (y)) && (x) > (y))
-#define isgreaterequal(x, y)        (!isunordered((x), (y)) && (x) >= (y))
-#define isless(x, y)                (!isunordered((x), (y)) && (x) < (y))
-#define islessequal(x, y)        (!isunordered((x), (y)) && (x) <= (y))
-#define islessgreater(x, y)        (!isunordered((x), (y)) && \
-                                        ((x) > (y) || (y) > (x)))
-#define isunordered(x, y)        (isnan(x) || isnan(y))
+#define	isgreater(x, y)		(!isunordered((x), (y)) && (x) > (y))
+#define	isgreaterequal(x, y)	(!isunordered((x), (y)) && (x) >= (y))
+#define	isless(x, y)		(!isunordered((x), (y)) && (x) < (y))
+#define	islessequal(x, y)	(!isunordered((x), (y)) && (x) <= (y))
+#define	islessgreater(x, y)	(!isunordered((x), (y)) && \
+					((x) > (y) || (y) > (x)))
+#define	isunordered(x, y)	(isnan(x) || isnan(y))
 
 #define isinf(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                isinff(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __isinf(x) \
-        :        __isinfl(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__isinff(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__isinf(x) \
+	:	__isinfl(x))
 #define isnan(x) \
-        ((sizeof (x) == sizeof (float)) ? \
-                isnanf(x) \
-        : (sizeof (x) == sizeof (double)) ? \
-                __isnan(x) \
-        :        __isnanl(x))
+	((sizeof (x) == sizeof (float)) ? \
+		__isnanf(x) \
+	: (sizeof (x) == sizeof (double)) ? \
+		__isnan(x) \
+	:	__isnanl(x))
 
 /*
  * XOPEN/SVID
  */
-#define M_E                2.7182818284590452354        /* e */
-#define M_LOG2E                1.4426950408889634074        /* log 2e */
-#define M_LOG10E        0.43429448190325182765        /* log 10e */
-#define M_LN2                0.69314718055994530942        /* log e2 */
-#define M_LN10                2.30258509299404568402        /* log e10 */
-#define M_PI                3.14159265358979323846        /* pi */
-#define M_PI_2                1.57079632679489661923        /* pi/2 */
-#define M_PI_4                0.78539816339744830962        /* pi/4 */
-#define M_1_PI                0.31830988618379067154        /* 1/pi */
-#define M_2_PI                0.63661977236758134308        /* 2/pi */
-#define M_2_SQRTPI        1.12837916709551257390        /* 2/sqrt(pi) */
-#define M_SQRT2                1.41421356237309504880        /* sqrt(2) */
-#define M_SQRT1_2        0.70710678118654752440        /* 1/sqrt(2) */
+#define	M_E		2.7182818284590452354	/* e */
+#define	M_LOG2E		1.4426950408889634074	/* log 2e */
+#define	M_LOG10E	0.43429448190325182765	/* log 10e */
+#define	M_LN2		0.69314718055994530942	/* log e2 */
+#define	M_LN10		2.30258509299404568402	/* log e10 */
+#define	M_PI		3.14159265358979323846	/* pi */
+#define	M_PI_2		1.57079632679489661923	/* pi/2 */
+#define	M_PI_4		0.78539816339744830962	/* pi/4 */
+#define	M_1_PI		0.31830988618379067154	/* 1/pi */
+#define	M_2_PI		0.63661977236758134308	/* 2/pi */
+#define	M_2_SQRTPI	1.12837916709551257390	/* 2/sqrt(pi) */
+#define	M_SQRT2		1.41421356237309504880	/* sqrt(2) */
+#define	M_SQRT1_2	0.70710678118654752440	/* 1/sqrt(2) */
 
-#define MAXFLOAT        ((float)3.40282346638528860e+38)
+#ifdef __vax__
+#define	MAXFLOAT	((float)1.70141173319264430e+38)
+#else
+#define	MAXFLOAT	((float)3.40282346638528860e+38)
+#endif /* __vax__ */
 
 extern int signgam;
 
-#define HUGE                MAXFLOAT
+#define	HUGE		MAXFLOAT
 
 /*
  * ANSI/POSIX
@@ -219,9 +274,7 @@ extern double log1p(double);
 extern double log2(double);
 extern double logb(double);
 extern double scalbn(double, int);
-#if 0
 extern double scalbln(double, long int);
-#endif
 
 extern double cbrt(double);
 extern double hypot(double, double);
@@ -232,14 +285,14 @@ extern double lgamma(double);
 extern double tgamma(double);
 
 #if 0
-extern double nearbyint(double);
+double nearbyint(double);
 #endif
 extern double rint(double);
 extern long int lrint(double);
 extern long long int llrint(double);
 extern double round(double);
-//extern long int lround(double);
-//extern long long int llround(double);
+extern long int lround(double);
+extern long long int llround(double);
 extern double trunc(double);
 
 extern double remainder(double, double);
@@ -249,7 +302,7 @@ extern double copysign(double, double);
 extern double nan(const char *);
 extern double nextafter(double, double);
 #if 0
-extern double nexttoward(double, long double);
+double nexttoward(double, long double);
 #endif
 
 extern double fdim(double, double);
@@ -257,7 +310,7 @@ extern double fmax(double, double);
 extern double fmin(double, double);
 
 #if 0
-extern double fma(double, double, double);
+double fma(double, double, double);
 #endif
 
 extern double j0(double);
@@ -319,9 +372,7 @@ extern float log2f(float);
 extern float logbf(float);
 extern float modff(float, float *);
 extern float scalbnf(float, int);
-#if 0
 extern float scalblnf(float, long int);
-#endif
 
 extern float cbrtf(float);
 extern float fabsf(float);
@@ -337,14 +388,14 @@ extern float tgammaf(float);
 extern float ceilf(float);
 extern float floorf(float);
 #if 0
-extern float nearbyintf(float);
+float nearbyintf(float);
 #endif
 extern float rintf(float);
 extern long int lrintf(float);
 extern long long int llrintf(float);
 extern float roundf(float);
-//extern long int lroundf(float);
-//extern long long int llroundf(float);
+extern long int lroundf(float);
+extern long long int llroundf(float);
 extern float truncf(float);
 
 extern float fmodf(float, float);
@@ -355,7 +406,7 @@ extern float copysignf(float, float);
 extern float nanf(const char *);
 extern float nextafterf(float, float);
 #if 0
-extern float nexttowardf(float, long double);
+float nexttowardf(float, long double);
 #endif
 
 extern float fdimf(float, float);
@@ -363,7 +414,7 @@ extern float fmaxf(float, float);
 extern float fminf(float, float);
 
 #if 0
-extern float fmaf(float, float, float);
+float fmaf(float, float, float);
 #endif
 
 extern float j0f(float);
@@ -400,7 +451,6 @@ extern float significandf(float);
 /*
  * Long double versions of C99 functions
  */
-#if 0
 extern long double acosl(long double);
 extern long double asinl(long double);
 extern long double atanl(long double);
@@ -409,66 +459,89 @@ extern long double cosl(long double);
 extern long double sinl(long double);
 extern long double tanl(long double);
 
-extern long double acoshl(long double);
-extern long double asinhl(long double);
-extern long double atanhl(long double);
-extern long double coshl(long double);
-extern long double sinhl(long double);
-extern long double tanhl(long double);
+#if 0
+long double acoshl(long double);
+long double asinhl(long double);
+long double atanhl(long double);
+long double coshl(long double);
+long double sinhl(long double);
+long double tanhl(long double);
+#endif
 
-extern long double expl(long double);
+#if 0
+long double expl(long double);
+#endif
 extern long double exp2l(long double);
-extern long double expm1l(long double);
+#if 0
+long double expm1l(long double);
+#endif
 extern long double frexpl(long double, int *);
 extern int ilogbl(long double);
 extern long double ldexpl(long double, int);
-extern long double logl(long double);
-extern long double log10l(long double);
-extern long double log1pl(long double);
-extern long double log2l(long double);
+#if 0
+long double logl(long double);
+long double log10l(long double);
+long double log1pl(long double);
+long double log2l(long double);
+#endif
 extern long double logbl(long double);
-extern long double modfl(long double, long double *);
+#if 0
+long double modfl(long double, long double *);
+#endif
 extern long double scalbnl(long double, int);
 extern long double scalblnl(long double, long int);
 
-extern long double cbrtl(long double);
+#if 0
+long double cbrtl(long double);
+#endif
 extern long double fabsl(long double);
-extern long double hypotl(long double, long double);
-extern long double powl(long double, long double);
+#if 0
+long double hypotl(long double, long double);
+long double powl(long double, long double);
+#endif
 extern long double sqrtl(long double);
 
-extern long double erfl(long double);
-extern long double erfcl(long double);
-extern long double lgammal(long double);
-extern long double tgammal(long double);
+#if 0
+long double erfl(long double);
+long double erfcl(long double);
+long double lgammal(long double);
+long double tgammal(long double);
+#endif
 
-extern long double ceill(long double);
-extern long double floorl(long double);
-extern long double nearbyintl(long double);
+#if 0
+long double ceill(long double);
+long double floorl(long double);
+long double nearbyintl(long double);
+#endif
 extern long double rintl(long double);
-extern long int lrintl(long double);
-extern long long int llrintl(long double);
-extern long double roundl(long double);
-extern long int lroundl(long double);
-extern long long int llroundl(long double);
-extern long double truncl(long double);
+#if 0
+long int lrintl(long double);
+long long int llrintl(long double);
+long double roundl(long double);
+long int lroundl(long double);
+long long int llroundl(long double);
+long double truncl(long double);
+#endif
 
-extern long double fmodl(long double, long double);
-extern long double remainderl(long double, long double);
-extern long double remquol(long double, long double, int *);
+#if 0
+long double fmodl(long double, long double);
+long double remainderl(long double, long double);
+long double remquol(long double, long double, int *);
+#endif
 
 extern long double copysignl(long double, long double);
 extern long double nanl(const char *);
-extern long double nextafterl(long double, long double);
-extern long double nexttowardl(long double, long double);
-
-#endif
-extern long double fdiml(long double, long double);
 #if 0
+long double nextafterl(long double, long double);
+long double nexttowardl(long double, long double);
+#endif
+
+extern long double fdiml(long double, long double);
 extern long double fmaxl(long double, long double);
 extern long double fminl(long double, long double);
 
-extern long double fmal(long double, long double, long double);
+#if 0
+long double fmal(long double, long double, long double);
 #endif
 
 /*
@@ -481,8 +554,10 @@ extern int __isfinite(double);
 extern int __isfinitef(float);
 extern int __isfinitel(long double);
 extern int __isinf(double);
+extern int __isinff(float);
 extern int __isinfl(long double);
 extern int __isnan(double);
+extern int __isnanf(float);
 extern int __isnanl(long double);
 extern int __isnormal(double);
 extern int __isnormalf(float);
@@ -490,6 +565,10 @@ extern int __isnormall(long double);
 extern int __signbit(double);
 extern int __signbitf(float);
 extern int __signbitl(long double);
+
+#if defined(__vax__)
+extern double infnan(int);
+#endif
 
 #ifdef __cplusplus
 }

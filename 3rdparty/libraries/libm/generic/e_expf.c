@@ -13,10 +13,6 @@
  * ====================================================
  */
 
-#if defined(LIBM_SCCS) && !defined(lint)
-static char rcsid[] = "$NetBSD: e_expf.c,v 1.5 1995/05/10 20:45:05 jtc Exp $";
-#endif
-
 #include "math.h"
 #include "math_private.h"
 
@@ -44,7 +40,7 @@ expf(float x)	/* default IEEE double exp */
 {
 	float y,hi,lo,c,t;
 	int32_t k,xsb;
-	uint32_t hx;
+	u_int32_t hx;
 
 	GET_FLOAT_WORD(hx,x);
 	xsb = (hx>>31)&1;		/* sign bit of x */
@@ -83,12 +79,12 @@ expf(float x)	/* default IEEE double exp */
 	if(k==0) 	return one-((x*c)/(c-(float)2.0)-x); 
 	else 		y = one-((lo-(x*c)/((float)2.0-c))-hi);
 	if(k >= -125) {
-	    uint32_t hy;
+	    u_int32_t hy;
 	    GET_FLOAT_WORD(hy,y);
 	    SET_FLOAT_WORD(y,hy+(k<<23));	/* add k to y's exponent */
 	    return y;
 	} else {
-	    uint32_t hy;
+	    u_int32_t hy;
 	    GET_FLOAT_WORD(hy,y);
 	    SET_FLOAT_WORD(y,hy+((k+100)<<23));	/* add k to y's exponent */
 	    return y*twom100;
