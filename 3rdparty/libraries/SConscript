@@ -18,5 +18,5 @@ SConscript(dirs=[
 	'zlib-1.2.5',
 	'pixman-0.19.2',
 	'libpng-1.4.3',
-	'cairo-1.8.10',
+	'cairo-1.10.0',
 ], exports=['env'])

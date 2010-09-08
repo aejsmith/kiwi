@@ -1,1 +1,1 @@
-../../../3rdparty/libraries/cairo-1.8.10/src/cairo-version.h
+../../../3rdparty/libraries/cairo-1.10.0/src/cairo-version.h
