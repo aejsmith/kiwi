@@ -78,6 +78,7 @@ sources = map(File, [
 	'stdlib/bsearch.c',
 	'stdlib/environ.c',
 	'stdlib/exit.c',
+	'stdlib/ldiv.c',
 	'stdlib/malloc.c',
 	'stdlib/mkstemp.c',
 	'stdlib/qsort.c',

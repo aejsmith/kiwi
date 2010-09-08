@@ -58,13 +58,13 @@ extern long atol(const char *s);
 extern long long atoll(const char *s);
 extern void *bsearch(const void *key, const void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *));
 extern void *calloc(size_t nmemb, size_t size);
-//extern div_t div(int numerator, int denominator);
+extern div_t div(int num, int denom);
 extern void exit(int status) __attribute__((noreturn));
 extern void free(void *ptr);
 extern char *getenv(const char *name);
 //extern int getsubopt(char **optionp, char *const *keylistp, char **valuep);
 extern long labs(long j);
-//extern ldiv_t ldiv(long numerator, long denominator);
+extern ldiv_t ldiv(long num, long denom);
 extern long long llabs(long long j);
 //extern lldiv_t lldiv(long long numerator, long long denominator);
 extern void *malloc(size_t size);
@@ -94,8 +94,6 @@ extern int unsetenv(const char *name);
 //extern int wctomb(char *s, wchar_t wc);
 
 #ifdef __cplusplus
-extern div_t div(int numerator, int denominator);
-extern ldiv_t ldiv(long numerator, long denominator);
 extern int system(const char *command);
 #endif
 
