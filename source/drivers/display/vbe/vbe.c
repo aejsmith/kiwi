@@ -35,22 +35,6 @@
 /** Display device structure. */
 static device_t *vbe_display_device;
 
-/** Get a framebuffer address.
- * @param _device	Device to get address from.
- * @param offset	Offset into the framebuffer.
- * @param physp		Where to store physical address.
- * @return		Status code describing result of the operation. */
-static status_t vbe_display_get_page(display_device_t *_device, offset_t offset, phys_ptr_t *physp) {
-	vbe_device_t *device = _device->data;
-
-	if(offset > (offset_t)device->size) {
-		return STATUS_NOT_FOUND;
-	}
-
-	*physp = device->phys + offset;
-	return STATUS_SUCCESS;
-}
-
 /** Set the display mode.
  * @param _dev		Device to set mode of.
  * @param mode		Mode structure for mode to set.
@@ -77,18 +61,34 @@ static status_t vbe_display_set_mode(display_device_t *_device, display_mode_t *
 
 /** VBE display operations. */
 static display_ops_t vbe_display_ops = {
-	.get_page = vbe_display_get_page,
 	.set_mode = vbe_display_set_mode,
 };
+
+/** Convert a mode depth to a pixel format.
+ * @param depth		Depth to convert.
+ * @return		Pixel format. */
+static pixel_format_t depth_to_format(uint16_t depth) {
+	switch(depth) {
+	case 8:
+		return PIXEL_FORMAT_IDX8;
+	case 16:
+		return PIXEL_FORMAT_RGB16;
+	case 24:
+		return PIXEL_FORMAT_RGB24;
+	case 32:
+	default:
+		return PIXEL_FORMAT_RGB32;
+	}
+}
 
 /** Initialisation function for the VBE driver.
  * @return		Status code describing result of the operation. */
 static status_t vbe_init(void) {
-	vbe_device_t *device = kmalloc(sizeof(vbe_device_t), MM_SLEEP);
+	phys_ptr_t mem_phys = ~((phys_ptr_t)0);
+	size_t count = 0, i, mem_size = 0;
 	vbe_mode_info_t *minfo = NULL;
 	display_mode_t *modes = NULL;
 	vbe_info_t *info = NULL;
-	size_t count = 0, i;
 	uint16_t *location;
 	bios_regs_t regs;
 	status_t ret;
@@ -119,14 +119,9 @@ static status_t vbe_init(void) {
 	if(info->vbe_version >= 0x0200) {
 		kprintf(LOG_NORMAL, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
 	}
+	mem_size = (info->total_memory * 64) * 1024;
 
-	/* Save a copy of the data, but don't free it yet: the modes may be
-	 * stored in the reserved section of it. */
-	memcpy(&device->info, info, sizeof(vbe_info_t));
-	device->phys = ~((phys_ptr_t)0);
-	device->size = (info->total_memory * 64) * 1024;
-
-	location = bios_mem_phys2virt(SEGOFF2LIN(device->info.video_mode_ptr));
+	location = bios_mem_phys2virt(SEGOFF2LIN(info->video_mode_ptr));
 	if(!location) {
 		ret = STATUS_DEVICE_ERROR;
 		goto out;
@@ -180,23 +175,24 @@ static status_t vbe_init(void) {
 		modes[count].id = location[i];
 		modes[count].width = minfo->x_resolution;
 		modes[count].height = minfo->y_resolution;
-		modes[count].depth = minfo->bits_per_pixel;
+		modes[count].format = depth_to_format(minfo->bits_per_pixel);
 		modes[count].offset = minfo->phys_base_ptr;
 		count++;
 
 		/* Try to guess the memory address. */
-		if(minfo->phys_base_ptr < device->phys) {
-			device->phys = minfo->phys_base_ptr;
+		if(minfo->phys_base_ptr < mem_phys) {
+			mem_phys = minfo->phys_base_ptr;
 		}
 	}
 
 	/* Now fix up mode offsets. */
 	for(i = 0; i < count; i++) {
-		modes[i].offset = modes[i].offset - device->phys;
+		modes[i].offset = modes[i].offset - mem_phys;
 	}
 
 	/* Add the display device. */
-	ret = display_device_create(NULL, NULL, &vbe_display_ops, device, modes, count, &vbe_display_device);
+	ret = display_device_create(NULL, NULL, &vbe_display_ops, NULL, modes, count,
+	                            mem_phys, mem_size, &vbe_display_device);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

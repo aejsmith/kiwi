@@ -26,7 +26,10 @@
 using namespace std;
 
 /** Construct the application server. */
-AppServer::AppServer() {}
+AppServer::AppServer() {
+	/* Open the display. TODO: Multi-display support. */
+	m_display = new Display("/display/0");
+}
 
 /** Create a new session.
  * @param path		Path to binary to run as initial session process.

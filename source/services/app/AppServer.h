@@ -26,6 +26,7 @@
 #include <map>
 
 #include "Connection.h"
+#include "Display.h"
 #include "Session.h"
 
 /** Class implementing the application server. */
@@ -46,6 +47,7 @@ private:
 
 	SessionMap m_sessions;			/**< Map of sessions. */
 	ConnectionList m_connections;		/**< Connections to the server. */
+	Display *m_display;			/**< Display that the server is using. */
 };
 
 #endif /* __APPSERVER_H */

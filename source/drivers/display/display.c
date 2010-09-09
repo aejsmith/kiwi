@@ -45,6 +45,34 @@ static atomic_t next_display_id = 0;
 /** Device used as the kernel framebuffer console. */
 static display_device_t *display_console_device = NULL;
 
+/** Convert a mode's pixel format to a depth in bits.
+ * @param mode		Mode to get depth of.
+ * @return		Depth in bits. */
+static uint16_t display_mode_depth(display_mode_t *mode) {
+	switch(mode->format) {
+	case PIXEL_FORMAT_ARGB32:
+	case PIXEL_FORMAT_BGRA32:
+	case PIXEL_FORMAT_RGB32:
+	case PIXEL_FORMAT_BGR32:
+		return 32;
+	case PIXEL_FORMAT_RGB24:
+	case PIXEL_FORMAT_BGR24:
+		return 24;
+	case PIXEL_FORMAT_ARGB16:
+	case PIXEL_FORMAT_BGRA16:
+	case PIXEL_FORMAT_RGB16:
+	case PIXEL_FORMAT_BGR16:
+		return 16;
+	case PIXEL_FORMAT_RGB15:
+	case PIXEL_FORMAT_BGR15:
+		return 15;
+	case PIXEL_FORMAT_IDX8:
+	case PIXEL_FORMAT_GREY8:
+		return 8;
+	}
+	return 0;
+}
+
 /** Reset the framebuffer console upon KDBG/fatal entry.
  * @param arg1		First notifier argument.
  * @param arg2		Second notifier argument.
@@ -97,9 +125,9 @@ static display_mode_t *display_mode_find(display_device_t *device, uint16_t widt
 
 	for(i = 0; i < device->count; i++) {
 		if(device->modes[i].width == width && device->modes[i].height == height) {
-			if(depth && device->modes[i].depth == depth) {
+			if(depth && display_mode_depth(&device->modes[i]) == depth) {
 				return &device->modes[i];
-			} else if(!ret || device->modes[i].depth > ret->depth) {
+			} else if(!ret || display_mode_depth(&device->modes[i]) > display_mode_depth(ret)) {
 				ret = &device->modes[i];
 			}
 		}
@@ -185,7 +213,13 @@ static void display_device_unwait(device_t *_device, void *data, object_wait_t *
  * @return		Status code describing result of the operation. */
 static status_t display_device_get_page(device_t *_device, void *data, offset_t offset, phys_ptr_t *physp) {
 	display_device_t *device = _device->data;
-	return device->ops->get_page(device, offset, physp);
+
+	if(offset >= (offset_t)device->mem_size) {
+		return STATUS_NOT_FOUND;
+	}
+
+	*physp = device->mem_phys + offset;
+	return STATUS_SUCCESS;
 }
 
 /** Handler for display device requests.
@@ -201,7 +235,6 @@ static status_t display_device_request(device_t *_device, void *data, int reques
                                        size_t insz, void **outp, size_t *outszp) {
 	display_device_t *device = _device->data;
 	display_mode_t *mode = NULL;
-	phys_ptr_t phys;
 	status_t ret;
 	uint16_t id;
 
@@ -290,13 +323,9 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			/* Set this device as the kernel console if there
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
-				ret = device->ops->get_page(device, mode->offset, &phys);
-				if(ret != STATUS_SUCCESS) {
-					fatal("Could not get video device framebuffer (%d)", ret);
-				}
-
 				/* Point the framebuffer console at the device. */
-				fb_console_reconfigure(mode->width, mode->height, mode->depth, phys);
+				fb_console_reconfigure(mode->width, mode->height, display_mode_depth(mode),
+				                       device->mem_phys + mode->offset);
 				fb_console.inhibited = true;
 
 				/* Register notifiers to reset the console upon
@@ -349,6 +378,7 @@ static device_ops_t display_device_ops = {
  * @return		Status code describing result of the operation. */
 status_t display_device_create(const char *name, device_t *parent, display_ops_t *ops,
                                void *data, display_mode_t *modes, size_t count,
+                               phys_ptr_t mem_phys, size_t mem_size,
                                device_t **devicep) {
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "display" } },
@@ -368,10 +398,12 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	device->id = atomic_inc(&next_display_id);
 	device->ops = ops;
 	device->data = data;
-	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_SLEEP);
-	device->count = count;
 	device->curr_mode = NULL;
 	device->redraw = false;
+	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_SLEEP);
+	device->count = count;
+	device->mem_phys = mem_phys;
+	device->mem_size = mem_size;
 
 	/* Create the device tree node. */
 	sprintf(dname, "%" PRId32, device->id);

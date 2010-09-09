@@ -18,6 +18,7 @@ env.Program('app', [
 	'Application.cc',
 	'AppServer.cc',
 	'Connection.cc',
+	'Display.cc',
 	'Session.cc',
 ], LIBS=['kiwi'])
 

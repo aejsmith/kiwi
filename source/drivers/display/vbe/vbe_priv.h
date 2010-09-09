@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -96,13 +96,6 @@ typedef struct vbe_mode_info {
 
 	uint8_t  reserved4[189];
 } __attribute__((packed)) vbe_mode_info_t;
-
-/** VBE device data structure. */
-typedef struct vbe_device {
-	vbe_info_t info;			/**< Device information structure. */
-	phys_ptr_t phys;			/**< Base address of framebuffer. */
-	size_t size;				/**< Size of device memory. */
-} vbe_device_t;
 
 /** VBE function definitions. */
 #define VBE_FUNCTION_CONTROLLER_INFO	0x4F00	/**< Return VBE Controller Information. */

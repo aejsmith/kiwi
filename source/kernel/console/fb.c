@@ -126,6 +126,10 @@ static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
 
 	/* Draw the pixel. */
 	switch(fb_console_depth) {
+	case 15:
+		colour16 = (RED(colour, 5) << 11) | (GREEN(colour, 5) << 5) | BLUE(colour, 5);
+		*(uint16_t *)mdest = *(uint16_t *)bdest = colour16;
+		break;
 	case 16:
 		colour16 = (RED(colour, 5) << 11) | (GREEN(colour, 6) << 5) | BLUE(colour, 5);
 		*(uint16_t *)mdest = *(uint16_t *)bdest = colour16;
