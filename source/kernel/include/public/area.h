@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Shared memory functions.
+ * @brief		Memory area functions.
  */
 
-#ifndef __KERNEL_SHM_H
-#define __KERNEL_SHM_H
+#ifndef __KERNEL_AREA_H
+#define __KERNEL_AREA_H
 
 #ifdef KERNEL
 # include <public/types.h>
@@ -31,13 +31,13 @@
 extern "C" {
 #endif
 
-extern status_t SYSCALL(shm_create)(size_t size, handle_t *handlep);
-extern status_t SYSCALL(shm_open)(shm_id_t id, handle_t *handlep);
-extern shm_id_t SYSCALL(shm_id)(handle_t handle);
-extern status_t SYSCALL(shm_resize)(handle_t handle, size_t size);
+extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset, handle_t *handlep);
+extern status_t SYSCALL(area_open)(area_id_t id, handle_t *handlep);
+extern area_id_t SYSCALL(area_id)(handle_t handle);
+extern status_t SYSCALL(area_resize)(handle_t handle, size_t size);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_SHM_H */
+#endif /* __KERNEL_AREA_H */

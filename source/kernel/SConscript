@@ -34,7 +34,6 @@ sources = map(File, [
 
 	'ipc/ipc.c',
 	'ipc/pipe.c',
-	'ipc/shm.c',
 
 	'lib/avl_tree.c',
 	'lib/bitmap.c',
@@ -45,6 +44,7 @@ sources = map(File, [
 	'lib/radix_tree.c',
 	'lib/string.c',
 
+	'mm/area.c',
 	'mm/kheap.c',
 	'mm/malloc.c',
 	'mm/page.c',
