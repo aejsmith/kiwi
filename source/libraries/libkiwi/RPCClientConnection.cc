@@ -16,11 +16,9 @@
 /**
  * @file
  * @brief		RPC client connection class.
- *
- * @todo		Should this handle errors somehow? I'm not going to
- *			use exceptions here.
  */
 
+#include <kiwi/private/log.h>
 #include <kiwi/RPC.h>
 
 using namespace kiwi;
@@ -59,14 +57,22 @@ void RPCClientConnection::HandleHangup() {
 
 /** Signal handler for a message being received. */
 void RPCClientConnection::_HandleMessage() {
-	uint32_t id;
-	size_t size;
-	char *data;
-	if(!m_conn.Receive(id, data, size)) {
+	try {
+		uint32_t id;
+		size_t size;
+		char *data;
+		if(!m_conn.Receive(id, data, size)) {
+			return;
+		}
+
+		RPCMessageBuffer buf(data, size);
+		HandleMessage(id, buf);
+		SendMessage(id, buf);
+	} catch(RPCError &e) {
+		log::warning("RPC error during message handling: %s\n", e.GetDescription());
+		return;
+	} catch(IPCError &e) {
+		log::warning("IPC error during message handling: %s\n", e.GetDescription());
 		return;
 	}
-
-	RPCMessageBuffer buf(data, size);
-	HandleMessage(id, buf);
-	SendMessage(id, buf);
 }
