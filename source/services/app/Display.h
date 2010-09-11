@@ -22,10 +22,9 @@
 #define __DISPLAY_H
 
 #include <drivers/display.h>
-
 #include <kiwi/Handle.h>
-
 #include <vector>
+#include "Surface.h"
 
 /** Class representing a display. */
 class Display : public kiwi::Handle {
@@ -43,12 +42,17 @@ public:
 	/** Get the current mode the device is using.
 	 * @return		Reference to current mode. */
 	const display_mode_t &GetCurrentMode() const { return m_current_mode; }
+
+	/** Get the surface for the framebuffer.
+	 * @return		Pointer to surface for framebuffer. */
+	Surface *GetSurface() const { return m_surface; }
 private:
 	void RegisterEvents();
 	void EventReceived(int id);
 
 	ModeVector m_modes;		/**< Modes supported by the device. */
 	display_mode_t m_current_mode;	/**< Current mode set on the device. */
+	Surface *m_surface;		/**< Surface referring to framebuffer. */
 };
 
 #endif /* __DISPLAY_H */

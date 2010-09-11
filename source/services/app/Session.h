@@ -24,21 +24,29 @@
 #include <kiwi/IPCPort.h>
 
 #include <list>
+#include <map>
 
 #include "org.kiwi.AppServer.h"
 
 class AppServer;
 class Application;
+class Surface;
 
 /** Class representing a session. */
 class Session : public kiwi::Object {
 	/** Type of the application list. */
 	typedef std::list<Application *> ApplicationList;
+
+	/** Type of the surface map. */
+	typedef std::map<area_id_t, Surface *> SurfaceMap;
 public:
 	Session(AppServer *server, const char *path);
 	~Session();
 
 	void RemoveApplication(Application *app);
+
+	void AddSurface(Surface *surface);
+	Surface *FindSurface(area_id_t id);
 
 	/** Get the ID of the session.
 	 * @return		ID of the session. */
@@ -50,6 +58,7 @@ private:
 	session_id_t m_id;		/**< ID of the session. */
 	kiwi::IPCPort m_port;		/**< Port for the session. */
 	ApplicationList m_apps;		/**< Applications running in the session. */
+	SurfaceMap m_surfaces;		/**< Surfaces on the server. */
 
 	static bool s_initial_created;	/**< Whether the initial session has been created. */
 };

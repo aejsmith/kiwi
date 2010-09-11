@@ -56,6 +56,7 @@ Display::Display(const char *path) {
 	ret = device_request(m_handle, DISPLAY_GET_MODES, NULL, 0, modes, sizeof(*modes) * count, NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get modes for " << path << " (" << ret << ")" << endl;
+		delete[] modes;
 		throw exception();
 	}
 	for(size_t i = 0; i < count; i++) {
@@ -64,19 +65,22 @@ Display::Display(const char *path) {
 	delete[] modes;
 
 	/* Try to get the preferred display mode. */
-	display_mode_t mode;
-	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &mode, sizeof(display_mode_t), NULL);
+	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &m_current_mode, sizeof(display_mode_t), NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get preferred mode for " << path << " (" << ret << ")" << endl;
 		throw exception();
 	}
 
 	/* Set the mode. */
-	ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL);
+	ret = device_request(m_handle, DISPLAY_SET_MODE, &m_current_mode.id, sizeof(m_current_mode.id), NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to set mode for " << path << " (" << ret << ")" << endl;
 		throw exception();
 	}
+
+	/* Create the surface for the framebuffer. */
+	m_surface = new Surface(m_handle, m_current_mode.offset, m_current_mode.width,
+	                        m_current_mode.height, m_current_mode.format);
 }
 
 /** Display destructor. */

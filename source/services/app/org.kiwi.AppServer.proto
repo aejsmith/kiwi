@@ -15,16 +15,65 @@ service org.kiwi.AppServer 1 {
 	# Session ID type. FIXME: Need kernel type definitions somewhere.
 	type SessionID int32;
 
-	# Session protocol definition. This is what applications connect to the
-	# server on.
-	service Session {
-		function CreateSession(out SessionID id);
-		function SwitchSession(SessionID id);
+	# Surface ID type. Surface IDs are the same as their area ID.
+	type SurfaceID int32;
+
+	# Window ID type.
+	type WindowID int32;
+
+	# Structure containing details of a point.
+	struct Point {
+		uint32 x;
+		uint32 y;
 	};
 
-	# The majority of the protocol is implemented in Session - applications
-	# connect to their session, not to the main port. The main service
-	# only provides things like events for session creation/switch.
+	# Structure containing dimensions of a rectangle.
+	struct Rect {
+		uint32 width;
+		uint32 height;
+	};
+
+	# Structure containing details of a region on a surface/window.
+	struct Region {
+		Point pos;
+		Rect rect;
+	};
+
+	# Session protocol definition. This is what applications connect to the
+	# server on. The majority of the protocol is implemented here, as apps
+	# connect to their session, not to the main port.
+	service Session {
+		# Session functions.
+		function CreateSession(out SessionID id);
+		function SwitchSession(SessionID id);
+
+		# Surface functions.
+		function CreateSurface(Rect size, out SurfaceID id);
+		function DestroySurface(SurfaceID id);
+		function GetSurfaceSize(SurfaceID id, out Rect size);
+		function ResizeSurface(SurfaceID id, Rect size);
+
+		# Window functions.
+		function CreateWindow(string name, Region region, out WindowID id);
+		function DestroyWindow(WindowID id);
+		function GetWindowRegion(WindowID id, out Region region);
+		function GetWindowSurface(WindowID id, out SurfaceID sid);
+		function RenameWindow(WindowID id, string name);
+		function MoveWindow(WindowID id, Point pos);
+		function ResizeWindow(WindowID id, Rect size);
+		function SubscribeToWindow(WindowID id, uint32 events);
+		function UpdateWindow(WindowID id, Region region);
+
+		# Window events.
+		event OnCreateWindow(WindowID id, string name, Region region);
+		event OnDestroyWindow(WindowID id);
+		event OnRenameWindow(WindowID id, string name);
+		event OnMoveWindow(WindowID id, Point pos);
+		event OnResizeWindow(WindowID id, Rect size);
+		event OnUpdateWindow(WindowID id, Region region);
+	};
+
+	# Session events.
 	event OnCreateSession(SessionID id);
 	event OnDestroySession(SessionID id);
 	event OnSwitchSession(SessionID id, SessionID prev);

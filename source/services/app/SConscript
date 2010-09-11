@@ -13,6 +13,12 @@
 
 Import('env')
 
+# Libraries to link to.
+libs = ['kiwi', 'pixman-1']
+
+# Include path.
+incpath = env['CPPPATH'] + ['../../include/pixman-1']
+
 env.Program('app', [
 	'org.kiwi.AppServer.cc',
 	'Application.cc',
@@ -20,7 +26,9 @@ env.Program('app', [
 	'Connection.cc',
 	'Display.cc',
 	'Session.cc',
-], LIBS=['kiwi'])
+	'Surface.cc',
+	'Window.cc',
+], LIBS=libs, CPPPATH=incpath)
 
 # Generate the client interface code.
 env.RPCServer('org.kiwi.AppServer.cc', 'org.kiwi.AppServer.proto')

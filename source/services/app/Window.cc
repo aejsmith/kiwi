@@ -15,30 +15,13 @@
 
 /**
  * @file
- * @brief		Memory area functions.
+ * @brief		Window class.
+ *
+ * The server does not implement the displaying of windows, or any policy on
+ * things like window order, position, focus, etc. This is all left up to the
+ * window manager. All that the server does is provide the mechanism for
+ * creation and deletion of windows, store properties about windows and provide
+ * surfaces for window content.
  */
 
-#ifndef __KERNEL_AREA_H
-#define __KERNEL_AREA_H
-
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset, handle_t *handlep);
-extern status_t SYSCALL(area_open)(area_id_t id, handle_t *handlep);
-extern area_id_t SYSCALL(area_id)(handle_t handle);
-extern size_t SYSCALL(area_size)(handle_t handle);
-extern status_t SYSCALL(area_resize)(handle_t handle, size_t size);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __KERNEL_AREA_H */
+#include "Window.h"

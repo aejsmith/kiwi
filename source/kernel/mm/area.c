@@ -268,6 +268,24 @@ area_id_t sys_area_id(handle_t handle) {
 	return ret;
 }
 
+/** Get the size of a memory area.
+ * @param handle	Handle to area.
+ * @return		Size of area, or 0 if handle is invalid. */
+size_t sys_area_size(handle_t handle) {
+	khandle_t *khandle;
+	area_t *area;
+	size_t ret;
+
+	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_AREA, &khandle) != STATUS_SUCCESS) {
+		return 0;
+	}
+
+	area = (area_t *)khandle->object;
+	ret = area->size;
+	handle_release(khandle);
+	return ret;
+}
+
 /** Resize a memory area.
  * @todo		Support shrinking areas.
  * @param handle	Handle to area.

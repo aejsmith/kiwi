@@ -15,30 +15,23 @@
 
 /**
  * @file
- * @brief		Memory area functions.
+ * @brief		Window class.
  */
 
-#ifndef __KERNEL_AREA_H
-#define __KERNEL_AREA_H
+#ifndef __WINDOW_H
+#define __WINDOW_H
 
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
+#include "org.kiwi.AppServer.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+class Application;
 
-extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset, handle_t *handlep);
-extern status_t SYSCALL(area_open)(area_id_t id, handle_t *handlep);
-extern area_id_t SYSCALL(area_id)(handle_t handle);
-extern size_t SYSCALL(area_size)(handle_t handle);
-extern status_t SYSCALL(area_resize)(handle_t handle, size_t size);
+/** Class implementing a window. */
+class Window {
+public:
+	/** Type of a window's ID. */
+	typedef org::kiwi::AppServer::WindowID ID;
+private:
 
-#ifdef __cplusplus
-}
-#endif
+};
 
-#endif /* __KERNEL_AREA_H */
+#endif /* __WINDOW_H */

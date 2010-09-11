@@ -89,6 +89,20 @@ void Session::RemoveApplication(Application *app) {
 	}
 }
 
+/** Add a surface to the session.
+ * @param surface	Surface to add. */
+void Session::AddSurface(Surface *surface) {
+	m_surfaces.insert(make_pair(surface->GetID(), surface));
+}
+
+/** Find a surface.
+ * @param id		ID of surface to find.
+ * @return		Pointer to surface if found, NULL if not. */
+Surface *Session::FindSurface(area_id_t id) {
+	SurfaceMap::iterator it = m_surfaces.find(id);
+	return (it != m_surfaces.end()) ? it->second : 0;
+}
+
 /** Handle a connection to a session. */
 void Session::HandleConnection() {
 	handle_t handle;
