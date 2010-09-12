@@ -23,7 +23,6 @@ env.SharedLibrary('kiwi', [
 	'Handle.cc',
 	'IPCConnection.cc',
 	'IPCPort.cc',
-	'IPCServer.cc',
 	'log.cc',
 	'Object.cc',
 	'Process.cc',
