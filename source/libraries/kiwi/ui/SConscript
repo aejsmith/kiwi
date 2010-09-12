@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -11,21 +11,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-import os
+Import('env')
 
-Import('env', 'config')
-
-# Create a link to the toolchain's linker script directory.
-if os.path.exists('ldscripts'):
-	os.remove('ldscripts')
-os.symlink('%s/%s/%s/toolchain-lib/ldscripts' % (config['TOOLCHAIN_DIR'], config['TOOLCHAIN_TARGET'], config['TOOLCHAIN_TARGET']),
-           'ldscripts')
-
-# Build all the libraries.
-SConscript(dirs=[
-	'kernel',
-	'libc',
-	'libstdc++',
-	'kiwi',
-	'3rdparty',
-], exports=['env'])
+env.SharedLibrary('kiwi-ui', [
+], LIBS=['kiwi', 'cairo'])

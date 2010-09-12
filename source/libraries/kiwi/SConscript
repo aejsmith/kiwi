@@ -13,6 +13,7 @@
 
 Import('env')
 
+# Build the core library.
 env.SharedLibrary('kiwi', [
 	'org.kiwi.AppServer.cc',
 	'org.kiwi.ServiceManager.cc',
@@ -36,3 +37,6 @@ env.RPCClient('org.kiwi.AppServer.cc', '../../services/app/org.kiwi.AppServer.pr
 
 # Generate the service manager interface code.
 env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
+
+# Build the additional libraries.
+SConscript(dirs=['ui'], exports=['env'])
