@@ -84,13 +84,6 @@ int main(int argc, char **argv) {
 		0,
 		"org.kiwi.AppServer"
 	));
-	svcmgr.AddService(new Service(
-		"pong",
-		"Service that pongs pings.",
-		"/system/services/pong",
-		Service::kOnDemand,
-		"org.kiwi.Pong"
-	));
 
 	svcmgr.Run();
 	return 0;
