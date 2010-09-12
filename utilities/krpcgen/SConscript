@@ -31,11 +31,15 @@ def rpc_emitter(target, source, env):
 	env.Depends(target[0], env['KRPCGEN'])
 	env.Depends(target[1], env['KRPCGEN'])
 	return target, source
+envmgr.AddBuilder('RPCServerClient', Builder(
+	action=Action('$KRPCGEN -s -c -o $TARGET $SOURCE', '$GENCOMSTR'),
+	emitter=rpc_emitter
+))
 envmgr.AddBuilder('RPCServer', Builder(
-	action=Action('$KRPCGEN -s $TARGET $SOURCE', '$GENCOMSTR'),
+	action=Action('$KRPCGEN -s -o $TARGET $SOURCE', '$GENCOMSTR'),
 	emitter=rpc_emitter
 ))
 envmgr.AddBuilder('RPCClient', Builder(
-	action=Action('$KRPCGEN -c $TARGET $SOURCE', '$GENCOMSTR'),
+	action=Action('$KRPCGEN -c -o $TARGET $SOURCE', '$GENCOMSTR'),
 	emitter=rpc_emitter
 ))

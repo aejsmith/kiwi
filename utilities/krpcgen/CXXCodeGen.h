@@ -27,8 +27,11 @@
 /** C++ code generator class. */
 class CXXCodeGen : public CodeGen {
 public:
-	bool GenerateServer(Service *service, const std::string &path);
-	bool GenerateClient(Service *service, const std::string &path);
+	bool Generate(Service *service, const std::string &path, bool server, bool client);
+
+	/** Get the output file extension.
+	 * @return		Output file extension. */
+	const char *OutputExtension() const { return ".cc"; }
 private:
 	void GenerateServerHeader(Service *service, std::ofstream &stream);
 	void GenerateServerCode(Service *service, std::ofstream &stream);

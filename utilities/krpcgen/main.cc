@@ -305,11 +305,11 @@ void set_service(statement_t *stmt) {
  * @param stream	Stream to output to.
  * @param progname	Program name. */
 static void usage(ostream &stream, const char *progname) {
-	stream << "Usage: " << progname << " [-t <target>] (-s <file>|-c <file>) <input file>" << endl;
+	stream << "Usage: " << progname << " [-t <target>] (-s|-c) [-o <output file>] <input file>" << endl;
 	stream << "Options:" << endl;
 	stream << " -t <target> - Specify target to generate code for (cxx, kernel)." << endl;
-	stream << " -s <file>   - Generate server code." << endl;
-	stream << " -c <file>   - Generate client code." << endl;
+	stream << " -s          - Generate server code." << endl;
+	stream << " -c          - Generate client code." << endl;
 	stream << "At least one of -s or -c must be specified." << endl;
 
 	exit((stream == cerr) ? 1 : 0);
@@ -325,7 +325,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* Parse the command line arguments. */
-	string client, server, target;
+	bool server = false, client = false;
+	string target, output;
 	for(int i = 1; i < argc; i++) {
 		if(strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
 			usage(cout, argv[0]);
@@ -338,18 +339,16 @@ int main(int argc, char **argv) {
 				usage(cerr, argv[0]);
 			}
 			target = argv[i];
+		} else if(strcmp(argv[i], "-o") == 0) {
+			if(++i == argc || argv[i][0] == 0) {
+				cerr << "Option '-o' requires an argument." << endl;
+				usage(cerr, argv[0]);
+			}
+			output = argv[i];
 		} else if(strcmp(argv[i], "-s") == 0) {
-			if(++i == argc || argv[i][0] == 0) {
-				cerr << "Option '-s' requires an argument." << endl;
-				usage(cerr, argv[0]);
-			}
-			server = argv[i];
+			server = true;
 		} else if(strcmp(argv[i], "-c") == 0) {
-			if(++i == argc || argv[i][0] == 0) {
-				cerr << "Option '-c' requires an argument." << endl;
-				usage(cerr, argv[0]);
-			}
-			client = argv[i];
+			client = true;
 		} else if(argv[i][0] == '-') {
 			cerr << "Unrecognised argument '" << argv[i] << '\'' << endl;
 			usage(cerr, argv[0]);
@@ -367,8 +366,8 @@ int main(int argc, char **argv) {
 		cerr << "No input file specified." << endl;
 		usage(cerr, argv[0]);
 	}
-	if(server.length() == 0 && client.length() == 0) {
-		cerr << "No output files specified." << endl;
+	if(!server && !client) {
+		cerr << "Must specify at least one of -s and -c." << endl;
 		usage(cerr, argv[0]);
 	}
 	if(target.length() == 0) {
@@ -404,16 +403,20 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	/* Generate the code. */
-	if(server.length() > 0) {
-		if(!cg->GenerateServer(current_service, server)) {
-			return 1;
+	/* Work out the output file name. */
+	if(!output.length()) {
+		string ipath = current_file;
+		size_t idx = ipath.find_last_of('.');
+		if(idx != string::npos) {
+			output = string(ipath, 0, idx) + cg->OutputExtension();
+		} else {
+			output = ipath + cg->OutputExtension();
 		}
 	}
-	if(client.length() > 0) {
-		if(!cg->GenerateClient(current_service, client)) {
-			return 1;
-		}
+
+	/* Generate the code. */
+	if(!cg->Generate(current_service, output, server, client)) {
+		return 1;
 	}
 	return 0;
 }

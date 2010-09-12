@@ -27,48 +27,37 @@
 
 using namespace std;
 
-/** Generate server code.
+/** Generate code.
  * @param service	Service to generate for.
  * @param path		Path to output file.
+ * @param server	Whether to generate server code.
+ * @param client	Whether to generate client code.
  * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateServer(Service *service, const string &path) {
+bool CXXCodeGen::Generate(Service *service, const string &path, bool server, bool client) {
 	ofstream stream;
 
 	/* Generate the header file. */
 	if(!BeginHeader(service, GetHeaderPath(path), stream)) {
 		return false;
 	}
-	GenerateServerHeader(service, stream);
+	if(server) {
+		GenerateServerHeader(service, stream);
+	}
+	if(client) {
+		GenerateClientHeader(service, stream);
+	}
 	EndHeader(stream);
 
 	/* Generate the main source file. */
 	if(!BeginCode(service, path, stream)) {
 		return false;
 	}
-	GenerateServerCode(service, stream);
-	EndCode(stream);
-	return true;
-}
-
-/** Generate client code.
- * @param service	Service to generate for.
- * @param path		Path to output file.
- * @return		Whether generated successfully. */
-bool CXXCodeGen::GenerateClient(Service *service, const string &path) {
-	ofstream stream;
-
-	/* Generate the header file. */
-	if(!BeginHeader(service, GetHeaderPath(path), stream)) {
-		return false;
+	if(server) {
+		GenerateServerCode(service, stream);
 	}
-	GenerateClientHeader(service, stream);
-	EndHeader(stream);
-
-	/* Generate the main source file. */
-	if(!BeginCode(service, path, stream)) {
-		return false;
+	if(client) {
+		GenerateClientCode(service, stream);
 	}
-	GenerateClientCode(service, stream);
 	EndCode(stream);
 	return true;
 }
