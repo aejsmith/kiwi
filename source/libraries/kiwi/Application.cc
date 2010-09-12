@@ -18,6 +18,7 @@
  * @brief		Application class.
  */
 
+#include <kiwi/private/log.h>
 #include <kiwi/Application.h>
 #include <kiwi/Error.h>
 
@@ -30,29 +31,29 @@ using namespace kiwi;
 using namespace org::kiwi::AppServer::Session;
 using namespace std;
 
-/** Macro to get the connection pointer. */
-#define GET_CONN()	reinterpret_cast<ServerConnection *>(m_conn)
+/** Application server connection instance. */
+ServerConnection *g_app_server = 0;
 
 /** Set up the application. */
-Application::Application() :
-	m_conn(0)
-{
+Application::Application() {
+	if(g_app_server) {
+		log::fatal("Application::Application: can only have 1 Application instance per process.\n");
+	}
+
 	/* Find the session port ID. */
 	const char *var = getenv("APPSERVER_PORT");
 	if(!var) {
-		clog << "Could not find app sever port ID" << endl;
-		throw OSError(STATUS_NOT_FOUND);
+		log::fatal("Could not find application server port ID\n");
 	}
 
 	/* Set up a connection to the application server. */
-	ServerConnection *conn = new ServerConnection(strtol(var, NULL, 10));
-	m_conn = reinterpret_cast<void *>(conn);
+	g_app_server = new ServerConnection(strtol(var, NULL, 10));
 }
 
 /** Destroy the application. */
 Application::~Application() {
-	if(m_conn) {
-		ServerConnection *conn = GET_CONN();
-		delete conn;
+	if(g_app_server) {
+		delete g_app_server;
+		g_app_server = 0;
 	}
 }

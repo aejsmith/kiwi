@@ -31,7 +31,7 @@ public:
 	/** Type of a window's ID. */
 	typedef org::kiwi::AppServer::WindowID ID;
 private:
-
+	
 };
 
 #endif /* __WINDOW_H */

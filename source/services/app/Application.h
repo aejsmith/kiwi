@@ -33,18 +33,23 @@ public:
 private:
 	status_t CreateSession(session_id_t &id);
 	status_t SwitchSession(session_id_t id);
+
 	status_t CreateSurface(org::kiwi::AppServer::Rect size, area_id_t &id);
 	status_t DestroySurface(area_id_t id);
 	status_t GetSurfaceSize(area_id_t id, org::kiwi::AppServer::Rect &size);
 	status_t ResizeSurface(area_id_t id, org::kiwi::AppServer::Rect size);
-	status_t CreateWindow(const std::string &name, org::kiwi::AppServer::Region region, Window::ID &id);
+
+	status_t CreateWindow(Window::ID &id);
 	status_t DestroyWindow(Window::ID id);
+	status_t SubscribeToWindow(Window::ID id, uint32_t events);
 	status_t GetWindowRegion(Window::ID id, org::kiwi::AppServer::Region &region);
 	status_t GetWindowSurface(Window::ID id, area_id_t &sid);
+	status_t CloseWindow(Window::ID id);
+	status_t ShowWindow(Window::ID id);
+	status_t HideWindow(Window::ID id);
 	status_t RenameWindow(Window::ID id, const std::string &name);
 	status_t MoveWindow(Window::ID id, org::kiwi::AppServer::Point pos);
 	status_t ResizeWindow(Window::ID id, org::kiwi::AppServer::Rect size);
-	status_t SubscribeToWindow(Window::ID id, uint32_t events);
 	status_t UpdateWindow(Window::ID id, org::kiwi::AppServer::Region region);
 
 	Session *m_session;		/**< Session that the application is running under. */

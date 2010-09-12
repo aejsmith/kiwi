@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 	AppServer server;
 
 	/* Create the initial session. */
-	server.CreateSession("/system/binaries/uitest");
+	server.CreateSession("/system/binaries/uiinit");
 
 	/* Run the event loop. */
 	server.Run();

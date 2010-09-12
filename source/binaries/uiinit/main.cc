@@ -15,23 +15,20 @@
 
 /**
  * @file
- * @brief		Application class.
+ * @brief		UI initialisation program.
+ *
+ * @todo		Replace this with per-user service manager instance.
  */
 
-#ifndef __KIWI_APPLICATION_H
-#define __KIWI_APPLICATION_H
+#include <kernel/thread.h>
+#include <kiwi/Process.h>
 
-#include <kiwi/EventLoop.h>
+using namespace kiwi;
 
-namespace kiwi {
-
-/** IPC server class. */
-class Application : public EventLoop {
-public:
-	Application();
-	~Application();
-};
-
+int main(int argc, char **argv) {
+	Process winmgr("/system/binaries/winmgr");
+	// FIXME: Window manager should find out if any windows exist when it
+	// starts. This sleep is to make sure the window manager is set up
+	// before we create.
+	return 0;
 }
-
-#endif /* __KIWI_APPLICATION_H */

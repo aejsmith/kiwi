@@ -54,19 +54,25 @@ service org.kiwi.AppServer 1 {
 		function ResizeSurface(SurfaceID id, Rect size);
 
 		# Window functions.
-		function CreateWindow(string name, Region region, out WindowID id);
+		function CreateWindow(out WindowID id);
 		function DestroyWindow(WindowID id);
+		function SubscribeToWindow(WindowID id, uint32 events);
 		function GetWindowRegion(WindowID id, out Region region);
 		function GetWindowSurface(WindowID id, out SurfaceID sid);
+		function CloseWindow(WindowID id);
+		function ShowWindow(WindowID id);
+		function HideWindow(WindowID id);
 		function RenameWindow(WindowID id, string name);
 		function MoveWindow(WindowID id, Point pos);
 		function ResizeWindow(WindowID id, Rect size);
-		function SubscribeToWindow(WindowID id, uint32 events);
 		function UpdateWindow(WindowID id, Region region);
 
 		# Window events.
 		event OnCreateWindow(WindowID id, string name, Region region);
 		event OnDestroyWindow(WindowID id);
+		event OnCloseWindow(WindowID id);
+		event OnShowWindow(WindowID id);
+		event OnHideWindow(WindowID id);
 		event OnRenameWindow(WindowID id, string name);
 		event OnMoveWindow(WindowID id, Point pos);
 		event OnResizeWindow(WindowID id, Rect size);

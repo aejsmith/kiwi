@@ -117,12 +117,9 @@ status_t Application::ResizeSurface(area_id_t id, org::kiwi::AppServer::Rect siz
 }
 
 /** Create a new window.
- * @param name		Title to give the window.
- * @param region	Location and dimensions of the window.
  * @param id		Where to store ID of window.
  * @return		Status code describing result of the operation. */
-status_t Application::CreateWindow(const string &name, org::kiwi::AppServer::Region region,
-                                   Window::ID &id) {
+status_t Application::CreateWindow(Window::ID &id) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -130,6 +127,15 @@ status_t Application::CreateWindow(const string &name, org::kiwi::AppServer::Reg
  * @param id		ID of window to destroy.
  * @return		Status code describing result of the operation. */
 status_t Application::DestroyWindow(Window::ID id) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Subscribe to events on a window.
+ * @param id		ID of window.
+ * @param events	Bitfield of events to subscribe to. This replaces the
+ *			previous subscriptions.
+ * @return		Status code describing result of the operation. */
+status_t Application::SubscribeToWindow(Window::ID id, uint32_t mask) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -146,6 +152,27 @@ status_t Application::GetWindowRegion(Window::ID id, org::kiwi::AppServer::Regio
  * @param sid		Where to store area ID for window's surface.
  * @return		Status code describing result of the operation. */
 status_t Application::GetWindowSurface(Window::ID id, area_id_t &sid) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Request that a window closes.
+ * @param id		ID of window to close.
+ * @return		Status code describing result of the operation. */
+status_t Application::CloseWindow(Window::ID id) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Show a window.
+ * @param id		ID of window to show.
+ * @return		Status code describing result of the operation. */
+status_t Application::ShowWindow(Window::ID id) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Hide a window.
+ * @param id		ID of window to hide.
+ * @return		Status code describing result of the operation. */
+status_t Application::HideWindow(Window::ID id) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -170,15 +197,6 @@ status_t Application::MoveWindow(Window::ID id, org::kiwi::AppServer::Point pos)
  * @param size		New size for the window.
  * @return		Status code describing result of the operation. */
 status_t Application::ResizeWindow(Window::ID id, org::kiwi::AppServer::Rect size) {
-	return STATUS_NOT_IMPLEMENTED;
-}
-
-/** Subscribe to events on a window.
- * @param id		ID of window.
- * @param events	Bitfield of events to subscribe to. This replaces the
- *			previous subscriptions.
- * @return		Status code describing result of the operation. */
-status_t Application::SubscribeToWindow(Window::ID id, uint32_t mask) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
