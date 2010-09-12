@@ -16,8 +16,5 @@ Import('env')
 SConscript(dirs=[
 	'failshell',
 	'forktest',
-	'ping',
-	'uiinit',
-	'winmgr',
 	'3rdparty',
 ], exports=['env'])
