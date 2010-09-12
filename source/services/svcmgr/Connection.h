@@ -21,14 +21,17 @@
 #ifndef __CONNECTION_H
 #define __CONNECTION_H
 
-#include "ClientConnection.h"
+#include "org.kiwi.ServiceManager.h"
+#include "ServiceManager.h"
 
 /** Class representing a client of the service manager. */
 class Connection : public org::kiwi::ServiceManager::ClientConnection {
 public:
-	Connection(handle_t handle);
+	Connection(handle_t handle, ServiceManager *svcmgr);
 private:
 	status_t LookupPort(const std::string &name, port_id_t &id);
+
+	ServiceManager *m_svcmgr;	/**< ServiceManager instance this connection belongs to. */
 };
 
 #endif /* __CONNECTION_H */

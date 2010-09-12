@@ -21,18 +21,20 @@
 #ifndef __SERVICEMANAGER_H
 #define __SERVICEMANAGER_H
 
-#include <kiwi/IPCServer.h>
+#include <kiwi/EventLoop.h>
 #include <kiwi/IPCConnection.h>
+#include <kiwi/IPCPort.h>
 
 #include <map>
 #include <list>
 #include <string>
 
+#include "org.kiwi.ServiceManager.h"
 #include "Port.h"
 #include "Service.h"
 
 /** Class implementing the service manager. */
-class ServiceManager : public kiwi::IPCServer {
+class ServiceManager : public kiwi::EventLoop {
 	/** Type for the port map. */
 	typedef std::map<std::string, Port *> PortMap;
 public:
@@ -40,17 +42,20 @@ public:
 
 	void AddService(Service *service);
 	Port *LookupPort(const std::string &name);
+	bool LookupPort(const std::string &name, port_id_t &id);
 
-	/** Get the instance of the service manager.
-	 * @return		Reference to service manager instance. */
-	static ServiceManager &Instance() { return *s_instance; }
+	/** Return whether the server is a session instance.
+	 * @return		Whether the server is a session instance. */
+	bool IsSessionInstance() const { return (m_parent != 0); }
 private:
-	void HandleConnection(handle_t handle);
+	void HandleConnection();
 
+	kiwi::IPCPort m_port;			/**< Server port. */
 	std::list<Service *> m_services;	/**< List of services. */
 	PortMap m_ports;			/**< Map of port names to port objects. */
 
-	static ServiceManager *s_instance;
+	/** Connection to global instance. */
+	org::kiwi::ServiceManager::ServerConnection *m_parent;
 };
 
 #endif /* __SERVICEMANAGER_H */

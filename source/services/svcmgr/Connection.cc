@@ -27,21 +27,18 @@ using namespace std;
 using namespace kiwi;
 
 /** Construct a connection object.
- * @param handle	Handle to the connection. */
-Connection::Connection(handle_t handle) :
-	org::kiwi::ServiceManager::ClientConnection(handle)
-{}
+ * @param handle	Handle to the connection.
+ * @param svcmgr	ServiceManager instance this connection belongs to. */
+Connection::Connection(handle_t handle, ServiceManager *svcmgr) :
+	org::kiwi::ServiceManager::ClientConnection(handle),
+	m_svcmgr(svcmgr)
+{
+}
 
 /** Look up a port.
  * @param name		Name of port to look up.
  * @param id		Where to store ID of port.
  * @return		0 on success, error code on failure. */
 status_t Connection::LookupPort(const string &name, port_id_t &id) {
-	Port *port = ServiceManager::Instance().LookupPort(name);
-	if(!port) {
-		return STATUS_NOT_FOUND;
-	}
-
-	id = port->GetID();
-	return STATUS_SUCCESS;
+	return m_svcmgr->LookupPort(name, id) ? STATUS_SUCCESS : STATUS_NOT_FOUND;
 }
