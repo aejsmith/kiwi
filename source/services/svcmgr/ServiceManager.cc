@@ -94,7 +94,10 @@ bool ServiceManager::LookupPort(const std::string &name, port_id_t &id) {
 	}
 
 	/* Look up in the parent. */
-	return (m_parent->LookupPort(name, id) == STATUS_SUCCESS) ? true : false;
+	if(m_parent && m_parent->LookupPort(name, id) == STATUS_SUCCESS) {
+		return true;
+	}
+	return false;
 }
 
 /** Handle a connection on the service manager port. */
@@ -117,12 +120,16 @@ int main(int argc, char **argv) {
 
 	/* Add services. TODO: These should be in configuration files. */
 	if(!svcmgr.IsSessionInstance()) {
-		svcmgr.AddService(new Service(
-			&svcmgr,
-			"console",
-			"Console.",
-			"/system/services/console"
-		));
+		/* Start up the session manager, then connect to it. */
+		//svcmgr.AddService(new Service(
+		//	&svcmgr,
+		//	"sessmgr",
+		//	"Session manager.",
+		//	"/system/services/sessmgr",
+		//	Service::kPerSession,
+		//	"org.kiwi.SessionManager"
+		//));
+		svcmgr.AddService(new Service(&svcmgr, "console", "Console.", "/system/services/console"));
 	}
 
 	svcmgr.Run();

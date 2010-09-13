@@ -29,6 +29,8 @@
  * Secondly, neither endpoint is freed until both ends of the connection are
  * closed. This makes it simpler to handle one end of a connection being
  * closed.
+ *
+ * @todo		This is all a bit naff.
  */
 
 #include <cpu/intr.h>
@@ -65,6 +67,12 @@
 
 struct ipc_connection;
 
+/** Structure used for synchronisation during connection. */
+typedef struct ipc_connect_sync {
+	semaphore_t sem;		/**< Semaphore for client to wait on. */
+	ipc_connect_info_t info;	/**< Information about the client. */
+} ipc_connect_sync_t;
+
 /** IPC port structure. */
 typedef struct ipc_port {
 	object_t obj;			/**< Object header. */
@@ -97,7 +105,7 @@ typedef struct ipc_connection {
 	ipc_port_t *port;		/**< Port that the connection is on. */
 	refcount_t count;		/**< Count of handles to either end of the connection. */
 	ipc_endpoint_t endpoints[2];	/**< Endpoints for each end of the connection. */
-	semaphore_t *sem;		/**< Pointer to semaphore used during connection setup. */
+	ipc_connect_sync_t *sync;	/**< Pointer to connection synchronisation structure. */
 } ipc_connection_t;
 
 /** In-kernel IPC message structure. */
@@ -155,7 +163,7 @@ static void ipc_port_release(ipc_port_t *port) {
 
 			list_remove(&conn->header);
 			conn->port = NULL;
-			semaphore_up(conn->sem, 1);
+			semaphore_up(&conn->sync->sem, 1);
 		}
 
 		/* Terminate all currently open connections. We do this by
@@ -470,8 +478,10 @@ port_id_t sys_ipc_port_id(handle_t handle) {
  *			connect to the port. If -1, the function will block
  *			indefinitely until a connection is made.
  * @param connp		Where to store handle to caller's end of the connection.
+ * @param infop		Where to store information about the thread that made
+ *			the conection.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp) {
+status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, ipc_connect_info_t *infop) {
 	ipc_connection_t *conn = NULL;
 	khandle_t *khandle;
 	ipc_port_t *port;
@@ -504,6 +514,17 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 		mutex_unlock(&port->lock);
 	}
 
+	/* Copy back information about the connection. */
+	if(infop) {
+		ret = memcpy_to_user(infop, &conn->sync->info, sizeof(*infop));
+		if(ret != STATUS_SUCCESS) {
+			semaphore_up(&port->conn_sem, 1);
+			mutex_unlock(&port->lock);
+			handle_release(khandle);
+			return ret;
+		}
+	}
+
 	/* Create a handle to the endpoint. */
 	refcount_inc(&conn->count);
 	ret = handle_create_and_attach(curr_proc, &conn->obj, &conn->endpoints[SERVER_ENDPOINT],
@@ -520,7 +541,8 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 	conn->port = port;
 
 	/* Wake the thread that made the connection. */
-	semaphore_up(conn->sem, 1);
+	semaphore_up(&conn->sync->sem, 1);
+	conn->sync = NULL;
 	mutex_unlock(&port->lock);
 	handle_release(khandle);
 	return ret;
@@ -531,7 +553,7 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
  * @param handlep	Where to store handle to caller's end of the connection.
  * @return		Status code describing result of the operation. */
 status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
-	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "ipc_open_sem", 0);
+	ipc_connect_sync_t sync;
 	ipc_connection_t *conn;
 	ipc_port_t *port;
 	handle_t handle;
@@ -544,7 +566,8 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 
 	mutex_lock(&port_tree_lock);
 
-	if(!(port = avl_tree_lookup(&port_tree, id))) {
+	port = avl_tree_lookup(&port_tree, id);
+	if(!port) {
 		mutex_unlock(&port_tree_lock);
 		return STATUS_NOT_FOUND;
 	}
@@ -561,7 +584,13 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 		conn->endpoints[i].remote = &conn->endpoints[(i + 1) % 2];
 	}
 	conn->port = port;
-	conn->sem = &sem;
+
+	/* Fill in the synchronisation structure. */
+	semaphore_init(&sync.sem, "ipc_connect_sem", 0);
+	sync.info.pid = curr_proc->id;
+	sync.info.tid = curr_thread->id;
+	sync.info.sid = curr_proc->session->id;
+	conn->sync = &sync;
 
 	/* Create a handle now, as we do not want to find that we cannot create
 	 * the handle after the connection has been accepted. */
@@ -581,7 +610,7 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	mutex_unlock(&port->lock);
 
 	/* Wait for the connection to be accepted. */
-	ret = semaphore_down_etc(&sem, -1, SYNC_INTERRUPTIBLE);
+	ret = semaphore_down_etc(&sync.sem, -1, SYNC_INTERRUPTIBLE);
 	if(ret != STATUS_SUCCESS) {
 		/* Take the port tree lock to ensure that the port doesn't get
 		 * freed. This is a bit naff, but oh well. */

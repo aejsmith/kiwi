@@ -38,6 +38,13 @@ typedef struct ipc_message_vector {
 	size_t size;				/**< Size of data buffer. */
 } ipc_message_vector_t;
 
+/** Structure containing details of a connection to a port. */
+typedef struct ipc_connect_info {
+	process_id_t pid;			/**< ID of process that connected. */
+	thread_id_t tid;			/**< ID of thread that connected. */
+	session_id_t sid;			/**< ID of session that connected. */
+} ipc_connect_info_t;
+
 /** IPC port handle event types. */
 #define PORT_EVENT_CONNECTION		0	/**< A connection is being made to the port. */
 
@@ -52,7 +59,8 @@ typedef struct ipc_message_vector {
 extern status_t SYSCALL(ipc_port_create)(handle_t *handlep);
 extern status_t SYSCALL(ipc_port_open)(port_id_t id, handle_t *handlep);
 extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);
-extern status_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout, handle_t *connp);
+extern status_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout, handle_t *handlep,
+                                         ipc_connect_info_t *infop);
 
 extern status_t SYSCALL(ipc_connection_open)(port_id_t id, handle_t *handlep);
 

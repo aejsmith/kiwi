@@ -11,6 +11,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
+type status_t int32_t;
 type handle_t int32_t;
 type process_id_t int32_t;
 type thread_id_t int32_t;
@@ -79,7 +80,7 @@ syscall thread_usleep(useconds_t);
 syscall ipc_port_create(ptr_t);
 syscall ipc_port_open(port_id_t, ptr_t);
 syscall ipc_port_id(handle_t);
-syscall ipc_port_listen(handle_t, useconds_t, ptr_t);
+syscall ipc_port_listen(handle_t, useconds_t, ptr_t, ptr_t);
 syscall ipc_connection_open(port_id_t, ptr_t);
 syscall ipc_message_send(handle_t, uint32_t, ptr_t, size_t);
 syscall ipc_message_sendv(handle_t, ptr_t, size_t);
