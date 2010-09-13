@@ -115,7 +115,7 @@ private:
 /** Base class for a connection to a server. */
 class RPCServerConnection : public Object {
 protected:
-	RPCServerConnection(const char *name, uint32_t version, port_id_t port = -1);
+	RPCServerConnection(const char *name, uint32_t version, port_id_t port = -1, handle_t handle = -1);
 
 	void SendMessage(uint32_t id, RPCMessageBuffer &buf);
 	void ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf);

@@ -28,6 +28,9 @@
 
 #include "Port.h"
 
+class Connection;
+class ServiceManager;
+
 /** Class defining a service known to the service manager. */
 class Service {
 public:
@@ -39,10 +42,12 @@ public:
 
 	/** Behaviour flags. */
 	enum Flags {
-		kOnDemand = 1,		/**< Should only be started when a port is needed. */
+		kOnDemand = (1<<0),	/**< Should only be started when a port is needed. */
+		kPerSession = (1<<1),	/**< Needs a port per session. */
 	};
 
-	Service(const char *name, const char *desc, const char *cmdline, int flags = 0, const char *port = 0);
+	Service(ServiceManager *svcmgr, const char *name, const char *desc, const char *cmdline,
+	        int flags = 0, const char *port = 0);
 	bool Start();
 
 	/** Get the service's flags.
@@ -57,16 +62,18 @@ public:
 	 * @return		Reference to the port list. */
 	Port *GetPort() const { return m_port; }
 private:
+	static void StartHelper(void *data);
 	void ProcessExited(int status);
 
+	ServiceManager *m_svcmgr;	/**< Service manager the service is for. */
 	std::string m_name;		/**< Name of the service. */
 	std::string m_description;	/**< Description of the service. */
 	std::string m_cmdline;		/**< Command line for the service. */
 	int m_flags;			/**< Behaviour flags. */
 	Port *m_port;			/**< Port for this service. */
-
 	State m_state;			/**< State of the service. */
 	kiwi::Process m_process;	/**< Process for the service. */
+	Connection *m_conn;		/**< Connection to the service. */
 };
 
 #endif /* __SERVICE_H */

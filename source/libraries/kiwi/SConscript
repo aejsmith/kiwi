@@ -38,4 +38,4 @@ env.RPCClient('org.kiwi.AppServer.cc', '../../services/app/org.kiwi.AppServer.pr
 env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
 
 # Build the additional libraries.
-SConscript(dirs=['ui'], exports=['env'])
+SConscript(dirs=['service', 'ui'], exports=['env'])

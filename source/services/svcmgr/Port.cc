@@ -16,6 +16,11 @@
 /**
  * @file
  * @brief		Service manager port class.
+ *
+ * @todo		Remove port from the event loop while the service is
+ *			running so that we don't get flooded with events if
+ *			the service doesn't accept the connection for some
+ *			reason.
  */
 
 #include <stdexcept>

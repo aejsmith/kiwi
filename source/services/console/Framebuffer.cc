@@ -96,6 +96,34 @@ static inline void putpixel_0888(uint32_t *dest, uint32_t colour) {
 	*dest = colour;
 }
 
+/** Convert a mode's pixel format to a depth in bits.
+ * @param mode		Mode to get depth of.
+ * @return		Depth in bits. */
+static uint16_t display_mode_depth(display_mode_t *mode) {
+	switch(mode->format) {
+	case PIXEL_FORMAT_ARGB32:
+	case PIXEL_FORMAT_BGRA32:
+	case PIXEL_FORMAT_RGB32:
+	case PIXEL_FORMAT_BGR32:
+		return 32;
+	case PIXEL_FORMAT_RGB24:
+	case PIXEL_FORMAT_BGR24:
+		return 24;
+	case PIXEL_FORMAT_ARGB16:
+	case PIXEL_FORMAT_BGRA16:
+	case PIXEL_FORMAT_RGB16:
+	case PIXEL_FORMAT_BGR16:
+		return 16;
+	case PIXEL_FORMAT_RGB15:
+	case PIXEL_FORMAT_BGR15:
+		return 15;
+	case PIXEL_FORMAT_IDX8:
+	case PIXEL_FORMAT_GREY8:
+		return 8;
+	}
+	return 0;
+}
+
 /** Constructor for a Framebuffer object.
  * @param device	Path to device to use. */
 Framebuffer::Framebuffer(const char *device) : m_buffer(0) {
@@ -125,7 +153,7 @@ Framebuffer::Framebuffer(const char *device) : m_buffer(0) {
 	/* Store mode details. */
 	m_width = mode.width;
 	m_height = mode.height;
-	m_depth = mode.depth;
+	m_depth = display_mode_depth(&mode);
 
 	/* Work out the size of the mapping to make. */
 	m_buffer_size = m_width * m_height * (m_depth / 8);

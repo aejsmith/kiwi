@@ -44,6 +44,10 @@ public:
 	Port *LookupPort(const std::string &name);
 	bool LookupPort(const std::string &name, port_id_t &id);
 
+	/** Get the port.
+	 * @return		Service manager's port. */
+	kiwi::IPCPort *GetPort() { return &m_port; }
+
 	/** Return whether the server is a session instance.
 	 * @return		Whether the server is a session instance. */
 	bool IsSessionInstance() const { return (m_parent != 0); }

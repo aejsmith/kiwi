@@ -171,6 +171,7 @@ void CXXCodeGen::GenerateClientHeader(Service *service, std::ofstream &stream) {
 	stream << "public:" << endl;
 	stream << "	ServerConnection();" << endl;
 	stream << "	ServerConnection(port_id_t id);" << endl;
+	stream << "	ServerConnection(handle_t handle, bool);" << endl;
 	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "	status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ");" << endl;
@@ -206,6 +207,9 @@ void CXXCodeGen::GenerateClientCode(Service *service, std::ofstream &stream) {
 	stream << "ServerConnection::ServerConnection(port_id_t id) : ::kiwi::RPCServerConnection(";
 	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
 	stream << ", id) {}" << endl;
+	stream << "ServerConnection::ServerConnection(handle_t handle, bool) : ::kiwi::RPCServerConnection(";
+	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
+	stream << ", -1, handle) {}" << endl;
 
 	/* Generate the function calls. */
 	BOOST_FOREACH(const Function *func, service->GetFunctions()) {

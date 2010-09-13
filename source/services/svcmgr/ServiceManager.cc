@@ -118,11 +118,10 @@ int main(int argc, char **argv) {
 	/* Add services. TODO: These should be in configuration files. */
 	if(!svcmgr.IsSessionInstance()) {
 		svcmgr.AddService(new Service(
-			"app",
-			"Application server.",
-			"/system/services/app",
-			0,
-			"org.kiwi.AppServer"
+			&svcmgr,
+			"console",
+			"Console.",
+			"/system/services/console"
 		));
 	}
 

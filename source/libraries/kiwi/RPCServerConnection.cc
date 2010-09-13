@@ -29,17 +29,22 @@ using namespace kiwi;
  * @param name		Name of the service.
  * @param version	Service version.
  * @param id		If not negative, this port will be used rather than
- *			looking up the port name. */
-RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, port_id_t id) :
-	m_name(name), m_version(version)
+ *			looking up the port name.
+ * @param handle	If not negative, both name and ID will be ignored, and
+ *			the object will use the connection referred to by this
+ *			handle. */
+RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, port_id_t id, handle_t handle) :
+	m_conn(handle), m_name(name), m_version(version)
 {
 	m_conn.OnMessage.Connect(this, &RPCServerConnection::HandleMessage);
 
 	/* Connect to the server. */
-	if(id >= 0) {
-		m_conn.Connect(id);
-	} else {
-		m_conn.Connect(m_name);
+	if(handle < 0) {
+		if(id >= 0) {
+			m_conn.Connect(id);
+		} else {
+			m_conn.Connect(m_name);
+		}
 	}
 
 	/* Check the server version. */
