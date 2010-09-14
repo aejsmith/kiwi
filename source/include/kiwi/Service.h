@@ -33,7 +33,7 @@ class Service : public EventLoop {
 public:
 	Service();
 protected:
-	virtual void HandleConnection(handle_t handle);
+	virtual void HandleConnection(handle_t handle, ipc_connect_info_t &info);
 private:
 	void _AddPort(const std::string &name, port_id_t id);
 	void _HandleConnection();

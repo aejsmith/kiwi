@@ -36,6 +36,8 @@ using namespace std;
 Port::Port(const char *name, Service *service) :
 	m_name(name), m_service(service)
 {
+	/* TODO: If a session instance, configure the ACL to only allow
+	 * connections from the session. */
 	m_port.Create();
 	m_port.OnConnection.Connect(this, &Port::HandleConnection);
 }

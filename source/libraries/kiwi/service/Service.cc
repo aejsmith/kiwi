@@ -39,8 +39,9 @@ Service::Service() : m_port(0) {
 }
 
 /** Handle a connection on the service's port.
- * @param handle	Handle to the connection. */
-void Service::HandleConnection(handle_t handle) {
+ * @param handle	Handle to the connection.
+ * @param info		Information about connecting thread. */
+void Service::HandleConnection(handle_t handle, ipc_connect_info_t &info) {
 	log::fatal("Service::HandleConnection must be reimplemented for services with a port\n");
 }
 
@@ -53,11 +54,13 @@ void Service::_AddPort(const std::string &name, port_id_t id) {
 
 /** Signal handler for port connection. */
 void Service::_HandleConnection() {
+	ipc_connect_info_t info;
 	handle_t handle;
 	try {
-		handle = m_port->Listen();
+		handle = m_port->Listen(&info);
 	} catch(...) {
 		return;
 	}
-	HandleConnection(handle);
+
+	HandleConnection(handle, info);
 }

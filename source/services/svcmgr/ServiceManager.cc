@@ -121,14 +121,14 @@ int main(int argc, char **argv) {
 	/* Add services. TODO: These should be in configuration files. */
 	if(!svcmgr.IsSessionInstance()) {
 		/* Start up the session manager, then connect to it. */
-		//svcmgr.AddService(new Service(
-		//	&svcmgr,
-		//	"sessmgr",
-		//	"Session manager.",
-		//	"/system/services/sessmgr",
-		//	Service::kPerSession,
-		//	"org.kiwi.SessionManager"
-		//));
+		svcmgr.AddService(new Service(
+			&svcmgr,
+			"sessmgr",
+			"Session manager.",
+			"/system/services/sessmgr",
+			0,
+			"org.kiwi.SessionManager"
+		));
 		svcmgr.AddService(new Service(&svcmgr, "console", "Console.", "/system/services/console"));
 	}
 
