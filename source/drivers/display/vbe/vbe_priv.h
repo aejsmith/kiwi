@@ -101,5 +101,6 @@ typedef struct vbe_mode_info {
 #define VBE_FUNCTION_CONTROLLER_INFO	0x4F00	/**< Return VBE Controller Information. */
 #define VBE_FUNCTION_MODE_INFO		0x4F01	/**< Return VBE Mode Information. */
 #define VBE_FUNCTION_SET_MODE		0x4F02	/**< Set VBE Mode. */
+#define VBE_FUNCTION_GET_MODE		0x4F03	/**< Return Current VBE Mode. */
 
 #endif /* __VBE_PRIV_H */

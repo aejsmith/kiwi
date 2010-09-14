@@ -43,6 +43,18 @@ static status_t vbe_display_set_mode(display_device_t *_device, display_mode_t *
 	bios_regs_t regs;
 
 	if(mode) {
+		/* Check if anything needs to be done. */
+		bios_regs_init(&regs);
+		regs.eax = VBE_FUNCTION_GET_MODE;
+		bios_interrupt(0x10, &regs);
+		if((regs.eax & 0xFF00) != 0) {
+			kprintf(LOG_DEBUG, "vbe: call failed with code 0x%x\n", regs.eax & 0xFFFF);
+			return STATUS_DEVICE_ERROR;
+		}
+		if((regs.ebx & ~((1<<14) | (1<<15))) == mode->id) {
+			return STATUS_SUCCESS;
+		}
+
 		kprintf(LOG_DEBUG, "vbe: switching to mode 0x%" PRIx32 " (mode: %p)\n", mode->id, mode);
 	}
 
