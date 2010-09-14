@@ -78,7 +78,7 @@ bool Service::Start() {
 		/* Create a thread that will connect to us. */
 		start_info info = { server->GetID(), -1, false };
 		handle_t handle;
-		status_t ret = thread_create("service_init", NULL, 0, &Service::StartHelper, &info, &handle);
+		status_t ret = thread_create("svcinit", NULL, 0, &Service::StartHelper, &info, &handle);
 		if(ret != STATUS_SUCCESS) {
 			cerr << "svcmgr: failed to create helper thread (" << ret << ")" << endl;
 			return false;
@@ -96,7 +96,7 @@ bool Service::Start() {
 
 	/* If the service has a port, pass information about it to it. */
 	if(m_port) {
-		m_conn->AddPort(m_port->GetName(), m_port->GetID(), 0);
+		m_conn->AddPort(m_port->GetName(), m_port->GetID());
 	}
 
 	/* Create the process. */

@@ -14,11 +14,10 @@
 service org.kiwi.ServiceManager 1 {
 	# Types used by the protocol. FIXME: Definitions for kernel types.
 	type PortID int32;
-	type SessionID int32;
 
 	# Functions for use by clients.
 	function LookupPort(string name, out PortID id);
 
 	# Events sent to services.
-	event AddPort(string name, PortID id, SessionID session);
+	event AddPort(string name, PortID id);
 };

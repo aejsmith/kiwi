@@ -33,10 +33,9 @@ class Service : public EventLoop {
 public:
 	Service();
 protected:
-	virtual void AddPort(const char *name, port_id_t id, session_id_t session);
 	virtual void HandleConnection(handle_t handle);
 private:
-	void _AddPort(const std::string &name, port_id_t id, session_id_t session);
+	void _AddPort(const std::string &name, port_id_t id);
 	void _HandleConnection();
 
 	void *m_svcmgr;			/**< Connection to service manager. */

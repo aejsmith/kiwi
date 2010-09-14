@@ -43,7 +43,6 @@ public:
 	/** Behaviour flags. */
 	enum Flags {
 		kOnDemand = (1<<0),	/**< Should only be started when a port is needed. */
-		kPerSession = (1<<1),	/**< Needs a port per session. */
 	};
 
 	Service(ServiceManager *svcmgr, const char *name, const char *desc, const char *cmdline,
