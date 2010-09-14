@@ -99,7 +99,7 @@ static bool open_serial(const char *path) {
 	tio.c_cflag |= CS8;
 	tio.c_iflag &= ~ICRNL;
 	tio.c_oflag = 0;
-	tio.c_lflag &= ~ICANON;
+	tio.c_lflag &= ~(ECHO | ICANON);
 	tio.c_cc[VMIN] = 0;
 	tio.c_cc[VTIME] = 0;
 
