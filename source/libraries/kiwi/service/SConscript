@@ -14,5 +14,9 @@
 Import('env')
 
 env.SharedLibrary('kiwi-service', [
+	'org.kiwi.SessionManager.cc',
 	'Service.cc',
+	'SessionManager.cc',
 ], LIBS=['kiwi'])
+
+env.RPCClient('org.kiwi.SessionManager.cc', '../../../services/sessmgr/org.kiwi.SessionManager.proto')
