@@ -32,7 +32,15 @@ void arch_early_init(void) {
 
 /** Reboot the system. */
 void arch_reboot(void) {
+	uint8_t val;
+
 	/* Try the keyboard controller. */
+	do {
+		val = in8(0x64);
+		if(val & (1<<0)) {
+			in8(0x60);
+		}
+	} while(val & (1<<1));
 	out8(0x64, 0xfe);
 	spin(5000);
 
