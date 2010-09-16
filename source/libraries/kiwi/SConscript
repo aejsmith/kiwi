@@ -15,9 +15,7 @@ Import('env')
 
 # Build the core library.
 env.SharedLibrary('kiwi', [
-	'org.kiwi.AppServer.cc',
 	'org.kiwi.ServiceManager.cc',
-	'Application.cc',
 	'Error.cc',
 	'EventLoop.cc',
 	'Handle.cc',
@@ -30,9 +28,6 @@ env.SharedLibrary('kiwi', [
 	'RPCMessageBuffer.cc',
 	'RPCServerConnection.cc',
 ], LIBS=['stdc++'])
-
-# Generate the application server interface code.
-env.RPCClient('org.kiwi.AppServer.cc', '../../services/app/org.kiwi.AppServer.proto')
 
 # Generate the service manager interface code.
 env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
