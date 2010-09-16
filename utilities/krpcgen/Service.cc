@@ -53,8 +53,8 @@ void Service::Dump() const {
 	cout << "Name: " << m_name << endl;
 	cout << "Version: " << m_version << endl;
 	cout << "Types:" << endl;
-	BOOST_FOREACH(const TypeMap::value_type &type, m_types) {
-		type.second->Dump();
+	BOOST_FOREACH(const Type *type, m_types) {
+		type->Dump();
 	}
 	cout << "Functions:" << endl;
 	BOOST_FOREACH(const Function *func, m_functions) {
@@ -97,7 +97,7 @@ bool Service::AddType(Type *type) {
 		return false;
 	}
 
-	m_types[type->GetName()] = type;
+	m_types.push_back(type);
 	return true;
 }
 
@@ -105,17 +105,17 @@ bool Service::AddType(Type *type) {
  * @param name		Name of the type to find.
  * @return		Pointer to type if found, NULL if not. */
 Type *Service::GetType(const char *name) const {
-	TypeMap::const_iterator it = m_types.find(name);
-	if(it == m_types.end()) {
-		/* Look up in the parent. */
-		if(m_parent) {
-			return m_parent->GetType(name);
-		} else {
-			return NULL;
+	BOOST_FOREACH(Type *type, m_types) {
+		if(type->GetName() == name) {
+			return type;
 		}
 	}
 
-	return it->second;
+	/* Look up in the parent. */
+	if(m_parent) {
+		return m_parent->GetType(name);
+	}
+	return NULL;
 }
 
 /** Add a child to the service.

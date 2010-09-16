@@ -295,15 +295,15 @@ bool CXXCodeGen::BeginHeader(Service *service, const string &path, ofstream &str
 	BeginNamespace(service, stream);
 
 	/* Now write out definitions for type aliases and structures. */
-	BOOST_FOREACH(const Service::TypeMap::value_type &type, service->GetTypes()) {
-		AliasType *atype = dynamic_cast<AliasType *>(type.second);
+	BOOST_FOREACH(const Type *type, service->GetTypes()) {
+		const AliasType *atype = dynamic_cast<const AliasType *>(type);
 		if(atype) {
 			stream << "typedef " << GetCXXType(atype->Resolve());
 			stream << ' ' << atype->GetName() << ';' << endl;
 			continue;
 		}
 
-		StructType *stype = dynamic_cast<StructType *>(type.second);
+		const StructType *stype = dynamic_cast<const StructType *>(type);
 		if(stype) {
 			/* Write the structure definition. */
 			stream << "struct " << stype->GetName() << " {" << endl;
@@ -377,8 +377,8 @@ bool CXXCodeGen::BeginCode(Service *service, const string &path, ofstream &strea
 	}
 
 	/* Write the struct (un)serialisation functions. */
-	BOOST_FOREACH(const Service::TypeMap::value_type &type, service->GetTypes()) {
-		StructType *stype = dynamic_cast<StructType *>(type.second);
+	BOOST_FOREACH(const Type *type, service->GetTypes()) {
+		const StructType *stype = dynamic_cast<const StructType *>(type);
 		if(!stype) {
 			continue;
 		}

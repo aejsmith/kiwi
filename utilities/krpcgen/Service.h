@@ -35,8 +35,8 @@ class Service {
 	/** Type of the name set. */
 	typedef std::set<std::string> NameSet;
 public:
-	/** Type of the type map. */
-	typedef std::map<std::string, Type *> TypeMap;
+	/** Type of the type list. */
+	typedef std::list<Type *> TypeList;
 
 	/** Type of the function list. */
 	typedef std::list<Function *> FunctionList;
@@ -77,7 +77,7 @@ public:
 
 	/** Get a reference to the type map.
 	 * @return		Reference to type map. */
-	const TypeMap &GetTypes() const { return m_types; }
+	const TypeList &GetTypes() const { return m_types; }
 
 	/** Get a reference to the function list.
 	 * @return		Reference to function list. */
@@ -97,7 +97,7 @@ private:
 	std::string m_name;		/**< Name of the service. */
 	unsigned long m_version;	/**< Service version number. */
 	Service *m_parent;		/**< Parent service. */
-	TypeMap m_types;		/**< Map of type names to types. */
+	TypeList m_types;		/**< List of types. */
 	FunctionList m_functions;	/**< List of functions. */
 	FunctionList m_events;		/**< List of events. */
 	uint32_t m_next_id;		/**< Next message ID. */
