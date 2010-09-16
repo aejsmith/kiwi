@@ -19,6 +19,8 @@
  */
 
 #include <kernel/device.h>
+#include <kernel/object.h>
+
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
@@ -84,8 +86,11 @@ void libkernel_init_stage2(process_args_t *args) {
 	/* If we're the first process, open handles to the kernel console. */
 	if(process_id(-1) == 1) {
 		device_open("/kconsole", &handle);
+		handle_set_flags(handle, HANDLE_INHERITABLE);
 		device_open("/kconsole", &handle);
+		handle_set_flags(handle, HANDLE_INHERITABLE);
 		device_open("/kconsole", &handle);
+		handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
 	/* Initialise the heap. */

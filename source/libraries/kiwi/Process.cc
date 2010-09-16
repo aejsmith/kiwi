@@ -74,8 +74,8 @@ Process::Process(process_id_t id) {
  */
 void Process::Create(const char *const args[], const char *const env[], HandleMap *handles) {
 	handle_t (*map)[2] = 0;
-	size_t mapsz = -1;
 	handle_t handle;
+	int mapsz = -1;
 	status_t ret;
 
 	assert(args && args[0]);
