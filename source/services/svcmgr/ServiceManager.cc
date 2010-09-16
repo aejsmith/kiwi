@@ -21,6 +21,8 @@
 #include <kiwi/Error.h>
 
 #include <cassert>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 
@@ -43,6 +45,11 @@ ServiceManager::ServiceManager() :
 	 * global instance. */
 	if(m_port.GetID() != 1) {
 		m_parent = new org::kiwi::ServiceManager::ServerConnection(1);
+
+		/* Set our port ID in the environment for apps to use. */
+		char str[16];
+		sprintf(str, "%d", m_port.GetID());
+		setenv("SVCMGR_PORT", str, 1);
 	}
 }
 

@@ -23,6 +23,8 @@
 
 #include <kiwi/IPCConnection.h>
 
+#include <cstdlib>
+
 #include "org.kiwi.ServiceManager.h"
 
 using namespace kiwi;
@@ -66,13 +68,24 @@ void IPCConnection::Connect(port_id_t id) {
  * @throw IPCError	Thrown if unable to connect.
  */
 void IPCConnection::Connect(const char *name) {
-	ServerConnection svcmgr(1);
+	port_id_t id;
+
+	/* Work out the service manager port ID. The ID of the session's
+	 * service manager (if any) is set in the environment. */
+	const char *pstr = getenv("SVCMGR_PORT");
+	if(pstr) {
+		id = strtol(pstr, NULL, 10);
+	} else {
+		id = 1;
+	}
 
 	/* Look up the port ID. */
-	port_id_t id;
-	status_t ret = svcmgr.LookupPort(name, id);
-	if(ret != STATUS_SUCCESS) {
-		throw IPCError(ret);
+	{
+		ServerConnection svcmgr(id);
+		status_t ret = svcmgr.LookupPort(name, id);
+		if(ret != STATUS_SUCCESS) {
+			throw IPCError(ret);
+		}
 	}
 
 	return Connect(id);
