@@ -158,7 +158,7 @@ static void ipc_port_release(ipc_port_t *port) {
 		mutex_lock(&port->lock);
 
 		/* Cancel all in-progress connection attempts. */
-		LIST_FOREACH(&port->waiting, iter) {
+		LIST_FOREACH_SAFE(&port->waiting, iter) {
 			conn = list_entry(iter, ipc_connection_t, header);
 
 			list_remove(&conn->header);
