@@ -128,14 +128,7 @@ int main(int argc, char **argv) {
 			0,
 			"org.kiwi.SessionManager"
 		));
-		svcmgr.AddService(new Service(
-			&svcmgr,
-			"window",
-			"Window server.",
-			"/system/services/window",
-			0,
-			"org.kiwi.WindowServer"
-		));
+		svcmgr.AddService(new Service(&svcmgr, "console", "Console.", "/system/services/console"));
 	}
 
 	svcmgr.Run();
