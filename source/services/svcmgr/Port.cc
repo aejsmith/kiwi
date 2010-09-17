@@ -23,6 +23,7 @@
  *			reason.
  */
 
+#include <kiwi/EventLoop.h>
 #include <stdexcept>
 #include "Port.h"
 #include "Service.h"
@@ -40,6 +41,16 @@ Port::Port(const char *name, Service *service) :
 	 * connections from the session. */
 	m_port.Create();
 	m_port.OnConnection.Connect(this, &Port::HandleConnection);
+}
+
+/** Start listening for connections on the port. */
+void Port::StartListening() {
+	m_port.RegisterEvents();
+}
+
+/** Stop listening for connections on the port. */
+void Port::StopListening() {
+	EventLoop::Instance()->RemoveHandle(&m_port);
 }
 
 /** Handle a connection on the port. */

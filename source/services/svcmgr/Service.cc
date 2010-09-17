@@ -108,6 +108,9 @@ bool Service::Start() {
 		return false;
 	}
 
+	if(m_port) {
+		m_port->StopListening();
+	}
 	m_state = kRunning;
 	return true;
 }
@@ -128,4 +131,7 @@ void Service::ProcessExited(int status) {
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
 	m_process.Close();
 	m_state = kStopped;
+	if(m_port) {
+		m_port->StartListening();
+	}
 }

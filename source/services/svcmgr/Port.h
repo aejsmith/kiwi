@@ -31,6 +31,9 @@ class Port {
 public:
 	Port(const char *name, Service *service);
 
+	void StartListening();
+	void StopListening();
+
 	/** Get the name of the port.
 	 * @return		Name of the port. */
 	const std::string &GetName() const { return m_name; }

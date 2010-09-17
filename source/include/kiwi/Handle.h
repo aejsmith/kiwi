@@ -39,6 +39,9 @@ public:
 	virtual void Close();
 	handle_t GetHandle() const;
 
+	// FIXME
+	virtual void RegisterEvents();
+
 	Signal<> OnClose;
 protected:
 	Handle();
@@ -49,7 +52,6 @@ protected:
 	void RegisterEvent(int event);
 	void UnregisterEvent(int event);
 
-	virtual void RegisterEvents();
 	virtual void EventReceived(int id);
 
 	handle_t m_handle;		/**< Handle ID. */
