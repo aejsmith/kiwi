@@ -324,9 +324,9 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
 				/* Point the framebuffer console at the device. */
+				fb_console.inhibited = true;
 				fb_console_reconfigure(mode->width, mode->height, display_mode_depth(mode),
 				                       device->mem_phys + mode->offset);
-				fb_console.inhibited = true;
 
 				/* Register notifiers to reset the console upon
 				 * KDBG/fatal. */

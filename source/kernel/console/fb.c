@@ -293,7 +293,9 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 
 	/* Map and clear the new framebuffer, and allocate a backbuffer. */
 	nmap = page_phys_map(addr, width * height * (depth / 8), MM_SLEEP);
-	memset(nmap, 0, width * height * (depth / 8));
+	if(!fb_console.inhibited) {
+		memset(nmap, 0, width * height * (depth / 8));
+	}
 	nbuf = kcalloc(width * height, depth / 8, MM_SLEEP);
 
 	/* Take the lock across updating the details (must be done in case
