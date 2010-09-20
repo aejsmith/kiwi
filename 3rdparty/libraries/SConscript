@@ -19,4 +19,5 @@ SConscript(dirs=[
 	'pixman-0.19.2',
 	'libpng-1.4.3',
 	'cairo-1.10.0',
+	'freetype-2.4.2',
 ], exports=['env'])
