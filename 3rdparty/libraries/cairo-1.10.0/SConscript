@@ -95,6 +95,7 @@ sources = [
 	'cairo-pdf-operators.c',
 	'cairo-deflate-stream.c',
 	'cairo-png.c',
+	'cairo-ft-font.c',
 	'cairo-ps-surface.c',
 	'cairo-pdf-surface.c',
 	'cairo-svg-surface.c',
@@ -118,10 +119,11 @@ incpath = env['CPPPATH'] + [
 	'.',
 	'../../../include/pixman-1',
 	'../../../include/libpng12',
+	'../../../include/freetype2',
 	'../../../include/cairo',
 ]
 
 # Build the library.
 env.SharedLibrary('cairo', map(lambda x: File('src/' + x), sources),
                   CCFLAGS=flags, CPPPATH=incpath, CPPDEFINES=defines,
-                  LIBS=['z', 'png', 'pixman-1'])
+                  LIBS=['z', 'png', 'pixman-1', 'freetype'])

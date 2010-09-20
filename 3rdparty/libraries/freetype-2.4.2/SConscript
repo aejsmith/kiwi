@@ -100,6 +100,11 @@ env.SharedLibrary('freetype', sources, CCFLAGS=flags, CPPPATH=incpath, CPPDEFINE
 # Workaround for SCons not picking up dependencies due to macro usage for
 # include paths.
 env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/freetype.h')
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftoutln.h')
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/tttables.h')
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftsynth.h')
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftlcdfil.h')
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/t1tables.h')
 env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/config/ftconfig.h')
 env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fttypes.h')
 env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fterrors.h')
