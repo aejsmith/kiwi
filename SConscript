@@ -63,6 +63,7 @@ def fs_image_func(target, source, env):
 		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
+	os.system('cp -R ' + str(Dir('#/data')) + ' ' + tmpdir + '/system/')
 	for (source, dest) in env['LINKS'].items():
 		if source[0] == '/':
 			source = source[1:]
