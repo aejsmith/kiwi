@@ -83,9 +83,12 @@ def fs_image_func(target, source, env):
 
 	# Clean up.
 	shutil.rmtree(tmpdir)
+data = []
+for (k, v) in dist['DATA'].items():
+	data += v
 target = dist.Command(
 	'fsimage.tar',
-	dist['MODULES'] + dist['LIBRARIES'] + dist['SERVICES'] + dist['BINARIES'],
+	dist['MODULES'] + dist['LIBRARIES'] + dist['SERVICES'] + dist['BINARIES'] + data,
 	Action(fs_image_func, '$GENCOMSTR')
 )
 if len(config['EXTRA_FSIMAGE']) > 0:
