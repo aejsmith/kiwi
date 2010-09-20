@@ -96,3 +96,17 @@ for (k, v) in components.items():
 
 # Build the library.
 env.SharedLibrary('freetype', sources, CCFLAGS=flags, CPPPATH=incpath, CPPDEFINES=defines, LIBS=libs)
+
+# Workaround for SCons not picking up dependencies due to macro usage for
+# include paths.
+env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/freetype.h')
+env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/config/ftconfig.h')
+env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fttypes.h')
+env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fterrors.h')
+env.Depends('../../../include/freetype2/freetype/config/ftconfig.h', '../../../include/freetype2/freetype/config/ftoption.h')
+env.Depends('../../../include/freetype2/freetype/config/ftconfig.h', '../../../include/freetype2/freetype/config/ftstdlib.h')
+env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/config/ftconfig.h')
+env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/ftsystem.h')
+env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/ftimage.h')
+env.Depends('../../../include/freetype2/freetype/fterrors.h', '../../../include/freetype2/freetype/fterrdef.h')
+env.Depends('../../../include/freetype2/freetype/fterrors.h', '../../../include/freetype2/freetype/ftmoderr.h')
