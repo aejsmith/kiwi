@@ -32,8 +32,10 @@
 using namespace kiwi;
 using namespace std;
 
-/** Construct the process object. It will not refer to a process. */
-Process::Process() {}
+/** Construct the process object. */
+Process::Process(handle_t handle) {
+	SetHandle(handle);
+}
 
 /** Construct the object and create a new process.
  * @see			Process::Create(). */
@@ -45,12 +47,6 @@ Process::Process(const char *const args[], const char *const env[], HandleMap *h
  * @see			Process::Create(). */
 Process::Process(const char *cmdline, const char *const env[], HandleMap *handles) {
 	Create(cmdline, env, handles);
-}
-
-/** Construct the object to refer to an existing process.
- * @see			Process::Open(). */
-Process::Process(process_id_t id) {
-	Open(id);
 }
 
 /** Create a new process.

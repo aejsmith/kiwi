@@ -44,10 +44,10 @@ public:
 	/** Type of the handle map. */
 	typedef std::vector<std::pair<handle_t, handle_t> > HandleMap;
 
-	Process();
+	Process(handle_t handle = -1);
 	Process(const char *const args[], const char *const env[] = environ, HandleMap *handles = 0);
 	Process(const char *cmdline, const char *const env[] = environ, HandleMap *handles = 0);
-	Process(process_id_t id);
+	//Process(process_id_t id);
 
 	void Create(const char *const args[], const char *const env[] = environ,
 	            HandleMap *handles = 0);
