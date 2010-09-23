@@ -1,0 +1,36 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+Import('env', 'envmgr')
+
+# Libraries to link to.
+libs = ['kiwi-service', 'kiwi-ui', 'pixman-1', 'cairo']
+
+# Include path.
+incpath = env['CPPPATH'] + ['../../include/pixman-1', '../../include/freetype2']
+
+env.Program('window', [
+	'org.kiwi.WindowServer.cc',
+	'Compositor.cc',
+	'Connection.cc',
+	'Decoration.cc',
+	'Display.cc',
+	'Session.cc',
+	'Surface.cc',
+	'Window.cc',
+	'WindowList.cc',
+	'WindowServer.cc',
+], LIBS=libs, CPPPATH=incpath)
+
+# Generate the RPC interface code.
+env.RPCServer('org.kiwi.WindowServer.cc', 'org.kiwi.WindowServer.proto')

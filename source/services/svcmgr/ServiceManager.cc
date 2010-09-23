@@ -19,6 +19,7 @@
  */
 
 #include <kiwi/Error.h>
+#include <kiwi/Process.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -135,7 +136,17 @@ int main(int argc, char **argv) {
 			0,
 			"org.kiwi.SessionManager"
 		));
-		svcmgr.AddService(new Service(&svcmgr, "console", "Console.", "/system/services/console"));
+		svcmgr.AddService(new Service(
+			&svcmgr,
+			"window",
+			"Window server.",
+			"/system/services/window",
+			0,
+			"org.kiwi.WindowServer"
+		));
+
+		/* Run the UI test application. */
+		Process proc("/system/binaries/uitest");
 	}
 
 	svcmgr.Run();

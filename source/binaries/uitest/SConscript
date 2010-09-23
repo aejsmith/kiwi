@@ -1,4 +1,4 @@
-# Copyright (C) 2009 Alex Smith
+# Copyright (C) 2009-2010 Alex Smith
 #
 # Kiwi is open source software, released under the terms of the Non-Profit
 # Open Software License 3.0. You should have received a copy of the
@@ -13,8 +13,5 @@
 
 Import('env')
 
-SConscript(dirs=[
-	'sessmgr',
-	'svcmgr',
-	'window',
-], exports=['env'])
+env.Program('uitest', ['org.kiwi.WindowServer.cc', 'main.cc'], LIBS=['kiwi-ui'], CPPPATH=env['CPPPATH'] + ['../../include/freetype2'])
+env.RPCClient('org.kiwi.WindowServer.cc', '../../services/window/org.kiwi.WindowServer.proto')

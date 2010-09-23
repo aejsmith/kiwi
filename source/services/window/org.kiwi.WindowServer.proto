@@ -1,0 +1,68 @@
+# Copyright (C) 2010 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+service org.kiwi.WindowServer 1 {
+	# Surface ID type. Surface IDs are the same as their area ID. FIXME:
+	# kernel type definitions.
+	type SurfaceID int32;
+
+	# Window ID type.
+	type WindowID int32;
+
+	# Structure representing a point.
+	struct Point {
+		int16 x;
+		int16 y;
+	};
+
+	# Structure representing a rectangle size.
+	struct Size {
+		uint16 width;
+		uint16 height;
+	};
+
+	# Structure representing a rectangle area on a surface.
+	struct Rect {
+		Point pos;
+		Size size;
+	};
+
+	# Surface functions.
+	function CreateSurface(Size size, out SurfaceID id);
+	function DestroySurface(SurfaceID id);
+	function ResizeSurface(SurfaceID id, Size size);
+	function GetSurfaceSize(SurfaceID id, out Size size);
+
+	# Window functions.
+	function CreateWindow(Rect rect, out WindowID id);
+	function DestroyWindow(WindowID id);
+	function SubscribeWindow(WindowID id, uint32 events);
+	function ShowWindow(WindowID id);
+	function HideWindow(WindowID id);
+	function CloseWindow(WindowID id);
+	function ResizeWindow(WindowID id, Size size);
+	function MoveWindow(WindowID id, Point pos);
+	function UpdateWindow(WindowID id, Rect rect);
+	function GetWindowSurface(WindowID id, out SurfaceID sid);
+	function GetWindowRect(WindowID id, out Rect rect);
+	function GetWindowTitle(WindowID id, out string title);
+	function SetWindowTitle(WindowID id, string title);
+
+	# Window events.
+	event OnCreateWindow(WindowID id);
+	event OnDestroyWindow(WindowID id);
+	event OnCloseWindow(WindowID id);
+	event OnShowWindow(WindowID id);
+	event OnHideWindow(WindowID id);
+	event OnSetWindowTitle(WindowID id, string name);
+};
