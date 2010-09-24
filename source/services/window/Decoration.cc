@@ -123,36 +123,6 @@ Decoration::~Decoration() {
 	}
 }
 
-#if 0
-	/* Work out the new size. */
-	m_rect = Rect(-2, -24, m_window->GetRect().GetWidth() + 4, m_window->GetRect().GetHeight() + 26);
-
-	/* Create a new surface and a context to render to. */
-	m_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, m_rect.GetWidth(), m_rect.GetHeight());
-	context = cairo_create(m_surface);
-
-	/* Draw the frame. */
-	rounded_rectangle(context, 0, 0, m_rect.GetWidth(), 24, 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
-	cairo_set_source_rgb(context, 0.296875, 0.5625, 0.81640625);
-	cairo_fill(context);
-	cairo_rectangle(context, 0, 24, m_rect.GetWidth(), m_rect.GetHeight() - 24);
-	cairo_fill(context);
-
-	/* Write the title. */
-	cairo_set_source_rgb(context, 1, 1, 1);
-	cairo_set_font_face(context, g_cairo_font);
-	cairo_set_font_options(context, g_cairo_font_opts);
-	cairo_set_font_size(context, 12.5);
-	cairo_move_to(context, 7, 17);
-	cairo_show_text(context, m_window->GetTitle().c_str());
-
-	/* Clear the window content area. */
-	cairo_rectangle(context, 2, 24, m_rect.GetWidth() - 4, m_rect.GetHeight() - 27);
-	cairo_set_source_rgba(context, 0, 0, 0, 0);
-	cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
-	cairo_fill(context);
-#endif
-
 /** Regenerate the decoration. */
 void Decoration::Redraw() {
 	cairo_pattern_t *pat;

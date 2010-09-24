@@ -172,7 +172,18 @@ status_t Connection::MoveWindow(Window::ID id, org::kiwi::WindowServer::Point po
 	return STATUS_SUCCESS;
 }
 
+/** Update an area in a window on screen.
+ * @param id		ID of window to update.
+ * @param rect		Rectangular area to update.
+ * @return		Status code describing result of the operation. */
 status_t Connection::UpdateWindow(Window::ID id, org::kiwi::WindowServer::Rect rect) {
+	Window *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	}
+
+	Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
+	window->Update(_rect);
 	return STATUS_SUCCESS;
 }
 

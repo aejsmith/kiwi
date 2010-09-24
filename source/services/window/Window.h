@@ -42,9 +42,6 @@ enum window_type {
 	WINDOW_TYPE_POPUP,	// same.
 };
 
-// do window ordering based on type.
-// IsTopLevel()
-
 /** Class implementing a window. */
 class Window : public kiwi::Object, public kiwi::internal::Noncopyable {
 public:
