@@ -261,7 +261,7 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 		cpu->max_phys_bits = 36;
 	}
 	if(!cpu->max_virt_bits) {
-		cpu->max_virt_bits = (cpu->extended_edx & (1<<29)) ? 64 : 32;
+		cpu->max_virt_bits = (cpu->extended_edx & (1<<29)) ? 48 : 32;
 	}
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's
