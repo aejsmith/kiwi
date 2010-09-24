@@ -33,8 +33,9 @@ public:
 
 	WindowList();
 
-	void AddWindow(Window *window);
-	void RemoveWindow(Window *window);
+	void Insert(Window *window);
+	void Remove(Window *window);
+	bool MoveToFront(Window *window);
 
 	/** Get the list head.
 	 * @return		Iterator to first window in the list. */

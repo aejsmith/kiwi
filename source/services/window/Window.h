@@ -54,9 +54,9 @@ public:
 	kiwi::Rect GetAbsoluteRect() const;
 	kiwi::Rect GetAbsoluteTotalRect() const;
 	kiwi::Rect GetTotalRect() const;
-
 	void SetTitle(const std::string &title);
 	void SetVisible(bool visible);
+	void SetActive(bool active);
 	void Update(kiwi::Rect rect);
 	void MoveTo(const kiwi::Point &pos);
 
@@ -93,6 +93,10 @@ public:
 	/** Check whether the window is visible.
 	 * @return		Whether the window is visible. */
 	bool IsVisible() const { return m_visible; }
+
+	/** Check whether the window or one of its children is active.
+	 * @return		Whether the window is active. */
+	bool IsActive() const { return m_active; }
 private:
 	Session *m_session;		/**< Session that the window is on. */
 	ID m_id;			/**< ID of the window. */
@@ -104,6 +108,7 @@ private:
 	Decoration *m_decoration;	/**< Decoration for the window. */
 	WindowList m_children;		/**< Child windows. */
 	bool m_visible : 1;		/**< Whether the window is visible. */
+	bool m_active : 1;		/**< Whether the window or a child is active. */
 };
 
 #endif /* __WINDOW_H */

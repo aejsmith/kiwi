@@ -145,8 +145,13 @@ void Decoration::Redraw() {
 	cairo_fill(context);
 	rounded_rectangle(context, 1, 1, m_rect.GetWidth() - 2, 11, 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
 	pat = cairo_pattern_create_linear(0, 0, 0, 12);
-	cairo_pattern_add_color_stop_rgb(pat, 0, 0.601562, 0.601562, 0.601562);
-	cairo_pattern_add_color_stop_rgb(pat, 1, 0.328125, 0.328125, 0.328125);
+	if(m_window->IsActive()) {
+		cairo_pattern_add_color_stop_rgb(pat, 0, 0.601562, 0.601562, 0.601562);
+		cairo_pattern_add_color_stop_rgb(pat, 1, 0.328125, 0.328125, 0.328125);
+	} else {
+		cairo_pattern_add_color_stop_rgb(pat, 0, 0.314531, 0.314531, 0.314531);
+		cairo_pattern_add_color_stop_rgb(pat, 1, 0.194375, 0.194375, 0.194375);
+	}
 	cairo_set_source(context, pat);
 	cairo_fill(context);
 	cairo_pattern_destroy(pat);
@@ -157,17 +162,23 @@ void Decoration::Redraw() {
 	cairo_set_source(context, pat);
 	cairo_fill(context);
 	cairo_pattern_destroy(pat);
-	cairo_rectangle(context, 1, 23, m_rect.GetWidth() - 2, 1);
-	pat = cairo_pattern_create_linear(0, 23, m_rect.GetWidth(), 23);
-	cairo_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);
-	cairo_pattern_add_color_stop_rgb(pat, 0.5, 0.4, 0.4, 0.4);
-	cairo_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 0);
-	cairo_set_source(context, pat);
-	cairo_fill(context);
-	cairo_pattern_destroy(pat);
+	if(m_window->IsActive()) {
+		cairo_rectangle(context, 1, 23, m_rect.GetWidth() - 2, 1);
+		pat = cairo_pattern_create_linear(0, 23, m_rect.GetWidth(), 23);
+		cairo_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);
+		cairo_pattern_add_color_stop_rgb(pat, 0.5, 0.4, 0.4, 0.4);
+		cairo_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 0);
+		cairo_set_source(context, pat);
+		cairo_fill(context);
+		cairo_pattern_destroy(pat);
+	}
 
 	/* Write the title. */
-	cairo_set_source_rgb(context, 1, 1, 1);
+	if(m_window->IsActive()) {
+		cairo_set_source_rgb(context, 1, 1, 1);
+	} else {
+		cairo_set_source_rgb(context, 0.45, 0.45, 0.45);
+	}
 	cairo_set_font_face(context, g_cairo_font);
 	cairo_set_font_options(context, g_cairo_font_opts);
 	cairo_set_font_size(context, 12.5);

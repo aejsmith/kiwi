@@ -51,11 +51,17 @@ public:
 
 	void HandleConnection(handle_t handle);
 	void RemoveConnection(Connection *conn);
+
 	void AddSurface(Surface *surface);
 	void RemoveSurface(Surface *surface);
 	Surface *FindSurface(area_id_t id);
+
 	Window *CreateWindow(kiwi::Rect &rect);
+	void RemoveWindow(Window *window);
 	Window *FindWindow(Window::ID id);
+	void ActivateWindow(Window *window);
+	void HideWindow(Window *window);
+
 	void Activate();
 	void Deactivate();
 
@@ -70,6 +76,10 @@ public:
 	/** Get the session's compositor.
 	 * @return		Pointer to session's compositor. */
 	Compositor *GetCompositor() const { return m_compositor; }
+
+	/** Get the active window.
+	 * @return		Pointer to active window. */
+	Window *GetActiveWindow() const { return m_active_window; }
 private:
 	void Release();
 
@@ -83,6 +93,7 @@ private:
 	Window *m_root;			/**< Root window. */
 	Compositor *m_compositor;	/**< Compositor. */
 	Window::ID m_next_window_id;	/**< Next window ID. */
+	Window *m_active_window;	/**< Active window. */
 };
 
 #endif /* __SESSION_H */

@@ -36,11 +36,12 @@ using namespace std;
  * @param id		ID of the session. */
 Session::Session(WindowServer *server, session_id_t id) :
 	m_server(server), m_id(id), m_active(false), m_refcount(0),
-	m_next_window_id(1)
+	m_next_window_id(1), m_active_window(0)
 {
 	/* Create the root window. */
 	Rect rect(0, 0, m_server->GetDisplay()->GetCurrentMode().width, m_server->GetDisplay()->GetCurrentMode().height);
 	m_root = new Window(this, 0, 0, rect, WINDOW_TYPE_ROOT);
+	m_active_window = m_root;
 
 	/* Set up a Cairo context for rendering on to the root surface. */
 	cairo_t *context = cairo_create(m_root->GetSurface()->GetCairoSurface());
@@ -115,12 +116,42 @@ Window *Session::CreateWindow(Rect &rect) {
 	return window;
 }
 
+/** Remove a window from the session.
+ * @param window	Window to remove. */
+void Session::RemoveWindow(Window *window) {
+	m_windows.erase(window->GetID());
+	if(m_active_window == window) {
+		ActivateWindow(m_root);
+	}
+}
+
 /** Find a window.
  * @param id		ID of window to find.
  * @return		Pointer to window if found, NULL if not. */
 Window *Session::FindWindow(Window::ID id) {
 	WindowMap::iterator it = m_windows.find(id);
 	return (it != m_windows.end()) ? it->second : 0;
+}
+
+/** Activate a window.
+ * @param window	Window to activate. */
+void Session::ActivateWindow(Window *window) {
+	if(m_active_window) {
+		m_active_window->SetActive(false);
+	}
+
+	m_active_window = window;
+	m_active_window->SetVisible(true);
+	m_active_window->SetActive(true);
+}
+
+/** Hide a window.
+ * @param window	Window to hide. */
+void Session::HideWindow(Window *window) {
+	if(m_active_window == window) {
+		ActivateWindow(m_root);
+	}
+	window->SetVisible(false);
 }
 
 /** Make the session the active session. */

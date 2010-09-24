@@ -34,16 +34,31 @@ WindowList::WindowList() {};
 
 /** Add a window to the window list.
  * @param window	Window to add. */
-void WindowList::AddWindow(Window *window) {
+void WindowList::Insert(Window *window) {
 	ListForWindow(window).push_back(window);
 	RebuildList();
 }
 
 /** Remove a window from the list.
  * @param window	Window to remove. */
-void WindowList::RemoveWindow(Window *window) {
+void WindowList::Remove(Window *window) {
 	ListForWindow(window).remove(window);
 	m_list.remove(window);
+}
+
+/** Move a window as far forward as it can be.
+ * @param window	Window to move forward.
+ * @return		Whether the list position changed. */
+bool WindowList::MoveToFront(Window *window) {
+	List &list = ListForWindow(window);
+	if(list.empty() || *(--list.end()) != window) {
+		list.remove(window);
+		list.push_back(window);
+		RebuildList();
+		return true;
+	}
+
+	return false;
 }
 
 /** Get the list a window should be placed in.

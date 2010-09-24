@@ -32,7 +32,7 @@ using namespace kiwi;
  * @param rect		Rectangle describing window area. */
 Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, window_type type) :
 	m_session(session), m_id(id), m_parent(parent), m_rect(rect),
-	m_type(type), m_decoration(0), m_visible(false)
+	m_type(type), m_decoration(0), m_visible(false), m_active(false)
 {
 	/* Create a new surface and publish it in the session. FIXME: Somehow
 	 * need to stop a DestroySurface call on this surface from working. */
@@ -49,17 +49,18 @@ Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, 
 		break;
 	};
 
-	/* If there is no parent (the root window) make it visible. */
+	/* If there is no parent (the root window) make us visible and active. */
 	if(!m_parent) {
 		m_visible = true;
+		m_active = true;
 	}
 }
 
 /** Destroy the window. */
 Window::~Window() {
-	/* Remove the window from the window manager. */
 	SetVisible(false);
 	m_session->RemoveSurface(m_surface);
+	m_session->RemoveWindow(this);
 	delete m_surface;
 }
 
@@ -109,22 +110,64 @@ void Window::SetTitle(const std::string &title) {
 	m_title = title;
 	if(m_decoration) {
 		m_decoration->Redraw();
+		m_session->GetCompositor()->Redraw(GetAbsoluteTotalRect());
 	}
 }
 
 /** Set visibility of the window.
+ * @note		Use Session::ActivateWindow() or Session::HideWindow()
+ *			instead of this!
  * @param visible	New visibility state. */
 void Window::SetVisible(bool visible) {
 	if(m_visible != visible) {
 		m_visible = visible;
 		if(m_parent) {
 			if(visible) {
-				m_parent->GetChildren().AddWindow(this);
+				m_parent->GetChildren().Insert(this);
 			} else {
-				m_parent->GetChildren().RemoveWindow(this);
+				m_parent->GetChildren().Remove(this);
 			}
 		}
 		m_session->GetCompositor()->Redraw(GetAbsoluteTotalRect());
+	}
+}
+
+/** Set whether the window is active.
+ * @note		Use Session::ActivateWindow() instead of this!
+ * @param active	New active state. */
+void Window::SetActive(bool active) {
+	if(m_active != active) {
+		bool redraw = false;
+
+		m_active = active;
+
+		/* Update the decoration. We always need a redraw if the
+		 * decoration changes. TODO: Redraw only the decoration area. */
+		if(m_decoration) {
+			m_decoration->Redraw();
+			redraw = true;
+		}
+
+		/* We must also change the active state on the parent window.
+		 * This is to ensure that, for example, when a child menu
+		 * window is active, the decoration on the window that the
+		 * menu is for appears as active. */
+		if(m_parent) {
+			m_parent->SetActive(active);
+		}
+
+		/* If we are now active, ensure that we are brought above all
+		 * windows in our parent. If the window list position changed,
+		 * perform a redraw. */
+		if(m_active && m_parent) {
+			if(m_parent->GetChildren().MoveToFront(this)) {
+				redraw = true;
+			}
+		}
+
+		if(redraw && m_visible) {
+			m_session->GetCompositor()->Redraw(GetAbsoluteTotalRect());
+		}
 	}
 }
 

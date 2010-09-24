@@ -132,7 +132,7 @@ status_t Connection::ShowWindow(Window::ID id) {
 		return STATUS_NOT_FOUND;
 	}
 
-	window->SetVisible(true);
+	m_session->ActivateWindow(window);
 	return STATUS_SUCCESS;
 }
 
@@ -145,7 +145,7 @@ status_t Connection::HideWindow(Window::ID id) {
 		return STATUS_NOT_FOUND;
 	}
 
-	window->SetVisible(false);
+	m_session->HideWindow(window);
 	return STATUS_SUCCESS;
 }
 
