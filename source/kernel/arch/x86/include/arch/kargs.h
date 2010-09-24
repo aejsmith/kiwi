@@ -44,6 +44,8 @@ typedef struct kernel_args_cpu_arch {
 	uint8_t family;			/**< CPU family. */
 	uint8_t model;			/**< CPU model. */
 	uint8_t stepping;		/**< CPU stepping. */
+	int max_phys_bits;		/**< Maximum physical address bits. */
+	int max_virt_bits;		/**< Maximum virtual address bits. */
 	int cache_alignment;		/**< Cache line size. */
 
 	/** Feature information. */

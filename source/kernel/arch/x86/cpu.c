@@ -188,6 +188,8 @@ void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
 	cpu->arch.family = args->family;
 	cpu->arch.model = args->model;
 	cpu->arch.stepping = args->stepping;
+	cpu->arch.max_phys_bits = args->max_phys_bits;
+	cpu->arch.max_virt_bits = args->max_virt_bits;
 	cpu->arch.cache_alignment = args->cache_alignment;
 	cpu_features_init(&cpu->arch.features, args->standard_ecx, args->standard_edx,
 	                  args->extended_ecx, args->extended_edx);

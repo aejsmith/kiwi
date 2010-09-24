@@ -232,6 +232,13 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 					}
 				}
 			}
+
+			if(cpu->highest_extended >= X86_CPUID_ADDRESS_SIZE) {
+				/* Get address size information. */
+				x86_cpuid(X86_CPUID_ADDRESS_SIZE, &eax, &ebx, &ecx, &edx);
+				cpu->max_phys_bits = eax & 0xff;
+				cpu->max_virt_bits = (eax >> 8) & 0xff;
+			}
 		} else {
 			cpu->highest_extended = 0;
 		}
@@ -247,6 +254,14 @@ static void cpu_arch_init(kernel_args_cpu_arch_t *cpu) {
 	 * whether the CPU supports long mode. */
 	if(!cpu->cache_alignment) {
 		cpu->cache_alignment = (cpu->extended_edx & (1<<29)) ? 64 : 32;
+	}
+
+	/* Same goes for address sizes. */
+	if(!cpu->max_phys_bits) {
+		cpu->max_phys_bits = 36;
+	}
+	if(!cpu->max_virt_bits) {
+		cpu->max_virt_bits = (cpu->extended_edx & (1<<29)) ? 64 : 32;
 	}
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's

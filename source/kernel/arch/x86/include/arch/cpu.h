@@ -86,6 +86,9 @@
 /** Model Specific Registers. */
 #define X86_MSR_TSC		0x10		/**< Time Stamp Counter (TSC). */
 #define X86_MSR_APIC_BASE	0x1b		/**< LAPIC base address. */
+#define X86_MSR_MTRR_BASE0	0x200		/**< Base of the variable length MTRR base registers. */
+#define X86_MSR_MTRR_MASK0	0x201		/**< Base of the variable length MTRR mask registers. */
+#define X86_MSR_MTRR_DEF_TYPE	0x2FF		/**< Default MTRR type. */
 #define X86_MSR_EFER		0xc0000080	/**< Extended Feature Enable register. */
 #define X86_MSR_STAR		0xc0000081	/**< System Call Target Address. */
 #define X86_MSR_LSTAR		0xc0000082	/**< 64-bit System Call Target Address. */
@@ -98,7 +101,6 @@
 #define X86_EFER_LME		(1<<8)		/**< Long Mode (IA-32e) Enable. */
 #define X86_EFER_LMA		(1<<10)		/**< Long Mode (IA-32e) Active. */
 #define X86_EFER_NXE		(1<<11)		/**< Execute Disable (XD/NX) Bit Enable. */
-
 
 /** Standard CPUID function definitions. */
 #define X86_CPUID_VENDOR_ID	0x00000000	/**< Vendor ID/Highest Standard Function. */
@@ -176,6 +178,8 @@ typedef struct cpu_arch {
 	uint8_t family;				/**< CPU family. */
 	uint8_t model;				/**< CPU model. */
 	uint8_t stepping;			/**< CPU stepping. */
+	int max_phys_bits;			/**< Maximum physical address bits. */
+	int max_virt_bits;			/**< Maximum virtual address bits. */
 	int cache_alignment;			/**< Cache line size. */
 	cpu_features_t features;		/**< Features supported by the CPU. */
 } cpu_arch_t;
