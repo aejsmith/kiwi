@@ -63,6 +63,14 @@ typedef struct vm_page {
 	offset_t offset;		/**< Offset into the owner of the page. */
 } vm_page_t;
 
+/** Enumeration of memory range types. */
+typedef enum memory_type {
+	MEMORY_TYPE_UC,			/**< Uncacheable. */
+	MEMORY_TYPE_WC,			/**< Write Combining. */
+	MEMORY_TYPE_WT,			/**< Write-through. */
+	MEMORY_TYPE_WB,			/**< Write-back. */
+} memory_type_t;
+
 /** Page queue numbers. */
 #define PAGE_QUEUE_MODIFIED	0	/**< Pages that need to be written. */
 #define PAGE_QUEUE_CACHED	1	/**< Pages that are held in caches. */
@@ -100,6 +108,9 @@ extern phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr
 extern phys_ptr_t page_alloc(size_t count, int pmflag);
 extern void page_free(phys_ptr_t base, size_t count);
 extern bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
+
+extern void page_get_memory_type(phys_ptr_t addr, memory_type_t *typep);
+extern void page_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type);
 
 extern void page_stats_get(page_stats_t *stats);
 

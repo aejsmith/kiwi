@@ -444,6 +444,8 @@ void cpu_boot_all(void (*entry)(void)) {
 			dprintf("  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000 / 1000);
 		}
 		dprintf("  clsize:      %d\n", cpu->arch.cache_alignment);
+		dprintf("  phys_bits:   %d\n", cpu->arch.max_phys_bits);
+		dprintf("  virt_bits:   %d\n", cpu->arch.max_virt_bits);
 	}
 
 	dprintf("cpu: feature set supported by all CPUs:\n");

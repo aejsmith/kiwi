@@ -40,6 +40,7 @@ void __init_text arch_premm_init(kernel_args_t *args) {
 	                  args->arch.extended_ecx, args->arch.extended_edx);
 	descriptor_init();
 	intr_init();
+	pat_init();
 }
 
 /** x86-specific second stage initialisation.
@@ -57,6 +58,7 @@ void __init_text arch_postmm_init(kernel_args_t *args) {
  * @param args		Kernel arguments structure. */
 void __init_text arch_ap_init(kernel_args_t *args) {
 	descriptor_ap_init();
+	pat_init();
 	lapic_init(args);
 #ifdef __x86_64__
 	syscall_arch_init();

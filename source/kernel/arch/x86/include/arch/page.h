@@ -39,7 +39,7 @@
 #define PG_WRITE		(1<<1)		/**< Page is writable. */
 #define PG_USER			(1<<2)		/**< Page is accessible in CPL3. */
 #define PG_PWT			(1<<3)		/**< Page has write-through caching. */
-#define PG_NOCACHE		(1<<4)		/**< Page has caching disabled. */
+#define PG_PCD			(1<<4)		/**< Page has caching disabled. */
 #define PG_ACCESSED		(1<<5)		/**< Page has been accessed. */
 #define PG_DIRTY		(1<<6)		/**< Page has been written to. */
 #define PG_LARGE		(1<<7)		/**< Page is a large page. */
@@ -68,6 +68,8 @@ typedef struct page_map {
 	ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
 	size_t invalidate_count;
 } page_map_t;
+
+extern void pat_init(void);
 
 #endif /* __ASM__/LOADER */
 #endif /* __ARCH_PAGE_H */

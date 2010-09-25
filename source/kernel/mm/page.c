@@ -72,6 +72,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/vm_cache.h>
 
@@ -108,6 +109,14 @@ typedef struct page_queue {
 	spinlock_t lock;		/**< Lock to protect the queue. */
 } page_queue_t;
 
+/** Structure containing a memory type range. */
+typedef struct memory_type_range {
+	list_t header;			/**< Link to range list. */
+	phys_ptr_t start;		/**< Start of range. */
+	phys_ptr_t end;			/**< End of range. */
+	memory_type_t type;		/**< Type of the range. */
+} memory_type_range_t;
+
 /** Page writer settings. */
 #define PAGE_WRITER_INTERVAL		SECS2USECS(4)
 #define PAGE_WRITER_MAX_PER_RUN		128
@@ -130,6 +139,10 @@ static page_queue_t page_queues[PAGE_QUEUE_COUNT];
 /** Page writer/page daemon threads. */
 static thread_t *page_writer_thread;
 //static thread_t *page_daemon_thread;
+
+/** Memory type ranges. */
+static LIST_DECLARE(memory_type_list);
+static SPINLOCK_DECLARE(memory_type_lock);
 
 /** Page writer thread.
  * @param arg1		Unused.
@@ -435,6 +448,47 @@ bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 	page_phys_unmap(mdest, PAGE_SIZE, false);
 	thread_unwire(curr_thread);
 	return true;
+}
+
+/** Get the type for a page of physical memory.
+ * @param addr		Address of page.
+ * @param typep		Where to store type of page. If no type has been
+ *			explicitly set by a call to page_set_memory_type(), no
+ *			value will be stored here. This means that callers
+ *			should store a default type in the location before
+ *			calling this function. */
+void page_get_memory_type(phys_ptr_t addr, memory_type_t *type) {
+	memory_type_range_t *range;
+
+	spinlock_lock(&memory_type_lock);
+
+	LIST_FOREACH(&memory_type_list, iter) {
+		range = list_entry(iter, memory_type_range_t, header);
+		if(addr >= range->start && addr < range->end) {
+			*type = range->type;
+			break;
+		}
+	}
+
+	spinlock_unlock(&memory_type_lock);
+}
+
+/** Set the type of a range of memory.
+ * @param start		Physical base address.
+ * @param size		Size of range.
+ * @param type		Type to set. */
+void page_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type) {
+	memory_type_range_t *range;
+
+	range = kmalloc(sizeof(*range), MM_SLEEP);
+	list_init(&range->header);
+	range->start = start;
+	range->end = start + size;
+	range->type = type;
+
+	spinlock_lock(&memory_type_lock);
+	list_append(&memory_type_list, &range->header);
+	spinlock_unlock(&memory_type_lock);
 }
 
 /** Get physical memory usage statistics.

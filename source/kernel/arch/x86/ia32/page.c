@@ -323,6 +323,7 @@ void page_map_unlock(page_map_t *map) {
  * @return		Status code describing result of the operation. */
 status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bool exec, int mmflag) {
 	uint64_t *ptbl, flags;
+	memory_type_t type;
 	int pte;
 
 	assert(mutex_held(&map->lock));
@@ -355,6 +356,28 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 		flags |= PG_GLOBAL;
 	} else {
 		flags |= PG_USER;
+	}
+
+	/* Get the memory type of the address and set flags accordingly. */
+	type = MEMORY_TYPE_WB;
+	page_get_memory_type(phys, &type);
+	switch(type) {
+	case MEMORY_TYPE_UC:
+		flags |= PG_PCD;
+		break;
+	case MEMORY_TYPE_WC:
+		/* This is only supported if the PAT is supported, we configure
+		 * it to use WC when both PCD and PWT are set. */
+		if(cpu_features.pat) {
+			flags |= (PG_PCD | PG_PWT);
+		}
+		break;
+	case MEMORY_TYPE_WT:
+		flags |= PG_PWT;
+		break;
+	case MEMORY_TYPE_WB:
+		/* No extra flags means WB. */
+		break;
 	}
 
 	/* Set the PTE. */
@@ -759,4 +782,20 @@ void page_arch_late_init(void) {
 	page_phys_unmap(pdp, PAGE_SIZE, true);
 	x86_write_cr3(x86_read_cr3());
 	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
+}
+
+/** Get a PAT entry. */
+#define PAT(e, t)	((uint64_t)t << ((e) * 8))
+
+/** Initialise the PAT. */
+void __init_text pat_init(void) {
+	uint64_t pat;
+
+	/* Configure the PAT. We do not use the PAT bit in the page table, as
+	 * conflicts with the large page bit, so we make PAT3 be WC. */
+	if(cpu_features.pat) {
+		pat = PAT(0, 0x06) | PAT(1, 0x04) | PAT(2, 0x07) | PAT(3, 0x01) |
+		      PAT(4, 0x06) | PAT(5, 0x04) | PAT(6, 0x07) | PAT(7, 0x00);
+		x86_write_msr(X86_MSR_CR_PAT, pat);
+	}
 }

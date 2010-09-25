@@ -88,6 +88,7 @@
 #define X86_MSR_APIC_BASE	0x1b		/**< LAPIC base address. */
 #define X86_MSR_MTRR_BASE0	0x200		/**< Base of the variable length MTRR base registers. */
 #define X86_MSR_MTRR_MASK0	0x201		/**< Base of the variable length MTRR mask registers. */
+#define X86_MSR_CR_PAT		0x277		/**< PAT. */
 #define X86_MSR_MTRR_DEF_TYPE	0x2FF		/**< Default MTRR type. */
 #define X86_MSR_EFER		0xc0000080	/**< Extended Feature Enable register. */
 #define X86_MSR_STAR		0xc0000081	/**< System Call Target Address. */
