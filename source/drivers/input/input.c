@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <module.h>
 #include <status.h>
+#include <time.h>
 
 /** Input device directory. */
 static device_t *input_device_dir;
@@ -91,7 +92,8 @@ static void input_device_close(device_t *_device, void *data) {
  * @param _device	Device to read from.
  * @param data		Handle-specific data pointer (unused).
  * @param _buf		Buffer to read into.
- * @param count		Number of bytes to read.
+ * @param count		Number of bytes to read. Must be a multiple of
+ *			sizeof(input_event_t).
  * @param offset	Offset to write to (ignored).
  * @param bytesp	Where to store number of bytes read.
  * @return		Status code describing result of the operation. */
@@ -99,10 +101,14 @@ static status_t input_device_read(device_t *_device, void *data, void *_buf, siz
                                   offset_t offset, size_t *bytesp) {
 	input_device_t *device = _device->data;
 	status_t ret = STATUS_SUCCESS;
-	char *buf = _buf;
+	input_event_t *buf = _buf;
 	size_t i;
 
-	for(i = 0; i < count; i++) {
+	if(count % sizeof(input_event_t)) {
+		return STATUS_INVALID_ARG;
+	}
+
+	for(i = 0; i < (count / sizeof(input_event_t)); i++) {
 		ret = semaphore_down_etc(&device->sem, -1, SYNC_INTERRUPTIBLE);
 		if(ret != STATUS_SUCCESS) {
 			break;
@@ -110,8 +116,7 @@ static status_t input_device_read(device_t *_device, void *data, void *_buf, siz
 
 		spinlock_lock(&device->lock);
 
-		buf[i] = device->buffer[device->start];
-
+		memcpy(&buf[i], &device->buffer[device->start], sizeof(*buf));
 		device->size--;
 		if(++device->start == INPUT_BUFFER_SIZE) {
 			device->start = 0;
@@ -120,7 +125,7 @@ static status_t input_device_read(device_t *_device, void *data, void *_buf, siz
 		spinlock_unlock(&device->lock);
 	}
 
-	*bytesp = i;
+	*bytesp = i * sizeof(input_event_t);
 	return ret;
 }
 
@@ -173,15 +178,6 @@ static status_t keyboard_device_request(device_t *_device, void *data, int reque
 	input_device_t *device = _device->data;
 
 	switch(request) {
-	case KEYBOARD_SET_LEDS:
-		if(insz != sizeof(keyboard_led_state_t)) {
-			return STATUS_INVALID_ARG;
-		} else if(!device->kops || !device->kops->set_leds) {
-			return STATUS_NOT_SUPPORTED;
-		}
-
-		device->kops->set_leds(device, in);
-		return STATUS_SUCCESS;
 	default:
 		if(request >= DEVICE_CUSTOM_REQUEST_START && device->kops->request) {
 			return device->kops->request(device, request, in, insz, outp, outszp);
@@ -234,16 +230,18 @@ static device_ops_t mouse_device_ops = {
 	.request = mouse_device_request,
 };
 
-/** Add data to an input device's buffer.
+/** Add an event to an input device's buffer.
  *
- * Inserts data into an input device's data buffer. This function is safe to
+ * Adds an event to an input device's event buffer. This function is safe to
  * use from interrupt context.
  *
- * @param device	Device to add to.
- * @param value		Value to add.
+ * @param _device	Device to add to.
+ * @param type		Type of event.
+ * @param value		Value of event.
  */
-void input_device_input(device_t *_device, uint8_t value) {
+void input_device_event(device_t *_device, uint8_t type, int32_t value) {
 	input_device_t *device = _device->data;
+	size_t i;
 
 	spinlock_lock(&device->lock);
 
@@ -253,32 +251,32 @@ void input_device_input(device_t *_device, uint8_t value) {
 		return;
 	}
 
-	device->buffer[(device->start + device->size++) % INPUT_BUFFER_SIZE] = value;
+	i = (device->start + device->size++) % INPUT_BUFFER_SIZE;
+	device->buffer[i].time = time_since_boot();
+	device->buffer[i].type = type;
+	device->buffer[i].value = value;
+
 	semaphore_up(&device->sem, 1);
 	notifier_run_unlocked(&device->data_notifier, NULL, false);
 	spinlock_unlock(&device->lock);
 }
-MODULE_EXPORT(input_device_input);
+MODULE_EXPORT(input_device_event);
 
 /** Add a new input device.
  * @param name		Name to give device. Only used if parent is specified.
  * @param parent	Optional parent node. If not provided, then the main
- *			device will be created under the input device
- *			container.
+ *			device will be created under the input device container.
  * @param type		Input device type.
- * @param protocol	Device protocol.
  * @param ops		Pointer to operations structure for device type.
  * @param data		Data specific to the device.
  * @param parent	Optional parent device.
  * @param devicep	Where to store pointer to device structure.
  * @return		Status code describing result of the operation. */
 static status_t input_device_create(const char *name, device_t *parent, uint8_t type,
-                                    uint8_t protocol, void *ops, void *data,
-                                    device_t **devicep) {
+                                    void *ops, void *data, device_t **devicep) {
 	device_attr_t attrs[] = {
 		{ "type", DEVICE_ATTR_STRING, { .string = "input" } },
 		{ "input.type", DEVICE_ATTR_UINT8, { .uint8 = type } },
-		{ "input.protocol", DEVICE_ATTR_UINT8, { .uint8 = protocol } },
 	};
 	char dname[DEVICE_NAME_MAX];
 	input_device_t *device;
@@ -337,7 +335,6 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
  * @param parent	Optional parent node. If not provided, then the main
  *			device will be created under the input device
  *			container.
- * @param protocol	Device protocol.
  * @param ops		Pointer to operations structure.
  * @param data		Data specific to the device.
  * @param parent	Optional parent device.
@@ -345,9 +342,9 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
  *
  * @return		Status code describing result of the operation.
  */
-status_t keyboard_device_create(const char *name, device_t *parent, uint8_t protocol,
-                                keyboard_ops_t *ops, void *data, device_t **devicep) {
-	return input_device_create(name, parent, INPUT_TYPE_KEYBOARD, protocol, ops, data, devicep);
+status_t keyboard_device_create(const char *name, device_t *parent, keyboard_ops_t *ops,
+                                void *data, device_t **devicep) {
+	return input_device_create(name, parent, INPUT_TYPE_KEYBOARD, ops, data, devicep);
 }
 MODULE_EXPORT(keyboard_device_create);
 
@@ -362,7 +359,6 @@ MODULE_EXPORT(keyboard_device_create);
  * @param parent	Optional parent node. If not provided, then the main
  *			device will be created under the input device
  *			container.
- * @param protocol	Device protocol.
  * @param ops		Pointer to operations structure.
  * @param data		Data specific to the device.
  * @param parent	Optional parent device.
@@ -370,9 +366,9 @@ MODULE_EXPORT(keyboard_device_create);
  *
  * @return		Status code describing result of the operation.
  */
-status_t mouse_device_create(const char *name, device_t *parent, uint8_t protocol,
-                             mouse_ops_t *ops, void *data, device_t **devicep) {
-	return input_device_create(name, parent, INPUT_TYPE_MOUSE, protocol, ops, data, devicep);
+status_t mouse_device_create(const char *name, device_t *parent, mouse_ops_t *ops,
+                             void *data, device_t **devicep) {
+	return input_device_create(name, parent, INPUT_TYPE_MOUSE, ops, data, devicep);
 }
 MODULE_EXPORT(mouse_device_create);
 

@@ -13,4 +13,4 @@
 
 Import('env')
 
-env.Module('i8042', ['i8042.c'])
+env.Module('i8042', ['i8042.c', 'keycodes.c'])
