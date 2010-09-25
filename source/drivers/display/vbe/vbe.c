@@ -21,6 +21,7 @@
 #include <drivers/display.h>
 
 #include <mm/malloc.h>
+#include <mm/page.h>
 
 #include <platform/bios.h>
 
@@ -201,6 +202,9 @@ static status_t vbe_init(void) {
 	for(i = 0; i < count; i++) {
 		modes[i].offset = modes[i].offset - mem_phys;
 	}
+
+	/* Set the cache mode on the framebuffer to WC. */
+	page_set_memory_type(mem_phys, ROUND_UP(mem_size, PAGE_SIZE), MEMORY_TYPE_WC);
 
 	/* Add the display device. */
 	ret = display_device_create(NULL, NULL, &vbe_display_ops, NULL, modes, count,
