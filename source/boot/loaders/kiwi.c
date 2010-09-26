@@ -214,8 +214,8 @@ static void __noreturn kiwi_loader_load(environ_t *env) {
 	/* If SMP is enabled, detect and boot secondary CPUs. */
 	if(!kernel_args->smp_disabled) {
 		cpu_detect();
-		cpu_boot_all(kiwi_loader_ap_entry);
 	}
+	cpu_boot_all(kiwi_loader_ap_entry);
 
 	/* Set the video mode. */
 	value = environ_lookup(env, "video_mode");
