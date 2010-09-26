@@ -271,7 +271,12 @@ class EnvironmentManager(dict):
 			env['ENV']['CCC_CC'] = ToolPath('gcc')
 		else:
 			env['CC'] = ToolPath('gcc')
-		env['CXX']     = ToolPath('g++')
+		if os.environ.has_key('CXX') and os.path.basename(os.environ['CXX']) == 'c++-analyzer':
+			env['CXX'] = os.environ['CXX']
+			env['ENV']['CCC_CXX'] = ToolPath('g++')
+			print env['CXX']
+		else:
+			env['CXX'] = ToolPath('g++')
 		env['AS']      = ToolPath('as')
 		env['OBJDUMP'] = ToolPath('objdump')
 		env['READELF'] = ToolPath('readelf')
