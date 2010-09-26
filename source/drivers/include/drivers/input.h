@@ -44,7 +44,7 @@ typedef struct input_event {
 #define INPUT_EVENT_REL_X	2	/**< Relative X movement (mouse). */
 #define INPUT_EVENT_REL_Y	3	/**< Relative Y movement (mouse). */
 #define INPUT_EVENT_BTN_DOWN	4	/**< Button down (mouse). */
-#define INPUT_EVENT_BTN_UP	4	/**< Button up (mouse). */
+#define INPUT_EVENT_BTN_UP	5	/**< Button up (mouse). */
 
 /** Keyboard key codes. */
 #define INPUT_KEY_LCTRL		1	/**< Left Ctrl. */
