@@ -176,6 +176,16 @@ static bool tftp_read(fs_handle_t *handle, void *buf, size_t count, offset_t off
 	start = offset / data->packet_size;
 	end = (offset + (count - 1)) / data->packet_size;
 
+	/* If the current packet number is less than the start packet, seek to
+	 * the start packet. */
+	if(data->packet_number < start) {
+		for(i = 0; i < start; i++) {
+			if(!tftp_read_packet(data)) {
+				return false;
+			}
+		}
+	}
+
 	/* If we're not starting on a block boundary, we need to do a partial
 	 * transfer on the initial block to get up to a block boundary. 
 	 * If the transfer only goes across one block, this will handle it. */
