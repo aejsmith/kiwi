@@ -110,12 +110,12 @@ void Cursor::MoveRelative(int dx, int dy) {
 
 	/* Ensure that the location is within the screen. */
 	if(x < -kCursorHotspotX) {
-		x = kCursorHotspotX;
+		x = -kCursorHotspotX;
 	} else if(x >= (m_root->GetRect().GetWidth() - kCursorHotspotX)) {
 		x = (m_root->GetRect().GetWidth() - kCursorHotspotX) - 1;
 	}
 	if(y < -kCursorHotspotY) {
-		y = kCursorHotspotY;
+		y = -kCursorHotspotY;
 	} else if(y >= (m_root->GetRect().GetHeight() - kCursorHotspotY)) {
 		y = (m_root->GetRect().GetHeight() - kCursorHotspotY) - 1;
 	}

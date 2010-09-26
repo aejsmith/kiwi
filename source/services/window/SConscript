@@ -26,6 +26,8 @@ env.Program('window', [
 	'Cursor.cc',
 	'Decoration.cc',
 	'Display.cc',
+	'InputManager.cc',
+	'MouseDevice.cc',
 	'Session.cc',
 	'Surface.cc',
 	'Window.cc',

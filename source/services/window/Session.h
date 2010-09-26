@@ -74,6 +74,10 @@ public:
 	 * @return		Root window for the session. */
 	Window *GetRoot() const { return m_root; }
 
+	/** Get the cursor.
+	 * @return		Cursor for the session. */
+	Cursor *GetCursor() const { return m_cursor; }
+
 	/** Get the session's compositor.
 	 * @return		Pointer to session's compositor. */
 	Compositor *GetCompositor() const { return m_compositor; }

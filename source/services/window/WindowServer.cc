@@ -21,6 +21,7 @@
 #include <algorithm>
 
 #include "Display.h"
+#include "InputManager.h"
 #include "Session.h"
 #include "WindowServer.h"
 
@@ -38,6 +39,9 @@ WindowServer::WindowServer() : m_active(0) {
 
 	/* Activate session 0. */
 	SwitchSession(0, 0);
+
+	/* Create the input device manager. */
+	m_inputmgr = new InputManager(this);
 }
 
 /** Remove a session from the server.

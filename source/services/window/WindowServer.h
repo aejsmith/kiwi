@@ -27,6 +27,7 @@
 #include <map>
 
 class Display;
+class InputManager;
 class Session;
 
 /** Main class for the window server. */
@@ -54,6 +55,7 @@ private:
 	SessionMap m_sessions;			/**< Map of known sessions. */
 	Session *m_active;			/**< Currently active session. */
 	Display *m_display;			/**< Display the server is using. */
+	InputManager *m_inputmgr;		/**< Input manager. */
 };
 
 #endif /* __WINDOWSERVER_H */
