@@ -113,7 +113,7 @@ static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_
 
 	assert(device == i8042_keyboard_dev);
 
-	if(!(in8(0x64) & (1<<0))) {
+	if(!(in8(0x64) & (1<<0)) || in8(0x64) & (1<<5)) {
 		return IRQ_UNHANDLED;
 	}
 
@@ -187,37 +187,6 @@ static void i8042_mouse_command(uint8_t cmd) {
 	}
 }
 
-/** Initialize the mouse device. */
-static void i8042_mouse_init(void) {
-	uint8_t cmdbyte;
-
-	/* Enable the AUX device. */
-	i8042_command_write(0xA8);
-
-	/* Set various parameters. */
-	i8042_mouse_command(0xF3);
-	i8042_mouse_command(MOUSE_RATE);
-	i8042_mouse_command(0xE8);
-	i8042_mouse_command(MOUSE_RESOLUTION);
-
-	/* Get the command byte from the controller. */
-	i8042_command_write(0x20);
-	i8042_wait_data();
-	cmdbyte = in8(0x60);
-
-	/* Enable mouse interrupts. Also set the System bit (bit 2) so that
-	 * a reboot via the i8042 controller will be a "warm" reboot. */
-	cmdbyte |= (1<<1);
-	cmdbyte |= (1<<2);
-
-	/* Write it back. */
-	i8042_command_write(0x60);
-	i8042_data_write(cmdbyte);
-
-	/* Enable the mouse. */
-	i8042_mouse_command(0xF4);
-}
-
 /** IRQ handler for i8042 mouse.
  * @param num		IRQ number.
  * @param _device	Device pointer.
@@ -230,7 +199,7 @@ static irq_result_t i8042_mouse_irq(unative_t num, void *_device, intr_frame_t *
 
 	assert(device == i8042_mouse_dev);
 
-	if(!(in8(0x64) & (1<<0))) {
+	if(!(in8(0x64) & (1<<0)) || !(in8(0x64) & (1<<5))) {
 		return IRQ_UNHANDLED;
 	}
 
@@ -305,6 +274,7 @@ static mouse_ops_t i8042_mouse_ops = {
 /** Initialisation function for the i8042 driver.
  * @return		Status code describing result of the operation. */
 static status_t i8042_init(void) {
+	uint8_t cmdbyte;
 	status_t ret;
 
 	/* Empty i8042 buffer. */
@@ -312,8 +282,31 @@ static status_t i8042_init(void) {
 		in8(0x60);
 	}
 
-	/* Initialise the mouse. */
-	i8042_mouse_init();
+	/* Get the command byte from the controller. */
+	i8042_command_write(0x20);
+	i8042_wait_data();
+	cmdbyte = in8(0x60);
+
+	/* Enable keyboard/mouse interrupts, and set the System bit (bit 2) so
+	 * that a reboot via the i8042 controller will be a "warm" reboot. */
+	cmdbyte |= ((1<<0) | (1<<1) | (1<<2));
+	cmdbyte &= ~((1<<4) | (1<<5));
+
+	/* Write it back. */
+	i8042_command_write(0x60);
+	i8042_data_write(cmdbyte);
+
+	/* Enable the AUX device. */
+	i8042_command_write(0xA8);
+
+	/* Set various parameters. */
+	i8042_mouse_command(0xF3);
+	i8042_mouse_command(MOUSE_RATE);
+	i8042_mouse_command(0xE8);
+	i8042_mouse_command(MOUSE_RESOLUTION);
+
+	/* Enable the mouse. */
+	i8042_mouse_command(0xF4);
 
 	ret = keyboard_device_create(NULL, NULL, &i8042_keyboard_ops, NULL, &i8042_keyboard_dev);
 	if(ret != STATUS_SUCCESS) {
@@ -344,6 +337,11 @@ static status_t i8042_init(void) {
 		device_destroy(i8042_mouse_dev);
 		device_destroy(i8042_keyboard_dev);
 		return ret;
+	}
+
+	/* Empty i8042 buffer. */
+	while(in8(0x64) & 1) {
+		in8(0x60);
 	}
 
 	return STATUS_SUCCESS;
