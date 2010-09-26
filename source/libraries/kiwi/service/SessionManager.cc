@@ -35,6 +35,11 @@ SessionManager::SessionManager() {
 	GET_CONN()->OnSwitchSession.Connect(OnSwitchSession);
 }
 
+/** Destroy the connection. */
+SessionManager::~SessionManager() {
+	delete GET_CONN();
+}
+
 /** Create a new session.
  * @param id		Where to store ID of session.
  * @return		Status code describing result of the operation. */

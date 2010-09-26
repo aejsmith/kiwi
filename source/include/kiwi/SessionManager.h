@@ -32,6 +32,7 @@ namespace kiwi {
 class SessionManager : public Object {
 public:
 	SessionManager();
+	~SessionManager();
 
 	status_t CreateSession(session_id_t &id);
 	status_t SwitchSession(session_id_t id);
