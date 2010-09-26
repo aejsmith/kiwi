@@ -75,6 +75,8 @@ WindowList::List &WindowList::ListForWindow(Window *window) {
 		return m_panels;
 	case WINDOW_TYPE_POPUP:
 		return m_popups;
+	case WINDOW_TYPE_CURSOR:
+		return m_cursors;
 	case WINDOW_TYPE_ROOT:
 		clog << "Root window should not be placed in WindowList" << endl;
 		abort();
@@ -90,4 +92,5 @@ void WindowList::RebuildList() {
 	copy(m_normal.begin(), m_normal.end(), back_inserter(m_list));
 	copy(m_panels.begin(), m_panels.end(), back_inserter(m_list));
 	copy(m_popups.begin(), m_popups.end(), back_inserter(m_list));
+	copy(m_cursors.begin(), m_cursors.end(), back_inserter(m_list));
 }

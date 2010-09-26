@@ -52,6 +52,7 @@ private:
 	List m_normal;			/**< List of normal windows. */
 	List m_panels;			/**< List of panel windows. */
 	List m_popups;			/**< List of popup windows. */
+	List m_cursors;			/**< List of cursor windows. */
 };
 
 #endif /* __WINDOWLIST_H */

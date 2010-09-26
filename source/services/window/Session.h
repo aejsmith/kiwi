@@ -32,6 +32,7 @@
 #include "Window.h"
 
 class Connection;
+class Cursor;
 class Surface;
 class Compositor;
 class WindowServer;
@@ -91,6 +92,7 @@ private:
 	bool m_active;			/**< Whether the session is active. */
 	int m_refcount;			/**< Reference count. */
 	Window *m_root;			/**< Root window. */
+	Cursor *m_cursor;		/**< Cursor. */
 	Compositor *m_compositor;	/**< Compositor. */
 	Window::ID m_next_window_id;	/**< Next window ID. */
 	Window *m_active_window;	/**< Active window. */

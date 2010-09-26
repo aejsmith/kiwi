@@ -166,7 +166,7 @@ void Decoration::Redraw() {
 		cairo_rectangle(context, 1, 23, m_rect.GetWidth() - 2, 1);
 		pat = cairo_pattern_create_linear(0, 23, m_rect.GetWidth(), 23);
 		cairo_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);
-		cairo_pattern_add_color_stop_rgb(pat, 0.5, 0.4, 0.4, 0.4);
+		cairo_pattern_add_color_stop_rgb(pat, 0.5, 0.45, 0.45, 0.45);
 		cairo_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 0);
 		cairo_set_source(context, pat);
 		cairo_fill(context);

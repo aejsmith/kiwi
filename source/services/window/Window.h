@@ -33,13 +33,15 @@ class Surface;
 
 // FIXME: Move to public location.
 enum window_type {
-	WINDOW_TYPE_ROOT,	// do not allow from clients.
 	WINDOW_TYPE_NORMAL,	// allow for top-levels only.
 	WINDOW_TYPE_UNBORDERED,	// same. but no border.
 	WINDOW_TYPE_ALERT,	// same.
 	WINDOW_TYPE_PANEL,	// same. fixed above all windows in the WindowList its in.
 	WINDOW_TYPE_CHILD,	// allow for children only.
 	WINDOW_TYPE_POPUP,	// same.
+
+	WINDOW_TYPE_ROOT,	// do not allow from clients.
+	WINDOW_TYPE_CURSOR,	// same.
 };
 
 /** Class implementing a window. */
@@ -59,6 +61,10 @@ public:
 	void SetActive(bool active);
 	void Update(kiwi::Rect rect);
 	void MoveTo(const kiwi::Point &pos);
+
+	/** Get the session the window is for.
+	 * @return		Session of the window. */
+	Session *GetSession() const { return m_session; }
 
 	/** Get the ID of the window.
 	 * @return		ID of the window. */

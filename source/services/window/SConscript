@@ -23,6 +23,7 @@ env.Program('window', [
 	'org.kiwi.WindowServer.cc',
 	'Compositor.cc',
 	'Connection.cc',
+	'Cursor.cc',
 	'Decoration.cc',
 	'Display.cc',
 	'Session.cc',

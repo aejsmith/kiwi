@@ -18,6 +18,8 @@
  * @brief		Window class.
  */
 
+#include <cassert>
+
 #include "Compositor.h"
 #include "Decoration.h"
 #include "Session.h"
@@ -25,10 +27,12 @@
 #include "Window.h"
 
 using namespace kiwi;
+using namespace std;
 
 /** Create a window.
  * @param session	Session that the window is on.
- * @param id		ID for the window.
+ * @param id		ID for the window. If negative, the window will not be
+ *			published in the session.
  * @param rect		Rectangle describing window area. */
 Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, window_type type) :
 	m_session(session), m_id(id), m_parent(parent), m_rect(rect),
@@ -37,7 +41,9 @@ Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, 
 	/* Create a new surface and publish it in the session. FIXME: Somehow
 	 * need to stop a DestroySurface call on this surface from working. */
 	m_surface = new Surface(rect.GetWidth(), rect.GetHeight());
-	m_session->AddSurface(m_surface);
+	if(m_id >= 0) {
+		m_session->AddSurface(m_surface);
+	}
 
 	/* Create the window decoration if the type requires one. */
 	switch(m_type) {
@@ -59,8 +65,10 @@ Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, 
 /** Destroy the window. */
 Window::~Window() {
 	SetVisible(false);
-	m_session->RemoveSurface(m_surface);
-	m_session->RemoveWindow(this);
+	if(m_id >= 0) {
+		m_session->RemoveSurface(m_surface);
+		m_session->RemoveWindow(this);
+	}
 	delete m_surface;
 }
 
@@ -136,6 +144,9 @@ void Window::SetVisible(bool visible) {
  * @note		Use Session::ActivateWindow() instead of this!
  * @param active	New active state. */
 void Window::SetActive(bool active) {
+	/* Cursors should not be made active. */
+	assert(!active || m_type != WINDOW_TYPE_CURSOR);
+
 	if(m_active != active) {
 		bool redraw = false;
 

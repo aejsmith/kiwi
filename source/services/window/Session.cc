@@ -23,6 +23,7 @@
 
 #include "Compositor.h"
 #include "Connection.h"
+#include "Cursor.h"
 #include "Display.h"
 #include "Session.h"
 #include "Surface.h"
@@ -70,6 +71,9 @@ Session::Session(WindowServer *server, session_id_t id) :
 
 	/* Create the compositor. */
 	m_compositor = new Compositor(m_server->GetDisplay(), m_root);
+
+	/* Create the cursor. */
+	m_cursor = new Cursor(m_root);
 }
 
 /** Handle a connection from a process in the session.
