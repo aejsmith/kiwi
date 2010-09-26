@@ -68,5 +68,11 @@ void MouseDevice::EventReceived(int id) {
 	case INPUT_EVENT_REL_Y:
 		m_server->GetActiveSession()->GetCursor()->MoveRelative(0, event.value);
 		break;
+	case INPUT_EVENT_BTN_DOWN:
+		m_server->GetActiveSession()->GetCursor()->Down(event.value);
+		break;
+	case INPUT_EVENT_BTN_UP:
+		m_server->GetActiveSession()->GetCursor()->Up(event.value);
+		break;
 	}
 }

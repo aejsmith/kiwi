@@ -73,7 +73,7 @@ Session::Session(WindowServer *server, session_id_t id) :
 	m_compositor = new Compositor(m_server->GetDisplay(), m_root);
 
 	/* Create the cursor. */
-	m_cursor = new Cursor(m_root);
+	m_cursor = new Cursor(this);
 }
 
 /** Handle a connection from a process in the session.
@@ -140,13 +140,15 @@ Window *Session::FindWindow(Window::ID id) {
 /** Activate a window.
  * @param window	Window to activate. */
 void Session::ActivateWindow(Window *window) {
-	if(m_active_window) {
-		m_active_window->SetActive(false);
-	}
+	if(m_active_window != window) {
+		if(m_active_window) {
+			m_active_window->SetActive(false);
+		}
 
-	m_active_window = window;
-	m_active_window->SetVisible(true);
-	m_active_window->SetActive(true);
+		m_active_window = window;
+		m_active_window->SetVisible(true);
+		m_active_window->SetActive(true);
+	}
 }
 
 /** Hide a window.

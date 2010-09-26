@@ -61,6 +61,7 @@ public:
 	void SetActive(bool active);
 	void Update(kiwi::Rect rect);
 	void MoveTo(const kiwi::Point &pos);
+	Window *AtPosition(const kiwi::Point &pos);
 
 	/** Get the session the window is for.
 	 * @return		Session of the window. */

@@ -44,6 +44,14 @@ public:
 	/** Get the list end.
 	 * @return		Iterator pointing after last window in the list. */
 	List::const_iterator End() { return m_list.end(); }
+
+	/** Get the reverse list head.
+	 * @return		Iterator to last window in the list. */
+	List::const_reverse_iterator RBegin() { return m_list.rbegin(); }
+
+	/** Get the reverse list end.
+	 * @return		Iterator pointing after first window in the list. */
+	List::const_reverse_iterator REnd() { return m_list.rend(); }
 private:
 	List &ListForWindow(Window *window);
 	void RebuildList();

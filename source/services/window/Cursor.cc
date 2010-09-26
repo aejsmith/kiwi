@@ -29,10 +29,12 @@
 
 #include <kiwi/Rect.h>
 
+#include <cassert>
 #include <exception>
 #include <iostream>
 
 #include "Cursor.h"
+#include "Session.h"
 #include "Surface.h"
 #include "Window.h"
 
@@ -47,9 +49,9 @@ static const int16_t kCursorHotspotX = 6;
 static const int16_t kCursorHotspotY = 3;
 
 /** Create the cursor.
- * @param root		Root window of session that cursor is for. */
-Cursor::Cursor(Window *root) :
-	m_root(root)
+ * @param session	Session that the cursor is for. */
+Cursor::Cursor(Session *session) :
+	m_session(session), m_root(session->GetRoot())
 {
 	/* Work out initial placement of the cursor (centre of screen). */
 	int16_t x = (m_root->GetRect().GetWidth() / 2) - (kCursorWidth / 2);
@@ -92,7 +94,7 @@ Cursor::Cursor(Window *root) :
 
 /** Destroy the cursor. */
 Cursor::~Cursor() {
-	
+	delete m_window;
 }
 
 /** Set visibility of the cursor.
@@ -104,7 +106,7 @@ void Cursor::SetVisible(bool visible) {
 /** Move the cursor relative to its current position.
  * @param dx		X delta.
  * @param dy		Y delta. */
-void Cursor::MoveRelative(int dx, int dy) {
+void Cursor::MoveRelative(int32_t dx, int32_t dy) {
 	int16_t x = m_window->GetRect().GetX() + dx;
 	int16_t y = m_window->GetRect().GetY() + dy;
 
@@ -122,4 +124,25 @@ void Cursor::MoveRelative(int dx, int dy) {
 
 	/* Move the window to the new position. */
 	m_window->MoveTo(Point(x, y));
+}
+
+/** Mouse button down handler.
+ * @param button	Button that was pressed. */
+void Cursor::Down(int32_t button) {
+	/* Get the position the cursor is pointing at. */
+	Point pos = m_window->GetAbsoluteRect().GetTopLeft();
+	pos = Point(pos.GetX() + kCursorHotspotX, pos.GetY() + kCursorHotspotY);
+
+	/* Get the window at this location. */
+	Window *window = m_root->AtPosition(pos);
+	assert(window);
+
+	/* Activate the window if it isn't already. */
+	m_session->ActivateWindow(window);
+}
+
+/** Mouse button up handler.
+ * @param button	Button that was released. */
+void Cursor::Up(int32_t button) {
+
 }

@@ -79,8 +79,8 @@ Window::~Window() {
 Rect Window::GetAbsoluteRect() const {
 	Rect ret = m_rect;
 	if(m_parent) {
-		ret.Adjust(m_parent->GetRect().GetX(), m_parent->GetRect().GetY(),
-		           m_parent->GetRect().GetX(), m_parent->GetRect().GetY());
+		Rect parent = m_parent->GetAbsoluteRect();
+		ret.Adjust(parent.GetX(), parent.GetY(), parent.GetX(), parent.GetY());
 	}
 	return ret;
 }
@@ -91,8 +91,8 @@ Rect Window::GetAbsoluteRect() const {
 Rect Window::GetAbsoluteTotalRect() const {
 	Rect ret = GetTotalRect();
 	if(m_parent) {
-		ret.Adjust(m_parent->GetRect().GetX(), m_parent->GetRect().GetY(),
-		           m_parent->GetRect().GetX(), m_parent->GetRect().GetY());
+		Rect parent = m_parent->GetAbsoluteRect();
+		ret.Adjust(parent.GetX(), parent.GetY(), parent.GetX(), parent.GetY());
 	}
 	return ret;
 }
@@ -208,4 +208,39 @@ void Window::MoveTo(const kiwi::Point &pos) {
 		update.Union(GetAbsoluteTotalRect());
 		m_session->GetCompositor()->Redraw(update);
 	}
+}
+
+/** Get window at position.
+ *
+ * If the specified point is within a child window, returns that window. The
+ * child list is searched end to first, meaning the front-most child containing
+ * the point will be returned. If the point isn't within a child, and it is
+ * within the window itself, the window itself will be returned. Otherwise,
+ * NULL will be returned.
+ *
+ * @param pos		Absolute screen position.
+ *
+ * @return		Child at position, window itself, or NULL if point
+ *			outside window and children.
+ */
+Window *Window::AtPosition(const kiwi::Point &pos) {
+	/* Can't do this for cursor windows. */
+	if(m_type == WINDOW_TYPE_CURSOR) {
+		return 0;
+	}
+
+	/* Check if it is within children. */
+	for(auto it = m_children.RBegin(); it != m_children.REnd(); ++it) {
+		Window *ret = (*it)->AtPosition(pos);
+		if(ret) {
+			return ret;
+		}
+	}
+
+	/* Not within children, is it within ourself? */
+	if(GetAbsoluteTotalRect().Contains(pos)) {
+		return this;
+	}
+
+	return 0;
 }

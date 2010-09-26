@@ -23,18 +23,22 @@
 
 #include <kiwi/Object.h>
 
+class Session;
 class Window;
 
 /** Class implementing a cursor. */
 class Cursor : public kiwi::Object {
 public:
-	Cursor(Window *root);
+	Cursor(Session *session);
 	~Cursor();
 
 	void SetVisible(bool visible);
-	void MoveRelative(int dx, int dy);
+	void MoveRelative(int32_t dx, int32_t dy);
+	void Down(int32_t button);
+	void Up(int32_t button);
 private:
-	Window *m_root;			/**< Root window. */
+	Session *m_session;		/**< Session the cursor is for. */
+	Window *m_root;			/**< Root window of session, stored for convenience. */
 	Window *m_window;		/**< Window implementing the cursor. */
 };
 
