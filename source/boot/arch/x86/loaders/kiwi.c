@@ -24,6 +24,7 @@
 
 #include <arch/boot.h>
 #include <arch/cpu.h>
+#include <arch/intr.h>
 #include <arch/page.h>
 
 #include <boot/cpu.h>
@@ -246,7 +247,10 @@ void __noreturn kiwi_loader_arch_enter(void) {
 		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
 	}
 #endif
+	/* Ensure that we enter the kernel with interrupts disabled. */
+	intr_disable();
 
+	/* Call the appropriate entry function. */
 	if(kernel_is_64bit) {
 		kiwi_loader_arch_enter64(kernel_args, cpu_current_id(), kernel_cr3, kernel_entry64);
 	} else {
