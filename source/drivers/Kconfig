@@ -62,7 +62,7 @@ comment "Input devices"
 config DRIVER_INPUT_I8042
 	bool "i8042 keyboard/mouse port driver"
 	default y
-	depends on ARCH_X86
+	depends on PLATFORM_PC
  	help
 	  Enable the i8042 (PS/2) keyboard/mouse port driver.
 
