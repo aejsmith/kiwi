@@ -119,6 +119,16 @@ static void page_structure_unmap(page_map_t *map, uint64_t *addr) {
 	}
 }
 
+/** Add an address to the invalidation list.
+ * @param map		Map to add to.
+ * @param virt		Address to add. */
+static void page_map_add_to_invalidate(page_map_t *map, ptr_t virt) {
+	if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
+		map->pages_to_invalidate[map->invalidate_count] = virt;
+	}
+	map->invalidate_count++;
+}
+
 /** Get the page directory containing an address.
  * @param map		Page map to get from.
  * @param virt		Virtual address to get page directory for.
@@ -195,21 +205,33 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	/* Get the page table number. A page table covers 2MB. */
 	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
 	if(!(pdir[pde] & PG_PRESENT)) {
-		/* Allocate a new page table if required. */
-		if(!alloc || unlikely(!(page = page_structure_alloc(mmflag | PM_ZERO)))) {
+		/* Allocate a new page table if required. Allocating a page can
+		 * cause page mappings to be modified (if a vmem boundary tag
+		 * refill occurs), handle this possibility. */
+		if(alloc) {
+			page = page_structure_alloc(mmflag | PM_ZERO);
+			if(pdir[pde] & PG_PRESENT) {
+				if(page) {
+					page_free(page, 1);
+				}
+			} else {
+				if(unlikely(!page)) {
+					page_structure_unmap(map, pdir);
+					return NULL;
+				}
+
+				/* Map it into the page directory. If this is
+				 * the kernel map, must invalidate the page
+				 * directory mapping entry. */
+				pdir[pde] = page | TABLE_MAPPING_FLAGS(map);
+				if(IS_KERNEL_MAP(map) && paging_inited) {
+					invlpg(KERNEL_PTBL_ADDR(virt));
+					page_map_add_to_invalidate(map, KERNEL_PTBL_ADDR(virt));
+				}
+			}
+		} else {
 			page_structure_unmap(map, pdir);
 			return NULL;
-		}
-
-		/* Map it into the page directory. If this is the kernel map,
-		 * must invalidate the page directory mapping entry. */
-		pdir[pde] = page | TABLE_MAPPING_FLAGS(map);
-		if(IS_KERNEL_MAP(map) && paging_inited) {
-			invlpg(KERNEL_PTBL_ADDR(virt));
-			if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
-				map->pages_to_invalidate[map->invalidate_count] = KERNEL_PTBL_ADDR(virt);
-			}
-			map->invalidate_count++;
 		}
 	}
 
@@ -434,10 +456,7 @@ void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec) {
 	if(IS_CURRENT_MAP(map)) {
 		invlpg(virt);
 	}
-	if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
-		map->pages_to_invalidate[map->invalidate_count] = virt;
-	}
-	map->invalidate_count++;
+	page_map_add_to_invalidate(map, virt);
 }
 
 /** Unmap a page.
@@ -480,10 +499,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 			invlpg(virt);
 		}
 		if(shared) {
-			if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
-				map->pages_to_invalidate[map->invalidate_count] = virt;
-			}
-			map->invalidate_count++;
+			page_map_add_to_invalidate(map, virt);
 		}
 	}
 
