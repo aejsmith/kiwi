@@ -19,6 +19,7 @@
  * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -354,8 +355,8 @@ typedef enum
     CMOV = 0x10
 } cpu_features_t;
 
-
-static unsigned int
+/* KIWI: Disable MMX and SSE. */
+static unsigned int  __attribute__ ((__target__("arch=i586,no-mmx,no-sse,no-sse2")))
 detect_cpu_features (void)
 {
     unsigned int features = 0;

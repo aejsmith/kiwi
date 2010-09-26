@@ -11,6 +11,9 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
+# Note about updating: pixman-cpu.c needs to have an attribute put on
+# detect_cpu_features() to disable MMX and SSE code generation.
+
 Import('env', 'config')
 
 # Base sources.
@@ -57,15 +60,14 @@ defines = {
 if config['SRCARCH'] == 'x86':
 	if config['ARCH'] == 'amd64':
 		defines['SIZEOF_LONG'] = 8
+		defines['USE_SSE2'] = 1
+		sources += ['pixman-sse2.c']
+		ccflags += ['-msse2']
 	else:
 		defines['SIZEOF_LONG'] = 4
 	defines['USE_MMX'] = 1
-	defines['USE_SSE2'] = 1
-	sources += [
-		'pixman-mmx.c',
-		'pixman-sse2.c',
-	]
-	ccflags += ['-mmmx', '-msse2', '-Winline']
+	sources += ['pixman-mmx.c']
+	ccflags += ['-mmmx', '-Winline']
 else:
 	raise Exception, "Architecture support not added."
 
