@@ -69,8 +69,11 @@ status_t SessionManager::SwitchSession(session_id_t id) {
 		return STATUS_NOT_FOUND;
 	}
 
-	/* Switch the session. */
+	/* Switch the session if it is not already active. */
 	Session *session = it->second;
+	if(m_active == session) {
+		return STATUS_SUCCESS;
+	}
 	swap(m_active, session);
 
 	/* Notify connections. */
