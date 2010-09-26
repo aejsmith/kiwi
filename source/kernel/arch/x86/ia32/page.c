@@ -201,8 +201,16 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 			return NULL;
 		}
 
-		/* Map it into the page directory. */
+		/* Map it into the page directory. If this is the kernel map,
+		 * must invalidate the page directory mapping entry. */
 		pdir[pde] = page | TABLE_MAPPING_FLAGS(map);
+		if(IS_KERNEL_MAP(map) && paging_inited) {
+			invlpg(KERNEL_PTBL_ADDR(virt));
+			if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
+				map->pages_to_invalidate[map->invalidate_count] = KERNEL_PTBL_ADDR(virt);
+			}
+			map->invalidate_count++;
+		}
 	}
 
 	/* Unmap the page directory and return the page table address. */
