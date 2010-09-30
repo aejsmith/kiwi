@@ -92,8 +92,37 @@ void Compositor::Redraw(const Rect &rect) {
 void Compositor::Redraw(const Region &region) {
 	Region::RectArray rects;
 	region.GetRects(rects);
+
+	cairo_save(m_context);
+
+	/* Add each rectangle to the current path. */
+	Rect screen(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
+	for(auto it = rects.begin(); it != rects.end(); ) {
+		it->Intersect(screen);
+		if(it->IsValid()) {
+			cairo_rectangle(m_context, it->GetX(), it->GetY(), it->GetWidth(), it->GetHeight());
+			++it;
+		} else {
+			it = rects.erase(it);
+		}
+	}
+
+	/* If no rectangles were inside the screen area, do nothing. */
+	if(rects.empty()) {
+		return;
+	}
+
+	/* Set the clip region to the updated area. */
+	cairo_clip(m_context);
+
+	/* Redraw. */
+	Render();
+	cairo_restore(m_context);
+
+	/* Update the screen. */
 	for(auto it = rects.begin(); it != rects.end(); ++it) {
-		Redraw(*it);
+		m_display->DrawSurface(m_surface, it->GetX(), it->GetY(), it->GetX(),
+		                       it->GetY(), it->GetWidth(), it->GetHeight());
 	}
 }
 
