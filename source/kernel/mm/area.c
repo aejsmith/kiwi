@@ -320,7 +320,6 @@ status_t sys_area_resize(handle_t handle, size_t size) {
 static void __init_text area_init(void) {
 	area_id_arena = vmem_create("area_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
 	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
-	                              NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
-	                              NULL, 0, MM_FATAL);
+	                              NULL, NULL, NULL, 0, MM_FATAL);
 }
 INITCALL(area_init);

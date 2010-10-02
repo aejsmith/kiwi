@@ -42,17 +42,11 @@ struct slab_bufctl;
 #define SLAB_LARGE_FRACTION	8		/**< Minimum fraction of the source quantum for large objects. */
 #define SLAB_WASTE_FRACTION	8		/**< Maximum fraction of a slab that should be wasted. */
 
-/** Reclaim priority to set if no special priority. */
-#define SLAB_DEFAULT_PRIORITY	100
-
 /** Slab constructor callback function. */
 typedef void (*slab_ctor_t)(void *obj, void *data);
 
 /** Slab destructor callback function. */
 typedef void (*slab_dtor_t)(void *obj, void *data);
-
-/** Slab reclaim callback function. */
-typedef void (*slab_reclaim_t)(void *data, bool force);
 
 /** Slab cache structure. */
 typedef struct slab_cache {
@@ -90,7 +84,6 @@ typedef struct slab_cache {
 	/** Callback functions. */
 	slab_ctor_t ctor;			/**< Object constructor function. */
 	slab_dtor_t dtor;			/**< Object destructor function. */
-	slab_reclaim_t reclaim;			/**< Memory reclaim function. */
 	void *data;				/**< Data to pass to helper functions. */
 	int priority;				/**< Reclaim priority. */
 
@@ -110,8 +103,7 @@ extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
 extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
                                        slab_ctor_t ctor, slab_dtor_t dtor,
-                                       slab_reclaim_t reclaim, void *data,
-                                       int priority, struct vmem *source, int flags,
+                                       void *data, struct vmem *source, int flags,
                                        int kmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 

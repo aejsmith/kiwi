@@ -511,11 +511,10 @@ int kdbg_cmd_handles(int argc, char **argv) {
 /** Initialise the handle caches. */
 void __init_text handle_init(void) {
 	khandle_cache = slab_cache_create("khandle_cache", sizeof(khandle_t), 0, NULL,
-	                                  NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY,
-	                                  NULL, 0, MM_FATAL);
+	                                  NULL, NULL, NULL, 0, MM_FATAL);
 	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
-	                                       0, handle_table_ctor, NULL, NULL, NULL,
-	                                       SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+	                                       0, handle_table_ctor, NULL, NULL, NULL, 0,
+	                                       MM_FATAL);
 }
 
 /** Get the type of an object referred to by a handle.

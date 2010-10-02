@@ -610,9 +610,8 @@ void __init_text process_init(void) {
 
 	/* Create the process slab cache and ID vmem arena. */
 	process_id_arena = vmem_create("process_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
-	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
-	                                  process_cache_ctor, NULL, NULL, NULL,
-	                                  SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0, process_cache_ctor, NULL,
+	                                  NULL, NULL, 0, MM_FATAL);
 
 	/* Create the kernel process. */
 	ret = process_alloc("[kernel]", 0, PROCESS_CRITICAL | PROCESS_FIXEDPRIO,

@@ -826,13 +826,8 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 			snprintf(qcname, SLAB_NAME_MAX, "%s_%zu", vmem->name, (i + 1) * vmem->quantum);
 			qcname[SLAB_NAME_MAX - 1] = 0;
 
-			/* Put quantum caches after the default reclaim
-			 * priority, so that any heap space that gets freed
-			 * after reclaiming from all the other slab caches can
-			 * then be reclaimed from quantum caches. */
 			vmem->qcache[i] = slab_cache_create(qcname, (i + 1) * vmem->quantum,
 			                                    vmem->quantum, NULL, NULL, NULL,
-			                                    NULL, SLAB_DEFAULT_PRIORITY + 2,
 			                                    vmem, SLAB_CACHE_QCACHE, 0);
 			if(vmem->qcache[i] == NULL) {
 				goto fail;

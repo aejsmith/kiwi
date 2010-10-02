@@ -2136,11 +2136,8 @@ int kdbg_cmd_node(int argc, char **argv) {
 /** Initialise the filesystem layer.
  * @param args		Kernel arguments structure. */
 void __init_text fs_init(kernel_args_t *args) {
-	/* The filesystem node cache has a reclaim priority of 1. This means
-	 * that filesystem nodes will be reclaimed before anything else. */
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
-	                                  NULL, NULL, NULL, NULL, 1, NULL, 0,
-	                                  MM_FATAL);
+	                                  NULL, NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Store the boot FS UUID for use by fs_probe(). */
 	boot_fs_uuid = args->boot_fs_uuid;

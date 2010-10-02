@@ -101,6 +101,12 @@ typedef struct slab {
 	slab_cache_t *parent;		/**< Cache containing the slab. */
 } slab_t;
 
+/** Reclaim priorities to use for caches. */
+#define SLAB_DEFAULT_PRIORITY		0
+#define SLAB_QCACHE_PRIORITY		1
+#define SLAB_METADATA_PRIORITY		2
+#define SLAB_MAG_PRIORITY		3
+
 /** Internally-used caches. */
 static slab_cache_t slab_cache_cache;	/**< Cache for allocation of new slab caches. */
 static slab_cache_t slab_bufctl_cache;	/**< Cache for buffer control structures. */
@@ -604,12 +610,6 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 
 	kprintf(LOG_DEBUG, "slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
 
-	/* Run the cache's reclaim callback (if any) before attempting to
-	 * destroy magazines. */
-	if(cache->reclaim) {
-		cache->reclaim(cache->data, force);
-	}
-
 	mutex_lock(&cache->depot_lock);
 
 	/* Destroy empty magazines. */
@@ -706,19 +706,17 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
- * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
- *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
  * @param priority	Reclaim priority (lower values will be reclaimed before
  *			higher values).
- * @param source	Vmem arena used to allocate memory. If NULL, the
- *			kernel heap arena will be used.
+ * @param source	Arena used to allocate memory. If NULL, the kernel heap
+ * 			arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param kmflag	Allocation flags.
  * @return		Whether the cache was successfully initialised. */
 static bool slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
-                            slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
-                            void *data, int priority, vmem_t *source, int flags, int kmflag) {
+                            slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
+                            vmem_t *source, int flags, int kmflag) {
 	slab_cache_t *exist;
 
 	assert(size);
@@ -746,7 +744,6 @@ static bool slab_cache_init(slab_cache_t *cache, const char *name, size_t size, 
 	cache->source = source;
 	cache->ctor = ctor;
 	cache->dtor = dtor;
-	cache->reclaim = reclaim;
 	cache->data = data;
 	cache->priority = priority;
 
@@ -827,26 +824,31 @@ static bool slab_cache_init(slab_cache_t *cache, const char *name, size_t size, 
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
- * @param reclaim	Reclaim callback - reclaims any allocated but unneeded
- *			objects within a cache (optional).
  * @param data		Data to pass as second parameter to callback functions.
- * @param priority	Reclaim priority (lower values will be reclaimed before
- *			higher values).
- * @param source	Vmem arena used to allocate memory. If NULL, the
- *			kernel heap arena will be used.
+ * @param source	Arena used to allocate memory. If NULL, the kernel heap
+ *			arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param kmflag	Allocation flags.
  * @return		Pointer to cache on success, negative error code on
  *			failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-                                slab_ctor_t ctor, slab_dtor_t dtor, slab_reclaim_t reclaim,
-                                void *data, int priority, vmem_t *source, int flags,
-                                int kmflag) {
+                                slab_ctor_t ctor, slab_dtor_t dtor, void *data,
+                                vmem_t *source, int flags, int kmflag) {
 	slab_cache_t *cache;
+	int priority;
 
 	/* Use the kernel heap if no specific source is provided. */
 	if(source == NULL) {
 		source = &kheap_arena;
+	}
+
+	/* If the cache is a quantum cache, reclaim it after all other caches.
+	 * This means that heap space reclaimed from normal caches can then be
+	 * reclaimed from the quantum caches. */
+	if(flags & SLAB_CACHE_QCACHE) {
+		priority = SLAB_QCACHE_PRIORITY;
+	} else {
+		priority = SLAB_DEFAULT_PRIORITY;
 	}
 
 	cache = slab_cache_alloc(&slab_cache_cache, kmflag);
@@ -854,8 +856,8 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 		return cache;
 	}
 
-	if(!slab_cache_init(cache, name, size, align, ctor, dtor, reclaim, data,
-	                    priority, source, flags, kmflag)) {
+	if(!slab_cache_init(cache, name, size, align, ctor, dtor, data, priority,
+	                    source, flags, kmflag)) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -924,7 +926,7 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Enable the magazine layer and start the reclaim thread. */
+/** Enable the magazine layer. */
 void __init_text slab_late_init(void) {
 	slab_cache_t *cache;
 
@@ -953,14 +955,12 @@ void __init_text slab_init(void) {
 
 	/* Initialise statically allocated internal caches. */
 	slab_cache_init(&slab_cache_cache, "slab_cache_cache", sizeof(slab_cache_t), 0, NULL,
-	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 3, &slab_metadata_arena, 0,
-	                MM_FATAL);
+	                NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
 	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", sizeof(slab_bufctl_t), 0, NULL,
-	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0,
-	                MM_FATAL);
+	                NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
 	slab_cache_init(&slab_slab_cache, "slab_slab_cache", sizeof(slab_t), 0, NULL, NULL, NULL,
-	                NULL, SLAB_DEFAULT_PRIORITY + 4, &slab_metadata_arena, 0, MM_FATAL);
+	                SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
 	slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
-	                NULL, NULL, NULL, SLAB_DEFAULT_PRIORITY + 5, &slab_metadata_arena,
-	                SLAB_CACHE_NOMAG, MM_FATAL);
+	                NULL, NULL, SLAB_MAG_PRIORITY, &slab_metadata_arena, SLAB_CACHE_NOMAG,
+	                MM_FATAL);
 }

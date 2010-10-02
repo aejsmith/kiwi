@@ -601,9 +601,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 /** Initialise the thread cache. */
 void __init_text thread_init(void) {
 	thread_id_arena = vmem_create("thread_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
-	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
-	                                 thread_cache_ctor, NULL, NULL, NULL,
-	                                 SLAB_DEFAULT_PRIORITY, NULL, 0, MM_FATAL);
+	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0, thread_cache_ctor, NULL,
+	                                 NULL, NULL, 0, MM_FATAL);
 }
 
 /** Create the thread reaper. */
