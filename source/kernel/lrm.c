@@ -34,8 +34,10 @@
 
 #include <console.h>
 #include <fatal.h>
+#include <kdbg.h>
 #include <lrm.h>
 #include <status.h>
+#include <symbol.h>
 
 #if CONFIG_LRM_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -122,6 +124,66 @@ void lrm_reclaim(uint32_t type, uint64_t required) {
 	}
 
 	// TODO
+}
+
+/** Print a resource state.
+ * @param type		Type of resource.
+ * @param name		Name of resource. */
+static void print_resource_state(uint32_t type, const char *name) {
+	int level = lrm_level(type);
+	kprintf(LOG_NONE, "%-21s ", name);
+	switch(level) {
+	case RESOURCE_LEVEL_OK:
+		kprintf(LOG_NONE, "OK\n");
+		return;
+	case RESOURCE_LEVEL_ADVISORY:
+		kprintf(LOG_NONE, "Advisory\n");
+		return;
+	case RESOURCE_LEVEL_LOW:
+		kprintf(LOG_NONE, "Low\n");
+		return;
+	case RESOURCE_LEVEL_CRITICAL:
+		kprintf(LOG_NONE, "Critical\n");
+		return;
+	}
+}
+
+/** Print low resource handler information.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_lrm(int argc, char **argv) {
+	lrm_handler_t *handler;
+	symbol_t *sym;
+	size_t off;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints a list of all registered low resource handlers.\n");
+		return KDBG_OK;
+	} else if(argc != 1) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	kprintf(LOG_NONE, "Types Priority Function\n");
+	kprintf(LOG_NONE, "===== ======== ========\n");
+
+	LIST_FOREACH(&lrm_handlers, iter) {
+		handler = list_entry(iter, lrm_handler_t, header);
+
+		kprintf(LOG_NONE, "0x%-3" PRIx32 " %-8" PRIu32 " ", handler->types, handler->priority);
+		sym = symbol_lookup_addr((ptr_t)handler->func, &off);
+		kprintf(LOG_NONE, "[%p] %s+0x%zx\n", handler->func,
+		        (sym) ? sym->name : "<unknown>", off);
+	}
+
+	kprintf(LOG_NONE, "\nResource states\n");
+	kprintf(LOG_NONE, "===============\n");
+	print_resource_state(RESOURCE_TYPE_MEMORY, "Physical Memory:");
+	print_resource_state(RESOURCE_TYPE_KASPACE, "Kernel Address Space:");
+	return KDBG_OK;
 }
 
 /** Perform LRM initialisation. */

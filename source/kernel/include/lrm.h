@@ -29,11 +29,14 @@
 
 /** Resource levels. */
 #define RESOURCE_LEVEL_OK	0	/**< Within acceptable level. */
-#define RESOURCE_LEVEL_ADVISORY	1	/**< Nearing low level. */
+#define RESOURCE_LEVEL_ADVISORY	1	/**< Nearing low level, advise reclaiming. */
 #define RESOURCE_LEVEL_LOW	2	/**< Low. */
 #define RESOURCE_LEVEL_CRITICAL	3	/**< Critically low. */
 
-/** Default priority for an LRM handler. */
+/** Priorities for LRM handlers. */
+#define LRM_CACHE_PRIORITY	0
+#define LRM_FS_PRIORITY		1
+#define LRM_SLAB_PRIORITY	2
 #define LRM_DEFAULT_PRIORITY	100
 
 /** Type of a low resource handler. */
@@ -57,6 +60,8 @@ extern void lrm_handler_unregister(lrm_handler_t *handler);
 
 extern int lrm_level(uint32_t types);
 extern void lrm_reclaim(uint32_t type, uint64_t required);
+
+extern int kdbg_cmd_lrm(int argc, char **argv);
 
 extern void lrm_init(void);
 
