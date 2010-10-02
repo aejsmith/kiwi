@@ -45,10 +45,15 @@ extern "C" {
 /** Handle behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
 
+/** Details of an object event to wait for. */
+typedef struct object_event {
+	handle_t handle;		/**< Handle to wait on. */
+	int event;			/**< Event to wait for. */
+	bool signalled;			/**< Whether the event was signalled. */
+} object_event_t;
+
 extern int SYSCALL(object_type)(handle_t handle);
-extern status_t SYSCALL(object_wait)(handle_t handle, int event, useconds_t timeout);
-extern status_t SYSCALL(object_wait_multiple)(handle_t *handles, int *events, size_t count,
-                                              useconds_t timeout, int *indexp);
+extern status_t SYSCALL(object_wait)(object_event_t *events, size_t count, useconds_t timeout);
 extern status_t SYSCALL(handle_get_flags)(handle_t handle, int *flagsp);
 extern status_t SYSCALL(handle_set_flags)(handle_t handle, int flags);
 extern status_t SYSCALL(handle_duplicate)(handle_t handle, handle_t dest, bool force, handle_t *newp);

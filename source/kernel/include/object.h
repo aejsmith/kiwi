@@ -44,17 +44,22 @@ typedef struct object_type {
 	 * @param handle	Handle to the object. */
 	void (*close)(struct khandle *handle);
 
-	/** Signal that an object is being waited for.
+	/** Signal that an object event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback
 	 *			function and return success.
-	 * @param wait		Wait information structure.
+	 * @param handle	Handle to object.
+	 * @param event		Event that is being waited for.
+	 * @param sync		Internal data pointer to be passed to
+	 *			object_wait_signal() or object_wait_notifier().
 	 * @return		Status code describing result of the operation. */
-	status_t (*wait)(struct object_wait *wait);
+	status_t (*wait)(struct khandle *handle, int event, void *sync);
 
 	/** Stop waiting for an object.
-	 * @param wait		Wait information structure. */
-	void (*unwait)(struct object_wait *wait);
+	 * @param handle	Handle to object.
+	 * @param event		Event that is being waited for.
+	 * @param sync		Internal data pointer. */
+	void (*unwait)(struct khandle *handle, int event, void *sync);
 
 	/** Check if an object can be memory-mapped.
 	 * @note		If this function is implemented, the get_page
@@ -97,14 +102,6 @@ typedef struct khandle {
 	refcount_t count;		/**< References to the handle. */
 } khandle_t;
 
-/** Handle waiting information structure. */
-typedef struct object_wait {
-	khandle_t *handle;		/**< Handle to object being waited for. */
-	int event;			/**< Event ID being waited for. */
-	void *priv;			/**< Internal implementation data pointer. */
-	int idx;			/**< Index into array for object_wait_multiple(). */
-} object_wait_t;
-
 /** Table that maps IDs to handles. */
 typedef struct handle_table {
 	rwlock_t lock;			/**< Lock to protect table. */
@@ -119,10 +116,7 @@ extern void object_destroy(object_t *obj);
 //extern void object_acl_remove(object_t *obj,
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
-extern void object_wait_callback(object_wait_t *wait);
-extern status_t object_wait(khandle_t *handle, int event, useconds_t timeout);
-extern status_t object_wait_multiple(khandle_t **handles, int *events, size_t count,
-                                     useconds_t timeout, int *indexp);
+extern void object_wait_signal(void *sync);
 
 extern khandle_t *handle_create(object_t *obj, void *data);
 extern status_t handle_create_and_attach(struct process *process, object_t *obj, void *data,

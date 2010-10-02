@@ -132,17 +132,18 @@ static status_t input_device_read(device_t *_device, void *data, void *_buf, siz
 /** Signal that an input device event is being waited for.
  * @param _device	Device to wait for.
  * @param data		Handle-specific data pointer (unused).
- * @param wait		Wait information structure.
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer.
  * @return		Status code describing result of the operation. */
-static status_t input_device_wait(device_t *_device, void *data, object_wait_t *wait) {
+static status_t input_device_wait(device_t *_device, void *data, int event, void *sync) {
 	input_device_t *device = _device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
 		if(semaphore_count(&device->sem)) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&device->data_notifier, object_wait_notifier, wait);
+			notifier_register(&device->data_notifier, object_wait_notifier, sync);
 		}
 		return STATUS_SUCCESS;
 	default:
@@ -153,13 +154,14 @@ static status_t input_device_wait(device_t *_device, void *data, object_wait_t *
 /** Stop waiting for an input device event.
  * @param _device	Device to stop waiting for.
  * @param data		Handle-specific data pointer (unused).
- * @param wait		Wait information structure. */
-static void input_device_unwait(device_t *_device, void *data, object_wait_t *wait) {
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer. */
+static void input_device_unwait(device_t *_device, void *data, int event, void *sync) {
 	input_device_t *device = _device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		notifier_unregister(&device->data_notifier, object_wait_notifier, wait);
+		notifier_unregister(&device->data_notifier, object_wait_notifier, sync);
 		break;
 	}
 }

@@ -46,9 +46,9 @@ EventLoop::EventLoop() {
  * @param handle	Handle the event will come from.
  * @param event		Event to wait for. */
 void EventLoop::AddEvent(Handle *handle, int event) {
+	object_event_t _event = { handle->GetHandle(), event, false };
+	m_events.push_back(_event);
 	m_handles.push_back(handle);
-	m_ids.push_back(handle->GetHandle());
-	m_events.push_back(event);
 }
 
 /** Remove an event from the event loop.
@@ -56,9 +56,8 @@ void EventLoop::AddEvent(Handle *handle, int event) {
  * @param event		Event that should be removed. */
 void EventLoop::RemoveEvent(Handle *handle, int event) {
 	for(size_t i = 0; i < m_handles.size(); ) {
-		if(m_handles[i] == handle && m_events[i] == event) {
+		if(m_handles[i] == handle && m_events[i].event == event) {
 			m_handles.erase(m_handles.begin() + i);
-			m_ids.erase(m_ids.begin() + i);
 			m_events.erase(m_events.begin() + i);
 		} else {
 			i++;
@@ -72,7 +71,6 @@ void EventLoop::RemoveHandle(Handle *handle) {
 	for(size_t i = 0; i < m_handles.size(); ) {
 		if(m_handles[i] == handle) {
 			m_handles.erase(m_handles.begin() + i);
-			m_ids.erase(m_ids.begin() + i);
 			m_events.erase(m_events.begin() + i);
 		} else {
 			i++;
@@ -97,14 +95,17 @@ void EventLoop::Run(void) {
 		}
 
 		/* Wait for any of the events. */
-		int event;
-		status_t ret = object_wait_multiple(&m_ids[0], &m_events[0], m_handles.size(), -1, &event);
+		status_t ret = object_wait(&m_events[0], m_handles.size(), -1);
 		if(ret != STATUS_SUCCESS) {
 			log::fatal("EventLoop::Run: Failed to wait for events: %d\n", ret);
 		}
 
-		/* Signal the handle the event occurred on. */
-		m_handles[event]->EventReceived(m_events[event]);
+		/* Signal each handle an event occurred on. */
+		for(size_t i = 0; i < m_events.size(); i++) {
+			if(m_events[i].signalled) {
+				m_handles[i]->EventReceived(m_events[i].event);
+			}
+		}
 	}
 }
 

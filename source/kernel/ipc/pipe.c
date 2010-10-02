@@ -202,26 +202,26 @@ out:
 /** Wait for a pipe to be readable or writable.
  *
  * Waits for a pipe to become readable or writable, and notifies the specified
- * object_wait_t structure when it is. This is a convenience function, for
- * example for devices that use pipes internally.
+ * object wait pointer when it is. This is a convenience function, for example
+ * for devices that use pipes internally.
  *
  * @param pipe		Pipe to wait for.
  * @param write		Whether to wait to be writable (pipe is classed as
  *			writable when there is space in the buffer).
- * @param wait		Wait structure to notify.
+ * @param sync		Wait synchronisation pointer.
  */
-void pipe_wait(pipe_t *pipe, bool write, object_wait_t *wait) {
+void pipe_wait(pipe_t *pipe, bool write, void *sync) {
 	if(write) {
 		if(semaphore_count(&pipe->space_sem)) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&pipe->space_notifier, object_wait_notifier, wait);
+			notifier_register(&pipe->space_notifier, object_wait_notifier, sync);
 		}
 	} else {
 		if(semaphore_count(&pipe->data_sem)) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&pipe->data_notifier, object_wait_notifier, wait);
+			notifier_register(&pipe->data_notifier, object_wait_notifier, sync);
 		}
 	}
 }
@@ -229,9 +229,9 @@ void pipe_wait(pipe_t *pipe, bool write, object_wait_t *wait) {
 /** Stop waiting for a pipe event.
  * @param pipe		Pipe to stop waiting for.
  * @param write		Whether waiting to be writable.
- * @param wait		Wait structure. */
-void pipe_unwait(pipe_t *pipe, bool write, object_wait_t *wait) {
-	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, object_wait_notifier, wait);
+ * @param sync		Wait synchronisation pointer. */
+void pipe_unwait(pipe_t *pipe, bool write, void *sync) {
+	notifier_unregister((write) ? &pipe->space_notifier : &pipe->data_notifier, object_wait_notifier, sync);
 }
 
 /** Create a new pipe.

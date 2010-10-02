@@ -172,18 +172,19 @@ static void display_device_close(device_t *_device, void *data) {
 /** Signal that a display device event is being waited for.
  * @param _device	Device to wait for.
  * @param data		Unused.
- * @param wait		Wait information structure.
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer.
  * @return		Status code describing result of the operation. */
-static status_t display_device_wait(device_t *_device, void *data, object_wait_t *wait) {
+static status_t display_device_wait(device_t *_device, void *data, int event, void *sync) {
 	display_device_t *device = _device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DISPLAY_EVENT_REDRAW:
 		if(device->redraw) {
 			device->redraw = false;
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&device->redraw_notifier, object_wait_notifier, wait);
+			notifier_register(&device->redraw_notifier, object_wait_notifier, sync);
 		}
 		return STATUS_SUCCESS;
 	default:
@@ -194,13 +195,14 @@ static status_t display_device_wait(device_t *_device, void *data, object_wait_t
 /** Stop waiting for a display device event.
  * @param _device	Device to stop waiting for.
  * @param data		Unused.
- * @param wait		Wait information structure. */
-static void display_device_unwait(device_t *_device, void *data, object_wait_t *wait) {
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer. */
+static void display_device_unwait(device_t *_device, void *data, int event, void *sync) {
 	display_device_t *device = _device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DISPLAY_EVENT_REDRAW:
-		notifier_unregister(&device->redraw_notifier, object_wait_notifier, wait);
+		notifier_unregister(&device->redraw_notifier, object_wait_notifier, sync);
 		break;
 	}
 }

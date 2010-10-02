@@ -53,11 +53,11 @@ pid_t wait(int *statusp) {
  * @param flags		Flags modifying behaviour.
  * @return		ID of process that terminated, or -1 on failure. */
 pid_t waitpid(pid_t pid, int *statusp, int flags) {
-	int *events = NULL, status, index;
-	handle_t *handles = NULL, *tmp;
+	object_event_t *events = NULL, *tmp;
 	posix_process_t *proc;
 	size_t count = 0, i;
 	status_t ret;
+	int status;
 
 	if(pid == 0) {
 		errno = ENOSYS;
@@ -70,12 +70,14 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	LIST_FOREACH(&child_processes, iter) {
 		proc = list_entry(iter, posix_process_t, header);
 		if(pid == -1 || proc->pid == pid) {
-			tmp = realloc(handles, sizeof(handle_t) * (count + 1));
+			tmp = realloc(events, sizeof(*events) * (count + 1));
 			if(!tmp) {
 				goto fail;
 			}
-			handles = tmp;
-			handles[count++] = proc->handle;
+			events = tmp;
+			events[count].handle = proc->handle;
+			events[count].event = PROCESS_EVENT_DEATH;
+			events[count++].signalled = false;
 		}
 	}
 
@@ -85,21 +87,11 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		goto fail;
 	}
 
-	/* Create the events array. */
-	events = malloc(sizeof(int) * count);
-	if(!events) {
-		goto fail;
-	}
-	for(i = 0; i < count; i++) {
-		events[i] = PROCESS_EVENT_DEATH;
-	}
-
 	semaphore_up(child_processes_lock, 1);
 
 	/* Wait for any of them to exit. */
-	ret = object_wait_multiple(handles, events, count, (flags & WNOHANG) ? 0 : -1, &index);
+	ret = object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
 	if(ret != STATUS_SUCCESS) {
-		if(handles) { free(handles); }
 		if(events) { free(events); }
 		if(ret == STATUS_WOULD_BLOCK) {
 			return 0;
@@ -108,27 +100,32 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		return -1;
 	}
 
-	/* Find the process that exited. */
-	semaphore_down(child_processes_lock, -1);
-	LIST_FOREACH(&child_processes, iter) {
-		proc = list_entry(iter, posix_process_t, header);
-		if(proc->handle == handles[index]) {
-			/* Get the exit status. TODO: signal/stopped. */
-			process_status(proc->handle, &status);
-			*statusp = (status << 8) | __WEXITED;
-			ret = proc->pid;
+	/* Only take the first exited process. */
+	for(i = 0; i < count; i++) {
+		if(!events[i].signalled) {
+			continue;
+		}
 
-			/* Clean up the process. */
-			handle_close(proc->handle);
-			list_remove(&proc->header);
-			free(proc);
-			goto out;
+		semaphore_down(child_processes_lock, -1);
+		LIST_FOREACH(&child_processes, iter) {
+			proc = list_entry(iter, posix_process_t, header);
+			if(proc->handle == events[i].handle) {
+				/* Get the exit status. TODO: signal/stopped. */
+				process_status(proc->handle, &status);
+				*statusp = (status << 8) | __WEXITED;
+				ret = proc->pid;
+
+				/* Clean up the process. */
+				handle_close(proc->handle);
+				list_remove(&proc->header);
+				free(proc);
+				goto out;
+			}
 		}
 	}
 fail:
 	ret = -1;
 out:
-	if(handles) { free(handles); }
 	if(events) { free(events); }
 	semaphore_up(child_processes_lock, 1);
 	return ret;

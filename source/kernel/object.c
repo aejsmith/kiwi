@@ -51,10 +51,11 @@
 # define dprintf(fmt...)	
 #endif
 
-/** Object waiting synchronization information structure. */
+/** Object waiting internal data structure. */
 typedef struct object_wait_sync {
-	semaphore_t sem;		/**< Semaphore counting events. */
-	object_wait_t *event;		/**< Handle that received first event (atomically set). */
+	semaphore_t *sem;		/**< Pointer to semaphore to up. */
+	object_event_t info;		/**< Userspace-supplied event information. */
+	khandle_t *handle;		/**< Kernel handle structure. */
 } object_wait_sync_t;
 
 /** Structure linking a handle to a handle table. */
@@ -99,121 +100,15 @@ void object_destroy(object_t *obj) {
  * @param arg2		Unused.
  * @param arg3		Wait structure pointer. */
 void object_wait_notifier(void *arg1, void *arg2, void *arg3) {
-	object_wait_callback(arg3);
+	object_wait_signal(arg3);
 }
 
-/** Object waiting callback function.
- * @param wait		Wait information structure. */
-void object_wait_callback(object_wait_t *wait) {
-	object_wait_sync_t *sync = wait->priv;
-
-	__sync_bool_compare_and_swap(&sync->event, NULL, wait);
-	semaphore_up(&sync->sem, 1);
-}
-
-/** Wait for an event to happen on an object.
- * @param handle	Handle to wait on.
- * @param event		Event ID to wait for (specific to object type).
- * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			cause the function to return immediately if the event
- *			has not happened, and a value of -1 will block
- *			indefinitely until the event happens.
- * @return		Status code describing result of the operation. */
-status_t object_wait(khandle_t *handle, int event, useconds_t timeout) {
-	object_wait_sync_t sync;
-	object_wait_t wait;
-	status_t ret;
-
-	if(!handle) {
-		return STATUS_INVALID_ARG;
-	}
-
-	semaphore_init(&sync.sem, "object_wait_sem", 0);
-	sync.event = NULL;
-	wait.handle = handle;
-	wait.event = event;
-	wait.priv = &sync;
-
-	if(!handle->object->type->wait || !handle->object->type->unwait) {
-		return STATUS_INVALID_EVENT;
-	}
-
-	ret = handle->object->type->wait(&wait);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
-	handle->object->type->unwait(&wait);
-	return ret;
-}
-
-/** Wait for events to happen on multiple objects.
- * @param handles	Array of handles to wait for.
- * @param event		Array of event IDs to wait for (specific to object
- *			type). The index into the array selects the handle the
- *			event is for - for example, specifying 1 as the event
- *			at index 1 will wait for event 1 on the handle at index
- *			1 in the handle array. If you wish to wait for multiple
- *			events on one handle, specify the handle multiple times
- *			in the arrays.
- * @param count		Number of handles.
- * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			cause the function to return immediately if the event
- *			has not happened, and a value of -1 will block
- *			indefinitely until the event happens.
- * @param indexp	Where to store index of event that occurred.
- * @return		Status code describing result of the operation. */
-status_t object_wait_multiple(khandle_t **handles, int *events, size_t count, useconds_t timeout,
-                              int *indexp) {
-	object_wait_sync_t sync;
-	object_wait_t *waits;
-	status_t ret;
-	size_t i;
-
-	if(!count || count > 1024 || !handles || !events) {
-		return STATUS_INVALID_ARG;
-	}
-
-	semaphore_init(&sync.sem, "object_wait_sem", 0);
-	sync.event = NULL;
-
-	/* Allocate wait structures for each handle and fill them in. */
-	waits = kmalloc(sizeof(object_wait_t) * count, MM_SLEEP);
-	for(i = 0; i < count; i++) {
-		if(!handles[i]) {
-			ret = STATUS_INVALID_ARG;
-			goto out;
-		} else if(!handles[i]->object->type->wait || !handles[i]->object->type->unwait) {
-			ret = STATUS_INVALID_EVENT;
-			goto out;
-		}
-
-		waits[i].handle = handles[i];
-		waits[i].event = events[i];
-		waits[i].priv = &sync;
-		waits[i].idx = i;
-
-		ret = handles[i]->object->type->wait(&waits[i]);
-		if(ret != STATUS_SUCCESS) {
-			goto out;
-		}
-	}
-
-	/* Wait for any of the events to be signalled. */
-	ret = semaphore_down_etc(&sync.sem, timeout, SYNC_INTERRUPTIBLE);
-	if(ret == STATUS_SUCCESS) {
-		assert(sync.event);
-		if(indexp) {
-			*indexp = sync.event->idx;
-		}
-	}
-out:
-	while(i--) {
-		handles[i]->object->type->unwait(&waits[i]);
-	}
-	kfree(waits);
-	return ret;
+/** Signal that an event being waited for has occurred.
+ * @param sync		Internal data pointer. */
+void object_wait_signal(void *_sync) {
+	object_wait_sync_t *sync = _sync;
+	sync->info.signalled = true;
+	semaphore_up(sync->sem, 1);
 }
 
 /** Create a handle to an object.
@@ -640,96 +535,76 @@ int sys_object_type(handle_t handle) {
 	return ret;
 }
 
-/** Wait for an event to happen on an object.
- * @param handle	Handle ID to wait on.
- * @param event		Event ID to wait for (specific to object type).
+/** Wait for events to occur on one or more objects..
+ * @param events	Array of structures describing events to wait for. Upon
+ *			successful return, the signalled field of each
+ *			structure will be updated to reflect whether or not the
+ *			event was signalled.
+ * @param count		Number of array entries.
  * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			cause the function to return immediately if the event
- *			has not happened, and a value of -1 will block
- *			indefinitely until the event happens.
+ *			cause the function to return immediately if the none of
+ *			the events have happened, and a value of -1 will block
+ *			indefinitely until one of events happens.
  * @return		Status code describing result of the operation. */
-status_t sys_object_wait(handle_t handle, int event, useconds_t timeout) {
-	khandle_t *khandle;
-	status_t ret;
+status_t sys_object_wait(object_event_t *events, size_t count, useconds_t timeout) {
+	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "object_wait_sem", 0);
+	object_wait_sync_t *syncs;
+	status_t ret, err;
+	size_t i = 0;
 
-	ret = handle_lookup(curr_proc, handle, -1, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	ret = object_wait(khandle, event, timeout);
-	handle_release(khandle);
-	return ret;
-}
-
-/** Wait for events to happen on multiple objects.
- * @param handles	Array of handle IDs to wait for.
- * @param event		Array of event IDs to wait for (specific to object
- *			type). The index into the array selects the handle the
- *			event is for - for example, specifying 1 as the event
- *			at index 1 will wait for event 1 on the handle at index
- *			1 in the handle array. If you wish to wait for multiple
- *			events on one handle, specify the handle multiple times
- *			in the arrays.
- * @param count		Number of handles.
- * @param timeout	Maximum time to wait in microseconds. A value of 0 will
- *			cause the function to return immediately if the event
- *			has not happened, and a value of -1 will block
- *			indefinitely until the event happens.
- * @param indexp	Where to store index of event that occurred.
- * @return		Status code describing result of the operation. */
-status_t sys_object_wait_multiple(handle_t *handles, int *events, size_t count,
-                                  useconds_t timeout, int *indexp) {
-	handle_t *khandles = NULL;
-	khandle_t **kobjs = NULL;
-	int *kevents = NULL;
-	status_t ret;
-	int kindex;
-	size_t i;
-
-	if(!count || count > 1024 || !handles || !events) {
+	if(!count || count > 1024 || !events) {
 		return STATUS_INVALID_ARG;
 	}
 
-	khandles = kmalloc(sizeof(handle_t) * count, MM_SLEEP);
-	ret = memcpy_from_user(khandles, handles, sizeof(handle_t) * count);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
+	/* Use of kcalloc() is important: the structures must be zeroed
+	 * initially for the cleanup code to work correctly. */
+	syncs = kcalloc(count, sizeof(*syncs), 0);
+	if(!syncs) {
+		return STATUS_NO_MEMORY;
 	}
 
-	kevents = kmalloc(sizeof(int) * count, MM_SLEEP);
-	ret = memcpy_from_user(kevents, events, sizeof(int) * count);
-	if(ret != STATUS_SUCCESS) {
-		goto out;
-	}
-
-	kobjs = kcalloc(count, sizeof(khandle_t *), MM_SLEEP);
 	for(i = 0; i < count; i++) {
-		ret = handle_lookup(curr_proc, khandles[i], -1, &kobjs[i]);
+		ret = memcpy_from_user(&syncs[i].info, &events[i], sizeof(*events));
 		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
+
+		syncs[i].sem = &sem;
+		syncs[i].info.signalled = false;
+
+		ret = handle_lookup(curr_proc, syncs[i].info.handle, -1, &syncs[i].handle);
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		} else if(!syncs[i].handle->object->type->wait || !syncs[i].handle->object->type->unwait) {
+			ret = STATUS_INVALID_EVENT;
+			handle_release(syncs[i].handle);
+			syncs[i].handle = NULL;
+			goto out;
+		}
+
+		ret = syncs[i].handle->object->type->wait(syncs[i].handle, syncs[i].info.event, &syncs[i]);
+		if(ret != STATUS_SUCCESS) {
+			handle_release(syncs[i].handle);
+			syncs[i].handle = NULL;
 			goto out;
 		}
 	}
 
-	ret = object_wait_multiple(kobjs, kevents, count, timeout, &kindex);
-	if(ret == STATUS_SUCCESS && indexp) {
-		ret = memcpy_to_user(indexp, &kindex, sizeof(int));
-	}
+	ret = semaphore_down_etc(&sem, timeout, SYNC_INTERRUPTIBLE);
 out:
-	if(kobjs) {
-		for(i = 0; i < count; i++) {
-			if(!kobjs[i]) {
-				break;
+	while(i--) {
+		syncs[i].handle->object->type->unwait(syncs[i].handle, syncs[i].info.event, &syncs[i]);
+		handle_release(syncs[i].handle);
+
+		if(ret == STATUS_SUCCESS) {
+			err = memcpy_to_user(&events[i], &syncs[i].info, sizeof(*events));
+			if(err != STATUS_SUCCESS) {
+				ret = err;
 			}
-			handle_release(kobjs[i]);
 		}
 	}
-	if(kevents) {
-		kfree(kevents);
-	}
-	if(khandles) {
-		kfree(khandles);
-	}
+
+	kfree(syncs);
 	return ret;
 }
 

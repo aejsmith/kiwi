@@ -60,24 +60,28 @@ static void device_object_close(khandle_t *handle) {
 }
 
 /** Signal that a device is being waited for.
- * @param wait		Wait information structure.
+ * @param handle	Handle to device.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t device_object_wait(object_wait_t *wait) {
-	device_t *device = (device_t *)wait->handle->object;
+static status_t device_object_wait(khandle_t *handle, int event, void *sync) {
+	device_t *device = (device_t *)handle->object;
 
 	if(device->ops && device->ops->wait && device->ops->unwait) {
-		return device->ops->wait(device, wait->handle->data, wait);
+		return device->ops->wait(device, handle->data, event, sync);
 	} else {
 		return STATUS_INVALID_EVENT;
 	}
 }
 
 /** Stop waiting for a device.
- * @param wait		Wait information structure. */
-static void device_object_unwait(object_wait_t *wait) {
-	device_t *device = (device_t *)wait->handle->object;
+ * @param handle	Handle to device.
+ * @param event		Event that was being waited for.
+ * @param sync		Internal data pointer. */
+static void device_object_unwait(khandle_t *handle, int event, void *sync) {
+	device_t *device = (device_t *)handle->object;
 	assert(device->ops);
-	return device->ops->unwait(device, wait->handle->data, wait);
+	return device->ops->unwait(device, handle->data, event, sync);
 }
 
 /** Check if a device can be memory-mapped.

@@ -76,17 +76,19 @@ typedef struct device_ops {
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback
 	 *			function and return success.
-	 * @param device	Device to wait for.
+	 * @param device	Device to wait on.
 	 * @param data		Handle-specific data pointer.
-	 * @param wait		Wait information structure.
+	 * @param event		Event to wait for.
+	 * @param sync		Internal information pointer.
 	 * @return		Status code describing result of operation. */
-	status_t (*wait)(struct device *device, void *data, object_wait_t *wait);
+	status_t (*wait)(struct device *device, void *data, int event, void *sync);
 
 	/** Stop waiting for a device event.
 	 * @param device	Device to stop waiting for.
 	 * @param data		Handle-specific data pointer.
-	 * @param wait		Wait information structure. */
-	void (*unwait)(struct device *device, void *data, object_wait_t *wait);
+	 * @param event		Event to wait for.
+	 * @param sync		Internal information pointer. */
+	void (*unwait)(struct device *device, void *data, int event, void *sync);
 
 	/** Check if a device can be memory-mapped.
 	 * @note		If this function is implemented, the get_page

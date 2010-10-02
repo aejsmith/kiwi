@@ -78,17 +78,18 @@ static status_t console_slave_write(device_t *device, void *data, const void *bu
 /** Signal that a console slave event is being waited for.
  * @param device	Device to wait for.
  * @param data		Handle-specific data pointer (unused).
- * @param wait		Wait information structure.
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer.
  * @return		Status code describing result of the operation. */
-static status_t console_slave_wait(device_t *device, void *data, object_wait_t *wait) {
+static status_t console_slave_wait(device_t *device, void *data, int event, void *sync) {
 	console_device_t *console = device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_wait(console->input, false, wait);
+		pipe_wait(console->input, false, sync);
 		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_wait(console->output, true, wait);
+		pipe_wait(console->output, true, sync);
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -98,16 +99,17 @@ static status_t console_slave_wait(device_t *device, void *data, object_wait_t *
 /** Stop waiting for a console slave event.
  * @param device	Device to stop waiting for.
  * @param data		Handle-specific data pointer (unused).
- * @param wait		Wait information structure. */
-static void console_slave_unwait(device_t *device, void *data, object_wait_t *wait) {
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer. */
+static void console_slave_unwait(device_t *device, void *data, int event, void *sync) {
 	console_device_t *console = device->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_unwait(console->input, false, wait);
+		pipe_unwait(console->input, false, sync);
 		break;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_unwait(console->output, true, wait);
+		pipe_unwait(console->output, true, sync);
 		break;
 	}
 }
@@ -192,17 +194,18 @@ static status_t console_master_write(device_t *device, void *data, const void *b
 /** Signal that a console master event is being waited for.
  * @param device	Device to wait for.
  * @param data		Pointer to console structure.
- * @param wait		Wait information structure.
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer.
  * @return		Status code describing result of the operation. */
-static status_t console_master_wait(device_t *device, void *data, object_wait_t *wait) {
+static status_t console_master_wait(device_t *device, void *data, int event, void *sync) {
 	console_device_t *console = data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_wait(console->output, false, wait);
+		pipe_wait(console->output, false, sync);
 		return STATUS_SUCCESS;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_wait(console->input, true, wait);
+		pipe_wait(console->input, true, sync);
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -212,16 +215,17 @@ static status_t console_master_wait(device_t *device, void *data, object_wait_t 
 /** Stop waiting for a console master event.
  * @param device	Device to stop waiting for.
  * @param data		Pointer to console structure.
- * @param wait		Wait information structure. */
-static void console_master_unwait(device_t *device, void *data, object_wait_t *wait) {
+ * @param event		Event to wait for.
+ * @param sync		Synchronisation pointer. */
+static void console_master_unwait(device_t *device, void *data, int event, void *sync) {
 	console_device_t *console = data;
 
-	switch(wait->event) {
+	switch(event) {
 	case DEVICE_EVENT_READABLE:
-		pipe_unwait(console->output, false, wait);
+		pipe_unwait(console->output, false, sync);
 		break;
 	case DEVICE_EVENT_WRITABLE:
-		pipe_unwait(console->input, true, wait);
+		pipe_unwait(console->input, true, sync);
 		break;
 	}
 }

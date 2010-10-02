@@ -226,18 +226,20 @@ static void process_object_close(khandle_t *handle) {
 }
 
 /** Signal that a process is being waited for.
- * @param wait		Wait information structure.
+ * @param handle	Handle to process.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_wait_t *wait) {
-	process_t *process = (process_t *)wait->handle->object;
+static status_t process_object_wait(khandle_t *handle, int event, void *sync) {
+	process_t *process = (process_t *)handle->object;
 
-	switch(wait->event) {
+	switch(event) {
 	case PROCESS_EVENT_DEATH:
 		mutex_lock(&process->lock);
 		if(process->state == PROCESS_DEAD) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&process->death_notifier, object_wait_notifier, wait);
+			notifier_register(&process->death_notifier, object_wait_notifier, sync);
 		}
 		mutex_unlock(&process->lock);
 		return STATUS_SUCCESS;
@@ -247,13 +249,15 @@ static status_t process_object_wait(object_wait_t *wait) {
 }
 
 /** Stop waiting for a process.
- * @param wait		Wait information structure. */
-static void process_object_unwait(object_wait_t *wait) {
-	process_t *process = (process_t *)wait->handle->object;
+ * @param handle	Handle to process.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer. */
+static void process_object_unwait(khandle_t *handle, int event, void *sync) {
+	process_t *process = (process_t *)handle->object;
 
-	switch(wait->event) {
+	switch(event) {
 	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, object_wait_notifier, wait);
+		notifier_unregister(&process->death_notifier, object_wait_notifier, sync);
 		break;
 	}
 }

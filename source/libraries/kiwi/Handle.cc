@@ -85,7 +85,8 @@ handle_t Handle::GetHandle() const {
  *			indefinitely until the event happens.
  * @return		True on success, false if the operation timed out. */
 bool Handle::Wait(int event, useconds_t timeout) const {
-	status_t ret = object_wait(m_handle, event, timeout);
+	object_event_t _event = { m_handle, event, false };
+	status_t ret = object_wait(&_event, 1, timeout);
 	if(ret == STATUS_SUCCESS) {
 		return true;
 	}

@@ -221,20 +221,22 @@ static void port_object_close(khandle_t *handle) {
 }
 
 /** Signal that a port event is being waited for.
- * @param wait		Wait information structure.
+ * @param handle	Handle to port.
+ * @param event		Event being waited for.
+ * @param sync		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t port_object_wait(object_wait_t *wait) {
-	ipc_port_t *port = (ipc_port_t *)wait->handle->object;
+static status_t port_object_wait(khandle_t *handle, int event, void *sync) {
+	ipc_port_t *port = (ipc_port_t *)handle->object;
 	status_t ret = STATUS_SUCCESS;
 
 	mutex_lock(&port->lock);
 
-	switch(wait->event) {
+	switch(event) {
 	case PORT_EVENT_CONNECTION:
 		if(semaphore_count(&port->conn_sem)) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&port->conn_notifier, object_wait_notifier, wait);
+			notifier_register(&port->conn_notifier, object_wait_notifier, sync);
 		}
 		break;
 	default:
@@ -247,13 +249,15 @@ static status_t port_object_wait(object_wait_t *wait) {
 }
 
 /** Stop waiting for a port event.
- * @param wait		Wait information structure. */
-static void port_object_unwait(object_wait_t *wait) {
-	ipc_port_t *port = (ipc_port_t *)wait->handle->object;
+ * @param handle	Handle to port.
+ * @param event		Event being waited for.
+ * @param sync		Internal data pointer. */
+static void port_object_unwait(khandle_t *handle, int event, void *sync) {
+	ipc_port_t *port = (ipc_port_t *)handle->object;
 
-	switch(wait->event) {
+	switch(event) {
 	case PORT_EVENT_CONNECTION:
-		notifier_unregister(&port->conn_notifier, object_wait_notifier, wait);
+		notifier_unregister(&port->conn_notifier, object_wait_notifier, sync);
 		break;
 	}
 }
@@ -334,28 +338,30 @@ static void connection_object_close(khandle_t *handle) {
 }
 
 /** Signal that a connection event is being waited for.
- * @param wait		Wait information structure.
+ * @param handle	Handle to connection.
+ * @param event		Event being waited for.
+ * @param sync		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t connection_object_wait(object_wait_t *wait) {
-	ipc_connection_t *conn = (ipc_connection_t *)wait->handle->object;
-	ipc_endpoint_t *endpoint = wait->handle->data;
+static status_t connection_object_wait(khandle_t *handle, int event, void *sync) {
+	ipc_connection_t *conn = (ipc_connection_t *)handle->object;
+	ipc_endpoint_t *endpoint = handle->data;
 	status_t ret = STATUS_SUCCESS;
 
 	mutex_lock(&conn->lock);
 
-	switch(wait->event) {
+	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
 		if(!endpoint->remote) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&endpoint->hangup_notifier, object_wait_notifier, wait);
+			notifier_register(&endpoint->hangup_notifier, object_wait_notifier, sync);
 		}
 		break;
 	case CONNECTION_EVENT_MESSAGE:
 		if(semaphore_count(&endpoint->data_sem)) {
-			object_wait_callback(wait);
+			object_wait_signal(sync);
 		} else {
-			notifier_register(&endpoint->msg_notifier, object_wait_notifier, wait);
+			notifier_register(&endpoint->msg_notifier, object_wait_notifier, sync);
 		}
 		break;
 
@@ -369,16 +375,18 @@ static status_t connection_object_wait(object_wait_t *wait) {
 }
 
 /** Stop waiting for a connection event.
- * @param wait		Wait information structure. */
-static void connection_object_unwait(object_wait_t *wait) {
-	ipc_endpoint_t *endpoint = wait->handle->data;
+ * @param handle	Handle to connection.
+ * @param event		Event being waited for.
+ * @param sync		Internal data pointer. */
+static void connection_object_unwait(khandle_t *handle, int event, void *sync) {
+	ipc_endpoint_t *endpoint = handle->data;
 
-	switch(wait->event) {
+	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
-		notifier_unregister(&endpoint->hangup_notifier, object_wait_notifier, wait);
+		notifier_unregister(&endpoint->hangup_notifier, object_wait_notifier, sync);
 		break;
 	case CONNECTION_EVENT_MESSAGE:
-		notifier_unregister(&endpoint->msg_notifier, object_wait_notifier, wait);
+		notifier_unregister(&endpoint->msg_notifier, object_wait_notifier, sync);
 		break;
 	}
 }
