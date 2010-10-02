@@ -30,7 +30,8 @@
  * mutex/spinlock will be held again by the calling thread. A condition becomes
  * true when either condvar_signal() or condvar_broadcast() is called on it.
  *
- * @note		You must not specify both a mutex and a spinlock.
+ * @note		You must not specify both a mutex and a spinlock. You
+ *			can, however, specify neither.
  *
  * @param cv		Condition variable to wait on.
  * @param mtx		Mutex to unlock/relock.
@@ -49,14 +50,14 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_
 	status_t ret;
 	bool state;
 
-	assert(!!mtx ^ !!sl);
+	assert(!(mtx && sl));
 
 	/* Acquire the wait queue lock and disable interrupts, then release
 	 * the specified lock. */
 	state = waitq_sleep_prepare(&cv->queue);
 	if(mtx) {
 		mutex_unlock(mtx);
-	} else {
+	} else if(sl) {
 		assert(!state);
 		spinlock_unlock_ni(sl);
 	}
@@ -67,7 +68,7 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_
 	/* Re-acquire the lock. */
 	if(mtx) {
 		mutex_lock(mtx);
-	} else {
+	} else if(sl) {
 		spinlock_lock_ni(sl);
 	}
 
