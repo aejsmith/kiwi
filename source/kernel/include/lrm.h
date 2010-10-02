@@ -24,7 +24,7 @@
 #include <lib/list.h>
 
 /** Resource types. */
-#define RESOURCE_TYPE_PAGES	(1<<0)	/**< Pages. */
+#define RESOURCE_TYPE_MEMORY	(1<<0)	/**< Physical memory. */
 #define RESOURCE_TYPE_KASPACE	(1<<1)	/**< Kernel address space. */
 
 /** Resource levels. */

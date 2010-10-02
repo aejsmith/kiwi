@@ -112,7 +112,7 @@ void lrm_reclaim(uint32_t type, uint64_t required) {
 	/* If the LRM has not been initialised yet, then we can't do anything. */
 	if(unlikely(!lrm_thread)) {
 		switch(type) {
-		case RESOURCE_TYPE_PAGES:
+		case RESOURCE_TYPE_MEMORY:
 			fatal("You do not have enough memory to run Kiwi");
 			break;
 		case RESOURCE_TYPE_KASPACE:

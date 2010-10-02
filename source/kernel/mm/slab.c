@@ -436,6 +436,7 @@ static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *
  * @return		Pointer to magazine on success, NULL on failure. */
 static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 	slab_magazine_t *mag = NULL;
+	int level;
 
 	mutex_lock(&cache->depot_lock);
 
@@ -445,7 +446,8 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		assert(!mag->rounds);
 	} else {
 		/* Do not attempt to allocate a magazine if low on memory. */
-		if(likely(lrm_level(RESOURCE_TYPE_PAGES | RESOURCE_TYPE_KASPACE) == RESOURCE_LEVEL_OK)) {
+		level = lrm_level(RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE);
+		if(likely(level == RESOURCE_LEVEL_OK)) {
 			mag = slab_cache_alloc(&slab_mag_cache, 0);
 			if(mag != NULL) {
 				list_init(&mag->header);

@@ -29,6 +29,8 @@
 #include <sync/condvar.h>
 #include <sync/mutex.h>
 
+#include <lrm.h>
+
 struct slab_cache;
 struct vmem;
 
@@ -80,7 +82,7 @@ typedef struct vmem {
 	size_t quantum;				/**< Quantum (size of each allocation). */
 	size_t qcache_max;			/**< Maximum size to cache. */
 	size_t qshift;				/**< log2(quantum). */
-	int flags;				/**< Arena behaviour flags. */
+	uint32_t type;				/**< Resource type. */
 
 	/** Quantum cache array. */
 	struct slab_cache *qcache[VMEM_QCACHE_MAX];
@@ -111,9 +113,6 @@ typedef struct vmem {
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
 
-/** Flags for Vmem arenas. */
-#define VMEM_RECLAIM		(1<<0)		/**< Reclaim from slab when no space available. */
-
 /** Flags for Vmem functions. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
 
@@ -129,11 +128,11 @@ extern void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
 extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
 
 extern bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
-                              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc,
-                              vmem_t *source, size_t qcache_max, int flags, int vmflag);
+                              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
+                              size_t qcache_max, uint32_t type, int vmflag);
 extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                            vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                           size_t qcache_max, int flags, int vmflag);
+                           size_t qcache_max, uint32_t type, int vmflag);
 
 extern void vmem_early_init(void);
 extern void vmem_init(void);

@@ -532,14 +532,12 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			break;
 		}
 
-		/* Try reclaiming from slab if the arena has specified that we
-		 * should do so. If doing so reduces the in-use size of the
-		 * arena, try the allocation again. */
-		if(vmem->flags & VMEM_RECLAIM) {
+		/* If the resource type is not 0, attempt to reclaim space. */
+		if(vmem->type) {
 			curr_size = vmem->used_size;
 			mutex_unlock(&vmem->lock);
 
-			//slab_reclaim();
+			lrm_reclaim(vmem->type, size);
 
 			mutex_lock(&vmem->lock);
 			if(vmem->used_size < curr_size) {
@@ -750,9 +748,9 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
 	return true;
 }
 
-/** Initialise a Vmem arena.
+/** Initialise a vmem arena.
  *
- * Initialises a Vmem arena and creates an initial span/free segment if the
+ * Initialises a vmem arena and creates an initial span/free segment if the
  * given size is non-zero.
  *
  * @param vmem		Arena to initialise.
@@ -764,14 +762,14 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
- * @param flags		Behaviour flags for the arena.
+ * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
  * @return		Whether the arena was created successfully.
  */
 bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                        size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                       size_t qcache_max, int flags, int vmflag) {
+                       size_t qcache_max, uint32_t type, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
 
@@ -807,7 +805,7 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 	vmem->quantum = quantum;
 	vmem->qcache_max = qcache_max;
 	vmem->qshift = highbit(quantum) - 1;
-	vmem->flags = flags;
+	vmem->type = type;
 	vmem->afunc = afunc;
 	vmem->ffunc = ffunc;
 	vmem->source = source;
@@ -885,14 +883,14 @@ fail:
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
- * @param flags		Behaviour flags for the arena.
+ * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
  * @return		Pointer to arena on success, NULL on failure.
  */
 vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                     vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                    size_t qcache_max, int flags, int vmflag) {
+                    size_t qcache_max, uint32_t type, int vmflag) {
 	vmem_t *vmem;
 
 	vmem = kmalloc(sizeof(vmem_t), vmflag & MM_FLAG_MASK);
@@ -901,7 +899,7 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 	}
 
 	if(!vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source,
-	                      qcache_max, flags, vmflag)) {
+	                      qcache_max, type, vmflag)) {
 		kfree(vmem);
 		return NULL;
 	}
@@ -961,8 +959,8 @@ static void vmem_dump_list(list_t *header, int indent) {
 	LIST_FOREACH(header, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
-		kprintf(LOG_NONE, "%*s%-*s %-5d %-16" PRIu64 " %-16" PRIu64 " %zu\n",
-		        indent, "", VMEM_NAME_MAX - indent, vmem->name, vmem->flags,
+		kprintf(LOG_NONE, "%*s%-*s %-4u %-16" PRIu64 " %-16" PRIu64 " %zu\n",
+		        indent, "", VMEM_NAME_MAX - indent, vmem->name, vmem->type,
 		        vmem->total_size, vmem->used_size, vmem->alloc_count);
 		vmem_dump_list(&vmem->children, indent + 2);
 	}
@@ -997,8 +995,8 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 
 	/* If no arguments specified dump a tree of all arenas. */
 	if(argc < 2) {
-		kprintf(LOG_NONE, "Name                      Flags Size             Used             Allocations\n");
-		kprintf(LOG_NONE, "====                      ===== ====             ====             ===========\n");
+		kprintf(LOG_NONE, "Name                      Type Size             Used             Allocations\n");
+		kprintf(LOG_NONE, "====                      ==== ====             ====             ===========\n");
 
 		/* Print a list of arenas. */
 		vmem_dump_list(&vmem_arenas, 0);
