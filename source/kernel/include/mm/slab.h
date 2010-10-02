@@ -115,8 +115,6 @@ extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t ali
                                        int kmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
-extern void slab_reclaim(void);
-
 extern int kdbg_cmd_slab(int argc, char **argv);
 
 extern void slab_late_init(void);

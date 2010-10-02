@@ -42,6 +42,7 @@
 #include <fatal.h>
 #include <init.h>
 #include <kargs.h>
+#include <lrm.h>
 #include <module.h>
 #include <object.h>
 #include <status.h>
@@ -390,10 +391,11 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		thread_init();
 		sched_init();
 		thread_reaper_init();
+		lrm_init();
 
 		/* Now that the thread system is up and all CPUs have been
-		 * registered, the slab allocator's reclaim thread can be
-		 * started and the magazine layer can be enabled. */
+		 * registered, the slab allocator's magazine layer can be
+		 * enabled. */
 		slab_late_init();
 
 		/* Bring up the VM system. */

@@ -158,6 +158,12 @@ config IPC_DEBUG
 	help
 	  Enable debug output from the IPC code.
 
+config LRM_DEBUG
+	bool "LRM debug output"
+	default n
+	help
+	  Enable debug output from the low resource manager.
+
 #######
 endmenu
 #######

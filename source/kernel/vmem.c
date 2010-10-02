@@ -28,7 +28,6 @@
  * just requiring the span to be placed on the end of the list. Segments under
  * a span, however, are sorted.
  *
- * @todo		Allow merging adjacent allocated segments.
  * @todo		Hash table resizing.
  */
 
@@ -540,7 +539,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			curr_size = vmem->used_size;
 			mutex_unlock(&vmem->lock);
 
-			slab_reclaim();
+			//slab_reclaim();
 
 			mutex_lock(&vmem->lock);
 			if(vmem->used_size < curr_size) {

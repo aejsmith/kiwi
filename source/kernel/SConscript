@@ -69,6 +69,7 @@ sources = map(File, [
 	'fatal.c',
 	'init.c',
 	'kdbg.c',
+	'lrm.c',
 	'module.c',
 	'object.c',
 	'symbol.c',

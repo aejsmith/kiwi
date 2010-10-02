@@ -48,12 +48,11 @@
 #include <proc/process.h>
 #include <proc/thread.h>
 
-#include <sync/condvar.h>
-
 #include <assert.h>
 #include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <lrm.h>
 #include <status.h>
 #include <vmem.h>
 
@@ -114,12 +113,6 @@ static vmem_t slab_metadata_arena;
 /** List of all slab caches. */
 static LIST_DECLARE(slab_caches);
 static MUTEX_DECLARE(slab_caches_lock, 0);
-
-/** Reclaim thread information. */
-static thread_t *slab_reclaim_thread = NULL;
-static CONDVAR_DECLARE(slab_reclaim_req);
-static CONDVAR_DECLARE(slab_reclaim_resp);
-static MUTEX_DECLARE(slab_reclaim_lock, 0);
 
 /** Whether the allocator is fully initialised. */
 static bool slab_inited = false;
@@ -445,8 +438,8 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {
-		/* Do not attempt to allocate a magazine if reclaiming. */
-		if(likely(!mutex_held(&slab_reclaim_lock))) {
+		/* Do not attempt to allocate a magazine if low on memory. */
+		if(likely(lrm_level(RESOURCE_TYPE_PAGES | RESOURCE_TYPE_KASPACE) == RESOURCE_LEVEL_OK)) {
 			mag = slab_cache_alloc(&slab_mag_cache, 0);
 			if(mag != NULL) {
 				list_init(&mag->header);
@@ -891,46 +884,6 @@ void slab_cache_destroy(slab_cache_t *cache) {
 	slab_cache_free(&slab_cache_cache, cache);
 }
 
-/** Entry point for slab reclaim thread.
- * @param arg1		First thread argument (unused).
- * @param arg2		Second thread argument (unused). */
-static void slab_reclaim_thread_entry(void *arg1, void *arg2) {
-	/* Take the reclaim lock immediately, unlocking/relocking it is handled
-	 * by the condition variable. */
-	mutex_lock(&slab_reclaim_lock);
-
-	while(true) {
-		/* Wait for a reclaim request. */
-		condvar_wait(&slab_reclaim_req, &slab_reclaim_lock, NULL);
-
-		/* Loop through all caches and reclaim. */
-		mutex_lock(&slab_caches_lock);
-		LIST_FOREACH(&slab_caches, iter) {
-			if(slab_cache_reclaim(list_entry(iter, slab_cache_t, header), false)) {
-				break;
-			}
-		}
-		mutex_unlock(&slab_caches_lock);
-
-		/* Wake the thread that called us. */
-		condvar_broadcast(&slab_reclaim_resp);
-	}
-}
-
-/** Reclaim unused memory held by slab caches. */
-void slab_reclaim(void) {
-	/* If the reclaim lock cannot be taken immediately a reclaim is already
-	 * being scheduled or in progress. */
-	if(!slab_reclaim_thread || mutex_lock_etc(&slab_reclaim_lock, 0, 0) != STATUS_SUCCESS) {
-		return;
-	}
-
-	/* Schedule a reclaim. */
-	condvar_signal(&slab_reclaim_req);
-	condvar_wait(&slab_reclaim_resp, &slab_reclaim_lock, NULL);
-	mutex_unlock(&slab_reclaim_lock);
-}
-
 /** Prints a list of all slab caches.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -974,7 +927,6 @@ int kdbg_cmd_slab(int argc, char **argv) {
 /** Enable the magazine layer and start the reclaim thread. */
 void __init_text slab_late_init(void) {
 	slab_cache_t *cache;
-	status_t ret;
 
 	mutex_lock(&slab_caches_lock);
 
@@ -990,14 +942,6 @@ void __init_text slab_late_init(void) {
 	}
 
 	mutex_unlock(&slab_caches_lock);
-
-	/* Create the reclaim thread. */
-	ret = thread_create("reclaim", kernel_proc, 0, slab_reclaim_thread_entry, NULL,
-	                    NULL, &slab_reclaim_thread);
-	if(ret != STATUS_SUCCESS) {
-		fatal("Could not create reclaim thread (%d)", ret);
-	}
-	thread_run(slab_reclaim_thread);
 }
 
 /** Initialise the slab allocator. */
