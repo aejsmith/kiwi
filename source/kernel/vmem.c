@@ -513,8 +513,8 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	}
 
 	/* Continuously loop until we can make the allocation. If MM_SLEEP is
-	 * not set, this will break out once reclaiming from slab cannot free
-	 * any space in the arena. */
+	 * not set, this will break out once reclaiming cannot free any space
+	 * in the arena. */
 	while(true) {
 		/* First try to find a free segment in the arena. */
 		seg = vmem_find_segment(vmem, size, minaddr, maxaddr, vmflag);
@@ -537,7 +537,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			curr_size = vmem->used_size;
 			mutex_unlock(&vmem->lock);
 
-			lrm_reclaim(vmem->type, size);
+			lrm_reclaim(vmem->type);
 
 			mutex_lock(&vmem->lock);
 			if(vmem->used_size < curr_size) {
