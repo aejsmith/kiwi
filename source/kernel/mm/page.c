@@ -190,6 +190,44 @@ static void page_writer(void *arg1, void *arg2) {
 	}
 }
 
+/** Cache flush low resource handler function.
+ * @param level		Resource level. */
+static void vm_cache_reclaim(int level) {
+	page_queue_t *queue = &page_queues[PAGE_QUEUE_CACHED];
+	vm_page_t *page;
+	size_t count = 0;
+
+	spinlock_lock(&queue->lock);
+
+	/* Work out how many pages to free. */
+	switch(level) {
+	case RESOURCE_LEVEL_ADVISORY:
+		count = queue->count / 8;
+	case RESOURCE_LEVEL_LOW:
+		count = queue->count / 4;
+	case RESOURCE_LEVEL_CRITICAL:
+		count = queue->count;
+		break;
+	}
+
+	/* Reclaim the pages. */
+	while(count--) {
+		page = list_entry(queue->pages.next, vm_page_t, header);
+		spinlock_unlock(&queue->lock);
+		vm_cache_evict_page(page);
+		spinlock_lock(&queue->lock);
+	}
+
+	spinlock_unlock(&queue->lock);
+}
+
+/** Slab low resource handler. */
+static lrm_handler_t vm_cache_lrm_handler = {
+	.types = RESOURCE_TYPE_MEMORY,
+	.priority = LRM_CACHE_PRIORITY,
+	.func = vm_cache_reclaim,
+};
+
 #if CONFIG_DEBUG
 /** Ensure that a free page is in the correct state.
  * @param page		Page to check. */
@@ -691,6 +729,9 @@ void __init_text vm_page_init(void) {
 		fatal("Could not start page writer (%d)", ret);
 	}
 	thread_run(page_writer_thread);
+
+	/* Register the cache reclaim low resource handler. */
+	lrm_handler_register(&vm_cache_lrm_handler);
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */

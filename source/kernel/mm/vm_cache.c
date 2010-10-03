@@ -634,9 +634,24 @@ bool vm_cache_flush_page(vm_page_t *page) {
  *
  * @param page		Page to evict.
  */
-//void vm_cache_evict_page(vm_page_t *page) {
-//	fatal("Not implemented");
-//}
+void vm_cache_evict_page(vm_page_t *page) {
+	vm_cache_t *cache;
+
+	/* Must be careful - another thread could be destroying the cache. */
+	if(!(cache = page->cache)) {
+		return;
+	}
+	mutex_lock(&cache->lock);
+	if(cache->deleted) {
+		mutex_unlock(&cache->lock);
+		return;
+	}
+
+	avl_tree_remove(&cache->pages, (key_t)page->offset);
+	vm_page_dequeue(page);
+	vm_page_free(page, 1);
+	mutex_unlock(&cache->lock);
+}
 
 /** Print information about a cache.
  * @param argc		Argument count.
