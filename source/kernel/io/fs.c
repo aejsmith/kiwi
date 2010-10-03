@@ -16,8 +16,6 @@
 /**
  * @file
  * @brief		Filesystem layer.
- *
- * @todo		Node cache reclaim.
  */
 
 #include <io/device.h>
@@ -37,6 +35,7 @@
 #include <console.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <lrm.h>
 #include <status.h>
 
 #if CONFIG_FS_DEBUG
@@ -71,6 +70,11 @@ static MUTEX_DECLARE(fs_types_lock, 0);
 static mount_id_t next_mount_id = 1;
 static LIST_DECLARE(mount_list);
 static MUTEX_DECLARE(mounts_lock, 0);
+
+/** List of unused nodes (LRU first). */
+static LIST_DECLARE(unused_nodes_list);
+static size_t unused_nodes_count = 0;
+static MUTEX_DECLARE(unused_nodes_lock, 0);
 
 /** Cache of filesystem node structures. */
 static slab_cache_t *fs_node_cache;
@@ -209,6 +213,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	node = slab_cache_alloc(fs_node_cache, MM_SLEEP);
 	refcount_set(&node->count, 1);
 	list_init(&node->mount_link);
+	list_init(&node->unused_link);
 	node->id = id;
 	node->type = type;
 	node->removed = false;
@@ -264,12 +269,83 @@ static status_t fs_node_free(fs_node_t *node) {
 		list_remove(&node->mount_link);
 	}
 
+	mutex_lock(&unused_nodes_lock);
+	list_remove(&node->unused_link);
+	unused_nodes_count--;
+	mutex_unlock(&unused_nodes_lock);
+
 	object_destroy(&node->obj);
 	dprintf("fs: freed node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
 	        (node->mount) ? node->mount->id : 0, node->id);
 	slab_cache_free(fs_node_cache, node);
 	return STATUS_SUCCESS;
 }
+
+/** Low resource handler for the FS node cache.
+ * @param level		Current resource level. */
+static void fs_node_reclaim(int level) {
+	size_t count = 0;
+	fs_node_t *node;
+	status_t ret;
+
+	mutex_lock(&unused_nodes_lock);
+
+	/* Determine how many nodes to free based on the resource level. */
+	switch(level) {
+	case RESOURCE_LEVEL_ADVISORY:
+		count = unused_nodes_count / 50;
+	case RESOURCE_LEVEL_LOW:
+		count = unused_nodes_count / 10;
+	case RESOURCE_LEVEL_CRITICAL:
+		count = unused_nodes_count;
+		break;
+	}
+
+	/* Must do at least something. */
+	if(!count) {
+		count = 1;
+	}
+
+	/* Reclaim some nodes. */
+	while(count--) {
+		node = list_entry(unused_nodes_list.next, fs_node_t, unused_link);
+		mutex_unlock(&unused_nodes_lock);
+
+		/* Avoid a race condition: we must unlock the unused nodes list
+		 * first to use the correct locking order, however this opens
+		 * up the possibility that a node lookup gets hold of this node.
+		 * Perform a reference count check to ensure this hasn't
+		 * happened. */
+		mutex_lock(&node->mount->lock);
+		if(refcount_get(&node->count) > 0) {
+			mutex_unlock(&node->mount->lock);
+			count++;
+			continue;
+		}
+
+		/* Free the node. If this fails, place the node back on the end
+		 * of the list, but do not increment the count. This ensures
+		 * that we do not get stuck in an infinite loop trying to free
+		 * this node if it's going to continually fail. */
+		ret = fs_node_free(node);
+		mutex_lock(&unused_nodes_lock);
+		if(ret != STATUS_SUCCESS) {
+			kprintf(LOG_WARN, "fs: failed to flush node %" PRIu16 ":%" PRIu64 " (%d)\n",
+			        node->mount->id, node->id);
+			if(!list_empty(&node->unused_link)) {
+				list_append(&unused_nodes_list, &node->unused_link);
+			}
+		}
+		mutex_unlock(&unused_nodes_lock);
+	}
+}
+
+/** FS low resource handler. */
+static lrm_handler_t fs_lrm_handler = {
+	.types = RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE,
+	.priority = LRM_FS_PRIORITY,
+	.func = fs_node_reclaim,
+};
 
 /** Look up a node in the filesystem.
  * @param path		Path string to look up.
@@ -459,6 +535,11 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 				 * to the used list if it was unused before. */
 				if(refcount_inc(&node->count) == 1) {
 					list_append(&mount->used_nodes, &node->mount_link);
+
+					mutex_lock(&unused_nodes_lock);
+					list_remove(&node->unused_link);
+					unused_nodes_count--;
+					mutex_unlock(&unused_nodes_lock);
 				}
 
 				mutex_unlock(&mount->lock);
@@ -603,6 +684,12 @@ void fs_node_release(fs_node_t *node) {
 		 * to anything or is removed, then destroy it immediately. */
 		if(mount && !node->removed && !list_empty(&node->mount_link)) {
 			list_append(&node->mount->unused_nodes, &node->mount_link);
+
+			mutex_lock(&unused_nodes_lock);
+			list_append(&unused_nodes_list, &node->unused_link);
+			unused_nodes_count++;
+			mutex_unlock(&unused_nodes_lock);
+
 			dprintf("fs: transferred node %p to unused list (mount: %p)\n", node, node->mount);
 			mutex_unlock(&mount->lock);
 		} else {
@@ -2138,6 +2225,9 @@ int kdbg_cmd_node(int argc, char **argv) {
 void __init_text fs_init(kernel_args_t *args) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
 	                                  NULL, NULL, NULL, NULL, 0, MM_FATAL);
+
+	/* Register the low resource handler. */
+	lrm_handler_register(&fs_lrm_handler);
 
 	/* Store the boot FS UUID for use by fs_probe(). */
 	boot_fs_uuid = args->boot_fs_uuid;

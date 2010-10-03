@@ -215,7 +215,7 @@ typedef struct fs_mount {
 
 	avl_tree_t nodes;		/**< Tree mapping node IDs to node structures. */
 	list_t used_nodes;		/**< List of in-use nodes. */
-	list_t unused_nodes;		/**< List of unused nodes (in LRU order). */
+	list_t unused_nodes;		/**< List of unused nodes (LRU first). */
 
 	int flags;			/**< Flags for the mount. */
 	fs_mount_ops_t *ops;		/**< Mount operations. */
@@ -239,6 +239,7 @@ typedef struct fs_node {
 
 	refcount_t count;		/**< Number of references to the node. */
 	list_t mount_link;		/**< Link to mount's node lists. */
+	list_t unused_link;		/**< Link to global unused node list. */
 	node_id_t id;			/**< ID of the node. */
 	fs_node_type_t type;		/**< Type of the node. */
 	bool removed;			/**< Whether the node has been removed. */

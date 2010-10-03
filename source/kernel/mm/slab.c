@@ -930,7 +930,7 @@ int kdbg_cmd_slab(int argc, char **argv) {
  * @todo		This should take into effect which caches are hot, and
  *			reclaim from them less frequently.
  * @param level		Resource level. */
-static void slab_lrm_handler_func(int level) {
+static void slab_reclaim(int level) {
 	/* Loop through all caches and reclaim. */
 	mutex_lock(&slab_caches_lock);
 	LIST_FOREACH(&slab_caches, iter) {
@@ -945,7 +945,7 @@ static void slab_lrm_handler_func(int level) {
 static lrm_handler_t slab_lrm_handler = {
 	.types = RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE,
 	.priority = LRM_SLAB_PRIORITY,
-	.func = slab_lrm_handler_func,
+	.func = slab_reclaim,
 };
 
 /** Enable the magazine layer. */
