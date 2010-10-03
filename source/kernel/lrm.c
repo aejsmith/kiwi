@@ -84,7 +84,8 @@ static void lrm_thread_func(void *arg1, void *arg2) {
 		condvar_wait_etc(&lrm_request_cvar, NULL, NULL, LRM_INTERVAL, 0);
 
 		/* Invoke handlers that can reclaim any resource types that are
-		 * not currently at an OK level. */
+		 * not currently at an OK level. TODO: Should only move onto
+		 * the next handler once the previous cannot do anything. */
 		LIST_FOREACH(&lrm_handlers, iter) {
 			handler = list_entry(iter, lrm_handler_t, header);
 

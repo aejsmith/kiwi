@@ -609,7 +609,7 @@ static bool slab_cpu_cache_init(slab_cache_t *cache, int kmflag) {
 static bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	bool ret = false;
 
-	kprintf(LOG_DEBUG, "slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
+	dprintf("slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
 
 	mutex_lock(&cache->depot_lock);
 
