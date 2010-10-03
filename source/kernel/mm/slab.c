@@ -605,10 +605,9 @@ static bool slab_cpu_cache_init(slab_cache_t *cache, int kmflag) {
  * @todo		Should we reclaim partial magazines too, somehow?
  * @param cache		Cache to reclaim from.
  * @param force		Whether to force reclaim of everything.
- * @return		Whether any slabs were freed. */
-static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
+ * @return		Whether the resource level became OK. */
+static bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 	bool ret = false;
-	size_t count;
 
 	kprintf(LOG_DEBUG, "slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
 
@@ -619,16 +618,15 @@ static inline bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
 		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
 	}
 
-	/* Get the slab count before destroying. */
-	if(!(count = cache->slab_count)) {
-		mutex_unlock(&cache->depot_lock);
-		return false;
-	}
-
 	/* Destroy full magazines until the slab count decreases. */
 	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
 		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-		if(cache->slab_count < count) {
+
+		/* Stop reclaiming if the resource level is now OK. TODO: Is
+		 * this the best thing to do? It may be better to try to
+		 * reclaim a bit more after the level becomes OK, to reduce the
+		 * frequency of reclaims. */
+		if(lrm_level(RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE) == RESOURCE_LEVEL_OK) {
 			ret = true;
 			if(!force) {
 				break;
@@ -928,6 +926,28 @@ int kdbg_cmd_slab(int argc, char **argv) {
 	return KDBG_OK;
 }
 
+/** Slab low resource handler function.
+ * @todo		This should take into effect which caches are hot, and
+ *			reclaim from them less frequently.
+ * @param level		Resource level. */
+static void slab_lrm_handler_func(int level) {
+	/* Loop through all caches and reclaim. */
+	mutex_lock(&slab_caches_lock);
+	LIST_FOREACH(&slab_caches, iter) {
+		if(slab_cache_reclaim(list_entry(iter, slab_cache_t, header), false)) {
+			break;
+		}
+	}
+	mutex_unlock(&slab_caches_lock);
+}
+
+/** Slab low resource handler. */
+static lrm_handler_t slab_lrm_handler = {
+	.types = RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE,
+	.priority = LRM_SLAB_PRIORITY,
+	.func = slab_lrm_handler_func,
+};
+
 /** Enable the magazine layer. */
 void __init_text slab_late_init(void) {
 	slab_cache_t *cache;
@@ -965,4 +985,7 @@ void __init_text slab_init(void) {
 	slab_cache_init(&slab_mag_cache, "slab_mag_cache", sizeof(slab_magazine_t), 0, NULL,
 	                NULL, NULL, SLAB_MAG_PRIORITY, &slab_metadata_arena, SLAB_CACHE_NOMAG,
 	                MM_FATAL);
+
+	/* Register the LRM handler. */
+	lrm_handler_register(&slab_lrm_handler);
 }
