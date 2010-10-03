@@ -482,7 +482,7 @@ char *device_path(device_t *device) {
 	while(device != device_tree_root) {
 		mutex_lock(&device->lock);
 		len += strlen(device->name) + 1;
-		tmp = kmalloc(len, MM_SLEEP);
+		tmp = kmalloc(len + 1, MM_SLEEP);
 		strcpy(tmp, "/");
 		strcat(tmp, device->name);
 		strcat(tmp, path);

@@ -1774,8 +1774,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	if(!root_mount) {
 		assert(curr_proc == kernel_proc);
 		if(strcmp(path, "/") != 0) {
-			ret = STATUS_NOT_FOUND;
-			goto fail;
+			fatal("Non-root mount before root filesystem mounted");
 		}
 	} else {
 		/* Look up the destination directory. */
