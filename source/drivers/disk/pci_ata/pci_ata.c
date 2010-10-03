@@ -146,7 +146,7 @@ static void pci_ata_channel_write_pio(ata_channel_t *channel, const void *buf, s
  * @param vec		Array of block descriptions. Each block will cover no
  *			more than 1 page.
  * @param count		Number of array entries.
-	 * @param write		Whether the transfer is a write.
+ * @param write		Whether the transfer is a write.
  * @return		Status code describing result of operation. */
 static status_t pci_ata_channel_prepare_dma(ata_channel_t *channel, const ata_dma_transfer_t *vec,
                                             size_t count, bool write) {
