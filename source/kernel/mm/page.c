@@ -203,8 +203,10 @@ static void vm_cache_reclaim(int level) {
 	switch(level) {
 	case RESOURCE_LEVEL_ADVISORY:
 		count = queue->count / 8;
+		break;
 	case RESOURCE_LEVEL_LOW:
 		count = queue->count / 4;
+		break;
 	case RESOURCE_LEVEL_CRITICAL:
 		count = queue->count;
 		break;

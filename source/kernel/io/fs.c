@@ -295,8 +295,10 @@ static void fs_node_reclaim(int level) {
 	switch(level) {
 	case RESOURCE_LEVEL_ADVISORY:
 		count = unused_nodes_count / 50;
+		break;
 	case RESOURCE_LEVEL_LOW:
 		count = unused_nodes_count / 10;
+		break;
 	case RESOURCE_LEVEL_CRITICAL:
 		count = unused_nodes_count;
 		break;
