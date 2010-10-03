@@ -336,8 +336,9 @@ static void fs_node_reclaim(int level) {
 				list_append(&unused_nodes_list, &node->unused_link);
 			}
 		}
-		mutex_unlock(&unused_nodes_lock);
 	}
+
+	mutex_unlock(&unused_nodes_lock);
 }
 
 /** FS low resource handler. */
