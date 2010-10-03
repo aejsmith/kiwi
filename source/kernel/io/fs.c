@@ -284,6 +284,7 @@ static status_t fs_node_free(fs_node_t *node) {
 /** Low resource handler for the FS node cache.
  * @param level		Current resource level. */
 static void fs_node_reclaim(int level) {
+	fs_mount_t *mount;
 	size_t count = 0;
 	fs_node_t *node;
 	status_t ret;
@@ -307,7 +308,7 @@ static void fs_node_reclaim(int level) {
 	}
 
 	/* Reclaim some nodes. */
-	while(count--) {
+	while(count-- && !list_empty(&unused_nodes_list)) {
 		node = list_entry(unused_nodes_list.next, fs_node_t, unused_link);
 		mutex_unlock(&unused_nodes_lock);
 
@@ -316,9 +317,10 @@ static void fs_node_reclaim(int level) {
 		 * up the possibility that a node lookup gets hold of this node.
 		 * Perform a reference count check to ensure this hasn't
 		 * happened. */
-		mutex_lock(&node->mount->lock);
+		mount = node->mount;
+		mutex_lock(&mount->lock);
 		if(refcount_get(&node->count) > 0) {
-			mutex_unlock(&node->mount->lock);
+			mutex_unlock(&mount->lock);
 			count++;
 			continue;
 		}
@@ -336,6 +338,8 @@ static void fs_node_reclaim(int level) {
 				list_append(&unused_nodes_list, &node->unused_link);
 			}
 		}
+
+		mutex_unlock(&mount->lock);
 	}
 
 	mutex_unlock(&unused_nodes_lock);
