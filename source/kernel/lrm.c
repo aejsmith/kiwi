@@ -138,7 +138,7 @@ static int compute_memory_level(void) {
 	uint64_t free;
 
 	page_stats_get(&stats);
-	free = stats.free / 1024 / 1024;
+	free = ROUND_UP(stats.free, 1024 * 1024) / 1024 / 1024;
 	if(free <= MEMORY_CRITICAL_LIMIT) {
 		return RESOURCE_LEVEL_CRITICAL;
 	} else if(free <= MEMORY_LOW_LIMIT) {
@@ -155,7 +155,8 @@ static int compute_memory_level(void) {
 static int compute_kaspace_level(void) {
 	uint64_t free;
 
-	free = (kheap_raw_arena.total_size - kheap_raw_arena.used_size) / 1024 / 1024;
+	free = ROUND_UP(kheap_raw_arena.total_size - kheap_raw_arena.used_size, 1024 * 1024);
+	free = free / 1024 / 1024;
 	if(free <= KASPACE_CRITICAL_LIMIT) {
 		return RESOURCE_LEVEL_CRITICAL;
 	} else if(free <= KASPACE_LOW_LIMIT) {
