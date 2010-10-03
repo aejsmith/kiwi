@@ -229,9 +229,13 @@ vm_page_t *vm_page_alloc(size_t count, int pmflag) {
 	vm_page_t *pages;
 	phys_ptr_t base;
 
-	if(!(base = page_xalloc(count, 0, 0, 0, pmflag))) {
+	base = page_xalloc(count, 0, 0, 0, pmflag);
+	if(unlikely(!base)) {
 		return NULL;
-	} else if(unlikely(!(pages = vm_page_lookup(base)))) {
+	}
+
+	pages = vm_page_lookup(base);
+	if(unlikely(!pages)) {
 		fatal("Could not look up pages for [%" PRIpp ", %" PRIpp ")",
 		      base, base + (count * PAGE_SIZE));
 	}
@@ -274,9 +278,10 @@ vm_page_t *vm_page_copy(vm_page_t *page, int mmflag) {
 
 	assert(page);
 
-	if(!(dest = vm_page_alloc(1, mmflag))) {
+	dest = vm_page_alloc(1, mmflag);
+	if(unlikely(!dest)) {
 		return NULL;
-	} else if(!page_copy(dest->addr, page->addr, mmflag)) {
+	} else if(unlikely(!page_copy(dest->addr, page->addr, mmflag))) {
 		vm_page_free(dest, 1);
 		return NULL;
 	}
@@ -352,8 +357,9 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 	phys_ptr_t base;
 	void *mapping;
 
-	if(!(base = vmem_xalloc(&page_arena, count * PAGE_SIZE, align, 0, 0, minaddr,
-	                        maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL))) {
+	base = vmem_xalloc(&page_arena, count * PAGE_SIZE, align, 0, 0, minaddr,
+	                   maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
+	if(unlikely(!base)) {
 		if(pmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation of %zu pages (1)", count);
 		}
@@ -369,7 +375,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 		thread_wire(curr_thread);
 
 		mapping = page_phys_map(base, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
-		if(!mapping) {
+		if(unlikely(!mapping)) {
 			if(pmflag & MM_FATAL) {
 				fatal("Could not perform mandatory allocation of %zu pages (2)", count);
 			}
@@ -414,7 +420,8 @@ void page_free(phys_ptr_t base, size_t count) {
 
 	/* Go through vm_page_free() here as that performs various checks and
 	 * ensures that all free pages are in exactly the same state. */
-	if(!(page = vm_page_lookup(base))) {
+	page = vm_page_lookup(base);
+	if(unlikely(!page)) {
 		/* Assume if the page is not found then vm_page_init() hasn't
 		 * been called yet. If the caller is passing in crap,
 		 * vmem_free() will pick it up. */
@@ -440,10 +447,14 @@ bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 
 	thread_wire(curr_thread);
 
-	if(!(mdest = page_phys_map(dest, PAGE_SIZE, mmflag))) {
+	mdest = page_phys_map(dest, PAGE_SIZE, mmflag);
+	if(unlikely(!mdest)) {
 		thread_unwire(curr_thread);
 		return false;
-	} else if(!(msrc = page_phys_map(source, PAGE_SIZE, mmflag))) {
+	}
+
+	msrc = page_phys_map(source, PAGE_SIZE, mmflag);
+	if(unlikely(!msrc)) {
 		page_phys_unmap(mdest, PAGE_SIZE, false);
 		thread_unwire(curr_thread);
 		return false;
@@ -673,7 +684,7 @@ void __init_text vm_page_init(void) {
 		}
 	}
 
-	/* Set up the page writer and page daemon. */
+	/* Set up the page writer. */
 	ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
 	                    NULL, &page_writer_thread);
 	if(ret != STATUS_SUCCESS) {
