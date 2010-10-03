@@ -242,13 +242,13 @@ static irq_result_t i8042_mouse_irq(unative_t num, void *_device, intr_frame_t *
 			/* If the new state has the button, but the old state
 			 * does not, it has been clicked. */
 			if(new_state & (1<<i) && (mouse_button_state & (1<<i)) == 0) {
-				input_device_event(i8042_mouse_dev, INPUT_EVENT_BTN_DOWN, i);
+				input_device_event(device, INPUT_EVENT_BTN_DOWN, i);
 			}
 
 			/* If the old state has the button, but the new state
 			 * does not, it has been released. */
 			if((new_state & (1<<i)) == 0 && mouse_button_state & (1<<i)) {
-				input_device_event(i8042_mouse_dev, INPUT_EVENT_BTN_UP, i);
+				input_device_event(device, INPUT_EVENT_BTN_UP, i);
 			}
 		}
 
