@@ -27,6 +27,8 @@
 /** Base class for a code generator. */
 class CodeGen {
 public:
+	virtual ~CodeGen() {}
+
 	/** Generate code.
 	 * @param service	Service to generate for.
 	 * @param path		Path to output file.

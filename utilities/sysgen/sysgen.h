@@ -74,6 +74,8 @@ typedef std::list<Syscall *> SyscallList;
 /** Base class for a code generation target. */
 class Target {
 public:
+	virtual ~Target() {}
+
 	/** Add the target's basic types to the type map.
 	 * @param map		Map to add to. */
 	virtual void AddTypes(TypeMap &map) = 0;
