@@ -18,21 +18,15 @@
  * @brief		Internal libkiwi logging functions.
  */
 
-#ifndef __KIWI_PRIVATE_LOG_H
-#define __KIWI_PRIVATE_LOG_H
-
-namespace kiwi {
-namespace log {
+#ifndef __LOG_H
+#define __LOG_H
 
 #if CONFIG_DEBUG
-extern void debug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void libkiwi_debug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 #else
-static inline void debug(const char *fmt, ...) {};
+static inline void libkiwi_debug(const char *fmt, ...) {};
 #endif
-extern void warning(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-extern void fatal(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void libkiwi_warn(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void libkiwi_fatal(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
-}
-}
-
-#endif /* __KIWI_PRIVATE_LOG_H */
+#endif /* __LOG_H */

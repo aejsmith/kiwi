@@ -21,10 +21,11 @@
 #include <kernel/object.h>
 #include <kernel/status.h>
 
-#include <kiwi/private/log.h>
 #include <kiwi/EventLoop.h>
 
 #include <cstring>
+
+#include "log.h"
 
 using namespace kiwi;
 using namespace std;
@@ -36,7 +37,7 @@ static EventLoop *event_loop_instance = 0;
 /** EventLoop constructor. */
 EventLoop::EventLoop() {
 	if(Instance()) {
-		log::fatal("EventLoop::EventLoop: Can only have 1 event loop per thread.\n");
+		libkiwi_fatal("EventLoop::EventLoop: Can only have 1 event loop per thread.\n");
 	}
 
 	event_loop_instance = this;
@@ -97,7 +98,7 @@ void EventLoop::Run(void) {
 		/* Wait for any of the events. */
 		status_t ret = object_wait(&m_events[0], m_handles.size(), -1);
 		if(ret != STATUS_SUCCESS) {
-			log::fatal("EventLoop::Run: Failed to wait for events: %d\n", ret);
+			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d\n", ret);
 		}
 
 		/* Signal each handle an event occurred on. */

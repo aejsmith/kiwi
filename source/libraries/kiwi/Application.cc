@@ -18,7 +18,6 @@
  * @brief		Application class.
  */
 
-#include <kiwi/private/log.h>
 #include <kiwi/Application.h>
 #include <kiwi/Error.h>
 
@@ -26,6 +25,7 @@
 #include <iostream>
 
 #include "org.kiwi.AppServer.h"
+#include "log.h"
 
 using namespace kiwi;
 using namespace org::kiwi::AppServer::Session;

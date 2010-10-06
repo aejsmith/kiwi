@@ -23,7 +23,8 @@
 
 #include <kiwi/EventLoop.h>
 #include <kiwi/Handle.h>
-#include <kiwi/private/log.h>
+
+#include "log.h"
 
 using namespace kiwi;
 
@@ -61,7 +62,7 @@ void Handle::Close() {
 		 * not existing. Therefore, if we fail, it means the programmer
 		 * has done something funny so we raise a fatal error. */
 		if(handle_close(m_handle) != STATUS_SUCCESS) {
-			log::fatal("Handle::Close: Handle %d has already been closed.\n", m_handle);
+			libkiwi_fatal("Handle::Close: Handle %d has already been closed.\n", m_handle);
 		}
 
 		m_handle = -1;
@@ -94,9 +95,9 @@ bool Handle::Wait(int event, useconds_t timeout) const {
 	/* Handle errors that can occur because the programmer has done
 	 * something daft. */
 	if(ret == STATUS_INVALID_HANDLE) {
-		log::fatal("Handle::Wait: Handle %d is invalid.\n", m_handle);
+		libkiwi_fatal("Handle::Wait: Handle %d is invalid.\n", m_handle);
 	} else if(ret == STATUS_INVALID_EVENT) {
-		log::fatal("Handle::Wait: Event %d is invalid for handle %d\n", event, m_handle);
+		libkiwi_fatal("Handle::Wait: Event %d is invalid for handle %d\n", event, m_handle);
 	}
 
 	return false;

@@ -18,13 +18,11 @@
  * @brief		Internal libkiwi logging functions.
  */
 
-#include <kiwi/private/log.h>
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-using namespace kiwi;
+#include "log.h"
 
 /** Print out a message.
  * @param stream	Stream to print to.
@@ -44,7 +42,7 @@ static void do_log_message(FILE *stream, const char *prefix, const char *fmt,
 
 #if CONFIG_DEBUG
 /** Print a debug message. */
-void log::debug(const char *fmt, ...) {
+void libkiwi_debug(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	do_log_message(stdout, "DEBUG", fmt, args, false);
@@ -53,10 +51,10 @@ void log::debug(const char *fmt, ...) {
 #endif
 
 /** Print a warning message. */
-void log::warning(const char *fmt, ...) {
+void libkiwi_warn(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	do_log_message(stderr, "WARNING", fmt, args, false);
+	do_log_message(stderr, "WARN", fmt, args, false);
 	va_end(args);
 }
 
@@ -64,7 +62,7 @@ void log::warning(const char *fmt, ...) {
  * @todo		Fatal error messages should pop up a message box on the
  *			GUI so programs don't just drop dead without any
  *			indication why. */
-void log::fatal(const char *fmt, ...) {
+void libkiwi_fatal(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	do_log_message(stderr, "FATAL", fmt, args, true);

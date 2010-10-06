@@ -18,8 +18,9 @@
  * @brief		RPC client connection class.
  */
 
-#include <kiwi/private/log.h>
 #include <kiwi/RPC.h>
+
+#include "log.h"
 
 using namespace kiwi;
 
@@ -69,10 +70,10 @@ void RPCClientConnection::_HandleMessage() {
 		HandleMessage(id, buf);
 		SendMessage(id, buf);
 	} catch(RPCError &e) {
-		log::warning("RPC error during message handling: %s\n", e.GetDescription());
+		libkiwi_warn("RPC error during message handling: %s\n", e.GetDescription());
 		return;
 	} catch(IPCError &e) {
-		log::warning("IPC error during message handling: %s\n", e.GetDescription());
+		libkiwi_warn("IPC error during message handling: %s\n", e.GetDescription());
 		return;
 	}
 }

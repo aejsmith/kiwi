@@ -18,11 +18,11 @@
  * @brief		Service main class.
  */
 
-#include <kiwi/private/log.h>
 #include <kiwi/IPCPort.h>
 #include <kiwi/Service.h>
 
 #include "../org.kiwi.ServiceManager.h"
+#include "../log.h"
 
 using namespace kiwi;
 using namespace org::kiwi::ServiceManager;
@@ -42,7 +42,7 @@ Service::Service() : m_port(0) {
  * @param handle	Handle to the connection.
  * @param info		Information about connecting thread. */
 void Service::HandleConnection(handle_t handle, ipc_connect_info_t &info) {
-	log::fatal("Service::HandleConnection must be reimplemented for services with a port\n");
+	libkiwi_fatal("Service::HandleConnection must be reimplemented for services with a port\n");
 }
 
 /** Signal handler for port addition. */

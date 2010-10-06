@@ -18,9 +18,10 @@
  * @brief		API object base class.
  */
 
-#include <kiwi/private/log.h>
 #include <kiwi/EventLoop.h>
 #include <kiwi/Object.h>
+
+#include "log.h"
 
 using namespace kiwi;
 
@@ -37,6 +38,6 @@ void Object::DeleteLater() {
 	if(loop) {
 		loop->DeleteObject(this);
 	} else {
-		log::fatal("Object::DeleteLater: Called without an event loop, will not be deleted");
+		libkiwi_warn("Object::DeleteLater: Called without an event loop, will not be deleted");
 	}
 }
