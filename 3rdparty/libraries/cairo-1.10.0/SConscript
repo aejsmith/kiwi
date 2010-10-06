@@ -100,7 +100,8 @@ env.KiwiLibrary('cairo',
 		'cairo-pdf-surface.c',
 		'cairo-svg-surface.c',
 	]),
-	libraries=['z', 'png', 'pixman-1', 'freetype'],
+	libraries = ['z', 'png', 'pixman', 'freetype'],
+	include_path = Dir('include'),
 	flags = {
 		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
 			'-Werror',
@@ -115,12 +116,6 @@ env.KiwiLibrary('cairo',
 			'HAVE_CONFIG_H': 1,
 			'CAIRO_NO_MUTEX': None,
 		},
-		'CPPPATH': env['CPPPATH'] + [
-			'.',
-			'../../../include/pixman-1',
-			'../../../include/libpng12',
-			'../../../include/freetype2',
-			'../../../include/cairo',
-		],
+		'CPPPATH': env['CPPPATH'] + ['.'],
 	},
 )

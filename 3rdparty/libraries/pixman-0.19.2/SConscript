@@ -72,11 +72,12 @@ else:
 	raise Exception, "Architecture support not added."
 
 # Build the library.
-env.KiwiLibrary('pixman-1',
+env.KiwiLibrary('pixman',
 	sources = map(lambda x: File('pixman/' + x), sources),
 	libraries = ['m'],
+	include_path = Dir('include'),
 	flags = {
-		'CPPPATH': env['CPPPATH'] + ['.', '../../../include/pixman-1'],
+		'CPPPATH': env['CPPPATH'] + ['.'],
 		'CPPDEFINES': defines,
 		'CCFLAGS': ccflags,
 	},

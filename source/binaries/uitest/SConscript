@@ -19,8 +19,5 @@ env.KiwiApplication('uitest',
 		'org.kiwi.WindowServer.cc',
 		'main.cc',
 	],
-	libraries = ['kiwi-ui'],
-	flags = {
-		'CPPPATH': env['CPPPATH'] + ['../../include/freetype2'],
-	},
+	libraries = ['kiwi-ui', 'freetype'],
 )

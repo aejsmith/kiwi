@@ -78,6 +78,7 @@ for (k, v) in components.items():
 env.KiwiLibrary('freetype',
 	sources = sources,
 	libraries = ['z'],
+	include_path = Dir('include'),
 	flags = {
 		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
 			'-Wall',
@@ -101,19 +102,19 @@ env.KiwiLibrary('freetype',
 
 # Workaround for SCons not picking up dependencies due to macro usage for
 # include paths.
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/freetype.h')
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftoutln.h')
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/tttables.h')
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftsynth.h')
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/ftlcdfil.h')
-env.Depends('../../../include/freetype2/ft2build.h', '../../../include/freetype2/freetype/t1tables.h')
-env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/config/ftconfig.h')
-env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fttypes.h')
-env.Depends('../../../include/freetype2/freetype/freetype.h', '../../../include/freetype2/freetype/fterrors.h')
-env.Depends('../../../include/freetype2/freetype/config/ftconfig.h', '../../../include/freetype2/freetype/config/ftoption.h')
-env.Depends('../../../include/freetype2/freetype/config/ftconfig.h', '../../../include/freetype2/freetype/config/ftstdlib.h')
-env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/config/ftconfig.h')
-env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/ftsystem.h')
-env.Depends('../../../include/freetype2/freetype/fttypes.h', '../../../include/freetype2/freetype/ftimage.h')
-env.Depends('../../../include/freetype2/freetype/fterrors.h', '../../../include/freetype2/freetype/fterrdef.h')
-env.Depends('../../../include/freetype2/freetype/fterrors.h', '../../../include/freetype2/freetype/ftmoderr.h')
+env.Depends('include/ft2build.h', 'include/freetype/freetype.h')
+env.Depends('include/ft2build.h', 'include/freetype/ftoutln.h')
+env.Depends('include/ft2build.h', 'include/freetype/tttables.h')
+env.Depends('include/ft2build.h', 'include/freetype/ftsynth.h')
+env.Depends('include/ft2build.h', 'include/freetype/ftlcdfil.h')
+env.Depends('include/ft2build.h', 'include/freetype/t1tables.h')
+env.Depends('include/freetype/freetype.h', 'include/freetype/config/ftconfig.h')
+env.Depends('include/freetype/freetype.h', 'include/freetype/fttypes.h')
+env.Depends('include/freetype/freetype.h', 'include/freetype/fterrors.h')
+env.Depends('include/freetype/config/ftconfig.h', 'include/freetype/config/ftoption.h')
+env.Depends('include/freetype/config/ftconfig.h', 'include/freetype/config/ftstdlib.h')
+env.Depends('include/freetype/fttypes.h', 'include/freetype/config/ftconfig.h')
+env.Depends('include/freetype/fttypes.h', 'include/freetype/ftsystem.h')
+env.Depends('include/freetype/fttypes.h', 'include/freetype/ftimage.h')
+env.Depends('include/freetype/fterrors.h', 'include/freetype/fterrdef.h')
+env.Depends('include/freetype/fterrors.h', 'include/freetype/ftmoderr.h')

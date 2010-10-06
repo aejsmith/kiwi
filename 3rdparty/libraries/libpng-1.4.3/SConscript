@@ -32,4 +32,5 @@ env.KiwiLibrary('png',
 		'pngwutil.c',
 	],
 	libraries = ['z', 'm'],
+	include_path = Dir('include'),
 )

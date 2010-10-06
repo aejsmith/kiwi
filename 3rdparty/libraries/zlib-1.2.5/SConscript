@@ -32,6 +32,7 @@ env.KiwiLibrary('z',
 		'uncompr.c',
 		'zutil.c',
 	],
+	include_path = Dir('include'),
 )
 
 # Build the minigzip utility.

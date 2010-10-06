@@ -33,8 +33,5 @@ env.KiwiService('window',
 		'WindowList.cc',
 		'WindowServer.cc',
 	],
-	libraries = ['kiwi-service', 'kiwi-ui', 'pixman-1', 'cairo'],
-	flags = {
-		'CPPPATH': env['CPPPATH'] + ['../../include/pixman-1', '../../include/freetype2'],
-	},
+	libraries = ['kiwi-service', 'kiwi-ui', 'pixman', 'cairo', 'freetype'],
 )
