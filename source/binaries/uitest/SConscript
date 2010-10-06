@@ -13,5 +13,14 @@
 
 Import('env')
 
-env.Program('uitest', ['org.kiwi.WindowServer.cc', 'main.cc'], LIBS=['kiwi-ui'], CPPPATH=env['CPPPATH'] + ['../../include/freetype2'])
 env.RPCClient('org.kiwi.WindowServer.cc', '../../services/window/org.kiwi.WindowServer.proto')
+env.KiwiApplication('uitest',
+	sources = [
+		'org.kiwi.WindowServer.cc',
+		'main.cc',
+	],
+	libraries = ['kiwi-ui'],
+	flags = {
+		'CPPPATH': env['CPPPATH'] + ['../../include/freetype2'],
+	},
+)

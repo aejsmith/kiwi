@@ -13,24 +13,26 @@
 
 Import('env')
 
-# Build the core library.
-env.SharedLibrary('kiwi', [
-	'org.kiwi.ServiceManager.cc',
-	'Error.cc',
-	'EventLoop.cc',
-	'Handle.cc',
-	'IPCConnection.cc',
-	'IPCPort.cc',
-	'log.cc',
-	'Object.cc',
-	'Process.cc',
-	'RPCClientConnection.cc',
-	'RPCMessageBuffer.cc',
-	'RPCServerConnection.cc',
-], LIBS=['stdc++'])
-
-# Generate the service manager interface code.
+# Generate service manager interface code for the IPC classes.
 env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
+
+# Build the core library.
+env.KiwiLibrary('kiwi',
+	sources = [
+		'org.kiwi.ServiceManager.cc',
+		'Error.cc',
+		'EventLoop.cc',
+		'Handle.cc',
+		'IPCConnection.cc',
+		'IPCPort.cc',
+		'log.cc',
+		'Object.cc',
+		'Process.cc',
+		'RPCClientConnection.cc',
+		'RPCMessageBuffer.cc',
+		'RPCServerConnection.cc',
+	],
+)
 
 # Build the additional libraries.
 SConscript(dirs=['service', 'ui'], exports=['env'])

@@ -31,15 +31,19 @@ class SourceList:
 sources = SourceList()
 SConscript(dirs=['arch/%s' % (config['ARCH']), 'generic', 'support'], exports=['env', 'sources'])
 
-# Silence some warnings because I can't be bothered to fix them, and include
-# the configuration header because some things need an endianness definition.
-flags = env['CCFLAGS'] + [
-	'-Wno-strict-aliasing',
-	'-Wno-sign-compare',
-	'-Wno-parentheses',
-	'-Wno-uninitialized',
-	'-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM'])
-]
-
-# Build the library from this.
-env.SharedLibrary('m', sources.files(), CCFLAGS=flags)
+# Build the library.
+env.KiwiLibrary('m',
+	sources = sources.files(),
+	flags = {
+		# Silence some warnings because I can't be bothered to fix them,
+		# and include the configuration header because some things need
+		# an endianness definition.
+		'CCFLAGS': env['CCFLAGS'] + [
+			'-Wno-strict-aliasing',
+			'-Wno-sign-compare',
+			'-Wno-parentheses',
+			'-Wno-uninitialized',
+			'-include', 'build/%s-%s/config.h' % (config['ARCH'], config['PLATFORM']),
+		],
+	},
+)

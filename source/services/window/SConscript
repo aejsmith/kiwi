@@ -13,27 +13,28 @@
 
 Import('env', 'envmgr')
 
-# Libraries to link to.
-libs = ['kiwi-service', 'kiwi-ui', 'pixman-1', 'cairo']
-
-# Include path.
-incpath = env['CPPPATH'] + ['../../include/pixman-1', '../../include/freetype2']
-
-env.Program('window', [
-	'org.kiwi.WindowServer.cc',
-	'Compositor.cc',
-	'Connection.cc',
-	'Cursor.cc',
-	'Decoration.cc',
-	'Display.cc',
-	'InputManager.cc',
-	'MouseDevice.cc',
-	'Session.cc',
-	'Surface.cc',
-	'Window.cc',
-	'WindowList.cc',
-	'WindowServer.cc',
-], LIBS=libs, CPPPATH=incpath)
-
 # Generate the RPC interface code.
 env.RPCServer('org.kiwi.WindowServer.cc', 'org.kiwi.WindowServer.proto')
+
+# Build the service.
+env.KiwiService('window',
+	sources = [
+		'org.kiwi.WindowServer.cc',
+		'Compositor.cc',
+		'Connection.cc',
+		'Cursor.cc',
+		'Decoration.cc',
+		'Display.cc',
+		'InputManager.cc',
+		'MouseDevice.cc',
+		'Session.cc',
+		'Surface.cc',
+		'Window.cc',
+		'WindowList.cc',
+		'WindowServer.cc',
+	],
+	libraries = ['kiwi-service', 'kiwi-ui', 'pixman-1', 'cairo'],
+	flags = {
+		'CPPPATH': env['CPPPATH'] + ['../../include/pixman-1', '../../include/freetype2'],
+	},
+)

@@ -13,59 +13,65 @@
 
 Import('env', 'envmgr')
 
-# Definitions controlling features.
-defines = {
-	'MORE_24': None,
-	#'ALLOW_GDT': None,
-	'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
-}
+# Build the program itself.
+target = env.KiwiApplication('dungeon',
+	sources = [
+		'actors.c',
+		'ballop.c',
+		'clockr.c',
+		'demons.c',
+		'dgame.c',
+		'dinit.c',
+		'dmain.c',
+		'dso1.c',
+		'dso2.c',
+		'dso3.c',
+		'dso4.c',
+		'dso5.c',
+		'dso6.c',
+		'dso7.c',
+		'dsub.c',
+		'dverb1.c',
+		'dverb2.c',
+		'gdt.c',
+		'lightp.c',
+		'local.c',
+		'nobjs.c',
+		'np.c',
+		'np1.c',
+		'np2.c',
+		'np3.c',
+		'nrooms.c',
+		'objcts.c',
+		'rooms.c',
+		'sobjs.c',
+		'supp.c',
+		'sverbs.c',
+		'verbs.c',
+		'villns.c',
+	],
+	flags = {
+		# Definitions controlling features.
+		'CPPDEFINES': {
+			'MORE_24': None,
+			#'ALLOW_GDT': None,
+			'TEXTFILE': '\\\"/system/data/dungeon/dtextc.dat\\\"'
+		},
 
-# Override build flags - it won't compile with our warning flags.
-flags = [
-	'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
-	'-Wno-redundant-decls', '-Wno-unused-variable',
-]
+		# Override build flags - it won't compile with our warning flags.
+		'CCFLAGS': [
+			'-Wno-format', '-Wno-missing-braces', '-Wno-parentheses',
+			'-Wno-redundant-decls', '-Wno-unused-variable',
+		],
+	}
+)
 
 # Build the data file.
-env.Command('dtextc.dat', ['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
-            Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR'))
-
-# Build the program itself.
-target = env.Program('dungeon', [
-	'actors.c',
-	'ballop.c',
-	'clockr.c',
-	'demons.c',
-	'dgame.c',
-	'dinit.c',
-	'dmain.c',
-	'dso1.c',
-	'dso2.c',
-	'dso3.c',
-	'dso4.c',
-	'dso5.c',
-	'dso6.c',
-	'dso7.c',
-	'dsub.c',
-	'dverb1.c',
-	'dverb2.c',
-	'gdt.c',
-	'lightp.c',
-	'local.c',
-	'nobjs.c',
-	'np.c',
-	'np1.c',
-	'np2.c',
-	'np3.c',
-	'nrooms.c',
-	'objcts.c',
-	'rooms.c',
-	'sobjs.c',
-	'supp.c',
-	'sverbs.c',
-	'verbs.c',
-	'villns.c',
-], CPPDEFINES=defines, CCFLAGS=flags)
+env.Command(
+	'dtextc.dat',
+	['dtextc.uu1', 'dtextc.uu2', 'dtextc.uu3', 'dtextc.uu4'],
+	Action('cat $SOURCES | uudecode -o $TARGET', '$GENCOMSTR')
+)
 
 # Depend on the data file.
 Depends(target, File('dtextc.dat'))

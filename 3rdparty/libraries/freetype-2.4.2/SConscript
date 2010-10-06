@@ -68,26 +68,6 @@ components = {
 	'psnames': ['psmodule.c'],
 }
 
-# Build flags.
-flags = filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
-	'-Wall',
-	'-Werror',
-]
-defines = {
-	'FT_CONFIG_OPTION_SYSTEM_ZLIB': None,
-	'FT_CONFIG_CONFIG_H': '"<ftconfig.h>"',
-	'FT2_BUILD_LIBRARY': None,
-	'FT_CONFIG_MODULES_H': '"<ftmodule.h>"',
-}
-incpath = env['CPPPATH'] + [
-	'builds/unix',
-	# Augh, freetype does nasty defines for header paths that SCons doesn't
-	# pick up on.
-	'#3rdparty/libraries/freetype-2.4.2/include',
-	'#3rdparty/libraries/freetype-2.4.2/include/freetype/config',
-]
-libs = ['z']
-
 # Generate the source list.
 sources = []
 for (k, v) in components.items():
@@ -95,7 +75,29 @@ for (k, v) in components.items():
 		sources.append(File(os.path.join('src', k, f)))
 
 # Build the library.
-env.SharedLibrary('freetype', sources, CCFLAGS=flags, CPPPATH=incpath, CPPDEFINES=defines, LIBS=libs)
+env.KiwiLibrary('freetype',
+	sources = sources,
+	libraries = ['z'],
+	flags = {
+		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [
+			'-Wall',
+			'-Werror',
+		],
+		'CPPDEFINES': {
+			'FT_CONFIG_OPTION_SYSTEM_ZLIB': None,
+			'FT_CONFIG_CONFIG_H': '"<ftconfig.h>"',
+			'FT2_BUILD_LIBRARY': None,
+			'FT_CONFIG_MODULES_H': '"<ftmodule.h>"',
+		},
+		'CPPPATH': env['CPPPATH'] + [
+			'builds/unix',
+			# Augh, freetype does nasty defines for header paths
+			# that SCons doesn't pick up on.
+			'#3rdparty/libraries/freetype-2.4.2/include',
+			'#3rdparty/libraries/freetype-2.4.2/include/freetype/config',
+		],
+	},
+)
 
 # Workaround for SCons not picking up dependencies due to macro usage for
 # include paths.

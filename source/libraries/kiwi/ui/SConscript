@@ -13,6 +13,10 @@
 
 Import('env')
 
-env.SharedLibrary('kiwi-ui', [
-	'Region.cc',
-], LIBS=['kiwi', 'cairo'])
+env.KiwiLibrary('kiwi-ui',
+	sources = [
+		'Region.cc',
+	],
+	libraries = ['kiwi', 'cairo'],
+	build_libraries = ['kiwi'],
+)

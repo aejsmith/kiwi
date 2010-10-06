@@ -42,9 +42,10 @@ Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGE
 
 # Build the library. The default visibility is set to hidden, as the majority
 # of functions in this library should not be exported.
-env.SharedLibrary(
-	'kernel',
-	arch_sources + sources,
-	LINKFLAGS=['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
-	CCFLAGS=env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
+env.KiwiLibrary('kernel',
+	sources = arch_sources + sources,
+	flags = {
+		'LINKFLAGS': ['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
+		'CCFLAGS': env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden'],
+	},
 )

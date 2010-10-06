@@ -162,4 +162,10 @@ env.Command(
 arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 
 # Build the library from this.
-env.SharedLibrary('c', arch_sources + sources, LINKFLAGS='-nodefaultlibs', LIBS=['kernel'])
+env.KiwiLibrary('c',
+	sources = arch_sources + sources,
+	libraries = ['kernel'],
+	flags = {
+		'LINKFLAGS': ['-nodefaultlibs'],
+	},
+)

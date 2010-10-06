@@ -13,13 +13,17 @@
 
 Import('env')
 
-env.Program('svcmgr', [
-	'org.kiwi.ServiceManager.cc',
-	'Connection.cc',
-	'Port.cc',
-	'Service.cc',
-	'ServiceManager.cc',
-], LIBS=['kiwi'])
-
 # Generate the RPC interface code.
 env.RPCServerClient('org.kiwi.ServiceManager.cc', 'org.kiwi.ServiceManager.proto')
+
+# Build the service.
+env.KiwiService('svcmgr',
+	sources = [
+		'org.kiwi.ServiceManager.cc',
+		'Connection.cc',
+		'Port.cc',
+		'Service.cc',
+		'ServiceManager.cc'
+	],
+	libraries = ['kiwi'],
+)
