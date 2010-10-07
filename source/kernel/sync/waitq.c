@@ -77,6 +77,14 @@ bool waitq_sleep_prepare(waitq_t *queue) {
 	return state;
 }
 
+/** Cancel a prepared sleep.
+ * @param queue		Queue to cancel from.
+ * @param state		Interrupt state to restore. */
+void waitq_sleep_cancel(waitq_t *queue, bool state) {
+	spinlock_unlock_ni(&queue->lock);
+	intr_restore(state);
+}
+
 /** Sleep on a wait queue.
  * @see			waitq_sleep_prepare().
  * @param queue		Queue to sleep on.

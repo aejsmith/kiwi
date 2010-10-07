@@ -23,6 +23,7 @@
 
 #include <io/context.h>
 
+#include <lib/avl_tree.h>
 #include <lib/notifier.h>
 
 #include <proc/session.h>
@@ -72,6 +73,7 @@ typedef struct process {
 	io_context_t ioctx;		/**< I/O context structure. */
 	session_t *session;		/**< Session the process belongs to. */
 	list_t threads;			/**< List of threads. */
+	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
 
 	/** State of the process. */
 	enum {

@@ -76,8 +76,7 @@ status_t semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
 	state = waitq_sleep_prepare(&sem->queue);
 	if(sem->count) {
 		--sem->count;
-		spinlock_unlock_ni(&sem->queue.lock);
-		intr_restore(state);
+		waitq_sleep_cancel(&sem->queue, state);
 		return STATUS_SUCCESS;
 	}
 

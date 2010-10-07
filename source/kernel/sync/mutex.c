@@ -67,8 +67,7 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 			/* Check again now that we have the wait queue lock,
 			 * in case mutex_unlock() was called on another CPU. */
 			if(atomic_cmp_set(&lock->locked, 0, 1)) {
-				spinlock_unlock_ni(&lock->queue.lock);
-				intr_restore(state);
+				waitq_sleep_cancel(&lock->queue, state);
 			} else {
 				/* If sleep is successful, lock ownership will
 				 * have been transferred to us. */

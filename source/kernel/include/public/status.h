@@ -64,6 +64,7 @@
 #define STATUS_MISSING_LIBRARY		39	/**< Required library not found. */
 #define STATUS_MISSING_SYMBOL		40	/**< Referenced symbol not found. */
 #define STATUS_DEST_UNREACHABLE		41	/**< Cannot reach destination. */
+#define STATUS_TRY_AGAIN		42	/**< Attempt the operation again. */
 
 #if !defined(KERNEL) && !defined(__ASM__)
 #include <kernel/types.h>

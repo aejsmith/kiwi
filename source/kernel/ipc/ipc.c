@@ -695,8 +695,7 @@ status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, s
 		state = waitq_sleep_prepare(&endpoint->remote->space_sem.queue);
 		if(endpoint->remote->space_sem.count) {
 			--endpoint->remote->space_sem.count;
-			spinlock_unlock_ni(&endpoint->remote->space_sem.queue.lock);
-			intr_restore(state);
+			waitq_sleep_cancel(&endpoint->remote->space_sem.queue, state);
 		} else {
 			mutex_unlock(&endpoint->conn->lock);
 			ret = waitq_sleep_unsafe(&endpoint->remote->space_sem.queue, -1, SYNC_INTERRUPTIBLE, state);
@@ -770,8 +769,7 @@ static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, i
 	state = waitq_sleep_prepare(&endpoint->data_sem.queue);
 	if(endpoint->data_sem.count) {
 		--endpoint->data_sem.count;
-		spinlock_unlock_ni(&endpoint->data_sem.queue.lock);
-		intr_restore(state);
+		waitq_sleep_cancel(&endpoint->data_sem.queue, state);
 	} else {
 		mutex_unlock(&endpoint->conn->lock);
 		ret = waitq_sleep_unsafe(&endpoint->data_sem.queue, timeout, SYNC_INTERRUPTIBLE, state);

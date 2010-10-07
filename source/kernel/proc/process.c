@@ -36,6 +36,7 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <sync/futex.h>
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
 
@@ -79,6 +80,7 @@ static void process_cache_ctor(void *obj, void *data) {
 
 	mutex_init(&process->lock, "process_lock", 0);
 	list_init(&process->threads);
+	avl_tree_init(&process->futexes);
 	notifier_init(&process->death_notifier, process);
 }
 
@@ -86,6 +88,7 @@ static void process_cache_ctor(void *obj, void *data) {
  * @note		Safe to call multiple times.
  * @param process	Process to clean up. */
 static void process_cleanup(process_t *process) {
+	futex_cleanup(process);
 	if(process->aspace) {
 		vm_aspace_destroy(process->aspace);
 		process->aspace = NULL;
