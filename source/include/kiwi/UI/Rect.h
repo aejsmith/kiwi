@@ -18,10 +18,11 @@
  * @brief		Rectangle class.
  */
 
-#ifndef __KIWI_RECT_H
-#define __KIWI_RECT_H
+#ifndef __KIWI_UI_RECT_H
+#define __KIWI_UI_RECT_H
 
-#include <kiwi/Point.h>
+#include <kiwi/UI/Point.h>
+
 #include <algorithm>
 
 namespace kiwi {
@@ -133,4 +134,4 @@ private:
 
 }
 
-#endif /* __KIWI_RECT_H */
+#endif /* __KIWI_UI_RECT_H */

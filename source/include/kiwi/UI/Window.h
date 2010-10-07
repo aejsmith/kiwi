@@ -18,8 +18,8 @@
  * @brief		Window class.
  */
 
-#ifndef __KIWI_WINDOW_H
-#define __KIWI_WINDOW_H
+#ifndef __KIWI_UI_WINDOW_H
+#define __KIWI_UI_WINDOW_H
 
 #include <kiwi/Object.h>
 
@@ -52,4 +52,4 @@ private:
 
 }
 
-#endif /* __KIWI_WINDOW_H */
+#endif /* __KIWI_UI_WINDOW_H */

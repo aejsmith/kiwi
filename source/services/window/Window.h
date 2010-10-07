@@ -21,8 +21,8 @@
 #ifndef __WINDOW_H
 #define __WINDOW_H
 
+#include <kiwi/UI/Rect.h>
 #include <kiwi/Object.h>
-#include <kiwi/Rect.h>
 
 #include "org.kiwi.WindowServer.h"
 #include "WindowList.h"

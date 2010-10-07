@@ -24,7 +24,7 @@
  */
 
 #include <cairo/cairo.h>
-#include <kiwi/Region.h>
+#include <kiwi/UI/Region.h>
 #include <algorithm>
 
 using namespace kiwi;

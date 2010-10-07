@@ -21,8 +21,8 @@
 #ifndef __WINDOWSERVER_H
 #define __WINDOWSERVER_H
 
-#include <kiwi/Service.h>
-#include <kiwi/SessionManager.h>
+#include <kiwi/Service/Service.h>
+#include <kiwi/Service/SessionManager.h>
 
 #include <map>
 

@@ -21,8 +21,8 @@
 #ifndef __SESSION_H
 #define __SESSION_H
 
+#include <kiwi/UI/Rect.h>
 #include <kiwi/Object.h>
-#include <kiwi/Rect.h>
 
 #include <kernel/types.h>
 

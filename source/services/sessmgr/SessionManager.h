@@ -21,7 +21,7 @@
 #ifndef __SESSIONMANAGER_H
 #define __SESSIONMANAGER_H
 
-#include <kiwi/Service.h>
+#include <kiwi/Service/Service.h>
 
 #include <list>
 #include <map>

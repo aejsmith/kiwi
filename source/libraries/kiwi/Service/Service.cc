@@ -18,8 +18,8 @@
  * @brief		Service main class.
  */
 
+#include <kiwi/Service/Service.h>
 #include <kiwi/IPCPort.h>
-#include <kiwi/Service.h>
 
 #include "../org.kiwi.ServiceManager.h"
 #include "../log.h"

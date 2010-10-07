@@ -27,7 +27,7 @@
 
 #include <cairo/cairo.h>
 
-#include <kiwi/Rect.h>
+#include <kiwi/UI/Rect.h>
 
 #include <cassert>
 #include <exception>

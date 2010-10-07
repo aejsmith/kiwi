@@ -18,7 +18,7 @@
  * @brief		Session manager interface.
  */
 
-#include <kiwi/SessionManager.h>
+#include <kiwi/Service/SessionManager.h>
 #include "org.kiwi.SessionManager.h"
 
 using namespace kiwi;

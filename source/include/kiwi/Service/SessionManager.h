@@ -18,8 +18,8 @@
  * @brief		Session manager interface.
  */
 
-#ifndef __KIWI_SESSIONMANAGER_H
-#define __KIWI_SESSIONMANAGER_H
+#ifndef __KIWI_SERVICE_SESSIONMANAGER_H
+#define __KIWI_SERVICE_SESSIONMANAGER_H
 
 #include <kernel/types.h>
 
@@ -46,4 +46,4 @@ private:
 
 }
 
-#endif /* __KIWI_SESSIONMANAGER_H */
+#endif /* __KIWI_SERVICE_SESSIONMANAGER_H */

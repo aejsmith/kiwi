@@ -23,8 +23,8 @@
 
 #include <cairo/cairo.h>
 
+#include <kiwi/UI/Rect.h>
 #include <kiwi/Object.h>
-#include <kiwi/Rect.h>
 
 class Window;
 

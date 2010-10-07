@@ -18,8 +18,8 @@
  * @brief		Service main class.
  */
 
-#ifndef __KIWI_SERVICE_H
-#define __KIWI_SERVICE_H
+#ifndef __KIWI_SERVICE_SERVICE_H
+#define __KIWI_SERVICE_SERVICE_H
 
 #include <kiwi/EventLoop.h>
 #include <kiwi/IPCPort.h>
@@ -44,4 +44,4 @@ private:
 
 }
 
-#endif /* __KIWI_SERVICE_H */
+#endif /* __KIWI_SERVICE_SERVICE_H */

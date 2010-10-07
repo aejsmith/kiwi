@@ -35,4 +35,4 @@ env.KiwiLibrary('kiwi',
 )
 
 # Build the additional libraries.
-SConscript(dirs=['service', 'ui'], exports=['env'])
+SConscript(dirs=['Service', 'UI'], exports=['env'])

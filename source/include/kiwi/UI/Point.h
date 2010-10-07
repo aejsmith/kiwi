@@ -18,8 +18,8 @@
  * @brief		Point class.
  */
 
-#ifndef __KIWI_POINT_H
-#define __KIWI_POINT_H
+#ifndef __KIWI_UI_POINT_H
+#define __KIWI_UI_POINT_H
 
 namespace kiwi {
 
@@ -45,4 +45,4 @@ private:
 
 }
 
-#endif /* __KIWI_POINT_H */
+#endif /* __KIWI_UI_POINT_H */

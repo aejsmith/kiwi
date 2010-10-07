@@ -18,11 +18,11 @@
  * @brief		Region class.
  */
 
-#ifndef __KIWI_REGION_H
-#define __KIWI_REGION_H
+#ifndef __KIWI_UI_REGION_H
+#define __KIWI_UI_REGION_H
 
-#include <kiwi/Point.h>
-#include <kiwi/Rect.h>
+#include <kiwi/UI/Point.h>
+#include <kiwi/UI/Rect.h>
 
 #include <vector>
 
@@ -62,4 +62,4 @@ private:
 
 }
 
-#endif /* __KIWI_REGION_H */
+#endif /* __KIWI_UI_REGION_H */
