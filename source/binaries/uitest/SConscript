@@ -19,5 +19,5 @@ env.KiwiApplication('uitest',
 		'org.kiwi.WindowServer.cc',
 		'main.cc',
 	],
-	libraries = ['kiwi-ui', 'freetype'],
+	libraries = ['kiwi-ui', 'freetype', 'cairo'],
 )

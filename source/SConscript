@@ -31,7 +31,7 @@ def process_library_deps(env, flags, libraries, build_libraries):
 	if not flags.has_key('LIBS'):
 		flags['LIBS'] = []
 	if not flags.has_key('CPPPATH'):
-		flags['CPPPATH'] = env['CPPPATH']
+		flags['CPPPATH'] = [] + env['CPPPATH']
 
 	# Work out libraries to link against.
 	def add_library(lib, link):
@@ -101,8 +101,8 @@ def kiwi_library_method(env, target, sources, libraries = None, build_libraries 
 	# We want to use our own include directory.
 	if include_path:
 		if not flags.has_key('CPPPATH'):
-			flags['CPPPATH'] = env['CPPPATH']
-		flags['CPPPATH'].append(include_path)
+			flags['CPPPATH'] = [] + env['CPPPATH']
+		flags['CPPPATH'] += include_path
 
 	# Set up the include path and get the libraries to link to.
 	process_library_deps(env, flags, libraries, build_libraries)
