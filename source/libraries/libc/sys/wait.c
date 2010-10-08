@@ -64,7 +64,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		return -1;
 	}
 
-	semaphore_down(child_processes_lock, -1);
+	libc_mutex_lock(&child_processes_lock, -1);
 
 	/* Build an array of handles to wait for. */
 	LIST_FOREACH(&child_processes, iter) {
@@ -87,7 +87,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		goto fail;
 	}
 
-	semaphore_up(child_processes_lock, 1);
+	libc_mutex_unlock(&child_processes_lock);
 
 	/* Wait for any of them to exit. */
 	ret = object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
@@ -106,7 +106,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 			continue;
 		}
 
-		semaphore_down(child_processes_lock, -1);
+		libc_mutex_lock(&child_processes_lock, -1);
 		LIST_FOREACH(&child_processes, iter) {
 			proc = list_entry(iter, posix_process_t, header);
 			if(proc->handle == events[i].handle) {
@@ -127,6 +127,6 @@ fail:
 	ret = -1;
 out:
 	if(events) { free(events); }
-	semaphore_up(child_processes_lock, 1);
+	libc_mutex_unlock(&child_processes_lock);
 	return ret;
 }

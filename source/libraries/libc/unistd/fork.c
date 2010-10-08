@@ -25,6 +25,8 @@
 #include <kernel/thread.h>
 #include <kernel/vm.h>
 
+#include <util/mutex.h>
+
 #include <setjmp.h>
 #include <stdlib.h>
 
@@ -32,7 +34,7 @@
 
 /** List of child processes created via fork(). */
 LIST_DECLARE(child_processes);
-handle_t child_processes_lock = 0;
+LIBC_MUTEX_DECLARE(child_processes_lock);
 
 /** Fork entry point.
  * @param arg		Pointer to jump buffer. */
@@ -67,9 +69,9 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 	if(proc->pid < 1) {
 		libc_fatal("could not get ID of child");
 	}
-	semaphore_down(child_processes_lock, -1);
+	libc_mutex_lock(&child_processes_lock, -1);
 	list_append(&child_processes, &proc->header);
-	semaphore_up(child_processes_lock, 1);
+	libc_mutex_unlock(&child_processes_lock);
 	return proc->pid;
 }
 
@@ -107,12 +109,4 @@ pid_t fork(void) {
 	}
 
 	return fork_parent(state, stack);
-}
-
-/** Create the child process list lock. */
-static void __attribute__((constructor)) fork_init(void) {
-	status_t ret = semaphore_create("child_processes_lock", 1, &child_processes_lock);
-	if(ret != STATUS_SUCCESS) {
-		libc_fatal("could not create child list lock (%d)", ret);
-	}
 }

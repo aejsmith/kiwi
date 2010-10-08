@@ -30,7 +30,7 @@ extern "C" {
 /** Structure containing a mutex. */
 typedef struct libc_mutex {
 	volatile int32_t futex;		/**< Futex value. */
-} libc_mutex_t;
+} __attribute__((aligned(4))) libc_mutex_t;
 
 /** Initialises a statically declared mutex. */
 #define LIBC_MUTEX_INITIALISER		{ 0 }
