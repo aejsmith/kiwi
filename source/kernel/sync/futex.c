@@ -86,6 +86,8 @@ void futex_cleanup(process_t *proc) {
 			slab_cache_free(futex_cache, futex);
 		}
 	}
+
+	mutex_unlock(&futex_tree_lock);
 }
 
 /** Look up a futex.
