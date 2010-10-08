@@ -24,8 +24,9 @@
 #include <kernel/process.h>
 #include <kernel/status.h>
 
+#include <util/list.h>
+
 #include <elf.h>
-#include <list.h>
 #include <stdio.h>
 
 /** Compiler attribute/builtin macros. */

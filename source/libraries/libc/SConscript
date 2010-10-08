@@ -145,6 +145,8 @@ sources = map(File, [
 	'unistd/unlink.c',
 	'unistd/write.c',
 
+	'util/mutex.c',
+
 	'errno.c',
 	'error_list.c',
 	'fatal.c',

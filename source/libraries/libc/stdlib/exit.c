@@ -22,7 +22,8 @@
 
 #include <kernel/process.h>
 
-#include <list.h>
+#include <util/list.h>
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>

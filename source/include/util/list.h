@@ -18,8 +18,8 @@
  * @brief		Linked list implementation.
  */
 
-#ifndef __LIST_H
-#define __LIST_H
+#ifndef __UTIL_LIST_H
+#define __UTIL_LIST_H
 
 #define __need_offsetof
 #include <stddef.h>
@@ -163,4 +163,4 @@ static inline void list_remove(list_t *entry) {
 }
 #endif
 
-#endif /* __LIST_H */
+#endif /* __UTIL_LIST_H */
