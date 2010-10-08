@@ -16,13 +16,12 @@
 /**
  * @file
  * @brief		Exit functions.
- *
- * @todo		Need locking on the atexit array.
  */
 
 #include <kernel/process.h>
 
 #include <util/list.h>
+#include <util/mutex.h>
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -45,39 +44,42 @@ typedef struct atexit_func {
 } atexit_func_t;
 
 /** Statically allocated structures. */
-static atexit_func_t __atexit_array[ATEXIT_MAX];
-static bool __atexit_inited = false;
+static atexit_func_t atexit_array[ATEXIT_MAX];
+static bool atexit_inited = false;
 
 /** List of free at-exit functions. */
-static LIST_DECLARE(__atexit_free_funcs);
-static size_t __atexit_free_count = 0;
+static LIST_DECLARE(atexit_free_funcs);
+static size_t atexit_free_count = 0;
 
 /** List of registered at-exit functions. */
-static LIST_DECLARE(__atexit_funcs);
-static size_t __atexit_count = 0;
+static LIST_DECLARE(atexit_funcs);
+static size_t atexit_count = 0;
+
+/** Locking to protect at-exit lists. */
+static LIBC_MUTEX_DECLARE(atexit_lock);
 
 /** Allocate an at-exit function structure.
  * @return		Function structure pointer, or NULL if none free. */
-static atexit_func_t *__atexit_alloc(void) {
+static atexit_func_t *atexit_alloc(void) {
 	atexit_func_t *func = NULL;
 	size_t i;
 
-	if(!__atexit_inited) {
+	if(!atexit_inited) {
 		for(i = 0; i < ATEXIT_MAX; i++) {
-			list_init(&__atexit_array[i].header);
-			list_append(&__atexit_free_funcs, &__atexit_array[i].header);
-			__atexit_free_count++;
+			list_init(&atexit_array[i].header);
+			list_append(&atexit_free_funcs, &atexit_array[i].header);
+			atexit_free_count++;
 		}
 
-		__atexit_inited = true;
+		atexit_inited = true;
 	}
 
-	if(__atexit_free_count) {
-		if(list_empty(&__atexit_free_funcs)) {
+	if(atexit_free_count) {
+		if(list_empty(&atexit_free_funcs)) {
 			libc_fatal("atexit data is corrupted");
 		}
 
-		func = list_entry(__atexit_free_funcs.next, atexit_func_t, header);
+		func = list_entry(atexit_free_funcs.next, atexit_func_t, header);
 		list_remove(&func->header);
 	}
 
@@ -86,9 +88,9 @@ static atexit_func_t *__atexit_alloc(void) {
 
 /** Free an at-exit function structure.
  * @param func		Function structure. */
-static void __atexit_free(atexit_func_t *func) {
-	list_append(&__atexit_free_funcs, &func->header);
-	__atexit_free_count++;
+static void atexit_free(atexit_func_t *func) {
+	list_append(&atexit_free_funcs, &func->header);
+	atexit_free_count++;
 }
 
 /** Register a C++ cleanup function.
@@ -99,7 +101,10 @@ static void __atexit_free(atexit_func_t *func) {
 int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 	atexit_func_t *func;
 
-	if(!(func = __atexit_alloc())) {
+	libc_mutex_lock(&atexit_lock, -1);
+
+	if(!(func = atexit_alloc())) {
+		libc_mutex_unlock(&atexit_lock);
 		return -1;
 	}
 
@@ -107,8 +112,9 @@ int __cxa_atexit(void (*function)(void *), void *arg, void *dso) {
 	func->arg = arg;
 	func->dso = dso;
 
-	list_prepend(&__atexit_funcs, &func->header);
-	__atexit_count++;
+	list_prepend(&atexit_funcs, &func->header);
+	atexit_count++;
+	libc_mutex_unlock(&atexit_lock);
 	return 0;
 }
 
@@ -118,18 +124,18 @@ void __cxa_finalize(void *d) {
 	atexit_func_t *func;
 	size_t count;
 restart:
-	LIST_FOREACH_SAFE(&__atexit_funcs, iter) {
+	LIST_FOREACH_SAFE(&atexit_funcs, iter) {
 		func = list_entry(iter, atexit_func_t, header);
-		count = __atexit_count;
+		count = atexit_count;
 
 		if(!d || d == func->dso) {
 			func->func(func->arg);
 
-			if(__atexit_count != count) {
-				__atexit_free(func);
+			if(atexit_count != count) {
+				atexit_free(func);
 				goto restart;
 			} else {
-				__atexit_free(func);
+				atexit_free(func);
 			}
 		}
 	}
