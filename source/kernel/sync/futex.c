@@ -30,6 +30,8 @@
  *			one to be placed in a device's memory.
  */
 
+#include <lib/utility.h>
+
 #include <mm/page.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -95,7 +97,8 @@ void futex_cleanup(process_t *proc) {
  * @return		Pointer to futex structure. Can only fail if the
  *			virtual address is invalid, in which case NULL will be
  *			returned. */
-static futex_t *futex_lookup(ptr_t addr) {
+static futex_t *futex_lookup(int32_t *addr) {
+	ptr_t base, offset;
 	phys_ptr_t phys;
 	futex_t *futex;
 	int32_t tmp;
@@ -103,20 +106,29 @@ static futex_t *futex_lookup(ptr_t addr) {
 	/* Check if the address is 4 byte aligned. This will ensure that the
 	 * address does not cross a page boundary because page sizes are
 	 * powers of 2. */
-	if(addr % sizeof(int32_t)) {
+	if((ptr_t)addr % sizeof(int32_t)) {
 		return NULL;
 	}
 
+	/* Get the page containing the address and the offset within it. */
+	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+	offset = (ptr_t)addr - base;
+
 	/* Look up the physical address. */
-	if(!page_map_find(&curr_aspace->pmap, addr, &phys)) {
+	page_map_lock(&curr_aspace->pmap);
+	if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
 		/* The page may not be mapped in. Try to trigger a fault, then
 		 * check again. */
-		if(memcpy_from_user(&tmp, (void *)addr, sizeof(tmp)) != STATUS_SUCCESS) {
+		if(memcpy_from_user(&tmp, addr, sizeof(tmp)) != STATUS_SUCCESS) {
+			page_map_unlock(&curr_aspace->pmap);
 			return NULL;
-		} else if(!page_map_find(&curr_aspace->pmap, addr, &phys)) {
+		} else if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
+			page_map_unlock(&curr_aspace->pmap);
 			return NULL;
 		}
 	}
+	phys += offset;
+	page_map_unlock(&curr_aspace->pmap);
 
 	mutex_lock(&curr_proc->lock);
 
@@ -137,10 +149,14 @@ static futex_t *futex_lookup(ptr_t addr) {
 			refcount_set(&futex->count, 1);
 			futex->phys = phys;
 
-			/* Attach it to the global tree and the process. */
+			/* Attach it to the global tree. */
 			avl_tree_insert(&futex_tree, phys, futex, NULL);
-			avl_tree_insert(&curr_proc->futexes, phys, futex, NULL);
+		} else {
+			refcount_inc(&futex->count);
 		}
+
+		/* Attach to the process' tree. */
+		avl_tree_insert(&curr_proc->futexes, phys, futex, NULL);
 
 		mutex_unlock(&futex_tree_lock);
 	}
@@ -167,7 +183,7 @@ status_t sys_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	bool state;
 
 	/* Find the futex. */
-	futex = futex_lookup((ptr_t)addr);
+	futex = futex_lookup(addr);
 	if(!futex) {
 		return STATUS_INVALID_ADDR;
 	}
@@ -209,7 +225,7 @@ status_t sys_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	}
 
 	/* Find the futex. */
-	futex = futex_lookup((ptr_t)addr);
+	futex = futex_lookup(addr);
 	if(!futex) {
 		return STATUS_INVALID_ADDR;
 	}
