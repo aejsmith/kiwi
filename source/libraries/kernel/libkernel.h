@@ -108,7 +108,6 @@ extern void rtld_symbol_init(rtld_image_t *image);
 extern void *rtld_init(process_args_t *args);
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
-extern void libkernel_heap_init(void);
 extern void libkernel_init(process_args_t *args);
 
 #endif /* __LIBKERNEL_H */

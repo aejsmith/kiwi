@@ -93,9 +93,6 @@ void libkernel_init_stage2(process_args_t *args) {
 		handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
-	/* Initialise the heap. */
-	libkernel_heap_init();
-
 	/* Initialise the runtime loader and load the program. */
 	entry = (void (*)(process_args_t *))rtld_init(args);
 

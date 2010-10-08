@@ -24,6 +24,12 @@ sources = map(File, [
 	'syscalls.S',
 ])
 
+# These won't conflict with the copies in libc, we don't export the symbols. I
+# would like to avoid having to do this, though...
+libc_sources = map(lambda x: File('../libc/%s' % x), [
+	'util/mutex.c',
+])
+
 # Generate the system call functions.
 env.Syscalls('syscalls.S', envmgr['kernel']['SYSCALLS'])
 
@@ -40,12 +46,16 @@ arch_sources = SConscript(dirs=['arch/%s' % (config['ARCH'])], exports=['env'])
 # Copy the architecture header in.
 Command('arch.h', 'arch/%s/arch.h' % (config['ARCH']), Action('cp $SOURCE $TARGET', None))
 
+# Perform some black magic to make the object files built from libc sources
+# have an alternative file name to not conflict.
+ccflags = env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden']
+libc_objects = map(lambda x: env.SharedObject(target = '%s.os' % (x.name), source = x, CCFLAGS = ccflags), libc_sources)
+
 # Build the library. The default visibility is set to hidden, as the majority
 # of functions in this library should not be exported.
 env.KiwiLibrary('kernel',
-	sources = arch_sources + sources,
+	sources = map(lambda x: env.SharedObject(x, CCFLAGS = ccflags), arch_sources + sources) + libc_objects,
 	flags = {
 		'LINKFLAGS': ['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
-		'CCFLAGS': env['CCFLAGS'] + ['-ffreestanding', '-fvisibility=hidden'],
 	},
 )

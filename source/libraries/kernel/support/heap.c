@@ -18,7 +18,7 @@
  * @brief		Kernel library heap functions.
  */
 
-#include <kernel/semaphore.h>
+#include <util/mutex.h>
 #include <stdlib.h>
 #include "../libkernel.h"
 
@@ -26,8 +26,8 @@
 static uint8_t libkernel_heap[LIBKERNEL_HEAP_SIZE];
 static size_t libkernel_heap_current = 0;
 
-/** Semaphore to protect the heap. */
-static handle_t libkernel_heap_lock;
+/** Lock to protect the heap. */
+static LIBC_MUTEX_DECLARE(libkernel_heap_lock);
 
 /** Allocate some memory.
  * @param size		Size to allocate.
@@ -35,16 +35,16 @@ static handle_t libkernel_heap_lock;
 void *malloc(size_t size) {
 	void *ret;
 
-	semaphore_down(libkernel_heap_lock, -1);
+	libc_mutex_lock(&libkernel_heap_lock, -1);
 
 	if((libkernel_heap_current + size) > LIBKERNEL_HEAP_SIZE) {
-		semaphore_up(libkernel_heap_lock, 1);
+		libc_mutex_unlock(&libkernel_heap_lock);
 		return NULL;
 	}
 
 	ret = &libkernel_heap[libkernel_heap_current];
 	libkernel_heap_current += size;
-	semaphore_up(libkernel_heap_lock, 1);
+	libc_mutex_unlock(&libkernel_heap_lock);
 	return ret;
 }
 
@@ -52,16 +52,4 @@ void *malloc(size_t size) {
  * @param addr		Address allocated. */
 void free(void *addr) {
 	/* Nothing happens. It probably should sometime. TODO. */
-}
-
-/** Initialise the libkernel heap. */
-void libkernel_heap_init(void) {
-	status_t ret;
-
-	/* Create the semaphore that protects the heap. */
-	ret = semaphore_create("libkernel_heap_lock", 1, &libkernel_heap_lock);
-	if(ret != STATUS_SUCCESS) {
-		dprintf("libkernel: could not create heap lock (%d)\n", ret);
-		process_exit(ret);
-	}
 }
