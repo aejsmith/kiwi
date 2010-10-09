@@ -37,7 +37,6 @@
 
 #include <cpu/cpu.h>
 
-#include <lib/hash.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -288,7 +287,7 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 	 * on the allocation hash table. Otherwise, we use the start of the
 	 * buffer as the structure. */
 	if(cache->flags & SLAB_CACHE_NOTOUCH) {
-		hash = hash_int_hash((key_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
+		hash = fnv_hash_integer((uint64_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
 		for(bufctl = cache->bufctl_hash[hash]; bufctl != NULL; bufctl = bufctl->next) {
 			if(bufctl->object == obj) {
 				break;
@@ -381,7 +380,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 
 	/* Place the allocation on the allocation hash table if required. */
 	if(cache->flags & SLAB_CACHE_NOTOUCH) {
-		hash = hash_int_hash((key_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
+		hash = fnv_hash_integer((uint64_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
 		bufctl->next = cache->bufctl_hash[hash];
 		cache->bufctl_hash[hash] = bufctl;
 	}

@@ -23,13 +23,6 @@
 
 #include <lib/list.h>
 
-/** 32-bit FNV_prime. */
-#define FNV_PRIME        16777619UL
-
-/** Defined in the FNV description. Result of hashing a known string with the
- *  FNV-0 algorithm and the above prime. */
-#define FNV_OFFSET_BASIS 2166136261UL
-
 /** Iterates over a hash table. */
 #define HASH_FOREACH(hash, iter) \
 	for(size_t _##iter##_i = 0; _##iter##_i < (hash)->entries; _##iter##_i++) \

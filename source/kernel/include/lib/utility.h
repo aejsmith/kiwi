@@ -107,4 +107,7 @@ static inline bool checksum_range(void *start, size_t size) {
 	return (checksum == 0);
 }
 
+extern uint32_t fnv_hash_string(const char *str);
+extern uint32_t fnv_hash_integer(uint64_t val);
+
 #endif /* __LIB_UTILITY_H */

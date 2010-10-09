@@ -33,7 +33,6 @@
 
 #include <arch/memmap.h>
 
-#include <lib/hash.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -562,7 +561,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 	if(seg) {
 		/* Add to allocation hash table. */
-		hash = hash_int_hash(seg->base) % vmem->htbl_size;
+		hash = fnv_hash_integer(seg->base) % vmem->htbl_size;
 		list_append(&vmem->alloc[hash], &seg->s_link);
 
 		vmem->used_size += size;
@@ -596,7 +595,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	mutex_lock(&vmem->lock);
 
 	/* Look for the allocation on the allocation hash table. */
-	hash = hash_int_hash(addr) % vmem->htbl_size;
+	hash = fnv_hash_integer(addr) % vmem->htbl_size;
 	LIST_FOREACH(&vmem->alloc[hash], iter) {
 		tag = list_entry(iter, vmem_btag_t, s_link);
 

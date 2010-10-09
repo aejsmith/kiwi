@@ -38,82 +38,40 @@ static const uint32_t primes[] = {
 };
 
 /** String hash function.
- *
- * Hash function for a string using the FNV-1 algorithm. See
- * http://www.isthe.com/chongo/tech/comp/fnv/
- *
  * @param key		Pointer to string to hash.
- *
- * @return		Hash generated from string.
- */
+ * @return		Hash generated from string. */
 uint32_t hash_str_hash(key_t key) {
-	register uint32_t hash = FNV_OFFSET_BASIS;
-	const char *str = (const char *)((ptr_t)key);
-
-	while(*str) {
-		hash = (hash * FNV_PRIME) ^ *str++;
-	}
-
-	return hash;
+	return fnv_hash_string((const char *)((ptr_t)key));
 }
 
 /** Comparison function for string keys.
- *
- * Compares the strings pointed to by the given pointers.
- *
  * @param key1		First key to compare.
  * @param key2		Second key to compare.
- *
- * @return		True if the same, false otherwise.
- */
+ * @return		True if the same, false otherwise. */
 bool hash_str_compare(key_t key1, key_t key2) {
 	return (strcmp((const char *)((ptr_t)key1), (const char *)((ptr_t)key2)) == 0) ? true : false;
 }
 
 /** Integer hash function.
- *
- * Hash function for an integer using the FNV-1 algorithm. See
- * http://www.isthe.com/chongo/tech/comp/fnv/
- *
  * @param key		Integer to hash.
- *
- * @return		Hash generated from integer.
- */
+ * @return		Hash generated from integer. */
 uint32_t hash_int_hash(key_t key) {
-	register uint32_t hash = FNV_OFFSET_BASIS;
-	size_t i = 0;
-
-	while(i++ < sizeof(key)) {
-		hash = (hash * FNV_PRIME) ^ (key & 0xff);
-		key >>= 8;
-	}
-
-	return hash;
+	return fnv_hash_integer(key);
 }
 
 /** Comparison function for integer keys.
- *
- * Compares the given integer hash table keys.
- *
  * @param key1		First key to compare.
  * @param key2		Second key to compare.
- *
- * @return		True if the same, false otherwise.
- */
+ * @return		True if the same, false otherwise. */
 bool hash_int_compare(key_t key1, key_t key2) {
 	return (key1 == key2);
 }
 
 /** Insert an entry into a hash table.
- *
- * Inserts the given entry into a hash table.
- *
  * @param hash		Hash table to add to.
- * @param entry		List header for entry to add.
- */
+ * @param entry		List header for entry to add. */
 void hash_insert(hash_t *hash, list_t *entry) {
 	key_t key = hash->ops->key(entry);
-
 	list_append(&hash->buckets[hash->ops->hash(key) % hash->entries], entry);
 }
 
@@ -139,24 +97,15 @@ bool hash_insert_unique(hash_t *hash, list_t *entry) {
 }
 
 /** Remove an entry from a hash table.
- *
- * Removes the given entry from the hash table it is contained in.
- *
- * @param entry		Entry to remove.
- */
+ * @param entry		Entry to remove. */
 void hash_remove(list_t *entry) {
 	list_remove(entry);
 }
 
 /** Find an entry in a hash table.
- *
- * Finds an entry with the given key in a hash table.
- *
  * @param hash		Hash table to find in.
  * @param key		Key to find.
- *
- * @return		Pointer to entry's list header if found, NULL if not.
- */
+ * @return		Pointer to entry's list header if found, NULL if not. */
 list_t *hash_lookup(hash_t *hash, key_t key) {
 	list_t *bucket;
 
@@ -171,16 +120,11 @@ list_t *hash_lookup(hash_t *hash, key_t key) {
 }
 
 /** Initialise a hash table.
- *
- * Initialises a hash table structure and allocates the buckets for it.
- *
  * @param hash		Hash table to initialise.
  * @param entries	Estimated number of entries.
  * @param ops		Hash table operations structure.
  * @param mmflag	Allocation flags.
- *
- * @return		Status code describing result of the operation.
- */
+ * @return		Status code describing result of the operation. */
 status_t hash_init(hash_t *hash, size_t entries, hash_ops_t *ops, int mmflag) {
 	size_t i;
 
