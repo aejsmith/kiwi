@@ -115,7 +115,7 @@ password, login sends these to the security server to be validated, receives
 a security context for the user back if successful and starts the new session
 with that context.
 
-The second allows a utility like `sudo` to be implemented. Program asks for
+The second allows a utility like `su` to be implemented. Program asks for
 password for user to switch to, sends username and password to security server,
 asking it to change its context to the new user, and if successful, starts the
 new process. The security server process has special capabilities which allow

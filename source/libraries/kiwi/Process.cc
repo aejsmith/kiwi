@@ -251,7 +251,7 @@ process_id_t Process::GetID(void) const {
 
 /** Get the ID of the process' session.
  * @return		ID of the process' session. */
-process_id_t Process::GetSessionID(void) const {
+session_id_t Process::GetSessionID(void) const {
 	return process_session(m_handle);
 }
 
@@ -263,7 +263,7 @@ process_id_t Process::GetCurrentID(void) {
 
 /** Get the ID of the current process' session.
  * @return		ID of the current process' session. */
-process_id_t Process::GetCurrentSessionID(void) {
+session_id_t Process::GetCurrentSessionID(void) {
 	return process_session(-1);
 }
 
