@@ -101,15 +101,32 @@ rights they want for the handle. If the ACL allows all of the requested rights,
 then the handle will be given only those rights, otherwise the open will be
 disallowed.
 
+Security Server
+---------------
+
+The security server is a userspace service that manages user accounts and
+groups. It exposes an RPC interface that allows a client to either obtain a
+security context for a user, or change its own security context to that of
+another user. Both operations require that the password for the user to change
+to be given.
+
+The first of these allows the GUI login to work: user enters their username and
+password, login sends these to the security server to be validated, receives
+a security context for the user back if successful and starts the new session
+with that context.
+
+The second allows a utility like `sudo` to be implemented. Program asks for
+password for user to switch to, sends username and password to security server,
+asking it to change its context to the new user, and if successful, starts the
+new process. The security server process has special capabilities which allow
+it to modify the security context of other processes, and this capability is
+kept only by the security server.
+
 TODO
 ----
 
- * Describe how user logins will work.
- * How can something like sudo be implemented? Currently this is pretty much
-   impossible, as once a capability has been dropped by a process, it cannot
-   be obtained again.
- * Priveleges system for userspace apps, for things like adding printers,
-   installing software, etc. (like Mac OS X's Authorization Services, or
-   PolicyKit).
+ * Userspace privileges system for programs to define custom priveleges for
+   things like adding printers, installing software, etc. (like Mac OS X's
+   Authorization Services and PolicyKit).
  * Would it be better to have ACL entries prioritised by the order that they
    are in the list, rather than by the type of the entry?
