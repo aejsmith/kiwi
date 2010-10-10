@@ -1,0 +1,115 @@
+Security Model
+==============
+
+License
+-------
+
+This document is distributed under the terms of the [Creative Commons
+Attribution-Noncommercial-Share Alike 3.0 Unported](http://creativecommons.org/
+licenses/by-nc-sa/3.0/) license.
+
+Introduction
+------------
+
+The purpose of this document is to describe the security model used by Kiwi to
+control access to objects and what processes are allowed to do.
+
+There are two methods of security used by the kernel:
+
+ * **Object ACLs**
+
+   The Kiwi kernel is object-oriented: most resources accessible by userspace
+   are represented by kernel objects, which can be accessed through a handle.
+   The object manager maintains an access control list (ACL) for each object,
+   which controls what can access them.
+
+ * **Capabilities**
+
+   Capabilities are used to control use of kernel operations that do not
+   operate on an object, for example shutdown/reboot, loading modules, etc.
+
+The following sections will describe in depth how each of these mechanisms
+work.
+
+Security Context
+----------------
+
+The core part of the security model is the security context. Each process has
+a security context which contains its user ID, a set of group IDs for each
+group the process belongs to and a set of capabilities that the process has.
+When creating a process, it can be given a new security context, or a copy of
+the parent's. However, a new security context cannot have capabilities that the
+parent does not have, and the user/group IDs cannot be changed unless the parent
+has the capabilities to do so. A process can also change its own security
+context, but the aforementioned restrictions apply.
+
+Users, Groups and Sessions
+--------------------------
+
+The only knowledge of users and groups that the kernel has is user and group
+IDs. User/group names, logging in, etc are handled in userspace.
+
+When a user logs in, the first process in the session is created with a
+security context containing the ID for their user, all of the group IDs for the
+user, and a set of capabilities allowed for their account and groups.
+
+Sessions are groups of processes that are represented by an ID allocated by the
+kernel. They are used by userspace to group processes by the login session that
+they are under in order to support multiple users being logged in at the same
+time. Sessions are created by using the `PROCESS_CREATE_SESSION` flag with
+`process_create`, and the capability to do so is kept only by the session
+manager process.
+
+Object ACLs
+-----------
+
+Each object type has a set of rights that control what can be done with objects.
+For example, the file object type has Read, Write and Execute rights. The ACL
+defines which rights should be given to processes, and can contain the following
+entry types:
+
+ * **User** - Specifies rights for a user.
+ * **Group** - Specifies rights for all users in a group.
+ * **Session** - Specifies rights for all processes in a session.
+ * **Capability** - Specifies rights for all processes with a certain
+   capability.
+ * **Others** - Specifies rights for processes that do not match any other
+   entries in the ACL.
+
+When a handle to an object is opened, the ACL is checked to determine what
+rights the handle should have. This means that the ACL is only checked at
+open-time rather than on every operation on a handle, and operations only need
+to check whether a handle has the necessary right. The following describes how
+the set of rights for a handle is determined:
+
+ * If a user entry matches the process' user ID, the handle will have the rights
+   specified by that entry.
+ * Otherwise, if group entries exist for any of the groups that the process is
+   in, the handle's rights will be the rights allowed by ALL of the matching
+   group entries.
+ * Otherwise, if a session entry matches the process' session ID, the handle
+   will have the rights specified by that entry.
+ * Otherwise, if any capability entries match the process' capabilities, the
+   handle's rights will be a combination of the rights specified by each
+   matching entry.
+ * Otherwise, if there is an others entry, the handle will have the rights
+   specified by that entry.
+ * Otherwise, the open will not be allowed.
+
+Some open functions, such as `fs_file_open`, allow the caller to specify which
+rights they want for the handle. If the ACL allows all of the requested rights,
+then the handle will be given only those rights, otherwise the open will be
+disallowed.
+
+TODO
+----
+
+ * Describe how user logins will work.
+ * How can something like sudo be implemented? Currently this is pretty much
+   impossible, as once a capability has been dropped by a process, it cannot
+   be obtained again.
+ * Priveleges system for userspace apps, for things like adding printers,
+   installing software, etc. (like Mac OS X's Authorization Services, or
+   PolicyKit).
+ * Would it be better to have ACL entries prioritised by the order that they
+   are in the list, rather than by the type of the entry?
