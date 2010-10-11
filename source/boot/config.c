@@ -65,7 +65,7 @@ static size_t temp_buf_idx = 0;
 static const char *current_file;	/**< Pointer to data for current file. */
 static const char *current_file_path;	/**< Current configuration file path. */
 static size_t current_file_offset;	/**< Current offset in the file. */
-static size_t current_file_size;		/**< Size of the current file. */
+static size_t current_file_size;	/**< Size of the current file. */
 static int current_line;		/**< Current line in the file. */
 static int current_col;			/**< Current column in the file (minus 1). */
 

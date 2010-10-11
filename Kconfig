@@ -76,6 +76,13 @@ config EXTRA_FSIMAGE
 	  Path to a directory containing extra files to copy in to the generated
 	  filesystem image.
 
+config FORCE_VIDEO_MODE
+	string "Force a video mode to be used"
+	default ""
+	help
+	  If set, the bootloader configuration file will be generated with the
+	  video_mode option set to this value.
+
 #######
 endmenu
 #######
