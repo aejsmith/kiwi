@@ -70,36 +70,32 @@ entry types:
 
  * **User** - Specifies rights for a user.
  * **Group** - Specifies rights for all users in a group.
+ * **Others** - Specifies rights for processes that do not match any user or
+   group entries.
  * **Session** - Specifies rights for all processes in a session.
  * **Capability** - Specifies rights for all processes with a certain
    capability.
- * **Others** - Specifies rights for processes that do not match any other
-   entries in the ACL.
 
-When a handle to an object is opened, the ACL is checked to determine what
-rights the handle should have. This means that the ACL is only checked at
-open-time rather than on every operation on a handle, and operations only need
-to check whether a handle has the necessary right. The following describes how
-the set of rights for a handle is determined:
+The following determines how the set of rights a process is allowed for an
+object is determined:
 
- * If a user entry matches the process' user ID, the handle will have the rights
-   specified by that entry.
- * Otherwise, if group entries exist for any of the groups that the process is
-   in, the handle's rights will be the rights allowed by ALL of the matching
-   group entries.
- * Otherwise, if a session entry matches the process' session ID, the handle
-   will have the rights specified by that entry.
- * Otherwise, if any capability entries match the process' capabilities, the
-   handle's rights will be a combination of the rights specified by each
-   matching entry.
- * Otherwise, if there is an others entry, the handle will have the rights
-   specified by that entry.
- * Otherwise, the open will not be allowed.
+ * If a user entry matches the process' user ID, the rights it specifies will
+   be added to the set of allowed rights.
+ * Otherwise, if any group entries match any of the groups the process is in,
+   the rights specified by each matching entry will be added to the set of
+   allowed rights.
+ * Otherwise, if an others entry exists, the rights it specifies will be added
+   to the set of allowed rights.
+ * If a session entry matches the process' session ID, the rights it specifies
+   will be added to the set of allowed rights.
+ * If capability entries exist for any of the process' capabilities, the rights
+   specified by each matching entry will be added to the set of allowed rights.
 
-Some open functions, such as `fs_file_open`, allow the caller to specify which
-rights they want for the handle. If the ACL allows all of the requested rights,
-then the handle will be given only those rights, otherwise the open will be
-disallowed.
+When opening a handle to an object, a set of requested rights must be specified.
+If any of the requested rights are not in the set of rights allowed to the
+process, the open call is denied. Otherwise, the handle is created with the
+requested rights. This means that the ACL is only checked at open time, and
+operations on a handle only need to check if it has the necessary rights.
 
 Security Server
 ---------------
@@ -122,11 +118,16 @@ new process. The security server process has special capabilities which allow
 it to modify the security context of other processes, and this capability is
 kept only by the security server.
 
+Notes
+-----
+
+Under this model it is impossible for support for the SUID/SGID bit to be
+implemented in the POSIX compatibility layer. In my opinion, that's a good
+thing.
+
 TODO
 ----
 
  * Userspace privileges system for programs to define custom priveleges for
    things like adding printers, installing software, etc. (like Mac OS X's
    Authorization Services and PolicyKit).
- * Would it be better to have ACL entries prioritised by the order that they
-   are in the list, rather than by the type of the entry?
