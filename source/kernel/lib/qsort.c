@@ -6,7 +6,7 @@
    Permission is granted to use, modify, and / or redistribute at will.
 */
 
-#include <lib/qsort.h>
+#include <lib/utility.h>
 
 /* This implementation is taken from Paul Edward's PDPCLIB.
 

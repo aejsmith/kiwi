@@ -189,7 +189,7 @@ status_t sys_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	}
 
 	/* Map the futex into memory so that we can check its value.
-	 * Wire ourselves to the current CPU to make a remote TLB invalidation
+	 * Wire ourself to the current CPU to make a remote TLB invalidation
 	 * unnecessary when unmapping. */
 	thread_wire(curr_thread);
 	mapping = page_phys_map(futex->phys, sizeof(*mapping), MM_SLEEP);

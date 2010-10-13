@@ -18,9 +18,9 @@
  * @brief		Kernel symbol manager.
  */
 
-#include <lib/qsort.h>
 #include <lib/radix_tree.h>
 #include <lib/string.h>
+#include <lib/utility.h>
 
 #include <mm/malloc.h>
 
