@@ -176,6 +176,28 @@ void *memmove(void *dest, const void *src, size_t count) {
 	return dest;
 }
 
+/** Compare 2 chunks of memory.
+ * @param p1		Pointer to the first chunk.
+ * @param p2		Pointer to the second chunk.
+ * @param count		Number of bytes to compare.
+ * @return		An integer less than, equal to or greater than 0 if
+ *			p1 is found, respectively, to be less than, to match,
+ *			or to be greater than p2. */
+int memcmp(const void *p1, const void *p2, size_t count) {
+	unsigned char *s1 = (unsigned char *)p1;
+	unsigned char *s2 = (unsigned char *)p2;
+
+	while(count--) {
+		if(*s1 != *s2) {
+			return *s1 - *s2;
+		}
+		s1++;
+		s2++;
+	}
+
+	return 0;
+}
+
 /** Get length of string.
  *
  * Gets the length of the string specified. The length is the number of

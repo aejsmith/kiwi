@@ -29,7 +29,6 @@
 #include <boot/error.h>
 #include <boot/memory.h>
 
-#include <lib/qsort.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
