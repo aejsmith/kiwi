@@ -69,6 +69,7 @@ typedef struct process {
 	struct vm_aspace *aspace;	/**< Process' address space. */
 	mutex_t lock;			/**< Lock to protect data in structure. */
 	refcount_t count;		/**< Number of handles to/threads in the process. */
+	security_context_t security;	/**< Security context. */
 	handle_table_t *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
 	session_t *session;		/**< Session the process belongs to. */

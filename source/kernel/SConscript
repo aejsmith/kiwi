@@ -59,6 +59,8 @@ sources = map(File, [
 	'proc/session.c',
 	'proc/thread.c',
 
+	'security/context.c',
+
 	'sync/condvar.c',
 	'sync/futex.c',
 	'sync/mutex.c',

@@ -58,7 +58,7 @@ Session::Session(SessionManager *sessmgr, uint32_t perms) :
 
 	/* Execute the process. */
 	handle_t handle;
-	status_t ret = process_create(args[0], args, env, PROCESS_CREATE_SESSION, map, 3, &handle);
+	status_t ret = process_create(args[0], args, env, PROCESS_CREATE_SESSION, NULL, map, 3, &handle);
 	if(ret != STATUS_SUCCESS) {
 		throw ProcessError(ret);
 	}

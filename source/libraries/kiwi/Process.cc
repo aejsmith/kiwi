@@ -127,7 +127,7 @@ void Process::Create(const char *const args[], const char *const env[], HandleMa
 
 			memcpy(&buf[next - cur + 1], args[0], len + 1);
 
-			ret = process_create(buf, args, (env) ? env : environ, 0, map, mapsz, &handle);
+			ret = process_create(buf, args, (env) ? env : environ, 0, NULL, map, mapsz, &handle);
 			if(ret == STATUS_SUCCESS) {
 				goto success;
 			} else if(ret != STATUS_NOT_FOUND && ret != STATUS_NOT_DIR) {
@@ -143,7 +143,7 @@ void Process::Create(const char *const args[], const char *const env[], HandleMa
 		ret = STATUS_NOT_FOUND;
 		goto fail;
 	} else {
-		ret = process_create(args[0], args, (env) ? env : environ, 0, map, mapsz, &handle);
+		ret = process_create(args[0], args, (env) ? env : environ, 0, NULL, map, mapsz, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
