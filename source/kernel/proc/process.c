@@ -1043,7 +1043,7 @@ process_id_t sys_process_id(handle_t handle) {
 	process_t *process;
 	khandle_t *khandle;
 
-	if(handle == -1) {
+	if(handle < 0) {
 		id = curr_proc->id;
 	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
@@ -1063,7 +1063,7 @@ session_id_t sys_process_session(handle_t handle) {
 	process_t *process;
 	khandle_t *khandle;
 
-	if(handle == -1) {
+	if(handle < 0) {
 		id = curr_proc->session->id;
 	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
@@ -1084,13 +1084,17 @@ status_t sys_process_security_context(handle_t handle, security_context_t *conte
 	khandle_t *khandle;
 	status_t ret;
 
-	if(handle == -1) {
+	if(handle < 0) {
+		mutex_lock(&curr_proc->lock);
 		ret = memcpy_to_user(contextp, &curr_proc->security, sizeof(*contextp));
+		mutex_unlock(&curr_proc->lock);
 	} else {
 		ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, &khandle);
 		if(ret == STATUS_SUCCESS) {
 			process = (process_t *)khandle->object;
+			mutex_lock(&process->lock);
 			ret = memcpy_to_user(contextp, &process->security, sizeof(*contextp));
+			mutex_unlock(&process->lock);
 			handle_release(khandle);
 		}
 	}
@@ -1108,7 +1112,39 @@ status_t sys_process_security_context(handle_t handle, security_context_t *conte
  *			does not have.
  * @return		Status code describing result of the operation. */
 status_t sys_process_set_security_context(handle_t handle, const security_context_t *context) {
-	return STATUS_NOT_IMPLEMENTED;
+	security_context_t *kcontext;
+	process_t *process;
+	status_t ret;
+
+	kcontext = kmalloc(sizeof(security_context_t), MM_SLEEP);
+	ret = memcpy_from_user(kcontext, context, sizeof(*kcontext));
+	if(ret != STATUS_SUCCESS) {
+		kfree(kcontext);
+		return ret;
+	}
+
+	if(handle < 0) {
+		process = curr_proc;
+	} else {
+		// TODO: Get process, check right!
+		kfree(kcontext);
+		return STATUS_NOT_IMPLEMENTED;
+	}
+
+	mutex_lock(&process->lock);
+
+	/* Validate the context. */
+	ret = security_context_validate(&curr_proc->security, &process->security, kcontext);
+	if(ret != STATUS_SUCCESS) {
+		mutex_unlock(&process->lock);
+		kfree(kcontext);
+		return ret;
+	}
+
+	/* Set the context. */
+	memcpy(&process->security, kcontext, sizeof(*kcontext));
+	mutex_unlock(&process->lock);
+	return STATUS_SUCCESS;
 }
 
 /** Query the exit status of a process.

@@ -741,7 +741,7 @@ thread_id_t sys_thread_id(handle_t handle) {
 	khandle_t *khandle;
 	thread_t *thread;
 
-	if(handle == -1) {
+	if(handle < 0) {
 		id = curr_thread->id;
 	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &khandle) == STATUS_SUCCESS) {
 		thread = (thread_t *)khandle->object;
