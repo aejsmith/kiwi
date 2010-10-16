@@ -1,0 +1,14 @@
+syntax: glob
+
+*~
+*.pyc
+.DS_Store
+..config.tmp
+.tmpconfig*
+
+syntax: regexp
+
+^build
+^documentation/markdown/output
+^\.sconsign\.dblite
+^\.config.*
