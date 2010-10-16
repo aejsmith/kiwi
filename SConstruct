@@ -302,12 +302,10 @@ def RequireTarget(target, error):
 		return
 	raise SCons.Errors.StopError(error)
 
-# If working from the Bazaar tree then set revision to the revision number.
+# If working from the Mercurial tree then set revision to the revision number.
 try:
-        from bzrlib import branch
-        b = branch.Branch.open(os.getcwd())
-        revno, revid = b.last_revision_info()
-	version['KIWI_VER_REVISION'] = revno
+	from mercurial import ui, hg
+	version['KIWI_VER_REVISION'] = hg.repository(ui.ui(), '.')['tip'].rev()
 except:
 	pass
 
