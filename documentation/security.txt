@@ -37,11 +37,12 @@ Security Context
 The core part of the security model is the security context. Each process has
 a security context which contains its user ID, a set of group IDs for each
 group the process belongs to and a set of capabilities that the process has.
+
 When creating a process, it can be given a new security context, or a copy of
 the parent's. However, a new security context cannot have capabilities that the
-parent does not have, and the user/group IDs cannot be changed unless the parent
-has the capabilities to do so. A process can also change its own security
-context, but the aforementioned restrictions apply.
+parent does not have, and the user/group IDs cannot be changed unless the
+parent has the capability (CAP_CHANGE_IDENTITY) to do so. A process can also
+change its own security context, but the aforementioned restrictions apply.
 
 Users, Groups and Sessions
 --------------------------
@@ -57,8 +58,8 @@ Sessions are groups of processes that are represented by an ID allocated by the
 kernel. They are used by userspace to group processes by the login session that
 they are under in order to support multiple users being logged in at the same
 time. Sessions are created by using the `PROCESS_CREATE_SESSION` flag with
-`process_create`, and the capability to do so is kept only by the session
-manager process.
+`process_create`, and the capability to do so is kept only by the security
+server (see below).
 
 Object ACLs
 -----------
@@ -100,23 +101,26 @@ operations on a handle only need to check if it has the necessary rights.
 Security Server
 ---------------
 
-The security server is a userspace service that manages user accounts and
-groups. It exposes an RPC interface that allows a client to either obtain a
-security context for a user, or change its own security context to that of
-another user. Both operations require that the password for the user to change
-to be given.
+The security server is a userspace service that manages user accounts, groups
+and sessions. It exposes an RPC interface that allows clients to manage user
+accounts, create and switch sessions, and to change their security context to
+that of another user.
 
-The first of these allows the GUI login to work: user enters their username and
-password, login sends these to the security server to be validated, receives
-a security context for the user back if successful and starts the new session
-with that context.
+Internally, the server assigns permissions to sessions, to restrict creation
+and switching of sessions. Only processes under session 0 are allowed to
+create new sessions and switch to any session. Processes under other sessions
+can only switch to session 0. This means that processes under user sessions
+cannot switch to a different user's session without going through the login
+prompt to authenticate as that user.
 
-The second allows a utility like `su` to be implemented. Program asks for
-password for user to switch to, sends username and password to security server,
-asking it to change its context to the new user, and if successful, starts the
-new process. The security server process has special capabilities which allow
-it to modify the security context of other processes, and this capability is
-kept only by the security server.
+The facility to change to the security context of another user is used to
+allow a program to be run as another user (like the UNIX `su` utility):
+prompt for user and password to switch to, send these to security server,
+security server sets context of caller to that of the user if successful, and
+the new program is started. The use of this functionality can be restricted
+to certain users/groups. To allow this to work, the security server has a
+special capability (CAP_SECURITY_AUTHORITY) that allows it to modify the
+security context of any process.
 
 Notes
 -----
@@ -128,6 +132,6 @@ thing.
 TODO
 ----
 
- * Userspace privileges system for programs to define custom priveleges for
+ * Userspace privileges system for programs to define custom privileges for
    things like adding printers, installing software, etc. (like Mac OS X's
    Authorization Services and PolicyKit).
