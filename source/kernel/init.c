@@ -80,6 +80,14 @@ static SPINLOCK_DECLARE(smp_boot_spinlock);
 static LIST_DECLARE(boot_module_list);
 static LIST_DECLARE(boot_fsimage_list);
 
+/** Wait until all CPUs reach a certain point.
+ * @param args		Kernel arguments structure.
+ * @param var		Variable to wait on. */
+static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
+	atomic_inc(var);
+	while(atomic_get(var) < (int)args->cpu_count);
+}
+
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
 static void __init_text boot_module_remove(boot_module_t *mod) {
@@ -271,14 +279,6 @@ static void __init_text load_modules(kernel_args_t *args) {
 		mod = list_entry(boot_module_list.next, boot_module_t, header);
 		load_boot_kmod(mod);
 	}
-}
-
-/** Wait until all CPUs reach a certain point.
- * @param args		Kernel arguments structure.
- * @param var		Variable to wait on. */
-static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
-	atomic_inc(var);
-	while(atomic_get(var) < (int)args->cpu_count);
 }
 
 /** Second-stage intialization thread.
