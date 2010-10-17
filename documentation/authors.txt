@@ -3,8 +3,8 @@ Authors
 
 Kiwi is primarily written by the following people:
 
- * Alex Smith - <alex@alex-smith.me.uk>
- * Philip Kent - <kentphilip@googlemail.com>
+ * Alex Smith <alex@alex-smith.me.uk>
+ * Philip Kent <kentphilip@googlemail.com>
 
 A full list of contributors can be obtained by looking through the bzr
 repository history.
