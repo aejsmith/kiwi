@@ -23,9 +23,15 @@
 
 #include <mm/malloc.h>
 
+#include <proc/process.h>
+#include <proc/thread.h>
+
 #include <security/context.h>
 
 #include <status.h>
+
+/** Initial security context. */
+security_context_t init_security_context __init_data;
 
 /** Comparison function. */
 static int compare_group(const void *a, const void *b) {
@@ -110,14 +116,60 @@ status_t security_context_validate(const security_context_t *setter,
 	return STATUS_SUCCESS;
 }
 
-/** Initialise a security context with full priveleges.
- * @note		Must ONLY be used to create the kernel process.
- * @param context	Context to initialise. */
-void security_context_full_init(security_context_t *context) {
-	security_context_init(context);
-	security_context_add_group(context, 0);
-	security_context_set_cap(context, CAP_PROCESS_SECURITY);
-	security_context_set_cap(context, CAP_CREATE_SESSION);
-	security_context_set_cap(context, CAP_CHANGE_IDENTITY);
-	security_context_set_cap(context, CAP_MODULE);
+/** Obtain the security context for a process.
+ *
+ * Obtains the security context for a process. This function must always be
+ * used to get the security context rather than accessing the process structure
+ * directly. When you are finished with the context you must call
+ * security_context_release() to unlock the context.
+ *
+ * @param process	Process to get context of, or NULL to get the context
+ *			of the current process.
+ *
+ * @return		Security context for the process.
+ */
+security_context_t *security_context_get(process_t *process) {
+	if(!process) {
+		if(unlikely(!curr_thread)) {
+			return &init_security_context;
+		}
+		process = curr_proc;
+	}
+
+	/* Take the security lock of the process. The purpose of this lock is
+	 * to ensure that the security context will not be changed while access
+	 * checks are performed using the context. It is unlocked by
+	 * security_context_release(). The mutex is created with the
+	 * MUTEX_RECURSIVE flag, meaning multiple calls to this function for
+	 * one process are OK. */
+	mutex_lock(&process->security_lock);
+	return &process->security;
+}
+
+/** Drop a process' security context lock.
+ * @return		Process to drop lock on, NULL for current process. */
+void security_context_release(process_t *process) {
+	if(!process) {
+		if(unlikely(!curr_thread)) {
+			return;
+		}
+		process = curr_proc;
+	}
+
+	mutex_unlock(&process->security_lock);
+}
+
+/** Initialise the security system. */
+void __init_text security_init(void) {
+	security_context_init(&init_security_context);
+	security_context_set_uid(&init_security_context, 0);
+	security_context_add_group(&init_security_context, 0);
+
+	/* Grant all capabilities to the initial security context, which is
+	 * used for the kernel process and for the first userspace process.
+	 * They will be dropped as required. */
+	security_context_set_cap(&init_security_context, CAP_SECURITY_AUTHORITY);
+	security_context_set_cap(&init_security_context, CAP_CREATE_SESSION);
+	security_context_set_cap(&init_security_context, CAP_CHANGE_IDENTITY);
+	security_context_set_cap(&init_security_context, CAP_MODULE);
 }

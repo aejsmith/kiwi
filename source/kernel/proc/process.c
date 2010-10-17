@@ -57,6 +57,28 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Structure containing process creation information. */
+typedef struct process_create {
+	/** Arguments provided by the caller. */
+	const char *path;		/**< Path to program. */
+	const char *const *args;	/**< Argument array. */
+	const char *const *env;		/**< Environment array. */
+	handle_t (*map)[2];		/**< Handle mapping array. */
+	int count;			/**< Number of handles in the array. */
+
+	/** Information used internally by the loader. */
+	struct vm_aspace *aspace;	/**< Address space for the process. */
+	void *data;			/**< Data pointer for the ELF loader. */
+	int argc;			/**< Argument count. */
+	int envc;			/**< Environment variable count. */
+	ptr_t arg_block;		/**< Address of argument block mapping. */
+	ptr_t stack;			/**< Address of stack mapping. */
+
+	/** Information to return to the caller. */
+	semaphore_t sem;		/**< Semaphore to wait for completion on. */
+	int status;			/**< Status code to return from the call. */
+} process_create_t;
+
 static object_type_t process_object_type;
 
 /** Tree of all processes. */
@@ -84,6 +106,7 @@ static void process_cache_ctor(void *obj, void *data) {
 	mutex_init(&process->lock, "process_lock", 0);
 	list_init(&process->threads);
 	avl_tree_init(&process->futexes);
+	mutex_init(&process->security_lock, "process_security_lock", MUTEX_RECURSIVE);
 	notifier_init(&process->death_notifier, process);
 }
 
@@ -185,14 +208,24 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		}
 	}
 
-	/* Validate any provided security context. */
+	/* If a security context is provided, validate it, else work out which
+	 * context to use. */
 	if(sectx) {
 		assert(parent);
 
+		mutex_lock(&parent->security_lock);
+
 		ret = security_context_validate(&parent->security, &parent->security, sectx);
 		if(ret != STATUS_SUCCESS) {
+			mutex_unlock(&parent->security_lock);
 			return ret;
 		}
+
+		mutex_unlock(&parent->security_lock);
+	} else if(parent) {
+		sectx = &parent->security;
+	} else {
+		sectx = &init_security_context;
 	}
 
 	/* Attempt to allocate a process ID. If creating the kernel process,
@@ -232,17 +265,10 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->status = -1;
 	process->create = NULL;
 
-	/* Initialise the security context for the process. */
-	if(sectx) {
-		/* The context is validated at the start of the function.
-		 * Just copy it across to the process. */
-		memcpy(&process->security, sectx, sizeof(*sectx));
-	} else {
-		/* Initialise a new security context. */
-		security_context_full_init(&process->security);
-	}
+	/* Copy across the security context. */
+	memcpy(&process->security, sectx, sizeof(*sectx));
 
-	/* Create a session for the process. */
+	/* Create a session for the process or inherit the parent's. */
 	if(!parent || cflags & PROCESS_CREATE_SESSION) {
 		process->session = session_create();
 	} else {
@@ -326,7 +352,7 @@ static object_type_t process_object_type = {
 /** Set up a new address space for a process.
  * @param info		Pointer to information structure.
  * @return		Status code describing result of the operation. */
-static status_t process_aspace_create(process_create_info_t *info) {
+static status_t process_aspace_create(process_create_t *info) {
 	khandle_t *handle;
 	status_t ret;
 	size_t size;
@@ -419,7 +445,7 @@ static size_t copy_argument_strings(char **dest, const char *const source[], siz
  * @param arg1		Pointer to creation information structure.
  * @param arg2		Unused. */
 static void process_entry_thread(void *arg1, void *arg2) {
-	process_create_info_t *info = arg1;
+	process_create_t *info = arg1;
 	ptr_t addr, stack, entry;
 	process_args_t *uargs;
 
@@ -551,7 +577,7 @@ process_t *process_lookup(process_id_t id) {
  */
 status_t process_create(const char *const args[], const char *const env[], int flags,
                         int priority, process_t *parent, process_t **procp) {
-	process_create_info_t info;
+	process_create_t info;
 	process_t *process;
 	thread_t *thread;
 	status_t ret;
@@ -569,6 +595,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
+
 	/* Create the new process. */
 	ret = process_alloc(args[0], flags, priority, info.aspace, NULL, parent, 0, NULL,
 	                    NULL, 0, &process, NULL, NULL);
@@ -677,7 +704,7 @@ void __init_text process_init(void) {
 /** Helper to free information copied from userspace.
  * @note		Does not free the address space.
  * @param info		Structure containing copied information. */
-static void process_create_args_free(process_create_info_t *info) {
+static void process_create_args_free(process_create_t *info) {
 	int i;
 
 	if(info->path) {
@@ -710,7 +737,7 @@ static void process_create_args_free(process_create_info_t *info) {
  * @return		Status code describing result of the operation. */
 static status_t process_create_args_copy(const char *path, const char *const args[],
                                          const char *const env[], handle_t map[][2],
-                                         int count, process_create_info_t *info) {
+                                         int count, process_create_t *info) {
 	status_t ret;
 	size_t size;
 
@@ -787,8 +814,8 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 status_t sys_process_create(const char *path, const char *const args[], const char *const env[],
                             int flags, const security_context_t *sectx, handle_t map[][2],
                             int count, handle_t *handlep) {
-	process_create_info_t info;
 	process_t *process = NULL;
+	process_create_t info;
 	thread_t *thread;
 	handle_t handle;
 	status_t ret;
@@ -871,8 +898,8 @@ fail:
 status_t sys_process_replace(const char *path, const char *const args[], const char *const env[],
                              const security_context_t *sectx, handle_t map[][2], int count) {
 	handle_table_t *table, *oldtable;
-	process_create_info_t info;
 	thread_t *thread = NULL;
+	process_create_t info;
 	vm_aspace_t *oldas;
 	char *oldname;
 	status_t ret;

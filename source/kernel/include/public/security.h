@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Process security functions.
+ * @brief		Security functions.
  */
 
 #ifndef __KERNEL_SECURITY_H
@@ -31,23 +31,19 @@
 extern "C" {
 #endif
 
-/** Maximum number of groups that a process can be in. */
+/** Maximum number of groups that a security context can have. */
 #define SECURITY_MAX_GROUPS		32
 
 /** Maximum number of capabilities. */
 #define SECURITY_MAX_CAPS		128
 
 /** Definitions of capabilities. */
-#define CAP_PROCESS_SECURITY		0	/**< Ability to modify any process' security context.
-						 * @note Processes with this capability cannot grant
-						 *       capabilities they do not have, or change the
-						 *       identity of a process if they do not have
-						 *       the CAP_CHANGE_IDENTITY capability. */
+#define CAP_SECURITY_AUTHORITY		0	/**< Ability to set any process' security context. */
 #define CAP_CREATE_SESSION		1	/**< Ability to create new sessions. */
 #define CAP_CHANGE_IDENTITY		2	/**< Ability to change user/group IDs. */
 #define CAP_MODULE			3	/**< Ability to load/unload kernel module. */
 
-/** Security context structure for a process.
+/** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()
  *			functions. */
 typedef struct security_context {

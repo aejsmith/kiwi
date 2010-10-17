@@ -38,6 +38,8 @@
 #include <proc/session.h>
 #include <proc/thread.h>
 
+#include <security/context.h>
+
 #include <console.h>
 #include <fatal.h>
 #include <init.h>
@@ -384,7 +386,8 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
 		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
-		/* Bring up process/thread-related stuff. */
+		/* Bring up process-/thread-related stuff. */
+		security_init();
 		handle_init();
 		session_init();
 		process_init();

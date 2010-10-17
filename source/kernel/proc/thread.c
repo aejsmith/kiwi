@@ -353,10 +353,11 @@ thread_t *thread_lookup(thread_id_t id) {
 	return ret;
 }
 
-/** Create a new thread.
+/** Create a new kernel-mode thread.
  *
- * Creates a new thread that will begin execution at the given function and
- * places it in the Created state.
+ * Creates a new thread that will begin execution at the given kernel-mode
+ * address and places it in the Created state. The thread must be started with
+ * thread_run().
  *
  * @param name		Name to give the thread.
  * @param owner		Process that the thread should belong to.

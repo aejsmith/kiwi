@@ -37,44 +37,31 @@
 #include <object.h>
 
 struct vm_aspace;
-
-/** Structure containing process creation information. */
-typedef struct process_create_info {
-	/** Arguments provided by the caller. */
-	const char *path;		/**< Path to program. */
-	const char *const *args;	/**< Argument array. */
-	const char *const *env;		/**< Environment array. */
-	handle_t (*map)[2];		/**< Handle mapping array. */
-	int count;			/**< Number of handles in the array. */
-
-	/** Information used internally by the loader. */
-	struct vm_aspace *aspace;	/**< Address space for the process. */
-	void *data;			/**< Data pointer for the ELF loader. */
-	int argc;			/**< Argument count. */
-	int envc;			/**< Environment variable count. */
-	ptr_t arg_block;		/**< Address of argument block mapping. */
-	ptr_t stack;			/**< Address of stack mapping. */
-
-	/** Information to return to the caller. */
-	semaphore_t sem;		/**< Semaphore to wait for completion on. */
-	int status;			/**< Status code to return from the call. */
-} process_create_info_t;
+struct process_create;
 
 /** Structure containing details about a process. */
 typedef struct process {
 	object_t obj;			/**< Kernel object header. */
 
+	/** Main thread information. */
+	mutex_t lock;			/**< Lock to protect data in structure. */
+	refcount_t count;		/**< Number of handles to/threads in the process. */
+	session_t *session;		/**< Session the process belongs to. */
+
+	/** Scheduling information. */
 	int flags;			/**< Behaviour flags for the process. */
 	size_t priority;		/**< Priority of the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
-	mutex_t lock;			/**< Lock to protect data in structure. */
-	refcount_t count;		/**< Number of handles to/threads in the process. */
-	security_context_t security;	/**< Security context. */
+
+	/** Resource information. */
 	handle_table_t *handles;	/**< Table of open handles. */
 	io_context_t ioctx;		/**< I/O context structure. */
-	session_t *session;		/**< Session the process belongs to. */
 	list_t threads;			/**< List of threads. */
 	avl_tree_t futexes;		/**< Tree of futexes that the process has accessed. */
+
+	/** Security information. */
+	mutex_t security_lock;		/**< Lock for security context. */
+	security_context_t security;	/**< Security context. */
 
 	/** State of the process. */
 	enum {
@@ -82,11 +69,12 @@ typedef struct process {
 		PROCESS_DEAD,		/**< Dead. */
 	} state;
 
+	/** Other process information. */
 	process_id_t id;		/**< ID of the process. */
 	char *name;			/**< Name of the process. */
 	notifier_t death_notifier;	/**< Notifier for process death. */
 	int status;			/**< Exit status of the process. */
-	process_create_info_t *create;	/**< Creation information structure. */
+	struct process_create *create;	/**< Internal creation information structure. */
 } process_t;
 
 /** Process flag definitions. */
