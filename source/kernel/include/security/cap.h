@@ -24,10 +24,13 @@
 #include <proc/process.h>
 
 /** Check whether a process has a capability.
- * @param process	Process to check.
+ * @param process	Process to check (NULL for current process).
  * @param cap		Capability to check for.
  * @return		Whether the process has the capability. */
 static inline bool cap_check(process_t *process, int cap) {
+	if(!process) {
+		process = curr_proc;
+	}
 	return security_context_has_cap(&process->security, cap);
 }
 

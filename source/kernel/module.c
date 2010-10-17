@@ -26,6 +26,8 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
+#include <security/cap.h>
+
 #include <sync/mutex.h>
 
 #include <console.h>
@@ -244,6 +246,11 @@ status_t module_load(khandle_t *handle, char *depbuf) {
 
 	if(!handle || !depbuf) {
 		return STATUS_INVALID_ARG;
+	}
+
+	/* Check if the current process can load modules. */
+	if(!cap_check(NULL, CAP_MODULE)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	/* Take the module lock to serialise module loading. */
