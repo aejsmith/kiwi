@@ -42,6 +42,9 @@ extern "C" {
 #define CAP_CREATE_SESSION		1	/**< Ability to create new sessions. */
 #define CAP_CHANGE_IDENTITY		2	/**< Ability to change user/group IDs. */
 #define CAP_MODULE			3	/**< Ability to load/unload kernel module. */
+#define CAP_FS_ADMIN			4	/**< Ability to bypass access checks on the filesystem. */
+#define CAP_FS_SETROOT			5	/**< Ability to use the fs_setroot() system call. */
+#define CAP_FS_MOUNT			6	/**< Ability to mount/unmount filesystems. */
 
 /** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()

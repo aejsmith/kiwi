@@ -31,6 +31,8 @@
 
 #include <proc/process.h>
 
+#include <security/cap.h>
+
 #include <assert.h>
 #include <console.h>
 #include <kargs.h>
@@ -2835,6 +2837,10 @@ status_t sys_fs_mount(const char *dev, const char *path, const char *type, const
 	char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
 	status_t ret;
 
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
+
 	/* Copy string arguments across from userspace. */
 	if(dev) {
 		ret = strndup_from_user(dev, FS_PATH_MAX, &kdevice);
@@ -2881,6 +2887,10 @@ out:
 status_t sys_fs_unmount(const char *path) {
 	status_t ret;
 	char *kpath;
+
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
 
 	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS) {
@@ -3029,6 +3039,10 @@ status_t sys_fs_setroot(const char *path) {
 	fs_node_t *node;
 	status_t ret;
 	char *kpath;
+
+	if(!cap_check(NULL, CAP_FS_SETROOT)) {
+		return STATUS_PERM_DENIED;
+	}
 
 	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS) {
