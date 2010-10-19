@@ -28,7 +28,9 @@
  * IDs), or the lifetime of objects - it is up to each object type to manage
  * these.
  *
- * @todo		Implement the ACL.
+ * @note		The ACL-related functionality is not implemented in
+ *			this file.
+ * @see			security/acl.c
  */
 
 #include <mm/malloc.h>
@@ -87,12 +89,17 @@ static void handle_table_ctor(void *obj, void *data) {
  *			handles will never be created to it. */
 void object_init(object_t *obj, object_type_t *type) {
 	obj->type = type;
+
+	/* Initialise the ACLs. */
+	object_acl_init(&obj->uacl);
+	object_acl_init(&obj->sacl);
 }
 
 /** Destroy an object structure.
  * @param obj		Object to destroy. */
 void object_destroy(object_t *obj) {
-	/* TODO: Clean ACL. */
+	object_acl_destroy(&obj->uacl);
+	object_acl_destroy(&obj->sacl);
 }
 
 /** Notifier function to use for object waiting.
@@ -132,6 +139,8 @@ khandle_t *handle_create(object_t *obj, void *data) {
 	refcount_set(&handle->count, 1);
 	handle->object = obj;
 	handle->data = data;
+	// FIXME
+	handle->rights = ~((uint32_t)0);
 	return handle;
 }
 
@@ -534,6 +543,35 @@ int sys_object_type(handle_t handle) {
 	return ret;
 }
 
+/** Get the owner of an object.
+ *
+ * Gets the owner of an object. The handle must have the OBJECT_READ_SECURITY
+ * right.
+ *
+ * @param handle	Handle to object.
+ * @param uidp		Where to store user ID of object's owner.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t sys_object_owner(handle_t handle, user_id_t *uidp) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Set the owner of an object.
+ *
+ * Sets the owner of an object. The handle must have the OBJECT_SET_OWNER
+ * right.
+ *
+ * @param handle	Handle to object to set owner of.
+ * @param uid		New owning user ID (or -1 to not change).
+ * @param gid		New owning group ID (or -1 to not change).
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t sys_object_set_owner(handle_t handle, user_id_t uid) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
 /** Wait for events to occur on one or more objects..
  * @param events	Array of structures describing events to wait for. Upon
  *			successful return, the signalled field of each
@@ -611,7 +649,7 @@ out:
  * @param handle	ID of handle to get flags for.
  * @param flagsp	Where to store handle flags.
  * @return		Status code describing result of the operation. */
-status_t sys_handle_get_flags(handle_t handle, int *flagsp) {
+status_t sys_handle_flags(handle_t handle, int *flagsp) {
 	handle_link_t *link;
 	status_t ret;
 

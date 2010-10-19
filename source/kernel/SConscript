@@ -59,6 +59,7 @@ sources = map(File, [
 	'proc/session.c',
 	'proc/thread.c',
 
+	'security/acl.c',
 	'security/context.c',
 
 	'sync/condvar.c',

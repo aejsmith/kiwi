@@ -91,14 +91,17 @@ typedef struct object_type {
  *			another structure for the object. */
 typedef struct object {
 	object_type_t *type;		/**< Type of the object. */
-	//rwlock_t lock;		/**< Lock protecting the ACL. */
-	//list_t acl;			/**< List of ACL entries. */
+	rwlock_t lock;			/**< Lock protecting the security attributes. */
+	user_id_t owner;		/**< Owning user ID. */
+	object_acl_t uacl;		/**< User-configurable ACL. */
+	object_acl_t sacl;		/**< System ACL. */
 } object_t;
 
 /** Structure containing a handle to a kernel object. */
 typedef struct khandle {
 	object_t *object;		/**< Object that the handle refers to. */
 	void *data;			/**< Per-handle data pointer. */
+	uint32_t rights;		/**< Rights for the handle. */
 	refcount_t count;		/**< References to the handle. */
 } khandle_t;
 
@@ -109,11 +112,19 @@ typedef struct handle_table {
 	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
+/** Check if a handle has a set of rights.
+ * @param handle	Handle to check.
+ * @param rights	Rights to check for.
+ * @return		Whether the handle has the rights. */
+static inline bool handle_rights(khandle_t *handle, uint32_t rights) {
+	return ((handle->rights & rights) == rights);
+}
+
+extern void object_acl_init(object_acl_t *acl);
+extern void object_acl_destroy(object_acl_t *acl);
+
 extern void object_init(object_t *obj, object_type_t *type);
 extern void object_destroy(object_t *obj);
-//extern bool object_acl_check(object_t *obj, process_t *proc, uint32_t rights);
-//extern void object_acl_insert(object_t *obj,
-//extern void object_acl_remove(object_t *obj,
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *sync);
