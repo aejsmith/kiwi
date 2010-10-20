@@ -194,7 +194,6 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
                               int count, process_t **procp, handle_t *handlep,
                               handle_t *uhandlep) {
 	process_t *process;
-	process_id_t id;
 	status_t ret;
 
 	assert(name);
@@ -208,35 +207,44 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		}
 	}
 
-	/* If a security context is provided, validate it, else work out which
+	/* Allocate a new process structure. */
+	process = slab_cache_alloc(process_cache, MM_SLEEP);
+
+	/* If a security context is provided, copy it to the structure and
+	 * validate it (which also canonicalises it), else work out which
 	 * context to use. */
 	if(sectx) {
-		assert(parent);
+		memcpy(&process->security, sectx, sizeof(*sectx));
 
+		assert(parent);
 		mutex_lock(&parent->security_lock);
 
-		ret = security_context_validate(&parent->security, &parent->security, sectx);
+		ret = security_context_validate(&parent->security, &parent->security, &process->security);
 		if(ret != STATUS_SUCCESS) {
 			mutex_unlock(&parent->security_lock);
+			slab_cache_free(process_cache, process);
 			return ret;
 		}
 
 		mutex_unlock(&parent->security_lock);
 	} else if(parent) {
-		sectx = &parent->security;
+		mutex_lock(&parent->security_lock);
+		memcpy(&process->security, &parent->security, sizeof(process->security));
+		mutex_unlock(&parent->security_lock);
 	} else {
-		sectx = &init_security_context;
+		memcpy(&process->security, &init_security_context, sizeof(process->security));
 	}
 
 	/* Attempt to allocate a process ID. If creating the kernel process,
 	 * always give it an ID of 0. */
 	if(kernel_proc) {
-		id = (process_id_t)vmem_alloc(process_id_arena, 1, 0);
-		if(id < 0) {
+		process->id = (process_id_t)vmem_alloc(process_id_arena, 1, 0);
+		if(process->id < 0) {
+			slab_cache_free(process_cache, process);
 			return STATUS_PROCESS_LIMIT;
 		}
 	} else {
-		id = 0;
+		process->id = 0;
 	}
 
 	/* Create a new handle table for the process if necessary. */
@@ -244,14 +252,14 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		ret = handle_table_create((parent) ? parent->handles : NULL, map, count, &table);
 		if(ret != STATUS_SUCCESS) {
 			if(kernel_proc) {
-				vmem_free(process_id_arena, id, 1);
+				vmem_free(process_id_arena, process->id, 1);
 			}
+			slab_cache_free(process_cache, process);
 			return ret;
 		}
 	}
 
-	/* Allocate and initialise a new process structure. */
-	process = slab_cache_alloc(process_cache, MM_SLEEP);
+	/* Initialise the remainder of the structure. */
 	object_init(&process->obj, &process_object_type);
 	refcount_set(&process->count, (handlep || uhandlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
@@ -260,13 +268,9 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->aspace = aspace;
 	process->handles = table;
 	process->state = PROCESS_RUNNING;
-	process->id = id;
 	process->name = kstrdup(name, MM_SLEEP);
 	process->status = -1;
 	process->create = NULL;
-
-	/* Copy across the security context. */
-	memcpy(&process->security, sectx, sizeof(*sectx));
 
 	/* Create a session for the process or inherit the parent's. */
 	if(!parent || cflags & PROCESS_CREATE_SESSION) {

@@ -204,7 +204,7 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	avl_tree_insert(&semaphore_tree, sem->id, sem, NULL);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &sem->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&sem->obj, NULL, rights, NULL, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		user_semaphore_release(sem);
 	}

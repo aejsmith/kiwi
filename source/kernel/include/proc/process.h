@@ -61,7 +61,7 @@ typedef struct process {
 
 	/** Security information. */
 	mutex_t security_lock;		/**< Lock for security context. */
-	security_context_t security;	/**< Security context. */
+	security_context_t security;	/**< Security context (canonicalised). */
 
 	/** State of the process. */
 	enum {

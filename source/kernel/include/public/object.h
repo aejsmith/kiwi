@@ -67,7 +67,7 @@ typedef struct object_event {
 /** Object ACL entry structure. */
 typedef struct object_acl_entry {
 	uint8_t type;			/**< Entry type. */
-	int32_t value;			/**< Value specific to type (user ID, group ID). */
+	int32_t value;			/**< Value specific to type (user/group/session ID, capability). */
 	uint32_t rights;		/**< Rights to grant. */
 } object_acl_entry_t;
 
@@ -77,16 +77,28 @@ typedef struct object_acl {
 	size_t count;			/**< Number of ACL entries. */
 } object_acl_t;
 
+/** Object security information structure. */
+typedef struct object_security {
+	user_id_t uid;			/**< Owning user ID (-1 means use current UID). */
+	group_id_t gid;			/**< Owning group ID (-1 means use current GID). */
+	object_acl_t *acl;		/**< Access control list (if NULL, default will be used). */
+} object_security_t;
+
 extern int SYSCALL(object_type)(handle_t handle);
-extern status_t SYSCALL(object_owner)(handle_t handle, user_id_t *uidp);
-extern status_t SYSCALL(object_set_owner)(handle_t handle, user_id_t uid);
+extern status_t SYSCALL(object_owner)(handle_t handle, user_id_t *uidp, user_id_t *gidp);
+extern status_t SYSCALL(object_set_owner)(handle_t handle, user_id_t uid, user_id_t gid);
 extern status_t SYSCALL(object_acl)(handle_t handle, object_acl_t *aclp);
 extern status_t SYSCALL(object_set_acl)(handle_t handle, const object_acl_t *acl);
 extern status_t SYSCALL(object_wait)(object_event_t *events, size_t count, useconds_t timeout);
+
 extern status_t SYSCALL(handle_flags)(handle_t handle, int *flagsp);
 extern status_t SYSCALL(handle_set_flags)(handle_t handle, int flags);
 extern status_t SYSCALL(handle_duplicate)(handle_t handle, handle_t dest, bool force, handle_t *newp);
 extern status_t SYSCALL(handle_close)(handle_t handle);
+
+#ifndef KERNEL
+extern status_t object_security(handle_t handle, object_security_t *securityp);
+#endif
 
 #ifdef __cplusplus
 }

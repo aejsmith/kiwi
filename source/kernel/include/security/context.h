@@ -27,12 +27,16 @@ struct process;
 
 extern security_context_t init_security_context;
 
+extern void security_context_canonicalise(security_context_t *context);
 extern status_t security_context_validate(const security_context_t *setter,
                                           const security_context_t *prev,
-                                          const security_context_t *context);
+                                          security_context_t *context);
 
 extern security_context_t *security_context_get(struct process *process);
 extern void security_context_release(struct process *process);
+
+extern user_id_t security_current_uid(void);
+extern group_id_t security_current_gid(void);
 
 extern void security_init(void);
 

@@ -37,33 +37,57 @@ security_context_t init_security_context __init_data;
 static int compare_group(const void *a, const void *b) {
 	group_id_t ga = *(const group_id_t *)a;
 	group_id_t gb = *(const group_id_t *)b;
-	return ga - gb;
+
+	/* This forces negative entries to be last in the array. */
+	if((ga < 0 && gb < 0) || (ga >= 0 && gb >= 0)) {
+		return ga - gb;
+	} else if(ga < 0) {
+		return 1;
+	} else {
+		return -1;
+	}
+}
+
+/** Canonicalise a security context.
+ *
+ * Converts a security context to canonical form. A security context is
+ * considered to be canonical if all group IDs after the primary group are in
+ * ascending order with no unused entries between (all unused entries are at
+ * the end), and there are no duplicate IDs. This is done to make comparison of
+ * contexts and group checks easier.
+ *
+ * @param context	Context to canonicalise.
+ */
+void security_context_canonicalise(security_context_t *context) {
+	size_t i;
+
+	/* Move the first non-negative group to the first entry. This is the
+	 * primary group. */
+	for(i = 0; i < ARRAYSZ(context->groups); i++) {
+		if(context->groups[i] >= 0) {
+			if(i != 0) {
+				context->groups[0] = context->groups[i];
+				context->groups[i] = -1;
+			}
+			break;
+		}
+	}
+
+	/* Sort the remaining groups into the required order. */
+	qsort(&context->groups[1], ARRAYSZ(context->groups) - 1, sizeof(context->groups[0]), compare_group);
 }
 
 /** Compare identity of two security contexts.
- * @fixme		This is pretty inefficient. Can't be bothered to think
- *			of a better way to do it at the moment.
+ * @note		This only works if both contexts are in canonical form.
  * @param a		First context.
  * @param b		Second context.
  * @return		True if the same, false if not. */
 static inline bool compare_identity(const security_context_t *a, const security_context_t *b) {
-	group_id_t *ga, *gb;
-	bool ret;
-
 	if(a->uid != b->uid) {
 		return false;
 	}
 
-	ga = kmalloc(sizeof(a->groups), MM_SLEEP);
-	memcpy(ga, a->groups, sizeof(a->groups));
-	qsort(ga, ARRAYSZ(a->groups), sizeof(a->groups[0]), compare_group);
-	gb = kmalloc(sizeof(b->groups), MM_SLEEP);
-	memcpy(gb, b->groups, sizeof(b->groups));
-	qsort(gb, ARRAYSZ(b->groups), sizeof(b->groups[0]), compare_group);
-	ret = (memcmp(ga, gb, sizeof(a->groups)) == 0);
-	kfree(ga);
-	kfree(gb);
-	return ret;
+	return (memcmp(a->groups, b->groups, sizeof(a->groups)) == 0);
 }
 
 /** Validate a security context.
@@ -76,31 +100,32 @@ static inline bool compare_identity(const security_context_t *a, const security_
  * @note		This does not check whether the process making the
  *			change is allowed to change the context.
  *
- * @param setter	Security context of process making the change.
- * @param prev		Previous security context.
- * @param context	New security context.
+ * @param setter	Security context of process making the change. Must be
+ *			in canonical form.
+ * @param prev		Previous security context. Must be in canonical form.
+ * @param context	New security context. This will be canonicalised using
+ *			security_context_canonicalise(): there is no need to
+ *			call that manually before calling this.
  *
  * @return		STATUS_SUCCESS if change is allowed, other status code
  *			if not.
  */
 status_t security_context_validate(const security_context_t *setter,
                                    const security_context_t *prev,
-                                   const security_context_t *context) {
+                                   security_context_t *context) {
 	size_t i;
 
+	/* Convert the new context into canonical form. */
+	security_context_canonicalise(context);
+
 	/* Must have at least one group. */
-	for(i = 0; i < ARRAYSZ(context->groups); i++) {
-		if(context->groups[i] >= 0) {
-			break;
-		}
-	}
-	if(i == ARRAYSZ(context->groups)) {
+	if(context->groups[0] < 0) {
 		return STATUS_INVALID_ARG;
 	}
 
-	/* If the identity is different, check if the setter can change it. */
-	if(!compare_identity(prev, context)) {
-		if(!security_context_has_cap(setter, CAP_CHANGE_IDENTITY)) {
+	/* Ensure that the identity is the same if unable to change it. */
+	if(!security_context_has_cap(setter, CAP_CHANGE_IDENTITY)) {
+		if(!compare_identity(prev, context)) {
 			return STATUS_PERM_DENIED;
 		}
 	}
@@ -159,6 +184,18 @@ void security_context_release(process_t *process) {
 	mutex_unlock(&process->security_lock);
 }
 
+/** Get the user ID of the current thread.
+ * @return		User ID of the current thread. */
+user_id_t security_current_uid(void) {
+	return curr_proc->security.uid;
+}
+
+/** Get the primary group ID of the current thread.
+ * @return		Primary group ID of the current thread. */
+group_id_t security_current_gid(void) {
+	return curr_proc->security.groups[0];
+}
+
 /** Initialise the security system. */
 void __init_text security_init(void) {
 	security_context_init(&init_security_context);
@@ -175,4 +212,5 @@ void __init_text security_init(void) {
 	security_context_set_cap(&init_security_context, CAP_FS_ADMIN);
 	security_context_set_cap(&init_security_context, CAP_FS_SETROOT);
 	security_context_set_cap(&init_security_context, CAP_FS_MOUNT);
+	security_context_set_cap(&init_security_context, CAP_CHANGE_OWNER);
 }
