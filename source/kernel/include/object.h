@@ -120,8 +120,7 @@ extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value,
 extern void object_acl_canonicalise(object_acl_t *acl);
 
 extern status_t object_security_validate(object_security_t *security, struct process *process);
-extern status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
-                                          struct process *process);
+extern status_t object_security_from_user(object_security_t *dest, const object_security_t *src);
 extern void object_security_destroy(object_security_t *security);
 
 extern void object_init(object_t *object, object_type_t *type, object_security_t *security,

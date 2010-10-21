@@ -194,13 +194,10 @@ status_t object_security_validate(object_security_t *security, process_t *proces
  *
  * @param dest		Structure to copy to.
  * @param src		Userspace source pointer.
- * @param process	Process to validate against. If NULL, the current
- *			process will be used.
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
-                                   process_t *process) {
+status_t object_security_from_user(object_security_t *dest, const object_security_t *src) {
 	// should return error if acl invalid. (in validate above)
 	return STATUS_NOT_IMPLEMENTED;
 }
