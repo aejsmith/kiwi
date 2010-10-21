@@ -103,7 +103,7 @@ typedef struct object {
 typedef struct object_handle {
 	object_t *object;		/**< Object that the handle refers to. */
 	void *data;			/**< Per-handle data pointer. */
-	uint32_t rights;		/**< Rights for the handle. */
+	object_rights_t rights;		/**< Rights for the handle. */
 	refcount_t count;		/**< References to the handle. */
 } object_handle_t;
 
@@ -116,26 +116,18 @@ typedef struct handle_table {
 
 extern void object_acl_init(object_acl_t *acl);
 extern void object_acl_destroy(object_acl_t *acl);
-extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, uint32_t rights);
+extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object_rights_t rights);
 extern void object_acl_canonicalise(object_acl_t *acl);
-
-/** Free memory for an object security structure.
- * @param security	Structure to free (structure itself is not freed, only
- *			memory allocated for the ACL within it). */
-static inline void object_security_destroy(object_security_t *security) {
-	if(security->acl) {
-		object_acl_destroy(security->acl);
-	}
-}
 
 extern status_t object_security_validate(object_security_t *security, struct process *process);
 extern status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
                                           struct process *process);
+extern void object_security_destroy(object_security_t *security);
 
 extern void object_init(object_t *object, object_type_t *type, object_security_t *security,
                         object_acl_t *sacl);
 extern void object_destroy(object_t *object);
-extern status_t object_rights(object_t *object, uint32_t rights, struct process *process);
+extern status_t object_rights(object_t *object, object_rights_t rights, struct process *process);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *sync);
@@ -144,11 +136,11 @@ extern void object_wait_signal(void *sync);
  * @param handle	Handle to check.
  * @param rights	Rights to check for.
  * @return		Whether the handle has the rights. */
-static inline bool object_handle_rights(object_handle_t *handle, uint32_t rights) {
+static inline bool object_handle_rights(object_handle_t *handle, object_rights_t rights) {
 	return ((handle->rights & rights) == rights);
 }
 
-extern status_t object_handle_create(object_t *object, void *data, uint32_t rights,
+extern status_t object_handle_create(object_t *object, void *data, object_rights_t rights,
                                      struct process *process, int flags,
                                      object_handle_t **handlep, handle_t *idp,
                                      handle_t *uidp);
@@ -158,7 +150,7 @@ extern status_t object_handle_attach(object_handle_t *handle, struct process *pr
                                      int flags, handle_t *idp, handle_t *uidp);
 extern status_t object_handle_detach(struct process *process, handle_t id);
 extern status_t object_handle_lookup(struct process *process, handle_t id, int type,
-                                     uint32_t rights, object_handle_t **handlep);
+                                     object_rights_t rights, object_handle_t **handlep);
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
                                     handle_table_t **tablep);

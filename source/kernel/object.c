@@ -111,8 +111,10 @@ static void handle_table_ctor(void *obj, void *data) {
 void object_init(object_t *object, object_type_t *type, object_security_t *security,
                  object_acl_t *sacl) {
 	assert(object);
-	assert(security);
-	assert(security->acl);
+	if(type) {
+		assert(security);
+		assert(security->acl);
+	}
 
 	rwlock_init(&object->lock, "object_lock");
 	object->type = type;
@@ -181,9 +183,9 @@ void object_wait_signal(void *_sync) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_handle_create(object_t *object, void *data, uint32_t rights, process_t *process,
-                              int flags, object_handle_t **handlep, handle_t *idp,
-                              handle_t *uidp) {
+status_t object_handle_create(object_t *object, void *data, object_rights_t rights,
+                              process_t *process, int flags, object_handle_t **handlep,
+                              handle_t *idp, handle_t *uidp) {
 	object_handle_t *handle;
 	status_t ret;
 
@@ -404,7 +406,7 @@ status_t object_handle_detach(process_t *process, handle_t id) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_handle_lookup(process_t *process, handle_t id, int type, uint32_t rights,
+status_t object_handle_lookup(process_t *process, handle_t id, int type, object_rights_t rights,
                               object_handle_t **handlep) {
 	handle_link_t *link;
 

@@ -57,6 +57,9 @@ extern "C" {
 /** Handle behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
 
+/** Type used to store a set of object rights. */
+typedef uint32_t object_rights_t;
+
 /** Details of an object event to wait for. */
 typedef struct object_event {
 	handle_t handle;		/**< Handle to wait on. */
@@ -68,7 +71,7 @@ typedef struct object_event {
 typedef struct object_acl_entry {
 	uint8_t type;			/**< Entry type. */
 	int32_t value;			/**< Value specific to type (user/group/session ID, capability). */
-	uint32_t rights;		/**< Rights to grant. */
+	object_rights_t rights;		/**< Rights to grant. */
 } object_acl_entry_t;
 
 /** Object ACL structure. */

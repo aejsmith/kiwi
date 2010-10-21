@@ -69,7 +69,7 @@ void object_acl_destroy(object_acl_t *acl) {
  *			ID. For ACL_ENTRY_CAPABILITY, it is a capability number.
  *			For ACL_ENTRY_OTHERS, it is ignored.
  * @param rights	Rights to give the entry. */
-void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, uint32_t rights) {
+void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object_rights_t rights) {
 	size_t i;
 
 	/* Check that the type and value are valid. */
@@ -105,7 +105,8 @@ void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, uint32
  * Converts an object ACL into canonical form. An ACL is considered to be in
  * canonical form if there are no duplicate entries (entries with the same type
  * and referring to the same thing, e.g. multiple entries for one user).
- * Duplicate entries are merged together. Invalid entries are also removed.
+ * Duplicate entries are merged together. Invalid entries (entries with an
+ * invalid type or value) are also removed.
  *
  * @param acl		ACL to canonicalise.
  */
@@ -200,7 +201,18 @@ status_t object_security_validate(object_security_t *security, process_t *proces
  */
 status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
                                    process_t *process) {
+	// should return error if acl invalid. (in validate above)
 	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Destroy an object security structure.
+ * @param security	Structure to destroy. The structure itself will not be
+ *			freed, only memory allocated for things within it. */
+void object_security_destroy(object_security_t *security) {
+	if(security->acl) {
+		object_acl_destroy(security->acl);
+		kfree(security->acl);
+	}
 }
 
 /** Get the owning user/group of an object.
@@ -306,5 +318,7 @@ status_t sys_object_acl(handle_t handle, object_acl_t *aclp) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_object_set_acl(handle_t handle, const object_acl_t *acl) {
+	// should canonicalise, return error if any invalid entries, fix doc.
+	// remove me, replace with object_set_security. replace -1 and -1
 	return STATUS_NOT_IMPLEMENTED;
 }
