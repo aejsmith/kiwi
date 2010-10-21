@@ -41,6 +41,9 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Access to grant others in the default ACL. */
+#define DEVICE_DEFAULT_RIGHTS	(DEVICE_QUERY | DEVICE_READ | DEVICE_WRITE | OBJECT_READ_SECURITY)
+
 /** Root of the device tree. */
 device_t *device_tree_root;
 
@@ -49,7 +52,7 @@ device_t *device_bus_dir;
 
 /** Closes a handle to a device.
  * @param handle	Handle to the device. */
-static void device_object_close(khandle_t *handle) {
+static void device_object_close(object_handle_t *handle) {
 	device_t *device = (device_t *)handle->object;
 
 	if(device->ops && device->ops->close) {
@@ -64,7 +67,7 @@ static void device_object_close(khandle_t *handle) {
  * @param event		Event to wait for.
  * @param sync		Internal data pointer.
  * @return		Status code describing result of the operation. */
-static status_t device_object_wait(khandle_t *handle, int event, void *sync) {
+static status_t device_object_wait(object_handle_t *handle, int event, void *sync) {
 	device_t *device = (device_t *)handle->object;
 
 	if(device->ops && device->ops->wait && device->ops->unwait) {
@@ -78,7 +81,7 @@ static status_t device_object_wait(khandle_t *handle, int event, void *sync) {
  * @param handle	Handle to device.
  * @param event		Event that was being waited for.
  * @param sync		Internal data pointer. */
-static void device_object_unwait(khandle_t *handle, int event, void *sync) {
+static void device_object_unwait(object_handle_t *handle, int event, void *sync) {
 	device_t *device = (device_t *)handle->object;
 	assert(device->ops);
 	return device->ops->unwait(device, handle->data, event, sync);
@@ -89,7 +92,7 @@ static void device_object_unwait(khandle_t *handle, int event, void *sync) {
  * @param flags		Mapping flags (VM_MAP_*).
  * @return		STATUS_SUCCESS if can be mapped, status code explaining
  *			why if not. */
-static status_t device_object_mappable(khandle_t *handle, int flags) {
+static status_t device_object_mappable(object_handle_t *handle, int flags) {
 	device_t *device = (device_t *)handle->object;
 
 	/* Cannot create private mappings to devices. */
@@ -110,7 +113,7 @@ static status_t device_object_mappable(khandle_t *handle, int flags) {
  * @param offset	Offset into device to get page from.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing result of the operation. */
-static status_t device_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static status_t device_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	device_t *device = (device_t *)handle->object;
 	status_t ret;
 
@@ -155,7 +158,9 @@ static object_type_t device_object_type = {
  */
 status_t device_create(const char *name, device_t *parent, device_ops_t *ops, void *data,
                        device_attr_t *attrs, size_t count, device_t **devicep) {
+	object_security_t security;
 	device_t *device = NULL;
+	object_acl_t acl;
 	status_t ret;
 	size_t i;
 
@@ -170,8 +175,15 @@ status_t device_create(const char *name, device_t *parent, device_ops_t *ops, vo
 		goto fail;
 	}
 
+	/* Create an ACL and security structure. TODO: Restrict device access. */
+	object_acl_init(&acl);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEVICE_DEFAULT_RIGHTS);
+	security.uid = 0;
+	security.gid = 0;
+	security.acl = &acl;
+
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type);
+	object_init(&device->obj, &device_object_type, &security, NULL);
 	mutex_init(&device->lock, "device_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -264,7 +276,7 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	}
 
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, &device_object_type);
+	object_init(&device->obj, NULL, NULL, NULL);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
@@ -502,9 +514,10 @@ char *device_path(device_t *device) {
 
 /** Get a handle to a device.
  * @param device	Device to get handle to.
+ * @param rights	Requested rights for the handle.
  * @param handlep	Where to store handle to device.
  * @return		Status code describing result of the operation. */
-status_t device_get(device_t *device, khandle_t **handlep) {
+status_t device_get(device_t *device, object_rights_t rights, object_handle_t **handlep) {
 	void *data = NULL;
 	status_t ret;
 
@@ -523,16 +536,21 @@ status_t device_get(device_t *device, khandle_t **handlep) {
 		}
 	}
 
-	*handlep = handle_create(&device->obj, data);
+	ret = object_handle_create(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
+		refcount_dec(&device->count);
+	}
+
 	mutex_unlock(&device->lock);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Create a handle to a device.
  * @param path		Path to device to open.
+ * @param rights	Requested rights for the handle.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t device_open(const char *path, khandle_t **handlep) {
+status_t device_open(const char *path, object_rights_t rights, object_handle_t **handlep) {
 	void *data = NULL;
 	device_t *device;
 	status_t ret;
@@ -556,10 +574,13 @@ status_t device_open(const char *path, khandle_t **handlep) {
 		}
 	}
 
-	/* No need to reference device, was already referenced by the lookup. */
-	*handlep = handle_create(&device->obj, data);
+	ret = object_handle_create(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
+		refcount_dec(&device->count);
+	}
+
 	mutex_unlock(&device->lock);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Read from a device.
@@ -568,7 +589,8 @@ status_t device_open(const char *path, khandle_t **handlep) {
  * operation - it is provided as a function rather than a request type because
  * it is supported by multiple device types.
  *
- * @param handle	Handle to device to read from.
+ * @param handle	Handle to device to read from. Needs the DEVICE_READ
+ *			right.
  * @param buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset in the device to read from (only valid for
@@ -577,7 +599,7 @@ status_t device_open(const char *path, khandle_t **handlep) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	device_t *device;
 	status_t ret;
 	size_t bytes;
@@ -586,6 +608,8 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
+	} else if(!object_handle_rights(handle, DEVICE_READ)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	device = (device_t *)handle->object;
@@ -611,7 +635,8 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
  * operation - it is provided as a function rather than a request type because
  * it is supported by multiple device types.
  *
- * @param handle	Handle to device to write to.
+ * @param handle	Handle to device to write to. Needs the DEVICE_WRITE
+ *			right.
  * @param buf		Buffer containing data to write.
  * @param count		Number of bytes to write.
  * @param offset	Offset in the device to write to (only valid for
@@ -620,7 +645,8 @@ status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset
  *
  * @return		Status code describing result of the operation.
  */
-status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t device_write(object_handle_t *handle, const void *buf, size_t count, offset_t offset,
+                      size_t *bytesp) {
 	device_t *device;
 	status_t ret;
 	size_t bytes;
@@ -629,6 +655,8 @@ status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
+	} else if(!object_handle_rights(handle, DEVICE_WRITE)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	device = (device_t *)handle->object;
@@ -658,8 +686,8 @@ status_t device_write(khandle_t *handle, const void *buf, size_t count, offset_t
  *			operation handler (optional).
  * @param outszp	Where to store size of data returned.
  * @return		Status code describing result of the operation. */
-status_t device_request(khandle_t *handle, int request, void *in, size_t insz, void **outp,
-                        size_t *outszp) {
+status_t device_request(object_handle_t *handle, int request, void *in, size_t insz,
+                        void **outp, size_t *outszp) {
 	device_t *device;
 
 	if(!handle) {
@@ -673,6 +701,7 @@ status_t device_request(khandle_t *handle, int request, void *in, size_t insz, v
 		return STATUS_INVALID_REQUEST;
 	}
 
+	// FIXME: Right checks?
 	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
 }
 
@@ -800,12 +829,13 @@ void __init_text device_init(void) {
  * handle_close().
  *
  * @param path		Device tree path for device to open.
+ * @param rights	Requested rights for the handle.
  * @param handlep	Where to store handle to the device.
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_device_open(const char *path, handle_t *handlep) {
-	khandle_t *handle;
+status_t sys_device_open(const char *path, object_rights_t rights, handle_t *handlep) {
+	object_handle_t *handle;
 	status_t ret;
 	char *kpath;
 
@@ -818,14 +848,14 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
 		return ret;
 	}
 
-	ret = device_open(kpath, &handle);
+	ret = device_open(kpath, rights, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
-	handle_release(handle);
+	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
+	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
 }
@@ -847,12 +877,12 @@ status_t sys_device_open(const char *path, handle_t *handlep) {
  */
 status_t sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
                          size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -883,7 +913,7 @@ status_t sys_device_read(handle_t handle, void *buf, size_t count, offset_t offs
 	kfree(kbuf);
 out:
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -911,12 +941,12 @@ out:
  */
 status_t sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset,
                           size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -946,7 +976,7 @@ out:
 		kfree(kbuf);
 	}
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -970,11 +1000,11 @@ out:
 status_t sys_device_request(handle_t handle, int request, void *in, size_t insz, void *out,
                             size_t outsz, size_t *bytesp) {
 	void *kin = NULL, *kout = NULL;
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	status_t ret, err;
 	size_t koutsz;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DEVICE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -1019,6 +1049,6 @@ out:
 	if(kout) {
 		kfree(kout);
 	}
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }

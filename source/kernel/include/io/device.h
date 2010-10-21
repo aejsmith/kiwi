@@ -194,7 +194,7 @@ extern device_t *device_bus_dir;
 /** Get the name of a device from a handle.
  * @param handle	Handle to get name from.
  * @return		Name of the device. */
-static inline const char *device_name(khandle_t *handle) {
+static inline const char *device_name(object_handle_t *handle) {
 	device_t *device = (device_t *)handle->object;
 	return device->name;
 }
@@ -210,13 +210,13 @@ extern void device_iterate(device_t *start, device_iterate_t func, void *data);
 extern device_attr_t *device_attr(device_t *device, const char *name, int type);
 extern char *device_path(device_t *device);
 
-extern status_t device_get(device_t *device, khandle_t **handlep);
-extern status_t device_open(const char *path, khandle_t **handlep);
-extern status_t device_read(khandle_t *handle, void *buf, size_t count, offset_t offset,
+extern status_t device_get(device_t *device, uint32_t rights, object_handle_t **handlep);
+extern status_t device_open(const char *path, uint32_t rights, object_handle_t **handlep);
+extern status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset,
                             size_t *bytesp);
-extern status_t device_write(khandle_t *handle, const void *buf, size_t count,
+extern status_t device_write(object_handle_t *handle, const void *buf, size_t count,
                              offset_t offset, size_t *bytesp);
-extern status_t device_request(khandle_t *handle, int request, void *in, size_t insz,
+extern status_t device_request(object_handle_t *handle, int request, void *in, size_t insz,
                                void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);

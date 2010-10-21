@@ -23,6 +23,7 @@ type node_id_t uint64_t;
 type useconds_t int64_t;
 type offset_t uint64_t;
 type rel_offset_t int64_t;
+type object_rights_t uint32_t;
 
 syscall module_load(ptr_t, ptr_t);
 syscall object_type(handle_t);
@@ -56,7 +57,7 @@ syscall fs_info(ptr_t, bool, ptr_t);
 syscall fs_link(ptr_t, ptr_t);
 syscall fs_unlink(ptr_t);
 syscall fs_rename(ptr_t, ptr_t);
-syscall device_open(ptr_t, ptr_t);
+syscall device_open(ptr_t, object_rights_t, ptr_t);
 syscall device_read(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall device_write(handle_t, ptr_t, size_t, offset_t, ptr_t);
 syscall device_request(handle_t, int, ptr_t, size_t, ptr_t, size_t, ptr_t);

@@ -22,9 +22,9 @@
 #define __KERNEL_DEVICE_H
 
 #ifdef KERNEL
-# include <public/types.h>
+# include <public/object.h>
 #else
-# include <kernel/types.h>
+# include <kernel/object.h>
 #endif
 
 #ifdef __cplusplus
@@ -34,13 +34,18 @@ extern "C" {
 /** Various device manager limitations. */
 #define DEVICE_PATH_MAX			4096	/**< Maximum length of a device tree path. */
 
+/** Device rights. */
+#define DEVICE_QUERY			(1<<8)	/**< Query device information. */
+#define DEVICE_READ			(1<<9)	/**< Read directly from the device. */
+#define DEVICE_WRITE			(1<<10)	/**< Write directly to the device. */
+
 /** Generic device events. */
 #define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */
 #define DEVICE_EVENT_WRITABLE		1	/**< Wait for the device to be writable. */
 //#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
 //#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
 
-extern status_t SYSCALL(device_open)(const char *path, handle_t *handlep);
+extern status_t SYSCALL(device_open)(const char *path, object_rights_t rights, handle_t *handlep);
 extern status_t SYSCALL(device_read)(handle_t handle, void *buf, size_t count, offset_t offset,
                                      size_t *bytesp);
 extern status_t SYSCALL(device_write)(handle_t handle, const void *buf, size_t count,
