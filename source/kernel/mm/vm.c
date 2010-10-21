@@ -216,7 +216,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 
 	/* Copy the object handle. */
 	if(src->handle) {
-		handle_get(src->handle);
+		object_handle_get(src->handle);
 		dest->handle = src->handle;
 		dest->obj_offset = src->obj_offset;
 	}
@@ -481,7 +481,7 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 
 		/* Copy object details into the split. */
 		if((split->handle = region->handle)) {
-			handle_get(split->handle);
+			object_handle_get(split->handle);
 		}
 		if((split->amap = region->amap)) {
 			refcount_inc(&split->amap->count);
@@ -509,7 +509,7 @@ static void vm_region_destroy(vm_region_t *region) {
 			vm_amap_release(region->amap);
 		}
 		if(region->handle) {
-			handle_release(region->handle);
+			object_handle_release(region->handle);
 		}
 	}
 
@@ -636,7 +636,7 @@ static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
  * @param access	Type of access that caused the fault.
  * @return		Whether the fault was successfully handled. */
 static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
-	khandle_t *handle = region->handle;
+	object_handle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t paddr;
 	offset_t offset;
@@ -959,7 +959,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
+status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
                 offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
 	status_t ret;
@@ -1016,7 +1016,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t 
 	region = vm_region_alloc(as, start, start + size, rflags);
 	if(handle) {
 		region->handle = handle;
-		handle_get(region->handle);
+		object_handle_get(region->handle);
 		region->obj_offset = offset;
 	}
 	if(!handle || (flags & VM_MAP_PRIVATE)) {
@@ -1266,14 +1266,14 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  */
 extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
                            offset_t offset, void **addrp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret;
 	ptr_t addr;
 
 	if(!(flags & VM_MAP_FIXED) && !addrp) {
 		return STATUS_INVALID_ARG;
 	} else if(handle >= 0) {
-		ret = handle_lookup(curr_proc, handle, -1, &khandle);
+		ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
@@ -1288,7 +1288,7 @@ extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
 	}
 
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	return ret;
 }

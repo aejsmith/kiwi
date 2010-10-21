@@ -409,15 +409,13 @@ static object_type_t connection_object_type = {
  * @param security	Security attributes for the object. If NULL, default
  *			security attributes will be used which sets the owning
  *			user and group to that of the calling process, grants
- *			listen access to the calling process' user and allows
- *			connections from anyone.
- * @param rights	Access rights for the handle. Must have at least
- *			PORT_LISTEN set.
+ *			listen access to the owning user and allows connections
+ *			from anyone.
+ * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to port.
  * @return		Status code describing result of the operation. */
 status_t sys_ipc_port_create(object_security_t *security, object_rights_t rights, handle_t *handlep) {
-	object_security_t ksecurity;
-	object_acl_t acl;
+	object_security_t ksecurity = { -1, -1, NULL };
 	ipc_port_t *port;
 	status_t ret;
 
@@ -430,23 +428,28 @@ status_t sys_ipc_port_create(object_security_t *security, object_rights_t rights
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
-	} else {
-		/* Construct default security attributes. */
-		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, OBJECT_READ_SECURITY | PORT_CONNECT);
-		ksecurity.uid = -1;
-		ksecurity.gid = -1;
-		ksecurity.acl = &acl;
+	}
+
+	/* Construct a default ACL if required. */
+	if(!ksecurity.acl) {
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
+		object_acl_init(ksecurity.acl);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
+		                     OBJECT_READ_SECURITY | PORT_LISTEN | PORT_CONNECT);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_OTHERS, 0,
+		                     OBJECT_READ_SECURITY | PORT_CONNECT);
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
 	port->id = vmem_alloc(port_id_arena, 1, 0);
 	if(!port->id) {
 		slab_cache_free(ipc_port_cache, port);
+		object_security_destroy(&ksecurity);
 		return STATUS_NO_PORTS;
 	}
 
 	object_init(&port->obj, &port_object_type, &ksecurity, NULL);
+	object_security_destroy(&ksecurity);
 	refcount_set(&port->count, 1);
 
 	mutex_lock(&port_tree_lock);

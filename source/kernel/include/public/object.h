@@ -51,8 +51,7 @@ extern "C" {
 
 /** Rights for all object types. */
 #define OBJECT_READ_SECURITY	(1<<0)	/**< Read security information (ACL, owner). */
-#define OBJECT_SET_OWNER	(1<<1)	/**< Set the object owner. */
-#define OBJECT_SET_ACL		(1<<2)	/**< Set the access control list. */
+#define OBJECT_SET_ACL		(1<<1)	/**< Set the access control list. */
 
 /** Handle behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
