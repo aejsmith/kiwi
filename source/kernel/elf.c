@@ -66,7 +66,7 @@ static bool elf_ehdr_check(elf_ehdr_t *ehdr) {
 typedef struct elf_binary {
 	elf_ehdr_t ehdr;		/**< Executable header. */
 	elf_phdr_t *phdrs;		/**< Program headers. */
-	khandle_t *handle;		/**< Handle to file being loaded. */
+	object_handle_t *handle;	/**< Handle to file being loaded. */
 	vm_aspace_t *as;		/**< Address space to map in to. */
 	ptr_t load_base;		/**< Load base for ET_DYN binaries. */
 	size_t load_size;		/**< Load size for ET_DYN. */
@@ -76,7 +76,7 @@ typedef struct elf_binary {
  * @param handle	Handle to binary.
  * @param as		Address space to reserve in.
  * @return		Status code describing result of the operation. */
-status_t elf_binary_reserve(khandle_t *handle, vm_aspace_t *as) {
+status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 	size_t bytes, i, size;
 	elf_phdr_t *phdrs;
 	ptr_t start, end;
@@ -213,7 +213,7 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
  *			requires the binary to be ELF_ET_DYN.
  * @param datap		Where to store data pointer to pass to elf_binary_finish().
  * @return		Status code describing result of the operation. */
-status_t elf_binary_load(khandle_t *handle, vm_aspace_t *as, ptr_t dest, void **datap) {
+status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, void **datap) {
 	size_t bytes, i, size, load_count = 0;
 	elf_binary_t *binary;
 	status_t ret;

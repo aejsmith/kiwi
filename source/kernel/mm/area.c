@@ -234,10 +234,10 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, const ob
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
-	} else {
-		/* Construct default security attributes. */
-		ksecurity.uid = -1;
-		ksecurity.gid = -1;
+	}
+
+	/* Construct a default ACL if required. */
+	if(!ksecurity.acl) {
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,

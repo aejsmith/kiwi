@@ -431,6 +431,12 @@ status_t object_handle_lookup(process_t *process, handle_t id, int type, object_
 		return STATUS_INVALID_HANDLE;
 	}
 
+	/* Check if the handle has the requested rights. */
+	if(rights && !object_handle_rights(link->handle, rights)) {
+		rwlock_unlock(&process->handles->lock);
+		return STATUS_PERM_DENIED;
+	}
+
 	object_handle_get(link->handle);
 	*handlep = link->handle;
 	rwlock_unlock(&process->handles->lock);
