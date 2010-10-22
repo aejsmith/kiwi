@@ -209,6 +209,7 @@ void object_security_destroy(object_security_t *security) {
 	if(security->acl) {
 		object_acl_destroy(security->acl);
 		kfree(security->acl);
+		security->acl = NULL;
 	}
 }
 
@@ -266,7 +267,7 @@ status_t sys_object_acl(handle_t handle, object_acl_t *aclp) {
 	size_t count;
 	status_t ret;
 
-	ret = object_handle_lookup(curr_proc, handle, -1, OBJECT_READ_SECURITY, &khandle);
+	ret = object_handle_lookup(NULL, handle, -1, OBJECT_READ_SECURITY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

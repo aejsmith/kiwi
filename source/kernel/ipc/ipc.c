@@ -414,7 +414,8 @@ static object_type_t connection_object_type = {
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to port.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_create(object_security_t *security, object_rights_t rights, handle_t *handlep) {
+status_t sys_ipc_port_create(const object_security_t *security, object_rights_t rights,
+                             handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	ipc_port_t *port;
 	status_t ret;
@@ -435,7 +436,7 @@ status_t sys_ipc_port_create(object_security_t *security, object_rights_t rights
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | PORT_LISTEN | PORT_CONNECT);
+		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | PORT_LISTEN | PORT_CONNECT);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_OTHERS, 0,
 		                     OBJECT_READ_SECURITY | PORT_CONNECT);
 	}

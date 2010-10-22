@@ -209,7 +209,7 @@ static object_type_t area_object_type = {
  *			read/write access to the calling process' user.
  * @param rights	Access rights for the handle.
  * @return		Status code describing result of the operation. */
-status_t sys_area_create(size_t size, handle_t source, offset_t offset, object_security_t *security,
+status_t sys_area_create(size_t size, handle_t source, offset_t offset, const object_security_t *security,
                          object_rights_t rights, handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	object_handle_t *ksource = NULL;
@@ -241,7 +241,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, object_s
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | AREA_READ | AREA_WRITE);
+		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | AREA_READ | AREA_WRITE);
 	}
 
 	area = slab_cache_alloc(area_cache, MM_SLEEP);

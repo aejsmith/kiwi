@@ -36,8 +36,8 @@ extern "C" {
 #define AREA_WRITE	(1<<9)		/**< Allow mapping for writing. */
 
 extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset,
-                                     object_security_t *security, object_rights_t rights,
-                                     handle_t *handlep);
+                                     const object_security_t *security,
+                                     object_rights_t rights, handle_t *handlep);
 extern status_t SYSCALL(area_open)(area_id_t id, object_rights_t rights, handle_t *handlep);
 extern area_id_t SYSCALL(area_id)(handle_t handle);
 extern size_t SYSCALL(area_size)(handle_t handle);

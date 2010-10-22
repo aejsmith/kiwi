@@ -87,8 +87,8 @@ typedef struct object_security {
 } object_security_t;
 
 extern int SYSCALL(object_type)(handle_t handle);
-extern status_t SYSCALL(object_owner)(handle_t handle, user_id_t *uidp, user_id_t *gidp);
-extern status_t SYSCALL(object_set_owner)(handle_t handle, user_id_t uid, user_id_t gid);
+extern status_t SYSCALL(object_owner)(handle_t handle, user_id_t *uidp, group_id_t *gidp);
+extern status_t SYSCALL(object_set_owner)(handle_t handle, user_id_t uid, group_id_t gid);
 extern status_t SYSCALL(object_acl)(handle_t handle, object_acl_t *aclp);
 extern status_t SYSCALL(object_set_acl)(handle_t handle, const object_acl_t *acl);
 extern status_t SYSCALL(object_wait)(object_event_t *events, size_t count, useconds_t timeout);

@@ -121,7 +121,7 @@ status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *d
 	/* Create a handler thread if necessary. */
 	if(handler->bottom) {
 		sprintf(name, "irq-%" PRIun, num);
-		ret = thread_create(name, kernel_proc, 0, irq_thread, handler, NULL, &handler->thread);
+		ret = thread_create(name, kernel_proc, 0, irq_thread, handler, NULL, NULL, &handler->thread);
 		if(ret != STATUS_SUCCESS) {
 			kfree(handler);
 			return ret;

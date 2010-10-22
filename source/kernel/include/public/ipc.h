@@ -59,7 +59,7 @@ typedef struct ipc_connect_info {
 #define IPC_QUEUE_MAX			256	/**< Maximum number of messages in a queue at a time. */
 #define IPC_MESSAGE_MAX			16384	/**< Maximum size of a message data buffer. */
 
-extern status_t SYSCALL(ipc_port_create)(object_security_t *security, object_rights_t rights,
+extern status_t SYSCALL(ipc_port_create)(const object_security_t *security, object_rights_t rights,
                                          handle_t *handlep);
 extern status_t SYSCALL(ipc_port_open)(port_id_t id, object_rights_t rights, handle_t *handlep);
 extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);

@@ -160,7 +160,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 
 /** Closes a handle to a thread.
  * @param handle	Handle being closed. */
-static void thread_object_close(khandle_t *handle) {
+static void thread_object_close(object_handle_t *handle) {
 	thread_destroy((thread_t *)handle->object);
 }
 
@@ -365,17 +365,43 @@ thread_t *thread_lookup(thread_id_t id) {
  * @param entry		Entry function for the thread.
  * @param arg1		First argument to pass to entry function.
  * @param arg2		Second argument to pass to entry function.
+ * @param security	Security attributes for the thread (if NULL, default
+ *			security attributes will be constructed).
  * @param threadp	Where to store pointer to thread structure.
  *
  * @return		Status code describing result of the operation.
  */
 status_t thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
-                       void *arg1, void *arg2, thread_t **threadp) {
+                       void *arg1, void *arg2, object_security_t *security,
+                       thread_t **threadp) {
+	object_security_t dsecurity = { -1, -1, NULL };
+	object_acl_t acl;
 	thread_t *thread;
 	status_t ret;
 
 	if(name == NULL || owner == NULL || threadp == NULL) {
 		return STATUS_INVALID_ARG;
+	}
+
+	if(security) {
+		dsecurity.uid = security->uid;
+		dsecurity.gid = security->gid;
+		dsecurity.acl = security->acl;
+	}
+
+	/* If an ACL is not given, construct a default ACL. */
+	if(!dsecurity.acl) {
+		object_acl_init(&acl);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
+		                     OBJECT_READ_SECURITY | PROCESS_QUERY);
+
+		/* Only grant set ACL access if a user-mode thread. */
+		if(owner != kernel_proc) {
+			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
+			                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | PROCESS_QUERY);
+		}
+
+		dsecurity.acl = &acl;
 	}
 
 	/* Allocate a thread structure from the cache. The thread constructor
@@ -404,7 +430,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 
-	object_init(&thread->obj, &thread_object_type);
+	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
 	thread->wire_count = 0;
@@ -611,7 +637,7 @@ void __init_text thread_reaper_init(void) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = thread_create("thread_reaper", kernel_proc, 0, thread_reaper, NULL, NULL, &thread);
+	ret = thread_create("thread_reaper", kernel_proc, 0, thread_reaper, NULL, NULL, NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create thread reaper (%d)", ret);
 	}
@@ -628,10 +654,12 @@ void __init_text thread_reaper_init(void) {
  *			stack of the default size will be allocated.
  * @param func		Function to execute.
  * @param arg		Argument to pass to thread.
- * @param handlep	Where to store handle to the thread.
+ * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
 status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                           void *arg, handle_t *handlep) {
+                           void *arg, const object_security_t *security, object_rights_t rights,
+                           handle_t *handlep) {
+	object_security_t ksecurity = { -1, -1, NULL };
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
 	handle_t handle = -1;
@@ -652,17 +680,29 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 
+	if(security) {
+		ret = object_security_from_user(&ksecurity, security);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
+	}
+
 	/* Create the thread, but do not run it yet. We attempt to create the
 	 * handle to the thread before running it as this allows us to
 	 * terminate it if not successful. */
-	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &thread);
+	ret = thread_create(kname, curr_proc, 0, thread_uspace_trampoline, args, NULL, &ksecurity, &thread);
+	object_security_destroy(&ksecurity);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
-	refcount_inc(&thread->count);
-	ret = handle_create_and_attach(curr_proc, &thread->obj, NULL, 0, &handle, handlep);
-	if(ret != STATUS_SUCCESS) {
-		goto fail;
+
+	/* Create a handle to the thread if necessary. */
+	if(handlep) {
+		refcount_inc(&thread->count);
+		ret = object_handle_create(&thread->obj, NULL, rights, NULL, 0, NULL, &handle, handlep);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
 	}
 
 	/* Create a userspace stack. TODO: Stack direction! */
@@ -690,7 +730,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 fail:
 	if(handle >= 0) {
 		/* This will handle thread destruction. */
-		handle_detach(curr_proc, handle);
+		object_handle_detach(NULL, handle);
 	} else if(thread) {
 		thread_destroy(thread);
 	}
@@ -701,9 +741,10 @@ fail:
 
 /** Open a handle to a thread.
  * @param id		ID of the thread to open.
+ * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to thread.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
+status_t sys_thread_open(thread_id_t id, object_rights_t rights, handle_t *handlep) {
 	thread_t *thread;
 	status_t ret;
 
@@ -713,7 +754,8 @@ status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
 
 	rwlock_read_lock(&thread_tree_lock);
 
-	if(!(thread = thread_lookup_unsafe(id))) {
+	thread = thread_lookup_unsafe(id);
+	if(!thread) {
 		rwlock_unlock(&thread_tree_lock);
 		return STATUS_NOT_FOUND;
 	}
@@ -721,7 +763,7 @@ status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &thread->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&thread->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		thread_destroy(thread);
 	}
@@ -738,16 +780,16 @@ status_t sys_thread_open(thread_id_t id, handle_t *handlep) {
  * @return		Thread ID, or -1 if the handle is invalid.
  */
 thread_id_t sys_thread_id(handle_t handle) {
+	object_handle_t *khandle;
 	thread_id_t id = -1;
-	khandle_t *khandle;
 	thread_t *thread;
 
 	if(handle < 0) {
 		id = curr_thread->id;
-	} else if(handle_lookup(curr_proc, handle, OBJECT_TYPE_THREAD, &khandle) == STATUS_SUCCESS) {
+	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, 0, &khandle) == STATUS_SUCCESS) {
 		thread = (thread_t *)khandle->object;
 		id = thread->id;
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 
 	return id;
