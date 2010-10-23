@@ -35,6 +35,9 @@
 /* FIXME: Better place for this. */
 #define PAGE_SIZE		0x1000
 
+/** Address type. */
+typedef unsigned long ptr_t;
+
 /** ELF type definitions. */
 typedef Elf32_Ehdr elf_ehdr_t;		/**< ELF executable header. */
 typedef Elf32_Phdr elf_phdr_t;		/**< ELF program header. */

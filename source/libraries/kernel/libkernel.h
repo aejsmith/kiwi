@@ -61,7 +61,7 @@
 #define LIBKERNEL_DEBUG		0
 
 /** Size of the heap. */
-#define LIBKERNEL_HEAP_SIZE	16384
+#define LIBKERNEL_HEAP_SIZE	8192
 
 #include "arch.h"
 
@@ -90,6 +90,10 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
+/** Heap operation function pointer types. */
+typedef void *(*libkernel_heap_alloc_t)(size_t);
+typedef void (*libkernel_heap_free_t)(void *);
+
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;
@@ -106,6 +110,8 @@ extern void rtld_image_unload(rtld_image_t *image);
 extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp);
 extern void rtld_symbol_init(rtld_image_t *image);
 extern void *rtld_init(process_args_t *args);
+
+extern void libkernel_heap_ops(libkernel_heap_alloc_t alloc, libkernel_heap_free_t free);
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
 extern void libkernel_init(process_args_t *args);
