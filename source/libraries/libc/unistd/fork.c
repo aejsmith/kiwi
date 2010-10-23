@@ -53,7 +53,7 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 
 	/* Clone the process, starting it at our entry function which restores
 	 * the saved process. FIXME: Stack direction. */
-	ret = process_clone(fork_entry, state, &stack[0x1000], &handle);
+	ret = process_clone(fork_entry, state, &stack[0x1000], NULL, PROCESS_QUERY, &handle);
 	vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);

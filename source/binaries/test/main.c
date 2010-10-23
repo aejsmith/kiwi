@@ -21,16 +21,9 @@
 #include <kernel/device.h>
 #include <kernel/process.h>
 
-extern void _start(process_args_t *args);
+#include <stdio.h>
 
-static void message(const char *buf) {
-	size_t i;
-
-	for(i = 0; buf[i]; i++) {}
-	device_write(1, buf, i, 0, NULL);
-}
-
-void _start(process_args_t *args) {
-	message("Hello World\n");
+int main(int argc, char **argv) {
+	printf("Hello World! %d\n", process_id(-1));
 	while(1);
 }
