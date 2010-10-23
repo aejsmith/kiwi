@@ -360,7 +360,8 @@ thread_t *thread_lookup(thread_id_t id) {
  * thread_run().
  *
  * @param name		Name to give the thread.
- * @param owner		Process that the thread should belong to.
+ * @param owner		Process that the thread should belong to (if NULL,
+ *			the thread will belong to the kernel process).
  * @param flags		Flags for the thread.
  * @param entry		Entry function for the thread.
  * @param arg1		First argument to pass to entry function.
@@ -379,8 +380,12 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread_t *thread;
 	status_t ret;
 
-	if(name == NULL || owner == NULL || threadp == NULL) {
+	if(!name || !threadp) {
 		return STATUS_INVALID_ARG;
+	}
+
+	if(!owner) {
+		owner = kernel_proc;
 	}
 
 	if(security) {
@@ -635,7 +640,7 @@ void __init_text thread_reaper_init(void) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = thread_create("thread_reaper", kernel_proc, 0, thread_reaper, NULL, NULL, NULL, &thread);
+	ret = thread_create("thread_reaper", NULL, 0, thread_reaper, NULL, NULL, NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create thread reaper (%d)", ret);
 	}

@@ -567,7 +567,7 @@ void __init_text sched_init(void) {
 
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-	ret = thread_create(name, kernel_proc, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
+	ret = thread_create(name, NULL, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
 	                    sched_idle_thread, NULL, NULL, NULL,
 	                    &curr_cpu->sched->idle_thread);
 	if(ret != STATUS_SUCCESS) {
@@ -594,7 +594,7 @@ void __init_text sched_init(void) {
 	/* Create the load-balancing thread if there is more than one CPU. */
 	if(cpu_count > 1) {
 		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
-		ret = thread_create(name, kernel_proc, THREAD_UNPREEMPTABLE, sched_balancer_thread,
+		ret = thread_create(name, NULL, THREAD_UNPREEMPTABLE, sched_balancer_thread,
 		                    NULL, NULL, NULL, &curr_cpu->sched->balancer_thread);
 		if(ret != STATUS_SUCCESS) {
 			fatal("Could not create load balancer thread for %" PRIu32 " (%d)",

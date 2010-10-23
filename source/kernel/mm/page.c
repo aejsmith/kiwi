@@ -76,7 +76,6 @@
 #include <mm/page.h>
 #include <mm/vm_cache.h>
 
-#include <proc/process.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -725,8 +724,8 @@ void __init_text vm_page_init(void) {
 	}
 
 	/* Set up the page writer. */
-	ret = thread_create("page_writer", kernel_proc, 0, page_writer, NULL,
-	                    NULL, NULL, &page_writer_thread);
+	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL,
+	                    &page_writer_thread);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start page writer (%d)", ret);
 	}

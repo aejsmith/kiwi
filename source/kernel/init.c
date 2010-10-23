@@ -405,7 +405,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		vm_init();
 
 		/* Create the second stage initialisation thread. */
-		ret = thread_create("init", kernel_proc, 0, init_thread, args, NULL, NULL, &thread);
+		ret = thread_create("init", NULL, 0, init_thread, args, NULL, NULL, &thread);
 		if(ret != STATUS_SUCCESS) {
 			fatal("Could not create second-stage initialisation thread");
 		}

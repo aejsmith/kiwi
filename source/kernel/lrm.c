@@ -28,7 +28,6 @@
 #include <mm/kheap.h>
 #include <mm/page.h>
 
-#include <proc/process.h>
 #include <proc/thread.h>
 
 #include <sync/condvar.h>
@@ -279,7 +278,7 @@ void __init_text lrm_init(void) {
 	status_t ret;
 
 	/* Create the LRM thread. */
-	ret = thread_create("lrm", kernel_proc, 0, lrm_thread_func, NULL, NULL, NULL, &lrm_thread);
+	ret = thread_create("lrm", NULL, 0, lrm_thread_func, NULL, NULL, NULL, &lrm_thread);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Failed to create LRM thread: %d\n", ret);
 	}
