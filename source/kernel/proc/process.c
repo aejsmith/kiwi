@@ -687,8 +687,8 @@ int kdbg_cmd_process(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "ID     State   Session Prio Flags Count  Aspace             Name\n");
-	kprintf(LOG_NONE, "==     =====   ======= ==== ===== =====  ======             ====\n");
+	kprintf(LOG_NONE, "ID     State   User Group Session Prio Flags Count Aspace             Name\n");
+	kprintf(LOG_NONE, "==     =====   ==== ===== ======= ==== ===== ===== ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
@@ -700,9 +700,11 @@ int kdbg_cmd_process(int argc, char **argv) {
 		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
 		default:		kprintf(LOG_NONE, "Bad     "); break;
 		}
-		kprintf(LOG_NONE, "%-7d %-4d %-5d %-6d %-18p %s\n", process->session->id,
-		        process->priority, process->flags, refcount_get(&process->count),
-		        process->aspace, process->name);
+		kprintf(LOG_NONE, "%-4d %-5d %-7d %-4d %-5d %-6d %-18p %s\n",
+		        process->security.uid, process->security.groups[0],
+		        process->session->id, process->priority, process->flags,
+		        refcount_get(&process->count), process->aspace,
+		        process->name);
 	}
 
 	return KDBG_OK;
