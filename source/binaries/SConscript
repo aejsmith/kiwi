@@ -16,6 +16,7 @@ Import('env')
 SConscript(dirs=[
 	#'failshell',
 	#'forktest',
-	'uitest',
-	'3rdparty/dungeon',
+	#'uitest',
+	#'3rdparty/dungeon',
+	'test',
 ], exports=['env'])
