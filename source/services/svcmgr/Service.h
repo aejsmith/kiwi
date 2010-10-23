@@ -43,6 +43,7 @@ public:
 	/** Behaviour flags. */
 	enum Flags {
 		kOnDemand = (1<<0),	/**< Should only be started when a port is needed. */
+		kCritical = (1<<1),	/**< Raise a fatal error if the service exits. */
 	};
 
 	Service(ServiceManager *svcmgr, const char *name, const char *desc, const char *cmdline,

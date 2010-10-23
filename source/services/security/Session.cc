@@ -77,6 +77,8 @@ Session::Session(SecurityServer *server, uint32_t perms) :
  * @param status	Exit status. */
 void Session::ProcessExited(int status) {
 	clog << "Session " << m_id << " main process terminated with status " << status <<endl;
+	// FIXME: We should not remove the session until the kernel session
+	// disappears.
 	m_server->RemoveSession(this);
 	DeleteLater();
 }

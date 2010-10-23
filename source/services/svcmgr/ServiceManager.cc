@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 			"security",
 			"Security server.",
 			"/system/services/security",
-			0,
+			Service::kCritical,
 			"org.kiwi.SecurityServer"
 		));
 

@@ -52,4 +52,6 @@ private:
 	Session *m_active_session;	/**< Currently active session. */
 };
 
+extern "C" void system_fatal(const char *message) __attribute__((noreturn));
+
 #endif /* __SECURITYSERVER_H */

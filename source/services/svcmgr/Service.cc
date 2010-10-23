@@ -23,6 +23,7 @@
 #include <kernel/thread.h>
 
 #include <iostream>
+#include <sstream>
 
 #include "org.kiwi.ServiceManager.h"
 #include "Connection.h"
@@ -100,7 +101,8 @@ bool Service::Start() {
 		m_conn->AddPort(m_port->GetName(), m_port->GetID());
 	}
 
-	/* Create the process. */
+	/* Create the process. TODO: Drop capabilities that services should not
+	 * have, particularly CAP_FATAL. */
 	try {
 		m_process.Create(m_cmdline.c_str(), environ, &map);
 	} catch(Error &e) {
@@ -128,10 +130,17 @@ void Service::StartHelper(void *data) {
 /** Slot for the process exiting.
  * @param status	Exit status of the process. */
 void Service::ProcessExited(int status) {
+	if(m_flags & kCritical) {
+		std::stringstream str;
+		str << "Critical service '" << m_name << "' exited with status " << status;
+		system_fatal(str.str().c_str());
+	}
+
 	m_conn = 0;
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
 	m_process.Close();
 	m_state = kStopped;
+
 	if(m_port) {
 		m_port->StartListening();
 	}

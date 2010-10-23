@@ -62,4 +62,6 @@ private:
 	org::kiwi::ServiceManager::ServerConnection *m_parent;
 };
 
+extern "C" void system_fatal(const char *message) __attribute__((noreturn));
+
 #endif /* __SERVICEMANAGER_H */

@@ -43,6 +43,7 @@ extern "C" {
 #define CAP_FS_SETROOT			5	/**< Ability to use the fs_setroot() system call. */
 #define CAP_FS_MOUNT			6	/**< Ability to mount/unmount filesystems. */
 #define CAP_CHANGE_OWNER		7	/**< Ability to set object user/group to arbitrary IDs. */
+#define CAP_FATAL			8	/**< Ability to halt the kernel with a fatal error. */
 
 /** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()

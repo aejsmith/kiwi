@@ -23,10 +23,17 @@
 
 #include <lib/printf.h>
 
+#include <mm/safe.h>
+
+#include <security/cap.h>
+
 #include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <status.h>
 #include <version.h>
+
+extern void sys_system_fatal(const char *message);
 
 /** Notifier to be called when a fatal error occurs. */
 NOTIFIER_DECLARE(fatal_notifier, NULL);
@@ -86,4 +93,23 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 
 	/* Halt the current CPU. */
 	cpu_halt();
+}
+
+/** Print a fatal error message and halt the system.
+ *
+ * Prints a fatal error message and halts the system. The calling process must
+ * have the CAP_FATAL capability.
+ *
+ * @param message	Message to print.
+ */
+void sys_system_fatal(const char *message) {
+	char *kmessage;
+
+	if(!cap_check(NULL, CAP_FATAL)) {
+		return;
+	} else if(strdup_from_user(message, &kmessage) != STATUS_SUCCESS) {
+		return;
+	}
+
+	fatal("%s", message);
 }
