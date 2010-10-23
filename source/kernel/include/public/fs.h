@@ -65,9 +65,9 @@ typedef struct fs_info {
 #define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
 
 /** Access rights for files/directories. */
-#define FS_READ			(1<<1)	/**< Open for reading. */
-#define FS_WRITE		(1<<2)	/**< Open for writing. */
-#define FS_EXECUTE		(1<<3)	/**< Open for execution. */
+#define FS_READ			(1<<8)	/**< Open for reading. */
+#define FS_WRITE		(1<<9)	/**< Open for writing. */
+#define FS_EXECUTE		(1<<10)	/**< Open for execution. */
 
 /** Behaviour flags for both FS handle types. */
 #define FS_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
