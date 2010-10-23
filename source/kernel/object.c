@@ -108,8 +108,7 @@ static void handle_table_ctor(void *obj, void *data) {
  *			the structure after taking the data pointer from it,
  *			which means it will be safe to call object_acl_destroy()
  *			on it. */
-void object_init(object_t *object, object_type_t *type, object_security_t *security,
-                 object_acl_t *sacl) {
+void object_init(object_t *object, object_type_t *type, object_security_t *security, object_acl_t *sacl) {
 	assert(object);
 	if(type) {
 		assert(security);
@@ -199,9 +198,8 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	}
 
 	/* Check whether the rights are allowed for the process. */
-	ret = object_rights(object, rights, process);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
+	if((object_rights(object, process) & rights) != rights) {
+		return STATUS_PERM_DENIED;
 	}
 
 	/* Create the kernel handle structure. */

@@ -88,6 +88,24 @@ static inline void security_context_set_uid(security_context_t *context, user_id
 	context->uid = uid;
 }
 
+/** Check if a security context is a member of a group.
+ * @param context	Context to check.
+ * @param gid		Group ID to check for.
+ * @return		Whether the context has the specified group. */
+static inline bool security_context_has_group(security_context_t *context, group_id_t gid) {
+	size_t i;
+
+	for(i = 0; i < SECURITY_MAX_GROUPS; i++) {
+		if(context->groups[i] < 0) {
+			break;
+		} else if(context->groups[i] == gid) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /** Add a group to a security context.
  * @note		Silently fails if group table full.
  * @note		Primary group is the first used entry in the structure.

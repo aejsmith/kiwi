@@ -78,7 +78,7 @@ void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object
 			return;
 		}
 	} else if(type == ACL_ENTRY_SESSION || type == ACL_ENTRY_CAPABILITY) {
-		if(value < 0) {
+		if(value < 0 || (type == ACL_ENTRY_CAPABILITY && value >= SECURITY_MAX_CAPS)) {
 			return;
 		}
 	} else if(type != ACL_ENTRY_OTHERS) {
@@ -87,7 +87,7 @@ void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object
 
 	/* Check if an identical entry already exists. */
 	for(i = 0; i < acl->count; i++) {
-		if(acl->entries[i].type == type && acl->entries[i].value == value) {
+		if(acl->entries[i].type == type && (type == ACL_ENTRY_OTHERS || acl->entries[i].value == value)) {
 			acl->entries[i].rights |= rights;
 			return;
 		}
@@ -128,6 +128,70 @@ void object_acl_canonicalise(object_acl_t *acl) {
 	acl->count = copy.count;
 }
 
+/** Calculate the rights that an ACL grants for a process.
+ * @param object	Object the ACL belongs to.
+ * @param acl		ACL to calculate from.
+ * @param process	Process to check (security lock held).
+ * @param context	Security context of process.
+ * @return		Set of rights that ACL grants the process. */
+static object_rights_t object_acl_rights(object_t *object, object_acl_t *acl, process_t *process,
+                                         security_context_t *context) {
+	object_rights_t rights = 0, urights = 0, grights = 0, orights = 0;
+	bool user = false, group = false;
+	group_id_t gid;
+	user_id_t uid;
+	size_t i;
+
+	/* Go through the entire ACL and calculate the rights allowed based on
+	 * the process's user, group, session and capabilities, and for others.
+	 * Any matching session and capability entries are always included in
+	 * the calculated rights. */
+	for(i = 0; i < acl->count; i++) {
+		switch(acl->entries[i].type) {
+		case ACL_ENTRY_USER:
+			uid = (acl->entries[i].value < 0) ? object->uid : acl->entries[i].value;
+			if(context->uid == uid) {
+				urights |= acl->entries[i].rights;
+				user = true;
+			}
+			break;
+		case ACL_ENTRY_GROUP:
+			gid = (acl->entries[i].value < 0) ? object->gid : acl->entries[i].value;
+			if(security_context_has_group(context, gid)) {
+				grights |= acl->entries[i].rights;
+				group = true;
+			}
+			break;
+		case ACL_ENTRY_OTHERS:
+			orights |= acl->entries[i].rights;
+			break;
+		case ACL_ENTRY_SESSION:
+			if(acl->entries[i].value == process->session->id) {
+				rights |= acl->entries[i].rights;
+			}
+			break;
+		case ACL_ENTRY_CAPABILITY:
+			if(security_context_has_cap(context, acl->entries[i].value)) {
+				rights |= acl->entries[i].rights;
+			}
+			break;
+		}
+	}
+
+	/* If a user entry matched, we use that. Otherwise, if any group entries
+	 * matched, we use the rights specified by all of them. Otherwise, we
+	 * use the others entry. */
+	if(user) {
+		rights |= urights;
+	} else if(group) {
+		rights |= grights;
+	} else {
+		rights |= orights;
+	}
+
+	return rights;
+}
+
 /** Validate object security attributes.
  *
  * Validates an object security attributes structure against a process' security
@@ -147,7 +211,6 @@ void object_acl_canonicalise(object_acl_t *acl) {
 status_t object_security_validate(object_security_t *security, process_t *process) {
 	status_t ret = STATUS_SUCCESS;
 	security_context_t *context;
-	size_t i;
 
 	/* Check if the IDs are valid. */
 	if(security->uid < -1 || security->gid < -1) {
@@ -167,17 +230,8 @@ status_t object_security_validate(object_security_t *security, process_t *proces
 	if(!security_context_has_cap(context, CAP_CHANGE_OWNER)) {
 		if(security->uid >= 0 && security->uid != context->uid) {
 			ret = STATUS_PERM_DENIED;
-		} else if(security->gid >= 0) {
+		} else if(security->gid >= 0 && !security_context_has_group(context, security->gid)) {
 			ret = STATUS_PERM_DENIED;
-
-			for(i = 0; i < SECURITY_MAX_GROUPS; i++) {
-				if(context->groups[i] < 0) {
-					break;
-				} else if(context->groups[i] == security->gid) {
-					ret = STATUS_SUCCESS;
-					break;
-				}
-			}
 		}
 	}
 
@@ -211,6 +265,23 @@ void object_security_destroy(object_security_t *security) {
 		kfree(security->acl);
 		security->acl = NULL;
 	}
+}
+
+/** Calculate allowed rights for an object.
+ * @param object	Object to calculate rights for.
+ * @param process	Process to calculate rights for (if NULL, current
+ *			process will be used).
+ * @return		The set of rights that the process is allowed for the
+ *			object. */
+object_rights_t object_rights(object_t *object, process_t *process) {
+	security_context_t *context;
+	object_rights_t rights = 0;
+
+	context = security_context_get(process);
+	rights |= object_acl_rights(object, &object->uacl, process, context);
+	rights |= object_acl_rights(object, &object->sacl, process, context);
+	security_context_release(process);
+	return rights;
 }
 
 /** Get the owning user/group of an object.
