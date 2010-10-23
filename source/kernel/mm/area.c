@@ -23,6 +23,8 @@
  *			covering a physical memory region to be created.
  */
 
+#include <kernel/area.h>
+
 #include <lib/avl_tree.h>
 #include <lib/refcount.h>
 
@@ -33,8 +35,6 @@
 #include <mm/vm.h>
 
 #include <proc/process.h>
-
-#include <public/area.h>
 
 #include <sync/mutex.h>
 #include <sync/rwlock.h>

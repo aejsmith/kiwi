@@ -15,27 +15,23 @@
 
 /**
  * @file
- * @brief		Futex functions.
+ * @brief		Time functions.
  */
 
-#ifndef __KERNEL_FUTEX_H
-#define __KERNEL_FUTEX_H
+#ifndef __KERNEL_TIME_H
+#define __KERNEL_TIME_H
 
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
+#include <kernel/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern status_t SYSCALL(futex_wait)(int32_t *addr, int32_t val, useconds_t timeout);
-extern status_t SYSCALL(futex_wake)(int32_t *addr, size_t count, size_t *wokenp);
+extern status_t SYSCALL(time_since_boot)(useconds_t *usp);
+extern status_t SYSCALL(time_since_epoch)(useconds_t *usp);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_FUTEX_H */
+#endif /* __KERNEL_TIME_H */

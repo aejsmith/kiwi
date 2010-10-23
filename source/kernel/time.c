@@ -23,9 +23,9 @@
 
 #include <cpu/cpu.h>
 
-#include <mm/safe.h>
+#include <kernel/time.h>
 
-#include <public/time.h>
+#include <mm/safe.h>
 
 #include <sync/waitq.h>
 

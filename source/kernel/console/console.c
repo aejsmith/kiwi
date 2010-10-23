@@ -20,12 +20,12 @@
 
 #include <io/device.h>
 
+#include <kernel/console.h>
+
 #include <lib/printf.h>
 
 #include <mm/page.h>
 #include <mm/vm.h>
-
-#include <public/console.h>
 
 #include <sync/spinlock.h>
 

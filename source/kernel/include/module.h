@@ -21,10 +21,10 @@
 #ifndef __MODULE_H
 #define __MODULE_H
 
+#include <kernel/module.h>
+
 #include <lib/list.h>
 #include <lib/refcount.h>
-
-#include <public/module.h>
 
 #include <elf.h>
 #include <object.h>

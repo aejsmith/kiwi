@@ -21,7 +21,7 @@
 #ifndef __SECURITY_CONTEXT_H
 #define __SECURITY_CONTEXT_H
 
-#include <public/security.h>
+#include <kernel/security.h>
 
 struct process;
 

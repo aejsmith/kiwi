@@ -21,11 +21,7 @@
 #ifndef __KERNEL_SEMAPHORE_H
 #define __KERNEL_SEMAPHORE_H
 
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
+#include <kernel/object.h>
 
 #ifdef __cplusplus
 extern "C" {

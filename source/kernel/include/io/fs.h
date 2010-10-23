@@ -21,11 +21,11 @@
 #ifndef __IO_FS_H
 #define __IO_FS_H
 
+#include <kernel/fs.h>
+
 #include <lib/avl_tree.h>
 #include <lib/radix_tree.h>
 #include <lib/refcount.h>
-
-#include <public/fs.h>
 
 #include <sync/mutex.h>
 

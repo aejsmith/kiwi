@@ -21,13 +21,8 @@
 #ifndef __KERNEL_PROCESS_H
 #define __KERNEL_PROCESS_H
 
-#ifdef KERNEL
-# include <public/object.h>
-# include <public/security.h>
-#else
-# include <kernel/object.h>
-# include <kernel/security.h>
-#endif
+#include <kernel/object.h>
+#include <kernel/security.h>
 
 #ifdef __cplusplus
 extern "C" {

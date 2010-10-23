@@ -22,7 +22,6 @@
 #define __TYPES_H
 
 #include <arch/types.h>
-#include <public/types.h>
 #include <compiler.h>
 
 /** C standard types. */
@@ -55,5 +54,7 @@ typedef uint64_t key_t;			/**< Type used to store a key for a container. */
 #define INT64_MIN	(-9223372036854775807ll-1)
 #define INT64_MAX	9223372036854775807ll
 #define UINT64_MAX	18446744073709551615ull
+
+#include <kernel/types.h>
 
 #endif /* __TYPES_H */

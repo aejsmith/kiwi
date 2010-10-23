@@ -21,7 +21,7 @@
 #ifndef __SYNC_FUTEX_H
 #define __SYNC_FUTEX_H
 
-#include <public/futex.h>
+#include <kernel/futex.h>
 
 struct process;
 

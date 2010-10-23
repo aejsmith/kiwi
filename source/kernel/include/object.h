@@ -21,13 +21,13 @@
 #ifndef __OBJECT_H
 #define __OBJECT_H
 
+#include <kernel/object.h>
+#include <kernel/security.h>
+
 #include <lib/avl_tree.h>
 #include <lib/bitmap.h>
 #include <lib/list.h>
 #include <lib/refcount.h>
-
-#include <public/object.h>
-#include <public/security.h>
 
 #include <sync/rwlock.h>
 

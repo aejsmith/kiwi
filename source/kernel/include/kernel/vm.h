@@ -21,11 +21,7 @@
 #ifndef __KERNEL_VM_H
 #define __KERNEL_VM_H
 
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
+#include <kernel/types.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -27,10 +27,10 @@
 #include <cpu/cpu.h>
 #include <cpu/fpu.h>
 
+#include <kernel/thread.h>
+
 #include <lib/list.h>
 #include <lib/refcount.h>
-
-#include <public/thread.h>
 
 #include <sync/spinlock.h>
 

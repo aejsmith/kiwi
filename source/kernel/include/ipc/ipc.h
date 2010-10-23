@@ -21,7 +21,7 @@
 #ifndef __IPC_IPC_H
 #define __IPC_IPC_H
 
-#include <public/ipc.h>
+#include <kernel/ipc.h>
 
 extern int kdbg_cmd_endpoint(int argc, char **argv);
 extern int kdbg_cmd_port(int argc, char **argv);

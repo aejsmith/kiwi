@@ -15,33 +15,23 @@
 
 /**
  * @file
- * @brief		Kernel module functions.
+ * @brief		Futex functions.
  */
 
-#ifndef __KERNEL_MODULE_H
-#define __KERNEL_MODULE_H
+#ifndef __KERNEL_FUTEX_H
+#define __KERNEL_FUTEX_H
 
-#ifdef KERNEL
-# include <public/types.h>
-#else
-# include <kernel/types.h>
-#endif
+#include <kernel/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Maximum length of a module name. */
-#define MODULE_NAME_MAX		16
-
-/** Module information section names. */
-#define MODULE_INFO_SECTION	".modinfo"
-#define MODULE_EXPORT_SECTION	".modexport"
-
-extern status_t SYSCALL(module_load)(const char *path, char *depbuf);
+extern status_t SYSCALL(futex_wait)(int32_t *addr, int32_t val, useconds_t timeout);
+extern status_t SYSCALL(futex_wake)(int32_t *addr, size_t count, size_t *wokenp);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __KERNEL_MODULE_H */
+#endif /* __KERNEL_FUTEX_H */

@@ -23,8 +23,8 @@
 
 #include <arch/memmap.h>
 #include <cpu/cpu.h>
+#include <kernel/vm.h>
 #include <mm/page.h>
-#include <public/vm.h>
 #include <sync/mutex.h>
 #include <object.h>
 

@@ -23,6 +23,8 @@
 
 #include <cpu/intr.h>
 
+#include <kernel/semaphore.h>
+
 #include <lib/avl_tree.h>
 #include <lib/refcount.h>
 
@@ -30,8 +32,6 @@
 #include <mm/safe.h>
 
 #include <proc/process.h>
-
-#include <public/semaphore.h>
 
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>

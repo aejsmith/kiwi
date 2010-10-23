@@ -21,11 +21,7 @@
 #ifndef __KERNEL_THREAD_H
 #define __KERNEL_THREAD_H
 
-#ifdef KERNEL
-# include <public/object.h>
-#else
-# include <kernel/object.h>
-#endif
+#include <kernel/object.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -23,13 +23,13 @@
 
 #include <io/context.h>
 
+#include <kernel/process.h>
+
 #include <lib/avl_tree.h>
 #include <lib/notifier.h>
 
 #include <proc/session.h>
 #include <proc/thread.h>
-
-#include <public/process.h>
 
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
