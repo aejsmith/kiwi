@@ -15,24 +15,24 @@
 
 /**
  * @file
- * @brief		Session manager connection class.
+ * @brief		Security server connection class.
  */
 
 #ifndef __CONNECTION_H
 #define __CONNECTION_H
 
-#include "org.kiwi.SessionManager.h"
+#include "org.kiwi.SecurityServer.h"
 
 class Session;
-class SessionManager;
+class SecurityServer;
 
-/** Class representing a connection to the session manager. */
-class Connection : public org::kiwi::SessionManager::ClientConnection {
+/** Class representing a connection to the security server. */
+class Connection : public org::kiwi::SecurityServer::ClientConnection {
 public:
-	Connection(SessionManager *sessmgr, Session *session, handle_t handle);
+	Connection(SecurityServer *server, Session *session, handle_t handle);
 
-	/** Get the session the connection is for.
-	 * @return		Session that connection is for. */
+	/** Get the session the connection is from.
+	 * @return		Session that connection is from. */
 	Session *GetSession() const { return m_session; }
 private:
 	status_t CreateSession(session_id_t &id);
@@ -40,7 +40,7 @@ private:
 
 	void HandleHangup();
 
-	SessionManager *m_sessmgr;	/**< Session manager that the connection is on. */
+	SecurityServer *m_server;	/**< Server the connection is on. */
 	Session *m_session;		/**< Session that the connection is on. */
 };
 

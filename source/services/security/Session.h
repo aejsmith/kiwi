@@ -23,7 +23,7 @@
 
 #include <kiwi/Process.h>
 
-class SessionManager;
+class SecurityServer;
 
 /** Class representing a session. */
 class Session : public kiwi::Object {
@@ -34,7 +34,7 @@ public:
 		kSwitchPermission = (1<<1),	/**< Allow switching to sessions other than 0. */
 	};
 
-	Session(SessionManager *sessmgr, uint32_t perms);
+	Session(SecurityServer *server, uint32_t perms);
 
 	/** Get the ID of the session.
 	 * @return		ID of the session. */
@@ -47,7 +47,7 @@ public:
 private:
 	void ProcessExited(int status);
 
-	SessionManager *m_sessmgr;		/**< Session manager this session is on. */
+	SecurityServer *m_server;		/**< Server this session is on. */
 	session_id_t m_id;			/**< ID of the session. */
 	uint32_t m_permissions;			/**< Permissions of the session. */
 	kiwi::Process *m_process;		/**< Main process for the session. */

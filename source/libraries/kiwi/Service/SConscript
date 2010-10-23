@@ -13,10 +13,10 @@
 
 Import('env')
 
-env.RPCClient('org.kiwi.SessionManager.cc', '../../../services/sessmgr/org.kiwi.SessionManager.proto')
+env.RPCClient('org.kiwi.SecurityServer.cc', '../../../services/security/org.kiwi.SecurityServer.proto')
 env.KiwiLibrary('kiwi-service',
 	sources = [
-		'org.kiwi.SessionManager.cc',
+		'org.kiwi.SecurityServer.cc',
 		'Service.cc',
 		'SessionManager.cc',
 	],

@@ -15,20 +15,20 @@
 
 /**
  * @file
- * @brief		Session manager connection class.
+ * @brief		Security server connection class.
  */
 
 #include "Connection.h"
+#include "SecurityServer.h"
 #include "Session.h"
-#include "SessionManager.h"
 
 /** Create a connection object.
- * @param sessmgr	Session manager the connection is on.
+ * @param server	Server the connection is on.
  * @param session	Session the connection is from.
  * @param handle	Handle to the connection. */
-Connection::Connection(SessionManager *sessmgr, Session *session, handle_t handle) :
-	org::kiwi::SessionManager::ClientConnection(handle),
-	m_sessmgr(sessmgr), m_session(session)
+Connection::Connection(SecurityServer *server, Session *session, handle_t handle) :
+	org::kiwi::SecurityServer::ClientConnection(handle),
+	m_server(server), m_session(session)
 {
 }
 
@@ -36,12 +36,14 @@ Connection::Connection(SessionManager *sessmgr, Session *session, handle_t handl
  * @param id		Where to store ID of session.
  * @return		Status code describing result of the operation. */
 status_t Connection::CreateSession(session_id_t &id) {
+	Session *session;
+	status_t ret;
+
 	if(!m_session->HasPermission(Session::kCreatePermission)) {
 		return STATUS_PERM_DENIED;
 	}
 
-	Session *session;
-	status_t ret = m_sessmgr->CreateSession(session);
+	ret = m_server->CreateSession(session);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -58,12 +60,12 @@ status_t Connection::SwitchSession(session_id_t id) {
 		return STATUS_PERM_DENIED;
 	}
 
-	return m_sessmgr->SwitchSession(id);
+	return m_server->SwitchSession(id);
 }
 
 /** Handle the connection being hung up. */
 void Connection::HandleHangup() {
 	/* Remove us from the server. */
-	m_sessmgr->RemoveConnection(this);
+	m_server->RemoveConnection(this);
 	DeleteLater();
 }

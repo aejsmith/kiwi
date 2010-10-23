@@ -22,8 +22,8 @@
 
 #include <iostream>
 
+#include "SecurityServer.h"
 #include "Session.h"
-#include "SessionManager.h"
 
 using namespace kiwi;
 using namespace std;
@@ -32,10 +32,10 @@ using namespace std;
 bool Session::s_initial_created = false;
 
 /** Construct a new session.
- * @param sessmgr	Session manager for the session.
+ * @param server	Server for the session.
  * @param perms		Permissions for the session. */
-Session::Session(SessionManager *sessmgr, uint32_t perms) :
-	m_sessmgr(sessmgr), m_permissions(perms)
+Session::Session(SecurityServer *server, uint32_t perms) :
+	m_server(server), m_permissions(perms)
 {
 	if(!s_initial_created) {
 		m_id = 0;
@@ -77,6 +77,6 @@ Session::Session(SessionManager *sessmgr, uint32_t perms) :
  * @param status	Exit status. */
 void Session::ProcessExited(int status) {
 	clog << "Session " << m_id << " main process terminated with status " << status <<endl;
-	m_sessmgr->RemoveSession(this);
+	m_server->RemoveSession(this);
 	DeleteLater();
 }

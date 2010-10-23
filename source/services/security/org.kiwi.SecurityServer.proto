@@ -11,7 +11,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-service org.kiwi.SessionManager 1 {
+service org.kiwi.SecurityServer 1 {
 	# Types used by the protocol. FIXME: Definitions for kernel types.
 	type SessionID int16;
 

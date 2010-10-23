@@ -14,14 +14,14 @@
 Import('env')
 
 # Generate the RPC interface code.
-env.RPCServer('org.kiwi.SessionManager.cc', 'org.kiwi.SessionManager.proto')
+env.RPCServer('org.kiwi.SecurityServer.cc', 'org.kiwi.SecurityServer.proto')
 
-env.KiwiService('sessmgr',
+env.KiwiService('security',
 	sources = [
-		'org.kiwi.SessionManager.cc',
+		'org.kiwi.SecurityServer.cc',
 		'Connection.cc',
 		'Session.cc',
-		'SessionManager.cc'
+		'SecurityServer.cc'
 	],
 	libraries = ['kiwi-service'],
 )

@@ -137,11 +137,11 @@ int main(int argc, char **argv) {
 		 * still have full capabilities. */
 		svcmgr.AddService(new Service(
 			&svcmgr,
-			"sessmgr",
-			"Session manager.",
-			"/system/services/sessmgr",
+			"security",
+			"Security server.",
+			"/system/services/security",
 			0,
-			"org.kiwi.SessionManager"
+			"org.kiwi.SecurityServer"
 		));
 
 		/* Now we can drop certain capabilities that only the security

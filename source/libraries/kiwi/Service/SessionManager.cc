@@ -19,10 +19,10 @@
  */
 
 #include <kiwi/Service/SessionManager.h>
-#include "org.kiwi.SessionManager.h"
+#include "org.kiwi.SecurityServer.h"
 
 using namespace kiwi;
-using namespace org::kiwi::SessionManager;
+using namespace org::kiwi::SecurityServer;
 
 /** Macro to get the session manager connection. */
 #define GET_CONN()	(reinterpret_cast<ServerConnection *>(m_conn))
