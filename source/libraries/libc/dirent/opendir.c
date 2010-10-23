@@ -35,7 +35,7 @@ DIR *opendir(const char *path) {
 		return NULL;
 	}
 
-	ret = fs_dir_open(path, 0, &dir->handle);
+	ret = fs_dir_open(path, FS_READ, 0, &dir->handle);
 	if(ret != STATUS_SUCCESS) {
 		free(dir);
 		return NULL;

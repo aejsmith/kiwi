@@ -48,7 +48,7 @@ typedef struct vm_region {
 	ptr_t end;			/**< Size of the region. */
 	int flags;			/**< Flags for the region. */
 
-	khandle_t *handle;		/**< Handle to object that this region is mapping. */
+	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
 	offset_t obj_offset;		/**< Offset into the object. */
 	vm_amap_t *amap;		/**< Anonymous map. */
 	offset_t amap_offset;		/**< Offset into the anonymous map. */
@@ -92,8 +92,8 @@ typedef struct vm_aspace {
 extern bool vm_fault(ptr_t addr, int reason, int access);
 
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
-extern status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, khandle_t *handle,
-                       offset_t offset, ptr_t *addrp);
+extern status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,
+                       object_handle_t *handle, offset_t offset, ptr_t *addrp);
 extern status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size);
 
 extern void vm_aspace_switch(vm_aspace_t *as);

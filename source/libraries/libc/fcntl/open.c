@@ -36,6 +36,7 @@
  *			success, -1 on failure (errno will be set to the error
  *			reason). */
 int open(const char *path, int oflag, ...) {
+	object_rights_t rights;
 	fs_node_type_t type;
 	handle_t handle;
 	fs_info_t info;
@@ -80,6 +81,13 @@ retry:
 		return -1;
 	}
 
+	/* Convert the flags to kernel flags. */
+	rights = 0;
+	rights |= ((oflag & O_RDONLY) ? FS_READ : 0);
+	rights |= ((oflag & O_WRONLY) ? FS_WRITE : 0);
+	kflag = 0;
+	kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
+
 	/* Open the entry according to the entry type. */
 	switch(type) {
 	case FS_NODE_FILE:
@@ -89,14 +97,10 @@ retry:
 		}
 
 		/* Convert the flags to kernel flags. */
-		kflag = 0;
-		kflag |= ((oflag & O_RDONLY) ? FS_FILE_READ : 0);
-		kflag |= ((oflag & O_WRONLY) ? FS_FILE_WRITE : 0);
 		kflag |= ((oflag & O_APPEND) ? FS_FILE_APPEND : 0);
-		kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
 
 		/* Open the file. */
-		ret = fs_file_open(path, kflag, &handle);
+		ret = fs_file_open(path, rights, kflag, &handle);
 		if(ret != STATUS_SUCCESS) {
 			if(ret == STATUS_NOT_FOUND) {
 				goto retry;
@@ -121,11 +125,7 @@ retry:
 			return -1;
 		}
 
-		/* Convert the flags to kernel flags. */
-		kflag = 0;
-		kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
-
-		ret = fs_dir_open(path, kflag, &handle);
+		ret = fs_dir_open(path, rights, kflag, &handle);
 		if(ret != STATUS_SUCCESS) {
 			if(ret == STATUS_NOT_FOUND) {
 				goto retry;

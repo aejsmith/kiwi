@@ -126,19 +126,21 @@ env.AddMethod(kiwi_library_method, 'KiwiLibrary')
 
 # Set up a shared library emitter to set dependencies on default libraries.
 def shlib_emitter(target, source, env):
-	if target[0].name != 'libkernel.so':
+	if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
 		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
-		Depends(target[0], env['LIBOUTDIR'].File('libkernel.so'))
-		if target[0].name != 'libc.so':
-			Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+	if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
+		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
 	return target, source
 env.Append(SHLIBEMITTER=[shlib_emitter])
 
 # Set up a program emitter to set dependencies on default libraries.
 def program_emitter(target, source, env):
-	Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
-	if env['SMARTLINK'](source, target, env, None) == '$CXX':
-		Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
+	if not ('-nostdlib' in env['LINKFLAGS'] or '-nostartfiles' in env['LINKFLAGS']):
+		Depends(target[0], env['LIBOUTDIR'].glob('*crt*.o'))
+	if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
+		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
+		if env['SMARTLINK'](source, target, env, None) == '$CXX':
+			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
 	return target, source
 env.Append(PROGEMITTER=[program_emitter])
 

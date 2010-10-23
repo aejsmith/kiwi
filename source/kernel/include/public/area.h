@@ -22,17 +22,23 @@
 #define __KERNEL_AREA_H
 
 #ifdef KERNEL
-# include <public/types.h>
+# include <public/object.h>
 #else
-# include <kernel/types.h>
+# include <kernel/object.h>
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset, handle_t *handlep);
-extern status_t SYSCALL(area_open)(area_id_t id, handle_t *handlep);
+/** Access rights for area objects. */
+#define AREA_READ	(1<<8)		/**< Allow mapping for reading. */
+#define AREA_WRITE	(1<<9)		/**< Allow mapping for writing. */
+
+extern status_t SYSCALL(area_create)(size_t size, handle_t source, offset_t offset,
+                                     const object_security_t *security,
+                                     object_rights_t rights, handle_t *handlep);
+extern status_t SYSCALL(area_open)(area_id_t id, object_rights_t rights, handle_t *handlep);
 extern area_id_t SYSCALL(area_id)(handle_t handle);
 extern size_t SYSCALL(area_size)(handle_t handle);
 extern status_t SYSCALL(area_resize)(handle_t handle, size_t size);

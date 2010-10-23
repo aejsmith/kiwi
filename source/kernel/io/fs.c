@@ -125,7 +125,7 @@ static fs_type_t *fs_type_lookup(const char *name) {
  *			contains a recognised type AND has the specified UUID.
  * @return		Pointer to type structure, or NULL if not recognised.
  *			If found, type will be referenced. */
-static fs_type_t *fs_type_probe(khandle_t *handle, const char *uuid) {
+static fs_type_t *fs_type_probe(object_handle_t *handle, const char *uuid) {
 	fs_type_t *type;
 
 	mutex_lock(&fs_types_lock);
@@ -224,16 +224,23 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	node->data = data;
 	node->mount = mount;
 
+	// FIXME
+	object_acl_t acl;
+	object_security_t security = { 0, 0, &acl };
+	object_acl_init(&acl);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
+	                     OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
+
 	/* Initialise the node's object header. */
 	switch(type) {
 	case FS_NODE_FILE:
-		object_init(&node->obj, &file_object_type);
+		object_init(&node->obj, &file_object_type, &security, NULL);
 		break;
 	case FS_NODE_DIR:
-		object_init(&node->obj, &dir_object_type);
+		object_init(&node->obj, &dir_object_type, &security, NULL);
 		break;
 	default:
-		object_init(&node->obj, NULL);
+		object_init(&node->obj, NULL, &security, NULL);
 		break;
 	}
 
@@ -866,13 +873,15 @@ static status_t fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
 }
 
 /** Create a handle to a node.
- * @param node		Node to create handle to. Will have an extra reference
- *			added to it.
+ * @param node		Node to create handle to (will be referenced).
+ * @param rights	Requested access rights for the handle.
  * @param flags		Flags for the handle.
- * @return		Pointer to handle structure. */
-static khandle_t *fs_handle_create(fs_node_t *node, int flags) {
+ * @param handlep	Where to store pointer to handle.
+ * @return		Status code describing result of the operation. */
+static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int flags,
+                                 object_handle_t **handlep) {
 	fs_handle_t *data;
-	khandle_t *handle;
+	status_t ret;
 
 	/* Allocate the per-handle data structure. */
 	data = kmalloc(sizeof(fs_handle_t), MM_SLEEP);
@@ -880,16 +889,21 @@ static khandle_t *fs_handle_create(fs_node_t *node, int flags) {
 	data->offset = 0;
 	data->flags = flags;
 
-	/* Create the handle. */
 	fs_node_get(node);
-	handle = handle_create(&node->obj, data);
-	dprintf("fs: opened handle %p to node %p (data: %p)\n", handle, node, data);
-	return handle;
+
+	/* Create the handle. */
+	ret = object_handle_create(&node->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
+		fs_node_release(node);
+		kfree(data);
+	}
+
+	return ret;
 }
 
 /** Close a handle to a file.
  * @param handle	Handle to close. */
-static void file_object_close(khandle_t *handle) {
+static void file_object_close(object_handle_t *handle) {
 	fs_node_release((fs_node_t *)handle->object);
 	kfree(handle->data);
 }
@@ -897,20 +911,31 @@ static void file_object_close(khandle_t *handle) {
 /** Check if a file can be memory-mapped.
  * @param handle	Handle to file.
  * @param flags		Mapping flags (VM_MAP_*).
- * @return		STATUS_SUCCESS if mappable, other STATUS_CODE if not. */
-static status_t file_object_mappable(khandle_t *handle, int flags) {
+ * @return		STATUS_SUCCESS if mappable, other status code if not. */
+static status_t file_object_mappable(object_handle_t *handle, int flags) {
 	fs_node_t *node = (fs_node_t *)handle->object;
-	fs_handle_t *data = handle->data;
 
-	/* Check whether the filesystem supports memory-mapping, and if shared
-	 * write access is requested, ensure that the handle flags allow it. */
+	/* Check whether the filesystem supports memory-mapping. */
 	if(!node->ops->get_cache) {
 		return STATUS_NOT_SUPPORTED;
-	} else if(!(flags & VM_MAP_PRIVATE) && flags & VM_MAP_WRITE && !(data->flags & FS_FILE_WRITE)) {
-		return STATUS_PERM_DENIED;
-	} else {
-		return STATUS_SUCCESS;
 	}
+
+	/* If mapping for reading, check if allowed. */
+	if(flags & VM_MAP_READ && !object_handle_rights(handle, FS_READ)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	/* If creating a shared mapping for writing, check for write access. */
+	if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE && !object_handle_rights(handle, FS_WRITE)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	/* If mapping for execution, check for execute access. */
+	if(flags & VM_MAP_EXEC && !object_handle_rights(handle, FS_EXECUTE)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 /** Get a page from a file object.
@@ -918,7 +943,7 @@ static status_t file_object_mappable(khandle_t *handle, int flags) {
  * @param offset	Offset of page to get.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing result of the operation. */
-static status_t file_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static status_t file_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	fs_node_t *node = (fs_node_t *)handle->object;
 	vm_cache_t *cache;
 
@@ -932,7 +957,7 @@ static status_t file_object_get_page(khandle_t *handle, offset_t offset, phys_pt
  * @param handle	Handle to file.
  * @param offset	Offset of page to release.
  * @param phys		Physical address of page that was unmapped. */
-static void file_object_release_page(khandle_t *handle, offset_t offset, phys_ptr_t phys) {
+static void file_object_release_page(object_handle_t *handle, offset_t offset, phys_ptr_t phys) {
 	fs_node_t *node = (fs_node_t *)handle->object;
 	vm_cache_t *cache;
 
@@ -1018,28 +1043,34 @@ static fs_node_ops_t memory_file_ops = {
  * @param buf		Pointer to memory area to use.
  * @param size		Size of memory area.
  *
- * @return		Pointer to handle to file (has FS_FILE_READ flag set).
+ * @return		Pointer to handle to file (has FS_READ access right).
  */
-khandle_t *fs_file_from_memory(const void *buf, size_t size) {
+object_handle_t *fs_file_from_memory(const void *buf, size_t size) {
+	object_handle_t *handle;
 	memory_file_t *file;
-	khandle_t *handle;
 	fs_node_t *node;
 
+	// FIXME: Will need to create an ACL here.
 	file = kmalloc(sizeof(memory_file_t), MM_SLEEP);
 	file->data = buf;
 	file->size = size;
 	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &memory_file_ops, file);
-	handle = fs_handle_create(node, FS_FILE_READ);
+
+	if(fs_handle_create(node, FS_READ, 0, &handle) != STATUS_SUCCESS) {
+		fatal("Should not fail to create memory file");
+	}
+
 	fs_node_release(node);
 	return handle;
 }
 
 /** Open a handle to a file.
  * @param path		Path to file to open.
+ * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t fs_file_open(const char *path, int flags, khandle_t **handlep) {
+status_t fs_file_open(const char *path, object_rights_t rights, int flags, object_handle_t **handlep) {
 	fs_node_t *node;
 	status_t ret;
 
@@ -1047,14 +1078,14 @@ status_t fs_file_open(const char *path, int flags, khandle_t **handlep) {
 	ret = fs_node_lookup(path, true, FS_NODE_FILE, &node);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(flags & FS_FILE_WRITE && FS_NODE_IS_RDONLY(node)) {
+	} else if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
 		fs_node_release(node);
 		return STATUS_READ_ONLY;
 	}
 
-	*handlep = fs_handle_create(node, flags);
+	ret = fs_handle_create(node, rights, flags, handlep);
 	fs_node_release(node);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Read from a file.
@@ -1068,7 +1099,7 @@ status_t fs_file_open(const char *path, int flags, khandle_t **handlep) {
  *			is updated even upon failure, as it can fail when part
  *			of the data has been read.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_read_internal(khandle_t *handle, void *buf, size_t count,
+static status_t fs_file_read_internal(object_handle_t *handle, void *buf, size_t count,
                                       offset_t offset, bool usehnd, size_t *bytesp) {
 	status_t ret = STATUS_SUCCESS;
 	fs_handle_t *data;
@@ -1081,16 +1112,16 @@ static status_t fs_file_read_internal(khandle_t *handle, void *buf, size_t count
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = STATUS_INVALID_HANDLE;
 		goto out;
+	} else if(!object_handle_rights(handle, FS_READ)) {
+		ret = STATUS_PERM_DENIED;
+		goto out;
 	}
 
 	node = (fs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == FS_NODE_FILE);
 
-	if(!(data->flags & FS_FILE_READ)) {
-		ret = STATUS_PERM_DENIED;
-		goto out;
-	} else if(!node->ops->read) {
+	if(!node->ops->read) {
 		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	} else if(!count) {
@@ -1127,7 +1158,8 @@ out:
  * handle's current offset, and before returning the offset will be incremented
  * by the number of bytes read.
  *
- * @param handle	Handle to file to read from.
+ * @param handle	Handle to file to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -1137,7 +1169,7 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp) {
+status_t fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp) {
 	return fs_file_read_internal(handle, buf, count, 0, true, bytesp);
 }
 
@@ -1146,7 +1178,8 @@ status_t fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to read from.
+ * @param handle	Handle to file to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -1157,7 +1190,7 @@ status_t fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t fs_file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	return fs_file_read_internal(handle, buf, count, offset, false, bytesp);
 }
 
@@ -1172,7 +1205,7 @@ status_t fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offs
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
  * @return		Status code describing result of the operation. */
-static status_t fs_file_write_internal(khandle_t *handle, const void *buf, size_t count,
+static status_t fs_file_write_internal(object_handle_t *handle, const void *buf, size_t count,
                                        offset_t offset, bool usehnd, size_t *bytesp) {
 	status_t ret = STATUS_SUCCESS;
 	fs_handle_t *data;
@@ -1186,16 +1219,16 @@ static status_t fs_file_write_internal(khandle_t *handle, const void *buf, size_
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		ret = STATUS_INVALID_HANDLE;
 		goto out;
+	} else if(!object_handle_rights(handle, FS_WRITE)) {
+		ret = STATUS_PERM_DENIED;
+		goto out;
 	}
 
 	node = (fs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == FS_NODE_FILE);
 
-	if(!(data->flags & FS_FILE_WRITE)) {
-		ret = STATUS_PERM_DENIED;
-		goto out;
-	} else if(!node->ops->write) {
+	if(!node->ops->write) {
 		ret = STATUS_NOT_SUPPORTED;
 		goto out;
 	} else if(!count) {
@@ -1239,7 +1272,8 @@ out:
  * before returning the handle's offset will be incremented by the number of
  * bytes written.
  *
- * @param handle	Handle to file to write to.
+ * @param handle	Handle to file to write to. Must have the FS_WRITE
+ *			access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -1252,7 +1286,7 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t *bytesp) {
+status_t fs_file_write(object_handle_t *handle, const void *buf, size_t count, size_t *bytesp) {
 	return fs_file_write_internal(handle, buf, count, 0, true, bytesp);
 }
 
@@ -1261,7 +1295,8 @@ status_t fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t 
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to write to.
+ * @param handle	Handle to file to write to. Must have the FS_WRITE
+ *			access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -1273,7 +1308,7 @@ status_t fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t 
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
+status_t fs_file_pwrite(object_handle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
 	return fs_file_write_internal(handle, buf, count, offset, false, bytesp);
 }
 
@@ -1284,12 +1319,13 @@ status_t fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @param handle	Handle to file to resize.
+ * @param handle	Handle to file to resize. Must have the FS_WRITE access
+ *			right.
  * @param size		New size of the file.
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_file_resize(khandle_t *handle, offset_t size) {
+status_t fs_file_resize(object_handle_t *handle, offset_t size) {
 	fs_handle_t *data;
 	fs_node_t *node;
 
@@ -1297,16 +1333,15 @@ status_t fs_file_resize(khandle_t *handle, offset_t size) {
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		return STATUS_INVALID_HANDLE;
+	} else if(!object_handle_rights(handle, FS_WRITE)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	node = (fs_node_t *)handle->object;
 	data = handle->data;
 	assert(node->type == FS_NODE_FILE);
 
-	/* Check if resizing is allowed. */
-	if(!(data->flags & FS_FILE_WRITE)) {
-		return STATUS_PERM_DENIED;
-	} else if(!node->ops->resize) {
+	if(!node->ops->resize) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
@@ -1327,7 +1362,7 @@ static status_t fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp)
 
 /** Close a handle to a directory.
  * @param handle	Handle to close. */
-static void dir_object_close(khandle_t *handle) {
+static void dir_object_close(object_handle_t *handle) {
 	fs_node_release((fs_node_t *)handle->object);
 	kfree(handle->data);
 }
@@ -1347,22 +1382,26 @@ status_t fs_dir_create(const char *path) {
 
 /** Open a handle to a directory.
  * @param path		Path to directory to open.
+ * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t fs_dir_open(const char *path, int flags, khandle_t **handlep) {
+status_t fs_dir_open(const char *path, object_rights_t rights, int flags, object_handle_t **handlep) {
 	fs_node_t *node;
 	status_t ret;
 
-	/* Look up the filesystem node. */
+	/* Look up the filesystem node and check if it is suitable. */
 	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
+	} else if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
+		fs_node_release(node);
+		return STATUS_READ_ONLY;
 	}
 
-	*handlep = fs_handle_create(node, flags);
+	ret = fs_handle_create(node, rights, flags, handlep);
 	fs_node_release(node);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Read a directory entry.
@@ -1373,7 +1412,8 @@ status_t fs_dir_open(const char *path, int flags, khandle_t **handlep) {
  * will be the handle's current offset, and upon success the handle's offset
  * will be incremented by 1.
  *
- * @param handle	Handle to directory to read from.
+ * @param handle	Handle to directory to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
  *			return STATUS_TOO_SMALL).
@@ -1382,7 +1422,7 @@ status_t fs_dir_open(const char *path, int flags, khandle_t **handlep) {
  *			handle's offset is past the end of the directory,
  *			STATUS_NOT_FOUND will be returned.
  */
-status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
+status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) {
 	fs_node_t *child, *node;
 	fs_dir_entry_t *entry;
 	fs_handle_t *data;
@@ -1393,6 +1433,8 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_INVALID_HANDLE;
+	} else if(!object_handle_rights(handle, FS_READ)) {
+		return STATUS_PERM_DENIED;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1477,7 +1519,7 @@ status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
+status_t fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp) {
 	fs_handle_t *data;
 	fs_node_t *node;
 	fs_info_t info;
@@ -1533,7 +1575,7 @@ status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offs
  * @param handle	Handle to file/directory to get information on.
  * @param info		Information structure to fill in.
  * @return		Status code describing result of the operation. */
-status_t fs_handle_info(khandle_t *handle, fs_info_t *info) {
+status_t fs_handle_info(object_handle_t *handle, fs_info_t *info) {
 	fs_node_t *node;
 
 	if(!handle || !info) {
@@ -1551,7 +1593,7 @@ status_t fs_handle_info(khandle_t *handle, fs_info_t *info) {
 /** Flush changes to a filesystem node to the FS.
  * @param handle	Handle to node to flush.
  * @return		Status code describing result of the operation. */
-status_t fs_handle_sync(khandle_t *handle) {
+status_t fs_handle_sync(object_handle_t *handle) {
 	fs_node_t *node;
 
 	if(!handle) {
@@ -1710,12 +1752,12 @@ static void free_mount_options(fs_mount_option_t *opts, size_t count) {
 /** Probe a device for filesystems.
  * @param device	Device to probe. */
 void fs_probe(device_t *device) {
-	khandle_t *handle;
+	object_handle_t *handle;
 	fs_type_t *type;
 	status_t ret;
 	char *path;
 
-	if(device_get(device, &handle) != STATUS_SUCCESS) {
+	if(device_get(device, DEVICE_READ, &handle) != STATUS_SUCCESS) {
 		return;
 	}
 
@@ -1736,7 +1778,7 @@ void fs_probe(device_t *device) {
 		}
 	}
 
-	handle_release(handle);
+	object_handle_release(handle);
 }
 
 /** Mount a filesystem.
@@ -1827,7 +1869,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 			goto fail;
 		}
 
-		ret = device_open(device, &mount->device);
+		ret = device_open(device, DEVICE_READ | DEVICE_WRITE, &mount->device);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
@@ -1892,7 +1934,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 fail:
 	if(mount) {
 		if(mount->device) {
-			handle_release(mount->device);
+			object_handle_release(mount->device);
 		}
 		if(mount->type) {
 			refcount_dec(&mount->type->count);
@@ -1986,7 +2028,7 @@ status_t fs_unmount(const char *path) {
 		mount->ops->unmount(mount);
 	}
 	if(mount->device) {
-		handle_release(mount->device);
+		object_handle_release(mount->device);
 	}
 	refcount_dec(&mount->type->count);
 
@@ -2261,12 +2303,13 @@ status_t sys_fs_file_create(const char *path) {
 
 /** Open a handle to a file.
  * @param path		Path to file to open.
+ * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to file.
  * @return		Status code describing result of the operation. */
-status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
+status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, handle_t *handlep) {
+	object_handle_t *handle;
 	char *kpath = NULL;
-	khandle_t *handle;
 	status_t ret;
 
 	if(!handlep) {
@@ -2278,14 +2321,14 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
 		return ret;
 	}
 
-	ret = fs_file_open(kpath, flags, &handle);
+	ret = fs_file_open(kpath, rights, flags, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
-	handle_release(handle);
+	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
+	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
 }
@@ -2296,7 +2339,8 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
  * handle's current offset, and before returning the offset will be incremented
  * by the number of bytes read.
  *
- * @param handle	Handle to file to read from.
+ * @param handle	Handle to file to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -2307,12 +2351,12 @@ status_t sys_fs_file_open(const char *path, int flags, handle_t *handlep) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2343,7 +2387,7 @@ status_t sys_fs_file_read(handle_t handle, void *buf, size_t count, size_t *byte
 	kfree(kbuf);
 out:
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -2359,7 +2403,8 @@ out:
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to read from.
+ * @param handle	Handle to file to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -2371,12 +2416,12 @@ out:
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2407,7 +2452,7 @@ status_t sys_fs_file_pread(handle_t handle, void *buf, size_t count, offset_t of
 	kfree(kbuf);
 out:
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -2426,7 +2471,8 @@ out:
  * before returning the handle's offset will be incremented by the number of
  * bytes written.
  *
- * @param handle	Handle to file to write to.
+ * @param handle	Handle to file to write to. Must have the FS_WRITE
+ *			access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -2440,12 +2486,12 @@ out:
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_file_write(handle_t handle, const void *buf, size_t count, size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2476,7 +2522,7 @@ out:
 		kfree(kbuf);
 	}
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -2492,7 +2538,8 @@ out:
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to write to.
+ * @param handle	Handle to file to write to. Must have the FS_WRITE
+ *			access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -2505,12 +2552,12 @@ out:
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_file_pwrite(handle_t handle, const void *buf, size_t count, offset_t offset, size_t *bytesp) {
-	khandle_t *khandle = NULL;
+	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2541,7 +2588,7 @@ out:
 		kfree(kbuf);
 	}
 	if(khandle) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 	}
 	if(bytesp) {
 		err = memcpy_to_user(bytesp, &bytes, sizeof(size_t));
@@ -2559,22 +2606,23 @@ out:
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @param handle	Handle to file to resize.
+ * @param handle	Handle to file to resize. Must have the FS_WRITE access
+ *			right.
  * @param size		New size of the file.
  *
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_file_resize(handle_t handle, offset_t size) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	status_t ret;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_FILE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	ret = fs_file_resize(khandle, size);
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -2597,12 +2645,13 @@ status_t sys_fs_dir_create(const char *path) {
 
 /** Open a handle to a directory.
  * @param path		Path to file to open.
+ * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
  * @param handlep	Where to store handle to directory.
  * @return		Status code describing result of the operation. */
-status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
+status_t sys_fs_dir_open(const char *path, object_rights_t rights, int flags, handle_t *handlep) {
+	object_handle_t *handle;
 	char *kpath = NULL;
-	khandle_t *handle;
 	status_t ret;
 
 	if(!handlep) {
@@ -2614,14 +2663,14 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
 		return ret;
 	}
 
-	ret = fs_dir_open(kpath, flags, &handle);
+	ret = fs_dir_open(kpath, rights, flags, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
 	}
 
-	ret = handle_attach(curr_proc, handle, 0, NULL, handlep);
-	handle_release(handle);
+	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
+	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
 }
@@ -2634,7 +2683,8 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
  * will be the handle's current offset, and upon success the handle's offset
  * will be incremented by 1.
  *
- * @param handle	Handle to directory to read from.
+ * @param handle	Handle to directory to read from. Must have the FS_READ
+ *			access right.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
  *			return STATUS_TOO_SMALL).
@@ -2644,15 +2694,15 @@ status_t sys_fs_dir_open(const char *path, int flags, handle_t *handlep) {
  *			STATUS_NOT_FOUND will be returned.
  */
 status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
+	object_handle_t *khandle;
 	fs_dir_entry_t *kbuf;
-	khandle_t *khandle;
 	status_t ret;
 
 	if(!size) {
 		return STATUS_TOO_SMALL;
 	}
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_DIR, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DIR, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -2663,7 +2713,7 @@ status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	 * forever. */
 	kbuf = kmalloc(size, 0);
 	if(!kbuf) {
-		handle_release(khandle);
+		object_handle_release(khandle);
 		return STATUS_NO_MEMORY;
 	}
 
@@ -2674,7 +2724,7 @@ status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
 	}
 
 	kfree(kbuf);
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -2692,11 +2742,11 @@ status_t sys_fs_dir_read(handle_t handle, fs_dir_entry_t *buf, size_t size) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, offset_t *newp) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	status_t ret;
 	offset_t new;
 
-	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -2705,7 +2755,7 @@ status_t sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, of
 	if(ret == STATUS_SUCCESS && newp) {
 		ret = memcpy_to_user(newp, &new, sizeof(offset_t));
 	}
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -2714,11 +2764,11 @@ status_t sys_fs_handle_seek(handle_t handle, int action, rel_offset_t offset, of
  * @param info		Information structure to fill in.
  * @return		Status code describing result of the operation. */
 status_t sys_fs_handle_info(handle_t handle, fs_info_t *info) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	fs_info_t kinfo;
 	status_t ret;
 
-	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -2727,7 +2777,7 @@ status_t sys_fs_handle_info(handle_t handle, fs_info_t *info) {
 	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -2735,16 +2785,16 @@ status_t sys_fs_handle_info(handle_t handle, fs_info_t *info) {
  * @param handle	Handle to node to flush.
  * @return		Status code describing result of the operation. */
 status_t sys_fs_handle_sync(handle_t handle) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	status_t ret;
 
-	ret = handle_lookup(curr_proc, handle, -1, &khandle);
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	ret = fs_handle_sync(khandle);
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 

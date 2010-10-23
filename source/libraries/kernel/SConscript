@@ -21,6 +21,7 @@ sources = map(File, [
 	'support/string.c',
 	'status_list.c',
 	'init.c',
+	'object.c',
 	'syscalls.S',
 ])
 

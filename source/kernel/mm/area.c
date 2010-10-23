@@ -26,9 +26,11 @@
 #include <lib/avl_tree.h>
 #include <lib/refcount.h>
 
+#include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
+#include <mm/vm.h>
 
 #include <proc/process.h>
 
@@ -51,7 +53,7 @@ typedef struct area {
 	size_t size;			/**< Size of area. */
 	mutex_t lock;			/**< Lock to protect area. */
 	refcount_t count;		/**< Number of handles referring to the area. */
-	khandle_t *source;		/**< Handle to source object. */
+	object_handle_t *source;	/**< Handle to source object. */
 	offset_t offset;		/**< Offset into source. */
 	avl_tree_t pages;		/**< Tree of pages for unbacked areas. */
 } area_t;
@@ -95,7 +97,7 @@ static void area_release(area_t *area) {
 		rwlock_unlock(&area_tree_lock);
 
 		if(area->source) {
-			handle_release(area->source);
+			object_handle_release(area->source);
 		}
 		vmem_free(area_id_arena, area->id, 1);
 		object_destroy(&area->obj);
@@ -105,8 +107,35 @@ static void area_release(area_t *area) {
 
 /** Close a handle to a memory area.
  * @param handle	Handle to the area. */
-static void area_object_close(khandle_t *handle) {
+static void area_object_close(object_handle_t *handle) {
 	area_release((area_t *)handle->object);
+}
+
+/** Check if an area can be mapped.
+ * @param handle	Handle to object.
+ * @param flags		Mapping flags (VM_MAP_*).
+ * @return		STATUS_SUCCESS if can be mapped, status code explaining
+ *			why if not. */
+static status_t area_object_mappable(object_handle_t *handle, int flags) {
+	area_t *area = (area_t *)handle->object;
+
+	if(flags & (VM_MAP_READ | VM_MAP_EXEC)) {
+		if(!object_handle_rights(handle, AREA_READ)) {
+			return STATUS_PERM_DENIED;
+		}
+	}
+	if(flags & VM_MAP_WRITE && !(flags & VM_MAP_PRIVATE)) {
+		if(!object_handle_rights(handle, AREA_WRITE)) {
+			return STATUS_PERM_DENIED;
+		}
+	}
+
+	/* If there is a source object, check whether we can map it. */
+	if(area->source && area->source->object->type->mappable) {
+		return area->source->object->type->mappable(area->source, flags);
+	}
+
+	return STATUS_SUCCESS;
 }
 
 /** Get a page from the object.
@@ -114,7 +143,7 @@ static void area_object_close(khandle_t *handle) {
  * @param offset	Offset into object to get page from.
  * @param physp		Where to store physical address of page.
  * @return		Status code describing result of the operation. */
-static status_t area_object_get_page(khandle_t *handle, offset_t offset, phys_ptr_t *physp) {
+static status_t area_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	area_t *area = (area_t *)handle->object;
 	status_t ret = STATUS_SUCCESS;
 	vm_page_t *page;
@@ -151,7 +180,7 @@ static status_t area_object_get_page(khandle_t *handle, offset_t offset, phys_pt
  * @param handle	Handle to object to release page in.
  * @param offset	Offset of page in object.
  * @param phys		Physical address of page that was unmapped. */
-static void area_object_release_page(khandle_t *handle, offset_t offset, phys_ptr_t phys) {
+static void area_object_release_page(object_handle_t *handle, offset_t offset, phys_ptr_t phys) {
 	area_t *area = (area_t *)handle->object;
 
 	if(area->source && area->source->object->type->release_page) {
@@ -164,6 +193,7 @@ static void area_object_release_page(khandle_t *handle, offset_t offset, phys_pt
 static object_type_t area_object_type = {
 	.id = OBJECT_TYPE_AREA,
 	.close = area_object_close,
+	.mappable = area_object_mappable,
 	.get_page = area_object_get_page,
 	.release_page = area_object_release_page,
 };
@@ -173,10 +203,16 @@ static object_type_t area_object_type = {
  * @param source	Handle to source object, or -1 if the area should be
  *			backed by anonymous memory.
  * @param offset	Offset within the source object to start from.
- * @param handlep	Where to store handle to area.
+ * @param security	Security attributes for the object. If NULL, default
+ *			security attributes will be used which sets the owning
+ *			user and group to that of the calling process and grants
+ *			read/write access to the calling process' user.
+ * @param rights	Access rights for the handle.
  * @return		Status code describing result of the operation. */
-status_t sys_area_create(size_t size, handle_t source, offset_t offset, handle_t *handlep) {
-	khandle_t *ksource = NULL;
+status_t sys_area_create(size_t size, handle_t source, offset_t offset, const object_security_t *security,
+                         object_rights_t rights, handle_t *handlep) {
+	object_security_t ksecurity = { -1, -1, NULL };
+	object_handle_t *ksource = NULL;
 	status_t ret;
 	area_t *area;
 
@@ -185,8 +221,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, handle_t
 	}
 
 	if(source >= 0) {
-		/* FIXME: Need to call mappable(). */
-		ret = handle_lookup(curr_proc, source, -1, &ksource);
+		ret = object_handle_lookup(NULL, source, -1, 0, &ksource);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		} else if(!ksource->object->type->get_page) {
@@ -194,16 +229,33 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, handle_t
 		}
 	}
 
+	if(security) {
+		ret = object_security_from_user(&ksecurity, security);
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+	}
+
+	/* Construct a default ACL if required. */
+	if(!ksecurity.acl) {
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
+		object_acl_init(ksecurity.acl);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
+		                     OBJECT_SET_ACL | AREA_READ | AREA_WRITE);
+	}
+
 	area = slab_cache_alloc(area_cache, MM_SLEEP);
 	area->id = vmem_alloc(area_id_arena, 1, 0);
 	if(!area->id) {
 		slab_cache_free(area_cache, area);
+		object_security_destroy(&ksecurity);
 		if(ksource) {
-			handle_release(ksource);
+			object_handle_release(ksource);
 		}
 		return STATUS_NO_AREAS;
 	}
-	object_init(&area->obj, &area_object_type);
+	object_init(&area->obj, &area_object_type, &ksecurity, NULL);
+	object_security_destroy(&ksecurity);
 	refcount_set(&area->count, 1);
 	area->source = ksource;
 	area->offset = offset;
@@ -213,7 +265,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, handle_t
 	avl_tree_insert(&area_tree, area->id, area, NULL);
 	rwlock_unlock(&area_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &area->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		area_release(area);
 	}
@@ -222,9 +274,10 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, handle_t
 
 /** Open a handle to a memory area.
  * @param id		ID of area to open.
+ * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to area.
  * @return		Status code describing result of the operation. */
-status_t sys_area_open(area_id_t id, handle_t *handlep) {
+status_t sys_area_open(area_id_t id, object_rights_t rights, handle_t *handlep) {
 	status_t ret;
 	area_t *area;
 
@@ -243,7 +296,7 @@ status_t sys_area_open(area_id_t id, handle_t *handlep) {
 	refcount_inc(&area->count);
 	rwlock_unlock(&area_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &area->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		area_release(area);
 	}
@@ -254,17 +307,17 @@ status_t sys_area_open(area_id_t id, handle_t *handlep) {
  * @param handle	Handle to area.
  * @return		ID of area on success, -1 if handle is invalid. */
 area_id_t sys_area_id(handle_t handle) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	area_id_t ret;
 	area_t *area;
 
-	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_AREA, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
 	area = (area_t *)khandle->object;
 	ret = area->id;
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -272,17 +325,17 @@ area_id_t sys_area_id(handle_t handle) {
  * @param handle	Handle to area.
  * @return		Size of area, or 0 if handle is invalid. */
 size_t sys_area_size(handle_t handle) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	area_t *area;
 	size_t ret;
 
-	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_AREA, &khandle) != STATUS_SUCCESS) {
-		return 0;
+	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
+		return -1;
 	}
 
 	area = (area_t *)khandle->object;
 	ret = area->size;
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -292,7 +345,7 @@ size_t sys_area_size(handle_t handle) {
  * @param size		New size of the area.
  * @return		Status code describing result of the operation. */
 status_t sys_area_resize(handle_t handle, size_t size) {
-	khandle_t *khandle;
+	object_handle_t *khandle;
 	status_t ret;
 	area_t *area;
 
@@ -300,7 +353,7 @@ status_t sys_area_resize(handle_t handle, size_t size) {
 		return STATUS_INVALID_ARG;
 	}
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_AREA, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -312,7 +365,7 @@ status_t sys_area_resize(handle_t handle, size_t size) {
 		area->size = size;
 	}
 
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 

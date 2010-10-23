@@ -58,7 +58,7 @@ typedef struct boot_module {
 	list_t header;			/**< Link to modules list. */
 	void *mapping;			/**< Pointer to mapped module data. */
 	size_t size;			/**< Size of the module data. */
-	khandle_t *handle;		/**< File handle for the module data. */
+	object_handle_t *handle;	/**< File handle for the module data. */
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
@@ -97,7 +97,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 	if(mod->name) {
 		kfree(mod->name);
 	}
-	handle_release(mod->handle);
+	object_handle_release(mod->handle);
 	page_phys_unmap(mod->mapping, mod->size, true);
 	kfree(mod);
 
@@ -127,7 +127,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @param mod		Boot module containing archive. */
 static void __init_text load_boot_fsimage(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
-	khandle_t *handle;
+	object_handle_t *handle;
 	int64_t size;
 	status_t ret;
 	size_t bytes;
@@ -165,7 +165,7 @@ static void __init_text load_boot_fsimage(boot_module_t *mod) {
 				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
 			}
 
-			ret = fs_file_open(hdr->name, FS_FILE_WRITE, &handle);
+			ret = fs_file_open(hdr->name, FS_WRITE, 0, &handle);
 			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to open file %s (%d)", hdr->name, ret);
 			}
@@ -177,7 +177,7 @@ static void __init_text load_boot_fsimage(boot_module_t *mod) {
 				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
 			}
 
-			handle_release(handle);
+			object_handle_release(handle);
 			break;
 		case DIRTYPE:
 			ret = fs_dir_create(hdr->name);
@@ -353,6 +353,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	if(cpu == args->boot_cpu) {
 		cpu_early_init(args);
 		console_early_init();
+		security_init();
 
 		/* Perform early architecture/platform initialisation. */
 		arch_premm_init(args);
@@ -387,7 +388,6 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
 		/* Bring up process-/thread-related stuff. */
-		security_init();
 		handle_init();
 		session_init();
 		process_init();
@@ -405,7 +405,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		vm_init();
 
 		/* Create the second stage initialisation thread. */
-		ret = thread_create("init", kernel_proc, 0, init_thread, args, NULL, &thread);
+		ret = thread_create("init", kernel_proc, 0, init_thread, args, NULL, NULL, &thread);
 		if(ret != STATUS_SUCCESS) {
 			fatal("Could not create second-stage initialisation thread");
 		}

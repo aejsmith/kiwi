@@ -161,7 +161,7 @@ public:
 			return;
 		}
 
-		ret = area_open(m_surface_id, &m_surface_handle);
+		ret = area_open(m_surface_id, AREA_READ | AREA_WRITE, &m_surface_handle);
 		if(ret != STATUS_SUCCESS) {
 			cout << "Failed to open surface: " << ret << endl;
 			return;

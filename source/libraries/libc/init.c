@@ -25,9 +25,13 @@
 #include <unistd.h>
 
 #include "libc.h"
+#include "../kernel/libkernel.h"
 
 /** Early C library initialisation. */
 static void __attribute__((constructor)) libc_early_init(void) {
+	/* Tell libkernel to use our allocation functions. */
+	libkernel_heap_ops(malloc, free);
+
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");
 	stdout = fdopen(STDOUT_FILENO, "a");

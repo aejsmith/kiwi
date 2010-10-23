@@ -45,7 +45,7 @@ InputManager::InputManager(WindowServer *server) :
 	status_t ret;
 
 	/* See above TODO. Just hardcode devices for now. */
-	ret = device_open("/input/1", &handle);
+	ret = device_open("/input/1", DEVICE_READ | DEVICE_WRITE, &handle);
 	if(ret == STATUS_SUCCESS) {
 		new MouseDevice(server, handle);
 	} else {

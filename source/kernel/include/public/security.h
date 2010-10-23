@@ -37,7 +37,8 @@ extern "C" {
 /** Maximum number of capabilities. */
 #define SECURITY_MAX_CAPS		128
 
-/** Definitions of capabilities. */
+/** Definitions of capabilities.
+ * @note		Update security_init() when adding capabilities. */
 #define CAP_SECURITY_AUTHORITY		0	/**< Ability to set any process' security context. */
 #define CAP_CREATE_SESSION		1	/**< Ability to create new sessions. */
 #define CAP_CHANGE_IDENTITY		2	/**< Ability to change user/group IDs. */
@@ -45,6 +46,7 @@ extern "C" {
 #define CAP_FS_ADMIN			4	/**< Ability to bypass access checks on the filesystem. */
 #define CAP_FS_SETROOT			5	/**< Ability to use the fs_setroot() system call. */
 #define CAP_FS_MOUNT			6	/**< Ability to mount/unmount filesystems. */
+#define CAP_CHANGE_OWNER		7	/**< Ability to set object user/group to arbitrary IDs. */
 
 /** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()
@@ -52,7 +54,12 @@ extern "C" {
 typedef struct security_context {
 	user_id_t uid;			/**< User ID. */
 
-	/** Groups that the process belongs to (all unused entries should be -1). */
+	/** Groups that the process belongs to (all unused entries negative).
+	 * @note		Primary group is the first used entry in the
+	 *			structure. This group is used as the default
+	 *			owning group when one is not specified during
+	 *			object creation. The order of other groups is
+	 *			irrelevant. */
 	group_id_t groups[SECURITY_MAX_GROUPS];
 	
 	/** Capabilities for the process. */
@@ -81,8 +88,30 @@ static inline void security_context_set_uid(security_context_t *context, user_id
 	context->uid = uid;
 }
 
+/** Check if a security context is a member of a group.
+ * @param context	Context to check.
+ * @param gid		Group ID to check for.
+ * @return		Whether the context has the specified group. */
+static inline bool security_context_has_group(security_context_t *context, group_id_t gid) {
+	size_t i;
+
+	for(i = 0; i < SECURITY_MAX_GROUPS; i++) {
+		if(context->groups[i] < 0) {
+			break;
+		} else if(context->groups[i] == gid) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /** Add a group to a security context.
  * @note		Silently fails if group table full.
+ * @note		Primary group is the first used entry in the structure.
+ *			This group is used as the default owning group when one
+ *			is not specified during object creation. The order of
+ *			other groups is irrelevant.
  * @param context	Context to add to.
  * @param gid		Group ID to add. */
 static inline void security_context_add_group(security_context_t *context, group_id_t gid) {

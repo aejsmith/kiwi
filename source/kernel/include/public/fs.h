@@ -22,9 +22,9 @@
 #define __KERNEL_FS_H
 
 #ifdef KERNEL
-# include <public/types.h>
+# include <public/object.h>
 #else
-# include <kernel/types.h>
+# include <kernel/object.h>
 #endif
 
 #ifdef __cplusplus
@@ -64,13 +64,16 @@ typedef struct fs_info {
 #define FS_PATH_MAX		4096	/**< Maximum length of a path string. */
 #define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
 
+/** Access rights for files/directories. */
+#define FS_READ			(1<<8)	/**< Open for reading. */
+#define FS_WRITE		(1<<9)	/**< Open for writing. */
+#define FS_EXECUTE		(1<<10)	/**< Open for execution. */
+
 /** Behaviour flags for both FS handle types. */
 #define FS_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
 
 /** Behaviour flags for fs_file_open(). */
-#define FS_FILE_READ		(1<<1)	/**< Open for reading. */
-#define FS_FILE_WRITE		(1<<2)	/**< Open for writing. */
-#define FS_FILE_APPEND		(1<<3)	/**< Before each write, offset is set to the end of the file. */
+#define FS_FILE_APPEND		(1<<1)	/**< Before each write, offset is set to the end of the file. */
 
 /** Operations for fs_handle_seek(). */
 #define FS_SEEK_SET		1	/**< Set the offset to the exact position specified. */
@@ -78,7 +81,7 @@ typedef struct fs_info {
 #define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
 
 extern status_t SYSCALL(fs_file_create)(const char *path);
-extern status_t SYSCALL(fs_file_open)(const char *path, int flags, handle_t *handlep);
+extern status_t SYSCALL(fs_file_open)(const char *path, object_rights_t rights, int flags, handle_t *handlep);
 extern status_t SYSCALL(fs_file_read)(handle_t handle, void *buf, size_t count, size_t *bytesp);
 extern status_t SYSCALL(fs_file_pread)(handle_t handle, void *buf, size_t count, offset_t offset,
                                        size_t *bytesp);
@@ -88,7 +91,7 @@ extern status_t SYSCALL(fs_file_pwrite)(handle_t handle, const void *buf, size_t
 extern status_t SYSCALL(fs_file_resize)(handle_t handle, offset_t size);
 
 extern status_t SYSCALL(fs_dir_create)(const char *path);
-extern status_t SYSCALL(fs_dir_open)(const char *path, int flags, handle_t *handlep);
+extern status_t SYSCALL(fs_dir_open)(const char *path, object_rights_t rights, int flags, handle_t *handlep);
 extern status_t SYSCALL(fs_dir_read)(handle_t handle, fs_dir_entry_t *buf, size_t size);
 
 extern status_t SYSCALL(fs_handle_seek)(handle_t handle, int action, rel_offset_t offset, offset_t *newp);

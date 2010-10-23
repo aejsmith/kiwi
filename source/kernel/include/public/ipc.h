@@ -22,9 +22,9 @@
 #define __KERNEL_IPC_H
 
 #ifdef KERNEL
-# include <public/types.h>
+# include <public/object.h>
 #else
-# include <kernel/types.h>
+# include <kernel/object.h>
 #endif
 
 #ifdef __cplusplus
@@ -41,9 +41,12 @@ typedef struct ipc_message_vector {
 /** Structure containing details of a connection to a port. */
 typedef struct ipc_connect_info {
 	process_id_t pid;			/**< ID of process that connected. */
-	thread_id_t tid;			/**< ID of thread that connected. */
 	session_id_t sid;			/**< ID of session that connected. */
 } ipc_connect_info_t;
+
+/** IPC port rights. */
+#define PORT_LISTEN			(1<<8)	/**< Listen for connections on the port. */
+#define PORT_CONNECT			(1<<9)	/**< Connect to the port. */
 
 /** IPC port handle event types. */
 #define PORT_EVENT_CONNECTION		0	/**< A connection is being made to the port. */
@@ -56,8 +59,9 @@ typedef struct ipc_connect_info {
 #define IPC_QUEUE_MAX			256	/**< Maximum number of messages in a queue at a time. */
 #define IPC_MESSAGE_MAX			16384	/**< Maximum size of a message data buffer. */
 
-extern status_t SYSCALL(ipc_port_create)(handle_t *handlep);
-extern status_t SYSCALL(ipc_port_open)(port_id_t id, handle_t *handlep);
+extern status_t SYSCALL(ipc_port_create)(const object_security_t *security, object_rights_t rights,
+                                         handle_t *handlep);
+extern status_t SYSCALL(ipc_port_open)(port_id_t id, object_rights_t rights, handle_t *handlep);
 extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);
 extern status_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout, handle_t *handlep,
                                          ipc_connect_info_t *infop);

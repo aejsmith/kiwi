@@ -59,7 +59,7 @@ typedef struct fs_type {
 	 * @param uuid		If not NULL, the function should only return
 	 *			true if the filesystem also has this UUID.
 	 * @return		Whether the device contains this FS type. */
-	bool (*probe)(khandle_t *device, const char *uuid);
+	bool (*probe)(object_handle_t *device, const char *uuid);
 
 	/** Mount an instance of this FS type.
 	 * @note		It is guaranteed that the device will contain
@@ -220,7 +220,7 @@ typedef struct fs_mount {
 	int flags;			/**< Flags for the mount. */
 	fs_mount_ops_t *ops;		/**< Mount operations. */
 	void *data;			/**< Implementation data pointer. */
-	khandle_t *device;		/**< Handle to device that the filesystem resides on. */
+	object_handle_t *device;	/**< Handle to device that the filesystem resides on. */
 
 	struct fs_node *root;		/**< Root node for the mount. */
 	struct fs_node *mountpoint;	/**< Directory that this mount is mounted on. */
@@ -272,21 +272,26 @@ extern void fs_node_remove(fs_node_t *node);
  */
 
 extern status_t fs_file_create(const char *path);
-extern khandle_t *fs_file_from_memory(const void *buf, size_t size);
-extern status_t fs_file_open(const char *path, int flags, khandle_t **handlep);
-extern status_t fs_file_read(khandle_t *handle, void *buf, size_t count, size_t *bytesp);
-extern status_t fs_file_pread(khandle_t *handle, void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern status_t fs_file_write(khandle_t *handle, const void *buf, size_t count, size_t *bytesp);
-extern status_t fs_file_pwrite(khandle_t *handle, const void *buf, size_t count, offset_t offset, size_t *bytesp);
-extern status_t fs_file_resize(khandle_t *handle, offset_t size);
+extern object_handle_t *fs_file_from_memory(const void *buf, size_t size);
+extern status_t fs_file_open(const char *path, object_rights_t rights, int flags,
+                             object_handle_t **handlep);
+extern status_t fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
+extern status_t fs_file_pread(object_handle_t *handle, void *buf, size_t count,
+                              offset_t offset, size_t *bytesp);
+extern status_t fs_file_write(object_handle_t *handle, const void *buf, size_t count,
+                              size_t *bytesp);
+extern status_t fs_file_pwrite(object_handle_t *handle, const void *buf, size_t count,
+                               offset_t offset, size_t *bytesp);
+extern status_t fs_file_resize(object_handle_t *handle, offset_t size);
 
 extern status_t fs_dir_create(const char *path);
-extern status_t fs_dir_open(const char *path, int flags, khandle_t **handlep);
-extern status_t fs_dir_read(khandle_t *handle, fs_dir_entry_t *buf, size_t size);
+extern status_t fs_dir_open(const char *path, object_rights_t rights, int flags,
+                            object_handle_t **handlep);
+extern status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size);
 
-extern status_t fs_handle_seek(khandle_t *handle, int action, rel_offset_t offset, offset_t *newp);
-extern status_t fs_handle_info(khandle_t *handle, fs_info_t *info);
-extern status_t fs_handle_sync(khandle_t *handle);
+extern status_t fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp);
+extern status_t fs_handle_info(object_handle_t *handle, fs_info_t *info);
+extern status_t fs_handle_sync(object_handle_t *handle);
 
 extern status_t fs_symlink_create(const char *path, const char *target);
 extern status_t fs_symlink_read(const char *path, char *buf, size_t size);

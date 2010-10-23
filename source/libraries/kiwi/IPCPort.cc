@@ -40,7 +40,7 @@ IPCPort::IPCPort(handle_t handle) {
  */
 void IPCPort::Create() {
 	handle_t handle;
-	status_t ret = ipc_port_create(&handle);
+	status_t ret = ipc_port_create(NULL, PORT_LISTEN, &handle);
 	if(ret != STATUS_SUCCESS) {
 		throw IPCError(ret);
 	}
@@ -60,7 +60,7 @@ void IPCPort::Create() {
  */
 void IPCPort::Open(port_id_t id) {
 	handle_t handle;
-	status_t ret = ipc_port_open(id, &handle);
+	status_t ret = ipc_port_open(id, PORT_LISTEN, &handle);
 	if(ret != STATUS_SUCCESS) {
 		throw IPCError(ret);
 	}

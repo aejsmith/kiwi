@@ -22,10 +22,10 @@
 #define __KERNEL_PROCESS_H
 
 #ifdef KERNEL
-# include <public/types.h>
+# include <public/object.h>
 # include <public/security.h>
 #else
-# include <kernel/types.h>
+# include <kernel/object.h>
 # include <kernel/security.h>
 #endif
 
@@ -46,6 +46,10 @@ typedef struct process_args {
 /** Expected path to libkernel. */
 #define LIBKERNEL_PATH		"/system/libraries/libkernel.so"
 
+/** Process access rights. */
+#define PROCESS_QUERY		(1<<8)	/**< Query process information. */
+#define PROCESS_SET_SECURITY	(1<<9)	/**< Set security context. */
+
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
@@ -56,14 +60,16 @@ extern status_t SYSCALL(process_create)(const char *path, const char *const args
                                         const char *const env[], int flags,
                                         const security_context_t *sectx,
                                         handle_t map[][2], int count,
-                                        handle_t *handlep);
+                                        const object_security_t *security,
+                                        object_rights_t rights, handle_t *handlep);
 extern status_t SYSCALL(process_replace)(const char *path, const char *const args[],
                                          const char *const env[],
                                          const security_context_t *sectx,
                                          handle_t map[][2], int count);
 extern status_t SYSCALL(process_clone)(void (*func)(void *), void *arg, void *sp,
-                                       handle_t *handlep);
-extern status_t SYSCALL(process_open)(process_id_t id, handle_t *handlep);
+                                       const object_security_t *security,
+                                       object_rights_t rights, handle_t *handlep);
+extern status_t SYSCALL(process_open)(process_id_t id, object_rights_t rights, handle_t *handlep);
 extern process_id_t SYSCALL(process_id)(handle_t handle);
 extern session_id_t SYSCALL(process_session)(handle_t handle);
 extern status_t SYSCALL(process_security_context)(handle_t handle, security_context_t *contextp);

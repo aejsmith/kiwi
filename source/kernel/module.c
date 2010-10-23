@@ -90,7 +90,7 @@ static void module_mem_free(void *base, size_t size) {
 /** Allocate a module structure.
  * @param handle	Handle to the module data.
  * @return		Pointer to created structure. */
-static module_t *module_alloc(khandle_t *handle) {
+static module_t *module_alloc(object_handle_t *handle) {
 	module_t *module;
 
 	module = kmalloc(sizeof(module_t), MM_SLEEP);
@@ -138,7 +138,7 @@ static module_t *module_find(const char *name) {
  * @param namebuf	Buffer to store name in (should be MODULE_NAME_MAX + 1
  *			bytes long).
  * @return		Status code describing result of the operation. */
-status_t module_name(khandle_t *handle, char *namebuf) {
+status_t module_name(object_handle_t *handle, char *namebuf) {
 	module_t *module;
 	symbol_t *sym;
 	status_t ret;
@@ -239,7 +239,7 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
  *			required dependency is not loaded, the function will
  *			return STATUS_MISSING_LIBRARY.
  */
-status_t module_load(khandle_t *handle, char *depbuf) {
+status_t module_load(object_handle_t *handle, char *depbuf) {
 	module_t *module;
 	symbol_t *sym;
 	status_t ret;
@@ -377,7 +377,7 @@ int kdbg_cmd_modules(int argc, char **argv) {
  */
 status_t sys_module_load(const char *path, char *depbuf) {
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
-	khandle_t *handle;
+	object_handle_t *handle;
 	status_t ret, err;
 
 	/* Copy the path across. */
@@ -387,7 +387,7 @@ status_t sys_module_load(const char *path, char *depbuf) {
 	}
 
 	/* Open a handle to the file. */
-	ret = fs_file_open(kpath, FS_FILE_READ, &handle);
+	ret = fs_file_open(kpath, FS_READ, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
@@ -401,7 +401,7 @@ status_t sys_module_load(const char *path, char *depbuf) {
 		}
 	}
 
-	handle_release(handle);
+	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
 }

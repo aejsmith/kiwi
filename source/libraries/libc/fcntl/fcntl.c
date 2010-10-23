@@ -34,7 +34,7 @@ static int fcntl_getfd(int fd) {
 	int kflags, flags = 0;
 	status_t ret;
 
-	ret = handle_get_flags(fd, &kflags);
+	ret = handle_flags(fd, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

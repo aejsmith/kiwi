@@ -156,7 +156,7 @@ static void user_semaphore_release(user_semaphore_t *sem) {
 
 /** Close a handle to a semaphore object.
  * @param handle	Handle being closed. */
-static void semaphore_object_close(khandle_t *handle) {
+static void semaphore_object_close(object_handle_t *handle) {
 	user_semaphore_release((user_semaphore_t *)handle->object);
 }
 
@@ -169,9 +169,15 @@ static object_type_t semaphore_object_type = {
 /** Create a new semaphore.
  * @param name		Optional name for the semaphore, for debugging purposes.
  * @param count		Initial count of the semaphore.
+ * @param security	Security attributes for the ACL. If NULL, default
+ *			attributes will be constructed which grant full access
+ *			to the semaphore to the calling process' user.
+ * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to the semaphore.
  * @return		Status code describing result of the operation. */
-status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep) {
+status_t sys_semaphore_create(const char *name, size_t count, const object_security_t *security,
+                              object_rights_t rights, handle_t *handlep) {
+	object_security_t ksecurity = { -1, -1, NULL };
 	user_semaphore_t *sem;
 	status_t ret;
 
@@ -179,10 +185,26 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 		return STATUS_INVALID_ARG;
 	}
 
+	if(security) {
+		ret = object_security_from_user(&ksecurity, security);
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+	}
+
+	/* Construct a default ACL if required. */
+	if(!ksecurity.acl) {
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
+		object_acl_init(ksecurity.acl);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
+		                     OBJECT_SET_ACL | SEMAPHORE_USAGE);
+	}
+
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
 	sem->id = vmem_alloc(semaphore_id_arena, 1, 0);
 	if(!sem->id) {
 		kfree(sem);
+		object_security_destroy(&ksecurity);
 		return STATUS_NO_SEMAPHORES;
 	}
 	if(name) {
@@ -190,13 +212,15 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 		if(ret != STATUS_SUCCESS) {
 			vmem_free(semaphore_id_arena, sem->id, 1);
 			kfree(sem);
+			object_security_destroy(&ksecurity);
 			return ret;
 		}
 	} else {
 		sem->name = NULL;
 	}
 
-	object_init(&sem->obj, &semaphore_object_type);
+	object_init(&sem->obj, &semaphore_object_type, &ksecurity, NULL);
+	object_security_destroy(&ksecurity);
 	semaphore_init(&sem->sem, (sem->name) ? sem->name : "user_semaphore", count);
 	refcount_set(&sem->count, 1);
 
@@ -204,7 +228,7 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 	avl_tree_insert(&semaphore_tree, sem->id, sem, NULL);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &sem->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		user_semaphore_release(sem);
 	}
@@ -213,9 +237,10 @@ status_t sys_semaphore_create(const char *name, size_t count, handle_t *handlep)
 
 /** Open a handle to a semaphore.
  * @param id		ID of the semaphore to open.
+ * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to semaphore.
  * @return		Status code describing result of the operation. */
-status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
+status_t sys_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t *handlep) {
 	user_semaphore_t *sem;
 	status_t ret;
 
@@ -225,7 +250,8 @@ status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 
 	rwlock_read_lock(&semaphore_tree_lock);
 
-	if(!(sem = avl_tree_lookup(&semaphore_tree, id))) {
+	sem = avl_tree_lookup(&semaphore_tree, id);
+	if(!sem) {
 		rwlock_unlock(&semaphore_tree_lock);
 		return STATUS_NOT_FOUND;
 	}
@@ -233,7 +259,7 @@ status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
 	refcount_inc(&sem->count);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	ret = handle_create_and_attach(curr_proc, &sem->obj, NULL, 0, NULL, handlep);
+	ret = object_handle_create(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		user_semaphore_release(sem);
 	}
@@ -244,17 +270,17 @@ status_t sys_semaphore_open(semaphore_id_t id, handle_t *handlep) {
  * @param handle	Handle to semaphore to get ID of.
  * @return		ID of semaphore on success, -1 if handle is invalid. */
 semaphore_id_t sys_semaphore_id(handle_t handle) {
+	object_handle_t *khandle;
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
-	khandle_t *khandle;
 
-	if(handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	ret = sem->id;
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -273,18 +299,18 @@ semaphore_id_t sys_semaphore_id(handle_t handle) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_semaphore_down(handle_t handle, useconds_t timeout) {
+	object_handle_t *khandle;
 	user_semaphore_t *sem;
-	khandle_t *khandle;
 	status_t ret;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	ret = semaphore_down_etc(&sem->sem, timeout, SYNC_INTERRUPTIBLE);
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return ret;
 }
 
@@ -299,18 +325,18 @@ status_t sys_semaphore_down(handle_t handle, useconds_t timeout) {
  * @return		Status code describing result of the operation.
  */
 status_t sys_semaphore_up(handle_t handle, size_t count) {
+	object_handle_t *khandle;
 	user_semaphore_t *sem;
-	khandle_t *khandle;
 	status_t ret;
 
-	ret = handle_lookup(curr_proc, handle, OBJECT_TYPE_SEMAPHORE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	semaphore_up(&sem->sem, count);
-	handle_release(khandle);
+	object_handle_release(khandle);
 	return STATUS_SUCCESS;
 }
 

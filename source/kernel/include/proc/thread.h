@@ -139,7 +139,7 @@ extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
 extern status_t thread_create(const char *name, struct process *owner, int flags,
                               thread_func_t entry, void *arg1, void *arg2,
-                              thread_t **threadp);
+                              object_security_t *security, thread_t **threadp);
 extern void thread_run(thread_t *thread);
 extern void thread_destroy(thread_t *thread);
 
