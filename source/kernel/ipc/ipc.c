@@ -70,7 +70,7 @@ struct ipc_connection;
 /** Structure used for synchronisation during connection. */
 typedef struct ipc_connect_sync {
 	semaphore_t sem;		/**< Semaphore for client to wait on. */
-	ipc_connect_info_t info;	/**< Information about the client. */
+	ipc_client_info_t info;		/**< Information about the client. */
 } ipc_connect_sync_t;
 
 /** IPC port structure. */
@@ -524,7 +524,7 @@ port_id_t sys_ipc_port_id(handle_t handle) {
  * @param infop		Where to store information about the process that made
  *			the conection.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, ipc_connect_info_t *infop) {
+status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, ipc_client_info_t *infop) {
 	ipc_connection_t *conn = NULL;
 	object_handle_t *khandle;
 	ipc_port_t *port;

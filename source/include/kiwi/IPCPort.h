@@ -37,7 +37,7 @@ public:
 	void Open(port_id_t id);
 	
 	bool Listen(IPCConnection *&conn, useconds_t timeout = -1) const;
-	handle_t Listen(ipc_connect_info_t *infop = 0, useconds_t timeout = -1) const;
+	handle_t Listen(ipc_client_info_t *infop = 0, useconds_t timeout = -1) const;
 	port_id_t GetID() const;
 
 	// FIXME

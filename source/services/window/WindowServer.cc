@@ -67,7 +67,7 @@ Session *WindowServer::LookupSession(session_id_t id) {
 /** Handle a connection to the window server.
  * @param handle	Handle to the connection.
  * @param info		Information about the connecting thread. */
-void WindowServer::HandleConnection(handle_t handle, ipc_connect_info_t &info) {
+void WindowServer::HandleConnection(handle_t handle, ipc_client_info_t &info) {
 	/* Get the session to accept the connection. */
 	LookupSession(info.sid)->HandleConnection(handle);
 }

@@ -95,7 +95,7 @@ bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) const {
  * @return		Handle to connection if made within the timeout, -1 if
  *			the timeout expired.
  * @throw IPCError	If any error other than timing out occurred. */
-handle_t IPCPort::Listen(ipc_connect_info_t *infop, useconds_t timeout) const {
+handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) const {
 	handle_t handle;
 	status_t ret = ipc_port_listen(m_handle, timeout, &handle, infop);
 	if(ret != STATUS_SUCCESS) {

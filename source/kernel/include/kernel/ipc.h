@@ -34,11 +34,11 @@ typedef struct ipc_message_vector {
 	size_t size;				/**< Size of data buffer. */
 } ipc_message_vector_t;
 
-/** Structure containing details of a connection to a port. */
-typedef struct ipc_connect_info {
-	process_id_t pid;			/**< ID of process that connected. */
-	session_id_t sid;			/**< ID of session that connected. */
-} ipc_connect_info_t;
+/** Structure containing details of a client on a port. */
+typedef struct ipc_client_info {
+	process_id_t pid;			/**< ID of client process. */
+	session_id_t sid;			/**< ID of client process' session. */
+} ipc_client_info_t;
 
 /** IPC port rights. */
 #define PORT_LISTEN			(1<<8)	/**< Listen for connections on the port. */
@@ -60,7 +60,7 @@ extern status_t SYSCALL(ipc_port_create)(const object_security_t *security, obje
 extern status_t SYSCALL(ipc_port_open)(port_id_t id, object_rights_t rights, handle_t *handlep);
 extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);
 extern status_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout, handle_t *handlep,
-                                         ipc_connect_info_t *infop);
+                                         ipc_client_info_t *infop);
 
 extern status_t SYSCALL(ipc_connection_open)(port_id_t id, handle_t *handlep);
 
