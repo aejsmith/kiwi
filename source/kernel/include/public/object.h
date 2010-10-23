@@ -100,6 +100,7 @@ extern status_t SYSCALL(handle_close)(handle_t handle);
 
 #ifndef KERNEL
 extern status_t object_security(handle_t handle, object_security_t *securityp);
+extern void object_security_destroy(object_security_t *security);
 #endif
 
 #ifdef __cplusplus
