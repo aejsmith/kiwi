@@ -78,7 +78,8 @@ bool Service::Start() {
 		/* Create a thread that will connect to us. */
 		start_info info = { server->GetID(), -1, false };
 		handle_t handle;
-		status_t ret = thread_create("svcinit", NULL, 0, &Service::StartHelper, &info, &handle);
+		status_t ret = thread_create("svcinit", NULL, 0, &Service::StartHelper,
+		                             &info, NULL, THREAD_QUERY, &handle);
 		if(ret != STATUS_SUCCESS) {
 			cerr << "svcmgr: failed to create helper thread (" << ret << ")" << endl;
 			return false;

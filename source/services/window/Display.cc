@@ -118,7 +118,7 @@ Display::Display(WindowServer *server, const char *path) :
 
 	/* Open the device. */
 	handle_t handle;
-	ret = device_open(path, &handle);
+	ret = device_open(path, DEVICE_READ | DEVICE_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to open display device " << path << " (" << ret << ")" << endl;
 		throw exception();

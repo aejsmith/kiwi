@@ -50,7 +50,7 @@ Surface::Surface(uint16_t width, uint16_t height) :
 	}
 
 	/* Create a new area. */
-	status_t ret = area_create(size, -1, 0, &m_area);
+	status_t ret = area_create(size, -1, 0, NULL, AREA_READ | AREA_WRITE, &m_area);
 	if(ret != STATUS_SUCCESS) {
 		OSError e(ret);
 		clog << "Failed to create area for surface: " << e.GetDescription() << endl;
