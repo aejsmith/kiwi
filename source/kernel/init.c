@@ -165,7 +165,7 @@ static void __init_text load_boot_fsimage(boot_module_t *mod) {
 				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
 			}
 
-			ret = fs_file_open(hdr->name, FS_FILE_WRITE, &handle);
+			ret = fs_file_open(hdr->name, FS_WRITE, 0, &handle);
 			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to open file %s (%d)", hdr->name, ret);
 			}

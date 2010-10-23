@@ -16,8 +16,6 @@
 /**
  * @file
  * @brief		Process management functions.
- *
- * @todo		Check execute permission on binaries.
  */
 
 #include <arch/memmap.h>
@@ -391,7 +389,7 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * we must reserve space to ensure that the mappings we create below
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
-	ret = fs_file_open(info->path, FS_FILE_READ, &handle);
+	ret = fs_file_open(info->path, FS_READ | FS_EXECUTE, 0, &handle);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
@@ -407,7 +405,7 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * rebooted. This avoids problems if a new kernel is not ABI-compatible
 	 * with the previous kernel. */
 	if(!kernel_library) {
-		ret = fs_file_open(LIBKERNEL_PATH, FS_FILE_READ, &kernel_library);
+		ret = fs_file_open(LIBKERNEL_PATH, FS_READ | FS_EXECUTE, 0, &kernel_library);
 		if(ret != STATUS_SUCCESS) {
 			fatal("Could not open kernel library (%d)", ret);
 		}

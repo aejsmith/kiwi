@@ -29,7 +29,7 @@ sources = map(File, [
 	'io/device.c',
 	'io/entry_cache.c',
 	'io/file_map.c',
-	#'io/fs.c',
+	'io/fs.c',
 	'io/ramfs.c',
 
 	'ipc/ipc.c',

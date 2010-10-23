@@ -273,7 +273,8 @@ extern void fs_node_remove(fs_node_t *node);
 
 extern status_t fs_file_create(const char *path);
 extern object_handle_t *fs_file_from_memory(const void *buf, size_t size);
-extern status_t fs_file_open(const char *path, int flags, object_handle_t **handlep);
+extern status_t fs_file_open(const char *path, object_rights_t rights, int flags,
+                             object_handle_t **handlep);
 extern status_t fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
 extern status_t fs_file_pread(object_handle_t *handle, void *buf, size_t count,
                               offset_t offset, size_t *bytesp);
@@ -284,7 +285,8 @@ extern status_t fs_file_pwrite(object_handle_t *handle, const void *buf, size_t 
 extern status_t fs_file_resize(object_handle_t *handle, offset_t size);
 
 extern status_t fs_dir_create(const char *path);
-extern status_t fs_dir_open(const char *path, int flags, object_handle_t **handlep);
+extern status_t fs_dir_open(const char *path, object_rights_t rights, int flags,
+                            object_handle_t **handlep);
 extern status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size);
 
 extern status_t fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp);
