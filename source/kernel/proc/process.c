@@ -266,10 +266,8 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | PROCESS_QUERY);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-		                     OBJECT_READ_SECURITY | PROCESS_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | PROCESS_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_QUERY);
 		dsecurity.acl = &acl;
 	}
 

@@ -420,7 +420,7 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 	ipc_port_t *port;
 	status_t ret;
 
-	if(!rights || !handlep) {
+	if(!handlep) {
 		return STATUS_INVALID_ARG;
 	}
 
@@ -436,9 +436,9 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | PORT_LISTEN | PORT_CONNECT);
+		                     OBJECT_SET_ACL | PORT_LISTEN | PORT_CONNECT);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_OTHERS, 0,
-		                     OBJECT_READ_SECURITY | PORT_CONNECT);
+		                     PORT_CONNECT);
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
@@ -571,8 +571,7 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 	/* Create a handle to the endpoint. */
 	refcount_inc(&conn->count);
 	ret = object_handle_create(&conn->obj, &conn->endpoints[SERVER_ENDPOINT],
-	                           OBJECT_READ_SECURITY, NULL, 0, NULL, NULL,
-	                           connp);
+	                           0, NULL, 0, NULL, NULL, connp);
 	if(ret != STATUS_SUCCESS) {
 		refcount_dec(&conn->count);
 		semaphore_up(&port->conn_sem, 1);
@@ -623,9 +622,8 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 
 	/* Create security attributes for the object. Since the object is a
 	 * private object and can't actually be opened anywhere else, we just
-	 * stick access to others on it. */
+	 * give it an empty ACL and don't do any access checks on the handle. */
 	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, OBJECT_READ_SECURITY);
 	security.uid = -1;
 	security.gid = -1;
 	security.acl = &acl;
@@ -649,8 +647,7 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	/* Create a handle now, as we do not want to find that we cannot create
 	 * the handle after the connection has been accepted. */
 	ret = object_handle_create(&conn->obj, &conn->endpoints[CLIENT_ENDPOINT],
-	                           OBJECT_READ_SECURITY, NULL, 0, NULL, &handle,
-	                           handlep);
+	                           0, NULL, 0, NULL, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		object_destroy(&conn->obj);
 		slab_cache_free(ipc_connection_cache, conn);

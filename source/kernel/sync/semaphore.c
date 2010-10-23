@@ -197,7 +197,7 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | SEMAPHORE_USAGE);
+		                     OBJECT_SET_ACL | SEMAPHORE_USAGE);
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);

@@ -192,14 +192,11 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	assert(object->type);
 	assert(handlep || idp || uidp);
 
-	/* Handles cannot have no access rights. */
-	if(!rights) {
-		return STATUS_INVALID_ARG;
-	}
-
 	/* Check whether the rights are allowed for the process. */
-	if((object_rights(object, process) & rights) != rights) {
-		return STATUS_PERM_DENIED;
+	if(rights) {
+		if((object_rights(object, process) & rights) != rights) {
+			return STATUS_PERM_DENIED;
+		}
 	}
 
 	/* Create the kernel handle structure. */

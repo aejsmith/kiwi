@@ -285,16 +285,10 @@ object_rights_t object_rights(object_t *object, process_t *process) {
 }
 
 /** Get the owning user/group of an object.
- *
- * Gets the owning user/group of an object. The handle must have the
- * OBJECT_READ_SECURITY right.
- *
  * @param handle	Handle to object.
  * @param uidp		Where to store owning user ID.
  * @param gidp		Where to store owning group ID.
- *
- * @return		Status code describing result of the operation.
- */
+ * @return		Status code describing result of the operation. */
 status_t sys_object_owner(handle_t handle, user_id_t *uidp, group_id_t *gidp) {
 	return STATUS_NOT_IMPLEMENTED;
 }
@@ -316,8 +310,10 @@ status_t sys_object_set_owner(handle_t handle, user_id_t uid, group_id_t gid) {
 
 /** Obtain a copy of an object's ACL.
  *
- * Obtains a copy of an object's access control list (ACL). The handle must
- * have the OBJECT_READ_SECURITY right.
+ * Obtains a copy of an object's access control list (ACL). It is recommended
+ * that you use the object_security() wrapper function provided by libkernel
+ * instead of this, as it will handle allocation of memory for the ACL for
+ * you.
  *
  * @param handle	Handle to object to get ACL of.
  * @param acl		Where to store ACL. The structure referred to by this
@@ -338,7 +334,7 @@ status_t sys_object_acl(handle_t handle, object_acl_t *aclp) {
 	size_t count;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, -1, OBJECT_READ_SECURITY, &khandle);
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

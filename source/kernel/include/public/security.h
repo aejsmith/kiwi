@@ -46,7 +46,7 @@ extern "C" {
 #define CAP_FS_ADMIN			4	/**< Ability to bypass access checks on the filesystem. */
 #define CAP_FS_SETROOT			5	/**< Ability to use the fs_setroot() system call. */
 #define CAP_FS_MOUNT			6	/**< Ability to mount/unmount filesystems. */
-#define CAP_CHANGE_OWNER		7	/**< Ability to make arbitrary object ownership changes. */
+#define CAP_CHANGE_OWNER		7	/**< Ability to set object user/group to arbitrary IDs. */
 
 /** Structure defining the security context for a process/thread.
  * @note		Should be modified using the security_context_*()

@@ -241,7 +241,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, const ob
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | AREA_READ | AREA_WRITE);
+		                     OBJECT_SET_ACL | AREA_READ | AREA_WRITE);
 	}
 
 	area = slab_cache_alloc(area_cache, MM_SLEEP);

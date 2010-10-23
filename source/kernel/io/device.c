@@ -42,7 +42,7 @@
 #endif
 
 /** Access to grant others in the default ACL. */
-#define DEVICE_DEFAULT_RIGHTS	(DEVICE_QUERY | DEVICE_READ | DEVICE_WRITE | OBJECT_READ_SECURITY)
+#define DEVICE_DEFAULT_RIGHTS	(DEVICE_QUERY | DEVICE_READ | DEVICE_WRITE)
 
 /** Root of the device tree. */
 device_t *device_tree_root;

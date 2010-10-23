@@ -229,7 +229,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	object_security_t security = { 0, 0, &acl };
 	object_acl_init(&acl);
 	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-	                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
+	                     OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
 
 	/* Initialise the node's object header. */
 	switch(type) {

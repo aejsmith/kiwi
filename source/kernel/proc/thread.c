@@ -392,13 +392,11 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-		                     OBJECT_READ_SECURITY | PROCESS_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, THREAD_QUERY);
 
 		/* Only grant set ACL access if a user-mode thread. */
 		if(owner != kernel_proc) {
-			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-			                     OBJECT_READ_SECURITY | OBJECT_SET_ACL | PROCESS_QUERY);
+			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | THREAD_QUERY);
 		}
 
 		dsecurity.acl = &acl;
