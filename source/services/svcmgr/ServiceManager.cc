@@ -18,6 +18,9 @@
  * @brief		Service manager.
  */
 
+#include <kernel/process.h>
+#include <kernel/security.h>
+
 #include <kiwi/Error.h>
 #include <kiwi/Process.h>
 
@@ -124,10 +127,14 @@ void ServiceManager::HandleConnection() {
  * @param argv		Argument array.
  * @return		Should not return. */
 int main(int argc, char **argv) {
+	security_context_t context;
 	ServiceManager svcmgr;
+	status_t ret;
 
 	/* Add services. TODO: These should be in configuration files. */
 	if(!svcmgr.IsSessionInstance()) {
+		/* Start the security server. This must be done first while we
+		 * still have full capabilities. */
 		svcmgr.AddService(new Service(
 			&svcmgr,
 			"sessmgr",
@@ -136,6 +143,25 @@ int main(int argc, char **argv) {
 			0,
 			"org.kiwi.SessionManager"
 		));
+
+		/* Now we can drop certain capabilities that only the security
+		 * server should have. */
+		ret = process_security_context(-1, &context);
+		if(ret != STATUS_SUCCESS) {
+			clog << "Failed to obtain security context" << endl;
+			return 1;
+		}
+
+		security_context_unset_cap(&context, CAP_SECURITY_AUTHORITY);
+		security_context_unset_cap(&context, CAP_CREATE_SESSION);
+
+		ret = process_set_security_context(-1, &context);
+		if(ret != STATUS_SUCCESS) {
+			clog << "Failed to update security context" << endl;
+			return 1;
+		}
+
+		/* Start remaining services. */
 		svcmgr.AddService(new Service(
 			&svcmgr,
 			"window",
