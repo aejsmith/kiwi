@@ -187,13 +187,21 @@ void security_context_release(process_t *process) {
 /** Get the user ID of the current thread.
  * @return		User ID of the current thread. */
 user_id_t security_current_uid(void) {
-	return curr_proc->security.uid;
+	if(likely(curr_thread)) {
+		return curr_proc->security.uid;
+	} else {
+		return init_security_context.uid;
+	}
 }
 
 /** Get the primary group ID of the current thread.
  * @return		Primary group ID of the current thread. */
 group_id_t security_current_gid(void) {
-	return curr_proc->security.groups[0];
+	if(likely(curr_thread)) {
+		return curr_proc->security.groups[0];
+	} else {
+		return init_security_context.groups[0];
+	}
 }
 
 /** Initialise the security system. */

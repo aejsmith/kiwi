@@ -354,6 +354,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 	if(cpu == args->boot_cpu) {
 		cpu_early_init(args);
 		console_early_init();
+		security_init();
 
 		/* Perform early architecture/platform initialisation. */
 		arch_premm_init(args);
@@ -388,7 +389,6 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
 		/* Bring up process-/thread-related stuff. */
-		security_init();
 		handle_init();
 		session_init();
 		process_init();
