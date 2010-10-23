@@ -72,7 +72,34 @@ static pid_t fork_parent(jmp_buf state, char *stack) {
 	libc_mutex_lock(&child_processes_lock, -1);
 	list_append(&child_processes, &proc->header);
 	libc_mutex_unlock(&child_processes_lock);
+
+	/* Parent returns PID of new process. */
 	return proc->pid;
+}
+
+/** Child part of fork().
+ * @param stack		Stack allocation.
+ * @return		Return value for fork(). */
+static pid_t fork_child(char *stack) {
+	posix_process_t *proc;
+
+	/* We're now back on the original stack, the temporary stack is no
+	 * longer needed. */
+	vm_unmap(stack, 0x1000);
+
+	/* Empty the child processes list: anything in there is not our child,
+	 * but a child of our parent. */
+	libc_mutex_lock(&child_processes_lock, -1);
+	LIST_FOREACH_SAFE(&child_processes, iter) {
+		proc = list_entry(iter, posix_process_t, header);
+		handle_close(proc->handle);
+		list_remove(&proc->header);
+		free(proc);
+	}
+	libc_mutex_unlock(&child_processes_lock);
+
+	/* Child returns 0. */
+	return 0;
 }
 
 /** Create a clone of the calling process.
@@ -103,10 +130,8 @@ pid_t fork(void) {
 
 	/* Save our execution state. */
 	if(setjmp(state) > 0) {
-		/* We're in the child. Clean up and return. */
-		vm_unmap(stack, 0x1000);
-		return 0;
+		return fork_child(stack);
+	} else {
+		return fork_parent(state, stack);
 	}
-
-	return fork_parent(state, stack);
 }
