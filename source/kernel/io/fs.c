@@ -477,7 +477,17 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 		} else if(!tok[0]) {
 			/* Zero-length path component, do nothing. */
 			continue;
-		} else if(tok[0] == '.' && tok[1] == '.' && !tok[2]) {
+		}
+
+		/* We're trying to descend into the directory, check for
+		 * execute permission. */
+		if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
+			fs_node_release(node);
+			return STATUS_PERM_DENIED;
+		}
+
+		/* Special handling for descending out of the directory. */
+		if(tok[0] == '.' && tok[1] == '.' && !tok[2]) {
 			if(node == curr_proc->ioctx.root_dir) {
 				/* Do not allow the lookup to ascend past the
 				 * process' root directory. */
@@ -780,10 +790,14 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 
 	mutex_lock(&parent->mount->lock);
 
-	/* Ensure that we are on a writable filesystem, and that the FS
-	 * supports node creation. */
+	/* Check that we are on a writable filesystem that we have write
+	 * permission to the directory, and that the FS supports node
+	 * creation. */
 	if(FS_NODE_IS_RDONLY(parent)) {
 		ret = STATUS_READ_ONLY;
+		goto out;
+	} else if(!(object_rights(&parent->obj, NULL) & FS_WRITE)) {
+		ret = STATUS_PERM_DENIED;
 		goto out;
 	} else if(!parent->ops->create) {
 		ret = STATUS_NOT_SUPPORTED;
@@ -883,6 +897,11 @@ static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int fl
 	fs_handle_t *data;
 	status_t ret;
 
+	/* Prevent opening for writing on a read-only filesystem. */
+	if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
+		return STATUS_READ_ONLY;
+	}
+
 	/* Allocate the per-handle data structure. */
 	data = kmalloc(sizeof(fs_handle_t), MM_SLEEP);
 	rwlock_init(&data->lock, "fs_handle_lock");
@@ -940,7 +959,9 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 		return STATUS_PERM_DENIED;
 	}
 
-	/* If creating a shared mapping for writing, check for write access. */
+	/* If creating a shared mapping for writing, check for write access.
+	 * It is not necessary to check for a read-only filesystem here: a
+	 * handle cannot be opened with FS_WRITE on a read-only FS. */
 	if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE && !object_handle_rights(handle, FS_WRITE)) {
 		return STATUS_PERM_DENIED;
 	}
@@ -1090,13 +1111,10 @@ status_t fs_file_open(const char *path, object_rights_t rights, int flags, objec
 	fs_node_t *node;
 	status_t ret;
 
-	/* Look up the filesystem node and check if it is suitable. */
+	/* Look up the filesystem node. */
 	ret = fs_node_lookup(path, true, FS_NODE_FILE, &node);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
-		fs_node_release(node);
-		return STATUS_READ_ONLY;
 	}
 
 	ret = fs_handle_create(node, rights, flags, handlep);
@@ -1407,13 +1425,10 @@ status_t fs_dir_open(const char *path, object_rights_t rights, int flags, object
 	fs_node_t *node;
 	status_t ret;
 
-	/* Look up the filesystem node and check if it is suitable. */
+	/* Look up the filesystem node. */
 	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
-		fs_node_release(node);
-		return STATUS_READ_ONLY;
 	}
 
 	ret = fs_handle_create(node, rights, flags, handlep);
@@ -1829,6 +1844,10 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 		return STATUS_INVALID_ARG;
 	}
 
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
+
 	/* Parse the options string. */
 	parse_mount_options(opts, &optarr, &count, &flags);
 
@@ -1985,6 +2004,10 @@ status_t fs_unmount(const char *path) {
 		return STATUS_INVALID_ARG;
 	}
 
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
+
 	/* Serialise mount/unmount operations. */
 	mutex_lock(&mounts_lock);
 
@@ -2126,6 +2149,9 @@ status_t fs_unlink(const char *path) {
 	/* Check whether the node can be unlinked. */
 	if(parent->mount != node->mount) {
 		ret = STATUS_IN_USE;
+		goto out;
+	} else if(!(object_rights(&parent->obj, NULL) & FS_WRITE)) {
+		ret = STATUS_PERM_DENIED;
 		goto out;
 	} else if(FS_NODE_IS_RDONLY(node)) {
 		ret = STATUS_READ_ONLY;
@@ -2904,10 +2930,6 @@ status_t sys_fs_mount(const char *dev, const char *path, const char *type, const
 	char *kdevice = NULL, *kpath = NULL, *ktype = NULL, *kopts = NULL;
 	status_t ret;
 
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
-	}
-
 	/* Copy string arguments across from userspace. */
 	if(dev) {
 		ret = strndup_from_user(dev, FS_PATH_MAX, &kdevice);
@@ -2954,10 +2976,6 @@ out:
 status_t sys_fs_unmount(const char *path) {
 	status_t ret;
 	char *kpath;
-
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
-	}
 
 	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
 	if(ret != STATUS_SUCCESS) {
@@ -3080,6 +3098,13 @@ status_t sys_fs_setcwd(const char *path) {
 		return ret;
 	}
 
+	/* Must have execute permission to use as working directory. */
+	if(!(object_rights(&node->obj, NULL) & FS_WRITE)) {
+		fs_node_release(node);
+		kfree(kpath);
+		return STATUS_PERM_DENIED;
+	}
+
 	/* Attempt to set. Release the node no matter what, as upon success it
 	 * is referenced by io_context_setcwd(). */
 	ret = io_context_setcwd(&curr_proc->ioctx, node);
@@ -3120,6 +3145,13 @@ status_t sys_fs_setroot(const char *path) {
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;
+	}
+
+	/* Must have execute permission to use as working directory. */
+	if(!(object_rights(&node->obj, NULL) & FS_WRITE)) {
+		fs_node_release(node);
+		kfree(kpath);
+		return STATUS_PERM_DENIED;
 	}
 
 	/* Attempt to set. Release the node no matter what, as upon success it
