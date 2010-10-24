@@ -102,12 +102,14 @@ static void handle_table_ctor(void *obj, void *data) {
  *			after taking the data pointer from it, which means it
  *			will be safe to call object_acl_destroy() on it.
  * @param sacl		If not NULL, the system ACL to give to the object. The
- *			array referred to by the entry should be in canonical
- *			form (see object_acl_canonicalise()). This function
- *			does not copy the data for the ACL, so it invalidates
- *			the structure after taking the data pointer from it,
- *			which means it will be safe to call object_acl_destroy()
- *			on it. */
+ *			system ACL is interpreted differently to the user ACL:
+ *			in the user ACL user, group and others entries are
+ *			exclusive. In the system ACL they are all used together.
+ *			This ACL should be in canonical form (see
+ *			object_acl_canonicalise()). This function does not copy
+ *			the data for the ACL, so it invalidates the structure
+ *			after taking the data pointer from it, which means it
+ *			will be safe to call object_acl_destroy() on it. */
 void object_init(object_t *object, object_type_t *type, object_security_t *security, object_acl_t *sacl) {
 	assert(object);
 	if(type) {
@@ -135,6 +137,10 @@ void object_init(object_t *object, object_type_t *type, object_security_t *secur
 	} else {
 		object_acl_init(&object->sacl);
 	}
+
+	/* Add default system ACL entries. We always allow an object's owning
+	 * user to change its ACL and owner. */
+	object_acl_add_entry(&object->sacl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | OBJECT_SET_OWNER);
 }
 
 /** Destroy an object structure.

@@ -38,6 +38,9 @@ extern "C" {
 #define OBJECT_TYPE_SEMAPHORE	8	/**< Semaphore. */
 #define OBJECT_TYPE_AREA	9	/**< Memory area. */
 
+/** Maximum ACL size. */
+#define OBJECT_ACL_MAX		64
+
 /** ACL entry types. */
 #define ACL_ENTRY_USER		0	/**< User (value of -1 means owning user). */
 #define ACL_ENTRY_GROUP		1	/**< Group (value of -1 means owning group). */
@@ -84,9 +87,8 @@ typedef struct object_security {
 
 extern int SYSCALL(object_type)(handle_t handle);
 extern status_t SYSCALL(object_owner)(handle_t handle, user_id_t *uidp, group_id_t *gidp);
-extern status_t SYSCALL(object_set_owner)(handle_t handle, user_id_t uid, group_id_t gid);
 extern status_t SYSCALL(object_acl)(handle_t handle, object_acl_t *aclp);
-extern status_t SYSCALL(object_set_acl)(handle_t handle, const object_acl_t *acl);
+extern status_t SYSCALL(object_set_security)(handle_t handle, const object_security_t *security);
 extern status_t SYSCALL(object_wait)(object_event_t *events, size_t count, useconds_t timeout);
 
 extern status_t SYSCALL(handle_flags)(handle_t handle, int *flagsp);
@@ -96,6 +98,7 @@ extern status_t SYSCALL(handle_close)(handle_t handle);
 
 #ifndef KERNEL
 extern status_t object_security(handle_t handle, object_security_t *securityp);
+extern object_acl_t *object_security_acl(object_security_t *security);
 extern void object_security_destroy(object_security_t *security);
 #endif
 

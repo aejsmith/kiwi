@@ -31,6 +31,7 @@
 
 #include <sync/rwlock.h>
 
+struct object;
 struct object_handle;
 struct object_wait;
 struct process;
@@ -40,6 +41,19 @@ struct vm_region;
 /** Kernel object type structure. */
 typedef struct object_type {
 	int id;				/**< ID number for the type. */
+
+	/** Validate new security attributes.
+	 * @note		It is checked whether the necessary rights for
+	 *			the change are allowed before calling this
+	 *			function. If this function is not provided,
+	 *			all changes will be allowed as long as they are
+	 *			permitted by the object's access rights.
+	 * @param object	Object to validate for.
+	 * @param security	Security attributes to validate. The ACL (if
+	 *			any) will be in canonical form.
+	 * @return		STATUS_SUCCESS if change should be allowed,
+	 *			other status code explaining why if not. */
+	status_t (*set_security)(struct object *object, object_security_t *security);
 
 	/** Close a handle to an object.
 	 * @param handle	Handle to the object. */

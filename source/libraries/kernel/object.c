@@ -32,7 +32,7 @@
  *			freed with object_security_destroy() once it is no
  *			longer needed.
  * @return		Status code describing result of the operation. */
-status_t __export object_security(handle_t handle, object_security_t *securityp) {
+__export status_t object_security(handle_t handle, object_security_t *securityp) {
 	status_t ret;
 
 	ret = object_owner(handle, &securityp->uid, &securityp->gid);
@@ -71,11 +71,29 @@ status_t __export object_security(handle_t handle, object_security_t *securityp)
 	return STATUS_SUCCESS;
 }
 
-/** Free memory allocated by object_security().
- * @param security	Structure to free data for. */
-void __export object_security_destroy(object_security_t *security) {
-	if(security->acl->entries) {
-		free(security->acl->entries);
+/** Get the ACL from an object security structure.
+ * @param security	Structure to get from.
+ * @return		Pointer to ACL, or NULL if failed to allocate one. */
+__export object_acl_t *object_security_acl(object_security_t *security) {
+	if(!security->acl) {
+		security->acl = malloc(sizeof(object_acl_t));
+		if(!security->acl) {
+			return NULL;
+		}
 	}
-	free(security->acl);
+
+	return security->acl;
+}
+
+/** Free memory allocated for an object security structure.
+ * @param security	Structure to free data for. */
+__export void object_security_destroy(object_security_t *security) {
+	if(security->acl) {
+		if(security->acl->entries) {
+			free(security->acl->entries);
+			security->acl->entries = NULL;
+		}
+		free(security->acl);
+		security->acl = NULL;
+	}
 }
