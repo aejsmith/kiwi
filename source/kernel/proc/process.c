@@ -320,6 +320,28 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	return STATUS_SUCCESS;
 }
 
+/** Validate process object security changes.
+ * @param object	Process object.
+ * @param security	Security attributes being set.
+ * @return		STATUS_SUCCESS if allowed, other status code if not. */
+static status_t process_object_set_security(object_t *object, object_security_t *security) {
+	size_t i;
+
+	/* If an ACL is provided, go through it to check that it does not
+	 * grant the PROCESS_SET_SECURITY right to anyone. This right is only
+	 * granted by the system ACL to processes with CAP_SECURITY_AUTHORITY,
+	 * and should not be granted to anyone else. */
+	if(security->acl) {
+		for(i = 0; i < security->acl->count; i++) {
+			if(security->acl->entries[i].rights & PROCESS_SET_SECURITY) {
+				return STATUS_PERM_DENIED;
+			}
+		}
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Closes a handle to a process.
  * @param handle	Handle to close. */
 static void process_object_close(object_handle_t *handle) {
@@ -366,6 +388,7 @@ static void process_object_unwait(object_handle_t *handle, int event, void *sync
 /** Process object type operations. */
 static object_type_t process_object_type = {
 	.id = OBJECT_TYPE_PROCESS,
+	.set_security = process_object_set_security,
 	.close = process_object_close,
 	.wait = process_object_wait,
 	.unwait = process_object_unwait,
@@ -871,6 +894,11 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
+
+		ret = process_object_set_security(NULL, &ksecurity);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
 	}
 
 	/* Create the address space for the process. */
@@ -1063,6 +1091,12 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 	if(security) {
 		ret = object_security_from_user(&ksecurity, security);
 		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+
+		ret = process_object_set_security(NULL, &ksecurity);
+		if(ret != STATUS_SUCCESS) {
+			object_security_destroy(&ksecurity);
 			return ret;
 		}
 	}

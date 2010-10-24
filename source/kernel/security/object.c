@@ -280,14 +280,14 @@ status_t object_security_validate(object_security_t *security, process_t *proces
  * @return		Status code describing result of the operation.
  */
 status_t object_security_from_user(object_security_t *dest, const object_security_t *src) {
-	object_acl_entry_t *entries;
-	object_acl_t *acl;
+	object_acl_entry_t *entries = NULL;
+	object_acl_t *acl = NULL;
 	status_t ret;
 
 	/* First copy the structure across. */
 	ret = memcpy_from_user(dest, src, sizeof(*src));
 	if(ret != STATUS_SUCCESS) {
-		return ret;
+		goto fail;
 	}
 
 	/* If there is an ACL, copy it. */
@@ -295,31 +295,28 @@ status_t object_security_from_user(object_security_t *dest, const object_securit
 		acl = kmalloc(sizeof(*acl), MM_SLEEP);
 		ret = memcpy_from_user(acl, dest->acl, sizeof(*acl));
 		if(ret != STATUS_SUCCESS) {
-			kfree(acl);
-			return ret;
+			goto fail;
 		}
 		dest->acl = acl;
 
 		/* Limit the maximum size of an ACL to prevent userspace from
 		 * giving us a massive ACL. */
 		if(acl->count > OBJECT_ACL_MAX) {
-			kfree(acl);
-			return STATUS_TOO_LONG;
+			ret = STATUS_TOO_LONG;
+			goto fail;
 		}
 
 		/* If there are entries, copy them. */
 		if(acl->count) {
 			if(!acl->entries) {
-				kfree(acl);
-				return STATUS_INVALID_ARG;
+				ret = STATUS_INVALID_ARG;
+				goto fail;
 			}
 
 			entries = kmalloc(sizeof(*entries) * acl->count, MM_SLEEP);
 			ret = memcpy_from_user(entries, acl->entries, sizeof(*entries) * acl->count);
 			if(ret != STATUS_SUCCESS) {
-				kfree(entries);
-				kfree(acl);
-				return ret;
+				goto fail;
 			}
 			acl->entries = entries;
 		} else {
@@ -330,8 +327,14 @@ status_t object_security_from_user(object_security_t *dest, const object_securit
 	/* Validate the structure. */
 	ret = object_security_validate(dest, NULL);
 	if(ret != STATUS_SUCCESS) {
-		object_security_destroy(dest);
+		goto fail;
 	}
+
+	return STATUS_SUCCESS;
+fail:
+	if(entries) { kfree(entries); }
+	if(acl) { kfree(acl); }
+	dest->acl = NULL;
 	return ret;
 }
 
