@@ -901,6 +901,21 @@ static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int fl
 	return ret;
 }
 
+/** Validate a filesystem security attributes change.
+ * @param object	Object to check.
+ * @param security	New security attributes.
+ * @return		STATUS_SUCCESS if change should be allowed, other
+ *			status code if not. */
+static status_t fs_object_set_security(object_t *object, object_security_t *security) {
+	fs_node_t *node = (fs_node_t *)object;
+
+	if(FS_NODE_IS_RDONLY(node)) {
+		return STATUS_READ_ONLY;
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Close a handle to a file.
  * @param handle	Handle to close. */
 static void file_object_close(object_handle_t *handle) {
@@ -970,6 +985,7 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 /** File object operations. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
+	.set_security = fs_object_set_security,
 	.close = file_object_close,
 	.mappable = file_object_mappable,
 	.get_page = file_object_get_page,
@@ -1370,6 +1386,7 @@ static void dir_object_close(object_handle_t *handle) {
 /** Directory object operations. */
 static object_type_t dir_object_type = {
 	.id = OBJECT_TYPE_DIR,
+	.set_security = fs_object_set_security,
 	.close = dir_object_close,
 };
 
