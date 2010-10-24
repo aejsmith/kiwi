@@ -205,11 +205,17 @@ status_t fs_type_unregister(fs_type_t *type) {
  * @param mount		Mount that the node resides on.
  * @param id		ID of the node.
  * @param type		Type of the node.
+ * @param security	Security attributes for the node. Should be NULL if the
+ *			filesystem does not support security attributes, in
+ *			which case default attributes will be used.
  * @param ops		Pointer to operations structure for the node.
  * @param data		Implementation-specific data pointer.
  * @return		Pointer to node structure allocated. */
 fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
-                         fs_node_ops_t *ops, void *data) {
+                         object_security_t *security, fs_node_ops_t *ops,
+                         void *data) {
+	object_security_t dsecurity;
+	object_acl_t acl, sacl;
 	fs_node_t *node;
 
 	node = slab_cache_alloc(fs_node_cache, MM_SLEEP);
@@ -224,23 +230,36 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	node->data = data;
 	node->mount = mount;
 
-	// FIXME
-	object_acl_t acl;
-	object_security_t security = { 0, 0, &acl };
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
+	/* If no security attributes are provided, construct defaults. */
+	if(!security) {
+		dsecurity.uid = 0;
+		dsecurity.gid = 0;
+		dsecurity.acl = &acl;
+
+		object_acl_init(&acl);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, FS_READ | FS_WRITE | FS_EXECUTE);
+
+		security = &dsecurity;
+	}
+
+	/* Create the system ACL. This grants processes with the CAP_FS_ADMIN
+	 * capability full control over the filesystem. FIXME: Should only
+	 * grant execute if a directory or if the standard ACL grants execute
+	 * capability to somebody. */
+	object_acl_init(&sacl);
+	//object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN,
+	//                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
 
 	/* Initialise the node's object header. */
 	switch(type) {
 	case FS_NODE_FILE:
-		object_init(&node->obj, &file_object_type, &security, NULL);
+		object_init(&node->obj, &file_object_type, security, &sacl);
 		break;
 	case FS_NODE_DIR:
-		object_init(&node->obj, &dir_object_type, &security, NULL);
+		object_init(&node->obj, &dir_object_type, security, &sacl);
 		break;
 	default:
-		object_init(&node->obj, NULL, &security, NULL);
+		object_init(&node->obj, NULL, security, &sacl);
 		break;
 	}
 
@@ -856,6 +875,22 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
 	}
 }
 
+/** Change filesystem security attributes.
+ * @param object	Object to check.
+ * @param security	New security attributes.
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_set_security(object_t *object, object_security_t *security) {
+	fs_node_t *node = (fs_node_t *)object;
+
+	if(FS_NODE_IS_RDONLY(node)) {
+		return STATUS_READ_ONLY;
+	} else if(!node->ops->set_security) {
+		return STATUS_NOT_SUPPORTED;
+	}
+
+	return node->ops->set_security(node, security);
+}
+
 /** Get the name of a node in its parent directory.
  * @param parent	Directory containing node.
  * @param id		ID of node to get name of.
@@ -902,6 +937,11 @@ static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int fl
 		return STATUS_READ_ONLY;
 	}
 
+	/* Prevent setting security attributes if the FS doesn't support it. */
+	if(!node->ops->set_security && rights & (OBJECT_SET_ACL | OBJECT_SET_OWNER)) {
+		return STATUS_NOT_SUPPORTED;
+	}
+
 	/* Allocate the per-handle data structure. */
 	data = kmalloc(sizeof(fs_handle_t), MM_SLEEP);
 	rwlock_init(&data->lock, "fs_handle_lock");
@@ -918,21 +958,6 @@ static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int fl
 	}
 
 	return ret;
-}
-
-/** Validate a filesystem security attributes change.
- * @param object	Object to check.
- * @param security	New security attributes.
- * @return		STATUS_SUCCESS if change should be allowed, other
- *			status code if not. */
-static status_t fs_object_set_security(object_t *object, object_security_t *security) {
-	fs_node_t *node = (fs_node_t *)object;
-
-	if(FS_NODE_IS_RDONLY(node)) {
-		return STATUS_READ_ONLY;
-	}
-
-	return STATUS_SUCCESS;
 }
 
 /** Close a handle to a file.
@@ -1006,7 +1031,7 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 /** File object operations. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
-	.set_security = fs_object_set_security,
+	.set_security = fs_node_set_security,
 	.close = file_object_close,
 	.mappable = file_object_mappable,
 	.get_page = file_object_get_page,
@@ -1083,15 +1108,19 @@ static fs_node_ops_t memory_file_ops = {
  * @return		Pointer to handle to file (has FS_READ access right).
  */
 object_handle_t *fs_file_from_memory(const void *buf, size_t size) {
+	object_acl_t acl;
+	object_security_t security = { 0, 0, &acl };
 	object_handle_t *handle;
 	memory_file_t *file;
 	fs_node_t *node;
 
-	// FIXME: Will need to create an ACL here.
 	file = kmalloc(sizeof(memory_file_t), MM_SLEEP);
 	file->data = buf;
 	file->size = size;
-	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &memory_file_ops, file);
+
+	object_acl_init(&acl);
+	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, FS_READ);
+	node = fs_node_alloc(NULL, 0, FS_NODE_FILE, &security, &memory_file_ops, file);
 
 	if(fs_handle_create(node, FS_READ, 0, &handle) != STATUS_SUCCESS) {
 		fatal("Should not fail to create memory file");
@@ -1404,7 +1433,7 @@ static void dir_object_close(object_handle_t *handle) {
 /** Directory object operations. */
 static object_type_t dir_object_type = {
 	.id = OBJECT_TYPE_DIR,
-	.set_security = fs_object_set_security,
+	.set_security = fs_node_set_security,
 	.close = dir_object_close,
 };
 

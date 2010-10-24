@@ -113,7 +113,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t
 	}
 
 	entry_cache_insert(pdata->entries, name, id);
-	*nodep = fs_node_alloc(parent->mount, id, type, parent->ops, data);
+	*nodep = fs_node_alloc(parent->mount, id, type, NULL, parent->ops, data);
 	return STATUS_SUCCESS;
 }
 
@@ -141,6 +141,17 @@ static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
 	info->links = 1;
 	info->size = (node->type == FS_NODE_FILE) ? data->cache->size : 0;
 	info->blksize = PAGE_SIZE;
+}
+
+/** Update security attributes of a RamFS node.
+ * @param node		Node to set for.
+ * @param security	New security attributes to set.
+ * @return		Status code describing result of the operation. */
+static status_t ramfs_node_set_security(fs_node_t *node, const object_security_t *security) {
+	/* Do not need to do anything here. However, this function must be
+	 * given in the operations structure so that the FS layer knows that
+	 * we support security attributes. */
+	return STATUS_SUCCESS;
 }
 
 /** Read from a RamFS file.
@@ -262,6 +273,7 @@ static fs_node_ops_t ramfs_node_ops = {
 	.create = ramfs_node_create,
 	.unlink = ramfs_node_unlink,
 	.info = ramfs_node_info,
+	.set_security = ramfs_node_set_security,
 	.read = ramfs_node_read,
 	.write = ramfs_node_write,
 	.get_cache = ramfs_node_get_cache,
@@ -288,6 +300,8 @@ static fs_mount_ops_t ramfs_mount_ops = {
  * @param count		Number of options.
  * @return		Status code describing result of the operation. */
 static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t count) {
+	object_acl_t acl;
+	object_security_t security = { 0, 0, &acl };
 	ramfs_mount_t *data;
 	ramfs_node_t *ndata;
 
@@ -301,7 +315,12 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 	ndata->entries = entry_cache_create(NULL, NULL);
 	entry_cache_insert(ndata->entries, ".", 0);
 	entry_cache_insert(ndata->entries, "..", 0);
-	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &ramfs_node_ops, ndata);
+	object_acl_init(&acl);
+	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
+	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, -1,
+	                     FS_READ | FS_WRITE | FS_EXECUTE);
+	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &security, &ramfs_node_ops, ndata);
 	return STATUS_SUCCESS;
 }
 

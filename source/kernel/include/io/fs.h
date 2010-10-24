@@ -145,6 +145,14 @@ typedef struct fs_node_ops {
 	 * @param info		Information structure to fill in. */
 	void (*info)(struct fs_node *node, fs_info_t *info);
 
+	/** Update security attributes of a node.
+	 * @param node		Node to set for.
+	 * @param security	New security attributes to set. If the user
+	 *			or group ID are -1, or the ACL pointer is NULL,
+	 *			they should not be changed.
+	 * @return		Status code describing result of the operation. */
+	status_t (*set_security)(struct fs_node *node, const object_security_t *security);
+
 	/** Read from a file.
 	 * @param node		Node to read from.
 	 * @param buf		Buffer to read into.
@@ -262,7 +270,8 @@ extern status_t fs_type_register(fs_type_t *type);
 extern status_t fs_type_unregister(fs_type_t *type);
 
 extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
-                                fs_node_ops_t *ops, void *data);
+                                object_security_t *security, fs_node_ops_t *ops,
+                                void *data);
 extern void fs_node_release(fs_node_t *node);
 extern void fs_node_remove(fs_node_t *node);
 

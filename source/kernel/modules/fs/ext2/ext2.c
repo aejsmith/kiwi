@@ -127,7 +127,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 	}
 
 	mutex_unlock(&parent->lock);
-	*nodep = fs_node_alloc(_parent->mount, inode->num, type, _parent->ops, inode);
+	*nodep = fs_node_alloc(_parent->mount, inode->num, type, NULL, _parent->ops, inode);
 	return STATUS_SUCCESS;
 fail:
 	mutex_unlock(&parent->lock);
@@ -414,7 +414,7 @@ static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **node
 	}
 
 	/* Create and fill out a node structure. */
-	*nodep = fs_node_alloc(mount, id, type, &ext2_node_ops, inode);
+	*nodep = fs_node_alloc(mount, id, type, NULL, &ext2_node_ops, inode);
 	return STATUS_SUCCESS;
 }
 

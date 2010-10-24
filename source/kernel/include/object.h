@@ -42,17 +42,19 @@ struct vm_region;
 typedef struct object_type {
 	int id;				/**< ID number for the type. */
 
-	/** Validate new security attributes.
-	 * @note		It is checked whether the necessary rights for
-	 *			the change are allowed before calling this
-	 *			function. If this function is not provided,
+	/** Set new security attributes.
+	 * @note		This function can be used to validate security
+	 *			attributes, and to write changes to permanent
+	 *			storage (i.e. filesystem). If it is not provided,
 	 *			all changes will be allowed as long as they are
-	 *			permitted by the object's access rights.
-	 * @param object	Object to validate for.
-	 * @param security	Security attributes to validate. The ACL (if
-	 *			any) will be in canonical form.
-	 * @return		STATUS_SUCCESS if change should be allowed,
-	 *			other status code explaining why if not. */
+	 *			permitted by the current ACL.
+	 * @note		It is checked whether the process has the
+	 *			necessary rights for the changes before calling
+	 *			this function.
+	 * @param object	Object to set for.
+	 * @param security	Security attributes to set. The ACL (if any)
+	 *			will be in canonical form.
+	 * @return		Status code describing result of the operation. */
 	status_t (*set_security)(struct object *object, object_security_t *security);
 
 	/** Close a handle to an object.

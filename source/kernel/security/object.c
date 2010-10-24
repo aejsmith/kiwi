@@ -511,24 +511,26 @@ status_t sys_object_set_security(handle_t handle, const object_security_t *secur
 		return ret;
 	}
 
-	/* Check if the necessary rights are set. */
-	if(((ksecurity.uid >= 0 || ksecurity.gid >= 0) && !object_handle_rights(khandle, OBJECT_SET_OWNER)) ||
-	   (ksecurity.acl && !object_handle_rights(khandle, OBJECT_SET_ACL))) {
-		object_handle_release(khandle);
-		object_security_destroy(&ksecurity);
-		return STATUS_PERM_DENIED;
+	/* Check if there is anything to do and that we have the necessary rights. */
+	if(ksecurity.uid < 0 && ksecurity.gid < 0 && !ksecurity.acl) {
+		ret = STATUS_SUCCESS;
+		goto out;
+	} else if((ksecurity.uid >= 0 || ksecurity.gid >= 0) && !object_handle_rights(khandle, OBJECT_SET_OWNER)) {
+		ret = STATUS_PERM_DENIED;
+		goto out;
+	} else if(ksecurity.acl && !object_handle_rights(khandle, OBJECT_SET_ACL)) {
+		ret = STATUS_PERM_DENIED;
+		goto out;
 	}
 
 	rwlock_write_lock(&khandle->object->lock);
 
-	/* If the object type has a security validation function, call it. */
+	/* If the object type has a set security function, call it. */
 	if(khandle->object->type->set_security) {
 		ret = khandle->object->type->set_security(khandle->object, &ksecurity);
 		if(ret != STATUS_SUCCESS) {
 			rwlock_unlock(&khandle->object->lock);
-			object_handle_release(khandle);
-			object_security_destroy(&ksecurity);
-			return ret;
+			goto out;
 		}
 	}
 
@@ -547,7 +549,9 @@ status_t sys_object_set_security(handle_t handle, const object_security_t *secur
 	}
 
 	rwlock_unlock(&khandle->object->lock);
+	ret = STATUS_SUCCESS;
+out:
 	object_handle_release(khandle);
 	object_security_destroy(&ksecurity);
-	return STATUS_SUCCESS;
+	return ret;
 }
