@@ -229,7 +229,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
 	object_security_t security = { 0, 0, &acl };
 	object_acl_init(&acl);
 	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-	                     OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
+	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
 
 	/* Initialise the node's object header. */
 	switch(type) {
@@ -790,7 +790,7 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 
 	mutex_lock(&parent->mount->lock);
 
-	/* Check that we are on a writable filesystem that we have write
+	/* Check that we are on a writable filesystem, that we have write
 	 * permission to the directory, and that the FS supports node
 	 * creation. */
 	if(FS_NODE_IS_RDONLY(parent)) {
@@ -898,7 +898,7 @@ static status_t fs_handle_create(fs_node_t *node, object_rights_t rights, int fl
 	status_t ret;
 
 	/* Prevent opening for writing on a read-only filesystem. */
-	if(rights & (OBJECT_SET_ACL | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
+	if(rights & (OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_WRITE) && FS_NODE_IS_RDONLY(node)) {
 		return STATUS_READ_ONLY;
 	}
 
