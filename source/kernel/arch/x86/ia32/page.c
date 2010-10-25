@@ -178,7 +178,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 	}
 
 	/* Unmap the PDP and return the page directory address. */
-	pdir = page_structure_map(map, pdp[pdpe] & PAGE_MASK, mmflag);
+	pdir = page_structure_map(map, pdp[pdpe] & PHYS_PAGE_MASK, mmflag);
 	page_structure_unmap(map, pdp);
 	return pdir;
 }
@@ -239,7 +239,7 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 	if(IS_KERNEL_MAP(map) && paging_inited) {
 		ptbl = (uint64_t *)KERNEL_PTBL_ADDR(virt);
 	} else {
-		ptbl = page_structure_map(map, pdir[pde] & PAGE_MASK, mmflag);
+		ptbl = page_structure_map(map, pdir[pde] & PHYS_PAGE_MASK, mmflag);
 	}
 	page_structure_unmap(map, pdir);
 	return ptbl;
@@ -486,7 +486,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 		return false;
 	}
 
-	paddr = ptbl[pte] & PAGE_MASK;
+	paddr = ptbl[pte] & PHYS_PAGE_MASK;
 
 	/* If the entry is dirty, set the modified flag on the page. */
 	if(ptbl[pte] & PG_DIRTY && (page = vm_page_lookup(paddr))) {
@@ -539,7 +539,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	}
 
 	/* Find the page directory for the entry. */
-	pdir = page_phys_map(pdp[pdpe] & PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	pdir = page_phys_map(pdp[pdpe] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
 	page_phys_unmap(pdp, PAGE_SIZE, false);
 	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
 	if(!(pdir[pde] & PG_PRESENT)) {
@@ -549,13 +549,13 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 
 	/* Handle large pages. */
 	if(pdir[pde] & PG_LARGE) {
-		*physp = (pdir[pde] & PAGE_MASK) + (virt % 0x200000);
+		*physp = (pdir[pde] & PHYS_PAGE_MASK) + (virt % 0x200000);
 		page_phys_unmap(pdir, PAGE_SIZE, false);
 		return true;
 	}
 
 	/* Map in the page table. */
-	ptbl = page_phys_map(pdir[pde] & PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	ptbl = page_phys_map(pdir[pde] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
 	page_phys_unmap(pdir, PAGE_SIZE, false);
 	pte = (virt % 0x200000) / PAGE_SIZE;
 	if(!(ptbl[pte] & PG_PRESENT)) {
@@ -563,7 +563,7 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		return false;
 	}
 
-	*physp = ptbl[pte] & PAGE_MASK;
+	*physp = ptbl[pte] & PHYS_PAGE_MASK;
 	page_phys_unmap(ptbl, PAGE_SIZE, false);
 	return true;
 }
@@ -633,19 +633,19 @@ void page_map_destroy(page_map_t *map) {
 			continue;
 		}
 
-		pdir = page_structure_map(map, pdp[i] & PAGE_MASK, MM_SLEEP);
+		pdir = page_structure_map(map, pdp[i] & PHYS_PAGE_MASK, MM_SLEEP);
 		for(j = 0; j < 512; j++) {
 			if(!(pdir[j] & PG_PRESENT)) {
 				continue;
 			}
 
 			if(!(pdir[j] & PG_LARGE)) {
-				page_free(pdir[j] & PAGE_MASK, 1);
+				page_free(pdir[j] & PHYS_PAGE_MASK, 1);
 			}
 		}
 		page_structure_unmap(map, pdir);
 
-		page_free(pdp[i] & PAGE_MASK, 1);
+		page_free(pdp[i] & PHYS_PAGE_MASK, 1);
 	}
 	page_structure_unmap(map, pdp);
 
@@ -760,9 +760,9 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 	/* Add the fractal mapping for the kernel page table. */
 	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
-	pdir = page_phys_map(pdp[3] & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	pdir = page_phys_map(pdp[3] & PHYS_PAGE_MASK, PAGE_SIZE, MM_FATAL);
 	pde = (KERNEL_PTBL_BASE % 0x40000000) / LARGE_PAGE_SIZE;
-	pdir[pde] = (pdp[3] & PAGE_MASK) | PG_PRESENT | PG_WRITE;
+	pdir[pde] = (pdp[3] & PHYS_PAGE_MASK) | PG_PRESENT | PG_WRITE;
 	page_phys_unmap(pdir, PAGE_SIZE, true);
 
 	/* The temporary identity mapping is still required as all the CPUs'

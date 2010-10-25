@@ -144,7 +144,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 	}
 
 	/* Get the PDP from the PML4. */
-	pdp = page_structure_map(pml4[pml4e] & PAGE_MASK);
+	pdp = page_structure_map(pml4[pml4e] & PHYS_PAGE_MASK);
 
 	/* Get the page directory number. A page directory covers 1GB. */
 	pdpe = (virt % 0x8000000000) / 0x40000000;
@@ -170,7 +170,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 	}
 
 	/* Return the page directory address. */
-	return page_structure_map(pdp[pdpe] & PAGE_MASK);
+	return page_structure_map(pdp[pdpe] & PHYS_PAGE_MASK);
 }
 
 /** Get the page table containing an address.
@@ -214,7 +214,7 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 
 	/* If this function is being used it should not be a large page. */
 	assert(!(pdir[pde] & PG_LARGE));
-	return page_structure_map(pdir[pde] & PAGE_MASK);
+	return page_structure_map(pdir[pde] & PHYS_PAGE_MASK);
 }
 
 /** Lock a page map.
@@ -455,7 +455,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 		return false;
 	}
 
-	paddr = ptbl[pte] & PAGE_MASK;
+	paddr = ptbl[pte] & PHYS_PAGE_MASK;
 
 	/* If the entry is dirty, set the modified flag on the page. */
 	if(ptbl[pte] & PG_DIRTY && (page = vm_page_lookup(paddr))) {
@@ -503,15 +503,15 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 		if(pdir[pde] & PG_PRESENT) {
 			/* Handle large pages. */
 			if(pdir[pde] & PG_LARGE) {
-				*physp = (pdir[pde] & PAGE_MASK) + (virt % 0x200000);
+				*physp = (pdir[pde] & PHYS_PAGE_MASK) + (virt % 0x200000);
 				return true;
 			}
 
-			ptbl = page_structure_map(pdir[pde] & PAGE_MASK);
+			ptbl = page_structure_map(pdir[pde] & PHYS_PAGE_MASK);
 			if(ptbl) {
 				pte = (virt % 0x200000) / PAGE_SIZE;
 				if(ptbl[pte] & PG_PRESENT) {
-					*physp = ptbl[pte] & PAGE_MASK;
+					*physp = ptbl[pte] & PHYS_PAGE_MASK;
 					return true;
 				}
 			}
@@ -572,27 +572,27 @@ void page_map_destroy(page_map_t *map) {
 			continue;
 		}
 
-		pdp = page_structure_map(pml4[i] & PAGE_MASK);
+		pdp = page_structure_map(pml4[i] & PHYS_PAGE_MASK);
 		for(j = 0; j < 512; j++) {
 			if(!(pdp[j] & PG_PRESENT)) {
 				continue;
 			}
 
-			pdir = page_structure_map(pdp[j] & PAGE_MASK);
+			pdir = page_structure_map(pdp[j] & PHYS_PAGE_MASK);
 			for(k = 0; k < 512; k++) {
 				if(!(pdir[k] & PG_PRESENT)) {
 					continue;
 				}
 
 				if(!(pdir[k] & PG_LARGE)) {
-					page_free(pdir[k] & PAGE_MASK, 1);
+					page_free(pdir[k] & PHYS_PAGE_MASK, 1);
 				}
 			}
 
-			page_free(pdp[j] & PAGE_MASK, 1);
+			page_free(pdp[j] & PHYS_PAGE_MASK, 1);
 		}
 
-		page_free(pml4[i] & PAGE_MASK, 1);
+		page_free(pml4[i] & PHYS_PAGE_MASK, 1);
 	}
 
 	page_free(map->cr3, 1);
@@ -688,7 +688,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	 * on all pages, which makes invalidating the TLB entries difficult
 	 * when removing the mapping. */
 	pml4 = page_structure_map(kernel_page_map.cr3);
-	bpml4 = page_structure_map(x86_read_cr3() & PAGE_MASK);
+	bpml4 = page_structure_map(x86_read_cr3() & PHYS_PAGE_MASK);
 	pml4[0] = bpml4[0];
 
 	page_map_unlock(&kernel_page_map);

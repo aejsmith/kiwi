@@ -27,11 +27,18 @@
 #define LARGE_PAGE_WIDTH	21		/**< Width of a large page in bits. */
 #define LARGE_PAGE_SIZE		0x200000	/**< Size of a large page (2MB). */
 
-/** Mask to clear page offset from a virtual address. */
+/** Mask to clear page offset and unsupported bits from a virtual address. */
 #ifdef __x86_64__
-# define PAGE_MASK		0x000FFFFFFFFFF000
+# define PAGE_MASK		0xFFFFFFFFFF000LL
 #else
 # define PAGE_MASK		0xFFFFF000
+#endif
+
+/** Mask to clear page offset and unsupported bits from a physical address. */
+#ifdef __x86_64__
+# define PHYS_PAGE_MASK		0xFFFFFFF000LL
+#else
+# define PHYS_PAGE_MASK		0xFFFFFF000LL
 #endif
 
 /** Definitions of paging structure bits. */
