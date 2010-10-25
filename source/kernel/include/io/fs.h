@@ -116,11 +116,15 @@ typedef struct fs_node_ops {
 	 * @param name		Name to give directory entry.
 	 * @param type		Type to give the new node.
 	 * @param target	For symbolic links, the target of the link.
+	 * @param security	Security attributes for the node. This should
+	 *			be passed through to fs_node_alloc() when
+	 *			creating the node structure.
 	 * @param nodep		Where to store pointer to node structure for
 	 *			created entry.
 	 * @return		Status code describing result of the operation. */
 	status_t (*create)(struct fs_node *parent, const char *name, fs_node_type_t type,
-	                   const char *target, struct fs_node **nodep);
+	                   const char *target, object_security_t *security,
+	                   struct fs_node **nodep);
 
 	/** Remove an entry from a directory.
 	 * @note		If the node's link count reaches 0, this
@@ -280,9 +284,9 @@ extern void fs_node_remove(fs_node_t *node);
  * Kernel interface.
  */
 
-extern status_t fs_file_create(const char *path);
 extern object_handle_t *fs_file_from_memory(const void *buf, size_t size);
 extern status_t fs_file_open(const char *path, object_rights_t rights, int flags,
+                             int create, object_security_t *security,
                              object_handle_t **handlep);
 extern status_t fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
 extern status_t fs_file_pread(object_handle_t *handle, void *buf, size_t count,
@@ -293,7 +297,7 @@ extern status_t fs_file_pwrite(object_handle_t *handle, const void *buf, size_t 
                                offset_t offset, size_t *bytesp);
 extern status_t fs_file_resize(object_handle_t *handle, offset_t size);
 
-extern status_t fs_dir_create(const char *path);
+extern status_t fs_dir_create(const char *path, object_security_t *security);
 extern status_t fs_dir_open(const char *path, object_rights_t rights, int flags,
                             object_handle_t **handlep);
 extern status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size);

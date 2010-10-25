@@ -32,6 +32,7 @@
 #include <proc/process.h>
 
 #include <security/cap.h>
+#include <security/context.h>
 
 #include <assert.h>
 #include <console.h>
@@ -775,12 +776,30 @@ void fs_node_remove(fs_node_t *node) {
  * @param path		Path to node to create.
  * @param type		Type to give the new node.
  * @param target	For symbolic links, the target of the link.
+ * @param security	Security attributes for the node.
+ * @param nodep		Where to store pointer to created node (can be NULL).
  * @return		Status code describing result of the operation. */
-static status_t fs_node_create(const char *path, fs_node_type_t type, const char *target) {
+static status_t fs_node_create(const char *path, fs_node_type_t type, const char *target,
+                               object_security_t *security, fs_node_t **nodep) {
 	fs_node_t *parent = NULL, *node = NULL;
 	char *dir, *name;
 	node_id_t id;
 	status_t ret;
+
+	assert(security);
+	assert(security->acl);
+
+	/* Replace -1 for UID and GID in the security attributes with the
+	 * current UID/GID. Normally this would be done by object_init(),
+	 * however we pass this through to the filesystem to write the
+	 * security attributes for the node, meaning the values must be
+	 * valid. */
+	if(security->uid < 0) {
+		security->uid = security_current_uid();
+	}
+	if(security->gid < 0) {
+		security->gid = security_current_gid();
+	}
 
 	/* Split path into directory/name. */
 	dir = kdirname(path, MM_SLEEP);
@@ -809,6 +828,16 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 
 	mutex_lock(&parent->mount->lock);
 
+	/* Check if the name we're creating already exists. This will populate
+	 * the entry cache so it will be OK to add the node to it. */
+	ret = fs_dir_lookup(parent, name, &id);
+	if(ret != STATUS_NOT_FOUND) {
+		if(ret == STATUS_SUCCESS) {
+			ret = STATUS_ALREADY_EXISTS;
+		}
+		goto out;
+	}
+
 	/* Check that we are on a writable filesystem, that we have write
 	 * permission to the directory, and that the FS supports node
 	 * creation. */
@@ -823,18 +852,8 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 		goto out;
 	}
 
-	/* Check if the name we're creating already exists. This will populate
-	 * the entry cache so it will be OK to add the node to it. */
-	ret = fs_dir_lookup(parent, name, &id);
-	if(ret != STATUS_NOT_FOUND) {
-		if(ret == STATUS_SUCCESS) {
-			ret = STATUS_ALREADY_EXISTS;
-		}
-		goto out;
-	}
-
 	/* We can now call into the filesystem to create the node. */
-	ret = parent->ops->create(parent, name, type, target, &node);
+	ret = parent->ops->create(parent, name, type, target, security, &node);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -845,6 +864,10 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 
 	dprintf("fs: created %s (node: %" PRIu16 ":%" PRIu64 ", parent: %" PRIu16 ":%" PRIu64 ")\n",
 	        path, node->mount->id, node->id, parent->mount->id, parent->id);
+	if(nodep) {
+		*nodep = node;
+		node = NULL;
+	}
 out:
 	if(parent) {
 		mutex_unlock(&parent->mount->lock);
@@ -1038,13 +1061,6 @@ static object_type_t file_object_type = {
 	.release_page = file_object_release_page,
 };
 
-/** Create a regular file in the file system.
- * @param path		Path to file to create.
- * @return		Status code describing result of the operation. */
-status_t fs_file_create(const char *path) {
-	return fs_node_create(path, FS_NODE_FILE, NULL);
-}
-
 /** Structure containing details of a memory file. */
 typedef struct memory_file {
 	const char *data;		/**< Data for the file. */
@@ -1130,20 +1146,71 @@ object_handle_t *fs_file_from_memory(const void *buf, size_t size) {
 	return handle;
 }
 
+/** Default rights to give to a file. */
+#define DEFAULT_FILE_RIGHTS_OWNER	(OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE)
+#define DEFAULT_FILE_RIGHTS_OTHERS	(FS_READ)
+
 /** Open a handle to a file.
  * @param path		Path to file to open.
  * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
+ * @param create	Whether to create the file. If 0, the file will not be
+ *			created if it doesn't exist. If FS_CREATE, it will be
+ *			created if it doesn't exist. If FS_CREATE_ALWAYS, it
+ *			will always be created, and an error will be returned
+ *			if it already exists.
+ * @param security	If creating the file, the security attributes to give
+ *			to it. If NULL, default security attributes will be
+ *			used. Note that the ACL (if any) will not be copied: the
+ *			memory used for it will be taken over and the given ACL
+ *			structure will be invalidated.
  * @param handlep	Where to store pointer to handle structure.
  * @return		Status code describing result of the operation. */
-status_t fs_file_open(const char *path, object_rights_t rights, int flags, object_handle_t **handlep) {
+status_t fs_file_open(const char *path, object_rights_t rights, int flags, int create,
+                      object_security_t *security, object_handle_t **handlep) {
+	object_security_t dsecurity = { -1, -1, NULL };
+	object_acl_t acl;
 	fs_node_t *node;
 	status_t ret;
+
+	if(create != 0 && create != FS_CREATE && create != FS_CREATE_ALWAYS) {
+		return STATUS_INVALID_ARG;
+	}
 
 	/* Look up the filesystem node. */
 	ret = fs_node_lookup(path, true, FS_NODE_FILE, &node);
 	if(ret != STATUS_SUCCESS) {
-		return ret;
+		/* If requested try to create the node. */
+		if(ret == STATUS_NOT_FOUND && create) {
+			if(security) {
+				dsecurity.uid = security->uid;
+				dsecurity.gid = security->gid;
+				if(security->acl) {
+					dsecurity.acl = security->acl;
+				}
+			}
+
+			/* Create a default ACL if none is given. */
+			if(!dsecurity.acl) {
+				dsecurity.acl = &acl;
+				object_acl_init(&acl);
+				object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
+				                     DEFAULT_FILE_RIGHTS_OWNER);
+				object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
+				                     DEFAULT_FILE_RIGHTS_OTHERS);
+			}
+
+			ret = fs_node_create(path, FS_NODE_FILE, NULL, &dsecurity, &node);
+			object_acl_destroy(dsecurity.acl);
+			if(ret != STATUS_SUCCESS) {
+				return ret;
+			}
+		} else {
+			return ret;
+		}
+	} else if(create == FS_CREATE_ALWAYS) {
+		fs_node_release(node);
+		return STATUS_ALREADY_EXISTS;
 	}
 
 	ret = fs_handle_create(node, rights, flags, handlep);
@@ -1437,11 +1504,42 @@ static object_type_t dir_object_type = {
 	.close = dir_object_close,
 };
 
+/** Default rights to give to a file. */
+#define DEFAULT_DIR_RIGHTS_OWNER	(OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE)
+#define DEFAULT_DIR_RIGHTS_OTHERS	(FS_READ | FS_EXECUTE)
+
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
+ * @param security	Security attributes for the directory. If NULL, default
+ *			security attributes will be used. Note that the ACL (if
+ *			any) will not be copied: the memory used for it will be
+ *			taken over and the given ACL structure will be
+ *			invalidated.
  * @return		Status code describing result of the operation. */
-status_t fs_dir_create(const char *path) {
-	return fs_node_create(path, FS_NODE_DIR, NULL);
+status_t fs_dir_create(const char *path, object_security_t *security) {
+	object_security_t dsecurity = { -1, -1, NULL };
+	object_acl_t acl;
+	status_t ret;
+
+	if(security) {
+		dsecurity.uid = security->uid;
+		dsecurity.gid = security->gid;
+		if(security->acl) {
+			dsecurity.acl = security->acl;
+		}
+	}
+
+	/* Create a default ACL if none is given. */
+	if(!dsecurity.acl) {
+		dsecurity.acl = &acl;
+		object_acl_init(&acl);
+		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_DIR_RIGHTS_OWNER);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_DIR_RIGHTS_OTHERS);
+	}
+
+	ret = fs_node_create(path, FS_NODE_DIR, NULL, &dsecurity, NULL);
+	object_acl_destroy(dsecurity.acl);
+	return ret;
 }
 
 /** Open a handle to a directory.
@@ -1679,7 +1777,20 @@ status_t fs_handle_sync(object_handle_t *handle) {
  *			directory containing the link.
  * @return		Status code describing result of the operation. */
 status_t fs_symlink_create(const char *path, const char *target) {
-	return fs_node_create(path, FS_NODE_SYMLINK, target);
+	object_acl_t acl;
+	object_security_t security = { -1, -1, &acl };
+	status_t ret;
+
+	/* Construct the ACL for the symbolic link. */
+	object_acl_init(&acl);
+	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
+	                     OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
+	                     FS_READ | FS_WRITE | FS_EXECUTE);
+
+	ret = fs_node_create(path, FS_NODE_SYMLINK, target, &security, NULL);
+	object_acl_destroy(security.acl);
+	return ret;
 }
 
 /** Get the destination of a symbolic link.
@@ -2356,30 +2467,23 @@ void __init_text fs_init(kernel_args_t *args) {
 	force_fsimage = args->force_fsimage;
 }
 
-/** Create a regular file in the file system.
- * @param path		Path to file to create.
- * @return		Status code describing result of the operation. */
-status_t sys_fs_file_create(const char *path) {
-	status_t ret;
-	char *kpath;
-
-	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	ret = fs_file_create(kpath);
-	kfree(kpath);
-	return ret;
-}
-
 /** Open a handle to a file.
  * @param path		Path to file to open.
  * @param rights	Requested access rights for the handle.
  * @param flags		Behaviour flags for the handle.
+ * @param create	Whether to create the file. If 0, the file will not be
+ *			created if it doesn't exist. If FS_CREATE, it will be
+ *			created if it doesn't exist. If FS_CREATE_ALWAYS, it
+ *			will always be created, and an error will be returned
+ *			if it already exists.
+ * @param security	If creating the file, the security attributes to give
+ *			to it. If NULL, default security attributes will be
+ *			used.
  * @param handlep	Where to store handle to file.
  * @return		Status code describing result of the operation. */
-status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, handle_t *handlep) {
+status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, int create,
+                          const object_security_t *security, handle_t *handlep) {
+	object_security_t ksecurity = { -1, -1, NULL };
 	object_handle_t *handle;
 	char *kpath = NULL;
 	status_t ret;
@@ -2393,14 +2497,24 @@ status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, h
 		return ret;
 	}
 
-	ret = fs_file_open(kpath, rights, flags, &handle);
+	if(security) {
+		ret = object_security_from_user(&ksecurity, security);
+		if(ret != STATUS_SUCCESS) {
+			kfree(kpath);
+			return ret;
+		}
+	}
+
+	ret = fs_file_open(kpath, rights, flags, create, (security) ? &ksecurity : NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
+		object_security_destroy(&ksecurity);
 		kfree(kpath);
 		return ret;
 	}
 
 	ret = object_handle_attach(handle, NULL, 0, NULL, handlep);
 	object_handle_release(handle);
+	object_security_destroy(&ksecurity);
 	kfree(kpath);
 	return ret;
 }
@@ -2700,8 +2814,11 @@ status_t sys_fs_file_resize(handle_t handle, offset_t size) {
 
 /** Create a directory in the file system.
  * @param path		Path to directory to create.
+ * @param security	Security attributes for the directory. If NULL, default
+ *			security attributes will be used.
  * @return		Status code describing result of the operation. */
-status_t sys_fs_dir_create(const char *path) {
+status_t sys_fs_dir_create(const char *path, const object_security_t *security) {
+	object_security_t ksecurity = { -1, -1, NULL };
 	status_t ret;
 	char *kpath;
 
@@ -2710,7 +2827,16 @@ status_t sys_fs_dir_create(const char *path) {
 		return ret;
 	}
 
-	ret = fs_dir_create(kpath);
+	if(security) {
+		ret = object_security_from_user(&ksecurity, security);
+		if(ret != STATUS_SUCCESS) {
+			kfree(kpath);
+			return ret;
+		}
+	}
+
+	ret = fs_dir_create(kpath, (security) ? &ksecurity : NULL);
+	object_security_destroy(&ksecurity);
 	kfree(kpath);
 	return ret;
 }

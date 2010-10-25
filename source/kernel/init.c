@@ -127,7 +127,9 @@ static boot_module_t *boot_module_lookup(const char *name) {
  * @param mod		Boot module containing archive. */
 static void __init_text load_boot_fsimage(boot_module_t *mod) {
 	tar_header_t *hdr = mod->mapping;
+	object_security_t security;
 	object_handle_t *handle;
+	object_acl_t acl;
 	int64_t size;
 	status_t ret;
 	size_t bytes;
@@ -160,15 +162,24 @@ static void __init_text load_boot_fsimage(boot_module_t *mod) {
 		switch(hdr->typeflag) {
 		case REGTYPE:
 		case AREGTYPE:
-			ret = fs_file_create(hdr->name);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to create regular file %s (%d)", hdr->name, ret);
-			}
+			/* TODO: Until we interpret the mode information in the
+			 * TAR file, override the default security attributes
+			 * to mark everything as executable. */
+			security.uid = -1;
+			security.gid = -1;
+			security.acl = &acl;
+			object_acl_init(&acl);
+			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
+			                     OBJECT_SET_OWNER | OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
+			object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
+			                     FS_READ | FS_EXECUTE);
 
-			ret = fs_file_open(hdr->name, FS_WRITE, 0, &handle);
+			ret = fs_file_open(hdr->name, FS_WRITE, 0, FS_CREATE_ALWAYS, &security, &handle);
 			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to open file %s (%d)", hdr->name, ret);
 			}
+
+			object_acl_destroy(&acl);
 
 			ret = fs_file_write(handle, (void *)((ptr_t)hdr + 512), size, &bytes);
 			if(ret != STATUS_SUCCESS) {
@@ -180,7 +191,7 @@ static void __init_text load_boot_fsimage(boot_module_t *mod) {
 			object_handle_release(handle);
 			break;
 		case DIRTYPE:
-			ret = fs_dir_create(hdr->name);
+			ret = fs_dir_create(hdr->name, NULL);
 			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to create directory %s (%d)", hdr->name, ret);
 			}

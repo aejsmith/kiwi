@@ -73,11 +73,13 @@ static void ramfs_node_free(fs_node_t *node) {
  * @param name		Name to give the node.
  * @param type		Type to give the new node.
  * @param target	For symbolic links, the target of the link.
+ * @param security	Security attributes for the node.
  * @param nodep		Where to store pointer to node structure for created
  *			entry.
  * @return		Status code describing result of the operation. */
 static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_type_t type,
-                                  const char *target, fs_node_t **nodep) {
+                                  const char *target, object_security_t *security,
+                                  fs_node_t **nodep) {
 	ramfs_mount_t *mount = parent->mount->data;
 	ramfs_node_t *pdata = parent->data, *data;
 	node_id_t id;
@@ -113,7 +115,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t
 	}
 
 	entry_cache_insert(pdata->entries, name, id);
-	*nodep = fs_node_alloc(parent->mount, id, type, NULL, parent->ops, data);
+	*nodep = fs_node_alloc(parent->mount, id, type, security, parent->ops, data);
 	return STATUS_SUCCESS;
 }
 

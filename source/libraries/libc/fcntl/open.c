@@ -27,8 +27,36 @@
 
 #include "../libc.h"
 
+/** Convert POSIX open() flags to kernel flags.
+ * @param type		Node type.
+ * @param oflag		POSIX open flags.
+ * @param krightsp	Where to store kernel rights.
+ * @param kflagsp	Where to store kernel flags.
+ * @param kcreatep	Where to store kernel creation flags. */
+static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rights_t *krightsp,
+                                      int *kflagsp, int *kcreatep) {
+	object_rights_t krights = 0;
+	int kflags = 0;
+
+	krights |= ((oflag & O_RDONLY) ? FS_READ : 0);
+	krights |= ((oflag & O_WRONLY) ? FS_WRITE : 0);
+
+	kflags |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
+	switch(type) {
+	case FS_NODE_FILE:
+		kflags |= ((oflag & O_APPEND) ? FS_FILE_APPEND : 0);
+		break;
+	default:
+		break;
+	}
+
+	*krightsp = krights;
+	*kflagsp = kflags;
+	*kcreatep = (oflag & O_EXCL) ? FS_CREATE_ALWAYS : FS_CREATE;
+}
+
 /** Open a file or directory.
- * @todo		Handle the mode argument.
+ * @todo		Convert mode to kernel ACL.
  * @param path		Path to file to open.
  * @param oflag		Flags controlling how to open the file.
  * @param ...		Mode to create the file with if O_CREAT is specified.
@@ -38,10 +66,10 @@
 int open(const char *path, int oflag, ...) {
 	object_rights_t rights;
 	fs_node_type_t type;
+	int kflags, kcreate;
 	handle_t handle;
 	fs_info_t info;
 	status_t ret;
-	int kflag;
 
 	/* Check whether the arguments are valid. I'm not sure if the second
 	 * check is correct, POSIX doesn't say anything about O_CREAT with
@@ -56,39 +84,28 @@ int open(const char *path, int oflag, ...) {
 		errno = EACCES;
 		return -1;
 	}
-retry:
-	/* Determine the filesystem entry type. */
-	ret = fs_info(path, true, &info);
-	if(ret == STATUS_SUCCESS) {
-		if(oflag & O_EXCL) {
-			errno = EEXIST;
-			return -1;
-		}
-		type = info.type;
-	} else if(ret == STATUS_NOT_FOUND && (oflag & O_CREAT)) {
-		/* File does not exist. Attempt to create it. */
-		ret = fs_file_create(path);
+
+	/* If O_CREAT is specified, we assume that we're going to be opening
+	 * a file. Although POSIX doesn't specify anything about O_CREAT with
+	 * a directory, Linux fails with EISDIR if O_CREAT is used with a
+	 * directory that already exists. */
+	if(oflag & O_CREAT) {
+		type = FS_NODE_FILE;
+	} else {
+		/* Determine the filesystem entry type. */
+		ret = fs_info(path, true, &info);
 		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_ALREADY_EXISTS) {
-				goto retry;
-			}
 			libc_status_to_errno(ret);
 			return -1;
 		}
-		type = FS_NODE_FILE;
-	} else {
-		libc_status_to_errno(ret);
-		return -1;
+
+		type = info.type;
 	}
 
 	/* Convert the flags to kernel flags. */
-	rights = 0;
-	rights |= ((oflag & O_RDONLY) ? FS_READ : 0);
-	rights |= ((oflag & O_WRONLY) ? FS_WRITE : 0);
-	kflag = 0;
-	kflag |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
+	convert_open_flags(type, oflag, &rights, &kflags, &kcreate);
 
-	/* Open the entry according to the entry type. */
+	/* Open according to the entry type. */
 	switch(type) {
 	case FS_NODE_FILE:
 		if(oflag & O_DIRECTORY) {
@@ -96,15 +113,9 @@ retry:
 			return -1;
 		}
 
-		/* Convert the flags to kernel flags. */
-		kflag |= ((oflag & O_APPEND) ? FS_FILE_APPEND : 0);
-
-		/* Open the file. */
-		ret = fs_file_open(path, rights, kflag, &handle);
+		/* Open the file, creating it if necessary. */
+		ret = fs_file_open(path, rights, kflags, kcreate, NULL, &handle);
 		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_NOT_FOUND) {
-				goto retry;
-			}
 			libc_status_to_errno(ret);
 			return -1;
 		}
@@ -125,11 +136,8 @@ retry:
 			return -1;
 		}
 
-		ret = fs_dir_open(path, rights, kflag, &handle);
+		ret = fs_dir_open(path, rights, kflags, &handle);
 		if(ret != STATUS_SUCCESS) {
-			if(ret == STATUS_NOT_FOUND) {
-				goto retry;
-			}
 			libc_status_to_errno(ret);
 			return -1;
 		}

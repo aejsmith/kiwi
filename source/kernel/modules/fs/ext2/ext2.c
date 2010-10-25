@@ -55,11 +55,13 @@ static status_t ext2_node_flush(fs_node_t *node) {
  * @param _parent	Directory to create in.
  * @param name		Name to give directory entry.
  * @param type		Type to give the new node.
+ * @param security	Security attributes for the node.
  * @param target	For symbolic links, the target of the link.
  * @param nodep		Where to store pointer to node for created entry.
  * @return		Status code describing result of the operation. */
 static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_type_t type,
-                                 const char *target, fs_node_t **nodep) {
+                                 const char *target, object_security_t *security,
+                                 fs_node_t **nodep) {
 	ext2_inode_t *parent = _parent->data, *inode;
 	size_t len, bytes;
 	uint16_t mode;

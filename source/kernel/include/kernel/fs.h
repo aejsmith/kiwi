@@ -71,33 +71,42 @@ typedef struct fs_info {
 /** Behaviour flags for fs_file_open(). */
 #define FS_FILE_APPEND		(1<<1)	/**< Before each write, offset is set to the end of the file. */
 
+/** Values for the create option of fs_file_open(). */
+#define FS_CREATE		1	/**< Create the file if it doesn't exist. */
+#define FS_CREATE_ALWAYS	2	/**< If the file already exists, fail, else create it. */
+
 /** Operations for fs_handle_seek(). */
 #define FS_SEEK_SET		1	/**< Set the offset to the exact position specified. */
 #define FS_SEEK_ADD		2	/**< Add the supplied value to the current offset. */
 #define FS_SEEK_END		3	/**< Set the offset to the end of the file plus the supplied value. */
 
-extern status_t SYSCALL(fs_file_create)(const char *path);
-extern status_t SYSCALL(fs_file_open)(const char *path, object_rights_t rights, int flags, handle_t *handlep);
+extern status_t SYSCALL(fs_file_open)(const char *path, object_rights_t rights, int flags,
+                                      int create, const object_security_t *security,
+                                      handle_t *handlep);
 extern status_t SYSCALL(fs_file_read)(handle_t handle, void *buf, size_t count, size_t *bytesp);
 extern status_t SYSCALL(fs_file_pread)(handle_t handle, void *buf, size_t count, offset_t offset,
                                        size_t *bytesp);
-extern status_t SYSCALL(fs_file_write)(handle_t handle, const void *buf, size_t count, size_t *bytesp);
+extern status_t SYSCALL(fs_file_write)(handle_t handle, const void *buf, size_t count,
+                                       size_t *bytesp);
 extern status_t SYSCALL(fs_file_pwrite)(handle_t handle, const void *buf, size_t count,
                                         offset_t offset, size_t *bytesp);
 extern status_t SYSCALL(fs_file_resize)(handle_t handle, offset_t size);
 
-extern status_t SYSCALL(fs_dir_create)(const char *path);
-extern status_t SYSCALL(fs_dir_open)(const char *path, object_rights_t rights, int flags, handle_t *handlep);
+extern status_t SYSCALL(fs_dir_create)(const char *path, const object_security_t *security);
+extern status_t SYSCALL(fs_dir_open)(const char *path, object_rights_t rights, int flags,
+                                     handle_t *handlep);
 extern status_t SYSCALL(fs_dir_read)(handle_t handle, fs_dir_entry_t *buf, size_t size);
 
-extern status_t SYSCALL(fs_handle_seek)(handle_t handle, int action, rel_offset_t offset, offset_t *newp);
+extern status_t SYSCALL(fs_handle_seek)(handle_t handle, int action, rel_offset_t offset,
+                                        offset_t *newp);
 extern status_t SYSCALL(fs_handle_info)(handle_t handle, fs_info_t *info);
 extern status_t SYSCALL(fs_handle_sync)(handle_t handle);
 
 extern status_t SYSCALL(fs_symlink_create)(const char *path, const char *target);
 extern status_t SYSCALL(fs_symlink_read)(const char *path, char *buf, size_t size);
 
-extern status_t SYSCALL(fs_mount)(const char *device, const char *path, const char *type, const char *opts);
+extern status_t SYSCALL(fs_mount)(const char *device, const char *path, const char *type,
+                                  const char *opts);
 extern status_t SYSCALL(fs_unmount)(const char *path);
 extern status_t SYSCALL(fs_sync)(void);
 extern status_t SYSCALL(fs_getcwd)(char *buf, size_t size);
