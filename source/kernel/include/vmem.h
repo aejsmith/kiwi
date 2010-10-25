@@ -34,41 +34,19 @@
 struct slab_cache;
 struct vmem;
 
-/** Vmem limitations/settings. */
+/** Sizes of entries in the vmem structure. */
 #define VMEM_NAME_MAX		25		/**< Maximum name length of a Vmem arena. */
 #define VMEM_HASH_INITIAL	16		/**< Initial size of allocation hash table. */
 #define VMEM_QCACHE_MAX		16		/**< Maximum number of quantum caches. */
-#define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
-#define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
-#define VMEM_RETRY_INTERVAL	1000000		/**< Interval between retries when sleeping for space (in µs). */
-#define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
+
+/** Slab size to use for a quantum cache. */
+#define VMEM_QCACHE_SSIZE(m)	MAX(1 << highbit(3 * (m)), 64)
 
 /** Number of free lists to use. */
 #define VMEM_FREELISTS		BITS(vmem_resource_t)
 
-/** Slab size to use for a vmem quantum cache. */
-#define VMEM_QCACHE_SSIZE(m)	MAX(1 << highbit(3 * (m)), 64)
-
 /** Type of vmem-allocated resources. */
 typedef uint64_t vmem_resource_t;
-
-/** Vmem boundary tag structure. */
-typedef struct vmem_btag {
-	list_t header;				/**< Link to boundary tag list. */
-	list_t s_link;				/**< Link to allocated/free list. */
-
-	vmem_resource_t base;			/**< Start of the range the tag covers. */
-	vmem_resource_t size;			/**< Size of the range. */
-	struct vmem_btag *span;			/**< Parent span (for segments). */
-
-	/** Type of the tag. */
-	enum {
-		VMEM_BTAG_SPAN,			/**< Span. */
-		VMEM_BTAG_IMPORTED,		/**< Imported span. */
-		VMEM_BTAG_FREE,			/**< Free segment. */
-		VMEM_BTAG_ALLOC,		/**< Allocated segment. */
-	} type;
-} vmem_btag_t;
 
 /** Vmem allocation function type. */
 typedef vmem_resource_t (*vmem_afunc_t)(struct vmem *, vmem_resource_t, int);
