@@ -24,8 +24,12 @@ sources = map(File, [
 	'time.c',
 ])
 
-# Set build flags to prevent FPU code generation.
-env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
+# Prevent FPU code generation, we want frame pointers, and want to warn on
+# stack frames that are too large.
+env['CCFLAGS'] += [
+	'-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow',
+	'-Wframe-larger-than=512', '-fno-omit-frame-pointer',
+]
 
 # Set the linker script path.
 env['LDSCRIPT'] = env.LDScript('link.ld', 'link-%s.ld.in' % (config['ARCH']))

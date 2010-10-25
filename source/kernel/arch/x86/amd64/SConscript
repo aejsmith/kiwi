@@ -26,7 +26,7 @@ sources = map(File, [
 
 # Set AMD64-specific compilation flags.
 env['ASFLAGS'] += ['-m64']
-env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone', '-fno-omit-frame-pointer']
+env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone']
 env['LINKFLAGS'] += ['-Wl,-m,elf_x86_64']
 
 Return('sources')
