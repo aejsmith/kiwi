@@ -128,10 +128,9 @@ void ServiceManager::HandleConnection() {
  * @return		Should not return. */
 int main(int argc, char **argv) {
 	security_context_t context;
-	ServiceManager svcmgr;
 	status_t ret;
 
-	/* Add services. TODO: These should be in configuration files. */
+	ServiceManager svcmgr;
 	if(!svcmgr.IsSessionInstance()) {
 		/* Start the security server. This must be done first while we
 		 * still have full capabilities. */
@@ -148,8 +147,7 @@ int main(int argc, char **argv) {
 		 * server should have. */
 		ret = process_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
-			clog << "Failed to obtain security context" << endl;
-			return 1;
+			system_fatal("Failed to obtain security context");
 		}
 
 		security_context_unset_cap(&context, CAP_SECURITY_AUTHORITY);
@@ -157,17 +155,16 @@ int main(int argc, char **argv) {
 
 		ret = process_set_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
-			clog << "Failed to update security context" << endl;
-			return 1;
+			system_fatal("Failed to drop capabilities");
 		}
 
-		/* Start remaining services. */
+		/* Add services. TODO: These should be in configuration files. */
 		svcmgr.AddService(new Service(
 			&svcmgr,
 			"window",
 			"Window server.",
 			"/system/services/window",
-			0,
+			Service::kCritical,
 			"org.kiwi.WindowServer"
 		));
 
