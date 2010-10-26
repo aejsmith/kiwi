@@ -21,7 +21,7 @@
 #ifndef __KIWI_OBJECT_H
 #define __KIWI_OBJECT_H
 
-#include <kiwi/global.h>
+#include <kiwi/CoreDefs.h>
 
 KIWI_BEGIN_NAMESPACE
 

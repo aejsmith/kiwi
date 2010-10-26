@@ -15,20 +15,35 @@
 
 /**
  * @file
- * @brief		Global Kiwi API definitions.
+ * @brief		Utility functions.
  */
 
-#ifndef __KIWI_GLOBAL_H
-#define __KIWI_GLOBAL_H
+#ifndef __KIWI_SUPPORT_UTILITY_H
+#define __KIWI_SUPPORT_UTILITY_H
 
-#include <kernel/types.h>
+#include <kiwi/CoreDefs.h>
 
-/** Visibility attribute definitions. */
-#define KIWI_PUBLIC		__attribute__((visibility("default")))
-#define KIWI_PRIVATE		__attribute__((visibility("hidden")))
+KIWI_BEGIN_NAMESPACE
 
-/** Definitions for the Kiwi namespace. */
-#define KIWI_BEGIN_NAMESPACE	namespace kiwi {
-#define KIWI_END_NAMESPACE	}
+/** Rounds a value up to a power of two.
+ * @param n		Value to round up.
+ * @param align		Value to round up to. */
+template <typename T>
+static inline T p2align(T n, T align) {
+	if(n & (align - 1)) {
+		n += align;
+		n &= ~(align - 1);
+	}
+	return n;
+}
 
-#endif /* __KIWI_GLOBAL_H */
+/** Get the size of an array.
+ * @param array		Array to get size of. */
+template <typename T, size_t N>
+size_t array_size(T (&array)[N]) {
+	return N;
+}
+
+KIWI_END_NAMESPACE
+
+#endif /* __KIWI_SUPPORT_UTILITY_H */

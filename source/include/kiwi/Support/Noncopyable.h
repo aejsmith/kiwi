@@ -21,7 +21,7 @@
 #ifndef __KIWI_SUPPORT_NONCOPYABLE_H
 #define __KIWI_SUPPORT_NONCOPYABLE_H
 
-#include <kiwi/global.h>
+#include <kiwi/CoreDefs.h>
 
 KIWI_BEGIN_NAMESPACE
 

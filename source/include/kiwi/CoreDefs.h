@@ -15,27 +15,20 @@
 
 /**
  * @file
- * @brief		Test application.
+ * @brief		Core Kiwi API definitions.
  */
 
-#include <kiwi/Support/Utility.h>
-#include <kiwi/Object.h>
+#ifndef __KIWI_COREDEFS_H
+#define __KIWI_COREDEFS_H
 
-#include <iostream>
+#include <kernel/types.h>
 
-using namespace kiwi;
-using namespace std;
+/** Visibility attribute definitions. */
+#define KIWI_PUBLIC		__attribute__((visibility("default")))
+#define KIWI_PRIVATE		__attribute__((visibility("hidden")))
 
-static int foobar[42];
+/** Definitions for the Kiwi namespace. */
+#define KIWI_BEGIN_NAMESPACE	namespace kiwi {
+#define KIWI_END_NAMESPACE	}
 
-class MyClass : public Object {
-public:
-	MyClass() {
-		cout << "Hello World! " << array_size(foobar) << endl;
-	}
-};
-
-int main(int argc, char **argv) {
-	MyClass x;
-	while(1);
-}
+#endif /* __KIWI_COREDEFS_H */
