@@ -26,7 +26,7 @@
 using namespace kiwi;
 using namespace std;
 
-static int foobar[42];
+static unsigned long foobar[2] = { 1337, 42 };
 
 class MyClass : public Object {
 public:
@@ -35,7 +35,20 @@ public:
 	}
 };
 
+extern "C" void thread_set_tls_addr(void *addr);
+
 int main(int argc, char **argv) {
 	MyClass x;
+	thread_set_tls_addr(foobar);
+	unsigned long vala, valb;
+#ifdef __x86_64__
+	__asm__ volatile("movq %%fs:8, %0" : "=r"(vala));
+	__asm__ volatile("movq %%fs:0, %0" : "=r"(valb));
+#else
+	__asm__ volatile("movl %%gs:4, %0" : "=r"(vala));
+	__asm__ volatile("movl %%gs:0, %0" : "=r"(valb));
+#endif
+	cout << vala << endl;
+	cout << valb << endl;
 	while(1);
 }

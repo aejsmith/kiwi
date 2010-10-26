@@ -15,5 +15,5 @@ Import('env')
 
 env.KiwiApplication('test',
 	sources = ['main.cc'],
-	libraries = ['kiwi'],
+	libraries = ['kernel', 'kiwi'],
 )

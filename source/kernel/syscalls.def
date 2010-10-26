@@ -84,6 +84,7 @@ syscall thread_open(thread_id_t, object_rights_t, ptr_t);
 syscall thread_id(handle_t);
 syscall thread_exit(int);
 syscall thread_usleep(useconds_t);
+syscall thread_set_tls_addr(ptr_t);
 syscall ipc_port_create(ptr_t, object_rights_t, ptr_t);
 syscall ipc_port_open(port_id_t, object_rights_t, ptr_t);
 syscall ipc_port_id(handle_t);

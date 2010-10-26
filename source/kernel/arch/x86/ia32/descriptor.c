@@ -39,6 +39,7 @@ static gdt_entry_t initial_gdt[] __aligned(8) = {
 	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 1, 1, 0 },	/**< Kernel DS (Data). */
 	{ 0xFFFF, 0, 0, 0xFE, 0xF, 0, 0, 1, 1, 0 },	/**< User CS (Code). */
 	{ 0xFFFF, 0, 0, 0xF2, 0xF, 0, 0, 1, 1, 0 },	/**< User DS (Data). */
+	{ 0xFFFF, 0, 0, 0xF2, 0xF, 0, 0, 1, 1, 0 },	/**< User GS (TLS). */
 	{ 0, 0, 0, 0x89, 0, 0, 0, 1, 0, 0 },		/**< TSS descriptor. */
 	{ 0, 0, 0, 0x89, 0, 0, 0, 1, 0, 0 },		/**< Doublefault TSS descriptor. */
 };
@@ -49,7 +50,7 @@ static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 /** Set the base address of a segment.
  * @param sel		Segment to modify.
  * @param base		New base address of the segment. */
-static inline void gdt_set_base(int sel, ptr_t base) {
+void gdt_set_base(int sel, ptr_t base) {
 	curr_cpu->arch.gdt[sel / 0x08].base0 = (base & 0xFFFF);
 	curr_cpu->arch.gdt[sel / 0x08].base1 = (base >> 16) & 0xFF;
 	curr_cpu->arch.gdt[sel / 0x08].base2 = (base >> 24) & 0xFF;

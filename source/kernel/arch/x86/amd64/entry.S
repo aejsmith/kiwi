@@ -42,17 +42,10 @@
 	push	%r13
 	push	%r14
 	push	%r15
-
-	push	%fs
-	andl	$0xFFFF, (%rsp)
-	push	%gs
-	andl	$0xFFFF, (%rsp)
 .endm
 
 /** Pop registers from the stack. */
 .macro POP_REGS
-	pop	%gs
-	pop	%fs
 	pop	%r15
 	pop	%r14
 	pop	%r13
@@ -141,12 +134,6 @@ PRIVATE_FUNCTION_START(isr_common)
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
-	/* Set sane segment descriptors. */
-	mov	$SEGMENT_K_DS, %ax
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %ss
-
 	/* Clear direction flag. */
 	cld
 
@@ -179,7 +166,7 @@ FUNCTION_START(syscall_entry)
 	 * call frame). */
 	push	%gs:8
 
-	/* Return to the previous GS value. */
+	/* Return to the previous GS base. */
 	swapgs
 
 	/* Clear direction flag. */
@@ -313,11 +300,6 @@ FUNCTION_START(thread_arch_enter_userspace)
 	push	$(X86_FLAGS_IF | X86_FLAGS_ALWAYS1)
 	push	$(SEGMENT_U_CS | 0x03)
 	push	%rdi
-	
-	/* Set other segment registers. */
-	mov	$(SEGMENT_U_DS | 0x03), %ax
-	mov	%ax, %ds
-	mov	%ax, %es
 
 	/* Move argument to RDI. */
 	movq	%rdx, %rdi

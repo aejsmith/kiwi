@@ -64,11 +64,12 @@ FUNCTION_START(kiwi_loader_arch_enter64)
 .Llmode:
 	/* Set data segments. */
 	mov	$SEGMENT_DS64, %ax
+	mov	%ax, %ss
+	xorl	%eax, %eax
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
 	mov	%ax, %gs
-	mov	%ax, %ss
 
         /* Clear the high 32 bits of %rsp. */
         mov     %esp, %esp

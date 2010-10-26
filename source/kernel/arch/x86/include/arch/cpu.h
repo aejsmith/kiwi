@@ -85,17 +85,18 @@
 
 /** Model Specific Registers. */
 #define X86_MSR_TSC		0x10		/**< Time Stamp Counter (TSC). */
-#define X86_MSR_APIC_BASE	0x1b		/**< LAPIC base address. */
+#define X86_MSR_APIC_BASE	0x1B		/**< LAPIC base address. */
 #define X86_MSR_MTRR_BASE0	0x200		/**< Base of the variable length MTRR base registers. */
 #define X86_MSR_MTRR_MASK0	0x201		/**< Base of the variable length MTRR mask registers. */
 #define X86_MSR_CR_PAT		0x277		/**< PAT. */
 #define X86_MSR_MTRR_DEF_TYPE	0x2FF		/**< Default MTRR type. */
-#define X86_MSR_EFER		0xc0000080	/**< Extended Feature Enable register. */
-#define X86_MSR_STAR		0xc0000081	/**< System Call Target Address. */
-#define X86_MSR_LSTAR		0xc0000082	/**< 64-bit System Call Target Address. */
-#define X86_MSR_FMASK		0xc0000084	/**< System Call Flag Mask. */
-#define X86_MSR_GS_BASE		0xc0000101	/**< GS segment base register. */
-#define X86_MSR_K_GS_BASE	0xc0000102	/**< GS base to switch to with SWAPGS. */
+#define X86_MSR_EFER		0xC0000080	/**< Extended Feature Enable register. */
+#define X86_MSR_STAR		0xC0000081	/**< System Call Target Address. */
+#define X86_MSR_LSTAR		0xC0000082	/**< 64-bit System Call Target Address. */
+#define X86_MSR_FMASK		0xC0000084	/**< System Call Flag Mask. */
+#define X86_MSR_FS_BASE		0xC0000100	/**< FS segment base register. */
+#define X86_MSR_GS_BASE		0xC0000101	/**< GS segment base register. */
+#define X86_MSR_K_GS_BASE	0xC0000102	/**< GS base to switch to with SWAPGS. */
 
 /** EFER MSR flags. */
 #define X86_EFER_SCE		(1<<0)		/**< System Call Enable. */

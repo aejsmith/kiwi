@@ -25,6 +25,8 @@
 
 #include <status.h>
 
+extern void sys_thread_set_tls_addr(void *addr);
+
 /** AMD64-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
 	/* Set the RSP0 field in the TSS to point to the new thread's
@@ -34,6 +36,9 @@ void thread_arch_post_switch(thread_t *thread) {
 	/* Store the address of the thread's architecture data in the
 	 * KERNEL_GS_BASE MSR for the SYSCALL handler to use. */
         x86_write_msr(X86_MSR_K_GS_BASE, (ptr_t)&thread->arch);
+
+	/* Set the FS base address. */
+	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
 }
 
 /** Initialise AMD64-specific thread data.
@@ -42,6 +47,7 @@ void thread_arch_post_switch(thread_t *thread) {
 status_t thread_arch_init(thread_t *thread) {
 	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
 	thread->arch.user_rsp = 0;
+	thread->arch.tls_base = 0;
 	return STATUS_SUCCESS;
 }
 
@@ -49,4 +55,14 @@ status_t thread_arch_init(thread_t *thread) {
  * @param thread	Thread to clean up. */
 void thread_arch_destroy(thread_t *thread) {
 	/* Nothing happens. */
+}
+
+/** Set the current thread's TLS address.
+ * @param addr		TLS base address. */
+void sys_thread_set_tls_addr(void *addr) {
+	/* The AMD64 ABI uses the FS segment register to access the TLS data.
+	 * Save the address to be written to the FS base upon each thread
+	 * switch. */
+	curr_thread->arch.tls_base = (ptr_t)addr;
+	x86_write_msr(X86_MSR_FS_BASE, curr_thread->arch.tls_base);
 }
