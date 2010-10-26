@@ -13,15 +13,26 @@
 
 Import('env')
 
+# Generate service manager interface code for the IPC classes.
+env.RPCClient('org.kiwi.ServiceManager.cc', '../../services/svcmgr/org.kiwi.ServiceManager.proto')
+
 # Build the core library.
 env.KiwiLibrary('kiwi',
 	sources = [
-
+		'org.kiwi.ServiceManager.cc',
+		'Error.cc',
+		'EventLoop.cc',
+		'Handle.cc',
+		'IPCConnection.cc',
+		'IPCPort.cc',
+		'log.cc',
+		'Object.cc',
+		'Process.cc',
+		'RPCClientConnection.cc',
+		'RPCMessageBuffer.cc',
+		'RPCServerConnection.cc',
 	],
-	flags = {
-		'CCFLAGS': env['CCFLAGS'] + ['-fvisibility=hidden'],
-	},
 )
 
 # Build the additional libraries.
-#SConscript(dirs=['Service', 'UI'], exports=['env'])
+SConscript(dirs=['Service', 'UI'], exports=['env'])
