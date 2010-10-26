@@ -15,20 +15,25 @@
 
 /**
  * @file
- * @brief		Global Kiwi API definitions.
+ * @brief		API object base class.
  */
 
-#ifndef __KIWI_GLOBAL_H
-#define __KIWI_GLOBAL_H
+#ifndef __KIWI_OBJECT_H
+#define __KIWI_OBJECT_H
 
-#include <kernel/types.h>
+#include <kiwi/global.h>
 
-/** Visibility attribute definitions. */
-#define KIWI_PUBLIC		__attribute__((visibility("default")))
-#define KIWI_PRIVATE		__attribute__((visibility("hidden")))
+KIWI_BEGIN_NAMESPACE
 
-/** Definitions for the Kiwi namespace. */
-#define KIWI_BEGIN_NAMESPACE	namespace kiwi {
-#define KIWI_END_NAMESPACE	}
+/** Base class for an API object. */
+class KIWI_PUBLIC Object {
+public:
+	virtual ~Object();
+	//void DeleteLater();
+protected:
+	Object();
+};
 
-#endif /* __KIWI_GLOBAL_H */
+KIWI_END_NAMESPACE
+
+#endif /* __KIWI_OBJECT_H */

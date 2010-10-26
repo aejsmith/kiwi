@@ -15,20 +15,16 @@
 
 /**
  * @file
- * @brief		Global Kiwi API definitions.
+ * @brief		API object base class.
  */
 
-#ifndef __KIWI_GLOBAL_H
-#define __KIWI_GLOBAL_H
+#include <kiwi/Object.h>
 
-#include <kernel/types.h>
+using namespace kiwi;
 
-/** Visibility attribute definitions. */
-#define KIWI_PUBLIC		__attribute__((visibility("default")))
-#define KIWI_PRIVATE		__attribute__((visibility("hidden")))
+/** Constructor for Object.
+ * @note		Protected - Object cannot be instantiated directly. */
+Object::Object() {}
 
-/** Definitions for the Kiwi namespace. */
-#define KIWI_BEGIN_NAMESPACE	namespace kiwi {
-#define KIWI_END_NAMESPACE	}
-
-#endif /* __KIWI_GLOBAL_H */
+/** Destructor for Object. */
+Object::~Object() {}

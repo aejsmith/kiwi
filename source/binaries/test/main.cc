@@ -18,6 +18,13 @@
  * @brief		Test application.
  */
 
+#include <kiwi/Object.h>
+
+#include <iostream>
+
+using namespace kiwi;
+using namespace std;
+
 // This -> kiwi/Utility/<something>.h
 template <typename T>
 static inline T p2align(T n, int alignment) {
@@ -28,6 +35,14 @@ static inline T p2align(T n, int alignment) {
 	return n;
 }
 
+class MyClass : public Object {
+public:
+	MyClass() {
+		cout << "Hello World!" << endl;
+	}
+};
+
 int main(int argc, char **argv) {
+	MyClass x;
 	while(1);
 }
