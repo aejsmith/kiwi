@@ -151,8 +151,8 @@ FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */
 FUNCTION_START(syscall_entry)
-	/* Switch to the kernel mode stack. The GS_BASE MSR points to the
-	 * thread's architecture-specific data. Use the SWAPGS instruction
+	/* Switch to the kernel mode stack. The KERNEL_GS_BASE MSR points to
+	 * the thread's architecture-specific data. Use the SWAPGS instruction
 	 * to get at it, so we can get our stack pointer. The userspace RSP
 	 * field is not used in returning - it is merely a temporary scratch
 	 * space we use before we push it onto the stack for the system call
@@ -162,15 +162,11 @@ FUNCTION_START(syscall_entry)
 	movq	%gs:0, %rsp
 
 	/* Get back the userspace stack pointer from the temporary scratch
-	 * space and put it onto the kernel stack (at the top of the system
-	 * call frame). */
+	 * space and put it onto the kernel stack. */
 	push	%gs:8
 
 	/* Return to the previous GS base. */
 	swapgs
-
-	/* Clear direction flag. */
-	cld
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (RAX = return IP, R11 = original RFLAGS). */
