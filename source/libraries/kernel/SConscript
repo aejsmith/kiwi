@@ -23,6 +23,7 @@ sources = map(File, [
 	'init.c',
 	'object.c',
 	'syscalls.S',
+	'tls.c',
 ])
 
 # These won't conflict with the copies in libc, we don't export the symbols. I

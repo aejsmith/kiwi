@@ -30,6 +30,7 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 	elf_addr_t *addr, sym_addr;
 	const char *strtab, *name;
 	int type, symidx, bind;
+	rtld_image_t *source;
 	elf_sym_t *symtab;
 	size_t i;
 
@@ -45,7 +46,7 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 		sym_addr = 0;
 
 		if(symidx != 0) {
-			if(!rtld_symbol_lookup(image, name, &sym_addr) && bind != ELF_STB_WEAK) {
+			if(!rtld_symbol_lookup(image, name, &sym_addr, &source) && bind != ELF_STB_WEAK) {
 				printf("rtld: %s: cannot resolve symbol %s\n", image->name, name);
 				return STATUS_MISSING_SYMBOL;
 			}
@@ -72,6 +73,15 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 			if(sym_addr) {
 				memcpy((char *)addr, (char *)sym_addr, symtab[symidx].st_size);
 			}
+			break;
+		case ELF_R_X86_64_DTPMOD64:
+			*addr = image->tls_module_id;
+			break;
+		case ELF_R_X86_64_DTPOFF64:
+			*addr = sym_addr + relocs[i].r_addend;
+			break;
+		case ELF_R_X86_64_TPOFF64:
+			*addr = sym_addr + source->tls_offset + relocs[i].r_addend;
 			break;
 		default:
 			dprintf("rtld: %s: unhandled relocation type %d\n", image->name, type);

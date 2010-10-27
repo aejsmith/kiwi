@@ -1,0 +1,46 @@
+/*
+ * Copyright (C) 2010 Alex Smith
+ *
+ * Kiwi is open source software, released under the terms of the Non-Profit
+ * Open Software License 3.0. You should have received a copy of the
+ * licensing information along with the source code distribution. If you
+ * have not received a copy of the license, please refer to the Kiwi
+ * project website.
+ *
+ * Please note that if you modify this file, the license requires you to
+ * ADD your name to the list of contributors. This boilerplate is not the
+ * license itself; please refer to the copy of the license you have received
+ * for complete terms.
+ */
+
+/**
+ * @file
+ * @brief		AMD64 thread-local storage support functions.
+ */
+
+#include "../../libkernel.h"
+
+/** Argument passed to __tls_get_addr(). */
+typedef struct tls_index {
+	unsigned long int ti_module;
+	unsigned long int ti_offset;
+} tls_index_t;
+
+extern void *__tls_get_addr(tls_index_t *index) __export;
+
+/** AMD64-specific TLS address lookup function.
+ * @param index		Pointer to argument structure. */
+void *__tls_get_addr(tls_index_t *index) {
+	unsigned long addr;
+	__asm__ volatile("movq %%fs:0, %0" : "=r"(addr));
+	return tls_get_addr((tls_tcb_t *)addr, index->ti_module, index->ti_offset);
+}
+
+/** Initialise architecture-specific data in the TCB.
+ * @param tcb		Thread control block. */
+void tls_tcb_init(tls_tcb_t *tcb) {
+	/* The base of the FS segment is set to point to the start of the TCB.
+	 * The first 8 bytes in the TCB must contain the linear address of the
+	 * TCB, so that it can be obtained at %fs:0. */
+	tcb->tpt = tcb;
+}

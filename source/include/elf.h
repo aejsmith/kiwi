@@ -477,7 +477,7 @@ typedef struct {
 #define ELF_R_X86_64_PC16	13		/**< 16-bit sign-extended PC relative. */
 #define ELF_R_X86_64_8		14		/**< Direct 8-bit sign-extended. */
 #define ELF_R_X86_64_PC8	15		/**< 8-bit sign-extended PC relative. */
-#define ELF_R_X86_64_DPTMOD64	16		/**< ID of module containing symbol. */
+#define ELF_R_X86_64_DTPMOD64	16		/**< ID of module containing symbol. */
 #define ELF_R_X86_64_DTPOFF64	17		/**< Offset in module's TLS block. */
 #define ELF_R_X86_64_TPOFF64	18		/**< Offset in initial TLS block. */
 #define ELF_R_X86_64_TLSGD	19		/**< 32-bit signed PC relative offset to two GOT entries (GD). */

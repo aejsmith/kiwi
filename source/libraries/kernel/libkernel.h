@@ -69,19 +69,30 @@
 typedef struct rtld_image {
 	list_t header;			/**< Link to loaded images library. */
 
+	/** Basic image information. */
 	const char *name;		/**< Shared object name of the library. */
 	const char *path;		/**< Full path to image file. */
 	int refcount;			/**< Reference count (tracks what is using the image). */
 	elf_addr_t dynamic[ELF_DT_NUM];	/**< Dynamic section entries. */
 	elf_dyn_t *dyntab;		/**< Pointer to unmodified dynamic section. */
 
+	/** Where the image is loaded to (for ELF_ET_DYN). */
 	void *load_base;		/**< Base address for the image. */
 	size_t load_size;		/**< Size of the image's memory region. */
 
+	/** Symbol hash table. */
 	Elf32_Word *h_buckets;		/**< Hash table buckets. */
 	int h_nbucket;			/**< Number of hash buckets. */
 	Elf32_Word *h_chains;		/**< Hash table chains. */
 	int h_nchain;			/**< Number of chain entries. */
+
+	/** TLS information. */
+	size_t tls_module_id;		/**< TLS module ID (0 if no TLS data). */
+	void *tls_image;		/**< Initial TLS image. */
+	size_t tls_filesz;		/**< File size of TLS image. */
+	size_t tls_memsz;		/**< Memory size of TLS image. */
+	size_t tls_align;		/**< TLS image alignment. */
+	ptrdiff_t tls_offset;		/**< Offset of TLS data from thread pointer. */
 
 	/** State of the image. */
 	enum {
@@ -105,11 +116,18 @@ extern rtld_image_t *application_image;
 #endif
 
 extern status_t rtld_image_relocate(rtld_image_t *image);
-extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep);
+extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
+                                rtld_image_t **imagep);
 extern void rtld_image_unload(rtld_image_t *image);
-extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp);
+extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp,
+                               rtld_image_t **sourcep);
 extern void rtld_symbol_init(rtld_image_t *image);
 extern void *rtld_init(process_args_t *args);
+
+extern size_t tls_alloc_module_id(void);
+extern ptrdiff_t tls_tp_offset(rtld_image_t *image);
+extern void *tls_get_addr(tls_tcb_t *tcb, size_t module, size_t offset);
+extern status_t tls_init(void);
 
 extern void libkernel_heap_ops(libkernel_heap_alloc_t alloc, libkernel_heap_free_t free);
 

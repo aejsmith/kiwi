@@ -42,8 +42,9 @@ static unsigned long rtld_symbol_hash(const unsigned char *name) {
  * @param start		Image to look up symbol for.
  * @param name		Name of symbol to look up.
  * @param addrp		Where to store address of symbol.
+ * @param sourcep	Where to store pointer to image containing symbol.
  * @return		True if found, false if not. */
-bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp) {
+bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp, rtld_image_t **sourcep) {
 	rtld_image_t *image;
 	unsigned long hash;
 	const char *strtab;
@@ -78,22 +79,30 @@ bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp
 		    i != ELF_STN_UNDEF;
 		    i = image->h_chains[i])
 		{
-			if(symtab[i].st_shndx == ELF_SHN_UNDEF || symtab[i].st_value == 0) {
+			if((symtab[i].st_value == 0 && ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_TLS) ||
+			   symtab[i].st_shndx == ELF_SHN_UNDEF) {
 				continue;
 			} else if(ELF_ST_TYPE(symtab[i].st_info) > ELF_STT_FUNC &&
-			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_COMMON) {
+			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_COMMON &&
+			          ELF_ST_TYPE(symtab[i].st_info) != ELF_STT_TLS) {
 				continue;
 			} else if(strcmp(strtab + symtab[i].st_name, name) != 0) {
 				continue;
 			}
 
-			/* Cannot look up non-global symbols. */
-			if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL &&
-			   ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
-				break;
+			if(ELF_ST_TYPE(symtab[i].st_info) == ELF_STT_TLS) {
+				*addrp = symtab[i].st_value;
+			} else {
+				/* Cannot look up non-global symbols. */
+				if(ELF_ST_BIND(symtab[i].st_info) != ELF_STB_GLOBAL &&
+				   ELF_ST_BIND(symtab[i].st_info) != ELF_STB_WEAK) {
+					break;
+				}
+
+				*addrp = (elf_addr_t)image->load_base + symtab[i].st_value;
 			}
 
-			*addrp = (elf_addr_t)image->load_base + symtab[i].st_value;
+			*sourcep = image;
 			return true;
 		}
 	} while(iter != start->header.next);
