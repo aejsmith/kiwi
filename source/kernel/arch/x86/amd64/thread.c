@@ -25,7 +25,7 @@
 
 #include <status.h>
 
-extern void sys_thread_set_tls_addr(void *addr);
+extern status_t sys_thread_set_tls_addr(void *addr);
 
 /** AMD64-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
@@ -58,11 +58,17 @@ void thread_arch_destroy(thread_t *thread) {
 }
 
 /** Set the current thread's TLS address.
- * @param addr		TLS base address. */
-void sys_thread_set_tls_addr(void *addr) {
+ * @param addr		TLS base address.
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_set_tls_addr(void *addr) {
+	if((ptr_t)addr >= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+		return STATUS_INVALID_ADDR;
+	}
+
 	/* The AMD64 ABI uses the FS segment register to access the TLS data.
 	 * Save the address to be written to the FS base upon each thread
 	 * switch. */
 	curr_thread->arch.tls_base = (ptr_t)addr;
 	x86_write_msr(X86_MSR_FS_BASE, curr_thread->arch.tls_base);
+	return STATUS_SUCCESS;
 }

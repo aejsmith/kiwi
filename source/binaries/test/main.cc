@@ -35,7 +35,7 @@ public:
 	}
 };
 
-extern "C" void thread_set_tls_addr(void *addr);
+extern "C" status_t thread_set_tls_addr(void *addr);
 
 int main(int argc, char **argv) {
 	MyClass x;
