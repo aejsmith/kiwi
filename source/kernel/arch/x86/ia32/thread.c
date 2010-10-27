@@ -55,7 +55,7 @@ void thread_arch_destroy(thread_t *thread) {
 /** Set the current thread's TLS address.
  * @param addr		TLS base address.
  * @return		Status code describing result of the operation. */
-void sys_thread_set_tls_addr(void *addr) {
+status_t sys_thread_set_tls_addr(void *addr) {
 	if((ptr_t)addr >= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
 		return STATUS_INVALID_ADDR;
 	}
