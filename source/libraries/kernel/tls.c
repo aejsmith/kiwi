@@ -24,6 +24,8 @@
  * @todo		Reuse module IDs when modules are unloaded.
  * @todo		I don't think the offset calculation and alignment
  *			handling is quite right.
+ * @todo		When cloning a process with process_clone(), TLS data
+ *			for all other threads should be freed.
  */
 
 #include <kernel/thread.h>

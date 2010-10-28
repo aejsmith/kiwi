@@ -54,6 +54,7 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
+extern status_t sys_thread_set_tls_addr(void *addr);
 
 /** Tree of all threads. */
 static AVL_TREE_DECLARE(thread_tree);
@@ -897,4 +898,13 @@ status_t sys_thread_usleep(useconds_t us, useconds_t *remp) {
 		}
 	}
 	return ret;
+}
+
+/** Set the current thread's TLS address.
+ * @param addr		TLS base address. Note that what this should be and how
+ *			it is set is architecture-dependent. Refer to the ELF
+ *			TLS specification for more information.
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_set_tls_addr(void *addr) {
+	return thread_arch_set_tls_addr(curr_thread, (ptr_t)addr);
 }

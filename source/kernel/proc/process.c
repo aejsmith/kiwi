@@ -1113,7 +1113,8 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 		goto fail;
 	}
 
-	/* Create and run the entry thread. */
+	/* Create and run the entry thread. The TLS address for the new thread
+	 * is set to that of the current thread. */
 	args = kmalloc(sizeof(*args), MM_SLEEP);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
@@ -1122,6 +1123,7 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
+	thread_arch_set_tls_addr(thread, thread_arch_tls_addr(curr_thread));
 	thread_run(thread);
 	object_security_destroy(&ksecurity);
 	return STATUS_SUCCESS;
