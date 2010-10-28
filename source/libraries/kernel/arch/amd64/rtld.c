@@ -44,11 +44,19 @@ static status_t rtld_image_relocate_internal(rtld_image_t *image, elf_rela_t *re
 		name   = strtab + symtab[symidx].st_name;
 		bind   = ELF_ST_BIND(symtab[symidx].st_info);
 		sym_addr = 0;
+		source = image;
 
 		if(symidx != 0) {
-			if(!rtld_symbol_lookup(image, name, &sym_addr, &source) && bind != ELF_STB_WEAK) {
-				printf("rtld: %s: cannot resolve symbol %s\n", image->name, name);
-				return STATUS_MISSING_SYMBOL;
+			if(bind == ELF_STB_LOCAL) {
+				/* TODO: Is this right? I was looking at the
+				 * Glibc code to try to figure this out, but
+				 * it's *horrible*. */
+				sym_addr = (elf_addr_t)image->load_base + symtab[symidx].st_value;
+			} else if(!rtld_symbol_lookup(image, name, &sym_addr, &source)) {
+				if(bind != ELF_STB_WEAK) {
+					printf("rtld: %s: cannot resolve symbol '%s'\n", image->name, name);
+					return STATUS_MISSING_SYMBOL;
+				}
 			}
 		}
 

@@ -397,8 +397,8 @@ typedef struct {
 
 /** Macros to get ELF32 relocation information. */
 #define ELF32_R_SYM(i)		((i)>>8)
-#define ELF32_R_TYPE(i)		((unsigned char)(i))
-#define ELF32_R_INFO(s,t)	(((s)<<8)+(unsigned char)(t))
+#define ELF32_R_TYPE(i)		((i)&0xff)
+#define ELF32_R_INFO(s,t)	(((s)<<8)+((i)&0xff))
 
 /** ELF64 relocation. */
 typedef struct {
@@ -521,7 +521,7 @@ typedef struct {
 } __packed Elf64_Sym;
 
 /** Macros to get symbol information. */
-#define ELF_ST_BIND(i)		((i)>>4)
+#define ELF_ST_BIND(i)		(((unsigned char)(i))>>4)
 #define ELF_ST_TYPE(i)		((i)&0xf)
 #define ELF_ST_INFO(b,t)	(((b)<<4)+((t)&0xf))
 #define ELF_ST_VISIBILITY(o)	((o) & 0x03)
