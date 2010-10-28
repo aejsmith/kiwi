@@ -67,17 +67,33 @@ static bool verbose_mode = false;
 		cout << current_file << ':' << current_line << ": " << m << endl; \
 	}
 
-/** Create a new parameter structure.
- * @param type		Type of variable.
- * @param next		Next parameter in the list.
- * @return		Pointer to the parameter structure. */
-parameter_t *new_parameter(const char *type, parameter_t *next) {
-	DEBUG("new_parameter(" << type << ", " << next << ")");
+/** Set a system call attribute.
+ * @param name		Name of the attribute.
+ * @return		Whether the attribute was valid. */
+bool Syscall::SetAttribute(const char *name) {
+	if(strcmp(name, "hidden") == 0) {
+		m_attributes |= kHiddenAttribute;
+		return true;
+	} else if(strcmp(name, "wrapped") == 0) {
+		/* Wrapped implies hidden, as the real call version should not
+		 * be visible. */
+		m_attributes |= (kWrappedAttribute | kHiddenAttribute);
+		return true;
+	}
+	return false;
+}
 
-	parameter_t *param = new parameter_t;
-	param->next = next;
-	param->type = strdup(type);
-	return param;
+/** Create a new identifier structure.
+ * @param str		Value of identifier.
+ * @param next		Next identifier in the list.
+ * @return		Pointer to the identifier structure. */
+identifier_t *new_identifier(const char *str, identifier_t *next) {
+	DEBUG("new_identifier(" << str << ", " << next << ")");
+
+	identifier_t *ident = new identifier_t;
+	ident->next = next;
+	ident->str = strdup(str);
+	return ident;
 }
 
 /** Add a new type alias.
@@ -103,8 +119,9 @@ void add_type(const char *name, const char *target) {
 /** Add a new system call.
  * @param name		Name of the call.
  * @param params	Parameters for the call.
+ * @param attribs	Attributes for the call.
  * @param num		Overridden call number (if -1 next number will be used). */
-void add_syscall(const char *name, parameter_t *params, long num) {
+void add_syscall(const char *name, identifier_t *params, identifier_t *attribs, long num) {
 	DEBUG("add_syscall(" << name << ", " << params << ")");
 
 	if(syscall_map.find(name) != syscall_map.end()) {
@@ -121,13 +138,19 @@ void add_syscall(const char *name, parameter_t *params, long num) {
 
 	Syscall *call = new Syscall(name, num);
 	while(params) {
-		TypeMap::iterator it = type_map.find(params->type);
+		TypeMap::iterator it = type_map.find(params->str);
 		if(it == type_map.end()) {
-			COMPILE_ERROR("Parameter type `" << params->type << "' does not exist.");
-			return;
+			COMPILE_ERROR("Parameter type `" << params->str << "' does not exist.");
+		} else {
+			call->AddParameter(it->second);
 		}
-		call->AddParameter(it->second);
 		params = params->next;
+	}
+	while(attribs) {
+		if(!call->SetAttribute(attribs->str)) {
+			COMPILE_ERROR("Invalid attribute `" << attribs->str << "'.");
+		}
+		attribs = attribs->next;
 	}
 
 	syscall_list.push_back(call);

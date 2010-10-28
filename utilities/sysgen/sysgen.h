@@ -43,13 +43,23 @@ typedef std::map<std::string, Type> TypeMap;
 /** Class representing a system call. */
 class Syscall {
 public:
-	Syscall(const char *name, unsigned long id) : m_name(name), m_id(id) {}
+	/** Attributes for a call. */
+	enum {
+		kHiddenAttribute = (1<<0),
+		kWrappedAttribute = (1<<1),
+	};
+
+	Syscall(const char *name, unsigned long id) :
+		m_name(name), m_id(id), m_param_count(0), m_attributes(0)
+	{}
 
 	/** Add a parameter to the call.
 	 * @param type		Type of the call. */
 	void AddParameter(Type type) {
 		m_param_count += type.count;
 	}
+
+	bool SetAttribute(const char *name);
 
 	/** Get the name of the call.
 	 * @return		Reference to call name. */
@@ -62,10 +72,15 @@ public:
 	/** Get the parameter count.
 	 * @return		Number of parameters. */
 	size_t GetParameterCount() const { return m_param_count; }
+
+	/** Get the call attributes.
+	 * @return		Attributes for the call. */
+	int GetAttributes() const { return m_attributes; }
 private:
 	std::string m_name;		/**< Name of the call. */
 	unsigned long m_id;		/**< ID of the call. */
 	size_t m_param_count;		/**< Number of parameters. */
+	int m_attributes;		/**< Attributes for the call. */
 };
 
 /** Type of a system call list. */
@@ -89,19 +104,19 @@ public:
 extern "C" {
 #endif
 
-/** Structure used to represent a parameter during parsing. */
-typedef struct parameter {
-	struct parameter *next;		/**< Next parameter in the list. */
-	char *type;			/**< Type name for the parameter. */
-} parameter_t;
+/** Structure used to represent an identifier during parsing. */
+typedef struct identifier {
+	struct identifier *next;	/**< Next identifier in the list. */
+	char *str;			/**< Identifier. */
+} identifier_t;
 
 extern FILE *yyin;
 extern const char *current_file;
 extern size_t current_line;
 
-extern parameter_t *new_parameter(const char *type, parameter_t *next);
+extern identifier_t *new_identifier(const char *str, identifier_t *next);
 extern void add_type(const char *name, const char *target);
-extern void add_syscall(const char *name, parameter_t *params, long num);
+extern void add_syscall(const char *name, identifier_t *params, identifier_t *attribs, long num);
 
 extern int yylex(void);
 extern int yyparse(void);
