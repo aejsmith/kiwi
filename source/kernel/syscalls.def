@@ -82,6 +82,7 @@ syscall process_loaded() hidden;
 syscall thread_create(ptr_t, ptr_t, size_t, ptr_t, ptr_t, ptr_t, object_rights_t, ptr_t) wrapped;
 syscall thread_open(thread_id_t, object_rights_t, ptr_t);
 syscall thread_id(handle_t);
+syscall thread_status(handle_t, ptr_t);
 syscall thread_exit(int) wrapped;
 syscall thread_usleep(useconds_t);
 syscall thread_set_tls_addr(ptr_t) hidden;

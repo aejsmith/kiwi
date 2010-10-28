@@ -30,6 +30,7 @@
 #include <kernel/thread.h>
 
 #include <lib/list.h>
+#include <lib/notifier.h>
 #include <lib/refcount.h>
 
 #include <sync/spinlock.h>
@@ -108,6 +109,8 @@ typedef struct thread {
 	/** Other thread information. */
 	thread_id_t id;			/**< ID of the thread. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
+	notifier_t death_notifier;	/**< Notifier for thread death. */
+	int status;			/**< Exit status of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;

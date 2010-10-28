@@ -46,7 +46,7 @@ static void thread_test(void *arg) {
 	cout << endl << "Running test on thread " << thread_id(-1) << endl << endl;
 	cout << test1 << endl;
 	cout << test2 << endl;
-	test2 = 32423;
+	test2 = 32423 + thread_id(-1);
 	cout << test2 << endl;
 	{
 		MyClass x;
@@ -61,6 +61,12 @@ int main(int argc, char **argv) {
 	if(ret != STATUS_SUCCESS) {
 		cout << "Failed to create thread: " << ret << endl;
 	}
-	//thread_test(NULL);
+	object_event_t event = { handle, THREAD_EVENT_DEATH, false };
+	object_wait(&event, 1, -1);
+	int status;
+	thread_status(handle, &status);
+	cout << "Test thread exited with status " << status << endl;
+	handle_close(handle);
+	thread_test(NULL);
 	while(1);
 }

@@ -30,6 +30,9 @@ extern "C" {
 /** Thread access rights. */
 #define THREAD_QUERY		(1<<8)	/**< Query thread information. */
 
+/** Thread object events. */
+#define THREAD_EVENT_DEATH	0	/**< Wait for thread death. */
+
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32
 
@@ -39,6 +42,7 @@ extern status_t SYSCALL(thread_create)(const char *name, void *stack, size_t sta
                                        object_rights_t rights, handle_t *handlep);
 extern status_t SYSCALL(thread_open)(thread_id_t id, object_rights_t rights, handle_t *handlep);
 extern thread_id_t SYSCALL(thread_id)(handle_t handle);
+extern status_t SYSCALL(thread_status)(handle_t handle, int *statusp);
 extern void SYSCALL(thread_exit)(int status) __attribute__((noreturn));
 extern status_t SYSCALL(thread_usleep)(useconds_t us, useconds_t *remp);
 

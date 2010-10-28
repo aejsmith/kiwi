@@ -1307,7 +1307,7 @@ status_t sys_process_status(handle_t handle, int *statusp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -1315,7 +1315,7 @@ status_t sys_process_status(handle_t handle, int *statusp) {
 
 	if(process->state != PROCESS_DEAD) {
 		object_handle_release(khandle);
-		return STATUS_PROCESS_RUNNING;
+		return STATUS_STILL_RUNNING;
 	}
 
 	ret = memcpy_to_user(statusp, &process->status, sizeof(int));

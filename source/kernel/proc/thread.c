@@ -80,6 +80,7 @@ static void thread_cache_ctor(void *obj, void *data) {
 	list_init(&thread->runq_link);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
+	notifier_init(&thread->death_notifier, thread);
 }
 
 /** Thread entry function wrapper. */
@@ -146,6 +147,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		if(thread->fpu) {
 			fpu_context_destroy(thread->fpu);
 		}
+		notifier_clear(&thread->death_notifier);
 		object_destroy(&thread->obj);
 
 		/* Deallocate the thread ID. */
@@ -164,10 +166,47 @@ static void thread_object_close(object_handle_t *handle) {
 	thread_destroy((thread_t *)handle->object);
 }
 
+/** Signal that a thread is being waited for.
+ * @param handle	Handle to thread.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer.
+ * @return		Status code describing result of the operation. */
+static status_t thread_object_wait(object_handle_t *handle, int event, void *sync) {
+	thread_t *thread = (thread_t *)handle->object;
+
+	switch(event) {
+	case THREAD_EVENT_DEATH:
+		if(thread->state == THREAD_DEAD) {
+			object_wait_signal(sync);
+		} else {
+			notifier_register(&thread->death_notifier, object_wait_notifier, sync);
+		}
+		return STATUS_SUCCESS;
+	default:
+		return STATUS_INVALID_EVENT;
+	}
+}
+
+/** Stop waiting for a thread.
+ * @param handle	Handle to thread.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer. */
+static void thread_object_unwait(object_handle_t *handle, int event, void *sync) {
+	thread_t *thread = (thread_t *)handle->object;
+
+	switch(event) {
+	case THREAD_EVENT_DEATH:
+		notifier_unregister(&thread->death_notifier, object_wait_notifier, sync);
+		break;
+	}
+}
+
 /** Thread object type. */
 static object_type_t thread_object_type = {
 	.id = OBJECT_TYPE_THREAD,
 	.close = thread_object_close,
+	.wait = thread_object_wait,
+	.unwait = thread_object_unwait,
 };
 
 /** Wake up a sleeping thread.
@@ -324,6 +363,7 @@ void thread_at_kernel_exit(void) {
  * @note		Does not return. */
 void thread_exit(void) {
 	curr_thread->state = THREAD_DEAD;
+	notifier_run(&curr_thread->death_notifier, NULL, true);
 	sched_yield();
 	fatal("Shouldn't get here");
 }
@@ -798,10 +838,35 @@ thread_id_t sys_thread_id(handle_t handle) {
 	return id;
 }
 
+/** Query the exit status of a thread.
+ * @param handle	Handle to thread.
+ * @param statusp	Where to store exit status of thread.
+ * @return		Status code describing result of the operation. */
+status_t sys_thread_status(handle_t handle, int *statusp) {
+	object_handle_t *khandle;
+	thread_t *thread;
+	status_t ret;
+
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, THREAD_QUERY, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+	thread = (thread_t *)khandle->object;
+
+	if(thread->state != THREAD_DEAD) {
+		object_handle_release(khandle);
+		return STATUS_STILL_RUNNING;
+	}
+
+	ret = memcpy_to_user(statusp, &thread->status, sizeof(int));
+	object_handle_release(khandle);
+	return ret;
+}
+
 /** Terminate the calling thread.
- * @todo		Status.
  * @param status	Exit status code. */
 void sys_thread_exit(int status) {
+	curr_thread->status = status;
 	thread_exit();
 }
 
