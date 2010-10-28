@@ -16,8 +16,6 @@
 /**
  * @file
  * @brief		POSIX error number handling.
- *
- * @todo		Make this thread-local.
  */
 
 #include <kernel/status.h>
@@ -78,12 +76,12 @@ static int status_to_errno_table[] = {
 };
 
 /** Real location of errno. */
-static int real_errno;
+static __thread int __errno = 0;
 
 /** Get the location of errno.
  * @return		Pointer to errno. */
 int *__libc_errno_location(void) {
-	return &real_errno;
+	return &__errno;
 }
 
 /** Set errno from a kernel status code.
@@ -95,8 +93,8 @@ void libc_status_to_errno(status_t status) {
 	if(status < 0 || (size_t)status >= ARRAYSZ(status_to_errno_table)) {
 		libc_fatal("unknown status code passed to status_to_errno()");
 	}
-	errno = status_to_errno_table[status];
-	if(errno == -1) {
+	__errno = status_to_errno_table[status];
+	if(__errno == -1) {
 		libc_fatal("trying to map disallowed status to errno");
 	}
 }
