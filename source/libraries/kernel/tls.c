@@ -44,36 +44,6 @@ static size_t next_module_id = 1;
 /** Statically allocated DTV size. */
 static ptr_t static_dtv_size = 0;
 
-/** Allocate a new module ID.
- * @return		Allocated module ID. */
-size_t tls_alloc_module_id(void) {
-	return next_module_id++;
-}
-
-/** Get a TLS address.
- * @note		This is not called directly by code, it is called from
- *			an architecture-specific wrapper (__tls_get_addr on
- *			most architectures).
- * @param tcb		Thread control block.
- * @param module	Module ID.
- * @param offset	Offset of object.
- * @return		Address of current thread's copy of the variable. */
-void *tls_get_addr(tls_tcb_t *tcb, size_t module, size_t offset) {
-	size_t size;
-
-	/* Check if the DTV contains this module. */
-	size = (size_t)tcb->dtv[0];
-	if(module >= size) {
-		printf("DTV resizing is not yet implemented\n");
-		return NULL;
-	} else if(!tcb->dtv[module]) {
-		printf("Dynamic TLS allocation not yet implemented\n");
-		return NULL;
-	}
-
-	return (void *)(tcb->dtv[module] + offset);
-}
-
 /** Look up an RTLD image by TLS module ID.
  * @param id		Module ID.
  * @return		Pointer to image. */
@@ -90,6 +60,37 @@ static rtld_image_t *tls_module_lookup(size_t id) {
 
 	return NULL;
 }
+
+/** Allocate a new module ID.
+ * @return		Allocated module ID. */
+size_t tls_alloc_module_id(void) {
+	return next_module_id++;
+}
+
+/** Get a TLS address.
+ * @note		This is not called directly by code, it is called from
+ *			an architecture-specific wrapper (__tls_get_addr on
+ *			most architectures).
+ * @param module	Module ID.
+ * @param offset	Offset of object.
+ * @return		Address of current thread's copy of the variable. */
+void *tls_get_addr(size_t module, size_t offset) {
+	tls_tcb_t *tcb = tls_tcb_get();
+	size_t size;
+
+	/* Check if the DTV contains this module. */
+	size = (size_t)tcb->dtv[0];
+	if(module >= size) {
+		printf("DTV resizing is not yet implemented\n");
+		return NULL;
+	} else if(!tcb->dtv[module]) {
+		printf("Dynamic TLS allocation not yet implemented\n");
+		return NULL;
+	}
+
+	return (void *)(tcb->dtv[module] + offset);
+}
+
 #ifdef TLS_VARIANT2
 /** Work out the size to allocate for the initial TLS block.
  * @return		Size to allocate. */
@@ -220,6 +221,18 @@ status_t tls_init(void) {
 	tcb = tls_initial_block_init((ptr_t)alloc, dtv);
 	tls_tcb_init(tcb);
 	tcb->dtv = dtv;
+	tcb->base = alloc;
 	thread_set_tls_addr(tcb);
 	return STATUS_SUCCESS;
+}
+
+/** Destroy the TLS block for the current thread.
+ * @todo		Will need to free dynamically allocated blocks here. */
+void tls_destroy(void) {
+	size_t size = ROUND_UP(tls_initial_block_size(), PAGE_SIZE);
+	tls_tcb_t *tcb = tls_tcb_get();
+
+	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",
+	        tcb->base, size, thread_id(-1));
+	vm_unmap(tcb->base, size);
 }

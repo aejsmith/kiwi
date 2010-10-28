@@ -55,7 +55,16 @@ typedef Elf64_Dyn  elf_dyn_t;		/**< ELF dynamic section type. */
 typedef struct tls_tcb {
 	void *tpt;			/**< Pointer to this structure. */
 	ptr_t *dtv;			/**< Dynamic thread vector. */
+	void *base;			/**< Base address of initial TLS allocation. */
 } tls_tcb_t;
+
+/** Get a pointer to the current thread's TCB.
+ * @return		Pointer to TCB. */
+static inline tls_tcb_t *tls_tcb_get(void) {
+	unsigned long addr;
+	__asm__ volatile("movq %%fs:0, %0" : "=r"(addr));
+	return (tls_tcb_t *)addr;
+}
 
 extern void tls_tcb_init(tls_tcb_t *tcb);
 

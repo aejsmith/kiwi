@@ -58,7 +58,7 @@
 	})
 
 /** Whether to enable debug output. */
-#define LIBKERNEL_DEBUG		0
+#define LIBKERNEL_DEBUG		1
 
 /** Size of the heap. */
 #define LIBKERNEL_HEAP_SIZE	8192
@@ -126,8 +126,9 @@ extern void *rtld_init(process_args_t *args);
 
 extern size_t tls_alloc_module_id(void);
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);
-extern void *tls_get_addr(tls_tcb_t *tcb, size_t module, size_t offset);
+extern void *tls_get_addr(size_t module, size_t offset);
 extern status_t tls_init(void);
+extern void tls_destroy(void);
 
 extern void libkernel_heap_ops(libkernel_heap_alloc_t alloc, libkernel_heap_free_t free);
 

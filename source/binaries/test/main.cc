@@ -21,6 +21,9 @@
 #include <kiwi/Support/Utility.h>
 #include <kiwi/Object.h>
 
+#include <kernel/status.h>
+#include <kernel/thread.h>
+
 #include <iostream>
 
 using namespace kiwi;
@@ -39,7 +42,8 @@ public:
 	}
 };
 
-int main(int argc, char **argv) {
+static void thread_test(void *arg) {
+	cout << endl << "Running test on thread " << thread_id(-1) << endl << endl;
 	cout << test1 << endl;
 	cout << test2 << endl;
 	test2 = 32423;
@@ -47,5 +51,16 @@ int main(int argc, char **argv) {
 	{
 		MyClass x;
 	}
+}
+
+int main(int argc, char **argv) {
+	thread_test(NULL);
+
+	handle_t handle;
+	status_t ret = thread_create("test", NULL, 0, thread_test, NULL, NULL, THREAD_QUERY, &handle);
+	if(ret != STATUS_SUCCESS) {
+		cout << "Failed to create thread: " << ret << endl;
+	}
+	//thread_test(NULL);
 	while(1);
 }

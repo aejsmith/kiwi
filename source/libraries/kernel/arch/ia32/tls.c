@@ -31,9 +31,7 @@ extern void *___tls_get_addr(tls_index_t *index) __attribute__((__regparm__(1)))
 /** IA32-specific TLS address lookup function.
  * @param index		Pointer to argument structure. */
 __attribute__((__regparm__(1))) __export void *___tls_get_addr(tls_index_t *index) {
-	unsigned long addr;
-	__asm__ volatile("movl %%gs:0, %0" : "=r"(addr));
-	return tls_get_addr((tls_tcb_t *)addr, index->ti_module, index->ti_offset);
+	return tls_get_addr(index->ti_module, index->ti_offset);
 }
 
 /** Initialise architecture-specific data in the TCB.
