@@ -16,6 +16,7 @@ Import('env')
 # Build the core library.
 env.KiwiLibrary('kiwi',
 	sources = [
+		'Error.cc',
 		'Object.cc',
 		'Signal.cc',
 	],
