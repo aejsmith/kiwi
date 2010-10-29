@@ -39,7 +39,7 @@ using namespace kiwi;
  *			SetHandle() call in derived class' constructors.
  *			http://www.artima.com/cppsource/nevercall.html
  *			http://www.artima.com/cppsource/pure_virtual.html */
-Handle::Handle() : m_handle(-1) {}
+Handle::Handle() : m_handle(-1), m_event_loop(EventLoop::Instance()) {}
 
 /** Destructor to close the handle. */
 Handle::~Handle() {
@@ -50,9 +50,8 @@ Handle::~Handle() {
 void Handle::Close() {
 	if(m_handle >= 0) {
 		/* Remove all events for this handle from the event loop. */
-		EventLoop *loop = EventLoop::Instance();
-		if(loop) {
-			loop->RemoveHandle(this);
+		if(m_event_loop) {
+			m_event_loop->RemoveHandle(this);
 		}
 
 		/* Emit the close event. */
@@ -75,9 +74,8 @@ void Handle::Close() {
  * @param inhbit	Whether to inhibit events. */
 void Handle::InhibitEvents(bool inhibit) {
 	if(inhibit) {
-		EventLoop *loop = EventLoop::Instance();
-		if(loop) {
-			loop->RemoveHandle(this);
+		if(m_event_loop) {
+			m_event_loop->RemoveHandle(this);
 		}
 	} else {
 		RegisterEvents();
@@ -94,7 +92,7 @@ void Handle::InhibitEvents(bool inhibit) {
  *			and a value of -1 will block indefinitely until the
  *			event happens.
  * @return		True on success, false if the operation timed out. */
-status_t Handle::Wait(int event, useconds_t timeout) const {
+status_t Handle::_Wait(int event, useconds_t timeout) const {
 	object_event_t _event = { m_handle, event, false };
 	status_t ret;
 
@@ -126,23 +124,22 @@ void Handle::SetHandle(handle_t handle) {
 /** Register an event with the current thread's event loop.
  * @param event		Event ID to register. */
 void Handle::RegisterEvent(int event) {
-	EventLoop *loop = EventLoop::Instance();
-	if(loop) {
-		loop->AddEvent(this, event);
+	if(m_event_loop) {
+		m_event_loop->AddEvent(this, event);
 	}
 }
 
 /** Unregister an event with the current thread's event loop.
  * @param event		Event ID to unregister. */
 void Handle::UnregisterEvent(int event) {
-	EventLoop *loop = EventLoop::Instance();
-	if(loop) {
-		loop->RemoveEvent(this, event);
+	if(m_event_loop) {
+		m_event_loop->RemoveEvent(this, event);
 	}
 }
 
 /** Register all events that the event loop should poll for. */
 void Handle::RegisterEvents() {}
 
-/** Handle an event received for the handle. */
-void Handle::HandleEvent(int id) {}
+/** Handle an event received for the handle.
+ * @param event		ID of event. */
+void Handle::HandleEvent(int event) {}

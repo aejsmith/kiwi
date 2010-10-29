@@ -25,7 +25,7 @@
 
 KIWI_BEGIN_NAMESPACE
 
-class EventLoopPrivate;
+struct EventLoopPrivate;
 
 /** Class implementing a loop for handling object events. */
 class KIWI_PUBLIC EventLoop : public Object, Noncopyable {

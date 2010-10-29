@@ -50,12 +50,13 @@ protected:
 	void SetHandle(handle_t handle);
 	void RegisterEvent(int event);
 	void UnregisterEvent(int event);
-	status_t Wait(int event, useconds_t timeout) const;
+	status_t _Wait(int event, useconds_t timeout) const;
 
 	virtual void RegisterEvents();
-	virtual void HandleEvent(int id);
+	virtual void HandleEvent(int event);
 
 	handle_t m_handle;		/**< Handle ID. */
+	EventLoop *m_event_loop;	/**< Event loop handling this handle. */
 };
 
 KIWI_END_NAMESPACE

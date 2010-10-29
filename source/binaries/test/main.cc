@@ -21,64 +21,48 @@
 #include <kiwi/Support/Mutex.h>
 #include <kiwi/Support/Utility.h>
 #include <kiwi/Object.h>
-
-#include <kernel/status.h>
-#include <kernel/thread.h>
+#include <kiwi/Thread.h>
 
 #include <iostream>
-#include <string>
 
 using namespace kiwi;
 using namespace std;
 
-class Foo {
-public:
-	Signal<int, const char *, const std::string &> MySignal;
-	void CallSignal();
+static Mutex test_mutex;
+
+class TestThread : public Thread {
 private:
-	Mutex m_lock;
+	int Main() {
+		test_mutex.Acquire();
+		cout << "Test thread (" << GetCurrentID() << ") running!" << endl;
+		Sleep(1000000);
+		cout << "Test thread releasing lock" << endl;
+		test_mutex.Release();
+		Sleep(500000);
+		test_mutex.Acquire();
+		cout << "Test thread got lock again" << endl;
+		test_mutex.Release();
+
+		return Thread::Main();
+	}
 };
-
-class TestObject : public Object {
-public:
-	void Callback(int x, const char *str1, const std::string &str2);
-};
-
-void Foo::CallSignal() {
-	Mutex::ScopedLock lock(m_lock);
-	MySignal(42, "Hello World", "!!!");
-	MySignal(1337, "Goodbye World", ":)");
-}
-
-void TestObject::Callback(int x, const char *str1, const std::string &str2) {
-	cout << x << ' ' << str1 << ' ' << str2 << endl;
-}
-
-static void callback(int x, const char *str1, const std::string &str2) {
-	cout << str2 << ' ' << str1 << ' ' << x << endl;
-}
-
-extern "C" void malloc_stats(void);
 
 int main(int argc, char **argv) {
-	malloc_stats();
-	cout << endl;
-	{
-		Foo foop;
-		{
-			TestObject test;
-			foop.MySignal.Connect(&test, &TestObject::Callback);
-			foop.MySignal.Connect(callback);
-			foop.MySignal.Connect(callback);
-			foop.MySignal.Connect(&test, &TestObject::Callback);
-			foop.MySignal.Connect(callback);
-			foop.MySignal.Connect(&test, &TestObject::Callback);
-			foop.CallSignal();
-		}
-		cout << endl;
-		foop.CallSignal();
+	TestThread thread;
+	thread.SetName("test_thread");
+	if(!thread.Run()) {
+		cout << "Failed to start test thread: " << thread.GetError().GetDescription() << endl;
+		return 1;
 	}
-	cout << endl;
-	malloc_stats();
+
+	Thread::Sleep(500000);
+	test_mutex.Acquire();
+	cout << "Main thread (" << Thread::GetCurrentID() << ") got lock" << endl;
+	Thread::Sleep(1000000);
+	cout << "Main thread releasing lock" << endl;
+	test_mutex.Release();
+
+	thread.Wait();
+	cout << "Thread exited with status " << thread.GetStatus() << endl;
 	while(1);
 }

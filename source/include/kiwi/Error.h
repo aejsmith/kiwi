@@ -36,7 +36,6 @@
 #define __KIWI_ERROR_H
 
 #include <kernel/status.h>
-
 #include <kiwi/CoreDefs.h>
 
 KIWI_BEGIN_NAMESPACE
@@ -44,6 +43,7 @@ KIWI_BEGIN_NAMESPACE
 /** Class providing information on an error. */
 class KIWI_PUBLIC Error {
 public:
+	Error() throw() : m_code(STATUS_SUCCESS) {}
 	Error(status_t code) throw() : m_code(code) {}
 
 	bool operator ==(Error &other) const throw() { return other.m_code == m_code; }

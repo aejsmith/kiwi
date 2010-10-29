@@ -107,6 +107,11 @@ void EventLoop::Run(void) {
 			m_priv->to_delete.erase(it);
 		}
 
+		/* If we have nothing to do, exit. */
+		if(!m_priv->handles.size()) {
+			return;
+		}
+
 		/* Wait for any of the events. */
 		status_t ret = object_wait(&m_priv->events[0], m_priv->handles.size(), -1);
 		if(unlikely(ret != STATUS_SUCCESS)) {
