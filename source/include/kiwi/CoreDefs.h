@@ -30,5 +30,7 @@
 /** Definitions for the Kiwi namespace. */
 #define KIWI_BEGIN_NAMESPACE	namespace kiwi {
 #define KIWI_END_NAMESPACE	}
+#define KIWI_BEGIN_INTERNAL	namespace internal {
+#define KIWI_END_INTERNAL	}
 
 #endif /* __KIWI_COREDEFS_H */

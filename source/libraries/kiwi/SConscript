@@ -17,6 +17,7 @@ Import('env')
 env.KiwiLibrary('kiwi',
 	sources = [
 		'Object.cc',
+		'Signal.cc',
 	],
 	flags = {
 		'CCFLAGS': env['CCFLAGS'] + ['-fvisibility=hidden'],

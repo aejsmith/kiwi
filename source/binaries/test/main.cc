@@ -20,53 +20,55 @@
 
 #include <kiwi/Support/Utility.h>
 #include <kiwi/Object.h>
+#include <kiwi/Signal.h>
 
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
 #include <iostream>
+#include <string>
 
 using namespace kiwi;
 using namespace std;
 
-extern __thread int test1;
-__thread int test1 = 1234;
-extern __thread int test2;
-
-static unsigned long foobar[2] = { 1337, 42 };
-
-class MyClass : public Object {
+class Foo : public Object {
 public:
-	MyClass() {
-		cout << "Hello World! " << array_size(foobar) << endl;
-	}
+	Signal<int, const char *, const std::string &> MySignal;
+	void CallSignal();
+	void Callback(int x, const char *str1, const std::string &str2);
 };
 
-static void thread_test(void *arg) {
-	cout << endl << "Running test on thread " << thread_id(-1) << endl << endl;
-	cout << test1 << endl;
-	cout << test2 << endl;
-	test2 = 32423 + thread_id(-1);
-	cout << test2 << endl;
-	{
-		MyClass x;
-	}
+void Foo::CallSignal() {
+	MySignal(42, "Hello World", "!!!");
+	MySignal(1337, "Goodbye World", ":)");
 }
 
-int main(int argc, char **argv) {
-	thread_test(NULL);
+void Foo::Callback(int x, const char *str1, const std::string &str2) {
+	cout << x << ' ' << str1 << ' ' << str2 << endl;
+}
 
-	handle_t handle;
-	status_t ret = thread_create("test", NULL, 0, thread_test, NULL, NULL, THREAD_QUERY, &handle);
-	if(ret != STATUS_SUCCESS) {
-		cout << "Failed to create thread: " << ret << endl;
+static void callback(int x, const char *str1, const std::string &str2) {
+	cout << str2 << ' ' << str1 << ' ' << x << endl;
+}
+
+extern "C" void malloc_stats(void);
+
+int main(int argc, char **argv) {
+	malloc_stats();
+	cout << endl;
+	{
+		Foo foop;
+		foop.MySignal.Connect(&foop, &Foo::Callback);
+		foop.MySignal.Connect(callback);
+		foop.MySignal.Connect(callback);
+		foop.MySignal.Connect(&foop, &Foo::Callback);
+		foop.MySignal.Connect(callback);
+		foop.MySignal.Connect(&foop, &Foo::Callback);
+		malloc_stats();
+		cout << endl;
+		foop.CallSignal();
 	}
-	object_event_t event = { handle, THREAD_EVENT_DEATH, false };
-	object_wait(&event, 1, -1);
-	int status;
-	thread_status(handle, &status);
-	cout << "Test thread exited with status " << status << endl;
-	handle_close(handle);
-	thread_test(NULL);
+	cout << endl;
+	malloc_stats();
 	while(1);
 }

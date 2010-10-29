@@ -22,14 +22,9 @@
 
 using namespace kiwi;
 
-extern __thread KIWI_PUBLIC int test2;
-__thread int test2 = 4567;
-#include <iostream>
-using namespace std;
-
 /** Constructor for Object.
  * @note		Protected - Object cannot be instantiated directly. */
-Object::Object() { cout << "Test: " << test2 << endl; }
+Object::Object() {}
 
 /** Destructor for Object. */
 Object::~Object() {}
