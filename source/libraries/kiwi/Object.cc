@@ -18,8 +18,12 @@
  * @brief		API object base class.
  */
 
+#include <kiwi/EventLoop.h>
 #include <kiwi/Object.h>
+
 #include <list>
+
+#include "Internal.h"
 
 using namespace kiwi;
 
@@ -41,6 +45,16 @@ KIWI_END_NAMESPACE
  * @note		Protected - Object cannot be instantiated directly. */
 Object::Object() {
 	m_priv = new ObjectPrivate;
+}
+
+/** Schedule the object for deletion when control returns to the event loop. */
+void Object::DeleteLater() {
+	EventLoop *loop = EventLoop::Instance();
+	if(loop) {
+		loop->DeleteObject(this);
+	} else {
+		libkiwi_warn("Object::DeleteLater: Called without an event loop, will not be deleted.");
+	}
 }
 
 /** Add a slot to the object.

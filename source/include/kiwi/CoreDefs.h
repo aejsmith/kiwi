@@ -21,7 +21,6 @@
 #ifndef __KIWI_COREDEFS_H
 #define __KIWI_COREDEFS_H
 
-#include <kernel/status.h>
 #include <kernel/types.h>
 
 /** Visibility attribute definitions. */

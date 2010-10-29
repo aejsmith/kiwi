@@ -15,35 +15,24 @@
 
 /**
  * @file
- * @brief		Utility functions.
+ * @brief		Internal libkiwi definitions.
  */
 
-#ifndef __KIWI_SUPPORT_UTILITY_H
-#define __KIWI_SUPPORT_UTILITY_H
+#ifndef __INTERNAL_H
+#define __INTERNAL_H
 
 #include <kiwi/CoreDefs.h>
 
-KIWI_BEGIN_NAMESPACE
+/** Compiler attribute/builtin macros. */
+#define likely(x)		__builtin_expect(!!(x), 1)
+#define unlikely(x)		__builtin_expect(!!(x), 0)
 
-/** Rounds a value up to a power of two.
- * @param n		Value to round up.
- * @param align		Value to round up to. */
-template <typename T>
-T p2align(T n, T align) {
-	if(n & (align - 1)) {
-		n += align;
-		n &= ~(align - 1);
-	}
-	return n;
-}
+#if CONFIG_DEBUG
+extern void libkiwi_debug(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
+#else
+static inline void libkiwi_debug(const char *fmt, ...) {};
+#endif
+extern void libkiwi_warn(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
+extern void libkiwi_fatal(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
 
-/** Get the size of an array.
- * @param array		Array to get size of. */
-template <typename T, size_t N>
-size_t array_size(T (&array)[N]) {
-	return N;
-}
-
-KIWI_END_NAMESPACE
-
-#endif /* __KIWI_SUPPORT_UTILITY_H */
+#endif /* __INTERNAL_H */

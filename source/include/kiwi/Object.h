@@ -31,7 +31,8 @@ struct ObjectPrivate;
 class KIWI_PUBLIC Object {
 public:
 	virtual ~Object();
-	//void DeleteLater();
+
+	void DeleteLater();
 
 	void AddSlot(internal::SignalImpl::Slot *slot);
 	void RemoveSlot(internal::SignalImpl::Slot *slot);

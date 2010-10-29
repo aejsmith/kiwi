@@ -35,12 +35,14 @@
 #ifndef __KIWI_ERROR_H
 #define __KIWI_ERROR_H
 
+#include <kernel/status.h>
+
 #include <kiwi/CoreDefs.h>
 
 KIWI_BEGIN_NAMESPACE
 
 /** Class providing information on an error. */
-class Error {
+class KIWI_PUBLIC Error {
 public:
 	Error(status_t code) throw() : m_code(code) {}
 

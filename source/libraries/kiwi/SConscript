@@ -17,6 +17,9 @@ Import('env')
 env.KiwiLibrary('kiwi',
 	sources = [
 		'Error.cc',
+		'EventLoop.cc',
+		'Handle.cc',
+		'Log.cc',
 		'Object.cc',
 		'Signal.cc',
 	],

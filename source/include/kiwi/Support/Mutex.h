@@ -21,13 +21,14 @@
 #ifndef __KIWI_SUPPORT_MUTEX_H
 #define __KIWI_SUPPORT_MUTEX_H
 
+#include <kernel/status.h>
 #include <kiwi/CoreDefs.h>
 #include <util/mutex.h>
 
 KIWI_BEGIN_NAMESPACE
 
 /** Class implementing a lock with exclusive ownership. */
-class Mutex {
+class KIWI_PUBLIC Mutex {
 public:
 	/** Scoped lock class that automatically releases lock when destroyed. */
 	class ScopedLock {
