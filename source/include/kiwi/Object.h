@@ -21,17 +21,24 @@
 #ifndef __KIWI_OBJECT_H
 #define __KIWI_OBJECT_H
 
-#include <kiwi/CoreDefs.h>
+#include <kiwi/Signal.h>
 
 KIWI_BEGIN_NAMESPACE
+
+struct ObjectPrivate;
 
 /** Base class for an API object. */
 class KIWI_PUBLIC Object {
 public:
 	virtual ~Object();
 	//void DeleteLater();
+
+	void AddSlot(internal::SignalImpl::Slot *slot);
+	void RemoveSlot(internal::SignalImpl::Slot *slot);
 protected:
 	Object();
+private:
+	ObjectPrivate *m_priv;		/**< Internal data for the object. */
 };
 
 KIWI_END_NAMESPACE

@@ -21,7 +21,9 @@
 #ifndef __KIWI_SIGNAL_H
 #define __KIWI_SIGNAL_H
 
-#include <kiwi/Object.h>
+#include <kiwi/CoreDefs.h>
+
+#include <type_traits>
 #include <list>
 
 KIWI_BEGIN_NAMESPACE
@@ -66,6 +68,8 @@ private:
 
 KIWI_END_INTERNAL
 
+class Object;
+
 /** Class implementing a type-safe callback system. */
 template <typename... A>
 class Signal : public internal::SignalImpl {
@@ -91,12 +95,38 @@ class Signal : public internal::SignalImpl {
 	};
 
 	/** Slot for a member function. */
-	template <typename T>
+	template <typename T, bool object = std::is_base_of<Object, T>::value>
 	class MemberSlot : public Slot {
 	public:
 		MemberSlot(SignalImpl *impl, T *obj, void (T::*func)(A...)) :
 			Slot(impl), m_obj(obj), m_func(func)
 		{}
+
+		void operator ()(A... args) {
+			(m_obj->*m_func)(args...);
+		}
+	private:
+		T *m_obj;
+		void (T::*m_func)(A...);
+	};
+
+	/** Slot for a member function in an Object-derived class. */
+	template <typename T>
+	class MemberSlot<T, true> : public Slot {
+	public:
+		MemberSlot(SignalImpl *impl, T *obj, void (T::*func)(A...)) :
+			Slot(impl), m_obj(obj), m_func(func)
+		{
+			/* Tell the Object about this slot, so that when the
+			 * object is destroyed the slot will automatically be
+			 * removed from the signal. */
+			m_obj->AddSlot(this);
+		}
+
+		~MemberSlot() {
+			/* Remove the slot from the object. */
+			m_obj->RemoveSlot(this);
+		}
 
 		void operator ()(A... args) {
 			(m_obj->*m_func)(args...);

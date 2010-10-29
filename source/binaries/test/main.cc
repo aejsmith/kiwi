@@ -31,10 +31,14 @@
 using namespace kiwi;
 using namespace std;
 
-class Foo : public Object {
+class Foo {
 public:
 	Signal<int, const char *, const std::string &> MySignal;
 	void CallSignal();
+};
+
+class TestObject : public Object {
+public:
 	void Callback(int x, const char *str1, const std::string &str2);
 };
 
@@ -43,7 +47,7 @@ void Foo::CallSignal() {
 	MySignal(1337, "Goodbye World", ":)");
 }
 
-void Foo::Callback(int x, const char *str1, const std::string &str2) {
+void TestObject::Callback(int x, const char *str1, const std::string &str2) {
 	cout << x << ' ' << str1 << ' ' << str2 << endl;
 }
 
@@ -58,13 +62,16 @@ int main(int argc, char **argv) {
 	cout << endl;
 	{
 		Foo foop;
-		foop.MySignal.Connect(&foop, &Foo::Callback);
-		foop.MySignal.Connect(callback);
-		foop.MySignal.Connect(callback);
-		foop.MySignal.Connect(&foop, &Foo::Callback);
-		foop.MySignal.Connect(callback);
-		foop.MySignal.Connect(&foop, &Foo::Callback);
-		malloc_stats();
+		{
+			TestObject test;
+			foop.MySignal.Connect(&test, &TestObject::Callback);
+			foop.MySignal.Connect(callback);
+			foop.MySignal.Connect(callback);
+			foop.MySignal.Connect(&test, &TestObject::Callback);
+			foop.MySignal.Connect(callback);
+			foop.MySignal.Connect(&test, &TestObject::Callback);
+			foop.CallSignal();
+		}
 		cout << endl;
 		foop.CallSignal();
 	}
