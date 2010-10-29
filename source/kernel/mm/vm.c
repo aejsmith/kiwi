@@ -994,6 +994,11 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		}
 	}
 
+	/* Cannot have a guard page on a 1-page stack. */
+	if(flags & VM_MAP_STACK && size == PAGE_SIZE) {
+		flags &= ~VM_MAP_STACK;
+	}
+
 	/* Convert mapping flags to region flags. The flags with a region
 	 * equivalent have the same value. */
 	rflags = flags & (VM_MAP_READ | VM_MAP_WRITE | VM_MAP_EXEC | VM_MAP_PRIVATE | VM_MAP_STACK);

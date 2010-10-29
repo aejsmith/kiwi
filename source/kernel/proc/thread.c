@@ -710,7 +710,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	status_t ret;
 	char *kname;
 
-	if(!handlep || (stack && stacksz < PAGE_SIZE)) {
+	if(!handlep) {
 		return STATUS_INVALID_ARG;
 	}
 
