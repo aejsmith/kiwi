@@ -24,7 +24,7 @@
 #include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 class EventLoop;
 
@@ -59,6 +59,6 @@ protected:
 	EventLoop *m_event_loop;	/**< Event loop handling this handle. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_HANDLE_H */

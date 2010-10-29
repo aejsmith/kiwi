@@ -38,7 +38,7 @@
 #include <kernel/status.h>
 #include <kiwi/CoreDefs.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Class providing information on an error. */
 class KIWI_PUBLIC Error {
@@ -59,6 +59,6 @@ private:
 	status_t m_code;		/**< Status code. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_ERROR_H */

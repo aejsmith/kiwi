@@ -27,10 +27,4 @@
 #define KIWI_PUBLIC		__attribute__((visibility("default")))
 #define KIWI_PRIVATE		__attribute__((visibility("hidden")))
 
-/** Definitions for the Kiwi namespace. */
-#define KIWI_BEGIN_NAMESPACE	namespace kiwi {
-#define KIWI_END_NAMESPACE	}
-#define KIWI_BEGIN_INTERNAL	namespace internal {
-#define KIWI_END_INTERNAL	}
-
 #endif /* __KIWI_COREDEFS_H */

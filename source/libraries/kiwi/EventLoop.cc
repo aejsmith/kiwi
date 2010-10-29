@@ -31,16 +31,12 @@
 using namespace kiwi;
 using namespace std;
 
-KIWI_BEGIN_NAMESPACE
-
 /** Internal data for EventLoop. */
-struct EventLoopPrivate {
+struct kiwi::EventLoopPrivate {
 	std::list<Object *> to_delete;		/**< Objects to delete when control returns to the loop. */
 	std::vector<object_event_t> events;	/**< Array of events to wait for. */
 	std::vector<Handle *> handles;		/**< Array of handle objects (used for callbacks). */
 };
-
-KIWI_END_NAMESPACE
 
 /** Pointer to the current thread's event loop. */
 static __thread EventLoop *event_loop_instance = 0;

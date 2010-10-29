@@ -25,7 +25,7 @@
 #include <kiwi/CoreDefs.h>
 #include <util/mutex.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Class implementing a lock with exclusive ownership. */
 class KIWI_PUBLIC Mutex {
@@ -64,6 +64,6 @@ private:
 	libc_mutex_t m_impl;		/**< Implementation of the mutex. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_SUPPORT_MUTEX_H */

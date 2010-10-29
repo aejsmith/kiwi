@@ -27,10 +27,8 @@
 
 using namespace kiwi;
 
-KIWI_BEGIN_NAMESPACE
-
 /** Internal data for Object. */
-struct ObjectPrivate {
+struct kiwi::ObjectPrivate {
 	typedef std::list<internal::SignalImpl::Slot *> SlotList;
 
 	ObjectPrivate() : destroyed(false) {}
@@ -38,8 +36,6 @@ struct ObjectPrivate {
 	bool destroyed;			/**< Whether the object is being destroyed. */
 	SlotList slots;			/**< Slots associated with this object. */
 };
-
-KIWI_END_NAMESPACE
 
 /** Constructor for Object.
  * @note		Protected - Object cannot be instantiated directly. */

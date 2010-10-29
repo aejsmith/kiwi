@@ -23,7 +23,7 @@
 
 #include <kiwi/CoreDefs.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Base class that prevents derived classes from being copied. */
 class Noncopyable {
@@ -35,6 +35,6 @@ private:
 	const Noncopyable &operator =(const Noncopyable &);
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_SUPPORT_NONCOPYABLE_H */

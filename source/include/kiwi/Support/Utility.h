@@ -23,7 +23,7 @@
 
 #include <kiwi/CoreDefs.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 /** Rounds a value up to a power of two.
  * @param n		Value to round up.
@@ -44,6 +44,6 @@ size_t array_size(T (&array)[N]) {
 	return N;
 }
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_SUPPORT_UTILITY_H */

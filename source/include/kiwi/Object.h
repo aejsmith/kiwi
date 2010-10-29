@@ -23,7 +23,7 @@
 
 #include <kiwi/Signal.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 struct ObjectPrivate;
 
@@ -42,6 +42,6 @@ private:
 	ObjectPrivate *m_priv;		/**< Internal data for the object. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_OBJECT_H */

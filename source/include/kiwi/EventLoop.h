@@ -23,7 +23,7 @@
 
 #include <kiwi/Handle.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 struct EventLoopPrivate;
 
@@ -46,6 +46,6 @@ private:
 	EventLoopPrivate *m_priv;	/**< Internal data pointer. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_EVENTLOOP_H */

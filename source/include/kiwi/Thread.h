@@ -25,7 +25,7 @@
 #include <kiwi/EventLoop.h>
 #include <kiwi/Handle.h>
 
-KIWI_BEGIN_NAMESPACE
+namespace kiwi {
 
 struct ThreadPrivate;
 
@@ -72,6 +72,6 @@ private:
 	ThreadPrivate *m_priv;		/**< Internal data pointer. */
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_THREAD_H */

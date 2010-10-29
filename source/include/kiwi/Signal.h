@@ -26,8 +26,8 @@
 #include <type_traits>
 #include <list>
 
-KIWI_BEGIN_NAMESPACE
-KIWI_BEGIN_INTERNAL
+namespace kiwi {
+namespace internal {
 
 /** Internal signal implementation. */
 class KIWI_PUBLIC SignalImpl {
@@ -66,7 +66,7 @@ private:
 	friend class Iterator;
 };
 
-KIWI_END_INTERNAL
+}
 
 class Object;
 
@@ -167,6 +167,6 @@ public:
 	}
 };
 
-KIWI_END_NAMESPACE
+}
 
 #endif /* __KIWI_SIGNAL_H */

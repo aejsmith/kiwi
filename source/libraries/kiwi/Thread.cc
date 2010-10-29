@@ -29,15 +29,11 @@
 
 using namespace kiwi;
 
-KIWI_BEGIN_NAMESPACE
-
 /** Internal data for Thread. */
-struct ThreadPrivate {
+struct kiwi::ThreadPrivate {
 	ThreadPrivate() : name("user_thread") {}
 	std::string name;		/**< Name to give the thread. */
 };
-
-KIWI_END_NAMESPACE
 
 /** Set up a thread object.
  * @note		The thread is not created here. Once the object has
