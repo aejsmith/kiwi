@@ -18,9 +18,9 @@
  * @brief		Test application.
  */
 
+#include <kiwi/Support/Mutex.h>
 #include <kiwi/Support/Utility.h>
 #include <kiwi/Object.h>
-#include <kiwi/Signal.h>
 
 #include <kernel/status.h>
 #include <kernel/thread.h>
@@ -35,6 +35,8 @@ class Foo {
 public:
 	Signal<int, const char *, const std::string &> MySignal;
 	void CallSignal();
+private:
+	Mutex m_lock;
 };
 
 class TestObject : public Object {
@@ -43,6 +45,7 @@ public:
 };
 
 void Foo::CallSignal() {
+	Mutex::ScopedLock lock(m_lock);
 	MySignal(42, "Hello World", "!!!");
 	MySignal(1337, "Goodbye World", ":)");
 }
