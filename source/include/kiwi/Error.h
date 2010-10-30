@@ -24,7 +24,18 @@
 #include <kernel/status.h>
 #include <kiwi/CoreDefs.h>
 
+#include <exception>
+
 namespace kiwi {
+
+/** Base class for errors. */
+class KIWI_PUBLIC BaseError : public std::exception {
+public:
+	virtual const char *GetDescription() const throw() = 0;
+	virtual const char *GetRecoverySuggestion() const throw() = 0;
+private:
+	const char *what() const throw();
+};
 
 /** Class providing information on an error.
  *
@@ -42,7 +53,7 @@ namespace kiwi {
  * function succeeded, and take an optional pointer to an Error object in which
  * error information will be stored.
  */
-class KIWI_PUBLIC Error {
+class KIWI_PUBLIC Error : public BaseError {
 public:
 	Error() throw() : m_code(STATUS_SUCCESS) {}
 	Error(status_t code) throw() : m_code(code) {}

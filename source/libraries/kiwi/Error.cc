@@ -30,6 +30,12 @@
 
 using namespace kiwi;
 
+/** Get a description of the error.
+ * @return		String error description. */
+const char *BaseError::what() const throw() {
+	return GetDescription();
+}
+
 /** Get the string description of the error.
  * @return		Localised string describing the error that occurred. */
 const char *Error::GetDescription() const throw() {
