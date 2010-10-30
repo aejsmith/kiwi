@@ -71,7 +71,6 @@ extern status_t SYSCALL(process_security_context)(handle_t handle, security_cont
 extern status_t SYSCALL(process_set_security_context)(handle_t handle, const security_context_t *context);
 extern status_t SYSCALL(process_status)(handle_t handle, int *statusp);
 extern void SYSCALL(process_exit)(int status) __attribute__((noreturn));
-extern void SYSCALL(process_loaded)(void);
 
 #ifdef __cplusplus
 }

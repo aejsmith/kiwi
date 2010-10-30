@@ -24,6 +24,7 @@
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
+extern void process_loaded(void);
 
 extern elf_dyn_t _DYNAMIC[];
 

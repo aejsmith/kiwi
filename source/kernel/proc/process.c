@@ -77,6 +77,7 @@ typedef struct process_create {
 	int status;			/**< Status code to return from the call. */
 } process_create_t;
 
+extern void sys_process_loaded(void);
 static object_type_t process_object_type;
 
 /** Tree of all processes. */
