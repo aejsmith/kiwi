@@ -58,7 +58,7 @@ bool IPCConnection::Connect(port_id_t id) {
 	handle_t handle;
 	status_t ret = ipc_connection_open(id, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -108,7 +108,7 @@ void IPCConnection::Connect(const char *name) {
 bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
 	status_t ret = ipc_message_send(m_handle, type, buf, size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -130,7 +130,7 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_
 
 	ret = ipc_message_peek(m_handle, timeout, &type, &size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -138,7 +138,7 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_
 	ret = ipc_message_receive(m_handle, 0, 0, data, size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		delete[] data;
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 

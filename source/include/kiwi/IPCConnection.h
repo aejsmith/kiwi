@@ -27,7 +27,7 @@
 namespace kiwi {
 
 /** Class implementing an IPC connection. */
-class KIWI_PUBLIC IPCConnection : public Handle {
+class KIWI_PUBLIC IPCConnection : public ErrorHandle {
 public:
 	IPCConnection(handle_t handle = -1);
 
@@ -38,10 +38,6 @@ public:
 	bool Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
 
 	bool WaitForHangup(useconds_t timeout = -1) const;
-
-	/** Get information about the last error that occurred.
-	 * @return		Reference to error object for last error. */
-	const Error &GetError() const { return m_error; }
 
 	/** Signal emitted when a message is received on the connection.
 	 * @note		The handler must call Receive() to get the
@@ -54,8 +50,6 @@ public:
 private:
 	void RegisterEvents();
 	void HandleEvent(int id);
-
-	Error m_error;			/**< Error information. */
 };
 
 }

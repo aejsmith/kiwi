@@ -70,7 +70,7 @@ bool Thread::Open(thread_id_t id) {
 
 	ret = thread_open(id, THREAD_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -95,7 +95,7 @@ bool Thread::Run() {
 	ret = thread_create(m_priv->name.c_str(), NULL, 0, &Thread::_Entry, this,
 	                    NULL, THREAD_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 

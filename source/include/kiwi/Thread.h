@@ -30,7 +30,7 @@ namespace kiwi {
 struct ThreadPrivate;
 
 /** Class implementing a thread. */
-class KIWI_PUBLIC Thread : public Handle {
+class KIWI_PUBLIC Thread : public ErrorHandle {
 public:
 	Thread(handle_t handle = -1);
 	~Thread();
@@ -43,10 +43,6 @@ public:
 	bool IsRunning() const;
 	int GetStatus() const;
 	thread_id_t GetID() const;
-
-	/** Get information about the last error that occurred.
-	 * @return		Reference to error object for last error. */
-	const Error &GetError() const { return m_error; }
 
 	/** Signal emitted when the thread exits.
 	 * @param		Exit status code. */
@@ -66,7 +62,6 @@ private:
 
 	KIWI_PRIVATE static void _Entry(void *arg);
 
-	Error m_error;			/**< Error information. */
 	EventLoop *m_event_loop;	/**< Event loop for the thread. */
 	ThreadPrivate *m_priv;		/**< Internal data pointer. */
 };

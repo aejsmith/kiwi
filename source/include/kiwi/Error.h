@@ -16,20 +16,6 @@
 /**
  * @file
  * @brief		Error class.
- *
- * This file defines a class used to report errors from API functions. It is
- * a wrapper around status_t which allows information to be obtained about an
- * error, such as a human-readable error description and suggestions for
- * recovering from an error.
- *
- * The suggested method for using this class in classes not designed to be used
- * from multiple threads simultaneously is to return a bool stating whether or
- * not the function succeeded, and to have a GetError function that returns a
- * reference to an error object giving details of the error. The suggested
- * method for using this class in classes designed to be used from multiple
- * threads simultaneously is to return a bool stating whether or not the
- * function succeeded, and take an optional pointer to an Error object in which
- * error information will be stored.
  */
 
 #ifndef __KIWI_ERROR_H
@@ -40,7 +26,22 @@
 
 namespace kiwi {
 
-/** Class providing information on an error. */
+/** Class providing information on an error.
+ *
+ * This class is used to report errors from API functions. It is a wrapper
+ * around status_t which allows information to be obtained about an error, such
+ * as a human-readable error description and suggestions for recovering from an
+ * error.
+ *
+ * The suggested method for using this class in classes not designed to be used
+ * from multiple threads simultaneously is to return a bool stating whether or
+ * not the function succeeded, and to have a GetError function that returns a
+ * reference to an error object giving details of the error. The suggested
+ * method for using this class in classes designed to be used from multiple
+ * threads simultaneously is to return a bool stating whether or not the
+ * function succeeded, and take an optional pointer to an Error object in which
+ * error information will be stored.
+ */
 class KIWI_PUBLIC Error {
 public:
 	Error() throw() : m_code(STATUS_SUCCESS) {}

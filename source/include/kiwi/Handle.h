@@ -22,6 +22,7 @@
 #define __KIWI_HANDLE_H
 
 #include <kiwi/Support/Noncopyable.h>
+#include <kiwi/Error.h>
 #include <kiwi/Object.h>
 
 namespace kiwi {
@@ -56,7 +57,23 @@ protected:
 	virtual void HandleEvent(int event);
 
 	handle_t m_handle;		/**< Handle ID. */
+private:
 	EventLoop *m_event_loop;	/**< Event loop handling this handle. */
+};
+
+/** Base handle class with an Error object.
+ * @note		See documentation for Error for when to use this. */
+class KIWI_PUBLIC ErrorHandle : public Handle {
+public:
+	/** Get information about the last error that occurred.
+	 * @return		Reference to error object for last error. */
+	const Error &GetError() const { return m_error; }
+protected:
+	/** Set the error information.
+	 * @param code		Status code to set. */
+	void SetError(status_t code) { m_error = code; }
+private:
+	Error m_error;			/**< Error information. */
 };
 
 }

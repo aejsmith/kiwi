@@ -30,7 +30,7 @@ namespace kiwi {
 
 /** Class implementing an IPC port.
  * @todo		Separate Listen, Accept and Reject functions. */
-class KIWI_PUBLIC IPCPort : public Handle {
+class KIWI_PUBLIC IPCPort : public ErrorHandle {
 public:
 	IPCPort(handle_t handle = -1);
 
@@ -40,10 +40,6 @@ public:
 	bool Listen(IPCConnection *&conn, useconds_t timeout = -1);
 	handle_t Listen(ipc_client_info_t *infop = 0, useconds_t timeout = -1);
 	port_id_t GetID() const;
-
-	/** Get information about the last error that occurred.
-	 * @return		Reference to error object for last error. */
-	const Error &GetError() const { return m_error; }
 
 	/** Signal emitted when a connection is received.
 	 * @note		Does not actually accept the connection: you
@@ -55,8 +51,6 @@ public:
 private:
 	void RegisterEvents();
 	void HandleEvent(int event);
-
-	Error m_error;			/**< Error information. */
 };
 
 }

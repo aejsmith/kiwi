@@ -49,7 +49,7 @@ bool IPCPort::Create() {
 	handle_t handle;
 	status_t ret = ipc_port_create(NULL, PORT_LISTEN, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -71,7 +71,7 @@ bool IPCPort::Open(port_id_t id) {
 	handle_t handle;
 	status_t ret = ipc_port_open(id, PORT_LISTEN, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return false;
 	}
 
@@ -108,7 +108,7 @@ handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) {
 	handle_t handle;
 	status_t ret = ipc_port_listen(m_handle, timeout, &handle, infop);
 	if(unlikely(ret != STATUS_SUCCESS)) {
-		m_error = ret;
+		SetError(ret);
 		return -1;
 	}
 
