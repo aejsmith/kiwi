@@ -32,8 +32,7 @@ struct ThreadPrivate;
 /** Class implementing a thread. */
 class KIWI_PUBLIC Thread : public Handle {
 public:
-	Thread();
-	Thread(handle_t handle);
+	Thread(handle_t handle = -1);
 	~Thread();
 
 	bool Open(thread_id_t id);

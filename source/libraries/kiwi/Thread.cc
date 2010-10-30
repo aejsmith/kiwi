@@ -35,25 +35,23 @@ struct kiwi::ThreadPrivate {
 	std::string name;		/**< Name to give the thread. */
 };
 
-/** Set up a thread object.
+/** Set up the thread object.
  * @note		The thread is not created here. Once the object has
  *			been initialised, you can either open an existing
  *			thread using Open(), or start a new thread using
- *			Run(). */
-Thread::Thread() :
-	m_event_loop(0), m_priv(new ThreadPrivate)
-{}
-
-/** Set up the thread object to use an existing handle.
- * @param handle	Handle to use. Must refer to a thread. */
+ *			Run().
+ * @param handle	If not negative, a existing thread handle to make the
+ *			object use. Must refer to a thread object. */
 Thread::Thread(handle_t handle) :
 	m_event_loop(0), m_priv(new ThreadPrivate)
 {
-	if(unlikely(object_type(handle) != OBJECT_TYPE_THREAD)) {
-		libkiwi_fatal("Thread::Thread: Handle must refer to a thread object.");
-	}
+	if(handle >= 0) {
+		if(unlikely(object_type(handle) != OBJECT_TYPE_THREAD)) {
+			libkiwi_fatal("Thread::Thread: Handle must refer to a thread object.");
+		}
 
-	SetHandle(handle);
+		SetHandle(handle);
+	}
 }
 
 /** Destroy the thread object. */
