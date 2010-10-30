@@ -57,6 +57,10 @@ status_t libc_mutex_lock(libc_mutex_t *lock, useconds_t timeout) {
 	 * waiters) and return. */
 	val = __sync_val_compare_and_swap(&lock->futex, 0, 1);
 	if(val != 0) {
+		if(timeout == 0) {
+			return STATUS_TIMED_OUT;
+		}
+
 		/* Set futex to 2 (locked with waiters). */
 		if(val != 2) {
 			val = __sync_lock_test_and_set(&lock->futex, 2);
