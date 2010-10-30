@@ -24,22 +24,25 @@
 #include <kiwi/EventLoop.h>
 #include <kiwi/IPCPort.h>
 
+// FIXME: Replace this.
 #include <string>
 
 namespace kiwi {
 
+struct ServicePrivate;
+
 /** Main class for a service. */
-class Service : public EventLoop {
+class KIWI_PUBLIC Service : public EventLoop {
 public:
 	Service();
+	~Service();
 protected:
 	virtual void HandleConnection(handle_t handle, ipc_client_info_t &info);
 private:
-	void _AddPort(const std::string &name, port_id_t id);
-	void _HandleConnection();
+	KIWI_PRIVATE void _AddPort(const std::string &name, port_id_t id);
+	KIWI_PRIVATE void _HandleConnection();
 
-	void *m_svcmgr;			/**< Connection to service manager. */
-	IPCPort *m_port;		/**< Port for single port services. */
+	ServicePrivate *m_priv;		/**< Internal data pointer. */
 };
 
 }

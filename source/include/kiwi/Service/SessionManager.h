@@ -21,27 +21,34 @@
 #ifndef __KIWI_SERVICE_SESSIONMANAGER_H
 #define __KIWI_SERVICE_SESSIONMANAGER_H
 
-#include <kernel/types.h>
-
 #include <kiwi/Object.h>
 #include <kiwi/Signal.h>
 
 namespace kiwi {
 
 /** Class to interface with the session manager. */
-class SessionManager : public Object {
+class KIWI_PUBLIC SessionManager : public Object {
 public:
 	SessionManager();
 	~SessionManager();
 
 	status_t CreateSession(session_id_t &id);
 	status_t SwitchSession(session_id_t id);
-	
+
+	/** Signal emitted when a new session is created.
+	 * @param		ID of the session. */
 	Signal<session_id_t> OnCreateSession;
+
+	/** Signal emitted when a session is destroyed.
+	 * @param		ID of the session. */
 	Signal<session_id_t> OnDestroySession;
+
+	/** Signal emitted when a session switch occurs.
+	 * @param		ID of the new session.
+	 * @param		ID of the previous session. */
 	Signal<session_id_t, session_id_t> OnSwitchSession;
 private:
-	void *m_conn;			/**< Connection implementation. */
+	void *m_priv;			/**< Connection implementation. */
 };
 
 }

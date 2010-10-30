@@ -13,9 +13,14 @@
 
 Import('env')
 
+# Generate RPC interfaces.
+env.RPCClient('org.kiwi.ServiceManager.cc', '../../../services/svcmgr/org.kiwi.ServiceManager.proto')
 env.RPCClient('org.kiwi.SecurityServer.cc', '../../../services/security/org.kiwi.SecurityServer.proto')
+
+# Build the library.
 env.KiwiLibrary('kiwi-service',
 	sources = [
+		'org.kiwi.ServiceManager.cc',
 		'org.kiwi.SecurityServer.cc',
 		'Service.cc',
 		'SessionManager.cc',

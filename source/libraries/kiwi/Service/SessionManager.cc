@@ -25,11 +25,11 @@ using namespace kiwi;
 using namespace org::kiwi::SecurityServer;
 
 /** Macro to get the session manager connection. */
-#define GET_CONN()	(reinterpret_cast<ServerConnection *>(m_conn))
+#define GET_CONN()	(reinterpret_cast<ServerConnection *>(m_priv))
 
 /** Connect to the session manager. */
 SessionManager::SessionManager() {
-	m_conn = new ServerConnection();
+	m_priv = new ServerConnection();
 	GET_CONN()->OnCreateSession.Connect(OnCreateSession);
 	GET_CONN()->OnDestroySession.Connect(OnDestroySession);
 	GET_CONN()->OnSwitchSession.Connect(OnSwitchSession);
