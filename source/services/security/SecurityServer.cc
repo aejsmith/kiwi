@@ -18,8 +18,6 @@
  * @brief		Security server.
  */
 
-#include <kernel/object.h>
-
 #include <cassert>
 #include <algorithm>
 #include <iostream>
@@ -47,7 +45,7 @@ status_t SecurityServer::CreateSession(Session *&session) {
 	/* Create the session. */
 	try {
 		session = new Session(this, 0);
-	} catch(kiwi::OSError &e) {
+	} catch(kiwi::Error &e) {
 		return e.GetCode();
 	}
 	m_sessions.insert(make_pair(session->GetID(), session));

@@ -16,6 +16,7 @@ Import('env')
 # Generate the RPC interface code.
 env.RPCServer('org.kiwi.SecurityServer.cc', 'org.kiwi.SecurityServer.proto')
 
+# Build the service.
 env.KiwiService('security',
 	sources = [
 		'org.kiwi.SecurityServer.cc',
@@ -23,5 +24,5 @@ env.KiwiService('security',
 		'Session.cc',
 		'SecurityServer.cc'
 	],
-	libraries = ['kiwi-service'],
+	libraries = ['kiwi', 'kiwi-service', 'kernel'],
 )
