@@ -19,8 +19,7 @@
  */
 
 #include <kiwi/RPC.h>
-
-#include "log.h"
+#include "Internal.h"
 
 using namespace kiwi;
 
@@ -46,7 +45,9 @@ RPCClientConnection::RPCClientConnection(const char *name, uint32_t version, han
  * @param id		ID of the message.
  * @param buf		Message buffer. */
 void RPCClientConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
-	m_conn.Send(id, buf.GetBuffer(), buf.GetSize());
+	if(!m_conn.Send(id, buf.GetBuffer(), buf.GetSize())) {
+		libkiwi_debug("Failed to send message to client: %s", m_conn.GetError().GetDescription());
+	}
 }
 
 /** Handle the connection being hung up.
@@ -63,6 +64,8 @@ void RPCClientConnection::_HandleMessage() {
 		size_t size;
 		char *data;
 		if(!m_conn.Receive(id, data, size)) {
+			libkiwi_debug("Failed to receive message from client: %s",
+			              m_conn.GetError().GetDescription());
 			return;
 		}
 
@@ -70,10 +73,7 @@ void RPCClientConnection::_HandleMessage() {
 		HandleMessage(id, buf);
 		SendMessage(id, buf);
 	} catch(RPCError &e) {
-		libkiwi_warn("RPC error during message handling: %s\n", e.GetDescription());
-		return;
-	} catch(IPCError &e) {
-		libkiwi_warn("IPC error during message handling: %s\n", e.GetDescription());
+		libkiwi_warn("RPC error during message handling: %s", e.GetDescription());
 		return;
 	}
 }
