@@ -298,8 +298,7 @@ static void __init_text load_modules(kernel_args_t *args) {
  * @param args		Kernel arguments structure pointer.
  * @param arg2		Thread argument (unused). */
 static void init_thread(void *args, void *arg2) {
-	//const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
-	const char *pargs[] = { "/system/binaries/test", NULL }, *penv[] = { NULL };
+	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
 	boot_module_t *mod;
 	status_t ret;

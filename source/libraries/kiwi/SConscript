@@ -34,6 +34,7 @@ env.KiwiLibrary('kiwi',
 		'Signal.cc',
 		'Thread.cc',
 	],
+	libraries = ['kernel'],
 	flags = {
 		'CCFLAGS': env['CCFLAGS'] + ['-fvisibility=hidden'],
 	},

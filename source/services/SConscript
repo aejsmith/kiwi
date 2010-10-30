@@ -12,10 +12,10 @@
 # for complete terms.
 
 Import('env')
-"""
+
 SConscript(dirs=[
-	'security',
+	#'security',
 	'svcmgr',
-	'window',
+	#'window',
 ], exports=['env'])
-"""
+

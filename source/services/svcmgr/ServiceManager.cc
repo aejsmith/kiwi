@@ -113,13 +113,10 @@ bool ServiceManager::LookupPort(const std::string &name, port_id_t &id) {
 
 /** Handle a connection on the service manager port. */
 void ServiceManager::HandleConnection() {
-	handle_t handle;
-	try {
-		handle = m_port.Listen();
-	} catch(...) {
-		return;
+	handle_t handle = m_port.Listen();
+	if(handle >= 0) {
+		new Connection(handle, this);
 	}
-	new Connection(handle, this);
 }
 
 /** Main function for the service manager.
@@ -169,7 +166,8 @@ int main(int argc, char **argv) {
 		));
 
 		/* Run the UI test application. */
-		Process proc("/system/binaries/uitest");
+		Process proc;
+		proc.Create("/system/binaries/uitest");
 	}
 
 	svcmgr.Run();

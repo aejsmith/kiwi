@@ -31,7 +31,7 @@
 namespace kiwi {
 
 /** Exception thrown for RPC protocol errors. */
-class RPCError : public BaseError {
+class KIWI_PUBLIC RPCError : public BaseError {
 public:
 	explicit RPCError(const std::string &msg);
 	~RPCError() throw();
@@ -41,7 +41,7 @@ private:
 };
 
 /** Type implementing the RPC 'bytes' type. */
-struct RPCByteString {
+struct KIWI_PUBLIC RPCByteString {
 	RPCByteString(const char *d, size_t s) : data(d), size(s) {}
 
 	const char *data;		/**< Data buffer. */
@@ -49,7 +49,7 @@ struct RPCByteString {
 };
 
 /** Class used to store an RPC message buffer. */
-class RPCMessageBuffer : Noncopyable {
+class KIWI_PUBLIC RPCMessageBuffer : Noncopyable {
 	/** Type IDs. */
 	enum TypeID {
 		kBoolType = 0,
@@ -118,7 +118,7 @@ private:
 };
 
 /** Base class for a connection to a server. */
-class RPCServerConnection : public Object {
+class KIWI_PUBLIC RPCServerConnection : public Object {
 public:
 	void Connect(port_id_t id = -1);
 protected:
@@ -137,7 +137,7 @@ private:
 };
 
 /** Base class for a connection to a client. */
-class RPCClientConnection : public Object {
+class KIWI_PUBLIC RPCClientConnection : public Object {
 protected:
 	RPCClientConnection(const char *name, uint32_t version, handle_t handle);
 

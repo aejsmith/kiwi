@@ -103,11 +103,9 @@ bool Service::Start() {
 
 	/* Create the process. TODO: Drop capabilities that services should not
 	 * have, particularly CAP_FATAL. */
-	try {
-		m_process.Create(m_cmdline.c_str(), environ, &map);
-	} catch(Error &e) {
+	if(!m_process.Create(m_cmdline.c_str(), environ, &map)) {
 		cerr << "svcmgr: failed to start service '" << m_name << "': ";
-		cerr << e.GetDescription() << endl;
+		cerr << m_process.GetError().GetDescription() << endl;
 		return false;
 	}
 
