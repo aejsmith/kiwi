@@ -97,9 +97,6 @@ void libkernel_init_stage2(process_args_t *args) {
 	/* Initialise the runtime loader and load the program. */
 	entry = (void (*)(process_args_t *))rtld_init(args);
 
-	/* Set up TLS for the current thread. */
-	tls_init();
-
 	/* Signal to the kernel that we've completed loading and call the entry
 	 * point for the program. */
 	process_loaded();

@@ -569,6 +569,10 @@ void *rtld_init(process_args_t *args) {
 		}
 	}
 #endif
+
+	/* Set up TLS for the current thread. */
+	tls_init();
+
 	/* Run INIT functions for loaded images. */
 	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);
