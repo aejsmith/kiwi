@@ -20,7 +20,7 @@
 
 #include <kiwi/Support/Mutex.h>
 #include <kiwi/Support/Utility.h>
-#include <kiwi/Object.h>
+#include <kiwi/Process.h>
 #include <kiwi/Thread.h>
 
 #include <iostream>
@@ -48,6 +48,12 @@ private:
 };
 
 int main(int argc, char **argv) {
+	if(Process::GetCurrentID() > 1) {
+		cout << "I'm the child!" << endl;
+		Thread::Sleep(1000000);
+		return 42;
+	}
+
 	TestThread thread;
 	thread.SetName("test_thread");
 	if(!thread.Run()) {
@@ -64,5 +70,13 @@ int main(int argc, char **argv) {
 
 	thread.Wait();
 	cout << "Thread exited with status " << thread.GetStatus() << endl;
+
+	Process child;
+	if(!child.Create("test")) {
+		cout << "Failed to start child process: " << child.GetError().GetDescription() << endl;
+		return 1;
+	}
+	child.Wait();
+	cout << "Child exited with status " << child.GetStatus() << endl;
 	while(1);
 }

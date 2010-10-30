@@ -58,7 +58,7 @@
 	})
 
 /** Whether to enable debug output. */
-#define LIBKERNEL_DEBUG		1
+#define LIBKERNEL_DEBUG		0
 
 /** Size of the heap. */
 #define LIBKERNEL_HEAP_SIZE	8192

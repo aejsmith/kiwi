@@ -21,7 +21,6 @@
 #ifndef __KIWI_PROCESS_H
 #define __KIWI_PROCESS_H
 
-#include <kiwi/Error.h>
 #include <kiwi/Handle.h>
 
 #include <utility>
@@ -31,41 +30,48 @@ extern char **environ;
 
 namespace kiwi {
 
-/** Exception class providing details of a process error.
+/** Class providing details of a process error.
  * @todo		Provide details of missing libraries/symbols. */
-class ProcessError : public OSError {
+class KIWI_PUBLIC ProcessError : public Error {
 public:
-	ProcessError(status_t code) : OSError(code) {}
+	ProcessError() {}
+	ProcessError(status_t code) : Error(code) {}
 };
 
 /** Class providing functionality to create and manipulate processes. */
-class Process : public Handle {
+class KIWI_PUBLIC Process : public Handle {
 public:
-	/** Type of the handle map. */
+	/** Type of the handle map.
+	 * @todo		Replace this. */
 	typedef std::vector<std::pair<handle_t, handle_t> > HandleMap;
 
 	Process(handle_t handle = -1);
-	Process(const char *const args[], const char *const env[] = environ, HandleMap *handles = 0);
-	Process(const char *cmdline, const char *const env[] = environ, HandleMap *handles = 0);
-	//Process(process_id_t id);
 
-	void Create(const char *const args[], const char *const env[] = environ,
+	bool Create(const char *const args[], const char *const env[] = environ,
 	            HandleMap *handles = 0);
-	void Create(const char *cmdline, const char *const env[] = environ,
+	bool Create(const char *cmdline, const char *const env[] = environ,
 	            HandleMap *handles = 0);
-	void Open(process_id_t id);
+	bool Open(process_id_t id);
+	bool Wait(useconds_t timeout = -1) const;
 
-	bool WaitForExit(int *statusp = 0, useconds_t timeout = -1) const;
-	process_id_t GetID(void) const;
-	session_id_t GetSessionID(void) const;
+	bool IsRunning() const;
+	int GetStatus() const;
+	process_id_t GetID() const;
+
+	/** Get information about the last error that occurred.
+	 * @return		Reference to error object for last error. */
+	const ProcessError &GetError() const { return m_error; }
+
+	/** Signal emitted when the process exits.
+	 * @param		Exit status code. */
+	Signal<int> OnExit;
 
 	static process_id_t GetCurrentID(void);
-	static session_id_t GetCurrentSessionID(void);
-
-	Signal<int> OnExit;
 private:
 	void RegisterEvents();
-	void EventReceived(int event);
+	void HandleEvent(int event);
+
+	ProcessError m_error;		/**< Error information. */
 };
 
 }
