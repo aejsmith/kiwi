@@ -25,11 +25,11 @@
 
 #include <cstdlib>
 
-//#include "org.kiwi.ServiceManager.h"
+#include "org.kiwi.ServiceManager.h"
 #include "Internal.h"
 
 using namespace kiwi;
-//using namespace org::kiwi::ServiceManager;
+using namespace org::kiwi::ServiceManager;
 
 /** Constructor for IPCConnection.
  * @param handle	If not negative, an existing connection handle to make
@@ -65,7 +65,7 @@ bool IPCConnection::Connect(port_id_t id) {
 	SetHandle(handle);
 	return true;
 }
-#if 0
+
 /** Connect to a port.
  *
  * Connects to an IPC port. If the object currently refers to a connection, the
@@ -74,9 +74,9 @@ bool IPCConnection::Connect(port_id_t id) {
  *
  * @param name		Port name to connect to.
  *
- * @throw IPCError	Thrown if unable to connect.
+ * @return		True if succeeded in connecting, false if not.
  */
-void IPCConnection::Connect(const char *name) {
+bool IPCConnection::Connect(const char *name) {
 	port_id_t id;
 
 	/* Work out the service manager port ID. The ID of the session's
@@ -89,17 +89,26 @@ void IPCConnection::Connect(const char *name) {
 	}
 
 	/* Look up the port ID. */
-	{
-		ServerConnection svcmgr(id);
+	try {
+		ServerConnection svcmgr;
+		svcmgr.Connect(id);
+
 		status_t ret = svcmgr.LookupPort(name, id);
-		if(ret != STATUS_SUCCESS) {
-			throw IPCError(ret);
+		if(unlikely(ret != STATUS_SUCCESS)) {
+			SetError(ret);
+			return false;
 		}
+	} catch(Error &e) {
+		SetError(e);
+		return false;
+	} catch(RPCError &e) {
+		SetError(STATUS_DEST_UNREACHABLE);
+		return false;
 	}
 
 	return Connect(id);
 }
-#endif
+
 /** Send a message on a port.
  * @param type		Type ID of message to send.
  * @param buf		Data buffer to send.

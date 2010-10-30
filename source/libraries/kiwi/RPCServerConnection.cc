@@ -51,8 +51,9 @@ void RPCServerConnection::Connect(port_id_t id) {
 			throw Error(m_conn.GetError());
 		}
 	} else {
-		//m_conn.Connect(m_name);
-		throw RPCError("Not implemented");
+		if(!m_conn.Connect(m_name)) {
+			throw Error(m_conn.GetError());
+		}
 	}
 
 	/* Check the server version. */

@@ -36,6 +36,14 @@ const char *BaseError::what() const throw() {
 	return GetDescription();
 }
 
+/** Get a recovery suggestion for the error.
+ * @return		Localised string suggesting a recovery action for the
+ *			error. If no suggestion is available, an empty string
+ *			will be returned. */
+const char *BaseError::GetRecoverySuggestion() const throw() {
+	return "";
+}
+
 /** Get the string description of the error.
  * @return		Localised string describing the error that occurred. */
 const char *Error::GetDescription() const throw() {

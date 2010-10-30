@@ -72,6 +72,10 @@ protected:
 	/** Set the error information.
 	 * @param code		Status code to set. */
 	void SetError(status_t code) { m_error = code; }
+
+	/** Set the error information.
+	 * @param error		Error object to set. */
+	void SetError(const Error &error) { m_error = error.GetCode(); }
 private:
 	Error m_error;			/**< Error information. */
 };

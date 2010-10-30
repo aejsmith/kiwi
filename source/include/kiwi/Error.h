@@ -32,7 +32,7 @@ namespace kiwi {
 class KIWI_PUBLIC BaseError : public std::exception {
 public:
 	virtual const char *GetDescription() const throw() = 0;
-	virtual const char *GetRecoverySuggestion() const throw() = 0;
+	virtual const char *GetRecoverySuggestion() const throw();
 private:
 	const char *what() const throw();
 };

@@ -31,7 +31,7 @@
 namespace kiwi {
 
 /** Exception thrown for RPC protocol errors. */
-class RPCError : public Error {
+class RPCError : public BaseError {
 public:
 	explicit RPCError(const std::string &msg);
 	~RPCError() throw();
