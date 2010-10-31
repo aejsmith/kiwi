@@ -70,6 +70,7 @@ sources = map(File, [
 	'sync/spinlock.c',
 	'sync/waitq.c',
 
+	'dpc.c',
 	'elf.c',
 	'fatal.c',
 	'init.c',

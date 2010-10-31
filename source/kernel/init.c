@@ -41,6 +41,7 @@
 #include <security/context.h>
 
 #include <console.h>
+#include <dpc.h>
 #include <fatal.h>
 #include <init.h>
 #include <kargs.h>
@@ -405,6 +406,7 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		thread_init();
 		sched_init();
 		thread_reaper_init();
+		dpc_init();
 		lrm_init();
 
 		/* Now that the thread system is up and all CPUs have been
