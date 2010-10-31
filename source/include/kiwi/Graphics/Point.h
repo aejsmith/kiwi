@@ -18,13 +18,15 @@
  * @brief		Point class.
  */
 
-#ifndef __KIWI_UI_POINT_H
-#define __KIWI_UI_POINT_H
+#ifndef __KIWI_GRAPHICS_POINT_H
+#define __KIWI_GRAPHICS_POINT_H
+
+#include <kiwi/CoreDefs.h>
 
 namespace kiwi {
 
 /** Class representing a single point on a 2D plane. */
-class Point {
+class KIWI_PUBLIC Point {
 public:
 	/** Initialise the point.
 	 * @param x		X position of the point.
@@ -45,4 +47,4 @@ private:
 
 }
 
-#endif /* __KIWI_UI_POINT_H */
+#endif /* __KIWI_GRAPHICS_POINT_H */
