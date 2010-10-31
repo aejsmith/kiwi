@@ -904,11 +904,23 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
  * @return		Status code describing result of the operation. */
 static status_t fs_node_set_security(object_t *object, object_security_t *security) {
 	fs_node_t *node = (fs_node_t *)object;
+	size_t i;
 
 	if(FS_NODE_IS_RDONLY(node)) {
 		return STATUS_READ_ONLY;
 	} else if(!node->ops->set_security) {
 		return STATUS_NOT_SUPPORTED;
+	}
+
+	/* The ACL must not contain any session or capability entries. */
+	if(security->acl) {
+		for(i = 0; i < security->acl->count; i++) {
+			switch(security->acl->entries[i].type) {
+			case ACL_ENTRY_CAPABILITY:
+			case ACL_ENTRY_SESSION:
+				return STATUS_NOT_SUPPORTED;
+			}
+		}
 	}
 
 	return node->ops->set_security(node, security);
