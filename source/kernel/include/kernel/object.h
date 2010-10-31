@@ -37,6 +37,7 @@ extern "C" {
 #define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
 #define OBJECT_TYPE_SEMAPHORE	8	/**< Semaphore. */
 #define OBJECT_TYPE_AREA	9	/**< Memory area. */
+#define OBJECT_TYPE_TIMER	10	/**< Timer. */
 
 /** Maximum ACL size. */
 #define OBJECT_ACL_MAX		64

@@ -33,6 +33,7 @@ env.KiwiLibrary('kiwi',
 		'RPCServerConnection.cc',
 		'Signal.cc',
 		'Thread.cc',
+		'Timer.cc',
 	],
 	libraries = ['kernel'],
 	flags = {

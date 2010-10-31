@@ -51,8 +51,8 @@ static inline bool notifier_empty(notifier_t *notif) {
 
 extern void notifier_init(notifier_t *notif, void *data);
 extern void notifier_clear(notifier_t *notif);
-extern void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy);
-extern void notifier_run(notifier_t *notif, void *data, bool destroy);
+extern bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy);
+extern bool notifier_run(notifier_t *notif, void *data, bool destroy);
 extern void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data);
 extern void notifier_unregister(notifier_t *notif, void (*func)(void *, void *, void *), void *data);
 

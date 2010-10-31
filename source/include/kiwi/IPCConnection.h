@@ -49,7 +49,7 @@ public:
 	Signal<> OnHangup;
 private:
 	void RegisterEvents();
-	void HandleEvent(int id);
+	void HandleEvent(int event);
 };
 
 }

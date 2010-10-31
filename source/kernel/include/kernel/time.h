@@ -27,6 +27,17 @@
 extern "C" {
 #endif
 
+/** Timer events. */
+#define TIMER_EVENT		0	/**< Event for the timer firing. */
+
+/** Timer mode values. */
+#define TIMER_ONESHOT		0	/**< Fire the timer event only once. */
+#define TIMER_PERIODIC		1	/**< Fire the event at regular intervals until stopped. */
+
+extern status_t SYSCALL(timer_create)(handle_t *handlep);
+extern status_t SYSCALL(timer_start)(handle_t handle, useconds_t interval, int mode);
+extern status_t SYSCALL(timer_stop)(handle_t handle);
+
 extern status_t SYSCALL(time_since_boot)(useconds_t *usp);
 extern status_t SYSCALL(time_since_epoch)(useconds_t *usp);
 

@@ -66,9 +66,12 @@ void notifier_clear(notifier_t *notif) {
  * @param notif		Notifier to run.
  * @param data		Pointer to pass as second argument to functions.
  * @param destroy	Whether to remove functions after calling them.
+ *
+ * @return		Whther any handlers were called.
  */
-void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
+bool notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 	notifier_func_t *nf;
+	bool called = false;
 
 	LIST_FOREACH_SAFE(&notif->functions, iter) {
 		nf = list_entry(iter, notifier_func_t, header);
@@ -77,17 +80,26 @@ void notifier_run_unlocked(notifier_t *notif, void *data, bool destroy) {
 			list_remove(&nf->header);
 			kfree(nf);
 		}
+
+		called = true;
 	}
+
+	return called;
 }
 
 /** Runs all functions on a notifier.
  * @param notif		Notifier to run.
  * @param data		Pointer to pass as second argument to functions.
- * @param destroy	Whether to remove functions after calling them. */
-void notifier_run(notifier_t *notif, void *data, bool destroy) {
+ * @param destroy	Whether to remove functions after calling them.
+ * @return		Whther any handlers were called. */
+bool notifier_run(notifier_t *notif, void *data, bool destroy) {
+	bool ret;
+
 	mutex_lock(&notif->lock);
-	notifier_run_unlocked(notif, data, destroy);
+	ret = notifier_run_unlocked(notif, data, destroy);
 	mutex_unlock(&notif->lock);
+
+	return ret;
 }
 
 /** Add a function to a notifier.

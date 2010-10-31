@@ -109,3 +109,6 @@ syscall time_since_boot(ptr_t);
 syscall time_since_epoch(ptr_t);
 syscall futex_wait(ptr_t, int32_t, useconds_t);
 syscall futex_wake(ptr_t, size_t, ptr_t);
+syscall timer_create(ptr_t);
+syscall timer_start(handle_t, useconds_t, int);
+syscall timer_stop(handle_t);

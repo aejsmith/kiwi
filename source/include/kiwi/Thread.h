@@ -58,7 +58,7 @@ protected:
 	virtual int Main();
 private:
 	void RegisterEvents();
-	void HandleEvent(int id);
+	void HandleEvent(int event);
 
 	KIWI_PRIVATE static void _Entry(void *arg);
 
