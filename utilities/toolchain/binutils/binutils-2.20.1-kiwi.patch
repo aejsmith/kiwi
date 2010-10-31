@@ -1,6 +1,6 @@
 diff -urN binutils-2.20.1.orig/bfd/config.bfd binutils-2.20.1/bfd/config.bfd
---- binutils-2.20.1.orig/bfd/config.bfd	2010-04-24 10:16:50.101608779 +0100
-+++ binutils-2.20.1/bfd/config.bfd	2010-04-24 10:16:58.739454878 +0100
+--- binutils-2.20.1.orig/bfd/config.bfd	2010-10-26 11:42:07.831926133 +0100
++++ binutils-2.20.1/bfd/config.bfd	2010-10-26 11:42:13.282767408 +0100
 @@ -641,6 +641,11 @@
      want64=true
      targ_underscore=yes
@@ -24,8 +24,8 @@ diff -urN binutils-2.20.1.orig/bfd/config.bfd binutils-2.20.1/bfd/config.bfd
    i860-*-mach3* | i860-*-osf1* | i860-*-coff*)
      targ_defvec=i860coff_vec
 diff -urN binutils-2.20.1.orig/config.sub binutils-2.20.1/config.sub
---- binutils-2.20.1.orig/config.sub	2010-04-24 10:16:49.495701883 +0100
-+++ binutils-2.20.1/config.sub	2010-04-24 10:16:58.741452243 +0100
+--- binutils-2.20.1.orig/config.sub	2010-10-26 11:42:07.688925715 +0100
++++ binutils-2.20.1/config.sub	2010-10-26 11:42:13.282767408 +0100
 @@ -1293,7 +1293,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -35,9 +35,35 @@ diff -urN binutils-2.20.1.orig/config.sub binutils-2.20.1/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
+diff -urN binutils-2.20.1.orig/configure binutils-2.20.1/configure
+--- binutils-2.20.1.orig/configure	2010-10-26 11:42:07.689925559 +0100
++++ binutils-2.20.1/configure	2010-10-26 11:45:26.352738710 +0100
+@@ -2815,7 +2815,8 @@
+   case "${target}" in
+     *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
+     | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
+-    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto*)
++    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto* \
++    | *-*-kiwi*)
+       case "${target}" in
+         *-*-linux*aout* | *-*-linux*oldld*)
+           ;;
+diff -urN binutils-2.20.1.orig/configure.ac binutils-2.20.1/configure.ac
+--- binutils-2.20.1.orig/configure.ac	2010-10-26 11:42:07.693925543 +0100
++++ binutils-2.20.1/configure.ac	2010-10-26 11:45:45.140927298 +0100
+@@ -308,7 +308,8 @@
+   case "${target}" in
+     *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
+     | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
+-    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto*)
++    | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto* \
++    | *-*-kiwi*)
+       case "${target}" in
+         *-*-linux*aout* | *-*-linux*oldld*)
+           ;;
 diff -urN binutils-2.20.1.orig/gas/configure.tgt binutils-2.20.1/gas/configure.tgt
---- binutils-2.20.1.orig/gas/configure.tgt	2010-04-24 10:16:49.836596261 +0100
-+++ binutils-2.20.1/gas/configure.tgt	2010-04-24 10:16:59.416464754 +0100
+--- binutils-2.20.1.orig/gas/configure.tgt	2010-10-26 11:42:07.518893993 +0100
++++ binutils-2.20.1/gas/configure.tgt	2010-10-26 11:42:13.283741318 +0100
 @@ -184,6 +184,7 @@
    i386-*-coff)				fmt=coff ;;
    i386-*-elf)				fmt=elf ;;
@@ -47,8 +73,8 @@ diff -urN binutils-2.20.1.orig/gas/configure.tgt binutils-2.20.1/gas/configure.t
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
    i386-*-netbsdpe*)			fmt=coff em=pe ;;
 diff -urN binutils-2.20.1.orig/ld/configure.tgt binutils-2.20.1/ld/configure.tgt
---- binutils-2.20.1.orig/ld/configure.tgt	2010-04-24 10:16:49.501701497 +0100
-+++ binutils-2.20.1/ld/configure.tgt	2010-04-24 10:16:59.417452068 +0100
+--- binutils-2.20.1.orig/ld/configure.tgt	2010-10-26 11:42:07.727925555 +0100
++++ binutils-2.20.1/ld/configure.tgt	2010-10-26 11:42:13.283741318 +0100
 @@ -245,6 +245,10 @@
  			targ_extra_emuls="elf_i386 elf_l1om"
  			;;

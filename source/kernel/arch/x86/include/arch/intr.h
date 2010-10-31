@@ -54,8 +54,6 @@
 /** Structure defining an interrupt stack frame. */
 typedef struct intr_frame {
 #ifdef __x86_64__
-	unative_t gs;			/**< GS. */
-	unative_t fs;			/**< FS. */
 	unative_t r15;			/**< R15. */
 	unative_t r14;			/**< R14. */
 	unative_t r13;			/**< R13. */

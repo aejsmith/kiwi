@@ -16,13 +16,17 @@ Import('env', 'envmgr', 'config')
 sources = map(File, [
 	'rtld/image.c',
 	'rtld/symbol.c',
+
 	'support/heap.c',
 	'support/printf.c',
 	'support/string.c',
+
 	'status_list.c',
 	'init.c',
 	'object.c',
 	'syscalls.S',
+	'thread.c',
+	'tls.c',
 ])
 
 # These won't conflict with the copies in libc, we don't export the symbols. I

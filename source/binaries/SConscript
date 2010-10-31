@@ -17,5 +17,6 @@ SConscript(dirs=[
 	#'failshell',
 	#'forktest',
 	'uitest',
+	'test',
 	'3rdparty/dungeon',
 ], exports=['env'])

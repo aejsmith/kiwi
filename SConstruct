@@ -343,3 +343,6 @@ if config.Configured() and not 'config' in COMMAND_LINE_TARGETS:
 else:
 	# Configuration does not exist. All we can do is configure.
 	RequireTarget('config', "Configuration missing or out of date. Please update using 'config' target.")
+
+# Change the Decider to MD5-timestamp to speed up the build a bit.
+Decider('MD5-timestamp')

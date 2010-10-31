@@ -76,12 +76,12 @@ static void __init_text gdt_init(void) {
 		"push	$1f\n"
 		"lretq\n"
 		"1:\n"
-		"mov	%1, %%ds\n"
-		"mov	%1, %%es\n"
-		"mov	%1, %%fs\n"
-		"mov	%1, %%gs\n"
 		"mov	%1, %%ss\n"
-		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS)
+		"mov	%2, %%ds\n"
+		"mov	%2, %%es\n"
+		"mov	%2, %%fs\n"
+		"mov	%2, %%gs\n"
+		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS), "r"(0)
 	);
 }
 

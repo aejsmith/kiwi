@@ -23,6 +23,7 @@
 #include <kernel/status.h>
 #include <kernel/vm.h>
 
+#include <kiwi/Support/Utility.h>
 #include <kiwi/Error.h>
 
 #include <cassert>
@@ -43,16 +44,12 @@ Surface::Surface(uint16_t width, uint16_t height) :
 {
 	/* Get the size of the area to create. Surfaces are 32-bit ARGB, with
 	 * 4 bytes per pixel. */
-	size_t size = width * height * 4;
-	if(size % 0x1000) {
-		size += 0x1000;
-		size -= size % 0x1000;
-	}
+	size_t size = p2align(width * height * 4, 0x1000);
 
 	/* Create a new area. */
 	status_t ret = area_create(size, -1, 0, NULL, AREA_READ | AREA_WRITE, &m_area);
 	if(ret != STATUS_SUCCESS) {
-		OSError e(ret);
+		Error e(ret);
 		clog << "Failed to create area for surface: " << e.GetDescription() << endl;
 		throw e;
 	}
@@ -74,7 +71,8 @@ area_id_t Surface::GetID() const {
  * @return		Pointer to surface data, or NULL if unable to map. */
 void *Surface::GetData() {
 	if(!m_mapping) {
-		status_t ret = vm_map(NULL, area_size(m_area), VM_MAP_READ | VM_MAP_WRITE, m_area, 0, &m_mapping);
+		status_t ret = vm_map(NULL, area_size(m_area), VM_MAP_READ | VM_MAP_WRITE,
+		                      m_area, 0, &m_mapping);
 		if(ret != STATUS_SUCCESS) {
 			return NULL;
 		}
@@ -135,11 +133,7 @@ status_t Surface::Resize(uint16_t width, uint16_t height) {
 	Unmap();
 
 	/* Get the new size for the area. */
-	size_t size = width * height * 4;
-	if(size % 0x1000) {
-		size += 0x1000;
-		size -= size % 0x1000;
-	}
+	size_t size = p2align(width * height * 4, 0x1000);
 
 	/* Resize the area. */
 	status_t ret = area_resize(m_area, size);

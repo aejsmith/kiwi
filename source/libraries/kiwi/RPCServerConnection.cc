@@ -28,22 +28,31 @@ using namespace kiwi;
 /** Construct an RPC server connection object.
  * @param name		Name of the service.
  * @param version	Service version.
- * @param id		If not negative, this port will be used rather than
- *			looking up the port name.
- * @param handle	If not negative, both name and ID will be ignored, and
- *			the object will use the connection referred to by this
- *			handle. */
-RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, port_id_t id, handle_t handle) :
+ * @param handle	If not negative, an existing connection handle to the
+ *			server. It is expected that this connection is newly
+ *			set up, i.e. there is a version message waiting. */
+RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, handle_t handle) :
 	m_conn(handle), m_name(name), m_version(version)
 {
 	m_conn.OnMessage.Connect(this, &RPCServerConnection::HandleMessage);
 
-	/* Connect to the server. */
-	if(handle < 0) {
-		if(id >= 0) {
-			m_conn.Connect(id);
-		} else {
-			m_conn.Connect(m_name);
+	/* If given a handle, check the version. */
+	if(handle >= 0) {
+		CheckVersion();
+	}
+}
+
+/** Connect to the server.
+ * @param id		A port ID to connect to. If negative (the default), the
+ *			service's name will be looked up and connected to. */
+void RPCServerConnection::Connect(port_id_t id) {
+	if(id >= 0) {
+		if(!m_conn.Connect(id)) {
+			throw Error(m_conn.GetError());
+		}
+	} else {
+		if(!m_conn.Connect(m_name)) {
+			throw Error(m_conn.GetError());
 		}
 	}
 
@@ -56,7 +65,9 @@ RPCServerConnection::RPCServerConnection(const char *name, uint32_t version, por
  * @param buf		Buffer containing message to send. Will be replaced
  *			with the response message. */
 void RPCServerConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
-	m_conn.Send(id, buf.GetBuffer(), buf.GetSize());
+	if(!m_conn.Send(id, buf.GetBuffer(), buf.GetSize())) {
+		throw Error(m_conn.GetError());
+	}
 
 	/* The server may send us events before we get the actual reply. If
 	 * the ID is not what is expected, pass it to the event handler. */
@@ -77,8 +88,22 @@ void RPCServerConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
 void RPCServerConnection::ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
 	size_t size;
 	char *data;
-	m_conn.Receive(id, data, size);
+
+	if(!m_conn.Receive(id, data, size)) {
+		throw Error(m_conn.GetError());
+	}
+
 	buf.Reset(data, size);
+}
+
+/** Handle an event on the connection.
+ * @param id		Message ID.
+ * @param buf		Message buffer. */
+void RPCServerConnection::HandleEvent(uint32_t id, RPCMessageBuffer &buf) {
+	/* The default implementation recognises no events. */
+	std::stringstream msg;
+	msg << "Received unknown event ID: " << id;
+	throw RPCError(msg.str());
 }
 
 /** Handle a message on the connection. */

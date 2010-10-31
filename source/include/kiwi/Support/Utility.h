@@ -15,23 +15,35 @@
 
 /**
  * @file
- * @brief		Application class.
+ * @brief		Utility functions.
  */
 
-#ifndef __KIWI_APPLICATION_H
-#define __KIWI_APPLICATION_H
+#ifndef __KIWI_SUPPORT_UTILITY_H
+#define __KIWI_SUPPORT_UTILITY_H
 
-#include <kiwi/EventLoop.h>
+#include <kiwi/CoreDefs.h>
 
 namespace kiwi {
 
-/** IPC server class. */
-class Application : public EventLoop {
-public:
-	Application();
-	~Application();
-};
+/** Rounds a value up to a power of two.
+ * @param n		Value to round up.
+ * @param align		Value to round up to. */
+template <typename T>
+T p2align(T n, int align) {
+	if(n & (align - 1)) {
+		n += align;
+		n &= ~(align - 1);
+	}
+	return n;
+}
+
+/** Get the size of an array.
+ * @param array		Array to get size of. */
+template <typename T, size_t N>
+size_t array_size(T (&array)[N]) {
+	return N;
+}
 
 }
 
-#endif /* __KIWI_APPLICATION_H */
+#endif /* __KIWI_SUPPORT_UTILITY_H */

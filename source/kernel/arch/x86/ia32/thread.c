@@ -23,19 +23,53 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <status.h>
+
 /** IA32-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
 	/* Set the ESP0 field in the TSS to point to the new thread's
 	 * kernel stack. */
 	thread->cpu->arch.tss.esp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
+
+	/* Update the segment base. It will be reloaded upon return to
+	 * userspace. */
+	gdt_set_base(SEGMENT_U_GS, thread->arch.tls_base);
 }
 
 /** Initialise IA32-specific thread data.
  * @param thread	Thread to initialise.
- * @return		Always returns 0. */
-int thread_arch_init(thread_t *thread) {
-	/* Nothing happens. */
-	return 0;
+ * @return		Always returns STATUS_SUCCESS. */
+status_t thread_arch_init(thread_t *thread) {
+	thread->arch.tls_base = 0;
+	return STATUS_SUCCESS;
+}
+
+/** Get the TLS address for a thread.
+ * @param thread	Thread to get for.
+ * @return		TLS address of thread. */
+ptr_t thread_arch_tls_addr(thread_t *thread) {
+	return thread->arch.tls_base;
+}
+
+/** Set the TLS address for a thread.
+ * @param thread	Thread to set for.
+ * @param addr		TLS address.
+ * @return		Status code describing result of the operation. */
+status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr) {
+	if(addr >= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+		return STATUS_INVALID_ADDR;
+	}
+
+	/* The IA32 ABI uses the GS segment register to access the TLS data.
+	 * Save the address to be set upon each context switch. */
+	thread->arch.tls_base = (ptr_t)addr;
+	if(thread == curr_thread) {
+		/* Update the segment base. It will be reloaded upon return to
+		 * userspace. */
+		gdt_set_base(SEGMENT_U_GS, (ptr_t)addr);
+	}
+
+	return STATUS_SUCCESS;
 }
 
 /** Clean up IA32-specific thread data.

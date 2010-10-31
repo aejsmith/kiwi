@@ -60,7 +60,7 @@
 #define STATUS_SYMLINK_LIMIT		35	/**< Exceeded nested symbolic link limit. */
 #define STATUS_IN_USE			36	/**< Object is in use. */
 #define STATUS_DEVICE_ERROR		37	/**< An error occurred during a hardware operation. */
-#define STATUS_PROCESS_RUNNING		38	/**< Process is still running. */
+#define STATUS_STILL_RUNNING		38	/**< Process/thread is still running. */
 #define STATUS_UNKNOWN_IMAGE		39	/**< Executable image has an unrecognised format. */
 #define STATUS_MALFORMED_IMAGE		40	/**< Executable image format is incorrect. */
 #define STATUS_MISSING_LIBRARY		41	/**< Required library not found. */

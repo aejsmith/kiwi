@@ -31,7 +31,11 @@ sources = map(File, [
 # always get built.
 stage1s = ['cdboot', 'pxeboot']
 for f in stage1s:
-	env.Program('%s.elf' % (f), '%s.S' % (f), LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-Ttext,0x7C00', '-Wl,-N'])
+	env.Program('%s.elf' % (f), '%s.S' % (f), LINKFLAGS=env['LINKFLAGS'] + [
+		'-Wl,-T,source/boot/platform/pc/stage1.ld',
+		'-Wl,-N'
+	])
+	Depends('%s.elf' % (f), File('stage1.ld'))
 	env.Command(f, '%s.elf' % (f), Action(
 		"$OBJCOPY -O binary --strip-all -R '.note.*' -R .comment $SOURCE $TARGET",
 		'$GENCOMSTR'

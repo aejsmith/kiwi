@@ -23,13 +23,13 @@
 
 #include <cairo/cairo.h>
 
-#include <kiwi/UI/Rect.h>
-#include <kiwi/Object.h>
+#include <kiwi/Graphics/Rect.h>
+#include <kiwi/Support/Noncopyable.h>
 
 class Window;
 
 /** Class providing a decoration for a window. */
-class Decoration : public kiwi::Object, public kiwi::internal::Noncopyable {
+class Decoration : kiwi::Noncopyable {
 public:
 	Decoration(Window *window);
 	~Decoration();

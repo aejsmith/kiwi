@@ -25,5 +25,5 @@ env.KiwiService('svcmgr',
 		'Service.cc',
 		'ServiceManager.cc'
 	],
-	libraries = ['kiwi'],
+	libraries = ['kiwi', 'kernel'],
 )

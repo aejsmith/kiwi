@@ -49,12 +49,14 @@ void MouseDevice::RegisterEvents() {
 
 /** Handle an event.
  * @param id		ID of the event. */
-void MouseDevice::EventReceived(int id) {
+void MouseDevice::HandleEvent(int id) {
+	input_event_t event;
+	status_t ret;
+
 	assert(id == DEVICE_EVENT_READABLE);
 
 	/* Read the event structure. */
-	input_event_t event;
-	status_t ret = device_read(m_handle, &event, sizeof(event), 0, NULL);
+	ret = device_read(m_handle, &event, sizeof(event), 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to read mouse event: " << ret << endl;
 		return;

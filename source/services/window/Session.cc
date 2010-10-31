@@ -39,20 +39,24 @@ Session::Session(WindowServer *server, session_id_t id) :
 	m_server(server), m_id(id), m_active(false), m_refcount(0),
 	m_next_window_id(1), m_active_window(0)
 {
+	cairo_surface_t *image;
+	cairo_t *context;
+	int w, h;
+
 	/* Create the root window. */
 	Rect rect(0, 0, m_server->GetDisplay()->GetCurrentMode().width, m_server->GetDisplay()->GetCurrentMode().height);
 	m_root = new Window(this, 0, 0, rect, WINDOW_TYPE_ROOT);
 	m_active_window = m_root;
 
 	/* Set up a Cairo context for rendering on to the root surface. */
-	cairo_t *context = cairo_create(m_root->GetSurface()->GetCairoSurface());
+	context = cairo_create(m_root->GetSurface()->GetCairoSurface());
 	if(cairo_status(context) != CAIRO_STATUS_SUCCESS) {
 		clog << "Failed to create Cairo context: " << cairo_status_to_string(cairo_status(context)) << endl;
 		throw exception();
 	}
 
 	/* Load the background image. */
-	cairo_surface_t *image = cairo_image_surface_create_from_png("/system/data/images/wallpaper.png");
+	image = cairo_image_surface_create_from_png("/system/data/images/wallpaper.png");
 	if(cairo_surface_status(image) != CAIRO_STATUS_SUCCESS) {
 		clog << "Failed to load background image: ";
 		clog << cairo_status_to_string(cairo_surface_status(image)) << endl;
@@ -60,8 +64,8 @@ Session::Session(WindowServer *server, session_id_t id) :
 	}
 
 	/* Draw the background image, scaling it if necessary. */
-	int w = cairo_image_surface_get_width(image);
-	int h = cairo_image_surface_get_height(image);
+	w = cairo_image_surface_get_width(image);
+	h = cairo_image_surface_get_height(image);
 	cairo_scale(context, static_cast<double>(m_root->GetSurface()->GetWidth()) / w,
 	            static_cast<double>(m_root->GetSurface()->GetHeight()) / h);
 	cairo_set_source_surface(context, image, 0, 0);

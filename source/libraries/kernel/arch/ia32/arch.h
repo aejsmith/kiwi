@@ -32,6 +32,9 @@
 #define ELF_ENDIAN		ELFDATA2LSB
 #define ELF_MACHINE		ELF_EM_386
 
+/** TLS settings. */
+#define TLS_VARIANT2		1	/**< Use variant II. */
+
 /* FIXME: Better place for this. */
 #define PAGE_SIZE		0x1000
 
@@ -47,5 +50,22 @@ typedef Elf32_Addr elf_addr_t;		/**< ELF address type. */
 typedef Elf32_Rel  elf_rel_t;		/**< ELF REL type. */
 typedef Elf32_Rela elf_rela_t;		/**< ELF RELA type. */
 typedef Elf32_Dyn  elf_dyn_t;		/**< ELF dynamic section type. */
+
+/** TLS thread control block. */
+typedef struct tls_tcb {
+	void *tpt;			/**< Pointer to this structure. */
+	ptr_t *dtv;			/**< Dynamic thread vector. */
+	void *base;			/**< Base address of initial TLS allocation. */
+} tls_tcb_t;
+
+/** Get a pointer to the current thread's TCB.
+ * @return		Pointer to TCB. */
+static inline tls_tcb_t *tls_tcb_get(void) {
+	unsigned long addr;
+	__asm__ volatile("movl %%gs:0, %0" : "=r"(addr));
+	return (tls_tcb_t *)addr;
+}
+
+extern void tls_tcb_init(tls_tcb_t *tcb);
 
 #endif /* __LIBKERNEL_ARCH_H */

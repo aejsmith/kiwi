@@ -21,40 +21,63 @@
 #ifndef __KIWI_HANDLE_H
 #define __KIWI_HANDLE_H
 
-#include <kernel/types.h>
-
+#include <kiwi/Support/Noncopyable.h>
+#include <kiwi/Error.h>
 #include <kiwi/Object.h>
-#include <kiwi/Signal.h>
 
 namespace kiwi {
 
 class EventLoop;
 
 /** Base class for all objects accessed through a handle. */
-class Handle : public Object, internal::Noncopyable {
+class KIWI_PUBLIC Handle : public Object, Noncopyable {
 	friend class EventLoop;
 public:
 	virtual ~Handle();
 
-	virtual void Close();
-	handle_t GetHandle() const;
+	void Close();
+	void InhibitEvents(bool inhibit);
 
-	// FIXME
-	virtual void RegisterEvents();
+	/** Get the kernel handle for this object.
+	 * @return		Kernel handle, or -1 if not currently open. Do
+	 *			NOT close the returned handle. */
+	handle_t GetHandle() const { return m_handle; }
 
+	/** Signal emitted when the handle is closed. */
 	Signal<> OnClose;
 protected:
 	Handle();
 
-	bool Wait(int event, useconds_t timeout) const;
-
 	void SetHandle(handle_t handle);
 	void RegisterEvent(int event);
 	void UnregisterEvent(int event);
+	status_t _Wait(int event, useconds_t timeout) const;
 
-	virtual void EventReceived(int id);
+	virtual void RegisterEvents();
+	virtual void HandleEvent(int event);
 
 	handle_t m_handle;		/**< Handle ID. */
+private:
+	EventLoop *m_event_loop;	/**< Event loop handling this handle. */
+};
+
+/** Base handle class with an Error object.
+ * @note		See documentation for Error for when to use this. */
+class KIWI_PUBLIC ErrorHandle : public Handle {
+public:
+	/** Get information about the last error that occurred.
+	 * @return		Reference to error object for last error. */
+	const Error &GetError() const { return m_error; }
+protected:
+	/** Set the error information.
+	 * @param code		Status code to set. */
+	void SetError(status_t code) { m_error = code; }
+
+	/** Set the error information.
+	 * @param error		Error object to set. */
+	void SetError(const Error &error) { m_error = error.GetCode(); }
+private:
+	Error m_error;			/**< Error information. */
 };
 
 }

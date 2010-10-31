@@ -101,6 +101,7 @@ env.KiwiLibrary('cairo',
 		'cairo-svg-surface.c',
 	]),
 	libraries = ['z', 'png', 'pixman', 'freetype'],
+	build_libraries = ['freetype'],
 	include_path = Dir('include'),
 	flags = {
 		'CCFLAGS': filter(lambda f: f[0:2] != '-W', env['CCFLAGS']) + [

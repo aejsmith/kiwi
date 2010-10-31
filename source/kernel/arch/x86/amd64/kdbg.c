@@ -46,8 +46,6 @@
  * @return		KDBG_OK on success, KDBG_FAIL on failure.
  */
 int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
-	KDBG_REGISTER_CHECK(name, len, regp, "gs", 2, curr_kdbg_frame->gs);
-	KDBG_REGISTER_CHECK(name, len, regp, "fs", 2, curr_kdbg_frame->fs);
 	KDBG_REGISTER_CHECK(name, len, regp, "cs", 2, curr_kdbg_frame->cs);
 	KDBG_REGISTER_CHECK(name, len, regp, "int_no", 6, curr_kdbg_frame->int_no);
 	KDBG_REGISTER_CHECK(name, len, regp, "err_code", 8, curr_kdbg_frame->err_code);
@@ -93,8 +91,8 @@ int kdbg_cmd_regs(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "cs: 0x%04" PRIxn "  ss: 0x%04" PRIxn "  gs: 0x%04" PRIxn "  fs: 0x%04" PRIxn "\n",
-	            curr_kdbg_frame->cs, curr_kdbg_frame->ss, curr_kdbg_frame->gs, curr_kdbg_frame->fs);
+	kprintf(LOG_NONE, "cs: 0x%04" PRIxn "  ss: 0x%04" PRIxn "\n",
+	            curr_kdbg_frame->cs, curr_kdbg_frame->ss);
 	kprintf(LOG_NONE, "int_no: %" PRIun "  err_code: %" PRIun "  rflags: 0x%016" PRIxn "\n",
 	            curr_kdbg_frame->int_no, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
 	kprintf(LOG_NONE, "rax: 0x%016" PRIxn "  rbx: 0x%016" PRIxn "  rcx: 0x%016" PRIxn "\n",

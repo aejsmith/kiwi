@@ -18,17 +18,15 @@
  * @brief		Rectangle class.
  */
 
-#ifndef __KIWI_UI_RECT_H
-#define __KIWI_UI_RECT_H
+#ifndef __KIWI_GRAPHICS_RECT_H
+#define __KIWI_GRAPHICS_RECT_H
 
-#include <kiwi/UI/Point.h>
-
-#include <algorithm>
+#include <kiwi/Graphics/Point.h>
 
 namespace kiwi {
 
 /** Class representing a rectangle area. */
-class Rect {
+class KIWI_PUBLIC Rect {
 public:
 	Rect() : m_left(0), m_top(0), m_right(0), m_bottom(0) {}
 
@@ -79,51 +77,32 @@ public:
 	 * @return		Point for bottom right. */
 	Point GetBottomRight() const { return Point(m_right, m_bottom); }
 
-	/** Check whether the rectangle is valid.
-	 * @return		Whether the rectangle is valid. */
-	bool IsValid() const {
-		return (GetWidth() > 0 && GetHeight() > 0);
+	bool IsValid() const;
+	bool Contains(const Point &point) const;
+	bool Intersects(const Rect &rect) const;
+	void Intersect(const Rect &rect);
+	Rect Intersected(const Rect &rect) const;
+	void Adjust(int dx1, int dy1, int dx2, int dy2);
+	Rect Adjusted(int dx1, int dy1, int dx2, int dy2) const;
+	void Translate(int dx, int dy);
+	Rect Translated(int dx, int dy) const;
+	void MoveTo(int x, int y);
+	void MoveTo(const Point &pos);
+
+	/** Intersect with another rectangle.
+	 * @see			Intersected().
+	 * @param rect		Rectangle to intersect with.
+	 * @return		Intersected rectangle. */
+	Rect operator &(const Rect &rect) const {
+		return Intersected(rect);
 	}
 
-	/** Check whether a point lies within the rectangle.
-	 * @param point		Point to check. */
-	bool Contains(const Point &point) const {
-		if(point.GetX() >= m_left && point.GetX() < m_right &&
-		   point.GetY() >= m_top && point.GetY() < m_bottom) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	/** Get the area where the rectangle intersects with another.
-	 * @param other		Rectangle to intersect with.
-	 * @return		Intersection rectangle. */
-	Rect Intersect(const Rect &rect) const {
-		Point tl(std::max(m_left, rect.m_left), std::max(m_top, rect.m_top));
-		Point br(std::min(m_right, rect.m_right), std::min(m_bottom, rect.m_bottom));
-		return Rect(tl, br);
-	}
-
-	/** Adjust the rectangle size.
-	 * @param dx1		Value to add to top left X position.
-	 * @param dy1		Value to add to top left Y position.
-	 * @param dx2		Value to add to bottom right X position.
-	 * @param dy2		Value to add to bottom right Y position. */
-	void Adjust(int dx1, int dy1, int dx2, int dy2) {
-		m_left += dx1;
-		m_top += dy1;
-		m_right += dx2;
-		m_bottom += dy2;
-	}
-
-	/** Move the rectangle.
-	 * @param pos		New position. */
-	void MoveTo(const Point &pos) {
-		m_right = pos.GetX() + GetWidth();
-		m_bottom = pos.GetY() + GetHeight();
-		m_left = pos.GetX();
-		m_top = pos.GetY();
+	/** Intersect with another rectangle.
+	 * @see			Intersect().
+	 * @param rect		Rectangle to intersect with. */
+	Rect &operator &=(const Rect &rect) {
+		Intersect(rect);
+		return *this;
 	}
 private:
 	int m_left;			/**< X position of top left. */
@@ -134,4 +113,4 @@ private:
 
 }
 
-#endif /* __KIWI_UI_RECT_H */
+#endif /* __KIWI_GRAPHICS_RECT_H */

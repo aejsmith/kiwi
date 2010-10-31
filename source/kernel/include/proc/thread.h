@@ -30,6 +30,7 @@
 #include <kernel/thread.h>
 
 #include <lib/list.h>
+#include <lib/notifier.h>
 #include <lib/refcount.h>
 
 #include <sync/spinlock.h>
@@ -108,6 +109,8 @@ typedef struct thread {
 	/** Other thread information. */
 	thread_id_t id;			/**< ID of the thread. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
+	notifier_t death_notifier;	/**< Notifier for thread death. */
+	int status;			/**< Exit status of the thread. */
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;
@@ -121,6 +124,8 @@ typedef struct thread {
 
 extern void thread_arch_post_switch(thread_t *thread);
 extern status_t thread_arch_init(thread_t *thread);
+extern ptr_t thread_arch_tls_addr(thread_t *thread);
+extern status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr);
 extern void thread_arch_destroy(thread_t *thread);
 extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
 

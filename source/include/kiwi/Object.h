@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,29 +21,25 @@
 #ifndef __KIWI_OBJECT_H
 #define __KIWI_OBJECT_H
 
+#include <kiwi/Signal.h>
+
 namespace kiwi {
-namespace internal {
 
-/** Base class that prevents derived classes from being copied. */
-class Noncopyable {
-protected:
-	Noncopyable() {}
-	~Noncopyable() {}
-private:
-	Noncopyable(const Noncopyable &);
-	const Noncopyable &operator =(const Noncopyable &);
-};
-
-}
+struct ObjectPrivate;
 
 /** Base class for an API object. */
-class Object {
+class KIWI_PUBLIC Object {
 public:
 	virtual ~Object();
 
 	void DeleteLater();
+
+	void AddSlot(internal::SignalImpl::Slot *slot);
+	void RemoveSlot(internal::SignalImpl::Slot *slot);
 protected:
 	Object();
+private:
+	ObjectPrivate *m_priv;		/**< Internal data for the object. */
 };
 
 }

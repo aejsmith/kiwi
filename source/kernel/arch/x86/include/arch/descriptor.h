@@ -22,25 +22,26 @@
 #define __ARCH_DESCRIPTOR_H
 
 #ifndef LOADER
-# ifdef __x86_64__
-#  define GDT_ENTRY_COUNT	9	/**< Total number of GDT descriptors. */
+# if __x86_64__
+#  define GDT_ENTRY_COUNT	7	/**< Total number of GDT entries. */
 # else
-#  define GDT_ENTRY_COUNT	7	/**< Total number of GDT descriptors. */
+#  define GDT_ENTRY_COUNT	8	/**< Total number of GDT entries. */
 # endif
-# define IDT_ENTRY_COUNT	256	/**< Total number of IDT descriptors. */
+# define IDT_ENTRY_COUNT	256	/**< Total number of IDT entries. */
 # if __x86_64__
 #  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
 #  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
 #  define SEGMENT_U_DS		0x18	/**< User data segment. */
 #  define SEGMENT_U_CS		0x20	/**< User code segment. */
-#  define SEGMENT_TSS		0x28	/**< TSS segment. */
+#  define SEGMENT_TSS		0x28	/**< TSS segment (takes up 2 entries). */
 # else
 #  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
 #  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
 #  define SEGMENT_U_CS		0x18	/**< User code segment. */
 #  define SEGMENT_U_DS		0x20	/**< User data segment. */
-#  define SEGMENT_TSS		0x28	/**< TSS segment. */
-#  define SEGMENT_DF_TSS	0x30	/**< Double fault TSS segment. */
+#  define SEGMENT_U_GS		0x28	/**< User GS (TLS) segment. */
+#  define SEGMENT_TSS		0x30	/**< TSS segment. */
+#  define SEGMENT_DF_TSS	0x38	/**< Double fault TSS segment. */
 # endif
 #endif
 
@@ -193,6 +194,7 @@ static inline void lidt(ptr_t base, uint16_t limit) {
 
 #ifndef LOADER
 #ifndef __x86_64__
+extern void gdt_set_base(int sel, ptr_t base);
 extern void tss_init(void);
 #endif
 extern void descriptor_init(void);

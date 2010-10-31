@@ -26,15 +26,22 @@
 #include <cstdlib>
 
 #include "org.kiwi.ServiceManager.h"
+#include "Internal.h"
 
 using namespace kiwi;
 using namespace org::kiwi::ServiceManager;
 
 /** Constructor for IPCConnection.
- * @param handle	Handle ID (default is -1, which means the object will
- *			not refer to a handle). */
+ * @param handle	If not negative, an existing connection handle to make
+ *			the object use. Must refer to a connection object. */
 IPCConnection::IPCConnection(handle_t handle) {
-	SetHandle(handle);
+	if(handle >= 0) {
+		if(unlikely(object_type(handle) != OBJECT_TYPE_CONNECTION)) {
+			libkiwi_fatal("IPCConnection::IPCConnection: Handle must refer to a connection object.");
+		}
+
+		SetHandle(handle);
+	}
 }
 
 /** Connect to a port.
@@ -45,16 +52,18 @@ IPCConnection::IPCConnection(handle_t handle) {
  *
  * @param id		Port ID to connect to.
 
- * @throw IPCError	Thrown if unable to connect.
+ * @return		True if succeeded in connecting, false if not.
  */
-void IPCConnection::Connect(port_id_t id) {
+bool IPCConnection::Connect(port_id_t id) {
 	handle_t handle;
 	status_t ret = ipc_connection_open(id, &handle);
-	if(ret != STATUS_SUCCESS) {
-		throw IPCError(ret);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return false;
 	}
 
 	SetHandle(handle);
+	return true;
 }
 
 /** Connect to a port.
@@ -65,9 +74,9 @@ void IPCConnection::Connect(port_id_t id) {
  *
  * @param name		Port name to connect to.
  *
- * @throw IPCError	Thrown if unable to connect.
+ * @return		True if succeeded in connecting, false if not.
  */
-void IPCConnection::Connect(const char *name) {
+bool IPCConnection::Connect(const char *name) {
 	port_id_t id;
 
 	/* Work out the service manager port ID. The ID of the session's
@@ -80,12 +89,21 @@ void IPCConnection::Connect(const char *name) {
 	}
 
 	/* Look up the port ID. */
-	{
-		ServerConnection svcmgr(id);
+	try {
+		ServerConnection svcmgr;
+		svcmgr.Connect(id);
+
 		status_t ret = svcmgr.LookupPort(name, id);
-		if(ret != STATUS_SUCCESS) {
-			throw IPCError(ret);
+		if(unlikely(ret != STATUS_SUCCESS)) {
+			SetError(ret);
+			return false;
 		}
+	} catch(Error &e) {
+		SetError(e);
+		return false;
+	} catch(RPCError &e) {
+		SetError(STATUS_DEST_UNREACHABLE);
+		return false;
 	}
 
 	return Connect(id);
@@ -95,12 +113,15 @@ void IPCConnection::Connect(const char *name) {
  * @param type		Type ID of message to send.
  * @param buf		Data buffer to send.
  * @param size		Size of data buffer.
- * @throw IPCError	Thrown if unable to send. */
-void IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
+ * @return		Whether sending the message succeeded. */
+bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
 	status_t ret = ipc_message_send(m_handle, type, buf, size);
-	if(ret != STATUS_SUCCESS) {
-		throw IPCError(ret);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return false;
 	}
+
+	return true;
 }
 
 /** Receive a message from a port.
@@ -112,23 +133,22 @@ void IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
  *			until a message is received, and a timeout of 0 will
  *			return immediately if no messages are waiting to be
  *			received.
- * @return		True if message received within the timeout, false if
- *			the timeout expired.
- * @throw IPCError	If any error other than timing out occurred. */
+ * @return		True if message received, false if an error occurred. */
 bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
-	status_t ret = ipc_message_peek(m_handle, timeout, &type, &size);
-	if(ret != STATUS_SUCCESS) {
-		if(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
-			return false;
-		}
-		throw IPCError(ret);
+	status_t ret;
+
+	ret = ipc_message_peek(m_handle, timeout, &type, &size);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return false;
 	}
 
 	data = new char[size];
 	ret = ipc_message_receive(m_handle, 0, 0, data, size);
-	if(ret != STATUS_SUCCESS) {
+	if(unlikely(ret != STATUS_SUCCESS)) {
 		delete[] data;
-		throw IPCError(ret);
+		SetError(ret);
+		return false;
 	}
 
 	return true;
@@ -141,7 +161,7 @@ bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_
  *			already hung up.
  * @return		True if successful, false if the timeout expired. */
 bool IPCConnection::WaitForHangup(useconds_t timeout) const {
-	return Wait(CONNECTION_EVENT_HANGUP, timeout);
+	return (_Wait(CONNECTION_EVENT_HANGUP, timeout) == STATUS_SUCCESS);
 }
 
 /** Register events with the event loop. */
@@ -151,9 +171,9 @@ void IPCConnection::RegisterEvents() {
 }
 
 /** Handle an event on the connection.
- * @param id		Event ID. */
-void IPCConnection::EventReceived(int id) {
-	switch(id) {
+ * @param event		Event ID. */
+void IPCConnection::HandleEvent(int event) {
+	switch(event) {
 	case CONNECTION_EVENT_HANGUP:
 		OnHangup();
 		break;

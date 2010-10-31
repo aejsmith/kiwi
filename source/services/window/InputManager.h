@@ -21,12 +21,12 @@
 #ifndef __INPUTMANAGER_H
 #define __INPUTMANAGER_H
 
-#include <kiwi/Object.h>
+#include <kiwi/Support/Noncopyable.h>
 
 class WindowServer;
 
 /** Class managing input devices. */
-class InputManager : public kiwi::internal::Noncopyable {
+class InputManager : kiwi::Noncopyable {
 public:
 	InputManager(WindowServer *server);
 private:

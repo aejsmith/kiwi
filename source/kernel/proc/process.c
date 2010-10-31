@@ -77,6 +77,7 @@ typedef struct process_create {
 	int status;			/**< Status code to return from the call. */
 } process_create_t;
 
+extern void sys_process_loaded(void);
 static object_type_t process_object_type;
 
 /** Tree of all processes. */
@@ -1113,7 +1114,8 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 		goto fail;
 	}
 
-	/* Create and run the entry thread. */
+	/* Create and run the entry thread. The TLS address for the new thread
+	 * is set to that of the current thread. */
 	args = kmalloc(sizeof(*args), MM_SLEEP);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
@@ -1122,6 +1124,7 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
+	thread_arch_set_tls_addr(thread, thread_arch_tls_addr(curr_thread));
 	thread_run(thread);
 	object_security_destroy(&ksecurity);
 	return STATUS_SUCCESS;
@@ -1307,7 +1310,7 @@ status_t sys_process_status(handle_t handle, int *statusp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(curr_proc, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -1315,7 +1318,7 @@ status_t sys_process_status(handle_t handle, int *statusp) {
 
 	if(process->state != PROCESS_DEAD) {
 		object_handle_release(khandle);
-		return STATUS_PROCESS_RUNNING;
+		return STATUS_STILL_RUNNING;
 	}
 
 	ret = memcpy_to_user(statusp, &process->status, sizeof(int));

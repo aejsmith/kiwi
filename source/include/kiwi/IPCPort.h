@@ -28,24 +28,29 @@
 
 namespace kiwi {
 
-/** Class implementing an IPC port. */
-class IPCPort : public Handle {
+/** Class implementing an IPC port.
+ * @todo		Separate Listen, Accept and Reject functions. */
+class KIWI_PUBLIC IPCPort : public ErrorHandle {
 public:
 	IPCPort(handle_t handle = -1);
 
-	void Create();
-	void Open(port_id_t id);
+	bool Create();
+	bool Open(port_id_t id);
 	
-	bool Listen(IPCConnection *&conn, useconds_t timeout = -1) const;
-	handle_t Listen(ipc_client_info_t *infop = 0, useconds_t timeout = -1) const;
+	bool Listen(IPCConnection *&conn, useconds_t timeout = -1);
+	handle_t Listen(ipc_client_info_t *infop = 0, useconds_t timeout = -1);
 	port_id_t GetID() const;
 
-	// FIXME
-	void RegisterEvents();
-
+	/** Signal emitted when a connection is received.
+	 * @note		Does not actually accept the connection: you
+	 *			must call Listen() in your handler function.
+	 *			If the connection is not listened for, this
+	 *			signal will be repeatedly emitted until it is,
+	 *			or until the connection attempt is cancelled. */
 	Signal<> OnConnection;
 private:
-	void EventReceived(int id);
+	void RegisterEvents();
+	void HandleEvent(int event);
 };
 
 }

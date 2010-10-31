@@ -21,7 +21,8 @@
 #ifndef __WINDOW_H
 #define __WINDOW_H
 
-#include <kiwi/UI/Rect.h>
+#include <kiwi/Graphics/Rect.h>
+#include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
 
 #include "org.kiwi.WindowServer.h"
@@ -45,7 +46,7 @@ enum window_type {
 };
 
 /** Class implementing a window. */
-class Window : public kiwi::Object, public kiwi::internal::Noncopyable {
+class Window : public kiwi::Object, kiwi::Noncopyable {
 public:
 	/** Type of a window's ID. */
 	typedef org::kiwi::WindowServer::WindowID ID;

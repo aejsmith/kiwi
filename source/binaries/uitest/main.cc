@@ -30,6 +30,7 @@
 #include <kernel/status.h>
 #include <kernel/thread.h>
 
+#include <kiwi/Support/Utility.h>
 #include <kiwi/EventLoop.h>
 
 #include <algorithm>
@@ -39,16 +40,8 @@
 #include "org.kiwi.WindowServer.h"
 
 using namespace org::kiwi::WindowServer;
+using namespace kiwi;
 using namespace std;
-
-template <typename T>
-static inline T p2align(T n, int alignment) {
-	if(n % alignment) {
-		n += alignment;
-		n -= n % alignment;
-	}
-	return n;
-}
 
 ServerConnection *g_conn;
 
@@ -225,6 +218,7 @@ int main(int argc, char **argv) {
 	kiwi::EventLoop loop;
 
 	g_conn = new ServerConnection;
+	g_conn->Connect();
 	Window window1("Test Window 1", 750, 350, 256, 256, draw_pattern2);
 	if(!window1.Inited()) {
 		return 1;

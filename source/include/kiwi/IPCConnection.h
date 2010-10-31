@@ -26,30 +26,30 @@
 
 namespace kiwi {
 
-/** Exception class providing details of an IPC error. */
-class IPCError : public OSError {
-public:
-	IPCError(status_t code) : OSError(code) {}
-};
-
 /** Class implementing an IPC connection. */
-class IPCConnection : public Handle {
+class KIWI_PUBLIC IPCConnection : public ErrorHandle {
 public:
 	IPCConnection(handle_t handle = -1);
 
-	void Connect(port_id_t id);
-	void Connect(const char *name);
+	bool Connect(port_id_t id);
+	bool Connect(const char *name);
 
-	void Send(uint32_t type, const void *buf, size_t size);
+	bool Send(uint32_t type, const void *buf, size_t size);
 	bool Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout = -1);
 
 	bool WaitForHangup(useconds_t timeout = -1) const;
 
+	/** Signal emitted when a message is received on the connection.
+	 * @note		The handler must call Receive() to get the
+	 *			message itself. If it does not, this signal
+	 *			will be repeatedly emitted until it is. */
 	Signal<> OnMessage;
+
+	/** Signal emitted when the remote end of the connection hangs up. */
 	Signal<> OnHangup;
-protected:
+private:
 	void RegisterEvents();
-	void EventReceived(int id);
+	void HandleEvent(int id);
 };
 
 }

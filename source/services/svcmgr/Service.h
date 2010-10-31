@@ -58,8 +58,8 @@ public:
 	 * @return		State of the service. */
 	State GetState() const { return m_state; }
 
-	/** Get a reference to the port list.
-	 * @return		Reference to the port list. */
+	/** Get the service's port.
+	 * @return		Pointer to service's port. */
 	Port *GetPort() const { return m_port; }
 private:
 	static void StartHelper(void *data);

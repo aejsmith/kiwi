@@ -15,18 +15,24 @@
 
 /**
  * @file
- * @brief		Internal libkiwi logging functions.
+ * @brief		Internal libkiwi definitions.
  */
 
-#ifndef __LOG_H
-#define __LOG_H
+#ifndef __INTERNAL_H
+#define __INTERNAL_H
+
+#include <kiwi/CoreDefs.h>
+
+/** Compiler attribute/builtin macros. */
+#define likely(x)		__builtin_expect(!!(x), 1)
+#define unlikely(x)		__builtin_expect(!!(x), 0)
 
 #if CONFIG_DEBUG
-extern void libkiwi_debug(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void libkiwi_debug(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
 #else
 static inline void libkiwi_debug(const char *fmt, ...) {};
 #endif
-extern void libkiwi_warn(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-extern void libkiwi_fatal(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern void libkiwi_warn(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
+extern void libkiwi_fatal(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
 
-#endif /* __LOG_H */
+#endif /* __INTERNAL_H */

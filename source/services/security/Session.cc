@@ -61,7 +61,7 @@ Session::Session(SecurityServer *server, uint32_t perms) :
 	status_t ret = process_create(args[0], args, env, PROCESS_CREATE_SESSION, NULL,
 	                              map, 3, NULL, PROCESS_QUERY, &handle);
 	if(ret != STATUS_SUCCESS) {
-		throw ProcessError(ret);
+		throw Error(ret);
 	}
 
 	/* Save the session ID. */

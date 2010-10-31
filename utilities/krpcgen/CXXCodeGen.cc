@@ -169,9 +169,7 @@ void CXXCodeGen::GenerateClientHeader(Service *service, std::ofstream &stream) {
 	/* Write out the ServerConnection class definition. */
 	stream << "class ServerConnection : public ::kiwi::RPCServerConnection {" << endl;
 	stream << "public:" << endl;
-	stream << "	ServerConnection();" << endl;
-	stream << "	ServerConnection(port_id_t id);" << endl;
-	stream << "	ServerConnection(handle_t handle, bool);" << endl;
+	stream << "	ServerConnection(handle_t handle = -1);" << endl;
 	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
 		stream << "	status_t " << func->GetName() << '(';
 		stream << GetFunctionParams(func) << ");" << endl;
@@ -200,16 +198,10 @@ void CXXCodeGen::GenerateClientCode(Service *service, std::ofstream &stream) {
 		GenerateClientCode(child, stream);
 	}
 
-	/* Generate the constructors. */
-	stream << "ServerConnection::ServerConnection() : ::kiwi::RPCServerConnection(";
+	/* Generate the constructor. */
+	stream << "ServerConnection::ServerConnection(handle_t handle) : ::kiwi::RPCServerConnection(";
 	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
-	stream << ") {}" << endl;
-	stream << "ServerConnection::ServerConnection(port_id_t id) : ::kiwi::RPCServerConnection(";
-	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
-	stream << ", id) {}" << endl;
-	stream << "ServerConnection::ServerConnection(handle_t handle, bool) : ::kiwi::RPCServerConnection(";
-	stream << '"' << service->GetFullName() << "\", " << service->GetVersion();
-	stream << ", -1, handle) {}" << endl;
+	stream << ", handle) {}" << endl;
 
 	/* Generate the function calls. */
 	BOOST_FOREACH(const Function *func, service->GetFunctions()) {
@@ -247,9 +239,8 @@ void CXXCodeGen::GenerateClientCode(Service *service, std::ofstream &stream) {
 		stream << "	}" << endl;
 	}
 	stream << "	default: {" << endl;
-	stream << "		std::stringstream __msg;" << endl;
-	stream << "		__msg << \"Received unknown event ID \" << __id;" << endl;
-	stream << "		throw ::kiwi::RPCError(__msg.str());" << endl;
+	stream << "		::kiwi::RPCServerConnection::HandleEvent(__id, __buf);" << endl;
+	stream << "		break;" << endl;
 	stream << "	}" << endl;
 	stream << "	}" << endl;
 	stream << '}' << endl;

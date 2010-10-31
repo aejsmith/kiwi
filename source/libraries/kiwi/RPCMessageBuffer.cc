@@ -74,70 +74,70 @@ void RPCMessageBuffer::Reset(char *buf, size_t size) {
 RPCMessageBuffer &RPCMessageBuffer::operator <<(bool val) {
 	/* Ensure that bool is kept a standard size across machines. */
 	uint8_t rval = static_cast<uint8_t>(val);
-	PushEntry(TYPE_BOOL, rval);
+	PushEntry(kBoolType, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(const std::string &str) {
-	PushEntry(TYPE_STRING, str.c_str(), str.length());
+	PushEntry(kStringType, str.c_str(), str.length());
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(RPCByteString &bytes) {
-	PushEntry(TYPE_BYTES, bytes.first, bytes.second);
+	PushEntry(kBytesType, bytes.data, bytes.size);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int8_t val) {
-	PushEntry(TYPE_INT8, val);
+	PushEntry(kInt8Type, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int16_t val) {
 	int16_t rval = cpu_to_le16(val);
-	PushEntry(TYPE_INT16, rval);
+	PushEntry(kInt16Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int32_t val) {
 	int32_t rval = cpu_to_le32(val);
-	PushEntry(TYPE_INT32, rval);
+	PushEntry(kInt32Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(int64_t val) {
 	int64_t rval = cpu_to_le64(val);
-	PushEntry(TYPE_INT64, rval);
+	PushEntry(kInt64Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint8_t val) {
-	PushEntry(TYPE_UINT8, val);
+	PushEntry(kUint8Type, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint16_t val) {
 	uint16_t rval = cpu_to_le16(val);
-	PushEntry(TYPE_UINT16, rval);
+	PushEntry(kUint16Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint32_t val) {
 	uint32_t rval = cpu_to_le32(val);
-	PushEntry(TYPE_UINT32, rval);
+	PushEntry(kUint32Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator <<(uint64_t val) {
 	uint64_t rval = cpu_to_le64(val);
-	PushEntry(TYPE_UINT64, rval);
+	PushEntry(kUint64Type, rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(bool &val) {
 	/* Boolean is transmitted as uint8_t. */
 	uint8_t rval;
-	PopEntry(TYPE_BOOL, rval);
+	PopEntry(kBoolType, rval);
 	val = static_cast<bool>(rval);
 	return *this;
 }
@@ -145,7 +145,7 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(bool &val) {
 RPCMessageBuffer &RPCMessageBuffer::operator >>(std::string &str) {
 	const char *buf;
 	size_t size;
-	PopEntry(TYPE_STRING, buf, size);
+	PopEntry(kStringType, buf, size);
 	str = std::string(buf, size);
 	return *this;
 }
@@ -153,59 +153,59 @@ RPCMessageBuffer &RPCMessageBuffer::operator >>(std::string &str) {
 RPCMessageBuffer &RPCMessageBuffer::operator >>(RPCByteString &bytes) {
 	const char *buf;
 	size_t size;
-	PopEntry(TYPE_BYTES, buf, size);
+	PopEntry(kBytesType, buf, size);
 	bytes = RPCByteString(buf, size);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int8_t &val) {
-	PopEntry(TYPE_INT8, val);
+	PopEntry(kInt8Type, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int16_t &val) {
 	int16_t rval;
-	PopEntry(TYPE_INT16, rval);
+	PopEntry(kInt16Type, rval);
 	val = le16_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int32_t &val) {
 	int32_t rval;
-	PopEntry(TYPE_INT32, rval);
+	PopEntry(kInt32Type, rval);
 	val = le32_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(int64_t &val) {
 	int64_t rval;
-	PopEntry(TYPE_INT64, rval);
+	PopEntry(kInt64Type, rval);
 	val = le64_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint8_t &val) {
-	PopEntry(TYPE_UINT8, val);
+	PopEntry(kUint8Type, val);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint16_t &val) {
 	uint16_t rval;
-	PopEntry(TYPE_UINT16, rval);
+	PopEntry(kUint16Type, rval);
 	val = le16_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint32_t &val) {
 	uint32_t rval;
-	PopEntry(TYPE_UINT32, rval);
+	PopEntry(kUint32Type, rval);
 	val = le32_to_cpu(rval);
 	return *this;
 }
 
 RPCMessageBuffer &RPCMessageBuffer::operator >>(uint64_t &val) {
 	uint64_t rval;
-	PopEntry(TYPE_UINT64, rval);
+	PopEntry(kUint64Type, rval);
 	val = le64_to_cpu(rval);
 	return *this;
 }

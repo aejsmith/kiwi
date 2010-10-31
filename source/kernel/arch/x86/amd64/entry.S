@@ -42,17 +42,10 @@
 	push	%r13
 	push	%r14
 	push	%r15
-
-	push	%fs
-	andl	$0xFFFF, (%rsp)
-	push	%gs
-	andl	$0xFFFF, (%rsp)
 .endm
 
 /** Pop registers from the stack. */
 .macro POP_REGS
-	pop	%gs
-	pop	%fs
 	pop	%r15
 	pop	%r14
 	pop	%r13
@@ -141,12 +134,6 @@ PRIVATE_FUNCTION_START(isr_common)
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
-	/* Set sane segment descriptors. */
-	mov	$SEGMENT_K_DS, %ax
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %ss
-
 	/* Clear direction flag. */
 	cld
 
@@ -164,8 +151,8 @@ FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */
 FUNCTION_START(syscall_entry)
-	/* Switch to the kernel mode stack. The GS_BASE MSR points to the
-	 * thread's architecture-specific data. Use the SWAPGS instruction
+	/* Switch to the kernel mode stack. The KERNEL_GS_BASE MSR points to
+	 * the thread's architecture-specific data. Use the SWAPGS instruction
 	 * to get at it, so we can get our stack pointer. The userspace RSP
 	 * field is not used in returning - it is merely a temporary scratch
 	 * space we use before we push it onto the stack for the system call
@@ -175,15 +162,11 @@ FUNCTION_START(syscall_entry)
 	movq	%gs:0, %rsp
 
 	/* Get back the userspace stack pointer from the temporary scratch
-	 * space and put it onto the kernel stack (at the top of the system
-	 * call frame). */
+	 * space and put it onto the kernel stack. */
 	push	%gs:8
 
-	/* Return to the previous GS value. */
+	/* Return to the previous GS base. */
 	swapgs
-
-	/* Clear direction flag. */
-	cld
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (RAX = return IP, R11 = original RFLAGS). */
@@ -313,11 +296,6 @@ FUNCTION_START(thread_arch_enter_userspace)
 	push	$(X86_FLAGS_IF | X86_FLAGS_ALWAYS1)
 	push	$(SEGMENT_U_CS | 0x03)
 	push	%rdi
-	
-	/* Set other segment registers. */
-	mov	$(SEGMENT_U_DS | 0x03), %ax
-	mov	%ax, %ds
-	mov	%ax, %es
 
 	/* Move argument to RDI. */
 	movq	%rdx, %rdi

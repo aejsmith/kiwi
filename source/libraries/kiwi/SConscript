@@ -25,14 +25,20 @@ env.KiwiLibrary('kiwi',
 		'Handle.cc',
 		'IPCConnection.cc',
 		'IPCPort.cc',
-		'log.cc',
+		'Log.cc',
 		'Object.cc',
 		'Process.cc',
 		'RPCClientConnection.cc',
 		'RPCMessageBuffer.cc',
 		'RPCServerConnection.cc',
+		'Signal.cc',
+		'Thread.cc',
 	],
+	libraries = ['kernel'],
+	flags = {
+		'CCFLAGS': env['CCFLAGS'] + ['-fvisibility=hidden'],
+	},
 )
 
 # Build the additional libraries.
-SConscript(dirs=['Service', 'UI'], exports=['env'])
+SConscript(dirs=['Graphics', 'Service'], exports=['env'])

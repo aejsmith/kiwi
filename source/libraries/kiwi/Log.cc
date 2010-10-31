@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "log.h"
+#include "Internal.h"
 
 /** Print out a message.
  * @param stream	Stream to print to.
@@ -35,6 +35,7 @@ static void do_log_message(FILE *stream, const char *prefix, const char *fmt,
                            va_list args, bool terminate) {
 	fprintf(stream, "*** libkiwi-%s: ", prefix);
 	vfprintf(stream, fmt, args);
+	fprintf(stream, "\n");
 	if(terminate) {
 		abort();
 	}

@@ -23,24 +23,38 @@
 
 #include <kiwi/EventLoop.h>
 
-#include <cstring>
+#include <list>
+#include <vector>
 
-#include "log.h"
+#include "Internal.h"
 
 using namespace kiwi;
 using namespace std;
 
-/** Pointer to the current thread's event loop.
- * @todo		Move this to TLS. */
-static EventLoop *event_loop_instance = 0;
+/** Internal data for EventLoop. */
+struct kiwi::EventLoopPrivate {
+	std::list<Object *> to_delete;		/**< Objects to delete when control returns to the loop. */
+	std::vector<object_event_t> events;	/**< Array of events to wait for. */
+	std::vector<Handle *> handles;		/**< Array of handle objects (used for callbacks). */
+};
+
+/** Pointer to the current thread's event loop. */
+static __thread EventLoop *event_loop_instance = 0;
 
 /** EventLoop constructor. */
 EventLoop::EventLoop() {
-	if(Instance()) {
-		libkiwi_fatal("EventLoop::EventLoop: Can only have 1 event loop per thread.\n");
+	if(event_loop_instance) {
+		libkiwi_fatal("EventLoop::EventLoop: Can only have 1 event loop per thread.");
 	}
 
+	m_priv = new EventLoopPrivate;
 	event_loop_instance = this;
+}
+
+/** EventLoop destructor. */
+EventLoop::~EventLoop() {
+	delete m_priv;
+	event_loop_instance = 0;
 }
 
 /** Add an event to the event loop.
@@ -48,18 +62,18 @@ EventLoop::EventLoop() {
  * @param event		Event to wait for. */
 void EventLoop::AddEvent(Handle *handle, int event) {
 	object_event_t _event = { handle->GetHandle(), event, false };
-	m_events.push_back(_event);
-	m_handles.push_back(handle);
+	m_priv->events.push_back(_event);
+	m_priv->handles.push_back(handle);
 }
 
 /** Remove an event from the event loop.
  * @param handle	Handle to event is from.
  * @param event		Event that should be removed. */
 void EventLoop::RemoveEvent(Handle *handle, int event) {
-	for(size_t i = 0; i < m_handles.size(); ) {
-		if(m_handles[i] == handle && m_events[i].event == event) {
-			m_handles.erase(m_handles.begin() + i);
-			m_events.erase(m_events.begin() + i);
+	for(size_t i = 0; i < m_priv->handles.size(); ) {
+		if(m_priv->handles[i] == handle && m_priv->events[i].event == event) {
+			m_priv->handles.erase(m_priv->handles.begin() + i);
+			m_priv->events.erase(m_priv->events.begin() + i);
 		} else {
 			i++;
 		}
@@ -69,20 +83,14 @@ void EventLoop::RemoveEvent(Handle *handle, int event) {
 /** Removes all events for a handle.
  * @param handle	Handle to remove. */
 void EventLoop::RemoveHandle(Handle *handle) {
-	for(size_t i = 0; i < m_handles.size(); ) {
-		if(m_handles[i] == handle) {
-			m_handles.erase(m_handles.begin() + i);
-			m_events.erase(m_events.begin() + i);
+	for(size_t i = 0; i < m_priv->handles.size(); ) {
+		if(m_priv->handles[i] == handle) {
+			m_priv->handles.erase(m_priv->handles.begin() + i);
+			m_priv->events.erase(m_priv->events.begin() + i);
 		} else {
 			i++;
 		}
 	}
-}
-
-/** Register an object to be deleted when control returns to the event loop.
- * @param obj		Object to delete. */
-void EventLoop::DeleteObject(Object *obj) {
-	m_to_delete.push_back(obj);
 }
 
 /** Run the event loop. */
@@ -90,21 +98,26 @@ void EventLoop::Run(void) {
 	while(true) {
 		/* Delete objects scheduled for deletion. */
 		list<Object *>::iterator it;
-		while((it = m_to_delete.begin()) != m_to_delete.end()) {
+		while((it = m_priv->to_delete.begin()) != m_priv->to_delete.end()) {
 			delete *it;
-			m_to_delete.erase(it);
+			m_priv->to_delete.erase(it);
+		}
+
+		/* If we have nothing to do, exit. */
+		if(!m_priv->handles.size()) {
+			return;
 		}
 
 		/* Wait for any of the events. */
-		status_t ret = object_wait(&m_events[0], m_handles.size(), -1);
-		if(ret != STATUS_SUCCESS) {
-			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d\n", ret);
+		status_t ret = object_wait(&m_priv->events[0], m_priv->handles.size(), -1);
+		if(unlikely(ret != STATUS_SUCCESS)) {
+			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d", ret);
 		}
 
 		/* Signal each handle an event occurred on. */
-		for(size_t i = 0; i < m_events.size(); i++) {
-			if(m_events[i].signalled) {
-				m_handles[i]->EventReceived(m_events[i].event);
+		for(size_t i = 0; i < m_priv->events.size(); i++) {
+			if(m_priv->events[i].signalled) {
+				m_priv->handles[i]->HandleEvent(m_priv->events[i].event);
 			}
 		}
 	}
@@ -115,4 +128,10 @@ void EventLoop::Run(void) {
  *			the thread does not have an event loop. */
 EventLoop *EventLoop::Instance() {
 	return event_loop_instance;
+}
+
+/** Register an object to be deleted when control returns to the event loop.
+ * @param obj		Object to delete. */
+void EventLoop::DeleteObject(Object *obj) {
+	m_priv->to_delete.push_back(obj);
 }

@@ -131,6 +131,84 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
 	return STATUS_MISSING_LIBRARY;
 }
 
+/** Handle an ELF_PT_LOAD program header.
+ * @param image		Image being loaded.
+ * @param phdr		Program header.
+ * @param handle	Handle to the file.
+ * @param path		Path to the file.
+ * @param i		Index of the program header.
+ * @return		Status code describing result of the operation. */
+static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t handle,
+                             const char *path, size_t i) {
+	elf_addr_t start, end;
+	offset_t offset;
+	int flags = 0;
+	status_t ret;
+	size_t size;
+
+	/* Work out the flags to map with. */
+	flags |= ((phdr->p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
+	flags |= ((phdr->p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
+	flags |= ((phdr->p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
+	if(!flags) {
+		dprintf("rtld: %s: program header %zu has no protection flags\n", path, i);
+		return STATUS_MALFORMED_IMAGE;
+	}
+
+	/* Set the fixed flag, and the private flag if mapping as writeable. */
+	flags |= VM_MAP_FIXED;
+	if(phdr->p_flags & ELF_PF_W) {
+		flags |= VM_MAP_PRIVATE;
+	}
+
+	/* Map the BSS if required. */
+	if(phdr->p_memsz > phdr->p_filesz) {
+		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+		end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_memsz, PAGE_SIZE);
+		size = end - start;
+
+		/* Must be writable to be able to clear later. */
+		if(!(flags & VM_MAP_WRITE)) {
+			dprintf("rtld: %s: program header %zu should be writable\n", path, i);
+			return STATUS_MALFORMED_IMAGE;
+		}
+
+		/* Create an anonymous region for it. */
+		ret = vm_map((void *)start, size, flags, -1, 0, NULL);
+		if(ret != STATUS_SUCCESS) {
+			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n", path, ret);
+			return ret;
+		}
+	}
+
+	if(phdr->p_filesz == 0) {
+		return STATUS_SUCCESS;
+	}
+
+	/* Load the data. */
+	start = (elf_addr_t)image->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
+	end = (elf_addr_t)image->load_base + ROUND_UP(phdr->p_vaddr + phdr->p_filesz, PAGE_SIZE);
+	size = end - start;
+	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
+	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
+
+	ret = vm_map((void *)start, size, flags, handle, offset, NULL);
+	if(ret != STATUS_SUCCESS) {
+		dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
+		return ret;
+	}
+
+	/* Clear out BSS. */
+	if(phdr->p_filesz < phdr->p_memsz) {
+		start = (elf_addr_t)image->load_base + phdr->p_vaddr + phdr->p_filesz;
+		size = phdr->p_memsz - phdr->p_filesz;
+		dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n", path, i, start, start + size);
+		memset((void *)start, 0, size);
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Load an image into memory.
  * @param path		Path to image file.
  * @param req		Image that requires this image. This is used to work
@@ -142,15 +220,13 @@ static status_t rtld_library_load(const char *name, rtld_image_t *req, rtld_imag
  * @return		Status code describing result of the operation. */
 status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp, rtld_image_t **imagep) {
 	rtld_image_t *image = NULL;
-	elf_addr_t start, end;
 	size_t bytes, size, i;
+	char *interp = NULL;
 	elf_phdr_t *phdrs;
 	const char *dep;
 	elf_ehdr_t ehdr;
 	handle_t handle;
-	offset_t offset;
 	status_t ret;
-	int flags;
 
 	/* Try to open the image. */
 	ret = fs_file_open(path, FS_READ | FS_EXECUTE, 0, 0, NULL, &handle);
@@ -218,15 +294,9 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	 * executables, just put the load base as NULL. */
 	if(ehdr.e_type == ELF_ET_DYN) {
 		for(i = 0, image->load_size = 0; i < ehdr.e_phnum; i++) {
-			if(phdrs[i].p_type != ELF_PT_LOAD) {
-				if(phdrs[i].p_type == ELF_PT_INTERP) {
-					dprintf("rtld: %s: library requires an interpreter!\n", path);
-					ret = STATUS_MALFORMED_IMAGE;
-					goto fail;
-				}
+			if(phdrs[i].p_type == ELF_PT_LOAD) {
 				continue;
 			}
-
 			if((phdrs[i].p_vaddr + phdrs[i].p_memsz) > image->load_size) {
 				image->load_size = ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
 			}
@@ -246,74 +316,74 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	/* Load all of the LOAD headers, and save the address of the dynamic
 	 * section if we find it. */
 	for(i = 0; i < ehdr.e_phnum; i++) {
-		if(phdrs[i].p_type == ELF_PT_DYNAMIC) {
+		switch(phdrs[i].p_type) {
+		case ELF_PT_LOAD:
+			ret = do_load_phdr(image, &phdrs[i], handle, path, i);
+			if(ret != STATUS_SUCCESS) {
+				goto fail;
+			}
+			break;
+		case ELF_PT_INTERP:
+			if(ehdr.e_type == ELF_ET_EXEC) {
+				interp = alloca(phdrs[i].p_filesz + 1);
+				ret = fs_file_pread(handle, interp, phdrs[i].p_filesz, phdrs[i].p_offset, NULL);
+				if(ret != STATUS_SUCCESS) {
+					goto fail;
+				}
+				interp[phdrs[i].p_filesz] = 0;
+			} else if(ehdr.e_type == ELF_ET_DYN) {
+				dprintf("rtld: %s: library requires an interpreter!\n", path);
+				ret = STATUS_MALFORMED_IMAGE;
+				goto fail;
+			}
+			break;
+		case ELF_PT_DYNAMIC:
 			image->dyntab = (elf_dyn_t *)((elf_addr_t)image->load_base + phdrs[i].p_vaddr);
-			continue;
-		} else if(phdrs[i].p_type != ELF_PT_LOAD) {
-			continue;
-		}
-
-		/* Work out the flags to map with. */
-		flags  = ((phdrs[i].p_flags & ELF_PF_R) ? VM_MAP_READ  : 0);
-		flags |= ((phdrs[i].p_flags & ELF_PF_W) ? VM_MAP_WRITE : 0);
-		flags |= ((phdrs[i].p_flags & ELF_PF_X) ? VM_MAP_EXEC  : 0);
-		if(flags == 0) {
-			dprintf("rtld: %s: program header %zu has no protection flags\n", path, i);
-			ret = STATUS_MALFORMED_IMAGE;
-			goto fail;
-		}
-
-		/* Set the fixed flag, and the private flag if mapping as
-		 * writeable. */
-		flags |= VM_MAP_FIXED;
-		if(phdrs[i].p_flags & ELF_PF_W) {
-			flags |= VM_MAP_PRIVATE;
-		}
-
-		/* Map the BSS if required. */
-		if(phdrs[i].p_memsz > phdrs[i].p_filesz) {
-			start = (elf_addr_t)image->load_base + ROUND_DOWN(phdrs[i].p_vaddr + phdrs[i].p_filesz, PAGE_SIZE);
-			end = (elf_addr_t)image->load_base + ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
-			size = end - start;
-
-			/* Must be writable to be able to clear later. */
-			if(!(flags & VM_MAP_WRITE)) {
-				dprintf("rtld: %s: program header %zu should be writable\n", path, i);
+			break;
+		case ELF_PT_TLS:
+			if(!phdrs[i].p_memsz) {
+				break;
+			} else if(image->tls_memsz) {
+				/* TODO: Is this right? */
+				dprintf("rtld: %s: multiple TLS segments not allowed\n", path);
 				ret = STATUS_MALFORMED_IMAGE;
 				goto fail;
 			}
 
-			/* Create an anonymous region for it. */
-			ret = vm_map((void *)start, size, flags, -1, 0, NULL);
-			if(ret != STATUS_SUCCESS) {
-				dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n", path, ret);
-				goto fail;
-			}
-		}
+			/* Set the module ID. When loading the executable, this
+			 * will return 1. */
+			image->tls_module_id = tls_alloc_module_id();
 
-		if(phdrs[i].p_filesz == 0) {
-			continue;
-		}
+			/* Record information about the initial TLS image. */
+			image->tls_image = (void *)((elf_addr_t)image->load_base + phdrs[i].p_vaddr);
+			image->tls_filesz = phdrs[i].p_filesz;
+			image->tls_memsz = phdrs[i].p_memsz;
+			image->tls_align = phdrs[i].p_align;
+			image->tls_offset = tls_tp_offset(image);
 
-		/* Load the data. */
-		start = (elf_addr_t)image->load_base + ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
-		end = (elf_addr_t)image->load_base + ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_filesz, PAGE_SIZE);
-		size = end - start;
-		offset = ROUND_DOWN(phdrs[i].p_offset, PAGE_SIZE);
-		dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
-
-		ret = vm_map((void *)start, size, flags, handle, offset, NULL);
-		if(ret != STATUS_SUCCESS) {
-			dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
+			dprintf("rtld: %s: got TLS segment at %p (filesz: %zu, memsz: %zu, align: %zu)\n",
+			        path, image->tls_image, image->tls_filesz, image->tls_memsz,
+			        image->tls_align);
+			break;
+		case ELF_PT_NOTE:
+		case ELF_PT_PHDR:
+			break;
+		default:
+			dprintf("rtld: %s: program header %zu has unhandled type %u\n",
+			        path, phdrs[i].p_type);
+			ret = STATUS_MALFORMED_IMAGE;
 			goto fail;
 		}
+	}
 
-		/* Clear out BSS. */
-		if(phdrs[i].p_filesz < phdrs[i].p_memsz) {
-			start = (elf_addr_t)image->load_base + phdrs[i].p_vaddr + phdrs[i].p_filesz;
-			size = phdrs[i].p_memsz - phdrs[i].p_filesz;
-			dprintf("rtld: %s: clearing BSS for %zu at [%p,%p)\n", path, i, start, start + size);
-			memset((void *)start, 0, size);
+	/* If loading an executable, check that it has libkernel as its
+	 * interpreter. This is to prevent someone from attempting to run a
+	 * non-Kiwi application. */
+	if(ehdr.e_type == ELF_ET_EXEC) {
+		if(!interp || strcmp(interp, LIBKERNEL_PATH) != 0) {
+			printf("rtld: %s: not a Kiwi application\n", path);
+			ret = STATUS_MALFORMED_IMAGE;
+			goto fail;
 		}
 	}
 
@@ -499,6 +569,10 @@ void *rtld_init(process_args_t *args) {
 		}
 	}
 #endif
+
+	/* Set up TLS for the current thread. */
+	tls_init();
+
 	/* Run INIT functions for loaded images. */
 	LIST_FOREACH(&loaded_images, iter) {
 		image = list_entry(iter, rtld_image_t, header);

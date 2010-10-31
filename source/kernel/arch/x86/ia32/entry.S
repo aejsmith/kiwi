@@ -305,7 +305,10 @@ FUNCTION_START(thread_arch_enter_userspace)
 	mov	$(SEGMENT_U_DS | 0x03), %ax
 	mov	%ax, %ds
 	mov	%ax, %es
-	
+	mov	%ax, %fs
+	mov	$(SEGMENT_U_GS | 0x03), %ax
+	mov	%ax, %gs
+
 	/* Clear general purpose registers. */
 	xorl	%eax, %eax
 	xorl	%ebx, %ebx

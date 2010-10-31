@@ -22,13 +22,18 @@
 #define __SURFACE_H
 
 #include <cairo/cairo.h>
+
 #include <drivers/display.h>
+
 #include <kernel/types.h>
+
+#include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
+
 #include <pixman.h>
 
 /** Class representing a surface. */
-class Surface : public kiwi::Object, public kiwi::internal::Noncopyable {
+class Surface : public kiwi::Object, kiwi::Noncopyable {
 public:
 	Surface(uint16_t width, uint16_t height);
 	~Surface();

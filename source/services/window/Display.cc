@@ -23,6 +23,8 @@
 #include <kernel/status.h>
 #include <kernel/vm.h>
 
+#include <kiwi/Support/Utility.h>
+
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -183,11 +185,7 @@ status_t Display::SetMode(display_mode_t &mode) {
 	m_current_mode = mode;
 
 	/* Work out the size of the mapping to make. */
-	m_mapping_size = mode.width * mode.height * bytes_per_pixel(mode.format);
-	if(m_mapping_size % 0x1000) {
-		m_mapping_size += 0x1000;
-		m_mapping_size -= m_mapping_size % 0x1000;
-	}
+	m_mapping_size = p2align(mode.width * mode.height * bytes_per_pixel(mode.format), 0x1000);
 
 	/* Create a mapping for the framebuffer and clear it. */
 	ret = vm_map(0, m_mapping_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset, &m_mapping);

@@ -45,12 +45,12 @@ Port::Port(const char *name, Service *service) :
 
 /** Start listening for connections on the port. */
 void Port::StartListening() {
-	m_port.RegisterEvents();
+	m_port.InhibitEvents(false);
 }
 
 /** Stop listening for connections on the port. */
 void Port::StopListening() {
-	EventLoop::Instance()->RemoveHandle(&m_port);
+	m_port.InhibitEvents(true);
 }
 
 /** Handle a connection on the port. */

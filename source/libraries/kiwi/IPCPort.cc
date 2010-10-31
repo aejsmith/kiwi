@@ -18,16 +18,23 @@
  * @brief		IPC port class.
  */
 
-#include <kernel/ipc.h>
+#include <kernel/object.h>
 #include <kiwi/IPCPort.h>
+#include "Internal.h"
 
 using namespace kiwi;
 
 /** Constructor for IPCPort.
- * @param handle	Handle ID (default is -1, which means the object will
- *			not refer to a handle). */
+ * @param handle	If not negative, an existing port handle to make the
+ *			object use. Must refer to a port object. */
 IPCPort::IPCPort(handle_t handle) {
-	SetHandle(handle);
+	if(handle >= 0) {
+		if(unlikely(object_type(handle) != OBJECT_TYPE_PORT)) {
+			libkiwi_fatal("IPCPort::IPCPort: Handle must refer to a port object.");
+		}
+
+		SetHandle(handle);
+	}
 }
 
 /** Create a new port.
@@ -36,16 +43,18 @@ IPCPort::IPCPort(handle_t handle) {
  * port will be closed upon success, and the object will refer to the new port.
  * Upon failure, the old port will remain open.
  *
- * @throw IPCError	If the port could not be created.
+ * @return		True if succeeded, false if not.
  */
-void IPCPort::Create() {
+bool IPCPort::Create() {
 	handle_t handle;
 	status_t ret = ipc_port_create(NULL, PORT_LISTEN, &handle);
-	if(ret != STATUS_SUCCESS) {
-		throw IPCError(ret);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return false;
 	}
 
 	SetHandle(handle);
+	return true;
 }
 
 /** Open an existing port.
@@ -56,16 +65,18 @@ void IPCPort::Create() {
  *
  * @param id		Port ID to open.
  *
- * @throw IPCError	If the port could not be opened.
+ * @return		True if succeeded, false if not.
  */
-void IPCPort::Open(port_id_t id) {
+bool IPCPort::Open(port_id_t id) {
 	handle_t handle;
 	status_t ret = ipc_port_open(id, PORT_LISTEN, &handle);
-	if(ret != STATUS_SUCCESS) {
-		throw IPCError(ret);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return false;
 	}
 
 	SetHandle(handle);
+	return true;
 }
 
 /** Block until a connection is made to the port.
@@ -74,12 +85,10 @@ void IPCPort::Open(port_id_t id) {
  *			until a connection is made, and a timeout of 0 will
  *			return immediately if no connection attempts are in
  *			progress.
- * @return		True if connection made within the timeout, false if
- *			the timeout expired.
- * @throw IPCError	If any error other than timing out occurred. */
-bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) const {
+ * @return		True on success, false if an error occurred. */
+bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) {
 	handle_t handle = Listen(0, timeout);
-	if(handle == -1) {
+	if(unlikely(handle < 0)) {
 		return false;
 	}
 
@@ -88,28 +97,26 @@ bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) const {
 }
 
 /** Block until a connection is made to the port.
+ * @param infop		If not NULL, information about the client will be
+ *			stored in the structure this points to.
  * @param timeout	Timeout in microseconds. A timeout of -1 will block
  *			until a connection is made, and a timeout of 0 will
  *			return immediately if no connection attempts are in
  *			progress.
- * @return		Handle to connection if made within the timeout, -1 if
- *			the timeout expired.
- * @throw IPCError	If any error other than timing out occurred. */
-handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) const {
+ * @return		Handle to connection, or -1 if an error occurred. */
+handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) {
 	handle_t handle;
 	status_t ret = ipc_port_listen(m_handle, timeout, &handle, infop);
-	if(ret != STATUS_SUCCESS) {
-		if(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK) {
-			return -1;
-		}
-		throw IPCError(ret);
+	if(unlikely(ret != STATUS_SUCCESS)) {
+		SetError(ret);
+		return -1;
 	}
 
 	return handle;
 }
 
 /** Get the ID of a port.
- * @return		Port ID, or -1 if an error occurs. */
+ * @return		Port ID. */
 port_id_t IPCPort::GetID() const {
 	return ipc_port_id(m_handle);
 }
@@ -120,9 +127,9 @@ void IPCPort::RegisterEvents() {
 }
 
 /** Handle an event on the port.
- * @param id		Event ID. */
-void IPCPort::EventReceived(int id) {
-	switch(id) {
+ * @param event		Event ID. */
+void IPCPort::HandleEvent(int event) {
+	switch(event) {
 	case PORT_EVENT_CONNECTION:
 		OnConnection();
 		break;

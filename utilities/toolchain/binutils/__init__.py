@@ -27,11 +27,17 @@ class BinutilsComponent(ToolchainComponent):
 	def build(self):
 		os.mkdir('binutils-build')
 
+		# Work out configure options to use.
+		confopts  = '--prefix=%s ' % (self.manager.destdir)
+		confopts += '--target=%s ' % (self.manager.target)
+		confopts += '--disable-werror '
+		# Note: If adding platforms which do not support gold, their
+		# GCC target definition must add --no-copy-dt-needed-entries
+		# to LINK_SPEC. This behaviour is the default with gold, but
+		# the opposite with GNU ld.
+		confopts += '--enable-gold '
+
 		# Build and install it.
-		self.execute(
-			'../binutils-%s/configure --prefix=%s --target=%s --disable-werror' \
-			% (self.version, self.manager.destdir, self.manager.target),
-			'binutils-build'
-		)
+		self.execute('../binutils-%s/configure %s' % (self.version, confopts), 'binutils-build')
 		self.execute('make -j%d' % (self.manager.makejobs), 'binutils-build')
 		self.execute('make install', 'binutils-build')

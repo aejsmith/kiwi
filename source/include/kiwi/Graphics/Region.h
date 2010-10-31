@@ -18,20 +18,21 @@
  * @brief		Region class.
  */
 
-#ifndef __KIWI_UI_REGION_H
-#define __KIWI_UI_REGION_H
+#ifndef __KIWI_GRAPHICS_REGION_H
+#define __KIWI_GRAPHICS_REGION_H
 
-#include <kiwi/UI/Point.h>
-#include <kiwi/UI/Rect.h>
+#include <kiwi/Graphics/Point.h>
+#include <kiwi/Graphics/Rect.h>
 
 #include <vector>
 
 namespace kiwi {
 
 /** Class representing a region made up of multiple rectangles. */
-class Region {
+class KIWI_PUBLIC Region {
 public:
-	/** Rectangle array type. */
+	/** Rectangle array type.
+	 * @fixme		Replace! */
 	typedef std::vector<Rect> RectArray;
 
 	Region();
@@ -62,4 +63,4 @@ private:
 
 }
 
-#endif /* __KIWI_UI_REGION_H */
+#endif /* __KIWI_GRAPHICS_REGION_H */

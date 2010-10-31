@@ -16,6 +16,8 @@
 /**
  * @file
  * @brief		RPC base classes/types.
+ *
+ * @todo		Once String is implemented, replace std::string usage.
  */
 
 #ifndef __KIWI_RPC_H
@@ -23,15 +25,13 @@
 
 #include <kiwi/Error.h>
 #include <kiwi/IPCConnection.h>
-#include <kiwi/Signal.h>
 
 #include <string>
-#include <utility>
 
 namespace kiwi {
 
 /** Exception thrown for RPC protocol errors. */
-class RPCError : public Error {
+class KIWI_PUBLIC RPCError : public BaseError {
 public:
 	explicit RPCError(const std::string &msg);
 	~RPCError() throw();
@@ -41,23 +41,28 @@ private:
 };
 
 /** Type implementing the RPC 'bytes' type. */
-typedef ::std::pair<const char *, size_t> RPCByteString;
+struct KIWI_PUBLIC RPCByteString {
+	RPCByteString(const char *d, size_t s) : data(d), size(s) {}
 
-/** Class used to store a message buffer. */
-class RPCMessageBuffer : internal::Noncopyable {
+	const char *data;		/**< Data buffer. */
+	size_t size;			/**< Size of buffer. */
+};
+
+/** Class used to store an RPC message buffer. */
+class KIWI_PUBLIC RPCMessageBuffer : Noncopyable {
 	/** Type IDs. */
 	enum TypeID {
-		TYPE_BOOL = 0,
-		TYPE_STRING = 1,
-		TYPE_BYTES = 2,
-		TYPE_INT8 = 3,
-		TYPE_INT16 = 4,
-		TYPE_INT32 = 5,
-		TYPE_INT64 = 6,
-		TYPE_UINT8 = 7,
-		TYPE_UINT16 = 8,
-		TYPE_UINT32 = 9,
-		TYPE_UINT64 = 10,
+		kBoolType = 0,
+		kStringType = 1,
+		kBytesType = 2,
+		kInt8Type = 3,
+		kInt16Type = 4,
+		kInt32Type = 5,
+		kInt64Type = 6,
+		kUint8Type = 7,
+		kUint16Type = 8,
+		kUint32Type = 9,
+		kUint64Type = 10,
 	};
 public:
 	RPCMessageBuffer();
@@ -99,13 +104,13 @@ public:
 	size_t GetSize() { return m_size; }
 private:
 	template <typename T>
-	void PushEntry(TypeID type, T entry);
+	KIWI_PRIVATE void PushEntry(TypeID type, T entry);
 
 	template <typename T>
-	void PopEntry(TypeID type, T &entry);
+	KIWI_PRIVATE void PopEntry(TypeID type, T &entry);
 
-	void PushEntry(TypeID type, const char *data, size_t size);
-	void PopEntry(TypeID type, const char *&data, size_t &size);
+	KIWI_PRIVATE void PushEntry(TypeID type, const char *data, size_t size);
+	KIWI_PRIVATE void PopEntry(TypeID type, const char *&data, size_t &size);
 
 	char *m_buffer;			/**< Buffer containing message data. */
 	size_t m_size;			/**< Current buffer size. */
@@ -113,13 +118,15 @@ private:
 };
 
 /** Base class for a connection to a server. */
-class RPCServerConnection : public Object {
+class KIWI_PUBLIC RPCServerConnection : public Object {
+public:
+	void Connect(port_id_t id = -1);
 protected:
-	RPCServerConnection(const char *name, uint32_t version, port_id_t port = -1, handle_t handle = -1);
+	RPCServerConnection(const char *name, uint32_t version, handle_t handle = -1);
 
 	void SendMessage(uint32_t id, RPCMessageBuffer &buf);
 	void ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf);
-	virtual void HandleEvent(uint32_t id, RPCMessageBuffer &buf) = 0;
+	virtual void HandleEvent(uint32_t id, RPCMessageBuffer &buf);
 private:
 	void HandleMessage();
 	void CheckVersion();
@@ -130,7 +137,7 @@ private:
 };
 
 /** Base class for a connection to a client. */
-class RPCClientConnection : public Object {
+class KIWI_PUBLIC RPCClientConnection : public Object {
 protected:
 	RPCClientConnection(const char *name, uint32_t version, handle_t handle);
 
