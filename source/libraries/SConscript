@@ -24,7 +24,7 @@ SConscript(dirs=[
 	'3rdparty/zlib-1.2.5',
 	'3rdparty/libpng-1.4.3',
 	'3rdparty/freetype-2.4.2',
-	'3rdparty/pixman-0.19.2',
+	'3rdparty/pixman-0.20.0',
 	'3rdparty/cairo-1.10.0',
 	'kiwi',
 ], exports=['env'])
