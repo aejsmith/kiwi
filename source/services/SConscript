@@ -16,6 +16,6 @@ Import('env')
 SConscript(dirs=[
 	'security',
 	'svcmgr',
-	#'window',
+	'window',
 ], exports=['env'])
 

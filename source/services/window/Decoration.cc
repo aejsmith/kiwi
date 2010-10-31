@@ -25,6 +25,7 @@
 
 #include <exception>
 #include <iostream>
+#include <math.h>
 
 #include "Decoration.h"
 #include "Window.h"

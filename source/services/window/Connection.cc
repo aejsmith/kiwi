@@ -50,7 +50,7 @@ status_t Connection::CreateSurface(org::kiwi::WindowServer::Size size, area_id_t
 		Surface *surface = new Surface(size.width, size.height);
 		m_session->AddSurface(surface);
 		id = surface->GetID();
-	} catch(OSError &e) {
+	} catch(Error &e) {
 		return e.GetCode();
 	}
 
@@ -108,7 +108,7 @@ status_t Connection::CreateWindow(org::kiwi::WindowServer::Rect rect, Window::ID
 		Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
 		Window *window = m_session->CreateWindow(_rect);
 		id = window->GetID();
-	} catch(OSError &e) {
+	} catch(Error &e) {
 		return e.GetCode();
 	}
 

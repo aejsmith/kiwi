@@ -69,8 +69,8 @@ void Compositor::Redraw(const Rect &rect) {
 	}
 
 	/* Get the area to draw. */
-	Rect screen(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
-	Rect area = screen.Intersect(rect);
+	Rect area(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
+	area.Intersect(rect);
 	if(area.IsValid()) {
 		/* Set the clip region so we only update the area changed. */
 		cairo_save(m_context);

@@ -21,13 +21,13 @@
 #ifndef __CURSOR_H
 #define __CURSOR_H
 
-#include <kiwi/Object.h>
+#include <kiwi/Support/Noncopyable.h>
 
 class Session;
 class Window;
 
 /** Class implementing a cursor. */
-class Cursor : public kiwi::Object {
+class Cursor : kiwi::Noncopyable {
 public:
 	Cursor(Session *session);
 	~Cursor();

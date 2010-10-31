@@ -21,7 +21,8 @@
 #ifndef __SESSION_H
 #define __SESSION_H
 
-#include <kiwi/UI/Rect.h>
+#include <kiwi/Graphics/Rect.h>
+#include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
 
 #include <kernel/types.h>
@@ -38,7 +39,7 @@ class Compositor;
 class WindowServer;
 
 /** Class containing information of a UI session. */
-class Session : public kiwi::Object, public kiwi::internal::Noncopyable {
+class Session : public kiwi::Object, kiwi::Noncopyable {
 	/** Type of the connection list. */
 	typedef std::list<Connection *> ConnectionList;
 

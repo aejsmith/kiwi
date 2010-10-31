@@ -31,7 +31,7 @@ public:
 	MouseDevice(WindowServer *server, handle_t handle);
 private:
 	void RegisterEvents();
-	void EventReceived(int id);
+	void HandleEvent(int id);
 
 	WindowServer *m_server;		/**< Server that the display is for. */
 };

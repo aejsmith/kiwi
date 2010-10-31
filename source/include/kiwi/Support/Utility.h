@@ -29,7 +29,7 @@ namespace kiwi {
  * @param n		Value to round up.
  * @param align		Value to round up to. */
 template <typename T>
-T p2align(T n, T align) {
+T p2align(T n, int align) {
 	if(n & (align - 1)) {
 		n += align;
 		n &= ~(align - 1);

@@ -23,9 +23,9 @@
 
 #include <cairo/cairo.h>
 
-#include <kiwi/UI/Rect.h>
-#include <kiwi/UI/Region.h>
-#include <kiwi/Object.h>
+#include <kiwi/Graphics/Rect.h>
+#include <kiwi/Graphics/Region.h>
+#include <kiwi/Support/Noncopyable.h>
 
 #include <list>
 
@@ -35,7 +35,7 @@ class Display;
 class Surface;
 
 /** Class that manages the rendering of windows. */
-class Compositor : public kiwi::internal::Noncopyable {
+class Compositor : kiwi::Noncopyable {
 public:
 	Compositor(Display *display, Window *root);
 	~Compositor();

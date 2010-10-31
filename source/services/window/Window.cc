@@ -191,7 +191,7 @@ void Window::Update(kiwi::Rect rect) {
 	rect.Adjust(abs.GetX(), abs.GetY(), abs.GetX(), abs.GetY());
 
 	/* Redraw the area on screen. */
-	m_session->GetCompositor()->Redraw(abs.Intersect(rect));
+	m_session->GetCompositor()->Redraw(abs.Intersected(rect));
 }
 
 /** Move the window.
