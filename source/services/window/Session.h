@@ -50,6 +50,7 @@ class Session : public kiwi::Object, kiwi::Noncopyable {
 	typedef std::map<Window::ID, Window *> WindowMap;
 public:
 	Session(WindowServer *server, session_id_t id);
+	~Session();
 
 	void HandleConnection(handle_t handle);
 	void RemoveConnection(Connection *conn);

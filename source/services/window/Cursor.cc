@@ -139,14 +139,12 @@ void Cursor::MoveRelative(int32_t dx, int32_t dy) {
 /** Mouse button down handler.
  * @param button	Button that was pressed. */
 void Cursor::Down(int32_t button) {
-	Window *window;
-
 	/* Get the position the cursor is pointing at. */
 	Point pos = m_window->GetAbsoluteRect().GetTopLeft();
-	pos = Point(pos.GetX() + kCursorHotspotX, pos.GetY() + kCursorHotspotY);
+	pos.Translate(kCursorHotspotX, kCursorHotspotY);
 
 	/* Get the window at this location. */
-	window = m_root->AtPosition(pos);
+	Window *window = m_root->AtPosition(pos);
 	assert(window);
 
 	/* Activate the window if it isn't already. */

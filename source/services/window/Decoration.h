@@ -34,7 +34,7 @@ public:
 	Decoration(Window *window);
 	~Decoration();
 
-	void Redraw();
+	void Update();
 
 	/** Get the Cairo surface for the decoration.
 	 * @return		Pointer to Cairo surface. */

@@ -29,6 +29,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <exception>
 
 #include "Compositor.h"
@@ -116,10 +118,11 @@ static pixman_format_code_t pixman_format_for_format(pixel_format_t format) {
 Display::Display(WindowServer *server, const char *path) :
 	m_server(server), m_mapping(0), m_mapping_size(0), m_image(0)
 {
+	handle_t handle;
 	status_t ret;
+	size_t count;
 
 	/* Open the device. */
-	handle_t handle;
 	ret = device_open(path, DEVICE_READ | DEVICE_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to open display device " << path << " (" << ret << ")" << endl;
@@ -128,26 +131,25 @@ Display::Display(WindowServer *server, const char *path) :
 	SetHandle(handle);
 
 	/* Get mode information. */
-	size_t count;
 	ret = device_request(m_handle, DISPLAY_MODE_COUNT, NULL, 0, &count, sizeof(count), NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get mode count for " << path << " (" << ret << ")" << endl;
 		throw exception();
+	} else {
+		unique_ptr<display_mode_t []> modes(new display_mode_t[count]);
+		ret = device_request(m_handle, DISPLAY_GET_MODES, NULL, 0, modes.get(),
+		                     sizeof(display_mode_t) * count, NULL);
+		if(ret != STATUS_SUCCESS) {
+			clog << "Failed to get modes for " << path << " (" << ret << ")" << endl;
+			throw exception();
+		}
+
+		copy(&modes[0], &modes[count], back_inserter(m_modes));
 	}
-	display_mode_t *modes = new display_mode_t[count];
-	ret = device_request(m_handle, DISPLAY_GET_MODES, NULL, 0, modes, sizeof(*modes) * count, NULL);
-	if(ret != STATUS_SUCCESS) {
-		clog << "Failed to get modes for " << path << " (" << ret << ")" << endl;
-		delete[] modes;
-		throw exception();
-	}
-	for(size_t i = 0; i < count; i++) {
-		m_modes.push_back(modes[i]);
-	}
-	delete[] modes;
 
 	/* Try to get the preferred display mode. */
-	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &m_current_mode, sizeof(display_mode_t), NULL);
+	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &m_current_mode,
+	                     sizeof(display_mode_t), NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get preferred mode for " << path << " (" << ret << ")" << endl;
 		throw exception();
@@ -219,7 +221,7 @@ void Display::DrawSurface(Surface *surface, int16_t x, int16_t y, int16_t src_x,
                           int16_t src_y, uint16_t width, uint16_t height) {
 	/* Pixman handles sanitising all parameters. Use the source operator
 	 * as we just want to stick the source surface over the framebuffer,
-	 * compositing is done by the window manager. */
+	 * compositing is done by Compositor. */
 	pixman_image_composite(PIXMAN_OP_SRC, surface->GetPixmanImage(), NULL,
 	                       m_image, src_x, src_y, 0, 0, x, y, width,
 	                       height);

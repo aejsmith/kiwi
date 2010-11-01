@@ -45,11 +45,10 @@ public:
 	void Redraw(const kiwi::Rect &rect);
 	void Redraw(const kiwi::Region &region);
 private:
-	void Render() { Render(m_root, 0, 0); }
 	void Render(Window *window, int16_t off_x, int16_t off_y);
 
 	void ScheduleRedraw();
-	void HandleTimer();
+	void PerformRedraw();
 
 	kiwi::Timer m_timer;		/**< Redraw timer. */
 	kiwi::Region m_redraw_region;	/**< Redraw region. */

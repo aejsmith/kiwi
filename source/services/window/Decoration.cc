@@ -114,7 +114,7 @@ Decoration::Decoration(Window *window) :
 		cairo_font_options_set_hint_metrics(g_cairo_font_opts, CAIRO_HINT_METRICS_ON);
 	}
 
-	Redraw();
+	Update();
 }
 
 /** Destroy the decoration. */
@@ -125,7 +125,7 @@ Decoration::~Decoration() {
 }
 
 /** Regenerate the decoration. */
-void Decoration::Redraw() {
+void Decoration::Update() {
 	cairo_pattern_t *pat;
 	cairo_t *context;
 

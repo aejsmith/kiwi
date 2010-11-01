@@ -37,7 +37,7 @@ Compositor::Compositor(Display *display, Window *root) :
 	m_surface(0), m_context(0)
 {
 	/* Set up the timer. */
-	m_timer.OnTimer.Connect(this, &Compositor::HandleTimer);
+	m_timer.OnTimer.Connect(this, &Compositor::PerformRedraw);
 
 	/* Create a surface to render to. */
 	m_surface = new Surface(display->GetCurrentMode().width, display->GetCurrentMode().height);
@@ -121,8 +121,8 @@ void Compositor::ScheduleRedraw() {
 	}
 }
 
-/** Handle a timer event. */
-void Compositor::HandleTimer() {
+/** Perform all queued redraw events. */
+void Compositor::PerformRedraw() {
 	/* Intersect the region with the screen area so we only have what is
 	 * actually on screen. */
 	Rect screen(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
@@ -148,8 +148,9 @@ void Compositor::HandleTimer() {
 	/* Set the clip region to the updated area. */
 	cairo_clip(m_context);
 
-	/* Redraw. */
-	Render();
+	/* Render all of the windows into the back buffer. Only the affected
+	 * areas will be updated. */
+	Render(m_root, 0, 0);
 
 	cairo_restore(m_context);
 

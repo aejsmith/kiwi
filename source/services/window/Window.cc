@@ -117,7 +117,7 @@ Rect Window::GetTotalRect() const {
 void Window::SetTitle(const std::string &title) {
 	m_title = title;
 	if(m_decoration) {
-		m_decoration->Redraw();
+		m_decoration->Update();
 		m_session->GetCompositor()->Redraw(GetAbsoluteTotalRect());
 	}
 }
@@ -155,7 +155,7 @@ void Window::SetActive(bool active) {
 		/* Update the decoration. We always need a redraw if the
 		 * decoration changes. TODO: Redraw only the decoration area. */
 		if(m_decoration) {
-			m_decoration->Redraw();
+			m_decoration->Update();
 			redraw = true;
 		}
 

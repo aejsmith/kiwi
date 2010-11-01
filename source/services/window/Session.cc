@@ -80,6 +80,13 @@ Session::Session(WindowServer *server, session_id_t id) :
 	m_cursor = new Cursor(this);
 }
 
+/** Destroy a session. */
+Session::~Session() {
+	delete m_cursor;
+	delete m_compositor;
+	delete m_root;
+}
+
 /** Handle a connection from a process in the session.
  * @param handle	Handle to the connection. */
 void Session::HandleConnection(handle_t handle) {

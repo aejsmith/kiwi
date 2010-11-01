@@ -218,8 +218,7 @@ void EventLoop::Merge(EventLoop *old) {
 	}
 
 	/* Add the contents of the handle array to ours. */
-	back_insert_iterator<decltype(m_priv->events)> it(m_priv->events);
-	copy(old->m_priv->events.begin(), old->m_priv->events.end(), it);
+	copy(old->m_priv->events.begin(), old->m_priv->events.end(), back_inserter(m_priv->events));
 }
 
 /** Register an object to be deleted when control returns to the event loop.

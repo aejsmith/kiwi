@@ -51,8 +51,6 @@ public:
 	 * @return		Reference to current mode. */
 	const display_mode_t &GetCurrentMode() const { return m_current_mode; }
 private:
-	status_t Map();
-
 	void RegisterEvents();
 	void HandleEvent(int event);
 
