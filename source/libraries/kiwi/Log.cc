@@ -18,6 +18,9 @@
  * @brief		Internal libkiwi logging functions.
  */
 
+#include <kernel/process.h>
+#include <kernel/thread.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +36,7 @@
  *			message. */
 static void do_log_message(FILE *stream, const char *prefix, const char *fmt,
                            va_list args, bool terminate) {
-	fprintf(stream, "*** libkiwi-%s: ", prefix);
+	fprintf(stream, "*** %s (%d:%d): ", prefix, process_id(-1), thread_id(-1));
 	vfprintf(stream, fmt, args);
 	fprintf(stream, "\n");
 	if(terminate) {
@@ -55,7 +58,7 @@ void libkiwi_debug(const char *fmt, ...) {
 void libkiwi_warn(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	do_log_message(stderr, "WARN", fmt, args, false);
+	do_log_message(stderr, "WARNING", fmt, args, false);
 	va_end(args);
 }
 

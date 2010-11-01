@@ -23,6 +23,7 @@
 
 #include <kiwi/Thread.h>
 
+#include <cassert>
 #include <string>
 
 #include "Internal.h"
@@ -58,11 +59,32 @@ Thread::Thread(handle_t handle) :
 	m_priv->event_loop = new EventLoop(true);
 }
 
-/** Destroy the thread object. */
+/** Destroy the thread object.
+ *
+ * Destroys the thread object. It should not be running. If any handles are
+ * still attached to the thread's event loop, they will be moved to the calling
+ * thread's event loop.
+ */
 Thread::~Thread() {
+	assert(!IsRunning());
+
 	if(m_priv->event_loop) {
+		EventLoop *current = EventLoop::Instance();
+		if(current) {
+			/* Move handles from the thread's event loop to the
+			 * current thread's. */
+			current->Merge(m_priv->event_loop);
+		} else {
+			/* Throw up a warning: when we destroy the loop the
+			 * handles it contains will have an invalid event loop
+			 * pointer. FIXME: Only do this if there are handles in
+			 * the loop. */
+			libkiwi_warn("Thread::~Thread: No event loop to move handles to.");
+		}
+
 		delete m_priv->event_loop;
 	}
+
 	delete m_priv;
 }
 

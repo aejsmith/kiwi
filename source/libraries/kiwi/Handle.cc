@@ -49,9 +49,9 @@ Handle::~Handle() {
 /** Close the handle. */
 void Handle::Close() {
 	if(m_handle >= 0) {
-		/* Remove all events for this handle from the event loop. */
+		/* Remove this handle from the event loop. */
 		if(m_event_loop) {
-			m_event_loop->RemoveHandle(this);
+			m_event_loop->DetachHandle(this);
 		}
 
 		/* Emit the close event. */
@@ -73,12 +73,11 @@ void Handle::Close() {
  *			object, events will be re-enabled.
  * @param inhbit	Whether to inhibit events. */
 void Handle::InhibitEvents(bool inhibit) {
-	if(inhibit) {
-		if(m_event_loop) {
-			m_event_loop->RemoveHandle(this);
+	if(m_handle >= 0 && m_event_loop) {
+		m_event_loop->RemoveEvents(this);
+		if(!inhibit) {
+			RegisterEvents();
 		}
-	} else {
-		RegisterEvents();
 	}
 }
 
@@ -116,7 +115,10 @@ status_t Handle::_Wait(int event, useconds_t timeout) const {
 void Handle::SetHandle(handle_t handle) {
 	Close();
 	m_handle = handle;
-	if(m_handle >= 0) {
+
+	/* Attach the handle to the event loop. */
+	if(m_handle >= 0 && m_event_loop) {
+		m_event_loop->AttachHandle(this);
 		RegisterEvents();
 	}
 }

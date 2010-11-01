@@ -36,15 +36,20 @@ public:
 	EventLoop();
 	~EventLoop();
 
+	void AttachHandle(Handle *handle);
+	void DetachHandle(Handle *handle);
+
 	void AddEvent(Handle *handle, int event);
 	void RemoveEvent(Handle *handle, int event);
-	void RemoveHandle(Handle *handle);
+	void RemoveEvents(Handle *handle);
+
 	int Run();
 	void Quit(int status = 0);
 
 	static EventLoop *Instance();
 private:
 	KIWI_PRIVATE EventLoop(bool priv);
+	KIWI_PRIVATE void Merge(EventLoop *old);
 	KIWI_PRIVATE void DeleteObject(Object *obj);
 
 	EventLoopPrivate *m_priv;	/**< Internal data pointer. */
