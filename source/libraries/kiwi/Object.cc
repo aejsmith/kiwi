@@ -70,6 +70,14 @@ void Object::RemoveSlot(internal::SignalImpl::Slot *slot) {
 
 /** Destructor for Object. */
 Object::~Object() {
+	/* Call our OnDestroy signal. */
+	try {
+		OnDestroy(this);
+	} catch(...) {
+		libkiwi_warn("Object::~Object: Unexpected exception in OnDestroy handler.");
+		throw;
+	}
+
 	/* Set the destroyed flag. This is to speed up slot removal: deleting
 	 * a slot will cause RemoveSlot() to be called, which checks the
 	 * flag to see if it needs to bother removing from the list. */

@@ -36,6 +36,11 @@ public:
 
 	void AddSlot(internal::SignalImpl::Slot *slot);
 	void RemoveSlot(internal::SignalImpl::Slot *slot);
+
+	/** Signal emitted when the object is destroyed.
+	 * @note		Handlers should NOT throw any exceptions.
+	 * @param		Pointer to the object. */
+	Signal<Object *> OnDestroy;
 protected:
 	Object();
 private:
