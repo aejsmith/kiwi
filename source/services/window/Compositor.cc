@@ -33,8 +33,12 @@ using namespace std;
  * @param display	Display that windows should be rendered to.
  * @param root		Root window. */
 Compositor::Compositor(Display *display, Window *root) :
-	m_display(display), m_root(root), m_surface(0), m_context(0)
+	m_timer(Timer::kOneShotMode), m_display(display), m_root(root),
+	m_surface(0), m_context(0)
 {
+	/* Set up the timer. */
+	m_timer.OnTimer.Connect(this, &Compositor::HandleTimer);
+
 	/* Create a surface to render to. */
 	m_surface = new Surface(display->GetCurrentMode().width, display->GetCurrentMode().height);
 
@@ -54,75 +58,27 @@ Compositor::~Compositor() {
 
 /** Redraw the entire screen. */
 void Compositor::Redraw() {
-	/* Re-render the entire surface. */
-	Render();
-
-	/* Update the screen. */
-	m_display->DrawSurface(m_surface, 0, 0, 0, 0, m_surface->GetWidth(), m_surface->GetHeight());
+	Rect rect(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
+	m_redraw_region.Union(rect);
+	ScheduleRedraw();
 }
 
 /** Redraw a rectangular area on screen.
  * @param rect		Rectangle to redraw. */
 void Compositor::Redraw(const Rect &rect) {
-	if(!rect.IsValid()) {
-		return;
-	}
-
-	/* Get the area to draw. */
-	Rect area(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
-	area.Intersect(rect);
-	if(area.IsValid()) {
-		/* Set the clip region so we only update the area changed. */
-		cairo_save(m_context);
-		cairo_rectangle(m_context, area.GetX(), area.GetY(), area.GetWidth(), area.GetHeight());
-		cairo_clip(m_context);
-
-		/* Redraw. */
-		Render();
-		cairo_restore(m_context);
-
-		/* Update the screen. */
-		m_display->DrawSurface(m_surface, area.GetX(), area.GetY(), area.GetX(),
-		                       area.GetY(), area.GetWidth(), area.GetHeight());
+	if(rect.IsValid()) {
+		m_redraw_region.Union(rect);
+		ScheduleRedraw();
 	}
 }
 
 /** Redraw a screen region.
  * @param region	Region to redraw. */
 void Compositor::Redraw(const Region &region) {
-	Region::RectArray rects;
-	region.GetRects(rects);
-
-	cairo_save(m_context);
-
-	/* Add each rectangle to the current path. */
-	Rect screen(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
-	for(auto it = rects.begin(); it != rects.end(); ) {
-		it->Intersect(screen);
-		if(it->IsValid()) {
-			cairo_rectangle(m_context, it->GetX(), it->GetY(), it->GetWidth(), it->GetHeight());
-			++it;
-		} else {
-			it = rects.erase(it);
-		}
-	}
-
-	/* If no rectangles were inside the screen area, do nothing. */
-	if(rects.empty()) {
-		return;
-	}
-
-	/* Set the clip region to the updated area. */
-	cairo_clip(m_context);
-
-	/* Redraw. */
-	Render();
-	cairo_restore(m_context);
-
-	/* Update the screen. */
-	for(auto it = rects.begin(); it != rects.end(); ++it) {
-		m_display->DrawSurface(m_surface, it->GetX(), it->GetY(), it->GetX(),
-		                       it->GetY(), it->GetWidth(), it->GetHeight());
+	/* Add the region to the redraw region and schedule a redraw. */
+	if(!region.Empty()) {
+		m_redraw_region.Union(region);
+		ScheduleRedraw();
 	}
 }
 
@@ -155,4 +111,52 @@ void Compositor::Render(Window *window, int16_t off_x, int16_t off_y) {
 	}
 
 	cairo_restore(m_context);
+}
+
+/** Start the redraw timer. */
+void Compositor::ScheduleRedraw() {
+	if(!m_timer.IsRunning()) {
+		/* Redraw every millisecond. */
+		m_timer.Start(1000);
+	}
+}
+
+/** Handle a timer event. */
+void Compositor::HandleTimer() {
+	/* Intersect the region with the screen area so we only have what is
+	 * actually on screen. */
+	Rect screen(0, 0, m_surface->GetWidth(), m_surface->GetHeight());
+	m_redraw_region.Intersect(screen);
+
+	/* Get the rectangles from the region and clear it. */
+	Region::RectArray rects;
+	m_redraw_region.GetRects(rects);
+	m_redraw_region.Clear();
+
+	/* If no rectangles were inside the screen area, do nothing. */
+	if(rects.empty()) {
+		return;
+	}
+
+	cairo_save(m_context);
+
+	/* Add each rectangle to the current path. */
+	for(auto it = rects.begin(); it != rects.end(); ++it) {
+		cairo_rectangle(m_context, it->GetX(), it->GetY(), it->GetWidth(), it->GetHeight());
+	}
+
+	/* Set the clip region to the updated area. */
+	cairo_clip(m_context);
+
+	/* Redraw. */
+	Render();
+
+	cairo_restore(m_context);
+
+	/* Update the screen. */
+	for(auto it = rects.begin(); it != rects.end(); ++it) {
+		m_display->DrawSurface(m_surface, it->GetX(), it->GetY(), it->GetX(),
+		                       it->GetY(), it->GetWidth(), it->GetHeight());
+	}
+
 }

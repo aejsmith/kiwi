@@ -26,6 +26,7 @@
 #include <kiwi/Graphics/Rect.h>
 #include <kiwi/Graphics/Region.h>
 #include <kiwi/Support/Noncopyable.h>
+#include <kiwi/Timer.h>
 
 #include <list>
 
@@ -35,7 +36,7 @@ class Display;
 class Surface;
 
 /** Class that manages the rendering of windows. */
-class Compositor : kiwi::Noncopyable {
+class Compositor : public kiwi::Object, kiwi::Noncopyable {
 public:
 	Compositor(Display *display, Window *root);
 	~Compositor();
@@ -47,6 +48,11 @@ private:
 	void Render() { Render(m_root, 0, 0); }
 	void Render(Window *window, int16_t off_x, int16_t off_y);
 
+	void ScheduleRedraw();
+	void HandleTimer();
+
+	kiwi::Timer m_timer;		/**< Redraw timer. */
+	kiwi::Region m_redraw_region;	/**< Redraw region. */
 	Display *m_display;		/**< Display to render to. */
 	Window *m_root;			/**< Root window. */
 	Surface *m_surface;		/**< Back buffer that rendering takes place on. */
