@@ -197,6 +197,10 @@ void Window::Update(kiwi::Rect rect) {
 /** Move the window.
  * @param pos		New position for window. */
 void Window::MoveTo(const kiwi::Point &pos) {
+	if(m_type == WINDOW_TYPE_ROOT) {
+		return;
+	}
+
 	/* Create a region to work out the update region. */
 	Region update(GetAbsoluteTotalRect());
 

@@ -40,6 +40,7 @@ private:
 	Session *m_session;		/**< Session the cursor is for. */
 	Window *m_root;			/**< Root window of session, stored for convenience. */
 	Window *m_window;		/**< Window implementing the cursor. */
+	Window *m_grabbed;		/**< Grabbed window. */
 };
 
 #endif /* __CURSOR_H */

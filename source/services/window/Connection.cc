@@ -108,11 +108,10 @@ status_t Connection::CreateWindow(org::kiwi::WindowServer::Rect rect, Window::ID
 		Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
 		Window *window = m_session->CreateWindow(_rect);
 		id = window->GetID();
+		return STATUS_SUCCESS;
 	} catch(Error &e) {
 		return e.GetCode();
 	}
-
-	return STATUS_SUCCESS;
 }
 
 status_t Connection::DestroyWindow(Window::ID id) {

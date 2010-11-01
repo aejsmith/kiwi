@@ -51,25 +51,29 @@ static const int16_t kCursorHotspotY = 3;
 /** Create the cursor.
  * @param session	Session that the cursor is for. */
 Cursor::Cursor(Session *session) :
-	m_session(session), m_root(session->GetRoot())
+	m_session(session), m_root(session->GetRoot()), m_grabbed(0)
 {
+	cairo_surface_t *image;
+	cairo_t *context;
+	int16_t x, y;
+
 	/* Work out initial placement of the cursor (centre of screen). */
-	int16_t x = (m_root->GetRect().GetWidth() / 2) - (kCursorWidth / 2);
-	int16_t y = (m_root->GetRect().GetHeight() / 2) - (kCursorHeight / 2);
+	x = (m_root->GetRect().GetWidth() / 2) - (kCursorWidth / 2);
+	y = (m_root->GetRect().GetHeight() / 2) - (kCursorHeight / 2);
 
 	/* Create the cursor window. */
 	Rect rect(x, y, kCursorWidth, kCursorHeight);
 	m_window = new Window(m_root->GetSession(), -1, m_root, rect, WINDOW_TYPE_CURSOR);
 
 	/* Set up a Cairo context for rendering on to the cursor. */
-	cairo_t *context = cairo_create(m_window->GetSurface()->GetCairoSurface());
+	context = cairo_create(m_window->GetSurface()->GetCairoSurface());
 	if(cairo_status(context) != CAIRO_STATUS_SUCCESS) {
 		clog << "Failed to create Cairo context: " << cairo_status_to_string(cairo_status(context)) << endl;
 		throw exception();
 	}
 
 	/* Load the image. */
-	cairo_surface_t *image = cairo_image_surface_create_from_png(kCursorPath);
+	image = cairo_image_surface_create_from_png(kCursorPath);
 	if(cairo_surface_status(image) != CAIRO_STATUS_SUCCESS) {
 		clog << "Failed to load cursor image: ";
 		clog << cairo_status_to_string(cairo_surface_status(image)) << endl;
@@ -123,26 +127,35 @@ void Cursor::MoveRelative(int32_t dx, int32_t dy) {
 	}
 
 	/* Move the window to the new position. */
+	dx = x - m_window->GetRect().GetX();
+	dy = y - m_window->GetRect().GetY();
 	m_window->MoveTo(Point(x, y));
+	if(m_grabbed) {
+		Point pos = m_grabbed->GetRect().GetTopLeft();
+		m_grabbed->MoveTo(Point(pos.GetX() + dx, pos.GetY() + dy));
+	}
 }
 
 /** Mouse button down handler.
  * @param button	Button that was pressed. */
 void Cursor::Down(int32_t button) {
+	Window *window;
+
 	/* Get the position the cursor is pointing at. */
 	Point pos = m_window->GetAbsoluteRect().GetTopLeft();
 	pos = Point(pos.GetX() + kCursorHotspotX, pos.GetY() + kCursorHotspotY);
 
 	/* Get the window at this location. */
-	Window *window = m_root->AtPosition(pos);
+	window = m_root->AtPosition(pos);
 	assert(window);
 
 	/* Activate the window if it isn't already. */
 	m_session->ActivateWindow(window);
+	m_grabbed = window;
 }
 
 /** Mouse button up handler.
  * @param button	Button that was released. */
 void Cursor::Up(int32_t button) {
-
+	m_grabbed = 0;
 }
