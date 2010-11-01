@@ -232,7 +232,7 @@ void Display::RegisterEvents() {
 
 /** Event callback function.
  * @param event		Event number. */
-void Display::EventReceived(int event) {
+void Display::HandleEvent(int event) {
 	assert(event == DISPLAY_EVENT_REDRAW);
 	m_server->GetActiveSession()->GetCompositor()->Redraw();
 }

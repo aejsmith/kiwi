@@ -54,7 +54,7 @@ private:
 	status_t Map();
 
 	void RegisterEvents();
-	void EventReceived(int id);
+	void HandleEvent(int event);
 
 	WindowServer *m_server;		/**< Server that the display is for. */
 	ModeVector m_modes;		/**< Modes supported by the device. */
