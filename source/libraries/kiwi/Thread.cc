@@ -31,8 +31,10 @@ using namespace kiwi;
 
 /** Internal data for Thread. */
 struct kiwi::ThreadPrivate {
-	ThreadPrivate() : name("user_thread") {}
+	ThreadPrivate() : name("user_thread"), event_loop(0) {}
+
 	std::string name;		/**< Name to give the thread. */
+	EventLoop *event_loop;		/**< Event loop for the thread. */
 };
 
 /** Set up the thread object.
@@ -43,7 +45,7 @@ struct kiwi::ThreadPrivate {
  * @param handle	If not negative, a existing thread handle to make the
  *			object use. Must refer to a thread object. */
 Thread::Thread(handle_t handle) :
-	m_event_loop(0), m_priv(new ThreadPrivate)
+	m_priv(new ThreadPrivate)
 {
 	if(handle >= 0) {
 		if(unlikely(object_type(handle) != OBJECT_TYPE_THREAD)) {
@@ -52,10 +54,15 @@ Thread::Thread(handle_t handle) :
 
 		SetHandle(handle);
 	}
+
+	m_priv->event_loop = new EventLoop(true);
 }
 
 /** Destroy the thread object. */
 Thread::~Thread() {
+	if(m_priv->event_loop) {
+		delete m_priv->event_loop;
+	}
 	delete m_priv;
 }
 
@@ -113,6 +120,14 @@ bool Thread::Wait(useconds_t timeout) const {
 	return (_Wait(THREAD_EVENT_DEATH, timeout) == STATUS_SUCCESS);
 }
 
+/** Ask the thread to quit.
+ * @param status	Status to make the thread's event loop return with. */
+void Thread::Quit(int status) {
+	if(IsRunning()) {
+		m_priv->event_loop->Quit(status);
+	}
+}
+
 /** Check whether the thread is running.
  * @return		Whether the thread is running. */
 bool Thread::IsRunning() const {
@@ -149,6 +164,12 @@ void Thread::Sleep(useconds_t usecs) {
 	thread_usleep(usecs, NULL);
 }
 
+/** Get the thread's event loop.
+ * @return		Reference to thread's event loop. */
+EventLoop &Thread::GetEventLoop() {
+	return *m_priv->event_loop;
+}
+
 /** Main function for the thread.
  *
  * The main function for the thread, which is called when the thread starts
@@ -158,8 +179,7 @@ void Thread::Sleep(useconds_t usecs) {
  * @return		Exit status code for the thread.
  */
 int Thread::Main() {
-	m_event_loop->Run();
-	return 0;
+	return m_priv->event_loop->Run();
 }
 
 /** Register events with the event loop. */
@@ -185,17 +205,10 @@ void Thread::HandleEvent(int event) {
  * @param arg		Pointer to Thread object. */
 void Thread::_Entry(void *arg) {
 	Thread *thread = reinterpret_cast<Thread *>(arg);
-	int ret;
 
-	/* Create the event loop for the thread. */
-	thread->m_event_loop = new EventLoop;
+	/* Set the event loop pointer. */
+	g_event_loop = thread->m_priv->event_loop;
 
 	/* Call the main function. */
-	ret = thread->Main();
-
-	/* Destroy the event loop. */
-	delete thread->m_event_loop;
-	thread->m_event_loop = 0;
-
-	thread_exit(ret);
+	thread_exit(thread->Main());
 }

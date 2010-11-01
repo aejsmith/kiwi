@@ -39,6 +39,7 @@ public:
 	void SetName(const char *name);
 	bool Run();
 	bool Wait(useconds_t timeout = -1) const;
+	void Quit(int status = 0);
 
 	bool IsRunning() const;
 	int GetStatus() const;
@@ -51,10 +52,7 @@ public:
 	static thread_id_t GetCurrentID();
 	static void Sleep(useconds_t usecs);
 protected:
-	/** Get the thread's event loop.
-	 * @return		Reference to thread's event loop. */
-	EventLoop &GetEventLoop() { return *m_event_loop; }
-
+	EventLoop &GetEventLoop();
 	virtual int Main();
 private:
 	void RegisterEvents();
@@ -62,7 +60,6 @@ private:
 
 	KIWI_PRIVATE static void _Entry(void *arg);
 
-	EventLoop *m_event_loop;	/**< Event loop for the thread. */
 	ThreadPrivate *m_priv;		/**< Internal data pointer. */
 };
 

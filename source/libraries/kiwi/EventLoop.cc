@@ -21,6 +21,7 @@
 #include <kernel/object.h>
 #include <kernel/status.h>
 
+#include <kiwi/Support/Mutex.h>
 #include <kiwi/EventLoop.h>
 
 #include <list>
@@ -33,28 +34,46 @@ using namespace std;
 
 /** Internal data for EventLoop. */
 struct kiwi::EventLoopPrivate {
+	EventLoopPrivate() : quit(false), status(0) {}
+
 	std::list<Object *> to_delete;		/**< Objects to delete when control returns to the loop. */
 	std::vector<object_event_t> events;	/**< Array of events to wait for. */
 	std::vector<Handle *> handles;		/**< Array of handle objects (used for callbacks). */
+
+	bool quit;				/**< Whether to quit the event loop. */
+	int status;				/**< Exit status. */
 };
 
+extern __thread EventLoop *g_esdfsfvent_loop;
+__thread EventLoop *g_esdfsfvent_loop = 0;
 /** Pointer to the current thread's event loop. */
-static __thread EventLoop *event_loop_instance = 0;
+__thread EventLoop *g_event_loop = 0;
 
-/** EventLoop constructor. */
-EventLoop::EventLoop() {
-	if(event_loop_instance) {
+/** Event loop constructor. */
+EventLoop::EventLoop() :
+	m_priv(new EventLoopPrivate)
+{
+	if(g_event_loop) {
 		libkiwi_fatal("EventLoop::EventLoop: Can only have 1 event loop per thread.");
+	} else {
+		g_event_loop = this;
 	}
-
-	m_priv = new EventLoopPrivate;
-	event_loop_instance = this;
 }
+
+/** Event loop constructor for use by Thread.
+ * @note		This is an internal constructor for use by Thread. It
+ *			does not check or set the global event loop pointer.
+ *			This is because Thread creates the event loop along
+ *			with the Thread object, and sets the event loop pointer
+ *			itself in the thread entry function. */
+EventLoop::EventLoop(bool priv) : m_priv(new EventLoopPrivate) {}
 
 /** EventLoop destructor. */
 EventLoop::~EventLoop() {
 	delete m_priv;
-	event_loop_instance = 0;
+	if(g_event_loop == this) {
+		g_event_loop = 0;
+	}
 }
 
 /** Add an event to the event loop.
@@ -93,9 +112,15 @@ void EventLoop::RemoveHandle(Handle *handle) {
 	}
 }
 
-/** Run the event loop. */
-void EventLoop::Run(void) {
+/** Run the event loop.
+ * @return		Status code the event loop was asked to exit with. */
+int EventLoop::Run(void) {
+	m_priv->status = 0;
+	m_priv->quit = false;
+
 	while(true) {
+		status_t ret;
+
 		/* Delete objects scheduled for deletion. */
 		list<Object *>::iterator it;
 		while((it = m_priv->to_delete.begin()) != m_priv->to_delete.end()) {
@@ -103,13 +128,13 @@ void EventLoop::Run(void) {
 			m_priv->to_delete.erase(it);
 		}
 
-		/* If we have nothing to do, exit. */
-		if(!m_priv->handles.size()) {
-			return;
+		/* If we have nothing to do, or we have been asked to, exit. */
+		if(!m_priv->handles.size() || m_priv->quit) {
+			return m_priv->status;
 		}
 
 		/* Wait for any of the events. */
-		status_t ret = object_wait(&m_priv->events[0], m_priv->handles.size(), -1);
+		ret = object_wait(&m_priv->events[0], m_priv->handles.size(), -1);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d", ret);
 		}
@@ -123,11 +148,20 @@ void EventLoop::Run(void) {
 	}
 }
 
+/** Ask the event loop to quit.
+ * @param status	Status code to make the event loop return.
+ * @todo		If the event loop is currently in object_wait(), we
+ *			should wake it up somehow. */
+void EventLoop::Quit(int status) {
+	m_priv->status = status;
+	m_priv->quit = true;
+}
+
 /** Get the current thread's event loop.
  * @return		Pointer to the current thread's event loop, or NULL if
  *			the thread does not have an event loop. */
 EventLoop *EventLoop::Instance() {
-	return event_loop_instance;
+	return g_event_loop;
 }
 
 /** Register an object to be deleted when control returns to the event loop.

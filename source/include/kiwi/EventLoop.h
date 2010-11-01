@@ -15,7 +15,7 @@
 
 /**
  * @file
- * @brief		Kiwi event loop class.
+ * @brief		Event loop class.
  */
 
 #ifndef __KIWI_EVENTLOOP_H
@@ -25,11 +25,13 @@
 
 namespace kiwi {
 
+class Thread;
 struct EventLoopPrivate;
 
 /** Class implementing a loop for handling object events. */
 class KIWI_PUBLIC EventLoop : public Object, Noncopyable {
 	friend class Object;
+	friend class Thread;
 public:
 	EventLoop();
 	~EventLoop();
@@ -37,10 +39,12 @@ public:
 	void AddEvent(Handle *handle, int event);
 	void RemoveEvent(Handle *handle, int event);
 	void RemoveHandle(Handle *handle);
-	void Run();
+	int Run();
+	void Quit(int status = 0);
 
 	static EventLoop *Instance();
 private:
+	KIWI_PRIVATE EventLoop(bool priv);
 	KIWI_PRIVATE void DeleteObject(Object *obj);
 
 	EventLoopPrivate *m_priv;	/**< Internal data pointer. */

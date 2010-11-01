@@ -35,4 +35,7 @@ static inline void libkiwi_debug(const char *fmt, ...) {};
 extern void libkiwi_warn(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
 extern void libkiwi_fatal(const char *fmt, ...) KIWI_PUBLIC __attribute__((format(printf, 1, 2)));
 
+namespace kiwi { class EventLoop; }
+extern __thread kiwi::EventLoop *g_event_loop;
+
 #endif /* __INTERNAL_H */
