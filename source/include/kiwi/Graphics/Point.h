@@ -33,6 +33,22 @@ public:
 	 * @param y		Y position of the point. */
 	Point(int x, int y) : m_x(x), m_y(y) {}
 
+	/** Move the point.
+	 * @param dx		X delta.
+	 * @param dy		Y delta. */
+	void Translate(int dx, int dy) {
+		m_x += dx;
+		m_y += dy;
+	}
+
+	/** Move the point.
+	 * @param dx		X delta.
+	 * @param dy		Y delta.
+	 * @return		Point with translation applied. */
+	Point Translated(int dx, int dy) const {
+		return Point(m_x + dx, m_y + dy);
+	}
+
 	/** Get X position of point.
 	 * @return		X position. */
 	int GetX() const { return m_x; }
