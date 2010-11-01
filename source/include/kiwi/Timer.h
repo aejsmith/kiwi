@@ -39,6 +39,10 @@ public:
 	void Start(useconds_t interval);
 	void Stop();
 
+	/** Check whether the timer is running.
+	 * @return		Whether the timer is running. */
+	bool IsRunning() const { return m_running; }
+
 	/** Signal emitted when the timer event fires. */
 	Signal<> OnTimer;
 private:
@@ -46,6 +50,7 @@ private:
 	void HandleEvent(int event);
 
 	Mode m_mode;			/**< Timer mode. */
+	bool m_running;			/**< Whether the timer is running. */
 };
 
 }

@@ -114,6 +114,13 @@ bool Region::Contains(const Point &point) const {
 	return cairo_region_contains_point(CAIRO_REGION_C(this), point.GetX(), point.GetY());
 }
 
+/** Clear the region. */
+void Region::Clear() {
+	void *region = cairo_region_create();
+	swap(region, m_data);
+	cairo_region_destroy(reinterpret_cast<cairo_region_t *>(region));
+}
+
 /** Set the area to the union of the current area and another region.
  * @param other		Other region. */
 void Region::Union(const Region &other) {

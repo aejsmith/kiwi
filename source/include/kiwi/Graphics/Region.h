@@ -49,6 +49,7 @@ public:
 	bool Empty() const;
 	bool Contains(const Point &point) const;
 
+	void Clear();
 	void Union(const Region &other);
 	void Union(const Rect &rect);
 	void Intersect(const Region &other);

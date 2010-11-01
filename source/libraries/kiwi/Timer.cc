@@ -36,7 +36,7 @@ using namespace kiwi;
  *			is stopped with Stop().
  * @throw Error		If unable to create the timer. This can only happen if
  *			the process' handle table is full. */
-Timer::Timer(Mode mode) : m_mode(mode) {
+Timer::Timer(Mode mode) : m_mode(mode), m_running(false) {
 	handle_t handle;
 	status_t ret;
 
@@ -61,12 +61,14 @@ void Timer::Start(useconds_t interval) {
 	mode = (m_mode == kPeriodicMode) ? TIMER_PERIODIC : TIMER_ONESHOT;
 	ret = timer_start(m_handle, interval, mode);
 	assert(ret == STATUS_SUCCESS);
+	m_running = true;
 }
 
 /** Stop the timer. */
 void Timer::Stop() {
 	status_t ret = timer_stop(m_handle);
 	assert(ret == STATUS_SUCCESS);
+	m_running = false;
 }
 
 /** Register events with the event loop. */
@@ -78,5 +80,10 @@ void Timer::RegisterEvents() {
  * @param event		Event ID. */
 void Timer::HandleEvent(int event) {
 	assert(event == TIMER_EVENT);
+
+	if(m_mode == kOneShotMode) {
+		m_running = false;
+	}
+
 	OnTimer();
 }
