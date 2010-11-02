@@ -28,6 +28,9 @@ namespace kiwi {
 /** Class representing a single point on a 2D plane. */
 class KIWI_PUBLIC Point {
 public:
+	/** Initialise the point to (0, 0). */
+	Point() : m_x(0), m_y(0) {}
+
 	/** Initialise the point.
 	 * @param x		X position of the point.
 	 * @param y		Y position of the point. */

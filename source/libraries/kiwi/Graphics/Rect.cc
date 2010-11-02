@@ -108,14 +108,28 @@ Rect Rect::Translated(int dx, int dy) const {
  * @param x		X position to move to.
  * @param y		Y position to move to. */
 void Rect::MoveTo(int x, int y) {
-	return MoveTo(Point(x, y));
+	m_right = x + GetWidth();
+	m_bottom = y + GetHeight();
+	m_left = x;
+	m_top = y;
 }
 
 /** Move the rectangle.
  * @param pos		New position. */
 void Rect::MoveTo(const Point &pos) {
-	m_right = pos.GetX() + GetWidth();
-	m_bottom = pos.GetY() + GetHeight();
-	m_left = pos.GetX();
-	m_top = pos.GetY();
+	MoveTo(pos.GetX(), pos.GetY());
+}
+
+/** Set the size of the rectangle.
+ * @param width		New width.
+ * @param height	New height. */
+void Rect::Resize(int width, int height) {
+	m_right = GetX() + width;
+	m_bottom = GetY() + height;
+}
+
+/** Set the size of the rectangle.
+ * @param size		New size. */
+void Rect::Resize(const Size &size) {
+	Resize(size.GetWidth(), size.GetHeight());
 }

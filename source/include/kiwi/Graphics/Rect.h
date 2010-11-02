@@ -22,12 +22,14 @@
 #define __KIWI_GRAPHICS_RECT_H
 
 #include <kiwi/Graphics/Point.h>
+#include <kiwi/Graphics/Size.h>
 
 namespace kiwi {
 
 /** Class representing a rectangle area. */
 class KIWI_PUBLIC Rect {
 public:
+	/** Initialise the rectangle with an invalid size. */
 	Rect() : m_left(0), m_top(0), m_right(0), m_bottom(0) {}
 
 	/** Initialise the rectangle.
@@ -48,10 +50,16 @@ public:
 	Rect(const Point &p1, const Point &p2) :
 		m_left(p1.GetX()), m_top(p1.GetY()), m_right(p2.GetX()),
 		m_bottom(p2.GetY())
-	{
-		if(m_right < m_left) { m_right = m_left; }
-		if(m_bottom < m_top) { m_bottom = m_top; }
-	}
+	{}
+
+	/** Initialise the rectangle.
+	 * @param pos		Position of the top left of the rectangle.
+	 * @param size		Size of the rectangle. */
+	Rect(const Point &pos, const Size &size) :
+		m_left(pos.GetX()), m_top(pos.GetY()),
+		m_right(pos.GetX() + size.GetWidth()),
+		m_bottom(pos.GetY() + size.GetHeight())
+	{}
 
 	/** Get X position of top left of rectangle.
 	 * @return		X position. */
@@ -77,6 +85,10 @@ public:
 	 * @return		Point for bottom right. */
 	Point GetBottomRight() const { return Point(m_right, m_bottom); }
 
+	/** Get size of rectangle.
+	 * @return		Size of the rectangle. */
+	Size GetSize() const { return Size(GetWidth(), GetHeight()); }
+
 	bool IsValid() const;
 	bool Contains(const Point &point) const;
 	bool Intersects(const Rect &rect) const;
@@ -88,6 +100,8 @@ public:
 	Rect Translated(int dx, int dy) const;
 	void MoveTo(int x, int y);
 	void MoveTo(const Point &pos);
+	void Resize(int width, int height);
+	void Resize(const Size &size);
 
 	/** Intersect with another rectangle.
 	 * @see			Intersected().
