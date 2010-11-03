@@ -18,6 +18,7 @@
  * @brief		UI test application.
  */
 
+#if 0
 #include <cairo/cairo.h>
 #include <cairo/cairo-ft.h>
 
@@ -260,5 +261,10 @@ int main(int argc, char **argv) {
 	}
 #endif
 	loop.Run();
+	return 0;
+}
+#endif
+
+int main(int argc, char **argv) {
 	return 0;
 }

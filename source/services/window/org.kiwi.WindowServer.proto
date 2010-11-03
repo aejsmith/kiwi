@@ -17,7 +17,7 @@ service org.kiwi.WindowServer 1 {
 	type SurfaceID int32;
 
 	# Window ID type.
-	type WindowID int32;
+	type WindowID uint32;
 
 	# Structure representing a point.
 	struct Point {
@@ -44,25 +44,32 @@ service org.kiwi.WindowServer 1 {
 	function GetSurfaceSize(SurfaceID id, out Size size);
 
 	# Window functions.
-	function CreateWindow(Rect rect, out WindowID id);
+	function CreateWindow(uint32 style, uint32 level, out WindowID id);
 	function DestroyWindow(WindowID id);
-	function SubscribeWindow(WindowID id, uint32 events);
-	function ShowWindow(WindowID id);
-	function HideWindow(WindowID id);
 	function CloseWindow(WindowID id);
-	function ResizeWindow(WindowID id, Size size);
-	function MoveWindow(WindowID id, Point pos);
-	function UpdateWindow(WindowID id, Rect rect);
-	function GetWindowSurface(WindowID id, out SurfaceID sid);
-	function GetWindowRect(WindowID id, out Rect rect);
 	function GetWindowTitle(WindowID id, out string title);
 	function SetWindowTitle(WindowID id, string title);
+	function GetWindowStyle(WindowID id, out uint32 style);
+	function SetWindowStyle(WindowID id, uint32 style);
+	function GetWindowLevel(WindowID id, out uint32 level);
+	function SetWindowLevel(WindowID id, uint32 level);
+	function GetWindowFrame(WindowID id, out Rect rect);
+	function ResizeWindow(WindowID id, Size size);
+	function MoveWindow(WindowID id, Point pos);
+	function GetWindowState(WindowID id, out uint32 state);
+	function SetWindowState(WindowID id, uint32 state);
+	function GetWindowSurface(WindowID id, out SurfaceID sid);
+	function UpdateWindow(WindowID id, Rect rect);
 
-	# Window events.
-	event OnCreateWindow(WindowID id);
-	event OnDestroyWindow(WindowID id);
-	event OnCloseWindow(WindowID id);
-	event OnShowWindow(WindowID id);
-	event OnHideWindow(WindowID id);
-	event OnSetWindowTitle(WindowID id, string name);
+	# Window events. TODO: Once class serialization is done, use it here
+	# with the Event classes.
+	event OnMouseMove(WindowID id, int64 time, uint32 modifiers, Point pos, uint32 buttons);
+	event OnMousePress(WindowID id, int64 time, uint32 modifiers, Point pos, uint32 buttons);
+	event OnMouseRelease(WindowID id, int64 time, uint32 modifiers, Point pos, uint32 buttons);
+	event OnKeyPress(WindowID id, int64 time, uint32 modifiers, int32 key, string text);
+	event OnKeyRelease(WindowID id, int64 time, uint32 modifiers, int32 key, string text);
+	event OnWindowResize(WindowID id, Size size, Size prev);
+	event OnWindowClose(WindowID id);
+	event OnWindowStateChange(WindowID id, uint32 state, uint32 prev);
+	event OnWindowTitleChange(WindowID id);
 };

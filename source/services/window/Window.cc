@@ -41,9 +41,9 @@ Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, 
 	/* Create a new surface and publish it in the session. FIXME: Somehow
 	 * need to stop a DestroySurface call on this surface from working. */
 	m_surface = new Surface(rect.GetWidth(), rect.GetHeight());
-	if(m_id >= 0) {
+	//if(m_id >= 0) {
 		m_session->AddSurface(m_surface);
-	}
+	//}
 
 	/* Create the window decoration if the type requires one. */
 	switch(m_type) {
@@ -65,10 +65,10 @@ Window::Window(Session *session, ID id, Window *parent, const kiwi::Rect &rect, 
 /** Destroy the window. */
 Window::~Window() {
 	SetVisible(false);
-	if(m_id >= 0) {
+	//if(m_id >= 0) {
 		m_session->RemoveSurface(m_surface);
 		m_session->RemoveWindow(this);
-	}
+	//}
 	delete m_surface;
 }
 

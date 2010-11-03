@@ -100,12 +100,13 @@ status_t Connection::GetSurfaceSize(area_id_t id, org::kiwi::WindowServer::Size 
 }
 
 /** Create a new window.
- * @param rect		Rectangle area for the window.
+ * @param style		Style for the window.
+ * @param level		Level for the window.
  * @param id		Where to store ID of window.
  * @return		Status code describing result of the operation. */
-status_t Connection::CreateWindow(org::kiwi::WindowServer::Rect rect, Window::ID &id) {
+status_t Connection::CreateWindow(uint32_t style, uint32_t level, Window::ID &id) {
 	try {
-		Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
+		Rect _rect(0, 0, 100, 100);
 		Window *window = m_session->CreateWindow(_rect);
 		id = window->GetID();
 		return STATUS_SUCCESS;
@@ -118,104 +119,8 @@ status_t Connection::DestroyWindow(Window::ID id) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
-status_t Connection::SubscribeWindow(Window::ID id, uint32_t events) {
-	return STATUS_NOT_IMPLEMENTED;
-}
-
-/** Show a window.
- * @param id		ID of window to show.
- * @return		Status code describing result of the operation. */
-status_t Connection::ShowWindow(Window::ID id) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	m_session->ActivateWindow(window);
-	return STATUS_SUCCESS;
-}
-
-/** Hide a window.
- * @param id		ID of window to hide.
- * @return		Status code describing result of the operation. */
-status_t Connection::HideWindow(Window::ID id) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	m_session->HideWindow(window);
-	return STATUS_SUCCESS;
-}
-
 status_t Connection::CloseWindow(Window::ID id) {
 	return STATUS_NOT_IMPLEMENTED;
-}
-
-status_t Connection::ResizeWindow(Window::ID id, org::kiwi::WindowServer::Size size) {
-	return STATUS_NOT_IMPLEMENTED;
-}
-
-/** Move a window.
- * @param id		ID of window to move.
- * @param pos		Position to move to.
- * @return		Status code describing result of the operation. */
-status_t Connection::MoveWindow(Window::ID id, org::kiwi::WindowServer::Point pos) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	Point _pos(pos.x, pos.y);
-	window->MoveTo(_pos);
-	return STATUS_SUCCESS;
-}
-
-/** Update an area in a window on screen.
- * @param id		ID of window to update.
- * @param rect		Rectangular area to update.
- * @return		Status code describing result of the operation. */
-status_t Connection::UpdateWindow(Window::ID id, org::kiwi::WindowServer::Rect rect) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
-	window->Update(_rect);
-	return STATUS_SUCCESS;
-}
-
-/** Get the surface for a window.
- * @param id		ID of window to get surface for.
- * @param sid		Where to store surface ID.
- * @return		Status code describing result of the operation. */
-status_t Connection::GetWindowSurface(Window::ID id, area_id_t &sid) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	sid = window->GetSurface()->GetID();
-	return STATUS_SUCCESS;
-}
-
-/** Get a window's rectangle area.
- * @param id		ID of window to get area for.
- * @param rect		Where to store rectangle.
- * @return		Status code describing result of the operation. */
-status_t Connection::GetWindowRect(Window::ID id, org::kiwi::WindowServer::Rect &rect) {
-	Window *window = m_session->FindWindow(id);
-	if(!window) {
-		return STATUS_NOT_FOUND;
-	}
-
-	Rect _rect = window->GetRect();
-	rect.pos.x = _rect.GetX();
-	rect.pos.y = _rect.GetY();
-	rect.size.width = _rect.GetWidth();
-	rect.size.height = _rect.GetHeight();
-	return STATUS_SUCCESS;
 }
 
 /** Get a window's title.
@@ -243,6 +148,98 @@ status_t Connection::SetWindowTitle(Window::ID id, const std::string &title) {
 	}
 
 	window->SetTitle(title);
+	return STATUS_SUCCESS;
+}
+
+status_t Connection::GetWindowStyle(Window::ID id, uint32_t &style) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+status_t Connection::SetWindowStyle(Window::ID id, uint32_t style) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+status_t Connection::GetWindowLevel(Window::ID id, uint32_t &level) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+status_t Connection::SetWindowLevel(Window::ID id, uint32_t level) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Get a window's frame, relative to its parent.
+ * @param id		ID of window to get area for.
+ * @param rect		Where to store rectangle describing window's frame (the
+ *			rectangular area that it occupies, relative to its
+ *			parent window).
+ * @return		Status code describing result of the operation. */
+status_t Connection::GetWindowFrame(Window::ID id, org::kiwi::WindowServer::Rect &rect) {
+	Window *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	}
+
+	Rect _rect = window->GetRect();
+	rect.pos.x = _rect.GetX();
+	rect.pos.y = _rect.GetY();
+	rect.size.width = _rect.GetWidth();
+	rect.size.height = _rect.GetHeight();
+	return STATUS_SUCCESS;
+}
+
+status_t Connection::ResizeWindow(Window::ID id, org::kiwi::WindowServer::Size size) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Move a window.
+ * @param id		ID of window to move.
+ * @param pos		Position to move to.
+ * @return		Status code describing result of the operation. */
+status_t Connection::MoveWindow(Window::ID id, org::kiwi::WindowServer::Point pos) {
+	Window *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	}
+
+	Point _pos(pos.x, pos.y);
+	window->MoveTo(_pos);
+	return STATUS_SUCCESS;
+}
+
+status_t Connection::GetWindowState(Window::ID id, uint32_t &state) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+status_t Connection::SetWindowState(Window::ID id, uint32_t state) {
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+/** Get the surface for a window.
+ * @param id		ID of window to get surface for.
+ * @param sid		Where to store surface ID.
+ * @return		Status code describing result of the operation. */
+status_t Connection::GetWindowSurface(Window::ID id, area_id_t &sid) {
+	Window *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	}
+
+	sid = window->GetSurface()->GetID();
+	return STATUS_SUCCESS;
+}
+
+/** Update an area in a window on screen.
+ * @param id		ID of window to update.
+ * @param rect		Rectangular area to update.
+ * @return		Status code describing result of the operation. */
+status_t Connection::UpdateWindow(Window::ID id, org::kiwi::WindowServer::Rect rect) {
+	Window *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	}
+
+	Rect _rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
+	window->Update(_rect);
 	return STATUS_SUCCESS;
 }
 
