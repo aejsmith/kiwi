@@ -13,12 +13,19 @@
 
 Import('env')
 
+# Generate window server interface code.
+env.RPCClient('org.kiwi.WindowServer.cc', '../../../services/window/org.kiwi.WindowServer.proto')
+
 # Build the library.
 env.KiwiLibrary('kiwi-graphics',
 	sources = [
+		'org.kiwi.WindowServer.cc',
+		'BaseWindow.cc',
+		'Event.cc',
 		'Rect.cc',
 		'Region.cc',
+		'Surface.cc',
 	],
 	libraries = ['kiwi', 'cairo'],
-	build_libraries = ['kiwi'],
+	build_libraries = ['kiwi', 'cairo'],
 )
