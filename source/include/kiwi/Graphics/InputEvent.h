@@ -36,8 +36,11 @@ namespace Input {
 	enum KeyboardModifier {
 		kControlModifier = (1<<0),	/**< A Control key is pressed. */
 		kAltModifier = (1<<1),		/**< An Alt key is pressed. */
-		kMetaModifier = (1<<2),		/**< A Meta key is pressed. */
+		kSuperModifier = (1<<2),	/**< A Super key is pressed. */
 		kShiftModifier = (1<<3),	/**< A Shift key is pressed. */
+		kCapsLockModifier = (1<<4),	/**< Caps Lock is enabled. */
+		kNumLockModifier = (1<<5),	/**< Num Lock is enabled. */
+		kScrollLockModifier = (1<<6),	/**< Scroll Lock is enabled. */
 	};
 
 	/** Mouse button flags. */

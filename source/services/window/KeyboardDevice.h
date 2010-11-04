@@ -15,20 +15,20 @@
 
 /**
  * @file
- * @brief		Mouse device class.
+ * @brief		Keyboard device class.
  */
 
-#ifndef __MOUSEDEVICE_H
-#define __MOUSEDEVICE_H
+#ifndef __KEYBOARDEVICE_H
+#define __KEYBOARDEVICE_H
 
 #include "InputDevice.h"
 
-/** Class representing a mouse device. */
-class MouseDevice : public InputDevice {
+/** Class representing a keyboard device. */
+class KeyboardDevice : public InputDevice {
 public:
-	MouseDevice(InputManager *manager, handle_t handle);
+	KeyboardDevice(InputManager *manager, handle_t handle);
 private:
 	void HandleEvent(input_event_t &event);
 };
 
-#endif /* __MOUSEDEVICE_H */
+#endif /* __KEYBOARDEVICE_H */

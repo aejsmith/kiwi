@@ -15,40 +15,36 @@
 
 /**
  * @file
- * @brief		Mouse device class.
+ * @brief		Keyboard device class.
+ *
+ * @todo		Keymap support.
  */
 
 #include <drivers/input.h>
 #include <iostream>
-#include "MouseDevice.h"
+#include "KeyboardDevice.h"
 
 using namespace std;
 
-/** Initialise the mouse device.
+/** Initialise the keyboard device.
  * @param manager	Manager of the device.
  * @param handle	Handle to device. */
-MouseDevice::MouseDevice(InputManager *manager, handle_t handle) :
+KeyboardDevice::KeyboardDevice(InputManager *manager, handle_t handle) :
 	InputDevice(manager, handle)
 {}
 
 /** Handle an event.
  * @param event		Kernel event structure. */
-void MouseDevice::HandleEvent(input_event_t &event) {
+void KeyboardDevice::HandleEvent(input_event_t &event) {
 	switch(event.type) {
-	case INPUT_EVENT_REL_X:
-		m_manager->MouseMove(event.time, event.value, 0);
+	case INPUT_EVENT_KEY_DOWN:
+		m_manager->KeyPress(event.time, event.value, string());
 		break;
-	case INPUT_EVENT_REL_Y:
-		m_manager->MouseMove(event.time, 0, event.value);
-		break;
-	case INPUT_EVENT_BTN_DOWN:
-		m_manager->MousePress(event.time, event.value);
-		break;
-	case INPUT_EVENT_BTN_UP:
-		m_manager->MouseRelease(event.time, event.value);
+	case INPUT_EVENT_KEY_UP:
+		m_manager->KeyRelease(event.time, event.value, string());
 		break;
 	default:
-		clog << "Unrecognised mouse event: " << event.type << endl;
+		clog << "Unrecognised keyboard event: " << event.type << endl;
 		break;
 	}
 }

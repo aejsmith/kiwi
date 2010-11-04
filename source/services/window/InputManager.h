@@ -21,6 +21,7 @@
 #ifndef __INPUTMANAGER_H
 #define __INPUTMANAGER_H
 
+#include <kiwi/Graphics/InputEvent.h>
 #include <kiwi/Support/Noncopyable.h>
 
 class WindowServer;
@@ -29,8 +30,20 @@ class WindowServer;
 class InputManager : kiwi::Noncopyable {
 public:
 	InputManager(WindowServer *server);
+
+	void MouseMove(useconds_t time, int dx, int dy);
+	void MousePress(useconds_t time, int32_t button);
+	void MouseRelease(useconds_t time, int32_t button);
+	void KeyPress(useconds_t time, int32_t key, const std::string &text);
+	void KeyRelease(useconds_t time, int32_t key, const std::string &text);
+
+	/** Get the modifier state.
+	 * @return		Modifier state. */
+	uint32_t GetModifiers() const { return m_modifiers; }
 private:
 	WindowServer *m_server;		/**< Server that the manager is for. */
+	uint32_t m_modifiers;		/**< Currently pressed keyboard modifiers. */
+	uint32_t m_buttons;		/**< Currently pressed mouse buttons. */
 };
 
 #endif /* __INPUTMANAGER_H */

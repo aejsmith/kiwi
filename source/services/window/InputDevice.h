@@ -15,20 +15,27 @@
 
 /**
  * @file
- * @brief		Mouse device class.
+ * @brief		Base input device class.
  */
 
-#ifndef __MOUSEDEVICE_H
-#define __MOUSEDEVICE_H
+#ifndef __INPUTDEVICE_H
+#define __INPUTDEVICE_H
 
-#include "InputDevice.h"
+#include <kiwi/Handle.h>
 
-/** Class representing a mouse device. */
-class MouseDevice : public InputDevice {
+#include "InputManager.h"
+
+/** Base class for an input device. */
+class InputDevice : public kiwi::Handle {
 public:
-	MouseDevice(InputManager *manager, handle_t handle);
+	InputDevice(InputManager *manager, handle_t handle);
+protected:
+	virtual void HandleEvent(input_event_t &event) = 0;
+
+	InputManager *m_manager;	/**< Input manager the device is for. */
 private:
-	void HandleEvent(input_event_t &event);
+	void RegisterEvents();
+	void HandleEvent(int id);
 };
 
-#endif /* __MOUSEDEVICE_H */
+#endif /* __INPUTDEVICE_H */
