@@ -13,7 +13,7 @@
 
 Import('env')
 
-env.KiwiApplication('uitest',
+env.KiwiApplication('console',
 	sources = [
 		'main.cc',
 	],

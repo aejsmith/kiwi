@@ -165,9 +165,9 @@ int main(int argc, char **argv) {
 			"org.kiwi.WindowServer"
 		));
 
-		/* Run the UI test application. */
+		/* Run the console application. */
 		Process proc;
-		proc.Create("/system/binaries/uitest");
+		proc.Create("/system/binaries/console");
 	}
 
 	svcmgr.Run();
