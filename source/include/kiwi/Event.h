@@ -36,12 +36,7 @@ public:
 		kKeyPress,		/**< Key press. */
 		kKeyRelease,		/**< Key release. */
 		kResize,		/**< Window/widget resized. */
-		kWindowCreate,		/**< Child window created. */
-		kWindowDestroy,		/**< Window destroyed. */
-		kWindowShow,		/**< Window shown. */
-		kWindowHide,		/**< Window hidden. */
-		kWindowActivate,	/**< Window activated. */
-		kWindowDeactivate,	/**< Window deactivate. */
+		kWindowClose,		/**< Window closed. */
 		kWindowTitleChange,	/**< Window title changed. */
 		kWindowStateChange,	/**< Window state has changed. */
 	};

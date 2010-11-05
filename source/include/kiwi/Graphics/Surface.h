@@ -22,6 +22,8 @@
 #define __KIWI_GRAPHICS_SURFACE_H
 
 #include <cairo/cairo.h>
+
+#include <kiwi/Graphics/Size.h>
 #include <kiwi/Object.h>
 
 namespace kiwi {
@@ -35,12 +37,13 @@ class SurfacePrivate;
  */
 class KIWI_PUBLIC Surface : public kiwi::Object {
 public:
-	Surface(uint16_t width, uint16_t height);
+	Surface(const Size &size);
 	Surface(area_id_t area);
 	~Surface();
 
-	bool Resize(uint16_t width, uint16_t height);
-	void *GetData();
+	Size GetSize() const;
+	bool Resize(const Size &size);
+	unsigned char *GetData();
 	size_t GetDataSize() const;
 	cairo_surface_t *GetCairoSurface();
 private:

@@ -299,7 +299,12 @@ status_t Connection::SetWindowState(ServerWindow::ID id, uint32_t state) {
 		return STATUS_PERM_DENIED;
 	}
 
+	bool visible = window->IsVisible();
 	window->SetState(state);
+	if(!visible && (state & BaseWindow::kVisibleState)) {
+		m_session->ActivateWindow(window);
+	}
+
 	return STATUS_SUCCESS;
 }
 

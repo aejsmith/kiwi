@@ -13,10 +13,8 @@
 
 Import('env')
 
-env.RPCClient('org.kiwi.WindowServer.cc', '../../services/window/org.kiwi.WindowServer.proto')
 env.KiwiApplication('uitest',
 	sources = [
-		'org.kiwi.WindowServer.cc',
 		'main.cc',
 	],
 	libraries = ['kiwi-graphics', 'kiwi', 'freetype', 'cairo', 'kernel'],

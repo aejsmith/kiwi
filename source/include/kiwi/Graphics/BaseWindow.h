@@ -35,6 +35,7 @@
 namespace kiwi {
 
 class BaseWindowPrivate;
+class WSConnection;
 class Surface;
 
 /** Base window class.
@@ -44,6 +45,7 @@ class Surface;
  * things like UI widgets: for this, use the Window class.
  */
 class KIWI_PUBLIC BaseWindow : public kiwi::Object, kiwi::Noncopyable {
+	friend class WSConnection;
 public:
 	/** Window levels.
 	 * @note		kRootLevel and kCursorLevel cannot be set by
@@ -109,10 +111,10 @@ protected:
 	virtual void MouseReleased(const MouseEvent &event);
 	virtual void KeyPressed(const KeyEvent &event);
 	virtual void KeyReleased(const KeyEvent &event);
-	virtual void WindowResized(const ResizeEvent &event);
-	virtual void WindowClosed(const WindowEvent &event);
+	virtual void Closed(const WindowEvent &event);
 	virtual void StateChanged(const WindowStateEvent &event);
 	virtual void TitleChanged(const WindowEvent &event);
+	virtual void Resized(const ResizeEvent &event);
 private:
 	BaseWindowPrivate *m_priv;	/**< Internal data pointer. */
 };
