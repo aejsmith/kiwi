@@ -45,8 +45,10 @@ class Surface;
  */
 class KIWI_PUBLIC BaseWindow : public kiwi::Object, kiwi::Noncopyable {
 public:
-	/** Window levels. */
-	enum Level {
+	/** Window levels.
+	 * @note		kRootLevel and kCursorLevel cannot be set by
+	 *			applications. */
+	enum Level : uint32_t {
 		kRootLevel = 0,			/**< Root window level. */
 		kNormalLevel = 10,		/**< Normal window level. */
 		kPanelLevel = 20,		/**< Panel level. */
@@ -55,7 +57,7 @@ public:
 	};
 
 	/** Window style flags. */
-	enum {
+	enum : uint32_t {
 		kActivatableMask = (1<<0),	/**< Can be made the active window. */
 		kBorderMask = (1<<1),		/**< Has a border. */
 		kMinimizableMask = (1<<2),	/**< The window can be minimized. */
@@ -65,7 +67,7 @@ public:
 	};
 
 	/** Pre-defined window styles. */
-	enum {
+	enum : uint32_t {
 		/** Normal window with a border. */
 		kNormalStyle = (kActivatableMask | kBorderMask | kMinimizableMask |
 		                kMaximizableMask | kResizableMask | kMovableMask),
@@ -76,14 +78,16 @@ public:
 	};
 
 	/** Window state flags. */
-	enum {
+	enum : uint32_t {
 		kVisibleState = (1<<0),		/**< Window is visible. */
-		kActiveState = (1<<1),		/**< Window is the active window. */
+		kActiveState = (1<<1),		/**< Window is active (cannot be changed through SetState()). */
 		kMaximizedState = (1<<2),	/**< Window is maximized. */
 		kMinimizedState = (1<<3),	/**< Window is minimized. */
 	};
 
 	BaseWindow(uint32_t style = kNormalStyle, Level level = kNormalLevel);
+	BaseWindow(const Size &size, uint32_t style = kNormalStyle, Level level = kNormalLevel);
+	BaseWindow(const Rect &frame, uint32_t style = kNormalStyle, Level level = kNormalLevel);
 	~BaseWindow();
 
 	std::string GetTitle() const;

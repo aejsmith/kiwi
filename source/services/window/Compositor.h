@@ -30,22 +30,22 @@
 
 #include <list>
 
-#include "Window.h"
+#include "ServerWindow.h"
 
 class Display;
-class Surface;
+class ServerSurface;
 
 /** Class that manages the rendering of windows. */
 class Compositor : public kiwi::Object, kiwi::Noncopyable {
 public:
-	Compositor(Display *display, Window *root);
+	Compositor(Display *display, ServerWindow *root);
 	~Compositor();
 
 	void Redraw();
 	void Redraw(const kiwi::Rect &rect);
 	void Redraw(const kiwi::Region &region);
 private:
-	void Render(Window *window, int16_t off_x, int16_t off_y);
+	void Render(ServerWindow *window, int off_x, int off_y);
 
 	void ScheduleRedraw();
 	void PerformRedraw();
@@ -53,8 +53,8 @@ private:
 	kiwi::Timer m_timer;		/**< Redraw timer. */
 	kiwi::Region m_redraw_region;	/**< Redraw region. */
 	Display *m_display;		/**< Display to render to. */
-	Window *m_root;			/**< Root window. */
-	Surface *m_surface;		/**< Back buffer that rendering takes place on. */
+	ServerWindow *m_root;		/**< Root window. */
+	ServerSurface *m_surface;	/**< Back buffer that rendering takes place on. */
 	cairo_t *m_context;		/**< Cairo context for rendering. */
 };
 

@@ -24,73 +24,85 @@
 #include <iostream>
 #include <iterator>
 
-#include "Window.h"
+#include "ServerWindow.h"
 #include "WindowList.h"
 
 using namespace std;
+
+WindowList::Iterator::Iterator(const Map &map, Map::const_iterator iter) :
+	m_map(map), m_map_iter(iter)
+{
+	if(m_map_iter != m_map.end()) {
+		m_list_iter = m_map_iter->second.begin();
+	}
+}
+
+WindowList::Iterator &WindowList::Iterator::operator ++() {
+	if(m_map_iter != m_map.end()) {
+		if(++m_list_iter == m_map_iter->second.end()) {
+			if(++m_map_iter != m_map.end()) {
+				m_list_iter = m_map_iter->second.begin();
+			} else {
+				m_list_iter = List::iterator();
+			}
+		}
+	}
+	return *this;
+}
+
+WindowList::Iterator &WindowList::Iterator::operator --() {
+	if(m_map_iter == m_map.end() || --m_list_iter == (--m_map_iter->second.begin())) {
+		if(--m_map_iter != (--m_map.begin())) {
+			m_list_iter = --m_map_iter->second.end();
+		} else {
+			m_list_iter = List::iterator();
+		}
+	}
+
+	return *this;
+}
 
 /** Construct the window list. */
 WindowList::WindowList() {};
 
 /** Add a window to the window list.
  * @param window	Window to add. */
-void WindowList::Insert(Window *window) {
+void WindowList::Insert(ServerWindow *window) {
 	ListForWindow(window).push_back(window);
-	RebuildList();
 }
 
 /** Remove a window from the list.
  * @param window	Window to remove. */
-void WindowList::Remove(Window *window) {
-	ListForWindow(window).remove(window);
-	m_list.remove(window);
+void WindowList::Remove(ServerWindow *window) {
+	List &list = ListForWindow(window);
+	list.remove(window);
+	if(list.empty()) {
+		m_windows.erase(window->GetLevel());
+	}
 }
 
-/** Move a window as far forward as it can be.
+/** Move a window above all others in its level.
  * @param window	Window to move forward.
  * @return		Whether the list position changed. */
-bool WindowList::MoveToFront(Window *window) {
+bool WindowList::MoveToFront(ServerWindow *window) {
 	List &list = ListForWindow(window);
 	if(list.empty() || *(--list.end()) != window) {
 		list.remove(window);
 		list.push_back(window);
-		RebuildList();
 		return true;
 	}
 
 	return false;
 }
 
-/** Get the list a window should be placed in.
- * @param window	Window.
- * @return		Reference to list. */
-WindowList::List &WindowList::ListForWindow(Window *window) {
-	switch(window->GetType()) {
-	case WINDOW_TYPE_NORMAL:
-	case WINDOW_TYPE_UNBORDERED:
-	case WINDOW_TYPE_ALERT:
-	case WINDOW_TYPE_CHILD:
-		return m_normal;
-	case WINDOW_TYPE_PANEL:
-		return m_panels;
-	case WINDOW_TYPE_POPUP:
-		return m_popups;
-	case WINDOW_TYPE_CURSOR:
-		return m_cursors;
-	case WINDOW_TYPE_ROOT:
-		clog << "Root window should not be placed in WindowList" << endl;
-		abort();
-	default:
-		clog << "Invalid window type, should be validated elsewhere." << endl;
-		abort();
+/** Get the list containing a window.
+ * @param window	Window to get list for.
+ * @return		Reference to list for the window. */
+WindowList::List &WindowList::ListForWindow(ServerWindow *window) {
+	Map::iterator it = m_windows.find(window->GetLevel());
+	if(it == m_windows.end()) {
+		it = m_windows.insert(make_pair(window->GetLevel(), List())).first;
 	}
-}
 
-/** Rebuild the list of all windows. */
-void WindowList::RebuildList() {
-	m_list.clear();
-	copy(m_normal.begin(), m_normal.end(), back_inserter(m_list));
-	copy(m_panels.begin(), m_panels.end(), back_inserter(m_list));
-	copy(m_popups.begin(), m_popups.end(), back_inserter(m_list));
-	copy(m_cursors.begin(), m_cursors.end(), back_inserter(m_list));
+	return it->second;
 }

@@ -21,46 +21,92 @@
 #ifndef __WINDOWLIST_H
 #define __WINDOWLIST_H
 
+#include <iterator>
 #include <list>
+#include <map>
+#include <stdint.h>
 
-class Window;
+class ServerWindow;
 
 /** Class managing the order of windows. */
 class WindowList {
-public:
 	/** Internal list type. */
-	typedef std::list<Window *> List;
+	typedef std::list<ServerWindow *> List;
+
+	/** Type of the map of levels to window lists. */
+	typedef std::map<uint32_t, List> Map;
+public:
+	/** List iterator type. */
+	class Iterator : public std::iterator<std::bidirectional_iterator_tag, ServerWindow *const> {
+		friend class WindowList;
+	public:
+		Iterator(const Iterator &other) :
+			m_map(other.m_map), m_map_iter(other.m_map_iter),
+			m_list_iter(other.m_list_iter)
+		{}
+
+		Iterator &operator ++();
+		Iterator &operator --();
+
+		Iterator operator ++(int) {
+			Iterator tmp(*this);
+			operator ++();
+			return tmp;
+		}
+
+		Iterator operator --(int) {
+			Iterator tmp(*this);
+			operator --();
+			return tmp;
+		}
+
+		bool operator ==(const Iterator &other) {
+			return (m_map_iter == other.m_map_iter && m_list_iter == other.m_list_iter);
+		}
+
+		bool operator !=(const Iterator &other) {
+			return (m_map_iter != other.m_map_iter || m_list_iter != other.m_list_iter);
+		}
+
+		ServerWindow *const &operator *() {
+			return *m_list_iter;
+		}
+	private:
+		Iterator(const Map &map, Map::const_iterator iter);
+
+		const Map &m_map;
+		Map::const_iterator m_map_iter;
+		List::const_iterator m_list_iter;
+	};
+
+	/** Reverse iterator type. */
+	typedef std::reverse_iterator<Iterator> ReverseIterator;
 
 	WindowList();
 
-	void Insert(Window *window);
-	void Remove(Window *window);
-	bool MoveToFront(Window *window);
+	void Insert(ServerWindow *window);
+	void Remove(ServerWindow *window);
+	bool MoveToFront(ServerWindow *window);
 
 	/** Get the list head.
 	 * @return		Iterator to first window in the list. */
-	List::const_iterator Begin() { return m_list.begin(); }
+	Iterator Begin() const { return Iterator(m_windows, m_windows.begin()); }
 
 	/** Get the list end.
 	 * @return		Iterator pointing after last window in the list. */
-	List::const_iterator End() { return m_list.end(); }
+	Iterator End() const { return Iterator(m_windows, m_windows.end()); }
 
 	/** Get the reverse list head.
 	 * @return		Iterator to last window in the list. */
-	List::const_reverse_iterator RBegin() { return m_list.rbegin(); }
+	ReverseIterator ReverseBegin() const { return ReverseIterator(End()); }
 
 	/** Get the reverse list end.
 	 * @return		Iterator pointing after first window in the list. */
-	List::const_reverse_iterator REnd() { return m_list.rend(); }
+	ReverseIterator ReverseEnd() const { return ReverseIterator(Begin()); }
 private:
-	List &ListForWindow(Window *window);
-	void RebuildList();
+	List &ListForWindow(ServerWindow *window);
 
-	List m_list;			/**< List of windows. */
-	List m_normal;			/**< List of normal windows. */
-	List m_panels;			/**< List of panel windows. */
-	List m_popups;			/**< List of popup windows. */
-	List m_cursors;			/**< List of cursor windows. */
+	Map m_windows;			/**< Map of levels to window lists. */
 };
 
 #endif /* __WINDOWLIST_H */

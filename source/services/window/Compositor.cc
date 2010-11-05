@@ -23,7 +23,7 @@
 
 #include "Decoration.h"
 #include "Display.h"
-#include "Surface.h"
+#include "ServerSurface.h"
 #include "Compositor.h"
 
 using namespace kiwi;
@@ -32,7 +32,7 @@ using namespace std;
 /** Set up the compositor.
  * @param display	Display that windows should be rendered to.
  * @param root		Root window. */
-Compositor::Compositor(Display *display, Window *root) :
+Compositor::Compositor(Display *display, ServerWindow *root) :
 	m_timer(Timer::kOneShotMode), m_display(display), m_root(root),
 	m_surface(0), m_context(0)
 {
@@ -40,7 +40,7 @@ Compositor::Compositor(Display *display, Window *root) :
 	m_timer.OnTimer.Connect(this, &Compositor::PerformRedraw);
 
 	/* Create a surface to render to. */
-	m_surface = new Surface(display->GetCurrentMode().width, display->GetCurrentMode().height);
+	m_surface = new ServerSurface(0, display->GetSize());
 
 	/* Set up a Cairo context for rendering on to the surface. */
 	m_context = cairo_create(m_surface->GetCairoSurface());
@@ -86,18 +86,18 @@ void Compositor::Redraw(const Region &region) {
  * @param window	Window to render.
  * @param off_x		X position offset.
  * @param off_y		Y position offset. */
-void Compositor::Render(Window *window, int16_t off_x, int16_t off_y) {
+void Compositor::Render(ServerWindow *window, int off_x, int off_y) {
 	cairo_save(m_context);
 
-	off_x += window->GetRect().GetX();
-	off_y += window->GetRect().GetY();
+	off_x += window->GetFrame().GetX();
+	off_y += window->GetFrame().GetY();
 
 	/* Paint decoration, if any. */
 	Decoration *decor = window->GetDecoration();
 	if(decor) {
 		cairo_set_source_surface(m_context, decor->GetSurface(),
-		                         off_x + decor->GetRect().GetX(),
-		                         off_y + decor->GetRect().GetY());
+		                         off_x + decor->GetFrame().GetX(),
+		                         off_y + decor->GetFrame().GetY());
 		cairo_paint(m_context);
 	}
 
@@ -156,8 +156,7 @@ void Compositor::PerformRedraw() {
 
 	/* Update the screen. */
 	for(auto it = rects.begin(); it != rects.end(); ++it) {
-		m_display->DrawSurface(m_surface, it->GetX(), it->GetY(), it->GetX(),
-		                       it->GetY(), it->GetWidth(), it->GetHeight());
+		m_display->DrawSurface(m_surface, it->GetTopLeft(), it->GetTopLeft(), it->GetSize());
 	}
 
 }

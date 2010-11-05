@@ -17,18 +17,18 @@ service org.kiwi.WindowServer 1 {
 	type SurfaceID int32;
 
 	# Window ID type.
-	type WindowID uint32;
+	type WindowID int32;
 
 	# Structure representing a point.
 	struct Point {
-		int16 x;
-		int16 y;
+		int32 x;
+		int32 y;
 	};
 
 	# Structure representing a rectangle size.
 	struct Size {
-		uint16 width;
-		uint16 height;
+		uint32 width;
+		uint32 height;
 	};
 
 	# Structure representing a rectangle area on a surface.
@@ -40,11 +40,11 @@ service org.kiwi.WindowServer 1 {
 	# Surface functions.
 	function CreateSurface(Size size, out SurfaceID id);
 	function DestroySurface(SurfaceID id);
-	function ResizeSurface(SurfaceID id, Size size);
 	function GetSurfaceSize(SurfaceID id, out Size size);
+	function ResizeSurface(SurfaceID id, Size size);
 
 	# Window functions.
-	function CreateWindow(uint32 style, uint32 level, out WindowID id);
+	function CreateWindow(out WindowID id);
 	function DestroyWindow(WindowID id);
 	function CloseWindow(WindowID id);
 	function GetWindowTitle(WindowID id, out string title);
@@ -58,6 +58,7 @@ service org.kiwi.WindowServer 1 {
 	function MoveWindow(WindowID id, Point pos);
 	function GetWindowState(WindowID id, out uint32 state);
 	function SetWindowState(WindowID id, uint32 state);
+	function ActivateWindow(WindowID id);
 	function GetWindowSurface(WindowID id, out SurfaceID sid);
 	function UpdateWindow(WindowID id, Rect rect);
 
@@ -68,8 +69,8 @@ service org.kiwi.WindowServer 1 {
 	event OnMouseRelease(WindowID id, int64 time, uint32 modifiers, Point pos, uint32 buttons);
 	event OnKeyPress(WindowID id, int64 time, uint32 modifiers, int32 key, string text);
 	event OnKeyRelease(WindowID id, int64 time, uint32 modifiers, int32 key, string text);
-	event OnWindowResize(WindowID id, Size size, Size prev);
 	event OnWindowClose(WindowID id);
-	event OnWindowStateChange(WindowID id, uint32 state, uint32 prev);
 	event OnWindowTitleChange(WindowID id);
+	event OnWindowStateChange(WindowID id, uint32 state, uint32 prev);
+	event OnWindowResize(WindowID id, Size size, Size prev);
 };

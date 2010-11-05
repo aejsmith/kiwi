@@ -22,7 +22,7 @@
 #define __CONNECTION_H
 
 #include "org.kiwi.WindowServer.h"
-#include "Window.h"
+#include "ServerWindow.h"
 
 class Session;
 
@@ -37,25 +37,26 @@ public:
 private:
 	status_t CreateSurface(org::kiwi::WindowServer::Size size, area_id_t &id);
 	status_t DestroySurface(area_id_t id);
-	status_t ResizeSurface(area_id_t id, org::kiwi::WindowServer::Size size);
 	status_t GetSurfaceSize(area_id_t id, org::kiwi::WindowServer::Size &size);
+	status_t ResizeSurface(area_id_t id, org::kiwi::WindowServer::Size size);
 
-	status_t CreateWindow(uint32_t style, uint32_t level, Window::ID &id);
-	status_t DestroyWindow(Window::ID id);
-	status_t CloseWindow(Window::ID id);
-	status_t GetWindowTitle(Window::ID id, std::string &title);
-	status_t SetWindowTitle(Window::ID id, const std::string &title);
-	status_t GetWindowStyle(Window::ID id, uint32_t &style);
-	status_t SetWindowStyle(Window::ID id, uint32_t style);
-	status_t GetWindowLevel(Window::ID id, uint32_t &level);
-	status_t SetWindowLevel(Window::ID id, uint32_t level);
-	status_t GetWindowFrame(Window::ID id, org::kiwi::WindowServer::Rect &rect);
-	status_t ResizeWindow(Window::ID id, org::kiwi::WindowServer::Size size);
-	status_t MoveWindow(Window::ID id, org::kiwi::WindowServer::Point pos);
-	status_t GetWindowState(Window::ID id, uint32_t &state);
-	status_t SetWindowState(Window::ID id, uint32_t state);
-	status_t GetWindowSurface(Window::ID id, area_id_t &sid);
-	status_t UpdateWindow(Window::ID id, org::kiwi::WindowServer::Rect rect);
+	status_t CreateWindow(ServerWindow::ID &id);
+	status_t DestroyWindow(ServerWindow::ID id);
+	status_t CloseWindow(ServerWindow::ID id);
+	status_t GetWindowTitle(ServerWindow::ID id, std::string &title);
+	status_t SetWindowTitle(ServerWindow::ID id, const std::string &title);
+	status_t GetWindowStyle(ServerWindow::ID id, uint32_t &style);
+	status_t SetWindowStyle(ServerWindow::ID id, uint32_t style);
+	status_t GetWindowLevel(ServerWindow::ID id, uint32_t &level);
+	status_t SetWindowLevel(ServerWindow::ID id, uint32_t level);
+	status_t GetWindowFrame(ServerWindow::ID id, org::kiwi::WindowServer::Rect &rect);
+	status_t ResizeWindow(ServerWindow::ID id, org::kiwi::WindowServer::Size size);
+	status_t MoveWindow(ServerWindow::ID id, org::kiwi::WindowServer::Point pos);
+	status_t GetWindowState(ServerWindow::ID id, uint32_t &state);
+	status_t SetWindowState(ServerWindow::ID id, uint32_t state);
+	status_t ActivateWindow(ServerWindow::ID id);
+	status_t GetWindowSurface(ServerWindow::ID id, area_id_t &sid);
+	status_t UpdateWindow(ServerWindow::ID id, org::kiwi::WindowServer::Rect rect);
 
 	void HandleHangup();
 

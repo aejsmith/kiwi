@@ -23,12 +23,14 @@
 
 #include <drivers/display.h>
 
+#include <kiwi/Graphics/Point.h>
+#include <kiwi/Graphics/Size.h>
 #include <kiwi/Handle.h>
 
 #include <pixman.h>
 #include <vector>
 
-class Surface;
+class ServerSurface;
 class WindowServer;
 
 /** Class representing a display. */
@@ -40,8 +42,7 @@ public:
 	Display(WindowServer *server, const char *path);
 
 	status_t SetMode(display_mode_t &mode);
-	void DrawSurface(Surface *surface, int16_t x, int16_t y, int16_t src_x,
-	                 int16_t src_y, uint16_t width, uint16_t height);
+	void DrawSurface(ServerSurface *surface, kiwi::Point dest, kiwi::Point src, kiwi::Size size);
 
 	/** Get an array of modes supported by the device.
 	 * @return		Reference to mode vector. */
@@ -50,6 +51,12 @@ public:
 	/** Get the current mode the device is using.
 	 * @return		Reference to current mode. */
 	const display_mode_t &GetCurrentMode() const { return m_current_mode; }
+
+	/** Get the size of the current mode.
+	 * @return		Size of the current mode. */
+	kiwi::Size GetSize() const {
+		return kiwi::Size(m_current_mode.width, m_current_mode.height);
+	}
 private:
 	void RegisterEvents();
 	void HandleEvent(int event);

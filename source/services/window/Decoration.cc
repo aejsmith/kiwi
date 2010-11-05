@@ -28,7 +28,7 @@
 #include <math.h>
 
 #include "Decoration.h"
-#include "Window.h"
+#include "ServerWindow.h"
 
 using namespace kiwi;
 using namespace std;
@@ -85,7 +85,7 @@ static void rounded_rectangle(cairo_t *context, double x, double y, double width
 
 /** Create a decoration.
  * @param window	Window that the decoration is for. */
-Decoration::Decoration(Window *window) :
+Decoration::Decoration(ServerWindow *window) :
 	m_window(window), m_surface(0)
 {
 	if(!g_cairo_font) {
@@ -134,17 +134,17 @@ void Decoration::Update() {
 	}
 
 	/* Work out the new size. */
-	m_rect = Rect(-1, -24, m_window->GetRect().GetWidth() + 2, m_window->GetRect().GetHeight() + 25);
+	m_frame = Rect(-1, -24, m_window->GetFrame().GetWidth() + 2, m_window->GetFrame().GetHeight() + 25);
 
 	/* Create a new surface and a context to render to. */
-	m_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, m_rect.GetWidth(), m_rect.GetHeight());
+	m_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, m_frame.GetWidth(), m_frame.GetHeight());
 	context = cairo_create(m_surface);
 
 	/* Draw the frame. */
-	rounded_rectangle(context, 0, 0, m_rect.GetWidth(), m_rect.GetHeight(), 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
+	rounded_rectangle(context, 0, 0, m_frame.GetWidth(), m_frame.GetHeight(), 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
 	cairo_set_source_rgb(context, 0.253906, 0.253906, 0.253906);
 	cairo_fill(context);
-	rounded_rectangle(context, 1, 1, m_rect.GetWidth() - 2, 11, 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
+	rounded_rectangle(context, 1, 1, m_frame.GetWidth() - 2, 11, 7.5, CORNER_TOP_LEFT | CORNER_TOP_RIGHT);
 	pat = cairo_pattern_create_linear(0, 0, 0, 12);
 	if(m_window->IsActive()) {
 		cairo_pattern_add_color_stop_rgb(pat, 0, 0.601562, 0.601562, 0.601562);
@@ -156,7 +156,7 @@ void Decoration::Update() {
 	cairo_set_source(context, pat);
 	cairo_fill(context);
 	cairo_pattern_destroy(pat);
-	cairo_rectangle(context, 1, 12, m_rect.GetWidth() - 2, 12);
+	cairo_rectangle(context, 1, 12, m_frame.GetWidth() - 2, 12);
 	pat = cairo_pattern_create_linear(0, 12, 0, 24);
 	cairo_pattern_add_color_stop_rgb(pat, 0, 0.156250, 0.156250, 0.156250);
 	cairo_pattern_add_color_stop_rgb(pat, 1, 0.089844, 0.089844, 0.089844);
@@ -164,8 +164,8 @@ void Decoration::Update() {
 	cairo_fill(context);
 	cairo_pattern_destroy(pat);
 	if(m_window->IsActive()) {
-		cairo_rectangle(context, 1, 23, m_rect.GetWidth() - 2, 1);
-		pat = cairo_pattern_create_linear(0, 23, m_rect.GetWidth(), 23);
+		cairo_rectangle(context, 1, 23, m_frame.GetWidth() - 2, 1);
+		pat = cairo_pattern_create_linear(0, 23, m_frame.GetWidth(), 23);
 		cairo_pattern_add_color_stop_rgba(pat, 0, 0, 0, 0, 0);
 		cairo_pattern_add_color_stop_rgb(pat, 0.5, 0.45, 0.45, 0.45);
 		cairo_pattern_add_color_stop_rgba(pat, 1, 0, 0, 0, 0);
@@ -187,7 +187,7 @@ void Decoration::Update() {
 	cairo_show_text(context, m_window->GetTitle().c_str());
 
 	/* Clear the window content area. */
-	cairo_rectangle(context, 1, 24, m_window->GetRect().GetWidth(), m_window->GetRect().GetHeight());
+	cairo_rectangle(context, 1, 24, m_window->GetFrame().GetWidth(), m_window->GetFrame().GetHeight());
 	cairo_set_source_rgba(context, 0, 0, 0, 0);
 	cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
 	cairo_fill(context);

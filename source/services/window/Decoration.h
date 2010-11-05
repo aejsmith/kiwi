@@ -26,12 +26,12 @@
 #include <kiwi/Graphics/Rect.h>
 #include <kiwi/Support/Noncopyable.h>
 
-class Window;
+class ServerWindow;
 
 /** Class providing a decoration for a window. */
 class Decoration : kiwi::Noncopyable {
 public:
-	Decoration(Window *window);
+	Decoration(ServerWindow *window);
 	~Decoration();
 
 	void Update();
@@ -43,10 +43,10 @@ public:
 	/** Get the decoration's area.
 	 * @return		Rectangle for the decoration's area, relative
 	 *			to the window that the decoration is for. */
-	kiwi::Rect GetRect() const { return m_rect; }
+	kiwi::Rect GetFrame() const { return m_frame; }
 private:
-	Window *m_window;		/**< Window that the decoration is for. */
-	kiwi::Rect m_rect;		/**< Area covered by the decoration, relative to window. */
+	ServerWindow *m_window;		/**< Window that the decoration is for. */
+	kiwi::Rect m_frame;		/**< Area covered by the decoration, relative to window. */
 	cairo_surface_t *m_surface;	/**< Surface containing the rendered decoration. */
 };
 

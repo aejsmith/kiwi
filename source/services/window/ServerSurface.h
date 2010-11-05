@@ -18,8 +18,8 @@
  * @brief		Surface class.
  */
 
-#ifndef __SURFACE_H
-#define __SURFACE_H
+#ifndef __SERVERSURFACE_H
+#define __SERVERSURFACE_H
 
 #include <cairo/cairo.h>
 
@@ -27,41 +27,52 @@
 
 #include <kernel/types.h>
 
+#include <kiwi/Graphics/Size.h>
 #include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
 
 #include <pixman.h>
 
-/** Class representing a surface. */
-class Surface : public kiwi::Object, kiwi::Noncopyable {
+class Connection;
+
+/** Class implementing the server side of kiwi::Surface. */
+class ServerSurface : public kiwi::Object, kiwi::Noncopyable {
 public:
-	Surface(uint16_t width, uint16_t height);
-	~Surface();
+	ServerSurface(Connection *owner, const kiwi::Size &size);
+	~ServerSurface();
 
 	area_id_t GetID() const;
 	void *GetData();
 	size_t GetDataSize() const;
 	pixman_image_t *GetPixmanImage();
 	cairo_surface_t *GetCairoSurface();
-	status_t Resize(uint16_t width, uint16_t height);
+	status_t Resize(const kiwi::Size &size);
+
+	/** Get the owner of the surface.
+	 * @return		Connection that owns the surface. */
+	Connection *GetOwner() const { return m_owner; }
+
+	/** Get the surface's size.
+	 * @return		Size of the surface. */
+	kiwi::Size GetSize() const { return m_size; }
 
 	/** Get the surface's width.
 	 * @return		Width of the surface. */
-	uint16_t GetWidth() const { return m_width; }
+	int GetWidth() const { return m_size.GetWidth(); }
 
 	/** Get the surface's height.
 	 * @return		Height of the surface. */
-	uint16_t GetHeight() const { return m_height; }
+	int GetHeight() const { return m_size.GetHeight(); }
 private:
 	status_t Map();
 	void Unmap();
 
+	Connection *m_owner;		/**< Connection that owns the surface. */
+	kiwi::Size m_size;		/**< Size of the surface. */
 	handle_t m_area;		/**< Handle to the surface's area. */
-	uint16_t m_width;		/**< Width of the surface. */
-	uint16_t m_height;		/**< Height of the surface. */
 	void *m_mapping;		/**< Mapping for the surface area. */
 	pixman_image_t *m_image;	/**< Pixman image for the surface data. */
 	cairo_surface_t *m_cairo;	/**< Cairo surface for operating on the surface. */
 };
 
-#endif /* __SURFACE_H */
+#endif /* __SERVERSURFACE_H */

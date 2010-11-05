@@ -26,7 +26,7 @@
 #include "Cursor.h"
 #include "Display.h"
 #include "Session.h"
-#include "Surface.h"
+#include "ServerSurface.h"
 #include "WindowServer.h"
 
 using namespace kiwi;
@@ -36,16 +36,16 @@ using namespace std;
  * @param server	Server that the session is on.
  * @param id		ID of the session. */
 Session::Session(WindowServer *server, session_id_t id) :
-	m_server(server), m_id(id), m_active(false), m_refcount(0),
-	m_next_window_id(1), m_active_window(0)
+	m_server(server), m_id(id), m_active(false), m_refcount(0), m_root(0),
+	m_cursor(0), m_compositor(0), m_next_wid(1), m_active_window(0)
 {
 	cairo_surface_t *image;
 	cairo_t *context;
 	int w, h;
 
 	/* Create the root window. */
-	Rect rect(0, 0, m_server->GetDisplay()->GetCurrentMode().width, m_server->GetDisplay()->GetCurrentMode().height);
-	m_root = new Window(this, 0, 0, rect, WINDOW_TYPE_ROOT);
+	Rect frame(Point(0, 0), m_server->GetDisplay()->GetSize());
+	m_root = new ServerWindow(this, 0, 0, 0, BaseWindow::kActivatableMask, BaseWindow::kRootLevel, frame);
 	m_active_window = m_root;
 
 	/* Set up a Cairo context for rendering on to the root surface. */
@@ -103,72 +103,62 @@ void Session::RemoveConnection(Connection *conn) {
 
 /** Add a surface to the session.
  * @param surface	Surface to add. */
-void Session::AddSurface(Surface *surface) {
+void Session::AddSurface(ServerSurface *surface) {
 	m_surfaces.insert(make_pair(surface->GetID(), surface));
 }
 
 /** Remove a surface from the session.
  * @param surface	Surface to remove. */
-void Session::RemoveSurface(Surface *surface) {
+void Session::RemoveSurface(ServerSurface *surface) {
 	m_surfaces.erase(surface->GetID());
 }
 
 /** Find a surface.
  * @param id		ID of surface to find.
  * @return		Pointer to surface if found, NULL if not. */
-Surface *Session::FindSurface(area_id_t id) {
+ServerSurface *Session::FindSurface(area_id_t id) {
 	SurfaceMap::iterator it = m_surfaces.find(id);
 	return (it != m_surfaces.end()) ? it->second : 0;
 }
 
 /** Create a new window.
- * @param rect		Rectangle area for the window.
+ * @param owner		Connection creating the window.
  * @return		Pointer to window. */
-Window *Session::CreateWindow(Rect &rect) {
-	// FIXME type and parent arg
-	Window *window = new Window(this, m_next_window_id++, m_root, rect, WINDOW_TYPE_NORMAL);
+ServerWindow *Session::CreateWindow(Connection *owner) {
+	ServerWindow *window = new ServerWindow(this, m_next_wid++, m_root, owner,
+	                                        BaseWindow::kNormalStyle,
+	                                        BaseWindow::kNormalLevel,
+	                                        Rect(10, 10, 100, 100));
 	m_windows.insert(make_pair(window->GetID(), window));
 	return window;
 }
 
 /** Remove a window from the session.
  * @param window	Window to remove. */
-void Session::RemoveWindow(Window *window) {
+void Session::RemoveWindow(ServerWindow *window) {
 	m_windows.erase(window->GetID());
 	if(m_active_window == window) {
-		ActivateWindow(m_root);
+		m_root->SetActive(true);
 	}
 }
 
 /** Find a window.
  * @param id		ID of window to find.
  * @return		Pointer to window if found, NULL if not. */
-Window *Session::FindWindow(Window::ID id) {
+ServerWindow *Session::FindWindow(ServerWindow::ID id) {
 	WindowMap::iterator it = m_windows.find(id);
 	return (it != m_windows.end()) ? it->second : 0;
 }
 
-/** Activate a window.
- * @param window	Window to activate. */
-void Session::ActivateWindow(Window *window) {
+/** Set a window as the active window.
+ * @param window	Window to set as active. */
+void Session::ActivateWindow(ServerWindow *window) {
 	if(m_active_window != window) {
-		if(m_active_window) {
-			m_active_window->SetActive(false);
-		}
-
+		m_active_window->SetActive(false);
 		m_active_window = window;
 		m_active_window->SetVisible(true);
 		m_active_window->SetActive(true);
 	}
-}
-
-/** Hide a window.
- * @param window	Window to hide. */
-void Session::HideWindow(Window *window) {
-	if(m_active_window == window) {
-		ActivateWindow(m_root);
-	}
-	window->SetVisible(false);
 }
 
 /** Make the session the active session. */

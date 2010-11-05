@@ -15,11 +15,11 @@
 
 /**
  * @file
- * @brief		Basic window class.
+ * @brief		Base window class.
  */
 
-//#include <kiwi/Graphics/BasicWindow.h>
+#include <kiwi/Graphics/BaseWindow.h>
 
-//using namespace kiwi;
+using namespace kiwi;
 
 

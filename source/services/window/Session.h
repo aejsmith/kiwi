@@ -30,11 +30,11 @@
 #include <list>
 #include <map>
 
-#include "Window.h"
+#include "ServerWindow.h"
 
 class Connection;
 class Cursor;
-class Surface;
+class ServerSurface;
 class Compositor;
 class WindowServer;
 
@@ -44,10 +44,10 @@ class Session : public kiwi::Object, kiwi::Noncopyable {
 	typedef std::list<Connection *> ConnectionList;
 
 	/** Type of the surface map. */
-	typedef std::map<area_id_t, Surface *> SurfaceMap;
+	typedef std::map<area_id_t, ServerSurface *> SurfaceMap;
 
 	/** Type of the window map. */
-	typedef std::map<Window::ID, Window *> WindowMap;
+	typedef std::map<ServerWindow::ID, ServerWindow *> WindowMap;
 public:
 	Session(WindowServer *server, session_id_t id);
 	~Session();
@@ -55,15 +55,14 @@ public:
 	void HandleConnection(handle_t handle);
 	void RemoveConnection(Connection *conn);
 
-	void AddSurface(Surface *surface);
-	void RemoveSurface(Surface *surface);
-	Surface *FindSurface(area_id_t id);
+	void AddSurface(ServerSurface *surface);
+	void RemoveSurface(ServerSurface *surface);
+	ServerSurface *FindSurface(area_id_t id);
 
-	Window *CreateWindow(kiwi::Rect &rect);
-	void RemoveWindow(Window *window);
-	Window *FindWindow(Window::ID id);
-	void ActivateWindow(Window *window);
-	void HideWindow(Window *window);
+	ServerWindow *CreateWindow(Connection *owner);
+	void RemoveWindow(ServerWindow *window);
+	ServerWindow *FindWindow(ServerWindow::ID id);
+	void ActivateWindow(ServerWindow *window);
 
 	void Activate();
 	void Deactivate();
@@ -74,7 +73,7 @@ public:
 
 	/** Get the root window.
 	 * @return		Root window for the session. */
-	Window *GetRoot() const { return m_root; }
+	ServerWindow *GetRoot() const { return m_root; }
 
 	/** Get the cursor.
 	 * @return		Cursor for the session. */
@@ -86,7 +85,7 @@ public:
 
 	/** Get the active window.
 	 * @return		Pointer to active window. */
-	Window *GetActiveWindow() const { return m_active_window; }
+	ServerWindow *GetActiveWindow() const { return m_active_window; }
 private:
 	void Release();
 
@@ -97,11 +96,11 @@ private:
 	session_id_t m_id;		/**< ID of the session. */
 	bool m_active;			/**< Whether the session is active. */
 	int m_refcount;			/**< Reference count. */
-	Window *m_root;			/**< Root window. */
+	ServerWindow *m_root;		/**< Root window. */
 	Cursor *m_cursor;		/**< Cursor. */
 	Compositor *m_compositor;	/**< Compositor. */
-	Window::ID m_next_window_id;	/**< Next window ID. */
-	Window *m_active_window;	/**< Active window. */
+	ServerWindow::ID m_next_wid;	/**< Next window ID. */
+	ServerWindow *m_active_window;	/**< Active window. */
 };
 
 #endif /* __SESSION_H */

@@ -35,35 +35,35 @@
 
 #include "Cursor.h"
 #include "Session.h"
-#include "Surface.h"
-#include "Window.h"
+#include "ServerSurface.h"
+#include "ServerWindow.h"
 
 using namespace kiwi;
 using namespace std;
 
 /** Properties of the cursor. */
 static const char *kCursorPath = "/system/data/images/cursor.png";
-static const uint16_t kCursorWidth = 24;
-static const uint16_t kCursorHeight = 24;
-static const int16_t kCursorHotspotX = 6;
-static const int16_t kCursorHotspotY = 3;
+static const int kCursorWidth = 24;
+static const int kCursorHeight = 24;
+static const int kCursorHotspotX = 6;
+static const int kCursorHotspotY = 3;
 
 /** Create the cursor.
  * @param session	Session that the cursor is for. */
 Cursor::Cursor(Session *session) :
-	m_session(session), m_root(session->GetRoot()), m_grabbed(0)
+	m_session(session), m_root(session->GetRoot())
 {
 	cairo_surface_t *image;
 	cairo_t *context;
-	int16_t x, y;
+	int x, y;
 
 	/* Work out initial placement of the cursor (centre of screen). */
-	x = (m_root->GetRect().GetWidth() / 2) - (kCursorWidth / 2);
-	y = (m_root->GetRect().GetHeight() / 2) - (kCursorHeight / 2);
+	x = (m_root->GetFrame().GetWidth() / 2) - (kCursorWidth / 2);
+	y = (m_root->GetFrame().GetHeight() / 2) - (kCursorHeight / 2);
 
 	/* Create the cursor window. */
-	Rect rect(x, y, kCursorWidth, kCursorHeight);
-	m_window = new Window(m_root->GetSession(), -1, m_root, rect, WINDOW_TYPE_CURSOR);
+	Rect frame(x, y, kCursorWidth, kCursorHeight);
+	m_window = new ServerWindow(m_root->GetSession(), -1, m_root, 0, 0, BaseWindow::kCursorLevel, frame);
 
 	/* Set up a Cairo context for rendering on to the cursor. */
 	context = cairo_create(m_window->GetSurface()->GetCairoSurface());
@@ -111,34 +111,31 @@ void Cursor::SetVisible(bool visible) {
  * @param dx		X delta.
  * @param dy		Y delta. */
 void Cursor::MoveRelative(int32_t dx, int32_t dy) {
-	int16_t x = m_window->GetRect().GetX() + dx;
-	int16_t y = m_window->GetRect().GetY() + dy;
+	int16_t x = m_window->GetFrame().GetX() + dx;
+	int16_t y = m_window->GetFrame().GetY() + dy;
 
 	/* Ensure that the location is within the screen. */
 	if(x < -kCursorHotspotX) {
 		x = -kCursorHotspotX;
-	} else if(x >= (m_root->GetRect().GetWidth() - kCursorHotspotX)) {
-		x = (m_root->GetRect().GetWidth() - kCursorHotspotX) - 1;
+	} else if(x >= (m_root->GetFrame().GetWidth() - kCursorHotspotX)) {
+		x = (m_root->GetFrame().GetWidth() - kCursorHotspotX) - 1;
 	}
 	if(y < -kCursorHotspotY) {
 		y = -kCursorHotspotY;
-	} else if(y >= (m_root->GetRect().GetHeight() - kCursorHotspotY)) {
-		y = (m_root->GetRect().GetHeight() - kCursorHotspotY) - 1;
+	} else if(y >= (m_root->GetFrame().GetHeight() - kCursorHotspotY)) {
+		y = (m_root->GetFrame().GetHeight() - kCursorHotspotY) - 1;
 	}
 
 	/* Move the window to the new position. */
-	dx = x - m_window->GetRect().GetX();
-	dy = y - m_window->GetRect().GetY();
+	dx = x - m_window->GetFrame().GetX();
+	dy = y - m_window->GetFrame().GetY();
 	m_window->MoveTo(Point(x, y));
-	if(m_grabbed) {
-		Point pos = m_grabbed->GetRect().GetTopLeft();
-		m_grabbed->MoveTo(Point(pos.GetX() + dx, pos.GetY() + dy));
-	}
 }
 
 /** Mouse button down handler.
  * @param button	Button that was pressed. */
 void Cursor::Down(int32_t button) {
+#if 0
 	/* Get the position the cursor is pointing at. */
 	Point pos = m_window->GetAbsoluteRect().GetTopLeft();
 	pos.Translate(kCursorHotspotX, kCursorHotspotY);
@@ -150,10 +147,11 @@ void Cursor::Down(int32_t button) {
 	/* Activate the window if it isn't already. */
 	m_session->ActivateWindow(window);
 	m_grabbed = window;
+#endif
 }
 
 /** Mouse button up handler.
  * @param button	Button that was released. */
 void Cursor::Up(int32_t button) {
-	m_grabbed = 0;
+
 }

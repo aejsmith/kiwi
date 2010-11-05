@@ -36,7 +36,7 @@
 #include "Compositor.h"
 #include "Display.h"
 #include "Session.h"
-#include "Surface.h"
+#include "ServerSurface.h"
 #include "WindowServer.h"
 
 using namespace kiwi;
@@ -211,20 +211,16 @@ status_t Display::SetMode(display_mode_t &mode) {
 
 /** Draw part of a surface onto the framebuffer.
  * @param surface	Surface to draw.
- * @param x		X position to draw at.
- * @param y		Y position to draw at.
- * @param src_x		X position to draw from in surface.
- * @param src_y		X position to draw from in surface.
- * @param width		Width to draw.
- * @param height	Height to draw. */
-void Display::DrawSurface(Surface *surface, int16_t x, int16_t y, int16_t src_x,
-                          int16_t src_y, uint16_t width, uint16_t height) {
+ * @param dest		Position to draw at.
+ * @param src		Position to draw from in source surface.
+ * @param size		Size of area to draw. */
+void Display::DrawSurface(ServerSurface *surface, Point dest, Point src, Size size) {
 	/* Pixman handles sanitising all parameters. Use the source operator
 	 * as we just want to stick the source surface over the framebuffer,
 	 * compositing is done by Compositor. */
 	pixman_image_composite(PIXMAN_OP_SRC, surface->GetPixmanImage(), NULL,
-	                       m_image, src_x, src_y, 0, 0, x, y, width,
-	                       height);
+	                       m_image, src.GetX(), src.GetY(), 0, 0, dest.GetX(),
+	                       dest.GetY(), size.GetWidth(), size.GetHeight());
 }
 
 /** Register events with the event loop. */
