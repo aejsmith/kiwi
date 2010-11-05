@@ -54,6 +54,17 @@ RPCMessageBuffer::RPCMessageBuffer(char *buf, size_t size) :
 {
 }
 
+/** Copy constructor for a message buffer.
+ * @param other		Message buffer to copy from. This will be reset to an
+ *			empty buffer. */
+RPCMessageBuffer::RPCMessageBuffer(RPCMessageBuffer &&other) :
+	m_buffer(other.m_buffer), m_size(other.m_size), m_offset(other.m_offset)
+{
+	other.m_buffer = 0;
+	other.m_size = 0;
+	other.m_offset = 0;
+}
+
 /** Destroy a message buffer. */
 RPCMessageBuffer::~RPCMessageBuffer() {
 	Reset();

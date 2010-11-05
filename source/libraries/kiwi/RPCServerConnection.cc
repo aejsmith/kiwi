@@ -20,10 +20,13 @@
 
 #include <kiwi/RPC.h>
 
+#include <list>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 using namespace kiwi;
+using namespace std;
 
 /** Construct an RPC server connection object.
  * @param name		Name of the service.
@@ -70,15 +73,22 @@ void RPCServerConnection::SendMessage(uint32_t id, RPCMessageBuffer &buf) {
 	}
 
 	/* The server may send us events before we get the actual reply. If
-	 * the ID is not what is expected, pass it to the event handler. */
+	 * the ID is not what is expected, store them all until we get the
+	 * reply we want, then handle them. */
+	list<pair<uint32_t, RPCMessageBuffer> > events;
 	while(true) {
 		uint32_t nid;
 		ReceiveMessage(nid, buf);
 		if(nid == id) {
-			return;
+			break;
 		} else {
-			HandleEvent(nid, buf);
+			events.push_back(make_pair(nid, std::move(buf)));
 		}
+	}
+
+	/* Handle the received events. */
+	for(auto it = events.begin(); it != events.end(); ++it) {
+		HandleEvent(it->first, it->second);
 	}
 }
 
@@ -101,7 +111,7 @@ void RPCServerConnection::ReceiveMessage(uint32_t &id, RPCMessageBuffer &buf) {
  * @param buf		Message buffer. */
 void RPCServerConnection::HandleEvent(uint32_t id, RPCMessageBuffer &buf) {
 	/* The default implementation recognises no events. */
-	std::stringstream msg;
+	ostringstream msg;
 	msg << "Received unknown event ID: " << id;
 	throw RPCError(msg.str());
 }
@@ -118,7 +128,7 @@ void RPCServerConnection::HandleMessage() {
 void RPCServerConnection::CheckVersion() {
 	RPCMessageBuffer buf;
 	uint32_t version, id;
-	std::string name;
+	string name;
 
 	/* The server should send us a message containing the service
 	 * name followed by the version when we open the connection. */
@@ -129,12 +139,12 @@ void RPCServerConnection::CheckVersion() {
 	buf >> name;
 	buf >> version;
 	if(name != m_name) {
-		std::ostringstream msg;
+		ostringstream msg;
 		msg << "Server's service name is incorrect (wanted " << m_name;
 		msg << ", got " << name;
 		throw RPCError(msg.str());
 	} else if(version != m_version) {
-		std::ostringstream msg;
+		ostringstream msg;
 		msg << "Client/server version mismatch (wanted " << m_version;
 		msg << ", got " << version;
 		throw RPCError(msg.str());

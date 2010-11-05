@@ -67,6 +67,7 @@ class KIWI_PUBLIC RPCMessageBuffer : Noncopyable {
 public:
 	RPCMessageBuffer();
 	RPCMessageBuffer(char *buf, size_t size);
+	RPCMessageBuffer(RPCMessageBuffer &&other);
 	~RPCMessageBuffer();
 
 	void Reset(char *buf = 0, size_t size = 0);
