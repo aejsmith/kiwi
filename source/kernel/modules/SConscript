@@ -11,7 +11,7 @@
 # license itself; please refer to the copy of the license you have received
 # for complete terms.
 
-subdirs = ['fs', 'platform']
+subdirs = ['fs', 'platform', 'tty']
 
 #############################
 # Build environment set-up. #

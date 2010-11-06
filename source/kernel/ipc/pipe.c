@@ -93,7 +93,7 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 
 	mutex_lock(&pipe->reader);
 
-	if(count <= PIPE_SIZE) {
+	if(count && count <= PIPE_SIZE) {
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
@@ -111,7 +111,7 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		}
 		notifier_run(&pipe->space_notifier, NULL, false);
 		mutex_unlock(&pipe->lock);
-	} else {
+	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->data_sem, (nonblock) ? 0 : -1,
 			                         SYNC_INTERRUPTIBLE);
@@ -155,7 +155,7 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 
 	mutex_lock(&pipe->writer);
 
-	if(count <= PIPE_SIZE) {
+	if(count && count <= PIPE_SIZE) {
 		/* Try to get all required space before writing. */
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
@@ -175,7 +175,7 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 		}
 		notifier_run(&pipe->data_notifier, NULL, false);
 		mutex_unlock(&pipe->lock);
-	} else {
+	} else if(count) {
 		for(i = 0; i < count; i++) {
 			ret = semaphore_down_etc(&pipe->space_sem, (nonblock) ? 0 : -1,
 			                         SYNC_INTERRUPTIBLE);

@@ -151,6 +151,7 @@ sources = map(File, [
 	'error_list.c',
 	'fatal.c',
 	'init.c',
+	'termios.c',
 ])
 
 # Generate the error string list.

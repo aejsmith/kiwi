@@ -113,7 +113,7 @@ typedef struct device_ops {
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.
-	 * @param data		Handle specific data pointer.
+	 * @param data		Handle-specific data pointer.
 	 * @param request	Request number.
 	 * @param in		Input buffer.
 	 * @param insz		Input buffer size.

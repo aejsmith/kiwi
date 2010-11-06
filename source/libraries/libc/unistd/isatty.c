@@ -24,6 +24,7 @@
 #include <unistd.h>
 
 /** Check whether a file descriptor refers to a TTY.
+ * @todo		Check device type.
  * @param fd		File descriptor to check.
  * @return		1 if a TTY, 0 if not. */
 int isatty(int fd) {

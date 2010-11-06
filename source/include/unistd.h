@@ -136,8 +136,8 @@ extern int symlink(const char *dest, const char *path);
 /* int symlinkat(const char *, int, const char *); */
 extern void sync(void);
 /* long sysconf(int); */
-//extern pid_t tcgetpgrp(int fd);
-//extern int tcsetpgrp(int fd, pid_t pgid);
+extern pid_t tcgetpgrp(int fd);
+extern int tcsetpgrp(int fd, pid_t pgid);
 /* int truncate(const char *, off_t); */
 /* char *ttyname(int); */
 /* int ttyname_r(int, char *, size_t); */
