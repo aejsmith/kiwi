@@ -33,7 +33,7 @@ TerminalApp::TerminalApp(int argc, char **argv) :
 
 /** Create a new terminal window. */
 void TerminalApp::CreateWindow() {
-	TerminalWindow *window = new TerminalWindow(this, 90, 35);
+	TerminalWindow *window = new TerminalWindow(this, 100, 35);
 	window->OnDestroy.Connect(this, &TerminalApp::WindowDestroyed);
 	window->GetTerminal().Run("/system/binaries/dungeon");
 }

@@ -83,6 +83,6 @@ Size Font::GetSize() {
 
 	cairo_scaled_font_extents(m_font, &extents);
 	width = round(extents.max_x_advance);
-	height = round(extents.height);
+	height = round(extents.ascent + extents.descent);
 	return Size(width, height);
 }
