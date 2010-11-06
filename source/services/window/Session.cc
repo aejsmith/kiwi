@@ -128,7 +128,7 @@ ServerWindow *Session::CreateWindow(Connection *owner) {
 	ServerWindow *window = new ServerWindow(this, m_next_wid++, m_root, owner,
 	                                        BaseWindow::kNormalStyle,
 	                                        BaseWindow::kNormalLevel,
-	                                        Rect(10, 10, 100, 100));
+	                                        Rect(10, 35, 100, 100));
 	m_windows.insert(make_pair(window->GetID(), window));
 	return window;
 }
@@ -148,6 +148,12 @@ void Session::RemoveWindow(ServerWindow *window) {
 ServerWindow *Session::FindWindow(ServerWindow::ID id) {
 	WindowMap::iterator it = m_windows.find(id);
 	return (it != m_windows.end()) ? it->second : 0;
+}
+
+/** Get the window under the cursor.
+ * @return		Pointer to window under the cursor. */
+ServerWindow *Session::WindowAtCursor() {
+	return m_root->AtPosition(m_cursor->GetPosition());
 }
 
 /** Set a window as the active window.
@@ -172,6 +178,68 @@ void Session::Activate() {
 void Session::Deactivate() {
 	m_active = false;
 	Release();
+}
+
+/** Dispatch a mouse move event.
+ * @param time		Time of the event.
+ * @param dx		X position delta.
+ * @param dy		Y position delta.
+ * @param modifiers	Keyboard modifiers pressed at time of the event.
+ * @param buttons	Buttons pressed at time of the event. */
+void Session::MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons) {
+	/* Move the cursor. */
+	m_cursor->MoveRelative(dx, dy);
+
+	/* Get the window for the event and the position within that window. */
+	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
+	Point pos = window->RelativePoint(m_cursor->GetPosition());
+
+	/* Send the event. */
+	MouseEvent event(Event::kMouseMove, time, modifiers, pos, buttons);
+	window->MouseMove(event);
+}
+
+/** Dispatch a mouse press event.
+ * @param time		Time of the event.
+ * @param modifiers	Keyboard modifiers pressed at time of the event.
+ * @param buttons	Buttons pressed at time of the event. */
+void Session::MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons) {
+	/* Get the window for the event and the position within that window. */
+	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
+	Point pos = window->RelativePoint(m_cursor->GetPosition());
+
+	/* Activate the window. */
+	ActivateWindow(window);
+
+	/* Send the event. */
+	MouseEvent event(Event::kMousePress, time, modifiers, pos, buttons);
+	window->MousePress(event);
+}
+
+/** Dispatch a mouse release event.
+ * @param time		Time of the event.
+ * @param modifiers	Keyboard modifiers pressed at time of the event.
+ * @param buttons	Buttons pressed at time of the event. */
+void Session::MouseRelease(useconds_t time, uint32_t modifiers, uint32_t buttons) {
+	/* Get the window for the event and the position within that window. */
+	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
+	Point pos = window->RelativePoint(m_cursor->GetPosition());
+
+	/* Send the event. */
+	MouseEvent event(Event::kMouseRelease, time, modifiers, pos, buttons);
+	window->MouseRelease(event);
+}
+
+/** Dispatch a key press event.
+ * @param event		Key event object. */
+void Session::KeyPress(const KeyEvent &event) {
+	m_active_window->KeyPress(event);
+}
+
+/** Dispatch a key release event.
+ * @param event		Key release object. */
+void Session::KeyRelease(const KeyEvent &event) {
+	m_active_window->KeyRelease(event);
 }
 
 /** Decrease the session reference count. */

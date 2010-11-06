@@ -21,6 +21,7 @@
 #ifndef __SESSION_H
 #define __SESSION_H
 
+#include <kiwi/Graphics/InputEvent.h>
 #include <kiwi/Graphics/Rect.h>
 #include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
@@ -62,10 +63,17 @@ public:
 	ServerWindow *CreateWindow(Connection *owner);
 	void RemoveWindow(ServerWindow *window);
 	ServerWindow *FindWindow(ServerWindow::ID id);
+	ServerWindow *WindowAtCursor();
 	void ActivateWindow(ServerWindow *window);
 
 	void Activate();
 	void Deactivate();
+
+	void MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons);
+	void MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons);
+	void MouseRelease(useconds_t time, uint32_t modifiers, uint32_t buttons);
+	void KeyPress(const kiwi::KeyEvent &event);
+	void KeyRelease(const kiwi::KeyEvent &event);
 
 	/** Get the ID of the session.
 	 * @return		ID of the session. */

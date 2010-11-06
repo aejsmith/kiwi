@@ -378,3 +378,71 @@ ServerWindow *ServerWindow::AtPosition(kiwi::Point pos) {
 
 	return 0;
 }
+
+/** Convert a point to be relative to the window.
+ * @param pos		Absolute position to convert.
+ * @return		Position relative to the window. */
+kiwi::Point ServerWindow::RelativePoint(kiwi::Point pos) {
+	Rect frame = GetAbsoluteFrame();
+	return pos.Translated(-frame.GetX(), -frame.GetY());
+}
+
+/** Handle a mouse move event on the window.
+ * @param event		Event object containing event details. */
+void ServerWindow::MouseMove(const MouseEvent &event) {
+	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
+		assert(m_decoration);
+	} else if(m_owner) {
+		org::kiwi::WindowServer::Point pos = {
+			event.GetPosition().GetX(), event.GetPosition().GetY()
+		};
+		m_owner->OnMouseMove(m_id, event.GetTime(), event.GetModifiers(),
+		                     pos, event.GetButtons());
+	}
+}
+
+/** Handle a mouse press event on the window.
+ * @param event		Event object containing event details. */
+void ServerWindow::MousePress(const MouseEvent &event) {
+	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
+		assert(m_decoration);
+	} else if(m_owner) {
+		org::kiwi::WindowServer::Point pos = {
+			event.GetPosition().GetX(), event.GetPosition().GetY()
+		};
+		m_owner->OnMousePress(m_id, event.GetTime(), event.GetModifiers(),
+		                      pos, event.GetButtons());
+	}
+}
+
+/** Handle a mouse release event on the window.
+ * @param event		Event object containing event details. */
+void ServerWindow::MouseRelease(const MouseEvent &event) {
+	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
+		assert(m_decoration);
+	} else if(m_owner) {
+		org::kiwi::WindowServer::Point pos = {
+			event.GetPosition().GetX(), event.GetPosition().GetY()
+		};
+		m_owner->OnMouseRelease(m_id, event.GetTime(), event.GetModifiers(),
+		                        pos, event.GetButtons());
+	}
+}
+
+/** Handle a key press event on the window.
+ * @param event		Event object containing event details. */
+void ServerWindow::KeyPress(const KeyEvent &event) {
+	if(m_owner) {
+		m_owner->OnKeyPress(m_id, event.GetTime(), event.GetModifiers(),
+		                    event.GetKey(), event.GetText());
+	}
+}
+
+/** Handle a key press event on the window.
+ * @param event		Event object containing event details. */
+void ServerWindow::KeyRelease(const KeyEvent &event) {
+	if(m_owner) {
+		m_owner->OnKeyRelease(m_id, event.GetTime(), event.GetModifiers(),
+		                      event.GetKey(), event.GetText());
+	}
+}

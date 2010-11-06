@@ -72,7 +72,7 @@ public:
 	 * @return		The set of keyboard modifiers that were pressed
 	 *			when the event occurred (a bitfield of values
 	 *			from Input::KeyboardModifier). */
-	uint32_t GetModififers() const { return m_time; }
+	uint32_t GetModifiers() const { return m_modifiers; }
 private:
 	useconds_t m_time;		/**< Time the event occurred at. */
 	uint32_t m_modifiers;		/**< Keyboard modififers. */

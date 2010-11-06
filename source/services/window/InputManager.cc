@@ -44,7 +44,7 @@ using namespace std;
 /** Initialise the input manager.
  * @param server	Server that the manager is for. */
 InputManager::InputManager(WindowServer *server) :
-	m_server(server)
+	m_server(server), m_modifiers(0), m_buttons(0)
 {
 	handle_t handle;
 	status_t ret;
@@ -69,7 +69,7 @@ InputManager::InputManager(WindowServer *server) :
  * @param dx		X position delta.
  * @param dy		Y position delta. */
 void InputManager::MouseMove(useconds_t time, int dx, int dy) {
-	m_server->GetActiveSession()->GetCursor()->MoveRelative(dx, dy);
+	m_server->GetActiveSession()->MouseMove(time, dx, dy, m_modifiers, m_buttons);
 }
 
 /** Convert a kernel button code.
@@ -93,6 +93,7 @@ static inline uint32_t convert_button(int32_t button) {
  * @param button	Kernel code for button that was pressed. */
 void InputManager::MousePress(useconds_t time, int32_t button) {
 	m_buttons |= convert_button(button);
+	m_server->GetActiveSession()->MousePress(time, m_modifiers, m_buttons);
 }
 
 /** Handle a mouse release event.
@@ -100,6 +101,7 @@ void InputManager::MousePress(useconds_t time, int32_t button) {
  * @param button	Kernel code for button that was released. */
 void InputManager::MouseRelease(useconds_t time, int32_t button) {
 	m_buttons &= ~convert_button(button);
+	m_server->GetActiveSession()->MouseRelease(time, m_modifiers, m_buttons);
 }
 
 /** Convert a kernel key code to a modifier.
@@ -153,6 +155,10 @@ void InputManager::KeyPress(useconds_t time, int32_t key, const std::string &tex
 	if(lock) {
 		m_modifiers ^= lock;
 	}
+
+	/* Send the event to the session. */
+	KeyEvent event(Event::kKeyPress, time, m_modifiers, key, text);
+	m_server->GetActiveSession()->KeyPress(event);
 }
 
 /** Handle a key release event.
@@ -162,4 +168,8 @@ void InputManager::KeyPress(useconds_t time, int32_t key, const std::string &tex
 void InputManager::KeyRelease(useconds_t time, int32_t key, const std::string &text) {
 	/* If the key is a modifier, disable it. */
 	m_modifiers &= ~convert_modifier(key);
+
+	/* Send the event to the session. */
+	KeyEvent event(Event::kKeyRelease, time, m_modifiers, key, text);
+	m_server->GetActiveSession()->KeyRelease(event);
 }

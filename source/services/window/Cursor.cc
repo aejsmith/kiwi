@@ -132,26 +132,9 @@ void Cursor::MoveRelative(int32_t dx, int32_t dy) {
 	m_window->MoveTo(Point(x, y));
 }
 
-/** Mouse button down handler.
- * @param button	Button that was pressed. */
-void Cursor::Down(int32_t button) {
-#if 0
-	/* Get the position the cursor is pointing at. */
-	Point pos = m_window->GetAbsoluteRect().GetTopLeft();
-	pos.Translate(kCursorHotspotX, kCursorHotspotY);
-
-	/* Get the window at this location. */
-	Window *window = m_root->AtPosition(pos);
-	assert(window);
-
-	/* Activate the window if it isn't already. */
-	m_session->ActivateWindow(window);
-	m_grabbed = window;
-#endif
-}
-
-/** Mouse button up handler.
- * @param button	Button that was released. */
-void Cursor::Up(int32_t button) {
-
+/** Get the position of the cursor.
+ * @return		Position of the cursor. */
+Point Cursor::GetPosition() const {
+	Point pos = m_window->GetAbsoluteFrame().GetTopLeft();
+	return pos.Translated(kCursorHotspotX, kCursorHotspotY);
 }

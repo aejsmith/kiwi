@@ -21,6 +21,7 @@
 #ifndef __CURSOR_H
 #define __CURSOR_H
 
+#include <kiwi/Graphics/Point.h>
 #include <kiwi/Support/Noncopyable.h>
 
 class Session;
@@ -34,8 +35,7 @@ public:
 
 	void SetVisible(bool visible);
 	void MoveRelative(int32_t dx, int32_t dy);
-	void Down(int32_t button);
-	void Up(int32_t button);
+	kiwi::Point GetPosition() const;
 private:
 	Session *m_session;		/**< Session the cursor is for. */
 	ServerWindow *m_root;		/**< Root window of session, stored for convenience. */
