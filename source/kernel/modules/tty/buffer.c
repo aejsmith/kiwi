@@ -240,7 +240,7 @@ tty_buffer_t *tty_buffer_create(void) {
 /** Destroy a terminal buffer.
  * @param buf		Buffer to destroy. */
 void tty_buffer_destroy(tty_buffer_t *buf) {
-	kheap_free(buf->buffer, TTY_BUFFER_SIZE);
+	kheap_free(buf->buffer, TTY_BUFFER_SIZE * sizeof(*buf->buffer));
 	notifier_clear(&buf->lines_notifier);
 	notifier_clear(&buf->data_notifier);
 	notifier_clear(&buf->space_notifier);

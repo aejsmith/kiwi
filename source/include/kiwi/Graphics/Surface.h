@@ -24,6 +24,7 @@
 #include <cairo/cairo.h>
 
 #include <kiwi/Graphics/Size.h>
+#include <kiwi/Support/Noncopyable.h>
 #include <kiwi/Object.h>
 
 namespace kiwi {
@@ -35,7 +36,7 @@ class SurfacePrivate;
  * This class provides an area of memory which can be drawn to. Surfaces are
  * stored as 32-bit ARGB (4 bytes per pixel).
  */
-class KIWI_PUBLIC Surface : public kiwi::Object {
+class KIWI_PUBLIC Surface : public kiwi::Object, kiwi::Noncopyable {
 public:
 	Surface(const Size &size);
 	Surface(area_id_t area);

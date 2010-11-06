@@ -165,9 +165,9 @@ int main(int argc, char **argv) {
 			"org.kiwi.WindowServer"
 		));
 
-		/* Run the console application. */
+		/* Run the terminal application. */
 		Process proc;
-		proc.Create("/system/binaries/console");
+		proc.Create("/system/binaries/terminal");
 	}
 
 	svcmgr.Run();
