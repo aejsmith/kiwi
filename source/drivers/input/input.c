@@ -175,7 +175,7 @@ static void input_device_unwait(device_t *_device, void *data, int event, void *
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t keyboard_device_request(device_t *_device, void *data, int request, void *in,
+static status_t keyboard_device_request(device_t *_device, void *data, int request, const void *in,
                                         size_t insz, void **outp, size_t *outszp) {
 	input_device_t *device = _device->data;
 
@@ -197,7 +197,7 @@ static status_t keyboard_device_request(device_t *_device, void *data, int reque
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t mouse_device_request(device_t *_device, void *data, int request, void *in,
+static status_t mouse_device_request(device_t *_device, void *data, int request, const void *in,
                                      size_t insz, void **outp, size_t *outszp) {
 	input_device_t *device = _device->data;
 

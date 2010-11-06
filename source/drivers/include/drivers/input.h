@@ -187,7 +187,7 @@ typedef struct keyboard_ops {
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct input_device *device, int request, void *in,
+	status_t (*request)(struct input_device *device, int request, const void *in,
 	                    size_t insz, void **outp, size_t *outszp);
 } keyboard_ops_t;
 
@@ -208,7 +208,7 @@ typedef struct mouse_ops {
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct input_device *device, int request, void *in,
+	status_t (*request)(struct input_device *device, int request, const void *in,
 	                    size_t insz, void **outp, size_t *outszp);
 } mouse_ops_t;
 

@@ -686,7 +686,7 @@ status_t device_write(object_handle_t *handle, const void *buf, size_t count, of
  *			operation handler (optional).
  * @param outszp	Where to store size of data returned.
  * @return		Status code describing result of the operation. */
-status_t device_request(object_handle_t *handle, int request, void *in, size_t insz,
+status_t device_request(object_handle_t *handle, int request, const void *in, size_t insz,
                         void **outp, size_t *outszp) {
 	device_t *device;
 
@@ -997,7 +997,7 @@ out:
  *			operation handler (optional).
  * @param outszp	Where to store size of data returned.
  * @return		Status code describing result of the operation. */
-status_t sys_device_request(handle_t handle, int request, void *in, size_t insz, void *out,
+status_t sys_device_request(handle_t handle, int request, const void *in, size_t insz, void *out,
                             size_t outsz, size_t *bytesp) {
 	void *kin = NULL, *kout = NULL;
 	object_handle_t *khandle;

@@ -261,7 +261,7 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t kconsole_device_request(device_t *device, void *data, int request, void *in,
+static status_t kconsole_device_request(device_t *device, void *data, int request, const void *in,
                                         size_t insz, void **outp, size_t *outszp) {
 	return STATUS_NOT_IMPLEMENTED;
 #if 0

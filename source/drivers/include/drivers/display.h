@@ -87,8 +87,8 @@ typedef struct display_ops {
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct display_device *device, int request, void *in, size_t insz,
-	                    void **outp, size_t *outszp);
+	status_t (*request)(struct display_device *device, int request, const void *in,
+	                    size_t insz, void **outp, size_t *outszp);
 
 	/** Set the display mode.
 	 * @param device	Device to set mode of.

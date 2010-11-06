@@ -120,7 +120,7 @@ typedef struct device_ops {
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct device *device, void *data, int request, void *in,
+	status_t (*request)(struct device *device, void *data, int request, const void *in,
 	                    size_t insz, void **outp, size_t *outszp);
 } device_ops_t;
 
@@ -216,7 +216,7 @@ extern status_t device_read(object_handle_t *handle, void *buf, size_t count, of
                             size_t *bytesp);
 extern status_t device_write(object_handle_t *handle, const void *buf, size_t count,
                              offset_t offset, size_t *bytesp);
-extern status_t device_request(object_handle_t *handle, int request, void *in, size_t insz,
+extern status_t device_request(object_handle_t *handle, int request, const void *in, size_t insz,
                                void **outp, size_t *outszp);
 
 extern int kdbg_cmd_device(int argc, char **argv);

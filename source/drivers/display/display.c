@@ -233,7 +233,7 @@ static status_t display_device_get_page(device_t *_device, void *data, offset_t 
  * @param outp		Where to store pointer to output buffer.
  * @param outszp	Where to store output buffer size.
  * @return		Status code describing result of the operation. */
-static status_t display_device_request(device_t *_device, void *data, int request, void *in,
+static status_t display_device_request(device_t *_device, void *data, int request, const void *in,
                                        size_t insz, void **outp, size_t *outszp) {
 	display_device_t *device = _device->data;
 	display_mode_t *mode = NULL;
