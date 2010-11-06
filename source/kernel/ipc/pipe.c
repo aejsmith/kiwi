@@ -40,8 +40,6 @@ static void pipe_ctor(void *obj, void *data) {
 	mutex_init(&pipe->reader, "pipe_reader_lock", 0);
 	mutex_init(&pipe->writer, "pipe_writer_lock", 0);
 	mutex_init(&pipe->lock, "pipe_lock", 0);
-	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
-	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
 	notifier_init(&pipe->space_notifier, pipe);
 	notifier_init(&pipe->data_notifier, pipe);
 }
@@ -240,6 +238,8 @@ pipe_t *pipe_create(void) {
 	pipe_t *pipe;
 
 	pipe = slab_cache_alloc(pipe_cache, MM_SLEEP);
+	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
+	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
 	pipe->buf = kheap_alloc(PIPE_SIZE, MM_SLEEP);
 	pipe->start = 0;
 	pipe->end = 0;
