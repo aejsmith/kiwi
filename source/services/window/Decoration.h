@@ -26,15 +26,20 @@
 #include <kiwi/Graphics/Rect.h>
 #include <kiwi/Support/Noncopyable.h>
 
+#include "MouseReceiver.h"
+
 class ServerWindow;
 
 /** Class providing a decoration for a window. */
-class Decoration : kiwi::Noncopyable {
+class Decoration : public MouseReceiver, kiwi::Noncopyable {
 public:
 	Decoration(ServerWindow *window);
 	~Decoration();
 
 	void Update();
+	void MouseMove(const kiwi::MouseEvent &event);
+	void MousePress(const kiwi::MouseEvent &event);
+	void MouseRelease(const kiwi::MouseEvent &event);
 
 	/** Get the Cairo surface for the decoration.
 	 * @return		Pointer to Cairo surface. */
@@ -48,6 +53,8 @@ private:
 	ServerWindow *m_window;		/**< Window that the decoration is for. */
 	kiwi::Rect m_frame;		/**< Area covered by the decoration, relative to window. */
 	cairo_surface_t *m_surface;	/**< Surface containing the rendered decoration. */
+	bool m_grabbed;			/**< Whether the decoration is grabbed. */
+	kiwi::Point m_grab_pos;		/**< Grab position. */
 };
 
 #endif /* __DECORATION_H */

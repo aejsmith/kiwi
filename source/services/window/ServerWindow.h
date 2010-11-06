@@ -27,6 +27,7 @@
 #include <kiwi/Object.h>
 
 #include "org.kiwi.WindowServer.h"
+#include "MouseReceiver.h"
 #include "WindowList.h"
 
 class Connection;
@@ -35,7 +36,7 @@ class ServerSurface;
 class Session;
 
 /** Class implementing the server side of a window. */
-class ServerWindow : public kiwi::Object, kiwi::Noncopyable {
+class ServerWindow : public kiwi::Object, public MouseReceiver, kiwi::Noncopyable {
 public:
 	/** Type of a window's ID. */
 	typedef org::kiwi::WindowServer::WindowID ID;

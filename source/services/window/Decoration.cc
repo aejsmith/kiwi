@@ -29,6 +29,7 @@
 
 #include "Decoration.h"
 #include "ServerWindow.h"
+#include "Session.h"
 
 using namespace kiwi;
 using namespace std;
@@ -86,7 +87,7 @@ static void rounded_rectangle(cairo_t *context, double x, double y, double width
 /** Create a decoration.
  * @param window	Window that the decoration is for. */
 Decoration::Decoration(ServerWindow *window) :
-	m_window(window), m_surface(0)
+	m_window(window), m_surface(0), m_grabbed(false)
 {
 	if(!g_cairo_font) {
 		FT_Face face;
@@ -193,4 +194,39 @@ void Decoration::Update() {
 	cairo_fill(context);
 
 	cairo_destroy(context);
+}
+
+/** Handle a mouse move event on the decoration.
+ * @param event		Event information object. */
+void Decoration::MouseMove(const MouseEvent &event) {
+	if(m_grabbed && m_window->GetStyle() & BaseWindow::kMovableMask) {
+		Point pos = m_window->GetFrame().GetTopLeft();
+		int dx = event.GetPosition().GetX() - m_grab_pos.GetX();
+		int dy = event.GetPosition().GetY() - m_grab_pos.GetY();
+		m_window->MoveTo(m_window->GetFrame().GetTopLeft().Translated(dx, dy));
+
+		/* Re-grab with new position. */
+		m_window->GetSession()->GrabMouse(this, m_window->GetAbsoluteFrame().GetTopLeft());
+	}
+}
+
+/** Handle a mouse press event on the decoration.
+ * @param event		Event information object. */
+void Decoration::MousePress(const MouseEvent &event) {
+	if(event.GetButtons() & Input::kLeftButton) {
+		m_grabbed = true;
+		m_grab_pos = event.GetPosition();
+
+		/* Grab the mouse in the session. */
+		m_window->GetSession()->GrabMouse(this, m_window->GetAbsoluteFrame().GetTopLeft());
+	}
+}
+
+/** Handle a mouse release event on the decoration.
+ * @param event		Event information object. */
+void Decoration::MouseRelease(const MouseEvent &event) {
+	if(!(event.GetButtons() & Input::kLeftButton) && m_grabbed) {
+		m_grabbed = false;
+		m_window->GetSession()->ReleaseMouse();
+	}
 }

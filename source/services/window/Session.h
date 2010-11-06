@@ -31,6 +31,7 @@
 #include <list>
 #include <map>
 
+#include "MouseReceiver.h"
 #include "ServerWindow.h"
 
 class Connection;
@@ -75,6 +76,9 @@ public:
 	void KeyPress(const kiwi::KeyEvent &event);
 	void KeyRelease(const kiwi::KeyEvent &event);
 
+	void GrabMouse(MouseReceiver *object, const kiwi::Point &offset);
+	void ReleaseMouse();
+
 	/** Get the ID of the session.
 	 * @return		ID of the session. */
 	session_id_t GetID() const { return m_id; }
@@ -95,6 +99,7 @@ public:
 	 * @return		Pointer to active window. */
 	ServerWindow *GetActiveWindow() const { return m_active_window; }
 private:
+	MouseReceiver *MouseEventTarget(kiwi::Point &pos, bool activate = false);
 	void Release();
 
 	ConnectionList m_connections;	/**< Connections on the session. */
@@ -109,6 +114,8 @@ private:
 	Compositor *m_compositor;	/**< Compositor. */
 	ServerWindow::ID m_next_wid;	/**< Next window ID. */
 	ServerWindow *m_active_window;	/**< Active window. */
+	MouseReceiver *m_mouse_grabber;	/**< Object that has grabbed the mouse. */
+	kiwi::Point m_grab_offset;	/**< Offset into the screen of the grabbed object. */
 };
 
 #endif /* __SESSION_H */

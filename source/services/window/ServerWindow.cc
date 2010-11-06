@@ -392,6 +392,7 @@ kiwi::Point ServerWindow::RelativePoint(kiwi::Point pos) {
 void ServerWindow::MouseMove(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
+		m_decoration->MouseMove(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()
@@ -406,6 +407,7 @@ void ServerWindow::MouseMove(const MouseEvent &event) {
 void ServerWindow::MousePress(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
+		m_decoration->MousePress(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()
@@ -420,6 +422,7 @@ void ServerWindow::MousePress(const MouseEvent &event) {
 void ServerWindow::MouseRelease(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
+		m_decoration->MouseRelease(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()

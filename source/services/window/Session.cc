@@ -18,6 +18,7 @@
  * @brief		UI session class.
  */
 
+#include <assert.h>
 #include <exception>
 #include <iostream>
 
@@ -37,7 +38,8 @@ using namespace std;
  * @param id		ID of the session. */
 Session::Session(WindowServer *server, session_id_t id) :
 	m_server(server), m_id(id), m_active(false), m_refcount(0), m_root(0),
-	m_cursor(0), m_compositor(0), m_next_wid(1), m_active_window(0)
+	m_cursor(0), m_compositor(0), m_next_wid(1), m_active_window(0),
+	m_mouse_grabber(0)
 {
 	cairo_surface_t *image;
 	cairo_t *context;
@@ -190,13 +192,13 @@ void Session::MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uin
 	/* Move the cursor. */
 	m_cursor->MoveRelative(dx, dy);
 
-	/* Get the window for the event and the position within that window. */
-	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
-	Point pos = window->RelativePoint(m_cursor->GetPosition());
+	/* Get the target for the event. */
+	Point pos;
+	MouseReceiver *object = MouseEventTarget(pos);
 
 	/* Send the event. */
 	MouseEvent event(Event::kMouseMove, time, modifiers, pos, buttons);
-	window->MouseMove(event);
+	object->MouseMove(event);
 }
 
 /** Dispatch a mouse press event.
@@ -204,16 +206,13 @@ void Session::MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uin
  * @param modifiers	Keyboard modifiers pressed at time of the event.
  * @param buttons	Buttons pressed at time of the event. */
 void Session::MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons) {
-	/* Get the window for the event and the position within that window. */
-	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
-	Point pos = window->RelativePoint(m_cursor->GetPosition());
-
-	/* Activate the window. */
-	ActivateWindow(window);
+	/* Get the target for the event. If it is a window, activate it. */
+	Point pos;
+	MouseReceiver *object = MouseEventTarget(pos, true);
 
 	/* Send the event. */
 	MouseEvent event(Event::kMousePress, time, modifiers, pos, buttons);
-	window->MousePress(event);
+	object->MousePress(event);
 }
 
 /** Dispatch a mouse release event.
@@ -221,13 +220,13 @@ void Session::MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons) 
  * @param modifiers	Keyboard modifiers pressed at time of the event.
  * @param buttons	Buttons pressed at time of the event. */
 void Session::MouseRelease(useconds_t time, uint32_t modifiers, uint32_t buttons) {
-	/* Get the window for the event and the position within that window. */
-	ServerWindow *window = m_root->AtPosition(m_cursor->GetPosition());
-	Point pos = window->RelativePoint(m_cursor->GetPosition());
+	/* Get the target for the event. If it is a window, activate it. */
+	Point pos;
+	MouseReceiver *object = MouseEventTarget(pos);
 
 	/* Send the event. */
 	MouseEvent event(Event::kMouseRelease, time, modifiers, pos, buttons);
-	window->MouseRelease(event);
+	object->MouseRelease(event);
 }
 
 /** Dispatch a key press event.
@@ -240,6 +239,40 @@ void Session::KeyPress(const KeyEvent &event) {
  * @param event		Key release object. */
 void Session::KeyRelease(const KeyEvent &event) {
 	m_active_window->KeyRelease(event);
+}
+
+/** Grab the mouse, causing all mouse events to be sent to the object.
+ * @param object	Mouse receiver to sent events to.
+ * @param offset	Offset of the object in screen, used to work out
+ *			position for mouse event. */
+void Session::GrabMouse(MouseReceiver *object, const Point &offset) {
+	m_mouse_grabber = object;
+	m_grab_offset = offset;
+}
+
+/** Release the mouse. */
+void Session::ReleaseMouse() {
+	m_mouse_grabber = 0;
+}
+
+/** Work out the target for a mouse event.
+ * @param pos		Where to store relative position for event.
+ * @param activate	If looking up a window, whether to activate it.
+ * @return		Pointer to receiver. */
+MouseReceiver *Session::MouseEventTarget(Point &pos, bool activate) {
+	Point abs = m_cursor->GetPosition();
+	if(m_mouse_grabber) {
+		pos = abs.Translated(-m_grab_offset.GetX(), -m_grab_offset.GetY());
+		return m_mouse_grabber;
+	} else {
+		/* Use the window that the cursor is currently pointing at. */
+		ServerWindow *window = m_root->AtPosition(abs);
+		pos = window->RelativePoint(abs);
+		if(activate) {
+			ActivateWindow(window);
+		}
+		return window;
+	}
 }
 
 /** Decrease the session reference count. */
