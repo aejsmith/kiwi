@@ -30,7 +30,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 
-#include "unistd_priv.h"
+#include "posix_priv.h"
 
 /** List of child processes created via fork(). */
 LIST_DECLARE(child_processes);

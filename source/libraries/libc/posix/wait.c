@@ -35,7 +35,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#include "../unistd/unistd_priv.h"
+#include "posix_priv.h"
 
 /** Wait for a child process to stop or terminate.
  * @param statusp	Where to store process exit status.

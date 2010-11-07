@@ -18,8 +18,8 @@
  * @brief		POSIX internal functions/definitions.
  */
 
-#ifndef __UNISTD_PRIV_H
-#define __UNISTD_PRIV_H
+#ifndef __POSIX_PRIV_H
+#define __POSIX_PRIV_H
 
 #include <util/list.h>
 #include <util/mutex.h>
@@ -38,4 +38,4 @@ typedef struct posix_process {
 extern list_t __hidden child_processes;
 extern libc_mutex_t __hidden child_processes_lock;
 
-#endif /* __UNISTD_PRIV_H */
+#endif /* __POSIX_PRIV_H */

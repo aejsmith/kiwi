@@ -26,7 +26,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "libc.h"
+#include "../libc.h"
 
 /** Get the input baud rate from a termios structure.
  * @param tio		Terminal I/O settings structure.
