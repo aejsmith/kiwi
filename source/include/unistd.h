@@ -61,7 +61,7 @@ extern char *optarg;
 extern int optind, opterr, optopt;
 
 extern int access(const char *path, int mode);
-//extern unsigned int alarm(unsigned int seconds);
+extern unsigned int alarm(unsigned int seconds);
 extern int chdir(const char *path);
 extern int chown(const char *path, uid_t uid, gid_t gid);
 extern int close(int fd);
@@ -139,7 +139,7 @@ extern void sync(void);
 extern pid_t tcgetpgrp(int fd);
 extern int tcsetpgrp(int fd, pid_t pgid);
 /* int truncate(const char *, off_t); */
-/* char *ttyname(int); */
+extern char *ttyname(int fd);
 /* int ttyname_r(int, char *, size_t); */
 extern int unlink(const char *path);
 //extern int unlinkat(int, const char *, int);

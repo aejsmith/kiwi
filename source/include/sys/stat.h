@@ -91,6 +91,7 @@ extern int mkdir(const char *path, mode_t mode);
 /* int mkdirat(int, const char *, mode_t); */
 /* int mkfifo(const char *, mode_t); */
 /* int mkfifoat(int, const char *, mode_t); */
+extern int mknod(const char *path, mode_t mode, dev_t dev);
 extern int stat(const char *__restrict path, struct stat *__restrict statp);
 extern mode_t umask(mode_t mask);
 /* int utimensat(int, const char *, const struct timespec [2], int); */

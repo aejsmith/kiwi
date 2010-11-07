@@ -71,7 +71,7 @@ uid_t getuid(void) {
  * @param gid		Group ID to set.
  * @return		0 on success, -1 on failure. */
 int setgid(gid_t gid) {
-	errno = ENOSYS;
+	libc_stub("setgid", false);
 	return -1;
 }
 
@@ -79,6 +79,6 @@ int setgid(gid_t gid) {
  * @param uid		User ID to set.
  * @return		0 on success, -1 on failure. */
 int setuid(uid_t uid) {
-	errno = ENOSYS;
+	libc_stub("setuid", false);
 	return -1;
 }
