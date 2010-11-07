@@ -68,6 +68,7 @@ sources = map(File, [
 	'posix/symlink.c',
 	'posix/sync.c',
 	'posix/termios.c',
+	'posix/uidgid.c',
 	'posix/umask.c',
 	'posix/unlink.c',
 	'posix/utime.c',

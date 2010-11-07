@@ -54,16 +54,12 @@
 #ifndef __MATH_H
 #define __MATH_H
 
+#include <sys/types.h>
 #include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef unsigned char u_char;
-typedef unsigned short u_short;
-typedef unsigned int u_int;
-typedef unsigned long u_long;
 
 #if defined(__x86_64__) || defined(__i386__)
 

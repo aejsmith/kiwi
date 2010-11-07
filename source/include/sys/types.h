@@ -50,6 +50,12 @@ typedef uint32_t nlink_t;		/**< Used to store a number of blocks. */
 typedef uint32_t uid_t;			/**< Used to store a user ID. */
 typedef uint32_t gid_t;			/**< Used to store a group ID. */
 
+/** Other type definitions. */
+typedef unsigned char u_char;
+typedef unsigned short u_short;
+typedef unsigned int u_int;
+typedef unsigned long u_long;
+
 /* clockid_t */
 /* [XSI] fsblkcnt_t */
 /* [XSI] fsfilcnt_t */

@@ -15,21 +15,31 @@
 
 /**
  * @file
- * @brief		POSIX get PID function.
+ * @brief		Password functions/definitions.
  */
 
-#include <kernel/process.h>
-#include <unistd.h>
+#ifndef __PWD_H
+#define __PWD_H
 
-/** Get the current process ID.
- * @return		ID of calling process. */
-pid_t getpid(void) {
-	return process_id(-1);
-}
+#include <sys/types.h>
 
-/** Get the parent process ID.
- * @return		ID of the parent process. */
-pid_t getppid(void) {
-	/* TODO. */
-	return 0;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** User information structure. */
+struct passwd {
+	char *pw_name;			/**< User's login name. */
+	char *pw_passwd;		/**< Password. */
+	uid_t pw_uid;			/**< Numerical user ID. */
+	gid_t pw_gid;			/**< Numerical group ID. */
+	char *pw_dir;			/**< Initial working directory. */
+	char *pw_shell;			/**< Program to use as shell. */
+	char *pw_gecos;			/**< Real name. */
+};
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* __PWD_H */
