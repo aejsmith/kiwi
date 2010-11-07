@@ -18,6 +18,9 @@
  * @brief		Terminal emulator.
  */
 
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "TerminalApp.h"
 #include "TerminalWindow.h"
 
@@ -27,6 +30,9 @@
 TerminalApp::TerminalApp(int argc, char **argv) :
 	m_window_count(0)
 {
+	/* Change to our home directory. */
+	chdir(getenv("HOME"));
+
 	/* Create the initial terminal. */
 	CreateWindow();
 }

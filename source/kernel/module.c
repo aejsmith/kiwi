@@ -278,8 +278,12 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 		kprintf(LOG_NORMAL, "module: information for module %p is invalid\n", module);
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
-	} else if(strnlen(module->name, MODULE_NAME_MAX + 1) == (MODULE_NAME_MAX + 1)) {
+	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
 		kprintf(LOG_NORMAL, "module: name of module %p is too long\n", module);
+		ret = STATUS_MALFORMED_IMAGE;
+		goto fail;
+	} else if(strnlen(module->description, MODULE_DESC_MAX) == MODULE_DESC_MAX) {
+		kprintf(LOG_NORMAL, "module: description of module %p is too long\n", module);
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	}
@@ -404,4 +408,61 @@ status_t sys_module_load(const char *path, char *depbuf) {
 	object_handle_release(handle);
 	kfree(kpath);
 	return ret;
+}
+
+/** Get information on loaded modules.
+ * @param infop		Array of module information structures to fill in.
+ * @param count		Number of entries in the array.
+ * @return		Status code describing result of the operation. */
+status_t sys_module_info(module_info_t *infop, size_t count) {
+	module_info_t info;
+	module_t *module;
+	status_t ret;
+	size_t i = 0;
+
+	/* Check if the current process can load modules. */
+	if(!cap_check(NULL, CAP_MODULE)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	mutex_lock(&module_lock);
+
+	LIST_FOREACH(&module_list, iter) {
+		module = list_entry(iter, module_t, header);
+
+		strcpy(info.name, module->name);
+		strcpy(info.desc, module->description);
+		info.count = refcount_get(&module->count);
+		info.load_size = module->load_size;
+
+		ret = memcpy_to_user(&infop[i++], &info, sizeof(info));
+		if(ret != STATUS_SUCCESS) {
+			mutex_unlock(&module_lock);
+			return ret;
+		}
+	}
+
+	mutex_unlock(&module_lock);
+	return STATUS_SUCCESS;
+}
+
+/** Get the number of loaded modules.
+ * @param countp	Where to store the number of loaded modules.
+ * @return		Status code describing result of the operation. */
+status_t sys_module_count(size_t *countp) {
+	size_t count = 0;
+
+	/* Check if the current process can load modules. */
+	if(!cap_check(NULL, CAP_MODULE)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	mutex_lock(&module_lock);
+
+	LIST_FOREACH(&module_list, iter) {
+		count++;
+	}
+
+	mutex_unlock(&module_lock);
+	return memcpy_to_user(countp, &count, sizeof(count));
 }

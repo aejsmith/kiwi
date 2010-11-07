@@ -27,14 +27,25 @@
 extern "C" {
 #endif
 
-/** Maximum length of a module name. */
+/** Maximum length of a module name/description. */
 #define MODULE_NAME_MAX		16
+#define MODULE_DESC_MAX		80
 
 /** Module information section names. */
 #define MODULE_INFO_SECTION	".modinfo"
 #define MODULE_EXPORT_SECTION	".modexport"
 
+/** Module information structure. */
+typedef struct module_info {
+	char name[MODULE_NAME_MAX];	/**< Name of the module. */
+	char desc[MODULE_DESC_MAX];	/**< Description of the module. */
+	size_t count;			/**< Reference count of the module. */
+	size_t load_size;		/**< Size of the module in memory. */
+} module_info_t;
+
 extern status_t SYSCALL(module_load)(const char *path, char *depbuf);
+extern status_t SYSCALL(module_info)(module_info_t *infop, size_t count);
+extern status_t SYSCALL(module_count)(size_t *countp);
 
 #ifdef __cplusplus
 }
