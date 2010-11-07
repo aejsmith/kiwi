@@ -14,7 +14,6 @@
 Import('env')
 
 SConscript(dirs=[
-	#'failshell',
 	'terminal',
 	'3rdparty/bash-4.1',
 	'3rdparty/dungeon',
