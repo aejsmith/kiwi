@@ -88,6 +88,52 @@ Terminal::~Terminal() {
 
 }
 
+/** Run a command in the terminal.
+ * @param cmdline	Command line to run. */
+bool Terminal::Run(const char *cmdline) {
+	handle_t in, out, err;
+	status_t ret;
+
+	assert(!m_process.IsRunning());
+
+	/* Work out the path to the slave. */
+	ostringstream path;
+	path << "/tty/" << m_id;
+
+	/* Open handles to it to give to the child. */
+	ret = device_open(path.str().c_str(), DEVICE_READ, &in);
+	if(ret != STATUS_SUCCESS) {
+		return false;
+	}
+	ret = device_open(path.str().c_str(), DEVICE_WRITE, &out);
+	if(ret != STATUS_SUCCESS) {
+		handle_close(in);
+		return false;
+	}
+	ret = device_open(path.str().c_str(), DEVICE_WRITE, &err);
+	if(ret != STATUS_SUCCESS) {
+		handle_close(out);
+		handle_close(in);
+		return false;
+	}
+
+	/* Make the handles inheritable so children of the process get them. */
+	handle_set_flags(in, HANDLE_INHERITABLE);
+	handle_set_flags(out, HANDLE_INHERITABLE);
+	handle_set_flags(err, HANDLE_INHERITABLE);
+
+	/* Create the child process. */
+	Process::HandleMap map;
+	map.push_back(make_pair(in, 0));
+	map.push_back(make_pair(out, 1));
+	map.push_back(make_pair(err, 2));
+	ret = m_process.Create(cmdline, environ, &map);
+	handle_close(err);
+	handle_close(out);
+	handle_close(in);
+	return ret;
+}
+
 /** Resize the terminal.
  * @param cols		New number of columns.
  * @param rows		New number of rows. */
@@ -166,55 +212,25 @@ void Terminal::Output(unsigned char ch) {
 
 	/* If we have reached the bottom of the console, scroll. */
 	if(m_cursor_y >= m_rows) {
-		//ScrollDown();
+		ScrollDown();
 		m_cursor_y = m_rows - 1;
 	}
 }
 
-/** Run a command in the terminal.
- * @param cmdline	Command line to run. */
-bool Terminal::Run(const char *cmdline) {
-	handle_t in, out, err;
-	status_t ret;
+/** Scroll the terminal down. */
+void Terminal::ScrollDown() {
+	/* Delete the top row of the buffer. */
+	delete m_buffer[0];
 
-	assert(!m_process.IsRunning());
+	/* Shift everything up. */
+	memmove(&m_buffer[0], &m_buffer[1], m_rows * sizeof(m_buffer[0]));
 
-	/* Work out the path to the slave. */
-	ostringstream path;
-	path << "/tty/" << m_id;
+	/* Add a new row. */
+	m_buffer[m_rows - 1] = new char[m_columns];
+	memset(m_buffer[m_rows - 1], 0, m_columns);
 
-	/* Open handles to it to give to the child. */
-	ret = device_open(path.str().c_str(), DEVICE_READ, &in);
-	if(ret != STATUS_SUCCESS) {
-		return false;
-	}
-	ret = device_open(path.str().c_str(), DEVICE_WRITE, &out);
-	if(ret != STATUS_SUCCESS) {
-		handle_close(in);
-		return false;
-	}
-	ret = device_open(path.str().c_str(), DEVICE_WRITE, &err);
-	if(ret != STATUS_SUCCESS) {
-		handle_close(out);
-		handle_close(in);
-		return false;
-	}
-
-	/* Make the handles inheritable so children of the process get them. */
-	handle_set_flags(in, HANDLE_INHERITABLE);
-	handle_set_flags(out, HANDLE_INHERITABLE);
-	handle_set_flags(err, HANDLE_INHERITABLE);
-
-	/* Create the child process. */
-	Process::HandleMap map;
-	map.push_back(make_pair(in, 0));
-	map.push_back(make_pair(out, 1));
-	map.push_back(make_pair(err, 2));
-	ret = m_process.Create(cmdline, environ, &map);
-	handle_close(err);
-	handle_close(out);
-	handle_close(in);
-	return ret;
+	/* Update. */
+	OnUpdate(Rect(0, 0, m_columns, m_rows));
 }
 
 /** Register events for the terminal. */

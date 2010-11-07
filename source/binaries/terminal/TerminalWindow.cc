@@ -91,7 +91,9 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 			cairo_set_operator(context, CAIRO_OPERATOR_OVER);
 
 			/* Draw the character. */
-			m_font->DrawChar(context, m_terminal.GetBuffer()[y][x], pos);
+			if(m_terminal.GetBuffer()[y][x]) {
+				m_font->DrawChar(context, m_terminal.GetBuffer()[y][x], pos);
+			}
 			Update(Rect(pos, font_size));
 		}
 	}

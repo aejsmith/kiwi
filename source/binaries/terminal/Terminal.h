@@ -59,10 +59,10 @@ public:
 	Terminal(int cols, int rows);
 	~Terminal();
 
+	bool Run(const char *cmdline);
 	void Resize(int cols, int rows);
 	void Input(unsigned char ch);
 	void Output(unsigned char ch);
-	bool Run(const char *cmdline);
 
 	/** Get the size of the terminal.
 	 * @param cols		Where to store number of columns.
@@ -88,6 +88,8 @@ public:
 	 * @param		Rectangle area to update. */
 	kiwi::Signal<kiwi::Rect> OnUpdate;
 private:
+	void ScrollDown();
+
 	void RegisterEvents();
 	void HandleEvent(int event);
 
