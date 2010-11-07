@@ -63,7 +63,7 @@ def fs_image_func(target, source, env):
 		os.makedirs(os.path.join(tmpdir, 'system', 'data', app))
 		for f in files:
 			shutil.copy(str(f), os.path.join(tmpdir, 'system', 'data', app))
-	os.system('cp -R ' + str(Dir('#/data')) + ' ' + tmpdir + '/system/')
+	os.system('cp -R ' + os.path.join(str(Dir('#/data')), '*') + ' ' + tmpdir)
 	for (source, dest) in env['LINKS'].items():
 		if source[0] == '/':
 			source = source[1:]
@@ -92,9 +92,10 @@ target = dist.Command(
 	dist['MODULES'] + dist['LIBRARIES'] + dist['SERVICES'] + dist['BINARIES'] + data,
 	Action(fs_image_func, '$GENCOMSTR')
 )
-if len(config['EXTRA_FSIMAGE']) > 0:
-	AlwaysBuild(target)
 dist['FSIMAGE'] = File('fsimage.tar')
+
+# Always build the filesystem image to make sure stuff is copied into it.
+AlwaysBuild(target)
 
 # Add aliases and set the default target.
 Alias('loader', dist['LOADER'])
