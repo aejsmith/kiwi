@@ -18,9 +18,7 @@
  * @brief		Terminal control functions.
  */
 
-#include <kernel/device.h>
-#include <kernel/object.h>
-#include <kernel/status.h>
+#include <sys/ioctl.h>
 
 #include <errno.h>
 #include <termios.h>
@@ -76,19 +74,7 @@ int cfsetospeed(struct termios *tio, speed_t speed) {
  * @param fd		File descriptor for terminal.
  * @return		0 on success, -1 on failure. */
 int tcdrain(int fd) {
-	status_t ret;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TIOCDRAIN, NULL, 0, NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, TIOCDRAIN);
 }
 
 /** Suspend or restart data transmission on a terminal.
@@ -98,19 +84,7 @@ int tcdrain(int fd) {
  *			will resume input.
  * @return		0 on success, -1 on failure. */
 int tcflow(int fd, int action) {
-	status_t ret;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TCXONC, &action, sizeof(action), NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, TCXONC, action);
 }
 
 /** Discard the contents of terminal buffers.
@@ -120,19 +94,7 @@ int tcflow(int fd, int action) {
  *			transmitted. TCIOFLUSH will flush both.
  * @return		0 on success, -1 on failure. */
 int tcflush(int fd, int action) {
-	status_t ret;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TCFLSH, &action, sizeof(action), NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, TCFLSH, action);
 }
 
 /** Get I/O settings for a terminal.
@@ -140,19 +102,7 @@ int tcflush(int fd, int action) {
  * @param tiop		Structure to fill with settings.
  * @return		0 on success, -1 on failure. */
 int tcgetattr(int fd, struct termios *tiop) {
-	status_t ret;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TCGETA, NULL, 0, tiop, sizeof(*tiop), NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, TCGETA, tiop);
 }
 
 /** Get process group ID of the terminal's session.
@@ -182,12 +132,7 @@ int tcsendbreak(int fd, int duration) {
  * @param tiop		Structure containing new terminal settings.
  * @return		0 on success, -1 on failure. */
 int tcsetattr(int fd, int action, const struct termios *tio) {
-	status_t ret;
 	int request;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
 
 	switch(action) {
 	case TCSANOW:
@@ -204,29 +149,16 @@ int tcsetattr(int fd, int action, const struct termios *tio) {
 		return -1;
 	}
 
-	ret = device_request(fd, request, tio, sizeof(*tio), NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, request, tio);
 }
 
 /** Get the foreground process group of a terminal
  * @param fd		File descriptor for terminal.
  * @return		Process group ID on success, -1 on failure. */
 pid_t tcgetpgrp(int fd) {
-	status_t ret;
 	pid_t pgid;
 
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TIOCGPGRP, NULL, 0, &pgid, sizeof(pgid), NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
+	if(ioctl(fd, TIOCGPGRP, &pgid) < 0) {
 		return -1;
 	}
 
@@ -238,17 +170,5 @@ pid_t tcgetpgrp(int fd) {
  * @param pgid		Process group ID to set.
  * @return		0 on success, -1 on failure. */
 int tcsetpgrp(int fd, pid_t pgid) {
-	status_t ret;
-
-	if(!isatty(fd)) {
-		return -1;
-	}
-
-	ret = device_request(fd, TIOCSPGRP, &pgid, sizeof(pgid), NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+	return ioctl(fd, TIOCSPGRP, &pgid);
 }

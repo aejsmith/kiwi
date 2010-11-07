@@ -38,9 +38,6 @@ sources = map(File, [
 	'dirent/rewinddir.c',
 	'dirent/scandir.c',
 
-	'fcntl/fcntl.c',
-	'fcntl/open.c',
-
 	'locale/localeconv.c',
 	'locale/setlocale.c',
 
@@ -53,13 +50,16 @@ sources = map(File, [
 	'posix/execlp.c',
 	'posix/execve.c',
 	'posix/execvp.c',
+	'posix/fcntl.c',
 	'posix/fork.c',
 	'posix/getcwd.c',
 	'posix/getopt.c',
 	'posix/getpid.c',
+	'posix/ioctl.c',
 	'posix/isatty.c',
 	'posix/lseek.c',
 	'posix/mkdir.c',
+	'posix/open.c',
 	'posix/pipe.c',
 	'posix/read.c',
 	'posix/rmdir.c',
