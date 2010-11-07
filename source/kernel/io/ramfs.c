@@ -141,8 +141,19 @@ static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
 	ramfs_node_t *data = node->data;
 
 	info->links = 1;
-	info->size = (node->type == FS_NODE_FILE) ? data->cache->size : 0;
 	info->blksize = PAGE_SIZE;
+
+	switch(node->type) {
+	case FS_NODE_FILE:
+		info->size = data->cache->size;
+		break;
+	case FS_NODE_SYMLINK:
+		info->size = strlen(data->target);
+		break;
+	default:
+		info->size = 0;
+		break;
+	}
 }
 
 /** Update security attributes of a RamFS node.
