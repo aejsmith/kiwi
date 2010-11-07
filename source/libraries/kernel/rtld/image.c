@@ -427,7 +427,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 
 	/* Check if the image is already loaded. */
 	if(type == ELF_ET_DYN) {
-		if(rtld_library_exists(image->name)) {
+		if(rtld_image_lookup(image->name)) {
 			printf("rtld: %s: image with same name already loaded\n", path);
 			ret = STATUS_ALREADY_EXISTS;
 			goto fail;
