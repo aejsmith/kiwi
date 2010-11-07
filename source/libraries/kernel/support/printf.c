@@ -30,6 +30,9 @@
 /** Output handle to use (stderr). */
 #define OUTPUT_HANDLE		2
 
+/** Whether debug output is enabled. */
+bool libkernel_debug = false;
+
 /** Print a character.
  * @param ch		Character to print. */
 static inline void printf_print_char(char ch) {

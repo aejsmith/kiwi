@@ -57,9 +57,6 @@
 		__n; \
 	})
 
-/** Whether to enable debug output. */
-#define LIBKERNEL_DEBUG		0
-
 /** Size of the heap. */
 #define LIBKERNEL_HEAP_SIZE	8192
 
@@ -109,11 +106,10 @@ extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;
 
-#if LIBKERNEL_DEBUG
-# define dprintf(fmt...)	printf(fmt)
-#else
-# define dprintf(fmt...)	
-#endif
+extern bool libkernel_debug;
+
+/** Print a debug message. */
+#define dprintf(fmt...)		if(libkernel_debug) { printf(fmt); }
 
 extern status_t rtld_image_relocate(rtld_image_t *image);
 extern status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **entryp,
@@ -122,7 +118,7 @@ extern void rtld_image_unload(rtld_image_t *image);
 extern bool rtld_symbol_lookup(rtld_image_t *start, const char *name, elf_addr_t *addrp,
                                rtld_image_t **sourcep);
 extern void rtld_symbol_init(rtld_image_t *image);
-extern void *rtld_init(process_args_t *args);
+extern void *rtld_init(process_args_t *args, bool dry_run);
 
 extern size_t tls_alloc_module_id(void);
 extern ptrdiff_t tls_tp_offset(rtld_image_t *image);

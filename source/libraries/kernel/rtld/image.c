@@ -534,8 +534,9 @@ void rtld_image_unload(rtld_image_t *image) {
 
 /** Initialise the runtime loader.
  * @param args		Process arguments structure pointer.
+ * @param dry_run	Whether this is a dry run.
  * @return		Entry point for the program. */
-void *rtld_init(process_args_t *args) {
+void *rtld_init(process_args_t *args, bool dry_run) {
 	rtld_image_t *image;
 	void (*func)(void);
 	status_t ret;
@@ -557,18 +558,24 @@ void *rtld_init(process_args_t *args) {
 		dprintf("rtld: failed to load binary (%d)\n", ret);
 		process_exit(ret);
 	}
-#if LIBKERNEL_DEBUG
-	/* Print out some debugging information. */
-	dprintf("rtld: final image list:\n");
-	LIST_FOREACH(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
-		if(image->path) {
-			dprintf("  %s => %s (%p)\n", image->name, image->path, image->load_base);
-		} else {
-			dprintf("  %s (%p)\n", image->name, image->load_base);
+
+	/* Print out the image list if required. */
+	if(libkernel_debug || dry_run) {
+		dprintf("rtld: final image list:\n");
+		LIST_FOREACH(&loaded_images, iter) {
+			image = list_entry(iter, rtld_image_t, header);
+			if(image->path) {
+				printf("  %s => %s (%p)\n", image->name, image->path, image->load_base);
+			} else {
+				printf("  %s (%p)\n", image->name, image->load_base);
+			}
 		}
 	}
-#endif
+
+	/* Exit now if doing a dry run. */
+	if(dry_run) {
+		process_exit(0);
+	}
 
 	/* Set up TLS for the current thread. */
 	tls_init();

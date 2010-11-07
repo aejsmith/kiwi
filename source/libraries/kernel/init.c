@@ -21,6 +21,8 @@
 #include <kernel/device.h>
 #include <kernel/object.h>
 
+#include <string.h>
+
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
@@ -82,7 +84,9 @@ void libkernel_init(process_args_t *args) {
  * @param args		Process argument block. */
 void libkernel_init_stage2(process_args_t *args) {
 	void (*entry)(process_args_t *);
+	bool dry_run = false;
 	handle_t handle;
+	int i;
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(process_id(-1) == 1) {
@@ -94,8 +98,17 @@ void libkernel_init_stage2(process_args_t *args) {
 		handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
+	/* Check if any of our options are set. */
+	for(i = 0; i < args->env_count; i++) {
+		if(strncmp(args->env[i], "RTLD_DRYRUN=", 12) == 0) {
+			dry_run = true;
+		} else if(strncmp(args->env[i], "LIBKERNEL_DEBUG=", 15) == 0) {
+			libkernel_debug = true;
+		}
+	}
+
 	/* Initialise the runtime loader and load the program. */
-	entry = (void (*)(process_args_t *))rtld_init(args);
+	entry = (void (*)(process_args_t *))rtld_init(args, dry_run);
 
 	/* Signal to the kernel that we've completed loading and call the entry
 	 * point for the program. */
