@@ -230,17 +230,27 @@ static lrm_handler_t vm_cache_lrm_handler = {
 };
 
 #if CONFIG_DEBUG
+/** Perform a free page check.
+ * @param check		Check to perform.
+ * @param page		Page being performed on. */
+#define DO_CHECK(page, check)		\
+	if(unlikely(!(check))) { \
+		fatal("Free page 0x%" PRIpp " check failure: %s", (page)->addr, #check); \
+	}
+
 /** Ensure that a free page is in the correct state.
  * @param page		Page to check. */
 static inline void check_free_page(vm_page_t *page) {
-	assert(!(page->addr % PAGE_SIZE));
-	assert(!refcount_get(&page->count));
-	assert(!page->modified);
-	assert(!page->cache);
-	assert(!page->amap);
-	assert(!page->queue);
-	assert(list_empty(&page->header));
+	DO_CHECK(page, !(page->addr % PAGE_SIZE));
+	DO_CHECK(page, !refcount_get(&page->count));
+	DO_CHECK(page, !page->modified);
+	DO_CHECK(page, !page->cache);
+	DO_CHECK(page, !page->amap);
+	DO_CHECK(page, !page->queue);
+	DO_CHECK(page, list_empty(&page->header));
 }
+
+#undef DO_CHECK
 
 /** Ensure that a range of free pages are in the correct state.
  * @param base		Base of page range.
@@ -305,6 +315,8 @@ void vm_page_free(vm_page_t *pages, size_t count) {
 	}
 
 	vmem_free(&page_arena, pages[0].addr, count * PAGE_SIZE);
+	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ")\n",
+		pages[0].addr, pages[0].addr + (count * PAGE_SIZE));
 }
 
 /** Create a copy of a page.
