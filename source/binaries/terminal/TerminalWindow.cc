@@ -115,7 +115,6 @@ void TerminalWindow::KeyPressed(const KeyEvent &event) {
 		/* Send the text to the terminal. */
 		string text = event.GetText();
 		for(auto it = text.begin(); it != text.end(); ++it) {
-			cout << "Sending char " << (*it) << endl;
 			m_terminal.Input(*it);
 		}
 	}
