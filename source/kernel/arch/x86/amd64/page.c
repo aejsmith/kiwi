@@ -415,11 +415,13 @@ void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec) {
 	} else {
 		ptbl[pte] &= ~PG_WRITE;
 	}
+#if CONFIG_X86_NX
 	if(exec) {
 		ptbl[pte] &= ~PG_NOEXEC;
-	} else {
+	} else if(cpu_features.xd) {
 		ptbl[pte] |= PG_NOEXEC;
 	}
+#endif
 	memory_barrier();
 
 	/* Clear TLB entries. */

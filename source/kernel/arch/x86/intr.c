@@ -91,6 +91,10 @@ static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
 		access = VM_FAULT_EXEC;
 	}
 #endif
+	/* Check if a reserved bit fault. This is always fatal. */
+	if(frame->err_code & (1<<3)) {
+		fatal("Reserved bit pagefault exception (%p) (0x%x)", addr, frame->err_code);
+	}
 
 	/* Try the virtual memory manager if the fault occurred at a userspace
 	 * address. */
