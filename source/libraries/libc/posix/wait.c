@@ -100,13 +100,14 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		return -1;
 	}
 
+	libc_mutex_lock(&child_processes_lock, -1);
+
 	/* Only take the first exited process. */
 	for(i = 0; i < count; i++) {
 		if(!events[i].signalled) {
 			continue;
 		}
 
-		libc_mutex_lock(&child_processes_lock, -1);
 		LIST_FOREACH(&child_processes, iter) {
 			proc = list_entry(iter, posix_process_t, header);
 			if(proc->handle == events[i].handle) {
