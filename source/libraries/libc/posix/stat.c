@@ -59,7 +59,7 @@ static void fs_info_to_stat(fs_info_t *info, struct stat *restrict statp) {
 		statp->st_mode = 0755 | S_IFDIR;
 		break;
 	case FS_NODE_SYMLINK:
-		statp->st_mode = 0644 | S_IFLNK;
+		statp->st_mode = 0777 | S_IFLNK;
 		break;
 	case FS_NODE_BLKDEV:
 		statp->st_mode = S_IFBLK;

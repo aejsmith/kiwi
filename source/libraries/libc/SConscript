@@ -65,6 +65,7 @@ sources = map(File, [
 	'posix/pipe.c',
 	'posix/pwd.c',
 	'posix/read.c',
+	'posix/readlink.c',
 	'posix/rmdir.c',
 	'posix/sleep.c',
 	'posix/stat.c',
