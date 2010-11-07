@@ -22,6 +22,7 @@
 
 /* int setjmp(jmp_buf env); */
 .global setjmp
+.type setjmp, @function
 setjmp:
 	movl	4(%esp), %edx
 
@@ -43,6 +44,7 @@ setjmp:
 
 /* void longjmp(jmp_buf env, int val); */
 .global longjmp
+.type setjmp, @function
 longjmp:
 	movl	4(%esp), %edx
 	movl	8(%esp), %eax
