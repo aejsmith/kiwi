@@ -35,7 +35,7 @@ TerminalApp::TerminalApp(int argc, char **argv) :
 void TerminalApp::CreateWindow() {
 	TerminalWindow *window = new TerminalWindow(this, 100, 35);
 	window->OnDestroy.Connect(this, &TerminalApp::WindowDestroyed);
-	window->GetTerminal().Run("/system/binaries/dungeon");
+	window->GetTerminal().Run("/system/binaries/bash");
 }
 
 /** Handle destruction of a window. */

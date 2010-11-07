@@ -1,0 +1,269 @@
+# Copyright (C) 2009 Alex Smith
+#
+# Kiwi is open source software, released under the terms of the Non-Profit
+# Open Software License 3.0. You should have received a copy of the
+# licensing information along with the source code distribution. If you
+# have not received a copy of the license, please refer to the Kiwi
+# project website.
+#
+# Please note that if you modify this file, the license requires you to
+# ADD your name to the list of contributors. This boilerplate is not the
+# license itself; please refer to the copy of the license you have received
+# for complete terms.
+
+# TODO: Generate signal names. For now I just copied the generated signames.h
+# from an autotools build. Same goes for version.h.
+
+Import('env', 'envmgr', 'config')
+host = envmgr['host']
+
+# Definitions for building for both the target and the host.
+defines = {
+	'PACKAGE': '\'"bash"\'',
+	'PROGRAM': '\'"bash"\'',
+	'CONF_HOSTTYPE': '\'"%s"\'' % (config['TOOLCHAIN_TARGET'].split('-')[0]),
+	'CONF_OSTYPE': '\'"kiwi"\'',
+	'CONF_MACHTYPE': '\'"%s"\'' % (config['TOOLCHAIN_TARGET']),
+	'CONF_VENDOR': '\'"pc"\'',
+	'LOCALEDIR': '\'"/system/share/locale"\'',
+	'SHELL': None,
+	'HAVE_CONFIG_H': None,
+	'RECYCLES_PIDS': None,
+}
+
+# Definitions for building for the host.
+host_defines = defines
+host_defines.update({
+	'BUILDTOOL': None,
+	'CROSS_COMPILING': None,
+})
+
+# Include paths.
+include_paths = ['.', 'include', 'lib', 'lib/sh', 'lib/termcap', 'builtins', Dir('#/')]
+
+# Target source files.
+sources = [
+	'shell.c',
+	'eval.c',
+	'y.tab.c',
+	'general.c',
+	'make_cmd.c',
+	'print_cmd.c',
+	'dispose_cmd.c',
+	'execute_cmd.c',
+	'variables.c',
+	'copy_cmd.c',
+	'error.c',
+	'expr.c',
+	'flags.c',
+	'nojobs.c',
+	'subst.c',
+	'hashcmd.c',
+	'hashlib.c',
+	'mailcheck.c',
+	'trap.c',
+	'input.c',
+	'unwind_prot.c',
+	'pathexp.c',
+	'sig.c',
+	'test.c',
+	'version.c',
+	'alias.c',
+	'array.c',
+	'arrayfunc.c',
+	'assoc.c',
+	'braces.c',
+	'bracecomp.c',
+	'bashhist.c',
+	'bashline.c',
+	'siglist.c',
+	'list.c',
+	'stringlib.c',
+	'locale.c',
+	'findcmd.c',
+	'redir.c',
+	'pcomplete.c',
+	'pcomplib.c',
+	'syntax.c',
+	'xmalloc.c',
+	'support/signames.c',
+	'builtins/builtins.c',
+	'builtins/common.c',
+	'builtins/evalfile.c',
+	'builtins/evalstring.c',
+	'builtins/getopt.c',
+	'builtins/bashgetopt.c',
+	'lib/glob/glob.c',
+	'lib/glob/strmatch.c',
+	'lib/glob/smatch.c',
+	'lib/glob/xmbsrtowcs.c',
+	'lib/sh/clktck.c',
+	'lib/sh/clock.c',
+	'lib/sh/getenv.c',
+	'lib/sh/oslib.c',
+	'lib/sh/setlinebuf.c',
+	'lib/sh/strnlen.c',
+	'lib/sh/itos.c',
+	'lib/sh/zread.c',
+	'lib/sh/zwrite.c',
+	'lib/sh/shtty.c',
+	'lib/sh/shmatch.c',
+	'lib/sh/eaccess.c',
+	'lib/sh/netconn.c',
+	'lib/sh/netopen.c',
+	'lib/sh/timeval.c',
+	'lib/sh/makepath.c',
+	'lib/sh/pathcanon.c',
+	'lib/sh/pathphys.c',
+	'lib/sh/tmpfile.c',
+	'lib/sh/stringlist.c',
+	'lib/sh/stringvec.c',
+	'lib/sh/spell.c',
+	'lib/sh/shquote.c',
+	'lib/sh/strtrans.c',
+	'lib/sh/snprintf.c',
+	'lib/sh/mailstat.c',
+	'lib/sh/fmtulong.c',
+	'lib/sh/fmtullong.c',
+	'lib/sh/fmtumax.c',
+	'lib/sh/zcatfd.c',
+	'lib/sh/zmapfd.c',
+	'lib/sh/winsize.c',
+	'lib/sh/wcsdup.c',
+	'lib/sh/fpurge.c',
+	'lib/sh/zgetline.c',
+	'lib/sh/mbscmp.c',
+	'lib/sh/uconvert.c',
+	'lib/sh/ufuncs.c',
+	'lib/sh/casemod.c',
+	'lib/sh/fdprintf.c',
+	'lib/sh/input_avail.c',
+	'lib/sh/mbscasecmp.c',
+	'lib/sh/fnxform.c',
+	'lib/sh/strcasestr.c',
+	'lib/sh/strtoimax.c',
+	'lib/sh/strtoumax.c',
+	'lib/sh/mktime.c',
+	'lib/sh/mbschr.c',
+	'lib/sh/inet_aton.c',
+	'lib/sh/getcwd.c',
+	'lib/readline/readline.c',
+	'lib/readline/vi_mode.c',
+	'lib/readline/funmap.c',
+	'lib/readline/keymaps.c',
+	'lib/readline/parens.c',
+	'lib/readline/search.c',
+	'lib/readline/rltty.c',
+	'lib/readline/complete.c',
+	'lib/readline/bind.c',
+	'lib/readline/isearch.c',
+	'lib/readline/display.c',
+	'lib/readline/signals.c',
+	'lib/readline/util.c',
+	'lib/readline/kill.c',
+	'lib/readline/undo.c',
+	'lib/readline/macro.c',
+	'lib/readline/input.c',
+	'lib/readline/callback.c',
+	'lib/readline/terminal.c',
+	'lib/readline/text.c',
+	'lib/readline/nls.c',
+	'lib/readline/misc.c',
+	'lib/readline/history.c',
+	'lib/readline/histexpand.c',
+	'lib/readline/histfile.c',
+	'lib/readline/histsearch.c',
+	#'lib/readline/shell.c',
+	'lib/readline/savestring.c',
+	'lib/readline/mbutil.c',
+	'lib/readline/tilde.c',
+	#'lib/readline/xmalloc.c',
+	'lib/readline/compat.c',
+	'lib/termcap/termcap.c',
+	'lib/termcap/tparam.c',
+	#'lib/tilde/tilde.c',
+]
+
+# Builtins.
+builtins = [
+	'builtins/alias.def',
+	'builtins/bind.def',
+	'builtins/break.def',
+	'builtins/builtin.def',
+	'builtins/caller.def',
+	'builtins/cd.def',
+	'builtins/colon.def',
+	'builtins/command.def',
+	'builtins/declare.def',
+	'builtins/echo.def',
+	'builtins/enable.def',
+	'builtins/eval.def',
+	'builtins/getopts.def',
+	'builtins/exec.def',
+	'builtins/exit.def',
+	'builtins/fc.def',
+	'builtins/fg_bg.def',
+	'builtins/hash.def',
+	'builtins/help.def',
+	'builtins/history.def',
+	'builtins/jobs.def',
+	'builtins/kill.def',
+	'builtins/let.def',
+	'builtins/read.def',
+	'builtins/return.def',
+	'builtins/set.def',
+	'builtins/setattr.def',
+	'builtins/shift.def',
+	'builtins/source.def',
+	'builtins/suspend.def',
+	'builtins/test.def',
+	'builtins/times.def',
+	'builtins/trap.def',
+	'builtins/type.def',
+	'builtins/ulimit.def',
+	'builtins/umask.def',
+	'builtins/wait.def',
+	'builtins/pushd.def',
+	'builtins/shopt.def',
+	'builtins/printf.def',
+	'builtins/complete.def',
+	'builtins/mapfile.def',
+]
+
+# Syntax generation tool.
+mksyntax = host.Program('mksyntax', ['mksyntax.c'], CPPDEFINES=host_defines,
+                        CPPPATH=include_paths, CCFLAGS=['-w'])
+target = env.Command('syntax.c', [], Action('$MKS -o $TARGET', '$GENCOMSTR'), MKS=mksyntax)
+env.Depends(target, mksyntax)
+
+# Builtin generation tool.
+mkbuiltins = host.Program('mkbuiltins', ['builtins/mkbuiltins.c'], CPPDEFINES=host_defines,
+                          CPPPATH=include_paths, CCFLAGS=['-w'])
+
+# Generate the builtins table. 
+target = env.Command(
+	['builtins/builtins.c', 'builtins/builtext.h'],
+	builtins + ['builtins/reserved.def'],
+	Action('$MKB -externfile ${TARGETS[1]} -structfile ${TARGETS[0]} -noproduction $SOURCES', '$GENCOMSTR'),
+	MKB=mkbuiltins,
+)
+env.Depends(target, mkbuiltins)
+
+# Generate the code for all of the builtins.
+for builtin in builtins:
+	targ_name = builtin[0:-4] + '.c'
+	sources.append(targ_name)
+	target = env.Command(targ_name, builtin,
+		Action('sh -c "cd ${SOURCE.dir}; ../mkbuiltins ${SOURCE.file}"', '$GENCOMSTR'),
+	)
+	env.Depends(target, mkbuiltins)
+
+# Build the program itself.
+env.KiwiApplication('bash',
+	sources = sources,
+	flags = {
+		'CPPDEFINES': defines,
+		'CCFLAGS': ['-w'],
+		'CPPPATH': include_paths,
+	}
+)

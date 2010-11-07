@@ -1,0 +1,80 @@
+diff -urN bash-4.1.orig/builtins/ulimit.def bash-4.1/builtins/ulimit.def
+--- bash-4.1.orig/builtins/ulimit.def	2010-11-07 08:52:48.502495876 +0000
++++ bash-4.1/builtins/ulimit.def	2010-11-07 08:56:16.832120391 +0000
+@@ -23,6 +23,7 @@
+ $BUILTIN ulimit
+ $FUNCTION ulimit_builtin
+ $DEPENDS_ON !_MINIX
++$DEPENDS_ON !__Kiwi__
+ $SHORT_DOC ulimit [-SHacdefilmnpqrstuvx] [limit]
+ Modify shell resource limits.
+ 
+@@ -65,7 +66,7 @@
+ Returns success unless an invalid option is supplied or an error occurs.
+ $END
+ 
+-#if !defined (_MINIX)
++#if !defined (_MINIX) && !defined(__Kiwi__)
+ 
+ #include <config.h>
+ 
+diff -urN bash-4.1.orig/configure bash-4.1/configure
+--- bash-4.1.orig/configure	2010-11-07 08:52:48.523244508 +0000
++++ bash-4.1/configure	2010-11-07 13:25:29.455181248 +0000
+@@ -30625,6 +30625,7 @@
+ solaris2.9*)	LOCAL_CFLAGS=-DSOLARIS  ;;
+ solaris2.10*)	LOCAL_CFLAGS=-DSOLARIS  ;;
+ solaris2*)	LOCAL_CFLAGS=-DSOLARIS ;;
++kiwi*)		LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+ lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+ linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+ 		case "`uname -r`" in
+diff -urN bash-4.1.orig/configure.in bash-4.1/configure.in
+--- bash-4.1.orig/configure.in	2010-11-07 08:52:48.523244508 +0000
++++ bash-4.1/configure.in	2010-11-07 13:25:18.371140885 +0000
+@@ -1027,6 +1027,7 @@
+ solaris2.9*)	LOCAL_CFLAGS=-DSOLARIS  ;;
+ solaris2.10*)	LOCAL_CFLAGS=-DSOLARIS  ;;
+ solaris2*)	LOCAL_CFLAGS=-DSOLARIS ;;
++kiwi*)		LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+ lynxos*)	LOCAL_CFLAGS=-DRECYCLES_PIDS ;;
+ linux*)		LOCAL_LDFLAGS=-rdynamic		 # allow dynamic loading
+ 		case "`uname -r`" in
+diff -urN bash-4.1.orig/lib/sh/netopen.c bash-4.1/lib/sh/netopen.c
+--- bash-4.1.orig/lib/sh/netopen.c	2010-11-07 08:52:48.533491746 +0000
++++ bash-4.1/lib/sh/netopen.c	2010-11-07 16:29:37.965181824 +0000
+@@ -339,6 +339,9 @@
+ 
+ #else /* !HAVE_NETWORK */
+ 
++/* Kiwi */
++#define _(text) (text)
++
+ int
+ netopen (path)
+      char *path;
+diff -urN bash-4.1.orig/lib/sh/oslib.c bash-4.1/lib/sh/oslib.c
+--- bash-4.1.orig/lib/sh/oslib.c	2010-11-07 08:52:48.533491746 +0000
++++ bash-4.1/lib/sh/oslib.c	2010-11-07 09:07:03.483245374 +0000
+@@ -209,7 +209,8 @@
+ #  else /* !HAVE_UNAME */
+ int
+ gethostname (name, namelen)
+-     int name, namelen;
++     char *name;
++     int namelen;
+ {
+   strncpy (name, "unknown", namelen);
+   name[namelen] = '\0';
+diff -urN bash-4.1.orig/support/config.sub bash-4.1/support/config.sub
+--- bash-4.1.orig/support/config.sub	2010-11-07 08:52:48.500495735 +0000
++++ bash-4.1/support/config.sub	2010-11-07 08:53:09.514182542 +0000
+@@ -1265,7 +1265,7 @@
+ 	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
+ 	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
+ 	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
+-	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops*)
++	      | -skyos* | -haiku* | -rdos* | -toppers* | -drops* | -kiwi*)
+ 	# Remember, each alternative MUST END IN *, to match a version number.
+ 		;;
+ 	-qnx*)

@@ -44,7 +44,7 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 
 	/* Create the font if necessary. */
 	if(!m_font) {
-		m_font = new Font("/system/data/fonts/DejaVuSansMono.ttf", 12.0);
+		m_font = new Font("/system/data/fonts/DejaVuSansMono.ttf", 13.0);
 	}
 
 	/* Work out the size to give the window. */
@@ -65,7 +65,8 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 /** Handle the terminal process exiting.
  * @param status	Exit status of the process. */
 void TerminalWindow::TerminalExited(int status) {
-	DeleteLater();
+	/* TODO. */
+	//DeleteLater();
 }
 
 /** Update an area in the terminal buffer.
