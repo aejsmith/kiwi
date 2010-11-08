@@ -32,6 +32,9 @@ extern "C" {
 #define O_WRONLY	0x0002		/**< Open for writing. */
 #define O_RDWR		0x0003		/**< Open for reading and writing. */
 
+/** Mask to get file access mode from open flags. */
+#define O_ACCMODE	O_RDWR
+
 /** File creation flags for open(). */
 #define O_CREAT		0x0004		/**< Create file if it does not exist. */
 #define O_EXCL		0x0008		/**< Exclusive use flag. */
