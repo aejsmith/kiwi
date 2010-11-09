@@ -410,59 +410,61 @@ status_t sys_module_load(const char *path, char *depbuf) {
 	return ret;
 }
 
-/** Get information on loaded modules.
- * @param infop		Array of module information structures to fill in.
- * @param count		Number of entries in the array.
+/** Get information on loaded kernel modules.
+ * @param infop		Array of module information structures to fill in. If
+ *			NULL, the function will only return the number of
+ *			loaded modules.
+ * @param countp	If infop is not NULL, this should point to a value
+ *			containing the size of the provided array. Upon
+ *			successful completion, the value will be updated to
+ *			be the number of structures filled in. If infop is NULL,
+ *			the number of loaded modules will be stored here.
  * @return		Status code describing result of the operation. */
-status_t sys_module_info(module_info_t *infop, size_t count) {
+status_t sys_module_info(module_info_t *infop, size_t *countp) {
+	size_t i = 0, count = 0;
 	module_info_t info;
 	module_t *module;
 	status_t ret;
-	size_t i = 0;
 
 	/* Check if the current process can load modules. */
 	if(!cap_check(NULL, CAP_MODULE)) {
 		return STATUS_PERM_DENIED;
 	}
 
+	if(infop) {
+		ret = memcpy_from_user(&count, countp, sizeof(count));
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		} else if(!count) {
+			return STATUS_SUCCESS;
+		}
+	}
+
 	mutex_lock(&module_lock);
 
 	LIST_FOREACH(&module_list, iter) {
-		module = list_entry(iter, module_t, header);
+		if(infop) {
+			module = list_entry(iter, module_t, header);
 
-		strcpy(info.name, module->name);
-		strcpy(info.desc, module->description);
-		info.count = refcount_get(&module->count);
-		info.load_size = module->load_size;
+			strcpy(info.name, module->name);
+			strcpy(info.desc, module->description);
+			info.count = refcount_get(&module->count);
+			info.load_size = module->load_size;
 
-		ret = memcpy_to_user(&infop[i++], &info, sizeof(info));
-		if(ret != STATUS_SUCCESS) {
-			mutex_unlock(&module_lock);
-			return ret;
+			ret = memcpy_to_user(&infop[i], &info, sizeof(info));
+			if(ret != STATUS_SUCCESS) {
+				mutex_unlock(&module_lock);
+				return ret;
+			}
+
+			if(++i >= count) {
+				break;
+			}
+		} else {
+			i++;
 		}
 	}
 
 	mutex_unlock(&module_lock);
-	return STATUS_SUCCESS;
-}
-
-/** Get the number of loaded modules.
- * @param countp	Where to store the number of loaded modules.
- * @return		Status code describing result of the operation. */
-status_t sys_module_count(size_t *countp) {
-	size_t count = 0;
-
-	/* Check if the current process can load modules. */
-	if(!cap_check(NULL, CAP_MODULE)) {
-		return STATUS_PERM_DENIED;
-	}
-
-	mutex_lock(&module_lock);
-
-	LIST_FOREACH(&module_list, iter) {
-		count++;
-	}
-
-	mutex_unlock(&module_lock);
-	return memcpy_to_user(countp, &count, sizeof(count));
+	return memcpy_to_user(countp, &i, sizeof(i));
 }

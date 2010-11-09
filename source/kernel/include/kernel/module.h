@@ -44,8 +44,7 @@ typedef struct module_info {
 } module_info_t;
 
 extern status_t SYSCALL(module_load)(const char *path, char *depbuf);
-extern status_t SYSCALL(module_info)(module_info_t *infop, size_t count);
-extern status_t SYSCALL(module_count)(size_t *countp);
+extern status_t SYSCALL(module_info)(module_info_t *infop, size_t *countp);
 
 #ifdef __cplusplus
 }
