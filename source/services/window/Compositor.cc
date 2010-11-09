@@ -101,6 +101,15 @@ void Compositor::Render(ServerWindow *window, int off_x, int off_y) {
 		cairo_paint(m_context);
 	}
 
+	/* The surface size can differ from the window size if the window has
+	 * been resized but the client has not updated the surface. Handle this
+	 * possibility by clipping to the window size. */
+	Rect frame = window->GetAbsoluteFrame();
+	if(frame.GetSize() != window->GetSurface()->GetSize()) {
+		cairo_rectangle(m_context, frame.GetX(), frame.GetY(), frame.GetWidth(), frame.GetHeight());
+		cairo_clip(m_context);
+	}
+
 	/* Paint main window content. */
 	cairo_set_source_surface(m_context, window->GetSurface()->GetCairoSurface(), off_x, off_y);
 	cairo_paint(m_context);

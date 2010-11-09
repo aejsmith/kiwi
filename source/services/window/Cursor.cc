@@ -111,8 +111,8 @@ void Cursor::SetVisible(bool visible) {
  * @param dx		X delta.
  * @param dy		Y delta. */
 void Cursor::MoveRelative(int32_t dx, int32_t dy) {
-	int16_t x = m_window->GetFrame().GetX() + dx;
-	int16_t y = m_window->GetFrame().GetY() + dy;
+	int x = m_window->GetFrame().GetX() + dx;
+	int y = m_window->GetFrame().GetY() + dy;
 
 	/* Ensure that the location is within the screen. */
 	if(x < -kCursorHotspotX) {
