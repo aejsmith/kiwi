@@ -111,10 +111,144 @@ void TerminalWindow::KeyPressed(const KeyEvent &event) {
 			break;
 		}
 	} else {
-		/* Send the text to the terminal. */
-		string text = event.GetText();
-		for(auto it = text.begin(); it != text.end(); ++it) {
-			m_terminal.Input(*it);
+		/* Send the key to the terminal. */
+		switch(event.GetKey()) {
+		case INPUT_KEY_INSERT:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('2');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_HOME:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('H');
+			break;
+		case INPUT_KEY_PGUP:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('5');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_PGDOWN:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('6');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_END:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('F');
+			break;
+		case INPUT_KEY_DELETE:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('3');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_UP:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('A');
+			break;
+		case INPUT_KEY_DOWN:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('B');
+			break;
+		case INPUT_KEY_LEFT:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('D');
+			break;
+		case INPUT_KEY_RIGHT:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('C');
+			break;
+		case INPUT_KEY_F1:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('O');
+			m_terminal.Input('P');
+			break;
+		case INPUT_KEY_F2:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('O');
+			m_terminal.Input('Q');
+			break;
+		case INPUT_KEY_F3:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('O');
+			m_terminal.Input('R');
+			break;
+		case INPUT_KEY_F4:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('O');
+			m_terminal.Input('S');
+			break;
+		case INPUT_KEY_F5:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('1');
+			m_terminal.Input('5');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F6:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('1');
+			m_terminal.Input('7');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F7:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('1');
+			m_terminal.Input('8');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F8:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('1');
+			m_terminal.Input('9');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F9:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('2');
+			m_terminal.Input('0');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F10:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('2');
+			m_terminal.Input('1');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F11:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('2');
+			m_terminal.Input('3');
+			m_terminal.Input('~');
+			break;
+		case INPUT_KEY_F12:
+			m_terminal.Input(0x1B);
+			m_terminal.Input('[');
+			m_terminal.Input('2');
+			m_terminal.Input('4');
+			m_terminal.Input('~');
+			break;
+		default:
+			string text = event.GetText();
+			for(auto it = text.begin(); it != text.end(); ++it) {
+				m_terminal.Input(*it);
+			}
+			break;
 		}
 	}
 }
