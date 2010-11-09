@@ -50,6 +50,7 @@ status_t Connection::CreateSurface(org::kiwi::WindowServer::Size size, area_id_t
 		ServerSurface *surface = new ServerSurface(this, Size(size.width, size.height));
 		m_session->AddSurface(surface);
 		id = surface->GetID();
+		m_surfaces.push_back(surface);
 	} catch(Error &e) {
 		return e.GetCode();
 	}
@@ -68,6 +69,7 @@ status_t Connection::DestroySurface(area_id_t id) {
 		return STATUS_PERM_DENIED;
 	}
 
+	m_surfaces.remove(surface);
 	m_session->RemoveSurface(surface);
 	delete surface;
 	return STATUS_SUCCESS;
@@ -110,6 +112,7 @@ status_t Connection::CreateWindow(ServerWindow::ID &id) {
 	try {
 		ServerWindow *window = m_session->CreateWindow(this);
 		id = window->GetID();
+		m_windows.push_back(window);
 	} catch(Error &e) {
 		return e.GetCode();
 	}
@@ -117,8 +120,20 @@ status_t Connection::CreateWindow(ServerWindow::ID &id) {
 	return STATUS_SUCCESS;
 }
 
+/** Destroy a window.
+ * @param id		ID of window to destroy.
+ * @return		Status code describing result of the operation. */
 status_t Connection::DestroyWindow(ServerWindow::ID id) {
-	return STATUS_NOT_IMPLEMENTED;
+	ServerWindow *window = m_session->FindWindow(id);
+	if(!window) {
+		return STATUS_NOT_FOUND;
+	} else if(window->GetOwner() != this) {
+		return STATUS_PERM_DENIED;
+	}
+
+	m_windows.remove(window);
+	delete window;
+	return STATUS_SUCCESS;
 }
 
 status_t Connection::CloseWindow(ServerWindow::ID id) {
@@ -353,6 +368,14 @@ status_t Connection::UpdateWindow(ServerWindow::ID id, org::kiwi::WindowServer::
 
 /** Handle the connection being hung up. */
 void Connection::HandleHangup() {
+	/* Destroy all windows and surfaces created by the connection. */
+	for(auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+		delete (*it);
+	}
+	for(auto it = m_surfaces.begin(); it != m_surfaces.end(); ++it) {
+		delete (*it);
+	}
+
 	/* Remove us from the session. */
 	m_session->RemoveConnection(this);
 	DeleteLater();

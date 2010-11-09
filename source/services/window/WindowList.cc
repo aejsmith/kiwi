@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdlib>
-#include <iostream>
 #include <iterator>
 
 #include "ServerWindow.h"
@@ -51,8 +50,8 @@ WindowList::Iterator &WindowList::Iterator::operator ++() {
 }
 
 WindowList::Iterator &WindowList::Iterator::operator --() {
-	if(m_map_iter == m_map.end() || --m_list_iter == (--m_map_iter->second.begin())) {
-		if(--m_map_iter != (--m_map.begin())) {
+	if(m_map_iter == m_map.end() || m_list_iter-- == m_map_iter->second.begin()) {
+		if(m_map_iter-- != m_map.begin()) {
 			m_list_iter = --m_map_iter->second.end();
 		} else {
 			m_list_iter = List::iterator();
@@ -60,6 +59,19 @@ WindowList::Iterator &WindowList::Iterator::operator --() {
 	}
 
 	return *this;
+}
+
+bool WindowList::Iterator::operator ==(const Iterator &other) {
+	if(m_map == other.m_map && m_map_iter == other.m_map_iter) {
+		if(m_map_iter == m_map.end() || m_list_iter == other.m_list_iter) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool WindowList::Iterator::operator !=(const Iterator &other) {
+	return !(*this == other);
 }
 
 /** Construct the window list. */

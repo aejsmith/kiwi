@@ -40,6 +40,7 @@ TerminalApp::TerminalApp(int argc, char **argv) :
 /** Create a new terminal window. */
 void TerminalApp::CreateWindow() {
 	TerminalWindow *window = new TerminalWindow(this, 100, 35);
+	m_window_count++;
 	window->OnDestroy.Connect(this, &TerminalApp::WindowDestroyed);
 	window->GetTerminal().Run("/system/binaries/bash");
 }

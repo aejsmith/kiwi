@@ -21,9 +21,12 @@
 #ifndef __CONNECTION_H
 #define __CONNECTION_H
 
+#include <list>
+
 #include "org.kiwi.WindowServer.h"
 #include "ServerWindow.h"
 
+class ServerSurface;
 class Session;
 
 /** Class representing a connection to the window server. */
@@ -60,7 +63,9 @@ private:
 
 	void HandleHangup();
 
-	Session *m_session;		/**< Session that the connection is on. */
+	Session *m_session;			/**< Session that the connection is on. */
+	std::list<ServerWindow *> m_windows;	/**< Windows created by the connection. */
+	std::list<ServerSurface *> m_surfaces;	/**< Surfaces created by the connection. */
 };
 
 #endif /* __CONNECTION_H */

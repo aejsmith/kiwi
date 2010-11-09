@@ -140,7 +140,7 @@ ServerWindow *Session::CreateWindow(Connection *owner) {
 void Session::RemoveWindow(ServerWindow *window) {
 	m_windows.erase(window->GetID());
 	if(m_active_window == window) {
-		m_root->SetActive(true);
+		ActivateWindow(m_root);
 	}
 }
 

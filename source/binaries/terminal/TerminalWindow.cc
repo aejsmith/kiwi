@@ -40,7 +40,7 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 	int id;
 
 	m_terminal.OnExit.Connect(this, &TerminalWindow::TerminalExited);
-	m_terminal.OnUpdate.Connect(this, &TerminalWindow:: TerminalUpdated);
+	m_terminal.OnUpdate.Connect(this, &TerminalWindow::TerminalUpdated);
 
 	/* Create the font if necessary. */
 	if(!m_font) {
@@ -65,8 +65,7 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 /** Handle the terminal process exiting.
  * @param status	Exit status of the process. */
 void TerminalWindow::TerminalExited(int status) {
-	/* TODO. */
-	//DeleteLater();
+	DeleteLater();
 }
 
 /** Update an area in the terminal buffer.

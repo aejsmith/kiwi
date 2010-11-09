@@ -19,7 +19,6 @@
  */
 
 #include <cassert>
-#include <iostream>
 
 #include "Compositor.h"
 #include "Connection.h"
@@ -67,6 +66,8 @@ ServerWindow::ServerWindow(Session *session, ID id, ServerWindow *parent, Connec
 
 /** Destroy the window. */
 ServerWindow::~ServerWindow() {
+	m_owner = 0;
+
 	SetVisible(false);
 	if(m_id >= 0) {
 		if(m_surface) {
@@ -259,8 +260,8 @@ void ServerWindow::SetState(uint32_t state) {
 		}
 
 		/* Redraw if required. */
-		if(update) {
-			Update();
+		if(update && m_session->IsActive()) {
+			m_session->GetCompositor()->Redraw(GetAbsoluteTotalFrame());
 		}
 
 		/* Send a state change event to the owner. */

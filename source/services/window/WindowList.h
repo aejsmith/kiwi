@@ -47,6 +47,8 @@ public:
 
 		Iterator &operator ++();
 		Iterator &operator --();
+		bool operator ==(const Iterator &other);
+		bool operator !=(const Iterator &other);
 
 		Iterator operator ++(int) {
 			Iterator tmp(*this);
@@ -58,14 +60,6 @@ public:
 			Iterator tmp(*this);
 			operator --();
 			return tmp;
-		}
-
-		bool operator ==(const Iterator &other) {
-			return (m_map_iter == other.m_map_iter && m_list_iter == other.m_list_iter);
-		}
-
-		bool operator !=(const Iterator &other) {
-			return (m_map_iter != other.m_map_iter || m_list_iter != other.m_list_iter);
 		}
 
 		ServerWindow *const &operator *() {
