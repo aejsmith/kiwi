@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 /** Various device manager limitations. */
-#define DEVICE_PATH_MAX			4096	/**< Maximum length of a device tree path. */
+#define DEVICE_PATH_MAX			256	/**< Maximum length of a device tree path. */
 
 /** Device rights. */
 #define DEVICE_QUERY			(1<<8)	/**< Query device information. */

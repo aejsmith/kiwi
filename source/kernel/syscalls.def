@@ -55,6 +55,7 @@ syscall fs_handle_sync(handle_t);
 syscall fs_symlink_create(ptr_t, ptr_t);
 syscall fs_symlink_read(ptr_t, ptr_t, size_t);
 syscall fs_mount(ptr_t, ptr_t, ptr_t, ptr_t);
+syscall fs_mount_info(ptr_t, ptr_t);
 syscall fs_unmount(ptr_t);
 syscall fs_sync();
 syscall fs_getcwd(ptr_t, size_t);

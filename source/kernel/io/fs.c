@@ -956,6 +956,79 @@ static status_t fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
 	}
 }
 
+/** Get the path of a filesystem node.
+ * @todo		Implement this for files.
+ * @param node		Node to get path to.
+ * @param root		Node to take as the root of the FS tree.
+ * @param pathp		Where to store pointer to kmalloc()'d path string.
+ * @return		Status code describing result of the operation. */
+static status_t fs_node_path(fs_node_t *node, fs_node_t *root, char **pathp) {
+	char *buf = NULL, *tmp, *name, path[3];
+	size_t len = 0;
+	node_id_t id;
+	status_t ret;
+
+	fs_node_get(node);
+
+	/* Loop through until we reach the root. */
+	while(node != root && node != root_mount->root) {
+		/* Save the current node's ID. Use the mountpoint ID if this is
+		 * the root of the mount. */
+		id = (node == node->mount->root) ? node->mount->mountpoint->id : node->id;
+
+		/* Get the parent of the node. */
+		strcpy(path, "..");
+		ret = fs_node_lookup_internal(path, node, false, 0, &node);
+		if(ret != STATUS_SUCCESS) {
+			node = NULL;
+			goto fail;
+		} else if(node->type != FS_NODE_DIR) {
+			kprintf(LOG_WARN, "fs: node %" PRIu16 ":%" PRIu64 " should be a directory but it isn't!\n",
+			        node->mount->id, node->id);
+			ret = STATUS_NOT_DIR;
+			goto fail;
+		}
+
+		/* Look up the name of the child in this directory. */
+		ret = fs_node_name(node, id, &name);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
+
+		/* Add the entry name on to the beginning of the path. */
+		len += ((buf) ? strlen(name) + 1 : strlen(name));
+		tmp = kmalloc(len + 1, MM_SLEEP);
+		strcpy(tmp, name);
+		kfree(name);
+		if(buf) {
+			strcat(tmp, "/");
+			strcat(tmp, buf);
+			kfree(buf);
+		}
+		buf = tmp;
+	}
+
+	fs_node_release(node);
+
+	/* Prepend a '/'. */
+	tmp = kmalloc((++len) + 1, MM_SLEEP);
+	strcpy(tmp, "/");
+	if(buf) {
+		strcat(tmp, buf);
+		kfree(buf);
+	}
+	buf = tmp;
+
+	*pathp = buf;
+	return STATUS_SUCCESS;
+fail:
+	if(node) {
+		fs_node_release(node);
+	}
+	kfree(buf);
+	return ret;
+}
+
 /** Create a handle to a node.
  * @param node		Node to create handle to (will be referenced).
  * @param rights	Requested access rights for the handle.
@@ -3130,6 +3203,90 @@ out:
 	return ret;
 }
 
+/** Get information on mounted filesystems.
+ * @param infop		Array of mount information structures to fill in. If
+ *			NULL, the function will only return the number of
+ *			mounted filesystems.
+ * @param countp	If infop is not NULL, this should point to a value
+ *			containing the size of the provided array. Upon
+ *			successful completion, the value will be updated to
+ *			be the number of structures filled in. If infop is NULL,
+ *			the number of mounted filesystems will be stored here.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_mount_info(fs_mount_info_t *infop, size_t *countp) {
+	fs_mount_info_t *info = NULL;
+	size_t i = 0, count = 0;
+	fs_mount_t *mount;
+	status_t ret;
+	char *path;
+
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	if(infop) {
+		ret = memcpy_from_user(&count, countp, sizeof(count));
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		} else if(!count) {
+			return STATUS_SUCCESS;
+		}
+
+		info = kmalloc(sizeof(*info), MM_SLEEP);
+	}
+
+	mutex_lock(&mounts_lock);
+
+	LIST_FOREACH(&mount_list, iter) {
+		if(infop) {
+			mount = list_entry(iter, fs_mount_t, header);
+			info->id = mount->id;
+			strncpy(info->type, mount->type->name, ARRAYSZ(info->type));
+			info->type[ARRAYSZ(info->type) - 1] = 0;
+
+			/* Get the path of the mount. */
+			ret = fs_node_path(mount->root, root_mount->root, &path);
+			if(ret != STATUS_SUCCESS) {
+				kfree(info);
+				mutex_unlock(&mounts_lock);
+				return ret;
+			}
+			strncpy(info->path, path, ARRAYSZ(info->path));
+			info->path[ARRAYSZ(info->path) - 1] = 0;
+			kfree(path);
+
+			/* Get the device path. */
+			if(mount->device) {
+				path = device_path((device_t *)mount->device->object);
+				strncpy(info->device, path, ARRAYSZ(info->device));
+				info->device[ARRAYSZ(info->device) - 1] = 0;
+				kfree(path);
+			} else {
+				info->device[0] = 0;
+			}
+
+			ret = memcpy_to_user(&infop[i], info, sizeof(*info));
+			if(ret != STATUS_SUCCESS) {
+				kfree(info);
+				mutex_unlock(&mounts_lock);
+				return ret;
+			}
+
+			if(++i >= count) {
+				break;
+			}
+		} else {
+			i++;
+		}
+	}
+
+	mutex_unlock(&mounts_lock);
+	if(infop) {
+		kfree(info);
+	}
+	return memcpy_to_user(countp, &i, sizeof(i));
+}
+
 /** Unmounts a filesystem.
  *
  * Flushes all modifications to a filesystem if it is not read-only and
@@ -3164,11 +3321,9 @@ status_t sys_fs_sync(void) {
  * @param size		Size of buffer.
  * @return		Status code describing result of the operation. */
 status_t sys_fs_getcwd(char *buf, size_t size) {
-	char *kbuf = NULL, *tmp, *name, path[3];
-	fs_node_t *node;
-	size_t len = 0;
-	node_id_t id;
 	status_t ret;
+	size_t len;
+	char *path;
 
 	if(!buf || !size) {
 		return STATUS_INVALID_ARG;
@@ -3176,73 +3331,21 @@ status_t sys_fs_getcwd(char *buf, size_t size) {
 
 	rwlock_read_lock(&curr_proc->ioctx.lock);
 
-	/* Get the working directory. */
-	node = curr_proc->ioctx.curr_dir;
-	fs_node_get(node);
-
-	/* Loop through until we reach the root. */
-	while(node != curr_proc->ioctx.root_dir) {
-		/* Save the current node's ID. Use the mountpoint ID if this is
-		 * the root of the mount. */
-		id = (node == node->mount->root) ? node->mount->mountpoint->id : node->id;
-
-		/* Get the parent of the node. */
-		strcpy(path, "..");
-		ret = fs_node_lookup_internal(path, node, false, 0, &node);
-		if(ret != STATUS_SUCCESS) {
-			node = NULL;
-			goto fail;
-		} else if(node->type != FS_NODE_DIR) {
-			kprintf(LOG_WARN, "fs: node %" PRIu16 ":%" PRIu64 " should be a directory but it isn't!\n",
-			        node->mount->id, node->id);
-			ret = STATUS_NOT_DIR;
-			goto fail;
-		}
-
-		/* Look up the name of the child in this directory. */
-		ret = fs_node_name(node, id, &name);
-		if(ret != STATUS_SUCCESS) {
-			goto fail;
-		}
-
-		/* Add the entry name on to the beginning of the path. */
-		len += ((kbuf) ? strlen(name) + 1 : strlen(name));
-		tmp = kmalloc(len + 1, MM_SLEEP);
-		strcpy(tmp, name);
-		kfree(name);
-		if(kbuf) {
-			strcat(tmp, "/");
-			strcat(tmp, kbuf);
-			kfree(kbuf);
-		}
-		kbuf = tmp;
+	ret = fs_node_path(curr_proc->ioctx.curr_dir, curr_proc->ioctx.root_dir, &path);
+	if(ret != STATUS_SUCCESS) {
+		rwlock_unlock(&curr_proc->ioctx.lock);
+		return ret;
 	}
 
-	fs_node_release(node);
 	rwlock_unlock(&curr_proc->ioctx.lock);
 
-	/* Prepend a '/'. */
-	tmp = kmalloc((++len) + 1, MM_SLEEP);
-	strcpy(tmp, "/");
-	if(kbuf) {
-		strcat(tmp, kbuf);
-		kfree(kbuf);
-	}
-	kbuf = tmp;
-
+	len = strlen(path);
 	if(len >= size) {
 		ret = STATUS_TOO_SMALL;
 	} else {
-		ret = memcpy_to_user(buf, kbuf, len + 1);
+		ret = memcpy_to_user(buf, path, len + 1);
 	}
-	kfree(kbuf);
-	return ret;
-fail:
-	if(node) {
-		fs_node_release(node);
-	}
-	rwlock_unlock(&curr_proc->ioctx.lock);
-	kfree(kbuf);
+	kfree(path);
 	return ret;
 }
 

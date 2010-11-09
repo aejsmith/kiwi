@@ -497,8 +497,10 @@ char *device_path(device_t *device) {
 		tmp = kmalloc(len + 1, MM_SLEEP);
 		strcpy(tmp, "/");
 		strcat(tmp, device->name);
-		strcat(tmp, path);
-		kfree(path);
+		if(path) {
+			strcat(tmp, path);
+			kfree(path);
+		}
 		path = tmp;
 		parent = device->parent;
 		mutex_unlock(&device->lock);

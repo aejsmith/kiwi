@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+/** Limitations for the filesystem. */
+#define FS_PATH_MAX		4096	/**< Maximum length of a path string. */
+#define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
+
 /** Directory entry information structure. */
 typedef struct fs_dir_entry {
 	size_t length;			/**< Length of this structure including name. */
@@ -56,9 +60,13 @@ typedef struct fs_info {
 	size_t links;			/**< Number of links to the node. */
 } fs_info_t;
 
-/** Limitations for the filesystem. */
-#define FS_PATH_MAX		4096	/**< Maximum length of a path string. */
-#define FS_NESTED_LINK_MAX	16	/**< Maximum number of nested symbolic links. */
+/** Mount information structure. */
+typedef struct fs_mount_info {
+	mount_id_t id;			/**< Mount ID. */
+	char type[32];			/**< Name of the filesystem type. */
+	char path[FS_PATH_MAX];		/**< Path that mount is at. */
+	char device[256];		/**< Device tree path of device. */
+} fs_mount_info_t;
 
 /** Access rights for files/directories. */
 #define FS_READ			(1<<8)	/**< Open for reading. */
@@ -107,6 +115,7 @@ extern status_t SYSCALL(fs_symlink_read)(const char *path, char *buf, size_t siz
 
 extern status_t SYSCALL(fs_mount)(const char *device, const char *path, const char *type,
                                   const char *opts);
+extern status_t SYSCALL(fs_mount_info)(fs_mount_info_t *infop, size_t *countp);
 extern status_t SYSCALL(fs_unmount)(const char *path);
 extern status_t SYSCALL(fs_sync)(void);
 extern status_t SYSCALL(fs_getcwd)(char *buf, size_t size);
