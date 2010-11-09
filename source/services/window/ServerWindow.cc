@@ -205,7 +205,7 @@ void ServerWindow::Resize(Size size) {
 	}
 
 	/* Add the new frame to the update region and update. */
-	if(IsVisible()) {
+	if(IsVisible() && m_session->IsActive()) {
 		update.Union(GetAbsoluteTotalFrame());
 		m_session->GetCompositor()->Redraw(update);
 	}
@@ -225,7 +225,7 @@ void ServerWindow::MoveTo(Point pos) {
 	m_frame.MoveTo(pos);
 
 	/* Update the screen. */
-	if(IsVisible()) {
+	if(IsVisible() && m_session->IsActive()) {
 		update.Union(GetAbsoluteTotalFrame());
 		m_session->GetCompositor()->Redraw(update);
 	}
@@ -325,7 +325,7 @@ void ServerWindow::SetActive(bool active) {
 
 /** Update the entire window. */
 void ServerWindow::Update() {
-	if(IsVisible()) {
+	if(IsVisible() && m_session->IsActive()) {
 		m_session->GetCompositor()->Redraw(GetAbsoluteTotalFrame());
 	}
 }
@@ -333,7 +333,7 @@ void ServerWindow::Update() {
 /** Update an area on the window.
  * @param rect		Rectangle area to update. */
 void ServerWindow::Update(kiwi::Rect rect) {
-	if(IsVisible()) {
+	if(IsVisible() && m_session->IsActive()) {
 		/* The provided rectangle is relative to our position. Adjust
 		 * it to be an on-screen position. */
 		Rect abs = GetAbsoluteFrame();

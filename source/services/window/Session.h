@@ -83,6 +83,10 @@ public:
 	 * @return		ID of the session. */
 	session_id_t GetID() const { return m_id; }
 
+	/** Check whether the session is active.
+	 * @return		Whether the session is the active session. */
+	bool IsActive() const { return m_active; }
+
 	/** Get the root window.
 	 * @return		Root window for the session. */
 	ServerWindow *GetRoot() const { return m_root; }
