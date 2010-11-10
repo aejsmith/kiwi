@@ -383,17 +383,16 @@ ServerWindow *ServerWindow::AtPosition(kiwi::Point pos) {
 /** Convert a point to be relative to the window.
  * @param pos		Absolute position to convert.
  * @return		Position relative to the window. */
-kiwi::Point ServerWindow::RelativePoint(kiwi::Point pos) {
-	Rect frame = GetAbsoluteFrame();
-	return pos.Translated(-frame.GetX(), -frame.GetY());
+kiwi::Point ServerWindow::RelativePoint(const kiwi::Point &pos) const {
+	return pos - GetAbsoluteFrame().GetTopLeft();
 }
 
 /** Handle a mouse move event on the window.
  * @param event		Event object containing event details. */
-void ServerWindow::MouseMove(const MouseEvent &event) {
+void ServerWindow::MouseMoved(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
-		m_decoration->MouseMove(event);
+		m_decoration->MouseMoved(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()
@@ -405,10 +404,10 @@ void ServerWindow::MouseMove(const MouseEvent &event) {
 
 /** Handle a mouse press event on the window.
  * @param event		Event object containing event details. */
-void ServerWindow::MousePress(const MouseEvent &event) {
+void ServerWindow::MousePressed(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
-		m_decoration->MousePress(event);
+		m_decoration->MousePressed(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()
@@ -420,10 +419,10 @@ void ServerWindow::MousePress(const MouseEvent &event) {
 
 /** Handle a mouse release event on the window.
  * @param event		Event object containing event details. */
-void ServerWindow::MouseRelease(const MouseEvent &event) {
+void ServerWindow::MouseReleased(const MouseEvent &event) {
 	if(event.GetPosition().GetX() < 0 || event.GetPosition().GetY() < 0) {
 		assert(m_decoration);
-		m_decoration->MouseRelease(event);
+		m_decoration->MouseReleased(event);
 	} else if(m_owner) {
 		org::kiwi::WindowServer::Point pos = {
 			event.GetPosition().GetX(), event.GetPosition().GetY()
@@ -435,7 +434,7 @@ void ServerWindow::MouseRelease(const MouseEvent &event) {
 
 /** Handle a key press event on the window.
  * @param event		Event object containing event details. */
-void ServerWindow::KeyPress(const KeyEvent &event) {
+void ServerWindow::KeyPressed(const KeyEvent &event) {
 	if(m_owner) {
 		m_owner->OnKeyPress(m_id, event.GetTime(), event.GetModifiers(),
 		                    event.GetKey(), event.GetText());
@@ -444,7 +443,7 @@ void ServerWindow::KeyPress(const KeyEvent &event) {
 
 /** Handle a key press event on the window.
  * @param event		Event object containing event details. */
-void ServerWindow::KeyRelease(const KeyEvent &event) {
+void ServerWindow::KeyReleased(const KeyEvent &event) {
 	if(m_owner) {
 		m_owner->OnKeyRelease(m_id, event.GetTime(), event.GetModifiers(),
 		                      event.GetKey(), event.GetText());

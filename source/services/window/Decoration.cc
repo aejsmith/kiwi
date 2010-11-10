@@ -198,35 +198,36 @@ void Decoration::Update() {
 
 /** Handle a mouse move event on the decoration.
  * @param event		Event information object. */
-void Decoration::MouseMove(const MouseEvent &event) {
+void Decoration::MouseMoved(const MouseEvent &event) {
 	if(m_grabbed && m_window->GetStyle() & BaseWindow::kMovableMask) {
-		Point pos = m_window->GetFrame().GetTopLeft();
-		int dx = event.GetPosition().GetX() - m_grab_pos.GetX();
-		int dy = event.GetPosition().GetY() - m_grab_pos.GetY();
-		m_window->MoveTo(m_window->GetFrame().GetTopLeft().Translated(dx, dy));
-
-		/* Re-grab with new position. */
-		m_window->GetSession()->GrabMouse(this, m_window->GetAbsoluteFrame().GetTopLeft());
+		Point delta = event.GetPosition() - m_grab_pos;
+		m_window->MoveTo(m_window->GetFrame().GetTopLeft() + delta);
 	}
 }
 
 /** Handle a mouse press event on the decoration.
  * @param event		Event information object. */
-void Decoration::MousePress(const MouseEvent &event) {
+void Decoration::MousePressed(const MouseEvent &event) {
 	if(event.GetButtons() & Input::kLeftButton) {
 		m_grabbed = true;
 		m_grab_pos = event.GetPosition();
 
 		/* Grab the mouse in the session. */
-		m_window->GetSession()->GrabMouse(this, m_window->GetAbsoluteFrame().GetTopLeft());
+		m_window->GetSession()->GrabMouse(this);
 	}
 }
 
 /** Handle a mouse release event on the decoration.
  * @param event		Event information object. */
-void Decoration::MouseRelease(const MouseEvent &event) {
+void Decoration::MouseReleased(const MouseEvent &event) {
 	if(!(event.GetButtons() & Input::kLeftButton) && m_grabbed) {
 		m_grabbed = false;
 		m_window->GetSession()->ReleaseMouse();
 	}
+}
+
+/** Get a point relative to the decoration.
+ * @return		Point relative to the decoration. */
+Point Decoration::RelativePoint(const kiwi::Point &pos) const {
+	return m_window->RelativePoint(pos);
 }

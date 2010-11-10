@@ -22,13 +22,15 @@
 #define __MOUSERECEIVER_H
 
 #include <kiwi/Graphics/InputEvent.h>
+#include <kiwi/Graphics/Point.h>
 
 /** Interface class for objects that can receive mouse events. */
 class MouseReceiver {
 public:
-	virtual void MouseMove(const kiwi::MouseEvent &event) = 0;
-	virtual void MousePress(const kiwi::MouseEvent &event) = 0;
-	virtual void MouseRelease(const kiwi::MouseEvent &event) = 0;
+	virtual void MouseMoved(const kiwi::MouseEvent &event) = 0;
+	virtual void MousePressed(const kiwi::MouseEvent &event) = 0;
+	virtual void MouseReleased(const kiwi::MouseEvent &event) = 0;
+	virtual kiwi::Point RelativePoint(const kiwi::Point &pos) const = 0;
 };
 
 #endif /* __MOUSERECEIVER_H */

@@ -70,13 +70,13 @@ public:
 	void Activate();
 	void Deactivate();
 
-	void MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons);
-	void MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons);
-	void MouseRelease(useconds_t time, uint32_t modifiers, uint32_t buttons);
-	void KeyPress(const kiwi::KeyEvent &event);
-	void KeyRelease(const kiwi::KeyEvent &event);
+	void MouseMoved(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons);
+	void MousePressed(useconds_t time, uint32_t modifiers, uint32_t buttons);
+	void MouseReleased(useconds_t time, uint32_t modifiers, uint32_t buttons);
+	void KeyPressed(const kiwi::KeyEvent &event);
+	void KeyReleased(const kiwi::KeyEvent &event);
 
-	void GrabMouse(MouseReceiver *object, const kiwi::Point &offset);
+	void GrabMouse(MouseReceiver *object);
 	void ReleaseMouse();
 
 	/** Get the ID of the session.
@@ -119,7 +119,6 @@ private:
 	ServerWindow::ID m_next_wid;	/**< Next window ID. */
 	ServerWindow *m_active_window;	/**< Active window. */
 	MouseReceiver *m_mouse_grabber;	/**< Object that has grabbed the mouse. */
-	kiwi::Point m_grab_offset;	/**< Offset into the screen of the grabbed object. */
 };
 
 #endif /* __SESSION_H */

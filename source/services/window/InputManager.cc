@@ -69,7 +69,7 @@ InputManager::InputManager(WindowServer *server) :
  * @param dx		X position delta.
  * @param dy		Y position delta. */
 void InputManager::MouseMove(useconds_t time, int dx, int dy) {
-	m_server->GetActiveSession()->MouseMove(time, dx, dy, m_modifiers, m_buttons);
+	m_server->GetActiveSession()->MouseMoved(time, dx, dy, m_modifiers, m_buttons);
 }
 
 /** Convert a kernel button code.
@@ -93,7 +93,7 @@ static inline uint32_t convert_button(int32_t button) {
  * @param button	Kernel code for button that was pressed. */
 void InputManager::MousePress(useconds_t time, int32_t button) {
 	m_buttons |= convert_button(button);
-	m_server->GetActiveSession()->MousePress(time, m_modifiers, m_buttons);
+	m_server->GetActiveSession()->MousePressed(time, m_modifiers, m_buttons);
 }
 
 /** Handle a mouse release event.
@@ -101,7 +101,7 @@ void InputManager::MousePress(useconds_t time, int32_t button) {
  * @param button	Kernel code for button that was released. */
 void InputManager::MouseRelease(useconds_t time, int32_t button) {
 	m_buttons &= ~convert_button(button);
-	m_server->GetActiveSession()->MouseRelease(time, m_modifiers, m_buttons);
+	m_server->GetActiveSession()->MouseReleased(time, m_modifiers, m_buttons);
 }
 
 /** Convert a kernel key code to a modifier.
@@ -158,7 +158,7 @@ void InputManager::KeyPress(useconds_t time, int32_t key, const std::string &tex
 
 	/* Send the event to the session. */
 	KeyEvent event(Event::kKeyPress, time, m_modifiers, key, text);
-	m_server->GetActiveSession()->KeyPress(event);
+	m_server->GetActiveSession()->KeyPressed(event);
 }
 
 /** Handle a key release event.
@@ -171,5 +171,5 @@ void InputManager::KeyRelease(useconds_t time, int32_t key, const std::string &t
 
 	/* Send the event to the session. */
 	KeyEvent event(Event::kKeyRelease, time, m_modifiers, key, text);
-	m_server->GetActiveSession()->KeyRelease(event);
+	m_server->GetActiveSession()->KeyReleased(event);
 }

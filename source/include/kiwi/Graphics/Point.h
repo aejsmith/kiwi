@@ -36,6 +36,40 @@ public:
 	 * @param y		Y position of the point. */
 	Point(int x, int y) : m_x(x), m_y(y) {}
 
+	/** Add another point to the point.
+	 * @param other		Other point. Its X and Y coordinates will be
+	 *			added to this point's coordinates.
+	 * @return		Result of the addition. */
+	Point operator +(const Point &other) const {
+		return Point(m_x + other.m_x, m_y + other.m_y);
+	}
+
+	/** Subtract another point from the point.
+	 * @param other		Other point. Its X and Y coordinates will be
+	 *			subtracted from this point's coordinates.
+	 * @return		Result of the subtraction. */
+	Point operator -(const Point &other) const {
+		return Point(m_x - other.m_x, m_y - other.m_y);
+	}
+
+	/** Add another point to the point.
+	 * @param other		Other point. Its X and Y coordinates will be
+	 *			added to this point's coordinates. */
+	Point &operator +=(const Point &other) {
+		m_x += other.m_x;
+		m_y += other.m_y;
+		return *this;
+	}
+
+	/** Subtract another point from the point.
+	 * @param other		Other point. Its X and Y coordinates will be
+	 *			subtracted from this point's coordinates. */
+	Point &operator -=(const Point &other) {
+		m_x -= other.m_x;
+		m_y -= other.m_y;
+		return *this;
+	}
+
 	/** Move the point.
 	 * @param dx		X delta.
 	 * @param dy		Y delta. */

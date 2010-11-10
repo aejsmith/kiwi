@@ -188,7 +188,7 @@ void Session::Deactivate() {
  * @param dy		Y position delta.
  * @param modifiers	Keyboard modifiers pressed at time of the event.
  * @param buttons	Buttons pressed at time of the event. */
-void Session::MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons) {
+void Session::MouseMoved(useconds_t time, int dx, int dy, uint32_t modifiers, uint32_t buttons) {
 	/* Move the cursor. */
 	m_cursor->MoveRelative(dx, dy);
 
@@ -198,56 +198,53 @@ void Session::MouseMove(useconds_t time, int dx, int dy, uint32_t modifiers, uin
 
 	/* Send the event. */
 	MouseEvent event(Event::kMouseMove, time, modifiers, pos, buttons);
-	object->MouseMove(event);
+	object->MouseMoved(event);
 }
 
 /** Dispatch a mouse press event.
  * @param time		Time of the event.
  * @param modifiers	Keyboard modifiers pressed at time of the event.
  * @param buttons	Buttons pressed at time of the event. */
-void Session::MousePress(useconds_t time, uint32_t modifiers, uint32_t buttons) {
+void Session::MousePressed(useconds_t time, uint32_t modifiers, uint32_t buttons) {
 	/* Get the target for the event. If it is a window, activate it. */
 	Point pos;
 	MouseReceiver *object = MouseEventTarget(pos, true);
 
 	/* Send the event. */
 	MouseEvent event(Event::kMousePress, time, modifiers, pos, buttons);
-	object->MousePress(event);
+	object->MousePressed(event);
 }
 
 /** Dispatch a mouse release event.
  * @param time		Time of the event.
  * @param modifiers	Keyboard modifiers pressed at time of the event.
  * @param buttons	Buttons pressed at time of the event. */
-void Session::MouseRelease(useconds_t time, uint32_t modifiers, uint32_t buttons) {
+void Session::MouseReleased(useconds_t time, uint32_t modifiers, uint32_t buttons) {
 	/* Get the target for the event. If it is a window, activate it. */
 	Point pos;
 	MouseReceiver *object = MouseEventTarget(pos);
 
 	/* Send the event. */
 	MouseEvent event(Event::kMouseRelease, time, modifiers, pos, buttons);
-	object->MouseRelease(event);
+	object->MouseReleased(event);
 }
 
 /** Dispatch a key press event.
  * @param event		Key event object. */
-void Session::KeyPress(const KeyEvent &event) {
-	m_active_window->KeyPress(event);
+void Session::KeyPressed(const KeyEvent &event) {
+	m_active_window->KeyPressed(event);
 }
 
 /** Dispatch a key release event.
  * @param event		Key release object. */
-void Session::KeyRelease(const KeyEvent &event) {
-	m_active_window->KeyRelease(event);
+void Session::KeyReleased(const KeyEvent &event) {
+	m_active_window->KeyReleased(event);
 }
 
 /** Grab the mouse, causing all mouse events to be sent to the object.
- * @param object	Mouse receiver to sent events to.
- * @param offset	Offset of the object in screen, used to work out
- *			position for mouse event. */
-void Session::GrabMouse(MouseReceiver *object, const Point &offset) {
+ * @param object	Mouse receiver to sent events to. */
+void Session::GrabMouse(MouseReceiver *object) {
 	m_mouse_grabber = object;
-	m_grab_offset = offset;
 }
 
 /** Release the mouse. */
@@ -262,7 +259,7 @@ void Session::ReleaseMouse() {
 MouseReceiver *Session::MouseEventTarget(Point &pos, bool activate) {
 	Point abs = m_cursor->GetPosition();
 	if(m_mouse_grabber) {
-		pos = abs.Translated(-m_grab_offset.GetX(), -m_grab_offset.GetY());
+		pos = m_mouse_grabber->RelativePoint(abs);
 		return m_mouse_grabber;
 	} else {
 		/* Use the window that the cursor is currently pointing at. */

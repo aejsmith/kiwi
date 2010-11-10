@@ -37,9 +37,10 @@ public:
 	~Decoration();
 
 	void Update();
-	void MouseMove(const kiwi::MouseEvent &event);
-	void MousePress(const kiwi::MouseEvent &event);
-	void MouseRelease(const kiwi::MouseEvent &event);
+	void MouseMoved(const kiwi::MouseEvent &event);
+	void MousePressed(const kiwi::MouseEvent &event);
+	void MouseReleased(const kiwi::MouseEvent &event);
+	kiwi::Point RelativePoint(const kiwi::Point &pos) const;
 
 	/** Get the Cairo surface for the decoration.
 	 * @return		Pointer to Cairo surface. */

@@ -58,13 +58,13 @@ public:
 	void Update();
 	void Update(kiwi::Rect rect);
 	ServerWindow *AtPosition(kiwi::Point pos);
-	kiwi::Point RelativePoint(kiwi::Point pos);
+	kiwi::Point RelativePoint(const kiwi::Point &pos) const;
 
-	void MouseMove(const kiwi::MouseEvent &event);
-	void MousePress(const kiwi::MouseEvent &event);
-	void MouseRelease(const kiwi::MouseEvent &event);
-	void KeyPress(const kiwi::KeyEvent &event);
-	void KeyRelease(const kiwi::KeyEvent &event);
+	void MouseMoved(const kiwi::MouseEvent &event);
+	void MousePressed(const kiwi::MouseEvent &event);
+	void MouseReleased(const kiwi::MouseEvent &event);
+	void KeyPressed(const kiwi::KeyEvent &event);
+	void KeyReleased(const kiwi::KeyEvent &event);
 
 	/** Get the session the window is under.
 	 * @return		Session of the window. */
