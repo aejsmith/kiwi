@@ -37,7 +37,7 @@ using namespace std;
 
 /** Create a surface.
  * @param size		Size of the surface. */
-ServerSurface::ServerSurface(Connection *owner, const Size &size) :
+ServerSurface::ServerSurface(Connection *owner, Size size) :
 	m_owner(owner), m_size(size), m_area(0), m_mapping(0), m_image(0),
 	m_cairo(0)
 {
@@ -128,7 +128,7 @@ cairo_surface_t *ServerSurface::GetCairoSurface() {
 /** Change the size of the surface.
  * @param size		New size.
  * @return		Status code describing result of the operation. */
-status_t ServerSurface::Resize(const Size &size) {
+status_t ServerSurface::Resize(Size size) {
 	Unmap();
 
 	/* Get the new size for the area. */

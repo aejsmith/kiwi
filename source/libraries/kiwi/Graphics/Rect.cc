@@ -31,7 +31,7 @@ bool Rect::IsValid() const {
 
 /** Check whether a point lies within the rectangle.
  * @param point		Point to check. */
-bool Rect::Contains(const Point &point) const {
+bool Rect::Contains(Point point) const {
 	if(point.GetX() >= m_left && point.GetX() < m_right &&
 	   point.GetY() >= m_top && point.GetY() < m_bottom) {
 		return true;
@@ -43,13 +43,13 @@ bool Rect::Contains(const Point &point) const {
 /** Check whether the rectangle intersects with another.
  * @return rect		Rectangle to check.
  * @return		Whether the rectangles intersect. */
-bool Rect::Intersects(const Rect &rect) const {
+bool Rect::Intersects(Rect rect) const {
 	return Intersected(rect).IsValid();
 }
 
 /** Intersect the rectangle with another.
  * @param rect		Rectangle to intersect with. */
-void Rect::Intersect(const Rect &rect) {
+void Rect::Intersect(Rect rect) {
 	m_left = std::max(m_left, rect.m_left);
 	m_top = std::max(m_top, rect.m_top);
 	m_right = std::min(m_right, rect.m_right);
@@ -59,7 +59,7 @@ void Rect::Intersect(const Rect &rect) {
 /** Get the area where the rectangle intersects with another.
  * @param rect		Rectangle to intersect with.
  * @return		Area where the rectangles intersect. */
-Rect Rect::Intersected(const Rect &rect) const {
+Rect Rect::Intersected(Rect rect) const {
 	Point tl(std::max(m_left, rect.m_left), std::max(m_top, rect.m_top));
 	Point br(std::min(m_right, rect.m_right), std::min(m_bottom, rect.m_bottom));
 	return Rect(tl, br);
@@ -116,7 +116,7 @@ void Rect::MoveTo(int x, int y) {
 
 /** Move the rectangle.
  * @param pos		New position. */
-void Rect::MoveTo(const Point &pos) {
+void Rect::MoveTo(Point pos) {
 	MoveTo(pos.GetX(), pos.GetY());
 }
 
@@ -130,6 +130,6 @@ void Rect::Resize(int width, int height) {
 
 /** Set the size of the rectangle.
  * @param size		New size. */
-void Rect::Resize(const Size &size) {
+void Rect::Resize(Size size) {
 	Resize(size.GetWidth(), size.GetHeight());
 }

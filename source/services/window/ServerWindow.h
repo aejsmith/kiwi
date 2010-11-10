@@ -58,7 +58,7 @@ public:
 	void Update();
 	void Update(kiwi::Rect rect);
 	ServerWindow *AtPosition(kiwi::Point pos);
-	kiwi::Point RelativePoint(const kiwi::Point &pos) const;
+	kiwi::Point RelativePoint(kiwi::Point pos) const;
 
 	void MouseMoved(const kiwi::MouseEvent &event);
 	void MousePressed(const kiwi::MouseEvent &event);

@@ -32,7 +32,7 @@ public:
 	/** Initialise the event.
 	 * @param size		New size of the object.
 	 * @param prev		Previous size of the object. */
-	ResizeEvent(const Size &size, const Size &prev) :
+	ResizeEvent(Size size, Size prev) :
 		Event(kResize), m_size(size), m_prev(prev)
 	{}
 

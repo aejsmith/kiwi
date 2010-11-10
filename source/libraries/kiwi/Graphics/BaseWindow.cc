@@ -96,7 +96,7 @@ BaseWindow::BaseWindow(uint32_t style, Level level) : m_priv(0) {
  * @param level		Level of the window. This controls the order of windows
  *			on screen. Windows with higher levels always appear
  *			above windows with lower levels. */
-BaseWindow::BaseWindow(const Size &size, uint32_t style, Level level) : m_priv(0) {
+BaseWindow::BaseWindow(Size size, uint32_t style, Level level) : m_priv(0) {
 	m_priv = new BaseWindowPrivate();
 
 	/* Put the window into the window map. */
@@ -116,7 +116,7 @@ BaseWindow::BaseWindow(const Size &size, uint32_t style, Level level) : m_priv(0
  * @param level		Level of the window. This controls the order of windows
  *			on screen. Windows with higher levels always appear
  *			above windows with lower levels. */
-BaseWindow::BaseWindow(const Rect &frame, uint32_t style, Level level) : m_priv(0) {
+BaseWindow::BaseWindow(Rect frame, uint32_t style, Level level) : m_priv(0) {
 	m_priv = new BaseWindowPrivate();
 
 	/* Put the window into the window map. */
@@ -164,7 +164,7 @@ Rect BaseWindow::GetFrame() const {
 
 /** Resize the window.
  * @param size		New size for the window. */
-void BaseWindow::Resize(const Size &size) {
+void BaseWindow::Resize(Size size) {
 	if(!size.IsValid()) {
 		return;
 	}
@@ -175,7 +175,7 @@ void BaseWindow::Resize(const Size &size) {
 
 /** Move the window.
  * @param pos		New position for the window. */
-void BaseWindow::MoveTo(const Point &pos) {
+void BaseWindow::MoveTo(Point pos) {
 	WindowServer::Point _pos = { pos.GetX(), pos.GetY() };
 	WSConnection::Instance()->MoveWindow(m_priv->id, _pos);
 }
@@ -230,7 +230,7 @@ Surface *BaseWindow::GetSurface() const {
 
 /** Update an area in the window on screen.
  * @param rect		Rectangle to update. */
-void BaseWindow::Update(const Rect &rect) {
+void BaseWindow::Update(Rect rect) {
 	if(!rect.IsValid()) {
 		return;
 	}

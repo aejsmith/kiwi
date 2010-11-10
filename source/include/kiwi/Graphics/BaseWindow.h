@@ -88,22 +88,22 @@ public:
 	};
 
 	BaseWindow(uint32_t style = kNormalStyle, Level level = kNormalLevel);
-	BaseWindow(const Size &size, uint32_t style = kNormalStyle, Level level = kNormalLevel);
-	BaseWindow(const Rect &frame, uint32_t style = kNormalStyle, Level level = kNormalLevel);
+	BaseWindow(Size size, uint32_t style = kNormalStyle, Level level = kNormalLevel);
+	BaseWindow(Rect frame, uint32_t style = kNormalStyle, Level level = kNormalLevel);
 	~BaseWindow();
 
 	std::string GetTitle() const;
 	void SetTitle(const std::string &title);
 	Rect GetFrame() const;
-	void Resize(const Size &size);
-	void MoveTo(const Point &pos);
+	void Resize(Size size);
+	void MoveTo(Point pos);
 	void Show();
 	void Hide();
 	bool IsVisible() const;
 	void Activate();
 	bool IsActive() const;
 	Surface *GetSurface() const;
-	void Update(const Rect &rect);
+	void Update(Rect rect);
 	void Update(const Region &region);
 protected:
 	virtual void MouseMoved(const MouseEvent &event);

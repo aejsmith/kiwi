@@ -383,7 +383,7 @@ ServerWindow *ServerWindow::AtPosition(kiwi::Point pos) {
 /** Convert a point to be relative to the window.
  * @param pos		Absolute position to convert.
  * @return		Position relative to the window. */
-kiwi::Point ServerWindow::RelativePoint(const kiwi::Point &pos) const {
+kiwi::Point ServerWindow::RelativePoint(kiwi::Point pos) const {
 	return pos - GetAbsoluteFrame().GetTopLeft();
 }
 

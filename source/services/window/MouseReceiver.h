@@ -30,7 +30,7 @@ public:
 	virtual void MouseMoved(const kiwi::MouseEvent &event) = 0;
 	virtual void MousePressed(const kiwi::MouseEvent &event) = 0;
 	virtual void MouseReleased(const kiwi::MouseEvent &event) = 0;
-	virtual kiwi::Point RelativePoint(const kiwi::Point &pos) const = 0;
+	virtual kiwi::Point RelativePoint(kiwi::Point pos) const = 0;
 };
 
 #endif /* __MOUSERECEIVER_H */

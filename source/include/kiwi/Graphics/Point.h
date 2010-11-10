@@ -40,7 +40,7 @@ public:
 	 * @param other		Other point. Its X and Y coordinates will be
 	 *			added to this point's coordinates.
 	 * @return		Result of the addition. */
-	Point operator +(const Point &other) const {
+	Point operator +(Point other) const {
 		return Point(m_x + other.m_x, m_y + other.m_y);
 	}
 
@@ -48,14 +48,14 @@ public:
 	 * @param other		Other point. Its X and Y coordinates will be
 	 *			subtracted from this point's coordinates.
 	 * @return		Result of the subtraction. */
-	Point operator -(const Point &other) const {
+	Point operator -(Point other) const {
 		return Point(m_x - other.m_x, m_y - other.m_y);
 	}
 
 	/** Add another point to the point.
 	 * @param other		Other point. Its X and Y coordinates will be
 	 *			added to this point's coordinates. */
-	Point &operator +=(const Point &other) {
+	Point &operator +=(Point other) {
 		m_x += other.m_x;
 		m_y += other.m_y;
 		return *this;
@@ -64,7 +64,7 @@ public:
 	/** Subtract another point from the point.
 	 * @param other		Other point. Its X and Y coordinates will be
 	 *			subtracted from this point's coordinates. */
-	Point &operator -=(const Point &other) {
+	Point &operator -=(Point other) {
 		m_x -= other.m_x;
 		m_y -= other.m_y;
 		return *this;

@@ -65,7 +65,7 @@ void Compositor::Redraw() {
 
 /** Redraw a rectangular area on screen.
  * @param rect		Rectangle to redraw. */
-void Compositor::Redraw(const Rect &rect) {
+void Compositor::Redraw(Rect rect) {
 	if(rect.IsValid()) {
 		m_redraw_region.Union(rect);
 		ScheduleRedraw();

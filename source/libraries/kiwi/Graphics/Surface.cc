@@ -58,7 +58,7 @@ struct kiwi::SurfacePrivate {
 
 /** Create a new local surface.
  * @param size		Size of the surface. */
-Surface::Surface(const Size &size) : m_priv(0) {
+Surface::Surface(Size size) : m_priv(0) {
 	std::unique_ptr<SurfacePrivate> priv(new SurfacePrivate());
 
 	priv->cairo = cairo_image_surface_create(CAIRO_FORMAT_ARGB32,
@@ -141,7 +141,7 @@ Size Surface::GetSize() const {
  *			a usable state.
  * @param size		New size for the surface.
  * @return		Whether succeeded in resizing. */
-bool Surface::Resize(const Size &size) {
+bool Surface::Resize(Size size) {
 	cairo_surface_t *cairo;
 
 	if(m_priv->area >= 0) {

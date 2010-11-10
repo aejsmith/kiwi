@@ -38,12 +38,12 @@ class SurfacePrivate;
  */
 class KIWI_PUBLIC Surface : public kiwi::Object, kiwi::Noncopyable {
 public:
-	Surface(const Size &size);
+	Surface(Size size);
 	Surface(area_id_t area);
 	~Surface();
 
 	Size GetSize() const;
-	bool Resize(const Size &size);
+	bool Resize(Size size);
 	unsigned char *GetData();
 	size_t GetDataSize() const;
 	cairo_surface_t *GetCairoSurface();

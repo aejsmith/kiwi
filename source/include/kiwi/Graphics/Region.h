@@ -36,7 +36,7 @@ public:
 	typedef std::vector<Rect> RectArray;
 
 	Region();
-	Region(const Rect &rect);
+	Region(Rect rect);
 	Region(const Region &other);
 	~Region();
 
@@ -47,17 +47,17 @@ public:
 	void GetRects(RectArray &array) const;
 
 	bool Empty() const;
-	bool Contains(const Point &point) const;
+	bool Contains(Point point) const;
 
 	void Clear();
 	void Union(const Region &other);
-	void Union(const Rect &rect);
+	void Union(Rect rect);
 	void Intersect(const Region &other);
-	void Intersect(const Rect &rect);
+	void Intersect(Rect rect);
 	void Subtract(const Region &other);
-	void Subtract(const Rect &rect);
+	void Subtract(Rect rect);
 	void XOR(const Region &other);
-	void XOR(const Rect &rect);
+	void XOR(Rect rect);
 private:
 	void *m_data;			/**< Pointer to Cairo region. */
 };

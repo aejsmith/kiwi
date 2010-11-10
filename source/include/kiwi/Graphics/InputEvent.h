@@ -89,7 +89,7 @@ public:
 	 * @param pos		Position of the mouse relative to the widget.
 	 * @param buttons	Buttons that were pressed when the event
 	 *			occurred. */
-	MouseEvent(Type type, useconds_t time, uint32_t modifiers, const Point &pos, uint32_t buttons) :
+	MouseEvent(Type type, useconds_t time, uint32_t modifiers, Point pos, uint32_t buttons) :
 		InputEvent(type, time, modifiers), m_pos(pos), m_buttons(buttons)
 	{}
 

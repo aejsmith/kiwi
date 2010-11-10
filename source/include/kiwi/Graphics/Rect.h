@@ -47,7 +47,7 @@ public:
 	/** Initialise the rectangle.
 	 * @param p1		Point for top left of the rectangle.
 	 * @param p2		Point for bottom right of the rectangle. */
-	Rect(const Point &p1, const Point &p2) :
+	Rect(Point p1, Point p2) :
 		m_left(p1.GetX()), m_top(p1.GetY()), m_right(p2.GetX()),
 		m_bottom(p2.GetY())
 	{}
@@ -55,7 +55,7 @@ public:
 	/** Initialise the rectangle.
 	 * @param pos		Position of the top left of the rectangle.
 	 * @param size		Size of the rectangle. */
-	Rect(const Point &pos, const Size &size) :
+	Rect(Point pos, Size size) :
 		m_left(pos.GetX()), m_top(pos.GetY()),
 		m_right(pos.GetX() + size.GetWidth()),
 		m_bottom(pos.GetY() + size.GetHeight())
@@ -90,31 +90,31 @@ public:
 	Size GetSize() const { return Size(GetWidth(), GetHeight()); }
 
 	bool IsValid() const;
-	bool Contains(const Point &point) const;
-	bool Intersects(const Rect &rect) const;
-	void Intersect(const Rect &rect);
-	Rect Intersected(const Rect &rect) const;
+	bool Contains(Point point) const;
+	bool Intersects(Rect rect) const;
+	void Intersect(Rect rect);
+	Rect Intersected(Rect rect) const;
 	void Adjust(int dx1, int dy1, int dx2, int dy2);
 	Rect Adjusted(int dx1, int dy1, int dx2, int dy2) const;
 	void Translate(int dx, int dy);
 	Rect Translated(int dx, int dy) const;
 	void MoveTo(int x, int y);
-	void MoveTo(const Point &pos);
+	void MoveTo(Point pos);
 	void Resize(int width, int height);
-	void Resize(const Size &size);
+	void Resize(Size size);
 
 	/** Intersect with another rectangle.
 	 * @see			Intersected().
 	 * @param rect		Rectangle to intersect with.
 	 * @return		Intersected rectangle. */
-	Rect operator &(const Rect &rect) const {
+	Rect operator &(Rect rect) const {
 		return Intersected(rect);
 	}
 
 	/** Intersect with another rectangle.
 	 * @see			Intersect().
 	 * @param rect		Rectangle to intersect with. */
-	Rect &operator &=(const Rect &rect) {
+	Rect &operator &=(Rect rect) {
 		Intersect(rect);
 		return *this;
 	}

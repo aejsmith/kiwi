@@ -38,7 +38,7 @@ class Connection;
 /** Class implementing the server side of kiwi::Surface. */
 class ServerSurface : public kiwi::Object, kiwi::Noncopyable {
 public:
-	ServerSurface(Connection *owner, const kiwi::Size &size);
+	ServerSurface(Connection *owner, kiwi::Size size);
 	~ServerSurface();
 
 	area_id_t GetID() const;
@@ -46,7 +46,7 @@ public:
 	size_t GetDataSize() const;
 	pixman_image_t *GetPixmanImage();
 	cairo_surface_t *GetCairoSurface();
-	status_t Resize(const kiwi::Size &size);
+	status_t Resize(kiwi::Size size);
 
 	/** Get the owner of the surface.
 	 * @return		Connection that owns the surface. */

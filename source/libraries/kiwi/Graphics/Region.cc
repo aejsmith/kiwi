@@ -49,7 +49,7 @@ Region::Region() {
 
 /** Construct a region containing a single rectangle.
  * @param rect		Rectangle to add to region. */
-Region::Region(const Rect &rect) {
+Region::Region(Rect rect) {
 	CAIRO_RECT(_rect, rect);
 	m_data = cairo_region_create_rectangle(&_rect);
 }
@@ -110,7 +110,7 @@ bool Region::Empty() const {
 /** Check whether the region contains a point.
  * @param point		Point to check.
  * @return		Whether the region contains the point. */
-bool Region::Contains(const Point &point) const {
+bool Region::Contains(Point point) const {
 	return cairo_region_contains_point(CAIRO_REGION_C(this), point.GetX(), point.GetY());
 }
 
@@ -129,7 +129,7 @@ void Region::Union(const Region &other) {
 
 /** Set the area to the union of the current area and another rectangle.
  * @param rect		Other rectangle. */
-void Region::Union(const Rect &rect) {
+void Region::Union(Rect rect) {
 	CAIRO_RECT(_rect, rect);
 	cairo_region_union_rectangle(CAIRO_REGION(this), &_rect);
 }
@@ -142,7 +142,7 @@ void Region::Intersect(const Region &other) {
 
 /** Set the area to the intersection of the current area and another rectangle.
  * @param rect		Other rectangle. */
-void Region::Intersect(const Rect &rect) {
+void Region::Intersect(Rect rect) {
 	CAIRO_RECT(_rect, rect);
 	cairo_region_intersect_rectangle(CAIRO_REGION(this), &_rect);
 }
@@ -155,7 +155,7 @@ void Region::Subtract(const Region &other) {
 
 /** Subtract another rectangle from the area.
  * @param rect		Other rectangle. */
-void Region::Subtract(const Rect &rect) {
+void Region::Subtract(Rect rect) {
 	CAIRO_RECT(_rect, rect);
 	cairo_region_subtract_rectangle(CAIRO_REGION(this), &_rect);
 }
@@ -168,7 +168,7 @@ void Region::XOR(const Region &other) {
 
 /** Set the area to the exclusive-OR of the current area and another rectangle.
  * @param other		Other rectangle. */
-void Region::XOR(const Rect &rect) {
+void Region::XOR(Rect rect) {
 	CAIRO_RECT(_rect, rect);
 	cairo_region_xor_rectangle(CAIRO_REGION(this), &_rect);
 }

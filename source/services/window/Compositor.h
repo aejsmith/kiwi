@@ -42,7 +42,7 @@ public:
 	~Compositor();
 
 	void Redraw();
-	void Redraw(const kiwi::Rect &rect);
+	void Redraw(kiwi::Rect rect);
 	void Redraw(const kiwi::Region &region);
 private:
 	void Render(ServerWindow *window, int off_x, int off_y);

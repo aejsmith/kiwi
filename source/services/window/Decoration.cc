@@ -228,6 +228,6 @@ void Decoration::MouseReleased(const MouseEvent &event) {
 
 /** Get a point relative to the decoration.
  * @return		Point relative to the decoration. */
-Point Decoration::RelativePoint(const kiwi::Point &pos) const {
+Point Decoration::RelativePoint(kiwi::Point pos) const {
 	return m_window->RelativePoint(pos);
 }

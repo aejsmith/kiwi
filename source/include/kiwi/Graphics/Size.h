@@ -39,14 +39,14 @@ public:
 	/** Check whether the size is equal to another size.
 	 * @param other		Size to check against.
 	 * @return		Whether equal. */
-	bool operator ==(const Size &other) const {
+	bool operator ==(Size other) const {
 		return (m_width == other.m_width && m_height == other.m_height);
 	}
 
 	/** Check whether the size is different from another size.
 	 * @param other		Size to check against.
 	 * @return		Whether different. */
-	bool operator !=(const Size &other) const {
+	bool operator !=(Size other) const {
 		return (m_width != other.m_width || m_height != other.m_height);
 	}
 
