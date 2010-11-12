@@ -894,7 +894,7 @@ static void fs_node_info(fs_node_t *node, fs_info_t *info) {
 	} else {
 		info->links = 1;
 		info->size = 0;
-		info->blksize = PAGE_SIZE;
+		info->block_size = PAGE_SIZE;
 	}
 }
 

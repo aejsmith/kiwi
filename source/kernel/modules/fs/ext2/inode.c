@@ -465,6 +465,7 @@ static status_t ext2_inode_truncate(ext2_inode_t *inode, offset_t size) {
 	file_map_invalidate(inode->map, 0, count);
 	vm_cache_resize(inode->cache, size);
 	inode->size = size;
+	inode->disk.i_mtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
 	ext2_inode_flush(inode);
 
 	for(i = 0; i < EXT2_N_BLOCKS; i++) {
@@ -853,7 +854,12 @@ status_t ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, of
 
 	mutex_unlock(&inode->lock);
 
-	return vm_cache_write(inode->cache, buf, count, offset, nonblock, bytesp);
+	ret = vm_cache_write(inode->cache, buf, count, offset, nonblock, bytesp);
+	if(*bytesp) {
+		inode->disk.i_mtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
+	}
+
+	return ret;
 }
 
 /** Resize an Ext2 inode.

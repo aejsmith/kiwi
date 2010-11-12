@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <init.h>
 #include <status.h>
+#include <time.h>
 
 /** RamFS mount information structure. */
 typedef struct ramfs_mount {
@@ -43,6 +44,10 @@ typedef struct ramfs_node {
 		entry_cache_t *entries;	/**< Directory entry store. */
 		char *target;		/**< Symbolic link destination. */
 	};
+
+	useconds_t created;		/**< Time of creation. */
+	useconds_t accessed;		/**< Time of last access. */
+	useconds_t modified;		/**< Time last modified. */
 } ramfs_node_t;
 
 /** Free a RamFS node.
@@ -88,6 +93,9 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t
 
 	/* Create the information structure. */
 	data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
+	data->created = time_since_epoch();
+	data->accessed = time_since_epoch();
+	data->modified = time_since_epoch();
 
 	/* Allocate a unique ID for the node. */
 	mutex_lock(&mount->lock);
@@ -141,7 +149,10 @@ static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
 	ramfs_node_t *data = node->data;
 
 	info->links = 1;
-	info->blksize = PAGE_SIZE;
+	info->block_size = PAGE_SIZE;
+	info->created = data->created;
+	info->accessed = data->accessed;
+	info->modified = data->modified;
 
 	switch(node->type) {
 	case FS_NODE_FILE:
@@ -194,13 +205,20 @@ static status_t ramfs_node_read(fs_node_t *node, void *buf, size_t count, offset
 static status_t ramfs_node_write(fs_node_t *node, const void *buf, size_t count, offset_t offset,
                                  bool nonblock, size_t *bytesp) {
 	ramfs_node_t *data = node->data;
+	status_t ret;
 
 	assert(node->type == FS_NODE_FILE);
 
 	if((offset + count) > data->cache->size) {
 		vm_cache_resize(data->cache, offset + count);
 	}
-	return vm_cache_write(data->cache, buf, count, offset, nonblock, bytesp);
+
+	ret = vm_cache_write(data->cache, buf, count, offset, nonblock, bytesp);
+	if(*bytesp) {
+		data->modified = time_since_epoch();
+	}
+
+	return ret;
 }
 
 /** Get the data cache for a RamFS file.
@@ -223,6 +241,7 @@ static status_t ramfs_node_resize(fs_node_t *node, offset_t size) {
 	assert(node->type == FS_NODE_FILE);
 
 	vm_cache_resize(data->cache, size);
+	data->modified = time_since_epoch();
 	return STATUS_SUCCESS;
 }
 

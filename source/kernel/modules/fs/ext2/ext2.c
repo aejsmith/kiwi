@@ -186,9 +186,14 @@ static void ext2_node_info(fs_node_t *node, fs_info_t *info) {
 	ext2_inode_t *inode = node->data;
 
 	mutex_lock(&inode->lock);
-	info->blksize = PAGE_SIZE;
+
+	info->block_size = PAGE_SIZE;
 	info->size = inode->size;
 	info->links = le16_to_cpu(inode->disk.i_links_count);
+	info->created = SECS2USECS(le32_to_cpu(inode->disk.i_ctime));
+	info->accessed = SECS2USECS(le32_to_cpu(inode->disk.i_atime));
+	info->modified = SECS2USECS(le32_to_cpu(inode->disk.i_mtime));
+
 	mutex_unlock(&inode->lock);
 }
 

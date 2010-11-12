@@ -38,17 +38,15 @@ static void fs_info_to_stat(fs_info_t *info, struct stat *restrict statp) {
 	statp->st_ino = info->id;
 	statp->st_nlink = info->links;
 	statp->st_size = info->size;
-	statp->st_blksize = info->blksize;
+	statp->st_blksize = info->block_size;
+	statp->st_atime = (info->accessed / 1000000);
+	statp->st_mtime = (info->modified / 1000000);
+	statp->st_ctime = (info->created / 1000000);
 
 	/* TODO. */
 	statp->st_uid = 0;
 	statp->st_gid = 0;
 	statp->st_blocks = 0;
-
-	/* TODO: Get correct times. */
-	statp->st_atime = 1281685593;
-	statp->st_mtime = 1281685593;
-	statp->st_ctime = 1281685593;
 
 	/* Determine the mode. */
 	switch(info->type) {

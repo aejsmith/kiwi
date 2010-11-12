@@ -55,9 +55,14 @@ typedef struct fs_info {
 	node_id_t id;			/**< Node ID. */
 	mount_id_t mount;		/**< Mount ID. */
 	fs_node_type_t type;		/**< Type of the node. */
-	size_t blksize;			/**< I/O block size. */
+	size_t block_size;		/**< I/O block size. */
 	offset_t size;			/**< Total size of file on filesystem. */
 	size_t links;			/**< Number of links to the node. */
+
+	/** Node times, all in microseconds since the UNIX epoch. */
+	useconds_t created;		/**< Time of creation. */
+	useconds_t accessed;		/**< Time of last access. */
+	useconds_t modified;		/**< Time last modified. */
 } fs_info_t;
 
 /** Mount information structure. */
