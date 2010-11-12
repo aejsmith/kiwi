@@ -64,11 +64,10 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
                                  fs_node_t **nodep) {
 	ext2_inode_t *parent = _parent->data, *inode;
 	size_t len, bytes;
-	uint16_t mode;
+	uint16_t mode = 0;
 	status_t ret;
 
-	/* Work out the mode. */
-	mode = (type == FS_NODE_DIR) ? 0755 : 0644;
+	/* Work out the mode for the type. */
 	switch(type) {
 	case FS_NODE_FILE:
 		mode |= EXT2_S_IFREG;
@@ -84,8 +83,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 	}
 
 	/* Allocate the inode. Use the parent's UID/GID for now. */
-	ret = ext2_inode_alloc(parent->mount, mode, le16_to_cpu(parent->disk.i_uid),
-	                       le16_to_cpu(parent->disk.i_gid), &inode);
+	ret = ext2_inode_alloc(parent->mount, mode, security, &inode);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -129,7 +127,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 	}
 
 	mutex_unlock(&parent->lock);
-	*nodep = fs_node_alloc(_parent->mount, inode->num, type, NULL, _parent->ops, inode);
+	*nodep = fs_node_alloc(_parent->mount, inode->num, type, security, _parent->ops, inode);
 	return STATUS_SUCCESS;
 fail:
 	mutex_unlock(&parent->lock);
@@ -192,6 +190,15 @@ static void ext2_node_info(fs_node_t *node, fs_info_t *info) {
 	info->size = inode->size;
 	info->links = le16_to_cpu(inode->disk.i_links_count);
 	mutex_unlock(&inode->lock);
+}
+
+/** Update security attributes of an Ext2 node.
+ * @param node		Node to set for.
+ * @param security	New security attributes to set.
+ * @return		Status code describing result of the operation. */
+static status_t ext2_node_set_security(fs_node_t *node, const object_security_t *security) {
+	ext2_inode_t *inode = node->data;
+	return ext2_inode_set_security(inode, security);
 }
 
 /** Read from an Ext2 file.
@@ -318,6 +325,7 @@ static fs_node_ops_t ext2_node_ops = {
 	.create = ext2_node_create,
 	.unlink = ext2_node_unlink,
 	.info = ext2_node_info,
+	.set_security = ext2_node_set_security,
 	.read = ext2_node_read,
 	.write = ext2_node_write,
 	.get_cache = ext2_node_get_cache,
@@ -368,6 +376,7 @@ static void ext2_unmount(fs_mount_t *mount) {
  * @return		Status code describing result of the operation. */
 static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **nodep) {
 	ext2_mount_t *data = mount->data;
+	object_security_t *security;
 	fs_node_type_t type;
 	ext2_inode_t *inode;
 	status_t ret;
@@ -415,8 +424,16 @@ static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **node
 		return STATUS_CORRUPT_FS;
 	}
 
+	/* Get security attributes for the node. */
+	ret = ext2_inode_security(inode, &security);
+	if(ret != STATUS_SUCCESS) {
+		ext2_inode_release(inode);
+		return ret;
+	}
+
 	/* Create and fill out a node structure. */
-	*nodep = fs_node_alloc(mount, id, type, NULL, &ext2_node_ops, inode);
+	*nodep = fs_node_alloc(mount, id, type, security, &ext2_node_ops, inode);
+	object_security_destroy(security);
 	return STATUS_SUCCESS;
 }
 

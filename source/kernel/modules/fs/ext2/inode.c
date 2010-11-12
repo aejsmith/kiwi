@@ -493,12 +493,12 @@ static status_t ext2_inode_truncate(ext2_inode_t *inode, offset_t size) {
 
 /** Allocate a new inode on an Ext2 filesystem.
  * @param mount		Mount to allocate on.
- * @param mode		Mode for inode.
- * @param uid		User ID for the inode.
- * @param gid		Group ID for the inode.
+ * @param mode		File type mode for the new node. Permission bits will
+ *			be ignored.
+ * @param security	Security attributes for the node.
  * @param inodep	Where to store pointer to new inode.
  * @return		Status code describing result of the operation. */
-status_t ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, uint16_t uid, uint16_t gid,
+status_t ext2_inode_alloc(ext2_mount_t *mount, uint16_t mode, const object_security_t *security,
                           ext2_inode_t **inodep) {
 	uint32_t *block, num, in, count, i, j;
 	ext2_group_desc_t *group;
@@ -588,9 +588,7 @@ found:
 	inode->size = 0;
 
 	time = USECS2SECS(time_since_epoch());
-	inode->disk.i_uid = cpu_to_le16(uid);
-	inode->disk.i_gid = cpu_to_le16(gid);
-	inode->disk.i_mode = cpu_to_le16(mode);
+	inode->disk.i_mode = cpu_to_le16(mode & EXT2_S_IFMT);
 	inode->disk.i_size = 0;
 	inode->disk.i_atime = cpu_to_le32(time);
 	inode->disk.i_ctime = cpu_to_le32(time);
@@ -602,6 +600,14 @@ found:
 	inode->disk.i_dir_acl = 0;
 	memset(inode->disk.i_block, 0, sizeof(inode->disk.i_block));
 	ext2_inode_flush(inode);
+
+	/* Set security attributes on the node. */
+	ret = ext2_inode_set_security(inode, security);
+	if(ret != STATUS_SUCCESS) {
+		mutex_unlock(&mount->lock);
+		ext2_inode_release(inode);
+		return ret;
+	}
 
 	dprintf("ext2: allocated inode %" PRIu32 " on %p (group: %" PRIu32 ")\n", in, mount, num);
 	mutex_unlock(&mount->lock);

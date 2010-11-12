@@ -96,6 +96,23 @@
 /** Inode flags. */
 #define EXT4_EXTENTS_FL		0x00080000	/**< Inode uses extents. */
 
+/** ACL definitions. */
+#define EXT2_ACL_VERSION	0x0001
+#define EXT2_ACL_XATTR		"system.posix_acl_access"
+
+/** ACL entry types. */
+#define EXT2_ACL_USER_OBJ	0x01
+#define EXT2_ACL_USER		0x02
+#define EXT2_ACL_GROUP_OBJ	0x04
+#define EXT2_ACL_GROUP		0x08
+#define EXT2_ACL_MASK		0x10
+#define EXT2_ACL_OTHER		0x20
+
+/** ACL entry permissions. */
+#define EXT2_ACL_READ		0x04
+#define EXT2_ACL_WRITE		0x02
+#define EXT2_ACL_EXECUTE	0x01
+
 /** Feature check macros. */
 #define EXT2_HAS_COMPAT_FEATURE(sb, mask)	\
 	(le32_to_cpu((sb)->s_feature_compat) & (mask))
@@ -267,6 +284,24 @@ typedef struct ext2_dirent {
 	uint8_t file_type;			/**< File type. */
 	char name[];				/**< Name of the file. */
 } __packed ext2_dirent_t;
+
+/** Ext2 ACL header. */
+typedef struct ext2_acl_header {
+	uint32_t a_version;			/**< ACL version. */
+} __packed ext2_acl_header_t;
+
+/** Ext2 long ACL entry (for EXT2_ACL_USER_OBJ and EXT2_ACL_GROUP_OBJ). */
+typedef struct ext2_acl_entry {
+	uint16_t e_tag;				/**< Entry type. */
+	uint16_t e_perm;			/**< Permissions granted by entry. */
+	uint32_t e_id;				/**< ID of user/group the entry applies to. */
+} __packed ext2_acl_entry_t;
+
+/** Ext2 short ACL entry. */
+typedef struct ext2_acl_entry_short {
+	uint16_t e_tag;				/**< Entry type. */
+	uint16_t e_perm;			/**< Permissions granted by entry. */
+} __packed ext2_acl_entry_short_t;
 
 /* Ext4 on-disk extent structure. */
 typedef struct ext4_extent {
