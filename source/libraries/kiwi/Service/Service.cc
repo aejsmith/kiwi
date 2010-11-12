@@ -21,6 +21,8 @@
 #include <kiwi/Service/Service.h>
 #include <kiwi/IPCPort.h>
 
+#include <memory>
+
 #include "org.kiwi.ServiceManager.h"
 #include "../Internal.h"
 
@@ -35,13 +37,15 @@ struct kiwi::ServicePrivate {
 };
 
 /** Construct the service. */
-Service::Service() :
-	m_priv(new ServicePrivate)
-{
+Service::Service() : m_priv(0) {
+	std::unique_ptr<ServicePrivate> priv(new ServicePrivate);
+
 	/* Set up the connection to the service manager. The service manager
 	 * maps handle 3 to our connection to it when it spawns us. */
-	m_priv->svcmgr = new ServerConnection(3);
-	m_priv->svcmgr->AddPort.Connect(this, &Service::_AddPort);
+	priv->svcmgr = new ServerConnection(3);
+	priv->svcmgr->AddPort.Connect(this, &Service::_AddPort);
+
+	m_priv = priv.release();
 }
 
 /** Destroy the service. */
@@ -49,9 +53,7 @@ Service::~Service() {
 	if(m_priv->port) {
 		delete m_priv->port;
 	}
-	if(m_priv->svcmgr) {
-		delete m_priv->svcmgr;
-	}
+	delete m_priv->svcmgr;
 	delete m_priv;
 }
 

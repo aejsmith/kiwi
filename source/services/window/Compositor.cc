@@ -167,5 +167,4 @@ void Compositor::PerformRedraw() {
 	for(auto it = rects.begin(); it != rects.end(); ++it) {
 		m_display->DrawSurface(m_surface, it->GetTopLeft(), it->GetTopLeft(), it->GetSize());
 	}
-
 }

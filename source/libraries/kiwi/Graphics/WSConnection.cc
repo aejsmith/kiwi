@@ -44,9 +44,7 @@ WSConnection::WSConnection() : m_conn(0) {
 
 /** Destroy the server connection. */
 WSConnection::~WSConnection() {
-	if(m_conn) {
-		delete m_conn;
-	}
+	delete m_conn;
 }
 
 /** Get the instance of WSConnection.

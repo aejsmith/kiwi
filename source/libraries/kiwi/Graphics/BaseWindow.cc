@@ -57,19 +57,17 @@ BaseWindowPrivate::BaseWindowPrivate() : id(-1), surface(0) {
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		libkiwi_warn("BaseWindow::BaseWindow: Failed to get window surface: %d", ret);
+		WSConnection::Instance()->DestroyWindow(id);
 		throw e;
 	}
+
 	surface = new Surface(area);
 }
 
 /** Destroy the window. */
 BaseWindowPrivate::~BaseWindowPrivate() {
-	if(surface) {
-		delete surface;
-	}
-	if(id >= 0) {
-		WSConnection::Instance()->DestroyWindow(id);
-	}
+	delete surface;
+	WSConnection::Instance()->DestroyWindow(id);
 }
 
 /** Create a new window.
@@ -133,10 +131,8 @@ BaseWindow::BaseWindow(Rect frame, uint32_t style, Level level) : m_priv(0) {
 
 /** Destroy the window. */
 BaseWindow::~BaseWindow() {
-	if(m_priv) {
-		WSConnection::Instance().RemoveWindow(m_priv->id);
-		delete m_priv;
-	}
+	WSConnection::Instance().RemoveWindow(m_priv->id);
+	delete m_priv;
 }
 
 /** Get the title of the window.
