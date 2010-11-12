@@ -3369,7 +3369,7 @@ status_t sys_fs_setcwd(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->obj, NULL) & FS_WRITE)) {
+	if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_PERM_DENIED;
