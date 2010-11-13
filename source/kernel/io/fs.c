@@ -1464,11 +1464,10 @@ static status_t fs_file_write_internal(object_handle_t *handle, const void *buf,
 		goto out;
 	}
 
-	/* Pull the offset out of the handle structure, and handle the
-	 * FS_FILE_APPEND flag. */
+	/* Pull the offset out of the handle, and handle the FS_APPEND flag. */
 	if(usehnd) {
 		rwlock_write_lock(&data->lock);
-		if(data->flags & FS_FILE_APPEND) {
+		if(data->flags & FS_APPEND) {
 			fs_node_info(node, &info);
 			data->offset = info.size;
 		}
@@ -1496,10 +1495,10 @@ out:
 /** Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the file
- * handle's current offset (if the FS_FILE_APPEND flag is set, the offset will
- * be set to the end of the file and the write will take place there), and
- * before returning the handle's offset will be incremented by the number of
- * bytes written.
+ * handle's current offset (if the FS_APPEND flag is set, the offset will be
+ * set to the end of the file and the write will take place there), and before
+ * returning the handle's offset will be incremented by the number of bytes
+ * written.
  *
  * @param handle	Handle to file to write to. Must have the FS_WRITE
  *			access right.
@@ -1507,8 +1506,7 @@ out:
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
  *			after checking all arguments, and the file handle
- *			offset will not be modified (even if FS_FILE_APPEND is
- *			set).
+ *			offset will not be modified (even if FS_APPEND is set).
  * @param bytesp	Where to store number of bytes written (optional). This
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
@@ -2757,10 +2755,10 @@ out:
 /** Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the file
- * handle's current offset (if the FS_FILE_APPEND flag is set, the offset will
- * be set to the end of the file and the write will take place there), and
- * before returning the handle's offset will be incremented by the number of
- * bytes written.
+ * handle's current offset (if the FS_APPEND flag is set, the offset will be
+ * set to the end of the file and the write will take place there), and before
+ * returning the handle's offset will be incremented by the number of bytes
+ * written.
  *
  * @param handle	Handle to file to write to. Must have the FS_WRITE
  *			access right.
@@ -2768,8 +2766,7 @@ out:
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
  *			after checking all arguments, and the file handle
- *			offset will not be modified (even if FS_FILE_APPEND is
- *			set).
+ *			offset will not be modified (even if FS_APPEND is set).
  * @param bytesp	Where to store number of bytes written (optional). This
  *			is updated even upon failure, as it can fail when part
  *			of the data has been written.
@@ -3082,6 +3079,56 @@ status_t sys_fs_handle_info(handle_t handle, fs_info_t *info) {
 	}
 	object_handle_release(khandle);
 	return ret;
+}
+
+/** Get filesystem handle flags.
+ * @param handle	Handle to get flags for.
+ * @param flagsp	Where to store flags for the handle.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_handle_flags(handle_t handle, int *flagsp) {
+	object_handle_t *khandle;
+	fs_handle_t *data;
+	status_t ret;
+
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	} else if(khandle->object->type->id != OBJECT_TYPE_FILE &&
+	          khandle->object->type->id != OBJECT_TYPE_DIR) {
+		object_handle_release(khandle);
+		return STATUS_INVALID_HANDLE;
+	}
+
+	data = khandle->data;
+	ret = memcpy_to_user(flagsp, &data->flags, sizeof(*flagsp));
+	object_handle_release(khandle);
+	return ret;
+}
+
+/** Set filesystem handle flags.
+ * @param handle	Handle to set flags for.
+ * @param flagsp	New behaviour flags for the handle. This will also
+ *			affect other handle IDs referring to the same underlying
+ *			handle.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_handle_set_flags(handle_t handle, int flags) {
+	object_handle_t *khandle;
+	fs_handle_t *data;
+	status_t ret;
+
+	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	} else if(khandle->object->type->id != OBJECT_TYPE_FILE &&
+	          khandle->object->type->id != OBJECT_TYPE_DIR) {
+		object_handle_release(khandle);
+		return STATUS_INVALID_HANDLE;
+	}
+
+	data = khandle->data;
+	data->flags = flags;
+	object_handle_release(khandle);
+	return STATUS_SUCCESS;
 }
 
 /** Flush changes to a filesystem node to the FS.

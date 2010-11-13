@@ -78,11 +78,9 @@ typedef struct fs_mount_info {
 #define FS_WRITE		(1<<9)	/**< Open for writing. */
 #define FS_EXECUTE		(1<<10)	/**< Open for execution. */
 
-/** Behaviour flags for both FS handle types. */
+/** Behaviour flags for FS handles. */
 #define FS_NONBLOCK		(1<<0)	/**< I/O operations on the handle should not block. */
-
-/** Behaviour flags for fs_file_open(). */
-#define FS_FILE_APPEND		(1<<1)	/**< Before each write, offset is set to the end of the file. */
+#define FS_APPEND		(1<<1)	/**< Before each write, offset is set to the end of the file. */
 
 /** Values for the create option of fs_file_open(). */
 #define FS_CREATE		1	/**< Create the file if it doesn't exist. */
@@ -113,6 +111,8 @@ extern status_t SYSCALL(fs_dir_read)(handle_t handle, fs_dir_entry_t *buf, size_
 extern status_t SYSCALL(fs_handle_seek)(handle_t handle, int action, rel_offset_t offset,
                                         offset_t *newp);
 extern status_t SYSCALL(fs_handle_info)(handle_t handle, fs_info_t *info);
+extern status_t SYSCALL(fs_handle_flags)(handle_t handle, int *flagsp);
+extern status_t SYSCALL(fs_handle_set_flags)(handle_t handle, int flags);
 extern status_t SYSCALL(fs_handle_sync)(handle_t handle);
 
 extern status_t SYSCALL(fs_symlink_create)(const char *path, const char *target);

@@ -48,6 +48,8 @@ syscall fs_dir_create(ptr_t, ptr_t);
 syscall fs_dir_open(ptr_t, object_rights_t, int, ptr_t);
 syscall fs_dir_read(handle_t, ptr_t, size_t);
 syscall fs_handle_seek(handle_t, int, rel_offset_t, ptr_t);
+syscall fs_handle_flags(handle_t, ptr_t);
+syscall fs_handle_set_flags(handle_t, int);
 syscall fs_handle_info(handle_t, ptr_t);
 syscall fs_handle_sync(handle_t);
 syscall fs_symlink_create(ptr_t, ptr_t);

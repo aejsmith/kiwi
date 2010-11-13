@@ -43,13 +43,7 @@ static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rig
 	krights |= ((oflag & O_WRONLY) ? FS_WRITE : 0);
 
 	kflags |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
-	switch(type) {
-	case FS_NODE_FILE:
-		kflags |= ((oflag & O_APPEND) ? FS_FILE_APPEND : 0);
-		break;
-	default:
-		break;
-	}
+	kflags |= ((oflag & O_APPEND) ? FS_APPEND : 0);
 
 	*krightsp = krights;
 	*kflagsp = kflags;

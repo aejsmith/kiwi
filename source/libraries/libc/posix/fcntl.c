@@ -18,6 +18,7 @@
  * @brief		POSIX file control functions.
  */
 
+#include <kernel/fs.h>
 #include <kernel/object.h>
 #include <kernel/status.h>
 
@@ -80,6 +81,44 @@ static int fcntl_dupfd(int fd, int dest) {
 	return new;
 }
 
+/** Perform the F_GETFL command.
+ * @param fd		File descriptor.
+ * @return		File status flags on success, -1 on failure. */
+static int fcntl_getfl(int fd) {
+	int kflags, flags = 0;
+	status_t ret;
+
+	ret = fs_handle_flags(fd, &kflags);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	flags |= ((kflags & FS_NONBLOCK) ? 0 : O_NONBLOCK);
+	flags |= ((kflags & FS_APPEND) ? 0 : O_APPEND);
+	return flags;
+}
+
+/** Perform the F_SETFL command.
+ * @param fd		File descriptor.
+ * @param flags		New flags.
+ * @return		0 on success, -1 on failure. */
+static int fcntl_setfl(int fd, int flags) {
+	int kflags = 0;
+	status_t ret;
+
+	kflags |= ((flags & O_NONBLOCK) ? 0 : FS_NONBLOCK);
+	kflags |= ((flags & O_APPEND) ? 0 : FS_APPEND);
+
+	ret = fs_handle_set_flags(fd, kflags);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
+}
+
 /** Control file descriptor behaviour.
  *
  * Controls the behaviour of a file descriptor according to the specified
@@ -130,11 +169,15 @@ int fcntl(int fd, int cmd, ...) {
 		ret = fcntl_dupfd(fd, arg);
 		break;
 	case F_GETFL:
+		ret = fcntl_getfl(fd);
+		break;
 	case F_SETFL:
-		libc_stub("fcntl(F_{GETFL,SETFL})", false);
-		return -1;
+		arg = va_arg(args, int);
+		ret = fcntl_setfl(fd, arg);
+		break;
 	default:
 		errno = EINVAL;
+		break;
 	}
 
 	va_end(args);
