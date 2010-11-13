@@ -15,9 +15,10 @@
 
 /**
  * @file
- * @brief		Object functions.
+ * @brief		Filesystem functions.
  */
 
+#include <kernel/fs.h>
 #include <kernel/object.h>
 #include <kernel/status.h>
 
@@ -25,17 +26,19 @@
 
 #include "libkernel.h"
 
-extern status_t _object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
-                                 object_acl_t *aclp);
+extern status_t _fs_security(const char *path, bool follow, user_id_t *uidp,
+                             group_id_t *gidp, object_acl_t *aclp);
 
-/** Obtain object security attributes.
- * @param handle	Handle to object to get attributes for.
+/** Obtain security attributes for a filesystem entry.
+ * @param path		Path to entry to get security attributes for.
+ * @param follow	Whether to follow if last path component is a symbolic
+ *			link.
  * @param securityp	Security structure to fill in. Memory is allocated for
  *			data within this structure, which means it must be
  *			freed with object_security_destroy() once it is no
  *			longer needed.
  * @return		Status code describing result of the operation. */
-__export status_t object_security(handle_t handle, object_security_t *securityp) {
+__export status_t fs_security(const char *path, bool follow, object_security_t *securityp) {
 	status_t ret;
 
 	securityp->acl = malloc(sizeof(object_acl_t));
@@ -46,7 +49,7 @@ __export status_t object_security(handle_t handle, object_security_t *securityp)
 	/* Call with a NULL entries pointer in order to get the size of the ACL.
 	 * TODO: What if the ACL is changed between the two calls? */
 	securityp->acl->entries = NULL;
-	ret = _object_security(handle, &securityp->uid, &securityp->gid, securityp->acl);
+	ret = _fs_security(path, follow, &securityp->uid, &securityp->gid, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl);
 		return ret;
@@ -59,7 +62,7 @@ __export status_t object_security(handle_t handle, object_security_t *securityp)
 	}
 
 	/* Get the ACL entries. */
-	ret = _object_security(handle, NULL, NULL, securityp->acl);
+	ret = _fs_security(path, follow, NULL, NULL, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl->entries);
 		free(securityp->acl);
@@ -67,31 +70,4 @@ __export status_t object_security(handle_t handle, object_security_t *securityp)
 	}
 
 	return STATUS_SUCCESS;
-}
-
-/** Get the ACL from an object security structure.
- * @param security	Structure to get from.
- * @return		Pointer to ACL, or NULL if failed to allocate one. */
-__export object_acl_t *object_security_acl(object_security_t *security) {
-	if(!security->acl) {
-		security->acl = malloc(sizeof(object_acl_t));
-		if(!security->acl) {
-			return NULL;
-		}
-	}
-
-	return security->acl;
-}
-
-/** Free memory allocated for an object security structure.
- * @param security	Structure to free data for. */
-__export void object_security_destroy(object_security_t *security) {
-	if(security->acl) {
-		if(security->acl->entries) {
-			free(security->acl->entries);
-			security->acl->entries = NULL;
-		}
-		free(security->acl);
-		security->acl = NULL;
-	}
 }

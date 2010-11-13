@@ -127,9 +127,14 @@ extern status_t SYSCALL(fs_getcwd)(char *buf, size_t size);
 extern status_t SYSCALL(fs_setcwd)(const char *path);
 extern status_t SYSCALL(fs_setroot)(const char *path);
 extern status_t SYSCALL(fs_info)(const char *path, bool follow, fs_info_t *info);
+extern status_t SYSCALL(fs_set_security)(const char *path, bool follow, const object_security_t *security);
 extern status_t SYSCALL(fs_link)(const char *source, const char *dest);
 extern status_t SYSCALL(fs_unlink)(const char *path);
 extern status_t SYSCALL(fs_rename)(const char *source, const char *dest);
+
+#ifndef KERNEL
+extern status_t fs_security(const char *path, bool follow, object_security_t *securityp);
+#endif
 
 #ifdef __cplusplus
 }

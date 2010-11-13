@@ -38,6 +38,9 @@
 #include <object.h>
 #include <status.h>
 
+extern status_t sys_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
+                                    object_acl_t *aclp);
+
 /** Initialise an ACL.
  * @param acl		ACL to initialise. */
 void object_acl_init(object_acl_t *acl) {
@@ -366,14 +369,132 @@ object_rights_t object_rights(object_t *object, process_t *process) {
 	return rights;
 }
 
-/** Get the owning user/group of an object.
+/** Set security attributes for an object.
+ *
+ * Sets the security attributes (owning user/group and ACL) of an object. In
+ * order to change the owning user/group IDs, the OBJECT_SET_OWNER right is
+ * required on the handle. In order to set a new ACL, the OBJECT_SET_ACL right
+ * is required.
+ *
+ * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
+ * ID different to its user ID, or set the owning group ID to that of a group
+ * it does not belong to.
+ *
+ * The OBJECT_SET_ACL and OBJECT_SET_OWNER object rights are always granted to
+ * an object's owning user, regardless of whether the ACL actually gives those
+ * rights to the user. This is to prevent another user that the ACL grants
+ * the OBJECT_SET_ACL right to from removing access to the object from the
+ * owner.
+ *
+ * @param object	Object to set security attributes for.
+ * @param handle	If not NULL, this handle will be used for rights checks.
+ *			Otherwise, they will be performed against the current
+ *			process.
+ * @param security	Security attributes to set. If the user ID is -1, it
+ *			will not be changed. If the group ID is -1, it will not
+ *			be changed. If the ACL pointer is NULL, the ACL will
+ *			not be changed.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t object_set_security(object_t *object, object_handle_t *handle, object_security_t *security) {
+	status_t ret;
+
+	/* Checks that if a new user and group ID are specified the process is
+	 * allowed to use them, and validate the new ACL. */
+	ret = object_security_validate(security, curr_proc);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+
+	/* Check if there is anything to do. */
+	if(security->uid < 0 && security->gid < 0 && !security->acl) {
+		return STATUS_SUCCESS;
+	}
+
+	/* Check if we have the necessary rights. */
+	if(security->uid >= 0 || security->gid >= 0) {
+		if(handle) {
+			if(!object_handle_rights(handle, OBJECT_SET_OWNER)) {
+				return STATUS_PERM_DENIED;
+			}
+		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_OWNER)) {
+			return STATUS_PERM_DENIED;
+		}
+	}
+	if(security->acl) {
+		if(handle) {
+			if(!object_handle_rights(handle, OBJECT_SET_ACL)) {
+				return STATUS_PERM_DENIED;
+			}
+		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_ACL)) {
+			return STATUS_PERM_DENIED;
+		}
+	}
+
+	rwlock_write_lock(&object->lock);
+
+	/* If the object type has a set security function, call it. */
+	if(object->type->set_security) {
+		ret = object->type->set_security(object, security);
+		if(ret != STATUS_SUCCESS) {
+			rwlock_unlock(&object->lock);
+			return ret;
+		}
+	}
+
+	/* Update the object. */
+	if(security->uid >= 0) {
+		object->uid = security->uid;
+	}
+	if(security->gid >= 0) {
+		object->gid = security->gid;
+	}
+	if(security->acl) {
+		object->uacl.entries = security->acl->entries;
+		object->uacl.count = security->acl->count;
+		security->acl->entries = NULL;
+		security->acl->count = 0;
+	}
+
+	rwlock_unlock(&object->lock);
+	return STATUS_SUCCESS;
+}
+
+/** Obtain security attributes for an object.
+ * @note		This call is used internally by libkernel, and not
+ *			exported from it, as it provides a wrapper around it
+ *			that handles ACL memory allocation automatically, and
+ *			puts everything into an object_security_t structure.
  * @param handle	Handle to object.
  * @param uidp		Where to store owning user ID.
  * @param gidp		Where to store owning group ID.
+ * @param aclp		Where to store ACL. The structure referred to by this
+ *			pointer must be initialised prior to calling the
+ *			function. If the entries pointer in the structure is
+ *			NULL, then the function will store the number of
+ *			entries in the ACL in the count entry and do nothing
+ *			else. Otherwise, at most the number of entries specified
+ *			by the count entry will be copied to the entries
+ *			array, and the count will be updated to give the actual
+ *			number of entries in the ACL.
  * @return		Status code describing result of the operation. */
-status_t sys_object_owner(handle_t handle, user_id_t *uidp, group_id_t *gidp) {
+status_t sys_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp, object_acl_t *aclp) {
 	object_handle_t *khandle;
+	object_acl_t kacl;
 	status_t ret;
+	size_t count;
+
+	if(!uidp && !gidp && !aclp) {
+		return STATUS_INVALID_ARG;
+	}
+
+	if(aclp) {
+		ret = memcpy_from_user(&kacl, aclp, sizeof(*aclp));
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+	}
 
 	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
@@ -385,83 +506,40 @@ status_t sys_object_owner(handle_t handle, user_id_t *uidp, group_id_t *gidp) {
 	if(uidp) {
 		ret = memcpy_to_user(uidp, &khandle->object->uid, sizeof(*uidp));
 		if(ret != STATUS_SUCCESS) {
-			rwlock_unlock(&khandle->object->lock);
-			object_handle_release(khandle);
-			return ret;
+			goto out;
 		}
 	}
 	if(gidp) {
 		ret = memcpy_to_user(gidp, &khandle->object->gid, sizeof(*gidp));
 		if(ret != STATUS_SUCCESS) {
-			rwlock_unlock(&khandle->object->lock);
-			object_handle_release(khandle);
-			return ret;
+			goto out;
 		}
 	}
-
-	rwlock_unlock(&khandle->object->lock);
-	object_handle_release(khandle);
-	return STATUS_SUCCESS;
-}
-
-/** Obtain a copy of an object's ACL.
- *
- * Obtains a copy of an object's access control list (ACL). It is recommended
- * that you use the object_security() wrapper function provided by libkernel
- * instead of this, as it will handle allocation of memory for the ACL for
- * you.
- *
- * @param handle	Handle to object to get ACL of.
- * @param acl		Where to store ACL. The structure referred to by this
- *			pointer must be initialised prior to calling the
- *			function. If the entries pointer in the structure is
- *			NULL, then the function will store the number of
- *			entries in the ACL in the count entry and do nothing
- *			else. Otherwise, at most the number of entries specified
- *			by the count entry will be copied to the entries
- *			array, and the count will be updated to give the actual
- *			number of entries in the ACL.
- *
- * @return		Status code describing result of the operation.
- */
-status_t sys_object_acl(handle_t handle, object_acl_t *aclp) {
-	object_handle_t *khandle;
-	object_acl_t uacl;
-	size_t count;
-	status_t ret;
-
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	ret = memcpy_from_user(&uacl, aclp, sizeof(uacl));
-	if(ret != STATUS_SUCCESS) {
-		object_handle_release(khandle);
-		return ret;
-	}
-
-	rwlock_read_lock(&khandle->object->lock);
-
-	/* If entries pointer is NULL, the caller wants us to give the number
-	 * of entries in the ACL. Otherwise, copy at most the number of entries
-	 * specified. */
-	if(uacl.entries) {
-		count = MIN(uacl.count, khandle->object->uacl.count);
-		if(count) {
-			ret = memcpy_to_user(uacl.entries,
-			                     khandle->object->uacl.entries,
-			                     sizeof(*uacl.entries) * count);
-			if(ret != STATUS_SUCCESS) {
-				rwlock_unlock(&khandle->object->lock);
-				object_handle_release(khandle);
-				return ret;
+	if(aclp) {
+		/* If entries pointer is NULL, the caller wants us to give the
+		 * number of entries in the ACL. Otherwise, copy at most the
+		 * number of entries specified. */
+		if(kacl.entries) {
+			count = MIN(kacl.count, khandle->object->uacl.count);
+			if(count) {
+				ret = memcpy_to_user(kacl.entries,
+				                     khandle->object->uacl.entries,
+				                     sizeof(*kacl.entries) * count);
+				if(ret != STATUS_SUCCESS) {
+					goto out;
+				}
 			}
 		}
+
+		/* Copy back the number of ACL entries. */
+		ret = memcpy_to_user(&aclp->count, &khandle->object->uacl.count, sizeof(aclp->count));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
 	}
 
-	/* Copy back the number of ACL entries. */
-	ret = memcpy_to_user(&aclp->count, &khandle->object->uacl.count, sizeof(aclp->count));
+	ret = STATUS_SUCCESS;
+out:
 	rwlock_unlock(&khandle->object->lock);
 	object_handle_release(khandle);
 	return ret;
@@ -497,9 +575,6 @@ status_t sys_object_set_security(handle_t handle, const object_security_t *secur
 	object_handle_t *khandle;
 	status_t ret;
 
-	/* Copy the security structure from userspace. This checks that if a
-	 * new user and group ID are specified the process is allowed to use
-	 * them, and validates the new ACL. */
 	ret = object_security_from_user(&ksecurity, security);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
@@ -511,46 +586,7 @@ status_t sys_object_set_security(handle_t handle, const object_security_t *secur
 		return ret;
 	}
 
-	/* Check if there is anything to do and that we have the necessary rights. */
-	if(ksecurity.uid < 0 && ksecurity.gid < 0 && !ksecurity.acl) {
-		ret = STATUS_SUCCESS;
-		goto out;
-	} else if((ksecurity.uid >= 0 || ksecurity.gid >= 0) && !object_handle_rights(khandle, OBJECT_SET_OWNER)) {
-		ret = STATUS_PERM_DENIED;
-		goto out;
-	} else if(ksecurity.acl && !object_handle_rights(khandle, OBJECT_SET_ACL)) {
-		ret = STATUS_PERM_DENIED;
-		goto out;
-	}
-
-	rwlock_write_lock(&khandle->object->lock);
-
-	/* If the object type has a set security function, call it. */
-	if(khandle->object->type->set_security) {
-		ret = khandle->object->type->set_security(khandle->object, &ksecurity);
-		if(ret != STATUS_SUCCESS) {
-			rwlock_unlock(&khandle->object->lock);
-			goto out;
-		}
-	}
-
-	/* Update the object. */
-	if(ksecurity.uid >= 0) {
-		khandle->object->uid = ksecurity.uid;
-	}
-	if(ksecurity.gid >= 0) {
-		khandle->object->gid = ksecurity.gid;
-	}
-	if(ksecurity.acl) {
-		khandle->object->uacl.entries = ksecurity.acl->entries;
-		khandle->object->uacl.count = ksecurity.acl->count;
-		ksecurity.acl->entries = NULL;
-		ksecurity.acl->count = 0;
-	}
-
-	rwlock_unlock(&khandle->object->lock);
-	ret = STATUS_SUCCESS;
-out:
+	ret = object_set_security(khandle->object, khandle, &ksecurity);
 	object_handle_release(khandle);
 	object_security_destroy(&ksecurity);
 	return ret;

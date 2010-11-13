@@ -55,6 +55,8 @@ typedef struct fs_handle {
 } fs_handle_t;
 
 extern void fs_node_get(fs_node_t *node);
+extern status_t sys_fs_security(const char *path, bool follow, user_id_t *uidp,
+                                group_id_t *gidp, object_acl_t *aclp);
 static status_t fs_dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
 static object_type_t file_object_type;
 static object_type_t dir_object_type;
@@ -3418,7 +3420,7 @@ status_t sys_fs_setroot(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->obj, NULL) & FS_WRITE)) {
+	if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_PERM_DENIED;
@@ -3452,6 +3454,160 @@ status_t sys_fs_info(const char *path, bool follow, fs_info_t *info) {
 	if(ret == STATUS_SUCCESS) {
 		ret = memcpy_to_user(info, &kinfo, sizeof(fs_info_t));
 	}
+	kfree(kpath);
+	return ret;
+}
+
+/** Obtain security attributes for a filesystem entry.
+ * @note		This call is used internally by libkernel, and not
+ *			exported from it, as it provides a wrapper around it
+ *			that handles ACL memory allocation automatically, and
+ *			puts everything into an object_security_t structure.
+ * @param path		Path to entry to get security attributes for.
+ * @param follow	Whether to follow if last path component is a symbolic
+ *			link.
+ * @param uidp		Where to store owning user ID.
+ * @param gidp		Where to store owning group ID.
+ * @param aclp		Where to store ACL. The structure referred to by this
+ *			pointer must be initialised prior to calling the
+ *			function. If the entries pointer in the structure is
+ *			NULL, then the function will store the number of
+ *			entries in the ACL in the count entry and do nothing
+ *			else. Otherwise, at most the number of entries specified
+ *			by the count entry will be copied to the entries
+ *			array, and the count will be updated to give the actual
+ *			number of entries in the ACL.
+ * @return		Status code describing result of the operation. */
+status_t sys_fs_security(const char *path, bool follow, user_id_t *uidp, group_id_t *gidp,
+                         object_acl_t *aclp) {
+	object_acl_t kacl;
+	fs_node_t *node;
+	status_t ret;
+	size_t count;
+	char *kpath;
+
+	if(!uidp && !gidp && !aclp) {
+		return STATUS_INVALID_ARG;
+	}
+
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+
+	if(aclp) {
+		ret = memcpy_from_user(&kacl, aclp, sizeof(*aclp));
+		if(ret != STATUS_SUCCESS) {
+			kfree(kpath);
+			return ret;
+		}
+	}
+
+	ret = fs_node_lookup(kpath, follow, -1, &node);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kpath);
+		return ret;
+	}
+
+	rwlock_read_lock(&node->obj.lock);
+
+	if(uidp) {
+		ret = memcpy_to_user(uidp, &node->obj.uid, sizeof(*uidp));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
+	}
+	if(gidp) {
+		ret = memcpy_to_user(gidp, &node->obj.gid, sizeof(*gidp));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
+	}
+	if(aclp) {
+		/* If entries pointer is NULL, the caller wants us to give the
+		 * number of entries in the ACL. Otherwise, copy at most the
+		 * number of entries specified. */
+		if(kacl.entries) {
+			count = MIN(kacl.count, node->obj.uacl.count);
+			if(count) {
+				ret = memcpy_to_user(kacl.entries,
+				                     node->obj.uacl.entries,
+				                     sizeof(*kacl.entries) * count);
+				if(ret != STATUS_SUCCESS) {
+					goto out;
+				}
+			}
+		}
+
+		/* Copy back the number of ACL entries. */
+		ret = memcpy_to_user(&aclp->count, &node->obj.uacl.count, sizeof(aclp->count));
+		if(ret != STATUS_SUCCESS) {
+			goto out;
+		}
+	}
+
+	ret = STATUS_SUCCESS;
+out:
+	rwlock_unlock(&node->obj.lock);
+	fs_node_release(node);
+	kfree(kpath);
+	return ret;
+}
+
+/** Set security attributes for a filesystem entry.
+ *
+ * Sets the security attributes (owning user/group and ACL) of a filesystem
+ * entry. In order to change the owning user/group IDs, the calling process
+ * must have the OBJECT_SET_OWNER right on the entry. In order to set a new
+ * ACL, the OBJECT_SET_ACL right is required.
+ *
+ * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
+ * ID different to its user ID, or set the owning group ID to that of a group
+ * it does not belong to.
+ *
+ * The OBJECT_SET_ACL and OBJECT_SET_OWNER object rights are always granted to
+ * an object's owning user, regardless of whether the ACL actually gives those
+ * rights to the user. This is to prevent another user that the ACL grants
+ * the OBJECT_SET_ACL right to from removing access to the object from the
+ * owner.
+ *
+ * @param path		Path to entry to set security attributes of.
+ * @param follow	Whether to follow if last path component is a symbolic
+ *			link.
+ * @param security	Security attributes to set. If the user ID is -1, it
+ *			will not be changed. If the group ID is -1, it will not
+ *			be changed. If the ACL pointer is NULL, the ACL will
+ *			not be changed.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t sys_fs_set_security(const char *path, bool follow, const object_security_t *security) {
+	object_security_t ksecurity;
+	fs_node_t *node;
+	status_t ret;
+	char *kpath;
+
+	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+
+	ret = object_security_from_user(&ksecurity, security);
+	if(ret != STATUS_SUCCESS) {
+		kfree(kpath);
+		return ret;
+	}
+
+	ret = fs_node_lookup(kpath, follow, -1, &node);
+	if(ret != STATUS_SUCCESS) {
+		object_security_destroy(&ksecurity);
+		kfree(kpath);
+		return ret;
+	}
+
+	ret = object_set_security(&node->obj, NULL, &ksecurity);
+	fs_node_release(node);
+	object_security_destroy(&ksecurity);
 	kfree(kpath);
 	return ret;
 }

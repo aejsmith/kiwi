@@ -21,9 +21,10 @@ sources = map(File, [
 	'support/printf.c',
 	'support/string.c',
 
-	'status_list.c',
+	'fs.c',
 	'init.c',
 	'object.c',
+	'status_list.c',
 	'syscalls.S',
 	'thread.c',
 	'tls.c',

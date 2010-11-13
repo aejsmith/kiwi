@@ -143,6 +143,8 @@ extern void object_init(object_t *object, object_type_t *type, object_security_t
                         object_acl_t *sacl);
 extern void object_destroy(object_t *object);
 extern object_rights_t object_rights(object_t *object, struct process *process);
+extern status_t object_set_security(object_t *object, object_handle_t *handle,
+                                    object_security_t *security);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *sync);
