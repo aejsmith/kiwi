@@ -24,8 +24,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdarg.h>
 
-#include "../libc.h"
+#include "posix_priv.h"
 
 /** Convert POSIX open() flags to kernel flags.
  * @param type		Node type.
@@ -52,7 +53,11 @@ static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rig
 
 	*krightsp = krights;
 	*kflagsp = kflags;
-	*kcreatep = (oflag & O_EXCL) ? FS_CREATE_ALWAYS : FS_CREATE;
+	if(oflag & O_CREAT) {
+		*kcreatep = (oflag & O_EXCL) ? FS_CREATE_ALWAYS : FS_CREATE;
+	} else {
+		*kcreatep = 0;
+	}
 }
 
 /** Open a file or directory.
@@ -64,12 +69,15 @@ static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rig
  *			success, -1 on failure (errno will be set to the error
  *			reason). */
 int open(const char *path, int oflag, ...) {
+	object_security_t security = { -1, -1, NULL };
 	object_rights_t rights;
 	fs_node_type_t type;
 	int kflags, kcreate;
 	handle_t handle;
 	fs_info_t info;
+	uint16_t mode;
 	status_t ret;
+	va_list args;
 
 	/* Check whether the arguments are valid. I'm not sure if the second
 	 * check is correct, POSIX doesn't say anything about O_CREAT with
@@ -113,8 +121,24 @@ int open(const char *path, int oflag, ...) {
 			return -1;
 		}
 
+		if(oflag & O_CREAT) {
+			/* Obtain the creation mask. */
+			va_start(args, oflag);
+			mode = va_arg(args, mode_t);
+			va_end(args);
+
+			/* Apply the creation mode mask. */
+			mode &= ~current_umask;
+
+			/* Convert the mode to a kernel ACL. */
+			security.acl = posix_mode_to_acl(NULL, mode);
+			if(!security.acl) {
+				return -1;
+			}
+		}
+
 		/* Open the file, creating it if necessary. */
-		ret = fs_file_open(path, rights, kflags, kcreate, NULL, &handle);
+		ret = fs_file_open(path, rights, kflags, kcreate, &security, &handle);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;

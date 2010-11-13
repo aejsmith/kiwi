@@ -81,7 +81,7 @@ struct stat {
 };
 
 extern int chmod(const char *path, mode_t mode);
-//extern int fchmod(int fd, mode_t mode);
+extern int fchmod(int fd, mode_t mode);
 /* int fchmodat(int, const char *, mode_t, int); */
 extern int fstat(int fd, struct stat *statp);
 /* int fstatat(int, const char *__restrict, struct stat *__restrict, int); */

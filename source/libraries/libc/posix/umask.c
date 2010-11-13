@@ -16,15 +16,21 @@
 /**
  * @file
  * @brief		POSIX umask() function.
+ *
+ * @todo		Preserve umask across an exec*() call.
  */
 
 #include <sys/stat.h>
-#include "../libc.h"
+#include "posix_priv.h"
+
+/** Current file mode creation mask. */
+mode_t current_umask = 022;
 
 /** Set the file mode creation mask.
  * @param mask		New mask.
  * @return		Previous mask. */
 mode_t umask(mode_t mask) {
-	libc_stub("umask", false);
-	return 022;
+	mode_t prev = current_umask;
+	current_umask = mask & 0777;
+	return prev;
 }

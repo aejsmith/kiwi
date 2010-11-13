@@ -21,6 +21,8 @@
 #ifndef __POSIX_PRIV_H
 #define __POSIX_PRIV_H
 
+#include <kernel/object.h>
+
 #include <util/list.h>
 #include <util/mutex.h>
 
@@ -37,5 +39,9 @@ typedef struct posix_process {
 
 extern list_t __hidden child_processes;
 extern libc_mutex_t __hidden child_processes_lock;
+
+extern mode_t __hidden current_umask;
+
+extern object_acl_t *posix_mode_to_acl(object_acl_t *current, mode_t mode) __hidden;
 
 #endif /* __POSIX_PRIV_H */
