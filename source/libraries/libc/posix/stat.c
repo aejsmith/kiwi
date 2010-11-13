@@ -52,6 +52,8 @@ static inline uint16_t rights_to_mode(object_rights_t rights) {
  * @param security	Security attributes for the entry.
  * @param statp		Stat structure. */
 static void fs_info_to_stat(fs_info_t *info, object_security_t *security, struct stat *restrict statp) {
+	uint16_t umode = 0, gmode = 0, omode = 0;
+	bool user = false, group = false;
 	object_acl_t *acl;
 	size_t i;
 
@@ -101,19 +103,27 @@ static void fs_info_to_stat(fs_info_t *info, object_security_t *security, struct
 		switch(acl->entries[i].type) {
 		case ACL_ENTRY_USER:
 			if(acl->entries[i].value == -1) {
-				statp->st_mode |= (rights_to_mode(acl->entries[i].rights) << 6);
+				umode |= rights_to_mode(acl->entries[i].rights);
+				user = true;
 			}
 			break;
 		case ACL_ENTRY_GROUP:
 			if(acl->entries[i].value == -1) {
-				statp->st_mode |= (rights_to_mode(acl->entries[i].rights) << 3);
+				gmode |= rights_to_mode(acl->entries[i].rights);
+				group = true;
 			}
 			break;
 		case ACL_ENTRY_OTHERS:
-			statp->st_mode |= rights_to_mode(acl->entries[i].rights);
+			omode |= rights_to_mode(acl->entries[i].rights);
 			break;
 		}
 	}
+
+	/* If we've not seen a user/group entry for the owning user/group, put
+	 * their permissions as the value for others. */
+	statp->st_mode |= (((user) ? umode : omode) << 6);
+	statp->st_mode |= (((group) ? gmode : omode) << 3);
+	statp->st_mode |= omode;
 }
 
 /** Get information about a filesystem entry.
