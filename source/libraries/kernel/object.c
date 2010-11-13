@@ -84,6 +84,7 @@ __export object_acl_t *object_security_acl(object_security_t *security) {
 }
 
 /** Free memory allocated for an object security structure.
+ * @note		Structure itself is not freed.
  * @param security	Structure to free data for. */
 __export void object_security_destroy(object_security_t *security) {
 	if(security->acl) {
@@ -94,4 +95,62 @@ __export void object_security_destroy(object_security_t *security) {
 		free(security->acl);
 		security->acl = NULL;
 	}
+}
+
+/** Initialise an ACL.
+ * @param acl		ACL to initialise. */
+__export void object_acl_init(object_acl_t *acl) {
+	acl->entries = NULL;
+	acl->count = 0;
+}
+
+/** Free memory used for an ACL.
+ * @note		Structure itself is not freed. */
+__export void object_acl_destroy(object_acl_t *acl) {
+	if(acl->count) {
+		free(acl->entries);
+		acl->entries = NULL;
+		acl->count = 0;
+	}
+}
+
+/** Add an entry to an ACL.
+ * @param acl		ACL to add to.
+ * @param type		Type of entry to add.
+ * @param value		Value for entry. How this is interpreted depends on
+ *			the entry type. For ACL_ENTRY_USER, it is a user ID,
+ *			with -1 referring to the owning user. For
+ *			ACL_ENTRY_GROUP, it is a group ID, with -1 referring to
+ *			the owning group. For ACL_ENTRY_SESSION, it is a session
+ *			ID. For ACL_ENTRY_CAPABILITY, it is a capability number.
+ *			For ACL_ENTRY_OTHERS, it is ignored.
+ * @param rights	Rights to give the entry.
+ * @return		Status code describing result of the operation. Note
+ *			that this function does not check for invalid entries,
+ *			it will only return an error if memory allocation fails.
+ *			Invalid entries will be picked up by the kernel when
+ *			the ACL is given to it. */
+__export status_t object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value,
+                                       object_rights_t rights) {
+	object_acl_entry_t *tmp;
+	size_t i;
+
+	/* Check if an identical entry already exists. */
+	for(i = 0; i < acl->count; i++) {
+		if(acl->entries[i].type == type && (type == ACL_ENTRY_OTHERS || acl->entries[i].value == value)) {
+			acl->entries[i].rights |= rights;
+			return STATUS_SUCCESS;
+		}
+	}
+
+	/* Add a new entry. */
+	tmp = realloc(acl->entries, sizeof(acl->entries[0]) * (acl->count + 1));
+	if(!tmp) {
+		return STATUS_NO_MEMORY;
+	}
+	acl->entries = tmp;
+	acl->entries[acl->count  ].type = type;
+	acl->entries[acl->count  ].value = value;
+	acl->entries[acl->count++].rights = rights;
+	return STATUS_SUCCESS;
 }

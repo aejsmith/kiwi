@@ -2585,10 +2585,16 @@ status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, i
 	}
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
-		if(ret != STATUS_SUCCESS) {
-			kfree(kpath);
-			return ret;
+		/* Don't bother copying anything provided if we aren't going
+		 * to use it. */
+		if(create != 0) {
+			ret = object_security_from_user(&ksecurity, security);
+			if(ret != STATUS_SUCCESS) {
+				kfree(kpath);
+				return ret;
+			}
+		} else {
+			security = NULL;
 		}
 	}
 

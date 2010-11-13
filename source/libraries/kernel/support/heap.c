@@ -27,8 +27,7 @@ static uint8_t libkernel_heap[LIBKERNEL_HEAP_SIZE];
 static size_t libkernel_heap_current = 0;
 
 /** Heap operations. */
-static libkernel_heap_alloc_t libkernel_heap_alloc = NULL;
-static libkernel_heap_free_t libkernel_heap_free = NULL;
+static libkernel_heap_ops_t *libkernel_heap_ops = NULL;
 
 /** Lock to protect the heap. */
 static LIBC_MUTEX_DECLARE(libkernel_heap_lock);
@@ -41,8 +40,8 @@ void *malloc(size_t size) {
 
 	libc_mutex_lock(&libkernel_heap_lock, -1);
 
-	if(libkernel_heap_alloc) {
-		ret = libkernel_heap_alloc(size);
+	if(libkernel_heap_ops) {
+		ret = libkernel_heap_ops->alloc(size);
 	} else if((libkernel_heap_current + size) > LIBKERNEL_HEAP_SIZE) {
 		ret = NULL;
 	} else {
@@ -54,22 +53,27 @@ void *malloc(size_t size) {
 	return ret;
 }
 
+/** Change the size of an allocation.
+ * @param addr		Allocation to resize.
+ * @param size		New size for the allocation.
+ * @return		Pointer to allocation on success, NULL on failure. */
+void *realloc(void *addr, size_t size) {
+	/* This is not supported on the early heap. */
+	return libkernel_heap_ops->realloc(addr, size);
+}
+
 /** Free memory previously allocated with malloc().
  * @param addr		Address allocated. */
 void free(void *addr) {
 	if((ptr_t)addr >= (ptr_t)libkernel_heap && (ptr_t)addr < ((ptr_t)libkernel_heap + LIBKERNEL_HEAP_SIZE)) {
 		return;
-	} else if(libkernel_heap_free) {
-		libkernel_heap_free(addr);
+	} else if(libkernel_heap_ops) {
+		libkernel_heap_ops->free(addr);
 	}
 }
 
 /** Set the kernel library heap operations.
- * @param alloc		Allocation function.
- * @param free		Deallocation function. */
-void __export libkernel_heap_ops(libkernel_heap_alloc_t alloc, libkernel_heap_free_t free) {
-	libc_mutex_lock(&libkernel_heap_lock, -1);
-	libkernel_heap_alloc = alloc;
-	libkernel_heap_free = free;
-	libc_mutex_unlock(&libkernel_heap_lock);
+ * @param ops		Operations to use. */
+__export void libkernel_heap_configure(libkernel_heap_ops_t *ops) {
+	libkernel_heap_ops = ops;
 }

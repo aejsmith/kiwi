@@ -27,10 +27,17 @@
 #include "libc.h"
 #include "../kernel/libkernel.h"
 
+/** Heap operations for libkernel. */
+static libkernel_heap_ops_t libc_heap_ops = {
+	.alloc = malloc,
+	.realloc = realloc,
+	.free = free,
+};
+
 /** Early C library initialisation. */
 static void __attribute__((constructor)) libc_early_init(void) {
 	/* Tell libkernel to use our allocation functions. */
-	libkernel_heap_ops(malloc, free);
+	libkernel_heap_configure(&libc_heap_ops);
 
 	/* Attempt to open standard I/O streams from existing handles. */
 	stdin = fdopen(STDIN_FILENO, "r");

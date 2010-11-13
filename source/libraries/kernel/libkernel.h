@@ -57,7 +57,7 @@
 		__n; \
 	})
 
-/** Size of the heap. */
+/** Size of the early heap. */
 #define LIBKERNEL_HEAP_SIZE	8192
 
 #include "arch.h"
@@ -98,9 +98,12 @@ typedef struct rtld_image {
 	} state;
 } rtld_image_t;
 
-/** Heap operation function pointer types. */
-typedef void *(*libkernel_heap_alloc_t)(size_t);
-typedef void (*libkernel_heap_free_t)(void *);
+/** Heap operations structure. */
+typedef struct libkernel_heap_ops {
+	void *(*alloc)(size_t);
+	void *(*realloc)(void *, size_t);
+	void (*free)(void *);
+} libkernel_heap_ops_t;
 
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
@@ -126,7 +129,7 @@ extern void *tls_get_addr(size_t module, size_t offset);
 extern status_t tls_init(void);
 extern void tls_destroy(void);
 
-extern void libkernel_heap_ops(libkernel_heap_alloc_t alloc, libkernel_heap_free_t free);
+extern void libkernel_heap_configure(libkernel_heap_ops_t *ops);
 
 extern void libkernel_arch_init(process_args_t *args, rtld_image_t *image);
 extern void libkernel_init(process_args_t *args);

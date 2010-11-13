@@ -99,6 +99,11 @@ extern status_t SYSCALL(handle_close)(handle_t handle);
 extern status_t object_security(handle_t handle, object_security_t *securityp);
 extern object_acl_t *object_security_acl(object_security_t *security);
 extern void object_security_destroy(object_security_t *security);
+
+extern void object_acl_init(object_acl_t *acl);
+extern void object_acl_destroy(object_acl_t *acl);
+extern status_t object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value,
+                                     object_rights_t rights);
 #endif
 
 #ifdef __cplusplus
