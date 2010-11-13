@@ -64,17 +64,11 @@ status_t ext2_inode_security(ext2_inode_t *inode, object_security_t **securityp)
 	mode = le16_to_cpu(inode->disk.i_mode);
 
 	rights = mode_to_rights((mode & EXT2_S_IRWXU) >> 6);
-	if(rights) {
-		object_acl_add_entry(security->acl, ACL_ENTRY_USER, -1, rights);
-	}
+	object_acl_add_entry(security->acl, ACL_ENTRY_USER, -1, rights);
 	rights = mode_to_rights((mode & EXT2_S_IRWXG) >> 3);
-	if(rights) {
-		object_acl_add_entry(security->acl, ACL_ENTRY_GROUP, -1, rights);
-	}
+	object_acl_add_entry(security->acl, ACL_ENTRY_GROUP, -1, rights);
 	rights = mode_to_rights(mode & EXT2_S_IRWXO);
-	if(rights) {
-		object_acl_add_entry(security->acl, ACL_ENTRY_OTHERS, 0, rights);
-	}
+	object_acl_add_entry(security->acl, ACL_ENTRY_OTHERS, 0, rights);
 
 	*securityp = security;
 	return STATUS_SUCCESS;
