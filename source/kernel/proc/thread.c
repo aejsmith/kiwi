@@ -430,6 +430,11 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	}
 
 	if(security) {
+		ret = object_security_validate(security, NULL);
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+
 		dsecurity.uid = security->uid;
 		dsecurity.gid = security->gid;
 		dsecurity.acl = security->acl;
@@ -439,12 +444,6 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
 		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, THREAD_QUERY);
-
-		/* Only grant set ACL access if a user-mode thread. */
-		if(owner != kernel_proc) {
-			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | THREAD_QUERY);
-		}
-
 		dsecurity.acl = &acl;
 	}
 
@@ -725,7 +724,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 	args->arg = (ptr_t)arg;
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, false);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}

@@ -155,6 +155,80 @@ static void process_release(process_t *process) {
 	}
 }
 
+/** Validate process object security changes.
+ * @param object	Process object.
+ * @param security	Security attributes being set.
+ * @return		STATUS_SUCCESS if allowed, other status code if not. */
+static status_t process_object_set_security(object_t *object, object_security_t *security) {
+	size_t i;
+
+	/* If an ACL is provided, go through it to check that it does not
+	 * grant the PROCESS_SET_SECURITY right to anyone. This right is only
+	 * granted by the system ACL to processes with CAP_SECURITY_AUTHORITY,
+	 * and should not be granted to anyone else. */
+	if(security->acl) {
+		for(i = 0; i < security->acl->count; i++) {
+			if(security->acl->entries[i].rights & PROCESS_SET_SECURITY) {
+				return STATUS_PERM_DENIED;
+			}
+		}
+	}
+
+	return STATUS_SUCCESS;
+}
+
+/** Closes a handle to a process.
+ * @param handle	Handle to close. */
+static void process_object_close(object_handle_t *handle) {
+	process_release((process_t *)handle->object);
+}
+
+/** Signal that a process is being waited for.
+ * @param handle	Handle to process.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer.
+ * @return		Status code describing result of the operation. */
+static status_t process_object_wait(object_handle_t *handle, int event, void *sync) {
+	process_t *process = (process_t *)handle->object;
+
+	switch(event) {
+	case PROCESS_EVENT_DEATH:
+		mutex_lock(&process->lock);
+		if(process->state == PROCESS_DEAD) {
+			object_wait_signal(sync);
+		} else {
+			notifier_register(&process->death_notifier, object_wait_notifier, sync);
+		}
+		mutex_unlock(&process->lock);
+		return STATUS_SUCCESS;
+	default:
+		return STATUS_INVALID_EVENT;
+	}
+}
+
+/** Stop waiting for a process.
+ * @param handle	Handle to process.
+ * @param event		Event to wait for.
+ * @param sync		Internal data pointer. */
+static void process_object_unwait(object_handle_t *handle, int event, void *sync) {
+	process_t *process = (process_t *)handle->object;
+
+	switch(event) {
+	case PROCESS_EVENT_DEATH:
+		notifier_unregister(&process->death_notifier, object_wait_notifier, sync);
+		break;
+	}
+}
+
+/** Process object type operations. */
+static object_type_t process_object_type = {
+	.id = OBJECT_TYPE_PROCESS,
+	.set_security = process_object_set_security,
+	.close = process_object_close,
+	.wait = process_object_wait,
+	.unwait = process_object_unwait,
+};
+
 /** Allocate a process structure and initialise it.
  *
  * Allocates a new process structure and initialises it. If uhandlep is not
@@ -204,6 +278,15 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	assert(name);
 	assert(procp);
 	assert(priority >= 0 && priority < PRIORITY_MAX);
+
+	ret = object_security_validate(security, NULL);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+	ret = process_object_set_security(NULL, security);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
 
 	/* If creating a new session, check if the parent is allowed to do so. */
 	if(cflags & PROCESS_CREATE_SESSION && parent) {
@@ -320,80 +403,6 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	*procp = process;
 	return STATUS_SUCCESS;
 }
-
-/** Validate process object security changes.
- * @param object	Process object.
- * @param security	Security attributes being set.
- * @return		STATUS_SUCCESS if allowed, other status code if not. */
-static status_t process_object_set_security(object_t *object, object_security_t *security) {
-	size_t i;
-
-	/* If an ACL is provided, go through it to check that it does not
-	 * grant the PROCESS_SET_SECURITY right to anyone. This right is only
-	 * granted by the system ACL to processes with CAP_SECURITY_AUTHORITY,
-	 * and should not be granted to anyone else. */
-	if(security->acl) {
-		for(i = 0; i < security->acl->count; i++) {
-			if(security->acl->entries[i].rights & PROCESS_SET_SECURITY) {
-				return STATUS_PERM_DENIED;
-			}
-		}
-	}
-
-	return STATUS_SUCCESS;
-}
-
-/** Closes a handle to a process.
- * @param handle	Handle to close. */
-static void process_object_close(object_handle_t *handle) {
-	process_release((process_t *)handle->object);
-}
-
-/** Signal that a process is being waited for.
- * @param handle	Handle to process.
- * @param event		Event to wait for.
- * @param sync		Internal data pointer.
- * @return		Status code describing result of the operation. */
-static status_t process_object_wait(object_handle_t *handle, int event, void *sync) {
-	process_t *process = (process_t *)handle->object;
-
-	switch(event) {
-	case PROCESS_EVENT_DEATH:
-		mutex_lock(&process->lock);
-		if(process->state == PROCESS_DEAD) {
-			object_wait_signal(sync);
-		} else {
-			notifier_register(&process->death_notifier, object_wait_notifier, sync);
-		}
-		mutex_unlock(&process->lock);
-		return STATUS_SUCCESS;
-	default:
-		return STATUS_INVALID_EVENT;
-	}
-}
-
-/** Stop waiting for a process.
- * @param handle	Handle to process.
- * @param event		Event to wait for.
- * @param sync		Internal data pointer. */
-static void process_object_unwait(object_handle_t *handle, int event, void *sync) {
-	process_t *process = (process_t *)handle->object;
-
-	switch(event) {
-	case PROCESS_EVENT_DEATH:
-		notifier_unregister(&process->death_notifier, object_wait_notifier, sync);
-		break;
-	}
-}
-
-/** Process object type operations. */
-static object_type_t process_object_type = {
-	.id = OBJECT_TYPE_PROCESS,
-	.set_security = process_object_set_security,
-	.close = process_object_close,
-	.wait = process_object_wait,
-	.unwait = process_object_unwait,
-};
 
 /** Set up a new address space for a process.
  * @param info		Pointer to information structure.
@@ -891,12 +900,7 @@ status_t sys_process_create(const char *path, const char *const args[], const ch
 	/* If no security attributes are provided a default ACL is constructed
 	 * by process_alloc(). */
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
-		if(ret != STATUS_SUCCESS) {
-			goto fail;
-		}
-
-		ret = process_object_set_security(NULL, &ksecurity);
+		ret = object_security_from_user(&ksecurity, security, false);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
@@ -1090,14 +1094,8 @@ status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const obje
 	/* If no security attributes are provided a default ACL is constructed
 	 * by process_alloc(). */
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, false);
 		if(ret != STATUS_SUCCESS) {
-			return ret;
-		}
-
-		ret = process_object_set_security(NULL, &ksecurity);
-		if(ret != STATUS_SUCCESS) {
-			object_security_destroy(&ksecurity);
 			return ret;
 		}
 	}

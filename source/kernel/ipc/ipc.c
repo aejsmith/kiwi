@@ -425,7 +425,7 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 	}
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, true);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}

@@ -186,7 +186,7 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
 	}
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, true);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}

@@ -787,9 +787,23 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 	char *dir, *name;
 	node_id_t id;
 	status_t ret;
+	size_t i;
 
 	assert(security);
 	assert(security->acl);
+
+	/* Validate the security attributes. */
+	ret = object_security_validate(security, NULL);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+	for(i = 0; i < security->acl->count; i++) {
+		switch(security->acl->entries[i].type) {
+		case ACL_ENTRY_CAPABILITY:
+		case ACL_ENTRY_SESSION:
+			return STATUS_NOT_SUPPORTED;
+		}
+	}
 
 	/* Replace -1 for UID and GID in the security attributes with the
 	 * current UID/GID. Normally this would be done by object_init(),
@@ -883,23 +897,6 @@ out:
 	return ret;
 }
 
-/** Get information about a node.
- * @param node		Node to get information for.
- * @param info		Structure to store information in. */
-static void fs_node_info(fs_node_t *node, fs_info_t *info) {
-	memset(info, 0, sizeof(fs_info_t));
-	info->id = node->id;
-	info->mount = (node->mount) ? node->mount->id : 0;
-	info->type = node->type;
-	if(node->ops->info) {
-		node->ops->info(node, info);
-	} else {
-		info->links = 1;
-		info->size = 0;
-		info->block_size = PAGE_SIZE;
-	}
-}
-
 /** Change filesystem security attributes.
  * @param object	Object to check.
  * @param security	New security attributes.
@@ -926,6 +923,23 @@ static status_t fs_node_set_security(object_t *object, object_security_t *securi
 	}
 
 	return node->ops->set_security(node, security);
+}
+
+/** Get information about a node.
+ * @param node		Node to get information for.
+ * @param info		Structure to store information in. */
+static void fs_node_info(fs_node_t *node, fs_info_t *info) {
+	memset(info, 0, sizeof(fs_info_t));
+	info->id = node->id;
+	info->mount = (node->mount) ? node->mount->id : 0;
+	info->type = node->type;
+	if(node->ops->info) {
+		node->ops->info(node, info);
+	} else {
+		info->links = 1;
+		info->size = 0;
+		info->block_size = PAGE_SIZE;
+	}
 }
 
 /** Get the name of a node in its parent directory.
@@ -1272,9 +1286,7 @@ status_t fs_file_open(const char *path, object_rights_t rights, int flags, int c
 			if(security) {
 				dsecurity.uid = security->uid;
 				dsecurity.gid = security->gid;
-				if(security->acl) {
-					dsecurity.acl = security->acl;
-				}
+				dsecurity.acl = security->acl;
 			}
 
 			/* Create a default ACL if none is given. */
@@ -2588,7 +2600,7 @@ status_t sys_fs_file_open(const char *path, object_rights_t rights, int flags, i
 		/* Don't bother copying anything provided if we aren't going
 		 * to use it. */
 		if(create != 0) {
-			ret = object_security_from_user(&ksecurity, security);
+			ret = object_security_from_user(&ksecurity, security, false);
 			if(ret != STATUS_SUCCESS) {
 				kfree(kpath);
 				return ret;
@@ -2921,7 +2933,7 @@ status_t sys_fs_dir_create(const char *path, const object_security_t *security) 
 	}
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, false);
 		if(ret != STATUS_SUCCESS) {
 			kfree(kpath);
 			return ret;
@@ -3598,7 +3610,7 @@ status_t sys_fs_set_security(const char *path, bool follow, const object_securit
 		return ret;
 	}
 
-	ret = object_security_from_user(&ksecurity, security);
+	ret = object_security_from_user(&ksecurity, security, false);
 	if(ret != STATUS_SUCCESS) {
 		kfree(kpath);
 		return ret;

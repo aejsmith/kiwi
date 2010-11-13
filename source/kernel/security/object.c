@@ -279,10 +279,14 @@ status_t object_security_validate(object_security_t *security, process_t *proces
  *
  * @param dest		Structure to copy to.
  * @param src		Userspace source pointer.
+ * @param validate	Whether the validate the attributes. This should always
+ *			be true unless the structure will be passed to another
+ *			function that performs validation.
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_security_from_user(object_security_t *dest, const object_security_t *src) {
+status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
+                                   bool validate) {
 	object_acl_entry_t *entries = NULL;
 	object_acl_t *acl = NULL;
 	status_t ret;
@@ -328,9 +332,11 @@ status_t object_security_from_user(object_security_t *dest, const object_securit
 	}
 
 	/* Validate the structure. */
-	ret = object_security_validate(dest, NULL);
-	if(ret != STATUS_SUCCESS) {
-		goto fail;
+	if(validate) {
+		ret = object_security_validate(dest, NULL);
+		if(ret != STATUS_SUCCESS) {
+			goto fail;
+		}
 	}
 
 	return STATUS_SUCCESS;
@@ -393,7 +399,9 @@ object_rights_t object_rights(object_t *object, process_t *process) {
  * @param security	Security attributes to set. If the user ID is -1, it
  *			will not be changed. If the group ID is -1, it will not
  *			be changed. If the ACL pointer is NULL, the ACL will
- *			not be changed.
+ *			not be changed. These attributes will be validated, so
+ *			it is not necessary to validate them when copying them
+ *			from userspace.
  *
  * @return		Status code describing result of the operation.
  */
@@ -575,7 +583,7 @@ status_t sys_object_set_security(handle_t handle, const object_security_t *secur
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_security_from_user(&ksecurity, security);
+	ret = object_security_from_user(&ksecurity, security, false);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

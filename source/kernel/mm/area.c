@@ -230,7 +230,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, const ob
 	}
 
 	if(security) {
-		ret = object_security_from_user(&ksecurity, security);
+		ret = object_security_from_user(&ksecurity, security, true);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
