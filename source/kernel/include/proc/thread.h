@@ -66,6 +66,8 @@ typedef struct thread {
 	int wire_count;			/**< How many calls to thread_wire() have been made. */
 	refcount_t count;		/**< Number of handles to the thread. */
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
+	ptr_t ustack;			/**< User-mode stack base. */
+	size_t ustack_size;		/**< Size of the user-mode stack. */
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */

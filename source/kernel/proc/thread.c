@@ -363,8 +363,14 @@ void thread_at_kernel_exit(void) {
 /** Terminate the current thread.
  * @note		Does not return. */
 void thread_exit(void) {
+	if(curr_thread->ustack_size) {
+		vm_unmap(curr_thread->owner->aspace, curr_thread->ustack,
+		         curr_thread->ustack_size);
+	}
+
 	curr_thread->state = THREAD_DEAD;
 	notifier_run(&curr_thread->death_notifier, NULL, true);
+
 	sched_yield();
 	fatal("Shouldn't get here");
 }
@@ -478,6 +484,8 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->fpu = NULL;
 	thread->wire_count = 0;
 	thread->killed = false;
+	thread->ustack = NULL;
+	thread->ustack_size = 0;
 	thread->flags = flags;
 	thread->priority = 0;
 	thread->timeslice = 0;
@@ -760,11 +768,12 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 
 		ret = vm_map(curr_proc->aspace, 0, stacksz,
 		             VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-		             NULL, 0, &args->sp);
+		             NULL, 0, &thread->ustack);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
-		args->sp += (stacksz - STACK_DELTA);
+		thread->ustack_size = stacksz;
+		args->sp = thread->ustack + (stacksz - STACK_DELTA);
 	}
 
 	thread_run(thread);
