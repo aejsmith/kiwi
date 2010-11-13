@@ -110,6 +110,7 @@ static struct {
 	{ "modules",	"Print a list of kernel modules.",		kdbg_cmd_modules },
 	{ "mount",	"Print a list of mounted filesystems.",		kdbg_cmd_mount },
 	{ "node",	"Print information about a filesystem node.",	kdbg_cmd_node },
+	{ "object",	"Print information about an object.",		kdbg_cmd_object },
 	{ "page",	"Print details about physical memory usage.",	kdbg_cmd_page },
 	{ "port",	"Print out information about IPC ports.",	kdbg_cmd_port },
 	{ "print",	"Print the value of an expression.",		kdbg_cmd_print },

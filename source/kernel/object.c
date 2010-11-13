@@ -602,6 +602,72 @@ int kdbg_cmd_handles(int argc, char **argv) {
 	return KDBG_OK;
 }
 
+/** Dump an ACL.
+ * @param acl		ACL to dump. */
+static void dump_object_acl(object_acl_t *acl) {
+	size_t i;
+
+	for(i = 0; i < acl->count; i++) {
+		switch(acl->entries[i].type) {
+		case ACL_ENTRY_USER:
+			kprintf(LOG_NONE, " User(%d): ", acl->entries[i].value);
+			break;
+		case ACL_ENTRY_GROUP:
+			kprintf(LOG_NONE, " Group(%d): ", acl->entries[i].value);
+			break;
+		case ACL_ENTRY_OTHERS:
+			kprintf(LOG_NONE, " Others: ");
+			break;
+		case ACL_ENTRY_SESSION:
+			kprintf(LOG_NONE, " Session(%d): ", acl->entries[i].value);
+			break;
+		case ACL_ENTRY_CAPABILITY:
+			kprintf(LOG_NONE, " Capability(%d): ", acl->entries[i].value);
+			break;
+		}
+
+		kprintf(LOG_NONE, "0x%x\n", acl->entries[i].rights);
+	}
+}
+
+/** Print information about an object.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
+int kdbg_cmd_object(int argc, char **argv) {
+	object_t *object;
+	unative_t addr;
+
+	if(KDBG_HELP(argc, argv)) {
+		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
+
+		kprintf(LOG_NONE, "Prints out information about an object.\n");
+		return KDBG_OK;
+	} else if(argc != 2) {
+		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDBG_FAIL;
+	}
+
+	if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
+		return KDBG_FAIL;
+	}
+
+	object = (object_t *)addr;
+
+	kprintf(LOG_NONE, "Object %p\n", object);
+	kprintf(LOG_NONE, "=================================================\n");
+	kprintf(LOG_NONE, "Type:  %d(%p)\n", object->type->id, object->type);
+	kprintf(LOG_NONE, "User:  %d\n", object->uid);
+	kprintf(LOG_NONE, "Group: %d\n\n", object->gid);
+
+	kprintf(LOG_NONE, "User ACL:\n");
+	dump_object_acl(&object->uacl);
+	kprintf(LOG_NONE, "System ACL:\n");
+	dump_object_acl(&object->sacl);
+
+	return KDBG_OK;
+}
+
 /** Initialise the handle caches. */
 void __init_text handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),

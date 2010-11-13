@@ -176,6 +176,7 @@ extern handle_table_t *handle_table_clone(handle_table_t *src);
 extern void handle_table_destroy(handle_table_t *table);
 
 extern int kdbg_cmd_handles(int argc, char **argv);
+extern int kdbg_cmd_object(int argc, char **argv);
 
 extern void handle_init(void);
 
