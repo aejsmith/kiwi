@@ -18,10 +18,13 @@
  * @brief		POSIX file access check function.
  */
 
-#include <sys/stat.h>
+#include <kernel/fs.h>
+#include <kernel/status.h>
 
 #include <errno.h>
 #include <unistd.h>
+
+#include "../libc.h"
 
 /** Check whether access to a file is allowed.
  * @param path		Path to file to check.
@@ -30,31 +33,51 @@
  * @return		0 if access is allowed, -1 if not with errno set
  *			accordingly. */
 int access(const char *path, int mode) {
-	struct stat st;
+	object_rights_t rights = 0;
+	handle_t handle;
+	fs_info_t info;
+	status_t ret;
 
-	if(stat(path, &st) != 0) {
+	ret = fs_info(path, true, &info);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
 		return -1;
 	}
 
-	/* If just checking existance, don't need to do any more. */
-	if(mode == F_OK) {
-		return 0;
+	if(mode != F_OK) {
+		if(mode & R_OK) {
+			rights |= FS_READ;
+		}
+		if(mode & W_OK) {
+			rights |= FS_WRITE;
+		}
+		if(mode & X_OK) {
+			rights |= FS_EXECUTE;
+		}
 	}
 
-	/* Check the mode in the stat structure.
-	 * TODO: Not really correct, need to take user/group into account.
-	 * TODO: Doesn't take into account whether the FS is mounted read-only. */
-	if(mode & R_OK && !(st.st_mode & S_IRUSR || st.st_mode & S_IRGRP)) {
-		errno = EACCES;
-		return -1;
-	}
-	if(mode & W_OK && !(st.st_mode & S_IWUSR || st.st_mode & S_IWGRP)) {
-		errno = EACCES;
-		return -1;
-	}
-	if(mode & X_OK && !(st.st_mode & S_IXUSR || st.st_mode & S_IXGRP)) {
-		errno = EACCES;
-		return -1;
+	switch(info.type) {
+	case FS_NODE_FILE:
+		ret = fs_file_open(path, rights, 0, 0, NULL, &handle);
+		if(ret != STATUS_SUCCESS) {
+			libc_status_to_errno(ret);
+			return -1;
+		}
+
+		handle_close(handle);
+		break;
+	case FS_NODE_DIR:
+		ret = fs_dir_open(path, rights, 0, &handle);
+		if(ret != STATUS_SUCCESS) {
+			libc_status_to_errno(ret);
+			return -1;
+		}
+
+		handle_close(handle);
+		break;
+	default:
+		/* Presume it's OK. */
+		break;
 	}
 
 	return 0;
