@@ -79,7 +79,7 @@ extern int execve(const char *path, char *const argv[], char *const envp[]);
 extern int execvp(const char *file, char *const argv[]);
 /* int faccessat(int, const char *, int, int); */
 //extern int fchdir(int fd);
-//extern int fchown(int fd, uid_t uid, gid_t gid);
+extern int fchown(int fd, uid_t uid, gid_t gid);
 /* int fchownat(int, const char *, uid_t, gid_t, int); */
 /* int fdatasync(int); */
 /* int fexecve(int, char *const [], char *const []); */
@@ -106,7 +106,7 @@ extern pid_t getppid(void);
 extern uid_t getuid(void);
 extern char *getwd(char *buf);
 extern int isatty(int fd);
-//extern int lchown(const char *path, uid_t uid, gid_t gid);
+extern int lchown(const char *path, uid_t uid, gid_t gid);
 //extern int link(const char *source, const char *dest);
 /* int linkat(int, const char *, int, const char *, int); */
 /* int lockf(int, int, off_t); */

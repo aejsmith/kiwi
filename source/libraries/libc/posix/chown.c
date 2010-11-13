@@ -18,7 +18,11 @@
  * @brief		POSIX change owner function.
  */
 
+#include <kernel/fs.h>
+#include <kernel/status.h>
+
 #include <unistd.h>
+
 #include "../libc.h"
 
 /** Change the owner of a filesystem entry.
@@ -27,6 +31,63 @@
  * @param gid		New group ID.
  * @return		0 on success, -1 on failure. */
 int chown(const char *path, uid_t uid, gid_t gid) {
-	libc_stub("chown", false);
+	object_security_t security;
+	status_t ret;
+
+	security.uid = uid;
+	security.gid = gid;
+	security.acl = NULL;
+
+	ret = fs_set_security(path, true, &security);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
+}
+
+/** Change the owner of a filesystem entry.
+ * @param path		Path to entry. If this refers to a symbolic link, it
+ *			will not be dereferenced.
+ * @param uid		New user ID.
+ * @param gid		New group ID.
+ * @return		0 on success, -1 on failure. */
+int lchown(const char *path, uid_t uid, gid_t gid) {
+	object_security_t security;
+	status_t ret;
+
+	security.uid = uid;
+	security.gid = gid;
+	security.acl = NULL;
+
+	ret = fs_set_security(path, false, &security);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
+}
+
+/** Change the owner of a filesystem entry.
+ * @param fd		File descriptor to entry.
+ * @param uid		New user ID.
+ * @param gid		New group ID.
+ * @return		0 on success, -1 on failure. */
+int fchown(int fd, uid_t uid, gid_t gid) {
+	object_security_t security;
+	status_t ret;
+
+	security.uid = uid;
+	security.gid = gid;
+	security.acl = NULL;
+
+	ret = object_set_security(fd, &security);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
 	return 0;
 }
