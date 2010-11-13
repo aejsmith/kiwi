@@ -26,6 +26,7 @@
 #include <io/fs.h>
 
 #include <lib/string.h>
+#include <lib/tar.h>
 
 #include <mm/kheap.h>
 #include <mm/malloc.h>
@@ -50,7 +51,6 @@
 #include <object.h>
 #include <status.h>
 #include <symbol.h>
-#include <tar.h>
 #include <time.h>
 #include <version.h>
 
@@ -124,97 +124,6 @@ static boot_module_t *boot_module_lookup(const char *name) {
 	return NULL;
 }
 
-/** Extract a TAR archive to the root FS.
- * @param mod		Boot module containing archive. */
-static void __init_text load_boot_fsimage(boot_module_t *mod) {
-	tar_header_t *hdr = mod->mapping;
-	object_security_t security;
-	object_handle_t *handle;
-	object_acl_t acl;
-	int64_t size;
-	status_t ret;
-	size_t bytes;
-
-	/* Check format of module. */
-	if(strncmp(hdr->magic, "ustar", 5) != 0) {
-		fatal("Unknown boot module format");
-	}
-
-	/* If any TAR files are loaded it means we should mount a RamFS at the
-	 * root, if this has not already been done. */
-	if(!root_mount) {
-		ret = fs_mount(NULL, "/", "ramfs", NULL);
-		if(ret != STATUS_SUCCESS) {
-			fatal("Could not mount RamFS at root (%d)", ret);
-		}
-	}
-
-	/* Loop until we encounter two null bytes (EOF). */
-	while(hdr->name[0] && hdr->name[1]) {
-		if(strncmp(hdr->magic, "ustar", 5) != 0) {
-			fatal("TAR file format is not correct");
-		}
-
-		/* All fields in the header are stored as ASCII - convert the
-		 * size to an integer (base 8). */
-		size = strtoll(hdr->size, NULL, 8);
-
-		/* Handle the entry based on its type flag. */
-		switch(hdr->typeflag) {
-		case REGTYPE:
-		case AREGTYPE:
-			/* TODO: Until we interpret the mode information in the
-			 * TAR file, override the default security attributes
-			 * to mark everything as executable. */
-			security.uid = -1;
-			security.gid = -1;
-			security.acl = &acl;
-			object_acl_init(&acl);
-			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-			                     OBJECT_SET_OWNER | OBJECT_SET_ACL | FS_READ | FS_WRITE | FS_EXECUTE);
-			object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-			                     FS_READ | FS_EXECUTE);
-
-			ret = fs_file_open(hdr->name, FS_WRITE, 0, FS_CREATE_ALWAYS, &security, &handle);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to open file %s (%d)", hdr->name, ret);
-			}
-
-			object_acl_destroy(&acl);
-
-			ret = fs_file_write(handle, (void *)((ptr_t)hdr + 512), size, &bytes);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to write file %s (%d)", hdr->name, ret);
-			} else if((int64_t)bytes != size) {
-				fatal("Did not write all data for file %s (%zu, %zu)", hdr->name, bytes, size);
-			}
-
-			object_handle_release(handle);
-			break;
-		case DIRTYPE:
-			ret = fs_dir_create(hdr->name, NULL);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to create directory %s (%d)", hdr->name, ret);
-			}
-			break;
-		case SYMTYPE:
-			ret = fs_symlink_create(hdr->name, hdr->linkname);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to create symbolic link %s (%d)", hdr->name, ret);
-			}
-			break;
-		default:
-			kprintf(LOG_DEBUG, "init: unhandled TAR type flag '%c'\n", hdr->typeflag);
-			break;
-		}
-
-		/* 512 for the header, plus the file size if necessary. */
-		hdr = (tar_header_t *)(ptr_t)((ptr_t)hdr + 512 + ((size != 0) ? ROUND_UP(size, 512) : 0));
-	}
-
-	boot_module_remove(mod);
-}
-
 /** Load a kernel module provided at boot.
  * @param mod		Module to load. */
 static void __init_text load_boot_kmod(boot_module_t *mod) {
@@ -233,7 +142,8 @@ static void __init_text load_boot_kmod(boot_module_t *mod) {
 		}
 
 		/* Unloaded dependency, try to find it and load it. */
-		if(!(dep = boot_module_lookup(name))) {
+		dep = boot_module_lookup(name);
+		if(!dep) {
 			fatal("Dependency on '%s' which is not available", name);
 		}
 		load_boot_kmod(dep);
@@ -329,9 +239,21 @@ static void init_thread(void *args, void *arg2) {
 			fatal("Could not find boot filesystem");
 		}
 
+		/* Mount a ramfs at the root to extract the images to. */
+		ret = fs_mount(NULL, "/", "ramfs", NULL);
+		if(ret != STATUS_SUCCESS) {
+			fatal("Could not mount ramfs for root (%d)", ret);
+		}
+
 		while(!list_empty(&boot_fsimage_list)) {
 			mod = list_entry(boot_fsimage_list.next, boot_module_t, header);
-			load_boot_fsimage(mod);
+
+			ret = tar_extract(mod->handle, "/");
+			if(ret != STATUS_SUCCESS) {
+				fatal("Failed to load FS image (%d)", ret);
+			}
+
+			boot_module_remove(mod);
 		}
 	} else {
 		while(!list_empty(&boot_fsimage_list)) {

@@ -18,10 +18,12 @@
  * @brief		TAR types/definitions.
  */
 
-#ifndef __TAR_H
-#define __TAR_H
+#ifndef __LIB_TAR_H
+#define __LIB_TAR_H
 
-/** Header for a tar file. */
+struct object_handle;
+
+/** Header for a TAR file. */
 typedef struct tar_header {
 	char name[100];		/**< Name of entry. */
 	char mode[8];		/**< Mode of entry. */
@@ -41,7 +43,7 @@ typedef struct tar_header {
 	char prefix[155];	/**< Prefix. */
 } tar_header_t;
 
-/** Tar entry types. */
+/** TAR entry types. */
 #define REGTYPE		'0'	/**< Regular file (preferred code). */
 #define AREGTYPE	'\0'	/**< Regular file (alternate code). */
 #define LNKTYPE		'1'	/**< Hard link. */
@@ -52,4 +54,20 @@ typedef struct tar_header {
 #define FIFOTYPE	'6'	/**< Named pipe.  */
 #define CONTTYPE	'7'	/**< Contiguous file. */
 
-#endif /* __TAR_H */
+/** TAR mode bits. */
+#define TSUID		04000
+#define TSGID		02000
+#define TSVTX		01000
+#define TUREAD		00400
+#define TUWRITE		00200
+#define TUEXEC		00100
+#define TGREAD		00040
+#define TGWRITE		00020
+#define TGEXEC		00010
+#define TOREAD		00004
+#define TOWRITE		00002
+#define TOEXEC		00001
+
+extern status_t tar_extract(struct object_handle *handle, const char *dest);
+
+#endif /* __LIB_TAR_H */

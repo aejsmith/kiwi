@@ -43,6 +43,7 @@ sources = map(File, [
 	'lib/qsort.c',
 	'lib/radix_tree.c',
 	'lib/string.c',
+	'lib/tar.c',
 	'lib/utility.c',
 
 	'mm/area.c',
