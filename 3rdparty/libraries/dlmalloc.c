@@ -1339,7 +1339,8 @@ extern void*     sbrk(ptrdiff_t);
 /* Declarations for locking */
 #if USE_LOCKS
 #ifndef WIN32
-#include <pthread.h>
+/* Kiwi */
+//#include <pthread.h>
 #if defined (__SVR4) && defined (__sun)  /* solaris */
 #include <thread.h>
 #endif /* solaris */

@@ -1,13 +1,15 @@
 #include <kernel/status.h>
 #include <kernel/vm.h>
 
+#include <util/mutex.h>
+
 #include <errno.h>
 #include <stddef.h>
+#include <time.h>
 
 #include "../libc.h"
 
 #define LACKS_SYS_MMAN_H
-#define LACKS_UNISTD_H
 #define LACKS_STDLIB_H
 
 /* Available features */
@@ -23,9 +25,6 @@
                    __FUNCTION__, __LINE__, m, p, __builtin_return_address(0));
 #define MALLOC_FAILURE_ACTION		errno = ENOMEM;
 #define malloc_getpagesize		((size_t)0x1000)
-
-/** Temporary. */
-#define time(p)				1248184472
 
 /** Wrapper for allocations. */
 static inline void *mmap_wrapper(size_t size) {
@@ -51,5 +50,15 @@ static inline int munmap_wrapper(void *start, size_t length) {
 #define MMAP(s)			mmap_wrapper((s))
 #define DIRECT_MMAP(s)		mmap_wrapper((s))
 #define MUNMAP(a, s)		munmap_wrapper((a), (s))
+
+/* Locking. */
+#define USE_LOCKS 2
+
+#define MLOCK_T			libc_mutex_t
+#define INITIAL_LOCK(sl)	libc_mutex_init(sl)
+#define ACQUIRE_LOCK(sl)	libc_mutex_lock(sl, -1)
+#define RELEASE_LOCK(sl)	libc_mutex_unlock(sl)
+
+static MLOCK_T malloc_global_mutex = LIBC_MUTEX_INITIALISER;
 
 #include "dlmalloc.c"
