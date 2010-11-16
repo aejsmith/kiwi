@@ -47,6 +47,7 @@
 #include <dpc.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <time.h>
 #include <vmem.h>
 
 #if CONFIG_VMEM_DEBUG
@@ -58,10 +59,11 @@
 /** Limitations/settings. */
 #define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
 #define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
-#define VMEM_RETRY_INTERVAL	1000000		/**< Interval between retries when sleeping for space (in µs). */
+#define VMEM_RETRY_INTERVAL	SECS2USECS(1)	/**< Interval between retries when sleeping for space (in µs). */
 #define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
 #define VMEM_REHASH_THRESHOLD	32		/**< Depth of a hash chain at which a rehash will be triggered. */
 #define VMEM_HASH_MAX		8192		/**< Maximum size of the allocation hash table. */
+#define VMEM_PERIODIC_INTERVAL	SECS2USECS(10)	/**< Interval for periodic maintenance. */
 
 /** Vmem boundary tag structure. */
 typedef struct vmem_btag {
@@ -94,6 +96,9 @@ static MUTEX_DECLARE(vmem_lock, 0);
 
 /** Statically allocated boundary tags to use during boot. */
 static vmem_btag_t vmem_boot_tags[VMEM_BOOT_TAG_COUNT];
+
+/** Periodiic maintenance timer. */
+static timer_t vmem_maintenance_timer;
 
 /** Allocate a new boundary tag structure.
  * @note		It is possible for this function to change the arena
@@ -161,6 +166,81 @@ static void vmem_btag_free(vmem_btag_t *tag) {
 	mutex_lock(&vmem_lock);
 	list_prepend(&vmem_btags, &tag->header);
 	mutex_unlock(&vmem_lock);
+}
+
+/** Rehash a vmem arena.
+ * @param _vmem		Pointer to arena to rehash. */
+static void vmem_rehash(void *_vmem) {
+	size_t new_size, prev_size, i;
+	vmem_t *vmem = _vmem;
+	list_t *table, *prev;
+	vmem_btag_t *seg;
+	uint32_t hash;
+
+	/* Work out the new size of the hash: the next highest power of 2 from
+	 * the current number of used segments. */
+	new_size = MIN(vmem->used_segs, VMEM_HASH_MAX);
+	new_size = MAX(new_size, VMEM_HASH_INITIAL);
+	if(new_size & (new_size - 1)) {
+		new_size = (size_t)1 << highbit(new_size);
+	}
+
+	if(new_size == vmem->alloc_hash_size) {
+		return;
+	}
+
+	kprintf(LOG_NORMAL, "vmem: rehashing arena %p(%s), new table size is %llu\n", vmem, vmem->name, new_size);
+
+	/* Allocate and initialise the new table. */
+	table = kmalloc(sizeof(list_t) * new_size, 0);
+	if(!table) {
+		vmem->rehash_requested = false;
+		return;
+	}
+
+	for(i = 0; i < new_size; i++) {
+		list_init(&table[i]);
+	}
+
+	mutex_lock(&vmem->lock);
+
+	prev = vmem->alloc_hash;
+	prev_size = vmem->alloc_hash_size;
+	vmem->alloc_hash = table;
+	vmem->alloc_hash_size = new_size;
+
+	/* Add the entries from the old table to the new one. */
+	for(i = 0; i < prev_size; i++) {
+		LIST_FOREACH_SAFE(&prev[i], iter) {
+			seg = list_entry(iter, vmem_btag_t, s_link);
+
+			hash = fnv_hash_integer(seg->base) % new_size;
+			list_append(&table[hash], &seg->s_link);
+		}
+	}
+
+	vmem->rehash_requested = false;
+	mutex_unlock(&vmem->lock);
+
+	if(prev != vmem->initial_hash) {
+		kfree(prev);
+	}
+}
+
+/** Perform periodic maintenance on all arenas.
+ * @param data		Unused. */
+static bool vmem_maintenance(void *data) {
+	vmem_t *vmem;
+
+	LIST_FOREACH(&vmem_arenas, iter) {
+		vmem = list_entry(iter, vmem_t, header);
+
+		if(!vmem->rehash_requested) {
+			vmem_rehash(vmem);
+		}
+	}
+
+	return false;
 }
 
 /** Check if a freelist is empty.
@@ -253,60 +333,6 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 	/* Insert the span into the tag list. */
 	list_append(&vmem->btags, &span->header);
 	return span;
-}
-
-/** Rehash a vmem arena.
- * @param _vmem		Pointer to arena to rehash. */
-static void vmem_rehash(void *_vmem) {
-	vmem_resource_t new_size, prev_size, i;
-	vmem_t *vmem = _vmem;
-	list_t *table, *prev;
-	vmem_btag_t *seg;
-	uint32_t hash;
-
-	/* Work out the new size of the hash: the next highest power of 2 from
-	 * the current number of used segments. */
-	new_size = MIN(vmem->used_segs, VMEM_HASH_MAX);
-	if(new_size & (new_size - 1)) {
-		new_size = (vmem_resource_t)1 << highbit(new_size);
-	}
-
-	kprintf(LOG_NORMAL, "vmem: rehashing arena %p(%s), new table size is %llu\n", vmem, vmem->name, new_size);
-
-	/* Allocate and initialise the new table. */
-	table = kmalloc(sizeof(list_t) * new_size, 0);
-	if(!table) {
-		vmem->rehash_requested = false;
-		return;
-	}
-
-	for(i = 0; i < new_size; i++) {
-		list_init(&table[i]);
-	}
-
-	mutex_lock(&vmem->lock);
-
-	prev = vmem->alloc_hash;
-	prev_size = vmem->alloc_hash_size;
-	vmem->alloc_hash = table;
-	vmem->alloc_hash_size = new_size;
-
-	/* Add the entries from the old table to the new one. */
-	for(i = 0; i < prev_size; i++) {
-		LIST_FOREACH_SAFE(&prev[i], iter) {
-			seg = list_entry(iter, vmem_btag_t, s_link);
-
-			hash = fnv_hash_integer(seg->base) % new_size;
-			list_append(&table[hash], &seg->s_link);
-		}
-	}
-
-	vmem->rehash_requested = false;
-	mutex_unlock(&vmem->lock);
-
-	if(prev != vmem->initial_hash) {
-		kfree(vmem->initial_hash);
-	}
 }
 
 /** Find a free segment using best-fit.
@@ -746,8 +772,10 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 			      vmem->name, size, tag->size);
 		}
 
-		/* If we've exceeded a certain hash chain depth in the search
-		 * for the segment, trigger a rehash. Don't make a request if
+		/* Although we periodically rehash all arenas, if we've exceeded
+		 * a certain chain depth in the search for the segment, trigger
+		 * a rehash. This is because under heavy load, we don't want to
+		 * have to wait for the periodic rehash. Don't make a request if
 		 * we have already made one that has not been completed yet, to
 		 * prevent flooding the DPC manager with requests. */
 		if(i >= VMEM_REHASH_THRESHOLD && !vmem->rehash_requested && dpc_inited()) {
@@ -936,8 +964,9 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 	}
 
 	list_init(&vmem->btags);
-	list_init(&vmem->children);
 	list_init(&vmem->header);
+	list_init(&vmem->children);
+	list_init(&vmem->parent_link);
 	mutex_init(&vmem->lock, "vmem_arena_lock", 0);
 	condvar_init(&vmem->space_cvar, "vmem_space_cvar");
 
@@ -992,16 +1021,17 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 		}
 	}
 
-	/* Add the arena to an arena list. */
+	/* Add the arena to the source's child list (for the benefit of the
+	 * KDBG command), and to the global arena list. */
 	if(source) {
 		mutex_lock(&source->lock);
-		list_append(&source->children, &vmem->header);
+		list_append(&source->children, &vmem->parent_link);
 		mutex_unlock(&source->lock);
-	} else {
-		mutex_lock(&vmem_lock);
-		list_append(&vmem_arenas, &vmem->header);
-		mutex_unlock(&vmem_lock);
 	}
+
+	mutex_lock(&vmem_lock);
+	list_append(&vmem_arenas, &vmem->header);
+	mutex_unlock(&vmem_lock);
 
 	dprintf("vmem: created arena %p(%s) (quantum: %zu, source: %p)\n",
 		vmem, vmem->name, quantum, source);
@@ -1058,47 +1088,19 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 	return vmem;
 }
 
-/** Add the initial tags to the boundary tag list. */
-void __init_text vmem_early_init(void) {
-	size_t i;
-
-	for(i = 0; i < VMEM_BOOT_TAG_COUNT; i++) {
-		list_init(&vmem_boot_tags[i].header);
-		list_init(&vmem_boot_tags[i].s_link);
-		list_append(&vmem_btags, &vmem_boot_tags[i].header);
-		vmem_btag_count++;
-	}
-}
-
-/** Create the boundary tag arena. */
-void __init_text vmem_init(void) {
-	/* Create the boundary tag arena. */
-	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
-	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
-	                  0, 0, MM_FATAL);
-}
-
 /** Find a vmem arena by name.
- * @param header	List header to search from.
  * @param name		Name of arena to find.
  * @return		Pointer to arena found or NULL if not. */
-static vmem_t *vmem_find_arena(list_t *header, const char *name) {
+static vmem_t *vmem_find_arena(const char *name) {
 	vmem_t *vmem;
 
-	LIST_FOREACH(header, iter) {
+	LIST_FOREACH(&vmem_arenas, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
-		if(vmem->flags & VMEM_PRIVATE) {
-			continue;
-		}
-
-		if(strcmp(vmem->name, name) == 0) {
-			return vmem;
-		}
-
-		vmem = vmem_find_arena(&vmem->children, name);
-		if(vmem != NULL) {
-			return vmem;
+		if(!(vmem->flags & VMEM_PRIVATE)) {
+			if(strcmp(vmem->name, name) == 0) {
+				return vmem;
+			}
 		}
 	}
 
@@ -1112,7 +1114,14 @@ static void vmem_dump_list(list_t *header, int indent) {
 	vmem_t *vmem;
 
 	LIST_FOREACH(header, iter) {
-		vmem = list_entry(iter, vmem_t, header);
+		if(header == &vmem_arenas) {
+			vmem = list_entry(iter, vmem_t, header);
+			if(vmem->source) {
+				continue;
+			}
+		} else {
+			vmem = list_entry(iter, vmem_t, parent_link);
+		}
 
 		if(vmem->flags & VMEM_PRIVATE) {
 			continue;
@@ -1168,7 +1177,7 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 
 	/* If a string was provided then do a lookup by name. */
 	if(name != NULL) {
-		if(strlen(name) >= VMEM_NAME_MAX || !(vmem = vmem_find_arena(&vmem_arenas, name))) {
+		if(strlen(name) >= VMEM_NAME_MAX || !(vmem = vmem_find_arena(name))) {
 			kprintf(LOG_NONE, "Arena '%s' not found\n", name);
 			return KDBG_FAIL;
 		}
@@ -1180,12 +1189,14 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	kprintf(LOG_NONE, "Arena %p: %s\n", vmem, vmem->name);
 	kprintf(LOG_NONE, "============================================================\n");
 	kprintf(LOG_NONE, "Quantum: %zu  Size: %" PRIu64 "  Used: %" PRIu64 "  Allocations: %zu\n",
-	            vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
+	        vmem->quantum, vmem->total_size, vmem->used_size, vmem->alloc_count);
+	kprintf(LOG_NONE, "Hash: %p  Hash Size: %zu  Used Segments: %llu\n",
+	        vmem->alloc_hash, vmem->alloc_hash_size, vmem->used_segs);
 	kprintf(LOG_NONE, "Locked: %d (%" PRId32 ")\n", atomic_get(&vmem->lock.locked),
 	        (vmem->lock.holder) ? vmem->lock.holder->id : -1);
 	if(vmem->source) {
 		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",
-		            vmem->source, vmem->source->name, vmem->imported_size);
+		        vmem->source, vmem->source->name, vmem->imported_size);
 	} else {
 		kprintf(LOG_NONE, "\n");
 	}
@@ -1208,4 +1219,30 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	}
 
 	return KDBG_OK;
+}
+
+/** Add the initial tags to the boundary tag list. */
+void __init_text vmem_early_init(void) {
+	size_t i;
+
+	for(i = 0; i < VMEM_BOOT_TAG_COUNT; i++) {
+		list_init(&vmem_boot_tags[i].header);
+		list_init(&vmem_boot_tags[i].s_link);
+		list_append(&vmem_btags, &vmem_boot_tags[i].header);
+		vmem_btag_count++;
+	}
+}
+
+/** Create the boundary tag arena. */
+void __init_text vmem_init(void) {
+	/* Create the boundary tag arena. */
+	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
+	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
+	                  0, 0, MM_FATAL);
+}
+
+/** Start the periodic maintenance timer. */
+void __init_text vmem_late_init(void) {
+	timer_init(&vmem_maintenance_timer, vmem_maintenance, NULL, TIMER_THREAD);
+	timer_start(&vmem_maintenance_timer, VMEM_PERIODIC_INTERVAL, TIMER_PERIODIC);
 }

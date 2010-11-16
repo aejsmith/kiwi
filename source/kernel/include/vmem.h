@@ -89,8 +89,9 @@ typedef struct vmem {
 
 	/** Other information. */
 	int flags;				/**< Behaviour flags for the arena. */
+	list_t header;				/**< Link to arena list. */
 	list_t children;			/**< List of arenas using this arena as a source. */
-	list_t header;				/**< Link to arena/children list. */
+	list_t parent_link;			/**< Link to parent arena. */
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
 
@@ -119,9 +120,10 @@ extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource
                            vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
                            int flags, uint32_t type, int vmflag);
 
+extern int kdbg_cmd_vmem(int argc, char **argv);
+
 extern void vmem_early_init(void);
 extern void vmem_init(void);
-
-extern int kdbg_cmd_vmem(int argc, char **argv);
+extern void vmem_late_init(void);
 
 #endif /* __VMEM_H */
