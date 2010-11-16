@@ -16,6 +16,8 @@
 /**
  * @file
  * @brief		Deferred procedure call functions.
+ *
+ * @todo		Per-CPU DPC thread.
  */
 
 #include <lib/list.h>

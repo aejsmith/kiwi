@@ -44,8 +44,6 @@ typedef struct user_timer {
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
 	bool fired;			/**< Whether the event has fired. */
-	useconds_t interval;		/**< Timer interval. */
-	int mode;			/**< Timer mode. */
 } user_timer_t;
 
 /** Check if a year is a leap year. */
@@ -156,6 +154,33 @@ void timer_device_set(timer_device_t *device) {
 	kprintf(LOG_NORMAL, "timer: activated timer device %s\n", device->name);
 }
 
+/** Start a timer, with CPU timer lock held.
+ * @param timer		Timer to start. */
+static void timer_start_unsafe(timer_t *timer) {
+	timer_t *exist;
+
+	timer->target = time_since_boot() + timer->initial;
+
+	/* Place the timer at the end of the list to begin with, and then
+	 * go through the list to see if we need to move it down before
+	 * another one (the list is ordered with nearest first). */
+	list_append(&curr_cpu->timers, &timer->header);
+	LIST_FOREACH_SAFE(&curr_cpu->timers, iter) {
+		exist = list_entry(iter, timer_t, header);
+		if(exist != timer && exist->target > timer->target) {
+			list_add_before(&exist->header, &timer->header);
+			break;
+		}
+	}
+}
+
+/** DPC function to run a timer function.
+ * @param _timer	Pointer to timer. */
+static void timer_dpc_request(void *_timer) {
+	timer_t *timer = _timer;
+	timer->func(timer->data);
+}
+
 /** Handles a timer tick.
  * @return		Whether to reschedule. */
 bool timer_tick(void) {
@@ -171,16 +196,25 @@ bool timer_tick(void) {
 	LIST_FOREACH_SAFE(&curr_cpu->timers, iter) {
 		timer = list_entry(iter, timer_t, header);
 
-		/* Since the list is ordered soonest expiry to furthest expiry
-		 * first, we can break if the current timer has not expired. */
+		/* Since the list is ordered soonest expiry first, we can break
+		 * if the current timer has not expired. */
 		if(time < timer->target) {
 			break;
 		}
 
 		/* Timer has expired, perform its timeout action. */
 		list_remove(&timer->header);
-		if(timer->func(timer->data)) {
-			schedule = true;
+		if(timer->flags & TIMER_THREAD) {
+			dpc_request(timer_dpc_request, timer);
+		} else {
+			if(timer->func(timer->data)) {
+				schedule = true;
+			}
+		}
+
+		/* If the timer is periodic, restart it. */
+		if(timer->mode == TIMER_PERIODIC) {
+			timer_start_unsafe(timer);
 		}
 	}
 
@@ -196,40 +230,32 @@ bool timer_tick(void) {
 /** Initialise a timer structure.
  * @param timer		Timer to initialise.
  * @param func		Function to call when the timer expires.
- * @param data		Data argument to pass to timer. */
-void timer_init(timer_t *timer, timer_func_t func, void *data) {
+ * @param data		Data argument to pass to timer.
+ * @param flags		Behaviour flags for the timer. */
+void timer_init(timer_t *timer, timer_func_t func, void *data, int flags) {
 	list_init(&timer->header);
 	timer->func = func;
 	timer->data = data;
+	timer->flags = flags;
 }
 
 /** Start a timer.
  * @param timer		Timer to start.
  * @param length	Microseconds to run the timer for. If 0 or negative
- *			the function will do nothing. */
-void timer_start(timer_t *timer, useconds_t length) {
-	timer_t *exist;
-
+ *			the function will do nothing.
+ * @param mode		Mode for the timer. */
+void timer_start(timer_t *timer, useconds_t length, int mode) {
 	if(length <= 0) {
 		return;
 	}
 
-	timer->target = time_since_boot() + length;
 	timer->cpu = curr_cpu;
+	timer->mode = mode;
+	timer->initial = length;
 
 	spinlock_lock(&curr_cpu->timer_lock);
 
-	/* Place the timer at the end of the list to begin with, and then
-	 * go through the list to see if we need to move it down before
-	 * another one (the list is ordered with nearest first). */
-	list_append(&curr_cpu->timers, &timer->header);
-	LIST_FOREACH_SAFE(&curr_cpu->timers, iter) {
-		exist = list_entry(iter, timer_t, header);
-		if(exist != timer && exist->target > timer->target) {
-			list_add_before(&exist->header, &timer->header);
-			break;
-		}
-	}
+	timer_start_unsafe(timer);
 
 	/* If the new timer is at the beginning of the list, then it has
 	 * the shortest remaining time so we need to adjust the clock
@@ -414,9 +440,10 @@ static object_type_t timer_object_type = {
 	.unwait = timer_object_unwait,
 };
 
-/** DPC function to signal a userspace timer.
- * @param _timer	Pointer to timer. */
-static void user_timer_dpc(void *_timer) {
+/** Timer handler function for a userspace timer.
+ * @param _timer	Pointer to timer.
+ * @return		Whether to reschedule. */
+static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
 
 	/* Signal the event. */
@@ -424,18 +451,7 @@ static void user_timer_dpc(void *_timer) {
 		timer->fired = true;
 	}
 
-	/* If this is a periodic timer, start it off again. */
-	if(timer->mode == TIMER_PERIODIC) {
-		timer_start(&timer->timer, timer->interval);
-	}
-}
-
-/** Timer handler function for a userspace timer.
- * @param timer		Pointer to timer.
- * @return		Whether to reschedule. */
-static bool user_timer_func(void *timer) {
-	dpc_request(user_timer_dpc, timer);
-	return true;
+	return false;
 }
 
 /** Create a new timer.
@@ -455,11 +471,9 @@ status_t sys_timer_create(handle_t *handlep) {
 
 	timer = kmalloc(sizeof(*timer), MM_SLEEP);
 	object_init(&timer->obj, &timer_object_type, &security, NULL);
-	timer_init(&timer->timer, user_timer_func, timer);
+	timer_init(&timer->timer, user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
 	timer->fired = false;
-	timer->interval = 0;
-	timer->mode = -1;
 
 	ret = object_handle_create(&timer->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
@@ -494,10 +508,8 @@ status_t sys_timer_start(handle_t handle, useconds_t interval, int mode) {
 	}
 
 	timer = (user_timer_t *)khandle->object;
-	timer->interval = interval;
-	timer->mode = mode;
 	timer_stop(&timer->timer);
-	timer_start(&timer->timer, interval);
+	timer_start(&timer->timer, interval, mode);
 	object_handle_release(khandle);
 	return STATUS_SUCCESS;
 }

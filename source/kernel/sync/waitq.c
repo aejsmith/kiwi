@@ -123,9 +123,9 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
 
 	/* Set whether we're interruptible, and set up a timeout if needed. */
 	curr_thread->interruptible = ((flags & SYNC_INTERRUPTIBLE) != 0);
-	timer_init(&curr_thread->sleep_timer, waitq_timer_handler, curr_thread);
+	timer_init(&curr_thread->sleep_timer, waitq_timer_handler, curr_thread, 0);
 	if(timeout > 0) {
-		timer_start(&curr_thread->sleep_timer, timeout);
+		timer_start(&curr_thread->sleep_timer, timeout, TIMER_ONESHOT);
 	}
 
 	/* Add the thread to the queue and unlock it. */

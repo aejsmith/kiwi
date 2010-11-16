@@ -448,7 +448,7 @@ void sched_internal(bool state) {
 	/* Set off the timer if necessary. */
 	if(!(curr_thread->flags & THREAD_UNPREEMPTABLE)) {
 		assert(curr_thread->timeslice > 0);
-		timer_start(&cpu->timer, curr_thread->timeslice);
+		timer_start(&cpu->timer, curr_thread->timeslice, TIMER_ONESHOT);
 	}
 
 	/* Only bother with this stuff if the new thread is different.
@@ -583,7 +583,7 @@ void __init_text sched_init(void) {
 	curr_cpu->idle = true;
 
 	/* Create the preemption timer. */
-	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL);
+	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL, 0);
 
 	/* Initialise run queues. */
 	for(i = 0; i < PRIORITY_MAX; i++) {
