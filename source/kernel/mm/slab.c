@@ -971,7 +971,7 @@ void __init_text slab_late_init(void) {
 void __init_text slab_init(void) {
 	/* Initialise the metadata arena. */
 	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", 0, 0, PAGE_SIZE,
-	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
+	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0, 0,
 	                  0, MM_FATAL);
 
 	/* Initialise statically allocated internal caches. */

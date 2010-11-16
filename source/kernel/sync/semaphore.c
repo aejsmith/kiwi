@@ -343,6 +343,6 @@ status_t sys_semaphore_up(handle_t handle, size_t count) {
 /** Initialise the semaphore ID allocator. */
 static void __init_text semaphore_id_init(void) {
 	semaphore_id_arena = vmem_create("semaphore_id_arena", 1, 65535, 1, NULL,
-	                                 NULL, NULL, 0, 0, MM_FATAL);
+	                                 NULL, NULL, 0, 0, 0, MM_FATAL);
 }
 INITCALL(semaphore_id_init);

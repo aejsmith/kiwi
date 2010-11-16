@@ -57,14 +57,14 @@ static void module_mem_init(void) {
 #ifdef KERNEL_MODULE_BASE
 	module_raw_arena = vmem_create("module_raw_arena", KERNEL_MODULE_BASE,
 	                               KERNEL_MODULE_SIZE, PAGE_SIZE, NULL,
-	                               NULL, NULL, 0, 0, MM_FATAL);
+	                               NULL, NULL, 0, 0, 0, MM_FATAL);
 	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
 	                           kheap_anon_afunc, kheap_anon_ffunc,
-	                           module_raw_arena, 0, 0, MM_FATAL);
+	                           module_raw_arena, 0, 0, 0, MM_FATAL);
 #else
 	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
 	                           kheap_anon_afunc, kheap_anon_ffunc,
-	                           &kheap_va_arena, 0, 0, MM_FATAL);
+	                           &kheap_va_arena, 0, 0, 0, MM_FATAL);
 #endif
 }
 

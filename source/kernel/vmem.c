@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -27,8 +27,6 @@
  * the number of tags in the list. Without keeping spans sorted, it is O(1),
  * just requiring the span to be placed on the end of the list. Segments under
  * a span, however, are sorted.
- *
- * @todo		Hash table resizing.
  */
 
 #include <arch/memmap.h>
@@ -46,6 +44,7 @@
 
 #include <assert.h>
 #include <console.h>
+#include <dpc.h>
 #include <fatal.h>
 #include <kdbg.h>
 #include <vmem.h>
@@ -55,6 +54,14 @@
 #else
 # define dprintf(fmt...)	
 #endif
+
+/** Limitations/settings. */
+#define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
+#define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
+#define VMEM_RETRY_INTERVAL	1000000		/**< Interval between retries when sleeping for space (in µs). */
+#define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
+#define VMEM_REHASH_THRESHOLD	32		/**< Depth of a hash chain at which a rehash will be triggered. */
+#define VMEM_HASH_MAX		8192		/**< Maximum size of the allocation hash table. */
 
 /** Vmem boundary tag structure. */
 typedef struct vmem_btag {
@@ -73,12 +80,6 @@ typedef struct vmem_btag {
 		VMEM_BTAG_ALLOC,		/**< Allocated segment. */
 	} type;
 } vmem_btag_t;
-
-/** Limitations/settings. */
-#define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
-#define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
-#define VMEM_RETRY_INTERVAL	1000000		/**< Interval between retries when sleeping for space (in µs). */
-#define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
 
 /** List of all arenas. */
 static LIST_DECLARE(vmem_arenas);
@@ -166,8 +167,8 @@ static void vmem_btag_free(vmem_btag_t *tag) {
  * @param vmem		Arena to check in.
  * @param list		List number.
  * @return		True if empty, false if not. */
-static bool vmem_freelist_empty(vmem_t *vmem, vmem_resource_t list) {
-	if(!(vmem->freemap & ((vmem_resource_t)1 << list))) {
+static bool vmem_freelist_empty(vmem_t *vmem, int list) {
+	if(!(vmem->free_map & ((vmem_resource_t)1 << list))) {
 		return true;
 	}
 
@@ -182,7 +183,7 @@ static void vmem_freelist_insert(vmem_t *vmem, vmem_btag_t *tag) {
 	int list = highbit(tag->size) - 1;
 
 	list_append(&vmem->free[list], &tag->s_link);
-	vmem->freemap |= ((vmem_resource_t)1 << list);
+	vmem->free_map |= ((vmem_resource_t)1 << list);
 }
 
 /** Remove a segment from its freelist.
@@ -193,7 +194,7 @@ static void vmem_freelist_remove(vmem_t *vmem, vmem_btag_t *tag) {
 
 	list_remove(&tag->s_link);
 	if(list_empty(&vmem->free[list])) {
-		vmem->freemap &= ~((vmem_resource_t)1 << list);
+		vmem->free_map &= ~((vmem_resource_t)1 << list);
 	}
 }
 
@@ -254,68 +255,177 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 	return span;
 }
 
+/** Rehash a vmem arena.
+ * @param _vmem		Pointer to arena to rehash. */
+static void vmem_rehash(void *_vmem) {
+	vmem_resource_t new_size, prev_size, i;
+	vmem_t *vmem = _vmem;
+	list_t *table, *prev;
+	vmem_btag_t *seg;
+	uint32_t hash;
+
+	/* Work out the new size of the hash: the next highest power of 2 from
+	 * the current number of used segments. */
+	new_size = MIN(vmem->used_segs, VMEM_HASH_MAX);
+	if(new_size & (new_size - 1)) {
+		new_size = (vmem_resource_t)1 << highbit(new_size);
+	}
+
+	kprintf(LOG_NORMAL, "vmem: rehashing arena %p(%s), new table size is %llu\n", vmem, vmem->name, new_size);
+
+	/* Allocate and initialise the new table. */
+	table = kmalloc(sizeof(list_t) * new_size, 0);
+	if(!table) {
+		vmem->rehash_requested = false;
+		return;
+	}
+
+	for(i = 0; i < new_size; i++) {
+		list_init(&table[i]);
+	}
+
+	mutex_lock(&vmem->lock);
+
+	prev = vmem->alloc_hash;
+	prev_size = vmem->alloc_hash_size;
+	vmem->alloc_hash = table;
+	vmem->alloc_hash_size = new_size;
+
+	/* Add the entries from the old table to the new one. */
+	for(i = 0; i < prev_size; i++) {
+		LIST_FOREACH_SAFE(&prev[i], iter) {
+			seg = list_entry(iter, vmem_btag_t, s_link);
+
+			hash = fnv_hash_integer(seg->base) % new_size;
+			list_append(&table[hash], &seg->s_link);
+		}
+	}
+
+	vmem->rehash_requested = false;
+	mutex_unlock(&vmem->lock);
+
+	if(prev != vmem->initial_hash) {
+		kfree(vmem->initial_hash);
+	}
+}
+
+/** Find a free segment using best-fit.
+ * @param vmem		Arena to search in.
+ * @param size		Size of segment required.
+ * @param minaddr	Minimum address of the allocation.
+ * @param maxaddr	Maximum address of the end of the allocation.
+ * @param list		Number of the lowest list that can contain a segment
+ *			of the requested size.
+ * @return		Pointer to segment tag if found, NULL if not. */
+static vmem_btag_t *vmem_find_bestfit(vmem_t *vmem, vmem_resource_t size,
+                                      vmem_resource_t minaddr, vmem_resource_t maxaddr,
+                                      int list) {
+	vmem_resource_t start, end;
+	vmem_btag_t *seg;
+	int i;
+
+	/* Search through all the freelists large enough. */
+	for(i = list; i < VMEM_FREELISTS; i++) {
+		if(vmem_freelist_empty(vmem, i)) {
+			continue;
+		}
+
+		/* Take the next tag off the list. */
+		LIST_FOREACH(&vmem->free[i], iter) {
+			seg = list_entry(iter, vmem_btag_t, s_link);
+			end = seg->base + seg->size;
+
+			/* Ensure that the segment satisfies the allocation
+			 * constraints. */
+			if(seg->size < size) {
+				continue;
+			} else if((end - 1) < minaddr) {
+				continue;
+			} else if(seg->base > (maxaddr - 1)) {
+				continue;
+			}
+
+			/* Make sure we can actually fit. */
+			start = MAX(seg->base, minaddr);
+			end = MIN(end - 1, maxaddr - 1) + 1;
+			if(size > (end - start)) {
+				continue;
+			}
+
+			return seg;
+		}
+	}
+
+	return NULL;
+}
+
+/** Find a free segment using instant-fit.
+ * @param vmem		Arena to search in.
+ * @param size		Size of segment required.
+ * @param minaddr	Minimum address of the allocation.
+ * @param maxaddr	Maximum address of the end of the allocation.
+ * @param list		Number of the lowest list that can contain a segment
+ *			of the requested size.
+ * @return		Pointer to segment tag if found, NULL if not. */
+static vmem_btag_t *vmem_find_instantfit(vmem_t *vmem, vmem_resource_t size,
+                                         vmem_resource_t minaddr, vmem_resource_t maxaddr,
+                                         int list) {
+	/* If the size is exactly a power of 2, then segments on freelist[n]
+	 * are guaranteed to be big enough. Otherwise, use freelist[n + 1] so
+	 * that we ensure that all segments we find are large enough. The free
+	 * bitmap check will ensure that list does not go higher than the
+	 * number of freelists. */
+	if((size & (size - 1)) != 0 && vmem->free_map >> (list + 1)) {
+		list++;
+	}
+
+	/* The rest is the same as best-fit. */
+	return vmem_find_bestfit(vmem, size, minaddr, maxaddr, list);
+}
+
+/** Find a free segment using random-fit.
+ * @param vmem		Arena to search in.
+ * @param size		Size of segment required.
+ * @param minaddr	Minimum address of the allocation.
+ * @param maxaddr	Maximum address of the end of the allocation.
+ * @param list		Number of the lowest list that can contain a segment
+ *			of the requested size.
+ * @return		Pointer to segment tag if found, NULL if not. */
+static vmem_btag_t *vmem_find_randomfit(vmem_t *vmem, vmem_resource_t size,
+                                        vmem_resource_t minaddr, vmem_resource_t maxaddr,
+                                        int list) {
+	fatal("VM_RANDOMFIT not yet implemented");
+}
+
 /** Find a free segment large enough for the given allocation.
  * @param vmem		Arena to search in.
  * @param size		Size of segment required.
  * @param minaddr	Minimum address of the allocation.
  * @param maxaddr	Maximum address of the end of the allocation.
  * @param vmflag	Allocation flags.
- * @return		Pointer to segment tag if found, false if not. */
+ * @return		Pointer to segment tag if found, NULL if not. */
 static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
                                       vmem_resource_t minaddr, vmem_resource_t maxaddr,
                                       int vmflag) {
 	vmem_btag_t *seg, *split1 = NULL, *split2 = NULL;
-	vmem_resource_t start, end, i;
 	int list = highbit(size) - 1;
 
 	assert(size);
 
-	/* Special behaviour for instant-fit allocations. */
-	if(!(vmflag & VM_BESTFIT)) {
-		/* If the size is exactly a power of 2, then segments on
-		 * freelist[n] are guaranteed to be big enough. Otherwise, use
-		 * freelist[n + 1] so that we ensure that all segments we find
-		 * are large enough. The free bitmap check will ensure that
-		 * list does not go higher than the number of freelists. */
-		if((size & (size - 1)) != 0 && vmem->freemap >> (list + 1)) {
-			list++;
-		}
-	}
-
 	while(true) {
-		/* Search through all the freelists large enough. */
-		for(i = list; i < VMEM_FREELISTS; i++) {
-			if(vmem_freelist_empty(vmem, i)) {
-				continue;
-			}
-
-			/* Take the next tag off the list. */
-			LIST_FOREACH(&vmem->free[i], iter) {
-				seg = list_entry(iter, vmem_btag_t, s_link);
-				end = seg->base + seg->size;
-
-				/* Ensure that the segment satisfies the
-				 * allocation constraints. */
-				if(seg->size < size) {
-					continue;
-				} else if((end - 1) < minaddr) {
-					continue;
-				} else if(seg->base > (maxaddr - 1)) {
-					continue;
-				}
-
-				/* Make sure we can actually fit. */
-				start = MAX(seg->base, minaddr);
-				end = MIN(end - 1, maxaddr - 1) + 1;
-				if(size > (end - start)) {
-					continue;
-				}
-				goto found;
-			}
+		/* Attempt to find a segment. */
+		if(vmflag & VM_RANDOMFIT) {
+			seg = vmem_find_randomfit(vmem, size, minaddr, maxaddr, list);
+		} else if(vmflag & VM_BESTFIT) {
+			seg = vmem_find_bestfit(vmem, size, minaddr, maxaddr, list);
+		} else {
+			seg = vmem_find_instantfit(vmem, size, minaddr, maxaddr, list);
 		}
 
-		return NULL;
-found:
+		if(!seg) {
+			return NULL;
+		}
+
 		/* If splitting is necessary, then get hold of tags for us
 		 * to use. Refilling the tag list can cause the arena layout
 		 * to change, so we have to reattempt the allocation after
@@ -474,9 +584,9 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 		base, base + size, vmem->name, vmem->source->name);
 }
 
-/** Allocate a segment from a Vmem arena.
+/** Allocate a segment from a vmem arena.
  *
- * Allocates a segment from a Vmem arena, importing a new span from the
+ * Allocates a segment from a vmem arena, importing a new span from the
  * source if necessary. The allocation behaviour can be modified by specifying
  * certain behaviour flags. The allocation is made to satisfy the specified
  * constraints. Because of this, it cannot use the quantum caches for the
@@ -585,10 +695,11 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 	if(seg) {
 		/* Add to allocation hash table. */
-		hash = fnv_hash_integer(seg->base) % vmem->htbl_size;
-		list_append(&vmem->alloc[hash], &seg->s_link);
+		hash = fnv_hash_integer(seg->base) % vmem->alloc_hash_size;
+		list_append(&vmem->alloc_hash[hash], &seg->s_link);
 
 		vmem->used_size += size;
+		vmem->used_segs++;
 		vmem->alloc_count++;
 		ret = seg->base;
 	} else if(vmflag & MM_FATAL) {
@@ -599,9 +710,9 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	return ret;
 }
 
-/** Free a segment to a Vmem arena.
+/** Free a segment to a vmem arena.
  *
- * Frees a previously allocated segment in a Vmem arena, bypassing the
+ * Frees a previously allocated segment in a vmem arena, bypassing the
  * quantum caches. If the allocation was originally made using vmem_alloc(),
  * use vmem_free() instead.
  *
@@ -612,6 +723,7 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	vmem_btag_t *tag, *exist;
 	uint32_t hash;
+	size_t i = 0;
 
 	assert(vmem);
 	assert((size % vmem->quantum) == 0);
@@ -619,23 +731,36 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	mutex_lock(&vmem->lock);
 
 	/* Look for the allocation on the allocation hash table. */
-	hash = fnv_hash_integer(addr) % vmem->htbl_size;
-	LIST_FOREACH(&vmem->alloc[hash], iter) {
+	hash = fnv_hash_integer(addr) % vmem->alloc_hash_size;
+	LIST_FOREACH(&vmem->alloc_hash[hash], iter) {
 		tag = list_entry(iter, vmem_btag_t, s_link);
 
 		assert(tag->type == VMEM_BTAG_ALLOC);
 		assert(tag->span);
 
 		if(tag->base != addr) {
+			i++;
 			continue;
 		} else if(tag->size != size) {
 			fatal("Bad vmem_xfree(%s): size: %" PRIu64 ", segment: %" PRIu64,
 			      vmem->name, size, tag->size);
 		}
 
+		/* If we've exceeded a certain hash chain depth in the search
+		 * for the segment, trigger a rehash. Don't make a request if
+		 * we have already made one that has not been completed yet, to
+		 * prevent flooding the DPC manager with requests. */
+		if(i >= VMEM_REHASH_THRESHOLD && !vmem->rehash_requested && dpc_inited()) {
+			dprintf("vmem: saw %zu segments in search on chain %u on %p(%s), triggering rehash\n",
+			        i, hash, vmem, vmem->name);
+			vmem->rehash_requested = true;
+			dpc_request(vmem_rehash, vmem);
+		}
+
 		tag->type = VMEM_BTAG_FREE;
 
 		vmem->used_size -= tag->size;
+		vmem->used_segs--;
 
 		/* Coalesce adjacent free segments. */
 		if(tag->header.next != &vmem->btags) {
@@ -676,9 +801,9 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	fatal("Bad vmem_free(%s): cannot find segment 0x%" PRIx64, vmem->name, addr);
 }
 
-/** Allocate a segment from a Vmem arena.
+/** Allocate a segment from a vmem arena.
  *
- * Allocates a segment from a Vmem arena, importing a new span from the
+ * Allocates a segment from a vmem arena, importing a new span from the
  * source if necessary. The allocation behaviour can be modified by specifying
  * certain behaviour flags.
  *
@@ -702,9 +827,9 @@ vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag) {
 	return vmem_xalloc(vmem, size, 0, 0, 0, 0, 0, vmflag);
 }
 
-/** Free a segment to a Vmem arena.
+/** Free a segment to a vmem arena.
  *
- * Frees a previously allocated segment in a Vmem arena. If the allocation was
+ * Frees a previously allocated segment in a vmem arena. If the allocation was
  * originally made using vmem_xalloc(), use vmem_xfree() instead.
  *
  * @param vmem		Arena to allocate from.
@@ -785,6 +910,7 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
+ * @param flags		Behaviour flags for the arena.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
@@ -792,7 +918,7 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
  */
 bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                        size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                       size_t qcache_max, uint32_t type, int vmflag) {
+                       size_t qcache_max, int flags, uint32_t type, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
 
@@ -802,43 +928,46 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 	assert(!(size % quantum));
 	assert(!(qcache_max % quantum));
 	assert(source != vmem);
+	assert(!source || (afunc && ffunc));
 
 	/* Impose a limit on the number of quantum caches. */
 	if(qcache_max > (quantum * VMEM_QCACHE_MAX)) {
 		qcache_max = quantum * VMEM_QCACHE_MAX;
 	}
 
-	list_init(&vmem->header);
-	list_init(&vmem->children);
 	list_init(&vmem->btags);
+	list_init(&vmem->children);
+	list_init(&vmem->header);
 	mutex_init(&vmem->lock, "vmem_arena_lock", 0);
 	condvar_init(&vmem->space_cvar, "vmem_space_cvar");
 
-	/* Initialise freelists and the allocation hash table. */
+	/* Initialise freelists and the initial allocation hash table. */
 	for(i = 0; i < VMEM_FREELISTS; i++) {
 		list_init(&vmem->free[i]);
 	}
 	for(i = 0; i < VMEM_HASH_INITIAL; i++) {
-		list_init(&vmem->init_hash[i]);
+		list_init(&vmem->initial_hash[i]);
 	}
-
-	strncpy(vmem->name, name, VMEM_NAME_MAX);
-	vmem->name[VMEM_NAME_MAX - 1] = 0;
 
 	vmem->quantum = quantum;
 	vmem->qcache_max = qcache_max;
 	vmem->qshift = highbit(quantum) - 1;
 	vmem->type = type;
+	vmem->free_map = 0;
+	vmem->alloc_hash = vmem->initial_hash;
+	vmem->alloc_hash_size = VMEM_HASH_INITIAL;
+	vmem->rehash_requested = false;
 	vmem->afunc = afunc;
 	vmem->ffunc = ffunc;
 	vmem->source = source;
-	vmem->freemap = 0;
-	vmem->alloc = vmem->init_hash;
-	vmem->htbl_size = VMEM_HASH_INITIAL;
 	vmem->total_size = 0;
 	vmem->used_size = 0;
 	vmem->imported_size = 0;
+	vmem->used_segs = 0;
 	vmem->alloc_count = 0;
+	vmem->flags = flags;
+	strncpy(vmem->name, name, VMEM_NAME_MAX);
+	vmem->name[VMEM_NAME_MAX - 1] = 0;
 
 	/* Create the quantum caches. */
 	if(vmem->qcache_max) {
@@ -863,10 +992,8 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 		}
 	}
 
-	/* Add the arena to the source's child list. */
+	/* Add the arena to an arena list. */
 	if(source) {
-		assert(afunc && ffunc);
-
 		mutex_lock(&source->lock);
 		list_append(&source->children, &vmem->header);
 		mutex_unlock(&source->lock);
@@ -893,9 +1020,9 @@ fail:
 	return false;	
 }
 
-/** Allocate and initialise a Vmem arena.
+/** Allocate and initialise a vmem arena.
  *
- * Allocates a new Vmem arena and creates an initial span/free segment if the
+ * Allocates a new vmem arena and creates an initial span/free segment if the
  * given size is non-zero.
  *
  * @param name		Name of the arena for debugging purposes.
@@ -906,14 +1033,15 @@ fail:
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
+ * @param flags		Behaviour flags for the arena.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
  * @return		Pointer to arena on success, NULL on failure.
  */
 vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
-                    vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                    size_t qcache_max, uint32_t type, int vmflag) {
+                    vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
+                    int flags, uint32_t type, int vmflag) {
 	vmem_t *vmem;
 
 	vmem = kmalloc(sizeof(vmem_t), vmflag & MM_FLAG_MASK);
@@ -922,7 +1050,7 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 	}
 
 	if(!vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source,
-	                      qcache_max, type, vmflag)) {
+	                      qcache_max, flags, type, vmflag)) {
 		kfree(vmem);
 		return NULL;
 	}
@@ -947,10 +1075,10 @@ void __init_text vmem_init(void) {
 	/* Create the boundary tag arena. */
 	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
-	                  0, MM_FATAL);
+	                  0, 0, MM_FATAL);
 }
 
-/** Find a Vmem arena by name.
+/** Find a vmem arena by name.
  * @param header	List header to search from.
  * @param name		Name of arena to find.
  * @return		Pointer to arena found or NULL if not. */
@@ -959,6 +1087,10 @@ static vmem_t *vmem_find_arena(list_t *header, const char *name) {
 
 	LIST_FOREACH(header, iter) {
 		vmem = list_entry(iter, vmem_t, header);
+
+		if(vmem->flags & VMEM_PRIVATE) {
+			continue;
+		}
 
 		if(strcmp(vmem->name, name) == 0) {
 			return vmem;
@@ -973,7 +1105,7 @@ static vmem_t *vmem_find_arena(list_t *header, const char *name) {
 	return NULL;
 }
 
-/** Dump Vmem arenas in a list.
+/** Dump vmem arenas in a list.
  * @param header	List header to dump from.
  * @param indent	Number of spaces to indent the name. */
 static void vmem_dump_list(list_t *header, int indent) {
@@ -982,6 +1114,10 @@ static void vmem_dump_list(list_t *header, int indent) {
 	LIST_FOREACH(header, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
+		if(vmem->flags & VMEM_PRIVATE) {
+			continue;
+		}
+
 		kprintf(LOG_NONE, "%*s%-*s %-4u %-16" PRIu64 " %-16" PRIu64 " %zu\n",
 		        indent, "", VMEM_NAME_MAX - indent, vmem->name, vmem->type,
 		        vmem->total_size, vmem->used_size, vmem->alloc_count);
@@ -989,9 +1125,9 @@ static void vmem_dump_list(list_t *header, int indent) {
 	}
 }
 
-/** KDBG Vmem information command.
+/** KDBG vmem information command.
  *
- * When supplied with no arguments, will give a list of all Vmem arenas.
+ * When supplied with no arguments, will give a list of all vmem arenas.
  * Otherwise, displays information about the specified arena.
  *
  * @param argc		Argument count.
@@ -1008,7 +1144,7 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s [arena]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "When supplied with no arguments, prints a tree of all Vmem arenas in the\n");
+		kprintf(LOG_NONE, "When supplied with no arguments, prints a tree of all vmem arenas in the\n");
 		kprintf(LOG_NONE, "system. Otherwise, prints information about and list of spans/segments in\n");
 		kprintf(LOG_NONE, "the specified arena. The arena can be specified as an address expression\n");
 		kprintf(LOG_NONE, "(e.g. %s &kheap_arena) or as an arena name (e.g. %s \"kheap\").\n", argv[0], argv[0]);

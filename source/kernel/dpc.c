@@ -49,7 +49,7 @@ static SPINLOCK_DECLARE(dpc_lock);
 static SEMAPHORE_DECLARE(dpc_request_sem, 0);
 
 /** DPC thread. */
-static thread_t *dpc_thread;
+static thread_t *dpc_thread = NULL;
 
 /** DPC thread main function.
  * @param arg1		Unused.
@@ -114,6 +114,12 @@ void dpc_request(dpc_function_t function, void *arg) {
 	semaphore_up(&dpc_request_sem, 1);
 
 	spinlock_unlock(&dpc_lock);
+}
+
+/** Check whether the DPC system has been initialised.
+ * @return		Whether initialised. */
+bool dpc_inited(void) {
+	return dpc_thread;
 }
 
 /** Initialize the DPC thread. */

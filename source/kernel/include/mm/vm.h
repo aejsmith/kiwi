@@ -67,12 +67,10 @@ typedef struct vm_region {
 /** Structure containing a virtual address space. */
 typedef struct vm_aspace {
 	mutex_t lock;			/**< Lock to protect address space. */
-	refcount_t count;		/**< Reference count of CPUs using address space. */
-
-	page_map_t pmap;		/**< Underlying page map for address space. */
-	avl_tree_t regions;		/**< Tree of mapped regions. */
-
 	vm_region_t *find_cache;	/**< Cached pointer to last region searched for. */
+	page_map_t pmap;		/**< Underlying page map for address space. */
+	refcount_t count;		/**< Reference count of CPUs using address space. */
+	avl_tree_t regions;		/**< Tree of mapped regions. */
 } vm_aspace_t;
 
 /** Macro that expands to a pointer to the current address space. */

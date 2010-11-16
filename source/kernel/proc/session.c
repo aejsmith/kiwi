@@ -64,5 +64,5 @@ void session_release(session_t *session) {
 
 /** Initialise the session ID allocator. */
 void __init_text session_init(void) {
-	session_id_arena = vmem_create("session_id_arena", 0, 65536, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	session_id_arena = vmem_create("session_id_arena", 0, 65536, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
 }

@@ -43,7 +43,7 @@ struct vmem;
 #define VMEM_QCACHE_SSIZE(m)	MAX(1 << highbit(3 * (m)), 64)
 
 /** Number of free lists to use. */
-#define VMEM_FREELISTS		BITS(vmem_resource_t)
+#define VMEM_FREELISTS		((int)BITS(vmem_resource_t))
 
 /** Type of vmem-allocated resources. */
 typedef uint64_t vmem_resource_t;
@@ -67,10 +67,11 @@ typedef struct vmem {
 
 	/** Boundary tag lists. */
 	list_t free[VMEM_FREELISTS];		/**< Power-of-2 free segment list. */
-	vmem_resource_t freemap;		/**< Bitmap of free lists - set bit indicates a list has segments. */
-	list_t init_hash[VMEM_HASH_INITIAL];	/**< Initial allocation hash table. */
-	list_t *alloc;				/**< Allocation hash table. */
-	size_t htbl_size;			/**< Current size of allocation hash table. */
+	vmem_resource_t free_map;		/**< Bitmap of free lists containing segments. */
+	list_t *alloc_hash;			/**< Allocation hash table. */
+	size_t alloc_hash_size;			/**< Current size of allocation hash table. */
+	list_t initial_hash[VMEM_HASH_INITIAL];	/**< Initial allocation hash table. */
+	bool rehash_requested;			/**< Whether a rehash has been requested. */
 	list_t btags;				/**< List of boundary tags. */
 	condvar_t space_cvar;			/**< Condition variable to wait for space on. */
 
@@ -80,19 +81,25 @@ typedef struct vmem {
 	struct vmem *source;			/**< Source arena. */
 
 	/** Various statistics. */
-	list_t children;			/**< List of arenas using this arena as a source. */
 	vmem_resource_t total_size;		/**< Total size of all spans. */
 	vmem_resource_t used_size;		/**< Total size of all in-use segments. */
 	vmem_resource_t imported_size;		/**< Total size of all imported spans. */
+	vmem_resource_t used_segs;		/**< Number of currently used segments. */
 	size_t alloc_count;			/**< Total number of allocations that have taken place. */
 
-	/** Debugging information. */
+	/** Other information. */
+	int flags;				/**< Behaviour flags for the arena. */
+	list_t children;			/**< List of arenas using this arena as a source. */
 	list_t header;				/**< Link to arena/children list. */
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
 
-/** Flags for Vmem functions. */
+/** Behaviour flags for vmem arenas. */
+#define VMEM_PRIVATE		(1<<0)		/**< Don't put the arena in the global arena list. */
+
+/** Allocation behaviour flags for vmem. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
+#define VM_RANDOMFIT		(1<<11)		/**< Randomise the allocation location. */
 
 extern vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
                                    vmem_resource_t align, vmem_resource_t phase,
@@ -107,10 +114,10 @@ extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, i
 
 extern bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                               size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                              size_t qcache_max, uint32_t type, int vmflag);
+                              size_t qcache_max, int flags, uint32_t type, int vmflag);
 extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
-                           vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                           size_t qcache_max, uint32_t type, int vmflag);
+                           vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
+                           int flags, uint32_t type, int vmflag);
 
 extern void vmem_early_init(void);
 extern void vmem_init(void);

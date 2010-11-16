@@ -1078,7 +1078,7 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 
 /** Initialise the IPC slab caches. */
 static void __init_text ipc_init(void) {
-	port_id_arena = vmem_create("port_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, MM_FATAL);
+	port_id_arena = vmem_create("port_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
 	ipc_port_cache = slab_cache_create("ipc_port_cache", sizeof(ipc_port_t), 0, ipc_port_ctor,
 	                                   NULL, NULL, NULL, 0, MM_FATAL);
 	ipc_connection_cache = slab_cache_create("ipc_connection_cache", sizeof(ipc_connection_t),

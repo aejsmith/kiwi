@@ -26,6 +26,7 @@
 typedef void (*dpc_function_t)(void *arg);
 
 extern void dpc_request(dpc_function_t func, void *arg);
+extern bool dpc_inited(void);
 extern void dpc_init(void);
 
 #endif /* __DPC_H */
