@@ -21,6 +21,7 @@
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
 #include <arch/page.h>
+#include <arch/stack.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

@@ -135,7 +135,6 @@
 
 #include <arch/descriptor.h>
 #include <arch/memmap.h>
-#include <arch/stack.h>
 
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;
@@ -192,16 +191,19 @@ extern void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx,
                               uint32_t standard_edx, uint32_t extended_ecx,
                               uint32_t extended_edx);
 
-/** Get the current CPU structure pointer from the base of the stack.
+static inline unative_t x86_read_dr3(void);
+static inline void x86_write_dr3(unative_t val);
+
+/** Get the current CPU structure pointer.
  * @return		Pointer to current CPU structure. */
 static inline ptr_t cpu_get_pointer(void) {
-	return *(ptr_t *)stack_get_base();
+	return x86_read_dr3();
 }
 
-/** Set the current CPU structure pointer at the base of the stack.
+/** Set the current CPU structure pointer.
  * @param addr		Pointer to new CPU structure. */
 static inline void cpu_set_pointer(ptr_t addr) {
-	*(ptr_t *)stack_get_base() = addr;
+	x86_write_dr3(addr);
 }
 
 #endif /* LOADER */

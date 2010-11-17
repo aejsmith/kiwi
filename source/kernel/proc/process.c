@@ -19,6 +19,7 @@
  */
 
 #include <arch/memmap.h>
+#include <arch/stack.h>
 
 #include <lib/avl_tree.h>
 #include <lib/string.h>

@@ -18,6 +18,8 @@
  * @brief		Thread management code.
  */
 
+#include <arch/stack.h>
+
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
 
