@@ -100,7 +100,6 @@ typedef struct vmem {
 
 /** Allocation behaviour flags for vmem. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
-#define VM_RANDOMFIT		(1<<11)		/**< Randomise the allocation location. */
 
 extern vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
                                    vmem_resource_t align, vmem_resource_t phase,

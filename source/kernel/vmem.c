@@ -189,7 +189,7 @@ static void vmem_rehash(void *_vmem) {
 		return;
 	}
 
-	kprintf(LOG_NORMAL, "vmem: rehashing arena %p(%s), new table size is %llu\n", vmem, vmem->name, new_size);
+	dprintf("vmem: rehashing arena %p(%s), new table size is %llu\n", vmem, vmem->name, new_size);
 
 	/* Allocate and initialise the new table. */
 	table = kmalloc(sizeof(list_t) * new_size, 0);
@@ -388,14 +388,10 @@ static vmem_btag_t *vmem_find_bestfit(vmem_t *vmem, vmem_resource_t size,
 /** Find a free segment using instant-fit.
  * @param vmem		Arena to search in.
  * @param size		Size of segment required.
- * @param minaddr	Minimum address of the allocation.
- * @param maxaddr	Maximum address of the end of the allocation.
  * @param list		Number of the lowest list that can contain a segment
  *			of the requested size.
  * @return		Pointer to segment tag if found, NULL if not. */
-static vmem_btag_t *vmem_find_instantfit(vmem_t *vmem, vmem_resource_t size,
-                                         vmem_resource_t minaddr, vmem_resource_t maxaddr,
-                                         int list) {
+static vmem_btag_t *vmem_find_instantfit(vmem_t *vmem, vmem_resource_t size, int list) {
 	/* If the size is exactly a power of 2, then segments on freelist[n]
 	 * are guaranteed to be big enough. Otherwise, use freelist[n + 1] so
 	 * that we ensure that all segments we find are large enough. The free
@@ -406,21 +402,7 @@ static vmem_btag_t *vmem_find_instantfit(vmem_t *vmem, vmem_resource_t size,
 	}
 
 	/* The rest is the same as best-fit. */
-	return vmem_find_bestfit(vmem, size, minaddr, maxaddr, list);
-}
-
-/** Find a free segment using random-fit.
- * @param vmem		Arena to search in.
- * @param size		Size of segment required.
- * @param minaddr	Minimum address of the allocation.
- * @param maxaddr	Maximum address of the end of the allocation.
- * @param list		Number of the lowest list that can contain a segment
- *			of the requested size.
- * @return		Pointer to segment tag if found, NULL if not. */
-static vmem_btag_t *vmem_find_randomfit(vmem_t *vmem, vmem_resource_t size,
-                                        vmem_resource_t minaddr, vmem_resource_t maxaddr,
-                                        int list) {
-	fatal("VM_RANDOMFIT not yet implemented");
+	return vmem_find_bestfit(vmem, size, 0, 0, list);
 }
 
 /** Find a free segment large enough for the given allocation.
@@ -438,14 +420,18 @@ static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
 
 	assert(size);
 
+	/* Don't perform an instant fit allocation if we have specific
+	 * constraints. */
+	if(minaddr || maxaddr) {
+		vmflag |= VM_BESTFIT;
+	}
+
 	while(true) {
 		/* Attempt to find a segment. */
-		if(vmflag & VM_RANDOMFIT) {
-			seg = vmem_find_randomfit(vmem, size, minaddr, maxaddr, list);
-		} else if(vmflag & VM_BESTFIT) {
+		if(vmflag & VM_BESTFIT) {
 			seg = vmem_find_bestfit(vmem, size, minaddr, maxaddr, list);
 		} else {
-			seg = vmem_find_instantfit(vmem, size, minaddr, maxaddr, list);
+			seg = vmem_find_instantfit(vmem, size, list);
 		}
 
 		if(!seg) {
@@ -662,13 +648,6 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 
 	if(align != 0 || phase != 0 || nocross != 0) {
 		fatal("Laziness has prevented implementation of these constraints. Sorry!");
-	}
-
-	/* Don't perform an instant fit allocation if we have specific
-	 * constraints (this is necessary for minaddr/maxaddr, not sure about
-	 * others...). */
-	if(align != 0 || phase != 0 || nocross != 0 || minaddr != 0 || maxaddr != 0) {
-		vmflag |= VM_BESTFIT;
 	}
 
 	/* Continuously loop until we can make the allocation. If MM_SLEEP is
