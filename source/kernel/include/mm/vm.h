@@ -24,53 +24,34 @@
 #include <arch/memmap.h>
 #include <cpu/cpu.h>
 #include <kernel/vm.h>
+#include <lib/utility.h>
 #include <mm/page.h>
 #include <sync/mutex.h>
 #include <object.h>
 
-struct vm_aspace;
+struct vm_region;
 
-/** Structure containing an anonymous memory map. */
-typedef struct vm_amap {
-	refcount_t count;		/**< Count of regions referring to this object. */
-	mutex_t lock;			/**< Lock to protect map. */
-
-	size_t curr_size;		/**< Number of pages currently contained in object. */
-	size_t max_size;		/**< Maximum number of pages in object. */
-	vm_page_t **pages;		/**< Array of pages currently in object. */
-	uint16_t *rref;			/**< Region reference count array. */
-} vm_amap_t;
-
-/** Structure representing a region in an address space. */
-typedef struct vm_region {
-	struct vm_aspace *as;		/**< Address space region belongs to. */
-	ptr_t start;			/**< Base address of the region. */
-	ptr_t end;			/**< Size of the region. */
-	int flags;			/**< Flags for the region. */
-
-	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
-	offset_t obj_offset;		/**< Offset into the object. */
-	vm_amap_t *amap;		/**< Anonymous map. */
-	offset_t amap_offset;		/**< Offset into the anonymous map. */
-
-	avl_tree_node_t *node;		/**< AVL tree node for the region. */
-} vm_region_t;
-
-/** Flags for the vm_region_t structure. */
-#define VM_REGION_READ		(1<<0)	/**< Region is readable. */
-#define VM_REGION_WRITE		(1<<1)	/**< Region is writable. */
-#define VM_REGION_EXEC		(1<<2)	/**< Region is executable. */
-#define VM_REGION_PRIVATE	(1<<3)	/**< Modifications to this region should not be visible to other processes. */
-#define VM_REGION_STACK		(1<<4)	/**< Region contains a stack and should have a guard page. */
-#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
+/** Number of free lists to use. */
+#define VM_FREELISTS		(((int)BITS(ptr_t)) - PAGE_WIDTH)
 
 /** Structure containing a virtual address space. */
 typedef struct vm_aspace {
 	mutex_t lock;			/**< Lock to protect address space. */
-	vm_region_t *find_cache;	/**< Cached pointer to last region searched for. */
-	page_map_t pmap;		/**< Underlying page map for address space. */
 	refcount_t count;		/**< Reference count of CPUs using address space. */
-	avl_tree_t regions;		/**< Tree of mapped regions. */
+
+	/** Address lookup stuff. */
+	struct vm_region *find_cache;	/**< Cached pointer to last region searched for. */
+	avl_tree_t tree;		/**< Tree of mapped regions for address lookups. */
+
+	/** Underlying page map for address space. */
+	page_map_t pmap;
+
+	/** Free region allocation. */
+	list_t free[VM_FREELISTS];	/**< Power of 2 free lists. */
+	ptr_t free_map;			/**< Bitmap of free lists with regions. */
+
+	/** Sorted list of all (including unused) regions. */
+	list_t regions;
 } vm_aspace_t;
 
 /** Macro that expands to a pointer to the current address space. */
@@ -80,12 +61,10 @@ typedef struct vm_aspace {
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
 #define VM_FAULT_PROTECTION	2	/**< Fault caused by a protection violation. */
 
-/** Page fault access codes.
- * @note		Defined to the same values as the region protection
- *			flags. */
-#define VM_FAULT_READ		(1<<0)	/**< Fault caused by a read. */
-#define VM_FAULT_WRITE		(1<<1)	/**< Fault caused by a write. */
-#define VM_FAULT_EXEC		(1<<2)	/**< Fault when trying to execute. */
+/** Page fault access codes. */
+#define VM_FAULT_READ		VM_MAP_READ
+#define VM_FAULT_WRITE		VM_MAP_WRITE
+#define VM_FAULT_EXEC		VM_MAP_EXEC
 
 extern bool vm_fault(ptr_t addr, int reason, int access);
 

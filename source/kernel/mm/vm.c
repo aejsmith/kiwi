@@ -25,8 +25,22 @@
  * the same as), in particular the implementation of anonymous memory and
  * copy-on-write.
  *
+ * Some details on the various region trees/lists and the method used for
+ * allocation of free regions.
+ *  - There is a vm_region_t structure for each region of memory within an
+ *    address space, whether allocated or not.
+ *  - There is an AVL tree containing only allocated regions, used for fast
+ *    region lookups upon page faults. We do not care about free regions when
+ *    doing these lookups, as a page fault on a free region is invalid, so
+ *    including free regions in this tree would be an unnecessary bottleneck.
+ *  - Free regions are attached to power of two free lists to allow fast
+ *    allocation of free space for non-fixed mappings.
+ *  - There is a sorted list of all regions in an address space. This is used
+ *    on unmap operations to be able to find all the regions that the unmap
+ *    covers.
+ *
  * A brief note about reference counting for pages in the anonymous memory
- * layer.
+ * layer:
  *  - The reference count in the page structure is used to track how many
  *    anonymous objects refer to a single page (i.e. object has been duplicated
  *    but the page has not been copied, because no write fault has occurred).
@@ -37,6 +51,7 @@
  *    the object can cover. This array is used to track how many regions are
  *    mapping each page of the object, allowing pages to be freed when no more
  *    regions refer to them.
+ *
  *
  * @todo		The anonymous object page array could be changed into a
  *			two-level array, which would reduce memory consumption
@@ -70,6 +85,41 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Structure containing an anonymous memory map. */
+typedef struct vm_amap {
+	refcount_t count;		/**< Count of regions referring to this object. */
+	mutex_t lock;			/**< Lock to protect map. */
+
+	size_t curr_size;		/**< Number of pages currently contained in object. */
+	size_t max_size;		/**< Maximum number of pages in object. */
+	vm_page_t **pages;		/**< Array of pages currently in object. */
+	uint16_t *rref;			/**< Region reference count array. */
+} vm_amap_t;
+
+/** Structure representing a region in an address space. */
+typedef struct vm_region {
+	list_t header;			/**< Link to the region list. */
+	list_t free_link;		/**< Link to free region lists. */
+
+	vm_aspace_t *as;		/**< Address space that the region belongs to. */
+	ptr_t start;			/**< Base address of the region. */
+	ptr_t end;			/**< End address of the region. */
+	int flags;			/**< Flags for the region (0 if region is free). */
+
+	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
+	offset_t obj_offset;		/**< Offset into the object. */
+	vm_amap_t *amap;		/**< Anonymous map. */
+	offset_t amap_offset;		/**< Offset into the anonymous map. */
+} vm_region_t;
+
+/** Region behaviour flags. */
+#define VM_REGION_READ		VM_MAP_READ
+#define VM_REGION_WRITE		VM_MAP_WRITE
+#define VM_REGION_EXEC		VM_MAP_EXEC
+#define VM_REGION_PRIVATE	VM_MAP_PRIVATE
+#define VM_REGION_STACK		VM_MAP_STACK
+#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
+
 /** Slab caches used for VM structures. */
 static slab_cache_t *vm_aspace_cache;
 static slab_cache_t *vm_region_cache;
@@ -80,10 +130,16 @@ static slab_cache_t *vm_amap_cache;
  * @param data		Ignored. */
 static void vm_aspace_ctor(void *obj, void *data) {
 	vm_aspace_t *as = obj;
+	int i;
 
 	mutex_init(&as->lock, "vm_aspace_lock", 0);
 	refcount_set(&as->count, 0);
-	avl_tree_init(&as->regions);
+	avl_tree_init(&as->tree);
+	list_init(&as->regions);
+
+	for(i = 0; i < VM_FREELISTS; i++) {
+		list_init(&as->free[i]);
+	}
 }
 
 /** Constructor for anonymous map objects.
@@ -93,6 +149,83 @@ static void vm_amap_ctor(void *obj, void *data) {
 	vm_amap_t *map = obj;
 
 	mutex_init(&map->lock, "vm_amap_lock", 0);
+}
+
+/** Check if a region fits in the user memory area.
+ * @param start		Start address of region.
+ * @param size		Size of region.
+ * @return		Whether region fits. */
+static inline bool vm_region_fits(ptr_t start, size_t size) {
+	ptr_t end = start + size;
+
+	if(end < start || end > (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+		return false;
+#if USER_MEMORY_BASE != 0
+	} else if(start < USER_MEMORY_BASE) {
+		return false;
+#endif
+	} else {
+		return true;
+	}
+}
+
+/** Check if a region is in use.
+ * @param region	Region to check.
+ * @return		Whether the region is in use. Region is classed as
+ *			in use if it is not free and not reserved. */
+static inline bool vm_region_used(const vm_region_t *region) {
+	return (region->flags && !(region->flags & VM_REGION_RESERVED));
+}
+
+/** Check if two regions can be merged.
+ * @param a		First region.
+ * @param b		Second region.
+ * @return		Whether the regions can be merged. Regions are only
+ *			mergeable if unused. */
+static inline bool vm_region_mergeable(const vm_region_t *a, const vm_region_t *b) {
+	if(!vm_region_used(a) && !vm_region_used(b)) {
+		if((a->flags & VM_REGION_RESERVED) == (b->flags & VM_REGION_RESERVED)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Add a region to the appropriate free list.
+ * @param region	Region to add.
+ * @param size		Size of the region. */
+static inline void vm_freelist_insert(vm_region_t *region, size_t size) {
+	int list = highbit(size) - PAGE_WIDTH - 1;
+
+	assert(!region->flags);
+	list_append(&region->as->free[list], &region->free_link);
+	region->as->free_map |= ((ptr_t)1 << list);
+}
+
+/** Remove a region from its free list.
+ * @param region	Region to remove. */
+static inline void vm_freelist_remove(vm_region_t *region) {
+	int list = highbit(region->end - region->start) - PAGE_WIDTH - 1;
+
+	assert(!region->flags);
+	list_remove(&region->free_link);
+	if(list_empty(&region->as->free[list])) {
+		region->as->free_map &= ~((ptr_t)1 << list);
+	}
+}
+
+/** Check if a freelist is empty.
+ * @param as		Address space to check in.
+ * @param list		List number.
+ * @return		Whether the list is empty. */
+static inline bool vm_freelist_empty(vm_aspace_t *as, int list) {
+	if(as->free_map & ((ptr_t)1 << list)) {
+		assert(!list_empty(&as->free[list]));
+		return false;
+	} else {
+		assert(list_empty(&as->free[list]));
+		return true;
+	}
 }
 
 /** Create an anonymous map.
@@ -162,34 +295,18 @@ static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 	return STATUS_SUCCESS;
 }
 
-/** Check if a region fits in the user memory area.
- * @param start		Start address of region.
- * @param size		Size of region.
- * @return		Whether region fits. */
-static inline bool vm_region_fits(ptr_t start, size_t size) {
-	ptr_t end = start + size;
-
-	if(end < start || end > (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
-		return false;
-#if USER_MEMORY_BASE != 0
-	} else if(start < USER_MEMORY_BASE) {
-		return false;
-#endif
-	} else {
-		return true;
-	}
-}
-
 /** Allocate a new region structure. Caller must attach object to it.
  * @param as		Address space of the region.
  * @param start		Start address of the region.
  * @param end		End address of the region.
  * @param flags		Flags for the region.
  * @return		Pointer to region structure. */
-static vm_region_t *vm_region_alloc(vm_aspace_t *as, ptr_t start, ptr_t end, int flags) {
+static vm_region_t *vm_region_create(vm_aspace_t *as, ptr_t start, ptr_t end, int flags) {
 	vm_region_t *region;
 
 	region = slab_cache_alloc(vm_region_cache, MM_SLEEP);
+	list_init(&region->header);
+	list_init(&region->free_link);
 	region->as = as;
 	region->start = start;
 	region->end = end;
@@ -209,8 +326,8 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	size_t i, start, end;
 	vm_region_t *dest;
 
-	dest = vm_region_alloc(as, src->start, src->end, src->flags);
-	if(src->flags & VM_REGION_RESERVED) {
+	dest = vm_region_create(as, src->start, src->end, src->flags);
+	if(!vm_region_used(src)) {
 		return dest;
 	}
 
@@ -270,19 +387,42 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 		dest->amap->rref[i - start] = 1;
 	}
 
-	dprintf("vm: copied anonymous region %p (map: %p) to %p (map: %p)\n",
+	dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
 	        src, src->amap, dest, dest->amap);
 	mutex_unlock(&src->amap->lock);
 	return dest;
 }
 
+/** Get the region before another region in the region list.
+ * @param region	Region to get region before from.
+ * @return		Pointer to previous region, or NULL if start of list. */
+static vm_region_t *vm_region_prev(vm_region_t *region) {
+	if(region->as->regions.next == &region->header) {
+		return NULL;
+	}
+
+	return list_entry(region->header.prev, vm_region_t, header);
+}
+
+/** Get the region after another region in the region list.
+ * @param region	Region to get region after from.
+ * @return		Pointer to next region, or NULL if end of list. */
+static vm_region_t *vm_region_next(vm_region_t *region) {
+	if(region->as->regions.prev == &region->header) {
+		return NULL;
+	}
+
+	return list_entry(region->header.next, vm_region_t, header);
+}
+
 /** Searches for a region containing an address.
  * @param as		Address space to search in (should be locked).
  * @param addr		Address to search for.
- * @param nearp		If non-NULL, will be set to the first region higher
- *			than the address if no exact region match is found.
- * @return		Pointer to region if found, false if not. */
-static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, vm_region_t **nearp) {
+ * @param unused	Whether to include unused regions in the search.
+ * @return		Pointer to region if found, false if not. If including
+ *			unused regions, this will always succeed unless the
+ *			given address is invalid. */
+static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 	avl_tree_node_t *node, *near = NULL;
 	vm_region_t *region;
 
@@ -294,36 +434,47 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, vm_region_t **ne
 	}
 
 	/* Fall back on searching through the AVL tree. */
-	node = as->regions.root;
+	node = as->tree.root;
 	while(node) {
 		region = avl_tree_entry(node, vm_region_t);
+		assert(vm_region_used(region));
 		if(addr >= region->start) {
 			if(addr < region->end) {
 				as->find_cache = region;
 				return region;
 			}
+
+			near = node;
 			node = node->right;
 		} else {
-			/* Save this node so that we can find the
-			 * next region upon failure. */
-			near = node;
 			node = node->left;
 		}
 	}
 
-	/* Failed, save the nearest entry if requested. */
-	if(nearp) {
-		*nearp = (near) ? avl_tree_entry(near, vm_region_t) : NULL;
-	}
-	return NULL;
-}
+	/* We couldn't find a matching allocated region. We do however have the
+	 * nearest allocated region on the left. If we want to include unused
+	 * regions in the search, search forward from this region in the region
+	 * list to find the required region. */
+	if(unused) {
+		if(near) {
+			region = vm_region_next(avl_tree_entry(near, vm_region_t));
+		} else {
+			/* Should never be empty. */
+			assert(!list_empty(&as->regions));
+			region = list_entry(as->regions.next, vm_region_t, header);
+		}
 
-/** Get the next region in the region list.
- * @param region	Current region.
- * @return		Pointer to next region. */
-static vm_region_t *vm_region_next(vm_region_t *region) {
-	avl_tree_node_t *node = avl_tree_node_next(region->node);
-	return (node) ? avl_tree_entry(node, vm_region_t) : NULL;
+		while(region) {
+			if(addr >= region->start && addr < region->end) {
+				assert(!vm_region_used(region));
+				return region;
+			}
+
+			region = vm_region_next(region);
+		}
+	}
+
+	return NULL;
 }
 
 /** Release a page that was mapped in a region.
@@ -374,7 +525,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 	ptr_t addr;
 	size_t i;
 
-	assert(!(region->flags & VM_REGION_RESERVED));
+	assert(vm_region_used(region));
 	assert(region->handle || region->amap);
 
 	/* Acquire the anonymous map lock if there is one. */
@@ -430,13 +581,12 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 	assert(start >= region->start);
 	assert(end <= region->end);
 
-	/* If not reserved, unmap pages in the areas we're not going to cover
-	 * any more, and let the object know that we're doing this. */
-	if(!(region->flags & VM_REGION_RESERVED)) {
-		if(region->end - end) {
+	/* Unmap pages in the areas we're not going to cover any more. */
+	if(vm_region_used(region)) {
+		if(end < region->end) {
 			vm_region_unmap(region, end, region->end);
 		}
-		if(start - region->start) {
+		if(start > region->start) {
 			vm_region_unmap(region, region->start, start);
 			if(region->amap) {
 				region->amap_offset += (start - region->start);
@@ -444,13 +594,19 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 				region->obj_offset += (start - region->start);
 			}
 		}
-	}
 
-	/* If the start address is changing, we must remove and re-insert the
-	 * region in the tree, because the key is changing. */
-	if(start != region->start) {
-		avl_tree_remove(&region->as->regions, (key_t)region->start);
-		avl_tree_insert(&region->as->regions, (key_t)start, region, &region->node);
+		/* If the start address is changing, we must re-insert the
+		 * region in the tree, because the key is changing. */
+		if(start != region->start) {
+			avl_tree_remove(&region->as->tree, region->start);
+			avl_tree_insert(&region->as->tree, start, region, NULL);
+		}
+	} else if(!(region->flags & VM_REGION_RESERVED)) {
+		/* If the size is changing, remove from the current freelist. */
+		if((region->end - region->start) != (end - start)) {
+			vm_freelist_remove(region);
+			vm_freelist_insert(region, end - start);
+		}
 	}
 
 	/* Modify the addresses in the region. */
@@ -459,7 +615,8 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 }
 
 /** Split a region.
- * @param region	Region to split.
+ * @param region	Region to split. Upon return this structure will be the
+ *			lower half of the split.
  * @param end		Where to end first part of region.
  * @param start		Where to start second part of region. */
 static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
@@ -471,9 +628,9 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 	assert(start >= end && start < region->end);
 
 	/* Create a region structure for the top half. */
-	split = vm_region_alloc(region->as, start, region->end, region->flags);
+	split = vm_region_create(region->as, start, region->end, region->flags);
 
-	if(!(region->flags & VM_REGION_RESERVED)) {
+	if(vm_region_used(region)) {
 		/* Unmap the gap between the regions if there is one. */
 		if(end != start) {
 			vm_region_unmap(region, end, start);
@@ -490,20 +647,30 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 		} else {
 			split->obj_offset = region->obj_offset + (start - region->start);
 		}
+
+		/* Insert the split region. */
+		avl_tree_insert(&split->as->tree, split->start, split, NULL);
+	} else if(!(region->flags & VM_REGION_RESERVED)) {
+		/* Move the bottom half to the correct free list. */
+		vm_freelist_remove(region);
+		vm_freelist_insert(region, end - region->start);
+
+		/* Add the split region to a free list. */
+		vm_freelist_insert(split, split->end - start);
 	}
+
+	list_add_after(&region->header, &split->header);
 
 	/* Change the size of the old region. */
 	region->end = end;
-
-	/* Insert the split region. */
-	avl_tree_insert(&split->as->regions, (key_t)split->start, split, &split->node);
 }
 
 /** Unmap an entire region.
  * @param region	Region to destroy. */
 static void vm_region_destroy(vm_region_t *region) {
-	/* Unmap the region and drop references to the object/anonymous map. */
-	if(!(region->flags & VM_REGION_RESERVED)) {
+	/* Unmap the region and drop references to the object/anonymous map,
+	 * and remove it from the tree or freelist. */
+	if(vm_region_used(region)) {
 		vm_region_unmap(region, region->start, region->end);
 		if(region->amap) {
 			vm_amap_release(region->amap);
@@ -511,122 +678,180 @@ static void vm_region_destroy(vm_region_t *region) {
 		if(region->handle) {
 			object_handle_release(region->handle);
 		}
+
+		avl_tree_remove(&region->as->tree, region->start);
+	} else if(!(region->flags & VM_REGION_RESERVED)) {
+		vm_freelist_remove(region);
 	}
 
-	avl_tree_remove(&region->as->regions, region->start);
+	/* Remove from the main region list. */
+	list_remove(&region->header);
 
-	/* If the region was the cached find pointer, get rid of it - bad
-	 * things will happen if something looks at a freed region. */
+	/* If the region was the cached find pointer, get rid of it. */
 	if(region == region->as->find_cache) {
 		region->as->find_cache = NULL;
 	}
+
+	assert(list_empty(&region->free_link));
 	slab_cache_free(vm_region_cache, region);
 }
 
-/** Free a region in an address space.
+/** Remove all existing regions in an address range.
  * @param as		Address space to free in.
  * @param start		Start of region to free.
- * @param end		End of region to free. */
-static void vm_unmap_internal(vm_aspace_t *as, ptr_t start, ptr_t end) {
-	vm_region_t *region, *near, *next;
+ * @param end		End of region to free.
+ * @return		Pointer to region before the hole created. */
+static vm_region_t *vm_region_insert_internal(vm_aspace_t *as, ptr_t start, ptr_t end) {
+	vm_region_t *region, *next, *prev;
 
-	/* Find the start region. */
-	if(!(region = vm_region_find(as, start, &near))) {
-		if(near == NULL) {
-			/* No region matches, and there is not a region after.
-			 * Nothing to do. */
-			return;
-		} else if(near->start >= end) {
-			/* Region following does not overlap the region we're
-			 * freeing, do nothing. */
-			return;
-		}
+	/* Find the region containing the start address. */
+	region = vm_region_find(as, start, true);
+	assert(region);
 
-		/* We need to free some regions following us. */
-		region = near;
-	} else if(region->start < start) {
-		if(region->end == end) {
-			/* Just shrink the region and finish. */
+	if(region->start < start) {
+		prev = region;
+		if(region->end <= end) {
 			vm_region_shrink(region, region->start, start);
-			return;
-		} else if(region->end < end) {
-			/* Shrink the region, move to next and fall through. */
-			vm_region_shrink(region, region->start, start);
-			if(!(region = vm_region_next(region))) {
-				return;
+
+			region = vm_region_next(region);
+			if(prev->end == end || !region) {
+				return prev;
 			}
 		} else {
 			/* Split the region and finish. */
 			vm_region_split(region, start, end);
-			return;
+			return region;
 		}
+	} else {
+		/* Save the region before this one to return to the caller. */
+		prev = vm_region_prev(region);
 	}
 
-	assert(region->start >= start);
-
 	/* Loop through and eat up all the regions necessary. */
-	while(region && region->start < end) {
+	while(true) {
 		if(region->end <= end) {
 			/* Completely overlap this region, remove. */
-			next = vm_region_next(region);
+			next = (region->end < end) ? vm_region_next(region) : NULL;
 			vm_region_destroy(region);
-			region = next;
+			if(!(region = next)) {
+				break;
+			}
 		} else {
 			/* Resize the existing region and finish. */
 			vm_region_shrink(region, end, region->end);
-			return;
+			break;
 		}
 	}
+
+	return prev;
 }
 
-/** Searches for free space in an address space.
- * @param as		Address space to search in (should be locked).
+/** Insert a region, replacing overlapping existing regions.
+ * @note		Addresses must be checked for validity by the caller.
+ * @param as		Address space to insert into.
+ * @param start		Start of region to insert.
+ * @param end		End of region to insert.
+ * @param flags		Flags for the new region.
+ * @return		Pointer to inserted region. May not start or end at the
+ *			requested addresses if inserting an unused region. This
+ *			region will have been inserted into the tree or free
+ *			lists as necessary. */
+static vm_region_t *vm_region_insert(vm_aspace_t *as, ptr_t start, ptr_t end, int flags) {
+	vm_region_t *region, *exist;
+
+	/* Create the new region. */
+	region = vm_region_create(as, start, end, flags);
+
+	/* Create a hole to insert the new region into. */
+	exist = vm_region_insert_internal(as, start, end);
+	if(exist) {
+		assert(exist->end == start);
+
+		list_add_after(&exist->header, &region->header);
+
+		/* If the existing region and this region are compatible,
+		 * merge them. */
+		if(vm_region_mergeable(region, exist)) {
+			region->start = exist->start;
+			vm_region_destroy(exist);
+		}
+	} else {
+		list_prepend(&as->regions, &region->header);
+	}
+
+	/* Check if we can merge with the region after. */
+	exist = vm_region_next(region);
+	if(exist) {
+		assert(exist->start == end);
+
+		if(vm_region_mergeable(region, exist)) {
+			region->end = exist->end;
+			vm_region_destroy(exist);
+		}
+	}
+
+	/* Finally, insert into the region tree or the free lists. */
+	if(vm_region_used(region)) {
+		avl_tree_insert(&as->tree, region->start, region, NULL);
+	} else if(!(region->flags & VM_REGION_RESERVED)) {
+		vm_freelist_insert(region, region->end - region->start);
+	}
+
+	return region;
+}
+
+/** Allocate space in an address space.
+ * @param as		Address space to allocate in (should be locked).
  * @param size		Size of space required.
- * @param addrp		Where to store address of space.
- * @return		True if space found, false if not. */
-static bool vm_find_free(vm_aspace_t *as, size_t size, ptr_t *addrp) {
-	vm_region_t *region, *prev = NULL;
+ * @param flags		Flags for the region. Should not be empty or reserved.
+ * @return		Pointer to region if allocated, NULL if not. */
+static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
+	vm_region_t *region;
+	size_t exist_size;
+	int list, i;
 
 	assert(size);
+	assert(flags && !(flags & VM_REGION_RESERVED));
 
-	/* Iterate over all regions to find the first suitable hole. */
-	AVL_TREE_FOREACH(&as->regions, iter) {
-		region = avl_tree_entry(iter, vm_region_t);
-
-		if(prev == NULL) {
-			/* First region, check if there is a hole preceding it
-			 * and whether it is big enough. */
-			if((USER_MEMORY_BASE + size) <= region->start) {
-				*addrp = USER_MEMORY_BASE;
-				return true;
-			}
-		} else {
-			/* Check if there is a gap between the previous region
-			 * and this region that's big enough. */
-			if((region->start - prev->end) >= size) {
-				*addrp = prev->end;
-				return true;
-			}
-		}
-
-		prev = region;
+	/* Get the list to search on. If the size is exactly a power of 2, then
+	 * regions on freelist[n] are guaranteed to be big enough. Otherwise,
+	 * use freelist[n + 1] so that we ensure that all regions we find are
+	 * large enough. The free bitmap check will ensure that list does not
+	 * go higher than the number of freelists. */
+	list = highbit(size) - PAGE_WIDTH - 1;
+	if((size & (size - 1)) != 0 && as->free_map >> (list + 1)) {
+		list++;
 	}
 
-	/* Reached the end of the address space, see if we have space following
-	 * the previous entry. If there wasn't a previous entry, the address
-	 * space was empty. */
-	if(prev) {
-		if((prev->end + size) > prev->end && (prev->end + size) <= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
-			/* We have some space, return it. */
-			*addrp = prev->end;
-			return true;
+	/* Find a free region. */
+	for(i = list; i < VM_FREELISTS; i++) {
+		if(vm_freelist_empty(as, i)) {
+			continue;
 		}
-	} else if(size <= USER_MEMORY_SIZE) {
-		*addrp = USER_MEMORY_BASE;
-		return true;
+
+		LIST_FOREACH(&as->free[i], iter) {
+			region = list_entry(iter, vm_region_t, free_link);
+			assert(!vm_region_used(region));
+
+			exist_size = region->end - region->start;
+			if(exist_size < size) {
+				continue;
+			} else if(exist_size > size) {
+				/* Too big, split it. */
+				vm_region_split(region, region->start + size, region->start + size);
+			}
+
+			/* Remove from the free list and add to the tree. */
+			vm_freelist_remove(region);
+			avl_tree_insert(&as->tree, region->start, region, NULL);
+			region->flags = flags;
+			dprintf("vm: allocated region [%p,%p) from list %d (as: %p)\n",
+			        region->start, region->end, i, as);
+			return region;
+		}
 	}
 
-	return false;
+	return NULL;
 }
 
 /** Handle an fault on a region with an anonymous map.
@@ -856,16 +1081,21 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	/* Safe to take the lock despite us being in an interrupt - the lock
 	 * is only held within the functions in this file, and they should not
 	 * incur a pagefault (if they do there's something wrong!). */
+	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
+		kprintf(LOG_WARN, "vm: recursive locking on %p, fault in VM operation?\n");
+		return false;
+	}
 	mutex_lock(&as->lock);
 
 	/* Find the region that the fault occurred in - if its a reserved
 	 * region, the memory is unmapped so treat it as though no region is
 	 * there. */
-	region = vm_region_find(as, addr, NULL);
-	if(unlikely(!region) || unlikely(region->flags & VM_REGION_RESERVED)) {
+	region = vm_region_find(as, addr, false);
+	if(unlikely(!region)) {
 		goto out;
 	}
 
+	assert(vm_region_used(region));
 	assert(region->amap || region->handle);
 
 	/* Check whether the access is allowed. Fault codes are defined to the
@@ -879,7 +1109,7 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	if(region->flags & VM_REGION_STACK && addr == region->start) {
 		kprintf(LOG_DEBUG, "vm: thread %" PRIu32 " hit stack guard page %p\n",
 		        curr_thread->id, addr);
-		return false;
+		goto out;
 	}
 
 	/* Lock the page map. */
@@ -920,14 +1150,7 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	}
 
 	mutex_lock(&as->lock);
-
-	/* Allocate the region structure. */
-	region = vm_region_alloc(as, start, start + size, VM_REGION_RESERVED);
-
-	/* Create a hole and insert it into the address space. */
-	vm_unmap_internal(as, start, start + size);
-	avl_tree_insert(&as->regions, (key_t)region->start, region, &region->node);
-
+	region = vm_region_insert(as, start, start + size, VM_REGION_RESERVED);
 	dprintf("vm: reserved region [%p,%p) (as: %p)\n",region->start, region->end, as);
 	mutex_unlock(&as->lock);
 	return STATUS_SUCCESS;
@@ -967,6 +1190,8 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
+		return STATUS_INVALID_ARG;
+	} else if(!(flags & (VM_MAP_READ | VM_MAP_WRITE | VM_MAP_EXEC))) {
 		return STATUS_INVALID_ARG;
 	}
 	if(flags & VM_MAP_FIXED) {
@@ -1008,17 +1233,17 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 	/* If the mapping is fixed, remove anything in the location we want to
 	 * insert into, otherwise find some free space. */
 	if(flags & VM_MAP_FIXED) {
-		vm_unmap_internal(as, start, start + size);
+		region = vm_region_insert(as, start, start + size, rflags);
 	} else {
-		if(!vm_find_free(as, size, &start)) {
+		region = vm_region_alloc(as, size, rflags);
+		if(!region) {
 			mutex_unlock(&as->lock);
 			return STATUS_NO_MEMORY;
 		}
 	}
 
-	/* Create the region structure, attach the object to it, and create an
-	 * anonymous map if necessary. */
-	region = vm_region_alloc(as, start, start + size, rflags);
+	/* Attach the object to the region, and create an anonymous map if
+	 * creating an anonymous or private mapping. */
 	if(handle) {
 		region->handle = handle;
 		object_handle_get(region->handle);
@@ -1032,9 +1257,6 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 			fatal("Could not reference new anonymous map");
 		}
 	}
-
-	/* Insert the region into the tree. */
-	avl_tree_insert(&as->regions, (key_t)region->start, region, &region->node);
 
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
 	        region->start, region->end, as, handle, flags, rflags);
@@ -1061,7 +1283,7 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 	}
 
 	mutex_lock(&as->lock);
-	vm_unmap_internal(as, start, start + size);
+	vm_region_insert(as, start, start + size, 0);
 	mutex_unlock(&as->lock);
 
 	dprintf("vm: unmapped region [%p,%p) (as: %p)\n", start, start + size, as);
@@ -1099,16 +1321,26 @@ void vm_aspace_switch(vm_aspace_t *as) {
 /** Create a new address space.
  * @return		Pointer to address space structure. */
 vm_aspace_t *vm_aspace_create(void) {
+	vm_region_t *region;
 	vm_aspace_t *as;
 	status_t ret;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
 	page_map_init(&as->pmap, MM_SLEEP);
 	as->find_cache = NULL;
+	as->free_map = 0;
+
+	/* Insert the initial free region. */
+	region = vm_region_create(as, USER_MEMORY_BASE, USER_MEMORY_BASE + USER_MEMORY_SIZE, 0);
+	list_append(&as->regions, &region->header);
+	vm_freelist_insert(region, USER_MEMORY_SIZE);
 
 	/* Mark the first page of the address space as reserved to catch NULL
-	 * pointer accesses. This should not fail. */
+	 * pointer accesses. Also mark the libkernel area as reserved. This
+	 * should not fail. */
 	ret = vm_reserve(as, 0x0, PAGE_SIZE);
+	assert(ret == STATUS_SUCCESS);
+	ret = vm_reserve(as, LIBKERNEL_BASE, LIBKERNEL_SIZE);
 	assert(ret == STATUS_SUCCESS);
 	return as;
 }
@@ -1124,24 +1356,32 @@ vm_aspace_t *vm_aspace_create(void) {
  * @return		Pointer to new address space.
  */
 vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
-	vm_region_t *region, *rclone;
-	vm_aspace_t *clone;
+	vm_region_t *orig_region, *region;
+	vm_aspace_t *as;
 
-	clone = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	page_map_init(&clone->pmap, MM_SLEEP);
-	clone->find_cache = NULL;
+	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
+	page_map_init(&as->pmap, MM_SLEEP);
+	as->find_cache = NULL;
+	as->free_map = 0;
 
 	mutex_lock(&orig->lock);
 
 	/* Clone each region in the original address space. */
-	AVL_TREE_FOREACH(&orig->regions, iter) {
-		region = avl_tree_entry(iter, vm_region_t);
-		rclone = vm_region_clone(region, clone);
-		avl_tree_insert(&clone->regions, (key_t)rclone->start, rclone, &rclone->node);
+	LIST_FOREACH(&orig->regions, iter) {
+		orig_region = list_entry(iter, vm_region_t, header);
+		region = vm_region_clone(orig_region, as);
+		list_append(&as->regions, &region->header);
+
+		/* Insert into the region tree or the free lists. */
+		if(vm_region_used(region)) {
+			avl_tree_insert(&as->tree, region->start, region, NULL);
+		} else if(!(region->flags & VM_REGION_RESERVED)) {
+			vm_freelist_insert(region, region->end - region->start);
+		}
 	}
 
 	mutex_unlock(&orig->lock);
-	return clone;
+	return as;
 }
 
 /** Destroy an address space.
@@ -1161,13 +1401,15 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	}
 
 	/* Unmap and destroy each region. */
-	AVL_TREE_FOREACH_SAFE(&as->regions, iter) {
-		vm_region_destroy(avl_tree_entry(iter, vm_region_t));
+	LIST_FOREACH_SAFE(&as->regions, iter) {
+		vm_region_destroy(list_entry(iter, vm_region_t, header));
 	}
 
 	/* Destroy the page map. */
 	page_map_destroy(&as->pmap);
 
+	assert(list_empty(&as->regions));
+	assert(avl_tree_empty(&as->tree));
 	slab_cache_free(vm_aspace_cache, as);
 }
 
@@ -1185,15 +1427,24 @@ void __init_text vm_init(void) {
 	vm_cache_init();
 }
 
+/** Display details of a region.
+ * @param region	Region to display. */
+static void dump_region(vm_region_t *region) {
+	kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
+	        region->start, region->end, region->flags,
+	        region->handle, region->obj_offset, region->amap,
+	        region->amap_offset);
+}
+
 /** Dump an address space.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_aspace(int argc, char **argv) {
-	vm_region_t *region;
 	process_t *process;
 	vm_aspace_t *as;
 	unative_t val;
+	int i;
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s [--addr] <value>\n\n", argv[0]);
@@ -1232,13 +1483,29 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	kprintf(LOG_NONE, "%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
 	        "====", "===", "=====", "======", "======", "====", "======");
 
-	AVL_TREE_FOREACH(&as->regions, iter) {
-		region = avl_tree_entry(iter, vm_region_t);
+	LIST_FOREACH(&as->regions, iter) {
+		dump_region(list_entry(iter, vm_region_t, header));
+	}
 
-		kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
-		        region->start, region->end, region->flags,
-		        region->handle, region->obj_offset, region->amap,
-		        region->amap_offset);
+	kprintf(LOG_NONE, "\nAllocated:\n\n");
+
+	AVL_TREE_FOREACH(&as->tree, iter) {
+		dump_region(avl_tree_entry(iter, vm_region_t));
+	}
+
+	for(i = 0; i < VM_FREELISTS; i++) {
+		if(!(as->free_map & ((ptr_t)1 << i))) {
+			if(list_empty(&as->free[i])) {
+				continue;
+			}
+			kprintf(LOG_NONE, "\nFreelist %d (shouldn't have entries!):\n\n", i);
+		} else {
+			kprintf(LOG_NONE, "\nFreelist %d:\n\n", i);
+		}
+
+		LIST_FOREACH(&as->free[i], iter) {
+			dump_region(list_entry(iter, vm_region_t, free_link));
+		}
 	}
 
 	return KDBG_OK;

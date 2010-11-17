@@ -27,9 +27,7 @@
 extern "C" {
 #endif
 
-/** Behaviour flags for vm_map_* functions.
- * @note		Flags that have a region equivalent are defined to the
- *			same value as the region flag. */
+/** Behaviour flags for vm_map_* functions. */
 #define VM_MAP_READ		(1<<0)	/**< Mapping should be readable. */
 #define VM_MAP_WRITE		(1<<1)	/**< Mapping should be writable. */
 #define VM_MAP_EXEC		(1<<2)	/**< Mapping should be executable. */
