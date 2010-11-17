@@ -247,6 +247,8 @@ PRIVATE_FUNCTION_START(__loader_entry)
 1:	jmp	1b
 FUNCTION_END(__loader_entry)
 
+.section .data, "aw", @progbits
+
 /** GDT pointer. */
 SYMBOL(loader_gdtp)
         .word .L__gdt_end-__gdt-1
@@ -259,8 +261,6 @@ SYMBOL(boot_device_id)
 /** Boot partition offset. */
 SYMBOL(boot_part_offset)
 	.quad 0
-
-.section .data, "aw", @progbits
 
 /** Stack. */
 .align PAGE_SIZE

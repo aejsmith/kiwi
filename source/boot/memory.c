@@ -18,6 +18,8 @@
  * @brief		Memory management functions.
  */
 
+#include <arch/stack.h>
+
 #include <boot/console.h>
 #include <boot/error.h>
 #include <boot/memory.h>
@@ -387,7 +389,7 @@ void memory_init(void) {
 	phys_memory_add((ptr_t)heap, (ptr_t)heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
 
 	/* Mark the boot CPU's stack as reclaimable. */
-	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);
+	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + KSTACK_SIZE, PHYS_MEMORY_RECLAIMABLE);
 }
 
 /** Finalise the memory map.
