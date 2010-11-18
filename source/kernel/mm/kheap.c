@@ -253,16 +253,17 @@ void kheap_unmap_range(void *addr, size_t size, bool shared) {
 
 /** First part of kernel heap initialisation. */
 void __init_text kheap_early_init(void) {
-	vmem_early_create(&kheap_raw_arena, "kheap_raw_arena", KERNEL_HEAP_BASE, KERNEL_HEAP_SIZE,
-	                  PAGE_SIZE, NULL, NULL, NULL, 0, 0, RESOURCE_TYPE_KASPACE, MM_FATAL);
+	vmem_early_create(&kheap_raw_arena, "kheap_raw_arena", KERNEL_HEAP_BASE,
+	                  KERNEL_HEAP_SIZE, PAGE_SIZE, NULL, NULL, NULL, 0,
+	                  RESOURCE_TYPE_KASPACE, MM_FATAL);
 }
 
 /** Second part of heap initialisation. */
 void __init_text kheap_init(void) {
 	vmem_early_create(&kheap_va_arena, "kheap_va_arena", 0, 0, PAGE_SIZE,
 	                  vmem_alloc, vmem_free, &kheap_raw_arena, PAGE_SIZE * 8,
-	                  0, 0, MM_FATAL);
+	                  0, MM_FATAL);
 	vmem_early_create(&kheap_arena, "kheap_arena", 0, 0, PAGE_SIZE,
 	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_va_arena, 0,
-	                  0, 0, MM_FATAL);
+	                  0, MM_FATAL);
 }

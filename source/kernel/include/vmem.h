@@ -88,15 +88,11 @@ typedef struct vmem {
 	size_t alloc_count;			/**< Total number of allocations that have taken place. */
 
 	/** Other information. */
-	int flags;				/**< Behaviour flags for the arena. */
 	list_t header;				/**< Link to arena list. */
 	list_t children;			/**< List of arenas using this arena as a source. */
 	list_t parent_link;			/**< Link to parent arena. */
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
-
-/** Behaviour flags for vmem arenas. */
-#define VMEM_PRIVATE		(1<<0)		/**< Don't put the arena in the global arena list. */
 
 /** Allocation behaviour flags for vmem. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
@@ -114,10 +110,10 @@ extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, i
 
 extern bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                               size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                              size_t qcache_max, int flags, uint32_t type, int vmflag);
+                              size_t qcache_max, uint32_t type, int vmflag);
 extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                            vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
-                           int flags, uint32_t type, int vmflag);
+                           uint32_t type, int vmflag);
 
 extern int kdbg_cmd_vmem(int argc, char **argv);
 

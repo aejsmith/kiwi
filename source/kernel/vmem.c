@@ -917,7 +917,6 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
- * @param flags		Behaviour flags for the arena.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
@@ -925,7 +924,7 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
  */
 bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
                        size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                       size_t qcache_max, int flags, uint32_t type, int vmflag) {
+                       size_t qcache_max, uint32_t type, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
 
@@ -973,7 +972,6 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 	vmem->imported_size = 0;
 	vmem->used_segs = 0;
 	vmem->alloc_count = 0;
-	vmem->flags = flags;
 	strncpy(vmem->name, name, VMEM_NAME_MAX);
 	vmem->name[VMEM_NAME_MAX - 1] = 0;
 
@@ -1042,7 +1040,6 @@ fail:
  * @param ffunc		Function to call to free to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
- * @param flags		Behaviour flags for the arena.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
  *
@@ -1050,7 +1047,7 @@ fail:
  */
 vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
                     vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
-                    int flags, uint32_t type, int vmflag) {
+                    uint32_t type, int vmflag) {
 	vmem_t *vmem;
 
 	vmem = kmalloc(sizeof(vmem_t), vmflag & MM_FLAG_MASK);
@@ -1059,7 +1056,7 @@ vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size
 	}
 
 	if(!vmem_early_create(vmem, name, base, size, quantum, afunc, ffunc, source,
-	                      qcache_max, flags, type, vmflag)) {
+	                      qcache_max, type, vmflag)) {
 		kfree(vmem);
 		return NULL;
 	}
@@ -1076,10 +1073,8 @@ static vmem_t *vmem_find_arena(const char *name) {
 	LIST_FOREACH(&vmem_arenas, iter) {
 		vmem = list_entry(iter, vmem_t, header);
 
-		if(!(vmem->flags & VMEM_PRIVATE)) {
-			if(strcmp(vmem->name, name) == 0) {
-				return vmem;
-			}
+		if(strcmp(vmem->name, name) == 0) {
+			return vmem;
 		}
 	}
 
@@ -1100,10 +1095,6 @@ static void vmem_dump_list(list_t *header, int indent) {
 			}
 		} else {
 			vmem = list_entry(iter, vmem_t, parent_link);
-		}
-
-		if(vmem->flags & VMEM_PRIVATE) {
-			continue;
 		}
 
 		kprintf(LOG_NONE, "%*s%-*s %-4u %-16" PRIu64 " %-16" PRIu64 " %zu\n",
@@ -1216,7 +1207,7 @@ void __init_text vmem_early_init(void) {
 void __init_text vmem_init(void) {
 	/* Create the boundary tag arena. */
 	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", 0, 0, PAGE_SIZE,
-	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena, 0,
+	                  kheap_anon_afunc, kheap_anon_ffunc, &kheap_raw_arena,
 	                  0, 0, MM_FATAL);
 }
 

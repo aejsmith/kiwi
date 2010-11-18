@@ -673,7 +673,7 @@ void __init_text page_init(kernel_args_t *args) {
 
 	/* Create the arena and populate it with detected ranges. */
 	vmem_early_create(&page_arena, "page_arena", 0, 0, PAGE_SIZE, NULL, NULL,
-	                  NULL, 0, 0, RESOURCE_TYPE_MEMORY, MM_FATAL);
+	                  NULL, 0, RESOURCE_TYPE_MEMORY, MM_FATAL);
 	for(addr = args->phys_ranges; addr;) {
 		range = page_phys_map(addr, sizeof(*range), MM_FATAL);
 		switch(range->type) {
