@@ -81,51 +81,33 @@ void bitmap_destroy(bitmap_t *bitmap) {
 }
 
 /** Set a bit in a bitmap.
- *
- * Sets the specified bit in a bitmap.
- *
  * @param bitmap	Bitmap to set in.
- * @param bit		Number of the bit to set.
- */
+ * @param bit		Number of the bit to set. */
 void bitmap_set(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	bitmap->data[bit / 8] |= (1 << (bit % 8));
 }
 
 /** Clear a bit in a bitmap.
- *
- * Clears the specified bit in a bitmap.
- *
  * @param bitmap	Bitmap to clear in.
- * @param bit		Number of the bit to clear.
- */
+ * @param bit		Number of the bit to clear. */
 void bitmap_clear(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	bitmap->data[bit / 8] &= ~(1 << (bit % 8));
 }
 
-/** Test a bit in a bitmap.
- *
- * Tests whether the specified bit in a bitmap is set.
- *
+/** Test whether a bit is set in a bitmap.
  * @param bitmap	Bitmap to test in.
  * @param bit		Number of the bit to test.
- *
- * @return		True if bit set, false if not.
- */
+ * @return		True if bit set, false if not. */
 bool bitmap_test(bitmap_t *bitmap, int bit) {
 	assert(bit < bitmap->count);
 	return bitmap->data[bit / 8] & (1 << (bit % 8));
 }
 
 /** Find first set bit in a bitmap.
- *
- * Finds the first bit set in a bitmap.
- *
  * @param bitmap	Bitmap to test in.
- *
- * @return		Position of first set bit, -1 if none set.
- */
+ * @return		Position of first set bit, -1 if none set. */
 int bitmap_ffs(bitmap_t *bitmap) {
 	size_t total = bitmap->count;
 	unative_t value;
@@ -155,13 +137,8 @@ int bitmap_ffs(bitmap_t *bitmap) {
 }
 
 /** Find first zero bit in a bitmap.
- *
- * Finds the first zero bit in a bitmap.
- *
  * @param bitmap	Bitmap to test in.
- *
- * @return		Position of first zero bit, -1 if all set.
- */
+ * @return		Position of first zero bit, -1 if all set. */
 int bitmap_ffz(bitmap_t *bitmap) {
 	size_t total = bitmap->count;
 	unative_t value;
