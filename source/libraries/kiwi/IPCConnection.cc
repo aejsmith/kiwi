@@ -85,7 +85,7 @@ bool IPCConnection::Connect(const char *name) {
 	if(pstr) {
 		id = strtol(pstr, NULL, 10);
 	} else {
-		id = 1;
+		id = 0;
 	}
 
 	/* Look up the port ID. */

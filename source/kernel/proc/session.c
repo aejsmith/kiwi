@@ -18,12 +18,10 @@
  * @brief		Session management.
  */
 
+#include <lib/id_alloc.h>
 #include <mm/malloc.h>
-
 #include <proc/session.h>
-
 #include <console.h>
-#include <vmem.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -32,16 +30,22 @@
 #endif
 
 /** Session ID allocator. */
-static vmem_t *session_id_arena;
+static id_alloc_t session_id_allocator;
 
 /** Create a new session.
- * @return		Pointer to created session, has 1 reference on. */
+ * @return		Pointer to created session with 1 reference on, or NULL
+ *			if the session limit has been reached. */
 session_t *session_create(void) {
 	session_t *session;
 
 	session = kmalloc(sizeof(*session), MM_SLEEP);
 	refcount_set(&session->count, 1);
-	session->id = (session_id_t)vmem_alloc(session_id_arena, 1, MM_SLEEP);
+	session->id = id_alloc_get(&session_id_allocator);
+	if(session->id < 0) {
+		kfree(session);
+		return NULL;
+	}
+
 	dprintf("session: created session %d\n", session->id);
 	return session;
 }
@@ -57,12 +61,12 @@ void session_get(session_t *session) {
 void session_release(session_t *session) {
 	if(refcount_dec(&session->count) == 0) {
 		dprintf("session: destroyed session %d\n", session->id);
-		vmem_free(session_id_arena, session->id, 1);
+		id_alloc_release(&session_id_allocator, session->id);
 		kfree(session);
 	}
 }
 
 /** Initialise the session ID allocator. */
 void __init_text session_init(void) {
-	session_id_arena = vmem_create("session_id_arena", 0, 65536, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
+	id_alloc_init(&session_id_allocator, 4095);
 }

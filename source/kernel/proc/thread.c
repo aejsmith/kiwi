@@ -24,6 +24,7 @@
 #include <cpu/ipi.h>
 
 #include <lib/avl_tree.h>
+#include <lib/id_alloc.h>
 #include <lib/string.h>
 
 #include <mm/kheap.h>
@@ -63,7 +64,7 @@ static AVL_TREE_DECLARE(thread_tree);
 static RWLOCK_DECLARE(thread_tree_lock);
 
 /** Thread ID allocator. */
-static vmem_t *thread_id_arena;
+static id_alloc_t thread_id_allocator;
 
 /** Thread structure cache. */
 static slab_cache_t *thread_cache;
@@ -154,7 +155,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		object_destroy(&thread->obj);
 
 		/* Deallocate the thread ID. */
-		vmem_free(thread_id_arena, (vmem_resource_t)thread->id, 1);
+		id_alloc_release(&thread_id_allocator, thread->id);
 
 		dprintf("thread: destroyed thread %" PRId32 "(%s) (thread: %p)\n",
 			thread->id, thread->name, thread);
@@ -459,6 +460,13 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	 * caches a kernel stack with the thread for us. */
 	thread = slab_cache_alloc(thread_cache, MM_SLEEP);
 
+	/* Allocate an ID for the thread. */
+	thread->id = id_alloc_get(&thread_id_allocator);
+	if(thread->id < 0) {
+		slab_cache_free(thread_cache, thread);
+		return STATUS_THREAD_LIMIT;
+	}
+
 	strncpy(thread->name, name, THREAD_NAME_MAX);
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
@@ -470,12 +478,10 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	ret = thread_arch_init(thread);
 	if(ret != STATUS_SUCCESS) {
 		kheap_free(thread->kstack, KSTACK_SIZE);
+		id_alloc_release(&thread_id_allocator, thread->id);
 		slab_cache_free(thread_cache, thread);
 		return ret;
 	}
-
-	/* Allocate an ID for the thread. */
-	thread->id = (thread_id_t)vmem_alloc(thread_id_arena, 1, MM_SLEEP);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
@@ -678,11 +684,15 @@ int kdbg_cmd_thread(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Initialise the thread cache. */
+/** Initialise the thread system. */
 void __init_text thread_init(void) {
-	thread_id_arena = vmem_create("thread_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
-	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0, thread_cache_ctor, NULL,
-	                                 NULL, NULL, 0, MM_FATAL);
+	/* Initialise the thread ID allocator. */
+	id_alloc_init(&thread_id_allocator, 65535);
+
+	/* Create the thread slab cache. */
+	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
+	                                 thread_cache_ctor, NULL, NULL, NULL, 0,
+	                                 MM_FATAL);
 }
 
 /** Create the thread reaper. */

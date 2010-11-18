@@ -22,6 +22,7 @@
 #include <arch/stack.h>
 
 #include <lib/avl_tree.h>
+#include <lib/id_alloc.h>
 #include <lib/string.h>
 
 #include <io/fs.h>
@@ -48,7 +49,6 @@
 #include <fatal.h>
 #include <kdbg.h>
 #include <status.h>
-#include <vmem.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -86,7 +86,7 @@ static AVL_TREE_DECLARE(process_tree);
 static RWLOCK_DECLARE(process_tree_lock);
 
 /** Process ID allocator. */
-static vmem_t *process_id_arena;
+static id_alloc_t process_id_allocator;
 
 /** Cache for process structures. */
 static slab_cache_t *process_cache;
@@ -143,7 +143,7 @@ static void process_destroy(process_t *process) {
 	session_release(process->session);
 	notifier_clear(&process->death_notifier);
 	object_destroy(&process->obj);
-	vmem_free(process_id_arena, (vmem_resource_t)process->id, 1);
+	id_alloc_release(&process_id_allocator, process->id);
 	kfree(process->name);
 	slab_cache_free(process_cache, process);
 }
@@ -274,6 +274,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	object_security_t dsecurity = { security->uid, security->gid, security->acl };
 	object_acl_t acl, sacl;
 	process_t *process;
+	session_t *session;
 	status_t ret;
 
 	assert(name);
@@ -294,6 +295,22 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		if(!cap_check(parent, CAP_CREATE_SESSION)) {
 			return STATUS_PERM_DENIED;
 		}
+	}
+
+	/* Create a session for the process or inherit the parent's. */
+	if(!parent || cflags & PROCESS_CREATE_SESSION) {
+		/* Check if the parent is allowed to create sessions. */
+		if(parent && !cap_check(parent, CAP_CREATE_SESSION)) {
+			return STATUS_PERM_DENIED;
+		}
+
+		session = session_create();
+		if(!session) {
+			return STATUS_PROCESS_LIMIT;
+		}
+	} else {
+		session_get(parent->session);
+		session = parent->session;
 	}
 
 	/* Allocate a new process structure. */
@@ -327,7 +344,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* Attempt to allocate a process ID. If creating the kernel process,
 	 * always give it an ID of 0. */
 	if(kernel_proc) {
-		process->id = (process_id_t)vmem_alloc(process_id_arena, 1, 0);
+		process->id = id_alloc_get(&process_id_allocator);
 		if(process->id < 0) {
 			slab_cache_free(process_cache, process);
 			return STATUS_PROCESS_LIMIT;
@@ -341,7 +358,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		ret = handle_table_create((parent) ? parent->handles : NULL, map, count, &table);
 		if(ret != STATUS_SUCCESS) {
 			if(kernel_proc) {
-				vmem_free(process_id_arena, process->id, 1);
+				id_alloc_release(&process_id_allocator, process->id);
 			}
 			slab_cache_free(process_cache, process);
 			return ret;
@@ -366,6 +383,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
 	refcount_set(&process->count, (uhandlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
+	process->session = session;
 	process->flags = flags;
 	process->priority = priority;
 	process->aspace = aspace;
@@ -374,14 +392,6 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->name = kstrdup(name, MM_SLEEP);
 	process->status = -1;
 	process->create = NULL;
-
-	/* Create a session for the process or inherit the parent's. */
-	if(!parent || cflags & PROCESS_CREATE_SESSION) {
-		process->session = session_create();
-	} else {
-		session_get(parent->session);
-		process->session = parent->session;
-	}
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
@@ -748,10 +758,15 @@ void __init_text process_init(void) {
 	object_security_t security = { 0, 0, &acl };
 	status_t ret;
 
-	/* Create the process slab cache and ID vmem arena. */
-	process_id_arena = vmem_create("process_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
-	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0, process_cache_ctor, NULL,
-	                                  NULL, NULL, 0, MM_FATAL);
+	/* Create the process ID allocator. We reserve ID 0 as it is always
+	 * given to the kernel process. */
+	id_alloc_init(&process_id_allocator, 65535);
+	id_alloc_reserve(&process_id_allocator, 0);
+
+	/* Create the process slab cache. */
+	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
+	                                  process_cache_ctor, NULL, NULL, NULL,
+	                                  0, MM_FATAL);
 
 	/* Create the ACL for the kernel process. */
 	object_acl_init(&acl);

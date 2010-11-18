@@ -26,6 +26,7 @@
 #include <kernel/semaphore.h>
 
 #include <lib/avl_tree.h>
+#include <lib/id_alloc.h>
 #include <lib/refcount.h>
 
 #include <mm/malloc.h>
@@ -41,7 +42,6 @@
 #include <kdbg.h>
 #include <object.h>
 #include <status.h>
-#include <vmem.h>
 
 /** Structure containing a userspace semaphore. */
 typedef struct user_semaphore {
@@ -53,10 +53,10 @@ typedef struct user_semaphore {
 	char *name;			/**< Name of the semaphore. */
 } user_semaphore_t;
 
-/** Semaphore ID allocator. */
-static vmem_t *semaphore_id_arena;
+/** User semaphore ID allocator. */
+static id_alloc_t semaphore_id_allocator;
 
-/** Tree of userspace semaphores. */
+/** Tree of user semaphores. */
 static AVL_TREE_DECLARE(semaphore_tree);
 static RWLOCK_DECLARE(semaphore_tree_lock);
 
@@ -149,7 +149,7 @@ static void user_semaphore_release(user_semaphore_t *sem) {
 		rwlock_unlock(&semaphore_tree_lock);
 
 		object_destroy(&sem->obj);
-		vmem_free(semaphore_id_arena, sem->id, 1);
+		id_alloc_release(&semaphore_id_allocator, sem->id);
 		kfree(sem);
 	}
 }
@@ -201,8 +201,8 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
-	sem->id = vmem_alloc(semaphore_id_arena, 1, 0);
-	if(!sem->id) {
+	sem->id = id_alloc_get(&semaphore_id_allocator);
+	if(sem->id < 0) {
 		kfree(sem);
 		object_security_destroy(&ksecurity);
 		return STATUS_NO_SEMAPHORES;
@@ -210,7 +210,7 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
 	if(name) {
 		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, &sem->name);
 		if(ret != STATUS_SUCCESS) {
-			vmem_free(semaphore_id_arena, sem->id, 1);
+			id_alloc_release(&semaphore_id_allocator, sem->id);
 			kfree(sem);
 			object_security_destroy(&ksecurity);
 			return ret;
@@ -342,7 +342,6 @@ status_t sys_semaphore_up(handle_t handle, size_t count) {
 
 /** Initialise the semaphore ID allocator. */
 static void __init_text semaphore_id_init(void) {
-	semaphore_id_arena = vmem_create("semaphore_id_arena", 1, 65535, 1, NULL,
-	                                 NULL, NULL, 0, 0, 0, MM_FATAL);
+	id_alloc_init(&semaphore_id_allocator, 65535);
 }
 INITCALL(semaphore_id_init);

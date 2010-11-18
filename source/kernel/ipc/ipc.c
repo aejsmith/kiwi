@@ -38,6 +38,7 @@
 #include <ipc/ipc.h>
 
 #include <lib/avl_tree.h>
+#include <lib/id_alloc.h>
 #include <lib/notifier.h>
 #include <lib/refcount.h>
 
@@ -57,7 +58,6 @@
 #include <object.h>
 #include <kdbg.h>
 #include <status.h>
-#include <vmem.h>
 
 #if CONFIG_IPC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -124,8 +124,8 @@ typedef struct ipc_message {
 static slab_cache_t *ipc_port_cache;
 static slab_cache_t *ipc_connection_cache;
 
-/** Arena for port ID allocations. */
-static vmem_t *port_id_arena;
+/** Port ID allocator. */
+static id_alloc_t port_id_allocator;
 
 /** Tree of all open ports. */
 static AVL_TREE_DECLARE(port_tree);
@@ -191,7 +191,7 @@ static void ipc_port_release(ipc_port_t *port) {
 		mutex_unlock(&port->lock);
 
 		dprintf("ipc: destroyed port %d (%p)\n", port->id, port);
-		vmem_free(port_id_arena, (vmem_resource_t)port->id, 1);
+		id_alloc_release(&port_id_allocator, port->id);
 		slab_cache_free(ipc_port_cache, port);
 	}
 }
@@ -442,8 +442,8 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
-	port->id = vmem_alloc(port_id_arena, 1, 0);
-	if(!port->id) {
+	port->id = id_alloc_get(&port_id_allocator);
+	if(port->id < 0) {
 		slab_cache_free(ipc_port_cache, port);
 		object_security_destroy(&ksecurity);
 		return STATUS_NO_PORTS;
@@ -1078,9 +1078,13 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 
 /** Initialise the IPC slab caches. */
 static void __init_text ipc_init(void) {
-	port_id_arena = vmem_create("port_id_arena", 1, 65535, 1, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
-	ipc_port_cache = slab_cache_create("ipc_port_cache", sizeof(ipc_port_t), 0, ipc_port_ctor,
-	                                   NULL, NULL, NULL, 0, MM_FATAL);
+	/* Initialise the port ID allocator. */
+	id_alloc_init(&port_id_allocator, 65535);
+
+	/* Create the IPC structure caches. */
+	ipc_port_cache = slab_cache_create("ipc_port_cache", sizeof(ipc_port_t), 0,
+	                                   ipc_port_ctor, NULL, NULL, NULL, 0,
+	                                   MM_FATAL);
 	ipc_connection_cache = slab_cache_create("ipc_connection_cache", sizeof(ipc_connection_t),
 	                                         0, ipc_connection_ctor, NULL, NULL, NULL, 0,
 	                                         MM_FATAL);

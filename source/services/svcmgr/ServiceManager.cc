@@ -44,10 +44,10 @@ ServiceManager::ServiceManager() :
 	m_port.Create();
 	m_port.OnConnection.Connect(this, &ServiceManager::HandleConnection);
 
-	/* If the port is port 1, then we are the global instance. Otherwise,
+	/* If the port is port 0, then we are the global instance. Otherwise,
 	 * we are a session instance, in which case we must connect to the
 	 * global instance. */
-	if(m_port.GetID() != 1) {
+	if(m_port.GetID() != 0) {
 		m_parent = new org::kiwi::ServiceManager::ServerConnection(1);
 
 		/* Set our port ID in the environment for apps to use. */
