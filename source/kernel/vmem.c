@@ -57,8 +57,8 @@
 #endif
 
 /** Limitations/settings. */
-#define VMEM_REFILL_THRESHOLD	16		/**< Minimum number of boundary tags before refilling. */
-#define VMEM_BOOT_TAG_COUNT	64		/**< Number of boundary tags to statically allocate. */
+#define VMEM_REFILL_THRESHOLD	32		/**< Minimum number of boundary tags before refilling. */
+#define VMEM_BOOT_TAG_COUNT	128		/**< Number of boundary tags to statically allocate. */
 #define VMEM_RETRY_INTERVAL	SECS2USECS(1)	/**< Interval between retries when sleeping for space (in µs). */
 #define VMEM_RETRY_MAX		30		/**< Maximum number of VMEM_RETRY_INTERVAL-long iterations. */
 #define VMEM_REHASH_THRESHOLD	32		/**< Depth of a hash chain at which a rehash will be triggered. */
