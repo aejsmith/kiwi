@@ -543,6 +543,9 @@ make_child (command, async_p)
       if (async_p)
 	last_asynchronous_pid = pid;
 
+#if defined (RECYCLES_PIDS)
+      reap_dead_jobs ();
+#endif
       add_pid (pid, async_p);
     }
   return (pid);
