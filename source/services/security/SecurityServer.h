@@ -21,6 +21,8 @@
 #ifndef __SECURITYSERVER_H
 #define __SECURITYSERVER_H
 
+#include <kernel/system.h>
+
 #include <kiwi/Service/Service.h>
 
 #include <list>
@@ -51,7 +53,5 @@ private:
 	ConnectionList m_connections;	/**< Connections to the server. */
 	Session *m_active_session;	/**< Currently active session. */
 };
-
-extern "C" void system_fatal(const char *message) __attribute__((noreturn));
 
 #endif /* __SECURITYSERVER_H */

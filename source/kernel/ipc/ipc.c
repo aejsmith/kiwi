@@ -54,7 +54,7 @@
 
 #include <assert.h>
 #include <console.h>
-#include <init.h>
+#include <kernel.h>
 #include <object.h>
 #include <kdbg.h>
 #include <status.h>

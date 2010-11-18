@@ -24,7 +24,7 @@
 #include <mm/slab.h>
 
 #include <assert.h>
-#include <init.h>
+#include <kernel.h>
 #include <object.h>
 #include <status.h>
 

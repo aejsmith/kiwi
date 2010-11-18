@@ -44,15 +44,14 @@
 #include <console.h>
 #include <dpc.h>
 #include <fatal.h>
-#include <init.h>
 #include <kargs.h>
+#include <kernel.h>
 #include <lrm.h>
 #include <module.h>
 #include <object.h>
 #include <status.h>
 #include <symbol.h>
 #include <time.h>
-#include <version.h>
 
 /** Structure describing a boot module. */
 typedef struct boot_module {

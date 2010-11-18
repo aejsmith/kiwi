@@ -31,7 +31,7 @@
 #include <mm/slab.h>
 
 #include <fatal.h>
-#include <init.h>
+#include <kernel.h>
 #include <status.h>
 
 /** Slab cache for entry cache structures. */

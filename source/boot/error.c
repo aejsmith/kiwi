@@ -18,11 +18,11 @@
  * @brief		Boot error handling functions.
  */
 
-#include <arch/boot.h>
-
 #include <boot/error.h>
 #include <boot/memory.h>
 #include <boot/ui.h>
+
+#include <platform/boot.h>
 
 #include <lib/printf.h>
 
@@ -128,7 +128,7 @@ static input_result_t boot_error_window_input(ui_window_t *window, uint16_t key)
 		ui_window_display(debug_log_window, 0);
 		return INPUT_RENDER;
 	case '\e':
-		arch_reboot();
+		platform_reboot();
 	default:
 		return INPUT_HANDLED;
 	}

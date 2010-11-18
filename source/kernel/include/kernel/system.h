@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,16 +15,27 @@
 
 /**
  * @file
- * @brief		Version information header.
+ * @brief		Miscellaneous system functions.
  */
 
-#ifndef __VERSION_H
-#define __VERSION_H
+#ifndef __KERNEL_SYSTEM_H
+#define __KERNEL_SYSTEM_H
 
-/** Version information for the kernel, defined in a build-generated file. */
-extern int kiwi_ver_release;		/**< Kiwi release number. */
-extern int kiwi_ver_update;		/**< Release update number. */
-extern int kiwi_ver_revision;		/**< Release revision number. */
-extern const char *kiwi_ver_string;	/**< String of version number. */
+#include <kernel/types.h>
 
-#endif /* __VERSION_H */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Actions for system_shutdown(). */
+#define SHUTDOWN_REBOOT		1	/**< Reboot the system. */
+#define SHUTDOWN_POWEROFF	2	/**< Power off the system. */
+
+extern status_t SYSCALL(system_shutdown)(int action);
+extern void SYSCALL(system_fatal)(const char *message);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __KERNEL_SYSTEM_H */

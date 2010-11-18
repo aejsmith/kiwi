@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,6 +21,8 @@
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
+#include <kernel/system.h>
+
 #include <lib/printf.h>
 
 #include <mm/safe.h>
@@ -30,10 +32,8 @@
 #include <console.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <status.h>
-#include <version.h>
-
-extern void sys_system_fatal(const char *message);
 
 /** Notifier to be called when a fatal error occurs. */
 NOTIFIER_DECLARE(fatal_notifier, NULL);

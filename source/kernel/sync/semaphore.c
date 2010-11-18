@@ -38,8 +38,8 @@
 #include <sync/semaphore.h>
 
 #include <console.h>
-#include <init.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <object.h>
 #include <status.h>
 

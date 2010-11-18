@@ -35,11 +35,10 @@
 #include <assert.h>
 #include <console.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <module.h>
 #include <status.h>
 #include <time.h>
-
-extern void arch_reboot(void);
 
 /** Mouse settings. */
 #define MOUSE_RATE		100	/**< Up to 100 packets per second. */
@@ -131,7 +130,7 @@ static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_
 		break;
 	case 61:
 		/* F3 - Reboot. */
-		arch_reboot();
+		platform_reboot();
 		break;
 	}
 

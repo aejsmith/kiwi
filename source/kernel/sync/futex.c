@@ -45,8 +45,8 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
+#include <kernel.h>
 #include <status.h>
-#include <init.h>
 
 /** Structure containing details of a futex. */
 typedef struct futex {

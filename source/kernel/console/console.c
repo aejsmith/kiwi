@@ -31,8 +31,8 @@
 
 #include <console.h>
 #include <fatal.h>
-#include <init.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <status.h>
 #include <types.h>
 

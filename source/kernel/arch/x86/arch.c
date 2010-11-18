@@ -18,7 +18,6 @@
  * @brief		x86 architecture core code.
  */
 
-#include <arch/io.h>
 #include <arch/lapic.h>
 #include <arch/page.h>
 
@@ -27,11 +26,10 @@
 
 #include <console.h>
 #include <fatal.h>
-#include <init.h>
+#include <kernel.h>
 #include <time.h>
 
 extern void syscall_arch_init(void);
-extern void arch_reboot(void);
 
 /** x86-specific early initialisation.
  * @param args		Kernel arguments structure. */
@@ -63,23 +61,4 @@ void __init_text arch_ap_init(kernel_args_t *args) {
 #ifdef __x86_64__
 	syscall_arch_init();
 #endif
-}
-
-/** Reboot the system. */
-void arch_reboot(void) {
-	uint8_t val;
-
-	/* Try the keyboard controller. */
-	do {
-		val = in8(0x64);
-		if(val & (1<<0)) {
-			in8(0x60);
-		}
-	} while(val & (1<<1));
-	out8(0x64, 0xfe);
-	spin(5000);
-
-	/* Fall back on a triple fault. */
-	lidt(0, 0);
-	__asm__ volatile("ud2");
 }

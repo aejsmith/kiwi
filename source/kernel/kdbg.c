@@ -51,14 +51,13 @@
 #include <sync/semaphore.h>
 
 #include <kdbg.h>
+#include <kernel.h>
 #include <lrm.h>
 #include <module.h>
 #include <object.h>
 #include <symbol.h>
 #include <time.h>
 #include <vmem.h>
-
-extern void arch_reboot(void);
 
 /** Notifier to be called when entering/exiting KDBG. */
 NOTIFIER_DECLARE(kdbg_entry_notifier, NULL);
@@ -348,7 +347,7 @@ static int kdbg_cmd_reboot(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	arch_reboot();
+	platform_reboot();
 	return KDBG_FAIL;
 }
 

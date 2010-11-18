@@ -23,7 +23,7 @@
 #include <proc/thread.h>
 
 #include <console.h>
-#include <init.h>
+#include <kernel.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

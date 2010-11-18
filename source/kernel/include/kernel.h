@@ -15,13 +15,21 @@
 
 /**
  * @file
- * @brief		Kernel initialisation functions.
+ * @brief		Core kernel functions/definitions.
  */
 
-#ifndef __INIT_H
-#define __INIT_H
+#ifndef __KERNEL_H
+#define __KERNEL_H
 
 #include <kargs.h>
+
+extern bool shutdown_in_progress;
+
+/** Version information for the kernel, defined in a build-generated file. */
+extern int kiwi_ver_release;		/**< Kiwi release number. */
+extern int kiwi_ver_update;		/**< Release update number. */
+extern int kiwi_ver_revision;		/**< Release revision number. */
+extern const char *kiwi_ver_string;	/**< String of version number. */
 
 /** Type of an initcall function. */
 typedef void (*initcall_t)(void);
@@ -41,4 +49,7 @@ extern void platform_premm_init(kernel_args_t *args);
 extern void platform_postmm_init(kernel_args_t *args);
 extern void platform_ap_init(kernel_args_t *args);
 
-#endif /* __INIT_H */
+extern void platform_reboot(void);
+extern void platform_poweroff(void);
+
+#endif /* __KERNEL_H */

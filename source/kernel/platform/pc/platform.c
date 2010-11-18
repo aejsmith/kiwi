@@ -18,11 +18,14 @@
  * @brief		PC platform core code.
  */
 
+#include <arch/descriptor.h>
+#include <arch/io.h>
+
 #include <platform/pic.h>
 #include <platform/pit.h>
 
 #include <fatal.h>
-#include <init.h>
+#include <kernel.h>
 
 /** PC platform first stage initialisation.
  * @param args		Kernel arguments structure. */
@@ -44,4 +47,28 @@ void __init_text platform_postmm_init(kernel_args_t *args) {
  * @param args		Kernel arguments structure. */
 void __init_text platform_ap_init(kernel_args_t *args) {
 	/* Nothing happens. */
+}
+
+/** Reboot the system. */
+void platform_reboot(void) {
+	uint8_t val;
+
+	/* Try the keyboard controller. */
+	do {
+		val = in8(0x64);
+		if(val & (1<<0)) {
+			in8(0x60);
+		}
+	} while(val & (1<<1));
+	out8(0x64, 0xfe);
+	spin(5000);
+
+	/* Fall back on a triple fault. */
+	lidt(0, 0);
+	__asm__ volatile("ud2");
+}
+
+/** Power off the system. */
+void platform_poweroff(void) {
+	/* TODO. */
 }

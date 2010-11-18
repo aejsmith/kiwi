@@ -25,7 +25,6 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <init.h>
 #include <symbol.h>
 
 extern symbol_table_t kernel_symtab;

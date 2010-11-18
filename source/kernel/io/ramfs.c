@@ -27,7 +27,7 @@
 #include <mm/vm_cache.h>
 
 #include <assert.h>
-#include <init.h>
+#include <kernel.h>
 #include <status.h>
 #include <time.h>
 

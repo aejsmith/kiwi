@@ -21,6 +21,8 @@
 #ifndef __SERVICEMANAGER_H
 #define __SERVICEMANAGER_H
 
+#include <kernel/system.h>
+
 #include <kiwi/EventLoop.h>
 #include <kiwi/IPCConnection.h>
 #include <kiwi/IPCPort.h>
@@ -61,7 +63,5 @@ private:
 	/** Connection to global instance. */
 	org::kiwi::ServiceManager::ServerConnection *m_parent;
 };
-
-extern "C" void system_fatal(const char *message) __attribute__((noreturn));
 
 #endif /* __SERVICEMANAGER_H */

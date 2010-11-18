@@ -18,9 +18,17 @@
  * @brief		PC platform startup code.
  */
 
+#include <arch/descriptor.h>
+#include <arch/io.h>
+
 #include <boot/config.h>
+
 #include <lib/string.h>
+
 #include <platform/boot.h>
+
+#include <time.h>
+
 #include "multiboot.h"
 
 extern char *video_mode_override;
@@ -40,4 +48,23 @@ void platform_early_init(void) {
 			}
 		}
 	}
+}
+
+/** Reboot the system. */
+void platform_reboot(void) {
+	uint8_t val;
+
+	/* Try the keyboard controller. */
+	do {
+		val = in8(0x64);
+		if(val & (1<<0)) {
+			in8(0x60);
+		}
+	} while(val & (1<<1));
+	out8(0x64, 0xfe);
+	spin(5000);
+
+	/* Fall back on a triple fault. */
+	lidt(0, 0);
+	__asm__ volatile("ud2");
 }
