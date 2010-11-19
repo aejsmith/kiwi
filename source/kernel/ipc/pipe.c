@@ -37,8 +37,6 @@ static slab_cache_t *pipe_cache;
 static void pipe_ctor(void *obj, void *data) {
 	pipe_t *pipe = obj;
 
-	mutex_init(&pipe->reader, "pipe_reader_lock", 0);
-	mutex_init(&pipe->writer, "pipe_writer_lock", 0);
 	mutex_init(&pipe->lock, "pipe_lock", 0);
 	notifier_init(&pipe->space_notifier, pipe);
 	notifier_init(&pipe->data_notifier, pipe);
@@ -91,8 +89,6 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 	status_t ret = STATUS_SUCCESS;
 	size_t i = 0;
 
-	mutex_lock(&pipe->reader);
-
 	if(count && count <= PIPE_SIZE) {
 		/* Try to get all required data before reading. */
 		for(i = 0; i < count; i++) {
@@ -126,7 +122,6 @@ status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t 
 		}
 	}
 out:
-	mutex_unlock(&pipe->reader);
 	if(bytesp) {
 		*bytesp = i;
 	}
@@ -152,8 +147,6 @@ out:
 status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp) {
 	status_t ret = STATUS_SUCCESS;
 	size_t i = 0;
-
-	mutex_lock(&pipe->writer);
 
 	if(count && count <= PIPE_SIZE) {
 		/* Try to get all required space before writing. */
@@ -190,7 +183,6 @@ status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, 
 		}
 	}
 out:
-	mutex_unlock(&pipe->writer);
 	if(bytesp) {
 		*bytesp = i;
 	}
@@ -250,8 +242,7 @@ pipe_t *pipe_create(void) {
  * @note		Caller must ensure that nothing is using the pipe.
  * @param pipe		Pipe to destroy. */
 void pipe_destroy(pipe_t *pipe) {
-	assert(!mutex_held(&pipe->reader));
-	assert(!mutex_held(&pipe->writer));
+	assert(!mutex_held(&pipe->lock));
 	assert(notifier_empty(&pipe->space_notifier));
 	assert(notifier_empty(&pipe->data_notifier));
 	kheap_free(pipe->buf, PIPE_SIZE);

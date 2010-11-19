@@ -31,8 +31,6 @@
 
 /** Structure containing a pipe. */
 typedef struct pipe {
-	mutex_t reader;			/**< Lock to serialize read requests. */
-	mutex_t writer;			/**< Lock to serialize write requests. */
 	mutex_t lock;			/**< Lock to protect buffer. */
 
 	semaphore_t space_sem;		/**< Semaphore counting available space. */
