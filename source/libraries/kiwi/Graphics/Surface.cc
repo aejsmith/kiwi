@@ -197,8 +197,8 @@ bool Surface::Resize(Size size) {
 /** Get the surface's raw data.
  * @return		Pointer to raw surface data. This must not be freed or
  *			deleted. */
-unsigned char *Surface::GetData() {
-	return cairo_image_surface_get_data(m_priv->cairo);
+uint32_t *Surface::GetData() {
+	return reinterpret_cast<uint32_t *>(cairo_image_surface_get_data(m_priv->cairo));
 }
 
 /** Get the size of the surface's raw data.

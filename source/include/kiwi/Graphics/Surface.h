@@ -44,7 +44,7 @@ public:
 
 	Size GetSize() const;
 	bool Resize(Size size);
-	unsigned char *GetData();
+	uint32_t *GetData();
 	size_t GetDataSize() const;
 	cairo_surface_t *GetCairoSurface();
 private:

@@ -87,6 +87,9 @@ public:
 	/** Signal emitted when an area of the terminal is updated.
 	 * @param		Rectangle area to update. */
 	kiwi::Signal<kiwi::Rect> OnUpdate;
+
+	/** Signal emitted when the terminal is scrolled down. */
+	kiwi::Signal<> OnScrollDown;
 private:
 	void ScrollDown();
 

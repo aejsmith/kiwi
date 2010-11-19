@@ -230,7 +230,8 @@ void Terminal::ScrollDown() {
 	memset(m_buffer[m_rows - 1], 0, m_columns);
 
 	/* Update. */
-	OnUpdate(Rect(0, 0, m_columns, m_rows));
+	OnScrollDown();
+	OnUpdate(Rect(0, m_rows - 1, m_columns, 1));
 }
 
 /** Register events for the terminal. */

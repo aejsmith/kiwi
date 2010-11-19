@@ -41,6 +41,7 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 
 	m_terminal.OnExit.Connect(this, &TerminalWindow::TerminalExited);
 	m_terminal.OnUpdate.Connect(this, &TerminalWindow::TerminalUpdated);
+	m_terminal.OnScrollDown.Connect(this, &TerminalWindow::TerminalScrolledDown);
 
 	/* Create the font if necessary. */
 	if(!m_font) {
@@ -97,6 +98,24 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 			Update(Rect(pos, font_size));
 		}
 	}
+}
+
+/** Scroll the terminal down. */
+void TerminalWindow::TerminalScrolledDown() {
+	uint32_t *buffer;
+	int cols, rows;
+	size_t row;
+
+	buffer = GetSurface()->GetData();
+	m_terminal.GetSize(cols, rows);
+	Size font_size = m_font->GetSize();
+
+	/* Move contents up. */
+	row = GetFrame().GetWidth() * font_size.GetHeight();
+	memmove(buffer, &buffer[row], row * (rows - 1) * 4);
+
+	/* Update the window. */
+	Update(Rect(0, 0, GetFrame().GetWidth(), font_size.GetHeight() * (rows - 1)));
 }
 
 /** Handle a key press event on the window.

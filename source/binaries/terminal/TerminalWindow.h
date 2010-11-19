@@ -38,6 +38,7 @@ public:
 private:
 	void TerminalExited(int status);
 	void TerminalUpdated(kiwi::Rect rect);
+	void TerminalScrolledDown();
 
 	void KeyPressed(const kiwi::KeyEvent &event);
 	void Resized(const kiwi::ResizeEvent &event);
