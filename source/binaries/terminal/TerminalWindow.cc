@@ -98,21 +98,25 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 			Update(Rect(pos, font_size));
 		}
 	}
+
+	cairo_destroy(context);
 }
 
 /** Scroll the terminal down. */
 void TerminalWindow::TerminalScrolledDown() {
-	uint32_t *buffer;
+	cairo_t *context;
 	int cols, rows;
-	size_t row;
 
-	buffer = GetSurface()->GetData();
 	m_terminal.GetSize(cols, rows);
 	Size font_size = m_font->GetSize();
 
-	/* Move contents up. */
-	row = GetFrame().GetWidth() * font_size.GetHeight();
-	memmove(buffer, &buffer[row], row * (rows - 1) * 4);
+	/* Create the context. */
+	context = cairo_create(GetSurface()->GetCairoSurface());
+	cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(context, GetSurface()->GetCairoSurface(), 0, -font_size.GetHeight());
+	cairo_rectangle(context, 0, 0, GetFrame().GetWidth(), font_size.GetHeight() * (rows - 1));
+	cairo_fill(context);
+	cairo_destroy(context);
 
 	/* Update the window. */
 	Update(Rect(0, 0, GetFrame().GetWidth(), font_size.GetHeight() * (rows - 1)));
