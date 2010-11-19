@@ -101,9 +101,8 @@ static inline bool tty_is_cchar(tty_device_t *tty, uint16_t ch, int cc) {
 /** Echo an input character.
  * @param tty		Terminal to echo on.
  * @param ch		Character to echo.
- * @param raw		If true, take the character as is.
- * @param nonblock	Whether to allow blocking. */
-static void tty_echo(tty_device_t *tty, uint16_t ch, bool raw, bool nonblock) {
+ * @param raw		If true, take the character as is. */
+static void tty_echo(tty_device_t *tty, uint16_t ch, bool raw) {
 	char buf[2] = { ch & 0xFF, 0 };
 	size_t count = 1;
 
@@ -126,7 +125,11 @@ static void tty_echo(tty_device_t *tty, uint16_t ch, bool raw, bool nonblock) {
 		}
 	}
 
-	pipe_write(tty->output, buf, count, nonblock, NULL);
+	/* We cannot block here: if a thread writes to the terminal and blocks
+	 * to wait for space, and the terminal master tries to give input to
+	 * the terminal, a deadlock would occur if this blocks. TODO: Offload
+	 * to a DPC or something if it would block. */
+	pipe_write(tty->output, buf, count, true, NULL);
 }
 
 /** Add a character to a terminal's input buffer.
@@ -206,11 +209,11 @@ static status_t tty_input(tty_device_t *tty, unsigned char value, bool nonblock)
 
 			/* ECHOE means print an erasing backspace. */
 			if(tty->termios.c_lflag & ECHOE) {
-				tty_echo(tty, '\b', true, nonblock);
-				tty_echo(tty, ' ', true, nonblock);
-				tty_echo(tty, '\b', true, nonblock);
+				tty_echo(tty, '\b', true);
+				tty_echo(tty, ' ', true);
+				tty_echo(tty, '\b', true);
 			} else {
-				tty_echo(tty, ch, false, nonblock);
+				tty_echo(tty, ch, false);
 			}
 
 			return STATUS_SUCCESS;
@@ -222,14 +225,14 @@ static status_t tty_input(tty_device_t *tty, unsigned char value, bool nonblock)
 
 			if(tty->termios.c_lflag & ECHOE) {
 				while(erase--) {
-					tty_echo(tty, '\b', true, nonblock);
-					tty_echo(tty, ' ', true, nonblock);
-					tty_echo(tty, '\b', true, nonblock);
+					tty_echo(tty, '\b', true);
+					tty_echo(tty, ' ', true);
+					tty_echo(tty, '\b', true);
 				}
 			}
 
 			if(tty->termios.c_lflag & ECHOK) {
-				tty_echo(tty, '\n', true, nonblock);
+				tty_echo(tty, '\n', true);
 			}
 
 			return STATUS_SUCCESS;
@@ -260,7 +263,7 @@ static status_t tty_input(tty_device_t *tty, unsigned char value, bool nonblock)
 	}
 
 	/* Echo the character and insert it. */
-	tty_echo(tty, ch, false, nonblock);
+	tty_echo(tty, ch, false);
 	return tty_buffer_insert(tty->input, ch, nonblock);
 }
 
