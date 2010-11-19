@@ -624,12 +624,19 @@ static inline void thread_dump(thread_t *thread, int level) {
 	        (thread == curr_thread) ? "*" : " ");
 
 	switch(thread->state) {
-	case THREAD_CREATED:	kprintf(level, "Created  "); break;
-	case THREAD_READY:	kprintf(level, "Ready    "); break;
-	case THREAD_RUNNING:	kprintf(level, "Running  "); break;
-	case THREAD_SLEEPING:	kprintf(level, "Sleeping "); break;
-	case THREAD_DEAD:	kprintf(level, "Dead     "); break;
-	default:		kprintf(level, "Bad      "); break;
+	case THREAD_CREATED:	kprintf(level, "Created      "); break;
+	case THREAD_READY:	kprintf(level, "Ready        "); break;
+	case THREAD_RUNNING:	kprintf(level, "Running      "); break;
+	case THREAD_SLEEPING:
+		kprintf(level, "Sleeping ");
+		if(thread->interruptible) {
+			kprintf(level, "(I) ");
+		} else {
+			kprintf(level, "    ");
+		}
+		break;
+	case THREAD_DEAD:	kprintf(level, "Dead         "); break;
+	default:		kprintf(level, "Bad          "); break;
 	}
 
 	kprintf(level, "%-4" PRIu32 " %-4d %-4zu %-5d %-20s %-5" PRId32 " %s\n",
@@ -658,8 +665,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID     State    CPU  Wire Prio Flags Waiting On           Owner Name\n");
-	kprintf(LOG_NONE, "==     =====    ===  ==== ==== ===== ==========           ===== ====\n");
+	kprintf(LOG_NONE, "ID     State        CPU  Wire Prio Flags Waiting On           Owner Name\n");
+	kprintf(LOG_NONE, "==     =====        ===  ==== ==== ===== ==========           ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */
