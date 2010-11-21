@@ -154,6 +154,12 @@ static status_t display_device_open(device_t *_device, void **datap) {
 		return STATUS_IN_USE;
 	}
 
+	if(device == display_console_device) {
+		fb_console.inhibited = true;
+		notifier_register(&fatal_notifier, display_console_register, device);
+		notifier_register(&kdbg_entry_notifier, display_console_register, device);
+		notifier_register(&kdbg_exit_notifier, display_console_unregister, device);
+	}
 	return STATUS_SUCCESS;
 }
 
@@ -167,6 +173,11 @@ static void display_device_close(device_t *_device, void *data) {
 
 	old = atomic_dec(&device->open);
 	assert(old == 1);
+
+	notifier_unregister(&fatal_notifier, display_console_register, NULL);
+	notifier_unregister(&kdbg_entry_notifier, display_console_register, NULL);
+	notifier_unregister(&kdbg_exit_notifier, display_console_unregister, NULL);
+	display_console_register(NULL, NULL, NULL);
 }
 
 /** Signal that a display device event is being waited for.
