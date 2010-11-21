@@ -18,6 +18,7 @@
  * @brief		PC platform core code.
  */
 
+#include <arch/cpu.h>
 #include <arch/descriptor.h>
 #include <arch/io.h>
 
@@ -71,4 +72,5 @@ void platform_reboot(void) {
 /** Power off the system. */
 void platform_poweroff(void) {
 	/* TODO. */
+	cpu_halt();
 }

@@ -326,9 +326,10 @@ extern int kdbg_cmd_mount(int argc, char **argv);
 extern int kdbg_cmd_node(int argc, char **argv);
 
 /**
- * Initialisation functions.
+ * Initialisation/shutdown functions.
  */
 
 extern void fs_init(struct kernel_args *args);
+extern void fs_shutdown(void);
 
 #endif /* __IO_FS_H */

@@ -28,6 +28,7 @@ type user_id_t int16_t;
 type group_id_t int16_t;
 
 syscall system_fatal(ptr_t);
+syscall system_shutdown(int);
 syscall module_load(ptr_t, ptr_t);
 syscall module_info(ptr_t, ptr_t);
 syscall object_type(handle_t);

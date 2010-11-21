@@ -80,6 +80,7 @@ sources = map(File, [
 	'lrm.c',
 	'module.c',
 	'object.c',
+	'shutdown.c',
 	'symbol.c',
 	'syscall_table.c',
 	'time.c',

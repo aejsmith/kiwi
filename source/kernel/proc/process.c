@@ -48,7 +48,9 @@
 #include <elf.h>
 #include <fatal.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <status.h>
+#include <time.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -591,12 +593,16 @@ void process_detach(thread_t *thread) {
 			process->create->status = process->status;
 			semaphore_up(&process->create->sem, 1);
 			process->create = NULL;
-		} else if(process->flags & PROCESS_CRITICAL) {
+		} else if(process->flags & PROCESS_CRITICAL && !shutdown_in_progress) {
 			fatal("Critical process %" PRId32 "(%s) terminated", process->id, process->name);
 		}
 
 		mutex_unlock(&process->lock);
-		notifier_run(&process->death_notifier, NULL, true);
+
+		/* Don't bother running callbacks during shutdown. */
+		if(!shutdown_in_progress) {
+			notifier_run(&process->death_notifier, NULL, true);
+		}
 	} else {
 		mutex_unlock(&process->lock);
 	}
@@ -742,7 +748,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
 		default:		kprintf(LOG_NONE, "Bad     "); break;
 		}
-		kprintf(LOG_NONE, "%-4d %-5d %-7d %-4d %-5d %-6d %-18p %s\n",
+		kprintf(LOG_NONE, "%-4d %-5d %-7d %-4d %-5d %-5d %-18p %s\n",
 		        process->security.uid, process->security.groups[0],
 		        process->session->id, process->priority, process->flags,
 		        refcount_get(&process->count), process->aspace,
@@ -779,6 +785,49 @@ void __init_text process_init(void) {
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
+}
+
+/** Terminate all running processes. */
+void process_shutdown(void) {
+	useconds_t interval = 0;
+	process_t *process;
+	thread_t *thread;
+	int count;
+
+	rwlock_read_lock(&process_tree_lock);
+	AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
+		process = avl_tree_entry(iter, process_t);
+		if(process != kernel_proc) {
+			LIST_FOREACH_SAFE(&process->threads, titer) {
+				thread = list_entry(titer, thread_t, owner_link);
+				thread_kill(thread);
+			}
+		}
+	}
+	rwlock_unlock(&process_tree_lock);
+
+	/* Wait until everything has terminated. */
+	do {
+		usleep(1000);
+		interval += 1000;
+
+		count = 0;
+		rwlock_read_lock(&process_tree_lock);
+		AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
+			process = avl_tree_entry(iter, process_t);
+			if(process != kernel_proc) {
+				count++;
+				if(!(interval % 2000000) && process->state == PROCESS_RUNNING) {
+					kprintf(LOG_NORMAL, "system: still waiting for %u(%s)...\n",
+					        process->id, process->name);
+				}
+			}
+		}
+		rwlock_unlock(&process_tree_lock);
+	} while(count);
+
+	/* Close the kernel library handle. */
+	object_handle_release(kernel_library);
 }
 
 /** Helper to free information copied from userspace.

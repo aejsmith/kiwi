@@ -23,6 +23,7 @@
 
 #include <kiwi/Error.h>
 #include <kiwi/Process.h>
+#include <kiwi/Thread.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -119,6 +120,12 @@ void ServiceManager::HandleConnection() {
 	}
 }
 
+/** Shut down the system. */
+static void shutdown_system(int status) {
+	Thread::Sleep(200000);
+	system_shutdown(SHUTDOWN_POWEROFF);
+}
+
 /** Main function for the service manager.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -165,8 +172,12 @@ int main(int argc, char **argv) {
 			"org.kiwi.WindowServer"
 		));
 
-		/* Run the terminal application. */
-		Process proc;
+	}
+
+	/* Run the terminal application. */
+	Process proc;
+	if(!svcmgr.IsSessionInstance()) {
+		proc.OnExit.Connect(shutdown_system);
 		proc.Create("/system/binaries/terminal");
 	}
 

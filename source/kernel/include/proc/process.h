@@ -98,5 +98,6 @@ extern void process_exit(int status) __noreturn;
 extern int kdbg_cmd_process(int argc, char **argv);
 
 extern void process_init(void);
+extern void process_shutdown(void);
 
 #endif /* __PROC_PROCESS_H */

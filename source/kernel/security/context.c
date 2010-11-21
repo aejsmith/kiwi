@@ -222,4 +222,5 @@ void __init_text security_init(void) {
 	security_context_set_cap(&init_security_context, CAP_FS_MOUNT);
 	security_context_set_cap(&init_security_context, CAP_CHANGE_OWNER);
 	security_context_set_cap(&init_security_context, CAP_FATAL);
+	security_context_set_cap(&init_security_context, CAP_SHUTDOWN);
 }

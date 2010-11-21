@@ -38,6 +38,7 @@
 #include <console.h>
 #include <kargs.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <lrm.h>
 #include <status.h>
 
@@ -2222,57 +2223,43 @@ fail:
 	return ret;
 }
 
-/** Unmounts a filesystem.
- *
- * Flushes all modifications to a filesystem if it is not read-only and
- * unmounts it. If any nodes in the filesystem are busy, then the operation
- * will fail.
- *
- * @param path		Path to mount point of filesystem.
- *
- * @return		Status code describing result of the operation.
- */
-status_t fs_unmount(const char *path) {
-	fs_node_t *node = NULL, *child;
-	fs_mount_t *mount = NULL;
+/** Internal part of fs_unmount().
+ * @param mount		Mount to unmount.
+ * @param node		Node looked up for the unmount (can be NULL). Will be
+ *			released when the function returns, even upon failure.
+ * @return		Status code describing result of the operation. */
+static status_t fs_unmount_internal(fs_mount_t *mount, fs_node_t *node) {
+	fs_node_t *child;
 	status_t ret;
 
-	if(!path) {
-		return STATUS_INVALID_ARG;
-	}
-
-	if(!cap_check(NULL, CAP_FS_MOUNT)) {
-		return STATUS_PERM_DENIED;
-	}
-
-	/* Serialise mount/unmount operations. */
-	mutex_lock(&mounts_lock);
-
-	/* Look up the destination directory and check if it can be unmounted. */
-	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
-	if(ret != STATUS_SUCCESS) {
-		goto fail;
-	} else if(node != node->mount->root) {
-		ret = STATUS_NOT_MOUNT;
-		goto fail;
-	} else if(!node->mount->mountpoint) {
-		ret = STATUS_IN_USE;
-		goto fail;
+	if(node) {
+		if(node != mount->root) {
+			fs_node_release(node);
+			return STATUS_NOT_MOUNT;
+		} else if(!mount->mountpoint && !shutdown_in_progress) {
+			fs_node_release(node);
+			return STATUS_IN_USE;
+		}
 	}
 
 	/* Lock parent mount to ensure that the mount does not get looked up
 	 * while we are unmounting. */
-	mount = node->mount;
-	mutex_lock(&mount->mountpoint->mount->lock);
+	if(mount->mountpoint) {
+		mutex_lock(&mount->mountpoint->mount->lock);
+	}
 	mutex_lock(&mount->lock);
 
-	/* Get rid of the reference the lookup added, and check if any nodes
-	 * on the mount are in use. */
-	if(refcount_dec(&node->count) != 1) {
-		assert(refcount_get(&node->count));
-		ret = STATUS_IN_USE;
-		goto fail;
-	} else if(node->mount_link.next != &mount->used_nodes || node->mount_link.prev != &mount->used_nodes) {
+	/* If a lookup was performed, get rid of the reference it added. */
+	if(node) {
+		if(refcount_dec(&node->count) != 1) {
+			assert(refcount_get(&node->count));
+			ret = STATUS_IN_USE;
+			goto fail;
+		}
+	}
+
+	/* Check if any nodes are in use. */
+	if(mount->root->mount_link.next != &mount->used_nodes || mount->root->mount_link.prev != &mount->used_nodes) {
 		ret = STATUS_IN_USE;
 		goto fail;
 	}
@@ -2288,17 +2275,19 @@ status_t fs_unmount(const char *path) {
 	}
 
 	/* Free the root node itself. */
-	refcount_dec(&node->count);
-	ret = fs_node_free(node);
+	refcount_dec(&mount->root->count);
+	ret = fs_node_free(mount->root);
 	if(ret != STATUS_SUCCESS) {
-		refcount_inc(&node->count);
+		refcount_inc(&mount->root->count);
 		goto fail;
 	}
 
 	/* Detach from the mountpoint. */
-	mount->mountpoint->mounted = NULL;
-	mutex_unlock(&mount->mountpoint->mount->lock);
-	fs_node_release(mount->mountpoint);
+	if(mount->mountpoint) {
+		mount->mountpoint->mounted = NULL;
+		mutex_unlock(&mount->mountpoint->mount->lock);
+		fs_node_release(mount->mountpoint);
+	}
 
 	/* Call unmount operation and release device/type. */
 	if(mount->ops->unmount) {
@@ -2310,19 +2299,50 @@ status_t fs_unmount(const char *path) {
 	refcount_dec(&mount->type->count);
 
 	list_remove(&mount->header);
-	mutex_unlock(&mounts_lock);
 	mutex_unlock(&mount->lock);
 	kfree(mount);
 	return STATUS_SUCCESS;
 fail:
-	if(node) {
-		if(mount) {
-			mutex_unlock(&mount->lock);
-			mutex_unlock(&mount->mountpoint->mount->lock);
-		} else {
-			fs_node_release(node);
-		}
+	mutex_unlock(&mount->lock);
+	if(mount->mountpoint) {
+		mutex_unlock(&mount->mountpoint->mount->lock);
 	}
+	return ret;
+}
+
+/** Unmount a filesystem.
+ *
+ * Flushes all modifications to a filesystem if it is not read-only and
+ * unmounts it. If any nodes in the filesystem are busy, then the operation
+ * will fail.
+ *
+ * @param path		Path to mount point of filesystem.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t fs_unmount(const char *path) {
+	fs_node_t *node;
+	status_t ret;
+
+	if(!path) {
+		return STATUS_INVALID_ARG;
+	}
+
+	if(!cap_check(NULL, CAP_FS_MOUNT)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	/* Serialise mount/unmount operations. */
+	mutex_lock(&mounts_lock);
+
+	/* Look up the destination directory. */
+	ret = fs_node_lookup(path, true, FS_NODE_DIR, &node);
+	if(ret != STATUS_SUCCESS) {
+		mutex_unlock(&mounts_lock);
+		return ret;
+	}
+
+	ret = fs_unmount_internal(node->mount, node);
 	mutex_unlock(&mounts_lock);
 	return ret;
 }
@@ -2562,6 +2582,37 @@ void __init_text fs_init(kernel_args_t *args) {
 	/* Store the boot FS UUID for use by fs_probe(). */
 	boot_fs_uuid = args->boot_fs_uuid;
 	force_fsimage = args->force_fsimage;
+}
+
+/** Shut down the filesystem layer. */
+void fs_shutdown(void) {
+	fs_mount_t *mount;
+	status_t ret;
+
+	/* Drop references to the kernel process' root and current directories. */
+	fs_node_release(curr_proc->ioctx.root_dir);
+	curr_proc->ioctx.root_dir = NULL;
+	fs_node_release(curr_proc->ioctx.curr_dir);
+	curr_proc->ioctx.curr_dir = NULL;
+
+	/* We must unmount all filesystems in the correct order, so that a FS
+	 * will be unmounted before the FS that it is mounted on. This is
+	 * actually easy to do: when a filesystem is mounted, it is appended to
+	 * the mounts list. This means that the FS it is mounted on will always
+	 * be before it in the list. So, we just need to iterate over the list
+	 * in reverse. */
+	LIST_FOREACH_SAFE_R(&mount_list, iter) {
+		mount = list_entry(iter, fs_mount_t, header);
+
+		ret = fs_unmount_internal(mount, NULL);
+		if(ret != STATUS_SUCCESS) {
+			if(ret == STATUS_IN_USE) {
+				fatal("Mount %p in use during shutdown", mount);
+			} else {
+				fatal("Failed to unmount %p (%d)", mount, ret);
+			}
+		}
+	}
 }
 
 /** Open a handle to a file.

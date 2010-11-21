@@ -128,11 +128,12 @@ void Service::StartHelper(void *data) {
 /** Slot for the process exiting.
  * @param status	Exit status of the process. */
 void Service::ProcessExited(int status) {
-	if(m_flags & kCritical) {
-		std::stringstream str;
-		str << "Critical service '" << m_name << "' exited with status " << status;
-		system_fatal(str.str().c_str());
-	}
+	/* TODO: Re-enable this when we have a proper shutdown implemented. */
+	//if(m_flags & kCritical) {
+	//	std::stringstream str;
+	//	str << "Critical service '" << m_name << "' exited with status " << status;
+	//	system_fatal(str.str().c_str());
+	//}
 
 	m_conn = 0;
 	cout << "svcmgr: service '" << m_name << "' exited with status " << status << endl;
