@@ -344,6 +344,9 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 
 	/* Create the root directory, and add '.' and '..' entries. */
 	ndata = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
+	ndata->created = time_since_epoch();
+	ndata->accessed = time_since_epoch();
+	ndata->modified = time_since_epoch();
 	ndata->entries = entry_cache_create(NULL, NULL);
 	entry_cache_insert(ndata->entries, ".", 0);
 	entry_cache_insert(ndata->entries, "..", 0);
