@@ -2037,7 +2037,7 @@ void fs_probe(device_t *device) {
 		type = fs_type_probe(handle, boot_fs_uuid);
 		if(type) {
 			path = device_path(device);
-			ret = fs_mount(path, "/", type->name, "ro");
+			ret = fs_mount(path, "/", type->name, NULL);
 			if(ret != STATUS_SUCCESS) {
 				fatal("Failed to mount boot filesystem (%d)", ret);
 			}
