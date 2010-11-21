@@ -100,11 +100,11 @@ status_t ext2_inode_set_security(ext2_inode_t *inode, const object_security_t *s
 	uint16_t mode;
 	size_t i;
 
-	/* Clear permission bits from the current mode. */
-	mode = le16_to_cpu(inode->disk.i_mode) & ~(EXT2_S_IRWXU | EXT2_S_IRWXG | EXT2_S_IRWXO);
-
 	/* Convert the ACL entries into mode bits. */
 	if(security->acl) {
+		/* Clear permission bits from the current mode. */
+		mode = le16_to_cpu(inode->disk.i_mode) & ~(EXT2_S_IRWXU | EXT2_S_IRWXG | EXT2_S_IRWXO);
+
 		for(i = 0; i < security->acl->count; i++) {
 			switch(security->acl->entries[i].type) {
 			case ACL_ENTRY_USER:
@@ -126,12 +126,16 @@ status_t ext2_inode_set_security(ext2_inode_t *inode, const object_security_t *s
 				break;
 			}
 		}
+
+		inode->disk.i_mode = cpu_to_le16(mode);
 	}
 
-	/* Store the new mode and the owning user/group IDs. */
-	inode->disk.i_mode = cpu_to_le16(mode);
-	inode->disk.i_uid = cpu_to_le16(security->uid);
-	inode->disk.i_gid = cpu_to_le16(security->gid);
+	if(security->uid >= 0) {
+		inode->disk.i_uid = cpu_to_le16(security->uid);
+	}
+	if(security->gid >= 0) {
+		inode->disk.i_gid = cpu_to_le16(security->gid);
+	}
 	ext2_inode_flush(inode);
 	return STATUS_SUCCESS;
 }
