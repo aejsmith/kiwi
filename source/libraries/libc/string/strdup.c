@@ -60,17 +60,12 @@ char *strndup(const char *s, size_t n) {
 	size_t len;
 	char *dup;
 
-	len = strlen(s);
-	if(n < len) {
-		len = n;
-	}
-
+	len = strnlen(s, n);
 	dup = malloc(len + 1);
-	if(dup == NULL) {
-		return NULL;
+	if(dup) {
+		memcpy(dup, s, len);
+		dup[len] = '\0';
 	}
 
-	memcpy(dup, s, len);
-	dup[len] = '\0';
 	return dup;
 }

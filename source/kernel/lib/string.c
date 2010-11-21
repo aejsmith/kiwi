@@ -544,11 +544,7 @@ char *kstrndup(const char *src, size_t n) {
 	size_t len;
 	char *dup;
 
-	len = strlen(src);
-	if(n < len) {
-		len = n;
-	}
-
+	len = strnlen(src, n);
 	dup = kmalloc(len + 1);
 	memcpy(dup, src, len);
 	dup[len] = '\0';
@@ -622,18 +618,13 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
 	size_t len;
 	char *dup;
 
-	len = strlen(src);
-	if(n < len) {
-		len = n;
-	}
-
+	len = strnlen(src, n);
 	dup = kmalloc(len + 1, kmflag);
-	if(dup == NULL) {
-		return NULL;
+	if(dup) {
+		memcpy(dup, src, len);
+		dup[len] = '\0';
 	}
 
-	memcpy(dup, src, len);
-	dup[len] = '\0';
 	return dup;
 }
 
