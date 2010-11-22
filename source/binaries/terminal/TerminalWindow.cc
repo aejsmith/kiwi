@@ -20,32 +20,65 @@
 
 #include <kiwi/Graphics/Surface.h>
 
+#include <algorithm>
+#include <assert.h>
 #include <iostream>
+#include <pixman.h>
+#include <stdlib.h>
 
 #include "TerminalWindow.h"
 
 using namespace kiwi;
 using namespace std;
 
-/** Font to use for terminals. */
+/** Normal terminal font. */
 Font *TerminalWindow::m_font = 0;
+
+/** Bold terminal font. */
+Font *TerminalWindow::m_bold_font = 0;
+
+/** Colour conversion table. */
+static struct { double r; double g; double b; } colour_table[2][9] = {
+	{
+		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
+		{ 0.0, 0.0, 0.0 },	/**< kBlackColour. */
+		{ 0.7, 0.1, 0.1 },	/**< kRedColour. */
+		{ 0.1, 0.7, 0.1 },	/**< kGreenColour. */
+		{ 0.7, 0.4, 0.1 },	/**< kYellowColour. */
+		{ 0.1, 0.1, 0.1 },	/**< kBlueColour */
+		{ 0.7, 0.1, 0.7 },	/**< kMagentaColour. */
+		{ 0.1, 0.7, 0.7 },	/**< kCyanColour. */
+		{ 0.7, 0.7, 0.7 },	/**< kWhiteColour. */
+	},
+	{
+		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
+		{ 0.4, 0.4, 0.4 },	/**< kBlackColour. */
+		{ 1.0, 0.3, 0.3 },	/**< kRedColour. */
+		{ 0.3, 1.0, 0.3 },	/**< kGreenColour. */
+		{ 1.0, 1.0, 0.3 },	/**< kYellowColour. */
+		{ 0.3, 0.3, 1.0 },	/**< kBlueColour */
+		{ 1.0, 0.3, 1.0 },	/**< kMagentaColour. */
+		{ 0.3, 1.0, 1.0 },	/**< kCyanColour. */
+		{ 1.0, 1.0, 1.0 },	/**< kWhiteColour. */
+	},
+};
 
 /** Create a new terminal window.
  * @param app		Application the window is for.
  * @param cols		Intial number of columns.
  * @param rows		Initial number of rows. */
 TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
-	m_app(app), m_terminal(cols, rows)
+	m_app(app), m_xterm(this), m_terminal(&m_xterm, cols, rows),
+	m_cols(cols), m_rows(rows), m_history_pos(0)
 {
 	int id;
 
 	m_terminal.OnExit.Connect(this, &TerminalWindow::TerminalExited);
-	m_terminal.OnUpdate.Connect(this, &TerminalWindow::TerminalUpdated);
-	m_terminal.OnScrollDown.Connect(this, &TerminalWindow::TerminalScrolledDown);
 
 	/* Create the font if necessary. */
 	if(!m_font) {
 		m_font = new Font("/system/data/fonts/DejaVuSansMono.ttf", 13.0);
+		m_bold_font = new Font("/system/data/fonts/DejaVuSansMono-Bold.ttf", 13.0);
 	}
 
 	/* Work out the size to give the window. */
@@ -63,12 +96,6 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
 	Show();
 }
 
-/** Handle the terminal process exiting.
- * @param status	Exit status of the process. */
-void TerminalWindow::TerminalExited(int status) {
-	DeleteLater();
-}
-
 /** Update an area in the terminal buffer.
  * @param rect		Area to update. */
 void TerminalWindow::TerminalUpdated(Rect rect) {
@@ -81,19 +108,50 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 
 	/* Draw the characters. */
 	for(int y = rect.GetY(); y < (rect.GetY() + rect.GetHeight()); y++) {
+		/* Ignore rows that we are not currently looking at. */
+		if(y >= (m_history_pos + m_rows)) {
+			continue;
+		}
+
 		for(int x = rect.GetX(); x < (rect.GetX() + rect.GetWidth()); x++) {
-			Point pos(x * font_size.GetWidth(), y * font_size.GetHeight());
+			Point pos(x * font_size.GetWidth(), (y - m_history_pos) * font_size.GetHeight());
+			TerminalBuffer::Character ch = m_terminal.GetBuffer()->CharAt(x, y);
+
+			/* Select the background colour. */
+			if(ch.bg != TerminalBuffer::kDefaultColour) {
+				cairo_set_source_rgb(
+					context,
+					colour_table[0][ch.bg].r,
+					colour_table[0][ch.bg].g,
+					colour_table[0][ch.bg].b
+				);
+			} else {
+				cairo_set_source_rgba(context, 0, 0, 0, 0.9);
+			}
 
 			/* Draw the background. */
 			cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
 			cairo_rectangle(context, pos.GetX(), pos.GetY(), font_size.GetWidth(), font_size.GetHeight());
-			cairo_set_source_rgba(context, 0, 0, 0, 0.9);
 			cairo_fill(context);
-			cairo_set_operator(context, CAIRO_OPERATOR_OVER);
+
+			/* Select the foreground colour. */
+			if(ch.fg != TerminalBuffer::kDefaultColour) {
+				cairo_set_source_rgb(
+					context,
+					colour_table[ch.bold][ch.fg].r,
+					colour_table[ch.bold][ch.fg].g,
+					colour_table[ch.bold][ch.fg].b
+				);
+			} else {
+				cairo_set_source_rgb(context, 1, 1, 1);
+			}
 
 			/* Draw the character. */
-			if(m_terminal.GetBuffer()[y][x]) {
-				m_font->DrawChar(context, m_terminal.GetBuffer()[y][x], pos);
+			cairo_set_operator(context, CAIRO_OPERATOR_OVER);
+			if(ch.bold) {
+				m_bold_font->DrawChar(context, ch.ch, pos);
+			} else {
+				m_font->DrawChar(context, ch.ch, pos);
 			}
 			Update(Rect(pos, font_size));
 		}
@@ -102,24 +160,134 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 	cairo_destroy(context);
 }
 
-/** Scroll the terminal down. */
-void TerminalWindow::TerminalScrolledDown() {
-	cairo_t *context;
-	int cols, rows;
+/** Scroll part of the main area of the terminal.
+ * @param start		Start of scroll region.
+ * @param end		End of scroll region (inclusive).
+ * @param delta		Position delta (-1 for scroll down, 1 for scroll up). */
+void TerminalWindow::TerminalScrolled(int start, int end, int delta) {
+	assert(start >= 0 && start < m_rows);
+	assert(end >= start && end < m_rows);
 
-	m_terminal.GetSize(cols, rows);
-	Size font_size = m_font->GetSize();
+	start -= m_history_pos;
+	if(start >= m_rows) {
+		return;
+	}
 
-	/* Create the context. */
-	context = cairo_create(GetSurface()->GetCairoSurface());
-	cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
-	cairo_set_source_surface(context, GetSurface()->GetCairoSurface(), 0, -font_size.GetHeight());
-	cairo_rectangle(context, 0, 0, GetFrame().GetWidth(), font_size.GetHeight() * (rows - 1));
-	cairo_fill(context);
-	cairo_destroy(context);
+	end -= m_history_pos;
+	if(end >= m_rows) {
+		end = m_rows - 1;
+	}
 
-	/* Update the window. */
-	Update(Rect(0, 0, GetFrame().GetWidth(), font_size.GetHeight() * (rows - 1)));
+	DoScroll(start, end, delta);
+}
+
+/** Handle a line being added to the history. */
+void TerminalWindow::TerminalHistoryAdded() {
+	if(m_history_pos == 0) {
+		TerminalScrolled(0, m_rows - 1, -1);
+	} else if(abs(m_history_pos) == m_terminal.GetBuffer()->GetHistorySize()) {
+		m_history_pos--;
+		ScrollDown(1);
+	} else {
+		m_history_pos--;
+	}
+}
+
+/** Handle the terminal process exiting.
+ * @param status	Exit status of the process. */
+void TerminalWindow::TerminalExited(int status) {
+	DeleteLater();
+}
+
+/** Move up in the history.
+ * @param amount	Number of rows to scroll up. */
+void TerminalWindow::ScrollUp(int amount) {
+	int npos = std::max(-static_cast<int>(m_terminal.GetBuffer()->GetHistorySize()), m_history_pos - amount);
+	if(npos < m_history_pos) {
+		int delta = m_history_pos - npos;
+		m_history_pos = npos;
+		if(delta == 1) {
+			DoScroll(0, m_rows - 1, 1);
+		} else {
+			TerminalUpdated(Rect(0, m_history_pos, m_cols, m_rows));
+		}
+	}
+}
+
+/** Move down in the history.
+ * @param amount	Number of rows to scroll down. */
+void TerminalWindow::ScrollDown(int amount) {
+	int npos = std::min(0, m_history_pos + amount);
+	if(npos > m_history_pos) {
+		int delta = npos - m_history_pos;
+		m_history_pos = npos;
+		if(delta == 1) {
+			DoScroll(0, m_rows - 1, -1);
+		} else {
+			TerminalUpdated(Rect(0, m_history_pos, m_cols, m_rows));
+		}
+	}
+}
+
+/** Scroll part of the visible area.
+ * @param start		Start of scroll region in visible area.
+ * @param end		End of scroll region in visible area (inclusive).
+ * @param delta		Position delta (-1 for scroll down, 1 for scroll up). */
+void TerminalWindow::DoScroll(int start, int end, int delta) {
+	assert(start >= 0 && start < m_rows);
+	assert(end >= start && end < m_rows);
+
+	/* Only need to copy if the scroll region is larger than 1 line. */
+	if(end > start) {
+		uint32_t *data = GetSurface()->GetData();
+		int src_y, dest_y;
+
+		/* Work out where to draw from and to. */
+		Size font_size = m_font->GetSize();
+		if(delta < 0) {
+			src_y = font_size.GetHeight() * (start - delta);
+			dest_y = font_size.GetHeight() * start;
+		} else {
+			src_y = font_size.GetHeight() * start;
+			dest_y = font_size.GetHeight() * (start + delta);
+		}
+
+		/* Work out the size of the area to draw. */
+		Size size(GetFrame().GetWidth(), font_size.GetHeight() * (end - start));
+
+		/* Scroll the area. Unfortunately pixman does not properly
+		 * support overlapping blits, it will corrupt the surface (the
+		 * same occurs with Cairo, which uses pixman. */
+		if(delta < 0) {
+			pixman_blt(data, data, size.GetWidth(), size.GetWidth(),
+			           32, 32, 0, src_y, 0, dest_y, size.GetWidth(),
+			           size.GetHeight());
+		} else {
+			memmove(data + (dest_y * size.GetWidth()),
+			        data + (src_y * size.GetWidth()),
+			        size.GetWidth() * size.GetHeight() * 4);
+		}
+
+		/* Update the window. */
+		Update(Rect(Point(0, dest_y), size));
+	}
+
+	/* Update characters on the top/bottom row. */
+	TerminalUpdated(Rect(0, m_history_pos + ((delta > 0) ? start : end), m_cols, 1));
+}
+
+/** Send input to the terminal.
+ * @param ch		Character to send. */
+void TerminalWindow::SendInput(unsigned char ch) {
+	/* The purpose of this function is to move back to the main area of
+	 * the terminal if we're currently looking at history. The reason it's
+	 * not done in KeyPressed() below is that not all key presses will
+	 * result in input being sent. */
+	if(m_history_pos < 0) {
+		ScrollDown(-m_history_pos);
+	}
+
+	m_terminal.Input(ch);
 }
 
 /** Handle a key press event on the window.
@@ -132,144 +300,156 @@ void TerminalWindow::KeyPressed(const KeyEvent &event) {
 		case INPUT_KEY_N:
 			m_app->CreateWindow();
 			break;
+		case INPUT_KEY_UP:
+			ScrollUp(1);
+			break;
+		case INPUT_KEY_DOWN:
+			ScrollDown(1);
+			break;
+		case INPUT_KEY_PGUP:
+			ScrollUp(m_rows);
+			break;
+		case INPUT_KEY_PGDOWN:
+			ScrollDown(m_rows);
+			break;
 		}
 	} else {
 		/* Send the key to the terminal. */
 		switch(event.GetKey()) {
 		case INPUT_KEY_INSERT:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('2');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('2');
+			SendInput('~');
 			break;
 		case INPUT_KEY_HOME:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('H');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('H');
 			break;
 		case INPUT_KEY_PGUP:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('5');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('5');
+			SendInput('~');
 			break;
 		case INPUT_KEY_PGDOWN:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('6');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('6');
+			SendInput('~');
 			break;
 		case INPUT_KEY_END:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('F');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('F');
 			break;
 		case INPUT_KEY_DELETE:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('3');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('3');
+			SendInput('~');
 			break;
 		case INPUT_KEY_UP:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('A');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('A');
 			break;
 		case INPUT_KEY_DOWN:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('B');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('B');
 			break;
 		case INPUT_KEY_LEFT:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('D');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('D');
 			break;
 		case INPUT_KEY_RIGHT:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('C');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('C');
 			break;
 		case INPUT_KEY_F1:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('O');
-			m_terminal.Input('P');
+			SendInput(0x1B);
+			SendInput('O');
+			SendInput('P');
 			break;
 		case INPUT_KEY_F2:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('O');
-			m_terminal.Input('Q');
+			SendInput(0x1B);
+			SendInput('O');
+			SendInput('Q');
 			break;
 		case INPUT_KEY_F3:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('O');
-			m_terminal.Input('R');
+			SendInput(0x1B);
+			SendInput('O');
+			SendInput('R');
 			break;
 		case INPUT_KEY_F4:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('O');
-			m_terminal.Input('S');
+			SendInput(0x1B);
+			SendInput('O');
+			SendInput('S');
 			break;
 		case INPUT_KEY_F5:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('1');
-			m_terminal.Input('5');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('1');
+			SendInput('5');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F6:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('1');
-			m_terminal.Input('7');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('1');
+			SendInput('7');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F7:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('1');
-			m_terminal.Input('8');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('1');
+			SendInput('8');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F8:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('1');
-			m_terminal.Input('9');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('1');
+			SendInput('9');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F9:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('2');
-			m_terminal.Input('0');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('2');
+			SendInput('0');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F10:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('2');
-			m_terminal.Input('1');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('2');
+			SendInput('1');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F11:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('2');
-			m_terminal.Input('3');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('2');
+			SendInput('3');
+			SendInput('~');
 			break;
 		case INPUT_KEY_F12:
-			m_terminal.Input(0x1B);
-			m_terminal.Input('[');
-			m_terminal.Input('2');
-			m_terminal.Input('4');
-			m_terminal.Input('~');
+			SendInput(0x1B);
+			SendInput('[');
+			SendInput('2');
+			SendInput('4');
+			SendInput('~');
 			break;
 		default:
 			string text = event.GetText();
 			for(auto it = text.begin(); it != text.end(); ++it) {
-				m_terminal.Input(*it);
+				SendInput(*it);
 			}
 			break;
 		}

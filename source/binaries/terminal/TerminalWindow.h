@@ -26,6 +26,7 @@
 #include "Font.h"
 #include "TerminalApp.h"
 #include "Terminal.h"
+#include "Xterm.h"
 
 /** Class for a terminal window. */
 class TerminalWindow : public kiwi::BaseWindow {
@@ -35,18 +36,29 @@ public:
 	/** Get the window's terminal.
 	 * @return		Reference to the window's terminal. */
 	Terminal &GetTerminal() { return m_terminal; }
+
+	void TerminalUpdated(kiwi::Rect rect);
+	void TerminalScrolled(int start, int end, int delta);
+	void TerminalHistoryAdded();
 private:
 	void TerminalExited(int status);
-	void TerminalUpdated(kiwi::Rect rect);
-	void TerminalScrolledDown();
+	void ScrollUp(int amount);
+	void ScrollDown(int amount);
+	void DoScroll(int start, int end, int delta);
+	void SendInput(unsigned char ch);
 
 	void KeyPressed(const kiwi::KeyEvent &event);
 	void Resized(const kiwi::ResizeEvent &event);
 
 	TerminalApp *m_app;		/**< Application the window is on. */
-	Terminal m_terminal;		/**< Terminal for the window. */
+	Xterm m_xterm;			/**< Xterm emulator. */
+	Terminal m_terminal;		/**< Terminal device for the window. */
+	int m_cols;			/**< Width of the terminal. */
+	int m_rows;			/**< Height of the terminal. */
+	int m_history_pos;		/**< Offset in history. */
 
-	static Font *m_font;		/**< Font to use. */
+	static Font *m_font;		/**< Normal font to use. */
+	static Font *m_bold_font;	/**< Bold font to use. */
 };
 
 #endif /* __TERMINALWINDOW_H */
