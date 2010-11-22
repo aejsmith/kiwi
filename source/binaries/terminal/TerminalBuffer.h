@@ -36,17 +36,17 @@ class TerminalBuffer {
 public:
 	/** Colour of a character in the buffer. */
 	enum Colour : uint8_t {
+		kBlackColour = 0,
+		kRedColour = 1,
+		kGreenColour = 2,
+		kYellowColour = 3,
+		kBlueColour = 4,
+		kMagentaColour = 5,
+		kCyanColour = 6,
+		kWhiteColour = 7,
+
 		/** No specific colour, use default. */
 		kDefaultColour,
-
-		kBlackColour,
-		kRedColour,		
-		kGreenColour,
-		kYellowColour,
-		kBlueColour,
-		kMagentaColour,
-		kCyanColour,
-		kWhiteColour,
 	};
 
 	/** Character in a terminal buffer. */
@@ -86,6 +86,11 @@ private:
 
 			m_chars[idx] = ch;
 		}
+
+		/** Clear the contents of the line. */
+		void Clear() {
+			m_chars.clear();
+		}
 	private:
 		/** Characters in the line. */
 		std::vector<Character> m_chars;
@@ -108,6 +113,14 @@ public:
 	/** Get the current size of the history.
 	 * @return		Current size of the history. */
 	size_t GetHistorySize() const { return m_history.size(); }
+
+	/** Get the size of the terminal.
+	 * @param cols		Where to store number of columns.
+	 * @param rows		Where to store number of rows. */
+	void GetSize(int &cols, int &rows) const {
+		cols = m_cols;
+		rows = m_rows;
+	}
 
 	/** Get the current position of the cursor.
 	 * @param x		Where to store X position.

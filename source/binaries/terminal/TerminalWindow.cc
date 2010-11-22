@@ -40,7 +40,6 @@ Font *TerminalWindow::m_bold_font = 0;
 /** Colour conversion table. */
 static struct { double r; double g; double b; } colour_table[2][9] = {
 	{
-		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
 		{ 0.0, 0.0, 0.0 },	/**< kBlackColour. */
 		{ 0.7, 0.1, 0.1 },	/**< kRedColour. */
 		{ 0.1, 0.7, 0.1 },	/**< kGreenColour. */
@@ -49,9 +48,9 @@ static struct { double r; double g; double b; } colour_table[2][9] = {
 		{ 0.7, 0.1, 0.7 },	/**< kMagentaColour. */
 		{ 0.1, 0.7, 0.7 },	/**< kCyanColour. */
 		{ 0.7, 0.7, 0.7 },	/**< kWhiteColour. */
+		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
 	},
 	{
-		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
 		{ 0.4, 0.4, 0.4 },	/**< kBlackColour. */
 		{ 1.0, 0.3, 0.3 },	/**< kRedColour. */
 		{ 0.3, 1.0, 0.3 },	/**< kGreenColour. */
@@ -60,6 +59,7 @@ static struct { double r; double g; double b; } colour_table[2][9] = {
 		{ 1.0, 0.3, 1.0 },	/**< kMagentaColour. */
 		{ 0.3, 1.0, 1.0 },	/**< kCyanColour. */
 		{ 1.0, 1.0, 1.0 },	/**< kWhiteColour. */
+		{ 0.0, 0.0, 0.0 },	/**< kDefaultColour (ignored). */
 	},
 };
 

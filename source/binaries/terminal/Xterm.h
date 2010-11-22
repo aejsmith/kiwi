@@ -38,6 +38,16 @@ private:
 	TerminalWindow *m_window;	/**< Window that the terminal is on. */
 	TerminalBuffer *m_buffers[2];	/**< Main and alternate buffer. */
 	int m_active_buffer;		/**< Index of active buffer. */
+
+	int m_esc_state;		/**< Current escape sequence parse state. */
+	int m_esc_params[8];		/**< Escape code parameters. */
+	int m_esc_param_size;		/**< Number of escape code parameters. */
+
+	/** Current attributes. */
+	TerminalBuffer::Character m_attrib;
+
+	int m_saved_x;			/**< Saved cursor X position. */
+	int m_saved_y;			/**< Saved cursor Y position. */
 };
 
 #endif /* __XTERM_H */
