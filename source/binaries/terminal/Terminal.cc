@@ -22,7 +22,6 @@
 #include <kernel/status.h>
 
 #include <kiwi/Error.h>
-#include <kiwi/Process.h>
 
 #include <assert.h>
 #include <iostream>
@@ -39,8 +38,8 @@ using namespace std;
 /** Create a new terminal.
  * @param cols		Number of columns.
  * @param rows		Number of rows. */
-Terminal::Terminal(int cols, int rows) :
-	m_id(0), m_columns(cols), m_rows(rows), m_cursor_x(0), m_cursor_y(0)
+Terminal::Terminal(Handler *handler, int cols, int rows) :
+	m_id(0), m_handler(handler), m_cols(cols), m_rows(rows)
 {
 	handle_t handle;
 	status_t ret;
@@ -75,18 +74,11 @@ Terminal::Terminal(int cols, int rows) :
 		throw e;
 	}
 
-	/* Create our buffer. */
-	m_buffer = new char *[rows];
-	for(int i = 0; i < rows; i++) {
-		m_buffer[i] = new char[cols];
-		memset(m_buffer[i], 0, cols);
-	}
+	m_handler->Resize(cols, rows);
 }
 
 /** Destroy the terminal. */
-Terminal::~Terminal() {
-
-}
+Terminal::~Terminal() {}
 
 /** Run a command in the terminal.
  * @param cmdline	Command line to run. */
@@ -138,22 +130,24 @@ bool Terminal::Run(const char *cmdline) {
  * @param cols		New number of columns.
  * @param rows		New number of rows. */
 void Terminal::Resize(int cols, int rows) {
-	if(cols == m_columns && rows == m_rows) {
+	status_t ret;
+
+	if(cols == m_cols && rows == m_rows) {
 		return;
 	}
 
+	/* Set the new window size of the terminal device. */
 	winsize size;
 	size.ws_col = cols;
 	size.ws_row = rows;
-
-	status_t ret = device_request(m_handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
+	ret = device_request(m_handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to resize terminal: " << e.GetDescription() << endl;
 		return;
 	}
 
-	/* TODO. */
+	m_handler->Resize(cols, rows);
 }
 
 /** Send input to the terminal.
@@ -170,68 +164,7 @@ void Terminal::Input(unsigned char ch) {
 /** Add output to the terminal.
  * @param ch		Character to add. */
 void Terminal::Output(unsigned char ch) {
-	switch(ch) {
-	case '\b':
-		/* Backspace, move back one character if we can. */
-		if(m_cursor_x) {
-			m_cursor_x--;
-		} else if(m_cursor_y) {
-			m_cursor_x = m_columns - 1;
-			m_cursor_y--;
-		}
-		break;
-	case '\r':
-		/* Carriage return, move to the start of the line. */
-		m_cursor_x = 0;
-		break;
-	case '\n':
-		/* Newline, treat it as if a carriage return was also there. */
-		m_cursor_x = 0;
-		m_cursor_y++;
-		break;
-	case '\t':
-		m_cursor_x += 8 - (m_cursor_x % 8);
-		break;
-	default:
-		/* If it is a non-printing character, ignore it. */
-		if(ch < ' ') {
-			break;
-		}
-
-		m_buffer[m_cursor_y][m_cursor_x] = ch;
-		OnUpdate(Rect(m_cursor_x, m_cursor_y, 1, 1));
-		m_cursor_x++;
-		break;
-	}
-
-	/* If we have reached the edge of the console insert a new line. */
-	if(m_cursor_x >= m_columns) {
-		m_cursor_x = 0;
-		m_cursor_y++;
-	}
-
-	/* If we have reached the bottom of the console, scroll. */
-	if(m_cursor_y >= m_rows) {
-		ScrollDown();
-		m_cursor_y = m_rows - 1;
-	}
-}
-
-/** Scroll the terminal down. */
-void Terminal::ScrollDown() {
-	/* Delete the top row of the buffer. */
-	delete m_buffer[0];
-
-	/* Shift everything up. */
-	memmove(&m_buffer[0], &m_buffer[1], m_rows * sizeof(m_buffer[0]));
-
-	/* Add a new row. */
-	m_buffer[m_rows - 1] = new char[m_columns];
-	memset(m_buffer[m_rows - 1], 0, m_columns);
-
-	/* Update. */
-	OnScrollDown();
-	OnUpdate(Rect(0, m_rows - 1, m_columns, 1));
+	m_handler->Output(ch);
 }
 
 /** Register events for the terminal. */
@@ -253,5 +186,5 @@ void Terminal::HandleEvent(int event) {
 		return;
 	}
 
-	Output(ch);
+	m_handler->Output(ch);
 }

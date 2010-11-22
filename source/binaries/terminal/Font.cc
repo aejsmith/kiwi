@@ -58,7 +58,7 @@ Font::Font(const char *path, double size) {
 }
 
 /** Draw a character in a Cairo context.
- * @param context	Context to draw to.
+ * @param context	Context to draw to. Source should be set.
  * @param ch		Character to draw.
  * @param pos		Position to draw at. */ 
 void Font::DrawChar(cairo_t *context, unsigned char ch, Point pos) {
@@ -70,7 +70,6 @@ void Font::DrawChar(cairo_t *context, unsigned char ch, Point pos) {
 	cairo_save(context);
 	cairo_set_scaled_font(context, m_font);
 	cairo_move_to(context, pos.GetX(), static_cast<double>(pos.GetY()) + extents.ascent);
-	cairo_set_source_rgb(context, 1, 1, 1);
 	cairo_show_text(context, buf);
 	cairo_restore(context);
 }

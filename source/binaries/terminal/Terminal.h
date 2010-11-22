@@ -23,40 +23,26 @@
 
 #include <kiwi/Graphics/Rect.h>
 
-#include <kiwi/Error.h>
 #include <kiwi/Handle.h>
 #include <kiwi/Process.h>
+
+#include "TerminalBuffer.h"
 
 /** Class implementing a terminal. */
 class Terminal : public kiwi::Handle {
 public:
-#if 0
-	/** Buffer containing the data from the terminal. */
-	class Buffer : kiwi::Noncopyable {
-		/** Maximum number of rows in the buffer. */
-		static const int kMaximumRows = 1024;
+	/** Base class for a terminal handler. */
+	class Handler {
 	public:
-		Buffer(int cols);
-		~Buffer();
+		virtual void Resize(int cols, int rows) = 0;
+		virtual void Output(unsigned char raw) = 0;
+		virtual TerminalBuffer *GetBuffer() = 0;
 
-		void Resize(int cols);
-		void ChangeOffset(int delta);
-		void WriteChar(
-
-		/** Signal emitted when a visible area must be update.
-		 * @param		Area to update. Note that these
-		 *			coordinates are in cells, not pixels. */
-		kiwi::Signal<Rect> OnUpdate;
-	private:
-		size_t m_start;		/**< Start of the circular buffer. */
-		size_t m_end;		/**< End of the circular buffer. */
-		size_t m_offset;	/**< Current display offset. */
-
-		/** Array of rows in the buffer. */
-		char *m_data[kMaximumRows];
+		/** Signal emitted when the active buffer changes. */
+		kiwi::Signal<> OnBufferChange;
 	};
-#endif
-	Terminal(int cols, int rows);
+
+	Terminal(Handler *handler, int cols, int rows);
 	~Terminal();
 
 	bool Run(const char *cmdline);
@@ -64,45 +50,34 @@ public:
 	void Input(unsigned char ch);
 	void Output(unsigned char ch);
 
-	/** Get the size of the terminal.
-	 * @param cols		Where to store number of columns.
-	 * @param rows		Where to store number of rows. */
-	void GetSize(int &cols, int &rows) const {
-		cols = m_columns;
-		rows = m_rows;
-	}
-
 	/** Get the ID of the terminal.
 	 * @return		ID of the terminal. */
 	int GetID() const { return m_id; }
 
+	/** Get the size of the terminal.
+	 * @param cols		Where to store number of columns.
+	 * @param rows		Where to store number of rows. */
+	void GetSize(int &cols, int &rows) const {
+		cols = m_cols;
+		rows = m_rows;
+	}
+
 	/** Get the data buffer.
 	 * @return		Data buffer. */
-	char **GetBuffer() { return m_buffer; }
+	TerminalBuffer *GetBuffer() { return m_handler->GetBuffer(); }
 
 	/** Signal emitted when the terminal main process exits.
 	 * @param		Exit status code. */
 	kiwi::Signal<int> OnExit;
-
-	/** Signal emitted when an area of the terminal is updated.
-	 * @param		Rectangle area to update. */
-	kiwi::Signal<kiwi::Rect> OnUpdate;
-
-	/** Signal emitted when the terminal is scrolled down. */
-	kiwi::Signal<> OnScrollDown;
 private:
-	void ScrollDown();
-
 	void RegisterEvents();
 	void HandleEvent(int event);
 
 	int m_id;			/**< ID of the terminal. */
-	int m_columns;			/**< Width of the terminal. */
+	Handler *m_handler;		/**< Handler for terminal input. */
+	int m_cols;			/**< Width of the terminal. */
 	int m_rows;			/**< Height of the terminal. */
-	int m_cursor_x;			/**< X position of cursor. */
-	int m_cursor_y;			/**< Y position of cursor. */
 	kiwi::Process m_process;	/**< Process running in the terminal. */
-	char **m_buffer;		/**< Data buffer. */
 };
 
 #endif /* __TERMINAL_H */

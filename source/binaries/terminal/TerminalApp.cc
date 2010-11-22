@@ -33,6 +33,9 @@ TerminalApp::TerminalApp(int argc, char **argv) :
 	/* Change to our home directory. */
 	chdir(getenv("HOME"));
 
+	/* Set the TERM value for clients to inherit. */
+	setenv("TERM", "xterm-color", 1);
+
 	/* Create the initial terminal. */
 	CreateWindow();
 }
