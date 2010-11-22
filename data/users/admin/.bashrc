@@ -8,4 +8,12 @@ export HISTCONTROL=ignoreboth
 shopt -s checkwinsize
 
 # Set the prompt.
-export PS1="[\t] [ \u in \w ] \$ "
+set_ps1() {
+	local COLOUR_NORMAL="\[\033[0;39m\]"
+	local COLOUR_BLUE="\[\033[1;34m\]"
+	local COLOUR_WHITE="\[\033[1;37m\]"
+
+	PS1="${COLOUR_WHITE}[${COLOUR_BLUE}\t${COLOUR_WHITE}] [ ${COLOUR_BLUE}\u${COLOUR_WHITE} ${COLOUR_WHITE}in ${COLOUR_BLUE}\w ${COLOUR_WHITE}] \$${COLOUR_NORMAL} "
+}
+set_ps1
+unset set_ps1

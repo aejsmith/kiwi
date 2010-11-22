@@ -230,7 +230,7 @@ static void do_list_long(const char *argv0, dir_entries_t *dents, const char *di
 static void do_list_short(dir_entries_t *dents) {
 	int i, num, len, max = 0, count;
 
-	//if(is_terminal) {
+	if(is_terminal) {
 		for(i = 0; i < dents->count; i++) {
 			len = strlen(dents->dents[i]->d_name);
 			max = ((len + 2) > max) ? (len + 2) : max;
@@ -254,11 +254,11 @@ static void do_list_short(dir_entries_t *dents) {
 		if(count != 0) {
 			printf("\n");
 		}
-	//} else {
-	//	for(i = 0; i < dents->count; i++) {
-	//		printf("%s\n", dents->dents[i]->d_name);
-	//	}
-	//}
+	} else {
+		for(i = 0; i < dents->count; i++) {
+			printf("%s\n", dents->dents[i]->d_name);
+		}
+	}
 }
 
 /** Perform the real work of listing a command line argument. */
@@ -429,8 +429,7 @@ int main(int argc, char *argv[]) {
 
 	/* Check if we're outputting to a terminal. */
 	if(isatty(STDOUT_FILENO)) {
-		// When enabling colours, uncomment bit in short list
-		//is_terminal = true;
+		is_terminal = true;
 	}
 
 	/* Loop through each specified entry. */
