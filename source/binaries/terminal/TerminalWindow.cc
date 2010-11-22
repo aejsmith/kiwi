@@ -100,7 +100,9 @@ TerminalWindow::TerminalWindow(TerminalApp *app, int cols, int rows) :
  * @param rect		Area to update. */
 void TerminalWindow::TerminalUpdated(Rect rect) {
 	cairo_t *context;
+	int csr_x, csr_y;
 
+	m_terminal.GetBuffer()->GetCursor(csr_x, csr_y);
 	Size font_size = m_font->GetSize();
 
 	/* Create the context. */
@@ -114,8 +116,16 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 		}
 
 		for(int x = rect.GetX(); x < (rect.GetX() + rect.GetWidth()); x++) {
-			Point pos(x * font_size.GetWidth(), (y - m_history_pos) * font_size.GetHeight());
+			bool invert;
+
+			/* Get the character. If it is the cursor, invert colours. */
 			TerminalBuffer::Character ch = m_terminal.GetBuffer()->CharAt(x, y);
+			if((invert = (x == csr_x && y == csr_y))) {
+				swap(ch.fg, ch.bg);
+			}
+
+			/* Work out where to draw at. */
+			Point pos(x * font_size.GetWidth(), (y - m_history_pos) * font_size.GetHeight());
 
 			/* Select the background colour. */
 			if(ch.bg != TerminalBuffer::kDefaultColour) {
@@ -126,7 +136,11 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 					colour_table[0][ch.bg].b
 				);
 			} else {
-				cairo_set_source_rgba(context, 0, 0, 0, 0.9);
+				if(invert) {
+					cairo_set_source_rgb(context, 1, 1, 1);
+				} else {
+					cairo_set_source_rgba(context, 0, 0, 0, 0.9);
+				}
 			}
 
 			/* Draw the background. */
@@ -143,7 +157,11 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 					colour_table[ch.bold][ch.fg].b
 				);
 			} else {
-				cairo_set_source_rgb(context, 1, 1, 1);
+				if(invert) {
+					cairo_set_source_rgb(context, 0, 0, 0);
+				} else {
+					cairo_set_source_rgb(context, 1, 1, 1);
+				}
 			}
 
 			/* Draw the character. */
@@ -234,6 +252,8 @@ void TerminalWindow::ScrollDown(int amount) {
  * @param end		End of scroll region in visible area (inclusive).
  * @param delta		Position delta (-1 for scroll down, 1 for scroll up). */
 void TerminalWindow::DoScroll(int start, int end, int delta) {
+	int csr_x, csr_y;
+
 	assert(start >= 0 && start < m_rows);
 	assert(end >= start && end < m_rows);
 
@@ -245,11 +265,11 @@ void TerminalWindow::DoScroll(int start, int end, int delta) {
 		/* Work out where to draw from and to. */
 		Size font_size = m_font->GetSize();
 		if(delta < 0) {
-			src_y = font_size.GetHeight() * (start - delta);
+			src_y = font_size.GetHeight() * (start + 1);
 			dest_y = font_size.GetHeight() * start;
 		} else {
 			src_y = font_size.GetHeight() * start;
-			dest_y = font_size.GetHeight() * (start + delta);
+			dest_y = font_size.GetHeight() * (start + 1);
 		}
 
 		/* Work out the size of the area to draw. */
@@ -274,6 +294,12 @@ void TerminalWindow::DoScroll(int start, int end, int delta) {
 
 	/* Update characters on the top/bottom row. */
 	TerminalUpdated(Rect(0, m_history_pos + ((delta > 0) ? start : end), m_cols, 1));
+
+	/* If the cursor was in the scrolled area, redraw the old position. */
+	m_terminal.GetBuffer()->GetCursor(csr_x, csr_y);
+	if(csr_y >= start && csr_y <= end) {
+		TerminalUpdated(Rect(csr_x, csr_y + delta, m_cols, 1));
+	}
 }
 
 /** Send input to the terminal.

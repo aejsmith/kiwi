@@ -26,6 +26,7 @@
 #include "TerminalWindow.h"
 
 using namespace kiwi;
+using namespace std;
 
 /** Initialise the terminal buffer.
  * @param window	Window that the buffer will be displayed on.
@@ -44,10 +45,10 @@ TerminalBuffer::TerminalBuffer(TerminalWindow *window, int cols, int rows, bool 
 /** Destroy the terminal buffer. */
 TerminalBuffer::~TerminalBuffer() {
 	/* Free all lines in the history and the main area. */
-	std::for_each(m_history.begin(), m_history.end(), [](Line *line) {
+	for_each(m_history.begin(), m_history.end(), [](Line *line) {
 		delete line;
 	});
-	std::for_each(m_lines.begin(), m_lines.end(), [](Line *line) {
+	for_each(m_lines.begin(), m_lines.end(), [](Line *line) {
 		delete line;
 	});
 }
@@ -117,10 +118,14 @@ void TerminalBuffer::ScrollDown() {
 	if(m_scroll_top == 0 && m_scroll_bottom == (m_rows - 1)) {
 		/* Scroll region is equal to entire visible area: we can push
 		 * the top line back to history. */
-		m_history.push_back(m_lines[0]);
-		if(m_history.size() > kHistorySize) {
-			delete m_history[0];
-			m_history.pop_front();
+		if(m_use_history) {
+			m_history.push_back(m_lines[0]);
+			if(m_history.size() > kHistorySize) {
+				delete m_history[0];
+				m_history.pop_front();
+			}
+		} else {
+			delete m_lines[0];
 		}
 		m_lines.pop_front();
 		m_lines.push_back(new Line);
@@ -158,13 +163,18 @@ void TerminalBuffer::MoveCursor(int x, int y) {
 	if(y < 0) { y = 0; }
 	if(y >= m_rows) { y = m_rows - 1; }
 
-	m_cursor_x = x;
-	m_cursor_y = y;
+	swap(m_cursor_x, x);
+	swap(m_cursor_y, y);
+	m_window->TerminalUpdated(Rect(x, y, 1, 1));
+	m_window->TerminalUpdated(Rect(m_cursor_x, m_cursor_y, 1, 1));
 }
 
 /** Output a character at the current cursor position.
  * @param ch		Character to output. */
 void TerminalBuffer::Output(Character ch) {
+	int prev_x = m_cursor_x;
+	int prev_y = m_cursor_y;
+
 	switch(ch.ch) {
 	case '\b':
 		/* Backspace, move back one character if we can. */
@@ -193,9 +203,7 @@ void TerminalBuffer::Output(Character ch) {
 			break;
 		}
 
-		m_lines[m_cursor_y]->AddCharacter(m_cursor_x, ch);
-		m_window->TerminalUpdated(Rect(m_cursor_x, m_cursor_y, 1, 1));
-		m_cursor_x++;
+		m_lines[m_cursor_y]->AddCharacter(m_cursor_x++, ch);
 		break;
 	}
 
@@ -207,8 +215,13 @@ void TerminalBuffer::Output(Character ch) {
 
 	/* If we have reached the bottom of the scroll region, scroll. */
 	if(m_cursor_y > m_scroll_bottom) {
-		ScrollDown();
 		m_cursor_y = m_rows - 1;
+		ScrollDown();
+	}
+
+	if(m_cursor_x != prev_x || m_cursor_y != prev_y) {
+		m_window->TerminalUpdated(Rect(prev_x, prev_y, 1, 1));
+		m_window->TerminalUpdated(Rect(m_cursor_x, m_cursor_y, 1, 1));
 	}
 }
 
