@@ -21,6 +21,8 @@
 #ifndef __XTERM_H
 #define __XTERM_H
 
+#include <string>
+
 #include "Terminal.h"
 
 class TerminalWindow;
@@ -42,6 +44,7 @@ private:
 	int m_esc_state;		/**< Current escape sequence parse state. */
 	int m_esc_params[8];		/**< Escape code parameters. */
 	int m_esc_param_size;		/**< Number of escape code parameters. */
+	std::string m_esc_string;	/**< String escape code parameter. */
 
 	/** Current attributes. */
 	TerminalBuffer::Character m_attrib;

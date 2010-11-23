@@ -17,3 +17,12 @@ set_ps1() {
 }
 set_ps1
 unset set_ps1
+
+# If this is an xterm set the title to user@host:dir
+case "$TERM" in
+xterm*|rxvt*)
+	PROMPT_COMMAND='echo -ne "\033]0;${USER}@kiwi: ${PWD/$HOME/~}\007"'
+	;;
+*)
+	;;
+esac

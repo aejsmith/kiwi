@@ -33,6 +33,7 @@
 #include <iostream>
 #include <string.h>
 
+#include "TerminalWindow.h"
 #include "Xterm.h"
 
 using namespace std;
@@ -114,6 +115,9 @@ void Xterm::Output(unsigned char raw) {
 		switch(raw) {
 		case '[':
 			m_esc_state = 2;
+			return;
+		case ']':
+			m_esc_state = 6;
 			return;
 		case '(':
 		case ')':
@@ -344,6 +348,39 @@ void Xterm::Output(unsigned char raw) {
 		/* Don't support anything here yet. ESC( and ESC) only have one
 		 * following character, if we're here we've received it so just
 		 * ignore it and reset. */
+		break;
+	case 6:
+		/* Operating System Controls. These take two arguments, an
+		 * integer and a string. */
+		if(m_esc_param_size < 0) {
+			m_esc_string.clear();
+			m_esc_param_size = 0;
+		}
+
+		if(m_esc_param_size == 0) {
+			if(isdigit(raw)) {
+				m_esc_params[0] *= 10;
+				m_esc_params[0] += (raw - '0');
+				return;
+			} else if(raw == ';') {
+				m_esc_param_size++;
+				return;
+			}
+		} else if(raw == 7) {
+			/* BEL is end of the command. */
+			switch(m_esc_params[0]) {
+			case 0:
+			case 2:
+				/* Set Window Title. */
+				m_window->SetTitle(m_esc_string);
+				break;
+			};
+		} else {
+			if(isprint(raw)) {
+				m_esc_string += raw;
+				return;
+			}
+		}
 		break;
 	}
 

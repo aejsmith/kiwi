@@ -30,8 +30,9 @@
 TerminalApp::TerminalApp(int argc, char **argv) :
 	m_window_count(0)
 {
-	/* Change to our home directory. */
+	/* Change to our home directory and set USER. FIXME: Better place for this. */
 	chdir(getenv("HOME"));
+	setenv("USER", "admin", 1);
 
 	/* Set the TERM value for clients to inherit. */
 	setenv("TERM", "xterm-color", 1);
