@@ -40,6 +40,7 @@ public:
 	void TerminalUpdated(kiwi::Rect rect);
 	void TerminalScrolled(int start, int end, int delta);
 	void TerminalHistoryAdded();
+	void TerminalBufferChanged();
 private:
 	void TerminalExited(int status);
 	void ScrollUp(int amount);

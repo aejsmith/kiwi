@@ -63,6 +63,7 @@ sources = map(File, [
 	'posix/mknod.c',
 	'posix/open.c',
 	'posix/pipe.c',
+	'posix/poll.c',
 	'posix/pwd.c',
 	'posix/read.c',
 	'posix/readlink.c',

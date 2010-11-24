@@ -82,6 +82,8 @@ void Xterm::Resize(int cols, int rows) {
 }
 
 /** Write output to the terminal.
+ * @todo		The parameter collection code is duplicated in a few
+ *			places. It shouldn't be.
  * @param raw		Character to output. */
 void Xterm::Output(unsigned char raw) {
 	int x, y, cols, rows;
@@ -336,12 +338,50 @@ void Xterm::Output(unsigned char raw) {
 		}
 		break;
 	case 4:
-		/* Meh, only here to get nano to work. Just ignore the rest
-		 * of the code. */
 		if(isdigit(raw)) {
+			m_esc_params[m_esc_param_size] *= 10;
+			m_esc_params[m_esc_param_size] += (raw - '0');
 			return;
-		} else if(raw == 'h' || raw == 'l') {
-			break;
+		}
+
+		if(raw == 'h') {
+			/* DEC Private Mode Set. */
+			switch(m_esc_params[0]) {
+			case 1049:
+				/* Save Cursor and Use Alternative Screen Buffer. */
+				m_buffers[m_active_buffer]->GetCursor(m_saved_x, m_saved_y);
+			case 47:
+			case 1047:
+				/* Use Alternate Screen Buffer. */
+				m_active_buffer = 1;
+				m_window->TerminalBufferChanged();
+				break;
+			case 1048:
+				/* Save Cursor. */
+				m_buffers[m_active_buffer]->GetCursor(m_saved_x, m_saved_y);
+				break;
+			}
+		} else if(raw == 'l') {
+			/* DEC Private Mode Reset. */
+			/* DEC Private Mode Set. */
+			switch(m_esc_params[0]) {
+			case 47:
+			case 1047:
+				/* Use Normal Screen Buffer. */
+				m_active_buffer = 0;
+				m_window->TerminalBufferChanged();
+				break;
+			case 1048:
+				/* Restore Cursor. */
+				m_buffers[m_active_buffer]->MoveCursor(m_saved_x, m_saved_y);
+				break;
+			case 1049:
+				/* Restore Cursor and Use Normal Screen Buffer. */
+				m_buffers[m_active_buffer]->MoveCursor(m_saved_x, m_saved_y);
+				m_active_buffer = 0;
+				m_window->TerminalBufferChanged();
+				break;
+			}
 		}
 		break;
 	case 5:

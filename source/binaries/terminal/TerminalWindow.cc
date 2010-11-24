@@ -211,6 +211,12 @@ void TerminalWindow::TerminalHistoryAdded() {
 	}
 }
 
+/** Handle the terminal buffer being changed. */
+void TerminalWindow::TerminalBufferChanged() {
+	m_history_pos = 0;
+	TerminalUpdated(Rect(0, 0, m_cols, m_rows));
+}
+
 /** Handle the terminal process exiting.
  * @param status	Exit status of the process. */
 void TerminalWindow::TerminalExited(int status) {
