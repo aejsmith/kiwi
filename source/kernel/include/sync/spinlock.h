@@ -35,9 +35,9 @@ typedef struct spinlock {
 /** Initialises a statically-declared spinlock. */
 #define SPINLOCK_INITIALISER(_name)	\
 	{ \
-		.name = _name, \
 		.locked = 0, \
 		.state = 0, \
+		.name = _name, \
 	}
 
 /** Statically declares a new spinlock. */

@@ -27,25 +27,31 @@
 #include <assert.h>
 #include <fatal.h>
 #include <status.h>
+#include <symbol.h>
 
-/** Lock a mutex.
- *
- * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
- * already holds the lock, then its recursion count will be increased and the
- * function will return immediately.
- *
+/** Handle a recursive locking error.
+ * @param lock		Lock error occurred on. */
+static inline void mutex_recursive_error(mutex_t *lock) {
+#if CONFIG_DEBUG
+	size_t off = 0;
+	symbol_t *sym;
+
+	sym = symbol_lookup_addr((ptr_t)lock->caller, &off);
+	fatal("Recursive locking of non-recursive mutex %p(%s)\n"
+	      "Locked by [%p] %s+0x%zx", lock, lock->queue.name, lock->caller,
+	      (sym) ? sym->name : "<unknown>", off);
+#else
+	fatal("Recursive locking of non-recursive mutex %p(%s)",
+	      lock, lock->queue.name);
+#endif
+}
+
+/** Internal mutex locking code.
  * @param lock		Mutex to lock.
- * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
- *			forever until the lock is acquired, and a timeout of 0
- *			will return an error immediately if unable to acquire
- *			the lock.
+ * @param timeout	Timeout in microseconds.
  * @param flags		Synchronization flags.
- *
- * @return		Status code describing result of the operation. Failure
- *			is only possible if the timeout is not -1, or if the
- *			SYNC_INTERRUPTIBLE flag is set.
- */
-status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
+ * @return		Status code describing result of the operation. */
+static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, int flags) {
 	status_t ret;
 	bool state;
 
@@ -58,8 +64,7 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 				atomic_inc(&lock->locked);
 				return STATUS_SUCCESS;
 			} else {
-				fatal("Recursive locking of non-recursive mutex %p(%s)",
-				      lock, lock->queue.name);
+				mutex_recursive_error(lock);
 			}
                 } else {
 			state = waitq_sleep_prepare(&lock->queue);
@@ -90,9 +95,46 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
  * function will return immediately.
  *
  * @param lock		Mutex to lock.
+ * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
+ *			forever until the lock is acquired, and a timeout of 0
+ *			will return an error immediately if unable to acquire
+ *			the lock.
+ * @param flags		Synchronization flags.
+ *
+ * @return		Status code describing result of the operation. Failure
+ *			is only possible if the timeout is not -1, or if the
+ *			SYNC_INTERRUPTIBLE flag is set.
+ */
+status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
+	status_t ret;
+
+	ret = mutex_lock_internal(lock, timeout, flags);
+#if CONFIG_DEBUG
+	if(likely(ret == STATUS_SUCCESS)) {
+		lock->caller = __builtin_return_address(0);
+	}
+#endif
+	return ret;
+}
+
+/** Lock a mutex.
+ *
+ * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
+ * already holds the lock, then its recursion count will be increased and the
+ * function will return immediately.
+ *
+ * @param lock		Mutex to lock.
  */
 void mutex_lock(mutex_t *lock) {
-	mutex_lock_etc(lock, -1, 0);
+#if CONFIG_DEBUG
+	status_t ret;
+
+	ret = mutex_lock_internal(lock, -1, 0);
+	assert(ret == STATUS_SUCCESS);
+	lock->caller = __builtin_return_address(0);
+#else
+	mutex_lock_internal(lock, -1, 0);
+#endif
 }
 
 /** Unlock a mutex.

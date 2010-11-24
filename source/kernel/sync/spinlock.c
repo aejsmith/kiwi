@@ -29,7 +29,7 @@
 #include <fatal.h>
 #include <status.h>
 
-/** Internal part of spinlock_lock_etc()/spinlock_lock_ni_etc().
+/** Internal spinlock locking code.
  * @param lock		Spinlock to lock.
  * @param timeout	Timeout.
  * @param flags		Synchronization flags.
@@ -151,7 +151,19 @@ status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
  * @param lock		Spinlock to lock.
  */
 void spinlock_lock(spinlock_t *lock) {
-	spinlock_lock_etc(lock, -1, 0);
+	status_t ret;
+	bool state;
+
+	/* Disable interrupts while locked to ensure that nothing else
+	 * will run on the current CPU for the duration of the lock. */
+	state = intr_disable();
+
+	/* Take the lock. */
+	ret = spinlock_lock_internal(lock, -1, 0);
+	assert(ret == STATUS_SUCCESS);
+
+	lock->state = state;
+	enter_cs_barrier();
 }
 
 /** Lock a spinlock without changing interrupt state.
@@ -169,7 +181,15 @@ void spinlock_lock(spinlock_t *lock) {
  * @param lock		Spinlock to lock.
  */
 void spinlock_lock_ni(spinlock_t *lock) {
-	spinlock_lock_ni_etc(lock, -1, 0);
+	status_t ret;
+
+	assert(!intr_state());
+
+	/* Take the lock. */
+	ret = spinlock_lock_internal(lock, -1, 0);
+	assert(ret == STATUS_SUCCESS);
+
+	enter_cs_barrier();
 }
 
 /** Unlock a spinlock.

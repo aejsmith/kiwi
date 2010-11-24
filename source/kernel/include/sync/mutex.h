@@ -27,8 +27,11 @@
 typedef struct mutex {
 	atomic_t locked;		/**< Lock count. */
 	waitq_t queue;			/**< Queue for threads to wait on. */
-	struct thread *holder;		/**< Thread holding the lock. */
 	int flags;			/**< Behaviour flags for the mutex. */
+	struct thread *holder;		/**< Thread holding the lock. */
+#if CONFIG_DEBUG
+	void *caller;			/**< Return address of lock call. */
+#endif
 } mutex_t;
 
 /** Initialises a statically declared mutex. */
