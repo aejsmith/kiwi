@@ -52,6 +52,9 @@ struct __fstream_internal;
 /** Maximum length of a filename string. */
 #define FILENAME_MAX	4096
 
+/** Directory usable for creating temporary files. */
+#define P_tmpdir	"/tmp"
+
 /** Actions for fseek(). */
 #define SEEK_SET	1		/**< Set the offset to the exact position specified. */
 #define SEEK_CUR	2		/**< Add the supplied value to the current offset. */

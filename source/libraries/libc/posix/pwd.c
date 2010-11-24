@@ -35,8 +35,20 @@ static struct passwd stub_pwd = {
         .pw_gecos = (char *)"Administrator",
 };
 
+static bool getpwent_called = false;
+
 void endpwent(void) {
+	getpwent_called = false;
         return;
+}
+
+struct passwd *getpwent(void) {
+	if(!getpwent_called) {
+		getpwent_called = true;
+		return &stub_pwd;
+	} else {
+		return NULL;
+	}
 }
 
 void setpwent(void) {

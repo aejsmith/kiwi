@@ -39,7 +39,7 @@ struct passwd {
 };
 
 extern void endpwent(void);
-//extern struct passwd *getpwent(void);
+extern struct passwd *getpwent(void);
 //extern struct passwd *getpwnam(const char *name);
 extern struct passwd *getpwuid(uid_t uid);
 extern void setpwent(void);

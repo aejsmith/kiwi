@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		POSIX signalling functions.
+ * @brief		POSIX signal functions.
  */
 
 #ifndef __SIGNAL_H
@@ -28,7 +28,8 @@
 extern "C" {
 #endif
 
-/** Signal number definitions. Values of default action:
+/**
+ * Signal number definitions. Values of default action:
  *  - A: Abnormal termination with core dump.
  *  - T: Abnormal termination.
  *  - I: Ignore.
@@ -178,32 +179,34 @@ struct sigaction {
 #define SIG_SETMASK	2		/**< Replace current mask with provided mask. */
 #define SIG_UNBLOCK	3		/**< Unblock all signals set in the provided mask. */
 
+extern const char *const sys_siglist[];
+
 extern int kill(pid_t pid, int num);
 /* int killpg(pid_t, int); */
+extern void psignal(int sig, const char *s);
 /* int pthread_kill(pthread_t, int); */
 /* int pthread_sigmask(int, const sigset_t *, sigset_t *); */
 extern int raise(int num);
-//extern int sigaction(int num, const struct sigaction *act, struct sigaction *oldact);
-//extern int sigaddset(sigset_t *set, int num);
-//extern int sigdelset(sigset_t *set, int num);
-//extern int sigemptyset(sigset_t *set);
-//extern int sigfillset(sigset_t *set);
+extern int sigaction(int num, const struct sigaction *__restrict act,
+                     struct sigaction *__restrict oldact);
+extern int sigaddset(sigset_t *set, int num);
+extern int sigdelset(sigset_t *set, int num);
+extern int sigemptyset(sigset_t *set);
+extern int sigfillset(sigset_t *set);
 /* int sighold(int); */
 /* int sigignore(int); */
 /* int siginterrupt(int, int); */
-//extern int sigismember(const sigset_t *set, int num);
+extern int sigismember(const sigset_t *set, int num);
 extern void (*signal(int sig, void (*handler)(int)))(int);
 /* int sigpause(int); */
 /* int sigpending(sigset_t *); */
-//extern int sigprocmask(int how, const sigset_t *set, sigset_t *oset);
+extern int sigprocmask(int how, const sigset_t *__restrict set, sigset_t *__restrict oset);
 /* int sigrelse(int); */
 /* void (*sigset(int, void (*)(int)))(int); */
 //extern int sigsuspend(const sigset_t *mask);
 /* int sigwait(const sigset_t *, int *); */
 
 /* Non-POSIX. */
-//extern void psignal(int sig, const char *s);
-//extern const char *const sys_siglist[];
 
 #ifdef __cplusplus
 }

@@ -20,7 +20,16 @@
 
 #include <errno.h>
 #include <signal.h>
+
 #include "../libc.h"
+
+int sigaction(int num, const struct sigaction *restrict act, struct sigaction *restrict oldact) {
+	//libc_stub("sigaction", false);
+	oldact->sa_handler = SIG_DFL;
+	sigemptyset(&oldact->sa_mask);
+	oldact->sa_flags = 0;
+	return 0;
+}
 
 /** Set the handler of a signal.
  * @param sig		Signal number.
@@ -28,6 +37,5 @@
  * @return		Previous handler, or SIG_ERR on failure. */
 void (*signal(int sig, void (*handler)(int)))(int) {
 	//libc_stub("signal", false);
-	errno = ENOSYS;
-	return SIG_ERR;
+	return SIG_DFL;
 }

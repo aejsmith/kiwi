@@ -82,7 +82,11 @@ sources = map(File, [
 	'posix/write.c',
 
 	'signal/kill.c',
-	'signal/signal.c',
+	'signal/sigaction.c',
+	'signal/sigprocmask.c',
+	'signal/sigset.c',
+	'signal/sigsetjmp.c',
+	'signal/strsignal.c',
 
 	'stdio/buffer.c',
 	'stdio/do_printf.c',

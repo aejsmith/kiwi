@@ -56,6 +56,7 @@ extern size_t strnlen(const char *str, size_t count);
 extern char *strpbrk(const char *s, const char *accept);
 extern char *strrchr(const char *t, int c);
 extern char *strsep(char **stringp, const char *delim);
+extern char *strsignal(int sig);
 extern size_t strspn(const char *s, const char *accept);
 extern char *strstr(const char *haystack, const char *needle);
 extern char *strtok(char *__restrict str, const char *__restrict delim);

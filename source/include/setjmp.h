@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,17 +15,19 @@
 
 /**
  * @file
- * @brief		Setjmp/longjmp functions.
+ * @brief		Non-local jump functions.
  */
 
 #ifndef __SETJMP_H
 #define __SETJMP_H
 
+#include <signal.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Buffer for setjmp/longjmp. TODO: Seperate arch include */
+/** Buffer for setjmp()/longjmp(). TODO: Seperate arch include */
 #ifdef __i386__
 /* jmp_buf[0] = Return address
  * jmp_buf[1] = ebp
@@ -48,8 +50,17 @@ typedef unsigned long jmp_buf[6];
 typedef unsigned long jmp_buf[8];
 #endif
 
-extern void longjmp(jmp_buf env, int val);
+/** Buffer for sigsetjmp()/siglongjmp(). */
+typedef struct _sigjmp_buf {
+        jmp_buf buf;
+        int restore_mask;
+       	sigset_t mask;
+} sigjmp_buf[1];
+
+extern void longjmp(jmp_buf env, int val) __attribute__((noreturn));
 extern int setjmp(jmp_buf env);
+extern void siglongjmp(sigjmp_buf env, int val) __attribute__((noreturn));
+extern int sigsetjmp(sigjmp_buf env, int savemask);
 
 #ifdef __cplusplus
 }
