@@ -134,7 +134,6 @@
 #ifndef LOADER
 
 #include <arch/descriptor.h>
-#include <arch/memmap.h>
 
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;

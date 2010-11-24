@@ -21,7 +21,6 @@
 #ifndef __MM_VM_H
 #define __MM_VM_H
 
-#include <arch/memmap.h>
 #include <cpu/cpu.h>
 #include <kernel/vm.h>
 #include <lib/utility.h>

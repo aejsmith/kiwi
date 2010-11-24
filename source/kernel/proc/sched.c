@@ -45,8 +45,6 @@
  * average, then its load balancer pulls threads from overloaded CPUs.
  */
 
-#include <arch/stack.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 

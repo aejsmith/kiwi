@@ -19,8 +19,8 @@
  */
 
 #include <arch/asm.h>
+#include <arch/memory.h>
 #include <arch/page.h>
-#include <arch/stack.h>
 
 #include <platform/boot.h>
 

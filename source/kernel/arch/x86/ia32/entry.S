@@ -21,7 +21,7 @@
 #include <arch/asm.h>
 #include <arch/cpu.h>
 #include <arch/descriptor.h>
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <status.h>
 
@@ -281,12 +281,12 @@ FUNCTION_START(thread_arch_enter_userspace)
 	movl	12(%esp), %eax
 
 	/* Push argument. */
-	subl	$STACK_DELTA, %esi
+	subl	$4, %esi
 	movl	%eax, (%esi)
 
 	/* Push a zero return address so the userspace program will fault if it
 	 * inadvertently returns from its entry function. */
-	subl	$STACK_DELTA, %esi
+	subl	$4, %esi
 	movl	$0, (%esi)
 
 	/* Set up a stack frame for IRET:

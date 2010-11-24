@@ -18,7 +18,6 @@
  * @brief		IA32 kernel debugger functions.
  */
 
-#include <arch/memmap.h>
 #include <arch/page.h>
 
 #include <cpu/intr.h>

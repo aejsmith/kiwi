@@ -59,7 +59,7 @@
  * @todo		Swap support.
  */
 
-#include <arch/memmap.h>
+#include <arch/memory.h>
 
 #include <cpu/intr.h>
 

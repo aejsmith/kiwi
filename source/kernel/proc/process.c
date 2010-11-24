@@ -18,8 +18,7 @@
  * @brief		Process management functions.
  */
 
-#include <arch/memmap.h>
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <lib/avl_tree.h>
 #include <lib/id_alloc.h>
@@ -539,7 +538,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	copy_argument_strings(uargs->env, info->env, info->envc, addr);
 
 	/* Get the stack pointer and save the argument block pointer. */
-	stack = info->stack + (USTACK_SIZE - STACK_DELTA);
+	stack = info->stack + USTACK_SIZE;
 	addr = info->arg_block;
 
 	/* Get the ELF loader to clear BSS and get the entry pointer. */

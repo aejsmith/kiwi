@@ -18,10 +18,10 @@
  * @brief		CPU management.
  *
  * Each CPU in the system is tracked by a cpu_t structure. This contains
- * information such as the CPU's ID, its current state, and its current thread.
- * Each kernel stack has a pointer to the CPU structure of the CPU it's being
- * used on at the bottom of it. The curr_cpu macro expands to the value of this
- * pointer, using cpu_get_pointer() to get its value.
+ * information such as the CPU's ID, its current state, and its current
+ * thread. An architecture-specific method is used to store a pointer to
+ * the current CPU's structure, and the curr_cpu macro expands to the
+ * value of this pointer.
  */
 
 #include <cpu/cpu.h>

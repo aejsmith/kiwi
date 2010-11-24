@@ -21,7 +21,7 @@
 #include <arch/asm.h>
 #include <arch/cpu.h>
 #include <arch/descriptor.h>
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <status.h>
 
@@ -282,7 +282,7 @@ FUNCTION_END(syscall_entry)
 FUNCTION_START(thread_arch_enter_userspace)
 	/* Push a zero return address so the userspace program will fault if it
 	 * inadvertently returns from its entry function. */
-	subq	$STACK_DELTA, %rsi
+	subq	$8, %rsi
 	movq	$0, (%rsi)
 
 	/* Set up a stack frame for IRET:

@@ -19,7 +19,6 @@
  */
 
 #include <arch/cpu.h>
-#include <arch/memmap.h>
 #include <arch/page.h>
 
 #include <cpu/intr.h>

@@ -19,7 +19,7 @@
  */
 
 #include <arch/lapic.h>
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <cpu/cpu.h>
 

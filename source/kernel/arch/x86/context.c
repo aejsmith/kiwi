@@ -18,7 +18,7 @@
  * @brief		x86 CPU context functions.
  */
 
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <cpu/context.h>
 #include <cpu/intr.h>
@@ -49,7 +49,7 @@ void context_init(context_t *ctx, ptr_t ip, unative_t *stack) {
 
 	/* Reserve space for the return address to be placed on the stack by
 	 * context_restore(). */
-	ctx->sp = ((ptr_t)stack + KSTACK_SIZE) - STACK_DELTA;
+	ctx->sp = ((ptr_t)stack + KSTACK_SIZE) - sizeof(unative_t);
 	ctx->ip = ip;
 }
 

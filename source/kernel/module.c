@@ -18,7 +18,7 @@
  * @brief		Kernel module loader.
  */
 
-#include <arch/memmap.h>
+#include <arch/memory.h>
 
 #include <io/fs.h>
 

@@ -18,7 +18,7 @@
  * @brief		Memory management functions.
  */
 
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <boot/console.h>
 #include <boot/error.h>

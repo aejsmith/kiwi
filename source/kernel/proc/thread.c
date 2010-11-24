@@ -18,7 +18,7 @@
  * @brief		Thread management code.
  */
 
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
@@ -777,7 +777,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 
 	/* Create a userspace stack. TODO: Stack direction! */
 	if(stack) {
-		args->sp = (ptr_t)stack + (stacksz - STACK_DELTA);
+		args->sp = (ptr_t)stack + stacksz;
 	} else {
 		if(stacksz) {
 			stacksz = ROUND_UP(stacksz, PAGE_SIZE);
@@ -792,7 +792,7 @@ status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (
 			goto fail;
 		}
 		thread->ustack_size = stacksz;
-		args->sp = thread->ustack + (stacksz - STACK_DELTA);
+		args->sp = thread->ustack + stacksz;
 	}
 
 	thread_run(thread);

@@ -18,7 +18,7 @@
  * @brief		AMD64 thread functions.
  */
 
-#include <arch/stack.h>
+#include <arch/memory.h>
 
 #include <cpu/cpu.h>
 

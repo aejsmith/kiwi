@@ -32,8 +32,8 @@
  *  0xFFE00000-0xFFFFFFFF - 2MB    - Fractal mapping of kernel page directory.
  */
 
-#ifndef __ARCH_MEMMAP_H
-#define __ARCH_MEMMAP_H
+#ifndef __ARCH_MEMORY_H
+#define __ARCH_MEMORY_H
 
 /** Memory layout definitions. */
 #if __x86_64__
@@ -61,4 +61,8 @@
 # define KERNEL_PTBL_BASE	0xFFE00000		/**< Kernel page tables base. */
 #endif
 
-#endif /* __ARCH_MEMMAP_H */
+/** Stack size definitions. */
+#define KSTACK_SIZE		0x2000			/**< Kernel stack size (8KB). */
+#define USTACK_SIZE		0x200000		/**< Userspace stack size (2MB). */
+
+#endif /* __ARCH_MEMORY_H */

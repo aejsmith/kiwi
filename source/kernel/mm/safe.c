@@ -18,7 +18,7 @@
  * @brief		Safe user memory access functions.
  */
 
-#include <arch/memmap.h>
+#include <arch/memory.h>
 
 #include <lib/string.h>
 

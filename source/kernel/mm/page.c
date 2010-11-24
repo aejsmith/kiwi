@@ -67,7 +67,7 @@
  *			arena uses quantum caching.
  */
 
-#include <arch/memmap.h>
+#include <arch/memory.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>

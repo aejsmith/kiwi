@@ -19,9 +19,8 @@
  */
 
 #include <arch/descriptor.h>
-#include <arch/memmap.h>
+#include <arch/memory.h>
 #include <arch/page.h>
-#include <arch/stack.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -91,7 +90,7 @@ static void __init_text tss_init(void) {
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
 	memset(&curr_cpu->arch.tss, 0, sizeof(tss_t));
-	curr_cpu->arch.tss.ist1 = ((ptr_t)curr_cpu->arch.double_fault_stack + KSTACK_SIZE) - STACK_DELTA;
+	curr_cpu->arch.tss.ist1 = (ptr_t)curr_cpu->arch.double_fault_stack + KSTACK_SIZE;
 	curr_cpu->arch.tss.io_bitmap = 104;
 
 	/* Load the TSS segment into TR. */

@@ -19,7 +19,7 @@
  */
 
 #include <arch/barrier.h>
-#include <arch/memmap.h>
+#include <arch/memory.h>
 
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
