@@ -389,7 +389,7 @@
    libraries. */
 
 /* Define if `sys_siglist' is declared by <signal.h> or <unistd.h>.  */
-#define HAVE_DECL_SYS_SIGLIST 0
+#define HAVE_DECL_SYS_SIGLIST 1
 /* #undef SYS_SIGLIST_DECLARED */
 
 /* Define if `_sys_siglist' is declared by <signal.h> or <unistd.h>.  */
@@ -455,7 +455,7 @@
 
 #define HAVE_DECL_STRCPY 1
 
-#define HAVE_DECL_STRSIGNAL 0
+#define HAVE_DECL_STRSIGNAL 1
 
 #define HAVE_DECL_STRTOLD 0
 
@@ -612,7 +612,7 @@
 /* #undef HAVE_GETPEERNAME */
 
 /* Define if you have the getpwent function. */
-/* #undef HAVE_GETPWENT */
+#define HAVE_GETPWENT 1
 
 /* Define if you have the getpwnam function. */
 /* #undef HAVE_GETPWNAM */
@@ -726,7 +726,7 @@
 #define HAVE_RAISE 1
 
 /* Define if you have the readlink function. */
-/* #undef HAVE_READLINK */
+#define HAVE_READLINK 1
 
 /* Define if you have the regcomp function. */
 /* #undef HAVE_REGCOMP */
@@ -826,7 +826,7 @@
 /* #undef HAVE_STRTOUMAX */
 
 /* Define if you have the strsignal function or macro. */
-/* #undef HAVE_STRSIGNAL */
+#define HAVE_STRSIGNAL 1
 
 /* Define if you have the sysconf function. */
 /* #undef HAVE_SYSCONF */
