@@ -21,6 +21,8 @@
 #include <signal.h>
 
 int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) {
-	sigemptyset(oset);
+	if(oset) {
+		sigemptyset(oset);
+	}
 	return 0;
 }
