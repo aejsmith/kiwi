@@ -26,6 +26,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../libc.h"
 
@@ -135,13 +136,28 @@ int fstat(int fd, struct stat *statp) {
 	fs_info_t info;
 	status_t ret;
 
-	ret = fs_handle_info(fd, &info);
-	if(ret != STATUS_SUCCESS) {
-		if(ret == STATUS_INVALID_HANDLE && object_type(fd) != -1) {
-			errno = ENOTSUP;
+	switch(object_type(fd)) {
+	case OBJECT_TYPE_FILE:
+	case OBJECT_TYPE_DIR:
+		ret = fs_handle_info(fd, &info);
+		if(ret != STATUS_SUCCESS) {
+			libc_status_to_errno(ret);
 			return -1;
 		}
-		libc_status_to_errno(ret);
+		break;
+	case OBJECT_TYPE_DEVICE:
+		memset(&info, 0, sizeof(info));
+		info.type = (isatty(fd)) ? FS_NODE_CHRDEV : FS_NODE_BLKDEV;
+		/* FIXME: Get correct values for block devices here. */
+		info.block_size = 1;
+		info.size = 1;
+		info.links = 1;
+		break;
+	case -1:
+		errno = EBADF;
+		return -1;
+	default:
+		errno = ENOTSUP;
 		return -1;
 	}
 
