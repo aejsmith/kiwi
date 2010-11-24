@@ -267,3 +267,4 @@ env.KiwiApplication('bash',
 		'CPPPATH': include_paths,
 	}
 )
+envmgr['dist']['LINKS']['/system/binaries/sh'] = 'bash'
