@@ -88,14 +88,10 @@ extern long strtol(const char *__restrict cp, char **__restrict endp, int base);
 extern long long int strtoll(const char *__restrict cp, char **__restrict endp, int base);
 extern unsigned long strtoul(const char *__restrict cp, char **__restrict endp, int base);
 extern unsigned long long int strtoull(const char *__restrict cp, char **__restrict endp, int base);
-//extern int system(const char *command);
+extern int system(const char *command);
 extern int unsetenv(const char *name);
 //extern size_t wcstombs(char *__restrict dest, const wchar_t *__restrict src, size_t n);
 //extern int wctomb(char *s, wchar_t wc);
-
-#ifdef __cplusplus
-extern int system(const char *command);
-#endif
 
 #ifdef __cplusplus
 }

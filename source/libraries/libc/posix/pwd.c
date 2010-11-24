@@ -21,6 +21,8 @@
  */
 
 #include <pwd.h>
+#include <unistd.h>
+
 #include "../libc.h"
 
 static struct passwd stub_pwd = {
@@ -43,4 +45,8 @@ void setpwent(void) {
 
 struct passwd *getpwuid(uid_t uid) {
         return &stub_pwd;
+}
+
+char *getlogin(void) {
+	return stub_pwd.pw_name;
 }

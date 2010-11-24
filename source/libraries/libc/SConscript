@@ -122,6 +122,7 @@ sources = map(File, [
 	'stdlib/rand.c',
 	'stdlib/strtod.c',
 	'stdlib/strtoul.c',
+	'stdlib/system.c',
 
 	'string/ffs.c',
 	'string/memchr.c',

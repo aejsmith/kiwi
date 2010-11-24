@@ -94,7 +94,7 @@ extern gid_t getgid(void);
 /* int getgroups(int, gid_t []); */
 /* long gethostid(void); */
 /* int gethostname(char *, size_t); */
-/* char *getlogin(void); */
+extern char *getlogin(void);
 /* int getlogin_r(char *, size_t); */
 extern int getopt(int argc, char *const argv[], const char *opts);
 //extern int getpagesize(void);
