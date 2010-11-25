@@ -25,8 +25,8 @@
 #include <platform/pic.h>
 
 #include <console.h>
-#include <fatal.h>
 #include <kdbg.h>
+#include <kernel.h>
 
 /** IRQ masks - disable all by default, apart from IRQ2 (cascade). */
 static uint8_t pic_mask_master = 0xFB;

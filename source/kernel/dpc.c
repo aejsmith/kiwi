@@ -32,7 +32,6 @@
 
 #include <assert.h>
 #include <dpc.h>
-#include <fatal.h>
 #include <status.h>
 
 /** Structure describing a DPC request. */

@@ -34,7 +34,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <kdbg.h>
 
 extern atomic_t cpu_pause_wait;

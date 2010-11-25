@@ -45,7 +45,6 @@
 #include <assert.h>
 #include <console.h>
 #include <dpc.h>
-#include <fatal.h>
 #include <kdbg.h>
 #include <time.h>
 #include <vmem.h>

@@ -31,7 +31,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <status.h>
 
 /** Structure describing a handler for an IRQ. */

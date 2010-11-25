@@ -36,7 +36,6 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <fatal.h>
 
 /** Get length of key string.
  * @param key		Key to get length of.

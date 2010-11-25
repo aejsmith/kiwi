@@ -43,7 +43,6 @@
 
 #include <console.h>
 #include <dpc.h>
-#include <fatal.h>
 #include <kargs.h>
 #include <kernel.h>
 #include <lrm.h>

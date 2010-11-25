@@ -27,7 +27,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 
 #ifndef __x86_64__
 extern void __context_restore_frame(void);
@@ -78,8 +77,7 @@ void context_restore_frame(context_t *ctx, intr_frame_t *frame) {
 	/* Nasty stuff... if an interrupt occurs without a privelege level
 	 * change then the stack pointer/segment will not be pushed/restored.
 	 * To get the stack pointer set correctly we must return to a
-	 * temporary function that restores the context properly. This deserves
-	 * a massive "F*CK YOU" to Intel. */
+	 * temporary function that restores the context properly. */
 	frame->ip = (unative_t)__context_restore_frame;
 	frame->dx = (unative_t)ctx;
 #endif

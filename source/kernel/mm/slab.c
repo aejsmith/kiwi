@@ -49,7 +49,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <kdbg.h>
 #include <lrm.h>
 #include <status.h>

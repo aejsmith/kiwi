@@ -21,8 +21,12 @@
 #ifndef __KERNEL_H
 #define __KERNEL_H
 
+#include <lib/notifier.h>
 #include <kargs.h>
 
+struct intr_frame;
+
+extern notifier_t fatal_notifier;
 extern bool shutdown_in_progress;
 
 /** Version information for the kernel, defined in a build-generated file. */
@@ -51,5 +55,12 @@ extern void platform_ap_init(kernel_args_t *args);
 
 extern void platform_reboot(void);
 extern void platform_poweroff(void);
+
+extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn __printf(2, 3);
+
+/** Print an error message and halt the kernel.
+ * @param fmt		The format string for the message.
+ * @param ...		The arguments to be used in the formatted message. */
+#define fatal(fmt...)	_fatal(NULL, fmt)
 
 #endif /* __KERNEL_H */

@@ -26,7 +26,7 @@
 #define __LIB_REFCOUNT_H
 
 #include <lib/atomic.h>
-#include <fatal.h>
+#include <kernel.h>
 
 /** Type containing a reference count */
 typedef atomic_t refcount_t;

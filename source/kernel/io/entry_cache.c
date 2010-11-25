@@ -30,7 +30,6 @@
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
-#include <fatal.h>
 #include <kernel.h>
 #include <status.h>
 

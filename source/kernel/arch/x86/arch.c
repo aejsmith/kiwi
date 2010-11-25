@@ -25,7 +25,6 @@
 #include <cpu/intr.h>
 
 #include <console.h>
-#include <fatal.h>
 #include <kernel.h>
 #include <time.h>
 

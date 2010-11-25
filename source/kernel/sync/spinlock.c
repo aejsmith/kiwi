@@ -26,7 +26,6 @@
 #include <sync/spinlock.h>
 
 #include <assert.h>
-#include <fatal.h>
 #include <status.h>
 
 /** Internal spinlock locking code.

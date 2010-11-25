@@ -25,7 +25,6 @@
 #include <platform/pic.h>
 #include <platform/pit.h>
 
-#include <fatal.h>
 #include <kernel.h>
 
 /** PC platform first stage initialisation.

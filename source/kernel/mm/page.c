@@ -80,7 +80,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <kargs.h>
 #include <kdbg.h>
 #include <lrm.h>

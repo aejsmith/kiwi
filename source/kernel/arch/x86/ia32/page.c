@@ -35,7 +35,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <kargs.h>
 #include <status.h>
 

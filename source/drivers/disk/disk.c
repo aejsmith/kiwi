@@ -27,7 +27,7 @@
 #include <mm/malloc.h>
 
 #include <console.h>
-#include <fatal.h>
+#include <kernel.h>
 #include <module.h>
 #include <status.h>
 

@@ -48,7 +48,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <fatal.h>
 #include <status.h>
 
 #if CONFIG_KHEAP_DEBUG

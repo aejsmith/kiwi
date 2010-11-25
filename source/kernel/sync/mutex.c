@@ -25,7 +25,6 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
-#include <fatal.h>
 #include <status.h>
 #include <symbol.h>
 

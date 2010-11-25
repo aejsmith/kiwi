@@ -31,7 +31,6 @@
 
 #include <console.h>
 #include <elf.h>
-#include <fatal.h>
 #include <module.h>
 #include <status.h>
 

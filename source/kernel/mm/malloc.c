@@ -41,7 +41,7 @@
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
-#include <fatal.h>
+#include <kernel.h>
 
 /** Information structure prepended to allocations. */
 typedef struct alloc_btag {

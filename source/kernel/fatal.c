@@ -30,7 +30,6 @@
 #include <security/cap.h>
 
 #include <console.h>
-#include <fatal.h>
 #include <kdbg.h>
 #include <kernel.h>
 #include <status.h>

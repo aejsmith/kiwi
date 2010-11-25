@@ -20,7 +20,7 @@
 
 #include <arch/io.h>
 #include <platform/console.h>
-#include <fatal.h>
+#include <kernel.h>
 
 #ifdef SERIAL_PORT
 /** Print a character to the serial console.

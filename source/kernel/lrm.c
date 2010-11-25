@@ -35,8 +35,8 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <fatal.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <lrm.h>
 #include <status.h>
 #include <symbol.h>

@@ -31,8 +31,6 @@
 #include <mm/vm_cache.h>
 
 #include <assert.h>
-#include <fatal.h>
-#include <kernel.h>
 #include <status.h>
 
 /** Structure containing a single range in a file map. */
