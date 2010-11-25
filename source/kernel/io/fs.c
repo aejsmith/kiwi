@@ -506,7 +506,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 		 * execute permission. */
 		if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
 			fs_node_release(node);
-			return STATUS_PERM_DENIED;
+			return STATUS_ACCESS_DENIED;
 		}
 
 		/* Special handling for descending out of the directory. */
@@ -862,7 +862,7 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 		ret = STATUS_READ_ONLY;
 		goto out;
 	} else if(!(object_rights(&parent->obj, NULL) & FS_WRITE)) {
-		ret = STATUS_PERM_DENIED;
+		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(!parent->ops->create) {
 		ret = STATUS_NOT_SUPPORTED;
@@ -1106,19 +1106,19 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 
 	/* If mapping for reading, check if allowed. */
 	if(flags & VM_MAP_READ && !object_handle_rights(handle, FS_READ)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	/* If creating a shared mapping for writing, check for write access.
 	 * It is not necessary to check for a read-only filesystem here: a
 	 * handle cannot be opened with FS_WRITE on a read-only FS. */
 	if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE && !object_handle_rights(handle, FS_WRITE)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	/* If mapping for execution, check for execute access. */
 	if(flags & VM_MAP_EXEC && !object_handle_rights(handle, FS_EXECUTE)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	return STATUS_SUCCESS;
@@ -1343,7 +1343,7 @@ static status_t fs_file_read_internal(object_handle_t *handle, void *buf, size_t
 		ret = STATUS_INVALID_HANDLE;
 		goto out;
 	} else if(!object_handle_rights(handle, FS_READ)) {
-		ret = STATUS_PERM_DENIED;
+		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
 
@@ -1450,7 +1450,7 @@ static status_t fs_file_write_internal(object_handle_t *handle, const void *buf,
 		ret = STATUS_INVALID_HANDLE;
 		goto out;
 	} else if(!object_handle_rights(handle, FS_WRITE)) {
-		ret = STATUS_PERM_DENIED;
+		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	}
 
@@ -1562,7 +1562,7 @@ status_t fs_file_resize(object_handle_t *handle, offset_t size) {
 	} else if(handle->object->type->id != OBJECT_TYPE_FILE) {
 		return STATUS_INVALID_HANDLE;
 	} else if(!object_handle_rights(handle, FS_WRITE)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -1691,7 +1691,7 @@ status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) 
 	} else if(handle->object->type->id != OBJECT_TYPE_DIR) {
 		return STATUS_INVALID_HANDLE;
 	} else if(!object_handle_rights(handle, FS_READ)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	node = (fs_node_t *)handle->object;
@@ -2408,7 +2408,7 @@ status_t fs_unlink(const char *path) {
 		ret = STATUS_IN_USE;
 		goto out;
 	} else if(!(object_rights(&parent->obj, NULL) & FS_WRITE)) {
-		ret = STATUS_PERM_DENIED;
+		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(FS_NODE_IS_RDONLY(node)) {
 		ret = STATUS_READ_ONLY;
@@ -3490,7 +3490,7 @@ status_t sys_fs_setcwd(const char *path) {
 	if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	/* Attempt to set. Release the node no matter what, as upon success it
@@ -3539,7 +3539,7 @@ status_t sys_fs_setroot(const char *path) {
 	if(!(object_rights(&node->obj, NULL) & FS_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	/* Attempt to set. Release the node no matter what, as upon success it

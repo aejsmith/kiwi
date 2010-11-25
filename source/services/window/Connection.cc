@@ -66,7 +66,7 @@ status_t Connection::DestroySurface(area_id_t id) {
 	if(!surface) {
 		return STATUS_NOT_FOUND;
 	} else if(surface->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	m_surfaces.remove(surface);
@@ -99,7 +99,7 @@ status_t Connection::ResizeSurface(area_id_t id, org::kiwi::WindowServer::Size s
 	if(!surface) {
 		return STATUS_NOT_FOUND;
 	} else if(surface->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	return surface->Resize(Size(size.width, size.height));
@@ -128,7 +128,7 @@ status_t Connection::DestroyWindow(ServerWindow::ID id) {
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	m_windows.remove(window);
@@ -163,7 +163,7 @@ status_t Connection::SetWindowTitle(ServerWindow::ID id, const std::string &titl
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->SetTitle(title);
@@ -193,7 +193,7 @@ status_t Connection::SetWindowStyle(ServerWindow::ID id, uint32_t style) {
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->SetStyle(style);
@@ -227,7 +227,7 @@ status_t Connection::SetWindowLevel(ServerWindow::ID id, uint32_t level) {
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->SetLevel(level);
@@ -263,7 +263,7 @@ status_t Connection::ResizeWindow(ServerWindow::ID id, org::kiwi::WindowServer::
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->Resize(Size(size.width, size.height));
@@ -279,7 +279,7 @@ status_t Connection::MoveWindow(ServerWindow::ID id, org::kiwi::WindowServer::Po
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->MoveTo(Point(pos.x, pos.y));
@@ -311,7 +311,7 @@ status_t Connection::SetWindowState(ServerWindow::ID id, uint32_t state) {
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	bool visible = window->IsVisible();
@@ -359,7 +359,7 @@ status_t Connection::UpdateWindow(ServerWindow::ID id, org::kiwi::WindowServer::
 	if(!window) {
 		return STATUS_NOT_FOUND;
 	} else if(window->GetOwner() != this) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	window->Update(Rect(rect.pos.x, rect.pos.y, rect.size.width, rect.size.height));

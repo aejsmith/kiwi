@@ -61,7 +61,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
 	case OBJECT_TYPE_FILE:
 		ret = fs_file_pread(fd, buf, count, offset, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			if(ret == STATUS_PERM_DENIED) {
+			if(ret == STATUS_ACCESS_DENIED) {
 				errno = EBADF;
 			} else {
 				libc_status_to_errno(ret);
@@ -110,7 +110,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 	case OBJECT_TYPE_FILE:
 		ret = fs_file_read(fd, buf, count, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
-			if(ret == STATUS_PERM_DENIED) {
+			if(ret == STATUS_ACCESS_DENIED) {
 				errno = EBADF;
 			} else {
 				libc_status_to_errno(ret);

@@ -234,7 +234,7 @@ static status_t port_object_wait(object_handle_t *handle, int event, void *sync)
 	switch(event) {
 	case PORT_EVENT_CONNECTION:
 		if(!object_handle_rights(handle, PORT_LISTEN)) {
-			ret = STATUS_PERM_DENIED;
+			ret = STATUS_ACCESS_DENIED;
 		}
 
 		if(semaphore_count(&port->conn_sem)) {

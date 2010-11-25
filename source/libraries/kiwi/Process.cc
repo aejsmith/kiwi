@@ -156,7 +156,7 @@ bool Process::Create(const char *const args[], const char *const env[], HandleMa
 			 * was not found, or we do not have execute permission
 			 * on the file. */
 			if(unlikely(ret != STATUS_NOT_FOUND && ret != STATUS_NOT_DIR &&
-			            ret != STATUS_PERM_DENIED)) {
+			            ret != STATUS_ACCESS_DENIED)) {
 				m_error = ret;
 				return false;
 			}

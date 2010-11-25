@@ -43,30 +43,31 @@
 #define STATUS_PROCESS_LIMIT		18	/**< Process limit reached. */
 #define STATUS_THREAD_LIMIT		19	/**< Thread limit reached. */
 #define STATUS_READ_ONLY		20	/**< Object cannot be modified. */
-#define STATUS_PERM_DENIED		21	/**< Permission denied. */
-#define STATUS_NOT_DIR			22	/**< Path component is not a directory. */
-#define STATUS_NOT_FILE			23	/**< Path does not refer to a file. */
-#define STATUS_NOT_SYMLINK		24	/**< Path does not refer to a symbolic link. */
-#define STATUS_NOT_MOUNT		25	/**< Path does not refer to root of a mount. */
-#define STATUS_NOT_FOUND		26	/**< Requested object could not be found. */
-#define STATUS_ALREADY_EXISTS		27	/**< Object already exists. */
-#define STATUS_TOO_SMALL		28	/**< Provided buffer is too small. */
-#define STATUS_TOO_LONG			29	/**< Provided string is too long. */
-#define STATUS_DIR_NOT_EMPTY		30	/**< Directory is not empty. */
-#define STATUS_DIR_FULL			31	/**< Directory is full. */
-#define STATUS_UNKNOWN_FS		32	/**< Filesystem has an unrecognised format. */
-#define STATUS_CORRUPT_FS		33	/**< Corruption detected on the filesystem. */
-#define STATUS_FS_FULL			34	/**< No space is available on the filesystem. */
-#define STATUS_SYMLINK_LIMIT		35	/**< Exceeded nested symbolic link limit. */
-#define STATUS_IN_USE			36	/**< Object is in use. */
-#define STATUS_DEVICE_ERROR		37	/**< An error occurred during a hardware operation. */
-#define STATUS_STILL_RUNNING		38	/**< Process/thread is still running. */
-#define STATUS_UNKNOWN_IMAGE		39	/**< Executable image has an unrecognised format. */
-#define STATUS_MALFORMED_IMAGE		40	/**< Executable image format is incorrect. */
-#define STATUS_MISSING_LIBRARY		41	/**< Required library not found. */
-#define STATUS_MISSING_SYMBOL		42	/**< Referenced symbol not found. */
-#define STATUS_DEST_UNREACHABLE		43	/**< Cannot reach destination. */
-#define STATUS_TRY_AGAIN		44	/**< Attempt the operation again. */
+#define STATUS_PERM_DENIED		21	/**< Operation not permitted. */
+#define STATUS_ACCESS_DENIED		22	/**< Requested access rights denied. */
+#define STATUS_NOT_DIR			23	/**< Path component is not a directory. */
+#define STATUS_NOT_FILE			24	/**< Path does not refer to a file. */
+#define STATUS_NOT_SYMLINK		25	/**< Path does not refer to a symbolic link. */
+#define STATUS_NOT_MOUNT		26	/**< Path does not refer to root of a mount. */
+#define STATUS_NOT_FOUND		27	/**< Requested object could not be found. */
+#define STATUS_ALREADY_EXISTS		28	/**< Object already exists. */
+#define STATUS_TOO_SMALL		29	/**< Provided buffer is too small. */
+#define STATUS_TOO_LONG			30	/**< Provided string is too long. */
+#define STATUS_DIR_NOT_EMPTY		31	/**< Directory is not empty. */
+#define STATUS_DIR_FULL			32	/**< Directory is full. */
+#define STATUS_UNKNOWN_FS		33	/**< Filesystem has an unrecognised format. */
+#define STATUS_CORRUPT_FS		34	/**< Corruption detected on the filesystem. */
+#define STATUS_FS_FULL			35	/**< No space is available on the filesystem. */
+#define STATUS_SYMLINK_LIMIT		36	/**< Exceeded nested symbolic link limit. */
+#define STATUS_IN_USE			37	/**< Object is in use. */
+#define STATUS_DEVICE_ERROR		38	/**< An error occurred during a hardware operation. */
+#define STATUS_STILL_RUNNING		39	/**< Process/thread is still running. */
+#define STATUS_UNKNOWN_IMAGE		40	/**< Executable image has an unrecognised format. */
+#define STATUS_MALFORMED_IMAGE		41	/**< Executable image format is incorrect. */
+#define STATUS_MISSING_LIBRARY		42	/**< Required library not found. */
+#define STATUS_MISSING_SYMBOL		43	/**< Referenced symbol not found. */
+#define STATUS_DEST_UNREACHABLE		44	/**< Cannot reach destination. */
+#define STATUS_TRY_AGAIN		45	/**< Attempt the operation again. */
 
 #if !defined(KERNEL) && !defined(__ASM__)
 #include <kernel/types.h>

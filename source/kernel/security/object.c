@@ -424,19 +424,19 @@ status_t object_set_security(object_t *object, object_handle_t *handle, object_s
 	if(security->uid >= 0 || security->gid >= 0) {
 		if(handle) {
 			if(!object_handle_rights(handle, OBJECT_SET_OWNER)) {
-				return STATUS_PERM_DENIED;
+				return STATUS_ACCESS_DENIED;
 			}
 		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_OWNER)) {
-			return STATUS_PERM_DENIED;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
 	if(security->acl) {
 		if(handle) {
 			if(!object_handle_rights(handle, OBJECT_SET_ACL)) {
-				return STATUS_PERM_DENIED;
+				return STATUS_ACCESS_DENIED;
 			}
 		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_ACL)) {
-			return STATUS_PERM_DENIED;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
 

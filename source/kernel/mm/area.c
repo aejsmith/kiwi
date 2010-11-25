@@ -121,12 +121,12 @@ static status_t area_object_mappable(object_handle_t *handle, int flags) {
 
 	if(flags & (VM_MAP_READ | VM_MAP_EXEC)) {
 		if(!object_handle_rights(handle, AREA_READ)) {
-			return STATUS_PERM_DENIED;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
 	if(flags & VM_MAP_WRITE && !(flags & VM_MAP_PRIVATE)) {
 		if(!object_handle_rights(handle, AREA_WRITE)) {
-			return STATUS_PERM_DENIED;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
 

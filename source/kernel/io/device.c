@@ -610,7 +610,7 @@ status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t 
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
 	} else if(!object_handle_rights(handle, DEVICE_READ)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	device = (device_t *)handle->object;
@@ -657,7 +657,7 @@ status_t device_write(object_handle_t *handle, const void *buf, size_t count, of
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
 	} else if(!object_handle_rights(handle, DEVICE_WRITE)) {
-		return STATUS_PERM_DENIED;
+		return STATUS_ACCESS_DENIED;
 	}
 
 	device = (device_t *)handle->object;
