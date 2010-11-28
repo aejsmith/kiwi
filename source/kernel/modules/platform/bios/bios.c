@@ -24,7 +24,7 @@
 #include <mm/malloc.h>
 #include <mm/page.h>
 
-#include <platform/bios.h>
+#include <platform/pc/bios.h>
 
 #include <sync/mutex.h>
 

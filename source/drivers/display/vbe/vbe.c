@@ -23,7 +23,7 @@
 #include <mm/malloc.h>
 #include <mm/page.h>
 
-#include <platform/bios.h>
+#include <platform/pc/bios.h>
 
 #include <assert.h>
 #include <console.h>
