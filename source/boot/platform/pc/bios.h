@@ -21,7 +21,7 @@
 #ifndef __PLATFORM_BIOS_H
 #define __PLATFORM_BIOS_H
 
-#include <arch/cpu.h>
+#include <arch/x86/cpu.h>
 #include <lib/string.h>
 #include <types.h>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -15,23 +15,17 @@
 
 /**
  * @file
- * @brief		PC console code.
+ * @brief		PC Programmable Interval Timer code.
  */
 
-#ifndef __PLATFORM_CONSOLE_H
-#define __PLATFORM_CONSOLE_H
+#ifndef __PLATFORM_PC_PIT_H
+#define __PLATFORM_PC_PIT_H
 
-#include <console.h>
+#include <time.h>
 
-/** Convert the serial port number from the configuration to a port number. */
-#if CONFIG_PC_SERIAL_PORT == 1
-# define SERIAL_PORT		0x3F8
-#elif CONFIG_PC_SERIAL_PORT == 2
-# define SERIAL_PORT		0x2F8
-#elif CONFIG_PC_SERIAL_PORT == 3
-# define SERIAL_PORT		0x3E8
-#elif CONFIG_PC_SERIAL_PORT == 4
-# define SERIAL_PORT		0x2E8
-#endif
+/** Frequency to use for PIT (in Hz). */
+#define PIT_FREQUENCY		1000
 
-#endif /* __PLATFORM_CONSOLE_H */
+extern timer_device_t pit_timer_device;
+
+#endif /* __PLATFORM_PC_PIT_H */

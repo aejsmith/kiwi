@@ -18,8 +18,8 @@
  * @brief		x86 descriptor table functions.
  */
 
-#ifndef __ARCH_DESCRIPTOR_H
-#define __ARCH_DESCRIPTOR_H
+#ifndef __ARCH_X86_DESCRIPTOR_H
+#define __ARCH_X86_DESCRIPTOR_H
 
 #ifndef LOADER
 # if __x86_64__
@@ -203,4 +203,4 @@ extern void gdt_set_limit(struct cpu *cpu, int sel, size_t limit);
 extern void descriptor_init(struct cpu *cpu);
 #endif
 #endif /* __ASM__ */
-#endif /* __ARCH_DESCRIPTOR_H */
+#endif /* __ARCH_X86_DESCRIPTOR_H */

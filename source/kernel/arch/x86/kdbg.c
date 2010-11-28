@@ -18,8 +18,7 @@
  * @brief		x86 kernel debugger functions.
  */
 
-#include <arch/cpu.h>
-#include <arch/page.h>
+#include <arch/x86/cpu.h>
 
 #include <cpu/intr.h>
 
@@ -147,9 +146,9 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
 	thread_t *thread;
 	size_t off = 0;
-	ptr_t page, ip;
 	unative_t tid;
 	symbol_t *sym;
+	ptr_t ip;
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
@@ -176,9 +175,6 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 		frame = (stack_frame_t *)curr_kdbg_frame->bp;
 		ip = curr_kdbg_frame->ip;
 	}
-
-	/* Make sure we stay on the same page. */
-	page = (ptr_t)frame & PAGE_MASK;
 
 	/* Print out the address of where the exception occurred. */
 	sym = symbol_lookup_addr(ip, &off);

@@ -18,7 +18,7 @@
  * @brief		x86 CD boot sector.
  */
 
-#include <arch/asm.h>
+#include <arch/x86/asm.h>
 #include <platform/boot.h>
 
 /** Various definitions. */

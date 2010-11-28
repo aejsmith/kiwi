@@ -18,10 +18,10 @@
  * @brief		x86 CPU detection functions.
  */
 
+#include <arch/x86/cpu.h>
+#include <arch/x86/lapic.h>
 #include <arch/boot.h>
-#include <arch/cpu.h>
 #include <arch/io.h>
-#include <arch/lapic.h>
 #include <arch/memory.h>
 
 #include <boot/console.h>

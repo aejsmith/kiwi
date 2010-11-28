@@ -18,6 +18,8 @@
  * @brief		AMD64 paging functions.
  */
 
+#include <arch/x86/cpu.h>
+#include <arch/x86/page.h>
 #include <arch/barrier.h>
 #include <arch/memory.h>
 

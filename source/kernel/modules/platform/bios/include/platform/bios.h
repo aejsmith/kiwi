@@ -18,9 +18,10 @@
  * @brief		PC BIOS interrupt interface.
  */
 
-#ifndef __PLATFORM_BIOS_H
-#define __PLATFORM_BIOS_H
+#ifndef __PLATFORM_PC_BIOS_H
+#define __PLATFORM_PC_BIOS_H
 
+#include <arch/x86/cpu.h>
 #include <mm/flags.h>
 
 /** Convert a segment + offset pair to a linear address. */
@@ -41,4 +42,4 @@ extern void bios_regs_init(bios_regs_t *regs);
 
 extern void bios_interrupt(uint8_t num, bios_regs_t *regs);
 
-#endif /* __PLATFORM_BIOS_H */
+#endif /* __PLATFORM_PC_BIOS_H */

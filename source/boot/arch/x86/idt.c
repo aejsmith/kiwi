@@ -18,8 +18,8 @@
  * @brief		x86 exception handling routines.
  */
 
+#include <arch/x86/descriptor.h>
 #include <arch/boot.h>
-#include <arch/descriptor.h>
 #include <arch/intr.h>
 
 #include <boot/error.h>

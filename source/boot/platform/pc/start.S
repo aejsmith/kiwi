@@ -18,7 +18,7 @@
  * @brief		x86 bootloader startup code.
  */
 
-#include <arch/asm.h>
+#include <arch/x86/asm.h>
 #include <arch/memory.h>
 #include <arch/page.h>
 

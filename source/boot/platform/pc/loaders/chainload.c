@@ -18,7 +18,6 @@
  * @brief		PC chainload loader type.
  */
 
-#include <arch/cpu.h>
 #include <arch/io.h>
 
 #include <boot/loader.h>

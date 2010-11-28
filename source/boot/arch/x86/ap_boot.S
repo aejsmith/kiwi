@@ -18,7 +18,7 @@
  * @brief		AP bootstrap code.
  */
 
-#include <arch/asm.h>
+#include <arch/x86/asm.h>
 #include <platform/boot.h>
 
 .section .trampoline, "ax", @progbits

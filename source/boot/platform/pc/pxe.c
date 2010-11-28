@@ -18,8 +18,6 @@
  * @brief		PXE filesystem handling.
  */
 
-#include <arch/cpu.h>
-
 #include <boot/console.h>
 #include <boot/disk.h>
 #include <boot/error.h>

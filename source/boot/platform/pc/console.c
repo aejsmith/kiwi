@@ -18,7 +18,6 @@
  * @brief		PC console code.
  */
 
-#include <arch/cpu.h>
 #include <arch/io.h>
 
 #include <boot/console.h>

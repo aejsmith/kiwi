@@ -19,7 +19,7 @@
  */
 
 #include <arch/io.h>
-#include <platform/console.h>
+#include <platform/pc/console.h>
 #include <kernel.h>
 
 #ifdef SERIAL_PORT

@@ -18,8 +18,8 @@
  * @brief		x86 kernel entry functions.
  */
 
-#include <arch/asm.h>
-#include <arch/cpu.h>
+#include <arch/x86/asm.h>
+#include <arch/x86/cpu.h>
 #include <arch/page.h>
 
 #include <platform/boot.h>

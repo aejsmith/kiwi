@@ -18,8 +18,6 @@
  * @brief		PC memory detection code.
  */
 
-#include <arch/cpu.h>
-
 #include <boot/console.h>
 #include <boot/error.h>
 #include <boot/memory.h>

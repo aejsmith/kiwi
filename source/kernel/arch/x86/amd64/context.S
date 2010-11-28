@@ -18,7 +18,7 @@
  * @brief		AMD64 CPU context functions.
  */
 
-#include <arch/asm.h>
+#include <arch/x86/asm.h>
 #include <arch/context.h>
 
 /** Save the current CPU context.

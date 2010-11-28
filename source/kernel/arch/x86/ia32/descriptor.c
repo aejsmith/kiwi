@@ -18,9 +18,9 @@
  * @brief		IA32 descriptor table functions.
  */
 
-#include <arch/descriptor.h>
+#include <arch/x86/cpu.h>
+#include <arch/x86/descriptor.h>
 #include <arch/memory.h>
-#include <arch/page.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

@@ -18,8 +18,8 @@
  * @brief		x86 local APIC definitions.
  */
 
-#ifndef __ARCH_LAPIC_H
-#define __ARCH_LAPIC_H
+#ifndef __ARCH_X86_LAPIC_H
+#define __ARCH_X86_LAPIC_H
 
 #include <types.h>
 
@@ -104,4 +104,4 @@ extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
 extern void lapic_init(struct kernel_args *args);
 
-#endif /* __ARCH_LAPIC_H */
+#endif /* __ARCH_X86_LAPIC_H */

@@ -18,8 +18,6 @@
  * @brief		AMD64 kernel debugger functions.
  */
 
-#include <arch/page.h>
-
 #include <cpu/intr.h>
 
 #include <lib/string.h>

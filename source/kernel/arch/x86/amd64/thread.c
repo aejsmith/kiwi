@@ -18,6 +18,7 @@
  * @brief		AMD64 thread functions.
  */
 
+#include <arch/x86/cpu.h>
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>

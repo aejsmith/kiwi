@@ -22,7 +22,7 @@
 
 #include <cpu/intr.h>
 
-#include <platform/pic.h>
+#include <platform/pc/pic.h>
 
 #include <console.h>
 #include <kdbg.h>

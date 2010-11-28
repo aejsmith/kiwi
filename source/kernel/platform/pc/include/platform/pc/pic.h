@@ -18,8 +18,8 @@
  * @brief		Programmable Interrupt Controller code.
  */
 
-#ifndef __PLATFORM_PIC_H
-#define __PLATFORM_PIC_H
+#ifndef __PLATFORM_PC_PIC_H
+#define __PLATFORM_PC_PIC_H
 
 /** PIC port definitions. */
 #define PIC_MASTER_COMMAND	0x20	/**< Command port (Master). */
@@ -42,4 +42,4 @@
 
 extern void pic_init(void);
 
-#endif /* __PLATFORM_PIC_H */
+#endif /* __PLATFORM_PC_PIC_H */

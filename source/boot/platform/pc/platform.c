@@ -18,7 +18,7 @@
  * @brief		PC platform startup code.
  */
 
-#include <arch/descriptor.h>
+#include <arch/x86/descriptor.h>
 #include <arch/io.h>
 
 #include <boot/config.h>

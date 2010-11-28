@@ -18,7 +18,7 @@
  * @brief		PC kernel entry functions.
  */
 
-#include <arch/asm.h>
+#include <arch/x86/asm.h>
 #include <platform/boot.h>
 
 #define CHAINLOAD_STACK		0x2000

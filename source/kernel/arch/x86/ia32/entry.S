@@ -18,9 +18,9 @@
  * @brief		IA32 kernel entry points.
  */
 
-#include <arch/asm.h>
-#include <arch/cpu.h>
-#include <arch/descriptor.h>
+#include <arch/x86/asm.h>
+#include <arch/x86/cpu.h>
+#include <arch/x86/descriptor.h>
 #include <arch/memory.h>
 
 #include <status.h>

@@ -22,10 +22,10 @@
  * as the kernel will create its own paging structures.
  */
 
+#include <arch/x86/cpu.h>
+#include <arch/x86/page.h>
 #include <arch/boot.h>
-#include <arch/cpu.h>
 #include <arch/intr.h>
-#include <arch/page.h>
 
 #include <boot/cpu.h>
 #include <boot/elf.h>

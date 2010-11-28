@@ -18,12 +18,12 @@
  * @brief		PC platform core code.
  */
 
+#include <arch/x86/descriptor.h>
 #include <arch/cpu.h>
-#include <arch/descriptor.h>
 #include <arch/io.h>
 
-#include <platform/pic.h>
-#include <platform/pit.h>
+#include <platform/pc/pic.h>
+#include <platform/pc/pit.h>
 
 #include <kernel.h>
 

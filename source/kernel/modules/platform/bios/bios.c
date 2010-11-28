@@ -18,7 +18,6 @@
  * @brief		PC BIOS interrupt interface.
  */
 
-#include <arch/cpu.h>
 #include <arch/io.h>
 
 #include <mm/kheap.h>

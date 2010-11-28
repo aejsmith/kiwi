@@ -19,11 +19,6 @@
  */
 
 #include <arch/boot.h>
-#include <arch/cpu.h>
-#include <arch/descriptor.h>
-#include <arch/io.h>
-
-#include <time.h>
 
 /** Perform early architecture initialisation. */
 void arch_early_init(void) {
