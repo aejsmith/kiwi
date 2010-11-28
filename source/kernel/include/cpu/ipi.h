@@ -31,6 +31,8 @@
 /** Type of a function to handle an IPI. */
 typedef status_t (*ipi_handler_t)(void *, unative_t, unative_t, unative_t, unative_t);
 
+extern void ipi_arch_interrupt(cpu_id_t dest);
+
 extern status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
                          unative_t data3, unative_t data4, int flags);
 extern void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,

@@ -18,8 +18,6 @@
  * @brief		Inter-CPU communication functions.
  */
 
-#include <arch/ipi.h>
-
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
@@ -127,7 +125,7 @@ static void ipi_message_queue(ipi_message_t *message, cpu_t *cpu) {
 	 * message will get processed even if we do not send an IPI. */
 	if(!cpu->ipi_sent) {
 		cpu->ipi_sent = true;
-		ipi_send_interrupt(cpu->id);
+		ipi_arch_interrupt(cpu->id);
 	}
 
 	spinlock_unlock(&cpu->ipi_lock);

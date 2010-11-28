@@ -23,6 +23,7 @@
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
+#include <cpu/ipi.h>
 
 #include <mm/page.h>
 
@@ -162,6 +163,12 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	}
 
 	intr_restore(state);
+}
+
+/** Send an IPI interrupt to a single CPU.
+ * @param dest		Destination CPU ID. */
+void ipi_arch_interrupt(cpu_id_t dest) {
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
 }
 
 /** Initialise the local APIC on the current CPU.
