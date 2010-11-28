@@ -53,6 +53,7 @@ typedef struct futex {
 	phys_ptr_t phys;		/**< Physical address of futex. */
 	refcount_t count;		/**< Number of processes referring to the futex. */
 	waitq_t queue;			/**< Queue for waiting on the futex. */
+	avl_tree_node_t tree_link;	/**< Link to global futex tree. */
 } futex_t;
 
 /** Futex allocator. */
@@ -80,11 +81,11 @@ void futex_cleanup(process_t *proc) {
 	AVL_TREE_FOREACH_SAFE(&proc->futexes, iter) {
 		futex = avl_tree_entry(iter, futex_t);
 
-		avl_tree_remove(&proc->futexes, futex->phys);
+		avl_tree_dyn_remove(&proc->futexes, futex->phys);
 
 		/* If no more processes refer to the futex we can free it. */
 		if(refcount_dec(&futex->count) == 0) {
-			avl_tree_remove(&futex_tree, futex->phys);
+			avl_tree_remove(&futex_tree, &futex->tree_link);
 			slab_cache_free(futex_cache, futex);
 		}
 	}
@@ -150,13 +151,13 @@ static futex_t *futex_lookup(int32_t *addr) {
 			futex->phys = phys;
 
 			/* Attach it to the global tree. */
-			avl_tree_insert(&futex_tree, phys, futex, NULL);
+			avl_tree_insert(&futex_tree, &futex->tree_link, phys, futex);
 		} else {
 			refcount_inc(&futex->count);
 		}
 
 		/* Attach to the process' tree. */
-		avl_tree_insert(&curr_proc->futexes, phys, futex, NULL);
+		avl_tree_dyn_insert(&curr_proc->futexes, phys, futex);
 
 		mutex_unlock(&futex_tree_lock);
 	}

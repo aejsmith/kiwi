@@ -84,6 +84,8 @@ typedef struct ipc_port {
 	list_t waiting;			/**< List of in-progress connection attempts. */
 	semaphore_t conn_sem;		/**< Semaphore counting connection attempts. */
 	notifier_t conn_notifier;	/**< Notifier for connection attempts. */
+
+	avl_tree_node_t tree_link;	/**< Link to node tree. */
 } ipc_port_t;
 
 /** IPC endpoint structure. */
@@ -186,7 +188,7 @@ static void ipc_port_release(ipc_port_t *port) {
 			mutex_unlock(&conn->lock);
 		}
 
-		avl_tree_remove(&port_tree, port->id);
+		avl_tree_remove(&port_tree, &port->tree_link);
 		mutex_unlock(&port_tree_lock);
 		mutex_unlock(&port->lock);
 
@@ -454,7 +456,7 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 	refcount_set(&port->count, 1);
 
 	mutex_lock(&port_tree_lock);
-	avl_tree_insert(&port_tree, port->id, port, NULL);
+	avl_tree_insert(&port_tree, &port->tree_link, port->id, port);
 	dprintf("ipc: created port %d(%p) (process: %d)\n", port->id, port, curr_proc->id);
 	mutex_unlock(&port_tree_lock);
 

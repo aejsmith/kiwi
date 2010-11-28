@@ -65,7 +65,7 @@ config QEMU_BINARY
 
 config QEMU_OPTS
 	string "Extra QEMU options"
-	default "-serial stdio -vga std -s -localtime"
+	default "-serial stdio -vga std -s -localtime -m 256"
 	help
 	  Extra options to pass to QEMU.
 

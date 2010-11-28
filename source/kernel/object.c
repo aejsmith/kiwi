@@ -66,6 +66,7 @@ typedef struct object_wait_sync {
 typedef struct handle_link {
 	object_handle_t *handle;	/**< Handle the link refers to. */
 	int flags;			/**< Behaviour flags for the handle. */
+	avl_tree_node_t link;		/**< AVL tree link. */
 } handle_link_t;
 
 /** Cache for handle structures. */
@@ -280,7 +281,7 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 	link->flags = flags;
 
 	bitmap_set(&table->bitmap, id);
-	avl_tree_insert(&table->tree, id, link, NULL);
+	avl_tree_insert(&table->tree, &link->link, id, link);
 }
 
 /** Insert a handle into a process' handle table.
@@ -347,13 +348,13 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 	handle_link_t *link;
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&process->handles->tree, (key_t)id);
+	link = avl_tree_lookup(&process->handles->tree, id);
 	if(!link) {
 		return STATUS_INVALID_HANDLE;
 	}
 
 	/* Remove from the tree and mark the ID as free. */
-	avl_tree_remove(&process->handles->tree, (key_t)id);
+	avl_tree_remove(&process->handles->tree, &link->link);
 	bitmap_clear(&process->handles->bitmap, id);
 
 	/* Release the handle and free the link. */
@@ -420,7 +421,7 @@ status_t object_handle_lookup(process_t *process, handle_t id, int type, object_
 	rwlock_read_lock(&process->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&process->handles->tree, (key_t)id);
+	link = avl_tree_lookup(&process->handles->tree, id);
 	if(!link) {
 		rwlock_unlock(&process->handles->lock);
 		return STATUS_INVALID_HANDLE;
@@ -554,7 +555,7 @@ void handle_table_destroy(handle_table_t *table) {
 	AVL_TREE_FOREACH_SAFE(&table->tree, iter) {
 		link = avl_tree_entry(iter, handle_link_t);
 		object_handle_release(link->handle);
-		avl_tree_remove(&table->tree, iter->key);
+		avl_tree_remove(&table->tree, &link->link);
 		kfree(link);
 	}
 
@@ -778,7 +779,7 @@ status_t sys_handle_flags(handle_t handle, int *flagsp) {
 	rwlock_read_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle);
+	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
 	if(!link) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
@@ -799,7 +800,7 @@ status_t sys_handle_set_flags(handle_t handle, int flags) {
 	rwlock_write_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, (key_t)handle);
+	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
 	if(!link) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;

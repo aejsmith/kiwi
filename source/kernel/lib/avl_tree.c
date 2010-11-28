@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -19,7 +19,6 @@
  *
  * Implementation details:
  * - Non-unique keys are not supported.
- * - Nodes are dynamically allocated.
  *
  * Reference:
  * - Wikipedia - AVL tree:
@@ -44,7 +43,7 @@
 static inline int avl_tree_subtree_height(avl_tree_node_t *node) {
 	int left, right;
 
-	if(node == NULL) {
+	if(!node) {
 		return 0;
 	}
 
@@ -82,7 +81,7 @@ static inline void avl_tree_rotate_left(avl_tree_t *tree, avl_tree_node_t *node)
 
 	/* Reparent the child to node's parent. */
 	child->parent = node->parent;
-	if(child->parent == NULL) {
+	if(!child->parent) {
 		/* If parent becomes NULL we're at the root of the tree. */
 		tree->root = child;
 	} else {
@@ -115,7 +114,7 @@ static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node
 
 	/* Reparent the child to node's parent. */
 	child->parent = node->parent;
-	if(child->parent == NULL) {
+	if(!child->parent) {
 		/* If parent becomes NULL we're at the root of the tree. */
 		tree->root = child;
 	} else {
@@ -161,7 +160,7 @@ static inline void avl_tree_balance_node(avl_tree_t *tree, avl_tree_node_t *node
 	}
 }
 
-/** Internal part of node lookup.
+/** Look up a node in an AVL tree.
  * @param tree		Tree to look up in.
  * @param key		Key to look for.
  * @return		Pointer to node if found, NULL if not. */
@@ -169,7 +168,7 @@ static avl_tree_node_t *avl_tree_lookup_internal(avl_tree_t *tree, key_t key) {
 	avl_tree_node_t *node = tree->root;
 
 	/* Descend down the tree to find the required node. */
-	while(node != NULL) {
+	while(node) {
 		if(node->key > key) {
 			node = node->left;
 		} else if(node->key < key) {
@@ -183,65 +182,49 @@ static avl_tree_node_t *avl_tree_lookup_internal(avl_tree_t *tree, key_t key) {
 }
 
 /** Insert a node in an AVL tree.
- *
- * Inserts a node into an AVL tree. The node's key will be set to the given
- * key value.
- *
  * @param tree		Tree to insert into.
+ * @param node		Node to insert into tree. This function does NOT check
+ *			if the node is already in another tree: it must be
+ *			removed by the caller if it is.
  * @param key		Key to give the node.
- * @param value		Value the key is associated with.
- * @param nodep		Where to store pointer to node if required.
- */
-void avl_tree_insert(avl_tree_t *tree, key_t key, void *value, avl_tree_node_t **nodep) {
-	avl_tree_node_t **next, *curr = NULL, *node;
+ * @param value		Value that the node will map to. */
+void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *value) {
+	avl_tree_node_t **next, *curr = NULL;
 	int balance;
 
-	/* Check if the key is unique. */
-	if(avl_tree_lookup(tree, key) != NULL) {
-		fatal("Attempted to insert duplicate key into AVL tree");
-	}
-
-	/* Create and set up the node. */
-	node = kmalloc(sizeof(avl_tree_node_t), MM_SLEEP);
-	node->parent = NULL;
 	node->left = NULL;
 	node->right = NULL;
 	node->height = 0;
 	node->key = key;
 	node->value = value;
 
-	/* Store the node pointer if needed. */
-	if(nodep != NULL) {
-		*nodep = node;
-	}
-
 	/* If tree is currently empty, just insert and finish. */
-	if(tree->root == NULL) {
+	if(!tree->root) {
+		node->parent = NULL;
 		tree->root = node;
 		return;
 	}
 
 	/* Descend to where we want to insert the node. */
 	next = &tree->root;
-	while((*next) != NULL) {
+	while(*next) {
 		curr = *next;
 
-		/* We checked that the key is unique, so this should not be the
-		 * case. */
-		assert(key != curr->key);
+		/* Ensure that the key is unique. */
+		if(unlikely(key == curr->key)) {
+			fatal("Attempted to insert duplicate key into AVL tree");
+		}
 
 		/* Get the next pointer. */
 		next = (key > curr->key) ? &curr->right : &curr->left;
 	}
-
-	assert(curr);
 
 	/* We now have an insertion point for the new node. */
 	node->parent = curr;
 	*next = node;
 
 	/* Now go back up the tree and check its balance. */
-	while(curr != NULL) {
+	while(curr) {
 		balance = avl_tree_balance_factor(curr);
 		if(balance < -1 || balance > 1) {
 			avl_tree_balance_node(tree, curr, balance);
@@ -251,38 +234,26 @@ void avl_tree_insert(avl_tree_t *tree, key_t key, void *value, avl_tree_node_t *
 }
 
 /** Remove a node from an AVL tree.
- *
- * Removes the given node from its containing AVL tree.
- *
- * @todo		This could probably be a bit better.
- *
  * @param tree		Tree to remove from.
- * @param node		Node to remove.
- */
-void avl_tree_remove(avl_tree_t *tree, key_t key) {
-	avl_tree_node_t *child, *start, *node;
+ * @param node		Node to remove. */
+void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
+	avl_tree_node_t *child, *start;
 	int balance;
 
-	/* Find the node. */
-	node = avl_tree_lookup_internal(tree, key);
-	if(node == NULL) {
-		return;
-	}
-
 	/* First we need to detach the node from the tree. */
-	if(node->left != NULL) {
+	if(node->left) {
 		/* Left node exists. Descend onto it, and then find the
 		 * right-most node, which will replace the node that we're
 		 * removing. */
 		child = node->left;
-		while(child->right != NULL) {
+		while(child->right) {
 			child = child->right;
 		}
 
 		if(child != node->left) {
-			if(child->left != NULL) {
-				/* There is a left subtree. This must be moved up to
-				 * replace child. */
+			if(child->left) {
+				/* There is a left subtree. This must be moved
+				 * up to replace child. */
 				child->left->parent = child->parent;
 				child->parent->right = child->left;
 				start = child->left;
@@ -302,13 +273,13 @@ void avl_tree_remove(avl_tree_t *tree, key_t key) {
 		/* Replace the node and fix up pointers. */
 		child->right = node->right;
 		child->parent = node->parent;
-		if(child->right != NULL) {
+		if(child->right) {
 			child->right->parent = child;
 		}
-		if(child->left != NULL) {
+		if(child->left) {
 			child->left->parent = child;
 		}
-		if(node->parent != NULL) {
+		if(node->parent) {
 			if(node->parent->left == node) {
 				node->parent->left = child;
 			} else {
@@ -318,11 +289,11 @@ void avl_tree_remove(avl_tree_t *tree, key_t key) {
 			assert(node == tree->root);
 			tree->root = child;
 		}
-	} else if(node->right != NULL) {
+	} else if(node->right) {
 		/* Left node doesn't exist but right node does. This is easy.
 		 * Just replace the node with its right child. */
 		node->right->parent = node->parent;
-		if(node->parent != NULL) {
+		if(node->parent) {
 			if(node->parent->left == node) {
 				node->parent->left = node->right;
 			} else {
@@ -337,7 +308,7 @@ void avl_tree_remove(avl_tree_t *tree, key_t key) {
 		/* Node is a leaf. If it is the only element in the tree,
 		 * then just remove it and return - no rebalancing required.
 		 * Otherwise, remove it and then rebalance. */
-		if(node->parent != NULL) {
+		if(node->parent) {
 			if(node->parent->left == node) {
 				node->parent->left = NULL;
 			} else {
@@ -346,17 +317,13 @@ void avl_tree_remove(avl_tree_t *tree, key_t key) {
 		} else {
 			assert(node == tree->root);
 			tree->root = NULL;
-
-			kfree(node);
 			return;
 		}
 		start = node->parent;
 	}
 
-	kfree(node);
-
 	/* Start now points to where we want to start rebalancing from. */
-	while(start != NULL) {
+	while(start) {
 		balance = avl_tree_balance_factor(start);
 		if(balance < -1 || balance > 1) {
 			avl_tree_balance_node(tree, start, balance);
@@ -365,19 +332,41 @@ void avl_tree_remove(avl_tree_t *tree, key_t key) {
 	}
 }
 
+/** Insert a value into an AVL tree with a dynamically allocated node.
+ *
+ * Inserts a value into an AVL tree with a dynamically allocated node. Values
+ * inserted using this function must be removed with avl_tree_dyn_remove() to
+ * free the node.
+ *
+ * @param tree		Tree to insert into.
+ * @param key		Key to give the value.
+ * @param value		Value the node will map to.
+ */
+void avl_tree_dyn_insert(avl_tree_t *tree, key_t key, void *value) {
+	avl_tree_node_t *node;
+
+	node = kmalloc(sizeof(*node), MM_SLEEP);
+	avl_tree_insert(tree, node, key, value);
+}
+
+/** Remove a value from an AVL tree with a dynamically allocated node.
+ * @param tree		Tree to remove from.
+ * @param key		Key of value to remove. */
+void avl_tree_dyn_remove(avl_tree_t *tree, key_t key) {
+	avl_tree_node_t *node = avl_tree_lookup_internal(tree, key);
+	if(node) {
+		avl_tree_remove(tree, node);
+		kfree(node);
+	}
+}
+
 /** Look up a node in an AVL tree.
- *
- * Looks up the node with the given key in an AVL tree.
- *
  * @param tree		Tree to look up in.
  * @param key		Key to look for.
- *
- * @return		Node's value if found, NULL if not.
- */
+ * @return		Node's value if found, NULL if not. */
 void *avl_tree_lookup(avl_tree_t *tree, key_t key) {
 	avl_tree_node_t *node = avl_tree_lookup_internal(tree, key);
-
-	return (node != NULL) ? node->value : NULL;
+	return (node) ? node->value : NULL;
 }
 
 /** Get the first node in an AVL tree.
@@ -389,21 +378,20 @@ void *avl_tree_lookup(avl_tree_t *tree, key_t key) {
  *
  * @return		Pointer to node, or NULL if tree empty.
  */
-avl_tree_node_t *avl_tree_node_first(avl_tree_t *tree) {
+avl_tree_node_t *avl_tree_first(avl_tree_t *tree) {
 	avl_tree_node_t *node = tree->root;
 
-	/* If the tree is empty return now. */
-	if(node == NULL) {
+	if(node) {
+		/* Descend down the left-hand side of the tree to find the
+		 * smallest node. */
+		while(node->left) {
+			node = node->left;
+		}
+
+		return node;
+	} else {
 		return NULL;
 	}
-
-	/* Descend down the left-hand side of the tree to find the smallest
-	 * node. */
-	while(node->left != NULL) {
-		node = node->left;
-	}
-
-	return node;
 }
 
 /** Get the last node in an AVL tree.
@@ -415,32 +403,25 @@ avl_tree_node_t *avl_tree_node_first(avl_tree_t *tree) {
  *
  * @return		Pointer to node, or NULL if tree empty.
  */
-avl_tree_node_t *avl_tree_node_last(avl_tree_t *tree) {
+avl_tree_node_t *avl_tree_last(avl_tree_t *tree) {
 	avl_tree_node_t *node = tree->root;
 
-	/* If the tree is empty return now. */
-	if(node == NULL) {
+	if(node) {
+		/* Descend down the right-hand side of the tree to find the
+		 * largest node. */
+		while(node->right) {
+			node = node->right;
+		}
+
+		return node;
+	} else {
 		return NULL;
 	}
-
-	/* Descend down the right-hand side of the tree to find the largest
-	 * node. */
-	while(node->right != NULL) {
-		node = node->right;
-	}
-
-	return node;
 }
 
-/** Get the node preceding a node in an AVL tree.
- *
- * Gets the node with a key that precedes an existing node's key in an AVL
- * tree.
- *
+/** Get the node preceding another node in an AVL tree.
  * @param node		Node to get preceding node of.
- * 
- * @return		Preceding node or NULL if none found.
- */
+ * @return		Preceding node or NULL if none found. */
 avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
 	if(!node) {
 		return NULL;
@@ -448,7 +429,7 @@ avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
 
 	/* If there's a left-hand child, move onto it and then go as far
 	 * right as we can. */
-	if(node->left != NULL) {
+	if(node->left) {
 		node = node->left;
 		while(node->right) {
 			node = node->right;
@@ -468,15 +449,9 @@ avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
 	}
 }
 
-/** Get the node following a node in an AVL tree.
- *
- * Gets the node with a key that follows an existing node's key in an AVL
- * tree.
- *
+/** Get the node following another node in an AVL tree.
  * @param node		Node to get following node of.
- * 
- * @return		Following node or NULL if none found.
- */
+ * @return		Following node or NULL if none found. */
 avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
 	if(!node) {
 		return NULL;
@@ -484,7 +459,7 @@ avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
 
 	/* If there's a right-hand child, move onto it and then go as far
 	 * left as we can. */
-	if(node->right != NULL) {
+	if(node->right) {
 		node = node->right;
 		while(node->left) {
 			node = node->left;

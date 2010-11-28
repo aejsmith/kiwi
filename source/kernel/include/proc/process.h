@@ -70,6 +70,7 @@ typedef struct process {
 	} state;
 
 	/** Other process information. */
+	avl_tree_node_t tree_link;	/**< Link to process tree. */
 	process_id_t id;		/**< ID of the process. */
 	char *name;			/**< Name of the process. */
 	notifier_t death_notifier;	/**< Notifier for process death. */

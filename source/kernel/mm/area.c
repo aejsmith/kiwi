@@ -56,6 +56,7 @@ typedef struct area {
 	object_handle_t *source;	/**< Handle to source object. */
 	offset_t offset;		/**< Offset into source. */
 	avl_tree_t pages;		/**< Tree of pages for unbacked areas. */
+	avl_tree_node_t tree_link;	/**< Link to area tree. */
 } area_t;
 
 /** Memory area ID allocator. */
@@ -88,12 +89,12 @@ static void area_release(area_t *area) {
 		AVL_TREE_FOREACH_SAFE(&area->pages, iter) {
 			page = avl_tree_entry(iter, vm_page_t);
 
-			avl_tree_remove(&area->pages, page->offset);
+			avl_tree_remove(&area->pages, &page->avl_link);
 			vm_page_free(page, 1);
 		}
 
 		rwlock_write_lock(&area_tree_lock);
-		avl_tree_remove(&area_tree, area->id);
+		avl_tree_remove(&area_tree, &area->tree_link);
 		rwlock_unlock(&area_tree_lock);
 
 		if(area->source) {
@@ -166,7 +167,7 @@ static status_t area_object_get_page(object_handle_t *handle, offset_t offset, p
 		if(!page) {
 			page = vm_page_alloc(1, MM_SLEEP | PM_ZERO);
 			page->offset = offset;
-			avl_tree_insert(&area->pages, offset, page, NULL);
+			avl_tree_insert(&area->pages, &page->avl_link, offset, page);
 		}
 
 		*physp = page->addr;
@@ -262,7 +263,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, const ob
 	area->size = size;
 
 	rwlock_write_lock(&area_tree_lock);
-	avl_tree_insert(&area_tree, area->id, area, NULL);
+	avl_tree_insert(&area_tree, &area->tree_link, area->id, area);
 	rwlock_unlock(&area_tree_lock);
 
 	ret = object_handle_create(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);

@@ -20,7 +20,6 @@
 
 #include <arch/memory.h>
 
-#include <lib/avl_tree.h>
 #include <lib/id_alloc.h>
 #include <lib/string.h>
 
@@ -133,7 +132,7 @@ static void process_destroy(process_t *process) {
 	assert(list_empty(&process->threads));
 
 	rwlock_write_lock(&process_tree_lock);
-	avl_tree_remove(&process_tree, (key_t)process->id);
+	avl_tree_remove(&process_tree, &process->tree_link);
 	rwlock_unlock(&process_tree_lock);
 
 	dprintf("process: destroyed process %" PRId32 "(%s) (process: %p, status: %d)\n",
@@ -395,7 +394,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
-	avl_tree_insert(&process_tree, (key_t)process->id, process, NULL);
+	avl_tree_insert(&process_tree, &process->tree_link, process->id, process);
 	rwlock_unlock(&process_tree_lock);
 
 	/* Create a handle to the process if required. */
@@ -615,7 +614,7 @@ void process_detach(thread_t *thread) {
  * @param id		ID of the process to find.
  * @return		Pointer to process found, or NULL if not found. */
 process_t *process_lookup_unsafe(process_id_t id) {
-	return avl_tree_lookup(&process_tree, (key_t)id);
+	return avl_tree_lookup(&process_tree, id);
 }
 
 /** Look up a process.
@@ -1219,7 +1218,7 @@ status_t sys_process_open(process_id_t id, object_rights_t rights, handle_t *han
 
 	rwlock_read_lock(&process_tree_lock);
 
-	process = avl_tree_lookup(&process_tree, (key_t)id);
+	process = process_lookup_unsafe(id);
 	if(!process) {
 		rwlock_unlock(&process_tree_lock);
 		return STATUS_NOT_FOUND;

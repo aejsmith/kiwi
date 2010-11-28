@@ -109,6 +109,6 @@ Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
 # Target to run in QEMU.
 Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
-	config['QEMU_BINARY'] + ' -cdrom $SOURCE -m 256 -boot d ' + config['QEMU_OPTS'],
+	config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
 	None
 )))

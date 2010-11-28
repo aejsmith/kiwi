@@ -250,6 +250,7 @@ typedef struct fs_node {
 	object_t obj;                   /**< Object header. */
 
 	refcount_t count;		/**< Number of references to the node. */
+	avl_tree_node_t tree_link;	/**< Link to node tree. */
 	list_t mount_link;		/**< Link to mount's node lists. */
 	list_t unused_link;		/**< Link to global unused node list. */
 	node_id_t id;			/**< ID of the node. */

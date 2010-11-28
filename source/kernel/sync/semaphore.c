@@ -51,6 +51,7 @@ typedef struct user_semaphore {
 	refcount_t count;		/**< Number of handles to the semaphore. */
 	semaphore_id_t id;		/**< ID of the semaphore. */
 	char *name;			/**< Name of the semaphore. */
+	avl_tree_node_t tree_link;	/**< Link to semaphore tree. */
 } user_semaphore_t;
 
 /** User semaphore ID allocator. */
@@ -145,7 +146,7 @@ int kdbg_cmd_semaphore(int argc, char **argv) {
 static void user_semaphore_release(user_semaphore_t *sem) {
 	if(refcount_dec(&sem->count) == 0) {
 		rwlock_write_lock(&semaphore_tree_lock);
-		avl_tree_remove(&semaphore_tree, sem->id);
+		avl_tree_remove(&semaphore_tree, &sem->tree_link);
 		rwlock_unlock(&semaphore_tree_lock);
 
 		object_destroy(&sem->obj);
@@ -225,7 +226,7 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
 	refcount_set(&sem->count, 1);
 
 	rwlock_write_lock(&semaphore_tree_lock);
-	avl_tree_insert(&semaphore_tree, sem->id, sem, NULL);
+	avl_tree_insert(&semaphore_tree, &sem->tree_link, sem->id, sem);
 	rwlock_unlock(&semaphore_tree_lock);
 
 	ret = object_handle_create(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);

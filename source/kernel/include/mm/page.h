@@ -23,6 +23,7 @@
 
 #include <arch/page.h>
 
+#include <lib/avl_tree.h>
 #include <lib/list.h>
 #include <lib/refcount.h>
 
@@ -55,12 +56,13 @@ typedef struct vm_page {
 	uint8_t unused: 7;
 
 	/** Information about how the page is being used.
-	 * @note		Use of count is up to the page owner.
+	 * @note		Use of count and avl_link is up to the owner.
 	 * @note		Should not have both cache and amap set. */
 	refcount_t count;		/**< Reference count of the page (use is up to page user). */
 	struct vm_cache *cache;		/**< Cache that the page belongs to. */
 	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
 	offset_t offset;		/**< Offset into the owner of the page. */
+	avl_tree_node_t avl_link;	/**< Link to AVL tree for use by owner. */
 } vm_page_t;
 
 /** Enumeration of memory range types. */

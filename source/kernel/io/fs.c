@@ -297,7 +297,7 @@ static status_t fs_node_free(fs_node_t *node) {
 
 	/* If the node has a mount, detach it from the node tree/lists. */
 	if(node->mount) {
-		avl_tree_remove(&node->mount->nodes, (key_t)node->id);
+		avl_tree_remove(&node->mount->nodes, &node->tree_link);
 		list_remove(&node->mount_link);
 	}
 
@@ -561,7 +561,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 		        id, mount->id, tok);
 
 		/* Check if the node is cached in the mount. */
-		node = avl_tree_lookup(&mount->nodes, (key_t)id);
+		node = avl_tree_lookup(&mount->nodes, id);
 		if(node) {
 			assert(node->mount == mount);
 
@@ -612,7 +612,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 			assert(node->ops);
 
 			/* Attach the node to the node tree and used list. */
-			avl_tree_insert(&mount->nodes, (key_t)id, node, NULL);
+			avl_tree_insert(&mount->nodes, &node->tree_link, id, node);
 			list_append(&mount->used_nodes, &node->mount_link);
 			mutex_unlock(&mount->lock);
 		}
@@ -876,7 +876,7 @@ static status_t fs_node_create(const char *path, fs_node_type_t type, const char
 	}
 
 	/* Attach the node to the node tree and used list. */
-	avl_tree_insert(&node->mount->nodes, (key_t)node->id, node, NULL);
+	avl_tree_insert(&node->mount->nodes, &node->tree_link, node->id, node);
 	list_append(&node->mount->used_nodes, &node->mount_link);
 
 	dprintf("fs: created %s (node: %" PRIu16 ":%" PRIu64 ", parent: %" PRIu16 ":%" PRIu64 ")\n",
@@ -1742,7 +1742,7 @@ status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size) 
 		 * root, rather than the mountpoint. If the node the entry
 		 * currently points to is not in the cache, then it won't be a
 		 * mountpoint (mountpoints are always in the cache). */
-		child = avl_tree_lookup(&node->mount->nodes, (key_t)buf->id);
+		child = avl_tree_lookup(&node->mount->nodes, buf->id);
 		if(child) {
 			if(child != node) {
 				/* Mounted pointer is protected by mount lock. */
@@ -2180,7 +2180,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	}
 
 	/* Put the root node into the node tree/used list. */
-	avl_tree_insert(&mount->nodes, (key_t)mount->root->id, mount->root, NULL);
+	avl_tree_insert(&mount->nodes, &mount->root->tree_link, mount->root->id, mount->root);
 	list_append(&mount->used_nodes, &mount->root->mount_link);
 
 	/* Make the mountpoint point to the new mount. */
@@ -2499,7 +2499,7 @@ int kdbg_cmd_node(int argc, char **argv) {
 				return KDBG_FAIL;
 			} else if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
 				return KDBG_FAIL;
-			} else if(!(node = avl_tree_lookup(&mount->nodes, (key_t)val))) {
+			} else if(!(node = avl_tree_lookup(&mount->nodes, val))) {
 				kprintf(LOG_NONE, "Unknown node ID %" PRIun ".\n", val);
 				return KDBG_FAIL;
 			}

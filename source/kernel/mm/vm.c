@@ -100,6 +100,7 @@ typedef struct vm_amap {
 typedef struct vm_region {
 	list_t header;			/**< Link to the region list. */
 	list_t free_link;		/**< Link to free region lists. */
+	avl_tree_node_t tree_link;	/**< Link to allocated region tree. */
 
 	vm_aspace_t *as;		/**< Address space that the region belongs to. */
 	ptr_t start;			/**< Base address of the region. */
@@ -598,8 +599,8 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 		/* If the start address is changing, we must re-insert the
 		 * region in the tree, because the key is changing. */
 		if(start != region->start) {
-			avl_tree_remove(&region->as->tree, region->start);
-			avl_tree_insert(&region->as->tree, start, region, NULL);
+			avl_tree_remove(&region->as->tree, &region->tree_link);
+			avl_tree_insert(&region->as->tree, &region->tree_link, start, region);
 		}
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		/* If the size is changing, remove from the current freelist. */
@@ -649,7 +650,7 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 		}
 
 		/* Insert the split region. */
-		avl_tree_insert(&split->as->tree, split->start, split, NULL);
+		avl_tree_insert(&split->as->tree, &split->tree_link, split->start, split);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		/* Move the bottom half to the correct free list. */
 		vm_freelist_remove(region);
@@ -679,7 +680,7 @@ static void vm_region_destroy(vm_region_t *region) {
 			object_handle_release(region->handle);
 		}
 
-		avl_tree_remove(&region->as->tree, region->start);
+		avl_tree_remove(&region->as->tree, &region->tree_link);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		vm_freelist_remove(region);
 	}
@@ -792,7 +793,7 @@ static vm_region_t *vm_region_insert(vm_aspace_t *as, ptr_t start, ptr_t end, in
 
 	/* Finally, insert into the region tree or the free lists. */
 	if(vm_region_used(region)) {
-		avl_tree_insert(&as->tree, region->start, region, NULL);
+		avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
 		vm_freelist_insert(region, region->end - region->start);
 	}
@@ -843,7 +844,7 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
 
 			/* Remove from the free list and add to the tree. */
 			vm_freelist_remove(region);
-			avl_tree_insert(&as->tree, region->start, region, NULL);
+			avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
 			region->flags = flags;
 			dprintf("vm: allocated region [%p,%p) from list %d (as: %p)\n",
 			        region->start, region->end, i, as);
@@ -1374,7 +1375,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 
 		/* Insert into the region tree or the free lists. */
 		if(vm_region_used(region)) {
-			avl_tree_insert(&as->tree, region->start, region, NULL);
+			avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
 		} else if(!(region->flags & VM_REGION_RESERVED)) {
 			vm_freelist_insert(region, region->end - region->start);
 		}

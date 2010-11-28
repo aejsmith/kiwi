@@ -29,6 +29,7 @@
 
 #include <kernel/thread.h>
 
+#include <lib/avl_tree.h>
 #include <lib/list.h>
 #include <lib/notifier.h>
 #include <lib/refcount.h>
@@ -110,6 +111,7 @@ typedef struct thread {
 
 	/** Other thread information. */
 	thread_id_t id;			/**< ID of the thread. */
+	avl_tree_node_t tree_link;	/**< Link to thread tree. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
 	notifier_t death_notifier;	/**< Notifier for thread death. */
 	int status;			/**< Exit status of the thread. */

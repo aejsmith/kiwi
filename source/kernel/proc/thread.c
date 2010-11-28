@@ -23,7 +23,6 @@
 #include <cpu/cpu.h>
 #include <cpu/ipi.h>
 
-#include <lib/avl_tree.h>
 #include <lib/id_alloc.h>
 #include <lib/string.h>
 
@@ -137,7 +136,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 
 		/* Remove from thread tree. */
 		rwlock_write_lock(&thread_tree_lock);
-		avl_tree_remove(&thread_tree, (key_t)thread->id);
+		avl_tree_remove(&thread_tree, &thread->tree_link);
 		rwlock_unlock(&thread_tree_lock);
 
 		/* Detach from its owner. */
@@ -384,7 +383,7 @@ void thread_exit(void) {
  * @param id		ID of the thread to find.
  * @return		Pointer to thread found, or NULL if not found. */
 thread_t *thread_lookup_unsafe(thread_id_t id) {
-	thread_t *thread = avl_tree_lookup(&thread_tree, (key_t)id);
+	thread_t *thread = avl_tree_lookup(&thread_tree, id);
 	return (thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) ? NULL : thread;
 }
 
@@ -515,7 +514,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 
 	/* Add to the thread tree. */
 	rwlock_write_lock(&thread_tree_lock);
-	avl_tree_insert(&thread_tree, (key_t)thread->id, thread, NULL);
+	avl_tree_insert(&thread_tree, &thread->tree_link, thread->id, thread);
 	rwlock_unlock(&thread_tree_lock);
 
 	*threadp = thread;
@@ -552,13 +551,6 @@ void thread_run(thread_t *thread) {
  * Decreases the reference count of a thread, and queues it for deletion if it
  * reaches 0. Do NOT use on threads that are running, for this use thread_kill()
  * or call thread_exit() from the thread.
- *
- * @note		Because avl_tree_remove() uses kfree(), we cannot
- *			remove the thread from the thread tree here as it can
- *			be called by the scheduler. To prevent the thread from
- *			being searched for we check the thread state in
- *			thread_lookup(), and return NULL if the thread found is
- *			not running.
  *
  * @param thread	Thread to destroy.
  */

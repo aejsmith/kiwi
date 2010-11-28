@@ -37,6 +37,7 @@
 typedef struct file_map_chunk {
 	uint64_t *blocks;		/**< Array of blocks in the chunk. */
 	bitmap_t bitmap;		/**< Bitmap indicating which blocks are cached. */
+	avl_tree_node_t link;		/**< Link to the map. */
 } file_map_chunk_t;
 
 /** Size we wish for each chunk to cover. */
@@ -82,9 +83,10 @@ file_map_t *file_map_create(size_t blksize, file_map_ops_t *ops, void *data) {
 void file_map_destroy(file_map_t *map) {
 	file_map_chunk_t *chunk;
 
-	AVL_TREE_FOREACH(&map->chunks, iter) {
+	AVL_TREE_FOREACH_SAFE(&map->chunks, iter) {
 		chunk = avl_tree_entry(iter, file_map_chunk_t);
 
+		avl_tree_remove(&map->chunks, &chunk->link);
 		kfree(chunk->blocks);
 		bitmap_destroy(&chunk->bitmap);
 		kfree(chunk);
@@ -122,7 +124,7 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 		chunk = kmalloc(sizeof(file_map_chunk_t), MM_SLEEP);
 		bitmap_init(&chunk->bitmap, map->blocks_per_chunk, NULL, MM_SLEEP);
 		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_SLEEP);
-		avl_tree_insert(&map->chunks, chunk_num, chunk, NULL);
+		avl_tree_insert(&map->chunks, &chunk->link, chunk_num, chunk);
 	}
 
 	/* Look up the block. */
@@ -149,7 +151,8 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 	mutex_lock(&map->lock);
 
 	for(i = start; i < (start + count); i++) {
-		if(!(chunk = avl_tree_lookup(&map->chunks, i / map->blocks_per_chunk))) {
+		chunk = avl_tree_lookup(&map->chunks, i / map->blocks_per_chunk);
+		if(!chunk) {
 			continue;
 		}
 
@@ -157,7 +160,7 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 
 		/* Free the chunk if it is now empty. */
 		if(bitmap_ffs(&chunk->bitmap) < 0) {
-			avl_tree_remove(&map->chunks, i / map->blocks_per_chunk);
+			avl_tree_remove(&map->chunks, &chunk->link);
 			kfree(chunk->blocks);
 			bitmap_destroy(&chunk->bitmap);
 			kfree(chunk);

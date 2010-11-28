@@ -105,7 +105,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	}
 
 	/* Check if we have it cached. */
-	page = avl_tree_lookup(&cache->pages, (key_t)offset);
+	page = avl_tree_lookup(&cache->pages, offset);
 	if(page) {
 		if(refcount_inc(&page->count) == 1) {
 			vm_page_dequeue(page);
@@ -165,7 +165,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	refcount_inc(&page->count);
 	page->cache = cache;
 	page->offset = offset;
-	avl_tree_insert(&cache->pages, (key_t)offset, page, NULL);
+	avl_tree_insert(&cache->pages, &page->avl_link, offset, page);
 	mutex_unlock(&cache->lock);
 
 	dprintf("cache: cached new page 0x%" PRIpp " at offset 0x%" PRIx64 " in %p\n",
@@ -206,7 +206,8 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 
 	assert(!cache->deleted);
 
-	if(!(page = avl_tree_lookup(&cache->pages, (key_t)offset))) {
+	page = avl_tree_lookup(&cache->pages, offset);
+	if(unlikely(!page)) {
 		fatal("Tried to release page that isn't cached");
 	}
 
@@ -224,7 +225,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		 * been resized with pages in use, discard it). Otherwise,
 		 * move the page to the appropriate queue. */
 		if(offset >= cache->size) {
-			avl_tree_remove(&cache->pages, (key_t)offset);
+			avl_tree_remove(&cache->pages, &page->avl_link);
 			vm_page_free(page, 1);
 		} else if(page->modified && cache->ops && cache->ops->write_page) {
 			vm_page_queue(page, PAGE_QUEUE_MODIFIED);
@@ -483,7 +484,7 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 			page = avl_tree_entry(iter, vm_page_t);
 
 			if(page->offset >= size && refcount_get(&page->count) == 0) {
-				avl_tree_remove(&cache->pages, (key_t)page->offset);
+				avl_tree_remove(&cache->pages, &page->avl_link);
 				vm_page_dequeue(page);
 				vm_page_free(page, 1);
 			}
@@ -582,7 +583,7 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 			}
 		}
 
-		avl_tree_remove(&cache->pages, (key_t)page->offset);
+		avl_tree_remove(&cache->pages, &page->avl_link);
 		vm_page_dequeue(page);
 		vm_page_free(page, 1);
 	}
@@ -647,7 +648,7 @@ void vm_cache_evict_page(vm_page_t *page) {
 		return;
 	}
 
-	avl_tree_remove(&cache->pages, (key_t)page->offset);
+	avl_tree_remove(&cache->pages, &page->avl_link);
 	vm_page_dequeue(page);
 	vm_page_free(page, 1);
 	mutex_unlock(&cache->lock);
