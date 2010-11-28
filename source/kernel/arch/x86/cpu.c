@@ -33,7 +33,6 @@
 
 /** Double fault handler stack for the boot CPU. */
 static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
-static bool boot_doublefault_stack_used = false;
 
 /** Atomic variable for paused CPUs to wait on. */
 atomic_t cpu_pause_wait = 0;
@@ -181,6 +180,9 @@ void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx, uint32_t
  * @param cpu		CPU structure to fill in.
  * @param args		Kernel arguments structure for the CPU. */
 void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
+	/* Set the pointer back to the CPU structure for curr_cpu. */
+	cpu->arch.cpu_ptr = cpu;
+
 	/* Copy information from the kernel arguments. */
 	cpu->arch.cpu_freq = args->cpu_freq;
 	cpu->arch.lapic_freq = args->lapic_freq;
@@ -198,13 +200,11 @@ void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;
 
 	/* Allocate a stack to use for double fault handling. */
-	if(boot_doublefault_stack_used) {
-		cpu->arch.double_fault_stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
-	} else {
+	if(cpu == &boot_cpu) {
 		cpu->arch.double_fault_stack = boot_doublefault_stack;
-		boot_doublefault_stack_used = true;
+	} else {
+		cpu->arch.double_fault_stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
 	}
-	*(ptr_t *)cpu->arch.double_fault_stack = (ptr_t)cpu;
 }
 
 /** CPU information command for KDBG.

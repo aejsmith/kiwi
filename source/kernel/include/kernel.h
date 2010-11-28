@@ -24,6 +24,7 @@
 #include <lib/notifier.h>
 #include <kargs.h>
 
+struct cpu;
 struct intr_frame;
 
 extern notifier_t fatal_notifier;
@@ -47,11 +48,10 @@ typedef void (*initcall_t)(void);
 
 extern void arch_premm_init(kernel_args_t *args);
 extern void arch_postmm_init(kernel_args_t *args);
-extern void arch_ap_init(kernel_args_t *args);
+extern void arch_ap_init(kernel_args_t *args, struct cpu *cpu);
 
 extern void platform_premm_init(kernel_args_t *args);
 extern void platform_postmm_init(kernel_args_t *args);
-extern void platform_ap_init(kernel_args_t *args);
 
 extern void platform_reboot(void);
 extern void platform_poweroff(void);

@@ -46,17 +46,21 @@ typedef struct breakpoint {
 } breakpoint_t;
 
 /** Breakpoint/watchpoint tracking structures. */
-static breakpoint_t kdbg_breakpoints[3];
+static breakpoint_t kdbg_breakpoints[4];
 
 /** Set breakpoint settings in the debug registers. */
 static inline void kdbg_setup_dreg(void) {
 	unative_t dr7 = 0;
 
 	x86_write_dr0(kdbg_breakpoints[0].addr);
+	dr7 |= kdbg_breakpoints[0].dr7;
 	x86_write_dr1(kdbg_breakpoints[1].addr);
+	dr7 |= kdbg_breakpoints[1].dr7;
 	x86_write_dr2(kdbg_breakpoints[2].addr);
+	dr7 |= kdbg_breakpoints[2].dr7;
+	x86_write_dr3(kdbg_breakpoints[3].addr);
+	dr7 |= kdbg_breakpoints[3].dr7;
 
-	dr7 |= (kdbg_breakpoints[0].dr7 | kdbg_breakpoints[1].dr7 | kdbg_breakpoints[2].dr7);
 	x86_write_dr7(dr7);
 }
 

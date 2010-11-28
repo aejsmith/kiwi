@@ -131,6 +131,11 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
+	/* If coming from userspace, load the kernel GS segment base. */
+	testl	$3, 24(%rsp)
+	jz	1f
+	swapgs
+1:
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
@@ -144,6 +149,11 @@ PRIVATE_FUNCTION_START(isr_common)
 	/* Restore the saved registers. */
 	POP_REGS
 
+	/* If returning to userspace, swap back to the previous GS base. */
+	testl	$3, 24(%rsp)
+	jz	2f
+	swapgs
+2:
 	/* Get rid of the error code and interrupt number. */
 	addq	$16, %rsp
 	iretq
@@ -151,25 +161,20 @@ FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */
 FUNCTION_START(syscall_entry)
-	/* Switch to the kernel mode stack. The KERNEL_GS_BASE MSR points to
-	 * the thread's architecture-specific data. Use the SWAPGS instruction
-	 * to get at it, so we can get our stack pointer. The userspace RSP
-	 * field is not used in returning - it is merely a temporary scratch
-	 * space we use before we push it onto the stack for the system call
-	 * frame. */
+	/* Swap to the kernel GS base address, which points at the current CPU's
+	 * architecture data. The second pointer in this is our kernel stack
+	 * pointer. The third pointer is a temporary scratch space for us to
+	 * save the userspace stack pointer in before we push it to the stack. */
 	swapgs
-	movq	%rsp, %gs:8
-	movq	%gs:0, %rsp
+	movq	%rsp, %gs:16
+	movq	%gs:8, %rsp
 
 	/* Get back the userspace stack pointer from the temporary scratch
 	 * space and put it onto the kernel stack. */
-	push	%gs:8
-
-	/* Return to the previous GS base. */
-	swapgs
+	push	%gs:16
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
-	 * for us (RAX = return IP, R11 = original RFLAGS). */
+	 * for us (RCX = return IP, R11 = original RFLAGS). */
 	push	%rcx
 	push	%r11
 
@@ -231,7 +236,8 @@ FUNCTION_START(syscall_entry)
 	pop	%rcx
 	pop	%rsp
 
-	/* Return to user-mode. */
+	/* Restore previous GS base and return to user-mode. */
+	swapgs
 	sysretq
 .Lstackargs:
 	/* Work out how many bytes to copy, save the call table offset and
@@ -317,5 +323,6 @@ FUNCTION_START(thread_arch_enter_userspace)
 	xorq	%r15, %r15
 
 	/* Enter userspace. */
+	swapgs
 	iretq
 FUNCTION_END(thread_arch_enter_userspace)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,13 +31,13 @@
 void thread_arch_post_switch(thread_t *thread) {
 	/* Set the RSP0 field in the TSS to point to the new thread's
 	 * kernel stack. */
-	thread->cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
+	curr_cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
 
-	/* Store the address of the thread's architecture data in the
-	 * KERNEL_GS_BASE MSR for the SYSCALL handler to use. */
-        x86_write_msr(X86_MSR_K_GS_BASE, (ptr_t)&thread->arch);
+	/* Store the kernel RSP in the current CPU structure for the SYSCALL
+	 * code to use. */
+	curr_cpu->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
 
-	/* Set the FS base address. */
+	/* Set the FS base address to the TLS segment base. */
 	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
 }
 
@@ -45,8 +45,6 @@ void thread_arch_post_switch(thread_t *thread) {
  * @param thread	Thread to initialise.
  * @return		Always returns STATUS_SUCCESS. */
 status_t thread_arch_init(thread_t *thread) {
-	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
-	thread->arch.user_rsp = 0;
 	thread->arch.tls_base = 0;
 	return STATUS_SUCCESS;
 }

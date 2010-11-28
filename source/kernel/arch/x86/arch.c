@@ -33,9 +33,10 @@ extern void syscall_arch_init(void);
 /** x86-specific early initialisation.
  * @param args		Kernel arguments structure. */
 void __init_text arch_premm_init(kernel_args_t *args) {
-	cpu_features_init(&cpu_features, args->arch.standard_ecx, args->arch.standard_edx,
-	                  args->arch.extended_ecx, args->arch.extended_edx);
-	descriptor_init();
+	cpu_features_init(&cpu_features, args->arch.standard_ecx,
+	                  args->arch.standard_edx, args->arch.extended_ecx,
+	                  args->arch.extended_edx);
+	descriptor_init(&boot_cpu);
 	intr_init();
 	pat_init();
 }
@@ -46,15 +47,19 @@ void __init_text arch_postmm_init(kernel_args_t *args) {
 #ifdef __x86_64__
 	syscall_arch_init();
 #else
-	tss_init();
+	/* Set the correct CR3 value in the double fault TSS. When the TSS is
+	 * set up by cpu_arch_init(), we are still on the PDP set up by the
+	 * bootloader. */
+	curr_cpu->arch.double_fault_tss.cr3 = x86_read_cr3();
 #endif
 	lapic_init(args);
 }
 
 /** x86-specific initialisation for an AP.
- * @param args		Kernel arguments structure. */
-void __init_text arch_ap_init(kernel_args_t *args) {
-	descriptor_ap_init();
+ * @param args		Kernel arguments structure.
+ * @param cpu		CPU structure for the AP. */
+void __init_text arch_ap_init(kernel_args_t *args, cpu_t *cpu) {
+	descriptor_init(cpu);
 	pat_init();
 	lapic_init(args);
 #ifdef __x86_64__

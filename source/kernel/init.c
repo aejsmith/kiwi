@@ -61,7 +61,7 @@ typedef struct boot_module {
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
-extern void kmain(kernel_args_t *args, uint32_t cpu);
+extern void kmain(kernel_args_t *args, cpu_id_t id);
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
@@ -273,25 +273,25 @@ static void init_thread(void *args, void *arg2) {
 }
 
 /** Main function of the kernel.
- * @param args          Arguments from the bootloader.
- * @param cpu           CPU that the function is running on. */
-void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
+ * @param args		Arguments from the bootloader.
+ * @param id		CPU that the function is running on. */
+void __init_text kmain(kernel_args_t *args, cpu_id_t id) {
 	thread_t *thread;
 	status_t ret;
 
 	/* Wait for all CPUs to enter the kernel. */
 	init_rendezvous(args, &init_rendezvous_1);
 
-	if(cpu == args->boot_cpu) {
-		cpu_early_init(args);
+	if(id == args->boot_cpu) {
 		console_early_init();
-		security_init();
 
 		/* Perform early architecture/platform initialisation. */
+		cpu_early_init(args);
 		arch_premm_init(args);
 		platform_premm_init(args);
 
 		/* Initialise kernel memory management subsystems. */
+		security_init();
 		vmem_early_init();
 		kheap_early_init();
 		page_init(args);
@@ -309,17 +309,16 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 		arch_postmm_init(args);
 		platform_postmm_init(args);
 
-		/* Bring up symbol manager and CPU-related stuff. */
-		symbol_init();
-		time_init();
-		cpu_init(args);
-		ipi_init();
 #if CONFIG_DEBUGGER_DELAY > 0
 		/* Delay to allow GDB to be connected. */
 		kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
 		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
-		/* Bring up process-/thread-related stuff. */
+		/* Perform other initialisation tasks. */
+		symbol_init();
+		time_init();
+		cpu_init(args);
+		ipi_init();
 		handle_init();
 		session_init();
 		process_init();
@@ -354,12 +353,10 @@ void __init_text kmain(kernel_args_t *args, uint32_t cpu) {
 
 		spinlock_lock(&smp_boot_spinlock);
 
-		/* Switch to the kernel page map, set the CPU pointer and do
-		 * architecture/platform initialisation. */
+		/* Switch to the kernel page map and do architecture-specific
+		 * initialisation of this CPU. */
 		page_map_switch(&kernel_page_map);
-		cpu_set_pointer((ptr_t)cpus[cpu]);
-		arch_ap_init(args);
-		platform_ap_init(args);
+		arch_ap_init(args, cpus[id]);
 
 		/* We're running, add ourselves to the running CPU list. */
 		list_append(&cpus_running, &curr_cpu->header);

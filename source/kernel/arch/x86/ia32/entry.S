@@ -134,6 +134,7 @@ PRIVATE_FUNCTION_START(isr_common)
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
+	mov	$SEGMENT_K_GS, %ax
 	mov	%ax, %gs
 
 	/* Clear direction flag. */
@@ -170,6 +171,7 @@ FUNCTION_START(syscall_entry)
 	mov	%ax, %ds
 	mov	%ax, %es
 	mov	%ax, %fs
+	mov	$SEGMENT_K_GS, %ax
 	mov	%ax, %gs
 	pop	%eax
 

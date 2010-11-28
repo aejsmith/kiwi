@@ -135,6 +135,8 @@
 
 #include <arch/descriptor.h>
 
+struct cpu;
+
 /** Type used to store a CPU ID. */
 typedef uint32_t cpu_id_t;
 
@@ -159,6 +161,22 @@ typedef struct cpu_features {
 
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
+	/** Pointer back to containing CPU structure.
+	 * @note		The GS segment is pointed at the top of this
+	 *			structure, which is used to get the current CPU
+	 *			structure pointer. */
+	struct cpu *cpu_ptr;
+#ifdef __x86_64__
+	/** SYSCALL/SYSRET data.
+	 * @note		It is OK to store these on a per-CPU basis
+	 *			rather than in per-thread data, as it is only
+	 *			used during system call entry, not return. The
+	 *			user RSP field is only used as a temporary
+	 *			scratch space before pushing it on to the
+	 *			kernel stack. */
+	ptr_t kernel_rsp;			/**< RSP for kernel entry via SYSCALL. */
+	ptr_t user_rsp;				/**< Temporary storage for user RSP. */
+#endif
 	/** Time conversion factors. */
 	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
 	uint64_t lapic_timer_cv;		/**< LAPIC timer conversion factor. */
@@ -190,19 +208,12 @@ extern void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx,
                               uint32_t standard_edx, uint32_t extended_ecx,
                               uint32_t extended_edx);
 
-static inline unative_t x86_read_dr3(void);
-static inline void x86_write_dr3(unative_t val);
-
 /** Get the current CPU structure pointer.
  * @return		Pointer to current CPU structure. */
-static inline ptr_t cpu_get_pointer(void) {
-	return x86_read_dr3();
-}
-
-/** Set the current CPU structure pointer.
- * @param addr		Pointer to new CPU structure. */
-static inline void cpu_set_pointer(ptr_t addr) {
-	x86_write_dr3(addr);
+static inline struct cpu *cpu_get_pointer(void) {
+	ptr_t addr;
+	__asm__ volatile("mov %%gs:0, %0" : "=r"(addr));
+	return (struct cpu *)addr;
 }
 
 #endif /* LOADER */

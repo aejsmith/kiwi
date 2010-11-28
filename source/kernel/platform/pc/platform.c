@@ -43,12 +43,6 @@ void __init_text platform_postmm_init(kernel_args_t *args) {
 	}
 }
 
-/** PC platform AP initialisation.
- * @param args		Kernel arguments structure. */
-void __init_text platform_ap_init(kernel_args_t *args) {
-	/* Nothing happens. */
-}
-
 /** Reboot the system. */
 void platform_reboot(void) {
 	uint8_t val;

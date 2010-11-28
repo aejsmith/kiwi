@@ -25,15 +25,6 @@
 
 /** x86-specific thread structure. */
 typedef struct thread_arch {
-#ifdef __x86_64__
-	/** SYSCALL/SYSRET data.
-	 * @note		This must be at the start of the structure. The
-	 *			kernel GS base address is pointed at this to
-	 *			allow the kernel/user stack pointers to be
-	 *			saved/restored. */
-	ptr_t kernel_rsp;	/**< RSP for kernel entry via SYSCALL. */
-	ptr_t user_rsp;		/**< Saved RSP for returning to userspace. */
-#endif
 	ptr_t tls_base;		/**< TLS base address. */
 } __packed thread_arch_t;
 

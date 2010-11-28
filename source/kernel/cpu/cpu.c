@@ -39,7 +39,7 @@
 #include <kargs.h>
 
 /** Boot CPU structure. */
-static cpu_t boot_cpu;
+cpu_t boot_cpu;
 
 /** Information about all CPUs. */
 size_t cpu_id_max = 0;			/**< Highest CPU ID in the system. */
@@ -95,17 +95,14 @@ void __init_text cpu_init(kernel_args_t *args) {
 	}
 }
 
-/** Initialise the boot CPU structure and CPU pointer.
+/** Initialise the boot CPU structure.
  * @param args		Kernel arguments structure. */
 void __init_text cpu_early_init(kernel_args_t *args) {
-	/* Store a few details. */
+	/* Store a few details from the kernel arguments. */
 	cpu_id_max = args->highest_cpu_id;
 	cpu_count = args->cpu_count;
 
 	/* Add the boot CPU. */
 	cpu_add(&boot_cpu, (kernel_args_cpu_t *)((ptr_t)args->cpus));
 	list_append(&cpus_running, &boot_cpu.header);
-
-	/* Set the CPU pointer. */
-	cpu_set_pointer((ptr_t)&boot_cpu);
 }

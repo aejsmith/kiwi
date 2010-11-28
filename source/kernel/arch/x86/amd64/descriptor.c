@@ -31,7 +31,7 @@
 extern uint8_t isr_array[IDT_ENTRY_COUNT][16];
 
 /** Array of GDT descriptors. */
-static gdt_entry_t initial_gdt[] __aligned(8) = {
+static gdt_entry_t initial_gdt[GDT_ENTRY_COUNT] __aligned(8) = {
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< NULL descriptor. */
 	{ 0xFFFF, 0, 0, 0x9A, 0xF, 0, 1, 0, 1, 0 },	/**< Kernel CS (Code). */
 	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 0, 1, 0 },	/**< Kernel DS (Data). */
@@ -44,19 +44,20 @@ static gdt_entry_t initial_gdt[] __aligned(8) = {
 /** Array of IDT entries. */
 static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 
-/** Set up the GDT for the current CPU. */
-static void __init_text gdt_init(void) {
+/** Set up the GDT for the current CPU.
+ * @param cpu		CPU to initialise for. */
+static void __init_text gdt_init(cpu_t *cpu) {
 	gdt_tss_entry_t *desc;
 	size_t size;
 	ptr_t base;
 
 	/* Create a copy of the statically allocated GDT. */
-	memcpy(curr_cpu->arch.gdt, initial_gdt, sizeof(initial_gdt));
+	memcpy(cpu->arch.gdt, initial_gdt, sizeof(initial_gdt));
 
 	/* Set up the TSS descriptor. */
-	base = (ptr_t)&curr_cpu->arch.tss;
+	base = (ptr_t)&cpu->arch.tss;
 	size = sizeof(tss_t);
-	desc = (gdt_tss_entry_t *)&curr_cpu->arch.gdt[SEGMENT_TSS / 0x08];
+	desc = (gdt_tss_entry_t *)&cpu->arch.gdt[SEGMENT_TSS / 0x08];
 	desc->base0 = base & 0xffff;
 	desc->base1 = ((base) >> 16) & 0xff;
 	desc->base2 = ((base) >> 24) & 0xff;
@@ -67,7 +68,7 @@ static void __init_text gdt_init(void) {
 	desc->type = 0x9;
 
 	/* Set the GDT pointer. */
-	lgdt((ptr_t)&curr_cpu->arch.gdt, sizeof(curr_cpu->arch.gdt) - 1);
+	lgdt((ptr_t)&cpu->arch.gdt, sizeof(cpu->arch.gdt) - 1);
 
 	/* Reload the segment registers. There is a 64-bit far jump instruction
 	 * but GAS doesn't like it... use LRETQ to reload CS instead. */
@@ -83,22 +84,27 @@ static void __init_text gdt_init(void) {
 		"mov	%2, %%gs\n"
 		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS), "r"(0)
 	);
+
+	/* Set the GS base address to point to the architecture CPU data. */
+	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&cpu->arch);
+	x86_write_msr(X86_MSR_K_GS_BASE, 0);
 }
 
-/** Set up the TSS for the current CPU. */
-static void __init_text tss_init(void) {
+/** Set up the TSS for the current CPU.
+ * @param cpu		CPU to initialise for. */
+static void __init_text tss_init(cpu_t *cpu) {
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
-	memset(&curr_cpu->arch.tss, 0, sizeof(tss_t));
-	curr_cpu->arch.tss.ist1 = (ptr_t)curr_cpu->arch.double_fault_stack + KSTACK_SIZE;
-	curr_cpu->arch.tss.io_bitmap = 104;
+	memset(&cpu->arch.tss, 0, sizeof(tss_t));
+	cpu->arch.tss.ist1 = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
+	cpu->arch.tss.io_bitmap = 104;
 
 	/* Load the TSS segment into TR. */
 	ltr(SEGMENT_TSS);
 }
 
 /** Initialise the IDT shared by all CPUs. */
-static inline void idt_init(void) {
+static void __init_text idt_init(void) {
 	unative_t i;
 	ptr_t addr;
 
@@ -120,27 +126,17 @@ static inline void idt_init(void) {
 	kernel_idt[FAULT_DOUBLE].ist = 1;
 }
 
-/** Initialise descriptor tables for the boot CPU. */
-void __init_text descriptor_init(void) {
-	gdt_init();
-	tss_init();
+/** Initialise descriptor tables for the current CPU.
+ * @param cpu		CPU to initialise for. */
+void __init_text descriptor_init(cpu_t *cpu) {
+	gdt_init(cpu);
+	tss_init(cpu);
 
-	/* The IDT only needs to be initialised once. Do that now as we are on
-	 * the boot CPU. */
-	idt_init();
+	/* The IDT only needs to be initialised once on the boot CPU. */
+	if(cpu == &boot_cpu) {
+		idt_init();
+	}
 
 	/* Point the CPU to the new IDT. */
-	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
-}
-
-/** Initialise descriptor tables for an application CPU. */
-void __init_text descriptor_ap_init(void) {
-	/* The GDT/TSS setup procedures are the same on both the BSP and APs,
-	 * so just call the functions for them. */
-	gdt_init();
-	tss_init();
-
-	/* For the IDT, there is no need to have a seperate IDT for each CPU,
-	 * so just point the IDTR at the shared IDT. */
 	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
 }

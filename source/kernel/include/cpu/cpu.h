@@ -57,6 +57,7 @@ typedef struct cpu {
 /** Expands to a pointer to the CPU structure of the current CPU. */
 #define curr_cpu	((cpu_t *)cpu_get_pointer())
 
+extern cpu_t boot_cpu;
 extern size_t cpu_id_max;
 extern size_t cpu_count;
 extern list_t cpus_running;

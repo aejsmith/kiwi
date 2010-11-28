@@ -478,10 +478,6 @@ void sched_internal(bool state) {
 /** Perform post-thread-switch tasks.
  * @param state		Interrupt state to restore. */
 void sched_post_switch(bool state) {
-#ifdef SET_CPU_ON_SWITCH
-	/* Set the current CPU pointer. */
-	cpu_set_pointer((ptr_t)cpus[cpu_current_id()]);
-#endif
 	/* Do architecture-specific post-switch tasks. */
 	thread_arch_post_switch(curr_thread);
 

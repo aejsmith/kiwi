@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -31,11 +31,11 @@
 void thread_arch_post_switch(thread_t *thread) {
 	/* Set the ESP0 field in the TSS to point to the new thread's
 	 * kernel stack. */
-	thread->cpu->arch.tss.esp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
+	curr_cpu->arch.tss.esp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
 
 	/* Update the segment base. It will be reloaded upon return to
 	 * userspace. */
-	gdt_set_base(SEGMENT_U_GS, thread->arch.tls_base);
+	gdt_set_base(curr_cpu, SEGMENT_U_GS, thread->arch.tls_base);
 }
 
 /** Initialise IA32-specific thread data.
@@ -68,7 +68,7 @@ status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr) {
 	if(thread == curr_thread) {
 		/* Update the segment base. It will be reloaded upon return to
 		 * userspace. */
-		gdt_set_base(SEGMENT_U_GS, (ptr_t)addr);
+		gdt_set_base(curr_cpu, SEGMENT_U_GS, (ptr_t)addr);
 	}
 
 	return STATUS_SUCCESS;
