@@ -1129,11 +1129,12 @@ static void vmem_dump_list(list_t *header, int indent) {
 int kdbg_cmd_vmem(int argc, char **argv) {
 	char *name = NULL;
 	vmem_btag_t *btag;
+	bool dump = false;
 	unative_t addr;
 	vmem_t *vmem;
 
 	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [arena]\n\n", argv[0]);
+		kprintf(LOG_NONE, "Usage: %s [[--dump] <arena>]\n\n", argv[0]);
 
 		kprintf(LOG_NONE, "When supplied with no arguments, prints a tree of all vmem arenas in the\n");
 		kprintf(LOG_NONE, "system. Otherwise, prints information about and list of spans/segments in\n");
@@ -1153,7 +1154,11 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	if(kdbg_parse_expression(argv[1], &addr, &name) != KDBG_OK) {
+	if(strcmp(argv[1], "--dump") == 0) {
+		dump = true;
+	}
+
+	if(kdbg_parse_expression(argv[(dump) ? 2 : 1], &addr, &name) != KDBG_OK) {
 		return KDBG_FAIL;
 	}
 
@@ -1177,26 +1182,27 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 	kprintf(LOG_NONE, "Locked: %d (%" PRId32 ")\n", atomic_get(&vmem->lock.locked),
 	        (vmem->lock.holder) ? vmem->lock.holder->id : -1);
 	if(vmem->source) {
-		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n\n",
+		kprintf(LOG_NONE, "Source: %p(%s)  Imported: %" PRIu64 "\n",
 		        vmem->source, vmem->source->name, vmem->imported_size);
-	} else {
-		kprintf(LOG_NONE, "\n");
 	}
 
-	/* Print out a span/segment list. */
-	kprintf(LOG_NONE, "Base                 End                  Type\n");
-	kprintf(LOG_NONE, "====                 ===                  ====\n");
-	LIST_FOREACH(&vmem->btags, iter) {
-		btag = list_entry(iter, vmem_btag_t, header);
+	/* Print out a span/segment list if requested. */
+	if(dump) {
+		kprintf(LOG_NONE, "\n");
+		kprintf(LOG_NONE, "Base                 End                  Type\n");
+		kprintf(LOG_NONE, "====                 ===                  ====\n");
+		LIST_FOREACH(&vmem->btags, iter) {
+			btag = list_entry(iter, vmem_btag_t, header);
 
-		if(btag->type == VMEM_BTAG_SPAN || btag->type == VMEM_BTAG_IMPORTED) {
-			kprintf(LOG_NONE, "0x%016" PRIx64 "   0x%016" PRIx64 "   Span%s\n",
-			            btag->base, btag->base + btag->size,
-			            (btag->type == VMEM_BTAG_IMPORTED) ? " (Imported)" : "");
-		} else {
-			kprintf(LOG_NONE, "  0x%016" PRIx64 "   0x%016" PRIx64 " Segment %s\n",
-			            btag->base, btag->base + btag->size,
-			            (btag->type == VMEM_BTAG_FREE) ? "(Free)" : "(Allocated)");
+			if(btag->type == VMEM_BTAG_SPAN || btag->type == VMEM_BTAG_IMPORTED) {
+				kprintf(LOG_NONE, "0x%016" PRIx64 "   0x%016" PRIx64 "   Span%s\n",
+				            btag->base, btag->base + btag->size,
+				            (btag->type == VMEM_BTAG_IMPORTED) ? " (Imported)" : "");
+			} else {
+				kprintf(LOG_NONE, "  0x%016" PRIx64 "   0x%016" PRIx64 " Segment %s\n",
+				            btag->base, btag->base + btag->size,
+				            (btag->type == VMEM_BTAG_FREE) ? "(Free)" : "(Allocated)");
+			}
 		}
 	}
 
