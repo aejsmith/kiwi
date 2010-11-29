@@ -118,12 +118,17 @@ static futex_t *futex_lookup(int32_t *addr) {
 	/* Look up the physical address. */
 	page_map_lock(&curr_aspace->pmap);
 	if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
+		page_map_unlock(&curr_aspace->pmap);
+
 		/* The page may not be mapped in. Try to trigger a fault, then
 		 * check again. */
 		if(memcpy_from_user(&tmp, addr, sizeof(tmp)) != STATUS_SUCCESS) {
-			page_map_unlock(&curr_aspace->pmap);
 			return NULL;
-		} else if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
+		}
+
+		page_map_lock(&curr_aspace->pmap);
+
+		if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
 			page_map_unlock(&curr_aspace->pmap);
 			return NULL;
 		}
