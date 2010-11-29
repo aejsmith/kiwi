@@ -92,6 +92,7 @@ static vmem_t vmem_btag_arena;
 
 /** Lock to protect global vmem information. */
 static MUTEX_DECLARE(vmem_lock, 0);
+static MUTEX_DECLARE(vmem_refill_lock, 0);
 
 /** Statically allocated boundary tags to use during boot. */
 static vmem_btag_t vmem_boot_tags[VMEM_BOOT_TAG_COUNT];
@@ -134,14 +135,21 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		mutex_unlock(&vmem_lock);
 		mutex_unlock(&vmem->lock);
 
-		/* We need to allocate new boundary tags. Allocate a page from
-		 * the tag arena and split it up into tags. */
+		/* The refill lock is to protect against multiple threads trying
+		 * to do a boundary tag allocation at the same, as this could
+		 * cause the free tag set we leave for use during the refill to
+		 * be depleted. */
+		mutex_lock(&vmem_refill_lock);
+
+		/* Allocate a page from the tag arena and split it nto tags. */
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
 		if(addr == 0) {
+			mutex_unlock(&vmem_refill_lock);
 			mutex_lock(&vmem->lock);
 			return NULL;
 		}
 
+		mutex_unlock(&vmem_refill_lock);
 		mutex_lock(&vmem_lock);
 
 		tag = (vmem_btag_t *)((ptr_t)addr);
