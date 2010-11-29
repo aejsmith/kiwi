@@ -184,6 +184,11 @@ static void vmem_rehash(void *_vmem) {
 	vmem_btag_t *seg;
 	uint32_t hash;
 
+	/* Don't do anything if we're low on boundary tags. */
+	if(vmem_btag_count <= VMEM_REFILL_THRESHOLD) {
+		return;
+	}
+
 	/* Work out the new size of the hash: the next highest power of 2 from
 	 * the current number of used segments. */
 	new_size = MIN(vmem->used_segs, VMEM_HASH_MAX);
