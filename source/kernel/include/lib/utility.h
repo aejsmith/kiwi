@@ -48,6 +48,14 @@
 		__n; \
 	})
 
+/** Swap two values. */
+#define SWAP(a, b)	\
+	{ \
+		typeof(a) __tmp = a; \
+		a = b; \
+		b = __tmp; \
+	}
+
 /** Get the number of bits in a type. */
 #define BITS(t)		(sizeof(t) * 8)
 

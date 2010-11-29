@@ -36,6 +36,7 @@
  */
 
 #include <cpu/cpu.h>
+#include <cpu/intr.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -73,7 +74,6 @@ typedef struct slab_magazine {
 
 /** Slab CPU cache structure. */
 typedef struct slab_cpu_cache {
-	mutex_t lock;			/**< CPU cache lock. */
 	slab_magazine_t *loaded;	/**< Current (loaded) magazine. */
 	slab_magazine_t *previous;	/**< Previous magazine. */
 } slab_cpu_cache_t;
@@ -443,7 +443,8 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {
-		/* Do not attempt to allocate a magazine if low on memory. */
+		/* Do not attempt to allocate a magazine if low on memory, we
+		 * will free directly to the slab layer. */
 		level = lrm_level(RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE);
 		if(likely(level == RESOURCE_LEVEL_OK)) {
 			mag = slab_cache_alloc(&slab_mag_cache, 0);
@@ -484,51 +485,54 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 	slab_cache_free(&slab_mag_cache, mag);
 }
 
-/** Move current magazine to previous and load a new magazine.
- * @param cc		CPU cache to reload.
- * @param mag		New magazine. */
-static inline void slab_cpu_reload(slab_cpu_cache_t *cc, slab_magazine_t *mag) {
-	cc->previous = cc->loaded;
-	cc->loaded = mag;
-}
-
 /** Allocate an object from the magazine layer.
  * @param cache		Cache to allocate from.
  * @return		Pointer to object on success, NULL on failure. */
 static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	slab_cpu_cache_t *cc = &cache->cpu_caches[curr_cpu->id];
 	slab_magazine_t *mag;
-	void *ret = NULL;
+	bool state;
+	void *ret;
 
-	mutex_lock(&cc->lock);
+	/* We do not need locking on the per-CPU cache as it will not be used
+	 * by any other CPUs. We do however need to disable interrupts to
+	 * prevent a thread switch from occurring mid-operation. */
+	state = intr_disable();
 
 	/* Check if we have a magazine to allocate from. */
 	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds) {
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			goto out;
+			intr_restore(state);
+			return ret;
 		} else if(cc->previous && cc->previous->rounds) {
 			/* Previous has rounds, exchange loaded with previous
 			 * and allocate from it. */
-			slab_cpu_reload(cc, cc->previous);
+			SWAP(cc->loaded, cc->previous);
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			goto out;
+			intr_restore(state);
+			return ret;
 		}
 	}
 
 	/* Try to get a full magazine from the depot. */
 	mag = slab_magazine_get_full(cache);
-	if(likely(mag != NULL)) {
-		/* Return previous to the depot. */
-		if(cc->previous) {
-			slab_magazine_put_empty(cache, cc->previous);
-		}
-
-		slab_cpu_reload(cc, mag);
-		ret = cc->loaded->objects[--cc->loaded->rounds];
+	assert(!intr_state());
+	if(unlikely(!mag)) {
+		intr_restore(state);
+		return NULL;
 	}
-out:
-	mutex_unlock(&cc->lock);
+
+	/* Return previous to the depot. */
+	if(cc->previous) {
+		slab_magazine_put_empty(cache, cc->previous);
+		assert(!intr_state());
+	}
+
+	cc->previous = cc->loaded;
+	cc->loaded = mag;
+	ret = cc->loaded->objects[--cc->loaded->rounds];
+	intr_restore(state);
 	return ret;
 }
 
@@ -539,41 +543,45 @@ out:
 static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 	slab_cpu_cache_t *cc = &cache->cpu_caches[curr_cpu->id];
 	slab_magazine_t *mag;
+	bool state;
 
-	mutex_lock(&cc->lock);
+	state = intr_disable();
 
 	/* If the loaded magazine has spare slots, just put the object there
 	 * and return. */
-	if(likely(cc->loaded != NULL)) {
+	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds < SLAB_MAGAZINE_SIZE) {
 			cc->loaded->objects[cc->loaded->rounds++] = obj;
-			mutex_unlock(&cc->lock);
+			intr_restore(state);
 			return true;
 		} else if(cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
 			/* Previous has spare slots, exchange them and insert
 			 * the object. */
-			slab_cpu_reload(cc, cc->previous);
+			SWAP(cc->loaded, cc->previous);
 			cc->loaded->objects[cc->loaded->rounds++] = obj;
-			mutex_unlock(&cc->lock);
+			intr_restore(state);
 			return true;
 		}
 	}
 
 	/* Get a new empty magazine. */
 	mag = slab_magazine_get_empty(cache);
-	if(unlikely(mag == NULL)) {
-		mutex_unlock(&cc->lock);
+	assert(!intr_state());
+	if(unlikely(!mag)) {
+		intr_restore(state);
 		return false;
 	}
 
 	/* Load the new magazine, and free the previous. */
 	if(likely(cc->previous)) {
 		slab_magazine_put_full(cache, cc->previous);
+		assert(!intr_state());
 	}
-	slab_cpu_reload(cc, mag);
+	cc->previous = cc->loaded;
+	cc->loaded = mag;
 
 	cc->loaded->objects[cc->loaded->rounds++] = obj;
-	mutex_unlock(&cc->lock);
+	intr_restore(state);
 	return true;
 }
 
@@ -582,18 +590,11 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
  * @param kmflag	Allocation flags.
  * @return		Whether the cache was created. */
 static bool slab_cpu_cache_init(slab_cache_t *cache, int kmflag) {
-	size_t i;
-
 	assert(slab_inited);
 
 	cache->cpu_caches = kcalloc(cpu_id_max + 1, sizeof(slab_cpu_cache_t), kmflag);
 	if(!cache->cpu_caches) {
 		return false;
-	}
-
-	/* Initialise the cache structures. */
-	for(i = 0; i <= cpu_id_max; i++) {
-		mutex_init(&cache->cpu_caches[i].lock, "cpu_cache_lock", 0);
 	}
 
 	return true;
