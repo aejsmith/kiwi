@@ -25,11 +25,15 @@
 
 #include <types.h>
 
-/** Round a value up. */
-#define ROUND_UP(value, nearest) \
+/** Round a value up.
+ * @note		If the alignment is a power of 2, use P2ALIGN instead.
+ * @param val		Value to round.
+ * @param nearest	Boundary to round up to.
+ * @return		Rounded value. */
+#define ROUND_UP(val, nearest)		\
 	__extension__ \
 	({ \
-		typeof(value) __n = value; \
+		typeof(val) __n = val; \
 		if(__n % (nearest)) { \
 			__n -= __n % (nearest); \
 			__n += nearest; \
@@ -37,16 +41,37 @@
 		__n; \
 	})
 
-/** Round a value down. */
-#define ROUND_DOWN(value, nearest) \
+/** Round a value down.
+ * @note		If the alignment is a power of 2, use P2ALIGN instead.
+ * @param val		Value to round.
+ * @param nearest	Boundary to round up to.
+ * @return		Rounded value. */
+#define ROUND_DOWN(val, nearest)	\
 	__extension__ \
 	({ \
-		typeof(value) __n = value; \
+		typeof(val) __n = val; \
 		if(__n % (nearest)) { \
 			__n -= __n % (nearest); \
 		} \
 		__n; \
 	})
+
+/** Check if a value is a power of 2.
+ * @param val		Value to check.
+ * @return		Whether value is a power of 2. */
+#define IS_POW2(val)		((val) && ((val) & ((val) - 1)) == 0)
+
+/** Get the number of bits in a type. */
+#define BITS(t)			(sizeof(t) * 8)
+
+/** Get the number of elements in an array. */
+#define ARRAYSZ(a)		(sizeof((a)) / sizeof((a)[0]))
+
+/** Get the lowest value out of a pair of values. */
+#define MIN(a, b)		((a) < (b) ? (a) : (b))
+
+/** Get the highest value out of a pair of values. */
+#define MAX(a, b)		((a) < (b) ? (b) : (a))
 
 /** Swap two values. */
 #define SWAP(a, b)	\
@@ -55,25 +80,6 @@
 		a = b; \
 		b = __tmp; \
 	}
-
-/** Get the number of bits in a type. */
-#define BITS(t)		(sizeof(t) * 8)
-
-/** Get the number of elements in an array. */
-#define ARRAYSZ(a)	(sizeof((a)) / sizeof((a)[0]))
-
-/** Get the lowest value out of a pair of values. */
-#define MIN(a, b)	((a) < (b) ? (a) : (b))
-
-/** Get the highest value out of a pair of values. */
-#define MAX(a, b)	((a) < (b) ? (b) : (a))
-
-/** Check if a value is a power of 2.
- * @param val		Value to check.
- * @return		Whether value is a power of 2. */
-static inline bool is_pow2(uint64_t val) {
-	return (val && (val & (val - 1)) == 0);
-}
 
 /** Get log base 2 (high bit) of a value.
  * @param val		Value to get high bit from.

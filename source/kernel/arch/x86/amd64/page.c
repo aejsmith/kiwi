@@ -608,7 +608,7 @@ void page_map_destroy(page_map_t *map) {
  * @param mmflag	Allocation behaviour flags.
  * @return		Address of mapping or NULL on failure. */
 void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
-	if(!size) {
+	if(unlikely(!size)) {
 		return NULL;
 	}
 

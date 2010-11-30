@@ -723,6 +723,7 @@ static bool slab_cache_init(slab_cache_t *cache, const char *name, size_t size, 
 	assert(source->quantum >= SLAB_ALIGN_MIN);
 	assert(align == 0 || !(align & (align - 1)));
 	assert(!(flags & SLAB_CACHE_LATEMAG));
+	assert(!align || IS_POW2(align));
 
 	mutex_init(&cache->depot_lock, "slab_depot_lock", 0);
 	mutex_init(&cache->slab_lock, "slab_slab_lock", 0);

@@ -665,7 +665,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	phys_ptr_t base, end;
 	char *ret;
 
-	if(!size) {
+	if(unlikely(!size)) {
 		return NULL;
 	}
 
@@ -678,7 +678,8 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 			base = ROUND_DOWN(addr, PAGE_SIZE);
 			end = ROUND_UP(addr + size, PAGE_SIZE);
 
-			if(!(ret = kheap_map_range(base, end - base, mmflag))) {
+			ret = kheap_map_range(base, end - base, mmflag);
+			if(unlikely(!ret)) {
 				return NULL;
 			}
 

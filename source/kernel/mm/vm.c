@@ -1088,9 +1088,7 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	}
 	mutex_lock(&as->lock);
 
-	/* Find the region that the fault occurred in - if its a reserved
-	 * region, the memory is unmapped so treat it as though no region is
-	 * there. */
+	/* Find the region that the fault occurred in. */
 	region = vm_region_find(as, addr, false);
 	if(unlikely(!region)) {
 		goto out;

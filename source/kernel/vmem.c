@@ -942,6 +942,7 @@ bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vme
 
 	assert(vmem);
 	assert(quantum);
+	assert(IS_POW2(quantum));
 	assert(!(base % quantum));
 	assert(!(size % quantum));
 	assert(!(qcache_max % quantum));
