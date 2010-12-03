@@ -48,24 +48,20 @@ static MUTEX_DECLARE(module_lock, 0);
 
 /** Arena used for allocating memory for kernel modules. */
 static vmem_t *module_arena;
-#ifdef KERNEL_MODULE_BASE
-static vmem_t *module_raw_arena;
-#endif
 
 /** Initialise the kernel module allocation arena. */
 static void module_mem_init(void) {
+	vmem_t *arena;
 #ifdef KERNEL_MODULE_BASE
-	module_raw_arena = vmem_create("module_raw_arena", KERNEL_MODULE_BASE,
-	                               KERNEL_MODULE_SIZE, PAGE_SIZE, NULL,
-	                               NULL, NULL, 0, 0, MM_FATAL);
-	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
-	                           kheap_anon_afunc, kheap_anon_ffunc,
-	                           module_raw_arena, 0, 0, MM_FATAL);
+	arena = vmem_create("module_raw_arena", PAGE_SIZE, 0, 0, NULL, NULL,
+	                    NULL, 0, KERNEL_MODULE_BASE, KERNEL_MODULE_SIZE,
+	                    MM_FATAL);
 #else
-	module_arena = vmem_create("module_arena", NULL, 0, PAGE_SIZE,
-	                           kheap_anon_afunc, kheap_anon_ffunc,
-	                           &kheap_va_arena, 0, 0, MM_FATAL);
+	arena = &kheap_va_arena;
 #endif
+	module_arena = vmem_create("module_arena", PAGE_SIZE, 0, 0, arena,
+	                           kheap_anon_afunc, kheap_anon_ffunc, 0, 0,
+	                           0, MM_FATAL);
 }
 
 /** Allocate memory suitable to hold a kernel module.

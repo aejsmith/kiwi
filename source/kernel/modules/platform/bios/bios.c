@@ -318,9 +318,8 @@ static status_t bios_init(void) {
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);
 
 	/* Initialise the memory allocator. */
-	bios_mem_arena = vmem_create("bios_mem_arena", BIOS_MEM_BASE, BIOS_MEM_SIZE,
-	                             1, NULL, NULL, NULL, 0, 0, MM_SLEEP);
-
+	bios_mem_arena = vmem_create("bios_mem_arena", 1, 0, 0, NULL, NULL, NULL, 0,
+	                             BIOS_MEM_BASE, BIOS_MEM_SIZE, MM_SLEEP);
 	/* Initialise the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);
 	X86EMU_setupMemFuncs(&x86emu_mem_funcs);

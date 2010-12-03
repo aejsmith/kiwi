@@ -61,6 +61,7 @@ typedef struct vmem {
 	size_t qcache_max;			/**< Maximum size to cache. */
 	size_t qshift;				/**< log2(quantum). */
 	uint32_t type;				/**< Resource type. */
+	int flags;				/**< Arena behaviour flags. */
 
 	/** Quantum cache array. */
 	struct slab_cache *qcache[VMEM_QCACHE_MAX];
@@ -94,6 +95,9 @@ typedef struct vmem {
 	char name[VMEM_NAME_MAX];		/**< Name of the arena. */
 } vmem_t;
 
+/** Arena behaviour flags. */
+#define VMEM_REFILL		(1<<0)		/**< Arena is on the refill allocation path. */
+
 /** Allocation behaviour flags for vmem. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
 
@@ -108,12 +112,12 @@ extern void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
 
 extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
 
-extern bool vmem_early_create(vmem_t *vmem, const char *name, vmem_resource_t base, vmem_resource_t size,
-                              size_t quantum, vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source,
-                              size_t qcache_max, uint32_t type, int vmflag);
-extern vmem_t *vmem_create(const char *name, vmem_resource_t base, vmem_resource_t size, size_t quantum,
-                           vmem_afunc_t afunc, vmem_ffunc_t ffunc, vmem_t *source, size_t qcache_max,
-                           uint32_t type, int vmflag);
+extern bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t type, int flags,
+                              vmem_t *source, vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
+                              vmem_resource_t base, vmem_resource_t size, int vmflag);
+extern vmem_t *vmem_create(const char *name, size_t quantum, uint32_t type, int flags, vmem_t *source,
+                           vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
+                           vmem_resource_t base, vmem_resource_t size, int vmflag);
 
 extern int kdbg_cmd_vmem(int argc, char **argv);
 
