@@ -36,6 +36,7 @@
 
 #include <mm/malloc.h>
 #include <mm/kheap.h>
+#include <mm/page.h>
 #include <mm/slab.h>
 
 #include <proc/thread.h>
@@ -92,7 +93,6 @@ static vmem_t vmem_btag_arena;
 
 /** Lock to protect global vmem information. */
 static MUTEX_DECLARE(vmem_lock, 0);
-static MUTEX_DECLARE(vmem_refill_lock, 0);
 
 /** Statically allocated boundary tags to use during boot. */
 static vmem_btag_t vmem_boot_tags[VMEM_BOOT_TAG_COUNT];
@@ -102,7 +102,7 @@ static timer_t vmem_maintenance_timer;
 
 /** Allocate a new boundary tag structure.
  * @note		It is possible for this function to change the arena
- *			layout!
+ *			layout for VMEM_REFILL arenas.
  * @param vmem		Arena that wants to allocate a tag.
  * @param vmflag	Allocation flags.
  * @return		Pointer to tag structure or NULL if cannot allocate. */
@@ -135,20 +135,23 @@ static vmem_btag_t *vmem_btag_alloc(vmem_t *vmem, int vmflag) {
 		mutex_unlock(&vmem_lock);
 		mutex_unlock(&vmem->lock);
 
-		/* The refill lock is to protect against multiple threads trying
-		 * to do a boundary tag allocation at the same, as this could
+		/* We want to protect against multiple threads trying to do a
+		 * boundary tag allocation at the same time, as this could
 		 * cause the free tag set we leave for use during the refill to
-		 * be depleted. */
-		mutex_lock(&vmem_refill_lock);
+		 * be depleted. We cannot, however, have a different lock for
+		 * this as this could cause deadlocks with the kernel page map
+		 * lock. So, we use the kernel page map lock to achieve
+		 * serialisation of refills. */
+		page_map_lock(&kernel_page_map);
 
 		addr = vmem_alloc(&vmem_btag_arena, PAGE_SIZE, vmflag | VM_REFILLING);
 		if(addr == 0) {
-			mutex_unlock(&vmem_refill_lock);
+			page_map_unlock(&kernel_page_map);
 			mutex_lock(&vmem->lock);
 			return NULL;
 		}
 
-		mutex_unlock(&vmem_refill_lock);
+		page_map_unlock(&kernel_page_map);
 		mutex_lock(&vmem_lock);
 
 		tag = (vmem_btag_t *)((ptr_t)addr);
