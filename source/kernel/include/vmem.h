@@ -48,11 +48,17 @@ struct vmem;
 /** Type of vmem-allocated resources. */
 typedef uint64_t vmem_resource_t;
 
-/** Vmem allocation function type. */
-typedef vmem_resource_t (*vmem_afunc_t)(struct vmem *, vmem_resource_t, int);
+/** Source import callback function type.
+ * @param base		Base of imported span.
+ * @param size		Size of imported span.
+ * @param vmflag	Allocation flags.
+ * @return		Status code describing result of the operation. */
+typedef status_t (*vmem_import_t)(vmem_resource_t base, vmem_resource_t size, int vmflag);
 
-/** Vmem free function type. */
-typedef void (*vmem_ffunc_t)(struct vmem *, vmem_resource_t, vmem_resource_t);
+/** Source release callback function type.
+ * @param base		Base of span being released.
+ * @param size		Size of span being released. */
+typedef void (*vmem_release_t)(vmem_resource_t base, vmem_resource_t size);
 
 /** Vmem arena structure. */
 typedef struct vmem {
@@ -77,9 +83,9 @@ typedef struct vmem {
 	condvar_t space_cvar;			/**< Condition variable to wait for space on. */
 
 	/** Source information. */
-	vmem_afunc_t afunc;			/**< Allocation function. */
-	vmem_ffunc_t ffunc;			/**< Free function. */
 	struct vmem *source;			/**< Source arena. */
+	vmem_import_t import;			/**< Source import callback. */
+	vmem_release_t release;			/**< Source release callback. */
 
 	/** Various statistics. */
 	vmem_resource_t total_size;		/**< Total size of all spans. */
@@ -101,8 +107,7 @@ typedef struct vmem {
 /** Allocation behaviour flags for vmem. */
 #define VM_BESTFIT		(1<<10)		/**< Use the smallest free segment suitable for the allocation. */
 
-extern vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
-                                   vmem_resource_t align, vmem_resource_t phase,
+extern vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size, vmem_resource_t align,
                                    vmem_resource_t nocross, vmem_resource_t minaddr,
                                    vmem_resource_t maxaddr, int vmflag);
 extern void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
@@ -112,12 +117,14 @@ extern void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size);
 
 extern bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmflag);
 
-extern bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t type, int flags,
-                              vmem_t *source, vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
-                              vmem_resource_t base, vmem_resource_t size, int vmflag);
-extern vmem_t *vmem_create(const char *name, size_t quantum, uint32_t type, int flags, vmem_t *source,
-                           vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
-                           vmem_resource_t base, vmem_resource_t size, int vmflag);
+extern bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t type,
+                              int flags, vmem_t *source, vmem_import_t import, vmem_release_t release,
+                              size_t qcache_max, vmem_resource_t base, vmem_resource_t size,
+                              int vmflag);
+extern vmem_t *vmem_create(const char *name, size_t quantum, uint32_t type, int flags,
+                           vmem_t *source, vmem_import_t import, vmem_release_t release,
+                           size_t qcache_max, vmem_resource_t base, vmem_resource_t size,
+                           int vmflag);
 
 extern int kdbg_cmd_vmem(int argc, char **argv);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -30,8 +30,8 @@ extern vmem_t kheap_raw_arena;
 extern vmem_t kheap_va_arena;
 extern vmem_t kheap_arena;
 
-extern vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmflag);
-extern void kheap_anon_ffunc(vmem_t *source, vmem_resource_t addr, vmem_resource_t size);
+extern status_t kheap_anon_import(vmem_resource_t base, vmem_resource_t size, int vmflag);
+extern void kheap_anon_release(vmem_resource_t addr, vmem_resource_t size);
 
 extern void *kheap_alloc(size_t size, int vmflag);
 extern void kheap_free(void *addr, size_t size);

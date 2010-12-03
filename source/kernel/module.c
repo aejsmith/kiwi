@@ -60,8 +60,8 @@ static void module_mem_init(void) {
 	arena = &kheap_va_arena;
 #endif
 	module_arena = vmem_create("module_arena", PAGE_SIZE, 0, 0, arena,
-	                           kheap_anon_afunc, kheap_anon_ffunc, 0, 0,
-	                           0, MM_FATAL);
+	                           kheap_anon_import, kheap_anon_release, 0,
+	                           0, 0, MM_FATAL);
 }
 
 /** Allocate memory suitable to hold a kernel module.

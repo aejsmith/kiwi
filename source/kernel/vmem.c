@@ -23,8 +23,8 @@
  *   http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.6.8388
  *
  * Quick note about the boundary tag list: it is not sorted in span order
- * because doing so would mean that vmem_add_real() would be O(n), where n is
- * the number of tags in the list. Without keeping spans sorted, it is O(1),
+ * because doing so would mean that vmem_add_internal() would be O(n), where n
+ * is the number of tags in the list. Without keeping spans sorted, it is O(1),
  * just requiring the span to be placed on the end of the list. Segments under
  * a span, however, are sorted.
  */
@@ -47,6 +47,7 @@
 #include <console.h>
 #include <dpc.h>
 #include <kdbg.h>
+#include <status.h>
 #include <time.h>
 #include <vmem.h>
 
@@ -73,15 +74,16 @@ typedef struct vmem_btag {
 	vmem_resource_t base;			/**< Start of the range the tag covers. */
 	vmem_resource_t size;			/**< Size of the range. */
 	struct vmem_btag *span;			/**< Parent span (for segments). */
-
-	/** Type of the tag. */
-	enum {
-		VMEM_BTAG_SPAN,			/**< Span. */
-		VMEM_BTAG_IMPORTED,		/**< Imported span. */
-		VMEM_BTAG_FREE,			/**< Free segment. */
-		VMEM_BTAG_ALLOC,		/**< Allocated segment. */
-	} type;
+	unative_t flags;			/**< Flags for the tag. */
 } vmem_btag_t;
+
+/** Flags for boundary tags. */
+#define VMEM_BTAG_SPAN		0x1		/**< Span. */
+#define VMEM_BTAG_SEGMENT	0x2		/**< Segment. */
+#define VMEM_BTAG_TYPE		0x3		/**< Type mask. */
+#define VMEM_BTAG_ALLOC		0x4		/**< Segment is allocated. */
+#define VMEM_BTAG_IMPORT	0x8		/**< Span was imported. */
+#define VMEM_BTAG_XIMPORT	0x10		/**< Span was imported with xalloc(). */
 
 /** List of all arenas. */
 static LIST_DECLARE(vmem_arenas);
@@ -292,41 +294,15 @@ static void vmem_freelist_remove(vmem_t *vmem, vmem_btag_t *tag) {
 	}
 }
 
-/** Check if a span overlaps an existing span.
- * @param vmem		Arena to check in.
- * @param base		Start of span to check.
- * @param size		End of the span.
- * @return		True if span overlaps, false otherwise. */
-static inline bool vmem_span_overlaps(vmem_t *vmem, vmem_resource_t base, vmem_resource_t end) {
-	vmem_resource_t btend;
-	vmem_btag_t *btag;
-
-	LIST_FOREACH(&vmem->btags, iter) {
-		btag = list_entry(iter, vmem_btag_t, tag_link);
-
-		btend = btag->base + btag->size;
-
-		if(btag->type != VMEM_BTAG_SPAN && btag->type != VMEM_BTAG_IMPORTED) {
-			continue;
-		} else if(base >= btag->base && base < btend) {
-			return true;
-		} else if(end > btag->base && end <= btend) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/** Real add span operation. Does not add a segment after the span.
+/** Internal add span operation, does not add a segment after the span.
  * @param vmem		Arena to add to.
  * @param base		Base of new span.
  * @param size		Size of the new span.
- * @param imported	Whether the span is imported.
+ * @param flags		Extra flags for the span.
  * @param vmflag	Allocation flags.
  * @return		Pointer to boundary tag on success, NULL on failure. */
-static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size,
-                                  bool imported, int vmflag) {
+static vmem_btag_t *vmem_add_internal(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size,
+                                      unative_t flags, int vmflag) {
 	vmem_btag_t *span;
 
 	assert(!(base % vmem->quantum));
@@ -340,7 +316,7 @@ static vmem_btag_t *vmem_add_real(vmem_t *vmem, vmem_resource_t base, vmem_resou
 	span->base = base;
 	span->size = size;
 	span->span = NULL;
-	span->type = (imported) ? VMEM_BTAG_IMPORTED : VMEM_BTAG_SPAN;
+	span->flags = VMEM_BTAG_SPAN | flags;
 
 	vmem->total_size += size;
 
@@ -493,7 +469,7 @@ static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
 			split1->base = seg->base;
 			split1->size = minaddr - seg->base;
 			split1->span = seg->span;
-			split1->type = VMEM_BTAG_FREE;
+			split1->flags = VMEM_BTAG_SEGMENT;
 
 			seg->base = minaddr;
 			seg->size -= split1->size;
@@ -506,7 +482,7 @@ static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
 			split2->base = seg->base + size;
 			split2->size = seg->size - size;
 			split2->span = seg->span;
-			split2->type = VMEM_BTAG_FREE;
+			split2->flags = VMEM_BTAG_SEGMENT;
 
 			seg->size = size;
 			list_add_after(&seg->tag_link, &split2->tag_link);
@@ -514,7 +490,7 @@ static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
 			split2 = NULL;
 		}
 
-		seg->type = VMEM_BTAG_ALLOC;
+		seg->flags |= VMEM_BTAG_ALLOC;
 
 		/* Free tags that weren't needed. */
 		if(split1) {
@@ -533,49 +509,75 @@ static vmem_btag_t *vmem_find_segment(vmem_t *vmem, vmem_resource_t size,
  * @param size		Size of the span to import.
  * @param vmflag	Allocation flags.
  * @return		Segment for the imported span, or NULL on failure. */
-static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, int vmflag) {
+static vmem_btag_t *vmem_import(vmem_t *vmem, vmem_resource_t size, vmem_resource_t align,
+                                vmem_resource_t nocross, vmem_resource_t minaddr,
+                                vmem_resource_t maxaddr, int vmflag) {
 	vmem_btag_t *span, *seg;
 	vmem_resource_t ret;
+	unative_t flags;
 
-	/* Unlock while we call afunc, so that we don't hold up any other
-	 * calls that may take place on this arena if using MM_SLEEP. */
 	mutex_unlock(&vmem->lock);
-	ret = vmem->afunc(vmem->source, size, vmflag);
-	mutex_lock(&vmem->lock);
 
-	if(ret == 0) {
+	/* If we have any allocation constraints, pass them to the source. The
+	 * tag is marked with the XIMPORT flag, to ensure that xfree() is used
+	 * to unimport if required. */
+	flags = VMEM_BTAG_IMPORT;
+	if(align || nocross || minaddr || maxaddr) {
+		flags |= VMEM_BTAG_XIMPORT;
+		ret = vmem_xalloc(vmem->source, size, align, nocross, minaddr, maxaddr, vmflag);
+	} else {
+		ret = vmem_alloc(vmem->source, size, vmflag);
+	}
+
+	if(unlikely(!ret)) {
+		mutex_lock(&vmem->lock);
 		return NULL;
 	}
 
-	/* Add the span and an allocated segment covering it. */
-	span = vmem_add_real(vmem, ret, size, true, vmflag);
-	if(unlikely(!span)) {
-		goto fail;
+	/* Call the import callback on the imported span. */
+	if(vmem->import) {
+		if(vmem->import(ret, size, vmflag) != STATUS_SUCCESS) {
+			goto fail2;
+		}
 	}
 
+	mutex_lock(&vmem->lock);
+
+	/* Add the span and an allocated segment covering it. */
+	span = vmem_add_internal(vmem, ret, size, flags, vmflag);
+	if(unlikely(!span)) {
+		goto fail1;
+	}
 	seg = vmem_btag_alloc(vmem, vmflag);
 	if(unlikely(!seg)) {
 		vmem->total_size -= size;
 		vmem_btag_free(span);
-		goto fail;
+		goto fail1;
 	}
-
-	vmem->imported_size += size;
 
 	seg->base = ret;
 	seg->size = size;
 	seg->span = span;
-	seg->type = VMEM_BTAG_ALLOC;
+	seg->flags = VMEM_BTAG_SEGMENT | VMEM_BTAG_ALLOC;
 
 	/* Insert the segment after the span. */
 	list_add_after(&span->tag_link, &seg->tag_link);
 
 	dprintf("vmem: imported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
 		ret, ret + size, vmem->name, vmem->source->name);
+	vmem->imported_size += size;
 	return seg;
-fail:
+fail1:
 	mutex_unlock(&vmem->lock);
-	vmem->ffunc(vmem->source, ret, size);
+	if(vmem->release) {
+		vmem->release(ret, size);
+	}
+fail2:
+	if(flags & VMEM_BTAG_XIMPORT) {
+		vmem_xfree(vmem->source, ret, size);
+	} else {
+		vmem_free(vmem->source, ret, size);
+	}
 	mutex_lock(&vmem->lock);
 	return NULL;
 }
@@ -584,36 +586,45 @@ fail:
  * @param vmem		Arena to unimport from.
  * @param span		Span to unimport. */
 static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
-	vmem_resource_t base, size;
 	vmem_btag_t *seg;
 
 	assert(span);
-	assert(span->type == VMEM_BTAG_IMPORTED);
+	assert(span->flags & VMEM_BTAG_IMPORT);
 
 	/* Check whether the span still has allocated segments. If we're
 	 * followed by a free segment covering the entire span we're OK to
 	 * unimport. */
 	seg = list_entry(span->tag_link.next, vmem_btag_t, tag_link);
-	if(seg->type != VMEM_BTAG_FREE || (seg->base != span->base && seg->size != span->size)) {
+	if(seg->flags & VMEM_BTAG_ALLOC || (seg->base != span->base && seg->size != span->size)) {
 		return;
 	}
+
+	/* Free the segment. Do not free the span yet as we need information in
+	 * it to unimport. */
+	vmem_freelist_remove(vmem, seg);
+	vmem_btag_free(seg);
+	list_remove(&span->tag_link);
 
 	vmem->total_size -= span->size;
 	vmem->imported_size -= span->size;
 
-	/* Record what we're freeing as something may take the tag after we've
-	 * freed it. */
-	base = span->base;
-	size = span->size;
-
-	vmem_freelist_remove(vmem, seg);
-	vmem_btag_free(seg);
-	vmem_btag_free(span);
-
 	mutex_unlock(&vmem->lock);
-	vmem->ffunc(vmem->source, base, size);
+
+	/* Call the release callback. */
+	if(vmem->release) {
+		vmem->release(span->base, span->size);
+	}
+
+	/* Free back to the source arena. */
+	if(span->flags & VMEM_BTAG_XIMPORT) {
+		vmem_xfree(vmem->source, span->base, span->size);
+	} else {
+		vmem_free(vmem->source, span->base, span->size);
+	}
+
 	mutex_lock(&vmem->lock);
 
+	vmem_btag_free(span);
 	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
 		base, base + size, vmem->name, vmem->source->name);
 }
@@ -630,21 +641,11 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
  * use vmem_alloc() to ensure that quantum caches will be used where
  * necessary.
  *
- * @todo		Implement the align, phase and nocross constraints.
- *
- * @note		One thing I'm not entirely sure on in this function
- *			is how minaddr/maxaddr are handled when it is necessary
- *			to import from the source arena. I have currently
- *			implemented it how Solaris' implementation does it -
- *			if a minaddr/maxaddr are specified, do not import from
- *			the source at all. However, this seems just a little
- *			bit odd to me. Actually attempting to handle it would
- *			be difficult, too...
+ * @todo		Implement the align and nocross constraints.
  *
  * @param vmem		Arena to allocate from.
  * @param size		Size of the segment to allocate.
  * @param align		Alignment of allocation.
- * @param phase		Offset from alignment boundary.
  * @param nocross	Alignment boundary the allocation should not go across.
  * @param minaddr	Minimum start address of the allocation.
  * @param maxaddr	Highest end address of the allocation.
@@ -652,8 +653,7 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
  *
  * @return		Address of the allocation, or NULL on failure.
  */
-vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
-                            vmem_resource_t align, vmem_resource_t phase,
+vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size, vmem_resource_t align,
                             vmem_resource_t nocross, vmem_resource_t minaddr,
                             vmem_resource_t maxaddr, int vmflag) {
 	vmem_resource_t curr_size, hash, ret = 0;
@@ -666,11 +666,11 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 	assert(!(minaddr % vmem->quantum));
 	assert(!(maxaddr % vmem->quantum));
 
-	mutex_lock(&vmem->lock);
-
-	if(align != 0 || phase != 0 || nocross != 0) {
-		fatal("Laziness has prevented implementation of these constraints. Sorry!");
+	if(unlikely(align || nocross)) {
+		fatal("TODO: Implement align and nocross constraints");
 	}
+
+	mutex_lock(&vmem->lock);
 
 	/* Continuously loop until we can make the allocation. If MM_SLEEP is
 	 * not set, this will break out once reclaiming cannot free any space
@@ -682,13 +682,12 @@ vmem_resource_t vmem_xalloc(vmem_t *vmem, vmem_resource_t size,
 			break;
 		}
 
-		/* If there is a source arena and the allocation does not have
-		 * address constraints, try importing from it. Don't need to
-		 * bother sleeping if we cannot import from the source - the
-		 * allocation flags get passed down so waiting should take
+		/* If there is a source arena, try importing from it. Don't
+		 * need to bother sleeping if we cannot import from the source:
+		 * the allocation flags get passed down so waiting should take
 		 * place at the arena at the end of the chain. */
-		if(vmem->source && minaddr == 0 && maxaddr == 0) {
-			seg = vmem_import(vmem, size, vmflag);
+		if(vmem->source) {
+			seg = vmem_import(vmem, size, align, nocross, minaddr, maxaddr, vmflag);
 			break;
 		}
 
@@ -762,7 +761,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	LIST_FOREACH(&vmem->alloc_hash[hash], iter) {
 		tag = list_entry(iter, vmem_btag_t, af_link);
 
-		assert(tag->type == VMEM_BTAG_ALLOC);
+		assert(tag->flags & VMEM_BTAG_ALLOC);
 		assert(tag->span);
 
 		if(tag->base != addr) {
@@ -786,7 +785,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 			dpc_request(vmem_rehash, vmem);
 		}
 
-		tag->type = VMEM_BTAG_FREE;
+		tag->flags &= ~VMEM_BTAG_ALLOC;
 
 		vmem->used_size -= tag->size;
 		vmem->used_segs--;
@@ -794,7 +793,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		/* Coalesce adjacent free segments. */
 		if(tag->tag_link.next != &vmem->btags) {
 			exist = list_entry(tag->tag_link.next, vmem_btag_t, tag_link);
-			if(exist->type == VMEM_BTAG_FREE) {
+			if(exist->flags == tag->flags) {
 				assert((tag->base + tag->size) == exist->base);
 				tag->size += exist->size;
 				vmem_freelist_remove(vmem, exist);
@@ -806,7 +805,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		assert(tag->tag_link.prev != &vmem->btags);
 
 		exist = list_entry(tag->tag_link.prev, vmem_btag_t, tag_link);
-		if(exist->type == VMEM_BTAG_FREE) {
+		if(exist->flags == tag->flags) {
 			assert((exist->base + exist->size) == tag->base);
 			tag->base = exist->base;
 			tag->size += exist->size;
@@ -817,7 +816,7 @@ void vmem_xfree(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 		vmem_freelist_insert(vmem, tag);
 
 		/* Check if the span can be unimported. */
-		if(vmem->source && tag->span->type == VMEM_BTAG_IMPORTED) {
+		if(vmem->source && tag->span->flags & VMEM_BTAG_IMPORT) {
 			vmem_unimport(vmem, tag->span);
 		} else {
 			condvar_broadcast(&vmem->space_cvar);
@@ -853,7 +852,7 @@ vmem_resource_t vmem_alloc(vmem_t *vmem, vmem_resource_t size, int vmflag) {
 		                                                 vmflag & MM_FLAG_MASK));
 	}
 
-	return vmem_xalloc(vmem, size, 0, 0, 0, 0, 0, vmflag);
+	return vmem_xalloc(vmem, size, 0, 0, 0, 0, vmflag);
 }
 
 /** Free a segment to a vmem arena.
@@ -877,6 +876,31 @@ void vmem_free(vmem_t *vmem, vmem_resource_t addr, vmem_resource_t size) {
 	vmem_xfree(vmem, addr, size);
 }
 
+/** Check if a vmem arena contains a span.
+ * @param vmem		Arena to check in.
+ * @param base		Start of span to check.
+ * @param size		End of the span.
+ * @return		Whether the span overlaps an existing span. */
+static bool vmem_contains(vmem_t *vmem, vmem_resource_t base, vmem_resource_t end) {
+	vmem_resource_t btend;
+	vmem_btag_t *btag;
+
+	LIST_FOREACH(&vmem->btags, iter) {
+		btag = list_entry(iter, vmem_btag_t, tag_link);
+
+		btend = btag->base + btag->size;
+		if((btag->flags & VMEM_BTAG_TYPE) != VMEM_BTAG_SPAN) {
+			continue;
+		} else if(base >= btag->base && base < btend) {
+			return true;
+		} else if(end > btag->base && end <= btend) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /** Add a new span to an arena.
  * @param vmem		Arena to add to.
  * @param base		Base of the new span.
@@ -890,21 +914,21 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
 	mutex_lock(&vmem->lock);
 
 	/* The new span should not overlap an existing span. */
-	if(vmem_span_overlaps(vmem, base, base + size)) {
+	if(vmem_contains(vmem, base, base + size)) {
 		fatal("Tried to add overlapping span [0x%" PRIx64 ", 0x%" PRIx64 ") to %p",
 			base, base + size, vmem);
 	}
 
 	/* Create the span itself. */
-	span = vmem_add_real(vmem, base, size, false, vmflag);
-	if(span == NULL) {
+	span = vmem_add_internal(vmem, base, size, 0, vmflag);
+	if(!span) {
 		mutex_unlock(&vmem->lock);
 		return false;
 	}
 
 	/* Create a free segment. */
 	seg = vmem_btag_alloc(vmem, vmflag);
-	if(seg == NULL) {
+	if(!seg) {
 		vmem_btag_free(span);
 		mutex_unlock(&vmem->lock);
 		return false;
@@ -913,7 +937,7 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
 	seg->base = base;
 	seg->size = size;
 	seg->span = span;
-	seg->type = VMEM_BTAG_FREE;
+	seg->flags = VMEM_BTAG_SEGMENT;
 
 	/* Place the segment after the span and add it to the freelists. */
 	list_add_after(&span->tag_link, &seg->tag_link);
@@ -926,27 +950,21 @@ bool vmem_add(vmem_t *vmem, vmem_resource_t base, vmem_resource_t size, int vmfl
 }
 
 /** Initialise a vmem arena.
- *
- * Initialises a vmem arena and creates an initial span/free segment if the
- * given size is non-zero.
- *
  * @param vmem		Arena to initialise.
  * @param name		Name of the arena for debugging purposes.
  * @param quantum	Allocation granularity.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param flags		Behaviour flags for the arena.
  * @param source	Arena backing this arena.
- * @param afunc		Function to call to import from the source.
- * @param ffunc		Function to call to free to the source.
+ * @param import	Callback function for importing from the source.
+ * @param release	Callback function for releasing to the source.
  * @param qcache_max	Maximum size to cache.
  * @param base		Start of the initial span.
  * @param size		Size of the initial span.
  * @param vmflag	Allocation flags.
- *
- * @return		Whether the arena was created successfully.
- */
+ * @return		Whether the arena was successfully initialised. */
 bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t type, int flags,
-                       vmem_t *source, vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
+                       vmem_t *source, vmem_import_t import, vmem_release_t release, size_t qcache_max,
                        vmem_resource_t base, vmem_resource_t size, int vmflag) {
 	char qcname[SLAB_NAME_MAX];
 	size_t i;
@@ -958,7 +976,6 @@ bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t 
 	assert(!(size % quantum));
 	assert(!(qcache_max % quantum));
 	assert(source != vmem);
-	assert(!source || (afunc && ffunc));
 
 	/* Impose a limit on the number of quantum caches. */
 	if(qcache_max > (quantum * VMEM_QCACHE_MAX)) {
@@ -989,9 +1006,9 @@ bool vmem_early_create(vmem_t *vmem, const char *name, size_t quantum, uint32_t 
 	vmem->alloc_hash = vmem->initial_hash;
 	vmem->alloc_hash_size = VMEM_HASH_INITIAL;
 	vmem->rehash_requested = false;
-	vmem->afunc = afunc;
-	vmem->ffunc = ffunc;
 	vmem->source = source;
+	vmem->import = import;
+	vmem->release = release;
 	vmem->total_size = 0;
 	vmem->used_size = 0;
 	vmem->imported_size = 0;
@@ -1053,25 +1070,19 @@ fail:
 }
 
 /** Allocate and initialise a vmem arena.
- *
- * Allocates a new vmem arena and creates an initial span/free segment if the
- * given size is non-zero.
- *
  * @param name		Name of the arena for debugging purposes.
  * @param base		Start of the initial span.
  * @param size		Size of the initial span.
  * @param quantum	Allocation granularity.
- * @param afunc		Function to call to import from the source.
- * @param ffunc		Function to call to free to the source.
+ * @param import	Callback function for importing from the source.
+ * @param release	Callback function for releasing to the source.
  * @param source	Arena backing this arena.
  * @param qcache_max	Maximum size to cache.
  * @param type		Type of the resource the arena is allocating, or 0.
  * @param vmflag	Allocation flags.
- *
- * @return		Pointer to arena on success, NULL on failure.
- */
+ * @return		Pointer to arena on success, NULL on failure. */
 vmem_t *vmem_create(const char *name, size_t quantum, uint32_t type, int flags, vmem_t *source,
-                    vmem_afunc_t afunc, vmem_ffunc_t ffunc, size_t qcache_max,
+                    vmem_import_t import, vmem_release_t release, size_t qcache_max,
                     vmem_resource_t base, vmem_resource_t size, int vmflag) {
 	vmem_t *vmem;
 
@@ -1080,7 +1091,7 @@ vmem_t *vmem_create(const char *name, size_t quantum, uint32_t type, int flags, 
 		return NULL;
 	}
 
-	if(!vmem_early_create(vmem, name, quantum, type, flags, source, afunc, ffunc,
+	if(!vmem_early_create(vmem, name, quantum, type, flags, source, import, release,
 	                      qcache_max, base, size, vmflag)) {
 		kfree(vmem);
 		return NULL;
@@ -1130,15 +1141,9 @@ static void vmem_dump_list(list_t *header, int indent) {
 }
 
 /** KDBG vmem information command.
- *
- * When supplied with no arguments, will give a list of all vmem arenas.
- * Otherwise, displays information about the specified arena.
- *
  * @param argc		Argument count.
  * @param argv		Argument array.
- *
- * @return		KDBG_OK on success, KDBG_FAIL on failure.
- */
+ * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_vmem(int argc, char **argv) {
 	char *name = NULL;
 	vmem_btag_t *btag;
@@ -1207,14 +1212,14 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 		LIST_FOREACH(&vmem->btags, iter) {
 			btag = list_entry(iter, vmem_btag_t, tag_link);
 
-			if(btag->type == VMEM_BTAG_SPAN || btag->type == VMEM_BTAG_IMPORTED) {
+			if((btag->flags & VMEM_BTAG_TYPE) == VMEM_BTAG_SPAN) {
 				kprintf(LOG_NONE, "0x%016" PRIx64 "   0x%016" PRIx64 "   Span%s\n",
 				            btag->base, btag->base + btag->size,
-				            (btag->type == VMEM_BTAG_IMPORTED) ? " (Imported)" : "");
+				            (btag->flags & VMEM_BTAG_IMPORT) ? " (Imported)" : "");
 			} else {
 				kprintf(LOG_NONE, "  0x%016" PRIx64 "   0x%016" PRIx64 " Segment %s\n",
 				            btag->base, btag->base + btag->size,
-				            (btag->type == VMEM_BTAG_FREE) ? "(Free)" : "(Allocated)");
+				            (btag->flags & VMEM_BTAG_ALLOC) ? "(Allocated)" : "(Free)");
 			}
 		}
 	}
@@ -1223,7 +1228,7 @@ int kdbg_cmd_vmem(int argc, char **argv) {
 }
 
 /** Add the initial tags to the boundary tag list. */
-void __init_text vmem_early_init(void) {
+__init_text void vmem_early_init(void) {
 	size_t i;
 
 	for(i = 0; i < VMEM_BOOT_TAG_COUNT; i++) {
@@ -1235,15 +1240,15 @@ void __init_text vmem_early_init(void) {
 }
 
 /** Create the boundary tag arena. */
-void __init_text vmem_init(void) {
+__init_text void vmem_init(void) {
 	/* Create the boundary tag arena. */
 	vmem_early_create(&vmem_btag_arena, "vmem_btag_arena", PAGE_SIZE, 0, VMEM_REFILL,
-	                  &kheap_raw_arena, kheap_anon_afunc, kheap_anon_ffunc, 0, 0, 0,
-	                  MM_FATAL);
+	                  &kheap_raw_arena, kheap_anon_import, kheap_anon_release, 0, 0,
+	                  0, MM_FATAL);
 }
 
 /** Start the periodic maintenance timer. */
-void __init_text vmem_late_init(void) {
+__init_text void vmem_late_init(void) {
 	timer_init(&vmem_maintenance_timer, vmem_maintenance, NULL, TIMER_THREAD);
 	timer_start(&vmem_maintenance_timer, VMEM_PERIODIC_INTERVAL, TIMER_PERIODIC);
 }

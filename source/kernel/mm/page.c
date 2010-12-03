@@ -407,7 +407,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 	phys_ptr_t base;
 	void *mapping;
 
-	base = vmem_xalloc(&page_arena, count * PAGE_SIZE, align, 0, 0, minaddr,
+	base = vmem_xalloc(&page_arena, count * PAGE_SIZE, align, 0, minaddr,
 	                   maxaddr, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(unlikely(!base)) {
 		if(pmflag & MM_FATAL) {
@@ -656,7 +656,7 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 
 	/* If reclaimable, allocate the range to prevent it being allocated. */
 	if(type == PHYS_MEMORY_RECLAIMABLE || type == PHYS_MEMORY_ALLOCATED) {
-		vmem_xalloc(&page_arena, end - start, 0, 0, 0, start, end, MM_FATAL);
+		vmem_xalloc(&page_arena, end - start, 0, 0, start, end, MM_FATAL);
 	}
 }
 

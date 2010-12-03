@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -17,7 +17,7 @@
  * @file
  * @brief		Kernel heap manager.
  *
- * The kernel heap manager uses Vmem to manage the kernel heap. It uses three
+ * The kernel heap manager uses vmem to manage the kernel heap. It uses three
  * levels of arenas, listed below:
  *  - kheap_raw_arena: This allocates address ranges on the heap.
  *  - kheap_va_arena:  This uses kheap_raw_arena as its source and provides
@@ -57,9 +57,9 @@
 #endif
 
 /** Kernel heap arenas. */
-vmem_t kheap_raw_arena;			/**< Raw heap arena (does not back ranges with pages). */
-vmem_t kheap_va_arena;			/**< Heap arena that provides quantum caching. */
-vmem_t kheap_arena;			/**< Heap arena that backs allocated ranges with anonymous pages. */
+vmem_t kheap_raw_arena;		/**< Raw heap address allocator. */
+vmem_t kheap_va_arena;		/**< Allocator that provides quantum caching. */
+vmem_t kheap_arena;		/**< Allocator that backs allocated ranges with anonymous pages. */
 
 /** Unmap a range on the kernel heap.
  * @note		Kernel page map should be locked.
@@ -83,43 +83,32 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 	}
 }
 
-/** Kernel heap arena allocation function.
- *
- * Allocates a range from the given source arena and backs it with anonymous
- * pages.
- *
- * @param source	Source arena.
- * @param size		Size of range to allocate.
+/** Kernel heap arena import callback.
+ * @param base		Base of allocation.
+ * @param size		Size of allocation.
  * @param vmflag	Allocation flags.
- *
- * @return		Address of allocation.
- */
-vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmflag) {
+ * @return		Status code describing result of the operation. */
+status_t kheap_anon_import(vmem_resource_t base, vmem_resource_t size, int vmflag) {
+	vmem_resource_t i;
 	phys_ptr_t page;
-	ptr_t ret, i;
-
-	assert(!(size % PAGE_SIZE));
-
-	/* Allocate a range from the backing arena. */
-	ret = (ptr_t)vmem_alloc(source, size, vmflag);
-	if(!ret) {
-		return 0;
-	}
+	status_t ret;
 
 	page_map_lock(&kernel_page_map);
 
 	/* Back the allocation with anonymous pages. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(1, vmflag & MM_FLAG_MASK);
-		if(page == 0) {
+		if(unlikely(!page)) {
 			dprintf("kheap: unable to allocate pages to back allocation\n");
 			goto fail;
 		}
 
 		/* Map the page into the kernel address space. */
-		if(page_map_insert(&kernel_page_map, ret + i, page, true, true,
-		                   vmflag & MM_FLAG_MASK) != STATUS_SUCCESS) {
-			dprintf("kheap: failed to map page 0x%" PRIpp " to %p\n", page, ret + i);
+		ret = page_map_insert(&kernel_page_map, (ptr_t)(base + i), page,
+		                      true, true, vmflag & MM_FLAG_MASK);
+		if(unlikely(ret != STATUS_SUCCESS)) {
+			dprintf("kheap: failed to map page 0x%" PRIpp " to %p (%d)\n",
+			        page, (ptr_t)(base + i), ret);
 			page_free(page, 1);
 			goto fail;
 		}
@@ -128,31 +117,21 @@ vmem_resource_t kheap_anon_afunc(vmem_t *source, vmem_resource_t size, int vmfla
 	}
 
 	page_map_unlock(&kernel_page_map);
-	return ret;
+	return STATUS_SUCCESS;
 fail:
 	/* Go back and reverse what we have done. */
 	kheap_do_unmap(ret, ret + i, true, true);
 	page_map_unlock(&kernel_page_map);
-	vmem_free(source, ret, size);
 	return 0;
 }
 
-/** Kernel heap arena free function.
- *
- * Frees the pages backing a given range and frees it to the source arena.
- *
- * @param source	Source arena.
- * @param addr		Address of range to free.
- * @param size		Size of range to free.
- */
-void kheap_anon_ffunc(vmem_t *source, vmem_resource_t addr, vmem_resource_t size) {
-	assert(!(size % PAGE_SIZE));
-
-	/* Unmap pages covering the range and free back to the source. */
+/** Kernel heap arena release callback.
+ * @param base		Base of range to free.
+ * @param size		Size of range to free. */
+void kheap_anon_release(vmem_resource_t base, vmem_resource_t size) {
 	page_map_lock(&kernel_page_map);
-	kheap_do_unmap((ptr_t)addr, (ptr_t)addr + (ptr_t)size, true, true);
+	kheap_do_unmap((ptr_t)base, (ptr_t)(base + size), true, true);
 	page_map_unlock(&kernel_page_map);
-	vmem_free(source, addr, size);
 }
 
 /** Allocate from the kernel heap.
@@ -181,7 +160,7 @@ void *kheap_alloc(size_t size, int vmflag) {
  * @param size		Size of the original allocation.
  */
 void kheap_free(void *addr, size_t size) {
-	vmem_free(&kheap_arena, (unative_t)((ptr_t)addr), size);
+	vmem_free(&kheap_arena, (vmem_resource_t)((ptr_t)addr), size);
 }
 
 /** Map a range of pages on the kernel heap.
@@ -202,7 +181,7 @@ void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag) {
 	assert(!(base % PAGE_SIZE));
 
 	ret = (ptr_t)vmem_alloc(&kheap_va_arena, size, vmflag);
-	if(!ret) {
+	if(unlikely(!ret)) {
 		return NULL;
 	}
 
@@ -260,9 +239,9 @@ void __init_text kheap_early_init(void) {
 /** Second part of heap initialisation. */
 void __init_text kheap_init(void) {
 	vmem_early_create(&kheap_va_arena, "kheap_va_arena", PAGE_SIZE, 0, 0,
-	                  &kheap_raw_arena, vmem_alloc, vmem_free, PAGE_SIZE * 8,
-	                  0, 0, MM_FATAL);
+	                  &kheap_raw_arena, NULL, NULL, PAGE_SIZE * 8, 0, 0,
+	                  MM_FATAL);
 	vmem_early_create(&kheap_arena, "kheap_arena", PAGE_SIZE, 0, 0,
-	                  &kheap_va_arena, kheap_anon_afunc, kheap_anon_ffunc, 0,
-	                  0, 0, MM_FATAL);
+	                  &kheap_va_arena, kheap_anon_import, kheap_anon_release,
+	                  0, 0, 0, MM_FATAL);
 }
