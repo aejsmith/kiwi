@@ -130,7 +130,11 @@ static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_
 		break;
 	case 61:
 		/* F3 - Reboot. */
-		platform_reboot();
+		system_shutdown(SHUTDOWN_REBOOT);
+		break;
+	case 62:
+		/* F4 - Shutdown. */
+		system_shutdown(SHUTDOWN_POWEROFF);
 		break;
 	}
 

@@ -73,25 +73,11 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 }
 
 /** Shut down the system.
- *
- * Terminates all running processes, flushes and unmounts all filesystems, and
- * then performs the specified action. The CAP_SHUTDOWN capability is required
- * to use this function.
- *
- * @param action	Action to perform once the system has been shut down.
- *
- * @return		Status code describing result of the operation. Will
- *			always succeed unless the calling process does not have
- *			the CAP_SHUTDOWN capability.
- */
-status_t sys_system_shutdown(int action) {
+ * @param action	Action to perform once the system has been shut down. */
+void system_shutdown(int action) {
 	WAITQ_DECLARE(shutdown_wait);
 	thread_t *thread;
 	status_t ret;
-
-	if(!cap_check(NULL, CAP_SHUTDOWN)) {
-		return STATUS_PERM_DENIED;
-	}
 
 	if(!shutdown_in_progress) {
 		shutdown_in_progress = true;
@@ -107,9 +93,7 @@ status_t sys_system_shutdown(int action) {
 			/* FIXME: This shouldn't be able to fail, must reserve
 			 * a thread or something in case we've got too many
 			 * threads running. */
-			kprintf(LOG_WARN, "system: unable to create shutdown thread (%d)\n", ret);
-			shutdown_in_progress = false;
-			return ret;
+			fatal("Unable to create shutdown thread (%d)", ret);
 		}
 
 		sched_preempt_disable();
@@ -120,4 +104,24 @@ status_t sys_system_shutdown(int action) {
 	 * this thread. */
 	waitq_sleep(&shutdown_wait, -1, SYNC_INTERRUPTIBLE);
 	thread_exit();
+}
+
+/** Shut down the system.
+ *
+ * Terminates all running processes, flushes and unmounts all filesystems, and
+ * then performs the specified action. The CAP_SHUTDOWN capability is required
+ * to use this function.
+ *
+ * @param action	Action to perform once the system has been shut down.
+ *
+ * @return		Status code describing result of the operation. Will
+ *			always succeed unless the calling process does not have
+ *			the CAP_SHUTDOWN capability.
+ */
+status_t sys_system_shutdown(int action) {
+	if(!cap_check(NULL, CAP_SHUTDOWN)) {
+		return STATUS_PERM_DENIED;
+	}
+
+	system_shutdown(action);
 }

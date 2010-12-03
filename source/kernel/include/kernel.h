@@ -21,6 +21,7 @@
 #ifndef __KERNEL_H
 #define __KERNEL_H
 
+#include <kernel/system.h>
 #include <lib/notifier.h>
 #include <kargs.h>
 
@@ -55,6 +56,8 @@ extern void platform_postmm_init(kernel_args_t *args);
 
 extern void platform_reboot(void);
 extern void platform_poweroff(void);
+
+extern void system_shutdown(int action) __noreturn;
 
 extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn __printf(2, 3);
 
