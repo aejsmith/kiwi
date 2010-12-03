@@ -100,10 +100,12 @@ void system_shutdown(int action) {
 		thread_run(thread);
 	}
 
-	/* The process shutdown code will interrupt us when it wants to kill
-	 * this thread. */
-	waitq_sleep(&shutdown_wait, -1, SYNC_INTERRUPTIBLE);
-	thread_exit();
+	if(curr_thread->owner != kernel_proc) {
+		/* The process shutdown code will interrupt us when it wants to
+		 * kill this thread. */
+		waitq_sleep(&shutdown_wait, -1, SYNC_INTERRUPTIBLE);
+		thread_exit();
+	}
 }
 
 /** Shut down the system.
@@ -124,4 +126,5 @@ status_t sys_system_shutdown(int action) {
 	}
 
 	system_shutdown(action);
+	fatal("Shouldn't get here");
 }
