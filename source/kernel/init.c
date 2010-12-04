@@ -329,10 +329,8 @@ void __init_text kmain(kernel_args_t *args, cpu_id_t id) {
 		lrm_init();
 
 		/* Now that the thread system is up and all CPUs have been
-		 * registered, the slab allocator's magazine layer can be
-		 * enabled, and the vmem periodic maintenance timer can be
+		 * registered, the vmem periodic maintenance timer can be
 		 * registered. */
-		slab_late_init();
 		vmem_late_init();
 
 		/* Bring up the VM system. */

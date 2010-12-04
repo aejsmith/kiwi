@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -21,6 +21,8 @@
 #ifndef __COMPILER_H
 #define __COMPILER_H
 
+#include <arch/cache.h>
+
 #ifdef __GNUC__
 # define __unused		__attribute__((unused))
 # define __used			__attribute__((used))
@@ -33,6 +35,7 @@
 # define __init_text		__attribute__((section(".init.text")))
 # define __init_data		__attribute__((section(".init.data")))
 # define __section(s)		__attribute__((section(s)))
+# define __cacheline_aligned	__aligned(CPU_CACHE_SIZE)
 # define likely(x)		__builtin_expect(!!(x), 1)
 # define unlikely(x)		__builtin_expect(!!(x), 0)
 #else

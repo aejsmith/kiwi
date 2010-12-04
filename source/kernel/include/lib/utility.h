@@ -26,7 +26,6 @@
 #include <types.h>
 
 /** Round a value up.
- * @note		If the alignment is a power of 2, use P2ALIGN instead.
  * @param val		Value to round.
  * @param nearest	Boundary to round up to.
  * @return		Rounded value. */
@@ -42,7 +41,6 @@
 	})
 
 /** Round a value down.
- * @note		If the alignment is a power of 2, use P2ALIGN instead.
  * @param val		Value to round.
  * @param nearest	Boundary to round up to.
  * @return		Rounded value. */
