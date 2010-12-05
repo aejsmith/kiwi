@@ -727,15 +727,12 @@ static void slab_cache_init(slab_cache_t *cache, const char *name, size_t size, 
 
 	/* If the cache contains large objects or is a quantum cache for vmem,
 	 * do not store the metadata within allocated buffers. */
-	kprintf(LOG_DEBUG, "%s: %zu %zu\n", name, size, source->quantum / SLAB_LARGE_FRACTION);
 	if(flags & SLAB_CACHE_QCACHE || size >= (source->quantum / SLAB_LARGE_FRACTION)) {
 		flags |= SLAB_CACHE_NOTOUCH;
 	}
 
 	/* Initialise the CPU caches if required. */
 	if(!(flags & SLAB_CACHE_NOMAG)) {
-		kprintf(LOG_DEBUG, "cpu_caches[0] = %p, cpu_caches[1] = %p\n",
-		        &cache->cpu_caches[0], &cache->cpu_caches[1]);
 		memset(cache->cpu_caches, 0, sizeof(slab_cpu_cache_t) * (cpu_id_max + 1));
 	}
 
