@@ -123,7 +123,7 @@ void ServiceManager::HandleConnection() {
 /** Shut down the system. */
 static void shutdown_system(int status) {
 	Thread::Sleep(200000);
-	system_shutdown(SHUTDOWN_POWEROFF);
+	kern_shutdown(SHUTDOWN_POWEROFF);
 }
 
 /** Main function for the service manager.
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
 		 * server should have. */
 		ret = process_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
-			system_fatal("Failed to obtain security context");
+			kern_fatal("Failed to obtain security context");
 		}
 
 		security_context_unset_cap(&context, CAP_SECURITY_AUTHORITY);
@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
 
 		ret = process_set_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
-			system_fatal("Failed to drop capabilities");
+			kern_fatal("Failed to drop capabilities");
 		}
 
 		/* Add services. TODO: These should be in configuration files. */

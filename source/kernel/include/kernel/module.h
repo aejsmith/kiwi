@@ -43,8 +43,8 @@ typedef struct module_info {
 	size_t load_size;		/**< Size of the module in memory. */
 } module_info_t;
 
-extern status_t SYSCALL(module_load)(const char *path, char *depbuf);
-extern status_t SYSCALL(module_info)(module_info_t *infop, size_t *countp);
+extern status_t kern_module_load(const char *path, char *depbuf);
+extern status_t kern_module_info(module_info_t *infop, size_t *countp);
 
 #ifdef __cplusplus
 }

@@ -210,8 +210,8 @@ static object_type_t area_object_type = {
  *			read/write access to the calling process' user.
  * @param rights	Access rights for the handle.
  * @return		Status code describing result of the operation. */
-status_t sys_area_create(size_t size, handle_t source, offset_t offset, const object_security_t *security,
-                         object_rights_t rights, handle_t *handlep) {
+status_t kern_area_create(size_t size, handle_t source, offset_t offset, const object_security_t *security,
+                          object_rights_t rights, handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	object_handle_t *ksource = NULL;
 	status_t ret;
@@ -278,7 +278,7 @@ status_t sys_area_create(size_t size, handle_t source, offset_t offset, const ob
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to area.
  * @return		Status code describing result of the operation. */
-status_t sys_area_open(area_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_area_open(area_id_t id, object_rights_t rights, handle_t *handlep) {
 	status_t ret;
 	area_t *area;
 
@@ -307,7 +307,7 @@ status_t sys_area_open(area_id_t id, object_rights_t rights, handle_t *handlep) 
 /** Get the ID of a memory area.
  * @param handle	Handle to area.
  * @return		ID of area on success, -1 if handle is invalid. */
-area_id_t sys_area_id(handle_t handle) {
+area_id_t kern_area_id(handle_t handle) {
 	object_handle_t *khandle;
 	area_id_t ret;
 	area_t *area;
@@ -325,7 +325,7 @@ area_id_t sys_area_id(handle_t handle) {
 /** Get the size of a memory area.
  * @param handle	Handle to area.
  * @return		Size of area, or 0 if handle is invalid. */
-size_t sys_area_size(handle_t handle) {
+size_t kern_area_size(handle_t handle) {
 	object_handle_t *khandle;
 	area_t *area;
 	size_t ret;
@@ -345,7 +345,7 @@ size_t sys_area_size(handle_t handle) {
  * @param handle	Handle to area.
  * @param size		New size of the area.
  * @return		Status code describing result of the operation. */
-status_t sys_area_resize(handle_t handle, size_t size) {
+status_t kern_area_resize(handle_t handle, size_t size) {
 	object_handle_t *khandle;
 	status_t ret;
 	area_t *area;

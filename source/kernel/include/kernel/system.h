@@ -27,12 +27,12 @@
 extern "C" {
 #endif
 
-/** Actions for system_shutdown(). */
+/** Actions for kern_shutdown(). */
 #define SHUTDOWN_REBOOT		1	/**< Reboot the system. */
 #define SHUTDOWN_POWEROFF	2	/**< Power off the system. */
 
-extern status_t SYSCALL(system_shutdown)(int action);
-extern void SYSCALL(system_fatal)(const char *message);
+extern status_t kern_shutdown(int action);
+extern void kern_fatal(const char *message);
 
 #ifdef __cplusplus
 }

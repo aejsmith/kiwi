@@ -120,7 +120,7 @@ void system_shutdown(int action) {
  *			always succeed unless the calling process does not have
  *			the CAP_SHUTDOWN capability.
  */
-status_t sys_system_shutdown(int action) {
+status_t kern_shutdown(int action) {
 	if(!cap_check(NULL, CAP_SHUTDOWN)) {
 		return STATUS_PERM_DENIED;
 	}

@@ -43,7 +43,7 @@ struct kiwi::SurfacePrivate {
 			cairo_surface_destroy(cairo);
 		}
 		if(mapping) {
-			vm_unmap(mapping, area_size(area));
+			vm_unmap(mapping, kern_area_size(area));
 		}
 		if(handle >= 0) {
 			handle_close(handle);
@@ -89,7 +89,7 @@ Surface::Surface(area_id_t area) : m_priv(0) {
 	priv->area = area;
 
 	/* Open a handle to the area. */
-	ret = area_open(area, AREA_READ | AREA_WRITE, &priv->handle);
+	ret = kern_area_open(area, AREA_READ | AREA_WRITE, &priv->handle);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		libkiwi_warn("Surface::Surface: Failed to open surface area: %s.",
@@ -98,7 +98,7 @@ Surface::Surface(area_id_t area) : m_priv(0) {
 	}
 
 	/* Map it in. */
-	ret = vm_map(NULL, area_size(priv->handle), VM_MAP_READ | VM_MAP_WRITE, priv->handle,
+	ret = vm_map(NULL, kern_area_size(priv->handle), VM_MAP_READ | VM_MAP_WRITE, priv->handle,
 	             0, reinterpret_cast<void **>(&priv->mapping));
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
@@ -145,7 +145,7 @@ bool Surface::Resize(Size size) {
 	cairo_surface_t *cairo;
 
 	if(m_priv->area >= 0) {
-		size_t prev = area_size(m_priv->handle);
+		size_t prev = kern_area_size(m_priv->handle);
 		unsigned char *mapping;
 		status_t ret;
 
@@ -157,7 +157,7 @@ bool Surface::Resize(Size size) {
 		}
 
 		/* Remap the surface. */
-		ret = vm_map(NULL, area_size(m_priv->handle), VM_MAP_READ | VM_MAP_WRITE,
+		ret = vm_map(NULL, kern_area_size(m_priv->handle), VM_MAP_READ | VM_MAP_WRITE,
 		             m_priv->handle, 0, reinterpret_cast<void **>(&mapping));
 		if(ret != STATUS_SUCCESS) {
 			return false;

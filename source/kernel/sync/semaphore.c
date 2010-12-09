@@ -176,8 +176,8 @@ static object_type_t semaphore_object_type = {
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to the semaphore.
  * @return		Status code describing result of the operation. */
-status_t sys_semaphore_create(const char *name, size_t count, const object_security_t *security,
-                              object_rights_t rights, handle_t *handlep) {
+status_t kern_semaphore_create(const char *name, size_t count, const object_security_t *security,
+                               object_rights_t rights, handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	user_semaphore_t *sem;
 	status_t ret;
@@ -241,7 +241,7 @@ status_t sys_semaphore_create(const char *name, size_t count, const object_secur
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to semaphore.
  * @return		Status code describing result of the operation. */
-status_t sys_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t *handlep) {
 	user_semaphore_t *sem;
 	status_t ret;
 
@@ -270,7 +270,7 @@ status_t sys_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t 
 /** Get the ID of a semaphore.
  * @param handle	Handle to semaphore to get ID of.
  * @return		ID of semaphore on success, -1 if handle is invalid. */
-semaphore_id_t sys_semaphore_id(handle_t handle) {
+semaphore_id_t kern_semaphore_id(handle_t handle) {
 	object_handle_t *khandle;
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
@@ -299,7 +299,7 @@ semaphore_id_t sys_semaphore_id(handle_t handle) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_semaphore_down(handle_t handle, useconds_t timeout) {
+status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
 	object_handle_t *khandle;
 	user_semaphore_t *sem;
 	status_t ret;
@@ -325,7 +325,7 @@ status_t sys_semaphore_down(handle_t handle, useconds_t timeout) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_semaphore_up(handle_t handle, size_t count) {
+status_t kern_semaphore_up(handle_t handle, size_t count) {
 	object_handle_t *khandle;
 	user_semaphore_t *sem;
 	status_t ret;

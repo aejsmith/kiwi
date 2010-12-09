@@ -110,7 +110,7 @@ void SecurityServer::RemoveConnection(Connection *conn) {
 void SecurityServer::HandleConnection(handle_t handle, ipc_client_info_t &info) {
 	SessionMap::iterator it = m_sessions.find(info.sid);
 	if(it == m_sessions.end()) {
-		system_fatal("Received connection from unknown session");
+		kern_fatal("Received connection from unknown session");
 	}
 
 	m_connections.push_back(new Connection(this, it->second, handle));

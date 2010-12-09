@@ -68,7 +68,7 @@ status_t libc_mutex_lock(libc_mutex_t *lock, useconds_t timeout) {
 
 		/* Loop until we can acquire the futex. */
 		while(val != 0) {
-			ret = futex_wait((int32_t *)&lock->futex, 2, timeout);
+			ret = kern_futex_wait((int32_t *)&lock->futex, 2, timeout);
 			if(ret != STATUS_SUCCESS && ret != STATUS_TRY_AGAIN) {
 				return ret;
 			}
@@ -89,7 +89,7 @@ void libc_mutex_unlock(libc_mutex_t *lock) {
 	if(__sync_fetch_and_sub(&lock->futex, 1) != 1) {
 		/* There were waiters. Wake one up. */
 		lock->futex = 0;
-		futex_wake((int32_t *)&lock->futex, 1, NULL);
+		kern_futex_wake((int32_t *)&lock->futex, 1, NULL);
 	}
 }
 

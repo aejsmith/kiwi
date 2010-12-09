@@ -328,9 +328,8 @@ void __init_text kmain(kernel_args_t *args, cpu_id_t id) {
 		dpc_init();
 		lrm_init();
 
-		/* Now that the thread system is up and all CPUs have been
-		 * registered, the vmem periodic maintenance timer can be
-		 * registered. */
+		/* Now that the scheduler is up, the vmem periodic maintenance
+		 * timer can be registered. */
 		vmem_late_init();
 
 		/* Bring up the VM system. */

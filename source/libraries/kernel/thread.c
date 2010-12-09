@@ -51,7 +51,7 @@ static void thread_entry_wrapper(void *arg) {
 
 	func = info->func;
 	arg = info->arg;
-	semaphore_up(info->sem, 1);
+	kern_semaphore_up(info->sem, 1);
 
 	func(arg);
 	thread_exit(0);
@@ -77,7 +77,7 @@ __export status_t thread_create(const char *name, void *stack, size_t stacksz, v
 
 	/* Create the semaphore that we use to wait for the thread to signal
 	 * that its initialisation has completed. */
-	ret = semaphore_create("thread_create_sem", 0, NULL, SEMAPHORE_USAGE, &info.sem);
+	ret = kern_semaphore_create("thread_create_sem", 0, NULL, SEMAPHORE_USAGE, &info.sem);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -92,7 +92,7 @@ __export status_t thread_create(const char *name, void *stack, size_t stacksz, v
 	}
 
 	/* Wait for the thread to signal that it is initialised. */
-	semaphore_down(info.sem, -1);
+	kern_semaphore_down(info.sem, -1);
 	handle_close(info.sem);
 	return info.ret;
 }

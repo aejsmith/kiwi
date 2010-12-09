@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 	size_t count, i;
 	status_t ret;
 
-	ret = module_info(NULL, &count);
+	ret = kern_module_info(NULL, &count);
 	if(ret != STATUS_SUCCESS) {
 		printf("%s: %s\n", argv[0], __kernel_status_strings[ret]);
 		return EXIT_FAILURE;
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	ret = module_info(modules, &count);
+	ret = kern_module_info(modules, &count);
 	if(ret != STATUS_SUCCESS) {
 		printf("%s: %s\n", argv[0], __kernel_status_strings[ret]);
 		return EXIT_FAILURE;

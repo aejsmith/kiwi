@@ -457,7 +457,7 @@ static bool user_timer_func(void *_timer) {
 /** Create a new timer.
  * @param handlep	Where to store handle to timer object.
  * @return		Status code describing result of the operation. */
-status_t sys_timer_create(handle_t *handlep) {
+status_t kern_timer_create(handle_t *handlep) {
 	object_acl_t acl;
 	object_security_t security = { -1, -1, &acl };
 	user_timer_t *timer;
@@ -493,7 +493,7 @@ status_t sys_timer_create(handle_t *handlep) {
  *			If TIMER_PERIODIC, it will be fired periodically at the
  *			specified interval, until timer_stop() is called.
  * @return		Status code describing result of the operation. */
-status_t sys_timer_start(handle_t handle, useconds_t interval, int mode) {
+status_t kern_timer_start(handle_t handle, useconds_t interval, int mode) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
 	status_t ret;
@@ -517,7 +517,7 @@ status_t sys_timer_start(handle_t handle, useconds_t interval, int mode) {
 /** Stop a timer.
  * @param handle	Handle to timer object.
  * @return		Status code describing result of the operation. */
-status_t sys_timer_stop(handle_t handle) {
+status_t kern_timer_stop(handle_t handle) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
 	status_t ret;

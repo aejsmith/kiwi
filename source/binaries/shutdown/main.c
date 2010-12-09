@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
 		action = SHUTDOWN_REBOOT;
 	}
 
-	ret = system_shutdown(action);
+	ret = kern_shutdown(action);
 	printf("%s: %s\n", argv[0], __kernel_status_strings[ret]);
 	return EXIT_FAILURE;
 }

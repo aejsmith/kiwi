@@ -182,7 +182,7 @@ static futex_t *futex_lookup(int32_t *addr) {
  *			until woken by a call to futex_wake(). If 0, an error
  *			will be returned immediately.
  * @return		Status code describing result of the operation. */
-status_t sys_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
+status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	int32_t *mapping;
 	futex_t *futex;
 	status_t ret;
@@ -222,7 +222,7 @@ status_t sys_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
  * @param count		Number of threads to attempt to wake.
  * @param wokenp	Where to store number of threads actually woken.
  * @return		Status code describing result of the operation. */
-status_t sys_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
+status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	size_t woken = 0;
 	futex_t *futex;
 

@@ -42,7 +42,7 @@ Timer::Timer(Mode mode) : m_mode(mode), m_running(false) {
 
 	assert(mode == kOneShotMode || mode == kPeriodicMode);
 
-	ret = timer_create(&handle);
+	ret = kern_timer_create(&handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		throw Error(ret);
 	}
@@ -59,14 +59,14 @@ void Timer::Start(useconds_t interval) {
 	assert(interval > 0);
 
 	mode = (m_mode == kPeriodicMode) ? TIMER_PERIODIC : TIMER_ONESHOT;
-	ret = timer_start(m_handle, interval, mode);
+	ret = kern_timer_start(m_handle, interval, mode);
 	assert(ret == STATUS_SUCCESS);
 	m_running = true;
 }
 
 /** Stop the timer. */
 void Timer::Stop() {
-	status_t ret = timer_stop(m_handle);
+	status_t ret = kern_timer_stop(m_handle);
 	assert(ret == STATUS_SUCCESS);
 	m_running = false;
 }

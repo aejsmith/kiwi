@@ -375,7 +375,7 @@ int kdbg_cmd_modules(int argc, char **argv) {
  *			required dependency is not loaded, the function will
  *			return STATUS_MISSING_LIBRARY.
  */
-status_t sys_module_load(const char *path, char *depbuf) {
+status_t kern_module_load(const char *path, char *depbuf) {
 	char *kpath = NULL, kdepbuf[MODULE_NAME_MAX + 1];
 	object_handle_t *handle;
 	status_t ret, err;
@@ -416,7 +416,7 @@ status_t sys_module_load(const char *path, char *depbuf) {
  *			be the number of structures filled in. If infop is NULL,
  *			the number of loaded modules will be stored here.
  * @return		Status code describing result of the operation. */
-status_t sys_module_info(module_info_t *infop, size_t *countp) {
+status_t kern_module_info(module_info_t *infop, size_t *countp) {
 	size_t i = 0, count = 0;
 	module_info_t info;
 	module_t *module;

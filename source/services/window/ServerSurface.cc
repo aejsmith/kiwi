@@ -46,7 +46,7 @@ ServerSurface::ServerSurface(Connection *owner, Size size) :
 	size_t data_size = p2align(GetDataSize(), 0x1000);
 
 	/* Create a new area. */
-	status_t ret = area_create(data_size, -1, 0, NULL, AREA_READ | AREA_WRITE, &m_area);
+	status_t ret = kern_area_create(data_size, -1, 0, NULL, AREA_READ | AREA_WRITE, &m_area);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		clog << "Failed to create area for surface: " << e.GetDescription() << endl;
@@ -63,14 +63,14 @@ ServerSurface::~ServerSurface() {
 /** Get the ID of the surface (the same as its area ID).
  * @return		ID of the surface. */
 area_id_t ServerSurface::GetID() const {
-	return area_id(m_area);
+	return kern_area_id(m_area);
 }
 
 /** Get a pointer to the surface's data.
  * @return		Pointer to surface data, or NULL if unable to map. */
 void *ServerSurface::GetData() {
 	if(!m_mapping) {
-		status_t ret = vm_map(NULL, area_size(m_area), VM_MAP_READ | VM_MAP_WRITE,
+		status_t ret = vm_map(NULL, kern_area_size(m_area), VM_MAP_READ | VM_MAP_WRITE,
 		                      m_area, 0, &m_mapping);
 		if(ret != STATUS_SUCCESS) {
 			return NULL;
@@ -135,7 +135,7 @@ status_t ServerSurface::Resize(Size size) {
 	size_t data_size = p2align(size.GetWidth() * size.GetWidth() * 4, 0x1000);
 
 	/* Resize the area. */
-	status_t ret = area_resize(m_area, data_size);
+	status_t ret = kern_area_resize(m_area, data_size);
 	if(ret != STATUS_SUCCESS) {
 		// TODO: Workaround for kernel not supporting shrinking.
 		if(ret != STATUS_NOT_IMPLEMENTED) {
@@ -158,7 +158,7 @@ void ServerSurface::Unmap() {
 		m_image = 0;
 	}
 	if(m_mapping) {
-		vm_unmap(m_mapping, area_size(m_area));
+		vm_unmap(m_mapping, kern_area_size(m_area));
 		m_mapping = 0;
 	}
 }

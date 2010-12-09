@@ -20,7 +20,6 @@
 
 #include <kernel/object.h>
 #include <kernel/process.h>
-#include <kernel/semaphore.h>
 #include <kernel/status.h>
 #include <kernel/thread.h>
 #include <kernel/vm.h>

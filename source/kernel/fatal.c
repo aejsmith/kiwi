@@ -101,7 +101,7 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
  *
  * @param message	Message to print.
  */
-void sys_system_fatal(const char *message) {
+void kern_fatal(const char *message) {
 	char *kmessage;
 
 	if(!cap_check(NULL, CAP_FATAL)) {
