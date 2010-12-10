@@ -32,7 +32,7 @@
 int symlink(const char *dest, const char *path) {
 	status_t ret;
 
-	ret = fs_symlink_create(path, dest);
+	ret = kern_symlink_create(path, dest);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

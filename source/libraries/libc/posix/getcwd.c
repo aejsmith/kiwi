@@ -40,7 +40,7 @@ char *getcwd(char *buf, size_t size) {
 		return NULL;
 	}
 
-	ret = fs_getcwd(buf, size);
+	ret = kern_fs_getcwd(buf, size);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return NULL;

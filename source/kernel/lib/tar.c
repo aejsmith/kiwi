@@ -38,13 +38,13 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
 	object_rights_t rights = 0;
 
 	if(mode & TOREAD) {
-		rights |= FS_READ;
+		rights |= FILE_READ;
 	}
 	if(mode & TOWRITE) {
-		rights |= FS_WRITE;
+		rights |= FILE_WRITE;
 	}
 	if(mode & TOEXEC) {
-		rights |= FS_EXECUTE;
+		rights |= FILE_EXECUTE;
 	}
 	return rights;
 }
@@ -89,12 +89,12 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 	switch(header->typeflag) {
 	case REGTYPE:
 	case AREGTYPE:
-		ret = fs_file_open(path, FS_WRITE, 0, FS_CREATE_ALWAYS, &security, &handle);
+		ret = file_open(path, FILE_WRITE, 0, FILE_CREATE_ALWAYS, &security, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 
-		ret = fs_file_write(handle, data, size, &bytes);
+		ret = file_write(handle, data, size, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			object_handle_release(handle);
 			goto out;
@@ -107,13 +107,13 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 		object_handle_release(handle);
 		break;
 	case DIRTYPE:
-		ret = fs_dir_create(path, &security);
+		ret = dir_create(path, &security);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
 		break;
 	case SYMTYPE:
-		ret = fs_symlink_create(path, header->linkname);
+		ret = symlink_create(path, header->linkname);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
@@ -149,7 +149,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 
 	while(true) {
 		/* Read in the next header. */
-		ret = fs_file_pread(handle, header, sizeof(*header), offset, &bytes);
+		ret = file_pread(handle, header, sizeof(*header), offset, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		} else if(bytes < 2) {
@@ -180,7 +180,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 				goto fail;
 			}
 
-			ret = fs_file_pread(handle, data, size, offset + 512, &bytes);
+			ret = file_pread(handle, data, size, offset + 512, &bytes);
 			if(ret != STATUS_SUCCESS) {
 				goto fail;
 			} else if(bytes != size) {

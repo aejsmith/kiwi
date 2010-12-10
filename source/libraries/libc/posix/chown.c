@@ -38,7 +38,7 @@ int chown(const char *path, uid_t uid, gid_t gid) {
 	security.gid = gid;
 	security.acl = NULL;
 
-	ret = fs_set_security(path, true, &security);
+	ret = kern_fs_set_security(path, true, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -61,7 +61,7 @@ int lchown(const char *path, uid_t uid, gid_t gid) {
 	security.gid = gid;
 	security.acl = NULL;
 
-	ret = fs_set_security(path, false, &security);
+	ret = kern_fs_set_security(path, false, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

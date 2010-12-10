@@ -26,8 +26,8 @@
 
 #include "libkernel.h"
 
-extern status_t _fs_security(const char *path, bool follow, user_id_t *uidp,
-                             group_id_t *gidp, object_acl_t *aclp);
+extern status_t _kern_fs_security(const char *path, bool follow, user_id_t *uidp,
+                                  group_id_t *gidp, object_acl_t *aclp);
 
 /** Obtain security attributes for a filesystem entry.
  * @param path		Path to entry to get security attributes for.
@@ -38,7 +38,7 @@ extern status_t _fs_security(const char *path, bool follow, user_id_t *uidp,
  *			freed with object_security_destroy() once it is no
  *			longer needed.
  * @return		Status code describing result of the operation. */
-__export status_t fs_security(const char *path, bool follow, object_security_t *securityp) {
+__export status_t kern_fs_security(const char *path, bool follow, object_security_t *securityp) {
 	status_t ret;
 
 	securityp->acl = malloc(sizeof(object_acl_t));
@@ -49,7 +49,7 @@ __export status_t fs_security(const char *path, bool follow, object_security_t *
 	/* Call with a NULL entries pointer in order to get the size of the ACL.
 	 * TODO: What if the ACL is changed between the two calls? */
 	securityp->acl->entries = NULL;
-	ret = _fs_security(path, follow, &securityp->uid, &securityp->gid, securityp->acl);
+	ret = _kern_fs_security(path, follow, &securityp->uid, &securityp->gid, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl);
 		return ret;
@@ -62,7 +62,7 @@ __export status_t fs_security(const char *path, bool follow, object_security_t *
 	}
 
 	/* Get the ACL entries. */
-	ret = _fs_security(path, follow, NULL, NULL, securityp->acl);
+	ret = _kern_fs_security(path, follow, NULL, NULL, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl->entries);
 		free(securityp->acl);

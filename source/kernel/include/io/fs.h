@@ -122,7 +122,7 @@ typedef struct fs_node_ops {
 	 * @param nodep		Where to store pointer to node structure for
 	 *			created entry.
 	 * @return		Status code describing result of the operation. */
-	status_t (*create)(struct fs_node *parent, const char *name, fs_node_type_t type,
+	status_t (*create)(struct fs_node *parent, const char *name, file_type_t type,
 	                   const char *target, object_security_t *security,
 	                   struct fs_node **nodep);
 
@@ -146,8 +146,8 @@ typedef struct fs_node_ops {
 
 	/** Get information about a node.
 	 * @param node		Node to get information on.
-	 * @param info		Information structure to fill in. */
-	void (*info)(struct fs_node *node, fs_info_t *info);
+	 * @param infop		Information structure to fill in. */
+	void (*info)(struct fs_node *node, file_info_t *infop);
 
 	/** Update security attributes of a node.
 	 * @param node		Node to set for.
@@ -203,7 +203,7 @@ typedef struct fs_node_ops {
 	 *			structure (must be allocated using a
 	 *			kmalloc()-based function).
 	 * @return		Status code describing result of the operation. */
-	status_t (*read_entry)(struct fs_node *node, offset_t index, fs_dir_entry_t **entryp);
+	status_t (*read_entry)(struct fs_node *node, offset_t index, dir_entry_t **entryp);
 
 	/** Look up a directory entry.
 	 * @param node		Node to look up in.
@@ -254,7 +254,7 @@ typedef struct fs_node {
 	list_t mount_link;		/**< Link to mount's node lists. */
 	list_t unused_link;		/**< Link to global unused node list. */
 	node_id_t id;			/**< ID of the node. */
-	fs_node_type_t type;		/**< Type of the node. */
+	file_type_t type;		/**< Type of the node. */
 	bool removed;			/**< Whether the node has been removed. */
 	fs_mount_t *mounted;		/**< Pointer to filesystem mounted on this node. */
 
@@ -274,7 +274,7 @@ typedef struct fs_node {
 extern status_t fs_type_register(fs_type_t *type);
 extern status_t fs_type_unregister(fs_type_t *type);
 
-extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, fs_node_type_t type,
+extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
                                 object_security_t *security, fs_node_ops_t *ops,
                                 void *data);
 extern void fs_node_release(fs_node_t *node);
@@ -285,39 +285,37 @@ extern void fs_node_remove(fs_node_t *node);
  * Kernel interface.
  */
 
-extern object_handle_t *fs_file_from_memory(const void *buf, size_t size);
-extern status_t fs_file_open(const char *path, object_rights_t rights, int flags,
-                             int create, object_security_t *security,
-                             object_handle_t **handlep);
-extern status_t fs_file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
-extern status_t fs_file_pread(object_handle_t *handle, void *buf, size_t count,
-                              offset_t offset, size_t *bytesp);
-extern status_t fs_file_write(object_handle_t *handle, const void *buf, size_t count,
-                              size_t *bytesp);
-extern status_t fs_file_pwrite(object_handle_t *handle, const void *buf, size_t count,
-                               offset_t offset, size_t *bytesp);
-extern status_t fs_file_resize(object_handle_t *handle, offset_t size);
+extern object_handle_t *file_from_memory(const void *buf, size_t size);
+extern status_t file_open(const char *path, object_rights_t rights, int flags,
+                          int create, object_security_t *security,
+                          object_handle_t **handlep);
+extern status_t file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
+extern status_t file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset,
+                           size_t *bytesp);
+extern status_t file_write(object_handle_t *handle, const void *buf, size_t count,
+                           size_t *bytesp);
+extern status_t file_pwrite(object_handle_t *handle, const void *buf, size_t count,
+                            offset_t offset, size_t *bytesp);
+extern status_t file_resize(object_handle_t *handle, offset_t size);
+extern status_t file_seek(object_handle_t *handle, int action, rel_offset_t offset,
+                          offset_t *newp);
+extern status_t file_info(object_handle_t *handle, file_info_t *infop);
+extern status_t file_sync(object_handle_t *handle);
 
-extern status_t fs_dir_create(const char *path, object_security_t *security);
-extern status_t fs_dir_open(const char *path, object_rights_t rights, int flags,
-                            object_handle_t **handlep);
-extern status_t fs_dir_read(object_handle_t *handle, fs_dir_entry_t *buf, size_t size);
+extern status_t dir_create(const char *path, object_security_t *security);
+extern status_t dir_read(object_handle_t *handle, dir_entry_t *buf, size_t size);
 
-extern status_t fs_handle_seek(object_handle_t *handle, int action, rel_offset_t offset, offset_t *newp);
-extern status_t fs_handle_info(object_handle_t *handle, fs_info_t *info);
-extern status_t fs_handle_sync(object_handle_t *handle);
-
-extern status_t fs_symlink_create(const char *path, const char *target);
-extern status_t fs_symlink_read(const char *path, char *buf, size_t size);
+extern status_t symlink_create(const char *path, const char *target);
+extern status_t symlink_read(const char *path, char *buf, size_t size);
 
 extern void fs_probe(struct device *device);
 extern status_t fs_mount(const char *device, const char *path, const char *type, const char *opts);
 extern status_t fs_unmount(const char *path);
-//extern status_t fs_sync(void);
-extern status_t fs_info(const char *path, bool follow, fs_info_t *info);
+extern status_t fs_info(const char *path, bool follow, file_info_t *infop);
 //extern status_t fs_link(const char *source, const char *dest);
 extern status_t fs_unlink(const char *path);
 //extern status_t fs_rename(const char *source, const char *dest);
+//extern status_t fs_sync(void);
 
 /**
  * Debugger commands.

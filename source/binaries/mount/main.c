@@ -32,11 +32,11 @@ static void usage(const char *argv0) {
 
 /** List information on all mounts. */
 static int mount_list(const char *argv0) {
-	fs_mount_info_t *mounts;
+	mount_info_t *mounts;
 	size_t count, i;
 	status_t ret;
 
-	ret = fs_mount_info(NULL, &count);
+	ret = kern_fs_mount_info(NULL, &count);
 	if(ret != STATUS_SUCCESS) {
 		printf("%s: %s\n", argv0, __kernel_status_strings[ret]);
 		return EXIT_FAILURE;
@@ -48,7 +48,7 @@ static int mount_list(const char *argv0) {
 		return EXIT_FAILURE;
 	}
 
-	ret = fs_mount_info(mounts, &count);
+	ret = kern_fs_mount_info(mounts, &count);
 	if(ret != STATUS_SUCCESS) {
 		printf("%s: %s\n", argv0, __kernel_status_strings[ret]);
 		return EXIT_FAILURE;
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
 		type = argv[3];
 		opts = (argc == 5) ? argv[4] : 0;
 
-		ret = fs_mount(dev, path, type, opts);
+		ret = kern_fs_mount(dev, path, type, opts);
 		if(ret != STATUS_SUCCESS) {
 			printf("%s: %s\n", argv[0], __kernel_status_strings[ret]);
 			return EXIT_FAILURE;

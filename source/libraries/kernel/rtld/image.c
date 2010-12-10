@@ -66,7 +66,7 @@ static bool rtld_library_exists(const char *path) {
 	dprintf("  trying %s... ", path);
 
 	/* Attempt to open it to see if it is there. */
-	ret = fs_file_open(path, FS_READ, 0, 0, NULL, &handle);
+	ret = kern_file_open(path, FILE_READ, 0, 0, NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("returned %d\n", ret);
 		return false;
@@ -229,16 +229,16 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	status_t ret;
 
 	/* Try to open the image. */
-	ret = fs_file_open(path, FS_READ | FS_EXECUTE, 0, 0, NULL, &handle);
+	ret = kern_file_open(path, FILE_READ | FILE_EXECUTE, 0, 0, NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
 
 	/* Read in its header and ensure that it is valid. */
-	ret = fs_file_pread(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = kern_file_pread(handle, &ehdr, sizeof(ehdr), 0, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
-	} else if(bytes != sizeof(elf_ehdr_t)) {
+	} else if(bytes != sizeof(ehdr)) {
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
 	} else if(ehdr.e_ident[0] != 0x7f || ehdr.e_ident[1] != 'E' || ehdr.e_ident[2] != 'L' || ehdr.e_ident[3] != 'F') {
@@ -281,7 +281,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	 * heap space. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
 	phdrs = alloca(size);
-	ret = fs_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
+	ret = kern_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != size) {
@@ -326,7 +326,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		case ELF_PT_INTERP:
 			if(ehdr.e_type == ELF_ET_EXEC) {
 				interp = alloca(phdrs[i].p_filesz + 1);
-				ret = fs_file_pread(handle, interp, phdrs[i].p_filesz, phdrs[i].p_offset, NULL);
+				ret = kern_file_pread(handle, interp, phdrs[i].p_filesz, phdrs[i].p_offset, NULL);
 				if(ret != STATUS_SUCCESS) {
 					goto fail;
 				}

@@ -89,7 +89,7 @@ void io_context_destroy(io_context_t *context) {
 status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	fs_node_t *old;
 
-	if(node->type != FS_NODE_DIR) {
+	if(node->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
 	}
 
@@ -117,7 +117,7 @@ status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 status_t io_context_setroot(io_context_t *context, fs_node_t *node) {
 	fs_node_t *oldr, *oldc;
 
-	if(node->type != FS_NODE_DIR) {
+	if(node->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
 	}
 

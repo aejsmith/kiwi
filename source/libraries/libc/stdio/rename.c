@@ -32,7 +32,7 @@
 int rename(const char *source, const char *dest) {
 	status_t ret;
 
-	ret = fs_rename(source, dest);
+	ret = kern_fs_rename(source, dest);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

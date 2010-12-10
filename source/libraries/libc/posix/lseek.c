@@ -46,15 +46,15 @@ off_t lseek(int fd, off_t off, int act) {
 	int kact;
 
 	switch(act) {
-	case SEEK_SET: kact = FS_SEEK_SET; break;
-	case SEEK_CUR: kact = FS_SEEK_ADD; break;
-	case SEEK_END: kact = FS_SEEK_END; break;
+	case SEEK_SET: kact = FILE_SEEK_SET; break;
+	case SEEK_CUR: kact = FILE_SEEK_ADD; break;
+	case SEEK_END: kact = FILE_SEEK_END; break;
 	default:
 		errno = EINVAL;
 		return -1;
 	}
 
-	ret = fs_handle_seek(fd, kact, off, &new);
+	ret = kern_file_seek(fd, kact, off, &new);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

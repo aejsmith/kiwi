@@ -71,11 +71,11 @@ void entry_cache_destroy(entry_cache_t *cache) {
  * @param name		Name of entry.
  * @param id		ID of node that entry points to.
  * @return		Pointer to entry structure. */
-static fs_dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const char *name, node_id_t id) {
-	fs_dir_entry_t *entry;
+static dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const char *name, node_id_t id) {
+	dir_entry_t *entry;
 	size_t len;
 
-	len = sizeof(fs_dir_entry_t) + strlen(name) + 1;
+	len = sizeof(dir_entry_t) + strlen(name) + 1;
 	entry = kmalloc(len, MM_SLEEP);
 	entry->length = len;
 	entry->id = id;
@@ -90,7 +90,7 @@ static fs_dir_entry_t *entry_cache_insert_internal(entry_cache_t *cache, const c
  * @param idp		Where to store ID of node entry points to.
  * @return		Status code describing result of the operation. */
 status_t entry_cache_lookup(entry_cache_t *cache, const char *name, node_id_t *idp) {
-	fs_dir_entry_t *entry;
+	dir_entry_t *entry;
 	node_id_t id;
 	status_t ret;
 

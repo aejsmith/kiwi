@@ -37,7 +37,7 @@
 int unlink(const char *path) {
 	status_t ret;
 
-	ret = fs_unlink(path);
+	ret = kern_fs_unlink(path);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

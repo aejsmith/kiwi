@@ -37,7 +37,7 @@ int chdir(const char *path) {
 		return -1;
 	}
 
-	ret = fs_setcwd(path);
+	ret = kern_fs_setcwd(path);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

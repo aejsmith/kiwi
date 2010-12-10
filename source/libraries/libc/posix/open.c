@@ -29,26 +29,24 @@
 #include "posix_priv.h"
 
 /** Convert POSIX open() flags to kernel flags.
- * @param type		Node type.
  * @param oflag		POSIX open flags.
  * @param krightsp	Where to store kernel rights.
  * @param kflagsp	Where to store kernel flags.
  * @param kcreatep	Where to store kernel creation flags. */
-static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rights_t *krightsp,
-                                      int *kflagsp, int *kcreatep) {
+static inline void convert_open_flags(int oflag, object_rights_t *krightsp, int *kflagsp, int *kcreatep) {
 	object_rights_t krights = 0;
 	int kflags = 0;
 
-	krights |= ((oflag & O_RDONLY) ? FS_READ : 0);
-	krights |= ((oflag & O_WRONLY) ? FS_WRITE : 0);
+	krights |= ((oflag & O_RDONLY) ? FILE_READ : 0);
+	krights |= ((oflag & O_WRONLY) ? FILE_WRITE : 0);
 
-	kflags |= ((oflag & O_NONBLOCK) ? FS_NONBLOCK : 0);
-	kflags |= ((oflag & O_APPEND) ? FS_APPEND : 0);
+	kflags |= ((oflag & O_NONBLOCK) ? FILE_NONBLOCK : 0);
+	kflags |= ((oflag & O_APPEND) ? FILE_APPEND : 0);
 
 	*krightsp = krights;
 	*kflagsp = kflags;
 	if(oflag & O_CREAT) {
-		*kcreatep = (oflag & O_EXCL) ? FS_CREATE_ALWAYS : FS_CREATE;
+		*kcreatep = (oflag & O_EXCL) ? FILE_CREATE_ALWAYS : FILE_CREATE;
 	} else {
 		*kcreatep = 0;
 	}
@@ -65,10 +63,10 @@ static inline void convert_open_flags(fs_node_type_t type, int oflag, object_rig
 int open(const char *path, int oflag, ...) {
 	object_security_t security = { -1, -1, NULL };
 	object_rights_t rights;
-	fs_node_type_t type;
 	int kflags, kcreate;
+	file_type_t type;
+	file_info_t info;
 	handle_t handle;
-	fs_info_t info;
 	uint16_t mode;
 	status_t ret;
 	va_list args;
@@ -92,29 +90,35 @@ int open(const char *path, int oflag, ...) {
 	 * a directory, Linux fails with EISDIR if O_CREAT is used with a
 	 * directory that already exists. */
 	if(oflag & O_CREAT) {
-		type = FS_NODE_FILE;
+		type = FILE_TYPE_REGULAR;
 	} else {
 		/* Determine the filesystem entry type. */
-		ret = fs_info(path, true, &info);
+		ret = kern_fs_info(path, true, &info);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;
 		}
 
 		type = info.type;
-	}
 
-	/* Convert the flags to kernel flags. */
-	convert_open_flags(type, oflag, &rights, &kflags, &kcreate);
-
-	/* Open according to the entry type. */
-	switch(type) {
-	case FS_NODE_FILE:
-		if(oflag & O_DIRECTORY) {
+		/* Handle the O_DIRECTORY flag. */
+		if(oflag & O_DIRECTORY && type != FILE_TYPE_DIR) {
 			errno = ENOTDIR;
 			return -1;
 		}
+	}
 
+	/* Convert the flags to kernel flags. */
+	convert_open_flags(oflag, &rights, &kflags, &kcreate);
+
+	/* Open according to the entry type. */
+	switch(type) {
+	case FILE_TYPE_DIR:
+		if(oflag & O_WRONLY || oflag & O_TRUNC) {
+			errno = EISDIR;
+			return -1;
+		}
+	case FILE_TYPE_REGULAR:
 		if(oflag & O_CREAT) {
 			/* Obtain the creation mask. */
 			va_start(args, oflag);
@@ -132,7 +136,7 @@ int open(const char *path, int oflag, ...) {
 		}
 
 		/* Open the file, creating it if necessary. */
-		ret = fs_file_open(path, rights, kflags, kcreate, &security, &handle);
+		ret = kern_file_open(path, rights, kflags, kcreate, &security, &handle);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;
@@ -140,24 +144,12 @@ int open(const char *path, int oflag, ...) {
 
 		/* Truncate the file if requested. */
 		if(oflag & O_TRUNC) {
-			ret = fs_file_resize(handle, 0);
+			ret = kern_file_resize(handle, 0);
 			if(ret != STATUS_SUCCESS) {
 				handle_close(handle);
 				libc_status_to_errno(ret);
 				return -1;
 			}
-		}
-		break;
-	case FS_NODE_DIR:
-		if(oflag & O_WRONLY || oflag & O_TRUNC) {
-			errno = EISDIR;
-			return -1;
-		}
-
-		ret = fs_dir_open(path, rights, kflags, &handle);
-		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
-			return -1;
 		}
 		break;
 	default:

@@ -34,11 +34,11 @@
  *			accordingly. */
 int access(const char *path, int mode) {
 	object_rights_t rights = 0;
+	file_info_t info;
 	handle_t handle;
-	fs_info_t info;
 	status_t ret;
 
-	ret = fs_info(path, true, &info);
+	ret = kern_fs_info(path, true, &info);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -46,28 +46,20 @@ int access(const char *path, int mode) {
 
 	if(mode != F_OK) {
 		if(mode & R_OK) {
-			rights |= FS_READ;
+			rights |= FILE_READ;
 		}
 		if(mode & W_OK) {
-			rights |= FS_WRITE;
+			rights |= FILE_WRITE;
 		}
 		if(mode & X_OK) {
-			rights |= FS_EXECUTE;
+			rights |= FILE_EXECUTE;
 		}
 	}
 
 	switch(info.type) {
-	case FS_NODE_FILE:
-		ret = fs_file_open(path, rights, 0, 0, NULL, &handle);
-		if(ret != STATUS_SUCCESS) {
-			libc_status_to_errno(ret);
-			return -1;
-		}
-
-		handle_close(handle);
-		break;
-	case FS_NODE_DIR:
-		ret = fs_dir_open(path, rights, 0, &handle);
+	case FILE_TYPE_REGULAR:
+	case FILE_TYPE_DIR:
+		ret = kern_file_open(path, rights, 0, 0, NULL, &handle);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;

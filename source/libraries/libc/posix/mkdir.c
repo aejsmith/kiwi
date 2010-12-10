@@ -33,7 +33,7 @@
 int mkdir(const char *path, mode_t mode) {
 	status_t ret;
 
-	ret = fs_dir_create(path, NULL);
+	ret = kern_dir_create(path, NULL);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

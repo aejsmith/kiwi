@@ -34,8 +34,7 @@ int fsync(int fd) {
 
 	switch(object_type(fd)) {
 	case OBJECT_TYPE_FILE:
-	case OBJECT_TYPE_DIR:
-		ret = fs_handle_sync(fd);
+		ret = kern_file_sync(fd);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;
@@ -52,5 +51,5 @@ int fsync(int fd) {
 
 /** Flush filesystem caches. */
 void sync(void) {
-	fs_sync();
+	kern_fs_sync();
 }

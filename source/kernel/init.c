@@ -174,7 +174,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		mod->name = NULL;
 		mod->size = amod->size;
 		mod->mapping = page_phys_map(amod->base, mod->size, MM_FATAL);
-		mod->handle = fs_file_from_memory(mod->mapping, mod->size);
+		mod->handle = file_from_memory(mod->mapping, mod->size);
 
 		/* Figure out the module name, which is needed to resolve
 		 * dependencies. If unable to get the name, assume the module

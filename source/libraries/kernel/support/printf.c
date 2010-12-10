@@ -41,7 +41,7 @@ static inline void printf_print_char(char ch) {
 		device_write(OUTPUT_HANDLE, &ch, 1, 0, NULL);
 		break;
 	case OBJECT_TYPE_FILE:
-		fs_file_write(OUTPUT_HANDLE, &ch, 1, NULL);
+		kern_file_write(OUTPUT_HANDLE, &ch, 1, NULL);
 		break;
 	}
 }
@@ -54,7 +54,7 @@ static inline void printf_print_string(const char *str) {
 		device_write(OUTPUT_HANDLE, str, strlen(str), 0, NULL);
 		break;
 	case OBJECT_TYPE_FILE:
-		fs_file_write(OUTPUT_HANDLE, str, strlen(str), NULL);
+		kern_file_write(OUTPUT_HANDLE, str, strlen(str), NULL);
 		break;
 	}
 }

@@ -59,7 +59,7 @@ static status_t ext2_node_flush(fs_node_t *node) {
  * @param target	For symbolic links, the target of the link.
  * @param nodep		Where to store pointer to node for created entry.
  * @return		Status code describing result of the operation. */
-static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_type_t type,
+static status_t ext2_node_create(fs_node_t *_parent, const char *name, file_type_t type,
                                  const char *target, object_security_t *security,
                                  fs_node_t **nodep) {
 	ext2_inode_t *parent = _parent->data, *inode;
@@ -69,13 +69,13 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 
 	/* Work out the mode for the type. */
 	switch(type) {
-	case FS_NODE_FILE:
+	case FILE_TYPE_REGULAR:
 		mode |= EXT2_S_IFREG;
 		break;
-	case FS_NODE_DIR:
+	case FILE_TYPE_DIR:
 		mode |= EXT2_S_IFDIR;
 		break;
-	case FS_NODE_SYMLINK:
+	case FILE_TYPE_SYMLINK:
 		mode |= EXT2_S_IFLNK;
 		break;
 	default:
@@ -92,7 +92,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 
 	/* Add the . and .. entries when creating a directory, and fill in
 	 * link destination when creating a symbolic link. */
-	if(type == FS_NODE_DIR) {
+	if(type == FILE_TYPE_DIR) {
 		ret = ext2_dir_insert(inode, ".", inode);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
@@ -102,7 +102,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, fs_node_t
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
-	} else if(type == FS_NODE_SYMLINK) {
+	} else if(type == FILE_TYPE_SYMLINK) {
 		len = strlen(target);
 		if(len <= sizeof(inode->disk.i_block)) {
 			inode->size = len;
@@ -147,7 +147,7 @@ static status_t ext2_node_unlink(fs_node_t *_parent, const char *name, fs_node_t
 	mutex_lock(&parent->lock);
 	mutex_lock(&inode->lock);
 
-	if(node->type == FS_NODE_DIR) {
+	if(node->type == FILE_TYPE_DIR) {
 		/* Ensure that it's empty. */
 		if(!ext2_dir_empty(inode)) {
 			ret = STATUS_DIR_NOT_EMPTY;
@@ -181,18 +181,18 @@ out:
 
 /** Get information about an Ext2 node.
  * @param node		Node to get information on.
- * @param info		Information structure to fill in. */
-static void ext2_node_info(fs_node_t *node, fs_info_t *info) {
+ * @param infop		Information structure to fill in. */
+static void ext2_node_info(fs_node_t *node, file_info_t *infop) {
 	ext2_inode_t *inode = node->data;
 
 	mutex_lock(&inode->lock);
 
-	info->block_size = PAGE_SIZE;
-	info->size = inode->size;
-	info->links = le16_to_cpu(inode->disk.i_links_count);
-	info->created = SECS2USECS(le32_to_cpu(inode->disk.i_ctime));
-	info->accessed = SECS2USECS(le32_to_cpu(inode->disk.i_atime));
-	info->modified = SECS2USECS(le32_to_cpu(inode->disk.i_mtime));
+	infop->block_size = PAGE_SIZE;
+	infop->size = inode->size;
+	infop->links = le16_to_cpu(inode->disk.i_links_count);
+	infop->created = SECS2USECS(le32_to_cpu(inode->disk.i_ctime));
+	infop->accessed = SECS2USECS(le32_to_cpu(inode->disk.i_atime));
+	infop->modified = SECS2USECS(le32_to_cpu(inode->disk.i_mtime));
 
 	mutex_unlock(&inode->lock);
 }
@@ -260,16 +260,16 @@ static status_t ext2_node_resize(fs_node_t *node, offset_t size) {
  * @return		Always returns false. */
 static bool ext2_read_entry_cb(ext2_inode_t *dir, ext2_dirent_t *header, const char *name,
                                offset_t offset, void *data) {
-	fs_dir_entry_t *entry;
+	dir_entry_t *entry;
 	size_t len;
 
-	len = sizeof(fs_dir_entry_t) + strlen(name) + 1;
+	len = sizeof(*entry) + strlen(name) + 1;
 	entry = kmalloc(len, MM_SLEEP);
 	entry->length = len;
 	entry->id = le32_to_cpu(header->inode);
 	strcpy(entry->name, name);
 
-	*(fs_dir_entry_t **)data = entry;
+	*(dir_entry_t **)data = entry;
 	return false;
 }
 
@@ -278,7 +278,7 @@ static bool ext2_read_entry_cb(ext2_inode_t *dir, ext2_dirent_t *header, const c
  * @param index		Index of entry to read.
  * @param entryp	Where to store pointer to directory entry structure.
  * @return		Status code describing result of the operation. */
-static status_t ext2_node_read_entry(fs_node_t *node, offset_t index, fs_dir_entry_t **entryp) {
+static status_t ext2_node_read_entry(fs_node_t *node, offset_t index, dir_entry_t **entryp) {
 	ext2_inode_t *inode = node->data;
 	return ext2_dir_iterate(inode, index, ext2_read_entry_cb, entryp);
 }
@@ -382,8 +382,8 @@ static void ext2_unmount(fs_mount_t *mount) {
 static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **nodep) {
 	ext2_mount_t *data = mount->data;
 	object_security_t *security;
-	fs_node_type_t type;
 	ext2_inode_t *inode;
+	file_type_t type;
 	status_t ret;
 
 	ret = ext2_inode_get(data, id, &inode);
@@ -394,25 +394,25 @@ static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **node
 	/* Figure out the node type. */
 	switch(le16_to_cpu(inode->disk.i_mode) & EXT2_S_IFMT) {
 	case EXT2_S_IFSOCK:
-		type = FS_NODE_SOCK;
+		type = FILE_TYPE_SOCK;
 		break;
 	case EXT2_S_IFLNK:
-		type = FS_NODE_SYMLINK;
+		type = FILE_TYPE_SYMLINK;
 		break;
 	case EXT2_S_IFREG:
-		type = FS_NODE_FILE;
+		type = FILE_TYPE_REGULAR;
 		break;
 	case EXT2_S_IFBLK:
-		type = FS_NODE_BLKDEV;
+		type = FILE_TYPE_BLKDEV;
 		break;
 	case EXT2_S_IFDIR:
-		type = FS_NODE_DIR;
+		type = FILE_TYPE_DIR;
 		break;
 	case EXT2_S_IFCHR:
-		type = FS_NODE_CHRDEV;
+		type = FILE_TYPE_CHRDEV;
 		break;
 	case EXT2_S_IFIFO:
-		type = FS_NODE_FIFO;
+		type = FILE_TYPE_FIFO;
 		break;
 	default:
 		dprintf("ext2: inode %" PRIu32 " has invalid type in mode (%" PRIu16 ")\n",
@@ -422,7 +422,7 @@ static status_t ext2_read_node(fs_mount_t *mount, node_id_t id, fs_node_t **node
 	}
 
 	/* Sanity check. */
-	if(id == EXT2_ROOT_INO && type != FS_NODE_DIR) {
+	if(id == EXT2_ROOT_INO && type != FILE_TYPE_DIR) {
 		dprintf("ext2: root inode %" PRIu32 " is not a directory (%" PRIu16 ")\n",
 		        inode->num, le16_to_cpu(inode->disk.i_mode));
 		ext2_inode_release(inode);

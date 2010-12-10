@@ -90,7 +90,6 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 
 		switch(object_type(fds[i].fd)) {
 		case OBJECT_TYPE_FILE:
-		case OBJECT_TYPE_DIR:
 			if(fds[i].events & ~(POLLIN | POLLOUT)) {
 				errno = ENOTSUP;
 				goto fail;

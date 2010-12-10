@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	ret = fs_unmount(argv[1]);
+	ret = kern_fs_unmount(argv[1]);
 	if(ret != STATUS_SUCCESS) {
 		printf("%s: %s\n", argv[0], __kernel_status_strings[ret]);
 		return EXIT_FAILURE;

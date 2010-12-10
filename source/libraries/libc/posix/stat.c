@@ -36,13 +36,13 @@
 static inline uint16_t rights_to_mode(object_rights_t rights) {
 	uint16_t mode = 0;
 
-	if(rights & FS_READ) {
+	if(rights & FILE_READ) {
 		mode |= S_IROTH;
 	}
-	if(rights & FS_WRITE) {
+	if(rights & FILE_WRITE) {
 		mode |= S_IWOTH;
 	}
-	if(rights & FS_EXECUTE) {
+	if(rights & FILE_EXECUTE) {
 		mode |= S_IXOTH;
 	}
 	return mode;
@@ -52,7 +52,7 @@ static inline uint16_t rights_to_mode(object_rights_t rights) {
  * @param info		Kernel information structure.
  * @param security	Security attributes for the entry.
  * @param statp		Stat structure. */
-static void fs_info_to_stat(fs_info_t *info, object_security_t *security, struct stat *restrict statp) {
+static void file_info_to_stat(file_info_t *info, object_security_t *security, struct stat *restrict statp) {
 	uint16_t umode = 0, gmode = 0, omode = 0;
 	bool user = false, group = false;
 	object_acl_t *acl;
@@ -75,25 +75,25 @@ static void fs_info_to_stat(fs_info_t *info, object_security_t *security, struct
 
 	/* Determine the file type mode. */
 	switch(info->type) {
-	case FS_NODE_FILE:
+	case FILE_TYPE_REGULAR:
 		statp->st_mode = S_IFREG;
 		break;
-	case FS_NODE_DIR:
+	case FILE_TYPE_DIR:
 		statp->st_mode = S_IFDIR;
 		break;
-	case FS_NODE_SYMLINK:
+	case FILE_TYPE_SYMLINK:
 		statp->st_mode = S_IFLNK;
 		break;
-	case FS_NODE_BLKDEV:
+	case FILE_TYPE_BLKDEV:
 		statp->st_mode = S_IFBLK;
 		break;
-	case FS_NODE_CHRDEV:
+	case FILE_TYPE_CHRDEV:
 		statp->st_mode = S_IFCHR;
 		break;
-	case FS_NODE_FIFO:
+	case FILE_TYPE_FIFO:
 		statp->st_mode = S_IFIFO;
 		break;
-	case FS_NODE_SOCK:
+	case FILE_TYPE_SOCK:
 		statp->st_mode = S_IFSOCK;
 		break;
 	}
@@ -133,13 +133,12 @@ static void fs_info_to_stat(fs_info_t *info, object_security_t *security, struct
  * @return		0 on success, -1 on failure. */
 int fstat(int fd, struct stat *statp) {
 	object_security_t security;
-	fs_info_t info;
+	file_info_t info;
 	status_t ret;
 
 	switch(object_type(fd)) {
 	case OBJECT_TYPE_FILE:
-	case OBJECT_TYPE_DIR:
-		ret = fs_handle_info(fd, &info);
+		ret = kern_file_info(fd, &info);
 		if(ret != STATUS_SUCCESS) {
 			libc_status_to_errno(ret);
 			return -1;
@@ -147,7 +146,7 @@ int fstat(int fd, struct stat *statp) {
 		break;
 	case OBJECT_TYPE_DEVICE:
 		memset(&info, 0, sizeof(info));
-		info.type = (isatty(fd)) ? FS_NODE_CHRDEV : FS_NODE_BLKDEV;
+		info.type = (isatty(fd)) ? FILE_TYPE_CHRDEV : FILE_TYPE_BLKDEV;
 		/* FIXME: Get correct values for block devices here. */
 		info.block_size = 1;
 		info.size = 1;
@@ -167,7 +166,7 @@ int fstat(int fd, struct stat *statp) {
 		return -1;
 	}
 
-	fs_info_to_stat(&info, &security, statp);
+	file_info_to_stat(&info, &security, statp);
 	object_security_destroy(&security);
 	return 0;
 }
@@ -179,22 +178,22 @@ int fstat(int fd, struct stat *statp) {
  * @param		0 on success, -1 on failure. */
 int lstat(const char *restrict path, struct stat *restrict statp) {
 	object_security_t security;
-	fs_info_t info;
+	file_info_t info;
 	status_t ret;
 
-	ret = fs_info(path, false, &info);
+	ret = kern_fs_info(path, false, &info);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
 	}
 
-	ret = fs_security(path, false, &security);
+	ret = kern_fs_security(path, false, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
 	}
 
-	fs_info_to_stat(&info, &security, statp);
+	file_info_to_stat(&info, &security, statp);
 	object_security_destroy(&security);
 	return 0;
 }
@@ -206,22 +205,22 @@ int lstat(const char *restrict path, struct stat *restrict statp) {
  * @param		0 on success, -1 on failure. */
 int stat(const char *restrict path, struct stat *restrict statp) {
 	object_security_t security;
-	fs_info_t info;
+	file_info_t info;
 	status_t ret;
 
-	ret = fs_info(path, true, &info);
+	ret = kern_fs_info(path, true, &info);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
 	}
 
-	ret = fs_security(path, true, &security);
+	ret = kern_fs_security(path, true, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
 	}
 
-	fs_info_to_stat(&info, &security, statp);
+	file_info_to_stat(&info, &security, statp);
 	object_security_destroy(&security);
 	return 0;
 }

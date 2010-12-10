@@ -29,15 +29,14 @@ extern "C" {
 
 /** Object type ID definitions. */
 #define OBJECT_TYPE_FILE	1	/**< File. */
-#define OBJECT_TYPE_DIR		2	/**< Directory. */
-#define OBJECT_TYPE_DEVICE	3	/**< Device. */
-#define OBJECT_TYPE_PROCESS	4	/**< Process. */
-#define OBJECT_TYPE_THREAD	5	/**< Thread. */
-#define OBJECT_TYPE_PORT	6	/**< IPC port. */
-#define OBJECT_TYPE_CONNECTION	7	/**< IPC connection. */
-#define OBJECT_TYPE_SEMAPHORE	8	/**< Semaphore. */
-#define OBJECT_TYPE_AREA	9	/**< Memory area. */
-#define OBJECT_TYPE_TIMER	10	/**< Timer. */
+#define OBJECT_TYPE_DEVICE	2	/**< Device. */
+#define OBJECT_TYPE_PROCESS	3	/**< Process. */
+#define OBJECT_TYPE_THREAD	4	/**< Thread. */
+#define OBJECT_TYPE_PORT	5	/**< IPC port. */
+#define OBJECT_TYPE_CONNECTION	6	/**< IPC connection. */
+#define OBJECT_TYPE_SEMAPHORE	7	/**< Semaphore. */
+#define OBJECT_TYPE_AREA	8	/**< Memory area. */
+#define OBJECT_TYPE_TIMER	9	/**< Timer. */
 
 /** Maximum ACL size. */
 #define OBJECT_ACL_MAX		64

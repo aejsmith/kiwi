@@ -57,13 +57,13 @@ static void ramfs_node_free(fs_node_t *node) {
 
 	/* Destroy the data caches. */
 	switch(node->type) {
-	case FS_NODE_FILE:
+	case FILE_TYPE_REGULAR:
 		vm_cache_destroy(data->cache, true);
 		break;
-	case FS_NODE_DIR:
+	case FILE_TYPE_DIR:
 		entry_cache_destroy(data->entries);
 		break;
-	case FS_NODE_SYMLINK:
+	case FILE_TYPE_SYMLINK:
 		kfree(data->target);
 		break;
 	default:
@@ -82,14 +82,14 @@ static void ramfs_node_free(fs_node_t *node) {
  * @param nodep		Where to store pointer to node structure for created
  *			entry.
  * @return		Status code describing result of the operation. */
-static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_type_t type,
+static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type_t type,
                                   const char *target, object_security_t *security,
                                   fs_node_t **nodep) {
 	ramfs_mount_t *mount = parent->mount->data;
 	ramfs_node_t *pdata = parent->data, *data;
 	node_id_t id;
 
-	assert(parent->type == FS_NODE_DIR);
+	assert(parent->type == FILE_TYPE_DIR);
 
 	/* Create the information structure. */
 	data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
@@ -104,17 +104,17 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t
 
 	/* Create data stores. */
 	switch(type) {
-	case FS_NODE_FILE:
+	case FILE_TYPE_REGULAR:
 		data->cache = vm_cache_create(0, NULL, NULL);
 		break;
-	case FS_NODE_DIR:
+	case FILE_TYPE_DIR:
 		data->entries = entry_cache_create(NULL, NULL);
 
 		/* Add '.' and '..' entries to the cache. */
 		entry_cache_insert(data->entries, ".", id);
 		entry_cache_insert(data->entries, "..", parent->id);
 		break;
-	case FS_NODE_SYMLINK:
+	case FILE_TYPE_SYMLINK:
 		data->target = kstrdup(target, MM_SLEEP);
 		break;
 	default:
@@ -135,7 +135,7 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, fs_node_t
 static status_t ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t *node) {
 	ramfs_node_t *pdata = parent->data;
 
-	assert(parent->type == FS_NODE_DIR);
+	assert(parent->type == FILE_TYPE_DIR);
 
 	entry_cache_remove(pdata->entries, name);
 	fs_node_remove(node);
@@ -144,25 +144,25 @@ static status_t ramfs_node_unlink(fs_node_t *parent, const char *name, fs_node_t
 
 /** Get information about a RamFS node.
  * @param node		Node to get information on.
- * @param info		Information structure to fill in. */
-static void ramfs_node_info(fs_node_t *node, fs_info_t *info) {
+ * @param infop		Information structure to fill in. */
+static void ramfs_node_info(fs_node_t *node, file_info_t *infop) {
 	ramfs_node_t *data = node->data;
 
-	info->links = 1;
-	info->block_size = PAGE_SIZE;
-	info->created = data->created;
-	info->accessed = data->accessed;
-	info->modified = data->modified;
+	infop->links = 1;
+	infop->block_size = PAGE_SIZE;
+	infop->created = data->created;
+	infop->accessed = data->accessed;
+	infop->modified = data->modified;
 
 	switch(node->type) {
-	case FS_NODE_FILE:
-		info->size = data->cache->size;
+	case FILE_TYPE_REGULAR:
+		infop->size = data->cache->size;
 		break;
-	case FS_NODE_SYMLINK:
-		info->size = strlen(data->target);
+	case FILE_TYPE_SYMLINK:
+		infop->size = strlen(data->target);
 		break;
 	default:
-		info->size = 0;
+		infop->size = 0;
 		break;
 	}
 }
@@ -190,7 +190,7 @@ static status_t ramfs_node_read(fs_node_t *node, void *buf, size_t count, offset
                                 bool nonblock, size_t *bytesp) {
 	ramfs_node_t *data = node->data;
 
-	assert(node->type == FS_NODE_FILE);
+	assert(node->type == FILE_TYPE_REGULAR);
 	return vm_cache_read(data->cache, buf, count, offset, nonblock, bytesp);
 }
 
@@ -207,7 +207,7 @@ static status_t ramfs_node_write(fs_node_t *node, const void *buf, size_t count,
 	ramfs_node_t *data = node->data;
 	status_t ret;
 
-	assert(node->type == FS_NODE_FILE);
+	assert(node->type == FILE_TYPE_REGULAR);
 
 	if((offset + count) > data->cache->size) {
 		vm_cache_resize(data->cache, offset + count);
@@ -227,7 +227,7 @@ static status_t ramfs_node_write(fs_node_t *node, const void *buf, size_t count,
 static vm_cache_t *ramfs_node_get_cache(fs_node_t *node) {
 	ramfs_node_t *data = node->data;
 
-	assert(node->type == FS_NODE_FILE);
+	assert(node->type == FILE_TYPE_REGULAR);
 	return data->cache;
 }
 
@@ -238,7 +238,7 @@ static vm_cache_t *ramfs_node_get_cache(fs_node_t *node) {
 static status_t ramfs_node_resize(fs_node_t *node, offset_t size) {
 	ramfs_node_t *data = node->data;
 
-	assert(node->type == FS_NODE_FILE);
+	assert(node->type == FILE_TYPE_REGULAR);
 
 	vm_cache_resize(data->cache, size);
 	data->modified = time_since_epoch();
@@ -250,17 +250,17 @@ static status_t ramfs_node_resize(fs_node_t *node, offset_t size) {
  * @param index		Index of entry to read.
  * @param entryp	Where to store pointer to directory entry structure.
  * @return		Status code describing result of the operation. */
-static status_t ramfs_node_read_entry(fs_node_t *node, offset_t index, fs_dir_entry_t **entryp) {
+static status_t ramfs_node_read_entry(fs_node_t *node, offset_t index, dir_entry_t **entryp) {
 	ramfs_node_t *data = node->data;
-	fs_dir_entry_t *entry;
+	dir_entry_t *entry;
 	offset_t i = 0;
 
-	assert(node->type == FS_NODE_DIR);
+	assert(node->type == FILE_TYPE_DIR);
 
 	mutex_lock(&data->entries->lock);
 
 	RADIX_TREE_FOREACH(&data->entries->entries, iter) {
-		entry = radix_tree_entry(iter, fs_dir_entry_t);
+		entry = radix_tree_entry(iter, dir_entry_t);
 
 		if(i++ == index) {
 			*entryp = kmemdup(entry, entry->length, MM_SLEEP);
@@ -281,7 +281,7 @@ static status_t ramfs_node_read_entry(fs_node_t *node, offset_t index, fs_dir_en
 static status_t ramfs_node_lookup_entry(fs_node_t *node, const char *name, node_id_t *idp) {
 	ramfs_node_t *data = node->data;
 
-	assert(node->type == FS_NODE_DIR);
+	assert(node->type == FILE_TYPE_DIR);
 	return entry_cache_lookup(data->entries, name, idp);
 }
 
@@ -293,7 +293,7 @@ static status_t ramfs_node_lookup_entry(fs_node_t *node, const char *name, node_
 static status_t ramfs_node_read_link(fs_node_t *node, char **destp) {
 	ramfs_node_t *data = node->data;
 
-	assert(node->type == FS_NODE_SYMLINK);
+	assert(node->type == FILE_TYPE_SYMLINK);
 
 	*destp = kstrdup(data->target, MM_SLEEP);
 	return STATUS_SUCCESS;
@@ -352,10 +352,10 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 	entry_cache_insert(ndata->entries, "..", 0);
 	object_acl_init(&acl);
 	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
+	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FILE_READ | FILE_WRITE | FILE_EXECUTE);
 	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, -1,
-	                     FS_READ | FS_WRITE | FS_EXECUTE);
-	mount->root = fs_node_alloc(mount, 0, FS_NODE_DIR, &security, &ramfs_node_ops, ndata);
+	                     FILE_READ | FILE_EXECUTE);
+	mount->root = fs_node_alloc(mount, 0, FILE_TYPE_DIR, &security, &ramfs_node_ops, ndata);
 	return STATUS_SUCCESS;
 }
 

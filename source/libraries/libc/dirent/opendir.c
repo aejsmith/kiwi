@@ -27,6 +27,7 @@
  * @param path		Path to directory.
  * @return		Pointer to directory stream, or NULL on failure */
 DIR *opendir(const char *path) {
+	file_info_t info;
 	status_t ret;
 	DIR *dir;
 
@@ -35,8 +36,20 @@ DIR *opendir(const char *path) {
 		return NULL;
 	}
 
-	ret = fs_dir_open(path, FS_READ, 0, &dir->handle);
+	ret = kern_file_open(path, FILE_READ, 0, 0, NULL, &dir->handle);
 	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		free(dir);
+		return NULL;
+	}
+
+	ret = kern_file_info(dir->handle, &info);
+	if(ret == STATUS_SUCCESS && info.type != FILE_TYPE_DIR) {
+		ret = STATUS_NOT_DIR;
+	}
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		handle_close(dir->handle);
 		free(dir);
 		return NULL;
 	}

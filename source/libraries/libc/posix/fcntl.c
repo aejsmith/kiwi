@@ -94,8 +94,8 @@ static int fcntl_getfl(int fd) {
 		return -1;
 	}
 
-	flags |= ((kflags & FS_NONBLOCK) ? 0 : O_NONBLOCK);
-	flags |= ((kflags & FS_APPEND) ? 0 : O_APPEND);
+	flags |= ((kflags & FILE_NONBLOCK) ? 0 : O_NONBLOCK);
+	flags |= ((kflags & FILE_APPEND) ? 0 : O_APPEND);
 	return flags;
 }
 
@@ -107,8 +107,8 @@ static int fcntl_setfl(int fd, int flags) {
 	int kflags = 0;
 	status_t ret;
 
-	kflags |= ((flags & O_NONBLOCK) ? 0 : FS_NONBLOCK);
-	kflags |= ((flags & O_APPEND) ? 0 : FS_APPEND);
+	kflags |= ((flags & O_NONBLOCK) ? 0 : FILE_NONBLOCK);
+	kflags |= ((flags & O_APPEND) ? 0 : FILE_APPEND);
 
 	ret = fs_handle_set_flags(fd, kflags);
 	if(ret != STATUS_SUCCESS) {

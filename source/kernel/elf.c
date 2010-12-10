@@ -83,10 +83,10 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 	status_t ret;
 
 	/* Read the ELF header in from the file. */
-	ret = fs_file_pread(handle, &ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = file_pread(handle, &ehdr, sizeof(ehdr), 0, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(bytes != sizeof(elf_ehdr_t)) {
+	} else if(bytes != sizeof(ehdr)) {
 		return STATUS_UNKNOWN_IMAGE;
 	} else if(!elf_ehdr_check(&ehdr)) {
 		return STATUS_UNKNOWN_IMAGE;
@@ -108,7 +108,7 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 	/* Allocate some memory for the program headers and load them too. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
 	phdrs = kmalloc(size, MM_SLEEP);
-	ret = fs_file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
+	ret = file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		kfree(phdrs);
 		return ret;
@@ -219,16 +219,16 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	int flags;
 
 	/* Allocate a structure to store data about the binary. */
-	binary = kmalloc(sizeof(elf_binary_t), MM_SLEEP);
+	binary = kmalloc(sizeof(*binary), MM_SLEEP);
 	binary->phdrs = NULL;
 	binary->handle = handle;
 	binary->as = as;
 
 	/* Read the ELF header in from the file. */
-	ret = fs_file_pread(handle, &binary->ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = file_pread(handle, &binary->ehdr, sizeof(binary->ehdr), 0, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
-	} else if(bytes != sizeof(elf_ehdr_t)) {
+	} else if(bytes != sizeof(binary->ehdr)) {
 		ret = STATUS_UNKNOWN_IMAGE;
 		goto fail;
 	} else if(!elf_ehdr_check(&binary->ehdr)) {
@@ -252,7 +252,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	/* Allocate some memory for the program headers and load them too. */
 	size = binary->ehdr.e_phnum * binary->ehdr.e_phentsize;
 	binary->phdrs = kmalloc(size, MM_SLEEP);
-	ret = fs_file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes);
+	ret = file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	} else if(bytes != size) {
@@ -500,7 +500,7 @@ static status_t elf_module_load_sections(module_t *module) {
 			        i, dest, sect->sh_size, sect->sh_type);
 
 			/* Read the section data in. */
-			ret = fs_file_pread(module->handle, dest, sect->sh_size, sect->sh_offset, &bytes);
+			ret = file_pread(module->handle, dest, sect->sh_size, sect->sh_offset, &bytes);
 			if(ret != STATUS_SUCCESS) {
 				return ret;
 			} else if(bytes != sect->sh_size) {
@@ -583,10 +583,10 @@ static status_t elf_module_relocate_rel(module_t *module, elf_shdr_t *sect, elf_
 		offset = sect->sh_offset + (i * sect->sh_entsize);
 
 		/* Read in the relocation. */
-		ret = fs_file_pread(module->handle, &rel, sizeof(elf_rel_t), offset, &bytes);
+		ret = file_pread(module->handle, &rel, sizeof(rel), offset, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
-		} else if(bytes != sizeof(elf_rel_t)) {
+		} else if(bytes != sizeof(rel)) {
 			return STATUS_MALFORMED_IMAGE;
 		}
 
@@ -615,10 +615,10 @@ static status_t elf_module_relocate_rela(module_t *module, elf_shdr_t *sect, elf
 		offset = sect->sh_offset + (i * sect->sh_entsize);
 
 		/* Read in the relocation. */
-		ret = fs_file_pread(module->handle, &rel, sizeof(elf_rela_t), offset, &bytes);
+		ret = file_pread(module->handle, &rel, sizeof(rel), offset, &bytes);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
-		} else if(bytes != sizeof(elf_rela_t)) {
+		} else if(bytes != sizeof(rel)) {
 			return STATUS_MALFORMED_IMAGE;
 		}
 
@@ -702,10 +702,10 @@ status_t elf_module_load(module_t *module) {
 	status_t ret;
 
 	/* Read the ELF header in from the file. */
-	ret = fs_file_pread(module->handle, &module->ehdr, sizeof(elf_ehdr_t), 0, &bytes);
+	ret = file_pread(module->handle, &module->ehdr, sizeof(module->ehdr), 0, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
-	} else if(bytes != sizeof(elf_ehdr_t)) {
+	} else if(bytes != sizeof(module->ehdr)) {
 		return STATUS_UNKNOWN_IMAGE;
 	} else if(!elf_ehdr_check(&module->ehdr)) {
 		return STATUS_UNKNOWN_IMAGE;
@@ -718,7 +718,7 @@ status_t elf_module_load(module_t *module) {
 	module->shdrs = kmalloc(size, MM_SLEEP);
 
 	/* Read the headers in. */
-	ret = fs_file_pread(module->handle, module->shdrs, size, module->ehdr.e_shoff, &bytes);
+	ret = file_pread(module->handle, module->shdrs, size, module->ehdr.e_shoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	} else if(bytes != size) {

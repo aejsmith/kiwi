@@ -46,7 +46,7 @@
 #define STATUS_PERM_DENIED		21	/**< Operation not permitted. */
 #define STATUS_ACCESS_DENIED		22	/**< Requested access rights denied. */
 #define STATUS_NOT_DIR			23	/**< Path component is not a directory. */
-#define STATUS_NOT_FILE			24	/**< Path does not refer to a file. */
+#define STATUS_NOT_REGULAR		24	/**< Path does not refer to a regular file. */
 #define STATUS_NOT_SYMLINK		25	/**< Path does not refer to a symbolic link. */
 #define STATUS_NOT_MOUNT		26	/**< Path does not refer to root of a mount. */
 #define STATUS_NOT_FOUND		27	/**< Requested object could not be found. */

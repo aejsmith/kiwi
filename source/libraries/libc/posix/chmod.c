@@ -37,13 +37,13 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
 	object_rights_t rights = 0;
 
 	if(mode & S_IROTH) {
-		rights |= FS_READ;
+		rights |= FILE_READ;
 	}
 	if(mode & S_IWOTH) {
-		rights |= FS_WRITE;
+		rights |= FILE_WRITE;
 	}
 	if(mode & S_IXOTH) {
-		rights |= FS_EXECUTE;
+		rights |= FILE_EXECUTE;
 	}
 	return rights;
 }
@@ -123,7 +123,7 @@ int chmod(const char *path, mode_t mode) {
 
 	/* Get the current security attributes, as we want to preserve extra
 	 * ACL entries. */
-	ret = fs_security(path, true, &security);
+	ret = kern_fs_security(path, true, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -139,7 +139,7 @@ int chmod(const char *path, mode_t mode) {
 	security.gid = -1;
 
 	/* Set the new security attributes. */
-	ret = fs_set_security(path, true, &security);
+	ret = kern_fs_set_security(path, true, &security);
 	object_security_destroy(&security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);

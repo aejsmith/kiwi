@@ -35,14 +35,14 @@
  *			on failure. */
 ssize_t readlink(const char *path, char *buf, size_t size) {
 	char *tmp = NULL;
-	fs_info_t info;
+	file_info_t info;
 	status_t ret;
 
 	/* The kernel will not do anything if the buffer provided is too small,
 	 * but we must return the truncated string if it is too small. Find out
 	 * the link size, and allocate a large enough buffer if the given one
 	 * is too small. */
-	ret = fs_info(path, false, &info);
+	ret = kern_fs_info(path, false, &info);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -53,7 +53,7 @@ ssize_t readlink(const char *path, char *buf, size_t size) {
 		}
 	}
 
-	ret = fs_symlink_read(path, (tmp) ? tmp : buf, info.size + 1);
+	ret = kern_symlink_read(path, (tmp) ? tmp : buf, info.size + 1);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

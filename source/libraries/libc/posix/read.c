@@ -59,7 +59,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
 	type = object_type(fd);
 	switch(type) {
 	case OBJECT_TYPE_FILE:
-		ret = fs_file_pread(fd, buf, count, offset, &bytes);
+		ret = kern_file_pread(fd, buf, count, offset, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
 			if(ret == STATUS_ACCESS_DENIED) {
 				errno = EBADF;
@@ -76,9 +76,6 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
 			return -1;
 		}
 		return (ssize_t)bytes;
-	case OBJECT_TYPE_DIR:
-		errno = EISDIR;
-		return -1;
 	case -1:
 		errno = EBADF;
 		return -1;
@@ -108,7 +105,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 	type = object_type(fd);
 	switch(type) {
 	case OBJECT_TYPE_FILE:
-		ret = fs_file_read(fd, buf, count, &bytes);
+		ret = kern_file_read(fd, buf, count, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
 			if(ret == STATUS_ACCESS_DENIED) {
 				errno = EBADF;
@@ -125,9 +122,6 @@ ssize_t read(int fd, void *buf, size_t count) {
 			return -1;
 		}
 		return (ssize_t)bytes;
-	case OBJECT_TYPE_DIR:
-		errno = EISDIR;
-		return -1;
 	case -1:
 		errno = EBADF;
 		return -1;
