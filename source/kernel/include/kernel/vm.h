@@ -35,9 +35,9 @@ extern "C" {
 #define VM_MAP_STACK		(1<<4)	/**< Mapping contains a stack and should have a guard page. */
 #define VM_MAP_FIXED		(1<<5)	/**< Mapping should be placed at the exact location specified. */
 
-extern status_t SYSCALL(vm_map)(void *start, size_t size, int flags, handle_t handle,
-                                offset_t offset, void **addrp);
-extern status_t SYSCALL(vm_unmap)(void *start, size_t size);
+extern status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle,
+                            offset_t offset, void **addrp);
+extern status_t kern_vm_unmap(void *start, size_t size);
 
 #ifdef __cplusplus
 }

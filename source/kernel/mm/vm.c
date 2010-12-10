@@ -1535,8 +1535,8 @@ int kdbg_cmd_aspace(int argc, char **argv) {
  *
  * @return		Status code describing result of the operation.
  */
-extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
-                           offset_t offset, void **addrp) {
+status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset,
+                     void **addrp) {
 	object_handle_t *khandle = NULL;
 	status_t ret;
 	ptr_t addr;
@@ -1574,6 +1574,6 @@ extern status_t sys_vm_map(void *start, size_t size, int flags, handle_t handle,
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_vm_unmap(void *start, size_t size) {
+status_t kern_vm_unmap(void *start, size_t size) {
 	return vm_unmap(curr_proc->aspace, (ptr_t)start, size);
 }

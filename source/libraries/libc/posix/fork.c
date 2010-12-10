@@ -53,7 +53,7 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 	/* Clone the process, starting it at our entry function which restores
 	 * the saved process. FIXME: Stack direction. */
 	ret = process_clone(fork_entry, state, &stack[0x1000], NULL, PROCESS_QUERY, &handle);
-	vm_unmap(stack, 0x1000);
+	kern_vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		free(proc);
@@ -83,7 +83,7 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 static pid_t fork_child(posix_process_t *proc, char *stack) {
 	/* We're now back on the original stack, the temporary stack is no
 	 * longer needed. */
-	vm_unmap(stack, 0x1000);
+	kern_vm_unmap(stack, 0x1000);
 
 	/* Free the unneeded process structure. */
 	free(proc);
@@ -132,7 +132,7 @@ pid_t fork(void) {
 	}
 
 	/* Create a temporary stack. FIXME: Page size is arch-dependent. */
-	ret = vm_map(NULL, 0x1000, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &stack);
+	ret = kern_vm_map(NULL, 0x1000, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &stack);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

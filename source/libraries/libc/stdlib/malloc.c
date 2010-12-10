@@ -31,7 +31,7 @@ static inline void *mmap_wrapper(size_t size) {
 	status_t ret;
 	void *addr;
 
-	ret = vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &addr);
+	ret = kern_vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &addr);
 	if(ret != STATUS_SUCCESS) {
 		return (void *)-1;
 	}
@@ -41,7 +41,7 @@ static inline void *mmap_wrapper(size_t size) {
 
 /** Wrapper for freeing. */
 static inline int munmap_wrapper(void *start, size_t length) {
-	return vm_unmap(start, length);
+	return kern_vm_unmap(start, length);
 }
 
 /* To stop it defining dev_zero_fd. */

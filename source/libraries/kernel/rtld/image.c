@@ -174,7 +174,7 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 		}
 
 		/* Create an anonymous region for it. */
-		ret = vm_map((void *)start, size, flags, -1, 0, NULL);
+		ret = kern_vm_map((void *)start, size, flags, -1, 0, NULL);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to create anonymous BSS region (%d)\n", path, ret);
 			return ret;
@@ -192,7 +192,7 @@ static status_t do_load_phdr(rtld_image_t *image, elf_phdr_t *phdr, handle_t han
 	offset = ROUND_DOWN(phdr->p_offset, PAGE_SIZE);
 	dprintf("rtld: %s: loading header %zu to [%p,%p)\n", path, i, start, start + size);
 
-	ret = vm_map((void *)start, size, flags, handle, offset, NULL);
+	ret = kern_vm_map((void *)start, size, flags, handle, offset, NULL);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("rtld: %s: unable to map file data into memory (%d)\n", path, ret);
 		return ret;
@@ -303,7 +303,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 		}
 
 		/* Allocate a chunk of memory for it. */
-		ret = vm_map(NULL, image->load_size, VM_MAP_READ | VM_MAP_PRIVATE, -1, 0, &image->load_base);
+		ret = kern_vm_map(NULL, image->load_size, VM_MAP_READ | VM_MAP_PRIVATE, -1, 0, &image->load_base);
 		if(ret != STATUS_SUCCESS) {
 			dprintf("rtld: %s: unable to allocate memory (%d)\n", path, ret);
 			goto fail;
@@ -476,7 +476,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 fail:
 	if(image) {
 		if(image->load_base) {
-			vm_unmap(image->load_base, image->load_size);
+			kern_vm_unmap(image->load_base, image->load_size);
 		}
 		list_remove(&image->header);
 		free(image);
@@ -524,7 +524,7 @@ void rtld_image_unload(rtld_image_t *image) {
 
 	dprintf("RTLD: Unloaded image %p(%s)\n", image, image->name);
 	if(image->load_base) {
-		vm_unmap(image->load_base, image->load_size);
+		kern_vm_unmap(image->load_base, image->load_size);
 	}
 	list_remove(&image->header);
 	free(image);

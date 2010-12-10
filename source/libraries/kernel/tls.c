@@ -213,7 +213,7 @@ status_t tls_init(void) {
 
 	/* Allocate the TLS block. */
 	size = ROUND_UP(tls_initial_block_size(), PAGE_SIZE);
-	ret = vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &alloc);
+	ret = kern_vm_map(NULL, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE, -1, 0, &alloc);
 	if(ret != STATUS_SUCCESS) {
 		free(dtv);
 		return ret;
@@ -236,5 +236,5 @@ void tls_destroy(void) {
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",
 	        tcb->base, size, thread_id(-1));
-	vm_unmap(tcb->base, size);
+	kern_vm_unmap(tcb->base, size);
 }

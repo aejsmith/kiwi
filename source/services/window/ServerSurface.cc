@@ -70,8 +70,8 @@ area_id_t ServerSurface::GetID() const {
  * @return		Pointer to surface data, or NULL if unable to map. */
 void *ServerSurface::GetData() {
 	if(!m_mapping) {
-		status_t ret = vm_map(NULL, kern_area_size(m_area), VM_MAP_READ | VM_MAP_WRITE,
-		                      m_area, 0, &m_mapping);
+		status_t ret = kern_vm_map(NULL, kern_area_size(m_area), VM_MAP_READ | VM_MAP_WRITE,
+		                           m_area, 0, &m_mapping);
 		if(ret != STATUS_SUCCESS) {
 			return NULL;
 		}
@@ -158,7 +158,7 @@ void ServerSurface::Unmap() {
 		m_image = 0;
 	}
 	if(m_mapping) {
-		vm_unmap(m_mapping, kern_area_size(m_area));
+		kern_vm_unmap(m_mapping, kern_area_size(m_area));
 		m_mapping = 0;
 	}
 }

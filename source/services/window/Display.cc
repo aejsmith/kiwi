@@ -174,7 +174,7 @@ status_t Display::SetMode(display_mode_t &mode) {
 		m_image = 0;
 	}
 	if(m_mapping) {
-		vm_unmap(m_mapping, m_mapping_size);
+		kern_vm_unmap(m_mapping, m_mapping_size);
 		m_mapping = 0;
 	}
 
@@ -190,7 +190,7 @@ status_t Display::SetMode(display_mode_t &mode) {
 	m_mapping_size = p2align(mode.width * mode.height * bytes_per_pixel(mode.format), 0x1000);
 
 	/* Create a mapping for the framebuffer and clear it. */
-	ret = vm_map(0, m_mapping_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset, &m_mapping);
+	ret = kern_vm_map(0, m_mapping_size, VM_MAP_READ | VM_MAP_WRITE, m_handle, mode.offset, &m_mapping);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to map display framebuffer (" << ret << ")" << endl;
 		return ret;

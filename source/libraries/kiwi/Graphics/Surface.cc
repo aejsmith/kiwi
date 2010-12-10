@@ -43,7 +43,7 @@ struct kiwi::SurfacePrivate {
 			cairo_surface_destroy(cairo);
 		}
 		if(mapping) {
-			vm_unmap(mapping, kern_area_size(area));
+			kern_vm_unmap(mapping, kern_area_size(area));
 		}
 		if(handle >= 0) {
 			handle_close(handle);
@@ -98,8 +98,8 @@ Surface::Surface(area_id_t area) : m_priv(0) {
 	}
 
 	/* Map it in. */
-	ret = vm_map(NULL, kern_area_size(priv->handle), VM_MAP_READ | VM_MAP_WRITE, priv->handle,
-	             0, reinterpret_cast<void **>(&priv->mapping));
+	ret = kern_vm_map(NULL, kern_area_size(priv->handle), VM_MAP_READ | VM_MAP_WRITE, priv->handle,
+	                  0, reinterpret_cast<void **>(&priv->mapping));
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		libkiwi_warn("Surface::Surface: Failed to map surface area: %s.",
@@ -157,14 +157,14 @@ bool Surface::Resize(Size size) {
 		}
 
 		/* Remap the surface. */
-		ret = vm_map(NULL, kern_area_size(m_priv->handle), VM_MAP_READ | VM_MAP_WRITE,
-		             m_priv->handle, 0, reinterpret_cast<void **>(&mapping));
+		ret = kern_vm_map(NULL, kern_area_size(m_priv->handle), VM_MAP_READ | VM_MAP_WRITE,
+		                  m_priv->handle, 0, reinterpret_cast<void **>(&mapping));
 		if(ret != STATUS_SUCCESS) {
 			return false;
 		}
 
 		swap(m_priv->mapping, mapping);
-		vm_unmap(mapping, prev);
+		kern_vm_unmap(mapping, prev);
 
 		/* Create a new Cairo surface. */
 		cairo = cairo_image_surface_create_for_data(m_priv->mapping,
