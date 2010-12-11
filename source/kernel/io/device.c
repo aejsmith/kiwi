@@ -537,7 +537,7 @@ status_t device_get(device_t *device, object_rights_t rights, object_handle_t **
 		}
 	}
 
-	ret = object_handle_create(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	ret = object_handle_open(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		refcount_dec(&device->count);
 	}
@@ -575,7 +575,7 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
 		}
 	}
 
-	ret = object_handle_create(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
+	ret = object_handle_open(&device->obj, data, rights, NULL, 0, handlep, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		refcount_dec(&device->count);
 	}

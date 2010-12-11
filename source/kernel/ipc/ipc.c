@@ -491,7 +491,7 @@ status_t sys_ipc_port_open(port_id_t id, object_rights_t rights, handle_t *handl
 	refcount_inc(&port->count);
 	mutex_unlock(&port_tree_lock);
 
-	ret = object_handle_create(&port->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&port->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		ipc_port_release(port);
 	}

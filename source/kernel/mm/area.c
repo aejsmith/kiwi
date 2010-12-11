@@ -296,7 +296,7 @@ status_t kern_area_open(area_id_t id, object_rights_t rights, handle_t *handlep)
 	refcount_inc(&area->count);
 	rwlock_unlock(&area_tree_lock);
 
-	ret = object_handle_create(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		area_release(area);
 	}

@@ -1230,7 +1230,7 @@ status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *ha
 	refcount_inc(&process->count);
 	rwlock_unlock(&process_tree_lock);
 
-	ret = object_handle_create(&process->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&process->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		process_release(process);
 	}

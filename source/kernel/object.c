@@ -169,16 +169,21 @@ void object_wait_signal(void *_sync) {
 
 /** Create a handle to an object.
  *
- * Creates a new handle to an object, performing rights checks, and optionally
- * attaches it to a process. If either the idp or uidp parameter is not NULL,
- * the handle will be attached.
+ * Creates a new handle to an object, and optionally attaches it to a process.
+ * If either the idp or uidp parameter is not NULL, the handle will be attached.
+ *
+ * Note that this function does NOT check whether the process is allowed the
+ * rights specified. This is because it must be possible to create a handle
+ * without doing rights checks when creating objects (when creating objects you
+ * can open them with rights the ACL does not grant). If it is necessary to
+ * perform a rights check, either perform it before calling this, or use the
+ * object_handle_open() wrapper around this function.
  *
  * @param object	Object to create handle to.
  * @param data		Per-handle data pointer.
- * @param rights	Requested rights for the handle. These will be checked
- *			against the access control list for the object.
- * @param process	Process to perform access checks on and attach handle
- *			to. If NULL, the current process will be used.
+ * @param rights	Rights for the handle.
+ * @param process	Process to attach handle to. If NULL, the current
+ *			process will be used.
  * @param flags		Flags for the handle table entry if attaching.
  * @param handlep	If not NULL, Where to store pointer to kernel handle
  *			structure.
@@ -198,13 +203,6 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	assert(object);
 	assert(object->type);
 	assert(handlep || idp || uidp);
-
-	/* Check whether the rights are allowed for the process. */
-	if(rights) {
-		if((object_rights(object, process) & rights) != rights) {
-			return STATUS_ACCESS_DENIED;
-		}
-	}
 
 	/* Create the kernel handle structure. */
 	handle = slab_cache_alloc(object_handle_cache, MM_SLEEP);
@@ -232,6 +230,21 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	}
 
 	return STATUS_SUCCESS;
+}
+
+/** Open a handle to an object.
+ * @note		This is a wrapper around object_handle_create() which
+ *			checks whether the process is allowed the specified
+ *			rights on the object.
+ * @see			object_handle_create(). */
+status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
+                            process_t *process, int flags, object_handle_t **handlep,
+                            handle_t *idp, handle_t *uidp) {
+	if(rights && (object_rights(object, process) & rights) != rights) {
+		return STATUS_ACCESS_DENIED;
+	}
+
+	return object_handle_create(object, data, rights, process, flags, handlep, idp, uidp);
 }
 
 /** Increase the reference count of a handle.

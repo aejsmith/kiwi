@@ -259,7 +259,7 @@ status_t kern_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t
 	refcount_inc(&sem->count);
 	rwlock_unlock(&semaphore_tree_lock);
 
-	ret = object_handle_create(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		user_semaphore_release(sem);
 	}

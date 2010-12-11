@@ -825,7 +825,7 @@ status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *hand
 	refcount_inc(&thread->count);
 	rwlock_unlock(&thread_tree_lock);
 
-	ret = object_handle_create(&thread->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
+	ret = object_handle_open(&thread->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
 		thread_destroy(thread);
 	}

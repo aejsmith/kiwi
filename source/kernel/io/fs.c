@@ -1021,7 +1021,9 @@ fail:
 
 /** Create a handle to a node.
  * @param node		Node to create handle to (will be referenced).
- * @param rights	Requested access rights for the handle.
+ * @param rights	Access rights for the handle. These are not checked
+ *			against the ACL, must be done before calling if
+ *			necessary.
  * @param flags		Flags for the handle.
  * @param handlep	Where to store pointer to handle.
  * @return		Status code describing result of the operation. */
@@ -1257,8 +1259,6 @@ static fs_node_ops_t memory_file_ops = {
  * @return		Pointer to handle to file (has FILE_READ access right).
  */
 object_handle_t *file_from_memory(const void *buf, size_t size) {
-	object_acl_t acl;
-	object_security_t security = { 0, 0, &acl };
 	object_handle_t *handle;
 	memory_file_t *file;
 	fs_node_t *node;
@@ -1267,14 +1267,8 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
 	file->data = buf;
 	file->size = size;
 
-	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, FILE_RIGHT_READ);
-	node = fs_node_alloc(NULL, 0, FILE_TYPE_REGULAR, &security, &memory_file_ops, file);
-
-	if(file_handle_create(node, FILE_RIGHT_READ, 0, &handle) != STATUS_SUCCESS) {
-		fatal("Should not fail to create memory file");
-	}
-
+	node = fs_node_alloc(NULL, 0, FILE_TYPE_REGULAR, NULL, &memory_file_ops, file);
+	file_handle_create(node, FILE_RIGHT_READ, 0, &handle);
 	fs_node_release(node);
 	return handle;
 }
@@ -1348,6 +1342,10 @@ status_t file_open(const char *path, object_rights_t rights, int flags, int crea
 	} else if(node->type != FILE_TYPE_REGULAR && node->type != FILE_TYPE_DIR) {
 		fs_node_release(node);
 		return STATUS_NOT_SUPPORTED;
+	} else if(rights && (object_rights(&node->obj, NULL) & rights) != rights) {
+		/* This check will only be done if we haven't had to create the
+		 * new file. */
+		return STATUS_ACCESS_DENIED;
 	}
 
 	ret = file_handle_create(node, rights, flags, handlep);
