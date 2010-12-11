@@ -95,9 +95,6 @@ extern void page_map_switch(page_map_t *map);
 extern status_t page_map_init(page_map_t *map, int mmflag);
 extern void page_map_destroy(page_map_t *map);
 
-extern void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag);
-extern void page_phys_unmap(void *addr, size_t size, bool shared);
-
 extern vm_page_t *vm_page_alloc(size_t count, int pmflag);
 extern void vm_page_free(vm_page_t *pages, size_t count);
 extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
@@ -111,8 +108,11 @@ extern phys_ptr_t page_alloc(size_t count, int pmflag);
 extern void page_free(phys_ptr_t base, size_t count);
 extern bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
 
-extern void page_get_memory_type(phys_ptr_t addr, memory_type_t *typep);
-extern void page_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type);
+extern void phys_memory_type(phys_ptr_t addr, memory_type_t *typep);
+extern void phys_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type);
+
+extern void *phys_map(phys_ptr_t addr, size_t size, int mmflag);
+extern void phys_unmap(void *addr, size_t size, bool shared);
 
 extern void page_stats_get(page_stats_t *stats);
 

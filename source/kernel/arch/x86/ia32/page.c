@@ -108,7 +108,7 @@ static phys_ptr_t page_structure_alloc(int mmflag) {
  * @return		Pointer to mapping on success, NULL on failure. */
 static uint64_t *page_structure_map(page_map_t *map, phys_ptr_t addr, int mmflag) {
 	assert(!IS_KERNEL_MAP(map) || !paging_inited);
-	return page_phys_map(addr, PAGE_SIZE, mmflag);
+	return phys_map(addr, PAGE_SIZE, mmflag);
 }
 
 /** Unmap a paging structure.
@@ -116,7 +116,7 @@ static uint64_t *page_structure_map(page_map_t *map, phys_ptr_t addr, int mmflag
  * @param addr		Address of mapping. */
 static void page_structure_unmap(page_map_t *map, uint64_t *addr) {
 	if(!IS_KERNEL_MAP(map) || !paging_inited) {
-		page_phys_unmap(addr, PAGE_SIZE, false);
+		phys_unmap(addr, PAGE_SIZE, false);
 	}
 }
 
@@ -534,40 +534,40 @@ bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp) {
 	 * to work for any virtual address - the helper functions have
 	 * restrictions about which addresses can be looked up in the kernel
 	 * page map. */
-	pdp = page_phys_map(map->cr3, PAGE_SIZE, MM_SLEEP);
+	pdp = phys_map(map->cr3, PAGE_SIZE, MM_SLEEP);
 	pdpe = virt / 0x40000000;
 	if(!(pdp[pdpe] & PG_PRESENT)) {
-		page_phys_unmap(pdp, PAGE_SIZE, false);
+		phys_unmap(pdp, PAGE_SIZE, false);
 		return false;
 	}
 
 	/* Find the page directory for the entry. */
-	pdir = page_phys_map(pdp[pdpe] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
-	page_phys_unmap(pdp, PAGE_SIZE, false);
+	pdir = phys_map(pdp[pdpe] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	phys_unmap(pdp, PAGE_SIZE, false);
 	pde = (virt % 0x40000000) / LARGE_PAGE_SIZE;
 	if(!(pdir[pde] & PG_PRESENT)) {
-		page_phys_unmap(pdir, PAGE_SIZE, false);
+		phys_unmap(pdir, PAGE_SIZE, false);
 		return false;
 	}
 
 	/* Handle large pages. */
 	if(pdir[pde] & PG_LARGE) {
 		*physp = (pdir[pde] & PHYS_PAGE_MASK) + (virt % 0x200000);
-		page_phys_unmap(pdir, PAGE_SIZE, false);
+		phys_unmap(pdir, PAGE_SIZE, false);
 		return true;
 	}
 
 	/* Map in the page table. */
-	ptbl = page_phys_map(pdir[pde] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
-	page_phys_unmap(pdir, PAGE_SIZE, false);
+	ptbl = phys_map(pdir[pde] & PHYS_PAGE_MASK, PAGE_SIZE, MM_SLEEP);
+	phys_unmap(pdir, PAGE_SIZE, false);
 	pte = (virt % 0x200000) / PAGE_SIZE;
 	if(!(ptbl[pte] & PG_PRESENT)) {
-		page_phys_unmap(ptbl, PAGE_SIZE, false);
+		phys_unmap(ptbl, PAGE_SIZE, false);
 		return false;
 	}
 
 	*physp = ptbl[pte] & PHYS_PAGE_MASK;
-	page_phys_unmap(ptbl, PAGE_SIZE, false);
+	phys_unmap(ptbl, PAGE_SIZE, false);
 	return true;
 }
 
@@ -661,7 +661,7 @@ void page_map_destroy(page_map_t *map) {
  * @param size		Size of range to map.
  * @param mmflag	Allocation behaviour flags.
  * @return		Address of mapping or NULL on failure. */
-void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	phys_ptr_t base, end;
 	char *ret;
 
@@ -700,7 +700,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
  *			the CPU that mapped it. This is used as an optimisation
  *			to not perform remote TLB invalidations when not
  *			required. */
-void page_phys_unmap(void *addr, size_t size, bool shared) {
+void phys_unmap(void *addr, size_t size, bool shared) {
 	ptr_t base, end;
 
 	if((ptr_t)addr >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
@@ -763,11 +763,11 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	page_structure_unmap(&kernel_page_map, pdir);
 
 	/* Add the fractal mapping for the kernel page table. */
-	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
-	pdir = page_phys_map(pdp[3] & PHYS_PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	pdp = phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdir = phys_map(pdp[3] & PHYS_PAGE_MASK, PAGE_SIZE, MM_FATAL);
 	pde = (KERNEL_PTBL_BASE % 0x40000000) / LARGE_PAGE_SIZE;
 	pdir[pde] = (pdp[3] & PHYS_PAGE_MASK) | PG_PRESENT | PG_WRITE;
-	page_phys_unmap(pdir, PAGE_SIZE, true);
+	phys_unmap(pdir, PAGE_SIZE, true);
 
 	/* The temporary identity mapping is still required as all the CPUs'
 	 * stack pointers are in it, and the kernel arguments pointer points to
@@ -775,10 +775,10 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	 * the new physical map page directory because the new one has the
 	 * global flag set on all pages, which makes invalidating the TLB
 	 * entries difficult when removing the mapping. */
-	bpdp = page_phys_map(x86_read_cr3() & PAGE_MASK, PAGE_SIZE, MM_FATAL);
+	bpdp = phys_map(x86_read_cr3() & PAGE_MASK, PAGE_SIZE, MM_FATAL);
 	pdp[0] = bpdp[0];
-	page_phys_unmap(bpdp, PAGE_SIZE, true);
-	page_phys_unmap(pdp, PAGE_SIZE, true);
+	phys_unmap(bpdp, PAGE_SIZE, true);
+	phys_unmap(pdp, PAGE_SIZE, true);
 
 	page_map_unlock(&kernel_page_map);
 	dprintf("page: initialised kernel page map (pdp: 0x%" PRIpp ")\n",
@@ -805,9 +805,9 @@ void page_arch_late_init(void) {
 	/* All of the CPUs have been booted and have new stacks, and the kernel
 	 * arguments are no longer required. Remove the temporary identity
 	 * mapping and flush the TLB on all CPUs. */
-	pdp = page_phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
+	pdp = phys_map(kernel_page_map.cr3, PAGE_SIZE, MM_FATAL);
 	pdp[0] = 0;
-	page_phys_unmap(pdp, PAGE_SIZE, true);
+	phys_unmap(pdp, PAGE_SIZE, true);
 	x86_write_cr3(x86_read_cr3());
 	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
 }

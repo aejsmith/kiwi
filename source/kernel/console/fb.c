@@ -292,7 +292,7 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 	size_t size = 0;
 
 	/* Map and clear the new framebuffer, and allocate a backbuffer. */
-	nmap = page_phys_map(addr, width * height * (depth / 8), MM_SLEEP);
+	nmap = phys_map(addr, width * height * (depth / 8), MM_SLEEP);
 	if(!fb_console.inhibited) {
 		memset(nmap, 0, width * height * (depth / 8));
 	}
@@ -329,7 +329,7 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 
 	/* Free the old mapping/buffer if necessary. */
 	if(omap) {
-		page_phys_unmap(omap, size, true);
+		phys_unmap(omap, size, true);
 		kfree(obuf);
 	}
 }

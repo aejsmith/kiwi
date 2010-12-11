@@ -183,7 +183,7 @@ void __init_text lapic_init(kernel_args_t *args) {
 	/* If the mapping has not been made, we're being run on the BSP. Create
 	 * it and register interrupt vector handlers. */
 	if(!lapic_mapping) {
-		lapic_mapping = page_phys_map(args->arch.lapic_address, PAGE_SIZE, MM_FATAL);
+		lapic_mapping = phys_map(args->arch.lapic_address, PAGE_SIZE, MM_FATAL);
 		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIpp ", mapped to %p\n",
 		        args->arch.lapic_address, lapic_mapping);
 

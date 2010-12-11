@@ -138,7 +138,7 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 
 	/* Obtain the HBA memory registers address and map them. */
 	reg_base = pci_config_read32(device, PCI_CONFIG_BAR5) & PCI_MEM_ADDRESS_MASK;
-	hba->regs = page_phys_map(reg_base, sizeof(ahci_hba_regs_t), MM_SLEEP);
+	hba->regs = phys_map(reg_base, sizeof(ahci_hba_regs_t), MM_SLEEP);
 	kprintf(LOG_DEBUG, "ahci: found HBA registers at 0x%" PRIpp ", mapped to %p\n",
 	        reg_base, hba->regs);
 	kprintf(LOG_DEBUG, "ahci: AHCI version is %u.%u\n",
@@ -196,7 +196,7 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 fail:
 	if(hba->regs) {
 		irq_unregister(hba->irq, ahci_irq_handler, NULL, hba);
-		page_phys_unmap((void *)hba->regs, sizeof(ahci_hba_regs_t), true);
+		phys_unmap((void *)hba->regs, sizeof(ahci_hba_regs_t), true);
 	}
 	kfree(hba);
 	return false;

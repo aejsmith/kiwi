@@ -84,14 +84,14 @@ void __init_text cpu_init(kernel_args_t *args) {
 
 	/* Add all non-boot CPUs. */
 	for(addr = args->cpus; addr;) {
-		cpu = page_phys_map(addr, sizeof(kernel_args_cpu_t), MM_FATAL);
+		cpu = phys_map(addr, sizeof(kernel_args_cpu_t), MM_FATAL);
 
 		if(cpu->id != boot_cpu.id) {
 			cpu_add(kmalloc(sizeof(cpu_t), MM_FATAL), cpu);
 		}
 
 		addr = cpu->next;
-		page_phys_unmap(cpu, sizeof(kernel_args_cpu_t), false);
+		phys_unmap(cpu, sizeof(kernel_args_cpu_t), false);
 	}
 }
 

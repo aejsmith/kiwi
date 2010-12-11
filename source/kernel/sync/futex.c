@@ -198,7 +198,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	 * Wire ourself to the current CPU to make a remote TLB invalidation
 	 * unnecessary when unmapping. */
 	thread_wire(curr_thread);
-	mapping = page_phys_map(futex->phys, sizeof(*mapping), MM_SLEEP);
+	mapping = phys_map(futex->phys, sizeof(*mapping), MM_SLEEP);
 
 	/* Prepare to sleep on the queue. */
 	state = waitq_sleep_prepare(&futex->queue);
@@ -212,7 +212,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 		ret = STATUS_TRY_AGAIN;
 	}
 
-	page_phys_unmap(mapping, sizeof(*mapping), false);
+	phys_unmap(mapping, sizeof(*mapping), false);
 	thread_unwire(curr_thread);
 	return ret;
 }

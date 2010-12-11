@@ -97,7 +97,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 		kfree(mod->name);
 	}
 	object_handle_release(mod->handle);
-	page_phys_unmap(mod->mapping, mod->size, true);
+	phys_unmap(mod->mapping, mod->size, true);
 	kfree(mod);
 
 	/* Update progress. */
@@ -165,7 +165,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 	 * dependencies, and also because the module loader requires handles
 	 * rather than a chunk of memory. */
 	for(addr = args->modules; addr;) {
-		amod = page_phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
+		amod = phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
 
 		/* Create a structure for the module and map the data into
 		 * memory. */
@@ -173,7 +173,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		list_init(&mod->header);
 		mod->name = NULL;
 		mod->size = amod->size;
-		mod->mapping = page_phys_map(amod->base, mod->size, MM_FATAL);
+		mod->mapping = phys_map(amod->base, mod->size, MM_FATAL);
 		mod->handle = file_from_memory(mod->mapping, mod->size);
 
 		/* Figure out the module name, which is needed to resolve
@@ -189,7 +189,7 @@ static void __init_text load_modules(kernel_args_t *args) {
 		}
 
 		addr = amod->next;
-		page_phys_unmap(amod, sizeof(kernel_args_module_t), true);
+		phys_unmap(amod, sizeof(kernel_args_module_t), true);
 	}
 
 	/* Determine how much to increase the boot progress by for each

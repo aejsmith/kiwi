@@ -88,8 +88,8 @@ static phys_ptr_t page_structure_alloc(int mmflag) {
  * @param addr		Address of structure.
  * @return		Pointer to mapping. */
 static uint64_t *page_structure_map(phys_ptr_t addr) {
-	/* Our page_phys_map() implementation never fails. */
-	return page_phys_map(addr, PAGE_SIZE, MM_FATAL);
+	/* Our phys_map() implementation never fails. */
+	return phys_map(addr, PAGE_SIZE, MM_FATAL);
 }
 
 /** Add an address to the invalidation list.
@@ -363,7 +363,7 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 
 	/* Get the memory type of the address and set flags accordingly. */
 	type = MEMORY_TYPE_WB;
-	page_get_memory_type(phys, &type);
+	phys_memory_type(phys, &type);
 	switch(type) {
 	case MEMORY_TYPE_UC:
 		flags |= PG_PCD;
@@ -607,7 +607,7 @@ void page_map_destroy(page_map_t *map) {
  * @param size		Size of range to map.
  * @param mmflag	Allocation behaviour flags.
  * @return		Address of mapping or NULL on failure. */
-void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	if(unlikely(!size)) {
 		return NULL;
 	}
@@ -629,7 +629,7 @@ void *page_phys_map(phys_ptr_t addr, size_t size, int mmflag) {
  *			the CPU that mapped it. This is used as an optimisation
  *			to not perform remote TLB invalidations when not
  *			required. */
-void page_phys_unmap(void *addr, size_t size, bool shared) {
+void phys_unmap(void *addr, size_t size, bool shared) {
 	/* Nothing needs to be done. */
 }
 

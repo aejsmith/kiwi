@@ -424,7 +424,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 	if(pmflag & PM_ZERO) {
 		thread_wire(curr_thread);
 
-		mapping = page_phys_map(base, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
+		mapping = phys_map(base, count * PAGE_SIZE, (pmflag & MM_FLAG_MASK) & ~MM_FATAL);
 		if(unlikely(!mapping)) {
 			if(pmflag & MM_FATAL) {
 				fatal("Could not perform mandatory allocation of %zu pages (2)", count);
@@ -436,7 +436,7 @@ phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
 		}
 
 		memset(mapping, 0, count * PAGE_SIZE);
-		page_phys_unmap(mapping, count * PAGE_SIZE, false);
+		phys_unmap(mapping, count * PAGE_SIZE, false);
 		thread_unwire(curr_thread);
 	}
 
@@ -497,22 +497,22 @@ bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 
 	thread_wire(curr_thread);
 
-	mdest = page_phys_map(dest, PAGE_SIZE, mmflag);
+	mdest = phys_map(dest, PAGE_SIZE, mmflag);
 	if(unlikely(!mdest)) {
 		thread_unwire(curr_thread);
 		return false;
 	}
 
-	msrc = page_phys_map(source, PAGE_SIZE, mmflag);
+	msrc = phys_map(source, PAGE_SIZE, mmflag);
 	if(unlikely(!msrc)) {
-		page_phys_unmap(mdest, PAGE_SIZE, false);
+		phys_unmap(mdest, PAGE_SIZE, false);
 		thread_unwire(curr_thread);
 		return false;
 	}
 
 	memcpy(mdest, msrc, PAGE_SIZE);
-	page_phys_unmap(msrc, PAGE_SIZE, false);
-	page_phys_unmap(mdest, PAGE_SIZE, false);
+	phys_unmap(msrc, PAGE_SIZE, false);
+	phys_unmap(mdest, PAGE_SIZE, false);
 	thread_unwire(curr_thread);
 	return true;
 }
@@ -524,7 +524,7 @@ bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
  *			value will be stored here. This means that callers
  *			should store a default type in the location before
  *			calling this function. */
-void page_get_memory_type(phys_ptr_t addr, memory_type_t *type) {
+void phys_memory_type(phys_ptr_t addr, memory_type_t *type) {
 	memory_type_range_t *range;
 
 	spinlock_lock(&memory_type_lock);
@@ -544,7 +544,7 @@ void page_get_memory_type(phys_ptr_t addr, memory_type_t *type) {
  * @param start		Physical base address.
  * @param size		Size of range.
  * @param type		Type to set. */
-void page_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type) {
+void phys_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type) {
 	memory_type_range_t *range;
 
 	range = kmalloc(sizeof(*range), MM_SLEEP);
@@ -674,7 +674,7 @@ void __init_text page_init(kernel_args_t *args) {
 	vmem_early_create(&page_arena, "page_arena", PAGE_SIZE, RESOURCE_TYPE_MEMORY,
 	                  VMEM_REFILL, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
 	for(addr = args->phys_ranges; addr;) {
-		range = page_phys_map(addr, sizeof(*range), MM_FATAL);
+		range = phys_map(addr, sizeof(*range), MM_FATAL);
 		switch(range->type) {
 		case PHYS_MEMORY_FREE:
 		case PHYS_MEMORY_RECLAIMABLE:
@@ -697,7 +697,7 @@ void __init_text page_init(kernel_args_t *args) {
 		}
 
 		addr = range->next;
-		page_phys_unmap(range, sizeof(*range), true);
+		phys_unmap(range, sizeof(*range), true);
 	}
 
 	/* Initialise architecture paging-related things. When this returns,
@@ -726,7 +726,7 @@ void __init_text vm_page_init(void) {
 		phys = page_alloc(size / PAGE_SIZE, MM_FATAL);
 
 		/* Map the structures into memory and initialise them. */
-		page_ranges[i].pages = page_phys_map(phys, size, MM_FATAL);
+		page_ranges[i].pages = phys_map(phys, size, MM_FATAL);
 		memset(page_ranges[i].pages, 0, size);
 		for(j = 0; j < count; j++) {
 			list_init(&page_ranges[i].pages[j].header);

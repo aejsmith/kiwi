@@ -321,7 +321,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	/* Allocate a PRDT if necessary. */
 	if(dma) {
 		channel->prdt_phys = page_xalloc(PRDT_SIZE / PAGE_SIZE, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP);
-		channel->prdt = page_phys_map(channel->prdt_phys, PRDT_SIZE, MM_SLEEP);
+		channel->prdt = phys_map(channel->prdt_phys, PRDT_SIZE, MM_SLEEP);
 	}
 
 	/* Register the IRQ handler. */
@@ -329,7 +329,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ata: failed to register PCI ATA IRQ handler %u\n", channel->irq);
 		if(dma) {
-			page_phys_unmap(channel->prdt, PRDT_SIZE, true);
+			phys_unmap(channel->prdt, PRDT_SIZE, true);
 			page_free(channel->prdt_phys, PRDT_SIZE / PAGE_SIZE);
 		}
 		kfree(channel);
@@ -342,7 +342,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	if(!channel->channel) {
 		irq_unregister(channel->irq, pci_ata_irq_handler, NULL, channel);
 		if(dma) {
-			page_phys_unmap(channel->prdt, PRDT_SIZE, true);
+			phys_unmap(channel->prdt, PRDT_SIZE, true);
 			page_free(channel->prdt_phys, PRDT_SIZE / PAGE_SIZE);
 		}
 		kfree(channel);

@@ -120,7 +120,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			assert(sharedp);
 
 			thread_wire(curr_thread);
-			*mappingp = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			*mappingp = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 			*sharedp = false;
 		} else {
 			*pagep = page;
@@ -144,19 +144,19 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			 * the mapping won't be shared, because it's possible
 			 * that device driver will do work in another thread,
 			 * which may be on another CPU. */
-			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 			shared = true;
 
 			ret = cache->ops->read_page(cache, mapping, offset, nonblock);
 			if(ret != STATUS_SUCCESS) {
-				page_phys_unmap(mapping, PAGE_SIZE, true);
+				phys_unmap(mapping, PAGE_SIZE, true);
 				vm_page_free(page, 1);
 				mutex_unlock(&cache->lock);
 				return ret;
 			}
 		} else {
 			thread_wire(curr_thread);
-			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 			memset(mapping, 0, PAGE_SIZE);
 		}
 	}
@@ -177,7 +177,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 		/* Reuse any mapping that may have already been created. */
 		if(!mapping) {
 			thread_wire(curr_thread);
-			mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 		}
 
 		*mappingp = mapping;
@@ -185,7 +185,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	} else {
 		/* Page mapping is not required, get rid of it. */
 		if(mapping) {
-			page_phys_unmap(mapping, PAGE_SIZE, shared);
+			phys_unmap(mapping, PAGE_SIZE, shared);
 			if(!shared) {
 				thread_unwire(curr_thread);
 			}
@@ -263,7 +263,7 @@ static status_t vm_cache_map_page(vm_cache_t *cache, offset_t offset, bool overw
  * @param shared	Shared value returned from vm_cache_map_page(). */
 static void vm_cache_unmap_page(vm_cache_t *cache, void *mapping, offset_t offset,
                                 bool dirty, bool shared) {
-	page_phys_unmap(mapping, PAGE_SIZE, shared);
+	phys_unmap(mapping, PAGE_SIZE, shared);
 	if(!shared) {
 		thread_unwire(curr_thread);
 	}
@@ -515,7 +515,7 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page)
 	 * pages the modified flag is cleared if there is no write operation. */
 	assert(cache->ops && cache->ops->write_page);
 
-	mapping = page_phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+	mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
 	ret = cache->ops->write_page(cache, mapping, page->offset, false);
 	if(ret == STATUS_SUCCESS) {
 		/* Clear modified flag only if the page reference count is
@@ -526,7 +526,7 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page)
 			vm_page_queue(page, PAGE_QUEUE_CACHED); 
 		}
 	}
-	page_phys_unmap(mapping, PAGE_SIZE, true);
+	phys_unmap(mapping, PAGE_SIZE, true);
 	return ret;
 }
 
