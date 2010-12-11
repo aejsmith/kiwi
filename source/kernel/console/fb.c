@@ -35,7 +35,7 @@ extern unsigned char copyright_ppm[];
 
 /** Width and height of the console font. */
 #define FONT_WIDTH		6
-#define FONT_HEIGHT		12
+#define FONT_HEIGHT		11
 
 /** Colour and size of the splash progress bar. */
 #define SPLASH_PROGRESS_FG	0x78cc00
