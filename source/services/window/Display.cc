@@ -123,7 +123,7 @@ Display::Display(WindowServer *server, const char *path) :
 	size_t count;
 
 	/* Open the device. */
-	ret = device_open(path, DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open(path, DEVICE_READ | DEVICE_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to open display device " << path << " (" << ret << ")" << endl;
 		throw exception();
@@ -131,14 +131,14 @@ Display::Display(WindowServer *server, const char *path) :
 	SetHandle(handle);
 
 	/* Get mode information. */
-	ret = device_request(m_handle, DISPLAY_MODE_COUNT, NULL, 0, &count, sizeof(count), NULL);
+	ret = kern_device_request(m_handle, DISPLAY_MODE_COUNT, NULL, 0, &count, sizeof(count), NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get mode count for " << path << " (" << ret << ")" << endl;
 		throw exception();
 	} else {
 		unique_ptr<display_mode_t []> modes(new display_mode_t[count]);
-		ret = device_request(m_handle, DISPLAY_GET_MODES, NULL, 0, modes.get(),
-		                     sizeof(display_mode_t) * count, NULL);
+		ret = kern_device_request(m_handle, DISPLAY_GET_MODES, NULL, 0, modes.get(),
+		                          sizeof(display_mode_t) * count, NULL);
 		if(ret != STATUS_SUCCESS) {
 			clog << "Failed to get modes for " << path << " (" << ret << ")" << endl;
 			throw exception();
@@ -148,8 +148,8 @@ Display::Display(WindowServer *server, const char *path) :
 	}
 
 	/* Try to get the preferred display mode. */
-	ret = device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &m_current_mode,
-	                     sizeof(display_mode_t), NULL);
+	ret = kern_device_request(m_handle, DISPLAY_GET_PREFERRED_MODE, NULL, 0, &m_current_mode,
+	                          sizeof(display_mode_t), NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to get preferred mode for " << path << " (" << ret << ")" << endl;
 		throw exception();
@@ -179,7 +179,7 @@ status_t Display::SetMode(display_mode_t &mode) {
 	}
 
 	/* Set the mode. */
-	ret = device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL);
+	ret = kern_device_request(m_handle, DISPLAY_SET_MODE, &mode.id, sizeof(mode.id), NULL, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to set display mode (" << ret << ")" << endl;
 		return ret;

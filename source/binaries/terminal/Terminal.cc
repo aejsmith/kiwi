@@ -47,7 +47,7 @@ Terminal::Terminal(Handler *handler, int cols, int rows) :
 	m_process.OnExit.Connect(OnExit);
 
 	/* Open the terminal master. */
-	ret = device_open("/tty/master", DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open("/tty/master", DEVICE_READ | DEVICE_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to create new terminal: " << e.GetDescription() << endl;
@@ -56,7 +56,7 @@ Terminal::Terminal(Handler *handler, int cols, int rows) :
 	SetHandle(handle);
 
 	/* Get the ID of the slave. */
-	ret = device_request(handle, TTY_MASTER_ID, 0, 0, &m_id, sizeof(m_id), 0);
+	ret = kern_device_request(handle, TTY_MASTER_ID, 0, 0, &m_id, sizeof(m_id), 0);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to get terminal slave ID: " << e.GetDescription() << endl;
@@ -67,7 +67,7 @@ Terminal::Terminal(Handler *handler, int cols, int rows) :
 	winsize size;
 	size.ws_col = cols;
 	size.ws_row = rows;
-	ret = device_request(handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
+	ret = kern_device_request(handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to set terminal size: " << e.GetDescription() << endl;
@@ -93,16 +93,16 @@ bool Terminal::Run(const char *cmdline) {
 	path << "/tty/" << m_id;
 
 	/* Open handles to it to give to the child. */
-	ret = device_open(path.str().c_str(), DEVICE_READ, &in);
+	ret = kern_device_open(path.str().c_str(), DEVICE_READ, &in);
 	if(ret != STATUS_SUCCESS) {
 		return false;
 	}
-	ret = device_open(path.str().c_str(), DEVICE_WRITE, &out);
+	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &out);
 	if(ret != STATUS_SUCCESS) {
 		handle_close(in);
 		return false;
 	}
-	ret = device_open(path.str().c_str(), DEVICE_WRITE, &err);
+	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &err);
 	if(ret != STATUS_SUCCESS) {
 		handle_close(out);
 		handle_close(in);
@@ -140,7 +140,7 @@ void Terminal::Resize(int cols, int rows) {
 	winsize size;
 	size.ws_col = cols;
 	size.ws_row = rows;
-	ret = device_request(m_handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
+	ret = kern_device_request(m_handle, TIOCSWINSZ, &size, sizeof(size), 0, 0, 0);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to resize terminal: " << e.GetDescription() << endl;
@@ -153,7 +153,7 @@ void Terminal::Resize(int cols, int rows) {
 /** Send input to the terminal.
  * @param ch		Character to send. */
 void Terminal::Input(unsigned char ch) {
-	status_t ret = device_write(m_handle, &ch, 1, 0, NULL);
+	status_t ret = kern_device_write(m_handle, &ch, 1, 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to send input to terminal: " << e.GetDescription() << endl;
@@ -181,7 +181,7 @@ void Terminal::HandleEvent(int event) {
 
 	assert(event == DEVICE_EVENT_READABLE);
 
-	ret = device_read(m_handle, &ch, 1, 0, &bytes);
+	ret = kern_device_read(m_handle, &ch, 1, 0, &bytes);
 	if(ret != STATUS_SUCCESS || bytes != 1) {
 		return;
 	}

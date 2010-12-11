@@ -53,7 +53,7 @@ void InputDevice::HandleEvent(int id) {
 	assert(id == DEVICE_EVENT_READABLE);
 
 	/* Read the event structure. */
-	ret = device_read(m_handle, &event, sizeof(event), 0, NULL);
+	ret = kern_device_read(m_handle, &event, sizeof(event), 0, NULL);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to read input event: " << ret << endl;
 		return;

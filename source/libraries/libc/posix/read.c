@@ -70,7 +70,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
 		}
 		return (ssize_t)bytes;
 	case OBJECT_TYPE_DEVICE:
-		ret = device_read(fd, buf, count, offset, &bytes);
+		ret = kern_device_read(fd, buf, count, offset, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
 			libc_status_to_errno(ret);
 			return -1;
@@ -116,7 +116,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 		}
 		return (ssize_t)bytes;
 	case OBJECT_TYPE_DEVICE:
-		ret = device_read(fd, buf, count, 0, &bytes);
+		ret = kern_device_read(fd, buf, count, 0, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
 			libc_status_to_errno(ret);
 			return -1;

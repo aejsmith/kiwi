@@ -41,13 +41,13 @@ extern "C" {
 //#define DEVICE_EVENT_CHILD_ADDED	2	/**< Wait for a child device to be added. */
 //#define DEVICE_EVENT_CHILD_REMOVED	3	/**< Wait for a child device to be removed. */
 
-extern status_t SYSCALL(device_open)(const char *path, object_rights_t rights, handle_t *handlep);
-extern status_t SYSCALL(device_read)(handle_t handle, void *buf, size_t count, offset_t offset,
-                                     size_t *bytesp);
-extern status_t SYSCALL(device_write)(handle_t handle, const void *buf, size_t count,
-                                      offset_t offset, size_t *bytesp);
-extern status_t SYSCALL(device_request)(handle_t handle, int request, const void *in, size_t insz,
-                                        void *out, size_t outsz, size_t *bytesp);
+extern status_t kern_device_open(const char *path, object_rights_t rights, handle_t *handlep);
+extern status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
+                                 size_t *bytesp);
+extern status_t kern_device_write(handle_t handle, const void *buf, size_t count,
+                                  offset_t offset, size_t *bytesp);
+extern status_t kern_device_request(handle_t handle, int request, const void *in, size_t insz,
+                                    void *out, size_t outsz, size_t *bytesp);
 
 #ifdef __cplusplus
 }

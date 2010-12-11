@@ -835,7 +835,7 @@ void __init_text device_init(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_device_open(const char *path, object_rights_t rights, handle_t *handlep) {
+status_t kern_device_open(const char *path, object_rights_t rights, handle_t *handlep) {
 	object_handle_t *handle;
 	status_t ret;
 	char *kpath;
@@ -876,8 +876,8 @@ status_t sys_device_open(const char *path, object_rights_t rights, handle_t *han
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
-                         size_t *bytesp) {
+status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t offset,
+                          size_t *bytesp) {
 	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	size_t bytes = 0;
@@ -940,8 +940,8 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_device_write(handle_t handle, const void *buf, size_t count, offset_t offset,
-                          size_t *bytesp) {
+status_t kern_device_write(handle_t handle, const void *buf, size_t count, offset_t offset,
+                           size_t *bytesp) {
 	object_handle_t *khandle = NULL;
 	status_t ret, err;
 	void *kbuf = NULL;
@@ -998,8 +998,8 @@ out:
  *			operation handler (optional).
  * @param outszp	Where to store size of data returned.
  * @return		Status code describing result of the operation. */
-status_t sys_device_request(handle_t handle, int request, const void *in, size_t insz, void *out,
-                            size_t outsz, size_t *bytesp) {
+status_t kern_device_request(handle_t handle, int request, const void *in, size_t insz, void *out,
+                             size_t outsz, size_t *bytesp) {
 	void *kin = NULL, *kout = NULL;
 	object_handle_t *khandle;
 	status_t ret, err;

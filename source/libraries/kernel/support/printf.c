@@ -38,7 +38,7 @@ bool libkernel_debug = false;
 static inline void printf_print_char(char ch) {
 	switch(object_type(OUTPUT_HANDLE)) {
 	case OBJECT_TYPE_DEVICE:
-		device_write(OUTPUT_HANDLE, &ch, 1, 0, NULL);
+		kern_device_write(OUTPUT_HANDLE, &ch, 1, 0, NULL);
 		break;
 	case OBJECT_TYPE_FILE:
 		kern_file_write(OUTPUT_HANDLE, &ch, 1, NULL);
@@ -51,7 +51,7 @@ static inline void printf_print_char(char ch) {
 static inline void printf_print_string(const char *str) {
 	switch(object_type(OUTPUT_HANDLE)) {
 	case OBJECT_TYPE_DEVICE:
-		device_write(OUTPUT_HANDLE, str, strlen(str), 0, NULL);
+		kern_device_write(OUTPUT_HANDLE, str, strlen(str), 0, NULL);
 		break;
 	case OBJECT_TYPE_FILE:
 		kern_file_write(OUTPUT_HANDLE, str, strlen(str), NULL);
