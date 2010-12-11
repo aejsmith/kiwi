@@ -35,7 +35,7 @@ static int fcntl_getfd(int fd) {
 	int kflags, flags = 0;
 	status_t ret;
 
-	ret = handle_flags(fd, &kflags);
+	ret = kern_handle_flags(fd, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -55,7 +55,7 @@ static int fcntl_setfd(int fd, int flags) {
 
 	kflags |= ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
 
-	ret = handle_set_flags(fd, kflags);
+	ret = kern_handle_set_flags(fd, kflags);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -72,7 +72,7 @@ static int fcntl_dupfd(int fd, int dest) {
 	status_t ret;
 	handle_t new;
 
-	ret = handle_duplicate(fd, dest, false, &new);
+	ret = kern_handle_duplicate(fd, dest, false, &new);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

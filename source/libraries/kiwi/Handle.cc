@@ -57,10 +57,11 @@ void Handle::Close() {
 		/* Emit the close event. */
 		OnClose();
 
-		/* The only error handle_close() can encounter is the handle
-		 * not existing. Therefore, if we fail, it means the programmer
-		 * has done something funny so we raise a fatal error. */
-		if(unlikely(handle_close(m_handle) != STATUS_SUCCESS)) {
+		/* The only error kern_handle_close() can encounter is the
+		 * handle not existing. Therefore, if we fail, it means the
+		 * programmer has done something funny so we raise a fatal
+		 * error. */
+		if(unlikely(kern_handle_close(m_handle) != STATUS_SUCCESS)) {
 			libkiwi_fatal("Handle::Close: Handle %d has already been closed.", m_handle);
 		}
 
@@ -95,7 +96,7 @@ status_t Handle::_Wait(int event, useconds_t timeout) const {
 	object_event_t _event = { m_handle, event, false };
 	status_t ret;
 
-	ret = object_wait(&_event, 1, timeout);
+	ret = kern_object_wait(&_event, 1, timeout);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		/* Handle errors that can occur because the programmer has done
 		 * something daft. */

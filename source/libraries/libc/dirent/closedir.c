@@ -27,7 +27,7 @@
 int closedir(DIR *dir) {
 	status_t ret;
 
-	ret = handle_close(dir->handle);
+	ret = kern_handle_close(dir->handle);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

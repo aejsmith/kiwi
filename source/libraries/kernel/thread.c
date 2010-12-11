@@ -87,13 +87,13 @@ __export status_t thread_create(const char *name, void *stack, size_t stacksz, v
 
 	ret = _thread_create(name, stack, stacksz, thread_entry_wrapper, &info, security, rights, handlep);
 	if(ret != STATUS_SUCCESS) {
-		handle_close(info.sem);
+		kern_handle_close(info.sem);
 		return ret;
 	}
 
 	/* Wait for the thread to signal that it is initialised. */
 	kern_semaphore_down(info.sem, -1);
-	handle_close(info.sem);
+	kern_handle_close(info.sem);
 	return info.ret;
 }
 

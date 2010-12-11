@@ -49,7 +49,7 @@ Thread::Thread(handle_t handle) :
 	m_priv(new ThreadPrivate)
 {
 	if(handle >= 0) {
-		if(unlikely(object_type(handle) != OBJECT_TYPE_THREAD)) {
+		if(unlikely(kern_object_type(handle) != OBJECT_TYPE_THREAD)) {
 			libkiwi_fatal("Thread::Thread: Handle must refer to a thread object.");
 		}
 

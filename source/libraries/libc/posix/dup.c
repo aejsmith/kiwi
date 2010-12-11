@@ -42,7 +42,7 @@ int dup2(int fd, int newfd) {
 	status_t ret;
 	handle_t new;
 
-	ret = handle_duplicate(fd, newfd, true, &new);
+	ret = kern_handle_duplicate(fd, newfd, true, &new);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

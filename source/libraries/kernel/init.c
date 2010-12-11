@@ -91,11 +91,11 @@ void libkernel_init_stage2(process_args_t *args) {
 	/* If we're the first process, open handles to the kernel console. */
 	if(process_id(-1) == 1) {
 		kern_device_open("/kconsole", DEVICE_READ, &handle);
-		handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 		kern_device_open("/kconsole", DEVICE_WRITE, &handle);
-		handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 		kern_device_open("/kconsole", DEVICE_WRITE, &handle);
-		handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
 	/* Check if any of our options are set. */

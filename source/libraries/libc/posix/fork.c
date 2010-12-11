@@ -93,7 +93,7 @@ static pid_t fork_child(posix_process_t *proc, char *stack) {
 	libc_mutex_lock(&child_processes_lock, -1);
 	LIST_FOREACH_SAFE(&child_processes, iter) {
 		proc = list_entry(iter, posix_process_t, header);
-		handle_close(proc->handle);
+		kern_handle_close(proc->handle);
 		list_remove(&proc->header);
 		free(proc);
 	}

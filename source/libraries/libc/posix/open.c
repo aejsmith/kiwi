@@ -146,7 +146,7 @@ int open(const char *path, int oflag, ...) {
 		if(oflag & O_TRUNC) {
 			ret = kern_file_resize(handle, 0);
 			if(ret != STATUS_SUCCESS) {
-				handle_close(handle);
+				kern_handle_close(handle);
 				libc_status_to_errno(ret);
 				return -1;
 			}
@@ -159,7 +159,7 @@ int open(const char *path, int oflag, ...) {
 
 	/* Mark the handle as inheritable if not opening with O_CLOEXEC. */
 	if(!(oflag & O_CLOEXEC)) {
-		handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 	}
 
 	return (int)handle;

@@ -29,7 +29,7 @@ using namespace kiwi;
  *			object use. Must refer to a port object. */
 IPCPort::IPCPort(handle_t handle) {
 	if(handle >= 0) {
-		if(unlikely(object_type(handle) != OBJECT_TYPE_PORT)) {
+		if(unlikely(kern_object_type(handle) != OBJECT_TYPE_PORT)) {
 			libkiwi_fatal("IPCPort::IPCPort: Handle must refer to a port object.");
 		}
 

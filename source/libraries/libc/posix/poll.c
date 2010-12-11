@@ -88,7 +88,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 	for(i = 0; i < nfds; i++) {
 		fds[i].revents = 0;
 
-		switch(object_type(fds[i].fd)) {
+		switch(kern_object_type(fds[i].fd)) {
 		case OBJECT_TYPE_FILE:
 			if(fds[i].events & ~(POLLIN | POLLOUT)) {
 				errno = ENOTSUP;
@@ -143,7 +143,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
 		return -1;
 	}
 
-	ret = object_wait(events, count, (timeout < 0) ? -1 : (timeout * 1000));
+	ret = kern_object_wait(events, count, (timeout < 0) ? -1 : (timeout * 1000));
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		goto fail;

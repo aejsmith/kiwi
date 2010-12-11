@@ -85,17 +85,19 @@ typedef struct object_security {
 	object_acl_t *acl;		/**< Access control list (if NULL, default will be used). */
 } object_security_t;
 
-extern int SYSCALL(object_type)(handle_t handle);
-extern status_t SYSCALL(object_set_security)(handle_t handle, const object_security_t *security);
-extern status_t SYSCALL(object_wait)(object_event_t *events, size_t count, useconds_t timeout);
+extern int kern_object_type(handle_t handle);
+#ifndef KERNEL
+extern status_t kern_object_security(handle_t handle, object_security_t *securityp);
+#endif
+extern status_t kern_object_set_security(handle_t handle, const object_security_t *security);
+extern status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout);
 
-extern status_t SYSCALL(handle_flags)(handle_t handle, int *flagsp);
-extern status_t SYSCALL(handle_set_flags)(handle_t handle, int flags);
-extern status_t SYSCALL(handle_duplicate)(handle_t handle, handle_t dest, bool force, handle_t *newp);
-extern status_t SYSCALL(handle_close)(handle_t handle);
+extern status_t kern_handle_flags(handle_t handle, int *flagsp);
+extern status_t kern_handle_set_flags(handle_t handle, int flags);
+extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp);
+extern status_t kern_handle_close(handle_t handle);
 
 #ifndef KERNEL
-extern status_t object_security(handle_t handle, object_security_t *securityp);
 extern object_acl_t *object_security_acl(object_security_t *security);
 extern void object_security_destroy(object_security_t *security);
 

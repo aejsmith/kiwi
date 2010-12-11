@@ -99,20 +99,20 @@ bool Terminal::Run(const char *cmdline) {
 	}
 	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &out);
 	if(ret != STATUS_SUCCESS) {
-		handle_close(in);
+		kern_handle_close(in);
 		return false;
 	}
 	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &err);
 	if(ret != STATUS_SUCCESS) {
-		handle_close(out);
-		handle_close(in);
+		kern_handle_close(out);
+		kern_handle_close(in);
 		return false;
 	}
 
 	/* Make the handles inheritable so children of the process get them. */
-	handle_set_flags(in, HANDLE_INHERITABLE);
-	handle_set_flags(out, HANDLE_INHERITABLE);
-	handle_set_flags(err, HANDLE_INHERITABLE);
+	kern_handle_set_flags(in, HANDLE_INHERITABLE);
+	kern_handle_set_flags(out, HANDLE_INHERITABLE);
+	kern_handle_set_flags(err, HANDLE_INHERITABLE);
 
 	/* Create the child process. */
 	Process::HandleMap map;
@@ -120,9 +120,9 @@ bool Terminal::Run(const char *cmdline) {
 	map.push_back(make_pair(out, 1));
 	map.push_back(make_pair(err, 2));
 	ret = m_process.Create(cmdline, environ, &map);
-	handle_close(err);
-	handle_close(out);
-	handle_close(in);
+	kern_handle_close(err);
+	kern_handle_close(out);
+	kern_handle_close(in);
 	return ret;
 }
 

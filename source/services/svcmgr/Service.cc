@@ -85,7 +85,7 @@ bool Service::Start() {
 			cerr << "svcmgr: failed to create helper thread (" << ret << ")" << endl;
 			return false;
 		}
-		handle_close(handle);
+		kern_handle_close(handle);
 
 		/* Wait for the connection. */
 		handle = server->Listen();

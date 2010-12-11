@@ -159,7 +159,7 @@ int fchmod(int fd, mode_t mode) {
 
 	/* Get the current security attributes, as we want to preserve extra
 	 * ACL entries. */
-	ret = object_security(fd, &security);
+	ret = kern_object_security(fd, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -175,7 +175,7 @@ int fchmod(int fd, mode_t mode) {
 	security.gid = -1;
 
 	/* Set the new security attributes. */
-	ret = object_set_security(fd, &security);
+	ret = kern_object_set_security(fd, &security);
 	object_security_destroy(&security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);

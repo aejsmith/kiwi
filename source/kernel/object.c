@@ -682,7 +682,7 @@ void __init_text handle_init(void) {
  * @param handle	Handle to object.
  * @return		Type ID of object on success, -1 if the handle was not
  *			found. */
-int sys_object_type(handle_t handle) {
+int kern_object_type(handle_t handle) {
 	object_handle_t *khandle;
 	int ret;
 
@@ -706,7 +706,7 @@ int sys_object_type(handle_t handle) {
  *			the events have happened, and a value of -1 will block
  *			indefinitely until one of events happens.
  * @return		Status code describing result of the operation. */
-status_t sys_object_wait(object_event_t *events, size_t count, useconds_t timeout) {
+status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout) {
 	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "object_wait_sem", 0);
 	object_wait_sync_t *syncs;
 	status_t ret, err;
@@ -772,7 +772,7 @@ out:
  * @param handle	ID of handle to get flags for.
  * @param flagsp	Where to store handle flags.
  * @return		Status code describing result of the operation. */
-status_t sys_handle_flags(handle_t handle, int *flagsp) {
+status_t kern_handle_flags(handle_t handle, int *flagsp) {
 	handle_link_t *link;
 	status_t ret;
 
@@ -794,7 +794,7 @@ status_t sys_handle_flags(handle_t handle, int *flagsp) {
  * @param handle	ID of handle to set flags for.
  * @param flags		Flags to set.
  * @return		Status code describing result of the operation. */
-status_t sys_handle_set_flags(handle_t handle, int flags) {
+status_t kern_handle_set_flags(handle_t handle, int flags) {
 	handle_link_t *link;
 
 	rwlock_write_lock(&curr_proc->handles->lock);
@@ -826,7 +826,7 @@ status_t sys_handle_set_flags(handle_t handle, int flags) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp) {
+status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp) {
 	handle_link_t *link;
 
 	if(handle >= CONFIG_HANDLE_MAX || dest >= CONFIG_HANDLE_MAX || !newp) {
@@ -873,6 +873,6 @@ status_t sys_handle_duplicate(handle_t handle, handle_t dest, bool force, handle
  * @return		Status code describing result of the operation.
  *			The only reason for failure is an invalid handle being
  *			specified. */
-status_t sys_handle_close(handle_t handle) {
+status_t kern_handle_close(handle_t handle) {
 	return object_handle_detach(NULL, handle);
 }

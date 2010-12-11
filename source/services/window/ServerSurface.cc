@@ -57,7 +57,7 @@ ServerSurface::ServerSurface(Connection *owner, Size size) :
 /** Destroy the surface. */
 ServerSurface::~ServerSurface() {
 	Unmap();
-	handle_close(m_area);
+	kern_handle_close(m_area);
 }
 
 /** Get the ID of the surface (the same as its area ID).

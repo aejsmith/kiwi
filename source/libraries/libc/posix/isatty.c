@@ -28,7 +28,7 @@
  * @param fd		File descriptor to check.
  * @return		1 if a TTY, 0 if not. */
 int isatty(int fd) {
-	switch(object_type(fd)) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_DEVICE:
 		return 1;
 	case -1:

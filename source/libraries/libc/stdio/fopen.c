@@ -117,7 +117,7 @@ FILE *fdopen(int fd, const char *mode) {
 	FILE *stream;
 
 	/* Check if the file descriptor is valid. */
-	switch(object_type(fd)) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_FILE:
 	case OBJECT_TYPE_DEVICE:
 		break;

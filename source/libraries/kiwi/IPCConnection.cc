@@ -36,7 +36,7 @@ using namespace org::kiwi::ServiceManager;
  *			the object use. Must refer to a connection object. */
 IPCConnection::IPCConnection(handle_t handle) {
 	if(handle >= 0) {
-		if(unlikely(object_type(handle) != OBJECT_TYPE_CONNECTION)) {
+		if(unlikely(kern_object_type(handle) != OBJECT_TYPE_CONNECTION)) {
 			libkiwi_fatal("IPCConnection::IPCConnection: Handle must refer to a connection object.");
 		}
 

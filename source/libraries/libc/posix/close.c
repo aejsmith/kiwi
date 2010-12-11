@@ -29,7 +29,9 @@
  * @param fd		File descriptor to close.
  * @return		0 on success, -1 on failure with errno set appropriately. */
 int close(int fd) {
-	status_t ret = handle_close(fd);
+	status_t ret;
+
+	ret = kern_handle_close(fd);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

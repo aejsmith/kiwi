@@ -83,7 +83,7 @@ int fchown(int fd, uid_t uid, gid_t gid) {
 	security.gid = gid;
 	security.acl = NULL;
 
-	ret = object_set_security(fd, &security);
+	ret = kern_object_set_security(fd, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

@@ -136,7 +136,7 @@ int fstat(int fd, struct stat *statp) {
 	file_info_t info;
 	status_t ret;
 
-	switch(object_type(fd)) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_info(fd, &info);
 		if(ret != STATUS_SUCCESS) {
@@ -160,7 +160,7 @@ int fstat(int fd, struct stat *statp) {
 		return -1;
 	}
 
-	ret = object_security(fd, &security);
+	ret = kern_object_security(fd, &security);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

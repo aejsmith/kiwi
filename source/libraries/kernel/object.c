@@ -25,8 +25,8 @@
 
 #include "libkernel.h"
 
-extern status_t _object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
-                                 object_acl_t *aclp);
+extern status_t _kern_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
+                                      object_acl_t *aclp);
 
 /** Obtain object security attributes.
  * @param handle	Handle to object to get attributes for.
@@ -35,7 +35,7 @@ extern status_t _object_security(handle_t handle, user_id_t *uidp, group_id_t *g
  *			freed with object_security_destroy() once it is no
  *			longer needed.
  * @return		Status code describing result of the operation. */
-__export status_t object_security(handle_t handle, object_security_t *securityp) {
+__export status_t kern_object_security(handle_t handle, object_security_t *securityp) {
 	status_t ret;
 
 	securityp->acl = malloc(sizeof(object_acl_t));
@@ -46,7 +46,7 @@ __export status_t object_security(handle_t handle, object_security_t *securityp)
 	/* Call with a NULL entries pointer in order to get the size of the ACL.
 	 * TODO: What if the ACL is changed between the two calls? */
 	securityp->acl->entries = NULL;
-	ret = _object_security(handle, &securityp->uid, &securityp->gid, securityp->acl);
+	ret = _kern_object_security(handle, &securityp->uid, &securityp->gid, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl);
 		return ret;
@@ -59,7 +59,7 @@ __export status_t object_security(handle_t handle, object_security_t *securityp)
 	}
 
 	/* Get the ACL entries. */
-	ret = _object_security(handle, NULL, NULL, securityp->acl);
+	ret = _kern_object_security(handle, NULL, NULL, securityp->acl);
 	if(ret != STATUS_SUCCESS) {
 		free(securityp->acl->entries);
 		free(securityp->acl);

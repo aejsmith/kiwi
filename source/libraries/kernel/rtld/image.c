@@ -73,7 +73,7 @@ static bool rtld_library_exists(const char *path) {
 	}
 
 	dprintf("success!\n");
-	handle_close(handle);
+	kern_handle_close(handle);
 	return true;
 }
 
@@ -471,7 +471,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	if(imagep) {
 		*imagep = image;
 	}
-	handle_close(handle);
+	kern_handle_close(handle);
 	return STATUS_SUCCESS;
 fail:
 	if(image) {
@@ -481,7 +481,7 @@ fail:
 		list_remove(&image->header);
 		free(image);
 	}
-	handle_close(handle);
+	kern_handle_close(handle);
 	return ret;
 }
 

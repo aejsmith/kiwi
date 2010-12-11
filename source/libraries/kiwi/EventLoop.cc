@@ -174,7 +174,7 @@ int EventLoop::Run(void) {
 		}
 
 		/* Wait for any of the events to occur. */
-		ret = object_wait(&m_priv->events[0], m_priv->events.size(), -1);
+		ret = kern_object_wait(&m_priv->events[0], m_priv->events.size(), -1);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d", ret);
 		}

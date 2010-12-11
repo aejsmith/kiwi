@@ -89,7 +89,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	libc_mutex_unlock(&child_processes_lock);
 
 	/* Wait for any of them to exit. */
-	ret = object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
+	ret = kern_object_wait(events, count, (flags & WNOHANG) ? 0 : -1);
 	if(ret != STATUS_SUCCESS) {
 		if(events) { free(events); }
 		if(ret == STATUS_WOULD_BLOCK) {
@@ -118,7 +118,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 				ret = proc->pid;
 
 				/* Clean up the process. */
-				handle_close(proc->handle);
+				kern_handle_close(proc->handle);
 				list_remove(&proc->header);
 				free(proc);
 				goto out;

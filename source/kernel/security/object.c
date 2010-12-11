@@ -38,8 +38,8 @@
 #include <object.h>
 #include <status.h>
 
-extern status_t sys_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
-                                    object_acl_t *aclp);
+extern status_t kern_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
+                                     object_acl_t *aclp);
 
 /** Initialise an ACL.
  * @param acl		ACL to initialise. */
@@ -487,7 +487,7 @@ status_t object_set_security(object_t *object, object_handle_t *handle, object_s
  *			array, and the count will be updated to give the actual
  *			number of entries in the ACL.
  * @return		Status code describing result of the operation. */
-status_t sys_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp, object_acl_t *aclp) {
+status_t kern_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp, object_acl_t *aclp) {
 	object_handle_t *khandle;
 	object_acl_t kacl;
 	status_t ret;
@@ -578,7 +578,7 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_object_set_security(handle_t handle, const object_security_t *security) {
+status_t kern_object_set_security(handle_t handle, const object_security_t *security) {
 	object_security_t ksecurity;
 	object_handle_t *khandle;
 	status_t ret;

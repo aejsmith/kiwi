@@ -36,7 +36,7 @@ bool libkernel_debug = false;
 /** Print a character.
  * @param ch		Character to print. */
 static inline void printf_print_char(char ch) {
-	switch(object_type(OUTPUT_HANDLE)) {
+	switch(kern_object_type(OUTPUT_HANDLE)) {
 	case OBJECT_TYPE_DEVICE:
 		kern_device_write(OUTPUT_HANDLE, &ch, 1, 0, NULL);
 		break;
@@ -49,7 +49,7 @@ static inline void printf_print_char(char ch) {
 /** Print a string.
  * @param str		String to print. */
 static inline void printf_print_string(const char *str) {
-	switch(object_type(OUTPUT_HANDLE)) {
+	switch(kern_object_type(OUTPUT_HANDLE)) {
 	case OBJECT_TYPE_DEVICE:
 		kern_device_write(OUTPUT_HANDLE, str, strlen(str), 0, NULL);
 		break;

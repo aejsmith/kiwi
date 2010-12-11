@@ -49,15 +49,13 @@
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
 	status_t ret;
 	size_t bytes;
-	int type;
 
 	if(offset < 0) {
 		errno = EINVAL;
 		return -1;
 	}
 
-	type = object_type(fd);
-	switch(type) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_pwrite(fd, buf, count, offset, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {
@@ -100,10 +98,8 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
 ssize_t write(int fd, const void *buf, size_t count) {
 	status_t ret;
 	size_t bytes;
-	int type;
 
-	type = object_type(fd);
-	switch(type) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_write(fd, buf, count, &bytes);
 		if(ret != STATUS_SUCCESS && (ret != STATUS_INTERRUPTED || bytes == 0)) {

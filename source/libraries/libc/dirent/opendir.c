@@ -49,7 +49,7 @@ DIR *opendir(const char *path) {
 	}
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
-		handle_close(dir->handle);
+		kern_handle_close(dir->handle);
 		free(dir);
 		return NULL;
 	}

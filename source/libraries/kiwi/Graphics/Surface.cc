@@ -46,7 +46,7 @@ struct kiwi::SurfacePrivate {
 			kern_vm_unmap(mapping, kern_area_size(area));
 		}
 		if(handle >= 0) {
-			handle_close(handle);
+			kern_handle_close(handle);
 		}
 	}
 

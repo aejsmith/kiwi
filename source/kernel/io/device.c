@@ -827,7 +827,7 @@ void __init_text device_init(void) {
  *
  * Opens a handle to a device that can be used to perform other operations on
  * it. Once the device is no longer required, the handle should be closed with
- * handle_close().
+ * kern_handle_close().
  *
  * @param path		Device tree path for device to open.
  * @param rights	Requested rights for the handle.

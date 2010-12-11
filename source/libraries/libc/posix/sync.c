@@ -32,7 +32,7 @@
 int fsync(int fd) {
 	status_t ret;
 
-	switch(object_type(fd)) {
+	switch(kern_object_type(fd)) {
 	case OBJECT_TYPE_FILE:
 		ret = kern_file_sync(fd);
 		if(ret != STATUS_SUCCESS) {

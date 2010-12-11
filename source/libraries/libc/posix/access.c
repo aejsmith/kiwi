@@ -65,7 +65,7 @@ int access(const char *path, int mode) {
 			return -1;
 		}
 
-		handle_close(handle);
+		kern_handle_close(handle);
 		break;
 	default:
 		/* Presume it's OK. */

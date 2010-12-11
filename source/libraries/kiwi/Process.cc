@@ -42,7 +42,7 @@ using namespace kiwi;
  *			object use. Must refer to a process object. */
 Process::Process(handle_t handle) {
 	if(handle >= 0) {
-		if(unlikely(object_type(handle) != OBJECT_TYPE_PROCESS)) {
+		if(unlikely(kern_object_type(handle) != OBJECT_TYPE_PROCESS)) {
 			libkiwi_fatal("Thread::Thread: Handle must refer to a thread object.");
 		}
 
