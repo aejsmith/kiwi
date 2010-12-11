@@ -47,7 +47,7 @@ Terminal::Terminal(Handler *handler, int cols, int rows) :
 	m_process.OnExit.Connect(OnExit);
 
 	/* Open the terminal master. */
-	ret = kern_device_open("/tty/master", DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open("/tty/master", DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		cout << "Failed to create new terminal: " << e.GetDescription() << endl;
@@ -93,16 +93,16 @@ bool Terminal::Run(const char *cmdline) {
 	path << "/tty/" << m_id;
 
 	/* Open handles to it to give to the child. */
-	ret = kern_device_open(path.str().c_str(), DEVICE_READ, &in);
+	ret = kern_device_open(path.str().c_str(), DEVICE_RIGHT_READ, &in);
 	if(ret != STATUS_SUCCESS) {
 		return false;
 	}
-	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &out);
+	ret = kern_device_open(path.str().c_str(), DEVICE_RIGHT_WRITE, &out);
 	if(ret != STATUS_SUCCESS) {
 		kern_handle_close(in);
 		return false;
 	}
-	ret = kern_device_open(path.str().c_str(), DEVICE_WRITE, &err);
+	ret = kern_device_open(path.str().c_str(), DEVICE_RIGHT_WRITE, &err);
 	if(ret != STATUS_SUCCESS) {
 		kern_handle_close(out);
 		kern_handle_close(in);

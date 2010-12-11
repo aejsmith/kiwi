@@ -52,7 +52,8 @@ static pid_t fork_parent(posix_process_t *proc, jmp_buf state, char *stack) {
 
 	/* Clone the process, starting it at our entry function which restores
 	 * the saved process. FIXME: Stack direction. */
-	ret = kern_process_clone(fork_entry, state, &stack[0x1000], NULL, PROCESS_QUERY, &handle);
+	ret = kern_process_clone(fork_entry, state, &stack[0x1000], NULL,
+	                         PROCESS_RIGHT_QUERY, &handle);
 	kern_vm_unmap(stack, 0x1000);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);

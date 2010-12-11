@@ -245,7 +245,11 @@ status_t object_security_validate(object_security_t *security, process_t *proces
 	if(security->acl) {
 		for(i = 0; i < security->acl->count; i++) {
 			entry = &security->acl->entries[i];
-			if(!object_acl_entry_valid(entry->type, entry->value, entry->rights)) {
+
+			/* Don't allow userspace to set internal rights. */
+			if(entry->rights & ~OBJECT_RIGHTS_MASK) {
+				return STATUS_INVALID_ARG;
+			} else if(!object_acl_entry_valid(entry->type, entry->value, entry->rights)) {
 				return STATUS_INVALID_ARG;
 			}
 		}
@@ -377,25 +381,15 @@ object_rights_t object_rights(object_t *object, process_t *process) {
 
 /** Set security attributes for an object.
  *
- * Sets the security attributes (owning user/group and ACL) of an object. In
- * order to change the owning user/group IDs, the OBJECT_SET_OWNER right is
- * required on the handle. In order to set a new ACL, the OBJECT_SET_ACL right
- * is required.
+ * Sets the security attributes (owning user/group and ACL) of an object. The
+ * calling process must be the owner of the entry, or if the object is a
+ * filesystem object, have the CAP_FS_ADMIN capability.
  *
  * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
  * ID different to its user ID, or set the owning group ID to that of a group
  * it does not belong to.
  *
- * The OBJECT_SET_ACL and OBJECT_SET_OWNER object rights are always granted to
- * an object's owning user, regardless of whether the ACL actually gives those
- * rights to the user. This is to prevent another user that the ACL grants
- * the OBJECT_SET_ACL right to from removing access to the object from the
- * owner.
- *
  * @param object	Object to set security attributes for.
- * @param handle	If not NULL, this handle will be used for rights checks.
- *			Otherwise, they will be performed against the current
- *			process.
  * @param security	Security attributes to set. If the user ID is -1, it
  *			will not be changed. If the group ID is -1, it will not
  *			be changed. If the ACL pointer is NULL, the ACL will
@@ -405,7 +399,7 @@ object_rights_t object_rights(object_t *object, process_t *process) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_set_security(object_t *object, object_handle_t *handle, object_security_t *security) {
+status_t object_set_security(object_t *object, object_security_t *security) {
 	status_t ret;
 
 	/* Checks that if a new user and group ID are specified the process is
@@ -421,23 +415,8 @@ status_t object_set_security(object_t *object, object_handle_t *handle, object_s
 	}
 
 	/* Check if we have the necessary rights. */
-	if(security->uid >= 0 || security->gid >= 0) {
-		if(handle) {
-			if(!object_handle_rights(handle, OBJECT_SET_OWNER)) {
-				return STATUS_ACCESS_DENIED;
-			}
-		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_OWNER)) {
-			return STATUS_ACCESS_DENIED;
-		}
-	}
-	if(security->acl) {
-		if(handle) {
-			if(!object_handle_rights(handle, OBJECT_SET_ACL)) {
-				return STATUS_ACCESS_DENIED;
-			}
-		} else if(!(object_rights(object, curr_proc) & OBJECT_SET_ACL)) {
-			return STATUS_ACCESS_DENIED;
-		}
+	if(!(object_rights(object, curr_proc) & OBJECT_RIGHT_OWNER)) {
+		return STATUS_ACCESS_DENIED;
 	}
 
 	rwlock_write_lock(&object->lock);
@@ -555,20 +534,13 @@ out:
 
 /** Set security attributes for an object.
  *
- * Sets the security attributes (owning user/group and ACL) of an object. In
- * order to change the owning user/group IDs, the OBJECT_SET_OWNER right is
- * required on the handle. In order to set a new ACL, the OBJECT_SET_ACL right
- * is required.
+ * Sets the security attributes (owning user/group and ACL) of an object. The
+ * calling process must be the owner of the entry, or if the object is a
+ * filesystem object, have the CAP_FS_ADMIN capability.
  *
  * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
  * ID different to its user ID, or set the owning group ID to that of a group
  * it does not belong to.
- *
- * The OBJECT_SET_ACL and OBJECT_SET_OWNER object rights are always granted to
- * an object's owning user, regardless of whether the ACL actually gives those
- * rights to the user. This is to prevent another user that the ACL grants
- * the OBJECT_SET_ACL right to from removing access to the object from the
- * owner.
  *
  * @param handle	Handle to object.
  * @param security	Security attributes to set. If the user ID is -1, it
@@ -594,7 +566,7 @@ status_t kern_object_set_security(handle_t handle, const object_security_t *secu
 		return ret;
 	}
 
-	ret = object_set_security(khandle->object, khandle, &ksecurity);
+	ret = object_set_security(khandle->object, &ksecurity);
 	object_handle_release(khandle);
 	object_security_destroy(&ksecurity);
 	return ret;

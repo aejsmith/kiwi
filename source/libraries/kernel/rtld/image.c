@@ -66,7 +66,7 @@ static bool rtld_library_exists(const char *path) {
 	dprintf("  trying %s... ", path);
 
 	/* Attempt to open it to see if it is there. */
-	ret = kern_file_open(path, FILE_READ, 0, 0, NULL, &handle);
+	ret = kern_file_open(path, FILE_RIGHT_READ, 0, 0, NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("returned %d\n", ret);
 		return false;
@@ -229,7 +229,7 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 	status_t ret;
 
 	/* Try to open the image. */
-	ret = kern_file_open(path, FILE_READ | FILE_EXECUTE, 0, 0, NULL, &handle);
+	ret = kern_file_open(path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

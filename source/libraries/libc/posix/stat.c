@@ -36,13 +36,13 @@
 static inline uint16_t rights_to_mode(object_rights_t rights) {
 	uint16_t mode = 0;
 
-	if(rights & FILE_READ) {
+	if(rights & FILE_RIGHT_READ) {
 		mode |= S_IROTH;
 	}
-	if(rights & FILE_WRITE) {
+	if(rights & FILE_RIGHT_WRITE) {
 		mode |= S_IWOTH;
 	}
-	if(rights & FILE_EXECUTE) {
+	if(rights & FILE_RIGHT_EXECUTE) {
 		mode |= S_IXOTH;
 	}
 	return mode;

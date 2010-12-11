@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 /** Thread access rights. */
-#define THREAD_QUERY		(1<<8)	/**< Query thread information. */
+#define THREAD_RIGHT_QUERY	(1<<0)	/**< Query thread information. */
 
 /** Thread object events. */
 #define THREAD_EVENT_DEATH	0	/**< Wait for thread death. */

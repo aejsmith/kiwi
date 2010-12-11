@@ -41,8 +41,8 @@ typedef struct ipc_client_info {
 } ipc_client_info_t;
 
 /** IPC port rights. */
-#define PORT_LISTEN			(1<<8)	/**< Listen for connections on the port. */
-#define PORT_CONNECT			(1<<9)	/**< Connect to the port. */
+#define PORT_RIGHT_LISTEN		(1<<0)	/**< Listen for connections on the port. */
+#define PORT_RIGHT_CONNECT		(1<<1)	/**< Connect to the port. */
 
 /** IPC port handle event types. */
 #define PORT_EVENT_CONNECTION		0	/**< A connection is being made to the port. */

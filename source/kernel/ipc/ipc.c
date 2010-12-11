@@ -235,7 +235,7 @@ static status_t port_object_wait(object_handle_t *handle, int event, void *sync)
 
 	switch(event) {
 	case PORT_EVENT_CONNECTION:
-		if(!object_handle_rights(handle, PORT_LISTEN)) {
+		if(!object_handle_rights(handle, PORT_RIGHT_LISTEN)) {
 			ret = STATUS_ACCESS_DENIED;
 		}
 
@@ -438,9 +438,9 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_SET_ACL | PORT_LISTEN | PORT_CONNECT);
+		                     PORT_RIGHT_LISTEN | PORT_RIGHT_CONNECT);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_OTHERS, 0,
-		                     PORT_CONNECT);
+		                     PORT_RIGHT_CONNECT);
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_SLEEP);
@@ -536,7 +536,7 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 		return STATUS_INVALID_ARG;
 	}
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PORT, PORT_LISTEN, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PORT, PORT_RIGHT_LISTEN, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -617,6 +617,9 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	if(!port) {
 		mutex_unlock(&port_tree_lock);
 		return STATUS_NOT_FOUND;
+	} else if(!(object_rights(&port->obj, curr_proc) & PORT_RIGHT_CONNECT)) {
+		mutex_unlock(&port_tree_lock);
+		return STATUS_ACCESS_DENIED;
 	}
 
 	mutex_lock(&port->lock);

@@ -121,12 +121,12 @@ static status_t area_object_mappable(object_handle_t *handle, int flags) {
 	area_t *area = (area_t *)handle->object;
 
 	if(flags & (VM_MAP_READ | VM_MAP_EXEC)) {
-		if(!object_handle_rights(handle, AREA_READ)) {
+		if(!object_handle_rights(handle, AREA_RIGHT_READ)) {
 			return STATUS_ACCESS_DENIED;
 		}
 	}
 	if(flags & VM_MAP_WRITE && !(flags & VM_MAP_PRIVATE)) {
-		if(!object_handle_rights(handle, AREA_WRITE)) {
+		if(!object_handle_rights(handle, AREA_RIGHT_WRITE)) {
 			return STATUS_ACCESS_DENIED;
 		}
 	}
@@ -241,8 +241,7 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 	if(!ksecurity.acl) {
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
-		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_SET_ACL | AREA_READ | AREA_WRITE);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1, AREA_RIGHT_READ | AREA_RIGHT_WRITE);
 	}
 
 	area = slab_cache_alloc(area_cache, MM_SLEEP);

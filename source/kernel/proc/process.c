@@ -168,7 +168,7 @@ static status_t process_object_set_security(object_t *object, object_security_t 
 	 * and should not be granted to anyone else. */
 	if(security->acl) {
 		for(i = 0; i < security->acl->count; i++) {
-			if(security->acl->entries[i].rights & PROCESS_SET_SECURITY) {
+			if(security->acl->entries[i].rights & PROCESS_RIGHT_SECURITY) {
 				return STATUS_PERM_DENIED;
 			}
 		}
@@ -367,8 +367,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | PROCESS_QUERY);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_RIGHT_QUERY);
 		dsecurity.acl = &acl;
 	}
 
@@ -376,7 +375,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	 * security context to processes with CAP_SECURITY_AUTHORITY. */
 	object_acl_init(&sacl);
 	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_SECURITY_AUTHORITY,
-	                     PROCESS_SET_SECURITY);
+	                     PROCESS_RIGHT_SECURITY);
 
 	/* Initialise the remainder of the structure. */
 	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
@@ -430,7 +429,7 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * we must reserve space to ensure that the mappings we create below
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
-	ret = file_open(info->path, FILE_READ | FILE_EXECUTE, 0, 0, NULL, &handle);
+	ret = file_open(info->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, NULL, &handle);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
@@ -446,7 +445,8 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * rebooted. This avoids problems if a new kernel is not ABI-compatible
 	 * with the previous kernel. */
 	if(!kernel_library) {
-		ret = file_open(LIBKERNEL_PATH, FILE_READ | FILE_EXECUTE, 0, 0, NULL, &kernel_library);
+		ret = file_open(LIBKERNEL_PATH, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
+		                0, 0, NULL, &kernel_library);
 		if(ret != STATUS_SUCCESS) {
 			fatal("Could not open kernel library (%d)", ret);
 		}
@@ -773,7 +773,7 @@ void __init_text process_init(void) {
 
 	/* Create the ACL for the kernel process. */
 	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_QUERY);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_RIGHT_QUERY);
 
 	/* Create the kernel process. */
 	ret = process_alloc("[kernel]", PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
@@ -1268,7 +1268,7 @@ session_id_t kern_process_session(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_proc->session->id;
-	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY,
+	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
 	                               &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->session->id;
@@ -1293,7 +1293,8 @@ status_t kern_process_security_context(handle_t handle, security_context_t *cont
 		ret = memcpy_to_user(contextp, &curr_proc->security, sizeof(*contextp));
 		mutex_unlock(&curr_proc->lock);
 	} else {
-		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
+		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
+		                           &khandle);
 		if(ret == STATUS_SUCCESS) {
 			process = (process_t *)khandle->object;
 			mutex_lock(&process->lock);
@@ -1332,7 +1333,7 @@ status_t kern_process_set_security_context(handle_t handle, const security_conte
 		process = curr_proc;
 	} else {
 		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS,
-		                           PROCESS_SET_SECURITY, &khandle);
+		                           PROCESS_RIGHT_SECURITY, &khandle);
 		if(ret == STATUS_SUCCESS) {
 			kfree(kcontext);
 			return ret;
@@ -1370,7 +1371,8 @@ status_t kern_process_status(handle_t handle, int *statusp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_QUERY, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
+	                           &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

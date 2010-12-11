@@ -197,8 +197,7 @@ status_t kern_semaphore_create(const char *name, size_t count, const object_secu
 	if(!ksecurity.acl) {
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
 		object_acl_init(ksecurity.acl);
-		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
-		                     OBJECT_SET_ACL | SEMAPHORE_USAGE);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1, SEMAPHORE_RIGHT_USAGE);
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
@@ -304,7 +303,7 @@ status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
 	user_semaphore_t *sem;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_USAGE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -330,7 +329,7 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 	user_semaphore_t *sem;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_USAGE, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

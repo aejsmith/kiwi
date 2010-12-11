@@ -38,13 +38,13 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
 	object_rights_t rights = 0;
 
 	if(mode & TOREAD) {
-		rights |= FILE_READ;
+		rights |= FILE_RIGHT_READ;
 	}
 	if(mode & TOWRITE) {
-		rights |= FILE_WRITE;
+		rights |= FILE_RIGHT_WRITE;
 	}
 	if(mode & TOEXEC) {
-		rights |= FILE_EXECUTE;
+		rights |= FILE_RIGHT_EXECUTE;
 	}
 	return rights;
 }
@@ -89,7 +89,7 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 	switch(header->typeflag) {
 	case REGTYPE:
 	case AREGTYPE:
-		ret = file_open(path, FILE_WRITE, 0, FILE_CREATE_ALWAYS, &security, &handle);
+		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS, &security, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}

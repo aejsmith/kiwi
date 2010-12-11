@@ -146,7 +146,7 @@ bool Process::Create(const char *const args[], const char *const env[], HandleMa
 
 			/* Try to create the process using this path string. */
 			ret = kern_process_create(buf, args, env, 0, NULL, map.get(), mapsz,
-			                          NULL, PROCESS_QUERY, &handle);
+			                          NULL, PROCESS_RIGHT_QUERY, &handle);
 			if(ret == STATUS_SUCCESS) {
 				SetHandle(handle);
 				return true;
@@ -166,7 +166,7 @@ bool Process::Create(const char *const args[], const char *const env[], HandleMa
 		return false;
 	} else {
 		ret = kern_process_create(args[0], args, env, 0, NULL, map.get(), mapsz, NULL,
-		                          PROCESS_QUERY, &handle);
+		                          PROCESS_RIGHT_QUERY, &handle);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			m_error = ret;
 			return false;
@@ -243,7 +243,7 @@ bool Process::Open(process_id_t id) {
 	handle_t handle;
 	status_t ret;
 
-	ret = kern_process_open(id, PROCESS_QUERY, &handle);
+	ret = kern_process_open(id, PROCESS_RIGHT_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		m_error = ret;
 		return false;

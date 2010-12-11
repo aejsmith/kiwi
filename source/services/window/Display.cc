@@ -123,7 +123,7 @@ Display::Display(WindowServer *server, const char *path) :
 	size_t count;
 
 	/* Open the device. */
-	ret = kern_device_open(path, DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open(path, DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE, &handle);
 	if(ret != STATUS_SUCCESS) {
 		clog << "Failed to open display device " << path << " (" << ret << ")" << endl;
 		throw exception();

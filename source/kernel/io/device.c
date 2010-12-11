@@ -41,7 +41,7 @@
 #endif
 
 /** Access to grant others in the default ACL. */
-#define DEVICE_DEFAULT_RIGHTS	(DEVICE_QUERY | DEVICE_READ | DEVICE_WRITE)
+#define DEVICE_DEFAULT_RIGHTS	(DEVICE_RIGHT_QUERY | DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE)
 
 /** Root of the device tree. */
 device_t *device_tree_root;
@@ -609,7 +609,7 @@ status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t 
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
-	} else if(!object_handle_rights(handle, DEVICE_READ)) {
+	} else if(!object_handle_rights(handle, DEVICE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
 	}
 
@@ -656,7 +656,7 @@ status_t device_write(object_handle_t *handle, const void *buf, size_t count, of
 		return STATUS_INVALID_ARG;
 	} else if(handle->object->type->id != OBJECT_TYPE_DEVICE) {
 		return STATUS_INVALID_HANDLE;
-	} else if(!object_handle_rights(handle, DEVICE_WRITE)) {
+	} else if(!object_handle_rights(handle, DEVICE_RIGHT_WRITE)) {
 		return STATUS_ACCESS_DENIED;
 	}
 

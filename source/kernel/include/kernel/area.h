@@ -28,8 +28,8 @@ extern "C" {
 #endif
 
 /** Access rights for area objects. */
-#define AREA_READ	(1<<8)		/**< Allow mapping for reading. */
-#define AREA_WRITE	(1<<9)		/**< Allow mapping for writing. */
+#define AREA_RIGHT_READ		(1<<0)	/**< Allow mapping for reading. */
+#define AREA_RIGHT_WRITE	(1<<1)	/**< Allow mapping for writing. */
 
 extern status_t kern_area_create(size_t size, handle_t source, offset_t offset,
                                  const object_security_t *security,

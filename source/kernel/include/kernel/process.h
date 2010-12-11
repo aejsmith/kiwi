@@ -42,8 +42,8 @@ typedef struct process_args {
 #define LIBKERNEL_PATH		"/system/libraries/libkernel.so"
 
 /** Process access rights. */
-#define PROCESS_QUERY		(1<<8)	/**< Query process information. */
-#define PROCESS_SET_SECURITY	(1<<9)	/**< Set security context. */
+#define PROCESS_RIGHT_QUERY	(1<<0)	/**< Query process information. */
+#define PROCESS_RIGHT_SECURITY	(1<<1)	/**< Set security context. */
 
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */

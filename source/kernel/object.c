@@ -141,7 +141,7 @@ void object_init(object_t *object, object_type_t *type, object_security_t *secur
 
 	/* Add default system ACL entries. We always allow an object's owning
 	 * user to change its ACL and owner. */
-	object_acl_add_entry(&object->sacl, ACL_ENTRY_USER, -1, OBJECT_SET_ACL | OBJECT_SET_OWNER);
+	object_acl_add_entry(&object->sacl, ACL_ENTRY_USER, -1, OBJECT_RIGHT_OWNER);
 }
 
 /** Destroy an object structure.

@@ -59,7 +59,7 @@ Session::Session(SecurityServer *server, uint32_t perms) :
 	/* Execute the process. */
 	handle_t handle;
 	status_t ret = kern_process_create(args[0], args, env, PROCESS_CREATE_SESSION, NULL,
-	                                   map, 3, NULL, PROCESS_QUERY, &handle);
+	                                   map, 3, NULL, PROCESS_RIGHT_QUERY, &handle);
 	if(ret != STATUS_SUCCESS) {
 		throw Error(ret);
 	}

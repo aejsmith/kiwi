@@ -50,13 +50,13 @@ InputManager::InputManager(WindowServer *server) :
 	status_t ret;
 
 	/* See above TODO. Just hardcode devices for now. */
-	ret = kern_device_open("/input/0", DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open("/input/0", DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE, &handle);
 	if(ret == STATUS_SUCCESS) {
 		new KeyboardDevice(this, handle);
 	} else {
 		clog << "Failed to open /input/0: " << ret << endl;
 	}
-	ret = kern_device_open("/input/1", DEVICE_READ | DEVICE_WRITE, &handle);
+	ret = kern_device_open("/input/1", DEVICE_RIGHT_READ | DEVICE_RIGHT_WRITE, &handle);
 	if(ret == STATUS_SUCCESS) {
 		new MouseDevice(this, handle);
 	} else {

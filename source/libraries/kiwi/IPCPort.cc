@@ -47,7 +47,7 @@ IPCPort::IPCPort(handle_t handle) {
  */
 bool IPCPort::Create() {
 	handle_t handle;
-	status_t ret = ipc_port_create(NULL, PORT_LISTEN, &handle);
+	status_t ret = ipc_port_create(NULL, PORT_RIGHT_LISTEN, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -69,7 +69,7 @@ bool IPCPort::Create() {
  */
 bool IPCPort::Open(port_id_t id) {
 	handle_t handle;
-	status_t ret = ipc_port_open(id, PORT_LISTEN, &handle);
+	status_t ret = ipc_port_open(id, PORT_RIGHT_LISTEN, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;

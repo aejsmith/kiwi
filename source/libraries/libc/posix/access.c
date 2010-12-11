@@ -46,13 +46,13 @@ int access(const char *path, int mode) {
 
 	if(mode != F_OK) {
 		if(mode & R_OK) {
-			rights |= FILE_READ;
+			rights |= FILE_RIGHT_READ;
 		}
 		if(mode & W_OK) {
-			rights |= FILE_WRITE;
+			rights |= FILE_RIGHT_WRITE;
 		}
 		if(mode & X_OK) {
-			rights |= FILE_EXECUTE;
+			rights |= FILE_RIGHT_EXECUTE;
 		}
 	}
 

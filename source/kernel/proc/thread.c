@@ -450,7 +450,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, THREAD_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, THREAD_RIGHT_QUERY);
 		dsecurity.acl = &acl;
 	}
 
@@ -866,7 +866,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, THREAD_QUERY, &khandle);
+	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, THREAD_RIGHT_QUERY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

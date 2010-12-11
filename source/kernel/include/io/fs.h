@@ -267,6 +267,14 @@ typedef struct fs_node {
 #define FS_NODE_IS_RDONLY(node)	\
 	((node)->mount && (node)->mount->flags & FS_MOUNT_RDONLY)
 
+/** Default rights to give to a file. */
+#define DEFAULT_FILE_RIGHTS_OWNER	(FILE_RIGHT_READ | FILE_RIGHT_WRITE)
+#define DEFAULT_FILE_RIGHTS_OTHERS	(FILE_RIGHT_READ)
+
+/** Default rights to give to a directory. */
+#define DEFAULT_DIR_RIGHTS_OWNER	(FILE_RIGHT_READ | FILE_RIGHT_WRITE | FILE_RIGHT_EXECUTE)
+#define DEFAULT_DIR_RIGHTS_OTHERS	(FILE_RIGHT_READ | FILE_RIGHT_EXECUTE)
+
 /**
  * Functions for use by filesystem implementations.
  */

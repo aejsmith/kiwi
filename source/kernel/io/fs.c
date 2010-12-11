@@ -233,14 +233,16 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
 	node->data = data;
 	node->mount = mount;
 
-	/* If no security attributes are provided, construct defaults. */
+	/* If no security attributes are provided, it means that the FS we're
+	 * creating the node for does not have security support. Construct a
+	 * default ACL that grants access to everyone. */
 	if(!security) {
 		dsecurity.uid = 0;
 		dsecurity.gid = 0;
 		dsecurity.acl = &acl;
 
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, FILE_READ | FILE_WRITE | FILE_EXECUTE);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_FILE_RIGHTS_OWNER);
 
 		security = &dsecurity;
 	}
@@ -250,6 +252,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
 	 * grant execute if a directory or if the standard ACL grants execute
 	 * capability to somebody. */
 	object_acl_init(&sacl);
+	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN, OBJECT_RIGHT_OWNER);
 	//object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN,
 	//                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
 
@@ -502,7 +505,7 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 
 		/* We're trying to descend into the directory, check for
 		 * execute permission. */
-		if(!(object_rights(&node->obj, NULL) & FILE_EXECUTE)) {
+		if(!(object_rights(&node->obj, NULL) & FILE_RIGHT_EXECUTE)) {
 			fs_node_release(node);
 			return STATUS_ACCESS_DENIED;
 		}
@@ -859,7 +862,7 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	if(FS_NODE_IS_RDONLY(parent)) {
 		ret = STATUS_READ_ONLY;
 		goto out;
-	} else if(!(object_rights(&parent->obj, NULL) & FILE_WRITE)) {
+	} else if(!(object_rights(&parent->obj, NULL) & FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(!parent->ops->create) {
@@ -894,34 +897,6 @@ out:
 	kfree(dir);
 	kfree(name);
 	return ret;
-}
-
-/** Change filesystem security attributes.
- * @param object	Object to check.
- * @param security	New security attributes.
- * @return		Status code describing result of the operation. */
-static status_t fs_node_set_security(object_t *object, object_security_t *security) {
-	fs_node_t *node = (fs_node_t *)object;
-	size_t i;
-
-	if(FS_NODE_IS_RDONLY(node)) {
-		return STATUS_READ_ONLY;
-	} else if(!node->ops->set_security) {
-		return STATUS_NOT_SUPPORTED;
-	}
-
-	/* The ACL must not contain any session or capability entries. */
-	if(security->acl) {
-		for(i = 0; i < security->acl->count; i++) {
-			switch(security->acl->entries[i].type) {
-			case ACL_ENTRY_CAPABILITY:
-			case ACL_ENTRY_SESSION:
-				return STATUS_NOT_SUPPORTED;
-			}
-		}
-	}
-
-	return node->ops->set_security(node, security);
 }
 
 /** Get information about a node.
@@ -1056,13 +1031,8 @@ static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int 
 	status_t ret;
 
 	/* Prevent opening for writing on a read-only filesystem. */
-	if(rights & (OBJECT_SET_ACL | OBJECT_SET_OWNER | FILE_WRITE) && FS_NODE_IS_RDONLY(node)) {
+	if(rights & FILE_RIGHT_WRITE && FS_NODE_IS_RDONLY(node)) {
 		return STATUS_READ_ONLY;
-	}
-
-	/* Prevent setting security attributes if the FS doesn't support it. */
-	if(!node->ops->set_security && rights & (OBJECT_SET_ACL | OBJECT_SET_OWNER)) {
-		return STATUS_NOT_SUPPORTED;
 	}
 
 	/* Allocate the per-handle data structure. */
@@ -1081,6 +1051,34 @@ static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int 
 	}
 
 	return ret;
+}
+
+/** Change filesystem security attributes.
+ * @param object	Object to check.
+ * @param security	New security attributes.
+ * @return		Status code describing result of the operation. */
+static status_t file_object_set_security(object_t *object, object_security_t *security) {
+	fs_node_t *node = (fs_node_t *)object;
+	size_t i;
+
+	if(FS_NODE_IS_RDONLY(node)) {
+		return STATUS_READ_ONLY;
+	} else if(!node->ops->set_security) {
+		return STATUS_NOT_SUPPORTED;
+	}
+
+	/* The ACL must not contain any session or capability entries. */
+	if(security->acl) {
+		for(i = 0; i < security->acl->count; i++) {
+			switch(security->acl->entries[i].type) {
+			case ACL_ENTRY_CAPABILITY:
+			case ACL_ENTRY_SESSION:
+				return STATUS_NOT_SUPPORTED;
+			}
+		}
+	}
+
+	return node->ops->set_security(node, security);
 }
 
 /** Close a handle to a file.
@@ -1131,22 +1129,26 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 	}
 
 	/* If mapping for reading, check if allowed. */
-	if(flags & VM_MAP_READ && !object_handle_rights(handle, FILE_READ)) {
-		return STATUS_ACCESS_DENIED;
+	if(flags & VM_MAP_READ) {
+		if(!object_handle_rights(handle, FILE_RIGHT_READ)) {
+			return STATUS_ACCESS_DENIED;
+		}
 	}
 
 	/* If creating a shared mapping for writing, check for write access.
 	 * It is not necessary to check for a read-only filesystem here: a
 	 * handle cannot be opened with FILE_WRITE on a read-only FS. */
 	if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE) {
-		if(!object_handle_rights(handle, FILE_WRITE)) {
+		if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
 			return STATUS_ACCESS_DENIED;
 		}
 	}
 
 	/* If mapping for execution, check for execute access. */
-	if(flags & VM_MAP_EXEC && !object_handle_rights(handle, FILE_EXECUTE)) {
-		return STATUS_ACCESS_DENIED;
+	if(flags & VM_MAP_EXEC) {
+		if(!object_handle_rights(handle, FILE_RIGHT_EXECUTE)) {
+			return STATUS_ACCESS_DENIED;
+		}
 	}
 
 	return STATUS_SUCCESS;
@@ -1184,7 +1186,7 @@ static void file_object_release_page(object_handle_t *handle, offset_t offset, p
 /** File object operations. */
 static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
-	.set_security = fs_node_set_security,
+	.set_security = file_object_set_security,
 	.close = file_object_close,
 	.control = file_object_control,
 	.mappable = file_object_mappable,
@@ -1266,20 +1268,16 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
 	file->size = size;
 
 	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, FILE_READ);
+	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, FILE_RIGHT_READ);
 	node = fs_node_alloc(NULL, 0, FILE_TYPE_REGULAR, &security, &memory_file_ops, file);
 
-	if(file_handle_create(node, FILE_READ, 0, &handle) != STATUS_SUCCESS) {
+	if(file_handle_create(node, FILE_RIGHT_READ, 0, &handle) != STATUS_SUCCESS) {
 		fatal("Should not fail to create memory file");
 	}
 
 	fs_node_release(node);
 	return handle;
 }
-
-/** Default rights to give to a file. */
-#define DEFAULT_FILE_RIGHTS_OWNER	(OBJECT_SET_ACL | OBJECT_SET_OWNER | FILE_READ | FILE_WRITE)
-#define DEFAULT_FILE_RIGHTS_OTHERS	(FILE_READ)
 
 /** Open a handle to a file or directory.
  *
@@ -1388,7 +1386,7 @@ static status_t file_read_internal(object_handle_t *handle, void *buf, size_t co
 	if(node->type != FILE_TYPE_REGULAR) {
 		ret = STATUS_NOT_REGULAR;
 		goto out;
-	} else if(!object_handle_rights(handle, FILE_READ)) {
+	} else if(!object_handle_rights(handle, FILE_RIGHT_READ)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(!node->ops->read) {
@@ -1494,7 +1492,7 @@ static status_t file_write_internal(object_handle_t *handle, const void *buf, si
 	if(node->type != FILE_TYPE_REGULAR) {
 		ret = STATUS_NOT_REGULAR;
 		goto out;
-	} else if(!object_handle_rights(handle, FILE_WRITE)) {
+	} else if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(!node->ops->write) {
@@ -1607,7 +1605,7 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
 	node = (fs_node_t *)handle->object;
 	if(node->type != FILE_TYPE_REGULAR) {
 		return STATUS_NOT_REGULAR;
-	} else if(!object_handle_rights(handle, FILE_WRITE)) {
+	} else if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
 		return STATUS_ACCESS_DENIED;
 	} else if(!node->ops->resize) {
 		return STATUS_NOT_SUPPORTED;
@@ -1730,10 +1728,6 @@ static status_t dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
 	return node->ops->lookup_entry(node, name, idp);
 }
 
-/** Default rights to give to a file. */
-#define DEFAULT_DIR_RIGHTS_OWNER	(OBJECT_SET_ACL | OBJECT_SET_OWNER | FILE_READ | FILE_WRITE | FILE_EXECUTE)
-#define DEFAULT_DIR_RIGHTS_OTHERS	(FILE_READ | FILE_EXECUTE)
-
 /** Create a directory.
  *
  * Creates a new directory in the file system. This function cannot open a
@@ -1810,7 +1804,7 @@ status_t dir_read(object_handle_t *handle, dir_entry_t *buf, size_t size) {
 	data = handle->data;
 	if(node->type != FILE_TYPE_DIR) {
 		return STATUS_NOT_DIR;
-	} else if(!object_handle_rights(handle, FILE_READ)) {
+	} else if(!object_handle_rights(handle, FILE_RIGHT_READ)) {
 		return STATUS_ACCESS_DENIED;
 	} else if(!node->ops->read_entry) {
 		return STATUS_NOT_SUPPORTED;
@@ -1886,10 +1880,8 @@ status_t symlink_create(const char *path, const char *target) {
 
 	/* Construct the ACL for the symbolic link. */
 	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-	                     OBJECT_SET_OWNER | FILE_READ | FILE_WRITE | FILE_EXECUTE);
 	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0,
-	                     FILE_READ | FILE_WRITE | FILE_EXECUTE);
+	                     FILE_RIGHT_READ | FILE_RIGHT_WRITE | FILE_RIGHT_EXECUTE);
 
 	ret = fs_node_create(path, FILE_TYPE_SYMLINK, target, &security, NULL);
 	object_acl_destroy(security.acl);
@@ -2032,7 +2024,7 @@ void fs_probe(device_t *device) {
 	status_t ret;
 	char *path;
 
-	if(device_get(device, DEVICE_READ, &handle) != STATUS_SUCCESS) {
+	if(device_get(device, DEVICE_RIGHT_READ, &handle) != STATUS_SUCCESS) {
 		return;
 	}
 
@@ -2079,6 +2071,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	fs_mount_option_t *optarr;
 	fs_mount_t *mount = NULL;
 	fs_node_t *node = NULL;
+	object_rights_t rights;
 	status_t ret;
 	size_t count;
 	int flags;
@@ -2148,7 +2141,13 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 			goto fail;
 		}
 
-		ret = device_open(device, DEVICE_READ | DEVICE_WRITE, &mount->device);
+		/* Only request write access if not mounting read-only. */
+		rights = DEVICE_RIGHT_READ;
+		if(!(flags & FS_MOUNT_RDONLY)) {
+			rights |= DEVICE_RIGHT_WRITE;
+		}
+
+		ret = device_open(device, rights, &mount->device);
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
 		}
@@ -2412,7 +2411,7 @@ status_t fs_unlink(const char *path) {
 	if(parent->mount != node->mount) {
 		ret = STATUS_IN_USE;
 		goto out;
-	} else if(!(object_rights(&parent->obj, NULL) & FILE_WRITE)) {
+	} else if(!(object_rights(&parent->obj, NULL) & FILE_RIGHT_WRITE)) {
 		ret = STATUS_ACCESS_DENIED;
 		goto out;
 	} else if(FS_NODE_IS_RDONLY(node)) {
@@ -3418,7 +3417,7 @@ status_t kern_fs_setcwd(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->obj, NULL) & FILE_EXECUTE)) {
+	if(!(object_rights(&node->obj, NULL) & FILE_RIGHT_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_ACCESS_DENIED;
@@ -3467,7 +3466,7 @@ status_t kern_fs_setroot(const char *path) {
 	}
 
 	/* Must have execute permission to use as working directory. */
-	if(!(object_rights(&node->obj, NULL) & FILE_EXECUTE)) {
+	if(!(object_rights(&node->obj, NULL) & FILE_RIGHT_EXECUTE)) {
 		fs_node_release(node);
 		kfree(kpath);
 		return STATUS_ACCESS_DENIED;
@@ -3604,19 +3603,12 @@ out:
 /** Set security attributes for a filesystem entry.
  *
  * Sets the security attributes (owning user/group and ACL) of a filesystem
- * entry. In order to change the owning user/group IDs, the calling process
- * must have the OBJECT_SET_OWNER right on the entry. In order to set a new
- * ACL, the OBJECT_SET_ACL right is required.
+ * entry. The calling process must either be the owner of the entry, or have
+ * the CAP_FS_ADMIN capability.
  *
  * A process without the CAP_CHANGE_OWNER capability cannot set an owning user
  * ID different to its user ID, or set the owning group ID to that of a group
  * it does not belong to.
- *
- * The OBJECT_SET_ACL and OBJECT_SET_OWNER object rights are always granted to
- * an object's owning user, regardless of whether the ACL actually gives those
- * rights to the user. This is to prevent another user that the ACL grants
- * the OBJECT_SET_ACL right to from removing access to the object from the
- * owner.
  *
  * @param path		Path to entry to set security attributes of.
  * @param follow	Whether to follow if last path component is a symbolic
@@ -3652,7 +3644,7 @@ status_t kern_fs_set_security(const char *path, bool follow, const object_securi
 		return ret;
 	}
 
-	ret = object_set_security(&node->obj, NULL, &ksecurity);
+	ret = object_set_security(&node->obj, &ksecurity);
 	fs_node_release(node);
 	object_security_destroy(&ksecurity);
 	kfree(kpath);

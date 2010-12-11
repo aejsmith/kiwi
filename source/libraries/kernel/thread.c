@@ -77,7 +77,7 @@ __export status_t kern_thread_create(const char *name, void *stack, size_t stack
 
 	/* Create the semaphore that we use to wait for the thread to signal
 	 * that its initialisation has completed. */
-	ret = kern_semaphore_create("thread_create_sem", 0, NULL, SEMAPHORE_USAGE, &info.sem);
+	ret = kern_semaphore_create("thread_create_sem", 0, NULL, SEMAPHORE_RIGHT_USAGE, &info.sem);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

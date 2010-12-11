@@ -31,9 +31,9 @@ extern "C" {
 #define DEVICE_PATH_MAX			256	/**< Maximum length of a device tree path. */
 
 /** Device rights. */
-#define DEVICE_QUERY			(1<<8)	/**< Query device information. */
-#define DEVICE_READ			(1<<9)	/**< Read directly from the device. */
-#define DEVICE_WRITE			(1<<10)	/**< Write directly to the device. */
+#define DEVICE_RIGHT_QUERY		(1<<0)	/**< Query device information. */
+#define DEVICE_RIGHT_READ		(1<<1)	/**< Read directly from the device. */
+#define DEVICE_RIGHT_WRITE		(1<<2)	/**< Write directly to the device. */
 
 /** Generic device events. */
 #define DEVICE_EVENT_READABLE		0	/**< Wait for the device to be readable. */

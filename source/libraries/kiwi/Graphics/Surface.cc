@@ -89,7 +89,7 @@ Surface::Surface(area_id_t area) : m_priv(0) {
 	priv->area = area;
 
 	/* Open a handle to the area. */
-	ret = kern_area_open(area, AREA_READ | AREA_WRITE, &priv->handle);
+	ret = kern_area_open(area, AREA_RIGHT_READ | AREA_RIGHT_WRITE, &priv->handle);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		libkiwi_warn("Surface::Surface: Failed to open surface area: %s.",

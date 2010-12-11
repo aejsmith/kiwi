@@ -36,7 +36,7 @@ DIR *opendir(const char *path) {
 		return NULL;
 	}
 
-	ret = kern_file_open(path, FILE_READ, 0, 0, NULL, &dir->handle);
+	ret = kern_file_open(path, FILE_RIGHT_READ, 0, 0, NULL, &dir->handle);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		free(dir);

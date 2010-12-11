@@ -97,7 +97,7 @@ bool Thread::Open(thread_id_t id) {
 	handle_t handle;
 	status_t ret;
 
-	ret = kern_thread_open(id, THREAD_QUERY, &handle);
+	ret = kern_thread_open(id, THREAD_RIGHT_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -122,7 +122,7 @@ bool Thread::Run() {
 	status_t ret;
 
 	ret = kern_thread_create(m_priv->name.c_str(), NULL, 0, &Thread::_Entry, this,
-	                         NULL, THREAD_QUERY, &handle);
+	                         NULL, THREAD_RIGHT_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;

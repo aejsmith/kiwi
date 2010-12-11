@@ -351,10 +351,8 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 	entry_cache_insert(ndata->entries, ".", 0);
 	entry_cache_insert(ndata->entries, "..", 0);
 	object_acl_init(&acl);
-	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1,
-	                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FILE_READ | FILE_WRITE | FILE_EXECUTE);
-	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, -1,
-	                     FILE_READ | FILE_EXECUTE);
+	object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_DIR_RIGHTS_OWNER);
+	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, -1, DEFAULT_DIR_RIGHTS_OTHERS);
 	mount->root = fs_node_alloc(mount, 0, FILE_TYPE_DIR, &security, &ramfs_node_ops, ndata);
 	return STATUS_SUCCESS;
 }

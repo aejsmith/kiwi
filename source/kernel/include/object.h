@@ -141,6 +141,12 @@ typedef struct handle_table {
 	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
+/** Internally-used object rights. */
+#define OBJECT_RIGHT_OWNER	(1<<24)	/**< Grant owner priveleges (change owner/ACL). */
+
+/** The top 8 bits of object_rights_t are reserved for internal usage. */
+#define OBJECT_RIGHTS_MASK	0x0FFFFFFF
+
 extern void object_acl_init(object_acl_t *acl);
 extern void object_acl_destroy(object_acl_t *acl);
 extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object_rights_t rights);
@@ -155,8 +161,7 @@ extern void object_init(object_t *object, object_type_t *type, object_security_t
                         object_acl_t *sacl);
 extern void object_destroy(object_t *object);
 extern object_rights_t object_rights(object_t *object, struct process *process);
-extern status_t object_set_security(object_t *object, object_handle_t *handle,
-                                    object_security_t *security);
+extern status_t object_set_security(object_t *object, object_security_t *security);
 
 extern void object_wait_notifier(void *arg1, void *arg2, void *arg3);
 extern void object_wait_signal(void *sync);

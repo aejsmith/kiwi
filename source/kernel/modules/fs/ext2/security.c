@@ -35,13 +35,13 @@ static inline object_rights_t mode_to_rights(uint16_t mode) {
 	object_rights_t rights = 0;
 
 	if(mode & EXT2_S_IROTH) {
-		rights |= FILE_READ;
+		rights |= FILE_RIGHT_READ;
 	}
 	if(mode & EXT2_S_IWOTH) {
-		rights |= FILE_WRITE;
+		rights |= FILE_RIGHT_WRITE;
 	}
 	if(mode & EXT2_S_IXOTH) {
-		rights |= FILE_EXECUTE;
+		rights |= FILE_RIGHT_EXECUTE;
 	}
 	return rights;
 }
@@ -80,13 +80,13 @@ status_t ext2_inode_security(ext2_inode_t *inode, object_security_t **securityp)
 static inline uint16_t rights_to_mode(object_rights_t rights) {
 	uint16_t mode = 0;
 
-	if(rights & FILE_READ) {
+	if(rights & FILE_RIGHT_READ) {
 		mode |= EXT2_S_IROTH;
 	}
-	if(rights & FILE_WRITE) {
+	if(rights & FILE_RIGHT_WRITE) {
 		mode |= EXT2_S_IWOTH;
 	}
-	if(rights & FILE_EXECUTE) {
+	if(rights & FILE_RIGHT_EXECUTE) {
 		mode |= EXT2_S_IXOTH;
 	}
 	return mode;

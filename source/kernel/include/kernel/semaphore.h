@@ -28,7 +28,7 @@ extern "C" {
 #endif
 
 /** Semaphore access rights. */
-#define SEMAPHORE_USAGE		(1<<8)	/**< Allow usage of the semaphore. */
+#define SEMAPHORE_RIGHT_USAGE	(1<<0)	/**< Allow usage of the semaphore. */
 
 /** Maximum length of a semaphore name. */
 #define SEMAPHORE_NAME_MAX	32

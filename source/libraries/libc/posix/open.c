@@ -37,8 +37,8 @@ static inline void convert_open_flags(int oflag, object_rights_t *krightsp, int 
 	object_rights_t krights = 0;
 	int kflags = 0;
 
-	krights |= ((oflag & O_RDONLY) ? FILE_READ : 0);
-	krights |= ((oflag & O_WRONLY) ? FILE_WRITE : 0);
+	krights |= ((oflag & O_RDONLY) ? FILE_RIGHT_READ : 0);
+	krights |= ((oflag & O_WRONLY) ? FILE_RIGHT_WRITE : 0);
 
 	kflags |= ((oflag & O_NONBLOCK) ? FILE_NONBLOCK : 0);
 	kflags |= ((oflag & O_APPEND) ? FILE_APPEND : 0);

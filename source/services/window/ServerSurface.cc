@@ -46,7 +46,7 @@ ServerSurface::ServerSurface(Connection *owner, Size size) :
 	size_t data_size = p2align(GetDataSize(), 0x1000);
 
 	/* Create a new area. */
-	status_t ret = kern_area_create(data_size, -1, 0, NULL, AREA_READ | AREA_WRITE, &m_area);
+	status_t ret = kern_area_create(data_size, -1, 0, NULL, AREA_RIGHT_READ | AREA_RIGHT_WRITE, &m_area);
 	if(ret != STATUS_SUCCESS) {
 		Error e(ret);
 		clog << "Failed to create area for surface: " << e.GetDescription() << endl;

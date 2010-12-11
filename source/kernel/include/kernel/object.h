@@ -48,10 +48,6 @@ extern "C" {
 #define ACL_ENTRY_SESSION	3	/**< Session. */
 #define ACL_ENTRY_CAPABILITY	4	/**< Capability. */
 
-/** Rights for all object types. */
-#define OBJECT_SET_ACL		(1<<0)	/**< Set the access control list. */
-#define OBJECT_SET_OWNER	(1<<1)	/**< Set the owner of the object. */
-
 /** Handle link behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
 
