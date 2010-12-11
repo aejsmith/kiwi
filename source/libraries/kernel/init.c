@@ -26,7 +26,6 @@
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
-extern void kern_process_loaded(void);
 
 extern elf_dyn_t _DYNAMIC[];
 
@@ -110,7 +109,7 @@ void libkernel_init_stage2(process_args_t *args) {
 
 	/* Signal to the kernel that we've completed loading and call the entry
 	 * point for the program. */
-	kern_process_loaded();
+	kern_process_control(-1, PROCESS_LOADED, NULL, NULL);
 	dprintf("libkernel: beginning program execution at %p...\n", entry);
 	entry(args);
 	dprintf("libkernel: program entry point returned\n");

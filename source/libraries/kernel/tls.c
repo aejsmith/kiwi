@@ -36,8 +36,6 @@
 
 #include "libkernel.h"
 
-extern status_t kern_thread_set_tls_addr(void *addr);
-
 /** Next module ID.
  * @note		Protected by the RTLD lock - this is only ever called
  *			from the RTLD which serialises image loading. */
@@ -224,7 +222,7 @@ status_t tls_init(void) {
 	tls_tcb_init(tcb);
 	tcb->dtv = dtv;
 	tcb->base = alloc;
-	kern_thread_set_tls_addr(tcb);
+	kern_thread_control(-1, THREAD_SET_TLS_ADDR, tcb, NULL);
 	return STATUS_SUCCESS;
 }
 

@@ -54,6 +54,7 @@ typedef struct process_args {
 /** Actions for kern_process_control(). */
 #define PROCESS_GET_SECTX	1	/**< Get security context (in: security_context_t). */
 #define PROCESS_SET_SECTX	2	/**< Set security context (out: security_context_t). */
+#define PROCESS_LOADED		3	/**< Signal that process is loaded (calling process only). */
 
 extern status_t kern_process_create(const char *path, const char *const args[],
                                     const char *const env[], int flags,

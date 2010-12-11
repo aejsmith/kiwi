@@ -1348,6 +1348,20 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 		mutex_unlock(&process->security_lock);
 		kfree(context);
 		break;
+	case PROCESS_LOADED:
+		if(khandle) {
+			ret = STATUS_NOT_SUPPORTED;
+			goto out;
+		}
+
+		mutex_lock(&process->lock);
+		if(process->create) {
+			process->create->status = STATUS_SUCCESS;
+			semaphore_up(&process->create->sem, 1);
+			process->create = NULL;
+		}
+		mutex_unlock(&curr_proc->lock);
+		break;
 	}
 out:
 	if(khandle) {
@@ -1392,15 +1406,4 @@ status_t kern_process_status(handle_t handle, int *statusp) {
  */
 void kern_process_exit(int status) {
 	process_exit(status);
-}
-
-/** Signal that the process has been loaded. */
-void kern_process_loaded(void) {
-	mutex_lock(&curr_proc->lock);
-	if(curr_proc->create) {
-		curr_proc->create->status = STATUS_SUCCESS;
-		semaphore_up(&curr_proc->create->sem, 1);
-		curr_proc->create = NULL;
-	}
-	mutex_unlock(&curr_proc->lock);
 }

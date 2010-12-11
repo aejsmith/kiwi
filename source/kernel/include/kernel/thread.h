@@ -33,6 +33,9 @@ extern "C" {
 /** Thread object events. */
 #define THREAD_EVENT_DEATH	0	/**< Wait for thread death. */
 
+/** Actions for kern_thread_control(). */
+#define THREAD_SET_TLS_ADDR	1	/**< Set TLS base address (calling thread only). */
+
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32
 
@@ -42,6 +45,7 @@ extern status_t kern_thread_create(const char *name, void *stack, size_t stacksz
                                    object_rights_t rights, handle_t *handlep);
 extern status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *handlep);
 extern thread_id_t kern_thread_id(handle_t handle);
+extern status_t kern_thread_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_thread_status(handle_t handle, int *statusp);
 extern void kern_thread_exit(int status) __attribute__((noreturn));
 extern status_t kern_thread_usleep(useconds_t us, useconds_t *remp);

@@ -55,7 +55,6 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
-extern status_t kern_thread_set_tls_addr(void *addr);
 
 /** Tree of all threads. */
 static AVL_TREE_DECLARE(thread_tree);
@@ -857,6 +856,46 @@ thread_id_t kern_thread_id(handle_t handle) {
 	return id;
 }
 
+/** Perform operations on a thread.
+ * @param handle	Handle to thread, or -1 to operate on the calling thread.
+ * @param action	Action to perform.
+ * @param in		Pointer to input buffer.
+ * @param out		Pointer to output buffer.
+ * @return		Status code describing result of the operation. */
+status_t kern_thread_control(handle_t handle, int action, const void *in, void *out) {
+	object_handle_t *khandle = NULL;
+	thread_t *thread;
+	status_t ret;
+
+	if(handle < 0) {
+		thread = curr_thread;
+	} else {
+		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, 0, &khandle);
+		if(ret != STATUS_SUCCESS) {
+			return ret;
+		}
+
+		thread = (thread_t *)khandle->object;
+	}
+
+	switch(action) {
+	case THREAD_SET_TLS_ADDR:
+		/* Can only set TLS address of current process. */
+		if(khandle) {
+			ret = STATUS_NOT_SUPPORTED;
+			goto out;
+		}
+
+		ret = thread_arch_set_tls_addr(thread, (ptr_t)in);
+		break;
+	}
+out:
+	if(khandle) {
+		object_handle_release(khandle);
+	}
+	return ret;
+}
+
 /** Query the exit status of a thread.
  * @param handle	Handle to thread.
  * @param statusp	Where to store exit status of thread.
@@ -916,13 +955,4 @@ status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
 		}
 	}
 	return ret;
-}
-
-/** Set the current thread's TLS address.
- * @param addr		TLS base address. Note that what this should be and how
- *			it is set is architecture-dependent. Refer to the ELF
- *			TLS specification for more information.
- * @return		Status code describing result of the operation. */
-status_t kern_thread_set_tls_addr(void *addr) {
-	return thread_arch_set_tls_addr(curr_thread, (ptr_t)addr);
 }
