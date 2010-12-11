@@ -61,6 +61,17 @@ typedef struct object_type {
 	 * @param handle	Handle to the object. */
 	void (*close)(struct object_handle *handle);
 
+	/** Change handle options.
+	 * @note		Since the HANDLE_{G,S}ET_FLAGS operations modify
+	 *			type-specific flags, it is up to this function
+	 *			to implement them.
+	 * @param handle	Handle to operate on.
+	 * @param action	Action to perform.
+	 * @param arg		Argument to function.
+	 * @param outp		Where to store return value.
+	 * @return		Status code describing result of the operation. */
+	status_t (*control)(struct object_handle *handle, int action, int arg, int *outp);
+
 	/** Signal that an object event is being waited for.
 	 * @note		If the event being waited for has occurred
 	 *			already, this function should call the callback

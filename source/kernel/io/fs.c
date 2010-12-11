@@ -1090,6 +1090,29 @@ static void file_object_close(object_handle_t *handle) {
 	kfree(handle->data);
 }
 
+/** Change file handle options.
+ * @param handle	Handle to operate on.
+ * @param action	Action to perform.
+ * @param arg		Argument to function.
+ * @param outp		Where to store return value.
+ * @return		Status code describing result of the operation. */
+static status_t file_object_control(object_handle_t *handle, int action, int arg, int *outp) {
+	file_handle_t *data = handle->data;
+
+	switch(action) {
+	case HANDLE_GET_FLAGS:
+		*outp = data->flags;
+		break;
+	case HANDLE_SET_FLAGS:
+		data->flags = arg;
+		break;
+	default:
+		return STATUS_NOT_SUPPORTED;
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Check if a file can be memory-mapped.
  * @param handle	Handle to file.
  * @param flags		Mapping flags (VM_MAP_*).
@@ -1163,6 +1186,7 @@ static object_type_t file_object_type = {
 	.id = OBJECT_TYPE_FILE,
 	.set_security = fs_node_set_security,
 	.close = file_object_close,
+	.control = file_object_control,
 	.mappable = file_object_mappable,
 	.get_page = file_object_get_page,
 	.release_page = file_object_release_page,
@@ -3104,54 +3128,6 @@ status_t kern_dir_read(handle_t handle, dir_entry_t *buf, size_t size) {
 	kfree(kbuf);
 	object_handle_release(khandle);
 	return ret;
-}
-
-/** Get filesystem handle flags.
- * @param handle	Handle to get flags for.
- * @param flagsp	Where to store flags for the handle.
- * @return		Status code describing result of the operation. */
-status_t sys_fs_handle_flags(handle_t handle, int *flagsp) {
-	object_handle_t *khandle;
-	file_handle_t *data;
-	status_t ret;
-
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	} else if(khandle->object->type->id != OBJECT_TYPE_FILE) {
-		object_handle_release(khandle);
-		return STATUS_INVALID_HANDLE;
-	}
-
-	data = khandle->data;
-	ret = memcpy_to_user(flagsp, &data->flags, sizeof(*flagsp));
-	object_handle_release(khandle);
-	return ret;
-}
-
-/** Set filesystem handle flags.
- * @param handle	Handle to set flags for.
- * @param flagsp	New behaviour flags for the handle. This will also
- *			affect other handle IDs referring to the same underlying
- *			handle.
- * @return		Status code describing result of the operation. */
-status_t sys_fs_handle_set_flags(handle_t handle, int flags) {
-	object_handle_t *khandle;
-	file_handle_t *data;
-	status_t ret;
-
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	} else if(khandle->object->type->id != OBJECT_TYPE_FILE) {
-		object_handle_release(khandle);
-		return STATUS_INVALID_HANDLE;
-	}
-
-	data = khandle->data;
-	data->flags = flags;
-	object_handle_release(khandle);
-	return STATUS_SUCCESS;
 }
 
 /** Create a symbolic link.

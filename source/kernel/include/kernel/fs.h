@@ -129,10 +129,6 @@ extern status_t kern_fs_unlink(const char *path);
 extern status_t kern_fs_rename(const char *source, const char *dest);
 extern status_t kern_fs_sync(void);
 
-// FIXME: diediedie
-extern status_t SYSCALL(fs_handle_flags)(handle_t handle, int *flagsp);
-extern status_t SYSCALL(fs_handle_set_flags)(handle_t handle, int flags);
-
 #ifdef __cplusplus
 }
 #endif

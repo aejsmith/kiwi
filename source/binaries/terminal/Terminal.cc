@@ -110,9 +110,9 @@ bool Terminal::Run(const char *cmdline) {
 	}
 
 	/* Make the handles inheritable so children of the process get them. */
-	kern_handle_set_flags(in, HANDLE_INHERITABLE);
-	kern_handle_set_flags(out, HANDLE_INHERITABLE);
-	kern_handle_set_flags(err, HANDLE_INHERITABLE);
+	kern_handle_control(in, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+	kern_handle_control(out, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
+	kern_handle_control(err, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
 
 	/* Create the child process. */
 	Process::HandleMap map;

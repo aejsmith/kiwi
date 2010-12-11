@@ -159,7 +159,7 @@ int open(const char *path, int oflag, ...) {
 
 	/* Mark the handle as inheritable if not opening with O_CLOEXEC. */
 	if(!(oflag & O_CLOEXEC)) {
-		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
+		kern_handle_control(handle, HANDLE_SET_LFLAGS, HANDLE_INHERITABLE, NULL);
 	}
 
 	return (int)handle;

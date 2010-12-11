@@ -52,8 +52,16 @@ extern "C" {
 #define OBJECT_SET_ACL		(1<<0)	/**< Set the access control list. */
 #define OBJECT_SET_OWNER	(1<<1)	/**< Set the owner of the object. */
 
-/** Handle behaviour flags. */
+/** Handle link behaviour flags. */
 #define HANDLE_INHERITABLE	(1<<0)	/**< Handle will be inherited by child processes. */
+
+/** Actions for kern_handle_control(). */
+#define HANDLE_GET_LFLAGS	1	/**< Get handle table link flags. */
+#define HANDLE_SET_LFLAGS	2	/**< Set handle table link flags. */
+#define HANDLE_GET_FLAGS	3	/**< Get handle flags (object type-specific). */
+#define HANDLE_SET_FLAGS	4	/**< Set handle flags (object type-specific). */
+#define HANDLE_GET_RIGHTS	5	/**< Get handle rights. */
+#define HANDLE_SET_RIGHTS	6	/**< Set handle rights. */
 
 /** Type used to store a set of object rights. */
 typedef uint32_t object_rights_t;
@@ -92,8 +100,7 @@ extern status_t kern_object_security(handle_t handle, object_security_t *securit
 extern status_t kern_object_set_security(handle_t handle, const object_security_t *security);
 extern status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout);
 
-extern status_t kern_handle_flags(handle_t handle, int *flagsp);
-extern status_t kern_handle_set_flags(handle_t handle, int flags);
+extern status_t kern_handle_control(handle_t handle, int action, int arg, int *outp);
 extern status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp);
 extern status_t kern_handle_close(handle_t handle);
 

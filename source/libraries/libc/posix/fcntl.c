@@ -35,7 +35,7 @@ static int fcntl_getfd(int fd) {
 	int kflags, flags = 0;
 	status_t ret;
 
-	ret = kern_handle_flags(fd, &kflags);
+	ret = kern_handle_control(fd, HANDLE_GET_LFLAGS, 0, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -55,7 +55,7 @@ static int fcntl_setfd(int fd, int flags) {
 
 	kflags |= ((flags & FD_CLOEXEC) ? 0 : HANDLE_INHERITABLE);
 
-	ret = kern_handle_set_flags(fd, kflags);
+	ret = kern_handle_control(fd, HANDLE_SET_LFLAGS, kflags, NULL);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -88,7 +88,7 @@ static int fcntl_getfl(int fd) {
 	int kflags, flags = 0;
 	status_t ret;
 
-	ret = fs_handle_flags(fd, &kflags);
+	ret = kern_handle_control(fd, HANDLE_GET_FLAGS, 0, &kflags);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;
@@ -110,7 +110,7 @@ static int fcntl_setfl(int fd, int flags) {
 	kflags |= ((flags & O_NONBLOCK) ? 0 : FILE_NONBLOCK);
 	kflags |= ((flags & O_APPEND) ? 0 : FILE_APPEND);
 
-	ret = fs_handle_set_flags(fd, kflags);
+	ret = kern_handle_control(fd, HANDLE_SET_FLAGS, kflags, NULL);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

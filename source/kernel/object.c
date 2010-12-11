@@ -768,34 +768,18 @@ out:
 	return ret;
 }
 
-/** Get behaviour flags for a handle.
- * @param handle	ID of handle to get flags for.
- * @param flagsp	Where to store handle flags.
+/** Change handle options.
+ * @param handle	Handle to operate on.
+ * @param action	Action to perform.
+ * @param arg		Argument to function.
+ * @param outp		Where to store return value from function.
  * @return		Status code describing result of the operation. */
-status_t kern_handle_flags(handle_t handle, int *flagsp) {
+status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
+	status_t ret = STATUS_SUCCESS;
+	object_handle_t *khandle;
+	object_rights_t rights;
 	handle_link_t *link;
-	status_t ret;
-
-	rwlock_read_lock(&curr_proc->handles->lock);
-
-	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&curr_proc->handles->tree, handle);
-	if(!link) {
-		rwlock_unlock(&curr_proc->handles->lock);
-		return STATUS_INVALID_HANDLE;
-	}
-
-	ret = memcpy_to_user(flagsp, &link->flags, sizeof(int));
-	rwlock_unlock(&curr_proc->handles->lock);
-	return ret;
-}
-
-/** Set behaviour flags for a handle.
- * @param handle	ID of handle to set flags for.
- * @param flags		Flags to set.
- * @return		Status code describing result of the operation. */
-status_t kern_handle_set_flags(handle_t handle, int flags) {
-	handle_link_t *link;
+	int kout = 0;
 
 	rwlock_write_lock(&curr_proc->handles->lock);
 
@@ -805,10 +789,50 @@ status_t kern_handle_set_flags(handle_t handle, int flags) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
+	khandle = link->handle;
 
-	link->flags = flags;
+	/* Perform the action. Implementation of HANDLE_{G,S}ET_FLAGS is left
+	 * to the object type, since they operate on flags specific to the
+	 * type. */
+	switch(action) {
+	case HANDLE_GET_LFLAGS:
+		/* Get handle table link flags. */
+		kout = link->flags;
+		break;
+	case HANDLE_SET_LFLAGS:
+		/* Set handle table link flags. */
+		link->flags = arg;
+		break;
+	case HANDLE_GET_RIGHTS:
+		/* Get handle rights. */
+		kout = khandle->rights;
+		break;
+	case HANDLE_SET_RIGHTS:
+		/* Set handle rights. */
+		rights = (object_rights_t)arg;
+		if(rights) {
+			if((object_rights(khandle->object, curr_proc) & rights) != rights) {
+				ret = STATUS_ACCESS_DENIED;
+				break;
+			}
+		}
+
+		khandle->rights = rights;
+		break;
+	default:
+		if(khandle->object->type->control) {
+			ret = khandle->object->type->control(khandle, action, arg, &kout);
+		} else {
+			ret = STATUS_NOT_SUPPORTED;
+		}
+		break;
+	}
+
 	rwlock_unlock(&curr_proc->handles->lock);
-	return STATUS_SUCCESS;
+	if(ret == STATUS_SUCCESS && outp) {
+		ret = memcpy_to_user(outp, &kout, sizeof(int));
+	}
+	return ret;
 }
 
 /** Duplicate a handle ID.
