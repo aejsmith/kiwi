@@ -51,6 +51,10 @@ typedef struct process_args {
 /** Process creation flags. */
 #define PROCESS_CREATE_SESSION	(1<<1)	/**< Place the process in a new session. */
 
+/** Actions for kern_process_control(). */
+#define PROCESS_GET_SECTX	1	/**< Get security context (in: security_context_t). */
+#define PROCESS_SET_SECTX	2	/**< Set security context (out: security_context_t). */
+
 extern status_t kern_process_create(const char *path, const char *const args[],
                                     const char *const env[], int flags,
                                     const security_context_t *sectx,
@@ -66,8 +70,7 @@ extern status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
 extern status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep);
 extern process_id_t kern_process_id(handle_t handle);
 extern session_id_t kern_process_session(handle_t handle);
-extern status_t kern_process_security_context(handle_t handle, security_context_t *contextp);
-extern status_t kern_process_set_security_context(handle_t handle, const security_context_t *context);
+extern status_t kern_process_control(handle_t handle, int action, const void *in, void *out);
 extern status_t kern_process_status(handle_t handle, int *statusp);
 extern void kern_process_exit(int status) __attribute__((noreturn));
 

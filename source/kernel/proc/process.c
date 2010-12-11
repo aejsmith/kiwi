@@ -1278,88 +1278,82 @@ session_id_t kern_process_session(handle_t handle) {
 	return id;
 }
 
-/** Get the security context of a process.
- * @param handle	Handle to process to get security context of, or -1 to
- *			get the security context of the calling process.
- * @param contextp	Where to store context.
+/** Perform operations on a process.
+ * @param handle	Handle to process, or -1 to operate on the calling
+ *			process.
+ * @param action	Action to perform.
+ * @param in		Pointer to input buffer.
+ * @param out		Pointer to output buffer.
  * @return		Status code describing result of the operation. */
-status_t kern_process_security_context(handle_t handle, security_context_t *contextp) {
-	object_handle_t *khandle;
-	process_t *process;
-	status_t ret;
-
-	if(handle < 0) {
-		mutex_lock(&curr_proc->lock);
-		ret = memcpy_to_user(contextp, &curr_proc->security, sizeof(*contextp));
-		mutex_unlock(&curr_proc->lock);
-	} else {
-		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
-		                           &khandle);
-		if(ret == STATUS_SUCCESS) {
-			process = (process_t *)khandle->object;
-			mutex_lock(&process->lock);
-			ret = memcpy_to_user(contextp, &process->security, sizeof(*contextp));
-			mutex_unlock(&process->lock);
-			object_handle_release(khandle);
-		}
-	}
-
-	return ret;
-}
-
-/** Set the security context of a process.
- * @param handle	Handle to process to set security context of, or -1 to
- *			set the security context of the calling process.
- * @param context	Security context to set. The identity of the process
- *			cannot be changed unless the caller has the
- *			CAP_CHANGE_IDENTITY capability, and the new context
- *			cannot have any capabilities that the calling process
- *			does not have.
- * @return		Status code describing result of the operation. */
-status_t kern_process_set_security_context(handle_t handle, const security_context_t *context) {
+status_t kern_process_control(handle_t handle, int action, const void *in, void *out) {
 	object_handle_t *khandle = NULL;
-	security_context_t *kcontext;
+	security_context_t *context;
 	process_t *process;
 	status_t ret;
-
-	kcontext = kmalloc(sizeof(security_context_t), MM_SLEEP);
-	ret = memcpy_from_user(kcontext, context, sizeof(*kcontext));
-	if(ret != STATUS_SUCCESS) {
-		kfree(kcontext);
-		return ret;
-	}
 
 	if(handle < 0) {
 		process = curr_proc;
 	} else {
-		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS,
-		                           PROCESS_RIGHT_SECURITY, &khandle);
-		if(ret == STATUS_SUCCESS) {
-			kfree(kcontext);
+		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, 0, &khandle);
+		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 
 		process = (process_t *)khandle->object;
 	}
 
-	mutex_lock(&process->lock);
+	switch(action) {
+	case PROCESS_GET_SECTX:
+		if(khandle) {
+			if(!object_handle_rights(khandle, PROCESS_RIGHT_QUERY)) {
+				ret = STATUS_ACCESS_DENIED;
+				goto out;
+			}
+		}
 
-	/* Validate the context. */
-	ret = security_context_validate(&curr_proc->security, &process->security, kcontext);
-	if(ret != STATUS_SUCCESS) {
-		mutex_unlock(&process->lock);
-		kfree(kcontext);
-		return ret;
+		mutex_lock(&process->security_lock);
+		ret = memcpy_to_user(out, &process->security, sizeof(process->security));
+		mutex_unlock(&process->security_lock);
+		break;
+	case PROCESS_SET_SECTX:
+		if(khandle) {
+			if(!object_handle_rights(khandle, PROCESS_RIGHT_SECURITY)) {
+				ret = STATUS_ACCESS_DENIED;
+				goto out;
+			}
+		}
+
+		context = kmalloc(sizeof(*context), MM_SLEEP);
+		ret = memcpy_from_user(context, in, sizeof(*context));
+		if(ret != STATUS_SUCCESS) {
+			kfree(context);
+			goto out;
+		}
+
+		mutex_lock(&curr_proc->security_lock);
+
+		/* Validate the context. */
+		ret = security_context_validate(&curr_proc->security, &process->security, context);
+		if(ret != STATUS_SUCCESS) {
+			mutex_unlock(&curr_proc->security_lock);
+			kfree(context);
+			goto out;
+		}
+
+		mutex_unlock(&curr_proc->security_lock);
+
+		/* Set the context. */
+		mutex_lock(&process->security_lock);
+		memcpy(&process->security, context, sizeof(*context));
+		mutex_unlock(&process->security_lock);
+		kfree(context);
+		break;
 	}
-
-	/* Set the context. */
-	memcpy(&process->security, kcontext, sizeof(*kcontext));
-	mutex_unlock(&process->lock);
-
+out:
 	if(khandle) {
 		object_handle_release(khandle);
 	}
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Query the exit status of a process.
