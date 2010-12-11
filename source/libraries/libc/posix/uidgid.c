@@ -33,7 +33,7 @@ gid_t getegid(void) {
 	security_context_t context;
 	status_t ret;
 
-	ret = process_security_context(-1, &context);
+	ret = kern_process_security_context(-1, &context);
 	if(ret != STATUS_SUCCESS) {
 		libc_fatal("failed to obtain security context: %d", ret);
 	}
@@ -47,7 +47,7 @@ uid_t geteuid(void) {
 	security_context_t context;
 	status_t ret;
 
-	ret = process_security_context(-1, &context);
+	ret = kern_process_security_context(-1, &context);
 	if(ret != STATUS_SUCCESS) {
 		libc_fatal("failed to obtain security context: %d", ret);
 	}

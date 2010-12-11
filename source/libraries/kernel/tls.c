@@ -24,8 +24,8 @@
  * @todo		Reuse module IDs when modules are unloaded.
  * @todo		I don't think the offset calculation and alignment
  *			handling is quite right.
- * @todo		When cloning a process with process_clone(), TLS data
- *			for all other threads should be freed.
+ * @todo		When cloning a process with kern_process_clone(), TLS
+ *			data for all other threads should be freed.
  */
 
 #include <kernel/thread.h>
@@ -36,7 +36,7 @@
 
 #include "libkernel.h"
 
-extern status_t thread_set_tls_addr(void *addr);
+extern status_t kern_thread_set_tls_addr(void *addr);
 
 /** Next module ID.
  * @note		Protected by the RTLD lock - this is only ever called
@@ -130,7 +130,7 @@ static tls_tcb_t *tls_initial_block_init(ptr_t base, ptr_t *dtv) {
 
 		dprintf("tls: loading image for module %s (%zu) to %p (offset %p) for thread %d\n",
 		        image->name, image->tls_module_id, base, -image->tls_offset,
-		        thread_id(-1));
+		        kern_thread_id(-1));
 		dtv[i] = base;
 
 		if(image->tls_filesz) {
@@ -143,7 +143,7 @@ static tls_tcb_t *tls_initial_block_init(ptr_t base, ptr_t *dtv) {
 	}
 
 	/* Return the TCB address. */
-	dprintf("tls: thread pointer for thread %d is %p\n", thread_id(-1), base);
+	dprintf("tls: thread pointer for thread %d is %p\n", kern_thread_id(-1), base);
 	return (void *)base;
 }
 
@@ -224,7 +224,7 @@ status_t tls_init(void) {
 	tls_tcb_init(tcb);
 	tcb->dtv = dtv;
 	tcb->base = alloc;
-	thread_set_tls_addr(tcb);
+	kern_thread_set_tls_addr(tcb);
 	return STATUS_SUCCESS;
 }
 
@@ -235,6 +235,6 @@ void tls_destroy(void) {
 	tls_tcb_t *tcb = tls_tcb_get();
 
 	dprintf("tls: freeing block %p (size: %zu) for thread %d\n",
-	        tcb->base, size, thread_id(-1));
+	        tcb->base, size, kern_thread_id(-1));
 	kern_vm_unmap(tcb->base, size);
 }

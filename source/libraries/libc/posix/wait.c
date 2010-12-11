@@ -111,7 +111,7 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 			proc = list_entry(iter, posix_process_t, header);
 			if(proc->handle == events[i].handle) {
 				/* Get the exit status. TODO: signal/stopped. */
-				process_status(proc->handle, &status);
+				kern_process_status(proc->handle, &status);
 				if(statusp) {
 					*statusp = (status << 8) | __WEXITED;
 				}

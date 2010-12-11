@@ -145,8 +145,8 @@ bool Process::Create(const char *const args[], const char *const env[], HandleMa
 			memcpy(&buf[path_len + 1], args[0], name_len + 1);
 
 			/* Try to create the process using this path string. */
-			ret = process_create(buf, args, env, 0, NULL, map.get(), mapsz, NULL,
-			                     PROCESS_QUERY, &handle);
+			ret = kern_process_create(buf, args, env, 0, NULL, map.get(), mapsz,
+			                          NULL, PROCESS_QUERY, &handle);
 			if(ret == STATUS_SUCCESS) {
 				SetHandle(handle);
 				return true;
@@ -165,8 +165,8 @@ bool Process::Create(const char *const args[], const char *const env[], HandleMa
 		m_error = STATUS_NOT_FOUND;
 		return false;
 	} else {
-		ret = process_create(args[0], args, env, 0, NULL, map.get(), mapsz, NULL,
-		                     PROCESS_QUERY, &handle);
+		ret = kern_process_create(args[0], args, env, 0, NULL, map.get(), mapsz, NULL,
+		                          PROCESS_QUERY, &handle);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			m_error = ret;
 			return false;
@@ -243,7 +243,7 @@ bool Process::Open(process_id_t id) {
 	handle_t handle;
 	status_t ret;
 
-	ret = process_open(id, PROCESS_QUERY, &handle);
+	ret = kern_process_open(id, PROCESS_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		m_error = ret;
 		return false;
@@ -267,7 +267,7 @@ bool Process::Wait(useconds_t timeout) const {
  * @return		Whether the process is running. */
 bool Process::IsRunning() const {
 	int status;
-	return (m_handle >= 0 && process_status(m_handle, &status) == STATUS_STILL_RUNNING);
+	return (m_handle >= 0 && kern_process_status(m_handle, &status) == STATUS_STILL_RUNNING);
 }
 
 /** Get the exit status of the process.
@@ -275,7 +275,7 @@ bool Process::IsRunning() const {
 int Process::GetStatus() const {
 	int status;
 
-	if(process_status(m_handle, &status) != STATUS_SUCCESS) {
+	if(kern_process_status(m_handle, &status) != STATUS_SUCCESS) {
 		return -1;
 	}
 	return status;
@@ -284,13 +284,13 @@ int Process::GetStatus() const {
 /** Get the ID of the process.
  * @return		ID of the process. */
 process_id_t Process::GetID(void) const {
-	return process_id(m_handle);
+	return kern_process_id(m_handle);
 }
 
 /** Get the ID of the current process.
  * @return		ID of the current process. */
 process_id_t Process::GetCurrentID(void) {
-	return process_id(-1);
+	return kern_process_id(-1);
 }
 
 /** Register events with the event loop. */
@@ -303,7 +303,7 @@ void Process::RegisterEvents() {
 void Process::HandleEvent(int event) {
 	if(event == PROCESS_EVENT_DEATH) {
 		int status = 0;
-		process_status(m_handle, &status);
+		kern_process_status(m_handle, &status);
 		OnExit(status);
 
 		/* Unregister the death event so that it doesn't continually

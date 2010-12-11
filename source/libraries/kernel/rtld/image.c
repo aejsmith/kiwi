@@ -556,7 +556,7 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 	ret = rtld_image_load(args->path, NULL, ELF_ET_EXEC, &entry, &application_image);
 	if(ret != STATUS_SUCCESS) {
 		dprintf("rtld: failed to load binary (%d)\n", ret);
-		process_exit(ret);
+		kern_process_exit(ret);
 	}
 
 	/* Print out the image list if required. */
@@ -574,7 +574,7 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 
 	/* Exit now if doing a dry run. */
 	if(dry_run) {
-		process_exit(0);
+		kern_process_exit(0);
 	}
 
 	/* Set up TLS for the current thread. */

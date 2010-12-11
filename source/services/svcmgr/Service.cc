@@ -79,8 +79,8 @@ bool Service::Start() {
 		/* Create a thread that will connect to us. */
 		start_info info = { server->GetID(), -1, false };
 		handle_t handle;
-		status_t ret = thread_create("svcinit", NULL, 0, &Service::StartHelper,
-		                             &info, NULL, THREAD_QUERY, &handle);
+		status_t ret = kern_thread_create("svcinit", NULL, 0, &Service::StartHelper,
+		                                  &info, NULL, THREAD_QUERY, &handle);
 		if(ret != STATUS_SUCCESS) {
 			cerr << "svcmgr: failed to create helper thread (" << ret << ")" << endl;
 			return false;
@@ -122,7 +122,7 @@ void Service::StartHelper(void *data) {
 	start_info *info = reinterpret_cast<start_info *>(data);
 	ipc_connection_open(info->port, &info->handle);
 	info->done = true;
-	thread_exit(0);
+	kern_thread_exit(0);
 }
 
 /** Slot for the process exiting.

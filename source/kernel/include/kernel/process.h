@@ -51,26 +51,25 @@ typedef struct process_args {
 /** Process creation flags. */
 #define PROCESS_CREATE_SESSION	(1<<1)	/**< Place the process in a new session. */
 
-extern status_t SYSCALL(process_create)(const char *path, const char *const args[],
-                                        const char *const env[], int flags,
-                                        const security_context_t *sectx,
-                                        handle_t map[][2], int count,
-                                        const object_security_t *security,
-                                        object_rights_t rights, handle_t *handlep);
-extern status_t SYSCALL(process_replace)(const char *path, const char *const args[],
-                                         const char *const env[],
-                                         const security_context_t *sectx,
-                                         handle_t map[][2], int count);
-extern status_t SYSCALL(process_clone)(void (*func)(void *), void *arg, void *sp,
-                                       const object_security_t *security,
-                                       object_rights_t rights, handle_t *handlep);
-extern status_t SYSCALL(process_open)(process_id_t id, object_rights_t rights, handle_t *handlep);
-extern process_id_t SYSCALL(process_id)(handle_t handle);
-extern session_id_t SYSCALL(process_session)(handle_t handle);
-extern status_t SYSCALL(process_security_context)(handle_t handle, security_context_t *contextp);
-extern status_t SYSCALL(process_set_security_context)(handle_t handle, const security_context_t *context);
-extern status_t SYSCALL(process_status)(handle_t handle, int *statusp);
-extern void SYSCALL(process_exit)(int status) __attribute__((noreturn));
+extern status_t kern_process_create(const char *path, const char *const args[],
+                                    const char *const env[], int flags,
+                                    const security_context_t *sectx,
+                                    handle_t map[][2], int count,
+                                    const object_security_t *security,
+                                    object_rights_t rights, handle_t *handlep);
+extern status_t kern_process_replace(const char *path, const char *const args[],
+                                     const char *const env[], const security_context_t *sectx,
+                                     handle_t map[][2], int count);
+extern status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
+                                   const object_security_t *security,
+                                   object_rights_t rights, handle_t *handlep);
+extern status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep);
+extern process_id_t kern_process_id(handle_t handle);
+extern session_id_t kern_process_session(handle_t handle);
+extern status_t kern_process_security_context(handle_t handle, security_context_t *contextp);
+extern status_t kern_process_set_security_context(handle_t handle, const security_context_t *context);
+extern status_t kern_process_status(handle_t handle, int *statusp);
+extern void kern_process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus
 }

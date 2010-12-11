@@ -77,7 +77,7 @@ typedef struct process_create {
 	int status;			/**< Status code to return from the call. */
 } process_create_t;
 
-extern void sys_process_loaded(void);
+extern void kern_process_loaded(void);
 static object_type_t process_object_type;
 
 /** Tree of all processes. */
@@ -943,10 +943,10 @@ static status_t process_create_args_copy(const char *path, const char *const arg
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_process_create(const char *path, const char *const args[], const char *const env[],
-                            int flags, const security_context_t *sectx, handle_t map[][2],
-                            int count, const object_security_t *security, object_rights_t rights,
-                            handle_t *handlep) {
+status_t kern_process_create(const char *path, const char *const args[], const char *const env[],
+                             int flags, const security_context_t *sectx, handle_t map[][2],
+                             int count, const object_security_t *security, object_rights_t rights,
+                             handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	process_t *process = NULL;
 	process_create_t info;
@@ -1044,8 +1044,8 @@ fail:
  * @return		Does not return on success, returns status code on
  *			failure.
  */
-status_t sys_process_replace(const char *path, const char *const args[], const char *const env[],
-                             const security_context_t *sectx, handle_t map[][2], int count) {
+status_t kern_process_replace(const char *path, const char *const args[], const char *const env[],
+                              const security_context_t *sectx, handle_t map[][2], int count) {
 	handle_table_t *table, *oldtable;
 	thread_t *thread = NULL;
 	process_create_t info;
@@ -1142,8 +1142,8 @@ fail:
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_process_clone(void (*func)(void *), void *arg, void *sp, const object_security_t *security,
-                           object_rights_t rights, handle_t *handlep) {
+status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const object_security_t *security,
+                            object_rights_t rights, handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	thread_uspace_args_t *args;
 	process_t *process = NULL;
@@ -1208,7 +1208,7 @@ fail:
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to process.
  * @return		Status code describing result of the operation. */
-status_t sys_process_open(process_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *handlep) {
 	process_t *process;
 	status_t ret;
 
@@ -1241,7 +1241,7 @@ status_t sys_process_open(process_id_t id, object_rights_t rights, handle_t *han
  * @param handle	Handle for process to get ID of, or -1 to get ID of
  *			the calling process.
  * @return		Process ID on success, -1 if handle is invalid. */
-process_id_t sys_process_id(handle_t handle) {
+process_id_t kern_process_id(handle_t handle) {
 	object_handle_t *khandle;
 	process_id_t id = -1;
 	process_t *process;
@@ -1261,7 +1261,7 @@ process_id_t sys_process_id(handle_t handle) {
  * @param handle	Handle for process to get session ID of, or -1 to get
  *			the calling process' session ID.
  * @return		Session ID on success, -1 if handle is invalid. */
-session_id_t sys_process_session(handle_t handle) {
+session_id_t kern_process_session(handle_t handle) {
 	object_handle_t *khandle;
 	session_id_t id = -1;
 	process_t *process;
@@ -1283,7 +1283,7 @@ session_id_t sys_process_session(handle_t handle) {
  *			get the security context of the calling process.
  * @param contextp	Where to store context.
  * @return		Status code describing result of the operation. */
-status_t sys_process_security_context(handle_t handle, security_context_t *contextp) {
+status_t kern_process_security_context(handle_t handle, security_context_t *contextp) {
 	object_handle_t *khandle;
 	process_t *process;
 	status_t ret;
@@ -1315,7 +1315,7 @@ status_t sys_process_security_context(handle_t handle, security_context_t *conte
  *			cannot have any capabilities that the calling process
  *			does not have.
  * @return		Status code describing result of the operation. */
-status_t sys_process_set_security_context(handle_t handle, const security_context_t *context) {
+status_t kern_process_set_security_context(handle_t handle, const security_context_t *context) {
 	object_handle_t *khandle = NULL;
 	security_context_t *kcontext;
 	process_t *process;
@@ -1365,7 +1365,7 @@ status_t sys_process_set_security_context(handle_t handle, const security_contex
  * @param handle	Handle to process.
  * @param statusp	Where to store exit status of process.
  * @return		Status code describing result of the operation. */
-status_t sys_process_status(handle_t handle, int *statusp) {
+status_t kern_process_status(handle_t handle, int *statusp) {
 	object_handle_t *khandle;
 	process_t *process;
 	status_t ret;
@@ -1394,12 +1394,12 @@ status_t sys_process_status(handle_t handle, int *statusp) {
  *
  * @param status	Exit status code.
  */
-void sys_process_exit(int status) {
+void kern_process_exit(int status) {
 	process_exit(status);
 }
 
 /** Signal that the process has been loaded. */
-void sys_process_loaded(void) {
+void kern_process_loaded(void) {
 	mutex_lock(&curr_proc->lock);
 	if(curr_proc->create) {
 		curr_proc->create->status = STATUS_SUCCESS;

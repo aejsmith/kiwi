@@ -58,14 +58,14 @@ Session::Session(SecurityServer *server, uint32_t perms) :
 
 	/* Execute the process. */
 	handle_t handle;
-	status_t ret = process_create(args[0], args, env, PROCESS_CREATE_SESSION, NULL,
-	                              map, 3, NULL, PROCESS_QUERY, &handle);
+	status_t ret = kern_process_create(args[0], args, env, PROCESS_CREATE_SESSION, NULL,
+	                                   map, 3, NULL, PROCESS_QUERY, &handle);
 	if(ret != STATUS_SUCCESS) {
 		throw Error(ret);
 	}
 
 	/* Save the session ID. */
-	m_id = process_session(handle);
+	m_id = kern_process_session(handle);
 
 	/* Wrap the process in a Process object, and add an event handler for
 	 * it dying. The session will be removed when this process dies. */

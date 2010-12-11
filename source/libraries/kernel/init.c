@@ -26,7 +26,7 @@
 #include "libkernel.h"
 
 extern void libkernel_init_stage2(process_args_t *args);
-extern void process_loaded(void);
+extern void kern_process_loaded(void);
 
 extern elf_dyn_t _DYNAMIC[];
 
@@ -89,7 +89,7 @@ void libkernel_init_stage2(process_args_t *args) {
 	int i;
 
 	/* If we're the first process, open handles to the kernel console. */
-	if(process_id(-1) == 1) {
+	if(kern_process_id(-1) == 1) {
 		kern_device_open("/kconsole", DEVICE_READ, &handle);
 		kern_handle_set_flags(handle, HANDLE_INHERITABLE);
 		kern_device_open("/kconsole", DEVICE_WRITE, &handle);
@@ -112,9 +112,9 @@ void libkernel_init_stage2(process_args_t *args) {
 
 	/* Signal to the kernel that we've completed loading and call the entry
 	 * point for the program. */
-	process_loaded();
+	kern_process_loaded();
 	dprintf("libkernel: beginning program execution at %p...\n", entry);
 	entry(args);
 	dprintf("libkernel: program entry point returned\n");
-	process_exit(0);
+	kern_process_exit(0);
 }

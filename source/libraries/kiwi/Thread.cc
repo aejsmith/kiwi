@@ -97,7 +97,7 @@ bool Thread::Open(thread_id_t id) {
 	handle_t handle;
 	status_t ret;
 
-	ret = thread_open(id, THREAD_QUERY, &handle);
+	ret = kern_thread_open(id, THREAD_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -121,8 +121,8 @@ bool Thread::Run() {
 	handle_t handle;
 	status_t ret;
 
-	ret = thread_create(m_priv->name.c_str(), NULL, 0, &Thread::_Entry, this,
-	                    NULL, THREAD_QUERY, &handle);
+	ret = kern_thread_create(m_priv->name.c_str(), NULL, 0, &Thread::_Entry, this,
+	                         NULL, THREAD_QUERY, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -154,7 +154,7 @@ void Thread::Quit(int status) {
  * @return		Whether the thread is running. */
 bool Thread::IsRunning() const {
 	int status;
-	return (m_handle >= 0 && thread_status(m_handle, &status) == STATUS_STILL_RUNNING);
+	return (m_handle >= 0 && kern_thread_status(m_handle, &status) == STATUS_STILL_RUNNING);
 }
 
 /** Get the exit status of the thread.
@@ -162,7 +162,7 @@ bool Thread::IsRunning() const {
 int Thread::GetStatus() const {
 	int status;
 
-	if(thread_status(m_handle, &status) != STATUS_SUCCESS) {
+	if(kern_thread_status(m_handle, &status) != STATUS_SUCCESS) {
 		return -1;
 	}
 	return status;
@@ -171,19 +171,19 @@ int Thread::GetStatus() const {
 /** Get the ID of the thread.
  * @return		ID of the thread. */
 thread_id_t Thread::GetID() const {
-	return thread_id(m_handle);
+	return kern_thread_id(m_handle);
 }
 
 /** Get the ID of the current thread.
  * @return		ID of the current thread. */
 thread_id_t Thread::GetCurrentID() {
-	return thread_id(-1);
+	return kern_thread_id(-1);
 }
 
 /** Sleep for a certain time period.
  * @param usecs		Microseconds to sleep for. */
 void Thread::Sleep(useconds_t usecs) {
-	thread_usleep(usecs, NULL);
+	kern_thread_usleep(usecs, NULL);
 }
 
 /** Get the thread's event loop.
@@ -214,7 +214,7 @@ void Thread::RegisterEvents() {
 void Thread::HandleEvent(int event) {
 	if(event == THREAD_EVENT_DEATH) {
 		int status = 0;
-		thread_status(m_handle, &status);
+		kern_thread_status(m_handle, &status);
 		OnExit(status);
 
 		/* Unregister the death event so that it doesn't continually
@@ -232,5 +232,5 @@ void Thread::_Entry(void *arg) {
 	g_event_loop = thread->m_priv->event_loop;
 
 	/* Call the main function. */
-	thread_exit(thread->Main());
+	kern_thread_exit(thread->Main());
 }

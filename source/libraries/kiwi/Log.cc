@@ -36,7 +36,7 @@
  *			message. */
 static void do_log_message(FILE *stream, const char *prefix, const char *fmt,
                            va_list args, bool terminate) {
-	fprintf(stream, "*** %s (%d:%d): ", prefix, process_id(-1), thread_id(-1));
+	fprintf(stream, "*** %s (%d:%d): ", prefix, kern_process_id(-1), kern_thread_id(-1));
 	vfprintf(stream, fmt, args);
 	fprintf(stream, "\n");
 	if(terminate) {

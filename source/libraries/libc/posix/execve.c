@@ -66,7 +66,8 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	}
 	close(fd);
 
-	ret = process_replace(path, (const char *const *)argv, (const char *const *)envp, NULL, NULL, -1);
+	ret = kern_process_replace(path, (const char *const *)argv, (const char *const *)envp,
+	                           NULL, NULL, -1);
 	libc_status_to_errno(ret);
 	return -1;
 }

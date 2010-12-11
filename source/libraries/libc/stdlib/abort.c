@@ -25,6 +25,6 @@
 
 /** Abort program execution. */
 void abort(void) {
-	printf("Process %d aborting!\n", process_id(-1));
-	process_exit(255);
+	printf("Process %d aborting!\n", kern_process_id(-1));
+	kern_process_exit(255);
 }

@@ -32,10 +32,10 @@ typedef struct thread_create_info {
 	void *arg;			/**< Argument to entry function. */
 } thread_create_info_t;
 
-extern status_t _thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                               void *arg, const object_security_t *security, object_rights_t rights,
+extern status_t _kern_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
+                                   void *arg, const object_security_t *security, object_rights_t rights,
                                handle_t *handlep);
-extern void _thread_exit(int status) __attribute__((noreturn));
+extern void _kern_thread_exit(int status) __attribute__((noreturn));
 
 /** Thread entry wrapper.
  * @param arg		Pointer to information structure. */
@@ -46,7 +46,7 @@ static void thread_entry_wrapper(void *arg) {
 	/* Attempt to initialise our TLS block. */
 	info->ret = tls_init();
 	if(info->ret != STATUS_SUCCESS) {
-		_thread_exit(-1);
+		_kern_thread_exit(-1);
 	}
 
 	func = info->func;
@@ -54,7 +54,7 @@ static void thread_entry_wrapper(void *arg) {
 	kern_semaphore_up(info->sem, 1);
 
 	func(arg);
-	thread_exit(0);
+	kern_thread_exit(0);
 }
 
 /** Create a new thread.
@@ -69,9 +69,9 @@ static void thread_entry_wrapper(void *arg) {
  * @param arg		Argument to pass to thread.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-__export status_t thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                                void *arg, const object_security_t *security, object_rights_t rights,
-                                handle_t *handlep) {
+__export status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
+                                     void *arg, const object_security_t *security, object_rights_t rights,
+                                     handle_t *handlep) {
 	thread_create_info_t info;
 	status_t ret;
 
@@ -85,7 +85,7 @@ __export status_t thread_create(const char *name, void *stack, size_t stacksz, v
 	info.func = func;
 	info.arg = arg;
 
-	ret = _thread_create(name, stack, stacksz, thread_entry_wrapper, &info, security, rights, handlep);
+	ret = _kern_thread_create(name, stack, stacksz, thread_entry_wrapper, &info, security, rights, handlep);
 	if(ret != STATUS_SUCCESS) {
 		kern_handle_close(info.sem);
 		return ret;
@@ -99,7 +99,7 @@ __export status_t thread_create(const char *name, void *stack, size_t stacksz, v
 
 /** Terminate the calling thread.
  * @param status	Exit status code. */
-__export void thread_exit(int status) {
+__export void kern_thread_exit(int status) {
 	tls_destroy();
-	_thread_exit(status);
+	_kern_thread_exit(status);
 }

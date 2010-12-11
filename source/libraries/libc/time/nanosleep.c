@@ -41,7 +41,7 @@ int nanosleep(const struct timespec *rqtp, struct timespec *rmtp) {
 	}
 
 	ns = ((uint64_t)rqtp->tv_sec * 1000000000) + rqtp->tv_nsec;
-	ret = thread_usleep(ns / 1000, &rem);
+	ret = kern_thread_usleep(ns / 1000, &rem);
 	if(ret == STATUS_INTERRUPTED) {
 		if(rmtp) {
 			ns = rem * 1000;

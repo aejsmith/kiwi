@@ -167,19 +167,19 @@ int atexit(void (*function)(void)) {
  */
 void exit(int status) {
 	__cxa_finalize(NULL);
-	process_exit(status);
+	kern_process_exit(status);
 }
 
 /** Terminate execution without calling at-exit functions.
  * @param status	Exit status.
  * @return		Does not return. */
 void _exit(int status) {
-	process_exit(status);
+	kern_process_exit(status);
 }
 
 /** Terminate execution without calling at-exit functions.
  * @param status	Exit status.
  * @return		Does not return. */
 void _Exit(int status) {
-	process_exit(status);
+	kern_process_exit(status);
 }

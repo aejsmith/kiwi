@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
 
 		/* Now we can drop certain capabilities that only the security
 		 * server should have. */
-		ret = process_security_context(-1, &context);
+		ret = kern_process_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
 			kern_fatal("Failed to obtain security context");
 		}
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
 		security_context_unset_cap(&context, CAP_SECURITY_AUTHORITY);
 		security_context_unset_cap(&context, CAP_CREATE_SESSION);
 
-		ret = process_set_security_context(-1, &context);
+		ret = kern_process_set_security_context(-1, &context);
 		if(ret != STATUS_SUCCESS) {
 			kern_fatal("Failed to drop capabilities");
 		}

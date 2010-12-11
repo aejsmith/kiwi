@@ -24,7 +24,7 @@
 /** Get the current process ID.
  * @return		ID of calling process. */
 pid_t getpid(void) {
-	return process_id(-1);
+	return kern_process_id(-1);
 }
 
 /** Get the parent process ID.

@@ -55,7 +55,7 @@
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
-extern status_t sys_thread_set_tls_addr(void *addr);
+extern status_t kern_thread_set_tls_addr(void *addr);
 
 /** Tree of all threads. */
 static AVL_TREE_DECLARE(thread_tree);
@@ -717,9 +717,9 @@ void __init_text thread_reaper_init(void) {
  * @param arg		Argument to pass to thread.
  * @param handlep	Where to store handle to the thread (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t sys_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
-                           void *arg, const object_security_t *security, object_rights_t rights,
-                           handle_t *handlep) {
+status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void (*func)(void *),
+                            void *arg, const object_security_t *security, object_rights_t rights,
+                            handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	thread_uspace_args_t *args;
 	thread_t *thread = NULL;
@@ -806,7 +806,7 @@ fail:
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to thread.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_open(thread_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *handlep) {
 	thread_t *thread;
 	status_t ret;
 
@@ -841,7 +841,7 @@ status_t sys_thread_open(thread_id_t id, object_rights_t rights, handle_t *handl
  *
  * @return		Thread ID, or -1 if the handle is invalid.
  */
-thread_id_t sys_thread_id(handle_t handle) {
+thread_id_t kern_thread_id(handle_t handle) {
 	object_handle_t *khandle;
 	thread_id_t id = -1;
 	thread_t *thread;
@@ -861,7 +861,7 @@ thread_id_t sys_thread_id(handle_t handle) {
  * @param handle	Handle to thread.
  * @param statusp	Where to store exit status of thread.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_status(handle_t handle, int *statusp) {
+status_t kern_thread_status(handle_t handle, int *statusp) {
 	object_handle_t *khandle;
 	thread_t *thread;
 	status_t ret;
@@ -884,7 +884,7 @@ status_t sys_thread_status(handle_t handle, int *statusp) {
 
 /** Terminate the calling thread.
  * @param status	Exit status code. */
-void sys_thread_exit(int status) {
+void kern_thread_exit(int status) {
 	curr_thread->status = status;
 	thread_exit();
 }
@@ -895,7 +895,7 @@ void sys_thread_exit(int status) {
  * @param remp		If not NULL, the number of microseconds remaining will
  *			be stored here if the wait is interrupted.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_usleep(useconds_t us, useconds_t *remp) {
+status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
 	useconds_t begin, elapsed, rem;
 	status_t ret;
 
@@ -923,6 +923,6 @@ status_t sys_thread_usleep(useconds_t us, useconds_t *remp) {
  *			it is set is architecture-dependent. Refer to the ELF
  *			TLS specification for more information.
  * @return		Status code describing result of the operation. */
-status_t sys_thread_set_tls_addr(void *addr) {
+status_t kern_thread_set_tls_addr(void *addr) {
 	return thread_arch_set_tls_addr(curr_thread, (ptr_t)addr);
 }

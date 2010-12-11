@@ -52,7 +52,7 @@ void libc_init(process_args_t *args) {
 	environ = args->env;
 
 	/* If we're process 1, set default environment variables. */
-	if(process_id(-1) == 1) {
+	if(kern_process_id(-1) == 1) {
 		setenv("PATH", "/system/binaries", 1);
 		setenv("HOME", "/users/admin", 1);
 	}
