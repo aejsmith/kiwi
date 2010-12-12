@@ -31,13 +31,6 @@
 # include <stdint.h>
 #endif
 
-/** Macro for system call function names. */
-#ifdef KERNEL
-# define SYSCALL(name)	sys_ ## name
-#else
-# define SYSCALL(name)	name
-#endif
-
 /** Type used to store a kernel status code. */
 typedef int32_t status_t;
 

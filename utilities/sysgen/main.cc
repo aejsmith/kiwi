@@ -166,20 +166,12 @@ static void generate_kernel_table(ostream &stream, const string &name) {
 	stream << "#include <syscall.h>" << endl;
 
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		if(call->GetName().compare(0, 5, "kern_") == 0) {
-			stream << "extern void " << call->GetName() << "(void);" << endl;
-		} else {
-			stream << "extern void sys_" << call->GetName() << "(void);" << endl;
-		}
+		stream << "extern void " << call->GetName() << "(void);" << endl;
 	}
 
 	stream << "syscall_t " << name << "[] = {" << endl;
 	BOOST_FOREACH(const Syscall *call, syscall_list) {
-		if(call->GetName().compare(0, 5, "kern_") == 0) {
-			stream << "	[" << call->GetID() << "] = { .addr = (ptr_t)" << call->GetName();
-		} else {
-			stream << "	[" << call->GetID() << "] = { .addr = (ptr_t)sys_" << call->GetName();
-		}
+		stream << "	[" << call->GetID() << "] = { .addr = (ptr_t)" << call->GetName();
 		stream << ", .count = " << call->GetParameterCount() << " }," << endl;
 	}
 	stream << "};" << endl;
