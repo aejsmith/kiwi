@@ -29,6 +29,8 @@ type group_id_t int16_t;
 
 syscall kern_fatal(ptr_t);
 syscall kern_shutdown(int);
+syscall kern_system_time(ptr_t);
+syscall kern_unix_time(ptr_t);
 syscall kern_module_load(ptr_t, ptr_t);
 syscall kern_module_info(ptr_t, ptr_t);
 syscall kern_object_type(handle_t);
@@ -105,8 +107,6 @@ syscall kern_area_open(area_id_t, object_rights_t, ptr_t);
 syscall kern_area_id(handle_t);
 syscall kern_area_size(handle_t);
 syscall kern_area_resize(handle_t, size_t);
-syscall time_since_boot(ptr_t);
-syscall time_since_epoch(ptr_t);
 syscall kern_futex_wait(ptr_t, int32_t, useconds_t);
 syscall kern_futex_wake(ptr_t, size_t, ptr_t);
 syscall kern_timer_create(ptr_t);

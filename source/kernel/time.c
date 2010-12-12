@@ -85,7 +85,7 @@ static void timer_tick_prepare(timer_t *timer) {
 	/* Only one-shot devices need to be prepared. For periodic devices,
 	 * the current tick length is set when the device is enabled. */
 	if(curr_timer_device->type == TIMER_DEVICE_ONESHOT) {
-		length = timer->target - time_since_boot();
+		length = timer->target - system_time();
 		curr_timer_device->prepare((length > 0) ? length : 1);
 	}
 }
@@ -127,13 +127,13 @@ useconds_t time_to_unix(int year, int month, int day, int hour, int min, int sec
 
 /** Get the number of microseconds since the Unix Epoch.
  *
- * Returns the number of microseconds that have passed since the Unix epoch,
+ * Returns the number of microseconds that have passed since the Unix Epoch,
  * 00:00:00 UTC, January 1st, 1970.
  *
  * @return		Number of microseconds since epoch.
  */
-useconds_t time_since_epoch(void) {
-	return boot_unix_time + time_since_boot();
+useconds_t unix_time(void) {
+	return boot_unix_time + system_time();
 }
 
 /** Set the current timer device.
@@ -159,7 +159,7 @@ void timer_device_set(timer_device_t *device) {
 static void timer_start_unsafe(timer_t *timer) {
 	timer_t *exist;
 
-	timer->target = time_since_boot() + timer->initial;
+	timer->target = system_time() + timer->initial;
 
 	/* Place the timer at the end of the list to begin with, and then
 	 * go through the list to see if we need to move it down before
@@ -184,7 +184,7 @@ static void timer_dpc_request(void *_timer) {
 /** Handles a timer tick.
  * @return		Whether to reschedule. */
 bool timer_tick(void) {
-	useconds_t time = time_since_boot();
+	useconds_t time = system_time();
 	bool schedule = false;
 	timer_t *timer;
 
@@ -292,8 +292,8 @@ void timer_stop(timer_t *timer) {
 /** Spin for a certain amount of time.
  * @param us		Microseconds to spin for. */
 void spin(useconds_t us) {
-	useconds_t target = time_since_boot() + us;
-	while(time_since_boot() < target) {
+	useconds_t target = system_time() + us;
+	while(system_time() < target) {
 		spin_loop_hint();
 	}
 }
@@ -365,7 +365,7 @@ int kdbg_cmd_timers(int argc, char **argv) {
  * @param argv		Argument array.
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */ 
 int kdbg_cmd_uptime(int argc, char **argv) {
-	useconds_t time = time_since_boot();
+	useconds_t time = system_time();
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
@@ -383,7 +383,7 @@ void __init_text time_init(void) {
 	time_arch_init();
 
 	/* Initialise the boot time. */
-	boot_unix_time = time_from_hardware() - time_since_boot();
+	boot_unix_time = time_from_hardware() - system_time();
 }
 
 /** Closes a handle to a timer.
@@ -533,18 +533,18 @@ status_t kern_timer_stop(handle_t handle) {
 	return STATUS_SUCCESS;
 }
 
-/** Get the system uptime.
+/** Get the system time (time since boot).
  * @param usp		Where to store number of microseconds since boot.
  * @return		Status code describing result of the operation. */
-status_t sys_time_since_boot(useconds_t *usp) {
-	useconds_t ret = time_since_boot();
+status_t kern_system_time(useconds_t *usp) {
+	useconds_t ret = system_time();
 	return memcpy_to_user(usp, &ret, sizeof(ret));
 }
 
 /** Get the time since the UNIX epoch.
  * @param usp		Where to store number of microseconds since the epoch.
  * @return		Status code describing result of the operation. */
-status_t sys_time_since_epoch(useconds_t *usp) {
-	useconds_t ret = time_since_epoch();
+status_t kern_unix_time(useconds_t *usp) {
+	useconds_t ret = unix_time();
 	return memcpy_to_user(usp, &ret, sizeof(ret));
 }

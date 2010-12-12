@@ -107,7 +107,7 @@ static status_t ext2_node_create(fs_node_t *_parent, const char *name, file_type
 		if(len <= sizeof(inode->disk.i_block)) {
 			inode->size = len;
 			memcpy(inode->disk.i_block, target, inode->size);
-			inode->disk.i_mtime = le32_to_cpu(USECS2SECS(time_since_epoch()));
+			inode->disk.i_mtime = le32_to_cpu(USECS2SECS(unix_time()));
 			ext2_inode_flush(inode);
 		} else {
 			ret = ext2_inode_write(inode, target, len, 0, false, &bytes);

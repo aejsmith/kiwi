@@ -32,17 +32,17 @@ static inline uint64_t rdtsc(void) {
 	return ((uint64_t)high << 32) | low;
 }
 
-/** Get the number of microseconds since the system was booted.
+/** Get the system time (number of microseconds since boot).
  * @return		Number of microseconds since system was booted. */
-useconds_t time_since_boot(void) {
+useconds_t system_time(void) {
 	return (useconds_t)((rdtsc() - boot_time_offset) / curr_cpu->arch.cycles_per_us);
 }
 
 /** Set up the boot time offset. */
 void __init_text time_arch_init(void) {
-	/* Initialise the boot time offset. In time_since_boot() this value is
+	/* Initialise the boot time offset. In system_time() this value is
 	 * subtracted from the value returned from TSC. This is necessary
-	 * because although the bootloader set the TSC to 0, QEMU (and possibly
-	 * some other things) don't support writing the TSC. */
+	 * because although the bootloader set the TSC to 0, QEMU (and
+	 * possibly some other things) don't support writing the TSC. */
 	boot_time_offset = rdtsc();
 }

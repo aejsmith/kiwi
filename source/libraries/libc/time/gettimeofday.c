@@ -29,7 +29,7 @@
 int gettimeofday(struct timeval *tv, void *tz) {
 	useconds_t ktime;
 
-	time_since_epoch(&ktime);
+	kern_unix_time(&ktime);
 	tv->tv_sec = ktime / 1000000;
 	tv->tv_usec = ktime % 1000000;
 	return 0;

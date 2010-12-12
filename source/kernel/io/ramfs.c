@@ -93,9 +93,9 @@ static status_t ramfs_node_create(fs_node_t *parent, const char *name, file_type
 
 	/* Create the information structure. */
 	data = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
-	data->created = time_since_epoch();
-	data->accessed = time_since_epoch();
-	data->modified = time_since_epoch();
+	data->created = unix_time();
+	data->accessed = unix_time();
+	data->modified = unix_time();
 
 	/* Allocate a unique ID for the node. */
 	mutex_lock(&mount->lock);
@@ -215,7 +215,7 @@ static status_t ramfs_node_write(fs_node_t *node, const void *buf, size_t count,
 
 	ret = vm_cache_write(data->cache, buf, count, offset, nonblock, bytesp);
 	if(*bytesp) {
-		data->modified = time_since_epoch();
+		data->modified = unix_time();
 	}
 
 	return ret;
@@ -241,7 +241,7 @@ static status_t ramfs_node_resize(fs_node_t *node, offset_t size) {
 	assert(node->type == FILE_TYPE_REGULAR);
 
 	vm_cache_resize(data->cache, size);
-	data->modified = time_since_epoch();
+	data->modified = unix_time();
 	return STATUS_SUCCESS;
 }
 
@@ -344,9 +344,9 @@ static status_t ramfs_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t c
 
 	/* Create the root directory, and add '.' and '..' entries. */
 	ndata = kmalloc(sizeof(ramfs_node_t), MM_SLEEP);
-	ndata->created = time_since_epoch();
-	ndata->accessed = time_since_epoch();
-	ndata->modified = time_since_epoch();
+	ndata->created = unix_time();
+	ndata->accessed = unix_time();
+	ndata->modified = unix_time();
 	ndata->entries = entry_cache_create(NULL, NULL);
 	entry_cache_insert(ndata->entries, ".", 0);
 	entry_cache_insert(ndata->entries, "..", 0);

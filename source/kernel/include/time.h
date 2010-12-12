@@ -90,8 +90,8 @@ typedef struct timer {
 
 extern useconds_t time_to_unix(int year, int month, int day, int hour, int min, int sec);
 extern useconds_t time_from_hardware(void);
-extern useconds_t time_since_boot(void);
-extern useconds_t time_since_epoch(void);
+extern useconds_t system_time(void);
+extern useconds_t unix_time(void);
 
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);

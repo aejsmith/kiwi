@@ -95,7 +95,7 @@ static void thread_trampoline(void) {
 		curr_thread->id, curr_thread->name, curr_cpu->id);
 
 	/* Set the last time to now so that accounting information is correct. */
-	curr_thread->last_time = time_since_boot();
+	curr_thread->last_time = system_time();
 
 	/* Run the thread's main function and then exit when it returns. */
 	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
@@ -340,7 +340,7 @@ void thread_at_kernel_entry(void) {
 	useconds_t now;
 
 	/* Update accounting information. */
-	now = time_since_boot();
+	now = system_time();
 	curr_thread->user_time += now - curr_thread->last_time;
 	curr_thread->last_time = now;
 }
@@ -350,7 +350,7 @@ void thread_at_kernel_exit(void) {
 	useconds_t now;
 
 	/* Update accounting information. */
-	now = time_since_boot();
+	now = system_time();
 	curr_thread->kernel_time += now - curr_thread->last_time;
 	curr_thread->last_time = now;
 
@@ -943,10 +943,10 @@ status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
 	}
 
 	/* FIXME: The method getting remaining time isn't quite accurate. */
-	begin = time_since_boot();
+	begin = system_time();
 	ret = usleep_etc(us, SYNC_INTERRUPTIBLE);
 	if(ret == STATUS_INTERRUPTED && remp) {
-		elapsed = time_since_boot() - begin;
+		elapsed = system_time() - begin;
 		if(elapsed < us) {
 			rem = us - elapsed;
 			memcpy_to_user(remp, &rem, sizeof(rem));

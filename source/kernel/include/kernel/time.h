@@ -38,8 +38,8 @@ extern status_t kern_timer_create(handle_t *handlep);
 extern status_t kern_timer_start(handle_t handle, useconds_t interval, int mode);
 extern status_t kern_timer_stop(handle_t handle);
 
-extern status_t SYSCALL(time_since_boot)(useconds_t *usp);
-extern status_t SYSCALL(time_since_epoch)(useconds_t *usp);
+extern status_t kern_system_time(useconds_t *usp);
+extern status_t kern_unix_time(useconds_t *usp);
 
 #ifdef __cplusplus
 }

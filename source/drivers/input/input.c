@@ -254,7 +254,7 @@ void input_device_event(device_t *_device, uint8_t type, int32_t value) {
 	}
 
 	i = (device->start + device->size++) % INPUT_BUFFER_SIZE;
-	device->buffer[i].time = time_since_boot();
+	device->buffer[i].time = system_time();
 	device->buffer[i].type = type;
 	device->buffer[i].value = value;
 

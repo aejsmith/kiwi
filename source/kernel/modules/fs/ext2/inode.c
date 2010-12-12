@@ -465,7 +465,7 @@ static status_t ext2_inode_truncate(ext2_inode_t *inode, offset_t size) {
 	file_map_invalidate(inode->map, 0, count);
 	vm_cache_resize(inode->cache, size);
 	inode->size = size;
-	inode->disk.i_mtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
+	inode->disk.i_mtime = cpu_to_le32(USECS2SECS(unix_time()));
 	ext2_inode_flush(inode);
 
 	for(i = 0; i < EXT2_N_BLOCKS; i++) {
@@ -588,7 +588,7 @@ found:
 
 	inode->size = 0;
 
-	time = USECS2SECS(time_since_epoch());
+	time = USECS2SECS(unix_time());
 	inode->disk.i_mode = cpu_to_le16(mode & EXT2_S_IFMT);
 	inode->disk.i_size = 0;
 	inode->disk.i_atime = cpu_to_le32(time);
@@ -781,7 +781,7 @@ void ext2_inode_release(ext2_inode_t *inode) {
 		dprintf("ext2: inode %p(%" PRIu32 ") has no links remaining, freeing...\n", inode, inode->num);
 
 		/* Update deletion time and truncate the inode. */
-		inode->disk.i_dtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
+		inode->disk.i_dtime = cpu_to_le32(USECS2SECS(unix_time()));
 		ext2_inode_truncate(inode, 0);
 		ext2_inode_flush(inode);
 
@@ -856,7 +856,7 @@ status_t ext2_inode_write(ext2_inode_t *inode, const void *buf, size_t count, of
 
 	ret = vm_cache_write(inode->cache, buf, count, offset, nonblock, bytesp);
 	if(*bytesp) {
-		inode->disk.i_mtime = cpu_to_le32(USECS2SECS(time_since_epoch()));
+		inode->disk.i_mtime = cpu_to_le32(USECS2SECS(unix_time()));
 	}
 
 	return ret;
