@@ -847,7 +847,7 @@ thread_id_t kern_thread_id(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_thread->id;
-	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, 0, &khandle) == STATUS_SUCCESS) {
+	} else if(object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle) == STATUS_SUCCESS) {
 		thread = (thread_t *)khandle->object;
 		id = thread->id;
 		object_handle_release(khandle);
@@ -870,7 +870,7 @@ status_t kern_thread_control(handle_t handle, int action, const void *in, void *
 	if(handle < 0) {
 		thread = curr_thread;
 	} else {
-		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, 0, &khandle);
+		ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, 0, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
@@ -905,7 +905,7 @@ status_t kern_thread_status(handle_t handle, int *statusp) {
 	thread_t *thread;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_THREAD, THREAD_RIGHT_QUERY, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_THREAD, THREAD_RIGHT_QUERY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

@@ -1248,7 +1248,7 @@ process_id_t kern_process_id(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_proc->id;
-	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, 0, &khandle) == STATUS_SUCCESS) {
+	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->id;
 		object_handle_release(khandle);
@@ -1268,7 +1268,7 @@ session_id_t kern_process_session(handle_t handle) {
 
 	if(handle < 0) {
 		id = curr_proc->session->id;
-	} else if(object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
+	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
 	                               &khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->session->id;
@@ -1294,7 +1294,7 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 	if(handle < 0) {
 		process = curr_proc;
 	} else {
-		ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, 0, &khandle);
+		ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
@@ -1379,8 +1379,7 @@ status_t kern_process_status(handle_t handle, int *statusp) {
 	process_t *process;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
-	                           &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

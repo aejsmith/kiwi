@@ -483,7 +483,7 @@ status_t kern_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp
 		}
 	}
 
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	ret = object_handle_lookup(handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -560,7 +560,7 @@ status_t kern_object_set_security(handle_t handle, const object_security_t *secu
 		return ret;
 	}
 
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	ret = object_handle_lookup(handle, -1, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		object_security_destroy(&ksecurity);
 		return ret;

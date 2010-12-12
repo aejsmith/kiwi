@@ -502,7 +502,7 @@ status_t kern_timer_start(handle_t handle, useconds_t interval, int mode) {
 		return STATUS_INVALID_ARG;
 	}
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_TIMER, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -522,7 +522,7 @@ status_t kern_timer_stop(handle_t handle) {
 	user_timer_t *timer;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_TIMER, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

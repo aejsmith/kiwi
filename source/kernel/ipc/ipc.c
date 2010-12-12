@@ -506,7 +506,7 @@ port_id_t sys_ipc_port_id(handle_t handle) {
 	ipc_port_t *port;
 	port_id_t ret;
 
-	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_PORT, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_PORT, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
@@ -536,7 +536,7 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 		return STATUS_INVALID_ARG;
 	}
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_PORT, PORT_RIGHT_LISTEN, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PORT, PORT_RIGHT_LISTEN, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -730,7 +730,7 @@ status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, s
 	}
 
 	/* Look up the handle. */
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
@@ -864,7 +864,7 @@ status_t sys_ipc_message_peek(handle_t handle, useconds_t timeout, uint32_t *typ
 	status_t ret;
 
 	/* Look up the handle. */
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -932,7 +932,7 @@ status_t sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *
 	}
 
 	/* Look up the handle. */
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_CONNECTION, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

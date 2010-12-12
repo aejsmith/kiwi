@@ -274,7 +274,7 @@ semaphore_id_t kern_semaphore_id(handle_t handle) {
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
 
-	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
@@ -303,7 +303,7 @@ status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
 	user_semaphore_t *sem;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -329,7 +329,7 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 	user_semaphore_t *sem;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

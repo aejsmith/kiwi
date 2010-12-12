@@ -2705,7 +2705,7 @@ status_t kern_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2770,7 +2770,7 @@ status_t kern_file_pread(handle_t handle, void *buf, size_t count, offset_t offs
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2840,7 +2840,7 @@ status_t kern_file_write(handle_t handle, const void *buf, size_t count, size_t 
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2906,7 +2906,7 @@ status_t kern_file_pwrite(handle_t handle, const void *buf, size_t count, offset
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -2965,7 +2965,7 @@ status_t kern_file_resize(handle_t handle, offset_t size) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -2993,7 +2993,7 @@ status_t kern_file_seek(handle_t handle, int action, rel_offset_t offset, offset
 	status_t ret;
 	offset_t new;
 
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -3015,7 +3015,7 @@ status_t kern_file_info(handle_t handle, file_info_t *infop) {
 	file_info_t kinfo;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -3035,7 +3035,7 @@ status_t kern_file_sync(handle_t handle) {
 	object_handle_t *khandle;
 	status_t ret;
 
-	ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
@@ -3101,7 +3101,7 @@ status_t kern_dir_read(handle_t handle, dir_entry_t *buf, size_t size) {
 		return STATUS_TOO_SMALL;
 	}
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_FILE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_FILE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

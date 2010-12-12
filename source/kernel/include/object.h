@@ -187,8 +187,8 @@ extern void object_handle_release(object_handle_t *handle);
 extern status_t object_handle_attach(object_handle_t *handle, struct process *process,
                                      int flags, handle_t *idp, handle_t *uidp);
 extern status_t object_handle_detach(struct process *process, handle_t id);
-extern status_t object_handle_lookup(struct process *process, handle_t id, int type,
-                                     object_rights_t rights, object_handle_t **handlep);
+extern status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
+                                     object_handle_t **handlep);
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
                                     handle_table_t **tablep);

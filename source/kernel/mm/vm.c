@@ -1544,7 +1544,7 @@ status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle, offse
 	if(!(flags & VM_MAP_FIXED) && !addrp) {
 		return STATUS_INVALID_ARG;
 	} else if(handle >= 0) {
-		ret = object_handle_lookup(NULL, handle, -1, 0, &khandle);
+		ret = object_handle_lookup(handle, -1, 0, &khandle);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}

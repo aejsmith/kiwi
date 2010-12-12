@@ -403,15 +403,14 @@ status_t object_handle_detach(process_t *process, handle_t id) {
 	return ret;
 }
 
-/** Look up a handle in a process' handle table.
+/** Look up a handle in a the current process' handle table.
  *
- * Looks up the handle with the given ID in a process' handle table, optionally
- * ensuring that the object is a certain type and that the handle has certain
- * rights. The returned handle will have an extra reference on it: when it is
- * no longer needed, it should be released with object_handle_release().
+ * Looks up the handle with the given ID in the current process' handle table,
+ * optionally checking that the object it refers to is a certain type and that
+ * the handle has certain rights. The returned handle will have an extra
+ * reference on it: when it is no longer needed, it should be released with
+ * object_handle_release().
  *
- * @param process	Process to look up in. If NULL, the current process
- *			will be used.
  * @param id		Handle ID to look up.
  * @param type		Required object type ID (if negative, no type checking
  *			will be performed).
@@ -421,40 +420,35 @@ status_t object_handle_detach(process_t *process, handle_t id) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t object_handle_lookup(process_t *process, handle_t id, int type, object_rights_t rights,
-                              object_handle_t **handlep) {
+status_t object_handle_lookup(handle_t id, int type, object_rights_t rights, object_handle_t **handlep) {
 	handle_link_t *link;
 
 	assert(handlep);
 
-	if(!process) {
-		process = curr_proc;
-	}
-
-	rwlock_read_lock(&process->handles->lock);
+	rwlock_read_lock(&curr_proc->handles->lock);
 
 	/* Look up the handle in the tree. */
-	link = avl_tree_lookup(&process->handles->tree, id);
+	link = avl_tree_lookup(&curr_proc->handles->tree, id);
 	if(!link) {
-		rwlock_unlock(&process->handles->lock);
+		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
 	/* Check if the type is the type the caller wants. */
 	if(type >= 0 && link->handle->object->type->id != type) {
-		rwlock_unlock(&process->handles->lock);
+		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
 
 	/* Check if the handle has the requested rights. */
 	if(rights && !object_handle_rights(link->handle, rights)) {
-		rwlock_unlock(&process->handles->lock);
+		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_ACCESS_DENIED;
 	}
 
 	object_handle_get(link->handle);
 	*handlep = link->handle;
-	rwlock_unlock(&process->handles->lock);
+	rwlock_unlock(&curr_proc->handles->lock);
 	return STATUS_SUCCESS;
 }
 
@@ -699,7 +693,7 @@ int kern_object_type(handle_t handle) {
 	object_handle_t *khandle;
 	int ret;
 
-	if(object_handle_lookup(NULL, handle, -1, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, -1, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
@@ -745,7 +739,7 @@ status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeo
 		syncs[i].sem = &sem;
 		syncs[i].info.signalled = false;
 
-		ret = object_handle_lookup(NULL, syncs[i].info.handle, -1, 0, &syncs[i].handle);
+		ret = object_handle_lookup(syncs[i].info.handle, -1, 0, &syncs[i].handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		} else if(!syncs[i].handle->object->type->wait || !syncs[i].handle->object->type->unwait) {

@@ -883,7 +883,7 @@ status_t kern_device_read(handle_t handle, void *buf, size_t count, offset_t off
 	size_t bytes = 0;
 	void *kbuf;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -947,7 +947,7 @@ status_t kern_device_write(handle_t handle, const void *buf, size_t count, offse
 	void *kbuf = NULL;
 	size_t bytes = 0;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}
@@ -1005,7 +1005,7 @@ status_t kern_device_request(handle_t handle, int request, const void *in, size_
 	status_t ret, err;
 	size_t koutsz;
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_DEVICE, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_DEVICE, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		goto out;
 	}

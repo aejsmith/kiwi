@@ -222,7 +222,7 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 	}
 
 	if(source >= 0) {
-		ret = object_handle_lookup(NULL, source, -1, 0, &ksource);
+		ret = object_handle_lookup(source, -1, 0, &ksource);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		} else if(!ksource->object->type->get_page) {
@@ -311,7 +311,7 @@ area_id_t kern_area_id(handle_t handle) {
 	area_id_t ret;
 	area_t *area;
 
-	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
@@ -329,7 +329,7 @@ size_t kern_area_size(handle_t handle) {
 	area_t *area;
 	size_t ret;
 
-	if(object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
 		return -1;
 	}
 
@@ -353,7 +353,7 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 		return STATUS_INVALID_ARG;
 	}
 
-	ret = object_handle_lookup(NULL, handle, OBJECT_TYPE_AREA, 0, &khandle);
+	ret = object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}
