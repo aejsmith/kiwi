@@ -590,8 +590,8 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
  * operation - it is provided as a function rather than a request type because
  * it is supported by multiple device types.
  *
- * @param handle	Handle to device to read from. Needs the DEVICE_READ
- *			right.
+ * @param handle	Handle to device to read from. Must have the
+ *			DEVICE_RIGHT_READ access right.
  * @param buf		Buffer to read into.
  * @param count		Number of bytes to read.
  * @param offset	Offset in the device to read from (only valid for
@@ -636,8 +636,8 @@ status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t 
  * operation - it is provided as a function rather than a request type because
  * it is supported by multiple device types.
  *
- * @param handle	Handle to device to write to. Needs the DEVICE_WRITE
- *			right.
+ * @param handle	Handle to device to write to. Must have the
+ *			DEVICE_RIGHT_WRITE right.
  * @param buf		Buffer containing data to write.
  * @param count		Number of bytes to write.
  * @param offset	Offset in the device to write to (only valid for

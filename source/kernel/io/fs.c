@@ -1139,7 +1139,7 @@ static status_t file_object_mappable(object_handle_t *handle, int flags) {
 
 	/* If creating a shared mapping for writing, check for write access.
 	 * It is not necessary to check for a read-only filesystem here: a
-	 * handle cannot be opened with FILE_WRITE on a read-only FS. */
+	 * handle cannot be opened with FILE_RIGHT_WRITE on a read-only FS. */
 	if((flags & (VM_MAP_WRITE | VM_MAP_PRIVATE)) == VM_MAP_WRITE) {
 		if(!object_handle_rights(handle, FILE_RIGHT_WRITE)) {
 			return STATUS_ACCESS_DENIED;
@@ -1256,7 +1256,7 @@ static fs_node_ops_t memory_file_ops = {
  * @param buf		Pointer to memory area to use.
  * @param size		Size of memory area.
  *
- * @return		Pointer to handle to file (has FILE_READ access right).
+ * @return		Pointer to handle to file (has FILE_RIGHT_READ right).
  */
 object_handle_t *file_from_memory(const void *buf, size_t size) {
 	object_handle_t *handle;
@@ -1422,8 +1422,8 @@ out:
  * handle's current offset, and before returning the offset will be incremented
  * by the number of bytes read.
  *
- * @param handle	Handle to file to read from. Must have the FILE_READ
- *			access right.
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -1442,8 +1442,8 @@ status_t file_read(object_handle_t *handle, void *buf, size_t count, size_t *byt
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to read from. Must have the FILE_READ
- *			access right.
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -1537,8 +1537,8 @@ out:
  * returning the handle's offset will be incremented by the number of bytes
  * written.
  *
- * @param handle	Handle to file to write to. Must have the FILE_WRITE
- *			access right.
+ * @param handle	Handle to file to write to. Must have the
+ *			FILE_RIGHT_WRITE access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -1560,8 +1560,8 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t count, size
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to write to. Must have the FILE_WRITE
- *			access right.
+ * @param handle	Handle to file to write to. Must have the
+ *			FILE_RIGHT_WRITE access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -1585,7 +1585,7 @@ status_t file_pwrite(object_handle_t *handle, const void *buf, size_t count, off
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @param handle	Handle to file to resize. Must have the FILE_WRITE
+ * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
  *			access right.
  * @param size		New size of the file.
  *
@@ -1777,7 +1777,7 @@ status_t dir_create(const char *path, object_security_t *security) {
  * will be incremented by 1.
  *
  * @param handle	Handle to directory to read from. Must have the
- *			FILE_READ access right.
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
  *			return STATUS_TOO_SMALL).
@@ -2688,8 +2688,8 @@ status_t kern_file_open(const char *path, object_rights_t rights, int flags, int
  * handle's current offset, and before returning the offset will be incremented
  * by the number of bytes read.
  *
- * @param handle	Handle to file to read from. Must have the FILE_READ
- *			access right.
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -2752,8 +2752,8 @@ out:
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to read from. Must have the FILE_READ
- *			access right.
+ * @param handle	Handle to file to read from. Must have the
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read data into.
  * @param count		Number of bytes to read. The supplied buffer should be
  *			at least this size.
@@ -2820,8 +2820,8 @@ out:
  * returning the handle's offset will be incremented by the number of bytes
  * written.
  *
- * @param handle	Handle to file to write to. Must have the FILE_WRITE
- *			access right.
+ * @param handle	Handle to file to write to. Must have the 
+ *			FILE_RIGHT_WRITE access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -2887,8 +2887,8 @@ out:
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
  *
- * @param handle	Handle to file to write to. Must have the FILE_WRITE
- *			access right.
+ * @param handle	Handle to file to write to. Must have the 
+ *			FILE_RIGHT_WRITE access right.
  * @param buf		Buffer to write data from.
  * @param count		Number of bytes to write. The supplied buffer should be
  *			at least this size. If zero, the function will return
@@ -2955,7 +2955,7 @@ out:
  * it is larger than the previous size, then the extended space will be filled
  * with zero bytes.
  *
- * @param handle	Handle to file to resize. Must have the FILE_WRITE
+ * @param handle	Handle to file to resize. Must have the FILE_RIGHT_WRITE
  *			access right.
  * @param size		New size of the file.
  *
@@ -3083,7 +3083,7 @@ status_t kern_dir_create(const char *path, const object_security_t *security) {
  * will be incremented by 1.
  *
  * @param handle	Handle to directory to read from. Must have the
- *			FILE_READ access right.
+ *			FILE_RIGHT_READ access right.
  * @param buf		Buffer to read entry in to.
  * @param size		Size of buffer (if not large enough, the function will
  *			return STATUS_TOO_SMALL).
