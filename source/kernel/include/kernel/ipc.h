@@ -22,23 +22,17 @@
 #define __KERNEL_IPC_H
 
 #include <kernel/object.h>
+#include <kernel/security.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/** Structure describing a message to send with ipc_message_sendv(). */
-typedef struct ipc_message_vector {
-	uint32_t type;				/**< Type of message. */
-	const void *buf;			/**< Data buffer. */
-	size_t size;				/**< Size of data buffer. */
-} ipc_message_vector_t;
-
 /** Structure containing details of a client on a port. */
-typedef struct ipc_client_info {
+typedef struct port_client {
 	process_id_t pid;			/**< ID of client process. */
 	session_id_t sid;			/**< ID of client process' session. */
-} ipc_client_info_t;
+} port_client_t;
 
 /** IPC port rights. */
 #define PORT_RIGHT_LISTEN		(1<<0)	/**< Listen for connections on the port. */
@@ -55,21 +49,21 @@ typedef struct ipc_client_info {
 #define IPC_QUEUE_MAX			256	/**< Maximum number of messages in a queue at a time. */
 #define IPC_MESSAGE_MAX			16384	/**< Maximum size of a message data buffer. */
 
-extern status_t SYSCALL(ipc_port_create)(const object_security_t *security, object_rights_t rights,
-                                         handle_t *handlep);
-extern status_t SYSCALL(ipc_port_open)(port_id_t id, object_rights_t rights, handle_t *handlep);
-extern port_id_t SYSCALL(ipc_port_id)(handle_t handle);
-extern status_t SYSCALL(ipc_port_listen)(handle_t handle, useconds_t timeout, handle_t *handlep,
-                                         ipc_client_info_t *infop);
+extern status_t kern_port_create(const object_security_t *security, object_rights_t rights,
+                                 handle_t *handlep);
+extern status_t kern_port_open(port_id_t id, object_rights_t rights, handle_t *handlep);
+extern port_id_t kern_port_id(handle_t handle);
+extern status_t kern_port_listen(handle_t handle, useconds_t timeout, handle_t *connp,
+                                 port_client_t *infop);
+extern status_t kern_port_loopback(handle_t handle, handle_t connp[2]);
 
-extern status_t SYSCALL(ipc_connection_open)(port_id_t id, handle_t *handlep);
-
-extern status_t SYSCALL(ipc_message_send)(handle_t handle, uint32_t type, const void *buf, size_t size);
-extern status_t SYSCALL(ipc_message_sendv)(handle_t handle, ipc_message_vector_t *vec, size_t count);
-extern status_t SYSCALL(ipc_message_peek)(handle_t handle, useconds_t timeout, uint32_t *typep,
-                                          size_t *sizep);
-extern status_t SYSCALL(ipc_message_receive)(handle_t handle, useconds_t timeout, uint32_t *typep,
-                                             void *buf, size_t size);
+extern status_t kern_connection_open(port_id_t id, handle_t *handlep);
+extern status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf,
+                                     size_t size);
+extern status_t kern_connection_peek(handle_t handle, useconds_t timeout, uint32_t *typep,
+                                     size_t *sizep);
+extern status_t kern_connection_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
+                                        void *buf, size_t size);
 
 #ifdef __cplusplus
 }

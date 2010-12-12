@@ -37,7 +37,7 @@ public:
 	Service();
 	~Service();
 protected:
-	virtual void HandleConnection(handle_t handle, ipc_client_info_t &info);
+	virtual void HandleConnection(handle_t handle, port_client_t &info);
 private:
 	KIWI_PRIVATE void _AddPort(const std::string &name, port_id_t id);
 	KIWI_PRIVATE void _HandleConnection();

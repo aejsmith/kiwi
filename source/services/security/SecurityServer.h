@@ -47,7 +47,7 @@ public:
 	void RemoveSession(Session *session);
 	void RemoveConnection(Connection *conn);
 private:
-	void HandleConnection(handle_t handle, ipc_client_info_t &info);
+	void HandleConnection(handle_t handle, port_client_t &info);
 
 	SessionMap m_sessions;		/**< Map of known sessions. */
 	ConnectionList m_connections;	/**< Connections to the server. */

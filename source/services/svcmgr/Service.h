@@ -62,7 +62,6 @@ public:
 	 * @return		Pointer to service's port. */
 	Port *GetPort() const { return m_port; }
 private:
-	static void StartHelper(void *data);
 	void ProcessExited(int status);
 
 	ServiceManager *m_svcmgr;	/**< Service manager the service is for. */

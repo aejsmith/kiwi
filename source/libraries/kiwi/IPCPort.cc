@@ -47,7 +47,9 @@ IPCPort::IPCPort(handle_t handle) {
  */
 bool IPCPort::Create() {
 	handle_t handle;
-	status_t ret = ipc_port_create(NULL, PORT_RIGHT_LISTEN, &handle);
+	status_t ret;
+
+	ret = kern_port_create(NULL, PORT_RIGHT_LISTEN | PORT_RIGHT_CONNECT, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -69,7 +71,9 @@ bool IPCPort::Create() {
  */
 bool IPCPort::Open(port_id_t id) {
 	handle_t handle;
-	status_t ret = ipc_port_open(id, PORT_RIGHT_LISTEN, &handle);
+	status_t ret;
+
+	ret = kern_port_open(id, PORT_RIGHT_LISTEN | PORT_RIGHT_CONNECT, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -87,7 +91,9 @@ bool IPCPort::Open(port_id_t id) {
  *			progress.
  * @return		True on success, false if an error occurred. */
 bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) {
-	handle_t handle = Listen(0, timeout);
+	handle_t handle;
+
+	handle = Listen(0, timeout);
 	if(unlikely(handle < 0)) {
 		return false;
 	}
@@ -104,9 +110,11 @@ bool IPCPort::Listen(IPCConnection *&conn, useconds_t timeout) {
  *			return immediately if no connection attempts are in
  *			progress.
  * @return		Handle to connection, or -1 if an error occurred. */
-handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) {
+handle_t IPCPort::Listen(port_client_t *infop, useconds_t timeout) {
 	handle_t handle;
-	status_t ret = ipc_port_listen(m_handle, timeout, &handle, infop);
+	status_t ret;
+
+	ret = kern_port_listen(m_handle, timeout, &handle, infop);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return -1;
@@ -118,7 +126,7 @@ handle_t IPCPort::Listen(ipc_client_info_t *infop, useconds_t timeout) {
 /** Get the ID of a port.
  * @return		Port ID. */
 port_id_t IPCPort::GetID() const {
-	return ipc_port_id(m_handle);
+	return kern_port_id(m_handle);
 }
 
 /** Register events with the event loop. */

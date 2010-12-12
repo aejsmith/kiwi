@@ -48,7 +48,7 @@ public:
 	Display *GetDisplay() const { return m_display; }
 private:
 	Session *LookupSession(session_id_t id);
-	void HandleConnection(handle_t handle, ipc_client_info_t &info);
+	void HandleConnection(handle_t handle, port_client_t &info);
 	void SwitchSession(session_id_t id, session_id_t prev);
 
 	kiwi::SessionManager *m_sessmgr;	/**< Connection to session manager. */

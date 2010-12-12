@@ -38,7 +38,7 @@ public:
 	bool Open(port_id_t id);
 	
 	bool Listen(IPCConnection *&conn, useconds_t timeout = -1);
-	handle_t Listen(ipc_client_info_t *infop = 0, useconds_t timeout = -1);
+	handle_t Listen(port_client_t *infop = 0, useconds_t timeout = -1);
 	port_id_t GetID() const;
 
 	/** Signal emitted when a connection is received.

@@ -70,7 +70,7 @@ struct ipc_connection;
 /** Structure used for synchronisation during connection. */
 typedef struct ipc_connect_sync {
 	semaphore_t sem;		/**< Semaphore for client to wait on. */
-	ipc_client_info_t info;		/**< Information about the client. */
+	port_client_t info;		/**< Information about the client. */
 } ipc_connect_sync_t;
 
 /** IPC port structure. */
@@ -102,12 +102,12 @@ typedef struct ipc_endpoint {
 /** IPC connection structure. */
 typedef struct ipc_connection {
 	object_t obj;			/**< Object header. */
-	list_t header;			/**< Link to port connection list. */
-	mutex_t lock;			/**< Lock covering connection. */
+	mutex_t lock;			/**< Lock protecting connection. */
 	ipc_port_t *port;		/**< Port that the connection is on. */
 	refcount_t count;		/**< Count of handles to either end of the connection. */
 	ipc_endpoint_t endpoints[2];	/**< Endpoints for each end of the connection. */
 	ipc_connect_sync_t *sync;	/**< Pointer to connection synchronisation structure. */
+	list_t header;			/**< Link to port connection list. */
 } ipc_connection_t;
 
 /** In-kernel IPC message structure. */
@@ -406,18 +406,21 @@ static object_type_t connection_object_type = {
 };
 
 /** Create a new IPC port.
- * @todo		Default attributes should allow listen only for the
- *			calling process. This needs process entries in the ACL.
+ * @todo		Change default attributes to what is said below, need a
+ *			change to the service manager.
  * @param security	Security attributes for the object. If NULL, default
  *			security attributes will be used which sets the owning
  *			user and group to that of the calling process, grants
- *			listen access to the owning user and allows connections
- *			from anyone.
+ *			listen access to nobody and allows connections from
+ *			anyone. Note that when creating objects you can specify
+ *			rights for the handle that the ACL doesn't grant to you.
+ *			This means that you can still request listen access here
+ *			here even though the default ACL disallows it.
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to port.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_create(const object_security_t *security, object_rights_t rights,
-                             handle_t *handlep) {
+status_t kern_port_create(const object_security_t *security, object_rights_t rights,
+                          handle_t *handlep) {
 	object_security_t ksecurity = { -1, -1, NULL };
 	ipc_port_t *port;
 	status_t ret;
@@ -472,7 +475,7 @@ status_t sys_ipc_port_create(const object_security_t *security, object_rights_t 
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to port.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_open(port_id_t id, object_rights_t rights, handle_t *handlep) {
+status_t kern_port_open(port_id_t id, object_rights_t rights, handle_t *handlep) {
 	ipc_port_t *port;
 	status_t ret;
 
@@ -501,7 +504,7 @@ status_t sys_ipc_port_open(port_id_t id, object_rights_t rights, handle_t *handl
 /** Get the ID of a port.
  * @param handle	Handle to port to get ID of.
  * @return		ID of port on success, -1 if handle is invalid. */
-port_id_t sys_ipc_port_id(handle_t handle) {
+port_id_t kern_port_id(handle_t handle) {
 	object_handle_t *khandle;
 	ipc_port_t *port;
 	port_id_t ret;
@@ -524,9 +527,9 @@ port_id_t sys_ipc_port_id(handle_t handle) {
  *			indefinitely until a connection is made.
  * @param connp		Where to store handle to caller's end of the connection.
  * @param infop		Where to store information about the process that made
- *			the conection.
+ *			the conection (can be NULL).
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, ipc_client_info_t *infop) {
+status_t kern_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, port_client_t *infop) {
 	ipc_connection_t *conn = NULL;
 	object_handle_t *khandle;
 	ipc_port_t *port;
@@ -583,29 +586,114 @@ status_t sys_ipc_port_listen(handle_t handle, useconds_t timeout, handle_t *conn
 	}
 
 	list_append(&port->connections, &conn->header);
-	conn->port = port;
 
 	/* Wake the thread that made the connection. */
 	semaphore_up(&conn->sync->sem, 1);
 	conn->sync = NULL;
 	mutex_unlock(&port->lock);
 	object_handle_release(khandle);
-	return ret;
+	return STATUS_SUCCESS;
 }
 
-/** Open an IPC connection to a port.
+/** Create an IPC connection object.
+ * @param port		Port that the connection is for.
+ * @param count		Initial reference count.
+ * @return		Pointer to connection object. */
+static ipc_connection_t *ipc_connection_create(ipc_port_t *port, int count) {
+	object_security_t security;
+	ipc_connection_t *conn;
+	object_acl_t acl;
+
+	/* Create security attributes for the object. Since the object is a
+	 * private object and can't actually be opened anywhere else, we just
+	 * give it an empty ACL and don't ever do any access checks on the
+	 * handle. */
+	object_acl_init(&acl);
+	security.uid = -1;
+	security.gid = -1;
+	security.acl = &acl;
+
+	/* Create a connection structure. */
+	conn = slab_cache_alloc(ipc_connection_cache, MM_SLEEP);
+	object_init(&conn->obj, &connection_object_type, &security, NULL);
+	refcount_set(&conn->count, count);
+	conn->port = port;
+	conn->endpoints[0].conn = conn;
+	conn->endpoints[0].remote = &conn->endpoints[1];
+	conn->endpoints[1].conn = conn;
+	conn->endpoints[1].remote = &conn->endpoints[0];
+	return conn;
+}
+
+/** Open a connection to an already open IPC port.
+ *
+ * Opens a connection to an IPC port that the caller has a handle open to. This
+ * allows, for example, a server to open a connection back to itself.
+ *
+ * @param handle	Handle to port (must have the PORT_RIGHT_LISTEN and
+ *			PORT_RIGHT_CONNECT access rights).
+ * @param connp		Where to store handles to each end of the connection.
+ *
+ * @return		Status code describing result of the operation.
+ */
+status_t kern_port_loopback(handle_t handle, handle_t connp[2]) {
+	object_handle_t *khandle;
+	ipc_connection_t *conn;
+	handle_t kconn[2];
+	ipc_port_t *port;
+	status_t ret;
+	int i;
+
+	if(!connp) {
+		return STATUS_INVALID_ARG;
+	}
+
+	ret = object_handle_lookup(handle, OBJECT_TYPE_PORT, PORT_RIGHT_LISTEN | PORT_RIGHT_CONNECT,
+	                           &khandle);
+	if(ret != STATUS_SUCCESS) {
+		return ret;
+	}
+	port = (ipc_port_t *)khandle->object;
+	mutex_lock(&port->lock);
+
+	/* Create a connection object. */
+	conn = ipc_connection_create(port, 0);
+
+	/* Create handles to each end of the connection. */
+	for(i = 0; i < 2; i++) {
+		refcount_inc(&conn->count);
+
+		ret = object_handle_create(&conn->obj, &conn->endpoints[i], 0, NULL,
+	                                   0, NULL, &kconn[i], &connp[i]);
+		if(ret != STATUS_SUCCESS) {
+			if(refcount_dec(&conn->count)) {
+				object_handle_detach(NULL, kconn[0]);
+			} else {
+				object_destroy(&conn->obj);
+				slab_cache_free(ipc_connection_cache, conn);
+				mutex_unlock(&port->lock);
+				object_handle_release(khandle);
+			}
+			return ret;
+		}
+	}
+
+	list_append(&port->connections, &conn->header);
+	mutex_unlock(&port->lock);
+	object_handle_release(khandle);
+	return STATUS_SUCCESS;
+}
+
+/** Open a connection to an IPC port.
  * @param id		Port ID to connect to.
  * @param handlep	Where to store handle to caller's end of the connection.
  * @return		Status code describing result of the operation. */
-status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
-	object_security_t security;
+status_t kern_connection_open(port_id_t id, handle_t *handlep) {
 	ipc_connect_sync_t sync;
 	ipc_connection_t *conn;
-	object_acl_t acl;
 	ipc_port_t *port;
 	handle_t handle;
 	status_t ret;
-	int i;
 
 	if(!handlep) {
 		return STATUS_INVALID_ARG;
@@ -625,23 +713,8 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	mutex_lock(&port->lock);
 	mutex_unlock(&port_tree_lock);
 
-	/* Create security attributes for the object. Since the object is a
-	 * private object and can't actually be opened anywhere else, we just
-	 * give it an empty ACL and don't do any access checks on the handle. */
-	object_acl_init(&acl);
-	security.uid = -1;
-	security.gid = -1;
-	security.acl = &acl;
-
-	/* Create a connection structure. */
-	conn = slab_cache_alloc(ipc_connection_cache, MM_SLEEP);
-	object_init(&conn->obj, &connection_object_type, &security, NULL);
-	refcount_set(&conn->count, 1);
-	for(i = 0; i < 2; i++) {
-		conn->endpoints[i].conn = conn;
-		conn->endpoints[i].remote = &conn->endpoints[(i + 1) % 2];
-	}
-	conn->port = port;
+	/* Create the connection object. */
+	conn = ipc_connection_create(port, 1);
 
 	/* Fill in the synchronisation structure. */
 	semaphore_init(&sync.sem, "ipc_connect_sem", 0);
@@ -692,7 +765,7 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
 	return STATUS_SUCCESS;
 }
 
-/** Send a message on a connection.
+/** Send a message on an IPC connection.
  *
  * Queues a message at the other end of a connection. Messages are sent
  * asynchronously. This function can block if the recipient's message queue is
@@ -706,7 +779,7 @@ status_t sys_ipc_connection_open(port_id_t id, handle_t *handlep) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_ipc_message_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
+status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf, size_t size) {
 	object_handle_t *khandle = NULL;
 	ipc_endpoint_t *endpoint = NULL;
 	ipc_message_t *message;
@@ -779,25 +852,6 @@ fail:
 	return ret;
 }
 
-/** Send multiple messages on a connection.
- *
- * Queues multiple messages at the other end of a connection. Messages are sent
- * asynchronously. They are queued in the order that they are found in the
- * array. The operation is atomic: the destination will not receive any of the
- * messages until all have been successfully queued, and if a failure occurs,
- * it will receive none of the messages. This function can block if the
- * recipient's message queue is full.
- *
- * @param handle	Handle to connection.
- * @param vec		Array of structures describing messages to send.
- * @param count		Number of messages in array.
- *
- * @return		Status code describing result of the operation.
- */
-status_t sys_ipc_message_sendv(handle_t handle, ipc_message_vector_t *vec, size_t count) {
-	return STATUS_NOT_IMPLEMENTED;
-}
-
 /** Wait until a message arrives.
  * @param endpoint	Endpoint to wait on. Connection should be locked.
  * @param timeout	Timeout.
@@ -857,7 +911,7 @@ static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, i
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_ipc_message_peek(handle_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
+status_t kern_connection_peek(handle_t handle, useconds_t timeout, uint32_t *typep, size_t *sizep) {
 	object_handle_t *khandle;
 	ipc_endpoint_t *endpoint;
 	ipc_message_t *message;
@@ -920,7 +974,7 @@ out:
  *
  * @return		Status code describing result of the operation.
  */
-status_t sys_ipc_message_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
+status_t kern_connection_receive(handle_t handle, useconds_t timeout, uint32_t *typep,
                                  void *buf, size_t size) {
 	ipc_message_t *message = NULL;
 	object_handle_t *khandle;

@@ -60,7 +60,7 @@ Service::~Service() {
 /** Handle a connection on the service's port.
  * @param handle	Handle to the connection.
  * @param info		Information about connecting thread. */
-void Service::HandleConnection(handle_t handle, ipc_client_info_t &info) {
+void Service::HandleConnection(handle_t handle, port_client_t &info) {
 	libkiwi_fatal("Service::HandleConnection: Must be reimplemented for services with a port.");
 }
 
@@ -75,7 +75,7 @@ void Service::_AddPort(const std::string &name, port_id_t id) {
 
 /** Signal handler for port connections. */
 void Service::_HandleConnection() {
-	ipc_client_info_t info;
+	port_client_t info;
 	handle_t handle;
 
 	handle = m_priv->port->Listen(&info);

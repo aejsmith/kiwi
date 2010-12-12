@@ -20,7 +20,6 @@
 
 #include <kernel/ipc.h>
 #include <kernel/object.h>
-#include <kernel/thread.h>
 
 #include <iostream>
 #include <sstream>
@@ -31,13 +30,6 @@
 
 using namespace kiwi;
 using namespace std;
-
-/** Data used by Service::Start() and Service::StartHelper(). */
-struct start_info {
-	port_id_t port;
-	handle_t handle;
-	volatile bool done;
-};
 
 /** Constructor for a service object.
  * @param svcmgr	Service manager the service is for.
@@ -60,6 +52,9 @@ Service::Service(ServiceManager *svcmgr, const char *name, const char *desc, con
 /** Start the service.
  * @return		Whether successful. */
 bool Service::Start() {
+	handle_t handles[2];
+	status_t ret;
+
 	if(m_state == kRunning) {
 		return true;
 	}
@@ -70,33 +65,19 @@ bool Service::Start() {
 	map.push_back(make_pair(1, 1));
 	map.push_back(make_pair(2, 2));
 
-	/* Pass a connection to us as handle 3, which we use to communicate
-	 * with the service. This is a pain to set up, we must connect to
-	 * ourself. FIXME: OH GOD THIS IS AWFUL. */
-	{
-		IPCPort *server = m_svcmgr->GetPort();
-
-		/* Create a thread that will connect to us. */
-		start_info info = { server->GetID(), -1, false };
-		handle_t handle;
-		status_t ret = kern_thread_create("svcinit", NULL, 0, &Service::StartHelper,
-		                                  &info, NULL, THREAD_RIGHT_QUERY, &handle);
-		if(ret != STATUS_SUCCESS) {
-			cerr << "svcmgr: failed to create helper thread (" << ret << ")" << endl;
-			return false;
-		}
-		kern_handle_close(handle);
-
-		/* Wait for the connection. */
-		handle = server->Listen();
-		m_conn = new Connection(handle, m_svcmgr);
-		while(!info.done) {}
-
-		/* Add the connection handle to the port map. */
-		map.push_back(make_pair(info.handle, 3));
+	/* Create the service control connection. */
+	ret = kern_port_loopback(m_svcmgr->GetPort()->GetHandle(), handles);
+	if(ret != STATUS_SUCCESS) {
+		cerr << "svcmgr: failed to create service control connection (" << ret << ")" << endl;
+		return false;
 	}
 
-	/* If the service has a port, pass information about it to it. */
+	m_conn = new Connection(handles[0], m_svcmgr);
+
+	/* Give a handle to this connection as handle 3 in the service. */
+	map.push_back(make_pair(handles[1], 3));
+
+	/* If the service has a port, send information about it to it. */
 	if(m_port) {
 		m_conn->AddPort(m_port->GetName(), m_port->GetID());
 	}
@@ -109,20 +90,14 @@ bool Service::Start() {
 		return false;
 	}
 
+	/* No longer need the client end of the connection. */
+	kern_handle_close(handles[1]);
+
 	if(m_port) {
 		m_port->StopListening();
 	}
 	m_state = kRunning;
 	return true;
-}
-
-/** Helper for starting a service.
- * @param data		Data argument. */
-void Service::StartHelper(void *data) {
-	start_info *info = reinterpret_cast<start_info *>(data);
-	ipc_connection_open(info->port, &info->handle);
-	info->done = true;
-	kern_thread_exit(0);
 }
 
 /** Slot for the process exiting.

@@ -56,7 +56,9 @@ IPCConnection::IPCConnection(handle_t handle) {
  */
 bool IPCConnection::Connect(port_id_t id) {
 	handle_t handle;
-	status_t ret = ipc_connection_open(id, &handle);
+	status_t ret;
+
+	ret = kern_connection_open(id, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -77,11 +79,12 @@ bool IPCConnection::Connect(port_id_t id) {
  * @return		True if succeeded in connecting, false if not.
  */
 bool IPCConnection::Connect(const char *name) {
+	const char *pstr;
 	port_id_t id;
 
 	/* Work out the service manager port ID. The ID of the session's
 	 * service manager (if any) is set in the environment. */
-	const char *pstr = getenv("SVCMGR_PORT");
+	pstr = getenv("SVCMGR_PORT");
 	if(pstr) {
 		id = strtol(pstr, NULL, 10);
 	} else {
@@ -90,10 +93,11 @@ bool IPCConnection::Connect(const char *name) {
 
 	/* Look up the port ID. */
 	try {
+		status_t ret;
+
 		ServerConnection svcmgr;
 		svcmgr.Connect(id);
-
-		status_t ret = svcmgr.LookupPort(name, id);
+		ret = svcmgr.LookupPort(name, id);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			SetError(ret);
 			return false;
@@ -115,7 +119,9 @@ bool IPCConnection::Connect(const char *name) {
  * @param size		Size of data buffer.
  * @return		Whether sending the message succeeded. */
 bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
-	status_t ret = ipc_message_send(m_handle, type, buf, size);
+	status_t ret;
+
+	ret = kern_connection_send(m_handle, type, buf, size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
@@ -137,14 +143,14 @@ bool IPCConnection::Send(uint32_t type, const void *buf, size_t size) {
 bool IPCConnection::Receive(uint32_t &type, char *&data, size_t &size, useconds_t timeout) {
 	status_t ret;
 
-	ret = ipc_message_peek(m_handle, timeout, &type, &size);
+	ret = kern_connection_peek(m_handle, timeout, &type, &size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		SetError(ret);
 		return false;
 	}
 
 	data = new char[size];
-	ret = ipc_message_receive(m_handle, 0, 0, data, size);
+	ret = kern_connection_receive(m_handle, 0, 0, data, size);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		delete[] data;
 		SetError(ret);
