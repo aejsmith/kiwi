@@ -350,9 +350,13 @@ status_t rtld_image_load(const char *path, rtld_image_t *req, int type, void **e
 				goto fail;
 			}
 
-			/* Set the module ID. When loading the executable, this
-			 * will return 1. */
-			image->tls_module_id = tls_alloc_module_id();
+			/* Set the module ID. For the main executable, this
+			 * must be APPLICATION_TLS_ID. */
+			if(ehdr.e_type == ELF_ET_EXEC) {
+				image->tls_module_id = APPLICATION_TLS_ID;
+			} else {
+				image->tls_module_id = tls_alloc_module_id();
+			}
 
 			/* Record information about the initial TLS image. */
 			image->tls_image = (void *)((elf_addr_t)image->load_base + phdrs[i].p_vaddr);
@@ -538,7 +542,6 @@ void rtld_image_unload(rtld_image_t *image) {
  * @return		Entry point for the program. */
 void *rtld_init(process_args_t *args, bool dry_run) {
 	rtld_image_t *image;
-	void (*func)(void);
 	status_t ret;
 	void *entry;
 
@@ -569,24 +572,6 @@ void *rtld_init(process_args_t *args, bool dry_run) {
 			} else {
 				printf("  %s (%p)\n", image->name, image->load_base);
 			}
-		}
-	}
-
-	/* Exit now if doing a dry run. */
-	if(dry_run) {
-		kern_process_exit(0);
-	}
-
-	/* Set up TLS for the current thread. */
-	tls_init();
-
-	/* Run INIT functions for loaded images. */
-	LIST_FOREACH(&loaded_images, iter) {
-		image = list_entry(iter, rtld_image_t, header);
-		if(image->dynamic[ELF_DT_INIT]) {
-			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
-			dprintf("rtld: %s: calling INIT function %p...\n", image->name, func);
-			func();
 		}
 	}
 

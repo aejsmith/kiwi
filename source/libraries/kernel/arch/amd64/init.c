@@ -28,15 +28,21 @@ void libkernel_arch_init(process_args_t *args, rtld_image_t *image) {
 	elf_addr_t *addr;
 	size_t count, i;
 
-	/* First perform RELA relocations. */
 	count = image->dynamic[ELF_DT_RELSZ_TYPE] / sizeof(elf_rela_t);
 	relocs = (elf_rela_t *)image->dynamic[ELF_DT_REL_TYPE];
 	for(i = 0; i < count; i++) {
-		if(ELF64_R_TYPE(relocs[i].r_info) != ELF_R_X86_64_RELATIVE) {
-			continue;
-		}
-
 		addr = (elf_addr_t *)(image->load_base + relocs[i].r_offset);
-		*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
+
+		switch(ELF64_R_TYPE(relocs[i].r_info)) {
+		case ELF_R_X86_64_RELATIVE:
+			*addr = (elf_addr_t)image->load_base + relocs[i].r_addend;
+			break;
+		case ELF_R_X86_64_DTPMOD64:
+			*addr = LIBKERNEL_TLS_ID;
+			break;
+		default:
+			kern_process_exit(STATUS_MALFORMED_IMAGE);
+			break;
+		}
 	}
 }

@@ -300,6 +300,15 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 			}
 			load_count++;
 			break;
+		case ELF_PT_TLS:
+			/* This is handled internally by libkernel, so we allow
+			 * it for ELF_ET_DYN. */
+			if(binary->ehdr.e_type != ELF_ET_DYN) {
+				kprintf(LOG_WARN, "elf: unsupported TLS segment\n");
+				ret = STATUS_NOT_SUPPORTED;
+				goto fail;
+			}
+			break;
 		case ELF_PT_DYNAMIC:
 		case ELF_PT_PHDR:
 		case ELF_PT_NOTE:
@@ -308,18 +317,20 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 		case ELF_PT_INTERP:
 			/* This code is used to load the kernel library, which
 			 * must not have an interpreter. */
-			dprintf("elf: cannot handle interpreter!\n");
-			ret = STATUS_MALFORMED_IMAGE;
+			kprintf(LOG_WARN, "elf: unexpected interpreter\n");
+			ret = STATUS_NOT_SUPPORTED;
 			goto fail;
 		default:
-			dprintf("elf: unknown program header type %u, ignoring\n", binary->phdrs[i].p_type);
-			break;
+			kprintf(LOG_WARN, "elf: unhandled program header type %u\n",
+			        binary->phdrs[i].p_type);
+			ret = STATUS_NOT_SUPPORTED;
+			goto fail;
 		}
 	}
 
 	/* Check if we actually loaded anything. */
 	if(!load_count) {
-		dprintf("elf: binary did not have any loadable program headers\n");
+		kprintf(LOG_WARN, "elf: binary did not have any loadable program headers\n");
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	}

@@ -125,6 +125,10 @@ static void do_printf(const char *format, va_list args) {
 				str = va_arg(args, const char *);
 				printf_print_string(str);
 				break;
+			case 'c':
+				dec = va_arg(args, int);
+				printf_print_char(dec);
+				break;
 			case 'd':
 				dec = va_arg(args, int);
 				if(dec < 0) {

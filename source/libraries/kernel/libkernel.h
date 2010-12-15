@@ -105,6 +105,11 @@ typedef struct libkernel_heap_ops {
 	void (*free)(void *);
 } libkernel_heap_ops_t;
 
+/** Pre-defined TLS module IDs. */
+#define APPLICATION_TLS_ID	1	/**< Application always has module ID 1. */
+#define LIBKERNEL_TLS_ID	2	/**< If libkernel has TLS, this will be its ID. */
+#define DYNAMIC_TLS_START	2	/**< Start of dynamically allocated IDs. */
+
 extern list_t loaded_images;
 extern rtld_image_t libkernel_image;
 extern rtld_image_t *application_image;

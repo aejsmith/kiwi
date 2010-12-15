@@ -39,7 +39,7 @@
 /** Next module ID.
  * @note		Protected by the RTLD lock - this is only ever called
  *			from the RTLD which serialises image loading. */
-static size_t next_module_id = 1;
+static size_t next_module_id = DYNAMIC_TLS_START;
 
 /** Statically allocated DTV size. */
 static ptr_t static_dtv_size = 0;
@@ -102,7 +102,9 @@ static size_t tls_initial_block_size(void) {
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
 	for(i = 1; i < static_dtv_size; i++) {
 		image = tls_module_lookup(i);
-		size = ROUND_UP(size + image->tls_memsz, image->tls_align);
+		if(image) {
+			size = ROUND_UP(size + image->tls_memsz, image->tls_align);
+		}
 	}
 
 	/* Add on the TCB size. */
@@ -120,6 +122,9 @@ static tls_tcb_t *tls_initial_block_init(ptr_t base, ptr_t *dtv) {
 
 	for(i = (static_dtv_size - 1); i >= 1; i--) {
 		image = tls_module_lookup(i);
+		if(!image) {
+			continue;
+		}
 
 		/* Handle alignment requirements. */
 		if(image->tls_align) {
@@ -162,7 +167,9 @@ ptrdiff_t tls_tp_offset(rtld_image_t *image) {
 	 * tlsoffset(m+1) = round(tlsoffset(m) + tlssize(m+1), align(m+1)) */
 	for(i = 1; i < image->tls_module_id; i++) {
 		exist = tls_module_lookup(i);
-		offset = ROUND_UP(offset + exist->tls_memsz, exist->tls_align);
+		if(exist) {
+			offset = ROUND_UP(offset + exist->tls_memsz, exist->tls_align);
+		}
 	}
 	offset = ROUND_UP(offset + image->tls_memsz, image->tls_align);
 

@@ -21,6 +21,7 @@
 #include <kernel/device.h>
 #include <kernel/object.h>
 
+#include <elf.h>
 #include <string.h>
 
 #include "libkernel.h"
@@ -84,8 +85,31 @@ void libkernel_init(process_args_t *args) {
 void libkernel_init_stage2(process_args_t *args) {
 	void (*entry)(process_args_t *);
 	bool dry_run = false;
+	rtld_image_t *image;
+	void (*func)(void);
+	elf_phdr_t *phdrs;
+	elf_ehdr_t *ehdr;
 	handle_t handle;
+	status_t ret;
 	int i;
+
+	/* Find out where our TLS segment is loaded to. */
+	ehdr = (elf_ehdr_t *)args->load_base;
+	phdrs = (elf_phdr_t *)((elf_addr_t)args->load_base + ehdr->e_phoff);
+	for(i = 0; i < (int)ehdr->e_phnum; i++) {
+		if(phdrs[i].p_type == ELF_PT_TLS) {
+			if(!phdrs[i].p_memsz) {
+				break;
+			}
+
+			libkernel_image.tls_module_id = tls_alloc_module_id();
+			libkernel_image.tls_image = (void *)((elf_addr_t)args->load_base + phdrs[i].p_vaddr);
+			libkernel_image.tls_filesz = phdrs[i].p_filesz;
+			libkernel_image.tls_memsz = phdrs[i].p_memsz;
+			libkernel_image.tls_align = phdrs[i].p_align;
+			break;
+		}
+	}
 
 	/* If we're the first process, open handles to the kernel console. */
 	if(kern_process_id(-1) == 1) {
@@ -106,10 +130,33 @@ void libkernel_init_stage2(process_args_t *args) {
 
 	/* Initialise the runtime loader and load the program. */
 	entry = (void (*)(process_args_t *))rtld_init(args, dry_run);
+	if(dry_run) {
+		kern_process_exit(STATUS_SUCCESS);
+	}
 
-	/* Signal to the kernel that we've completed loading and call the entry
-	 * point for the program. */
+	/* Set up TLS for the current thread. */
+	if(libkernel_image.tls_module_id) {
+		libkernel_image.tls_offset = tls_tp_offset(&libkernel_image);
+	}
+	ret = tls_init();
+	if(ret != STATUS_SUCCESS) {
+		kern_process_exit(ret);
+	}
+
+	/* Signal to the kernel that we've completed loading. */
 	kern_process_control(-1, PROCESS_LOADED, NULL, NULL);
+
+	/* Run INIT functions for loaded images. */
+	LIST_FOREACH(&loaded_images, iter) {
+		image = list_entry(iter, rtld_image_t, header);
+		if(image->dynamic[ELF_DT_INIT]) {
+			func = (void (*)(void))(image->load_base + image->dynamic[ELF_DT_INIT]);
+			dprintf("rtld: %s: calling INIT function %p...\n", image->name, func);
+			func();
+		}
+	}
+
+	/* Call the entry point for the program. */
 	dprintf("libkernel: beginning program execution at %p...\n", entry);
 	entry(args);
 	dprintf("libkernel: program entry point returned\n");
