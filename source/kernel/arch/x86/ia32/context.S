@@ -61,22 +61,7 @@ FUNCTION_END(context_save)
  */
 FUNCTION_START(context_restore)
 	movl	4(%esp), %edx
-
-	/* Restore new callee-save registers. */
-	movl	CONTEXT_OFF_SI(%edx), %esi
-	movl	CONTEXT_OFF_DI(%edx), %edi
-	movl	CONTEXT_OFF_BX(%edx), %ebx
-	movl	CONTEXT_OFF_BP(%edx), %ebp
-
-	/* Restore new instruction/stack pointers. */
-	movl	CONTEXT_OFF_SP(%edx), %esp
-	movl	CONTEXT_OFF_IP(%edx), %eax
-	movl	%eax, (%esp)
-
-	/* Cause context_save() to return true. */
-	xorl	%eax, %eax
-	inc	%eax
-	ret
+	jmp	__context_restore_frame
 FUNCTION_END(context_restore)
 
 /** Helper for context_restore_frame(). Entered with the context pointer in edx. */

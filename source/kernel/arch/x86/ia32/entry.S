@@ -21,14 +21,14 @@
 #include <arch/x86/asm.h>
 #include <arch/x86/cpu.h>
 #include <arch/x86/descriptor.h>
+#include <arch/intr.h>
 #include <arch/memory.h>
 
 #include <status.h>
 
-/** Push registers onto the stack. */
-.macro PUSH_REGS
+/** Push registers onto the stack and set up a sane state. */
+.macro ENTRY_COMMON
 	pusha
-
 	push	%ds
 	andl	$0xFFFF, (%esp)
 	push	%es
@@ -37,16 +37,30 @@
 	andl	$0xFFFF, (%esp)
 	push	%gs
 	andl	$0xFFFF, (%esp)
+
+	/* Set sane segment descriptors. */
+	mov	$SEGMENT_K_DS, %ax
+	mov	%ax, %ds
+	mov	%ax, %es
+	mov	%ax, %fs
+	mov	$SEGMENT_K_GS, %ax
+	mov	%ax, %gs
+
+	/* Clear direction flag. */
+	cld
 .endm
 
 /** Pop registers from the stack. */
-.macro POP_REGS
+.macro RETURN_COMMON
 	pop	%gs
 	pop	%fs
 	pop	%es
 	pop	%ds
-
 	popa
+
+	/* Get rid of the error code and interrupt number, and return. */
+	addl	$8, %esp
+	iret
 .endm
 
 /** Macro to define an ISR.
@@ -126,131 +140,87 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
-	/* Create the interrupt frame structure on the stack. */
-	PUSH_REGS
+	/* Save previous state and set up a sane state. */
+	ENTRY_COMMON
 
-	/* Set sane segment descriptors. */
-	mov	$SEGMENT_K_DS, %ax
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %fs
-	mov	$SEGMENT_K_GS, %ax
-	mov	%ax, %gs
-
-	/* Clear direction flag. */
-	cld
-
-	/* Pass a pointer to the structure we made to the interrupt handler. */
+	/* Pass a pointer to the frame we made to the interrupt handler. */
 	push	%esp
 	call	intr_handler
-	addl	$4, %esp
+	add	$4, %esp
 
-	/* Restore the saved registers. */
-	POP_REGS
-
-	/* Get rid of the error code and interrupt number. */
-	addl	$8, %esp
-	iret
+	/* Restore the saved state and return. */
+	RETURN_COMMON
 FUNCTION_END(isr_common)
 
 /** System call interrupt entry point. */
 FUNCTION_START(syscall_entry)
-	/* Save current segment descriptors. */
-	push	%ds
-	andl	$0xFFFF, (%esp)
-	push	%es
-	andl	$0xFFFF, (%esp)
-	push	%fs
-	andl	$0xFFFF, (%esp)
-	push	%gs
-	andl	$0xFFFF, (%esp)
+	/* Push an interrupt number and error code. */
+	push	$0
+	push	$SYSCALL_INT_NO
 
-	/* Set sane segment descriptors. */
-	push	%eax
-	mov	$SEGMENT_K_DS, %ax
-	mov	%ax, %ds
-	mov	%ax, %es
-	mov	%ax, %fs
-	mov	$SEGMENT_K_GS, %ax
-	mov	%ax, %gs
-	pop	%eax
-
-	/* Clear direction flag. */
-	cld
-
-	/* Save the arguments while we do kernel entry work and get the system
-	 * call details. */
-	push	%ebp
-	push	%ebx
-	push	%esi
-	push	%edi
-	push	%ecx
-	push	%edx
-	push	%eax
+	/* Save previous state and set up a sane state. */
+	ENTRY_COMMON
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
 	sti
 
 	/* Get back the call number and check whether it is valid. */
-	pop	%edi
+	movl	IFRAME_OFF_AX(%esp), %edi
 	cmp	syscall_table_size, %edi
 	jae	.Linval
 
 	/* Check the argument count. If there are more than 6 arguments, we
 	 * must copy from the stack. */
 	shl	$3, %edi
-	movl	syscall_table + 4(,%edi,1), %esi
-	cmpl	$6, %esi
+	movl	syscall_table + 4(,%edi,1), %ecx
+	cmpl	$6, %ecx
 	ja	.Lstackargs
 
-	/* Perform the call. */
+	/* Restore the arguments passed in registers and perform the call. */
+	sub	$24, %esp
+	movl	24 + IFRAME_OFF_DX(%esp), %eax
+	movl	%eax, 0(%esp)
+	movl	24 + IFRAME_OFF_CX(%esp), %eax
+	movl	%eax, 4(%esp)
+	movl	24 + IFRAME_OFF_DI(%esp), %eax
+	movl	%eax, 8(%esp)
+	movl	24 + IFRAME_OFF_SI(%esp), %eax
+	movl	%eax, 12(%esp)
+	movl	24 + IFRAME_OFF_BX(%esp), %eax
+	movl	%eax, 16(%esp)
+	movl	24 + IFRAME_OFF_BP(%esp), %eax
+	movl	%eax, 20(%esp)
 	call	*syscall_table(,%edi,1)
-	addl	$8, %esp
+	add	$24, %esp
 .Lreturn:
+	/* Save the return value of the system call. */
+	movl	%eax, IFRAME_OFF_AX(%esp)
+
 	/* Disable interrupts. */
 	cli
 
-	/* At this point the stack pointer should point to the callee-save
-	 * registers. Restore them. */
-	pop	%edi
-	pop	%esi
-	pop	%ebx
-	pop	%ebp
-
-	/* Perform kernel exit work. Preserve the system call's return value. */
-	push	%eax
+	/* Perform kernel exit work. This requires an interrupt frame for
+	 * signal delivery. */
+	//push	%esp
 	call	thread_at_kernel_exit
-	pop	%eax
+	//add	$4, %esp
 
-	/* Clear all non-callee-save registers as we do not want to leak values
-	 * used in the kernel to userspace.  */
-	xorl	%edx, %edx
-	xorl	%ecx, %ecx
-
-	/* Restore segment descriptors. */
-	pop	%gs
-	pop	%fs
-	pop	%es
-	pop	%ds
-
-	/* Return to user-mode. */
-	iret
+	/* Restore the saved state and return. */
+	RETURN_COMMON
 .Lstackargs:
-	/* All registers are passed on the stack. Get rid of the two registers
-	 * we won't need to restore. */
-	addl	$8, %esp
-
-	/* Work out how many bytes to copy and save the current stack pointer.
-	 * EDI = table offset, ESI = argument count. */
-	shl	$2, %esi
+	/* Work out how many bytes to copy and reserve space on the stack.
+	 *  EDI = table offset, ECX = argument count, EBX = saved SP
+	 * EDI and EBX are callee-save registers, and so will not be clobbered
+	 * by any called functions. */
+	shl	$2, %ecx
 	movl	%esp, %ebx
-	sub	%esi, %esp
+	sub	%ecx, %esp
 
 	/* Copy the arguments. The source is the userspace stack pointer + 4. */
 	movl	%esp, %edx
-	push	%esi
-	movl	44(%ebx), %eax
+	push	%ecx
+	movl	IFRAME_OFF_SP(%ebx), %eax
 	addl	$4, %eax
 	push	%eax
 	push	%edx
@@ -271,7 +241,6 @@ FUNCTION_START(syscall_entry)
 	jmp	.Lreturn
 .Linval:
 	movl	$STATUS_INVALID_SYSCALL, %eax
-	addl	$8, %esp
 	jmp	.Lreturn
 FUNCTION_END(syscall_entry)
 

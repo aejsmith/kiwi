@@ -21,8 +21,6 @@
 #ifndef __ARCH_INTR_H
 #define __ARCH_INTR_H
 
-#include <types.h>
-
 /** Definitions for fault numbers. */
 #define FAULT_DIVIDE		0	/**< Divide Error. */
 #define FAULT_DEBUG		1	/**< Debug. */
@@ -49,7 +47,59 @@
 #define IRQ_BASE		32	/**< IRQ number base. */
 
 /** System call interrupt number. */
-#define SYSCALL_INT_NO		0x80
+#ifdef __i386__
+# define SYSCALL_INT_NO		0x80
+#endif
+
+/** Interrupt frame structure offsets. */
+#ifdef __x86_64__
+# define IFRAME_OFF_R15		0x0
+# define IFRAME_OFF_R14		0x8
+# define IFRAME_OFF_R13		0x10
+# define IFRAME_OFF_R12		0x18
+# define IFRAME_OFF_R11		0x20
+# define IFRAME_OFF_R10		0x28
+# define IFRAME_OFF_R9		0x30
+# define IFRAME_OFF_R8		0x38
+# define IFRAME_OFF_BP		0x40
+# define IFRAME_OFF_SI		0x48
+# define IFRAME_OFF_DI		0x50
+# define IFRAME_OFF_DX		0x58
+# define IFRAME_OFF_CX		0x60
+# define IFRAME_OFF_BX		0x68
+# define IFRAME_OFF_AX		0x70
+# define IFRAME_OFF_INT_NO	0x78
+# define IFRAME_OFF_ERR_CODE	0x80
+# define IFRAME_OFF_IP		0x88
+# define IFRAME_OFF_CS		0x90
+# define IFRAME_OFF_FLAGS	0x98
+# define IFRAME_OFF_SP		0xa0
+# define IFRAME_OFF_SS		0xa8
+#else
+# define IFRAME_OFF_GS		0x0
+# define IFRAME_OFF_FS		0x4
+# define IFRAME_OFF_ES		0x8
+# define IFRAME_OFF_DS		0xc
+# define IFRAME_OFF_DI		0x10
+# define IFRAME_OFF_SI		0x14
+# define IFRAME_OFF_BP		0x18
+# define IFRAME_OFF_KSP		0x1c
+# define IFRAME_OFF_BX		0x20
+# define IFRAME_OFF_DX		0x24
+# define IFRAME_OFF_CX		0x28
+# define IFRAME_OFF_AX		0x2c
+# define IFRAME_OFF_INT_NO	0x30
+# define IFRAME_OFF_ERR_CODE	0x34
+# define IFRAME_OFF_IP		0x38
+# define IFRAME_OFF_CS		0x3c
+# define IFRAME_OFF_FLAGS	0x40
+# define IFRAME_OFF_SP		0x44
+# define IFRAME_OFF_SS		0x48
+#endif
+
+#ifndef __ASM__
+
+#include <types.h>
 
 /** Structure defining an interrupt stack frame. */
 typedef struct intr_frame {
@@ -144,4 +194,5 @@ extern void intr_register(unative_t num, intr_handler_t handler);
 extern void intr_remove(unative_t num);
 extern void intr_init(void);
 
+#endif /* __ASM__ */
 #endif /* __ARCH_INTR_H */

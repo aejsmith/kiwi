@@ -21,6 +21,7 @@
 #include <arch/x86/asm.h>
 #include <arch/x86/cpu.h>
 #include <arch/x86/descriptor.h>
+#include <arch/intr.h>
 #include <arch/memory.h>
 
 #include <status.h>
@@ -171,116 +172,117 @@ FUNCTION_START(syscall_entry)
 
 	/* Get back the userspace stack pointer from the temporary scratch
 	 * space and put it onto the kernel stack. */
+	push	$(SEGMENT_U_DS | 3)
 	push	%gs:16
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
-	 * for us (RCX = return IP, R11 = original RFLAGS). */
-	push	%rcx
+	 * for us (R11 = original RFLAGS, RCX = return IP) and the rest of the
+	 * interrupt frame. */
 	push	%r11
-
-	/* Save the arguments while we do kernel entry work and get the system
-	 * call details. */
-	push	%r9
-	push	%r8
-	push	%r10
-	push	%rdx
-	push	%rsi
-	push	%rdi
-	push	%rax
+	push	$(SEGMENT_U_CS | 3)
+	push	%rcx
+	push	$0
+	push	$0
+	PUSH_REGS
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
 	sti
 
 	/* Get back the call number and check whether it is valid. */
-	pop	%rax
-	cmp	syscall_table_size, %rax
+	movq	IFRAME_OFF_AX(%rsp), %rbx
+	cmp	syscall_table_size, %rbx
 	jae	.Linval
 
 	/* Check the argument count. If there are more than 6 arguments, we
 	 * must copy from the stack. */
-	shl	$4, %rax
-	movq	syscall_table + 8(,%rax,1), %rdx
+	shl	$4, %rbx
+	movq	syscall_table + 8(,%rbx,1), %rdx
 	cmpq	$6, %rdx
 	ja	.Lstackargs
 
-	/* Restore arguments and perform the call. */
-	pop	%rdi
-	pop	%rsi
-	pop	%rdx
-	pop	%rcx
-	pop	%r8
-	pop	%r9
-	call	*syscall_table(,%rax,1)
+	/* Restore arguments and perform the call. The argument that should be
+	 * in RCX is passed in R10, as RCX is used by SYSCALL/SYSRET as the
+	 * return IP. */
+	movq	IFRAME_OFF_DI(%rsp), %rdi
+	movq	IFRAME_OFF_SI(%rsp), %rsi
+	movq	IFRAME_OFF_DX(%rsp), %rdx
+	movq	IFRAME_OFF_R10(%rsp), %rcx
+	movq	IFRAME_OFF_R8(%rsp), %r8
+	movq	IFRAME_OFF_R9(%rsp), %r9
+	call	*syscall_table(,%rbx,1)
 .Lreturn:
+	/* Save the return value of the system call. */
+	movq	%rax, IFRAME_OFF_AX(%rsp)
+
 	/* Clear interrupts. */
 	cli
 
-	/* Perform kernel exit work. Preserve the system call's return value. */
-	push	%rax
+	/* Perform kernel exit work. This requires an interrupt frame for
+	 * signal delivery. If a signal is to be delivered, return via IRET as
+	 * we need RCX to be preserved. */
+	//movq	%rsp, %rdi
 	call	thread_at_kernel_exit
-	pop	%rax
+	//test	%rax, %rax
+	//jnz	.Liret
 
-	/* Clear all non-callee-save registers as we do not want to leak values
-	 * used in the kernel to userspace.  */
-	xorq	%rdi, %rdi
-	xorq	%rsi, %rsi
-	xorq	%rdx, %rdx
-	xorq	%r10, %r10
-	xorq	%r8, %r8
-	xorq	%r9, %r9
-
-	/* Restore RFLAGS and RIP for SYSRET to use, as well as the stack
-	 * pointer. */
-	pop	%r11
+	/* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace
+	 * stack pointer. */
+	POP_REGS
+	add	$16, %rsp
 	pop	%rcx
+	add	$8, %rsp
+	pop	%r11
 	pop	%rsp
 
 	/* Restore previous GS base and return to user-mode. */
 	swapgs
 	sysretq
 .Lstackargs:
-	/* Work out how many bytes to copy, save the call table offset and
-	 * current stack pointer, then work out where to copy to. */
+	/* Work out how many bytes to copy and reserve space on the stack.
+	 *  RDX = argument count, RBX = call table offset, R12 = saved SP.
+	 * RDX is in the correct location to pass to memcpy_from_user() after
+	 * modifying, RBX and R12 are callee-save so they won't be clobbered by
+	 * any called functions. */
 	sub	$6, %rdx
 	shl	$3, %rdx
-	push	%rax
-	push	%rbx
-	movq	%rsp, %rbx
+	movq	%rsp, %r12
 	sub	%rdx, %rsp
 
 	/* Copy the arguments. The source is the userspace stack pointer + 8. */
 	movq	%rsp, %rdi
-	movq	80(%rbx), %rsi
+	movq	IFRAME_OFF_SP(%r12), %rsi
 	add	$8, %rsi
 	call	memcpy_from_user
 	cmp	$STATUS_SUCCESS, %eax
 	jne	.Lcpyfail
 
 	/* Restore the arguments passed in registers and perform the call. */
-	movq	16(%rbx), %rdi
-	movq	24(%rbx), %rsi
-	movq	32(%rbx), %rdx
-	movq	40(%rbx), %rcx
-	movq	48(%rbx), %r8
-	movq	56(%rbx), %r9
-	movq	8(%rbx), %rax
-	call	*syscall_table(,%rax,1)
+	movq	IFRAME_OFF_DI(%r12), %rdi
+	movq	IFRAME_OFF_SI(%r12), %rsi
+	movq	IFRAME_OFF_DX(%r12), %rdx
+	movq	IFRAME_OFF_R10(%r12), %rcx
+	movq	IFRAME_OFF_R8(%r12), %r8
+	movq	IFRAME_OFF_R9(%r12), %r9
+	call	*syscall_table(,%rbx,1)
 
-	/* Restore stack pointer and old value of RBX then return. */
-	movq	%rbx, %rsp
-	pop	%rbx
-	add	$56, %rsp
+	/* Restore stack pointer then return. */
+	movq	%r12, %rsp
 	jmp	.Lreturn
+.Liret:
+	/* Restore the registers, get rid of interrupt/error code. */
+	POP_REGS
+	addq	$16, %rsp
+
+	/* Return to userspace. */
+	swapgs
+	iretq
 .Lcpyfail:
 	movq	$STATUS_INVALID_ADDR, %rax
-	movq	%rbx, %rsp
-	pop	%rbx
-	add	$56, %rsp
+	movq	%r12, %rsp
 	jmp	.Lreturn
 .Linval:
 	movq	$STATUS_INVALID_SYSCALL, %rax
-	add	$48, %rsp
 	jmp	.Lreturn
 FUNCTION_END(syscall_entry)
 

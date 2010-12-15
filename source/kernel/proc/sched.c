@@ -439,7 +439,7 @@ void sched_internal(bool state) {
 
 #if SCHED_OVERKILL_DEBUG
 	kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
-		curr_thread->id, curr_thread->name, curr_thread->owner->id, curr_cpu->id);
+		curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
 #endif
 
 	/* Set off the timer if necessary. */
@@ -456,7 +456,7 @@ void sched_internal(bool state) {
 		/* Switch the address space. If the new process' address space
 		 * is set to NULL then vm_aspace_switch() will just switch to
 		 * the kernel address space. */
-		vm_aspace_switch(curr_thread->owner->aspace);
+		vm_aspace_switch(curr_proc->aspace);
 
 		/* Save old FPU state if necessary, and disable the FPU. It
 		 * will be re-enabled if required. */

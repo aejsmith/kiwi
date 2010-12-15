@@ -363,8 +363,7 @@ void thread_at_kernel_exit(void) {
  * @note		Does not return. */
 void thread_exit(void) {
 	if(curr_thread->ustack_size) {
-		vm_unmap(curr_thread->owner->aspace, curr_thread->ustack,
-		         curr_thread->ustack_size);
+		vm_unmap(curr_proc->aspace, curr_thread->ustack, curr_thread->ustack_size);
 	}
 
 	curr_thread->state = THREAD_DEAD;

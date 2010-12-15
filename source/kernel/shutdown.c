@@ -100,7 +100,7 @@ void system_shutdown(int action) {
 		thread_run(thread);
 	}
 
-	if(curr_thread->owner != kernel_proc) {
+	if(curr_proc != kernel_proc) {
 		/* The process shutdown code will interrupt us when it wants to
 		 * kill this thread. */
 		waitq_sleep(&shutdown_wait, -1, SYNC_INTERRUPTIBLE);
