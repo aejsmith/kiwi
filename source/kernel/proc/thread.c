@@ -263,29 +263,28 @@ void thread_unwire(thread_t *thread) {
 	}
 }
 
-/** Interrupt a sleeping thread.
+/** Interrupt a thread.
  *
- * Causes a sleeping thread to be woken and to return an error from the sleep
- * call if it is interruptible.
+ * If the specified thread is in interruptible sleep, causes it to be woken and
+ * to return an error from the sleep call.
  *
  * @param thread	Thread to interrupt.
  *
  * @return		Whether the thread was interrupted.
  */
 bool thread_interrupt(thread_t *thread) {
+	bool ret = false;
 	waitq_t *queue;
-	bool ret;
 
 	spinlock_lock(&thread->lock);
 
-	assert(thread->state == THREAD_SLEEPING);
-
-	if((ret = thread->interruptible)) {
+	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
 		thread->context = thread->sleep_context;
 		queue = thread->waitq;
 		spinlock_lock(&queue->lock);
 		thread_wake(thread);
 		spinlock_unlock(&queue->lock);
+		ret = true;
 	}
 
 	spinlock_unlock(&thread->lock);
