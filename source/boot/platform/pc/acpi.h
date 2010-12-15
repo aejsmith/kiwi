@@ -92,7 +92,7 @@ typedef struct acpi_madt {
 typedef struct acpi_madt_lapic {
 	uint8_t type;				/**< APIC type (0). */
 	uint8_t length;				/**< Structure length. */
-	uint8_t processor_id;			/**< APCI Processor ID. */
+	uint8_t processor_id;			/**< ACPI Processor ID. */
 	uint8_t lapic_id;			/**< Processor's LAPIC ID. */
 	uint32_t flags;				/**< LAPIC flags. */
 } __packed acpi_madt_lapic_t;
