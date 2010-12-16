@@ -25,6 +25,8 @@
 
 #include <types.h>
 
+extern status_t validate_user_address(void *dest, size_t size);
+
 extern status_t memcpy_from_user(void *dest, const void *src, size_t count);
 extern status_t memcpy_to_user(void *dest, const void *src, size_t count);
 extern status_t memset_user(void *dest, int val, size_t count);
