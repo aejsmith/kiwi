@@ -21,26 +21,25 @@
 #ifndef __ARCH_INTR_H
 #define __ARCH_INTR_H
 
-/** Definitions for fault numbers. */
-#define FAULT_DIVIDE		0	/**< Divide Error. */
-#define FAULT_DEBUG		1	/**< Debug. */
-#define FAULT_NMI		2	/**< Non-Maskable Interrupt. */
-#define FAULT_BREAKPOINT	3	/**< Breakpoint. */
-#define FAULT_OVERFLOW		4	/**< Overflow. */
-#define FAULT_BOUND		5	/**< BOUND Range Exceeded. */
-#define FAULT_INVALID_OPCODE	6	/**< Invalid Opcode. */
-#define FAULT_DEVICE_NOT_AVAIL	7	/**< Device Not Available. */
-#define FAULT_DOUBLE		8	/**< Double Fault. */
-#define FAULT_COPROC_OVERRUN	9	/**< Coprocessor Segment Overrun. */
-#define FAULT_INVALID_TSS	10	/**< Invalid TSS. */
-#define FAULT_SEGMENT_NOT_PRES	11	/**< Segment Not Present. */
-#define FAULT_STACK		12	/**< Stack Fault. */
-#define FAULT_GP		13	/**< General Protection Fault. */
-#define FAULT_PAGE		14	/**< Page Fault. */
-#define FAULT_FPU		16	/**< x87 FPU Floating-Point Error. */
-#define FAULT_ALIGNMENT		17	/**< Alignment Check. */
-#define FAULT_MCE		18	/**< Machine Check. */
-#define FAULT_SIMD		19	/**< SIMD Floating-Point. */
+/** Definitions for hardware exception numbers. */
+#define X86_EXCEPT_DE		0	/**< Divide Error. */
+#define X86_EXCEPT_DB		1	/**< Debug. */
+#define X86_EXCEPT_NMI		2	/**< Non-Maskable Interrupt. */
+#define X86_EXCEPT_BP		3	/**< Breakpoint. */
+#define X86_EXCEPT_OF		4	/**< Overflow. */
+#define X86_EXCEPT_BR		5	/**< BOUND Range Exceeded. */
+#define X86_EXCEPT_UD		6	/**< Invalid Opcode. */
+#define X86_EXCEPT_NM		7	/**< Device Not Available. */
+#define X86_EXCEPT_DF		8	/**< Double Fault. */
+#define X86_EXCEPT_TS		10	/**< Invalid TSS. */
+#define X86_EXCEPT_NP		11	/**< Segment Not Present. */
+#define X86_EXCEPT_SS		12	/**< Stack Fault. */
+#define X86_EXCEPT_GP		13	/**< General Protection Fault. */
+#define X86_EXCEPT_PF		14	/**< Page Fault. */
+#define X86_EXCEPT_MF		16	/**< x87 FPU Floating-Point Error. */
+#define X86_EXCEPT_AC		17	/**< Alignment Check. */
+#define X86_EXCEPT_MC		18	/**< Machine Check. */
+#define X86_EXCEPT_XM		19	/**< SIMD Floating-Point. */
 
 /** Various definitions. */
 #define IRQ_COUNT		16	/**< Total number of IRQs. */
@@ -119,13 +118,6 @@ typedef struct intr_frame {
 	unative_t cx;			/**< RCX. */
 	unative_t bx;			/**< RBX. */
 	unative_t ax;			/**< RAX. */
-	unative_t int_no;		/**< Interrupt number. */
-	unative_t err_code;		/**< Error code (if applicable). */
-	unative_t ip;			/**< RIP. */
-	unative_t cs;			/**< CS. */
-	unative_t flags;		/**< RFLAGS. */
-	unative_t sp;			/**< RSP. */
-	unative_t ss;			/**< SS. */
 #else
 	unative_t gs;			/**< GS. */
 	unative_t fs;			/**< FS. */
@@ -139,14 +131,14 @@ typedef struct intr_frame {
 	unative_t dx;			/**< EDX. */
 	unative_t cx;			/**< ECX. */
 	unative_t ax;			/**< EAX. */
+#endif
 	unative_t int_no;		/**< Interrupt number. */
 	unative_t err_code;		/**< Error code (if applicable). */
-	unative_t ip;			/**< EIP. */
+	unative_t ip;			/**< IP. */
 	unative_t cs;			/**< CS. */
-	unative_t flags;		/**< EFLAGS. */
-	unative_t sp;			/**< ESP. */
+	unative_t flags;		/**< FLAGS. */
+	unative_t sp;			/**< SP. */
 	unative_t ss;			/**< SS. */
-#endif
 } __packed intr_frame_t;
 
 /** Enable interrupts.

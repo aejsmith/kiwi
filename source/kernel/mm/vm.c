@@ -860,8 +860,8 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
  * @param addr		Virtual address of fault (rounded down to base of page).
  * @param reason	Reason for the fault.
  * @param access	Type of access that caused the fault.
- * @return		Whether the fault was successfully handled. */
-static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
+ * @return		VM_FAULT_* code describing result of the fault. */
+static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
 	object_handle_t *handle = region->handle;
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t paddr;
@@ -944,7 +944,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 				if(unlikely(ret != STATUS_SUCCESS)) {
 					dprintf("vm:  could not read page from source (%d)\n", ret);
 					mutex_unlock(&amap->lock);
-					return false;
+					return VM_FAULT_OOM;
 				}
 			}
 
@@ -986,7 +986,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 			if(unlikely(ret != STATUS_SUCCESS)) {
 				dprintf("vm:  could not read page from source (%d)\n", ret);
 				mutex_unlock(&amap->lock);
-				return false;
+				return VM_FAULT_OOM;
 			}
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIpp " from %p as read-only\n",
@@ -1009,7 +1009,7 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
 	dprintf("vm:  anon fault: mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n",
 	        paddr, addr, region->as, write);
 	mutex_unlock(&amap->lock);
-	return true;
+	return VM_FAULT_SUCCESS;
 }
 
 /** Handles a fault on objects requiring no special handling.
@@ -1017,8 +1017,8 @@ static bool vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int acces
  * @param addr		Virtual address of fault (rounded down to base of page).
  * @param reason	Reason for the fault.
  * @param access	Type of access that caused the fault.
- * @return		Whether the fault was successfully handled. */
-static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
+ * @return		VM_FAULT_* code describing result of the fault. */
+static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int access) {
 	phys_ptr_t phys, exist;
 	bool write, exec;
 	offset_t offset;
@@ -1032,7 +1032,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	ret = region->handle->object->type->get_page(region->handle, offset, &phys);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		dprintf("vm:  failed to get page for %p (%d)\n", addr, ret);
-		return false;
+		return VM_FAULT_OOM;
 	}
 
 	/* Check if a mapping already exists. This is possible if two threads
@@ -1045,7 +1045,7 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 		} else if(region->handle->object->type->release_page) {
 			region->handle->object->type->release_page(region->handle, offset, phys);
 		}
-		return true;
+		return VM_FAULT_SUCCESS;
 	}
 
 	/* Work out the flags to map with. */
@@ -1056,22 +1056,22 @@ static bool vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int ac
 	page_map_insert(&region->as->pmap, addr, phys, write, exec, MM_SLEEP);
 	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
 	        phys, addr, region->as, write, exec);
-	return true;
+	return VM_FAULT_SUCCESS;
 }
 
 /** Page fault handler.
  * @param addr		Address the fault occurred at.
  * @param reason	Reason for the fault.
  * @param access	Type of memory access that caused the fault.
- * @return		Whether the fault was handled. */
-bool vm_fault(ptr_t addr, int reason, int access) {
+ * @return		VM_FAULT_* code describing result of the fault. */
+int vm_fault(ptr_t addr, int reason, int access) {
 	vm_aspace_t *as = curr_aspace;
 	vm_region_t *region;
-	bool ret = false;
+	int ret;
 
 	/* If we don't have an address space, don't do anything. */
 	if(!as) {
-		return false;
+		return VM_FAULT_FAILURE;
 	}
 
 	dprintf("vm: page fault at %p (as: %p, reason: %d, access: %d)\n", addr, as, reason, access);
@@ -1084,14 +1084,16 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	 * incur a pagefault (if they do there's something wrong!). */
 	if(unlikely(mutex_held(&as->lock) && as->lock.holder == curr_thread)) {
 		kprintf(LOG_WARN, "vm: recursive locking on %p, fault in VM operation?\n");
-		return false;
+		return VM_FAULT_FAILURE;
 	}
+
 	mutex_lock(&as->lock);
 
 	/* Find the region that the fault occurred in. */
 	region = vm_region_find(as, addr, false);
 	if(unlikely(!region)) {
-		goto out;
+		mutex_unlock(&as->lock);
+		return VM_FAULT_NOREGION;
 	}
 
 	assert(vm_region_used(region));
@@ -1100,7 +1102,8 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	/* Check whether the access is allowed. Fault codes are defined to the
 	 * same value as region protection flags. */
 	if(!(region->flags & access)) {
-		goto out;
+		mutex_unlock(&as->lock);
+		return VM_FAULT_ACCESS;
 	}
 
 	/* If the region is a stack region, check if we've hit the guard page.
@@ -1108,7 +1111,8 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	if(region->flags & VM_REGION_STACK && addr == region->start) {
 		kprintf(LOG_DEBUG, "vm: thread %" PRIu32 " hit stack guard page %p\n",
 		        curr_thread->id, addr);
-		goto out;
+		mutex_unlock(&as->lock);
+		return VM_FAULT_NOREGION;
 	}
 
 	/* Lock the page map. */
@@ -1123,7 +1127,6 @@ bool vm_fault(ptr_t addr, int reason, int access) {
 	}
 
 	page_map_unlock(&as->pmap);
-out:
 	mutex_unlock(&as->lock);
 	return ret;
 }

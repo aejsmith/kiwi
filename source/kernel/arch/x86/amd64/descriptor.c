@@ -123,7 +123,7 @@ static void __init_text idt_init(void) {
 
 	/* In tss_init() above we point the first IST entry at the double
 	 * fault stack. Point the double fault IDT entry at this stack. */
-	kernel_idt[FAULT_DOUBLE].ist = 1;
+	kernel_idt[X86_EXCEPT_DF].ist = 1;
 }
 
 /** Initialise descriptor tables for the current CPU.

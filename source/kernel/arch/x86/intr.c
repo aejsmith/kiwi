@@ -23,12 +23,14 @@
 
 #include <cpu/intr.h>
 
+#include <lib/string.h>
 #include <lib/utility.h>
 
 #include <mm/vm.h>
 
 #include <proc/process.h>
 #include <proc/sched.h>
+#include <proc/signal.h>
 #include <proc/thread.h>
 
 #include <assert.h>
@@ -38,14 +40,14 @@
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 
-extern bool kdbg_int1_handler(unative_t num, intr_frame_t *frame);
+extern bool kdbg_db_handler(unative_t num, intr_frame_t *frame);
 extern void intr_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
 static intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
 
 /** String names for CPU exceptions. */
-static const char *fault_names[] = {
+static const char *except_strings[] = {
 	"Divide Error", "Debug", "Non-Maskable Interrupt", "Breakpoint",
 	"Overflow", "BOUND Range Exceeded", "Invalid Opcode",
 	"Device Not Available", "Double Fault", "Coprocessor Segment Overrun",
@@ -57,97 +59,111 @@ static const char *fault_names[] = {
 	"Reserved", "Reserved", "Reserved",
 };
 
+/** Unhandled interrupt function.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool unhandled_interrupt(unative_t num, intr_frame_t *frame) {
+	_fatal(frame, "Received unknown interrupt %" PRIun, num);
+}
+
+/** Kernel-mode exception handler.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static void kmode_except_handler(unative_t num, intr_frame_t *frame) {
+	/* All unhandled kernel-mode exceptions are fatal. */
+	_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)", num, except_strings[num]);
+}
+
+/** Generic exception handler.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool except_handler(unative_t num, intr_frame_t *frame) {
+	siginfo_t info;
+
+	if(frame->cs & 3) {
+		memset(&info, 0, sizeof(info));
+		info.si_addr = (void *)frame->ip;
+		signal_send(curr_thread, SIGSEGV, &info, true);
+	} else {
+		kmode_except_handler(num, frame);
+	}
+
+	return false;
+}
+
+/** Divide Error (#DE) fault handler.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool de_fault(unative_t num, intr_frame_t *frame) {
+	siginfo_t info;
+
+	if(frame->cs & 3) {
+		memset(&info, 0, sizeof(info));
+		info.si_code = FPE_INTDIV;
+		info.si_addr = (void *)frame->ip;
+		signal_send(curr_thread, SIGFPE, &info, true);
+	} else {
+		kmode_except_handler(num, frame);
+	}
+
+	return false;
+}
+
 /** Handler for NMIs.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		Always returns false. */
-static bool intr_handle_nmi(unative_t num, intr_frame_t *frame) {
+static bool nmi_handler(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
 		while(atomic_get(&cpu_pause_wait));
-		return false;
-	}
-
-	_fatal(frame, "Received unexpected NMI");
-}
-
-/** Handler for page faults.
- * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Whether to reschedule. */
-static bool intr_handle_pagefault(unative_t num, intr_frame_t *frame) {
-	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
-	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
-	ptr_t addr = x86_read_cr2();
-
-#if CONFIG_X86_NX
-	/* Check if the fault was caused by instruction execution. */
-	if(cpu_features.xd && frame->err_code & (1<<4)) {
-		access = VM_FAULT_EXEC;
-	}
-#endif
-	/* Check if a reserved bit fault. This is always fatal. */
-	if(frame->err_code & (1<<3)) {
-		fatal("Reserved bit pagefault exception (%p) (0x%x)", addr, frame->err_code);
-	}
-
-	/* Try the virtual memory manager if the fault occurred at a userspace
-	 * address. */
-	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
-		if(vm_fault(addr, reason, access)) {
-			return false;
-		} else if(curr_thread->in_usermem) {
-			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
-			kdbg_enter(KDBG_ENTRY_USER, frame);
-			context_restore_frame(&curr_thread->usermem_context, frame);
-			return false;
-		}
-	}
-
-	/* Nothing could handle this fault. If it happened in the kernel,
-	 * die, otherwise just kill the process. */
-	if(frame->err_code & (1<<2)) {
-		kprintf(LOG_DEBUG, "arch: killing process %" PRId32 " due to unhandled pagefault (%p)\n",
-		        curr_proc->id, addr);
-		kprintf(LOG_DEBUG, "arch:  %s | %s%s%s\n",
-		        (frame->err_code & (1<<0)) ? "protection" : "not-present",
-		        (frame->err_code & (1<<1)) ? "write" : "read",
-		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
-		        (frame->err_code & (1<<4)) ? " | execute" : "");
-		kdbg_enter(KDBG_ENTRY_USER, frame);
-		process_exit(255);
 	} else {
-		_fatal(frame, "Unhandled kernel-mode pagefault exception (%p)\n"
-		              "%s | %s%s%s", addr,
-		              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
-		              (frame->err_code & (1<<1)) ? "Write" : "Read",
-		              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
-		              (frame->err_code & (1<<4)) ? " | Execute" : "");
+		_fatal(frame, "Received unexpected NMI");
 	}
+
+	return false;
 }
 
-/** Handler for device-not-available exceptions.
+/** Invalid Opcode (#UD) fault handler.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool ud_fault(unative_t num, intr_frame_t *frame) {
+	siginfo_t info;
+
+	if(frame->cs & 3) {
+		memset(&info, 0, sizeof(info));
+		info.si_code = ILL_ILLOPC;
+		info.si_addr = (void *)frame->ip;
+		signal_send(curr_thread, SIGILL, &info, true);
+	} else {
+		kmode_except_handler(num, frame);
+	}
+
+	return false;
+}
+
+/** Handler for device-not-available (#NM) exceptions.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		Whether to reschedule. */
-static bool intr_handle_nm(unative_t num, intr_frame_t *frame) {
+static bool nm_fault(unative_t num, intr_frame_t *frame) {
 	if(frame->cs & 3) {
 		fpu_request();
-		return false;
 	} else {
-		_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)",
-		       num, fault_names[num]);
+		kmode_except_handler(num, frame);
 	}
+
+	return false;
 }
 
 /** Handler for double faults.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame.
  * @return		Doesn't return. */
-static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
+static bool double_fault(unative_t num, intr_frame_t *frame) {
 #ifndef __x86_64__
 	/* Copy in the state from before the fault into the frame. */
 	frame->gs = curr_cpu->arch.tss.gs;
@@ -167,8 +183,131 @@ static bool intr_handle_doublefault(unative_t num, intr_frame_t *frame) {
 	frame->sp = curr_cpu->arch.tss.esp;
 	frame->ss = curr_cpu->arch.tss.ss;
 #endif
-	_fatal(frame, "Double Fault (%p)", frame->ip);
+	_fatal(frame, "Double Fault", frame->ip);
 	cpu_halt();
+}
+
+/** Handler for page faults.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame.
+ * @return		Whether to reschedule. */
+static bool page_fault(unative_t num, intr_frame_t *frame) {
+	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
+	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
+	ptr_t addr = x86_read_cr2();
+	siginfo_t info;
+	int ret;
+
+#if CONFIG_X86_NX
+	/* Check if the fault was caused by instruction execution. */
+	if(cpu_features.xd && frame->err_code & (1<<4)) {
+		access = VM_FAULT_EXEC;
+	}
+#endif
+	/* Check if a reserved bit fault. This is always fatal. */
+	if(frame->err_code & (1<<3)) {
+		fatal("Reserved bit PF exception (%p) (0x%x)", addr, frame->err_code);
+	}
+
+	/* Try the virtual memory manager if the fault occurred at a userspace
+	 * address. */
+	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+		ret = vm_fault(addr, reason, access);
+		if(ret == VM_FAULT_SUCCESS) {
+			return false;
+		} else if(curr_thread->in_usermem) {
+			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
+			kdbg_enter(KDBG_ENTRY_USER, frame);
+			context_restore_frame(&curr_thread->usermem_context, frame);
+			return false;
+		}
+	} else {
+		/* This is an access to kernel memory, which should be reported
+		 * to userspace as accessing non-existant memory. */
+		ret = VM_FAULT_NOREGION;
+	}
+
+	/* Nothing could handle this fault. If it happened in the kernel,
+	 * die, otherwise just kill the process. */
+	if(frame->err_code & (1<<2)) {
+		kprintf(LOG_DEBUG, "arch: unhandled pagefault in thread %" PRId32 " of process %" PRId32 " (%p)\n",
+		        curr_thread->id, curr_proc->id, addr);
+		kprintf(LOG_DEBUG, "arch:  %s | %s%s%s\n",
+		        (frame->err_code & (1<<0)) ? "protection" : "not-present",
+		        (frame->err_code & (1<<1)) ? "write" : "read",
+		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
+		        (frame->err_code & (1<<4)) ? " | execute" : "");
+		kdbg_enter(KDBG_ENTRY_USER, frame);
+
+		memset(&info, 0, sizeof(info));
+		info.si_addr = (void *)frame->ip;
+
+		/* Pick the signal number and code. */
+		switch(ret) {
+		case VM_FAULT_NOREGION:
+			info.si_signo = SIGSEGV;
+			info.si_code = SEGV_MAPERR;
+			break;
+		case VM_FAULT_ACCESS:
+			info.si_signo = SIGSEGV;
+			info.si_code = SEGV_ACCERR;
+			break;
+		case VM_FAULT_OOM:
+			info.si_signo = SIGBUS;
+			info.si_code = BUS_ADRERR;
+			break;
+		default:
+			info.si_signo = SIGSEGV;
+			break;
+		}
+
+		signal_send(curr_thread, info.si_signo, &info, true);
+	} else {
+		_fatal(frame, "Unhandled kernel-mode pagefault exception (%p)\n"
+		              "%s | %s%s%s", addr,
+		              (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
+		              (frame->err_code & (1<<1)) ? "Write" : "Read",
+		              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
+		              (frame->err_code & (1<<4)) ? " | Execute" : "");
+	}
+
+	return false;
+}
+
+/** FPU Floating-Point Error (#MF) fault handler.
+ * @todo		Get FPU status and convert to correct signal code.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool mf_fault(unative_t num, intr_frame_t *frame) {
+	siginfo_t info;
+
+	if(frame->cs & 3) {
+		memset(&info, 0, sizeof(info));
+		info.si_addr = (void *)frame->ip;
+		signal_send(curr_thread, SIGFPE, &info, true);
+	} else {
+		kmode_except_handler(num, frame);
+	}
+
+	return false;
+}
+
+/** SIMD Floating-Point (#XM) fault handler.
+ * @todo		Get FPU status and convert to correct signal code.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static bool xm_fault(unative_t num, intr_frame_t *frame) {
+	siginfo_t info;
+
+	if(frame->cs & 3) {
+		memset(&info, 0, sizeof(info));
+		info.si_addr = (void *)frame->ip;
+		signal_send(curr_thread, SIGFPE, &info, true);
+	} else {
+		kmode_except_handler(num, frame);
+	}
+
+	return false;
 }
 
 /** Register an interrupt handler.
@@ -203,23 +342,8 @@ void intr_handler(intr_frame_t *frame) {
 	}
 
 	if(unlikely(atomic_get(&kdbg_running) == 2)) {
-		kdbg_except_handler(num, (num < 32) ? fault_names[num] : "Unknown", frame);
+		kdbg_except_handler(num, (num < 32) ? except_strings[num] : "Unknown", frame);
 		return;
-	} else if(unlikely(!intr_handlers[num])) {
-		if(num < 32) {
-			/* Fatal if in kernel-mode, exit if in user-mode. */
-			if(frame->cs & 3) {
-				kprintf(LOG_DEBUG, "arch: killing process %" PRId32 " due to exception %" PRIun "\n",
-				        curr_proc->id, num);
-				kdbg_enter(KDBG_ENTRY_USER, frame);
-				process_exit(255);
-			} else {
-				_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)",
-				       num, fault_names[num]);
-			}
-		} else {
-			_fatal(frame, "Recieved unknown interrupt %" PRIun, num);
-		}
 	}
 
 	schedule = intr_handlers[num](num, frame);
@@ -239,19 +363,31 @@ void intr_handler(intr_frame_t *frame) {
 
 /** Initialise the interrupt handler table. */
 void intr_init(void) {
-	int i;
+	size_t i;
 
-	/* Set handlers for faults that require specific handling. */
-	intr_register(FAULT_DEBUG, kdbg_int1_handler);
-	intr_register(FAULT_NMI, intr_handle_nmi);
-	intr_register(FAULT_DEVICE_NOT_AVAIL, intr_handle_nm);
-	intr_register(FAULT_DOUBLE, intr_handle_doublefault);
-	intr_register(FAULT_PAGE, intr_handle_pagefault);
-
-	/* Entries 32-47 are IRQs, 48 onwards are unrecognised for now. */
-	for(i = 32; i <= 47; i++) {
-		intr_register(i, irq_handler);
+	/* Install default handlers. 0-31 are exceptions, 32-47 are IRQs, the
+	 * rest should be pointed to the unhandled interrupt function */
+	for(i = 0; i < 32; i++) {
+		intr_handlers[i] = except_handler;
+	}
+	for(i = 32; i < 48; i++) {
+		intr_handlers[i] = irq_handler;
+	}
+	for(i = 48; i < ARRAYSZ(intr_handlers); i++) {
+		intr_handlers[i] = unhandled_interrupt;
 	}
 
+	/* Set handlers for faults that require specific handling. */
+	intr_handlers[X86_EXCEPT_DE]  = de_fault;
+	intr_handlers[X86_EXCEPT_DB]  = kdbg_db_handler;
+	intr_handlers[X86_EXCEPT_NMI] = nmi_handler;
+	intr_handlers[X86_EXCEPT_UD]  = ud_fault;
+	intr_handlers[X86_EXCEPT_NM]  = nm_fault;
+	intr_handlers[X86_EXCEPT_DF]  = double_fault;
+	intr_handlers[X86_EXCEPT_PF]  = page_fault;
+	intr_handlers[X86_EXCEPT_MF]  = mf_fault;
+	intr_handlers[X86_EXCEPT_XM]  = xm_fault;
+
+	/* Set up the arch-independent IRQ subsystem. */
 	irq_init();
 }

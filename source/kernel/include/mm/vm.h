@@ -65,7 +65,14 @@ typedef struct vm_aspace {
 #define VM_FAULT_WRITE		VM_MAP_WRITE
 #define VM_FAULT_EXEC		VM_MAP_EXEC
 
-extern bool vm_fault(ptr_t addr, int reason, int access);
+/** Page fault status codes. */
+#define VM_FAULT_SUCCESS	0	/**< Fault handled successfully. */
+#define VM_FAULT_FAILURE	1	/**< Other failure. */
+#define VM_FAULT_NOREGION	2	/**< Address not in valid region (SEGV_MAPERR). */
+#define VM_FAULT_ACCESS		3	/**< Access denied to region (SEGV_ACCERR). */
+#define VM_FAULT_OOM		4	/**< Out of memory (BUS_ADRERR). */
+
+extern int vm_fault(ptr_t addr, int reason, int access);
 
 extern status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size);
 extern status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,

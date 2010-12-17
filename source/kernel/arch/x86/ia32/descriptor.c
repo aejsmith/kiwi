@@ -114,7 +114,7 @@ static void __init_text tss_init(cpu_t *cpu) {
 	memset(&cpu->arch.double_fault_tss, 0, sizeof(tss_t));
 	stack = (ptr_t)cpu->arch.double_fault_stack;
 	cpu->arch.double_fault_tss.cr3 = x86_read_cr3();
-	cpu->arch.double_fault_tss.eip = (ptr_t)&isr_array[FAULT_DOUBLE];
+	cpu->arch.double_fault_tss.eip = (ptr_t)&isr_array[X86_EXCEPT_DF];
 	cpu->arch.double_fault_tss.eflags = X86_FLAGS_ALWAYS1;
 	cpu->arch.double_fault_tss.esp = stack + KSTACK_SIZE;
 	cpu->arch.double_fault_tss.es = SEGMENT_K_DS;
@@ -151,7 +151,7 @@ static void __init_text idt_init(void) {
 
 	/* Modify the double fault entry to become a task gate using the
 	 * doublefault TSS. */
-	idt_set_entry(FAULT_DOUBLE, 0, SEGMENT_DF_TSS, 0xE5);
+	idt_set_entry(X86_EXCEPT_DF, 0, SEGMENT_DF_TSS, 0xE5);
 
 	/* Set up the system call interrupt handler. It does not go through
 	 * the usual route for interrupts because it doesn't need to do some
