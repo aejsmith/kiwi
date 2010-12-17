@@ -42,7 +42,7 @@ __export status_t kern_signal_action(int num, const sigaction_t *newp, sigaction
 		new.sa_restorer = kern_signal_return;
 	}
 
-	ret = _kern_signal_action(num, (newp) ? &new : NULL, oldp);
+	ret = _kern_signal_action(num, (newp) ? &new : NULL, &old);
 	if(ret == STATUS_SUCCESS && oldp) {
 		memcpy(oldp, &old, sizeof(old) - sizeof(old.sa_restorer));
 	}
