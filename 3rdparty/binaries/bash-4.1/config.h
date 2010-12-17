@@ -537,7 +537,7 @@
 
 /* #undef HAVE_BSD_SIGNALS */
 
-/* #undef HAVE_POSIX_SIGNALS */
+#define HAVE_POSIX_SIGNALS 1
 
 /* #undef HAVE_USG_SIGHOLD */
 
