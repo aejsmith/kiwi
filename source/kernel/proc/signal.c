@@ -31,6 +31,8 @@
 #include <object.h>
 #include <status.h>
 
+extern void kern_signal_return(void);
+
 /** Check if a signal defaults to being ignored. */
 #define signal_dfl_ignore(s)	\
 	((s) == SIGCHLD || (s) == SIGURG || (s) == SIGWINCH)
@@ -397,4 +399,9 @@ status_t kern_signal_altstack(const stack_t *newp, stack_t *oldp) {
 	}
 
 	return STATUS_SUCCESS;
+}
+
+/** Return from a signal handler. */
+void kern_signal_return(void) {
+	fatal("TODO");
 }

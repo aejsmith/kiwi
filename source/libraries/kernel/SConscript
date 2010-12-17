@@ -24,6 +24,7 @@ sources = map(File, [
 	'fs.c',
 	'init.c',
 	'object.c',
+	'signal.c',
 	'status_list.c',
 	'syscalls.S',
 	'thread.c',
@@ -60,7 +61,14 @@ libc_objects = map(lambda x: env.SharedObject(target = '%s.os' % (x.name), sourc
 # Build the library. The default visibility is set to hidden, as the majority
 # of functions in this library should not be exported.
 env.KiwiLibrary('kernel',
-	sources = map(lambda x: env.SharedObject(x, CCFLAGS = ccflags), arch_sources + sources) + libc_objects,
+	sources = map(
+		lambda x: env.SharedObject(
+			x,
+			CCFLAGS = ccflags,
+			CPPDEFINES = ['LIBKERNEL']
+		),
+		arch_sources + sources
+	) + libc_objects,
 	flags = {
 		'LINKFLAGS': ['-nodefaultlibs', '-nostdlib', '-Wl,-e,libkernel_init', '-Wl,-Bsymbolic'],
 	},
