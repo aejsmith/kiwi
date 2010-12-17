@@ -30,6 +30,7 @@
 
 #include <assert.h>
 #include <status.h>
+#include <syscall_table.h>
 
 /** Signal frame structure. */
 typedef struct signal_frame {

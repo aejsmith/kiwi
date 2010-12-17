@@ -28,6 +28,10 @@ envmgr.AddTool('SyscallTable', env['SYSGEN'], Action(
 	'$SYSGEN $SYSGENFLAGS -t $TABLE -o $TARGET %s $SOURCES' % (config['ARCH']),
 	'$GENCOMSTR'
 ))
+envmgr.AddTool('SyscallHeader', env['SYSGEN'], Action(
+	'$SYSGEN $SYSGENFLAGS -n $GUARD -o $TARGET %s $SOURCES' % (config['ARCH']),
+	'$GENCOMSTR'
+))
 envmgr.AddTool('Syscalls', env['SYSGEN'], Action(
 	'$SYSGEN $SYSGENFLAGS -o $TARGET %s $SOURCES' % (config['ARCH']),
 	'$GENCOMSTR'

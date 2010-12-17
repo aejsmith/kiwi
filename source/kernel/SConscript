@@ -147,6 +147,7 @@ env.Command('console/copyright.c', ['console/copyright.ppm'],
 # Generate the system call table.
 env['SYSCALLS'] = File('syscalls.def')
 env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE='syscall_table')
+env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD='__SYSCALL_TABLE_H')
 
 # Get the list of source files from the architecture/platform.
 arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
