@@ -27,6 +27,7 @@
 #include <cpu/cpu.h>
 #include <cpu/fpu.h>
 
+#include <kernel/signal.h>
 #include <kernel/thread.h>
 
 #include <lib/avl_tree.h>
@@ -85,6 +86,12 @@ typedef struct thread {
 	timer_t sleep_timer;		/**< Timer for sleep timeout. */
 	bool timed_out;			/**< Whether the sleep timed out. */
 	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
+
+	/** Signal information. */
+	sigset_t signal_mask;		/**< Signal mask for the thread. */
+	sigset_t pending_signals;	/**< Bitmap of pending signals. */
+	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
+	stack_t signal_altstack;	/**< Alternate signal stack. */
 
 	/** Accounting information. */
 	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */

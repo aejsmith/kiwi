@@ -46,7 +46,6 @@ const char *const sys_siglist[NSIG] = {
 	[SIGTSTP]  = "Stopped (terminal)",
 	[SIGTTIN]  = "Stopped (terminal input)",
 	[SIGTTOU]  = "Stopped (terminal output)",
-	[SIGPOLL]  = "I/O ready",
 	[SIGWINCH] = "Window changed",
 };
 
@@ -73,4 +72,16 @@ void psignal(int sig, const char *s) {
 	} else {
 		fprintf(stderr, "%s\n", strsignal(sig));
 	}
+}
+
+/** Print string representation of signal.
+ *
+ * Display a message on standard error followed by a string representation
+ * of a signal.
+ *
+ * @param info		Signal to print information on.
+ * @param s		Optional message to precede signal with.
+ */
+void psiginfo(const siginfo_t *info, const char *s) {
+	psignal(info->si_signo, s);
 }

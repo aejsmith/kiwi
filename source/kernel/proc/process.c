@@ -55,6 +55,10 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Default process rights. */
+#define DEFAULT_PROCESS_RIGHTS_OWNER	(PROCESS_RIGHT_QUERY | PROCESS_RIGHT_SIGNAL)
+#define DEFAULT_PROCESS_RIGHTS_OTHERS	(PROCESS_RIGHT_QUERY)
+
 /** Structure containing process creation information. */
 typedef struct process_create {
 	/** Arguments provided by the caller. */
@@ -367,7 +371,8 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_RIGHT_QUERY);
+		object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_PROCESS_RIGHTS_OWNER);
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_PROCESS_RIGHTS_OTHERS);
 		dsecurity.acl = &acl;
 	}
 
@@ -390,6 +395,17 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->name = kstrdup(name, MM_SLEEP);
 	process->status = -1;
 	process->create = NULL;
+
+	/* Handle the PROCESS_CREATE_CLONE flag. When this is specified, we
+	 * inherit signal handling information from the parent. */
+	if(cflags & PROCESS_CREATE_CLONE) {
+		assert(parent);
+		memcpy(process->signal_act, parent->signal_act, sizeof(process->signal_act));
+		process->signal_mask = parent->signal_mask;
+	} else {
+		memset(process->signal_act, 0, sizeof(process->signal_act));
+		process->signal_mask = 0;
+	}
 
 	/* Add to the process tree. */
 	rwlock_write_lock(&process_tree_lock);
@@ -1081,8 +1097,9 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 		goto fail;
 	}
 
-	/* Switch over to the new address space and handle table. */
 	mutex_lock(&curr_proc->lock);
+
+	/* Switch over to the new address space and handle table. */
 	sched_preempt_disable();
 	vm_aspace_switch(info.aspace);
 	oldas = curr_proc->aspace;
@@ -1092,6 +1109,13 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	curr_proc->handles = table;
 	oldname = curr_proc->name;
 	curr_proc->name = kstrdup(info.path, MM_SLEEP);
+
+	/* Reset signal handling state. */
+	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
+	curr_proc->signal_mask = 0;
+	memset(&curr_thread->signal_altstack, 0, sizeof(curr_thread->signal_altstack));
+	curr_thread->signal_altstack.ss_flags = SS_DISABLE;
+
 	mutex_unlock(&curr_proc->lock);
 
 	/* Free up old data. */
@@ -1168,14 +1192,13 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(curr_proc->name, 0, PRIORITY_USER, as, table, curr_proc,
-	                    0, NULL, NULL, 0, &ksecurity, &process, rights,
-	                    &handle, handlep);
+	                    PROCESS_CREATE_CLONE, NULL, NULL, 0, &ksecurity, &process,
+	                    rights, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
 
-	/* Create and run the entry thread. The TLS address for the new thread
-	 * is set to that of the current thread. */
+	/* Create the entry thread. */
 	args = kmalloc(sizeof(*args), MM_SLEEP);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
@@ -1184,7 +1207,13 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
+
+	/* Inherit certain per-thread attributes such as the alternate signal
+	 * stack and TLS address from the thread that called us. */
+	memcpy(&thread->signal_altstack, &curr_thread->signal_altstack, sizeof(thread->signal_altstack));
 	thread_arch_set_tls_addr(thread, thread_arch_tls_addr(curr_thread));
+
+	/* Run the new thread. */
 	thread_run(thread);
 	object_security_destroy(&ksecurity);
 	return STATUS_SUCCESS;

@@ -15,35 +15,13 @@
 
 /**
  * @file
- * @brief		Signal mask function.
+ * @brief		Signal wait functions.
  */
 
-#include <kernel/signal.h>
-#include <kernel/status.h>
-
-#include <errno.h>
 #include <signal.h>
-
 #include "../libc.h"
 
-/** Set the signal mask.
- * @param how		How to set the mask.
- * @param set		Signal set to mask (can be NULL).
- * @param oset		Where to store previous masked signal set (can be NULL).
- * @return		0 on success, -1 on failure. */
-int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) {
-	status_t ret;
-
-	if(how & ~SIGNAL_MASK_ACTION) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	ret = kern_signal_mask(how, set, oset);
-	if(ret != STATUS_SUCCESS) {
-		libc_status_to_errno(ret);
-		return -1;
-	}
-
-	return 0;
+int sigsuspend(const sigset_t *mask) {
+	libc_stub("sigsuspend", true);
+	return -1;
 }

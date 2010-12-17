@@ -44,12 +44,14 @@ typedef struct process_args {
 /** Process access rights. */
 #define PROCESS_RIGHT_QUERY	(1<<0)	/**< Query process information. */
 #define PROCESS_RIGHT_SECURITY	(1<<1)	/**< Set security context. */
+#define PROCESS_RIGHT_SIGNAL	(1<<2)	/**< Send a signal to the process. */
 
 /** Process object events. */
 #define PROCESS_EVENT_DEATH	0	/**< Wait for process death. */
 
 /** Process creation flags. */
-#define PROCESS_CREATE_SESSION	(1<<1)	/**< Place the process in a new session. */
+#define PROCESS_CREATE_SESSION	(1<<0)	/**< Place the process in a new session. */
+#define PROCESS_CREATE_CLONE	(1<<1)	/**< Inherit extra information from the parent. */
 
 /** Actions for kern_process_control(). */
 #define PROCESS_GET_SECTX	1	/**< Get security context (in: security_context_t). */

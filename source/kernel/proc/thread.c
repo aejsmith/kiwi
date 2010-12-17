@@ -34,6 +34,7 @@
 
 #include <proc/process.h>
 #include <proc/sched.h>
+#include <proc/signal.h>
 #include <proc/thread.h>
 
 #include <sync/mutex.h>
@@ -51,6 +52,10 @@
 #else
 # define dprintf(fmt...)	
 #endif
+
+/** Default thread rights. */
+#define DEFAULT_THREAD_RIGHTS_OWNER	(THREAD_RIGHT_QUERY | THREAD_RIGHT_SIGNAL)
+#define DEFAULT_THREAD_RIGHTS_OTHERS	(THREAD_RIGHT_QUERY)
 
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
@@ -357,6 +362,11 @@ void thread_at_kernel_exit(void) {
 	if(curr_thread->killed) {
 		thread_exit();
 	}
+
+	/* Handle pending signals. */
+	if(curr_thread->pending_signals) {
+		signal_handle_pending();
+	}
 }
 
 /** Terminate the current thread.
@@ -447,7 +457,10 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	/* If an ACL is not given, construct a default ACL. */
 	if(!dsecurity.acl) {
 		object_acl_init(&acl);
-		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, THREAD_RIGHT_QUERY);
+		if(owner != kernel_proc) {
+			object_acl_add_entry(&acl, ACL_ENTRY_USER, -1, DEFAULT_THREAD_RIGHTS_OWNER);
+		}
+		object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, DEFAULT_THREAD_RIGHTS_OTHERS);
 		dsecurity.acl = &acl;
 	}
 
@@ -485,11 +498,11 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
+	thread->flags = flags;
 	thread->wire_count = 0;
 	thread->killed = false;
 	thread->ustack = NULL;
 	thread->ustack_size = 0;
-	thread->flags = flags;
 	thread->priority = 0;
 	thread->timeslice = 0;
 	thread->preempt_off = 0;
@@ -500,11 +513,18 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->last_time = 0;
 	thread->kernel_time = 0;
 	thread->user_time = 0;
+	thread->pending_signals = 0;
 	thread->in_usermem = false;
 	thread->state = THREAD_CREATED;
 	thread->entry = entry;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
+
+	/* Initialise signal handling state. */
+	thread->signal_mask = 0;
+	memset(thread->signal_info, 0, sizeof(thread->signal_info));
+	memset(&thread->signal_altstack, 0, sizeof(thread->signal_altstack));
+	thread->signal_altstack.ss_flags = SS_DISABLE;
 
 	/* Add the thread to the owner. */
 	process_attach(owner, thread);

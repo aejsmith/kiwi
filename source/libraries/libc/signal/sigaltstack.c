@@ -15,31 +15,33 @@
 
 /**
  * @file
- * @brief		Signal mask function.
+ * @brief		Alternate signal stack function.
  */
 
 #include <kernel/signal.h>
 #include <kernel/status.h>
 
-#include <errno.h>
 #include <signal.h>
 
 #include "../libc.h"
 
-/** Set the signal mask.
- * @param how		How to set the mask.
- * @param set		Signal set to mask (can be NULL).
- * @param oset		Where to store previous masked signal set (can be NULL).
- * @return		0 on success, -1 on failure. */
-int sigprocmask(int how, const sigset_t *restrict set, sigset_t *restrict oset) {
+/** Get and set the alternate signal stack.
+ *
+ * Gets and sets the alternate signal stack for the current thread. This stack
+ * is used to execute signal handlers with the SA_ONSTACK flag set. The
+ * alternate stack is a per-thread attribute. If fork() is called, the new
+ * process' initial thread inherits the alternate stack from the thread that
+ * called fork().
+ *
+ * @param ss		Alternate stack to set (can be NULL).
+ * @param oset		Where to store previous alternate stack (can be NULL).
+ *
+ * @return		0 on success, -1 on failure.
+ */
+int sigaltstack(const stack_t *restrict ss, stack_t *restrict oldss) {
 	status_t ret;
 
-	if(how & ~SIGNAL_MASK_ACTION) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	ret = kern_signal_mask(how, set, oset);
+	ret = kern_signal_altstack(ss, oldss);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

@@ -24,6 +24,7 @@
 #include <io/context.h>
 
 #include <kernel/process.h>
+#include <kernel/signal.h>
 
 #include <lib/avl_tree.h>
 #include <lib/notifier.h>
@@ -62,6 +63,10 @@ typedef struct process {
 	/** Security information. */
 	mutex_t security_lock;		/**< Lock for security context. */
 	security_context_t security;	/**< Security context (canonicalised). */
+
+	/** Signal information. */
+	sigset_t signal_mask;		/**< Bitmap of masked signals. */
+	sigaction_t signal_act[NSIG];	/**< Signal action structures. */
 
 	/** State of the process. */
 	enum {

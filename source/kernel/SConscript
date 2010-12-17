@@ -59,6 +59,7 @@ sources = map(File, [
 	'proc/process.c',
 	'proc/sched.c',
 	'proc/session.c',
+	'proc/signal.c',
 	'proc/thread.c',
 
 	'security/context.c',

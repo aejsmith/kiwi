@@ -18,7 +18,13 @@
  * @brief		POSIX signal send functions.
  */
 
+#include <kernel/process.h>
+#include <kernel/signal.h>
+#include <kernel/status.h>
+
+#include <errno.h>
 #include <signal.h>
+
 #include "../libc.h"
 
 /** Send a signal to a process.
@@ -26,14 +32,51 @@
  * @param num		Signal number.
  * @return		0 on success, -1 on failure. */
 int kill(pid_t pid, int num) {
-	libc_stub("kill", false);
-	return -1;
+	handle_t handle;
+	status_t ret;
+
+	if(pid < 1) {
+		libc_stub("kill(pid < 0)", false);
+		return -1;
+	}
+
+	ret = kern_process_open(pid, PROCESS_RIGHT_SIGNAL, &handle);
+	if(ret != STATUS_SUCCESS) {
+		switch(ret) {
+		case STATUS_ACCESS_DENIED:
+			errno = EPERM;
+			break;
+		case STATUS_NOT_FOUND:
+			errno = ESRCH;
+			break;
+		default:
+			libc_status_to_errno(ret);
+			break;
+		}
+		return -1;
+	}
+
+	ret = kern_signal_send(handle, num);
+	kern_handle_close(handle);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
 }
 
 /** Send a signal to the current process.
  * @param num		Signal number.
  * @return		0 on success, -1 on failure. */
 int raise(int num) {
-	libc_stub("raise", true);
-	return -1;
+	status_t ret;
+
+	ret = kern_signal_send(-1, num);
+	if(ret != STATUS_SUCCESS) {
+		libc_status_to_errno(ret);
+		return -1;
+	}
+
+	return 0;
 }

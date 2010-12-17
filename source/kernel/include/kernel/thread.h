@@ -29,6 +29,7 @@ extern "C" {
 
 /** Thread access rights. */
 #define THREAD_RIGHT_QUERY	(1<<0)	/**< Query thread information. */
+#define THREAD_RIGHT_SIGNAL	(1<<1)	/**< Send a signal to the thread. */
 
 /** Thread object events. */
 #define THREAD_EVENT_DEATH	0	/**< Wait for thread death. */
