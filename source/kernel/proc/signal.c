@@ -193,12 +193,10 @@ retry:
 
 		/* Handle the default action. */
 		if(signal_dfl_term(num)) {
-			// FIXME: reason
-			process_exit(num);
+			process_exit(num, EXIT_REASON_SIGNAL);
 		} else if(signal_dfl_core(num)) {
 			/* TODO: Core dump. */
-			// FIXME: reason
-			process_exit(num);
+			process_exit(num, EXIT_REASON_SIGNAL);
 		} else if(signal_dfl_stop(num)) {
 			/* TODO: Stop process. */
 			kprintf(LOG_WARN, "signal: todo: stop process\n");

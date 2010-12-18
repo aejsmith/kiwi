@@ -266,8 +266,7 @@ bool Process::Wait(useconds_t timeout) const {
 /** Check whether the process is running.
  * @return		Whether the process is running. */
 bool Process::IsRunning() const {
-	int status;
-	return (m_handle >= 0 && kern_process_status(m_handle, &status) == STATUS_STILL_RUNNING);
+	return (m_handle >= 0 && kern_process_status(m_handle, 0, 0) == STATUS_STILL_RUNNING);
 }
 
 /** Get the exit status of the process.
@@ -275,7 +274,7 @@ bool Process::IsRunning() const {
 int Process::GetStatus() const {
 	int status;
 
-	if(kern_process_status(m_handle, &status) != STATUS_SUCCESS) {
+	if(kern_process_status(m_handle, &status, 0) != STATUS_SUCCESS) {
 		return -1;
 	}
 	return status;
@@ -303,7 +302,7 @@ void Process::RegisterEvents() {
 void Process::HandleEvent(int event) {
 	if(event == PROCESS_EVENT_DEATH) {
 		int status = 0;
-		kern_process_status(m_handle, &status);
+		kern_process_status(m_handle, &status, 0);
 		OnExit(status);
 
 		/* Unregister the death event so that it doesn't continually

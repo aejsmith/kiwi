@@ -58,6 +58,10 @@ typedef struct process_args {
 #define PROCESS_SET_SECTX	2	/**< Set security context (out: security_context_t). */
 #define PROCESS_LOADED		3	/**< Signal that process is loaded (calling process only). */
 
+/** Process exit reason codes. */
+#define EXIT_REASON_NORMAL	0	/**< Normal exit (status is exit code). */
+#define EXIT_REASON_SIGNAL	1	/**< Exited due to a signal (status is signal number). */
+
 extern status_t kern_process_create(const char *path, const char *const args[],
                                     const char *const env[], int flags,
                                     const security_context_t *sectx,
@@ -74,7 +78,7 @@ extern status_t kern_process_open(process_id_t id, object_rights_t rights, handl
 extern process_id_t kern_process_id(handle_t handle);
 extern session_id_t kern_process_session(handle_t handle);
 extern status_t kern_process_control(handle_t handle, int action, const void *in, void *out);
-extern status_t kern_process_status(handle_t handle, int *statusp);
+extern status_t kern_process_status(handle_t handle, int *statusp, int *reasonp);
 extern void kern_process_exit(int status) __attribute__((noreturn));
 
 #ifdef __cplusplus

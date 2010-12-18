@@ -393,7 +393,8 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->handles = table;
 	process->state = PROCESS_RUNNING;
 	process->name = kstrdup(name, MM_SLEEP);
-	process->status = -1;
+	process->status = 0;
+	process->reason = EXIT_REASON_NORMAL;
 	process->create = NULL;
 
 	/* Handle the PROCESS_CREATE_CLONE flag. When this is specified, we
@@ -710,12 +711,13 @@ status_t process_create(const char *const args[], const char *const env[], int f
 /** Terminate the calling process.
  *
  * Terminates the calling process. All threads in the process will also be
- * terminated. The status code given can be retrieved by any processes with a
- * handle to the process with process_status().
+ * terminated. The status and reason codes given can be retrieved by any
+ * processes with a handle to the process with kern_process_status().
  *
  * @param status	Exit status code.
+ * @param reason	Exit reason.
  */
-void process_exit(int status) {
+void process_exit(int status, int reason) {
 	thread_t *thread;
 
 	mutex_lock(&curr_proc->lock);
@@ -729,6 +731,7 @@ void process_exit(int status) {
 	}
 
 	curr_proc->status = status;
+	curr_proc->reason = reason;
 	mutex_unlock(&curr_proc->lock);
 
 	thread_exit();
@@ -1407,8 +1410,9 @@ out:
 /** Query the exit status of a process.
  * @param handle	Handle to process.
  * @param statusp	Where to store exit status of process.
+ * @param reasonp	Where to store exit reason.
  * @return		Status code describing result of the operation. */
-status_t kern_process_status(handle_t handle, int *statusp) {
+status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	object_handle_t *khandle;
 	process_t *process;
 	status_t ret;
@@ -1424,7 +1428,12 @@ status_t kern_process_status(handle_t handle, int *statusp) {
 		return STATUS_STILL_RUNNING;
 	}
 
-	ret = memcpy_to_user(statusp, &process->status, sizeof(int));
+	if(statusp) {
+		ret = memcpy_to_user(statusp, &process->status, sizeof(*statusp));
+	}
+	if(reasonp) {
+		ret = memcpy_to_user(reasonp, &process->reason, sizeof(*reasonp));
+	}
 	object_handle_release(khandle);
 	return ret;
 }
@@ -1438,5 +1447,5 @@ status_t kern_process_status(handle_t handle, int *statusp) {
  * @param status	Exit status code.
  */
 void kern_process_exit(int status) {
-	process_exit(status);
+	process_exit(status, EXIT_REASON_NORMAL);
 }

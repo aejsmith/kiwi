@@ -79,7 +79,7 @@ syscall kern_process_open(process_id_t, object_rights_t, ptr_t);
 syscall kern_process_id(handle_t);
 syscall kern_process_session(handle_t);
 syscall kern_process_control(handle_t, int, ptr_t, ptr_t);
-syscall kern_process_status(handle_t, ptr_t);
+syscall kern_process_status(handle_t, ptr_t, ptr_t);
 syscall kern_process_exit(int);
 syscall kern_thread_create(ptr_t, ptr_t, size_t, ptr_t, ptr_t, ptr_t, object_rights_t, ptr_t) wrapped;
 syscall kern_thread_open(thread_id_t, object_rights_t, ptr_t);

@@ -43,6 +43,18 @@ pid_t wait(int *statusp) {
 	return waitpid(-1, statusp, 0);
 }
 
+/** Convert a process exit status/reason to a POSIX status. */
+static inline int convert_exit_status(int status, int reason) {
+	switch(reason) {
+	case EXIT_REASON_NORMAL:
+		return (status << 8) | __WEXITED;
+	case EXIT_REASON_SIGNAL:
+		return (status << 8) | __WSIGNALED;
+	default:
+		libc_fatal("unhandled exit reason %s", reason);
+	}
+}
+
 /** Wait for a child process to stop or terminate.
  * @param pid		If greater than 0, a specific PID to wait on (must be a
  *			child of the process). If 0, the function waits for any
@@ -55,8 +67,8 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 	object_event_t *events = NULL, *tmp;
 	posix_process_t *proc;
 	size_t count = 0, i;
+	int status, reason;
 	status_t ret;
-	int status;
 
 	if(pid == 0) {
 		errno = ENOSYS;
@@ -110,10 +122,10 @@ pid_t waitpid(pid_t pid, int *statusp, int flags) {
 		LIST_FOREACH(&child_processes, iter) {
 			proc = list_entry(iter, posix_process_t, header);
 			if(proc->handle == events[i].handle) {
-				/* Get the exit status. TODO: signal/stopped. */
-				kern_process_status(proc->handle, &status);
+				/* Get the exit status. */
 				if(statusp) {
-					*statusp = (status << 8) | __WEXITED;
+					kern_process_status(proc->handle, &status, &reason);
+					*statusp = convert_exit_status(status, reason);
 				}
 				ret = proc->pid;
 

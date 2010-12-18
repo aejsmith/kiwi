@@ -79,7 +79,8 @@ typedef struct process {
 	process_id_t id;		/**< ID of the process. */
 	char *name;			/**< Name of the process. */
 	notifier_t death_notifier;	/**< Notifier for process death. */
-	int status;			/**< Exit status of the process. */
+	int status;			/**< Exit status. */
+	int reason;			/**< Exit reason. */
 	struct process_create *create;	/**< Internal creation information structure. */
 } process_t;
 
@@ -99,7 +100,7 @@ extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
 extern status_t process_create(const char *const args[], const char *const env[], int flags,
                                int priority, process_t *parent, process_t **procp);
-extern void process_exit(int status) __noreturn;
+extern void process_exit(int status, int reason) __noreturn;
 
 extern int kdbg_cmd_process(int argc, char **argv);
 
