@@ -30,11 +30,14 @@ extern "C" {
 /** Timer events. */
 #define TIMER_EVENT		0	/**< Event for the timer firing. */
 
-/** Timer mode values. */
-#define TIMER_ONESHOT		0	/**< Fire the timer event only once. */
-#define TIMER_PERIODIC		1	/**< Fire the event at regular intervals until stopped. */
+/** Timer flags. */
+#define TIMER_SIGNAL		(1<<0)	/**< Send SIGALRM upon timer completion. */
 
-extern status_t kern_timer_create(handle_t *handlep);
+/** Timer mode values. */
+#define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
+#define TIMER_PERIODIC		2	/**< Fire the event at regular intervals until stopped. */
+
+extern status_t kern_timer_create(int flags, handle_t *handlep);
 extern status_t kern_timer_start(handle_t handle, useconds_t interval, int mode);
 extern status_t kern_timer_stop(handle_t handle);
 

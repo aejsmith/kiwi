@@ -42,7 +42,7 @@ Timer::Timer(Mode mode) : m_mode(mode), m_running(false) {
 
 	assert(mode == kOneShotMode || mode == kPeriodicMode);
 
-	ret = kern_timer_create(&handle);
+	ret = kern_timer_create(0, &handle);
 	if(unlikely(ret != STATUS_SUCCESS)) {
 		throw Error(ret);
 	}

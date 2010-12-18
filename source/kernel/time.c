@@ -27,6 +27,9 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
+#include <proc/signal.h>
+#include <proc/thread.h>
+
 #include <sync/waitq.h>
 
 #include <assert.h>
@@ -41,9 +44,11 @@
 typedef struct user_timer {
 	object_t obj;			/**< Object header. */
 
+	int flags;			/**< Flags for the timer. */
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
 	bool fired;			/**< Whether the event has fired. */
+	thread_t *thread;		/**< Thread that created the timer. */
 } user_timer_t;
 
 /** Check if a year is a leap year. */
@@ -446,6 +451,11 @@ static object_type_t timer_object_type = {
 static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
 
+	/* Send an alarm signal if required. */
+	if(timer->flags & TIMER_SIGNAL) {
+		signal_send(timer->thread, SIGALRM, NULL, false);
+	}
+
 	/* Signal the event. */
 	if(!notifier_run(&timer->notifier, NULL, true)) {
 		timer->fired = true;
@@ -455,9 +465,10 @@ static bool user_timer_func(void *_timer) {
 }
 
 /** Create a new timer.
+ * @param flags		Flags for the timer.
  * @param handlep	Where to store handle to timer object.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_create(handle_t *handlep) {
+status_t kern_timer_create(int flags, handle_t *handlep) {
 	object_acl_t acl;
 	object_security_t security = { -1, -1, &acl };
 	user_timer_t *timer;
@@ -473,7 +484,9 @@ status_t kern_timer_create(handle_t *handlep) {
 	object_init(&timer->obj, &timer_object_type, &security, NULL);
 	timer_init(&timer->timer, user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
+	timer->flags = flags;
 	timer->fired = false;
+	timer->thread = curr_thread;
 
 	ret = object_handle_create(&timer->obj, NULL, 0, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
