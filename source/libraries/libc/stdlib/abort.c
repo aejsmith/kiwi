@@ -18,13 +18,22 @@
  * @brief		Abort function.
  */
 
-#include <kernel/process.h>
-
-#include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
 
 /** Abort program execution. */
 void abort(void) {
-	printf("Process %d aborting!\n", kern_process_id(-1));
-	kern_process_exit(255);
+	sigset_t set;
+
+	/* First time we raise we just ensure that the signal is unblocked. */
+	sigemptyset(&set);
+	sigaddset(&set, SIGABRT);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	raise(SIGABRT);
+
+	/* If we're still alive, we reset the signal to the default action and
+	 * then raise again. */
+	signal(SIGABRT, SIG_DFL);
+	raise(SIGABRT);
+	_Exit(255);
 }
