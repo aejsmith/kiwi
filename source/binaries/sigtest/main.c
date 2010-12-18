@@ -20,9 +20,11 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <unistd.h>
 
 static void signal_handler(int sig) {
 	printf("Got signal %d!\n", sig);
+	alarm(1);
 }
 
 int main(int argc, char **argv) {

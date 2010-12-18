@@ -18,14 +18,40 @@
  * @brief		POSIX alarm function.
  */
 
+#include <kernel/time.h>
+#include <kernel/status.h>
+
+#include <util/mutex.h>
+
 #include <unistd.h>
+
 #include "../libc.h"
+
+/** Alarm timer handle. */
+static handle_t alarm_handle = -1;
+static LIBC_MUTEX_DECLARE(alarm_lock);
 
 /** Arrange for a SIGALRM signal to be delivered after a certain time.
  * @param seconds	Seconds to wait for.
  * @return		Seconds until previously scheduled alarm was to be
  *			delivered, or 0 if no previous alarm. */
 unsigned int alarm(unsigned int seconds) {
-	libc_stub("alarm", false);
-	return 0;
+	useconds_t rem;
+	status_t ret;
+
+	libc_mutex_lock(&alarm_lock, -1);
+
+	/* Create the alarm timer if it has not already been created. */
+	if(alarm_handle < 0) {
+		ret = kern_timer_create(TIMER_SIGNAL, &alarm_handle);
+		if(ret != STATUS_SUCCESS) {
+			/* Augh, POSIX doesn't let this fail. */
+			libc_fatal("failed to create alarm timer (%d)", ret);
+		}
+	}
+
+	kern_timer_stop(alarm_handle, &rem);
+	kern_timer_start(alarm_handle, seconds * 1000000, TIMER_ONESHOT);
+	libc_mutex_unlock(&alarm_lock);
+	return rem / 1000000;
 }
