@@ -345,12 +345,7 @@ FUNCTION_START(syscall_entry)
 FUNCTION_END(syscall_entry)
 
 /** Userspace entry function. */
-FUNCTION_START(thread_arch_enter_userspace)
-	/* Push a zero return address so the userspace program will fault if it
-	 * inadvertently returns from its entry function. */
-	subq	$8, %rsi
-	movq	$0, (%rsi)
-
+FUNCTION_START(amd64_enter_userspace)
 	/* Set up a stack frame for IRET:
 	 *  - SS.
 	 *  - RSP.
@@ -385,4 +380,4 @@ FUNCTION_START(thread_arch_enter_userspace)
 	/* Enter userspace. */
 	swapgs
 	iretq
-FUNCTION_END(thread_arch_enter_userspace)
+FUNCTION_END(amd64_enter_userspace)

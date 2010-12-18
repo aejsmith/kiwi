@@ -135,10 +135,10 @@ typedef struct thread {
 
 extern void thread_arch_post_switch(thread_t *thread);
 extern status_t thread_arch_init(thread_t *thread);
+extern void thread_arch_destroy(thread_t *thread);
 extern ptr_t thread_arch_tls_addr(thread_t *thread);
 extern status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void thread_arch_destroy(thread_t *thread);
-extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg);
+extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __noreturn;
 
 extern void thread_uspace_trampoline(void *_args, void *arg2);
 

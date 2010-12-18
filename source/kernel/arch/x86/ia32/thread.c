@@ -22,10 +22,14 @@
 
 #include <cpu/cpu.h>
 
+#include <mm/safe.h>
+
 #include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <status.h>
+
+extern void ia32_enter_userspace(ptr_t entry, ptr_t sp) __noreturn;
 
 /** IA32-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
@@ -50,6 +54,12 @@ void thread_arch_post_switch(thread_t *thread) {
 status_t thread_arch_init(thread_t *thread) {
 	thread->arch.tls_base = 0;
 	return STATUS_SUCCESS;
+}
+
+/** Clean up IA32-specific thread data.
+ * @param thread	Thread to clean up. */
+void thread_arch_destroy(thread_t *thread) {
+	/* Nothing happens. */
 }
 
 /** Get the TLS address for a thread.
@@ -80,8 +90,22 @@ status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr) {
 	return STATUS_SUCCESS;
 }
 
-/** Clean up IA32-specific thread data.
- * @param thread	Thread to clean up. */
-void thread_arch_destroy(thread_t *thread) {
-	/* Nothing happens. */
+/** Enter userspace in the current thread.
+ * @param entry		Entry function.
+ * @param stack		Stack pointer.
+ * @param arg		Argument to function. */
+void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) {
+	/* Write the argument to the function to the stack. */
+	stack -= sizeof(unative_t);
+	if(memcpy_to_user((void *)stack, &arg, sizeof(arg)) != STATUS_SUCCESS) {
+		thread_exit();
+	}
+
+	/* Write a 0 return address for the entry function. */
+	stack -= sizeof(unative_t);
+	if(memset_user((void *)stack, 0, sizeof(unative_t)) != STATUS_SUCCESS) {
+		thread_exit();
+	}
+
+	ia32_enter_userspace(entry, stack);
 }

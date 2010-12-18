@@ -267,20 +267,10 @@ FUNCTION_START(syscall_entry)
 FUNCTION_END(syscall_entry)
 
 /** Userspace entry function. */
-FUNCTION_START(thread_arch_enter_userspace)
+FUNCTION_START(ia32_enter_userspace)
 	/* Get arguments. */
 	movl	4(%esp), %edi
 	movl	8(%esp), %esi
-	movl	12(%esp), %eax
-
-	/* Push argument. */
-	subl	$4, %esi
-	movl	%eax, (%esi)
-
-	/* Push a zero return address so the userspace program will fault if it
-	 * inadvertently returns from its entry function. */
-	subl	$4, %esi
-	movl	$0, (%esi)
 
 	/* Set up a stack frame for IRET:
 	 *  - SS.
@@ -313,4 +303,4 @@ FUNCTION_START(thread_arch_enter_userspace)
 
 	/* Enter userspace. */
 	iret
-FUNCTION_END(thread_arch_enter_userspace)
+FUNCTION_END(ia32_enter_userspace)
