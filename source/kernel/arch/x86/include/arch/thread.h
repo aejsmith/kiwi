@@ -60,7 +60,7 @@ typedef struct thread_arch {
 # define THREAD_ARCH_OFF_USER_IFRAME	0x18
 # define THREAD_ARCH_OFF_FLAGS		0x20
 #else
-# define THREAD_ARCH_OFF_USER_IRAME	0x4
+# define THREAD_ARCH_OFF_USER_IFRAME	0x4
 # define THREAD_ARCH_OFF_FLAGS		0x8
 #endif
 

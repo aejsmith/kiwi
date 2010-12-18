@@ -79,7 +79,10 @@ static void __init_text gdt_init(cpu_t *cpu) {
 	gdt_set_base(cpu, SEGMENT_DF_TSS, (ptr_t)&cpu->arch.double_fault_tss);
 	gdt_set_limit(cpu, SEGMENT_DF_TSS, sizeof(tss_t));
 
-	/* Set the kernel GS segment to point to the architecture CPU data. */
+	/* Although once the thread system is up the GS base is pointed at the
+	 * architecture thread data, we need curr_cpu to work before that. Our
+	 * CPU data has a pointer at the start which we can use, so point the
+	 * GS base at that to begin with. */
 	gdt_set_base(cpu, SEGMENT_K_GS, (ptr_t)&cpu->arch);
 
 	/* Set the GDT pointer. */

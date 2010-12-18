@@ -23,6 +23,7 @@
 #include <arch/x86/descriptor.h>
 #include <arch/intr.h>
 #include <arch/memory.h>
+#include <arch/thread.h>
 
 #include <status.h>
 
@@ -143,11 +144,34 @@ PRIVATE_FUNCTION_START(isr_common)
 	/* Save previous state and set up a sane state. */
 	ENTRY_COMMON
 
-	/* Pass a pointer to the frame we made to the interrupt handler. */
+	/* If coming from user-mode, we must save the frame pointer and perform
+	 * kernel entry work. */
+	testl	$3, IFRAME_OFF_CS(%esp)
+	jz	1f
+	movl	%esp, %gs:THREAD_ARCH_OFF_USER_IFRAME
+	call	thread_at_kernel_entry
+1:
+	/* Call the interrupt handler. */
+	movl	IFRAME_OFF_INT_NO(%esp), %eax
 	push	%esp
-	call	intr_handler
-	add	$4, %esp
+	push	%eax
+	call	*intr_handlers(,%eax,4)
+	add	$8, %esp
 
+	/* If returning to user-mode, save the return value from the handler
+	 * (EBX is callee-save) and perform kernel exit work. We don't
+	 * reschedule until after we do exit work so that if the thread has
+	 * been killed it doesn't stick around longer than necessary. */
+	mov	%al, %bl
+	testl	$3, IFRAME_OFF_CS(%esp)
+	jz	2f
+	call	thread_at_kernel_exit
+2:
+	/* Reschedule if requested by the handler. */
+	test	%bl, %bl
+	jz	3f
+	call	sched_yield
+3:
 	/* Restore the saved state and return. */
 	RETURN_COMMON
 FUNCTION_END(isr_common)
@@ -160,6 +184,9 @@ FUNCTION_START(syscall_entry)
 
 	/* Save previous state and set up a sane state. */
 	ENTRY_COMMON
+
+	/* Save the user-mode interrupt frame pointer. */
+	movl	%esp, %gs:THREAD_ARCH_OFF_USER_IFRAME
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
@@ -197,14 +224,9 @@ FUNCTION_START(syscall_entry)
 	/* Save the return value of the system call. */
 	movl	%eax, IFRAME_OFF_AX(%esp)
 
-	/* Disable interrupts. */
+	/* Disable interrupts and perform kernel exit work. */
 	cli
-
-	/* Perform kernel exit work. This requires an interrupt frame for
-	 * signal delivery. */
-	//push	%esp
 	call	thread_at_kernel_exit
-	//add	$4, %esp
 
 	/* Restore the saved state and return. */
 	RETURN_COMMON

@@ -29,11 +29,17 @@
 
 /** IA32-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
+	/* Store the current CPU pointer and then point the GS register to the
+	 * new thread's architecture data. */
+	thread->arch.cpu = thread->cpu;
+	gdt_set_base(thread->cpu, SEGMENT_K_GS, (ptr_t)&thread->arch);
+	__asm__ volatile("mov %0, %%gs" :: "r"(SEGMENT_K_GS));
+
 	/* Set the ESP0 field in the TSS to point to the new thread's
 	 * kernel stack. */
 	curr_cpu->arch.tss.esp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
 
-	/* Update the segment base. It will be reloaded upon return to
+	/* Update the GS segment base. It will be reloaded upon return to
 	 * userspace. */
 	gdt_set_base(curr_cpu, SEGMENT_U_GS, thread->arch.tls_base);
 }

@@ -391,7 +391,7 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 
 	/* Get the memory type of the address and set flags accordingly. */
 	type = MEMORY_TYPE_WB;
-	page_get_memory_type(phys, &type);
+	phys_memory_type(phys, &type);
 	switch(type) {
 	case MEMORY_TYPE_UC:
 		flags |= PG_PCD;
