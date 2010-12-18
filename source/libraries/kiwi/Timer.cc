@@ -66,7 +66,7 @@ void Timer::Start(useconds_t interval) {
 
 /** Stop the timer. */
 void Timer::Stop() {
-	status_t ret = kern_timer_stop(m_handle);
+	status_t ret = kern_timer_stop(m_handle, 0);
 	assert(ret == STATUS_SUCCESS);
 	m_running = false;
 }

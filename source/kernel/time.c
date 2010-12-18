@@ -529,10 +529,12 @@ status_t kern_timer_start(handle_t handle, useconds_t interval, int mode) {
 
 /** Stop a timer.
  * @param handle	Handle to timer object.
+ * @param remp		If not NULL, where to store remaining time.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_stop(handle_t handle) {
+status_t kern_timer_stop(handle_t handle, useconds_t *remp) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
+	useconds_t rem;
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
@@ -541,9 +543,17 @@ status_t kern_timer_stop(handle_t handle) {
 	}
 
 	timer = (user_timer_t *)khandle->object;
-	timer_stop(&timer->timer);
+	if(!list_empty(&timer->timer.header)) {
+		timer_stop(&timer->timer);
+		if(remp) {
+			rem = system_time() - timer->timer.target;
+			ret = memcpy_to_user(remp, &rem, sizeof(*remp));
+		}
+	} else if(remp) {
+		ret = memset_user(remp, 0, sizeof(*remp));
+	}
 	object_handle_release(khandle);
-	return STATUS_SUCCESS;
+	return ret;
 }
 
 /** Get the system time (time since boot).

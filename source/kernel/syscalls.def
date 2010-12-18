@@ -111,7 +111,7 @@ syscall kern_futex_wait(ptr_t, int32_t, useconds_t);
 syscall kern_futex_wake(ptr_t, size_t, ptr_t);
 syscall kern_timer_create(int, ptr_t);
 syscall kern_timer_start(handle_t, useconds_t, int);
-syscall kern_timer_stop(handle_t);
+syscall kern_timer_stop(handle_t, ptr_t);
 syscall kern_signal_send(handle_t, int);
 syscall kern_signal_action(int, ptr_t, ptr_t) wrapped;
 syscall kern_signal_mask(int, ptr_t, ptr_t);
