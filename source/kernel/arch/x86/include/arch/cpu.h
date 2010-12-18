@@ -53,22 +53,8 @@ typedef struct cpu_features {
 
 /** Architecture-specific CPU structure. */
 typedef struct cpu_arch {
-	/** Pointer back to containing CPU structure.
-	 * @note		The GS segment is pointed at the top of this
-	 *			structure, which is used to get the current CPU
-	 *			structure pointer. */
-	struct cpu *cpu_ptr;
-#ifdef __x86_64__
-	/** SYSCALL/SYSRET data.
-	 * @note		It is OK to store these on a per-CPU basis
-	 *			rather than in per-thread data, as it is only
-	 *			used during system call entry, not return. The
-	 *			user RSP field is only used as a temporary
-	 *			scratch space before pushing it on to the
-	 *			kernel stack. */
-	ptr_t kernel_rsp;			/**< RSP for kernel entry via SYSCALL. */
-	ptr_t user_rsp;				/**< Temporary storage for user RSP. */
-#endif
+	struct cpu *parent;			/**< Pointer back to CPU. */
+
 	/** Time conversion factors. */
 	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
 	uint64_t lapic_timer_cv;		/**< LAPIC timer conversion factor. */

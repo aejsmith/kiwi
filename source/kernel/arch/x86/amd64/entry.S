@@ -23,6 +23,7 @@
 #include <arch/x86/descriptor.h>
 #include <arch/intr.h>
 #include <arch/memory.h>
+#include <arch/thread.h>
 
 #include <status.h>
 
@@ -132,31 +133,82 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
-	/* If coming from userspace, load the kernel GS segment base. */
+	/* If coming from user-mode, there is more work to do. Jump to the
+	 * user-mode ISR handling code below. */
 	testl	$3, 24(%rsp)
-	jz	1f
-	swapgs
-1:
+	jnz	isr_common_user
+
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
 	/* Clear direction flag. */
 	cld
 
-	/* Pass a pointer to the structure we made to the interrupt handler. */
-	movq	%rsp, %rdi
-	call	intr_handler
+	/* Call the interrupt handler. */
+	movq	IFRAME_OFF_INT_NO(%rsp), %rdi
+	movq	%rsp, %rsi
+	call	*intr_handlers(,%rdi,8)
+
+	/* Reschedule if requested by the handler. */
+	test	%al, %al
+	jz	1f
+	call	sched_yield
+1:
+	/* Restore the saved registers. */
+	POP_REGS
+
+	/* Get rid of the error code and interrupt number, and return. */
+	addq	$16, %rsp
+	iretq
+FUNCTION_END(isr_common)
+
+/** Common user-mode ISR handling code. */
+PRIVATE_FUNCTION_START(isr_common_user)
+	/* Load the kernel GS segment base. */
+	swapgs
+
+	/* Create the interrupt frame structure on the stack. */
+	PUSH_REGS
+
+	/* Clear direction flag. */
+	cld
+
+	/* Save the user-mode interrupt frame pointer. */
+	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_IFRAME
+
+	/* Perform kernel entry work. */
+	call	thread_at_kernel_entry
+
+	/* Call the interrupt handler. */
+	movq	IFRAME_OFF_INT_NO(%rsp), %rdi
+	movq	%rsp, %rsi
+	call	*intr_handlers(,%rdi,8)
+
+	/* Save the return value from the handler (RBX is callee-save) and
+	 * perform kernel exit work. We don't reschedule until after we do
+	 * exit work so that if the thread has been killed it doesn't stick
+	 * around longer than necessary. */
+	mov	%al, %bl
+	call	thread_at_kernel_exit
+
+	/* Reschedule if requested by the handler. */
+	test	%bl, %bl
+	jz	1f
+	call	sched_yield
+1:
+	/* We must clear the THREAD_ARCH_IFRAME_MODIFIED flag if it has been
+	 * set. This is used in the SYSCALL handler below so that it knows
+	 * whether to return via the IRET path, but as we're returning using
+	 * IRET anyway it doesn't matter to us. */
+	andl	$~THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
 
 	/* Restore the saved registers. */
 	POP_REGS
 
-	/* If returning to userspace, swap back to the previous GS base. */
-	testl	$3, 24(%rsp)
-	jz	2f
-	swapgs
-2:
-	/* Get rid of the error code and interrupt number. */
+	/* Get rid of the error code and interrupt number, swap back to the
+	 * previous GS base and return. */
 	addq	$16, %rsp
+	swapgs
 	iretq
 FUNCTION_END(isr_common)
 
@@ -167,13 +219,13 @@ FUNCTION_START(syscall_entry)
 	 * pointer. The third pointer is a temporary scratch space for us to
 	 * save the userspace stack pointer in before we push it to the stack. */
 	swapgs
-	movq	%rsp, %gs:16
-	movq	%gs:8, %rsp
+	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_RSP
+	movq	%gs:THREAD_ARCH_OFF_KERNEL_RSP, %rsp
 
 	/* Get back the userspace stack pointer from the temporary scratch
 	 * space and put it onto the kernel stack. */
 	push	$(SEGMENT_U_DS | 3)
-	push	%gs:16
+	push	%gs:THREAD_ARCH_OFF_USER_RSP
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (R11 = original RFLAGS, RCX = return IP) and the rest of the
@@ -184,6 +236,9 @@ FUNCTION_START(syscall_entry)
 	push	$0
 	push	$0
 	PUSH_REGS
+
+	/* Save the user-mode interrupt frame pointer. */
+	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_IFRAME
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
@@ -218,13 +273,15 @@ FUNCTION_START(syscall_entry)
 	/* Clear interrupts. */
 	cli
 
-	/* Perform kernel exit work. This requires an interrupt frame for
-	 * signal delivery. If a signal is to be delivered, return via IRET as
-	 * we need RCX to be preserved. */
-	//movq	%rsp, %rdi
+	/* Perform kernel exit work. */
 	call	thread_at_kernel_exit
-	//test	%rax, %rax
-	//jnz	.Liret
+
+	/* If we're going to execute a user-mode signal handler, or we have
+	 * returned from a signal handler, the signal frame setup code will
+	 * have set the THREAD_ARCH_IFRAME_MODIFIED flag. When this flag is
+	 * set, we return via IRET as it doesn't clobber certain registers. */
+	testl	$THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
+	jnz	.Liret
 
 	/* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace
 	 * stack pointer. */
@@ -270,6 +327,9 @@ FUNCTION_START(syscall_entry)
 	movq	%r12, %rsp
 	jmp	.Lreturn
 .Liret:
+	/* Clear the modified flag. */
+	andl	$~THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
+
 	/* Restore the registers, get rid of interrupt/error code. */
 	POP_REGS
 	addq	$16, %rsp

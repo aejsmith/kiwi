@@ -181,8 +181,7 @@ void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx, uint32_t
  * @param cpu		CPU structure to fill in.
  * @param args		Kernel arguments structure for the CPU. */
 void __init_text cpu_arch_init(cpu_t *cpu, kernel_args_cpu_arch_t *args) {
-	/* Set the pointer back to the CPU structure for curr_cpu. */
-	cpu->arch.cpu_ptr = cpu;
+	cpu->arch.parent = cpu;
 
 	/* Copy information from the kernel arguments. */
 	cpu->arch.cpu_freq = args->cpu_freq;

@@ -85,7 +85,10 @@ static void __init_text gdt_init(cpu_t *cpu) {
 		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS), "r"(0)
 	);
 
-	/* Set the GS base address to point to the architecture CPU data. */
+	/* Although once the thread system is up the GS base is pointed at the
+	 * architecture thread data, we need curr_cpu to work before that. Our
+	 * CPU data has a pointer at the start which we can use, so point the
+	 * GS base at that to begin with. */
 	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&cpu->arch);
 	x86_write_msr(X86_MSR_K_GS_BASE, 0);
 }

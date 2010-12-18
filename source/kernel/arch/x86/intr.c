@@ -39,12 +39,11 @@
 
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
-
 extern bool kdbg_db_handler(unative_t num, intr_frame_t *frame);
-extern void intr_handler(intr_frame_t *frame);
+extern void kdbg_arch_except_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
-static intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
+intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
 
 /** String names for CPU exceptions. */
 static const char *except_strings[] = {
@@ -310,6 +309,13 @@ static bool xm_fault(unative_t num, intr_frame_t *frame) {
 	return false;
 }
 
+/** Handle an exception that occurred in KDBG.
+ * @param frame		Interrupt frame. */
+void kdbg_arch_except_handler(intr_frame_t *frame) {
+	unative_t num = frame->int_no;
+	kdbg_except_handler(num, (num < 32) ? except_strings[num] : "Unknown", frame);
+}
+
 /** Register an interrupt handler.
  *
  * Registers a handler to be called upon receipt of a certain interrupt. If
@@ -328,37 +334,6 @@ void intr_register(unative_t num, intr_handler_t handler) {
 void intr_remove(unative_t num) {
 	assert(num < IDT_ENTRY_COUNT);
 	intr_handlers[num] = NULL;
-}
-
-/** Interrupt handler routine.
- * @param frame		Interrupt stack frame. */
-void intr_handler(intr_frame_t *frame) {
-	unative_t num = frame->int_no;
-	bool schedule;
-
-	/* Do entry stuff if coming from user mode. */
-	if(frame->cs & 3) {
-		thread_at_kernel_entry();
-	}
-
-	if(unlikely(atomic_get(&kdbg_running) == 2)) {
-		kdbg_except_handler(num, (num < 32) ? except_strings[num] : "Unknown", frame);
-		return;
-	}
-
-	schedule = intr_handlers[num](num, frame);
-
-	/* Do userspace return work if returning to userspace. This is done
-	 * before rescheduling so that the thread does not stay around longer
-	 * than necessary if it has been killed. */
-	if(frame->cs & 3) {
-		thread_at_kernel_exit();
-	}
-
-	/* Reschedule if asked to by the interrupt handler. */
-	if(schedule) {
-		sched_yield();
-	}
 }
 
 /** Initialise the interrupt handler table. */

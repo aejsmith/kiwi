@@ -30,13 +30,18 @@
 
 /** AMD64-specific post-thread switch function. */
 void thread_arch_post_switch(thread_t *thread) {
-	/* Set the RSP0 field in the TSS to point to the new thread's
-	 * kernel stack. */
-	curr_cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
+	/* Store the current CPU pointer and then point the GS register to the
+	 * new thread's architecture data. */
+	thread->arch.cpu = thread->cpu;
+	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&thread->arch);
 
 	/* Store the kernel RSP in the current CPU structure for the SYSCALL
 	 * code to use. */
-	curr_cpu->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
+	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
+
+	/* Set the RSP0 field in the TSS to point to the new thread's
+	 * kernel stack. */
+	curr_cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
 
 	/* Set the FS base address to the TLS segment base. */
 	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
@@ -46,6 +51,7 @@ void thread_arch_post_switch(thread_t *thread) {
  * @param thread	Thread to initialise.
  * @return		Always returns STATUS_SUCCESS. */
 status_t thread_arch_init(thread_t *thread) {
+	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
 	return STATUS_SUCCESS;
 }

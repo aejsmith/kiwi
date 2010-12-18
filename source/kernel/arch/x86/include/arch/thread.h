@@ -21,11 +21,47 @@
 #ifndef __ARCH_THREAD_H
 #define __ARCH_THREAD_H
 
+#ifndef __ASM__
+
 #include <types.h>
 
-/** x86-specific thread structure. */
+struct cpu;
+struct intr_frame;
+
+/** x86-specific thread structure.
+ * @note		The GS register is pointed to the copy of this structure
+ *			for the current thread. It is used to access per-CPU
+ *			data, and also to easily access per-thread data from
+ *			assembly code. If changing the layout of this structure,
+ *			be sure to updated the offset definitions below. */
 typedef struct thread_arch {
-	ptr_t tls_base;		/**< TLS base address. */
+	struct cpu *cpu;			/** Current CPU pointer. */
+#ifdef __x86_64__
+	/** SYSCALL/SYSRET data. */
+	ptr_t kernel_rsp;			/**< RSP for kernel entry via SYSCALL. */
+	ptr_t user_rsp;				/**< Temporary storage for user RSP. */
+#endif
+	struct intr_frame *user_iframe;		/**< Frame from last user-mode entry. */
+	unative_t flags;			/**< Flags for the thread. */
+	ptr_t tls_base;				/**< TLS base address. */
 } __packed thread_arch_t;
+
+#endif /* __ASM__ */
+
+/** Flags for thread_arch_t. */
+#ifdef __x86_64__
+# define THREAD_ARCH_IFRAME_MODIFIED	(1<<0)	/**< Interrupt frame was modified. */
+#endif
+
+/** Offsets in thread_arch_t. */
+#ifdef __x86_64__
+# define THREAD_ARCH_OFF_KERNEL_RSP	0x8
+# define THREAD_ARCH_OFF_USER_RSP	0x10
+# define THREAD_ARCH_OFF_USER_IFRAME	0x18
+# define THREAD_ARCH_OFF_FLAGS		0x20
+#else
+# define THREAD_ARCH_OFF_USER_IRAME	0x4
+# define THREAD_ARCH_OFF_FLAGS		0x8
+#endif
 
 #endif /* __ARCH_THREAD_H */
