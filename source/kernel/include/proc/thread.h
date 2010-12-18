@@ -91,7 +91,7 @@ typedef struct thread {
 	sigset_t signal_mask;		/**< Signal mask for the thread. */
 	sigset_t pending_signals;	/**< Bitmap of pending signals. */
 	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
-	stack_t signal_altstack;	/**< Alternate signal stack. */
+	stack_t signal_stack;		/**< Alternate signal stack. */
 
 	/** Accounting information. */
 	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */

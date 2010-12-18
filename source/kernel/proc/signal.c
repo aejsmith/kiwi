@@ -59,6 +59,21 @@ extern void kern_signal_return(void);
  * @note		This must be updated if any new signals are added. */
 #define VALID_SIGNAL_MASK	0xFFFFFE
 
+/** Force delivery of a signal due to failure delivering another.
+ * @param thread	Thread to send to.
+ * @param num		Signal to send.
+ * @param cause		Signal that could not be delivered. */
+static void signal_force(thread_t *thread, int num, int cause) {
+	/* If failed delivering the signal that we're sending now, force it to
+	 * run with the default action. This will usually result in the process
+	 * being killed. */
+	if(num == cause) {
+		thread->owner->signal_act[num].sa_handler = SIG_DFL;
+	}
+
+	signal_send(thread, num, NULL, true);
+}
+
 /** Send a signal to a thread.
  * @param thread	Thread to send to.
  * @param num		Signal number to send.
@@ -107,8 +122,9 @@ void signal_send(thread_t *thread, int num, siginfo_t *info, bool force) {
 
 /** Handle pending signals for the current thread. */
 void signal_handle_pending(void) {
+	sigset_t pending, mask;
 	sigaction_t *action;
-	sigset_t pending;
+	status_t ret;
 	int num;
 
 	/* Delay signal delivery during process loading. */
@@ -118,7 +134,7 @@ void signal_handle_pending(void) {
 
 	mutex_lock(&curr_proc->lock);
 	spinlock_lock(&curr_thread->lock);
-
+retry:
 	/* Work out the set of pending signals with masks applied. */
 	pending = curr_thread->pending_signals;
 	pending &= ~(curr_thread->signal_mask | curr_proc->signal_mask);
@@ -144,9 +160,30 @@ void signal_handle_pending(void) {
 		/* If not the default action, we must execute a user-mode
 		 * handler function. */
 		if(action->sa_handler != SIG_DFL) {
-			// handle sa flags here!
-			kprintf(LOG_WARN, "signal: todo: execute user-mode handler %d\n", num);
-			continue;
+			/* Save the current mask, and apply a new mask. AFAICT,
+			 * POSIX doesn't specify whether this mask is applied
+			 * to the whole process, or just to the thread receiving
+			 * the signal. FIXME. */
+			mask = curr_proc->signal_mask;
+			curr_proc->signal_mask |= action->sa_mask;
+			if(!(action->sa_flags & SA_NODEFER)) {
+				curr_proc->signal_mask |= (1 << num);
+			}
+
+			/* Reset the signal if requested. */
+			if(action->sa_flags & SA_RESETHAND) {
+				memset(action, 0, sizeof(*action));
+			}
+
+			/* Get the architecture code to set up the user-mode
+			 * context to run the handler. */
+			ret = signal_arch_setup_frame(action, &curr_thread->signal_info[num], mask);
+			if(ret != STATUS_SUCCESS) {
+				signal_force(curr_thread, SIGSEGV, num);
+				goto retry;
+			}
+
+			break;
 		}
 
 		/* Unlock while handling default action in case we need to kill
@@ -368,12 +405,12 @@ status_t kern_signal_mask(int flags, const sigset_t *newp, sigset_t *oldp) {
  *
  * @return		0 on success, -1 on failure.
  */
-status_t kern_signal_altstack(const stack_t *newp, stack_t *oldp) {
+status_t kern_signal_stack(const stack_t *newp, stack_t *oldp) {
 	stack_t kstack;
 	status_t ret;
 
 	if(oldp) {
-		ret = memcpy_to_user(oldp, &curr_thread->signal_altstack, sizeof(*oldp));
+		ret = memcpy_to_user(oldp, &curr_thread->signal_stack, sizeof(*oldp));
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
@@ -395,7 +432,7 @@ status_t kern_signal_altstack(const stack_t *newp, stack_t *oldp) {
 			return ret;
 		}
 
-		memcpy(&curr_thread->signal_altstack, &kstack, sizeof(kstack));
+		memcpy(&curr_thread->signal_stack, &kstack, sizeof(kstack));
 	}
 
 	return STATUS_SUCCESS;
@@ -403,5 +440,18 @@ status_t kern_signal_altstack(const stack_t *newp, stack_t *oldp) {
 
 /** Return from a signal handler. */
 void kern_signal_return(void) {
-	fatal("TODO");
+	sigset_t mask;
+	status_t ret;
+
+	ret = signal_arch_restore_frame(&mask);
+	if(ret != STATUS_SUCCESS) {
+		kprintf(LOG_NORMAL, "signal: failed to restore signal context for %u, forcing SEGV\n",
+		        curr_thread->id);
+		signal_force(curr_thread, SIGSEGV, SIGSEGV);
+	}
+
+	/* Restore the previous signal mask. */
+	mask &= ~((1 << SIGKILL) | (1 << SIGSTOP));
+	mask &= VALID_SIGNAL_MASK;
+	curr_proc->signal_mask = mask;
 }

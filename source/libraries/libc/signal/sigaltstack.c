@@ -41,7 +41,7 @@
 int sigaltstack(const stack_t *restrict ss, stack_t *restrict oldss) {
 	status_t ret;
 
-	ret = kern_signal_altstack(ss, oldss);
+	ret = kern_signal_stack(ss, oldss);
 	if(ret != STATUS_SUCCESS) {
 		libc_status_to_errno(ret);
 		return -1;

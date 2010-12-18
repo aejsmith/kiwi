@@ -15,20 +15,19 @@
 
 /**
  * @file
- * @brief		Signal functions.
+ * @brief		Signal test command.
  */
 
-#ifndef __PROC_SIGNAL_H
-#define __PROC_SIGNAL_H
+#include <stdio.h>
+#include <signal.h>
 
-#include <kernel/signal.h>
+static void signal_handler(int sig) {
+	printf("Got signal %d!\n", sig);
+}
 
-struct thread;
-
-extern status_t signal_arch_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t mask);
-extern status_t signal_arch_restore_frame(sigset_t *maskp);
-
-extern void signal_send(struct thread *thread, int num, siginfo_t *info, bool force);
-extern void signal_handle_pending(void);
-
-#endif /* __PROC_SIGNAL_H */
+int main(int argc, char **argv) {
+	signal(SIGUSR1, signal_handler);
+	while(true) {
+		getchar();
+	}
+}

@@ -86,7 +86,7 @@ typedef struct mcontext {
 #endif
 } mcontext_t;
 
-/** Structure containing a signal context. */
+/** Structure containing a saved context. */
 typedef struct ucontext {
 	struct ucontext *uc_link;	/**< Unused. */
 	sigset_t uc_sigmask;		/**< Signals masked when this context is active. */
@@ -211,7 +211,7 @@ extern "C" {
 extern status_t kern_signal_send(handle_t handle, int num);
 extern status_t kern_signal_action(int num, const sigaction_t *newp, sigaction_t *oldp);
 extern status_t kern_signal_mask(int flags, const sigset_t *newp, sigset_t *oldp);
-extern status_t kern_signal_altstack(const stack_t *newp, stack_t *oldp);
+extern status_t kern_signal_stack(const stack_t *newp, stack_t *oldp);
 
 #ifdef __cplusplus
 }

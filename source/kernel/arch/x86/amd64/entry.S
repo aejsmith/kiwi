@@ -270,10 +270,8 @@ FUNCTION_START(syscall_entry)
 	/* Save the return value of the system call. */
 	movq	%rax, IFRAME_OFF_AX(%rsp)
 
-	/* Clear interrupts. */
+	/* Disable interrupts and perform kernel exit work. */
 	cli
-
-	/* Perform kernel exit work. */
 	call	thread_at_kernel_exit
 
 	/* If we're going to execute a user-mode signal handler, or we have

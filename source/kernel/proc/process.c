@@ -1113,8 +1113,9 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	/* Reset signal handling state. */
 	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
 	curr_proc->signal_mask = 0;
-	memset(&curr_thread->signal_altstack, 0, sizeof(curr_thread->signal_altstack));
-	curr_thread->signal_altstack.ss_flags = SS_DISABLE;
+	curr_thread->signal_stack.ss_sp = NULL;
+	curr_thread->signal_stack.ss_size = 0;
+	curr_thread->signal_stack.ss_flags = SS_DISABLE;
 
 	mutex_unlock(&curr_proc->lock);
 
@@ -1210,7 +1211,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 
 	/* Inherit certain per-thread attributes such as the alternate signal
 	 * stack and TLS address from the thread that called us. */
-	memcpy(&thread->signal_altstack, &curr_thread->signal_altstack, sizeof(thread->signal_altstack));
+	memcpy(&thread->signal_stack, &curr_thread->signal_stack, sizeof(thread->signal_stack));
 	thread_arch_set_tls_addr(thread, thread_arch_tls_addr(curr_thread));
 
 	/* Run the new thread. */

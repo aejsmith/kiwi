@@ -523,8 +523,9 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	/* Initialise signal handling state. */
 	thread->signal_mask = 0;
 	memset(thread->signal_info, 0, sizeof(thread->signal_info));
-	memset(&thread->signal_altstack, 0, sizeof(thread->signal_altstack));
-	thread->signal_altstack.ss_flags = SS_DISABLE;
+	thread->signal_stack.ss_sp = NULL;
+	thread->signal_stack.ss_size = 0;
+	thread->signal_stack.ss_flags = SS_DISABLE;
 
 	/* Add the thread to the owner. */
 	process_attach(owner, thread);
