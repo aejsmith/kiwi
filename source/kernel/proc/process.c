@@ -1178,6 +1178,10 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	handle_t handle;
 	status_t ret;
 
+	if(validate_user_address(sp, 0) != STATUS_SUCCESS) {
+		return STATUS_INVALID_ADDR;
+	}
+
 	/* If no security attributes are provided a default ACL is constructed
 	 * by process_alloc(). */
 	if(security) {

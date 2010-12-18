@@ -747,6 +747,8 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void 
 
 	if(!handlep) {
 		return STATUS_INVALID_ARG;
+	} else if(validate_user_address(stack, stacksz) != STATUS_SUCCESS) {
+		return STATUS_INVALID_ADDR;
 	}
 
 	ret = strndup_from_user(name, THREAD_NAME_MAX, &kname);
