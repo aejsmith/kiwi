@@ -40,7 +40,6 @@
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 extern bool kdbg_db_handler(unative_t num, intr_frame_t *frame);
-extern void kdbg_arch_except_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
 intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
@@ -62,15 +61,26 @@ static const char *except_strings[] = {
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
 static bool unhandled_interrupt(unative_t num, intr_frame_t *frame) {
-	_fatal(frame, "Received unknown interrupt %" PRIun, num);
+	if(atomic_get(&kdbg_running) == 2) {
+		kdbg_except_handler(num, "Unknown", frame);
+	} else {
+		_fatal(frame, "Received unknown interrupt %" PRIun, num);
+	}
+
+	return false;
 }
 
 /** Kernel-mode exception handler.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
 static void kmode_except_handler(unative_t num, intr_frame_t *frame) {
-	/* All unhandled kernel-mode exceptions are fatal. */
-	_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)", num, except_strings[num]);
+	/* All unhandled kernel-mode exceptions are fatal. When in KDBG, pass
+	 * through to its exception handler. */
+	if(atomic_get(&kdbg_running) == 2) {
+		kdbg_except_handler(num, except_strings[num], frame);
+	} else {
+		_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)", num, except_strings[num]);
+	}
 }
 
 /** Generic exception handler.
@@ -197,6 +207,11 @@ static bool page_fault(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 	int ret;
 
+	/* We can't service a page fault while running KDBG. */
+	if(unlikely(atomic_get(&kdbg_running) == 2)) {
+		kdbg_except_handler(num, except_strings[num], frame);
+		return false;
+	}
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */
 	if(cpu_features.xd && frame->err_code & (1<<4)) {
@@ -307,13 +322,6 @@ static bool xm_fault(unative_t num, intr_frame_t *frame) {
 	}
 
 	return false;
-}
-
-/** Handle an exception that occurred in KDBG.
- * @param frame		Interrupt frame. */
-void kdbg_arch_except_handler(intr_frame_t *frame) {
-	unative_t num = frame->int_no;
-	kdbg_except_handler(num, (num < 32) ? except_strings[num] : "Unknown", frame);
 }
 
 /** Register an interrupt handler.
