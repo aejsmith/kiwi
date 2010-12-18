@@ -503,7 +503,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->killed = false;
 	thread->ustack = NULL;
 	thread->ustack_size = 0;
-	thread->priority = 0;
+	thread->priority = owner->priority;
 	thread->timeslice = 0;
 	thread->preempt_off = 0;
 	thread->preempt_missed = false;
