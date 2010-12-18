@@ -156,6 +156,12 @@ void EventLoop::RemoveEvents(Handle *handle) {
 	}
 }
 
+/** Perform pre-event handling tasks. */
+void EventLoop::PreHandle() {}
+
+/** Perform post-event handling tasks. */
+void EventLoop::PostHandle() {}
+
 /** Run the event loop.
  * @return		Status code the event loop was asked to exit with. */
 int EventLoop::Run(void) {
@@ -179,6 +185,8 @@ int EventLoop::Run(void) {
 			libkiwi_fatal("EventLoop::Run: Failed to wait for events: %d", ret);
 		}
 
+		PreHandle();
+
 		/* Signal each handle an event occurred on. */
 		for(size_t i = 0; i < m_priv->events.size(); i++) {
 			if(m_priv->events[i].signalled) {
@@ -186,6 +194,8 @@ int EventLoop::Run(void) {
 				handle->second->HandleEvent(m_priv->events[i].event);
 			}
 		}
+
+		PostHandle();
 	}
 }
 

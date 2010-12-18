@@ -22,6 +22,9 @@
 #define __TERMINALAPP_H
 
 #include <kiwi/EventLoop.h>
+#include <list>
+
+class TerminalWindow;
 
 /** Terminal application class. */
 class TerminalApp : public kiwi::EventLoop {
@@ -30,9 +33,11 @@ public:
 
 	void CreateWindow();
 private:
+	void PostHandle();
 	void WindowDestroyed(Object *obj);
 
-	int m_window_count;		/**< Number of open windows. */
+	/** List of all windows. */
+	std::list<TerminalWindow *> m_windows;
 };
 
 #endif /* __TERMINALAPP_H */

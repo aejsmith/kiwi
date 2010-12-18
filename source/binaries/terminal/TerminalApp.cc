@@ -27,9 +27,7 @@
 /** Terminal application constructor.
  * @param argc		Argument count.
  * @param argv		Argument array. */
-TerminalApp::TerminalApp(int argc, char **argv) :
-	m_window_count(0)
-{
+TerminalApp::TerminalApp(int argc, char **argv) {
 	/* Change to our home directory and set USER. FIXME: Better place for this. */
 	chdir(getenv("HOME"));
 	setenv("USER", "admin", 1);
@@ -44,14 +42,22 @@ TerminalApp::TerminalApp(int argc, char **argv) :
 /** Create a new terminal window. */
 void TerminalApp::CreateWindow() {
 	TerminalWindow *window = new TerminalWindow(this, 100, 35);
-	m_window_count++;
+	m_windows.push_back(window);
 	window->OnDestroy.Connect(this, &TerminalApp::WindowDestroyed);
 	window->GetTerminal().Run("/system/binaries/bash");
 }
 
+/** Perform post-event handling tasks. */
+void TerminalApp::PostHandle() {
+	for(auto it = m_windows.begin(); it != m_windows.end(); ++it) {
+		(*it)->Flush();
+	}
+}
+
 /** Handle destruction of a window. */
 void TerminalApp::WindowDestroyed(Object *obj) {
-	if(--m_window_count == 0) {
+	m_windows.remove(static_cast<TerminalWindow *>(obj));
+	if(m_windows.empty()) {
 		Quit();
 	}
 }

@@ -43,6 +43,9 @@ public:
 	void RemoveEvent(Handle *handle, int event);
 	void RemoveEvents(Handle *handle);
 
+	virtual void PreHandle();
+	virtual void PostHandle();
+
 	int Run();
 	void Quit(int status = 0);
 

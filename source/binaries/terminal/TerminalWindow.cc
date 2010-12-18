@@ -171,7 +171,7 @@ void TerminalWindow::TerminalUpdated(Rect rect) {
 			} else {
 				m_font->DrawChar(context, ch.ch, pos);
 			}
-			Update(Rect(pos, font_size));
+			m_updated.Union(Rect(pos, font_size));
 		}
 	}
 
@@ -215,6 +215,18 @@ void TerminalWindow::TerminalHistoryAdded() {
 void TerminalWindow::TerminalBufferChanged() {
 	m_history_pos = 0;
 	TerminalUpdated(Rect(0, 0, m_cols, m_rows));
+}
+
+/** Flush updates to the window. */
+void TerminalWindow::Flush() {
+	/* Update the redrawn area. */
+	Region::RectArray rects;
+	m_updated.GetRects(rects);
+	for(auto it = rects.begin(); it != rects.end(); ++it) {
+		Update(*it);
+	}
+
+	m_updated.Clear();
 }
 
 /** Handle the terminal process exiting.
@@ -295,7 +307,7 @@ void TerminalWindow::DoScroll(int start, int end, int delta) {
 		}
 
 		/* Update the window. */
-		Update(Rect(Point(0, dest_y), size));
+		m_updated.Union(Rect(Point(0, dest_y), size));
 	}
 
 	/* Update characters on the top/bottom row. */
@@ -510,5 +522,5 @@ void TerminalWindow::Resized(const ResizeEvent &event) {
 
 	/* Destroy the context and update the window. */
 	cairo_destroy(context);
-	Update(GetFrame());
+	m_updated.Union(GetFrame());
 }

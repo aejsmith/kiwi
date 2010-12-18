@@ -148,6 +148,8 @@ void Terminal::Resize(int cols, int rows) {
 	}
 
 	m_handler->Resize(cols, rows);
+	m_cols = cols;
+	m_rows = rows;
 }
 
 /** Send input to the terminal.

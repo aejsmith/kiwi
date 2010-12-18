@@ -41,6 +41,7 @@ public:
 	void TerminalScrolled(int start, int end, int delta);
 	void TerminalHistoryAdded();
 	void TerminalBufferChanged();
+	void Flush();
 private:
 	void TerminalExited(int status);
 	void ScrollUp(int amount);
@@ -57,6 +58,7 @@ private:
 	int m_cols;			/**< Width of the terminal. */
 	int m_rows;			/**< Height of the terminal. */
 	int m_history_pos;		/**< Offset in history. */
+	kiwi::Region m_updated;		/**< Updated region. */
 
 	static Font *m_font;		/**< Normal font to use. */
 	static Font *m_bold_font;	/**< Bold font to use. */
