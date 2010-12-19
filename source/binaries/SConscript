@@ -20,7 +20,6 @@ SConscript(dirs=[
 	'lsmod',
 	'mount',
 	'shutdown',
-	'sigtest',
 	'terminal',
 	'unmount',
 	'3rdparty/bash-4.1',
