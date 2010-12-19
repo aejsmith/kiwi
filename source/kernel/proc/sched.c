@@ -116,15 +116,15 @@ typedef struct sched_cpu {
 	sched_queue_t *active;		/**< Active queue. */
 	sched_queue_t *expired;		/**< Expired queue. */
 	sched_queue_t queues[2];	/**< Active and expired queues. */
-	size_t total;			/**< Total thread count. */
+	size_t total;			/**< Total running/ready thread count. */
 } sched_cpu_t;
 
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 
-/** Total number of runnable threads across all CPUs. */
-static atomic_t threads_runnable = 0;
+/** Total number of running/ready threads across all CPUs. */
+static atomic_t threads_running = 0;
 
 /** Add a thread to a queue.
  * @param queue		Queue to add to.
@@ -144,173 +144,6 @@ static inline void sched_queue_remove(sched_queue_t *queue, thread_t *thread) {
 	}
 }
 
-#if 0
-/** Migrate a thread from another CPU to current CPU.
- * @param cpu		Source CPU's scheduler structure (should be locked).
- * @param thread	Thread to migrate.
- * @return		1 if successful, 0 if not. */
-static inline int sched_migrate_thread(sched_cpu_t *cpu, thread_t *thread) {
-	spinlock_lock_ni(&thread->lock);
-
-	assert(thread->cpu->sched == cpu);
-	assert(thread->state == THREAD_READY);
-
-	/* Don't move wired threads. */
-	if(thread->wire_count) {
-		spinlock_unlock_ni(&thread->lock);
-		return 0;
-	}
-
-	dprintf("sched: migrating thread %" PRId32 "(%s) to CPU %" PRIu32 " from CPU %" PRIu32 "\n",
-		thread->id, thread->name, curr_cpu->id, thread->cpu->id);
-
-	/* Remove the thread from its old CPU. */
-	list_remove(&thread->runq_link);
-	cpu->count[thread->priority]--;
-	atomic_dec(&cpu->runnable);
-
-	thread->cpu = curr_cpu;
-
-	/* Drop the source CPU lock temporarily while we work on the current
-	 * CPU to prevent deadlock. Interrupts are managed by the caller so we
-	 * do not need to worry about the state. */
-	spinlock_unlock_ni(&cpu->lock);
-
-	/* Insert it in the current CPU's queue. */
-	spinlock_lock_ni(&curr_cpu->sched->lock);
-	curr_cpu->sched->count[thread->priority]++;
-	list_append(&curr_cpu->sched->queues[thread->priority], &thread->runq_link);
-	atomic_inc(&curr_cpu->sched->runnable);
-	spinlock_unlock_ni(&curr_cpu->sched->lock);
-	spinlock_unlock_ni(&thread->lock);
-
-	/* Retake the source CPU lock. */
-	spinlock_lock_ni(&cpu->lock);
-	return 1;
-}
-
-/** Migrate threads from another CPU.
- * @param cpu		Source CPU's scheduler structure (should be locked).
- * @param priority	Priority queue to migrate from.
- * @param max		Maximum number of threads to migrate.
- * @return		Number of threads migrated. */
-static inline int sched_migrate_cpu(sched_cpu_t *cpu, int priority, int max) {
-	thread_t *thread;
-	int count = max;
-
-	LIST_FOREACH_SAFE(&cpu->queues[priority], iter) {
-		thread = list_entry(iter, thread_t, runq_link);
-
-		count -= sched_migrate_thread(cpu, thread);
-		if(count == 0) {
-			break;
-		}
-	}
-
-	return (max - count);
-}
-
-/** Attempt to migrate threads with a certain priority.
- * @param average	Average number of threads per CPU.
- * @param priority	Thread priority to migrate.
- * @param max		Maximum number of threads to migrate.
- * @return		Number of threads migrated. */
-static inline int sched_migrate_priority(int average, int priority, int max) {
-	bool state = intr_disable();
-	int load, num, count = max;
-	cpu_t *cpu;
-
-	LIST_FOREACH(&cpus_running, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu == curr_cpu || !cpu->sched) {
-			continue;
-		}
-
-		spinlock_lock_ni(&cpu->sched->lock);
-
-		/* Check whether the CPU has some threads that we can take. */
-		load = atomic_get(&cpu->sched->runnable);
-		if(load <= average) {
-			dprintf("sched: cpu %" PRIu32 " with load %d average %d has no threads for %" PRIu32 "\n",
-				cpu->id, load, average, curr_cpu->id);
-			spinlock_unlock_ni(&cpu->sched->lock);
-			continue;
-		}
-
-		/* Calculate how many threads to take from this CPU. */
-		num = (load - average) < count ? (load - average) : count;
-		dprintf("sched: migrating at most %d from priority %d on %" PRIu32 " (count: %d, max: %d)\n",
-			num, priority, cpu->id, count, max);
-
-		/* Take as many threads as we can. */
-		count -= sched_migrate_cpu(cpu->sched, priority, num);
-		spinlock_unlock_ni(&cpu->sched->lock);
-
-		/* If count is now zero, then we have nothing left to do. */
-		assert(count >= 0);
-		if(count == 0) {
-			intr_restore(state);
-			return max;
-		}
-	}
-
-	intr_restore(state);
-	return (max - count);
-}
-
-/** Per-CPU load balancing thread.
- * @param arg1		First thread argument.
- * @param arg2		Second thread argument. */
-static void sched_balancer_thread(void *arg1, void *arg2) {
-	int total, load, average, count, i;
-
-	while(true) {
-		usleep(SECS2USECS(3));
-		dprintf("sched: load-balancer for CPU %" PRIu32 " woken\n", curr_cpu->id);
-
-		/* Check if there are any threads available. */
-		total = atomic_get(&threads_runnable);
-		if(total == 0) {
-			dprintf("sched: runnable thread count is 0, nothing to do\n");
-			continue;
-		}
-
-		/* Get the average number of threads that a CPU should have as
-		 * well as our current load. We round up to a multiple of the
-		 * CPU count rather than rounding down here for a good reason.
-		 * As an example, we have an 8 CPU box, and there are 15
-		 * runnable threads. If we round down, then the average will
-		 * be 1. This could result in all but one CPU having 1 thread,
-		 * and one CPU having 8 threads (the other CPUs won't pull
-		 * threads off this CPU to themselves if they have the average
-		 * of one, and CPUs don't give threads away either). Rounding
-		 * up the total count will ensure that this doesn't happen. */
-		average = (ROUND_UP(total, cpu_count) / cpu_count);
-		load = atomic_get(&curr_cpu->sched->runnable);
-
-		/* If this CPU has the average or more than the average we
-		 * don't need to do anything. It is up to other CPUs to take
-		 * threads from this CPU. */
-		if(load >= average) {
-			dprintf("sched: load %d greater than or equal to average %d, nothing to do\n", load, average);
-			continue;
-		}
-
-		/* There are not enough threads on this CPU, work out how many
-		 * we need and find some to take from other CPUs. Low priority
-		 * threads are migrated before higher priority threads. */
-		count = average - load;
-		for(i = (PRIORITY_MAX - 1); i >= 0; i--) {
-			count -= sched_migrate_priority(average, i, count);
-			if(count == 0) {
-				break;
-			}
-		}
-
-		continue;
-	}
-}
-#endif
 /** Calculate the initial priority of a thread.
  * @param thread	Thread to calculate for. */
 static inline void sched_calculate_priority(thread_t *thread) {
@@ -371,8 +204,6 @@ static thread_t *sched_cpu_pick(sched_cpu_t *cpu) {
 	i = bitops_fls(cpu->active->bitmap);
 	thread = list_entry(cpu->active->threads[i].next, thread_t, runq_link);
 	sched_queue_remove(cpu->active, thread);
-	cpu->total--;
-	atomic_dec(&threads_runnable);
 	return thread;
 }
 
@@ -413,14 +244,17 @@ void sched_internal(bool state) {
 		sched_tweak_priority(cpu, curr_thread);
 	}
 
-	/* If this thread hasn't gone to sleep then re-queue it. */
 	if(curr_thread->state == THREAD_RUNNING) {
+		/* The thread hasn't gone to sleep, re-queue it. */
 		curr_thread->state = THREAD_READY;
 		if(curr_thread != cpu->idle_thread) {
 			sched_queue_insert(cpu->expired, curr_thread);
-			cpu->total++;
-			atomic_inc(&threads_runnable);
 		}
+	} else {
+		/* Thread is no longer running, decrease counts. */
+		assert(curr_thread != cpu->idle_thread);
+		cpu->total--;
+		atomic_dec(&threads_running);
 	}
 
 	/* Find a new thread to run. A NULL return value means no threads are
@@ -511,6 +345,55 @@ void sched_post_switch(bool state) {
 	intr_restore(state);
 }
 
+/** Allocate a CPU for a thread to run on.
+ * @param thread	Thread to allocate for. */
+static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
+	size_t total, average, load;
+	cpu_t *cpu, *other;
+
+	/* On uniprocessor systems, we only have one choice. */
+	if(cpu_count == 1) {
+		return curr_cpu;
+	}
+
+	/* Add 1 to the total number of threads to account for the thread we're
+	 * adding. */
+	total = atomic_get(&threads_running) + 1;
+
+	/* Start on the current CPU that the thread currently belongs to. */
+	cpu = (thread->cpu) ? thread->cpu : curr_cpu;
+
+	/* Get the average number of threads that a CPU should have as well as
+	 * the CPU's current load. We round up to a multiple of the CPU count
+	 * rather than rounding down here to stop us from loading off threads
+	 * unnecessarily. */
+	average = (ROUND_UP(total, cpu_count) / cpu_count);
+	load = cpu->sched->total;
+
+	/* If the CPU has less than or equal to the average, we're OK to keep
+	 * the thread on it. */
+	if(load <= average) {
+		return cpu;
+	}
+
+	/* We need to pick another CPU. Try to find one with a load less than
+	 * the average. If there isn't one, we just keep the thread on its
+	 * current CPU. */
+	LIST_FOREACH(&cpus_running, iter) {
+		other = list_entry(iter, cpu_t, header);
+
+		load = other->sched->total;
+		if(load < average) {
+			kprintf(LOG_DEBUG, "sched: CPU %u load %zu less than average %zu, giving it thread %u\n",
+			        other->id, load, average, thread->id);
+			cpu = other;
+			break;
+		}
+	}
+
+	return cpu;
+}
+
 /** Insert a thread into the scheduler.
  * @param thread	Thread to insert (should be locked). */
 void sched_thread_insert(thread_t *thread) {
@@ -533,10 +416,7 @@ void sched_thread_insert(thread_t *thread) {
 		}
 	} else {
 		/* Pick a new CPU for the thread to run on. */
-		// TODO: implement this
-		if(!thread->cpu) {
-			thread->cpu = curr_cpu;
-		}
+		thread->cpu = sched_allocate_cpu(thread);
 	}
 
 	sched = thread->cpu->sched;
@@ -544,7 +424,7 @@ void sched_thread_insert(thread_t *thread) {
 
 	sched_queue_insert(sched->active, thread);
 	sched->total++;
-	atomic_inc(&threads_runnable);
+	atomic_inc(&threads_running);
 
 	/* If the thread has a higher priority than the currently running
 	 * thread on the CPU, or if the CPU is idle, reschedule it. */
