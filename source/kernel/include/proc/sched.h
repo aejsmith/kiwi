@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -20,14 +20,6 @@
 
 #ifndef __PROC_SCHED_H
 #define __PROC_SCHED_H
-
-/** Number of process priority levels. */
-#define PRIORITY_MAX		8
-
-/** Priority level definitions. */
-#define PRIORITY_KERNEL		0		/**< Kernel process. */
-#define PRIORITY_SYSTEM		1		/**< System process. */
-#define PRIORITY_USER		3		/**< User process. */
 
 extern void sched_yield(void);
 extern void sched_preempt_disable(void);

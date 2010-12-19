@@ -64,8 +64,8 @@ typedef struct thread {
 	thread_arch_t arch;		/**< Architecture thread data. */
 	unative_t *kstack;		/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
-	cpu_t *cpu;			/**< CPU that the thread runs on. */
-	int wire_count;			/**< How many calls to thread_wire() have been made. */
+	int priority;			/**< Priority of the thread. */
+	size_t wire_count;		/**< How many calls to thread_wire() have been made. */
 	refcount_t count;		/**< Number of handles to the thread. */
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
 	ptr_t ustack;			/**< User-mode stack base. */
@@ -73,9 +73,11 @@ typedef struct thread {
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */
-	size_t priority;		/**< Current scheduling priority. */
-	uint32_t timeslice;		/**< Current timeslice. */
-	int preempt_off;		/**< Whether preemption is disabled. */
+	int max_prio;			/**< Maximum scheduling priority. */
+	int curr_prio;			/**< Current scheduling priority. */
+	cpu_t *cpu;			/**< CPU that the thread runs on. */
+	useconds_t timeslice;		/**< Current timeslice. */
+	size_t preempt_off;		/**< Whether preemption is disabled. */
 	bool preempt_missed;		/**< Whether preemption was missed due to being disabled. */
 
 	/** Sleeping information. */
@@ -125,10 +127,6 @@ typedef struct thread {
 	struct process *owner;		/**< Pointer to parent process. */
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;
-
-/** Thread flag definitions. */
-#define THREAD_UNQUEUEABLE	(1<<1)	/**< Thread cannot be queued in the run queue. */
-#define THREAD_UNPREEMPTABLE	(1<<2)	/**< Thread will not be preempted. */
 
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)

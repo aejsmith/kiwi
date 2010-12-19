@@ -51,7 +51,7 @@ typedef struct process {
 
 	/** Scheduling information. */
 	int flags;			/**< Behaviour flags for the process. */
-	size_t priority;		/**< Priority of the process. */
+	int priority;			/**< Priority class of the process. */
 	struct vm_aspace *aspace;	/**< Process' address space. */
 
 	/** Resource information. */
@@ -86,7 +86,10 @@ typedef struct process {
 
 /** Process flag definitions. */
 #define PROCESS_CRITICAL	(1<<0)	/**< Process is critical to system operation, cannot die. */
-#define PROCESS_FIXEDPRIO	(1<<1)	/**< Process' priority is fixed and should not be changed. */
+
+/** Internal priority classes. */
+#define PRIORITY_CLASS_SYSTEM	3	/**< Used for the kernel process. */
+#define PRIORITY_CLASS_MAX	3
 
 /** Macro that expands to a pointer to the current process. */
 #define curr_proc		(curr_thread->owner)

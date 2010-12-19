@@ -62,6 +62,11 @@ typedef struct process_args {
 #define EXIT_REASON_NORMAL	0	/**< Normal exit (status is exit code). */
 #define EXIT_REASON_SIGNAL	1	/**< Exited due to a signal (status is signal number). */
 
+/** Process priority classes. */
+#define PRIORITY_CLASS_LOW	0	/**< Low priority. */
+#define PRIORITY_CLASS_NORMAL	1	/**< Normal priority. */
+#define PRIORITY_CLASS_HIGH	2	/**< High priority. */
+
 extern status_t kern_process_create(const char *path, const char *const args[],
                                     const char *const env[], int flags,
                                     const security_context_t *sectx,

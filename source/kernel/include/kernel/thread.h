@@ -40,6 +40,11 @@ extern "C" {
 /** Maximum length of a thread name. */
 #define THREAD_NAME_MAX		32
 
+/** Thread priority values. */
+#define THREAD_PRIORITY_LOW	0	/**< Low priority. */
+#define THREAD_PRIORITY_NORMAL	1	/**< Normal priority. */
+#define THREAD_PRIORITY_HIGH	2	/**< High priority. */
+
 extern status_t kern_thread_create(const char *name, void *stack, size_t stacksz,
                                    void (*func)(void *), void *arg,
                                    const object_security_t *security,

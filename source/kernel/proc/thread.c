@@ -260,9 +260,7 @@ void thread_wire(thread_t *thread) {
 void thread_unwire(thread_t *thread) {
 	if(thread) {
 		spinlock_lock(&thread->lock);
-		if(thread->wire_count == 0) {
-			fatal("Calling unwire when thread already unwired");
-		}
+		assert(thread->wire_count > 0);
 		thread->wire_count--;
 		spinlock_unlock(&thread->lock);
 	}
@@ -499,11 +497,13 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	refcount_set(&thread->count, 1);
 	thread->fpu = NULL;
 	thread->flags = flags;
+	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wire_count = 0;
 	thread->killed = false;
 	thread->ustack = NULL;
 	thread->ustack_size = 0;
-	thread->priority = owner->priority;
+	thread->max_prio = -1;
+	thread->curr_prio = -1;
 	thread->timeslice = 0;
 	thread->preempt_off = 0;
 	thread->preempt_missed = false;
@@ -543,22 +543,13 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 }
 
 /** Run a newly-created thread.
- *
- * Moves a newly created thread into the Ready state and places it on the
- * run queue of the current CPU.
- *
- * @todo		If the thread is not tied to the current CPU, pick the
- *			best CPU for it to run on.
- *
- * @param thread	Thread to run.
- */
+ * @param thread	Thread to run. */
 void thread_run(thread_t *thread) {
 	spinlock_lock(&thread->lock);
 
 	assert(thread->state == THREAD_CREATED);
 
 	thread->state = THREAD_READY;
-	thread->cpu = curr_cpu;
 	sched_thread_insert(thread);
 
 	spinlock_unlock(&thread->lock);
@@ -648,9 +639,9 @@ static inline void thread_dump(thread_t *thread, int level) {
 	default:		kprintf(level, "Bad          "); break;
 	}
 
-	kprintf(level, "%-4" PRIu32 " %-4d %-4zu %-5d %-20s %-5" PRId32 " %s\n",
+	kprintf(level, "%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
 	        (thread->cpu) ? thread->cpu->id : 0, thread->wire_count, thread->priority,
-	        thread->flags, (thread->waitq) ? thread->waitq->name : "None",
+	        thread->curr_prio, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
 	        thread->owner->id, thread->name);
 }
 
@@ -674,8 +665,8 @@ int kdbg_cmd_thread(int argc, char **argv) {
 		return KDBG_FAIL;
 	}
 
-	kprintf(LOG_NONE, "ID     State        CPU  Wire Prio Flags Waiting On           Owner Name\n");
-	kprintf(LOG_NONE, "==     =====        ===  ==== ==== ===== ==========           ===== ====\n");
+	kprintf(LOG_NONE, "ID     State        CPU  Wire Prio (Curr) Flags Waiting On           Owner Name\n");
+	kprintf(LOG_NONE, "==     =====        ===  ==== ==== ====== ===== ==========           ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */

@@ -241,7 +241,7 @@ static object_type_t process_object_type = {
  *
  * @param name		Name to give the process.
  * @param flags		Behaviour flags for the process.
- * @param priority	Priority to give the process.
+ * @param priority	Priority class to give the process.
  * @param aspace	Address space for the process.
  * @param table		If not NULL, this handle table will be used, otherwise
  *			a new table will be created containing either all
@@ -282,7 +282,6 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 
 	assert(name);
 	assert(procp);
-	assert(priority >= 0 && priority < PRIORITY_MAX);
 
 	ret = object_security_validate(security, NULL);
 	if(ret != STATUS_SUCCESS) {
@@ -655,7 +654,7 @@ process_t *process_lookup(process_id_t id) {
  * @param args		Arguments to pass to process (NULL-terminated array).
  * @param env		Environment to pass to process (NULL-terminated array).
  * @param flags		Behaviour flags for the process.
- * @param priority	Priority for the process.
+ * @param priority	Priority class for the process.
  * @param parent	Parent for the process.
  * @param procp		Where to store pointer to new process.
  *
@@ -669,7 +668,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	thread_t *thread;
 	status_t ret;
 
-	if(!args || !args[0] || !env || priority < 0 || priority >= PRIORITY_MAX) {
+	if(!args || !args[0] || !env || priority < 0 || priority > PRIORITY_CLASS_MAX) {
 		return STATUS_INVALID_ARG;
 	}
 
@@ -795,9 +794,9 @@ void __init_text process_init(void) {
 	object_acl_add_entry(&acl, ACL_ENTRY_OTHERS, 0, PROCESS_RIGHT_QUERY);
 
 	/* Create the kernel process. */
-	ret = process_alloc("[kernel]", PROCESS_CRITICAL | PROCESS_FIXEDPRIO,
-	                    PRIORITY_KERNEL, NULL, NULL, NULL, 0, NULL, NULL,
-	                    0, &security, &kernel_proc, 0, NULL, NULL);
+	ret = process_alloc("[kernel]", PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM,
+	                    NULL, NULL, NULL, 0, NULL, NULL, 0, &security,
+	                    &kernel_proc, 0, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not initialise kernel process (%d)", ret);
 	}
@@ -994,9 +993,9 @@ status_t kern_process_create(const char *path, const char *const args[], const c
 	}
 
 	/* Create the new process and a handle to it. */
-	ret = process_alloc(info.path, 0, PRIORITY_USER, info.aspace, NULL, curr_proc,
-	                    flags, NULL, info.map, count, &ksecurity, &process, rights,
-	                    &handle, handlep);
+	ret = process_alloc(info.path, 0, PRIORITY_CLASS_NORMAL, info.aspace, NULL,
+	                    curr_proc, flags, NULL, info.map, count, &ksecurity,
+	                    &process, rights, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}
@@ -1199,9 +1198,9 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	table = handle_table_clone(curr_proc->handles);
 
 	/* Create the new process and a handle to it. */
-	ret = process_alloc(curr_proc->name, 0, PRIORITY_USER, as, table, curr_proc,
-	                    PROCESS_CREATE_CLONE, NULL, NULL, 0, &ksecurity, &process,
-	                    rights, &handle, handlep);
+	ret = process_alloc(curr_proc->name, 0, PRIORITY_CLASS_NORMAL, as, table,
+	                    curr_proc, PROCESS_CREATE_CLONE, NULL, NULL, 0,
+	                    &ksecurity, &process, rights, &handle, handlep);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
 	}

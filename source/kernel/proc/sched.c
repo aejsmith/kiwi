@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2010 Alex Smith
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
@@ -17,33 +17,50 @@
  * @file
  * @brief		Thread scheduler.
  *
- * The thread scheduler maintains per-CPU prioritized run queues. The highest
- * priority is 0, then 1, then 2, etc, until PRIORITY_MAX is reached. Each
- * CPU has an array of linked lists, one for each priority. When picking a
- * thread to run, the scheduler goes through the CPU's run queues, starting
- * at the highest priority, until a thread is found. This means that higher
- * priority threads will always be scheduled before lower priority threads.
+ * The thread scheduler maintains per-CPU prioritized run queues. Internally,
+ * there are 32 priority levels, which process priority classes and thread
+ * priorities are mapped on to. Each CPU has two priority queues: active and
+ * expired. A priority queue is an array of linked lists for each priority
+ * level, and a bitmap of lists with queues in. This makes thread selection
+ * O(1): find the highest set bit in the bitmap, and take the first thread off
+ * that list.
  *
- * However, this can introduce starvation problems for lower priority threads.
- * To prevent this, when switching threads the scheduler checks whether the
- * previous thread used all of its timeslice. If it didn't, its priority is
- * increased by 1, unless it is at its owner's maximum. Otherwise, the
- * scheduler checks if it is preventing any other threads running, and if it
- * is its priority is decreased by 1.
+ * The active queue is used to select threads to run, and when a thread needs
+ * to be reinserted into the queue after using all of its timeslice, it is
+ * placed in the expired queue. When selecting a thread, if there are no threads
+ * in the active queue, but there are in the expired queue, the active and
+ * expired queues are swapped. This alleviates starvation of lower priority
+ * threads by guaranteeing that all threads waiting in the active queue will be
+ * given a chance to run before going back to higher priority threads that are
+ * using up all of their timeslice.
  *
- * Threads are also assigned a timeslice based on their priority. The current
- * timeslice algorithm is (thread priority + 1) milliseconds.
+ * CPU-bound threads get punished by a small decrease in priority (a maximum of
+ * 5) to ensure that interactive threads at the same priority get given more
+ * chance to run. The current heuristic used to determine whether a thread is
+ * CPU-bound is to see whether it uses up all of its timeslice.
  *
- * Because the highest priority is 0, this means that higher priority processes
- * will get run more frequently than lower priority processes, but will run
- * for shorter periods.
+ * On multi-CPU systems, load is balanced between CPUs when moving threads into
+ * the Ready state by picking an appropriate CPU to run on. Currently, the CPU
+ * that the thread previously ran on is favoured if it is not heavily loaded.
+ * Otherwise, the CPU with the lowest load is picked.
  *
- * On SMP systems, load balancing is performed by a set of threads, one for
- * each CPU. A count of all runnable threads across all CPUs is manintained,
- * which is used by the load balancer thread to work out the average number
- * of threads that a CPU should have. If a CPU has less threads than this
- * average, then its load balancer pulls threads from overloaded CPUs.
+ * @todo		Load balancing could be improved in situations where
+ *			there are several CPU-bound threads running. Currently,
+ *			a thread is only moved to another CPU when it is woken
+ *			from sleep. This could be done by stealing threads from
+ *			other CPUs when a CPU becomes idle.
+ * @todo		Once the facility to get CPU topology information is
+ *			implemented, we should be more friendly to HT systems
+ *			when picking a CPU for a thread to run on by favouring
+ *			idle logical CPUs on a core that is not already running
+ *			a thread on another of its logical CPUs.
+ * @todo		Possibly a better heuristic for determining whether a
+ *			thread is CPU-/IO-bound is to look at how much time it
+ *			spends sleeping.
+ * @todo		Alter timeslice based on priority?
  */
+
+#include <arch/bitops.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
@@ -70,8 +87,23 @@
 # define dprintf(fmt...)	
 #endif
 
+/** Number of priority levels. */
+#define PRIORITY_COUNT		32
+
+/** Timeslice to give to threads. */
+#define THREAD_TIMESLICE	MSECS2USECS(3)
+
+/** Maximum penalty to CPU-bound threads. */
+#define MAX_PENALTY		5
+
 /** Set to 1 to enable a debug message for every thread switch. */
 #define SCHED_OVERKILL_DEBUG	0
+
+/** Run queue structure. */
+typedef struct sched_queue {
+	unative_t bitmap;		/**< Bitmap of queues with data. */
+	list_t threads[PRIORITY_COUNT];	/**< Queues of runnable threads. */
+} sched_queue_t;
 
 /** Per-CPU scheduling information structure. */
 typedef struct sched_cpu {
@@ -80,21 +112,39 @@ typedef struct sched_cpu {
 	thread_t *prev_thread;		/**< Previously executed thread. */
 
 	thread_t *idle_thread;		/**< Thread scheduled when no other threads runnable. */
-	thread_t *balancer_thread;	/**< Load balancing thread. */
 	timer_t timer;			/**< Preemption timer. */
-
-	list_t queues[PRIORITY_MAX];	/**< Prioritized runnable thread queues. */
-	size_t count[PRIORITY_MAX];	/**< Count of threads in run queues. */
-	atomic_t runnable;		/**< Total count of runnable threads. */
+	sched_queue_t *active;		/**< Active queue. */
+	sched_queue_t *expired;		/**< Expired queue. */
+	sched_queue_t queues[2];	/**< Active and expired queues. */
+	size_t total;			/**< Total thread count. */
 } sched_cpu_t;
 
 extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 
-/** Total runnable threads across all CPUs. */
+/** Total number of runnable threads across all CPUs. */
 static atomic_t threads_runnable = 0;
 
+/** Add a thread to a queue.
+ * @param queue		Queue to add to.
+ * @param thread	Thread to add. */
+static inline void sched_queue_insert(sched_queue_t *queue, thread_t *thread) {
+	list_append(&queue->threads[thread->curr_prio], &thread->runq_link);
+	queue->bitmap |= (1 << thread->curr_prio);
+}
+
+/** Remove a thread from a queue.
+ * @param queue		Queue to remove from.
+ * @param thread	Thread to remove. */
+static inline void sched_queue_remove(sched_queue_t *queue, thread_t *thread) {
+	list_remove(&thread->runq_link);
+	if(list_empty(&queue->threads[thread->curr_prio])) {
+		queue->bitmap &= ~(1 << thread->curr_prio);
+	}
+}
+
+#if 0
 /** Migrate a thread from another CPU to current CPU.
  * @param cpu		Source CPU's scheduler structure (should be locked).
  * @param thread	Thread to migrate.
@@ -260,104 +310,70 @@ static void sched_balancer_thread(void *arg1, void *arg2) {
 		continue;
 	}
 }
+#endif
+/** Calculate the initial priority of a thread.
+ * @param thread	Thread to calculate for. */
+static inline void sched_calculate_priority(thread_t *thread) {
+	int priority;
+
+	/* We need to map the priority class and the thread priority onto our
+	 * 32 priority levels. See documentation/sched-priorities.txt for a
+	 * pretty bad explanation of what this is doing. */
+	priority = 5 + (thread->owner->priority * 8);
+	priority += (thread->priority - 1) * 2;
+
+	dprintf("sched: setting priority for thread %" PRId32 " to %d (proc: %d, thread: %d)\n",
+	        thread->id, priority, thread->owner->priority, thread->priority);
+	thread->max_prio = thread->curr_prio = priority;
+}
 
 /** Tweak priority of a thread being stored.
  * @param cpu		Per-CPU scheduler information structure.
  * @param thread	Thread to tweak. */
 static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
-	size_t i;
-
-	/* If the timeslice wasn't fully used, give a bonus if we're not
-	 * already at the process' maximum. */
 	if(thread->timeslice != 0) {
-		if(thread->priority > thread->owner->priority) {
-			thread->priority--;
-			dprintf("sched: thread %" PRId32 " (" PRIu32 ") bonus (new: %zu, max: %zu)\n",
-				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
+		/* The timeslice wasn't fully used, give a bonus if we're not
+		 * already at the maximum priority. */
+		if(thread->curr_prio < thread->max_prio) {
+			thread->curr_prio++;
+			dprintf("sched: thread %" PRId32 " (%" PRId32 ") bonus (new: %d, max: %d)\n",
+				thread->id, thread->owner->id, thread->curr_prio, thread->max_prio);
 		}
-
-		return;
-	}
-
-	/* Check if there are any higher or equal priority threads. */
-	for(i = 0; i <= thread->priority; i++) {
-		/* If there are, then this thread is not preventing other
-		 * things from running so no penalties are required. */
-		if(cpu->count[i] > 0) {
-			return;
+	} else {
+		/* The timeslice was used up, penalise the thread if we've not
+		 * already given it the maximum penalty. */
+		if(thread->curr_prio && (thread->max_prio - thread->curr_prio) < MAX_PENALTY) {
+			thread->curr_prio--;
+			dprintf("sched: thread %" PRId32 " (%" PRId32 ") penalty (new: %d, max: %d)\n",
+				thread->id, thread->owner->id, thread->curr_prio, thread->max_prio);
 		}
-	}
-
-	/* Check if there are any lower priority threads. The conditions for
-	 * this loop guarantee that no penalty will be given if the thread
-	 * is already at the lowest priority - it simply won't run. */
-	for(i = thread->priority + 1; i < PRIORITY_MAX; i++) {
-		/* If there are, then this thread is preventing others from
-		 * running, so we give it a priority penalty of +1. */
-		if(cpu->count[i] > 0) {
-			thread->priority++;
-
-			dprintf("sched: thread %" PRId32 " (" PRIu32 ") penalty (new: %zu, max: %zu)\n",
-				thread->id, thread->owner->id, thread->priority, thread->owner->priority);
-			return;
-		}		
 	}
 }
 
 /** Pick a new thread to run.
  * @param cpu		Per-CPU scheduler information structure.
  * @return		Pointer to thread, or NULL if no threads available. */
-static thread_t *sched_queue_pick(sched_cpu_t *cpu) {
+static thread_t *sched_cpu_pick(sched_cpu_t *cpu) {
 	thread_t *thread;
 	int i;
 
-	/* Loop through each queue, starting at the highest priority, to find
-	 * a thread to run. */
-	for(i = 0; i < PRIORITY_MAX; i++) {
-		if(cpu->count[i] == 0) {
-			continue;
+	if(!cpu->active->bitmap) {
+		/* The active queue is empty. If there are threads on the
+		 * expired queue, swap them. */
+		if(cpu->expired->bitmap) {
+			SWAP(cpu->active, cpu->expired);
+		} else {
+			return NULL;
 		}
-
-		/* Pick the first thread off the queue. */
-		thread = list_entry(cpu->queues[i].next, thread_t, runq_link);
-		list_remove(&thread->runq_link);
-		cpu->count[i]--;
-
-		atomic_dec(&threads_runnable);
-		atomic_dec(&cpu->runnable);
-
-		/* Only lock the new thread if it isn't the current - the
-		 * current gets locked by sched_internal(). */
-		if(thread != curr_thread) {
-			spinlock_lock_ni(&thread->lock);
-		}
-
-		/* Calculate a new timeslice for the thread using the algorithm
-		 * described at the top of the file. */
-		thread->timeslice = ((thread->priority + 1) * 1000);
-
-		return thread;
 	}
 
-	return NULL;
-}
-
-/** Tweak thread priority and store in run queue.
- * @param cpu		Per-CPU scheduler information structure.
- * @param thread	Thread to store. */
-static void sched_queue_store(sched_cpu_t *cpu, thread_t *thread) {
-	/* Tweak priority of the thread if required. */
-	if((thread->owner->flags & PROCESS_FIXEDPRIO) == 0) {
-		sched_tweak_priority(cpu, thread);
-	}
-
-	assert(thread->priority < PRIORITY_MAX);
-
-	cpu->count[thread->priority]++;
-	list_append(&cpu->queues[thread->priority], &thread->runq_link);
-
-	atomic_inc(&cpu->runnable);
-	atomic_inc(&threads_runnable);
+	/* Get the thread to run. */
+	i = bitops_fls(cpu->active->bitmap);
+	thread = list_entry(cpu->active->threads[i].next, thread_t, runq_link);
+	sched_queue_remove(cpu->active, thread);
+	cpu->total--;
+	atomic_dec(&threads_runnable);
+	return thread;
 }
 
 /** Scheduler timer handler function.
@@ -378,17 +394,6 @@ static bool sched_timer_handler(void *data) {
 	return ret;
 }
 
-/** Scheduler idle thread function.
- * @param arg1		Unused.
- * @param arg2		Unused. */
-static void sched_idle_thread(void *arg1, void *arg2) {
-	intr_disable();
-	while(true) {
-		sched_yield();
-		cpu_idle();
-	}
-}
-
 /** Internal part of the thread scheduler. Expects current thread to be locked.
  * @param state		Previous interrupt state. */
 void sched_internal(bool state) {
@@ -402,30 +407,43 @@ void sched_internal(bool state) {
 	/* Thread can't be in ready state if we're running it now. */
 	assert(curr_thread->state != THREAD_READY);
 
-	/* If this thread hasn't gone to sleep then dump it on the end of
-	 * the run queue */
+	/* Tweak the priority of the thread based on whether it used up its
+	 * timeslice. */
+	if(curr_thread != cpu->idle_thread) {
+		sched_tweak_priority(cpu, curr_thread);
+	}
+
+	/* If this thread hasn't gone to sleep then re-queue it. */
 	if(curr_thread->state == THREAD_RUNNING) {
 		curr_thread->state = THREAD_READY;
-		if(!(curr_thread->flags & THREAD_UNQUEUEABLE)) {
-			sched_queue_store(cpu, curr_thread);
+		if(curr_thread != cpu->idle_thread) {
+			sched_queue_insert(cpu->expired, curr_thread);
+			cpu->total++;
+			atomic_inc(&threads_runnable);
 		}
 	}
 
 	/* Find a new thread to run. A NULL return value means no threads are
 	 * ready, so we schedule the idle thread in this case. This will
 	 * return with the new thread locked if it is not the current. */
-	new = sched_queue_pick(cpu);
-	if(new == NULL) {
+	new = sched_cpu_pick(cpu);
+	if(!new) {
 		new = cpu->idle_thread;
 		if(new != curr_thread) {
 			spinlock_lock_ni(&new->lock);
 			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n", curr_cpu->id);
 		}
-		new->timeslice = 0;
 
-		/* Mark the current CPU as idle. */
+		/* The idle thread runs indefinitely until an interrupt causes
+		 * something to be woken up. */
+		new->timeslice = 0;
 		curr_cpu->idle = true;
 	} else {
+		if(new != curr_thread) {
+			spinlock_lock_ni(&new->lock);
+		}
+
+		new->timeslice = THREAD_TIMESLICE;
 		curr_cpu->idle = false;
 	}
 
@@ -443,15 +461,14 @@ void sched_internal(bool state) {
 #endif
 
 	/* Set off the timer if necessary. */
-	if(!(curr_thread->flags & THREAD_UNPREEMPTABLE)) {
-		assert(curr_thread->timeslice > 0);
+	if(curr_thread->timeslice > 0) {
 		timer_start(&cpu->timer, curr_thread->timeslice, TIMER_ONESHOT);
 	}
 
-	/* Only bother with this stuff if the new thread is different.
+	/* Only need to perform a context switch if the new thread is different.
 	 * The switch may return to thread_trampoline() or to the interruption
-	 * handler in waitq_sleep(), so put anything to do after a switch in
-	 * sched_post_switch(). */
+	 * handler in waitq_sleep_unsafe(), so put anything to do after a
+	 * switch in sched_post_switch(). */
 	if(curr_thread != cpu->prev_thread) {
 		/* Switch the address space. If the new process' address space
 		 * is set to NULL then vm_aspace_switch() will just switch to
@@ -463,8 +480,8 @@ void sched_internal(bool state) {
 		if(fpu_state()) {
 			assert(cpu->prev_thread->fpu);
 			fpu_context_save(cpu->prev_thread->fpu);
+			fpu_disable();
 		}
-		fpu_disable();
 
 		/* Switch to the new CPU context. */
 		if(!context_save(&cpu->prev_thread->context)) {
@@ -494,19 +511,51 @@ void sched_post_switch(bool state) {
 	intr_restore(state);
 }
 
-/** Insert a thread into its CPU's run queue.
+/** Insert a thread into the scheduler.
  * @param thread	Thread to insert (should be locked). */
 void sched_thread_insert(thread_t *thread) {
+	sched_cpu_t *sched;
+
 	assert(thread->state == THREAD_READY);
-	assert(!(thread->flags & THREAD_UNQUEUEABLE));
 
-	spinlock_lock(&thread->cpu->sched->lock);
-	sched_queue_store(thread->cpu->sched, thread);
-	spinlock_unlock(&thread->cpu->sched->lock);
-
-	if(thread->cpu != curr_cpu && thread->cpu->idle) {
-		cpu_reschedule(thread->cpu);
+	/* If we've been newly created, we will not have a priority set.
+	 * Calculate the maximum priority for the thread. */
+	if(unlikely(thread->max_prio < 0)) {
+		sched_calculate_priority(thread);
 	}
+
+	if(thread->wire_count) {
+		/* If the wire count is greater than 0 and the thread doesn't
+		 * have a CPU, it means that it was wired before it started
+		 * running. Put it onto the current CPU in this case. */
+		if(unlikely(!thread->cpu)) {
+			thread->cpu = curr_cpu;
+		}
+	} else {
+		/* Pick a new CPU for the thread to run on. */
+		// TODO: implement this
+		if(!thread->cpu) {
+			thread->cpu = curr_cpu;
+		}
+	}
+
+	sched = thread->cpu->sched;
+	spinlock_lock(&sched->lock);
+
+	sched_queue_insert(sched->active, thread);
+	sched->total++;
+	atomic_inc(&threads_runnable);
+
+	/* If the thread has a higher priority than the currently running
+	 * thread on the CPU, or if the CPU is idle, reschedule it. */
+	// FIXME: preempt current CPU, sched_preempt, use in timer
+	if(thread->cpu != curr_cpu) {
+		if(thread->curr_prio > thread->cpu->thread->curr_prio || thread->cpu->idle) {
+			cpu_reschedule(thread->cpu);
+		}
+	}
+
+	spinlock_unlock(&sched->lock);
 }
 
 /** Yield remaining timeslice and switch to another thread. */
@@ -534,17 +583,29 @@ void sched_preempt_disable(void) {
 void sched_preempt_enable(void) {
 	spinlock_lock(&curr_thread->lock);
 
-	if(curr_thread->preempt_off <= 0) {
-		fatal("Preemption already enabled or negative");
-	} else if(--curr_thread->preempt_off == 0) {
+	assert(curr_thread->preempt_off > 0);
+
+	if(--curr_thread->preempt_off == 0) {
 		/* If preemption was missed then preempt immediately. */
 		if(curr_thread->preempt_missed) {
 			curr_thread->preempt_missed = false;
 			spinlock_unlock(&curr_thread->lock);
 			sched_yield();
-		} else {
-			spinlock_unlock(&curr_thread->lock);
+			return;
 		}
+	}
+
+	spinlock_unlock(&curr_thread->lock);
+}
+
+/** Scheduler idle thread function.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void sched_idle_thread(void *arg1, void *arg2) {
+	intr_disable();
+	while(true) {
+		sched_yield();
+		cpu_idle();
 	}
 }
 
@@ -552,17 +613,18 @@ void sched_preempt_enable(void) {
 void __init_text sched_init(void) {
 	char name[THREAD_NAME_MAX];
 	status_t ret;
-	int i;
+	int i, j;
 
 	/* Create the per-CPU information structure. */
 	curr_cpu->sched = kmalloc(sizeof(sched_cpu_t), MM_FATAL);
 	spinlock_init(&curr_cpu->sched->lock, "sched_lock");
-	atomic_set(&curr_cpu->sched->runnable, 0);
+	curr_cpu->sched->total = 0;
+	curr_cpu->sched->active = &curr_cpu->sched->queues[0];
+	curr_cpu->sched->expired = &curr_cpu->sched->queues[1];
 
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
-	ret = thread_create(name, NULL, THREAD_UNQUEUEABLE | THREAD_UNPREEMPTABLE,
-	                    sched_idle_thread, NULL, NULL, NULL,
+	ret = thread_create(name, NULL, 0, sched_idle_thread, NULL, NULL, NULL,
 	                    &curr_cpu->sched->idle_thread);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create idle thread for %" PRIu32 " (%d)", curr_cpu->id, ret);
@@ -579,23 +641,12 @@ void __init_text sched_init(void) {
 	/* Create the preemption timer. */
 	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL, 0);
 
-	/* Initialise run queues. */
-	for(i = 0; i < PRIORITY_MAX; i++) {
-		list_init(&curr_cpu->sched->queues[i]);
-		curr_cpu->sched->count[i] = 0;
-	}
-
-	/* Create the load-balancing thread if there is more than one CPU. */
-	if(cpu_count > 1) {
-		sprintf(name, "balancer-%" PRIu32, curr_cpu->id);
-		ret = thread_create(name, NULL, THREAD_UNPREEMPTABLE, sched_balancer_thread,
-		                    NULL, NULL, NULL, &curr_cpu->sched->balancer_thread);
-		if(ret != STATUS_SUCCESS) {
-			fatal("Could not create load balancer thread for %" PRIu32 " (%d)",
-			      curr_cpu->id, ret);
+	/* Initialise queues. */
+	for(i = 0; i < 2; i++) {
+		curr_cpu->sched->queues[i].bitmap = 0;
+		for(j = 0; j < PRIORITY_COUNT; j++) {
+			list_init(&curr_cpu->sched->queues[i].threads[j]);
 		}
-		thread_wire(curr_cpu->sched->balancer_thread);
-		thread_run(curr_cpu->sched->balancer_thread);
 	}
 }
 

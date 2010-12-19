@@ -1,0 +1,41 @@
+This diagram (rather badly) shows how the priority classes and thread priorities
+are mapped on to the scheduler's 32 priority levels. The arrow pointing to the
+left onto the array is the base line for each priority class (with normal thread
+priority). High/low thread priority adds +2/-2 to this baseline. Since there is
+a maximum penalty of 5, a low priority thread can be pushed down 2 into the next
+lowest down priority class (which is what the arrow out the bottom of the block
+is).
+
+    _____        __
+31 |_____|       ^ | -- PRIORITY_CLASS_SYSTEM + THREAD_PRIORITY_HIGH
+30 |_____|       | |
+29 |_____|<--------| -- PRIORITY_CLASS_SYSTEM + THREAD_PRIORITY_NORMAL
+28 |_____|       | |
+27 |_____|       | | -- PRIORITY_CLASS_SYSTEM + THREAD_PRIORITY_LOW
+26 |_____|       | |
+25 |_____|       | |
+24 |_____| __    |_|
+23 |_____| ^ |   |   -- PRIORITY_CLASS_HIGH + THREAD_PRIORITY_HIGH
+22 |_____| | |   v
+21 |_____|<--|       -- PRIORITY_CLASS_HIGH + THREAD_PRIORITY_NORMAL
+20 |_____| | |
+19 |_____| | |       -- PRIORITY_CLASS_HIGH + THREAD_PRIORITY_LOW
+18 |_____| | |
+17 |_____| | |
+16 |_____| |_|   __
+15 |_____| |     ^ | -- PRIORITY_CLASS_NORMAL + THREAD_PRIORITY_HIGH
+14 |_____| v     | |
+13 |_____|<--------| -- PRIORITY_CLASS_NORMAL + THREAD_PRIORITY_NORMAL
+12 |_____|       | |
+11 |_____|       | | -- PRIORITY_CLASS_NORMAL + THREAD_PRIORITY_LOW
+10 |_____|       | |
+9  |_____|       | |
+8  |_____| __    |_|
+7  |_____| ^ |   |   -- PRIORITY_CLASS_LOW + THREAD_PRIORITY_HIGH
+6  |_____| | |   v
+5  |_____|<--|       -- PRIORITY_CLASS_LOW + THREAD_PRIORITY_NORMAL
+4  |_____| | |
+3  |_____| | |       -- PRIORITY_CLASS_LOW + THREAD_PRIORITY_LOW
+2  |_____| | |
+1  |_____| | |
+0  |_____| v_|

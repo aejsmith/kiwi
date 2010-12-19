@@ -266,7 +266,7 @@ static void init_thread(void *args, void *arg2) {
 	console_update_boot_progress(100);
 
 	/* Run the service manager. */
-	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_SYSTEM, kernel_proc, NULL);
+	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM, kernel_proc, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start service manager (%d)", ret);
 	}

@@ -1298,9 +1298,11 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
  * @param as		Address space to switch to (if NULL, then will switch
  *			to the kernel address space). */
 void vm_aspace_switch(vm_aspace_t *as) {
-	bool state = intr_disable();
+	bool state;
 
 	if(as != curr_aspace) {
+		state = intr_disable();
+
 		/* Decrease old address space's reference count, if there is one. */
 		if(curr_aspace) {
 			refcount_dec(&curr_aspace->count);
@@ -1315,9 +1317,8 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		}
 
 		curr_aspace = as;
+		intr_restore(state);
 	}
-
-	intr_restore(state);
 }
 
 /** Create a new address space.

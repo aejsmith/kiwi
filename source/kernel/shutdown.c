@@ -50,6 +50,9 @@ static status_t shutdown_ipi_handler(void *message, unative_t a1, unative_t a2, 
 static void shutdown_thread_entry(void *_action, void *arg2) {
 	int action = (int)((ptr_t)_action);
 
+	thread_wire(curr_thread);
+	sched_preempt_disable();
+
 	kprintf(LOG_NORMAL, "system: terminating all processes...\n");
 	process_shutdown();
 	kprintf(LOG_NORMAL, "system: unmounting filesystems...\n");
@@ -87,8 +90,8 @@ void system_shutdown(int action) {
 		 * as it's possible that parts of the shutdown process will use
 		 * them, and if we're running in one, we'll block those DPCs
 		 * from executing. */
-		ret = thread_create("shutdown", NULL, THREAD_UNPREEMPTABLE, shutdown_thread_entry,
-		                    (void *)((ptr_t)action), NULL, NULL, &thread);
+		ret = thread_create("shutdown", NULL, 0, shutdown_thread_entry, (void *)((ptr_t)action),
+		                    NULL, NULL, &thread);
 		if(ret != STATUS_SUCCESS) {
 			/* FIXME: This shouldn't be able to fail, must reserve
 			 * a thread or something in case we've got too many
