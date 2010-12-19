@@ -22,6 +22,7 @@
 #define __PROC_SCHED_H
 
 extern void sched_yield(void);
+extern void sched_preempt(void);
 extern void sched_preempt_disable(void);
 extern void sched_preempt_enable(void);
 

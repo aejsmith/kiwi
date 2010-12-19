@@ -64,6 +64,7 @@
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
+#include <cpu/ipi.h>
 
 #include <lib/string.h>
 
@@ -209,20 +210,10 @@ static thread_t *sched_cpu_pick(sched_cpu_t *cpu) {
 
 /** Scheduler timer handler function.
  * @param data		Data argument (unused).
- * @return		Whether to perform a thread switch. */
+ * @return		Always returns true. */
 static bool sched_timer_handler(void *data) {
-	bool ret = true;
-
-	spinlock_lock(&curr_thread->lock);
-
 	curr_thread->timeslice = 0;
-	if(curr_thread->preempt_off > 0) {
-		curr_thread->preempt_missed = true;
-		ret = false;
-	}
-
-	spinlock_unlock(&curr_thread->lock);
-	return ret;
+	return true;
 }
 
 /** Internal part of the thread scheduler. Expects current thread to be locked.
@@ -427,11 +418,13 @@ void sched_thread_insert(thread_t *thread) {
 	atomic_inc(&threads_running);
 
 	/* If the thread has a higher priority than the currently running
-	 * thread on the CPU, or if the CPU is idle, reschedule it. */
-	// FIXME: preempt current CPU, sched_preempt, use in timer
-	if(thread->cpu != curr_cpu) {
-		if(thread->curr_prio > thread->cpu->thread->curr_prio || thread->cpu->idle) {
-			cpu_reschedule(thread->cpu);
+	 * thread on the CPU, or if the CPU is idle, preempt it. */
+	if(thread->cpu->idle || thread->curr_prio > thread->cpu->thread->curr_prio) {
+		if(!thread->cpu->idle) {
+			thread->cpu->should_preempt = true;
+		}
+		if(thread->cpu != curr_cpu) {
+			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
 		}
 	}
 
@@ -444,6 +437,22 @@ void sched_yield(void) {
 
 	spinlock_lock_ni(&curr_thread->lock);
 	sched_internal(state);
+}
+
+/** Preempt the current thread. */
+void sched_preempt(void) {
+	bool state = intr_disable();
+
+	curr_cpu->should_preempt = false;
+
+	spinlock_lock_ni(&curr_thread->lock);
+	if(curr_thread->preempt_off > 0) {
+		curr_thread->preempt_missed = true;
+		spinlock_unlock_ni(&curr_thread->lock);
+		intr_restore(state);
+	} else {
+		sched_internal(state);
+	}
 }
 
 /** Disable preemption.
@@ -461,7 +470,9 @@ void sched_preempt_disable(void) {
 /** Enable preemption.
  * @note		See sched_preempt_disable() for details of behaviour. */
 void sched_preempt_enable(void) {
-	spinlock_lock(&curr_thread->lock);
+	bool state = intr_disable();
+
+	spinlock_lock_ni(&curr_thread->lock);
 
 	assert(curr_thread->preempt_off > 0);
 
@@ -469,13 +480,13 @@ void sched_preempt_enable(void) {
 		/* If preemption was missed then preempt immediately. */
 		if(curr_thread->preempt_missed) {
 			curr_thread->preempt_missed = false;
-			spinlock_unlock(&curr_thread->lock);
-			sched_yield();
+			sched_internal(state);
 			return;
 		}
 	}
 
-	spinlock_unlock(&curr_thread->lock);
+	spinlock_unlock_ni(&curr_thread->lock);
+	intr_restore(state);
 }
 
 /** Scheduler idle thread function.

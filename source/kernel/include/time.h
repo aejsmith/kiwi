@@ -69,8 +69,9 @@ typedef struct timer_device {
  *			this function is called with a spinlock held in
  *			interrupt context. Be careful!
  * @param data		Data argument from timer creator.
- * @return		Whether to reschedule after handling. This is ignored
- *			if the function is run in thread context. */
+ * @return		Whether to preempt the current thread after handling.
+ *			This is ignored if the function is run in thread
+ *			context. */
 typedef bool (*timer_func_t)(void *data);
 
 /** Structure containing details of a timer. */

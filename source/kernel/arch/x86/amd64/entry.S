@@ -133,11 +133,11 @@ FUNCTION_END(isr_array)
 
 /** Common ISR handling code. */
 PRIVATE_FUNCTION_START(isr_common)
-	/* If coming from user-mode, there is more work to do. Jump to the
-	 * user-mode ISR handling code below. */
+	/* If coming from user-mode, need to load the kernel GS segment base. */
 	testl	$3, 24(%rsp)
-	jnz	isr_common_user
-
+	jz	1f
+	swapgs
+1:
 	/* Create the interrupt frame structure on the stack. */
 	PUSH_REGS
 
@@ -145,71 +145,19 @@ PRIVATE_FUNCTION_START(isr_common)
 	cld
 
 	/* Call the interrupt handler. */
-	movq	IFRAME_OFF_INT_NO(%rsp), %rdi
-	movq	%rsp, %rsi
-	call	*intr_handlers(,%rdi,8)
-
-	/* Reschedule if requested by the handler. */
-	test	%al, %al
-	jz	1f
-	call	sched_yield
-1:
-	/* Restore the saved registers. */
-	POP_REGS
-
-	/* Get rid of the error code and interrupt number, and return. */
-	addq	$16, %rsp
-	iretq
-FUNCTION_END(isr_common)
-
-/** Common user-mode ISR handling code. */
-PRIVATE_FUNCTION_START(isr_common_user)
-	/* Load the kernel GS segment base. */
-	swapgs
-
-	/* Create the interrupt frame structure on the stack. */
-	PUSH_REGS
-
-	/* Clear direction flag. */
-	cld
-
-	/* Save the user-mode interrupt frame pointer. */
-	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_IFRAME
-
-	/* Perform kernel entry work. */
-	call	thread_at_kernel_entry
-
-	/* Call the interrupt handler. */
-	movq	IFRAME_OFF_INT_NO(%rsp), %rdi
-	movq	%rsp, %rsi
-	call	*intr_handlers(,%rdi,8)
-
-	/* Save the return value from the handler (RBX is callee-save) and
-	 * perform kernel exit work. We don't reschedule until after we do
-	 * exit work so that if the thread has been killed it doesn't stick
-	 * around longer than necessary. */
-	mov	%al, %bl
-	call	thread_at_kernel_exit
-
-	/* Reschedule if requested by the handler. */
-	test	%bl, %bl
-	jz	1f
-	call	sched_yield
-1:
-	/* We must clear the THREAD_ARCH_IFRAME_MODIFIED flag if it has been
-	 * set. This is used in the SYSCALL handler below so that it knows
-	 * whether to return via the IRET path, but as we're returning using
-	 * IRET anyway it doesn't matter to us. */
-	andl	$~THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
+	movq	%rsp, %rdi
+	call	intr_handler
 
 	/* Restore the saved registers. */
 	POP_REGS
 
-	/* Get rid of the error code and interrupt number, swap back to the
-	 * previous GS base and return. */
+	/* Get rid of the error code and interrupt number, restore the previous
+	 * GS base if returning to user-mode, and return. */
 	addq	$16, %rsp
+	testl	$3, 8(%rsp)
+	jz	2f
 	swapgs
-	iretq
+2:	iretq
 FUNCTION_END(isr_common)
 
 /** SYSCALL entry point. */

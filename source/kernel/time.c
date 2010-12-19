@@ -187,10 +187,10 @@ static void timer_dpc_request(void *_timer) {
 }
 
 /** Handles a timer tick.
- * @return		Whether to reschedule. */
+ * @return		Whether to preempt the current thread. */
 bool timer_tick(void) {
 	useconds_t time = system_time();
-	bool schedule = false;
+	bool preempt = false;
 	timer_t *timer;
 
 	assert(curr_timer_device);
@@ -213,7 +213,7 @@ bool timer_tick(void) {
 			dpc_request(timer_dpc_request, timer);
 		} else {
 			if(timer->func(timer->data)) {
-				schedule = true;
+				preempt = true;
 			}
 		}
 
@@ -229,7 +229,7 @@ bool timer_tick(void) {
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
-	return schedule;
+	return preempt;
 }
 
 /** Initialise a timer structure.
@@ -447,7 +447,7 @@ static object_type_t timer_object_type = {
 
 /** Timer handler function for a userspace timer.
  * @param _timer	Pointer to timer.
- * @return		Whether to reschedule. */
+ * @return		Whether to preempt. */
 static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
 

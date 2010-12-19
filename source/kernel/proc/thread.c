@@ -365,6 +365,11 @@ void thread_at_kernel_exit(void) {
 	if(curr_thread->pending_signals) {
 		signal_handle_pending();
 	}
+
+	/* Preempt if required. */
+	if(curr_cpu->should_preempt) {
+		sched_preempt();
+	}
 }
 
 /** Terminate the current thread.

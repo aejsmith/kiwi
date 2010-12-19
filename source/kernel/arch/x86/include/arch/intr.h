@@ -178,9 +178,8 @@ static inline bool intr_state(void) {
 	return (flags & (1<<9)) ? true : false;
 }
 
-/** Interrupt handler routine type.
- * @return		Whether to reschedule. */
-typedef bool (*intr_handler_t)(unative_t num, intr_frame_t *frame);
+/** Interrupt handler function type. */
+typedef void (*intr_handler_t)(unative_t num, intr_frame_t *frame);
 
 extern void intr_register(unative_t num, intr_handler_t handler);
 extern void intr_remove(unative_t num);

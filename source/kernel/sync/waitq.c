@@ -36,7 +36,7 @@ extern void thread_wake(thread_t *thread);
 
 /** Handle a timeout on a wait queue.
  * @param _thread	Pointer to thread that timed out.
- * @return		Whether to reschedule. */
+ * @return		Whether to preempt. */
 static bool waitq_timer_handler(void *_thread) {
 	thread_t *thread = _thread;
 	waitq_t *queue;

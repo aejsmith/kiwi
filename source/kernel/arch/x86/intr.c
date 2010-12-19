@@ -39,7 +39,8 @@
 
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
-extern bool kdbg_db_handler(unative_t num, intr_frame_t *frame);
+extern void kdbg_db_handler(unative_t num, intr_frame_t *frame);
+extern void intr_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
 intr_handler_t intr_handlers[IDT_ENTRY_COUNT];
@@ -60,14 +61,12 @@ static const char *except_strings[] = {
 /** Unhandled interrupt function.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool unhandled_interrupt(unative_t num, intr_frame_t *frame) {
+static void unhandled_interrupt(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&kdbg_running) == 2) {
 		kdbg_except_handler(num, "Unknown", frame);
 	} else {
 		_fatal(frame, "Received unknown interrupt %" PRIun, num);
 	}
-
-	return false;
 }
 
 /** Kernel-mode exception handler.
@@ -86,7 +85,7 @@ static void kmode_except_handler(unative_t num, intr_frame_t *frame) {
 /** Generic exception handler.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool except_handler(unative_t num, intr_frame_t *frame) {
+static void except_handler(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
@@ -96,14 +95,12 @@ static bool except_handler(unative_t num, intr_frame_t *frame) {
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** Divide Error (#DE) fault handler.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool de_fault(unative_t num, intr_frame_t *frame) {
+static void de_fault(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
@@ -114,15 +111,12 @@ static bool de_fault(unative_t num, intr_frame_t *frame) {
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** Handler for NMIs.
  * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-static bool nmi_handler(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void nmi_handler(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
@@ -132,14 +126,12 @@ static bool nmi_handler(unative_t num, intr_frame_t *frame) {
 	} else {
 		_fatal(frame, "Received unexpected NMI");
 	}
-
-	return false;
 }
 
 /** Invalid Opcode (#UD) fault handler.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool ud_fault(unative_t num, intr_frame_t *frame) {
+static void ud_fault(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
@@ -150,29 +142,23 @@ static bool ud_fault(unative_t num, intr_frame_t *frame) {
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** Handler for device-not-available (#NM) exceptions.
  * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Whether to reschedule. */
-static bool nm_fault(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void nm_fault(unative_t num, intr_frame_t *frame) {
 	if(frame->cs & 3) {
 		fpu_request();
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** Handler for double faults.
  * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Doesn't return. */
-static bool double_fault(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void double_fault(unative_t num, intr_frame_t *frame) {
 #ifndef __x86_64__
 	/* Copy in the state from before the fault into the frame. */
 	frame->gs = curr_cpu->arch.tss.gs;
@@ -198,9 +184,8 @@ static bool double_fault(unative_t num, intr_frame_t *frame) {
 
 /** Handler for page faults.
  * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Whether to reschedule. */
-static bool page_fault(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void page_fault(unative_t num, intr_frame_t *frame) {
 	int reason = (frame->err_code & (1<<0)) ? VM_FAULT_PROTECTION : VM_FAULT_NOTPRESENT;
 	int access = (frame->err_code & (1<<1)) ? VM_FAULT_WRITE : VM_FAULT_READ;
 	ptr_t addr = x86_read_cr2();
@@ -210,7 +195,7 @@ static bool page_fault(unative_t num, intr_frame_t *frame) {
 	/* We can't service a page fault while running KDBG. */
 	if(unlikely(atomic_get(&kdbg_running) == 2)) {
 		kdbg_except_handler(num, except_strings[num], frame);
-		return false;
+		return;
 	}
 #if CONFIG_X86_NX
 	/* Check if the fault was caused by instruction execution. */
@@ -228,12 +213,12 @@ static bool page_fault(unative_t num, intr_frame_t *frame) {
 	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
 		ret = vm_fault(addr, reason, access);
 		if(ret == VM_FAULT_SUCCESS) {
-			return false;
+			return;
 		} else if(curr_thread->in_usermem) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			kdbg_enter(KDBG_ENTRY_USER, frame);
 			context_restore_frame(&curr_thread->usermem_context, frame);
-			return false;
+			return;
 		}
 	} else {
 		/* This is an access to kernel memory, which should be reported
@@ -284,15 +269,13 @@ static bool page_fault(unative_t num, intr_frame_t *frame) {
 		              (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
 		              (frame->err_code & (1<<4)) ? " | Execute" : "");
 	}
-
-	return false;
 }
 
 /** FPU Floating-Point Error (#MF) fault handler.
  * @todo		Get FPU status and convert to correct signal code.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool mf_fault(unative_t num, intr_frame_t *frame) {
+static void mf_fault(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
@@ -302,15 +285,13 @@ static bool mf_fault(unative_t num, intr_frame_t *frame) {
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** SIMD Floating-Point (#XM) fault handler.
  * @todo		Get FPU status and convert to correct signal code.
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
-static bool xm_fault(unative_t num, intr_frame_t *frame) {
+static void xm_fault(unative_t num, intr_frame_t *frame) {
 	siginfo_t info;
 
 	if(frame->cs & 3) {
@@ -320,8 +301,6 @@ static bool xm_fault(unative_t num, intr_frame_t *frame) {
 	} else {
 		kmode_except_handler(num, frame);
 	}
-
-	return false;
 }
 
 /** Register an interrupt handler.
@@ -342,6 +321,39 @@ void intr_register(unative_t num, intr_handler_t handler) {
 void intr_remove(unative_t num) {
 	assert(num < IDT_ENTRY_COUNT);
 	intr_handlers[num] = NULL;
+}
+
+/** Interrupt handler.
+ * @param frame		Interrupt frame. */
+void intr_handler(intr_frame_t *frame) {
+	bool user = frame->cs & 3;
+
+	if(user) {
+		/* Save the user-mode interrupt frame pointer, used by the
+		 * signal frame setup/restore code. */
+		curr_thread->arch.user_iframe = frame;
+		thread_at_kernel_entry();
+	}
+
+	/* Call the handler. */
+	intr_handlers[frame->int_no](frame->int_no, frame);
+
+	if(user) {
+		thread_at_kernel_exit();
+#ifdef __x86_64__
+		/* We must clear the THREAD_ARCH_IFRAME_MODIFIED flag if it has
+		 * been set. This is used in the SYSCALL handler below so that
+		 * it knows whether to return via the IRET path, but as we're
+		 * returning using IRET anyway it doesn't matter to us. */
+		curr_thread->arch.flags &= ~THREAD_ARCH_IFRAME_MODIFIED;
+#endif
+	} else {
+		/* Preempt if required. When returning to userspace, this is
+		 * done by thread_at_kernel_exit(). */
+		if(curr_cpu->should_preempt) {
+			sched_preempt();
+		}
+	}
 }
 
 /** Initialise the interrupt handler table. */

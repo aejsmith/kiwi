@@ -59,30 +59,17 @@ static inline void lapic_eoi(void) {
 
 /** Spurious interrupt handler.
  * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-static bool lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
-	return false;
 }
 
 /** IPI message interrupt handler.
  * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-static bool lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+static void lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 	ipi_process_pending();
 	lapic_eoi();
-	return false;
-}
-
-/** Reschedule IPI interrupt handler.
- * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns true. */
-static bool lapic_reschedule_handler(unative_t num, intr_frame_t *frame) {
-	lapic_eoi();
-	return true;
 }
 
 /** Enable the local APIC timer. */
@@ -115,12 +102,10 @@ static timer_device_t lapic_timer_device = {
 
 /** Timer interrupt handler.
  * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Return value from clock_tick(). */
-static bool lapic_timer_handler(unative_t num, intr_frame_t *frame) {
-	bool ret = timer_tick();
+ * @param frame		Interrupt stack frame. */
+static void lapic_timer_handler(unative_t num, intr_frame_t *frame) {
+	curr_cpu->should_preempt = timer_tick();
 	lapic_eoi();
-	return ret;
 }
 
 /** Get the current local APIC ID.
@@ -173,7 +158,7 @@ void ipi_arch_interrupt(cpu_id_t dest) {
 
 /** Initialise the local APIC on the current CPU.
  * @param args		Kernel arguments structure. */
-void __init_text lapic_init(kernel_args_t *args) {
+__init_text void lapic_init(kernel_args_t *args) {
 	/* Don't do anything if the bootloader did not detect an LAPIC or if
 	 * it was manually disabled. */
 	if(args->arch.lapic_disabled) {
@@ -190,7 +175,6 @@ void __init_text lapic_init(kernel_args_t *args) {
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
 		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
-		intr_register(LAPIC_VECT_RESCHEDULE, lapic_reschedule_handler);
 	}
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt

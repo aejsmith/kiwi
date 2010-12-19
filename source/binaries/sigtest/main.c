@@ -29,7 +29,5 @@ static void signal_handler(int sig) {
 
 int main(int argc, char **argv) {
 	signal(SIGUSR1, signal_handler);
-	while(true) {
-		getchar();
-	}
+	while(true) {}
 }

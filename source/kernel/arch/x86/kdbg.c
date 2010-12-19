@@ -30,7 +30,7 @@
 #include <symbol.h>
 #include <kdbg.h>
 
-extern bool kdbg_db_handler(unative_t num, intr_frame_t *frame);
+extern void kdbg_db_handler(unative_t num, intr_frame_t *frame);
 
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
@@ -65,9 +65,8 @@ static inline void kdbg_setup_dreg(void) {
 
 /** Debug exception (#DB) handler.
  * @param num		Interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Always returns false. */
-bool kdbg_db_handler(unative_t num, intr_frame_t *frame) {
+ * @param frame		Interrupt stack frame. */
+void kdbg_db_handler(unative_t num, intr_frame_t *frame) {
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
 	size_t i;
@@ -104,8 +103,6 @@ bool kdbg_db_handler(unative_t num, intr_frame_t *frame) {
 	if(reason == KDBG_ENTRY_BREAK) {
 		frame->flags |= X86_FLAGS_RF;
 	}
-
-	return false;
 }
 
 /** Call KDBG.

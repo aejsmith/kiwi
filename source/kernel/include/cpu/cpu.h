@@ -42,6 +42,7 @@ typedef struct cpu {
 	struct sched_cpu *sched;	/**< Scheduler run queues/timers. */
 	struct thread *thread;		/**< Currently executing thread. */
 	struct vm_aspace *aspace;	/**< Address space currently in use. */
+	bool should_preempt;		/**< Whether the CPU should be preempted. */
 	bool idle;			/**< Whether the CPU is idle. */
 
 	/** IPI information. */
@@ -66,8 +67,6 @@ extern cpu_t **cpus;
 extern void cpu_pause_all(void);
 extern void cpu_resume_all(void);
 extern void cpu_halt_all(void);
-
-extern void cpu_reschedule(cpu_t *cpu);
 
 extern cpu_id_t cpu_current_id(void);
 

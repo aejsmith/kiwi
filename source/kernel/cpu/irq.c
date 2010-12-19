@@ -215,12 +215,11 @@ status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void 
 
 /** Hardware interrupt handler.
  * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame.
- * @return		Whether to reschedule. */
-bool irq_handler(unative_t num, intr_frame_t *frame) {
-	bool level, schedule = false;
+ * @param frame		Interrupt stack frame. */
+void irq_handler(unative_t num, intr_frame_t *frame) {
 	irq_handler_t *handler;
 	irq_result_t ret;
+	bool level;
 
 	assert(irq_ops);
 	assert(irq_ops->mode);
@@ -231,7 +230,7 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 
 	/* Execute any pre-handling function. */
 	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
-		return false;
+		return;
 	}
 
 	/* Get the trigger mode. */
@@ -243,12 +242,12 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 
 		if(handler->top) {
 			ret = handler->top(num, handler->data, frame);
-			if(ret == IRQ_RESCHEDULE) {
-				schedule = true;
+			if(ret == IRQ_PREEMPT) {
+				curr_cpu->should_preempt = true;
 			} else if(ret == IRQ_RUN_THREAD) {
 				assert(handler->thread);
 				semaphore_up(&handler->sem, 1);
-				schedule = true;
+				curr_cpu->should_preempt = true;
 			}
 
 			/* For edge-triggered interrupts we must invoke all
@@ -268,7 +267,7 @@ bool irq_handler(unative_t num, intr_frame_t *frame) {
 		if(!handler->top) {
 			assert(handler->thread);
 			semaphore_up(&handler->sem, 1);
-			schedule = true;
+			curr_cpu->should_preempt = true;
 		}
 	}
 out:
@@ -276,8 +275,6 @@ out:
 	if(irq_ops->post_handle) {
 		irq_ops->post_handle(num, frame);
 	}
-
-	return schedule;
 }
 
 /** Initialise the IRQ handling system. */

@@ -28,7 +28,7 @@
  * @param frame		Interrupt stack frame.
  * @return		IRQ status code. */
 static irq_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
-	return (timer_tick()) ? IRQ_RESCHEDULE : IRQ_HANDLED;
+	return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
 /** Enable the PIT. */

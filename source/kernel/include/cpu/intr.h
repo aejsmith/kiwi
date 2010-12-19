@@ -29,7 +29,7 @@
 typedef enum irq_result {
 	IRQ_UNHANDLED,		/**< Interrupt was not handled. */
 	IRQ_HANDLED,		/**< Interrupt was handled. */
-	IRQ_RESCHEDULE,		/**< Interrupt was handled, and a thread switch should be performed. */
+	IRQ_PREEMPT,		/**< Interrupt was handled, and the current thread should be preempted. */
 	IRQ_RUN_THREAD,		/**< Interrupt was handled, and the threaded handler should be run. */
 } irq_result_t;
 
@@ -74,7 +74,7 @@ extern irq_ops_t *irq_ops;
 extern status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
 extern status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data);
 
-extern bool irq_handler(unative_t num, intr_frame_t *frame);
+extern void irq_handler(unative_t num, intr_frame_t *frame);
 
 extern void irq_init(void);
 
