@@ -280,41 +280,46 @@ void sched_internal(bool state) {
 	/* Finished with the scheduler queues, unlock. */
 	spinlock_unlock_ni(&cpu->lock);
 
-#if SCHED_OVERKILL_DEBUG
-	kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
-		curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
-#endif
-
 	/* Set off the timer if necessary. */
 	if(curr_thread->timeslice > 0) {
 		timer_start(&cpu->timer, curr_thread->timeslice, TIMER_ONESHOT);
 	}
 
-	/* Only need to perform a context switch if the new thread is different.
-	 * The switch may return to thread_trampoline() or to the interruption
-	 * handler in waitq_sleep_unsafe(), so put anything to do after a
-	 * switch in sched_post_switch(). */
+	/* Only need to continue if the new thread is different. */
 	if(curr_thread != cpu->prev_thread) {
-		/* Switch the address space. If the new process' address space
-		 * is set to NULL then vm_aspace_switch() will just switch to
-		 * the kernel address space. */
-		vm_aspace_switch(curr_proc->aspace);
+#if SCHED_OVERKILL_DEBUG
+		kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
+			curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
+#endif
 
-		/* Save old FPU state if necessary, and disable the FPU. It
-		 * will be re-enabled if required. */
-		if(fpu_state()) {
-			assert(cpu->prev_thread->fpu);
-			fpu_context_save(cpu->prev_thread->fpu);
-			fpu_disable();
+		/* The switch may return to thread_trampoline() or to the
+		 * interruption handler in waitq_sleep_unsafe(), so put
+		 * anything to do after a switch in sched_post_switch(). */
+		if(curr_thread != cpu->prev_thread) {
+			/* Switch the address space. If the new process' address
+			 * space is set to NULL then vm_aspace_switch() will
+			 * just switch to the kernel address space. */
+			vm_aspace_switch(curr_proc->aspace);
+
+			/* Save old FPU state if necessary, and disable the FPU.
+			 * It will be re-enabled on-demand if required. */
+			if(fpu_state()) {
+				assert(cpu->prev_thread->fpu);
+				fpu_context_save(cpu->prev_thread->fpu);
+				fpu_disable();
+			}
+
+			/* Switch to the new CPU context. */
+			if(!context_save(&cpu->prev_thread->context)) {
+				context_restore(&curr_thread->context);
+			}
 		}
 
-		/* Switch to the new CPU context. */
-		if(!context_save(&cpu->prev_thread->context)) {
-			context_restore(&curr_thread->context);
-		}
+		sched_post_switch(state);
+	} else {
+		spinlock_unlock_ni(&curr_thread->lock);
+		intr_restore(state);
 	}
-
-	sched_post_switch(state);
 }
 
 /** Perform post-thread-switch tasks.
@@ -324,7 +329,10 @@ void sched_post_switch(bool state) {
 	thread_arch_post_switch(curr_thread);
 
 	spinlock_unlock_ni(&curr_thread->lock);
-	if(curr_thread != curr_cpu->sched->prev_thread) {
+
+	/* The prev_thread pointer is set to NULL during sched_init(). It will
+	 * only ever be NULL once. */
+	if(likely(curr_cpu->sched->prev_thread)) {
 		spinlock_unlock_ni(&curr_cpu->sched->prev_thread->lock);
 
 		/* Deal with thread terminations. */
@@ -525,7 +533,7 @@ void __init_text sched_init(void) {
 	/* Set the idle thread as the current thread. */
 	curr_cpu->sched->idle_thread->cpu = curr_cpu;
 	curr_cpu->sched->idle_thread->state = THREAD_RUNNING;
-	curr_cpu->sched->prev_thread = curr_cpu->sched->idle_thread;
+	curr_cpu->sched->prev_thread = NULL;
 	curr_cpu->thread = curr_cpu->sched->idle_thread;
 	curr_cpu->idle = true;
 
