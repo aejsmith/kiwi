@@ -383,7 +383,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 		load = other->sched->total;
 		if(load < average) {
-			kprintf(LOG_DEBUG, "sched: CPU %u load %zu less than average %zu, giving it thread %u\n",
+			dprintf("sched: CPU %u load %zu less than average %zu, giving it thread %u\n",
 			        other->id, load, average, thread->id);
 			cpu = other;
 			break;
