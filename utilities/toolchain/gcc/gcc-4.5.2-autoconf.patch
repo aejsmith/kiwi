@@ -1,6 +1,6 @@
-diff -urN gcc-4.5.1.orig/libstdc++-v3/configure gcc-4.5.1/libstdc++-v3/configure
---- gcc-4.5.1.orig/libstdc++-v3/configure	2010-08-13 11:28:21.795869045 +0100
-+++ gcc-4.5.1/libstdc++-v3/configure	2010-08-13 11:29:51.934793450 +0100
+diff -urN gcc-4.5.2.orig/libstdc++-v3/configure gcc-4.5.2/libstdc++-v3/configure
+--- gcc-4.5.2.orig/libstdc++-v3/configure	2010-12-22 09:46:01.498055281 +0000
++++ gcc-4.5.2/libstdc++-v3/configure	2010-12-22 09:51:05.087211338 +0000
 @@ -11139,7 +11139,8 @@
  
  
@@ -91,24 +91,6 @@ diff -urN gcc-4.5.1.orig/libstdc++-v3/configure gcc-4.5.1/libstdc++-v3/configure
  int main()
  {
    _Decimal32 d1;
-@@ -25562,7 +25564,7 @@
- 	CFLAGS="$chktls_save_CFLAGS"
- 	if test "X$thread_CFLAGS" != Xfailed; then
- 	  CFLAGS="$thread_CFLAGS $chktls_save_CFLAGS"
--	  if test "$cross_compiling" = yes; then :
-+ 	  	  	  	  	  	  if test "$cross_compiling" = yes; then :
-   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
- $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
- as_fn_error "cannot run test program while cross compiling
-@@ -44500,7 +44502,7 @@
- 	CFLAGS="$chktls_save_CFLAGS"
- 	if test "X$thread_CFLAGS" != Xfailed; then
- 	  CFLAGS="$thread_CFLAGS $chktls_save_CFLAGS"
--	  if test "$cross_compiling" = yes; then :
-+ 	  	  	  	  	  	  if test "$cross_compiling" = yes; then :
-   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
- $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
- as_fn_error "cannot run test program while cross compiling
 @@ -44576,6 +44578,199 @@
  	;;
      esac
@@ -309,12 +291,3 @@ diff -urN gcc-4.5.1.orig/libstdc++-v3/configure gcc-4.5.1/libstdc++-v3/configure
    *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu)
  
    # All these tests are for C++; save the language and the compiler flags.
-@@ -50585,7 +50780,7 @@
- 	CFLAGS="$chktls_save_CFLAGS"
- 	if test "X$thread_CFLAGS" != Xfailed; then
- 	  CFLAGS="$thread_CFLAGS $chktls_save_CFLAGS"
--	  if test "$cross_compiling" = yes; then :
-+ 	  	  	  	  	  	  if test "$cross_compiling" = yes; then :
-   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
- $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
- as_fn_error "cannot run test program while cross compiling

@@ -16,7 +16,7 @@ from utilities.toolchain.component import ToolchainComponent
 
 class BinutilsComponent(ToolchainComponent):
 	name = 'binutils'
-	version = '2.20.1'
+	version = '2.21'
 	source = [
 		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
 	]
