@@ -62,6 +62,7 @@
 #include <arch/memory.h>
 
 #include <cpu/intr.h>
+#include <cpu/ipi.h>
 
 #include <lib/string.h>
 
@@ -1295,12 +1296,16 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 /** Switch to another address space.
  * @note		Does not take address space lock because this function
  *			is used during rescheduling.
- * @param as		Address space to switch to (if NULL, then will switch
- *			to the kernel address space). */
+ * @param as		Address space to switch to. */
 void vm_aspace_switch(vm_aspace_t *as) {
 	bool state;
 
-	if(as != curr_aspace) {
+	/* The kernel process does not have an address space. When switching to
+	 * one of its threads, it is not necessary to switch to the kernel
+	 * page map, as all mappings in the kernel page map are visible in all
+	 * address spaces. Kernel threads should never touch the userspace
+	 * portion of the address space. */
+	if(as && as != curr_aspace) {
 		state = intr_disable();
 
 		/* Decrease old address space's reference count, if there is one. */
@@ -1308,15 +1313,11 @@ void vm_aspace_switch(vm_aspace_t *as) {
 			refcount_dec(&curr_aspace->count);
 		}
 
-		/* If NULL, switch to kernel address space. */
-		if(as) {
-			refcount_inc(&as->count);
-			page_map_switch(&as->pmap);
-		} else {
-			page_map_switch(&kernel_page_map);
-		}
-
+		/* Switch to the new address space. */
+		refcount_inc(&as->count);
+		page_map_switch(&as->pmap);
 		curr_aspace = as;
+
 		intr_restore(state);
 	}
 }
@@ -1387,6 +1388,27 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	return as;
 }
 
+/** Switch away from an address space to the kernel page map. */
+static inline void do_switch_aspace(vm_aspace_t *as) {
+	assert(!curr_proc->aspace);
+	page_map_switch(&kernel_page_map);
+	refcount_dec(&as->count);
+	curr_aspace = NULL;
+}
+
+/** Switch away from an address space. */
+static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unative_t arg3, unative_t arg4) {
+	vm_aspace_t *as = (vm_aspace_t *)_as;
+
+	/* We may have switched address space between the check below and
+	 * receiving the IPI. Avoid an unnecessary switch in this case. */
+	if(as == curr_aspace) {
+		do_switch_aspace(as);
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /** Destroy an address space.
  *
  * Removes all memory mappings in an address space and frees it. This must
@@ -1397,10 +1419,29 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
  * @param as		Address space to destroy.
  */
 void vm_aspace_destroy(vm_aspace_t *as) {
+	cpu_t *cpu;
+
 	assert(as);
 
+	/* If the address space is in use, it must mean that a CPU has not
+	 * switched away from it because it is now running a kernel thread
+	 * (see the comment in vm_aspace_switch()). We need to go through
+	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
-		fatal("Destroying in-use address space");
+		LIST_FOREACH(&cpus_running, iter) {
+			cpu = list_entry(iter, cpu_t, header);
+			if(cpu->aspace == as) {
+				if(cpu == curr_cpu) {
+					do_switch_aspace(as);
+				} else {
+					ipi_send(cpu->id, switch_aspace_ipi, (unative_t)as,
+					         0, 0, 0, IPI_SEND_SYNC);
+				}
+			}
+		}
+
+		/* The address space should no longer be in use. */
+		assert(refcount_get(&as->count) == 0);
 	}
 
 	/* Unmap and destroy each region. */
