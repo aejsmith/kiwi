@@ -21,13 +21,15 @@
  * virtual memory layout is as follows:
  *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - Userspace memory.
  *  0xFFFFFF8000000000-0xFFFFFFBFFFFFFFFF - 256GB - Mapped to physical memory.
- *  0xFFFFFFC000000000-0xFFFFFFFF7FFFFFFF - 254GB - Kernel heap.
+ *  0xFFFFFFC000000000-0xFFFFFFDFFFFFFFFF - 128GB - Kernel heap.
+ *  0xFFFFFFE000000000-0xFFFFFFFF7FFFFFFF - 126GB - Kernel VM region.
  *  0xFFFFFFFF80000000-0xFFFFFFFFFFFFFFFF - 2GB   - Kernel image/modules.
  *
  * On IA32, it is as follows:
  *  0x00000000-0x7FFFFFFF - 2GB    - Userspace memory.
  *  0x80000000-0xBFFFFFFF - 1GB    - Mapped to the first GB of physical memory.
- *  0xC0000000-0xFFBFFFFF - 1020MB - Kernel heap.
+ *  0xC0000000-0xEFFFFFFF - 768MB  - Kernel heap.
+ *  0xF0000000-0xFFBFFFFF - 254MB  - Kernel VM region.
  *  0xFFC00000-0xFFDFFFFF - 2MB    - Kernel image.
  *  0xFFE00000-0xFFFFFFFF - 2MB    - Fractal mapping of kernel page directory.
  */
@@ -44,7 +46,9 @@
 # define KERNEL_PMAP_BASE	0xFFFFFF8000000000	/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
 # define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
-# define KERNEL_HEAP_SIZE	0x0000003F80000000	/**< Kernel heap size (254GB). */
+# define KERNEL_HEAP_SIZE	0x0000002000000000	/**< Kernel heap size (128GB). */
+# define KERNEL_VM_BASE		0xFFFFFFE000000000	/**< Kernel VM region base. */
+# define KERNEL_VM_SIZE		0x0000001F80000000	/**< Kernel VM region size (126GB). */
 # define KERNEL_VIRT_BASE	0xFFFFFFFF80000000	/**< Kernel virtual base address. */
 # define KERNEL_MODULE_BASE	0xFFFFFFFFC0000000	/**< Module area base. */
 # define KERNEL_MODULE_SIZE	0x0000000040000000	/**< Module area size (1GB). */
@@ -56,7 +60,9 @@
 # define KERNEL_PMAP_BASE	0x80000000		/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x40000000		/**< Physical map area size (1GB). */
 # define KERNEL_HEAP_BASE	0xC0000000		/**< Kernel heap base. */
-# define KERNEL_HEAP_SIZE	0x3FC00000		/**< Kernel heap size (1020MB). */
+# define KERNEL_HEAP_SIZE	0x30000000		/**< Kernel heap size (768MB). */
+# define KERNEL_VM_BASE		0xF0000000		/**< Kernel VM region base. */
+# define KERNEL_VM_SIZE		0x0FC00000		/**< Kernel VM region size (254MB). */
 # define KERNEL_VIRT_BASE	0xFFC00000		/**< Kernel virtual base address. */
 # define KERNEL_PTBL_BASE	0xFFE00000		/**< Kernel page tables base. */
 #endif

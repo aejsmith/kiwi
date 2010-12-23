@@ -30,6 +30,7 @@
 #include <lib/utility.h>
 
 #include <mm/kheap.h>
+#include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/vm.h>
 
@@ -54,7 +55,7 @@
 	(IS_KERNEL_MAP(map) ? (PG_PRESENT | PG_WRITE) : (PG_PRESENT | PG_WRITE | PG_USER))
 
 /** Determine if a page map is the current page map. */
-#define IS_CURRENT_MAP(map)	(IS_KERNEL_MAP(map) || map == &curr_aspace->pmap)
+#define IS_CURRENT_MAP(map)	(IS_KERNEL_MAP(map) || (curr_aspace && map == curr_aspace->pmap))
 
 /** Macro to get mapping for a kernel page table.
  * @param addr		Virtual address to get page table for. */
@@ -316,7 +317,7 @@ static void page_map_flush(page_map_t *map) {
 		/* TODO: Multicast. */
 		LIST_FOREACH(&cpus_running, iter) {
 			cpu = list_entry(iter, cpu_t, header);
-			if(cpu == curr_cpu || map != &cpu->aspace->pmap) {
+			if(cpu == curr_cpu || map != cpu->aspace->pmap) {
 				continue;
 			}
 
@@ -577,43 +578,47 @@ void page_map_switch(page_map_t *map) {
 	x86_write_cr3(map->cr3);
 }
 
-/** Initialise a page map.
- * @param map		Page map to initialise.
+/** Create and initialise a page map.
  * @param mmflag	Allocation flags.
- * @return		Status code describing result of operation. Failure
- *			can only occur if MM_SLEEP is not specified. */
-status_t page_map_init(page_map_t *map, int mmflag) {
+ * @return		Pointer to new page map, NULL on allocation failure. */
+page_map_t *page_map_create(int mmflag) {
 	uint64_t *kpdp, *pdp;
+	page_map_t *map;
+
+	map = kmalloc(sizeof(*map), mmflag);
+	if(!map) {
+		return NULL;
+	}
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
 	map->invalidate_count = 0;
 	map->cr3 = page_structure_alloc(mmflag | PM_ZERO);
 	if(!map->cr3) {
-		return STATUS_NO_MEMORY;
+		kfree(map);
+		return NULL;
 	}
 
-	if(!IS_KERNEL_MAP(map)) {
-		/* Duplicate the kernel mappings. */
-		kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag);
-		if(!kpdp) {
-			page_free(map->cr3, 1);
-			return STATUS_NO_MEMORY;
-		}
-		pdp = page_structure_map(map, map->cr3, mmflag);
-		if(!pdp) {
-			page_structure_unmap(map, kpdp);
-			page_free(map->cr3, 1);
-			return STATUS_NO_MEMORY;
-		}
-
-		pdp[2] = kpdp[2] & ~PG_ACCESSED;
-		pdp[3] = kpdp[3] & ~PG_ACCESSED;
-
-		page_structure_unmap(map, pdp);
+	/* Duplicate the kernel mappings. */
+	kpdp = page_structure_map(map, kernel_page_map.cr3, mmflag);
+	if(!kpdp) {
+		page_free(map->cr3, 1);
+		kfree(map);
+		return NULL;
+	}
+	pdp = page_structure_map(map, map->cr3, mmflag);
+	if(!pdp) {
 		page_structure_unmap(map, kpdp);
+		page_free(map->cr3, 1);
+		kfree(map);
+		return NULL;
 	}
 
-	return STATUS_SUCCESS;
+	pdp[2] = kpdp[2] & ~PG_ACCESSED;
+	pdp[3] = kpdp[3] & ~PG_ACCESSED;
+
+	page_structure_unmap(map, pdp);
+	page_structure_unmap(map, kpdp);
+	return map;
 }
 
 /** Destroy a page map.
@@ -653,6 +658,7 @@ void page_map_destroy(page_map_t *map) {
 	page_structure_unmap(map, pdp);
 
 	page_free(map->cr3, 1);
+	kfree(map);
 }
 
 /** Map physical memory into the kernel address space.
@@ -742,7 +748,9 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	int pde;
 
 	/* Initialise the kernel page map structure. */
-	page_map_init(&kernel_page_map, MM_FATAL);
+	mutex_init(&kernel_page_map.lock, "page_map_lock", MUTEX_RECURSIVE);
+	kernel_page_map.invalidate_count = 0;
+	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL | PM_ZERO);
 	page_map_lock(&kernel_page_map);
 
 	/* Map the kernel in. The following mappings are made:

@@ -116,9 +116,9 @@ static futex_t *futex_lookup(int32_t *addr) {
 	offset = (ptr_t)addr - base;
 
 	/* Look up the physical address. */
-	page_map_lock(&curr_aspace->pmap);
-	if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
-		page_map_unlock(&curr_aspace->pmap);
+	page_map_lock(curr_aspace->pmap);
+	if(!page_map_find(curr_aspace->pmap, base, &phys)) {
+		page_map_unlock(curr_aspace->pmap);
 
 		/* The page may not be mapped in. Try to trigger a fault, then
 		 * check again. */
@@ -126,15 +126,15 @@ static futex_t *futex_lookup(int32_t *addr) {
 			return NULL;
 		}
 
-		page_map_lock(&curr_aspace->pmap);
+		page_map_lock(curr_aspace->pmap);
 
-		if(!page_map_find(&curr_aspace->pmap, base, &phys)) {
-			page_map_unlock(&curr_aspace->pmap);
+		if(!page_map_find(curr_aspace->pmap, base, &phys)) {
+			page_map_unlock(curr_aspace->pmap);
 			return NULL;
 		}
 	}
 	phys += offset;
-	page_map_unlock(&curr_aspace->pmap);
+	page_map_unlock(curr_aspace->pmap);
 
 	mutex_lock(&curr_proc->lock);
 

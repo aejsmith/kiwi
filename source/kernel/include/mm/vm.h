@@ -37,13 +37,14 @@ struct vm_region;
 typedef struct vm_aspace {
 	mutex_t lock;			/**< Lock to protect address space. */
 	refcount_t count;		/**< Reference count of CPUs using address space. */
+	int flags;			/**< Flags for the address space. */
 
 	/** Address lookup stuff. */
 	struct vm_region *find_cache;	/**< Cached pointer to last region searched for. */
 	avl_tree_t tree;		/**< Tree of mapped regions for address lookups. */
 
 	/** Underlying page map for address space. */
-	page_map_t pmap;
+	page_map_t *pmap;
 
 	/** Free region allocation. */
 	list_t free[VM_FREELISTS];	/**< Power of 2 free lists. */
@@ -55,6 +56,9 @@ typedef struct vm_aspace {
 
 /** Macro that expands to a pointer to the current address space. */
 #define curr_aspace		(curr_cpu->aspace)
+
+/** Address space flags. */
+#define VM_ASPACE_MLOCK		(1<<0)	/**< All pages on allocated regions always mapped in. */
 
 /** Page fault reason codes. */
 #define VM_FAULT_NOTPRESENT	1	/**< Fault caused by a not present page. */
@@ -71,6 +75,8 @@ typedef struct vm_aspace {
 #define VM_FAULT_NOREGION	2	/**< Address not in valid region (SEGV_MAPERR). */
 #define VM_FAULT_ACCESS		3	/**< Access denied to region (SEGV_ACCERR). */
 #define VM_FAULT_OOM		4	/**< Out of memory (BUS_ADRERR). */
+
+extern vm_aspace_t *kernel_aspace;
 
 extern int vm_fault(ptr_t addr, int reason, int access);
 

@@ -69,58 +69,19 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
-#include <mm/vm.h>
 #include <mm/vm_cache.h>
 
 #include <proc/process.h>
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kdbg.h>
 #include <status.h>
 
-#if CONFIG_VM_DEBUG
-# define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
-#else
-# define dprintf(fmt...)	
-#endif
+#include "vm_priv.h"
 
-/** Structure containing an anonymous memory map. */
-typedef struct vm_amap {
-	refcount_t count;		/**< Count of regions referring to this object. */
-	mutex_t lock;			/**< Lock to protect map. */
-
-	size_t curr_size;		/**< Number of pages currently contained in object. */
-	size_t max_size;		/**< Maximum number of pages in object. */
-	vm_page_t **pages;		/**< Array of pages currently in object. */
-	uint16_t *rref;			/**< Region reference count array. */
-} vm_amap_t;
-
-/** Structure representing a region in an address space. */
-typedef struct vm_region {
-	list_t header;			/**< Link to the region list. */
-	list_t free_link;		/**< Link to free region lists. */
-	avl_tree_node_t tree_link;	/**< Link to allocated region tree. */
-
-	vm_aspace_t *as;		/**< Address space that the region belongs to. */
-	ptr_t start;			/**< Base address of the region. */
-	ptr_t end;			/**< End address of the region. */
-	int flags;			/**< Flags for the region (0 if region is free). */
-
-	object_handle_t *handle;	/**< Handle to object that this region is mapping. */
-	offset_t obj_offset;		/**< Offset into the object. */
-	vm_amap_t *amap;		/**< Anonymous map. */
-	offset_t amap_offset;		/**< Offset into the anonymous map. */
-} vm_region_t;
-
-/** Region behaviour flags. */
-#define VM_REGION_READ		VM_MAP_READ
-#define VM_REGION_WRITE		VM_MAP_WRITE
-#define VM_REGION_EXEC		VM_MAP_EXEC
-#define VM_REGION_PRIVATE	VM_MAP_PRIVATE
-#define VM_REGION_STACK		VM_MAP_STACK
-#define VM_REGION_RESERVED	(1<<5)	/**< Region is reserved and should never be allocated. */
+/** VM-managed portion of the kernel address space. */
+vm_aspace_t *kernel_aspace = NULL;
 
 /** Slab caches used for VM structures. */
 static slab_cache_t *vm_aspace_cache;
@@ -153,22 +114,23 @@ static void vm_amap_ctor(void *obj, void *data) {
 	mutex_init(&map->lock, "vm_amap_lock", 0);
 }
 
-/** Check if a region fits in the user memory area.
+/** Check if a region fits in an address space.
+ * @param as		Address space to check in.
  * @param start		Start address of region.
  * @param size		Size of region.
  * @return		Whether region fits. */
-static inline bool vm_region_fits(ptr_t start, size_t size) {
-	ptr_t end = start + size;
+static inline bool vm_region_fits(vm_aspace_t *as, ptr_t start, size_t size) {
+	vm_region_t *first, *last;
+	ptr_t end;
 
-	if(end < start || end > (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
-		return false;
-#if USER_MEMORY_BASE != 0
-	} else if(start < USER_MEMORY_BASE) {
-		return false;
-#endif
-	} else {
-		return true;
-	}
+	assert(!list_empty(&as->regions));
+
+	/* Get the first and last regions in the address space. */
+	first = list_entry(as->regions.next, vm_region_t, header);
+	last = list_entry(as->regions.prev, vm_region_t, header);
+	end = start + size;
+
+	return (end >= start && start >= first->start && end <= last->end);
 }
 
 /** Check if a region is in use.
@@ -370,11 +332,11 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_SLEEP);
 
 	/* Write-protect all mappings on the source region. */
-	page_map_lock(&src->as->pmap);
+	page_map_lock(src->as->pmap);
 	for(i = src->start; i < src->end; i += PAGE_SIZE) {
-		page_map_protect(&src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
+		page_map_protect(src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
 	}
-	page_map_unlock(&src->as->pmap);
+	page_map_unlock(src->as->pmap);
 
 	/* Point all of the pages in the new map to the pages from the source
 	 * map: they will be copied when a write fault occurs on either the
@@ -535,13 +497,13 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		mutex_lock(&region->amap->lock);
 	}
 
-	page_map_lock(&region->as->pmap);
+	page_map_lock(region->as->pmap);
 
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		offset = (offset_t)(addr - region->start);
 
 		/* Unmap the page and release it from its source. */
-		if(page_map_remove(&region->as->pmap, addr, true, &phys)) {
+		if(page_map_remove(region->as->pmap, addr, true, &phys)) {
 			vm_region_release_page(region, offset, phys);
 		}
 
@@ -565,7 +527,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		}
 	}
 
-	page_map_unlock(&region->as->pmap);
+	page_map_unlock(region->as->pmap);
 
 	if(region->amap) {
 		mutex_unlock(&region->amap->lock);
@@ -935,7 +897,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			/* Find the page to copy. If handling a protection
 			 * fault, use the existing mapping address. */
 			if(reason == VM_FAULT_PROTECTION) {
-				if(unlikely(!page_map_find(&region->as->pmap, addr, &paddr))) {
+				if(unlikely(!page_map_find(region->as->pmap, addr, &paddr))) {
 					fatal("No mapping for %p, but protection fault on it", addr);
 				}
 			} else {
@@ -1000,13 +962,13 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	 * set correctly. If this is a protection fault, remove existing
 	 * mappings. */
 	if(reason == VM_FAULT_PROTECTION) {
-		if(unlikely(!page_map_remove(&region->as->pmap, addr, true, NULL))) {
+		if(unlikely(!page_map_remove(region->as->pmap, addr, true, NULL))) {
 			fatal("Could not remove previous mapping for %p", addr);
 		}
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(&region->as->pmap, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
+	page_map_insert(region->as->pmap, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
 	dprintf("vm:  anon fault: mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n",
 	        paddr, addr, region->as, write);
 	mutex_unlock(&amap->lock);
@@ -1039,7 +1001,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	/* Check if a mapping already exists. This is possible if two threads
 	 * in a process on different CPUs fault on the same address
 	 * simultaneously. */
-	if(page_map_find(&region->as->pmap, addr, &exist)) {
+	if(page_map_find(region->as->pmap, addr, &exist)) {
 		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIpp", should be %" PRIpp ")",
 			      exist, phys);
@@ -1054,7 +1016,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	exec = region->flags & VM_REGION_EXEC;
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(&region->as->pmap, addr, phys, write, exec, MM_SLEEP);
+	page_map_insert(region->as->pmap, addr, phys, write, exec, MM_SLEEP);
 	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
 	        phys, addr, region->as, write, exec);
 	return VM_FAULT_SUCCESS;
@@ -1071,9 +1033,11 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	int ret;
 
 	/* If we don't have an address space, don't do anything. */
-	if(!as) {
+	if(unlikely(!as)) {
 		return VM_FAULT_FAILURE;
 	}
+
+	assert(!(as->flags & VM_ASPACE_MLOCK));
 
 	dprintf("vm: page fault at %p (as: %p, reason: %d, access: %d)\n", addr, as, reason, access);
 
@@ -1117,7 +1081,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Lock the page map. */
-	page_map_lock(&as->pmap);
+	page_map_lock(as->pmap);
 
 	/* Call the anonymous fault handler if there is an anonymous map, else
 	 * use the generic fault handler. */
@@ -1127,7 +1091,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 		ret = vm_generic_fault(region, addr, reason, access);
 	}
 
-	page_map_unlock(&as->pmap);
+	page_map_unlock(as->pmap);
 	mutex_unlock(&as->lock);
 	return ret;
 }
@@ -1148,11 +1112,17 @@ int vm_fault(ptr_t addr, int reason, int access) {
 status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	vm_region_t *region;
 
-	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
+	if(!size || start % PAGE_SIZE || size % PAGE_SIZE) {
 		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&as->lock);
+
+	if(!vm_region_fits(as, start, size)) {
+		mutex_unlock(&as->lock);
+		return STATUS_NO_MEMORY;
+	}
+
 	region = vm_region_insert(as, start, start + size, VM_REGION_RESERVED);
 	dprintf("vm: reserved region [%p,%p) (as: %p)\n",region->start, region->end, as);
 	mutex_unlock(&as->lock);
@@ -1188,8 +1158,9 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
                 offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
+	int rflags, access;
 	status_t ret;
-	int rflags;
+	ptr_t i;
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
@@ -1198,7 +1169,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		return STATUS_INVALID_ARG;
 	}
 	if(flags & VM_MAP_FIXED) {
-		if(start % PAGE_SIZE || !vm_region_fits(start, size)) {
+		if(start % PAGE_SIZE) {
 			return STATUS_INVALID_ARG;
 		}
 	} else if(!addrp) {
@@ -1236,6 +1207,11 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 	/* If the mapping is fixed, remove anything in the location we want to
 	 * insert into, otherwise find some free space. */
 	if(flags & VM_MAP_FIXED) {
+		if(!vm_region_fits(as, start, size)) {
+			mutex_unlock(&as->lock);
+			return STATUS_NO_MEMORY;
+		}
+
 		region = vm_region_insert(as, start, start + size, rflags);
 	} else {
 		region = vm_region_alloc(as, size, rflags);
@@ -1261,6 +1237,39 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		}
 	}
 
+	/* If on an address space locked into memory (i.e. the kernel address
+	 * space, map all pages into memory allowing the full access of the
+	 * region. */
+	if(as->flags & VM_ASPACE_MLOCK) {
+		/* The fault handling code doesn't actually care whether it's
+		 * an execute, only if it's a write or not. */
+		access = (region->flags & VM_REGION_WRITE) ? VM_FAULT_WRITE : VM_FAULT_READ;
+
+		/* Fault on each page in the region. */
+		page_map_lock(as->pmap);
+		for(i = region->start; i < region->end; i += PAGE_SIZE) {
+			if(region->amap) {
+				ret = vm_anon_fault(region, i, VM_FAULT_NOTPRESENT, access);
+			} else {
+				ret = vm_generic_fault(region, i, VM_FAULT_NOTPRESENT, access);
+			}
+
+			if(unlikely(ret != VM_FAULT_SUCCESS)) {
+				/* The only allowed failure is OOM, in which
+				 * case we have to revert the entire mapping. */
+				if(likely(ret == VM_FAULT_OOM)) {
+					page_map_unlock(as->pmap);
+					vm_region_insert(as, region->start, region->end, 0);
+					mutex_unlock(&as->lock);
+					return STATUS_NO_MEMORY;
+				} else {
+					fatal("Failed to map in kernel region (%d)", ret);
+				}
+			}
+		}
+		page_map_unlock(as->pmap);
+	}
+
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
 	        region->start, region->end, as, handle, flags, rflags);
 	if(addrp) {
@@ -1281,15 +1290,20 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
  * @return		Status code describing result of the operation.
  */
 status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
-	if(!size || start % PAGE_SIZE || size % PAGE_SIZE || !vm_region_fits(start, size)) {
+	if(!size || start % PAGE_SIZE || size % PAGE_SIZE) {
 		return STATUS_INVALID_ARG;
 	}
 
 	mutex_lock(&as->lock);
-	vm_region_insert(as, start, start + size, 0);
-	mutex_unlock(&as->lock);
 
+	if(!vm_region_fits(as, start, size)) {
+		mutex_unlock(&as->lock);
+		return STATUS_NO_MEMORY;
+	}
+
+	vm_region_insert(as, start, start + size, 0);
 	dprintf("vm: unmapped region [%p,%p) (as: %p)\n", start, start + size, as);
+	mutex_unlock(&as->lock);
 	return STATUS_SUCCESS;
 }
 
@@ -1315,7 +1329,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 
 		/* Switch to the new address space. */
 		refcount_inc(&as->count);
-		page_map_switch(&as->pmap);
+		page_map_switch(as->pmap);
 		curr_aspace = as;
 
 		intr_restore(state);
@@ -1330,7 +1344,8 @@ vm_aspace_t *vm_aspace_create(void) {
 	status_t ret;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	page_map_init(&as->pmap, MM_SLEEP);
+	as->pmap = page_map_create(MM_SLEEP);
+	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
 
@@ -1355,6 +1370,10 @@ vm_aspace_t *vm_aspace_create(void) {
  * shared among the two address spaces (modifications in one will affect both),
  * whereas private regions will be duplicated via copy-on-write.
  *
+ * @todo		Duplicate all mappings from the previous address space
+ *			after cloning regions, to remove overhead of faulting
+ *			in the new process.
+ *
  * @param orig		Original address space.
  *
  * @return		Pointer to new address space.
@@ -1363,8 +1382,11 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	vm_region_t *orig_region, *region;
 	vm_aspace_t *as;
 
+	assert(!(orig->flags & VM_ASPACE_MLOCK));
+
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	page_map_init(&as->pmap, MM_SLEEP);
+	as->pmap = page_map_create(MM_SLEEP);
+	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
 
@@ -1450,7 +1472,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	}
 
 	/* Destroy the page map. */
-	page_map_destroy(&as->pmap);
+	page_map_destroy(as->pmap);
 
 	assert(list_empty(&as->regions));
 	assert(avl_tree_empty(&as->tree));
@@ -1459,6 +1481,9 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 
 /** Initialise the VM system. */
 void __init_text vm_init(void) {
+	vm_region_t *region;
+
+	/* Create the VM slab caches. */
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
 	                                    0, vm_aspace_ctor, NULL, NULL, NULL, 0,
 	                                    MM_FATAL);
@@ -1467,8 +1492,22 @@ void __init_text vm_init(void) {
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
 	                                  0, vm_amap_ctor, NULL, NULL, NULL, 0,
 	                                  MM_FATAL);
+
+	/* Initialise the other parts of the VM system. */
 	vm_page_init();
 	vm_cache_init();
+
+	/* Create the kernel address space. */
+	kernel_aspace = slab_cache_alloc(vm_aspace_cache, MM_FATAL);
+	kernel_aspace->pmap = &kernel_page_map;
+	kernel_aspace->flags = VM_ASPACE_MLOCK;
+	kernel_aspace->find_cache = NULL;
+	kernel_aspace->free_map = 0;
+
+	/* Insert the initial free region. */
+	region = vm_region_create(kernel_aspace, KERNEL_VM_BASE, KERNEL_VM_BASE + KERNEL_VM_SIZE, 0);
+	list_append(&kernel_aspace->regions, &region->header);
+	vm_freelist_insert(region, KERNEL_VM_SIZE);
 }
 
 /** Display details of a region.

@@ -29,6 +29,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/vm.h>
 
@@ -53,7 +54,7 @@
 	(IS_KERNEL_MAP(map) ? (PG_PRESENT | PG_WRITE) : (PG_PRESENT | PG_WRITE | PG_USER))
 
 /** Determine if a page map is the current page map. */
-#define IS_CURRENT_MAP(map)	(IS_KERNEL_MAP(map) || map == &curr_aspace->pmap)
+#define IS_CURRENT_MAP(map)	(IS_KERNEL_MAP(map) || (curr_aspace && map == curr_aspace->pmap))
 
 extern char __text_start[], __text_end[];
 extern char __init_start[], __init_end[];
@@ -288,7 +289,7 @@ static void page_map_flush(page_map_t *map) {
 		/* TODO: Multicast. */
 		LIST_FOREACH(&cpus_running, iter) {
 			cpu = list_entry(iter, cpu_t, header);
-			if(cpu == curr_cpu || map != &cpu->aspace->pmap) {
+			if(cpu == curr_cpu || map != cpu->aspace->pmap) {
 				continue;
 			}
 
@@ -530,29 +531,31 @@ void page_map_switch(page_map_t *map) {
 	x86_write_cr3(map->cr3);
 }
 
-/** Initialise a page map.
- * @param map		Page map to initialise.
+/** Create and initialise a page map.
  * @param mmflag	Allocation flags.
- * @return		Status code describing result of operation. Failure
- *			can only occur if MM_SLEEP is not specified. */
-status_t page_map_init(page_map_t *map, int mmflag) {
+ * @return		Pointer to new page map, NULL on allocation failure. */
+page_map_t *page_map_create(int mmflag) {
 	uint64_t *kpml4, *pml4;
+	page_map_t *map;
+
+	map = kmalloc(sizeof(*map), mmflag);
+	if(!map) {
+		return NULL;
+	}
 
 	mutex_init(&map->lock, "page_map_lock", MUTEX_RECURSIVE);
 	map->invalidate_count = 0;
 	map->cr3 = page_structure_alloc(mmflag);
 	if(!map->cr3) {
-		return STATUS_NO_MEMORY;
+		kfree(map);
+		return NULL;
 	}
 
-	if(!IS_KERNEL_MAP(map)) {
-		/* Get the kernel mappings into the new PML4. */
-		kpml4 = page_structure_map(kernel_page_map.cr3);
-		pml4 = page_structure_map(map->cr3);
-		pml4[511] = kpml4[511] & ~PG_ACCESSED;
-	}
-
-	return STATUS_SUCCESS;
+	/* Get the kernel mappings into the new PML4. */
+	kpml4 = page_structure_map(kernel_page_map.cr3);
+	pml4 = page_structure_map(map->cr3);
+	pml4[511] = kpml4[511] & ~PG_ACCESSED;
+	return map;
 }
 
 /** Destroy a page map.
@@ -599,6 +602,7 @@ void page_map_destroy(page_map_t *map) {
 	}
 
 	page_free(map->cr3, 1);
+	kfree(map);
 }
 
 /** Map physical memory into the kernel address space.
@@ -639,7 +643,7 @@ void phys_unmap(void *addr, size_t size, bool shared) {
  * @param end		End of range to map.
  * @param write		Whether to mark as writable.
  * @param exec		Whether to mark as executable. */
-static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, ptr_t end,
+static __init_text void page_map_kernel_range(kernel_args_t *args, ptr_t start, ptr_t end,
                                               bool write, bool exec) {
 	phys_ptr_t phys = (start - KERNEL_VIRT_BASE) + args->kernel_phys;
 	size_t i;
@@ -658,12 +662,14 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 
 /** Perform AMD64 paging initialisation.
  * @param args		Kernel arguments pointer. */
-void __init_text page_arch_init(kernel_args_t *args) {
+__init_text void page_arch_init(kernel_args_t *args) {
 	uint64_t *pml4, *bpml4, *pdir;
 	phys_ptr_t i, j;
 
 	/* Initialise the kernel page map structure. */
-	page_map_init(&kernel_page_map, MM_FATAL);
+	mutex_init(&kernel_page_map.lock, "page_map_lock", MUTEX_RECURSIVE);
+	kernel_page_map.invalidate_count = 0;
+	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);
 	page_map_lock(&kernel_page_map);
 
 	/* Map the kernel in. The following mappings are made:
@@ -707,13 +713,13 @@ void __init_text page_arch_init(kernel_args_t *args) {
 
 /** TLB flush IPI handler.
  * @return		Always returns STATUS_SUCCESS. */
-static status_t tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
+static __init_text status_t tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
 	x86_write_cr3(x86_read_cr3());
 	return STATUS_SUCCESS;
 }
 
 /** Perform late AMD64 paging initialisation. */
-void page_arch_late_init(void) {
+__init_text void page_arch_late_init(void) {
 	uint64_t *pml4;
 
 	/* All of the CPUs have been booted and have new stacks, and the kernel
@@ -729,7 +735,7 @@ void page_arch_late_init(void) {
 #define PAT(e, t)	((uint64_t)t << ((e) * 8))
 
 /** Initialise the PAT. */
-void __init_text pat_init(void) {
+__init_text void pat_init(void) {
 	uint64_t pat;
 
 	/* Configure the PAT. We do not use the PAT bit in the page table, as

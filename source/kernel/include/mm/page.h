@@ -92,7 +92,7 @@ extern void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec)
 extern bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp);
 extern bool page_map_find(page_map_t *map, ptr_t virt, phys_ptr_t *physp);
 extern void page_map_switch(page_map_t *map);
-extern status_t page_map_init(page_map_t *map, int mmflag);
+extern page_map_t *page_map_create(int mmflag);
 extern void page_map_destroy(page_map_t *map);
 
 extern vm_page_t *vm_page_alloc(size_t count, int pmflag);
