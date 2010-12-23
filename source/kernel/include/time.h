@@ -45,7 +45,6 @@ struct cpu;
 /** Structure containing details of a hardware timer. */
 typedef struct timer_device {
 	const char *name;		/**< Name of the timer. */
-	useconds_t len;			/**< Length of a tick (for periodic timer). */
 
 	/** Type of the device. */
 	enum {
