@@ -25,6 +25,7 @@
 #include "Compositor.h"
 #include "Connection.h"
 #include "Cursor.h"
+#include "Decoration.h"
 #include "Display.h"
 #include "Session.h"
 #include "ServerSurface.h"
@@ -139,6 +140,9 @@ ServerWindow *Session::CreateWindow(Connection *owner) {
  * @param window	Window to remove. */
 void Session::RemoveWindow(ServerWindow *window) {
 	m_windows.erase(window->GetID());
+	if(m_mouse_grabber == window || m_mouse_grabber == window->GetDecoration()) {
+		m_mouse_grabber = 0;
+	}
 	if(m_active_window == window) {
 		ActivateWindow(m_root);
 	}
