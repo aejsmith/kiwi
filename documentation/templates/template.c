@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 <author>
+ * Copyright (C) 2011 <author>
  *
  * Kiwi is open source software, released under the terms of the Non-Profit
  * Open Software License 3.0. You should have received a copy of the
