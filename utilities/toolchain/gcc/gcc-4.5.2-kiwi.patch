@@ -1,6 +1,6 @@
 diff -urN gcc-4.5.2.orig/config.sub gcc-4.5.2/config.sub
---- gcc-4.5.2.orig/config.sub	2010-12-22 09:46:01.501054611 +0000
-+++ gcc-4.5.2/config.sub	2010-12-22 09:46:14.578133829 +0000
+--- gcc-4.5.2.orig/config.sub	2011-01-17 17:44:21.542689657 +0000
++++ gcc-4.5.2/config.sub	2011-01-17 17:44:28.092674882 +0000
 @@ -1315,7 +1315,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -10,9 +10,65 @@ diff -urN gcc-4.5.2.orig/config.sub gcc-4.5.2/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
+diff -urN gcc-4.5.2.orig/gcc/config/arm/kiwi.h gcc-4.5.2/gcc/config/arm/kiwi.h
+--- gcc-4.5.2.orig/gcc/config/arm/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.2/gcc/config/arm/kiwi.h	2011-01-17 17:44:28.603595963 +0000
+@@ -0,0 +1,46 @@
++/* Definitions for Kiwi ARM targets
++   Copyright (C) 2007, Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#undef  TARGET_VERSION
++#define TARGET_VERSION fprintf (stderr, " (ARM Kiwi/ELF)");
++
++/* We want both the BPABI builtins and the Kiwi builtins. */
++#undef  TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS() 		\
++  do 						\
++    {						\
++      TARGET_BPABI_CPP_BUILTINS();		\
++      KIWI_TARGET_OS_CPP_BUILTINS();		\
++    }						\
++  while (false)
++
++#define KIWI_LINK_SPEC " \
++  %{shared:-shared} \
++  %{symbolic:-Bsymbolic} \
++  %{mbig-endian:-EB} %{mlittle-endian:-EL} \
++  -X \
++  %{!shared: \
++    %{!static: \
++      %{rdynamic:-export-dynamic} \
++      %{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++    %{static:-Bstatic}}"
++
++/* Include BPABI link spec as well as our own. */
++#undef  LINK_SPEC
++#define LINK_SPEC KIWI_LINK_SPEC BE8_LINK_SPEC
+diff -urN gcc-4.5.2.orig/gcc/config/arm/t-kiwi gcc-4.5.2/gcc/config/arm/t-kiwi
+--- gcc-4.5.2.orig/gcc/config/arm/t-kiwi	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.5.2/gcc/config/arm/t-kiwi	2011-01-17 17:44:29.488459343 +0000
+@@ -0,0 +1,2 @@
++# These functions are included in shared libraries.
++TARGET_LIBGCC2_CFLAGS = -fPIC
 diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi32.h gcc-4.5.2/gcc/config/i386/kiwi32.h
 --- gcc-4.5.2.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/kiwi32.h	2010-12-22 09:46:14.657116190 +0000
++++ gcc-4.5.2/gcc/config/i386/kiwi32.h	2011-01-17 17:44:29.489459189 +0000
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -42,12 +98,12 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi32.h gcc-4.5.2/gcc/config/i386/kiwi
 +  %{!shared: \
 +    %{!static: \
 +      %{rdynamic:-export-dynamic} \
-+      %{m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
-+      %{!m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++      %{m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++      %{!m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
 +    %{static:-static}}"
 diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi64.h gcc-4.5.2/gcc/config/i386/kiwi64.h
 --- gcc-4.5.2.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/kiwi64.h	2010-12-22 09:46:15.908836602 +0000
++++ gcc-4.5.2/gcc/config/i386/kiwi64.h	2011-01-17 17:44:29.896396382 +0000
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -77,12 +133,12 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi64.h gcc-4.5.2/gcc/config/i386/kiwi
 +  %{!shared: \
 +    %{!static: \
 +      %{rdynamic:-export-dynamic} \
-+      %{!m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
-+      %{m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++      %{!m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
++      %{m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
 +    %{static:-static}}"
 diff -urN gcc-4.5.2.orig/gcc/config/i386/t-kiwi64 gcc-4.5.2/gcc/config/i386/t-kiwi64
 --- gcc-4.5.2.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/t-kiwi64	2010-12-22 09:46:16.437718461 +0000
++++ gcc-4.5.2/gcc/config/i386/t-kiwi64	2011-01-17 17:44:30.320330989 +0000
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -103,8 +159,8 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/t-kiwi64 gcc-4.5.2/gcc/config/i386/t-ki
 +TARGET_LIBGCC2_CFLAGS = -fPIC
 diff -urN gcc-4.5.2.orig/gcc/config/kiwi.h gcc-4.5.2/gcc/config/kiwi.h
 --- gcc-4.5.2.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/kiwi.h	2010-12-22 09:46:18.363288381 +0000
-@@ -0,0 +1,40 @@
++++ gcc-4.5.2/gcc/config/kiwi.h	2011-01-17 17:44:30.835251579 +0000
+@@ -0,0 +1,44 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
 +
@@ -125,11 +181,15 @@ diff -urN gcc-4.5.2.orig/gcc/config/kiwi.h gcc-4.5.2/gcc/config/kiwi.h
 +<http://www.gnu.org/licenses/>.  */
 +
 +/* Specify predefined symbols in preprocessor.  */
-+#undef  TARGET_OS_CPP_BUILTINS
-+#define TARGET_OS_CPP_BUILTINS()		\
++#undef  KIWI_TARGET_OS_CPP_BUILTINS
++#define KIWI_TARGET_OS_CPP_BUILTINS()		\
 +	do {					\
 +		builtin_define ("__Kiwi__");	\
 +	} while (0)
++
++#undef  TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()		\
++	KIWI_TARGET_OS_CPP_BUILTINS()
 +
 +#undef  STARTFILE_SPEC
 +#define STARTFILE_SPEC \
@@ -146,9 +206,9 @@ diff -urN gcc-4.5.2.orig/gcc/config/kiwi.h gcc-4.5.2/gcc/config/kiwi.h
 +/* Make no assumptions about header files. */
 +#define NO_IMPLICIT_EXTERN_C
 diff -urN gcc-4.5.2.orig/gcc/config.gcc gcc-4.5.2/gcc/config.gcc
---- gcc-4.5.2.orig/gcc/config.gcc	2010-12-22 09:46:00.392302245 +0000
-+++ gcc-4.5.2/gcc/config.gcc	2010-12-22 09:46:19.816963686 +0000
-@@ -611,6 +611,14 @@
+--- gcc-4.5.2.orig/gcc/config.gcc	2011-01-17 17:44:21.226738739 +0000
++++ gcc-4.5.2/gcc/config.gcc	2011-01-17 17:47:52.885861711 +0000
+@@ -611,6 +611,13 @@
    default_use_cxa_atexit=yes
    use_gcc_stdint=wrap
    ;;
@@ -158,30 +218,50 @@ diff -urN gcc-4.5.2.orig/gcc/config.gcc gcc-4.5.2/gcc/config.gcc
 +   gnu_ld=yes
 +   default_use_cxa_atexit=yes
 +   tmake_file="t-svr4"
-+   tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h kiwi.h"
 +   ;;
  esac
  
  case ${target} in
-@@ -1453,6 +1461,14 @@
+@@ -800,6 +807,11 @@
+ 	tm_file="${tm_file} arm/aout.h arm/arm.h"
+ 	tmake_file="${tmake_file} arm/t-arm-softfp soft-fp/t-softfp"
+ 	;;
++arm*-*-kiwi*)
++	tm_file="dbxelf.h elfos.h kiwi.h arm/elf.h arm/bpabi.h arm/kiwi.h arm/aout.h arm/arm.h"
++	tmake_file="${tmake_file} arm/t-arm arm/t-arm-elf arm/t-bpabi arm/t-arm-softfp soft-fp/t-softfp"
++	need_64bit_hwint=yes
++	;;
+ arm*-*-rtems*)
+ 	tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/aout.h arm/arm.h arm/rtems-elf.h rtems.h newlib-stdint.h"
+ 	tmake_file="arm/t-arm arm/t-arm-elf t-rtems arm/t-rtems"
+@@ -1453,6 +1465,14 @@
  		tm_file="${tm_file} dbxcoff.h"
  	fi
  	;;
 +i[34567]86-*-kiwi*)
-+	tm_file="${tm_file} i386/kiwi32.h"
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h kiwi.h i386/kiwi32.h"
 +	tmake_file="${tmake_file} i386/t-crtstuff"
 +	;;
 +x86_64-*-kiwi*)
-+	tm_file="${tm_file} i386/x86-64.h i386/kiwi64.h"
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h i386/i386elf.h kiwi.h i386/x86-64.h i386/kiwi64.h"
 +	tmake_file="${tmake_file} i386/t-kiwi64"
 +	;;
  ia64*-*-elf*)
  	tm_file="${tm_file} dbxelf.h elfos.h newlib-stdint.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
 diff -urN gcc-4.5.2.orig/libgcc/config.host gcc-4.5.2/libgcc/config.host
---- gcc-4.5.2.orig/libgcc/config.host	2010-12-22 09:46:00.324317429 +0000
-+++ gcc-4.5.2/libgcc/config.host	2010-12-22 09:46:20.816740377 +0000
-@@ -278,6 +278,10 @@
+--- gcc-4.5.2.orig/libgcc/config.host	2011-01-17 17:44:21.155749766 +0000
++++ gcc-4.5.2/libgcc/config.host	2011-01-17 17:44:32.049064522 +0000
+@@ -215,6 +215,8 @@
+ 	;;
+ arm*-*-eabi* | arm*-*-symbianelf* )
+ 	;;
++arm*-*-kiwi*)
++	;;
+ arm*-*-rtems*)
+ 	;;
+ arm*-*-elf)
+@@ -278,6 +280,10 @@
  	;;
  x86_64-*-elf*)
  	;;
@@ -193,8 +273,8 @@ diff -urN gcc-4.5.2.orig/libgcc/config.host gcc-4.5.2/libgcc/config.host
  	;;
  x86_64-*-freebsd*)
 diff -urN gcc-4.5.2.orig/libstdc++-v3/configure.host gcc-4.5.2/libstdc++-v3/configure.host
---- gcc-4.5.2.orig/libstdc++-v3/configure.host	2010-12-22 09:46:00.481282372 +0000
-+++ gcc-4.5.2/libstdc++-v3/configure.host	2010-12-22 09:46:20.832736802 +0000
+--- gcc-4.5.2.orig/libstdc++-v3/configure.host	2011-01-17 17:44:21.318724449 +0000
++++ gcc-4.5.2/libstdc++-v3/configure.host	2011-01-17 17:44:32.209039888 +0000
 @@ -256,6 +256,10 @@
      atomicity_dir=os/irix
      atomic_word_dir=os/irix
@@ -207,8 +287,8 @@ diff -urN gcc-4.5.2.orig/libstdc++-v3/configure.host gcc-4.5.2/libstdc++-v3/conf
      os_include_dir="os/mingw32"
      error_constants_dir="os/mingw32"
 diff -urN gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4 gcc-4.5.2/libstdc++-v3/crossconfig.m4
---- gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4	2010-12-22 09:46:00.492279915 +0000
-+++ gcc-4.5.2/libstdc++-v3/crossconfig.m4	2010-12-22 09:46:21.155664670 +0000
+--- gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4	2011-01-17 17:44:21.331722431 +0000
++++ gcc-4.5.2/libstdc++-v3/crossconfig.m4	2011-01-17 17:44:35.420545911 +0000
 @@ -141,6 +141,10 @@
  	;;
      esac
@@ -221,8 +301,8 @@ diff -urN gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4 gcc-4.5.2/libstdc++-v3/cros
      GLIBCXX_CHECK_COMPILER_FEATURES
      GLIBCXX_CHECK_LINKER_FEATURES
 diff -urN gcc-4.5.2.orig/libtool.m4 gcc-4.5.2/libtool.m4
---- gcc-4.5.2.orig/libtool.m4	2010-12-22 09:46:01.500054834 +0000
-+++ gcc-4.5.2/libtool.m4	2010-12-22 09:46:21.397610630 +0000
+--- gcc-4.5.2.orig/libtool.m4	2011-01-17 17:44:21.540689969 +0000
++++ gcc-4.5.2/libtool.m4	2011-01-17 17:44:35.724499219 +0000
 @@ -5370,7 +5370,9 @@
    _LT_LINKER_SHLIBS($1)
    _LT_SYS_DYNAMIC_LINKER($1)
@@ -235,8 +315,8 @@ diff -urN gcc-4.5.2.orig/libtool.m4 gcc-4.5.2/libtool.m4
  
    # Report which library types will actually be built
 diff -urN gcc-4.5.2.orig/ltmain.sh gcc-4.5.2/ltmain.sh
---- gcc-4.5.2.orig/ltmain.sh	2010-12-22 09:46:01.518050815 +0000
-+++ gcc-4.5.2/ltmain.sh	2010-12-22 09:46:21.839511924 +0000
+--- gcc-4.5.2.orig/ltmain.sh	2011-01-17 17:44:21.557687328 +0000
++++ gcc-4.5.2/ltmain.sh	2011-01-17 17:44:36.256417541 +0000
 @@ -1451,6 +1451,12 @@
        removelist="$lobj $libobj ${libobj}T"
      fi
@@ -251,8 +331,8 @@ diff -urN gcc-4.5.2.orig/ltmain.sh gcc-4.5.2/ltmain.sh
      case $host_os in
      cygwin* | mingw* | pw32* | os2* | cegcc*)
 diff -urN gcc-4.5.2.orig/Makefile.in gcc-4.5.2/Makefile.in
---- gcc-4.5.2.orig/Makefile.in	2010-12-22 09:46:01.516051262 +0000
-+++ gcc-4.5.2/Makefile.in	2010-12-22 09:46:22.141444480 +0000
+--- gcc-4.5.2.orig/Makefile.in	2011-01-17 17:44:21.555687638 +0000
++++ gcc-4.5.2/Makefile.in	2011-01-17 17:44:36.363401120 +0000
 @@ -58408,7 +58408,6 @@
  configure-target-libobjc: maybe-configure-target-boehm-gc
  all-target-libobjc: maybe-all-target-libiberty

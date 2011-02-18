@@ -1,6 +1,15 @@
 diff -urN binutils-2.21.orig/bfd/config.bfd binutils-2.21/bfd/config.bfd
---- binutils-2.21.orig/bfd/config.bfd	2010-12-22 09:38:39.255722817 +0000
-+++ binutils-2.21/bfd/config.bfd	2010-12-22 09:40:34.972928025 +0000
+--- binutils-2.21.orig/bfd/config.bfd	2011-01-17 17:37:02.031977025 +0000
++++ binutils-2.21/bfd/config.bfd	2011-01-17 17:37:08.723369678 +0000
+@@ -281,7 +281,7 @@
+     ;;
+   arm-*-elf | arm-*-freebsd* | arm*-*-linux-* | arm*-*-conix* | \
+   arm*-*-uclinux* | arm-*-kfreebsd*-gnu | \
+-  arm*-*-eabi* )
++  arm*-*-eabi* | arm*-*-kiwi*)
+     targ_defvec=bfd_elf32_littlearm_vec
+     targ_selvecs=bfd_elf32_bigarm_vec
+     ;;
 @@ -638,6 +638,11 @@
      want64=true
      targ_underscore=no
@@ -24,8 +33,8 @@ diff -urN binutils-2.21.orig/bfd/config.bfd binutils-2.21/bfd/config.bfd
    i860-*-mach3* | i860-*-osf1* | i860-*-coff*)
      targ_defvec=i860coff_vec
 diff -urN binutils-2.21.orig/config.sub binutils-2.21/config.sub
---- binutils-2.21.orig/config.sub	2010-12-22 09:38:39.505667123 +0000
-+++ binutils-2.21/config.sub	2010-12-22 09:40:51.119327397 +0000
+--- binutils-2.21.orig/config.sub	2011-01-17 17:37:02.263920977 +0000
++++ binutils-2.21/config.sub	2011-01-17 17:37:08.723369678 +0000
 @@ -1317,7 +1317,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
@@ -36,8 +45,8 @@ diff -urN binutils-2.21.orig/config.sub binutils-2.21/config.sub
  		;;
  	-qnx*)
 diff -urN binutils-2.21.orig/configure binutils-2.21/configure
---- binutils-2.21.orig/configure	2010-12-22 09:38:39.517664448 +0000
-+++ binutils-2.21/configure	2010-12-22 09:41:44.988312315 +0000
+--- binutils-2.21.orig/configure	2011-01-17 17:37:02.275918080 +0000
++++ binutils-2.21/configure	2011-01-17 17:37:08.730368004 +0000
 @@ -2869,7 +2869,8 @@
      case "${target}" in
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
@@ -49,8 +58,8 @@ diff -urN binutils-2.21.orig/configure binutils-2.21/configure
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff -urN binutils-2.21.orig/configure.ac binutils-2.21/configure.ac
---- binutils-2.21.orig/configure.ac	2010-12-22 09:38:39.517664448 +0000
-+++ binutils-2.21/configure.ac	2010-12-22 09:42:04.720910236 +0000
+--- binutils-2.21.orig/configure.ac	2011-01-17 17:37:02.274918322 +0000
++++ binutils-2.21/configure.ac	2011-01-17 17:37:08.737366334 +0000
 @@ -351,7 +351,8 @@
      case "${target}" in
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
@@ -62,9 +71,17 @@ diff -urN binutils-2.21.orig/configure.ac binutils-2.21/configure.ac
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
 diff -urN binutils-2.21.orig/gas/configure.tgt binutils-2.21/gas/configure.tgt
---- binutils-2.21.orig/gas/configure.tgt	2010-12-22 09:38:39.299713015 +0000
-+++ binutils-2.21/gas/configure.tgt	2010-12-22 09:42:45.127894565 +0000
-@@ -181,6 +181,7 @@
+--- binutils-2.21.orig/gas/configure.tgt	2011-01-17 17:37:02.076966152 +0000
++++ binutils-2.21/gas/configure.tgt	2011-01-17 17:37:08.738366095 +0000
+@@ -112,6 +112,7 @@
+   arm-*-eabi*)				fmt=elf em=armeabi ;;
+   arm-*-symbianelf*)			fmt=elf em=symbian ;;
+   arm-*-kaos*)				fmt=elf ;;
++  arm-*-kiwi*)				fmt=elf  em=armeabi ;;
+   arm-*-conix*)				fmt=elf ;;
+   arm-*-linux*aout*)			fmt=aout em=linux ;;
+   arm-*-linux-*eabi*)			fmt=elf  em=armlinuxeabi ;;
+@@ -181,6 +182,7 @@
    i386-*-coff)				fmt=coff ;;
    i386-*-elf)				fmt=elf ;;
    i386-*-kaos*)				fmt=elf ;;
@@ -73,9 +90,17 @@ diff -urN binutils-2.21.orig/gas/configure.tgt binutils-2.21/gas/configure.tgt
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
    i386-*-netbsdpe*)			fmt=coff em=pe ;;
 diff -urN binutils-2.21.orig/ld/configure.tgt binutils-2.21/ld/configure.tgt
---- binutils-2.21.orig/ld/configure.tgt	2010-12-22 09:38:39.151745988 +0000
-+++ binutils-2.21/ld/configure.tgt	2010-12-22 09:43:08.975572760 +0000
-@@ -246,6 +246,10 @@
+--- binutils-2.21.orig/ld/configure.tgt	2011-01-17 17:37:01.929001943 +0000
++++ binutils-2.21/ld/configure.tgt	2011-01-17 17:39:45.897955496 +0000
+@@ -70,6 +70,7 @@
+ 	  		targ_emul=armelf ;;
+ arm*-*-symbianelf*)     targ_emul=armsymbian;;
+ arm-*-kaos*)		targ_emul=armelf ;;
++arm*-*-kiwi*)		targ_emul=armelf ;;
+ arm9e-*-elf)		targ_emul=armelf ;;
+ arm*b-*-linux-*eabi)	targ_emul=armelfb_linux_eabi
+ 			targ_extra_emuls=armelf_linux_eabi
+@@ -246,6 +247,10 @@
  			targ_extra_emuls="elf_i386 elf_l1om"
  			;;
  i[3-7]86-*-kaos*)	targ_emul=elf_i386 ;;
