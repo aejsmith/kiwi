@@ -38,7 +38,7 @@ typedef struct loader_type {
 	 * @param env		Environment for the OS. */
 	void (*configure)(environ_t *env);
 } loader_type_t;
-
+#if 0
 /** Get the loader type from an environment.
  * @param env		Environment to get from.
  * @return		Pointer to loader type. */
@@ -60,6 +60,7 @@ static inline void loader_type_set(environ_t *env, loader_type_t *type) {
 	value.pointer = type;
 	environ_insert(env, "loader_type", &value);
 }
+#endif
 
 extern void kiwi_loader_arch_setup(environ_t *env);
 extern void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env);

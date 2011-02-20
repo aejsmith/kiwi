@@ -23,5 +23,5 @@
 
 /** Perform early architecture initialisation. */
 void arch_early_init(void) {
-	idt_init();
+	cpu_init();
 }

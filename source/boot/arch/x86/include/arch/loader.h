@@ -24,8 +24,7 @@
 
 #include <types.h>
 
-extern bool cpu_lapic_init(void);
-extern void idt_init(void);
+extern void cpu_init(void);
 extern void arch_early_init(void);
 
 #endif /* __ARCH_LOADER_H */

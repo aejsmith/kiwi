@@ -388,7 +388,7 @@ void memory_init(void) {
 	                PHYS_MEMORY_INTERNAL);
 	phys_memory_add((ptr_t)heap, (ptr_t)heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
 
-	/* Mark the boot CPU's stack as reclaimable. */
+	/* Mark the stack as reclaimable. */
 	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + KSTACK_SIZE, PHYS_MEMORY_RECLAIMABLE);
 }
 

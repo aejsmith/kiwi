@@ -21,7 +21,6 @@ sources = map(File, [
 	'loaders/enter.S',
 	'bios.S',
 	'console.c',
-	'cpu.c',
 	'disk.c',
 	'memory.c',
 	'platform.c',

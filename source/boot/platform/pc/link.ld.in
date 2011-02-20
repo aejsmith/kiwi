@@ -34,11 +34,6 @@ SECTIONS {
 		*(.init.text)
 		*(.text)
 		*(.text.*)
-
-		__ap_trampoline_start = .;
-		*(.trampoline)
-		__ap_trampoline_end = .;
-
 		__text_end = .;
 	}
 
