@@ -44,7 +44,7 @@ typedef struct kboot_tag {
 #define KBOOT_TAG_BOOTDEV		3	/**< Boot device information. */
 #define KBOOT_TAG_LFB			4	/**< Linear framebuffer information. */
 
-/** Maximum length of an option name. */
+/** Maximum length of fields in the option tag. */
 #define KBOOT_OPTION_NAME_LEN		32
 
 /** Tag containing an option passed to the kernel. */
@@ -80,7 +80,7 @@ typedef struct kboot_tag_memory {
 typedef struct kboot_tag_module {
 	kboot_tag_t header;			/**< Tag header. */
 
-	phys_ptr_t base;			/**< Address of the module. */
+	phys_ptr_t addr;			/**< Address of the module. */
 	uint32_t size;				/**< Size of the module. */
 } __packed kboot_tag_module_t;
 
@@ -112,36 +112,117 @@ typedef struct kboot_tag_lfb {
 #define KBOOT_ITAG_OPTION		1	/**< Option description. */
 #define KBOOT_ITAG_MAPPING		2	/**< Virtual memory mapping description. */
 
-/** Length of fields in the kboot_itag_image structure. */
-#define KBOOT_IMAGE_NAME_LEN		32
-
 /** Flags for the kboot_itag_image structure. */
 #define KBOOT_IMAGE_LFB			(1<<0)	/**< Switch to a video mode and provide LFB information. */
 
 /** Image tag containing basic image information. */
 typedef struct kboot_itag_image {
-	char name[KBOOT_IMAGE_NAME_LEN];	/**< Name of the image. */
 	uint32_t flags;				/**< Flags for the image. */
 } __packed kboot_itag_image_t;
 
+/** Macro to declare an image itag. */
+#define KBOOT_IMAGE(flags) \
+	__asm__( \
+		"   .pushsection \".note.kboot.image\", \"a\"\n" \
+		"   .long 1f - 0f\n" \
+		"   .long 3f - 2f\n" \
+		"   .long " XSTRINGIFY(KBOOT_ITAG_IMAGE) "\n" \
+		"0: .asciz \"KBoot\"\n" \
+		"1: .p2align 2\n" \
+		"2: .long " STRINGIFY(flags) "\n" \
+		"3: .p2align 2\n" \
+		"   .popsection\n" \
+	)
+
 /** Image tag containing an option description. */
 typedef struct kboot_itag_option {
-	char name[KBOOT_OPTION_NAME_LEN];	/**< Name of the option. */
 	uint32_t type;				/**< Type of the option. */
-
-	/** Default value of the option. */
-	union {
-		bool boolean;
-		uint64_t integer;
-		char string[128];
-	} defval;
+	uint32_t name_len;			/**< Length of the option name. */
+	uint32_t desc_len;			/**< Length of the option description. */
+	uint32_t default_len;			/**< Length of the default value. */
 } __packed kboot_itag_option_t;
+
+/** Macro to declare a boolean option itag. */
+#define KBOOT_BOOLEAN_OPTION(name, desc, default) \
+	__asm__( \
+		"   .pushsection \".note.kboot.option." name "\", \"a\"\n" \
+		"   .long 1f - 0f\n" \
+		"   .long 6f - 2f\n" \
+		"   .long " XSTRINGIFY(KBOOT_ITAG_OPTION) "\n" \
+		"0: .asciz \"KBoot\"\n" \
+		"1: .p2align 2\n" \
+		"2: .long " XSTRINGIFY(KBOOT_OPTION_BOOLEAN) "\n" \
+		"   .long 4f - 3f\n" \
+		"   .long 5f - 4f\n" \
+		"   .long 1\n" \
+		"3: .asciz \"" name "\"\n" \
+		"4: .asciz \"" desc "\"\n" \
+		"5: .byte " STRINGIFY(default) "\n" \
+		"6: .p2align 2\n" \
+		"   .popsection\n" \
+	)
+
+/** Macro to declare an integer option itag. */
+#define KBOOT_INTEGER_OPTION(name, desc, default) \
+	__asm__( \
+		"   .pushsection \".note.kboot.option." name "\", \"a\"\n" \
+		"   .long 1f - 0f\n" \
+		"   .long 6f - 2f\n" \
+		"   .long " XSTRINGIFY(KBOOT_ITAG_OPTION) "\n" \
+		"0: .asciz \"KBoot\"\n" \
+		"1: .p2align 2\n" \
+		"2: .long " XSTRINGIFY(KBOOT_OPTION_INTEGER) "\n" \
+		"   .long 4f - 3f\n" \
+		"   .long 5f - 4f\n" \
+		"   .long 8\n" \
+		"3: .asciz \"" name "\"\n" \
+		"4: .asciz \"" desc "\"\n" \
+		"5: .quad " STRINGIFY(default) "\n" \
+		"6: .p2align 2\n" \
+		"   .popsection\n" \
+	)
+
+/** Macro to declare an string option itag. */
+#define KBOOT_STRING_OPTION(name, desc, default) \
+	__asm__( \
+		"   .pushsection \".note.kboot.option." name "\", \"a\"\n" \
+		"   .long 1f - 0f\n" \
+		"   .long 6f - 2f\n" \
+		"   .long " XSTRINGIFY(KBOOT_ITAG_OPTION) "\n" \
+		"0: .asciz \"KBoot\"\n" \
+		"1: .p2align 2\n" \
+		"2: .long " XSTRINGIFY(KBOOT_OPTION_STRING) "\n" \
+		"   .long 4f - 3f\n" \
+		"   .long 5f - 4f\n" \
+		"   .long 6f - 5f\n" \
+		"3: .asciz \"" name "\"\n" \
+		"4: .asciz \"" desc "\"\n" \
+		"5: .asciz \"" default "\"\n" \
+		"6: .p2align 2\n" \
+		"   .popsection\n" \
+	)
 
 /** Image tag containing a virtual memory mapping description. */
 typedef struct kboot_itag_mapping {
 	uint64_t virt;				/**< Virtual address to map. */
-	phys_ptr_t phys;			/**< Physical address to map to. */
+	uint64_t phys;				/**< Physical address to map to. */
 	uint64_t size;				/**< Size of mapping to make. */
 } __packed kboot_itag_mapping_t;
+
+/** Macro to declare a boolean option itag. */
+#define KBOOT_MAPPING(virt, phys, size) \
+	__asm__( \
+		"   .pushsection \".note.kboot.mapping.b" STRINGIFY(virt) "\", \"a\"\n" \
+		"   .long 1f - 0f\n" \
+		"   .long 3f - 2f\n" \
+		"   .long " XSTRINGIFY(KBOOT_ITAG_MAPPING) "\n" \
+		"0: .asciz \"KBoot\"\n" \
+		"1: .p2align 2\n" \
+		"2: .quad " STRINGIFY(virt) "\n" \
+		"   .quad " STRINGIFY(phys) "\n" \
+		"   .quad " STRINGIFY(size) "\n" \
+		"3: .p2align 2\n" \
+		"   .popsection\n" \
+	)
 
 #endif /* __KBOOT_H */

@@ -38,4 +38,7 @@
 # error "Kiwi does not currently support compilers other than GCC"
 #endif
 
+#define STRINGIFY(val)		#val
+#define XSTRINGIFY(val)		STRINGIFY(val)
+
 #endif /* __COMPILER_H */
