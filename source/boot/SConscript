@@ -25,11 +25,14 @@ sources = map(File, [
 	'lib/string.c',
 	'lib/support.c',
 
+	'loaders/kboot.c',
+
 	'partitions/msdos.c',
 
 	'config.c',
 	'console.c',
 	'disk.c',
+	'elf.c',
 	'error.c',
 	'fs.c',
 	'main.c',

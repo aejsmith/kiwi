@@ -44,7 +44,10 @@ loader_type_t *loader_type_get(environ_t *env) {
 	value_t *value;
 
 	value = environ_lookup(env, "loader_type");
-	assert(value && value->type == VALUE_TYPE_POINTER);
+	if(!value || value->type != VALUE_TYPE_POINTER) {
+		boot_error("No operating system loaded");
+	}
+
 	return value->pointer;
 }
 

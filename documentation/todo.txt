@@ -1,0 +1,6 @@
+Major TODO items
+----------------
+
+Loader:
+ - All the configuration stuff is messy, clean it up.
+ - Support booting from HD without being loaded via Multiboot.

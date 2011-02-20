@@ -69,13 +69,13 @@ def iso_image_func(target, source, env):
 
 	# Write the configuration.
 	f = open(os.path.join(tmpdir, 'boot', 'loader.cfg'), 'w')
-	f.write('set "hidden" true\n')
+	f.write('set "timeout" 5\n')
 	f.write('entry "Kiwi" {\n')
 	if config['DEBUG']:
 		f.write('	set "splash_disabled" true\n')
 	if config['FORCE_VIDEO_MODE']:
 		f.write('	set "video_mode" "%s"\n' % (config['FORCE_VIDEO_MODE']))
-	f.write('	kiwi\n')
+	f.write('	kboot "/kiwi/kernel" "/kiwi/modules"\n')
 	f.write('}\n')
 	f.close()
 
