@@ -29,6 +29,7 @@
 
 #include <lib/string.h>
 
+#include <assert.h>
 #include <config.h>
 #include <console.h>
 #include <elf.h>
@@ -54,6 +55,111 @@ typedef struct kboot_data {
 
 extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
 
+/** Allocate a tag in the tag list.
+ * @param data		Loader data structure.
+ * @param type		Type of the tag.
+ * @param size		Size of the tag.
+ * @return		Address of allocated tag. */
+static void *allocate_tag(kboot_data_t *data, uint32_t type, size_t size) {
+	kboot_tag_t *tag, *exist;
+
+	assert(size >= sizeof(kboot_tag_t));
+
+	tag = kmalloc(size);
+	tag->next = 0;
+	tag->type = type;
+
+	/* Add at the end of the list. */
+	if(data->tags) {
+		for(exist = data->tags; exist->next; exist = (kboot_tag_t *)((ptr_t)exist->next));
+		exist->next = (ptr_t)tag;
+	} else {
+		data->tags = tag;
+	}
+
+	return tag;
+}
+
+/** Load a single module.
+ * @param data		Loader data structure.
+ * @param handle	Handle to module to load.
+ * @param name		Name of the module. */
+static void load_module(kboot_data_t *data, fs_handle_t *handle, const char *name) {
+	kboot_tag_module_t *tag;
+	phys_ptr_t addr;
+	offset_t size;
+
+	if(handle->directory) {
+		return;
+	}
+
+	kprintf("Loading %s...\n", name);
+
+	/* Allocate a chunk of memory to load to. */
+	size = fs_file_size(handle);
+	addr = phys_memory_alloc(ROUND_UP(size, PAGE_SIZE), PAGE_SIZE, true);
+	if(!fs_file_read(handle, (void *)((ptr_t)addr), size, 0)) {
+		boot_error("Could not read module %s", name);
+	}
+
+	/* Add the module to the tag list. */
+	tag = allocate_tag(data, KBOOT_TAG_MODULE, sizeof(*tag));
+	tag->addr = addr;
+	tag->size = size;
+
+	dprintf("kboot: loaded module %s to 0x%" PRIpp " (size: %" PRIu64 ")\n",
+	        name, addr, size);
+}
+
+/** Load a list of modules.
+ * @param data		Loader data structure.
+ * @param list		List to load. */
+static void load_module_list(kboot_data_t *data, value_list_t *list) {
+	fs_handle_t *handle;
+	size_t i;
+
+	for(i = 0; i < list->count; i++) {
+		handle = fs_open(NULL, list->values[i].string);
+		if(!handle) {
+			boot_error("Could not open module %s", list->values[i].string);
+		}
+
+		load_module(data, handle, strrchr(list->values[i].string, '/') + 1);
+		fs_close(handle);
+	}
+}
+
+/** Callback to load a module from a directory.
+ * @param name		Name of the entry.
+ * @param handle	Handle to entry.
+ * @param data		Data argument passed to fs_dir_read().
+ * @return		Whether to continue iteration. */
+static bool load_modules_cb(const char *name, fs_handle_t *handle, void *arg) {
+	load_module(arg, handle, name);
+	return true;
+}
+
+/** Load a directory of modules.
+ * @param data		Loader data structure.
+ * @param path		Path to directory. */
+static void load_module_dir(kboot_data_t *data, const char *path) {
+	fs_handle_t *handle;
+
+	if(!(handle = fs_open(NULL, path))) {
+		boot_error("Could not find module directory %s", path);
+	} else if(!handle->directory) {
+		boot_error("Module directory %s not directory", path);
+	} else if(!handle->mount->type->read_dir) {
+		boot_error("Cannot use module directory on non-listable FS");
+	}
+
+	if(!fs_dir_read(handle, load_modules_cb, data)) {
+		boot_error("Failed to iterate module directory");
+	}
+
+	fs_close(handle);
+}
+
 /** Load the operating system.
  * @param env		Environment for the OS. */
 static __noreturn void kboot_loader_load(environ_t *env) {
@@ -71,6 +177,14 @@ static __noreturn void kboot_loader_load(environ_t *env) {
 	/* Load the kernel image into memory. */
 	kprintf("Loading kernel...\n");
 	mmu = kboot_arch_load(data->kernel);
+
+	/* Load modules. */
+	if(data->modules.type == VALUE_TYPE_LIST) {
+		load_module_list(data, data->modules.list);
+	} else if(data->modules.type == VALUE_TYPE_STRING) {
+		load_module_dir(data, data->modules.string);
+	}
+
 	while(1);
 }
 
