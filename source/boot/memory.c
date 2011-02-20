@@ -211,7 +211,7 @@ static void memory_range_merge(memory_range_t *range) {
 		}
 	}
 }
-#if 0
+
 /** Dump a list of physical memory ranges. */
 static void phys_memory_dump(void) {
 	memory_range_t *range;
@@ -242,7 +242,7 @@ static void phys_memory_dump(void) {
 		}
 	}
 }
-#endif
+
 /** Add a range of physical memory.
  * @param start		Start of the range (must be page-aligned).
  * @param end		End of the range (must be page-aligned).
@@ -390,10 +390,11 @@ void memory_init(void) {
 	/* Mark the stack as reclaimable. */
 	phys_memory_add((ptr_t)loader_stack, (ptr_t)loader_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);
 }
-#if 0
+
 /** Finalise the memory map.
- * @note		Only needs to be called when booting a Kiwi kernel. */
-void memory_finalise(void) {
+ * @note		Only needs to be called when booting a KBoot kernel.
+ * @return		Physical address of the first memory range tag. */
+phys_ptr_t memory_finalise(void) {
 	memory_range_t *range, *next;
 	uint32_t i = 0;
 
@@ -410,21 +411,21 @@ void memory_finalise(void) {
 	dprintf("memory: final memory map:\n");
 	phys_memory_dump();
 
-	/* Set up the addresses in the range structures. */
+	/* Set up the tag headers in the range structures. */
 	LIST_FOREACH(&memory_ranges, iter) {
 		range = list_entry(iter, memory_range_t, header);
+
+		range->ka.header.type = KBOOT_TAG_MEMORY;
 		if(range->header.next != &memory_ranges) {
 			next = list_entry(range->header.next, memory_range_t, header);
-			range->ka.next = (ptr_t)&next->ka;
+			range->ka.header.next = (ptr_t)&next->ka;
 		} else {
-			range->ka.next = 0;
+			range->ka.header.next = 0;
 		}
 
 		i++;
 	}
 
 	range = list_entry(memory_ranges.next, memory_range_t, header);
-	kernel_args->phys_ranges = (ptr_t)&range->ka;
-	kernel_args->phys_range_count = i;
+	return (ptr_t)&range->ka;
 }
-#endif

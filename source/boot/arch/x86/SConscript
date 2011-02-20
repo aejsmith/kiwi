@@ -17,6 +17,7 @@
 Import('env')
 
 sources = map(File, [
+	'loaders/enter.S',
 	'loaders/kboot.c',
 	'arch.c',
 	'cpu.c',

@@ -49,11 +49,31 @@ typedef struct kboot_data {
 	fs_handle_t *kernel;		/**< Handle to the kernel image. */
 	bool is_kboot;			/**< Whether the image is a KBoot image. */
 	value_t modules;		/**< Modules to load. */
-	kboot_tag_t *tags;		/**< Start of the tag list. */
+	phys_ptr_t tags;		/**< Start of the tag list. */
 	ui_window_t *config;		/**< Configuration window. */
+	mmu_context_t *mmu;		/**< MMU context. */
 } kboot_data_t;
 
 extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
+extern void kboot_arch_enter(mmu_context_t *ctx, phys_ptr_t tags) __noreturn;
+
+/** Add a tag to the tag list.
+ * @param data		Loader data structure.
+ * @param tag		Address of tag to add. */
+static void append_tag(kboot_data_t *data, phys_ptr_t tag) {
+	kboot_tag_t *exist;
+	phys_ptr_t addr;
+
+	if(data->tags) {
+		for(addr = data->tags; addr; addr = exist->next) {
+			exist = (kboot_tag_t *)((ptr_t)addr);
+		}
+
+		exist->next = tag;
+	} else {
+		data->tags = tag;
+	}
+}
 
 /** Allocate a tag in the tag list.
  * @param data		Loader data structure.
@@ -61,7 +81,7 @@ extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
  * @param size		Size of the tag.
  * @return		Address of allocated tag. */
 static void *allocate_tag(kboot_data_t *data, uint32_t type, size_t size) {
-	kboot_tag_t *tag, *exist;
+	kboot_tag_t *tag;
 
 	assert(size >= sizeof(kboot_tag_t));
 
@@ -69,14 +89,7 @@ static void *allocate_tag(kboot_data_t *data, uint32_t type, size_t size) {
 	tag->next = 0;
 	tag->type = type;
 
-	/* Add at the end of the list. */
-	if(data->tags) {
-		for(exist = data->tags; exist->next; exist = (kboot_tag_t *)((ptr_t)exist->next));
-		exist->next = (ptr_t)tag;
-	} else {
-		data->tags = tag;
-	}
-
+	append_tag(data, (ptr_t)tag);
 	return tag;
 }
 
@@ -160,11 +173,112 @@ static void load_module_dir(kboot_data_t *data, const char *path) {
 	fs_close(handle);
 }
 
+/** Set a single option.
+ * @param data		Loader data pointer.
+ * @param name		Name of the option.
+ * @param type		Type of the option. */
+static void set_option(kboot_data_t *data, const char *name, uint32_t type) {
+	kboot_tag_option_t *tag;
+	value_t *value;
+	size_t size;
+
+	value = environ_lookup(data->env, name);
+	switch(type) {
+	case KBOOT_OPTION_BOOLEAN:
+		size = 1;
+		break;
+	case KBOOT_OPTION_STRING:
+		size = strlen(value->string + 1);
+		break;
+	case KBOOT_OPTION_INTEGER:
+		size = sizeof(uint64_t);
+		break;
+	}
+
+	tag = allocate_tag(data, KBOOT_TAG_OPTION, sizeof(*tag) + size);
+	strncpy(tag->name, name, sizeof(tag->name));
+	tag->name[sizeof(tag->name) - 1] = 0;
+	tag->type = type;
+	tag->size = size;
+
+	switch(type) {
+	case KBOOT_OPTION_BOOLEAN:
+		*(bool *)&tag[1] = value->boolean;
+		break;
+	case KBOOT_OPTION_STRING:
+		memcpy(&tag[1], value->string, size);
+		break;
+	case KBOOT_OPTION_INTEGER:
+		*(uint64_t *)&tag[1] = value->integer;
+		break;
+	}
+}
+
+/** Set the video mode.
+ * @param data		Loader data pointer. */
+static void set_video_mode(kboot_data_t *data) {
+	kboot_tag_lfb_t *tag;
+	video_mode_t *mode;
+	value_t *value;
+
+	value = environ_lookup(data->env, "video_mode");
+	mode = value->pointer;
+	video_enable(mode);
+
+	tag = allocate_tag(data, KBOOT_TAG_LFB, sizeof(*tag));
+	tag->width = mode->width;
+	tag->height = mode->height;
+	tag->depth = mode->bpp;
+	tag->addr = mode->addr;
+}
+
+/** Tag iterator to set options in the tag list.
+ * @param note		Note header.
+ * @param name		Note name.
+ * @param desc		Note data.
+ * @param _data		KBoot loader data pointer.
+ * @return		Whether to continue iteration. */
+static bool set_options(elf_note_t *note, const char *name, void *desc, void *_data) {
+	kboot_itag_mapping_t *mapping;
+	kboot_itag_option_t *option;
+	kboot_data_t *data = _data;
+	kboot_itag_image_t *image;
+
+	if(strcmp(name, "KBoot") != 0) {
+		return true;
+	}
+
+	switch(note->n_type) {
+	case KBOOT_ITAG_IMAGE:
+		image = desc;
+
+		/* Set the video mode if requested. */
+		if(image->flags & KBOOT_IMAGE_LFB) {
+			set_video_mode(data);
+		}
+
+		break;
+	case KBOOT_ITAG_OPTION:
+		option = desc;
+		set_option(data, desc + sizeof(*option), option->type);
+		break;
+	case KBOOT_ITAG_MAPPING:
+		mapping = desc;
+		if(!mmu_map(data->mmu, mapping->virt, mapping->phys, mapping->size)) {
+			boot_error("Kernel specifies an invalid memory mapping");
+		}
+		break;
+	}
+
+	return true;
+}
+
 /** Load the operating system.
  * @param env		Environment for the OS. */
 static __noreturn void kboot_loader_load(environ_t *env) {
 	kboot_data_t *data = loader_data_get(env);
-	mmu_context_t *mmu;
+	kboot_tag_bootdev_t *bootdev;
+	phys_ptr_t addr;
 
 	/* We don't report these errors until the user actually tries to run a
 	 * menu entry. */
@@ -176,7 +290,12 @@ static __noreturn void kboot_loader_load(environ_t *env) {
 
 	/* Load the kernel image into memory. */
 	kprintf("Loading kernel...\n");
-	mmu = kboot_arch_load(data->kernel);
+	data->mmu = kboot_arch_load(data->kernel);
+
+	/* Record the boot device. */
+	bootdev = allocate_tag(data, KBOOT_TAG_BOOTDEV, sizeof(*bootdev));
+	strncpy(bootdev->uuid, current_disk->fs->uuid, sizeof(bootdev->uuid));
+	bootdev->uuid[sizeof(bootdev->uuid) - 1] = 0;
 
 	/* Load modules. */
 	if(data->modules.type == VALUE_TYPE_LIST) {
@@ -185,7 +304,15 @@ static __noreturn void kboot_loader_load(environ_t *env) {
 		load_module_dir(data, data->modules.string);
 	}
 
-	while(1);
+	/* Create option tags, set video mode and set up memory mappings. */
+	elf_note_iterate(data->kernel, set_options, data);
+
+	/* Finish off the memory map and add memory ranges to the tag list. */
+	addr = memory_finalise();
+	append_tag(data, addr);
+
+	/* Enter the kernel. */
+	kboot_arch_enter(data->mmu, data->tags);
 }
 
 /** Display a configuration menu.
@@ -201,13 +328,13 @@ static loader_type_t kboot_loader_type = {
 	.configure = kboot_loader_configure,
 };
 
-/** Tag iterator to add configuration settings to the environment.
+/** Tag iterator to add options to the environment.
  * @param note		Note header.
  * @param name		Note name.
  * @param desc		Note data.
  * @param _data		KBoot loader data pointer.
  * @return		Whether to continue iteration. */
-static bool add_config_tags(elf_note_t *note, const char *name, void *desc, void *_data) {
+static bool add_options(elf_note_t *note, const char *name, void *desc, void *_data) {
 	const char *opt_name, *opt_desc;
 	kboot_itag_option_t *option;
 	kboot_data_t *data = _data;
@@ -297,7 +424,7 @@ static bool config_cmd_kboot(value_list_t *args, environ_t *env) {
 	value_copy(&args->values[1], &data->modules);
 	data->env = env;
 	data->is_kboot = false;
-	data->tags = NULL;
+	data->tags = 0;
 	data->config = ui_list_create("Kernel Options", true);
 
 	/* Open the kernel image. */
@@ -307,8 +434,8 @@ static bool config_cmd_kboot(value_list_t *args, environ_t *env) {
 		return true;
 	}
 
-	/* Find all configuration tags. */
-	elf_note_iterate(data->kernel, add_config_tags, data);
+	/* Find all option tags. */
+	elf_note_iterate(data->kernel, add_options, data);
 	return true;
 }
 DEFINE_COMMAND("kboot", config_cmd_kboot);

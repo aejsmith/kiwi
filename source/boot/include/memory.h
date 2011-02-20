@@ -42,6 +42,6 @@ extern phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim)
 
 extern void platform_memory_detect(void);
 extern void memory_init(void);
-extern void memory_finalise(void);
+extern phys_ptr_t memory_finalise(void);
 
 #endif /* __MEMORY_H */

@@ -69,6 +69,12 @@
 #define X86_FLAGS_VIP		(1<<20)		/**< Virtual Interrupt Pending Flag. */
 #define X86_FLAGS_ID		(1<<21)		/**< ID Flag. */
 
+/** Model Specific Registers. */
+#define X86_MSR_EFER		0xC0000080	/**< Extended Feature Enable register. */
+
+/** EFER MSR flags. */
+#define X86_EFER_LME		(1<<8)		/**< Long Mode (IA-32e) Enable. */
+
 /** Standard CPUID function definitions. */
 #define X86_CPUID_VENDOR_ID	0x00000000	/**< Vendor ID/Highest Standard Function. */
 #define X86_CPUID_FEATURE_INFO	0x00000001	/**< Feature Information. */

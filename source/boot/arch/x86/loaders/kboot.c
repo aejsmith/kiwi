@@ -31,6 +31,9 @@
 #include <loader.h>
 
 extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
+extern void kboot_arch_enter(mmu_context_t *ctx, phys_ptr_t tags) __noreturn;
+extern void kboot_arch_enter64(phys_ptr_t tags, ptr_t cr3, uint64_t entry) __noreturn;
+extern void kboot_arch_enter32(phys_ptr_t tags, ptr_t cr3, uint32_t entry) __noreturn;
 
 /** IA32 kernel loader function. */
 DEFINE_ELF_LOADER(load_elf32_kernel, 32, 0x400000);
@@ -115,4 +118,19 @@ mmu_context_t *kboot_arch_load(fs_handle_t *handle) {
 	/* Identity map the loader (first 4MB). */
 	mmu_map(ctx, 0, 0, 0x400000);
 	return ctx;
+}
+
+/** Enter a loaded KBoot kernel.
+ * @param ctx		MMU context.
+ * @param tags		Tag list address. */
+__noreturn void kboot_arch_enter(mmu_context_t *ctx, phys_ptr_t tags) {
+	/* Enter with interrupts disabled. */
+	__asm__ volatile("cli");
+
+	/* Call the appropriate entry function. */
+	if(kernel_is_64bit) {
+		kboot_arch_enter64(tags, ctx->cr3, kernel_entry64);
+	} else {
+		kboot_arch_enter32(tags, ctx->cr3, kernel_entry32);
+	}
 }
