@@ -26,8 +26,6 @@
 #include <lib/list.h>
 #include <sync/spinlock.h>
 
-struct kernel_args;
-struct kernel_args_cpu_arch;
 struct sched_cpu;
 struct thread;
 struct vm_aspace;
@@ -77,7 +75,6 @@ extern void cpu_halt_all(void);
 
 extern cpu_id_t cpu_current_id(void);
 
-extern void cpu_arch_init(cpu_t *cpu, struct kernel_args_cpu_arch *args);
 extern cpu_t *cpu_register(cpu_id_t id, int state);
 extern void cpu_init(void);
 extern void cpu_early_init(void);

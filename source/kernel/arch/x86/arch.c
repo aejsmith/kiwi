@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		x86 architecture core code.
+ * @brief		x86 architecture initialisation code.
  */
 
 #include <x86/cpu.h>
@@ -32,20 +32,16 @@
 
 extern void syscall_arch_init(void);
 
-/** x86-specific early initialisation.
- * @param args		Kernel arguments structure. */
-void __init_text arch_premm_init(kernel_args_t *args) {
-	cpu_features_init(&cpu_features, args->arch.standard_ecx,
-	                  args->arch.standard_edx, args->arch.extended_ecx,
-	                  args->arch.extended_edx);
-	descriptor_init(&boot_cpu);
+/** x86-specific early initialisation. */
+__init_text void arch_premm_init(void) {
+	cpu_arch_init(&boot_cpu);
 	intr_init();
 	pat_init();
 }
 
 /** x86-specific second stage initialisation.
  * @param args		Kernel arguments structure. */
-void __init_text arch_postmm_init(kernel_args_t *args) {
+__init_text void arch_postmm_init(kernel_args_t *args) {
 #ifdef __x86_64__
 	syscall_arch_init();
 #else
@@ -60,7 +56,7 @@ void __init_text arch_postmm_init(kernel_args_t *args) {
 /** x86-specific initialisation for an AP.
  * @param args		Kernel arguments structure.
  * @param cpu		CPU structure for the AP. */
-void __init_text arch_ap_init(kernel_args_t *args, cpu_t *cpu) {
+__init_text void arch_ap_init(kernel_args_t *args, cpu_t *cpu) {
 	descriptor_init(cpu);
 	pat_init();
 	lapic_init(args);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -135,10 +135,6 @@
 
 extern cpu_features_t cpu_features;
 
-extern void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx,
-                              uint32_t standard_edx, uint32_t extended_ecx,
-                              uint32_t extended_edx);
-
 /** Macros to generate functions to access registers. */
 #define GEN_READ_REG(name, type)	\
 	static inline type x86_read_ ## name (void) { \
@@ -244,6 +240,7 @@ static inline unative_t x86_read_flags(void) {
 static inline void x86_write_flags(unative_t val) {
 	__asm__ volatile("push %0; popf" :: "rm"(val));
 }
+
 /** Read an MSR.
  * @param msr		MSR to read.
  * @return		Value read from the MSR. */
@@ -270,6 +267,16 @@ static inline void x86_write_msr(uint32_t msr, uint64_t value) {
 static inline void x86_cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
 	__asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "0"(level));
 }
+
+/** Read the Time Stamp Counter.
+ * @return		Value of the TSC. */
+static inline uint64_t x86_rdtsc(void) {
+	uint32_t high, low;
+	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
+	return ((uint64_t)high << 32) | low;
+}
+
+extern void cpu_arch_init(struct cpu *cpu);
 
 #endif /* __ASM__ */
 #endif /* __X86_CPU_H */

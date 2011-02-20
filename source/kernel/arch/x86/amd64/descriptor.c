@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,7 +48,7 @@ static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 
 /** Set up the GDT for the current CPU.
  * @param cpu		CPU to initialise for. */
-static void __init_text gdt_init(cpu_t *cpu) {
+static __init_text void gdt_init(cpu_t *cpu) {
 	gdt_tss_entry_t *desc;
 	size_t size;
 	ptr_t base;
@@ -97,7 +97,7 @@ static void __init_text gdt_init(cpu_t *cpu) {
 
 /** Set up the TSS for the current CPU.
  * @param cpu		CPU to initialise for. */
-static void __init_text tss_init(cpu_t *cpu) {
+static __init_text void tss_init(cpu_t *cpu) {
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
 	memset(&cpu->arch.tss, 0, sizeof(tss_t));
@@ -109,7 +109,7 @@ static void __init_text tss_init(cpu_t *cpu) {
 }
 
 /** Initialise the IDT shared by all CPUs. */
-static void __init_text idt_init(void) {
+static __init_text void idt_init(void) {
 	unative_t i;
 	ptr_t addr;
 
@@ -133,7 +133,7 @@ static void __init_text idt_init(void) {
 
 /** Initialise descriptor tables for the current CPU.
  * @param cpu		CPU to initialise for. */
-void __init_text descriptor_init(cpu_t *cpu) {
+__init_text void descriptor_init(cpu_t *cpu) {
 	gdt_init(cpu);
 	tss_init(cpu);
 
