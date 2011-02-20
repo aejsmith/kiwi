@@ -25,11 +25,11 @@
 
 #include <lib/string.h>
 
+#include <pc/multiboot.h>
+
 #include <config.h>
 #include <loader.h>
 #include <time.h>
-
-#include "multiboot.h"
 
 extern char *video_mode_override;
 

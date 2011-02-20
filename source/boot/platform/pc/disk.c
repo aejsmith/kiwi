@@ -22,15 +22,15 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <pc/bios.h>
+#include <pc/multiboot.h>
+#include <pc/pxe.h>
+
 #include <assert.h>
 #include <console.h>
 #include <disk.h>
 #include <loader.h>
 #include <memory.h>
-
-#include "bios.h"
-#include "multiboot.h"
-#include "pxe.h"
 
 /** Drive parameters structure. We only care about the EDD 1.x fields. */
 typedef struct drive_parameters {

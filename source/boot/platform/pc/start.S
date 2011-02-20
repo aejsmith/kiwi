@@ -20,12 +20,9 @@
  */
 
 #include <arch/page.h>
-
 #include <platform/loader.h>
-
+#include <pc/multiboot.h>
 #include <x86/asm.h>
-
-#include "multiboot.h"
 
 /* Ensure that this code is linked in first. */
 .section .init.text, "ax", @progbits

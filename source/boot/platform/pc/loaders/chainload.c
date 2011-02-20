@@ -20,9 +20,8 @@
  */
 
 #include <arch/io.h>
+#include <pc/bios.h>
 #include <loader.h>
-
-#include "../bios.h"
 
 extern void chain_loader_enter(uint8_t id, ptr_t part) __noreturn;
 

@@ -24,9 +24,9 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <console.h>
+#include <pc/bios.h>
 
-#include "bios.h"
+#include <console.h>
 
 /** Convert the serial port number from the configuration to a port number. */
 #if CONFIG_PC_SERIAL_PORT == 1

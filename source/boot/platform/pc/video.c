@@ -22,14 +22,14 @@
 #include <lib/list.h>
 #include <lib/string.h>
 
+#include <pc/bios.h>
+#include <pc/vbe.h>
+
 #include <console.h>
 #include <loader.h>
 #include <memory.h>
 #include <menu.h>
 #include <video.h>
-
-#include "bios.h"
-#include "vbe.h"
 
 /** Structure describing a VBE video mode. */
 typedef struct vbe_mode {

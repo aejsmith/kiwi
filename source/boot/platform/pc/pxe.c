@@ -22,15 +22,15 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <pc/bios.h>
+#include <pc/pxe.h>
+
 #include <console.h>
 #include <disk.h>
 #include <endian.h>
 #include <fs.h>
 #include <loader.h>
 #include <memory.h>
-
-#include "bios.h"
-#include "pxe.h"
 
 /** Structure containing details of a PXE handle. */
 typedef struct pxe_handle {

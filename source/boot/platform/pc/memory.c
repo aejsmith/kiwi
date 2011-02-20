@@ -22,11 +22,11 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <pc/bios.h>
+
 #include <console.h>
 #include <loader.h>
 #include <memory.h>
-
-#include "bios.h"
 
 /** Memory map type values. */
 #define E820_TYPE_FREE		1		/**< Usable memory. */
