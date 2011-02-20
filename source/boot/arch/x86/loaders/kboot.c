@@ -106,6 +106,14 @@ static mmu_context_t *kboot_arch_load32(fs_handle_t *handle) {
  * @return		Created MMU context for kernel. */
 mmu_context_t *kboot_arch_load(fs_handle_t *handle) {
 	mmu_context_t *ctx;
+	unative_t flags;
+
+	/* Check if CPUID is supported - if we can change EFLAGS.ID, it is. */
+	flags = x86_read_flags();
+	x86_write_flags(flags ^ X86_FLAGS_ID);
+	if((x86_read_flags() & X86_FLAGS_ID) == (flags & X86_FLAGS_ID)) {
+		boot_error("CPU does not support CPUID");
+	}
 
 	if(elf_check(handle, ELFCLASS64, ELF_EM_X86_64)) {
 		ctx = kboot_arch_load64(handle);

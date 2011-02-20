@@ -141,6 +141,21 @@ GEN_WRITE_REG(cr4, unative_t);
 #undef GEN_READ_REG
 #undef GEN_WRITE_REG
 
+/** Get current value of EFLAGS/RFLAGS.
+ * @return		Current value of EFLAGS/RFLAGS. */
+static inline unative_t x86_read_flags(void) {
+	unative_t val;
+
+	__asm__ volatile("pushf; pop %0" : "=rm"(val));
+	return val;
+}
+
+/** Set value of EFLAGS/RFLAGS.
+ * @param val		New value for EFLAGS/RFLAGS. */
+static inline void x86_write_flags(unative_t val) {
+	__asm__ volatile("push %0; popf" :: "rm"(val));
+}
+
 /** Execute the CPUID instruction.
  * @param level		CPUID level.
  * @param a		Where to store EAX value.
