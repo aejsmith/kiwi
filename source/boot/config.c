@@ -72,16 +72,6 @@ static size_t current_file_size;	/**< Size of the current file. */
 static int current_line;		/**< Current line in the file. */
 static int current_col;			/**< Current column in the file (minus 1). */
 
-/** Default configuration for when no configuration exists. */
-static const char *default_config =
-	"set \"hidden\" true\n"
-	"entry \"Kiwi\" {\n"
-#if CONFIG_DEBUG
-	"	set \"splash_disabled\" true\n"
-#endif
-	"	kiwi\n"
-	"}\n";
-
 /** Configuration file paths to try. */
 static const char *config_file_paths[] = {
 	"/system/boot/loader.cfg",
@@ -145,7 +135,7 @@ static void syntax_error(const char *fmt, ...) {
 /** Copy the contents of one value to another.
  * @param source	Source value.
  * @param dest		Destination value. */
-static void value_copy(value_t *source, value_t *dest) {
+void value_copy(value_t *source, value_t *dest) {
 	dest->type = source->type;
 	switch(dest->type) {
 	case VALUE_TYPE_INTEGER:
@@ -171,7 +161,7 @@ static void value_copy(value_t *source, value_t *dest) {
 
 /** Destroy a value.
  * @param value		Value to destroy. */
-static void value_destroy(value_t *value) {
+void value_destroy(value_t *value) {
 	switch(value->type) {
 	case VALUE_TYPE_STRING:
 		if(value->string) {
@@ -628,9 +618,6 @@ void config_init(void) {
 			}
 		}
 
-		/* No configuration was loaded, use the default. */
-		if(!config_parse(default_config, "<default>")) {
-			internal_error("Could not load default configuration");
-		}
+		boot_error("Could not load configuration file");
 	}
 }

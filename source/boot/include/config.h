@@ -87,6 +87,9 @@ typedef struct command {
 extern char *config_file_override;
 extern environ_t *root_environ;
 
+extern void value_copy(value_t *source, value_t *dest);
+extern void value_destroy(value_t *value);
+
 extern bool command_list_exec(command_list_t *list, environ_t *env);
 
 extern void value_list_insert(value_list_t *list, value_t *value);
