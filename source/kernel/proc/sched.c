@@ -379,7 +379,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 	/* We need to pick another CPU. Try to find one with a load less than
 	 * the average. If there isn't one, we just keep the thread on its
 	 * current CPU. */
-	LIST_FOREACH(&cpus_running, iter) {
+	LIST_FOREACH(&running_cpus, iter) {
 		other = list_entry(iter, cpu_t, header);
 
 		load = other->sched->total;

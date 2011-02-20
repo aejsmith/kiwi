@@ -217,7 +217,7 @@ status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative
 	}
 
 	/* Check if the destination exists. */
-	if(dest > cpu_id_max || !cpus[dest]) {
+	if(dest > highest_cpu_id || !cpus[dest]) {
 		intr_restore(state);
 		return STATUS_NOT_FOUND;
 	}
@@ -264,7 +264,7 @@ status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative
  *			is not possible for a status code to propagate back
  *			from the CPUs to this function. If this is required,
  *			then ipi_send() should be used to individually send an
- *			IPI to each CPU in the cpus_running list.
+ *			IPI to each CPU in the running_cpus list.
  *
  * @param handler	Handler function for the message (can be NULL).
  * @param data1		First handler argument.
@@ -287,7 +287,7 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
 	}
 
 	/* Loop through all running CPUs, excluding ourselves. */
-	LIST_FOREACH(&cpus_running, iter) {
+	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
 		if(cpu == curr_cpu) {
 			continue;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,21 +43,20 @@
 cpu_t boot_cpu;
 
 /** Information about all CPUs. */
-size_t cpu_id_max = 0;			/**< Highest CPU ID in the system. */
+size_t highest_cpu_id = 0;		/**< Highest CPU ID in the system. */
 size_t cpu_count = 0;			/**< Number of CPUs. */
-LIST_DECLARE(cpus_running);		/**< List of running CPUs. */
+LIST_DECLARE(running_cpus);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
-/** Initialise a CPU and add it to the list.
+/** Initialise a CPU structure and register it.
  * @param cpu		Structure to initialise.
- * @param args		Kernel arguments CPU structure. */
-static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
+ * @param id		ID of the CPU to add.
+ * @param state		State of the CPU. */
+static void cpu_register_internal(cpu_t *cpu, cpu_id_t id, int state) {
 	memset(cpu, 0, sizeof(cpu_t));
 	list_init(&cpu->header);
-	cpu->id = args->id;
-
-	/* Initialise architecture-specific data. */
-	cpu_arch_init(cpu, &args->arch);
+	cpu->id = id;
+	cpu->state = state;
 
 	/* Initialise IPI information. */
 	list_init(&cpu->ipi_queue);
@@ -67,43 +66,50 @@ static void cpu_add(cpu_t *cpu, kernel_args_cpu_t *args) {
 	list_init(&cpu->timers);
 	spinlock_init(&cpu->timer_lock, "timer_lock");
 
-	/* Store in the CPU array. */
-	if(cpus) {
-		cpus[cpu->id] = cpu;
+	/* Store in the running list if it is running. */
+	if(state == CPU_RUNNING) {
+		list_append(&running_cpus, &boot_cpu.header);
 	}
 }
 
-/** Register all non-boot CPUs.
- * @param args		Kernel arguments structure. */
-void __init_text cpu_init(kernel_args_t *args) {
-	kernel_args_cpu_t *cpu;
-	phys_ptr_t addr;
+/** Register a non-boot CPU.
+ * @param id		ID of CPU to add.
+ * @param state		Current state of the CPU.
+ * @return		Pointer to CPU structure. */
+cpu_t *cpu_register(cpu_id_t id, int state) {
+	cpu_t *cpu;
 
-	/* Create the CPU array and add the boot CPU to it. */
-	cpus = kcalloc(cpu_id_max + 1, sizeof(cpu_t *), MM_FATAL);
+	assert(cpus);
+	assert(!cpus[id]);
+
+	cpu = kmalloc(sizeof(*cpu), MM_FATAL);
+	cpu_register_internal(cpu, id, state);
+
+	/* Resize the CPU array if required. */
+	if(id > highest_cpu_id) {
+		cpus = krealloc(cpus, sizeof(cpu_t *) * (id + 1), MM_FATAL);
+		memset(&cpus[highest_cpu_id + 1], 0, (id - highest_cpu_id) * sizeof(cpu_t *));
+
+                highest_cpu_id = id;
+        }
+
+	cpus[id] = cpu;
+	return cpu;
+}
+
+/** Properly initialise the CPU subsystem. */
+__init_text void cpu_init(void) {
+	/* Get the real ID of the boot CPU. */
+	boot_cpu.id = highest_cpu_id = cpu_current_id();
+	cpu_count = 1;
+
+	/* Create the initial CPU array and add the boot CPU to it. */
+	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
-
-	/* Add all non-boot CPUs. */
-	for(addr = args->cpus; addr;) {
-		cpu = phys_map(addr, sizeof(kernel_args_cpu_t), MM_FATAL);
-
-		if(cpu->id != boot_cpu.id) {
-			cpu_add(kmalloc(sizeof(cpu_t), MM_FATAL), cpu);
-		}
-
-		addr = cpu->next;
-		phys_unmap(cpu, sizeof(kernel_args_cpu_t), false);
-	}
 }
 
-/** Initialise the boot CPU structure.
- * @param args		Kernel arguments structure. */
-void __init_text cpu_early_init(kernel_args_t *args) {
-	/* Store a few details from the kernel arguments. */
-	cpu_id_max = args->highest_cpu_id;
-	cpu_count = args->cpu_count;
-
+/** Initialise the boot CPU structure. */
+__init_text void cpu_early_init(void) {
 	/* Add the boot CPU. */
-	cpu_add(&boot_cpu, (kernel_args_cpu_t *)((ptr_t)args->cpus));
-	list_append(&cpus_running, &boot_cpu.header);
+	cpu_register_internal(&boot_cpu, 0, CPU_RUNNING);
 }

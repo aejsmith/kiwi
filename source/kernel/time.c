@@ -351,7 +351,7 @@ int kdbg_cmd_timers(int argc, char **argv) {
 		}
 	}
 
-	if(id > cpu_id_max || !(cpu = cpus[id])) {
+	if(id > highest_cpu_id || !(cpu = cpus[id])) {
 		kprintf(LOG_NONE, "Invalid CPU ID.\n");
 		return KDBG_FAIL;
 	}

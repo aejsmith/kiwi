@@ -39,6 +39,12 @@ typedef struct cpu {
 	cpu_id_t id;			/**< ID of the CPU. */
 	cpu_arch_t arch;		/**< Architecture-specific information. */
 
+	/** Current state of the CPU. */
+	enum {
+		CPU_OFFLINE,		/**< Offline. */
+		CPU_RUNNING,		/**< Running. */
+	} state;
+
 	/** Scheduler information. */
 	struct sched_cpu *sched;	/**< Scheduler run queues/timers. */
 	struct thread *thread;		/**< Currently executing thread. */
@@ -60,9 +66,9 @@ typedef struct cpu {
 #define curr_cpu	((cpu_t *)cpu_get_pointer())
 
 extern cpu_t boot_cpu;
-extern size_t cpu_id_max;
+extern size_t highest_cpu_id;
 extern size_t cpu_count;
-extern list_t cpus_running;
+extern list_t running_cpus;
 extern cpu_t **cpus;
 
 extern void cpu_pause_all(void);
@@ -72,8 +78,9 @@ extern void cpu_halt_all(void);
 extern cpu_id_t cpu_current_id(void);
 
 extern void cpu_arch_init(cpu_t *cpu, struct kernel_args_cpu_arch *args);
-extern void cpu_init(struct kernel_args *args);
-extern void cpu_early_init(struct kernel_args *args);
+extern cpu_t *cpu_register(cpu_id_t id, int state);
+extern void cpu_init(void);
+extern void cpu_early_init(void);
 
 extern int kdbg_cmd_cpus(int argc, char **argv);
 

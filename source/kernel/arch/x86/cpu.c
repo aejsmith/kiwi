@@ -58,7 +58,7 @@ void cpu_pause_all(void) {
 
 	atomic_set(&cpu_pause_wait, 1);
 
-	LIST_FOREACH(&cpus_running, iter) {
+	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
 		if(cpu->id != cpu_current_id()) {
 			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
@@ -80,7 +80,7 @@ void cpu_halt_all(void) {
 	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
 	 * during early boot, secondary CPUs do not have an IDT set up so
 	 * sending them an NMI IPI results in a triple fault. */
-	LIST_FOREACH(&cpus_running, iter) {
+	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
 		if(cpu->id != cpu_current_id()) {
 			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
@@ -220,7 +220,7 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 	kprintf(LOG_NONE, "ID   Freq (MHz) LAPIC Freq (MHz) Cache Align Model Name\n");
 	kprintf(LOG_NONE, "==   ========== ================ =========== ==========\n");
 
-	for(i = 0; i <= cpu_id_max; i++) {
+	for(i = 0; i <= highest_cpu_id; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}

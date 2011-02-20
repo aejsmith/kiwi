@@ -290,6 +290,12 @@ __init_text void kmain_bsp(phys_ptr_t tags) {
 __init_text static void kmain_bsp_bottom(void) {
 	/* Bring up the debug console. */
 	console_early_init();
+
+	/* Perform early architecture/platform initialisation. */
+	cpu_early_init();
+	//arch_premm_init();
+	//platform_premm_init();
+
 	kprintf(LOG_DEBUG, "Hello, World\n");
 	while(1);
 #if 0

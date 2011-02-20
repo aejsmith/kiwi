@@ -1451,7 +1451,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	 * (see the comment in vm_aspace_switch()). We need to go through
 	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
-		LIST_FOREACH(&cpus_running, iter) {
+		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu->aspace == as) {
 				if(cpu == curr_cpu) {

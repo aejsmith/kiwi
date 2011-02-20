@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -320,7 +320,7 @@ static void page_map_flush(page_map_t *map) {
 		ipi_broadcast(tlb_invalidate_ipi, (unative_t)map, 0, 0, 0, IPI_SEND_SYNC);
 	} else {
 		/* TODO: Multicast. */
-		LIST_FOREACH(&cpus_running, iter) {
+		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu == curr_cpu || map != cpu->aspace->pmap) {
 				continue;

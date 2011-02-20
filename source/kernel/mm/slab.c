@@ -734,7 +734,7 @@ static void slab_cache_init(slab_cache_t *cache, const char *name, size_t size, 
 
 	/* Initialise the CPU caches if required. */
 	if(!(flags & SLAB_CACHE_NOMAG)) {
-		memset(cache->cpu_caches, 0, sizeof(slab_cpu_cache_t) * (cpu_id_max + 1));
+		memset(cache->cpu_caches, 0, sizeof(slab_cpu_cache_t) * (highest_cpu_id + 1));
 	}
 
 	/* Set calculated settings for the cache. */
@@ -916,7 +916,7 @@ void __init_text slab_init(void) {
 	/* Work out the cache structure size. The CPU caches are in a
 	 * variable-sized array at the end of the cache structure, so each
 	 * cache must have space for enough CPU caches at the end. */
-	cache_size = sizeof(slab_cache_t) + (sizeof(slab_cpu_cache_t) * (cpu_id_max + 1));
+	cache_size = sizeof(slab_cache_t) + (sizeof(slab_cpu_cache_t) * (highest_cpu_id + 1));
 
 	/* Intialise the cache for cache structures. Note that because this
 	 * cache is statically allocated, we cannot use the magazine layer on
