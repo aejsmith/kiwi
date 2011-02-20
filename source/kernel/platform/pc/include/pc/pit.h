@@ -19,8 +19,8 @@
  * @brief		PC Programmable Interval Timer code.
  */
 
-#ifndef __PLATFORM_PC_PIT_H
-#define __PLATFORM_PC_PIT_H
+#ifndef __PC_PIT_H
+#define __PC_PIT_H
 
 #include <time.h>
 
@@ -29,4 +29,4 @@
 
 extern timer_device_t pit_timer_device;
 
-#endif /* __PLATFORM_PC_PIT_H */
+#endif /* __PC_PIT_H */

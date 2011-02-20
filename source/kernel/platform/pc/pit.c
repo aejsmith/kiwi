@@ -21,7 +21,7 @@
 
 #include <arch/io.h>
 #include <cpu/intr.h>
-#include <platform/pc/pit.h>
+#include <pc/pit.h>
 
 /** Handle a PIT tick.
  * @param num		IRQ number.

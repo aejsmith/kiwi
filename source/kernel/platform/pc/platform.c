@@ -24,8 +24,8 @@
 
 #include <x86/descriptor.h>
 
-#include <platform/pc/pic.h>
-#include <platform/pc/pit.h>
+#include <pc/pic.h>
+#include <pc/pit.h>
 
 #include <kernel.h>
 

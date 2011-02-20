@@ -19,8 +19,8 @@
  * @brief		PC console code.
  */
 
-#ifndef __PLATFORM_PC_CONSOLE_H
-#define __PLATFORM_PC_CONSOLE_H
+#ifndef __PC_CONSOLE_H
+#define __PC_CONSOLE_H
 
 #include <console.h>
 
@@ -35,4 +35,4 @@
 # define SERIAL_PORT		0x2E8
 #endif
 
-#endif /* __PLATFORM_PC_CONSOLE_H */
+#endif /* __PC_CONSOLE_H */

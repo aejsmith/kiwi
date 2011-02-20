@@ -21,9 +21,9 @@
 
 #include <arch/io.h>
 
-#include <cpu/intr.h>
+#include <pc/pic.h>
 
-#include <platform/pc/pic.h>
+#include <cpu/intr.h>
 
 #include <console.h>
 #include <kdbg.h>

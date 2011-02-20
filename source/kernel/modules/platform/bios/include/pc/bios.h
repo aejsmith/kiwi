@@ -19,8 +19,8 @@
  * @brief		PC BIOS interrupt interface.
  */
 
-#ifndef __PLATFORM_PC_BIOS_H
-#define __PLATFORM_PC_BIOS_H
+#ifndef __PC_BIOS_H
+#define __PC_BIOS_H
 
 #include <x86/cpu.h>
 #include <mm/flags.h>
@@ -43,4 +43,4 @@ extern void bios_regs_init(bios_regs_t *regs);
 
 extern void bios_interrupt(uint8_t num, bios_regs_t *regs);
 
-#endif /* __PLATFORM_PC_BIOS_H */
+#endif /* __PC_BIOS_H */
