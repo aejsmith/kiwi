@@ -53,7 +53,7 @@ static void internal_error_printf(const char *fmt, ...) {
 	va_end(args);
 }
 
-#if defined(CONFIG_ARCH_AMD64) || defined(CONFIG_ARCH_IA32)
+#ifdef CONFIG_ARCH_X86
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
 	struct stack_frame *next;	/**< Pointer to next stack frame. */
