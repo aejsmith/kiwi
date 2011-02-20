@@ -218,7 +218,7 @@ static void ui_window_render(ui_window_t *window, int seconds) {
  * @param timeout	Seconds to wait before closing the window if no input.
  *			If 0, the window will not time out. */
 void ui_window_display(ui_window_t *window, int timeout) {
-	useconds_t us = timeout * 1000000;
+	timeout_t us = timeout * 1000000;
 	bool exited = false;
 	input_result_t ret;
 	uint16_t key;

@@ -28,7 +28,7 @@
 #include <fs.h>
 #include <memory.h>
 
-#include "../../kernel/modules/fs/ext2/ext2.h"
+#include "ext2.h"
 
 /** Data for an Ext2 mount. */
 typedef struct ext2_mount {
@@ -240,7 +240,7 @@ static bool ext2_inode_block_read(fs_handle_t *handle, void *buf, uint32_t block
  * @param mount		Mount to read from.
  * @param id		ID of node.
  * @return		Pointer to handle to inode on success, NULL on failure. */
-static fs_handle_t *ext2_inode_get(fs_mount_t *mount, node_id_t id) {
+static fs_handle_t *ext2_inode_get(fs_mount_t *mount, uint32_t id) {
 	ext2_mount_t *data = mount->data;
 	ext2_inode_t *inode;
 	size_t group, size;

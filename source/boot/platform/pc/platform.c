@@ -19,14 +19,14 @@
  * @brief		PC platform startup code.
  */
 
-#include <arch/x86/descriptor.h>
 #include <arch/io.h>
+
+#include <x86/descriptor.h>
 
 #include <lib/string.h>
 
-#include <platform/boot.h>
-
 #include <config.h>
+#include <loader.h>
 #include <time.h>
 
 #include "multiboot.h"

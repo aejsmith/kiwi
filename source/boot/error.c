@@ -19,8 +19,6 @@
  * @brief		Boot error handling functions.
  */
 
-#include <platform/boot.h>
-
 #include <lib/printf.h>
 
 #include <loader.h>

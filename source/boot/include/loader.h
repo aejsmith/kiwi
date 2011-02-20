@@ -22,7 +22,10 @@
 #ifndef __LOADER_H
 #define __LOADER_H
 
-#include <assert.h>
+#include <arch/loader.h>
+
+#include <platform/loader.h>
+
 #include <config.h>
 #include <fs.h>
 #include <ui.h>
@@ -38,36 +41,11 @@ typedef struct loader_type {
 	 * @param env		Environment for the OS. */
 	void (*configure)(environ_t *env);
 } loader_type_t;
-#if 0
-/** Get the loader type from an environment.
- * @param env		Environment to get from.
- * @return		Pointer to loader type. */
-static inline loader_type_t *loader_type_get(environ_t *env) {
-	value_t *value;
 
-	value = environ_lookup(env, "loader_type");
-	assert(value && value->type == VALUE_TYPE_POINTER);
-	return value->pointer;
-}
+extern loader_type_t *loader_type_get(environ_t *env);
+extern void loader_type_set(environ_t *env, loader_type_t *type);
 
-/** Set the loader type in an environment.
- * @param env		Environment to set in.
- * @param type		Type to set. */
-static inline void loader_type_set(environ_t *env, loader_type_t *type) {
-	value_t value;
-
-	value.type = VALUE_TYPE_POINTER;
-	value.pointer = type;
-	environ_insert(env, "loader_type", &value);
-}
-#endif
-
-extern void kiwi_loader_arch_setup(environ_t *env);
-extern void kiwi_loader_arch_load(fs_handle_t *handle, environ_t *env);
-extern void kiwi_loader_arch_configure(environ_t *env, ui_window_t *window);
-extern void kiwi_loader_arch_enter(void) __noreturn;
 extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
-
 #if CONFIG_PLATFORM_PC
 extern bool config_cmd_chainload(value_list_t *args, environ_t *env);
 #endif

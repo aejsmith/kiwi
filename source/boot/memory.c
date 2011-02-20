@@ -19,14 +19,13 @@
  * @brief		Memory management functions.
  */
 
-#include <arch/memory.h>
-
 #include <lib/list.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
 #include <console.h>
+#include <kboot.h>
 #include <loader.h>
 #include <memory.h>
 
@@ -39,13 +38,13 @@ typedef struct heap_chunk {
 /** Structure used to represent a physical memory range internally. */
 typedef struct memory_range {
 	list_t header;			/**< Link to range list. */
-	kernel_args_memory_t ka;	/**< Actual range structure. */
+	kboot_tag_memory_t ka;		/**< Actual range structure. */
 } memory_range_t;
 
 /** Size of the heap (128KB). */
 #define HEAP_SIZE		131072
 
-extern char __start[], __end[], boot_stack[];
+extern char __start[], __end[], loader_stack[];
 
 /** Statically allocated heap. */
 static uint8_t heap[HEAP_SIZE] __aligned(PAGE_SIZE);
@@ -212,7 +211,7 @@ static void memory_range_merge(memory_range_t *range) {
 		}
 	}
 }
-
+#if 0
 /** Dump a list of physical memory ranges. */
 static void phys_memory_dump(void) {
 	memory_range_t *range;
@@ -243,7 +242,7 @@ static void phys_memory_dump(void) {
 		}
 	}
 }
-
+#endif
 /** Add a range of physical memory.
  * @param start		Start of the range (must be page-aligned).
  * @param end		End of the range (must be page-aligned).
@@ -389,9 +388,9 @@ void memory_init(void) {
 	phys_memory_add((ptr_t)heap, (ptr_t)heap + HEAP_SIZE, PHYS_MEMORY_RECLAIMABLE);
 
 	/* Mark the stack as reclaimable. */
-	phys_memory_add((ptr_t)boot_stack, (ptr_t)boot_stack + KSTACK_SIZE, PHYS_MEMORY_RECLAIMABLE);
+	phys_memory_add((ptr_t)loader_stack, (ptr_t)loader_stack + PAGE_SIZE, PHYS_MEMORY_RECLAIMABLE);
 }
-
+#if 0
 /** Finalise the memory map.
  * @note		Only needs to be called when booting a Kiwi kernel. */
 void memory_finalise(void) {
@@ -428,3 +427,4 @@ void memory_finalise(void) {
 	kernel_args->phys_ranges = (ptr_t)&range->ka;
 	kernel_args->phys_range_count = i;
 }
+#endif

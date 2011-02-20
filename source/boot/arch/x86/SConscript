@@ -22,7 +22,6 @@ sources = map(File, [
 	'arch.c',
 	'cpu.c',
 	'except.S',
-	'idt.c',
 ])
 
 # Set build flags.

@@ -22,11 +22,10 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <platform/boot.h>
-
 #include <assert.h>
 #include <console.h>
 #include <disk.h>
+#include <loader.h>
 #include <memory.h>
 
 #include "bios.h"

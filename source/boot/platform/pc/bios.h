@@ -22,8 +22,8 @@
 #ifndef __PLATFORM_BIOS_H
 #define __PLATFORM_BIOS_H
 
-#include <arch/x86/cpu.h>
 #include <lib/string.h>
+#include <x86/cpu.h>
 #include <types.h>
 
 /** Memory area to use when passing data to BIOS interrupts (56KB).

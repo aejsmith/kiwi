@@ -19,7 +19,6 @@
  * @brief		x86 bootloader startup code.
  */
 
-#include <arch/memory.h>
 #include <arch/page.h>
 
 #include <platform/loader.h>
@@ -239,7 +238,7 @@ FUNCTION_END(__multiboot_entry)
 PRIVATE_FUNCTION_START(__loader_entry)
 	/* Set the stack pointer to the physical location of our stack and
 	 * clear the stack frame/EFLAGS. */
-	movl	$boot_stack + KSTACK_SIZE, %esp
+	movl	$loader_stack + PAGE_SIZE, %esp
 	xorl	%ebp, %ebp
 	push	$0
 	popf
@@ -266,8 +265,8 @@ SYMBOL(boot_part_offset)
 
 /** Stack. */
 .align PAGE_SIZE
-SYMBOL(boot_stack)
-	.fill	KSTACK_SIZE
+SYMBOL(loader_stack)
+	.fill	PAGE_SIZE
 
 /** Global descriptor table. */
 __gdt:

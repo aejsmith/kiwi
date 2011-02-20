@@ -25,7 +25,7 @@ sources = map(File, [
 	'lib/string.c',
 	'lib/support.c',
 
-	'loaders/kiwi.c',
+	#'loaders/kiwi.c',
 
 	'partitions/msdos.c',
 
@@ -34,7 +34,6 @@ sources = map(File, [
 	'disk.c',
 	'error.c',
 	'fs.c',
-	'kargs.c',
 	'main.c',
 	'memory.c',
 	'menu.c',

@@ -25,11 +25,10 @@
 
 #include <lib/string.h>
 
+#include <assert.h>
 #include <config.h>
 #include <console.h>
-#include <cpu.h>
 #include <fs.h>
-#include <kargs.h>
 #include <loader.h>
 #include <memory.h>
 #include <menu.h>
@@ -37,6 +36,28 @@
 
 extern char __bss_start[], __bss_end[];
 extern void loader_main(void);
+
+/** Get the loader type from an environment.
+ * @param env		Environment to get from.
+ * @return		Pointer to loader type. */
+loader_type_t *loader_type_get(environ_t *env) {
+	value_t *value;
+
+	value = environ_lookup(env, "loader_type");
+	assert(value && value->type == VALUE_TYPE_POINTER);
+	return value->pointer;
+}
+
+/** Set the loader type in an environment.
+ * @param env		Environment to set in.
+ * @param type		Type to set. */
+void loader_type_set(environ_t *env, loader_type_t *type) {
+	value_t value;
+
+	value.type = VALUE_TYPE_POINTER;
+	value.pointer = type;
+	environ_insert(env, "loader_type", &value);
+}
 
 /** Main function for the Kiwi bootloader. */
 void loader_main(void) {
@@ -55,10 +76,7 @@ void loader_main(void) {
 	arch_early_init();
 	platform_early_init();
 
-	/* Set up the kernel arguments structure and memory manager, and detect
-	 * hardware details. */
-	kargs_init();
-	cpu_init();
+	/* Detect hardware details. */
 	memory_init();
 	disk_init();
 	video_init();

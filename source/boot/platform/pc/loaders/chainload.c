@@ -20,9 +20,6 @@
  */
 
 #include <arch/io.h>
-
-#include <platform/boot.h>
-
 #include <loader.h>
 
 #include "../bios.h"

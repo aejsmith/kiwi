@@ -24,7 +24,6 @@
 
 #include <assert.h>
 #include <loader.h>
-#include <kargs.h>
 #include <memory.h>
 #include <menu.h>
 #include <time.h>
@@ -49,7 +48,7 @@ static command_t menu_entry_commands[] = {
 #if CONFIG_PLATFORM_PC
 	{ "chainload",	config_cmd_chainload },
 #endif
-	{ "kiwi",	config_cmd_kiwi },
+	//{ "kiwi",	config_cmd_kiwi },
 	{ "set",	config_cmd_set },
 };
 

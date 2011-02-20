@@ -27,6 +27,8 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <platform/loader.h>
+
 #include <assert.h>
 #include <console.h>
 #include <loader.h>
@@ -130,7 +132,7 @@ static uint64_t calculate_cpu_frequency(void) {
  *			that this function is usable where it is unsuitable to
  *			perform a BIOS call.
  * @param us		Microseconds to delay for. */
-void spin(useconds_t us) {
+void spin(timeout_t us) {
 	/* Work out when we will finish */
 	uint64_t target = rdtsc() + ((cpu_frequency / 1000000) * us);
 
