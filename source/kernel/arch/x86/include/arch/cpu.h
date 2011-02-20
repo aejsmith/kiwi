@@ -22,11 +22,9 @@
 #ifndef __ARCH_CPU_H
 #define __ARCH_CPU_H
 
-#include <types.h>
-
-#ifndef LOADER
-
 #include <x86/descriptor.h>
+
+#include <types.h>
 
 struct cpu;
 
@@ -88,8 +86,6 @@ static inline struct cpu *cpu_get_pointer(void) {
 	__asm__ volatile("mov %%gs:0, %0" : "=r"(addr));
 	return (struct cpu *)addr;
 }
-
-#endif /* LOADER */
 
 /** Halt the current CPU. */
 static inline __noreturn void cpu_halt(void) {

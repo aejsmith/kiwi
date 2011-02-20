@@ -225,11 +225,7 @@ typedef struct ext2_group_desc {
 } __packed ext2_group_desc_t;
 
 /** Ext2 inode structure. */
-#ifdef LOADER
-typedef struct ext2_inode {
-#else
 typedef struct ext2_disk_inode {
-#endif
 	uint16_t i_mode;			/**< File mode. */
 	uint16_t i_uid;				/**< Lower 16-bits of owner's UID. */
 	uint32_t i_size;			/**< File size. */
@@ -271,11 +267,7 @@ typedef struct ext2_disk_inode {
 			uint32_t m_i_reserved2[2];
 		} masix2;
 	} osd2;					/**< OS-dependent data 2. */
-#ifdef LOADER
-} __packed ext2_inode_t;
-#else
 } __packed ext2_disk_inode_t;
-#endif
 
 /** Ext2 directory entry. */
 typedef struct ext2_dirent {

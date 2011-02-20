@@ -22,34 +22,34 @@
 #ifndef __X86_DESCRIPTOR_H
 #define __X86_DESCRIPTOR_H
 
-#ifndef LOADER
-# if __x86_64__
-#  define GDT_ENTRY_COUNT	7	/**< Total number of GDT entries. */
-# else
-#  define GDT_ENTRY_COUNT	9	/**< Total number of GDT entries. */
-# endif
-# define IDT_ENTRY_COUNT	256	/**< Total number of IDT entries. */
-# if __x86_64__
-#  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
-#  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
-#  define SEGMENT_U_DS		0x18	/**< User data segment. */
-#  define SEGMENT_U_CS		0x20	/**< User code segment. */
-#  define SEGMENT_TSS		0x28	/**< TSS segment (takes up 2 entries). */
-# else
-#  define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
-#  define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
-#  define SEGMENT_K_GS		0x18	/**< Kernel GS (CPU pointer) segment. */
-#  define SEGMENT_U_CS		0x20	/**< User code segment. */
-#  define SEGMENT_U_DS		0x28	/**< User data segment. */
-#  define SEGMENT_U_GS		0x30	/**< User GS (TLS) segment. */
-#  define SEGMENT_TSS		0x38	/**< TSS segment. */
-#  define SEGMENT_DF_TSS	0x40	/**< Double fault TSS segment. */
-# endif
+#if __x86_64__
+# define GDT_ENTRY_COUNT	7	/**< Total number of GDT entries. */
+#else
+# define GDT_ENTRY_COUNT	9	/**< Total number of GDT entries. */
+#endif
+#define IDT_ENTRY_COUNT		256	/**< Total number of IDT entries. */
+#if __x86_64__
+# define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
+# define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
+# define SEGMENT_U_DS		0x18	/**< User data segment. */
+# define SEGMENT_U_CS		0x20	/**< User code segment. */
+# define SEGMENT_TSS		0x28	/**< TSS segment (takes up 2 entries). */
+#else
+# define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
+# define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
+# define SEGMENT_K_GS		0x18	/**< Kernel GS (CPU pointer) segment. */
+# define SEGMENT_U_CS		0x20	/**< User code segment. */
+# define SEGMENT_U_DS		0x28	/**< User data segment. */
+# define SEGMENT_U_GS		0x30	/**< User GS (TLS) segment. */
+# define SEGMENT_TSS		0x38	/**< TSS segment. */
+# define SEGMENT_DF_TSS		0x40	/**< Double fault TSS segment. */
 #endif
 
 #ifndef __ASM__
 
 #include <types.h>
+
+struct cpu;
 
 /** GDT pointer loaded into the GDTR register. */
 typedef struct gdt_pointer {
@@ -194,14 +194,11 @@ static inline void lidt(ptr_t base, uint16_t limit) {
 	__asm__ volatile("lidt %0" :: "m"(idtp));
 }
 
-#ifndef LOADER
-struct cpu;
-
 #ifndef __x86_64__
 extern void gdt_set_base(struct cpu *cpu, int sel, ptr_t base);
 extern void gdt_set_limit(struct cpu *cpu, int sel, size_t limit);
 #endif
 extern void descriptor_init(struct cpu *cpu);
-#endif
+
 #endif /* __ASM__ */
 #endif /* __X86_DESCRIPTOR_H */

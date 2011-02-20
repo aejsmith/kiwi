@@ -23,11 +23,7 @@
 #include <lib/printf.h>
 #include <lib/string.h>
 
-#ifdef LOADER
-# include <boot/memory.h>
-#else
-# include <mm/malloc.h>
-#endif
+#include <mm/malloc.h>
 
 /** Copy data in memory.
  *
@@ -509,49 +505,6 @@ char *strcat(char *restrict dest, const char *restrict src) {
 	return dest;
 }
 
-#ifdef LOADER
-/** Duplicate a string.
- *
- * Allocates a buffer big enough to hold the given string and copies the
- * string to it. The pointer returned should be freed with kfree().
- *
- * @param src		Pointer to the source buffer.
- * 
- * @return		Pointer to the allocated buffer containing the string.
- */
-char *kstrdup(const char *src) {
-	size_t len = strlen(src) + 1;
-	char *dup;
-
-	dup = kmalloc(len);
-	memcpy(dup, src, len);
-	return dup;
-}
-
-/** Duplicate a string with a length limit.
- *
- * Allocates a buffer either as big as the string or the maximum length
- * given, and then copies at most the number of bytes specified of the string
- * to it. If the string is longer than the limit, a null byte will be added
- * to the end of the duplicate. The pointer returned should be freed with
- * kfree().
- *
- * @param src		Pointer to the source buffer.
- * @param n		Maximum number of bytes to copy.
- * 
- * @return		Pointer to the allocated buffer containing the string.
- */
-char *kstrndup(const char *src, size_t n) {
-	size_t len;
-	char *dup;
-
-	len = strnlen(src, n);
-	dup = kmalloc(len + 1);
-	memcpy(dup, src, len);
-	dup[len] = '\0';
-	return dup;
-}
-#else
 /** Duplicate memory.
  *
  * Allocates a block of memory big enough and copies the source to it.
@@ -733,7 +686,6 @@ char *kdirname(const char *path, int kmflag) {
 	}
 	return ret;
 }
-#endif
 
 /** Macro to implement strtoul() and strtoull(). */
 #define __strtoux(type, cp, endp, base)		\

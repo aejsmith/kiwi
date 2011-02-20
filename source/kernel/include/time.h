@@ -22,8 +22,11 @@
 #ifndef __TIME_H
 #define __TIME_H
 
+#include <kernel/time.h>
 #include <lib/list.h>
 #include <types.h>
+
+struct cpu;
 
 /** Convert microseconds to seconds. */
 #define USECS2SECS(secs)	(secs / 1000000)
@@ -36,12 +39,6 @@
 
 /** Convert milliseconds to microseconds. */
 #define MSECS2USECS(msecs)	((useconds_t)msecs * 1000)
-
-#ifndef LOADER
-
-#include <kernel/time.h>
-
-struct cpu;
 
 /** Structure containing details of a hardware timer. */
 typedef struct timer_device {
@@ -103,14 +100,12 @@ extern void timer_stop(timer_t *timer);
 extern status_t usleep_etc(useconds_t us, int flags);
 extern void usleep(useconds_t us);
 
+extern void spin(useconds_t us);
+
 extern int kdbg_cmd_timers(int argc, char **argv);
 extern int kdbg_cmd_uptime(int argc, char **argv);
 
 extern void time_arch_init(void);
 extern void time_init(void);
-
-#endif /* LOADER */
-
-extern void spin(useconds_t us);
 
 #endif /* __TIME_H */

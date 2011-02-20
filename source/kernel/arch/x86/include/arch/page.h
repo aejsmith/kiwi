@@ -42,7 +42,7 @@
 # define PHYS_PAGE_MASK		0xFFFFFF000LL
 #endif
 
-#if !defined(__ASM__) && !defined(LOADER)
+#ifndef __ASM__
 
 #include <sync/mutex.h>
 
@@ -61,5 +61,5 @@ typedef struct page_map {
 	size_t invalidate_count;
 } page_map_t;
 
-#endif /* __ASM__/LOADER */
+#endif /* __ASM__ */
 #endif /* __ARCH_PAGE_H */

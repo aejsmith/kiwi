@@ -130,17 +130,14 @@
 
 #ifndef __ASM__
 
-#include <types.h>
-
-#ifndef LOADER
 #include <arch/cpu.h>
+#include <types.h>
 
 extern cpu_features_t cpu_features;
 
 extern void cpu_features_init(cpu_features_t *features, uint32_t standard_ecx,
                               uint32_t standard_edx, uint32_t extended_ecx,
                               uint32_t extended_edx);
-#endif /* LOADER */
 
 /** Macros to generate functions to access registers. */
 #define GEN_READ_REG(name, type)	\

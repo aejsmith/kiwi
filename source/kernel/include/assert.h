@@ -23,18 +23,10 @@
 #define __ASSERT_H
 
 #include <compiler.h>
-#ifdef LOADER
-# include <boot/error.h>
-#else
-# include <kernel.h>
-#endif
+#include <kernel.h>
 
 #if CONFIG_DEBUG
-# ifdef LOADER
-#  define assert(cond)	if(unlikely(!(cond))) { internal_error("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
-# else
-#  define assert(cond)	if(unlikely(!(cond))) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
-# endif
+# define assert(cond)	if(unlikely(!(cond))) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
 #else
 # define assert(cond)	((void)0)
 #endif

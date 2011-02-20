@@ -38,9 +38,9 @@
 # define PG_NOEXEC		(1<<63)		/**< Page is not executable (requires NX support). */
 #endif
 
-#if !defined(__ASM__) && !defined(LOADER)
+#ifndef __ASM__
 
 extern void pat_init(void);
 
-#endif /* __ASM__/LOADER */
+#endif /* __ASM__ */
 #endif /* __X86_PAGE_H */
