@@ -188,7 +188,7 @@ static void set_option(kboot_data_t *data, const char *name, uint32_t type) {
 		size = 1;
 		break;
 	case KBOOT_OPTION_STRING:
-		size = strlen(value->string + 1);
+		size = strlen(value->string) + 1;
 		break;
 	case KBOOT_OPTION_INTEGER:
 		size = sizeof(uint64_t);
