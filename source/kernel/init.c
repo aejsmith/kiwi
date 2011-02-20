@@ -294,7 +294,12 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Perform early architecture/platform initialisation. */
 	cpu_early_init();
 	arch_premm_init();
-	//platform_premm_init();
+	platform_premm_init();
+
+	/* Initialise kernel memory management subsystems. */
+	security_init();
+	vmem_early_init();
+	kheap_early_init();
 
 	kprintf(LOG_DEBUG, "Hello, World\n");
 	while(1);
