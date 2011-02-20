@@ -24,7 +24,46 @@
 
 #include "../../include/elf.h"
 
+#include <arch/mmu.h>
+
+#include <lib/string.h>
+#include <lib/utility.h>
+
+#include <console.h>
 #include <fs.h>
+#include <memory.h>
+
+#ifdef CONFIG_ARCH_LITTLE_ENDIAN
+# define ELF_ENDIAN	ELFDATA2LSB
+#else
+# define ELF_ENDIAN	ELFDATA2MSB
+#endif
+
+/** Check whether a file is a certain ELF type.
+ * @param handle	Handle to file to check.
+ * @param bitsize	ELF class definition.
+ * @param machine	ELF machine definition.
+ * @return		Whether the file is this type. */
+static inline bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t machine) {
+	Elf32_Ehdr ehdr;
+
+	if(!fs_file_read(handle, &ehdr, sizeof(ehdr), 0)) {
+		return false;
+	} else if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, 4) != 0) {
+		return false;
+	} else if(ehdr.e_ident[ELF_EI_VERSION] != 1 || ehdr.e_version != 1) {
+		return false;
+	} else if(ehdr.e_ident[ELF_EI_CLASS] != bitsize) {
+		return false;
+	} else if(ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN) {
+		return false;
+	} else if(machine != ELF_EM_NONE && ehdr.e_machine != machine) {
+		return false;
+	} else if(ehdr.e_type != ELF_ET_EXEC) {
+		return false;
+	}
+	return true;
+}
 
 /** ELF note type. */
 typedef Elf32_Note elf_note_t;
@@ -38,5 +77,61 @@ typedef Elf32_Note elf_note_t;
 typedef bool (*elf_note_iterate_t)(elf_note_t *note, const char *name, void *desc, void *data);
 
 extern bool elf_note_iterate(fs_handle_t *handle, elf_note_iterate_t cb, void *data);
+
+/** Macro expanding to a function to load an ELF kernel.
+ * @param _name		Name to give the function.
+ * @param _bits		32 or 64.
+ * @param _alignment	Alignment for physical memory allocations. */
+#define DEFINE_ELF_LOADER(_name, _bits, _alignment)	\
+	static inline void _name(fs_handle_t *handle, mmu_context_t *ctx, Elf##_bits##_Addr *entryp) { \
+		Elf##_bits##_Addr virt_base = 0, virt_end = 0; \
+		Elf##_bits##_Phdr *phdrs; \
+		Elf##_bits##_Ehdr ehdr; \
+		phys_ptr_t phys; \
+		ptr_t dest; \
+		size_t i; \
+		\
+		if(!fs_file_read(handle, &ehdr, sizeof(ehdr), 0)) { \
+			boot_error("Could not read kernel image"); \
+		} \
+		\
+		phdrs = kmalloc(sizeof(*phdrs) * ehdr.e_phnum); \
+		if(!fs_file_read(handle, phdrs, ehdr.e_phnum * ehdr.e_phentsize, ehdr.e_phoff)) { \
+			boot_error("Could not read kernel image"); \
+		} \
+		\
+		for(i = 0; i < ehdr.e_phnum; i++) { \
+			if(phdrs[i].p_type != ELF_PT_LOAD) { \
+				continue; \
+			} \
+			if(virt_base == 0 || virt_base > phdrs[i].p_vaddr) { \
+				virt_base = phdrs[i].p_vaddr; \
+			} \
+			if(virt_end < (phdrs[i].p_vaddr + phdrs[i].p_memsz)) { \
+				virt_end = phdrs[i].p_vaddr + phdrs[i].p_memsz; \
+			} \
+		} \
+		phys_memory_protect(virt_base, virt_end); \
+		\
+		phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), _alignment, false); \
+		dprintf("elf: loading kernel image to 0x%" PRIpp " (size: 0x%zx, align: 0x%zx)\n", \
+		        phys, (size_t)(virt_end - virt_base), _alignment); \
+		\
+		for(i = 0; i < ehdr.e_phnum; i++) { \
+			if(phdrs[i].p_type != ELF_PT_LOAD) { \
+				continue; \
+			} \
+			\
+			dest = (ptr_t)(phys + (phdrs[i].p_vaddr - virt_base)); \
+			if(!fs_file_read(handle, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
+				boot_error("Could not read kernel image"); \
+			} \
+			\
+			memset((void *)(dest + (ptr_t)phdrs[i].p_filesz), 0, phdrs[i].p_memsz - phdrs[i].p_filesz); \
+		} \
+		\
+		mmu_map(ctx, virt_base, phys, ROUND_UP(virt_end - virt_base, _alignment)); \
+		*entryp = ehdr.e_entry; \
+	}
 
 #endif /* __BOOT_ELF_H */

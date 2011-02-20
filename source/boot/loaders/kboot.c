@@ -25,9 +25,12 @@
  *    Loads the specified kernel and all modules in the given directory.
  */
 
+#include <arch/mmu.h>
+
 #include <lib/string.h>
 
 #include <config.h>
+#include <console.h>
 #include <elf.h>
 #include <fs.h>
 #include <kboot.h>
@@ -49,9 +52,25 @@ typedef struct kboot_data {
 	ui_window_t *config;		/**< Configuration window. */
 } kboot_data_t;
 
+extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
+
 /** Load the operating system.
  * @param env		Environment for the OS. */
 static __noreturn void kboot_loader_load(environ_t *env) {
+	kboot_data_t *data = loader_data_get(env);
+	mmu_context_t *mmu;
+
+	/* We don't report these errors until the user actually tries to run a
+	 * menu entry. */
+	if(!data->kernel) {
+		boot_error("Could not find kernel image");
+	} else if(!data->is_kboot) {
+		boot_error("Kernel is not a valid KBoot kernel");
+	}
+
+	/* Load the kernel image into memory. */
+	kprintf("Loading kernel...\n");
+	mmu = kboot_arch_load(data->kernel);
 	while(1);
 }
 

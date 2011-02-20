@@ -19,43 +19,7 @@
  * @brief		ELF loading functions.
  */
 
-#include <lib/string.h>
-#include <lib/utility.h>
-
 #include <elf.h>
-#include <memory.h>
-
-#ifdef CONFIG_ARCH_LITTLE_ENDIAN
-# define ELF_ENDIAN	ELFDATA2LSB
-#else
-# define ELF_ENDIAN	ELFDATA2MSB
-#endif
-
-/** Check whether a file is a certain ELF type.
- * @param handle	Handle to file to check.
- * @param bitsize	ELF class definition.
- * @param machine	ELF machine definition.
- * @return		Whether the file is this type. */
-static bool elf_check(fs_handle_t *handle, uint8_t bitsize, uint8_t machine) {
-	Elf32_Ehdr ehdr;
-
-	if(!fs_file_read(handle, &ehdr, sizeof(ehdr), 0)) {
-		return false;
-	} else if(strncmp((const char *)ehdr.e_ident, ELF_MAGIC, 4) != 0) {
-		return false;
-	} else if(ehdr.e_ident[ELF_EI_VERSION] != 1 || ehdr.e_version != 1) {
-		return false;
-	} else if(ehdr.e_ident[ELF_EI_CLASS] != bitsize) {
-		return false;
-	} else if(ehdr.e_ident[ELF_EI_DATA] != ELF_ENDIAN) {
-		return false;
-	} else if(machine != ELF_EM_NONE && ehdr.e_machine != machine) {
-		return false;
-	} else if(ehdr.e_type != ELF_ET_EXEC) {
-		return false;
-	}
-	return true;
-}
 
 /** Define an ELF note iteration function. */
 #define ELF_NOTE_ITERATE(_bits) \

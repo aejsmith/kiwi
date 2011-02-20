@@ -17,9 +17,11 @@
 Import('env')
 
 sources = map(File, [
+	'loaders/kboot.c',
 	'arch.c',
 	'cpu.c',
 	'except.S',
+	'mmu.c',
 ])
 
 # Set build flags.
