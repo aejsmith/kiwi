@@ -19,8 +19,8 @@
  * @brief		Bootloader disk functions.
  */
 
-#ifndef __BOOT_DISK_H
-#define __BOOT_DISK_H
+#ifndef __DISK_H
+#define __DISK_H
 
 #include <lib/list.h>
 
@@ -87,4 +87,4 @@ extern disk_t *disk_parent(disk_t *disk);
 extern void platform_disk_detect(void);
 extern void disk_init(void);
 
-#endif /* __BOOT_DISK_H */
+#endif /* __DISK_H */

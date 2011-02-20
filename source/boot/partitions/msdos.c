@@ -19,10 +19,10 @@
  * @brief		MSDOS partition table scanner.
  */
 
-#include <boot/console.h>
-#include <boot/memory.h>
-
 #include <lib/utility.h>
+
+#include <console.h>
+#include <memory.h>
 
 #include "msdos.h"
 

@@ -23,15 +23,14 @@
  * @todo		Destroy windows.
  */
 
-#include <boot/memory.h>
-#include <boot/ui.h>
-
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <memory.h>
 #include <time.h>
+#include <ui.h>
 
 struct ui_choice;
 struct ui_textbox;

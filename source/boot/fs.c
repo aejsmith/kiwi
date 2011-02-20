@@ -19,13 +19,12 @@
  * @brief		Filesystem functions.
  */
 
-#include <boot/fs.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <fs.h>
+#include <memory.h>
 
 /** Array of filesystem implementations. */
 static fs_type_t *filesystem_types[] = {

@@ -30,7 +30,8 @@
 #include <stddef.h>
 
 /** Extra integer types. */
-typedef uint64_t offset_t;
+typedef uint64_t offset_t;		/**< Type used to store an offset into a object. */
+typedef int64_t timeout_t;		/**< Type used to store a time value in microseconds. */
 
 /** Type limit macros. */
 #define INT8_MIN	(-128)

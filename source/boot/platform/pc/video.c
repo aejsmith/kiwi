@@ -19,14 +19,14 @@
  * @brief		VBE video setup code.
  */
 
-#include <boot/console.h>
-#include <boot/error.h>
-#include <boot/memory.h>
-#include <boot/menu.h>
-#include <boot/video.h>
-
 #include <lib/list.h>
 #include <lib/string.h>
+
+#include <console.h>
+#include <loader.h>
+#include <memory.h>
+#include <menu.h>
+#include <video.h>
 
 #include "bios.h"
 #include "vbe.h"

@@ -19,13 +19,13 @@
  * @brief		Boot error handling functions.
  */
 
-#include <boot/error.h>
-#include <boot/memory.h>
-#include <boot/ui.h>
-
 #include <platform/boot.h>
 
 #include <lib/printf.h>
+
+#include <loader.h>
+#include <memory.h>
+#include <ui.h>
 
 /** Boot error window state. */
 static const char *boot_error_format;

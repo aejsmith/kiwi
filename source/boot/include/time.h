@@ -14,18 +14,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+
 /**
  * @file
- * @brief		Bootloader menu interface.
+ * @brief		Time handling functions.
  */
 
-#ifndef __BOOT_MENU_H
-#define __BOOT_MENU_H
+#ifndef __TIME_H
+#define __TIME_H
 
-#include <boot/config.h>
+#include <types.h>
 
-extern bool config_cmd_entry(value_list_t *args, environ_t *env);
+/** Convert microseconds to seconds. */
+#define USECS2SECS(secs)	(secs / 1000000)
 
-extern environ_t *menu_display(void);
+/** Convert seconds to microseconds. */
+#define SECS2USECS(secs)	((useconds_t)secs * 1000000)
 
-#endif /* __BOOT_MENU_H */
+/** Convert microseconds to milliseconds. */
+#define USECS2MSECS(msecs)	(msecs / 1000)
+
+/** Convert milliseconds to microseconds. */
+#define MSECS2USECS(msecs)	((useconds_t)msecs * 1000)
+
+extern void spin(timeout_t us);
+
+#endif /* __TIME_H */

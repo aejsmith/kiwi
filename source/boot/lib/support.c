@@ -19,7 +19,7 @@
  * @brief		Various support functions.
  */
 
-#include <boot/error.h>
+#include <loader.h>
 
 #ifdef __ARM_EABI__
 extern void abort(void);

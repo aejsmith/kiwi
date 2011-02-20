@@ -19,10 +19,10 @@
  * @brief		Filesystem functions.
  */
 
-#ifndef __BOOT_FS_H
-#define __BOOT_FS_H
+#ifndef __FS_H
+#define __FS_H
 
-#include <boot/disk.h>
+#include <disk.h>
 
 struct fs_mount;
 struct fs_handle;
@@ -103,4 +103,4 @@ extern bool fs_file_read(fs_handle_t *handle, void *buf, size_t count, offset_t 
 extern offset_t fs_file_size(fs_handle_t *handle);
 extern bool fs_dir_read(fs_handle_t *handle, fs_dir_read_cb_t cb, void *arg);
 
-#endif /* __BOOT_FS_H */
+#endif /* __FS_H */

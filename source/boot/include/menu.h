@@ -16,31 +16,16 @@
 
 /**
  * @file
- * @brief		PXE loader wrapper.
- *
- * There is supposedly a 32KB limit on the boot file size. However, gPXE and
- * none of my real hardware actually imposes this limit. Therefore, I'm
- * ignoring it. If we encounter any hardware that actually has this limit,
- * this will have to be done a different way...
+ * @brief		Bootloader menu interface.
  */
 
-#include <platform/loader.h>
-#include <x86/asm.h>
+#ifndef __MENU_H
+#define __MENU_H
 
-.section .text
-.code16
+#include <config.h>
 
-/** Main function of the PXE boot sector. */
-FUNCTION_START(_start)
-	/* Set the boot drive ID to 0x7F for PXE. */
-	movb	$0x7F, %dl
-	xorl	%ebx, %ebx
-	xorl	%ecx, %ecx
+extern bool config_cmd_entry(value_list_t *args, environ_t *env);
 
-	/* Jump to the loader entry point. */
-	ljmp	$(LOADER_LOAD_ADDR >> 4), $0
-FUNCTION_END(_start)
+extern environ_t *menu_display(void);
 
-/** Pad the file to the loader load address. */
-. = _start + LOADER_LOAD_ADDR - 0x7C00 - 1;
-.byte 0
+#endif /* __MENU_H */

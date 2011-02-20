@@ -19,17 +19,16 @@
  * @brief		Bootloader menu interface.
  */
 
-#include <boot/loader.h>
-#include <boot/memory.h>
-#include <boot/menu.h>
-#include <boot/ui.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <loader.h>
 #include <kargs.h>
+#include <memory.h>
+#include <menu.h>
 #include <time.h>
+#include <ui.h>
 
 /** Structure containing a menu entry. */
 typedef struct menu_entry {

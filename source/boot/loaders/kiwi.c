@@ -30,17 +30,16 @@
  *    Same as above but auto-detects the boot directory.
  */
 
-#include <boot/cpu.h>
-#include <boot/loader.h>
-#include <boot/memory.h>
-#include <boot/fs.h>
-#include <boot/ui.h>
-#include <boot/video.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <cpu.h>
+#include <fs.h>
 #include <kargs.h>
+#include <loader.h>
+#include <memory.h>
+#include <ui.h>
+#include <video.h>
 
 /** Array of boot paths. */
 static const char *kiwi_boot_dirs[] = {

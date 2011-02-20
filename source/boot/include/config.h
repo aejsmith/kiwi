@@ -19,8 +19,8 @@
  * @brief		Bootloader configuration functions.
  */
 
-#ifndef __BOOT_CONFIG_H
-#define __BOOT_CONFIG_H
+#ifndef __CONFIG_H
+#define __CONFIG_H
 
 #include <lib/list.h>
 
@@ -91,4 +91,4 @@ extern bool config_cmd_set(value_list_t *args, environ_t *env);
 
 extern void config_init(void);
 
-#endif /* __BOOT_CONFIG_H */
+#endif /* __CONFIG_H */

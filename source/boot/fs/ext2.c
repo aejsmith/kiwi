@@ -19,15 +19,14 @@
  * @brief		Ext2 filesystem support.
  */
 
-#include <boot/console.h>
-#include <boot/fs.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <console.h>
 #include <endian.h>
+#include <fs.h>
+#include <memory.h>
 
 #include "../../kernel/modules/fs/ext2/ext2.h"
 

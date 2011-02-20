@@ -19,14 +19,13 @@
  * @brief		Loader type structure.
  */
 
-#ifndef __BOOT_LOADER_H
-#define __BOOT_LOADER_H
-
-#include <boot/config.h>
-#include <boot/fs.h>
-#include <boot/ui.h>
+#ifndef __LOADER_H
+#define __LOADER_H
 
 #include <assert.h>
+#include <config.h>
+#include <fs.h>
+#include <ui.h>
 
 /** Structure defining a loader type. */
 typedef struct loader_type {
@@ -72,4 +71,7 @@ extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
 extern bool config_cmd_chainload(value_list_t *args, environ_t *env);
 #endif
 
-#endif /* __BOOT_LOADER_H */
+extern void internal_error(const char *fmt, ...) __printf(1, 2) __noreturn;
+extern void boot_error(const char *fmt, ...) __printf(1, 2) __noreturn;
+
+#endif /* __LOADER_H */

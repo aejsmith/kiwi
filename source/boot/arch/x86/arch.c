@@ -19,7 +19,7 @@
  * @brief		x86 architecture initialisation functions.
  */
 
-#include <arch/boot.h>
+#include <arch/loader.h>
 
 /** Perform early architecture initialisation. */
 void arch_early_init(void) {

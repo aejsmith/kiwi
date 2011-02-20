@@ -16,25 +16,16 @@
 
 /**
  * @file
- * @brief		Memory management functions.
+ * @brief		x86 loader definitions.
  */
 
-#ifndef __BOOT_MEMORY_H
-#define __BOOT_MEMORY_H
+#ifndef __ARCH_LOADER_H
+#define __ARCH_LOADER_H
 
-#include <arch/page.h>
-#include <kargs.h>
+#include <types.h>
 
-extern void *kmalloc(size_t size);
-extern void *krealloc(void *addr, size_t size);
-extern void kfree(void *addr);
+extern bool cpu_lapic_init(void);
+extern void idt_init(void);
+extern void arch_early_init(void);
 
-extern void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type);
-extern void phys_memory_protect(phys_ptr_t start, phys_ptr_t end);
-extern phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim);
-
-extern void platform_memory_detect(void);
-extern void memory_init(void);
-extern void memory_finalise(void);
-
-#endif /* __BOOT_MEMORY_H */
+#endif /* __ARCH_LOADER_H */

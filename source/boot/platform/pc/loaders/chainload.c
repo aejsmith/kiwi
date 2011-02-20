@@ -21,9 +21,9 @@
 
 #include <arch/io.h>
 
-#include <boot/loader.h>
-
 #include <platform/boot.h>
+
+#include <loader.h>
 
 #include "../bios.h"
 

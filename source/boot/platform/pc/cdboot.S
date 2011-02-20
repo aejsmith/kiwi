@@ -19,8 +19,8 @@
  * @brief		x86 CD boot sector.
  */
 
-#include <arch/x86/asm.h>
-#include <platform/boot.h>
+#include <platform/loader.h>
+#include <x86/asm.h>
 
 /** Various definitions. */
 #define ISO9660_BLOCK_SHIFT	11	/**< Shift to get size of an ISO9660 block. */

@@ -19,12 +19,11 @@
  * @brief		Bootloader video functions.
  */
 
-#ifndef __BOOT_VIDEO_H
-#define __BOOT_VIDEO_H
-
-#include <boot/ui.h>
+#ifndef __VIDEO_H
+#define __VIDEO_H
 
 #include <lib/list.h>
+#include <ui.h>
 
 /** Structure describing a video mode. */
 typedef struct video_mode {
@@ -48,4 +47,4 @@ extern ui_entry_t *video_mode_chooser(const char *label, value_t *value);
 extern void video_init(void);
 extern void video_enable(video_mode_t *mode);
 
-#endif /* __BOOT_VIDEO_H */
+#endif /* __VIDEO_H */

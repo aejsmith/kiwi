@@ -16,15 +16,25 @@
 
 /**
  * @file
- * @brief		Boot error handling functions.
+ * @brief		Memory management functions.
  */
 
-#ifndef __BOOT_ERROR_H
-#define __BOOT_ERROR_H
+#ifndef __MEMORY_H
+#define __MEMORY_H
 
-#include <types.h>
+#include <arch/page.h>
+#include <kargs.h>
 
-extern void internal_error(const char *fmt, ...) __printf(1, 2) __noreturn;
-extern void boot_error(const char *fmt, ...) __printf(1, 2) __noreturn;
+extern void *kmalloc(size_t size);
+extern void *krealloc(void *addr, size_t size);
+extern void kfree(void *addr);
 
-#endif /* __BOOT_ERROR_H */
+extern void phys_memory_add(phys_ptr_t start, phys_ptr_t end, int type);
+extern void phys_memory_protect(phys_ptr_t start, phys_ptr_t end);
+extern phys_ptr_t phys_memory_alloc(phys_ptr_t size, size_t align, bool reclaim);
+
+extern void platform_memory_detect(void);
+extern void memory_init(void);
+extern void memory_finalise(void);
+
+#endif /* __MEMORY_H */

@@ -19,15 +19,14 @@
  * @brief		ISO9660 filesystem support.
  */
 
-#include <boot/console.h>
-#include <boot/fs.h>
-#include <boot/memory.h>
-
 #include <lib/ctype.h>
 #include <lib/string.h>
 
 #include <assert.h>
+#include <console.h>
 #include <endian.h>
+#include <fs.h>
+#include <memory.h>
 
 #include "iso9660.h"
 

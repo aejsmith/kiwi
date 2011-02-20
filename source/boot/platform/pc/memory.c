@@ -19,12 +19,12 @@
  * @brief		PC memory detection code.
  */
 
-#include <boot/console.h>
-#include <boot/error.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <console.h>
+#include <loader.h>
+#include <memory.h>
 
 #include "bios.h"
 

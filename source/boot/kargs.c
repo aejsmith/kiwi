@@ -19,9 +19,10 @@
  * @brief		Kernel arguments structure functions.
  */
 
-#include <boot/memory.h>
 #include <lib/string.h>
+
 #include <kargs.h>
+#include <memory.h>
 
 /** Arguments structure passed to the kernel. */
 kernel_args_t *kernel_args = NULL;

@@ -21,15 +21,14 @@
 
 #include <arch/memory.h>
 
-#include <boot/console.h>
-#include <boot/error.h>
-#include <boot/memory.h>
-
 #include <lib/list.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <assert.h>
+#include <console.h>
+#include <loader.h>
+#include <memory.h>
 
 /** Structure representing an area on the heap. */
 typedef struct heap_chunk {

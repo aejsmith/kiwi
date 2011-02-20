@@ -19,16 +19,15 @@
  * @brief		BIOS disk device functions.
  */
 
-#include <boot/console.h>
-#include <boot/disk.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <platform/boot.h>
 
 #include <assert.h>
+#include <console.h>
+#include <disk.h>
+#include <memory.h>
 
 #include "bios.h"
 #include "multiboot.h"

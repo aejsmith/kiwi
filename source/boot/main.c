@@ -19,23 +19,21 @@
  * @brief		Bootloader main function.
  */
 
-#include <arch/boot.h>
+#include <arch/loader.h>
 
-#include <boot/config.h>
-#include <boot/console.h>
-#include <boot/cpu.h>
-#include <boot/error.h>
-#include <boot/fs.h>
-#include <boot/loader.h>
-#include <boot/memory.h>
-#include <boot/menu.h>
-#include <boot/video.h>
-
-#include <platform/boot.h>
+#include <platform/loader.h>
 
 #include <lib/string.h>
 
+#include <config.h>
+#include <console.h>
+#include <cpu.h>
+#include <fs.h>
 #include <kargs.h>
+#include <loader.h>
+#include <memory.h>
+#include <menu.h>
+#include <video.h>
 
 extern char __bss_start[], __bss_end[];
 extern void loader_main(void);

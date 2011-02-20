@@ -21,10 +21,10 @@
 
 #include <arch/io.h>
 
-#include <boot/console.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <console.h>
 
 #include "bios.h"
 

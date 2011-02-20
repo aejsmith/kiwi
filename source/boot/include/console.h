@@ -19,8 +19,8 @@
  * @brief		Console functions.
  */
 
-#ifndef __BOOT_CONSOLE_H
-#define __BOOT_CONSOLE_H
+#ifndef __CONSOLE_H
+#define __CONSOLE_H
 
 #include <stdarg.h>
 #include <types.h>
@@ -115,4 +115,4 @@ extern int dprintf(const char *fmt, ...) __printf(1, 2);
 
 extern void console_init(void);
 
-#endif /* __BOOT_CONSOLE_H */
+#endif /* __CONSOLE_H */

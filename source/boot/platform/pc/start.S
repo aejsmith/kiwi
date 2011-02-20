@@ -19,11 +19,12 @@
  * @brief		x86 bootloader startup code.
  */
 
-#include <arch/x86/asm.h>
 #include <arch/memory.h>
 #include <arch/page.h>
 
-#include <platform/boot.h>
+#include <platform/loader.h>
+
+#include <x86/asm.h>
 
 #include "multiboot.h"
 

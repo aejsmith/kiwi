@@ -22,15 +22,14 @@
 #ifndef __BOOT_ELF_H
 #define __BOOT_ELF_H
 
-#include <boot/console.h>
-#include <boot/error.h>
-#include <boot/fs.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 
+#include <console.h>
 #include <elf.h>
+#include <fs.h>
 #include <kargs.h>
+#include <loader.h>
+#include <memory.h>
 
 /** Check whether a file is a certain elf type.
  * @param handle	Handle to file to check.

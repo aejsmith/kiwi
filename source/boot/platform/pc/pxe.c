@@ -19,16 +19,15 @@
  * @brief		PXE filesystem handling.
  */
 
-#include <boot/console.h>
-#include <boot/disk.h>
-#include <boot/error.h>
-#include <boot/memory.h>
-#include <boot/fs.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <console.h>
+#include <disk.h>
 #include <endian.h>
+#include <fs.h>
+#include <loader.h>
+#include <memory.h>
 
 #include "bios.h"
 #include "pxe.h"

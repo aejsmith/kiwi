@@ -16,16 +16,34 @@
 
 /**
  * @file
- * @brief		x86 bootloader definitions.
+ * @brief		x86 assembly code definitions.
  */
 
-#ifndef __ARCH_BOOT_H
-#define __ARCH_BOOT_H
+#ifndef __X86_ASM_H
+#define __X86_ASM_H
 
-#include <types.h>
+#ifndef __ASM__
+# error "What are you doing?"
+#endif
 
-extern bool cpu_lapic_init(void);
-extern void idt_init(void);
-extern void arch_early_init(void);
+/** Macro to define the beginning of a global function. */
+#define FUNCTION_START(name)		\
+	.global name; \
+	.type name, @function; \
+	name:
 
-#endif /* __ARCH_BOOT_H */
+/** Macro to define the beginning of a private function. */
+#define PRIVATE_FUNCTION_START(name)	\
+	.type name, @function; \
+	name:
+
+/** Macro to define the end of a function. */
+#define FUNCTION_END(name)		\
+	.size name, . - name
+
+/** Macro to define a global symbol. */
+#define SYMBOL(name)			\
+	.global name; \
+	name:
+
+#endif /* __X86_ASM_H */

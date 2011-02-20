@@ -19,11 +19,11 @@
  * @brief		User interface functions.
  */
 
-#ifndef __BOOT_UI_H
-#define __BOOT_UI_H
+#ifndef __UI_H
+#define __UI_H
 
-#include <boot/config.h>
-#include <boot/console.h>
+#include <config.h>
+#include <console.h>
 
 struct ui_entry;
 struct ui_window;
@@ -113,4 +113,4 @@ extern ui_entry_t *ui_textbox_create(const char *label, value_t *value);
 extern ui_entry_t *ui_chooser_create(const char *label, value_t *value);
 extern void ui_chooser_insert(ui_entry_t *entry, const char *name, void *value, bool selected);
 
-#endif /* __BOOT_UI_H */
+#endif /* __UI_H */

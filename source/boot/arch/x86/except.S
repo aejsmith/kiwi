@@ -19,8 +19,8 @@
  * @brief		x86 interrupt service routines.
  */
 
-#include <arch/x86/asm.h>
-#include <platform/boot.h>
+#include <platform/loader.h>
+#include <x86/asm.h>
 
 .section ".text", "ax", @progbits
 

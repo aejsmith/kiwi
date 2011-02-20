@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		PC platform bootloader definitions.
+ * @brief		PC platform loader definitions.
  */
 
-#ifndef __PLATFORM_BOOT_H
-#define __PLATFORM_BOOT_H
+#ifndef __PLATFORM_LOADER_H
+#define __PLATFORM_LOADER_H
 
 /** Memory layout definitions. */
 #define LOADER_LOAD_ADDR	0x10000		/**< Load address of the boot loader. */
@@ -45,4 +45,4 @@ extern void platform_reboot(void);
 
 #endif /* __ASM__ */
 
-#endif /* __PLATFORM_BOOT_H */
+#endif /* __PLATFORM_LOADER_H */

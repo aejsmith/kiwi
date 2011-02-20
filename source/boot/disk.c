@@ -19,13 +19,13 @@
  * @brief		Bootloader disk functions.
  */
 
-#include <boot/disk.h>
-#include <boot/error.h>
-#include <boot/fs.h>
-#include <boot/memory.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <disk.h>
+#include <fs.h>
+#include <loader.h>
+#include <memory.h>
 
 #include "partitions/msdos.h"
 

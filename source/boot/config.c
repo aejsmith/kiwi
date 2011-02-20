@@ -21,16 +21,16 @@
  * @fixme		The parser is a little bit shit...
  */
 
-#include <boot/config.h>
-#include <boot/console.h>
-#include <boot/error.h>
-#include <boot/fs.h>
-#include <boot/memory.h>
-#include <boot/menu.h>
-
 #include <lib/ctype.h>
 #include <lib/string.h>
 #include <lib/utility.h>
+
+#include <config.h>
+#include <console.h>
+#include <fs.h>
+#include <loader.h>
+#include <memory.h>
+#include <menu.h>
 
 /** Structure containing details of a command to run. */
 typedef struct command_list_entry {

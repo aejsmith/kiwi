@@ -22,7 +22,7 @@
 #ifndef __ASSERT_H
 #define __ASSERT_H
 
-#include <boot/error.h>
+#include <loader.h>
 
 #if CONFIG_DEBUG
 # define assert(cond)	if(unlikely(!(cond))) { internal_error("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }

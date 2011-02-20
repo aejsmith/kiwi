@@ -22,12 +22,11 @@
 #include <arch/x86/descriptor.h>
 #include <arch/io.h>
 
-#include <boot/config.h>
-
 #include <lib/string.h>
 
 #include <platform/boot.h>
 
+#include <config.h>
 #include <time.h>
 
 #include "multiboot.h"

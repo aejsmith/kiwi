@@ -19,8 +19,8 @@
  * @brief		Bootloader CPU functions.
  */
 
-#ifndef __BOOT_CPU_H
-#define __BOOT_CPU_H
+#ifndef __CPU_H
+#define __CPU_H
 
 #include <lib/atomic.h>
 #include <kargs.h>
@@ -34,4 +34,4 @@ extern void cpu_boot_all(void (*entry)(void));
 extern void cpu_init(void);
 extern void cpu_ap_init(void);
 
-#endif /* __BOOT_CPU_H */
+#endif /* __CPU_H */

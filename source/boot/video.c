@@ -19,10 +19,10 @@
  * @brief		Bootloader video functions.
  */
 
-#include <boot/memory.h>
-#include <boot/video.h>
-
 #include <lib/string.h>
+
+#include <memory.h>
+#include <video.h>
 
 /** List of video modes. */
 static LIST_DECLARE(video_modes);

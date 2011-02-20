@@ -19,8 +19,8 @@
  * @brief		BIOS interrupt functions.
  */
 
-#include <arch/x86/asm.h>
-#include <platform/boot.h>
+#include <platform/loader.h>
+#include <x86/asm.h>
 
 /** Size of the registers structure. */
 #define REGS_SIZE	0x24
