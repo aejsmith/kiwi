@@ -26,7 +26,7 @@
 
 #ifndef LOADER
 
-#include <arch/x86/descriptor.h>
+#include <x86/descriptor.h>
 
 struct cpu;
 

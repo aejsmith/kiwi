@@ -19,9 +19,9 @@
  * @brief		x86 architecture core code.
  */
 
-#include <arch/x86/cpu.h>
-#include <arch/x86/lapic.h>
-#include <arch/x86/page.h>
+#include <x86/cpu.h>
+#include <x86/lapic.h>
+#include <x86/page.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

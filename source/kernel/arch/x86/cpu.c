@@ -19,9 +19,10 @@
  * @brief		x86 CPU management.
  */
 
-#include <arch/x86/cpu.h>
-#include <arch/x86/lapic.h>
 #include <arch/memory.h>
+
+#include <x86/cpu.h>
+#include <x86/lapic.h>
 
 #include <cpu/cpu.h>
 

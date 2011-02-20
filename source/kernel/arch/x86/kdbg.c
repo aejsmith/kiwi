@@ -19,7 +19,7 @@
  * @brief		x86 kernel debugger functions.
  */
 
-#include <arch/x86/cpu.h>
+#include <x86/cpu.h>
 
 #include <cpu/intr.h>
 

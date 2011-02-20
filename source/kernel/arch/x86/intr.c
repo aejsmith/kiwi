@@ -19,8 +19,9 @@
  * @brief		x86 interrupt functions.
  */
 
-#include <arch/x86/cpu.h>
 #include <arch/memory.h>
+
+#include <x86/cpu.h>
 
 #include <cpu/intr.h>
 

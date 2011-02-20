@@ -21,8 +21,9 @@
  * @todo		Save and restore FPU context.
  */
 
-#include <arch/x86/cpu.h>
 #include <arch/memory.h>
+
+#include <x86/cpu.h>
 
 #include <cpu/intr.h>
 

@@ -19,7 +19,7 @@
  * @brief		x86 FPU functions.
  */
 
-#include <arch/x86/cpu.h>
+#include <x86/cpu.h>
 #include <cpu/fpu.h>
 
 /** Save FPU state.

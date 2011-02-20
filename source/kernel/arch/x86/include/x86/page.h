@@ -19,8 +19,8 @@
  * @brief		x86 paging definitions.
  */
 
-#ifndef __ARCH_X86_PAGE_H
-#define __ARCH_X86_PAGE_H
+#ifndef __X86_PAGE_H
+#define __X86_PAGE_H
 
 /** Definitions of paging structure bits. */
 #define PG_PRESENT		(1<<0)		/**< Page is present. */
@@ -43,4 +43,4 @@
 extern void pat_init(void);
 
 #endif /* __ASM__/LOADER */
-#endif /* __ARCH_X86_PAGE_H */
+#endif /* __X86_PAGE_H */

@@ -22,7 +22,7 @@
 #ifndef __PLATFORM_PC_BIOS_H
 #define __PLATFORM_PC_BIOS_H
 
-#include <arch/x86/cpu.h>
+#include <x86/cpu.h>
 #include <mm/flags.h>
 
 /** Convert a segment + offset pair to a linear address. */

@@ -19,8 +19,8 @@
  * @brief		AMD64 system call setup code.
  */
 
-#include <arch/x86/cpu.h>
-#include <arch/x86/descriptor.h>
+#include <x86/cpu.h>
+#include <x86/descriptor.h>
 
 #include <cpu/cpu.h>
 

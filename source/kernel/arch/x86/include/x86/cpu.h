@@ -19,8 +19,8 @@
  * @brief		x86 CPU management.
  */
 
-#ifndef __ARCH_X86_CPU_H
-#define __ARCH_X86_CPU_H
+#ifndef __X86_CPU_H
+#define __X86_CPU_H
 
 /** Flags in the CR0 Control Register. */
 #define X86_CR0_PE		(1<<0)		/**< Protected Mode Enable. */
@@ -275,4 +275,4 @@ static inline void x86_cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t 
 }
 
 #endif /* __ASM__ */
-#endif /* __ARCH_X86_CPU_H */
+#endif /* __X86_CPU_H */

@@ -19,8 +19,8 @@
  * @brief		x86 assembly code definitions.
  */
 
-#ifndef __ARCH_X86_ASM_H
-#define __ARCH_X86_ASM_H
+#ifndef __X86_ASM_H
+#define __X86_ASM_H
 
 #ifndef __ASM__
 # error "What are you doing?"
@@ -46,4 +46,4 @@
 	.global name; \
 	name:
 
-#endif /* __ARCH_X86_ASM_H */
+#endif /* __X86_ASM_H */

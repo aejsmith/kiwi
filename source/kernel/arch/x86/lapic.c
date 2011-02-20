@@ -19,8 +19,9 @@
  * @brief		x86 local APIC code.
  */
 
-#include <arch/x86/lapic.h>
 #include <arch/io.h>
+
+#include <x86/lapic.h>
 
 #include <cpu/cpu.h>
 #include <cpu/intr.h>

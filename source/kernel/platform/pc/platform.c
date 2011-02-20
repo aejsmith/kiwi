@@ -19,9 +19,10 @@
  * @brief		PC platform core code.
  */
 
-#include <arch/x86/descriptor.h>
 #include <arch/cpu.h>
 #include <arch/io.h>
+
+#include <x86/descriptor.h>
 
 #include <platform/pc/pic.h>
 #include <platform/pc/pit.h>
