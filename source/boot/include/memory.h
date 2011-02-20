@@ -23,7 +23,14 @@
 #define __MEMORY_H
 
 #include <arch/page.h>
-#include <kargs.h>
+#include <kboot.h>
+
+/** Physical memory range types. */
+#define PHYS_MEMORY_FREE	KBOOT_MEMORY_FREE
+#define PHYS_MEMORY_ALLOCATED	KBOOT_MEMORY_ALLOCATED
+#define PHYS_MEMORY_RECLAIMABLE	KBOOT_MEMORY_RECLAIMABLE
+#define PHYS_MEMORY_RESERVED	KBOOT_MEMORY_RESERVED
+#define PHYS_MEMORY_INTERNAL	4
 
 extern void *kmalloc(size_t size);
 extern void *krealloc(void *addr, size_t size);
