@@ -416,6 +416,7 @@ phys_ptr_t memory_finalise(void) {
 		range = list_entry(iter, memory_range_t, header);
 
 		range->ka.header.type = KBOOT_TAG_MEMORY;
+		range->ka.header.size = sizeof(range->ka);
 		if(range->header.next != &memory_ranges) {
 			next = list_entry(range->header.next, memory_range_t, header);
 			range->ka.header.next = (ptr_t)&next->ka;

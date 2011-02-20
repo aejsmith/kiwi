@@ -88,6 +88,7 @@ static void *allocate_tag(kboot_data_t *data, uint32_t type, size_t size) {
 	tag = kmalloc(size);
 	tag->next = 0;
 	tag->type = type;
+	tag->size = size;
 
 	append_tag(data, (ptr_t)tag);
 	return tag;

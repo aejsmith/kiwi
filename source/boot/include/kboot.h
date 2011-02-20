@@ -35,6 +35,7 @@
 typedef struct kboot_tag {
 	phys_ptr_t next;			/**< Address of next tag, 0 if last tag. */
 	uint32_t type;				/**< Type of the tag. */
+	uint32_t size;				/**< Total size of the tag data. */
 } __packed kboot_tag_t;
 
 /** Possible information tag types. */
