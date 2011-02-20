@@ -63,7 +63,7 @@ typedef struct thread {
 	context_t context;		/**< CPU context. */
 	fpu_context_t *fpu;		/**< FPU context. */
 	thread_arch_t arch;		/**< Architecture thread data. */
-	unative_t *kstack;		/**< Kernel stack pointer. */
+	void *kstack;			/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
 	size_t wire_count;		/**< How many calls to thread_wire() have been made. */

@@ -19,6 +19,8 @@
  * @brief		Kernel initialisation functions.
  */
 
+#include <arch/memory.h>
+
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 #include <cpu/ipi.h>
@@ -44,7 +46,7 @@
 
 #include <console.h>
 #include <dpc.h>
-#include <kargs.h>
+#include <kboot.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <module.h>
@@ -62,33 +64,26 @@ typedef struct boot_module {
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
-extern void kmain(kernel_args_t *args, cpu_id_t id);
+extern void kmain_bsp(phys_ptr_t tags);
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
-/** Rendezvous variables for SMP boot. */
-static atomic_t init_rendezvous_1 __init_data = 0;
-static atomic_t init_rendezvous_2 __init_data = 0;
-static atomic_t init_rendezvous_3 __init_data = 0;
+static void kmain_bsp_bottom(void);
 
+/** New stack for the boot CPU. */
+static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
+
+/** Address of the KBoot tag list. */
+phys_ptr_t kboot_tag_list __init_data;
+
+#if 0
 /** The amount to increment the boot progress for each module. */
 static int current_init_progress __init_data = 10;
 static int progress_per_module __init_data;
 
-/** Lock to serialise the SMP boot. */
-static SPINLOCK_DECLARE(smp_boot_spinlock);
-
 /** List of modules/FS images from the bootloader. */
 static LIST_DECLARE(boot_module_list);
 static LIST_DECLARE(boot_fsimage_list);
-
-/** Wait until all CPUs reach a certain point.
- * @param args		Kernel arguments structure.
- * @param var		Variable to wait on. */
-static inline void init_rendezvous(kernel_args_t *args, atomic_t *var) {
-	atomic_inc(var);
-	while(atomic_get(var) < (int)args->cpu_count);
-}
 
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
@@ -272,11 +267,32 @@ static void init_thread(void *args, void *arg2) {
 		fatal("Could not start service manager (%d)", ret);
 	}
 }
+#endif
 
-/** Main function of the kernel.
- * @param args		Arguments from the bootloader.
- * @param id		CPU that the function is running on. */
-void __init_text kmain(kernel_args_t *args, cpu_id_t id) {
+/** Main entry point of the kernel.
+ * @param tags		Physical address of KBoot tag list. */
+__init_text void kmain_bsp(phys_ptr_t tags) {
+	context_t ctx;
+
+	/* Save the tag list address. */
+	kboot_tag_list = tags;
+
+	/* Currently we are running on a stack set up for us by the loader.
+	 * This stack is most likely in a mapping that will go away once the
+	 * memory management subsystems are brought up. Therefore, the first
+	 * thing we do is move over to a new stack that is mapped along with
+	 * the kernel. */
+	context_init(&ctx, (ptr_t)kmain_bsp_bottom, boot_stack);
+	context_restore(&ctx);
+}
+
+/** Initialisation code for the boot CPU. */
+__init_text static void kmain_bsp_bottom(void) {
+	/* Bring up the debug console. */
+	console_early_init();
+	kprintf(LOG_DEBUG, "Hello, World\n");
+	while(1);
+#if 0
 	thread_t *thread;
 	status_t ret;
 
@@ -368,4 +384,5 @@ void __init_text kmain(kernel_args_t *args, cpu_id_t id) {
 		init_rendezvous(args, &init_rendezvous_3);
 		sched_enter();
 	}
+#endif
 }

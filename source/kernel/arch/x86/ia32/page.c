@@ -71,6 +71,9 @@ extern char __init_start[], __init_end[];
 extern char __rodata_start[], __rodata_end[];
 extern char __data_start[], __bss_end[];
 
+/** Define a boot mapping for the physical map area. */
+KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, KERNEL_PMAP_SIZE);
+
 /** Kernel page map. */
 page_map_t kernel_page_map;
 

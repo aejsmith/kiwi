@@ -22,7 +22,7 @@
 #include <arch/memory.h>
 #include <arch/page.h>
 
-ENTRY(kmain)
+ENTRY(kmain_bsp)
 OUTPUT_ARCH("i386")
 OUTPUT_FORMAT("elf32-i386")
 

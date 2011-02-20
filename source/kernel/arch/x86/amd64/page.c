@@ -40,6 +40,7 @@
 #include <assert.h>
 #include <console.h>
 #include <kargs.h>
+#include <kboot.h>
 #include <status.h>
 
 #if CONFIG_PAGE_DEBUG
@@ -63,11 +64,11 @@ extern char __init_start[], __init_end[];
 extern char __rodata_start[], __rodata_end[];
 extern char __data_start[], __bss_end[];
 
+/** Define a boot mapping of the first 8GB of physical memory. */
+KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000);
+
 /** Kernel page map. */
 page_map_t kernel_page_map;
-
-/** Whether the kernel page map has been initialised. */
-static bool paging_inited = false;
 
 /** Invalidate a TLB entry.
  * @param addr		Address to invalidate. */
@@ -79,12 +80,7 @@ static inline void invlpg(ptr_t addr) {
  * @param mmflag	Allocation flags. PM_ZERO will be added.
  * @return		Address of structure on success, 0 on failure. */
 static phys_ptr_t page_structure_alloc(int mmflag) {
-	if(likely(paging_inited)) {
-		return page_alloc(1, mmflag | PM_ZERO);
-	} else {
-		/* During initialisation we only have 1GB of physical mapping. */
-		return page_xalloc(1, 0, 0, 0x40000000, mmflag | PM_ZERO);
-	}
+	return page_alloc(1, mmflag | PM_ZERO);
 }
 
 /** Get the virtual address of a page structure.
@@ -618,14 +614,7 @@ void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 		return NULL;
 	}
 
-	if(likely(paging_inited)) {
-		return (void *)(KERNEL_PMAP_BASE + addr);
-	} else {
-		/* During boot there is a 1GB identity mapping. */
-		assert(addr < 0x40000000);
-		assert((addr + size) <= 0x40000000);
-		return (void *)addr;
-	}
+	return (void *)(KERNEL_PMAP_BASE + addr);
 }
 
 /** Unmap physical memory from the kernel address space.
@@ -684,7 +673,8 @@ __init_text void page_arch_init(kernel_args_t *args) {
 	page_map_kernel_range(args, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
 	page_map_kernel_range(args, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
 
-	/* Create 8GB of physical mapping for now. FIXME. */
+	/* Create 8GB of physical mapping for now. FIXME: Map up to the highest
+	 * available physical address. */
 	for(i = 0; i < 0x200000000; i += 0x40000000) {
 		pdir = page_map_get_pdir(&kernel_page_map, i + KERNEL_PMAP_BASE, true, MM_FATAL);
 		for(j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
@@ -708,9 +698,6 @@ __init_text void page_arch_init(kernel_args_t *args) {
 
 	/* Switch to the kernel page map. */
 	page_map_switch(&kernel_page_map);
-
-	/* The physical map area can now be used. */
-	paging_inited = true;
 }
 
 /** TLB flush IPI handler.

@@ -43,7 +43,7 @@ extern void __context_restore_frame(void);
  * @param ip		Instruction pointer.
  * @param stack		Base of stack.
  */
-void context_init(context_t *ctx, ptr_t ip, unative_t *stack) {
+void context_init(context_t *ctx, ptr_t ip, void *stack) {
 	/* Ensure that everything is cleared to 0. */
 	memset(ctx, 0, sizeof(context_t));
 

@@ -28,6 +28,9 @@
 #include <pc/pit.h>
 
 #include <kernel.h>
+#include <kboot.h>
+
+KBOOT_IMAGE(KBOOT_IMAGE_LFB);
 
 /** PC platform first stage initialisation.
  * @param args		Kernel arguments structure. */
