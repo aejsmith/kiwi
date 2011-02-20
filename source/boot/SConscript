@@ -97,8 +97,9 @@ env.Program('loader.elf', map(env.Object, sources), LINKFLAGS=env['LINKFLAGS'] +
 Depends('loader.elf', env['LDSCRIPT'])
 
 # Generate various information files and the stripped boot loader image.
-env.Command('loader.lst', 'loader.elf', Action('$OBJDUMP -d $SOURCE > $TARGET', '$GENCOMSTR'))
-env.Command('loader.rde', 'loader.elf', Action('$READELF -a $SOURCE > $TARGET', '$GENCOMSTR'))
-env.Command('loader.sym', 'loader.elf', Action('$NM -C $SOURCE | sort > $TARGET', '$GENCOMSTR'))
-env.Command('loader', 'loader.elf', Action('$OBJCOPY -O binary --strip-all $SOURCE $TARGET', '$GENCOMSTR'))
-Depends('loader', ['loader.lst', 'loader.rde', 'loader.sym'])
+env.Command(['loader', 'loader.lst', 'loader.rde', 'loader.sym'], 'loader.elf', [
+	Action('$OBJCOPY -O binary --strip-all $SOURCE ${TARGETS[0]}', '$GENCOMSTR'),
+	Action('$OBJDUMP -d $SOURCE > ${TARGETS[1]}', None),
+	Action('$READELF -a $SOURCE > ${TARGETS[2]}', None),
+	Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
+])
