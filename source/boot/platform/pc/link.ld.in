@@ -48,6 +48,11 @@ SECTIONS {
 		__data_start = .;
 		*(.data)
 		*(.data.*)
+
+		__commands_start = .;
+		*(.commands)
+		__commands_end = .;
+
 		__data_end = .;
 	}
 

@@ -16,13 +16,14 @@
 
 /**
  * @file
- * @brief		Bootloader configuration functions.
+ * @brief		Boot configuration system.
  */
 
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
 #include <lib/list.h>
+#include <fs.h>
 
 struct value;
 struct command;
@@ -53,7 +54,7 @@ typedef struct value {
 
 	/** Actual value. */
 	union {
-		int integer;			/**< Integer. */
+		uint64_t integer;		/**< Integer. */
 		bool boolean;			/**< Boolean. */
 		char *string;			/**< String. */
 		value_list_t *list;		/**< List. */
@@ -76,18 +77,23 @@ typedef struct command {
 	bool (*func)(value_list_t *args, environ_t *env);
 } command_t;
 
+/** Define a command, to be automatically added to the command list. */
+#define DEFINE_COMMAND(name, func) \
+	static command_t __command_##func __section(".commands") __used = { \
+		name, \
+		func \
+	}
+
 extern char *config_file_override;
 extern environ_t *root_environ;
 
-extern bool command_list_exec(command_list_t *list, command_t *commands, int count, environ_t *env);
+extern bool command_list_exec(command_list_t *list, environ_t *env);
 
 extern void value_list_insert(value_list_t *list, value_t *value);
 
 extern environ_t *environ_create(void);
 extern value_t *environ_lookup(environ_t *env, const char *name);
 extern void environ_insert(environ_t *env, const char *name, value_t *value);
-
-extern bool config_cmd_set(value_list_t *args, environ_t *env);
 
 extern void config_init(void);
 

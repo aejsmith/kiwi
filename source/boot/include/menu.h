@@ -24,8 +24,6 @@
 
 #include <config.h>
 
-extern bool config_cmd_entry(value_list_t *args, environ_t *env);
-
 extern environ_t *menu_display(void);
 
 #endif /* __MENU_H */

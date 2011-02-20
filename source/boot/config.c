@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Configuration file parser.
+ * @brief		Configuration system.
  *
  * @fixme		The parser is a little bit shit...
  */
@@ -52,6 +52,8 @@ typedef struct environ_entry {
 /** Character returned from get_next_char() for end-of-file. */
 #define EOF			-1
 
+extern command_t __commands_start[], __commands_end[];
+
 static void value_list_destroy(value_list_t *list);
 static value_list_t *value_list_copy(value_list_t *source);
 static command_list_t *command_list_copy(command_list_t *source);
@@ -86,12 +88,6 @@ static const char *config_file_paths[] = {
 	"/boot/loader.cfg",
 	"/kiwi/loader.cfg",
 	"/loader.cfg",
-};
-
-/** Commands allowed in the top level of the configuration. */
-static command_t top_level_commands[] = {
-	{ "entry", config_cmd_entry },
-	{ "set", config_cmd_set },
 };
 
 /** Overridden configuration file path. */
@@ -139,7 +135,7 @@ static void rewind_input(void) {
 static void syntax_error(const char *fmt, ...) {
 	va_list args;
 
-	dprintf("config: %s:%d:%d: error: ", current_file_path, current_line, current_col);
+	dprintf("%s:%d:%d: error: ", current_file_path, current_line, current_col);
 	va_start(args, fmt);
 	dvprintf(fmt, args);
 	va_end(args);
@@ -269,7 +265,7 @@ static void command_list_destroy(command_list_t *list) {
 /** Parse an integer.
  * @param intp		Where to store integer parsed.
  * @return		Whether successful. */
-static bool parse_integer(int *intp) {
+static bool parse_integer(uint64_t *intp) {
 	char ch;
 
 	while(true) {
@@ -278,7 +274,7 @@ static bool parse_integer(int *intp) {
 			temp_buf[temp_buf_idx++] = ch;
 		} else {
 			temp_buf[temp_buf_idx] = 0;
-			*intp = strtoul(temp_buf, NULL, 0);
+			*intp = strtoull(temp_buf, NULL, 0);
 			temp_buf_idx = 0;
 			return true;
 		}
@@ -453,11 +449,11 @@ fail:
 	return NULL;
 }
 
-/** Load a configuration file.
- * @param path		Path of the file (used for debugging).
+/** Parse configuration data.
  * @param buf		Pointer to NULL-terminated buffer containing file data.
+ * @param path		Path of the file (used in error output).
  * @return		Whether the file was loaded successfully. */
-static bool config_load_internal(const char *path, const char *buf) {
+static bool config_parse(const char *buf, const char *path) {
 	command_list_t *list;
 	bool ret;
 
@@ -472,8 +468,7 @@ static bool config_load_internal(const char *path, const char *buf) {
 		return false;
 	}
 
-	root_environ = environ_create();
-	ret = command_list_exec(list, top_level_commands, ARRAYSZ(top_level_commands), root_environ);
+	ret = command_list_exec(list, root_environ);
 	command_list_destroy(list);
 	return ret;
 }
@@ -501,7 +496,7 @@ static bool config_load(fs_mount_t *mount, const char *path) {
 	}
 	buf[size] = 0;
 
-	ret = config_load_internal(path, buf);
+	ret = config_parse(buf, path);
 	kfree(buf);
 	fs_close(handle);
 	return ret;
@@ -509,35 +504,31 @@ static bool config_load(fs_mount_t *mount, const char *path) {
 
 /** Execute a single command from a command list.
  * @param entry		Entry to execute.
- * @param commands	Array of commands that can be used.
- * @param count		Number of commands.
  * @param env		Environment to execute command in.
  * @return		Whether successful. */
-static bool command_exec(command_list_entry_t *entry, command_t *commands, int count, environ_t *env) {
+static bool command_exec(command_list_entry_t *entry, environ_t *env) {
 	int i;
 
-	for(i = 0; i < count; i++) {
-		if(strcmp(commands[i].name, entry->name) == 0) {
-			return commands[i].func(entry->args, env);
+	for(i = 0; i < (__commands_end - __commands_start); i++) {
+		if(strcmp(__commands_start[i].name, entry->name) == 0) {
+			return __commands_start[i].func(entry->args, env);
 		}
 	}
 
-	dprintf("config: unknown command '%s'\n", entry->name);
+	dprintf("unknown command '%s'\n", entry->name);
 	return false;
 }
 
 /** Execute a command list.
  * @param list		List of commands.
- * @param commands	Array of commands that can be used.
- * @param count		Number of commands.
  * @param env		Environment to execute commands in.
  * @return		Whether all of the commands completed successfully. */
-bool command_list_exec(command_list_t *list, command_t *commands, int count, environ_t *env) {
+bool command_list_exec(command_list_t *list, environ_t *env) {
 	command_list_entry_t *entry;
 
 	LIST_FOREACH(list, iter) {
 		entry = list_entry(iter, command_list_entry_t, header);
-		if(!command_exec(entry, commands, count, env)) {
+		if(!command_exec(entry, env)) {
 			return false;
 		}
 	}
@@ -607,19 +598,23 @@ void environ_insert(environ_t *env, const char *name, value_t *value) {
  * @param args		Argument list.
  * @param env		Environment to set in.
  * @return		Whether successful. */
-bool config_cmd_set(value_list_t *args, environ_t *env) {
+static bool config_cmd_set(value_list_t *args, environ_t *env) {
 	if(args->count != 2 || args->values[0].type != VALUE_TYPE_STRING) {
-		dprintf("config: set: invalid arguments\n");
+		dprintf("set: invalid arguments\n");
 		return false;
 	}
 
 	environ_insert(env, args->values[0].string, &args->values[1]);
 	return true;
 }
+DEFINE_COMMAND("set", config_cmd_set);
 
-/** Load the bootloader configuration. */
+/** Set up the configuration system and load the configuration file. */
 void config_init(void) {
 	size_t i;
+
+	/* Create the root environment. */
+	root_environ = environ_create();
 
 	if(config_file_override) {
 		if(!config_load(NULL, config_file_override)) {
@@ -634,7 +629,7 @@ void config_init(void) {
 		}
 
 		/* No configuration was loaded, use the default. */
-		if(!config_load_internal("<default>", default_config)) {
+		if(!config_parse(default_config, "<default>")) {
 			internal_error("Could not load default configuration");
 		}
 	}

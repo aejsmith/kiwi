@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Bootloader menu interface.
+ * @brief		Menu interface.
  */
 
 #include <lib/string.h>
@@ -43,20 +43,11 @@ static LIST_DECLARE(menu_entries);
 /** Selected menu entry. */
 static menu_entry_t *selected_menu_entry = NULL;
 
-/** Commands that can be executed within a menu entry. */
-static command_t menu_entry_commands[] = {
-#if CONFIG_PLATFORM_PC
-	{ "chainload",	config_cmd_chainload },
-#endif
-	//{ "kiwi",	config_cmd_kiwi },
-	{ "set",	config_cmd_set },
-};
-
 /** Add a new menu entry.
  * @param args		Arguments to the command.
  * @param env		Environment to operate on.
  * @return		Whether successful. */
-bool config_cmd_entry(value_list_t *args, environ_t *env) {
+static bool config_cmd_entry(value_list_t *args, environ_t *env) {
 	menu_entry_t *entry;
 
 	assert(env == root_environ);
@@ -73,8 +64,7 @@ bool config_cmd_entry(value_list_t *args, environ_t *env) {
 	entry->env = environ_create();
 
 	/* Execute the command list. */
-	if(!command_list_exec(args->values[1].cmds, menu_entry_commands,
-	                      ARRAYSZ(menu_entry_commands), entry->env)) {
+	if(!command_list_exec(args->values[1].cmds, entry->env)) {
 		//environ_destroy(entry->env);
 		kfree(entry->name);
 		kfree(entry);
@@ -84,13 +74,14 @@ bool config_cmd_entry(value_list_t *args, environ_t *env) {
 	list_append(&menu_entries, &entry->link);
 	return true;
 }
+DEFINE_COMMAND("entry", config_cmd_entry);
 
 /** Find the default menu entry.
  * @return		Default entry. */
 static menu_entry_t *menu_find_default(void) {
 	menu_entry_t *entry;
 	value_t *value;
-	int i = 0;
+	uint64_t i = 0;
 
 	if((value = environ_lookup(root_environ, "default"))) {
 		LIST_FOREACH(&menu_entries, iter) {
@@ -209,8 +200,10 @@ environ_t *menu_display(void) {
 	int timeout = 0;
 	value_t *value;
 
+	/* If no menu entries are defined, assume that the top-level environment
+	 * has been configured with something to boot. */
 	if(list_empty(&menu_entries)) {
-		boot_error("No entries defined in configuration");
+		return root_environ;
 	}
 
 	/* Find the default entry. */

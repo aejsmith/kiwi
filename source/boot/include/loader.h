@@ -44,11 +44,8 @@ typedef struct loader_type {
 
 extern loader_type_t *loader_type_get(environ_t *env);
 extern void loader_type_set(environ_t *env, loader_type_t *type);
-
-extern bool config_cmd_kiwi(value_list_t *args, environ_t *env);
-#if CONFIG_PLATFORM_PC
-extern bool config_cmd_chainload(value_list_t *args, environ_t *env);
-#endif
+extern void *loader_data_get(environ_t *env);
+extern void loader_data_set(environ_t *env, void *data);
 
 extern void internal_error(const char *fmt, ...) __printf(1, 2) __noreturn;
 extern void boot_error(const char *fmt, ...) __printf(1, 2) __noreturn;

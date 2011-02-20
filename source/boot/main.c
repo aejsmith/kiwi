@@ -59,6 +59,28 @@ void loader_type_set(environ_t *env, loader_type_t *type) {
 	environ_insert(env, "loader_type", &value);
 }
 
+/** Get the loader data from an environment.
+ * @param env		Environment to get from.
+ * @return		Pointer to loader data. */
+void *loader_data_get(environ_t *env) {
+	value_t *value;
+
+	value = environ_lookup(env, "loader_data");
+	assert(value && value->type == VALUE_TYPE_POINTER);
+	return value->pointer;
+}
+
+/** Set the loader data in an environment.
+ * @param env		Environment to set in.
+ * @param data		Loader data pointer. */
+void loader_data_set(environ_t *env, void *data) {
+	value_t value;
+
+	value.type = VALUE_TYPE_POINTER;
+	value.pointer = data;
+	environ_insert(env, "loader_data", &value);
+}
+
 /** Main function for the Kiwi bootloader. */
 void loader_main(void) {
 	loader_type_t *type;

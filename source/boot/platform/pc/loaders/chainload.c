@@ -20,7 +20,10 @@
  */
 
 #include <arch/io.h>
+
 #include <pc/bios.h>
+
+#include <config.h>
 #include <loader.h>
 
 extern void chain_loader_enter(uint8_t id, ptr_t part) __noreturn;
@@ -89,7 +92,7 @@ static loader_type_t chain_loader_type = {
  * @param args		Arguments for the command.
  * @param env		Environment to use.
  * @return		Whether successful. */
-bool config_cmd_chainload(value_list_t *args, environ_t *env) {
+static bool config_cmd_chainload(value_list_t *args, environ_t *env) {
 	if(args->count != 0) {
 		dprintf("config: chainload: invalid arguments\n");
 		return false;
@@ -98,3 +101,4 @@ bool config_cmd_chainload(value_list_t *args, environ_t *env) {
 	loader_type_set(env, &chain_loader_type);
 	return true;
 }
+DEFINE_COMMAND("chainload", config_cmd_chainload);
