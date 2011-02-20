@@ -20,8 +20,15 @@ Import('config', 'envmgr')
 sources = map(File, [
 	'fs/ext2.c',
 	'fs/iso9660.c',
+
+	'lib/printf.c',
+	'lib/string.c',
+	'lib/support.c',
+
 	'loaders/kiwi.c',
+
 	'partitions/msdos.c',
+
 	'config.c',
 	'console.c',
 	'disk.c',
@@ -35,13 +42,6 @@ sources = map(File, [
 	'video.c',
 ])
 
-# Sources to use from the kernel.
-ksources = map(lambda x: File('../kernel/%s' % x), [
-	'lib/printf.c',
-	'lib/qsort.c',
-	'lib/string.c',
-])
-
 ############################
 # Build environment set-up #
 ############################
@@ -53,9 +53,6 @@ env = envmgr.Create('boot', {
 		Dir('include'),
 		Dir('arch/%s/include' % (config['SRCARCH'])),
 		Dir('platform/%s/include' % (config['PLATFORM'])),
-		Dir('../kernel/include'),
-		Dir('../kernel/arch/%s/include' % (config['SRCARCH'])),
-		Dir('../kernel/platform/%s/include' % (config['PLATFORM'])),
 	],
 	'CCFLAGS': [
 		'-nostdlib', '-nostdinc', '-ffreestanding',
@@ -79,10 +76,13 @@ env = envmgr.Create('boot', {
 })
 
 # Override any optimisation level specified, we want to optimise for size.
-for flag in env['CCFLAGS']:
-	if flag[0:2] == '-O':
-		env['CCFLAGS'].remove(flag)
-env['CCFLAGS'] += ['-Os']
+env['CCFLAGS'] = filter(lambda f: f[0:2] != '-O', env['CCFLAGS']) + ['-Os']
+
+# Add the GCC include directory for some standard headers.
+from subprocess import Popen, PIPE
+incdir = Popen([env['CC'], '-print-file-name=include'], stdout=PIPE).communicate()[0].strip()
+env['CCFLAGS'] += ['-isystem', incdir]
+env['ASFLAGS'] += ['-isystem', incdir]
 
 # Let the distribution environment know where the loader is.
 envmgr['dist']['LOADER'] = File('loader')
@@ -92,13 +92,8 @@ arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
 platform_sources = SConscript(dirs=['platform/' + config['PLATFORM']], exports=['env'])
 sources = arch_sources + platform_sources + sources
 
-# Perform some black magic to make the object files built from kernel sources
-# have an alternative file name to not conflict.
-kobjects = map(lambda x: env.Object(target='%s.o' % (x.name), source = x), ksources)
-objects = map(env.Object, sources) + kobjects
-
 # Link the bootloader.
-env.Program('loader.elf', objects, LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+env.Program('loader.elf', map(env.Object, sources), LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('loader.elf', env['LDSCRIPT'])
 
 # Generate various information files and the stripped boot loader image.
