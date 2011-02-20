@@ -313,19 +313,19 @@ static void iso9660_close(fs_handle_t *handle) {
 /** Read from an ISO9660 handle.
  * @param handle	Handle to read from.
  * @param buf		Buffer to read into.
- * @param size		Size to read.
+ * @param count		Number of bytes to read.
  * @param offset	Offset to read from.
  * @return		Whether the read succeeded. */
-static bool iso9660_read(fs_handle_t *handle, void *buf, size_t size, offset_t offset) {
+static bool iso9660_read(fs_handle_t *handle, void *buf, size_t count, offset_t offset) {
 	iso9660_handle_t *data = handle->data;
 
-	if(!size || offset >= data->data_len) {
-		return 0;
-	} else if((offset + size) > data->data_len) {
-		return 0;
+	if(!count || offset >= data->data_len) {
+		return false;
+	} else if((offset + count) > data->data_len) {
+		return false;
 	}
 
-	return disk_read(handle->mount->disk, buf, size, (data->extent * ISO9660_BLOCK_SIZE) + offset);
+	return disk_read(handle->mount->disk, buf, count, (data->extent * ISO9660_BLOCK_SIZE) + offset);
 }
 
 /** Get the size of an ISO9660 file.
