@@ -268,7 +268,16 @@ static __init_text void load_modules(void) {
 	}
 }
 
-/** Second-stage intialization thread.8
+/** Boot secondary CPUs. */
+static __init_text void smp_boot(void) {
+	cpu_id_t i;
+
+	for(i = 0; i <= highest_cpu_id; i++) {
+		cpu_boot(cpus[i]);
+	}
+}
+
+/** Second-stage intialization thread.
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
@@ -276,6 +285,13 @@ static void init_thread(void *arg1, void *arg2) {
 	initcall_t *initcall;
 	boot_module_t *mod;
 	status_t ret;
+
+	/* Bring up all detected secondary CPUs. */
+	smp_boot();
+	kprintf(LOG_NORMAL, "cpu: detected %zu CPU(s):\n", cpu_count);
+	LIST_FOREACH(&running_cpus, iter) {
+		cpu_dump(list_entry(iter, cpu_t, header));
+	}
 
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
@@ -372,6 +388,7 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Initialise kernel memory management subsystems. */
 	security_init();
+	time_init();
 	vmem_early_init();
 	kheap_early_init();
 	page_init();
@@ -393,12 +410,14 @@ static __init_text void kmain_bsp_bottom(void) {
 	kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
 	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
-	/* Perform other initialisation tasks. */
-	symbol_init();
-	time_init();
+
+	/* Properly initialise the CPU subsystem, and detect other CPUs. */
 	cpu_init();
 	slab_late_init();
 	ipi_init();
+
+	/* Perform other initialisation tasks. */
+	symbol_init();
 	handle_init();
 	session_init();
 	process_init();

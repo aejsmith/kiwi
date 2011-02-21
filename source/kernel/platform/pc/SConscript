@@ -15,12 +15,14 @@
 #
 
 sources = map(File, [
+	'acpi.c',
 	'console.c',
 	'kdbg.c',
 	'pic.c',
 	'pit.c',
 	'platform.c',
 	'rtc.c',
+	'smp.c',
 ])
 
 Return('sources')

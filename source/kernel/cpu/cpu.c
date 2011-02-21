@@ -37,7 +37,9 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
+#include <kboot.h>
+
+KBOOT_BOOLEAN_OPTION("smp_disabled", "Disable SMP", false);
 
 /** Boot CPU structure. */
 cpu_t boot_cpu;
@@ -80,7 +82,6 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 	cpu_t *cpu;
 
 	assert(cpus);
-	assert(!cpus[id]);
 
 	cpu = kmalloc(sizeof(*cpu), MM_FATAL);
 	cpu_register_internal(cpu, id, state);
@@ -93,7 +94,9 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
                 highest_cpu_id = id;
         }
 
+	assert(!cpus[id]);
 	cpus[id] = cpu;
+	cpu_count++;
 	return cpu;
 }
 
@@ -106,6 +109,11 @@ __init_text void cpu_init(void) {
 	/* Create the initial CPU array and add the boot CPU to it. */
 	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
+
+	/* Detect secondary CPUs. */
+	if(!kboot_boolean_option("smp_disabled")) {
+		smp_detect();
+	}
 }
 
 /** Initialise the boot CPU structure. */

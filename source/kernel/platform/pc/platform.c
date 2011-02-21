@@ -25,6 +25,7 @@
 #include <x86/descriptor.h>
 #include <x86/lapic.h>
 
+#include <pc/acpi.h>
 #include <pc/pic.h>
 #include <pc/pit.h>
 
@@ -41,8 +42,8 @@ __init_text void platform_premm_init(void) {
 /** PC platform second stage initialisation.
  * @param args		Kernel arguments structure. */
 __init_text void platform_postmm_init(void) {
-	/* Initialise interrupt handling. */
 	pic_init();
+	acpi_init();
 
 	/* If the LAPIC is not available, we must use the PIT as the timer. */
 	if(!lapic_enabled()) {

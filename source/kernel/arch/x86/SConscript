@@ -25,6 +25,7 @@ sources = map(File, [
 	'kdbg.c',
 	'lapic.c',
 	'signal.c',
+	'smp.c',
 	'time.c',
 ])
 

@@ -74,10 +74,14 @@ extern void cpu_resume_all(void);
 extern void cpu_halt_all(void);
 
 extern cpu_id_t cpu_current_id(void);
+extern void cpu_boot(cpu_t *cpu);
+extern void cpu_dump(cpu_t *cpu);
 
 extern cpu_t *cpu_register(cpu_id_t id, int state);
 extern void cpu_init(void);
 extern void cpu_early_init(void);
+
+extern void smp_detect(void);
 
 extern int kdbg_cmd_cpus(int argc, char **argv);
 
