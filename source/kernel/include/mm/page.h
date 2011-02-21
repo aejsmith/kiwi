@@ -120,7 +120,7 @@ extern void page_stats_get(page_stats_t *stats);
 extern int kdbg_cmd_page(int argc, char **argv);
 
 extern void page_arch_init(struct kernel_args *args);
-extern void page_init(struct kernel_args *args);
+extern void page_init(void);
 extern void vm_page_init(void);
 extern void page_arch_late_init(void);
 extern void page_late_init(void);

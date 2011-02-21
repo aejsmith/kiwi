@@ -329,8 +329,17 @@ __init_text void kmain_bsp(phys_ptr_t tags) {
 
 /** Initialisation code for the boot CPU. */
 static __init_text void kmain_bsp_bottom(void) {
+	kboot_tag_core_t *core;
+
 	/* Bring up the debug console. */
 	console_early_init();
+
+	/* Verify that a core tag is available. */
+	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
+	if(!core) {
+		fatal("Not booted by a KBoot-compliant loader");
+	}
+	kboot_tag_release(core);
 
 	/* Perform early architecture/platform initialisation. */
 	cpu_early_init();
@@ -341,12 +350,13 @@ static __init_text void kmain_bsp_bottom(void) {
 	security_init();
 	vmem_early_init();
 	kheap_early_init();
+	page_init();
+	vmem_init();
+	slab_init();
+	kheap_init();
+	malloc_init();
 
 	kprintf(LOG_DEBUG, "Hello, World\n");
-
-	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, tag) {
-		kprintf(LOG_DEBUG, "Memory: 0x%" PRIpp " - 0x%" PRIpp "\n", tag->start, tag->end);
-	}
 	while(1);
 #if 0
 	thread_t *thread;

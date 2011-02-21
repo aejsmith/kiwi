@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -81,7 +81,7 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
+#include <kboot.h>
 #include <kdbg.h>
 #include <lrm.h>
 #include <status.h>
@@ -642,7 +642,7 @@ int kdbg_cmd_page(int argc, char **argv) {
  * @param start		Start of range.
  * @param end		End of range.
  * @param type		Type of range. */
-static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int type) {
+static __init_text void page_range_add(phys_ptr_t start, phys_ptr_t end, int type) {
 	if(page_range_count >= PAGE_RANGES_MAX) {
 		fatal("No free page range structures");
 	}
@@ -652,41 +652,43 @@ static void __init_text page_range_add(phys_ptr_t start, phys_ptr_t end, int typ
 	page_ranges[page_range_count].start = start;
 	page_ranges[page_range_count].end = end;
 	page_ranges[page_range_count].pages = NULL;
-	page_ranges[page_range_count].reclaim = (type == PHYS_MEMORY_RECLAIMABLE);
+	page_ranges[page_range_count].reclaim = (type == KBOOT_MEMORY_RECLAIMABLE);
 	page_range_count++;
 
 	/* If reclaimable, allocate the range to prevent it being allocated. */
-	if(type == PHYS_MEMORY_RECLAIMABLE || type == PHYS_MEMORY_ALLOCATED) {
+	if(type == KBOOT_MEMORY_RECLAIMABLE || type == KBOOT_MEMORY_ALLOCATED) {
 		vmem_xalloc(&page_arena, end - start, 0, 0, start, end, MM_FATAL);
 	}
 }
 
-/** Initialise the physical memory manager.
- * @param args		Kernel arguments. */
-void __init_text page_init(kernel_args_t *args) {
-	phys_ptr_t init_start, init_end, addr;
-	kernel_args_memory_t *range;
+/** Initialise the physical memory manager. */
+__init_text void page_init(void) {
+	phys_ptr_t init_start, init_end;
+	kboot_tag_core_t *core;
 
-	/* Work out the start and end of the .init section. */
-	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + args->kernel_phys;
-	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + args->kernel_phys;
-
-	/* Create the arena and populate it with detected ranges. */
+	/* Create the vmem arena for page allocations. */
 	vmem_early_create(&page_arena, "page_arena", PAGE_SIZE, RESOURCE_TYPE_MEMORY,
 	                  VMEM_REFILL, NULL, NULL, NULL, 0, 0, 0, MM_FATAL);
-	for(addr = args->phys_ranges; addr;) {
-		range = phys_map(addr, sizeof(*range), MM_FATAL);
+
+	/* Work out the start and end of the .init section. */
+	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
+	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + core->kernel_phys;
+	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + core->kernel_phys;
+	kboot_tag_release(core);
+
+	/* Iterate over all memory ranges provided by the loader. */
+	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
 		switch(range->type) {
-		case PHYS_MEMORY_FREE:
-		case PHYS_MEMORY_RECLAIMABLE:
+		case KBOOT_MEMORY_FREE:
+		case KBOOT_MEMORY_RECLAIMABLE:
 			page_range_add(range->start, range->end, range->type);
 			break;
-		case PHYS_MEMORY_ALLOCATED:
+		case KBOOT_MEMORY_ALLOCATED:
 			/* If this region contains the kernel, mark the part
 			 * containing the init region as reclaimable. */
 			if(init_start >= range->start && init_end <= range->end) {
 				page_range_add(range->start, init_start, range->type);
-				page_range_add(init_start, init_end, PHYS_MEMORY_RECLAIMABLE);
+				page_range_add(init_start, init_end, KBOOT_MEMORY_RECLAIMABLE);
 				page_range_add(init_end, range->end, range->type);
 			} else {
 				page_range_add(range->start, range->end, range->type);
@@ -696,18 +698,16 @@ void __init_text page_init(kernel_args_t *args) {
 			/* Don't care about non-usable ranges. */
 			break;
 		}
-
-		addr = range->next;
-		phys_unmap(range, sizeof(*range), true);
 	}
 
+	while(1);
 	/* Initialise architecture paging-related things. When this returns,
 	 * we should be on the kernel page map. */
-	page_arch_init(args);
+	//page_arch_init(args);
 }
 
 /** Set up structures for each usable page. */
-void __init_text vm_page_init(void) {
+__init_text void vm_page_init(void) {
 	size_t i, j, count, size;
 	phys_ptr_t phys;
 	status_t ret;
@@ -748,11 +748,15 @@ void __init_text vm_page_init(void) {
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */
-void __init_text page_late_init(void) {
+__init_text void page_late_init(void) {
 	size_t reclaimed = 0, size, i;
 
 	page_arch_late_init();
 
+	/* It's OK for us to reclaim despite the fact that this function is
+	 * contained in memory that will be reclaimed, as nothing should make
+	 * any allocations or write to reclaimed memory while this is
+	 * happening. */
 	for(i = 0; i < page_range_count; i++) {
 		if(page_ranges[i].reclaim) {
 			size = page_ranges[i].end - page_ranges[i].start;
