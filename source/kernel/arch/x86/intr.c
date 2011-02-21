@@ -216,7 +216,7 @@ static void page_fault(unative_t num, intr_frame_t *frame) {
 		ret = vm_fault(addr, reason, access);
 		if(ret == VM_FAULT_SUCCESS) {
 			return;
-		} else if(curr_thread->in_usermem) {
+		} else if(curr_thread && curr_thread->in_usermem) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			kdbg_enter(KDBG_ENTRY_USER, frame);
 			context_restore_frame(&curr_thread->usermem_context, frame);
