@@ -37,4 +37,7 @@ extern void kboot_tag_release(void *current);
 		_vname; \
 		_vname = kboot_tag_iterate((_type), _vname))
 
+extern bool kboot_boolean_option(const char *name);
+extern uint64_t kboot_integer_option(const char *name);
+
 #endif /* __KERNEL_KBOOT_H */

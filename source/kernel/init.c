@@ -44,6 +44,7 @@
 
 #include <security/context.h>
 
+#include <assert.h>
 #include <console.h>
 #include <dpc.h>
 #include <kboot.h>
@@ -125,9 +126,44 @@ __init_text void kboot_tag_release(void *current) {
 	phys_unmap(header, header->size, true);
 }
 
+/** Look up a KBoot option tag.
+ * @param name		Name to look up.
+ * @param type		Required option type.
+ * @return		Pointer to tag. Must be released. */
+static __init_text kboot_tag_option_t *lookup_option(const char *name, uint32_t type) {
+	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
+		if(strcmp(tag->name, name) == 0) {
+			if(tag->type != type) {
+				fatal("Boot option '%s' has incorrect type", name);
+			}
+			return tag;
+		}
+	}
+
+	fatal("Requested boot option '%s' not found", name);
+}
+
+/** Get the value of a KBoot boolean option.
+ * @param name		Name of the option.
+ * @return		Value of the option. */
+__init_text bool kboot_boolean_option(const char *name) {
+	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_BOOLEAN);
+	assert(tag->size == sizeof(bool));
+	return *(bool *)&tag[1];
+}
+
+/** Get the value of a KBoot integer option.
+ * @param name		Name of the option.
+ * @return		Value of the option. */
+__init_text uint64_t kboot_integer_option(const char *name) {
+	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_INTEGER);
+	assert(tag->size == sizeof(uint64_t));
+	return *(uint64_t *)&tag[1];
+}
+
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
-static void __init_text boot_module_remove(boot_module_t *mod) {
+static __init_text void boot_module_remove(boot_module_t *mod) {
 	list_remove(&mod->header);
 	if(mod->name) {
 		kfree(mod->name);
@@ -144,7 +180,7 @@ static void __init_text boot_module_remove(boot_module_t *mod) {
 /** Look up a kernel module in the boot module list.
  * @param name		Name to look for.
  * @return		Pointer to module if found, NULL if not. */
-static boot_module_t *boot_module_lookup(const char *name) {
+static __init_text boot_module_t *boot_module_lookup(const char *name) {
 	boot_module_t *mod;
 
 	LIST_FOREACH(&boot_module_list, iter) {
@@ -160,7 +196,7 @@ static boot_module_t *boot_module_lookup(const char *name) {
 
 /** Load a kernel module provided at boot.
  * @param mod		Module to load. */
-static void __init_text load_boot_kmod(boot_module_t *mod) {
+static __init_text void load_boot_kmod(boot_module_t *mod) {
 	char name[MODULE_NAME_MAX + 1];
 	boot_module_t *dep;
 	status_t ret;
@@ -232,7 +268,7 @@ static __init_text void load_modules(void) {
 	}
 }
 
-/** Second-stage intialization thread.
+/** Second-stage intialization thread.8
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
