@@ -359,6 +359,11 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Set up the console. */
 	console_init();
 	kprintf(LOG_NORMAL, "kernel: version %s booting...\n", kiwi_ver_string);
+
+	/* Perform second stage architecture/platform initialisation. */
+	arch_postmm_init();
+	platform_postmm_init();
+
 	while(1);
 #if 0
 	thread_t *thread;
@@ -389,10 +394,6 @@ static __init_text void kmain_bsp_bottom(void) {
 		console_init(args);
 		kprintf(LOG_NORMAL, "kernel: version %s booting (%" PRIu32 " CPU(s))\n",
 		        kiwi_ver_string, cpu_count);
-
-		/* Perform second stage architecture/platform initialisation. */
-		arch_postmm_init(args);
-		platform_postmm_init(args);
 
 #if CONFIG_DEBUGGER_DELAY > 0
 		/* Delay to allow GDB to be connected. */

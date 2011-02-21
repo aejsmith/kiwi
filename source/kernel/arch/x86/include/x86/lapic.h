@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +23,6 @@
 #define __X86_LAPIC_H
 
 #include <types.h>
-
-struct kernel_args;
 
 /** Local APIC register offsets. */
 #define LAPIC_REG_APIC_ID		8	/**< Local APIC ID. */
@@ -99,9 +97,10 @@ struct kernel_args;
 #define LAPIC_IPI_DEST_ALL		0x03	/**< All, excluding self. */
 #define LAPIC_IPI_DEST_ALL_INCL		0x02	/**< All, including self. */
 
+extern bool lapic_enabled(void);
 extern uint32_t lapic_id(void);
 extern void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector);
 
-extern void lapic_init(struct kernel_args *args);
+extern void lapic_init(void);
 
 #endif /* __X86_LAPIC_H */

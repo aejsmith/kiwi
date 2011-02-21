@@ -23,6 +23,7 @@
 #include <arch/io.h>
 
 #include <x86/descriptor.h>
+#include <x86/lapic.h>
 
 #include <pc/pic.h>
 #include <pc/pit.h>
@@ -33,16 +34,18 @@
 KBOOT_IMAGE(KBOOT_IMAGE_LFB);
 
 /** PC platform first stage initialisation. */
-void __init_text platform_premm_init(void) {
+__init_text void platform_premm_init(void) {
 	/* Nothing happens. */
 }
 
 /** PC platform second stage initialisation.
  * @param args		Kernel arguments structure. */
-void __init_text platform_postmm_init(kernel_args_t *args) {
-	/* Initialise interrupt handling and the timer. */
+__init_text void platform_postmm_init(void) {
+	/* Initialise interrupt handling. */
 	pic_init();
-	if(args->arch.lapic_disabled) {
+
+	/* If the LAPIC is not available, we must use the PIT as the timer. */
+	if(!lapic_enabled()) {
 		timer_device_set(&pit_timer_device);
 	}
 }

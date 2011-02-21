@@ -65,7 +65,7 @@ static __init_text int frequency_compare(const void *a, const void *b) {
 /** Calculate a frequency multiple times and get the median of the results.
  * @param func		Function to call to get a frequency.
  * @return		Median of the results. */
-static __init_text uint64_t calculate_frequency(uint64_t (*func)()) {
+__init_text uint64_t calculate_frequency(uint64_t (*func)()) {
 	uint64_t results[FREQUENCY_ATTEMPTS];
 	size_t i;
 

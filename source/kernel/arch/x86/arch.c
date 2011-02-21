@@ -39,9 +39,8 @@ __init_text void arch_premm_init(void) {
 	pat_init();
 }
 
-/** x86-specific second stage initialisation.
- * @param args		Kernel arguments structure. */
-__init_text void arch_postmm_init(kernel_args_t *args) {
+/** x86-specific second stage initialisation. */
+__init_text void arch_postmm_init(void) {
 #ifdef __x86_64__
 	syscall_arch_init();
 #else
@@ -50,7 +49,7 @@ __init_text void arch_postmm_init(kernel_args_t *args) {
 	 * bootloader. */
 	curr_cpu->arch.double_fault_tss.cr3 = x86_read_cr3();
 #endif
-	lapic_init(args);
+	lapic_init();
 }
 
 /** x86-specific initialisation for an AP.
@@ -59,7 +58,7 @@ __init_text void arch_postmm_init(kernel_args_t *args) {
 __init_text void arch_ap_init(kernel_args_t *args, cpu_t *cpu) {
 	descriptor_init(cpu);
 	pat_init();
-	lapic_init(args);
+	lapic_init();
 #ifdef __x86_64__
 	syscall_arch_init();
 #endif

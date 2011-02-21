@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 
 #include <arch/io.h>
 
+#include <x86/cpu.h>
 #include <x86/lapic.h>
 
 #include <cpu/cpu.h>
@@ -35,10 +36,16 @@
 #include <kdbg.h>
 #include <time.h>
 
+/** Frequency of the PIT. */
+#define PIT_FREQUENCY		1193182L
+
 extern void ipi_process_pending(void);
 
 /** Local APIC mapping. If NULL the LAPIC is not present. */
 static volatile uint32_t *lapic_mapping = NULL;
+
+/** Local APIC base address. */
+static phys_ptr_t lapic_base = 0;
 
 /** Read from a register in the current CPU's local APIC.
  * @param reg		Register to read from.
@@ -110,6 +117,12 @@ static void lapic_timer_handler(unative_t num, intr_frame_t *frame) {
 	lapic_eoi();
 }
 
+/** Return whether the LAPIC enabled.
+ * @return		Whether the LAPIC is enabled. */
+bool lapic_enabled(void) {
+	return lapic_mapping;
+}
+
 /** Get the current local APIC ID.
  * @return		Local APIC ID. */
 uint32_t lapic_id(void) {
@@ -158,21 +171,77 @@ void ipi_arch_interrupt(cpu_id_t dest) {
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
 }
 
-/** Initialise the local APIC on the current CPU.
- * @param args		Kernel arguments structure. */
-__init_text void lapic_init(kernel_args_t *args) {
-	/* Don't do anything if the bootloader did not detect an LAPIC or if
-	 * it was manually disabled. */
-	if(args->arch.lapic_disabled) {
+/** Function to calculate the LAPIC timer frequency.
+ * @return		Calculated frequency. */
+static __init_text uint64_t calculate_lapic_frequency(void) {
+	uint16_t shi, slo, ehi, elo, pticks;
+	uint64_t end, lticks;
+
+	/* First set the PIT to rate generator mode. */
+	out8(0x43, 0x34);
+	out8(0x40, 0xFF);
+	out8(0x40, 0xFF);
+
+	/* Wait for the cycle to begin. */
+	do {
+		out8(0x43, 0x00);
+		slo = in8(0x40);
+		shi = in8(0x40);
+	} while(shi != 0xFF);
+
+	/* Kick off the LAPIC timer. */
+	lapic_write(LAPIC_REG_TIMER_INITIAL, 0xFFFFFFFF);
+
+	/* Wait for the high byte to drop to 128. */
+	do {
+		out8(0x43, 0x00);
+		elo = in8(0x40);
+		ehi = in8(0x40);
+	} while(ehi > 0x80);
+
+	/* Get the current timer value. */
+	end = lapic_read(LAPIC_REG_TIMER_CURRENT);
+
+	/* Calculate the differences between the values. */
+	lticks = 0xFFFFFFFF - end;
+	pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
+
+	/* Calculate frequency. */
+	return (lticks * 8 * PIT_FREQUENCY) / pticks;
+}
+
+/** Initialise the local APIC on the current CPU. */
+__init_text void lapic_init(void) {
+	uint64_t base;
+
+	/* Check whether we have LAPIC support. */
+	if(!cpu_features.apic) {
 		return;
 	}
 
-	/* If the mapping has not been made, we're being run on the BSP. Create
-	 * it and register interrupt vector handlers. */
-	if(!lapic_mapping) {
-		lapic_mapping = phys_map(args->arch.lapic_address, PAGE_SIZE, MM_FATAL);
+	/* Get the base address of the LAPIC mapping. If bit 11 is 0, the LAPIC
+	 * is disabled. */
+	base = x86_read_msr(X86_MSR_APIC_BASE);
+	if(!(base & (1<<11))) {
+		return;
+	} else if(cpu_features.x2apic && base & (1<<10)) {
+		fatal("Cannot handle CPU %u in x2APIC mode", curr_cpu->id);
+	}
+	base &= 0xFFFFF000;
+
+	if(lapic_mapping) {
+		/* This is a secondary CPU. Ensure that the base address is
+		 * not different to the boot CPU's. */
+		if(base != lapic_base) {
+			fatal("CPU %u has different LAPIC address to boot CPU", curr_cpu->id);
+		}
+	} else {
+		/* This is the boot CPU. Map the LAPIC into virtual memory and
+		 * register interrupt vector handlers. */
+		lapic_base = base;
+		lapic_mapping = phys_map(base, PAGE_SIZE, MM_FATAL);
 		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIpp ", mapped to %p\n",
-		        args->arch.lapic_address, lapic_mapping);
+		        base, lapic_mapping);
 
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
@@ -184,13 +253,22 @@ __init_text void lapic_init(kernel_args_t *args) {
 	lapic_write(LAPIC_REG_SPURIOUS, LAPIC_VECT_SPURIOUS | (1<<8));
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
-	/* Accept all interrupts. */
-	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR & 0xFFFFFF00));
+	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU
+	 * in cpu_arch_init(), same applies here. */
+	if(strncmp(curr_cpu->arch.model_name, "QEMU", 4) != 0 || curr_cpu == &boot_cpu) {
+		curr_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
+	} else {
+		curr_cpu->arch.lapic_freq = boot_cpu.arch.lapic_freq;
+	}
 
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
-	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU %u is %u\n",
-	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv);
+	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
+	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
+	        curr_cpu->arch.lapic_freq / 1000000);
+
+	/* Accept all interrupts. */
+	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR & 0xFFFFFF00));
 
 	/* Set the timer device. */
 	timer_device_set(&lapic_timer_device);

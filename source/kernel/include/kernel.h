@@ -49,11 +49,11 @@ typedef void (*initcall_t)(void);
 	static ptr_t __initcall_##func __section(".init.initcalls") __used = (ptr_t)func
 
 extern void arch_premm_init(void);
-extern void arch_postmm_init(kernel_args_t *args);
+extern void arch_postmm_init(void);
 extern void arch_ap_init(kernel_args_t *args, struct cpu *cpu);
 
 extern void platform_premm_init(void);
-extern void platform_postmm_init(kernel_args_t *args);
+extern void platform_postmm_init(void);
 
 extern void platform_reboot(void);
 extern void platform_poweroff(void);
