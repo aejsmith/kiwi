@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,7 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
+#include <kboot.h>
 #include <kdbg.h>
 #include <kernel.h>
 #include <lrm.h>
@@ -61,12 +61,6 @@ extern status_t kern_fs_security(const char *path, bool follow, user_id_t *uidp,
                                  group_id_t *gidp, object_acl_t *aclp);
 static status_t dir_lookup(fs_node_t *node, const char *name, node_id_t *idp);
 static object_type_t file_object_type;
-
-/** Pointer to the boot FS UUID string. */
-static const char *boot_fs_uuid = NULL;
-
-/** Whether to force FS image usage. */
-static bool force_fsimage = false;
 
 /** List of registered FS types. */
 static LIST_DECLARE(fs_types);
@@ -2018,6 +2012,7 @@ static void free_mount_options(fs_mount_option_t *opts, size_t count) {
 /** Probe a device for filesystems.
  * @param device	Device to probe. */
 void fs_probe(device_t *device) {
+	kboot_tag_bootdev_t *bootdev;
 	object_handle_t *handle;
 	fs_type_t *type;
 	status_t ret;
@@ -2029,18 +2024,26 @@ void fs_probe(device_t *device) {
 
 	/* Only probe for the boot FS at the moment. TODO: Notifications for
 	 * filesystem detection. */
-	if(!root_mount && !force_fsimage) {
-		type = fs_type_probe(handle, boot_fs_uuid);
-		if(type) {
-			path = device_path(device);
-			ret = fs_mount(path, "/", type->name, NULL);
-			if(ret != STATUS_SUCCESS) {
-				fatal("Failed to mount boot filesystem (%d)", ret);
+	if(!root_mount) {
+		// FIXME force_fsimage option
+		/* If the root mount is not created, we're still OK to use
+		 * KBoot functions. Look for the boot device tag. */
+		bootdev = kboot_tag_iterate(KBOOT_TAG_BOOTDEV, NULL);
+		if(bootdev) {
+			type = fs_type_probe(handle, bootdev->uuid);
+			if(type) {
+				path = device_path(device);
+				ret = fs_mount(path, "/", type->name, NULL);
+				if(ret != STATUS_SUCCESS) {
+					fatal("Failed to mount boot filesystem (%d)", ret);
+				}
+
+				kprintf(LOG_NORMAL, "fs: mounted boot device %s:%s\n", type->name, path);
+				refcount_dec(&type->count);
+				kfree(path);
 			}
 
-			kprintf(LOG_NORMAL, "fs: mounted boot device %s:%s\n", type->name, path);
-			refcount_dec(&type->count);
-			kfree(path);
+			kboot_tag_release(bootdev);
 		}
 	}
 
@@ -2573,18 +2576,13 @@ int kdbg_cmd_node(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Initialise the filesystem layer.
- * @param args		Kernel arguments structure. */
-void __init_text fs_init(kernel_args_t *args) {
+/** Initialise the filesystem layer. */
+__init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
 	                                  NULL, NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Register the low resource handler. */
 	lrm_handler_register(&fs_lrm_handler);
-
-	/* Store the boot FS UUID for use by fs_probe(). */
-	boot_fs_uuid = args->boot_fs_uuid;
-	force_fsimage = args->force_fsimage;
 }
 
 /** Shut down the filesystem layer. */

@@ -245,16 +245,17 @@ static void __init_text load_modules(kernel_args_t *args) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
-	kprintf(LOG_NORMAL, "In init thread!\n");
 #if 0
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
+#endif
 	initcall_t *initcall;
+#if 0
 	boot_module_t *mod;
 	status_t ret;
-
+#endif
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
-	fs_init(args);
+	fs_init();
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -262,7 +263,7 @@ static void init_thread(void *arg1, void *arg2) {
 	}
 
 	console_update_boot_progress(10);
-
+#if 0
 	/* Load modules, then any FS images supplied. Wait until after loading
 	 * kernel modules to do FS images, so that we only load FS images if the
 	 * boot filesystem could not be mounted. */

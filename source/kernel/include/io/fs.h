@@ -35,7 +35,6 @@
 struct device;
 struct fs_mount;
 struct fs_node;
-struct kernel_args;
 struct vm_cache;
 
 /** Structure containing a filesystem mount option. */
@@ -337,7 +336,7 @@ extern int kdbg_cmd_node(int argc, char **argv);
  * Initialisation/shutdown functions.
  */
 
-extern void fs_init(struct kernel_args *args);
+extern void fs_init(void);
 extern void fs_shutdown(void);
 
 #endif /* __IO_FS_H */
