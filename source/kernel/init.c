@@ -76,6 +76,14 @@ static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
 /** Address of the KBoot tag list. */
 static phys_ptr_t kboot_tag_list __init_data;
 
+/** The amount to increment the boot progress for each module. */
+static int progress_per_module __init_data;
+static int current_init_progress __init_data = 10;
+
+/** List of modules/FS images from the loader. */
+static LIST_DECLARE(boot_module_list);
+static LIST_DECLARE(boot_fsimage_list);
+
 /** Iterate over the KBoot tag list.
  * @param type		Type of tag to iterate.
  * @param current	Pointer to current tag.
@@ -116,15 +124,6 @@ __init_text void kboot_tag_release(void *current) {
 	kboot_tag_t *header = current;
 	phys_unmap(header, header->size, true);
 }
-
-#if 0
-/** The amount to increment the boot progress for each module. */
-static int current_init_progress __init_data = 10;
-static int progress_per_module __init_data;
-
-/** List of modules/FS images from the bootloader. */
-static LIST_DECLARE(boot_module_list);
-static LIST_DECLARE(boot_fsimage_list);
 
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
@@ -185,33 +184,23 @@ static void __init_text load_boot_kmod(boot_module_t *mod) {
 	}
 }
 
-/** Load modules loaded by the bootloader.
- * @param args		Kernel arguments structure. */
-static void __init_text load_modules(kernel_args_t *args) {
-	kernel_args_module_t *amod;
+/** Load boot-time kernel modules. */
+static __init_text void load_modules(void) {
 	boot_module_t *mod;
-	phys_ptr_t addr;
+	size_t count = 0;
 	char *tmp;
 
-	if(!args->module_count) {
-		fatal("No modules were provided, cannot do anything!");
-	}
-
 	/* Firstly, populate our module list with the module details from the
-	 * bootloader. This is done so that it's much easier to look up module
+	 * loader. This is done so that it's much easier to look up module
 	 * dependencies, and also because the module loader requires handles
 	 * rather than a chunk of memory. */
-	for(addr = args->modules; addr;) {
-		amod = phys_map(addr, sizeof(kernel_args_module_t), MM_FATAL);
-
-		/* Create a structure for the module and map the data into
-		 * memory. */
+	KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
 		mod = kmalloc(sizeof(boot_module_t), MM_FATAL);
 		list_init(&mod->header);
 		mod->name = NULL;
-		mod->size = amod->size;
-		mod->mapping = phys_map(amod->base, mod->size, MM_FATAL);
-		mod->handle = file_from_memory(mod->mapping, mod->size);
+		mod->size = tag->size;
+		mod->mapping = phys_map(tag->addr, tag->size, MM_FATAL);
+		mod->handle = file_from_memory(mod->mapping, tag->size);
 
 		/* Figure out the module name, which is needed to resolve
 		 * dependencies. If unable to get the name, assume the module
@@ -225,13 +214,16 @@ static void __init_text load_modules(kernel_args_t *args) {
 			list_append(&boot_module_list, &mod->header);
 		}
 
-		addr = amod->next;
-		phys_unmap(amod, sizeof(kernel_args_module_t), true);
+		count++;
+	}
+
+	if(!count) {
+		fatal("No modules were provided, cannot do anything!");
 	}
 
 	/* Determine how much to increase the boot progress by for each
 	 * module loaded. */
-	progress_per_module = 80 / args->module_count;
+	progress_per_module = 80 / count;
 
 	/* Load all kernel modules. */
 	while(!list_empty(&boot_module_list)) {
@@ -239,7 +231,6 @@ static void __init_text load_modules(kernel_args_t *args) {
 		load_boot_kmod(mod);
 	}
 }
-#endif
 
 /** Second-stage intialization thread.
  * @param arg1		Unused.
@@ -249,10 +240,9 @@ static void init_thread(void *arg1, void *arg2) {
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 #endif
 	initcall_t *initcall;
-#if 0
 	boot_module_t *mod;
 	status_t ret;
-#endif
+
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
 	fs_init();
@@ -263,11 +253,11 @@ static void init_thread(void *arg1, void *arg2) {
 	}
 
 	console_update_boot_progress(10);
-#if 0
+
 	/* Load modules, then any FS images supplied. Wait until after loading
 	 * kernel modules to do FS images, so that we only load FS images if the
 	 * boot filesystem could not be mounted. */
-	load_modules(args);
+	load_modules();
 	if(!root_mount) {
 		if(list_empty(&boot_fsimage_list)) {
 			fatal("Could not find boot filesystem");
@@ -295,7 +285,7 @@ static void init_thread(void *arg1, void *arg2) {
 			boot_module_remove(mod);
 		}
 	}
-
+#if 0
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();
 
