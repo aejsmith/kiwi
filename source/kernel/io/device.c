@@ -257,6 +257,8 @@ fail:
  * @return		Status code describing result of the operation.
  */
 status_t device_alias(const char *name, device_t *parent, device_t *dest, device_t **devicep) {
+	object_security_t security;
+	object_acl_t acl;
 	device_t *device;
 
 	if(!name || strlen(name) >= DEVICE_NAME_MAX || !parent || !dest) {
@@ -275,8 +277,13 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 		return STATUS_ALREADY_EXISTS;
 	}
 
+	object_acl_init(&acl);
+	security.uid = 0;
+	security.gid = 0;
+	security.acl = &acl;
+
 	device = kmalloc(sizeof(device_t), MM_SLEEP);
-	object_init(&device->obj, NULL, NULL, NULL);
+	object_init(&device->obj, NULL, &security, NULL);
 	mutex_init(&device->lock, "device_alias_lock", 0);
 	refcount_set(&device->count, 0);
 	radix_tree_init(&device->children);
