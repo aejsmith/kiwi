@@ -356,7 +356,9 @@ static __init_text void kmain_bsp_bottom(void) {
 	kheap_init();
 	malloc_init();
 
-	kprintf(LOG_DEBUG, "Hello, World\n");
+	/* Set up the console. */
+	console_init();
+	kprintf(LOG_NORMAL, "kernel: version %s booting...\n", kiwi_ver_string);
 	while(1);
 #if 0
 	thread_t *thread;

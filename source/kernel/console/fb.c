@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,7 +28,7 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <kargs.h>
+#include <kboot.h>
 
 extern unsigned char console_font[];
 extern unsigned char logo_ppm[];
@@ -75,7 +75,7 @@ static char *fb_console_mapping = NULL;
 
 /** Backbuffer for the console. */
 static char *fb_console_buffer = NULL;
-
+#if 0
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.
  * @return		Address of next non-whitespace byte. */
@@ -114,7 +114,7 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
 	ppm = ppm_skip(ppm);
 	*heightp = strtoul((const char *)ppm, (char **)&ppm, 10);
 }
-
+#endif
 /** Draw a pixel to the framebuffer.
  * @param colour	RGB colour for pixel.
  * @param x		X position of pixel.
@@ -142,7 +142,7 @@ static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
 		break;
 	}
 }
-
+#if 0
 /** Draw a PPM image on the framebuffer.
  * @param ppm		Buffer containing PPM image.
  * @param x		X position of image.
@@ -184,7 +184,7 @@ static void fb_console_draw_ppm(unsigned char *ppm, uint16_t x, uint16_t y) {
 		}
 	}
 }
-
+#endif
 /** Draw a rectangle in a solid colour.
  * @param colour	Colour to draw in.
  * @param x		X position of rectangle.
@@ -344,16 +344,24 @@ void fb_console_reset(void) {
 	//spinlock_unlock(&fb_console_lock);
 }
 
-/** Initialise the framebuffer console.
- * @param args		Kernel arguments. */
-void __init_text console_init(kernel_args_t *args) {
-	uint16_t width, height;
+/** Initialise the framebuffer console. */
+__init_text void console_init(void) {
+	//uint16_t width, height;
+	kboot_tag_lfb_t *lfb;
 
-	/* Configure the console using information from the bootloader and
-	 * register it. */
-	fb_console_reconfigure(args->fb_width, args->fb_height, args->fb_depth, args->fb_addr);
+	/* Look up the KBoot framebuffer tag. */
+	lfb = kboot_tag_iterate(KBOOT_TAG_LFB, NULL);
+	if(!lfb) {
+		kprintf(LOG_WARN, "console: no framebuffer information provided by loader\n");
+		return;
+	}
+
+	/* Configure the framebuffer and register it. */
+	fb_console_reconfigure(lfb->width, lfb->height, lfb->depth, lfb->addr);
 	console_register(&fb_console);
 
+	kboot_tag_release(lfb);
+#if 0
 	if(!args->splash_disabled) {
 		fb_console.inhibited = true;
 		splash_enabled = true;
@@ -377,6 +385,7 @@ void __init_text console_init(kernel_args_t *args) {
 		/* Draw initial progress bar. */
 		console_update_boot_progress(0);
 	}
+#endif
 }
 
 /** Update the progress on the boot splash.

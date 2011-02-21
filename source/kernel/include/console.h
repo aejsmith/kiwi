@@ -44,8 +44,6 @@ typedef struct console {
 #define LOG_WARN	3		/**< Warning message. */
 #define LOG_NONE	4		/**< Do not log the message (for fatal/KDBG). */
 
-struct kernel_args;
-
 extern console_t fb_console;
 extern uint16_t fb_console_width;
 extern uint16_t fb_console_height;
@@ -65,7 +63,7 @@ extern void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t dept
 extern void fb_console_reset(void);
 
 extern void console_early_init(void);
-extern void console_init(struct kernel_args *args);
+extern void console_init(void);
 extern void console_update_boot_progress(int percent);
 
 #endif /* __CONSOLE_H */
