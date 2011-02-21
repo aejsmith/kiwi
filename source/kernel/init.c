@@ -76,6 +76,47 @@ static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
 /** Address of the KBoot tag list. */
 static phys_ptr_t kboot_tag_list __init_data;
 
+/** Iterate over the KBoot tag list.
+ * @param type		Type of tag to iterate.
+ * @param current	Pointer to current tag.
+ * @return		Virtual address of next tag, or NULL if no more tags
+ *			found. This memory must be unmapped after it has been
+ *			used. This will be done if it is passed as the current
+ *			argument to this function, or if it is passed to
+ *			kboot_tag_release(). */
+__init_text void *kboot_tag_iterate(uint32_t type, void *current) {
+	kboot_tag_t *header = current, *tmp;
+	phys_ptr_t next;
+
+	do {
+		/* Get the address of the next tag. */
+		if(header) {
+			next = header->next;
+			phys_unmap(header, header->size, true);
+		} else {
+			next = kboot_tag_list;
+		}
+		if(!next) {
+			return NULL;
+		}
+
+		/* First map with only the header size in order to get the full
+		 * size of the tag data. */
+		tmp = phys_map(next, sizeof(kboot_tag_t), MM_FATAL);
+		header = phys_map(next, tmp->size, MM_FATAL);
+		phys_unmap(tmp, sizeof(kboot_tag_t), true);
+	} while(header->type != type);
+
+	return header;
+}
+
+/** Unmap a KBoot tag.
+ * @param current	Address of tag to unmap. */
+__init_text void kboot_tag_release(void *current) {
+	kboot_tag_t *header = current;
+	phys_unmap(header, header->size, true);
+}
+
 #if 0
 /** The amount to increment the boot progress for each module. */
 static int current_init_progress __init_data = 10;
@@ -198,11 +239,14 @@ static void __init_text load_modules(kernel_args_t *args) {
 		load_boot_kmod(mod);
 	}
 }
+#endif
 
 /** Second-stage intialization thread.
- * @param args		Kernel arguments structure pointer.
- * @param arg2		Thread argument (unused). */
-static void init_thread(void *args, void *arg2) {
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void init_thread(void *arg1, void *arg2) {
+	kprintf(LOG_NORMAL, "In init thread!\n");
+#if 0
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
 	initcall_t *initcall;
 	boot_module_t *mod;
@@ -211,11 +255,6 @@ static void init_thread(void *args, void *arg2) {
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
 	fs_init(args);
-
-	/* Bring up secondary CPUs. The first rendezvous sets off their
-	 * initialisation, the second waits for them to complete. */
-	init_rendezvous(args, &init_rendezvous_2);
-	init_rendezvous(args, &init_rendezvous_3);
 
 	/* Call other initialisation functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
@@ -266,48 +305,7 @@ static void init_thread(void *args, void *arg2) {
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start service manager (%d)", ret);
 	}
-}
 #endif
-
-/** Iterate over the KBoot tag list.
- * @param type		Type of tag to iterate.
- * @param current	Pointer to current tag.
- * @return		Virtual address of next tag, or NULL if no more tags
- *			found. This memory must be unmapped after it has been
- *			used. This will be done if it is passed as the current
- *			argument to this function, or if it is passed to
- *			kboot_tag_release(). */
-__init_text void *kboot_tag_iterate(uint32_t type, void *current) {
-	kboot_tag_t *header = current, *tmp;
-	phys_ptr_t next;
-
-	do {
-		/* Get the address of the next tag. */
-		if(header) {
-			next = header->next;
-			phys_unmap(header, header->size, true);
-		} else {
-			next = kboot_tag_list;
-		}
-		if(!next) {
-			return NULL;
-		}
-
-		/* First map with only the header size in order to get the full
-		 * size of the tag data. */
-		tmp = phys_map(next, sizeof(kboot_tag_t), MM_FATAL);
-		header = phys_map(next, tmp->size, MM_FATAL);
-		phys_unmap(tmp, sizeof(kboot_tag_t), true);
-	} while(header->type != type);
-
-	return header;
-}
-
-/** Unmap a KBoot tag.
- * @param current	Address of tag to unmap. */
-__init_text void kboot_tag_release(void *current) {
-	kboot_tag_t *header = current;
-	phys_unmap(header, header->size, true);
 }
 
 /** Main entry point of the kernel.
@@ -330,6 +328,8 @@ __init_text void kmain_bsp(phys_ptr_t tags) {
 /** Initialisation code for the boot CPU. */
 static __init_text void kmain_bsp_bottom(void) {
 	kboot_tag_core_t *core;
+	thread_t *thread;
+	status_t ret;
 
 	/* Bring up the debug console. */
 	console_early_init();
@@ -364,94 +364,66 @@ static __init_text void kmain_bsp_bottom(void) {
 	arch_postmm_init();
 	platform_postmm_init();
 
-	while(1);
-#if 0
-	thread_t *thread;
-	status_t ret;
-
-	/* Wait for all CPUs to enter the kernel. */
-	init_rendezvous(args, &init_rendezvous_1);
-
-	if(id == args->boot_cpu) {
-		console_early_init();
-
-		/* Perform early architecture/platform initialisation. */
-		cpu_early_init(args);
-		arch_premm_init(args);
-		platform_premm_init(args);
-
-		/* Initialise kernel memory management subsystems. */
-		security_init();
-		vmem_early_init();
-		kheap_early_init();
-		page_init(args);
-		vmem_init();
-		slab_init();
-		kheap_init();
-		malloc_init();
-
-		/* Set up the console. */
-		console_init(args);
-		kprintf(LOG_NORMAL, "kernel: version %s booting (%" PRIu32 " CPU(s))\n",
-		        kiwi_ver_string, cpu_count);
-
 #if CONFIG_DEBUGGER_DELAY > 0
-		/* Delay to allow GDB to be connected. */
-		kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
-		spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
+	/* Delay to allow GDB to be connected. */
+	kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
+	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
-		/* Perform other initialisation tasks. */
-		symbol_init();
-		time_init();
-		cpu_init(args);
-		ipi_init();
-		handle_init();
-		session_init();
-		process_init();
-		thread_init();
-		sched_init();
-		thread_reaper_init();
-		dpc_init();
-		lrm_init();
+	/* Perform other initialisation tasks. */
+	symbol_init();
+	time_init();
+	cpu_init();
+	ipi_init();
+	handle_init();
+	session_init();
+	process_init();
+	thread_init();
+	sched_init();
+	thread_reaper_init();
+	dpc_init();
+	lrm_init();
 
-		/* Now that the scheduler is up, the vmem periodic maintenance
-		 * timer can be registered. */
-		vmem_late_init();
+	/* Now that the scheduler is up, the vmem periodic maintenance timer
+	 * can be registered. */
+	vmem_late_init();
 
-		/* Bring up the VM system. */
-		vm_init();
+	/* Bring up the VM system. */
+	vm_init();
 
-		/* Create the second stage initialisation thread. */
-		ret = thread_create("init", NULL, 0, init_thread, args, NULL, NULL, &thread);
-		if(ret != STATUS_SUCCESS) {
-			fatal("Could not create second-stage initialisation thread");
-		}
-		thread_run(thread);
-
-		/* Finally begin executing other threads. */
-		sched_enter();
-	} else {
-		/* Wait for the boot CPU to do its initialisation. */
-		init_rendezvous(args, &init_rendezvous_2);
-
-		spinlock_lock(&smp_boot_spinlock);
-
-		/* Switch to the kernel page map and do architecture-specific
-		 * initialisation of this CPU. */
-		page_map_switch(&kernel_page_map);
-		arch_ap_init(args, cpus[id]);
-
-		/* We're running, add ourselves to the running CPU list. */
-		list_append(&cpus_running, &curr_cpu->header);
-
-		/* Do scheduler initialisation. */
-		sched_init();
-
-		spinlock_unlock(&smp_boot_spinlock);
-
-		/* Perform the final rendezvous and then enter the scheduler. */
-		init_rendezvous(args, &init_rendezvous_3);
-		sched_enter();
+	/* Create the second stage initialisation thread. */
+	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, &thread);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create second-stage initialisation thread");
 	}
-#endif
+	thread_run(thread);
+
+	/* Finally begin executing other threads. */
+	sched_enter();
 }
+
+#if 0
+/** Kernel entry point for a secondary CPU. */
+__init_text void kmain_ap(void) {
+	/* Wait for the boot CPU to do its initialisation. */
+	init_rendezvous(args, &init_rendezvous_2);
+
+	spinlock_lock(&smp_boot_spinlock);
+
+	/* Switch to the kernel page map and do architecture-specific
+	 * initialisation of this CPU. */
+	page_map_switch(&kernel_page_map);
+	arch_ap_init(args, cpus[id]);
+
+	/* We're running, add ourselves to the running CPU list. */
+	list_append(&cpus_running, &curr_cpu->header);
+
+	/* Do scheduler initialisation. */
+	sched_init();
+
+	spinlock_unlock(&smp_boot_spinlock);
+
+	/* Perform the final rendezvous and then enter the scheduler. */
+	init_rendezvous(args, &init_rendezvous_3);
+	sched_enter();
+}
+#endif
