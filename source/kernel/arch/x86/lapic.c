@@ -32,9 +32,11 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
+#include <kboot.h>
 #include <kdbg.h>
 #include <time.h>
+
+KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage (disables SMP)", false);
 
 /** Frequency of the PIT. */
 #define PIT_FREQUENCY		1193182L
@@ -214,8 +216,9 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
 __init_text void lapic_init(void) {
 	uint64_t base;
 
-	/* Check whether we have LAPIC support. */
-	if(!cpu_features.apic) {
+	/* Don't do anything if we don't have LAPIC support or have been asked
+	 * not to use the LAPIC. */
+	if(!cpu_features.apic || kboot_boolean_option("lapic_disabled")) {
 		return;
 	}
 
