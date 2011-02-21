@@ -236,9 +236,7 @@ static __init_text void load_modules(void) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void init_thread(void *arg1, void *arg2) {
-#if 0
 	const char *pargs[] = { "/system/services/svcmgr", NULL }, *penv[] = { NULL };
-#endif
 	initcall_t *initcall;
 	boot_module_t *mod;
 	status_t ret;
@@ -285,7 +283,7 @@ static void init_thread(void *arg1, void *arg2) {
 			boot_module_remove(mod);
 		}
 	}
-#if 0
+
 	/* Reclaim memory taken up by initialisation code/data. */
 	page_late_init();
 
@@ -296,7 +294,6 @@ static void init_thread(void *arg1, void *arg2) {
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start service manager (%d)", ret);
 	}
-#endif
 }
 
 /** Main entry point of the kernel.
