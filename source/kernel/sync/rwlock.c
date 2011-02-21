@@ -95,7 +95,6 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	bool state = intr_disable();
 
-	curr_thread->rwlock_writer = false;
 	spinlock_lock_ni(&lock->queue.lock);
 
 	if(lock->held) {
@@ -105,6 +104,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 		if(!lock->readers || !list_empty(&lock->queue.threads)) {
 			/* Readers count will have been incremented for us
 			 * upon success. */
+			curr_thread->rwlock_writer = false;
 			return waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
 		}
 	} else {
@@ -138,11 +138,11 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	status_t ret = STATUS_SUCCESS;
 	bool state = intr_disable();
 
-	curr_thread->rwlock_writer = true;
 	spinlock_lock_ni(&lock->queue.lock);
 
 	/* Just acquire the exclusive lock. */
 	if(lock->held) {
+		curr_thread->rwlock_writer = true;
 		ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
 		if(ret != STATUS_SUCCESS) {
 			/* Failed to acquire the lock. In this case, there may
