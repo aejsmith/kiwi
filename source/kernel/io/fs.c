@@ -49,6 +49,8 @@
 # define dprintf(fmt...)	
 #endif
 
+KBOOT_BOOLEAN_OPTION("force_fsimage", "Force filesystem image usage", false);
+
 /** Data for a file handle. */
 typedef struct file_handle {
 	mutex_t lock;			/**< Lock to protect offset. */
@@ -2024,8 +2026,7 @@ void fs_probe(device_t *device) {
 
 	/* Only probe for the boot FS at the moment. TODO: Notifications for
 	 * filesystem detection. */
-	if(!root_mount) {
-		// FIXME force_fsimage option
+	if(!root_mount && !kboot_boolean_option("force_fsimage")) {
 		/* If the root mount is not created, we're still OK to use
 		 * KBoot functions. Look for the boot device tag. */
 		bootdev = kboot_tag_iterate(KBOOT_TAG_BOOTDEV, NULL);
