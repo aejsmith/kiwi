@@ -30,6 +30,12 @@
 #include <console.h>
 #include <kboot.h>
 
+#if CONFIG_DEBUG
+KBOOT_BOOLEAN_OPTION("splash_disabled", "Disable splash screen", true);
+#else
+KBOOT_BOOLEAN_OPTION("splash_disabled", "Disable splash screen", false);
+#endif
+
 extern unsigned char console_font[];
 extern unsigned char logo_ppm[];
 extern unsigned char copyright_ppm[];
@@ -75,7 +81,7 @@ static char *fb_console_mapping = NULL;
 
 /** Backbuffer for the console. */
 static char *fb_console_buffer = NULL;
-#if 0
+
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.
  * @return		Address of next non-whitespace byte. */
@@ -114,7 +120,7 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
 	ppm = ppm_skip(ppm);
 	*heightp = strtoul((const char *)ppm, (char **)&ppm, 10);
 }
-#endif
+
 /** Draw a pixel to the framebuffer.
  * @param colour	RGB colour for pixel.
  * @param x		X position of pixel.
@@ -142,7 +148,7 @@ static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
 		break;
 	}
 }
-#if 0
+
 /** Draw a PPM image on the framebuffer.
  * @param ppm		Buffer containing PPM image.
  * @param x		X position of image.
@@ -184,7 +190,7 @@ static void fb_console_draw_ppm(unsigned char *ppm, uint16_t x, uint16_t y) {
 		}
 	}
 }
-#endif
+
 /** Draw a rectangle in a solid colour.
  * @param colour	Colour to draw in.
  * @param x		X position of rectangle.
@@ -346,7 +352,7 @@ void fb_console_reset(void) {
 
 /** Initialise the framebuffer console. */
 __init_text void console_init(void) {
-	//uint16_t width, height;
+	uint16_t width, height;
 	kboot_tag_lfb_t *lfb;
 
 	/* Look up the KBoot framebuffer tag. */
@@ -361,8 +367,8 @@ __init_text void console_init(void) {
 	console_register(&fb_console);
 
 	kboot_tag_release(lfb);
-#if 0
-	if(!args->splash_disabled) {
+
+	if(!kboot_boolean_option("splash_disabled")) {
 		fb_console.inhibited = true;
 		splash_enabled = true;
 
@@ -385,7 +391,6 @@ __init_text void console_init(void) {
 		/* Draw initial progress bar. */
 		console_update_boot_progress(0);
 	}
-#endif
 }
 
 /** Update the progress on the boot splash.
