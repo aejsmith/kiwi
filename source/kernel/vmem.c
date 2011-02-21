@@ -625,9 +625,9 @@ static void vmem_unimport(vmem_t *vmem, vmem_btag_t *span) {
 
 	mutex_lock(&vmem->lock);
 
-	vmem_btag_free(span);
 	dprintf("vmem: unimported span [0x%" PRIx64 ", 0x%" PRIx64 ") (vmem: %s, source: %s)\n",
-		base, base + size, vmem->name, vmem->source->name);
+		span->base, span->base + span->size, vmem->name, vmem->source->name);
+	vmem_btag_free(span);
 }
 
 /** Allocate a segment from a vmem arena.
