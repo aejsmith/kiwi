@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,7 @@
 #include <sync/mutex.h>
 
 struct vmem;
-struct slab_magazine;
+struct slab_percpu;
 struct slab_bufctl;
 
 /** Allocator limitations/settings. */
@@ -49,14 +49,10 @@ typedef void (*slab_ctor_t)(void *obj, void *data);
 /** Slab destructor callback function. */
 typedef void (*slab_dtor_t)(void *obj, void *data);
 
-/** Slab CPU cache structure. */
-typedef struct slab_cpu_cache {
-	struct slab_magazine *loaded;		/**< Current (loaded) magazine. */
-	struct slab_magazine *previous;		/**< Previous magazine. */
-} __cacheline_aligned slab_cpu_cache_t;
-
 /** Slab cache structure. */
 typedef struct slab_cache {
+	struct slab_percpu *cpu_caches;		/**< Per-CPU caches. */
+
 	/** Magazine depot structures. */
 	mutex_t depot_lock;			/**< Magazine depot lock. */
 	list_t magazine_full;			/**< List of full magazines. */
@@ -96,19 +92,13 @@ typedef struct slab_cache {
 	/** Debugging information. */
 	list_t header;				/**< List to slab cache list. */
 	char name[SLAB_NAME_MAX];		/**< Name of cache. */
-
-	/** Per-CPU caches.
-	 * @note		These will be allocated onto the end of the
-	 *			structure as necessary. They will be correctly
-	 *			aligned to a cacheline boundary to prevent
-	 *			sharing between CPUs. */
-	slab_cpu_cache_t cpu_caches[];
 } __cacheline_aligned slab_cache_t;
 
 /** Slab cache flags. */
 #define SLAB_CACHE_NOMAG	(1<<0)		/**< Disable the magazine layer. */
 #define SLAB_CACHE_NOTOUCH	(1<<1)		/**< Always store metadata outside of allocated memory. */
 #define SLAB_CACHE_QCACHE	(1<<2)		/**< Cache is serving as a quantum cache for its source. */
+#define SLAB_CACHE_LATEMAG	(1<<3)		/**< Internal, do not set. */
 
 extern void *slab_cache_alloc(slab_cache_t *cache, int kmflag);
 extern void slab_cache_free(slab_cache_t *cache, void *obj);
@@ -125,5 +115,6 @@ extern void slab_cache_destroy(slab_cache_t *cache);
 extern int kdbg_cmd_slab(int argc, char **argv);
 
 extern void slab_init(void);
+extern void slab_late_init(void);
 
 #endif /* __MM_SLAB_H */

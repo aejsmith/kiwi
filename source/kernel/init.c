@@ -397,6 +397,7 @@ static __init_text void kmain_bsp_bottom(void) {
 	symbol_init();
 	time_init();
 	cpu_init();
+	slab_late_init();
 	ipi_init();
 	handle_init();
 	session_init();
