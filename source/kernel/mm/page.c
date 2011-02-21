@@ -700,10 +700,9 @@ __init_text void page_init(void) {
 		}
 	}
 
-	while(1);
 	/* Initialise architecture paging-related things. When this returns,
 	 * we should be on the kernel page map. */
-	//page_arch_init(args);
+	page_arch_init();
 }
 
 /** Set up structures for each usable page. */
@@ -750,8 +749,6 @@ __init_text void vm_page_init(void) {
 /** Reclaim memory no longer in use after kernel initialisation. */
 __init_text void page_late_init(void) {
 	size_t reclaimed = 0, size, i;
-
-	page_arch_late_init();
 
 	/* It's OK for us to reclaim despite the fact that this function is
 	 * contained in memory that will be reclaimed, as nothing should make

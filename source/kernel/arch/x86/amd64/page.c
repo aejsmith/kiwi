@@ -39,7 +39,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
 #include <kboot.h>
 #include <status.h>
 
@@ -629,14 +628,14 @@ void phys_unmap(void *addr, size_t size, bool shared) {
 }
 
 /** Map part of the kernel into the kernel page map.
- * @param args		Kernel arguments pointer.
+ * @param core		KBoot core tag pointer.
  * @param start		Start of range to map.
  * @param end		End of range to map.
  * @param write		Whether to mark as writable.
  * @param exec		Whether to mark as executable. */
-static __init_text void page_map_kernel_range(kernel_args_t *args, ptr_t start, ptr_t end,
+static __init_text void page_map_kernel_range(kboot_tag_core_t *core, ptr_t start, ptr_t end,
                                               bool write, bool exec) {
-	phys_ptr_t phys = (start - KERNEL_VIRT_BASE) + args->kernel_phys;
+	phys_ptr_t phys = (start - KERNEL_VIRT_BASE) + core->kernel_phys;
 	size_t i;
 
 	assert(start >= KERNEL_VIRT_BASE);
@@ -651,11 +650,11 @@ static __init_text void page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 	        start, end, phys, phys + (end - start), write, exec);
 }
 
-/** Perform AMD64 paging initialisation.
- * @param args		Kernel arguments pointer. */
-__init_text void page_arch_init(kernel_args_t *args) {
-	uint64_t *pml4, *bpml4, *pdir;
+/** Perform AMD64 paging initialisation. */
+__init_text void page_arch_init(void) {
+	kboot_tag_core_t *core;
 	phys_ptr_t i, j;
+	uint64_t *pdir;
 
 	/* Initialise the kernel page map structure. */
 	mutex_init(&kernel_page_map.lock, "page_map_lock", MUTEX_RECURSIVE);
@@ -663,15 +662,21 @@ __init_text void page_arch_init(kernel_args_t *args) {
 	kernel_page_map.cr3 = page_structure_alloc(MM_FATAL);
 	page_map_lock(&kernel_page_map);
 
+	/* We require the core tag to get the kernel physical address. */
+	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
+	assert(core);
+
 	/* Map the kernel in. The following mappings are made:
 	 *  .text      - R/X
 	 *  .init      - R/W/X
 	 *  .rodata    - R
 	 *  .data/.bss - R/W */
-	page_map_kernel_range(args, ROUND_DOWN((ptr_t)__text_start, PAGE_SIZE), (ptr_t)__text_end, false, true);
-	page_map_kernel_range(args, (ptr_t)__init_start, (ptr_t)__init_end, true, true);
-	page_map_kernel_range(args, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
-	page_map_kernel_range(args, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
+	page_map_kernel_range(core, ROUND_DOWN((ptr_t)__text_start, PAGE_SIZE), (ptr_t)__text_end, false, true);
+	page_map_kernel_range(core, (ptr_t)__init_start, (ptr_t)__init_end, true, true);
+	page_map_kernel_range(core, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
+	page_map_kernel_range(core, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
+
+	kboot_tag_release(core);
 
 	/* Create 8GB of physical mapping for now. FIXME: Map up to the highest
 	 * available physical address. */
@@ -682,42 +687,12 @@ __init_text void page_arch_init(kernel_args_t *args) {
 		}
 	}
 
-	/* The temporary identity mapping is still required as all the CPUs'
-	 * stack pointers are in it, and the kernel arguments pointer points to
-	 * it. Use the structures from the bootloader rather than just using
-	 * the new kernel PDP because the kernel PDP has the global flag set
-	 * on all pages, which makes invalidating the TLB entries difficult
-	 * when removing the mapping. */
-	pml4 = page_structure_map(kernel_page_map.cr3);
-	bpml4 = page_structure_map(x86_read_cr3() & PHYS_PAGE_MASK);
-	pml4[0] = bpml4[0];
-
 	page_map_unlock(&kernel_page_map);
 	dprintf("page: initialised kernel page map (pml4: 0x%" PRIpp ")\n",
 	        kernel_page_map.cr3);
 
 	/* Switch to the kernel page map. */
 	page_map_switch(&kernel_page_map);
-}
-
-/** TLB flush IPI handler.
- * @return		Always returns STATUS_SUCCESS. */
-static __init_text status_t tlb_flush_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
-	x86_write_cr3(x86_read_cr3());
-	return STATUS_SUCCESS;
-}
-
-/** Perform late AMD64 paging initialisation. */
-__init_text void page_arch_late_init(void) {
-	uint64_t *pml4;
-
-	/* All of the CPUs have been booted and have new stacks, and the kernel
-	 * arguments are no longer required. Remove the temporary identity
-	 * mapping and flush the TLB on all CPUs. */
-	pml4 = page_structure_map(kernel_page_map.cr3);
-	pml4[0] = 0;
-	x86_write_cr3(x86_read_cr3());
-	ipi_broadcast(tlb_flush_ipi, 0, 0, 0, 0, IPI_SEND_SYNC);
 }
 
 /** Get a PAT entry. */
