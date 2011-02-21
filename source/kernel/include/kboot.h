@@ -16,12 +16,25 @@
 
 /**
  * @file
- * @brief		KBoot helper macros.
+ * @brief		KBoot utility functions.
+ *
+ * @warning		These functions are only available during kernel
+ *			initialisation. The memory they occupy is freed during
+ *			boot memory reclaim.
  */
 
 #ifndef __KERNEL_KBOOT_H
 #define __KERNEL_KBOOT_H
 
 #include "../../boot/include/kboot.h"
+
+extern void *kboot_tag_iterate(uint32_t type, void *current);
+extern void kboot_tag_release(void *current);
+
+/** Iterate over the KBoot tag list. */
+#define KBOOT_ITERATE(_type, _vtype, _vname) \
+	for(_vtype *_vname = kboot_tag_iterate((_type), NULL); \
+		_vname; \
+		_vname = kboot_tag_iterate((_type), _vname))
 
 #endif /* __KERNEL_KBOOT_H */

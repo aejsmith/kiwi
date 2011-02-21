@@ -74,7 +74,7 @@ static void kmain_bsp_bottom(void);
 static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
 
 /** Address of the KBoot tag list. */
-phys_ptr_t kboot_tag_list __init_data;
+static phys_ptr_t kboot_tag_list __init_data;
 
 #if 0
 /** The amount to increment the boot progress for each module. */
@@ -269,6 +269,47 @@ static void init_thread(void *args, void *arg2) {
 }
 #endif
 
+/** Iterate over the KBoot tag list.
+ * @param type		Type of tag to iterate.
+ * @param current	Pointer to current tag.
+ * @return		Virtual address of next tag, or NULL if no more tags
+ *			found. This memory must be unmapped after it has been
+ *			used. This will be done if it is passed as the current
+ *			argument to this function, or if it is passed to
+ *			kboot_tag_release(). */
+__init_text void *kboot_tag_iterate(uint32_t type, void *current) {
+	kboot_tag_t *header = current, *tmp;
+	phys_ptr_t next;
+
+	do {
+		/* Get the address of the next tag. */
+		if(header) {
+			next = header->next;
+			phys_unmap(header, header->size, true);
+		} else {
+			next = kboot_tag_list;
+		}
+		if(!next) {
+			return NULL;
+		}
+
+		/* First map with only the header size in order to get the full
+		 * size of the tag data. */
+		tmp = phys_map(next, sizeof(kboot_tag_t), MM_FATAL);
+		header = phys_map(next, tmp->size, MM_FATAL);
+		phys_unmap(tmp, sizeof(kboot_tag_t), true);
+	} while(header->type != type);
+
+	return header;
+}
+
+/** Unmap a KBoot tag.
+ * @param current	Address of tag to unmap. */
+__init_text void kboot_tag_release(void *current) {
+	kboot_tag_t *header = current;
+	phys_unmap(header, header->size, true);
+}
+
 /** Main entry point of the kernel.
  * @param tags		Physical address of KBoot tag list. */
 __init_text void kmain_bsp(phys_ptr_t tags) {
@@ -302,6 +343,10 @@ static __init_text void kmain_bsp_bottom(void) {
 	kheap_early_init();
 
 	kprintf(LOG_DEBUG, "Hello, World\n");
+
+	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, tag) {
+		kprintf(LOG_DEBUG, "Memory: 0x%" PRIpp " - 0x%" PRIpp "\n", tag->start, tag->end);
+	}
 	while(1);
 #if 0
 	thread_t *thread;
