@@ -293,5 +293,6 @@ void __init_text symbol_init(void) {
 	radix_tree_init(symbol_tree);
 
 	/* Publish the kernel symbol table in the tree. */
+	list_init(&kernel_symtab.header);
 	symbol_table_publish(&kernel_symtab);
 }
