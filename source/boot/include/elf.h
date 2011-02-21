@@ -83,7 +83,8 @@ extern bool elf_note_iterate(fs_handle_t *handle, elf_note_iterate_t cb, void *d
  * @param _bits		32 or 64.
  * @param _alignment	Alignment for physical memory allocations. */
 #define DEFINE_ELF_LOADER(_name, _bits, _alignment)	\
-	static inline void _name(fs_handle_t *handle, mmu_context_t *ctx, Elf##_bits##_Addr *entryp) { \
+	static inline void _name(fs_handle_t *handle, mmu_context_t *ctx, Elf##_bits##_Addr *entryp, \
+			phys_ptr_t *physp) { \
 		Elf##_bits##_Addr virt_base = 0, virt_end = 0; \
 		Elf##_bits##_Phdr *phdrs; \
 		Elf##_bits##_Ehdr ehdr; \
@@ -116,6 +117,7 @@ extern bool elf_note_iterate(fs_handle_t *handle, elf_note_iterate_t cb, void *d
 		phys = phys_memory_alloc(ROUND_UP(virt_end - virt_base, PAGE_SIZE), _alignment, false); \
 		dprintf("elf: loading kernel image to 0x%" PRIpp " (size: 0x%zx, align: 0x%zx)\n", \
 		        phys, (size_t)(virt_end - virt_base), _alignment); \
+		*physp = phys; \
 		\
 		for(i = 0; i < ehdr.e_phnum; i++) { \
 			if(phdrs[i].p_type != ELF_PT_LOAD) { \

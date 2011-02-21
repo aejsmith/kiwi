@@ -39,11 +39,19 @@ typedef struct kboot_tag {
 } __packed kboot_tag_t;
 
 /** Possible information tag types. */
-#define KBOOT_TAG_OPTION		0	/**< Kernel option. */
-#define KBOOT_TAG_MEMORY		1	/**< Physical memory range (at least 1 free range required). */
-#define KBOOT_TAG_MODULE		2	/**< Boot module. */
-#define KBOOT_TAG_BOOTDEV		3	/**< Boot device information. */
-#define KBOOT_TAG_LFB			4	/**< Linear framebuffer information. */
+#define KBOOT_TAG_CORE			1	/**< Core information tag (always present). */
+#define KBOOT_TAG_OPTION		2	/**< Kernel option. */
+#define KBOOT_TAG_MEMORY		3	/**< Physical memory range (at least 1 free range required). */
+#define KBOOT_TAG_MODULE		4	/**< Boot module. */
+#define KBOOT_TAG_BOOTDEV		5	/**< Boot device information. */
+#define KBOOT_TAG_LFB			6	/**< Linear framebuffer information. */
+
+/** Tag containing core information for the kernel. */
+typedef struct kboot_tag_core {
+	kboot_tag_t header;			/**< Tag header. */
+
+	phys_ptr_t kernel_phys;			/**< Physical address of the kernel image. */
+} __packed kboot_tag_core_t;
 
 /** Maximum length of fields in the option tag. */
 #define KBOOT_OPTION_NAME_LEN		32

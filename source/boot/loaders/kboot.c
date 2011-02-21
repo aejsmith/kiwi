@@ -54,7 +54,7 @@ typedef struct kboot_data {
 	mmu_context_t *mmu;		/**< MMU context. */
 } kboot_data_t;
 
-extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
+extern mmu_context_t *kboot_arch_load(fs_handle_t *handle, phys_ptr_t *physp);
 extern void kboot_arch_enter(mmu_context_t *ctx, phys_ptr_t tags) __noreturn;
 
 /** Add a tag to the tag list.
@@ -279,6 +279,7 @@ static bool set_options(elf_note_t *note, const char *name, void *desc, void *_d
 static __noreturn void kboot_loader_load(environ_t *env) {
 	kboot_data_t *data = loader_data_get(env);
 	kboot_tag_bootdev_t *bootdev;
+	kboot_tag_core_t *core;
 	phys_ptr_t addr;
 
 	/* We don't report these errors until the user actually tries to run a
@@ -289,9 +290,12 @@ static __noreturn void kboot_loader_load(environ_t *env) {
 		boot_error("Kernel is not a valid KBoot kernel");
 	}
 
+	/* Create the core information tag. */
+	core = allocate_tag(data, KBOOT_TAG_CORE, sizeof(*core));
+
 	/* Load the kernel image into memory. */
 	kprintf("Loading kernel...\n");
-	data->mmu = kboot_arch_load(data->kernel);
+	data->mmu = kboot_arch_load(data->kernel, &core->kernel_phys);
 
 	/* Record the boot device. */
 	bootdev = allocate_tag(data, KBOOT_TAG_BOOTDEV, sizeof(*bootdev));

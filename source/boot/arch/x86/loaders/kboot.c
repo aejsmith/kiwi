@@ -30,7 +30,7 @@
 #include <kboot.h>
 #include <loader.h>
 
-extern mmu_context_t *kboot_arch_load(fs_handle_t *handle);
+extern mmu_context_t *kboot_arch_load(fs_handle_t *handle, phys_ptr_t *physp);
 extern void kboot_arch_enter(mmu_context_t *ctx, phys_ptr_t tags) __noreturn;
 extern void kboot_arch_enter64(phys_ptr_t tags, ptr_t cr3, uint64_t entry) __noreturn;
 extern void kboot_arch_enter32(phys_ptr_t tags, ptr_t cr3, uint32_t entry) __noreturn;
@@ -65,8 +65,9 @@ static inline bool have_long_mode(void) {
 
 /** Load an AMD64 KBoot image into memory.
  * @param handle	Handle to image.
+ * @param physp		Where to store physical address of kernel image.
  * @return		Created MMU context for kernel. */
-static mmu_context_t *kboot_arch_load64(fs_handle_t *handle) {
+static mmu_context_t *kboot_arch_load64(fs_handle_t *handle, phys_ptr_t *physp) {
 	mmu_context_t *ctx;
 
 	/* Check for 64-bit support. */
@@ -78,7 +79,7 @@ static mmu_context_t *kboot_arch_load64(fs_handle_t *handle) {
 	ctx = mmu_create(true);
 
 	/* Load the kernel. */
-	load_elf64_kernel(handle, ctx, &kernel_entry64);
+	load_elf64_kernel(handle, ctx, &kernel_entry64, physp);
 	kernel_is_64bit = true;
 	dprintf("kboot: 64-bit kernel entry point is 0x%llx, CR3 is 0x%llx\n",
 	        kernel_entry64, ctx->cr3);
@@ -87,15 +88,16 @@ static mmu_context_t *kboot_arch_load64(fs_handle_t *handle) {
 
 /** Load an IA32 KBoot image into memory.
  * @param handle	Handle to image.
+ * @param physp		Where to store physical address of kernel image.
  * @return		Created MMU context for kernel. */
-static mmu_context_t *kboot_arch_load32(fs_handle_t *handle) {
+static mmu_context_t *kboot_arch_load32(fs_handle_t *handle, phys_ptr_t *physp) {
 	mmu_context_t *ctx;
 
 	/* Create the MMU context. */
 	ctx = mmu_create(false);
 
 	/* Load the kernel. */
-	load_elf32_kernel(handle, ctx, &kernel_entry32);
+	load_elf32_kernel(handle, ctx, &kernel_entry32, physp);
 	dprintf("kboot: 32-bit kernel entry point is 0x%lx, CR3 is 0x%llx\n",
 	        kernel_entry32, ctx->cr3);
 	return ctx;
@@ -103,8 +105,9 @@ static mmu_context_t *kboot_arch_load32(fs_handle_t *handle) {
 
 /** Load a KBoot image into memory.
  * @param handle	Handle to image.
+ * @param physp		Where to store physical address of kernel image.
  * @return		Created MMU context for kernel. */
-mmu_context_t *kboot_arch_load(fs_handle_t *handle) {
+mmu_context_t *kboot_arch_load(fs_handle_t *handle, phys_ptr_t *physp) {
 	mmu_context_t *ctx;
 	unative_t flags;
 
@@ -116,9 +119,9 @@ mmu_context_t *kboot_arch_load(fs_handle_t *handle) {
 	}
 
 	if(elf_check(handle, ELFCLASS64, ELF_EM_X86_64)) {
-		ctx = kboot_arch_load64(handle);
+		ctx = kboot_arch_load64(handle, physp);
 	} else if(elf_check(handle, ELFCLASS32, ELF_EM_386)) {
-		ctx = kboot_arch_load32(handle);
+		ctx = kboot_arch_load32(handle, physp);
 	} else {
 		boot_error("Kernel image is not for this architecture");
 	}
