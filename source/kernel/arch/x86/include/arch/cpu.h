@@ -169,7 +169,7 @@ typedef struct cpu_arch {
  * @return		Pointer to current CPU structure. */
 static inline struct cpu *cpu_get_pointer(void) {
 	ptr_t addr;
-	__asm__ volatile("mov %%gs:0, %0" : "=r"(addr));
+	__asm__("mov %%gs:0, %0" : "=r"(addr));
 	return (struct cpu *)addr;
 }
 
