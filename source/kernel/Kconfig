@@ -35,7 +35,7 @@ config KLOG_SIZE
 menu "Architecture options"
 ###########################
 
-if ARCH_AMD64 || ARCH_IA32
+if ARCH_X86
 source "source/kernel/arch/x86/Kconfig"
 endif
 

@@ -1,0 +1,99 @@
+#
+# Copyright (C) 2011 Alex Smith
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+choice
+	prompt "Architecture"
+	default ARCH_AMD64
+
+config ARCH_AMD64
+	bool "AMD64"
+	help
+	  Target the built system to 64-bit x86 processors.
+
+config ARCH_ARM
+	bool "ARM"
+	help
+	  Target the built system to ARM processors.
+
+config ARCH_IA32
+	bool "IA32"
+	help
+	  Target the built system to 32-bit x86 processors.
+
+endchoice
+
+config ARCH
+        string
+        default "amd64" if ARCH_AMD64
+        default "arm" if ARCH_ARM
+        default "ia32" if ARCH_IA32
+
+config SRCARCH
+	string
+	default "x86" if ARCH_AMD64 || ARCH_IA32
+	default ARCH
+
+############################
+# x86 configuration values #
+############################
+
+if ARCH_AMD64 || ARCH_IA32
+
+config TOOLCHAIN_TARGET
+	string
+	default "x86_64-kiwi" if ARCH_AMD64
+	default "i686-kiwi" if ARCH_IA32
+
+config ARCH_X86
+	def_bool y
+
+config ARCH_LITTLE_ENDIAN
+	def_bool y
+
+config ARCH_32BIT
+	def_bool ARCH_IA32
+
+config ARCH_64BIT
+	def_bool ARCH_AMD64
+
+config ARCH_CCFLAGS
+	string
+	default "-march=i686" if ARCH_IA32
+	default ""
+
+endif
+
+############################
+# ARM configuration values #
+############################
+
+if ARCH_ARM
+
+config TOOLCHAIN_TARGET
+	string
+	default "arm-kiwi"
+
+config ARCH_LITTLE_ENDIAN
+	def_bool y
+
+config ARCH_32BIT
+	def_bool y
+
+config ARCH_CCFLAGS
+	string
+	default "-Wno-psabi"
+
+endif

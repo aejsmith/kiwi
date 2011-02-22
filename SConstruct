@@ -14,6 +14,16 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+# TODO:
+#  - Eventually we should have separate build directories for each different
+#    target. We build stuff targeting the host system (build utilities), an
+#    architecture and a hardware platform (kernel and loader) and just an
+#    architecture (userspace, these are not platform-dependant). Separating
+#    these off into separate build directories would prevent unnecessary
+#    rebuilds, for example if the hardware platform was changed it would not be
+#    necessary to rebuild userspace. I'm not sure how to do this (or even if
+#    it's possible) with SCons.
+
 # Release information.
 version = {
 	'KIWI_VER_RELEASE': 0,
@@ -58,89 +68,16 @@ target_flags = {
 	'ASCOM': '$CC $_CCCOMCOM $ASFLAGS -c -o $TARGET $SOURCES',
 }
 
-# Architecture specific flags.
-arch_target_flags = {
-	'ia32': {
-		'CCFLAGS': ['-march=i686']
-	}
-}
-
 #########################
 # Internal build setup. #
 #########################
 
-import os
-import sys
-import SCons.Errors
-from utilities.toolchain import ToolchainManager
+import os, sys, SCons.Errors
+sys.path = [os.path.abspath(os.path.join('utilities', 'build'))] + sys.path
 
-# Class to parse a Kconfig configuration file.
-class ConfigParser(dict):
-	def __init__(self, path):
-		dict.__init__(self)
-
-		# Parse the configuration file. If it doesn't exist, just
-		# return - the dictionary will be empty so Configured() will
-		# return false.
-		try:
-			f = open(path, 'r')
-		except IOError:
-			return
-
-		# Read and parse the file contents. We return without adding
-		# any values if there is a parse error, this will cause
-		# Configured() to return false and require the user to reconfig.
-		lines = f.readlines()
-		f.close()
-		values = {}
-		for line in lines:
-			line = line.strip()
-
-			# Ignore blank lines or comments.
-			if not len(line) or line[0] == '#':
-				continue
-
-			# Split the line into key/value.
-			line = line.split('=', 1)
-			if len(line) != 2:
-				return
-			key = line[0].strip()
-			value = line[1].strip()
-			if len(key) < 8 or key[0:7] != 'CONFIG_' or not len(value):
-				return
-			key = line[0].strip()[7:]
-
-			# Work out the correct value.
-			if value == 'y':
-				value = True
-			elif value[0] == '"' and value[-1] == '"':
-				value = value[1:-1]
-			elif value[0:2] == '0x' and len(value) > 2:
-				value = int(value, 16)
-			elif value.isdigit():
-				value = int(value)
-			else:
-				print "Unrecognised value type: %s" % (value)
-				return
-
-			# Add it to the dictionary.
-			values[key] = value
-
-		# Everything was OK, add stuff into the real dictionary.
-		for (k, v) in values.items():
-			self[k] = v
-
-	# Get a configuration value. This returns None for any accesses to
-	# undefined keys.
-	def __getitem__(self, key):
-		try:
-			return dict.__getitem__(self, key)
-		except KeyError:
-			return None
-
-	# Check whether the build configuration exists.
-	def Configured(self):
-		return len(self) > 0
+import vcs
+from kconfig import ConfigParser
+from toolchain import ToolchainManager
 
 # Class for build environment management. Because we have several build
 # environments, this class acts like a dictionary of environments, and assists
@@ -245,15 +182,17 @@ class EnvironmentManager(dict):
 	# Create an environment for building for the target system. This
 	# requires that the configuration has been set up correctly.
 	def Create(self, name, flags=None):
-		assert self.config.Configured()
+		assert self.config.configured()
 
 		env = Environment(platform='posix', ENV=os.environ)
 		self._SetupEnvironment(env, target_flags)
-		if arch_target_flags.has_key(self.config['ARCH']):
-			self._MergeFlags(env, arch_target_flags[self.config['ARCH']])
 		self._MergeFlags(env, flags)
 
 		# Add in extra compilation flags from the configuration.
+		if self.config.has_key('ARCH_CCFLAGS'):
+			env['CCFLAGS'] += self.config['ARCH_CCFLAGS'].split()
+		if self.config.has_key('PLATFORM_CCFLAGS'):
+			env['CCFLAGS'] += self.config['PLATFORM_CCFLAGS'].split()
 		env['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()
 		env['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
 		env['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
@@ -306,12 +245,11 @@ def RequireTarget(target, error):
 		return
 	raise SCons.Errors.StopError(error)
 
-# If working from the Mercurial tree then set revision to the revision number.
-try:
-	from mercurial import ui, hg
-	version['KIWI_VER_REVISION'] = hg.repository(ui.ui(), '.')['tip'].rev()
-except:
-	pass
+# Change the Decider to MD5-timestamp to speed up the build a bit.
+Decider('MD5-timestamp')
+
+# Set revision to the VCS revision number.
+version['KIWI_VER_REVISION'] = vcs.revision_id()
 
 # Set the version string.
 version['KIWI_VER_STRING'] = '%d.%d.%d' % (
@@ -331,10 +269,10 @@ SConscript('utilities/SConscript', variant_dir=os.path.join('build', 'host'), ex
 
 # Add targets to run the configuration interface.
 env['ENV']['KERNELVERSION'] = version['KIWI_VER_STRING']
-Alias('config', env.ConfigMenu('config', ['Kconfig']))
+Alias('config', env.ConfigMenu('__config', ['Kconfig']))
 
 # Only do the rest of the build if the configuration exists.
-if config.Configured() and not 'config' in COMMAND_LINE_TARGETS:
+if config.configured() and not 'config' in COMMAND_LINE_TARGETS:
 	# Initialise the toolchain manager and add the toolchain build target.
 	toolchain = ToolchainManager(config)
 	Alias('toolchain', Command('__toolchain', [], Action(toolchain.update, None)))
@@ -347,6 +285,3 @@ if config.Configured() and not 'config' in COMMAND_LINE_TARGETS:
 else:
 	# Configuration does not exist. All we can do is configure.
 	RequireTarget('config', "Configuration missing or out of date. Please update using 'config' target.")
-
-# Change the Decider to MD5-timestamp to speed up the build a bit.
-Decider('MD5-timestamp')

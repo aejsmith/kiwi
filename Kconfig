@@ -90,43 +90,10 @@ config FORCE_VIDEO_MODE
 endmenu
 #######
 
-comment "Target system selection"
+comment "Target system "
 
-choice
-	prompt "Architecture"
-	default ARCH_X86
-
-config ARCH_AMD64
-	bool "AMD64"
-	help
-	  Target the built system to 64-bit x86 processors.
-
-config ARCH_IA32
-	bool "IA32"
-	help
-	  Target the built system to 32-bit x86 processors.
-
-endchoice
-
-config ARCH
-        string
-        default "amd64" if ARCH_AMD64
-        default "ia32" if ARCH_IA32
-
-choice
-	prompt "Platform"
-	default PLATFORM_PC if ARCH_AMD64 || ARCH_X86
-
-config PLATFORM_PC
-	bool "Standard PC"
-	help
-	  Target the built system to standard PCs (nearly all x86 computers).
-
-endchoice
-
-config PLATFORM
-        string
-        default "pc" if PLATFORM_PC
+source "config/Kconfig.arch"
+source "config/Kconfig.platform"
 
 comment "System configuration"
 
