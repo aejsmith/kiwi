@@ -278,6 +278,8 @@ static __init_text void smp_boot(void) {
 			cpu_boot(cpus[i]);
 		}
 	}
+
+	cpu_boot_wait = 2;
 }
 
 /** Second-stage intialization thread.
@@ -456,12 +458,19 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	page_map_switch(&kernel_page_map);
 	arch_ap_init(cpu);
 
+	/* Initialise the scheduler. */
+	sched_init();
+
 	/* Signal that we're up and add ourselves to the running CPU list. */
 	cpu->state = CPU_RUNNING;
 	list_append(&running_cpus, &curr_cpu->header);
 	cpu_boot_wait = 1;
 
-	/* Do scheduler initialisation and then begin scheduling threads. */
-	sched_init();
+	/* Wait for remaining CPUs to be brought up. */
+	while(cpu_boot_wait != 2) {
+		spin_loop_hint();
+	}
+
+	/* Begin scheduling threads. */
 	sched_enter();
 }
