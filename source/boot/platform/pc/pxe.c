@@ -177,7 +177,7 @@ static bool tftp_read(fs_handle_t *handle, void *buf, size_t count, offset_t off
 	/* If the current packet number is less than the start packet, seek to
 	 * the start packet. */
 	if(data->packet_number < start) {
-		for(i = 0; i < start; i++) {
+		for(i = data->packet_number; i < start; i++) {
 			if(!tftp_read_packet(data)) {
 				return false;
 			}
