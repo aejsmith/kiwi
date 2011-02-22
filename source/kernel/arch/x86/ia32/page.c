@@ -40,7 +40,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
 #include <status.h>
 
 #if CONFIG_PAGE_DEBUG

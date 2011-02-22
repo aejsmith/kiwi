@@ -33,7 +33,6 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kargs.h>
 #include <kdbg.h>
 
 /** Frequency of the PIT. */

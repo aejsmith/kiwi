@@ -32,7 +32,6 @@
 
 #include <sync/spinlock.h>
 
-struct kernel_args;
 struct page_queue;
 struct vm_amap;
 struct vm_cache;
