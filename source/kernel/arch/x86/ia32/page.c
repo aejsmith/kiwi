@@ -321,7 +321,7 @@ static void page_map_flush(page_map_t *map) {
 		/* TODO: Multicast. */
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
-			if(cpu == curr_cpu || map != cpu->aspace->pmap) {
+			if(cpu == curr_cpu || !cpu->aspace || map != cpu->aspace->pmap) {
 				continue;
 			}
 
