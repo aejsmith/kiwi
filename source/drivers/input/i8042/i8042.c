@@ -35,6 +35,7 @@
 
 #include <assert.h>
 #include <console.h>
+#include <dpc.h>
 #include <kdbg.h>
 #include <kernel.h>
 #include <module.h>
@@ -131,11 +132,11 @@ static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_
 		break;
 	case 61:
 		/* F3 - Reboot. */
-		system_shutdown(SHUTDOWN_REBOOT);
+		dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_REBOOT));
 		break;
 	case 62:
 		/* F4 - Shutdown. */
-		system_shutdown(SHUTDOWN_POWEROFF);
+		dpc_request((dpc_function_t)system_shutdown, (void *)((ptr_t)SHUTDOWN_POWEROFF));
 		break;
 	}
 
