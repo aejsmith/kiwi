@@ -19,10 +19,98 @@
  * @brief		x86 SMP boot code.
  */
 
+#include <arch/barrier.h>
+#include <arch/memory.h>
+
+#include <x86/lapic.h>
+
 #include <cpu/cpu.h>
+
+#include <lib/string.h>
+
+#include <mm/kheap.h>
+#include <mm/page.h>
+
+#include <assert.h>
+#include <console.h>
+#include <time.h>
+
+extern char __ap_trampoline_start[], __ap_trampoline_end[];
+extern void kmain_ap(cpu_t *cpu);
+
+/** Page reserved to copy the AP boostrap code to. */
+phys_ptr_t ap_bootstrap_page = 0;
 
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
 void cpu_boot(cpu_t *cpu) {
-	
+	page_map_t *pmap;
+	useconds_t delay;
+	void *mapping;
+
+	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
+	assert(lapic_enabled());
+	cpu_boot_wait = 0;
+
+	/* Allocate a double fault stack for the new CPU. This is also used as
+	 * the initial stack while initialising the AP, before it enters the
+	 * scheduler. */
+	cpu->arch.double_fault_stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
+
+	/* Create a temporary page map for the AP to use while booting. This is
+	 * necessary because the bootstrap code needs to be identity mapped
+	 * while it enables paging. */
+	pmap = page_map_create(MM_FATAL);
+	page_map_lock(pmap);
+	page_map_insert(pmap, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
+	page_map_unlock(pmap);
+
+	/* Copy the trampoline code to the page reserved by the paging
+	 * initialisation code. */
+	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
+	memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
+
+	/* Fill in details required by the bootstrap code. */
+#ifdef __x86_64__
+	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
+	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
+	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
+	*(uint32_t *)(mapping + 40) = (ptr_t)pmap->cr3;
+#else
+# error "FIXME"
+#endif
+	memory_barrier();
+	phys_unmap(mapping, PAGE_SIZE, true);
+
+	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
+	spin(10000);
+
+	/* Send a SIPI. The vector argument specifies where to look for the
+	 * bootstrap code, as the SIPI will start execution from 0x000VV000,
+	 * where VV is the vector specified in the IPI. We don't do what the
+	 * MP Specification says here because QEMU assumes that if a CPU is
+	 * halted (even by the 'hlt' instruction) then it can accept SIPIs.
+	 * If the CPU reaches the idle loop before the second SIPI is sent, it
+	 * will fault. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
+	spin(10000);
+
+	/* If the CPU is up, then return. */
+	if(cpu_boot_wait) {
+		return;
+	}
+
+	/* Send a second SIPI and then check in 10ms intervals to see if it
+	 * has booted. If it hasn't booted after 5 seconds, fail. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
+	for(delay = 0; delay < 5000000; delay += 10000) {
+		if(cpu_boot_wait) {
+			page_map_destroy(pmap);
+			return;
+		}
+		spin(10000);
+	}
+
+	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
 }

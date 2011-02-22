@@ -24,7 +24,6 @@
 
 #include <kernel/system.h>
 #include <lib/notifier.h>
-#include <kargs.h>
 
 struct cpu;
 struct intr_frame;
@@ -50,7 +49,7 @@ typedef void (*initcall_t)(void);
 
 extern void arch_premm_init(void);
 extern void arch_postmm_init(void);
-extern void arch_ap_init(kernel_args_t *args, struct cpu *cpu);
+extern void arch_ap_init(struct cpu *cpu);
 
 extern void platform_premm_init(void);
 extern void platform_postmm_init(void);

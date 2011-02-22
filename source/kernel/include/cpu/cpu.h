@@ -69,6 +69,8 @@ extern size_t cpu_count;
 extern list_t running_cpus;
 extern cpu_t **cpus;
 
+extern volatile int cpu_boot_wait;
+
 extern void cpu_pause_all(void);
 extern void cpu_resume_all(void);
 extern void cpu_halt_all(void);

@@ -53,10 +53,9 @@ __init_text void arch_postmm_init(void) {
 }
 
 /** x86-specific initialisation for an AP.
- * @param args		Kernel arguments structure.
  * @param cpu		CPU structure for the AP. */
-__init_text void arch_ap_init(kernel_args_t *args, cpu_t *cpu) {
-	descriptor_init(cpu);
+__init_text void arch_ap_init(cpu_t *cpu) {
+	cpu_arch_init(cpu);
 	pat_init();
 	lapic_init();
 #ifdef __x86_64__

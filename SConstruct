@@ -288,6 +288,7 @@ class EnvironmentManager(dict):
 		env['AR']      = ToolPath('ar')
 		env['RANLIB']  = ToolPath('ranlib')
 		env['OBJCOPY'] = ToolPath('objcopy')
+		env['LD']      = ToolPath('ld')
 
 		self._MergeFlags(env, flags)
 		self[name] = env

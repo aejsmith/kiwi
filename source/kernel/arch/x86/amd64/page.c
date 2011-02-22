@@ -656,6 +656,10 @@ __init_text void page_arch_init(void) {
 	phys_ptr_t i, j;
 	uint64_t *pdir;
 
+	/* Reserve a low memory page for the AP bootstrap code. FIXME: This
+	 * needs freeing somewhere. */
+	ap_bootstrap_page = page_xalloc(1, 0, 0, 0x100000, MM_FATAL);
+
 	/* Initialise the kernel page map structure. */
 	mutex_init(&kernel_page_map.lock, "page_map_lock", MUTEX_RECURSIVE);
 	kernel_page_map.invalidate_count = 0;

@@ -66,6 +66,7 @@ typedef struct boot_module {
 } boot_module_t;
 
 extern void kmain_bsp(phys_ptr_t tags);
+extern void kmain_ap(cpu_t *cpu);
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
@@ -273,7 +274,9 @@ static __init_text void smp_boot(void) {
 	cpu_id_t i;
 
 	for(i = 0; i <= highest_cpu_id; i++) {
-		cpu_boot(cpus[i]);
+		if(cpus[i] && cpus[i]->state == CPU_OFFLINE) {
+			cpu_boot(cpus[i]);
+		}
 	}
 }
 
@@ -445,29 +448,20 @@ static __init_text void kmain_bsp_bottom(void) {
 	sched_enter();
 }
 
-#if 0
-/** Kernel entry point for a secondary CPU. */
-__init_text void kmain_ap(void) {
-	/* Wait for the boot CPU to do its initialisation. */
-	init_rendezvous(args, &init_rendezvous_2);
-
-	spinlock_lock(&smp_boot_spinlock);
-
+/** Kernel entry point for a secondary CPU.
+ * @param cpu		Pointer to CPU structure for the CPU. */
+__init_text void kmain_ap(cpu_t *cpu) {
 	/* Switch to the kernel page map and do architecture-specific
 	 * initialisation of this CPU. */
 	page_map_switch(&kernel_page_map);
-	arch_ap_init(args, cpus[id]);
+	arch_ap_init(cpu);
 
-	/* We're running, add ourselves to the running CPU list. */
-	list_append(&cpus_running, &curr_cpu->header);
+	/* Signal that we're up and add ourselves to the running CPU list. */
+	cpu->state = CPU_RUNNING;
+	list_append(&running_cpus, &curr_cpu->header);
+	cpu_boot_wait = 1;
 
-	/* Do scheduler initialisation. */
+	/* Do scheduler initialisation and then begin scheduling threads. */
 	sched_init();
-
-	spinlock_unlock(&smp_boot_spinlock);
-
-	/* Perform the final rendezvous and then enter the scheduler. */
-	init_rendezvous(args, &init_rendezvous_3);
 	sched_enter();
 }
-#endif

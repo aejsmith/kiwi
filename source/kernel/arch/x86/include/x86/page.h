@@ -40,6 +40,8 @@
 
 #ifndef __ASM__
 
+extern phys_ptr_t ap_bootstrap_page;
+
 extern void pat_init(void);
 
 #endif /* __ASM__ */

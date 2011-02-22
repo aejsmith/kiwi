@@ -79,8 +79,10 @@ FUNCTION_START(kboot_arch_enter64)
 	addl	$PAGE_SIZE, %esp
 	andl	$0xFFFFF000, %esp
 
-	/* Clear the stack frame. */
+	/* Clear the stack frame/RFLAGS. */
 	xorq	%rbp, %rbp
+	push	$0
+	popf
 
 	/* Call the kernel. */
 	call	*%rax
@@ -115,8 +117,10 @@ FUNCTION_START(kboot_arch_enter32)
 	addl	$PAGE_SIZE, %esp
 	andl	$0xFFFFF000, %esp
 
-	/* Clear the stack frame. */
+	/* Clear the stack frame/EFLAGS. */
 	xorl	%ebp, %ebp
+	push	$0
+	popf
 
 	/* Call the kernel. */
 	push	%esi

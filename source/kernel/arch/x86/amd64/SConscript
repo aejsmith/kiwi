@@ -17,6 +17,7 @@
 Import('env')
 
 sources = map(File, [
+	'ap_boot.bin.c',
 	'context.S',
 	'descriptor.c',
 	'elf.c',
@@ -31,5 +32,12 @@ sources = map(File, [
 env['ASFLAGS'] += ['-m64']
 env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone']
 env['LINKFLAGS'] += ['-Wl,-m,elf_x86_64']
+
+# Generate the AP boot code.
+env.Command('ap_boot.bin', env.Object('ap_boot.S'),
+	Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
+env.Command('ap_boot.bin.c', ['ap_boot.bin'],
+	Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
+		'$GENCOMSTR'))
 
 Return('sources')

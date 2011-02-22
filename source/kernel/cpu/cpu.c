@@ -50,6 +50,9 @@ size_t cpu_count = 0;			/**< Number of CPUs. */
 LIST_DECLARE(running_cpus);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
+/** Variable to wait on while waiting for a CPU to boot. */
+volatile int cpu_boot_wait = 0;
+
 /** Initialise a CPU structure and register it.
  * @param cpu		Structure to initialise.
  * @param id		ID of the CPU to add.
