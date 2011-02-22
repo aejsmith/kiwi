@@ -318,12 +318,13 @@ void thread_kill(thread_t *thread) {
 			thread_wake(thread);
 			spinlock_unlock(&queue->lock);
 		}
-
+#if CONFIG_SMP
 		/* If the thread is on a different CPU, send the CPU an IPI
 		 * so that it will check the thread killed state. */
 		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
 			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
 		}
+#endif
 	}
 	spinlock_unlock(&thread->lock);
 }

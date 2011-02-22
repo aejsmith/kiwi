@@ -39,11 +39,13 @@
 /** Whether a system shutdown is in progress. */
 bool shutdown_in_progress = false;
 
+#if CONFIG_SMP
 /** IPI handler to halt a CPU. */
 static status_t shutdown_ipi_handler(void *message, unative_t a1, unative_t a2, unative_t a3, unative_t a4) {
 	ipi_acknowledge(message, STATUS_SUCCESS);
 	cpu_halt();
 }
+#endif
 
 /** System shutdown thread.
  * @param _action	Action to perform once the system has been shut down.
@@ -58,8 +60,10 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	process_shutdown();
 	kprintf(LOG_NORMAL, "system: unmounting filesystems...\n");
 	fs_shutdown();
+#if CONFIG_SMP
 	kprintf(LOG_NORMAL, "system: shutting down secondary CPUs...\n");
 	ipi_broadcast(shutdown_ipi_handler, 0, 0, 0, 0, IPI_SEND_SYNC);
+#endif
 
 	switch(action) {
 	case SHUTDOWN_REBOOT:

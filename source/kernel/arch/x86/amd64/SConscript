@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2009-2011 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,10 +14,11 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-Import('env')
+from util import FeatureSources
+Import('config', 'env')
 
-sources = map(File, [
-	'ap_boot.bin.c',
+sources = FeatureSources(config, [
+	('SMP', 'ap_boot.bin.c'),
 	'context.S',
 	'descriptor.c',
 	'elf.c',
@@ -34,10 +35,11 @@ env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone']
 env['LINKFLAGS'] += ['-Wl,-m,elf_x86_64']
 
 # Generate the AP boot code.
-env.Command('ap_boot.bin', env.Object('ap_boot.S'),
-	Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
-env.Command('ap_boot.bin.c', ['ap_boot.bin'],
-	Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
-		'$GENCOMSTR'))
+if config['SMP']:
+	env.Command('ap_boot.bin', env.Object('ap_boot.S'),
+		Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
+	env.Command('ap_boot.bin.c', ['ap_boot.bin'],
+		Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
+			'$GENCOMSTR'))
 
 Return('sources')

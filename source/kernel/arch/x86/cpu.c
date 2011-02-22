@@ -44,12 +44,6 @@
 /** Double fault handler stack for the boot CPU. */
 static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
-/** Atomic variable for paused CPUs to wait on. */
-atomic_t cpu_pause_wait = 0;
-
-/** Whether cpu_halt_all() has been called. */
-atomic_t cpu_halting_all = 0;
-
 /** Feature set present on all CPUs. */
 cpu_features_t cpu_features;
 
@@ -117,48 +111,6 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
 
 	/* Calculate frequency. */
 	return (cycles * PIT_FREQUENCY) / ticks;
-}
-
-/** Pause execution of other CPUs.
- *
- * Pauses execution of all CPUs other than the CPU that calls the function.
- * This is done using an NMI, so CPUs will be paused even if they have
- * interrupts disabled. Use cpu_resume_all() to resume CPUs after using this
- * function.
- */
-void cpu_pause_all(void) {
-	cpu_t *cpu;
-
-	atomic_set(&cpu_pause_wait, 1);
-
-	LIST_FOREACH(&running_cpus, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_current_id()) {
-			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
-		}
-	}
-}
-
-/** Resume CPUs paused with cpu_pause_all(). */
-void cpu_resume_all(void) {
-	atomic_set(&cpu_pause_wait, 0);
-}
-
-/** Halt all other CPUs. */
-void cpu_halt_all(void) {
-	cpu_t *cpu;
-
-	atomic_set(&cpu_halting_all, 1);
-
-	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
-	 * during early boot, secondary CPUs do not have an IDT set up so
-	 * sending them an NMI IPI results in a triple fault. */
-	LIST_FOREACH(&running_cpus, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_current_id()) {
-			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
-		}
-	}
 }
 
 /** Get current CPU ID.
@@ -272,14 +224,13 @@ static __init_text void detect_cpu_features(cpu_arch_t *cpu) {
 __init_text void cpu_arch_init(cpu_t *cpu) {
 	/* If this is the boot CPU, a double fault stack will not have been
 	 * allocated. Use the pre-allocated one in this case. */
+#if CONFIG_SMP
 	if(cpu == &boot_cpu) {
+#endif
 		cpu->arch.double_fault_stack = boot_doublefault_stack;
-	} else {
-		// FIXME!!
-		// FIXME!! just to make sure i remember to set this
-		// FIXME!!
-		assert(cpu->arch.double_fault_stack);
+#if CONFIG_SMP
 	}
+#endif
 
 	/* Initialise and load descriptor tables. */
 	descriptor_init(cpu);
@@ -295,9 +246,9 @@ __init_text void cpu_arch_init(cpu_t *cpu) {
 	 * structure. Otherwise, check that the feature set matches the global
 	 * features. We do not allow SMP configurations with different features
 	 * on different CPUs. */
-//#if CONFIG_SMP
+#if CONFIG_SMP
 	if(cpu == &boot_cpu) {
-//#endif
+#endif
 		memcpy(&cpu_features, &cpu->arch.features, sizeof(cpu_features));
 
 		/* Check for required features. */
@@ -308,22 +259,26 @@ __init_text void cpu_arch_init(cpu_t *cpu) {
 		} else if(!cpu_features.pge) {
 			fatal("CPU does not support PGE");
 		}
-//#if CONFIG_SMP
+#if CONFIG_SMP
 	} else {
 		if(memcmp(&cpu_features, &cpu->arch.features, sizeof(cpu_features)) != 0) {
 			fatal("CPU %u has different feature set to boot CPU", cpu->id);
 		}
 	}
-//#endif
+#endif
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's
 	 * frequency is OK but the others will usually get rubbish, so as a
 	 * workaround use the boot CPU's frequency on all CPUs under QEMU. */
+#if CONFIG_SMP
 	if(strncmp(cpu->arch.model_name, "QEMU", 4) != 0 || cpu == &boot_cpu) {
+#endif
 		cpu->arch.cpu_freq = calculate_frequency(calculate_cpu_frequency);
+#if CONFIG_SMP
 	} else {
 		cpu->arch.cpu_freq = boot_cpu.arch.cpu_freq;
 	}
+#endif
 
 	/* Work out the cycles per µs. */
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;

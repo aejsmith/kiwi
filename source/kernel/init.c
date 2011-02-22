@@ -66,7 +66,9 @@ typedef struct boot_module {
 } boot_module_t;
 
 extern void kmain_bsp(phys_ptr_t tags);
+#if CONFIG_SMP
 extern void kmain_ap(cpu_t *cpu);
+#endif
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
@@ -269,6 +271,7 @@ static __init_text void load_modules(void) {
 	}
 }
 
+#if CONFIG_SMP
 /** Boot secondary CPUs. */
 static __init_text void smp_boot(void) {
 	cpu_id_t i;
@@ -281,6 +284,7 @@ static __init_text void smp_boot(void) {
 
 	cpu_boot_wait = 2;
 }
+#endif
 
 /** Second-stage intialization thread.
  * @param arg1		Unused.
@@ -292,7 +296,9 @@ static void init_thread(void *arg1, void *arg2) {
 	status_t ret;
 
 	/* Bring up all detected secondary CPUs. */
+#if CONFIG_SMP
 	smp_boot();
+#endif
 	kprintf(LOG_NORMAL, "cpu: detected %zu CPU(s):\n", cpu_count);
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu_dump(list_entry(iter, cpu_t, header));
@@ -419,7 +425,9 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Properly initialise the CPU subsystem, and detect other CPUs. */
 	cpu_init();
 	slab_late_init();
+#if CONFIG_SMP
 	ipi_init();
+#endif
 
 	/* Perform other initialisation tasks. */
 	symbol_init();
@@ -450,6 +458,7 @@ static __init_text void kmain_bsp_bottom(void) {
 	sched_enter();
 }
 
+#if CONFIG_SMP
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
 __init_text void kmain_ap(cpu_t *cpu) {
@@ -474,3 +483,4 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Begin scheduling threads. */
 	sched_enter();
 }
+#endif

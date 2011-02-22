@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2009-2011 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-sources = map(File, [
+from util import FeatureSources
+Import('config')
+
+sources = FeatureSources(config, [
 	'acpi.c',
 	'console.c',
 	'kdbg.c',
@@ -22,7 +25,7 @@ sources = map(File, [
 	'pit.c',
 	'platform.c',
 	'rtc.c',
-	'smp.c',
+	('SMP', 'smp.c'),
 ])
 
 Return('sources')

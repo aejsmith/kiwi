@@ -41,6 +41,54 @@ extern void kmain_ap(cpu_t *cpu);
 /** Page reserved to copy the AP boostrap code to. */
 phys_ptr_t ap_bootstrap_page = 0;
 
+/** Atomic variable for paused CPUs to wait on. */
+atomic_t cpu_pause_wait = 0;
+
+/** Whether cpu_halt_all() has been called. */
+atomic_t cpu_halting_all = 0;
+
+/** Pause execution of other CPUs.
+ *
+ * Pauses execution of all CPUs other than the CPU that calls the function.
+ * This is done using an NMI, so CPUs will be paused even if they have
+ * interrupts disabled. Use cpu_resume_all() to resume CPUs after using this
+ * function.
+ */
+void cpu_pause_all(void) {
+	cpu_t *cpu;
+
+	atomic_set(&cpu_pause_wait, 1);
+
+	LIST_FOREACH(&running_cpus, iter) {
+		cpu = list_entry(iter, cpu_t, header);
+		if(cpu->id != cpu_current_id()) {
+			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
+		}
+	}
+}
+
+/** Resume CPUs paused with cpu_pause_all(). */
+void cpu_resume_all(void) {
+	atomic_set(&cpu_pause_wait, 0);
+}
+
+/** Halt all other CPUs. */
+void cpu_halt_all(void) {
+	cpu_t *cpu;
+
+	atomic_set(&cpu_halting_all, 1);
+
+	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
+	 * during early boot, secondary CPUs do not have an IDT set up so
+	 * sending them an NMI IPI results in a triple fault. */
+	LIST_FOREACH(&running_cpus, iter) {
+		cpu = list_entry(iter, cpu_t, header);
+		if(cpu->id != cpu_current_id()) {
+			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
+		}
+	}
+}
+
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
 void cpu_boot(cpu_t *cpu) {

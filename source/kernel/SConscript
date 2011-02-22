@@ -15,8 +15,9 @@
 #
 
 Import('config', 'envmgr', 'version')
+from util import FeatureSources
 
-sources = map(File, [
+sources = FeatureSources(config, [
 	'console/console.c',
 	'console/copyright.c',
 	'console/fb.c',
@@ -25,7 +26,7 @@ sources = map(File, [
 
 	'cpu/cpu.c',
 	'cpu/fpu.c',
-	'cpu/ipi.c',
+	('SMP', 'cpu/ipi.c'),
 	'cpu/irq.c',
 
 	'io/context.c',

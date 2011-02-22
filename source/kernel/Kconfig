@@ -18,6 +18,15 @@
 menu "Kernel configuration"
 ###########################
 
+config SMP
+	bool "Symmetric Multi-Processing (SMP) support"
+	depends on HAVE_SMP
+	default y
+	help
+	  Enable support for systems with multiple CPUs/cores. If the kernel
+	  will only ever be run on a system with 1 CPU, you should say N here,
+	  as some single-CPU optimisations can be made.
+
 config HANDLE_MAX
 	int "Handle table size"
 	default 1024
@@ -123,7 +132,7 @@ config SCHED_DEBUG
 	help
 	  Enable large amounts of debug output from the thread scheduler. This
 	  will not print messages on every thread switch, however this can be
-	  enabled by defining SCHED_OVERKILL_DEBUG to 1 in sched.c
+	  enabled by defining SCHED_OVERKILL_DEBUG to 1 in sched.c.
 
 config MODULE_DEBUG
 	bool "Module loader debug output"

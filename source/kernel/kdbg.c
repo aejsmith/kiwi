@@ -741,9 +741,10 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 		kprintf(LOG_NONE, "KDBG: Warning: Stepped but no step in progress?\n");
 	}
 
+#if CONFIG_SMP
 	/* Ask all other CPUs to pause execution. */
 	cpu_pause_all();
-
+#endif
 	curr_kdbg_frame = frame;
 
 	/* Run entry notifiers. */
@@ -797,9 +798,10 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	/* Run exit notifiers. */
 	notifier_run_unlocked(&kdbg_exit_notifier, NULL, false);
 
+#if CONFIG_SMP
 	/* Resume other CPUs. */
 	cpu_resume_all();
-
+#endif
 	atomic_set(&kdbg_running, 0);
 	intr_restore(state);
 	return ret;

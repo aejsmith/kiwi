@@ -125,8 +125,10 @@ extern void sched_internal(bool state);
 extern void sched_post_switch(bool state);
 extern void sched_thread_insert(thread_t *thread);
 
+#if CONFIG_SMP
 /** Total number of running/ready threads across all CPUs. */
 static atomic_t threads_running = 0;
+#endif
 
 /** Add a thread to a queue.
  * @param queue		Queue to add to.
@@ -188,7 +190,7 @@ static inline void sched_tweak_priority(sched_cpu_t *cpu, thread_t *thread) {
 /** Pick a new thread to run.
  * @param cpu		Per-CPU scheduler information structure.
  * @return		Pointer to thread, or NULL if no threads available. */
-static thread_t *sched_cpu_pick(sched_cpu_t *cpu) {
+static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
 	thread_t *thread;
 	int i;
 
@@ -246,13 +248,15 @@ void sched_internal(bool state) {
 		/* Thread is no longer running, decrease counts. */
 		assert(curr_thread != cpu->idle_thread);
 		cpu->total--;
+#if CONFIG_SMP
 		atomic_dec(&threads_running);
+#endif
 	}
 
 	/* Find a new thread to run. A NULL return value means no threads are
 	 * ready, so we schedule the idle thread in this case. This will
 	 * return with the new thread locked if it is not the current. */
-	new = sched_cpu_pick(cpu);
+	new = sched_pick_thread(cpu);
 	if(!new) {
 		new = cpu->idle_thread;
 		if(new != curr_thread) {
@@ -345,6 +349,7 @@ void sched_post_switch(bool state) {
 	intr_restore(state);
 }
 
+#if CONFIG_SMP
 /** Allocate a CPU for a thread to run on.
  * @param thread	Thread to allocate for. */
 static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
@@ -393,6 +398,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 	return cpu;
 }
+#endif
 
 /** Insert a thread into the scheduler.
  * @param thread	Thread to insert (should be locked). */
@@ -407,6 +413,7 @@ void sched_thread_insert(thread_t *thread) {
 		sched_calculate_priority(thread);
 	}
 
+#if CONFIG_SMP
 	if(thread->wire_count) {
 		/* If the wire count is greater than 0 and the thread doesn't
 		 * have a CPU, it means that it was wired before it started
@@ -418,13 +425,17 @@ void sched_thread_insert(thread_t *thread) {
 		/* Pick a new CPU for the thread to run on. */
 		thread->cpu = sched_allocate_cpu(thread);
 	}
-
+#else
+	thread->cpu = curr_cpu;
+#endif
 	sched = thread->cpu->sched;
 	spinlock_lock(&sched->lock);
 
 	sched_queue_insert(sched->active, thread);
 	sched->total++;
+#if CONFIG_SMP
 	atomic_inc(&threads_running);
+#endif
 
 	/* If the thread has a higher priority than the currently running
 	 * thread on the CPU, or if the CPU is idle, preempt it. */
@@ -432,9 +443,11 @@ void sched_thread_insert(thread_t *thread) {
 		if(!thread->cpu->idle) {
 			thread->cpu->should_preempt = true;
 		}
+#if CONFIG_SMP
 		if(thread->cpu != curr_cpu) {
 			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
 		}
+#endif
 	}
 
 	spinlock_unlock(&sched->lock);

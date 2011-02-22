@@ -94,10 +94,12 @@ static uint64_t *page_structure_map(phys_ptr_t addr) {
  * @param map		Map to add to.
  * @param virt		Address to add. */
 static void page_map_add_to_invalidate(page_map_t *map, ptr_t virt) {
+#if CONFIG_SMP
 	if(map->invalidate_count < INVALIDATE_ARRAY_SIZE) {
 		map->pages_to_invalidate[map->invalidate_count] = virt;
 	}
 	map->invalidate_count++;
+#endif
 }
 
 /** Get the page directory containing an address.
@@ -230,6 +232,7 @@ void page_map_lock(page_map_t *map) {
 	mutex_lock(&map->lock);
 }
 
+#if CONFIG_SMP
 /** TLB invalidation IPI handler.
  * @param d1		Address of page map structure.
  * @return		Always returns STATUS_SUCCESS. */
@@ -300,16 +303,18 @@ static void page_map_flush(page_map_t *map) {
 
 	map->invalidate_count = 0;
 }
+#endif
 
 /** Unlock a page map.
  * @param map		Map to unlock. */
 void page_map_unlock(page_map_t *map) {
+#if CONFIG_SMP
 	/* If the lock is being released (recursion count currently 1), and
 	 * flush queued TLB changes. */
 	if(mutex_recursion(&map->lock) == 1) {
 		page_map_flush(map);
 	}
-
+#endif
 	mutex_unlock(&map->lock);
 	thread_unwire(curr_thread);
 }
@@ -656,9 +661,11 @@ __init_text void page_arch_init(void) {
 	phys_ptr_t i, j;
 	uint64_t *pdir;
 
+#if CONFIG_SMP
 	/* Reserve a low memory page for the AP bootstrap code. FIXME: This
 	 * needs freeing somewhere. */
 	ap_bootstrap_page = page_xalloc(1, 0, 0, 0x100000, MM_FATAL);
+#endif
 
 	/* Initialise the kernel page map structure. */
 	mutex_init(&kernel_page_map.lock, "page_map_lock", MUTEX_RECURSIVE);

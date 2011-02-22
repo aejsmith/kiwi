@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2009-2011 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,9 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+from util import FeatureSources
 Import('config', 'env')
 
-sources = map(File, [
+sources = FeatureSources(config, [
 	'arch.c',
 	'context.c',
 	'cpu.c',
@@ -25,7 +26,7 @@ sources = map(File, [
 	'kdbg.c',
 	'lapic.c',
 	'signal.c',
-	'smp.c',
+	('SMP', 'smp.c'),
 	'time.c',
 ])
 
@@ -34,10 +35,6 @@ env['CCFLAGS'] += [
 	'-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow',
 	'-Wframe-larger-than=512',
 ]
-
-# For debug builds, do not omit frame pointers.
-if config['DEBUG']:
-	env['CCFLAGS'] += ['-fno-omit-frame-pointer']
 
 # Set the linker script path.
 env['LDSCRIPT'] = env.LDScript('link.ld', 'link-%s.ld.in' % (config['ARCH']))

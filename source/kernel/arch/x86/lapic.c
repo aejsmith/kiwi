@@ -36,12 +36,18 @@
 #include <kdbg.h>
 #include <time.h>
 
+#if CONFIG_SMP
 KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage (disables SMP)", false);
+#else
+KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage", false);
+#endif
 
 /** Frequency of the PIT. */
 #define PIT_FREQUENCY		1193182L
 
+#if CONFIG_SMP
 extern void ipi_process_pending(void);
+#endif
 
 /** Local APIC mapping. If NULL the LAPIC is not present. */
 static volatile uint32_t *lapic_mapping = NULL;
@@ -75,6 +81,7 @@ static void lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
 }
 
+#if CONFIG_SMP
 /** IPI message interrupt handler.
  * @param num		Interrupt number.
  * @param frame		Interrupt stack frame. */
@@ -82,6 +89,7 @@ static void lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 	ipi_process_pending();
 	lapic_eoi();
 }
+#endif
 
 /** Enable the local APIC timer. */
 static void lapic_timer_enable(void) {
@@ -167,11 +175,13 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	intr_restore(state);
 }
 
+#if CONFIG_SMP
 /** Send an IPI interrupt to a single CPU.
  * @param dest		Destination CPU ID. */
 void ipi_arch_interrupt(cpu_id_t dest) {
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
 }
+#endif
 
 /** Function to calculate the LAPIC timer frequency.
  * @return		Calculated frequency. */
@@ -232,6 +242,7 @@ __init_text void lapic_init(void) {
 	}
 	base &= 0xFFFFF000;
 
+#if CONFIG_SMP
 	if(lapic_mapping) {
 		/* This is a secondary CPU. Ensure that the base address is
 		 * not different to the boot CPU's. */
@@ -239,6 +250,7 @@ __init_text void lapic_init(void) {
 			fatal("CPU %u has different LAPIC address to boot CPU", curr_cpu->id);
 		}
 	} else {
+#endif
 		/* This is the boot CPU. Map the LAPIC into virtual memory and
 		 * register interrupt vector handlers. */
 		lapic_base = base;
@@ -248,8 +260,10 @@ __init_text void lapic_init(void) {
 
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
+#if CONFIG_SMP
 		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
 	}
+#endif
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt
 	 * vector in the Spurious Interrupt Vector Register. */
@@ -258,11 +272,15 @@ __init_text void lapic_init(void) {
 
 	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU
 	 * in cpu_arch_init(), same applies here. */
+#if CONFIG_SMP
 	if(strncmp(curr_cpu->arch.model_name, "QEMU", 4) != 0 || curr_cpu == &boot_cpu) {
+#endif
 		curr_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
+#if CONFIG_SMP
 	} else {
 		curr_cpu->arch.lapic_freq = boot_cpu.arch.lapic_freq;
 	}
+#endif
 
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;

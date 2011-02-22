@@ -1419,6 +1419,7 @@ static inline void do_switch_aspace(vm_aspace_t *as) {
 	curr_aspace = NULL;
 }
 
+#if CONFIG_SMP
 /** Switch away from an address space. */
 static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unative_t arg3, unative_t arg4) {
 	vm_aspace_t *as = (vm_aspace_t *)_as;
@@ -1431,6 +1432,7 @@ static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unat
 
 	return STATUS_SUCCESS;
 }
+#endif
 
 /** Destroy an address space.
  *
@@ -1442,7 +1444,9 @@ static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unat
  * @param as		Address space to destroy.
  */
 void vm_aspace_destroy(vm_aspace_t *as) {
+#if CONFIG_SMP
 	cpu_t *cpu;
+#endif
 
 	assert(as);
 
@@ -1451,6 +1455,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	 * (see the comment in vm_aspace_switch()). We need to go through
 	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
+#if CONFIG_SMP
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu->aspace == as) {
@@ -1462,7 +1467,9 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 				}
 			}
 		}
-
+#else
+		do_switch_aspace(as);
+#endif
 		/* The address space should no longer be in use. */
 		assert(refcount_get(&as->count) == 0);
 	}

@@ -39,7 +39,9 @@
 #include <console.h>
 #include <kboot.h>
 
+#if CONFIG_SMP
 KBOOT_BOOLEAN_OPTION("smp_disabled", "Disable SMP", false);
+#endif
 
 /** Boot CPU structure. */
 cpu_t boot_cpu;
@@ -50,8 +52,10 @@ size_t cpu_count = 0;			/**< Number of CPUs. */
 LIST_DECLARE(running_cpus);		/**< List of running CPUs. */
 cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). */
 
+#if CONFIG_SMP
 /** Variable to wait on while waiting for a CPU to boot. */
 volatile int cpu_boot_wait = 0;
+#endif
 
 /** Initialise a CPU structure and register it.
  * @param cpu		Structure to initialise.
@@ -73,10 +77,11 @@ static void cpu_register_internal(cpu_t *cpu, cpu_id_t id, int state) {
 
 	/* Store in the running list if it is running. */
 	if(state == CPU_RUNNING) {
-		list_append(&running_cpus, &boot_cpu.header);
+		list_append(&running_cpus, &cpu->header);
 	}
 }
 
+#if CONFIG_SMP
 /** Register a non-boot CPU.
  * @param id		ID of CPU to add.
  * @param state		Current state of the CPU.
@@ -102,6 +107,7 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 	cpu_count++;
 	return cpu;
 }
+#endif
 
 /** Properly initialise the CPU subsystem. */
 __init_text void cpu_init(void) {
@@ -113,10 +119,12 @@ __init_text void cpu_init(void) {
 	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
 
+#if CONFIG_SMP
 	/* Detect secondary CPUs. */
 	if(!kboot_boolean_option("smp_disabled")) {
 		smp_detect();
 	}
+#endif
 }
 
 /** Initialise the boot CPU structure. */

@@ -75,9 +75,10 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 	intr_disable();
 
 	if(atomic_cmp_set(&fatal_protect, 0, 1)) {
+#if CONFIG_SMP
 		/* Halt all other CPUs. */
 		cpu_halt_all();
-
+#endif
 		/* Run callback functions registered. */
 		notifier_run_unlocked(&fatal_notifier, NULL, false);
 

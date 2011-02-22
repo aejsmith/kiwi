@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,7 +60,10 @@ typedef struct cpu {
 	spinlock_t timer_lock;		/**< Timer list lock. */
 } cpu_t;
 
-/** Expands to a pointer to the CPU structure of the current CPU. */
+/** Expands to a pointer to the CPU structure of the current CPU.
+ * @note		We don't define this to &boot_cpu when compiling
+ *			without SMP support to ensure that a module will work
+ *			properly in any kernel when compiled without SMP. */
 #define curr_cpu	((cpu_t *)cpu_get_pointer())
 
 extern cpu_t boot_cpu;
@@ -69,21 +72,25 @@ extern size_t cpu_count;
 extern list_t running_cpus;
 extern cpu_t **cpus;
 
+#if CONFIG_SMP
 extern volatile int cpu_boot_wait;
+#endif
 
+extern cpu_id_t cpu_current_id(void);
+extern void cpu_dump(cpu_t *cpu);
+
+extern void cpu_init(void);
+extern void cpu_early_init(void);
+
+#if CONFIG_SMP
 extern void cpu_pause_all(void);
 extern void cpu_resume_all(void);
 extern void cpu_halt_all(void);
 
-extern cpu_id_t cpu_current_id(void);
-extern void cpu_boot(cpu_t *cpu);
-extern void cpu_dump(cpu_t *cpu);
-
 extern cpu_t *cpu_register(cpu_id_t id, int state);
-extern void cpu_init(void);
-extern void cpu_early_init(void);
-
+extern void cpu_boot(cpu_t *cpu);
 extern void smp_detect(void);
+#endif
 
 extern int kdbg_cmd_cpus(int argc, char **argv);
 

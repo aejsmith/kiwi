@@ -52,6 +52,7 @@ __init_text void arch_postmm_init(void) {
 	lapic_init();
 }
 
+#if CONFIG_SMP
 /** x86-specific initialisation for an AP.
  * @param cpu		CPU structure for the AP. */
 __init_text void arch_ap_init(cpu_t *cpu) {
@@ -62,3 +63,4 @@ __init_text void arch_ap_init(cpu_t *cpu) {
 	syscall_arch_init();
 #endif
 }
+#endif

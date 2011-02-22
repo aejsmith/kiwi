@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,8 +39,10 @@
 #include <console.h>
 #include <kdbg.h>
 
+#if CONFIG_SMP
 extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
+#endif
 extern void kdbg_db_handler(unative_t num, intr_frame_t *frame);
 extern void intr_handler(intr_frame_t *frame);
 
@@ -119,15 +121,17 @@ static void de_fault(unative_t num, intr_frame_t *frame) {
  * @param num		CPU interrupt number.
  * @param frame		Interrupt stack frame. */
 static void nmi_handler(unative_t num, intr_frame_t *frame) {
+#if CONFIG_SMP
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
 		/* A CPU is in KDBG, assume that it wants us to pause
 		 * execution until it has finished. */
 		while(atomic_get(&cpu_pause_wait));
-	} else {
-		_fatal(frame, "Received unexpected NMI");
+		return;
 	}
+#endif
+	_fatal(frame, "Received unexpected NMI");
 }
 
 /** Invalid Opcode (#UD) fault handler.

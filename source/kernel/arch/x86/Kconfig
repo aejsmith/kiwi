@@ -14,6 +14,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+config HAVE_SMP
+	def_bool y
+
 config X86_NX
 	bool "No-Execute (NX) support"
 	default y

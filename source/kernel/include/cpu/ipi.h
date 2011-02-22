@@ -22,6 +22,8 @@
 #ifndef __CPI_IPI_H
 #define __CPI_IPI_H
 
+#if CONFIG_SMP
+
 #include <cpu/cpu.h>
 
 #include <types.h>
@@ -42,4 +44,5 @@ extern void ipi_acknowledge(void *message, status_t status);
 
 extern void ipi_init(void);
 
+#endif /* CONFIG_SMP */
 #endif /* __CPI_IPI_H */
