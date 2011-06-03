@@ -125,8 +125,10 @@ extern bool elf_note_iterate(fs_handle_t *handle, elf_note_iterate_t cb, void *d
 			} \
 			\
 			dest = (ptr_t)(phys + (phdrs[i].p_vaddr - virt_base)); \
-			if(!fs_file_read(handle, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
-				boot_error("Could not read kernel image"); \
+			if(phdrs[i].p_filesz) { \
+				if(!fs_file_read(handle, (void *)dest, phdrs[i].p_filesz, phdrs[i].p_offset)) { \
+					boot_error("Could not read kernel image"); \
+				} \
 			} \
 			\
 			memset((void *)(dest + (ptr_t)phdrs[i].p_filesz), 0, phdrs[i].p_memsz - phdrs[i].p_filesz); \
