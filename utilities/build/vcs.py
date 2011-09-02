@@ -17,7 +17,13 @@
 # Obtain the revision number from the Mercurial repository.
 def revision_id():
 	try:
-		from mercurial import ui, hg
-		return hg.repository(ui.ui(), '.')['tip'].rev()
+		from subprocess import Popen, PIPE
+		hg = Popen(['hg', 'identify', '-n'], stdout = PIPE, stderr = PIPE)
+		rev = hg.communicate()[0].strip()
+		if hg.returncode != 0:
+			return 0
+		if rev[-1] == '+':
+			rev = rev[0:-1]
+		return int(rev)
 	except:
 		return 0
