@@ -129,12 +129,11 @@ env = envmgr.Create('kernel', {
 if config['DEBUG']:
 	env['CCFLAGS'] += ['-fno-omit-frame-pointer', '-fno-optimize-sibling-calls']
 
-# Set up stuff for using clang.
-if config['USE_CLANG']:
-	if env['ENV'].has_key('CCC_CC'):
-		env['CCC_CC'] = 'clang'
-	else:
-		env['CC'] = 'clang'
+# Add the GCC include directory for some standard headers.
+from subprocess import Popen, PIPE
+incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
+env['CCFLAGS'] += ['-isystem', incdir]
+env['ASFLAGS'] += ['-isystem', incdir]
 
 # Generate the version information file.
 def gen_version_c(target, source, env):

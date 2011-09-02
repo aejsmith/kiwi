@@ -507,7 +507,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wire_count = 0;
 	thread->killed = false;
-	thread->ustack = NULL;
+	thread->ustack = 0;
 	thread->ustack_size = 0;
 	thread->max_prio = -1;
 	thread->curr_prio = -1;

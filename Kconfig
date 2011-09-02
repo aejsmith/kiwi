@@ -36,12 +36,6 @@ config TOOLCHAIN_MAKE_JOBS
 	help
 	  Argument to pass to -j for make when building the toolchain.
 
-config USE_CLANG
-	bool "Build kernel with clang"
-	default n
-	help
-	  Whether to build the kernel and modules with clang.
-
 config EXTRA_CCFLAGS
 	string "Extra CCFLAGS"
 	default "-O2"

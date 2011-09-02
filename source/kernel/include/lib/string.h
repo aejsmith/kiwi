@@ -24,7 +24,6 @@
 
 #include <mm/flags.h>
 
-#include <stdarg.h>
 #include <types.h>
 
 extern void *memcpy(void *restrict dest, const void *restrict src, size_t count);

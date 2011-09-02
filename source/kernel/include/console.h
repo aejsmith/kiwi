@@ -23,7 +23,6 @@
 #define __CONSOLE_H
 
 #include <lib/list.h>
-#include <stdarg.h>
 
 /** Kernel console implementation structure. */
 typedef struct console {

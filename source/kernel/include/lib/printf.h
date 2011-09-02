@@ -22,7 +22,7 @@
 #ifndef __LIB_PRINTF_H
 #define __LIB_PRINTF_H
 
-#include <stdarg.h>
+#include <types.h>
 
 /** Type for a do_printf() helper function. */
 typedef void (*printf_helper_t)(char, void *, int *);
