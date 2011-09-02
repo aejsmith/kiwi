@@ -96,9 +96,9 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
 	name = 'binutils'
-	version = '2.21'
+	version = '2.21.1' # remove a below on next upgrade
 	source = [
-		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
+		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + 'a.tar.bz2',
 	]
 	patches = [
 		('binutils-' + version + '-kiwi.patch', 'binutils-' + version, 1),
@@ -125,7 +125,7 @@ class BinutilsComponent(ToolchainComponent):
 # Component definition for GCC.
 class GCCComponent(ToolchainComponent):
 	name = 'gcc'
-	version = '4.5.2'
+	version = '4.6.1'
 	source = [
 		'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-core-' + version + '.tar.bz2',
 		'http://ftp.gnu.org/gnu/gcc/gcc-' + version + '/gcc-g++-' + version + '.tar.bz2',
@@ -140,16 +140,18 @@ class GCCComponent(ToolchainComponent):
 		os.mkdir('gcc-build')
 
 		# Work out configure options to use.
+		env = ""
 		confopts  = '--prefix=%s ' % (self.manager.destdir)
 		confopts += '--target=%s ' % (self.manager.target)
 		confopts += '--enable-languages=c,c++ '
 		confopts += '--disable-libstdcxx-pch '
 		confopts += '--disable-shared '
 		if os.uname()[0] == 'Darwin':
+			env = "CC=clang CXX=clang++ "
 			confopts += '--with-libiconv-prefix=/opt/local --with-gmp=/opt/local --with-mpfr=/opt/local'
 
 		# Build and install it.
-		self.execute('../gcc-%s/configure %s' % (self.version, confopts), 'gcc-build')
+		self.execute('%s../gcc-%s/configure %s' % (env, self.version, confopts), 'gcc-build')
 		self.execute('make -j%d all-gcc' % (self.manager.makejobs), 'gcc-build')
 		self.execute('make -j%d all-target-libgcc all-target-libstdc++-v3' % (self.manager.makejobs), 'gcc-build')
 		self.execute('make install-gcc install-target-libgcc install-target-libstdc++-v3', 'gcc-build')

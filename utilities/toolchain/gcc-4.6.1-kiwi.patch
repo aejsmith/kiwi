@@ -1,7 +1,7 @@
-diff -urN gcc-4.5.2.orig/config.sub gcc-4.5.2/config.sub
---- gcc-4.5.2.orig/config.sub	2011-01-17 17:44:21.542689657 +0000
-+++ gcc-4.5.2/config.sub	2011-01-17 17:44:28.092674882 +0000
-@@ -1315,7 +1315,7 @@
+diff -urN gcc-4.6.1.orig/config.sub gcc-4.6.1/config.sub
+--- gcc-4.6.1.orig/config.sub	2011-07-05 14:32:57.583643635 +0100
++++ gcc-4.6.1/config.sub	2011-07-05 14:33:05.159527818 +0100
+@@ -1317,7 +1317,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
@@ -10,9 +10,9 @@ diff -urN gcc-4.5.2.orig/config.sub gcc-4.5.2/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
-diff -urN gcc-4.5.2.orig/gcc/config/arm/kiwi.h gcc-4.5.2/gcc/config/arm/kiwi.h
---- gcc-4.5.2.orig/gcc/config/arm/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/arm/kiwi.h	2011-01-17 17:44:28.603595963 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/arm/kiwi.h gcc-4.6.1/gcc/config/arm/kiwi.h
+--- gcc-4.6.1.orig/gcc/config/arm/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/arm/kiwi.h	2011-07-05 14:33:05.160527801 +0100
 @@ -0,0 +1,46 @@
 +/* Definitions for Kiwi ARM targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -60,15 +60,15 @@ diff -urN gcc-4.5.2.orig/gcc/config/arm/kiwi.h gcc-4.5.2/gcc/config/arm/kiwi.h
 +/* Include BPABI link spec as well as our own. */
 +#undef  LINK_SPEC
 +#define LINK_SPEC KIWI_LINK_SPEC BE8_LINK_SPEC
-diff -urN gcc-4.5.2.orig/gcc/config/arm/t-kiwi gcc-4.5.2/gcc/config/arm/t-kiwi
---- gcc-4.5.2.orig/gcc/config/arm/t-kiwi	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/arm/t-kiwi	2011-01-17 17:44:29.488459343 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/arm/t-kiwi gcc-4.6.1/gcc/config/arm/t-kiwi
+--- gcc-4.6.1.orig/gcc/config/arm/t-kiwi	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/arm/t-kiwi	2011-07-05 14:33:05.166527708 +0100
 @@ -0,0 +1,2 @@
 +# These functions are included in shared libraries.
 +TARGET_LIBGCC2_CFLAGS = -fPIC
-diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi32.h gcc-4.5.2/gcc/config/i386/kiwi32.h
---- gcc-4.5.2.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/kiwi32.h	2011-01-17 17:44:29.489459189 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/i386/kiwi32.h gcc-4.6.1/gcc/config/i386/kiwi32.h
+--- gcc-4.6.1.orig/gcc/config/i386/kiwi32.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/i386/kiwi32.h	2011-07-05 14:33:05.167527693 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi i386 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -101,9 +101,9 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi32.h gcc-4.5.2/gcc/config/i386/kiwi
 +      %{m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
 +      %{!m64:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
 +    %{static:-static}}"
-diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi64.h gcc-4.5.2/gcc/config/i386/kiwi64.h
---- gcc-4.5.2.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/kiwi64.h	2011-01-17 17:44:29.896396382 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/i386/kiwi64.h gcc-4.6.1/gcc/config/i386/kiwi64.h
+--- gcc-4.6.1.orig/gcc/config/i386/kiwi64.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/i386/kiwi64.h	2011-07-05 14:33:05.167527693 +0100
 @@ -0,0 +1,31 @@
 +/* Definitions for Kiwi x86-64 targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -136,9 +136,9 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/kiwi64.h gcc-4.5.2/gcc/config/i386/kiwi
 +      %{!m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}} \
 +      %{m32:%{!dynamic-linker:-dynamic-linker /system/libraries/libkernel.so}}} \
 +    %{static:-static}}"
-diff -urN gcc-4.5.2.orig/gcc/config/i386/t-kiwi64 gcc-4.5.2/gcc/config/i386/t-kiwi64
---- gcc-4.5.2.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/i386/t-kiwi64	2011-01-17 17:44:30.320330989 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/i386/t-kiwi64 gcc-4.6.1/gcc/config/i386/t-kiwi64
+--- gcc-4.6.1.orig/gcc/config/i386/t-kiwi64	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/i386/t-kiwi64	2011-07-05 14:33:05.168527678 +0100
 @@ -0,0 +1,17 @@
 +MULTILIB_OPTIONS = m64/m32
 +MULTILIB_DIRNAMES = 64 32
@@ -157,9 +157,9 @@ diff -urN gcc-4.5.2.orig/gcc/config/i386/t-kiwi64 gcc-4.5.2/gcc/config/i386/t-ki
 +
 +# Compile libgcc2.a with pic.
 +TARGET_LIBGCC2_CFLAGS = -fPIC
-diff -urN gcc-4.5.2.orig/gcc/config/kiwi.h gcc-4.5.2/gcc/config/kiwi.h
---- gcc-4.5.2.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
-+++ gcc-4.5.2/gcc/config/kiwi.h	2011-01-17 17:44:30.835251579 +0000
+diff -urN gcc-4.6.1.orig/gcc/config/kiwi.h gcc-4.6.1/gcc/config/kiwi.h
+--- gcc-4.6.1.orig/gcc/config/kiwi.h	1970-01-01 01:00:00.000000000 +0100
++++ gcc-4.6.1/gcc/config/kiwi.h	2011-07-05 14:33:05.168527678 +0100
 @@ -0,0 +1,44 @@
 +/* Definitions for Kiwi targets
 +   Copyright (C) 2007, Free Software Foundation, Inc.
@@ -205,24 +205,24 @@ diff -urN gcc-4.5.2.orig/gcc/config/kiwi.h gcc-4.5.2/gcc/config/kiwi.h
 +
 +/* Make no assumptions about header files. */
 +#define NO_IMPLICIT_EXTERN_C
-diff -urN gcc-4.5.2.orig/gcc/config.gcc gcc-4.5.2/gcc/config.gcc
---- gcc-4.5.2.orig/gcc/config.gcc	2011-01-17 17:44:21.226738739 +0000
-+++ gcc-4.5.2/gcc/config.gcc	2011-01-17 17:47:52.885861711 +0000
-@@ -611,6 +611,13 @@
+diff -urN gcc-4.6.1.orig/gcc/config.gcc gcc-4.6.1/gcc/config.gcc
+--- gcc-4.6.1.orig/gcc/config.gcc	2011-07-05 14:32:57.640642769 +0100
++++ gcc-4.6.1/gcc/config.gcc	2011-07-05 14:33:05.172527617 +0100
+@@ -699,6 +699,13 @@
    default_use_cxa_atexit=yes
    use_gcc_stdint=wrap
    ;;
 +*-*-kiwi*)
-+   extra_parts="crtbegin.o crtend.o crtbeginS.o crtbeginT.o crtendS.o"
-+   gas=yes
-+   gnu_ld=yes
-+   default_use_cxa_atexit=yes
-+   tmake_file="t-svr4"
-+   ;;
++  extra_parts="crtbegin.o crtend.o crtbeginS.o crtbeginT.o crtendS.o"
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=yes
++  tmake_file="t-svr4"
++  ;;
  esac
  
  case ${target} in
-@@ -800,6 +807,11 @@
+@@ -894,6 +901,11 @@
  	tm_file="${tm_file} arm/aout.h arm/arm.h"
  	tmake_file="${tmake_file} arm/t-arm-softfp soft-fp/t-softfp"
  	;;
@@ -234,7 +234,7 @@ diff -urN gcc-4.5.2.orig/gcc/config.gcc gcc-4.5.2/gcc/config.gcc
  arm*-*-rtems*)
  	tm_file="dbxelf.h elfos.h arm/unknown-elf.h arm/elf.h arm/aout.h arm/arm.h arm/rtems-elf.h rtems.h newlib-stdint.h"
  	tmake_file="arm/t-arm arm/t-arm-elf t-rtems arm/t-rtems"
-@@ -1453,6 +1465,14 @@
+@@ -1580,6 +1592,14 @@
  		tm_file="${tm_file} dbxcoff.h"
  	fi
  	;;
@@ -249,10 +249,10 @@ diff -urN gcc-4.5.2.orig/gcc/config.gcc gcc-4.5.2/gcc/config.gcc
  ia64*-*-elf*)
  	tm_file="${tm_file} dbxelf.h elfos.h newlib-stdint.h ia64/sysv4.h ia64/elf.h"
  	tmake_file="ia64/t-ia64"
-diff -urN gcc-4.5.2.orig/libgcc/config.host gcc-4.5.2/libgcc/config.host
---- gcc-4.5.2.orig/libgcc/config.host	2011-01-17 17:44:21.155749766 +0000
-+++ gcc-4.5.2/libgcc/config.host	2011-01-17 17:44:32.049064522 +0000
-@@ -215,6 +215,8 @@
+diff -urN gcc-4.6.1.orig/libgcc/config.host gcc-4.6.1/libgcc/config.host
+--- gcc-4.6.1.orig/libgcc/config.host	2011-07-05 14:32:57.823639970 +0100
++++ gcc-4.6.1/libgcc/config.host	2011-07-05 14:33:05.174527585 +0100
+@@ -218,6 +218,8 @@
  	;;
  arm*-*-eabi* | arm*-*-symbianelf* )
  	;;
@@ -261,7 +261,7 @@ diff -urN gcc-4.5.2.orig/libgcc/config.host gcc-4.5.2/libgcc/config.host
  arm*-*-rtems*)
  	;;
  arm*-*-elf)
-@@ -278,6 +280,10 @@
+@@ -281,6 +283,10 @@
  	;;
  x86_64-*-elf*)
  	;;
@@ -270,12 +270,12 @@ diff -urN gcc-4.5.2.orig/libgcc/config.host gcc-4.5.2/libgcc/config.host
 +x86_64-*-kiwi*)
 +	;;
  i[34567]86-*-freebsd*)
+ 	tmake_file="${tmake_file} i386/t-freebsd"
  	;;
- x86_64-*-freebsd*)
-diff -urN gcc-4.5.2.orig/libstdc++-v3/configure.host gcc-4.5.2/libstdc++-v3/configure.host
---- gcc-4.5.2.orig/libstdc++-v3/configure.host	2011-01-17 17:44:21.318724449 +0000
-+++ gcc-4.5.2/libstdc++-v3/configure.host	2011-01-17 17:44:32.209039888 +0000
-@@ -256,6 +256,10 @@
+diff -urN gcc-4.6.1.orig/libstdc++-v3/configure.host gcc-4.6.1/libstdc++-v3/configure.host
+--- gcc-4.6.1.orig/libstdc++-v3/configure.host	2011-07-05 14:32:58.059636363 +0100
++++ gcc-4.6.1/libstdc++-v3/configure.host	2011-07-05 14:33:05.175527569 +0100
+@@ -253,6 +253,10 @@
      atomicity_dir=os/irix
      atomic_word_dir=os/irix
      ;;
@@ -286,9 +286,9 @@ diff -urN gcc-4.5.2.orig/libstdc++-v3/configure.host gcc-4.5.2/libstdc++-v3/conf
    mingw32*)
      os_include_dir="os/mingw32"
      error_constants_dir="os/mingw32"
-diff -urN gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4 gcc-4.5.2/libstdc++-v3/crossconfig.m4
---- gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4	2011-01-17 17:44:21.331722431 +0000
-+++ gcc-4.5.2/libstdc++-v3/crossconfig.m4	2011-01-17 17:44:35.420545911 +0000
+diff -urN gcc-4.6.1.orig/libstdc++-v3/crossconfig.m4 gcc-4.6.1/libstdc++-v3/crossconfig.m4
+--- gcc-4.6.1.orig/libstdc++-v3/crossconfig.m4	2011-07-05 14:32:58.038636683 +0100
++++ gcc-4.6.1/libstdc++-v3/crossconfig.m4	2011-07-05 14:33:05.175527569 +0100
 @@ -141,6 +141,10 @@
  	;;
      esac
@@ -300,10 +300,10 @@ diff -urN gcc-4.5.2.orig/libstdc++-v3/crossconfig.m4 gcc-4.5.2/libstdc++-v3/cros
    *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu)
      GLIBCXX_CHECK_COMPILER_FEATURES
      GLIBCXX_CHECK_LINKER_FEATURES
-diff -urN gcc-4.5.2.orig/libtool.m4 gcc-4.5.2/libtool.m4
---- gcc-4.5.2.orig/libtool.m4	2011-01-17 17:44:21.540689969 +0000
-+++ gcc-4.5.2/libtool.m4	2011-01-17 17:44:35.724499219 +0000
-@@ -5370,7 +5370,9 @@
+diff -urN gcc-4.6.1.orig/libtool.m4 gcc-4.6.1/libtool.m4
+--- gcc-4.6.1.orig/libtool.m4	2011-07-05 14:32:57.626642982 +0100
++++ gcc-4.6.1/libtool.m4	2011-07-05 14:33:05.181527479 +0100
+@@ -5362,7 +5362,9 @@
    _LT_LINKER_SHLIBS($1)
    _LT_SYS_DYNAMIC_LINKER($1)
    _LT_LINKER_HARDCODE_LIBPATH($1)
@@ -314,9 +314,9 @@ diff -urN gcc-4.5.2.orig/libtool.m4 gcc-4.5.2/libtool.m4
    _LT_CMD_STRIPLIB
  
    # Report which library types will actually be built
-diff -urN gcc-4.5.2.orig/ltmain.sh gcc-4.5.2/ltmain.sh
---- gcc-4.5.2.orig/ltmain.sh	2011-01-17 17:44:21.557687328 +0000
-+++ gcc-4.5.2/ltmain.sh	2011-01-17 17:44:36.256417541 +0000
+diff -urN gcc-4.6.1.orig/ltmain.sh gcc-4.6.1/ltmain.sh
+--- gcc-4.6.1.orig/ltmain.sh	2011-07-05 14:32:57.806640230 +0100
++++ gcc-4.6.1/ltmain.sh	2011-07-05 14:33:05.186527403 +0100
 @@ -1451,6 +1451,12 @@
        removelist="$lobj $libobj ${libobj}T"
      fi
@@ -330,10 +330,10 @@ diff -urN gcc-4.5.2.orig/ltmain.sh gcc-4.5.2/ltmain.sh
      # On Cygwin there's no "real" PIC flag so we must build both object types
      case $host_os in
      cygwin* | mingw* | pw32* | os2* | cegcc*)
-diff -urN gcc-4.5.2.orig/Makefile.in gcc-4.5.2/Makefile.in
---- gcc-4.5.2.orig/Makefile.in	2011-01-17 17:44:21.555687638 +0000
-+++ gcc-4.5.2/Makefile.in	2011-01-17 17:44:36.363401120 +0000
-@@ -58408,7 +58408,6 @@
+diff -urN gcc-4.6.1.orig/Makefile.in gcc-4.6.1/Makefile.in
+--- gcc-4.6.1.orig/Makefile.in	2011-07-05 14:32:57.635642844 +0100
++++ gcc-4.6.1/Makefile.in	2011-07-05 14:33:05.202527158 +0100
+@@ -61003,7 +61003,6 @@
  configure-target-libobjc: maybe-configure-target-boehm-gc
  all-target-libobjc: maybe-all-target-libiberty
  all-target-libobjc: maybe-all-target-boehm-gc
