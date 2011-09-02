@@ -165,6 +165,8 @@ void timer_device_set(timer_device_t *device) {
 static void timer_start_unsafe(timer_t *timer) {
 	timer_t *exist;
 
+	assert(list_empty(&timer->header));
+
 	timer->target = system_time() + timer->initial;
 
 	/* Place the timer at the end of the list to begin with, and then
@@ -283,11 +285,15 @@ void timer_stop(timer_t *timer) {
 
 		spinlock_lock(&timer->cpu->timer_lock);
 
-		/* Readjust the tick length if required. */
-		next = list_entry(timer->cpu->timers.next, timer_t, header);
-		if(next == timer && timer->header.next != &timer->cpu->timers) {
-			next = list_entry(timer->header.next, timer_t, header);
-			timer_tick_prepare(next);
+		/* Readjust the tick length if required. We can only do this if
+		 * the CPU is the current CPU. If not, it's no big deal: the
+		 * CPU will just get a tick and timer_tick() will do nothing. */
+		if(timer->cpu == curr_cpu) {
+			next = list_entry(timer->cpu->timers.next, timer_t, header);
+			if(next == timer && timer->header.next != &timer->cpu->timers) {
+				next = list_entry(timer->header.next, timer_t, header);
+				timer_tick_prepare(next);
+			}
 		}
 
 		list_remove(&timer->header);
