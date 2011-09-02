@@ -41,7 +41,7 @@ dist = envmgr.Create('dist', {
 })
 
 # Visit subdirectories.
-SConscript(dirs=['source'])
+SConscript(dirs = ['source'])
 
 # Create a TAR archive containing the filesystem tree.
 def fs_image_func(target, source, env):
@@ -108,10 +108,16 @@ Alias('libraries', dist['LIBRARIES'])
 Alias('services', dist['SERVICES'])
 Alias('binaries', dist['BINARIES'])
 Alias('fsimage', dist['FSIMAGE'])
-Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
-# Target to run in QEMU.
-Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
-	config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
-	None
-)))
+# Add platform-specific targets to generate bootable images.
+if config['PLATFORM'] == 'pc':
+	from iso import ISOBuilder
+	dist['BUILDERS']['ISOImage'] = ISOBuilder
+
+	Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
+
+	# Target to run in QEMU.
+	Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
+		config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
+		None
+	)))

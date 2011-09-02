@@ -19,7 +19,7 @@ import os
 Import('env', 'config')
 
 # Build all the libraries.
-SConscript(dirs=[
+SConscript(dirs = [
 	'kernel',
 	'libc',
 	'3rdparty/libm',
@@ -30,4 +30,4 @@ SConscript(dirs=[
 	'3rdparty/pixman-0.20.0',
 	'3rdparty/cairo-1.10.0',
 	'kiwi',
-], exports=['env'])
+], exports = ['env'])

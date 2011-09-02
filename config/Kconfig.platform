@@ -17,14 +17,6 @@
 choice
 	prompt "Platform"
 	default PLATFORM_PC if ARCH_X86
-	default PLATFORM_OMAP3 if ARCH_ARM
-
-config PLATFORM_OMAP3
-	bool "Texas Instruments OMAP3"
-	depends on ARCH_ARM
-	help
-	  Target the built system to Texas Instruments' OMAP3 platform.
-	  This includes boards such as the BeagleBoard.
 
 config PLATFORM_PC
 	bool "Standard PC"
@@ -36,17 +28,4 @@ endchoice
 
 config PLATFORM
         string
-        default "omap3" if PLATFORM_OMAP3
         default "pc" if PLATFORM_PC
-
-##############################
-# OMAP3 configuration values #
-##############################
-
-if PLATFORM_OMAP3
-
-config PLATFORM_CCFLAGS
-	string
-	default "-mcpu=cortex-a8 -mfpu=vfp"
-
-endif

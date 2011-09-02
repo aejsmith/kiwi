@@ -65,7 +65,7 @@ typedef struct boot_module {
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
-extern void kmain_bsp(phys_ptr_t tags);
+extern void kmain_bsp(uint32_t magic, phys_ptr_t tags);
 #if CONFIG_SMP
 extern void kmain_ap(cpu_t *cpu);
 #endif
@@ -360,12 +360,21 @@ static void init_thread(void *arg1, void *arg2) {
 }
 
 /** Main entry point of the kernel.
+ * @param magic		KBoot magic number.
  * @param tags		Physical address of KBoot tag list. */
-__init_text void kmain_bsp(phys_ptr_t tags) {
+__init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 	context_t ctx;
 
 	/* Save the tag list address. */
 	kboot_tag_list = tags;
+
+	/* Bring up the debug console. */
+	console_early_init();
+
+	/* Check the magic number. */
+	if(magic != KBOOT_MAGIC) {
+		fatal("Not loaded by a KBoot-compliant loader");
+	}
 
 	/* Currently we are running on a stack set up for us by the loader.
 	 * This stack is most likely in a mapping that will go away once the
@@ -381,9 +390,6 @@ static __init_text void kmain_bsp_bottom(void) {
 	kboot_tag_core_t *core;
 	thread_t *thread;
 	status_t ret;
-
-	/* Bring up the debug console. */
-	console_early_init();
 
 	/* Verify that a core tag is available. */
 	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);

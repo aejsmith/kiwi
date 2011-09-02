@@ -14,6 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+###########################
+menu "Architecture options"
+###########################
+
 config HAVE_SMP
 	def_bool y
 
@@ -23,3 +27,7 @@ config X86_NX
 	help
 	  Enable support for the No-Execute/Execute-Disable bit supported by
 	  recent CPUs.
+
+#######
+endmenu
+#######

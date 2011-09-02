@@ -125,6 +125,10 @@ env = envmgr.Create('kernel', {
 	},
 })
 
+# If doing a debug build, do not disable frame pointers.
+if config['DEBUG']:
+	env['CCFLAGS'] += ['-fno-omit-frame-pointer', '-fno-optimize-sibling-calls']
+
 # Set up stuff for using clang.
 if config['USE_CLANG']:
 	if env['ENV'].has_key('CCC_CC'):
@@ -144,18 +148,21 @@ AlwaysBuild(env.Command('version.c', [], env.Action(gen_version_c, None)))
 
 # Generate the boot splash image source files.
 env.Command('console/logo.c', ['console/logo.ppm'],
-            Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
+	Action('$BIN2HEX $SOURCE logo_ppm > $TARGET', '$GENCOMSTR'))
 env.Command('console/copyright.c', ['console/copyright.ppm'],
-            Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
+	Action('$BIN2HEX $SOURCE copyright_ppm > $TARGET', '$GENCOMSTR'))
 
 # Generate the system call table.
 env['SYSCALLS'] = File('syscalls.def')
 env.SyscallTable('syscall_table.c', env['SYSCALLS'], TABLE='syscall_table')
 env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD='__SYSCALL_TABLE_H')
 
+# Let the distribution environment know where the kernel is.
+envmgr['dist']['KERNEL'] = File('kernel')
+
 # Get the list of source files from the architecture/platform.
-arch_sources = SConscript(dirs=['arch/' + config['SRCARCH']], exports=['env'])
-platform_sources = SConscript(dirs=['platform/' + config['PLATFORM']], exports=['env'])
+arch_sources = SConscript(dirs = ['arch/' + config['SRCARCH']], exports = ['env'])
+platform_sources = SConscript(dirs = ['platform/' + config['PLATFORM']], exports = ['env'])
 sources = arch_sources + platform_sources + sources
 
 # Create a fake symbol table used for the first linking stage.
@@ -171,21 +178,21 @@ def fake_symtab_func(target, source, env):
 # Link the first kernel image using a fake symbol table.
 env.Command('fake-symtab.c', [], Action(fake_symtab_func, '$GENCOMSTR'))
 env.Program('kernel-pass1', map(env.Object, sources) + ['fake-symtab.c'],
-            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-pass1', env['LDSCRIPT'])
 
 # Generate the first real symbol table and relink the kernel with it.
 env.Command('symtab-pass1.c', ['kernel-pass1'],
-            Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
+	Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Program('kernel-pass2', map(env.Object, sources) + ['symtab-pass1.c'],
-            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-pass2', env['LDSCRIPT'])
 
 # Generate the final symbol table with correct symbol addresses.
 env.Command('symtab-pass2.c', ['kernel-pass2'],
-            Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
+	Action('$NM -S $SOURCE | sort | $GENSYMTAB kernel_symtab > $TARGET', '$GENCOMSTR'))
 env.Program('kernel-unstripped', map(env.Object, sources) + ['symtab-pass2.c'],
-            LINKFLAGS=env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
+	LINKFLAGS = env['LINKFLAGS'] + ['-Wl,-T,$LDSCRIPT'])
 Depends('kernel-unstripped', env['LDSCRIPT'])
 
 # Generate various information files and the stripped kernel image.
@@ -196,8 +203,5 @@ env.Command(['kernel', 'kernel.lst', 'kernel.rde', 'kernel.sym'], 'kernel-unstri
 	Action('$NM -C $SOURCE | sort > ${TARGETS[3]}', None),
 ])
 
-# Let the distribution environment know where the kernel is.
-envmgr['dist']['KERNEL'] = File('kernel')
-
 # Build kernel modules.
-SConscript(dirs=['modules'])
+SConscript(dirs = ['modules'])

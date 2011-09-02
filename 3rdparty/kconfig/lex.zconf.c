@@ -2352,8 +2352,8 @@ FILE *zconf_fopen(const char *name)
 
 void zconf_initscan(const char *name)
 {
-	zconfin = zconf_fopen(name);
-	if (!zconfin) {
+	yyin = zconf_fopen(name);
+	if (!yyin) {
 		printf("can't find file %s\n", name);
 		exit(1);
 	}
@@ -2361,27 +2361,28 @@ void zconf_initscan(const char *name)
 	current_buf = malloc(sizeof(*current_buf));
 	memset(current_buf, 0, sizeof(*current_buf));
 
-	current_file = file_lookup(name);
+	current_file = file_lookup(yyin, name);
 	current_file->lineno = 1;
 	current_file->flags = FILE_BUSY;
 }
 
 void zconf_nextfile(const char *name)
 {
-	struct file *file = file_lookup(name);
+	struct file *file;
 	struct buffer *buf = malloc(sizeof(*buf));
 	memset(buf, 0, sizeof(*buf));
 
 	current_buf->state = YY_CURRENT_BUFFER;
-	zconfin = zconf_fopen(name);
-	if (!zconfin) {
+	yyin = zconf_fopen(name);
+	if (!yyin) {
 		printf("%s:%d: can't open file \"%s\"\n", zconf_curname(), zconf_lineno(), name);
 		exit(1);
 	}
-	zconf_switch_to_buffer(zconf_create_buffer(zconfin,YY_BUF_SIZE));
+	yy_switch_to_buffer(yy_create_buffer(yyin, YY_BUF_SIZE));
 	buf->parent = current_buf;
 	current_buf = buf;
 
+	file = file_lookup(yyin, name);
 	if (file->flags & FILE_BUSY) {
 		printf("%s:%d: do not source '%s' from itself\n",
 		       zconf_curname(), zconf_lineno(), name);
@@ -2397,6 +2398,7 @@ void zconf_nextfile(const char *name)
 	file->lineno = 1;
 	file->parent = current_file;
 	current_file = file;
+	fchdir(current_file->dirfd);
 }
 
 static void zconf_endfile(void)
@@ -2405,13 +2407,16 @@ static void zconf_endfile(void)
 
 	current_file->flags |= FILE_SCANNED;
 	current_file->flags &= ~FILE_BUSY;
+	close(current_file->dirfd);
 	current_file = current_file->parent;
+	if (current_file)
+		fchdir(current_file->dirfd);
 
 	parent = current_buf->parent;
 	if (parent) {
-		fclose(zconfin);
-		zconf_delete_buffer(YY_CURRENT_BUFFER);
-		zconf_switch_to_buffer(parent->state);
+		fclose(yyin);
+		yy_delete_buffer(YY_CURRENT_BUFFER);
+		yy_switch_to_buffer(parent->state);
 	}
 	free(current_buf);
 	current_buf = parent;

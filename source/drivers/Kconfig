@@ -14,10 +14,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-##############
-menu "Drivers"
-##############
-
 comment "Bus managers"
 
 config DRIVER_BUS_ATA
@@ -68,7 +64,3 @@ config DRIVER_INPUT_I8042
 	depends on PLATFORM_PC
  	help
 	  Enable the i8042 (PS/2) keyboard/mouse port driver.
-
-#######
-endmenu
-#######

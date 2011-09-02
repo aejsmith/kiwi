@@ -40,6 +40,6 @@ env['CCFLAGS'] += [
 env['LDSCRIPT'] = env.LDScript('link.ld', 'link-%s.ld.in' % (config['ARCH']))
 
 # Pull in AMD64-/IA32-specific stuff.
-sources += SConscript(dirs=[config['ARCH']], exports=['env'])
+sources += SConscript(dirs = [config['ARCH']], exports = ['env'])
 
 Return('sources')

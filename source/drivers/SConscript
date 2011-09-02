@@ -27,4 +27,4 @@ subdirs = [
 env = envmgr['module']
 env['CPPPATH'].append(Dir('include'))
 
-SConscript(dirs=subdirs, exports=['env'])
+SConscript(dirs = subdirs, exports = ['env'])

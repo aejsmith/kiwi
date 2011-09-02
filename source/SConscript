@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2009-2010 Alex Smith
+# Copyright (C) 2009-2011 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,50 @@
 Import('envmgr', 'config')
 
 dist = envmgr['dist']
+
+#################
+# Kernel build. #
+#################
+
+# Build the kernel and drivers.
+SConscript(dirs = ['kernel', 'drivers'])
+
+################
+# KBoot build. #
+################
+
+# Create the build environment for the bootloader.
+env = envmgr.Create('boot', {
+	'LIBS': [],
+	'CCFLAGS': [ '-nostdlib', '-nostdinc', '-ffreestanding', '-fno-stack-protector'],
+	'ASFLAGS': ['-nostdinc'],
+	'LINKFLAGS': ['-nostdlib'],
+})
+
+# Override any optimisation level specified, we want to optimise for size.
+env['CCFLAGS'] = filter(lambda f: f[0:2] != '-O', env['CCFLAGS']) + ['-Os']
+
+# Add the GCC include directory for some standard headers.
+from subprocess import Popen, PIPE
+incdir = Popen([env['CC'], '-print-file-name=include'], stdout = PIPE).communicate()[0].strip()
+env['CCFLAGS'] += ['-isystem', incdir]
+env['ASFLAGS'] += ['-isystem', incdir]
+
+# Build the bootloader.
+defaults = []
+SConscript(dirs = ['boot'], exports = ['env', 'defaults'])
+for t in defaults:
+	if t[0].name != 'loader':
+		Depends(File('boot/loader'), t)
+
+# Put stuff into the distribution environment.
+dist['LOADER'] = File('boot/loader')
+if config['PLATFORM'] == 'pc':
+	dist['CDBOOT'] = File('boot/platform/pc/stage1/cdboot')
+
+####################
+# Userspace build. #
+####################
 
 # Set up the userspace build environment.
 env = envmgr.Create('uspace', {
@@ -134,7 +178,7 @@ def shlib_emitter(target, source, env):
 	if not ('-nostdlib' in env['LINKFLAGS'] or '-nodefaultlibs' in env['LINKFLAGS']):
 		Depends(target[0], env['LIBOUTDIR'].File('libc.so'))
 	return target, source
-env.Append(SHLIBEMITTER=[shlib_emitter])
+env.Append(SHLIBEMITTER = [shlib_emitter])
 
 # Set up a program emitter to set dependencies on default libraries.
 def program_emitter(target, source, env):
@@ -145,15 +189,12 @@ def program_emitter(target, source, env):
 		if env['SMARTLINK'](source, target, env, None) == '$CXX':
 			Depends(target[0], env['LIBOUTDIR'].File('libstdc++.so'))
 	return target, source
-env.Append(PROGEMITTER=[program_emitter])
+env.Append(PROGEMITTER = [program_emitter])
 
 # Add an action for ASM files in a shared library.
 from SCons.Tool import createObjBuilders
 static_obj, shared_obj = createObjBuilders(env)
 shared_obj.add_action('.S', Action('$CC $_CCCOMCOM $ASFLAGS -DSHARED -c -o $TARGET $SOURCES', '$ASCOMSTR'))
 
-# Build the kernel/bootloader/drivers.
-SConscript(dirs=['kernel', 'boot', 'drivers'])
-
 # Build userspace.
-SConscript(dirs=['libraries', 'services', 'binaries'], exports=['env'])
+SConscript(dirs = ['libraries', 'services', 'binaries'], exports = ['env'])

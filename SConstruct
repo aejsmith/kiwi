@@ -17,12 +17,13 @@
 # TODO:
 #  - Eventually we should have separate build directories for each different
 #    target. We build stuff targeting the host system (build utilities), an
-#    architecture and a hardware platform (kernel and loader) and just an
+#    architecture and a hardware platform (kernel and KBoot) and just an
 #    architecture (userspace, these are not platform-dependant). Separating
 #    these off into separate build directories would prevent unnecessary
 #    rebuilds, for example if the hardware platform was changed it would not be
-#    necessary to rebuild userspace. I'm not sure how to do this (or even if
-#    it's possible) with SCons.
+#    necessary to rebuild userspace. Don't think this is possible with SCons
+#    though, will have to wait until I write the Super Awesome Kiwi Build
+#    System.
 
 # Release information.
 version = {
@@ -115,7 +116,7 @@ class EnvironmentManager(dict):
 		# Create an array of builders that will be added to all
 		# environments.
 		self.builders = {
-			'LDScript': Builder(action=Action(
+			'LDScript': Builder(action = Action(
 				'$CC $_CCCOMCOM $ASFLAGS -E -x c $SOURCE | grep -v "^\#" > $TARGET',
 				'$GENCOMSTR'
 			)),
@@ -171,11 +172,11 @@ class EnvironmentManager(dict):
 			for dep in depends:
 				Depends(target, dep)
 			return (target, source)
-		self.AddBuilder(name, Builder(action=act, emitter=dep_emitter))
+		self.AddBuilder(name, Builder(action = act, emitter = dep_emitter))
 
 	# Create an environment for building for the host system.
-	def CreateHost(self, name, flags=None):
-		env = Environment(ENV=os.environ)
+	def CreateHost(self, name, flags = None):
+		env = Environment(ENV = os.environ)
 		self._SetupEnvironment(env, host_flags)
 		self._MergeFlags(env, flags)
 		self[name] = env
@@ -183,12 +184,13 @@ class EnvironmentManager(dict):
 
 	# Create an environment for building for the target system. This
 	# requires that the configuration has been set up correctly.
-	def Create(self, name, flags=None):
+	def Create(self, name, flags = None):
 		assert self.config.configured()
 
-		env = Environment(platform='posix', ENV=os.environ)
+		env = Environment(platform = 'posix', ENV = os.environ)
 		self._SetupEnvironment(env, target_flags)
 		self._MergeFlags(env, flags)
+		env['CONFIG'] = self.config
 
 		# Add in extra compilation flags from the configuration.
 		if self.config.has_key('ARCH_CCFLAGS'):
@@ -198,10 +200,6 @@ class EnvironmentManager(dict):
 		env['CCFLAGS'] += self.config['EXTRA_CCFLAGS'].split()
 		env['CFLAGS'] += self.config['EXTRA_CFLAGS'].split()
 		env['CXXFLAGS'] += self.config['EXTRA_CXXFLAGS'].split()
-
-		# If doing a debug build, set -fno-omit-frame-pointer.
-		if config['DEBUG']:
-			env['CCFLAGS'] += ['-fno-omit-frame-pointer']
 
 		# Set paths to toolchain components.
 		def ToolPath(name):
@@ -236,7 +234,7 @@ class EnvironmentManager(dict):
 		return env
 
 	# Create a new environment based on an existing environment.
-	def Clone(self, name, base, flags=None):
+	def Clone(self, name, base, flags = None):
 		self[name] = self[base].Clone()
 		self._MergeFlags(self[name], flags)
 		return self[name]
@@ -267,7 +265,7 @@ Export('config', 'envmgr', 'version')
 
 # Create the host environment and get targets for build utilities.
 env = envmgr.CreateHost('host')
-SConscript('utilities/SConscript', variant_dir=os.path.join('build', 'host'), exports=['env'])
+SConscript('utilities/SConscript', variant_dir = os.path.join('build', 'host', 'utilities'), exports = ['env'])
 
 # Add targets to run the configuration interface.
 env['ENV']['KERNELVERSION'] = version['KIWI_VER_STRING']
@@ -283,7 +281,7 @@ if config.configured() and not 'config' in COMMAND_LINE_TARGETS:
 	if toolchain.check() != 0:
 		RequireTarget('toolchain', "Toolchain out of date. Update using the 'toolchain' target.")
 	else:
-		SConscript('SConscript', variant_dir=os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
+		SConscript('SConscript', variant_dir = os.path.join('build', '%s-%s' % (config['ARCH'], config['PLATFORM'])))
 else:
 	# Configuration does not exist. All we can do is configure.
 	RequireTarget('config', "Configuration missing or out of date. Please update using 'config' target.")

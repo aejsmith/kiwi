@@ -14,6 +14,10 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
+#############################
+menu "Platform configuration"
+#############################
+
 choice
 	prompt "Serial port"
 	default PC_SERIAL_PORT_COM1
@@ -44,3 +48,7 @@ config PC_SERIAL_PORT
 	default 2 if PC_SERIAL_PORT_COM2
 	default 3 if PC_SERIAL_PORT_COM3
 	default 4 if PC_SERIAL_PORT_COM4
+
+#######
+endmenu
+#######

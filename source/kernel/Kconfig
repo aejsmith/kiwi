@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2010 Alex Smith
+# Copyright (C) 2010-2011 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -13,10 +13,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
-
-###########################
-menu "Kernel configuration"
-###########################
 
 config SMP
 	bool "Symmetric Multi-Processing (SMP) support"
@@ -40,29 +36,13 @@ config KLOG_SIZE
 	help
 	  Size for the kernel log buffer (in characters).
 
-###########################
-menu "Architecture options"
-###########################
-
 if ARCH_X86
-source "source/kernel/arch/x86/Kconfig"
+source "arch/x86/Kconfig"
 endif
-
-#######
-endmenu
-#######
-
-#######################
-menu "Platform options"
-#######################
 
 if PLATFORM_PC
-source "source/kernel/platform/pc/Kconfig"
+source "platform/pc/Kconfig"
 endif
-
-#######
-endmenu
-#######
 
 ########################
 menu "Debugging options"
@@ -180,8 +160,4 @@ config LRM_DEBUG
 endmenu
 #######
 
-source "source/kernel/modules/Kconfig"
-
-#######
-endmenu
-#######
+source "modules/Kconfig"

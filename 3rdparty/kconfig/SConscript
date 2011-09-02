@@ -49,7 +49,7 @@ env['MCONF'] = env.Program('mconf', [
 	'lxdialog/textbox.c',
 	'lxdialog/yesno.c',
 	'lxdialog/menubox.c',
-], CCFLAGS=lxdialog_ccflags(), LIBS=lxdialog_libs(), CPPDEFINES=['KBUILD_NO_NLS'])
+], CCFLAGS = lxdialog_ccflags(), LIBS = lxdialog_libs(), CPPDEFINES = ['KBUILD_NO_NLS'])
 
 # Add a config menu builder.
 envmgr.AddTool('ConfigMenu', env['MCONF'], Action('$MCONF $SOURCE', None))

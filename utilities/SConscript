@@ -22,9 +22,9 @@ if os.uname()[0] == 'Darwin':
 	env['LIBPATH'] = ['/opt/local/lib']
 
 # Set paths to build utilities.
-envmgr.AddVariable('GENSYMTAB', File('../../utilities/gensymtab.py'))
-envmgr.AddVariable('GENERRLIST', File('../../utilities/generrlist.py'))
-envmgr.AddVariable('BIN2HEX', File('../../utilities/bin2hex.py'))
+envmgr.AddVariable('GENSYMTAB', File('../../../utilities/gensymtab.py'))
+envmgr.AddVariable('GENERRLIST', File('../../../utilities/generrlist.py'))
+envmgr.AddVariable('BIN2HEX', File('../../../utilities/bin2hex.py'))
 
 # Visit subdirectories.
-SConscript(dirs=['kconfig', 'krpcgen', 'sysgen'], exports=['env'])
+SConscript(dirs = ['kconfig', 'krpcgen', 'sysgen'], exports = ['env'])

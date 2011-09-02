@@ -10,6 +10,7 @@
 extern "C" {
 #endif
 
+#include <sys/stat.h>
 #include <stdio.h>
 #ifndef __cplusplus
 #include <stdbool.h>
@@ -21,6 +22,9 @@ struct file {
 	char *name;
 	int lineno;
 	int flags;
+	dev_t dev;
+	ino_t ino;
+	int dirfd;
 };
 
 #define FILE_BUSY		0x0001

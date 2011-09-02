@@ -30,9 +30,7 @@ sources = FeatureSources(config, [
 ])
 
 # Set AMD64-specific compilation flags.
-env['ASFLAGS'] += ['-m64']
-env['CCFLAGS'] += ['-m64', '-mcmodel=kernel', '-mno-red-zone']
-env['LINKFLAGS'] += ['-Wl,-m,elf_x86_64']
+env['CCFLAGS'] += ['-mcmodel=kernel', '-mno-red-zone']
 
 # Generate the AP boot code.
 if config['SMP']:

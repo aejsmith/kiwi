@@ -100,7 +100,7 @@ void menu_finalize(struct menu *parent);
 void menu_set_type(int type);
 
 /* util.c */
-struct file *file_lookup(const char *name);
+struct file *file_lookup(FILE *stream, const char *name);
 int file_write_dep(const char *name);
 
 struct gstr {

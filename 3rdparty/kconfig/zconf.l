@@ -292,14 +292,14 @@ void zconf_initscan(const char *name)
 	current_buf = malloc(sizeof(*current_buf));
 	memset(current_buf, 0, sizeof(*current_buf));
 
-	current_file = file_lookup(name);
+	current_file = file_lookup(yyin, name);
 	current_file->lineno = 1;
 	current_file->flags = FILE_BUSY;
 }
 
 void zconf_nextfile(const char *name)
 {
-	struct file *file = file_lookup(name);
+	struct file *file;
 	struct buffer *buf = malloc(sizeof(*buf));
 	memset(buf, 0, sizeof(*buf));
 
@@ -313,6 +313,7 @@ void zconf_nextfile(const char *name)
 	buf->parent = current_buf;
 	current_buf = buf;
 
+	file = file_lookup(yyin, name);
 	if (file->flags & FILE_BUSY) {
 		printf("%s:%d: do not source '%s' from itself\n",
 		       zconf_curname(), zconf_lineno(), name);
@@ -328,6 +329,7 @@ void zconf_nextfile(const char *name)
 	file->lineno = 1;
 	file->parent = current_file;
 	current_file = file;
+	fchdir(current_file->dirfd);
 }
 
 static void zconf_endfile(void)
@@ -336,7 +338,10 @@ static void zconf_endfile(void)
 
 	current_file->flags |= FILE_SCANNED;
 	current_file->flags &= ~FILE_BUSY;
+	close(current_file->dirfd);
 	current_file = current_file->parent;
+	if (current_file)
+		fchdir(current_file->dirfd);
 
 	parent = current_buf->parent;
 	if (parent) {

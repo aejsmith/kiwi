@@ -5,22 +5,45 @@
  * Released under the terms of the GNU GPL v2.0.
  */
 
+#include <libgen.h>
 #include <string.h>
+#include <fcntl.h>
 #include "lkc.h"
 
 /* file already present in list? If not add it */
-struct file *file_lookup(const char *name)
+struct file *file_lookup(FILE *stream, const char *name)
 {
 	struct file *file;
+	struct stat sb;
+	char *tmp;
+	int ret;
+
+	ret = fstat(fileno(stream), &sb);
+	if (ret != 0) {
+		perror("stat");
+		exit(1);
+	}
 
 	for (file = file_list; file; file = file->next) {
-		if (!strcmp(name, file->name))
+		if (file->dev == sb.st_dev && file->ino == sb.st_ino)
 			return file;
 	}
 
 	file = malloc(sizeof(*file));
 	memset(file, 0, sizeof(*file));
 	file->name = strdup(name);
+	file->dev = sb.st_dev;
+	file->ino = sb.st_ino;
+
+	/* Work out the directory path. */
+	tmp = strdup(name);
+	file->dirfd = open(dirname(tmp), O_DIRECTORY | O_RDONLY);
+	if (file->dirfd < 0) {
+		perror("open");
+		exit(1);
+	}
+	free(tmp);
+
 	file->next = file_list;
 	file_list = file;
 	return file;
