@@ -223,11 +223,14 @@ static bool sched_timer_handler(void *data) {
  * @param state		Previous interrupt state. */
 void sched_internal(bool state) {
 	sched_cpu_t *cpu = curr_cpu->sched;
-	thread_t *new;
+	thread_t *next;
 
 	assert(!atomic_get(&kdbg_running));
 
 	spinlock_lock_ni(&cpu->lock);
+
+	/* Stop the preemption timer if it is running. */
+	timer_stop(&cpu->timer);
 
 	/* Thread can't be in ready state if we're running it now. */
 	assert(curr_thread->state != THREAD_READY);
@@ -254,33 +257,32 @@ void sched_internal(bool state) {
 	}
 
 	/* Find a new thread to run. A NULL return value means no threads are
-	 * ready, so we schedule the idle thread in this case. This will
-	 * return with the new thread locked if it is not the current. */
-	new = sched_pick_thread(cpu);
-	if(!new) {
-		new = cpu->idle_thread;
-		if(new != curr_thread) {
-			spinlock_lock_ni(&new->lock);
+	 * ready, so we schedule the idle thread in this case. */
+	next = sched_pick_thread(cpu);
+	if(next) {
+		if(next != curr_thread) {
+			spinlock_lock_ni(&next->lock);
+		}
+
+		next->timeslice = THREAD_TIMESLICE;
+		curr_cpu->idle = false;
+	} else {
+		next = cpu->idle_thread;
+		if(next != curr_thread) {
+			spinlock_lock_ni(&next->lock);
 			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n", curr_cpu->id);
 		}
 
 		/* The idle thread runs indefinitely until an interrupt causes
 		 * something to be woken up. */
-		new->timeslice = 0;
+		next->timeslice = 0;
 		curr_cpu->idle = true;
-	} else {
-		if(new != curr_thread) {
-			spinlock_lock_ni(&new->lock);
-		}
-
-		new->timeslice = THREAD_TIMESLICE;
-		curr_cpu->idle = false;
 	}
 
 	/* Move the thread to the Running state and set it as the current. */
 	cpu->prev_thread = curr_thread;
-	new->state = THREAD_RUNNING;
-	curr_thread = new;
+	next->state = THREAD_RUNNING;
+	curr_thread = next;
 
 	/* Finished with the scheduler queues, unlock. */
 	spinlock_unlock_ni(&cpu->lock);
@@ -297,29 +299,27 @@ void sched_internal(bool state) {
 			curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
 #endif
 
+		/* Switch the address space. If the new process' address space
+		 * is set to NULL then vm_aspace_switch() will just switch to
+		 * the kernel address space. */
+		vm_aspace_switch(curr_proc->aspace);
+
+		/* Save old FPU state if necessary, and disable the FPU. It
+		 * will be re-enabled on-demand if required. */
+		if(fpu_state()) {
+			assert(cpu->prev_thread->fpu);
+			fpu_context_save(cpu->prev_thread->fpu);
+			fpu_disable();
+		}
+
+		/* Switch to the new CPU context. */
+		if(!context_save(&cpu->prev_thread->context)) {
+			context_restore(&curr_thread->context);
+		}
+
 		/* The switch may return to thread_trampoline() or to the
 		 * interruption handler in waitq_sleep_unsafe(), so put
 		 * anything to do after a switch in sched_post_switch(). */
-		if(curr_thread != cpu->prev_thread) {
-			/* Switch the address space. If the new process' address
-			 * space is set to NULL then vm_aspace_switch() will
-			 * just switch to the kernel address space. */
-			vm_aspace_switch(curr_proc->aspace);
-
-			/* Save old FPU state if necessary, and disable the FPU.
-			 * It will be re-enabled on-demand if required. */
-			if(fpu_state()) {
-				assert(cpu->prev_thread->fpu);
-				fpu_context_save(cpu->prev_thread->fpu);
-				fpu_disable();
-			}
-
-			/* Switch to the new CPU context. */
-			if(!context_save(&cpu->prev_thread->context)) {
-				context_restore(&curr_thread->context);
-			}
-		}
-
 		sched_post_switch(state);
 	} else {
 		spinlock_unlock_ni(&curr_thread->lock);
@@ -338,6 +338,9 @@ void sched_post_switch(bool state) {
 	/* The prev_thread pointer is set to NULL during sched_init(). It will
 	 * only ever be NULL once. */
 	if(likely(curr_cpu->sched->prev_thread)) {
+		/* Unlock previous. This will not be the current thread, as a
+		 * switch is not performed if the new thread is the same as the
+		 * previous. */
 		spinlock_unlock_ni(&curr_cpu->sched->prev_thread->lock);
 
 		/* Deal with thread terminations. */
@@ -523,7 +526,7 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 }
 
 /** Initialise the scheduler for the current CPU. */
-void __init_text sched_init(void) {
+__init_text void sched_init(void) {
 	char name[THREAD_NAME_MAX];
 	status_t ret;
 	int i, j;
@@ -564,7 +567,7 @@ void __init_text sched_init(void) {
 }
 
 /** Begin executing other threads. */
-void __init_text sched_enter(void) {
+__init_text void sched_enter(void) {
 	assert(!intr_state());
 
 	/* Lock the idle thread - sched_post_switch() expects the thread to be
