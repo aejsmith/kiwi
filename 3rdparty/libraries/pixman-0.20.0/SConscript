@@ -71,7 +71,7 @@ if config['SRCARCH'] == 'x86':
 		defines['SIZEOF_LONG'] = 4
 	defines['USE_MMX'] = 1
 	sources += ['pixman-mmx.c']
-	ccflags += ['-mmmx', '-Winline']
+	ccflags += ['-mmmx']
 else:
 	raise Exception, "Architecture support not added."
 

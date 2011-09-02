@@ -194,6 +194,8 @@ static void set_option(kboot_data_t *data, const char *name, uint32_t type) {
 	case KBOOT_OPTION_INTEGER:
 		size = sizeof(uint64_t);
 		break;
+	default:
+		internal_error("Eeeep.");
 	}
 
 	tag = allocate_tag(data, KBOOT_TAG_OPTION, sizeof(*tag) + size);

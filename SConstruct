@@ -35,7 +35,7 @@ version = {
 cc_warning_flags = [
 	'-Wall', '-Wextra', '-Werror', '-Wno-variadic-macros',
 	'-Wno-unused-parameter', '-Wwrite-strings', '-Wmissing-declarations',
-	'-Wredundant-decls', '-Wno-format',
+	'-Wredundant-decls', '-Wno-format', '-Wno-unused-but-set-variable',
 ]
 
 # C++ warning flags.
@@ -49,7 +49,9 @@ cxx_warning_flags = [
 host_flags = {
 	'CCFLAGS': ['-pipe'],
 	'CFLAGS': ['-std=gnu99'],
-	'CXXFLAGS': filter(lambda f: f not in ['-Wmissing-declarations', '-Wno-variadic-macros'], cc_warning_flags),
+	'CXXFLAGS': filter(lambda f: f not in [
+		'-Wmissing-declarations', '-Wno-variadic-macros',
+		'-Wno-unused-but-set-variable'], cc_warning_flags),
 	'YACCFLAGS': ['-d'],
 }
 
