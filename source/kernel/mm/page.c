@@ -800,12 +800,10 @@ void page_stats_get(page_stats_t *stats) {
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_page(int argc, char **argv) {
 	page_stats_t stats;
-#if 0
-	vm_page_t *page;
 	unative_t addr;
-	int queue = -1;
+	page_t *page;
 	size_t i;
-#endif
+
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s [<addr>]\n\n", argv[0]);
 
@@ -816,41 +814,36 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
 		return KDBG_FAIL;
 	}
-#if 0
+
 	if(argc == 2) {
 		if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		} else if(addr % PAGE_SIZE) {
-			kprintf(LOG_NONE, "Address must be page aligned\n");
+			kprintf(LOG_NONE, "Address must be page aligned.\n");
 			return KDBG_FAIL;
-		} else if(!(page = vm_page_lookup(addr))) {
+		} else if(!(page = page_lookup(addr))) {
 			kprintf(LOG_NONE, "404 Page Not Found\n");
 			return KDBG_FAIL;
 		}
 
-		/* Work out the ID of the queue the page is on. */
-		if(page->queue) {
-			queue = (int)(((ptr_t)page->queue - (ptr_t)page_queues) / sizeof(page_queue_t));
-		}
-
-		kprintf(LOG_NONE, "Page 0x%" PRIxPHYS " (%p)\n", page->addr, page);
+		kprintf(LOG_NONE, "Page 0x%" PRIxPHYS " (%p) (Range: %d)\n", page->addr, page, page->phys_range);
 		kprintf(LOG_NONE, "=================================================\n");
-		kprintf(LOG_NONE, "Queue:    %d (%p)\n", queue, page->queue);
+		kprintf(LOG_NONE, "State:    %d\n", page->state);
 		kprintf(LOG_NONE, "Modified: %d\n", page->modified);
 		kprintf(LOG_NONE, "Count:    %d\n", page->count);
 		kprintf(LOG_NONE, "Cache:    %p\n", page->cache);
 		kprintf(LOG_NONE, "Amap:     %p\n", page->amap);
 		kprintf(LOG_NONE, "Offset:   %" PRIu64 "\n", page->offset);
 	} else {
-		kprintf(LOG_NONE, "Start              End                Pages\n");
-		kprintf(LOG_NONE, "=====              ===                =====\n");
+		kprintf(LOG_NONE, "Start              End                Freelist Pages\n");
+		kprintf(LOG_NONE, "=====              ===                ======== =====\n");
 
-		for(i = 0; i < page_range_count; i++) {
-			kprintf(LOG_NONE, "0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %p\n",
-			        page_ranges[i].start, page_ranges[i].end,
-			        page_ranges[i].pages);
+		for(i = 0; i < phys_range_count; i++) {
+			kprintf(LOG_NONE, "0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %-8u %p\n",
+			        phys_ranges[i].start, phys_ranges[i].end,
+			        phys_ranges[i].freelist, phys_ranges[i].pages);
 		}
-#endif
+
 		page_stats_get(&stats);
 		kprintf(LOG_NONE, "\nUsage statistics\n");
 		kprintf(LOG_NONE, "================\n");
@@ -859,7 +852,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "Modified:  %" PRIu64 " KiB\n", stats.modified / 1024);
 		kprintf(LOG_NONE, "Cached:    %" PRIu64 " KiB\n", stats.cached / 1024);
 		kprintf(LOG_NONE, "Free:      %" PRIu64 " KiB\n", stats.free / 1024);
-	//}
+	}
 
 	return KDBG_OK;
 }
