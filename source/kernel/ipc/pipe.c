@@ -21,7 +21,7 @@
 
 #include <ipc/pipe.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/slab.h>
 
 #include <assert.h>
@@ -233,7 +233,7 @@ pipe_t *pipe_create(void) {
 	pipe = slab_cache_alloc(pipe_cache, MM_SLEEP);
 	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
-	pipe->buf = kheap_alloc(PIPE_SIZE, MM_SLEEP);
+	pipe->buf = heap_alloc(PIPE_SIZE, MM_SLEEP);
 	pipe->start = 0;
 	pipe->end = 0;
 	return pipe;
@@ -246,13 +246,13 @@ void pipe_destroy(pipe_t *pipe) {
 	assert(!mutex_held(&pipe->lock));
 	assert(notifier_empty(&pipe->space_notifier));
 	assert(notifier_empty(&pipe->data_notifier));
-	kheap_free(pipe->buf, PIPE_SIZE);
+	heap_free(pipe->buf, PIPE_SIZE);
 	slab_cache_free(pipe_cache, pipe);
 }
 
 /** Initialise the pipe slab cache. */
 static void __init_text pipe_cache_init(void) {
 	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
-	                               NULL, NULL, NULL, 0, MM_FATAL);
+	                               NULL, NULL, 0, MM_FATAL);
 }
 INITCALL(pipe_cache_init);

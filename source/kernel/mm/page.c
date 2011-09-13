@@ -89,7 +89,6 @@
 #include <lrm.h>
 #include <status.h>
 #include <time.h>
-#include <vmem.h>
 
 #if CONFIG_PAGE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

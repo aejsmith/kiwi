@@ -69,7 +69,6 @@
 
 #include <lib/string.h>
 
-#include <mm/kheap.h>
 #include <mm/malloc.h>
 #include <mm/vm.h>
 

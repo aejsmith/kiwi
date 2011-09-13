@@ -2580,7 +2580,7 @@ int kdbg_cmd_node(int argc, char **argv) {
 /** Initialise the filesystem layer. */
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
-	                                  NULL, NULL, NULL, NULL, 0, MM_FATAL);
+	                                  NULL, NULL, NULL, 0, MM_FATAL);
 
 	/* Register the low resource handler. */
 	lrm_handler_register(&fs_lrm_handler);

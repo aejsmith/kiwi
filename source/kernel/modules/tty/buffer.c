@@ -21,7 +21,7 @@
 
 #include <lib/string.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 
 #include <assert.h>
@@ -234,14 +234,14 @@ tty_buffer_t *tty_buffer_create(void) {
 	notifier_init(&buf->space_notifier, buf);
 	buf->start = 0;
 	buf->end = 0;
-	buf->buffer = kheap_alloc(TTY_BUFFER_SIZE * sizeof(*buf->buffer), MM_SLEEP);
+	buf->buffer = heap_alloc(TTY_BUFFER_SIZE * sizeof(*buf->buffer), MM_SLEEP);
 	return buf;
 }
 
 /** Destroy a terminal buffer.
  * @param buf		Buffer to destroy. */
 void tty_buffer_destroy(tty_buffer_t *buf) {
-	kheap_free(buf->buffer, TTY_BUFFER_SIZE * sizeof(*buf->buffer));
+	heap_free(buf->buffer, TTY_BUFFER_SIZE * sizeof(*buf->buffer));
 	notifier_clear(&buf->lines_notifier);
 	notifier_clear(&buf->data_notifier);
 	notifier_clear(&buf->space_notifier);

@@ -28,7 +28,7 @@
 
 #include <lib/string.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/page.h>
 
 #include <assert.h>
@@ -103,7 +103,7 @@ void cpu_boot(cpu_t *cpu) {
 	/* Allocate a double fault stack for the new CPU. This is also used as
 	 * the initial stack while initialising the AP, before it enters the
 	 * scheduler. */
-	cpu->arch.double_fault_stack = kheap_alloc(KSTACK_SIZE, MM_FATAL);
+	cpu->arch.double_fault_stack = heap_alloc(KSTACK_SIZE, MM_FATAL);
 
 	/* Create a temporary page map for the AP to use while booting. This is
 	 * necessary because the bootstrap code needs to be identity mapped

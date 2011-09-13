@@ -21,7 +21,7 @@
 
 #include <arch/io.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
 
@@ -34,7 +34,6 @@
 #include <kdbg.h>
 #include <module.h>
 #include <status.h>
-#include <vmem.h>
 
 #include "x86emu/x86emu.h"
 
@@ -49,11 +48,10 @@
 
 /** BIOS memory allocation data. */
 static void *bios_mem_mapping = NULL;
-static vmem_t *bios_mem_arena = NULL;
 static phys_ptr_t bios_mem_pages = 0;
 
 /** Lock to serialise BIOS interrupt calls. */
-static MUTEX_DECLARE(bios_lock, 0);
+static MUTEX_DECLARE(bios_lock, MUTEX_RECURSIVE);
 
 /** Read 8 bits from a port.
  * @param port		Port to read from.
@@ -159,6 +157,9 @@ static X86EMU_memFuncs x86emu_mem_funcs = {
 	.wrl = x86emu_mem_wrl,
 };
 
+static uint32_t next_alloc = BIOS_MEM_BASE;
+static size_t remaining_size = BIOS_MEM_SIZE;
+
 /** Allocate space in the BIOS memory area.
  * @param size		Size of allocation.
  * @param mmflag	Allocation flags.
@@ -167,13 +168,23 @@ static X86EMU_memFuncs x86emu_mem_funcs = {
  *			passed to interrupts - use bios_mem_virt2phys() to
  *			convert the address to a physical address first. */
 void *bios_mem_alloc(size_t size, int mmflag) {
-	vmem_resource_t ret;
+	uint32_t ret;
 
-	if(!(ret = vmem_alloc(bios_mem_arena, size, mmflag))) {
+	mutex_lock(&bios_lock);
+
+	if(size > remaining_size) {
+		if(mmflag & MM_SLEEP) {
+			fatal("oh dear\n");
+		}
 		return NULL;
 	}
 
-	return bios_mem_phys2virt((uint32_t)ret);
+	ret = next_alloc;
+	next_alloc += size;
+	remaining_size -= size;
+
+	mutex_unlock(&bios_lock);
+	return bios_mem_phys2virt(ret);
 }
 MODULE_EXPORT(bios_mem_alloc);
 
@@ -181,7 +192,7 @@ MODULE_EXPORT(bios_mem_alloc);
  * @param addr		Address of allocation.
  * @param size		Size of the original allocation. */
 void bios_mem_free(void *addr, size_t size) {
-	vmem_free(bios_mem_arena, bios_mem_virt2phys(addr), size);
+
 }
 MODULE_EXPORT(bios_mem_free);
 
@@ -235,6 +246,9 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 
 	mutex_lock(&bios_lock);
 
+	uint32_t save_next_alloc = next_alloc;
+	size_t save_remaining_size = remaining_size;
+
 	/* Allocate a stack and a halt byte to finish execution. */
 	stack = bios_mem_alloc(BIOS_STACK_SIZE, MM_SLEEP);
 	halt = bios_mem_alloc(1, MM_SLEEP);
@@ -280,6 +294,8 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 	/* Free up data. */
 	bios_mem_free(halt, 1);
 	bios_mem_free(stack, BIOS_STACK_SIZE);
+	next_alloc = save_next_alloc;
+	remaining_size = save_remaining_size;
 
 	mutex_unlock(&bios_lock);
 }
@@ -312,15 +328,13 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
  * @return		Status code describing result of the operation. */
 static status_t bios_init(void) {
 	/* Allocate a chunk of heap space and map stuff into it. */
-	bios_mem_mapping = (void *)((ptr_t)vmem_alloc(&kheap_va_arena, 0x100000, MM_SLEEP));
+	bios_mem_mapping = (void *)heap_raw_alloc(0x100000, MM_SLEEP);
+	kprintf(LOG_DEBUG, "mapping at %p\n", bios_mem_mapping);
 	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_SLEEP, &bios_mem_pages);
 	bios_mem_map(BIOS_BDA_BASE, BIOS_BDA_BASE, BIOS_BDA_SIZE);
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);
 
-	/* Initialise the memory allocator. */
-	bios_mem_arena = vmem_create("bios_mem_arena", 1, 0, 0, NULL, NULL, NULL, 0,
-	                             BIOS_MEM_BASE, BIOS_MEM_SIZE, MM_SLEEP);
 	/* Initialise the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);
 	X86EMU_setupMemFuncs(&x86emu_mem_funcs);

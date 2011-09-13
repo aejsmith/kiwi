@@ -703,6 +703,6 @@ int kdbg_cmd_cache(int argc, char **argv) {
 /** Create the VM cache structure slab cache. */
 void __init_text vm_cache_init(void) {
 	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),
-	                                   0, vm_cache_ctor, NULL, NULL, NULL,
-	                                   0, MM_FATAL);
+	                                   0, vm_cache_ctor, NULL, NULL, 0,
+	                                   MM_FATAL);
 }

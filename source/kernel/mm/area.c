@@ -374,6 +374,6 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 static void __init_text area_init(void) {
 	id_alloc_init(&area_id_allocator, 65535);
 	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
-	                               NULL, NULL, NULL, 0, MM_FATAL);
+	                               NULL, NULL, 0, MM_FATAL);
 }
 INITCALL(area_init);

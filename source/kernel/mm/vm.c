@@ -1493,12 +1493,12 @@ void __init_text vm_init(void) {
 
 	/* Create the VM slab caches. */
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
-	                                    0, vm_aspace_ctor, NULL, NULL, NULL, 0,
+	                                    0, vm_aspace_ctor, NULL, NULL, 0,
 	                                    MM_FATAL);
 	vm_region_cache = slab_cache_create("vm_region_cache", sizeof(vm_region_t),
-	                                    0, NULL, NULL, NULL, NULL, 0, MM_FATAL);
+	                                    0, NULL, NULL, NULL, 0, MM_FATAL);
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
-	                                  0, vm_amap_ctor, NULL, NULL, NULL, 0,
+	                                  0, vm_amap_ctor, NULL, NULL, 0,
 	                                  MM_FATAL);
 
 	/* Initialise the other parts of the VM system. */

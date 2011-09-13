@@ -37,8 +37,9 @@
  */
 
 #include <lib/string.h>
+#include <lib/utility.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
@@ -92,7 +93,7 @@ void *kmalloc(size_t size, int kmflag) {
 	}
 
 	/* Fall back on the kernel heap. */
-	addr = kheap_alloc(ROUND_UP(total, PAGE_SIZE), (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
+	addr = heap_alloc(ROUND_UP(total, PAGE_SIZE), (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(addr == NULL) {
 		if(kmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation (%zu bytes)", size);
@@ -177,7 +178,7 @@ void kfree(void *addr) {
 		/* If the cache pointer is not set, assume the allocation came
 		 * directly from the heap. */
 		if(btag->cache == NULL) {
-			kheap_free(btag, ROUND_UP(btag->size + sizeof(alloc_btag_t), PAGE_SIZE));
+			heap_free(btag, ROUND_UP(btag->size + sizeof(alloc_btag_t), PAGE_SIZE));
 			return;
 		}
 
@@ -199,7 +200,7 @@ void __init_text malloc_init(void) {
 		name[SLAB_NAME_MAX - 1] = 0;
 
 		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
-		                                      NULL, NULL, 0, 0);
+		                                      NULL, 0, 0);
 		if(kmalloc_caches[i] == NULL) {
 			fatal("Could not create malloc cache: %s", name);
 		}

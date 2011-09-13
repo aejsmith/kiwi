@@ -255,6 +255,6 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 /** Initialise the futex cache. */
 static void __init_text futex_init(void) {
 	futex_cache = slab_cache_create("futex_cache", sizeof(futex_t), 0, futex_ctor,
-	                                NULL, NULL, NULL, 0, MM_FATAL);
+	                                NULL, NULL, 0, MM_FATAL);
 }
 INITCALL(futex_init);

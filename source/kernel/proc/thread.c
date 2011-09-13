@@ -27,7 +27,7 @@
 #include <lib/id_alloc.h>
 #include <lib/string.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -148,7 +148,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		process_detach(thread);
 
 		/* Now clean up the thread. */
-		kheap_free(thread->kstack, KSTACK_SIZE);
+		heap_free(thread->kstack, KSTACK_SIZE);
 		context_destroy(&thread->context);
 		thread_arch_destroy(thread);
 		if(thread->fpu) {
@@ -484,13 +484,13 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
 	/* Allocate a kernel stack and initialise the thread context. */
-	thread->kstack = kheap_alloc(KSTACK_SIZE, MM_SLEEP);
+	thread->kstack = heap_alloc(KSTACK_SIZE, MM_SLEEP);
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
 	/* Initialise architecture-specific data. */
 	ret = thread_arch_init(thread);
 	if(ret != STATUS_SUCCESS) {
-		kheap_free(thread->kstack, KSTACK_SIZE);
+		heap_free(thread->kstack, KSTACK_SIZE);
 		id_alloc_release(&thread_id_allocator, thread->id);
 		slab_cache_free(thread_cache, thread);
 		return ret;
@@ -705,7 +705,7 @@ void __init_text thread_init(void) {
 
 	/* Create the thread slab cache. */
 	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
-	                                 thread_cache_ctor, NULL, NULL, NULL, 0,
+	                                 thread_cache_ctor, NULL, NULL, 0,
 	                                 MM_FATAL);
 }
 

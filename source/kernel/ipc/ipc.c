@@ -1143,10 +1143,10 @@ static void __init_text ipc_init(void) {
 
 	/* Create the IPC structure caches. */
 	ipc_port_cache = slab_cache_create("ipc_port_cache", sizeof(ipc_port_t), 0,
-	                                   ipc_port_ctor, NULL, NULL, NULL, 0,
+	                                   ipc_port_ctor, NULL, NULL, 0,
 	                                   MM_FATAL);
 	ipc_connection_cache = slab_cache_create("ipc_connection_cache", sizeof(ipc_connection_t),
-	                                         0, ipc_connection_ctor, NULL, NULL, NULL, 0,
+	                                         0, ipc_connection_ctor, NULL, NULL, 0,
 	                                         MM_FATAL);
 }
 INITCALL(ipc_init);

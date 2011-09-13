@@ -26,7 +26,7 @@
 
 #include <lib/utility.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/page.h>
 
 #include <proc/thread.h>
@@ -154,6 +154,8 @@ static int compute_memory_level(void) {
 /** Get the free kernel address space level.
  * @return		Free kernel address space level. */
 static int compute_kaspace_level(void) {
+	// FIXME
+#if 0
 	uint64_t free;
 
 	free = ROUND_UP(kheap_raw_arena.total_size - kheap_raw_arena.used_size, 1024 * 1024);
@@ -165,8 +167,9 @@ static int compute_kaspace_level(void) {
 	} else if(free <= KASPACE_ADVISORY_LIMIT) {
 		return RESOURCE_LEVEL_ADVISORY;
 	} else {
+#endif
 		return RESOURCE_LEVEL_OK;
-	}
+	//}
 }
 
 /** Get the level of available resources.

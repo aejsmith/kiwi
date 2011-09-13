@@ -31,7 +31,7 @@
 #include <lib/string.h>
 #include <lib/tar.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
 #include <mm/slab.h>
@@ -406,12 +406,9 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Initialise kernel memory management subsystems. */
 	security_init();
 	time_init();
-	vmem_early_init();
-	kheap_early_init();
 	page_init();
-	vmem_init();
+	heap_init();
 	slab_init();
-	kheap_init();
 	malloc_init();
 
 	/* Set up the console. */
@@ -445,10 +442,6 @@ static __init_text void kmain_bsp_bottom(void) {
 	thread_reaper_init();
 	dpc_init();
 	lrm_init();
-
-	/* Now that the scheduler is up, the vmem periodic maintenance timer
-	 * can be registered. */
-	vmem_late_init();
 
 	/* Bring up the VM system. */
 	vm_init();

@@ -680,9 +680,9 @@ int kdbg_cmd_object(int argc, char **argv) {
 /** Initialise the handle caches. */
 void __init_text handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
-	                                        0, NULL, NULL, NULL, NULL, 0, MM_FATAL);
+	                                        0, NULL, NULL, NULL, 0, MM_FATAL);
 	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
-	                                       0, handle_table_ctor, NULL, NULL, NULL, 0,
+	                                       0, handle_table_ctor, NULL, NULL, 0,
 	                                       MM_FATAL);
 }
 

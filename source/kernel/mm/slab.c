@@ -40,7 +40,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
@@ -52,7 +52,6 @@
 #include <kdbg.h>
 #include <lrm.h>
 #include <status.h>
-#include <vmem.h>
 
 #if CONFIG_SLAB_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -101,9 +100,8 @@ typedef struct slab {
 
 /** Reclaim priorities to use for caches. */
 #define SLAB_DEFAULT_PRIORITY		0
-#define SLAB_QCACHE_PRIORITY		1
-#define SLAB_METADATA_PRIORITY		2
-#define SLAB_MAG_PRIORITY		3
+#define SLAB_METADATA_PRIORITY		1
+#define SLAB_MAG_PRIORITY		2
 
 /** Internally-used caches. */
 static slab_cache_t slab_cache_cache;		/**< Cache for allocation of new slab caches. */
@@ -112,42 +110,15 @@ static slab_cache_t slab_bufctl_cache;		/**< Cache for buffer control structures
 static slab_cache_t slab_slab_cache;		/**< Cache for slab structures. */
 static slab_cache_t *slab_percpu_cache = NULL;	/**< Cache for per-CPU structures. */
 
-/** Vmem arena to back the internal caches. */
-static vmem_t slab_metadata_arena;
-
 /** List of all slab caches. */
 static LIST_DECLARE(slab_caches);
 static MUTEX_DECLARE(slab_caches_lock, 0);
-
-/** Work out the optimal slab size for a cache.
- * @todo		Better implementation.
- * @param cache		Cache to work out for.
- * @return		Slab size to use. */
-static inline size_t slab_get_slabsize(slab_cache_t *cache) {
-	size_t size;
-
-	if(cache->flags & SLAB_CACHE_QCACHE) {
-		return VMEM_QCACHE_SSIZE(cache->source->qcache_max);
-	} else if(cache->obj_size < (cache->source->quantum / SLAB_LARGE_FRACTION)) {
-		return cache->source->quantum;
-	}
-
-	/* Don't need to worry about space taken up by metadata here: the
-	 * no-touch flag will always be enabled for objects of this size (see
-	 * above check). */
-	size = ROUND_UP(cache->obj_size, cache->source->quantum);
-	while((size % cache->obj_size) > (size / SLAB_WASTE_FRACTION)) {
-		size += cache->source->quantum;
-	}
-
-	return size;
-}
 
 /** Destroy a slab.
  * @param cache		Cache to destroy in.
  * @param slab		Slab to destroy. */
 static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
-	unative_t addr = (unative_t)slab->base;
+	void *addr = slab->base;
 	slab_bufctl_t *bufctl;
 
 	if(unlikely(slab->refcount != 0)) {
@@ -159,7 +130,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 
 	/* Destroy all buffer control structures and the slab structure if
 	 * stored externally. */
-	if(cache->flags & SLAB_CACHE_NOTOUCH) {
+	if(cache->flags & SLAB_CACHE_LARGE) {
 		while(slab->free != NULL) {
 			bufctl = slab->free;
 			slab->free = bufctl->next;
@@ -171,7 +142,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 	}
 
 	cache->slab_count--;
-	vmem_free(cache->source, addr, cache->slab_size);
+	heap_free(addr, cache->slab_size);
 }
 
 /** Allocate a new slab and divide it up into objects.
@@ -180,8 +151,8 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
  * @return		Pointer to slab structure. */
 static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	slab_bufctl_t *bufctl, *prev = NULL;
-	unative_t addr;
 	slab_t *slab;
+	void *addr;
 	size_t i;
 
 	/* Drop slab lock while creating as a reclaim may occur that wants to
@@ -189,10 +160,10 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	mutex_unlock(&cache->slab_lock);
 
 	/* Allocate a new slab. */
-	addr = vmem_alloc(cache->source, cache->slab_size, (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
-	if(unlikely(addr == 0)) {
-		/* Handle MM_FATAL ourselves rather than converting to vmflag
-		 * so that we get a more accurate error message. */
+	addr = heap_alloc(cache->slab_size, (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
+	if(unlikely(!addr)) {
+		/* Handle MM_FATAL ourselves so that we get a more accurate
+		 * error message. */
 		if(kmflag & MM_FATAL) {
 			fatal("Could not perform mandatory allocation on object cache %p(%s) (1)",
 			      cache, cache->name);
@@ -204,7 +175,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	mutex_lock(&cache->slab_lock);
 
 	/* Create the slab structure for the slab. */
-	if(cache->flags & SLAB_CACHE_NOTOUCH) {
+	if(cache->flags & SLAB_CACHE_LARGE) {
 		slab = slab_cache_alloc(&slab_slab_cache, kmflag & ~MM_FATAL);
 		if(unlikely(slab == NULL)) {
 			/* Same as above. */
@@ -213,17 +184,17 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 				      cache, cache->name);
 			}
 
-			vmem_free(cache->source, addr, cache->slab_size);
+			heap_free(addr, cache->slab_size);
 			return NULL;
 		}
 	} else {
-		slab = (slab_t *)((addr + cache->slab_size) - sizeof(slab_t));
+		slab = (slab_t *)(((ptr_t)addr + cache->slab_size) - sizeof(slab_t));
 	}
 
 	cache->slab_count++;
 
 	list_init(&slab->header);
-	slab->base = (void *)addr;
+	slab->base = addr;
 	slab->refcount = 0;
 	slab->free = NULL;
 	slab->colour = cache->colour_next;
@@ -231,7 +202,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 
 	/* Divide the buffer up into unconstructed, free objects. */
 	for(i = 0; i < cache->obj_count; i++) {
-		if(cache->flags & SLAB_CACHE_NOTOUCH) {
+		if(cache->flags & SLAB_CACHE_LARGE) {
 			bufctl = slab_cache_alloc(&slab_bufctl_cache, kmflag & ~MM_FATAL);
 			if(unlikely(bufctl == NULL)) {
 				/* Same as above. */
@@ -245,9 +216,9 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 			}
 
 			bufctl->parent = slab;
-			bufctl->object = (void *)(addr + slab->colour + (i * cache->obj_size));
+			bufctl->object = (void *)((ptr_t)addr + slab->colour + (i * cache->obj_size));
 		} else {
-			bufctl = (slab_bufctl_t *)(addr + slab->colour + (i * cache->obj_size));
+			bufctl = (slab_bufctl_t *)((ptr_t)addr + slab->colour + (i * cache->obj_size));
 		}
 
 		/* Add to the free list. */
@@ -280,10 +251,10 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 
 	mutex_lock(&cache->slab_lock);
 
-	/* Find the buffer control structure. For no-touch caches, look it up
-	 * on the allocation hash table. Otherwise, we use the start of the
+	/* Find the buffer control structure. For large object caches, look it
+	 * up on the allocation hash table. Otherwise, we use the start of the
 	 * buffer as the structure. */
-	if(cache->flags & SLAB_CACHE_NOTOUCH) {
+	if(cache->flags & SLAB_CACHE_LARGE) {
 		hash = fnv_hash_integer((uint64_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
 		for(bufctl = cache->bufctl_hash[hash]; bufctl != NULL; bufctl = bufctl->next) {
 			if(bufctl->object == obj) {
@@ -373,10 +344,10 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 	slab->free = bufctl->next;
 	slab->refcount++;
 
-	obj = (cache->flags & SLAB_CACHE_NOTOUCH) ? bufctl->object : (void *)bufctl;
+	obj = (cache->flags & SLAB_CACHE_LARGE) ? bufctl->object : (void *)bufctl;
 
 	/* Place the allocation on the allocation hash table if required. */
-	if(cache->flags & SLAB_CACHE_NOTOUCH) {
+	if(cache->flags & SLAB_CACHE_LARGE) {
 		hash = fnv_hash_integer((uint64_t)((ptr_t)obj)) % SLAB_HASH_SIZE;
 		bufctl->next = cache->bufctl_hash[hash];
 		cache->bufctl_hash[hash] = bufctl;
@@ -707,19 +678,16 @@ static status_t slab_percpu_init(slab_cache_t *cache, int kmflag) {
  * @param data		Data to pass as second parameter to callback functions.
  * @param priority	Reclaim priority (lower values will be reclaimed before
  *			higher values).
- * @param source	Arena used to allocate memory.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param kmflag	Allocation flags.
  * @return		Status code describing result of the operation. */
 static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
-                                slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-                                vmem_t *source, int flags, int kmflag) {
+				slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
+				int flags, int kmflag) {
 	slab_cache_t *exist;
 	status_t ret;
 
 	assert(size);
-	assert(source);
-	assert(source->quantum >= SLAB_ALIGN_MIN);
 	assert(align == 0 || !(align & (align - 1)));
 	assert(!align || IS_POW2(align));
 	assert(!(flags & SLAB_CACHE_LATEMAG));
@@ -731,7 +699,6 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 	list_init(&cache->slab_partial);
 	list_init(&cache->slab_full);
 	list_init(&cache->header);
-
 #if CONFIG_SLAB_STATS
 	atomic_set(&cache->alloc_current, 0);
 	atomic_set(&cache->alloc_total, 0);
@@ -740,56 +707,54 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
 
-	cache->source = source;
+	strncpy(cache->name, name, SLAB_NAME_MAX);
+	cache->name[SLAB_NAME_MAX - 1] = 0;
+
+	cache->flags = flags;
 	cache->ctor = ctor;
 	cache->dtor = dtor;
 	cache->data = data;
 	cache->priority = priority;
+	cache->colour_next = 0;
 
 	/* Alignment must be at lest SLAB_ALIGN_MIN. */
-	if(align < SLAB_ALIGN_MIN) {
-		align = SLAB_ALIGN_MIN;
-	}
+	cache->align = MAX(SLAB_ALIGN_MIN, align);
 
-	/* Ensure that the slab size is aligned. */
-	size = ROUND_UP(size, align);
+	/* Make sure the object size is aligned. */
+	cache->obj_size = ROUND_UP(size, cache->align);
+
+	/* If the cache contains large objects, set the large flag which causes
+	 * to not store metadata within allocated space. */
+	if(cache->obj_size >= (PAGE_SIZE / SLAB_LARGE_FRACTION)) {
+		cache->flags |= SLAB_CACHE_LARGE;
+
+		/* Compute the appropriate slab size. */
+		cache->slab_size = ROUND_UP(cache->obj_size, PAGE_SIZE);
+		while((cache->slab_size % cache->obj_size) > (cache->slab_size / SLAB_WASTE_FRACTION)) {
+			cache->slab_size += PAGE_SIZE;
+		}
+
+		cache->obj_count = cache->slab_size / cache->obj_size;
+		cache->colour_max = cache->slab_size - (cache->obj_count * cache->obj_size);
+	} else {
+		cache->slab_size = PAGE_SIZE;
+		cache->obj_count = (cache->slab_size - sizeof(slab_t)) / cache->obj_size;
+		cache->colour_max = (cache->slab_size - (cache->obj_count * cache->obj_size)) - sizeof(slab_t);
+	}
 
 	/* If we want the magazine layer to be enabled but the CPU count is
 	 * not known, disable it until it is known. */
-	if(!(flags & SLAB_CACHE_NOMAG) && !slab_percpu_cache) {
-		flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
-	}
-
-	/* If the cache contains large objects or is a quantum cache for vmem,
-	 * do not store the metadata within allocated buffers. */
-	if(flags & SLAB_CACHE_QCACHE || size >= (source->quantum / SLAB_LARGE_FRACTION)) {
-		flags |= SLAB_CACHE_NOTOUCH;
+	if(!(cache->flags & SLAB_CACHE_NOMAG) && !slab_percpu_cache) {
+		cache->flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
 	}
 
 	/* Initialise the CPU caches if required. */
-	if(!(flags & SLAB_CACHE_NOMAG)) {
+	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_percpu_init(cache, kmflag);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
 		}
 	}
-
-	/* Set calculated settings for the cache. */
-	cache->colour_next = 0;
-	cache->flags = flags;
-	cache->obj_size = size;
-	cache->align = align;
-	cache->slab_size = slab_get_slabsize(cache);
-	if(flags & SLAB_CACHE_NOTOUCH) {
-		cache->obj_count = cache->slab_size / cache->obj_size;
-		cache->colour_max = cache->slab_size - (cache->obj_count * cache->obj_size);
-	} else {
-		cache->obj_count = (cache->slab_size - sizeof(slab_t)) / cache->obj_size;
-		cache->colour_max = (cache->slab_size - (cache->obj_count * cache->obj_size)) - sizeof(slab_t);
-	}
-
-	strncpy(cache->name, name, SLAB_NAME_MAX);
-	cache->name[SLAB_NAME_MAX - 1] = 0;
 
 	/* Add the cache to the global cache list, keeping it ordered by
 	 * priority. */
@@ -811,7 +776,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 	}
 	mutex_unlock(&slab_caches_lock);
 
-	dprintf("slab: created slab cache %p(%s) (objsize: %u, slabsize: %u, align: %u)\n",
+	dprintf("slab: created slab cache %p(%s) (obj_size: %u, slab_size: %u, align: %u)\n",
 		cache, cache->name, cache->obj_size, cache->slab_size, cache->align);
 	return STATUS_SUCCESS;
 }
@@ -825,38 +790,21 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
  * @param data		Data to pass as second parameter to callback functions.
- * @param source	Arena used to allocate memory. If NULL, the kernel heap
- *			arena will be used.
  * @param flags		Flags to modify the behaviour of the cache.
  * @param kmflag	Allocation flags.
  * @return		Pointer to cache on success, NULL on failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-                                slab_ctor_t ctor, slab_dtor_t dtor, void *data,
-                                vmem_t *source, int flags, int kmflag) {
+				slab_ctor_t ctor, slab_dtor_t dtor, void *data,
+				int flags, int kmflag) {
 	slab_cache_t *cache;
-	int priority;
-
-	/* Use the kernel heap if no specific source is provided. */
-	if(!source) {
-		source = &kheap_arena;
-	}
-
-	/* If the cache is a quantum cache, reclaim it after all other caches.
-	 * This means that heap space reclaimed from normal caches can then be
-	 * reclaimed from the quantum caches. */
-	if(flags & SLAB_CACHE_QCACHE) {
-		priority = SLAB_QCACHE_PRIORITY;
-	} else {
-		priority = SLAB_DEFAULT_PRIORITY;
-	}
 
 	cache = slab_cache_alloc(&slab_cache_cache, kmflag);
 	if(!cache) {
 		return NULL;
 	}
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, data, priority,
-	                   source, flags, kmflag) != STATUS_SUCCESS) {
+	if(slab_cache_init(cache, name, size, align, ctor, dtor, data, SLAB_DEFAULT_PRIORITY,
+			   flags, kmflag) != STATUS_SUCCESS) {
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -912,13 +860,13 @@ int kdbg_cmd_slab(int argc, char **argv) {
 
 #if CONFIG_SLAB_STATS
 		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-10zu %-7d %d\n",
-		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-		        cache->slab_size, cache->flags, cache->slab_count,
-		        atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
+			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			cache->slab_size, cache->flags, cache->slab_count,
+			atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
 #else
 		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %zu\n",
-		        SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-		        cache->slab_size, cache->flags, cache->slab_count);
+			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			cache->slab_size, cache->flags, cache->slab_count);
 #endif
 	}
 
@@ -949,26 +897,20 @@ static lrm_handler_t slab_lrm_handler = {
 
 /** Initialise the slab allocator. */
 __init_text void slab_init(void) {
-	/* Initialise the metadata arena. */
-	vmem_early_create(&slab_metadata_arena, "slab_metadata_arena", PAGE_SIZE, 0, 0,
-		&kheap_raw_arena, kheap_anon_import, kheap_anon_release, 0, 0, 0,
-		MM_FATAL);
-
 	/* Intialise the cache for cache structures. */
 	slab_cache_init(&slab_cache_cache, "slab_cache_cache", SLAB_SIZE_ALIGN(slab_cache_t),
-		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
+		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_FATAL);
 
 	/* Initialise the magazine cache. This cannot have the magazine layer
 	 * enabled, for pretty obvious reasons. */
 	slab_cache_init(&slab_mag_cache, "slab_mag_cache", SLAB_SIZE_ALIGN(slab_magazine_t),
-		NULL, NULL, NULL, SLAB_MAG_PRIORITY, &slab_metadata_arena,
-		SLAB_CACHE_NOMAG, MM_FATAL);
+		NULL, NULL, NULL, SLAB_MAG_PRIORITY, SLAB_CACHE_NOMAG, MM_FATAL);
 
 	/* Create other internal caches. */
 	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", SLAB_SIZE_ALIGN(slab_bufctl_t),
-		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
+		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_FATAL);
 	slab_cache_init(&slab_slab_cache, "slab_slab_cache", SLAB_SIZE_ALIGN(slab_t),
-		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena, 0, MM_FATAL);
+		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_FATAL);
 
 	/* Register the LRM handler. */
 	lrm_handler_register(&slab_lrm_handler);
@@ -983,8 +925,7 @@ __init_text void slab_late_init(void) {
 	size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
 	slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_FATAL);
 	slab_cache_init(slab_percpu_cache, "slab_percpu_cache", size, __alignof(slab_percpu_t),
-		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, &slab_metadata_arena,
-		SLAB_CACHE_NOMAG, MM_FATAL);
+		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, SLAB_CACHE_NOMAG, MM_FATAL);
 
 	mutex_lock(&slab_caches_lock);
 

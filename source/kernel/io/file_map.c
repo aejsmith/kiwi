@@ -264,7 +264,7 @@ vm_cache_ops_t file_map_vm_cache_ops = {
 /** Initialise the file map slab cache. */
 static void __init_text file_map_init(void) {
 	file_map_cache = slab_cache_create("file_map_cache", sizeof(file_map_t),
-	                                   0, file_map_ctor, NULL, NULL, NULL, 0,
+	                                   0, file_map_ctor, NULL, NULL, 0,
 	                                   MM_FATAL);
 }
 INITCALL(file_map_init);

@@ -23,8 +23,9 @@
 
 #include <io/fs.h>
 
-#include <mm/kheap.h>
+#include <mm/heap.h>
 #include <mm/malloc.h>
+#include <mm/page.h>
 #include <mm/safe.h>
 
 #include <security/cap.h>
@@ -35,7 +36,6 @@
 #include <kdbg.h>
 #include <module.h>
 #include <status.h>
-#include <vmem.h>
 
 #if CONFIG_MODULE_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)
@@ -47,41 +47,51 @@
 static LIST_DECLARE(module_list);
 static MUTEX_DECLARE(module_lock, 0);
 
-/** Arena used for allocating memory for kernel modules. */
-static vmem_t *module_arena;
-
-/** Initialise the kernel module allocation arena. */
-static void module_mem_init(void) {
-	vmem_t *arena;
 #ifdef KERNEL_MODULE_BASE
-	arena = vmem_create("module_raw_arena", PAGE_SIZE, 0, 0, NULL, NULL,
-	                    NULL, 0, KERNEL_MODULE_BASE, KERNEL_MODULE_SIZE,
-	                    MM_FATAL);
-#else
-	arena = &kheap_va_arena;
+/** Module memory allocation space. */
+static ptr_t next_module_addr = KERNEL_MODULE_BASE;
+static size_t remaining_module_size = KERNEL_MODULE_SIZE;
 #endif
-	module_arena = vmem_create("module_arena", PAGE_SIZE, 0, 0, arena,
-	                           kheap_anon_import, kheap_anon_release, 0,
-	                           0, 0, MM_FATAL);
-}
 
 /** Allocate memory suitable to hold a kernel module.
  * @param size		Size of the allocation.
  * @return		Address allocated or NULL if no available memory. */
 void *module_mem_alloc(size_t size) {
-	/* Create the arenas if they have not been created. */
-	if(!module_arena) {
-		module_mem_init();
+#ifdef KERNEL_MODULE_BASE
+	page_t *page;
+	ptr_t addr;
+	size_t i;
+
+	size = ROUND_UP(size, PAGE_SIZE);
+
+	if(size > remaining_module_size) {
+		return NULL;
 	}
 
-	return (void *)((ptr_t)vmem_alloc(module_arena, ROUND_UP(size, PAGE_SIZE), 0));
+	addr = next_module_addr;
+
+	page_map_lock(&kernel_page_map);
+	for(i = 0; i < size; i += PAGE_SIZE) {
+		page = page_alloc(MM_FATAL);
+		page_map_insert(&kernel_page_map, addr + i, page->addr, true, true, MM_FATAL);
+	}
+	page_map_unlock(&kernel_page_map);
+
+	next_module_addr += size;
+	remaining_module_size -= size;
+	return (void *)addr;
+#else
+	return heap_alloc(ROUND_UP(size, PAGE_SIZE), 0);
+#endif
 }
 
 /** Free memory holding a module.
  * @param base		Base of the allocation.
  * @param size		Size of the allocation. */
 static void module_mem_free(void *base, size_t size) {
-	vmem_free(module_arena, (vmem_resource_t)((ptr_t)base), ROUND_UP(size, PAGE_SIZE));
+#ifndef KERNEL_MODULE_BASE
+	heap_free(base, ROUND_UP(size, PAGE_SIZE));
+#endif
 }
 
 /** Allocate a module structure.

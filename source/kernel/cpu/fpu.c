@@ -67,7 +67,7 @@ void fpu_request(void) {
 /** Initialise the FPU context cache. */
 static void __init_text fpu_cache_init(void) {
 	fpu_context_cache = slab_cache_create("fpu_context_cache", sizeof(fpu_context_t),
-	                                      FPU_CONTEXT_ALIGN, NULL, NULL, NULL, NULL,
-	                                      0, MM_FATAL);
+	                                      FPU_CONTEXT_ALIGN, NULL, NULL, NULL, 0,
+	                                      MM_FATAL);
 }
 INITCALL(fpu_cache_init);

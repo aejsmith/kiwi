@@ -31,7 +31,6 @@
 
 #include <sync/mutex.h>
 
-struct vmem;
 struct slab_percpu;
 struct slab_bufctl;
 
@@ -81,7 +80,6 @@ typedef struct slab_cache {
 	size_t obj_size;			/**< Size of an object. */
 	size_t obj_count;			/**< Number of objects per slab. */
 	size_t align;				/**< Required alignment of each object. */
-	struct vmem *source;			/**< Vmem arena to use for memory allocation. */
 
 	/** Callback functions. */
 	slab_ctor_t ctor;			/**< Object constructor function. */
@@ -96,8 +94,7 @@ typedef struct slab_cache {
 
 /** Slab cache flags. */
 #define SLAB_CACHE_NOMAG	(1<<0)		/**< Disable the magazine layer. */
-#define SLAB_CACHE_NOTOUCH	(1<<1)		/**< Always store metadata outside of allocated memory. */
-#define SLAB_CACHE_QCACHE	(1<<2)		/**< Cache is serving as a quantum cache for its source. */
+#define SLAB_CACHE_LARGE	(1<<1)		/**< Cache is a large object cache. */
 #define SLAB_CACHE_LATEMAG	(1<<3)		/**< Internal, do not set. */
 
 extern void *slab_cache_alloc(slab_cache_t *cache, int kmflag);
@@ -108,8 +105,7 @@ extern void slab_cache_free(slab_cache_t *cache, void *obj);
 
 extern slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
                                        slab_ctor_t ctor, slab_dtor_t dtor,
-                                       void *data, struct vmem *source, int flags,
-                                       int kmflag);
+                                       void *data, int flags, int kmflag);
 extern void slab_cache_destroy(slab_cache_t *cache);
 
 extern int kdbg_cmd_slab(int argc, char **argv);

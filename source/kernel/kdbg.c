@@ -58,7 +58,6 @@
 #include <object.h>
 #include <symbol.h>
 #include <time.h>
-#include <vmem.h>
 
 /** Notifier to be called when entering/exiting KDBG. */
 NOTIFIER_DECLARE(kdbg_entry_notifier, NULL);
@@ -123,7 +122,6 @@ static struct {
 	{ "thread",	"Print a list of threads.",			kdbg_cmd_thread },
 	{ "timers",	"Dumps a list of timers.",			kdbg_cmd_timers },
 	{ "uptime",	"Prints the system uptime.",			kdbg_cmd_uptime },
-	{ "vmem",	"Show information about Vmem arenas.",		kdbg_cmd_vmem },
 	{ "watch",	"Create a watchpoint.",				kdbg_cmd_watch },
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,31 +16,28 @@
 
 /**
  * @file
- * @brief		Kernel heap manager.
+ * @brief		Kernel heap allocation functions.
  */
 
-#ifndef __MM_KHEAP_H
-#define __MM_KHEAP_H
+#ifndef __MM_HEAP_H
+#define __MM_HEAP_H
 
 #include <arch/page.h>
 
+#include <mm/flags.h>
+
 #include <types.h>
-#include <vmem.h>
 
-extern vmem_t kheap_raw_arena;
-extern vmem_t kheap_va_arena;
-extern vmem_t kheap_arena;
+extern ptr_t heap_raw_alloc(size_t size, int mmflag);
+extern void heap_raw_free(ptr_t addr, size_t size);
 
-extern status_t kheap_anon_import(vmem_resource_t base, vmem_resource_t size, int vmflag);
-extern void kheap_anon_release(vmem_resource_t addr, vmem_resource_t size);
+extern void *heap_alloc(size_t size, int mmflag);
+extern void heap_free(void *addr, size_t size);
 
-extern void *kheap_alloc(size_t size, int vmflag);
-extern void kheap_free(void *addr, size_t size);
+// FIXME: remove
+extern void *heap_map_range(phys_ptr_t base, size_t size, int mmflag);
+extern void heap_unmap_range(void *addr, size_t size, bool shared);
 
-extern void *kheap_map_range(phys_ptr_t base, size_t size, int vmflag);
-extern void kheap_unmap_range(void *addr, size_t size, bool shared);
+extern void heap_init();
 
-extern void kheap_early_init(void);
-extern void kheap_init(void);
-
-#endif /* __MM_KHEAP_H */
+#endif /* __MM_HEAP_H */

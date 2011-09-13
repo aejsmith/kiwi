@@ -82,11 +82,11 @@ config VMEM_DEBUG
 	  object IDs) uses vmem in some way, this will generate a HUGE amount
 	  of output.
 
-config KHEAP_DEBUG
+config HEAP_DEBUG
 	bool "Kernel heap debug output"
 	default n
 	help
-	  Enable extra debug output from the kernel heap manager.
+	  Enable extra debug output from the kernel heap allocator.
 
 config SLAB_DEBUG
 	bool "Slab allocator debug output"

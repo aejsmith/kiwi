@@ -21,6 +21,7 @@
 
 #include <arch/io.h>
 #include <arch/memory.h>
+#include <arch/page.h>
 
 #include <x86/cpu.h>
 #include <x86/lapic.h>
@@ -28,8 +29,7 @@
 #include <cpu/cpu.h>
 
 #include <lib/string.h>
-
-#include <mm/kheap.h>
+#include <lib/utility.h>
 
 #include <assert.h>
 #include <console.h>

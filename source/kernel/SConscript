@@ -52,7 +52,7 @@ sources = FeatureSources(config, [
 	'lib/utility.c',
 
 	'mm/area.c',
-	'mm/kheap.c',
+	'mm/heap.c',
 	'mm/malloc.c',
 	'mm/page.c',
 	'mm/safe.c',
@@ -90,7 +90,6 @@ sources = FeatureSources(config, [
 	'syscall_table.c',
 	'time.c',
 	'version.c',
-	'vmem.c',
 ])
 
 ############################

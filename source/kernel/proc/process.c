@@ -787,8 +787,8 @@ void __init_text process_init(void) {
 
 	/* Create the process slab cache. */
 	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
-	                                  process_cache_ctor, NULL, NULL, NULL,
-	                                  0, MM_FATAL);
+	                                  process_cache_ctor, NULL, NULL, 0,
+	                                  MM_FATAL);
 
 	/* Create the ACL for the kernel process. */
 	object_acl_init(&acl);
