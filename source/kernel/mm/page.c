@@ -190,7 +190,7 @@ static void page_writer(void *arg1, void *arg2) {
 
 			/* Write out the page. */
 			if(vm_cache_flush_page(page)) {
-				dprintf("page: page writer wrote page 0x%" PRIpp "\n", page->addr);
+				dprintf("page: page writer wrote page 0x%" PRIxPHYS "\n", page->addr);
 				written++;
 			}
 
@@ -271,7 +271,7 @@ static inline void page_queue_remove(unsigned index, page_t *page) {
 static void remove_page_from_current_queue(page_t *page) {
 	/* Check that we have a valid current state. */
 	if(unlikely(page->state >= PAGE_QUEUE_COUNT)) {
-		fatal("Page 0x%" PRIpp " has invalid state (%u)\n", page->addr, page->state);
+		fatal("Page 0x%" PRIxPHYS " has invalid state (%u)\n", page->addr, page->state);
 	}
 
 	page_queue_remove(page->state, page);
@@ -286,7 +286,7 @@ void page_set_state(page_t *page, unsigned state) {
 	remove_page_from_current_queue(page);
 
 	if(unlikely(state >= PAGE_QUEUE_COUNT)) {
-		fatal("Setting invalid state on 0x%" PRIpp " (%u)\n", page->addr, state);
+		fatal("Setting invalid state on 0x%" PRIxPHYS " (%u)\n", page->addr, state);
 	}
 
 	/* Set new state and push on the new queue. */
@@ -358,7 +358,7 @@ page_t *page_alloc(int mmflag) {
 
 		thread_unwire(curr_thread);
 
-		dprintf("page: allocated page 0x%" PRIpp " (list: %u)\n", page->addr, i);
+		dprintf("page: allocated page 0x%" PRIxPHYS " (list: %u)\n", page->addr, i);
 		return page;
 	}
 
@@ -390,7 +390,7 @@ static void page_free_internal(page_t *page) {
  * @param page		Page to free. */
 void page_free(page_t *page) {
 	if(unlikely(page->state == PAGE_STATE_FREE)) {
-		fatal("Attempting to free already free page 0x%" PRIpp, page->addr);
+		fatal("Attempting to free already free page 0x%" PRIxPHYS, page->addr);
 	}
 
 	/* Remove from current queue. */
@@ -400,7 +400,7 @@ void page_free(page_t *page) {
 	page_free_internal(page);
 	mutex_unlock(&free_page_lock);
 
-	dprintf("page: freed page 0x%" PRIpp " (list: %u)\n", page->addr,
+	dprintf("page: freed page 0x%" PRIxPHYS " (list: %u)\n", page->addr,
 		phys_ranges[page->phys_range].freelist);
 }
 
@@ -452,7 +452,7 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 
 		if(base == list->minaddr && end == (list->maxaddr - 1)) {
 			/* Exact fit. */
-			dprintf("page: free list %u can satisfy [0x%" PRIpp ",0x%" PRIpp ")\n",
+			dprintf("page: free list %u can satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
 			        i, minaddr, maxaddr);
 			if(list_empty(&list->pages)) {
 				continue;
@@ -471,7 +471,7 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 
 	/* Check any lists that were determined to be a partial fit. */
 	for(i = 0; i < partial_fit_count; i++) {
-		dprintf("page: free list %u can partially satisfy [0x%" PRIpp ",0x%" PRIpp ")\n",
+		dprintf("page: free list %u can partially satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
 		        partial_fits[i], minaddr, maxaddr);
 
 		/* Check if there are any pages that can fit. */
@@ -658,7 +658,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 
 	thread_unwire(curr_thread);
 
-	dprintf("page: allocated page range [0x%" PRIpp ",0x%" PRIpp ")\n",
+	dprintf("page: allocated page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
 	        pages->addr, pages->addr + size);
 	*basep = pages->addr;
 	return STATUS_SUCCESS;
@@ -678,7 +678,7 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 
 	pages = page_lookup(base);
 	if(unlikely(!pages)) {
-		fatal("Invalid base address 0x%" PRIpp, base);
+		fatal("Invalid base address 0x%" PRIxPHYS, base);
 	}
 
 	/* Ranges allocated by phys_alloc() will not span across a physical
@@ -691,7 +691,7 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 	/* Remove each page in the range from its current queue. */
 	for(i = 0; i < (size / PAGE_SIZE); i++) {
 		if(unlikely(pages[i].state == PAGE_STATE_FREE)) {
-			fatal("Page 0x%" PRIpp " in range [0x%" PRIpp ",0x%" PRIpp ") already free",
+			fatal("Page 0x%" PRIxPHYS " in range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") already free",
 			      pages[i].addr, base, base + size);
 		}
 
@@ -705,7 +705,7 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 	}
 	mutex_unlock(&free_page_lock);
 
-	dprintf("page: freed page range [0x%" PRIpp ",0x%" PRIpp ") (list: %u)\n",
+	dprintf("page: freed page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (list: %u)\n",
 	        base, base + size, phys_ranges[pages->phys_range].freelist);
 }
 
@@ -833,7 +833,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 			queue = (int)(((ptr_t)page->queue - (ptr_t)page_queues) / sizeof(page_queue_t));
 		}
 
-		kprintf(LOG_NONE, "Page 0x%" PRIpp " (%p)\n", page->addr, page);
+		kprintf(LOG_NONE, "Page 0x%" PRIxPHYS " (%p)\n", page->addr, page);
 		kprintf(LOG_NONE, "=================================================\n");
 		kprintf(LOG_NONE, "Queue:    %d (%p)\n", queue, page->queue);
 		kprintf(LOG_NONE, "Modified: %d\n", page->modified);
@@ -846,7 +846,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 		kprintf(LOG_NONE, "=====              ===                =====\n");
 
 		for(i = 0; i < page_range_count; i++) {
-			kprintf(LOG_NONE, "0x%-16" PRIpp " 0x%-16" PRIpp " %p\n",
+			kprintf(LOG_NONE, "0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %p\n",
 			        page_ranges[i].start, page_ranges[i].end,
 			        page_ranges[i].pages);
 		}
@@ -937,13 +937,13 @@ __init_text void page_init(void) {
 	platform_page_init();
 	kprintf(LOG_DEBUG, "page: usable physical memory ranges:\n");
 	for(i = 0; i < phys_range_count; i++) {
-		kprintf(LOG_DEBUG, " 0x%016" PRIpp " - 0x%016" PRIpp " (%u)\n",
+		kprintf(LOG_DEBUG, " 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS " (%u)\n",
 		        phys_ranges[i].start, phys_ranges[i].end,
 		        phys_ranges[i].freelist);
 	}
 	kprintf(LOG_DEBUG, "page: free list coverage:\n");
 	for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
-		kprintf(LOG_DEBUG, " %u: 0x%016" PRIpp " - 0x%016" PRIpp "\n",
+		kprintf(LOG_DEBUG, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
 		        i, free_page_lists[i].minaddr, free_page_lists[i].maxaddr);
 	}
 
@@ -973,7 +973,7 @@ __init_text void page_init(void) {
 	}
 	pages_size = size;
 
-	kprintf(LOG_DEBUG, "page: have %zu pages, using %zuKiB for structures at 0x%" PRIpp "\n",
+	kprintf(LOG_DEBUG, "page: have %zu pages, using %" PRIuPHYS "KiB for structures at 0x%" PRIxPHYS "\n",
 	        total_page_count, pages_size / 1024, pages_base);
 
 	/* Now for each memory range we have, create page structures. */

@@ -127,7 +127,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			*pagep = page;
 		}
 
-		dprintf("cache: retreived cached page 0x%" PRIpp " from offset 0x%" PRIx64 " in %p\n",
+		dprintf("cache: retreived cached page 0x%" PRIxPHYS " from offset 0x%" PRIx64 " in %p\n",
 		        page->addr, offset, cache);
 		return STATUS_SUCCESS;
 	}
@@ -169,7 +169,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	avl_tree_insert(&cache->pages, &page->avl_link, offset, page);
 	mutex_unlock(&cache->lock);
 
-	dprintf("cache: cached new page 0x%" PRIpp " at offset 0x%" PRIx64 " in %p\n",
+	dprintf("cache: cached new page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
 	        page->addr, offset, cache);
 
 	if(mappingp) {
@@ -212,7 +212,7 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		fatal("Tried to release page that isn't cached");
 	}
 
-	dprintf("cache: released page 0x%" PRIpp " at offset 0x%" PRIx64 " in %p\n",
+	dprintf("cache: released page 0x%" PRIxPHYS " at offset 0x%" PRIx64 " in %p\n",
 	        page->addr, offset, cache);
 
 	/* Mark as modified if requested. */
@@ -693,7 +693,7 @@ int kdbg_cmd_cache(int argc, char **argv) {
 	AVL_TREE_FOREACH(&cache->pages, iter) {
 		page = avl_tree_entry(iter, page_t);
 
-		kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
+		kprintf(LOG_NONE, "  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
 		        page->addr, page->offset, page->modified, refcount_get(&page->count));
 	}
 

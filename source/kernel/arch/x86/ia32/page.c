@@ -740,7 +740,7 @@ static void __init_text page_map_kernel_range(kernel_args_t *args, ptr_t start, 
 		page_map_insert(&kernel_page_map, start + i, phys + i, write, exec, MM_FATAL);
 	}
 
-	dprintf("page: created kernel mapping [%p,%p) to [0x%" PRIpp ",0x%" PRIpp ") (%d %d)\n",
+	dprintf("page: created kernel mapping [%p,%p) to [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (%d %d)\n",
 	        start, end, phys, phys + (end - start), write, exec);
 }
 
@@ -793,7 +793,7 @@ void __init_text page_arch_init(kernel_args_t *args) {
 	phys_unmap(pdp, PAGE_SIZE, true);
 
 	page_map_unlock(&kernel_page_map);
-	dprintf("page: initialised kernel page map (pdp: 0x%" PRIpp ")\n",
+	dprintf("page: initialised kernel page map (pdp: 0x%" PRIxPHYS ")\n",
 	        kernel_page_map.cr3);
 
 	/* Switch to the kernel page map. */

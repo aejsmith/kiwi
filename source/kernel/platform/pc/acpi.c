@@ -100,7 +100,7 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
 			}
 		}
 
-		kprintf(LOG_NORMAL, "acpi: found ACPI RSDP at 0x%" PRIpp " (revision: %" PRIu8 ")\n",
+		kprintf(LOG_NORMAL, "acpi: found ACPI RSDP at 0x%" PRIxPHYS " (revision: %" PRIu8 ")\n",
 		        start + i, rsdp->revision);
 		return rsdp;
 	}

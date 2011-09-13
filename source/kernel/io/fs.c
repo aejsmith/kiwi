@@ -2495,19 +2495,19 @@ int kdbg_cmd_node(int argc, char **argv) {
 			if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
 				return KDBG_FAIL;
 			} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-				kprintf(LOG_NONE, "Unknown mount ID %" PRIun ".\n", val);
+				kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
 				return KDBG_FAIL;
 			}
 		} else {
 			if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 				return KDBG_FAIL;
 			} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-				kprintf(LOG_NONE, "Unknown mount ID %" PRIun ".\n", val);
+				kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
 				return KDBG_FAIL;
 			} else if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
 				return KDBG_FAIL;
 			} else if(!(node = avl_tree_lookup(&mount->nodes, val))) {
-				kprintf(LOG_NONE, "Unknown node ID %" PRIun ".\n", val);
+				kprintf(LOG_NONE, "Unknown node ID %" PRIuN ".\n", val);
 				return KDBG_FAIL;
 			}
 		}
@@ -2515,7 +2515,7 @@ int kdbg_cmd_node(int argc, char **argv) {
 		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
 			return KDBG_FAIL;
 		} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-			kprintf(LOG_NONE, "Unknown mount ID %" PRIun ".\n", val);
+			kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
 			return KDBG_FAIL;
 		}
 	}

@@ -89,21 +89,21 @@ int kdbg_cmd_regs(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "cs: 0x%04" PRIxn "  ss: 0x%04" PRIxn "\n",
+	kprintf(LOG_NONE, "cs: 0x%04" PRIxN "  ss: 0x%04" PRIxN "\n",
 	            curr_kdbg_frame->cs, curr_kdbg_frame->ss);
-	kprintf(LOG_NONE, "int_no: %" PRIun "  err_code: %" PRIun "  rflags: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "int_no: %" PRIuN "  err_code: %" PRIuN "  rflags: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->int_no, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
-	kprintf(LOG_NONE, "rax: 0x%016" PRIxn "  rbx: 0x%016" PRIxn "  rcx: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rax: 0x%016" PRIxN "  rbx: 0x%016" PRIxN "  rcx: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->ax, curr_kdbg_frame->bx, curr_kdbg_frame->cx);
-	kprintf(LOG_NONE, "rdx: 0x%016" PRIxn "  rdi: 0x%016" PRIxn "  rsi: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rdx: 0x%016" PRIxN "  rdi: 0x%016" PRIxN "  rsi: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->dx, curr_kdbg_frame->di, curr_kdbg_frame->si);
-	kprintf(LOG_NONE, "rbp: 0x%016" PRIxn "  r8:  0x%016" PRIxn "  r9:  0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rbp: 0x%016" PRIxN "  r8:  0x%016" PRIxN "  r9:  0x%016" PRIxN "\n",
 	            curr_kdbg_frame->bp, curr_kdbg_frame->r8, curr_kdbg_frame->r9);
-	kprintf(LOG_NONE, "r10: 0x%016" PRIxn "  r11: 0x%016" PRIxn "  r12: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "r10: 0x%016" PRIxN "  r11: 0x%016" PRIxN "  r12: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->r10, curr_kdbg_frame->r11, curr_kdbg_frame->r12);
-	kprintf(LOG_NONE, "r13: 0x%016" PRIxn "  r14: 0x%016" PRIxn "  r15: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "r13: 0x%016" PRIxN "  r14: 0x%016" PRIxN "  r15: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->r13, curr_kdbg_frame->r14, curr_kdbg_frame->r15);
-	kprintf(LOG_NONE, "rip: 0x%016" PRIxn "  rsp: 0x%016" PRIxn "\n",
+	kprintf(LOG_NONE, "rip: 0x%016" PRIxN "  rsp: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->ip, curr_kdbg_frame->sp);
 	return KDBG_OK;
 }

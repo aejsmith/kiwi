@@ -327,10 +327,10 @@ static int kdbg_cmd_print(int argc, char **argv) {
 	}
 
 	switch(fmt) {
-	case 'x':	kprintf(LOG_NONE, "0x%" PRIxn "\n", value); break;
-	case 'i':	kprintf(LOG_NONE, "%" PRIdn "\n", value); break;
-	case 'o':	kprintf(LOG_NONE, "0%" PRIon "\n", value); break;
-	case 'u':	kprintf(LOG_NONE, "%" PRIun "\n", value); break;
+	case 'x':	kprintf(LOG_NONE, "0x%" PRIxN "\n", value); break;
+	case 'i':	kprintf(LOG_NONE, "%" PRIdN "\n", value); break;
+	case 'o':	kprintf(LOG_NONE, "0%" PRIoN "\n", value); break;
+	case 'u':	kprintf(LOG_NONE, "%" PRIuN "\n", value); break;
 	}
 	return KDBG_OK;
 }
@@ -681,7 +681,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
  * @param frame		Interrupt stack frame.
  */
 void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
-	kprintf(LOG_NONE, "KDBG: Exception %" PRIun " (%s) occurred during command (%p)\n",
+	kprintf(LOG_NONE, "KDBG: Exception %" PRIuN " (%s) occurred during command (%p)\n",
 	                  num, name, frame->ip);
 	context_restore_frame(&kdbg_fault_context, frame);
 }

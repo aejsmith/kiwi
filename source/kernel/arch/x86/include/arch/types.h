@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,24 +26,25 @@
 #define PRIu8		"u"		/**< Format for uint8_t. */
 #define PRIu16		"u"		/**< Format for uint16_t. */
 #define PRIu32		"u"		/**< Format for uint32_t. */
-#define PRIu64		"llu"		/**< Format for uint64_t. */
-#define PRIun		"lu"		/**< Format for unative_t. */
+#define PRIu64		"lu"		/**< Format for uint64_t. */
+#define PRIuN		"lu"		/**< Format for unative_t. */
 #define PRId8		"d"		/**< Format for int8_t. */
 #define PRId16		"d"		/**< Format for int16_t. */
 #define PRId32		"d"		/**< Format for int32_t. */
-#define PRId64		"lld"		/**< Format for int64_t. */
-#define PRIdn		"d"		/**< Format for native_t. */
+#define PRId64		"ld"		/**< Format for int64_t. */
+#define PRIdN		"d"		/**< Format for native_t. */
 #define PRIx8		"x"		/**< Format for (u)int8_t (hexadecimal). */
 #define PRIx16		"x"		/**< Format for (u)int16_t (hexadecimal). */
 #define PRIx32		"x"		/**< Format for (u)int32_t (hexadecimal). */
-#define PRIx64		"llx"		/**< Format for (u)int64_t (hexadecimal). */
-#define PRIxn		"lx"		/**< Format for (u)native_t (hexadecimal). */
+#define PRIx64		"lx"		/**< Format for (u)int64_t (hexadecimal). */
+#define PRIxN		"lx"		/**< Format for (u)native_t (hexadecimal). */
 #define PRIo8		"o"		/**< Format for (u)int8_t (octal). */
 #define PRIo16		"o"		/**< Format for (u)int16_t (octal). */
 #define PRIo32		"o"		/**< Format for (u)int32_t (octal). */
 #define PRIo64		"llo"		/**< Format for (u)int64_t (octal). */
-#define PRIon		"lo"		/**< Format for (u)native_t (octal). */
-#define PRIpp		"llx"		/**< Format for phys_ptr_t. */
+#define PRIoN		"lo"		/**< Format for (u)native_t (octal). */
+#define PRIxPHYS	"lx"		/**< Format for phys_ptr_t (hexadecimal). */
+#define PRIuPHYS	"lu"		/**< Format for phys_ptr_t. */
 
 /** Unsigned data types. */
 typedef unsigned char uint8_t;		/**< Unsigned 8-bit. */

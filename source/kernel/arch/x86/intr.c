@@ -69,7 +69,7 @@ static void unhandled_interrupt(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&kdbg_running) == 2) {
 		kdbg_except_handler(num, "Unknown", frame);
 	} else {
-		_fatal(frame, "Received unknown interrupt %" PRIun, num);
+		_fatal(frame, "Received unknown interrupt %" PRIuN, num);
 	}
 }
 
@@ -82,7 +82,7 @@ static void kmode_except_handler(unative_t num, intr_frame_t *frame) {
 	if(atomic_get(&kdbg_running) == 2) {
 		kdbg_except_handler(num, except_strings[num], frame);
 	} else {
-		_fatal(frame, "Unhandled kernel-mode exception %" PRIun " (%s)", num, except_strings[num]);
+		_fatal(frame, "Unhandled kernel-mode exception %" PRIuN " (%s)", num, except_strings[num]);
 	}
 }
 

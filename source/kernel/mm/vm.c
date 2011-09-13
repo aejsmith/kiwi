@@ -517,7 +517,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 			assert(region->amap->rref[i]);
 
 			if(--region->amap->rref[i] == 0 && region->amap->pages[i]) {
-				dprintf("vm: anon object rref %zu reached 0, freeing 0x%" PRIpp " (amap: %p)\n",
+				dprintf("vm: anon object rref %zu reached 0, freeing 0x%" PRIxPHYS " (amap: %p)\n",
 				        i, region->amap->pages[i]->addr, region->amap);
 				if(refcount_dec(&region->amap->pages[i]->count) == 0) {
 					page_free(region->amap->pages[i]);
@@ -912,7 +912,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 				}
 			}
 
-			dprintf("vm:  anon write fault: copying page 0x%" PRIpp " from %p\n",
+			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS " from %p\n",
 			        paddr, handle->object);
 
 			page = page_alloc(MM_SLEEP);
@@ -953,7 +953,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 				return VM_FAULT_OOM;
 			}
 
-			dprintf("vm:  anon read fault: mapping page 0x%" PRIpp " from %p as read-only\n",
+			dprintf("vm:  anon read fault: mapping page 0x%" PRIxPHYS " from %p as read-only\n",
 			        paddr, handle->object);
 			write = false;
 		}
@@ -970,7 +970,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
 	page_map_insert(region->as->pmap, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
-	dprintf("vm:  anon fault: mapped 0x%" PRIpp " at %p (as: %p, write: %d)\n",
+	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d)\n",
 	        paddr, addr, region->as, write);
 	mutex_unlock(&amap->lock);
 	return VM_FAULT_SUCCESS;
@@ -1004,7 +1004,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	 * simultaneously. */
 	if(page_map_find(region->as->pmap, addr, &exist)) {
 		if(exist != phys) {
-			fatal("Incorrect existing mapping found (found %" PRIpp", should be %" PRIpp ")",
+			fatal("Incorrect existing mapping found (found %" PRIxPHYS", should be %" PRIxPHYS ")",
 			      exist, phys);
 		} else if(region->handle->object->type->release_page) {
 			region->handle->object->type->release_page(region->handle, offset, phys);
@@ -1018,7 +1018,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
 	page_map_insert(region->as->pmap, addr, phys, write, exec, MM_SLEEP);
-	dprintf("vm:  mapped 0x%" PRIpp " at %p (as: %p, write: %d, exec: %d)\n",
+	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d, exec: %d)\n",
 	        phys, addr, region->as, write, exec);
 	return VM_FAULT_SUCCESS;
 }

@@ -378,7 +378,7 @@ static void unmap_range(ptr_t start, ptr_t end, bool free, bool shared) {
 			phys_free(page, PAGE_SIZE);
 		}
 
-		dprintf("heap: unmapped page 0x%" PRIpp " from %p\n", page, i);
+		dprintf("heap: unmapped page 0x%" PRIxPHYS " from %p\n", page, i);
 	}
 }
 
@@ -421,13 +421,13 @@ void *heap_alloc(size_t size, int mmflag) {
 		ret = page_map_insert(&kernel_page_map, addr + i, page->addr,
 		                      true, true, mmflag & MM_FLAG_MASK);
 		if(unlikely(ret != STATUS_SUCCESS)) {
-			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIpp " to %p (%d)\n",
+			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIxPHYS " to %p (%d)\n",
 			        page->addr, addr + i, ret);
 			page_free(page);
 			goto fail;
 		}
 
-		dprintf("heap: mapped page 0x%" PRIpp " at %p\n", page->addr, addr + i);
+		dprintf("heap: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
 	}
 
 	page_map_unlock(&kernel_page_map);
@@ -500,11 +500,11 @@ void *heap_map_range(phys_ptr_t base, size_t size, int mmflag) {
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		if(page_map_insert(&kernel_page_map, ret + i, base + i, true, true,
 		                   mmflag & MM_FLAG_MASK) != STATUS_SUCCESS) {
-			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIpp " to %p\n", base, ret + i);
+			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIxPHYS " to %p\n", base, ret + i);
 			goto fail;
 		}
 
-		dprintf("heap: mapped page 0x%" PRIpp " at %p\n", base, ret + i);
+		dprintf("heap: mapped page 0x%" PRIxPHYS " at %p\n", base, ret + i);
 	}
 
 	page_map_unlock(&kernel_page_map);

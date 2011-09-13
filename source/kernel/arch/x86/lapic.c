@@ -255,7 +255,7 @@ __init_text void lapic_init(void) {
 		 * register interrupt vector handlers. */
 		lapic_base = base;
 		lapic_mapping = phys_map(base, PAGE_SIZE, MM_FATAL);
-		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIpp ", mapped to %p\n",
+		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
 		        base, lapic_mapping);
 
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);

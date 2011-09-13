@@ -89,20 +89,20 @@ int kdbg_cmd_regs(int argc, char **argv) {
 		return KDBG_OK;
 	}
 
-	kprintf(LOG_NONE, "cs: 0x%04" PRIxn "  ds: 0x%04" PRIxn "  es: 0x%04" PRIxn
-	                  "  fs: 0x%04" PRIxn "  gs: 0x%04" PRIxn "\n",
+	kprintf(LOG_NONE, "cs: 0x%04" PRIxN "  ds: 0x%04" PRIxN "  es: 0x%04" PRIxN
+	                  "  fs: 0x%04" PRIxN "  gs: 0x%04" PRIxN "\n",
 	                  curr_kdbg_frame->cs, curr_kdbg_frame->ds, curr_kdbg_frame->es,
 	                  curr_kdbg_frame->fs, curr_kdbg_frame->gs);
 	if(curr_kdbg_frame->cs & 3) {
-		kprintf(LOG_NONE, "ss: 0x%04" PRIxn "  ", curr_kdbg_frame->ss);
+		kprintf(LOG_NONE, "ss: 0x%04" PRIxN "  ", curr_kdbg_frame->ss);
 	}
-	kprintf(LOG_NONE, "int_no: %" PRIun "  err_code: %" PRIun "  eflags: 0x%08" PRIxn "\n",
+	kprintf(LOG_NONE, "int_no: %" PRIuN "  err_code: %" PRIuN "  eflags: 0x%08" PRIxN "\n",
 	                  curr_kdbg_frame->int_no, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
-	kprintf(LOG_NONE, "eax: 0x%08" PRIxn "  ebx: 0x%08" PRIxn "  ecx: 0x%08" PRIxn "  edx: 0x%08" PRIxn "\n",
+	kprintf(LOG_NONE, "eax: 0x%08" PRIxN "  ebx: 0x%08" PRIxN "  ecx: 0x%08" PRIxN "  edx: 0x%08" PRIxN "\n",
 	                  curr_kdbg_frame->ax, curr_kdbg_frame->bx, curr_kdbg_frame->cx, curr_kdbg_frame->dx);
-	kprintf(LOG_NONE, "edi: 0x%08" PRIxn "  esi: 0x%08" PRIxn "  ebp: 0x%08" PRIxn "  eip: 0x%08" PRIxn "\n",
+	kprintf(LOG_NONE, "edi: 0x%08" PRIxN "  esi: 0x%08" PRIxN "  ebp: 0x%08" PRIxN "  eip: 0x%08" PRIxN "\n",
 	                  curr_kdbg_frame->di, curr_kdbg_frame->si, curr_kdbg_frame->bp, curr_kdbg_frame->ip);
-	kprintf(LOG_NONE, "esp: 0x%08" PRIxn "\n",
+	kprintf(LOG_NONE, "esp: 0x%08" PRIxN "\n",
 	                  (curr_kdbg_frame->cs & 3) ? curr_kdbg_frame->sp : curr_kdbg_frame->ksp);
 	return KDBG_OK;
 }
