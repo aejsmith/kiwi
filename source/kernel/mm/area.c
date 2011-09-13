@@ -83,15 +83,15 @@ static void area_ctor(void *obj, void *data) {
 /** Release a memory area.
  * @param area		Area to release. */
 static void area_release(area_t *area) {
-	vm_page_t *page;
+	page_t *page;
 
 	if(refcount_dec(&area->count) == 0) {
 		/* Free all pages. */
 		AVL_TREE_FOREACH_SAFE(&area->pages, iter) {
-			page = avl_tree_entry(iter, vm_page_t);
+			page = avl_tree_entry(iter, page_t);
 
 			avl_tree_remove(&area->pages, &page->avl_link);
-			vm_page_free(page, 1);
+			page_free(page);
 		}
 
 		rwlock_write_lock(&area_tree_lock);
@@ -148,7 +148,7 @@ static status_t area_object_mappable(object_handle_t *handle, int flags) {
 static status_t area_object_get_page(object_handle_t *handle, offset_t offset, phys_ptr_t *physp) {
 	area_t *area = (area_t *)handle->object;
 	status_t ret = STATUS_SUCCESS;
-	vm_page_t *page;
+	page_t *page;
 
 	mutex_lock(&area->lock);
 
@@ -166,7 +166,7 @@ static status_t area_object_get_page(object_handle_t *handle, offset_t offset, p
 		/* If the page is not already in the object, allocate a new page. */
 		page = avl_tree_lookup(&area->pages, offset);
 		if(!page) {
-			page = vm_page_alloc(1, MM_SLEEP | PM_ZERO);
+			page = page_alloc(MM_SLEEP | PM_ZERO);
 			page->offset = offset;
 			avl_tree_insert(&area->pages, &page->avl_link, offset, page);
 		}

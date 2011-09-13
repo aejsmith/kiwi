@@ -30,6 +30,8 @@
 
 #include <mm/flags.h>
 
+#include <platform/page.h>
+
 #include <sync/spinlock.h>
 
 struct page_queue;
@@ -46,12 +48,13 @@ typedef struct page_stats {
 } page_stats_t;
 
 /** Structure describing a page in memory. */
-typedef struct vm_page {
+typedef struct page {
 	list_t header;			/**< Link to page queue. */
-	struct page_queue *queue;	/**< Queue that the page is in. */
 
 	/** Basic page information. */
-	phys_ptr_t addr;		/**< Physical address of the page. */
+	phys_ptr_t addr;		/**< Physical address of page. */
+	unsigned phys_range;		/**< Memory range that the page belongs to. */
+	unsigned state;			/**< State of the page. */
 	bool modified : 1;		/**< Whether the page has been modified. */
 	uint8_t unused: 7;
 
@@ -63,7 +66,7 @@ typedef struct vm_page {
 	struct vm_amap *amap;		/**< Anonymous map the page belongs to. */
 	offset_t offset;		/**< Offset into the owner of the page. */
 	avl_tree_node_t avl_link;	/**< Link to AVL tree for use by owner. */
-} vm_page_t;
+} page_t;
 
 /** Enumeration of memory range types. */
 typedef enum memory_type {
@@ -73,11 +76,14 @@ typedef enum memory_type {
 	MEMORY_TYPE_WB,			/**< Write-back. */
 } memory_type_t;
 
-/** Page queue numbers. */
-#define PAGE_QUEUE_MODIFIED	0	/**< Pages that need to be written. */
-#define PAGE_QUEUE_CACHED	1	/**< Pages that are held in caches. */
-#define PAGE_QUEUE_PAGEABLE	2	/**< Pages that are mapped but can be paged out. */
-#define PAGE_QUEUE_COUNT	3	/**< Number of page lists. */
+/** Possible states of a page. */
+#define PAGE_STATE_ALLOCATED	0	/**< Allocated. */
+#define PAGE_STATE_MODIFIED	1	/**< Modified. */
+#define PAGE_STATE_CACHED	2	/**< Cached. */
+#define PAGE_STATE_FREE		3	/**< Free. */
+
+/** Number of page queues. */
+#define PAGE_QUEUE_COUNT	3
 
 /** Flags to modify page allocation behaviour. */
 #define PM_ZERO			(1<<10)	/**< Clear the page contents before returning. */
@@ -95,18 +101,17 @@ extern void page_map_switch(page_map_t *map);
 extern page_map_t *page_map_create(int mmflag);
 extern void page_map_destroy(page_map_t *map);
 
-extern vm_page_t *vm_page_alloc(size_t count, int pmflag);
-extern void vm_page_free(vm_page_t *pages, size_t count);
-extern vm_page_t *vm_page_copy(vm_page_t *page, int mmflag);
-extern void vm_page_queue(vm_page_t *page, size_t queue);
-extern void vm_page_dequeue(vm_page_t *page);
-extern vm_page_t *vm_page_lookup(phys_ptr_t addr);
+extern void page_set_state(page_t *page, unsigned state);
+extern page_t *page_lookup(phys_ptr_t addr);
+extern page_t *page_alloc(int mmflag);
+extern void page_free(page_t *page);
+extern page_t *page_copy(page_t *page, int mmflag);
 
-extern phys_ptr_t page_xalloc(size_t count, phys_ptr_t align, phys_ptr_t minaddr,
-                              phys_ptr_t maxaddr, int pmflag);
-extern phys_ptr_t page_alloc(size_t count, int pmflag);
-extern void page_free(phys_ptr_t base, size_t count);
-extern bool page_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
+extern status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
+                           phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag,
+                           phys_ptr_t *basep);
+extern void phys_free(phys_ptr_t base, phys_size_t size);
+extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
 
 extern void phys_memory_type(phys_ptr_t addr, memory_type_t *typep);
 extern void phys_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type);
@@ -118,9 +123,11 @@ extern void page_stats_get(page_stats_t *stats);
 
 extern int kdbg_cmd_page(int argc, char **argv);
 
+extern void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist);
+
 extern void page_arch_init(void);
+extern void platform_page_init(void);
 extern void page_init(void);
-extern void vm_page_init(void);
 extern void page_late_init(void);
 
 #endif /* __MM_PAGE_H */

@@ -79,7 +79,8 @@ static inline void invlpg(ptr_t addr) {
  * @param mmflag	Allocation flags. PM_ZERO will be added.
  * @return		Address of structure on success, 0 on failure. */
 static phys_ptr_t page_structure_alloc(int mmflag) {
-	return page_alloc(1, mmflag | PM_ZERO);
+	page_t *page = page_alloc(mmflag | PM_ZERO);
+        return (page) ? page->addr : 0;
 }
 
 /** Get the virtual address of a page structure.
@@ -129,7 +130,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 			page = page_structure_alloc(mmflag);
 			if(pml4[pml4e] & PG_PRESENT) {
 				if(page) {
-					page_free(page, 1);
+					phys_free(page, PAGE_SIZE);
 				}
 			} else {
 				if(unlikely(!page)) {
@@ -155,7 +156,7 @@ static uint64_t *page_map_get_pdir(page_map_t *map, ptr_t virt, bool alloc, int 
 			page = page_structure_alloc(mmflag);
 			if(pdp[pdpe] & PG_PRESENT) {
 				if(page) {
-					page_free(page, 1);
+					phys_free(page, PAGE_SIZE);
 				}
 			} else {
 				if(unlikely(!page)) {
@@ -198,7 +199,7 @@ static uint64_t *page_map_get_ptbl(page_map_t *map, ptr_t virt, bool alloc, int 
 			page = page_structure_alloc(mmflag);
 			if(pdir[pde] & PG_PRESENT) {
 				if(page) {
-					page_free(page, 1);
+					phys_free(page, PAGE_SIZE);
 				}
 			} else {
 				if(unlikely(!page)) {
@@ -445,8 +446,8 @@ void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec) {
  * @return		Whether the address was mapped. */
 bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp) {
 	phys_ptr_t paddr;
-	vm_page_t *page;
 	uint64_t *ptbl;
+	page_t *page;
 	int pte;
 
 	assert(mutex_held(&map->lock));
@@ -464,7 +465,7 @@ bool page_map_remove(page_map_t *map, ptr_t virt, bool shared, phys_ptr_t *physp
 	paddr = ptbl[pte] & PHYS_PAGE_MASK;
 
 	/* If the entry is dirty, set the modified flag on the page. */
-	if(ptbl[pte] & PG_DIRTY && (page = vm_page_lookup(paddr))) {
+	if(ptbl[pte] & PG_DIRTY && (page = page_lookup(paddr))) {
 		page->modified = true;
 	}
 
@@ -593,17 +594,17 @@ void page_map_destroy(page_map_t *map) {
 				}
 
 				if(!(pdir[k] & PG_LARGE)) {
-					page_free(pdir[k] & PHYS_PAGE_MASK, 1);
+					phys_free(pdir[k] & PHYS_PAGE_MASK, PAGE_SIZE);
 				}
 			}
 
-			page_free(pdp[j] & PHYS_PAGE_MASK, 1);
+			phys_free(pdp[j] & PHYS_PAGE_MASK, PAGE_SIZE);
 		}
 
-		page_free(pml4[i] & PHYS_PAGE_MASK, 1);
+		phys_free(pml4[i] & PHYS_PAGE_MASK, PAGE_SIZE);
 	}
 
-	page_free(map->cr3, 1);
+	phys_free(map->cr3, PAGE_SIZE);
 	kfree(map);
 }
 
@@ -664,7 +665,7 @@ __init_text void page_arch_init(void) {
 #if CONFIG_SMP
 	/* Reserve a low memory page for the AP bootstrap code. FIXME: This
 	 * needs freeing somewhere. */
-	ap_bootstrap_page = page_xalloc(1, 0, 0, 0x100000, MM_FATAL);
+	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_FATAL, &ap_bootstrap_page);
 #endif
 
 	/* Initialise the kernel page map structure. */

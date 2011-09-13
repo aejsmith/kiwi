@@ -27,7 +27,6 @@
 #include <sync/mutex.h>
 
 struct vm_cache;
-struct vm_page;
 
 /** Structure containing operations for a page cache. */
 typedef struct vm_cache_ops {
@@ -57,7 +56,7 @@ typedef struct vm_cache_ops {
 	 * @param cache		Cache the page belongs to.
 	 * @param page	 	Page to check.
 	 * @return		Whether the page can be evicted. */
-	bool (*evict_page)(struct vm_cache *cache, struct vm_page *page);
+	bool (*evict_page)(struct vm_cache *cache, page_t *page);
 } vm_cache_ops_t;
 
 /** Structure containing a page-based data cache. */
@@ -81,8 +80,8 @@ extern void vm_cache_resize(vm_cache_t *cache, offset_t size);
 extern status_t vm_cache_flush(vm_cache_t *cache);
 extern status_t vm_cache_destroy(vm_cache_t *cache, bool discard);
 
-extern bool vm_cache_flush_page(vm_page_t *page);
-extern void vm_cache_evict_page(vm_page_t *page);
+extern bool vm_cache_flush_page(page_t *page);
+extern void vm_cache_evict_page(page_t *page);
 
 extern int kdbg_cmd_cache(int argc, char **argv);
 

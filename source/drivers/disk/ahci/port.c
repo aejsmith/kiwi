@@ -246,8 +246,7 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	}
 
 	/* Allocate a chunk of memory to use for the port structures. */
-	port->mem_phys = page_xalloc(AHCI_PORT_MEM_SIZE / PAGE_SIZE, 0, 0, (phys_ptr_t)0x100000000,
-	                             MM_SLEEP | PM_ZERO);
+	phys_alloc(AHCI_PORT_MEM_SIZE, 0, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP | PM_ZERO, &port->mem_phys);
 	port->mem_virt = phys_map(port->mem_phys, AHCI_PORT_MEM_SIZE, MM_SLEEP);
 	virt = (ptr_t)port->mem_virt;
 	port->clist = (volatile ahci_command_header_t *)virt;
@@ -366,7 +365,7 @@ void ahci_port_destroy(ahci_port_t *port) {
 
 	/* Free the structure. */
 	phys_unmap((void *)port->mem_virt, AHCI_PORT_MEM_SIZE, true);
-	page_free(port->mem_phys, AHCI_PORT_MEM_SIZE / PAGE_SIZE);
+	phys_free(port->mem_phys, AHCI_PORT_MEM_SIZE);
 	kfree(port);
 }
 

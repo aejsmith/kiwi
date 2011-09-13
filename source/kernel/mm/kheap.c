@@ -77,7 +77,7 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
-			page_free(page, 1);
+			phys_free(page, PAGE_SIZE);
 		}
 
 		dprintf("kheap: unmapped page 0x%" PRIpp " from %p\n", page, i);
@@ -91,26 +91,26 @@ static void kheap_do_unmap(ptr_t start, ptr_t end, bool free, bool shared) {
  * @return		Status code describing result of the operation. */
 status_t kheap_anon_import(vmem_resource_t base, vmem_resource_t size, int vmflag) {
 	vmem_resource_t i;
-	phys_ptr_t page;
 	status_t ret;
+	page_t *page;
 
 	page_map_lock(&kernel_page_map);
 
 	/* Back the allocation with anonymous pages. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		page = page_alloc(1, vmflag & MM_FLAG_MASK);
+		page = page_alloc(vmflag & MM_FLAG_MASK);
 		if(unlikely(!page)) {
 			dprintf("kheap: unable to allocate pages to back allocation\n");
 			goto fail;
 		}
 
 		/* Map the page into the kernel address space. */
-		ret = page_map_insert(&kernel_page_map, (ptr_t)(base + i), page,
+		ret = page_map_insert(&kernel_page_map, (ptr_t)(base + i), page->addr,
 		                      true, true, vmflag & MM_FLAG_MASK);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			dprintf("kheap: failed to map page 0x%" PRIpp " to %p (%d)\n",
 			        page, (ptr_t)(base + i), ret);
-			page_free(page, 1);
+			page_free(page);
 			goto fail;
 		}
 

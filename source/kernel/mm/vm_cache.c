@@ -85,11 +85,11 @@ vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
  *			be shared. Only used if mappingp is set.
  * @return		Status code describing result of the operation. */
 static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, bool overwrite,
-                                           bool nonblock, vm_page_t **pagep, void **mappingp,
+                                           bool nonblock, page_t **pagep, void **mappingp,
                                            bool *sharedp) {
 	void *mapping = NULL;
 	bool shared = false;
-	vm_page_t *page;
+	page_t *page;
 	status_t ret;
 
 	assert((pagep && !mappingp) || (mappingp && !pagep));
@@ -109,7 +109,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	page = avl_tree_lookup(&cache->pages, offset);
 	if(page) {
 		if(refcount_inc(&page->count) == 1) {
-			vm_page_dequeue(page);
+			page_set_state(page, PAGE_STATE_ALLOCATED);
 		}
 		mutex_unlock(&cache->lock);
 
@@ -133,7 +133,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	}
 
 	/* Allocate a new page. */
-	page = vm_page_alloc(1, MM_SLEEP);
+	page = page_alloc(MM_SLEEP);
 
 	/* Only bother filling the page with data if it's not going to be
 	 * immediately overwritten. */
@@ -151,7 +151,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			ret = cache->ops->read_page(cache, mapping, offset, nonblock);
 			if(ret != STATUS_SUCCESS) {
 				phys_unmap(mapping, PAGE_SIZE, true);
-				vm_page_free(page, 1);
+				page_free(page);
 				mutex_unlock(&cache->lock);
 				return ret;
 			}
@@ -201,7 +201,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
  * @param offset	Offset of page to release.
  * @param dirty		Whether the page has been dirtied. */
 static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, bool dirty) {
-	vm_page_t *page;
+	page_t *page;
 
 	mutex_lock(&cache->lock);
 
@@ -227,12 +227,12 @@ static void vm_cache_release_page_internal(vm_cache_t *cache, offset_t offset, b
 		 * move the page to the appropriate queue. */
 		if(offset >= cache->size) {
 			avl_tree_remove(&cache->pages, &page->avl_link);
-			vm_page_free(page, 1);
+			page_free(page);
 		} else if(page->modified && cache->ops && cache->ops->write_page) {
-			vm_page_queue(page, PAGE_QUEUE_MODIFIED);
+			page_set_state(page, PAGE_STATE_MODIFIED);
 		} else {
 			page->modified = false;
-			vm_page_queue(page, PAGE_QUEUE_CACHED);
+			page_set_state(page, PAGE_STATE_CACHED);
 		}
 	}
 
@@ -450,8 +450,8 @@ out:
  * @return		Status code describing result of the operation.
  */
 status_t vm_cache_get_page(vm_cache_t *cache, offset_t offset, phys_ptr_t *physp) {
-	vm_page_t *page;
 	status_t ret;
+	page_t *page;
 
 	ret = vm_cache_get_page_internal(cache, offset, false, false, &page, NULL, NULL);
 	if(ret == STATUS_SUCCESS) {
@@ -474,7 +474,7 @@ void vm_cache_release_page(vm_cache_t *cache, offset_t offset, phys_ptr_t phys) 
  * @param cache		Cache to resize.
  * @param size		New size of the cache. */
 void vm_cache_resize(vm_cache_t *cache, offset_t size) {
-	vm_page_t *page;
+	page_t *page;
 
 	mutex_lock(&cache->lock);
 
@@ -482,12 +482,11 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
 	 * they will get freed once they are released. */
 	if(size < cache->size) {
 		AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
-			page = avl_tree_entry(iter, vm_page_t);
+			page = avl_tree_entry(iter, page_t);
 
 			if(page->offset >= size && refcount_get(&page->count) == 0) {
 				avl_tree_remove(&cache->pages, &page->avl_link);
-				vm_page_dequeue(page);
-				vm_page_free(page, 1);
+				page_free(page);
 			}
 		}
 	}
@@ -501,7 +500,7 @@ void vm_cache_resize(vm_cache_t *cache, offset_t size) {
  * @param cache		Cache page belongs to.
  * @param page		Page to flush.
  * @return		Status code describing result of the operation. */
-static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page) {
+static status_t vm_cache_flush_page_internal(vm_cache_t *cache, page_t *page) {
 	void *mapping;
 	status_t ret;
 
@@ -524,7 +523,7 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page)
 		 * space as read-write. */
 		if(refcount_get(&page->count) == 0) {
 			page->modified = false;
-			vm_page_queue(page, PAGE_QUEUE_CACHED); 
+			page_set_state(page, PAGE_STATE_CACHED); 
 		}
 	}
 	phys_unmap(mapping, PAGE_SIZE, true);
@@ -539,13 +538,13 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, vm_page_t *page)
  *			occur, it is the most recent that is returned. */
 status_t vm_cache_flush(vm_cache_t *cache) {
 	status_t ret = STATUS_SUCCESS, err;
-	vm_page_t *page;
+	page_t *page;
 
 	mutex_lock(&cache->lock);
 
 	/* Flush all pages. */
 	AVL_TREE_FOREACH(&cache->pages, iter) {
-		page = avl_tree_entry(iter, vm_page_t);
+		page = avl_tree_entry(iter, page_t);
 
 		err = vm_cache_flush_page_internal(cache, page);
 		if(err != STATUS_SUCCESS) {
@@ -563,15 +562,15 @@ status_t vm_cache_flush(vm_cache_t *cache) {
  *			always succeed if true.
  * @return		Status code describing result of the operation. */
 status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
-	vm_page_t *page;
 	status_t ret;
+	page_t *page;
 
 	mutex_lock(&cache->lock);
 	cache->deleted = true;
 
 	/* Free all pages. */
 	AVL_TREE_FOREACH_SAFE(&cache->pages, iter) {
-		page = avl_tree_entry(iter, vm_page_t);
+		page = avl_tree_entry(iter, page_t);
 
 		if(refcount_get(&page->count) != 0) {
 			fatal("Cache page still in use while destroying");
@@ -585,8 +584,7 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 		}
 
 		avl_tree_remove(&cache->pages, &page->avl_link);
-		vm_page_dequeue(page);
-		vm_page_free(page, 1);
+		page_free(page);
 	}
 
 	/* Unlock and relock the cache to allow any attempts to flush or evict
@@ -609,7 +607,7 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
  *
  * @return		Whether the page was removed from the queue.
  */
-bool vm_cache_flush_page(vm_page_t *page) {
+bool vm_cache_flush_page(page_t *page) {
 	vm_cache_t *cache;
 	status_t ret;
 
@@ -636,7 +634,7 @@ bool vm_cache_flush_page(vm_page_t *page) {
  *
  * @param page		Page to evict.
  */
-void vm_cache_evict_page(vm_page_t *page) {
+void vm_cache_evict_page(page_t *page) {
 	vm_cache_t *cache;
 
 	/* Must be careful - another thread could be destroying the cache. */
@@ -650,8 +648,7 @@ void vm_cache_evict_page(vm_page_t *page) {
 	}
 
 	avl_tree_remove(&cache->pages, &page->avl_link);
-	vm_page_dequeue(page);
-	vm_page_free(page, 1);
+	page_free(page);
 	mutex_unlock(&cache->lock);
 }
 
@@ -661,8 +658,8 @@ void vm_cache_evict_page(vm_page_t *page) {
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_cache(int argc, char **argv) {
 	vm_cache_t *cache;
-	vm_page_t *page;
 	unative_t val;
+	page_t *page;
 
 	if(KDBG_HELP(argc, argv)) {
 		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
@@ -694,7 +691,7 @@ int kdbg_cmd_cache(int argc, char **argv) {
 	/* Show all cached pages. */
 	kprintf(LOG_NONE, "Cached pages:\n");
 	AVL_TREE_FOREACH(&cache->pages, iter) {
-		page = avl_tree_entry(iter, vm_page_t);
+		page = avl_tree_entry(iter, page_t);
 
 		kprintf(LOG_NONE, "  Page 0x%016" PRIpp " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
 		        page->addr, page->offset, page->modified, refcount_get(&page->count));

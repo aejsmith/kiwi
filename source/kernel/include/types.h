@@ -31,6 +31,7 @@
 
 /** Internal kernel integer types. */
 typedef uint64_t key_t;			/**< Type used to store a key for a container. */
+typedef uint32_t page_num_t;		/**< Integer type representing a number of pages. */
 
 /** Minimum and maximum values a signed char can hold. */
 #define SCHAR_MIN	(-SCHAR_MAX - 1)

@@ -313,7 +313,7 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 static status_t bios_init(void) {
 	/* Allocate a chunk of heap space and map stuff into it. */
 	bios_mem_mapping = (void *)((ptr_t)vmem_alloc(&kheap_va_arena, 0x100000, MM_SLEEP));
-	bios_mem_pages = page_alloc(BIOS_MEM_SIZE / PAGE_SIZE, MM_SLEEP);
+	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_SLEEP, &bios_mem_pages);
 	bios_mem_map(BIOS_BDA_BASE, BIOS_BDA_BASE, BIOS_BDA_SIZE);
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);

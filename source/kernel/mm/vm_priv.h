@@ -38,7 +38,7 @@ typedef struct vm_amap {
 
 	size_t curr_size;		/**< Number of pages currently contained in object. */
 	size_t max_size;		/**< Maximum number of pages in object. */
-	vm_page_t **pages;		/**< Array of pages currently in object. */
+	page_t **pages;			/**< Array of pages currently in object. */
 	uint16_t *rref;			/**< Region reference count array. */
 } vm_amap_t;
 

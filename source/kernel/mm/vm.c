@@ -205,7 +205,7 @@ static vm_amap_t *vm_amap_create(size_t size) {
 	refcount_set(&map->count, 1);
 	map->curr_size = 0;
 	map->max_size = size >> PAGE_WIDTH;
-	map->pages = kcalloc(map->max_size, sizeof(vm_page_t *), MM_SLEEP);
+	map->pages = kcalloc(map->max_size, sizeof(page_t *), MM_SLEEP);
 	map->rref = kcalloc(map->max_size, sizeof(uint16_t *), MM_SLEEP);
 	dprintf("vm: created anonymous map %p (size: %zu, pages: %zu)\n", map, size, map->max_size);
 	return map;
@@ -329,7 +329,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	refcount_set(&dest->amap->count, 1);
 	dest->amap->curr_size = 0;
 	dest->amap->max_size = end - start;
-	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(vm_page_t *), MM_SLEEP);
+	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(page_t *), MM_SLEEP);
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_SLEEP);
 
 	/* Write-protect all mappings on the source region. */
@@ -520,7 +520,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 				dprintf("vm: anon object rref %zu reached 0, freeing 0x%" PRIpp " (amap: %p)\n",
 				        i, region->amap->pages[i]->addr, region->amap);
 				if(refcount_dec(&region->amap->pages[i]->count) == 0) {
-					vm_page_free(region->amap->pages[i], 1);
+					page_free(region->amap->pages[i]);
 				}
 				region->amap->pages[i] = NULL;
 				region->amap->curr_size--;
@@ -830,7 +830,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	vm_amap_t *amap = region->amap;
 	phys_ptr_t paddr;
 	offset_t offset;
-	vm_page_t *page;
+	page_t *page;
 	status_t ret;
 	bool write;
 	size_t i;
@@ -860,7 +860,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	if(!amap->pages[i] && !handle) {
 		/* No page existing and no source. Allocate a zeroed page. */
 		dprintf("vm:  anon fault: no existing page and no source, allocating new\n");
-		amap->pages[i] = vm_page_alloc(1, MM_SLEEP | PM_ZERO);
+		amap->pages[i] = page_alloc(MM_SLEEP | PM_ZERO);
 		refcount_inc(&amap->pages[i]->count);
 		amap->curr_size++;
 		paddr = amap->pages[i]->addr;
@@ -876,7 +876,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 
 				dprintf("vm:  anon write fault: copying page %zu due to refcount > 1\n", i);
 
-				page = vm_page_copy(amap->pages[i], MM_SLEEP);
+				page = page_copy(amap->pages[i], MM_SLEEP);
 				refcount_inc(&page->count);
 
 				/* Decrease the count of the old page. We must
@@ -884,7 +884,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 				 * could have released the page while we were
 				 * copying. */
 				if(refcount_dec(&amap->pages[i]->count) == 0) {
-					vm_page_free(amap->pages[i], 1);
+					page_free(amap->pages[i]);
 				}
 
 				amap->pages[i] = page;
@@ -915,8 +915,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			dprintf("vm:  anon write fault: copying page 0x%" PRIpp " from %p\n",
 			        paddr, handle->object);
 
-			page = vm_page_alloc(1, MM_SLEEP);
-			page_copy(page->addr, paddr, MM_SLEEP);
+			page = page_alloc(MM_SLEEP);
+			phys_copy(page->addr, paddr, MM_SLEEP);
 
 			/* Add the page and release the old one. */
 			refcount_inc(&page->count);
@@ -1502,7 +1502,6 @@ void __init_text vm_init(void) {
 	                                  MM_FATAL);
 
 	/* Initialise the other parts of the VM system. */
-	vm_page_init();
 	vm_cache_init();
 
 	/* Create the kernel address space. */
