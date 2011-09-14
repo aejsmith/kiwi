@@ -22,6 +22,7 @@
 #include <arch/io.h>
 #include <cpu/intr.h>
 #include <pc/pit.h>
+#include <time.h>
 
 /** Handle a PIT tick.
  * @param num		IRQ number.
@@ -36,8 +37,8 @@ static irq_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) 
 static void pit_enable(void) {
 	uint16_t base;
 
-	/* Set frequency (1000Hz) */
-	base = 1193182L / PIT_FREQUENCY;
+	/* Set frequency. */
+	base = PIT_BASE_FREQUENCY / PIT_TIMER_FREQUENCY;
 	out8(0x43, 0x36);
 	out8(0x40, base & 0xFF);
 	out8(0x40, base >> 8);
@@ -51,9 +52,14 @@ static void pit_disable(void) {
 }
 
 /** PIT clock source. */
-timer_device_t pit_timer_device = {
+static timer_device_t pit_timer_device = {
 	.name = "PIT",
 	.type = TIMER_DEVICE_PERIODIC,
 	.enable = pit_enable,
 	.disable = pit_disable,
 };
+
+/** Initialise the PIT timer. */
+__init_text void pit_init(void) {
+	timer_device_set(&pit_timer_device);
+}

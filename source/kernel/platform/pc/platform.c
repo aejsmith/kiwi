@@ -31,6 +31,7 @@
 
 #include <kernel.h>
 #include <kboot.h>
+#include <time.h>
 
 KBOOT_IMAGE(KBOOT_IMAGE_LFB);
 
@@ -47,7 +48,7 @@ __init_text void platform_postmm_init(void) {
 
 	/* If the LAPIC is not available, we must use the PIT as the timer. */
 	if(!lapic_enabled()) {
-		timer_device_set(&pit_timer_device);
+		pit_init();
 	}
 }
 

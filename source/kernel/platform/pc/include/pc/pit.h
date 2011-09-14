@@ -22,11 +22,12 @@
 #ifndef __PC_PIT_H
 #define __PC_PIT_H
 
-#include <time.h>
+/** Base frequency of the PIT. */
+#define PIT_BASE_FREQUENCY	1193182L
 
-/** Frequency to use for PIT (in Hz). */
-#define PIT_FREQUENCY		1000
+/** Frequency that we run the PIT periodic timer at. */
+#define PIT_TIMER_FREQUENCY	1000
 
-extern timer_device_t pit_timer_device;
+extern void pit_init(void);
 
 #endif /* __PC_PIT_H */

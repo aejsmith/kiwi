@@ -30,6 +30,8 @@
 
 #include <mm/phys.h>
 
+#include <pc/pit.h>
+
 #include <assert.h>
 #include <console.h>
 #include <kboot.h>
@@ -41,9 +43,6 @@ KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage (disables SMP)"
 #else
 KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage", false);
 #endif
-
-/** Frequency of the PIT. */
-#define PIT_FREQUENCY		1193182L
 
 #if CONFIG_SMP
 extern void ipi_process_pending(void);
@@ -219,7 +218,7 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
 	pticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
 
 	/* Calculate frequency. */
-	return (lticks * 8 * PIT_FREQUENCY) / pticks;
+	return (lticks * 8 * PIT_BASE_FREQUENCY) / pticks;
 }
 
 /** Initialise the local APIC on the current CPU. */

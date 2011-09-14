@@ -31,12 +31,11 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <pc/pit.h>
+
 #include <assert.h>
 #include <console.h>
 #include <kdbg.h>
-
-/** Frequency of the PIT. */
-#define PIT_FREQUENCY		1193182L
 
 /** Number of times to get a frequency (must be odd). */
 #define FREQUENCY_ATTEMPTS	9
@@ -110,7 +109,7 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
 	ticks = ((ehi << 8) | elo) - ((shi << 8) | slo);
 
 	/* Calculate frequency. */
-	return (cycles * PIT_FREQUENCY) / ticks;
+	return (cycles * PIT_BASE_FREQUENCY) / ticks;
 }
 
 /** Get current CPU ID.
