@@ -184,12 +184,12 @@ static void page_fault(unative_t num, intr_frame_t *frame) {
 		kdbg_except_handler(num, except_strings[num], frame);
 		return;
 	}
-#if CONFIG_X86_NX
+
 	/* Check if the fault was caused by instruction execution. */
 	if(cpu_features.xd && frame->err_code & (1<<4)) {
 		access = VM_FAULT_EXEC;
 	}
-#endif
+
 	/* Check if a reserved bit fault. This is always fatal. */
 	if(frame->err_code & (1<<3)) {
 		fatal("Reserved bit PF exception (%p) (0x%x)", addr, frame->err_code);

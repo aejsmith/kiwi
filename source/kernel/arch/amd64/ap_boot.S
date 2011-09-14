@@ -87,7 +87,7 @@ PRIVATE_FUNCTION_START(ap_boot)
 	rdmsr
 	orl	$X86_EFER_LME, %eax
 	wrmsr
-#if CONFIG_X86_NX
+
 	/* Check for NX support and enable it if necessary. We must do this
 	 * here as if it is supported the page tables will have the NX bit set
 	 * on certain parts of the kernel. */
@@ -100,7 +100,6 @@ PRIVATE_FUNCTION_START(ap_boot)
 	orl	$X86_EFER_NXE, %eax
 	wrmsr
 2:
-#endif
 	/* Set PG (Paging Enable) to put us in compatibility mode. */
 	movl	%cr0, %eax
 	orl	$X86_CR0_PG, %eax

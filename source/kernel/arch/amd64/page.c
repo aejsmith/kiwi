@@ -376,11 +376,9 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 	if(write) {
 		flags |= PG_WRITE;
 	}
-#if CONFIG_X86_NX
 	if(!exec && cpu_features.xd) {
 		flags |= PG_NOEXEC;
 	}
-#endif
 	if(IS_KERNEL_MAP(map)) {
 		flags |= PG_GLOBAL;
 	} else {
@@ -426,13 +424,11 @@ void page_map_protect(page_map_t *map, ptr_t virt, bool write, bool exec) {
 	} else {
 		ptbl[pte] &= ~PG_WRITE;
 	}
-#if CONFIG_X86_NX
 	if(exec) {
 		ptbl[pte] &= ~PG_NOEXEC;
 	} else if(cpu_features.xd) {
 		ptbl[pte] |= PG_NOEXEC;
 	}
-#endif
 	memory_barrier();
 
 	/* Clear TLB entries. */

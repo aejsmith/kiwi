@@ -36,8 +36,8 @@ config KLOG_SIZE
 	help
 	  Size for the kernel log buffer (in characters).
 
-if ARCH_X86
-source "arch/x86/Kconfig"
+if ARCH_AMD64
+source "arch/amd64/Kconfig"
 endif
 
 if PLATFORM_PC

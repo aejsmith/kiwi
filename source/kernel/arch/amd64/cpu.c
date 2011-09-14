@@ -291,12 +291,10 @@ __init_text void cpu_arch_init(cpu_t *cpu) {
 	 * because we do not want the FPU to be enabled initially. */
 	x86_write_cr0((x86_read_cr0() | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP | X86_CR0_TS) & ~X86_CR0_EM);
 
-#if CONFIG_X86_NX
 	/* Enable NX/XD if supported. */
 	if(cpu_features.xd) {
                 x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
         }
-#endif
 }
 
 /** Dump information about a CPU.
