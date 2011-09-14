@@ -34,7 +34,6 @@ extern void heap_raw_free(ptr_t addr, size_t size);
 extern void *heap_alloc(size_t size, int mmflag);
 extern void heap_free(void *addr, size_t size);
 
-// FIXME: remove
 extern void *heap_map_range(phys_ptr_t base, size_t size, int mmflag);
 extern void heap_unmap_range(void *addr, size_t size, bool shared);
 

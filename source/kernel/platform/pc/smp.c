@@ -29,7 +29,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/page.h>
+#include <mm/phys.h>
 
 #include <assert.h>
 #include <console.h>

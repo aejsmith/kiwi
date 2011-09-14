@@ -32,6 +32,7 @@
 #include <io/device.h>
 
 #include <mm/page.h>
+#include <mm/phys.h>
 
 #include <time.h>
 

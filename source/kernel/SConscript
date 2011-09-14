@@ -55,6 +55,7 @@ sources = FeatureSources(config, [
 	'mm/heap.c',
 	'mm/malloc.c',
 	'mm/page.c',
+	'mm/phys.c',
 	'mm/safe.c',
 	'mm/slab.c',
 	'mm/vm.c',

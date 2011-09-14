@@ -34,6 +34,7 @@
 #include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
+#include <mm/phys.h>
 #include <mm/slab.h>
 #include <mm/vm.h>
 

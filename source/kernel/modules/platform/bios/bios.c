@@ -24,6 +24,7 @@
 #include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/page.h>
+#include <mm/phys.h>
 
 #include <pc/bios.h>
 

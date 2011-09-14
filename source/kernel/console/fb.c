@@ -23,7 +23,7 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
-#include <mm/page.h>
+#include <mm/phys.h>
 
 #include <sync/spinlock.h>
 

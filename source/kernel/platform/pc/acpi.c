@@ -27,7 +27,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-#include <mm/page.h>
+#include <mm/phys.h>
 
 #include <assert.h>
 #include <console.h>

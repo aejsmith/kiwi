@@ -25,6 +25,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
+#include <mm/phys.h>
 #include <mm/slab.h>
 #include <mm/vm_cache.h>
 

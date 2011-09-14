@@ -33,6 +33,7 @@
 
 #include <mm/malloc.h>
 #include <mm/page.h>
+#include <mm/phys.h>
 #include <mm/vm.h>
 
 #include <proc/thread.h>
@@ -68,6 +69,27 @@ KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000);
 
 /** Kernel page map. */
 page_map_t kernel_page_map;
+
+/** Table mapping memory types to page table flags. */
+static struct { bool pat; uint64_t flags; } memory_type_flags[] = {
+	/** Normal Memory - Standard behaviour. */
+	{ false, 0 },
+
+	/** Device Memory - Assume MTRRs are set up correctly. */
+	{ false, 0 },
+
+	/** Uncacheable. */
+	{ false, PG_PCD },
+
+	/** Write Combining - PAT configured for WC if these both set. */
+	{ true, PG_PCD | PG_PWT },
+
+	/** Write-through. */
+	{ false, PG_PWT },
+
+	/** Write-back - Standard behaviour. */
+	{ false, 0 },
+};
 
 /** Invalidate a TLB entry.
  * @param addr		Address to invalidate. */
@@ -330,7 +352,7 @@ void page_map_unlock(page_map_t *map) {
  * @return		Status code describing result of operation. */
 status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool write, bool exec, int mmflag) {
 	uint64_t *ptbl, flags;
-	memory_type_t type;
+	unsigned type;
 	int pte;
 
 	assert(mutex_held(&map->lock));
@@ -366,25 +388,9 @@ status_t page_map_insert(page_map_t *map, ptr_t virt, phys_ptr_t phys, bool writ
 	}
 
 	/* Get the memory type of the address and set flags accordingly. */
-	type = MEMORY_TYPE_WB;
-	phys_memory_type(phys, &type);
-	switch(type) {
-	case MEMORY_TYPE_UC:
-		flags |= PG_PCD;
-		break;
-	case MEMORY_TYPE_WC:
-		/* This is only supported if the PAT is supported, we configure
-		 * it to use WC when both PCD and PWT are set. */
-		if(cpu_features.pat) {
-			flags |= (PG_PCD | PG_PWT);
-		}
-		break;
-	case MEMORY_TYPE_WT:
-		flags |= PG_PWT;
-		break;
-	case MEMORY_TYPE_WB:
-		/* No extra flags means WB. */
-		break;
+	type = phys_memory_type(phys);
+	if(!memory_type_flags[type].pat || cpu_features.pat) {
+		flags |= memory_type_flags[type].flags;
 	}
 
 	/* Set the PTE. */

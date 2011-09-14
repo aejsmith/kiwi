@@ -46,6 +46,7 @@
 # define LIBKERNEL_SIZE		0x0000000010000000	/**< Maximum size of kernel library. */
 # define KERNEL_PMAP_BASE	0xFFFFFF8000000000	/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
+# define KERNEL_PMAP_OFFSET	0x0000000000000000	/**< Physical map area offset. */
 # define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
 # define KERNEL_HEAP_SIZE	0x0000002000000000	/**< Kernel heap size (128GB). */
 # define KERNEL_VM_BASE		0xFFFFFFE000000000	/**< Kernel VM region base. */
@@ -60,6 +61,7 @@
 # define LIBKERNEL_SIZE		0x00010000		/**< Maximum size of kernel library. */
 # define KERNEL_PMAP_BASE	0x80000000		/**< Physical map area base. */
 # define KERNEL_PMAP_SIZE	0x40000000		/**< Physical map area size (1GB). */
+# define KERNEL_PMAP_OFFSET	0x00000000		/**< Physical map area offset. */
 # define KERNEL_HEAP_BASE	0xC0000000		/**< Kernel heap base. */
 # define KERNEL_HEAP_SIZE	0x30000000		/**< Kernel heap size (768MB). */
 # define KERNEL_VM_BASE		0xF0000000		/**< Kernel VM region base. */

@@ -34,6 +34,7 @@
 #include <lib/utility.h>
 
 #include <mm/page.h>
+#include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm.h>

@@ -68,6 +68,7 @@
 #include <lib/string.h>
 
 #include <mm/malloc.h>
+#include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
 #include <mm/vm_cache.h>

@@ -68,22 +68,11 @@ typedef struct page {
 	avl_tree_node_t avl_link;	/**< Link to AVL tree for use by owner. */
 } page_t;
 
-/** Enumeration of memory range types. */
-typedef enum memory_type {
-	MEMORY_TYPE_UC,			/**< Uncacheable. */
-	MEMORY_TYPE_WC,			/**< Write Combining. */
-	MEMORY_TYPE_WT,			/**< Write-through. */
-	MEMORY_TYPE_WB,			/**< Write-back. */
-} memory_type_t;
-
 /** Possible states of a page. */
 #define PAGE_STATE_ALLOCATED	0	/**< Allocated. */
 #define PAGE_STATE_MODIFIED	1	/**< Modified. */
 #define PAGE_STATE_CACHED	2	/**< Cached. */
 #define PAGE_STATE_FREE		3	/**< Free. */
-
-/** Number of page queues. */
-#define PAGE_QUEUE_COUNT	3
 
 /** Flags to modify page allocation behaviour. */
 #define PM_ZERO			(1<<10)	/**< Clear the page contents before returning. */
@@ -106,18 +95,6 @@ extern page_t *page_lookup(phys_ptr_t addr);
 extern page_t *page_alloc(int mmflag);
 extern void page_free(page_t *page);
 extern page_t *page_copy(page_t *page, int mmflag);
-
-extern status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-                           phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag,
-                           phys_ptr_t *basep);
-extern void phys_free(phys_ptr_t base, phys_size_t size);
-extern bool phys_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag);
-
-extern void phys_memory_type(phys_ptr_t addr, memory_type_t *typep);
-extern void phys_set_memory_type(phys_ptr_t start, size_t size, memory_type_t type);
-
-extern void *phys_map(phys_ptr_t addr, size_t size, int mmflag);
-extern void phys_unmap(void *addr, size_t size, bool shared);
 
 extern void page_stats_get(page_stats_t *stats);
 
