@@ -61,7 +61,7 @@ defines = {
 }
 
 # Architecture-specific feature definitions, flags and sources.
-if config['SRCARCH'] == 'x86':
+if config['ARCH_X86']:
 	if config['ARCH'] == 'amd64':
 		defines['SIZEOF_LONG'] = 8
 		defines['USE_SSE2'] = 1

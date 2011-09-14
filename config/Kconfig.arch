@@ -23,33 +23,26 @@ config ARCH_AMD64
 	help
 	  Target the built system to 64-bit x86 processors.
 
-config ARCH_IA32
-	bool "IA32"
-	help
-	  Target the built system to 32-bit x86 processors.
-
 endchoice
 
 config ARCH
         string
         default "amd64" if ARCH_AMD64
-        default "ia32" if ARCH_IA32
 
 config SRCARCH
 	string
-	default "x86" if ARCH_AMD64 || ARCH_IA32
+	default "x86" if ARCH_AMD64
 	default ARCH
 
 ############################
 # x86 configuration values #
 ############################
 
-if ARCH_AMD64 || ARCH_IA32
+if ARCH_AMD64
 
 config TOOLCHAIN_TARGET
 	string
-	default "x86_64-kiwi" if ARCH_AMD64
-	default "i686-kiwi" if ARCH_IA32
+	default "x86_64-kiwi"
 
 config ARCH_X86
 	def_bool y
@@ -57,15 +50,11 @@ config ARCH_X86
 config ARCH_LITTLE_ENDIAN
 	def_bool y
 
-config ARCH_32BIT
-	def_bool ARCH_IA32
-
 config ARCH_64BIT
-	def_bool ARCH_AMD64
+	def_bool y
 
 config ARCH_CCFLAGS
 	string
-	default "-march=i686" if ARCH_IA32
 	default ""
 
 endif

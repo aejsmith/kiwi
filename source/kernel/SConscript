@@ -102,7 +102,7 @@ env = envmgr.Create('kernel', {
 	'LIBS': [],
 	'CPPPATH': [
 		Dir('include'),
-		Dir('arch/%s/include' % (config['SRCARCH'])),
+		Dir('arch/%s/include' % (config['ARCH'])),
 		Dir('platform/%s/include' % (config['PLATFORM'])),
 	],
 	'CCFLAGS': [
@@ -160,7 +160,7 @@ env.SyscallHeader('include/syscall_table.h', env['SYSCALLS'], GUARD='__SYSCALL_T
 envmgr['dist']['KERNEL'] = File('kernel')
 
 # Get the list of source files from the architecture/platform.
-arch_sources = SConscript(dirs = ['arch/' + config['SRCARCH']], exports = ['env'])
+arch_sources = SConscript(dirs = ['arch/' + config['ARCH']], exports = ['env'])
 platform_sources = SConscript(dirs = ['platform/' + config['PLATFORM']], exports = ['env'])
 sources = arch_sources + platform_sources + sources
 

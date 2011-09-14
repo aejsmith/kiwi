@@ -1,0 +1,61 @@
+#
+# Copyright (C) 2009-2011 Alex Smith
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+from util import FeatureSources
+Import('config', 'env')
+
+sources = FeatureSources(config, [
+	('SMP', 'ap_boot.bin.c'),
+	'arch.c',
+	'context.c',
+	'context_asm.S',
+	'cpu.c',
+	'descriptor.c',
+	'elf.c',
+	'entry.S',
+	'fpu.c',
+	'intr.c',
+	'kdbg.c',
+	'lapic.c',
+	'page.c',
+	'signal.c',
+	'syscall.c',
+	('SMP', 'smp.c'),
+	'thread.c',
+	'time.c',
+])
+
+# Prevent FPU code generation, warn on stack frames that are too large.
+env['CCFLAGS'] += ['-mno-sse', '-mno-mmx', '-mno-sse2', '-mno-3dnow']
+
+# Warn on stack frames that are too large.
+env['CCFLAGS'] += ['-Wframe-larger-than=512']
+
+# Set other AMD64-specific flags.
+env['CCFLAGS'] += ['-mcmodel=kernel', '-mno-red-zone']
+
+# Set the linker script path.
+env['LDSCRIPT'] = env.LDScript('link.ld', 'link.ld.in')
+
+# Generate the AP boot code.
+if config['SMP']:
+	env.Command('ap_boot.bin', env.Object('ap_boot.S'),
+		Action('$LD -Ttext=0 --oformat binary --strip-all -o $TARGET $SOURCE', None))
+	env.Command('ap_boot.bin.c', ['ap_boot.bin'],
+		Action('$BIN2HEX --no-size --section .init.trampoline $SOURCE __smp_trampoline > $TARGET',
+			'$GENCOMSTR'))
+
+Return('sources')
