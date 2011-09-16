@@ -57,11 +57,11 @@ cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). *
 volatile int cpu_boot_wait = 0;
 #endif
 
-/** Initialise a CPU structure and register it.
+/** Initialise a CPU structure.
  * @param cpu		Structure to initialise.
  * @param id		ID of the CPU to add.
  * @param state		State of the CPU. */
-static void cpu_register_internal(cpu_t *cpu, cpu_id_t id, int state) {
+static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
 	memset(cpu, 0, sizeof(cpu_t));
 	list_init(&cpu->header);
 	cpu->id = id;
@@ -74,11 +74,6 @@ static void cpu_register_internal(cpu_t *cpu, cpu_id_t id, int state) {
 	/* Initialise timer information. */
 	list_init(&cpu->timers);
 	spinlock_init(&cpu->timer_lock, "timer_lock");
-
-	/* Store in the running list if it is running. */
-	if(state == CPU_RUNNING) {
-		list_append(&running_cpus, &cpu->header);
-	}
 }
 
 #if CONFIG_SMP
@@ -92,7 +87,7 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 	assert(cpus);
 
 	cpu = kmalloc(sizeof(*cpu), MM_FATAL);
-	cpu_register_internal(cpu, id, state);
+	cpu_ctor(cpu, id, state);
 
 	/* Resize the CPU array if required. */
 	if(id > highest_cpu_id) {
@@ -109,10 +104,33 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 }
 #endif
 
+/** Perform early CPU subsystem initialisation. */
+__init_text void cpu_early_init(void) {
+	/* The boot CPU is initially assigned an ID of 0. It is later corrected
+	 * once we have the ability to get the real ID. */
+	cpu_ctor(&boot_cpu, 0, CPU_RUNNING);
+	list_append(&running_cpus, &boot_cpu.header);
+
+	/* Perform architecture initialisation. This initialises some state
+	 * shared between all CPUs. */
+	arch_cpu_early_init();
+}
+
+/** Perform early per-CPU initialisation.
+ * @param cpu		Structure for the current CPU. */
+__init_text void cpu_early_init_percpu(cpu_t *cpu) {
+	arch_cpu_early_init_percpu(cpu);
+}
+
+/** Perform additional per-CPU initialisation. */
+__init_text void cpu_init_percpu() {
+	arch_cpu_init_percpu();
+}
+
 /** Properly initialise the CPU subsystem. */
 __init_text void cpu_init(void) {
 	/* Get the real ID of the boot CPU. */
-	boot_cpu.id = highest_cpu_id = cpu_current_id();
+	boot_cpu.id = highest_cpu_id = cpu_id();
 	cpu_count = 1;
 
 	/* Create the initial CPU array and add the boot CPU to it. */
@@ -125,10 +143,4 @@ __init_text void cpu_init(void) {
 		smp_detect();
 	}
 #endif
-}
-
-/** Initialise the boot CPU structure. */
-__init_text void cpu_early_init(void) {
-	/* Add the boot CPU. */
-	cpu_register_internal(&boot_cpu, 0, CPU_RUNNING);
 }

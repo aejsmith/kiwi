@@ -134,6 +134,7 @@ static inline void lidt(ptr_t base, uint16_t limit) {
 }
 
 extern void descriptor_init(struct cpu *cpu);
+extern void idt_init();
 
 #endif /* __ASM__ */
 #endif /* __X86_DESCRIPTOR_H */

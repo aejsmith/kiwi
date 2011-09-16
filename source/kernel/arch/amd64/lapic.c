@@ -270,7 +270,7 @@ __init_text void lapic_init(void) {
 	lapic_write(LAPIC_REG_TIMER_DIVIDER, LAPIC_TIMER_DIV8);
 
 	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU
-	 * in cpu_arch_init(), same applies here. */
+	 * in arch_cpu_early_init_percpu(), same applies here. */
 #if CONFIG_SMP
 	if(strncmp(curr_cpu->arch.model_name, "QEMU", 4) != 0 || curr_cpu == &boot_cpu) {
 #endif

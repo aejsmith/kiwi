@@ -399,10 +399,9 @@ static __init_text void kmain_bsp_bottom(void) {
 	}
 	kboot_tag_release(core);
 
-	/* Perform early architecture/platform initialisation. */
+	/* Do early CPU subsystem and CPU initialisation. */
 	cpu_early_init();
-	arch_premm_init();
-	platform_premm_init();
+	cpu_early_init_percpu(&boot_cpu);
 
 	/* Initialise kernel memory management subsystems. */
 	security_init();
@@ -416,9 +415,12 @@ static __init_text void kmain_bsp_bottom(void) {
 	console_init();
 	kprintf(LOG_NORMAL, "kernel: version %s booting...\n", kiwi_ver_string);
 
-	/* Perform second stage architecture/platform initialisation. */
-	arch_postmm_init();
-	platform_postmm_init();
+	/* Perform more per-CPU initialisation that can be done now the memory
+	 * management subsystems are up. */
+	cpu_init_percpu();
+
+	/* Initialise the platform. */
+	platform_init();
 
 #if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */
@@ -462,6 +464,7 @@ static __init_text void kmain_bsp_bottom(void) {
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
 __init_text void kmain_ap(cpu_t *cpu) {
+#if 0
 	/* Switch to the kernel page map and do architecture-specific
 	 * initialisation of this CPU. */
 	page_map_switch(&kernel_page_map);
@@ -482,5 +485,7 @@ __init_text void kmain_ap(cpu_t *cpu) {
 
 	/* Begin scheduling threads. */
 	sched_enter();
+#endif
+	while(true);
 }
 #endif

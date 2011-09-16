@@ -133,7 +133,7 @@ typedef struct cpu_features {
 } cpu_features_t;
 
 /** Architecture-specific CPU structure. */
-typedef struct cpu_arch {
+typedef struct arch_cpu {
 	struct cpu *parent;			/**< Pointer back to CPU. */
 
 	/** Time conversion factors. */
@@ -160,7 +160,7 @@ typedef struct cpu_arch {
 	uint32_t highest_standard;		/**< Highest standard function. */
 	uint32_t highest_extended;		/**< Highest extended function. */
 	cpu_features_t features;		/**< Features supported by the CPU. */
-} cpu_arch_t;
+} arch_cpu_t;
 
 /** Get the current CPU structure pointer.
  * @return		Pointer to current CPU structure. */

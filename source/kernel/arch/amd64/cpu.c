@@ -20,11 +20,14 @@
  */
 
 #include <arch/io.h>
+#include <arch/intr.h>
 #include <arch/memory.h>
 #include <arch/page.h>
 
 #include <x86/cpu.h>
+#include <x86/descriptor.h>
 #include <x86/lapic.h>
+#include <x86/page.h>
 
 #include <cpu/cpu.h>
 
@@ -37,6 +40,8 @@
 #include <console.h>
 #include <kdbg.h>
 
+extern void syscall_arch_init(void);
+
 /** Number of times to get a frequency (must be odd). */
 #define FREQUENCY_ATTEMPTS	9
 
@@ -45,6 +50,26 @@ static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
 /** Feature set present on all CPUs. */
 cpu_features_t cpu_features;
+
+/**
+ * Get the current CPU ID.
+ * 
+ * Gets the ID of the CPU that the function executes on. This function should
+ * only be used in cases where the curr_cpu variable is unavailable or unsafe.
+ * Anywhere else you should be using curr_cpu->id.
+ *
+ * @return              Current CPU ID.
+ */
+cpu_id_t cpu_id(void) {
+        return (cpu_id_t)lapic_id();
+}
+
+/** Perform early initialisation common to all CPUs. */
+__init_text void arch_cpu_early_init(void) {
+	/* Initialise the global IDT and the interrupt handler table. */
+	idt_init();
+	intr_init();
+}
 
 /** Comparison function for qsort() on an array of uint64_t's.
  * @param a		Pointer to first value.
@@ -112,22 +137,10 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
 	return (cycles * PIT_BASE_FREQUENCY) / ticks;
 }
 
-/** Get current CPU ID.
- * 
- * Gets the ID of the CPU that the function executes on. This function should
- * only be used in cases where the curr_cpu variable is unavailable or unsafe,
- * i.e. during thread switching.
- *
- * @return              Current CPU ID.
- */
-cpu_id_t cpu_current_id(void) {
-        return (cpu_id_t)lapic_id();
-}
-
 /** Detect CPU features/information.
  * @param cpu		Pointer to architecture CPU structure to fill in.
  *			Assumes that the structure is zeroed out. */
-static __init_text void detect_cpu_features(cpu_arch_t *cpu) {
+static __init_text void detect_cpu_features(arch_cpu_t *cpu) {
 	uint32_t eax, ebx, ecx, edx;
 	uint32_t *ptr;
 	size_t i, j;
@@ -140,8 +153,9 @@ static __init_text void detect_cpu_features(cpu_arch_t *cpu) {
 	}
 
 	/* Get standard feature information. */
-	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &cpu->features.standard_ecx,
-		&cpu->features.standard_edx);
+	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx,
+	          &cpu->features.standard_ecx,
+	          &cpu->features.standard_edx);
 
 	/* Save model information. */
 	cpu->family = (eax >> 8) & 0x0f;
@@ -160,8 +174,9 @@ static __init_text void detect_cpu_features(cpu_arch_t *cpu) {
 	if(cpu->highest_extended & (1<<31)) {
 		if(cpu->highest_extended >= X86_CPUID_EXT_FEATURE) {
 			/* Get extended feature information. */
-			x86_cpuid(X86_CPUID_EXT_FEATURE, &eax, &ebx, &cpu->features.extended_ecx,
-				&cpu->features.extended_edx);
+			x86_cpuid(X86_CPUID_EXT_FEATURE, &eax, &ebx,
+			          &cpu->features.extended_ecx,
+			          &cpu->features.extended_edx);
 		}
 
 		if(cpu->highest_extended >= X86_CPUID_BRAND_STRING3) {
@@ -220,7 +235,7 @@ static __init_text void detect_cpu_features(cpu_arch_t *cpu) {
 
 /** Detect and set up the current CPU.
  * @param cpu		CPU structure for the current CPU. */
-__init_text void cpu_arch_init(cpu_t *cpu) {
+__init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	/* If this is the boot CPU, a double fault stack will not have been
 	 * allocated. Use the pre-allocated one in this case. */
 #if CONFIG_SMP
@@ -233,6 +248,7 @@ __init_text void cpu_arch_init(cpu_t *cpu) {
 
 	/* Initialise and load descriptor tables. */
 	descriptor_init(cpu);
+	pat_init();
 
 	/* Set the CPU structure back pointer, used for the curr_cpu pointer
 	 * before the thread system is up. */
@@ -294,6 +310,12 @@ __init_text void cpu_arch_init(cpu_t *cpu) {
 	if(cpu_features.xd) {
                 x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
         }
+}
+
+/** Perform additional initialisation of the current CPU. */
+__init_text void arch_cpu_init_percpu() {
+	lapic_init();
+	syscall_arch_init();
 }
 
 /** Dump information about a CPU.

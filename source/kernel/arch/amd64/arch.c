@@ -30,22 +30,8 @@
 #include <kernel.h>
 #include <time.h>
 
-extern void syscall_arch_init(void);
-
-/** x86-specific early initialisation. */
-__init_text void arch_premm_init(void) {
-	cpu_arch_init(&boot_cpu);
-	intr_init();
-	pat_init();
-}
-
-/** x86-specific second stage initialisation. */
-__init_text void arch_postmm_init(void) {
-	syscall_arch_init();
-	lapic_init();
-}
-
 #if CONFIG_SMP
+#if 0
 /** x86-specific initialisation for an AP.
  * @param cpu		CPU structure for the AP. */
 __init_text void arch_ap_init(cpu_t *cpu) {
@@ -54,4 +40,5 @@ __init_text void arch_ap_init(cpu_t *cpu) {
 	lapic_init();
 	syscall_arch_init();
 }
+#endif
 #endif

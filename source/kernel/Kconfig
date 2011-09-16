@@ -16,7 +16,7 @@
 
 config SMP
 	bool "Symmetric Multi-Processing (SMP) support"
-	depends on HAVE_SMP
+	depends on !HAVE_SMP
 	default y
 	help
 	  Enable support for systems with multiple CPUs/cores. If the kernel

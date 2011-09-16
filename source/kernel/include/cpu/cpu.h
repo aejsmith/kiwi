@@ -35,7 +35,7 @@ typedef struct cpu {
 	list_t header;			/**< Link to running CPUs list. */
 
 	cpu_id_t id;			/**< ID of the CPU. */
-	cpu_arch_t arch;		/**< Architecture-specific information. */
+	arch_cpu_t arch;		/**< Architecture-specific information. */
 
 	/** Current state of the CPU. */
 	enum {
@@ -76,11 +76,17 @@ extern cpu_t **cpus;
 extern volatile int cpu_boot_wait;
 #endif
 
-extern cpu_id_t cpu_current_id(void);
+extern cpu_id_t cpu_id(void);
 extern void cpu_dump(cpu_t *cpu);
 
-extern void cpu_init(void);
+extern void arch_cpu_early_init(void);
+extern void arch_cpu_early_init_percpu(cpu_t *cpu);
+extern void arch_cpu_init_percpu(void);
+
 extern void cpu_early_init(void);
+extern void cpu_early_init_percpu(cpu_t *cpu);
+extern void cpu_init_percpu(void);
+extern void cpu_init(void);
 
 #if CONFIG_SMP
 extern void cpu_pause_all(void);

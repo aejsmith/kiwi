@@ -62,7 +62,7 @@ void cpu_pause_all(void) {
 
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_current_id()) {
+		if(cpu->id != cpu_id()) {
 			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
 		}
 	}
@@ -84,7 +84,7 @@ void cpu_halt_all(void) {
 	 * sending them an NMI IPI results in a triple fault. */
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_current_id()) {
+		if(cpu->id != cpu_id()) {
 			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
 		}
 	}

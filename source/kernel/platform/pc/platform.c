@@ -35,14 +35,8 @@
 
 KBOOT_IMAGE(KBOOT_IMAGE_LFB);
 
-/** PC platform first stage initialisation. */
-__init_text void platform_premm_init(void) {
-	/* Nothing happens. */
-}
-
-/** PC platform second stage initialisation.
- * @param args		Kernel arguments structure. */
-__init_text void platform_postmm_init(void) {
+/** PC platform initialisation. */
+__init_text void platform_init(void) {
 	pic_init();
 	acpi_init();
 

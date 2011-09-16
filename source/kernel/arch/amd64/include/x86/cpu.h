@@ -277,7 +277,6 @@ static inline uint64_t x86_rdtsc(void) {
 }
 
 extern uint64_t calculate_frequency(uint64_t (*func)());
-extern void cpu_arch_init(struct cpu *cpu);
 
 #endif /* __ASM__ */
 #endif /* __X86_CPU_H */

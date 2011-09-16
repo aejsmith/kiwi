@@ -108,8 +108,19 @@ static __init_text void tss_init(cpu_t *cpu) {
 	ltr(SEGMENT_TSS);
 }
 
+/** Initialise descriptor tables for the current CPU.
+ * @param cpu		CPU to initialise for. */
+__init_text void descriptor_init(cpu_t *cpu) {
+	/* Initialise and load the GDT/TSS. */
+	gdt_init(cpu);
+	tss_init(cpu);
+
+	/* Point the CPU to the global IDT. */
+	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
+}
+
 /** Initialise the IDT shared by all CPUs. */
-static __init_text void idt_init(void) {
+__init_text void idt_init(void) {
 	unative_t i;
 	ptr_t addr;
 
@@ -126,22 +137,7 @@ static __init_text void idt_init(void) {
 		kernel_idt[i].flags = 0x8E;
 	}
 
-	/* In tss_init() above we point the first IST entry at the double
-	 * fault stack. Point the double fault IDT entry at this stack. */
+	/* In tss_init() we point the first IST entry at the double fault
+	 * stack. Point the double fault IDT entry at this stack. */
 	kernel_idt[X86_EXCEPT_DF].ist = 1;
-}
-
-/** Initialise descriptor tables for the current CPU.
- * @param cpu		CPU to initialise for. */
-__init_text void descriptor_init(cpu_t *cpu) {
-	gdt_init(cpu);
-	tss_init(cpu);
-
-	/* The IDT only needs to be initialised once on the boot CPU. */
-	if(cpu == &boot_cpu) {
-		idt_init();
-	}
-
-	/* Point the CPU to the new IDT. */
-	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
 }
