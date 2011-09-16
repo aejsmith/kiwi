@@ -256,7 +256,6 @@ static __init_text void syscall_init(void) {
 	x86_write_msr(X86_MSR_STAR, star);
 }
 
-
 /** Detect and set up the current CPU.
  * @param cpu		CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {

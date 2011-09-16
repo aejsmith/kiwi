@@ -45,7 +45,7 @@ static inline status_t spinlock_lock_internal(spinlock_t *lock, useconds_t timeo
 			}
 		} else {
 			while(!atomic_cmp_set(&lock->locked, 0, 1)) {
-				spin_loop_hint();
+				cpu_spin_hint();
 			}
 		}
 	} else {

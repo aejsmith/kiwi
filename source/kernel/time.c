@@ -306,7 +306,7 @@ void timer_stop(timer_t *timer) {
 void spin(useconds_t us) {
 	useconds_t target = system_time() + us;
 	while(system_time() < target) {
-		spin_loop_hint();
+		cpu_spin_hint();
 	}
 }
 

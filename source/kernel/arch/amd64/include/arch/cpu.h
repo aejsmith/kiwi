@@ -76,12 +76,11 @@ static inline void cpu_idle(void) {
 	__asm__ volatile("sti; hlt; cli");
 }
 
-/** Spin loop hint using the PAUSE instruction.
- * @note		See PAUSE instruction in Intel 64 and IA-32
- *			Architectures Software Developer's Manual, Volume 2B:
- *			Instruction Set Reference N-Z for more information as
- *			to why this function is necessary. */
-static inline void spin_loop_hint(void) {
+/** CPU-specific spin loop hint. */
+static inline void cpu_spin_hint(void) {
+	/* See PAUSE instruction in Intel 64 and IA-32 Architectures Software
+	 * Developer's Manual, Volume 2B: Instruction Set Reference N-Z for
+	 * more information as to what this does. */
 	__asm__ volatile("pause");
 }
 

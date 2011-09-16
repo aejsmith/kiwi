@@ -480,7 +480,7 @@ __init_text void kmain_ap(cpu_t *cpu) {
 
 	/* Wait for remaining CPUs to be brought up. */
 	while(cpu_boot_wait != 2) {
-		spin_loop_hint();
+		cpu_spin_hint();
 	}
 
 	/* Begin scheduling threads. */

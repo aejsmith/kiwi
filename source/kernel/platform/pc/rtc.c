@@ -43,7 +43,7 @@ useconds_t time_from_hardware(void) {
 	/* Check if an update is in progress. */
 	out8(0x70, 0x0A);
 	while(in8(0x71) & 0x80) {
-		spin_loop_hint();
+		cpu_spin_hint();
 		out8(0x70, 0x0A);
 	}
 
