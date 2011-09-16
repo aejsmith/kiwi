@@ -40,7 +40,7 @@
 #include <console.h>
 #include <kdbg.h>
 
-extern void syscall_arch_init(void);
+extern void syscall_entry(void);
 
 /** Number of times to get a frequency (must be odd). */
 #define FREQUENCY_ATTEMPTS	9
@@ -138,56 +138,53 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
 }
 
 /** Detect CPU features/information.
- * @param cpu		Pointer to architecture CPU structure to fill in.
- *			Assumes that the structure is zeroed out. */
-static __init_text void detect_cpu_features(arch_cpu_t *cpu) {
+ * @param cpu		Pointer to CPU structure for this CPU.
+ * @param features	Pointer to the features structure to fill in. */
+static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features) {
 	uint32_t eax, ebx, ecx, edx;
 	uint32_t *ptr;
 	size_t i, j;
 	char *str;
 
 	/* Get the highest supported standard level. */
-	x86_cpuid(X86_CPUID_VENDOR_ID, &cpu->highest_standard, &ebx, &ecx, &edx);
-	if(cpu->highest_standard < X86_CPUID_FEATURE_INFO) {
-		fatal("CPUID feature information is not supported");
+	x86_cpuid(X86_CPUID_VENDOR_ID, &features->highest_standard, &ebx, &ecx, &edx);
+	if(features->highest_standard < X86_CPUID_FEATURE_INFO) {
+		return;
 	}
 
 	/* Get standard feature information. */
-	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx,
-	          &cpu->features.standard_ecx,
-	          &cpu->features.standard_edx);
+	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &features->standard_ecx, &features->standard_edx);
 
 	/* Save model information. */
-	cpu->family = (eax >> 8) & 0x0f;
-	cpu->model = (eax >> 4) & 0x0f;
-	cpu->stepping = eax & 0x0f;
+	cpu->arch.family = (eax >> 8) & 0x0f;
+	cpu->arch.model = (eax >> 4) & 0x0f;
+	cpu->arch.stepping = eax & 0x0f;
 
 	/* If the CLFLUSH instruction is supported, get the cache line size.
-	 * If it is not, a sensible default will be chosen later based on
-	 * whether long mode is supported. */
-	if(cpu->features.clfsh) {
-		cpu->cache_alignment = ((ebx >> 8) & 0xFF) * 8;
+	 * If it is not, a sensible default will be chosen later. */
+	if(features->clfsh) {
+		cpu->arch.cache_alignment = ((ebx >> 8) & 0xFF) * 8;
 	}
 
 	/* Get the highest supported extended level. */
-	x86_cpuid(X86_CPUID_EXT_MAX, &cpu->highest_extended, &ebx, &ecx, &edx);
-	if(cpu->highest_extended & (1<<31)) {
-		if(cpu->highest_extended >= X86_CPUID_EXT_FEATURE) {
+	x86_cpuid(X86_CPUID_EXT_MAX, &features->highest_extended, &ebx, &ecx, &edx);
+	if(features->highest_extended & (1<<31)) {
+		if(features->highest_extended >= X86_CPUID_EXT_FEATURE) {
 			/* Get extended feature information. */
 			x86_cpuid(X86_CPUID_EXT_FEATURE, &eax, &ebx,
-			          &cpu->features.extended_ecx,
-			          &cpu->features.extended_edx);
+			          &features->extended_ecx,
+			          &features->extended_edx);
 		}
 
-		if(cpu->highest_extended >= X86_CPUID_BRAND_STRING3) {
+		if(features->highest_extended >= X86_CPUID_BRAND_STRING3) {
 			/* Get brand information. */
-			ptr = (uint32_t *)cpu->model_name;
+			ptr = (uint32_t *)cpu->arch.model_name;
 			x86_cpuid(X86_CPUID_BRAND_STRING1, &ptr[0], &ptr[1], &ptr[2],  &ptr[3]);
 			x86_cpuid(X86_CPUID_BRAND_STRING2, &ptr[4], &ptr[5], &ptr[6],  &ptr[7]);
 			x86_cpuid(X86_CPUID_BRAND_STRING3, &ptr[8], &ptr[9], &ptr[10], &ptr[11]);
 
 			/* Some CPUs right-justify the string... */
-			str = cpu->model_name;
+			str = cpu->arch.model_name;
 			i = 0; j = 0;
 			while(str[i] == ' ') {
 				i++;
@@ -196,66 +193,87 @@ static __init_text void detect_cpu_features(arch_cpu_t *cpu) {
 				while(str[i]) {
 					str[j++] = str[i++];
 				}
-				while(j < sizeof(cpu->model_name)) {
+				while(j < sizeof(cpu->arch.model_name)) {
 					str[j++] = 0;
 				}
 			}
 		}
 
-		if(cpu->highest_extended >= X86_CPUID_ADDRESS_SIZE) {
+		if(features->highest_extended >= X86_CPUID_ADDRESS_SIZE) {
 			/* Get address size information. */
 			x86_cpuid(X86_CPUID_ADDRESS_SIZE, &eax, &ebx, &ecx, &edx);
-			cpu->max_phys_bits = eax & 0xff;
-			cpu->max_virt_bits = (eax >> 8) & 0xff;
+			cpu->arch.max_phys_bits = eax & 0xff;
+			cpu->arch.max_virt_bits = (eax >> 8) & 0xff;
 		}
 	} else {
-		cpu->highest_extended = 0;
+		features->highest_extended = 0;
 	}
 
 	/* Get a brand string if one wasn't found. */
-	if(!cpu->model_name[0]) {
-		/* TODO: Get this based on the family/model/stepping. */
-		strcpy(cpu->model_name, "Unknown Model");
+	if(!cpu->arch.model_name[0]) {
+		strcpy(cpu->arch.model_name, "Unknown Model");
 	}
 
-	/* If the cache line size is not set, use a sane default based on
-	 * whether the CPU supports long mode. */
-	if(!cpu->cache_alignment) {
-		cpu->cache_alignment = (cpu->features.lmode) ? 64 : 32;
+	/* If the cache line/address sizes are not set, use a sane default. */
+	if(!cpu->arch.cache_alignment) {
+		cpu->arch.cache_alignment = 64;
 	}
-
-	/* Same goes for address sizes. */
-	if(!cpu->max_phys_bits) {
-		cpu->max_phys_bits = 32;
+	if(!cpu->arch.max_phys_bits) {
+		cpu->arch.max_phys_bits = 32;
 	}
-	if(!cpu->max_virt_bits) {
-		cpu->max_virt_bits = (cpu->features.lmode) ? 48 : 32;
+	if(!cpu->arch.max_virt_bits) {
+		cpu->arch.max_virt_bits = 48;
 	}
 }
+
+/** Initialise SYSCALL/SYSRET MSRs. */
+static __init_text void syscall_init(void) {
+	uint64_t fmask, lstar, star;
+
+	/* Disable interrupts and clear direction flag upon entry. */
+	fmask = X86_FLAGS_IF | X86_FLAGS_DF;
+
+	/* Set system call entry address. */
+	lstar = (uint64_t)syscall_entry;
+
+	/* Set segments for entry and returning. In 64-bit mode things happen
+	 * as follows upon entry:
+	 *  - CS is set to the value in IA32_STAR[47:32].
+	 *  - SS is set to the value in IA32_STAR[47:32] + 8.
+	 * Upon return to 64-bit mode, the following happens:
+	 *  - CS is set to (the value in IA32_STAR[63:48] + 16).
+	 *  - SS is set to (the value in IA32_STAR[63:48] + 8).
+	 * Weird. This means that we have to have a specific GDT order to
+	 * make things work. We set the SYSRET values below to the kernel DS,
+	 * so that we get the correct segment (kernel DS + 16 = user CS, and
+	 * kernel DS + 8 = user DS). */
+	star = ((uint64_t)(SEGMENT_K_DS | 0x03) << 48) | ((uint64_t)SEGMENT_K_CS << 32);
+
+	/* Set System Call Enable (SCE) in EFER and write everything out. */
+	x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_SCE);
+	x86_write_msr(X86_MSR_FMASK, fmask);
+	x86_write_msr(X86_MSR_LSTAR, lstar);
+	x86_write_msr(X86_MSR_STAR, star);
+}
+
 
 /** Detect and set up the current CPU.
  * @param cpu		CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
+	cpu_features_t features;
+
 	/* If this is the boot CPU, a double fault stack will not have been
 	 * allocated. Use the pre-allocated one in this case. */
-#if CONFIG_SMP
 	if(cpu == &boot_cpu) {
-#endif
 		cpu->arch.double_fault_stack = boot_doublefault_stack;
-#if CONFIG_SMP
 	}
-#endif
 
 	/* Initialise and load descriptor tables. */
 	descriptor_init(cpu);
 	pat_init();
 
-	/* Set the CPU structure back pointer, used for the curr_cpu pointer
-	 * before the thread system is up. */
-	cpu->arch.parent = cpu;
-
-	/* Detect features for the CPU. */
-	detect_cpu_features(&cpu->arch);
+	/* Detect CPU features and information. */
+	detect_cpu_features(cpu, &features);
 
 	/* If this is the boot CPU, copy features to the global features
 	 * structure. Otherwise, check that the feature set matches the global
@@ -264,23 +282,28 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 #if CONFIG_SMP
 	if(cpu == &boot_cpu) {
 #endif
-		memcpy(&cpu_features, &cpu->arch.features, sizeof(cpu_features));
-
-		/* Check for required features. */
-		if(!cpu_features.fpu || !cpu_features.fxsr) {
-			fatal("CPU does not support FPU/FXSR");
-		} else if(!cpu_features.tsc) {
-			fatal("CPU does not support TSC");
-		} else if(!cpu_features.pge) {
-			fatal("CPU does not support PGE");
-		}
+		memcpy(&cpu_features, &features, sizeof(cpu_features));
 #if CONFIG_SMP
 	} else {
-		if(memcmp(&cpu_features, &cpu->arch.features, sizeof(cpu_features)) != 0) {
+		if(memcmp(&cpu_features, &features, sizeof(cpu_features)) != 0) {
 			fatal("CPU %u has different feature set to boot CPU", cpu->id);
 		}
 	}
 #endif
+
+	/* Check for required features. It is almost certain that AMD64 CPUs
+	 * will support these, however I cannot find anything in the Intel/AMD
+	 * manuals that state there is a guaranteed minimum feature set when
+	 * 64-bit mode is supported, so check to be on the safe side. */
+	if(features.highest_standard < X86_CPUID_FEATURE_INFO) {
+		fatal("CPUID feature information is not supported");
+	} else if(!cpu_features.fpu || !cpu_features.fxsr) {
+		fatal("CPU does not support FPU/FXSR");
+	} else if(!cpu_features.tsc) {
+		fatal("CPU does not support TSC");
+	} else if(!cpu_features.pge) {
+		fatal("CPU does not support PGE");
+	}
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's
 	 * frequency is OK but the others will usually get rubbish, so as a
@@ -294,7 +317,6 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 		cpu->arch.cpu_freq = boot_cpu.arch.cpu_freq;
 	}
 #endif
-
 	/* Work out the cycles per µs. */
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;
 
@@ -310,12 +332,14 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	if(cpu_features.xd) {
                 x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
         }
+
+	/* Set up SYSCALL/SYSRET MSRs. */
+	syscall_init();
 }
 
 /** Perform additional initialisation of the current CPU. */
 __init_text void arch_cpu_init_percpu() {
 	lapic_init();
-	syscall_arch_init();
 }
 
 /** Dump information about a CPU.
@@ -325,7 +349,7 @@ void cpu_dump(cpu_t *cpu) {
 		cpu->id, cpu->arch.model_name, cpu->arch.family,
 		cpu->arch.model, cpu->arch.stepping);
 	kprintf(LOG_NORMAL, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
-	if(cpu->arch.features.apic) {
+	if(lapic_enabled()) {
 		kprintf(LOG_NORMAL, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
 	}
 	kprintf(LOG_NORMAL, "  cache_align: %d\n", cpu->arch.cache_alignment);

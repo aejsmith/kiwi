@@ -32,7 +32,6 @@ sources = FeatureSources(config, [
 	'lapic.c',
 	'page.c',
 	'signal.c',
-	'syscall.c',
 	('SMP', 'smp.c'),
 	'thread.c',
 	'time.c',
