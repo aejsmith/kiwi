@@ -33,6 +33,7 @@
 # define __malloc		__attribute__((malloc))
 # define __printf(a, b)		__attribute__((format(printf, a, b)))
 # define __deprecated		__attribute__((deprecated))
+# define __always_inline	__attribute__((always_inline))
 # define __init_text		__attribute__((section(".init.text")))
 # define __init_data		__attribute__((section(".init.data")))
 # define __section(s)		__attribute__((section(s)))
