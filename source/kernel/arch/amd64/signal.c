@@ -137,7 +137,7 @@ status_t signal_arch_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 
 	/* We must return from system calls via the IRET path because we have
 	 * modified the frame. */
-	curr_thread->arch.flags |= THREAD_ARCH_IFRAME_MODIFIED;
+	curr_thread->arch.flags |= ARCH_THREAD_IFRAME_MODIFIED;
 	return STATUS_SUCCESS;
 }
 

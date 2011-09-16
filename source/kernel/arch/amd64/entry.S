@@ -169,13 +169,13 @@ FUNCTION_START(syscall_entry)
 	 * pointer. The third pointer is a temporary scratch space for us to
 	 * save the userspace stack pointer in before we push it to the stack. */
 	swapgs
-	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_RSP
-	movq	%gs:THREAD_ARCH_OFF_KERNEL_RSP, %rsp
+	movq	%rsp, %gs:ARCH_THREAD_OFF_USER_RSP
+	movq	%gs:ARCH_THREAD_OFF_KERNEL_RSP, %rsp
 
 	/* Get back the userspace stack pointer from the temporary scratch
 	 * space and put it onto the kernel stack. */
 	push	$(SEGMENT_U_DS | 3)
-	push	%gs:THREAD_ARCH_OFF_USER_RSP
+	push	%gs:ARCH_THREAD_OFF_USER_RSP
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (R11 = original RFLAGS, RCX = return IP) and the rest of the
@@ -188,7 +188,7 @@ FUNCTION_START(syscall_entry)
 	PUSH_REGS
 
 	/* Save the user-mode interrupt frame pointer. */
-	movq	%rsp, %gs:THREAD_ARCH_OFF_USER_IFRAME
+	movq	%rsp, %gs:ARCH_THREAD_OFF_USER_IFRAME
 
 	/* Perform kernel entry work and enable interrupts. */
 	call	thread_at_kernel_entry
@@ -226,9 +226,9 @@ FUNCTION_START(syscall_entry)
 
 	/* If we're going to execute a user-mode signal handler, or we have
 	 * returned from a signal handler, the signal frame setup code will
-	 * have set the THREAD_ARCH_IFRAME_MODIFIED flag. When this flag is
+	 * have set the ARCH_THREAD_IFRAME_MODIFIED flag. When this flag is
 	 * set, we return via IRET as it doesn't clobber certain registers. */
-	testl	$THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
+	testl	$ARCH_THREAD_IFRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
 	jnz	.Liret
 
 	/* Restore saved registers, RFLAGS/RIP for SYSRET, and the userspace
@@ -276,7 +276,7 @@ FUNCTION_START(syscall_entry)
 	jmp	.Lreturn
 .Liret:
 	/* Clear the modified flag. */
-	andl	$~THREAD_ARCH_IFRAME_MODIFIED, %gs:THREAD_ARCH_OFF_FLAGS
+	andl	$~ARCH_THREAD_IFRAME_MODIFIED, %gs:ARCH_THREAD_OFF_FLAGS
 
 	/* Restore the registers, get rid of interrupt/error code. */
 	POP_REGS

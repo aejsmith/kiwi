@@ -62,7 +62,7 @@ typedef struct thread {
 	spinlock_t lock;		/**< Protects the thread's internals. */
 	context_t context;		/**< CPU context. */
 	fpu_context_t *fpu;		/**< FPU context. */
-	thread_arch_t arch;		/**< Architecture thread data. */
+	arch_thread_t arch;		/**< Architecture thread data. */
 	void *kstack;			/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
@@ -132,12 +132,12 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern void thread_arch_post_switch(thread_t *thread);
-extern status_t thread_arch_init(thread_t *thread);
-extern void thread_arch_destroy(thread_t *thread);
-extern ptr_t thread_arch_tls_addr(thread_t *thread);
-extern status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr);
-extern void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __noreturn;
+extern void arch_thread_post_switch(thread_t *thread);
+extern status_t arch_thread_init(thread_t *thread);
+extern void arch_thread_destroy(thread_t *thread);
+extern ptr_t arch_thread_tls_addr(thread_t *thread);
+extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
+extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __noreturn;
 
 extern void thread_uspace_trampoline(void *_args, void *arg2);
 

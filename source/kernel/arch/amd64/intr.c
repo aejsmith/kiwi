@@ -328,11 +328,11 @@ void intr_handler(intr_frame_t *frame) {
 	if(user) {
 		thread_at_kernel_exit();
 
-		/* We must clear the THREAD_ARCH_IFRAME_MODIFIED flag if it has
+		/* We must clear the ARCH_THREAD_IFRAME_MODIFIED flag if it has
 		 * been set. This is used in the SYSCALL handler below so that
 		 * it knows whether to return via the IRET path, but as we're
 		 * returning using IRET anyway it doesn't matter to us. */
-		curr_thread->arch.flags &= ~THREAD_ARCH_IFRAME_MODIFIED;
+		curr_thread->arch.flags &= ~ARCH_THREAD_IFRAME_MODIFIED;
 	} else {
 		/* Preempt if required. When returning to userspace, this is
 		 * done by thread_at_kernel_exit(). */

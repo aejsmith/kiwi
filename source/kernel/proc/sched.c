@@ -330,7 +330,7 @@ void sched_internal(bool state) {
  * @param state		Interrupt state to restore. */
 void sched_post_switch(bool state) {
 	/* Do architecture-specific post-switch tasks. */
-	thread_arch_post_switch(curr_thread);
+	arch_thread_post_switch(curr_thread);
 
 	spinlock_unlock_ni(&curr_thread->lock);
 

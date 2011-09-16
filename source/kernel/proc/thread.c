@@ -120,7 +120,7 @@ void thread_uspace_trampoline(void *_args, void *arg2) {
 	arg = args->arg;
 	kfree(args);
 
-	thread_arch_enter_userspace(entry, sp, arg);
+	arch_thread_enter_userspace(entry, sp, arg);
 }
 
 /** Dead thread reaper.
@@ -150,7 +150,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		/* Now clean up the thread. */
 		heap_free(thread->kstack, KSTACK_SIZE);
 		context_destroy(&thread->context);
-		thread_arch_destroy(thread);
+		arch_thread_destroy(thread);
 		if(thread->fpu) {
 			fpu_context_destroy(thread->fpu);
 		}
@@ -488,7 +488,7 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
 	/* Initialise architecture-specific data. */
-	ret = thread_arch_init(thread);
+	ret = arch_thread_init(thread);
 	if(ret != STATUS_SUCCESS) {
 		heap_free(thread->kstack, KSTACK_SIZE);
 		id_alloc_release(&thread_id_allocator, thread->id);
@@ -905,7 +905,7 @@ status_t kern_thread_control(handle_t handle, int action, const void *in, void *
 			goto out;
 		}
 
-		ret = thread_arch_set_tls_addr(thread, (ptr_t)in);
+		ret = arch_thread_set_tls_addr(thread, (ptr_t)in);
 		break;
 	}
 out:

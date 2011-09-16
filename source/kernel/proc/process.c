@@ -568,7 +568,7 @@ static void process_entry_thread(void *arg1, void *arg2) {
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in new process (entry: %p, stack: %p, args: %p)\n",
 	        entry, stack, addr);
-	thread_arch_enter_userspace(entry, stack, addr);
+	arch_thread_enter_userspace(entry, stack, addr);
 	fatal("Failed to enter userspace!");
 }
 
@@ -1219,7 +1219,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	/* Inherit certain per-thread attributes such as the alternate signal
 	 * stack and TLS address from the thread that called us. */
 	memcpy(&thread->signal_stack, &curr_thread->signal_stack, sizeof(thread->signal_stack));
-	thread_arch_set_tls_addr(thread, thread_arch_tls_addr(curr_thread));
+	arch_thread_set_tls_addr(thread, arch_thread_tls_addr(curr_thread));
 
 	/* Run the new thread. */
 	thread_run(thread);

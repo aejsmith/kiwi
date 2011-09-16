@@ -35,7 +35,7 @@
 extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg) __noreturn;
 
 /** AMD64-specific post-thread switch function. */
-void thread_arch_post_switch(thread_t *thread) {
+void arch_thread_post_switch(thread_t *thread) {
 	/* Store the current CPU pointer and then point the GS register to the
 	 * new thread's architecture data. */
 	thread->arch.cpu = thread->cpu;
@@ -56,7 +56,7 @@ void thread_arch_post_switch(thread_t *thread) {
 /** Initialise AMD64-specific thread data.
  * @param thread	Thread to initialise.
  * @return		Always returns STATUS_SUCCESS. */
-status_t thread_arch_init(thread_t *thread) {
+status_t arch_thread_init(thread_t *thread) {
 	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
 	return STATUS_SUCCESS;
@@ -64,14 +64,14 @@ status_t thread_arch_init(thread_t *thread) {
 
 /** Clean up AMD64-specific thread data.
  * @param thread	Thread to clean up. */
-void thread_arch_destroy(thread_t *thread) {
+void arch_thread_destroy(thread_t *thread) {
 	/* Nothing happens. */
 }
 
 /** Get the TLS address for a thread.
  * @param thread	Thread to get for.
  * @return		TLS address of thread. */
-ptr_t thread_arch_tls_addr(thread_t *thread) {
+ptr_t arch_thread_tls_addr(thread_t *thread) {
 	return thread->arch.tls_base;
 }
 
@@ -79,7 +79,7 @@ ptr_t thread_arch_tls_addr(thread_t *thread) {
  * @param thread	Thread to set for.
  * @param addr		TLS address.
  * @return		Status code describing result of the operation. */
-status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr) {
+status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
 	if(addr >= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
 		return STATUS_INVALID_ADDR;
 	}
@@ -99,7 +99,7 @@ status_t thread_arch_set_tls_addr(thread_t *thread, ptr_t addr) {
  * @param entry		Entry function.
  * @param stack		Stack pointer.
  * @param arg		Argument to function. */
-void thread_arch_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) {
+void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) {
 	/* Write a 0 return address for the entry function. */
 	stack -= sizeof(unative_t);
 	if(memset_user((void *)stack, 0, sizeof(unative_t)) != STATUS_SUCCESS) {
