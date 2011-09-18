@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,48 +58,25 @@ typedef struct thread_uspace_args {
 typedef struct thread {
 	object_t obj;			/**< Object header. */
 
+	/**
+	 * Lock for the thread.
+	 *
+	 * This lock protects data in the thread that may be modified by
+	 * other threads. Some data members are only ever accessed by the
+	 * thread itself, and therefore it is not necessary to take the lock
+	 * when accessing these.
+	 */
+	spinlock_t lock;
+
 	/** Main thread information. */
-	spinlock_t lock;		/**< Protects the thread's internals. */
 	context_t context;		/**< CPU context. */
 	fpu_context_t *fpu;		/**< FPU context. */
 	arch_thread_t arch;		/**< Architecture thread data. */
 	void *kstack;			/**< Kernel stack pointer. */
 	int flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
-	size_t wire_count;		/**< How many calls to thread_wire() have been made. */
-	refcount_t count;		/**< Number of handles to the thread. */
+	size_t wired;			/**< How many calls to thread_wire() have been made. */
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
-	ptr_t ustack;			/**< User-mode stack base. */
-	size_t ustack_size;		/**< Size of the user-mode stack. */
-
-	/** Scheduling information. */
-	list_t runq_link;		/**< Link to run queues. */
-	int max_prio;			/**< Maximum scheduling priority. */
-	int curr_prio;			/**< Current scheduling priority. */
-	cpu_t *cpu;			/**< CPU that the thread runs on. */
-	useconds_t timeslice;		/**< Current timeslice. */
-	size_t preempt_off;		/**< Whether preemption is disabled. */
-	bool preempt_missed;		/**< Whether preemption was missed due to being disabled. */
-
-	/** Sleeping information. */
-	list_t waitq_link;		/**< Link to wait queue. */
-	struct waitq *waitq;		/**< Wait queue that the thread is sleeping on. */
-	bool interruptible;		/**< Whether the sleep can be interrupted. */
-	context_t sleep_context;	/**< Context to restore upon sleep interruption/timeout. */
-	timer_t sleep_timer;		/**< Timer for sleep timeout. */
-	bool timed_out;			/**< Whether the sleep timed out. */
-	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
-
-	/** Signal information. */
-	sigset_t signal_mask;		/**< Signal mask for the thread. */
-	sigset_t pending_signals;	/**< Bitmap of pending signals. */
-	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
-	stack_t signal_stack;		/**< Alternate signal stack. */
-
-	/** Accounting information. */
-	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */
-	useconds_t kernel_time;		/**< Total time the thread has spent in the kernel. */
-	useconds_t user_time;		/**< Total time the thread has spent in user mode. */
 
 	/** State of the thread. */
 	enum {
@@ -110,9 +87,47 @@ typedef struct thread {
 		THREAD_DEAD,		/**< Thread is dead and awaiting cleanup. */
 	} state;
 
+	/** Scheduling information. */
+	list_t runq_link;		/**< Link to run queues. */
+	int max_prio;			/**< Maximum scheduling priority. */
+	int curr_prio;			/**< Current scheduling priority. */
+	cpu_t *cpu;			/**< CPU that the thread runs on. */
+	useconds_t timeslice;		/**< Current timeslice. */
+	size_t preempt_disabled;	/**< Whether preemption is disabled. */
+	bool missed_preempt;		/**< Whether preemption was missed due to being disabled. */
+
+	/** Sleeping information. */
+	list_t waitq_link;		/**< Link to wait queue. */
+	struct waitq *waitq;		/**< Wait queue that the thread is sleeping on. */
+	bool interruptible;		/**< Whether the sleep can be interrupted. */
+	context_t sleep_context;	/**< Context to restore upon sleep interruption/timeout. */
+	timer_t sleep_timer;		/**< Timer for sleep timeout. */
+	bool timed_out;			/**< Whether the sleep timed out. */
+	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
+
+	/** Accounting information. */
+	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */
+	useconds_t kernel_time;		/**< Total time the thread has spent in the kernel. */
+	useconds_t user_time;		/**< Total time the thread has spent in user mode. */
+
 	/** Information used by user memory functions. */
 	bool in_usermem;		/**< Whether the thread is in the user memory access functions. */
 	context_t usermem_context;	/**< Context to restore upon user memory access fault. */
+
+	/**
+	 * Reference count for the thread.
+	 *
+	 * A running thread always has at least 1 reference on it. Handles and
+	 * pointers to a thread create an extra reference to it. When the
+	 * count reaches 0, the thread is destroyed.
+	 */
+	refcount_t count;
+
+	/** Signal information. */
+	sigset_t signal_mask;		/**< Signal mask for the thread. */
+	sigset_t pending_signals;	/**< Bitmap of pending signals. */
+	siginfo_t signal_info[NSIG];	/**< Information associated with pending signals. */
+	stack_t signal_stack;		/**< Alternate signal stack. */
 
 	/** Thread entry function. */
 	thread_func_t entry;		/**< Entry function for the thread. */
@@ -120,6 +135,8 @@ typedef struct thread {
 	void *arg2;			/**< Second argument to thread entry function. */
 
 	/** Other thread information. */
+	ptr_t ustack;			/**< User-mode stack base. */
+	size_t ustack_size;		/**< Size of the user-mode stack. */
 	thread_id_t id;			/**< ID of the thread. */
 	avl_tree_node_t tree_link;	/**< Link to thread tree. */
 	char name[THREAD_NAME_MAX];	/**< Name of the thread. */
@@ -146,6 +163,11 @@ extern void thread_unwire(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
+
+extern void thread_preempt(void);
+extern void thread_disable_preempt(void);
+extern void thread_enable_preempt(void);
+extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);
 extern void thread_exit(void) __noreturn;

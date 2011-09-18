@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -120,10 +120,6 @@ typedef struct sched_cpu {
 	size_t total;			/**< Total running/ready thread count. */
 } sched_cpu_t;
 
-extern void sched_internal(bool state);
-extern void sched_post_switch(bool state);
-extern void sched_thread_insert(thread_t *thread);
-
 #if CONFIG_SMP
 /** Total number of running/ready threads across all CPUs. */
 static atomic_t threads_running = 0;
@@ -218,9 +214,21 @@ static bool sched_timer_handler(void *data) {
 	return true;
 }
 
-/** Internal part of the thread scheduler. Expects current thread to be locked.
- * @param state		Previous interrupt state. */
-void sched_internal(bool state) {
+/**
+ * Main function of the scheduler.
+ *
+ * Main function of the scheduler. Picks a new thread to run and switches to
+ * it. Interrupts must be disabled (explicitly, before taking the thread lock),
+ * and the current thread must be locked. When the thread is next run and this
+ * function returns, the thread lock will have been released and the given
+ * interrupt state will have been restored.
+ *
+ * @warning		Never call this function. Use one of the thread methods
+ *			to trigger a reschedule (e.g. thread_yield()).
+ *
+ * @param state		Previous interrupt state.
+ */
+void sched_reschedule(bool state) {
 	sched_cpu_t *cpu = curr_cpu->sched;
 	thread_t *next;
 
@@ -403,8 +411,9 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 #endif
 
 /** Insert a thread into the scheduler.
- * @param thread	Thread to insert (should be locked). */
-void sched_thread_insert(thread_t *thread) {
+ * @param thread	Thread to insert (should be locked and in the Ready
+ *			state). */
+void sched_insert_thread(thread_t *thread) {
 	sched_cpu_t *sched;
 
 	assert(thread->state == THREAD_READY);
@@ -416,14 +425,7 @@ void sched_thread_insert(thread_t *thread) {
 	}
 
 #if CONFIG_SMP
-	if(thread->wire_count) {
-		/* If the wire count is greater than 0 and the thread doesn't
-		 * have a CPU, it means that it was wired before it started
-		 * running. Put it onto the current CPU in this case. */
-		if(unlikely(!thread->cpu)) {
-			thread->cpu = curr_cpu;
-		}
-	} else {
+	if(!thread->wired) {
 		/* Pick a new CPU for the thread to run on. */
 		thread->cpu = sched_allocate_cpu(thread);
 	}
@@ -455,71 +457,18 @@ void sched_thread_insert(thread_t *thread) {
 	spinlock_unlock(&sched->lock);
 }
 
-/** Yield remaining timeslice and switch to another thread. */
-void sched_yield(void) {
-	bool state = intr_disable();
-
-	spinlock_lock_ni(&curr_thread->lock);
-	sched_internal(state);
-}
-
-/** Preempt the current thread. */
-void sched_preempt(void) {
-	bool state = intr_disable();
-
-	curr_cpu->should_preempt = false;
-
-	spinlock_lock_ni(&curr_thread->lock);
-	if(curr_thread->preempt_off > 0) {
-		curr_thread->preempt_missed = true;
-		spinlock_unlock_ni(&curr_thread->lock);
-		intr_restore(state);
-	} else {
-		sched_internal(state);
-	}
-}
-
-/** Disable preemption.
- *
- * Disables preemption for the current thread. Disables can be nested, so if
- * 2 calls are made to this function, 2 calls to sched_preempt_enable() are
- * required to reenable preemption.
- */
-void sched_preempt_disable(void) {
-	spinlock_lock(&curr_thread->lock);
-	curr_thread->preempt_off++;
-	spinlock_unlock(&curr_thread->lock);
-}
-
-/** Enable preemption.
- * @note		See sched_preempt_disable() for details of behaviour. */
-void sched_preempt_enable(void) {
-	bool state = intr_disable();
-
-	spinlock_lock_ni(&curr_thread->lock);
-
-	assert(curr_thread->preempt_off > 0);
-
-	if(--curr_thread->preempt_off == 0) {
-		/* If preemption was missed then preempt immediately. */
-		if(curr_thread->preempt_missed) {
-			curr_thread->preempt_missed = false;
-			sched_internal(state);
-			return;
-		}
-	}
-
-	spinlock_unlock_ni(&curr_thread->lock);
-	intr_restore(state);
-}
-
 /** Scheduler idle thread function.
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void sched_idle_thread(void *arg1, void *arg2) {
+	/* We run the loop with interrupts disabled. The cpu_idle() function is
+	 * expected to re-enable interrupts as required. */
 	intr_disable();
+
 	while(true) {
-		sched_yield();
+		spinlock_lock_ni(&curr_thread->lock);
+		sched_reschedule(false);
+
 		cpu_idle();
 	}
 }

@@ -31,8 +31,6 @@
 #include <status.h>
 #include <time.h>
 
-extern void sched_internal(bool state);
-extern void sched_post_switch(bool state);
 extern void thread_wake(thread_t *thread);
 
 /** Handle a timeout on a wait queue.
@@ -59,7 +57,8 @@ static bool waitq_timer_handler(void *_thread) {
 	return false;
 }
 
-/** Prepare to sleep on a wait queue.
+/**
+ * Prepare to sleep on a wait queue.
  *
  * Prepares for the current thread to sleep on a wait queue. The wait queue
  * lock will be taken and interrupts will be disabled. To begin waiting after
@@ -136,11 +135,12 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
 	/* Send the thread to sleep. The scheduler will handle interrupt state
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
-	sched_internal(state);
+	sched_reschedule(state);
 	return STATUS_SUCCESS;
 }
 
-/** Sleep on a wait queue.
+/**
+ * Sleep on a wait queue.
  *
  * Inserts the current thread into a wait queue and then sleeps until woken
  * by waitq_wake()/waitq_wake_all(), until the timeout specified expires, or,

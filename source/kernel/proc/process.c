@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,7 +32,6 @@
 #include <mm/vm.h>
 
 #include <proc/process.h>
-#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <security/cap.h>
@@ -234,7 +233,8 @@ static object_type_t process_object_type = {
 	.unwait = process_object_unwait,
 };
 
-/** Allocate a process structure and initialise it.
+/**
+ * Allocate a process structure and initialise it.
  *
  * Allocates a new process structure and initialises it. If uhandlep is not
  * NULL, then a handle to the process will be created in the parent, and it
@@ -646,7 +646,8 @@ process_t *process_lookup(process_id_t id) {
 	return ret;
 }
 
-/** Execute a new process.
+/**
+ * Execute a new process.
  *
  * Creates a new process and runs a program within it. The path to the process
  * should be the first argument specified in the argument structure. The new
@@ -708,7 +709,8 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	return info.status;
 }
 
-/** Terminate the calling process.
+/**
+ * Terminate the calling process.
  *
  * Terminates the calling process. All threads in the process will also be
  * terminated. The status and reason codes given can be retrieved by any
@@ -927,7 +929,8 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	return STATUS_SUCCESS;
 }
 
-/** Create a new process.
+/**
+ * Create a new process.
  *
  * Creates a new process and executes a program within it. If the count
  * argument is negative, then all handles with the HANDLE_INHERITABLE flag in
@@ -1034,7 +1037,8 @@ fail:
 	return ret;
 }
 
-/** Replace the current process.
+/**
+ * Replace the current process.
  *
  * Replaces the current process with a new program. All threads in the process
  * other than the calling thread will be terminated. If the count argument is
@@ -1103,11 +1107,11 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	mutex_lock(&curr_proc->lock);
 
 	/* Switch over to the new address space and handle table. */
-	sched_preempt_disable();
+	thread_disable_preempt();
 	vm_aspace_switch(info.aspace);
 	oldas = curr_proc->aspace;
 	curr_proc->aspace = info.aspace;
-	sched_preempt_enable();
+	thread_enable_preempt();
 	oldtable = curr_proc->handles;
 	curr_proc->handles = table;
 	oldname = curr_proc->name;
@@ -1144,7 +1148,8 @@ fail:
 	return ret;
 }
 
-/** Clone the calling process.
+/**
+ * Clone the calling process.
  *
  * Creates a clone of the calling process. The new process will have a clone of
  * the original process' address space. Data in private mappings will be copied
@@ -1438,7 +1443,8 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	return ret;
 }
 
-/** Terminate the calling process.
+/**
+ * Terminate the calling process.
  *
  * Terminates the calling process. All threads in the process will also be
  * terminated. The status code given can be retrieved by any processes with a

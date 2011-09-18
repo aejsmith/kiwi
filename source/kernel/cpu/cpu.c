@@ -33,8 +33,6 @@
 #include <mm/malloc.h>
 #include <mm/page.h>
 
-#include <proc/sched.h>
-
 #include <assert.h>
 #include <console.h>
 #include <kboot.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>
+#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <lib/id_alloc.h>
@@ -58,8 +59,6 @@
 #define DEFAULT_THREAD_RIGHTS_OWNER	(THREAD_RIGHT_QUERY | THREAD_RIGHT_SIGNAL)
 #define DEFAULT_THREAD_RIGHTS_OTHERS	(THREAD_RIGHT_QUERY)
 
-extern void sched_post_switch(bool state);
-extern void sched_thread_insert(thread_t *thread);
 extern void thread_wake(thread_t *thread);
 
 /** Tree of all threads. */
@@ -233,41 +232,55 @@ void thread_wake(thread_t *thread) {
 	thread->interruptible = false;
 
 	thread->state = THREAD_READY;
-	sched_thread_insert(thread);
+	sched_insert_thread(thread);
 }
 
-/** Wire a thread to its current CPU.
+/**
+ * Wire a thread to its current CPU.
  *
- * Increases the wire count of a thread to ensure that it will not be
- * migrated to another CPU.
+ * Wires a thread to the CPU it is currently running on. If the thread does not
+ * have a CPU, it will be set to the current CPU. This prevents it from being
+ * moved to another CPU by the scheduler. In order for the thread to be unwired,
+ * there must be an equal number of calls to thread_unwire() as there have been
+ * to thread_wire().
  *
  * @param thread	Thread to wire.
  */
 void thread_wire(thread_t *thread) {
 	if(thread) {
 		spinlock_lock(&thread->lock);
-		thread->wire_count++;
+
+		thread->wired++;
+
+		/* Wire to the current CPU if there is not a CPU set. */
+		if(!thread->cpu) {
+			thread->cpu = curr_cpu;
+		}
+
 		spinlock_unlock(&thread->lock);
 	}
 }
 
-/** Unwire a thread.
+/**
+ * Unwire a thread from its CPU.
  *
  * Decreases the wire count of a thread. If the count reaches 0, the thread
- * will be unwired and able to migrate again.
+ * will be unwired and the scheduler will be allowed to move it to another
+ * CPU.
  *
  * @param thread	Thread to unwire.
  */
 void thread_unwire(thread_t *thread) {
 	if(thread) {
 		spinlock_lock(&thread->lock);
-		assert(thread->wire_count > 0);
-		thread->wire_count--;
+		assert(thread->wired > 0);
+		thread->wired--;
 		spinlock_unlock(&thread->lock);
 	}
 }
 
-/** Interrupt a thread.
+/**
+ * Interrupt a thread.
  *
  * If the specified thread is in interruptible sleep, causes it to be woken and
  * to return an error from the sleep call.
@@ -295,7 +308,8 @@ bool thread_interrupt(thread_t *thread) {
 	return ret;
 }
 
-/** Request a thread to terminate.
+/**
+ * Request a thread to terminate.
  *
  * Ask a userspace thread to terminate as soon as possible (upon next exit from
  * the kernel). If the thread is currently in interruptible sleep, it will be
@@ -339,6 +353,67 @@ void thread_rename(thread_t *thread, const char *name) {
 	spinlock_unlock(&thread->lock);
 }
 
+/** Preempt the current thread. */
+void thread_preempt(void) {
+	bool state = intr_disable();
+
+	curr_cpu->should_preempt = false;
+
+	spinlock_lock_ni(&curr_thread->lock);
+	if(curr_thread->preempt_disabled > 0) {
+		curr_thread->missed_preempt = true;
+		spinlock_unlock_ni(&curr_thread->lock);
+		intr_restore(state);
+	} else {
+		sched_reschedule(state);
+	}
+}
+
+/**
+ * Disable preemption for the current thread.
+ *
+ * Prevents the current thread from being preempted. If a preemption is missed
+ * due to being disabled, the thread will be preempted as soon as preemption is
+ * enabled again. In order for preemption to be enabled again, there must be
+ * an equal number of calls to thread_enable_preempt() as there have been to
+ * thread_disable_preempt().
+ */
+void thread_disable_preempt(void) {
+	spinlock_lock(&curr_thread->lock);
+	curr_thread->preempt_disabled++;
+	spinlock_unlock(&curr_thread->lock);
+}
+
+/** Re-enable preemption for the current thread.
+ * @see			thread_disable_preempt(). */
+void thread_enable_preempt(void) {
+	bool state = intr_disable();
+
+	spinlock_lock_ni(&curr_thread->lock);
+
+	assert(curr_thread->preempt_disabled > 0);
+
+	if(--curr_thread->preempt_disabled == 0) {
+		/* If a preemption was missed then preempt immediately. */
+		if(curr_thread->missed_preempt) {
+			curr_thread->missed_preempt = false;
+			sched_reschedule(state);
+			return;
+		}
+	}
+
+	spinlock_unlock_ni(&curr_thread->lock);
+	intr_restore(state);
+}
+
+/** Yield remaining timeslice and switch to another thread. */
+void thread_yield(void) {
+	bool state = intr_disable();
+
+	spinlock_lock_ni(&curr_thread->lock);
+	sched_reschedule(state);
+}
+
 /** Perform tasks necessary when a thread is entering the kernel. */
 void thread_at_kernel_entry(void) {
 	useconds_t now;
@@ -370,7 +445,7 @@ void thread_at_kernel_exit(void) {
 
 	/* Preempt if required. */
 	if(curr_cpu->should_preempt) {
-		sched_preempt();
+		thread_preempt();
 	}
 }
 
@@ -384,7 +459,7 @@ void thread_exit(void) {
 	curr_thread->state = THREAD_DEAD;
 	notifier_run(&curr_thread->death_notifier, NULL, true);
 
-	sched_yield();
+	thread_yield();
 	fatal("Shouldn't get here");
 }
 
@@ -413,7 +488,8 @@ thread_t *thread_lookup(thread_id_t id) {
 	return ret;
 }
 
-/** Create a new kernel-mode thread.
+/**
+ * Create a new kernel-mode thread.
  *
  * Creates a new thread that will begin execution at the given kernel-mode
  * address and places it in the Created state. The thread must be started with
@@ -505,15 +581,15 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->fpu = NULL;
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
-	thread->wire_count = 0;
+	thread->wired = 0;
 	thread->killed = false;
 	thread->ustack = 0;
 	thread->ustack_size = 0;
 	thread->max_prio = -1;
 	thread->curr_prio = -1;
 	thread->timeslice = 0;
-	thread->preempt_off = 0;
-	thread->preempt_missed = false;
+	thread->preempt_disabled = 0;
+	thread->missed_preempt = false;
 	thread->waitq = NULL;
 	thread->interruptible = false;
 	thread->timed_out = false;
@@ -557,12 +633,13 @@ void thread_run(thread_t *thread) {
 	assert(thread->state == THREAD_CREATED);
 
 	thread->state = THREAD_READY;
-	sched_thread_insert(thread);
+	sched_insert_thread(thread);
 
 	spinlock_unlock(&thread->lock);
 }
 
-/** Destroy a thread.
+/**
+ * Destroy a thread.
  *
  * Decreases the reference count of a thread, and queues it for deletion if it
  * reaches 0. Do NOT use on threads that are running, for this use thread_kill()
@@ -647,7 +724,7 @@ static inline void thread_dump(thread_t *thread, int level) {
 	}
 
 	kprintf(level, "%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
-	        (thread->cpu) ? thread->cpu->id : 0, thread->wire_count, thread->priority,
+	        (thread->cpu) ? thread->cpu->id : 0, thread->wired, thread->priority,
 	        thread->curr_prio, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
 	        thread->owner->id, thread->name);
 }
@@ -850,7 +927,8 @@ status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *hand
 	return ret;
 }
 
-/** Get the ID of a thread.
+/**
+ * Get the ID of a thread.
  *
  * Gets the ID of the thread referred to by a handle. If the handle is
  * specified as -1, then the ID of the calling thread will be returned.

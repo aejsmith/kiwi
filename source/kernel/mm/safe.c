@@ -26,7 +26,6 @@
 #include <mm/malloc.h>
 #include <mm/safe.h>
 
-#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <status.h>

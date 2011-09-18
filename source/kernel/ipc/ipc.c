@@ -48,7 +48,6 @@
 #include <mm/slab.h>
 
 #include <proc/process.h>
-#include <proc/sched.h>
 
 #include <sync/mutex.h>
 #include <sync/semaphore.h>

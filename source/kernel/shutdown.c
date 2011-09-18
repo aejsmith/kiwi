@@ -27,7 +27,6 @@
 #include <kernel/system.h>
 
 #include <proc/process.h>
-#include <proc/sched.h>
 #include <proc/thread.h>
 
 #include <security/cap.h>
@@ -54,7 +53,7 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	int action = (int)((ptr_t)_action);
 
 	thread_wire(curr_thread);
-	sched_preempt_disable();
+	thread_disable_preempt();
 
 	kprintf(LOG_NORMAL, "system: terminating all processes...\n");
 	process_shutdown();
@@ -104,7 +103,7 @@ void system_shutdown(int action) {
 			fatal("Unable to create shutdown thread (%d)", ret);
 		}
 
-		sched_preempt_disable();
+		thread_disable_preempt();
 		thread_run(thread);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,12 +22,13 @@
 #ifndef __PROC_SCHED_H
 #define __PROC_SCHED_H
 
-extern void sched_yield(void);
-extern void sched_preempt(void);
-extern void sched_preempt_disable(void);
-extern void sched_preempt_enable(void);
+#include <proc/thread.h>
+
+extern void sched_reschedule(bool state);
+extern void sched_post_switch(bool state);
+extern void sched_insert_thread(thread_t *thread);
 
 extern void sched_init(void);
-extern void sched_enter(void);
+extern void sched_enter(void) __noreturn;
 
 #endif /* __PROC_SCHED_H */
