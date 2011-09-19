@@ -53,6 +53,7 @@
 #include <lrm.h>
 #include <module.h>
 #include <object.h>
+#include <setjmp.h>
 #include <status.h>
 #include <symbol.h>
 #include <time.h>
@@ -364,7 +365,7 @@ static void init_thread(void *arg1, void *arg2) {
  * @param magic		KBoot magic number.
  * @param tags		Physical address of KBoot tag list. */
 __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
-	context_t ctx;
+	jmp_buf buf;
 
 	/* Save the tag list address. */
 	kboot_tag_list = tags;
@@ -382,8 +383,8 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 	 * memory management subsystems are brought up. Therefore, the first
 	 * thing we do is move over to a new stack that is mapped along with
 	 * the kernel. */
-	context_init(&ctx, (ptr_t)kmain_bsp_bottom, boot_stack);
-	context_restore(&ctx);
+	initjmp(buf, kmain_bsp_bottom, boot_stack, KSTACK_SIZE);
+	longjmp(buf, 1);
 }
 
 /** Initialisation code for the boot CPU. */
