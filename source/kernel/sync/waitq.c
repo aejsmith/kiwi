@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,30 +32,6 @@
 #include <time.h>
 
 extern void thread_wake(thread_t *thread);
-
-/** Handle a timeout on a wait queue.
- * @param _thread	Pointer to thread that timed out.
- * @return		Whether to preempt. */
-static bool waitq_timer_handler(void *_thread) {
-	thread_t *thread = _thread;
-	waitq_t *queue;
-
-	spinlock_lock(&thread->lock);
-
-	/* The thread could have been woken up already by another CPU. */
-	if(thread->state == THREAD_SLEEPING) {
-		/* Restore the interruption context and queue it to run. */
-		queue = thread->waitq;
-		spinlock_lock(&queue->lock);
-		thread->timed_out = true;
-		thread->context = thread->sleep_context;
-		thread_wake(thread);
-		spinlock_unlock(&queue->lock);
-	}
-
-	spinlock_unlock(&thread->lock);
-	return false;
-}
 
 /**
  * Prepare to sleep on a wait queue.
@@ -95,8 +71,6 @@ void waitq_sleep_cancel(waitq_t *queue, bool state) {
  * @param state		Interrupt state returned from waitq_sleep_prepare().
  * @return		Status code describing result of the operation. */
 status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
-	status_t ret;
-
 	assert(spinlock_held(&queue->lock));
 	assert(!intr_state());
 
@@ -108,22 +82,12 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
 
 	spinlock_lock_ni(&curr_thread->lock);
 
+	/* Save details of the sleep to the thread structure. */
 	curr_thread->waitq = queue;
-	curr_thread->timed_out = false;
-
-	/* Set up interruption/timeout context if necessary. This context will
-	 * be restored if sleep is interrupted. */
-	if(flags & SYNC_INTERRUPTIBLE || timeout > 0) {
-		if(context_save(&curr_thread->sleep_context)) {
-			ret = (curr_thread->timed_out) ? STATUS_TIMED_OUT : STATUS_INTERRUPTED;
-			sched_post_switch(state);
-			return ret;
-		}
-	}
-
-	/* Set whether we're interruptible, and set up a timeout if needed. */
 	curr_thread->interruptible = ((flags & SYNC_INTERRUPTIBLE) != 0);
-	timer_init(&curr_thread->sleep_timer, waitq_timer_handler, curr_thread, 0);
+	curr_thread->sleep_status = STATUS_SUCCESS;
+
+	/* Set up a timeout if needed. */
 	if(timeout > 0) {
 		timer_start(&curr_thread->sleep_timer, timeout, TIMER_ONESHOT);
 	}
@@ -136,7 +100,7 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
 	 * and thread locking. */
 	curr_thread->state = THREAD_SLEEPING;
 	sched_reschedule(state);
-	return STATUS_SUCCESS;
+	return curr_thread->sleep_status;
 }
 
 /**
@@ -157,7 +121,8 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
  *			SYNC_INTERRUPTIBLE flag is set.
  */
 status_t waitq_sleep(waitq_t *queue, useconds_t timeout, int flags) {
-	return waitq_sleep_unsafe(queue, timeout, flags, waitq_sleep_prepare(queue));
+	bool state = waitq_sleep_prepare(queue);
+	return waitq_sleep_unsafe(queue, timeout, flags, state);
 }
 
 /** Wake up the next thread on a wait queue.

@@ -60,6 +60,7 @@
 #define DEFAULT_THREAD_RIGHTS_OTHERS	(THREAD_RIGHT_QUERY)
 
 extern void thread_wake(thread_t *thread);
+static bool thread_timeout(void *_thread);
 
 /** Tree of all threads. */
 static AVL_TREE_DECLARE(thread_tree);
@@ -86,6 +87,7 @@ static void thread_cache_ctor(void *obj, void *data) {
 	list_init(&thread->runq_link);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
+	timer_init(&thread->sleep_timer, thread_timeout, thread, 0);
 	notifier_init(&thread->death_notifier, thread);
 }
 
@@ -235,6 +237,30 @@ void thread_wake(thread_t *thread) {
 	sched_insert_thread(thread);
 }
 
+/** Sleep timeout handler.
+ * @param _thread	Pointer to thread to wake. */
+static bool thread_timeout(void *_thread) {
+	thread_t *thread = _thread;
+	waitq_t *queue;
+
+	spinlock_lock(&thread->lock);
+
+	/* The thread could have been woken up already by another CPU. */
+	if(thread->state == THREAD_SLEEPING) {
+		/* Set the wake reason. */
+		thread->sleep_status = STATUS_TIMED_OUT;
+
+		/* Remove the thread from the wait queue. */
+		queue = thread->waitq;
+		spinlock_lock(&queue->lock);
+		thread_wake(thread);
+		spinlock_unlock(&queue->lock);
+	}
+
+	spinlock_unlock(&thread->lock);
+	return false;
+}
+
 /**
  * Wire a thread to its current CPU.
  *
@@ -279,6 +305,26 @@ void thread_unwire(thread_t *thread) {
 	}
 }
 
+/** Internal part of thread_interrupt().
+ * @param thread	Thread to interrupt (must be locked).
+ * @return		Whether the thread was interrupted. */
+static bool thread_interrupt_unsafe(thread_t *thread) {
+	waitq_t *queue;
+
+	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
+		thread->sleep_status = STATUS_INTERRUPTED;
+
+		queue = thread->waitq;
+		spinlock_lock(&queue->lock);
+		thread_wake(thread);
+		spinlock_unlock(&queue->lock);
+
+		return true;
+	} else {
+		return false;
+	}
+}
+
 /**
  * Interrupt a thread.
  *
@@ -290,21 +336,12 @@ void thread_unwire(thread_t *thread) {
  * @return		Whether the thread was interrupted.
  */
 bool thread_interrupt(thread_t *thread) {
-	bool ret = false;
-	waitq_t *queue;
+	bool ret;
 
 	spinlock_lock(&thread->lock);
-
-	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
-		thread->context = thread->sleep_context;
-		queue = thread->waitq;
-		spinlock_lock(&queue->lock);
-		thread_wake(thread);
-		spinlock_unlock(&queue->lock);
-		ret = true;
-	}
-
+	ret = thread_interrupt_unsafe(thread);
 	spinlock_unlock(&thread->lock);
+
 	return ret;
 }
 
@@ -318,20 +355,13 @@ bool thread_interrupt(thread_t *thread) {
  * @param thread	Thread to kill.
  */
 void thread_kill(thread_t *thread) {
-	waitq_t *queue;
-
 	spinlock_lock(&thread->lock);
+
 	if(thread->owner != kernel_proc) {
 		thread->killed = true;
 
 		/* Interrupt the thread if it is in interruptible sleep. */
-		if(thread->state == THREAD_SLEEPING && thread->interruptible) {
-			thread->context = thread->sleep_context;
-			queue = thread->waitq;
-			spinlock_lock(&queue->lock);
-			thread_wake(thread);
-			spinlock_unlock(&queue->lock);
-		}
+		thread_interrupt_unsafe(thread);
 #if CONFIG_SMP
 		/* If the thread is on a different CPU, send the CPU an IPI
 		 * so that it will check the thread killed state. */
@@ -340,6 +370,7 @@ void thread_kill(thread_t *thread) {
 		}
 #endif
 	}
+
 	spinlock_unlock(&thread->lock);
 }
 
@@ -592,7 +623,6 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 	thread->missed_preempt = false;
 	thread->waitq = NULL;
 	thread->interruptible = false;
-	thread->timed_out = false;
 	thread->last_time = 0;
 	thread->kernel_time = 0;
 	thread->user_time = 0;
