@@ -131,7 +131,8 @@ useconds_t time_to_unix(int year, int month, int day, int hour, int min, int sec
 	return SECS2USECS(seconds);
 }
 
-/** Get the number of microseconds since the Unix Epoch.
+/**
+ * Get the number of microseconds since the Unix Epoch.
  *
  * Returns the number of microseconds that have passed since the Unix Epoch,
  * 00:00:00 UTC, January 1st, 1970.
@@ -142,7 +143,8 @@ useconds_t unix_time(void) {
 	return boot_unix_time + system_time();
 }
 
-/** Set the current timer device.
+/**
+ * Set the current timer device.
  *
  * Sets the device that will provide timer ticks. The previous device will
  * be disabled.
@@ -312,23 +314,23 @@ void spin(useconds_t us) {
 
 /** Sleep for a certain amount of time.
  * @param us		Microseconds to sleep for.
- * @param flags		Flags modifying sleep behaviour (see sync/flags.h).
+ * @param interruptible	Whether the sleep should be interruptible.
  * @return		Status code describing result of the operation. */
-status_t usleep_etc(useconds_t us, int flags) {
+status_t usleep_etc(useconds_t us, bool interruptible) {
 	waitq_t queue;
 	status_t ret;
 
 	assert(us >= 0);
 
 	waitq_init(&queue, "usleep");
-	ret = waitq_sleep(&queue, us, flags);
+	ret = waitq_sleep(&queue, us, (interruptible) ? SYNC_INTERRUPTIBLE : 0);
 	return (ret == STATUS_WOULD_BLOCK || ret == STATUS_TIMED_OUT) ? 0 : ret;
 }
 
 /** Sleep for a certain amount of time.
  * @param us		Microseconds to sleep for. */
 void usleep(useconds_t us) {
-	usleep_etc(us, 0);
+	usleep_etc(us, false);
 }
 
 /** Dump a list of timers.

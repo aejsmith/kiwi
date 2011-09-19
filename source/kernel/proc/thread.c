@@ -1071,7 +1071,7 @@ status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
 
 	/* FIXME: The method getting remaining time isn't quite accurate. */
 	begin = system_time();
-	ret = usleep_etc(us, SYNC_INTERRUPTIBLE);
+	ret = usleep_etc(us, true);
 	if(ret == STATUS_INTERRUPTED && remp) {
 		elapsed = system_time() - begin;
 		if(elapsed < us) {
