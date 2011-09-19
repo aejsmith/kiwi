@@ -30,7 +30,6 @@
  * possible.
  */
 
-#include <cpu/context.h>
 #include <cpu/cpu.h>
 #include <cpu/intr.h>
 
@@ -56,6 +55,7 @@
 #include <lrm.h>
 #include <module.h>
 #include <object.h>
+#include <setjmp.h>
 #include <symbol.h>
 #include <time.h>
 
@@ -72,7 +72,7 @@ intr_frame_t *curr_kdbg_frame = NULL;
 /** Breakpoint/watchpoint ID that triggered entry. */
 size_t kdbg_breakpoint_id = 0;
 
-static context_t kdbg_fault_context;			/**< Context to restore upon exceptions. */
+static jmp_buf kdbg_fault_context;			/**< Context to restore upon exceptions. */
 static char kdbg_in_buffer[KDBG_INPUT_BUF_SIZE];	/**< User input buffer. */
 static size_t kdbg_step_count = 0;			/**< Instructions remaining to single-step. */
 
@@ -491,13 +491,35 @@ static char *kdbg_get_input(int count) {
 	return kdbg_in_buffer;
 }
 
+/** Call a command.
+ * @param idx		Index of the command.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		Return value of command. */
+static int run_command(size_t idx, int argc, char **argv) {
+	int ret;
+
+	/* Set kdbg_running to 2 to signal that we're in a command. */
+	atomic_set(&kdbg_running, 2);
+
+	if(setjmp(kdbg_fault_context) != 0) {
+		/* Fault occurred. */
+		ret = KDBG_FAIL;
+	} else {
+		ret = kdbg_commands[idx].function(argc, argv);
+	}
+
+	atomic_set(&kdbg_running, 1);
+	return ret;
+}
+
 /** Process a line of input. At most 16 command arguments allowed.
  * @param input		Line of input read from the console.
  * @return		Status returned by command. */
 static int kdbg_process_input(char *input) {
-	int argc = 0, ret;
 	char *next, *cur;
 	char *argv[16];
+	int argc = 0;
 	size_t s;
 
 	/* Loop through the input and seperate all the arguments out. We use
@@ -541,18 +563,7 @@ static int kdbg_process_input(char *input) {
 			continue;
 		}
 
-		/* Set kdbg_running to 2 to signify that we're in a command. */
-		atomic_set(&kdbg_running, 2);
-
-		if(context_save(&kdbg_fault_context)) {
-			/* Fault occurred. */
-			ret = KDBG_FAIL;
-		} else {
-			ret = kdbg_commands[s].function(argc, argv);
-		}
-
-		atomic_set(&kdbg_running, 1);
-		return ret;
+		return run_command(s, argc, argv);
 	}
 
 	kprintf(LOG_NONE, "KDBG: Unknown command '%s'\n", argv[0]);
@@ -683,7 +694,7 @@ int kdbg_parse_expression(char *exp, unative_t *valp, char **strp) {
 void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
 	kprintf(LOG_NONE, "KDBG: Exception %" PRIuN " (%s) occurred during command (%p)\n",
 	                  num, name, frame->ip);
-	context_restore_frame(&kdbg_fault_context, frame);
+	longjmp(kdbg_fault_context, 1);
 }
 
 /** Debugger main function.

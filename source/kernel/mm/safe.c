@@ -28,6 +28,7 @@
 
 #include <proc/thread.h>
 
+#include <setjmp.h>
 #include <status.h>
 
 /** Check if an address is valid. */
@@ -41,7 +42,7 @@
 
 /** Common entry code for userspace memory functions. */
 #define USERMEM_ENTER()			\
-	if(context_save(&curr_thread->usermem_context)) { \
+	if(setjmp(curr_thread->usermem_context) != 0) { \
 		return STATUS_INVALID_ADDR; \
 	} \
 	curr_thread->in_usermem = true

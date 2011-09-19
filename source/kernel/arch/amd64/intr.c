@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <console.h>
 #include <kdbg.h>
+#include <setjmp.h>
 
 #if CONFIG_SMP
 extern atomic_t cpu_pause_wait;
@@ -203,8 +204,7 @@ static void page_fault(unative_t num, intr_frame_t *frame) {
 		} else if(curr_thread && curr_thread->in_usermem) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
 			kdbg_enter(KDBG_ENTRY_USER, frame);
-			context_restore_frame(&curr_thread->usermem_context, frame);
-			return;
+			longjmp(curr_thread->usermem_context, 1);
 		}
 	} else {
 		/* This is an access to kernel memory, which should be reported

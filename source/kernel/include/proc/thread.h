@@ -22,6 +22,7 @@
 #ifndef __PROC_THREAD_H
 #define __PROC_THREAD_H
 
+#include <arch/setjmp.h>
 #include <arch/thread.h>
 
 #include <cpu/context.h>
@@ -111,7 +112,7 @@ typedef struct thread {
 
 	/** Information used by user memory functions. */
 	bool in_usermem;		/**< Whether the thread is in the user memory access functions. */
-	context_t usermem_context;	/**< Context to restore upon user memory access fault. */
+	jmp_buf usermem_context;	/**< Context to restore upon user memory access fault. */
 
 	/**
 	 * Reference count for the thread.

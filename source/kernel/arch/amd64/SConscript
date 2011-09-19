@@ -31,6 +31,7 @@ sources = FeatureSources(config, [
 	'kdbg.c',
 	'lapic.c',
 	'page.c',
+	'setjmp.S',
 	'signal.c',
 	('SMP', 'smp.c'),
 	'thread.c',
