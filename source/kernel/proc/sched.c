@@ -306,23 +306,12 @@ void sched_reschedule(bool state) {
 			curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
 #endif
 
-		/* Switch the address space. If the new process' address space
-		 * is set to NULL then vm_aspace_switch() will just switch to
-		 * the kernel address space. */
+		/* Switch the address space. This function handles the case
+		 * where the new process' aspace pointer is NULL. */
 		vm_aspace_switch(curr_proc->aspace);
 
-		/* Save old FPU state if necessary, and disable the FPU. It
-		 * will be re-enabled on-demand if required. */
-		if(fpu_state()) {
-			assert(cpu->prev_thread->fpu);
-			fpu_context_save(cpu->prev_thread->fpu);
-			fpu_disable();
-		}
-
-		/* Switch to the new CPU context. */
-		if(!context_save(&cpu->prev_thread->context)) {
-			context_restore(&curr_thread->context);
-		}
+		/* Perform the thread switch. */
+		arch_thread_switch(curr_thread, cpu->prev_thread);
 
 		/* The switch may return to thread_trampoline() or to the
 		 * interruption handler in waitq_sleep_unsafe(), so put
@@ -337,9 +326,6 @@ void sched_reschedule(bool state) {
 /** Perform post-thread-switch tasks.
  * @param state		Interrupt state to restore. */
 void sched_post_switch(bool state) {
-	/* Do architecture-specific post-switch tasks. */
-	arch_thread_post_switch(curr_thread);
-
 	spinlock_unlock_ni(&curr_thread->lock);
 
 	/* The prev_thread pointer is set to NULL during sched_init(). It will
@@ -516,12 +502,10 @@ __init_text void sched_init(void) {
 
 /** Begin executing other threads. */
 __init_text void sched_enter(void) {
-	assert(!intr_state());
-
-	/* Lock the idle thread - sched_post_switch() expects the thread to be
-	 * locked. */
+	/* Lock the idle thread - sched_post_switch() expects it to be locked. */
 	spinlock_lock_ni(&curr_thread->lock);
 
-	/* Restore the idle thread's context. */
-	context_restore(&curr_cpu->sched->idle_thread->context);
+	/* Switch to the idle thread. */
+	arch_thread_switch(curr_thread, NULL);
+	fatal("Should not get here");
 }

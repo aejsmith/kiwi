@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,26 +36,33 @@ struct intr_frame;
  *			assembly code. If changing the layout of this structure,
  *			be sure to updated the offset definitions below. */
 typedef struct arch_thread {
-	struct cpu *cpu;			/** Current CPU pointer. */
+	struct cpu *cpu;			/** Current CPU pointer, used by curr_cpu. */
 
 	/** SYSCALL/SYSRET data. */
 	ptr_t kernel_rsp;			/**< RSP for kernel entry via SYSCALL. */
 	ptr_t user_rsp;				/**< Temporary storage for user RSP. */
 
+	/** Saved context switch stack pointer. */
+	ptr_t saved_rsp;
+
 	struct intr_frame *user_iframe;		/**< Frame from last user-mode entry. */
-	unative_t flags;			/**< Flags for the thread. */
+	unsigned long flags;			/**< Flags for the thread. */
 	ptr_t tls_base;				/**< TLS base address. */
+
+	/** FPU context save point. */
+	char fpu[512] __aligned(16);
 } __packed arch_thread_t;
 
 #endif /* __ASM__ */
 
 /** Flags for arch_thread_t. */
 #define ARCH_THREAD_IFRAME_MODIFIED	(1<<0)	/**< Interrupt frame was modified. */
+#define ARCH_THREAD_HAVE_FPU		(1<<1)	/**< Thread has an FPU state saved. */
 
 /** Offsets in arch_thread_t. */
 #define ARCH_THREAD_OFF_KERNEL_RSP	0x8
 #define ARCH_THREAD_OFF_USER_RSP	0x10
-#define ARCH_THREAD_OFF_USER_IFRAME	0x18
-#define ARCH_THREAD_OFF_FLAGS		0x20
+#define ARCH_THREAD_OFF_USER_IFRAME	0x20
+#define ARCH_THREAD_OFF_FLAGS		0x28
 
 #endif /* __ARCH_THREAD_H */

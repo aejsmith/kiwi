@@ -149,12 +149,8 @@ static void thread_reaper(void *arg1, void *arg2) {
 		process_detach(thread);
 
 		/* Now clean up the thread. */
-		heap_free(thread->kstack, KSTACK_SIZE);
-		context_destroy(&thread->context);
 		arch_thread_destroy(thread);
-		if(thread->fpu) {
-			fpu_context_destroy(thread->fpu);
-		}
+		heap_free(thread->kstack, KSTACK_SIZE);
 		notifier_clear(&thread->death_notifier);
 		object_destroy(&thread->obj);
 
@@ -539,7 +535,7 @@ thread_t *thread_lookup(thread_id_t id) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t thread_create(const char *name, process_t *owner, int flags, thread_func_t entry,
+status_t thread_create(const char *name, process_t *owner, unsigned flags, thread_func_t entry,
                        void *arg1, void *arg2, object_security_t *security,
                        thread_t **threadp) {
 	object_security_t dsecurity = { -1, -1, NULL };
@@ -592,16 +588,9 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 
 	/* Allocate a kernel stack and initialise the thread context. */
 	thread->kstack = heap_alloc(KSTACK_SIZE, MM_SLEEP);
-	context_init(&thread->context, (ptr_t)thread_trampoline, thread->kstack);
 
-	/* Initialise architecture-specific data. */
-	ret = arch_thread_init(thread);
-	if(ret != STATUS_SUCCESS) {
-		heap_free(thread->kstack, KSTACK_SIZE);
-		id_alloc_release(&thread_id_allocator, thread->id);
-		slab_cache_free(thread_cache, thread);
-		return ret;
-	}
+	/* Initialise the architecture-specific data. */
+	arch_thread_init(thread, thread_trampoline);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
@@ -609,7 +598,6 @@ status_t thread_create(const char *name, process_t *owner, int flags, thread_fun
 
 	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
 	refcount_set(&thread->count, 1);
-	thread->fpu = NULL;
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wired = 0;
@@ -811,7 +799,7 @@ void __init_text thread_init(void) {
 	id_alloc_init(&thread_id_allocator, 65535);
 
 	/* Create the thread slab cache. */
-	thread_cache = slab_cache_create("thread_cache", sizeof(thread_t), 0,
+	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),
 	                                 thread_cache_ctor, NULL, NULL, 0,
 	                                 MM_FATAL);
 }

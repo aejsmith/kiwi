@@ -25,9 +25,7 @@
 #include <arch/setjmp.h>
 #include <arch/thread.h>
 
-#include <cpu/context.h>
 #include <cpu/cpu.h>
-#include <cpu/fpu.h>
 
 #include <kernel/signal.h>
 #include <kernel/thread.h>
@@ -70,11 +68,9 @@ typedef struct thread {
 	spinlock_t lock;
 
 	/** Main thread information. */
-	context_t context;		/**< CPU context. */
-	fpu_context_t *fpu;		/**< FPU context. */
-	arch_thread_t arch;		/**< Architecture thread data. */
+	arch_thread_t arch;		/**< Architecture thread implementation. */
 	void *kstack;			/**< Kernel stack pointer. */
-	int flags;			/**< Flags for the thread. */
+	unsigned flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
 	size_t wired;			/**< How many calls to thread_wire() have been made. */
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
@@ -149,9 +145,9 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern void arch_thread_post_switch(thread_t *thread);
-extern status_t arch_thread_init(thread_t *thread);
+extern void arch_thread_init(thread_t *thread, void (*entry)(void));
 extern void arch_thread_destroy(thread_t *thread);
+extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern ptr_t arch_thread_tls_addr(thread_t *thread);
 extern status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr);
 extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __noreturn;
@@ -174,7 +170,7 @@ extern void thread_exit(void) __noreturn;
 
 extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
-extern status_t thread_create(const char *name, struct process *owner, int flags,
+extern status_t thread_create(const char *name, struct process *owner, unsigned flags,
                               thread_func_t entry, void *arg1, void *arg2,
                               object_security_t *security, thread_t **threadp);
 extern void thread_run(thread_t *thread);

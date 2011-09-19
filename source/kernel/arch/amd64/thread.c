@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <arch/memory.h>
 
 #include <x86/cpu.h>
+#include <x86/fpu.h>
 
 #include <cpu/cpu.h>
 
@@ -33,39 +34,76 @@
 #include <status.h>
 
 extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg) __noreturn;
-
-/** AMD64-specific post-thread switch function. */
-void arch_thread_post_switch(thread_t *thread) {
-	/* Store the current CPU pointer and then point the GS register to the
-	 * new thread's architecture data. */
-	thread->arch.cpu = thread->cpu;
-	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&thread->arch);
-
-	/* Store the kernel RSP in the current CPU structure for the SYSCALL
-	 * code to use. */
-	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
-
-	/* Set the RSP0 field in the TSS to point to the new thread's
-	 * kernel stack. */
-	curr_cpu->arch.tss.rsp0 = (ptr_t)thread->kstack + KSTACK_SIZE;
-
-	/* Set the FS base address to the TLS segment base. */
-	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
-}
+extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
+extern void amd64_context_restore(ptr_t new_rsp);
 
 /** Initialise AMD64-specific thread data.
  * @param thread	Thread to initialise.
- * @return		Always returns STATUS_SUCCESS. */
-status_t arch_thread_init(thread_t *thread) {
+ * @param entry		Entry point for the thread. */
+void arch_thread_init(thread_t *thread, void (*entry)(void)) {
+	unative_t *sp;
+
 	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
-	return STATUS_SUCCESS;
+
+	/* Point the RSP for SYSCALL entry at the top of the stack. */
+	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
+
+	/* Initialise the kernel stack. First value is a fake return address to
+	 * make the backtrace end correctly and maintain ABI alignment
+	 * requirements: ((RSP - 8) % 16) == 0 on entry to a function. */
+	sp = (unative_t *)thread->arch.kernel_rsp;
+	*--sp = 0;			/* Fake return address for backtrace. */
+	*--sp = (ptr_t)entry;		/* RIP/Return address. */
+	*--sp = 0;			/* RBP. */
+	*--sp = 0;			/* RBX. */
+	*--sp = 0;			/* R12. */
+	*--sp = 0;			/* R13. */
+	*--sp = 0;			/* R14. */
+	*--sp = 0;			/* R15. */
+
+	/* Save the stack pointer for arch_thread_switch(). */
+	thread->arch.saved_rsp = (ptr_t)sp;
 }
 
 /** Clean up AMD64-specific thread data.
  * @param thread	Thread to clean up. */
 void arch_thread_destroy(thread_t *thread) {
 	/* Nothing happens. */
+}
+
+/** Switch to another thread.
+ * @param thread	Thread to switch to.
+ * @param prev		Thread that was previously running. */
+void arch_thread_switch(thread_t *thread, thread_t *prev) {
+	/* Store the current CPU pointer and then point the GS register to the
+	 * new thread's architecture data. */
+	thread->arch.cpu = curr_cpu;
+	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&thread->arch);
+
+	/* Set the RSP0 field in the TSS to point to the new thread's
+	 * kernel stack. */
+	curr_cpu->arch.tss.rsp0 = thread->arch.kernel_rsp;
+
+	/* Set the FS base address to the TLS segment base. */
+	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
+
+	/* If the FPU is currently enabled, disable it. We switch to the new
+	 * context on demand in the new thread. TODO: Possibly determine
+	 * whether the FPU is frequently used, and switch straight away to
+	 * avoid an exception to re-enable it. */
+	if(x86_fpu_state()) {
+		x86_fpu_save(prev->arch.fpu);
+		x86_fpu_disable();
+	}
+
+	/* Switch to the new context. */
+	if(likely(prev)) {
+		amd64_context_switch(thread->arch.saved_rsp, &prev->arch.saved_rsp);
+	} else {
+		/* Initial thread switch, don't have a previous thread. */
+		amd64_context_restore(thread->arch.saved_rsp);
+	}
 }
 
 /** Get the TLS address for a thread.

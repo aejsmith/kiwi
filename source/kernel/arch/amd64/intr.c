@@ -22,6 +22,7 @@
 #include <arch/memory.h>
 
 #include <x86/cpu.h>
+#include <x86/fpu.h>
 
 #include <cpu/intr.h>
 
@@ -155,8 +156,21 @@ static void ud_fault(unative_t num, intr_frame_t *frame) {
  * @param frame		Interrupt stack frame. */
 static void nm_fault(unative_t num, intr_frame_t *frame) {
 	if(frame->cs & 3) {
-		fpu_request();
+		/* We're coming from user-mode, this is a valid request for FPU
+		 * usage. Enable the FPU. */
+		x86_fpu_enable();
+
+		/* If the thread has the ARCH_THREAD_HAVE_FPU flag set, we have
+		 * used the FPU previously and so have a state to restore.
+		 * Otherwise, initialise a new state. */
+		if(curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU) {
+			x86_fpu_restore(curr_thread->arch.fpu);
+		} else {
+			x86_fpu_init();
+			curr_thread->arch.flags |= ARCH_THREAD_HAVE_FPU;
+		}
 	} else {
+		/* FPU usage is not allowed in kernel-mode. */
 		kmode_except_handler(num, frame);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,38 +19,42 @@
  * @brief		AMD64 FPU functions.
  */
 
+#ifndef __X86_FPU_H
+#define __X86_FPU_H
+
 #include <x86/cpu.h>
-#include <cpu/fpu.h>
 
 /** Save FPU state.
- * @param ctx		Context to restore. */
-void fpu_context_save(fpu_context_t *ctx) {
-	__asm__ volatile("fxsave (%0)" :: "r"(ctx->data));
+ * @param buf		Buffer to save into. */
+static inline void x86_fpu_save(char buf[512]) {
+	__asm__ volatile("fxsave (%0)" :: "r"(buf));
 }
 
 /** Restore FPU state.
- * @param ctx		Context to restore. */
-void fpu_context_restore(fpu_context_t *ctx) {
-	__asm__ volatile("fxrstor (%0)" :: "r"(ctx->data));
+ * @param buf		Buffer to restore from. */
+static inline void x86_fpu_restore(char buf[512]) {
+	__asm__ volatile("fxrstor (%0)" :: "r"(buf));
 }
 
 /** Check whether the FPU is enabled.
  * @return		Whether the FPU is enabled. */
-bool fpu_state(void) {
+static inline bool x86_fpu_state(void) {
 	return !(x86_read_cr0() & X86_CR0_TS);
 }
 
 /** Enable FPU usage. */
-void fpu_enable(void) {
+static inline void x86_fpu_enable(void) {
 	x86_write_cr0(x86_read_cr0() & ~X86_CR0_TS);
 }
 
 /** Disable FPU usage. */
-void fpu_disable(void) {
+static inline void x86_fpu_disable(void) {
 	x86_write_cr0(x86_read_cr0() | X86_CR0_TS);
 }
 
 /** Reset the FPU state. */
-void fpu_init(void) {
+static inline void x86_fpu_init(void) {
 	__asm__ volatile("fninit");
 }
+
+#endif /* __X86_FPU_H */

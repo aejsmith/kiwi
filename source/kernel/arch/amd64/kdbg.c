@@ -142,9 +142,9 @@ void kdbg_enter(int reason, intr_frame_t *frame) {
  * @return		KDBG_OK on success, KDBG_FAIL on failure. */
 int kdbg_cmd_backtrace(int argc, char **argv) {
 	stack_frame_t *frame;
+	unative_t *sp, tid;
 	thread_t *thread;
 	size_t off = 0;
-	unative_t tid;
 	symbol_t *sym;
 	ptr_t ip;
 
@@ -167,8 +167,14 @@ int kdbg_cmd_backtrace(int argc, char **argv) {
 			return KDBG_FAIL;
 		}
 
-		frame = (stack_frame_t *)thread->context.bp;
-		ip = thread->context.ip;
+		if(thread->state == THREAD_RUNNING) {
+			kprintf(LOG_NONE, "Cannot trace running thread.\n");
+			return KDBG_FAIL;
+		}
+
+		sp = (unative_t *)thread->arch.saved_rsp;
+		frame = (stack_frame_t *)sp[5];
+		ip = sp[6];
 	} else {
 		frame = (stack_frame_t *)curr_kdbg_frame->bp;
 		ip = curr_kdbg_frame->ip;

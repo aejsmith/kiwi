@@ -25,7 +25,6 @@ sources = FeatureSources(config, [
 	'console/logo.c',
 
 	'cpu/cpu.c',
-	'cpu/fpu.c',
 	('SMP', 'cpu/ipi.c'),
 	'cpu/irq.c',
 

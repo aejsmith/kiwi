@@ -20,13 +20,10 @@ Import('config', 'env')
 sources = FeatureSources(config, [
 	('SMP', 'ap_boot.bin.c'),
 	'arch.c',
-	'context.c',
-	'context_asm.S',
 	'cpu.c',
 	'descriptor.c',
 	'elf.c',
 	'entry.S',
-	'fpu.c',
 	'intr.c',
 	'kdbg.c',
 	'lapic.c',
@@ -34,6 +31,7 @@ sources = FeatureSources(config, [
 	'setjmp.S',
 	'signal.c',
 	('SMP', 'smp.c'),
+	'switch.S',
 	'thread.c',
 	'time.c',
 ])
