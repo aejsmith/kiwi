@@ -935,10 +935,6 @@ __init_text void page_init(void) {
 			}
 		}
 	}
-
-	/* Initialise architecture paging-related things. When this returns,
-	 * we should be on the kernel page map. */
-	page_arch_init();
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */

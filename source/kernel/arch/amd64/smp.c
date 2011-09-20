@@ -23,12 +23,14 @@
 #include <arch/memory.h>
 
 #include <x86/lapic.h>
+#include <x86/mmu.h>
 
 #include <cpu/cpu.h>
 
 #include <lib/string.h>
 
 #include <mm/heap.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 
@@ -93,7 +95,7 @@ void cpu_halt_all(void) {
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
 void cpu_boot(cpu_t *cpu) {
-	page_map_t *pmap;
+	mmu_context_t *mmu;
 	useconds_t delay;
 	void *mapping;
 
@@ -106,13 +108,13 @@ void cpu_boot(cpu_t *cpu) {
 	 * scheduler. */
 	cpu->arch.double_fault_stack = heap_alloc(KSTACK_SIZE, MM_FATAL);
 
-	/* Create a temporary page map for the AP to use while booting. This is
-	 * necessary because the bootstrap code needs to be identity mapped
-	 * while it enables paging. */
-	pmap = page_map_create(MM_FATAL);
-	page_map_lock(pmap);
-	page_map_insert(pmap, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
-	page_map_unlock(pmap);
+	/* Create a temporary MMU context for the AP to use while booting.
+	 * This is necessary because the bootstrap code needs to be identity
+	 * mapped while it enables paging. */
+	mmu = mmu_context_create(MM_FATAL);
+	mmu_context_lock(mmu);
+	mmu_context_map(mmu, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
+	mmu_context_unlock(mmu);
 
 	/* Copy the trampoline code to the page reserved by the paging
 	 * initialisation code. */
@@ -123,7 +125,7 @@ void cpu_boot(cpu_t *cpu) {
 	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
 	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
 	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
-	*(uint32_t *)(mapping + 40) = (ptr_t)pmap->cr3;
+	*(uint32_t *)(mapping + 40) = (ptr_t)mmu->cr3;
 
 	memory_barrier();
 	phys_unmap(mapping, PAGE_SIZE, true);
@@ -152,7 +154,7 @@ void cpu_boot(cpu_t *cpu) {
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
 	for(delay = 0; delay < 5000000; delay += 10000) {
 		if(cpu_boot_wait) {
-			page_map_destroy(pmap);
+			mmu_context_destroy(mmu);
 			return;
 		}
 		spin(10000);

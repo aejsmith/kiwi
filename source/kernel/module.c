@@ -25,6 +25,7 @@
 
 #include <mm/heap.h>
 #include <mm/malloc.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/safe.h>
 
@@ -70,12 +71,12 @@ void *module_mem_alloc(size_t size) {
 
 	addr = next_module_addr;
 
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		page = page_alloc(MM_FATAL);
-		page_map_insert(&kernel_page_map, addr + i, page->addr, true, true, MM_FATAL);
+		mmu_context_map(&kernel_mmu_context, addr + i, page->addr, true, true, MM_FATAL);
 	}
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 
 	next_module_addr += size;
 	remaining_module_size -= size;

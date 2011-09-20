@@ -34,24 +34,4 @@
 /** Mask to clear page offset and unsupported bits from a physical address. */
 #define PHYS_PAGE_MASK		0xFFFFFFF000LL
 
-#ifndef __ASM__
-
-#include <sync/mutex.h>
-
-/** Size of TLB flush array. */
-#define INVALIDATE_ARRAY_SIZE	128
-
-/** Structure containing a hardware page map. */
-typedef struct page_map {
-	mutex_t lock;			/**< Lock to protect page map. */
-	phys_ptr_t cr3;			/**< Value to load into the CR3 register. */
-
-	/** Array of TLB entries to flush when unlocking page map.
-	 * @note		If the count becomes greater than the array
-	 *			size, then the entire TLB will be flushed. */
-	ptr_t pages_to_invalidate[INVALIDATE_ARRAY_SIZE];
-	size_t invalidate_count;
-} page_map_t;
-
-#endif /* __ASM__ */
 #endif /* __ARCH_PAGE_H */

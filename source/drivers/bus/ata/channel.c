@@ -29,7 +29,7 @@
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
-#include <mm/page.h>
+#include <mm/mmu.h>
 
 #include <assert.h>
 #include <console.h>
@@ -97,7 +97,7 @@ static void add_dma_transfer(ata_dma_transfer_t **vecp, size_t *entriesp, ptr_t 
 
 	/* Find the physical address. */
 	pgoff = addr % PAGE_SIZE;
-	if(!page_map_find(&kernel_page_map, addr - pgoff, &phys)) {
+	if(!mmu_context_query(&kernel_mmu_context, addr - pgoff, &phys, NULL, NULL)) {
 		fatal("Part of DMA transfer buffer was not mapped");
 	}
 
@@ -124,7 +124,7 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 	assert(channel->dma);
 	assert(channel->ops->prepare_dma);
 
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 
 	/* Align on a page boundary. */
 	if(ibuf % PAGE_SIZE) {
@@ -146,7 +146,7 @@ status_t ata_channel_prepare_dma(ata_channel_t *channel, void *buf, size_t count
 		add_dma_transfer(&vec, &entries, ibuf, count);
 	}
 
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 
 	if(entries > channel->max_dma_bpt) {
 		kprintf(LOG_WARN, "ata: ???\n");

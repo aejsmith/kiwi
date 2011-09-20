@@ -27,7 +27,6 @@
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
 #include <x86/lapic.h>
-#include <x86/page.h>
 
 #include <cpu/cpu.h>
 
@@ -269,7 +268,6 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 
 	/* Initialise and load descriptor tables. */
 	descriptor_init(cpu);
-	pat_init();
 
 	/* Detect CPU features and information. */
 	detect_cpu_features(cpu, &features);
@@ -329,8 +327,8 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 
 	/* Enable NX/XD if supported. */
 	if(cpu_features.xd) {
-                x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
-        }
+		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
+	}
 
 	/* Set up SYSCALL/SYSRET MSRs. */
 	syscall_init();

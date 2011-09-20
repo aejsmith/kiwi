@@ -33,7 +33,7 @@
 
 #include <lib/utility.h>
 
-#include <mm/page.h>
+#include <mm/mmu.h>
 #include <mm/phys.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -118,9 +118,9 @@ static futex_t *futex_lookup(int32_t *addr) {
 	offset = (ptr_t)addr - base;
 
 	/* Look up the physical address. */
-	page_map_lock(curr_aspace->pmap);
-	if(!page_map_find(curr_aspace->pmap, base, &phys)) {
-		page_map_unlock(curr_aspace->pmap);
+	mmu_context_lock(curr_aspace->mmu);
+	if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL, NULL)) {
+		mmu_context_unlock(curr_aspace->mmu);
 
 		/* The page may not be mapped in. Try to trigger a fault, then
 		 * check again. */
@@ -128,15 +128,15 @@ static futex_t *futex_lookup(int32_t *addr) {
 			return NULL;
 		}
 
-		page_map_lock(curr_aspace->pmap);
+		mmu_context_lock(curr_aspace->mmu);
 
-		if(!page_map_find(curr_aspace->pmap, base, &phys)) {
-			page_map_unlock(curr_aspace->pmap);
+		if(!mmu_context_query(curr_aspace->mmu, base, &phys, NULL, NULL)) {
+			mmu_context_unlock(curr_aspace->mmu);
 			return NULL;
 		}
 	}
 	phys += offset;
-	page_map_unlock(curr_aspace->pmap);
+	mmu_context_unlock(curr_aspace->mmu);
 
 	mutex_lock(&curr_proc->lock);
 

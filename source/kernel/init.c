@@ -33,6 +33,7 @@
 
 #include <mm/heap.h>
 #include <mm/malloc.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 #include <mm/slab.h>
@@ -408,6 +409,8 @@ static __init_text void kmain_bsp_bottom(void) {
 	security_init();
 	time_init();
 	page_init();
+	mmu_init();
+	mmu_init_percpu();
 	heap_init();
 	slab_init();
 	malloc_init();

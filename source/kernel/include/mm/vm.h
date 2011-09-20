@@ -25,7 +25,7 @@
 #include <cpu/cpu.h>
 #include <kernel/vm.h>
 #include <lib/utility.h>
-#include <mm/page.h>
+#include <mm/mmu.h>
 #include <sync/mutex.h>
 #include <object.h>
 
@@ -44,8 +44,8 @@ typedef struct vm_aspace {
 	struct vm_region *find_cache;	/**< Cached pointer to last region searched for. */
 	avl_tree_t tree;		/**< Tree of mapped regions for address lookups. */
 
-	/** Underlying page map for address space. */
-	page_map_t *pmap;
+	/** Underlying MMU context for address space. */
+	mmu_context_t *mmu;
 
 	/** Free region allocation. */
 	list_t free[VM_FREELISTS];	/**< Power of 2 free lists. */

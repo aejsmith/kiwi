@@ -379,6 +379,12 @@ static inline uint64_t x86_rdtsc(void) {
 	return ((uint64_t)high << 32) | low;
 }
 
+/** Invalidate a TLB entry.
+ * @param addr		Address to invalidate. */
+static inline void x86_invlpg(ptr_t addr) {
+	__asm__ volatile("invlpg (%0)" :: "r"(addr));
+}
+
 extern uint64_t calculate_frequency(uint64_t (*func)());
 
 #endif /* __ASM__ */

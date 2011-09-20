@@ -35,6 +35,7 @@
 #define USER_MEMORY_SIZE	0x0000800000000000	/**< User memory size (128TB). */
 #define LIBKERNEL_BASE		0x00007FFFF0000000	/**< Location of kernel library. */
 #define LIBKERNEL_SIZE		0x0000000010000000	/**< Maximum size of kernel library. */
+#define KERNEL_MEMORY_BASE	0xFFFFFF8000000000	/**< Base of kernel memory area. */
 #define KERNEL_PMAP_BASE	0xFFFFFF8000000000	/**< Physical map area base. */
 #define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
 #define KERNEL_PMAP_OFFSET	0x0000000000000000	/**< Physical map area offset. */

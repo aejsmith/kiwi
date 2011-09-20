@@ -33,6 +33,7 @@
 #include <lib/utility.h>
 
 #include <mm/heap.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 
@@ -372,7 +373,7 @@ static void unmap_range(ptr_t start, ptr_t end, bool free, bool shared) {
 	ptr_t i;
 
 	for(i = start; i < end; i += PAGE_SIZE) {
-		if(!page_map_remove(&kernel_page_map, i, shared, &page)) {
+		if(!mmu_context_unmap(&kernel_mmu_context, i, shared, &page)) {
 			fatal("Address %p was not mapped while freeing", i);
 		}
 		if(free) {
@@ -408,7 +409,7 @@ void *heap_alloc(size_t size, int mmflag) {
 		return NULL;
 	}
 
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 
 	/* Back the allocation with anonymous pages. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
@@ -419,7 +420,7 @@ void *heap_alloc(size_t size, int mmflag) {
 		}
 
 		/* Map the page into the kernel address space. */
-		ret = page_map_insert(&kernel_page_map, addr + i, page->addr,
+		ret = mmu_context_map(&kernel_mmu_context, addr + i, page->addr,
 		                      true, true, mmflag & MM_FLAG_MASK);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIxPHYS " to %p (%d)\n",
@@ -431,12 +432,12 @@ void *heap_alloc(size_t size, int mmflag) {
 		dprintf("heap: mapped page 0x%" PRIxPHYS " at %p\n", page->addr, addr + i);
 	}
 
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 	return (void *)addr;
 fail:
 	/* Go back and reverse what we have done. */
 	unmap_range(ret, ret + i, true, true);
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 	heap_raw_free(addr, size);
 	return NULL;
 }
@@ -460,9 +461,9 @@ void heap_free(void *addr, size_t size) {
 	mutex_unlock(&heap_lock);
 
 	/* Unmap pages covering the range. */
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 	unmap_range((ptr_t)addr, (ptr_t)addr + size, true, true);
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 
 	/* Free it. */
 	mutex_lock(&heap_lock);
@@ -495,11 +496,11 @@ void *heap_map_range(phys_ptr_t base, size_t size, int mmflag) {
 		return NULL;
 	}
 
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		if(page_map_insert(&kernel_page_map, ret + i, base + i, true, true,
+		if(mmu_context_map(&kernel_mmu_context, ret + i, base + i, true, true,
 		                   mmflag & MM_FLAG_MASK) != STATUS_SUCCESS) {
 			kprintf(LOG_DEBUG, "heap: failed to map page 0x%" PRIxPHYS " to %p\n", base, ret + i);
 			goto fail;
@@ -508,12 +509,12 @@ void *heap_map_range(phys_ptr_t base, size_t size, int mmflag) {
 		dprintf("heap: mapped page 0x%" PRIxPHYS " at %p\n", base, ret + i);
 	}
 
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
 	unmap_range(ret, ret + i, true, true);
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 	heap_raw_free(ret, size);
 	return NULL;
 }
@@ -542,9 +543,9 @@ void heap_unmap_range(void *addr, size_t size, bool shared) {
 	mutex_unlock(&heap_lock);
 
 	/* Unmap pages covering the range. */
-	page_map_lock(&kernel_page_map);
+	mmu_context_lock(&kernel_mmu_context);
 	unmap_range((ptr_t)addr, (ptr_t)addr + size, false, true);
-	page_map_unlock(&kernel_page_map);
+	mmu_context_unlock(&kernel_mmu_context);
 
 	/* Free it. */
 	mutex_lock(&heap_lock);

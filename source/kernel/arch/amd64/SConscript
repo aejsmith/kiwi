@@ -27,7 +27,7 @@ sources = FeatureSources(config, [
 	'intr.c',
 	'kdbg.c',
 	'lapic.c',
-	'page.c',
+	'mmu.c',
 	'setjmp.S',
 	'signal.c',
 	('SMP', 'smp.c'),

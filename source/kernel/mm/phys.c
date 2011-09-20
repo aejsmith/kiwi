@@ -35,6 +35,14 @@
 #include <assert.h>
 #include <kernel.h>
 
+/** Macro to check if an address range is within the physical map region. */
+#if KERNEL_PMAP_OFFSET > 0
+# define PMAP_CONTAINS(addr, size)	\
+	(addr >= KERNEL_PMAP_OFFSET && (addr + size) <= (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE))
+#else
+# define PMAP_CONTAINS(addr, size)	((addr + size) <= KERNEL_PMAP_SIZE)
+#endif
+
 /** Structure containing a memory type range. */
 typedef struct memory_type_range {
 	phys_ptr_t start;		/**< Start of range. */
@@ -49,6 +57,39 @@ typedef struct memory_type_range {
 static memory_type_range_t memory_types[MEMORY_TYPE_RANGE_MAX];
 static size_t memory_types_count = 0;
 static SPINLOCK_DECLARE(memory_types_lock);
+
+/** Map physical memory into the kernel address space.
+ * @param addr		Physical address to map.
+ * @param size		Size of range to map.
+ * @param mmflag	Allocation flags.
+ * @return		Pointer to mapped data. */
+void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+	if(unlikely(!size)) {
+		return NULL;
+	}
+
+	/* Use the physical map area if the range lies within it. */
+	if(PMAP_CONTAINS(addr, size)) {
+		return (void *)(KERNEL_PMAP_BASE + (addr - KERNEL_PMAP_OFFSET));
+	}
+
+	/* Map to the kernel heap instead. */
+	return heap_map_range(addr, size, mmflag);
+}
+
+/** Unmap memory mapped with phys_map().
+ * @param addr		Address of virtual mapping.
+ * @param size		Size of range.
+ * @param shared	Whether the mapping was used by other CPUs. */
+void phys_unmap(void *addr, size_t size, bool shared) {
+	ptr_t virt = (ptr_t)addr;
+
+	/* If the range lies within the physical map area, don't need to do
+	 * anything. Otherwise, unmap and free from the kernel heap. */
+	if(virt < KERNEL_PMAP_BASE || virt >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
+		heap_unmap_range(addr, size, shared);
+	}
+}
 
 /** Copy the contents of a page.
  * @param dest		Destination page.

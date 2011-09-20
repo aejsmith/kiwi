@@ -334,11 +334,11 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_SLEEP);
 
 	/* Write-protect all mappings on the source region. */
-	page_map_lock(src->as->pmap);
+	mmu_context_lock(src->as->mmu);
 	for(i = src->start; i < src->end; i += PAGE_SIZE) {
-		page_map_protect(src->as->pmap, i, false, src->flags & VM_REGION_EXEC);
+		mmu_context_protect(src->as->mmu, i, false, src->flags & VM_REGION_EXEC);
 	}
-	page_map_unlock(src->as->pmap);
+	mmu_context_unlock(src->as->mmu);
 
 	/* Point all of the pages in the new map to the pages from the source
 	 * map: they will be copied when a write fault occurs on either the
@@ -499,13 +499,13 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		mutex_lock(&region->amap->lock);
 	}
 
-	page_map_lock(region->as->pmap);
+	mmu_context_lock(region->as->mmu);
 
 	for(addr = start; addr < end; addr += PAGE_SIZE) {
 		offset = (offset_t)(addr - region->start);
 
 		/* Unmap the page and release it from its source. */
-		if(page_map_remove(region->as->pmap, addr, true, &phys)) {
+		if(mmu_context_unmap(region->as->mmu, addr, true, &phys)) {
 			vm_region_release_page(region, offset, phys);
 		}
 
@@ -529,7 +529,7 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		}
 	}
 
-	page_map_unlock(region->as->pmap);
+	mmu_context_unlock(region->as->mmu);
 
 	if(region->amap) {
 		mutex_unlock(&region->amap->lock);
@@ -899,7 +899,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			/* Find the page to copy. If handling a protection
 			 * fault, use the existing mapping address. */
 			if(reason == VM_FAULT_PROTECTION) {
-				if(unlikely(!page_map_find(region->as->pmap, addr, &paddr))) {
+				if(unlikely(!mmu_context_query(region->as->mmu, addr, &paddr, NULL, NULL))) {
 					fatal("No mapping for %p, but protection fault on it", addr);
 				}
 			} else {
@@ -964,13 +964,13 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	 * set correctly. If this is a protection fault, remove existing
 	 * mappings. */
 	if(reason == VM_FAULT_PROTECTION) {
-		if(unlikely(!page_map_remove(region->as->pmap, addr, true, NULL))) {
+		if(unlikely(!mmu_context_unmap(region->as->mmu, addr, true, NULL))) {
 			fatal("Could not remove previous mapping for %p", addr);
 		}
 	}
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(region->as->pmap, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
+	mmu_context_map(region->as->mmu, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_SLEEP);
 	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d)\n",
 	        paddr, addr, region->as, write);
 	mutex_unlock(&amap->lock);
@@ -1003,7 +1003,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	/* Check if a mapping already exists. This is possible if two threads
 	 * in a process on different CPUs fault on the same address
 	 * simultaneously. */
-	if(page_map_find(region->as->pmap, addr, &exist)) {
+	if(mmu_context_query(region->as->mmu, addr, &exist, NULL, NULL)) {
 		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIxPHYS", should be %" PRIxPHYS ")",
 			      exist, phys);
@@ -1018,7 +1018,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	exec = region->flags & VM_REGION_EXEC;
 
 	/* Map the entry in. Should always succeed with MM_SLEEP set. */
-	page_map_insert(region->as->pmap, addr, phys, write, exec, MM_SLEEP);
+	mmu_context_map(region->as->mmu, addr, phys, write, exec, MM_SLEEP);
 	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d, exec: %d)\n",
 	        phys, addr, region->as, write, exec);
 	return VM_FAULT_SUCCESS;
@@ -1083,7 +1083,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	}
 
 	/* Lock the page map. */
-	page_map_lock(as->pmap);
+	mmu_context_lock(as->mmu);
 
 	/* Call the anonymous fault handler if there is an anonymous map, else
 	 * use the generic fault handler. */
@@ -1093,7 +1093,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 		ret = vm_generic_fault(region, addr, reason, access);
 	}
 
-	page_map_unlock(as->pmap);
+	mmu_context_unlock(as->mmu);
 	mutex_unlock(&as->lock);
 	return ret;
 }
@@ -1248,7 +1248,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		access = (region->flags & VM_REGION_WRITE) ? VM_FAULT_WRITE : VM_FAULT_READ;
 
 		/* Fault on each page in the region. */
-		page_map_lock(as->pmap);
+		mmu_context_lock(as->mmu);
 		for(i = region->start; i < region->end; i += PAGE_SIZE) {
 			if(region->amap) {
 				ret = vm_anon_fault(region, i, VM_FAULT_NOTPRESENT, access);
@@ -1260,7 +1260,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 				/* The only allowed failure is OOM, in which
 				 * case we have to revert the entire mapping. */
 				if(likely(ret == VM_FAULT_OOM)) {
-					page_map_unlock(as->pmap);
+					mmu_context_unlock(as->mmu);
 					vm_region_insert(as, region->start, region->end, 0);
 					mutex_unlock(&as->lock);
 					return STATUS_NO_MEMORY;
@@ -1269,7 +1269,7 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 				}
 			}
 		}
-		page_map_unlock(as->pmap);
+		mmu_context_unlock(as->mmu);
 	}
 
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
@@ -1331,7 +1331,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 
 		/* Switch to the new address space. */
 		refcount_inc(&as->count);
-		page_map_switch(as->pmap);
+		mmu_context_switch(as->mmu);
 		curr_aspace = as;
 
 		intr_restore(state);
@@ -1346,7 +1346,7 @@ vm_aspace_t *vm_aspace_create(void) {
 	status_t ret;
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	as->pmap = page_map_create(MM_SLEEP);
+	as->mmu = mmu_context_create(MM_SLEEP);
 	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
@@ -1387,7 +1387,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	assert(!(orig->flags & VM_ASPACE_MLOCK));
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
-	as->pmap = page_map_create(MM_SLEEP);
+	as->mmu = mmu_context_create(MM_SLEEP);
 	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
@@ -1415,7 +1415,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 /** Switch away from an address space to the kernel page map. */
 static inline void do_switch_aspace(vm_aspace_t *as) {
 	assert(!curr_proc->aspace);
-	page_map_switch(&kernel_page_map);
+	mmu_context_switch(&kernel_mmu_context);
 	refcount_dec(&as->count);
 	curr_aspace = NULL;
 }
@@ -1481,7 +1481,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	}
 
 	/* Destroy the page map. */
-	page_map_destroy(as->pmap);
+	mmu_context_destroy(as->mmu);
 
 	assert(list_empty(&as->regions));
 	assert(avl_tree_empty(&as->tree));
@@ -1507,7 +1507,7 @@ void __init_text vm_init(void) {
 
 	/* Create the kernel address space. */
 	kernel_aspace = slab_cache_alloc(vm_aspace_cache, MM_FATAL);
-	kernel_aspace->pmap = &kernel_page_map;
+	kernel_aspace->mmu = &kernel_mmu_context;
 	kernel_aspace->flags = VM_ASPACE_MLOCK;
 	kernel_aspace->find_cache = NULL;
 	kernel_aspace->free_map = 0;
