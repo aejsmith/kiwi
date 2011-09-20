@@ -34,13 +34,72 @@ extern uint8_t isr_array[IDT_ENTRY_COUNT][16];
 
 /** Array of GDT descriptors. */
 static gdt_entry_t initial_gdt[GDT_ENTRY_COUNT] __aligned(8) = {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< NULL descriptor. */
-	{ 0xFFFF, 0, 0, 0x9A, 0xF, 0, 1, 0, 1, 0 },	/**< Kernel CS (Code). */
-	{ 0xFFFF, 0, 0, 0x92, 0xF, 0, 0, 0, 1, 0 },	/**< Kernel DS (Data). */
-	{ 0xFFFF, 0, 0, 0xF2, 0xF, 0, 0, 1, 1, 0 },	/**< User DS (Data). */
-	{ 0xFFFF, 0, 0, 0xF8, 0xF, 0, 1, 0, 1, 0 },	/**< User CS (Code). */
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< TSS descriptor - filled in by gdt_init(). */
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		/**< Second part of TSS descriptor. */
+	/** NULL descriptor (0x0). */
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+
+	/** Kernel CS (0x8). */
+	{
+		0xFFFF,			/**< Limit (low). */
+		0,			/**< Base (low). */
+		0x8,			/**< Type (Execute). */
+		1,			/**< S (Code/Data). */
+		0,			/**< DPL (0 - Kernel). */
+		1,			/**< Present. */
+		0xF,			/**< Limit (high). */
+		1,			/**< 64-bit Code. */
+		0,			/**< Special. */
+		1,			/**< Granularity. */
+		0,			/**< Base (high). */
+	},
+
+	/** Kernel DS (0x10). */
+	{
+		0xFFFF,			/**< Limit (low). */
+		0,			/**< Base (low). */
+		0x2,			/**< Type (Read/Write). */
+		1,			/**< S (Code/Data). */
+		0,			/**< DPL (0 - Kernel). */
+		1,			/**< Present. */
+		0xF,			/**< Limit (high). */
+		0,			/**< Ignored. */
+		0,			/**< Special. */
+		1,			/**< Granularity. */
+		0,			/**< Base (high). */
+	},
+
+	/** User DS (0x18). */
+	{
+		0xFFFF,			/**< Limit (low). */
+		0,			/**< Base (low). */
+		0x2,			/**< Type (Read/Write). */
+		1,			/**< S (Code/Data). */
+		3,			/**< DPL (3 - User). */
+		1,			/**< Present. */
+		0xF,			/**< Limit (high). */
+		0,			/**< Ignored. */
+		0,			/**< Special. */
+		1,			/**< Granularity. */
+		0,			/**< Base (high). */
+	},
+
+	/** User CS (0x20). */
+	{
+		0xFFFF,			/**< Limit (low). */
+		0,			/**< Base (low). */
+		0x8,			/**< Type (Execute). */
+		1,			/**< S (Code/Data). */
+		3,			/**< DPL (3 - User). */
+		1,			/**< Present. */
+		0xF,			/**< Limit (high). */
+		1,			/**< 64-bit Code. */
+		0,			/**< Special. */
+		1,			/**< Granularity. */
+		0,			/**< Base (high). */
+	},
+
+	/** TSS descriptor - filled in by gdt_init(). */
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
 /** Array of IDT entries. */
@@ -59,11 +118,10 @@ static __init_text void gdt_init(cpu_t *cpu) {
 	/* Set up the TSS descriptor. */
 	base = (ptr_t)&cpu->arch.tss;
 	size = sizeof(tss_t);
-	desc = (gdt_tss_entry_t *)&cpu->arch.gdt[SEGMENT_TSS / 0x08];
-	desc->base0 = base & 0xffff;
-	desc->base1 = ((base) >> 16) & 0xff;
-	desc->base2 = ((base) >> 24) & 0xff;
-	desc->base3 = ((base) >> 32);
+	desc = (gdt_tss_entry_t *)&cpu->arch.gdt[KERNEL_TSS / 0x08];
+	desc->base0 = base & 0xffffff;
+	desc->base1 = ((base) >> 24) & 0xff;
+	desc->base2 = ((base) >> 32);
 	desc->limit0 = size & 0xffff;
 	desc->limit1 = (size >> 16) & 0xf;
 	desc->present = 1;
@@ -84,7 +142,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 		"mov	%2, %%es\n"
 		"mov	%2, %%fs\n"
 		"mov	%2, %%gs\n"
-		:: "i"(SEGMENT_K_CS), "r"(SEGMENT_K_DS), "r"(0)
+		:: "i"(KERNEL_CS), "r"(KERNEL_DS), "r"(0)
 	);
 
 	/* Although once the thread system is up the GS base is pointed at the
@@ -106,7 +164,7 @@ static __init_text void tss_init(cpu_t *cpu) {
 	cpu->arch.tss.io_bitmap = 104;
 
 	/* Load the TSS segment into TR. */
-	ltr(SEGMENT_TSS);
+	ltr(KERNEL_TSS);
 }
 
 /** Initialise descriptor tables for the current CPU.
@@ -133,7 +191,7 @@ __init_text void idt_init(void) {
 		kernel_idt[i].base2 = ((addr >> 32) & 0xFFFFFFFF);
 		kernel_idt[i].ist = 0;
 		kernel_idt[i].reserved = 0;
-		kernel_idt[i].sel = SEGMENT_K_CS;
+		kernel_idt[i].sel = KERNEL_CS;
 		kernel_idt[i].unused = 0;
 		kernel_idt[i].flags = 0x8E;
 	}

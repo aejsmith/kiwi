@@ -174,14 +174,14 @@ FUNCTION_START(syscall_entry)
 
 	/* Get back the userspace stack pointer from the temporary scratch
 	 * space and put it onto the kernel stack. */
-	push	$(SEGMENT_U_DS | 3)
+	push	$(USER_DS | 3)
 	push	%gs:ARCH_THREAD_OFF_USER_RSP
 
 	/* We now have a stack pointer set up, push information SYSCALL saved
 	 * for us (R11 = original RFLAGS, RCX = return IP) and the rest of the
 	 * interrupt frame. */
 	push	%r11
-	push	$(SEGMENT_U_CS | 3)
+	push	$(USER_CS | 3)
 	push	%rcx
 	push	$0
 	push	$0
@@ -302,10 +302,10 @@ FUNCTION_START(amd64_enter_userspace)
 	 *  - RFLAGS.
 	 *  - CS.
 	 *  - RIP. */
-	push	$(SEGMENT_U_DS | 0x03)
+	push	$(USER_DS | 0x03)
 	push	%rsi
 	push	$(X86_FLAGS_IF | X86_FLAGS_ALWAYS1)
-	push	$(SEGMENT_U_CS | 0x03)
+	push	$(USER_CS | 0x03)
 	push	%rdi
 
 	/* Move argument to RDI. */

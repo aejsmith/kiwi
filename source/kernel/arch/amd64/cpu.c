@@ -235,18 +235,18 @@ static __init_text void syscall_init(void) {
 	/* Set system call entry address. */
 	lstar = (uint64_t)syscall_entry;
 
-	/* Set segments for entry and returning. In 64-bit mode things happen
-	 * as follows upon entry:
+	/* Set segments for entry and returning. The following happens upon
+	 * entry to kernel-mode:
 	 *  - CS is set to the value in IA32_STAR[47:32].
 	 *  - SS is set to the value in IA32_STAR[47:32] + 8.
-	 * Upon return to 64-bit mode, the following happens:
+	 * Upon return to user mode, the following happens:
 	 *  - CS is set to (the value in IA32_STAR[63:48] + 16).
 	 *  - SS is set to (the value in IA32_STAR[63:48] + 8).
 	 * Weird. This means that we have to have a specific GDT order to
 	 * make things work. We set the SYSRET values below to the kernel DS,
 	 * so that we get the correct segment (kernel DS + 16 = user CS, and
 	 * kernel DS + 8 = user DS). */
-	star = ((uint64_t)(SEGMENT_K_DS | 0x03) << 48) | ((uint64_t)SEGMENT_K_CS << 32);
+	star = ((uint64_t)(KERNEL_DS | 0x03) << 48) | ((uint64_t)KERNEL_CS << 32);
 
 	/* Set System Call Enable (SCE) in EFER and write everything out. */
 	x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_SCE);

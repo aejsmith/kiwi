@@ -22,13 +22,17 @@
 #ifndef __X86_DESCRIPTOR_H
 #define __X86_DESCRIPTOR_H
 
+/** Descriptor table sizes. */
 #define GDT_ENTRY_COUNT		7	/**< Total number of GDT entries. */
 #define IDT_ENTRY_COUNT		256	/**< Total number of IDT entries. */
-#define SEGMENT_K_CS		0x08	/**< Kernel code segment. */
-#define SEGMENT_K_DS		0x10	/**< Kernel data segment. */
-#define SEGMENT_U_DS		0x18	/**< User data segment. */
-#define SEGMENT_U_CS		0x20	/**< User code segment. */
-#define SEGMENT_TSS		0x28	/**< TSS segment (takes up 2 entries). */
+
+/** Segment definitions.
+ * @note		The ordering of these is important to SYSCALL/SYSRET. */
+#define KERNEL_CS		0x08	/**< Kernel code segment. */
+#define KERNEL_DS		0x10	/**< Kernel data segment. */
+#define USER_DS			0x18	/**< User data segment. */
+#define USER_CS			0x20	/**< User code segment. */
+#define KERNEL_TSS		0x28	/**< TSS segment (takes up 2 GDT entries). */
 
 #ifndef __ASM__
 
@@ -70,22 +74,23 @@ typedef struct tss {
 /** Structure of a GDT descriptor. */
 typedef struct gdt_entry {
 	unsigned limit0 : 16;		/**< Low part of limit. */
-	unsigned base0 : 16;		/**< Low part of base. */
-	unsigned base1 : 8;		/**< Middle part of base. */
-	unsigned access : 8;		/**< Access flags. */
+	unsigned base0 : 24;		/**< Low part of base. */
+	unsigned type : 4;		/**< Type flag. */
+	unsigned s : 1;			/**< S (descriptor type) flag. */
+	unsigned dpl : 2;		/**< Descriptor privilege level. */
+	unsigned present : 1;		/**< Present. */
 	unsigned limit1 : 4;		/**< High part of limit. */
-	unsigned available : 1;		/**< Spare bit. */
+	unsigned : 1;			/**< Spare bit. */
 	unsigned longmode : 1;		/**< 64-bit code segment. */
 	unsigned special : 1;		/**< Special. */
 	unsigned granularity : 1;	/**< Granularity. */
-	unsigned base2 : 8;		/**< High part of base. */
+	unsigned base1 : 8;		/**< High part of base. */
 } __packed gdt_entry_t;
 
 /** Structure of a TSS GDT entry. */
 typedef struct gdt_tss_entry {
 	unsigned limit0 : 16;		/**< Low part of limit. */
-	unsigned base0 : 16;		/**< Part 1 of base. */
-	unsigned base1 : 8;		/**< Part 2 of base. */
+	unsigned base0 : 24;		/**< Part 1 of base. */
 	unsigned type : 4;		/**< Type flag. */
 	unsigned : 1;			/**< Unused. */
 	unsigned dpl : 2;		/**< Descriptor privilege level. */
@@ -94,8 +99,8 @@ typedef struct gdt_tss_entry {
 	unsigned available : 1;		/**< Spare bit. */
 	unsigned : 2;			/**< Unused. */
 	unsigned granularity : 1;	/**< Granularity. */
-	unsigned base2 : 8;		/**< Part 3 of base. */
-	unsigned base3 : 32;		/**< Part 4 of base. */
+	unsigned base1 : 8;		/**< Part 2 of base. */
+	unsigned base2 : 32;		/**< Part 3 of base. */
 	unsigned : 32;			/**< Unused. */
 } __packed gdt_tss_entry_t;
 
