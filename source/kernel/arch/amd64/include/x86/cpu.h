@@ -371,14 +371,6 @@ static inline void x86_cpuid(uint32_t level, uint32_t *a, uint32_t *b, uint32_t 
 	__asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "0"(level));
 }
 
-/** Read the Time Stamp Counter.
- * @return		Value of the TSC. */
-static inline uint64_t x86_rdtsc(void) {
-	uint32_t high, low;
-	__asm__ volatile("rdtsc" : "=a"(low), "=d"(high));
-	return ((uint64_t)high << 32) | low;
-}
-
 /** Invalidate a TLB entry.
  * @param addr		Address to invalidate. */
 static inline void x86_invlpg(ptr_t addr) {

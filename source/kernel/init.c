@@ -405,9 +405,10 @@ static __init_text void kmain_bsp_bottom(void) {
 	cpu_early_init();
 	cpu_early_init_percpu(&boot_cpu);
 
-	/* Initialise kernel memory management subsystems. */
+	/* Initialise the security subsystem. */
 	security_init();
-	time_init();
+
+	/* Initialise kernel memory management subsystems. */
 	page_init();
 	mmu_init();
 	mmu_init_percpu();
@@ -425,6 +426,9 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Initialise the platform. */
 	platform_init();
+
+	/* Get the time from the hardware. */
+	time_init();
 
 #if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */

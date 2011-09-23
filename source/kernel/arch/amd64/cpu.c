@@ -27,6 +27,7 @@
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
 #include <x86/lapic.h>
+#include <x86/tsc.h>
 
 #include <cpu/cpu.h>
 
@@ -332,6 +333,9 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 
 	/* Set up SYSCALL/SYSRET MSRs. */
 	syscall_init();
+
+	/* Configure the TSC offset for system_time(). */
+	tsc_init();
 }
 
 /** Perform additional initialisation of the current CPU. */

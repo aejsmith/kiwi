@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,23 +20,28 @@
  */
 
 #include <x86/cpu.h>
-#include <cpu/cpu.h>
-#include <time.h>
+#include <x86/tsc.h>
 
-/** Value of TSC when time_arch_init() was called. */
-static uint64_t boot_time_offset = 0;
+#include <cpu/cpu.h>
+
+#include <time.h>
 
 /** Get the system time (number of microseconds since boot).
  * @return		Number of microseconds since system was booted. */
 useconds_t system_time(void) {
-	return (useconds_t)((x86_rdtsc() - boot_time_offset) / curr_cpu->arch.cycles_per_us);
+	return (useconds_t)((x86_rdtsc() - curr_cpu->arch.system_time_offset) / curr_cpu->arch.cycles_per_us);
 }
 
 /** Set up the boot time offset. */
-void __init_text time_arch_init(void) {
-	/* Initialise the boot time offset. In system_time() this value is
-	 * subtracted from the value returned from TSC. This is necessary
-	 * because although the bootloader set the TSC to 0, QEMU (and
-	 * possibly some other things) don't support writing the TSC. */
-	boot_time_offset = x86_rdtsc();
+__init_text void tsc_init(void) {
+	/* Calculate the offset to subtract from the TSC when calculating the
+	 * system time. For the boot CPU, this is the current value of the TSC,
+	 * so the system time at this point is 0. For other CPUs, we need to
+	 * synchronise against the boot CPU so system_time() reads the same
+	 * value on all CPUs. */
+	//if(curr_cpu == &boot_cpu) {
+		curr_cpu->arch.system_time_offset = x86_rdtsc();
+	//} else {
+		// TODO
+	//}
 }

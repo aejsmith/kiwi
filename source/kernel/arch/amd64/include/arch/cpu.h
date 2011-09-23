@@ -38,6 +38,7 @@ typedef struct arch_cpu {
 	/** Time conversion factors. */
 	uint64_t cycles_per_us;			/**< CPU cycles per µs. */
 	uint64_t lapic_timer_cv;		/**< LAPIC timer conversion factor. */
+	int64_t system_time_offset;		/**< Value to subtract from TSC value for system_time(). */
 
 	/** Per-CPU CPU structures. */
 	gdt_entry_t gdt[GDT_ENTRY_COUNT];	/**< Array of GDT descriptors. */
