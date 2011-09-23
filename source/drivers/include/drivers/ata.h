@@ -26,7 +26,7 @@
 # error "This header is for kernel/driver use only"
 #endif
 
-#include <cpu/intr.h>
+#include <device/irq.h>
 
 #include <io/device.h>
 
@@ -270,6 +270,6 @@ extern ata_channel_t *ata_channel_add(device_t *parent, const char *name, ata_ch
                                       bool pio, bool dma, size_t max_dma_bpt,
                                       phys_ptr_t max_dma_addr);
 extern void ata_channel_scan(ata_channel_t *channel);
-extern irq_result_t ata_channel_interrupt(ata_channel_t *channel);
+extern irq_status_t ata_channel_interrupt(ata_channel_t *channel);
 
 #endif /* __DRIVERS_ATA_H */

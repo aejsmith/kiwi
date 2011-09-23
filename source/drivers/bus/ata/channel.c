@@ -446,7 +446,7 @@ MODULE_EXPORT(ata_channel_scan);
  * @note		Safe to call from IRQ context.
  * @param channel	Channel that the interrupt occurred on.
  * @return		IRQ result code. */
-irq_result_t ata_channel_interrupt(ata_channel_t *channel) {
+irq_status_t ata_channel_interrupt(ata_channel_t *channel) {
 	if(mutex_held(&channel->lock)) {
 		semaphore_up(&channel->irq_sem, 1);
 		return IRQ_HANDLED;

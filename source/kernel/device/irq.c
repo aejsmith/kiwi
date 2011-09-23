@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,11 +19,13 @@
  * @brief		Hardware interrupt handling code.
  */
 
-#include <cpu/intr.h>
+#include <device/irq.h>
 
 #include <lib/string.h>
 
 #include <mm/malloc.h>
+
+#include <platform/irq.h>
 
 #include <proc/thread.h>
 
@@ -53,11 +55,11 @@ typedef struct irq {
 	list_t handlers;		/**< List of handler structures. */
 } irq_t;
 
+/** IRQ controller being used. */
+static irq_controller_t *irq_controller;
+
 /** Array of IRQ structures. */
 static irq_t irq_table[IRQ_COUNT];
-
-/** IRQ handling operations provided by architecture/platform. */
-irq_ops_t *irq_ops;
 
 /** IRQ handler thread main loop.
  * @param _handler	Pointer to handler structure.
@@ -81,7 +83,8 @@ static void irq_thread(void *_handler, void *arg2) {
 	}
 }
 
-/** Registers an IRQ handler.
+/**
+ * Registers an IRQ handler.
  *
  * Registers a handler for an IRQ. The new handler will be appended to the
  * list of IRQ handlers (IRQ handlers are called in the order they are
@@ -98,7 +101,7 @@ static void irq_thread(void *_handler, void *arg2) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
+status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data) {
 	irq_handler_t *handler, *exist;
 	char name[THREAD_NAME_MAX];
 	status_t ret;
@@ -147,8 +150,8 @@ status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *d
 	list_append(&irq_table[num].handlers, &handler->header);
 
 	/* Enable it if the list was empty before. */
-	if(enable && irq_ops->enable) {
-		irq_ops->enable(num);
+	if(enable && irq_controller->enable) {
+		irq_controller->enable(num);
 	}
 
 	spinlock_unlock(&irq_table[num].lock);
@@ -157,10 +160,12 @@ status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *d
 	if(handler->thread) {
 		thread_run(handler->thread);
 	}
+
 	return STATUS_SUCCESS;
 }
 
-/** Removes an IRQ handler.
+/**
+ * Removes an IRQ handler.
  *
  * Removes a previously added handler for an IRQ. This function must be given
  * the handler functions/data argument the handler was originally registered
@@ -173,7 +178,7 @@ status_t irq_register(unative_t num, irq_top_t top, irq_bottom_t bottom, void *d
  *
  * @return		Status code describing result of the operation.
  */
-status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void *data) {
+status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *data) {
 	irq_handler_t *handler;
 
 	if(num >= IRQ_COUNT) {
@@ -192,8 +197,8 @@ status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void 
 		list_remove(&handler->header);
 
 		/* Disable if list now empty. */
-		if(list_empty(&irq_table[num].handlers) && irq_ops->disable) {
-			irq_ops->disable(num);
+		if(list_empty(&irq_table[num].handlers) && irq_controller->disable) {
+			irq_controller->disable(num);
 		}
 
 		spinlock_unlock(&irq_table[num].lock);
@@ -215,46 +220,47 @@ status_t irq_unregister(unative_t num, irq_top_t top, irq_bottom_t bottom, void 
 }
 
 /** Hardware interrupt handler.
- * @param num		CPU interrupt number.
- * @param frame		Interrupt stack frame. */
-void irq_handler(unative_t num, intr_frame_t *frame) {
+ * @param num		IRQ number. */
+void irq_handler(unsigned num) {
 	irq_handler_t *handler;
-	irq_result_t ret;
-	bool level;
+	irq_status_t ret;
+	irq_mode_t mode;
 
-	assert(irq_ops);
-	assert(irq_ops->mode);
-
-	/* Work out the IRQ number. */
-	num -= IRQ_BASE;
+	assert(irq_controller);
 	assert(num < IRQ_COUNT);
 
 	/* Execute any pre-handling function. */
-	if(irq_ops->pre_handle && !irq_ops->pre_handle(num, frame)) {
+	if(irq_controller->pre_handle && !irq_controller->pre_handle(num)) {
 		return;
 	}
 
 	/* Get the trigger mode. */
-	level = irq_ops->mode(num, frame);
+	mode = irq_controller->mode(num);
 
 	/* First see if any handlers with top-half functions take the IRQ. */
 	LIST_FOREACH_SAFE(&irq_table[num].handlers, iter) {
 		handler = list_entry(iter, irq_handler_t, header);
 
 		if(handler->top) {
-			ret = handler->top(num, handler->data, frame);
-			if(ret == IRQ_PREEMPT) {
+			ret = handler->top(num, handler->data);
+			switch(ret) {
+			case IRQ_PREEMPT:
 				curr_cpu->should_preempt = true;
-			} else if(ret == IRQ_RUN_THREAD) {
+				break;
+			case IRQ_RUN_THREAD:
 				assert(handler->thread);
+
 				semaphore_up(&handler->sem, 1);
 				curr_cpu->should_preempt = true;
+				break;
+			default:
+				break;
 			}
 
 			/* For edge-triggered interrupts we must invoke all
 			 * handlers, because multiple interrupt pulses can be
 			 * merged if they occur close together. */
-			if(level && ret != IRQ_UNHANDLED) {
+			if(mode == IRQ_MODE_LEVEL && ret != IRQ_UNHANDLED) {
 				goto out;
 			}
 		}
@@ -267,23 +273,31 @@ void irq_handler(unative_t num, intr_frame_t *frame) {
 
 		if(!handler->top) {
 			assert(handler->thread);
+
 			semaphore_up(&handler->sem, 1);
 			curr_cpu->should_preempt = true;
 		}
 	}
 out:
 	/* Perform post-handling actions. */
-	if(irq_ops->post_handle) {
-		irq_ops->post_handle(num, frame);
+	if(irq_controller->post_handle) {
+		irq_controller->post_handle(num);
 	}
 }
 
-/** Initialise the IRQ handling system. */
-void __init_text irq_init(void) {
+/** Initialise the IRQ handling system.
+ * @param ctrlr		IRQ controller to use. */
+__init_text void irq_init(irq_controller_t *ctrlr) {
 	size_t i;
 
+	assert(ctrlr->mode);
+
+	/* Initialise the IRQ table. */
 	for(i = 0; i < IRQ_COUNT; i++) {
 		spinlock_init(&irq_table[i].lock, "irq_lock");
 		list_init(&irq_table[i].handlers);
 	}
+
+	/* Set the controller. */
+	irq_controller = ctrlr;
 }

@@ -26,6 +26,8 @@
 
 #include <cpu/intr.h>
 
+#include <device/irq.h>
+
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -72,6 +74,13 @@ static void unhandled_interrupt(unative_t num, intr_frame_t *frame) {
 	} else {
 		_fatal(frame, "Received unknown interrupt %" PRIuN, num);
 	}
+}
+
+/** Hardware interrupt wrapper.
+ * @param num		CPU interrupt number.
+ * @param frame		Interrupt stack frame. */
+static void hardware_interrupt(unative_t num, intr_frame_t *frame) {
+	irq_handler(num - 32);
 }
 
 /** Kernel-mode exception handler.
@@ -365,7 +374,7 @@ void intr_init(void) {
 		intr_handlers[i] = except_handler;
 	}
 	for(i = 32; i < 48; i++) {
-		intr_handlers[i] = irq_handler;
+		intr_handlers[i] = hardware_interrupt;
 	}
 	for(i = 48; i < ARRAYSZ(intr_handlers); i++) {
 		intr_handlers[i] = unhandled_interrupt;
@@ -381,7 +390,4 @@ void intr_init(void) {
 	intr_handlers[X86_EXCEPT_PF]  = page_fault;
 	intr_handlers[X86_EXCEPT_MF]  = mf_fault;
 	intr_handlers[X86_EXCEPT_XM]  = xm_fault;
-
-	/* Set up the arch-independent IRQ subsystem. */
-	irq_init();
 }

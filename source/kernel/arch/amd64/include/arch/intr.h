@@ -42,10 +42,6 @@
 #define X86_EXCEPT_MC		18	/**< Machine Check. */
 #define X86_EXCEPT_XM		19	/**< SIMD Floating-Point. */
 
-/** Various definitions. */
-#define IRQ_COUNT		16	/**< Total number of IRQs. */
-#define IRQ_BASE		32	/**< IRQ number base. */
-
 /** Interrupt frame structure offsets. */
 #define IFRAME_OFF_R15		0x0
 #define IFRAME_OFF_R14		0x8

@@ -25,8 +25,6 @@
 
 #include <arch/io.h>
 
-#include <cpu/intr.h>
-
 #include <drivers/ata.h>
 #include <drivers/pci.h>
 
@@ -238,9 +236,8 @@ static ata_sff_channel_ops_t pci_ata_channel_ops = {
 /** Handler for a PCI ATA IRQ.
  * @param num		IRQ number.
  * @param _channel	Pointer to channel structure.
- * @param frame		Interrupt frame (unused).
  * @return		Whether the IRQ was handled. */
-static irq_result_t pci_ata_irq_handler(unative_t num, void *_channel, intr_frame_t *frame) {
+static irq_status_t pci_ata_irq_handler(unsigned num, void *_channel) {
 	pci_ata_channel_t *data = _channel;
 	uint8_t status;
 

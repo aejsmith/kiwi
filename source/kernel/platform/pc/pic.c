@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,12 +21,12 @@
 
 #include <arch/io.h>
 
+#include <device/irq.h>
+
 #include <pc/pic.h>
 
-#include <cpu/intr.h>
-
+#include <assert.h>
 #include <console.h>
-#include <kdbg.h>
 #include <kernel.h>
 
 /** IRQ masks - disable all by default, apart from IRQ2 (cascade). */
@@ -38,7 +38,7 @@ static uint16_t pic_level_triggered = 0;
 
 /** Acknowledge a PIC interrupt.
  * @param num		IRQ number. */
-static void pic_eoi(unative_t num) {
+static void pic_eoi(unsigned num) {
 	if(num >= 8) {
 		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
 	}
@@ -49,54 +49,59 @@ static void pic_eoi(unative_t num) {
 
 /** Pre-handling function.
  * @param num		IRQ number.
- * @param frame		Interrupt stack frame.
  * @return		True if IRQ should be handled. */
-static bool pic_pre_handle(unative_t num, intr_frame_t *frame) {
+static bool pic_pre_handle(unsigned num) {
+	assert(num < 16);
+
 	/* Check for spurious IRQs. */
 	if(num == 7) {
 		/* Read the In-Service Register, check the high bit. */
 		out8(0x23, 3);
 		if((in8(0x20) & 0x80) == 0) {
-			kprintf(LOG_DEBUG, "intr: spurious IRQ7 (master), ignoring...\n");
+			kprintf(LOG_DEBUG, "pic: spurious IRQ7 (master), ignoring...\n");
 			return false;
 		}
 	} else if(num == 15) {
 		/* Read the In-Service Register, check the high bit. */
 		out8(0xA3, 3);
 		if((in8(0xA0) & 0x80) == 0) {
-			kprintf(LOG_DEBUG, "intr: spurious IRQ15 (slave), ignoring...\n");
+			kprintf(LOG_DEBUG, "pic: spurious IRQ15 (slave), ignoring...\n");
 			return false;
 		}
 	}
 
-	if(!(pic_level_triggered & (1<<num))) {
+	/* Edge-triggered interrupts must be acked before we handle. */
+	if(!(pic_level_triggered & (1 << num))) {
 		pic_eoi(num);
 	}
+
 	return true;
 }
 
 /** Post-handling function.
- * @param num		IRQ number.
- * @param frame		Interrupt stack frame. */
-static void pic_post_handle(unative_t num, intr_frame_t *frame) {
-	if(pic_level_triggered & (1<<num)) {
+ * @param num		IRQ number. */
+static void pic_post_handle(unsigned num) {
+	/* Level-triggered interrupts must be acked once all handlers have been
+	 * run. */
+	if(pic_level_triggered & (1 << num)) {
 		pic_eoi(num);
 	}
 }
 
-/** Trigger mode function.
+/** Get the trigger mode of an IRQ.
  * @param num		IRQ number.
- * @param frame		Interrupt stack frame.
- * @return		True if level-triggered, false if edge-triggered. */
-static bool pic_mode(unative_t num, intr_frame_t *frame) {
-	return (pic_level_triggered & (1<<num));
+ * @return		Trigger mode of the IRQ. */
+static irq_mode_t pic_mode(unsigned num) {
+	return (pic_level_triggered & (1 << num));
 }
 
-/** IRQ enable function.
+/** Enable an IRQ.
  * @param num		IRQ to enable. */
-static void pic_enable(unative_t num) {
+static void pic_enable(unsigned num) {
+	assert(num < 16);
+
 	if(num >= 8) {
-		pic_mask_slave &= ~(1<<(num - 8));
+		pic_mask_slave &= ~(1 << (num - 8));
 		out8(PIC_SLAVE_DATA, pic_mask_slave);
 	} else {
 		pic_mask_master &= ~(1<<num);
@@ -104,9 +109,11 @@ static void pic_enable(unative_t num) {
 	}
 }
 
-/** IRQ disable function.
+/** Disable an IRQ.
  * @param num		IRQ to disable. */
-static void pic_disable(unative_t num) {
+static void pic_disable(unsigned num) {
+	assert(num < 16);
+
 	if(num >= 8) {
 		pic_mask_slave |= (1<<(num - 8));
 		out8(PIC_SLAVE_DATA, pic_mask_slave);
@@ -117,7 +124,7 @@ static void pic_disable(unative_t num) {
 }
 
 /** PIC IRQ operations. */
-static irq_ops_t pic_irq_ops = {
+static irq_controller_t pic_irq_controller = {
 	.pre_handle = pic_pre_handle,
 	.post_handle = pic_post_handle,
 	.mode = pic_mode,
@@ -126,14 +133,14 @@ static irq_ops_t pic_irq_ops = {
 };
 
 /** Initialise the PIC. */
-void __init_text pic_init(void) {
+__init_text void pic_init(void) {
 	/* Send an initialisation command to both PICs (ICW1). */
 	out8(PIC_MASTER_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 	out8(PIC_SLAVE_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 
 	/* Set the interrupt vectors to use (ICW2). */
-	out8(PIC_MASTER_DATA, IRQ_BASE);
-	out8(PIC_SLAVE_DATA, IRQ_BASE + 8);
+	out8(PIC_MASTER_DATA, 32);
+	out8(PIC_SLAVE_DATA, 32 + 8);
 
 	/* Set how the PICs are connected to each other (ICW3). */
 	out8(PIC_MASTER_DATA, 0x04);
@@ -143,13 +150,13 @@ void __init_text pic_init(void) {
 	out8(PIC_MASTER_DATA, PIC_ICW4_8086);
 	out8(PIC_SLAVE_DATA, PIC_ICW4_8086);
 
-	/* Set IRQ masks. */
+	/* Set initial IRQ masks. */
 	out8(PIC_MASTER_DATA, pic_mask_master);
 	out8(PIC_SLAVE_DATA, pic_mask_slave);
 
 	/* Get the trigger modes. */
 	pic_level_triggered = (in8(PIC_SLAVE_ELCR) << 8) | in8(PIC_MASTER_ELCR);
 
-	/* Set the IRQ operations structure. */
-	irq_ops = &pic_irq_ops;
+	/* Initialise the IRQ handling system. */
+	irq_init(&pic_irq_controller);
 }

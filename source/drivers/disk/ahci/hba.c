@@ -19,8 +19,6 @@
  * @brief		AHCI HBA functions.
  */
 
-#include <cpu/intr.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -38,9 +36,8 @@ static atomic_t next_hba_id = 0;
 /** AHCI IRQ handler.
  * @param num		IRQ number.
  * @param _hba		Pointer to HBA structure.
- * @param frame		Interrupt frame (unused).
  * @return		Whether the IRQ was handled. */
-static irq_result_t ahci_irq_handler(unative_t num, void *_hba, intr_frame_t *frame) {
+static irq_status_t ahci_irq_handler(unsigned num, void *_hba) {
 	ahci_hba_t *hba = _hba;
 	bool handled = false;
 	uint32_t pending;

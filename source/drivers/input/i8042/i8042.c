@@ -29,7 +29,7 @@
 
 #include <arch/io.h>
 
-#include <cpu/intr.h>
+#include <device/irq.h>
 
 #include <drivers/input.h>
 
@@ -105,9 +105,8 @@ static void i8042_command_write(uint8_t cmd) {
 /** IRQ handler for i8042 keyboard.
  * @param num		IRQ number.
  * @param _device	Device pointer.
- * @param frame		Interrupt stack frame.
  * @return		IRQ status code. */
-static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_t *frame) {
+static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 	device_t *device = _device;
 	uint8_t code, type;
 	int32_t value;
@@ -124,7 +123,7 @@ static irq_result_t i8042_keyboard_irq(unative_t num, void *_device, intr_frame_
 	switch(code) {
 	case 59:
 		/* F1 - Enter KDBG. */
-		kdbg_enter(KDBG_ENTRY_USER, frame);
+		kdbg_enter(KDBG_ENTRY_USER, NULL);
 		break;
 	case 60:
 		/* F2 - Call fatal(). */
@@ -195,9 +194,8 @@ static void i8042_mouse_command(uint8_t cmd) {
 /** IRQ handler for i8042 mouse.
  * @param num		IRQ number.
  * @param _device	Device pointer.
- * @param frame		Interrupt stack frame.
  * @return		IRQ status code. */
-static irq_result_t i8042_mouse_irq(unative_t num, void *_device, intr_frame_t *frame) {
+static irq_status_t i8042_mouse_irq(unsigned num, void *_device) {
 	device_t *device = _device;
 	uint8_t new_state = 0;
 	int i, dx, dy;

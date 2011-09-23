@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,16 +20,15 @@
  */
 
 #include <arch/io.h>
-#include <cpu/intr.h>
+#include <device/irq.h>
 #include <pc/pit.h>
 #include <time.h>
 
 /** Handle a PIT tick.
  * @param num		IRQ number.
  * @param data		Data associated with IRQ (unused).
- * @param frame		Interrupt stack frame.
  * @return		IRQ status code. */
-static irq_result_t pit_handler(unative_t num, void *data, intr_frame_t *frame) {
+static irq_status_t pit_handler(unsigned num, void *data) {
 	return (timer_tick()) ? IRQ_PREEMPT : IRQ_HANDLED;
 }
 
