@@ -363,7 +363,7 @@ void heap_raw_free(ptr_t addr, size_t size) {
 }
 
 /** Unmap a range on the kernel heap.
- * @note		Kernel page map should be locked.
+ * @note		Kernel MMU context should be locked.
  * @param start		Start of range.
  * @param end		End of range.
  * @param free		Whether to free the pages.

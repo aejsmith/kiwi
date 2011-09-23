@@ -42,7 +42,7 @@ extern unsigned char copyright_ppm[];
 
 /** Width and height of the console font. */
 #define FONT_WIDTH		6
-#define FONT_HEIGHT		11
+#define FONT_HEIGHT		12
 
 /** Colour and size of the splash progress bar. */
 #define SPLASH_PROGRESS_FG	0x78cc00
@@ -198,7 +198,7 @@ static void fb_console_draw_ppm(unsigned char *ppm, uint16_t x, uint16_t y) {
  * @param width		Width of rectangle.
  * @param height	Height of rectangle. */
 static void fb_console_fillrect(uint32_t colour, uint16_t x, uint16_t y,
-                                 uint16_t width, uint16_t height) {
+                                uint16_t width, uint16_t height) {
 	uint16_t i, j;
 
 	for(i = 0; i < height; i++) {

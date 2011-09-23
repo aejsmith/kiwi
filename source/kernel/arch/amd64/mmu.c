@@ -264,7 +264,7 @@ static status_t tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unativ
 		/* If the number of pages to invalidate is larger than the size
 		 * of the address array, perform a complete TLB flush. */
 		if(ctx->invalidate_count > INVALIDATE_ARRAY_SIZE) {
-			/* For the kernel page map, we must disable PGE and
+			/* For the kernel context, we must disable PGE and
 			 * reenable it to perform a complete TLB flush. */
 			if(IS_KERNEL_CTX(ctx)) {
 				x86_write_cr4(x86_read_cr4() & ~X86_CR4_PGE);
@@ -293,7 +293,7 @@ static void mmu_context_flush(mmu_context_t *ctx) {
 		return;
 	}
 
-	/* If this is the kernel page map, perform changes on all other CPUs,
+	/* If this is the kernel context, perform changes on all other CPUs,
 	 * else perform it on each CPU using the map. */
 	if(IS_KERNEL_CTX(ctx)) {
 		ipi_broadcast(tlb_invalidate_ipi, (unative_t)ctx, 0, 0, 0, IPI_SEND_SYNC);

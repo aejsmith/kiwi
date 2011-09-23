@@ -1082,7 +1082,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 		return VM_FAULT_NOREGION;
 	}
 
-	/* Lock the page map. */
+	/* Lock the MMU context. */
 	mmu_context_lock(as->mmu);
 
 	/* Call the anonymous fault handler if there is an anonymous map, else
@@ -1316,10 +1316,10 @@ status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
 void vm_aspace_switch(vm_aspace_t *as) {
 	bool state;
 
-	/* The kernel process does not have an address space. When switching to
-	 * one of its threads, it is not necessary to switch to the kernel
-	 * page map, as all mappings in the kernel page map are visible in all
-	 * address spaces. Kernel threads should never touch the userspace
+	/* The kernel process does not have an address space. When switching
+	 * to one of its threads, it is not necessary to switch to the kernel
+	 * MMU context, as all mappings in the kernel context are visible in
+	 * all address spaces. Kernel threads should never touch the userspace
 	 * portion of the address space. */
 	if(as && as != curr_aspace) {
 		state = intr_disable();
@@ -1412,7 +1412,7 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	return as;
 }
 
-/** Switch away from an address space to the kernel page map. */
+/** Switch away from an address space to the kernel MMU context. */
 static inline void do_switch_aspace(vm_aspace_t *as) {
 	assert(!curr_proc->aspace);
 	mmu_context_switch(&kernel_mmu_context);
@@ -1480,7 +1480,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 		vm_region_destroy(list_entry(iter, vm_region_t, header));
 	}
 
-	/* Destroy the page map. */
+	/* Destroy the MMU context. */
 	mmu_context_destroy(as->mmu);
 
 	assert(list_empty(&as->regions));

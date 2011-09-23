@@ -13,7 +13,7 @@ Different parts of Kiwi's design have been inspired by other OSes,
 and these deserve credit:
 
  * HelenOS (http://www.helenos.org)
-   - Parts of threading/multi-CPU/synchronization code.
+   - Parts of multi-CPU/synchronization code.
  * Haiku (http://www.haiku-os.org)
    - Some memory management code.
  * Meander (written by froggey on IRC)
