@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,10 +50,10 @@ typedef struct timer_device {
 		TIMER_DEVICE_ONESHOT,	/**< Timer fires after the period specified. */
 	} type;
 
-	/** Enable the device. */
+	/** Enable the device (for periodic devices). */
 	void (*enable)(void);
 
-	/** Disable the device (stops it from firing ticks). */
+	/** Disable the device (for periodic devices). */
 	void (*disable)(void);
 
 	/** Set up the next tick (for one-shot devices).

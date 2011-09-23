@@ -90,18 +90,6 @@ static void lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
 }
 #endif
 
-/** Enable the local APIC timer. */
-static void lapic_timer_enable(void) {
-	/* Set the interrupt vector, no extra bits = Unmasked/One-shot. */
-	lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_VECT_TIMER);
-}
-
-/** Disable the local APIC timer. */
-static void lapic_timer_disable(void) {
-	/* Set bit 16 in the Timer LVT register to 1 (Masked) */
-	lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_VECT_TIMER | (1<<16));
-}
-
 /** Prepare local APIC timer tick.
  * @param us		Number of microseconds to tick in. */
 static void lapic_timer_prepare(useconds_t us) {
@@ -113,8 +101,6 @@ static void lapic_timer_prepare(useconds_t us) {
 static timer_device_t lapic_timer_device = {
 	.name = "LAPIC",
 	.type = TIMER_DEVICE_ONESHOT,
-	.enable = lapic_timer_enable,
-	.disable = lapic_timer_disable,
 	.prepare = lapic_timer_prepare,
 };
 
@@ -257,6 +243,10 @@ __init_text void lapic_init(void) {
 		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
 		        base, lapic_mapping);
 
+		/* Install the LAPIC timer device. */
+		timer_device_set(&lapic_timer_device);
+
+		/* Register interrupt vectors. */
 		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
 		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
 #if CONFIG_SMP
@@ -281,6 +271,13 @@ __init_text void lapic_init(void) {
 	}
 #endif
 
+	/* Sanity check. */
+	if(curr_cpu != &boot_cpu) {
+		if(curr_cpu->id != lapic_id()) {
+			fatal("CPU ID mismatch (detected %u, LAPIC %u)", curr_cpu->id, lapic_id());
+		}
+	}
+
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
 	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
@@ -290,6 +287,7 @@ __init_text void lapic_init(void) {
 	/* Accept all interrupts. */
 	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR & 0xFFFFFF00));
 
-	/* Set the timer device. */
-	timer_device_set(&lapic_timer_device);
+	/* Enable the timer: interrupt vector, no extra bits = Unmasked/One-shot. */
+	lapic_write(LAPIC_REG_TIMER_INITIAL, 0);
+	lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_VECT_TIMER);
 }

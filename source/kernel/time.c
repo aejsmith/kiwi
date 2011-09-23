@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,22 +78,33 @@ static int days_before_month[] = {
 /** The number of microseconds since the Epoch the kernel was booted at. */
 static useconds_t boot_unix_time = 0;
 
-/** Current timer device. */
-static timer_device_t *curr_timer_device = NULL;
+/** Hardware timer device. */
+static timer_device_t *timer_device = NULL;
 
 /** Prepares next timer tick.
  * @param timer		Timer to prepare for. */
-static void timer_tick_prepare(timer_t *timer) {
-	useconds_t length;
+static void timer_device_prepare(timer_t *timer) {
+	useconds_t length = timer->target - system_time();
+	timer_device->prepare((length > 0) ? length : 1);
+}
 
-	assert(curr_timer_device);
-
-	/* Only one-shot devices need to be prepared. For periodic devices,
-	 * the current tick length is set when the device is enabled. */
-	if(curr_timer_device->type == TIMER_DEVICE_ONESHOT) {
-		length = timer->target - system_time();
-		curr_timer_device->prepare((length > 0) ? length : 1);
+/** Ensure that the timer device is enabled. */
+static inline void timer_device_enable(void) {
+	/* The device may not be disabled when we expect it to be, if
+	 * timer_stop() is run from a different CPU to the one the timer is
+	 * running on. */
+	if(!curr_cpu->timer_enabled) {
+		timer_device->enable();
+		curr_cpu->timer_enabled = true;
 	}
+}
+
+/** Disable the timer device. */
+static inline void timer_device_disable(void) {
+	/* The timer device should always be enabled when we expect it to be. */
+	assert(curr_cpu->timer_enabled);
+	timer_device->disable();
+	curr_cpu->timer_enabled = false;
 }
 
 /** Convert a date/time to microseconds since the epoch.
@@ -144,21 +155,20 @@ useconds_t unix_time(void) {
 }
 
 /**
- * Set the current timer device.
+ * Set the timer device.
  *
- * Sets the device that will provide timer ticks. The previous device will
- * be disabled.
+ * Sets the device that will provide timer ticks. This function must only be
+ * called once.
  *
  * @param device	Device to set.
  */
 void timer_device_set(timer_device_t *device) {
-	/* Deactivate the old device. */
-	if(curr_timer_device) {
-		curr_timer_device->disable();
+	if(timer_device) {
+		fatal("Multiple timer devices registered");
 	}
 
-	curr_timer_device = device;
-	device->enable();
+	timer_device = device;
+
 	kprintf(LOG_NORMAL, "timer: activated timer device %s\n", device->name);
 }
 
@@ -166,22 +176,26 @@ void timer_device_set(timer_device_t *device) {
  * @param timer		Timer to start. */
 static void timer_start_unsafe(timer_t *timer) {
 	timer_t *exist;
+	list_t *pos;
 
 	assert(list_empty(&timer->header));
 
+	/* Work out the absolute completion time. */
 	timer->target = system_time() + timer->initial;
 
-	/* Place the timer at the end of the list to begin with, and then
-	 * go through the list to see if we need to move it down before
-	 * another one (the list is ordered with nearest first). */
-	list_append(&curr_cpu->timers, &timer->header);
-	LIST_FOREACH_SAFE(&curr_cpu->timers, iter) {
-		exist = list_entry(iter, timer_t, header);
-		if(exist != timer && exist->target > timer->target) {
-			list_add_before(&exist->header, &timer->header);
+	/* Find the insertion point for the timer: the list must be ordered
+	 * with nearest expiration time first. */
+	pos = curr_cpu->timers.next;
+	while(pos != &curr_cpu->timers) {
+		exist = list_entry(pos, timer_t, header);
+		if(exist->target > timer->target) {
 			break;
 		}
+
+		pos = pos->next;
 	}
+
+	list_add_before(pos, &timer->header);
 }
 
 /** DPC function to run a timer function.
@@ -198,7 +212,7 @@ bool timer_tick(void) {
 	bool preempt = false;
 	timer_t *timer;
 
-	assert(curr_timer_device);
+	assert(timer_device);
 
 	spinlock_lock(&curr_cpu->timer_lock);
 
@@ -212,8 +226,10 @@ bool timer_tick(void) {
 			break;
 		}
 
-		/* Timer has expired, perform its timeout action. */
+		/* This timer has expired, remove it from the list. */
 		list_remove(&timer->header);
+
+		/* Perform its timeout action. */
 		if(timer->flags & TIMER_THREAD) {
 			dpc_request(timer_dpc_request, timer);
 		} else {
@@ -228,9 +244,20 @@ bool timer_tick(void) {
 		}
 	}
 
-	/* Find the next timeout if there is one. */
-	if(!list_empty(&curr_cpu->timers)) {
-		timer_tick_prepare(list_entry(curr_cpu->timers.next, timer_t, header));
+	switch(timer_device->type) {
+	case TIMER_DEVICE_ONESHOT:
+		/* Prepare the next tick if there is still a timer in the list. */
+		if(!list_empty(&curr_cpu->timers)) {
+			timer_device_prepare(list_entry(curr_cpu->timers.next, timer_t, header));
+		}
+		break;
+	case TIMER_DEVICE_PERIODIC:
+		/* For periodic devices, if the list is empty disable the
+		 * device so the timer does not interrupt unnecessarily. */
+		if(list_empty(&curr_cpu->timers)) {
+			timer_device_disable();
+		}
+		break;
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
@@ -265,13 +292,22 @@ void timer_start(timer_t *timer, useconds_t length, int mode) {
 
 	spinlock_lock(&curr_cpu->timer_lock);
 
+	/* Add the timer to the list. */
 	timer_start_unsafe(timer);
 
-	/* If the new timer is at the beginning of the list, then it has
-	 * the shortest remaining time so we need to adjust the clock
-	 * to tick after that amount of time. */
-	if(curr_cpu->timers.next == &timer->header) {
-		timer_tick_prepare(timer);
+	switch(timer_device->type) {
+	case TIMER_DEVICE_ONESHOT:
+		/* If the new timer is at the beginning of the list, then it
+		 * has the shortest remaining time, so we need to adjust the
+		 * device to tick for it. */
+		if(curr_cpu->timers.next == &timer->header) {
+			timer_device_prepare(timer);
+		}
+		break;
+	case TIMER_DEVICE_PERIODIC:
+		/* Enable the device. */
+		timer_device_enable();
+		break;
 	}
 
 	spinlock_unlock(&curr_cpu->timer_lock);
@@ -280,25 +316,36 @@ void timer_start(timer_t *timer, useconds_t length, int mode) {
 /** Cancel a running timer.
  * @param timer		Timer to stop. */
 void timer_stop(timer_t *timer) {
-	timer_t *next;
+	timer_t *first;
 
 	if(!list_empty(&timer->header)) {
 		assert(timer->cpu);
 
 		spinlock_lock(&timer->cpu->timer_lock);
 
-		/* Readjust the tick length if required. We can only do this if
-		 * the CPU is the current CPU. If not, it's no big deal: the
-		 * CPU will just get a tick and timer_tick() will do nothing. */
+		first = list_entry(timer->cpu->timers.next, timer_t, header);
+		list_remove(&timer->header);
+
+		/* If the timer is running on this CPU, adjust the tick length
+		 * or disable the device if required. If the timer is on another
+		 * CPU, it's no big deal: the rest of the code is able to handle
+		 * unexpected ticks. */
 		if(timer->cpu == curr_cpu) {
-			next = list_entry(timer->cpu->timers.next, timer_t, header);
-			if(next == timer && timer->header.next != &timer->cpu->timers) {
-				next = list_entry(timer->header.next, timer_t, header);
-				timer_tick_prepare(next);
+			switch(timer_device->type) {
+			case TIMER_DEVICE_ONESHOT:
+				if(first == timer && !list_empty(&curr_cpu->timers)) {
+					first = list_entry(curr_cpu->timers.next, timer_t, header);
+					timer_device_prepare(first);
+				}
+				break;
+			case TIMER_DEVICE_PERIODIC:
+				if(list_empty(&curr_cpu->timers)) {
+					timer_device_disable();
+				}
+				break;
 			}
 		}
 
-		list_remove(&timer->header);
 		spinlock_unlock(&timer->cpu->timer_lock);
 	}
 }

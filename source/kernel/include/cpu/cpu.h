@@ -57,6 +57,7 @@ typedef struct cpu {
 
 	/** Timer information. */
 	list_t timers;			/**< List of active timers. */
+	bool timer_enabled;		/**< Whether the timer device is enabled. */
 	spinlock_t timer_lock;		/**< Timer list lock. */
 } cpu_t;
 
