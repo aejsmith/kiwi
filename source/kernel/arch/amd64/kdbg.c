@@ -19,9 +19,9 @@
  * @brief		AMD64 kernel debugger functions.
  */
 
-#include <x86/cpu.h>
+#include <arch/frame.h>
 
-#include <cpu/intr.h>
+#include <x86/cpu.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>

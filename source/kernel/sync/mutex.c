@@ -19,8 +19,6 @@
  * @brief		Mutex implementation.
  */
 
-#include <cpu/intr.h>
-
 #include <proc/thread.h>
 
 #include <sync/mutex.h>

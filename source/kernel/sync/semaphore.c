@@ -22,8 +22,6 @@
  *			going above 0.
  */
 
-#include <cpu/intr.h>
-
 #include <kernel/semaphore.h>
 
 #include <lib/avl_tree.h>

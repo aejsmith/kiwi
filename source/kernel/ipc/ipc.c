@@ -34,8 +34,6 @@
  * @todo		This is all a bit naff.
  */
 
-#include <cpu/intr.h>
-
 #include <ipc/ipc.h>
 
 #include <lib/avl_tree.h>

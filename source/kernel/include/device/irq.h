@@ -22,8 +22,6 @@
 #ifndef __DEVICE_IRQ_H
 #define __DEVICE_IRQ_H
 
-#include <arch/intr.h>
-
 #include <types.h>
 
 /** IRQ handler return status. */

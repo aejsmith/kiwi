@@ -22,7 +22,7 @@
 #ifndef __X86_INTR_H
 #define __X86_INTR_H
 
-#include <arch/intr.h>
+#include <arch/frame.h>
 
 #include <x86/descriptor.h>
 

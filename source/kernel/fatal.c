@@ -19,8 +19,9 @@
  * @brief		Error handling functions.
  */
 
+#include <arch/frame.h>
+
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <kernel/system.h>
 

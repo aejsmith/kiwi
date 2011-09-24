@@ -26,7 +26,6 @@
  */
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <lib/string.h>
 

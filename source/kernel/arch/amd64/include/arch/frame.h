@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,11 +16,11 @@
 
 /**
  * @file
- * @brief		AMD64 interrupt functions/definitions.
+ * @brief		AMD64 interrupt frame structure.
  */
 
-#ifndef __ARCH_INTR_H
-#define __ARCH_INTR_H
+#ifndef __ARCH_FRAME_H
+#define __ARCH_FRAME_H
 
 /** Interrupt frame structure offsets. */
 #define IFRAME_OFF_R15		0x0
@@ -39,7 +39,7 @@
 #define IFRAME_OFF_BX		0x68
 #define IFRAME_OFF_AX		0x70
 #define IFRAME_OFF_NUM		0x78
-#define IFRAME_OFF_ERROR	0x80
+#define IFRAME_OFF_ERR_CODE	0x80
 #define IFRAME_OFF_IP		0x88
 #define IFRAME_OFF_CS		0x90
 #define IFRAME_OFF_FLAGS	0x98
@@ -77,4 +77,4 @@ typedef struct intr_frame {
 } __packed intr_frame_t;
 
 #endif /* __ASM__ */
-#endif /* __ARCH_INTR_H */
+#endif /* __ARCH_FRAME_H */

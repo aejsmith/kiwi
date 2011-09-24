@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,8 +30,9 @@
  * possible.
  */
 
+#include <arch/frame.h>
+
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <ipc/ipc.h>
 

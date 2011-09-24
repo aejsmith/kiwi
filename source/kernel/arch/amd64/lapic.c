@@ -20,7 +20,6 @@
  */
 
 #include <arch/io.h>
-#include <arch/intr.h>
 
 #include <x86/cpu.h>
 #include <x86/intr.h>

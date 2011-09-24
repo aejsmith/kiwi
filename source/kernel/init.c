@@ -22,7 +22,6 @@
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <io/device.h>

@@ -19,7 +19,7 @@
  * @brief		AMD64 kernel entry points.
  */
 
-#include <arch/intr.h>
+#include <arch/frame.h>
 #include <arch/memory.h>
 #include <arch/thread.h>
 

@@ -23,7 +23,6 @@
 #include <x86/lapic.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <console.h>
 #include <kernel.h>
