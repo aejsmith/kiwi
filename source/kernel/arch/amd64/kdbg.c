@@ -31,7 +31,7 @@
 #include <symbol.h>
 #include <kdbg.h>
 
-extern void kdbg_db_handler(unative_t num, intr_frame_t *frame);
+extern void kdbg_db_handler(intr_frame_t *frame);
 
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
@@ -65,9 +65,8 @@ static inline void kdbg_setup_dreg(void) {
 }
 
 /** Debug exception (#DB) handler.
- * @param num		Interrupt number.
  * @param frame		Interrupt stack frame. */
-void kdbg_db_handler(unative_t num, intr_frame_t *frame) {
+void kdbg_db_handler(intr_frame_t *frame) {
 	int reason = KDBG_ENTRY_USER;
 	unative_t dr6;
 	size_t i;
@@ -399,7 +398,7 @@ int kdbg_cmd_watch(int argc, char **argv) {
  */
 int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
 	KDBG_REGISTER_CHECK(name, len, regp, "cs", 2, curr_kdbg_frame->cs);
-	KDBG_REGISTER_CHECK(name, len, regp, "int_no", 6, curr_kdbg_frame->int_no);
+	KDBG_REGISTER_CHECK(name, len, regp, "num", 6, curr_kdbg_frame->num);
 	KDBG_REGISTER_CHECK(name, len, regp, "err_code", 8, curr_kdbg_frame->err_code);
 	KDBG_REGISTER_CHECK(name, len, regp, "r15", 3, curr_kdbg_frame->r15);
 	KDBG_REGISTER_CHECK(name, len, regp, "r14", 3, curr_kdbg_frame->r14);
@@ -445,8 +444,8 @@ int kdbg_cmd_regs(int argc, char **argv) {
 
 	kprintf(LOG_NONE, "cs: 0x%04" PRIxN "  ss: 0x%04" PRIxN "\n",
 	            curr_kdbg_frame->cs, curr_kdbg_frame->ss);
-	kprintf(LOG_NONE, "int_no: %" PRIuN "  err_code: %" PRIuN "  rflags: 0x%016" PRIxN "\n",
-	            curr_kdbg_frame->int_no, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
+	kprintf(LOG_NONE, "num: %" PRIuN "  err_code: %" PRIuN "  rflags: 0x%016" PRIxN "\n",
+	            curr_kdbg_frame->num, curr_kdbg_frame->err_code, curr_kdbg_frame->flags);
 	kprintf(LOG_NONE, "rax: 0x%016" PRIxN "  rbx: 0x%016" PRIxN "  rcx: 0x%016" PRIxN "\n",
 	            curr_kdbg_frame->ax, curr_kdbg_frame->bx, curr_kdbg_frame->cx);
 	kprintf(LOG_NONE, "rdx: 0x%016" PRIxN "  rdi: 0x%016" PRIxN "  rsi: 0x%016" PRIxN "\n",

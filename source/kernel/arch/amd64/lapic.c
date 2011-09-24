@@ -20,12 +20,13 @@
  */
 
 #include <arch/io.h>
+#include <arch/intr.h>
 
 #include <x86/cpu.h>
+#include <x86/intr.h>
 #include <x86/lapic.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <mm/phys.h>
@@ -74,17 +75,15 @@ static inline void lapic_eoi(void) {
 }
 
 /** Spurious interrupt handler.
- * @param num		Interrupt number.
  * @param frame		Interrupt stack frame. */
-static void lapic_spurious_handler(unative_t num, intr_frame_t *frame) {
+static void lapic_spurious_handler(intr_frame_t *frame) {
 	kprintf(LOG_DEBUG, "lapic: received spurious interrupt\n");
 }
 
 #if CONFIG_SMP
 /** IPI message interrupt handler.
- * @param num		Interrupt number.
  * @param frame		Interrupt stack frame. */
-static void lapic_ipi_handler(unative_t num, intr_frame_t *frame) {
+static void lapic_ipi_handler(intr_frame_t *frame) {
 	ipi_process_pending();
 	lapic_eoi();
 }
@@ -105,9 +104,8 @@ static timer_device_t lapic_timer_device = {
 };
 
 /** Timer interrupt handler.
- * @param num		Interrupt number.
  * @param frame		Interrupt stack frame. */
-static void lapic_timer_handler(unative_t num, intr_frame_t *frame) {
+static void lapic_timer_handler(intr_frame_t *frame) {
 	curr_cpu->should_preempt = timer_tick();
 	lapic_eoi();
 }
@@ -246,11 +244,11 @@ __init_text void lapic_init(void) {
 		/* Install the LAPIC timer device. */
 		timer_device_set(&lapic_timer_device);
 
-		/* Register interrupt vectors. */
-		intr_register(LAPIC_VECT_SPURIOUS, lapic_spurious_handler);
-		intr_register(LAPIC_VECT_TIMER, lapic_timer_handler);
+		/* Install interrupt vectors. */
+		intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
+		intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
 #if CONFIG_SMP
-		intr_register(LAPIC_VECT_IPI, lapic_ipi_handler);
+		intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
 	}
 #endif
 

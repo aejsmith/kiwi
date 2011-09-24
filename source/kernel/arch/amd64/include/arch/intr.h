@@ -22,26 +22,6 @@
 #ifndef __ARCH_INTR_H
 #define __ARCH_INTR_H
 
-/** Definitions for hardware exception numbers. */
-#define X86_EXCEPT_DE		0	/**< Divide Error. */
-#define X86_EXCEPT_DB		1	/**< Debug. */
-#define X86_EXCEPT_NMI		2	/**< Non-Maskable Interrupt. */
-#define X86_EXCEPT_BP		3	/**< Breakpoint. */
-#define X86_EXCEPT_OF		4	/**< Overflow. */
-#define X86_EXCEPT_BR		5	/**< BOUND Range Exceeded. */
-#define X86_EXCEPT_UD		6	/**< Invalid Opcode. */
-#define X86_EXCEPT_NM		7	/**< Device Not Available. */
-#define X86_EXCEPT_DF		8	/**< Double Fault. */
-#define X86_EXCEPT_TS		10	/**< Invalid TSS. */
-#define X86_EXCEPT_NP		11	/**< Segment Not Present. */
-#define X86_EXCEPT_SS		12	/**< Stack Fault. */
-#define X86_EXCEPT_GP		13	/**< General Protection Fault. */
-#define X86_EXCEPT_PF		14	/**< Page Fault. */
-#define X86_EXCEPT_MF		16	/**< x87 FPU Floating-Point Error. */
-#define X86_EXCEPT_AC		17	/**< Alignment Check. */
-#define X86_EXCEPT_MC		18	/**< Machine Check. */
-#define X86_EXCEPT_XM		19	/**< SIMD Floating-Point. */
-
 /** Interrupt frame structure offsets. */
 #define IFRAME_OFF_R15		0x0
 #define IFRAME_OFF_R14		0x8
@@ -58,8 +38,8 @@
 #define IFRAME_OFF_CX		0x60
 #define IFRAME_OFF_BX		0x68
 #define IFRAME_OFF_AX		0x70
-#define IFRAME_OFF_INT_NO	0x78
-#define IFRAME_OFF_ERR_CODE	0x80
+#define IFRAME_OFF_NUM		0x78
+#define IFRAME_OFF_ERROR	0x80
 #define IFRAME_OFF_IP		0x88
 #define IFRAME_OFF_CS		0x90
 #define IFRAME_OFF_FLAGS	0x98
@@ -87,7 +67,7 @@ typedef struct intr_frame {
 	unative_t cx;			/**< RCX. */
 	unative_t bx;			/**< RBX. */
 	unative_t ax;			/**< RAX. */
-	unative_t int_no;		/**< Interrupt number. */
+	unative_t num;			/**< Interrupt number. */
 	unative_t err_code;		/**< Error code (if applicable). */
 	unative_t ip;			/**< IP. */
 	unative_t cs;			/**< CS. */
@@ -95,13 +75,6 @@ typedef struct intr_frame {
 	unative_t sp;			/**< SP. */
 	unative_t ss;			/**< SS. */
 } __packed intr_frame_t;
-
-/** Interrupt handler function type. */
-typedef void (*intr_handler_t)(unative_t num, intr_frame_t *frame);
-
-extern void intr_register(unative_t num, intr_handler_t handler);
-extern void intr_remove(unative_t num);
-extern void intr_init(void);
 
 #endif /* __ASM__ */
 #endif /* __ARCH_INTR_H */

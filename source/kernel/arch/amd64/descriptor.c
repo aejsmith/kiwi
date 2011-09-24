@@ -23,9 +23,9 @@
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
+#include <x86/intr.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <lib/string.h>
 

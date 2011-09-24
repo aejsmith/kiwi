@@ -20,12 +20,12 @@
  */
 
 #include <arch/io.h>
-#include <arch/intr.h>
 #include <arch/memory.h>
 #include <arch/page.h>
 
 #include <x86/cpu.h>
 #include <x86/descriptor.h>
+#include <x86/intr.h>
 #include <x86/lapic.h>
 #include <x86/tsc.h>
 
