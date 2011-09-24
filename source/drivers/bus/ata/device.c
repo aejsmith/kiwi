@@ -31,8 +31,8 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <console.h>
 #include <endian.h>
+#include <kernel.h>
 #include <status.h>
 
 #include "ata_priv.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,19 +37,10 @@ typedef struct console {
 	void (*putch)(unsigned char ch);
 } console_t;
 
-/** Console log levels. */
-#define LOG_DEBUG	1		/**< Debug message. */
-#define LOG_NORMAL	2		/**< Normal message. */
-#define LOG_WARN	3		/**< Warning message. */
-#define LOG_NONE	4		/**< Do not log the message (for fatal/KDBG). */
-
 extern console_t fb_console;
 extern uint16_t fb_console_width;
 extern uint16_t fb_console_height;
 extern uint8_t fb_console_depth;
-
-extern int kvprintf(int level, const char *fmt, va_list args);
-extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
 
 extern void console_putch(int level, char ch);
 extern void console_register(console_t *cons);

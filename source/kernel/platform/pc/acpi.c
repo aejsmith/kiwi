@@ -30,7 +30,7 @@
 #include <mm/phys.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 
 /** Whether ACPI is supported. */
 bool acpi_supported = false;

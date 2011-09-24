@@ -24,7 +24,6 @@
 
 #include <cpu/cpu.h>
 
-#include <console.h>
 #include <kernel.h>
 #include <time.h>
 

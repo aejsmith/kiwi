@@ -35,7 +35,6 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <console.h>
 #include <kdbg.h>
 #include <kernel.h>
 #include <lrm.h>

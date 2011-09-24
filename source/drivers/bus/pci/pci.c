@@ -37,7 +37,7 @@
 #include <io/device.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <module.h>
 #include <status.h>
 

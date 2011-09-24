@@ -33,7 +33,7 @@
 #include <sync/spinlock.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <status.h>
 
 /** Structure describing a handler for an IRQ. */

@@ -36,7 +36,6 @@
 #include <security/context.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kboot.h>
 #include <kdbg.h>
 #include <kernel.h>

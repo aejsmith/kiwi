@@ -23,7 +23,7 @@
 #define __VM_PRIV_H
 
 #include <mm/vm.h>
-#include <console.h>
+#include <kernel.h>
 
 #if CONFIG_VM_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

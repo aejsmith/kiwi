@@ -36,9 +36,8 @@
 #include <proc/signal.h>
 #include <proc/thread.h>
 
-#include <assert.h>
-#include <console.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <setjmp.h>
 
 #if CONFIG_SMP

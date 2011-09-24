@@ -30,8 +30,8 @@
 
 #include <proc/process.h>
 
-#include <console.h>
 #include <elf.h>
+#include <kernel.h>
 #include <module.h>
 #include <status.h>
 

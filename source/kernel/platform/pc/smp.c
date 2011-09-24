@@ -32,7 +32,7 @@
 #include <mm/phys.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 
 /** Search for the MP Floating Pointer in a given range.
  * @param start		Start of range to check.

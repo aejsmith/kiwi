@@ -33,8 +33,8 @@
 #include <mm/page.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kboot.h>
+#include <kernel.h>
 
 #if CONFIG_SMP
 KBOOT_BOOLEAN_OPTION("smp_disabled", "Disable SMP", false);

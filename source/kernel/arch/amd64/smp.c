@@ -35,7 +35,7 @@
 #include <mm/phys.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <time.h>
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];

@@ -43,8 +43,8 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <status.h>
 #include <time.h>
 

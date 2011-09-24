@@ -27,7 +27,7 @@
 #include <lib/tar.h>
 #include <lib/utility.h>
 
-#include <console.h>
+#include <kernel.h>
 #include <object.h>
 #include <status.h>
 

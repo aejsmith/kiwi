@@ -84,9 +84,9 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kboot.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <lrm.h>
 #include <status.h>
 #include <time.h>

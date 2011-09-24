@@ -36,7 +36,6 @@
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
 
-#include <console.h>
 #include <kdbg.h>
 #include <kernel.h>
 #include <object.h>

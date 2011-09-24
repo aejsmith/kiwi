@@ -51,7 +51,6 @@
 #include <sync/semaphore.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kernel.h>
 #include <object.h>
 #include <kdbg.h>

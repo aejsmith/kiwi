@@ -39,8 +39,8 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kboot.h>
+#include <kernel.h>
 #include <status.h>
 
 /** Check if an MMU context is the kernel context. */

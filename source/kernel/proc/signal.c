@@ -28,7 +28,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <object.h>
 #include <status.h>
 

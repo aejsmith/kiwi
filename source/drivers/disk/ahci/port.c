@@ -27,7 +27,7 @@
 #include <mm/malloc.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <status.h>
 
 #include "ahci.h"

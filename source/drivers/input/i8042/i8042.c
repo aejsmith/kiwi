@@ -34,7 +34,6 @@
 #include <drivers/input.h>
 
 #include <assert.h>
-#include <console.h>
 #include <dpc.h>
 #include <kdbg.h>
 #include <kernel.h>

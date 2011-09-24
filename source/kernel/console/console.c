@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -97,7 +97,8 @@ static void kvprintf_helper(char ch, void *data, int *total) {
 	*total = *total + 1;
 }
 
-/** Write a character to the console.
+/**
+ * Write a character to the console.
  *
  * Writes a character to all currently registered consoles that allow the
  * specified log level, and stores it in the kernel log buffer.

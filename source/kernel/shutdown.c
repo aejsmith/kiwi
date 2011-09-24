@@ -31,7 +31,6 @@
 
 #include <security/cap.h>
 
-#include <console.h>
 #include <kernel.h>
 #include <status.h>
 

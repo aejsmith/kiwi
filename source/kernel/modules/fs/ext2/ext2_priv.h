@@ -28,8 +28,8 @@
 
 #include <mm/vm_cache.h>
 
-#include <console.h>
 #include <endian.h>
+#include <kernel.h>
 
 #include "ext2.h"
 

@@ -26,7 +26,7 @@
 
 #include <mm/malloc.h>
 
-#include <console.h>
+#include <kernel.h>
 #include <status.h>
 
 #include "disk_priv.h"

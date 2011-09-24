@@ -26,7 +26,7 @@
 #include <lib/notifier.h>
 #include <lib/string.h>
 
-#include <console.h>
+#include <kernel.h>
 #include <types.h>
 
 /** Size of KDBG input buffer. */

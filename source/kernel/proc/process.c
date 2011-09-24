@@ -42,7 +42,6 @@
 #include <sync/semaphore.h>
 
 #include <assert.h>
-#include <console.h>
 #include <elf.h>
 #include <kdbg.h>
 #include <kernel.h>

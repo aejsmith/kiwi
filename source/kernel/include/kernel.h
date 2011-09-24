@@ -61,4 +61,13 @@ extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn
  * @param ...		The arguments to be used in the formatted message. */
 #define fatal(fmt...)	_fatal(NULL, fmt)
 
+/** Console log levels. */
+#define LOG_DEBUG	1		/**< Debug message. */
+#define LOG_NORMAL	2		/**< Normal message. */
+#define LOG_WARN	3		/**< Warning message. */
+#define LOG_NONE	4		/**< Do not log the message (for fatal/KDBG). */
+
+extern int kvprintf(int level, const char *fmt, va_list args);
+extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
+
 #endif /* __KERNEL_H */

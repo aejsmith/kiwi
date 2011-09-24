@@ -34,9 +34,9 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
-#include <console.h>
 #include <dpc.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <object.h>
 #include <status.h>
 #include <time.h>

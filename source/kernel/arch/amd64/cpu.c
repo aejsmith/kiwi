@@ -36,9 +36,8 @@
 
 #include <pc/pit.h>
 
-#include <assert.h>
-#include <console.h>
 #include <kdbg.h>
+#include <kernel.h>
 
 extern void syscall_entry(void);
 

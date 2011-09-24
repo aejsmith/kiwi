@@ -38,7 +38,7 @@
 #include <mm/phys.h>
 
 #include <assert.h>
-#include <console.h>
+#include <kernel.h>
 #include <status.h>
 
 #if CONFIG_HEAP_DEBUG

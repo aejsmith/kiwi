@@ -22,7 +22,7 @@
 #include <lib/id_alloc.h>
 #include <mm/malloc.h>
 #include <proc/session.h>
-#include <console.h>
+#include <kernel.h>
 
 #if CONFIG_PROC_DEBUG
 # define dprintf(fmt...)	kprintf(LOG_DEBUG, fmt)

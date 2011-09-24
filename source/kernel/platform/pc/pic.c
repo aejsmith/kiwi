@@ -26,7 +26,6 @@
 #include <pc/pic.h>
 
 #include <assert.h>
-#include <console.h>
 #include <kernel.h>
 
 /** IRQ masks - disable all by default, apart from IRQ2 (cascade). */

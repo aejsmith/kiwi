@@ -29,6 +29,7 @@
 
 #include <console.h>
 #include <kboot.h>
+#include <kernel.h>
 
 #if CONFIG_DEBUG
 KBOOT_BOOLEAN_OPTION("splash_disabled", "Disable splash screen", true);

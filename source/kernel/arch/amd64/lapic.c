@@ -32,10 +32,9 @@
 
 #include <pc/pit.h>
 
-#include <assert.h>
-#include <console.h>
 #include <kboot.h>
 #include <kdbg.h>
+#include <kernel.h>
 #include <time.h>
 
 #if CONFIG_SMP
