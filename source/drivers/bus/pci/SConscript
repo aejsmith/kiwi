@@ -17,10 +17,8 @@
 Import('env', 'config')
 
 sources = map(File, [
+	'platform/%s.c' % (config['PLATFORM']),
 	'pci.c',
 ])
 
-# Get the architecture-specific source files.
-arch_sources = SConscript(dirs=['arch/%s' % (config['SRCARCH'])], exports=['env'])
-
-env.Module('pci', sources + arch_sources)
+env.Module('pci', sources)

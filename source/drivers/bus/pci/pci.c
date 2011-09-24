@@ -75,7 +75,7 @@ static status_t pci_device_scan(device_t *bus, int id, int dev, int func, int in
 	uint8_t dest;
 
 	/* Check vendor ID to determine if device exists. */
-	if(pci_arch_config_read16(id, dev, func, PCI_CONFIG_VENDOR_ID) == 0xFFFF) {
+	if(platform_pci_config_read16(id, dev, func, PCI_CONFIG_VENDOR_ID) == 0xFFFF) {
 		return STATUS_SUCCESS;
 	}
 
@@ -141,7 +141,7 @@ static status_t pci_bus_scan(int id, int indent) {
 
 	kprintf(LOG_NOTICE, "pci: %*sscanning bus %d for devices...\n", indent, "", id);
 	for(i = 0; i < 32; i++) {
-		if(pci_arch_config_read8(id, i, 0, PCI_CONFIG_HEADER_TYPE) & 0x80) {
+		if(platform_pci_config_read8(id, i, 0, PCI_CONFIG_HEADER_TYPE) & 0x80) {
 			/* Multifunction device. */
 			for(j = 0; j < 8; j++) {
 				ret = pci_device_scan(device, id, i, j, indent + 1);
@@ -167,7 +167,7 @@ static status_t pci_bus_scan(int id, int indent) {
  * @param reg		Register to read.
  * @return		Value read. */
 uint8_t pci_config_read8(pci_device_t *device, uint8_t reg) {
-	return pci_arch_config_read8(device->bus, device->device, device->function, reg);
+	return platform_pci_config_read8(device->bus, device->device, device->function, reg);
 }
 MODULE_EXPORT(pci_config_read8);
 
@@ -176,7 +176,7 @@ MODULE_EXPORT(pci_config_read8);
  * @param reg		Register to write.
  * @param val		Value to write. */
 void pci_config_write8(pci_device_t *device, uint8_t reg, uint8_t val) {
-	pci_arch_config_write8(device->bus, device->device, device->function, reg, val);
+	platform_pci_config_write8(device->bus, device->device, device->function, reg, val);
 }
 MODULE_EXPORT(pci_config_write8);
 
@@ -185,7 +185,7 @@ MODULE_EXPORT(pci_config_write8);
  * @param reg		Register to read.
  * @return		Value read. */
 uint16_t pci_config_read16(pci_device_t *device, uint8_t reg) {
-	return pci_arch_config_read16(device->bus, device->device, device->function, reg);
+	return platform_pci_config_read16(device->bus, device->device, device->function, reg);
 }
 MODULE_EXPORT(pci_config_read16);
 
@@ -194,7 +194,7 @@ MODULE_EXPORT(pci_config_read16);
  * @param reg		Register to write.
  * @param val		Value to write. */
 void pci_config_write16(pci_device_t *device, uint8_t reg, uint16_t val) {
-	pci_arch_config_write16(device->bus, device->device, device->function, reg, val);
+	platform_pci_config_write16(device->bus, device->device, device->function, reg, val);
 }
 MODULE_EXPORT(pci_config_write16);
 
@@ -203,7 +203,7 @@ MODULE_EXPORT(pci_config_write16);
  * @param reg		Register to read.
  * @return		Value read. */
 uint32_t pci_config_read32(pci_device_t *device, uint8_t reg) {
-	return pci_arch_config_read32(device->bus, device->device, device->function, reg);
+	return platform_pci_config_read32(device->bus, device->device, device->function, reg);
 }
 MODULE_EXPORT(pci_config_read32);
 
@@ -212,7 +212,7 @@ MODULE_EXPORT(pci_config_read32);
  * @param reg		Register to write.
  * @param val		Value to write. */
 void pci_config_write32(pci_device_t *device, uint8_t reg, uint32_t val) {
-	pci_arch_config_write32(device->bus, device->device, device->function, reg, val);
+	platform_pci_config_write32(device->bus, device->device, device->function, reg, val);
 }
 MODULE_EXPORT(pci_config_write32);
 
@@ -325,7 +325,7 @@ static status_t pci_init(void) {
 	status_t ret;
 
 	/* Get the architecture to detect PCI presence. */
-	ret = pci_arch_init();
+	ret = platform_pci_init();
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_NOTICE, "pci: PCI is not present or not usable (%d)\n", ret);
 		return ret;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		x86-specific PCI functions.
+ * @brief		PC-specific PCI functions.
  *
  * Configuration Address Register:
  * ------------------------------------------------------------------
@@ -33,7 +33,7 @@
 #include <module.h>
 #include <status.h>
 
-#include "../../pci_priv.h"
+#include "../pci_priv.h"
 
 /** PCI configuration registers. */
 #define PCI_CONFIG_ADDRESS	0xCF8	/**< Configuration Address Register. */
@@ -54,7 +54,7 @@ static SPINLOCK_DECLARE(pci_config_lock);
  * @param func		Function number.
  * @param reg		Register to read.
  * @return		Value read. */
-uint8_t pci_arch_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+uint8_t platform_pci_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint8_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -71,7 +71,7 @@ uint8_t pci_arch_config_read8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t re
  * @param func		Function number.
  * @param reg		Register to write.
  * @param val		Value to write. */
-void pci_arch_config_write8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint8_t val) {
+void platform_pci_config_write8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint8_t val) {
 	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	out8(PCI_CONFIG_DATA + (reg & 3), val);
@@ -80,7 +80,7 @@ void pci_arch_config_write8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg,
 
 /** Read a 16-bit value from the PCI configuration space.
  * @return		Value read. */
-uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+uint16_t platform_pci_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint16_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -96,7 +96,7 @@ uint16_t pci_arch_config_read16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
  * @param func		Function number.
  * @param reg		Register to write.
  * @param val		Value to write. */
-void pci_arch_config_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint16_t val) {
+void platform_pci_config_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint16_t val) {
 	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	out16(PCI_CONFIG_DATA + (reg & 2), val);
@@ -109,7 +109,7 @@ void pci_arch_config_write16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg
  * @param func		Function number.
  * @param reg		Register to read.
  * @return		Value read. */
-uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
+uint32_t platform_pci_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg) {
 	uint32_t ret;
 
 	spinlock_lock(&pci_config_lock);
@@ -125,7 +125,7 @@ uint32_t pci_arch_config_read32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
  * @param func		Function number.
  * @param reg		Register to write.
  * @param val		Value to write. */
-void pci_arch_config_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint32_t val) {
+void platform_pci_config_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg, uint32_t val) {
 	spinlock_lock(&pci_config_lock);
 	out32(PCI_CONFIG_ADDRESS, PCI_ADDRESS(bus, dev, func, reg));
 	out32(PCI_CONFIG_DATA, val);
@@ -134,7 +134,7 @@ void pci_arch_config_write32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t reg
 
 /** Check for PCI presence.
  * @return		STATUS_SUCCESS if present, other code if not. */
-status_t pci_arch_init(void) {
+status_t platform_pci_init(void) {
 	out32(PCI_CONFIG_ADDRESS, 0x80000000);
 	return (in32(PCI_CONFIG_ADDRESS) != 0x80000000) ? STATUS_NOT_SUPPORTED : STATUS_SUCCESS;
 }
