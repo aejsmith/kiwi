@@ -105,7 +105,8 @@ void kdbg_db_handler(intr_frame_t *frame) {
 	}
 }
 
-/** Call KDBG.
+/**
+ * Call KDBG.
  *
  * Wrapper function for kdbg_main(). If a register structure is provided,
  * then directly calls kdbg_main(), otherwise raises a debug interrupt to
@@ -386,7 +387,8 @@ int kdbg_cmd_watch(int argc, char **argv) {
 		return KDBG_OK; \
 	}
 
-/** Get the value of a register.
+/**
+ * Get the value of a register.
  *
  * Gets the value of a register and stores it in the given location.
  *
@@ -423,7 +425,8 @@ int kdbg_register_value(const char *name, size_t len, unative_t *regp) {
 	return KDBG_FAIL;
 }
 
-/** Print out all registers.
+/**
+ * Print out all registers.
  *
  * Prints out the value of all registers in the current KDBG register set.
  *

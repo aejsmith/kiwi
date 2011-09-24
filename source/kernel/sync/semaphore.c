@@ -282,7 +282,8 @@ semaphore_id_t kern_semaphore_id(handle_t handle) {
 	return ret;
 }
 
-/** Down (decrease the count of) a semaphore.
+/**
+ * Down (decrease the count of) a semaphore.
  *
  * Attempts to decrease the count of a semaphore by 1. If the count of the
  * semaphore is currently 0, the function will block until another thread
@@ -312,7 +313,8 @@ status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
 	return ret;
 }
 
-/** Up (increase the count of) a semaphore.
+/**
+ * Up (increase the count of) a semaphore.
  *
  * Increases the count of a semaphore by the specified number. This can cause
  * waiting threads to be woken.
@@ -339,7 +341,7 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 }
 
 /** Initialise the semaphore ID allocator. */
-static void __init_text semaphore_id_init(void) {
+static __init_text void semaphore_id_init(void) {
 	id_alloc_init(&semaphore_id_allocator, 65535);
 }
 INITCALL(semaphore_id_init);

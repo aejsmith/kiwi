@@ -148,7 +148,8 @@ void symbol_table_publish(symbol_table_t *table) {
 	list_append(&symbol_tables, &table->header);
 }
 
-/** Look up symbol from address.
+/**
+ * Look up symbol by address.
  *
  * Looks for the symbol corresponding to an address in a symbol table, and
  * gets the offset of the address in the symbol.
@@ -186,7 +187,8 @@ symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *of
 	return NULL;
 }
 
-/** Look up symbol from name.
+/**
+ * Look up symbol by name.
  *
  * Looks for a symbol with the name specified in a symbol table. If specified,
  * will only look for global and/or exported symbols.
@@ -219,7 +221,8 @@ symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool
 	return NULL;
 }
 
-/** Look up symbol by address.
+/**
+ * Look up symbol by address.
  *
  * Looks for the symbol corresponding to an address in all symbol tables, and
  * gets the offset of the address in the symbol.
@@ -249,7 +252,8 @@ symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
 	}
 }
 
-/** Look up symbol by name.
+/**
+ * Look up symbol by name.
  *
  * Looks for a symbol with the name specified in all symbol tables. If
  * specified, will only look for global and/or exported symbols.
@@ -288,7 +292,7 @@ symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
 }
 
 /** Initialise the kernel symbol manager. */
-void __init_text symbol_init(void) {
+__init_text void symbol_init(void) {
 	symbol_tree = kmalloc(sizeof(radix_tree_t), MM_FATAL);
 	radix_tree_init(symbol_tree);
 

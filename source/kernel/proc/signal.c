@@ -178,7 +178,7 @@ retry:
 
 			/* Get the architecture code to set up the user-mode
 			 * context to run the handler. */
-			ret = signal_arch_setup_frame(action, &curr_thread->signal_info[num], mask);
+			ret = arch_signal_setup_frame(action, &curr_thread->signal_info[num], mask);
 			if(ret != STATUS_SUCCESS) {
 				signal_force(curr_thread, SIGSEGV, num);
 				goto retry;
@@ -391,7 +391,8 @@ status_t kern_signal_mask(int flags, const sigset_t *newp, sigset_t *oldp) {
 	return STATUS_SUCCESS;
 }
 
-/** Get and set the alternate signal stack.
+/**
+ * Get and set the alternate signal stack.
  *
  * Gets and sets the alternate signal stack for the current thread. This stack
  * is used to execute signal handlers with the SA_ONSTACK flag set. The
@@ -442,7 +443,7 @@ void kern_signal_return(void) {
 	sigset_t mask;
 	status_t ret;
 
-	ret = signal_arch_restore_frame(&mask);
+	ret = arch_signal_restore_frame(&mask);
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_NORMAL, "signal: failed to restore signal context for %u, forcing SEGV\n",
 		        curr_thread->id);

@@ -171,7 +171,8 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 	mutex_unlock(&map->lock);
 }
 
-/** Read a page from a file using a file map.
+/**
+ * Read a page from a file using a file map.
  *
  * Helper function for a VM cache to read a page from a file using its file
  * map to help read from the source device. If this function is used, the
@@ -212,7 +213,8 @@ status_t file_map_read_page(vm_cache_t *cache, void *buf, offset_t offset, bool 
 	return STATUS_SUCCESS;
 }
 
-/** Write a page to a file using a file map.
+/**
+ * Write a page to a file using a file map.
  *
  * Helper function for a VM cache to write a page to a file using its file
  * map to help write to the source device. If this function is used, the
@@ -262,7 +264,7 @@ vm_cache_ops_t file_map_vm_cache_ops = {
 };
 
 /** Initialise the file map slab cache. */
-static void __init_text file_map_init(void) {
+static __init_text void file_map_init(void) {
 	file_map_cache = slab_cache_create("file_map_cache", sizeof(file_map_t),
 	                                   0, file_map_ctor, NULL, NULL, 0,
 	                                   MM_FATAL);

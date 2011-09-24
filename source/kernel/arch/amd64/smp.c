@@ -50,7 +50,8 @@ atomic_t cpu_pause_wait = 0;
 /** Whether cpu_halt_all() has been called. */
 atomic_t cpu_halting_all = 0;
 
-/** Pause execution of other CPUs.
+/**
+ * Pause execution of other CPUs.
  *
  * Pauses execution of all CPUs other than the CPU that calls the function.
  * This is done using an NMI, so CPUs will be paused even if they have

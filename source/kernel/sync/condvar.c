@@ -23,7 +23,8 @@
 
 #include <assert.h>
 
-/** Wait for a condition to become true.
+/**
+ * Wait for a condition to become true.
  *
  * Atomically unlocks a mutex or spinlock and then blocks until a condition
  * becomes true. The specified mutex/spinlock should be held by the calling
@@ -76,7 +77,8 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_
 	return ret;
 }
 
-/** Wait for a condition to become true.
+/**
+ * Wait for a condition to become true.
  *
  * Atomically unlocks a mutex or spinlock and then blocks until a condition
  * becomes true. The specified mutex/spinlock should be held by the calling
@@ -93,7 +95,8 @@ void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl) {
 	condvar_wait_etc(cv, mtx, sl, -1, 0);
 }
 
-/** Signal that a condition has become true.
+/**
+ * Signal that a condition has become true.
  *
  * Wakes the first thread (if any) waiting for a condition variable to become
  * true.
@@ -106,7 +109,8 @@ bool condvar_signal(condvar_t *cv) {
 	return waitq_wake(&cv->queue);
 }
 
-/** Broadcast that a condition has become true.
+/**
+ * Broadcast that a condition has become true.
  *
  * Wakes all threads (if any) currently waiting for a condition variable to
  * become true.

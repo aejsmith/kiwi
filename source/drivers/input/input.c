@@ -233,7 +233,8 @@ static device_ops_t mouse_device_ops = {
 	.request = mouse_device_request,
 };
 
-/** Add an event to an input device's buffer.
+/**
+ * Add an event to an input device's buffer.
  *
  * Adds an event to an input device's event buffer. This function is safe to
  * use from interrupt context.
@@ -327,7 +328,8 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	return STATUS_SUCCESS;
 }
 
-/** Add a new keyboard device.
+/**
+ * Add a new keyboard device.
  *
  * Adds a new keyboard device to the device tree. If specified, the device will
  * be created as a child of a specific device, and an alias will be created
@@ -351,7 +353,8 @@ status_t keyboard_device_create(const char *name, device_t *parent, keyboard_ops
 }
 MODULE_EXPORT(keyboard_device_create);
 
-/** Add a new mouse device.
+/**
+ * Add a new mouse device.
  *
  * Adds a new mouse device to the device tree. If specified, the device will
  * be created as a child of a specific device, and an alias will be created

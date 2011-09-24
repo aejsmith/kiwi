@@ -276,7 +276,8 @@ static int pci_driver_probe(device_t *_device, void *_driver) {
 	return 2;
 }
 
-/** Register a new PCI driver.
+/**
+ * Register a new PCI driver.
  *
  * Registers a new PCI device driver. The driver's add device callback will be
  * called for any PCI devices currently in the system that match the driver.
@@ -305,7 +306,8 @@ status_t pci_driver_register(pci_driver_t *driver) {
 }
 MODULE_EXPORT(pci_driver_register);
 
-/** Unregister a PCI driver.
+/**
+ * Unregister a PCI driver.
  *
  * Unregisters a PCI device driver. All devices managed by the driver will be
  * removed.

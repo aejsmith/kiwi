@@ -366,7 +366,7 @@ static fs_type_t ramfs_fs_type = {
 };
 
 /** Register RamFS with the VFS. */
-static void __init_text ramfs_init(void) {
+static __init_text void ramfs_init(void) {
 	status_t ret;
 
 	ret = fs_type_register(&ramfs_fs_type);

@@ -86,7 +86,8 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 	return STATUS_SUCCESS;
 }
 
-/** Lock a mutex.
+/**
+ * Lock a mutex.
  *
  * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
  * already holds the lock, then its recursion count will be increased and the
@@ -115,7 +116,8 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 	return ret;
 }
 
-/** Lock a mutex.
+/**
+ * Lock a mutex.
  *
  * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
  * already holds the lock, then its recursion count will be increased and the
@@ -135,7 +137,8 @@ void mutex_lock(mutex_t *lock) {
 #endif
 }
 
-/** Unlock a mutex.
+/**
+ * Unlock a mutex.
  *
  * Unlocks a mutex. Must be held by the current thread else a fatal error
  * will occur. It is also invalid to unlock an already unlocked mutex. If

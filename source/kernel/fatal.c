@@ -61,7 +61,8 @@ static void fatal_printf(const char *format, ...) {
 	va_end(args);
 }
 
-/** Raise a fatal error.
+/**
+ * Raise a fatal error.
  *
  * Halts all CPUs, prints a formatted error message to the console and enters
  * KDBG. The function will never return.
@@ -97,7 +98,8 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 	cpu_halt();
 }
 
-/** Print a fatal error message and halt the system.
+/**
+ * Print a fatal error message and halt the system.
  *
  * Prints a fatal error message and halts the system. The calling process must
  * have the CAP_FATAL capability.

@@ -40,7 +40,8 @@ void notifier_init(notifier_t *notif, void *data) {
 	notif->data = data;
 }
 
-/** Remove all functions from a notifier.
+/**
+ * Remove all functions from a notifier.
  *
  * Removes all functions registered with a notifier and frees data used to
  * store function information.
@@ -59,7 +60,8 @@ void notifier_clear(notifier_t *notif) {
 	mutex_unlock(&notif->lock);
 }
 
-/** Runs all functions on a notifier.
+/**
+ * Runs all functions on a notifier.
  *
  * Runs all the functions currently registered for a notifier, without taking
  * the lock.

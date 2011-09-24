@@ -43,7 +43,8 @@ static inline uint16_t tty_buffer_get(tty_buffer_t *buf) {
 	return ch;
 }
 
-/** Read a line from a terminal buffer.
+/**
+ * Read a line from a terminal buffer.
  *
  * Reads up to the given number of bytes from a terminal buffer, but at most
  * 1 line.

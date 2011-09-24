@@ -231,7 +231,8 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 	return STATUS_SUCCESS;
 }
 
-/** Load a kernel module.
+/**
+ * Load a kernel module.
  *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
  * module are not met, the name of the first unmet dependency encountered is
@@ -371,7 +372,8 @@ int kdbg_cmd_modules(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Load a kernel module.
+/**
+ * Load a kernel module.
  *
  * Loads a kernel module from the filesystem. If any of the dependencies of the
  * module are not met, the name of the first unmet dependency encountered is

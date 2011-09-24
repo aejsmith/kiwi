@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -76,60 +76,41 @@ status_t validate_user_address(void *dest, size_t size) {
 	return (VALID((ptr_t)dest, size)) ? STATUS_SUCCESS : STATUS_INVALID_ADDR;
 }
 
-/** Copy data from userspace.
- *
- * Copies data from a userspace source memory area to a kernel memory area.
- *
- * @param dest		The memory area to copy to.
- * @param src		The memory area to copy from.
+/** Copy data from user memory.
+ * @param dest		The kernel memory area to copy to.
+ * @param src		The user memory area to copy from.
  * @param count		The number of bytes to copy.
- *
- * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on failure.
- */
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
+ *			failure. */
 status_t memcpy_from_user(void *dest, const void *src, size_t count) {
 	USERMEM_WRAP(src, count, memcpy(dest, src, count));
 }
 
-/** Copy data to userspace.
- *
- * Copies data from a kernel memory area to a userspace memory area.
- *
- * @param dest		The memory area to copy to.
- * @param src		The memory area to copy from.
+/** Copy data to user memory.
+ * @param dest		The user memory area to copy to.
+ * @param src		The kernel memory area to copy from.
  * @param count		The number of bytes to copy.
- *
- * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on failure.
- */
+ * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
+ *			failure. */
 status_t memcpy_to_user(void *dest, const void *src, size_t count) {
 	USERMEM_WRAP(dest, count, memcpy(dest, src, count));
 }
 
-/** Fill a userspace memory area.
- *
- * Fills a userspace memory area with the value specified.
- *
- * @param dest		The memory area to fill.
+/** Fill a user memory area.
+ * @param dest		The user memory area to fill.
  * @param val		The value to fill with.
  * @param count		The number of bytes to fill.
- *
  * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
- *			failure.
- */
+ *			failure. */
 status_t memset_user(void *dest, int val, size_t count) {
 	USERMEM_WRAP(dest, count, memset(dest, val, count));
 }
 
-/** Get length of userspace string.
- *
- * Gets the length of the specified string residing in a userspace memory
- * area. The length is the number of characters found before a NULL byte.
- *
+/** Get the length of a user string.
  * @param str		Pointer to the string.
  * @param lenp		Where to store string length.
- * 
  * @return		STATUS_SUCCESS on success, STATUS_INVALID_ADDR on
- *			failure.
- */
+ *			failure. */
 status_t strlen_user(const char *str, size_t *lenp) {
 	size_t retval = 0;
 
@@ -150,15 +131,17 @@ status_t strlen_user(const char *str, size_t *lenp) {
 	USERMEM_SUCCESS();
 }
 
-/** Duplicate string from userspace.
+/**
+ * Duplicate a string from user memory.
  *
- * Allocates a buffer large enough and copies across a string from userspace.
+ * Allocates a buffer large enough and copies across a string from user memory.
  * The allocation is not made using MM_SLEEP, as there is no length limit and
  * therefore the length could be too large to fit in the heap. Use of
  * strndup_from_user() is preferred to this.
  *
  * @param src		Location to copy from.
- * @param destp		Pointer to buffer in which to store destination.
+ * @param destp		Pointer to location in which to store address of
+ *			destination buffer.
  *
  * @return		Status code describing result of the operation.
  *			Returns STATUS_INVALID_ARG if the string is
@@ -191,16 +174,18 @@ status_t strdup_from_user(const void *src, char **destp) {
 	return STATUS_SUCCESS;
 }
 
-/** Duplicate string from userspace.
+/**
+ * Duplicate a string from user memory.
  *
- * Allocates a buffer large enough and copies across a string from userspace.
+ * Allocates a buffer large enough and copies across a string from user memory.
  * If the string is longer than the maximum length, then an error will be
  * returned. Because a length limit is provided, the allocation is made using
  * MM_SLEEP - it is assumed that the limit is sensible.
  *
  * @param src		Location to copy from.
  * @param max		Maximum length allowed.
- * @param destp		Pointer to buffer in which to store destination.
+ * @param destp		Pointer to location in which to store address of
+ *			destination buffer.
  *
  * @return		Status code describing result of the operation.
  *			Returns STATUS_INVALID_ARG if the string is
@@ -231,14 +216,16 @@ status_t strndup_from_user(const void *src, size_t max, char **destp) {
 	return STATUS_SUCCESS;
 }
 
-/** Copy a NULL-terminated array of strings from userspace.
+/**
+ * Copy a NULL-terminated array of strings from user memory.
  *
- * Copies a NULL-terminated array of strings from userspace. The array
+ * Copies a NULL-terminated array of strings from user memory. The array
  * itself and each array entry must be freed with kfree() once no longer
  * needed.
  *
  * @param src		Array to copy.
- * @param arrayp	Pointer to set to new array location.
+ * @param arrayp	Pointer to location in which to store address of
+ *			allocated array.
  *
  * @return		Status code describing result of the operation.
  */

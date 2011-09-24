@@ -180,7 +180,8 @@ void ipi_process_pending(void) {
 	spinlock_unlock(&curr_cpu->ipi_lock);
 }
 
-/** Send an IPI to a single CPU.
+/**
+ * Send an IPI to a single CPU.
  *
  * Sends an IPI to a single CPU. This IPI will cause the specified handler to
  * be invoked on that CPU, with the four data parameters as arguments to it.
@@ -250,7 +251,8 @@ status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative
 	}
 }
 
-/** Send an IPI to all CPUs.
+/**
+ * Send an IPI to all CPUs.
  *
  * Sends an IPI to all CPUs other than the calling CPU.. This IPI will cause
  * the specified handler to be invoked on those CPUs, with the four data
@@ -334,7 +336,8 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
 	local_irq_restore(state);
 }
 
-/** Acknowledge a message.
+/**
+ * Acknowledge a message.
  *
  * Acknowledges an IPI message and sets its return code to the given value.
  * This function is only of use when the IPI is sent synchronously, and the
@@ -364,7 +367,7 @@ void ipi_acknowledge(void *ptr, status_t status) {
 }
 
 /** Initialise the IPI message pool.  */
-void __init_text ipi_init(void) {
+__init_text void ipi_init(void) {
 	size_t i, count = cpu_count * IPI_MESSAGES_PER_CPU;
 	ipi_message_t *messages;
 

@@ -304,7 +304,8 @@ static radix_tree_node_t *radix_tree_node_lookup(radix_tree_t *tree, unsigned ch
 	}
 }
 
-/** Insert a value into a radix tree.
+/**
+ * Insert a value into a radix tree.
  *
  * Inserts a value with the given key into a radix tree. If a node already
  * exists with the same key, then the node's value is replaced with the new
@@ -390,7 +391,8 @@ void radix_tree_insert(radix_tree_t *tree, const char *key, void *value) {
 	}
 }
 
-/** Remove a value from a radix tree.
+/**
+ * Remove a value from a radix tree.
  *
  * Removes the value with the given key from a radix tree. If the key is not
  * found in the tree then the function will do nothing.
@@ -466,50 +468,32 @@ void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_hel
 }
 
 /** Look up a value in a radix tree.
- *
- * Looks up the value associated with a key within a radix tree.
- *
  * @param tree		Tree to search in.
  * @param key		Key to search for.
- *
- * @return		Value of key if found, NULL if not found.
- */
+ * @return		Value of key if found, NULL if not found. */
 void *radix_tree_lookup(radix_tree_t *tree, const char *key) {
 	radix_tree_node_t *node = radix_tree_node_lookup(tree, (unsigned char *)key);
 	return (node) ? node->value : NULL;
 }
 
 /** Initialise a radix tree.
- *
- * Initialises a radix tree structure.
- *
- * @param tree		Tree to destroy.
- */
+ * @param tree		Tree to destroy. */
 void radix_tree_init(radix_tree_t *tree) {
 	/* Clear the root node. */
 	memset(&tree->root, 0, sizeof(tree->root));
 }
 
-/** Clear a radix tree.
- *
- * Clears out the contents of a radix tree.
- *
+/** Clear the contents of a radix tree.
  * @param tree		Tree to clear.
  * @param helper	Helper function that gets called on all non-NULL values
- *			found in the tree (can be NULL).
- */
+ *			found in the tree (can be NULL). */
 void radix_tree_clear(radix_tree_t *tree, radix_tree_clear_helper_t helper) {
 	radix_tree_node_clear(&tree->root, helper);
 }
 
-/** Get the node following a node in a radix tree.
- *
- * Gets the node with a key that follows another node's key in a radix tree.
- *
+/** Get the node following another node in a radix tree.
  * @param node		Node to get following node of.
- * 
- * @return		Following node or NULL if none found.
- */
+ * @return		Following node or NULL if none found. */
 radix_tree_node_t *radix_tree_node_next(radix_tree_node_t *node) {
 	radix_tree_node_t *orig = node, *tmp;
 

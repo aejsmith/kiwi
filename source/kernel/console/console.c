@@ -296,7 +296,7 @@ static device_ops_t kconsole_device_ops = {
 };
 
 /** Register the kernel console device. */
-static void __init_text kconsole_device_init(void) {
+static __init_text void kconsole_device_init(void) {
 	status_t ret;
 
 	ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,

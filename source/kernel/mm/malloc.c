@@ -59,14 +59,9 @@ typedef struct alloc_btag {
 static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
 
 /** Allocate a block of memory.
- *
- * Allocates a block of memory and returns a pointer to it.
- *
  * @param size		Size of block.
  * @param kmflag	Allocation flags.
- *
- * @return		Pointer to block on success, NULL on failure.
- */
+ * @return		Pointer to block on success, NULL on failure. */
 void *kmalloc(size_t size, int kmflag) {
 	size_t total = size + sizeof(alloc_btag_t), idx;
 	alloc_btag_t *addr;
@@ -106,15 +101,10 @@ void *kmalloc(size_t size, int kmflag) {
 	return &addr[1];
 }
 
-/** Allocate an array of memory.
- *
- * Allocates an array of elements, and zeros the allocated memory.
- *
+/** Allocate an array of zeroed memory.
  * @param nmemb		Number of array elements.
  * @param size		Size of each element.
- *
- * @return		Pointer to block on success, NULL on failure.
- */
+ * @return		Pointer to block on success, NULL on failure. */
 void *kcalloc(size_t nmemb, size_t size, int kmflag) {
 	void *ret;
 
@@ -127,7 +117,8 @@ void *kcalloc(size_t nmemb, size_t size, int kmflag) {
 	return ret;
 }
 
-/** Resizes an allocated memory block.
+/**
+ * Resizes an allocated memory block.
  *
  * Resizes a memory block previously allocated with kmalloc(), kcalloc() or
  * krealloc(). If passed a NULL pointer, call is equivalent to
@@ -162,7 +153,8 @@ void *krealloc(void *addr, size_t size, int kmflag) {
 	return ret;
 }
 
-/** Free a block of memory.
+/**
+ * Free a block of memory.
  *
  * Frees a block of memory previously allocated with kmalloc(), kcalloc() or
  * krealloc().
@@ -188,7 +180,7 @@ void kfree(void *addr) {
 }
 
 /** Initialise the allocator caches. */
-void __init_text malloc_init(void) {
+__init_text void malloc_init(void) {
 	char name[SLAB_NAME_MAX];
 	size_t i, size;
 

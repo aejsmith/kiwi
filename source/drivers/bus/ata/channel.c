@@ -302,7 +302,8 @@ status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bo
 	return STATUS_TIMED_OUT;
 }
 
-/** Prepares to perform a command on a channel.
+/**
+ * Prepares to perform a command on a channel.
  *
  * Locks the channel, waits for it to become ready (DRQ and BSY set to 0),
  * selects the specified device and waits for it to become ready again. This

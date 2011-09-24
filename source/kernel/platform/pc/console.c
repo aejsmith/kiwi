@@ -58,7 +58,7 @@ static console_t serial_console = {
 #endif
 
 /** Set up the console. */
-void __init_text console_early_init(void) {
+__init_text void console_early_init(void) {
 #ifdef SERIAL_PORT
 	uint8_t status = in8(SERIAL_PORT + 6);
 

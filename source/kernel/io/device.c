@@ -138,7 +138,8 @@ static object_type_t device_object_type = {
 	.get_page = device_object_get_page,
 };
 
-/** Create a new device tree node.
+/**
+ * Create a new device tree node.
  *
  * Creates a new node in the device tree. The device created will not have a
  * reference on it. The device can have no operations, in which case it will
@@ -242,7 +243,8 @@ fail:
 	return ret;
 }
 
-/** Create an alias for a device.
+/**
+ * Create an alias for a device.
  *
  * Creates an alias for another device in the device tree. Any attempts to open
  * the alias will open the device it is an alias for.
@@ -312,7 +314,8 @@ status_t device_alias(const char *name, device_t *parent, device_t *dest, device
 	return STATUS_SUCCESS;
 }
 
-/** Remove a device from the device tree.
+/**
+ * Remove a device from the device tree.
  *
  * Removes a device from the device tree. The device must have no users. All
  * aliases of the device should be destroyed before the device itself.
@@ -401,7 +404,8 @@ static bool device_iterate_internal(device_t *device, device_iterate_t func, voi
 	return true;
 }
 
-/** Iterate through the device tree.
+/**
+ * Iterate through the device tree.
  *
  * Calls the specified function on a device and all its children (and all their
  * children, etc).
@@ -460,7 +464,8 @@ static device_t *device_lookup(const char *path) {
 	return device;
 }
 
-/** Get a device attribute.
+/**
+ * Get a device attribute.
  *
  * Gets an attribute from a device, and optionally checks that it is the
  * required type. Returned structure must NOT be modified.
@@ -591,7 +596,8 @@ status_t device_open(const char *path, object_rights_t rights, object_handle_t *
 	return ret;
 }
 
-/** Read from a device.
+/**
+ * Read from a device.
  *
  * Reads data from a device into a buffer. The device may not support the
  * operation - it is provided as a function rather than a request type because
@@ -637,7 +643,8 @@ status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t 
 	return ret;
 }
 
-/** Write to a device.
+/**
+ * Write to a device.
  *
  * Writes data to a device from buffer. The device may not support the
  * operation - it is provided as a function rather than a request type because
@@ -813,7 +820,7 @@ int kdbg_cmd_device(int argc, char **argv) {
 }
 
 /** Initialise the device manager. */
-void __init_text device_init(void) {
+__init_text void device_init(void) {
 	status_t ret;
 
 	/* Create the root node of the device tree. */
@@ -830,7 +837,8 @@ void __init_text device_init(void) {
 	}
 }
 
-/** Open a handle to a device.
+/**
+ * Open a handle to a device.
  *
  * Opens a handle to a device that can be used to perform other operations on
  * it. Once the device is no longer required, the handle should be closed with
@@ -868,7 +876,8 @@ status_t kern_device_open(const char *path, object_rights_t rights, handle_t *ha
 	return ret;
 }
 
-/** Read from a device.
+/**
+ * Read from a device.
  *
  * Reads data from a device into a buffer. The device may not support the
  * operation - it is provided as a function rather than a request type because
@@ -932,7 +941,8 @@ out:
 	return ret;
 }
 
-/** Write to a device.
+/**
+ * Write to a device.
  *
  * Writes data to a device from buffer. The device may not support the
  * operation - it is provided as a function rather than a request type because

@@ -46,7 +46,8 @@ static inline int refcount_inc(refcount_t *ref) {
 	return atomic_inc(ref) + 1;
 }
 
-/** Decrease a reference count.
+/**
+ * Decrease a reference count.
  *
  * Atomically decreases the value of a reference count. If it goes below 0
  * then a fatal() call will be made.
@@ -65,7 +66,8 @@ static inline int refcount_dec(refcount_t *ref) {
 	return val;
 }
 
-/** Decrease a reference count.
+/**
+ * Decrease a reference count.
  *
  * Atomically decreases the value of a reference count. If it goes below 0
  * then the specified function will be called with a pointer to the reference

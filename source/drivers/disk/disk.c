@@ -258,7 +258,8 @@ out:
 	return ret;
 }
 
-/** Create a new disk device.
+/**
+ * Create a new disk device.
  *
  * Registers a new disk device with the disk device manager and scans it for
  * partitions.

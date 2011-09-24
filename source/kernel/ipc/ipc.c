@@ -622,7 +622,8 @@ static ipc_connection_t *ipc_connection_create(ipc_port_t *port, int count) {
 	return conn;
 }
 
-/** Open a connection to an already open IPC port.
+/**
+ * Open a connection to an already open IPC port.
  *
  * Opens a connection to an IPC port that the caller has a handle open to. This
  * allows, for example, a server to open a connection back to itself.
@@ -762,7 +763,8 @@ status_t kern_connection_open(port_id_t id, handle_t *handlep) {
 	return STATUS_SUCCESS;
 }
 
-/** Send a message on an IPC connection.
+/**
+ * Send a message on an IPC connection.
  *
  * Queues a message at the other end of a connection. Messages are sent
  * asynchronously. This function can block if the recipient's message queue is
@@ -893,7 +895,8 @@ static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, i
 	return STATUS_SUCCESS;
 }
 
-/** Get details of the next message on a connection.
+/**
+ * Get details of the next message on a connection.
  *
  * Waits until a message arrives on a connection, and then returns the type and
  * size of the message, leaving the message on the queue.
@@ -950,7 +953,8 @@ out:
 	return ret;
 }
 
-/** Receive a message from a connection.
+/**
+ * Receive a message from a connection.
  *
  * Waits until a message arrives on a connection and then copies it's data into
  * the supplied buffers.
@@ -1133,7 +1137,7 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 }
 
 /** Initialise the IPC slab caches. */
-static void __init_text ipc_init(void) {
+static __init_text void ipc_init(void) {
 	/* Initialise the port ID allocator. */
 	id_alloc_init(&port_id_allocator, 65535);
 

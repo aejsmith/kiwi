@@ -172,7 +172,8 @@ status_t fs_type_register(fs_type_t *type) {
 	return STATUS_SUCCESS;
 }
 
-/** Remove a filesystem type.
+/**
+ * Remove a filesystem type.
  *
  * Removes a previously registered filesystem type. Will not succeed if the
  * filesystem type is in use by any mounts.
@@ -622,7 +623,8 @@ static status_t fs_node_lookup_internal(char *path, fs_node_t *node, bool follow
 	}
 }
 
-/** Look up a node in the filesystem.
+/**
+ * Look up a node in the filesystem.
  *
  * Looks up a node in the filesystem. If the path is a relative path (one that
  * does not begin with a '/' character), then it will be looked up relative to
@@ -703,7 +705,8 @@ void fs_node_get(fs_node_t *node) {
 	}
 }
 
-/** Decrease the reference count of a node.
+/**
+ * Decrease the reference count of a node.
  *
  * Decreases the reference count of a filesystem node. If this causes the
  * node's count to become zero, then the node will be moved on to the mount's
@@ -760,7 +763,8 @@ void fs_node_release(fs_node_t *node) {
 	}
 }
 
-/** Mark a filesystem node as removed.
+/**
+ * Mark a filesystem node as removed.
  *
  * Marks a filesystem node as removed. This is to be used by filesystem
  * implementations to mark a node as removed when its link count reaches 0,
@@ -1234,7 +1238,8 @@ static fs_node_ops_t memory_file_ops = {
 	.read = memory_file_read,
 };
 
-/** Create a read-only file backed by a chunk of memory.
+/**
+ * Create a read-only file backed by a chunk of memory.
  *
  * Creates a special read-only file that is backed by the specified chunk of
  * memory. This is useful to pass data stored in memory to code that expects
@@ -1269,7 +1274,8 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
 	return handle;
 }
 
-/** Open a handle to a file or directory.
+/**
+ * Open a handle to a file or directory.
  *
  * Opens a handle to a regular file or directory, optionally creating it if it
  * doesn't exist. If the entry does not exist, it will be created as a regular
@@ -1412,7 +1418,8 @@ out:
 	return ret;
 }
 
-/** Read from a file.
+/**
+ * Read from a file.
  *
  * Reads data from a file into a buffer. The read will occur from the file
  * handle's current offset, and before returning the offset will be incremented
@@ -1433,7 +1440,8 @@ status_t file_read(object_handle_t *handle, void *buf, size_t count, size_t *byt
 	return file_read_internal(handle, buf, count, 0, true, bytesp);
 }
 
-/** Read from a file.
+/**
+ * Read from a file.
  *
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
@@ -1525,7 +1533,8 @@ out:
 	return ret;
 }
 
-/** Write to a file.
+/**
+ * Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the file
  * handle's current offset (if the FILE_APPEND flag is set, the offset will be
@@ -1551,7 +1560,8 @@ status_t file_write(object_handle_t *handle, const void *buf, size_t count, size
 	return file_write_internal(handle, buf, count, 0, true, bytesp);
 }
 
-/** Write to a file.
+/**
+ * Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
@@ -1574,7 +1584,8 @@ status_t file_pwrite(object_handle_t *handle, const void *buf, size_t count, off
 	return file_write_internal(handle, buf, count, offset, false, bytesp);
 }
 
-/** Modify the size of a file.
+/**
+ * Modify the size of a file.
  *
  * Modifies the size of a file in the file system. If the new size is smaller
  * than the previous size of the file, then the extra data is discarded. If
@@ -1608,7 +1619,8 @@ status_t file_resize(object_handle_t *handle, offset_t size) {
 	return node->ops->resize(node, size);
 }
 
-/** Set the offset of a file handle.
+/**
+ * Set the offset of a file handle.
  *
  * Modifies the offset of a file handle according to the specified action, and
  * returns the new offset. For directories, the offset is the index of the next
@@ -1722,7 +1734,8 @@ static status_t dir_lookup(fs_node_t *node, const char *name, node_id_t *idp) {
 	return node->ops->lookup_entry(node, name, idp);
 }
 
-/** Create a directory.
+/**
+ * Create a directory.
  *
  * Creates a new directory in the file system. This function cannot open a
  * handle to the created directory. The reason for this is that it is unlikely
@@ -1764,7 +1777,8 @@ status_t dir_create(const char *path, object_security_t *security) {
 	return ret;
 }
 
-/** Read a directory entry.
+/**
+ * Read a directory entry.
  *
  * Reads a single directory entry structure from a directory into a buffer. As
  * the structure length is variable, a buffer size argument must be provided
@@ -1882,7 +1896,8 @@ status_t symlink_create(const char *path, const char *target) {
 	return ret;
 }
 
-/** Get the destination of a symbolic link.
+/**
+ * Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
  * always be placed at the end of the string.
@@ -2050,7 +2065,8 @@ void fs_probe(device_t *device) {
 	object_handle_release(handle);
 }
 
-/** Mount a filesystem.
+/**
+ * Mount a filesystem.
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * The opts parameter allows a string containing a list of comma-seperated
@@ -2316,7 +2332,8 @@ fail:
 	return ret;
 }
 
-/** Unmount a filesystem.
+/**
+ * Unmount a filesystem.
  *
  * Flushes all modifications to a filesystem if it is not read-only and
  * unmounts it. If any nodes in the filesystem are busy, then the operation
@@ -2377,7 +2394,8 @@ status_t fs_info(const char *path, bool follow, file_info_t *infop) {
 	return STATUS_SUCCESS;
 }
 
-/** Decrease the link count of a filesystem node.
+/**
+ * Decrease the link count of a filesystem node.
  *
  * Decreases the link count of a filesystem node, and removes the directory
  * entry for it. If the link count becomes 0, then the node will be removed
@@ -2616,7 +2634,8 @@ void fs_shutdown(void) {
 	}
 }
 
-/** Open a handle to a file or directory.
+/**
+ * Open a handle to a file or directory.
  *
  * Opens a handle to a regular file or directory, optionally creating it if it
  * doesn't exist. If the entry does not exist, it will be created as a regular
@@ -2681,7 +2700,8 @@ status_t kern_file_open(const char *path, object_rights_t rights, int flags, int
 	return ret;
 }
 
-/** Read from a file.
+/**
+ * Read from a file.
  *
  * Reads data from a file into a buffer. The read will occur from the file
  * handle's current offset, and before returning the offset will be incremented
@@ -2746,7 +2766,8 @@ out:
 	return ret;
 }
 
-/** Read from a file.
+/**
+ * Read from a file.
  *
  * Reads data from a file into a buffer. The read will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
@@ -2811,7 +2832,8 @@ out:
 	return ret;
 }
 
-/** Write to a file.
+/**
+ * Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the file
  * handle's current offset (if the FILE_APPEND flag is set, the offset will be
@@ -2881,7 +2903,8 @@ out:
 	return ret;
 }
 
-/** Write to a file.
+/**
+ * Write to a file.
  *
  * Writes data from a buffer into a file. The write will occur at the specified
  * offset, and the handle's offset will be ignored and not modified.
@@ -2947,7 +2970,8 @@ out:
 	return ret;
 }
 
-/** Modify the size of a file.
+/**
+ * Modify the size of a file.
  *
  * Modifies the size of a file in the file system. If the new size is smaller
  * than the previous size of the file, then the extra data is discarded. If
@@ -2974,7 +2998,8 @@ status_t kern_file_resize(handle_t handle, offset_t size) {
 	return ret;
 }
 
-/** Set the offset of a file handle.
+/**
+ * Set the offset of a file handle.
  *
  * Modifies the offset of a file handle according to the specified action, and
  * returns the new offset. For directories, the offset is the index of the next
@@ -3073,7 +3098,8 @@ status_t kern_dir_create(const char *path, const object_security_t *security) {
 	return ret;
 }
 
-/** Read a directory entry.
+/**
+ * Read a directory entry.
  *
  * Reads a single directory entry structure from a directory into a buffer. As
  * the structure length is variable, a buffer size argument must be provided
@@ -3153,7 +3179,8 @@ status_t kern_symlink_create(const char *path, const char *target) {
 	return ret;
 }
 
-/** Get the destination of a symbolic link.
+/**
+ * Get the destination of a symbolic link.
  *
  * Reads the destination of a symbolic link into a buffer. A NULL byte will
  * always be placed at the end of the string.
@@ -3192,7 +3219,8 @@ status_t kern_symlink_read(const char *path, char *buf, size_t size) {
 	return ret;
 }
 
-/** Mount a filesystem.
+/**
+ * Mount a filesystem.
  *
  * Mounts a filesystem onto an existing directory in the filesystem hierarchy.
  * The opts parameter allows a string containing a list of comma-seperated
@@ -3332,7 +3360,8 @@ status_t kern_fs_mount_info(mount_info_t *infop, size_t *countp) {
 	return memcpy_to_user(countp, &i, sizeof(i));
 }
 
-/** Unmounts a filesystem.
+/**
+ * Unmounts a filesystem.
  *
  * Flushes all modifications to a filesystem if it is not read-only and
  * unmounts it. If any nodes in the filesystem are busy, then the operation
@@ -3428,7 +3457,8 @@ status_t kern_fs_setcwd(const char *path) {
 	return ret;
 }
 
-/** Set the root directory.
+/**
+ * Set the root directory.
  *
  * Sets both the current directory and the root directory for the calling
  * process to the directory specified. Any processes spawned by the process
@@ -3597,7 +3627,8 @@ out:
 	return ret;
 }
 
-/** Set security attributes for a filesystem entry.
+/**
+ * Set security attributes for a filesystem entry.
  *
  * Sets the security attributes (owning user/group and ACL) of a filesystem
  * entry. The calling process must either be the owner of the entry, or have
@@ -3652,7 +3683,8 @@ status_t kern_fs_link(const char *source, const char *dest) {
 	return STATUS_NOT_IMPLEMENTED;
 }
 
-/** Decrease the link count of a filesystem node.
+/**
+ * Decrease the link count of a filesystem node.
  *
  * Decreases the link count of a filesystem node, and removes the directory
  * entry for it. If the link count becomes 0, then the node will be removed

@@ -70,7 +70,8 @@ static inline void pipe_insert(pipe_t *pipe, char ch) {
 	semaphore_up(&pipe->data_sem, 1);
 }
 
-/** Read data from a pipe.
+/**
+ * Read data from a pipe.
  *
  * Reads data from a pipe into a buffer. Reads of less than or equal to
  * PIPE_SIZE will either read all the requested data, or none at all. Reads of
@@ -129,7 +130,8 @@ out:
 	return ret;
 }
 
-/** Write data to a pipe.
+/**
+ * Write data to a pipe.
  *
  * Writes data from a buffer to a pipe. Writes of less than or equal to
  * PIPE_SIZE will either write all the requested data, or none at all. Writes
@@ -190,7 +192,8 @@ out:
 	return ret;
 }
 
-/** Wait for a pipe to be readable or writable.
+/**
+ * Wait for a pipe to be readable or writable.
  *
  * Waits for a pipe to become readable or writable, and notifies the specified
  * object wait pointer when it is. This is a convenience function, for example
@@ -251,7 +254,7 @@ void pipe_destroy(pipe_t *pipe) {
 }
 
 /** Initialise the pipe slab cache. */
-static void __init_text pipe_cache_init(void) {
+static __init_text void pipe_cache_init(void) {
 	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
 	                               NULL, NULL, 0, MM_FATAL);
 }

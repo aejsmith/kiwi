@@ -197,7 +197,8 @@ void bios_mem_free(void *addr, size_t size) {
 }
 MODULE_EXPORT(bios_mem_free);
 
-/** Convert a virtual address to a physical address.
+/**
+ * Convert a virtual address to a physical address.
  *
  * Converts the virtual address of part of the BIOS memory area to a physical
  * address that can be passed to BIOS interrupts.
@@ -214,7 +215,8 @@ uint32_t bios_mem_virt2phys(void *addr) {
 }
 MODULE_EXPORT(bios_mem_virt2phys);
 
-/** Convert a BIOS memory address to a virtual address.
+/**
+ * Convert a BIOS memory address to a virtual address.
  *
  * Converts a physical BIOS memory address to a virtual kernel address. Be
  * aware of data that may straddle across a boundary between different memory
@@ -231,7 +233,8 @@ void *bios_mem_phys2virt(uint32_t addr) {
 }
 MODULE_EXPORT(bios_mem_phys2virt);
 
-/** Execute a BIOS interrupt.
+/**
+ * Execute a BIOS interrupt.
  *
  * Executes a real-mode BIOS interrupt. Calls to BIOS interrupts are
  * serialized.

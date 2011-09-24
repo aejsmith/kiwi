@@ -157,7 +157,8 @@ static void printf_number_helper(uint64_t num, long width, long precision, int b
 	}
 }
 
-/** Internal implementation of printf()-style functions.
+/**
+ * Internal implementation of printf()-style functions.
  *
  * This function does the main work of printf()-style functions. It parses
  * the format string, and uses a supplied helper function to actually put

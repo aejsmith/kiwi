@@ -117,7 +117,8 @@ void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object
 	acl->entries[acl->count++].rights = rights;
 }
 
-/** Canonicalise an object ACL.
+/**
+ * Canonicalise an object ACL.
  *
  * Converts an object ACL into canonical form. An ACL is considered to be in
  * canonical form if there are no duplicate entries (entries with the same type
@@ -215,7 +216,8 @@ static object_rights_t object_acl_rights(object_t *object, object_acl_t *acl, bo
 	return rights;
 }
 
-/** Validate object security attributes.
+/**
+ * Validate object security attributes.
  *
  * Validates an object security attributes structure against a process' security
  * context to check if the user and group the structure specifies are allowed
@@ -275,7 +277,8 @@ status_t object_security_validate(object_security_t *security, process_t *proces
 	return ret;
 }
 
-/** Copy object security attributes from userspace.
+/**
+ * Copy object security attributes from userspace.
  *
  * Copies an object security attributes structure from userspace memory,
  * canonicalises its ACL and validates it using object_security_validate().
@@ -380,7 +383,8 @@ object_rights_t object_rights(object_t *object, process_t *process) {
 	return rights;
 }
 
-/** Set security attributes for an object.
+/**
+ * Set security attributes for an object.
  *
  * Sets the security attributes (owning user/group and ACL) of an object. The
  * calling process must be the owner of the entry, or if the object is a
@@ -533,7 +537,8 @@ out:
 	return ret;
 }
 
-/** Set security attributes for an object.
+/**
+ * Set security attributes for an object.
  *
  * Sets the security attributes (owning user/group and ACL) of an object. The
  * calling process must be the owner of the entry, or if the object is a

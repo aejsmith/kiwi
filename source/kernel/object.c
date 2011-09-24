@@ -168,7 +168,8 @@ void object_wait_signal(void *_sync) {
 	semaphore_up(sync->sem, 1);
 }
 
-/** Create a handle to an object.
+/**
+ * Create a handle to an object.
  *
  * Creates a new handle to an object, and optionally attaches it to a process.
  * If either the idp or uidp parameter is not NULL, the handle will be attached.
@@ -248,7 +249,8 @@ status_t object_handle_open(object_t *object, void *data, object_rights_t rights
 	return object_handle_create(object, data, rights, process, flags, handlep, idp, uidp);
 }
 
-/** Increase the reference count of a handle.
+/**
+ * Increase the reference count of a handle.
  *
  * Increases the reference count of a handle to signal that it is being used.
  * When the handle is no longer needed it should be released with
@@ -261,7 +263,8 @@ void object_handle_get(object_handle_t *handle) {
 	refcount_inc(&handle->count);
 }
 
-/** Release a handle.
+/**
+ * Release a handle.
  *
  * Decreases the reference count of a handle. If no more references remain to
  * the handle, it will be destroyed.
@@ -298,7 +301,8 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 	avl_tree_insert(&table->tree, &link->link, id, link);
 }
 
-/** Insert a handle into a process' handle table.
+/**
+ * Insert a handle into a process' handle table.
  *
  * Allocates a handle ID for a process and adds a handle to it. On success,
  * the handle will have an extra reference on it.
@@ -380,7 +384,8 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 	return STATUS_SUCCESS;
 }
 
-/** Detach a handle from a process.
+/**
+ * Detach a handle from a process.
  *
  * Removes the specified handle ID from a process' handle table and releases
  * the handle.
@@ -404,7 +409,8 @@ status_t object_handle_detach(process_t *process, handle_t id) {
 	return ret;
 }
 
-/** Look up a handle in a the current process' handle table.
+/**
+ * Look up a handle in a the current process' handle table.
  *
  * Looks up the handle with the given ID in the current process' handle table,
  * optionally checking that the object it refers to is a certain type and that
@@ -453,7 +459,8 @@ status_t object_handle_lookup(handle_t id, int type, object_rights_t rights, obj
 	return STATUS_SUCCESS;
 }
 
-/** Create a new handle table.
+/**
+ * Create a new handle table.
  *
  * Creates a new handle table and duplicates handles from another handle table
  * into it, either using provided mapping information, or by looking at the
@@ -526,7 +533,8 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 	return STATUS_SUCCESS;
 }
 
-/** Clone a handle table.
+/**
+ * Clone a handle table.
  *
  * Creates a clone of a handle table. All handles, even non-inheritable ones,
  * will be copied into the new table. The table entries will all refer to the
@@ -678,7 +686,7 @@ int kdbg_cmd_object(int argc, char **argv) {
 }
 
 /** Initialise the handle caches. */
-void __init_text handle_init(void) {
+__init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
 	                                        0, NULL, NULL, NULL, 0, MM_FATAL);
 	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
@@ -843,7 +851,8 @@ status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
 	return ret;
 }
 
-/** Duplicate a handle ID.
+/**
+ * Duplicate a handle ID.
  *
  * Duplicates an entry in the calling process' handle table. The new handle ID
  * will refer to the same handle as the source ID.

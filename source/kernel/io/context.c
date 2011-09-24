@@ -29,7 +29,8 @@
 extern void fs_node_get(fs_node_t *node);
 extern fs_mount_t *root_mount;
 
-/** Initialise an I/O context.
+/**
+ * Initialise an I/O context.
  *
  * Initialises an I/O context structure. If a parent context is provided, then
  * the new context will inherit parts of the parent context such as current
@@ -76,7 +77,8 @@ void io_context_destroy(io_context_t *context) {
 	fs_node_release(context->root_dir);
 }
 
-/** Set the current directory of an I/O context.
+/**
+ * Set the current directory of an I/O context.
  *
  * Sets the current directory of an I/O context to the specified filesystem
  * node. The previous working directory node will be released, and the supplied
@@ -105,7 +107,8 @@ status_t io_context_setcwd(io_context_t *context, fs_node_t *node) {
 	return STATUS_SUCCESS;
 }
 
-/** Set the root directory of an I/O context.
+/**
+ * Set the root directory of an I/O context.
  *
  * Sets both the root directory and current directory of an I/O context to
  * the specified directory.

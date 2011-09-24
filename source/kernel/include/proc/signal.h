@@ -26,8 +26,8 @@
 
 struct thread;
 
-extern status_t signal_arch_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t mask);
-extern status_t signal_arch_restore_frame(sigset_t *maskp);
+extern status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t mask);
+extern status_t arch_signal_restore_frame(sigset_t *maskp);
 
 extern void signal_send(struct thread *thread, int num, siginfo_t *info, bool force);
 extern void signal_handle_pending(void);

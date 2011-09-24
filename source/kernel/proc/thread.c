@@ -793,7 +793,7 @@ int kdbg_cmd_thread(int argc, char **argv) {
 }
 
 /** Initialise the thread system. */
-void __init_text thread_init(void) {
+__init_text void thread_init(void) {
 	/* Initialise the thread ID allocator. */
 	id_alloc_init(&thread_id_allocator, 65535);
 
@@ -804,7 +804,7 @@ void __init_text thread_init(void) {
 }
 
 /** Create the thread reaper. */
-void __init_text thread_reaper_init(void) {
+__init_text void thread_reaper_init(void) {
 	thread_t *thread;
 	status_t ret;
 

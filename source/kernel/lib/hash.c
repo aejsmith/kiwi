@@ -76,7 +76,8 @@ void hash_insert(hash_t *hash, list_t *entry) {
 	list_append(&hash->buckets[hash->ops->hash(key) % hash->entries], entry);
 }
 
-/** Insert an entry into a hash table.
+/**
+ * Insert an entry into a hash table.
  *
  * Inserts the given entry into a hash table, ensuring that no other entry
  * exists with the same key.

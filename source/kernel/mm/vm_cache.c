@@ -439,7 +439,8 @@ out:
 	return ret;
 }
 
-/** Get a page from a cache.
+/**
+ * Get a page from a cache.
  *
  * Gets a page from a cache. This is a helper function to allow the cache to
  * be memory-mapped.
@@ -598,7 +599,8 @@ status_t vm_cache_destroy(vm_cache_t *cache, bool discard) {
 	return STATUS_SUCCESS;
 }
 
-/** Flush changes to a page from a cache.
+/**
+ * Flush changes to a page from a cache.
  *
  * Flushes changes to a modified page belonging to a cache. This is a helper
  * function for use by the page daemon, and should not be used by anything
@@ -627,7 +629,8 @@ bool vm_cache_flush_page(page_t *page) {
 	return (ret == STATUS_SUCCESS);
 }
 
-/** Evict a page in a cache from memory.
+/**
+ * Evict a page in a cache from memory.
  *
  * Attempts to evict a page belonging to a cache from memory. This is a helper
  * function for use by the page daemon, and should not be used by anything
@@ -702,7 +705,7 @@ int kdbg_cmd_cache(int argc, char **argv) {
 }
 
 /** Create the VM cache structure slab cache. */
-void __init_text vm_cache_init(void) {
+__init_text void vm_cache_init(void) {
 	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),
 	                                   0, vm_cache_ctor, NULL, NULL, 0,
 	                                   MM_FATAL);

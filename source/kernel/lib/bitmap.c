@@ -30,7 +30,8 @@
 #include <assert.h>
 #include <status.h>
 
-/** Initialise a bitmap.
+/**
+ * Initialise a bitmap.
  *
  * Initialises the given bitmap structure. If the data argument is supplied,
  * then it should point to a preallocated memory area that's large enough to
@@ -67,7 +68,8 @@ status_t bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int mmflag) {
 	return STATUS_SUCCESS;
 }
 
-/** Destroy a bitmap.
+/**
+ * Destroy a bitmap.
  *
  * Destroys the given bitmap. If the original call to bitmap_init() was given
  * a preallocated memory space, then this function will not free it: it is up

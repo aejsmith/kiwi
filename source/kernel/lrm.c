@@ -277,7 +277,7 @@ int kdbg_cmd_lrm(int argc, char **argv) {
 }
 
 /** Perform LRM initialisation. */
-void __init_text lrm_init(void) {
+__init_text void lrm_init(void) {
 	status_t ret;
 
 	/* Create the LRM thread. */

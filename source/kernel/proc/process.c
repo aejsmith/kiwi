@@ -776,7 +776,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 }
 
 /** Initialise the process table and slab cache. */
-void __init_text process_init(void) {
+__init_text void process_init(void) {
 	object_acl_t acl;
 	object_security_t security = { 0, 0, &acl };
 	status_t ret;

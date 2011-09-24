@@ -49,7 +49,8 @@ static int compare_group(const void *a, const void *b) {
 	}
 }
 
-/** Canonicalise a security context.
+/**
+ * Canonicalise a security context.
  *
  * Converts a security context to canonical form. A security context is
  * considered to be canonical if all group IDs after the primary group are in
@@ -91,7 +92,8 @@ static inline bool compare_identity(const security_context_t *a, const security_
 	return (memcmp(a->groups, b->groups, sizeof(a->groups)) == 0);
 }
 
-/** Validate a security context.
+/**
+ * Validate a security context.
  *
  * Validates a security context to check that it does not have any capabilities
  * that the security context of the process trying to set it does not have,
@@ -142,7 +144,8 @@ status_t security_context_validate(const security_context_t *setter,
 	return STATUS_SUCCESS;
 }
 
-/** Obtain the security context for a process.
+/**
+ * Obtain the security context for a process.
  *
  * Obtains the security context for a process. This function must always be
  * used to get the security context rather than accessing the process structure
@@ -206,7 +209,7 @@ group_id_t security_current_gid(void) {
 }
 
 /** Initialise the security system. */
-void __init_text security_init(void) {
+__init_text void security_init(void) {
 	security_context_init(&init_security_context);
 	security_context_set_uid(&init_security_context, 0);
 	security_context_add_group(&init_security_context, 0);

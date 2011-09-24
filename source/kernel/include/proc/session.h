@@ -34,6 +34,6 @@ extern session_t *session_create(void);
 extern void session_get(session_t *session);
 extern void session_release(session_t *session);
 
-extern void __init_text session_init(void);
+extern void session_init(void);
 
 #endif /* __PROC_SESSION_H */

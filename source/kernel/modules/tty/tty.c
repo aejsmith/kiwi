@@ -79,7 +79,8 @@ static void tty_release(tty_device_t *tty) {
 	}
 }
 
-/** Check if a character is a control character.
+/**
+ * Check if a character is a control character.
  *
  * Checks if the given character is a certain control character for a
  * terminal. If the terminal's next character is escaped, the function

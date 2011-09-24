@@ -1097,7 +1097,8 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	return ret;
 }
 
-/** Mark a region as reserved.
+/**
+ * Mark a region as reserved.
  *
  * Marks a region of memory in an address space as reserved. Reserved regions
  * will never be allocated from if mapping without VM_MAP_FIXED, but they can
@@ -1130,7 +1131,8 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	return STATUS_SUCCESS;
 }
 
-/** Map an object into memory.
+/**
+ * Map an object into memory.
  *
  * Creates a new memory mapping within an address space that maps either an
  * object or anonymous memory. If the VM_MAP_FIXED flag is specified, then the
@@ -1280,11 +1282,13 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 	return STATUS_SUCCESS;
 }
 
-/** Unmaps a region of memory.
+/**
+ * Unmaps a region of memory.
  *
  * Marks the specified address range as free in an address space and unmaps
  * anything that may be mapped there.
  *
+ * @param as		Address space to unmap from.
  * @param start		Start of region to free.
  * @param size		Size of region to free.
  *
@@ -1365,7 +1369,8 @@ vm_aspace_t *vm_aspace_create(void) {
 	return as;
 }
 
-/** Create a clone of an address space.
+/**
+ * Create a clone of an address space.
  *
  * Creates a clone of an existing address space. Non-private regions will be
  * shared among the two address spaces (modifications in one will affect both),
@@ -1373,7 +1378,13 @@ vm_aspace_t *vm_aspace_create(void) {
  *
  * @todo		Duplicate all mappings from the previous address space
  *			after cloning regions, to remove overhead of faulting
- *			in the new process.
+ *			in the new process? This may not be the best thing to
+ *			do as cloning is mainly used to implement the POSIX
+ *			fork() system call, which is most often followed with
+ *			an exec(). In this case, the majority of the duplicated
+ *			mappings would in fact not be required, and copying
+ *			mappings would be more overhead. Could possibly just
+ *			map a working set...
  *
  * @param orig		Original address space.
  *
@@ -1434,7 +1445,8 @@ static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unat
 }
 #endif
 
-/** Destroy an address space.
+/**
+ * Destroy an address space.
  *
  * Removes all memory mappings in an address space and frees it. This must
  * not be called if the address space is in use on any CPU. There should also
@@ -1488,7 +1500,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 }
 
 /** Initialise the VM system. */
-void __init_text vm_init(void) {
+__init_text void vm_init(void) {
 	vm_region_t *region;
 
 	/* Create the VM slab caches. */
@@ -1601,7 +1613,8 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 	return KDBG_OK;
 }
 
-/** Map an object into memory.
+/**
+ * Map an object into memory.
  *
  * Creates a new memory mapping within an address space that maps either an
  * object or anonymous memory. If the VM_MAP_FIXED flag is specified, then the
@@ -1655,7 +1668,8 @@ status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle, offse
 	return ret;
 }
 
-/** Unmaps a region of memory.
+/**
+ * Unmaps a region of memory.
  *
  * Marks the specified address range as free in the calling process' address
  * space and unmaps anything that may be mapped there.

@@ -73,7 +73,8 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 	}
 }
 
-/** Acquire a readers-writer lock for reading.
+/**
+ * Acquire a readers-writer lock for reading.
  *
  * Acquires a readers-writer lock for reading. Multiple readers can hold a
  * readers-writer lock at any one time, however if there are any writers
@@ -116,7 +117,8 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	return STATUS_SUCCESS;
 }
 
-/** Acquire a readers-writer lock for writing.
+/**
+ * Acquire a readers-writer lock for writing.
  *
  * Acquires a readers-writer lock for writing. When the lock has been acquired,
  * no other readers or writers will be holding the lock, or be able to acquire
@@ -161,7 +163,8 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	return ret;
 }
 
-/** Acquire a readers-writer lock for reading.
+/**
+ * Acquire a readers-writer lock for reading.
  *
  * Acquires a readers-writer lock for reading. Multiple readers can hold a
  * readers-writer lock at any one time, however if there are any writers
@@ -174,7 +177,8 @@ void rwlock_read_lock(rwlock_t *lock) {
 	rwlock_read_lock_etc(lock, -1, 0);
 }
 
-/** Acquire a readers-writer lock for writing.
+/**
+ * Acquire a readers-writer lock for writing.
  *
  * Acquires a readers-writer lock for writing. When the lock has been acquired,
  * no other readers or writers will be holding the lock, or be able to acquire

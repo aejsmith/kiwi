@@ -25,7 +25,8 @@
 
 #include <mm/malloc.h>
 
-/** Copy data in memory.
+/**
+ * Copy data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may not overlap.
@@ -84,15 +85,10 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 }
 
 /** Fill a memory area.
- *
- * Fills a memory area with the value specified.
- *
  * @param dest		The memory area to fill.
  * @param val		The value to fill with (converted to an unsigned char).
  * @param count		The number of bytes to fill.
- *
- * @return		Destination location.
- */
+ * @return		Destination location. */
 void *memset(void *dest, int val, size_t count) {
 	unsigned char c = val & 0xff;
 	unative_t *nd, nval;
@@ -143,7 +139,8 @@ void *memset(void *dest, int val, size_t count) {
 	return dest;
 }
 
-/** Copy overlapping data in memory.
+/**
+ * Copy overlapping data in memory.
  *
  * Copies bytes from a source memory area to a destination memory area,
  * where both areas may overlap.
@@ -195,7 +192,8 @@ int memcmp(const void *p1, const void *p2, size_t count) {
 	return 0;
 }
 
-/** Get length of string.
+/**
+ * Get the length of string.
  *
  * Gets the length of the string specified. The length is the number of
  * characters found before a NULL byte.
@@ -210,7 +208,8 @@ size_t strlen(const char *str) {
 	return retval;
 }
 
-/** Get length of string with limit.
+/**
+ * Get length of string with limit.
  *
  * Gets the length of the string specified. The length is the number of
  * characters found either before a NULL byte or before the maximum length
@@ -227,17 +226,12 @@ size_t strnlen(const char *str, size_t count) {
 	return retval;
 }
 
-/** Compare 2 strings.
- *
- * Compares the two strings specified.
- *
+/** Compare two strings.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strcmp(const char *s1, const char *s2) {
 	char x;
 
@@ -253,19 +247,13 @@ int strcmp(const char *s1, const char *s2) {
 	return x - *s2;
 }
 
-/** Compare 2 strings with a length limit.
- *
- * Compares the two strings specified. Compares at most the number of bytes
- * specified.
- *
+/** Compare two strings with a length limit.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
  * @param count		Maximum number of bytes to compare.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strncmp(const char *s1, const char *s2, size_t count) {
 	const char *a = s1;
 	const char *b = s2;
@@ -282,18 +270,12 @@ int strncmp(const char *s1, const char *s2, size_t count) {
 	return 0;
 }
 
-/** Compare 2 strings ignorning case.
- *
- * Compares the two strings specified, ignorning the case of the characters
- * in the strings.
- *
+/** Compare two strings ignorning case.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strcasecmp(const char *s1, const char *s2) {
 	for(;;) {
 		if(!*s2 || (tolower(*s1) != tolower(*s2)))
@@ -304,19 +286,13 @@ int strcasecmp(const char *s1, const char *s2) {
 	return tolower(*s1) - tolower(*s2);
 }
 
-/** Compare 2 strings with a length limit ignoring case.
- *
- * Compares the two strings specified, ignorning the case of the characters
- * in the strings. Compares at most the number of bytes specified.
- *
+/** Compare two strings with a length limit ignoring case.
  * @param s1		Pointer to the first string.
  * @param s2		Pointer to the second string.
  * @param count		Maximum number of bytes to compare.
- * 
  * @return		An integer less than, equal to or greater than 0 if
  *			s1 is found, respectively, to be less than, to match,
- *			or to be greater than s2.
- */
+ *			or to be greater than s2. */
 int strncasecmp(const char *s1, const char *s2, size_t count) {
 	const char *a = s1;
 	const char *b = s2;
@@ -333,7 +309,8 @@ int strncasecmp(const char *s1, const char *s2, size_t count) {
 	return 0;
 }
 
-/** Separate a string.
+/**
+ * Separate a string.
  *
  * Finds the first occurrence of a symbol in the string delim in *stringp.
  * If one is found, the delimeter is replaced by a NULL byte and the pointer
@@ -373,15 +350,10 @@ char *strsep(char **stringp, const char *delim) {
 	}
 }
 
-/** Find a character in a string.
- *
- * Finds the first occurrence of a character in the specified string.
- *
+/** Find the first occurrence of a character in a string.
  * @param s		Pointer to the string to search.
  * @param c		Character to search for.
- * 
- * @return		NULL if token not found, otherwise pointer to token.
- */
+ * @return		NULL if token not found, otherwise pointer to token. */
 char *strchr(const char *s, int c) {
 	char ch = c;
 
@@ -397,15 +369,10 @@ char *strchr(const char *s, int c) {
 	return (char *)s;
 }
 
-/** Find a character in a string.
- *
- * Finds the last occurrence of a character in the specified string.
- *
+/** Find the last occurrence of a character in a string.
  * @param s		Pointer to the string to search.
  * @param c		Character to search for.
- * 
- * @return		NULL if token not found, otherwise pointer to token.
- */
+ * @return		NULL if token not found, otherwise pointer to token. */
 char *strrchr(const char *s, int c) {
 	const char *l = NULL;
 
@@ -420,7 +387,8 @@ char *strrchr(const char *s, int c) {
 	return (char *)l;
 }
 
-/** Strip whitespace from a string.
+/**
+ * Strip whitespace from a string.
  * 
  * Strips whitespace from the start and end of a string. The string is modified
  * in-place.
@@ -448,7 +416,8 @@ char *strstrip(char *str) {
 	return str;
 }
 
-/** Copy a string.
+/**
+ * Copy a string.
  *
  * Copies a string from one place to another. Assumes that the destination
  * is big enough to hold the string.
@@ -465,7 +434,8 @@ char *strcpy(char *restrict dest, const char *restrict src) {
 	return dest;
 }
 
-/** Copy a string with a length limit.
+/**
+ * Copy a string with a length limit.
  *
  * Copies a string from one place to another. Will copy at most the number
  * of bytes specified.
@@ -488,15 +458,10 @@ char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 	return dest;
 }
 
-/** Concatenate 2 strings.
- *
- * Appends one string to another.
- *
+/** Concatenate two strings.
  * @param dest		Pointer to the string to append to.
  * @param src		Pointer to the string to append.
- * 
- * @return		Pointer to dest.
- */
+ * @return		Pointer to dest. */
 char *strcat(char *restrict dest, const char *restrict src) {
 	size_t destlen = strlen(dest);
 	char *d = dest + destlen;
@@ -505,9 +470,11 @@ char *strcat(char *restrict dest, const char *restrict src) {
 	return dest;
 }
 
-/** Duplicate memory.
+/**
+ * Duplicate memory.
  *
- * Allocates a block of memory big enough and copies the source to it.
+ * Allocates a block of memory big enough and copies the source to it. The
+ * memory returned should be freed with kfree().
  *
  * @param src		Memory to duplicate.
  * @param count		Number of bytes to duplicate.
@@ -531,10 +498,11 @@ void *kmemdup(const void *src, size_t count, int kmflag) {
 	return dest;
 }
 
-/** Duplicate a string.
+/**
+ * Duplicate a string.
  *
  * Allocates a buffer big enough to hold the given string and copies the
- * string to it. The pointer returned should be freed with kfree().
+ * string to it. The memory returned should be freed with kfree().
  *
  * @param src		Pointer to the source buffer.
  * @param kmflag	Allocation flags for kmalloc().
@@ -554,12 +522,13 @@ char *kstrdup(const char *src, int kmflag) {
 	return dup;
 }
 
-/** Duplicate a string with a length limit.
+/**
+ * Duplicate a string with a length limit.
  *
  * Allocates a buffer either as big as the string or the maximum length
  * given, and then copies at most the number of bytes specified of the string
  * to it. If the string is longer than the limit, a null byte will be added
- * to the end of the duplicate. The pointer returned should be freed with
+ * to the end of the duplicate. The memory returned should be freed with
  * kfree().
  *
  * @param src		Pointer to the source buffer.
@@ -582,7 +551,8 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
 	return dup;
 }
 
-/** Get last component of a path.
+/**
+ * Get the last component of a path.
  *
  * Returns an allocated string buffer containing the last component of the
  * given path.
@@ -634,7 +604,8 @@ char *kbasename(const char *path, int kmflag) {
 	}
 }
 
-/** Get part of a path preceding the last /.
+/**
+ * Get the part of a path preceding the last /.
  *
  * Returns an allocated string buffer containing everything preceding the last
  * component of the given path.
@@ -719,29 +690,19 @@ char *kdirname(const char *path, int kmflag) {
 	})
 
 /** Convert a string to an unsigned long.
- *
- * Converts a string to an unsigned long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use (if zero will guess).
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 unsigned long strtoul(const char *cp, char **endp, unsigned int base) {
 	return __strtoux(unsigned long, cp, endp, base);
 }
 
 /** Convert a string to a signed long.
- *
- * Converts a string to an signed long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 long strtol(const char *cp, char **endp, unsigned int base) {
 	if(*cp == '-') {
 		return -strtoul(cp + 1, endp, base);
@@ -750,29 +711,19 @@ long strtol(const char *cp, char **endp, unsigned int base) {
 }
 
 /** Convert a string to an unsigned long long.
- *
- * Converts a string to an unsigned long long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 unsigned long long strtoull(const char *cp, char **endp, unsigned int base) {
 	return __strtoux(unsigned long long, cp, endp, base);
 }
 
 /** Convert a string to an signed long long.
- *
- * Converts a string to an signed long long using the specified number base.
- *
  * @param cp		The start of the string.
  * @param endp		Pointer to the end of the parsed string placed here.
  * @param base		The number base to use.
- *
- * @return		Converted value.
- */
+ * @return		Converted value. */
 long long strtoll(const char *cp, char **endp, unsigned int base) {
 	if(*cp == '-') {
 		return -strtoull(cp + 1, endp, base);
@@ -800,7 +751,8 @@ static void vsnprintf_helper(char ch, void *_data, int *total) {
 	}
 }
 
-/** Format a string and place it in a buffer.
+/**
+ * Format a string and place it in a buffer.
  *
  * Places a formatted string in a buffer according to the format and
  * arguments given.
@@ -831,10 +783,12 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args) {
 	return ret;
 }
 
-/** Format a string and place it in a buffer.
+/**
+ * Format a string and place it in a buffer.
  *
  * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * arguments given. The buffer must be large enough to store the formatted
+ * string; it is preferrable to use vsnprintf().
  *
  * @param buf		The buffer to place the result into.
  * @param fmt		The format string to use.
@@ -847,7 +801,8 @@ int vsprintf(char *buf, const char *fmt, va_list args) {
 	return vsnprintf(buf, (size_t)-1, fmt, args);
 }
 
-/** Format a string and place it in a buffer.
+/**
+ * Format a string and place it in a buffer.
  *
  * Places a formatted string in a buffer according to the format and
  * arguments given.
@@ -870,10 +825,12 @@ int snprintf(char *buf, size_t size, const char *fmt, ...) {
 	return ret;
 }
 
-/** Format a string and place it in a buffer.
+/**
+ * Format a string and place it in a buffer.
  *
  * Places a formatted string in a buffer according to the format and
- * arguments given.
+ * arguments given. The buffer must be large enough to store the formatted
+ * string; it is preferrable to use snprintf().
  *
  * @param buf		The buffer to place the result into.
  * @param fmt		The format string to use.

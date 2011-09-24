@@ -56,7 +56,8 @@ static const unsigned char kdbg_kbd_layout_s[] = {
 	0, 0, '+', 0, 0, 0, 0, 0, 0, 0, '|', 0, 0
 };
 
-/** Get a character from the keyboard.
+/**
+ * Get a character from the keyboard.
  *
  * Waits for input to become available, takes it out of the i8042 buffer and
  * returns it.

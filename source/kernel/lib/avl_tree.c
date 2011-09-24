@@ -333,7 +333,8 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 	}
 }
 
-/** Insert a value into an AVL tree with a dynamically allocated node.
+/**
+ * Insert a value into an AVL tree with a dynamically allocated node.
  *
  * Inserts a value into an AVL tree with a dynamically allocated node. Values
  * inserted using this function must be removed with avl_tree_dyn_remove() to
@@ -370,7 +371,8 @@ void *avl_tree_lookup(avl_tree_t *tree, key_t key) {
 	return (node) ? node->value : NULL;
 }
 
-/** Get the first node in an AVL tree.
+/**
+ * Get the first node in an AVL tree.
  *
  * Gets a pointer to the first node (the one with the lowest key) in an AVL
  * tree by descending down the tree's left-hand side.
@@ -395,7 +397,8 @@ avl_tree_node_t *avl_tree_first(avl_tree_t *tree) {
 	}
 }
 
-/** Get the last node in an AVL tree.
+/**
+ * Get the last node in an AVL tree.
  *
  * Gets a pointer to the last node (the one with the highest key) in an AVL
  * tree by descending down the tree's right-hand side.

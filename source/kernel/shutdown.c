@@ -114,7 +114,8 @@ void system_shutdown(int action) {
 	}
 }
 
-/** Shut down the system.
+/**
+ * Shut down the system.
  *
  * Terminates all running processes, flushes and unmounts all filesystems, and
  * then performs the specified action. The CAP_SHUTDOWN capability is required

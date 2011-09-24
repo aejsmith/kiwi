@@ -54,7 +54,7 @@ typedef struct signal_frame {
  * @param info		Signal information.
  * @param mask		Previous signal mask.
  * @return		Status code describing result of the operation. */
-status_t signal_arch_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t mask) {
+status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t mask) {
 	signal_frame_t frame;
 	intr_frame_t *iframe;
 	status_t ret;
@@ -143,7 +143,7 @@ status_t signal_arch_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 /** Restore previous context after returning from a signal handler.
  * @param maskp		Where to store restored signal mask.
  * @return		Status code describing result of the operation. */
-status_t signal_arch_restore_frame(sigset_t *maskp) {
+status_t arch_signal_restore_frame(sigset_t *maskp) {
 	signal_frame_t frame;
 	intr_frame_t *iframe;
 	status_t ret;

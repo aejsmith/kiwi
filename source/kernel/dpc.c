@@ -94,7 +94,8 @@ static dpc_request_t *dpc_request_alloc(void) {
 	return request;
 }
 
-/** Make a DPC request.
+/**
+ * Make a DPC request.
  *
  * Adds a function to the DPC queue to be called by the DPC thread. This
  * function is safe to use from interrupt context.
@@ -125,7 +126,7 @@ bool dpc_inited(void) {
 }
 
 /** Initialize the DPC thread. */
-void __init_text dpc_init(void) {
+__init_text void dpc_init(void) {
 	dpc_request_t *alloc;
 	status_t ret;
 	size_t i;
