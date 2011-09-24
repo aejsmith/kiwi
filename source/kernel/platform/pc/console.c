@@ -50,7 +50,7 @@ static console_t serial_console = {
 #if CONFIG_DEBUG
 	.min_level = LOG_DEBUG,
 #else
-	.min_level = LOG_NORMAL,
+	.min_level = LOG_NOTICE,
 #endif
 	.init = serial_console_init,
 	.putch = serial_console_putch,

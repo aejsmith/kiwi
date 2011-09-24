@@ -206,7 +206,7 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 			/* Meh, ignore it. */
 			continue;
 		} else if(strcmp(module->deps[i], module->name) == 0) {
-			kprintf(LOG_NORMAL, "module: module %s depends on itself\n", module, module->name);
+			kprintf(LOG_NOTICE, "module: module %s depends on itself\n", module, module->name);
 			return STATUS_MALFORMED_IMAGE;
 		}
 
@@ -284,15 +284,15 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 
 	/* Check if it is valid. */
 	if(!module->name || !module->description || !module->init) {
-		kprintf(LOG_NORMAL, "module: information for module %p is invalid\n", module);
+		kprintf(LOG_NOTICE, "module: information for module %p is invalid\n", module);
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	} else if(strnlen(module->name, MODULE_NAME_MAX) == MODULE_NAME_MAX) {
-		kprintf(LOG_NORMAL, "module: name of module %p is too long\n", module);
+		kprintf(LOG_NOTICE, "module: name of module %p is too long\n", module);
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	} else if(strnlen(module->description, MODULE_DESC_MAX) == MODULE_DESC_MAX) {
-		kprintf(LOG_NORMAL, "module: description of module %p is too long\n", module);
+		kprintf(LOG_NOTICE, "module: description of module %p is too long\n", module);
 		ret = STATUS_MALFORMED_IMAGE;
 		goto fail;
 	}
@@ -334,7 +334,7 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 
 	list_append(&module_list, &module->header);
 	module->handle = NULL;
-	kprintf(LOG_NORMAL, "module: successfully loaded module %s (%s)\n",
+	kprintf(LOG_NOTICE, "module: successfully loaded module %s (%s)\n",
 	        module->name, module->description);
 	mutex_unlock(&module_lock);
 	return STATUS_SUCCESS;

@@ -54,27 +54,27 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	thread_wire(curr_thread);
 	thread_disable_preempt();
 
-	kprintf(LOG_NORMAL, "system: terminating all processes...\n");
+	kprintf(LOG_NOTICE, "system: terminating all processes...\n");
 	process_shutdown();
-	kprintf(LOG_NORMAL, "system: unmounting filesystems...\n");
+	kprintf(LOG_NOTICE, "system: unmounting filesystems...\n");
 	fs_shutdown();
 #if CONFIG_SMP
-	kprintf(LOG_NORMAL, "system: shutting down secondary CPUs...\n");
+	kprintf(LOG_NOTICE, "system: shutting down secondary CPUs...\n");
 	ipi_broadcast(shutdown_ipi_handler, 0, 0, 0, 0, IPI_SEND_SYNC);
 #endif
 
 	switch(action) {
 	case SHUTDOWN_REBOOT:
-		kprintf(LOG_NORMAL, "system: rebooting...\n");
+		kprintf(LOG_NOTICE, "system: rebooting...\n");
 		platform_reboot();
 		break;
 	case SHUTDOWN_POWEROFF:
-		kprintf(LOG_NORMAL, "system: powering off...\n");
+		kprintf(LOG_NOTICE, "system: powering off...\n");
 		platform_poweroff();
 		break;
 	}
 
-	kprintf(LOG_NORMAL, "system: halted.\n");
+	kprintf(LOG_NOTICE, "system: halted.\n");
 	cpu_halt();
 }
 

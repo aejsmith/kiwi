@@ -345,16 +345,16 @@ __init_text void arch_cpu_init_percpu() {
 /** Dump information about a CPU.
  * @param cpu		CPU to dump. */
 void cpu_dump(cpu_t *cpu) {
-	kprintf(LOG_NORMAL, " cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
+	kprintf(LOG_NOTICE, " cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
 		cpu->id, cpu->arch.model_name, cpu->arch.family,
 		cpu->arch.model, cpu->arch.stepping);
-	kprintf(LOG_NORMAL, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
+	kprintf(LOG_NOTICE, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
 	if(lapic_enabled()) {
-		kprintf(LOG_NORMAL, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
+		kprintf(LOG_NOTICE, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
 	}
-	kprintf(LOG_NORMAL, "  cache_align: %d\n", cpu->arch.cache_alignment);
-	kprintf(LOG_NORMAL, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
-	kprintf(LOG_NORMAL, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
+	kprintf(LOG_NOTICE, "  cache_align: %d\n", cpu->arch.cache_alignment);
+	kprintf(LOG_NOTICE, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
+	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
 }
 
 /** CPU information command for KDBG.

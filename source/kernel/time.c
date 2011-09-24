@@ -169,7 +169,7 @@ void timer_device_set(timer_device_t *device) {
 
 	timer_device = device;
 
-	kprintf(LOG_NORMAL, "timer: activated timer device %s\n", device->name);
+	kprintf(LOG_NOTICE, "timer: activated timer device %s\n", device->name);
 }
 
 /** Start a timer, with CPU timer lock held.

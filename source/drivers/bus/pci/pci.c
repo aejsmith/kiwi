@@ -108,14 +108,14 @@ static status_t pci_device_scan(device_t *bus, int id, int dev, int func, int in
 		return ret;
 	}
 
-	kprintf(LOG_NORMAL, "pci: %*sdevice %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
+	kprintf(LOG_NOTICE, "pci: %*sdevice %d:%02x.%d (vendor: 0x%04x, device: 0x%04x, class: 0x%02x 0x%02x)\n",
 	        indent, "", id, dev, func, device->vendor_id, device->device_id,
 	        device->base_class, device->sub_class);
 
 	/* Check for a PCI-to-PCI bridge. */
 	if(device->base_class == 0x06 && device->sub_class == 0x04) {
 		dest = pci_config_read8(device, 0x19);
-		kprintf(LOG_NORMAL, "pci: %*sdevice %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
+		kprintf(LOG_NOTICE, "pci: %*sdevice %d:%02x.%d is a PCI-to-PCI bridge to %u\n",
 		        indent + 1, "", id, dev, func, dest);
 		pci_bus_scan(dest, indent + 1);
 	}
@@ -139,7 +139,7 @@ static status_t pci_bus_scan(int id, int indent) {
 		return ret;
 	}
 
-	kprintf(LOG_NORMAL, "pci: %*sscanning bus %d for devices...\n", indent, "", id);
+	kprintf(LOG_NOTICE, "pci: %*sscanning bus %d for devices...\n", indent, "", id);
 	for(i = 0; i < 32; i++) {
 		if(pci_arch_config_read8(id, i, 0, PCI_CONFIG_HEADER_TYPE) & 0x80) {
 			/* Multifunction device. */
@@ -327,7 +327,7 @@ static status_t pci_init(void) {
 	/* Get the architecture to detect PCI presence. */
 	ret = pci_arch_init();
 	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_NORMAL, "pci: PCI is not present or not usable (%d)\n", ret);
+		kprintf(LOG_NOTICE, "pci: PCI is not present or not usable (%d)\n", ret);
 		return ret;
 	}
 

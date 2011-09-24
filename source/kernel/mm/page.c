@@ -954,6 +954,6 @@ __init_text void page_late_init(void) {
 		}
 	}
 
-	kprintf(LOG_NORMAL, "page: reclaimed %zu KiB of unneeded memory\n", reclaimed / 1024);
+	kprintf(LOG_NOTICE, "page: reclaimed %zu KiB of unneeded memory\n", reclaimed / 1024);
 #endif
 }

@@ -53,7 +53,7 @@ static __init_text void acpi_table_copy(phys_ptr_t addr) {
 		return;
 	}
 
-	kprintf(LOG_NORMAL, "acpi: table %.4s revision %" PRIu8 " (%.6s %.8s %" PRIu32 ")\n",
+	kprintf(LOG_NOTICE, "acpi: table %.4s revision %" PRIu8 " (%.6s %.8s %" PRIu32 ")\n",
 		source->signature, source->revision, source->oem_id,
 		source->oem_table_id, source->oem_revision);
 
@@ -100,7 +100,7 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
 			}
 		}
 
-		kprintf(LOG_NORMAL, "acpi: found ACPI RSDP at 0x%" PRIxPHYS " (revision: %" PRIu8 ")\n",
+		kprintf(LOG_NOTICE, "acpi: found ACPI RSDP at 0x%" PRIxPHYS " (revision: %" PRIu8 ")\n",
 		        start + i, rsdp->revision);
 		return rsdp;
 	}

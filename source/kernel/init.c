@@ -301,7 +301,7 @@ static void init_thread(void *arg1, void *arg2) {
 #if CONFIG_SMP
 	smp_boot();
 #endif
-	kprintf(LOG_NORMAL, "cpu: detected %zu CPU(s):\n", cpu_count);
+	kprintf(LOG_NOTICE, "cpu: detected %zu CPU(s):\n", cpu_count);
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu_dump(list_entry(iter, cpu_t, header));
 	}
@@ -417,7 +417,7 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Set up the console. */
 	console_init();
-	kprintf(LOG_NORMAL, "kernel: version %s booting...\n", kiwi_ver_string);
+	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
 
 	/* Perform more per-CPU initialisation that can be done now the memory
 	 * management subsystems are up. */
@@ -431,7 +431,7 @@ static __init_text void kmain_bsp_bottom(void) {
 
 #if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */
-	kprintf(LOG_NORMAL, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
+	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
 	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
 

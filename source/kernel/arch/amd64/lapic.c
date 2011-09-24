@@ -236,7 +236,7 @@ __init_text void lapic_init(void) {
 		 * register interrupt vector handlers. */
 		lapic_base = base;
 		lapic_mapping = phys_map(base, PAGE_SIZE, MM_FATAL);
-		kprintf(LOG_NORMAL, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
+		kprintf(LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
 		        base, lapic_mapping);
 
 		/* Install the LAPIC timer device. */
@@ -276,7 +276,7 @@ __init_text void lapic_init(void) {
 
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
-	kprintf(LOG_NORMAL, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
+	kprintf(LOG_NOTICE, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
 	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
 	        curr_cpu->arch.lapic_freq / 1000000);
 

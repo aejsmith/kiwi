@@ -23,7 +23,10 @@
 #define __KERNEL_H
 
 #include <arch/lirq.h>
+
+#include <kernel/log.h>
 #include <kernel/system.h>
+
 #include <lib/notifier.h>
 
 struct cpu;
@@ -62,10 +65,7 @@ extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn
 #define fatal(fmt...)	_fatal(NULL, fmt)
 
 /** Console log levels. */
-#define LOG_DEBUG	1		/**< Debug message. */
-#define LOG_NORMAL	2		/**< Normal message. */
-#define LOG_WARN	3		/**< Warning message. */
-#define LOG_NONE	4		/**< Do not log the message (for fatal/KDBG). */
+#define LOG_NONE		4	/**< Do not log the message (for fatal/KDBG). */
 
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);

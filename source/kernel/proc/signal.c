@@ -445,7 +445,7 @@ void kern_signal_return(void) {
 
 	ret = arch_signal_restore_frame(&mask);
 	if(ret != STATUS_SUCCESS) {
-		kprintf(LOG_NORMAL, "signal: failed to restore signal context for %u, forcing SEGV\n",
+		kprintf(LOG_NOTICE, "signal: failed to restore signal context for %u, forcing SEGV\n",
 		        curr_thread->id);
 		signal_force(curr_thread, SIGSEGV, SIGSEGV);
 	}

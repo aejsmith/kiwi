@@ -166,7 +166,7 @@ status_t fs_type_register(fs_type_t *type) {
 	list_init(&type->header);
 	list_append(&fs_types, &type->header);
 
-	kprintf(LOG_NORMAL, "fs: registered filesystem type %s (%s)\n",
+	kprintf(LOG_NOTICE, "fs: registered filesystem type %s (%s)\n",
 	        type->name, type->description);
 	mutex_unlock(&fs_types_lock);
 	return STATUS_SUCCESS;
@@ -2053,7 +2053,7 @@ void fs_probe(device_t *device) {
 					fatal("Failed to mount boot filesystem (%d)", ret);
 				}
 
-				kprintf(LOG_NORMAL, "fs: mounted boot device %s:%s\n", type->name, path);
+				kprintf(LOG_NOTICE, "fs: mounted boot device %s:%s\n", type->name, path);
 				refcount_dec(&type->count);
 				kfree(path);
 			}

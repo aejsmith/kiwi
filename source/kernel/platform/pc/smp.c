@@ -174,7 +174,7 @@ static inline bool smp_detect_acpi(void) {
 void smp_detect(void) {
 	/* If the LAPIC is disabled, we cannot use SMP. */
 	if(!lapic_enabled()) {
-		kprintf(LOG_NORMAL, "cpu: disabling SMP due to lack of APIC support\n");
+		kprintf(LOG_NOTICE, "cpu: disabling SMP due to lack of APIC support\n");
 		return;
 	}
 

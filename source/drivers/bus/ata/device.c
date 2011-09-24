@@ -312,11 +312,11 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	device->num = num;
 	device->parent = channel;
 	device->lba48 = (le16_to_cpu(ident[83]) & (1<<10)) ? true : false;
-	kprintf(LOG_NORMAL, "ata: found device %u on channel %s:\n", num, channel->node->name);
-	kprintf(LOG_NORMAL, " model:      %s\n", device->model);
-	kprintf(LOG_NORMAL, " serial:     %s\n", device->serial);
-	kprintf(LOG_NORMAL, " revision:   %s\n", device->revision);
-	kprintf(LOG_NORMAL, " lba48:      %d\n", device->lba48);
+	kprintf(LOG_NOTICE, "ata: found device %u on channel %s:\n", num, channel->node->name);
+	kprintf(LOG_NOTICE, " model:      %s\n", device->model);
+	kprintf(LOG_NOTICE, " serial:     %s\n", device->serial);
+	kprintf(LOG_NOTICE, " revision:   %s\n", device->revision);
+	kprintf(LOG_NOTICE, " lba48:      %d\n", device->lba48);
 
 	/* Get the block count. */
 	if(device->lba48) {
@@ -324,7 +324,7 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	} else {
 		blocks = le32_to_cpu(*(uint32_t *)(ident + 60));
 	}
-	kprintf(LOG_NORMAL, " blocks:     %u\n", blocks);
+	kprintf(LOG_NOTICE, " blocks:     %u\n", blocks);
 
 	/* Get the block size - "Bit 12 of word 106 shall be set to 1 to
 	 * indicate that the device has been formatted with a logical sector
@@ -336,8 +336,8 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	} else {
 		device->block_size = 512;
 	}
-	kprintf(LOG_NORMAL, " block_size: %u\n", device->block_size);
-	kprintf(LOG_NORMAL, " size:       %llu\n", (uint64_t)blocks * device->block_size);
+	kprintf(LOG_NOTICE, " block_size: %u\n", device->block_size);
+	kprintf(LOG_NOTICE, " size:       %llu\n", (uint64_t)blocks * device->block_size);
 
 	/* Detect whether DMA is supported. */
 	device->dma = false;
@@ -364,7 +364,7 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 			device->dma = true;
 		}
 	}
-	kprintf(LOG_NORMAL, " dma:        %d\n", device->dma);
+	kprintf(LOG_NOTICE, " dma:        %d\n", device->dma);
 
 	/* Refuse to use the device if it doesn't support DMA and the channel
 	 * doesn't support PIO. */

@@ -123,14 +123,14 @@ static status_t vbe_init(void) {
 		goto out;
 	}
 
-	kprintf(LOG_NORMAL, "vbe: vbe presence was detected:\n");
-	kprintf(LOG_NORMAL, " signature:    %s\n", info->vbe_signature);
-	kprintf(LOG_NORMAL, " version:      0x%" PRIx16 "\n", info->vbe_version);
-	kprintf(LOG_NORMAL, " capabilities: 0x%" PRIx32 "\n", info->capabilities);
-	kprintf(LOG_NORMAL, " mode pointer: 0x%" PRIx32 "\n", info->video_mode_ptr);
-	kprintf(LOG_NORMAL, " total memory: %" PRIu16 "KB\n", info->total_memory * 64);
+	kprintf(LOG_NOTICE, "vbe: vbe presence was detected:\n");
+	kprintf(LOG_NOTICE, " signature:    %s\n", info->vbe_signature);
+	kprintf(LOG_NOTICE, " version:      0x%" PRIx16 "\n", info->vbe_version);
+	kprintf(LOG_NOTICE, " capabilities: 0x%" PRIx32 "\n", info->capabilities);
+	kprintf(LOG_NOTICE, " mode pointer: 0x%" PRIx32 "\n", info->video_mode_ptr);
+	kprintf(LOG_NOTICE, " total memory: %" PRIu16 "KB\n", info->total_memory * 64);
 	if(info->vbe_version >= 0x0200) {
-		kprintf(LOG_NORMAL, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
+		kprintf(LOG_NOTICE, " OEM revision: 0x%" PRIx16 "\n", info->oem_software_rev);
 	}
 	mem_size = (info->total_memory * 64) * 1024;
 

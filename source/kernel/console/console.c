@@ -211,7 +211,7 @@ int kdbg_cmd_log(int argc, char **argv) {
 		argv[1]++;
 		switch(*argv[1]) {
 		case 'd': level = LOG_DEBUG; break;
-		case 'n': level = LOG_NORMAL; break;
+		case 'n': level = LOG_NOTICE; break;
 		case 'w': level = LOG_WARN; break;
 		default:
 			kprintf(LOG_NONE, "Unknown level character '%c'\n", *argv[1]);
@@ -245,7 +245,7 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
 
 	spinlock_lock(&console_lock);
 	for(i = 0; i < count; i++) {
-		console_putch_unlocked(LOG_NORMAL, str[i]);
+		console_putch_unlocked(LOG_NOTICE, str[i]);
 	}
 	spinlock_unlock(&console_lock);
 

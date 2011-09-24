@@ -359,7 +359,7 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	ata_channel_t *pri, *sec;
 	uint8_t pri_pi, sec_pi;
 
-	kprintf(LOG_NORMAL, "ata: found PCI ATA controller %d:%02x.%d (vendor: 0x%04x, id: 0x%04x)\n",
+	kprintf(LOG_NOTICE, "ata: found PCI ATA controller %d:%02x.%d (vendor: 0x%04x, id: 0x%04x)\n",
 	        device->bus, device->device, device->function, device->vendor_id,
 	        device->device_id);
 
@@ -394,7 +394,7 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	/* Add the channel. */
 	pri = pci_ata_channel_add(device, 0, ctrl_base, cmd_base, bus_master_base, irq);
 	if(pri) {
-		kprintf(LOG_NORMAL, " primary:   %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NOTICE, " primary:   %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
 		        PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
 		        ctrl_base, cmd_base, bus_master_base, irq);
 	}
@@ -414,7 +414,7 @@ static bool pci_ata_add_device(pci_device_t *device, void *data) {
 	/* Add the channel. */
 	sec = pci_ata_channel_add(device, 1, ctrl_base, cmd_base, bus_master_base, irq);
 	if(sec) {
-		kprintf(LOG_NORMAL, " secondary: %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
+		kprintf(LOG_NOTICE, " secondary: %s (ctrl_base: 0x%x, cmd_base: 0x%x, bm_base: 0x%x, irq: %d)\n",
 		        PCI_ATA_IS_COMPAT(pri_pi) ? "compat" : "native-PCI",
 		        ctrl_base, cmd_base, bus_master_base + 8, irq);
 	}

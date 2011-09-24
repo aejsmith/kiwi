@@ -286,7 +286,7 @@ static void fb_console_putch(unsigned char ch) {
 
 /** Framebuffer console. */
 console_t fb_console = {
-	.min_level = LOG_NORMAL,
+	.min_level = LOG_NOTICE,
 	.putch = fb_console_putch,
 };
 

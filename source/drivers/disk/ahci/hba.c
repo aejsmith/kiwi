@@ -112,7 +112,7 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 	ahci_hba_t *hba;
 	status_t ret;
 
-	kprintf(LOG_NORMAL, "ahci: found AHCI HBA %d:%02x.%d (vendor: 0x%04x, id: 0x%04x)\n",
+	kprintf(LOG_NOTICE, "ahci: found AHCI HBA %d:%02x.%d (vendor: 0x%04x, id: 0x%04x)\n",
 	        device->bus, device->device, device->function, device->vendor_id,
 	        device->device_id);
 

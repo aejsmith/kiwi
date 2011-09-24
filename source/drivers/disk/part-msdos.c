@@ -83,10 +83,10 @@ bool partition_probe_msdos(disk_device_t *device) {
 			continue;
 		}
 
-		kprintf(LOG_NORMAL, "disk: found MSDOS partition %d on disk %d:\n", i, device->id);
-		kprintf(LOG_NORMAL, " type:      0x%x\n", part->type);
-		kprintf(LOG_NORMAL, " start_lba: %u\n", part->start_lba);
-		kprintf(LOG_NORMAL, " num_sects: %u\n", part->num_sects);
+		kprintf(LOG_NOTICE, "disk: found MSDOS partition %d on disk %d:\n", i, device->id);
+		kprintf(LOG_NOTICE, " type:      0x%x\n", part->type);
+		kprintf(LOG_NOTICE, " start_lba: %u\n", part->start_lba);
+		kprintf(LOG_NOTICE, " num_sects: %u\n", part->num_sects);
 
 		partition_add(device, i, part->start_lba, part->num_sects);
 	}

@@ -835,7 +835,7 @@ void process_shutdown(void) {
 			if(process != kernel_proc) {
 				count++;
 				if(!(interval % 2000000) && process->state == PROCESS_RUNNING) {
-					kprintf(LOG_NORMAL, "system: still waiting for %u(%s)...\n",
+					kprintf(LOG_NOTICE, "system: still waiting for %u(%s)...\n",
 					        process->id, process->name);
 				}
 			}
