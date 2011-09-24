@@ -725,7 +725,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	}
 
 	/* If we're in KDBG multiple times, bad bad bad! */
-	if(!atomic_cmp_set(&kdbg_running, 0, 1)) {
+	if(!atomic_cas(&kdbg_running, 0, 1)) {
 		/* A value of 3 means KDBG is disabled. */
 		if(atomic_get(&kdbg_running) != 3) {
 			kprintf(LOG_NONE, "KDBG: Error: Multiple entries to KDBG!\n");

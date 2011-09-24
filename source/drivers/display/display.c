@@ -151,7 +151,7 @@ static void display_device_destroy(device_t *_device) {
 static status_t display_device_open(device_t *_device, void **datap) {
 	display_device_t *device = _device->data;
 
-	if(!atomic_cmp_set(&device->open, 0, 1)) {
+	if(!atomic_cas(&device->open, 0, 1)) {
 		return STATUS_IN_USE;
 	}
 

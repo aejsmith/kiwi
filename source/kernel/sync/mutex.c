@@ -54,7 +54,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 	bool state;
 
 	/* Try to take the lock. */
-	if(!atomic_cmp_set(&lock->locked, 0, 1)) {
+	if(!atomic_cas(&lock->locked, 0, 1)) {
 		if(lock->holder == curr_thread) {
 			/* Wrap this with likely because if held by the current
 			 * thread the MUTEX_RECURSIVE flag should be set. */
@@ -69,7 +69,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 
 			/* Check again now that we have the wait queue lock,
 			 * in case mutex_unlock() was called on another CPU. */
-			if(atomic_cmp_set(&lock->locked, 0, 1)) {
+			if(atomic_cas(&lock->locked, 0, 1)) {
 				waitq_sleep_cancel(&lock->queue, state);
 			} else {
 				/* If sleep is successful, lock ownership will
