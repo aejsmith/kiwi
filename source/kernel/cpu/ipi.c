@@ -20,7 +20,6 @@
  */
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <lib/refcount.h>
@@ -206,19 +205,19 @@ void ipi_process_pending(void) {
  */
 status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative_t data2,
                   unative_t data3, unative_t data4, int flags) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 	ipi_message_t *message;
 	status_t ret;
 
 	/* Don't do anything if the IPI system isn't enabled. */
 	if(!ipi_enabled) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return STATUS_SUCCESS;
 	}
 
 	/* Check if the destination exists. */
 	if(dest > highest_cpu_id || !cpus[dest]) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return STATUS_NOT_FOUND;
 	}
 
@@ -241,12 +240,12 @@ status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative
 
 		ret = message->status;
 		ipi_message_release(message);
-		intr_restore(state);
+		local_irq_restore(state);
 		return ret;
 	} else {
 		/* Asynchronous, drop count on the message and return. */
 		ipi_message_release(message);
-		intr_restore(state);
+		local_irq_restore(state);
 		return STATUS_SUCCESS;
 	}
 }
@@ -275,14 +274,14 @@ status_t ipi_send(cpu_id_t dest, ipi_handler_t handler, unative_t data1, unative
  */
 void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
                    unative_t data3, unative_t data4, int flags) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 	LIST_DECLARE(sent_list);
 	ipi_message_t *message;
 	cpu_t *cpu;
 
 	/* Don't do anything if the IPI system isn't enabled. */
 	if(!ipi_enabled) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return;
 	}
 
@@ -332,7 +331,7 @@ void ipi_broadcast(ipi_handler_t handler, unative_t data1, unative_t data2,
 		} while(!list_empty(&sent_list));
 	}
 
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 /** Acknowledge a message.

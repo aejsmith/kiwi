@@ -35,7 +35,6 @@
  */
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -466,42 +465,42 @@ static inline void *slab_cpu_obj_alloc(slab_cache_t *cache) {
 	/* We do not need locking on the per-CPU cache as it will not be used
 	 * by any other CPUs. We do however need to disable interrupts to
 	 * prevent a thread switch from occurring mid-operation. */
-	state = intr_disable();
+	state = local_irq_disable();
 
 	/* Check if we have a magazine to allocate from. */
 	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds) {
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			intr_restore(state);
+			local_irq_restore(state);
 			return ret;
 		} else if(cc->previous && cc->previous->rounds) {
 			/* Previous has rounds, exchange loaded with previous
 			 * and allocate from it. */
 			SWAP(cc->loaded, cc->previous);
 			ret = cc->loaded->objects[--cc->loaded->rounds];
-			intr_restore(state);
+			local_irq_restore(state);
 			return ret;
 		}
 	}
 
 	/* Try to get a full magazine from the depot. */
 	mag = slab_magazine_get_full(cache);
-	assert(!intr_state());
+	assert(!local_irq_state());
 	if(unlikely(!mag)) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return NULL;
 	}
 
 	/* Return previous to the depot. */
 	if(cc->previous) {
 		slab_magazine_put_empty(cache, cc->previous);
-		assert(!intr_state());
+		assert(!local_irq_state());
 	}
 
 	cc->previous = cc->loaded;
 	cc->loaded = mag;
 	ret = cc->loaded->objects[--cc->loaded->rounds];
-	intr_restore(state);
+	local_irq_restore(state);
 	return ret;
 }
 
@@ -514,43 +513,43 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 	slab_magazine_t *mag;
 	bool state;
 
-	state = intr_disable();
+	state = local_irq_disable();
 
 	/* If the loaded magazine has spare slots, just put the object there
 	 * and return. */
 	if(likely(cc->loaded)) {
 		if(cc->loaded->rounds < SLAB_MAGAZINE_SIZE) {
 			cc->loaded->objects[cc->loaded->rounds++] = obj;
-			intr_restore(state);
+			local_irq_restore(state);
 			return true;
 		} else if(cc->previous && cc->previous->rounds < SLAB_MAGAZINE_SIZE) {
 			/* Previous has spare slots, exchange them and insert
 			 * the object. */
 			SWAP(cc->loaded, cc->previous);
 			cc->loaded->objects[cc->loaded->rounds++] = obj;
-			intr_restore(state);
+			local_irq_restore(state);
 			return true;
 		}
 	}
 
 	/* Get a new empty magazine. */
 	mag = slab_magazine_get_empty(cache);
-	assert(!intr_state());
+	assert(!local_irq_state());
 	if(unlikely(!mag)) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return false;
 	}
 
 	/* Load the new magazine, and free the previous. */
 	if(likely(cc->previous)) {
 		slab_magazine_put_full(cache, cc->previous);
-		assert(!intr_state());
+		assert(!local_irq_state());
 	}
 	cc->previous = cc->loaded;
 	cc->loaded = mag;
 
 	cc->loaded->objects[cc->loaded->rounds++] = obj;
-	intr_restore(state);
+	local_irq_restore(state);
 	return true;
 }
 

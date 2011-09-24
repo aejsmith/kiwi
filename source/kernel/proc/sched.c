@@ -64,7 +64,6 @@
 #include <arch/bitops.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <lib/string.h>
@@ -319,7 +318,7 @@ void sched_reschedule(bool state) {
 		sched_post_switch(state);
 	} else {
 		spinlock_unlock_ni(&curr_thread->lock);
-		intr_restore(state);
+		local_irq_restore(state);
 	}
 }
 
@@ -342,7 +341,7 @@ void sched_post_switch(bool state) {
 		}
 	}
 
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 #if CONFIG_SMP
@@ -449,7 +448,7 @@ void sched_insert_thread(thread_t *thread) {
 static void sched_idle_thread(void *arg1, void *arg2) {
 	/* We run the loop with interrupts disabled. The cpu_idle() function is
 	 * expected to re-enable interrupts as required. */
-	intr_disable();
+	local_irq_disable();
 
 	while(true) {
 		spinlock_lock_ni(&curr_thread->lock);

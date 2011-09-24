@@ -708,7 +708,7 @@ void kdbg_except_handler(unative_t num, const char *name, intr_frame_t *frame) {
  * @return		Return status.
  */
 int kdbg_main(int reason, intr_frame_t *frame) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 	static int pcount = 0;
 	size_t off = 0;
 	symbol_t *sym;
@@ -718,7 +718,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	/* Double check that we have a registers structure. */
 	if(!frame) {
 		kprintf(LOG_NONE, "KDBG: Error: No registers structure provided\n");
-		intr_restore(state);
+		local_irq_restore(state);
 		return KDBG_FAIL;
 	}
 
@@ -728,7 +728,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 		if(atomic_get(&kdbg_running) != 3) {
 			kprintf(LOG_NONE, "KDBG: Error: Multiple entries to KDBG!\n");
 		}
-		intr_restore(state);
+		local_irq_restore(state);
 		return KDBG_FAIL;
 	}
 
@@ -737,7 +737,7 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 		if(reason == KDBG_ENTRY_STEPPED) {
 			if(--kdbg_step_count > 0) {
 				atomic_set(&kdbg_running, 0);
-				intr_restore(state);
+				local_irq_restore(state);
 				return KDBG_STEP;
 			}
 		} else {
@@ -812,6 +812,6 @@ int kdbg_main(int reason, intr_frame_t *frame) {
 	cpu_resume_all();
 #endif
 	atomic_set(&kdbg_running, 0);
-	intr_restore(state);
+	local_irq_restore(state);
 	return ret;
 }

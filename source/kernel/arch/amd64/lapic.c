@@ -141,7 +141,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 		return;
 	}
 
-	state = intr_disable();
+	state = local_irq_disable();
 
 	/* Write the destination ID to the high part of the ICR. */
 	lapic_write(LAPIC_REG_ICR1, ((uint32_t)id << 24));
@@ -157,7 +157,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 		__asm__ volatile("pause");
 	}
 
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 #if CONFIG_SMP

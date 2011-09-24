@@ -22,7 +22,6 @@
  * starvation, are from HelenOS' readers-writer lock implementation.
  */
 
-#include <cpu/intr.h>
 #include <proc/thread.h>
 #include <sync/rwlock.h>
 #include <status.h>
@@ -93,7 +92,7 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			SYNC_INTERRUPTIBLE flag is set.
  */
 status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 
 	spinlock_lock_ni(&lock->queue.lock);
 
@@ -113,7 +112,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 
 	lock->readers++;
 	spinlock_unlock_ni(&lock->queue.lock);
-	intr_restore(state);
+	local_irq_restore(state);
 	return STATUS_SUCCESS;
 }
 
@@ -136,7 +135,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
  */
 status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	status_t ret = STATUS_SUCCESS;
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 
 	spinlock_lock_ni(&lock->queue.lock);
 
@@ -156,7 +155,7 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	} else {
 		lock->held = 1;
 		spinlock_unlock_ni(&lock->queue.lock);
-		intr_restore(state);
+		local_irq_restore(state);
 	}
 
 	return ret;

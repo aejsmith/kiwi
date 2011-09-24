@@ -22,7 +22,6 @@
 #include <arch/barrier.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 
 #include <sync/spinlock.h>
 
@@ -97,12 +96,12 @@ status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
 
 	/* Disable interrupts while locked to ensure that nothing else
 	 * will run on the current CPU for the duration of the lock. */
-	state = intr_disable();
+	state = local_irq_disable();
 
 	/* Take the lock. */
 	ret = spinlock_lock_internal(lock, timeout, flags);
 	if(ret != STATUS_SUCCESS) {
-		intr_restore(state);
+		local_irq_restore(state);
 		return ret;
 	}
 
@@ -142,7 +141,7 @@ status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
 status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
 	status_t ret;
 
-	assert(!intr_state());
+	assert(!local_irq_state());
 
 	/* Take the lock. */
 	ret = spinlock_lock_internal(lock, timeout, flags);
@@ -171,7 +170,7 @@ void spinlock_lock(spinlock_t *lock) {
 
 	/* Disable interrupts while locked to ensure that nothing else
 	 * will run on the current CPU for the duration of the lock. */
-	state = intr_disable();
+	state = local_irq_disable();
 
 	/* Take the lock. */
 	ret = spinlock_lock_internal(lock, -1, 0);
@@ -200,7 +199,7 @@ void spinlock_lock(spinlock_t *lock) {
 void spinlock_lock_ni(spinlock_t *lock) {
 	status_t ret;
 
-	assert(!intr_state());
+	assert(!local_irq_state());
 
 	/* Take the lock. */
 	ret = spinlock_lock_internal(lock, -1, 0);
@@ -231,7 +230,7 @@ void spinlock_unlock(spinlock_t *lock) {
 
 	leave_cs_barrier();
 	atomic_set(&lock->value, 1);
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 /** Release a spinlock without changing interrupt state.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #ifndef __KERNEL_H
 #define __KERNEL_H
 
+#include <arch/lirq.h>
 #include <kernel/system.h>
 #include <lib/notifier.h>
 

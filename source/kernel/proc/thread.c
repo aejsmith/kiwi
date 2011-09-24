@@ -22,7 +22,6 @@
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <lib/id_alloc.h>
@@ -382,7 +381,7 @@ void thread_rename(thread_t *thread, const char *name) {
 
 /** Preempt the current thread. */
 void thread_preempt(void) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 
 	curr_cpu->should_preempt = false;
 
@@ -390,7 +389,7 @@ void thread_preempt(void) {
 	if(curr_thread->preempt_disabled > 0) {
 		curr_thread->missed_preempt = true;
 		spinlock_unlock_ni(&curr_thread->lock);
-		intr_restore(state);
+		local_irq_restore(state);
 	} else {
 		sched_reschedule(state);
 	}
@@ -414,7 +413,7 @@ void thread_disable_preempt(void) {
 /** Re-enable preemption for the current thread.
  * @see			thread_disable_preempt(). */
 void thread_enable_preempt(void) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 
 	spinlock_lock_ni(&curr_thread->lock);
 
@@ -430,12 +429,12 @@ void thread_enable_preempt(void) {
 	}
 
 	spinlock_unlock_ni(&curr_thread->lock);
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 /** Yield remaining timeslice and switch to another thread. */
 void thread_yield(void) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 
 	spinlock_lock_ni(&curr_thread->lock);
 	sched_reschedule(state);

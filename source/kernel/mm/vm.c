@@ -62,7 +62,6 @@
 
 #include <arch/memory.h>
 
-#include <cpu/intr.h>
 #include <cpu/ipi.h>
 
 #include <lib/string.h>
@@ -1322,7 +1321,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 	 * all address spaces. Kernel threads should never touch the userspace
 	 * portion of the address space. */
 	if(as && as != curr_aspace) {
-		state = intr_disable();
+		state = local_irq_disable();
 
 		/* Decrease old address space's reference count, if there is one. */
 		if(curr_aspace) {
@@ -1334,7 +1333,7 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		mmu_context_switch(as->mmu);
 		curr_aspace = as;
 
-		intr_restore(state);
+		local_irq_restore(state);
 	}
 }
 

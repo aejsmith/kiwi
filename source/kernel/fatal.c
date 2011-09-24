@@ -72,7 +72,7 @@ static void fatal_printf(const char *format, ...) {
 void _fatal(intr_frame_t *frame, const char *format, ...) {
 	va_list args;
 
-	intr_disable();
+	local_irq_disable();
 
 	if(atomic_cmp_set(&fatal_protect, 0, 1)) {
 #if CONFIG_SMP

@@ -19,8 +19,6 @@
  * @brief		Wait queue functions.
  */
 
-#include <cpu/intr.h>
-
 #include <proc/sched.h>
 #include <proc/thread.h>
 
@@ -48,7 +46,7 @@ extern void thread_wake(thread_t *thread);
  * @return		Previous interrupt state.
  */
 bool waitq_sleep_prepare(waitq_t *queue) {
-	bool state = intr_disable();
+	bool state = local_irq_disable();
 	spinlock_lock_ni(&queue->lock);
 	return state;
 }
@@ -58,7 +56,7 @@ bool waitq_sleep_prepare(waitq_t *queue) {
  * @param state		Interrupt state to restore. */
 void waitq_sleep_cancel(waitq_t *queue, bool state) {
 	spinlock_unlock_ni(&queue->lock);
-	intr_restore(state);
+	local_irq_restore(state);
 }
 
 /** Sleep on a wait queue.
@@ -72,11 +70,11 @@ void waitq_sleep_cancel(waitq_t *queue, bool state) {
  * @return		Status code describing result of the operation. */
 status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
 	assert(spinlock_held(&queue->lock));
-	assert(!intr_state());
+	assert(!local_irq_state());
 
 	if(!timeout) {
 		spinlock_unlock_ni(&queue->lock);
-		intr_restore(state);
+		local_irq_restore(state);
 		return STATUS_WOULD_BLOCK;
 	}
 
