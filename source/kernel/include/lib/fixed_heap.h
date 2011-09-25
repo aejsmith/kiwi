@@ -1,0 +1,39 @@
+/*
+ * Copyright (C) 2011 Alex Smith
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/**
+ * @file
+ * @brief		Fixed heap allocator.
+ */
+
+#ifndef __LIB_FIXED_HEAP_H
+#define __LIB_FIXED_HEAP_H
+
+#include <types.h>
+
+struct fixed_heap_tag;
+
+/** Structure containing a fixed heap allocator. */
+typedef struct fixed_heap {
+	struct fixed_heap_tag *tags;	/**< List of tags. */
+} fixed_heap_t;
+
+extern void *fixed_heap_alloc(fixed_heap_t *heap, size_t size);
+extern void fixed_heap_free(fixed_heap_t *heap, void *ptr);
+
+extern void fixed_heap_init(fixed_heap_t *heap, void *mem, size_t size);
+
+#endif /* __LIB_FIXED_HEAP_H */
