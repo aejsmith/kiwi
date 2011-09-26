@@ -445,6 +445,10 @@ static bool kdbg_tab_complete(size_t *lenp) {
 	return false;
 }
 
+unsigned char kdbg_get_char(void) {
+	return console_getc_unsafe();
+}
+
 /** Get a line of input. Overwrites data from previous call.
  * @param count		Current command number.
  * @return		Pointer to start of line. */

@@ -52,28 +52,120 @@ static uint32_t klog_start = 0;
 /** Number of characters in the buffer. */
 static uint32_t klog_length = 0;
 
-/** Write a character to the console/log
- * @note		Does not take the console lock.
- * @param level		Log level.
- * @param ch		Character to print. */
-static void console_putch_unlocked(int level, char ch) {
-	console_t *cons;
-#if !CONFIG_DEBUG
-	if(level == LOG_DEBUG) {
-		return;
-	}
-#endif
-	LIST_FOREACH(&console_list, iter) {
-		cons = list_entry(iter, console_t, header);
+/** Write a character to all consoles without taking the lock.
+ * @param ch		Character to write. */
+void console_putc_unsafe(unsigned char ch) {
+	console_t *console;
 
-		if(level < cons->min_level) {
-			continue;
-		} else if(cons->inhibited && level != LOG_NONE) {
-			continue;
+	LIST_FOREACH(&console_list, iter) {
+		console = list_entry(iter, console_t, header);
+
+		if(console->putc) {
+			console->putc(ch);
+		}
+	}
+}
+
+/** Get a character from the console without taking the lock.
+ * @return		Character read. */
+uint16_t console_getc_unsafe(void) {
+	console_t *console;
+	uint16_t ch;
+
+	while(true) {
+		LIST_FOREACH(&console_list, iter) {
+			console = list_entry(iter, console_t, header);
+
+			if(console->getc) {
+				ch = console->getc();
+				if(ch) {
+					return ch;
+				}
+			}
+		}
+	}
+}
+
+/** Register a console.
+ * @param console	Console to register. */
+void console_register(console_t *console) {
+	list_init(&console->header);
+
+	spinlock_lock(&console_lock);
+	list_append(&console_list, &console->header);
+	spinlock_unlock(&console_lock);
+}
+
+/** Unregister a console.
+ * @param console	Console to unregister. */
+void console_unregister(console_t *console) {
+	spinlock_lock(&console_lock);
+	list_remove(&console->header);
+	spinlock_unlock(&console_lock);
+}
+
+/** Handle an input character.
+ * @param parser	Parser data to use.
+ * @param ch		Character received.
+ * @return		Value to return, 0 if no character to return yet. */
+uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
+	uint16_t ret = 0;
+
+	if(parser->length < 0) {
+		if(ch == 0x1B) {
+			parser->length = 0;
+			return 0;
+		} else {
+			return (uint16_t)ch;
+		}
+	} else {
+		parser->buffer[parser->length++] = ch;
+
+		/* Check for known sequences. */
+		if(parser->length == 2) {
+			if(strncmp(parser->buffer, "[A", 2) == 0) {
+				ret = CONSOLE_KEY_UP;
+			} else if(strncmp(parser->buffer, "[B", 2) == 0) {
+				ret = CONSOLE_KEY_DOWN;
+			} else if(strncmp(parser->buffer, "[D", 2) == 0) {
+				ret = CONSOLE_KEY_LEFT;
+			} else if(strncmp(parser->buffer, "[C", 2) == 0) {
+				ret = CONSOLE_KEY_RIGHT;
+			} else if(strncmp(parser->buffer, "[H", 2) == 0) {
+				ret = CONSOLE_KEY_HOME;
+			} else if(strncmp(parser->buffer, "[F", 2) == 0) {
+				ret = CONSOLE_KEY_END;
+			}
+		} else if(parser->length == 3) {
+			if(strncmp(parser->buffer, "[3~", 3) == 0) {
+				ret = CONSOLE_KEY_DELETE;
+			} else if(strncmp(parser->buffer, "[5~", 3) == 0) {
+				ret = CONSOLE_KEY_PGUP;
+			} else if(strncmp(parser->buffer, "[6~", 3) == 0) {
+				ret = CONSOLE_KEY_PGDN;
+			}
 		}
 
-		cons->putch((unsigned char)ch);
+		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN) {
+			parser->length = -1;
+		}
+		return ret;
 	}
+}
+
+/** Initialise an ANSI escape code parser data structure.
+ * @param parser	Parser to initialise. */
+void ansi_parser_init(ansi_parser_t *parser) {
+	parser->length = -1;
+}
+
+/** Helper for kvprintf().
+ * @param ch		Character to display.
+ * @param data		Pointer to log level.
+ * @param total		Pointer to total character count. */
+static void kvprintf_helper(char ch, void *data, int *total) {
+	int level = *(int *)data;
+	console_t *console;
 
 	/* Store in the log buffer. */
 	if(level != LOG_NONE) {
@@ -85,59 +177,17 @@ static void console_putch_unlocked(int level, char ch) {
 			klog_start = (klog_start + 1) % CONFIG_KLOG_SIZE;
 		}
 	}
-}
 
-/** Helper for kvprintf().
- * @param ch		Character to display.
- * @param data		Pointer to log level.
- * @param total		Pointer to total character count. */
-static void kvprintf_helper(char ch, void *data, int *total) {
-	int level = *(int *)data;
-	console_putch_unlocked(level, ch);
+	/* Write to the console. */
+	LIST_FOREACH(&console_list, iter) {
+		console = list_entry(iter, console_t, header);
+
+		if(console->putc && (level == LOG_NONE || level >= console->min_level)) {
+			console->putc(ch);
+		}
+	}
+
 	*total = *total + 1;
-}
-
-/**
- * Write a character to the console.
- *
- * Writes a character to all currently registered consoles that allow the
- * specified log level, and stores it in the kernel log buffer.
- *
- * @param level		Log level.
- * @param ch		Character to print.
- */
-void console_putch(int level, char ch) {
-	if(level != LOG_NONE) {
-		spinlock_lock(&console_lock);
-		console_putch_unlocked(level, ch);
-		spinlock_unlock(&console_lock);
-	} else {
-		console_putch_unlocked(level, ch);
-	}
-}
-
-/** Register a console and initialise it.
- * @param cons		Console to register. */
-void console_register(console_t *cons) {
-	spinlock_lock(&console_lock);
-
-	cons->inhibited = false;
-	list_init(&cons->header);
-	list_append(&console_list, &cons->header);
-
-	if(cons->init) {
-		cons->init();
-	}
-
-	spinlock_unlock(&console_lock);
-}
-
-/** Unregister a console.
- * @param cons		Console to register. */
-void console_unregister(console_t *cons) {
-	spinlock_lock(&console_lock);
-	list_remove(&cons->header);
-	spinlock_unlock(&console_lock);
 }
 
 /** Print a formatted message to the kernel log.
@@ -221,7 +271,7 @@ int kdbg_cmd_log(int argc, char **argv) {
 
 	for(i = 0, pos = klog_start; i < klog_length; i++) {
 		if(level == -1 || klog_buffer[pos].level >= level) {
-			console_putch(LOG_NONE, klog_buffer[pos].ch);
+			console_putc_unsafe(klog_buffer[pos].ch);
 		}
 		if(++pos >= CONFIG_KLOG_SIZE) {
 			pos = 0;
@@ -245,7 +295,7 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
 
 	spinlock_lock(&console_lock);
 	for(i = 0; i < count; i++) {
-		console_putch_unlocked(LOG_NOTICE, str[i]);
+		console_putc_unsafe(str[i]);
 	}
 	spinlock_unlock(&console_lock);
 
@@ -306,3 +356,8 @@ static __init_text void kconsole_device_init(void) {
 	}
 }
 INITCALL(kconsole_device_init);
+
+/** Initialise the debug console. */
+void console_early_init(void) {
+	platform_console_early_init();
+}

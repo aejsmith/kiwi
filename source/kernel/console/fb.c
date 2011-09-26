@@ -29,6 +29,7 @@
 
 #include <console.h>
 #include <kboot.h>
+#include <kdbg.h>
 #include <kernel.h>
 
 #if CONFIG_DEBUG
@@ -52,7 +53,7 @@ extern unsigned char copyright_ppm[];
 #define SPLASH_PROGRESS_HEIGHT	3
 
 /** Size of one row in bytes. */
-#define ROW_SIZE		((fb_console_width * FONT_HEIGHT) * (fb_console_depth / 8))
+#define ROW_SIZE		((fb_console_mode.width * FONT_HEIGHT) * (fb_console_mode.depth / 8))
 
 /** Get red colour from RGB value. */
 #define RED(x, bits)		((x >> (24 - bits)) & ((1 << bits) - 1))
@@ -69,19 +70,18 @@ static uint16_t splash_progress_x;
 static uint16_t splash_progress_y;
 
 /** Current display mode. */
-uint16_t fb_console_width;
-uint16_t fb_console_height;
-uint8_t fb_console_depth;
-
-/** Framebuffer console details. */
-static uint16_t fb_console_cols;
-static uint16_t fb_console_rows;
-static uint16_t fb_console_x = 0;
-static uint16_t fb_console_y = 0;
+static fb_info_t fb_console_mode;
 static char *fb_console_mapping = NULL;
 
 /** Backbuffer for the console. */
 static char *fb_console_buffer = NULL;
+
+/** Framebuffer console details. */
+static bool fb_console_acquired = false;
+static uint16_t fb_console_cols;
+static uint16_t fb_console_rows;
+static uint16_t fb_console_x = 0;
+static uint16_t fb_console_y = 0;
 
 /* Skip over whitespace and comments in a PPM file.
  * @param buf		Pointer to data buffer.
@@ -127,13 +127,13 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
  * @param x		X position of pixel.
  * @param y		Y position of pixel. */
 static void fb_console_putpixel(uint32_t colour, uint16_t x, uint16_t y) {
-	size_t offset = ((y * fb_console_width) + x) * (fb_console_depth / 8);
+	size_t offset = ((y * fb_console_mode.width) + x) * (fb_console_mode.depth / 8);
 	char *mdest = fb_console_mapping + offset;
 	char *bdest = fb_console_buffer + offset;
 	uint16_t colour16;
 
 	/* Draw the pixel. */
-	switch(fb_console_depth) {
+	switch(fb_console_mode.depth) {
 	case 15:
 		colour16 = (RED(colour, 5) << 11) | (GREEN(colour, 5) << 5) | BLUE(colour, 5);
 		*(uint16_t *)mdest = *(uint16_t *)bdest = colour16;
@@ -211,7 +211,7 @@ static void fb_console_fillrect(uint32_t colour, uint16_t x, uint16_t y,
 
 /** Write a character to the console.
  * @param ch		Character to write. */
-static void fb_console_putch(unsigned char ch) {
+static void fb_console_putc(unsigned char ch) {
 	int i, j, x, y;
 
 	switch(ch) {
@@ -277,7 +277,7 @@ static void fb_console_putch(unsigned char ch) {
 
 		/* Copy the updated backbuffer onto the framebuffer. */
 		memcpy(fb_console_mapping, fb_console_buffer,
-		       fb_console_width * fb_console_height * (fb_console_depth / 8));
+		       fb_console_mode.width * fb_console_mode.height * (fb_console_mode.depth / 8));
 
 		/* Update the cursor position. */
 		fb_console_y = fb_console_rows - 1;
@@ -285,55 +285,35 @@ static void fb_console_putch(unsigned char ch) {
 }
 
 /** Framebuffer console. */
-console_t fb_console = {
+static console_t fb_console = {
 	.min_level = LOG_NOTICE,
-	.putch = fb_console_putch,
+	.putc = fb_console_putc,
 };
 
 /** Reconfigure the framebuffer console.
- * @param width		Width of display.
- * @param height	Height of display.
- * @param depth		Bits per pixel.
- * @param addr		Physical address of framebuffer. */
-void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys_ptr_t addr) {
+ * @param info		Information structure for new framebuffer. */
+static void fb_console_configure(const fb_info_t *info) {
 	void *nmap, *nbuf, *omap = NULL, *obuf = NULL;
 	size_t size = 0;
 
-	/* Map and clear the new framebuffer, and allocate a backbuffer. */
-	nmap = phys_map(addr, width * height * (depth / 8), MM_SLEEP);
-	if(!fb_console.inhibited) {
-		memset(nmap, 0, width * height * (depth / 8));
-	}
-	nbuf = kcalloc(width * height, depth / 8, MM_SLEEP);
-
-	/* Take the lock across updating the details (must be done in case
-	 * another CPU tries to write to the console while updating). */
-	// FIXME
-	//spinlock_lock(&fb_console_lock, 0);
+	/* Map the new framebuffer, and allocate a backbuffer. */
+	nmap = phys_map(info->addr, info->width * info->height * (info->depth / 8), MM_SLEEP);
+	nbuf = kcalloc(info->width * info->height, info->depth / 8, MM_SLEEP);
 
 	/* Save old mapping/buffer details to unmap/free after unlocking. */
 	if(fb_console_mapping) {
 		omap = fb_console_mapping;
 		obuf = fb_console_buffer;
-		size = fb_console_width * fb_console_height * (fb_console_depth / 8);
+		size = fb_console_mode.width * fb_console_mode.height * (fb_console_mode.depth / 8);
 	}
 
 	/* Store new details. */
 	fb_console_mapping = nmap;
 	fb_console_buffer = nbuf;
-	fb_console_width = width;
-	fb_console_height = height;
-	fb_console_depth = depth;
-	fb_console_cols = width / FONT_WIDTH;
-	fb_console_rows = height / FONT_HEIGHT;
+	memcpy(&fb_console_mode, info, sizeof(*info));
+	fb_console_cols = info->width / FONT_WIDTH;
+	fb_console_rows = info->height / FONT_HEIGHT;
 	fb_console_x = fb_console_y = 0;
-
-	/* Disable the splash screen so that the new framebuffer doesn't end
-	 * up with a progress bar on it if something in userspace tries to
-	 * update the boot progress. */
-	splash_enabled = false;
-
-	//spinlock_unlock(&fb_console_lock);
 
 	/* Free the old mapping/buffer if necessary. */
 	if(omap) {
@@ -342,19 +322,84 @@ void fb_console_reconfigure(uint16_t width, uint16_t height, uint8_t depth, phys
 	}
 }
 
-/** Reset the framebuffer console cursor position. */
-void fb_console_reset(void) {
-	//spinlock_lock(&fb_console_lock, 0);
+/** Reset the framebuffer console. */
+static void fb_console_reset(void) {
+	/* Reset the cursor position and clear the first row of the console. */
 	fb_console_x = fb_console_y = 0;
 	memset(fb_console_mapping, 0, ROW_SIZE);
 	memset(fb_console_buffer, 0, ROW_SIZE);
-	//spinlock_unlock(&fb_console_lock);
+}
+
+/** Enable the framebuffer console upon KDBG entry/fatal().
+ * @param arg1		First notifier argument.
+ * @param arg2		Second notifier argument.
+ * @param arg3		Third notifier argument. */
+static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
+	if(!fb_console.putc) {
+		fb_console.putc = fb_console_putc;
+		fb_console_reset();
+	}
+}
+
+/** Disable the framebuffer console upon KDBG exit.
+ * @param arg1		First notifier argument.
+ * @param arg2		Second notifier argument.
+ * @param arg3		Third notifier argument. */
+static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
+	if(fb_console_acquired || splash_enabled) {
+		fb_console.putc = NULL;
+	}
+}
+
+/** Control the framebuffer console.
+ * @param op		Operation to perform.
+ * @param info		For FB_CONSOLE_INFO and FB_CONSOLE_CONFIGURE, FB info
+ *			structure to use. */
+void fb_console_control(unsigned op, fb_info_t *info) {
+	switch(op) {
+	case FB_CONSOLE_INFO:
+		/* Get information on the current mode. */
+		memcpy(info, &fb_console_mode, sizeof(*info));
+		break;
+	case FB_CONSOLE_CONFIGURE:
+		/* Reconfigure to use a new framebuffer. */
+		fb_console_configure(info);
+		break;
+	case FB_CONSOLE_ACQUIRE:
+		/* Acquire the framebuffer for exclusive use. */
+		if(fb_console_acquired) {
+			fatal("Framebuffer console already acquired");
+		}
+
+		/* Prevent output to the console. */
+		fb_console.putc = NULL;
+		fb_console_acquired = true;
+		break;
+	case FB_CONSOLE_RELEASE:
+		/* Release the framebuffer. */
+		if(!fb_console_acquired) {
+			fatal("Framebuffer console not acquired");
+		}
+
+		/* If the splash wasn't enabled, re-enable console output. */
+		if(!splash_enabled) {
+			fb_console.putc = fb_console_putc;
+			fb_console_reset();
+		}
+
+		fb_console_acquired = false;
+		break;
+	};
 }
 
 /** Initialise the framebuffer console. */
 __init_text void console_init(void) {
 	uint16_t width, height;
 	kboot_tag_lfb_t *lfb;
+	fb_info_t info;
+
+	/* Do platform initialisation. */
+	platform_console_init();
 
 	/* Look up the KBoot framebuffer tag. */
 	lfb = kboot_tag_iterate(KBOOT_TAG_LFB, NULL);
@@ -363,31 +408,45 @@ __init_text void console_init(void) {
 		return;
 	}
 
-	/* Configure the framebuffer and register it. */
-	fb_console_reconfigure(lfb->width, lfb->height, lfb->depth, lfb->addr);
+	/* Configure the framebuffer. */
+	info.width = lfb->width;
+	info.height = lfb->height;
+	info.depth = lfb->depth;
+	info.addr = lfb->addr;
+	kboot_tag_release(lfb);
+	fb_console_configure(&info);
+
+	/* Clear the framebuffer and register the console. */
+	memset(fb_console_mapping, 0, info.width * info.height * (info.depth / 8));
 	console_register(&fb_console);
 
-	kboot_tag_release(lfb);
+	/* Register callbacks to reset the framebuffer console upon fatal() and
+	 * KDBG entry. */
+	notifier_register(&fatal_notifier, fb_console_enable, NULL);
+	notifier_register(&kdbg_entry_notifier, fb_console_enable, NULL);
+	notifier_register(&kdbg_exit_notifier, fb_console_disable, NULL);
 
 	if(!kboot_boolean_option("splash_disabled")) {
-		fb_console.inhibited = true;
 		splash_enabled = true;
+
+		/* Prevent log output. */
+		fb_console.putc = NULL;
 
 		/* Draw copyright text. */
 		ppm_size(copyright_ppm, &width, &height);
-		fb_console_draw_ppm(copyright_ppm, (fb_console_width / 2) - (width / 2),
-		                    fb_console_height - height - 5);
+		fb_console_draw_ppm(copyright_ppm, (fb_console_mode.width / 2) - (width / 2),
+		                    fb_console_mode.height - height - 5);
 
 		/* Get logo dimensions. */
 		ppm_size(logo_ppm, &width, &height);
 
 		/* Determine where to draw the progress bar. */
-		splash_progress_x = (fb_console_width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
-		splash_progress_y = (fb_console_height / 2) + (height / 2) + 20;
+		splash_progress_x = (fb_console_mode.width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
+		splash_progress_y = (fb_console_mode.height / 2) + (height / 2) + 20;
 
 		/* Draw logo. */
-		fb_console_draw_ppm(logo_ppm, (fb_console_width / 2) - (width / 2),
-		                    (fb_console_height / 2) - (height / 2) - 10);
+		fb_console_draw_ppm(logo_ppm, (fb_console_mode.width / 2) - (width / 2),
+		                    (fb_console_mode.height / 2) - (height / 2) - 10);
 
 		/* Draw initial progress bar. */
 		console_update_boot_progress(0);
@@ -397,7 +456,7 @@ __init_text void console_init(void) {
 /** Update the progress on the boot splash.
  * @param percent	Boot progress percentage. */
 void console_update_boot_progress(int percent) {
-	if(splash_enabled) {
+	if(splash_enabled && !fb_console_acquired) {
 		fb_console_fillrect(SPLASH_PROGRESS_BG, splash_progress_x,
 		                    splash_progress_y, SPLASH_PROGRESS_WIDTH,
 		                    SPLASH_PROGRESS_HEIGHT);

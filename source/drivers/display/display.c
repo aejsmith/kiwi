@@ -74,24 +74,11 @@ static uint16_t display_mode_depth(display_mode_t *mode) {
 	return 0;
 }
 
-/** Reset the framebuffer console upon KDBG/fatal entry.
+/** Trigger a redraw event after KDBG has run.
  * @param arg1		First notifier argument.
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
-static void display_console_register(void *arg1, void *arg2, void *arg3) {
-	/* Use the inhibited flag to determine whether a reset is required. */
-	if(fb_console.inhibited) {
-		fb_console_reset();
-		fb_console.inhibited = false;
-	}
-}
-
-/** Unregister the KDBG/fatal framebuffer console.
- * @param arg1		First notifier argument.
- * @param arg2		Second notifier argument.
- * @param arg3		Third notifier argument. */
-static void display_console_unregister(void *arg1, void *arg2, void *arg3) {
-	fb_console.inhibited = true;
+static void display_console_redraw(void *arg1, void *arg2, void *arg3) {
 	display_console_device->redraw = true;
 	notifier_run_unlocked(&display_console_device->redraw_notifier, NULL, false);
 }
@@ -155,11 +142,10 @@ static status_t display_device_open(device_t *_device, void **datap) {
 		return STATUS_IN_USE;
 	}
 
+	/* If this is the kernel console device, register the redraw notifier. */
 	if(device == display_console_device) {
-		fb_console.inhibited = true;
-		notifier_register(&fatal_notifier, display_console_register, device);
-		notifier_register(&kdbg_entry_notifier, display_console_register, device);
-		notifier_register(&kdbg_exit_notifier, display_console_unregister, device);
+		fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
+		notifier_register(&kdbg_exit_notifier, display_console_redraw, device);
 	}
 	return STATUS_SUCCESS;
 }
@@ -175,10 +161,10 @@ static void display_device_close(device_t *_device, void *data) {
 	old = atomic_dec(&device->open);
 	assert(old == 1);
 
-	notifier_unregister(&fatal_notifier, display_console_register, NULL);
-	notifier_unregister(&kdbg_entry_notifier, display_console_register, NULL);
-	notifier_unregister(&kdbg_exit_notifier, display_console_unregister, NULL);
-	display_console_register(NULL, NULL, NULL);
+	if(device == display_console_device) {
+		notifier_unregister(&kdbg_exit_notifier, display_console_redraw, device);
+		fb_console_control(FB_CONSOLE_RELEASE, NULL);
+	}
 }
 
 /** Signal that a display device event is being waited for.
@@ -249,6 +235,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
                                        size_t insz, void **outp, size_t *outszp) {
 	display_device_t *device = _device->data;
 	display_mode_t *mode = NULL;
+	fb_info_t info;
 	status_t ret;
 	uint16_t id;
 
@@ -277,7 +264,8 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 		/* For now just return whatever mode the kernel console is
 		 * using, and fallback on 1024x768, then 800x600 if the mode
 		 * is unavailable. */
-		mode = display_mode_find(device, fb_console_width, fb_console_height, fb_console_depth);
+		fb_console_control(FB_CONSOLE_INFO, &info);
+		mode = display_mode_find(device, info.width, info.height, info.depth);
 		if(!mode) {
 			mode = display_mode_find(device, 1024, 768, 0);
 			if(!mode) {
@@ -310,11 +298,9 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			}
 
 			if(device == display_console_device) {
-				notifier_unregister(&fatal_notifier, display_console_register, NULL);
-				notifier_unregister(&kdbg_entry_notifier, display_console_register, NULL);
-				notifier_unregister(&kdbg_exit_notifier, display_console_unregister, NULL);
+				notifier_unregister(&kdbg_exit_notifier, display_console_redraw, device);
+				fb_console_control(FB_CONSOLE_RELEASE, NULL);
 				display_console_device = NULL;
-				fb_console.inhibited = false;
 			}
 			device->curr_mode = NULL;
 		} else {
@@ -338,16 +324,18 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
 				/* Point the framebuffer console at the device. */
-				fb_console.inhibited = true;
-				fb_console_reconfigure(mode->width, mode->height, display_mode_depth(mode),
-				                       device->mem_phys + mode->offset);
+				info.width = mode->width;
+				info.height = mode->height;
+				info.depth = display_mode_depth(mode);
+				info.addr = device->mem_phys + mode->offset;
+				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
 
-				/* Register notifiers to reset the console upon
-				 * KDBG/fatal. */
+				/* Register a notifier to redraw the console
+				 * after KDBG has run, and acquire the console
+				 * to prevent kernel output. */
 				if(!display_console_device) {
-					notifier_register(&fatal_notifier, display_console_register, device);
-					notifier_register(&kdbg_entry_notifier, display_console_register, device);
-					notifier_register(&kdbg_exit_notifier, display_console_unregister, device);
+					fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
+					notifier_register(&kdbg_exit_notifier, display_console_redraw, device);
 				}
 
 				display_console_device = device;

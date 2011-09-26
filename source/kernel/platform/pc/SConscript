@@ -20,7 +20,6 @@ Import('config')
 sources = FeatureSources(config, [
 	'acpi.c',
 	'console.c',
-	'kdbg.c',
 	'page.c',
 	'pic.c',
 	'pit.c',
