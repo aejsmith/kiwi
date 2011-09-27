@@ -31,6 +31,7 @@
 
 #include <security/cap.h>
 
+#include <assert.h>
 #include <console.h>
 #include <kdb.h>
 #include <kernel.h>
@@ -81,7 +82,9 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 		notifier_run_unlocked(&fatal_notifier, NULL, false);
 
 		fatal_printf("\nFatal Error: ");
+		va_start(args, fmt);
 		do_printf(fatal_printf_helper, NULL, fmt, args);
+		va_end(args);
 		fatal_printf("\n");
 
 		kdb_enter(KDB_REASON_FATAL, frame);
@@ -89,6 +92,14 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 
 	/* Halt the current CPU. */
 	cpu_halt();
+}
+
+/** Handle failure of an assertion.
+ * @param cond		String of the condition that failed.
+ * @param file		File name that contained the assertion.
+ * @param line		Line number of the assertion. */
+void __assert_fail(const char *cond, const char *file, int line) {
+	_fatal(NULL, "Assertion `%s' failed\nat %s:%d", cond, file, line);
 }
 
 /**

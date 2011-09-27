@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
@@ -22,13 +22,18 @@
 #ifndef __ASSERT_H
 #define __ASSERT_H
 
-#include <compiler.h>
 #include <kernel.h>
 
 #if CONFIG_DEBUG
-# define assert(cond)	if(unlikely(!(cond))) { fatal("Assertion failure: %s\nat %s:%d", #cond, __FILE__, __LINE__); }
+
+/** Raise a fatal error if the given condition is not met.
+ * @param cond		Condition to test. */
+#define assert(cond)	if(unlikely(!(cond))) { __assert_fail(#cond, __FILE__, __LINE__); }
+
 #else
-# define assert(cond)	((void)0)
+#define assert(cond)	((void)0)
 #endif
+
+extern void __assert_fail(const char *cond, const char *file, int line) __noreturn;
 
 #endif /* __ASSERT_H */
