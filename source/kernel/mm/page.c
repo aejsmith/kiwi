@@ -710,70 +710,70 @@ void page_stats_get(page_stats_t *stats) {
 	stats->cached = page_queues[PAGE_STATE_CACHED].count * PAGE_SIZE;
 	stats->free = stats->total - stats->allocated - stats->modified - stats->cached;
 }
-#if 0
+
 /** Print details about physical memory usage.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_page(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 	page_stats_t stats;
-	unative_t addr;
+	uint64_t addr;
 	page_t *page;
 	size_t i;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<addr>]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<addr>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out a list of all usable page ranges and information about physical\n");
-		kprintf(LOG_NONE, "memory usage, or details of a single page.\n");
-		return KDBG_OK;
+		kdb_printf("Prints out a list of all usable page ranges and information about physical\n");
+		kdb_printf("memory usage, or details of a single page.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 1 && argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	if(argc == 2) {
-		if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
+		if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
 		} else if(addr % PAGE_SIZE) {
-			kprintf(LOG_NONE, "Address must be page aligned.\n");
-			return KDBG_FAIL;
-		} else if(!(page = page_lookup(addr))) {
-			kprintf(LOG_NONE, "404 Page Not Found\n");
-			return KDBG_FAIL;
+			kdb_printf("Address must be page aligned.\n");
+			return KDB_FAILURE;
+		} else if(!(page = page_lookup((phys_ptr_t)addr))) {
+			kdb_printf("404 Page Not Found\n");
+			return KDB_FAILURE;
 		}
 
-		kprintf(LOG_NONE, "Page 0x%" PRIxPHYS " (%p) (Range: %d)\n", page->addr, page, page->phys_range);
-		kprintf(LOG_NONE, "=================================================\n");
-		kprintf(LOG_NONE, "State:    %d\n", page->state);
-		kprintf(LOG_NONE, "Modified: %d\n", page->modified);
-		kprintf(LOG_NONE, "Count:    %d\n", page->count);
-		kprintf(LOG_NONE, "Cache:    %p\n", page->cache);
-		kprintf(LOG_NONE, "Amap:     %p\n", page->amap);
-		kprintf(LOG_NONE, "Offset:   %" PRIu64 "\n", page->offset);
+		kdb_printf("Page 0x%" PRIxPHYS " (%p) (Range: %d)\n", page->addr, page, page->phys_range);
+		kdb_printf("=================================================\n");
+		kdb_printf("State:    %d\n", page->state);
+		kdb_printf("Modified: %d\n", page->modified);
+		kdb_printf("Count:    %d\n", page->count);
+		kdb_printf("Cache:    %p\n", page->cache);
+		kdb_printf("Amap:     %p\n", page->amap);
+		kdb_printf("Offset:   %" PRIu64 "\n", page->offset);
 	} else {
-		kprintf(LOG_NONE, "Start              End                Freelist Pages\n");
-		kprintf(LOG_NONE, "=====              ===                ======== =====\n");
+		kdb_printf("Start              End                Freelist Pages\n");
+		kdb_printf("=====              ===                ======== =====\n");
 
 		for(i = 0; i < phys_range_count; i++) {
-			kprintf(LOG_NONE, "0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %-8u %p\n",
-			        phys_ranges[i].start, phys_ranges[i].end,
-			        phys_ranges[i].freelist, phys_ranges[i].pages);
+			kdb_printf("0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %-8u %p\n",
+			           phys_ranges[i].start, phys_ranges[i].end,
+			           phys_ranges[i].freelist, phys_ranges[i].pages);
 		}
 
 		page_stats_get(&stats);
-		kprintf(LOG_NONE, "\nUsage statistics\n");
-		kprintf(LOG_NONE, "================\n");
-		kprintf(LOG_NONE, "Total:     %" PRIu64 " KiB\n", stats.total / 1024);
-		kprintf(LOG_NONE, "Allocated: %" PRIu64 " KiB\n", stats.allocated / 1024);
-		kprintf(LOG_NONE, "Modified:  %" PRIu64 " KiB\n", stats.modified / 1024);
-		kprintf(LOG_NONE, "Cached:    %" PRIu64 " KiB\n", stats.cached / 1024);
-		kprintf(LOG_NONE, "Free:      %" PRIu64 " KiB\n", stats.free / 1024);
+		kdb_printf("\nUsage statistics\n");
+		kdb_printf("================\n");
+		kdb_printf("Total:     %" PRIu64 " KiB\n", stats.total / 1024);
+		kdb_printf("Allocated: %" PRIu64 " KiB\n", stats.allocated / 1024);
+		kdb_printf("Modified:  %" PRIu64 " KiB\n", stats.modified / 1024);
+		kdb_printf("Cached:    %" PRIu64 " KiB\n", stats.cached / 1024);
+		kdb_printf("Free:      %" PRIu64 " KiB\n", stats.free / 1024);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Add a new range of physical memory.
  * @note		Ranges must be added in lowest to highest order!
  * @param start		Start of range.
@@ -935,6 +935,9 @@ __init_text void page_init(void) {
 			}
 		}
 	}
+
+	/* Register the KDB command. */
+	kdb_register_command("page", "Display physical memory usage information.", kdb_cmd_page);
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */

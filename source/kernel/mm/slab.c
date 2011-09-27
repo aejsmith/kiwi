@@ -831,47 +831,48 @@ void slab_cache_destroy(slab_cache_t *cache) {
 
 	slab_cache_free(&slab_cache_cache, cache);
 }
-#if 0
+
 /** Prints a list of all slab caches.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success. */
-int kdbg_cmd_slab(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 	slab_cache_t *cache;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all active slab caches and some statistics about them.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all active slab caches and some statistics about them.\n");
+		return KDB_SUCCESS;
 	}
 
 #if CONFIG_SLAB_STATS
-	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
-	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ========== ======= =====\n");
+	kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
+	kdb_printf("====                      =====  ======== ========= ===== ========== ======= =====\n");
 #else
-	kprintf(LOG_NONE, "Name                      Align  Obj Size Slab Size Flags Slab Count\n");
-	kprintf(LOG_NONE, "====                      =====  ======== ========= ===== ==========\n");
+	kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count\n");
+	kdb_printf("====                      =====  ======== ========= ===== ==========\n");
 #endif
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
 #if CONFIG_SLAB_STATS
-		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %-10zu %-7d %d\n",
-			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-			cache->slab_size, cache->flags, cache->slab_count,
-			atomic_get(&cache->alloc_current), atomic_get(&cache->alloc_total));
+		kdb_printf("%-*s %-6zu %-8zu %-9zu %-5d %-10zu %-7d %d\n",
+			   SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			   cache->slab_size, cache->flags, cache->slab_count,
+			   atomic_get(&cache->alloc_current),
+		           atomic_get(&cache->alloc_total));
 #else
-		kprintf(LOG_NONE, "%-*s %-6zu %-8zu %-9zu %-5d %zu\n",
-			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-			cache->slab_size, cache->flags, cache->slab_count);
+		kdb_printf("%-*s %-6zu %-8zu %-9zu %-5d %zu\n",
+			   SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			   cache->slab_size, cache->flags, cache->slab_count);
 #endif
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Slab low resource handler function.
  * @todo		This should take into effect which caches are hot, and
  *			reclaim from them less frequently.
@@ -913,6 +914,9 @@ __init_text void slab_init(void) {
 
 	/* Register the LRM handler. */
 	lrm_handler_register(&slab_lrm_handler);
+
+	/* Register the KDB command. */
+	kdb_register_command("slab", "Display slab cache statistics.", kdb_cmd_slab);
 }
 
 /** Enable the magazine layer. */

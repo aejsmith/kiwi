@@ -578,45 +578,45 @@ void handle_table_destroy(handle_table_t *table) {
 	bitmap_destroy(&table->bitmap);
 	slab_cache_free(handle_table_cache, table);
 }
-#if 0
+
 /** Print a list of a process' handles.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_handles(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter) {
 	handle_link_t *link;
 	process_t *process;
-	unative_t id;
+	uint64_t id;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s <process ID>\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s <process ID>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out a list of all currently open handles in a process.\n");
-		return KDBG_OK;
+		kdb_printf("Prints out a list of all currently open handles in a process.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
-	if(kdbg_parse_expression(argv[1], &id, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
+	if(kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
 	} else if(!(process = process_lookup_unsafe(id))) {
-		kprintf(LOG_NONE, "Invalid process ID.\n");
-		return KDBG_FAIL;
+		kdb_printf("Invalid process ID.\n");
+		return KDB_FAILURE;
 	}
 
-	kprintf(LOG_NONE, "ID    Object             Type                  Count  Data\n");
-	kprintf(LOG_NONE, "==    ======             ====                  =====  ====\n");
+	kdb_printf("ID    Object             Type                  Count  Data\n");
+	kdb_printf("==    ======             ====                  =====  ====\n");
 
 	AVL_TREE_FOREACH(&process->handles->tree, iter) {
 		link = avl_tree_entry(iter, handle_link_t);
-		kprintf(LOG_NONE, "%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
-		        iter->key, link->handle->object, link->handle->object->type->id,
-		        link->handle->object->type, refcount_get(&link->handle->count),
-		        link->handle->data);
+		kdb_printf("%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
+		           iter->key, link->handle->object, link->handle->object->type->id,
+		           link->handle->object->type, refcount_get(&link->handle->count),
+		           link->handle->data);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
 
 /** Dump an ACL.
@@ -627,64 +627,64 @@ static void dump_object_acl(object_acl_t *acl) {
 	for(i = 0; i < acl->count; i++) {
 		switch(acl->entries[i].type) {
 		case ACL_ENTRY_USER:
-			kprintf(LOG_NONE, " User(%d): ", acl->entries[i].value);
+			kdb_printf(" User(%d): ", acl->entries[i].value);
 			break;
 		case ACL_ENTRY_GROUP:
-			kprintf(LOG_NONE, " Group(%d): ", acl->entries[i].value);
+			kdb_printf(" Group(%d): ", acl->entries[i].value);
 			break;
 		case ACL_ENTRY_OTHERS:
-			kprintf(LOG_NONE, " Others: ");
+			kdb_printf(" Others: ");
 			break;
 		case ACL_ENTRY_SESSION:
-			kprintf(LOG_NONE, " Session(%d): ", acl->entries[i].value);
+			kdb_printf(" Session(%d): ", acl->entries[i].value);
 			break;
 		case ACL_ENTRY_CAPABILITY:
-			kprintf(LOG_NONE, " Capability(%d): ", acl->entries[i].value);
+			kdb_printf(" Capability(%d): ", acl->entries[i].value);
 			break;
 		}
 
-		kprintf(LOG_NONE, "0x%x\n", acl->entries[i].rights);
+		kdb_printf("0x%x\n", acl->entries[i].rights);
 	}
 }
 
 /** Print information about an object.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_object(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) {
 	object_t *object;
-	unative_t addr;
+	uint64_t addr;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s <address>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out information about an object.\n");
-		return KDBG_OK;
+		kdb_printf("Prints out information about an object.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
-	if(kdbg_parse_expression(argv[1], &addr, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
+	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
 	}
 
-	object = (object_t *)addr;
+	object = (object_t *)((ptr_t)addr);
 
-	kprintf(LOG_NONE, "Object %p\n", object);
-	kprintf(LOG_NONE, "=================================================\n");
-	kprintf(LOG_NONE, "Type:  %d(%p)\n", object->type->id, object->type);
-	kprintf(LOG_NONE, "User:  %d\n", object->uid);
-	kprintf(LOG_NONE, "Group: %d\n\n", object->gid);
+	kdb_printf("Object %p\n", object);
+	kdb_printf("=================================================\n");
+	kdb_printf("Type:  %d(%p)\n", object->type->id, object->type);
+	kdb_printf("User:  %d\n", object->uid);
+	kdb_printf("Group: %d\n\n", object->gid);
 
-	kprintf(LOG_NONE, "User ACL:\n");
+	kdb_printf("User ACL:\n");
 	dump_object_acl(&object->uacl);
-	kprintf(LOG_NONE, "System ACL:\n");
+	kdb_printf("System ACL:\n");
 	dump_object_acl(&object->sacl);
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Initialise the handle caches. */
 __init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
@@ -692,6 +692,10 @@ __init_text void handle_init(void) {
 	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
 	                                       0, handle_table_ctor, NULL, NULL, 0,
 	                                       MM_FATAL);
+
+	/* Register the KDB commands. */
+	kdb_register_command("handles", "Inspect a process' handle table.", kdb_cmd_handles);
+	kdb_register_command("object", "Show information about a kernel object.", kdb_cmd_object);
 }
 
 /** Get the type of an object referred to by a handle.

@@ -63,6 +63,21 @@ cpu_id_t cpu_id(void) {
         return (cpu_id_t)lapic_id();
 }
 
+/** Dump information about a CPU.
+ * @param cpu		CPU to dump. */
+void cpu_dump(cpu_t *cpu) {
+	kprintf(LOG_NOTICE, " cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
+		cpu->id, cpu->arch.model_name, cpu->arch.family,
+		cpu->arch.model, cpu->arch.stepping);
+	kprintf(LOG_NOTICE, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
+	if(lapic_enabled()) {
+		kprintf(LOG_NOTICE, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
+	}
+	kprintf(LOG_NOTICE, "  cache_align: %d\n", cpu->arch.cache_alignment);
+	kprintf(LOG_NOTICE, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
+	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
+}
+
 /** Perform early initialisation common to all CPUs. */
 __init_text void arch_cpu_early_init(void) {
 	/* Initialise the global IDT and the interrupt handler table. */
@@ -337,54 +352,41 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	tsc_init();
 }
 
-/** Perform additional initialisation of the current CPU. */
-__init_text void arch_cpu_init_percpu() {
-	lapic_init();
-}
-
-/** Dump information about a CPU.
- * @param cpu		CPU to dump. */
-void cpu_dump(cpu_t *cpu) {
-	kprintf(LOG_NOTICE, " cpu%" PRIu32 ": %s (family: %u, model: %u, stepping: %u)\n",
-		cpu->id, cpu->arch.model_name, cpu->arch.family,
-		cpu->arch.model, cpu->arch.stepping);
-	kprintf(LOG_NOTICE, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
-	if(lapic_enabled()) {
-		kprintf(LOG_NOTICE, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
-	}
-	kprintf(LOG_NOTICE, "  cache_align: %d\n", cpu->arch.cache_alignment);
-	kprintf(LOG_NOTICE, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
-	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
-}
-#if 0
-/** CPU information command for KDBG.
+/** Display a list of running CPUs.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success. */
-int kdbg_cmd_cpus(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 	size_t i;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all CPUs and information about them.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all CPUs and information about them.\n");
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "ID   Freq (MHz) LAPIC Freq (MHz) Cache Align Model Name\n");
-	kprintf(LOG_NONE, "==   ========== ================ =========== ==========\n");
+	kdb_printf("ID   Freq (MHz) LAPIC Freq (MHz) Cache Align Model Name\n");
+	kdb_printf("==   ========== ================ =========== ==========\n");
 
 	for(i = 0; i <= highest_cpu_id; i++) {
 		if(cpus[i] == NULL) {
 			continue;
 		}
 
-		kprintf(LOG_NONE, "%-4" PRIu32 " %-10" PRIu64 " %-16" PRIu64 " %-11d %s\n",
-		        cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
-		        cpus[i]->arch.lapic_freq / 1000000, cpus[i]->arch.cache_alignment,
-		        (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
+		kdb_printf("%-4" PRIu32 " %-10" PRIu64 " %-16" PRIu64 " %-11d %s\n",
+		           cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
+		           cpus[i]->arch.lapic_freq / 1000000, cpus[i]->arch.cache_alignment,
+		           (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
+/** Perform additional initialisation of the current CPU. */
+__init_text void arch_cpu_init_percpu() {
+	/* Register the KDB command. */
+	kdb_register_command("cpus", "Display a list of CPUs.", kdb_cmd_cpus);
+
+	lapic_init();
+}

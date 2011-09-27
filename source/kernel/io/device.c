@@ -719,7 +719,7 @@ status_t device_request(object_handle_t *handle, int request, const void *in, si
 	// FIXME: Right checks?
 	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
 }
-#if 0
+
 /** Print out a device's children.
  * @param tree		Radix tree to print.
  * @param indent	Indentation level. */
@@ -729,7 +729,7 @@ static void device_dump_children(radix_tree_t *tree, int indent) {
 	RADIX_TREE_FOREACH(tree, iter) {
 		device = radix_tree_entry(iter, device_t);
 
-		kprintf(LOG_NONE, "%*s%-*s %-18p %-18p %d\n", indent, "",
+		kdb_printf("%*s%-*s %-18p %-18p %d\n", indent, "",
 		        24 - indent, device->name, device, device->parent,
 		        refcount_get(&device->count));
 		if(device->dest) {
@@ -743,82 +743,82 @@ static void device_dump_children(radix_tree_t *tree, int indent) {
 /** Print out device information.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		Always returns KDBG_OK. */
-int kdbg_cmd_device(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) {
 	device_t *device;
-	unative_t val;
+	uint64_t val;
 	size_t i;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<addr>]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<addr>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "If no arguments are given, shows the contents of the device tree. Otherwise\n");
-		kprintf(LOG_NONE, "shows information about a single device.\n");
-		return KDBG_OK;
+		kdb_printf("If no arguments are given, shows the contents of the device tree. Otherwise\n");
+		kdb_printf("shows information about a single device.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 1 && argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	if(argc == 1) {
-		kprintf(LOG_NONE, "Name                     Address            Parent             Count\n");
-		kprintf(LOG_NONE, "====                     =======            ======             =====\n");
+		kdb_printf("Name                     Address            Parent             Count\n");
+		kdb_printf("====                     =======            ======             =====\n");
 
 		device_dump_children(&device_tree_root->children, 0);
-		return KDBG_OK;
+		return KDB_SUCCESS;
 	}
 
-	if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
+	if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
 	}
 	device = (device_t *)((ptr_t)val);
 
-	kprintf(LOG_NONE, "Device %p(%s)\n", device, device->name);
-	kprintf(LOG_NONE, "=================================================\n");
-	kprintf(LOG_NONE, "Count:       %d\n", refcount_get(&device->count));
-	kprintf(LOG_NONE, "Parent:      %p\n", device->parent);
+	kdb_printf("Device %p(%s)\n", device, device->name);
+	kdb_printf("=================================================\n");
+	kdb_printf("Count:       %d\n", refcount_get(&device->count));
+	kdb_printf("Parent:      %p\n", device->parent);
 	if(device->dest) {
-		kprintf(LOG_NONE, "Destination: %p(%s)\n", device->dest, device->dest->name);
+		kdb_printf("Destination: %p(%s)\n", device->dest, device->dest->name);
 	}
-	kprintf(LOG_NONE, "Ops:         %p\n", device->ops);
-	kprintf(LOG_NONE, "Data:        %p\n", device->data);
+	kdb_printf("Ops:         %p\n", device->ops);
+	kdb_printf("Data:        %p\n", device->data);
 
 	if(!device->attrs) {
-		return KDBG_OK;
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "\nAttributes:\n");
+	kdb_printf("\nAttributes:\n");
 
 	for(i = 0; i < device->attr_count; i++) {
-		kprintf(LOG_NONE, "  %s - ", device->attrs[i].name);
+		kdb_printf("  %s - ", device->attrs[i].name);
 		switch(device->attrs[i].type) {
 		case DEVICE_ATTR_UINT8:
-			kprintf(LOG_NONE, "uint8: %" PRIu8 " (0x%" PRIx8 ")\n",
+			kdb_printf("uint8: %" PRIu8 " (0x%" PRIx8 ")\n",
 			        device->attrs[i].value.uint8, device->attrs[i].value.uint8);
 			break;
 		case DEVICE_ATTR_UINT16:
-			kprintf(LOG_NONE, "uint16: %" PRIu16 " (0x%" PRIx16 ")\n",
+			kdb_printf("uint16: %" PRIu16 " (0x%" PRIx16 ")\n",
 			        device->attrs[i].value.uint16, device->attrs[i].value.uint16);
 			break;
 		case DEVICE_ATTR_UINT32:
-			kprintf(LOG_NONE, "uint32: %" PRIu32 " (0x%" PRIx32 ")\n",
+			kdb_printf("uint32: %" PRIu32 " (0x%" PRIx32 ")\n",
 			        device->attrs[i].value.uint32, device->attrs[i].value.uint32);
 			break;
 		case DEVICE_ATTR_UINT64:
-			kprintf(LOG_NONE, "uint64: %" PRIu64 " (0x%" PRIx64 ")\n",
+			kdb_printf("uint64: %" PRIu64 " (0x%" PRIx64 ")\n",
 			        device->attrs[i].value.uint64, device->attrs[i].value.uint64);
 			break;
 		case DEVICE_ATTR_STRING:
-			kprintf(LOG_NONE, "string: '%s'\n", device->attrs[i].value.string);
+			kdb_printf("string: '%s'\n", device->attrs[i].value.string);
 			break;
 		default:
-			kprintf(LOG_NONE, "Invalid!\n");
+			kdb_printf("Invalid!\n");
 			break;
 		}
 	}
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Initialise the device manager. */
 __init_text void device_init(void) {
 	status_t ret;
@@ -835,6 +835,9 @@ __init_text void device_init(void) {
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create bus directory in device tree (%d)", ret);
 	}
+
+	/* Register the KDB command. */
+	kdb_register_command("device", "Examine the device tree.", kdb_cmd_device);
 }
 
 /**

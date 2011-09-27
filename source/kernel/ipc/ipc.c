@@ -1030,112 +1030,112 @@ fail:
 	object_handle_release(khandle);
 	return ret;
 }
-#if 0
+
 /** Print information about IPC ports.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG status code. */
-int kdbg_cmd_port(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_port(int argc, char **argv, kdb_filter_t *filter) {
 	ipc_connection_t *conn;
 	ipc_port_t *port;
-	unative_t val;
+	uint64_t val;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<port ID>]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<port ID>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints either a list of all IPC ports or information about a certain port.\n");
-		return KDBG_OK;
+		kdb_printf("Prints either a list of all IPC ports or information about a certain port.\n");
+		return KDB_SUCCESS;
 	} else if(argc == 1) {
-		kprintf(LOG_NONE, "ID    Count  Waiting\n");
-		kprintf(LOG_NONE, "==    =====  =======\n");
+		kdb_printf("ID    Count  Waiting\n");
+		kdb_printf("==    =====  =======\n");
 
 		AVL_TREE_FOREACH(&port_tree, iter) {
 			port = avl_tree_entry(iter, ipc_port_t);
 
-			kprintf(LOG_NONE, "%-5" PRIu32 " %-6d %u\n", port->id,
-			        refcount_get(&port->count),
-			        semaphore_count(&port->conn_sem));
+			kdb_printf("%-5" PRIu32 " %-6d %u\n", port->id,
+			           refcount_get(&port->count),
+			           semaphore_count(&port->conn_sem));
 		}
 
-		return KDBG_OK;
+		return KDB_SUCCESS;
 	} else if(argc == 2) {
-		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
+		if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
 		} else if(!(port = avl_tree_lookup(&port_tree, val))) {
-			kprintf(LOG_NONE, "Invalid port ID.\n");
-			return KDBG_FAIL;
+			kdb_printf("Invalid port ID.\n");
+			return KDB_FAILURE;
 		}
 
-		kprintf(LOG_NONE, "Port %p(%d)\n", port, port->id);
-		kprintf(LOG_NONE, "=================================================\n");
+		kdb_printf("Port %p(%d)\n", port, port->id);
+		kdb_printf("=================================================\n");
 
-		kprintf(LOG_NONE, "Locked:  %d (%" PRId32 ")\n", atomic_get(&port->lock.locked),
+		kdb_printf("Locked:  %d (%" PRId32 ")\n", atomic_get(&port->lock.locked),
 		        (port->lock.holder) ? port->lock.holder->id : -1);
-		kprintf(LOG_NONE, "Count:   %d\n", refcount_get(&port->count));
-		kprintf(LOG_NONE, "Waiting (%u):\n", semaphore_count(&port->conn_sem));
+		kdb_printf("Count:   %d\n", refcount_get(&port->count));
+		kdb_printf("Waiting (%u):\n", semaphore_count(&port->conn_sem));
 		LIST_FOREACH(&port->waiting, iter) {
 			conn = list_entry(iter, ipc_connection_t, header);
-			kprintf(LOG_NONE, " %p: endpoint[0] = %p endpoint[1] = %p\n",
-			        conn, &conn->endpoints[0], &conn->endpoints[1]);
+			kdb_printf(" %p: endpoint[0] = %p endpoint[1] = %p\n",
+			           conn, &conn->endpoints[0], &conn->endpoints[1]);
 		}
-		kprintf(LOG_NONE, "Connections:\n");
+		kdb_printf("Connections:\n");
 		LIST_FOREACH(&port->connections, iter) {
 			conn = list_entry(iter, ipc_connection_t, header);
-			kprintf(LOG_NONE, " %p: endpoint[0] = %p endpoint[1] = %p\n",
-			        conn, &conn->endpoints[0], &conn->endpoints[1]);
+			kdb_printf(" %p: endpoint[0] = %p endpoint[1] = %p\n",
+			           conn, &conn->endpoints[0], &conn->endpoints[1]);
 		}
-		return KDBG_OK;
+		return KDB_SUCCESS;
 	} else {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 }
 
 /** Print information about an IPC endpoint.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG status code. */
-int kdbg_cmd_endpoint(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_endpoint(int argc, char **argv, kdb_filter_t *filter) {
 	ipc_endpoint_t *endpoint;
 	ipc_message_t *message;
-	unative_t val;
+	uint64_t val;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s <addr>\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s <addr>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Shows information about an IPC endpoint. The address can be obtained by\n");
-		kprintf(LOG_NONE, "looking at the data field of an IPC handle.\n");
-		return KDBG_OK;
+		kdb_printf("Shows information about an IPC endpoint. The address can be obtained by\n");
+		kdb_printf("looking at the data field of an IPC handle.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
-	if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
+	if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
 	}
 	endpoint = (ipc_endpoint_t *)((ptr_t)val);
 
-	kprintf(LOG_NONE, "Endpoint %p\n", endpoint);
-	kprintf(LOG_NONE, "=================================================\n");
+	kdb_printf("Endpoint %p\n", endpoint);
+	kdb_printf("=================================================\n");
 
-	kprintf(LOG_NONE, "Locked: %d (%p) (%" PRId32 ")\n", atomic_get(&endpoint->conn->lock.locked),
+	kdb_printf("Locked: %d (%p) (%" PRId32 ")\n", atomic_get(&endpoint->conn->lock.locked),
 	        (endpoint->conn->lock.holder) ? endpoint->conn->lock.holder->id : -1);
-	kprintf(LOG_NONE, "Space:  %u\n", semaphore_count(&endpoint->space_sem));
-	kprintf(LOG_NONE, "Data:   %u\n", semaphore_count(&endpoint->data_sem));
-	kprintf(LOG_NONE, "Remote: %p\n\n", endpoint->remote);
+	kdb_printf("Space:  %u\n", semaphore_count(&endpoint->space_sem));
+	kdb_printf("Data:   %u\n", semaphore_count(&endpoint->data_sem));
+	kdb_printf("Remote: %p\n\n", endpoint->remote);
 
-	kprintf(LOG_NONE, "Messages:\n");
+	kdb_printf("Messages:\n");
 	LIST_FOREACH(&endpoint->messages, iter) {
 		message = list_entry(iter, ipc_message_t, header);
 
-		kprintf(LOG_NONE, " %p: type %" PRIu32 ", size: %zu, buffer: %p\n",
-		        message, message->type, message->size, message->data);
+		kdb_printf(" %p: type %" PRIu32 ", size: %zu, buffer: %p\n",
+		           message, message->type, message->size, message->data);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Initialise the IPC slab caches. */
 static __init_text void ipc_init(void) {
 	/* Initialise the port ID allocator. */
@@ -1148,5 +1148,9 @@ static __init_text void ipc_init(void) {
 	ipc_connection_cache = slab_cache_create("ipc_connection_cache", sizeof(ipc_connection_t),
 	                                         0, ipc_connection_ctor, NULL, NULL, 0,
 	                                         MM_FATAL);
+
+	/* Register the KDB commands. */
+	kdb_register_command("port", "Obtain information about IPC ports.", kdb_cmd_port);
+	kdb_register_command("endpoint", "Print information about an IPC endpoint.", kdb_cmd_endpoint);
 }
 INITCALL(ipc_init);

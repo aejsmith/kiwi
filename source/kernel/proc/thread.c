@@ -686,112 +686,110 @@ void thread_destroy(thread_t *thread) {
 
 	spinlock_unlock(&thread->lock);
 }
-#if 0
-/** Kill a thread.
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_kill(int argc, char **argv) {
-	thread_t *thread;
-	unative_t tid;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<thread ID>]\n\n", argv[0]);
-
-		kprintf(LOG_NONE, "Schedules a currently running thread to be killed once KDBG exits.\n");
-		kprintf(LOG_NONE, "Note that this has no effect on kernel threads.\n");
-		return KDBG_OK;
-	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
-	}
-
-	if(kdbg_parse_expression(argv[1], &tid, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
-	} else if(!(thread = thread_lookup_unsafe(tid))) {
-		kprintf(LOG_NONE, "Invalid thread ID.\n");
-		return KDBG_FAIL;
-	}
-
-	thread_kill(thread);
-	return KDBG_OK;
-}
 
 /** Print information about a thread.
- * @param thread	Thread to print.
- * @param level		Log level. */
-static inline void thread_dump(thread_t *thread, int level) {
-	kprintf(level, "%-5" PRId32 "%s ", thread->id,
-	        (thread == curr_thread) ? "*" : " ");
+ * @param thread	Thread to print. */
+static inline void dump_thread(thread_t *thread) {
+	kdb_printf("%-5" PRId32 "%s ", thread->id,
+	           (thread == curr_thread) ? "*" : " ");
 
 	switch(thread->state) {
-	case THREAD_CREATED:	kprintf(level, "Created      "); break;
-	case THREAD_READY:	kprintf(level, "Ready        "); break;
-	case THREAD_RUNNING:	kprintf(level, "Running      "); break;
+	case THREAD_CREATED:	kdb_printf("Created      "); break;
+	case THREAD_READY:	kdb_printf("Ready        "); break;
+	case THREAD_RUNNING:	kdb_printf("Running      "); break;
 	case THREAD_SLEEPING:
-		kprintf(level, "Sleeping ");
+		kdb_printf("Sleeping ");
 		if(thread->interruptible) {
-			kprintf(level, "(I) ");
+			kdb_printf("(I) ");
 		} else {
-			kprintf(level, "    ");
+			kdb_printf("    ");
 		}
 		break;
-	case THREAD_DEAD:	kprintf(level, "Dead         "); break;
-	default:		kprintf(level, "Bad          "); break;
+	case THREAD_DEAD:	kdb_printf("Dead         "); break;
+	default:		kdb_printf("Bad          "); break;
 	}
 
-	kprintf(level, "%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
-	        (thread->cpu) ? thread->cpu->id : 0, thread->wired, thread->priority,
-	        thread->curr_prio, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
-	        thread->owner->id, thread->name);
+	kdb_printf("%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
+	           (thread->cpu) ? thread->cpu->id : 0, thread->wired, thread->priority,
+	           thread->curr_prio, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
+	           thread->owner->id, thread->name);
 }
 
 /** Dump a list of threads.
  * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_thread(int argc, char **argv) {
+ * @param argv		Argument array.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_thread(int argc, char **argv, kdb_filter_t *filter) {
 	process_t *process;
 	thread_t *thread;
-	unative_t pid;
+	uint64_t pid;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<process ID>]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<process ID>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all threads, or a list of threads within a process\n");
-		kprintf(LOG_NONE, "if given a process ID. The ID is given as an expression.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all threads, or a list of threads within a process\n");
+		kdb_printf("if given a process ID. The ID is given as an expression.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 1 && argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
-	kprintf(LOG_NONE, "ID     State        CPU  Wire Prio (Curr) Flags Waiting On           Owner Name\n");
-	kprintf(LOG_NONE, "==     =====        ===  ==== ==== ====== ===== ==========           ===== ====\n");
+	kdb_printf("ID     State        CPU  Wire Prio (Curr) Flags Waiting On           Owner Name\n");
+	kdb_printf("==     =====        ===  ==== ==== ====== ===== ==========           ===== ====\n");
 
 	if(argc == 2) {
 		/* Find the process ID. */
-		if(kdbg_parse_expression(argv[1], &pid, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
+		if(kdb_parse_expression(argv[1], &pid, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
 		} else if(!(process = process_lookup_unsafe(pid))) {
-			kprintf(LOG_NONE, "Invalid process ID.\n");
-			return KDBG_FAIL;
+			kdb_printf("Invalid process ID.\n");
+			return KDB_FAILURE;
 		}
 
 		LIST_FOREACH(&process->threads, iter) {
 			thread = list_entry(iter, thread_t, owner_link);
-			thread_dump(thread, LOG_NONE);
+			dump_thread(thread);
 		}
 	} else {
 		AVL_TREE_FOREACH(&thread_tree, iter) {
 			thread = avl_tree_entry(iter, thread_t);
-			thread_dump(thread, LOG_NONE);
+			dump_thread(thread);
 		}
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
+/** Kill a thread.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
+	thread_t *thread;
+	uint64_t tid;
+
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<thread ID>]\n\n", argv[0]);
+
+		kdb_printf("Schedules a currently running thread to be killed once KDB exits.\n");
+		kdb_printf("Note that this has no effect on kernel threads.\n");
+		return KDB_SUCCESS;
+	} else if(argc != 2) {
+		kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
+	}
+
+	if(kdb_parse_expression(argv[1], &tid, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
+	} else if(!(thread = thread_lookup_unsafe(tid))) {
+		kdb_printf("Invalid thread ID.\n");
+		return KDB_FAILURE;
+	}
+
+	thread_kill(thread);
+	return KDB_SUCCESS;
+}
 
 /** Initialise the thread system. */
 __init_text void thread_init(void) {
@@ -802,6 +800,10 @@ __init_text void thread_init(void) {
 	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),
 	                                 thread_cache_ctor, NULL, NULL, 0,
 	                                 MM_FATAL);
+
+	/* Register our KDB commands. */
+	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);
+	kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
 }
 
 /** Create the thread reaper. */

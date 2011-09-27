@@ -343,35 +343,41 @@ fail:
 	mutex_unlock(&module_lock);
 	return ret;
 }
-#if 0
+
 /** Print a list of loaded kernel modules.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		Always returns KDBG_OK. */
-int kdbg_cmd_modules(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter) {
 	module_t *module;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all loaded kernel modules.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all loaded kernel modules.\n");
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "Name             Count Size     Description\n");
-	kprintf(LOG_NONE, "====             ===== ====     ===========\n");
+	kdb_printf("Name             Count Size     Description\n");
+	kdb_printf("====             ===== ====     ===========\n");
 
 	LIST_FOREACH(&module_list, iter) {
 		module = list_entry(iter, module_t, header);
 
-		kprintf(LOG_NONE, "%-16s %-5d %-8zu %s\n", module->name,
-		        refcount_get(&module->count), module->load_size,
-		        module->description);
+		kdb_printf("%-16s %-5d %-8zu %s\n", module->name,
+		           refcount_get(&module->count), module->load_size,
+		           module->description);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
+/** Register the module KDB command. */
+static __init_text void module_init(void) {
+	kdb_register_command("modules", "Display information about loaded kernel modules.", kdb_cmd_modules);
+}
+INITCALL(module_init);
+
 /**
  * Load a kernel module.
  *

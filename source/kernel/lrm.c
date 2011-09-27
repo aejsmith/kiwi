@@ -215,25 +215,25 @@ void lrm_reclaim(uint32_t type) {
 	condvar_wait(&lrm_response_cvar, &lrm_response_lock, NULL);
 	mutex_unlock(&lrm_response_lock);
 }
-#if 0
+
 /** Print a resource state.
  * @param type		Type of resource.
  * @param name		Name of resource. */
 static void print_resource_state(uint32_t type, const char *name) {
 	int level = lrm_level(type);
-	kprintf(LOG_NONE, "%-21s ", name);
+	kdb_printf("%-21s ", name);
 	switch(level) {
 	case RESOURCE_LEVEL_OK:
-		kprintf(LOG_NONE, "OK\n");
+		kdb_printf("OK\n");
 		return;
 	case RESOURCE_LEVEL_ADVISORY:
-		kprintf(LOG_NONE, "Advisory\n");
+		kdb_printf("Advisory\n");
 		return;
 	case RESOURCE_LEVEL_LOW:
-		kprintf(LOG_NONE, "Low\n");
+		kdb_printf("Low\n");
 		return;
 	case RESOURCE_LEVEL_CRITICAL:
-		kprintf(LOG_NONE, "Critical\n");
+		kdb_printf("Critical\n");
 		return;
 	}
 }
@@ -241,41 +241,41 @@ static void print_resource_state(uint32_t type, const char *name) {
 /** Print low resource handler information.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_lrm(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_lrm(int argc, char **argv, kdb_filter_t *filter) {
 	lrm_handler_t *handler;
 	symbol_t *sym;
 	size_t off;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all registered low resource handlers.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all registered low resource handlers.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 1) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
-	kprintf(LOG_NONE, "Types Priority Function\n");
-	kprintf(LOG_NONE, "===== ======== ========\n");
+	kdb_printf("Types Priority Function\n");
+	kdb_printf("===== ======== ========\n");
 
 	LIST_FOREACH(&lrm_handlers, iter) {
 		handler = list_entry(iter, lrm_handler_t, header);
 
-		kprintf(LOG_NONE, "0x%-3" PRIx32 " %-8" PRIu32 " ", handler->types, handler->priority);
+		kdb_printf("0x%-3" PRIx32 " %-8" PRIu32 " ", handler->types, handler->priority);
 		sym = symbol_lookup_addr((ptr_t)handler->func, &off);
-		kprintf(LOG_NONE, "[%p] %s+0x%zx\n", handler->func,
-		        (sym) ? sym->name : "<unknown>", off);
+		kdb_printf("[%p] %s+0x%zx\n", handler->func,
+		           (sym) ? sym->name : "<unknown>", off);
 	}
 
-	kprintf(LOG_NONE, "\nResource states\n");
-	kprintf(LOG_NONE, "===============\n");
+	kdb_printf("\nResource states\n");
+	kdb_printf("===============\n");
 	print_resource_state(RESOURCE_TYPE_MEMORY, "Physical Memory:");
 	print_resource_state(RESOURCE_TYPE_KASPACE, "Kernel Address Space:");
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Perform LRM initialisation. */
 __init_text void lrm_init(void) {
 	status_t ret;
@@ -286,4 +286,7 @@ __init_text void lrm_init(void) {
 		fatal("Failed to create LRM thread: %d\n", ret);
 	}
 	thread_run(lrm_thread);
+
+	/* Register the KDB command. */
+	kdb_register_command("lrm", "Display low resource manager information.", kdb_cmd_lrm);
 }

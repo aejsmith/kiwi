@@ -371,6 +371,9 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 	/* Save the tag list address. */
 	kboot_tag_list = tags;
 
+	/* Make the debugger available as soon as possible. */
+	kdb_init();
+
 	/* Bring up the debug console. */
 	console_early_init();
 
@@ -392,9 +395,6 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 static __init_text void kmain_bsp_bottom(void) {
 	thread_t *thread;
 	status_t ret;
-
-	/* Make the debugger available as soon as possible. */
-	kdb_init();
 
 	/* Do early CPU subsystem and CPU initialisation. */
 	cpu_early_init();

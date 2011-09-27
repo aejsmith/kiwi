@@ -655,58 +655,60 @@ void vm_cache_evict_page(page_t *page) {
 	page_free(page);
 	mutex_unlock(&cache->lock);
 }
-#if 0
+
 /** Print information about a cache.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_cache(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 	vm_cache_t *cache;
-	unative_t val;
+	uint64_t addr;
 	page_t *page;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s <address>\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s <address>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints details about a VM cache.\n");
-		return KDBG_OK;
+		kdb_printf("Prints information about a VM cache.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	/* Get the address. */
-	if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-		return KDBG_FAIL;
+	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS) {
+		return KDB_FAILURE;
 	}
-	cache = (vm_cache_t *)((ptr_t)val);
+	cache = (vm_cache_t *)((ptr_t)addr);
 
 	/* Print out basic information. */
-	kprintf(LOG_NONE, "Cache %p\n", cache);
-	kprintf(LOG_NONE, "=================================================\n");
+	kdb_printf("Cache %p\n", cache);
+	kdb_printf("=================================================\n");
 
-	kprintf(LOG_NONE, "Locked:  %d (%" PRId32 ")\n", atomic_get(&cache->lock.locked),
-	        (cache->lock.holder) ? cache->lock.holder->id : -1);
-	kprintf(LOG_NONE, "Size:    %" PRIu64 "\n", cache->size);
-	kprintf(LOG_NONE, "Ops:     %p\n", cache->ops);
-	kprintf(LOG_NONE, "Data:    %p\n", cache->data);
-	kprintf(LOG_NONE, "Deleted: %d\n\n", cache->deleted);
+	kdb_printf("Locked:  %d (%" PRId32 ")\n", atomic_get(&cache->lock.locked),
+	           (cache->lock.holder) ? cache->lock.holder->id : -1);
+	kdb_printf("Size:    %" PRIu64 "\n", cache->size);
+	kdb_printf("Ops:     %p\n", cache->ops);
+	kdb_printf("Data:    %p\n", cache->data);
+	kdb_printf("Deleted: %d\n\n", cache->deleted);
 
 	/* Show all cached pages. */
-	kprintf(LOG_NONE, "Cached pages:\n");
+	kdb_printf("Cached pages:\n");
 	AVL_TREE_FOREACH(&cache->pages, iter) {
 		page = avl_tree_entry(iter, page_t);
 
-		kprintf(LOG_NONE, "  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
-		        page->addr, page->offset, page->modified, refcount_get(&page->count));
+		kdb_printf("  Page 0x%016" PRIxPHYS " - Offset: %-10" PRIu64 " Modified: %-1d Count: %d\n",
+		           page->addr, page->offset, page->modified, refcount_get(&page->count));
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Create the VM cache structure slab cache. */
 __init_text void vm_cache_init(void) {
 	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),
 	                                   0, vm_cache_ctor, NULL, NULL, 0,
 	                                   MM_FATAL);
+
+	kdb_register_command("cache", "Print information about a page cache.", kdb_cmd_cache);
 }

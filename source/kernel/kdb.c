@@ -350,7 +350,7 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 
 			sym = symbol_lookup_name(namebuf, false, false);
 			if(!sym) {
-				kdb_printf("KDBG: Symbol '%s' not found.\n", namebuf);
+				kdb_printf("KDB: Symbol '%s' not found.\n", namebuf);
 				return KDB_FAILURE;
 			}
 
@@ -375,7 +375,7 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 		if(isoperator(exp[0])) {
 			oper = *(exp++);
 			if(exp[0] == 0) {
-				kdb_printf("KDBG: Expected operand after operator\n");
+				kdb_printf("KDB: Expected operand after operator\n");
 				return KDB_FAILURE;
 			}
 		}

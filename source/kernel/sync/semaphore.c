@@ -36,7 +36,6 @@
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
 
-#include <kdb.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
@@ -111,34 +110,7 @@ void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
 	waitq_init(&sem->queue, name);
 	sem->count = initial;
 }
-#if 0
-/** Print a list of semaphores.
- * @param argc		Argument count.
- * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_semaphore(int argc, char **argv) {
-	user_semaphore_t *sem;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
-		kprintf(LOG_NONE, "Prints out a list of semaphore objects.\n");
-		return KDBG_OK;
-	}
-
-	kprintf(LOG_NONE, "ID    Name                 Refcount Count\n");
-	kprintf(LOG_NONE, "==    ====                 ======== =====\n");
-
-	AVL_TREE_FOREACH(&semaphore_tree, iter) {
-		sem = avl_tree_entry(iter, user_semaphore_t);
-
-		kprintf(LOG_NONE, "%-5" PRIu32 " %-20s %-8d %d\n", sem->id,
-		        sem->sem.queue.name, refcount_get(&sem->count),
-		        sem->sem.count);
-	}
-
-	return KDBG_OK;
-}
-#endif
 /** Release a user semaphore.
  * @param sem		Semaphore to release. */
 static void user_semaphore_release(user_semaphore_t *sem) {

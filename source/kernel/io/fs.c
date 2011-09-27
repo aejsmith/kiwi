@@ -1948,7 +1948,7 @@ status_t symlink_read(const char *path, char *buf, size_t size) {
 	kfree(dest);
 	return STATUS_SUCCESS;
 }
-#if 0
+
 /** Look up a mount by ID.
  * @note		Does not take the mount lock.
  * @param id		ID of mount to look up.
@@ -1965,7 +1965,7 @@ static fs_mount_t *fs_mount_lookup(mount_id_t id) {
 
 	return NULL;
 }
-#endif
+
 /** Parse mount arguments.
  * @param str		Options string.
  * @param optsp		Where to store options structure array.
@@ -2454,110 +2454,110 @@ out:
 	kfree(name);
 	return ret;
 }
-#if 0
+
 /** Print a list of mounts.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		Always returns KDBG_OK. */
-int kdbg_cmd_mount(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_mount(int argc, char **argv, kdb_filter_t *filter) {
 	fs_mount_t *mount;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out a list of all mounted filesystems.");
-		return KDBG_OK;
+		kdb_printf("Prints out a list of all mounted filesystems.");
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "%-5s %-5s %-10s %-18s %-18s %-18s %-18s\n",
-	        "ID", "Flags", "Type", "Ops", "Data", "Root", "Mountpoint");
-	kprintf(LOG_NONE, "%-5s %-5s %-10s %-18s %-18s %-18s %-18s\n",
-	        "==", "=====", "====", "===", "====", "====", "==========");
+	kdb_printf("%-5s %-5s %-10s %-18s %-18s %-18s %-18s\n",
+	           "ID", "Flags", "Type", "Ops", "Data", "Root", "Mountpoint");
+	kdb_printf("%-5s %-5s %-10s %-18s %-18s %-18s %-18s\n",
+	           "==", "=====", "====", "===", "====", "====", "==========");
 
 	LIST_FOREACH(&mount_list, iter) {
 		mount = list_entry(iter, fs_mount_t, header);
-		kprintf(LOG_NONE, "%-5" PRIu16 " %-5d %-10s %-18p %-18p %-18p %-18p\n",
-		        mount->id, mount->flags, (mount->type) ? mount->type->name : "invalid",
-		        mount->ops, mount->data, mount->root, mount->mountpoint);
+		kdb_printf("%-5" PRIu16 " %-5d %-10s %-18p %-18p %-18p %-18p\n",
+		           mount->id, mount->flags, (mount->type) ? mount->type->name : "invalid",
+		           mount->ops, mount->data, mount->root, mount->mountpoint);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
 
 /** Print information about a node.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_node(int argc, char **argv) {
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 	fs_node_t *node = NULL;
 	list_t *list = NULL;
 	fs_mount_t *mount;
-	unative_t val;
+	uint64_t val;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [--unused|--used] <mount ID>\n", argv[0]);
-		kprintf(LOG_NONE, "       %s <mount ID> <node ID>\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [--unused|--used] <mount ID>\n", argv[0]);
+		kdb_printf("       %s <mount ID> <node ID>\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints either a list of nodes on a mount, or details of a\n");
-		kprintf(LOG_NONE, "single filesystem node that's currently in memory.\n");
-		return KDBG_OK;
+		kdb_printf("Prints either a list of nodes on a mount, or details of a\n");
+		kdb_printf("single filesystem node that's currently in memory.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 2 && argc != 3) {
-		kprintf(LOG_NONE, "Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	/* Parse the arguments. */
 	if(argc == 3) {
 		if(argv[1][0] == '-' && argv[1][1] == '-') {
-			if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
-				return KDBG_FAIL;
+			if(kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS) {
+				return KDB_FAILURE;
 			} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-				kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
-				return KDBG_FAIL;
+				kdb_printf("Unknown mount ID %" PRIu64 ".\n", val);
+				return KDB_FAILURE;
 			}
 		} else {
-			if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-				return KDBG_FAIL;
+			if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+				return KDB_FAILURE;
 			} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-				kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
-				return KDBG_FAIL;
-			} else if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
-				return KDBG_FAIL;
+				kdb_printf("Unknown mount ID %" PRIu64 ".\n", val);
+				return KDB_FAILURE;
+			} else if(kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS) {
+				return KDB_FAILURE;
 			} else if(!(node = avl_tree_lookup(&mount->nodes, val))) {
-				kprintf(LOG_NONE, "Unknown node ID %" PRIuN ".\n", val);
-				return KDBG_FAIL;
+				kdb_printf("Unknown node ID %" PRIu64 ".\n", val);
+				return KDB_FAILURE;
 			}
 		}
 	} else {
-		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
+		if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
 		} else if(!(mount = fs_mount_lookup((mount_id_t)val))) {
-			kprintf(LOG_NONE, "Unknown mount ID %" PRIuN ".\n", val);
-			return KDBG_FAIL;
+			kdb_printf("Unknown mount ID %" PRIu64 ".\n", val);
+			return KDB_FAILURE;
 		}
 	}
 
 	if(node) {
 		/* Print out basic node information. */
-		kprintf(LOG_NONE, "Node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
-		        (node->mount) ? node->mount->id : 0, node->id);
-		kprintf(LOG_NONE, "=================================================\n");
+		kdb_printf("Node %p(%" PRIu16 ":%" PRIu64 ")\n", node,
+		           (node->mount) ? node->mount->id : 0, node->id);
+		kdb_printf("=================================================\n");
 
-		kprintf(LOG_NONE, "Count:   %d\n", refcount_get(&node->count));
+		kdb_printf("Count:   %d\n", refcount_get(&node->count));
 		if(node->mount) {
-			kprintf(LOG_NONE, "Mount:   %p (Locked: %d (%" PRId32 "))\n", node->mount,
-			        atomic_get(&node->mount->lock.locked),
-			        (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
+			kdb_printf("Mount:   %p (Locked: %d (%" PRId32 "))\n", node->mount,
+			           atomic_get(&node->mount->lock.locked),
+			           (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
 		} else {
-			kprintf(LOG_NONE, "Mount:   %p\n", node->mount);
+			kdb_printf("Mount:   %p\n", node->mount);
 		}
-		kprintf(LOG_NONE, "Ops:     %p\n", node->ops);
-		kprintf(LOG_NONE, "Data:    %p\n", node->data);
-		kprintf(LOG_NONE, "Removed: %d\n", node->removed);
-		kprintf(LOG_NONE, "Type:    %d\n", node->type);
+		kdb_printf("Ops:     %p\n", node->ops);
+		kdb_printf("Data:    %p\n", node->data);
+		kdb_printf("Removed: %d\n", node->removed);
+		kdb_printf("Type:    %d\n", node->type);
 		if(node->mounted) {
-			kprintf(LOG_NONE, "Mounted: %p(%" PRIu16 ")\n", node->mounted,
-			        node->mounted->id);
+			kdb_printf("Mounted: %p(%" PRIu16 ")\n", node->mounted,
+			           node->mounted->id);
 		}
 	} else {
 		if(argc == 3) {
@@ -2566,34 +2566,34 @@ int kdbg_cmd_node(int argc, char **argv) {
 			} else if(strcmp(argv[1], "--used") == 0) {
 				list = &mount->used_nodes;
 			} else {
-				kprintf(LOG_NONE, "Unrecognized argument '%s'.\n", argv[1]);
-				return KDBG_FAIL;
+				kdb_printf("Unrecognized argument '%s'.\n", argv[1]);
+				return KDB_FAILURE;
 			}
 		}
 
-		kprintf(LOG_NONE, "ID       Count Removed Type Ops                Data               Mount\n");
-		kprintf(LOG_NONE, "==       ===== ======= ==== ===                ====               =====\n");
+		kdb_printf("ID       Count Removed Type Ops                Data               Mount\n");
+		kdb_printf("==       ===== ======= ==== ===                ====               =====\n");
 
 		if(list) {
 			LIST_FOREACH(list, iter) {
 				node = list_entry(iter, fs_node_t, mount_link);
-				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
-				        node->id, refcount_get(&node->count), node->removed,
-				        node->type, node->ops, node->data, node->mount);
+				kdb_printf("%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
+				           node->id, refcount_get(&node->count), node->removed,
+				           node->type, node->ops, node->data, node->mount);
 			}
 		} else {
 			AVL_TREE_FOREACH(&mount->nodes, iter) {
 				node = avl_tree_entry(iter, fs_node_t);
-				kprintf(LOG_NONE, "%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
-				        node->id, refcount_get(&node->count), node->removed,
-				        node->type, node->ops, node->data, node->mount);
+				kdb_printf("%-8" PRIu64 " %-5d %-7d %-4d %-18p %-18p %p\n",
+				           node->id, refcount_get(&node->count), node->removed,
+				           node->type, node->ops, node->data, node->mount);
 			}
 		}
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Initialise the filesystem layer. */
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
@@ -2601,6 +2601,10 @@ __init_text void fs_init(void) {
 
 	/* Register the low resource handler. */
 	lrm_handler_register(&fs_lrm_handler);
+
+	/* Register the KDB commands. */
+	kdb_register_command("mount", "Print a list of mounted filesystems.", kdb_cmd_mount);
+	kdb_register_command("node", "Display information about a filesystem node.", kdb_cmd_node);
 }
 
 /** Shut down the filesystem layer. */

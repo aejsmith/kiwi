@@ -1499,6 +1499,90 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	slab_cache_free(vm_aspace_cache, as);
 }
 
+/** Display details of a region.
+ * @param region	Region to display. */
+static void dump_region(vm_region_t *region) {
+	kdb_printf("%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
+	           region->start, region->end, region->flags,
+	           region->handle, region->obj_offset, region->amap,
+	           region->amap_offset);
+}
+
+/** Dump an address space.
+ * @param argc		Argument count.
+ * @param argv		Argument array.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) {
+	process_t *process;
+	vm_aspace_t *as;
+	uint64_t val;
+	unsigned i;
+
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [--addr] <value>\n\n", argv[0]);
+
+		kdb_printf("Prints the contents of an address space. If the --addr option is specified, the\n");
+		kdb_printf("value will be taken as an address of an address space structure. Otherwise it\n");
+		kdb_printf("is taken as a process ID, and that process' address space is printed.\n");
+		return KDB_SUCCESS;
+	} else if(argc < 2 || argc > 3) {
+		kdb_printf("Expression expected. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
+	}
+
+	if(argc == 3) {
+		if(strcmp(argv[1], "--addr") != 0) {
+			kdb_printf("Unknown option '%s'\n", argv[1]);
+			return KDB_FAILURE;
+		} else if(kdb_parse_expression(argv[2], &val, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
+		}
+
+		as = (vm_aspace_t *)((ptr_t)val);
+	} else {
+		if(kdb_parse_expression(argv[1], &val, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
+		} else if(!(process = process_lookup_unsafe(val))) {
+			kdb_printf("Invalid process ID.\n");
+			return KDB_FAILURE;
+		}
+
+		as = process->aspace;
+	}
+
+	kdb_printf("%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
+	           "Base", "End", "Flags", "Handle", "Offset", "Amap", "Offset");
+	kdb_printf("%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
+	           "====", "===", "=====", "======", "======", "====", "======");
+
+	LIST_FOREACH(&as->regions, iter) {
+		dump_region(list_entry(iter, vm_region_t, header));
+	}
+
+	kdb_printf("\nAllocated:\n\n");
+
+	AVL_TREE_FOREACH(&as->tree, iter) {
+		dump_region(avl_tree_entry(iter, vm_region_t));
+	}
+
+	for(i = 0; i < VM_FREELISTS; i++) {
+		if(!(as->free_map & ((ptr_t)1 << i))) {
+			if(list_empty(&as->free[i])) {
+				continue;
+			}
+			kdb_printf("\nFreelist %d (shouldn't have entries!):\n\n", i);
+		} else {
+			kdb_printf("\nFreelist %d:\n\n", i);
+		}
+
+		LIST_FOREACH(&as->free[i], iter) {
+			dump_region(list_entry(iter, vm_region_t, free_link));
+		}
+	}
+
+	return KDB_SUCCESS;
+}
+
 /** Initialise the VM system. */
 __init_text void vm_init(void) {
 	vm_region_t *region;
@@ -1512,6 +1596,9 @@ __init_text void vm_init(void) {
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
 	                                  0, vm_amap_ctor, NULL, NULL, 0,
 	                                  MM_FATAL);
+
+	/* Register the KDB command. */
+	kdb_register_command("aspace", "Dump an address space.", kdb_cmd_aspace);
 
 	/* Initialise the other parts of the VM system. */
 	vm_cache_init();
@@ -1529,91 +1616,6 @@ __init_text void vm_init(void) {
 	vm_freelist_insert(region, KERNEL_VM_SIZE);
 }
 
-#if 0
-/** Display details of a region.
- * @param region	Region to display. */
-static void dump_region(vm_region_t *region) {
-	kprintf(LOG_NONE, "%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
-	        region->start, region->end, region->flags,
-	        region->handle, region->obj_offset, region->amap,
-	        region->amap_offset);
-}
-
-/** Dump an address space.
- * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */
-int kdbg_cmd_aspace(int argc, char **argv) {
-	process_t *process;
-	vm_aspace_t *as;
-	unative_t val;
-	int i;
-
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [--addr] <value>\n\n", argv[0]);
-
-		kprintf(LOG_NONE, "Prints the contents of an address space. If the --addr option is specified, the\n");
-		kprintf(LOG_NONE, "value will be taken as an address of an address space structure. Otherwise it\n");
-		kprintf(LOG_NONE, "is taken as a process ID, and that process' address space is printed.\n");
-		return KDBG_OK;
-	} else if(argc < 2 || argc > 3) {
-		kprintf(LOG_NONE, "Expression expected. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
-	}
-
-	if(argc == 3) {
-		if(strcmp(argv[1], "--addr") != 0) {
-			kprintf(LOG_NONE, "Unknown option '%s'\n", argv[1]);
-			return KDBG_FAIL;
-		} else if(kdbg_parse_expression(argv[2], &val, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
-		}
-
-		as = (vm_aspace_t *)((ptr_t)val);
-	} else {
-		if(kdbg_parse_expression(argv[1], &val, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
-		} else if(!(process = process_lookup_unsafe(val))) {
-			kprintf(LOG_NONE, "Invalid process ID.\n");
-			return KDBG_FAIL;
-		}
-
-		as = process->aspace;
-	}
-
-	kprintf(LOG_NONE, "%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
-	        "Base", "End", "Flags", "Handle", "Offset", "Amap", "Offset");
-	kprintf(LOG_NONE, "%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
-	        "====", "===", "=====", "======", "======", "====", "======");
-
-	LIST_FOREACH(&as->regions, iter) {
-		dump_region(list_entry(iter, vm_region_t, header));
-	}
-
-	kprintf(LOG_NONE, "\nAllocated:\n\n");
-
-	AVL_TREE_FOREACH(&as->tree, iter) {
-		dump_region(avl_tree_entry(iter, vm_region_t));
-	}
-
-	for(i = 0; i < VM_FREELISTS; i++) {
-		if(!(as->free_map & ((ptr_t)1 << i))) {
-			if(list_empty(&as->free[i])) {
-				continue;
-			}
-			kprintf(LOG_NONE, "\nFreelist %d (shouldn't have entries!):\n\n", i);
-		} else {
-			kprintf(LOG_NONE, "\nFreelist %d:\n\n", i);
-		}
-
-		LIST_FOREACH(&as->free[i], iter) {
-			dump_region(list_entry(iter, vm_region_t, free_link));
-		}
-	}
-
-	return KDBG_OK;
-}
-#endif
 /**
  * Map an object into memory.
  *

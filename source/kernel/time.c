@@ -379,70 +379,79 @@ status_t usleep_etc(useconds_t us, bool interruptible) {
 void usleep(useconds_t us) {
 	usleep_etc(us, false);
 }
-#if 0
+
 /** Dump a list of timers.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */ 
-int kdbg_cmd_timers(int argc, char **argv) {
-	unative_t id = curr_cpu->id;
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) {
 	timer_t *timer;
+	uint64_t id;
 	cpu_t *cpu;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [<CPU ID>]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [<CPU ID>]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all timers on a CPU. If no ID given, current CPU\n");
-		kprintf(LOG_NONE, "will be used.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all timers on a CPU. If no ID given, current CPU\n");
+		kdb_printf("will be used.\n");
+		return KDB_SUCCESS;
 	} else if(argc != 1 && argc != 2) {
-		kprintf(LOG_NONE, "Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Incorrect number of argments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	if(argc == 2) {
-		if(kdbg_parse_expression(argv[1], &id, NULL) != KDBG_OK) {
-			return KDBG_FAIL;
+		if(kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS) {
+			return KDB_FAILURE;
 		}
+
+		if(id > highest_cpu_id || !(cpu = cpus[id])) {
+			kdb_printf("Invalid CPU ID.\n");
+			return KDB_FAILURE;
+		}
+	} else {
+		cpu = curr_cpu;
 	}
 
-	if(id > highest_cpu_id || !(cpu = cpus[id])) {
-		kprintf(LOG_NONE, "Invalid CPU ID.\n");
-		return KDBG_FAIL;
-	}
+	kdb_printf("Target           Function           Data\n");
+	kdb_printf("======           ========           ====\n");
 
-	kprintf(LOG_NONE, "Target           Function           Data\n");
-	kprintf(LOG_NONE, "======           ========           ====\n");
 	LIST_FOREACH(&cpu->timers, iter) {
 		timer = list_entry(iter, timer_t, header);
-		kprintf(LOG_NONE, "%-16llu %-18p %p\n", timer->target, timer->func, timer->data);
+		kdb_printf("%-16llu %-18p %p\n", timer->target, timer->func, timer->data);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;
 }
 
 /** Print the system uptime.
  * @param argc		Argument count.
  * @param argv		Argument array.
- * @return		KDBG_OK on success, KDBG_FAIL on failure. */ 
-int kdbg_cmd_uptime(int argc, char **argv) {
-	useconds_t time = system_time();
+ * @param filter	Unused.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) {
+	useconds_t time;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints how much time has passed since the kernel started.\n");
-		return KDBG_OK;
+		kdb_printf("Prints how much time has passed since the kernel started.\n");
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "%llu seconds (%llu microseconds)\n", time / 1000000, time);
-	return KDBG_OK;
+	time = system_time();
+	kdb_printf("%llu seconds (%llu microseconds)\n", time / 1000000, time);
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Initialise the timing system. */
 __init_text void time_init(void) {
 	/* Initialise the boot time. */
 	boot_unix_time = time_from_hardware() - system_time();
+
+	/* Register debugger commands. */
+	kdb_register_command("timers", "Print a list of running timers.", kdb_cmd_timers);
+	kdb_register_command("uptime", "Display the system uptime.", kdb_cmd_uptime);
 }
 
 /** Closes a handle to a timer.

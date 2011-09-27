@@ -231,29 +231,29 @@ int kprintf(int level, const char *fmt, ...) {
 
 	return ret;
 }
-#if 0
+
 /** Print out the kernel log buffer.
  * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		Command status. */
-int kdbg_cmd_log(int argc, char **argv) {
+ * @param argv		Argument array.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
 	int level = -1;
 	size_t i, pos;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s [/level]\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s [/level]\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints out the contents of the kernel log buffer. If no level is specified\n");
-		kprintf(LOG_NONE, "the entire log will be printed, otherwise only characters with the specified\n");
-		kprintf(LOG_NONE, "level or higher will be printed.\n");
-		kprintf(LOG_NONE, "  Log levels:\n");
-		kprintf(LOG_NONE, "    d    Debug.\n");
-		kprintf(LOG_NONE, "    n    Normal.\n");
-		kprintf(LOG_NONE, "    w    Warning.\n");
-		return KDBG_OK;
+		kdb_printf("Prints out the contents of the kernel log buffer. If no level is specified\n");
+		kdb_printf("the entire log will be printed, otherwise only characters with the specified\n");
+		kdb_printf("level or higher will be printed.\n");
+		kdb_printf("  Log levels:\n");
+		kdb_printf("    d    Debug.\n");
+		kdb_printf("    n    Normal.\n");
+		kdb_printf("    w    Warning.\n");
+		return KDB_SUCCESS;
 	} else if(!(argc == 1 || (argc == 2 && argv[1][0] == '/'))) {
-		kprintf(LOG_NONE, "Invalid arguments. See 'help %s' for help.\n", argv[0]);
-		return KDBG_FAIL;
+		kdb_printf("Invalid arguments. See 'help %s' for help.\n", argv[0]);
+		return KDB_FAILURE;
 	}
 
 	/* Look for a log level. */
@@ -264,22 +264,23 @@ int kdbg_cmd_log(int argc, char **argv) {
 		case 'n': level = LOG_NOTICE; break;
 		case 'w': level = LOG_WARN; break;
 		default:
-			kprintf(LOG_NONE, "Unknown level character '%c'\n", *argv[1]);
-			return KDBG_FAIL;
+			kdb_printf("Unknown level character '%c'\n", *argv[1]);
+			return KDB_FAILURE;
 		}
 	}
 
 	for(i = 0, pos = klog_start; i < klog_length; i++) {
 		if(level == -1 || klog_buffer[pos].level >= level) {
-			console_putc_unsafe(klog_buffer[pos].ch);
+			kdb_printf("%c", klog_buffer[pos].ch);
 		}
 		if(++pos >= CONFIG_KLOG_SIZE) {
 			pos = 0;
 		}
 	}
-	return KDBG_OK;
+
+	return KDB_SUCCESS;
 }
-#endif
+
 /** Write to the kernel console device.
  * @param device	Device to write to.
  * @param data		Handle-specific data pointer.
@@ -360,4 +361,7 @@ INITCALL(kconsole_device_init);
 /** Initialise the debug console. */
 void console_early_init(void) {
 	platform_console_early_init();
+
+	/* Register the KDB command. */
+	kdb_register_command("log", "Display the kernel log buffer.", kdb_cmd_log);
 }

@@ -737,44 +737,44 @@ void process_exit(int status, int reason) {
 
 	thread_exit();
 }
-#if 0
+
 /** Dump the contents of the process tree.
  * @param argc		Argument count.
- * @param argv		Argument pointer array.
- * @return		Always returns KDBG_OK. */
-int kdbg_cmd_process(int argc, char **argv) {
+ * @param argv		Argument array.
+ * @return		KDB status code. */
+static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter) {
 	process_t *process;
 
-	if(KDBG_HELP(argc, argv)) {
-		kprintf(LOG_NONE, "Usage: %s\n\n", argv[0]);
+	if(kdb_help(argc, argv)) {
+		kdb_printf("Usage: %s\n\n", argv[0]);
 
-		kprintf(LOG_NONE, "Prints a list of all running processes.\n");
-		return KDBG_OK;
+		kdb_printf("Prints a list of all running processes.\n");
+		return KDB_SUCCESS;
 	}
 
-	kprintf(LOG_NONE, "ID     State   User Group Session Prio Flags Count Aspace             Name\n");
-	kprintf(LOG_NONE, "==     =====   ==== ===== ======= ==== ===== ===== ======             ====\n");
+	kdb_printf("ID     State   User Group Session Prio Flags Count Aspace             Name\n");
+	kdb_printf("==     =====   ==== ===== ======= ==== ===== ===== ======             ====\n");
 
 	AVL_TREE_FOREACH(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
 
-		kprintf(LOG_NONE, "%-5" PRId32 "%s ", process->id,
-		        (process == curr_proc) ? "*" : " ");
+		kdb_printf("%-5" PRId32 "%s ", process->id,
+		           (process == curr_proc) ? "*" : " ");
 		switch(process->state) {
-		case PROCESS_RUNNING:	kprintf(LOG_NONE, "Running "); break;
-		case PROCESS_DEAD:	kprintf(LOG_NONE, "Dead    "); break;
-		default:		kprintf(LOG_NONE, "Bad     "); break;
+		case PROCESS_RUNNING:	kdb_printf("Running "); break;
+		case PROCESS_DEAD:	kdb_printf("Dead    "); break;
+		default:		kdb_printf("Bad     "); break;
 		}
-		kprintf(LOG_NONE, "%-4d %-5d %-7d %-4d %-5d %-5d %-18p %s\n",
-		        process->security.uid, process->security.groups[0],
-		        process->session->id, process->priority, process->flags,
-		        refcount_get(&process->count), process->aspace,
-		        process->name);
+		kdb_printf("%-4d %-5d %-7d %-4d %-5d %-5d %-18p %s\n",
+		           process->security.uid, process->security.groups[0],
+		           process->session->id, process->priority, process->flags,
+		           refcount_get(&process->count), process->aspace,
+		           process->name);
 	}
 
-	return KDBG_OK;
+	return KDB_SUCCESS;;
 }
-#endif
+
 /** Initialise the process table and slab cache. */
 __init_text void process_init(void) {
 	object_acl_t acl;
@@ -790,6 +790,9 @@ __init_text void process_init(void) {
 	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
 	                                  process_cache_ctor, NULL, NULL, 0,
 	                                  MM_FATAL);
+
+	/* Register the KDB command. */
+	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
 
 	/* Create the ACL for the kernel process. */
 	object_acl_init(&acl);
