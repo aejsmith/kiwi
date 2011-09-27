@@ -379,7 +379,8 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 
 	/* Check the magic number. */
 	if(magic != KBOOT_MAGIC) {
-		fatal("Not loaded by a KBoot-compliant loader");
+		kprintf(LOG_ERROR, "Not loaded by a KBoot-compliant loader\n");
+		cpu_halt();
 	}
 
 	/* Currently we are running on a stack set up for us by the loader.
