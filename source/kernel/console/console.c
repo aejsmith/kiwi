@@ -168,21 +168,19 @@ static void kvprintf_helper(char ch, void *data, int *total) {
 	console_t *console;
 
 	/* Store in the log buffer. */
-	if(level != LOG_NONE) {
-		klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].level = level;
-		klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].ch = (unsigned char)ch;
-		if(klog_length < CONFIG_KLOG_SIZE) {
-			klog_length++;
-		} else {
-			klog_start = (klog_start + 1) % CONFIG_KLOG_SIZE;
-		}
+	klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].level = level;
+	klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].ch = (unsigned char)ch;
+	if(klog_length < CONFIG_KLOG_SIZE) {
+		klog_length++;
+	} else {
+		klog_start = (klog_start + 1) % CONFIG_KLOG_SIZE;
 	}
 
 	/* Write to the console. */
 	LIST_FOREACH(&console_list, iter) {
 		console = list_entry(iter, console_t, header);
 
-		if(console->putc && (level == LOG_NONE || level >= console->min_level)) {
+		if(console->putc && level >= console->min_level) {
 			console->putc(ch);
 		}
 	}
@@ -197,21 +195,16 @@ static void kvprintf_helper(char ch, void *data, int *total) {
  * @return		Number of characters written. */
 int kvprintf(int level, const char *fmt, va_list args) {
 	int ret;
+
 #if !CONFIG_DEBUG
 	/* When debug output is disabled, do not do anything. */
 	if(level == LOG_DEBUG) {
 		return 0;
 	}
 #endif
-	/* Do not take the lock if not logging as LOG_NONE is usually used from
-	 * KDBG/fatal(). */
-	if(level != LOG_NONE) {
-		spinlock_lock(&console_lock);
-		ret = do_printf(kvprintf_helper, &level, fmt, args);
-		spinlock_unlock(&console_lock);
-	} else {
-		ret = do_printf(kvprintf_helper, &level, fmt, args);
-	}
+	spinlock_lock(&console_lock);
+	ret = do_printf(kvprintf_helper, &level, fmt, args);
+	spinlock_unlock(&console_lock);
 
 	return ret;
 }

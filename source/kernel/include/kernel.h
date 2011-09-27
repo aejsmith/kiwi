@@ -64,9 +64,6 @@ extern void _fatal(struct intr_frame *frame, const char *fmt, ...) __noreturn __
  * @param ...		Arguments to substitute into format string. */
 #define fatal(fmt...)	_fatal(NULL, fmt)
 
-/** Console log levels. */
-#define LOG_NONE		-1	/**< Do not log the message (for fatal/KDBG). */
-
 extern int kvprintf(int level, const char *fmt, va_list args);
 extern int kprintf(int level, const char *fmt, ...) __printf(2, 3);
 
