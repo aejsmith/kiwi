@@ -1597,10 +1597,10 @@ __init_text void vm_init(void) {
 	                                  0, vm_amap_ctor, NULL, NULL, 0,
 	                                  MM_FATAL);
 
-	/* Register the KDB command. */
-	kdb_register_command("aspace", "Dump an address space.", kdb_cmd_aspace);
+	/* Bring up the page daemons. */
+	page_daemon_init();
 
-	/* Initialise the other parts of the VM system. */
+	/* Initialise the caching system. */
 	vm_cache_init();
 
 	/* Create the kernel address space. */
@@ -1614,6 +1614,9 @@ __init_text void vm_init(void) {
 	region = vm_region_create(kernel_aspace, KERNEL_VM_BASE, KERNEL_VM_BASE + KERNEL_VM_SIZE, 0);
 	list_append(&kernel_aspace->regions, &region->header);
 	vm_freelist_insert(region, KERNEL_VM_SIZE);
+
+	/* Register the KDB command. */
+	kdb_register_command("aspace", "Dump an address space.", kdb_cmd_aspace);
 }
 
 /**

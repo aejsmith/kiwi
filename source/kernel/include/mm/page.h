@@ -90,6 +90,7 @@ extern void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsigned f
 extern void platform_page_init(void);
 
 extern void page_init(void);
+extern void page_daemon_init(void);
 extern void page_late_init(void);
 
 #endif /* __MM_PAGE_H */

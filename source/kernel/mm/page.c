@@ -147,18 +147,17 @@ static physical_range_t phys_ranges[PHYS_RANGE_MAX];
 static size_t phys_range_count = 0;
 
 /** Page writer/page daemon threads. */
-//static thread_t *page_writer_thread;
+static thread_t *page_writer_thread;
 //static thread_t *page_daemon_thread;
 
-#if 0
 /** Page writer thread.
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void page_writer(void *arg1, void *arg2) {
-	page_queue_t *queue = &page_queues[PAGE_QUEUE_MODIFIED];
+	page_queue_t *queue = &page_queues[PAGE_STATE_MODIFIED];
 	LIST_DECLARE(marker);
-	vm_page_t *page;
 	size_t written;
+	page_t *page;
 
 	while(true) {
 		if(lrm_level(RESOURCE_TYPE_MEMORY) >= RESOURCE_LEVEL_LOW) {
@@ -176,7 +175,7 @@ static void page_writer(void *arg1, void *arg2) {
 		 * per iteration, or until we reach the end of the queue. */
 		while(written < PAGE_WRITER_MAX_PER_RUN && marker.next != &queue->pages) {
 			/* Take the page and move the marker after it. */
-			page = list_entry(marker.next, vm_page_t, header);
+			page = list_entry(marker.next, page_t, header);
 			list_add_after(&page->header, &marker);
 			spinlock_unlock(&queue->lock);
 
@@ -194,7 +193,7 @@ static void page_writer(void *arg1, void *arg2) {
 		spinlock_unlock(&queue->lock);
 	}
 }
-
+#if 0
 /** Cache flush low resource handler function.
  * @param level		Resource level. */
 static void vm_cache_reclaim(int level) {
@@ -938,6 +937,18 @@ __init_text void page_init(void) {
 
 	/* Register the KDB command. */
 	kdb_register_command("page", "Display physical memory usage information.", kdb_cmd_page);
+}
+
+/** Initialise the page daemons. */
+__init_text void page_daemon_init(void) {
+	status_t ret;
+
+	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL,
+	                    &page_writer_thread);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not start page writer (%d)", ret);
+	}
+	thread_run(page_writer_thread);
 }
 
 /** Reclaim memory no longer in use after kernel initialisation. */
