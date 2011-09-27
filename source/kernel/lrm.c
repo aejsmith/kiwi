@@ -35,7 +35,7 @@
 #include <sync/semaphore.h>
 #include <sync/spinlock.h>
 
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <status.h>
@@ -215,7 +215,7 @@ void lrm_reclaim(uint32_t type) {
 	condvar_wait(&lrm_response_cvar, &lrm_response_lock, NULL);
 	mutex_unlock(&lrm_response_lock);
 }
-
+#if 0
 /** Print a resource state.
  * @param type		Type of resource.
  * @param name		Name of resource. */
@@ -275,7 +275,7 @@ int kdbg_cmd_lrm(int argc, char **argv) {
 	print_resource_state(RESOURCE_TYPE_KASPACE, "Kernel Address Space:");
 	return KDBG_OK;
 }
-
+#endif
 /** Perform LRM initialisation. */
 __init_text void lrm_init(void) {
 	status_t ret;

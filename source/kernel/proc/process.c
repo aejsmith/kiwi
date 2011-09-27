@@ -43,7 +43,7 @@
 
 #include <assert.h>
 #include <elf.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 #include <time.h>
@@ -625,8 +625,8 @@ void process_detach(thread_t *thread) {
 }
 
 /** Look up a process without taking the tree lock.
- * @note		This function should only be used within KDBG. Use
- *			process_lookup() outside of KDBG.
+ * @note		This function should only be used within KDB. Use
+ *			process_lookup() outside of KDB.
  * @param id		ID of the process to find.
  * @return		Pointer to process found, or NULL if not found. */
 process_t *process_lookup_unsafe(process_id_t id) {
@@ -737,7 +737,7 @@ void process_exit(int status, int reason) {
 
 	thread_exit();
 }
-
+#if 0
 /** Dump the contents of the process tree.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
@@ -774,7 +774,7 @@ int kdbg_cmd_process(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the process table and slab cache. */
 __init_text void process_init(void) {
 	object_acl_t acl;

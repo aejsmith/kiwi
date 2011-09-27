@@ -31,7 +31,7 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 #include <types.h>
@@ -231,7 +231,7 @@ int kprintf(int level, const char *fmt, ...) {
 
 	return ret;
 }
-
+#if 0
 /** Print out the kernel log buffer.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
@@ -279,7 +279,7 @@ int kdbg_cmd_log(int argc, char **argv) {
 	}
 	return KDBG_OK;
 }
-
+#endif
 /** Write to the kernel console device.
  * @param device	Device to write to.
  * @param data		Handle-specific data pointer.

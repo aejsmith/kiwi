@@ -33,7 +33,6 @@
 #include <pc/pit.h>
 
 #include <kboot.h>
-#include <kdbg.h>
 #include <kernel.h>
 #include <time.h>
 

@@ -84,7 +84,7 @@ sources = FeatureSources(config, [
 	'elf.c',
 	'fatal.c',
 	'init.c',
-	'kdbg.c',
+	'kdb.c',
 	'lrm.c',
 	'module.c',
 	'object.c',

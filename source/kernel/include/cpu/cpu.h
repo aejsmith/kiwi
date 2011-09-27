@@ -99,6 +99,4 @@ extern void cpu_boot(cpu_t *cpu);
 extern void smp_detect(void);
 #endif
 
-extern int kdbg_cmd_cpus(int argc, char **argv);
-
 #endif /* __CPU_CPU_H */

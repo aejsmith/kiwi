@@ -30,7 +30,7 @@
 #include <proc/process.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 
@@ -719,7 +719,7 @@ status_t device_request(object_handle_t *handle, int request, const void *in, si
 	// FIXME: Right checks?
 	return device->ops->request(device, handle->data, request, in, insz, outp, outszp);
 }
-
+#if 0
 /** Print out a device's children.
  * @param tree		Radix tree to print.
  * @param indent	Indentation level. */
@@ -818,7 +818,7 @@ int kdbg_cmd_device(int argc, char **argv) {
 	}
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the device manager. */
 __init_text void device_init(void) {
 	status_t ret;

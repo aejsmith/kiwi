@@ -76,7 +76,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 #include <time.h>
@@ -231,7 +231,7 @@ void sched_reschedule(bool state) {
 	sched_cpu_t *cpu = curr_cpu->sched;
 	thread_t *next;
 
-	assert(!atomic_get(&kdbg_running));
+	assert(!atomic_get(&kdb_running));
 
 	spinlock_lock_ni(&cpu->lock);
 

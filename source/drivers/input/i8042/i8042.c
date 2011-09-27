@@ -35,7 +35,7 @@
 
 #include <assert.h>
 #include <dpc.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <module.h>
 #include <status.h>
@@ -118,11 +118,11 @@ static irq_status_t i8042_keyboard_irq(unsigned num, void *_device) {
 
 	code = in8(0x60);
 
-	/* Some debugging hooks to go into KDBG, etc. */
+	/* Some debugging hooks to go into KDB, etc. */
 	switch(code) {
 	case 59:
-		/* F1 - Enter KDBG. */
-		kdbg_enter(KDBG_ENTRY_USER, NULL);
+		/* F1 - Enter KDB. */
+		kdb_enter(KDB_REASON_USER, NULL);
 		break;
 	case 60:
 		/* F2 - Call fatal(). */

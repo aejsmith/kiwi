@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
@@ -16,12 +16,14 @@
 
 /**
  * @file
- * @brief		IPC system.
+ * @brief		AMD64 kernel debugger definitions.
  */
 
-#ifndef __IPC_IPC_H
-#define __IPC_IPC_H
+#ifndef __ARCH_KDB_H
+#define __ARCH_KDB_H
 
-#include <kernel/ipc.h>
+/** Number of breakpoints supported. */
+#define KDB_BREAKPOINT_COUNT	4
+#define KDB_WATCHPOINT_COUNT	4
 
-#endif /* __IPC_IPC_H */
+#endif /* __ARCH_KDB_H */

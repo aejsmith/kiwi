@@ -19,14 +19,15 @@
  * @brief		VBE display driver.
  */
 
-#include <pc/bios.h>
-
 #include <drivers/display.h>
+
+#include <lib/string.h>
 
 #include <mm/malloc.h>
 #include <mm/phys.h>
 
-#include <kdbg.h>
+#include <pc/bios.h>
+
 #include <kernel.h>
 #include <module.h>
 #include <status.h>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,23 +32,19 @@
 #include <security/cap.h>
 
 #include <console.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 
 /** Notifier to be called when a fatal error occurs. */
 NOTIFIER_DECLARE(fatal_notifier, NULL);
 
-/** Atomic variable to protect against nested calls to _fatal(). */
-static atomic_t fatal_protect = 0;
+/** Atomic variable to protect against nested calls to fatal(). */
+static atomic_t in_fatal = 0;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
 	console_putc_unsafe(ch);
-	if(ch == '\n') {
-		console_putc_unsafe(' ');
-		console_putc_unsafe(' ');
-	}
 	*total = *total + 1;
 }
 
@@ -62,21 +58,21 @@ static void fatal_printf(const char *format, ...) {
 }
 
 /**
- * Raise a fatal error.
+ * Handle an unrecoverable kernel error.
  *
  * Halts all CPUs, prints a formatted error message to the console and enters
- * KDBG. The function will never return.
+ * KDB. The function will never return.
  *
  * @param frame		Interrupt stack frame (if any).
- * @param format	The format string for the message.
- * @param ...		The arguments to be used in the formatted message.
+ * @param fmt		Error message format string.
+ * @param ...		Arguments to substitute into format string.
  */
-void _fatal(intr_frame_t *frame, const char *format, ...) {
+void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 	va_list args;
 
 	local_irq_disable();
 
-	if(atomic_cas(&fatal_protect, 0, 1)) {
+	if(atomic_inc(&in_fatal) == 0) {
 #if CONFIG_SMP
 		/* Halt all other CPUs. */
 		cpu_halt_all();
@@ -84,14 +80,11 @@ void _fatal(intr_frame_t *frame, const char *format, ...) {
 		/* Run callback functions registered. */
 		notifier_run_unlocked(&fatal_notifier, NULL, false);
 
-		console_putc_unsafe('\n');
-		fatal_printf("Fatal Error (CPU: %u; Version: %s):\n", cpu_id(), kiwi_ver_string);
-		va_start(args, format);
-		do_printf(fatal_printf_helper, NULL, format, args);
-		va_end(args);
-		console_putc_unsafe('\n');
+		fatal_printf("\nFatal Error: ");
+		do_printf(fatal_printf_helper, NULL, fmt, args);
+		fatal_printf("\n");
 
-		kdbg_enter(KDBG_ENTRY_FATAL, frame);
+		kdb_enter(KDB_REASON_FATAL, frame);
 	}
 
 	/* Halt the current CPU. */

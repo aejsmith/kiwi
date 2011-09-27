@@ -76,7 +76,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <status.h>
 
 #include "vm_priv.h"
@@ -1529,6 +1529,7 @@ __init_text void vm_init(void) {
 	vm_freelist_insert(region, KERNEL_VM_SIZE);
 }
 
+#if 0
 /** Display details of a region.
  * @param region	Region to display. */
 static void dump_region(vm_region_t *region) {
@@ -1612,7 +1613,7 @@ int kdbg_cmd_aspace(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /**
  * Map an object into memory.
  *

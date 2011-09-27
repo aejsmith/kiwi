@@ -32,7 +32,7 @@
 
 #include <assert.h>
 #include <console.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <module.h>
 #include <status.h>
@@ -74,7 +74,7 @@ static uint16_t display_mode_depth(display_mode_t *mode) {
 	return 0;
 }
 
-/** Trigger a redraw event after KDBG has run.
+/** Trigger a redraw event after KDB has run.
  * @param arg1		First notifier argument.
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
@@ -145,7 +145,7 @@ static status_t display_device_open(device_t *_device, void **datap) {
 	/* If this is the kernel console device, register the redraw notifier. */
 	if(device == display_console_device) {
 		fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
-		notifier_register(&kdbg_exit_notifier, display_console_redraw, device);
+		notifier_register(&kdb_exit_notifier, display_console_redraw, device);
 	}
 	return STATUS_SUCCESS;
 }
@@ -162,7 +162,7 @@ static void display_device_close(device_t *_device, void *data) {
 	assert(old == 1);
 
 	if(device == display_console_device) {
-		notifier_unregister(&kdbg_exit_notifier, display_console_redraw, device);
+		notifier_unregister(&kdb_exit_notifier, display_console_redraw, device);
 		fb_console_control(FB_CONSOLE_RELEASE, NULL);
 	}
 }
@@ -298,7 +298,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			}
 
 			if(device == display_console_device) {
-				notifier_unregister(&kdbg_exit_notifier, display_console_redraw, device);
+				notifier_unregister(&kdb_exit_notifier, display_console_redraw, device);
 				fb_console_control(FB_CONSOLE_RELEASE, NULL);
 				display_console_device = NULL;
 			}
@@ -331,11 +331,11 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
 
 				/* Register a notifier to redraw the console
-				 * after KDBG has run, and acquire the console
+				 * after KDB has run, and acquire the console
 				 * to prevent kernel output. */
 				if(!display_console_device) {
 					fb_console_control(FB_CONSOLE_ACQUIRE, NULL);
-					notifier_register(&kdbg_exit_notifier, display_console_redraw, device);
+					notifier_register(&kdb_exit_notifier, display_console_redraw, device);
 				}
 
 				display_console_device = device;

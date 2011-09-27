@@ -176,9 +176,6 @@ extern status_t thread_create(const char *name, struct process *owner, unsigned 
 extern void thread_run(thread_t *thread);
 extern void thread_destroy(thread_t *thread);
 
-extern int kdbg_cmd_kill(int argc, char **argv);
-extern int kdbg_cmd_thread(int argc, char **argv);
-
 extern void thread_init(void);
 extern void thread_reaper_init(void);
 

@@ -36,7 +36,7 @@
 
 #include <pc/pit.h>
 
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 
 extern void syscall_entry(void);
@@ -356,7 +356,7 @@ void cpu_dump(cpu_t *cpu) {
 	kprintf(LOG_NOTICE, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
 	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
 }
-
+#if 0
 /** CPU information command for KDBG.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -387,3 +387,4 @@ int kdbg_cmd_cpus(int argc, char **argv) {
 
 	return KDBG_OK;
 }
+#endif

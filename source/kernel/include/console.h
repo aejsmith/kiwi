@@ -55,8 +55,6 @@ extern uint16_t console_getc_unsafe(void);
 extern void console_register(console_t *console);
 extern void console_unregister(console_t *console);
 
-extern int kdbg_cmd_log(int argc, char **argv);
-
 extern void platform_console_early_init(void);
 extern void platform_console_init(void);
 

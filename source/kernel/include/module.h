@@ -90,6 +90,4 @@ extern void *module_mem_alloc(size_t size);
 extern status_t module_name(object_handle_t *handle, char *namebuf);
 extern status_t module_load(object_handle_t *handle, char *depbuf);
 
-extern int kdbg_cmd_modules(int argc, char **argv);
-
 #endif /* __MODULE_H */

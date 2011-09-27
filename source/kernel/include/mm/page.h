@@ -85,8 +85,6 @@ extern page_t *page_copy(page_t *page, int mmflag);
 
 extern void page_stats_get(page_stats_t *stats);
 
-extern int kdbg_cmd_page(int argc, char **argv);
-
 extern void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsigned freelist);
 
 extern void platform_page_init(void);

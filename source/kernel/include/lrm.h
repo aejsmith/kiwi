@@ -62,8 +62,6 @@ extern void lrm_handler_unregister(lrm_handler_t *handler);
 extern int lrm_level(uint32_t types);
 extern void lrm_reclaim(uint32_t type);
 
-extern int kdbg_cmd_lrm(int argc, char **argv);
-
 extern void lrm_init(void);
 
 #endif /* __LRM_H */

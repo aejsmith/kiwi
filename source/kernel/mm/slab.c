@@ -47,7 +47,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <status.h>
@@ -831,7 +831,7 @@ void slab_cache_destroy(slab_cache_t *cache) {
 
 	slab_cache_free(&slab_cache_cache, cache);
 }
-
+#if 0
 /** Prints a list of all slab caches.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -871,7 +871,7 @@ int kdbg_cmd_slab(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Slab low resource handler function.
  * @todo		This should take into effect which caches are hot, and
  *			reclaim from them less frequently.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,8 @@
 
 #include <arch/io.h>
 
+#include <lib/string.h>
+
 #include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
@@ -31,7 +33,6 @@
 #include <sync/mutex.h>
 
 #include <assert.h>
-#include <kdbg.h>
 #include <kernel.h>
 #include <module.h>
 #include <status.h>

@@ -36,7 +36,7 @@
 #include <proc/signal.h>
 #include <proc/thread.h>
 
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <setjmp.h>
 
@@ -45,7 +45,7 @@ extern atomic_t cpu_pause_wait;
 extern atomic_t cpu_halting_all;
 #endif
 
-extern void kdbg_db_handler(intr_frame_t *frame);
+extern void kdb_db_handler(intr_frame_t *frame);
 extern void intr_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
@@ -67,8 +67,8 @@ static const char *except_strings[] = {
 /** Unhandled interrupt function.
  * @param frame		Interrupt stack frame. */
 static void unhandled_interrupt(intr_frame_t *frame) {
-	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(frame->num, "Unknown", frame);
+	if(atomic_get(&kdb_running) == 2) {
+		kdb_except_handler("Unknown", frame);
 	} else {
 		_fatal(frame, "Received unknown interrupt %lu", frame->num);
 	}
@@ -84,10 +84,10 @@ static void hardware_interrupt(intr_frame_t *frame) {
 /** Unhandled kernel-mode exception handler.
  * @param frame		Interrupt stack frame. */
 static void kmode_except_handler(intr_frame_t *frame) {
-	/* All unhandled kernel-mode exceptions are fatal. When in KDBG, pass
+	/* All unhandled kernel-mode exceptions are fatal. When in KDB, pass
 	 * through to its exception handler. */
-	if(atomic_get(&kdbg_running) == 2) {
-		kdbg_except_handler(frame->num, except_strings[frame->num], frame);
+	if(atomic_get(&kdb_running) == 2) {
+		kdb_except_handler(except_strings[frame->num], frame);
 	} else {
 		_fatal(frame, "Unhandled kernel-mode exception %lu (%s)",
 		       frame->num, except_strings[frame->num]);
@@ -130,7 +130,7 @@ static void nmi_handler(intr_frame_t *frame) {
 	if(atomic_get(&cpu_halting_all)) {
 		cpu_halt();
 	} else if(atomic_get(&cpu_pause_wait)) {
-		/* A CPU is in KDBG, assume that it wants us to pause
+		/* A CPU is in KDB, assume that it wants us to pause
 		 * execution until it has finished. */
 		while(atomic_get(&cpu_pause_wait));
 		return;
@@ -193,9 +193,9 @@ static void page_fault(intr_frame_t *frame) {
 	siginfo_t info;
 	int ret;
 
-	/* We can't service a page fault while running KDBG. */
-	if(unlikely(atomic_get(&kdbg_running) == 2)) {
-		kdbg_except_handler(frame->num, except_strings[frame->num], frame);
+	/* We can't service a page fault while running KDB. */
+	if(unlikely(atomic_get(&kdb_running) == 2)) {
+		kdb_except_handler(except_strings[frame->num], frame);
 		return;
 	}
 
@@ -217,7 +217,7 @@ static void page_fault(intr_frame_t *frame) {
 			return;
 		} else if(curr_thread && curr_thread->in_usermem) {
 			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
-			kdbg_enter(KDBG_ENTRY_USER, frame);
+			kdb_enter(KDB_REASON_USER, frame);
 			longjmp(curr_thread->usermem_context, 1);
 		}
 	} else {
@@ -236,7 +236,7 @@ static void page_fault(intr_frame_t *frame) {
 		        (frame->err_code & (1<<1)) ? "write" : "read",
 		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
 		        (frame->err_code & (1<<4)) ? " | execute" : "");
-		kdbg_enter(KDBG_ENTRY_USER, frame);
+		kdb_enter(KDB_REASON_USER, frame);
 
 		memset(&info, 0, sizeof(info));
 		info.si_addr = (void *)frame->ip;
@@ -353,7 +353,7 @@ __init_text void intr_init(void) {
 
 	/* Set handlers for faults that require specific handling. */
 	intr_table[X86_EXCEPT_DE]  = de_fault;
-	intr_table[X86_EXCEPT_DB]  = kdbg_db_handler;
+	intr_table[X86_EXCEPT_DB]  = kdb_db_handler;
 	intr_table[X86_EXCEPT_NMI] = nmi_handler;
 	intr_table[X86_EXCEPT_UD]  = ud_fault;
 	intr_table[X86_EXCEPT_NM]  = nm_fault;

@@ -37,7 +37,7 @@
 
 #include <assert.h>
 #include <kboot.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <status.h>
@@ -1948,7 +1948,7 @@ status_t symlink_read(const char *path, char *buf, size_t size) {
 	kfree(dest);
 	return STATUS_SUCCESS;
 }
-
+#if 0
 /** Look up a mount by ID.
  * @note		Does not take the mount lock.
  * @param id		ID of mount to look up.
@@ -1965,7 +1965,7 @@ static fs_mount_t *fs_mount_lookup(mount_id_t id) {
 
 	return NULL;
 }
-
+#endif
 /** Parse mount arguments.
  * @param str		Options string.
  * @param optsp		Where to store options structure array.
@@ -2454,7 +2454,7 @@ out:
 	kfree(name);
 	return ret;
 }
-
+#if 0
 /** Print a list of mounts.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -2593,7 +2593,7 @@ int kdbg_cmd_node(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the filesystem layer. */
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,

@@ -43,7 +43,7 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <status.h>
 #include <time.h>
@@ -491,8 +491,8 @@ void thread_exit(void) {
 
 /** Lookup a running thread without taking the tree lock.
  * @note		Newly created and dead threads are ignored.
- * @note		This function should only be used within KDBG. Use
- *			thread_lookup() outside of KDBG.
+ * @note		This function should only be used within KDB. Use
+ *			thread_lookup() outside of KDB.
  * @param id		ID of the thread to find.
  * @return		Pointer to thread found, or NULL if not found. */
 thread_t *thread_lookup_unsafe(thread_id_t id) {
@@ -686,7 +686,7 @@ void thread_destroy(thread_t *thread) {
 
 	spinlock_unlock(&thread->lock);
 }
-
+#if 0
 /** Kill a thread.
  * @param argc		Argument count.
  * @param argv		Argument pointer array.
@@ -791,6 +791,7 @@ int kdbg_cmd_thread(int argc, char **argv) {
 
 	return KDBG_OK;
 }
+#endif
 
 /** Initialise the thread system. */
 __init_text void thread_init(void) {

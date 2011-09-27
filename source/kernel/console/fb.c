@@ -29,7 +29,7 @@
 
 #include <console.h>
 #include <kboot.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 
 #if CONFIG_DEBUG
@@ -330,7 +330,7 @@ static void fb_console_reset(void) {
 	memset(fb_console_buffer, 0, ROW_SIZE);
 }
 
-/** Enable the framebuffer console upon KDBG entry/fatal().
+/** Enable the framebuffer console upon KDB entry/fatal().
  * @param arg1		First notifier argument.
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
@@ -341,7 +341,7 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
 	}
 }
 
-/** Disable the framebuffer console upon KDBG exit.
+/** Disable the framebuffer console upon KDB exit.
  * @param arg1		First notifier argument.
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
@@ -421,10 +421,10 @@ __init_text void console_init(void) {
 	console_register(&fb_console);
 
 	/* Register callbacks to reset the framebuffer console upon fatal() and
-	 * KDBG entry. */
+	 * KDB entry. */
 	notifier_register(&fatal_notifier, fb_console_enable, NULL);
-	notifier_register(&kdbg_entry_notifier, fb_console_enable, NULL);
-	notifier_register(&kdbg_exit_notifier, fb_console_disable, NULL);
+	notifier_register(&kdb_entry_notifier, fb_console_enable, NULL);
+	notifier_register(&kdb_exit_notifier, fb_console_disable, NULL);
 
 	if(!kboot_boolean_option("splash_disabled")) {
 		splash_enabled = true;

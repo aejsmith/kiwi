@@ -85,7 +85,7 @@
 
 #include <assert.h>
 #include <kboot.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <status.h>
@@ -710,7 +710,7 @@ void page_stats_get(page_stats_t *stats) {
 	stats->cached = page_queues[PAGE_STATE_CACHED].count * PAGE_SIZE;
 	stats->free = stats->total - stats->allocated - stats->modified - stats->cached;
 }
-
+#if 0
 /** Print details about physical memory usage.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -773,7 +773,7 @@ int kdbg_cmd_page(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Add a new range of physical memory.
  * @note		Ranges must be added in lowest to highest order!
  * @param start		Start of range.

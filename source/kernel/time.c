@@ -35,7 +35,7 @@
 
 #include <assert.h>
 #include <dpc.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
@@ -379,7 +379,7 @@ status_t usleep_etc(useconds_t us, bool interruptible) {
 void usleep(useconds_t us) {
 	usleep_etc(us, false);
 }
-
+#if 0
 /** Dump a list of timers.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -438,7 +438,7 @@ int kdbg_cmd_uptime(int argc, char **argv) {
 	kprintf(LOG_NONE, "%llu seconds (%llu microseconds)\n", time / 1000000, time);
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the timing system. */
 __init_text void time_init(void) {
 	/* Initialise the boot time. */

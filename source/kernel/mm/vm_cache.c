@@ -32,7 +32,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <status.h>
 
 #if CONFIG_CACHE_DEBUG
@@ -655,7 +655,7 @@ void vm_cache_evict_page(page_t *page) {
 	page_free(page);
 	mutex_unlock(&cache->lock);
 }
-
+#if 0
 /** Print information about a cache.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -703,7 +703,7 @@ int kdbg_cmd_cache(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Create the VM cache structure slab cache. */
 __init_text void vm_cache_init(void) {
 	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),

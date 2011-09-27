@@ -326,13 +326,6 @@ extern status_t fs_unlink(const char *path);
 //extern status_t fs_sync(void);
 
 /**
- * Debugger commands.
- */
-
-extern int kdbg_cmd_mount(int argc, char **argv);
-extern int kdbg_cmd_node(int argc, char **argv);
-
-/**
  * Initialisation/shutdown functions.
  */
 

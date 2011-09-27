@@ -36,7 +36,7 @@
 #include <sync/rwlock.h>
 #include <sync/semaphore.h>
 
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
@@ -111,7 +111,7 @@ void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
 	waitq_init(&sem->queue, name);
 	sem->count = initial;
 }
-
+#if 0
 /** Print a list of semaphores.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -138,7 +138,7 @@ int kdbg_cmd_semaphore(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Release a user semaphore.
  * @param sem		Semaphore to release. */
 static void user_semaphore_release(user_semaphore_t *sem) {

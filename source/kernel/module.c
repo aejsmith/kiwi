@@ -33,7 +33,7 @@
 
 #include <sync/mutex.h>
 
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <module.h>
 #include <status.h>
@@ -319,7 +319,7 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 
 	/* Publish the symbol table. Do this before calling the initialisation
 	 * function so backtraces will have the correct symbols if the call
-	 * ends up inside KDBG. */
+	 * ends up inside KDB. */
 	symbol_table_publish(&module->symtab);
 
 	/* Call the module initialisation function. */
@@ -343,7 +343,7 @@ fail:
 	mutex_unlock(&module_lock);
 	return ret;
 }
-
+#if 0
 /** Print a list of loaded kernel modules.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -371,7 +371,7 @@ int kdbg_cmd_modules(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /**
  * Load a kernel module.
  *

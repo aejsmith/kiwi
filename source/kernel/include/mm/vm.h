@@ -93,6 +93,4 @@ extern void vm_aspace_destroy(vm_aspace_t *as);
 
 extern void vm_init(void);
 
-extern int kdbg_cmd_aspace(int argc, char **argv);
-
 #endif /* __MM_VM_H */

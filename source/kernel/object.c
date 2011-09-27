@@ -45,7 +45,7 @@
 #include <sync/semaphore.h>
 
 #include <assert.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <object.h>
 #include <status.h>
@@ -578,7 +578,7 @@ void handle_table_destroy(handle_table_t *table) {
 	bitmap_destroy(&table->bitmap);
 	slab_cache_free(handle_table_cache, table);
 }
-
+#if 0
 /** Print a list of a process' handles.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -684,7 +684,7 @@ int kdbg_cmd_object(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the handle caches. */
 __init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),

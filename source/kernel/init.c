@@ -49,6 +49,7 @@
 #include <console.h>
 #include <dpc.h>
 #include <kboot.h>
+#include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
 #include <module.h>
@@ -389,16 +390,11 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 
 /** Initialisation code for the boot CPU. */
 static __init_text void kmain_bsp_bottom(void) {
-	kboot_tag_core_t *core;
 	thread_t *thread;
 	status_t ret;
 
-	/* Verify that a core tag is available. */
-	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
-	if(!core) {
-		fatal("Not booted by a KBoot-compliant loader");
-	}
-	kboot_tag_release(core);
+	/* Make the debugger available as soon as possible. */
+	kdb_init();
 
 	/* Do early CPU subsystem and CPU initialisation. */
 	cpu_early_init();

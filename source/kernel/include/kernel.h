@@ -57,11 +57,11 @@ extern void platform_poweroff(void);
 
 extern void system_shutdown(int action);
 
-extern void _fatal(struct intr_frame *frame, const char *format, ...) __noreturn __printf(2, 3);
+extern void _fatal(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);
 
-/** Print an error message and halt the kernel.
- * @param fmt		The format string for the message.
- * @param ...		The arguments to be used in the formatted message. */
+/** Handle an unrecoverable kernel error.
+ * @param fmt		Error message format string.
+ * @param ...		Arguments to substitute into format string. */
 #define fatal(fmt...)	_fatal(NULL, fmt)
 
 /** Console log levels. */

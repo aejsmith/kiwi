@@ -53,7 +53,7 @@
 #include <assert.h>
 #include <kernel.h>
 #include <object.h>
-#include <kdbg.h>
+#include <kdb.h>
 #include <status.h>
 
 #if CONFIG_IPC_DEBUG
@@ -1030,7 +1030,7 @@ fail:
 	object_handle_release(khandle);
 	return ret;
 }
-
+#if 0
 /** Print information about IPC ports.
  * @param argc		Argument count.
  * @param argv		Argument array.
@@ -1135,7 +1135,7 @@ int kdbg_cmd_endpoint(int argc, char **argv) {
 
 	return KDBG_OK;
 }
-
+#endif
 /** Initialise the IPC slab caches. */
 static __init_text void ipc_init(void) {
 	/* Initialise the port ID allocator. */

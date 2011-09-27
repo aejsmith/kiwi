@@ -220,8 +220,6 @@ extern status_t device_write(object_handle_t *handle, const void *buf, size_t co
 extern status_t device_request(object_handle_t *handle, int request, const void *in, size_t insz,
                                void **outp, size_t *outszp);
 
-extern int kdbg_cmd_device(int argc, char **argv);
-
 extern void device_init(void);
 
 #endif /* __IO_DEVICE_H */

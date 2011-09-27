@@ -54,6 +54,4 @@ extern void semaphore_down(semaphore_t *sem);
 extern void semaphore_up(semaphore_t *sem, size_t count);
 extern void semaphore_init(semaphore_t *sem, const char *name, size_t initial);
 
-extern int kdbg_cmd_semaphore(int argc, char **argv);
-
 #endif /* __SYNC_SEMAPHORE_H */

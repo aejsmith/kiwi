@@ -106,8 +106,6 @@ extern status_t process_create(const char *const args[], const char *const env[]
                                int priority, process_t *parent, process_t **procp);
 extern void process_exit(int status, int reason) __noreturn;
 
-extern int kdbg_cmd_process(int argc, char **argv);
-
 extern void process_init(void);
 extern void process_shutdown(void);
 
