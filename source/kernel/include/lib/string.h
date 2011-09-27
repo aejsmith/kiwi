@@ -39,6 +39,7 @@ extern int strncasecmp(const char *s1, const char *s2, size_t count);
 extern char *strsep(char **stringp, const char *delim);
 extern char *strchr(const char *s, int c);
 extern char *strrchr(const char *s, int c);
+extern char *strstr(const char *s, const char *what);
 extern char *strstrip(char *str);
 extern char *strcpy(char *restrict dest, const char *restrict src);
 extern char *strncpy(char *restrict dest, const char *restrict src, size_t count);
