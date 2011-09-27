@@ -953,21 +953,39 @@ __init_text void page_daemon_init(void) {
 
 /** Reclaim memory no longer in use after kernel initialisation. */
 __init_text void page_late_init(void) {
-#if 0
-	size_t reclaimed = 0, size, i;
+	phys_ptr_t addr, init_start, init_end;
+	kboot_tag_core_t *core;
+	size_t reclaimed = 0;
 
-	/* It's OK for us to reclaim despite the fact that this function is
+	/* Calculate the location and size of the initialisation section. */
+	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
+	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + core->kernel_phys;
+	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + core->kernel_phys;
+
+	/* It's OK for us to reclaim despite the fact that the KBoot data is
 	 * contained in memory that will be reclaimed, as nothing should make
 	 * any allocations or write to reclaimed memory while this is
 	 * happening. */
-	for(i = 0; i < page_range_count; i++) {
-		if(page_ranges[i].reclaim) {
-			size = page_ranges[i].end - page_ranges[i].start;
-			page_free(page_ranges[i].start, size / PAGE_SIZE);
-			reclaimed += size;
+	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
+		if(range->type == KBOOT_MEMORY_RECLAIMABLE) {
+			/* Must individually free each page in the range, as
+			 * the KBoot range could be split across more than one
+			 * of our internal ranges, and frees across range
+			 * boundaries are not allowed. */
+			for(addr = range->start; addr < range->end; addr += PAGE_SIZE) {
+				phys_free(addr, PAGE_SIZE);
+			}
+
+			reclaimed += (range->end - range->start);
 		}
 	}
 
+	/* Free the initialisation data. Same as above applies. */
+	for(addr = init_start; addr < init_end; addr += PAGE_SIZE) {
+		phys_free(addr, PAGE_SIZE);
+	}
+
+	reclaimed += (init_end - init_start);
+
 	kprintf(LOG_NOTICE, "page: reclaimed %zu KiB of unneeded memory\n", reclaimed / 1024);
-#endif
 }
