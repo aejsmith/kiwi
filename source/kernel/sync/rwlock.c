@@ -93,9 +93,9 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
  *			SYNC_INTERRUPTIBLE flag is set.
  */
 status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
-	bool state = local_irq_disable();
+	bool state;
 
-	spinlock_lock_ni(&lock->queue.lock);
+	state = waitq_sleep_prepare(&lock->queue);
 
 	if(lock->held) {
 		/* Lock is held, check if it's held by readers. If it is, and
@@ -112,8 +112,7 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	}
 
 	lock->readers++;
-	spinlock_unlock_ni(&lock->queue.lock);
-	local_irq_restore(state);
+	waitq_sleep_cancel(&lock->queue, state);
 	return STATUS_SUCCESS;
 }
 
@@ -137,13 +136,14 @@ status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
  */
 status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 	status_t ret = STATUS_SUCCESS;
-	bool state = local_irq_disable();
+	bool state;
 
-	spinlock_lock_ni(&lock->queue.lock);
+	state = waitq_sleep_prepare(&lock->queue);
 
 	/* Just acquire the exclusive lock. */
 	if(lock->held) {
 		curr_thread->rwlock_writer = true;
+
 		ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
 		if(ret != STATUS_SUCCESS) {
 			/* Failed to acquire the lock. In this case, there may
@@ -156,8 +156,7 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 		}
 	} else {
 		lock->held = 1;
-		spinlock_unlock_ni(&lock->queue.lock);
-		local_irq_restore(state);
+		waitq_sleep_cancel(&lock->queue, state);
 	}
 
 	return ret;
