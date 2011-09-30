@@ -285,6 +285,8 @@ void sched_reschedule(bool state) {
 		curr_cpu->idle = true;
 	}
 
+	assert(next->cpu == curr_cpu);
+
 	/* Move the thread to the Running state and set it as the current. */
 	cpu->prev_thread = curr_thread;
 	next->state = THREAD_RUNNING;
@@ -304,7 +306,6 @@ void sched_reschedule(bool state) {
 		kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
 			curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
 #endif
-
 		/* Switch the address space. This function handles the case
 		 * where the new process' aspace pointer is NULL. */
 		vm_aspace_switch(curr_proc->aspace);
@@ -312,9 +313,9 @@ void sched_reschedule(bool state) {
 		/* Perform the thread switch. */
 		arch_thread_switch(curr_thread, cpu->prev_thread);
 
-		/* The switch may return to thread_trampoline() or to the
-		 * interruption handler in waitq_sleep_unsafe(), so put
-		 * anything to do after a switch in sched_post_switch(). */
+		/* The switch may return to thread_trampoline(), so put
+		 * anything to do after a switch in sched_post_switch()
+		 * below. */
 		sched_post_switch(state);
 	} else {
 		spinlock_unlock_ni(&curr_thread->lock);

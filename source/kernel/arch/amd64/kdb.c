@@ -21,6 +21,7 @@
 
 #include <arch/frame.h>
 #include <arch/kdb.h>
+#include <arch/memory.h>
 
 #include <x86/cpu.h>
 
@@ -33,7 +34,7 @@
 
 /** Structure containing a stack frame. */
 typedef struct stack_frame {
-	struct stack_frame *next;	/**< Pointer to next stack frame. */
+	ptr_t next;			/**< Address of next stack frame. */
 	ptr_t addr;			/**< Function return address. */
 } stack_frame_t;
 
@@ -288,24 +289,52 @@ bool arch_kdb_get_watchpoint(unsigned index, ptr_t *addrp, size_t *sizep, bool *
 	return true;
 }
 
+/** Check if an address is within a stack.
+ * @param addr		Address to check.
+ * @param stack		Stack to check. */
+#define IS_IN_STACK(addr, stack)	\
+	((addr) >= (ptr_t)(stack) && (addr) < ((ptr_t)(stack) + KSTACK_SIZE))
+
+/** Check if an address lies within the kernel stack.
+ * @param thread	Thread to check for.
+ * @param addr		Address to check.
+ * @return		Whether the address is in the kernel stack. */
+static bool is_kstack_address(thread_t *thread, ptr_t addr) {
+	if(!thread) {
+		thread = curr_thread;
+		if(!thread) {
+			/* Early boot, assume we are on the kernel stack. */
+			return true;
+		}
+	}
+
+	return (IS_IN_STACK(addr, thread->kstack) || IS_IN_STACK(addr, curr_cpu->arch.double_fault_stack));
+}
+
 /** Perform a backtrace.
  * @param thread	Thread to trace. If NULL, use the current frame.
  * @param cb		Backtrace callback. */
 void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
 	stack_frame_t *frame;
 	unative_t *sp;
+	ptr_t bp;
 
 	/* Get the stack frame. */
 	if(thread) {
 		sp = (unative_t *)thread->arch.saved_rsp;
-		frame = (stack_frame_t *)sp[5];
+		bp = sp[5];
 	} else {
-		frame = (stack_frame_t *)curr_kdb_frame->bp;
+		bp = curr_kdb_frame->bp;
 	}
 
-	while(frame && frame->addr) {
-		cb(frame->addr);
-		frame = frame->next;
+	while(bp && is_kstack_address(thread, bp)) {
+		frame = (stack_frame_t *)bp;
+
+		if(frame->addr) {
+			cb(frame->addr);
+		}
+
+		bp = frame->next;
 	}
 }
 

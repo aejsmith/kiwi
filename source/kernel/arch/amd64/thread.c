@@ -77,7 +77,8 @@ void arch_thread_destroy(thread_t *thread) {
  * @param prev		Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
 	/* Store the current CPU pointer and then point the GS register to the
-	 * new thread's architecture data. */
+	 * new thread's architecture data. The load of curr_cpu will load from
+	 * the previous thread's architecture data. */
 	thread->arch.cpu = curr_cpu;
 	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&thread->arch);
 
