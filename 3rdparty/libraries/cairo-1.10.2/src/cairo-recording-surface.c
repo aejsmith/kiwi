@@ -37,7 +37,13 @@
  *	Adrian Johnson <ajohnson@redneon.com>
  */
 
-/* A recording surface is a surface that records all drawing operations at
+/**
+ * SECTION:cairo-recording
+ * @Title: Recording Surfaces
+ * @Short_Description: Records all drawing operations
+ * @See_Also: #cairo_surface_t
+ *
+ * A recording surface is a surface that records all drawing operations at
  * the highest level of the surface backend interface, (that is, the
  * level of paint, mask, stroke, fill, and show_text_glyphs). The recording
  * surface can then be "replayed" against any target surface by using it
@@ -70,8 +76,6 @@
  * copy-on-write implementation for _cairo_surface_snapshot.
  */
 
-/* XXX Rename to recording surface */
-
 #include "cairoint.h"
 #include "cairo-analysis-surface-private.h"
 #include "cairo-clip-private.h"
@@ -86,6 +90,16 @@ typedef enum {
 
 static const cairo_surface_backend_t cairo_recording_surface_backend;
 
+/**
+ * CAIRO_HAS_RECORDING_SURFACE:
+ *
+ * Defined if the recording surface backend is available.
+ * The recording surface backend is always built in.
+ * This macro was added for completeness in cairo 1.10.
+ *
+ * Since: 1.10
+ */
+
 /* Currently all recording surfaces do have a size which should be passed
  * in as the maximum size of any target surface against which the
  * recording-surface will ever be replayed.
@@ -98,8 +112,8 @@ static const cairo_surface_backend_t cairo_recording_surface_backend;
 /**
  * cairo_recording_surface_create:
  * @content: the content of the recording surface
- * @extents_pixels: the extents to record in pixels, can be %NULL to record
- *                  unbounded operations.
+ * @extents: the extents to record in pixels, can be %NULL to record
+ *           unbounded operations.
  *
  * Creates a recording-surface which can be used to record all drawing operations
  * at the highest level (that is, the level of paint, mask, stroke, fill
@@ -110,7 +124,11 @@ static const cairo_surface_backend_t cairo_recording_surface_backend;
  * necessary objects (paths, patterns, etc.), in order to achieve
  * accurate replay.
  *
- * Since 1.10
+ * Return value: a pointer to the newly created surface. The caller
+ * owns the surface and should call cairo_surface_destroy() when done
+ * with it.
+ *
+ * Since: 1.10
  **/
 cairo_surface_t *
 cairo_recording_surface_create (cairo_content_t		 content,

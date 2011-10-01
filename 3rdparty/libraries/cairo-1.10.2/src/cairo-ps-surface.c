@@ -1303,6 +1303,7 @@ cairo_ps_surface_set_size (cairo_surface_t	*surface,
 			   double		 height_in_points)
 {
     cairo_ps_surface_t *ps_surface = NULL;
+    cairo_status_t status;
 
     if (! _extract_ps_surface (surface, TRUE, &ps_surface))
 	return;
@@ -1312,6 +1313,11 @@ cairo_ps_surface_set_size (cairo_surface_t	*surface,
     cairo_matrix_init (&ps_surface->cairo_to_ps, 1, 0, 0, -1, 0, height_in_points);
     _cairo_pdf_operators_set_cairo_to_pdf_matrix (&ps_surface->pdf_operators,
 						  &ps_surface->cairo_to_ps);
+    status = _cairo_paginated_surface_set_size (ps_surface->paginated_surface,
+						width_in_points,
+						height_in_points);
+    if (status)
+	status = _cairo_surface_set_error (surface, status);
 }
 
 /**
@@ -2370,11 +2376,12 @@ _cairo_ps_surface_emit_jpeg_image (cairo_ps_surface_t    *surface,
 				 "  /Width %d def\n"
 				 "  /Height %d def\n"
 				 "  /BitsPerComponent %d def\n"
-				 "  /Decode [ 0 1 0 1 0 1 ] def\n",
+				 "  /Decode [ %s ] def\n",
 				 info.num_components == 1 ? "DeviceGray" : "DeviceRGB",
 				 info.width,
 				 info.height,
-				 info.bits_per_component);
+				 info.bits_per_component,
+                                 info.num_components == 1 ? "0 1" : "0 1 0 1 0 1");
 
     if (surface->use_string_datasource) {
 	_cairo_output_stream_printf (surface->stream,
@@ -3502,9 +3509,6 @@ _cairo_ps_surface_paint (void			*abstract_surface,
     if (unlikely (status))
 	return status;
 
-    if (! _cairo_rectangle_intersect (&extents.bounded, &surface->page_bbox))
-	return CAIRO_STATUS_SUCCESS;
-
     if (surface->paginated_mode == CAIRO_PAGINATED_MODE_ANALYZE)
 	return _cairo_ps_surface_analyze_operation (surface, op, source, &extents.bounded);
 
@@ -3540,9 +3544,8 @@ _cairo_ps_surface_paint (void			*abstract_surface,
 	if (unlikely (status))
 	    return status;
 
-	_cairo_output_stream_printf (stream, "%d %d %d %d rectfill\n",
-				     extents.bounded.x, extents.bounded.y,
-				     extents.bounded.width, extents.bounded.height);
+	_cairo_output_stream_printf (stream, "0 0 %f %f rectfill\n",
+				     surface->width, surface->height);
     }
 
     return CAIRO_STATUS_SUCCESS;
@@ -3572,9 +3575,6 @@ _cairo_ps_surface_stroke (void			*abstract_surface,
 							  clip);
     if (unlikely (status))
 	return status;
-
-    if (! _cairo_rectangle_intersect (&extents.bounded, &surface->page_bbox))
-	return CAIRO_STATUS_SUCCESS;
 
     /* use the more accurate extents */
     if (extents.is_bounded) {
@@ -3636,9 +3636,6 @@ _cairo_ps_surface_fill (void		*abstract_surface,
 							clip);
     if (unlikely (status))
 	return status;
-
-    if (! _cairo_rectangle_intersect (&extents.bounded, &surface->page_bbox))
-	return CAIRO_STATUS_SUCCESS;
 
     /* use the more accurate extents */
     if (extents.is_bounded) {

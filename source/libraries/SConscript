@@ -28,6 +28,6 @@ SConscript(dirs = [
 	'3rdparty/libpng-1.4.3',
 	'3rdparty/freetype-2.4.3',
 	'3rdparty/pixman-0.20.0',
-	'3rdparty/cairo-1.10.0',
+	'3rdparty/cairo-1.10.2',
 	'kiwi',
 ], exports = ['env'])

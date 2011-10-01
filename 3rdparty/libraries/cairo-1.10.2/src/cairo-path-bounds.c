@@ -131,6 +131,8 @@ _cairo_path_bounder_curve_to (void *closure,
     else
     {
 	/* All control points are within the current extents. */
+	bounder->current_point = *d;
+
 	return CAIRO_STATUS_SUCCESS;
     }
 }
@@ -331,7 +333,9 @@ _cairo_path_fixed_extents (const cairo_path_fixed_t *path,
 
     if (! path->has_curve_to) {
 	*box = path->extents;
-	return path->extents.p1.x < path->extents.p2.x;
+	/* empty extents should still have an origin and should not
+	 * be {0, 0, 0, 0} */
+	return path->extents.p1.x <= path->extents.p2.x;
     }
 
     _cairo_path_bounder_init (&bounder);

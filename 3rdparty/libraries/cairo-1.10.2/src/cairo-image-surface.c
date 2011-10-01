@@ -876,10 +876,13 @@ _nearest_sample (cairo_filter_t filter, double *tx, double *ty)
 }
 
 #if HAS_ATOMIC_OPS
+static pixman_image_t *__pixman_transparent_image;
+static pixman_image_t *__pixman_black_image;
+static pixman_image_t *__pixman_white_image;
+
 static pixman_image_t *
 _pixman_transparent_image (void)
 {
-    static pixman_image_t *__pixman_transparent_image;
     pixman_image_t *image;
 
     image = __pixman_transparent_image;
@@ -910,7 +913,6 @@ _pixman_transparent_image (void)
 static pixman_image_t *
 _pixman_black_image (void)
 {
-    static pixman_image_t *__pixman_black_image;
     pixman_image_t *image;
 
     image = __pixman_black_image;
@@ -941,7 +943,6 @@ _pixman_black_image (void)
 static pixman_image_t *
 _pixman_white_image (void)
 {
-    static pixman_image_t *__pixman_white_image;
     pixman_image_t *image;
 
     image = __pixman_white_image;
@@ -995,14 +996,39 @@ hars_petruska_f54_1_random (void)
 #undef rol
 }
 
+static struct {
+    cairo_color_t color;
+    pixman_image_t *image;
+} cache[16];
+static int n_cached;
+
+void
+_cairo_image_reset_static_data (void)
+{
+    while (n_cached)
+	pixman_image_unref (cache[--n_cached].image);
+
+#if HAS_ATOMIC_OPS
+    if (__pixman_transparent_image) {
+	pixman_image_unref (__pixman_transparent_image);
+	__pixman_transparent_image = NULL;
+    }
+
+    if (__pixman_black_image) {
+	pixman_image_unref (__pixman_black_image);
+	__pixman_black_image = NULL;
+    }
+
+    if (__pixman_white_image) {
+	pixman_image_unref (__pixman_white_image);
+	__pixman_white_image = NULL;
+    }
+#endif
+}
+
 static pixman_image_t *
 _pixman_image_for_solid (const cairo_solid_pattern_t *pattern)
 {
-    static struct {
-	cairo_color_t color;
-	pixman_image_t *image;
-    } cache[16];
-    static int n_cached;
     pixman_color_t color;
     pixman_image_t *image;
     int i;
@@ -2666,7 +2692,13 @@ _fill_unaligned_boxes (cairo_image_surface_t *dst,
 			     x1, y1, x2 - x1, y2 - y1,
 			     pixel);
 
-		/* top */
+		/*
+		 * Corners have to be included only once if the rects
+		 * are passed to the rectangular scan converter
+		 * because it can only handle disjoint rectangles.
+		*/
+
+		/* top (including top-left and top-right corners) */
 		if (! _cairo_fixed_is_integer (box[i].p1.y)) {
 		    b.p1.x = box[i].p1.x;
 		    b.p1.y = box[i].p1.y;
@@ -2678,31 +2710,31 @@ _fill_unaligned_boxes (cairo_image_surface_t *dst,
 			goto CLEANUP_CONVERTER;
 		}
 
-		/* left */
+		/* left (no corners) */
 		if (! _cairo_fixed_is_integer (box[i].p1.x)) {
 		    b.p1.x = box[i].p1.x;
-		    b.p1.y = box[i].p1.y;
+		    b.p1.y = _cairo_fixed_from_int (y1);
 		    b.p2.x = _cairo_fixed_from_int (x1);
-		    b.p2.y = box[i].p2.y;
+		    b.p2.y = _cairo_fixed_from_int (y2);
 
 		    status = _cairo_rectangular_scan_converter_add_box (&converter, &b, 1);
 		    if (unlikely (status))
 			goto CLEANUP_CONVERTER;
 		}
 
-		/* right */
+		/* right (no corners) */
 		if (! _cairo_fixed_is_integer (box[i].p2.x)) {
 		    b.p1.x = _cairo_fixed_from_int (x2);
-		    b.p1.y = box[i].p1.y;
+		    b.p1.y = _cairo_fixed_from_int (y1);
 		    b.p2.x = box[i].p2.x;
-		    b.p2.y = box[i].p2.y;
+		    b.p2.y = _cairo_fixed_from_int (y2);
 
 		    status = _cairo_rectangular_scan_converter_add_box (&converter, &b, 1);
 		    if (unlikely (status))
 			goto CLEANUP_CONVERTER;
 		}
 
-		/* bottom */
+		/* bottom (including bottom-left and bottom-right corners) */
 		if (! _cairo_fixed_is_integer (box[i].p2.y)) {
 		    b.p1.x = box[i].p1.x;
 		    b.p1.y = _cairo_fixed_from_int (y2);
@@ -3421,10 +3453,15 @@ _composite_spans (void                          *closure,
     /* TODO: support rendering to A1 surfaces (or: go add span
      * compositing to pixman.) */
 
-    if (pattern == NULL && dst_format == PIXMAN_a8) {
+    if (pattern == NULL &&
+	dst_format == PIXMAN_a8 &&
+	op == CAIRO_OPERATOR_SOURCE)
+    {
 	mask = dst;
 	dst = NULL;
-    } else {
+    }
+    else
+    {
 	int stride = CAIRO_STRIDE_FOR_WIDTH_BPP (extents->width, 8);
 	uint8_t *data = mask_buf;
 
@@ -4221,7 +4258,7 @@ _cairo_image_surface_fill_rectangles (void		      *abstract_surface,
     cairo_image_surface_t *surface = abstract_surface;
 
     pixman_color_t pixman_color;
-    pixman_box32_t stack_boxes[CAIRO_STACK_ARRAY_LENGTH (pixman_rectangle16_t)];
+    pixman_box32_t stack_boxes[CAIRO_STACK_ARRAY_LENGTH (pixman_box32_t)];
     pixman_box32_t *pixman_boxes = stack_boxes;
     int i;
 
@@ -4236,7 +4273,7 @@ _cairo_image_surface_fill_rectangles (void		      *abstract_surface,
     pixman_color.alpha = color->alpha_short;
 
     if (num_rects > ARRAY_LENGTH (stack_boxes)) {
-	pixman_boxes = _cairo_malloc_ab (num_rects, sizeof (pixman_rectangle16_t));
+	pixman_boxes = _cairo_malloc_ab (num_rects, sizeof (pixman_box32_t));
 	if (unlikely (pixman_boxes == NULL))
 	    return _cairo_error (CAIRO_STATUS_NO_MEMORY);
     }
