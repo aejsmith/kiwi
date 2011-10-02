@@ -45,6 +45,7 @@ void arch_thread_init(thread_t *thread, void (*entry)(void)) {
 
 	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
+	thread->arch.fpu_count = 0;
 
 	/* Point the RSP for SYSCALL entry at the top of the stack. */
 	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
@@ -76,6 +77,18 @@ void arch_thread_destroy(thread_t *thread) {
  * @param thread	Thread to switch to.
  * @param prev		Thread that was previously running. */
 void arch_thread_switch(thread_t *thread, thread_t *prev) {
+	bool fpu_enabled;
+
+	/* Save the current FPU state, if any. */
+	fpu_enabled = x86_fpu_state();
+	if(likely(prev)) {
+		if(fpu_enabled) {
+			x86_fpu_save(prev->arch.fpu);
+		} else {
+			prev->arch.fpu_count = 0;
+		}
+	}
+
 	/* Store the current CPU pointer and then point the GS register to the
 	 * new thread's architecture data. The load of curr_cpu will load from
 	 * the previous thread's architecture data. */
@@ -89,13 +102,22 @@ void arch_thread_switch(thread_t *thread, thread_t *prev) {
 	/* Set the FS base address to the TLS segment base. */
 	x86_write_msr(X86_MSR_FS_BASE, thread->arch.tls_base);
 
-	/* If the FPU is currently enabled, disable it. We switch to the new
-	 * context on demand in the new thread. TODO: Possibly determine
-	 * whether the FPU is frequently used, and switch straight away to
-	 * avoid an exception to re-enable it. */
-	if(x86_fpu_state()) {
-		x86_fpu_save(prev->arch.fpu);
-		x86_fpu_disable();
+	/* Handle the FPU state. */
+	if(thread->arch.flags & ARCH_THREAD_FREQUENT_FPU) {
+		/* The FPU is being frequently used by the new thread, load the
+		 * new state immediately so that the thread doesn't have to
+		 * incur a fault before it can use the FPU again. */
+		if(!fpu_enabled) {
+			x86_fpu_enable();
+		}
+		x86_fpu_restore(thread->arch.fpu);
+	} else {
+		/* Disable the FPU. We switch the FPU state on demand in the
+		 * new thread, to remove the overhead of loading it now when
+		 * it is not likely that the FPU will be needed by the thread. */
+		if(fpu_enabled) {
+			x86_fpu_disable();
+		}
 	}
 
 	/* Switch to the new context. */

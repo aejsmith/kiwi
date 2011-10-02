@@ -49,6 +49,9 @@ typedef struct arch_thread {
 	unsigned long flags;			/**< Flags for the thread. */
 	ptr_t tls_base;				/**< TLS base address. */
 
+	/** Number of consecutive runs that the FPU is used for. */
+	unsigned fpu_count;
+
 	/** FPU context save point. */
 	char fpu[512] __aligned(16);
 } __packed arch_thread_t;
@@ -58,6 +61,7 @@ typedef struct arch_thread {
 /** Flags for arch_thread_t. */
 #define ARCH_THREAD_IFRAME_MODIFIED	(1<<0)	/**< Interrupt frame was modified. */
 #define ARCH_THREAD_HAVE_FPU		(1<<1)	/**< Thread has an FPU state saved. */
+#define ARCH_THREAD_FREQUENT_FPU	(1<<2)	/**< FPU is frequently used by the thread. */
 
 /** Offsets in arch_thread_t. */
 #define ARCH_THREAD_OFF_KERNEL_RSP	0x8

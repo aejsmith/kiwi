@@ -171,6 +171,13 @@ static void nm_fault(intr_frame_t *frame) {
 			x86_fpu_init();
 			curr_thread->arch.flags |= ARCH_THREAD_HAVE_FPU;
 		}
+
+		if(++curr_thread->arch.fpu_count >= 5) {
+			/* We're using the FPU frequently, set a flag which
+			 * causes the FPU state to be loaded during a thread
+			 * switch. */
+			curr_thread->arch.flags |= ARCH_THREAD_FREQUENT_FPU;
+		}
 	} else {
 		/* FPU usage is not allowed in kernel-mode. */
 		kmode_except_handler(frame);
