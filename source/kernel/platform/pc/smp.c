@@ -25,6 +25,7 @@
 #include <pc/mps.h>
 
 #include <cpu/cpu.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -171,7 +172,7 @@ static inline bool smp_detect_acpi(void) {
 }
 
 /** Detect all secondary CPUs in the system. */
-void smp_detect(void) {
+void platform_smp_detect(void) {
 	/* If the LAPIC is disabled, we cannot use SMP. */
 	if(!lapic_enabled()) {
 		kprintf(LOG_NOTICE, "cpu: disabling SMP due to lack of APIC support\n");

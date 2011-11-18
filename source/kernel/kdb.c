@@ -36,6 +36,7 @@
 #include <arch/page.h>
 
 #include <cpu/cpu.h>
+#include <cpu/smp.h>
 
 #include <lib/ctype.h>
 #include <lib/fixed_heap.h>
@@ -834,7 +835,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 #if CONFIG_SMP
 	/* Ask all other CPUs to pause execution. */
-	cpu_pause_all();
+	smp_pause_all();
 #endif
 	curr_kdb_frame = frame;
 
@@ -932,9 +933,9 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 	/* Run exit notifiers. */
 	notifier_run_unlocked(&kdb_exit_notifier, NULL, false);
 
-#if CONFIG_KERNEL_SMP
+#if CONFIG_SMP
 	/* Resume other CPUs. */
-	cpu_resume_all();
+	smp_resume_all();
 #endif
 	atomic_set(&kdb_running, 0);
 	local_irq_restore(state);
@@ -1644,6 +1645,7 @@ void kdb_register_command(const char *name, const char *description, kdb_command
 		ret = strcmp(name, exist->name);
 		if(ret == 0) {
 			kdb_free(cmd);
+			spinlock_unlock(&kdb_commands_lock);
 			return;
 		} else if(ret < 0) {
 			break;

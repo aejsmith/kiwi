@@ -62,7 +62,7 @@
 
 #include <arch/memory.h>
 
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 
@@ -1432,11 +1432,12 @@ static inline void do_switch_aspace(vm_aspace_t *as) {
 
 #if CONFIG_SMP
 /** Switch away from an address space. */
-static status_t switch_aspace_ipi(void *msg, unative_t _as, unative_t arg2, unative_t arg3, unative_t arg4) {
-	vm_aspace_t *as = (vm_aspace_t *)_as;
+static status_t switch_aspace_call_func(void *_as) {
+	vm_aspace_t *as = _as;
 
 	/* We may have switched address space between the check below and
-	 * receiving the IPI. Avoid an unnecessary switch in this case. */
+	 * receiving the interrupt. Avoid an unnecessary switch in this
+	 * case. */
 	if(as == curr_aspace) {
 		do_switch_aspace(as);
 	}
@@ -1474,8 +1475,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 				if(cpu == curr_cpu) {
 					do_switch_aspace(as);
 				} else {
-					ipi_send(cpu->id, switch_aspace_ipi, (unative_t)as,
-					         0, 0, 0, IPI_SEND_SYNC);
+					smp_call_single(cpu->id, switch_aspace_call_func, as, 0);
 				}
 			}
 		}

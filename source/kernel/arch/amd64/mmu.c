@@ -26,7 +26,7 @@
 #include <x86/mmu.h>
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 #include <lib/utility.h>
@@ -250,16 +250,16 @@ void mmu_context_lock(mmu_context_t *ctx) {
 }
 
 #if CONFIG_SMP
-/** TLB invalidation IPI handler.
- * @param d1		Address of MMU context structure.
+/** Remote TLB invalidation handler.
+ * @param _ctx		Address of MMU context structure.
  * @return		Always returns STATUS_SUCCESS. */
-static status_t tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unative_t d3, unative_t d4) {
-	mmu_context_t *ctx = (mmu_context_t *)((ptr_t)d1);
+static status_t tlb_invalidate_call_func(void *_ctx) {
+	mmu_context_t *ctx = _ctx;
 	size_t i;
 
 	/* Don't need to do anything if we aren't using the context - we may
 	 * have switched address space between the modifying CPU sending the
-	 * IPI and us receiving it. */
+	 * interrupt and us receiving it. */
 	if(IS_CURRENT_CTX(ctx)) {
 		/* If the number of pages to invalidate is larger than the size
 		 * of the address array, perform a complete TLB flush. */
@@ -282,7 +282,7 @@ static status_t tlb_invalidate_ipi(void *msg, unative_t d1, unative_t d2, unativ
 	return STATUS_SUCCESS;
 }
 
-/** Send invalidation IPIs.
+/** Perform remote TLB invalidation.
  * @param ctx		Context to send for. */
 static void mmu_context_flush(mmu_context_t *ctx) {
 	cpu_t *cpu;
@@ -296,19 +296,19 @@ static void mmu_context_flush(mmu_context_t *ctx) {
 	/* If this is the kernel context, perform changes on all other CPUs,
 	 * else perform it on each CPU using the map. */
 	if(IS_KERNEL_CTX(ctx)) {
-		ipi_broadcast(tlb_invalidate_ipi, (unative_t)ctx, 0, 0, 0, IPI_SEND_SYNC);
+		smp_call_broadcast(tlb_invalidate_call_func, ctx, 0);
 	} else {
 		/* TODO: Multicast. */
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
-			if(cpu == curr_cpu || !cpu->aspace || ctx != cpu->aspace->ctx) {
+			if(cpu == curr_cpu || !cpu->aspace || ctx != cpu->aspace->mmu) {
 				continue;
 			}
 
 			/* CPU is using this address space. */
-			if(ipi_send(cpu->id, tlb_invalidate_ipi, (unative_t)ctx,
-			            0, 0, 0, IPI_SEND_SYNC) != STATUS_SUCCESS) {
-				fatal("Could not send TLB invalidation IPI");
+			if(smp_call_single(cpu->id, tlb_invalidate_call_func, ctx,
+			                   0) != STATUS_SUCCESS) {
+				fatal("Could not perform remote TLB invalidation");
 			}
 		}
 	}
@@ -654,8 +654,7 @@ __init_text void arch_mmu_init(void) {
 	uint64_t *pdir;
 
 #if CONFIG_SMP
-	/* Reserve a low memory page for the AP bootstrap code. FIXME: This
-	 * needs freeing somewhere. */
+	/* Reserve a low memory page for the AP bootstrap code. */
 	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_FATAL, &ap_bootstrap_page);
 #endif
 

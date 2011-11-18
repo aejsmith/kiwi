@@ -64,7 +64,7 @@
 #include <arch/bitops.h>
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 
@@ -435,7 +435,7 @@ void sched_insert_thread(thread_t *thread) {
 		}
 #if CONFIG_SMP
 		if(thread->cpu != curr_cpu) {
-			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
+			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
 		}
 #endif
 	}

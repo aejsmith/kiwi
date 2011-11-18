@@ -33,12 +33,7 @@
 #include <mm/page.h>
 
 #include <assert.h>
-#include <kboot.h>
 #include <kernel.h>
-
-#if CONFIG_SMP
-KBOOT_BOOLEAN_OPTION("smp_disabled", "Disable SMP", false);
-#endif
 
 /** Boot CPU structure. */
 cpu_t boot_cpu;
@@ -64,9 +59,11 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
 	cpu->id = id;
 	cpu->state = state;
 
-	/* Initialise IPI information. */
-	list_init(&cpu->ipi_queue);
-	spinlock_init(&cpu->ipi_lock, "ipi_lock");
+#if CONFIG_SMP
+	/* Initialise SMP call information. */
+	list_init(&cpu->call_queue);
+	spinlock_init(&cpu->call_lock, "ipi_lock");
+#endif
 
 	/* Initialise timer information. */
 	list_init(&cpu->timers);
@@ -133,11 +130,4 @@ __init_text void cpu_init(void) {
 	/* Create the initial CPU array and add the boot CPU to it. */
 	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_FATAL);
 	cpus[boot_cpu.id] = &boot_cpu;
-
-#if CONFIG_SMP
-	/* Detect secondary CPUs. */
-	if(!kboot_boolean_option("smp_disabled")) {
-		smp_detect();
-	}
-#endif
 }

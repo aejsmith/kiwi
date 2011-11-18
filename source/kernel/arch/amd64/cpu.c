@@ -297,7 +297,12 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 		memcpy(&cpu_features, &features, sizeof(cpu_features));
 #if CONFIG_SMP
 	} else {
-		if(memcmp(&cpu_features, &features, sizeof(cpu_features)) != 0) {
+		if(cpu_features.highest_standard != features.highest_standard ||
+		   cpu_features.highest_extended != features.highest_extended ||
+		   cpu_features.standard_edx != features.standard_edx ||
+		   cpu_features.standard_ecx != features.standard_ecx ||
+		   cpu_features.extended_edx != features.extended_edx ||
+		   cpu_features.extended_ecx != features.extended_ecx) {
 			fatal("CPU %u has different feature set to boot CPU", cpu->id);
 		}
 	}

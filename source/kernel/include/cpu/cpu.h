@@ -27,6 +27,7 @@
 #include <sync/spinlock.h>
 
 struct sched_cpu;
+struct smp_call;
 struct thread;
 struct vm_aspace;
 
@@ -50,15 +51,18 @@ typedef struct cpu {
 	bool should_preempt;		/**< Whether the CPU should be preempted. */
 	bool idle;			/**< Whether the CPU is idle. */
 
-	/** IPI information. */
-	list_t ipi_queue;		/**< List of IPI messages sent to this CPU. */
-	bool ipi_sent;			/**< Whether it is necessary to send an IPI. */
-	spinlock_t ipi_lock;		/**< Lock to protect IPI queue. */
-
 	/** Timer information. */
 	list_t timers;			/**< List of active timers. */
 	bool timer_enabled;		/**< Whether the timer device is enabled. */
 	spinlock_t timer_lock;		/**< Timer list lock. */
+
+#if CONFIG_SMP
+	/** SMP call information. */
+	list_t call_queue;		/**< List of calls queued to this CPU. */
+	bool ipi_sent;			/**< Whether an IPI has been sent to the CPU. */
+	struct smp_call *curr_call;	/**< SMP call currently being handled. */
+	spinlock_t call_lock;		/**< Lock to protect call queue. */
+#endif
 } cpu_t;
 
 /** Expands to a pointer to the CPU structure of the current CPU.
@@ -74,9 +78,8 @@ extern list_t running_cpus;
 extern cpu_t **cpus;
 
 #if CONFIG_SMP
-extern volatile int cpu_boot_wait;
+extern cpu_t *cpu_register(cpu_id_t id, int state);
 #endif
-
 extern cpu_id_t cpu_id(void);
 extern void cpu_dump(cpu_t *cpu);
 
@@ -88,15 +91,5 @@ extern void cpu_early_init(void);
 extern void cpu_early_init_percpu(cpu_t *cpu);
 extern void cpu_init_percpu(void);
 extern void cpu_init(void);
-
-#if CONFIG_SMP
-extern void cpu_pause_all(void);
-extern void cpu_resume_all(void);
-extern void cpu_halt_all(void);
-
-extern cpu_t *cpu_register(cpu_id_t id, int state);
-extern void cpu_boot(cpu_t *cpu);
-extern void smp_detect(void);
-#endif
 
 #endif /* __CPU_CPU_H */

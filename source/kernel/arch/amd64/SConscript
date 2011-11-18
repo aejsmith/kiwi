@@ -19,7 +19,6 @@ Import('config', 'env')
 
 sources = FeatureSources(config, [
 	('SMP', 'ap_boot.bin.c'),
-	'arch.c',
 	'cpu.c',
 	'descriptor.c',
 	'elf.c',

@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		AMD64 SMP boot code.
+ * @brief		AMD64 SMP support.
  */
 
 #include <arch/barrier.h>
@@ -26,6 +26,7 @@
 #include <x86/mmu.h>
 
 #include <cpu/cpu.h>
+#include <cpu/smp.h>
 
 #include <lib/string.h>
 
@@ -39,29 +40,30 @@
 #include <time.h>
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
+extern atomic_t nmi_expected;
 extern void kmain_ap(cpu_t *cpu);
 
-/** Page reserved to copy the AP boostrap code to. */
+/** MMU context used by APs while booting. */
+static mmu_context_t *ap_mmu_context;
+
+/** Page reserved to copy the AP bootstrap code to. */
 phys_ptr_t ap_bootstrap_page = 0;
 
 /** Atomic variable for paused CPUs to wait on. */
-atomic_t cpu_pause_wait = 0;
+atomic_t smp_pause_wait = 0;
 
-/** Whether cpu_halt_all() has been called. */
-atomic_t cpu_halting_all = 0;
+/** Send an IPI interrupt to a single CPU.
+ * @param dest		Destination CPU ID. */
+void arch_smp_ipi(cpu_id_t dest) {
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
+}
 
-/**
- * Pause execution of other CPUs.
- *
- * Pauses execution of all CPUs other than the CPU that calls the function.
- * This is done using an NMI, so CPUs will be paused even if they have
- * interrupts disabled. Use cpu_resume_all() to resume CPUs after using this
- * function.
- */
-void cpu_pause_all(void) {
+/** Pause execution of all other CPUs. */
+void arch_smp_pause_all(void) {
 	cpu_t *cpu;
 
-	atomic_set(&cpu_pause_wait, 1);
+	atomic_set(&nmi_expected, 1);
+	atomic_set(&smp_pause_wait, 1);
 
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
@@ -71,16 +73,16 @@ void cpu_pause_all(void) {
 	}
 }
 
-/** Resume CPUs paused with cpu_pause_all(). */
-void cpu_resume_all(void) {
-	atomic_set(&cpu_pause_wait, 0);
+/** Resume CPUs paused with arch_smp_paulse_all(). */
+void arch_smp_resume_all(void) {
+	atomic_set(&smp_pause_wait, 0);
 }
 
 /** Halt all other CPUs. */
-void cpu_halt_all(void) {
+void arch_smp_halt_all(void) {
 	cpu_t *cpu;
 
-	atomic_set(&cpu_halting_all, 1);
+	atomic_set(&nmi_expected, 1);
 
 	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
 	 * during early boot, secondary CPUs do not have an IDT set up so
@@ -93,43 +95,46 @@ void cpu_halt_all(void) {
 	}
 }
 
+/** Prepare the SMP boot process. */
+void arch_smp_boot_prepare(void) {
+	void *mapping;
+
+	/* Copy the trampoline code to the page reserved by the paging
+	 * initialisation code. */
+	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
+	memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
+	phys_unmap(mapping, PAGE_SIZE, false);
+
+	/* Create a temporary MMU context for APs to use while booting which
+	 * identity maps the bootstrap code at its physical location. */
+	ap_mmu_context = mmu_context_create(MM_FATAL);
+	mmu_context_lock(ap_mmu_context);
+	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
+	mmu_context_unlock(ap_mmu_context);
+}
+
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
-void cpu_boot(cpu_t *cpu) {
-	mmu_context_t *mmu;
+void arch_smp_boot(cpu_t *cpu) {
 	useconds_t delay;
 	void *mapping;
 
 	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
 	assert(lapic_enabled());
-	cpu_boot_wait = 0;
 
 	/* Allocate a double fault stack for the new CPU. This is also used as
 	 * the initial stack while initialising the AP, before it enters the
 	 * scheduler. */
 	cpu->arch.double_fault_stack = heap_alloc(KSTACK_SIZE, MM_FATAL);
 
-	/* Create a temporary MMU context for the AP to use while booting.
-	 * This is necessary because the bootstrap code needs to be identity
-	 * mapped while it enables paging. */
-	mmu = mmu_context_create(MM_FATAL);
-	mmu_context_lock(mmu);
-	mmu_context_map(mmu, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
-	mmu_context_unlock(mmu);
-
-	/* Copy the trampoline code to the page reserved by the paging
-	 * initialisation code. */
-	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
-	memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
-
 	/* Fill in details required by the bootstrap code. */
+	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
 	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
 	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
 	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
-	*(uint32_t *)(mapping + 40) = (ptr_t)mmu->cr3;
-
+	*(uint32_t *)(mapping + 40) = (ptr_t)ap_mmu_context->pml4;
 	memory_barrier();
-	phys_unmap(mapping, PAGE_SIZE, true);
+	phys_unmap(mapping, PAGE_SIZE, false);
 
 	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
@@ -146,7 +151,7 @@ void cpu_boot(cpu_t *cpu) {
 	spin(10000);
 
 	/* If the CPU is up, then return. */
-	if(cpu_boot_wait) {
+	if(smp_boot_wait) {
 		return;
 	}
 
@@ -154,12 +159,20 @@ void cpu_boot(cpu_t *cpu) {
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
 	for(delay = 0; delay < 5000000; delay += 10000) {
-		if(cpu_boot_wait) {
-			mmu_context_destroy(mmu);
+		if(smp_boot_wait) {
 			return;
 		}
 		spin(10000);
 	}
 
 	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
+}
+
+/** Clean up after secondary CPUs have been booted. */
+void arch_smp_boot_cleanup(void) {
+	/* Destroy the temporary MMU context. */
+	mmu_context_destroy(ap_mmu_context);
+
+	/* Free the bootstrap page. */
+	phys_free(ap_bootstrap_page, PAGE_SIZE);
 }

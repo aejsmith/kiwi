@@ -20,7 +20,7 @@
  */
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <io/fs.h>
 
@@ -38,9 +38,9 @@
 bool shutdown_in_progress = false;
 
 #if CONFIG_SMP
-/** IPI handler to halt a CPU. */
-static status_t shutdown_ipi_handler(void *message, unative_t a1, unative_t a2, unative_t a3, unative_t a4) {
-	ipi_acknowledge(message, STATUS_SUCCESS);
+/** SMP call handler to halt a CPU. */
+static status_t shutdown_call_func(void *data) {
+	smp_call_acknowledge(STATUS_SUCCESS);
 	cpu_halt();
 }
 #endif
@@ -59,8 +59,8 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	kprintf(LOG_NOTICE, "system: unmounting filesystems...\n");
 	fs_shutdown();
 #if CONFIG_SMP
-	kprintf(LOG_NOTICE, "system: shutting down secondary CPUs...\n");
-	ipi_broadcast(shutdown_ipi_handler, 0, 0, 0, 0, IPI_SEND_SYNC);
+	kprintf(LOG_NOTICE, "system: shutting down other CPUs...\n");
+	smp_call_broadcast(shutdown_call_func, NULL, 0);
 #endif
 
 	switch(action) {

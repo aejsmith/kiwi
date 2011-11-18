@@ -22,6 +22,7 @@
 #include <arch/frame.h>
 
 #include <cpu/cpu.h>
+#include <cpu/smp.h>
 
 #include <kernel/system.h>
 
@@ -76,7 +77,7 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 	if(atomic_inc(&in_fatal) == 0) {
 #if CONFIG_SMP
 		/* Halt all other CPUs. */
-		cpu_halt_all();
+		smp_halt_all();
 #endif
 		/* Run callback functions registered. */
 		notifier_run_unlocked(&fatal_notifier, NULL, false);

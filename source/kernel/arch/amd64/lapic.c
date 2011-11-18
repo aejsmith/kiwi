@@ -26,7 +26,9 @@
 #include <x86/lapic.h>
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
+
+#include <lib/string.h>
 
 #include <mm/phys.h>
 
@@ -40,10 +42,6 @@
 KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage (disables SMP)", false);
 #else
 KBOOT_BOOLEAN_OPTION("lapic_disabled", "Disable Local APIC usage", false);
-#endif
-
-#if CONFIG_SMP
-extern void ipi_process_pending(void);
 #endif
 
 /** Local APIC mapping. If NULL the LAPIC is not present. */
@@ -78,10 +76,10 @@ static void lapic_spurious_handler(intr_frame_t *frame) {
 }
 
 #if CONFIG_SMP
-/** IPI message interrupt handler.
+/** IPI interrupt handler.
  * @param frame		Interrupt stack frame. */
 static void lapic_ipi_handler(intr_frame_t *frame) {
-	ipi_process_pending();
+	smp_ipi_handler();
 	lapic_eoi();
 }
 #endif
@@ -154,14 +152,6 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 
 	local_irq_restore(state);
 }
-
-#if CONFIG_SMP
-/** Send an IPI interrupt to a single CPU.
- * @param dest		Destination CPU ID. */
-void ipi_arch_interrupt(cpu_id_t dest) {
-	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
-}
-#endif
 
 /** Function to calculate the LAPIC timer frequency.
  * @return		Calculated frequency. */

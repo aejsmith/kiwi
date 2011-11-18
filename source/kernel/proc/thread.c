@@ -22,7 +22,7 @@
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <lib/id_alloc.h>
 #include <lib/string.h>
@@ -358,10 +358,10 @@ void thread_kill(thread_t *thread) {
 		/* Interrupt the thread if it is in interruptible sleep. */
 		thread_interrupt_unsafe(thread);
 #if CONFIG_SMP
-		/* If the thread is on a different CPU, send the CPU an IPI
-		 * so that it will check the thread killed state. */
+		/* If the thread is on a different CPU, interrupt the CPU so
+		 * that it will check the thread killed state. */
 		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
-			ipi_send(thread->cpu->id, NULL, 0, 0, 0, 0, 0);
+			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
 		}
 #endif
 	}

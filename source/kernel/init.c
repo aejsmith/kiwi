@@ -22,7 +22,7 @@
 #include <arch/memory.h>
 
 #include <cpu/cpu.h>
-#include <cpu/ipi.h>
+#include <cpu/smp.h>
 
 #include <io/device.h>
 #include <io/fs.h>
@@ -274,21 +274,6 @@ static __init_text void load_modules(void) {
 	}
 }
 
-#if CONFIG_SMP
-/** Boot secondary CPUs. */
-static __init_text void smp_boot(void) {
-	cpu_id_t i;
-
-	for(i = 0; i <= highest_cpu_id; i++) {
-		if(cpus[i] && cpus[i]->state == CPU_OFFLINE) {
-			cpu_boot(cpus[i]);
-		}
-	}
-
-	cpu_boot_wait = 2;
-}
-#endif
-
 /** Second-stage intialization thread.
  * @param arg1		Unused.
  * @param arg2		Unused. */
@@ -434,10 +419,11 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Properly initialise the CPU subsystem, and detect other CPUs. */
 	cpu_init();
-	slab_late_init();
 #if CONFIG_SMP
-	ipi_init();
+	smp_init();
 #endif
+	/* Initialise the slab per-CPU layer. */
+	slab_late_init();
 
 	/* Perform other initialisation tasks. */
 	symbol_init();
@@ -468,11 +454,10 @@ static __init_text void kmain_bsp_bottom(void) {
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
 __init_text void kmain_ap(cpu_t *cpu) {
-#if 0
-	/* Switch to the kernel page map and do architecture-specific
-	 * initialisation of this CPU. */
-	page_map_switch(&kernel_page_map);
-	arch_ap_init(cpu);
+	/* Switch to the kernel MMU context and perform CPU initialisation. */
+	mmu_init_percpu();
+	cpu_early_init_percpu(cpu);
+	cpu_init_percpu();
 
 	/* Initialise the scheduler. */
 	sched_init();
@@ -480,16 +465,14 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Signal that we're up and add ourselves to the running CPU list. */
 	cpu->state = CPU_RUNNING;
 	list_append(&running_cpus, &curr_cpu->header);
-	cpu_boot_wait = 1;
+	smp_boot_wait = 1;
 
 	/* Wait for remaining CPUs to be brought up. */
-	while(cpu_boot_wait != 2) {
+	while(smp_boot_wait != 2) {
 		cpu_spin_hint();
 	}
 
 	/* Begin scheduling threads. */
 	sched_enter();
-#endif
-	while(true);
 }
 #endif
