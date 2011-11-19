@@ -133,7 +133,10 @@ static void nmi_handler(intr_frame_t *frame) {
 #if CONFIG_SMP
 	if(atomic_get(&nmi_expected)) {
 		if(atomic_get(&smp_pause_wait)) {
-			while(atomic_get(&smp_pause_wait));
+			while(atomic_get(&smp_pause_wait)) {
+				cpu_spin_hint();
+			}
+
 			atomic_set(&nmi_expected, 0);
 			return;
 		} else {
