@@ -229,6 +229,8 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
 	if(!(flags & SMP_CALL_ASYNC)) {
 		acked = 1;
 		call->result = &acked;
+	} else {
+		call->result = NULL;
 	}
 
 	/* Queue the call in the CPU's call queue and send it an IPI. */
@@ -296,6 +298,8 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
 		if(!(flags & SMP_CALL_ASYNC)) {
 			atomic_inc(&acked);
 			call->result = &acked;
+		} else {
+			call->result = NULL;
 		}
 
 		/* Queue the call in the CPU's call queue and send it an IPI. */
