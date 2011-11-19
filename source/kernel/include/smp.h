@@ -35,7 +35,7 @@
  *			or multicast calls, no value will be returned. */
 typedef status_t (*smp_call_func_t)(void *arg);
 
-extern volatile unsigned smp_boot_wait;
+extern volatile unsigned smp_boot_status;
 
 extern void arch_smp_ipi(cpu_id_t dest);
 
@@ -45,6 +45,12 @@ extern status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, 
 extern void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags);
 //extern void smp_call_multicast(cpu_set_t *cpus, smp_call_func_t func, void *arg, unsigned flags);
 extern void smp_call_acknowledge(status_t status);
+
+/** Values for smp_boot_status (arch can use anything > 3). */
+#define SMP_BOOT_INIT		0	/**< Boot process has started. */
+#define SMP_BOOT_ALIVE		1	/**< AP has reached kmain_ap(). */
+#define SMP_BOOT_BOOTED		2	/**< AP has completed kmain_ap(). */
+#define SMP_BOOT_COMPLETE	3	/**< All APs have been booted. */
 
 extern void arch_smp_boot_prepare(void);
 extern void arch_smp_boot(cpu_t *cpu);

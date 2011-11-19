@@ -24,6 +24,7 @@
 
 #include <x86/lapic.h>
 #include <x86/mmu.h>
+#include <x86/tsc.h>
 
 #include <lib/string.h>
 
@@ -53,7 +54,7 @@ void arch_smp_ipi(cpu_id_t dest) {
 }
 
 /** Prepare the SMP boot process. */
-void arch_smp_boot_prepare(void) {
+__init_text void arch_smp_boot_prepare(void) {
 	void *mapping;
 
 	/* Copy the trampoline code to the page reserved by the paging
@@ -70,10 +71,47 @@ void arch_smp_boot_prepare(void) {
 	mmu_context_unlock(ap_mmu_context);
 }
 
+/** Start the target CPU and wait until it is alive.
+ * @param id		CPU ID to boot.
+ * @return		Whether the CPU responded in time. */
+static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
+	useconds_t delay;
+
+	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_INIT, 0x00);
+	spin(10000);
+
+	/* Send a SIPI. The vector argument specifies where to look for the
+	 * bootstrap code, as the SIPI will start execution from 0x000VV000,
+	 * where VV is the vector specified in the IPI. We don't do what the
+	 * MP Specification says here because QEMU assumes that if a CPU is
+	 * halted (even by the 'hlt' instruction) then it can accept SIPIs.
+	 * If the CPU reaches the idle loop before the second SIPI is sent, it
+	 * will fault. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
+	spin(10000);
+
+	/* If the CPU is up, then return. */
+	if(smp_boot_status > SMP_BOOT_INIT) {
+		return true;
+	}
+
+	/* Send a second SIPI and then check in 10ms intervals to see if it
+	 * has booted. If it hasn't booted after 5 seconds, fail. */
+	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
+	for(delay = 0; delay < 5000000; delay += 10000) {
+		if(smp_boot_status > SMP_BOOT_INIT) {
+			return true;
+		}
+		spin(10000);
+	}
+
+	return false;
+}
+
 /** Boot a secondary CPU.
  * @param cpu		CPU to boot. */
-void arch_smp_boot(cpu_t *cpu) {
-	useconds_t delay;
+__init_text void arch_smp_boot(cpu_t *cpu) {
 	void *mapping;
 
 	kprintf(LOG_DEBUG, "cpu: booting CPU %" PRIu32 "...\n", cpu->id);
@@ -93,40 +131,22 @@ void arch_smp_boot(cpu_t *cpu) {
 	memory_barrier();
 	phys_unmap(mapping, PAGE_SIZE, false);
 
-	/* Send an INIT IPI to the AP to reset its state and delay 10ms. */
-	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_INIT, 0x00);
-	spin(10000);
-
-	/* Send a SIPI. The vector argument specifies where to look for the
-	 * bootstrap code, as the SIPI will start execution from 0x000VV000,
-	 * where VV is the vector specified in the IPI. We don't do what the
-	 * MP Specification says here because QEMU assumes that if a CPU is
-	 * halted (even by the 'hlt' instruction) then it can accept SIPIs.
-	 * If the CPU reaches the idle loop before the second SIPI is sent, it
-	 * will fault. */
-	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
-	spin(10000);
-
-	/* If the CPU is up, then return. */
-	if(smp_boot_wait) {
-		return;
+	/* Kick the CPU into life. */
+	if(!boot_cpu_and_wait(cpu->id)) {
+		fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
 	}
 
-	/* Send a second SIPI and then check in 10ms intervals to see if it
-	 * has booted. If it hasn't booted after 5 seconds, fail. */
-	lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
-	for(delay = 0; delay < 5000000; delay += 10000) {
-		if(smp_boot_wait) {
-			return;
-		}
-		spin(10000);
-	}
+	/* The TSC of the AP must be synchronised against the boot CPU. */
+	tsc_init_source();
 
-	fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
+	/* Finally, wait for the CPU to complete its initialisation. */
+	while(smp_boot_status != SMP_BOOT_BOOTED) {
+		cpu_spin_hint();
+	}
 }
 
 /** Clean up after secondary CPUs have been booted. */
-void arch_smp_boot_cleanup(void) {
+__init_text void arch_smp_boot_cleanup(void) {
 	/* Destroy the temporary MMU context. */
 	mmu_context_destroy(ap_mmu_context);
 

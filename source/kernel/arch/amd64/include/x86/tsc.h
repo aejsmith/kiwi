@@ -30,6 +30,9 @@ static inline uint64_t x86_rdtsc(void) {
 	return ((uint64_t)high << 32) | low;
 }
 
-extern void tsc_init();
+extern void tsc_init_target(void);
+#if CONFIG_SMP
+extern void tsc_init_source(void);
+#endif
 
 #endif /* __X86_TSC_H */

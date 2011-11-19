@@ -54,8 +54,8 @@ static SPINLOCK_DECLARE(smp_call_lock);
 /** Whether SMP call system is enabled. */
 static bool smp_call_enabled = false;
 
-/** Waiting variable for secondary CPU boot. */
-volatile unsigned smp_boot_wait = 0;
+/** Variable used to synchronise the stages of the SMP boot process. */
+volatile unsigned smp_boot_status = 0;
 
 /** Get a free SMP call structure.
  * @return		SMP call structure. */
@@ -381,19 +381,23 @@ __init_text void smp_init(void) {
 /** Boot secondary CPUs. */
 __init_text void smp_boot(void) {
 	cpu_id_t i;
+	bool state;
 
+	state = local_irq_disable();
 	arch_smp_boot_prepare();
 
 	for(i = 0; i <= highest_cpu_id; i++) {
 		if(cpus[i] && cpus[i]->state == CPU_OFFLINE) {
-			smp_boot_wait = 0;
+			smp_boot_status = SMP_BOOT_INIT;
 			arch_smp_boot(cpus[i]);
 		}
 	}
 
 	arch_smp_boot_cleanup();
 
-	/* Set to 2 to indicate to the newly-booted CPUs that all CPUs are up
-	 * and they can start scheduling threads (see kmain_ap()). */
-	smp_boot_wait = 2;
+	/* Indicate to the newly-booted CPUs that all CPUs are up and they
+	 * can start scheduling threads (see kmain_ap()). */
+	smp_boot_status = SMP_BOOT_COMPLETE;
+
+	local_irq_restore(state);
 }

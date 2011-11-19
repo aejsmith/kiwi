@@ -353,7 +353,7 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	syscall_init();
 
 	/* Configure the TSC offset for system_time(). */
-	tsc_init();
+	tsc_init_target();
 }
 
 /** Display a list of running CPUs.

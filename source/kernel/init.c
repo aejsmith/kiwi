@@ -453,6 +453,9 @@ static __init_text void kmain_bsp_bottom(void) {
 /** Kernel entry point for a secondary CPU.
  * @param cpu		Pointer to CPU structure for the CPU. */
 __init_text void kmain_ap(cpu_t *cpu) {
+	/* Indicate that we have reached the kernel. */
+	smp_boot_status = SMP_BOOT_ALIVE;
+
 	/* Switch to the kernel MMU context and perform CPU initialisation. */
 	mmu_init_percpu();
 	cpu_early_init_percpu(cpu);
@@ -464,10 +467,10 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Signal that we're up and add ourselves to the running CPU list. */
 	cpu->state = CPU_RUNNING;
 	list_append(&running_cpus, &curr_cpu->header);
-	smp_boot_wait = 1;
+	smp_boot_status = SMP_BOOT_BOOTED;
 
 	/* Wait for remaining CPUs to be brought up. */
-	while(smp_boot_wait != 2) {
+	while(smp_boot_status != SMP_BOOT_COMPLETE) {
 		cpu_spin_hint();
 	}
 
