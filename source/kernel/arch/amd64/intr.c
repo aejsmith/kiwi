@@ -40,20 +40,11 @@
 #include <kernel.h>
 #include <setjmp.h>
 
-#if CONFIG_SMP
-extern atomic_t smp_pause_wait;
-#endif
-
 extern void kdb_db_handler(intr_frame_t *frame);
 extern void intr_handler(intr_frame_t *frame);
 
 /** Array of interrupt handling routines. */
 intr_handler_t intr_table[IDT_ENTRY_COUNT];
-
-#if CONFIG_SMP
-/** Whether an NMI is currently expected. */
-atomic_t nmi_expected = 0;
-#endif
 
 /** String names for CPU exceptions. */
 static const char *except_strings[] = {
@@ -131,17 +122,12 @@ static void de_fault(intr_frame_t *frame) {
  * @param frame		Interrupt stack frame. */
 static void nmi_handler(intr_frame_t *frame) {
 #if CONFIG_SMP
-	if(atomic_get(&nmi_expected)) {
-		if(atomic_get(&smp_pause_wait)) {
-			while(atomic_get(&smp_pause_wait)) {
-				cpu_spin_hint();
-			}
-
-			atomic_set(&nmi_expected, 0);
-			return;
-		} else {
-			cpu_halt();
+	if(atomic_get(&kdb_running) > 0) {
+		while(atomic_get(&kdb_running) > 0) {
+			cpu_spin_hint();
 		}
+
+		return;
 	}
 #endif
 	_fatal(frame, "Received unexpected NMI");

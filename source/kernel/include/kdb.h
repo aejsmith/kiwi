@@ -97,6 +97,9 @@ extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *addrp, size_t *sizep,
 extern void arch_kdb_backtrace(struct thread *thread, kdb_backtrace_cb_t cb);
 extern bool arch_kdb_register_value(const char *name, size_t len, unative_t *regp);
 extern void arch_kdb_dump_registers(void);
+#if CONFIG_SMP
+extern void arch_kdb_trap_cpus(void);
+#endif
 
 extern kdb_status_t kdb_main(kdb_reason_t reason, struct intr_frame *frame, unsigned index);
 extern void kdb_except_handler(const char *name, struct intr_frame *frame);

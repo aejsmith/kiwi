@@ -347,32 +347,6 @@ void smp_call_acknowledge(status_t status) {
 	}
 }
 
-/**
- * Pause execution of all other CPUs.
- *
- * Pauses execution of all CPUs other than the CPU that calls the function.
- * This is done immediately, overriding local IRQ delivery state on the CPUs.
- * Use smp_resume_all() to resume CPUs after using this function.
- */
-void smp_pause_all(void) {
-	arch_smp_pause_all();
-}
-
-/** Resume CPUs paused with smp_pause_all(). */
-void smp_resume_all(void) {
-	arch_smp_resume_all();
-}
-
-/**
- * Halt all other CPUs.
- *
- * Immediately halts execution of all CPUs other than the current CPU,
- * overriding local IRQ delivery state on the CPUs.
- */
-void smp_halt_all(void) {
-	arch_smp_halt_all();
-}
-
 /** Initialise the SMP call system and detect secondary CPUs. */
 __init_text void smp_init(void) {
 	smp_call_t *calls;

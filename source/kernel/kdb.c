@@ -835,7 +835,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 #if CONFIG_SMP
 	/* Ask all other CPUs to pause execution. */
-	smp_pause_all();
+	arch_kdb_trap_cpus();
 #endif
 	curr_kdb_frame = frame;
 
@@ -933,10 +933,6 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 	/* Run exit notifiers. */
 	notifier_run_unlocked(&kdb_exit_notifier, NULL, false);
 
-#if CONFIG_SMP
-	/* Resume other CPUs. */
-	smp_resume_all();
-#endif
 	atomic_set(&kdb_running, 0);
 	local_irq_restore(state);
 	return ret;

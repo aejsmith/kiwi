@@ -40,7 +40,6 @@
 #include <time.h>
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];
-extern atomic_t nmi_expected;
 extern void kmain_ap(cpu_t *cpu);
 
 /** MMU context used by APs while booting. */
@@ -49,50 +48,10 @@ static mmu_context_t *ap_mmu_context;
 /** Page reserved to copy the AP bootstrap code to. */
 phys_ptr_t ap_bootstrap_page = 0;
 
-/** Atomic variable for paused CPUs to wait on. */
-atomic_t smp_pause_wait = 0;
-
 /** Send an IPI interrupt to a single CPU.
  * @param dest		Destination CPU ID. */
 void arch_smp_ipi(cpu_id_t dest) {
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, (uint32_t)dest, LAPIC_IPI_FIXED, LAPIC_VECT_IPI);
-}
-
-/** Pause execution of all other CPUs. */
-void arch_smp_pause_all(void) {
-	cpu_t *cpu;
-
-	atomic_set(&nmi_expected, 1);
-	atomic_set(&smp_pause_wait, 1);
-
-	LIST_FOREACH(&running_cpus, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_id()) {
-			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
-		}
-	}
-}
-
-/** Resume CPUs paused with arch_smp_paulse_all(). */
-void arch_smp_resume_all(void) {
-	atomic_set(&smp_pause_wait, 0);
-}
-
-/** Halt all other CPUs. */
-void arch_smp_halt_all(void) {
-	cpu_t *cpu;
-
-	atomic_set(&nmi_expected, 1);
-
-	/* Have to do this rather than just use LAPIC_IPI_DEST_ALL, because
-	 * during early boot, secondary CPUs do not have an IDT set up so
-	 * sending them an NMI IPI results in a triple fault. */
-	LIST_FOREACH(&running_cpus, iter) {
-		cpu = list_entry(iter, cpu_t, header);
-		if(cpu->id != cpu_id()) {
-			lapic_ipi(LAPIC_IPI_DEST_SINGLE, cpu->id, LAPIC_IPI_NMI, 0);
-		}
-	}
 }
 
 /** Prepare the SMP boot process. */

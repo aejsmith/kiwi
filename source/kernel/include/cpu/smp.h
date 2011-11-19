@@ -46,19 +46,11 @@ extern void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags);
 //extern void smp_call_multicast(cpu_set_t *cpus, smp_call_func_t func, void *arg, unsigned flags);
 extern void smp_call_acknowledge(status_t status);
 
-extern void arch_smp_pause_all(void);
-extern void arch_smp_resume_all(void);
-extern void arch_smp_halt_all(void);
-
 extern void arch_smp_boot_prepare(void);
 extern void arch_smp_boot(cpu_t *cpu);
 extern void arch_smp_boot_cleanup(void);
 
 extern void platform_smp_detect(void);
-
-extern void smp_pause_all(void);
-extern void smp_resume_all(void);
-extern void smp_halt_all(void);
 
 extern void smp_init(void);
 extern void smp_boot(void);
