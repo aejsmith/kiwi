@@ -29,13 +29,12 @@
 #include <x86/lapic.h>
 #include <x86/tsc.h>
 
-#include <cpu/cpu.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
 #include <pc/pit.h>
 
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
 

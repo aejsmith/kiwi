@@ -19,8 +19,8 @@
  * @brief		CPU management.
  */
 
-#ifndef __CPU_CPU_H
-#define __CPU_CPU_H
+#ifndef __CPU_H
+#define __CPU_H
 
 #include <arch/cpu.h>
 #include <lib/list.h>
@@ -92,4 +92,4 @@ extern void cpu_early_init_percpu(cpu_t *cpu);
 extern void cpu_init_percpu(void);
 extern void cpu_init(void);
 
-#endif /* __CPU_CPU_H */
+#endif /* __CPU_H */

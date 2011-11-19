@@ -63,9 +63,6 @@
 
 #include <arch/bitops.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -76,8 +73,10 @@
 #include <proc/thread.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <smp.h>
 #include <status.h>
 #include <time.h>
 

@@ -19,15 +19,13 @@
  * @brief		Symmetric Multi-Processing (SMP) support.
  */
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/refcount.h>
 
 #include <mm/malloc.h>
 
 #include <assert.h>
 #include <kboot.h>
+#include <smp.h>
 #include <status.h>
 
 /** Boot option to disable SMP. */

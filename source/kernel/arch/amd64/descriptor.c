@@ -25,9 +25,9 @@
 #include <x86/descriptor.h>
 #include <x86/intr.h>
 
-#include <cpu/cpu.h>
-
 #include <lib/string.h>
+
+#include <cpu.h>
 
 /** ISR array in entry.S. Each handler is aligned to 16 bytes. */
 extern uint8_t isr_array[IDT_ENTRY_COUNT][16];

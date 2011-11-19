@@ -25,9 +25,6 @@
 #include <x86/cpu.h>
 #include <x86/mmu.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -39,8 +36,10 @@
 #include <proc/thread.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <smp.h>
 #include <status.h>
 
 /** Check if an MMU context is the kernel context. */

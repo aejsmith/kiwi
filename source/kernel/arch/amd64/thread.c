@@ -24,13 +24,12 @@
 #include <x86/cpu.h>
 #include <x86/fpu.h>
 
-#include <cpu/cpu.h>
-
 #include <mm/safe.h>
 
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <cpu.h>
 #include <status.h>
 
 extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg) __noreturn;

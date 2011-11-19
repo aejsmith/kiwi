@@ -25,14 +25,13 @@
  * value of this pointer.
  */
 
-#include <cpu/cpu.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
 #include <mm/page.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kernel.h>
 
 /** Boot CPU structure. */

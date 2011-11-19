@@ -21,9 +21,6 @@
 
 #include <arch/memory.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/id_alloc.h>
 #include <lib/string.h>
 
@@ -43,8 +40,10 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
+#include <smp.h>
 #include <status.h>
 #include <time.h>
 

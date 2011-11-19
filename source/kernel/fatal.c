@@ -21,8 +21,6 @@
 
 #include <arch/frame.h>
 
-#include <cpu/cpu.h>
-
 #include <kernel/system.h>
 
 #include <lib/printf.h>
@@ -33,6 +31,7 @@
 
 #include <assert.h>
 #include <console.h>
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <status.h>

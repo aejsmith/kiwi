@@ -21,11 +21,10 @@
 
 #include <arch/barrier.h>
 
-#include <cpu/cpu.h>
-
 #include <sync/spinlock.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <status.h>
 
 /** Internal spinlock locking code.

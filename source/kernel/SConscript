@@ -24,9 +24,6 @@ sources = FeatureSources(config, [
 	'console/font.c',
 	'console/logo.c',
 
-	'cpu/cpu.c',
-	('SMP', 'cpu/smp.c'),
-
 	'device/irq.c',
 
 	'io/context.c',
@@ -80,6 +77,7 @@ sources = FeatureSources(config, [
 	'sync/spinlock.c',
 	'sync/waitq.c',
 
+	'cpu.c',
 	'dpc.c',
 	'elf.c',
 	'fatal.c',
@@ -89,6 +87,7 @@ sources = FeatureSources(config, [
 	'module.c',
 	'object.c',
 	'shutdown.c',
+	('SMP', 'smp.c'),
 	'symbol.c',
 	'syscall_table.c',
 	'time.c',

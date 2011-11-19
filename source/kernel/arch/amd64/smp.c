@@ -25,9 +25,6 @@
 #include <x86/lapic.h>
 #include <x86/mmu.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 
 #include <mm/heap.h>
@@ -37,6 +34,7 @@
 
 #include <assert.h>
 #include <kernel.h>
+#include <smp.h>
 #include <time.h>
 
 extern char __ap_trampoline_start[], __ap_trampoline_end[];

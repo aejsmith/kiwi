@@ -19,8 +19,6 @@
  * @brief		Time handling functions.
  */
 
-#include <cpu/cpu.h>
-
 #include <kernel/time.h>
 
 #include <lib/notifier.h>
@@ -34,6 +32,7 @@
 #include <sync/waitq.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <dpc.h>
 #include <kdb.h>
 #include <kernel.h>

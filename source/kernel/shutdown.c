@@ -19,9 +19,6 @@
  * @brief		System shutdown code.
  */
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <io/fs.h>
 
 #include <kernel/system.h>
@@ -31,7 +28,9 @@
 
 #include <security/cap.h>
 
+#include <cpu.h>
 #include <kernel.h>
+#include <smp.h>
 #include <status.h>
 
 /** Whether a system shutdown is in progress. */

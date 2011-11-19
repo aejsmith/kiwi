@@ -21,9 +21,6 @@
 
 #include <arch/memory.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <io/device.h>
 #include <io/fs.h>
 
@@ -47,6 +44,7 @@
 
 #include <assert.h>
 #include <console.h>
+#include <cpu.h>
 #include <dpc.h>
 #include <kboot.h>
 #include <kdb.h>
@@ -55,6 +53,7 @@
 #include <module.h>
 #include <object.h>
 #include <setjmp.h>
+#include <smp.h>
 #include <status.h>
 #include <symbol.h>
 #include <time.h>

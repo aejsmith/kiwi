@@ -62,8 +62,6 @@
 
 #include <arch/memory.h>
 
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 
 #include <mm/malloc.h>
@@ -77,6 +75,7 @@
 
 #include <assert.h>
 #include <kdb.h>
+#include <smp.h>
 #include <status.h>
 
 #include "vm_priv.h"

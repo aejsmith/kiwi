@@ -25,17 +25,16 @@
 #include <x86/intr.h>
 #include <x86/lapic.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 
 #include <mm/phys.h>
 
 #include <pc/pit.h>
 
+#include <cpu.h>
 #include <kboot.h>
 #include <kernel.h>
+#include <smp.h>
 #include <time.h>
 
 #if CONFIG_SMP

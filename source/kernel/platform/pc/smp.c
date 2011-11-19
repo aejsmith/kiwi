@@ -24,9 +24,6 @@
 #include <pc/acpi.h>
 #include <pc/mps.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -34,6 +31,7 @@
 
 #include <assert.h>
 #include <kernel.h>
+#include <smp.h>
 
 /** Search for the MP Floating Pointer in a given range.
  * @param start		Start of range to check.

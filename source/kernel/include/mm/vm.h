@@ -22,11 +22,11 @@
 #ifndef __MM_VM_H
 #define __MM_VM_H
 
-#include <cpu/cpu.h>
 #include <kernel/vm.h>
 #include <lib/utility.h>
 #include <mm/mmu.h>
 #include <sync/mutex.h>
+#include <cpu.h>
 #include <object.h>
 
 struct vm_region;

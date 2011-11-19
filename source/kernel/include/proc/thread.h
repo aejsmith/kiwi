@@ -25,8 +25,6 @@
 #include <arch/setjmp.h>
 #include <arch/thread.h>
 
-#include <cpu/cpu.h>
-
 #include <kernel/signal.h>
 #include <kernel/thread.h>
 
@@ -37,6 +35,7 @@
 
 #include <sync/spinlock.h>
 
+#include <cpu.h>
 #include <object.h>
 #include <time.h>
 

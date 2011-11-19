@@ -35,9 +35,6 @@
 #include <arch/kdb.h>
 #include <arch/page.h>
 
-#include <cpu/cpu.h>
-#include <cpu/smp.h>
-
 #include <lib/ctype.h>
 #include <lib/fixed_heap.h>
 #include <lib/printf.h>
@@ -48,6 +45,7 @@
 #include <sync/spinlock.h>
 
 #include <console.h>
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <setjmp.h>

@@ -22,8 +22,7 @@
 #include <x86/cpu.h>
 #include <x86/tsc.h>
 
-#include <cpu/cpu.h>
-
+#include <cpu.h>
 #include <time.h>
 
 /** Get the system time (number of microseconds since boot).

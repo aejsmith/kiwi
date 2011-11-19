@@ -19,10 +19,10 @@
  * @brief		Symmetric Multi-Processing (SMP) support.
  */
 
-#ifndef __CPU_SMP_H
-#define __CPU_SMP_H
+#ifndef __SMP_H
+#define __SMP_H
 
-#include <cpu/cpu.h>
+#include <cpu.h>
 
 #ifdef CONFIG_SMP
 
@@ -57,4 +57,4 @@ extern void smp_boot(void);
 
 #endif /* CONFIG_SMP */
 
-#endif /* __CPU_SMP_H */
+#endif /* __SMP_H */

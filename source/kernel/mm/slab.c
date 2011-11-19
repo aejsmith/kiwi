@@ -34,8 +34,6 @@
  * @todo		Allocation hash table resizing.
  */
 
-#include <cpu/cpu.h>
-
 #include <lib/string.h>
 #include <lib/utility.h>
 
@@ -47,6 +45,7 @@
 #include <proc/thread.h>
 
 #include <assert.h>
+#include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
 #include <lrm.h>
