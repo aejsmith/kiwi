@@ -359,6 +359,9 @@ page_t *page_alloc(int mmflag) {
 		/* TODO: Try harder. */
 		fatal("Oh god help");
 	}
+
+	mutex_unlock(&free_page_lock);
+	thread_unwire(curr_thread);
 	return NULL;
 }
 
