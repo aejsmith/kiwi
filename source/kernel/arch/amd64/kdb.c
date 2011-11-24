@@ -406,6 +406,6 @@ void arch_kdb_trap_cpus(void) {
 #endif
 
 /** Register architecture-specific KDB commands. */
-__init_text void arch_kdb_init() {
+__init_text void arch_kdb_init(void) {
 	/* Nothing happens. */
 }

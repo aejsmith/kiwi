@@ -22,8 +22,7 @@
  * memory layout is as follows:
  *  0x0000000000000000-0x00007FFFFFFFFFFF - 128TB - Userspace memory.
  *  0xFFFFFF8000000000-0xFFFFFFBFFFFFFFFF - 256GB - Mapped to physical memory.
- *  0xFFFFFFC000000000-0xFFFFFFDFFFFFFFFF - 128GB - Kernel heap.
- *  0xFFFFFFE000000000-0xFFFFFFFF7FFFFFFF - 126GB - Kernel VM region.
+ *  0xFFFFFFC000000000-0xFFFFFFFF7FFFFFFF - 254GB - Kernel heap.
  *  0xFFFFFFFF80000000-0xFFFFFFFFFFFFFFFF - 2GB   - Kernel image/modules.
  */
 
@@ -40,9 +39,7 @@
 #define KERNEL_PMAP_SIZE	0x0000004000000000	/**< Physical map area size (256GB). */
 #define KERNEL_PMAP_OFFSET	0x0000000000000000	/**< Physical map area offset. */
 #define KERNEL_HEAP_BASE	0xFFFFFFC000000000	/**< Kernel heap base. */
-#define KERNEL_HEAP_SIZE	0x0000002000000000	/**< Kernel heap size (128GB). */
-#define KERNEL_VM_BASE		0xFFFFFFE000000000	/**< Kernel VM region base. */
-#define KERNEL_VM_SIZE		0x0000001F80000000	/**< Kernel VM region size (126GB). */
+#define KERNEL_HEAP_SIZE	0x0000003F80000000	/**< Kernel heap size (254GB). */
 #define KERNEL_VIRT_BASE	0xFFFFFFFF80000000	/**< Kernel virtual base address. */
 #define KERNEL_MODULE_BASE	0xFFFFFFFFC0000000	/**< Module area base. */
 #define KERNEL_MODULE_SIZE	0x0000000040000000	/**< Module area size (1GB). */

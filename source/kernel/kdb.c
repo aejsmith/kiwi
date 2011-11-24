@@ -1674,7 +1674,7 @@ void kdb_unregister_command(const char *name) {
 }
 
 /** Initialise the kernel debugger. */
-__init_text void kdb_init() {
+__init_text void kdb_init(void) {
 	/* Initialise the heap. */
 	fixed_heap_init(&kdb_heap, kdb_heap_area, KDB_HEAP_SIZE);
 

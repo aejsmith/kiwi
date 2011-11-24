@@ -80,9 +80,6 @@
 
 #include "vm_priv.h"
 
-/** VM-managed portion of the kernel address space. */
-vm_aspace_t *kernel_aspace = NULL;
-
 /** Slab caches used for VM structures. */
 static slab_cache_t *vm_aspace_cache;
 static slab_cache_t *vm_region_cache;
@@ -1037,8 +1034,6 @@ int vm_fault(ptr_t addr, int reason, int access) {
 		return VM_FAULT_FAILURE;
 	}
 
-	assert(!(as->flags & VM_ASPACE_MLOCK));
-
 	dprintf("vm: page fault at %p (as: %p, reason: %d, access: %d)\n", addr, as, reason, access);
 
 	/* Round down address to a page boundary. */
@@ -1160,9 +1155,8 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
                 offset_t offset, ptr_t *addrp) {
 	vm_region_t *region;
-	int rflags, access;
 	status_t ret;
-	ptr_t i;
+	int rflags;
 
 	/* Check whether the supplied arguments are valid. */
 	if(!size || size % PAGE_SIZE || offset % PAGE_SIZE) {
@@ -1237,39 +1231,6 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		if(vm_amap_map(region->amap, 0, size) != STATUS_SUCCESS) {
 			fatal("Could not reference new anonymous map");
 		}
-	}
-
-	/* If on an address space locked into memory (i.e. the kernel address
-	 * space, map all pages into memory allowing the full access of the
-	 * region. */
-	if(as->flags & VM_ASPACE_MLOCK) {
-		/* The fault handling code doesn't actually care whether it's
-		 * an execute, only if it's a write or not. */
-		access = (region->flags & VM_REGION_WRITE) ? VM_FAULT_WRITE : VM_FAULT_READ;
-
-		/* Fault on each page in the region. */
-		mmu_context_lock(as->mmu);
-		for(i = region->start; i < region->end; i += PAGE_SIZE) {
-			if(region->amap) {
-				ret = vm_anon_fault(region, i, VM_FAULT_NOTPRESENT, access);
-			} else {
-				ret = vm_generic_fault(region, i, VM_FAULT_NOTPRESENT, access);
-			}
-
-			if(unlikely(ret != VM_FAULT_SUCCESS)) {
-				/* The only allowed failure is OOM, in which
-				 * case we have to revert the entire mapping. */
-				if(likely(ret == VM_FAULT_OOM)) {
-					mmu_context_unlock(as->mmu);
-					vm_region_insert(as, region->start, region->end, 0);
-					mutex_unlock(&as->lock);
-					return STATUS_NO_MEMORY;
-				} else {
-					fatal("Failed to map in kernel region (%d)", ret);
-				}
-			}
-		}
-		mmu_context_unlock(as->mmu);
 	}
 
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
@@ -1349,7 +1310,6 @@ vm_aspace_t *vm_aspace_create(void) {
 
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
 	as->mmu = mmu_context_create(MM_SLEEP);
-	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
 
@@ -1393,11 +1353,8 @@ vm_aspace_t *vm_aspace_clone(vm_aspace_t *orig) {
 	vm_region_t *orig_region, *region;
 	vm_aspace_t *as;
 
-	assert(!(orig->flags & VM_ASPACE_MLOCK));
-
 	as = slab_cache_alloc(vm_aspace_cache, MM_SLEEP);
 	as->mmu = mmu_context_create(MM_SLEEP);
-	as->flags = 0;
 	as->find_cache = NULL;
 	as->free_map = 0;
 
@@ -1584,8 +1541,6 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 
 /** Initialise the VM system. */
 __init_text void vm_init(void) {
-	vm_region_t *region;
-
 	/* Create the VM slab caches. */
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
 	                                    0, vm_aspace_ctor, NULL, NULL, 0,
@@ -1601,18 +1556,6 @@ __init_text void vm_init(void) {
 
 	/* Initialise the caching system. */
 	vm_cache_init();
-
-	/* Create the kernel address space. */
-	kernel_aspace = slab_cache_alloc(vm_aspace_cache, MM_FATAL);
-	kernel_aspace->mmu = &kernel_mmu_context;
-	kernel_aspace->flags = VM_ASPACE_MLOCK;
-	kernel_aspace->find_cache = NULL;
-	kernel_aspace->free_map = 0;
-
-	/* Insert the initial free region. */
-	region = vm_region_create(kernel_aspace, KERNEL_VM_BASE, KERNEL_VM_BASE + KERNEL_VM_SIZE, 0);
-	list_append(&kernel_aspace->regions, &region->header);
-	vm_freelist_insert(region, KERNEL_VM_SIZE);
 
 	/* Register the KDB command. */
 	kdb_register_command("aspace", "Dump an address space.", kdb_cmd_aspace);

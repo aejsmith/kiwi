@@ -30,7 +30,7 @@
  * @param func		Function that should be called.
  * @param stack		Base of stack to use.
  * @param size		Size of stack. */
-extern void initjmp(jmp_buf buf, void (*func)(), void *stack, size_t size);
+extern void initjmp(jmp_buf buf, void (*func)(void), void *stack, size_t size);
 
 /** Save the current execution state.
  * @param buf		Buffer to save to.

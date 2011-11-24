@@ -117,7 +117,7 @@ extern void kdb_enter(kdb_reason_t reason, struct intr_frame *frame);
 extern void kdb_register_command(const char *name, const char *description, kdb_command_t func);
 extern void kdb_unregister_command(const char *name);
 
-extern void arch_kdb_init();
-extern void kdb_init();
+extern void arch_kdb_init(void);
+extern void kdb_init(void);
 
 #endif /* __KDB_H */
