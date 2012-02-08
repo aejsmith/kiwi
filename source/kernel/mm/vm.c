@@ -123,8 +123,8 @@ static inline bool vm_region_fits(vm_aspace_t *as, ptr_t start, size_t size) {
 	assert(!list_empty(&as->regions));
 
 	/* Get the first and last regions in the address space. */
-	first = list_entry(as->regions.next, vm_region_t, header);
-	last = list_entry(as->regions.prev, vm_region_t, header);
+	first = list_first(&as->regions, vm_region_t, header);
+	last = list_last(&as->regions, vm_region_t, header);
 	end = start + size;
 
 	return (end >= start && start >= first->start && end <= last->end);
@@ -358,22 +358,22 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
  * @param region	Region to get region before from.
  * @return		Pointer to previous region, or NULL if start of list. */
 static vm_region_t *vm_region_prev(vm_region_t *region) {
-	if(region->as->regions.next == &region->header) {
+	if(region == list_first(&region->as->regions, vm_region_t, header)) {
 		return NULL;
 	}
 
-	return list_entry(region->header.prev, vm_region_t, header);
+	return list_prev(&region->header, vm_region_t, header);
 }
 
 /** Get the region after another region in the region list.
  * @param region	Region to get region after from.
  * @return		Pointer to next region, or NULL if end of list. */
 static vm_region_t *vm_region_next(vm_region_t *region) {
-	if(region->as->regions.prev == &region->header) {
+	if(region == list_last(&region->as->regions, vm_region_t, header)) {
 		return NULL;
 	}
 
-	return list_entry(region->header.next, vm_region_t, header);
+	return list_next(&region->header, vm_region_t, header);
 }
 
 /** Searches for a region containing an address.
@@ -422,7 +422,7 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 		} else {
 			/* Should never be empty. */
 			assert(!list_empty(&as->regions));
-			region = list_entry(as->regions.next, vm_region_t, header);
+			region = list_first(&as->regions, vm_region_t, header);
 		}
 
 		while(region) {

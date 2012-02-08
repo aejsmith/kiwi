@@ -888,7 +888,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 
 			/* Call the command to set up the filter. */
 			filter = kdb_malloc(sizeof(kdb_filter_t));
-			if(perform_call(list_entry(data.filters.next, kdb_args_t, header),
+			if(perform_call(list_first(&data.filters, kdb_args_t, header),
 			                NULL, filter) != KDB_SUCCESS) {
 				kdb_free(filter);
 				continue;

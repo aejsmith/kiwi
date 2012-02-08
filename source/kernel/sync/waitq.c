@@ -130,7 +130,7 @@ bool waitq_wake_unsafe(waitq_t *queue) {
 	thread_t *thread;
 
 	if(!list_empty(&queue->threads)) {
-		thread = list_entry(queue->threads.next, thread_t, waitq_link);
+		thread = list_first(&queue->threads, thread_t, waitq_link);
 		spinlock_lock(&thread->lock);
 		thread_wake(thread);
 		spinlock_unlock(&thread->lock);

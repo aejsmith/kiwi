@@ -175,7 +175,7 @@ static void page_writer(void *arg1, void *arg2) {
 		 * per iteration, or until we reach the end of the queue. */
 		while(written < PAGE_WRITER_MAX_PER_RUN && marker.next != &queue->pages) {
 			/* Take the page and move the marker after it. */
-			page = list_entry(marker.next, page_t, header);
+			page = list_next(&marker, page_t, header);
 			list_add_after(&page->header, &marker);
 			spinlock_unlock(&queue->lock);
 
@@ -218,7 +218,7 @@ static void vm_cache_reclaim(int level) {
 
 	/* Reclaim the pages. */
 	while(count--) {
-		page = list_entry(queue->pages.next, vm_page_t, header);
+		page = list_first(&queue->pages, vm_page_t, header);
 		spinlock_unlock(&queue->lock);
 		vm_cache_evict_page(page);
 		spinlock_lock(&queue->lock);
@@ -322,7 +322,7 @@ page_t *page_alloc(int mmflag) {
 		}
 
 		/* Get the page and mark it as allocated. */
-		page = list_entry(free_page_lists[i].pages.next, page_t, header);
+		page = list_first(&free_page_lists[i].pages, page_t, header);
 		list_remove(&page->header);
 		page->state = PAGE_STATE_ALLOCATED;
 
@@ -453,7 +453,7 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 			}
 
 			/* Get the page and mark it as allocated. */
-			page = list_entry(list->pages.next, page_t, header);
+			page = list_first(&list->pages, page_t, header);
 			list_remove(&page->header);
 			page->state = PAGE_STATE_ALLOCATED;
 			return page;

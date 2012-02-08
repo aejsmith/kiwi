@@ -65,7 +65,7 @@ static void dpc_thread_func(void *arg1, void *arg2) {
 		/* Get the next request in the list. */
 		spinlock_lock(&dpc_lock);
 		assert(!list_empty(&dpc_requests));
-		request = list_entry(dpc_requests.next, dpc_request_t, header);
+		request = list_first(&dpc_requests, dpc_request_t, header);
 		list_remove(&request->header);
 		spinlock_unlock(&dpc_lock);
 
@@ -89,7 +89,7 @@ static dpc_request_t *dpc_request_alloc(void) {
 		fatal("Out of DPC request structures");
 	}
 
-	request = list_entry(dpc_free.next, dpc_request_t, header);
+	request = list_first(&dpc_free, dpc_request_t, header);
 	list_remove(&request->header);
 	return request;
 }

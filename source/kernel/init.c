@@ -268,7 +268,7 @@ static __init_text void load_modules(void) {
 
 	/* Load all kernel modules. */
 	while(!list_empty(&boot_module_list)) {
-		mod = list_entry(boot_module_list.next, boot_module_t, header);
+		mod = list_first(&boot_module_list, boot_module_t, header);
 		load_boot_kmod(mod);
 	}
 }
@@ -318,7 +318,7 @@ static void init_thread(void *arg1, void *arg2) {
 		}
 
 		while(!list_empty(&boot_fsimage_list)) {
-			mod = list_entry(boot_fsimage_list.next, boot_module_t, header);
+			mod = list_first(&boot_fsimage_list, boot_module_t, header);
 
 			ret = tar_extract(mod->handle, "/");
 			if(ret != STATUS_SUCCESS) {
@@ -329,7 +329,7 @@ static void init_thread(void *arg1, void *arg2) {
 		}
 	} else {
 		while(!list_empty(&boot_fsimage_list)) {
-			mod = list_entry(boot_fsimage_list.next, boot_module_t, header);
+			mod = list_first(&boot_fsimage_list, boot_module_t, header);
 			boot_module_remove(mod);
 		}
 	}

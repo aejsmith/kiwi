@@ -134,7 +134,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 		/* Take the next thread off the list. */
 		spinlock_lock(&dead_thread_lock);
 		assert(!list_empty(&dead_threads));
-		thread = list_entry(dead_threads.next, thread_t, runq_link);
+		thread = list_first(&dead_threads, thread_t, runq_link);
 		list_remove(&thread->runq_link);
 		spinlock_unlock(&dead_thread_lock);
 

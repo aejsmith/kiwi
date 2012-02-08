@@ -553,7 +553,7 @@ status_t kern_port_listen(handle_t handle, useconds_t timeout, handle_t *connp, 
 
 		mutex_lock(&port->lock);
 		if(!list_empty(&port->waiting)) {
-			conn = list_entry(port->waiting.next, ipc_connection_t, header);
+			conn = list_first(&port->waiting, ipc_connection_t, header);
 			break;
 		}
 		mutex_unlock(&port->lock);
@@ -891,7 +891,7 @@ static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, i
 	}
 
 	assert(!list_empty(&endpoint->messages));
-	*messagep = list_entry(endpoint->messages.next, ipc_message_t, header);
+	*messagep = list_first(&endpoint->messages, ipc_message_t, header);
 	return STATUS_SUCCESS;
 }
 

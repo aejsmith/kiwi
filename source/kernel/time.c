@@ -247,7 +247,7 @@ bool timer_tick(void) {
 	case TIMER_DEVICE_ONESHOT:
 		/* Prepare the next tick if there is still a timer in the list. */
 		if(!list_empty(&curr_cpu->timers)) {
-			timer_device_prepare(list_entry(curr_cpu->timers.next, timer_t, header));
+			timer_device_prepare(list_first(&curr_cpu->timers, timer_t, header));
 		}
 		break;
 	case TIMER_DEVICE_PERIODIC:
@@ -322,7 +322,7 @@ void timer_stop(timer_t *timer) {
 
 		spinlock_lock(&timer->cpu->timer_lock);
 
-		first = list_entry(timer->cpu->timers.next, timer_t, header);
+		first = list_first(&timer->cpu->timers, timer_t, header);
 		list_remove(&timer->header);
 
 		/* If the timer is running on this CPU, adjust the tick length
@@ -333,7 +333,7 @@ void timer_stop(timer_t *timer) {
 			switch(timer_device->type) {
 			case TIMER_DEVICE_ONESHOT:
 				if(first == timer && !list_empty(&curr_cpu->timers)) {
-					first = list_entry(curr_cpu->timers.next, timer_t, header);
+					first = list_first(&curr_cpu->timers, timer_t, header);
 					timer_device_prepare(first);
 				}
 				break;

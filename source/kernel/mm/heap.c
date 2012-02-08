@@ -126,7 +126,7 @@ static heap_tag_t *heap_tag_get(int mmflag) {
 		return first;
 	} else {
 		/* Pop a tag off the list. */
-		tag = list_entry(heap_tag_pool.next, heap_tag_t, tag_link);
+		tag = list_first(&heap_tag_pool, heap_tag_t, tag_link);
 		list_remove(&tag->tag_link);
 		return tag;
 	}
@@ -317,7 +317,7 @@ static void free_internal(heap_tag_t *tag) {
 
 	/* Coalesce with adjacent free ranges. */
 	if(tag->tag_link.next != &heap_ranges) {
-		exist = list_entry(tag->tag_link.next, heap_tag_t, tag_link);
+		exist = list_next(&tag->tag_link, heap_tag_t, tag_link);
 		if(!exist->allocated) {
 			tag->size += exist->size;
 			heap_freelist_remove(exist);
@@ -326,7 +326,7 @@ static void free_internal(heap_tag_t *tag) {
 		}
 	}
 	if(tag->tag_link.prev != &heap_ranges) {
-		exist = list_entry(tag->tag_link.prev, heap_tag_t, tag_link);
+		exist = list_prev(&tag->tag_link, heap_tag_t, tag_link);
 		if(!exist->allocated) {
 			tag->addr = exist->addr;
 			tag->size += exist->size;

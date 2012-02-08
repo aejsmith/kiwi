@@ -40,7 +40,7 @@ typedef struct waitq {
 #define WAITQ_INITIALISER(_var, _name)	\
 	{ \
 		.lock = SPINLOCK_INITIALISER("waitq_lock"), \
-		.threads = LIST_INITIALISER(_var.threads), \
+		.threads = LIST_INITIALIZER(_var.threads), \
 		.name = _name, \
 	}
 

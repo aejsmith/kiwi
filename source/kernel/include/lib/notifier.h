@@ -35,7 +35,7 @@ typedef struct notifier {
 #define NOTIFIER_INITIALISER(_var, _data)	\
 	{ \
 		.lock = MUTEX_INITIALISER(_var.lock, "notifier_lock", 0), \
-		.functions = LIST_INITIALISER(_var.functions), \
+		.functions = LIST_INITIALIZER(_var.functions), \
 		.data = _data, \
 	}
 

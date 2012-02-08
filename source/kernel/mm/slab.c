@@ -321,7 +321,7 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int kmflag) {
 
 	/* If there is a slab in the partial list, take it. */
 	if(!list_empty(&cache->slab_partial)) {
-		slab = list_entry(cache->slab_partial.next, slab_t, header);
+		slab = list_first(&cache->slab_partial, slab_t, header);
 	} else {
 		/* No slabs with free objects available - allocate a new
 		 * slab. */
@@ -376,7 +376,7 @@ static inline slab_magazine_t *slab_magazine_get_full(slab_cache_t *cache) {
 	mutex_lock(&cache->depot_lock);
 
 	if(!list_empty(&cache->magazine_full)) {
-		mag = list_entry(cache->magazine_full.next, slab_magazine_t, header);
+		mag = list_first(&cache->magazine_full, slab_magazine_t, header);
 		list_remove(&mag->header);
 		assert(mag->rounds == SLAB_MAGAZINE_SIZE);
 	}
@@ -406,7 +406,7 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 	mutex_lock(&cache->depot_lock);
 
 	if(!list_empty(&cache->magazine_empty)) {
-		mag = list_entry(cache->magazine_empty.next, slab_magazine_t, header);
+		mag = list_first(&cache->magazine_empty, slab_magazine_t, header);
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {

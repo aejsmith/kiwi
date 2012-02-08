@@ -271,7 +271,7 @@ status_t kern_signal_send(handle_t handle, int num) {
 				thread = NULL;
 			}
 			if(!thread) {
-				thread = list_entry(process->threads.next, thread_t, owner_link);
+				thread = list_first(&process->threads, thread_t, owner_link);
 			}
 			mutex_unlock(&process->lock);
 			break;

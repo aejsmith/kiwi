@@ -341,7 +341,7 @@ static void fs_node_reclaim(int level) {
 
 	/* Reclaim some nodes. */
 	while(count-- && !list_empty(&unused_nodes_list)) {
-		node = list_entry(unused_nodes_list.next, fs_node_t, unused_link);
+		node = list_first(&unused_nodes_list, fs_node_t, unused_link);
 		mutex_unlock(&unused_nodes_lock);
 
 		/* Avoid a race condition: we must unlock the unused nodes list
@@ -2624,7 +2624,7 @@ void fs_shutdown(void) {
 	 * the mounts list. This means that the FS it is mounted on will always
 	 * be before it in the list. So, we just need to iterate over the list
 	 * in reverse. */
-	LIST_FOREACH_SAFE_R(&mount_list, iter) {
+	LIST_FOREACH_REVERSE_SAFE(&mount_list, iter) {
 		mount = list_entry(iter, fs_mount_t, header);
 
 		ret = fs_unmount_internal(mount, NULL);

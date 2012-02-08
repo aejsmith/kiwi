@@ -199,7 +199,7 @@ static thread_t *sched_pick_thread(sched_cpu_t *cpu) {
 
 	/* Get the thread to run. */
 	i = bitops_fls(cpu->active->bitmap);
-	thread = list_entry(cpu->active->threads[i].next, thread_t, runq_link);
+	thread = list_first(&cpu->active->threads[i], thread_t, runq_link);
 	sched_queue_remove(cpu->active, thread);
 	return thread;
 }

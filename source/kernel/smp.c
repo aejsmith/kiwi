@@ -124,7 +124,7 @@ void smp_ipi_handler(void) {
 
 	/* Loop through and handle each call that's been queued to us. */
 	while(!list_empty(&curr_cpu->call_queue)) {
-		call = list_entry(curr_cpu->call_queue.next, smp_call_t, cpu_link);
+		call = list_first(&curr_cpu->call_queue, smp_call_t, cpu_link);
 		list_remove(&call->cpu_link);
 		spinlock_unlock(&curr_cpu->call_lock);
 
