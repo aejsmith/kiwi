@@ -34,6 +34,7 @@
  * @todo		Allocation hash table resizing.
  */
 
+#include <lib/fnv.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 

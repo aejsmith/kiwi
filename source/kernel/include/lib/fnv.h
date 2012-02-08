@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 Alex Smith
+ * Copyright (C) 2007-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,14 +16,17 @@
 
 /**
  * @file
- * @brief		Utility functions.
+ * @brief		FNV hash functions.
  *
  * Reference:
  *  - Fowler/Noll/Vo (FNV) Hash
  *    http://www.isthe.com/chongo/tech/comp/fnv/
  */
 
-#include <lib/utility.h>
+#ifndef __LIB_FNV_H
+#define __LIB_FNV_H
+
+#include <types.h>
 
 /** 32-bit FNV_prime. */
 #define FNV_PRIME		16777619UL
@@ -32,30 +35,20 @@
  *  FNV-0 algorithm and the above prime. */
 #define FNV_OFFSET_BASIS	2166136261UL
 
-/** Compute the FNV-1 hash of a string.
- * @param str		String to hash.
- * @return		Generated hash. */
-uint32_t fnv_hash_string(const char *str) {
-	register uint32_t hash = FNV_OFFSET_BASIS;
-
-	while(*str) {
-		hash = (hash * FNV_PRIME) ^ *str++;
-	}
-
-	return hash;
-}
-
 /** Compute the FNV-1 hash of an integer.
  * @param val		Value to hash.
  * @return		Generated hash. */
-uint32_t fnv_hash_integer(uint64_t val) {
-	register uint32_t hash = FNV_OFFSET_BASIS;
-	size_t i = 0;
+#define fnv_hash_integer(val)	\
+	__extension__ \
+	({ \
+		typeof(val) __fnv_val = val; \
+		register uint32_t __fnv_hash = FNV_OFFSET_BASIS; \
+		size_t __fnv_i = 0; \
+		while(__fnv_i++ < sizeof(__fnv_val)) { \
+			__fnv_hash = (__fnv_hash * FNV_PRIME) ^ (__fnv_val & 0xff); \
+			__fnv_val >>= 8; \
+		} \
+		__fnv_hash; \
+	})
 
-	while(i++ < sizeof(val)) {
-		hash = (hash * FNV_PRIME) ^ (val & 0xff);
-		val >>= 8;
-	}
-
-	return hash;
-}
+#endif /* __LIB_FNV_H */

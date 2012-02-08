@@ -29,6 +29,7 @@
 #include <arch/memory.h>
 #include <arch/page.h>
 
+#include <lib/fnv.h>
 #include <lib/string.h>
 #include <lib/utility.h>
 

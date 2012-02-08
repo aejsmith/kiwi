@@ -46,7 +46,6 @@ sources = FeatureSources(config, [
 	'lib/radix_tree.c',
 	'lib/string.c',
 	'lib/tar.c',
-	'lib/utility.c',
 
 	'mm/area.c',
 	'mm/heap.c',
