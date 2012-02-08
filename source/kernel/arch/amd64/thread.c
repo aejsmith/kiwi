@@ -40,7 +40,7 @@ extern void amd64_context_restore(ptr_t new_rsp);
  * @param thread	Thread to initialize.
  * @param entry		Entry point for the thread. */
 void arch_thread_init(thread_t *thread, void (*entry)(void)) {
-	unative_t *sp;
+	unsigned long *sp;
 
 	thread->arch.flags = 0;
 	thread->arch.tls_base = 0;
@@ -52,7 +52,7 @@ void arch_thread_init(thread_t *thread, void (*entry)(void)) {
 	/* Initialize the kernel stack. First value is a fake return address to
 	 * make the backtrace end correctly and maintain ABI alignment
 	 * requirements: ((RSP - 8) % 16) == 0 on entry to a function. */
-	sp = (unative_t *)thread->arch.kernel_rsp;
+	sp = (unsigned long *)thread->arch.kernel_rsp;
 	*--sp = 0;			/* Fake return address for backtrace. */
 	*--sp = (ptr_t)entry;		/* RIP/Return address. */
 	*--sp = 0;			/* RBP. */
@@ -161,8 +161,8 @@ status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
  * @param arg		Argument to function. */
 void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) {
 	/* Write a 0 return address for the entry function. */
-	stack -= sizeof(unative_t);
-	if(memset_user((void *)stack, 0, sizeof(unative_t)) != STATUS_SUCCESS) {
+	stack -= sizeof(unsigned long);
+	if(memset_user((void *)stack, 0, sizeof(unsigned long)) != STATUS_SUCCESS) {
 		thread_exit();
 	}
 

@@ -40,7 +40,7 @@
 typedef struct irq_handler {
 	list_t header;			/**< List header. */
 
-	unative_t num;			/**< IRQ number. */
+	unsigned num;			/**< IRQ number. */
 	irq_top_t top;			/**< Top-half handler. */
 	irq_bottom_t bottom;		/**< Bottom-half handler. */
 	void *data;			/**< Argument to pass to handler. */
@@ -122,7 +122,7 @@ status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *da
 
 	/* Create a handler thread if necessary. */
 	if(handler->bottom) {
-		sprintf(name, "irq-%" PRIuN, num);
+		sprintf(name, "irq-%u", num);
 		ret = thread_create(name, NULL, 0, irq_thread, handler, NULL, NULL, &handler->thread);
 		if(ret != STATUS_SUCCESS) {
 			kfree(handler);

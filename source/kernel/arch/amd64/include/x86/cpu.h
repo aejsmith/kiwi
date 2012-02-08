@@ -252,87 +252,87 @@ extern cpu_features_t cpu_features;
 
 /** Read the CR0 register.
  * @return		Value of the CR0 register. */
-GEN_READ_REG(cr0, unative_t);
+GEN_READ_REG(cr0, unsigned long);
 
 /** Write the CR0 register.
  * @param val		New value of the CR0 register. */
-GEN_WRITE_REG(cr0, unative_t);
+GEN_WRITE_REG(cr0, unsigned long);
 
 /** Read the CR2 register.
  * @return		Value of the CR2 register. */
-GEN_READ_REG(cr2, unative_t);
+GEN_READ_REG(cr2, unsigned long);
 
 /** Read the CR3 register.
  * @return		Value of the CR3 register. */
-GEN_READ_REG(cr3, unative_t);
+GEN_READ_REG(cr3, unsigned long);
 
 /** Write the CR3 register.
  * @param val		New value of the CR3 register. */
-GEN_WRITE_REG(cr3, unative_t);
+GEN_WRITE_REG(cr3, unsigned long);
 
 /** Read the CR4 register.
  * @return		Value of the CR4 register. */
-GEN_READ_REG(cr4, unative_t);
+GEN_READ_REG(cr4, unsigned long);
 
 /** Write the CR4 register.
  * @param val		New value of the CR4 register. */
-GEN_WRITE_REG(cr4, unative_t);
+GEN_WRITE_REG(cr4, unsigned long);
 
 /** Read the DR0 register.
  * @return		Value of the DR0 register. */
-GEN_READ_REG(dr0, unative_t);
+GEN_READ_REG(dr0, unsigned long);
 
 /** Write the DR0 register.
  * @param val		New value of the DR0 register. */
-GEN_WRITE_REG(dr0, unative_t);
+GEN_WRITE_REG(dr0, unsigned long);
 
 /** Read the DR1 register.
  * @return		Value of the DR1 register. */
-GEN_READ_REG(dr1, unative_t);
+GEN_READ_REG(dr1, unsigned long);
 
 /** Write the DR1 register.
  * @param val		New value of the DR1 register. */
-GEN_WRITE_REG(dr1, unative_t);
+GEN_WRITE_REG(dr1, unsigned long);
 
 /** Read the DR2 register.
  * @return		Value of the DR2 register. */
-GEN_READ_REG(dr2, unative_t);
+GEN_READ_REG(dr2, unsigned long);
 
 /** Write the DR2 register.
  * @param val		New value of the DR2 register. */
-GEN_WRITE_REG(dr2, unative_t);
+GEN_WRITE_REG(dr2, unsigned long);
 
 /** Read the DR3 register.
  * @return		Value of the DR3 register. */
-GEN_READ_REG(dr3, unative_t);
+GEN_READ_REG(dr3, unsigned long);
 
 /** Write the DR3 register.
  * @param val		New value of the DR3 register. */
-GEN_WRITE_REG(dr3, unative_t);
+GEN_WRITE_REG(dr3, unsigned long);
 
 /** Read the DR6 register.
  * @return		Value of the DR6 register. */
-GEN_READ_REG(dr6, unative_t);
+GEN_READ_REG(dr6, unsigned long);
 
 /** Write the DR6 register.
  * @param val		New value of the DR6 register. */
-GEN_WRITE_REG(dr6, unative_t);
+GEN_WRITE_REG(dr6, unsigned long);
 
 /** Read the DR7 register.
  * @return		Value of the DR7 register. */
-GEN_READ_REG(dr7, unative_t);
+GEN_READ_REG(dr7, unsigned long);
 
 /** Write the DR7 register.
  * @param val		New value of the DR7 register. */
-GEN_WRITE_REG(dr7, unative_t);
+GEN_WRITE_REG(dr7, unsigned long);
 
 #undef GEN_READ_REG
 #undef GEN_WRITE_REG
 
 /** Get current value of EFLAGS/RFLAGS.
  * @return		Current value of EFLAGS/RFLAGS. */
-static inline unative_t x86_read_flags(void) {
-	unative_t val;
+static inline unsigned long x86_read_flags(void) {
+	unsigned long val;
 
 	__asm__ volatile("pushf; pop %0" : "=rm"(val));
 	return val;
@@ -340,7 +340,7 @@ static inline unative_t x86_read_flags(void) {
 
 /** Set value of EFLAGS/RFLAGS.
  * @param val		New value for EFLAGS/RFLAGS. */
-static inline void x86_write_flags(unative_t val) {
+static inline void x86_write_flags(unsigned long val) {
 	__asm__ volatile("push %0; popf" :: "rm"(val));
 }
 

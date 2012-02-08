@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Alex Smith
+ * Copyright (C) 2007-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,12 +42,12 @@
  */
 void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	const char *s = (const char *)src;
+	const unsigned long *ns;
 	char *d = (char *)dest;
-	const unative_t *ns;
-	unative_t *nd;
+	unsigned long *nd;
 
 	/* Align the destination. */
-	while((ptr_t)d & (sizeof(unative_t) - 1)) {
+	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
 		if(count--) {
 			*d++ = *s++;
 		} else {
@@ -56,21 +56,21 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	}
 
 	/* Write in native-sized blocks if we can. */
-	if(count >= sizeof(unative_t)) {
-		nd = (unative_t *)d;
-		ns = (const unative_t *)s;
+	if(count >= sizeof(unsigned long)) {
+		nd = (unsigned long *)d;
+		ns = (const unsigned long *)s;
 
 		/* Unroll the loop if possible. */
-		while(count >= (sizeof(unative_t) * 4)) {
+		while(count >= (sizeof(unsigned long) * 4)) {
 			*nd++ = *ns++;
 			*nd++ = *ns++;
 			*nd++ = *ns++;
 			*nd++ = *ns++;
-			count -= sizeof(unative_t) * 4;
+			count -= sizeof(unsigned long) * 4;
 		}
-		while(count >= sizeof(unative_t)) {
+		while(count >= sizeof(unsigned long)) {
 			*nd++ = *ns++;
-			count -= sizeof(unative_t);
+			count -= sizeof(unsigned long);
 		}
 
 		d = (char *)nd;
@@ -91,12 +91,12 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
  * @return		Destination location. */
 void *memset(void *dest, int val, size_t count) {
 	unsigned char c = val & 0xff;
-	unative_t *nd, nval;
+	unsigned long *nd, nval;
 	char *d = (char *)dest;
 	size_t i;
 
 	/* Align the destination. */
-	while((ptr_t)d & (sizeof(unative_t) - 1)) {
+	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
 		if(count--) {
 			*d++ = c;
 		} else {
@@ -105,28 +105,28 @@ void *memset(void *dest, int val, size_t count) {
 	}
 
 	/* Write in native-sized blocks if we can. */
-	if(count >= sizeof(unative_t)) {
-		nd = (unative_t *)d;
+	if(count >= sizeof(unsigned long)) {
+		nd = (unsigned long *)d;
 
 		/* Compute the value we will write. */
 		nval = c;
 		if(nval != 0) {
-			for(i = 8; i < (sizeof(unative_t) * 8); i <<= 1) {
+			for(i = 8; i < (sizeof(unsigned long) * 8); i <<= 1) {
 				nval = (nval << i) | nval;
 			}
 		}
 
 		/* Unroll the loop if possible. */
-		while(count >= (sizeof(unative_t) * 4)) {
+		while(count >= (sizeof(unsigned long) * 4)) {
 			*nd++ = nval;
 			*nd++ = nval;
 			*nd++ = nval;
 			*nd++ = nval;
-			count -= sizeof(unative_t) * 4;
+			count -= sizeof(unsigned long) * 4;
 		}
-		while(count >= sizeof(unative_t)) {
+		while(count >= sizeof(unsigned long)) {
 			*nd++ = nval;
-			count -= sizeof(unative_t);
+			count -= sizeof(unsigned long);
 		}
 
 		d = (char *)nd;

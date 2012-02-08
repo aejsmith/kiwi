@@ -27,22 +27,18 @@
 #define PRIu16		"u"		/**< Format for uint16_t. */
 #define PRIu32		"u"		/**< Format for uint32_t. */
 #define PRIu64		"lu"		/**< Format for uint64_t. */
-#define PRIuN		"lu"		/**< Format for unative_t. */
 #define PRId8		"d"		/**< Format for int8_t. */
 #define PRId16		"d"		/**< Format for int16_t. */
 #define PRId32		"d"		/**< Format for int32_t. */
 #define PRId64		"ld"		/**< Format for int64_t. */
-#define PRIdN		"d"		/**< Format for native_t. */
 #define PRIx8		"x"		/**< Format for (u)int8_t (hexadecimal). */
 #define PRIx16		"x"		/**< Format for (u)int16_t (hexadecimal). */
 #define PRIx32		"x"		/**< Format for (u)int32_t (hexadecimal). */
 #define PRIx64		"lx"		/**< Format for (u)int64_t (hexadecimal). */
-#define PRIxN		"lx"		/**< Format for (u)native_t (hexadecimal). */
 #define PRIo8		"o"		/**< Format for (u)int8_t (octal). */
 #define PRIo16		"o"		/**< Format for (u)int16_t (octal). */
 #define PRIo32		"o"		/**< Format for (u)int32_t (octal). */
 #define PRIo64		"llo"		/**< Format for (u)int64_t (octal). */
-#define PRIoN		"lo"		/**< Format for (u)native_t (octal). */
 #define PRIxPHYS	"lx"		/**< Format for phys_ptr_t (hexadecimal). */
 #define PRIuPHYS	"lu"		/**< Format for phys_ptr_t. */
 
@@ -57,10 +53,6 @@ typedef signed char int8_t;		/**< Signed 8-bit. */
 typedef signed short int16_t;		/**< Signed 16-bit. */
 typedef signed int int32_t;		/**< Signed 32-bit. */
 typedef signed long int64_t;		/**< Signed 64-bit. */
-
-/** Native-sized types. */
-typedef unsigned long unative_t;	/**< Unsigned native-sized type. */
-typedef signed long native_t;		/**< Signed native-sized type. */
 
 /** Integer type that can represent a pointer. */
 typedef unsigned long ptr_t;

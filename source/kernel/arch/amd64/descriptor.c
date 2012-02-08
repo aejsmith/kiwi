@@ -180,7 +180,7 @@ __init_text void descriptor_init(cpu_t *cpu) {
 
 /** Initialize the IDT shared by all CPUs. */
 __init_text void idt_init(void) {
-	unative_t i;
+	unsigned long i;
 	ptr_t addr;
 
 	/* Fill out the handlers in the IDT. */

@@ -41,7 +41,7 @@ typedef struct stack_frame {
 
 /** Structure containing details of a breakpoint. */
 typedef struct breakpoint {
-	unative_t dr7;			/**< Value to OR into DR7. */
+	unsigned long dr7;			/**< Value to OR into DR7. */
 	ptr_t addr;			/**< Address of the breakpoint. */
 } breakpoint_t;
 
@@ -52,7 +52,7 @@ static breakpoint_t kdb_breakpoints[KDB_BREAKPOINT_COUNT];
 
 /** Set breakpoint settings in the debug registers. */
 static inline void setup_debug_regs() {
-	unative_t dr7 = 0;
+	unsigned long dr7 = 0;
 
 	x86_write_dr0(kdb_breakpoints[0].addr);
 	dr7 |= kdb_breakpoints[0].dr7;
@@ -88,8 +88,8 @@ static void kdb_enter_internal(kdb_reason_t reason, intr_frame_t *frame, unsigne
  * @param frame		Interrupt frame. */
 void kdb_db_handler(intr_frame_t *frame) {
 	kdb_reason_t reason = KDB_REASON_USER;
+	unsigned long dr6;
 	unsigned i = 0;
-	unative_t dr6;
 
 	/* Work out the reason. */
 	dr6 = x86_read_dr6();
@@ -136,7 +136,7 @@ void kdb_enter(kdb_reason_t reason, intr_frame_t *frame) {
 		/* Raise a debug interrupt so we can get into the debugger
 		 * with an interrupt frame. Store the entry reason in EAX,
 		 * which will be picked up in the #DB handler above. */
-		__asm__ volatile("int $1" :: "a"((unative_t)reason));
+		__asm__ volatile("int $1" :: "a"((unsigned long)reason));
 		return;
 	}
 }
@@ -168,7 +168,7 @@ int arch_kdb_install_breakpoint(ptr_t addr) {
  *			just writes.
  * @return		Index of added watchpoint, or -1 if none available. */
 int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
-	unative_t dr7;
+	unsigned long dr7;
 	size_t i;
 
 	for(i = 0; i < ARRAY_SIZE(kdb_breakpoints); i++) {
@@ -317,12 +317,12 @@ static bool is_kstack_address(thread_t *thread, ptr_t addr) {
  * @param cb		Backtrace callback. */
 void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
 	stack_frame_t *frame;
-	unative_t *sp;
+	unsigned long *sp;
 	ptr_t bp;
 
 	/* Get the stack frame. */
 	if(thread) {
-		sp = (unative_t *)thread->arch.saved_rsp;
+		sp = (unsigned long *)thread->arch.saved_rsp;
 		bp = sp[5];
 	} else {
 		bp = curr_kdb_frame->bp;
@@ -351,7 +351,7 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
  * @param len		Length of register name.
  * @param regp		Location to store register value in.
  * @return		Whether the register name was valid. */
-bool arch_kdb_register_value(const char *name, size_t len, unative_t *regp) {
+bool arch_kdb_register_value(const char *name, size_t len, unsigned long *regp) {
 	KDB_REGISTER_CHECK(name, len, regp, "cs", 2, curr_kdb_frame->cs);
 	KDB_REGISTER_CHECK(name, len, regp, "num", 6, curr_kdb_frame->num);
 	KDB_REGISTER_CHECK(name, len, regp, "err_code", 8, curr_kdb_frame->err_code);
@@ -379,22 +379,20 @@ bool arch_kdb_register_value(const char *name, size_t len, unative_t *regp) {
 
 /** Print out all registers. */
 void arch_kdb_dump_registers(void) {
-	kdb_printf("cs: 0x%04" PRIxN "  ss: 0x%04" PRIxN "\n",
-		curr_kdb_frame->cs, curr_kdb_frame->ss);
-	kdb_printf("num: %" PRIuN "  err_code: %" PRIuN "  rflags: 0x%016" PRIxN "\n",
+	kdb_printf("cs: 0x%04lx  ss: 0x%04lx\n", curr_kdb_frame->cs, curr_kdb_frame->ss);
+	kdb_printf("num: %lu  err_code: %lu  rflags: 0x%016lx\n",
 		curr_kdb_frame->num, curr_kdb_frame->err_code, curr_kdb_frame->flags);
-	kdb_printf("rax: 0x%016" PRIxN "  rbx: 0x%016" PRIxN "  rcx: 0x%016" PRIxN "\n",
+	kdb_printf("rax: 0x%016lx  rbx: 0x%016lx  rcx: 0x%016lx\n",
 		curr_kdb_frame->ax, curr_kdb_frame->bx, curr_kdb_frame->cx);
-	kdb_printf("rdx: 0x%016" PRIxN "  rdi: 0x%016" PRIxN "  rsi: 0x%016" PRIxN "\n",
+	kdb_printf("rdx: 0x%016lx  rdi: 0x%016lx  rsi: 0x%016lx\n",
 		curr_kdb_frame->dx, curr_kdb_frame->di, curr_kdb_frame->si);
-	kdb_printf("rbp: 0x%016" PRIxN "  r8:  0x%016" PRIxN "  r9:  0x%016" PRIxN "\n",
+	kdb_printf("rbp: 0x%016lx  r8:  0x%016lx  r9:  0x%016lx\n",
 		curr_kdb_frame->bp, curr_kdb_frame->r8, curr_kdb_frame->r9);
-	kdb_printf("r10: 0x%016" PRIxN "  r11: 0x%016" PRIxN "  r12: 0x%016" PRIxN "\n",
+	kdb_printf("r10: 0x%016lx  r11: 0x%016lx  r12: 0x%016lx\n",
 		curr_kdb_frame->r10, curr_kdb_frame->r11, curr_kdb_frame->r12);
-	kdb_printf("r13: 0x%016" PRIxN "  r14: 0x%016" PRIxN "  r15: 0x%016" PRIxN "\n",
+	kdb_printf("r13: 0x%016lx  r14: 0x%016lx  r15: 0x%016lx\n",
 		curr_kdb_frame->r13, curr_kdb_frame->r14, curr_kdb_frame->r15);
-	kdb_printf("rip: 0x%016" PRIxN "  rsp: 0x%016" PRIxN "\n",
-		curr_kdb_frame->ip, curr_kdb_frame->sp);
+	kdb_printf("rip: 0x%016lx  rsp: 0x%016lx\n", curr_kdb_frame->ip, curr_kdb_frame->sp);
 }
 
 #if CONFIG_SMP

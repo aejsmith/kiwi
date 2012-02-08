@@ -42,7 +42,7 @@ typedef struct signal_frame {
 	void *retaddr;			/**< Return address. */
 	siginfo_t info;			/**< Signal information. */
 	ucontext_t context;		/**< Previous context. */
-} __aligned(sizeof(unative_t)) signal_frame_t;
+} __aligned(sizeof(unsigned long)) signal_frame_t;
 
 /** FLAGS values to restore. */
 #define RESTORE_FLAGS	(X86_FLAGS_CF | X86_FLAGS_PF | X86_FLAGS_AF | \
@@ -70,9 +70,9 @@ status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 		/* No need to obey the red zone here, this is a dedicated stack
 		 * that nothing else should be using. */
 		dest = (ptr_t)curr_thread->signal_stack.ss_sp + curr_thread->signal_stack.ss_size;
-		dest = ROUND_DOWN(dest, sizeof(unative_t)) - sizeof(signal_frame_t);
+		dest = ROUND_DOWN(dest, sizeof(unsigned long)) - sizeof(signal_frame_t);
 	} else {
-		dest = ROUND_DOWN(iframe->sp, sizeof(unative_t)) - sizeof(signal_frame_t);
+		dest = ROUND_DOWN(iframe->sp, sizeof(unsigned long)) - sizeof(signal_frame_t);
 
 		/* We must not clobber the red zone (128 bytes below the stack
 		 * pointer). */

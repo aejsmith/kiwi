@@ -27,7 +27,7 @@
 /** Enable IRQ delivery.
  * @return		Previous IRQ state. */
 static inline bool local_irq_enable(void) {
-	unative_t flags;
+	unsigned long flags;
 
 	__asm__ volatile("pushf; sti; pop %0" : "=r"(flags));
 	return (flags & (1<<9)) ? true : false;
@@ -36,7 +36,7 @@ static inline bool local_irq_enable(void) {
 /** Disable IRQ delivery.
  * @return		Previous IRQ state. */
 static inline bool local_irq_disable(void) {
-	unative_t flags;
+	unsigned long flags;
 
 	__asm__ volatile("pushf; cli; pop %0" : "=r"(flags));
 	return (flags & (1<<9)) ? true : false;
@@ -55,7 +55,7 @@ static inline void local_irq_restore(bool state) {
 /** Get IRQ state.
  * @return		Current IRQ state. */
 static inline bool local_irq_state(void) {
-	unative_t flags;
+	unsigned long flags;
 
 	__asm__ volatile("pushf; pop %0" : "=r"(flags));
 	return (flags & (1<<9)) ? true : false;

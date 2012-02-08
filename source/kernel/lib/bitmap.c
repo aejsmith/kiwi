@@ -113,17 +113,17 @@ bool bitmap_test(bitmap_t *bitmap, int bit) {
  * @return		Position of first set bit, -1 if none set. */
 int bitmap_ffs(bitmap_t *bitmap) {
 	size_t total = bitmap->count;
-	unative_t value;
+	unsigned long value;
 	int result = 0;
 
-	while(total >= BITS(unative_t)) {
-		value = ((unative_t *)bitmap->data)[result / BITS(unative_t)];
+	while(total >= BITS(unsigned long)) {
+		value = ((unsigned long *)bitmap->data)[result / BITS(unsigned long)];
 		if(value) {
 			return result + bitops_ffs(value);
 		}
 
-		total -= BITS(unative_t);
-		result += BITS(unative_t);
+		total -= BITS(unsigned long);
+		result += BITS(unsigned long);
 	}
 
 	/* Probably could be done faster... */
@@ -144,17 +144,17 @@ int bitmap_ffs(bitmap_t *bitmap) {
  * @return		Position of first zero bit, -1 if all set. */
 int bitmap_ffz(bitmap_t *bitmap) {
 	size_t total = bitmap->count;
-	unative_t value;
+	unsigned long value;
 	int result = 0;
 
-	while(total >= BITS(unative_t)) {
-		value = ((unative_t *)bitmap->data)[result / BITS(unative_t)];
-		if(value != ~((unative_t)0)) {
+	while(total >= BITS(unsigned long)) {
+		value = ((unsigned long *)bitmap->data)[result / BITS(unsigned long)];
+		if(value != ~((unsigned long)0)) {
 			return result + bitops_ffz(value);
 		}
 
-		total -= BITS(unative_t);
-		result += BITS(unative_t);
+		total -= BITS(unsigned long);
+		result += BITS(unsigned long);
 	}
 
 	/* Probably could be done faster... */

@@ -91,10 +91,10 @@ static inline int highbit(uint64_t val) {
 #if CONFIG_ARCH_64BIT
 	return bitops_fls(val) + 1;
 #elif CONFIG_ARCH_32BIT
-	unative_t high, low;
+	unsigned long high, low;
 
-	high = (unative_t)((val >> 32) & 0xffffffff);
-	low = (unative_t)(val & 0xffffffff);
+	high = (unsigned long)((val >> 32) & 0xffffffff);
+	low = (unsigned long)(val & 0xffffffff);
 	if(high) {
 		return bitops_fls(high) + 32 + 1;
 	} else {

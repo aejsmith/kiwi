@@ -289,8 +289,8 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 	static char namebuf[128];
 
 	uint64_t val = 0, current;
+	unsigned long reg;
 	symbol_t *sym;
-	unative_t reg;
 	char oper = 0;
 	size_t len;
 

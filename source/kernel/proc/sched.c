@@ -100,7 +100,7 @@
 
 /** Run queue structure. */
 typedef struct sched_queue {
-	unative_t bitmap;		/**< Bitmap of queues with data. */
+	unsigned long bitmap;		/**< Bitmap of queues with data. */
 	list_t threads[PRIORITY_COUNT];	/**< Queues of runnable threads. */
 } sched_queue_t;
 

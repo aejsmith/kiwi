@@ -28,7 +28,7 @@
  * @note		Does not check if value is zero, caller should do this.
  * @param value		Value to test.
  * @return		Position of first set bit. */
-static inline int bitops_ffs(unative_t value) {
+static inline int bitops_ffs(unsigned long value) {
 	__asm__ ("bsf %1, %0" : "=r"(value) : "rm"(value) : "cc");
 	return (int)value;
 }
@@ -38,7 +38,7 @@ static inline int bitops_ffs(unative_t value) {
  *			this.
  * @param value		Value to test.
  * @return		Position of first zero bit. */
-static inline int bitops_ffz(unative_t value) {
+static inline int bitops_ffz(unsigned long value) {
 	__asm__ ("bsf %1, %0" : "=r"(value) : "r"(~value) : "cc");
 	return (int)value;
 }
@@ -47,7 +47,7 @@ static inline int bitops_ffz(unative_t value) {
  * @note		Does not check if value is zero, caller should do this.
  * @param value		Value to test.
  * @return		Position of last set bit. */
-static inline int bitops_fls(unative_t value) {
+static inline int bitops_fls(unsigned long value) {
         __asm__ ("bsr %1, %0" : "=r" (value) : "rm"(value) : "cc");
       	return (int)value;
 }

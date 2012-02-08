@@ -52,28 +52,28 @@
 
 /** Structure defining an interrupt stack frame. */
 typedef struct intr_frame {
-	unative_t r15;			/**< R15. */
-	unative_t r14;			/**< R14. */
-	unative_t r13;			/**< R13. */
-	unative_t r12;			/**< R12. */
-	unative_t r11;			/**< R11. */
-	unative_t r10;			/**< R10. */
-	unative_t r9;			/**< R9. */
-	unative_t r8;			/**< R8. */
-	unative_t bp;			/**< RBP. */
-	unative_t si;			/**< RSI. */
-	unative_t di;			/**< RDI. */
-	unative_t dx;			/**< RDX. */
-	unative_t cx;			/**< RCX. */
-	unative_t bx;			/**< RBX. */
-	unative_t ax;			/**< RAX. */
-	unative_t num;			/**< Interrupt number. */
-	unative_t err_code;		/**< Error code (if applicable). */
-	unative_t ip;			/**< IP. */
-	unative_t cs;			/**< CS. */
-	unative_t flags;		/**< FLAGS. */
-	unative_t sp;			/**< SP. */
-	unative_t ss;			/**< SS. */
+	unsigned long r15;		/**< R15. */
+	unsigned long r14;		/**< R14. */
+	unsigned long r13;		/**< R13. */
+	unsigned long r12;		/**< R12. */
+	unsigned long r11;		/**< R11. */
+	unsigned long r10;		/**< R10. */
+	unsigned long r9;		/**< R9. */
+	unsigned long r8;		/**< R8. */
+	unsigned long bp;		/**< RBP. */
+	unsigned long si;		/**< RSI. */
+	unsigned long di;		/**< RDI. */
+	unsigned long dx;		/**< RDX. */
+	unsigned long cx;		/**< RCX. */
+	unsigned long bx;		/**< RBX. */
+	unsigned long ax;		/**< RAX. */
+	unsigned long num;		/**< Interrupt number. */
+	unsigned long err_code;		/**< Error code (if applicable). */
+	unsigned long ip;		/**< IP. */
+	unsigned long cs;		/**< CS. */
+	unsigned long flags;		/**< FLAGS. */
+	unsigned long sp;		/**< SP. */
+	unsigned long ss;		/**< SS. */
 } __packed intr_frame_t;
 
 #endif /* __ASM__ */

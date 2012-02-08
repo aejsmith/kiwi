@@ -95,7 +95,7 @@ extern bool arch_kdb_remove_watchpoint(unsigned index);
 extern bool arch_kdb_get_breakpoint(unsigned index, ptr_t *addrp);
 extern bool arch_kdb_get_watchpoint(unsigned index, ptr_t *addrp, size_t *sizep, bool *rwp);
 extern void arch_kdb_backtrace(struct thread *thread, kdb_backtrace_cb_t cb);
-extern bool arch_kdb_register_value(const char *name, size_t len, unative_t *regp);
+extern bool arch_kdb_register_value(const char *name, size_t len, unsigned long *regp);
 extern void arch_kdb_dump_registers(void);
 #if CONFIG_SMP
 extern void arch_kdb_trap_cpus(void);
