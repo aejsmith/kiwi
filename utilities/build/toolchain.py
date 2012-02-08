@@ -96,9 +96,9 @@ class ToolchainComponent:
 # Component definition for binutils.
 class BinutilsComponent(ToolchainComponent):
 	name = 'binutils'
-	version = '2.21.1' # remove a below on next upgrade
+	version = '2.22'
 	source = [
-		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + 'a.tar.bz2',
+		'http://ftp.gnu.org/gnu/binutils/binutils-' + version + '.tar.bz2',
 	]
 	patches = [
 		('binutils-' + version + '-kiwi.patch', 'binutils-' + version, 1),

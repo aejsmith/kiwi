@@ -1,6 +1,6 @@
-diff -urN binutils-2.21.1.orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
---- binutils-2.21.1.orig/bfd/config.bfd	2011-09-01 20:20:18.000000000 +0100
-+++ binutils-2.21.1/bfd/config.bfd	2011-09-01 20:20:57.000000000 +0100
+diff -urN binutils-2.22.orig/bfd/config.bfd binutils-2.22/bfd/config.bfd
+--- binutils-2.22.orig/bfd/config.bfd	2012-02-07 10:30:43.000000000 +0000
++++ binutils-2.22/bfd/config.bfd	2012-02-07 10:31:37.000000000 +0000
 @@ -281,7 +281,7 @@
      ;;
    arm-*-elf | arm-*-freebsd* | arm*-*-linux-* | arm*-*-conix* | \
@@ -10,7 +10,7 @@ diff -urN binutils-2.21.1.orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
      targ_defvec=bfd_elf32_littlearm_vec
      targ_selvecs=bfd_elf32_bigarm_vec
      ;;
-@@ -647,6 +647,11 @@
+@@ -613,6 +613,11 @@
      want64=true
      targ_underscore=no
      ;;
@@ -22,7 +22,7 @@ diff -urN binutils-2.21.1.orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
  #endif
    i[3-7]86-*-lynxos*)
      targ_defvec=bfd_elf32_i386_vec
-@@ -708,6 +713,9 @@
+@@ -674,6 +679,9 @@
      targ_defvec=bfd_elf32_i386_vec
      targ_selfvecs=i386chaos_vec
      ;;
@@ -32,10 +32,10 @@ diff -urN binutils-2.21.1.orig/bfd/config.bfd binutils-2.21.1/bfd/config.bfd
  
    i860-*-mach3* | i860-*-osf1* | i860-*-coff*)
      targ_defvec=i860coff_vec
-diff -urN binutils-2.21.1.orig/config.sub binutils-2.21.1/config.sub
---- binutils-2.21.1.orig/config.sub	2011-09-01 20:20:19.000000000 +0100
-+++ binutils-2.21.1/config.sub	2011-09-01 20:20:57.000000000 +0100
-@@ -1317,7 +1317,7 @@
+diff -urN binutils-2.22.orig/config.sub binutils-2.22/config.sub
+--- binutils-2.22.orig/config.sub	2012-02-07 10:30:44.000000000 +0000
++++ binutils-2.22/config.sub	2012-02-07 10:31:37.000000000 +0000
+@@ -1342,7 +1342,7 @@
  	      | -os2* | -vos* | -palmos* | -uclinux* | -nucleus* \
  	      | -morphos* | -superux* | -rtmk* | -rtmk-nova* | -windiss* \
  	      | -powermax* | -dnix* | -nx6 | -nx7 | -sei* | -dragonfly* \
@@ -44,36 +44,34 @@ diff -urN binutils-2.21.1.orig/config.sub binutils-2.21.1/config.sub
  	# Remember, each alternative MUST END IN *, to match a version number.
  		;;
  	-qnx*)
-diff -urN binutils-2.21.1.orig/configure binutils-2.21.1/configure
---- binutils-2.21.1.orig/configure	2011-09-01 20:20:19.000000000 +0100
-+++ binutils-2.21.1/configure	2011-09-01 20:20:57.000000000 +0100
-@@ -2869,7 +2869,8 @@
-     case "${target}" in
+diff -urN binutils-2.22.orig/configure binutils-2.22/configure
+--- binutils-2.22.orig/configure	2012-02-07 10:30:44.000000000 +0000
++++ binutils-2.22/configure	2012-02-07 10:32:58.000000000 +0000
+@@ -2861,7 +2861,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
--      | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto*)
-+      | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto* \
-+      | *-*-kiwi*)
+       | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
+-      | *-*-solaris2* | *-*-nto*)
++      | *-*-solaris2* | *-*-nto* | *-*-kiwi*)
          case "${target}" in
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
-diff -urN binutils-2.21.1.orig/configure.ac binutils-2.21.1/configure.ac
---- binutils-2.21.1.orig/configure.ac	2011-09-01 20:20:19.000000000 +0100
-+++ binutils-2.21.1/configure.ac	2011-09-01 20:20:57.000000000 +0100
-@@ -351,7 +351,8 @@
-     case "${target}" in
+diff -urN binutils-2.22.orig/configure.ac binutils-2.22/configure.ac
+--- binutils-2.22.orig/configure.ac	2012-02-07 10:30:44.000000000 +0000
++++ binutils-2.22/configure.ac	2012-02-07 10:32:49.000000000 +0000
+@@ -312,7 +312,7 @@
        *-*-elf* | *-*-sysv4* | *-*-unixware* | *-*-eabi* | hppa*64*-*-hpux* \
        | *-*-linux* | frv-*-uclinux* | *-*-irix5* | *-*-irix6* \
--      | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto*)
-+      | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-solaris2* | *-*-nto* \
-+      | *-*-kiwi*)
+       | *-*-netbsd* | *-*-openbsd* | *-*-freebsd* | *-*-dragonfly* \
+-      | *-*-solaris2* | *-*-nto*)
++      | *-*-solaris2* | *-*-nto* | *-*-kiwi*)
          case "${target}" in
            *-*-linux*aout* | *-*-linux*oldld*)
              ;;
-diff -urN binutils-2.21.1.orig/gas/configure.tgt binutils-2.21.1/gas/configure.tgt
---- binutils-2.21.1.orig/gas/configure.tgt	2011-09-01 20:20:19.000000000 +0100
-+++ binutils-2.21.1/gas/configure.tgt	2011-09-01 20:20:57.000000000 +0100
-@@ -112,6 +112,7 @@
+diff -urN binutils-2.22.orig/gas/configure.tgt binutils-2.22/gas/configure.tgt
+--- binutils-2.22.orig/gas/configure.tgt	2012-02-07 10:30:45.000000000 +0000
++++ binutils-2.22/gas/configure.tgt	2012-02-07 10:31:37.000000000 +0000
+@@ -107,6 +107,7 @@
    arm-*-eabi*)				fmt=elf em=armeabi ;;
    arm-*-symbianelf*)			fmt=elf em=symbian ;;
    arm-*-kaos*)				fmt=elf ;;
@@ -81,7 +79,7 @@ diff -urN binutils-2.21.1.orig/gas/configure.tgt binutils-2.21.1/gas/configure.t
    arm-*-conix*)				fmt=elf ;;
    arm-*-linux*aout*)			fmt=aout em=linux ;;
    arm-*-linux-*eabi*)			fmt=elf  em=armlinuxeabi ;;
-@@ -181,6 +182,7 @@
+@@ -176,6 +177,7 @@
    i386-*-coff)				fmt=coff ;;
    i386-*-elf)				fmt=elf ;;
    i386-*-kaos*)				fmt=elf ;;
@@ -89,19 +87,19 @@ diff -urN binutils-2.21.1.orig/gas/configure.tgt binutils-2.21.1/gas/configure.t
    i386-*-bsd*)				fmt=aout em=386bsd ;;
    i386-*-netbsd0.8)			fmt=aout em=386bsd ;;
    i386-*-netbsdpe*)			fmt=coff em=pe ;;
-diff -urN binutils-2.21.1.orig/ld/configure.tgt binutils-2.21.1/ld/configure.tgt
---- binutils-2.21.1.orig/ld/configure.tgt	2011-09-01 20:20:24.000000000 +0100
-+++ binutils-2.21.1/ld/configure.tgt	2011-09-01 20:20:57.000000000 +0100
+diff -urN binutils-2.22.orig/ld/configure.tgt binutils-2.22/ld/configure.tgt
+--- binutils-2.22.orig/ld/configure.tgt	2012-02-07 10:30:51.000000000 +0000
++++ binutils-2.22/ld/configure.tgt	2012-02-07 10:31:37.000000000 +0000
 @@ -70,6 +70,7 @@
  	  		targ_emul=armelf ;;
  arm*-*-symbianelf*)     targ_emul=armsymbian;;
  arm-*-kaos*)		targ_emul=armelf ;;
 +arm*-*-kiwi*)		targ_emul=armelf ;;
  arm9e-*-elf)		targ_emul=armelf ;;
- arm*b-*-linux-*eabi)	targ_emul=armelfb_linux_eabi
+ arm*b-*-linux-*eabi*)	targ_emul=armelfb_linux_eabi
  			targ_extra_emuls=armelf_linux_eabi
-@@ -246,6 +247,10 @@
- 			targ_extra_emuls="elf_i386 elf_l1om"
+@@ -234,6 +235,10 @@
+ 			targ_extra_emuls="elf_i386 elf_l1om elf_k1om"
  			;;
  i[3-7]86-*-kaos*)	targ_emul=elf_i386 ;;
 +i[3-7]86-*-kiwi*)	targ_emul=elf_i386 ;;
