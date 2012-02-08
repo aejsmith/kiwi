@@ -65,7 +65,7 @@ void security_context_canonicalise(security_context_t *context) {
 
 	/* Move the first non-negative group to the first entry. This is the
 	 * primary group. */
-	for(i = 0; i < ARRAYSZ(context->groups); i++) {
+	for(i = 0; i < ARRAY_SIZE(context->groups); i++) {
 		if(context->groups[i] >= 0) {
 			if(i != 0) {
 				context->groups[0] = context->groups[i];
@@ -76,7 +76,7 @@ void security_context_canonicalise(security_context_t *context) {
 	}
 
 	/* Sort the remaining groups into the required order. */
-	qsort(&context->groups[1], ARRAYSZ(context->groups) - 1, sizeof(context->groups[0]), compare_group);
+	qsort(&context->groups[1], ARRAY_SIZE(context->groups) - 1, sizeof(context->groups[0]), compare_group);
 }
 
 /** Compare identity of two security contexts.
@@ -135,7 +135,7 @@ status_t security_context_validate(const security_context_t *setter,
 
 	/* Compare capabilities: cannot set capabilities that the setter does
 	 * not have.*/
-	for(i = 0; i < ARRAYSZ(context->caps); i++) {
+	for(i = 0; i < ARRAY_SIZE(context->caps); i++) {
 		if(context->caps[i] & ~(setter->caps[i])) {
 			return STATUS_PERM_DENIED;
 		}

@@ -348,7 +348,7 @@ __init_text void intr_init(void) {
 	for(i = 32; i < 48; i++) {
 		intr_table[i] = hardware_interrupt;
 	}
-	for(i = 48; i < ARRAYSZ(intr_table); i++) {
+	for(i = 48; i < ARRAY_SIZE(intr_table); i++) {
 		intr_table[i] = unhandled_interrupt;
 	}
 

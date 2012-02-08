@@ -3318,8 +3318,8 @@ status_t kern_fs_mount_info(mount_info_t *infop, size_t *countp) {
 		if(infop) {
 			mount = list_entry(iter, fs_mount_t, header);
 			info->id = mount->id;
-			strncpy(info->type, mount->type->name, ARRAYSZ(info->type));
-			info->type[ARRAYSZ(info->type) - 1] = 0;
+			strncpy(info->type, mount->type->name, ARRAY_SIZE(info->type));
+			info->type[ARRAY_SIZE(info->type) - 1] = 0;
 
 			/* Get the path of the mount. */
 			ret = fs_node_path(mount->root, root_mount->root, &path);
@@ -3328,15 +3328,15 @@ status_t kern_fs_mount_info(mount_info_t *infop, size_t *countp) {
 				mutex_unlock(&mounts_lock);
 				return ret;
 			}
-			strncpy(info->path, path, ARRAYSZ(info->path));
-			info->path[ARRAYSZ(info->path) - 1] = 0;
+			strncpy(info->path, path, ARRAY_SIZE(info->path));
+			info->path[ARRAY_SIZE(info->path) - 1] = 0;
 			kfree(path);
 
 			/* Get the device path. */
 			if(mount->device) {
 				path = device_path((device_t *)mount->device->object);
-				strncpy(info->device, path, ARRAYSZ(info->device));
-				info->device[ARRAYSZ(info->device) - 1] = 0;
+				strncpy(info->device, path, ARRAY_SIZE(info->device));
+				info->device[ARRAY_SIZE(info->device) - 1] = 0;
 				kfree(path);
 			} else {
 				info->device[0] = 0;

@@ -433,7 +433,7 @@ static pci_device_id_t pci_ata_device_ids[] = {
 /** ATA PCI driver structure. */
 static pci_driver_t pci_ata_driver = {
 	.ids = pci_ata_device_ids,
-	.count = ARRAYSZ(pci_ata_device_ids),
+	.count = ARRAY_SIZE(pci_ata_device_ids),
 	.add_device = pci_ata_add_device,
 };
 

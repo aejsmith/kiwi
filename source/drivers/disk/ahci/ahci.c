@@ -34,7 +34,7 @@ static pci_device_id_t ahci_device_ids[] = {
 /** ATA PCI driver structure. */
 static pci_driver_t ahci_driver = {
 	.ids = ahci_device_ids,
-	.count = ARRAYSZ(ahci_device_ids),
+	.count = ARRAY_SIZE(ahci_device_ids),
 	.add_device = ahci_hba_add,
 };
 

@@ -103,7 +103,7 @@ static status_t pci_device_scan(device_t *bus, int id, int dev, int func, int in
 
 	/* Create a device tree node for it. */
 	sprintf(name, "%02x.%d", dev, func);
-	ret = device_create(name, bus, NULL, device, attr, ARRAYSZ(attr), &device->node);
+	ret = device_create(name, bus, NULL, device, attr, ARRAY_SIZE(attr), &device->node);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

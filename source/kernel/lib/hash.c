@@ -133,7 +133,7 @@ status_t hash_init(hash_t *hash, size_t entries, hash_ops_t *ops, int mmflag) {
 	assert(entries);
 
 	/* Pick a prime that's at least the estimated number of entries. */
-	for(i = 0; i < ARRAYSZ(primes); i++) {
+	for(i = 0; i < ARRAY_SIZE(primes); i++) {
 		hash->entries = primes[i];
 		if(hash->entries >= entries) {
 			break;

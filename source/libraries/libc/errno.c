@@ -92,7 +92,7 @@ int *__libc_errno_location(void) {
  *			should be careful.
  * @param status	Status to set. */
 void libc_status_to_errno(status_t status) {
-	if(status < 0 || (size_t)status >= ARRAYSZ(status_to_errno_table)) {
+	if(status < 0 || (size_t)status >= ARRAY_SIZE(status_to_errno_table)) {
 		libc_fatal("unknown status code passed to status_to_errno()");
 	}
 	__errno = status_to_errno_table[status];

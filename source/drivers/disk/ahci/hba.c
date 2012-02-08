@@ -45,7 +45,7 @@ static irq_status_t ahci_irq_handler(unsigned num, void *_hba) {
 	pending = hba->regs->is;
 	if(pending) {
 		/* Determine which port(s) the interrupt is for. */
-		for(i = 0; i < ARRAYSZ(hba->ports); i++) {
+		for(i = 0; i < ARRAY_SIZE(hba->ports); i++) {
 			if(pending & (1<<i) && hba->ports[i]) {
 				handled = true;
 				ahci_port_interrupt(hba->ports[i]);
@@ -158,7 +158,7 @@ bool ahci_hba_add(pci_device_t *device, void *data) {
 
 	/* Publish it in the device tree. */
 	sprintf(name, "ahci%d", hba->id);
-	ret = device_create(name, device->node, NULL, hba, attr, ARRAYSZ(attr), &hba->node);
+	ret = device_create(name, device->node, NULL, hba, attr, ARRAY_SIZE(attr), &hba->node);
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ahci: could not create device tree node for HBA %d (%d)\n",
 			hba->id, ret);

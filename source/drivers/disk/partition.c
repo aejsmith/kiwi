@@ -78,7 +78,7 @@ static disk_ops_t partition_disk_ops = {
 bool partition_probe(disk_device_t *device) {
 	size_t i;
 
-	for(i = 0; i < ARRAYSZ(partition_types); i++) {
+	for(i = 0; i < ARRAY_SIZE(partition_types); i++) {
 		if(partition_types[i](device)) {
 			return true;
 		}
@@ -112,7 +112,7 @@ void partition_add(disk_device_t *parent, int id, uint64_t offset, uint64_t size
 	/* Create the device tree node. */
 	sprintf(name, "%d", device->id);
 	ret = device_create(name, parent->device, &disk_device_ops, device, attrs,
-	                    ARRAYSZ(attrs), &device->device);
+	                    ARRAY_SIZE(attrs), &device->device);
 	if(ret != STATUS_SUCCESS) {
 		kfree(device);
 	}

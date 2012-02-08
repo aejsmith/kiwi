@@ -101,7 +101,7 @@ void kdb_db_handler(intr_frame_t *frame) {
 		if(dr6 & X86_DR6_BS) {
 			reason = KDB_REASON_STEP;
 		} else if(dr6 & (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3)) {
-			for(; i < ARRAYSZ(kdb_breakpoints); i++) {
+			for(; i < ARRAY_SIZE(kdb_breakpoints); i++) {
 				if(frame->ip == kdb_breakpoints[i].addr) {
 					reason = KDB_REASON_BREAK;
 					break;
@@ -147,7 +147,7 @@ void kdb_enter(kdb_reason_t reason, intr_frame_t *frame) {
 int arch_kdb_install_breakpoint(ptr_t addr) {
 	size_t i;
 
-	for(i = 0; i < ARRAYSZ(kdb_breakpoints); i++) {
+	for(i = 0; i < ARRAY_SIZE(kdb_breakpoints); i++) {
 		if(kdb_breakpoints[i].dr7) {
 			continue;
 		}
@@ -171,7 +171,7 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
 	unative_t dr7;
 	size_t i;
 
-	for(i = 0; i < ARRAYSZ(kdb_breakpoints); i++) {
+	for(i = 0; i < ARRAY_SIZE(kdb_breakpoints); i++) {
 		if(kdb_breakpoints[i].dr7) {
 			continue;
 		}
@@ -215,7 +215,7 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
  * @param index		Index of breakpoint to remove.
  * @return		Whether the breakpoint existed. */
 bool arch_kdb_remove_breakpoint(unsigned index) {
-	if(index >= ARRAYSZ(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
+	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
 	   (kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
 		kdb_printf("Breakpoint ID %u invalid.\n", index);
 		return false;
@@ -229,7 +229,7 @@ bool arch_kdb_remove_breakpoint(unsigned index) {
  * @param index		Index of watchpoint to remove.
  * @return		Whether the breakpoint existed. */
 bool arch_kdb_remove_watchpoint(unsigned index) {
-	if(index >= ARRAYSZ(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
+	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
 	   !(kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
 		kdb_printf("Watchpoint ID %u invalid.\n", index);
 		return false;

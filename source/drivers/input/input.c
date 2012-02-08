@@ -307,7 +307,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 	iops = (type == INPUT_TYPE_KEYBOARD) ? &keyboard_device_ops : &mouse_device_ops;
 	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
-		ret = device_create(name, parent, iops, device, attrs, ARRAYSZ(attrs), devicep);
+		ret = device_create(name, parent, iops, device, attrs, ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -318,7 +318,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 		device_alias(dname, input_device_dir, *devicep, NULL);
 	} else {
 		ret = device_create(dname, input_device_dir, iops, device, attrs,
-		                    ARRAYSZ(attrs), devicep);
+		                    ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;

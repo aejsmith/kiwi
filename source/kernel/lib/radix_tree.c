@@ -141,11 +141,11 @@ static radix_tree_node_t *radix_tree_node_first_child(radix_tree_node_t *node) {
 	size_t i, j;
 
 	if(node->child_count) {
-		for(i = 0; i < ARRAYSZ(node->children); i++) {
+		for(i = 0; i < ARRAY_SIZE(node->children); i++) {
 			if(!node->children[i] || !node->children[i]->count) {
 				continue;
 			}
-			for(j = 0; j < ARRAYSZ(node->children[i]->nodes); j++) {
+			for(j = 0; j < ARRAY_SIZE(node->children[i]->nodes); j++) {
 				if(node->children[i]->nodes[j]) {
 					return node->children[i]->nodes[j];
 				}
@@ -164,11 +164,11 @@ static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) 
 	radix_tree_node_t *parent = node->parent;
 	size_t i, j;
 
-	for(i = high; i < ARRAYSZ(parent->children); i++) {
+	for(i = high; i < ARRAY_SIZE(parent->children); i++) {
 		if(!parent->children[i] || !parent->children[i]->count) {
 			continue;
 		}
-		for(j = (i == high) ? (low + 1) : 0; j < ARRAYSZ(parent->children[i]->nodes); j++) {
+		for(j = (i == high) ? (low + 1) : 0; j < ARRAY_SIZE(parent->children[i]->nodes); j++) {
 			if(parent->children[i]->nodes[j]) {
 				return parent->children[i]->nodes[j];
 			}
@@ -209,11 +209,11 @@ static void radix_tree_node_clear(radix_tree_node_t *node, radix_tree_clear_help
 	radix_tree_node_t *child;
 	size_t i, j;
 
-	for(i = 0; i < ARRAYSZ(node->children); i++) {
+	for(i = 0; i < ARRAY_SIZE(node->children); i++) {
 		/* Test the child array on each iteration - it may be freed
 		 * automatically by radix_tree_node_remove_child() within the
 		 * loop. */
-		for(j = 0; node->children[i] && j < ARRAYSZ(node->children[i]->nodes); j++) {
+		for(j = 0; node->children[i] && j < ARRAY_SIZE(node->children[i]->nodes); j++) {
 			if(!(child = node->children[i]->nodes[j])) {
 				continue;
 			}
@@ -422,12 +422,12 @@ void radix_tree_remove(radix_tree_t *tree, const char *key, radix_tree_clear_hel
 		if(node->child_count == 1) {
 			/* Only one child: Just need to prepend our key to it.
 			 * First need to find it... */
-			for(i = 0, child = NULL; i < ARRAYSZ(node->children) && !child; i++) {
+			for(i = 0, child = NULL; i < ARRAY_SIZE(node->children) && !child; i++) {
 				if(!node->children[i]) {
 					continue;
 				}
 
-				for(j = 0; j < ARRAYSZ(node->children[i]->nodes); j++) {
+				for(j = 0; j < ARRAY_SIZE(node->children[i]->nodes); j++) {
 					if(node->children[i]->nodes[j]) {
 						child = node->children[i]->nodes[j];
 						break;

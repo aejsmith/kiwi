@@ -411,7 +411,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	sprintf(dname, "%" PRId32, device->id);
 	if(parent) {
 		ret = device_create(name, parent, &display_device_ops, device, attrs,
-		                    ARRAYSZ(attrs), devicep);
+		                    ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -422,7 +422,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 		device_alias(dname, display_device_dir, *devicep, NULL);
 	} else {
 		ret = device_create(dname, display_device_dir, &display_device_ops, device,
-		                    attrs, ARRAYSZ(attrs), devicep);
+		                    attrs, ARRAY_SIZE(attrs), devicep);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;

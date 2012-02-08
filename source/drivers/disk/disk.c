@@ -301,7 +301,7 @@ status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 	sprintf(dname, "%d", device->id);
 	if(parent) {
 		ret = device_create(name, parent, &disk_device_ops, device, attrs,
-		                    ARRAYSZ(attrs), &device->device);
+		                    ARRAY_SIZE(attrs), &device->device);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;
@@ -312,7 +312,7 @@ status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 		device_alias(dname, disk_device_dir, device->device, NULL);
 	} else {
 		ret = device_create(dname, disk_device_dir, &disk_device_ops, device, attrs,
-		                    ARRAYSZ(attrs), &device->device);
+		                    ARRAY_SIZE(attrs), &device->device);
 		if(ret != STATUS_SUCCESS) {
 			kfree(device);
 			return ret;

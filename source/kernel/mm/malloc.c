@@ -185,7 +185,7 @@ __init_text void malloc_init(void) {
 	size_t i, size;
 
 	/* Create all of the cache structures. */
-	for(i = 0; i < ARRAYSZ(kmalloc_caches); i++) {
+	for(i = 0; i < ARRAY_SIZE(kmalloc_caches); i++) {
 		size = (1 << (i + KMALLOC_CACHE_MIN));
 
 		snprintf(name, SLAB_NAME_MAX, "kmalloc_%zu", size);

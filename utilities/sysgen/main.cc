@@ -176,7 +176,7 @@ static void generate_kernel_table(ostream &stream, const string &name) {
 		stream << ", .count = " << call->GetParameterCount() << " }," << endl;
 	}
 	stream << "};" << endl;
-	stream << "size_t " << name << "_size = ARRAYSZ(" << name << ");" << endl;
+	stream << "size_t " << name << "_size = ARRAY_SIZE(" << name << ");" << endl;
 }
 
 /** Generate a call number header.

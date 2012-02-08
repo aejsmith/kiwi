@@ -418,7 +418,7 @@ ata_channel_t *ata_channel_add(device_t *parent, const char *name, ata_channel_o
 	}
 
 	/* Publish it in the device tree. */
-	ret = device_create(name, parent, NULL, NULL, attr, ARRAYSZ(attr), &channel->node);
+	ret = device_create(name, parent, NULL, NULL, attr, ARRAY_SIZE(attr), &channel->node);
 	if(ret != STATUS_SUCCESS) {
 		kprintf(LOG_WARN, "ata: could not create device tree node for channel %s (%d)\n",
 			name, ret);

@@ -73,7 +73,7 @@ bool partition_probe_msdos(disk_device_t *device) {
 	}
 
 	/* Loop through all partitions in the table. */
-	for(i = 0; i < ARRAYSZ(mbr->partitions); i++) {
+	for(i = 0; i < ARRAY_SIZE(mbr->partitions); i++) {
 		part = &mbr->partitions[i];
 		if(part->type == 0 || (part->bootable != 0 && part->bootable != 0x80)) {
 			continue;
