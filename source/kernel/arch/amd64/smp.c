@@ -58,7 +58,7 @@ __init_text void arch_smp_boot_prepare(void) {
 	void *mapping;
 
 	/* Copy the trampoline code to the page reserved by the paging
-	 * initialisation code. */
+	 * initialization code. */
 	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
 	memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
 	phys_unmap(mapping, PAGE_SIZE, false);
@@ -118,7 +118,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	assert(lapic_enabled());
 
 	/* Allocate a double fault stack for the new CPU. This is also used as
-	 * the initial stack while initialising the AP, before it enters the
+	 * the initial stack while initializing the AP, before it enters the
 	 * scheduler. */
 	cpu->arch.double_fault_stack = heap_alloc(KSTACK_SIZE, MM_FATAL);
 
@@ -139,7 +139,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	/* The TSC of the AP must be synchronised against the boot CPU. */
 	tsc_init_source();
 
-	/* Finally, wait for the CPU to complete its initialisation. */
+	/* Finally, wait for the CPU to complete its initialization. */
 	while(smp_boot_status != SMP_BOOT_BOOTED) {
 		cpu_spin_hint();
 	}

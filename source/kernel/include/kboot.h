@@ -19,7 +19,7 @@
  * @brief		KBoot utility functions.
  *
  * @warning		These functions are only available during kernel
- *			initialisation. The memory they occupy is freed during
+ *			initialization. The memory they occupy is freed during
  *			boot memory reclaim.
  */
 

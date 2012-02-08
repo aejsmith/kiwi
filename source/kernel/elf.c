@@ -188,7 +188,7 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 		}
 	}
 
-	/* If file size is zero then this header is just uninitialised data. */
+	/* If file size is zero then this header is just uninitialized data. */
 	if(phdr->p_filesz == 0) {
 		return STATUS_SUCCESS;
 	}

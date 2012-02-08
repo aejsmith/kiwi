@@ -31,17 +31,17 @@ typedef struct notifier {
 	void *data;			/**< Data to pass to functions. */
 } notifier_t;
 
-/** Initialises a statically declared notifier. */
-#define NOTIFIER_INITIALISER(_var, _data)	\
+/** Initializes a statically declared notifier. */
+#define NOTIFIER_INITIALIZER(_var, _data)	\
 	{ \
-		.lock = MUTEX_INITIALISER(_var.lock, "notifier_lock", 0), \
+		.lock = MUTEX_INITIALIZER(_var.lock, "notifier_lock", 0), \
 		.functions = LIST_INITIALIZER(_var.functions), \
 		.data = _data, \
 	}
 
 /** Statically declares a new notifier. */
 #define NOTIFIER_DECLARE(_var, _data)		\
-	notifier_t _var = NOTIFIER_INITIALISER(_var, _data)
+	notifier_t _var = NOTIFIER_INITIALIZER(_var, _data)
 
 /** Check if a notifier's function list is empty.
  * @param notif		Notifier to check.

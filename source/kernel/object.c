@@ -86,8 +86,8 @@ static void handle_table_ctor(void *obj, void *data) {
 	rwlock_init(&table->lock, "handle_table_lock");
 }
 
-/** Initialise an object structure.
- * @param obj		Object to initialise.
+/** Initialize an object structure.
+ * @param obj		Object to initialize.
  * @param type		Pointer to type structure for object type. Can be NULL,
  *			in which case the object will be a 'NULL object', and
  *			handles will never be created to it.
@@ -685,7 +685,7 @@ static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) 
 	return KDB_SUCCESS;
 }
 
-/** Initialise the handle caches. */
+/** Initialize the handle caches. */
 __init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
 	                                        0, NULL, NULL, NULL, 0, MM_FATAL);
@@ -727,7 +727,7 @@ int kern_object_type(handle_t handle) {
  *			indefinitely until one of events happens.
  * @return		Status code describing result of the operation. */
 status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeout) {
-	semaphore_t sem = SEMAPHORE_INITIALISER(sem, "object_wait_sem", 0);
+	semaphore_t sem = SEMAPHORE_INITIALIZER(sem, "object_wait_sem", 0);
 	object_wait_sync_t *syncs;
 	status_t ret, err;
 	size_t i = 0;

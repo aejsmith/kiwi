@@ -36,17 +36,17 @@ typedef struct waitq {
 	const char *name;		/**< Name of wait queue. */
 } waitq_t;
 
-/** Initialises a statically declared wait queue. */
-#define WAITQ_INITIALISER(_var, _name)	\
+/** Initializes a statically declared wait queue. */
+#define WAITQ_INITIALIZER(_var, _name)	\
 	{ \
-		.lock = SPINLOCK_INITIALISER("waitq_lock"), \
+		.lock = SPINLOCK_INITIALIZER("waitq_lock"), \
 		.threads = LIST_INITIALIZER(_var.threads), \
 		.name = _name, \
 	}
 
 /** Statically declares a new wait queue. */
 #define WAITQ_DECLARE(_var)		\
-	waitq_t _var = WAITQ_INITIALISER(_var, #_var)
+	waitq_t _var = WAITQ_INITIALIZER(_var, #_var)
 
 extern bool waitq_sleep_prepare(waitq_t *queue);
 extern void waitq_sleep_cancel(waitq_t *queue, bool state);

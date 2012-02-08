@@ -31,16 +31,16 @@ typedef struct semaphore {
 	waitq_t queue;			/**< Queue for threads to wait on. */
 } semaphore_t;
 
-/** Initialises a statically declared semaphore. */
-#define SEMAPHORE_INITIALISER(_var, _name, _initial)	\
+/** Initializes a statically declared semaphore. */
+#define SEMAPHORE_INITIALIZER(_var, _name, _initial)	\
 	{ \
 		.count = _initial, \
-		.queue = WAITQ_INITIALISER(_var.queue, _name), \
+		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
 	}
 
 /** Statically declares a new semaphore. */
 #define SEMAPHORE_DECLARE(_var, _initial)		\
-	semaphore_t _var = SEMAPHORE_INITIALISER(_var, #_var, _initial)
+	semaphore_t _var = SEMAPHORE_INITIALIZER(_var, #_var, _initial)
 
 /** Get the current value of a semaphore.
  * @param sem		Semaphore to get count of.

@@ -77,8 +77,8 @@ static int symbol_table_qsort_compare(const void *_sym1, const void *_sym2) {
 	return sym1->addr - sym2->addr;
 }
 
-/** Initialise a symbol table.
- * @param table		Table to initialise. */
+/** Initialize a symbol table.
+ * @param table		Table to initialize. */
 void symbol_table_init(symbol_table_t *table) {
 	list_init(&table->header);
 	table->symbols = NULL;
@@ -291,7 +291,7 @@ symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
 	}
 }
 
-/** Initialise the kernel symbol manager. */
+/** Initialize the kernel symbol manager. */
 __init_text void symbol_init(void) {
 	symbol_tree = kmalloc(sizeof(radix_tree_t), MM_FATAL);
 	radix_tree_init(symbol_tree);

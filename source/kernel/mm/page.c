@@ -57,7 +57,7 @@
  *
  * The allocation code is not optimised for quick allocations of contiguous
  * ranges of pages, or pages with alignment/boundary constraints, as it is
- * assumed that this will not be done frequently (e.g. in driver initialisation
+ * assumed that this will not be done frequently (e.g. in driver initialization
  * routines). The method used to do this is to search through each page of
  * memory to find free pages that satisfy the constraints.
  *
@@ -569,7 +569,7 @@ found:
  * location of the allocation. All arguments must be a multiple of the system
  * page size, and any constraints which are not required should be specified
  * as 0. It is intended that this function is not used regularly, for example
- * within driver initialisation routines, as it is not optimised for fast
+ * within driver initialization routines, as it is not optimised for fast
  * allocations. It is, however, optimised for single-page allocations with only
  * certain platform-specific minimum/maximum address constraints, for example
  * below 16MB or below 4GB on the PC platform.
@@ -822,7 +822,7 @@ __init_text void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsig
 	range->freelist = freelist;
 }
 
-/** Initialise the physical memory manager. */
+/** Initialize the physical memory manager. */
 __init_text void page_init(void) {
 	phys_ptr_t pages_base = 0, offset = 0, addr;
 	phys_size_t pages_size = 0, size;
@@ -831,7 +831,7 @@ __init_text void page_init(void) {
 	bool free;
 	size_t i;
 
-	/* Initialise page queues and freelists. */
+	/* Initialize page queues and freelists. */
 	for(i = 0; i < PAGE_QUEUE_COUNT; i++) {
 		list_init(&page_queues[i].pages);
 		page_queues[i].count = 0;
@@ -881,7 +881,7 @@ __init_text void page_init(void) {
 	/* Now check if we have enough memory in this range. */
 	size = ROUND_UP(sizeof(page_t) * total_page_count, PAGE_SIZE);
 	if(size > pages_size) {
-		fatal("Not enough contiguous memory for initialisation");
+		fatal("Not enough contiguous memory for initialization");
 	}
 	pages_size = size;
 
@@ -895,7 +895,7 @@ __init_text void page_init(void) {
 		phys_ranges[i].pages = phys_map(pages_base + offset, size, MM_FATAL);
 		offset += size;
 
-		/* Initialise each of the pages. */
+		/* Initialize each of the pages. */
 		memset(phys_ranges[i].pages, 0, size);
 		for(j = 0; j < count; j++) {
 			list_init(&phys_ranges[i].pages[j].header);
@@ -942,7 +942,7 @@ __init_text void page_init(void) {
 	kdb_register_command("page", "Display physical memory usage information.", kdb_cmd_page);
 }
 
-/** Initialise the page daemons. */
+/** Initialize the page daemons. */
 __init_text void page_daemon_init(void) {
 	status_t ret;
 
@@ -954,13 +954,13 @@ __init_text void page_daemon_init(void) {
 	thread_run(page_writer_thread);
 }
 
-/** Reclaim memory no longer in use after kernel initialisation. */
+/** Reclaim memory no longer in use after kernel initialization. */
 __init_text void page_late_init(void) {
 	phys_ptr_t addr, init_start, init_end;
 	kboot_tag_core_t *core;
 	size_t reclaimed = 0;
 
-	/* Calculate the location and size of the initialisation section. */
+	/* Calculate the location and size of the initialization section. */
 	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
 	init_start = ((ptr_t)__init_start - KERNEL_VIRT_BASE) + core->kernel_phys;
 	init_end = ((ptr_t)__init_end - KERNEL_VIRT_BASE) + core->kernel_phys;
@@ -983,7 +983,7 @@ __init_text void page_late_init(void) {
 		}
 	}
 
-	/* Free the initialisation data. Same as above applies. */
+	/* Free the initialization data. Same as above applies. */
 	for(addr = init_start; addr < init_end; addr += PAGE_SIZE) {
 		phys_free(addr, PAGE_SIZE);
 	}

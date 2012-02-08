@@ -42,8 +42,8 @@
 extern status_t kern_object_security(handle_t handle, user_id_t *uidp, group_id_t *gidp,
                                      object_acl_t *aclp);
 
-/** Initialise an ACL.
- * @param acl		ACL to initialise. */
+/** Initialize an ACL.
+ * @param acl		ACL to initialize. */
 void object_acl_init(object_acl_t *acl) {
 	acl->entries = NULL;
 	acl->count = 0;
@@ -462,7 +462,7 @@ status_t object_set_security(object_t *object, object_security_t *security) {
  * @param uidp		Where to store owning user ID.
  * @param gidp		Where to store owning group ID.
  * @param aclp		Where to store ACL. The structure referred to by this
- *			pointer must be initialised prior to calling the
+ *			pointer must be initialized prior to calling the
  *			function. If the entries pointer in the structure is
  *			NULL, then the function will store the number of
  *			entries in the ACL in the count entry and do nothing

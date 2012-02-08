@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Kernel initialisation functions.
+ * @brief		Kernel initialization functions.
  */
 
 #include <arch/memory.h>
@@ -295,7 +295,7 @@ static void init_thread(void *arg1, void *arg2) {
 	device_init();
 	fs_init();
 
-	/* Call other initialisation functions. */
+	/* Call other initialization functions. */
 	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
 		(*initcall)();
 	}
@@ -334,7 +334,7 @@ static void init_thread(void *arg1, void *arg2) {
 		}
 	}
 
-	/* Reclaim memory taken up by initialisation code/data. */
+	/* Reclaim memory taken up by initialization code/data. */
 	page_late_init();
 
 	console_update_boot_progress(100);
@@ -376,19 +376,19 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 	longjmp(buf, 1);
 }
 
-/** Initialisation code for the boot CPU. */
+/** Initialization code for the boot CPU. */
 static __init_text void kmain_bsp_bottom(void) {
 	thread_t *thread;
 	status_t ret;
 
-	/* Do early CPU subsystem and CPU initialisation. */
+	/* Do early CPU subsystem and CPU initialization. */
 	cpu_early_init();
 	cpu_early_init_percpu(&boot_cpu);
 
-	/* Initialise the security subsystem. */
+	/* Initialize the security subsystem. */
 	security_init();
 
-	/* Initialise kernel memory management subsystems. */
+	/* Initialize kernel memory management subsystems. */
 	page_init();
 	mmu_init();
 	mmu_init_percpu();
@@ -400,11 +400,11 @@ static __init_text void kmain_bsp_bottom(void) {
 	console_init();
 	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
 
-	/* Perform more per-CPU initialisation that can be done now the memory
+	/* Perform more per-CPU initialization that can be done now the memory
 	 * management subsystems are up. */
 	cpu_init_percpu();
 
-	/* Initialise the platform. */
+	/* Initialize the platform. */
 	platform_init();
 
 	/* Get the time from the hardware. */
@@ -416,15 +416,15 @@ static __init_text void kmain_bsp_bottom(void) {
 	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
 #endif
 
-	/* Properly initialise the CPU subsystem, and detect other CPUs. */
+	/* Properly initialize the CPU subsystem, and detect other CPUs. */
 	cpu_init();
 #if CONFIG_SMP
 	smp_init();
 #endif
-	/* Initialise the slab per-CPU layer. */
+	/* Initialize the slab per-CPU layer. */
 	slab_late_init();
 
-	/* Perform other initialisation tasks. */
+	/* Perform other initialization tasks. */
 	symbol_init();
 	handle_init();
 	session_init();
@@ -438,10 +438,10 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Bring up the VM system. */
 	vm_init();
 
-	/* Create the second stage initialisation thread. */
+	/* Create the second stage initialization thread. */
 	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, &thread);
 	if(ret != STATUS_SUCCESS) {
-		fatal("Could not create second-stage initialisation thread");
+		fatal("Could not create second-stage initialization thread");
 	}
 	thread_run(thread);
 
@@ -456,12 +456,12 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	/* Indicate that we have reached the kernel. */
 	smp_boot_status = SMP_BOOT_ALIVE;
 
-	/* Switch to the kernel MMU context and perform CPU initialisation. */
+	/* Switch to the kernel MMU context and perform CPU initialization. */
 	mmu_init_percpu();
 	cpu_early_init_percpu(cpu);
 	cpu_init_percpu();
 
-	/* Initialise the scheduler. */
+	/* Initialize the scheduler. */
 	sched_init();
 
 	/* Signal that we're up and add ourselves to the running CPU list. */

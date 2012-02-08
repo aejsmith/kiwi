@@ -67,8 +67,8 @@ void id_alloc_reserve(id_alloc_t *alloc, int32_t id) {
 	mutex_unlock(&alloc->lock);
 }
 
-/** Initialise an ID allocator.
- * @param alloc		Allocator to initialise.
+/** Initialize an ID allocator.
+ * @param alloc		Allocator to initialize.
  * @param max		Highest allowed ID. */
 void id_alloc_init(id_alloc_t *alloc, int32_t max) {
 	mutex_init(&alloc->lock, "id_alloc_lock", 0);

@@ -77,9 +77,9 @@ void cpu_dump(cpu_t *cpu) {
 	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
 }
 
-/** Perform early initialisation common to all CPUs. */
+/** Perform early initialization common to all CPUs. */
 __init_text void arch_cpu_early_init(void) {
-	/* Initialise the global IDT and the interrupt handler table. */
+	/* Initialize the global IDT and the interrupt handler table. */
 	idt_init();
 	intr_init();
 }
@@ -239,7 +239,7 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 	}
 }
 
-/** Initialise SYSCALL/SYSRET MSRs. */
+/** Initialize SYSCALL/SYSRET MSRs. */
 static __init_text void syscall_init(void) {
 	uint64_t fmask, lstar, star;
 
@@ -280,7 +280,7 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 		cpu->arch.double_fault_stack = boot_doublefault_stack;
 	}
 
-	/* Initialise and load descriptor tables. */
+	/* Initialize and load descriptor tables. */
 	descriptor_init(cpu);
 
 	/* Detect CPU features and information. */
@@ -387,7 +387,7 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Perform additional initialisation of the current CPU. */
+/** Perform additional initialization of the current CPU. */
 __init_text void arch_cpu_init_percpu() {
 	/* Register the KDB command. */
 	kdb_register_command("cpus", "Display a list of CPUs.", kdb_cmd_cpus);

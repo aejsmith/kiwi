@@ -664,12 +664,12 @@ static status_t slab_percpu_init(slab_cache_t *cache, int kmflag) {
 	return STATUS_SUCCESS;
 }
 
-/** Initialise a slab cache.
- * @param cache		Cache to initialise.
+/** Initialize a slab cache.
+ * @param cache		Cache to initialize.
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
- * @param ctor		Constructor callback - performs one-time initialisation
+ * @param ctor		Constructor callback - performs one-time initialization
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
@@ -746,7 +746,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 		cache->flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
 	}
 
-	/* Initialise the CPU caches if required. */
+	/* Initialize the CPU caches if required. */
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_percpu_init(cache, kmflag);
 		if(ret != STATUS_SUCCESS) {
@@ -783,7 +783,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @param name		Name of cache (for debugging purposes).
  * @param size		Size of each object.
  * @param align		Alignment of each object. Must be a power of two.
- * @param ctor		Constructor callback - performs one-time initialisation
+ * @param ctor		Constructor callback - performs one-time initialization
  *			of an object (optional).
  * @param dtor		Destructor callback - undoes anything done by the
  *			constructor, if applicable (optional).
@@ -894,13 +894,13 @@ static lrm_handler_t slab_lrm_handler = {
 	.func = slab_reclaim,
 };
 
-/** Initialise the slab allocator. */
+/** Initialize the slab allocator. */
 __init_text void slab_init(void) {
 	/* Intialise the cache for cache structures. */
 	slab_cache_init(&slab_cache_cache, "slab_cache_cache", SLAB_SIZE_ALIGN(slab_cache_t),
 		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_FATAL);
 
-	/* Initialise the magazine cache. This cannot have the magazine layer
+	/* Initialize the magazine cache. This cannot have the magazine layer
 	 * enabled, for pretty obvious reasons. */
 	slab_cache_init(&slab_mag_cache, "slab_mag_cache", SLAB_SIZE_ALIGN(slab_magazine_t),
 		NULL, NULL, NULL, SLAB_MAG_PRIORITY, SLAB_CACHE_NOMAG, MM_FATAL);

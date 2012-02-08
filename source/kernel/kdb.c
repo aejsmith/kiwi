@@ -585,7 +585,7 @@ static char *kdb_read_line(int count) {
 	size_t hist, next, pos;
 	uint16_t ch;
 
-	/* Initialise the state. */
+	/* Initialize the state. */
 	state.length = state.position = 0;
 	state.buffer = current_input_line;
 	state.buffer[0] = 0;
@@ -1673,9 +1673,9 @@ void kdb_unregister_command(const char *name) {
 	spinlock_unlock(&kdb_commands_lock);
 }
 
-/** Initialise the kernel debugger. */
+/** Initialize the kernel debugger. */
 __init_text void kdb_init(void) {
-	/* Initialise the heap. */
+	/* Initialize the heap. */
 	fixed_heap_init(&kdb_heap, kdb_heap_area, KDB_HEAP_SIZE);
 
 	/* Register architecture-specific commands. */

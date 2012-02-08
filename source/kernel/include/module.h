@@ -31,7 +31,7 @@
 #include <object.h>
 #include <symbol.h>
 
-/** Module initialisation function type. */
+/** Module initialization function type. */
 typedef status_t (*module_init_t)(void);
 
 /** Module unload function type. */
@@ -50,7 +50,7 @@ typedef struct module {
 	const char *name;		/**< Name of module. */
 	const char *description;	/**< Description of the module. */
 	const char **deps;		/**< Module dependencies. */
-	module_init_t init;		/**< Module initialisation function. */
+	module_init_t init;		/**< Module initialization function. */
 	module_unload_t unload;		/**< Module unload function. */
 
 	/** ELF loader information. */

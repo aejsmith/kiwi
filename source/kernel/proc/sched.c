@@ -458,7 +458,7 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 	}
 }
 
-/** Initialise the scheduler for the current CPU. */
+/** Initialize the scheduler for the current CPU. */
 __init_text void sched_init(void) {
 	char name[THREAD_NAME_MAX];
 	status_t ret;
@@ -490,7 +490,7 @@ __init_text void sched_init(void) {
 	/* Create the preemption timer. */
 	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL, 0);
 
-	/* Initialise queues. */
+	/* Initialize queues. */
 	for(i = 0; i < 2; i++) {
 		curr_cpu->sched->queues[i].bitmap = 0;
 		for(j = 0; j < PRIORITY_COUNT; j++) {

@@ -31,8 +31,8 @@ typedef struct notifier_func {
 	void *data;				/**< Third data argument for function. */
 } notifier_func_t;
 
-/** Initialise a notifier.
- * @param notif		Notifier to initialise.
+/** Initialize a notifier.
+ * @param notif		Notifier to initialize.
  * @param data		Pointer to pass as first argument to functions. */
 void notifier_init(notifier_t *notif, void *data) {
 	mutex_init(&notif->lock, "notifier_lock", 0);

@@ -31,16 +31,16 @@
 #include <status.h>
 
 /**
- * Initialise a bitmap.
+ * Initialize a bitmap.
  *
- * Initialises the given bitmap structure. If the data argument is supplied,
+ * Initializes the given bitmap structure. If the data argument is supplied,
  * then it should point to a preallocated memory area that's large enough to
  * store bits for each bit in the bitmap (see BITMAP_BYTES in bitmap.h).
  * Otherwise, memory for the bitmap will be dynamically allocated. If the
  * bitmap's data was not allocated by this function, then bitmap_destroy()
  * will not free it.
  *
- * @param bitmap	Bitmap to initialise.
+ * @param bitmap	Bitmap to initialize.
  * @param bits		Number of bits the bitmap should be able to hold.
  * @param data		Pointer to preallocated memory (if any).
  * @param mmflag	Allocation flags to use if allocating memory.

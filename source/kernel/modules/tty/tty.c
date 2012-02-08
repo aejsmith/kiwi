@@ -679,13 +679,13 @@ static device_ops_t tty_master_ops = {
 	.request = tty_master_request,
 };
 
-/** Initialisation function for the terminal module.
+/** Initialization function for the terminal module.
  * @return		Status code describing result of the operation. */
 static status_t tty_init(void) {
 	status_t ret;
 
 	/* Create terminal device directory. */
-	ret = device_create("tty", device_tree_root, NULL, NULL, NULL, 0, &tty_device_dir);	
+	ret = device_create("tty", device_tree_root, NULL, NULL, NULL, 0, &tty_device_dir);
 	if(ret != STATUS_SUCCESS) {
 		return ret;
 	}

@@ -44,8 +44,8 @@ extern const char *kiwi_ver_string;	/**< String of version number. */
 /** Type of an initcall function. */
 typedef void (*initcall_t)(void);
 
-/** Macro to declare an initialisation function.
- * @note		Initcalls are called in the initialisation thread,
+/** Macro to declare an initialization function.
+ * @note		Initcalls are called in the initialization thread,
  *			after other CPUs have been booted. They are called in
  *			the order that they are in the initcall section. */
 #define INITCALL(func)	\

@@ -36,8 +36,8 @@ extern void amd64_enter_userspace(ptr_t entry, ptr_t sp, ptr_t arg) __noreturn;
 extern void amd64_context_switch(ptr_t new_rsp, ptr_t *old_rsp);
 extern void amd64_context_restore(ptr_t new_rsp);
 
-/** Initialise AMD64-specific thread data.
- * @param thread	Thread to initialise.
+/** Initialize AMD64-specific thread data.
+ * @param thread	Thread to initialize.
  * @param entry		Entry point for the thread. */
 void arch_thread_init(thread_t *thread, void (*entry)(void)) {
 	unative_t *sp;
@@ -49,7 +49,7 @@ void arch_thread_init(thread_t *thread, void (*entry)(void)) {
 	/* Point the RSP for SYSCALL entry at the top of the stack. */
 	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
 
-	/* Initialise the kernel stack. First value is a fake return address to
+	/* Initialize the kernel stack. First value is a fake return address to
 	 * make the backtrace end correctly and maintain ABI alignment
 	 * requirements: ((RSP - 8) % 16) == 0 on entry to a function. */
 	sp = (unative_t *)thread->arch.kernel_rsp;

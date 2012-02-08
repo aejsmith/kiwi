@@ -172,8 +172,8 @@ void mutex_unlock(mutex_t *lock) {
 	spinlock_unlock(&lock->queue.lock);
 }
 
-/** Initialise a mutex.
- * @param lock		Mutex to initialise.
+/** Initialize a mutex.
+ * @param lock		Mutex to initialize.
  * @param name		Name to give the mutex.
  * @param flags		Behaviour flags for the mutex. */
 void mutex_init(mutex_t *lock, const char *name, int flags) {

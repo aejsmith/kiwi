@@ -203,8 +203,8 @@ void rwlock_unlock(rwlock_t *lock) {
 	spinlock_unlock(&lock->queue.lock);
 }
 
-/** Initialise a readers-writer lock.
- * @param lock		Lock to initialise.
+/** Initialize a readers-writer lock.
+ * @param lock		Lock to initialize.
  * @param name		Name to give lock. */
 void rwlock_init(rwlock_t *lock, const char *name) {
 	waitq_init(&lock->queue, name);

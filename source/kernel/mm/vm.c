@@ -1539,7 +1539,7 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 	return KDB_SUCCESS;
 }
 
-/** Initialise the VM system. */
+/** Initialize the VM system. */
 __init_text void vm_init(void) {
 	/* Create the VM slab caches. */
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
@@ -1554,7 +1554,7 @@ __init_text void vm_init(void) {
 	/* Bring up the page daemons. */
 	page_daemon_init();
 
-	/* Initialise the caching system. */
+	/* Initialize the caching system. */
 	vm_cache_init();
 
 	/* Register the KDB command. */

@@ -253,7 +253,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
 	//object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_FS_ADMIN,
 	//                     OBJECT_SET_ACL | OBJECT_SET_OWNER | FS_READ | FS_WRITE | FS_EXECUTE);
 
-	/* Initialise the node's object header. Only regular files and
+	/* Initialize the node's object header. Only regular files and
 	 * directories can have handles opened to them. */
 	switch(type) {
 	case FILE_TYPE_REGULAR:
@@ -2130,7 +2130,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 		}
 	}
 
-	/* Initialise the mount structure. */
+	/* Initialize the mount structure. */
 	mount = kmalloc(sizeof(fs_mount_t), MM_SLEEP);
 	mutex_init(&mount->lock, "fs_mount_lock", 0);
 	avl_tree_init(&mount->nodes);
@@ -2594,7 +2594,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Initialise the filesystem layer. */
+/** Initialize the filesystem layer. */
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
 	                                  NULL, NULL, NULL, 0, MM_FATAL);
@@ -3546,7 +3546,7 @@ status_t kern_fs_info(const char *path, bool follow, file_info_t *infop) {
  * @param uidp		Where to store owning user ID.
  * @param gidp		Where to store owning group ID.
  * @param aclp		Where to store ACL. The structure referred to by this
- *			pointer must be initialised prior to calling the
+ *			pointer must be initialized prior to calling the
  *			function. If the entries pointer in the structure is
  *			NULL, then the function will store the number of
  *			entries in the ACL in the count entry and do nothing

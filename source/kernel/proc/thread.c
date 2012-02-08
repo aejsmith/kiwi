@@ -584,10 +584,10 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	strncpy(thread->name, name, THREAD_NAME_MAX);
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
-	/* Allocate a kernel stack and initialise the thread context. */
+	/* Allocate a kernel stack and initialize the thread context. */
 	thread->kstack = heap_alloc(KSTACK_SIZE, MM_SLEEP);
 
-	/* Initialise the architecture-specific data. */
+	/* Initialize the architecture-specific data. */
 	arch_thread_init(thread, thread_trampoline);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
@@ -619,7 +619,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
 
-	/* Initialise signal handling state. */
+	/* Initialize signal handling state. */
 	thread->signal_mask = 0;
 	memset(thread->signal_info, 0, sizeof(thread->signal_info));
 	thread->signal_stack.ss_sp = NULL;
@@ -790,9 +790,9 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Initialise the thread system. */
+/** Initialize the thread system. */
 __init_text void thread_init(void) {
-	/* Initialise the thread ID allocator. */
+	/* Initialize the thread ID allocator. */
 	id_alloc_init(&thread_id_allocator, 65535);
 
 	/* Create the thread slab cache. */

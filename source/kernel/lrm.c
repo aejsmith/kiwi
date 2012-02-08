@@ -192,7 +192,7 @@ int lrm_level(uint32_t types) {
 /** Attempt to reclaim a resource.
  * @param type		Type of resource to reclaim. */
 void lrm_reclaim(uint32_t type) {
-	/* If the LRM has not been initialised yet, then we can't do anything. */
+	/* If the LRM has not been initialized yet, then we can't do anything. */
 	if(unlikely(!lrm_thread)) {
 		switch(type) {
 		case RESOURCE_TYPE_MEMORY:
@@ -276,7 +276,7 @@ static kdb_status_t kdb_cmd_lrm(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Perform LRM initialisation. */
+/** Perform LRM initialization. */
 __init_text void lrm_init(void) {
 	status_t ret;
 

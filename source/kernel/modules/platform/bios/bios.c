@@ -306,8 +306,8 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 }
 MODULE_EXPORT(bios_interrupt);
 
-/** Initialise a registers structure.
- * @param regs		Structure to initialise. */
+/** Initialize a registers structure.
+ * @param regs		Structure to initialize. */
 void bios_regs_init(bios_regs_t *regs) {
 	memset(regs, 0, sizeof(bios_regs_t));
 	regs->eflags = X86_FLAGS_IF | X86_FLAGS_ALWAYS1;
@@ -329,7 +329,7 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 	mmu_context_unlock(&kernel_mmu_context);
 }
 
-/** Initialisation function for the BIOS module.
+/** Initialization function for the BIOS module.
  * @return		Status code describing result of the operation. */
 static status_t bios_init(void) {
 	/* Allocate a chunk of heap space and map stuff into it. */
@@ -339,7 +339,7 @@ static status_t bios_init(void) {
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);
 
-	/* Initialise the I/O and memory functions for X86EMU. */
+	/* Initialize the I/O and memory functions for X86EMU. */
 	X86EMU_setupPioFuncs(&x86emu_pio_funcs);
 	X86EMU_setupMemFuncs(&x86emu_mem_funcs);
 	return STATUS_SUCCESS;

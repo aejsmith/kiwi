@@ -35,18 +35,18 @@ typedef struct mutex {
 #endif
 } mutex_t;
 
-/** Initialises a statically declared mutex. */
-#define MUTEX_INITIALISER(_var, _name, _flags)	\
+/** Initializes a statically declared mutex. */
+#define MUTEX_INITIALIZER(_var, _name, _flags)	\
 	{ \
 		.locked = 0, \
-		.queue = WAITQ_INITIALISER(_var.queue, _name), \
+		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
 		.holder = NULL, \
 		.flags = _flags, \
 	}
 
 /** Statically declares a new mutex. */
 #define MUTEX_DECLARE(_var, _flags)		\
-	mutex_t _var = MUTEX_INITIALISER(_var, #_var, _flags)
+	mutex_t _var = MUTEX_INITIALIZER(_var, #_var, _flags)
 
 /** Mutex behaviour flags. */
 #define MUTEX_RECURSIVE		(1<<0)	/**< Allow recursive locking by a thread. */

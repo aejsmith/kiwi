@@ -25,8 +25,8 @@
 #include <arch/setjmp.h>
 #include <types.h>
 
-/** Initialise a jump buffer.
- * @param buf		Buffer to initialise.
+/** Initialize a jump buffer.
+ * @param buf		Buffer to initialize.
  * @param func		Function that should be called.
  * @param stack		Base of stack to use.
  * @param size		Size of stack. */

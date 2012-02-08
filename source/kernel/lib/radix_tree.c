@@ -476,7 +476,7 @@ void *radix_tree_lookup(radix_tree_t *tree, const char *key) {
 	return (node) ? node->value : NULL;
 }
 
-/** Initialise a radix tree.
+/** Initialize a radix tree.
  * @param tree		Tree to destroy. */
 void radix_tree_init(radix_tree_t *tree) {
 	/* Clear the root node. */

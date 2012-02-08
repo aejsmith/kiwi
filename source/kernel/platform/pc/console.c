@@ -252,5 +252,5 @@ __init_text void platform_console_early_init(void) {
 /** Set up the console. */
 __init_text void platform_console_init(void) {
 	/* We use the framebuffer set up by KBoot, don't need any specific
-	 * initialisation here. */
+	 * initialization here. */
 }

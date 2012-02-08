@@ -548,7 +548,7 @@ void mmu_context_switch(mmu_context_t *ctx) {
 	x86_write_cr3(ctx->pml4);
 }
 
-/** Create and initialise an MMU context.
+/** Create and initialize an MMU context.
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to new context, NULL on allocation failure. */
 mmu_context_t *mmu_context_create(int mmflag) {
@@ -657,7 +657,7 @@ __init_text void arch_mmu_init(void) {
 	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_FATAL, &ap_bootstrap_page);
 #endif
 
-	/* Initialise the kernel MMU context structure. */
+	/* Initialize the kernel MMU context structure. */
 	mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
 	kernel_mmu_context.invalidate_count = 0;
 	kernel_mmu_context.pml4 = alloc_structure(MM_FATAL);
@@ -707,7 +707,7 @@ __init_text void arch_mmu_init(void) {
 /** Get a PAT entry. */
 #define PAT(e, t)	((uint64_t)t << ((e) * 8))
 
-/** Initialise the MMU for this CPU. */
+/** Initialize the MMU for this CPU. */
 __init_text void arch_mmu_init_percpu(void) {
 	uint64_t pat;
 

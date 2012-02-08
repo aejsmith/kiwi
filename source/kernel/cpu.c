@@ -48,8 +48,8 @@ cpu_t **cpus = NULL;			/**< Array of CPU structure pointers (index == CPU ID). *
 volatile int cpu_boot_wait = 0;
 #endif
 
-/** Initialise a CPU structure.
- * @param cpu		Structure to initialise.
+/** Initialize a CPU structure.
+ * @param cpu		Structure to initialize.
  * @param id		ID of the CPU to add.
  * @param state		State of the CPU. */
 static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
@@ -59,12 +59,12 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
 	cpu->state = state;
 
 #if CONFIG_SMP
-	/* Initialise SMP call information. */
+	/* Initialize SMP call information. */
 	list_init(&cpu->call_queue);
 	spinlock_init(&cpu->call_lock, "ipi_lock");
 #endif
 
-	/* Initialise timer information. */
+	/* Initialize timer information. */
 	list_init(&cpu->timers);
 	spinlock_init(&cpu->timer_lock, "timer_lock");
 }
@@ -97,30 +97,30 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 }
 #endif
 
-/** Perform early CPU subsystem initialisation. */
+/** Perform early CPU subsystem initialization. */
 __init_text void cpu_early_init(void) {
 	/* The boot CPU is initially assigned an ID of 0. It is later corrected
 	 * once we have the ability to get the real ID. */
 	cpu_ctor(&boot_cpu, 0, CPU_RUNNING);
 	list_append(&running_cpus, &boot_cpu.header);
 
-	/* Perform architecture initialisation. This initialises some state
+	/* Perform architecture initialization. This initializes some state
 	 * shared between all CPUs. */
 	arch_cpu_early_init();
 }
 
-/** Perform early per-CPU initialisation.
+/** Perform early per-CPU initialization.
  * @param cpu		Structure for the current CPU. */
 __init_text void cpu_early_init_percpu(cpu_t *cpu) {
 	arch_cpu_early_init_percpu(cpu);
 }
 
-/** Perform additional per-CPU initialisation. */
+/** Perform additional per-CPU initialization. */
 __init_text void cpu_init_percpu() {
 	arch_cpu_init_percpu();
 }
 
-/** Properly initialise the CPU subsystem. */
+/** Properly initialize the CPU subsystem. */
 __init_text void cpu_init(void) {
 	/* Get the real ID of the boot CPU. */
 	boot_cpu.id = highest_cpu_id = cpu_id();

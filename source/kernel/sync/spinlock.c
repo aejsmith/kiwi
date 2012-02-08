@@ -243,8 +243,8 @@ void spinlock_unlock_ni(spinlock_t *lock) {
 	atomic_set(&lock->value, 1);
 }
 
-/** Initialise a spinlock structure.
- * @param lock		Spinlock to initialise.
+/** Initialize a spinlock structure.
+ * @param lock		Spinlock to initialize.
  * @param name		Name of the spinlock, used for debugging purposes. */
 void spinlock_init(spinlock_t *lock, const char *name) {
 	atomic_set(&lock->value, 1);

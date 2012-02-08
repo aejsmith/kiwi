@@ -119,8 +119,8 @@ void dpc_request(dpc_function_t function, void *arg) {
 	spinlock_unlock(&dpc_lock);
 }
 
-/** Check whether the DPC system has been initialised.
- * @return		Whether initialised. */
+/** Check whether the DPC system has been initialized.
+ * @return		Whether initialized. */
 bool dpc_inited(void) {
 	return dpc_thread;
 }

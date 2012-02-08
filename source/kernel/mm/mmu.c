@@ -21,14 +21,14 @@
 
 #include <mm/mmu.h>
 
-/** Initialise the kernel MMU context. */
+/** Initialize the kernel MMU context. */
 __init_text void mmu_init(void) {
 	arch_mmu_init();
 }
 
-/** Perform per-CPU MMU initialisation. */
+/** Perform per-CPU MMU initialization. */
 __init_text void mmu_init_percpu(void) {
-	/* Do architecture-specific initialisation. */
+	/* Do architecture-specific initialization. */
 	arch_mmu_init_percpu();
 
 	/* Switch to the kernel context. */

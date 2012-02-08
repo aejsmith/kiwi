@@ -233,9 +233,9 @@ static object_type_t process_object_type = {
 };
 
 /**
- * Allocate a process structure and initialise it.
+ * Allocate a process structure and initialize it.
  *
- * Allocates a new process structure and initialises it. If uhandlep is not
+ * Allocates a new process structure and initializes it. If uhandlep is not
  * NULL, then a handle to the process will be created in the parent, and it
  * will be placed in the location(s) specified.
  *
@@ -381,7 +381,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_SECURITY_AUTHORITY,
 	                     PROCESS_RIGHT_SECURITY);
 
-	/* Initialise the remainder of the structure. */
+	/* Initialize the remainder of the structure. */
 	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
 	refcount_set(&process->count, (uhandlep) ? 1 : 0);
 	io_context_init(&process->ioctx, (parent) ? &parent->ioctx : NULL);
@@ -775,7 +775,7 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 	return KDB_SUCCESS;;
 }
 
-/** Initialise the process table and slab cache. */
+/** Initialize the process table and slab cache. */
 __init_text void process_init(void) {
 	object_acl_t acl;
 	object_security_t security = { 0, 0, &acl };
@@ -803,7 +803,7 @@ __init_text void process_init(void) {
 	                    NULL, NULL, NULL, 0, NULL, NULL, 0, &security,
 	                    &kernel_proc, 0, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
-		fatal("Could not initialise kernel process (%d)", ret);
+		fatal("Could not initialize kernel process (%d)", ret);
 	}
 }
 

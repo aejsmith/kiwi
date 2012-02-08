@@ -138,7 +138,7 @@ void entry_cache_remove(entry_cache_t *cache, const char *name) {
 	mutex_unlock(&cache->lock);
 }
 
-/** Initialise the entry cache slab cache. */
+/** Initialize the entry cache slab cache. */
 static __init_text void entry_cache_init(void) {
 	entry_cache_cache = slab_cache_create("entry_cache_cache", sizeof(entry_cache_t),
 	                                      0, entry_cache_ctor, NULL, NULL, 0,

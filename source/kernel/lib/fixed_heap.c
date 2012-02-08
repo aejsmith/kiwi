@@ -130,8 +130,8 @@ void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
 	}
 }
 
-/** Initialise a fixed heap allocator.
- * @param heap		Heap to initialise.
+/** Initialize a fixed heap allocator.
+ * @param heap		Heap to initialize.
  * @param mem		Memory area to use.
  * @param size		Size of memory area. */
 void fixed_heap_init(fixed_heap_t *heap, void *mem, size_t size) {

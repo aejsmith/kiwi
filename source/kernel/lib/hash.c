@@ -121,8 +121,8 @@ list_t *hash_lookup(hash_t *hash, key_t key) {
 	return NULL;
 }
 
-/** Initialise a hash table.
- * @param hash		Hash table to initialise.
+/** Initialize a hash table.
+ * @param hash		Hash table to initialize.
  * @param entries	Estimated number of entries.
  * @param ops		Hash table operations structure.
  * @param mmflag	Allocation flags.
@@ -140,7 +140,7 @@ status_t hash_init(hash_t *hash, size_t entries, hash_ops_t *ops, int mmflag) {
 		}
 	}
 
-	/* Allocate and initialise buckets. */
+	/* Allocate and initialize buckets. */
 	hash->buckets = kmalloc(sizeof(list_t) * hash->entries, mmflag);
 	if(hash->buckets == NULL) {
 		return STATUS_NO_MEMORY;

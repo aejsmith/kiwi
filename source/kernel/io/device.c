@@ -819,7 +819,7 @@ static kdb_status_t kdb_cmd_device(int argc, char **argv, kdb_filter_t *filter) 
 	return KDB_SUCCESS;
 }
 
-/** Initialise the device manager. */
+/** Initialize the device manager. */
 __init_text void device_init(void) {
 	status_t ret;
 

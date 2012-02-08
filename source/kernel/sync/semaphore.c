@@ -102,8 +102,8 @@ void semaphore_up(semaphore_t *sem, size_t count) {
 	spinlock_unlock(&sem->queue.lock);
 }
 
-/** Initialise a semaphore structure.
- * @param sem		Semaphore to initialise.
+/** Initialize a semaphore structure.
+ * @param sem		Semaphore to initialize.
  * @param name		Name of the semaphore, for debugging purposes.
  * @param initial	Initial value of the semaphore. */
 void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
@@ -312,7 +312,7 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 	return STATUS_SUCCESS;
 }
 
-/** Initialise the semaphore ID allocator. */
+/** Initialize the semaphore ID allocator. */
 static __init_text void semaphore_id_init(void) {
 	id_alloc_init(&semaphore_id_allocator, 65535);
 }

@@ -263,8 +263,8 @@ bool timer_tick(void) {
 	return preempt;
 }
 
-/** Initialise a timer structure.
- * @param timer		Timer to initialise.
+/** Initialize a timer structure.
+ * @param timer		Timer to initialize.
  * @param func		Function to call when the timer expires.
  * @param data		Data argument to pass to timer.
  * @param flags		Behaviour flags for the timer. */
@@ -443,9 +443,9 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
 	return KDB_SUCCESS;
 }
 
-/** Initialise the timing system. */
+/** Initialize the timing system. */
 __init_text void time_init(void) {
-	/* Initialise the boot time. */
+	/* Initialize the boot time. */
 	boot_unix_time = time_from_hardware() - system_time();
 
 	/* Register debugger commands. */

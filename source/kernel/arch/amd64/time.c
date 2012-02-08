@@ -71,7 +71,7 @@ __init_text void tsc_init_target(void) {
 }
 
 #if CONFIG_SMP
-/** Boot CPU side of TSC initialisation. */
+/** Boot CPU side of TSC initialization. */
 __init_text void tsc_init_source(void) {
 	/* Wait for the AP to get into tsc_init_target(). */
 	while(smp_boot_status != SMP_BOOT_TSC_SYNC1) {

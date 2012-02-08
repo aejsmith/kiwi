@@ -58,7 +58,7 @@ static timer_device_t pit_timer_device = {
 	.disable = pit_disable,
 };
 
-/** Initialise the PIT timer. */
+/** Initialize the PIT timer. */
 __init_text void pit_init(void) {
 	timer_device_set(&pit_timer_device);
 }

@@ -158,7 +158,7 @@ static void nm_fault(intr_frame_t *frame) {
 
 		/* If the thread has the ARCH_THREAD_HAVE_FPU flag set, we have
 		 * used the FPU previously and so have a state to restore.
-		 * Otherwise, initialise a new state. */
+		 * Otherwise, initialize a new state. */
 		if(curr_thread->arch.flags & ARCH_THREAD_HAVE_FPU) {
 			x86_fpu_restore(curr_thread->arch.fpu);
 		} else {
@@ -336,7 +336,7 @@ void intr_handler(intr_frame_t *frame) {
 	}
 }
 
-/** Initialise the interrupt handler table. */
+/** Initialize the interrupt handler table. */
 __init_text void intr_init(void) {
 	size_t i;
 

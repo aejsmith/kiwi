@@ -301,7 +301,7 @@ static void connection_object_close(object_handle_t *handle) {
 		message = list_entry(iter, ipc_message_t, header);
 
 		/* We must change the semaphores even though the endpoint is
-		 * being freed as they are initialised in the slab constructor
+		 * being freed as they are initialized in the slab constructor
 		 * rather than after being allocated. */
 		ret = semaphore_down_etc(&endpoint->data_sem, 0, 0);
 		assert(ret == STATUS_SUCCESS);
@@ -1136,9 +1136,9 @@ static kdb_status_t kdb_cmd_endpoint(int argc, char **argv, kdb_filter_t *filter
 	return KDB_SUCCESS;
 }
 
-/** Initialise the IPC slab caches. */
+/** Initialize the IPC slab caches. */
 static __init_text void ipc_init(void) {
-	/* Initialise the port ID allocator. */
+	/* Initialize the port ID allocator. */
 	id_alloc_init(&port_id_allocator, 65535);
 
 	/* Create the IPC structure caches. */

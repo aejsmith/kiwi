@@ -326,7 +326,7 @@ extern status_t fs_unlink(const char *path);
 //extern status_t fs_sync(void);
 
 /**
- * Initialisation/shutdown functions.
+ * Initialization/shutdown functions.
  */
 
 extern void fs_init(void);

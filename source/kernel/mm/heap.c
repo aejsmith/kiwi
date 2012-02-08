@@ -234,7 +234,7 @@ static heap_tag_t *heap_hash_find(ptr_t addr, size_t size) {
 		 * want to have to wait for the periodic rehash. */
 		if(i >= HEAP_REHASH_THRESHOLD && !heap_rehash_requested) {
 			dprintf("heap: saw %zu allocations in search on chain %u, triggering rehash\n",
-				i, hash);
+			        i, hash);
 			heap_rehash_requested = true;
 			// TODO: trigger rehash
 		}
@@ -242,7 +242,7 @@ static heap_tag_t *heap_hash_find(ptr_t addr, size_t size) {
 		/* Check that it is the expected size. */
 		if(unlikely(tag->size != size)) {
 			fatal("Incorrect size for heap allocation %p (given: %zu, actual: %zu)",
-				addr, size, tag->size);
+			      addr, size, tag->size);
 		}
 
 		/* Erase the allocation and return it. */
@@ -553,12 +553,12 @@ void heap_unmap_range(void *addr, size_t size, bool shared) {
 	mutex_unlock(&heap_lock);
 }
 
-/** Initialise the kernel heap allocator. */
+/** Initialize the kernel heap allocator. */
 __init_text void heap_init(void) {
 	heap_tag_t *tag;
 	unsigned i;
 
-	/* Initialise lists. */
+	/* Initialize lists. */
 	for(i = 0; i < HEAP_INITIAL_HASH_SIZE; i++) {
 		list_init(&initial_heap_hash[i]);
 	}

@@ -317,12 +317,12 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 		goto fail;
 	}
 
-	/* Publish the symbol table. Do this before calling the initialisation
+	/* Publish the symbol table. Do this before calling the initialization
 	 * function so backtraces will have the correct symbols if the call
 	 * ends up inside KDB. */
 	symbol_table_publish(&module->symtab);
 
-	/* Call the module initialisation function. */
+	/* Call the module initialization function. */
 	dprintf("module: calling init function %p for module %p(%s)...\n",
 		module->init, module, module->name);
 	ret = module->init();

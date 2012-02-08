@@ -65,7 +65,7 @@ typedef struct security_context {
 	uint64_t caps[SECURITY_MAX_CAPS / 64];
 } security_context_t;
 
-/** Initialise a security context.
+/** Initialize a security context.
  * @param context	Context to intialise. */
 static inline void security_context_init(security_context_t *context) {
 	size_t i;

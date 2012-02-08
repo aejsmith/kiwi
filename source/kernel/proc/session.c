@@ -67,7 +67,7 @@ void session_release(session_t *session) {
 	}
 }
 
-/** Initialise the session ID allocator. */
+/** Initialize the session ID allocator. */
 __init_text void session_init(void) {
 	id_alloc_init(&session_id_allocator, 4095);
 }

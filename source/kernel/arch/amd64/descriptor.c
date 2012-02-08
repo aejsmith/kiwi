@@ -106,7 +106,7 @@ static gdt_entry_t initial_gdt[GDT_ENTRY_COUNT] __aligned(8) = {
 static idt_entry_t kernel_idt[IDT_ENTRY_COUNT] __aligned(8);
 
 /** Set up the GDT for the current CPU.
- * @param cpu		CPU to initialise for. */
+ * @param cpu		CPU to initialize for. */
 static __init_text void gdt_init(cpu_t *cpu) {
 	gdt_tss_entry_t *desc;
 	size_t size;
@@ -155,7 +155,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 }
 
 /** Set up the TSS for the current CPU.
- * @param cpu		CPU to initialise for. */
+ * @param cpu		CPU to initialize for. */
 static __init_text void tss_init(cpu_t *cpu) {
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
@@ -167,10 +167,10 @@ static __init_text void tss_init(cpu_t *cpu) {
 	ltr(KERNEL_TSS);
 }
 
-/** Initialise descriptor tables for the current CPU.
- * @param cpu		CPU to initialise for. */
+/** Initialize descriptor tables for the current CPU.
+ * @param cpu		CPU to initialize for. */
 __init_text void descriptor_init(cpu_t *cpu) {
-	/* Initialise and load the GDT/TSS. */
+	/* Initialize and load the GDT/TSS. */
 	gdt_init(cpu);
 	tss_init(cpu);
 
@@ -178,7 +178,7 @@ __init_text void descriptor_init(cpu_t *cpu) {
 	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
 }
 
-/** Initialise the IDT shared by all CPUs. */
+/** Initialize the IDT shared by all CPUs. */
 __init_text void idt_init(void) {
 	unative_t i;
 	ptr_t addr;

@@ -263,7 +263,7 @@ vm_cache_ops_t file_map_vm_cache_ops = {
 	.write_page = file_map_write_page,
 };
 
-/** Initialise the file map slab cache. */
+/** Initialize the file map slab cache. */
 static __init_text void file_map_init(void) {
 	file_map_cache = slab_cache_create("file_map_cache", sizeof(file_map_t),
 	                                   0, file_map_ctor, NULL, NULL, 0,

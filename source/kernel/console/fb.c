@@ -492,13 +492,13 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 	}
 }
 
-/** Initialise the framebuffer console. */
+/** Initialize the framebuffer console. */
 __init_text void console_init(void) {
 	uint16_t width, height;
 	kboot_tag_lfb_t *lfb;
 	fb_info_t info;
 
-	/* Do platform initialisation. */
+	/* Do platform initialization. */
 	platform_console_init();
 
 	/* Look up the KBoot framebuffer tag. */

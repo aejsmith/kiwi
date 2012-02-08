@@ -128,7 +128,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	bool state;
 
 	/* Must perform this check to prevent problems if fatal() is called
-	 * before we've initialised the LAPIC. */
+	 * before we've initialized the LAPIC. */
 	if(!lapic_mapping) {
 		return;
 	}
@@ -191,7 +191,7 @@ static __init_text uint64_t calculate_lapic_frequency(void) {
 	return (lticks * 8 * PIT_BASE_FREQUENCY) / pticks;
 }
 
-/** Initialise the local APIC on the current CPU. */
+/** Initialize the local APIC on the current CPU. */
 __init_text void lapic_init(void) {
 	uint64_t base;
 

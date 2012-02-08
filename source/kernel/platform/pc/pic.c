@@ -131,9 +131,9 @@ static irq_controller_t pic_irq_controller = {
 	.disable = pic_disable,
 };
 
-/** Initialise the PIC. */
+/** Initialize the PIC. */
 __init_text void pic_init(void) {
-	/* Send an initialisation command to both PICs (ICW1). */
+	/* Send an initialization command to both PICs (ICW1). */
 	out8(PIC_MASTER_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 	out8(PIC_SLAVE_COMMAND, PIC_ICW1_INIT | PIC_ICW1_ICW4);
 
@@ -156,6 +156,6 @@ __init_text void pic_init(void) {
 	/* Get the trigger modes. */
 	pic_level_triggered = (in8(PIC_SLAVE_ELCR) << 8) | in8(PIC_MASTER_ELCR);
 
-	/* Initialise the IRQ handling system. */
+	/* Initialize the IRQ handling system. */
 	irq_init(&pic_irq_controller);
 }

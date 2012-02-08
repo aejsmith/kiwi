@@ -68,7 +68,7 @@
 .endm
 
 /** Macro to define an ISR.
- * @note		Aligned to 16 bytes because the IDT initialisation
+ * @note		Aligned to 16 bytes because the IDT initialization
  *			code requires each handler to be 16 bytes.
  * @param nr		Interrupt vector number. */
 .macro ISR nr
@@ -79,7 +79,7 @@
 .endm
 
 /** Macro to define an ISR with an error code.
- * @note		Aligned to 16 bytes because the IDT initialisation
+ * @note		Aligned to 16 bytes because the IDT initialization
  *			code requires each handler to be 16 bytes.
  * @param nr		Interrupt vector number. */
 .macro ISR_E nr

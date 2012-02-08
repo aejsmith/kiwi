@@ -31,17 +31,17 @@ typedef struct rwlock {
 	waitq_t queue;			/**< Queue to sleep on. */
 } rwlock_t;
 
-/** Initialises a statically declared readers-writer lock. */
-#define RWLOCK_INITIALISER(_var, _name)		\
+/** Initializes a statically declared readers-writer lock. */
+#define RWLOCK_INITIALIZER(_var, _name)		\
 	{ \
 		.held = 0, \
 		.readers = 0, \
-		.queue = WAITQ_INITIALISER(_var.queue, _name), \
+		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
 	}
 
 /** Statically declares a new readers-writer lock. */
 #define RWLOCK_DECLARE(_var)			\
-	rwlock_t _var = RWLOCK_INITIALISER(_var, #_var)
+	rwlock_t _var = RWLOCK_INITIALIZER(_var, #_var)
 
 extern status_t rwlock_read_lock_etc(rwlock_t *lock, useconds_t timeout, int flags);
 extern status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags);

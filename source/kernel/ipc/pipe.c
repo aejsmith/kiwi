@@ -253,7 +253,7 @@ void pipe_destroy(pipe_t *pipe) {
 	slab_cache_free(pipe_cache, pipe);
 }
 
-/** Initialise the pipe slab cache. */
+/** Initialize the pipe slab cache. */
 static __init_text void pipe_cache_init(void) {
 	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
 	                               NULL, NULL, 0, MM_FATAL);

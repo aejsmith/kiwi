@@ -345,7 +345,7 @@ void smp_call_acknowledge(status_t status) {
 	}
 }
 
-/** Initialise the SMP call system and detect secondary CPUs. */
+/** Initialize the SMP call system and detect secondary CPUs. */
 __init_text void smp_init(void) {
 	smp_call_t *calls;
 	size_t i, count;
@@ -367,7 +367,7 @@ __init_text void smp_init(void) {
 	count = cpu_count * SMP_CALLS_PER_CPU;
 	calls = kcalloc(count, sizeof(smp_call_t), MM_FATAL);
 
-	/* Initialise each structure and add it to the pool. */
+	/* Initialize each structure and add it to the pool. */
 	for(i = 0; i < count; i++) {
 		list_init(&calls[i].cpu_link);
 

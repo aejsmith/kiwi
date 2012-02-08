@@ -179,8 +179,8 @@ bool waitq_empty(waitq_t *queue) {
 	return ret;
 }
 
-/** Initialise a wait queue structure.
- * @param queue		Wait queue to initialise.
+/** Initialize a wait queue structure.
+ * @param queue		Wait queue to initialize.
  * @param name		Name of wait queue. */
 void waitq_init(waitq_t *queue, const char *name) {
 	spinlock_init(&queue->lock, "waitq_lock");

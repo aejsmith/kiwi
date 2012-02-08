@@ -285,14 +285,14 @@ out:
 	}
 }
 
-/** Initialise the IRQ handling system.
+/** Initialize the IRQ handling system.
  * @param ctrlr		IRQ controller to use. */
 __init_text void irq_init(irq_controller_t *ctrlr) {
 	size_t i;
 
 	assert(ctrlr->mode);
 
-	/* Initialise the IRQ table. */
+	/* Initialize the IRQ table. */
 	for(i = 0; i < IRQ_COUNT; i++) {
 		spinlock_init(&irq_table[i].lock, "irq_lock");
 		list_init(&irq_table[i].handlers);

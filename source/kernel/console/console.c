@@ -153,8 +153,8 @@ uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
 	}
 }
 
-/** Initialise an ANSI escape code parser data structure.
- * @param parser	Parser to initialise. */
+/** Initialize an ANSI escape code parser data structure.
+ * @param parser	Parser to initialize. */
 void ansi_parser_init(ansi_parser_t *parser) {
 	parser->length = -1;
 }
@@ -351,7 +351,7 @@ static __init_text void kconsole_device_init(void) {
 }
 INITCALL(kconsole_device_init);
 
-/** Initialise the debug console. */
+/** Initialize the debug console. */
 void console_early_init(void) {
 	platform_console_early_init();
 

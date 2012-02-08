@@ -208,7 +208,7 @@ group_id_t security_current_gid(void) {
 	}
 }
 
-/** Initialise the security system. */
+/** Initialize the security system. */
 __init_text void security_init(void) {
 	security_context_init(&init_security_context);
 	security_context_set_uid(&init_security_context, 0);

@@ -179,7 +179,7 @@ void kfree(void *addr) {
 	}
 }
 
-/** Initialise the allocator caches. */
+/** Initialize the allocator caches. */
 __init_text void malloc_init(void) {
 	char name[SLAB_NAME_MAX];
 	size_t i, size;

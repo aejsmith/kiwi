@@ -632,7 +632,7 @@ static fs_type_t ext2_fs_type = {
 	.mount = ext2_mount,
 };
 
-/** Initialisation function for the Ext2 module.
+/** Initialization function for the Ext2 module.
  * @return		0 on success, negative error code on failure. */
 static status_t ext2_init(void) {
 	return fs_type_register(&ext2_fs_type);
