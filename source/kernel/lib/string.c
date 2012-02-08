@@ -93,7 +93,6 @@ void *memset(void *dest, int val, size_t count) {
 	unsigned char c = val & 0xff;
 	unsigned long *nd, nval;
 	char *d = (char *)dest;
-	size_t i;
 
 	/* Align the destination. */
 	while((ptr_t)d & (sizeof(unsigned long) - 1)) {
@@ -109,13 +108,13 @@ void *memset(void *dest, int val, size_t count) {
 		nd = (unsigned long *)d;
 
 		/* Compute the value we will write. */
-		nval = c;
-		if(nval != 0) {
-			for(i = 8; i < (sizeof(unsigned long) * 8); i <<= 1) {
-				nval = (nval << i) | nval;
-			}
-		}
-
+#if CONFIG_ARCH_64BIT
+		nval = c * 0x0101010101010101ul;
+#elif CONFIG_ARCH_32BIT
+		nval = c * 0x01010101ul;
+#else
+# error "Unsupported"
+#endif
 		/* Unroll the loop if possible. */
 		while(count >= (sizeof(unsigned long) * 4)) {
 			*nd++ = nval;
@@ -203,9 +202,10 @@ int memcmp(const void *p1, const void *p2, size_t count) {
  * @return		Length of the string.
  */
 size_t strlen(const char *str) {
-	size_t retval;
-	for(retval = 0; *str != '\0'; str++) retval++;
-	return retval;
+	size_t ret;
+
+	for(ret = 0; *str != '\0'; ret++, str++);
+	return ret;
 }
 
 /**
@@ -221,9 +221,10 @@ size_t strlen(const char *str) {
  * @return		Length of the string.
  */
 size_t strnlen(const char *str, size_t count) {
-	size_t retval;
-	for(retval = 0; *str != '\0' && retval < count; str++) retval++;
-	return retval;
+	size_t ret;
+
+	for(ret = 0; *str != '\0' && ret < count; ret++, str++);
+	return ret;
 }
 
 /** Compare two strings.
@@ -233,18 +234,8 @@ size_t strnlen(const char *str, size_t count) {
  *			s1 is found, respectively, to be less than, to match,
  *			or to be greater than s2. */
 int strcmp(const char *s1, const char *s2) {
-	char x;
-
-	for(;;) {
-		x = *s1;
-		if(x != *s2)
-			break;
-		if(!x)
-			break;
-		s1++;
-		s2++;
-	}
-	return x - *s2;
+	for(; *s1 && *s2 && *s1 == *s2; s1++, s2++);
+	return *s1 - *s2;
 }
 
 /** Compare two strings with a length limit.
@@ -255,17 +246,19 @@ int strcmp(const char *s1, const char *s2) {
  *			s1 is found, respectively, to be less than, to match,
  *			or to be greater than s2. */
 int strncmp(const char *s1, const char *s2, size_t count) {
-	const char *a = s1;
-	const char *b = s2;
-	const char *fini = a + count;
+	const char *a = s1, *b = s2, *fini = a + count;
+	int res;
 
 	while(a < fini) {
-		int res = *a - *b;
-		if(res)
+		res = *a - *b;
+		if(res) {
 			return res;
-		if(!*a)
+		}
+		if(!*a) {
 			return 0;
-		a++; b++;
+		}
+		a++;
+		b++;
 	}
 	return 0;
 }
@@ -277,12 +270,7 @@ int strncmp(const char *s1, const char *s2, size_t count) {
  *			s1 is found, respectively, to be less than, to match,
  *			or to be greater than s2. */
 int strcasecmp(const char *s1, const char *s2) {
-	for(;;) {
-		if(!*s2 || (tolower(*s1) != tolower(*s2)))
-			break;
-		s1++;
-		s2++;
-	}
+	for(; *s1 && *s2 && tolower(*s1) == tolower(*s2); s1++, s2++);
 	return tolower(*s1) - tolower(*s2);
 }
 
@@ -294,17 +282,19 @@ int strcasecmp(const char *s1, const char *s2) {
  *			s1 is found, respectively, to be less than, to match,
  *			or to be greater than s2. */
 int strncasecmp(const char *s1, const char *s2, size_t count) {
-	const char *a = s1;
-	const char *b = s2;
-	const char *fini = a + count;
+	const char *a = s1, *b = s2, *fini = a + count;
+	int res;
 
 	while(a < fini) {
-		int res = tolower(*a) - tolower(*b);
-		if(res)
+		res = tolower(*a) - tolower(*b);
+		if(res) {
 			return res;
-		if(!*a)
+		}
+		if(!*a) {
 			return 0;
-		a++; b++;
+		}
+		a++;
+		b++;
 	}
 	return 0;
 }
@@ -325,26 +315,27 @@ int strncasecmp(const char *s1, const char *s2, size_t count) {
  *			token found.
  */
 char *strsep(char **stringp, const char *delim) {
-	char *s;
 	const char *spanp;
+	char *tok, *s;
 	int c, sc;
-	char *tok;
 
-	if((s = *stringp) == NULL)
-		return (NULL);
+	if(!(s = *stringp)) {
+		return s;
+	}
 
 	for(tok = s;;) {
 		c = *s++;
 		spanp = delim;
 		do {
 			if((sc = *spanp++) == c) {
-				if (c == 0)
+				if(c == 0) {
 					s = NULL;
-				else
+				} else {
 					s[-1] = 0;
+				}
 
 				*stringp = s;
-				return (tok);
+				return tok;
 			}
 		} while(sc != 0);
 	}
@@ -358,12 +349,13 @@ char *strchr(const char *s, int c) {
 	char ch = c;
 
 	for (;;) {
-		if(*s == ch)
+		if(*s == ch) {
 			break;
-		else if(!*s)
+		} else if(!*s) {
 			return NULL;
-		else
+		} else {
 			s++;
+		}
 	}
 
 	return (char *)s;
@@ -377,10 +369,12 @@ char *strrchr(const char *s, int c) {
 	const char *l = NULL;
 
 	for(;;) {
-		if(*s == c)
+		if(*s == c) {
 			l = s;
-		if (!*s)
+		}
+		if(!*s) {
 			return (char *)l;
+		}
 		s++;
 	}
 
@@ -474,7 +468,9 @@ char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 }
 
 /** Concatenate two strings.
- * @param dest		Pointer to the string to append to.
+ * @param dest		Pointer to the string to append to. The containing
+ *			buffer must have enough extra space for the source
+ *			string.
  * @param src		Pointer to the string to append.
  * @return		Pointer to dest. */
 char *strcat(char *restrict dest, const char *restrict src) {
@@ -505,11 +501,10 @@ void *kmemdup(const void *src, size_t count, int kmflag) {
 	}
 
 	dest = kmalloc(count, kmflag);
-	if(dest == NULL) {
-		return NULL;
+	if(dest) {
+		memcpy(dest, src, count);
 	}
 
-	memcpy(dest, src, count);
 	return dest;
 }
 
@@ -529,11 +524,10 @@ char *kstrdup(const char *src, int kmflag) {
 	char *dup;
 
 	dup = kmalloc(len, kmflag);
-	if(dup == NULL) {
-		return NULL;
+	if(dup) {
+		memcpy(dup, src, len);
 	}
 
-	memcpy(dup, src, len);
 	return dup;
 }
 
