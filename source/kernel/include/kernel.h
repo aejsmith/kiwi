@@ -55,6 +55,8 @@ extern void platform_init(void);
 extern void platform_reboot(void);
 extern void platform_poweroff(void);
 
+extern void update_boot_progress(int percent);
+
 extern void system_shutdown(int action);
 
 extern void _fatal(struct intr_frame *frame, const char *fmt, ...) __noreturn __printf(2, 3);

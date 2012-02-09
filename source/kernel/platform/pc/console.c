@@ -20,7 +20,10 @@
  */
 
 #include <arch/io.h>
+
 #include <pc/console.h>
+
+#include <console.h>
 #include <kernel.h>
 
 /** Keyboard code definitions */
@@ -30,6 +33,11 @@
 #define RIGHT_ALT	0x38
 #define LEFT_SHIFT	0x2A
 #define RIGHT_SHIFT	0x36
+
+#ifdef SERIAL_PORT
+/** Serial port ANSI escape parser. */
+static ansi_parser_t serial_ansi_parser;
+#endif
 
 #if CONFIG_PC_KBD_LAYOUT_UK
 /** Lower case keyboard layout - United Kingdom. */
@@ -83,10 +91,9 @@ static const uint16_t kbd_layout_extended[128] = {
 	CONSOLE_KEY_DOWN, CONSOLE_KEY_PGDN, 0, CONSOLE_KEY_DELETE
 };
 
-/** Read a character from the PC console.
- * @return		Character read from the console, or 0 if if no character
- *			was available. */
-static uint16_t pc_console_getc(void) {
+/** Read a character from the i8042 keyboard.
+ * @return		Character read, or 0 if none available. */
+static uint16_t i8042_console_getc(void) {
 	static bool shift = false;
 	static bool ctrl = false;
 	static bool alt = false;
@@ -167,17 +174,14 @@ static uint16_t pc_console_getc(void) {
 }
 
 /** PC console. */
-static console_t pc_console = {
-	.getc = pc_console_getc,
+static console_in_ops_t i8042_console_in_ops = {
+	.getc = i8042_console_getc,
 };
 
-#ifdef SERIAL_PORT
-/** Serial port ANSI escape parser. */
-static ansi_parser_t serial_ansi_parser;
-
+#if SERIAL_PORT
 /** Write a character to the serial console.
  * @param ch		Character to print. */
-static void serial_console_putc(unsigned char ch) {
+static void serial_console_putc(char ch) {
 	if(ch == '\n') {
 		serial_console_putc('\r');
 	}
@@ -186,9 +190,13 @@ static void serial_console_putc(unsigned char ch) {
 	while(!(in8(SERIAL_PORT + 5) & 0x20));
 }
 
+/** Serial port console output operations. */
+static console_out_ops_t serial_console_out_ops = {
+	.putc = serial_console_putc,
+};
+
 /** Read a character from the serial console.
- * @return		Character read from the console, or 0 if no character
- *			was available. */
+ * @return		Character read, or 0 if none available. */
 static uint16_t serial_console_getc(void) {
 	unsigned char ch = in8(SERIAL_PORT + 6);
 	uint16_t converted;
@@ -215,10 +223,8 @@ static uint16_t serial_console_getc(void) {
 	return 0;
 }
 
-/** Serial port console. */
-static console_t serial_console = {
-	.min_level = LOG_DEBUG,
-	.putc = serial_console_putc,
+/** Serial port console input operations. */
+static console_in_ops_t serial_console_in_ops = {
 	.getc = serial_console_getc,
 };
 #endif
@@ -242,15 +248,16 @@ __init_text void platform_console_early_init(void) {
 		while(!(in8(SERIAL_PORT + 5) & 0x20));
 
 		ansi_parser_init(&serial_ansi_parser);
-		console_register(&serial_console);
+		debug_console_ops = &serial_console_out_ops;
+		console_register_in_ops(&serial_console_in_ops);
 	}
 #endif
-	/* Register the PC console for debugger input. */
-	console_register(&pc_console);
+	/* Register the i8042 input device. */
+	console_register_in_ops(&i8042_console_in_ops);
 }
 
 /** Set up the console. */
 __init_text void platform_console_init(void) {
-	/* We use the framebuffer set up by KBoot, don't need any specific
-	 * initialization here. */
+	/* Use the framebuffer set up by KBoot. */
+	fb_console_init();
 }

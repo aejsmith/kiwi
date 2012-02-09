@@ -179,7 +179,7 @@ static __init_text void boot_module_remove(boot_module_t *mod) {
 
 	/* Update progress. */
 	current_init_progress += progress_per_module;
-	console_update_boot_progress(current_init_progress);
+	update_boot_progress(current_init_progress);
 }
 
 /** Look up a kernel module in the boot module list.
@@ -300,7 +300,7 @@ static void init_thread(void *arg1, void *arg2) {
 		(*initcall)();
 	}
 
-	console_update_boot_progress(10);
+	update_boot_progress(10);
 
 	/* Load modules, then any FS images supplied. Wait until after loading
 	 * kernel modules to do FS images, so that we only load FS images if the
@@ -337,7 +337,7 @@ static void init_thread(void *arg1, void *arg2) {
 	/* Reclaim memory taken up by initialization code/data. */
 	page_late_init();
 
-	console_update_boot_progress(100);
+	update_boot_progress(100);
 
 	/* Run the service manager. */
 	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM, kernel_proc, NULL);

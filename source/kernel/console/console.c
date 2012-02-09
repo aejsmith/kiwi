@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,12 +21,9 @@
 
 #include <io/device.h>
 
-#include <kernel/console.h>
-
 #include <lib/printf.h>
 
 #include <mm/page.h>
-#include <mm/vm.h>
 
 #include <sync/spinlock.h>
 
@@ -34,11 +31,6 @@
 #include <kdb.h>
 #include <kernel.h>
 #include <status.h>
-#include <types.h>
-
-/** List of kernel consoles. */
-static LIST_DECLARE(console_list);
-static SPINLOCK_DECLARE(console_lock);
 
 /** Cyclic kernel log buffer. */
 static struct {
@@ -52,111 +44,34 @@ static uint32_t klog_start = 0;
 /** Number of characters in the buffer. */
 static uint32_t klog_length = 0;
 
-/** Write a character to all consoles without taking the lock.
- * @param ch		Character to write. */
-void console_putc_unsafe(unsigned char ch) {
-	console_t *console;
+/** Lock for the kernel console. */
+static SPINLOCK_DECLARE(console_lock);
 
-	LIST_FOREACH(&console_list, iter) {
-		console = list_entry(iter, console_t, header);
+/** Debug console operations. */
+console_out_ops_t *debug_console_ops = NULL;
 
-		if(console->putc) {
-			console->putc(ch);
-		}
-	}
-}
+/** On-screen console operations. */
+console_out_ops_t *screen_console_ops = NULL;
 
-/** Get a character from the console without taking the lock.
- * @return		Character read. */
-uint16_t console_getc_unsafe(void) {
-	console_t *console;
-	uint16_t ch;
+/** List of kernel console input operations. */
+LIST_DECLARE(console_in_ops);
 
-	while(true) {
-		LIST_FOREACH(&console_list, iter) {
-			console = list_entry(iter, console_t, header);
-
-			if(console->getc) {
-				ch = console->getc();
-				if(ch) {
-					return ch;
-				}
-			}
-		}
-	}
-}
-
-/** Register a console.
- * @param console	Console to register. */
-void console_register(console_t *console) {
-	list_init(&console->header);
+/** Register console input operations.
+ * @param ops		Operations to register. */
+void console_register_in_ops(console_in_ops_t *ops) {
+	list_init(&ops->header);
 
 	spinlock_lock(&console_lock);
-	list_append(&console_list, &console->header);
+	list_append(&console_in_ops, &ops->header);
 	spinlock_unlock(&console_lock);
 }
 
-/** Unregister a console.
- * @param console	Console to unregister. */
-void console_unregister(console_t *console) {
+/** Unregister console input operations.
+ * @param ops		Operations to unregister. */
+void console_unregister_in_ops(console_in_ops_t *ops) {
 	spinlock_lock(&console_lock);
-	list_remove(&console->header);
+	list_remove(&ops->header);
 	spinlock_unlock(&console_lock);
-}
-
-/** Handle an input character.
- * @param parser	Parser data to use.
- * @param ch		Character received.
- * @return		Value to return, 0 if no character to return yet. */
-uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
-	uint16_t ret = 0;
-
-	if(parser->length < 0) {
-		if(ch == 0x1B) {
-			parser->length = 0;
-			return 0;
-		} else {
-			return (uint16_t)ch;
-		}
-	} else {
-		parser->buffer[parser->length++] = ch;
-
-		/* Check for known sequences. */
-		if(parser->length == 2) {
-			if(strncmp(parser->buffer, "[A", 2) == 0) {
-				ret = CONSOLE_KEY_UP;
-			} else if(strncmp(parser->buffer, "[B", 2) == 0) {
-				ret = CONSOLE_KEY_DOWN;
-			} else if(strncmp(parser->buffer, "[D", 2) == 0) {
-				ret = CONSOLE_KEY_LEFT;
-			} else if(strncmp(parser->buffer, "[C", 2) == 0) {
-				ret = CONSOLE_KEY_RIGHT;
-			} else if(strncmp(parser->buffer, "[H", 2) == 0) {
-				ret = CONSOLE_KEY_HOME;
-			} else if(strncmp(parser->buffer, "[F", 2) == 0) {
-				ret = CONSOLE_KEY_END;
-			}
-		} else if(parser->length == 3) {
-			if(strncmp(parser->buffer, "[3~", 3) == 0) {
-				ret = CONSOLE_KEY_DELETE;
-			} else if(strncmp(parser->buffer, "[5~", 3) == 0) {
-				ret = CONSOLE_KEY_PGUP;
-			} else if(strncmp(parser->buffer, "[6~", 3) == 0) {
-				ret = CONSOLE_KEY_PGDN;
-			}
-		}
-
-		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN) {
-			parser->length = -1;
-		}
-		return ret;
-	}
-}
-
-/** Initialize an ANSI escape code parser data structure.
- * @param parser	Parser to initialize. */
-void ansi_parser_init(ansi_parser_t *parser) {
-	parser->length = -1;
 }
 
 /** Helper for kvprintf().
@@ -165,7 +80,6 @@ void ansi_parser_init(ansi_parser_t *parser) {
  * @param total		Pointer to total character count. */
 static void kvprintf_helper(char ch, void *data, int *total) {
 	int level = *(int *)data;
-	console_t *console;
 
 	/* Store in the log buffer. */
 	klog_buffer[(klog_start + klog_length) % CONFIG_KLOG_SIZE].level = level;
@@ -177,12 +91,11 @@ static void kvprintf_helper(char ch, void *data, int *total) {
 	}
 
 	/* Write to the console. */
-	LIST_FOREACH(&console_list, iter) {
-		console = list_entry(iter, console_t, header);
-
-		if(console->putc && level >= console->min_level) {
-			console->putc(ch);
-		}
+	if(debug_console_ops) {
+		debug_console_ops->putc(ch);
+	}
+	if(level >= LOG_NOTICE && screen_console_ops) {
+		screen_console_ops->putc(ch);
 	}
 
 	*total = *total + 1;
@@ -274,6 +187,74 @@ static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
+/** Initialize the debug console. */
+__init_text void console_early_init(void) {
+	platform_console_early_init();
+
+	/* Register the KDB command. */
+	kdb_register_command("log", "Display the kernel log buffer.", kdb_cmd_log);
+}
+
+/** Initialize the primary console. */
+__init_text void console_init(void) {
+	platform_console_init();
+}
+
+/** Handle an input character.
+ * @param parser	Parser data to use.
+ * @param ch		Character received.
+ * @return		Value to return, 0 if no character to return yet. */
+uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
+	uint16_t ret = 0;
+
+	if(parser->length < 0) {
+		if(ch == 0x1B) {
+			parser->length = 0;
+			return 0;
+		} else {
+			return (uint16_t)ch;
+		}
+	} else {
+		parser->buffer[parser->length++] = ch;
+
+		/* Check for known sequences. */
+		if(parser->length == 2) {
+			if(strncmp(parser->buffer, "[A", 2) == 0) {
+				ret = CONSOLE_KEY_UP;
+			} else if(strncmp(parser->buffer, "[B", 2) == 0) {
+				ret = CONSOLE_KEY_DOWN;
+			} else if(strncmp(parser->buffer, "[D", 2) == 0) {
+				ret = CONSOLE_KEY_LEFT;
+			} else if(strncmp(parser->buffer, "[C", 2) == 0) {
+				ret = CONSOLE_KEY_RIGHT;
+			} else if(strncmp(parser->buffer, "[H", 2) == 0) {
+				ret = CONSOLE_KEY_HOME;
+			} else if(strncmp(parser->buffer, "[F", 2) == 0) {
+				ret = CONSOLE_KEY_END;
+			}
+		} else if(parser->length == 3) {
+			if(strncmp(parser->buffer, "[3~", 3) == 0) {
+				ret = CONSOLE_KEY_DELETE;
+			} else if(strncmp(parser->buffer, "[5~", 3) == 0) {
+				ret = CONSOLE_KEY_PGUP;
+			} else if(strncmp(parser->buffer, "[6~", 3) == 0) {
+				ret = CONSOLE_KEY_PGDN;
+			}
+		}
+
+		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN) {
+			parser->length = -1;
+		}
+		return ret;
+	}
+}
+
+/** Initialize an ANSI escape code parser data structure.
+ * @param parser	Parser to initialize. */
+void ansi_parser_init(ansi_parser_t *parser) {
+	parser->length = -1;
+}
+
 /** Write to the kernel console device.
  * @param device	Device to write to.
  * @param data		Handle-specific data pointer.
@@ -289,7 +270,12 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
 
 	spinlock_lock(&console_lock);
 	for(i = 0; i < count; i++) {
-		console_putc_unsafe(str[i]);
+		if(debug_console_ops) {
+			debug_console_ops->putc(str[i]);
+		}
+		if(screen_console_ops) {
+			screen_console_ops->putc(str[i]);
+		}
 	}
 	spinlock_unlock(&console_lock);
 
@@ -297,46 +283,9 @@ static status_t kconsole_device_write(device_t *device, void *data, const void *
 	return STATUS_SUCCESS;
 }
 
-/** Handler for kernel console device requests.
- * @param device	Device request is being made on.
- * @param data		Handle specific data pointer.
- * @param request	Request number.
- * @param in		Input buffer.
- * @param insz		Input buffer size.
- * @param outp		Where to store pointer to output buffer.
- * @param outszp	Where to store output buffer size.
- * @return		Status code describing result of the operation. */
-static status_t kconsole_device_request(device_t *device, void *data, int request, const void *in,
-                                        size_t insz, void **outp, size_t *outszp) {
-	return STATUS_NOT_IMPLEMENTED;
-#if 0
-	switch(request) {
-	case KCONSOLE_GET_LOG_SIZE:
-		return CONFIG_KLOG_SIZE;
-	case KCONSOLE_READ_LOG:
-		return -ERR_NOT_IMPLEMENTED;
-	case KCONSOLE_CLEAR_LOG:
-		spinlock_lock(&console_lock);
-		klog_start = klog_length = 0;
-		spinlock_unlock(&console_lock);
-		return 0;
-	case KCONSOLE_UPDATE_PROGRESS:
-		if(insz != sizeof(int)) {
-			return -ERR_PARAM_INVAL;
-		}
-
-		console_update_boot_progress(*(int *)in);
-		return 0;
-	default:
-		return -ERR_PARAM_INVAL;
-	}
-#endif
-}
-
 /** Kernel console device operations structure. */
 static device_ops_t kconsole_device_ops = {
 	.write = kconsole_device_write,
-	.request = kconsole_device_request,
 };
 
 /** Register the kernel console device. */
@@ -350,11 +299,3 @@ static __init_text void kconsole_device_init(void) {
 	}
 }
 INITCALL(kconsole_device_init);
-
-/** Initialize the debug console. */
-void console_early_init(void) {
-	platform_console_early_init();
-
-	/* Register the KDB command. */
-	kdb_register_command("log", "Display the kernel log buffer.", kdb_cmd_log);
-}

@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2010-2011 Alex Smith
+ * Copyright (C) 2011-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
@@ -17,18 +17,15 @@
 /**
  * @file
  * @brief		Framebuffer console.
- *
- * @todo		This does not handle endianness very well. In fact the
- *			rendering code is generally a little bit shit.
  */
 
 #include <lib/ctype.h>
 #include <lib/string.h>
+#include <lib/utility.h>
 
+#include <mm/heap.h>
 #include <mm/malloc.h>
 #include <mm/phys.h>
-
-#include <sync/spinlock.h>
 
 #include <console.h>
 #include <kboot.h>
@@ -45,7 +42,7 @@ extern unsigned char console_font[];
 extern unsigned char logo_ppm[];
 extern unsigned char copyright_ppm[];
 
-/** Width, height and colours of the console font. */
+/** Dimensions and colours of the console font. */
 #define FONT_WIDTH		6
 #define FONT_HEIGHT		12
 #define FONT_FG			0xffffff
@@ -66,105 +63,58 @@ extern unsigned char copyright_ppm[];
 /** Get blue colour from RGB value. */
 #define BLUE(x, bits)		((x >> (8  - bits)) & ((1 << bits) - 1))
 
+/** Get the byte offset of a pixel. */
+#define OFFSET(x, y)		(((y * fb_info.width) + x) * fb_info.bytes_per_pixel)
+
+/** Framebuffer information. */
+static fb_info_t fb_info;
+static char *fb_mapping = NULL;
+static char *fb_backbuffer = NULL;
+
+/** Framebuffer console information. */
+static unsigned char *fb_console_glyphs = NULL;
+static uint16_t fb_console_cols;
+static uint16_t fb_console_rows;
+static uint16_t fb_console_x = 0;
+static uint16_t fb_console_y = 0;
+static bool fb_console_acquired = false;
+static bool fb_was_acquired = false;
+
 /** Boot splash information. */
 static bool splash_enabled = false;
 static uint16_t splash_progress_x;
 static uint16_t splash_progress_y;
 
-/** Current display mode. */
-static fb_info_t fb_console_mode;
-static char *fb_console_mapping = NULL;
+/** Put a pixel on the framebuffer.
+ * @param x		X position.
+ * @param y		Y position.
+ * @param rgb		RGB colour to draw. */
+static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
+	uint32_t value = (RED(rgb, fb_info.red_size) << fb_info.red_position) |
+	                 (GREEN(rgb, fb_info.green_size) << fb_info.green_position) |
+	                 (BLUE(rgb, fb_info.blue_size) << fb_info.blue_position);
+	size_t offset = OFFSET(x, y);
+	void *fb_dest = fb_mapping + offset;
+	void *bb_dest = fb_backbuffer + offset;
 
-/** Backbuffer for the console. */
-static char *fb_console_buffer = NULL;
-
-/** Framebuffer console details. */
-static bool fb_console_acquired = false;
-static uint16_t fb_console_cols;
-static uint16_t fb_console_rows;
-static uint16_t fb_console_x = 0;
-static uint16_t fb_console_y = 0;
-
-/** Get the byte offset of a pixel in the framebuffer.
- * @param x		X position of pixel.
- * @param y		Y position of pixel.
- * @return		Byte offset of pixel in framebuffer. */
-static inline size_t fb_console_offset(uint16_t x, uint16_t y) {
-	return (((y * fb_console_mode.width) + x) * (fb_console_mode.depth / 8));
-}
-
-/** Get the RGB value of a pixel.
- * @param x		X position of pixel.
- * @param y		Y position of pixel.
- * @return		Value of the pixel. */
-static uint32_t fb_console_getpixel(uint16_t x, uint16_t y) {
-	uint8_t *src = (uint8_t *)(fb_console_buffer + fb_console_offset(x, y));
-	uint32_t ret = 0;
-	uint16_t val16;
-
-	switch(fb_console_mode.depth) {
-	case 16:
-		val16 = *(uint16_t *)src;
-		ret |= (((val16 >> 11) & 0x1f) << (16 + 3));
-		ret |= (((val16 >> 5) & 0x3f) << (8 + 2));
-		ret |= ((val16 & 0x1f) << 3);
+	switch(fb_info.bytes_per_pixel) {
+	case 2:
+		*(uint16_t *)fb_dest = (uint16_t)value;
+		*(uint16_t *)bb_dest = (uint16_t)value;
 		break;
-	case 24:
-		ret = (src[0] << 16) | (src[1] << 8) | src[2];
+	case 3:
+		((uint8_t *)fb_dest)[0] = value & 0xff;
+		((uint8_t *)fb_dest)[1] = (value >> 8) & 0xff;
+		((uint8_t *)fb_dest)[2] = (value >> 16) & 0xff;
+		((uint8_t *)bb_dest)[0] = value & 0xff;
+		((uint8_t *)bb_dest)[1] = (value >> 8) & 0xff;
+		((uint8_t *)bb_dest)[2] = (value >> 16) & 0xff;
 		break;
-	case 32:
-		ret = *(uint32_t *)src;
+	case 4:
+		*(uint32_t *)fb_dest = value;
+		*(uint32_t *)bb_dest = value;
 		break;
 	}
-
-	return ret;
-}
-
-/** Draw a pixel to the framebuffer.
- * @param x		X position of pixel.
- * @param y		Y position of pixel.
- * @param rgb		RGB colour for pixel. */
-static void fb_console_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
-	char *mdest = fb_console_mapping + fb_console_offset(x, y);
-	char *bdest = fb_console_buffer + fb_console_offset(x, y);
-
-	switch(fb_console_mode.depth) {
-	case 16:
-		*(uint16_t *)mdest = *(uint16_t *)bdest = (RED(rgb, 5) << 11) | (GREEN(rgb, 6) << 5) | BLUE(rgb, 5);
-		break;
-	case 24:
-		((uint8_t *)mdest)[0] = ((uint8_t *)bdest)[0] = RED(rgb, 8);
-		((uint8_t *)mdest)[1] = ((uint8_t *)bdest)[1] = GREEN(rgb, 8);
-		((uint8_t *)mdest)[2] = ((uint8_t *)bdest)[2] = BLUE(rgb, 8);
-		break;
-	case 32:
-		*(uint32_t *)mdest = *(uint32_t *)bdest = rgb;
-		break;
-	}
-}
-
-/** Compare a pixel on the framebuffer.
- * @param x		X position of pixel.
- * @param y		Y position of pixel.
- * @param cmp		RGB colour to compare with.
- * @return		Whether the pixels are equal. */
-static bool fb_console_cmppixel(uint16_t x, uint16_t y, uint32_t cmp) {
-	uint32_t value = 0;
-
-	/* Work out the value the pixel would be on the framebuffer. */
-	switch(fb_console_mode.depth) {
-	case 16:
-		value = (cmp & 0xf8fcf8);
-		break;
-	case 24:
-		value = (cmp & 0xffffff);
-		break;
-	case 32:
-		value = cmp;
-		break;
-	}
-
-	return (fb_console_getpixel(x, y) == value);
 }
 
 /** Draw a rectangle in a solid colour.
@@ -173,18 +123,17 @@ static bool fb_console_cmppixel(uint16_t x, uint16_t y, uint32_t cmp) {
  * @param width		Width of rectangle.
  * @param height	Height of rectangle.
  * @param rgb		Colour to draw in. */
-static void fb_console_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
+static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint32_t rgb) {
 	uint16_t i, j;
 
-	if(x == 0 && width == fb_console_mode.width && (rgb == 0 || rgb == 0xffffff)) {
-		memset(fb_console_buffer + fb_console_offset(0, y), (uint8_t)rgb,
-		       width * height * (fb_console_mode.depth / 8));
-		memset(fb_console_mapping + fb_console_offset(0, y), (uint8_t)rgb,
-		       width * height * (fb_console_mode.depth / 8));
+	if(x == 0 && width == fb_info.width && (rgb == 0 || rgb == 0xffffff)) {
+		/* Fast path where we can fill a block quickly. */
+		memset(fb_mapping + OFFSET(0, y), (uint8_t)rgb, width * height * fb_info.bytes_per_pixel);
+		memset(fb_backbuffer + OFFSET(0, y), (uint8_t)rgb, width * height * fb_info.bytes_per_pixel);
 	} else {
 		for(i = 0; i < height; i++) {
 			for(j = 0; j < width; j++) {
-				fb_console_putpixel(x + j, y + i, rgb);
+				fb_putpixel(x + j, y + i, rgb);
 			}
 		}
 	}
@@ -194,47 +143,67 @@ static void fb_console_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t
  * @param dest_y	Y position of destination.
  * @param src_y		Y position of source area.
  * @param height	Height of area to copy. */
-static void fb_console_copyrect(uint16_t dest_y, uint16_t src_y, uint16_t height) {
-	size_t dest_offset = fb_console_offset(0, dest_y);
-	size_t src_offset = fb_console_offset(0, src_y);
+static void fb_copyrect(uint16_t dest_y, uint16_t src_y, uint16_t height) {
+	size_t dest_offset = OFFSET(0, dest_y);
+	size_t src_offset = OFFSET(0, src_y);
 
 	/* Copy everything on the backbuffer. */
-	memmove(fb_console_buffer + dest_offset, fb_console_buffer + src_offset,
-	        fb_console_mode.width * height * (fb_console_mode.depth / 8));
+	memmove(fb_backbuffer + dest_offset, fb_backbuffer + src_offset,
+	        fb_info.width * height * fb_info.bytes_per_pixel);
 
 	/* Copy the updated backbuffer onto the framebuffer. */
-	memcpy(fb_console_mapping + dest_offset, fb_console_buffer + dest_offset,
-		fb_console_mode.width * height * (fb_console_mode.depth / 8));
+	memcpy(fb_mapping + dest_offset, fb_backbuffer + dest_offset,
+	       fb_info.width * height * fb_info.bytes_per_pixel);
 }
 
-/** Toggle the cursor. */
-static void fb_console_toggle_cursor(void) {
-	uint16_t i, j, x, y;
+/** Draw the glyph at the specified position the console.
+ * @param x		X position (characters).
+ * @param y		Y position (characters).
+ * @param fg		Foreground colour.
+ * @param bg		Background colour. */
+static void fb_console_draw_glyph(uint16_t x, uint16_t y, uint32_t fg, uint32_t bg) {
+	unsigned char ch;
+	uint16_t i, j;
 
+	/* Get the glyph. */
+	ch = fb_console_glyphs[(y * fb_console_cols) + x];
+
+	/* Convert to a pixel position. */
+	x *= FONT_WIDTH;
+	y *= FONT_HEIGHT;
+
+	/* Draw the glyph. */
 	for(i = 0; i < FONT_HEIGHT; i++) {
 		for(j = 0; j < FONT_WIDTH; j++) {
-			x = (fb_console_x * FONT_WIDTH) + j;
-			y = (fb_console_y * FONT_HEIGHT) + i;
-
-			/* We cannot just invert the pixel value here. On
-			 * framebuffers less than 24-bit, the value we read
-			 * back is not necessarily the same as the one we
-			 * write in the first place. */
-			if(fb_console_cmppixel(x, y, FONT_FG)) {
-				fb_console_putpixel(x, y, FONT_BG);
+			if(console_font[(ch * FONT_HEIGHT) + i] & (1<<(7-j))) {
+				fb_putpixel(x + j, y + i, fg);
 			} else {
-				fb_console_putpixel(x, y, FONT_FG);
+				fb_putpixel(x + j, y + i, bg);
 			}
 		}
 	}
 }
 
-/** Write a character to the console.
- * @param ch		Character to write. */
-static void fb_console_putc(unsigned char ch) {
-	uint16_t i, j, x, y;
+/** Enable the cursor. */
+static void fb_console_enable_cursor(void) {
+	/* Draw in inverted colours. */
+	fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_BG, FONT_FG);
+}
 
-	fb_console_toggle_cursor();
+/** Disable the cursor. */
+static void fb_console_disable_cursor(void) {
+	/* Draw back in the correct colours. */
+	fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_FG, FONT_BG);
+}
+
+/** Write a character to the framebuffer console.
+ * @param ch		Character to write. */
+static void fb_console_putc(char ch) {
+	if(fb_console_acquired) {
+		return;
+	}
+
+	fb_console_disable_cursor();
 
 	switch(ch) {
 	case '\b':
@@ -242,7 +211,7 @@ static void fb_console_putc(unsigned char ch) {
 		if(fb_console_x) {
 			fb_console_x--;
 		} else if(fb_console_y) {
-			fb_console_x = fb_console_rows - 1;
+			fb_console_x = fb_console_cols - 1;
 			fb_console_y--;
 		}
 		break;
@@ -252,7 +221,7 @@ static void fb_console_putc(unsigned char ch) {
 		break;
 	case '\n':
 		/* Newline, treat it as if a carriage return was there (will
-		 * be handled below. */
+		 * be handled below). */
 		fb_console_x = fb_console_cols;
 		break;
 	case '\t':
@@ -264,18 +233,8 @@ static void fb_console_putc(unsigned char ch) {
 			break;
 		}
 
-		x = fb_console_x * FONT_WIDTH;
-		y = fb_console_y * FONT_HEIGHT;
-		for(i = 0; i < FONT_HEIGHT; i++) {
-			for(j = 0; j < FONT_WIDTH; j++) {
-				if(console_font[(ch * FONT_HEIGHT) + i] & (1<<(7-j))) {
-					fb_console_putpixel(x + j, y + i, FONT_FG);
-				} else {
-					fb_console_putpixel(x + j, y + i, FONT_BG);
-				}
-			}
-		}
-
+		fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x] = ch;
+		fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_FG, FONT_BG);
 		fb_console_x++;
 		break;
 	}
@@ -284,69 +243,40 @@ static void fb_console_putc(unsigned char ch) {
 	if(fb_console_x >= fb_console_cols) {
 		fb_console_x = 0;
 		if(++fb_console_y < fb_console_rows) {
-			fb_console_fillrect(0, FONT_HEIGHT * fb_console_y, fb_console_mode.width,
-			                    FONT_HEIGHT, FONT_BG);
+			fb_fillrect(0, FONT_HEIGHT * fb_console_y, fb_info.width, FONT_HEIGHT, FONT_BG);
 		}
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
 	if(fb_console_y >= fb_console_rows) {
 		/* Move everything up and fill the last row with blanks. */
-		fb_console_copyrect(0, FONT_HEIGHT, (fb_console_rows - 1) * FONT_HEIGHT);
-		fb_console_fillrect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_console_mode.width,
-		                    FONT_HEIGHT, FONT_BG);
+		memmove(fb_console_glyphs, fb_console_glyphs + fb_console_cols,
+		        (fb_console_rows - 1) * fb_console_cols);
+		memset(fb_console_glyphs + ((fb_console_rows - 1) * fb_console_cols),
+		       ' ', fb_console_cols);
+		fb_copyrect(0, FONT_HEIGHT, (fb_console_rows - 1) * FONT_HEIGHT);
+		fb_fillrect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_info.width,
+		            FONT_HEIGHT, FONT_BG);
 
 		/* Update the cursor position. */
 		fb_console_y = fb_console_rows - 1;
 	}
 
-	fb_console_toggle_cursor();
+	fb_console_enable_cursor();
 }
 
-/** Framebuffer console. */
-static console_t fb_console = {
-	.min_level = LOG_NOTICE,
+/** Kernel console output operations structure. */
+static console_out_ops_t fb_console_out_ops = {
 	.putc = fb_console_putc,
 };
-
-/** Reconfigure the framebuffer console.
- * @param info		Information structure for new framebuffer. */
-static void fb_console_configure(const fb_info_t *info) {
-	void *nmap, *nbuf, *omap = NULL, *obuf = NULL;
-	size_t size = 0;
-
-	/* Map the new framebuffer, and allocate a backbuffer. */
-	nmap = phys_map(info->addr, info->width * info->height * (info->depth / 8), MM_SLEEP);
-	nbuf = kcalloc(info->width * info->height, info->depth / 8, MM_SLEEP);
-
-	/* Save old mapping/buffer details to unmap/free after unlocking. */
-	if(fb_console_mapping) {
-		omap = fb_console_mapping;
-		obuf = fb_console_buffer;
-		size = fb_console_mode.width * fb_console_mode.height * (fb_console_mode.depth / 8);
-	}
-
-	/* Store new details. */
-	fb_console_mapping = nmap;
-	fb_console_buffer = nbuf;
-	memcpy(&fb_console_mode, info, sizeof(*info));
-	fb_console_cols = info->width / FONT_WIDTH;
-	fb_console_rows = info->height / FONT_HEIGHT;
-	fb_console_x = fb_console_y = 0;
-
-	/* Free the old mapping/buffer if necessary. */
-	if(omap) {
-		phys_unmap(omap, size, true);
-		kfree(obuf);
-	}
-}
 
 /** Reset the framebuffer console. */
 static void fb_console_reset(void) {
 	/* Reset the cursor position and clear the first row of the console. */
 	fb_console_x = fb_console_y = 0;
-	fb_console_fillrect(0, 0, fb_console_mode.width, FONT_HEIGHT, FONT_BG);
-	fb_console_toggle_cursor();
+	fb_fillrect(0, 0, fb_info.width, FONT_HEIGHT, FONT_BG);
+	memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
+	fb_console_enable_cursor();
 }
 
 /** Enable the framebuffer console upon KDB entry/fatal().
@@ -354,9 +284,12 @@ static void fb_console_reset(void) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
-	if(!fb_console.putc) {
-		fb_console.putc = fb_console_putc;
-		fb_console_reset();
+	if(screen_console_ops == &fb_console_out_ops) {
+		fb_was_acquired = fb_console_acquired;
+		if(fb_was_acquired) {
+			fb_console_acquired = false;
+			fb_console_reset();
+		}
 	}
 }
 
@@ -365,9 +298,63 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
-	if(fb_console_acquired || splash_enabled) {
-		fb_console.putc = NULL;
+	if(screen_console_ops == &fb_console_out_ops) {
+		fb_console_acquired = fb_was_acquired;
 	}
+}
+
+/** Reconfigure the framebuffer console.
+ * @param info		Information structure for new framebuffer.
+ * @param mmflag	Allocation behaviour flags (MM_SLEEP or MM_FATAL). */
+static void fb_console_configure(const fb_info_t *info, int mmflag) {
+	size_t size;
+
+	/* Temporarily disable the framebuffer console to ensure nothing prints
+	 * to it while we're making the change. */
+	if(screen_console_ops == &fb_console_out_ops) {
+		/* Framebuffer console is already in use. Temporarily disable
+		 * it to ensure nothing prints to it while we're making
+		 * changes. */
+		screen_console_ops = NULL;
+
+		/* Free old mappings. */
+		size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
+		phys_unmap(fb_mapping, size, true);
+		heap_free(fb_backbuffer, ROUND_UP(size, PAGE_SIZE));
+		kfree(fb_console_glyphs);
+	} else {
+		/* First time the framebuffer console has been enabled.
+		 * Register callbacks to reset the framebuffer console upon
+		 * fatal() and KDB entry. */
+		notifier_register(&fatal_notifier, fb_console_enable, NULL);
+		notifier_register(&kdb_entry_notifier, fb_console_enable, NULL);
+		notifier_register(&kdb_exit_notifier, fb_console_disable, NULL);
+	}
+
+	memcpy(&fb_info, info, sizeof(fb_info));
+
+	/* Map in the framebuffer, clear it and allocate a backbuffer. */
+	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
+	fb_mapping = phys_map(fb_info.addr, size, mmflag);
+	memset(fb_mapping, 0, size);
+	fb_backbuffer = heap_alloc(ROUND_UP(size, PAGE_SIZE), mmflag);
+	memset(fb_backbuffer, 0, size);
+
+	/* Configure the console and create a backbuffer for it, initially
+	 * filled with spaces. */
+	fb_console_x = fb_console_y = 0;
+	fb_console_cols = fb_info.width / FONT_WIDTH;
+	fb_console_rows = fb_info.height / FONT_HEIGHT;
+	fb_console_glyphs = kmalloc(fb_console_cols * fb_console_rows, mmflag);
+	memset(fb_console_glyphs, ' ', fb_console_cols * fb_console_rows);
+
+	if(!fb_console_acquired) {
+		/* Clear to the font background colour. */
+		fb_fillrect(0, 0, fb_info.width, fb_info.height, FONT_BG);
+		fb_console_enable_cursor();
+	}
+
+	screen_console_ops = &fb_console_out_ops;
 }
 
 /** Control the framebuffer console.
@@ -378,21 +365,21 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 	switch(op) {
 	case FB_CONSOLE_INFO:
 		/* Get information on the current mode. */
-		memcpy(info, &fb_console_mode, sizeof(*info));
+		memcpy(info, &fb_info, sizeof(*info));
 		break;
 	case FB_CONSOLE_CONFIGURE:
 		/* Reconfigure to use a new framebuffer. */
-		fb_console_configure(info);
+		fb_console_configure(info, MM_SLEEP);
 		break;
 	case FB_CONSOLE_ACQUIRE:
 		/* Acquire the framebuffer for exclusive use. */
-		if(fb_console_acquired) {
+		if(fb_console_acquired && !splash_enabled) {
 			fatal("Framebuffer console already acquired");
 		}
 
 		/* Prevent output to the console. */
-		fb_console.putc = NULL;
 		fb_console_acquired = true;
+		splash_enabled = false;
 		break;
 	case FB_CONSOLE_RELEASE:
 		/* Release the framebuffer. */
@@ -400,13 +387,8 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 			fatal("Framebuffer console not acquired");
 		}
 
-		/* If the splash wasn't enabled, re-enable console output. */
-		if(!splash_enabled) {
-			fb_console.putc = fb_console_putc;
-			fb_console_reset();
-		}
-
 		fb_console_acquired = false;
+		fb_console_reset();
 		break;
 	};
 }
@@ -487,86 +469,105 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 			colour |= (*(ppm++) * coef) << 16;
 			colour |= (*(ppm++) * coef) << 8;
 			colour |= *(ppm++) * coef;
-			fb_console_putpixel(x + j, y + i, colour);
+			fb_putpixel(x + j, y + i, colour);
 		}
 	}
 }
 
 /** Initialize the framebuffer console. */
-__init_text void console_init(void) {
+__init_text void fb_console_init(void) {
 	uint16_t width, height;
 	kboot_tag_lfb_t *lfb;
 	fb_info_t info;
 
-	/* Do platform initialization. */
-	platform_console_init();
-
-	/* Look up the KBoot framebuffer tag. */
+	/* Look up the framebuffer boot tag. */
 	lfb = kboot_tag_iterate(KBOOT_TAG_LFB, NULL);
 	if(!lfb) {
-		kprintf(LOG_WARN, "console: no framebuffer information provided by loader\n");
-		return;
+		fatal("Expected LFB but no boot tag");
 	}
 
-	/* Configure the framebuffer. */
+	/* Copy the information from it. Currently guessing the size/position
+	 * values, see KBoot issue #8. */
 	info.width = lfb->width;
 	info.height = lfb->height;
 	info.depth = lfb->depth;
+	info.bytes_per_pixel = ROUND_UP(lfb->depth, 8) / 8;
 	info.addr = lfb->addr;
+	switch(info.depth) {
+	case 15:
+		/* RGB 5:5:5. */
+		info.red_position = 10;
+		info.red_size = 5;
+		info.green_position = 5;
+		info.green_size = 5;
+		info.blue_position = 0;
+		info.blue_size = 5;
+		break;
+	case 16:
+		/* RGB 5:6:5. */
+		info.red_position = 11;
+		info.red_size = 5;
+		info.green_position = 5;
+		info.green_size = 6;
+		info.blue_position = 0;
+		info.blue_size = 5;
+		break;
+	case 24:
+		/* RGB 8:8:8. */
+	case 32:
+		/* ARGB 0:8:8:8. */
+		info.red_position = 16;
+		info.red_size = 8;
+		info.green_position = 8;
+		info.green_size = 8;
+		info.blue_position = 0;
+		info.blue_size = 8;
+		break;
+	default:
+		fatal("Unsupported framebuffer depth");
+	}
+
 	kboot_tag_release(lfb);
-	fb_console_configure(&info);
 
-	/* Register the console. */
-	console_register(&fb_console);
-
-	/* Register callbacks to reset the framebuffer console upon fatal() and
-	 * KDB entry. */
-	notifier_register(&fatal_notifier, fb_console_enable, NULL);
-	notifier_register(&kdb_entry_notifier, fb_console_enable, NULL);
-	notifier_register(&kdb_exit_notifier, fb_console_disable, NULL);
-
+	/* If the splash is enabled, acquire the console so output is ignored. */
 	if(!kboot_boolean_option("splash_disabled")) {
 		splash_enabled = true;
+		fb_console_acquired = true;
+	}
 
-		/* Prevent log output. */
-		fb_console.putc = NULL;
+	/* Configure the framebuffer. */
+	fb_console_configure(&info, MM_FATAL);
 
-		/* Clear the console to black. */
-		fb_console_fillrect(0, 0, info.width, info.height, 0x0);
-
+	/* Draw the splash screen if enabled. */
+	if(splash_enabled) {
 		/* Draw copyright text. */
 		ppm_size(copyright_ppm, &width, &height);
-		ppm_draw(copyright_ppm, (fb_console_mode.width / 2) - (width / 2),
-		         fb_console_mode.height - height - 5);
+		ppm_draw(copyright_ppm, (fb_info.width / 2) - (width / 2), fb_info.height - height - 5);
 
 		/* Get logo dimensions. */
 		ppm_size(logo_ppm, &width, &height);
 
 		/* Determine where to draw the progress bar. */
-		splash_progress_x = (fb_console_mode.width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
-		splash_progress_y = (fb_console_mode.height / 2) + (height / 2) + 20;
+		splash_progress_x = (fb_info.width / 2) - (SPLASH_PROGRESS_WIDTH / 2);
+		splash_progress_y = (fb_info.height / 2) + (height / 2) + 20;
 
 		/* Draw logo. */
-		ppm_draw(logo_ppm, (fb_console_mode.width / 2) - (width / 2),
-		         (fb_console_mode.height / 2) - (height / 2) - 10);
+		ppm_draw(logo_ppm, (fb_info.width / 2) - (width / 2), (fb_info.height / 2) - (height / 2) - 10);
 
 		/* Draw initial progress bar. */
-		console_update_boot_progress(0);
-	} else {
-		/* Clear the console to the font background colour. */
-		fb_console_fillrect(0, 0, info.width, info.height, FONT_BG);
+		update_boot_progress(0);
 	}
 }
 
 /** Update the progress on the boot splash.
  * @param percent	Boot progress percentage. */
-void console_update_boot_progress(int percent) {
-	if(splash_enabled && !fb_console_acquired) {
-		fb_console_fillrect(splash_progress_x, splash_progress_y,
-		                    SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
-		                    SPLASH_PROGRESS_BG);
-		fb_console_fillrect(splash_progress_x, splash_progress_y,
-		                    (SPLASH_PROGRESS_WIDTH * percent) / 100,
-		                    SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
+void update_boot_progress(int percent) {
+	if(splash_enabled) {
+		fb_fillrect(splash_progress_x, splash_progress_y,
+		            SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
+		            SPLASH_PROGRESS_BG);
+		fb_fillrect(splash_progress_x, splash_progress_y,
+		            (SPLASH_PROGRESS_WIDTH * percent) / 100,
+		            SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
 	}
 }

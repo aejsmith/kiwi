@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,19 +24,21 @@
 
 #include <lib/list.h>
 
-/** Kernel console implementation structure. */
-typedef struct console {
-	list_t header;			/**< Link to the console list. */
-	int min_level;			/**< Minimum log level that the console will receive. */
-
+/** Kernel console output operations structure. */
+typedef struct console_out_ops {
 	/** Write a character to the console.
 	 * @param ch		Character to write. */
-	void (*putc)(unsigned char ch);
+	void (*putc)(char ch);
+} console_out_ops_t;
 
-	/** Get a character from the console.
-	 * @return		Character read, or 0 if no character available. */
+/** Kernel console input operations structure. */
+typedef struct console_in_ops {
+	list_t header;			/**< Link to input operations list. */
+
+	/** Check for a character from the console.
+	 * @return		Character read, or 0 if none available. */
 	uint16_t (*getc)(void);
-} console_t;
+} console_in_ops_t;
 
 /** Special console key definitions. */
 #define CONSOLE_KEY_UP		0x100
@@ -49,18 +51,18 @@ typedef struct console {
 #define CONSOLE_KEY_PGDN	0x107
 #define CONSOLE_KEY_DELETE	0x108
 
-extern void console_putc_unsafe(unsigned char ch);
-extern uint16_t console_getc_unsafe(void);
+extern console_out_ops_t *debug_console_ops;
+extern console_out_ops_t *screen_console_ops;
+extern list_t console_in_ops;
 
-extern void console_register(console_t *console);
-extern void console_unregister(console_t *console);
+extern void console_register_in_ops(console_in_ops_t *ops);
+extern void console_unregister_in_ops(console_in_ops_t *ops);
 
 extern void platform_console_early_init(void);
 extern void platform_console_init(void);
 
 extern void console_early_init(void);
 extern void console_init(void);
-extern void console_update_boot_progress(int percent);
 
 /** Buffer length for ANSI escape code parser. */
 #define ANSI_PARSER_BUFFER_LEN	3
@@ -80,7 +82,14 @@ extern void ansi_parser_init(ansi_parser_t *parser);
 typedef struct fb_info {
 	uint16_t width;			/**< Width of the framebuffer. */
 	uint16_t height;		/**< Height of the framebuffer. */
-	uint16_t depth;			/**< Colour depth of the framebuffer. */
+	uint8_t depth;			/**< Colour depth of the framebuffer (bits per pixel). */
+	uint8_t bytes_per_pixel;	/**< Bytes per pixel. */
+	uint8_t red_position;		/**< Red field position. */
+	uint8_t red_size;		/**< Red field size. */
+	uint8_t green_position;		/**< Green field position. */
+	uint8_t green_size;		/**< Green field size. */
+	uint8_t blue_position;		/**< Blue field position. */
+	uint8_t blue_size;		/**< Blue field size. */
 	phys_ptr_t addr;		/**< Physical address of the framebuffer. */
 } fb_info_t;
 
@@ -91,5 +100,6 @@ typedef struct fb_info {
 #define FB_CONSOLE_RELEASE	4	/**< Release control of the framebuffer. */
 
 extern void fb_console_control(unsigned op, fb_info_t *info);
+extern void fb_console_init(void);
 
 #endif /* __CONSOLE_H */

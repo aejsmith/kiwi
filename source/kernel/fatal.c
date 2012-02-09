@@ -44,7 +44,12 @@ static atomic_t in_fatal = 0;
 
 /** Helper for fatal_printf(). */
 static void fatal_printf_helper(char ch, void *data, int *total) {
-	console_putc_unsafe(ch);
+	if(debug_console_ops) {
+		debug_console_ops->putc(ch);
+	}
+	if(screen_console_ops) {
+		screen_console_ops->putc(ch);
+	}
 	*total = *total + 1;
 }
 

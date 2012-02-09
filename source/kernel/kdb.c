@@ -141,7 +141,12 @@ static kdb_command_desc_t *lookup_command(const char *name) {
 /** Print a character.
  * @param ch		Character to print. */
 static void kdb_putc(char ch) {
-	console_putc_unsafe(ch);
+	if(debug_console_ops) {
+		debug_console_ops->putc(ch);
+	}
+	if(screen_console_ops) {
+		screen_console_ops->putc(ch);
+	}
 }
 
 /** Helper for kdb_printf(). */
@@ -229,7 +234,19 @@ static void kdb_backtrace_cb(ptr_t addr) {
 /** Read a character from the console.
  * @return		Character/special key code read. */
 uint16_t kdb_getc(void) {
-	return console_getc_unsafe();
+	console_in_ops_t *ops;
+	uint16_t ch;
+
+	while(true) {
+		LIST_FOREACH(&console_in_ops, iter) {
+			ops = list_entry(iter, console_in_ops_t, header);
+
+			ch = ops->getc();
+			if(ch) {
+				return ch;
+			}
+		}
+	}
 }
 
 /** Allocate memory for use within KDB.

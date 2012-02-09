@@ -22,8 +22,6 @@
 #ifndef __PC_CONSOLE_H
 #define __PC_CONSOLE_H
 
-#include <console.h>
-
 /** Convert the serial port number from the configuration to a port number. */
 #if CONFIG_PC_SERIAL_PORT == 1
 # define SERIAL_PORT		0x3F8

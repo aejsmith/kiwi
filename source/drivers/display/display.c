@@ -49,7 +49,7 @@ static display_device_t *display_console_device = NULL;
 /** Convert a mode's pixel format to a depth in bits.
  * @param mode		Mode to get depth of.
  * @return		Depth in bits. */
-static uint16_t display_mode_depth(display_mode_t *mode) {
+static uint16_t display_mode_depth(const display_mode_t *mode) {
 	switch(mode->format) {
 	case PIXEL_FORMAT_ARGB32:
 	case PIXEL_FORMAT_BGRA32:
@@ -222,6 +222,50 @@ static status_t display_device_get_page(device_t *_device, void *data, offset_t 
 	return STATUS_SUCCESS;
 }
 
+/** Convert a display_mode_t to an fb_info_t.
+ * @param device	Device the mode is from.
+ * @param mode		Mode to convert.
+ * @param info		Information structure to fill in. */
+static void display_mode_to_fb_info(display_device_t *device, const display_mode_t *mode, fb_info_t *info) {
+	info->width = mode->width;
+	info->height = mode->height;
+	info->depth = display_mode_depth(mode);
+	info->bytes_per_pixel = ROUND_UP(info->depth, 8) / 8;
+	info->addr = device->mem_phys + mode->offset;
+
+	switch(mode->format) {
+	case PIXEL_FORMAT_ARGB32:
+	case PIXEL_FORMAT_RGB32:
+	case PIXEL_FORMAT_RGB24:
+		info->red_position = 16;
+		info->red_size = 8;
+		info->green_position = 8;
+		info->green_size = 8;
+		info->blue_position = 0;
+		info->blue_size = 8;
+		break;
+	case PIXEL_FORMAT_ARGB16:
+	case PIXEL_FORMAT_RGB16:
+		info->red_position = 11;
+		info->red_size = 5;
+		info->green_position = 5;
+		info->green_size = 6;
+		info->blue_position = 0;
+		info->blue_size = 5;
+		break;
+	case PIXEL_FORMAT_RGB15:
+		info->red_position = 10;
+		info->red_size = 5;
+		info->green_position = 5;
+		info->green_size = 5;
+		info->blue_position = 0;
+		info->blue_size = 5;
+		break;
+	default:
+		fatal("TODO");
+	}
+}
+
 /** Handler for display device requests.
  * @param _device	Device request is being made on.
  * @param data		Unused.
@@ -324,10 +368,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
 				/* Point the framebuffer console at the device. */
-				info.width = mode->width;
-				info.height = mode->height;
-				info.depth = display_mode_depth(mode);
-				info.addr = device->mem_phys + mode->offset;
+				display_mode_to_fb_info(device, mode, &info);
 				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
 
 				/* Register a notifier to redraw the console
