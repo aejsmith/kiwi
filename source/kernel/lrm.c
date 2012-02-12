@@ -26,7 +26,7 @@
 
 #include <lib/utility.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/page.h>
 
 #include <proc/thread.h>

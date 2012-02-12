@@ -28,7 +28,7 @@
 
 #include <lib/string.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
@@ -120,7 +120,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	/* Allocate a double fault stack for the new CPU. This is also used as
 	 * the initial stack while initializing the AP, before it enters the
 	 * scheduler. */
-	cpu->arch.double_fault_stack = heap_alloc(KSTACK_SIZE, MM_FATAL);
+	cpu->arch.double_fault_stack = kmem_alloc(KSTACK_SIZE, MM_FATAL);
 
 	/* Fill in details required by the bootstrap code. */
 	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);

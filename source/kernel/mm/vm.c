@@ -1314,9 +1314,9 @@ vm_aspace_t *vm_aspace_create(void) {
 	as->free_map = 0;
 
 	/* Insert the initial free region. */
-	region = vm_region_create(as, USER_MEMORY_BASE, USER_MEMORY_BASE + USER_MEMORY_SIZE, 0);
+	region = vm_region_create(as, USER_BASE, USER_BASE + USER_SIZE, 0);
 	list_append(&as->regions, &region->header);
-	vm_freelist_insert(region, USER_MEMORY_SIZE);
+	vm_freelist_insert(region, USER_SIZE);
 
 	/* Mark the first page of the address space as reserved to catch NULL
 	 * pointer accesses. Also mark the libkernel area as reserved. This

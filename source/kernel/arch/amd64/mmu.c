@@ -59,18 +59,13 @@
 	assert(!(virt % PAGE_SIZE)); \
 	assert(!(phys % PAGE_SIZE)); \
 	if(IS_KERNEL_CTX(ctx)) { \
-		assert(virt >= KERNEL_MEMORY_BASE); \
+		assert(virt >= KERNEL_BASE); \
 	} else { \
-		assert(virt < USER_MEMORY_SIZE); \
+		assert(virt < USER_SIZE); \
 	}
 #else
 # define CHECK_OPERATION(ctx, virt, phys)	
 #endif
-
-extern char __text_start[], __text_end[];
-extern char __init_start[], __init_end[];
-extern char __rodata_start[], __rodata_end[];
-extern char __data_start[], __bss_end[];
 
 /** Define a boot mapping of the first 8GB of physical memory. */
 KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000);

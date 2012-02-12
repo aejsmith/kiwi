@@ -38,7 +38,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
@@ -141,7 +141,7 @@ static void slab_destroy(slab_cache_t *cache, slab_t *slab) {
 	}
 
 	cache->slab_count--;
-	heap_free(addr, cache->slab_size);
+	kmem_free(addr, cache->slab_size);
 }
 
 /** Allocate a new slab and divide it up into objects.
@@ -159,7 +159,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 	mutex_unlock(&cache->slab_lock);
 
 	/* Allocate a new slab. */
-	addr = heap_alloc(cache->slab_size, (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
+	addr = kmem_alloc(cache->slab_size, (kmflag & MM_FLAG_MASK) & ~MM_FATAL);
 	if(unlikely(!addr)) {
 		/* Handle MM_FATAL ourselves so that we get a more accurate
 		 * error message. */
@@ -183,7 +183,7 @@ static inline slab_t *slab_create(slab_cache_t *cache, int kmflag) {
 				      cache, cache->name);
 			}
 
-			heap_free(addr, cache->slab_size);
+			kmem_free(addr, cache->slab_size);
 			return NULL;
 		}
 	} else {

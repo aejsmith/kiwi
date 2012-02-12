@@ -23,7 +23,7 @@
 
 #include <lib/string.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/phys.h>
@@ -332,8 +332,8 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 /** Initialization function for the BIOS module.
  * @return		Status code describing result of the operation. */
 static status_t bios_init(void) {
-	/* Allocate a chunk of heap space and map stuff into it. */
-	bios_mem_mapping = (void *)heap_raw_alloc(0x100000, MM_SLEEP);
+	/* Allocate a chunk of address space and map stuff into it. */
+	bios_mem_mapping = (void *)kmem_raw_alloc(0x100000, MM_SLEEP);
 	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_SLEEP, &bios_mem_pages);
 	bios_mem_map(BIOS_BDA_BASE, BIOS_BDA_BASE, BIOS_BDA_SIZE);
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);

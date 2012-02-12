@@ -27,7 +27,7 @@
 #include <lib/string.h>
 #include <lib/tar.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -392,7 +392,7 @@ static __init_text void kmain_bsp_bottom(void) {
 	page_init();
 	mmu_init();
 	mmu_init_percpu();
-	heap_init();
+	kmem_init();
 	slab_init();
 	malloc_init();
 

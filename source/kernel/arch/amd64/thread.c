@@ -140,7 +140,7 @@ ptr_t arch_thread_tls_addr(thread_t *thread) {
  * @param addr		TLS address.
  * @return		Status code describing result of the operation. */
 status_t arch_thread_set_tls_addr(thread_t *thread, ptr_t addr) {
-	if(addr >= (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+	if(addr >= (USER_BASE + USER_SIZE)) {
 		return STATUS_INVALID_ADDR;
 	}
 

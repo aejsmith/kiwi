@@ -73,20 +73,11 @@ config PAGE_DEBUG
 	  that this will write a debug message on every page allocation and
 	  deallocation.
 
-config VMEM_DEBUG
-	bool "Vmem allocator debug output"
+config KMEM_DEBUG
+	bool "Kernel memory allocator debug output"
 	default n
 	help
-	  Enable extra debug output from the vmem resource allocator. Since
-	  just about every allocation done by the kernel (pages, kernel heap,
-	  object IDs) uses vmem in some way, this will generate a HUGE amount
-	  of output.
-
-config HEAP_DEBUG
-	bool "Kernel heap debug output"
-	default n
-	help
-	  Enable extra debug output from the kernel heap allocator.
+	  Enable extra debug output from the kernel virtual memory allocator.
 
 config SLAB_DEBUG
 	bool "Slab allocator debug output"

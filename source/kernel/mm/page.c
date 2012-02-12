@@ -130,8 +130,6 @@ typedef struct page_freelist {
 /** Maximum number of physical ranges. */
 #define PHYS_RANGE_MAX			32
 
-extern char __init_start[], __init_end[];
-
 /** Total usable page count. */
 static page_num_t total_page_count = 0;
 

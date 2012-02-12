@@ -24,7 +24,7 @@
 #include <lib/id_alloc.h>
 #include <lib/string.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/safe.h>
 #include <mm/slab.h>
@@ -148,7 +148,7 @@ static void thread_reaper(void *arg1, void *arg2) {
 
 		/* Now clean up the thread. */
 		arch_thread_destroy(thread);
-		heap_free(thread->kstack, KSTACK_SIZE);
+		kmem_free(thread->kstack, KSTACK_SIZE);
 		notifier_clear(&thread->death_notifier);
 		object_destroy(&thread->obj);
 
@@ -585,7 +585,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
 	/* Allocate a kernel stack and initialize the thread context. */
-	thread->kstack = heap_alloc(KSTACK_SIZE, MM_SLEEP);
+	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_SLEEP);
 
 	/* Initialize the architecture-specific data. */
 	arch_thread_init(thread, thread_trampoline);

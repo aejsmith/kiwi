@@ -212,7 +212,7 @@ static void page_fault(intr_frame_t *frame) {
 
 	/* Try the virtual memory manager if the fault occurred at a userspace
 	 * address. */
-	if(addr < (USER_MEMORY_BASE + USER_MEMORY_SIZE)) {
+	if(addr < (USER_BASE + USER_SIZE)) {
 		ret = vm_fault(addr, reason, access);
 		if(ret == VM_FAULT_SUCCESS) {
 			return;

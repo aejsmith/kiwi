@@ -23,7 +23,7 @@
 
 #include <io/fs.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>
 #include <mm/page.h>
@@ -82,7 +82,7 @@ void *module_mem_alloc(size_t size) {
 	remaining_module_size -= size;
 	return (void *)addr;
 #else
-	return heap_alloc(ROUND_UP(size, PAGE_SIZE), 0);
+	return kmem_alloc(ROUND_UP(size, PAGE_SIZE), 0);
 #endif
 }
 
@@ -91,7 +91,7 @@ void *module_mem_alloc(size_t size) {
  * @param size		Size of the allocation. */
 static void module_mem_free(void *base, size_t size) {
 #ifndef KERNEL_MODULE_BASE
-	heap_free(base, ROUND_UP(size, PAGE_SIZE));
+	kmem_free(base, ROUND_UP(size, PAGE_SIZE));
 #endif
 }
 

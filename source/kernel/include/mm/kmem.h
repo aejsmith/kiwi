@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2011-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
@@ -16,27 +16,25 @@
 
 /**
  * @file
- * @brief		Kernel heap allocation functions.
+ * @brief		Kernel virtual memory allocator.
  */
 
-#ifndef __MM_HEAP_H
-#define __MM_HEAP_H
+#ifndef __MM_KMEM_H
+#define __MM_KMEM_H
 
 #include <arch/page.h>
 
 #include <mm/flags.h>
 
-#include <types.h>
+extern ptr_t kmem_raw_alloc(size_t size, int mmflag);
+extern void kmem_raw_free(ptr_t addr, size_t size);
 
-extern ptr_t heap_raw_alloc(size_t size, int mmflag);
-extern void heap_raw_free(ptr_t addr, size_t size);
+extern void *kmem_alloc(size_t size, int mmflag);
+extern void kmem_free(void *addr, size_t size);
 
-extern void *heap_alloc(size_t size, int mmflag);
-extern void heap_free(void *addr, size_t size);
+extern void *kmem_map(phys_ptr_t base, size_t size, int mmflag);
+extern void kmem_unmap(void *addr, size_t size, bool shared);
 
-extern void *heap_map_range(phys_ptr_t base, size_t size, int mmflag);
-extern void heap_unmap_range(void *addr, size_t size, bool shared);
+extern void kmem_init(void);
 
-extern void heap_init(void);
-
-#endif /* __MM_HEAP_H */
+#endif /* __MM_KMEM_H */

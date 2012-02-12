@@ -28,18 +28,18 @@
  * caches smaller than 32 bytes is pointless. Allocations use the smallest
  * cache that can fit both the allocation and its information structure. If an
  * allocation larger than 64K is requested, then the allocation will use the
- * kernel heap directly.
+ * kernel memory allocator directly.
  *
  * Allocations are tracked using an alloc_tag_t structure, which is placed
  * before the allocation in memory. It tracks the size of the allocation and
- * the cache it came from. If the allocation came from the heap, then the
- * cache pointer will be NULL.
+ * the cache it came from. If the allocation came from kmem, then the cache
+ * pointer will be NULL.
  */
 
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/slab.h>
 
@@ -55,7 +55,7 @@ typedef struct alloc_tag {
 #define KMALLOC_CACHE_MIN	5	/**< Minimum cache size (2^5  == 32). */
 #define KMALLOC_CACHE_MAX	16	/**< Maximum cache size (2^16 == 64K). */
 
-/** Slab caches for kmalloc() and friends. */
+/** Slab caches for kmalloc(). */
 static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
 
 /** Allocate a block of memory.
@@ -84,8 +84,8 @@ void *kmalloc(size_t size, int kmflag) {
 
 		addr->cache = kmalloc_caches[idx];
 	} else {
-		/* Fall back on the kernel heap. */
-		addr = heap_alloc(ROUND_UP(total, PAGE_SIZE), kmflag & MM_FLAG_MASK);
+		/* Fall back on kmem. */
+		addr = kmem_alloc(ROUND_UP(total, PAGE_SIZE), kmflag & MM_FLAG_MASK);
 		if(unlikely(!addr)) {
 			return NULL;
 		}
@@ -167,9 +167,9 @@ void kfree(void *addr) {
 		tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
 
 		/* If the cache pointer is not set, assume the allocation came
-		 * directly from the heap. */
+		 * directly from kmem. */
 		if(!tag->cache) {
-			heap_free(tag, ROUND_UP(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
+			kmem_free(tag, ROUND_UP(tag->size + sizeof(alloc_tag_t), PAGE_SIZE));
 			return;
 		}
 

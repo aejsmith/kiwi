@@ -48,7 +48,7 @@ sources = FeatureSources(config, [
 	'lib/tar.c',
 
 	'mm/area.c',
-	'mm/heap.c',
+	'mm/kmem.c',
 	'mm/malloc.c',
 	'mm/mmu.c',
 	'mm/page.c',

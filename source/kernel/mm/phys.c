@@ -24,7 +24,8 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
+#include <mm/mmu.h>
 #include <mm/page.h>
 #include <mm/phys.h>
 
@@ -64,6 +65,8 @@ static SPINLOCK_DECLARE(memory_types_lock);
  * @param mmflag	Allocation flags.
  * @return		Pointer to mapped data. */
 void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
+	phys_ptr_t base, end;
+
 	if(unlikely(!size)) {
 		return NULL;
 	}
@@ -73,8 +76,11 @@ void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 		return (void *)(KERNEL_PMAP_BASE + (addr - KERNEL_PMAP_OFFSET));
 	}
 
-	/* Map to the kernel heap instead. */
-	return heap_map_range(addr, size, mmflag);
+	/* Outside the physical map area. Must instead allocate some kernel
+	 * memory space and map there. */
+	base = ROUND_DOWN(addr, PAGE_SIZE);
+	end = ROUND_UP(addr + size, PAGE_SIZE);
+	return kmem_map(base, end - base, mmflag);
 }
 
 /** Unmap memory mapped with phys_map().
@@ -82,12 +88,15 @@ void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
  * @param size		Size of range.
  * @param shared	Whether the mapping was used by other CPUs. */
 void phys_unmap(void *addr, size_t size, bool shared) {
-	ptr_t virt = (ptr_t)addr;
+	ptr_t base, end;
 
 	/* If the range lies within the physical map area, don't need to do
-	 * anything. Otherwise, unmap and free from the kernel heap. */
-	if(virt < KERNEL_PMAP_BASE || virt >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
-		heap_unmap_range(addr, size, shared);
+	 * anything. Otherwise, unmap and free from kernel memory. */
+	if((ptr_t)addr < KERNEL_PMAP_BASE || (ptr_t)addr >= (KERNEL_PMAP_BASE + KERNEL_PMAP_SIZE)) {
+		base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
+		end = ROUND_UP((ptr_t)addr + size, PAGE_SIZE);
+		
+		kmem_unmap((void *)base, end - base, shared);
 	}
 }
 

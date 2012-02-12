@@ -23,7 +23,7 @@
 #include <lib/string.h>
 #include <lib/utility.h>
 
-#include <mm/heap.h>
+#include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/phys.h>
 
@@ -320,7 +320,7 @@ static void fb_console_configure(const fb_info_t *info, int mmflag) {
 		/* Free old mappings. */
 		size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
 		phys_unmap(fb_mapping, size, true);
-		heap_free(fb_backbuffer, ROUND_UP(size, PAGE_SIZE));
+		kmem_free(fb_backbuffer, ROUND_UP(size, PAGE_SIZE));
 		kfree(fb_console_glyphs);
 	} else {
 		/* First time the framebuffer console has been enabled.
@@ -337,7 +337,7 @@ static void fb_console_configure(const fb_info_t *info, int mmflag) {
 	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
 	fb_mapping = phys_map(fb_info.addr, size, mmflag);
 	memset(fb_mapping, 0, size);
-	fb_backbuffer = heap_alloc(ROUND_UP(size, PAGE_SIZE), mmflag);
+	fb_backbuffer = kmem_alloc(ROUND_UP(size, PAGE_SIZE), mmflag);
 	memset(fb_backbuffer, 0, size);
 
 	/* Configure the console and create a backbuffer for it, initially

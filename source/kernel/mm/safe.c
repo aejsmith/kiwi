@@ -32,12 +32,12 @@
 #include <status.h>
 
 /** Check if an address is valid. */
-#if USER_MEMORY_BASE == 0
+#if USER_BASE == 0
 # define VALID(addr, count)		\
-	(((addr) + (count)) <= USER_MEMORY_SIZE && ((addr) + (count)) >= (addr))
+	(((addr) + (count)) <= USER_SIZE && ((addr) + (count)) >= (addr))
 #else
 # define VALID(addr, count)			\
-	((addr) >= USER_MEMORY_BASE && ((addr) + (count)) <= (USER_MEMORY_BASE + USER_MEMORY_SIZE) && ((addr) + (count)) >= (addr))
+	((addr) >= USER_BASE && ((addr) + (count)) <= (USER_BASE + USER_SIZE) && ((addr) + (count)) >= (addr))
 #endif
 
 /** Common entry code for userspace memory functions. */
@@ -136,7 +136,7 @@ status_t strlen_user(const char *str, size_t *lenp) {
  *
  * Allocates a buffer large enough and copies across a string from user memory.
  * The allocation is not made using MM_SLEEP, as there is no length limit and
- * therefore the length could be too large to fit in the heap. Use of
+ * therefore the length could be too large to fit in memory. Use of
  * strndup_from_user() is preferred to this.
  *
  * @param src		Location to copy from.

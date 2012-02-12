@@ -44,7 +44,6 @@ static size_t acpi_table_count = 0;
 static __init_text void acpi_table_copy(phys_ptr_t addr) {
 	acpi_header_t *source;
 
-	/* Map the table on the heap. */
 	source = phys_map(addr, PAGE_SIZE * 2, MM_FATAL);
 
 	/* Check the checksum of the table. */
