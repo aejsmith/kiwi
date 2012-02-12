@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -488,11 +488,17 @@ bool mmu_context_unmap(mmu_context_t *ctx, ptr_t virt, bool shared, phys_ptr_t *
 bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, bool *writep, bool *executep) {
 	uint64_t *pdir, *ptbl;
 	unsigned pde, pte;
+	bool ret = false;
 
 	/* We allow checks on any address here, so that you can query a kernel
 	 * address even when you are on a user address space. */
 	assert(mutex_held(&ctx->lock));
 	assert(!(virt % PAGE_SIZE));
+
+	/* For a kernel address we must lock the kernel context. */
+	if(virt >= KERNEL_BASE && !IS_KERNEL_CTX(ctx)) {
+		mmu_context_lock(&kernel_mmu_context);
+	}
 
 	/* Find the page directory for the entry. */
 	pdir = mmu_context_get_pdir(ctx, virt, false, 0);
@@ -513,28 +519,31 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, bool *
 				if(executep) {
 					*executep = (pdir[pde] & X86_PTE_NOEXEC) == 0;
 				}
-				return true;
-			}
-
-			/* Not a large page, map page table. */
-			ptbl = map_structure(pdir[pde] & PHYS_PAGE_MASK);
-			pte = (virt % 0x200000) / PAGE_SIZE;
-			if(ptbl[pte] & X86_PTE_PRESENT) {
-				if(physp) {
-					*physp = ptbl[pte] & PHYS_PAGE_MASK;
+				ret = true;
+			} else {
+				/* Not a large page, map page table. */
+				ptbl = map_structure(pdir[pde] & PHYS_PAGE_MASK);
+				pte = (virt % 0x200000) / PAGE_SIZE;
+				if(ptbl[pte] & X86_PTE_PRESENT) {
+					if(physp) {
+						*physp = ptbl[pte] & PHYS_PAGE_MASK;
+					}
+					if(writep) {
+						*writep = !!(pdir[pde] & X86_PTE_WRITE);
+					}
+					if(executep) {
+						*executep = (pdir[pde] & X86_PTE_NOEXEC) == 0;
+					}
+					ret = true;
 				}
-				if(writep) {
-					*writep = !!(pdir[pde] & X86_PTE_WRITE);
-				}
-				if(executep) {
-					*executep = (pdir[pde] & X86_PTE_NOEXEC) == 0;
-				}
-				return true;
 			}
 		}
 	}
 
-	return false;
+	if(virt >= KERNEL_BASE && !IS_KERNEL_CTX(ctx)) {
+		mmu_context_lock(&kernel_mmu_context);
+	}
+	return ret;
 }
 
 /** Switch to another MMU context.
