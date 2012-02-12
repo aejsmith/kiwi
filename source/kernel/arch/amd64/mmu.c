@@ -541,7 +541,7 @@ bool mmu_context_query(mmu_context_t *ctx, ptr_t virt, phys_ptr_t *physp, bool *
 	}
 
 	if(virt >= KERNEL_BASE && !IS_KERNEL_CTX(ctx)) {
-		mmu_context_lock(&kernel_mmu_context);
+		mmu_context_unlock(&kernel_mmu_context);
 	}
 	return ret;
 }
