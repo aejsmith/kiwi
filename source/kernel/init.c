@@ -378,7 +378,6 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 
 /** Initialization code for the boot CPU. */
 static __init_text void kmain_bsp_bottom(void) {
-	thread_t *thread;
 	status_t ret;
 
 	/* Do early CPU subsystem and CPU initialization. */
@@ -430,8 +429,8 @@ static __init_text void kmain_bsp_bottom(void) {
 	session_init();
 	process_init();
 	thread_init();
+	sched_init_percpu();
 	sched_init();
-	thread_reaper_init();
 	dpc_init();
 	lrm_init();
 
@@ -439,11 +438,10 @@ static __init_text void kmain_bsp_bottom(void) {
 	vm_init();
 
 	/* Create the second stage initialization thread. */
-	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, &thread);
+	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not create second-stage initialization thread");
 	}
-	thread_run(thread);
 
 	/* Finally begin executing other threads. */
 	sched_enter();
@@ -462,7 +460,7 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	cpu_init_percpu();
 
 	/* Initialize the scheduler. */
-	sched_init();
+	sched_init_percpu();
 
 	/* Signal that we're up and add ourselves to the running CPU list. */
 	cpu->state = CPU_RUNNING;

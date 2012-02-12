@@ -116,7 +116,7 @@ __init_text void cpu_early_init_percpu(cpu_t *cpu) {
 }
 
 /** Perform additional per-CPU initialization. */
-__init_text void cpu_init_percpu() {
+__init_text void cpu_init_percpu(void) {
 	arch_cpu_init_percpu();
 }
 

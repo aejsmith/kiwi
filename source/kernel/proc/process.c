@@ -699,6 +699,7 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	}
 	process->create = &info;
 	thread_run(thread);
+	thread_release(thread);
 
 	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
@@ -1014,6 +1015,7 @@ status_t kern_process_create(const char *path, const char *const args[], const c
 	}
 	process->create = &info;
 	thread_run(thread);
+	thread_release(thread);
 
 	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
@@ -1136,12 +1138,13 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	/* Run the thread and wait for it to complete, then free up data and
 	 * exit this thread. */
 	thread_run(thread);
+	thread_release(thread);
 	semaphore_down(&info.sem);
 	process_create_args_free(&info);
 	thread_exit();
 fail:
 	if(thread) {
-		thread_destroy(thread);
+		thread_release(thread);
 	}
 	if(info.aspace) {
 		vm_aspace_destroy(info.aspace);
@@ -1230,6 +1233,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 
 	/* Run the new thread. */
 	thread_run(thread);
+	thread_release(thread);
 	object_security_destroy(&ksecurity);
 	return STATUS_SUCCESS;
 fail:

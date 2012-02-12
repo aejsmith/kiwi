@@ -66,6 +66,8 @@ static SPINLOCK_DECLARE(lrm_handlers_lock);
 
 /** LRM thread. */
 static thread_t *lrm_thread = NULL;
+
+/** LRM request queue. */
 static CONDVAR_DECLARE(lrm_request_cvar);
 static CONDVAR_DECLARE(lrm_response_cvar);
 static MUTEX_DECLARE(lrm_response_lock, 0);

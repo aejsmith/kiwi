@@ -72,6 +72,8 @@
 #include <proc/sched.h>
 #include <proc/thread.h>
 
+#include <sync/semaphore.h>
+
 #include <assert.h>
 #include <cpu.h>
 #include <kdb.h>
@@ -122,6 +124,11 @@ typedef struct sched_cpu {
 /** Total number of running/ready threads across all CPUs. */
 static atomic_t threads_running = 0;
 #endif
+
+/** Dead thread queue. */
+static LIST_DECLARE(dead_threads);
+static SPINLOCK_DECLARE(dead_thread_lock);
+static SEMAPHORE_DECLARE(dead_thread_sem, 0);
 
 /** Add a thread to a queue.
  * @param queue		Queue to add to.
@@ -335,9 +342,15 @@ void sched_post_switch(bool state) {
 		 * previous. */
 		spinlock_unlock_ni(&curr_cpu->sched->prev_thread->lock);
 
-		/* Deal with thread terminations. */
+		/* Deal with thread terminations. We cannot delete the thread
+		 * directly as all allocator functions are unsafe to call
+		 * from here. Instead we queue the thread to be deleted by
+		 * the reaper thread. */
 		if(curr_cpu->sched->prev_thread->state == THREAD_DEAD) {
-			thread_destroy(curr_cpu->sched->prev_thread);
+			spinlock_lock(&dead_thread_lock);
+			list_append(&dead_threads, &curr_cpu->sched->prev_thread->runq_link);
+			semaphore_up(&dead_thread_sem, 1);
+			spinlock_unlock(&dead_thread_lock);
 		}
 	}
 
@@ -384,7 +397,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 		load = other->sched->total;
 		if(load < average) {
-			dprintf("sched: CPU %u load %zu less than average %zu, giving it thread %u\n",
+			dprintf("sched: CPU %" PRIu32 " load %zu less than average %zu, giving it thread %" PRId32 "\n",
 			        other->id, load, average, thread->id);
 			cpu = other;
 			break;
@@ -442,6 +455,26 @@ void sched_insert_thread(thread_t *thread) {
 	spinlock_unlock(&sched->lock);
 }
 
+/** Dead thread reaper.
+ * @param arg1		Unused.
+ * @param arg2		Unused. */
+static void sched_reaper_thread(void *arg1, void *arg2) {
+	thread_t *thread;
+
+	while(true) {
+		semaphore_down(&dead_thread_sem);
+
+		/* Take the next thread off the list. */
+		spinlock_lock(&dead_thread_lock);
+		assert(!list_empty(&dead_threads));
+		thread = list_first(&dead_threads, thread_t, runq_link);
+		list_remove(&thread->runq_link);
+		spinlock_unlock(&dead_thread_lock);
+
+		thread_release(thread);
+	}
+}
+
 /** Scheduler idle thread function.
  * @param arg1		Unused.
  * @param arg2		Unused. */
@@ -458,8 +491,19 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 	}
 }
 
-/** Initialize the scheduler for the current CPU. */
+/** Initialize the scheduler globally. */
 __init_text void sched_init(void) {
+	status_t ret;
+
+	/* Create the thread reaper. */
+	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create thread reaper (%d)", ret);
+	}
+}
+
+/** Initialize the scheduler for the current CPU. */
+__init_text void sched_init_percpu(void) {
 	char name[THREAD_NAME_MAX];
 	status_t ret;
 	int i, j;
@@ -481,6 +525,7 @@ __init_text void sched_init(void) {
 	thread_wire(curr_cpu->sched->idle_thread);
 
 	/* Set the idle thread as the current thread. */
+	refcount_inc(&curr_cpu->sched->idle_thread->count);
 	curr_cpu->sched->idle_thread->cpu = curr_cpu;
 	curr_cpu->sched->idle_thread->state = THREAD_RUNNING;
 	curr_cpu->sched->prev_thread = NULL;

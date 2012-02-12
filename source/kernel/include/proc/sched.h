@@ -29,6 +29,7 @@ extern void sched_post_switch(bool state);
 extern void sched_insert_thread(thread_t *thread);
 
 extern void sched_init(void);
+extern void sched_init_percpu(void);
 extern void sched_enter(void) __noreturn;
 
 #endif /* __PROC_SCHED_H */

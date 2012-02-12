@@ -81,11 +81,11 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
  * @param action	Action to perform once the system has been shut down. */
 void system_shutdown(int action) {
 	WAITQ_DECLARE(shutdown_wait);
-	thread_t *thread;
 	status_t ret;
 
 	if(!shutdown_in_progress) {
 		shutdown_in_progress = true;
+		thread_disable_preempt();
 
 		/* Perform the shutdown in a thread under the kernel process,
 		 * as all other processes will be terminated. Don't use a DPC,
@@ -93,16 +93,13 @@ void system_shutdown(int action) {
 		 * them, and if we're running in one, we'll block those DPCs
 		 * from executing. */
 		ret = thread_create("shutdown", NULL, 0, shutdown_thread_entry, (void *)((ptr_t)action),
-		                    NULL, NULL, &thread);
+		                    NULL, NULL, NULL);
 		if(ret != STATUS_SUCCESS) {
 			/* FIXME: This shouldn't be able to fail, must reserve
 			 * a thread or something in case we've got too many
 			 * threads running. */
 			fatal("Unable to create shutdown thread (%d)", ret);
 		}
-
-		thread_disable_preempt();
-		thread_run(thread);
 	}
 
 	if(curr_proc != kernel_proc) {

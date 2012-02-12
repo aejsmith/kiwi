@@ -144,10 +144,6 @@ static MUTEX_DECLARE(free_page_lock, 0);
 static physical_range_t phys_ranges[PHYS_RANGE_MAX];
 static size_t phys_range_count = 0;
 
-/** Page writer/page daemon threads. */
-static thread_t *page_writer_thread;
-//static thread_t *page_daemon_thread;
-
 /** Page writer thread.
  * @param arg1		Unused.
  * @param arg2		Unused. */
@@ -949,12 +945,10 @@ __init_text void page_init(void) {
 __init_text void page_daemon_init(void) {
 	status_t ret;
 
-	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL,
-	                    &page_writer_thread);
+	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		fatal("Could not start page writer (%d)", ret);
 	}
-	thread_run(page_writer_thread);
 }
 
 /** Reclaim memory no longer in use after kernel initialization. */

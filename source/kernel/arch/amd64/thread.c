@@ -38,8 +38,9 @@ extern void amd64_context_restore(ptr_t new_rsp);
 
 /** Initialize AMD64-specific thread data.
  * @param thread	Thread to initialize.
+ * @param stack		Base of the kernel stack for the thread.
  * @param entry		Entry point for the thread. */
-void arch_thread_init(thread_t *thread, void (*entry)(void)) {
+void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void)) {
 	unsigned long *sp;
 
 	thread->arch.flags = 0;
@@ -47,7 +48,7 @@ void arch_thread_init(thread_t *thread, void (*entry)(void)) {
 	thread->arch.fpu_count = 0;
 
 	/* Point the RSP for SYSCALL entry at the top of the stack. */
-	thread->arch.kernel_rsp = (ptr_t)thread->kstack + KSTACK_SIZE;
+	thread->arch.kernel_rsp = (ptr_t)stack + KSTACK_SIZE;
 
 	/* Initialize the kernel stack. First value is a fake return address to
 	 * make the backtrace end correctly and maintain ABI alignment

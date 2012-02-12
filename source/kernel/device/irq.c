@@ -139,7 +139,7 @@ status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *da
 		if(exist->top == top && exist->bottom == bottom && exist->data == data) {
 			spinlock_unlock(&irq_table[num].lock);
 			if(handler->thread) {
-				thread_destroy(handler->thread);
+				thread_release(handler->thread);
 			}
 			kfree(handler);
 			return STATUS_ALREADY_EXISTS;
@@ -209,6 +209,7 @@ status_t irq_unregister(unsigned num, irq_top_t top, irq_bottom_t bottom, void *
 		 * should exit. */
 		if(handler->thread) {
 			semaphore_up(&handler->sem, 1);
+			thread_release(handler->thread);
 		} else {
 			kfree(handler);
 		}

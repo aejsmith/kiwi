@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -56,6 +56,18 @@ typedef struct thread_uspace_args {
 typedef struct thread {
 	object_t obj;			/**< Object header. */
 
+	/** Architecture thread implementation. */
+	arch_thread_t arch;
+
+	/** State of the thread. */
+	enum {
+		THREAD_CREATED,		/**< Newly created, not yet made runnable. */
+		THREAD_READY,		/**< Ready and waiting to be run. */
+		THREAD_RUNNING,		/**< Running on some CPU. */
+		THREAD_SLEEPING,	/**< Sleeping, waiting for some event to occur. */
+		THREAD_DEAD,		/**< Dead, waiting to be cleaned up. */
+	} state;
+
 	/**
 	 * Lock for the thread.
 	 *
@@ -67,21 +79,11 @@ typedef struct thread {
 	spinlock_t lock;
 
 	/** Main thread information. */
-	arch_thread_t arch;		/**< Architecture thread implementation. */
 	void *kstack;			/**< Kernel stack pointer. */
 	unsigned flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
 	size_t wired;			/**< How many calls to thread_wire() have been made. */
 	bool killed;			/**< Whether thread_kill() has been called on the thread. */
-
-	/** State of the thread. */
-	enum {
-		THREAD_CREATED,		/**< Thread is newly created. */
-		THREAD_READY,		/**< Thread is runnable. */
-		THREAD_RUNNING,		/**< Thread is running on a CPU. */
-		THREAD_SLEEPING,	/**< Thread is sleeping. */
-		THREAD_DEAD,		/**< Thread is dead and awaiting cleanup. */
-	} state;
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */
@@ -125,7 +127,7 @@ typedef struct thread {
 	stack_t signal_stack;		/**< Alternate signal stack. */
 
 	/** Thread entry function. */
-	thread_func_t entry;		/**< Entry function for the thread. */
+	thread_func_t func;		/**< Entry function for the thread. */
 	void *arg1;			/**< First argument to thread entry function. */
 	void *arg2;			/**< Second argument to thread entry function. */
 
@@ -144,7 +146,7 @@ typedef struct thread {
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
-extern void arch_thread_init(thread_t *thread, void (*entry)(void));
+extern void arch_thread_init(thread_t *thread, void *stack, void (*entry)(void));
 extern void arch_thread_destroy(thread_t *thread);
 extern void arch_thread_switch(thread_t *thread, thread_t *prev);
 extern ptr_t arch_thread_tls_addr(thread_t *thread);
@@ -153,6 +155,8 @@ extern void arch_thread_enter_userspace(ptr_t entry, ptr_t stack, ptr_t arg) __n
 
 extern void thread_uspace_trampoline(void *_args, void *arg2);
 
+extern void thread_retain(thread_t *thread);
+extern void thread_release(thread_t *thread);
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);
@@ -170,12 +174,10 @@ extern void thread_exit(void) __noreturn;
 extern thread_t *thread_lookup_unsafe(thread_id_t id);
 extern thread_t *thread_lookup(thread_id_t id);
 extern status_t thread_create(const char *name, struct process *owner, unsigned flags,
-                              thread_func_t entry, void *arg1, void *arg2,
+                              thread_func_t func, void *arg1, void *arg2,
                               object_security_t *security, thread_t **threadp);
 extern void thread_run(thread_t *thread);
-extern void thread_destroy(thread_t *thread);
 
 extern void thread_init(void);
-extern void thread_reaper_init(void);
 
 #endif /* __PROC_THREAD_H */

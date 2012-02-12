@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -70,11 +70,6 @@ static id_alloc_t thread_id_allocator;
 /** Thread structure cache. */
 static slab_cache_t *thread_cache;
 
-/** Dead thread queue information. */
-static LIST_DECLARE(dead_threads);
-static SPINLOCK_DECLARE(dead_thread_lock);
-static SEMAPHORE_DECLARE(dead_thread_sem, 0);
-
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
  * @param data		Ignored. */
@@ -82,6 +77,7 @@ static void thread_cache_ctor(void *obj, void *data) {
 	thread_t *thread = (thread_t *)obj;
 
 	spinlock_init(&thread->lock, "thread_lock");
+	refcount_set(&thread->count, 0);
 	list_init(&thread->runq_link);
 	list_init(&thread->waitq_link);
 	list_init(&thread->owner_link);
@@ -96,14 +92,14 @@ static void thread_trampoline(void) {
 	 * It is therefore necessary to perform post-switch tasks now. */
 	sched_post_switch(true);
 
-	dprintf("thread: entered thread %" PRId32 "(%s) on CPU %" PRIu32 "\n",
+	dprintf("thread: entered thread %" PRId32 " (%s) on CPU %" PRIu32 "\n",
 		curr_thread->id, curr_thread->name, curr_cpu->id);
 
 	/* Set the last time to now so that accounting information is correct. */
 	curr_thread->last_time = system_time();
 
 	/* Run the thread's main function and then exit when it returns. */
-	curr_thread->entry(curr_thread->arg1, curr_thread->arg2);
+	curr_thread->func(curr_thread->arg1, curr_thread->arg2);
 	thread_exit();
 }
 
@@ -122,50 +118,10 @@ void thread_uspace_trampoline(void *_args, void *arg2) {
 	arch_thread_enter_userspace(entry, sp, arg);
 }
 
-/** Dead thread reaper.
- * @param arg1		Unused.
- * @param arg2		Unused. */
-static void thread_reaper(void *arg1, void *arg2) {
-	thread_t *thread;
-
-	while(true) {
-		semaphore_down(&dead_thread_sem);
-
-		/* Take the next thread off the list. */
-		spinlock_lock(&dead_thread_lock);
-		assert(!list_empty(&dead_threads));
-		thread = list_first(&dead_threads, thread_t, runq_link);
-		list_remove(&thread->runq_link);
-		spinlock_unlock(&dead_thread_lock);
-
-		/* Remove from thread tree. */
-		rwlock_write_lock(&thread_tree_lock);
-		avl_tree_remove(&thread_tree, &thread->tree_link);
-		rwlock_unlock(&thread_tree_lock);
-
-		/* Detach from its owner. */
-		process_detach(thread);
-
-		/* Now clean up the thread. */
-		arch_thread_destroy(thread);
-		kmem_free(thread->kstack, KSTACK_SIZE);
-		notifier_clear(&thread->death_notifier);
-		object_destroy(&thread->obj);
-
-		/* Deallocate the thread ID. */
-		id_alloc_release(&thread_id_allocator, thread->id);
-
-		dprintf("thread: destroyed thread %" PRId32 "(%s) (thread: %p)\n",
-			thread->id, thread->name, thread);
-
-		slab_cache_free(thread_cache, thread);
-	}
-}
-
 /** Closes a handle to a thread.
  * @param handle	Handle being closed. */
 static void thread_object_close(object_handle_t *handle) {
-	thread_destroy((thread_t *)handle->object);
+	thread_release((thread_t *)handle->object);
 }
 
 /** Signal that a thread is being waited for.
@@ -256,6 +212,61 @@ static bool thread_timeout(void *_thread) {
 }
 
 /**
+ * Increase the reference count of a thread.
+ *
+ * Increases the reference count of a thread. This should be done when you
+ * want to ensure that the thread will not freed: it will only be freed once
+ * the count reaches 0.
+ *
+ * @param thread	Thread to retain.
+ */
+void thread_retain(thread_t *thread) {
+	refcount_inc(&thread->count);
+}
+
+/**
+ * Decrease the reference count of a thread.
+ *
+ * Decreases the reference count of a thread. This should be called once you
+ * no longer require a thread (that you previously called thread_retain() on).
+ * Once the reference count reaches 0, the thread will be destroyed.
+ *
+ * @param thread	Thread to release.
+ */
+void thread_release(thread_t *thread) {
+	if(refcount_dec(&thread->count) > 0) {
+		return;
+	}
+
+	/* If a thread is running it will have a reference on it. Should not be
+	 * in the running state for this reason. */
+	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
+	assert(list_empty(&thread->runq_link));
+
+	/* Remove from thread tree. */
+	rwlock_write_lock(&thread_tree_lock);
+	avl_tree_remove(&thread_tree, &thread->tree_link);
+	rwlock_unlock(&thread_tree_lock);
+
+	/* Detach from its owner. */
+	process_detach(thread);
+
+	/* Now clean up the thread. */
+	arch_thread_destroy(thread);
+	kmem_free(thread->kstack, KSTACK_SIZE);
+	notifier_clear(&thread->death_notifier);
+	object_destroy(&thread->obj);
+
+	/* Deallocate the thread ID. */
+	id_alloc_release(&thread_id_allocator, thread->id);
+
+	dprintf("thread: destroyed thread %" PRId32 " (%s) (thread: %p)\n", thread->id,
+	        thread->name, thread);
+
+	slab_cache_free(thread_cache, thread);
+}
+
+/**
  * Wire a thread to its current CPU.
  *
  * Wires a thread to the CPU it is currently running on. If the thread does not
@@ -267,6 +278,8 @@ static bool thread_timeout(void *_thread) {
  * @param thread	Thread to wire.
  */
 void thread_wire(thread_t *thread) {
+	/* This function may be called during initialization on curr_thread
+	 * before the thread system is up. Need to handle this case. */
 	if(thread) {
 		spinlock_lock(&thread->lock);
 
@@ -404,9 +417,7 @@ void thread_preempt(void) {
  * thread_disable_preempt().
  */
 void thread_disable_preempt(void) {
-	spinlock_lock(&curr_thread->lock);
 	curr_thread->preempt_disabled++;
-	spinlock_unlock(&curr_thread->lock);
 }
 
 /** Re-enable preemption for the current thread.
@@ -477,18 +488,24 @@ void thread_at_kernel_exit(void) {
 /** Terminate the current thread.
  * @note		Does not return. */
 void thread_exit(void) {
+	bool state;
+
 	if(curr_thread->ustack_size) {
 		vm_unmap(curr_proc->aspace, curr_thread->ustack, curr_thread->ustack_size);
 	}
 
-	curr_thread->state = THREAD_DEAD;
 	notifier_run(&curr_thread->death_notifier, NULL, true);
 
-	thread_yield();
+	state = local_irq_disable();
+	spinlock_lock_ni(&curr_thread->lock);
+
+	curr_thread->state = THREAD_DEAD;
+
+	sched_reschedule(state);
 	fatal("Shouldn't get here");
 }
 
-/** Lookup a running thread without taking the tree lock.
+/** Look up a running thread without taking the tree lock.
  * @note		Newly created and dead threads are ignored.
  * @note		This function should only be used within KDB. Use
  *			thread_lookup() outside of KDB.
@@ -499,41 +516,58 @@ thread_t *thread_lookup_unsafe(thread_id_t id) {
 	return (thread && (thread->state == THREAD_DEAD || thread->state == THREAD_CREATED)) ? NULL : thread;
 }
 
-/** Lookup a running thread.
- * @note		Newly created and dead threads are ignored.
+/**
+ * Look up a running thread.
+ *
+ * Looks up a running thread by its ID. Newly created and dead threads are
+ * ignored. If the thread is found, it will be returned with a reference
+ * added to it. Once it is no longer needed, thread_release() should be called
+ * on it.
+ *
  * @param id		ID of the thread to find.
- * @return		Pointer to thread found, or NULL if not found. */
+ *
+ * @return		Pointer to thread found, or NULL if not found.
+ */
 thread_t *thread_lookup(thread_id_t id) {
 	thread_t *ret;
 
 	rwlock_read_lock(&thread_tree_lock);
-	ret = thread_lookup_unsafe(id);
-	rwlock_unlock(&thread_tree_lock);
 
+	ret = thread_lookup_unsafe(id);
+	if(ret) {
+		thread_retain(ret);
+	}
+
+	rwlock_unlock(&thread_tree_lock);
 	return ret;
 }
 
 /**
- * Create a new kernel-mode thread.
+ * Create a new kernel mode thread.
  *
- * Creates a new thread that will begin execution at the given kernel-mode
- * address and places it in the Created state. The thread must be started with
- * thread_run().
+ * Creates a new thread running in kernel mode. The state the thread will be in
+ * depends on whether the threadp argument is non-NULL. If it is NULL, the
+ * thread will begin execution immediately. If non-NULL, the thread will be
+ * in the Created state, and will have a reference on it. To start execution
+ * of the thread, thread_run() must be called on it. When you no longer need
+ * access to the thread object, you should call thread_release() to ensure that
+ * it will be freed once it has finished running.
  *
  * @param name		Name to give the thread.
  * @param owner		Process that the thread should belong to (if NULL,
  *			the thread will belong to the kernel process).
  * @param flags		Flags for the thread.
- * @param entry		Entry function for the thread.
+ * @param func		Entry function for the thread.
  * @param arg1		First argument to pass to entry function.
  * @param arg2		Second argument to pass to entry function.
  * @param security	Security attributes for the thread (if NULL, default
  *			security attributes will be constructed).
- * @param threadp	Where to store pointer to thread structure.
+ * @param threadp	Where to store pointer to thread object (can be NULL,
+ *			see above).
  *
  * @return		Status code describing result of the operation.
  */
-status_t thread_create(const char *name, process_t *owner, unsigned flags, thread_func_t entry,
+status_t thread_create(const char *name, process_t *owner, unsigned flags, thread_func_t func,
                        void *arg1, void *arg2, object_security_t *security,
                        thread_t **threadp) {
 	object_security_t dsecurity = { -1, -1, NULL };
@@ -541,9 +575,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread_t *thread;
 	status_t ret;
 
-	if(!name || !threadp) {
-		return STATUS_INVALID_ARG;
-	}
+	assert(name);
 
 	if(!owner) {
 		owner = kernel_proc;
@@ -588,14 +620,18 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_WAIT);
 
 	/* Initialize the architecture-specific data. */
-	arch_thread_init(thread, thread_trampoline);
+	arch_thread_init(thread, thread->kstack, thread_trampoline);
 
 	/* Initially set the CPU to NULL - the thread will be assigned to a
 	 * CPU when thread_run() is called on it. */
 	thread->cpu = NULL;
 
+	/* Add a reference if the caller wants a pointer to the thread. */
+	if(threadp) {
+		refcount_inc(&thread->count);
+	}
+
 	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
-	refcount_set(&thread->count, 1);
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wired = 0;
@@ -615,7 +651,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread->pending_signals = 0;
 	thread->in_usermem = false;
 	thread->state = THREAD_CREATED;
-	thread->entry = entry;
+	thread->func = func;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
 
@@ -634,10 +670,16 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	avl_tree_insert(&thread_tree, &thread->tree_link, thread->id, thread);
 	rwlock_unlock(&thread_tree_lock);
 
-	*threadp = thread;
-
-	dprintf("thread: created thread %" PRId32 "(%s) (thread: %p, owner: %p)\n",
+	dprintf("thread: created thread %" PRId32 " (%s) (thread: %p, owner: %p)\n",
 		thread->id, thread->name, thread, owner);
+
+	if(threadp) {
+		*threadp = thread;
+	} else {
+		/* Caller doesn't want a pointer, just start it running. */
+		thread_run(thread);
+	}
+
 	return STATUS_SUCCESS;
 }
 
@@ -648,40 +690,9 @@ void thread_run(thread_t *thread) {
 
 	assert(thread->state == THREAD_CREATED);
 
+	refcount_inc(&thread->count);
 	thread->state = THREAD_READY;
 	sched_insert_thread(thread);
-
-	spinlock_unlock(&thread->lock);
-}
-
-/**
- * Destroy a thread.
- *
- * Decreases the reference count of a thread, and queues it for deletion if it
- * reaches 0. Do NOT use on threads that are running, for this use thread_kill()
- * or call thread_exit() from the thread.
- *
- * @param thread	Thread to destroy.
- */
-void thread_destroy(thread_t *thread) {
-	spinlock_lock(&thread->lock);
-
-	if(refcount_dec(&thread->count) > 0) {
-		spinlock_unlock(&thread->lock);
-		return;
-	}
-
-	dprintf("thread: queueing thread %" PRId32 "(%s) for deletion (owner: %" PRId32 ")\n",
-		thread->id, thread->name, thread->owner->id);
-
-	assert(list_empty(&thread->runq_link));
-	assert(thread->state == THREAD_CREATED || thread->state == THREAD_DEAD);
-
-	/* Queue for deletion by the thread reaper. */
-	spinlock_lock(&dead_thread_lock);
-	list_append(&dead_threads, &thread->runq_link);
-	semaphore_up(&dead_thread_sem, 1);
-	spinlock_unlock(&dead_thread_lock);
 
 	spinlock_unlock(&thread->lock);
 }
@@ -805,18 +816,6 @@ __init_text void thread_init(void) {
 	kdb_register_command("kill", "Kill a running user thread.", kdb_cmd_kill);
 }
 
-/** Create the thread reaper. */
-__init_text void thread_reaper_init(void) {
-	thread_t *thread;
-	status_t ret;
-
-	ret = thread_create("thread_reaper", NULL, 0, thread_reaper, NULL, NULL, NULL, &thread);
-	if(ret != STATUS_SUCCESS) {
-		fatal("Could not create thread reaper (%d)", ret);
-	}
-	thread_run(thread);
-}
-
 /** Create a new thread.
  * @param name		Name of the thread to create.
  * @param stack		Pointer to base of stack to use for thread. If NULL,
@@ -901,14 +900,15 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void 
 	}
 
 	thread_run(thread);
+	thread_release(thread);
 	kfree(kname);
 	return ret;
 fail:
 	if(handle >= 0) {
-		/* This will handle thread destruction. */
 		object_handle_detach(NULL, handle);
-	} else if(thread) {
-		thread_destroy(thread);
+	}
+	if(thread) {
+		thread_release(thread);
 	}
 	kfree(args);
 	kfree(kname);
@@ -928,21 +928,17 @@ status_t kern_thread_open(thread_id_t id, object_rights_t rights, handle_t *hand
 		return STATUS_INVALID_ARG;
 	}
 
-	rwlock_read_lock(&thread_tree_lock);
-
-	thread = thread_lookup_unsafe(id);
+	thread = thread_lookup(id);
 	if(!thread) {
-		rwlock_unlock(&thread_tree_lock);
 		return STATUS_NOT_FOUND;
 	}
 
-	refcount_inc(&thread->count);
-	rwlock_unlock(&thread_tree_lock);
-
+	/* Reference added by thread_lookup() is taken over by this handle. */
 	ret = object_handle_open(&thread->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
 	if(ret != STATUS_SUCCESS) {
-		thread_destroy(thread);
+		thread_release(thread);
 	}
+
 	return ret;
 }
 
@@ -996,7 +992,7 @@ status_t kern_thread_control(handle_t handle, int action, const void *in, void *
 
 	switch(action) {
 	case THREAD_SET_TLS_ADDR:
-		/* Can only set TLS address of current process. */
+		/* Can only set TLS address of current thread. */
 		if(khandle) {
 			ret = STATUS_NOT_SUPPORTED;
 			goto out;
