@@ -367,10 +367,6 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			/* Set this device as the kernel console if there
 			 * isn't one. */
 			if(!display_console_device || display_console_device == device) {
-				/* Point the framebuffer console at the device. */
-				display_mode_to_fb_info(device, mode, &info);
-				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
-
 				/* Register a notifier to redraw the console
 				 * after KDB has run, and acquire the console
 				 * to prevent kernel output. */
@@ -380,6 +376,10 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 				}
 
 				display_console_device = device;
+
+				/* Point the framebuffer console at the device. */
+				display_mode_to_fb_info(device, mode, &info);
+				fb_console_control(FB_CONSOLE_CONFIGURE, &info);
 			}
 		}
 

@@ -390,7 +390,7 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 		fb_console_acquired = false;
 		fb_console_reset();
 		break;
-	};
+	}
 }
 
 /* Skip over whitespace and comments in a PPM file.
