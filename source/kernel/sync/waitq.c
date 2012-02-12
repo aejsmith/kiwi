@@ -65,7 +65,7 @@ void waitq_sleep_cancel(waitq_t *queue, bool state) {
  * @param timeout	Timeout in microseconds. If 0 is specified, then the
  *			function will return an error immediately. If -1, it
  *			will block indefinitely until the thread is woken.
- * @param flags		Flags to modify behaviour (see sync/flags.h).
+ * @param flags		Flags to modify behaviour (see sync/sync.h).
  * @param state		Interrupt state returned from waitq_sleep_prepare().
  * @return		Status code describing result of the operation. */
 status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool state) {
@@ -112,7 +112,7 @@ status_t waitq_sleep_unsafe(waitq_t *queue, useconds_t timeout, int flags, bool 
  * @param timeout	Timeout in microseconds. If 0 is specified, then the
  *			function will return an error immediately. If -1, it
  *			will block indefinitely until the thread is woken.
- * @param flags		Flags to modify behaviour (see sync/flags.h).
+ * @param flags		Flags to modify behaviour (see sync/sync.h).
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the

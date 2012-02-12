@@ -22,7 +22,6 @@
 #ifndef __SYNC_SEMAPHORE_H
 #define __SYNC_SEMAPHORE_H
 
-#include <sync/flags.h>
 #include <sync/waitq.h>
 
 /** Structure containing a semaphore. */

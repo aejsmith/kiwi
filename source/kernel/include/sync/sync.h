@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,14 +16,14 @@
 
 /**
  * @file
- * @brief		Synchronization flag definitions.
+ * @brief		Synchronization definitions.
  */
 
-#ifndef __SYNC_FLAGS_H
-#define __SYNC_FLAGS_H
+#ifndef __SYNC_SYNC_H
+#define __SYNC_SYNC_H
 
 /** Behaviour flags for synchronization functions. */
 #define SYNC_INTERRUPTIBLE	(1<<0)	/**< Sleep should be interruptible. */
 //#define SYNC_ABSOLUTE		(1<<1)	/**< Specified timeout is absolute, not relative to current time. */
 
-#endif /* __SYNC_FLAGS_H */
+#endif /* __SYNC_SYNC_H */

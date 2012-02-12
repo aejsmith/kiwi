@@ -24,7 +24,7 @@
 
 #include <lib/atomic.h>
 
-#include <sync/flags.h>
+#include <sync/sync.h>
 
 /** Structure containing a spinlock. */
 typedef struct spinlock {

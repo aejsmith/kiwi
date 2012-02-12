@@ -24,8 +24,8 @@
 
 #include <lib/list.h>
 
-#include <sync/flags.h>
 #include <sync/spinlock.h>
+#include <sync/sync.h>
 
 struct mutex;
 
