@@ -23,7 +23,7 @@
 #define __PC_BIOS_H
 
 #include <x86/cpu.h>
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 /** Convert a segment + offset pair to a linear address. */
 #define SEGOFF2LIN(segoff)	((ptr_t)(((segoff) & 0xFFFF0000) >> 12) + ((segoff) & 0xFFFF))

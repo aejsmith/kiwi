@@ -347,7 +347,7 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 void avl_tree_dyn_insert(avl_tree_t *tree, key_t key, void *value) {
 	avl_tree_node_t *node;
 
-	node = kmalloc(sizeof(*node), MM_SLEEP);
+	node = kmalloc(sizeof(*node), MM_WAIT);
 	avl_tree_insert(tree, node, key, value);
 }
 

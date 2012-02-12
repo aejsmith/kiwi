@@ -39,8 +39,7 @@ status_t ext2_block_zero(ext2_mount_t *mount, uint32_t block) {
 	status_t ret;
 	char *data;
 
-	data = kmalloc(mount->block_size, MM_SLEEP);
-	memset(data, 0, mount->block_size);
+	data = kmalloc(mount->block_size, MM_WAIT | MM_ZERO);
 	ret = ext2_block_write(mount, data, block, false);
 	kfree(data);
 	return ret;
@@ -77,7 +76,7 @@ status_t ext2_block_alloc(ext2_mount_t *mount, bool nonblock, uint32_t *blockp) 
 		count = (mount->blocks_per_group / 8) / mount->block_size;
 
 		/* Iterate through all blocks in the bitmap. */
-		block = kmalloc(mount->block_size, MM_SLEEP);
+		block = kmalloc(mount->block_size, MM_WAIT);
 		for(i = 0; i < count; i++) {
 			ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_block_bitmap) + i, nonblock);
 			if(ret != STATUS_SUCCESS) {
@@ -154,7 +153,7 @@ status_t ext2_block_free(ext2_mount_t *mount, uint32_t num) {
 
 	/* Get the block within the bitmap that contains the block. */
 	i = (num % mount->blocks_per_group) / 8 / mount->block_size;
-	block = kmalloc(mount->block_size, MM_SLEEP);
+	block = kmalloc(mount->block_size, MM_WAIT);
 	ret = ext2_block_read(mount, block, le32_to_cpu(group->bg_block_bitmap) + i, false);
 	if(ret != STATUS_SUCCESS) {
 		mutex_unlock(&mount->lock);

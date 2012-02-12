@@ -291,7 +291,7 @@ static status_t input_device_create(const char *name, device_t *parent, uint8_t 
 		return STATUS_INVALID_ARG;
 	}
 
-	device = kmalloc(sizeof(input_device_t), MM_SLEEP);
+	device = kmalloc(sizeof(input_device_t), MM_WAIT);
 	spinlock_init(&device->lock, "input_device_lock");
 	semaphore_init(&device->sem, "input_device_sem", 0);
 	notifier_init(&device->data_notifier, device);

@@ -56,7 +56,7 @@ typedef struct msdos_mbr {
  * @param device	Device to scan.
  * @return		Whether an MSDOS partition table was found. */
 bool partition_probe_msdos(disk_device_t *device) {
-	msdos_mbr_t *mbr = kmalloc(sizeof(msdos_mbr_t), MM_SLEEP);
+	msdos_mbr_t *mbr = kmalloc(sizeof(msdos_mbr_t), MM_WAIT);
 	msdos_part_t *part;
 	size_t bytes, i;
 	status_t ret;

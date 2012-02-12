@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2011 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,8 +32,8 @@
  *
  * Allocations are tracked using an alloc_tag_t structure, which is placed
  * before the allocation in memory. It tracks the size of the allocation and
- * the cache it came from. If the allocation came from kmem, then the cache
- * pointer will be NULL.
+ * the cache it came from. If the allocation came directly  from the kernel
+ * memory allocator, then the cache pointer will be NULL.
  */
 
 #include <lib/string.h>
@@ -60,9 +60,9 @@ static slab_cache_t *kmalloc_caches[KMALLOC_CACHE_MAX - KMALLOC_CACHE_MIN + 1];
 
 /** Allocate a block of memory.
  * @param size		Size of block.
- * @param kmflag	Allocation flags.
+ * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to block on success, NULL on failure. */
-void *kmalloc(size_t size, int kmflag) {
+void *kmalloc(size_t size, int mmflag) {
 	size_t total = size + sizeof(alloc_tag_t), idx;
 	alloc_tag_t *addr;
 
@@ -77,7 +77,7 @@ void *kmalloc(size_t size, int kmflag) {
 		}
 		idx -= KMALLOC_CACHE_MIN;
 
-		addr = slab_cache_alloc(kmalloc_caches[idx], kmflag);
+		addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
 		if(unlikely(!addr)) {
 			return NULL;
 		}
@@ -85,7 +85,7 @@ void *kmalloc(size_t size, int kmflag) {
 		addr->cache = kmalloc_caches[idx];
 	} else {
 		/* Fall back on kmem. */
-		addr = kmem_alloc(ROUND_UP(total, PAGE_SIZE), kmflag & MM_FLAG_MASK);
+		addr = kmem_alloc(ROUND_UP(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
 		if(unlikely(!addr)) {
 			return NULL;
 		}
@@ -94,23 +94,22 @@ void *kmalloc(size_t size, int kmflag) {
 	}
 
 	addr->size = size;
+
+	/* Zero the allocation if requested. */
+	if(mmflag & MM_ZERO) {
+		memset(&addr[1], 0, size);
+	}
+
 	return &addr[1];
 }
 
 /** Allocate an array of zeroed memory.
  * @param nmemb		Number of array elements.
  * @param size		Size of each element.
+ * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to block on success, NULL on failure. */
-void *kcalloc(size_t nmemb, size_t size, int kmflag) {
-	void *ret;
-
-	ret = kmalloc(nmemb * size, kmflag);
-	if(ret == NULL) {
-		return NULL;
-	}
-
-	memset(ret, 0, nmemb * size);
-	return ret;
+void *kcalloc(size_t nmemb, size_t size, int mmflag) {
+	return kmalloc(nmemb * size, mmflag | MM_ZERO);
 }
 
 /**
@@ -118,19 +117,21 @@ void *kcalloc(size_t nmemb, size_t size, int kmflag) {
  *
  * Resizes a memory block previously allocated with kmalloc(), kcalloc() or
  * krealloc(). If passed a NULL pointer, call is equivalent to
- * kmalloc(size, kmflag).
+ * kmalloc(size, mmflag). If MM_ZERO is specified, and the block size is being
+ * increased, then the space difference will be zeroed.
  *
  * @param addr		Address to resize.
  * @param size		New size.
+ * @param mmflag	Allocation behaviour flags.
  *
  * @return		Pointer to block on success, NULL on failure.
  */
-void *krealloc(void *addr, size_t size, int kmflag) {
+void *krealloc(void *addr, size_t size, int mmflag) {
 	alloc_tag_t *tag;
 	void *ret;
 
 	if(!addr) {
-		return kmalloc(size, kmflag);
+		return kmalloc(size, mmflag);
 	}
 
 	tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
@@ -139,13 +140,18 @@ void *krealloc(void *addr, size_t size, int kmflag) {
 	}
 
 	/* Make a new allocation. */
-	ret = kmalloc(size, kmflag);
+	ret = kmalloc(size, mmflag & ~MM_ZERO);
 	if(!ret) {
 		return ret;
 	}
 
 	/* Copy the block data using the smallest of the two sizes. */
 	memcpy(ret, addr, MIN(tag->size, size));
+
+	/* Zero any new space if requested. */
+	if(mmflag & MM_ZERO && size > tag->size) {
+		memset((char *)addr + tag->size, 0, size - tag->size);
+	}
 
 	/* Free the old allocation. */
 	kfree(addr);
@@ -189,6 +195,6 @@ __init_text void malloc_init(void) {
 		name[SLAB_NAME_MAX - 1] = 0;
 
 		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
-		                                      NULL, 0, MM_FATAL);
+		                                      NULL, 0, MM_BOOT);
 	}
 }

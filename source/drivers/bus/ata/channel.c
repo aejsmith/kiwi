@@ -101,7 +101,7 @@ static void add_dma_transfer(ata_dma_transfer_t **vecp, size_t *entriesp, ptr_t 
 		fatal("Part of DMA transfer buffer was not mapped");
 	}
 
-	*vecp = krealloc(*vecp, sizeof(**vecp) * *entriesp, MM_SLEEP);
+	*vecp = krealloc(*vecp, sizeof(**vecp) * *entriesp, MM_WAIT);
 	(*vecp)[i].phys = phys + pgoff;
 	(*vecp)[i].size = size;
 }
@@ -397,7 +397,7 @@ ata_channel_t *ata_channel_add(device_t *parent, const char *name, ata_channel_o
 	assert(pio || dma);
 
 	/* Create a new channel structure. */
-	channel = kmalloc(sizeof(*channel), MM_SLEEP);
+	channel = kmalloc(sizeof(*channel), MM_WAIT);
 	mutex_init(&channel->lock, "ata_channel_lock", 0);
 	semaphore_init(&channel->irq_sem, "ata_channel_irq_sem", 0);
 	channel->ops = ops;

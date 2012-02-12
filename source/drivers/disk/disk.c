@@ -105,7 +105,7 @@ status_t disk_device_read(disk_device_t *device, void *buf, size_t count, offset
 
 	/* Allocate a temporary buffer for partial transfers if required. */
 	if(offset % blksize || count % blksize) {
-		block = kmalloc(blksize, MM_SLEEP);
+		block = kmalloc(blksize, MM_WAIT);
 	}
 
 	/* Now work out the start block and the end block. Subtract one from
@@ -187,7 +187,7 @@ status_t disk_device_write(disk_device_t *device, const void *buf, size_t count,
 
 	/* Allocate a temporary buffer for partial transfers if required. */
 	if(offset % blksize || count % blksize) {
-		block = kmalloc(blksize, MM_SLEEP);
+		block = kmalloc(blksize, MM_WAIT);
 	}
 
 	/* Now work out the start block and the end block. Subtract one from
@@ -290,7 +290,7 @@ status_t disk_device_create(const char *name, device_t *parent, disk_ops_t *ops,
 		return STATUS_INVALID_ARG;
 	}
 
-	device = kmalloc(sizeof(disk_device_t), MM_SLEEP);
+	device = kmalloc(sizeof(disk_device_t), MM_WAIT);
 	device->id = atomic_inc(&next_disk_id);
 	device->ops = ops;
 	device->data = data;

@@ -73,8 +73,8 @@ void *module_mem_alloc(size_t size) {
 
 	mmu_context_lock(&kernel_mmu_context);
 	for(i = 0; i < size; i += PAGE_SIZE) {
-		page = page_alloc(MM_FATAL);
-		mmu_context_map(&kernel_mmu_context, addr + i, page->addr, true, true, MM_FATAL);
+		page = page_alloc(MM_BOOT);
+		mmu_context_map(&kernel_mmu_context, addr + i, page->addr, true, true, MM_BOOT);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
 
@@ -101,7 +101,7 @@ static void module_mem_free(void *base, size_t size) {
 static module_t *module_alloc(object_handle_t *handle) {
 	module_t *module;
 
-	module = kmalloc(sizeof(module_t), MM_SLEEP);
+	module = kmalloc(sizeof(module_t), MM_WAIT);
 	list_init(&module->header);
 	refcount_set(&module->count, 0);
 	symbol_table_init(&module->symtab);

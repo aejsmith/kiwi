@@ -542,7 +542,7 @@ status_t kern_timer_create(int flags, handle_t *handlep) {
 
 	object_acl_init(&acl);
 
-	timer = kmalloc(sizeof(*timer), MM_SLEEP);
+	timer = kmalloc(sizeof(*timer), MM_WAIT);
 	object_init(&timer->obj, &timer_object_type, &security, NULL);
 	timer_init(&timer->timer, user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);

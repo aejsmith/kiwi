@@ -223,7 +223,7 @@ __init_text void lapic_init(void) {
 		/* This is the boot CPU. Map the LAPIC into virtual memory and
 		 * register interrupt vector handlers. */
 		lapic_base = base;
-		lapic_mapping = phys_map(base, PAGE_SIZE, MM_FATAL);
+		lapic_mapping = phys_map(base, PAGE_SIZE, MM_BOOT);
 		kprintf(LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
 		        base, lapic_mapping);
 

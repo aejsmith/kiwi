@@ -62,7 +62,7 @@ static void vm_cache_ctor(void *obj, void *data) {
 vm_cache_t *vm_cache_create(offset_t size, vm_cache_ops_t *ops, void *data) {
 	vm_cache_t *cache;
 
-	cache = slab_cache_alloc(vm_cache_cache, MM_SLEEP);
+	cache = slab_cache_alloc(vm_cache_cache, MM_WAIT);
 	cache->size = size;
 	cache->ops = ops;
 	cache->data = data;
@@ -122,7 +122,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			assert(sharedp);
 
 			thread_wire(curr_thread);
-			*mappingp = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			*mappingp = phys_map(page->addr, PAGE_SIZE, MM_WAIT);
 			*sharedp = false;
 		} else {
 			*pagep = page;
@@ -134,7 +134,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 	}
 
 	/* Allocate a new page. */
-	page = page_alloc(MM_SLEEP);
+	page = page_alloc(MM_WAIT);
 
 	/* Only bother filling the page with data if it's not going to be
 	 * immediately overwritten. */
@@ -146,7 +146,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			 * the mapping won't be shared, because it's possible
 			 * that device driver will do work in another thread,
 			 * which may be on another CPU. */
-			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_WAIT);
 			shared = true;
 
 			ret = cache->ops->read_page(cache, mapping, offset, nonblock);
@@ -158,7 +158,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 			}
 		} else {
 			thread_wire(curr_thread);
-			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_WAIT);
 			memset(mapping, 0, PAGE_SIZE);
 		}
 	}
@@ -179,7 +179,7 @@ static status_t vm_cache_get_page_internal(vm_cache_t *cache, offset_t offset, b
 		/* Reuse any mapping that may have already been created. */
 		if(!mapping) {
 			thread_wire(curr_thread);
-			mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+			mapping = phys_map(page->addr, PAGE_SIZE, MM_WAIT);
 		}
 
 		*mappingp = mapping;
@@ -517,7 +517,7 @@ static status_t vm_cache_flush_page_internal(vm_cache_t *cache, page_t *page) {
 	 * pages the modified flag is cleared if there is no write operation. */
 	assert(cache->ops && cache->ops->write_page);
 
-	mapping = phys_map(page->addr, PAGE_SIZE, MM_SLEEP);
+	mapping = phys_map(page->addr, PAGE_SIZE, MM_WAIT);
 	ret = cache->ops->write_page(cache, mapping, page->offset, false);
 	if(ret == STATUS_SUCCESS) {
 		/* Clear modified flag only if the page reference count is
@@ -708,7 +708,7 @@ static kdb_status_t kdb_cmd_cache(int argc, char **argv, kdb_filter_t *filter) {
 __init_text void vm_cache_init(void) {
 	vm_cache_cache = slab_cache_create("vm_cache_cache", sizeof(vm_cache_t),
 	                                   0, vm_cache_ctor, NULL, NULL, 0,
-	                                   MM_FATAL);
+	                                   MM_BOOT);
 
 	kdb_register_command("cache", "Print information about a page cache.", kdb_cmd_cache);
 }

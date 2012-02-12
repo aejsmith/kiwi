@@ -44,7 +44,7 @@ static size_t acpi_table_count = 0;
 static __init_text void acpi_table_copy(phys_ptr_t addr) {
 	acpi_header_t *source;
 
-	source = phys_map(addr, PAGE_SIZE * 2, MM_FATAL);
+	source = phys_map(addr, PAGE_SIZE * 2, MM_BOOT);
 
 	/* Check the checksum of the table. */
 	if(!checksum_range(source, source->length)) {
@@ -57,10 +57,10 @@ static __init_text void acpi_table_copy(phys_ptr_t addr) {
 		source->oem_table_id, source->oem_revision);
 
 	/* Reallocate the table array. */
-	acpi_tables = krealloc(acpi_tables, sizeof(acpi_header_t *) * ++acpi_table_count, MM_FATAL);
+	acpi_tables = krealloc(acpi_tables, sizeof(acpi_header_t *) * ++acpi_table_count, MM_BOOT);
 
 	/* Allocate a table structure and copy the table. */
-	acpi_tables[acpi_table_count - 1] = kmalloc(source->length, MM_FATAL);
+	acpi_tables[acpi_table_count - 1] = kmalloc(source->length, MM_BOOT);
 	memcpy(acpi_tables[acpi_table_count - 1], source, source->length);
 
 	phys_unmap(source, PAGE_SIZE * 2, true);
@@ -79,7 +79,7 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
 
 	/* Search through the range on 16-byte boundaries. */
 	for(i = 0; i < size; i += 16) {
-		rsdp = phys_map(start + i, sizeof(*rsdp), MM_FATAL);
+		rsdp = phys_map(start + i, sizeof(*rsdp), MM_BOOT);
 
 		/* Check if the signature and checksum are correct. */
 		if(strncmp((char *)rsdp->signature, ACPI_RSDP_SIGNATURE, 8) != 0) {
@@ -114,7 +114,7 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
 	acpi_xsdt_t *source;
 	size_t i, count;
 
-	source = phys_map(addr, PAGE_SIZE, MM_FATAL);
+	source = phys_map(addr, PAGE_SIZE, MM_BOOT);
 
 	/* Check signature and checksum. */
 	if(strncmp((char *)source->header.signature, ACPI_XSDT_SIGNATURE, 4) != 0) {
@@ -144,7 +144,7 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
 	acpi_rsdt_t *source;
 	size_t i, count;
 
-	source = phys_map(addr, PAGE_SIZE, MM_FATAL);
+	source = phys_map(addr, PAGE_SIZE, MM_BOOT);
 
 	/* Check signature and checksum. */
 	if(strncmp((char *)source->header.signature, ACPI_RSDT_SIGNATURE, 4) != 0) {
@@ -191,7 +191,7 @@ __init_text void acpi_init(void) {
 	phys_ptr_t ebda;
 
 	/* Get the base address of the Extended BIOS Data Area (EBDA). */
-	mapping = phys_map(0x40e, sizeof(uint16_t), MM_FATAL);
+	mapping = phys_map(0x40e, sizeof(uint16_t), MM_BOOT);
 	ebda = (*mapping) << 4;
 	phys_unmap(mapping, sizeof(uint16_t), true);
 

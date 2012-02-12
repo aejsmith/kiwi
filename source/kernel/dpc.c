@@ -134,7 +134,7 @@ __init_text void dpc_init(void) {
 	/* Allocate a chunk of DPC structures. We do not allocate a new
 	 * structure upon every dpc_request() call to make it usable from
 	 * interrupt context. */
-	alloc = kmem_alloc(PAGE_SIZE, MM_FATAL);
+	alloc = kmem_alloc(PAGE_SIZE, MM_BOOT);
 	for(i = 0; i < (PAGE_SIZE / sizeof(dpc_request_t)); i++) {
 		list_init(&alloc[i].header);
 		list_append(&dpc_free, &alloc[i].header);

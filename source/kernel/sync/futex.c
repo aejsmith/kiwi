@@ -153,7 +153,7 @@ static futex_t *futex_lookup(int32_t *addr) {
 		if(!futex) {
 			/* Couldn't find it, this means that this is the first
 			 * access to this futex. Create a structure for it. */
-			futex = slab_cache_alloc(futex_cache, MM_SLEEP);
+			futex = slab_cache_alloc(futex_cache, MM_WAIT);
 			refcount_set(&futex->count, 1);
 			futex->phys = phys;
 
@@ -200,7 +200,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	 * Wire ourself to the current CPU to make a remote TLB invalidation
 	 * unnecessary when unmapping. */
 	thread_wire(curr_thread);
-	mapping = phys_map(futex->phys, sizeof(*mapping), MM_SLEEP);
+	mapping = phys_map(futex->phys, sizeof(*mapping), MM_WAIT);
 
 	/* Prepare to sleep on the queue. */
 	state = waitq_sleep_prepare(&futex->queue);
@@ -256,6 +256,6 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 /** Initialize the futex cache. */
 static __init_text void futex_init(void) {
 	futex_cache = slab_cache_create("futex_cache", sizeof(futex_t), 0, futex_ctor,
-	                                NULL, NULL, 0, MM_FATAL);
+	                                NULL, NULL, 0, MM_BOOT);
 }
 INITCALL(futex_init);

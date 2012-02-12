@@ -28,7 +28,7 @@
 #include <lib/list.h>
 #include <lib/refcount.h>
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 #include <platform/page.h>
 
@@ -73,9 +73,6 @@ typedef struct page {
 #define PAGE_STATE_MODIFIED	1	/**< Modified. */
 #define PAGE_STATE_CACHED	2	/**< Cached. */
 #define PAGE_STATE_FREE		3	/**< Free. */
-
-/** Flags to modify page allocation behaviour. */
-#define PM_ZERO			(1<<10)	/**< Clear the page contents before returning. */
 
 extern void page_set_state(page_t *page, unsigned state);
 extern page_t *page_lookup(phys_ptr_t addr);

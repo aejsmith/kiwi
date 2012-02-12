@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,24 +16,20 @@
 
 /**
  * @file
- * @brief		Memory allocation flags.
- *
- * This file includes definitions for flags supported by all allocation
- * functions. Allocators defining their own specific flags should start
- * from bit 10.
+ * @brief               Memory management core definitions.
  */
 
-#ifndef __MM_FLAGS_H
-#define __MM_FLAGS_H
+#ifndef __MM_MM_H
+#define __MM_MM_H
 
 /** Allocation flags supported by all allocators. */
-#define MM_SLEEP		(1<<0)		/**< Block until memory is available. */
-#define MM_FATAL		(1<<1)		/**< Call fatal() if unable to satisfy an allocation. */
+#define MM_WAIT			(1<<0)	/**< Block until memory is available, guarantees success. */
+#define MM_BOOT			(1<<1)	/**< Allocation is required for boot. */
+#define MM_ZERO			(1<<2)	/**< Zero out allocated memory. */
 
-/** Internal flags used by Vmem, defined here to include in flag mask. */
-#define VM_REFILLING		(1<<2)		/**< Tag refill in progress, do not attempt to refill again. */
+/** Mask to select only generic allocation flags.
+ * @note		Does not include MM_ZERO - should be handled manually
+ *			by each allocator as required. */
+#define MM_FLAG_MASK		(MM_WAIT | MM_BOOT)
 
-/** Mask to select only generic allocation flags. */
-#define MM_FLAG_MASK		(MM_SLEEP | MM_FATAL | VM_REFILLING)
-
-#endif /* __MM_FLAGS_H */
+#endif /* __MM_MM_H */

@@ -80,7 +80,7 @@ static status_t pci_device_scan(device_t *bus, int id, int dev, int func, int in
 	}
 
 	/* Create the device information structure. */
-	device = kmalloc(sizeof(*device), MM_SLEEP);
+	device = kmalloc(sizeof(*device), MM_WAIT);
 	list_init(&device->header);
 	device->driver = NULL;
 	device->bus = id;

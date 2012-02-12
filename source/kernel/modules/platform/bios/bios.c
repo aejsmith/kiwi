@@ -175,7 +175,7 @@ void *bios_mem_alloc(size_t size, int mmflag) {
 	mutex_lock(&bios_lock);
 
 	if(size > remaining_size) {
-		if(mmflag & MM_SLEEP) {
+		if(mmflag & MM_WAIT) {
 			fatal("oh dear\n");
 		}
 		return NULL;
@@ -255,8 +255,8 @@ void bios_interrupt(uint8_t num, bios_regs_t *regs) {
 	size_t save_remaining_size = remaining_size;
 
 	/* Allocate a stack and a halt byte to finish execution. */
-	stack = bios_mem_alloc(BIOS_STACK_SIZE, MM_SLEEP);
-	halt = bios_mem_alloc(1, MM_SLEEP);
+	stack = bios_mem_alloc(BIOS_STACK_SIZE, MM_WAIT);
+	halt = bios_mem_alloc(1, MM_WAIT);
 	*(uint8_t *)halt = 0xF4;
 
 	/* Copy in the registers. */
@@ -324,7 +324,7 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
 	mmu_context_lock(&kernel_mmu_context);
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		mmu_context_map(&kernel_mmu_context, (ptr_t)bios_mem_mapping + addr + i,
-		                phys + i, true, true, MM_SLEEP);
+		                phys + i, true, true, MM_WAIT);
 	}
 	mmu_context_unlock(&kernel_mmu_context);
 }
@@ -333,8 +333,8 @@ static void bios_mem_map(ptr_t addr, phys_ptr_t phys, size_t size) {
  * @return		Status code describing result of the operation. */
 static status_t bios_init(void) {
 	/* Allocate a chunk of address space and map stuff into it. */
-	bios_mem_mapping = (void *)kmem_raw_alloc(0x100000, MM_SLEEP);
-	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_SLEEP, &bios_mem_pages);
+	bios_mem_mapping = (void *)kmem_raw_alloc(0x100000, MM_WAIT);
+	phys_alloc(BIOS_MEM_SIZE, 0, 0, 0, 0, MM_WAIT, &bios_mem_pages);
 	bios_mem_map(BIOS_BDA_BASE, BIOS_BDA_BASE, BIOS_BDA_SIZE);
 	bios_mem_map(BIOS_MEM_BASE, bios_mem_pages, BIOS_MEM_SIZE);
 	bios_mem_map(BIOS_EBDA_BASE, BIOS_EBDA_BASE, BIOS_EBDA_SIZE);

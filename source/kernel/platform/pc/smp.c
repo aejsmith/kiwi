@@ -47,7 +47,7 @@ static mp_floating_pointer_t *mps_find_floating_pointer(ptr_t start, size_t size
 
 	/* Search through the range on 16-byte boundaries. */
 	for(i = 0; i < size; i += 16) {
-		fp = phys_map(start + i, sizeof(*fp), MM_FATAL);
+		fp = phys_map(start + i, sizeof(*fp), MM_BOOT);
 
 		/* Check if the signature and checksum are correct. */
 		if(strncmp(fp->signature, "_MP_", 4) != 0) {
@@ -78,7 +78,7 @@ static bool smp_detect_mps(void) {
 	size_t i;
 
 	/* Get the base address of the Extended BIOS Data Area (EBDA). */
-	mapping = phys_map(0x40e, sizeof(uint16_t), MM_FATAL);
+	mapping = phys_map(0x40e, sizeof(uint16_t), MM_BOOT);
 	ebda = (*mapping) << 4;
 	phys_unmap(mapping, sizeof(uint16_t), true);
 
@@ -96,7 +96,7 @@ static bool smp_detect_mps(void) {
 		return false;
 	}
 
-	cfg = phys_map(fp->phys_addr_ptr, PAGE_SIZE, MM_FATAL);
+	cfg = phys_map(fp->phys_addr_ptr, PAGE_SIZE, MM_BOOT);
 	phys_unmap(fp, sizeof(*fp), true);
 
 	/* Check that it is valid. */

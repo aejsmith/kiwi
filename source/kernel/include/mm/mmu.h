@@ -34,7 +34,7 @@
 
 #include <arch/page.h>
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 #include <types.h>
 

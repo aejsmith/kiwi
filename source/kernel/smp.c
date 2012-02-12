@@ -365,7 +365,7 @@ __init_text void smp_init(void) {
 
 	/* Allocate message structures based on the total CPU count. */
 	count = cpu_count * SMP_CALLS_PER_CPU;
-	calls = kcalloc(count, sizeof(smp_call_t), MM_FATAL);
+	calls = kcalloc(count, sizeof(smp_call_t), MM_BOOT);
 
 	/* Initialize each structure and add it to the pool. */
 	for(i = 0; i < count; i++) {

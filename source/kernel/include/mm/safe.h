@@ -22,7 +22,7 @@
 #ifndef __MM_SAFE_H
 #define __MM_SAFE_H
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 #include <types.h>
 

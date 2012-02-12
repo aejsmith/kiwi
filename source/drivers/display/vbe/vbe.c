@@ -108,7 +108,7 @@ static status_t vbe_init(void) {
 	status_t ret;
 
 	/* Detect VBE presence by trying to get controller information. */
-	info = bios_mem_alloc(sizeof(vbe_info_t), MM_SLEEP);
+	info = bios_mem_alloc(sizeof(vbe_info_t), MM_WAIT);
 	strncpy(info->vbe_signature, "VBE2", 4);
 	bios_regs_init(&regs);
 	regs.eax = VBE_FUNCTION_CONTROLLER_INFO;
@@ -142,7 +142,7 @@ static status_t vbe_init(void) {
 	}
 
 	/* Allocate a region to store the mode information structure in. */
-	minfo = bios_mem_alloc(sizeof(vbe_mode_info_t), MM_SLEEP);
+	minfo = bios_mem_alloc(sizeof(vbe_mode_info_t), MM_WAIT);
 
 	/* Iterate through all the modes available. An ID of 0xFFFF indicates
 	 * the end of the mode list. */
@@ -185,7 +185,7 @@ static status_t vbe_init(void) {
 
 		/* Add the mode to the mode array. To begin with, set offset to
 		 * the full physical address. */
-		modes = krealloc(modes, sizeof(display_mode_t) * (count + 1), MM_SLEEP);
+		modes = krealloc(modes, sizeof(display_mode_t) * (count + 1), MM_WAIT);
 		modes[count].id = location[i];
 		modes[count].width = minfo->x_resolution;
 		modes[count].height = minfo->y_resolution;

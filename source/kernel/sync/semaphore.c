@@ -165,12 +165,12 @@ status_t kern_semaphore_create(const char *name, size_t count, const object_secu
 
 	/* Construct a default ACL if required. */
 	if(!ksecurity.acl) {
-		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_WAIT);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1, SEMAPHORE_RIGHT_USAGE);
 	}
 
-	sem = kmalloc(sizeof(user_semaphore_t), MM_SLEEP);
+	sem = kmalloc(sizeof(user_semaphore_t), MM_WAIT);
 	sem->id = id_alloc_get(&semaphore_id_allocator);
 	if(sem->id < 0) {
 		kfree(sem);

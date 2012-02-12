@@ -572,7 +572,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 
 	/* Allocate a thread structure from the cache. The thread constructor
 	 * caches a kernel stack with the thread for us. */
-	thread = slab_cache_alloc(thread_cache, MM_SLEEP);
+	thread = slab_cache_alloc(thread_cache, MM_WAIT);
 
 	/* Allocate an ID for the thread. */
 	thread->id = id_alloc_get(&thread_id_allocator);
@@ -585,7 +585,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread->name[THREAD_NAME_MAX - 1] = 0;
 
 	/* Allocate a kernel stack and initialize the thread context. */
-	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_SLEEP);
+	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_WAIT);
 
 	/* Initialize the architecture-specific data. */
 	arch_thread_init(thread, thread_trampoline);
@@ -798,7 +798,7 @@ __init_text void thread_init(void) {
 	/* Create the thread slab cache. */
 	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),
 	                                 thread_cache_ctor, NULL, NULL, 0,
-	                                 MM_FATAL);
+	                                 MM_BOOT);
 
 	/* Register our KDB commands. */
 	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);
@@ -851,7 +851,7 @@ status_t kern_thread_create(const char *name, void *stack, size_t stacksz, void 
 	}
 
 	/* Create arguments structure. */
-	args = kmalloc(sizeof(thread_uspace_args_t), MM_SLEEP);
+	args = kmalloc(sizeof(thread_uspace_args_t), MM_WAIT);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 

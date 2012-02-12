@@ -108,7 +108,7 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 
 	/* Allocate some memory for the program headers and load them too. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
-	phdrs = kmalloc(size, MM_SLEEP);
+	phdrs = kmalloc(size, MM_WAIT);
 	ret = file_pread(handle, phdrs, size, ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		kfree(phdrs);
@@ -220,7 +220,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	int flags;
 
 	/* Allocate a structure to store data about the binary. */
-	binary = kmalloc(sizeof(*binary), MM_SLEEP);
+	binary = kmalloc(sizeof(*binary), MM_WAIT);
 	binary->phdrs = NULL;
 	binary->handle = handle;
 	binary->as = as;
@@ -252,7 +252,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 
 	/* Allocate some memory for the program headers and load them too. */
 	size = binary->ehdr.e_phnum * binary->ehdr.e_phentsize;
-	binary->phdrs = kmalloc(size, MM_SLEEP);
+	binary->phdrs = kmalloc(size, MM_WAIT);
 	ret = file_pread(handle, binary->phdrs, size, binary->ehdr.e_phoff, &bytes);
 	if(ret != STATUS_SUCCESS) {
 		goto fail;
@@ -727,7 +727,7 @@ status_t elf_module_load(module_t *module) {
 
 	/* Calculate the size of the section headers and allocate space. */
 	size = module->ehdr.e_shnum * module->ehdr.e_shentsize;
-	module->shdrs = kmalloc(size, MM_SLEEP);
+	module->shdrs = kmalloc(size, MM_WAIT);
 
 	/* Read the headers in. */
 	ret = file_pread(module->handle, module->shdrs, size, module->ehdr.e_shoff, &bytes);

@@ -166,7 +166,7 @@ static status_t area_object_get_page(object_handle_t *handle, offset_t offset, p
 		/* If the page is not already in the object, allocate a new page. */
 		page = avl_tree_lookup(&area->pages, offset);
 		if(!page) {
-			page = page_alloc(MM_SLEEP | PM_ZERO);
+			page = page_alloc(MM_WAIT | MM_ZERO);
 			page->offset = offset;
 			avl_tree_insert(&area->pages, &page->avl_link, offset, page);
 		}
@@ -240,12 +240,12 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 
 	/* Construct a default ACL if required. */
 	if(!ksecurity.acl) {
-		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_SLEEP);
+		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_WAIT);
 		object_acl_init(ksecurity.acl);
 		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1, AREA_RIGHT_READ | AREA_RIGHT_WRITE);
 	}
 
-	area = slab_cache_alloc(area_cache, MM_SLEEP);
+	area = slab_cache_alloc(area_cache, MM_WAIT);
 	area->id = id_alloc_get(&area_id_allocator);
 	if(area->id < 0) {
 		slab_cache_free(area_cache, area);
@@ -374,6 +374,6 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 static __init_text void area_init(void) {
 	id_alloc_init(&area_id_allocator, 65535);
 	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
-	                               NULL, NULL, 0, MM_FATAL);
+	                               NULL, NULL, 0, MM_BOOT);
 }
 INITCALL(area_init);

@@ -42,7 +42,7 @@ static void symbol_tree_insert(symbol_t *symbol) {
 	list_t *list;
 
 	if(!(list = radix_tree_lookup(symbol_tree, symbol->name))) {
-		list = kmalloc(sizeof(list_t), MM_SLEEP);
+		list = kmalloc(sizeof(list_t), MM_WAIT);
 		list_init(list);
 		radix_tree_insert(symbol_tree, symbol->name, list);
 	}
@@ -117,7 +117,7 @@ void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr, si
 
 	/* Resize the symbol table so we can fit the symbol in. */
 	i = table->count++;
-	table->symbols = krealloc(table->symbols, table->count * sizeof(symbol_t), MM_SLEEP);
+	table->symbols = krealloc(table->symbols, table->count * sizeof(symbol_t), MM_WAIT);
 
 	/* Fill in the symbol information. */
 	table->symbols[i].addr = addr;
@@ -293,7 +293,7 @@ symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
 
 /** Initialize the kernel symbol manager. */
 __init_text void symbol_init(void) {
-	symbol_tree = kmalloc(sizeof(radix_tree_t), MM_FATAL);
+	symbol_tree = kmalloc(sizeof(radix_tree_t), MM_BOOT);
 	radix_tree_init(symbol_tree);
 
 	/* Publish the kernel symbol table in the tree. */

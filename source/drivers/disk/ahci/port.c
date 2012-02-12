@@ -229,7 +229,7 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	phys_ptr_t phys;
 	ptr_t virt;
 
-	port = kmalloc(sizeof(*port), MM_SLEEP);
+	port = kmalloc(sizeof(*port), MM_WAIT);
 	port->num = num;
 	port->parent = hba;
 	port->regs = &hba->regs->ports[num];
@@ -246,8 +246,8 @@ ahci_port_t *ahci_port_add(ahci_hba_t *hba, uint8_t num) {
 	}
 
 	/* Allocate a chunk of memory to use for the port structures. */
-	phys_alloc(AHCI_PORT_MEM_SIZE, 0, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP | PM_ZERO, &port->mem_phys);
-	port->mem_virt = phys_map(port->mem_phys, AHCI_PORT_MEM_SIZE, MM_SLEEP);
+	phys_alloc(AHCI_PORT_MEM_SIZE, 0, 0, 0, (phys_ptr_t)0x100000000, MM_WAIT | MM_ZERO, &port->mem_phys);
+	port->mem_virt = phys_map(port->mem_phys, AHCI_PORT_MEM_SIZE, MM_WAIT);
 	virt = (ptr_t)port->mem_virt;
 	port->clist = (volatile ahci_command_header_t *)virt;
 	virt += sizeof(ahci_command_header_t) * AHCI_COMMAND_HEADER_COUNT;

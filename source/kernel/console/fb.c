@@ -305,7 +305,7 @@ static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
 
 /** Reconfigure the framebuffer console.
  * @param info		Information structure for new framebuffer.
- * @param mmflag	Allocation behaviour flags (MM_SLEEP or MM_FATAL). */
+ * @param mmflag	Allocation behaviour flags (MM_WAIT or MM_BOOT). */
 static void fb_console_configure(const fb_info_t *info, int mmflag) {
 	size_t size;
 
@@ -337,8 +337,7 @@ static void fb_console_configure(const fb_info_t *info, int mmflag) {
 	size = fb_info.width * fb_info.height * fb_info.bytes_per_pixel;
 	fb_mapping = phys_map(fb_info.addr, size, mmflag);
 	memset(fb_mapping, 0, size);
-	fb_backbuffer = kmem_alloc(ROUND_UP(size, PAGE_SIZE), mmflag);
-	memset(fb_backbuffer, 0, size);
+	fb_backbuffer = kmem_alloc(ROUND_UP(size, PAGE_SIZE), mmflag | MM_ZERO);
 
 	/* Configure the console and create a backbuffer for it, initially
 	 * filled with spaces. */
@@ -369,7 +368,7 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 		break;
 	case FB_CONSOLE_CONFIGURE:
 		/* Reconfigure to use a new framebuffer. */
-		fb_console_configure(info, MM_SLEEP);
+		fb_console_configure(info, MM_WAIT);
 		break;
 	case FB_CONSOLE_ACQUIRE:
 		/* Acquire the framebuffer for exclusive use. */
@@ -536,7 +535,7 @@ __init_text void fb_console_init(void) {
 	}
 
 	/* Configure the framebuffer. */
-	fb_console_configure(&info, MM_FATAL);
+	fb_console_configure(&info, MM_BOOT);
 
 	/* Draw the splash screen if enabled. */
 	if(splash_enabled) {

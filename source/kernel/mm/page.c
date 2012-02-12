@@ -333,7 +333,7 @@ page_t *page_alloc(int mmflag) {
 		page_queue_append(PAGE_STATE_ALLOCATED, page);
 
 		/* If we require a zero page, clear it now. */
-		if(mmflag & PM_ZERO) {
+		if(mmflag & MM_ZERO) {
 			mapping = phys_map(page->addr, PAGE_SIZE, mmflag & MM_FLAG_MASK);
 			if(unlikely(!mapping)) {
 				page_free(page);
@@ -351,9 +351,10 @@ page_t *page_alloc(int mmflag) {
 		return page;
 	}
 
-	if(mmflag & MM_FATAL) {
+	// TODO: Reclaim/wait for memory.
+	if(mmflag & MM_BOOT) {
 		fatal("Unable to satisfy boot page allocation");
-	} else if(mmflag & MM_SLEEP) {
+	} else if(mmflag & MM_WAIT) {
 		/* TODO: Try harder. */
 		fatal("Oh god help");
 	}
@@ -393,7 +394,7 @@ void page_free(page_t *page) {
 	mutex_unlock(&free_page_lock);
 
 	dprintf("page: freed page 0x%" PRIxPHYS " (list: %u)\n", page->addr,
-		phys_ranges[page->phys_range].freelist);
+	        phys_ranges[page->phys_range].freelist);
 }
 
 /** Create a copy of a page.
@@ -615,9 +616,9 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		pages = phys_alloc_slowpath(count, align, boundary, minaddr, maxaddr);
 	}
 	if(unlikely(!pages)) {
-		if(mmflag & MM_FATAL) {
-			fatal("Unable to satisfy boot page allocation");
-		} else if(mmflag & MM_SLEEP) {
+		if(mmflag & MM_BOOT) {
+			fatal("Unable to satisfy boot allocation of %zu page(s)", count);
+		} else if(mmflag & MM_WAIT) {
 			fatal("Oh god help");
 		}
 
@@ -636,7 +637,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 	}
 
 	/* If we require the range to be zero, clear it now. */
-	if(mmflag & PM_ZERO) {
+	if(mmflag & MM_ZERO) {
 		mapping = phys_map(pages->addr, size, mmflag & MM_FLAG_MASK);
 		if(unlikely(!mapping)) {
 			phys_free(pages->addr, size);
@@ -866,9 +867,13 @@ __init_text void page_init(void) {
 			continue;
 		}
 
+#if KERNEL_PMAP_OFFSET > 0
+		if(range->start >= KERNEL_PMAP_OFFSET && range->start < (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE)) {
+			size = MIN((phys_ptr_t)(KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE), range->end) - range->start;
+#else
 		if(range->start < KERNEL_PMAP_SIZE) {
 			size = MIN((phys_ptr_t)KERNEL_PMAP_SIZE, range->end) - range->start;
-
+#endif
 			if(size > pages_size) {
 				pages_base = range->start;
 				pages_size = size;
@@ -890,7 +895,7 @@ __init_text void page_init(void) {
 	for(i = 0; i < phys_range_count; i++) {
 		count = (phys_ranges[i].end - phys_ranges[i].start) / PAGE_SIZE;
 		size = sizeof(page_t) * count;
-		phys_ranges[i].pages = phys_map(pages_base + offset, size, MM_FATAL);
+		phys_ranges[i].pages = phys_map(pages_base + offset, size, MM_BOOT);
 		offset += size;
 
 		/* Initialize each of the pages. */

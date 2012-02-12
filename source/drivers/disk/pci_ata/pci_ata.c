@@ -298,7 +298,7 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 	}
 
 	/* Allocate our information structure. */
-	channel = kmalloc(sizeof(*channel), MM_SLEEP);
+	channel = kmalloc(sizeof(*channel), MM_WAIT);
 	channel->channel = NULL;
 	channel->pci_device = pci_device;
 	channel->ctrl_base = ctrl_base;
@@ -318,8 +318,8 @@ static ata_channel_t *pci_ata_channel_add(pci_device_t *pci_device, int idx, uin
 
 	/* Allocate a PRDT if necessary. */
 	if(dma) {
-		phys_alloc(PRDT_SIZE, 0, 0, 0, (phys_ptr_t)0x100000000, MM_SLEEP, &channel->prdt_phys);
-		channel->prdt = phys_map(channel->prdt_phys, PRDT_SIZE, MM_SLEEP);
+		phys_alloc(PRDT_SIZE, 0, 0, 0, (phys_ptr_t)0x100000000, MM_WAIT, &channel->prdt_phys);
+		channel->prdt = phys_map(channel->prdt_phys, PRDT_SIZE, MM_WAIT);
 	}
 
 	/* Register the IRQ handler. */

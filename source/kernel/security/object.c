@@ -111,7 +111,7 @@ void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object
 	}
 
 	/* Add a new entry. */
-	acl->entries = krealloc(acl->entries, sizeof(acl->entries[0]) * (acl->count + 1), MM_SLEEP);
+	acl->entries = krealloc(acl->entries, sizeof(acl->entries[0]) * (acl->count + 1), MM_WAIT);
 	acl->entries[acl->count  ].type = type;
 	acl->entries[acl->count  ].value = value;
 	acl->entries[acl->count++].rights = rights;
@@ -307,7 +307,7 @@ status_t object_security_from_user(object_security_t *dest, const object_securit
 
 	/* If there is an ACL, copy it. */
 	if(dest->acl) {
-		acl = kmalloc(sizeof(*acl), MM_SLEEP);
+		acl = kmalloc(sizeof(*acl), MM_WAIT);
 		ret = memcpy_from_user(acl, dest->acl, sizeof(*acl));
 		if(ret != STATUS_SUCCESS) {
 			goto fail;
@@ -328,7 +328,7 @@ status_t object_security_from_user(object_security_t *dest, const object_securit
 				goto fail;
 			}
 
-			entries = kmalloc(sizeof(*entries) * acl->count, MM_SLEEP);
+			entries = kmalloc(sizeof(*entries) * acl->count, MM_WAIT);
 			ret = memcpy_from_user(entries, acl->entries, sizeof(*entries) * acl->count);
 			if(ret != STATUS_SUCCESS) {
 				goto fail;

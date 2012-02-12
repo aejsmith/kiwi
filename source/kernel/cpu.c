@@ -79,12 +79,12 @@ cpu_t *cpu_register(cpu_id_t id, int state) {
 
 	assert(cpus);
 
-	cpu = kmalloc(sizeof(*cpu), MM_FATAL);
+	cpu = kmalloc(sizeof(*cpu), MM_BOOT);
 	cpu_ctor(cpu, id, state);
 
 	/* Resize the CPU array if required. */
 	if(id > highest_cpu_id) {
-		cpus = krealloc(cpus, sizeof(cpu_t *) * (id + 1), MM_FATAL);
+		cpus = krealloc(cpus, sizeof(cpu_t *) * (id + 1), MM_BOOT);
 		memset(&cpus[highest_cpu_id + 1], 0, (id - highest_cpu_id) * sizeof(cpu_t *));
 
                 highest_cpu_id = id;
@@ -127,6 +127,6 @@ __init_text void cpu_init(void) {
 	cpu_count = 1;
 
 	/* Create the initial CPU array and add the boot CPU to it. */
-	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_FATAL);
+	cpus = kcalloc(highest_cpu_id + 1, sizeof(cpu_t *), MM_BOOT);
 	cpus[boot_cpu.id] = &boot_cpu;
 }

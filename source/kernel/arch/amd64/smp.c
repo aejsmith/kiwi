@@ -59,15 +59,15 @@ __init_text void arch_smp_boot_prepare(void) {
 
 	/* Copy the trampoline code to the page reserved by the paging
 	 * initialization code. */
-	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
+	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
 	memcpy(mapping, __ap_trampoline_start, __ap_trampoline_end - __ap_trampoline_start);
 	phys_unmap(mapping, PAGE_SIZE, false);
 
 	/* Create a temporary MMU context for APs to use while booting which
 	 * identity maps the bootstrap code at its physical location. */
-	ap_mmu_context = mmu_context_create(MM_FATAL);
+	ap_mmu_context = mmu_context_create(MM_BOOT);
 	mmu_context_lock(ap_mmu_context);
-	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_FATAL);
+	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_BOOT);
 	mmu_context_unlock(ap_mmu_context);
 }
 
@@ -120,10 +120,10 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	/* Allocate a double fault stack for the new CPU. This is also used as
 	 * the initial stack while initializing the AP, before it enters the
 	 * scheduler. */
-	cpu->arch.double_fault_stack = kmem_alloc(KSTACK_SIZE, MM_FATAL);
+	cpu->arch.double_fault_stack = kmem_alloc(KSTACK_SIZE, MM_BOOT);
 
 	/* Fill in details required by the bootstrap code. */
-	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_FATAL);
+	mapping = phys_map(ap_bootstrap_page, PAGE_SIZE, MM_BOOT);
 	*(uint64_t *)(mapping + 16) = (ptr_t)kmain_ap;
 	*(uint64_t *)(mapping + 24) = (ptr_t)cpu;
 	*(uint64_t *)(mapping + 32) = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;

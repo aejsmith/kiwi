@@ -68,7 +68,7 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 
 	/* Work out the path to the entry. */
 	if(prefix) {
-		path = kmalloc(strlen(prefix) + strlen(header->name) + 2, MM_SLEEP);
+		path = kmalloc(strlen(prefix) + strlen(header->name) + 2, MM_WAIT);
 		strcpy(path, prefix);
 		strcat(path, "/");
 		strcat(path, header->name);
@@ -146,7 +146,7 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 	void *data = NULL;
 	status_t ret;
 
-	header = kmalloc(sizeof(tar_header_t), MM_SLEEP);
+	header = kmalloc(sizeof(tar_header_t), MM_WAIT);
 
 	while(true) {
 		/* Read in the next header. */

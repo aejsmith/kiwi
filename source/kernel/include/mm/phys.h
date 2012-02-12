@@ -23,7 +23,8 @@
 #define __MM_PHYS_H
 
 #include <arch/page.h>
-#include <mm/flags.h>
+
+#include <mm/mm.h>
 
 /** Memory range types. */
 #define MEMORY_TYPE_NORMAL	0	/**< Normal Memory. */

@@ -265,7 +265,7 @@ static bool ext2_read_entry_cb(ext2_inode_t *dir, ext2_dirent_t *header, const c
 	size_t len;
 
 	len = sizeof(*entry) + strlen(name) + 1;
-	entry = kmalloc(len, MM_SLEEP);
+	entry = kmalloc(len, MM_WAIT);
 	entry->length = len;
 	entry->id = le32_to_cpu(header->inode);
 	strcpy(entry->name, name);
@@ -305,7 +305,7 @@ static status_t ext2_node_read_link(fs_node_t *node, char **destp) {
 	size_t bytes;
 	char *dest;
 
-	dest = kmalloc(inode->size + 1, MM_SLEEP);
+	dest = kmalloc(inode->size + 1, MM_WAIT);
 	if(le32_to_cpu(inode->disk.i_blocks) == 0) {
 		memcpy(dest, inode->disk.i_block, inode->size);
 	} else {
@@ -460,7 +460,7 @@ static bool ext2_probe(object_handle_t *handle, const char *uuid) {
 	size_t bytes;
 	char *tmp;
 
-	sb = kmalloc(sizeof(ext2_superblock_t), MM_SLEEP);
+	sb = kmalloc(sizeof(ext2_superblock_t), MM_WAIT);
 	if(device_read(handle, sb, sizeof(ext2_superblock_t), 1024, &bytes) != STATUS_SUCCESS) {
 		kfree(sb);
 		return false;
@@ -489,7 +489,7 @@ static bool ext2_probe(object_handle_t *handle, const char *uuid) {
 
 	/* Check the UUID if required. */
 	if(uuid) {
-		tmp = kmalloc(37, MM_SLEEP);
+		tmp = kmalloc(37, MM_WAIT);
 		sprintf(tmp, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
 		        sb->s_uuid[0], sb->s_uuid[1], sb->s_uuid[2], sb->s_uuid[3], sb->s_uuid[4],
 		        sb->s_uuid[5], sb->s_uuid[6], sb->s_uuid[7], sb->s_uuid[8], sb->s_uuid[9],
@@ -519,7 +519,7 @@ static status_t ext2_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t co
 
 	/* Create a mount structure to track information about the mount. */
 	mount->ops = &ext2_mount_ops;
-	data = mount->data = kcalloc(1, sizeof(ext2_mount_t), MM_SLEEP);
+	data = mount->data = kcalloc(1, sizeof(ext2_mount_t), MM_WAIT);
 	mutex_init(&data->lock, "ext2_mount_lock", 0);
 	data->parent = mount;
 	data->device = mount->device;
@@ -573,7 +573,7 @@ static status_t ext2_mount(fs_mount_t *mount, fs_mount_option_t *opts, size_t co
 	dprintf(" block_count:  %u\n", data->block_count);
 	dprintf(" inode_count:  %u\n", data->inode_count);
 
-	/* Read in the group descriptor table. Don't use MM_SLEEP as it could
+	/* Read in the group descriptor table. Don't use MM_WAIT as it could
 	 * be very big. */
 	data->group_tbl = kmalloc(data->group_tbl_size, 0);
 	if(!data->group_tbl) {

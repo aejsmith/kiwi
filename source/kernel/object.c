@@ -207,7 +207,7 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
 	assert(handlep || idp || uidp);
 
 	/* Create the kernel handle structure. */
-	handle = slab_cache_alloc(object_handle_cache, MM_SLEEP);
+	handle = slab_cache_alloc(object_handle_cache, MM_WAIT);
 	refcount_set(&handle->count, 1);
 	handle->object = object;
 	handle->data = data;
@@ -293,7 +293,7 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 
 	object_handle_get(handle);
 
-	link = kmalloc(sizeof(*link), MM_SLEEP);
+	link = kmalloc(sizeof(*link), MM_WAIT);
 	link->handle = handle;
 	link->flags = flags;
 
@@ -487,8 +487,8 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 	handle_link_t *link;
 	int i;
 
-	table = slab_cache_alloc(handle_table_cache, MM_SLEEP);
-	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
+	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
+	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_WAIT);
 
 	/* Inherit all inheritable handles in the parent table. */
 	if(parent && count != 0) {
@@ -548,8 +548,8 @@ handle_table_t *handle_table_clone(handle_table_t *src) {
 	handle_table_t *table;
 	handle_link_t *link;
 
-	table = slab_cache_alloc(handle_table_cache, MM_SLEEP);
-	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_SLEEP);
+	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
+	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_WAIT);
 
 	rwlock_read_lock(&src->lock);
 
@@ -688,10 +688,10 @@ static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) 
 /** Initialize the handle caches. */
 __init_text void handle_init(void) {
 	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
-	                                        0, NULL, NULL, NULL, 0, MM_FATAL);
+	                                        0, NULL, NULL, NULL, 0, MM_BOOT);
 	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
 	                                       0, handle_table_ctor, NULL, NULL, 0,
-	                                       MM_FATAL);
+	                                       MM_BOOT);
 
 	/* Register the KDB commands. */
 	kdb_register_command("handles", "Inspect a process' handle table.", kdb_cmd_handles);

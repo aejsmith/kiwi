@@ -105,7 +105,7 @@ void phys_unmap(void *addr, size_t size, bool shared) {
  * @param source	Source page.
  * @param mmflag	Allocation flags for mapping page in memory.
  * @return		True if successful, false if unable to map pages into
- *			memory (cannot happen if MM_SLEEP is specified). */
+ *			memory (cannot happen if MM_WAIT is specified). */
 bool phys_copy(phys_ptr_t dest, phys_ptr_t source, int mmflag) {
 	void *mdest, *msrc;
 

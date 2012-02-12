@@ -24,7 +24,7 @@
 
 #include <lib/utility.h>
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 /** Structure containing a bitmap. */
 typedef struct bitmap {

@@ -316,7 +316,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	}
 
 	/* Allocate a new process structure. */
-	process = slab_cache_alloc(process_cache, MM_SLEEP);
+	process = slab_cache_alloc(process_cache, MM_WAIT);
 
 	/* If a security context is provided, copy it to the structure and
 	 * validate it (which also canonicalises it), else work out which
@@ -391,7 +391,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	process->aspace = aspace;
 	process->handles = table;
 	process->state = PROCESS_RUNNING;
-	process->name = kstrdup(name, MM_SLEEP);
+	process->name = kstrdup(name, MM_WAIT);
 	process->status = 0;
 	process->reason = EXIT_REASON_NORMAL;
 	process->create = NULL;
@@ -789,7 +789,7 @@ __init_text void process_init(void) {
 	/* Create the process slab cache. */
 	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
 	                                  process_cache_ctor, NULL, NULL, 0,
-	                                  MM_FATAL);
+	                                  MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
@@ -1117,7 +1117,7 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	oldtable = curr_proc->handles;
 	curr_proc->handles = table;
 	oldname = curr_proc->name;
-	curr_proc->name = kstrdup(info.path, MM_SLEEP);
+	curr_proc->name = kstrdup(info.path, MM_WAIT);
 
 	/* Reset signal handling state. */
 	memset(curr_proc->signal_act, 0, sizeof(curr_proc->signal_act));
@@ -1214,7 +1214,7 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	}
 
 	/* Create the entry thread. */
-	args = kmalloc(sizeof(*args), MM_SLEEP);
+	args = kmalloc(sizeof(*args), MM_WAIT);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 	args->sp = (ptr_t)sp;
@@ -1367,7 +1367,7 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 			}
 		}
 
-		context = kmalloc(sizeof(*context), MM_SLEEP);
+		context = kmalloc(sizeof(*context), MM_WAIT);
 		ret = memcpy_from_user(context, in, sizeof(*context));
 		if(ret != STATUS_SUCCESS) {
 			kfree(context);

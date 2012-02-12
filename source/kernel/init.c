@@ -116,8 +116,8 @@ __init_text void *kboot_tag_iterate(uint32_t type, void *current) {
 
 		/* First map with only the header size in order to get the full
 		 * size of the tag data. */
-		tmp = phys_map(next, sizeof(kboot_tag_t), MM_FATAL);
-		header = phys_map(next, tmp->size, MM_FATAL);
+		tmp = phys_map(next, sizeof(kboot_tag_t), MM_BOOT);
+		header = phys_map(next, tmp->size, MM_BOOT);
 		phys_unmap(tmp, sizeof(kboot_tag_t), true);
 	} while(header->type != type);
 
@@ -236,17 +236,17 @@ static __init_text void load_modules(void) {
 	 * dependencies, and also because the module loader requires handles
 	 * rather than a chunk of memory. */
 	KBOOT_ITERATE(KBOOT_TAG_MODULE, kboot_tag_module_t, tag) {
-		mod = kmalloc(sizeof(boot_module_t), MM_FATAL);
+		mod = kmalloc(sizeof(boot_module_t), MM_BOOT);
 		list_init(&mod->header);
 		mod->name = NULL;
 		mod->size = tag->size;
-		mod->mapping = phys_map(tag->addr, tag->size, MM_FATAL);
+		mod->mapping = phys_map(tag->addr, tag->size, MM_BOOT);
 		mod->handle = file_from_memory(mod->mapping, tag->size);
 
 		/* Figure out the module name, which is needed to resolve
 		 * dependencies. If unable to get the name, assume the module
 		 * is a filesystem image. */
-		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_FATAL);
+		tmp = kmalloc(MODULE_NAME_MAX + 1, MM_BOOT);
 		if(module_name(mod->handle, tmp) != STATUS_SUCCESS) {
 			kfree(tmp);
 			list_append(&boot_fsimage_list, &mod->header);

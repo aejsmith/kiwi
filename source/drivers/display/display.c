@@ -288,14 +288,14 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 		if(!outp || !outszp) {
 			return STATUS_INVALID_ARG;
 		}
-		*outp = kmemdup(&device->count, sizeof(size_t), MM_SLEEP);
+		*outp = kmemdup(&device->count, sizeof(size_t), MM_WAIT);
 		*outszp = sizeof(size_t);
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_MODES:
 		if(!outp || !outszp) {
 			return STATUS_INVALID_ARG;
 		}
-		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_SLEEP);
+		*outp = kmemdup(device->modes, sizeof(display_mode_t) * device->count, MM_WAIT);
 		*outszp = sizeof(display_mode_t) * device->count;
 		return STATUS_SUCCESS;
 	case DISPLAY_GET_PREFERRED_MODE:
@@ -321,7 +321,7 @@ static status_t display_device_request(device_t *_device, void *data, int reques
 			}
 		}
 
-		*outp = kmemdup(mode, sizeof(display_mode_t), MM_SLEEP);
+		*outp = kmemdup(mode, sizeof(display_mode_t), MM_WAIT);
 		*outszp = sizeof(display_mode_t);
 		mutex_unlock(&device->lock);
 		return STATUS_SUCCESS;
@@ -434,7 +434,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 		return STATUS_INVALID_ARG;
 	}
 
-	device = kmalloc(sizeof(display_device_t), MM_SLEEP);
+	device = kmalloc(sizeof(display_device_t), MM_WAIT);
 	mutex_init(&device->lock, "display_device_lock", 0);
 	atomic_set(&device->open, 0);
 	notifier_init(&device->redraw_notifier, device);
@@ -443,7 +443,7 @@ status_t display_device_create(const char *name, device_t *parent, display_ops_t
 	device->data = data;
 	device->curr_mode = NULL;
 	device->redraw = false;
-	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_SLEEP);
+	device->modes = kmemdup(modes, sizeof(display_mode_t) * count, MM_WAIT);
 	device->count = count;
 	device->mem_phys = mem_phys;
 	device->mem_size = mem_size;

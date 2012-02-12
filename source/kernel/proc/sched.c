@@ -465,7 +465,7 @@ __init_text void sched_init(void) {
 	int i, j;
 
 	/* Create the per-CPU information structure. */
-	curr_cpu->sched = kmalloc(sizeof(sched_cpu_t), MM_FATAL);
+	curr_cpu->sched = kmalloc(sizeof(sched_cpu_t), MM_BOOT);
 	spinlock_init(&curr_cpu->sched->lock, "sched_lock");
 	curr_cpu->sched->total = 0;
 	curr_cpu->sched->active = &curr_cpu->sched->queues[0];

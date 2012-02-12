@@ -233,10 +233,10 @@ void pipe_unwait(pipe_t *pipe, bool write, void *sync) {
 pipe_t *pipe_create(void) {
 	pipe_t *pipe;
 
-	pipe = slab_cache_alloc(pipe_cache, MM_SLEEP);
+	pipe = slab_cache_alloc(pipe_cache, MM_WAIT);
 	semaphore_init(&pipe->space_sem, "pipe_space_sem", PIPE_SIZE);
 	semaphore_init(&pipe->data_sem, "pipe_data_sem", 0);
-	pipe->buf = kmem_alloc(PIPE_SIZE, MM_SLEEP);
+	pipe->buf = kmem_alloc(PIPE_SIZE, MM_WAIT);
 	pipe->start = 0;
 	pipe->end = 0;
 	return pipe;
@@ -256,6 +256,6 @@ void pipe_destroy(pipe_t *pipe) {
 /** Initialize the pipe slab cache. */
 static __init_text void pipe_cache_init(void) {
 	pipe_cache = slab_cache_create("pipe_cache", sizeof(pipe_t), 0, pipe_ctor,
-	                               NULL, NULL, 0, MM_FATAL);
+	                               NULL, NULL, 0, MM_BOOT);
 }
 INITCALL(pipe_cache_init);

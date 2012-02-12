@@ -56,11 +56,11 @@ status_t ext2_inode_security(ext2_inode_t *inode, object_security_t **securityp)
 	object_rights_t rights;
 	uint16_t mode;
 
-	security = kmalloc(sizeof(*security), MM_SLEEP);
+	security = kmalloc(sizeof(*security), MM_WAIT);
 	security->uid = le16_to_cpu(inode->disk.i_uid);
 	security->gid = le16_to_cpu(inode->disk.i_gid);
 
-	security->acl = kmalloc(sizeof(*security->acl), MM_SLEEP);
+	security->acl = kmalloc(sizeof(*security->acl), MM_WAIT);
 	object_acl_init(security->acl);
 	mode = le16_to_cpu(inode->disk.i_mode);
 

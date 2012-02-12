@@ -24,7 +24,7 @@
 
 #include <arch/page.h>
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 extern ptr_t kmem_raw_alloc(size_t size, int mmflag);
 extern void kmem_raw_free(ptr_t addr, size_t size);

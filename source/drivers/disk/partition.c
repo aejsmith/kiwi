@@ -102,7 +102,7 @@ void partition_add(disk_device_t *parent, int id, uint64_t offset, uint64_t size
 	disk_device_t *device;
 	status_t ret;
 
-	device = kmalloc(sizeof(disk_device_t), MM_SLEEP);
+	device = kmalloc(sizeof(disk_device_t), MM_WAIT);
 	device->id = id;
 	device->ops = &partition_disk_ops;
 	device->offset = offset;

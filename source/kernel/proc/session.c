@@ -39,7 +39,7 @@ static id_alloc_t session_id_allocator;
 session_t *session_create(void) {
 	session_t *session;
 
-	session = kmalloc(sizeof(*session), MM_SLEEP);
+	session = kmalloc(sizeof(*session), MM_WAIT);
 	refcount_set(&session->count, 1);
 	session->id = id_alloc_get(&session_id_allocator);
 	if(session->id < 0) {

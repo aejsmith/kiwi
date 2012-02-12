@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,13 +22,13 @@
 #ifndef __MM_MALLOC_H
 #define __MM_MALLOC_H
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 #include <types.h>
 
-extern void *kmalloc(size_t size, int kmflag) __malloc;
-extern void *kcalloc(size_t nmemb, size_t size, int kmflag) __malloc;
-extern void *krealloc(void *addr, size_t size, int kmflag) __malloc;
+extern void *kmalloc(size_t size, int mmflag) __malloc;
+extern void *kcalloc(size_t nmemb, size_t size, int mmflag) __malloc;
+extern void *krealloc(void *addr, size_t size, int mmflag) __malloc;
 extern void kfree(void *addr);
 
 extern void malloc_init(void);

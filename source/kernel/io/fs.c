@@ -218,7 +218,7 @@ fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
 	object_acl_t acl, sacl;
 	fs_node_t *node;
 
-	node = slab_cache_alloc(fs_node_cache, MM_SLEEP);
+	node = slab_cache_alloc(fs_node_cache, MM_WAIT);
 	refcount_set(&node->count, 1);
 	list_init(&node->mount_link);
 	list_init(&node->unused_link);
@@ -668,7 +668,7 @@ static status_t fs_node_lookup(const char *path, bool follow, int type, fs_node_
 	}
 
 	/* Duplicate path so that fs_node_lookup_internal() can modify it. */
-	dup = kstrdup(path, MM_SLEEP);
+	dup = kstrdup(path, MM_WAIT);
 
 	/* Look up the path string. */
 	ret = fs_node_lookup_internal(dup, node, follow, 0, &node);
@@ -820,8 +820,8 @@ static status_t fs_node_create(const char *path, file_type_t type, const char *t
 	}
 
 	/* Split path into directory/name. */
-	dir = kdirname(path, MM_SLEEP);
-	name = kbasename(path, MM_SLEEP);
+	dir = kdirname(path, MM_WAIT);
+	name = kbasename(path, MM_WAIT);
 
 	/* It is possible for kbasename() to return a string with a '/'
 	 * character if the path refers to the root of the FS. */
@@ -937,7 +937,7 @@ static status_t fs_node_name(fs_node_t *parent, node_id_t id, char **namep) {
 		}
 
 		if(entry->id == id) {
-			*namep = kstrdup(entry->name, MM_SLEEP);
+			*namep = kstrdup(entry->name, MM_WAIT);
 			kfree(entry);
 			return STATUS_SUCCESS;
 		}
@@ -987,7 +987,7 @@ static status_t fs_node_path(fs_node_t *node, fs_node_t *root, char **pathp) {
 
 		/* Add the entry name on to the beginning of the path. */
 		len += ((buf) ? strlen(name) + 1 : strlen(name));
-		tmp = kmalloc(len + 1, MM_SLEEP);
+		tmp = kmalloc(len + 1, MM_WAIT);
 		strcpy(tmp, name);
 		kfree(name);
 		if(buf) {
@@ -1001,7 +1001,7 @@ static status_t fs_node_path(fs_node_t *node, fs_node_t *root, char **pathp) {
 	fs_node_release(node);
 
 	/* Prepend a '/'. */
-	tmp = kmalloc((++len) + 1, MM_SLEEP);
+	tmp = kmalloc((++len) + 1, MM_WAIT);
 	strcpy(tmp, "/");
 	if(buf) {
 		strcat(tmp, buf);
@@ -1038,7 +1038,7 @@ static status_t file_handle_create(fs_node_t *node, object_rights_t rights, int 
 	}
 
 	/* Allocate the per-handle data structure. */
-	data = kmalloc(sizeof(file_handle_t), MM_SLEEP);
+	data = kmalloc(sizeof(file_handle_t), MM_WAIT);
 	mutex_init(&data->lock, "file_handle_lock", 0);
 	data->offset = 0;
 	data->flags = flags;
@@ -1264,7 +1264,7 @@ object_handle_t *file_from_memory(const void *buf, size_t size) {
 	memory_file_t *file;
 	fs_node_t *node;
 
-	file = kmalloc(sizeof(memory_file_t), MM_SLEEP);
+	file = kmalloc(sizeof(memory_file_t), MM_WAIT);
 	file->data = buf;
 	file->size = size;
 
@@ -1979,7 +1979,7 @@ static void parse_mount_options(const char *str, fs_mount_option_t **optsp, size
 
 	if(str) {
 		/* Duplicate the string to allow modification with strsep(). */
-		dup = kstrdup(str, MM_SLEEP);
+		dup = kstrdup(str, MM_WAIT);
 
 		while((value = strsep(&dup, ","))) {
 			name = strsep(&value, "=");
@@ -1993,9 +1993,9 @@ static void parse_mount_options(const char *str, fs_mount_option_t **optsp, size
 			if(strcmp(name, "ro") == 0) {
 				flags |= FS_MOUNT_RDONLY;
 			} else {
-				opts = krealloc(opts, sizeof(fs_mount_option_t) * (count + 1), MM_SLEEP);
-				opts[count].name = kstrdup(name, MM_SLEEP);
-				opts[count].value = (value) ? kstrdup(value, MM_SLEEP) : NULL;
+				opts = krealloc(opts, sizeof(fs_mount_option_t) * (count + 1), MM_WAIT);
+				opts[count].name = kstrdup(name, MM_WAIT);
+				opts[count].value = (value) ? kstrdup(value, MM_WAIT) : NULL;
 				count++;
 			}
 		}
@@ -2131,7 +2131,7 @@ status_t fs_mount(const char *device, const char *path, const char *type, const 
 	}
 
 	/* Initialize the mount structure. */
-	mount = kmalloc(sizeof(fs_mount_t), MM_SLEEP);
+	mount = kmalloc(sizeof(fs_mount_t), MM_WAIT);
 	mutex_init(&mount->lock, "fs_mount_lock", 0);
 	avl_tree_init(&mount->nodes);
 	list_init(&mount->used_nodes);
@@ -2412,8 +2412,8 @@ status_t fs_unlink(const char *path) {
 	status_t ret;
 
 	/* Split path into directory/name. */
-	dir = kdirname(path, MM_SLEEP);
-	name = kbasename(path, MM_SLEEP);
+	dir = kdirname(path, MM_WAIT);
+	name = kbasename(path, MM_WAIT);
 
 	dprintf("fs: unlink(%s) - dirname is '%s', basename is '%s'\n", path, dir, name);
 
@@ -2597,7 +2597,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 /** Initialize the filesystem layer. */
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
-	                                  NULL, NULL, NULL, 0, MM_FATAL);
+	                                  NULL, NULL, NULL, 0, MM_BOOT);
 
 	/* Register the low resource handler. */
 	lrm_handler_register(&fs_lrm_handler);
@@ -2738,7 +2738,7 @@ status_t kern_file_read(handle_t handle, void *buf, size_t count, size_t *bytesp
 		goto out;
 	}
 
-	/* Allocate a temporary buffer to read into. Don't use MM_SLEEP for
+	/* Allocate a temporary buffer to read into. Don't use MM_WAIT for
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
@@ -2804,7 +2804,7 @@ status_t kern_file_pread(handle_t handle, void *buf, size_t count, offset_t offs
 		goto out;
 	}
 
-	/* Allocate a temporary buffer to read into. Don't use MM_SLEEP for
+	/* Allocate a temporary buffer to read into. Don't use MM_WAIT for
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
@@ -2875,7 +2875,7 @@ status_t kern_file_write(handle_t handle, const void *buf, size_t count, size_t 
 		goto out;
 	}
 
-	/* Copy the data to write across from userspace. Don't use MM_SLEEP for
+	/* Copy the data to write across from userspace. Don't use MM_WAIT for
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
@@ -2942,7 +2942,7 @@ status_t kern_file_pwrite(handle_t handle, const void *buf, size_t count, offset
 		goto out;
 	}
 
-	/* Copy the data to write across from userspace. Don't use MM_SLEEP for
+	/* Copy the data to write across from userspace. Don't use MM_WAIT for
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
@@ -3135,7 +3135,7 @@ status_t kern_dir_read(handle_t handle, dir_entry_t *buf, size_t size) {
 		return ret;
 	}
 
-	/* Allocate a temporary buffer to read into. Don't use MM_SLEEP for
+	/* Allocate a temporary buffer to read into. Don't use MM_WAIT for
 	 * this allocation because the process may provide a count larger than
 	 * we can allocate in kernel space, in which case it would block
 	 * forever. */
@@ -3206,7 +3206,7 @@ status_t kern_symlink_read(const char *path, char *buf, size_t size) {
 	}
 
 	/* Allocate a buffer to read into. See comment in sys_fs_file_read()
-	 * about not using MM_SLEEP. */
+	 * about not using MM_WAIT. */
 	kbuf = kmalloc(size, 0);
 	if(!kbuf) {
 		kfree(kpath);
@@ -3309,7 +3309,7 @@ status_t kern_fs_mount_info(mount_info_t *infop, size_t *countp) {
 			return STATUS_SUCCESS;
 		}
 
-		info = kmalloc(sizeof(*info), MM_SLEEP);
+		info = kmalloc(sizeof(*info), MM_WAIT);
 	}
 
 	mutex_lock(&mounts_lock);

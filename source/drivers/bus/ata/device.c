@@ -262,7 +262,7 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 		return;
 	}
 
-	ident = kmalloc(512, MM_SLEEP);
+	ident = kmalloc(512, MM_WAIT);
 
 	/* Prepare a DMA transfer if the channel doesn't support PIO. */
 	if(!channel->pio) {
@@ -305,7 +305,7 @@ void ata_device_detect(ata_channel_t *channel, uint8_t num) {
 	}
 
 	/* Allocate a device structure and fill it out. */
-	device = kmalloc(sizeof(*device), MM_SLEEP);
+	device = kmalloc(sizeof(*device), MM_WAIT);
 	ata_copy_string(device->model, (char *)(ident + 27), 40);
 	ata_copy_string(device->serial, (char *)(ident + 10), 20);
 	ata_copy_string(device->revision, (char *)(ident + 23), 8);

@@ -111,7 +111,7 @@ status_t irq_register(unsigned num, irq_top_t top, irq_bottom_t bottom, void *da
 		return STATUS_INVALID_ARG;
 	}
 
-	handler = kmalloc(sizeof(irq_handler_t), MM_SLEEP);
+	handler = kmalloc(sizeof(irq_handler_t), MM_WAIT);
 	list_init(&handler->header);
 	semaphore_init(&handler->sem, "irq_sem", 0);
 	handler->num = num;

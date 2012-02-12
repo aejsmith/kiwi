@@ -22,7 +22,7 @@
 #ifndef __LIB_STRING_H
 #define __LIB_STRING_H
 
-#include <mm/flags.h>
+#include <mm/mm.h>
 
 #include <types.h>
 

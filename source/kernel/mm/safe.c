@@ -135,7 +135,7 @@ status_t strlen_user(const char *str, size_t *lenp) {
  * Duplicate a string from user memory.
  *
  * Allocates a buffer large enough and copies across a string from user memory.
- * The allocation is not made using MM_SLEEP, as there is no length limit and
+ * The allocation is not made using MM_WAIT, as there is no length limit and
  * therefore the length could be too large to fit in memory. Use of
  * strndup_from_user() is preferred to this.
  *
@@ -180,7 +180,7 @@ status_t strdup_from_user(const void *src, char **destp) {
  * Allocates a buffer large enough and copies across a string from user memory.
  * If the string is longer than the maximum length, then an error will be
  * returned. Because a length limit is provided, the allocation is made using
- * MM_SLEEP - it is assumed that the limit is sensible.
+ * MM_WAIT - it is assumed that the limit is sensible.
  *
  * @param src		Location to copy from.
  * @param max		Maximum length allowed.
@@ -205,7 +205,7 @@ status_t strndup_from_user(const void *src, size_t max, char **destp) {
 		return STATUS_TOO_LONG;
 	}
 
-	d = kmalloc(len + 1, MM_SLEEP);
+	d = kmalloc(len + 1, MM_WAIT);
 	ret = memcpy_from_user(d, src, len);
 	if(ret != STATUS_SUCCESS) {
 		kfree(d);

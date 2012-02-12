@@ -98,7 +98,7 @@ mmu_context_t kernel_mmu_context;
  * @param mmflag	Allocation flags.
  * @return		Address of structure on success, 0 on failure. */
 static phys_ptr_t alloc_structure(int mmflag) {
-	page_t *page = page_alloc(mmflag | PM_ZERO);
+	page_t *page = page_alloc(mmflag | MM_ZERO);
         return (page) ? page->addr : 0;
 }
 
@@ -107,7 +107,7 @@ static phys_ptr_t alloc_structure(int mmflag) {
  * @return		Pointer to mapping. */
 static uint64_t *map_structure(phys_ptr_t addr) {
 	/* Our phys_map() implementation never fails. */
-	return phys_map(addr, PAGE_SIZE, MM_FATAL);
+	return phys_map(addr, PAGE_SIZE, MM_BOOT);
 }
 
 /** Get the page directory containing a virtual address.
@@ -643,7 +643,7 @@ static __init_text void create_kernel_mapping(kboot_tag_core_t *core, ptr_t star
 	assert(!(end % PAGE_SIZE));
 
 	for(i = 0; i < (end - start); i += PAGE_SIZE) {
-		mmu_context_map(&kernel_mmu_context, start + i, phys + i, write, execute, MM_FATAL);
+		mmu_context_map(&kernel_mmu_context, start + i, phys + i, write, execute, MM_BOOT);
 	}
 
 	kprintf(LOG_DEBUG, "mmu: created kernel mapping [%p,%p) to [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (write: %d, exec: %d)\n",
@@ -658,13 +658,13 @@ __init_text void arch_mmu_init(void) {
 
 #if CONFIG_SMP
 	/* Reserve a low memory page for the AP bootstrap code. */
-	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_FATAL, &ap_bootstrap_page);
+	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
 #endif
 
 	/* Initialize the kernel MMU context structure. */
 	mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
 	kernel_mmu_context.invalidate_count = 0;
-	kernel_mmu_context.pml4 = alloc_structure(MM_FATAL);
+	kernel_mmu_context.pml4 = alloc_structure(MM_BOOT);
 
 	/* We require the core tag to get the kernel physical address. */
 	core = kboot_tag_iterate(KBOOT_TAG_CORE, NULL);
@@ -698,7 +698,7 @@ __init_text void arch_mmu_init(void) {
 
 	/* Create the physical map area. */
 	for(i = 0; i < highest_phys; i += 0x40000000) {
-		pdir = mmu_context_get_pdir(&kernel_mmu_context, i + KERNEL_PMAP_BASE, true, MM_FATAL);
+		pdir = mmu_context_get_pdir(&kernel_mmu_context, i + KERNEL_PMAP_BASE, true, MM_BOOT);
 		for(j = 0; j < 0x40000000; j += LARGE_PAGE_SIZE) {
 			pdir[j / LARGE_PAGE_SIZE] = (i + j) | X86_PTE_PRESENT | X86_PTE_WRITE |
 			                            X86_PTE_GLOBAL | X86_PTE_LARGE;

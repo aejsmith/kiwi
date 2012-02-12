@@ -115,7 +115,7 @@ static kmem_range_t *kmem_range_get(int mmflag) {
 		/* Split up this page into range structures. */
 		first = NULL;
 		for(i = 0; i < (PAGE_SIZE / sizeof(kmem_range_t)); i++) {
-			range = phys_map(page + (i * sizeof(kmem_range_t)), sizeof(kmem_range_t), MM_SLEEP);
+			range = phys_map(page + (i * sizeof(kmem_range_t)), sizeof(kmem_range_t), MM_WAIT);
 			list_init(&range->range_link);
 			list_init(&range->af_link);
 			range->allocated = 0;
@@ -345,9 +345,9 @@ ptr_t kmem_raw_alloc(size_t size, int mmflag) {
 	range = kmem_freelist_find(size);
 	if(unlikely(!range)) {
 		// TODO: Reclaim/wait for memory.
-		if(mmflag & MM_FATAL) {
+		if(mmflag & MM_BOOT) {
 			fatal("Exhausted kernel memory during boot");
-		} else if(mmflag & MM_SLEEP) {
+		} else if(mmflag & MM_WAIT) {
 			fatal("Oh god help");
 		}
 
@@ -447,9 +447,9 @@ void *kmem_alloc(size_t size, int mmflag) {
 	}
 
 	/* Zero the range if requested. */
-	//if(mmflag & MM_ZERO) {
-	//	memset((void *)ret, 0, size);
-	//}
+	if(mmflag & MM_ZERO) {
+		memset((void *)ret, 0, size);
+	}
 
 	mmu_context_unlock(&kernel_mmu_context);
 	return (void *)ret;
@@ -562,7 +562,7 @@ __init_text void kmem_init(void) {
 	}
 
 	/* Create the initial free range. */
-	range = kmem_range_get(MM_FATAL);
+	range = kmem_range_get(MM_BOOT);
 	range->addr = KERNEL_KMEM_BASE;
 	range->size = KERNEL_KMEM_SIZE;
 	list_append(&kmem_ranges, &range->range_link);
