@@ -198,7 +198,7 @@ int memcmp(const void *p1, const void *p2, size_t count) {
  * characters found before a NULL byte.
  *
  * @param str		Pointer to the string.
- * 
+ *
  * @return		Length of the string.
  */
 size_t strlen(const char *str) {
@@ -217,7 +217,7 @@ size_t strlen(const char *str) {
  *
  * @param str		Pointer to the string.
  * @param count		Maximum length of the string.
- * 
+ *
  * @return		Length of the string.
  */
 size_t strnlen(const char *str, size_t count) {
@@ -310,7 +310,7 @@ int strncasecmp(const char *s1, const char *s2, size_t count) {
  *
  * @param stringp	Pointer to a pointer to the string to separate.
  * @param delim		String containing all possible delimeters.
- * 
+ *
  * @return		NULL if stringp is NULL, otherwise a pointer to the
  *			token found.
  */
@@ -398,7 +398,7 @@ char *strstr(const char *s, const char *what) {
 
 /**
  * Strip whitespace from a string.
- * 
+ *
  * Strips whitespace from the start and end of a string. The string is modified
  * in-place.
  *
@@ -433,7 +433,7 @@ char *strstrip(char *str) {
  *
  * @param dest		Pointer to the destination buffer.
  * @param src		Pointer to the source buffer.
- * 
+ *
  * @return		The value specified for dest.
  */
 char *strcpy(char *restrict dest, const char *restrict src) {
@@ -452,12 +452,12 @@ char *strcpy(char *restrict dest, const char *restrict src) {
  * @param dest		Pointer to the destination buffer.
  * @param src		Pointer to the source buffer.
  * @param count		Maximum number of bytes to copy.
- * 
+ *
  * @return		The value specified for dest.
  */
 char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 	size_t i;
-	
+
 	for(i = 0; i < count; i++) {
 		dest[i] = src[i];
 		if(!src[i]) {
@@ -489,18 +489,18 @@ char *strcat(char *restrict dest, const char *restrict src) {
  *
  * @param src		Memory to duplicate.
  * @param count		Number of bytes to duplicate.
- * @param kmflag	Allocation flags for kmalloc().
+ * @param mmflag	Allocation behaviour flags.
  *
  * @return		Pointer to duplicated memory.
  */
-void *kmemdup(const void *src, size_t count, int kmflag) {
+void *kmemdup(const void *src, size_t count, int mmflag) {
 	char *dest;
 
 	if(count == 0) {
 		return NULL;
 	}
 
-	dest = kmalloc(count, kmflag);
+	dest = kmalloc(count, mmflag);
 	if(dest) {
 		memcpy(dest, src, count);
 	}
@@ -515,15 +515,15 @@ void *kmemdup(const void *src, size_t count, int kmflag) {
  * string to it. The memory returned should be freed with kfree().
  *
  * @param src		Pointer to the source buffer.
- * @param kmflag	Allocation flags for kmalloc().
- * 
+ * @param mmflag	Allocation behaviour flags.
+ *
  * @return		Pointer to the allocated buffer containing the string.
  */
-char *kstrdup(const char *src, int kmflag) {
+char *kstrdup(const char *src, int mmflag) {
 	size_t len = strlen(src) + 1;
 	char *dup;
 
-	dup = kmalloc(len, kmflag);
+	dup = kmalloc(len, mmflag);
 	if(dup) {
 		memcpy(dup, src, len);
 	}
@@ -542,16 +542,16 @@ char *kstrdup(const char *src, int kmflag) {
  *
  * @param src		Pointer to the source buffer.
  * @param n		Maximum number of bytes to copy.
- * @param kmflag	Allocation flags for kmalloc().
- * 
+ * @param mmflag	Allocation behaviour flags.
+ *
  * @return		Pointer to the allocated buffer containing the string.
  */
-char *kstrndup(const char *src, size_t n, int kmflag) {
+char *kstrndup(const char *src, size_t n, int mmflag) {
 	size_t len;
 	char *dup;
 
 	len = strnlen(src, n);
-	dup = kmalloc(len + 1, kmflag);
+	dup = kmalloc(len + 1, mmflag);
 	if(dup) {
 		memcpy(dup, src, len);
 		dup[len] = '\0';
@@ -567,23 +567,23 @@ char *kstrndup(const char *src, size_t n, int kmflag) {
  * given path.
  *
  * @param path		Pathname to parse.
- * @param kmflag	Allocation flags.
+ * @param mmflag	Allocation behaviour flags.
  *
  * @return		Pointer to string containing last component of path.
  *			The string returned is allocated via kmalloc(), so
  *			should be freed using kfree().
  */
-char *kbasename(const char *path, int kmflag) {
+char *kbasename(const char *path, int mmflag) {
 	char *ptr, *dup, *ret;
 	size_t len;
 
 	if(path == NULL || path[0] == 0 || (path[0] == '.' && path[1] == 0)) {
-		return kstrdup(".", kmflag);
+		return kstrdup(".", mmflag);
 	} else if(path[0] == '.' && path[1] == '.' && path[2] == 0) {
-		return kstrdup("..", kmflag);
+		return kstrdup("..", mmflag);
 	}
 
-	if(!(dup = kstrdup(path, kmflag))) {
+	if(!(dup = kstrdup(path, mmflag))) {
 		return NULL;
 	}
 
@@ -596,18 +596,18 @@ char *kbasename(const char *path, int kmflag) {
 	/* If length is now 0, the entire string was '/' characters. */
 	if(!len) {
 		kfree(dup);
-		return kstrdup("/", kmflag);
+		return kstrdup("/", mmflag);
 	}
 
 	if(!(ptr = strrchr(dup, '/'))) {
 		/* No '/' character in the string, that means what we have is
 		 * correct. Resize the allocation to the new length. */
-		if(!(ret = krealloc(dup, len + 1, kmflag))) {
+		if(!(ret = krealloc(dup, len + 1, mmflag))) {
 			kfree(dup);
 		}
 		return ret;
 	} else {
-		ret = kstrdup(ptr + 1, kmflag);
+		ret = kstrdup(ptr + 1, mmflag);
 		kfree(dup);
 		return ret;
 	}
@@ -620,23 +620,23 @@ char *kbasename(const char *path, int kmflag) {
  * component of the given path.
  *
  * @param path		Pathname to parse.
- * @param kmflag	Allocation flags.
+ * @param mmflag	Allocation behaviour flags.
  *
  * @return		Pointer to string. The string returned is allocated via
  *			kmalloc(), so should be freed using kfree().
  */
-char *kdirname(const char *path, int kmflag) {
+char *kdirname(const char *path, int mmflag) {
 	char *ptr, *dup, *ret;
 	size_t len;
 
 	if(path == NULL || path[0] == 0 || (path[0] == '.' && path[1] == 0)) {
-		return kstrdup(".", kmflag);
+		return kstrdup(".", mmflag);
 	} else if(path[0] == '.' && path[1] == '.' && path[2] == 0) {
-		return kstrdup(".", kmflag);
+		return kstrdup(".", mmflag);
 	}
 
 	/* Duplicate string to modify it. */
-	if(!(dup = kstrdup(path, kmflag))) {
+	if(!(dup = kstrdup(path, mmflag))) {
 		return NULL;
 	}
 
@@ -649,7 +649,7 @@ char *kdirname(const char *path, int kmflag) {
 	/* Look for last '/' character. */
 	if(!(ptr = strrchr(dup, '/'))) {
 		kfree(dup);
-		return kstrdup(".", kmflag);
+		return kstrdup(".", mmflag);
 	}
 
 	/* Strip off the character and any extras. */
@@ -660,8 +660,8 @@ char *kdirname(const char *path, int kmflag) {
 
 	if(!len) {
 		kfree(dup);
-		return kstrdup("/", kmflag);
-	} else if(!(ret = krealloc(dup, len + 1, kmflag))) {
+		return kstrdup("/", mmflag);
+	} else if(!(ret = krealloc(dup, len + 1, mmflag))) {
 		kfree(dup);
 	}
 	return ret;
