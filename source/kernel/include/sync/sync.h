@@ -24,6 +24,6 @@
 
 /** Behaviour flags for synchronization functions. */
 #define SYNC_INTERRUPTIBLE	(1<<0)	/**< Sleep should be interruptible. */
-//#define SYNC_ABSOLUTE		(1<<1)	/**< Specified timeout is absolute, not relative to current time. */
+#define SYNC_ABSOLUTE		(1<<1)	/**< Specified timeout is absolute, not relative to current time. */
 
 #endif /* __SYNC_SYNC_H */

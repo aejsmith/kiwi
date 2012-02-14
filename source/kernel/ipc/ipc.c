@@ -144,6 +144,21 @@ static void ipc_port_ctor(void *obj, void *data) {
 	notifier_init(&port->conn_notifier, port);
 }
 
+/** Wake all threads waiting on a semaphore.
+ * @param sem		Semaphore to wake up on. */
+static void semaphore_wake_all(semaphore_t *sem) {
+	thread_t *thread;
+
+	spinlock_lock(&sem->lock);
+
+	while(!list_empty(&sem->threads)) {
+		thread = list_first(&sem->threads, thread_t, wait_link);
+		thread_wake(thread);
+	}
+
+	spinlock_unlock(&sem->lock);
+}
+
 /** Release an IPC port object.
  * @param port		Port to release. */
 static void ipc_port_release(ipc_port_t *port) {
@@ -173,8 +188,8 @@ static void ipc_port_release(ipc_port_t *port) {
 			mutex_lock(&conn->lock);
 
 			for(i = 0; i < 2; i++) {
-				waitq_wake_all(&conn->endpoints[i].space_sem.queue);
-				waitq_wake_all(&conn->endpoints[i].data_sem.queue);
+				semaphore_wake_all(&conn->endpoints[i].space_sem);
+				semaphore_wake_all(&conn->endpoints[i].data_sem);
 				notifier_run(&conn->endpoints[i].hangup_notifier, NULL, false);
 				conn->endpoints[i].remote = NULL;
 			}
@@ -289,8 +304,8 @@ static void connection_object_close(object_handle_t *handle) {
 	 * waiting for space on this end or messages on the remote end. They
 	 * will detect that we have set remote to NULL and return an error. */
 	if(endpoint->remote) {
-		waitq_wake_all(&endpoint->space_sem.queue);
-		waitq_wake_all(&endpoint->remote->data_sem.queue);
+		semaphore_wake_all(&endpoint->space_sem);
+		semaphore_wake_all(&endpoint->remote->data_sem);
 		notifier_run(&endpoint->remote->hangup_notifier, NULL, false);
 		endpoint->remote->remote = NULL;
 		endpoint->remote = NULL;
@@ -783,7 +798,6 @@ status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf, s
 	ipc_endpoint_t *endpoint = NULL;
 	ipc_message_t *message;
 	status_t ret;
-	bool state;
 
 	if((!buf && size) || size > IPC_MESSAGE_MAX) {
 		return STATUS_INVALID_ARG;
@@ -813,13 +827,16 @@ status_t kern_connection_send(handle_t handle, uint32_t type, const void *buf, s
 	 * be atomic in order to interact properly with connection_object_close().
 	 * FIXME: Should integrate this in the semaphore API. */
 	if(endpoint->remote) {
-		state = waitq_sleep_prepare(&endpoint->remote->space_sem.queue);
+		spinlock_lock(&endpoint->remote->space_sem.lock);
 		if(endpoint->remote->space_sem.count) {
 			--endpoint->remote->space_sem.count;
-			waitq_sleep_cancel(&endpoint->remote->space_sem.queue, state);
+			spinlock_unlock(&endpoint->remote->space_sem.lock);
 		} else {
 			mutex_unlock(&endpoint->conn->lock);
-			ret = waitq_sleep_unsafe(&endpoint->remote->space_sem.queue, -1, SYNC_INTERRUPTIBLE, state);
+			list_append(&endpoint->remote->space_sem.threads, &curr_thread->wait_link);
+			ret = thread_sleep(&endpoint->remote->space_sem.lock, -1,
+			                   endpoint->remote->space_sem.name,
+			                   SYNC_INTERRUPTIBLE);
 			mutex_lock(&endpoint->conn->lock);
 			if(ret != STATUS_SUCCESS) {
 				goto fail;
@@ -858,7 +875,6 @@ fail:
  * @return		Status code describing result of the operation. */
 static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, ipc_message_t **messagep) {
 	status_t ret;
-	bool state;
 
 	/* Check if anything can send us a message. */
 	if(!endpoint->remote) {
@@ -868,13 +884,15 @@ static status_t wait_for_message(ipc_endpoint_t *endpoint, useconds_t timeout, i
 	/* Wait for data in our message queue. The unlock/wait needs to be
 	 * atomic in order to interact properly with connection_object_close().
 	 * FIXME: Integrate this in semaphore API. */
-	state = waitq_sleep_prepare(&endpoint->data_sem.queue);
+	spinlock_lock(&endpoint->data_sem.lock);
 	if(endpoint->data_sem.count) {
 		--endpoint->data_sem.count;
-		waitq_sleep_cancel(&endpoint->data_sem.queue, state);
+		spinlock_unlock(&endpoint->data_sem.lock);
 	} else {
 		mutex_unlock(&endpoint->conn->lock);
-		ret = waitq_sleep_unsafe(&endpoint->data_sem.queue, timeout, SYNC_INTERRUPTIBLE, state);
+		list_append(&endpoint->data_sem.threads, &curr_thread->wait_link);
+		ret = thread_sleep(&endpoint->data_sem.lock, -1, endpoint->data_sem.name,
+		                   SYNC_INTERRUPTIBLE);
 		mutex_lock(&endpoint->conn->lock);
 		if(ret != STATUS_SUCCESS) {
 			return ret;
@@ -1069,7 +1087,7 @@ static kdb_status_t kdb_cmd_port(int argc, char **argv, kdb_filter_t *filter) {
 		kdb_printf("Port %p(%d)\n", port, port->id);
 		kdb_printf("=================================================\n");
 
-		kdb_printf("Locked:  %d (%" PRId32 ")\n", atomic_get(&port->lock.locked),
+		kdb_printf("Locked:  %d (%" PRId32 ")\n", atomic_get(&port->lock.value),
 		        (port->lock.holder) ? port->lock.holder->id : -1);
 		kdb_printf("Count:   %d\n", refcount_get(&port->count));
 		kdb_printf("Waiting (%u):\n", semaphore_count(&port->conn_sem));
@@ -1119,7 +1137,7 @@ static kdb_status_t kdb_cmd_endpoint(int argc, char **argv, kdb_filter_t *filter
 	kdb_printf("Endpoint %p\n", endpoint);
 	kdb_printf("=================================================\n");
 
-	kdb_printf("Locked: %d (%p) (%" PRId32 ")\n", atomic_get(&endpoint->conn->lock.locked),
+	kdb_printf("Locked: %d (%p) (%" PRId32 ")\n", atomic_get(&endpoint->conn->lock.value),
 	        (endpoint->conn->lock.holder) ? endpoint->conn->lock.holder->id : -1);
 	kdb_printf("Space:  %u\n", semaphore_count(&endpoint->space_sem));
 	kdb_printf("Data:   %u\n", semaphore_count(&endpoint->data_sem));

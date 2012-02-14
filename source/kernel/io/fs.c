@@ -2546,7 +2546,7 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 		kdb_printf("Count:   %d\n", refcount_get(&node->count));
 		if(node->mount) {
 			kdb_printf("Mount:   %p (Locked: %d (%" PRId32 "))\n", node->mount,
-			           atomic_get(&node->mount->lock.locked),
+			           atomic_get(&node->mount->lock.value),
 			           (node->mount->lock.holder) ? node->mount->lock.holder->id : -1);
 		} else {
 			kdb_printf("Mount:   %p\n", node->mount);

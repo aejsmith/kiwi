@@ -34,13 +34,13 @@
 #include <lib/refcount.h>
 
 #include <sync/spinlock.h>
+#include <sync/sync.h>
 
 #include <cpu.h>
 #include <object.h>
 #include <time.h>
 
 struct process;
-struct waitq;
 
 /** Entry function for a thread. */
 typedef void (*thread_func_t)(void *, void *);
@@ -83,7 +83,8 @@ typedef struct thread {
 	unsigned flags;			/**< Flags for the thread. */
 	int priority;			/**< Priority of the thread. */
 	size_t wired;			/**< How many calls to thread_wire() have been made. */
-	bool killed;			/**< Whether thread_kill() has been called on the thread. */
+	size_t preempt_disabled;	/**< Whether preemption is disabled. */
+	bool missed_preempt;		/**< Whether preemption was missed due to being disabled. */
 
 	/** Scheduling information. */
 	list_t runq_link;		/**< Link to run queues. */
@@ -91,16 +92,13 @@ typedef struct thread {
 	int curr_prio;			/**< Current scheduling priority. */
 	cpu_t *cpu;			/**< CPU that the thread runs on. */
 	useconds_t timeslice;		/**< Current timeslice. */
-	size_t preempt_disabled;	/**< Whether preemption is disabled. */
-	bool missed_preempt;		/**< Whether preemption was missed due to being disabled. */
 
 	/** Sleeping information. */
-	list_t waitq_link;		/**< Link to wait queue. */
-	struct waitq *waitq;		/**< Wait queue that the thread is sleeping on. */
-	bool interruptible;		/**< Whether the sleep can be interrupted. */
-	timer_t sleep_timer;		/**< Timer for sleep timeout. */
-	status_t sleep_status;		/**< Sleeping status. */
-	bool rwlock_writer;		/**< Whether the thread wants exclusive access to an rwlock. */
+	list_t wait_link;		/**< Link to a waiting list. */
+	timer_t sleep_timer;		/**< Sleep timeout timer. */
+	status_t sleep_status;		/**< Sleep status (timed out/interrupted). */
+	spinlock_t *wait_lock;		/**< Lock for the waiting list. */
+	const char *waiting_on;		/**< What is being waited on (for informational purposes). */
 
 	/** Accounting information. */
 	useconds_t last_time;		/**< Time that the thread entered/left the kernel. */
@@ -143,6 +141,12 @@ typedef struct thread {
 	list_t owner_link;		/**< Link to parent process. */
 } thread_t;
 
+/** Internal flags for a thread (do not set these). */
+#define THREAD_INTERRUPTIBLE	(1<<0)	/**< Thread is in an interruptible sleep. */
+#define THREAD_INTERRUPTED	(1<<1)	/**< Thread has been interrupted. */
+#define THREAD_KILLED		(1<<2)	/**< Thread has been killed. */
+#define THREAD_RWLOCK_WRITER	(1<<3)	/**< Thread is blocked on an rwlock for writing. */
+
 /** Macro that expands to a pointer to the current thread. */
 #define curr_thread		(curr_cpu->thread)
 
@@ -159,6 +163,7 @@ extern void thread_retain(thread_t *thread);
 extern void thread_release(thread_t *thread);
 extern void thread_wire(thread_t *thread);
 extern void thread_unwire(thread_t *thread);
+extern void thread_wake(thread_t *thread);
 extern bool thread_interrupt(thread_t *thread);
 extern void thread_kill(thread_t *thread);
 extern void thread_rename(thread_t *thread, const char *name);
@@ -166,6 +171,7 @@ extern void thread_rename(thread_t *thread, const char *name);
 extern void thread_preempt(void);
 extern void thread_disable_preempt(void);
 extern void thread_enable_preempt(void);
+extern status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, int flags);
 extern void thread_yield(void);
 extern void thread_at_kernel_entry(void);
 extern void thread_at_kernel_exit(void);

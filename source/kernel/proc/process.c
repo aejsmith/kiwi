@@ -102,7 +102,7 @@ process_t *kernel_proc = NULL;
 /** Constructor for process objects.
  * @param obj		Pointer to object.
  * @param data		Ignored. */
-static void process_cache_ctor(void *obj, void *data) {
+static void process_ctor(void *obj, void *data) {
 	process_t *process = (process_t *)obj;
 
 	mutex_init(&process->lock, "process_lock", 0);
@@ -788,9 +788,8 @@ __init_text void process_init(void) {
 	id_alloc_reserve(&process_id_allocator, 0);
 
 	/* Create the process slab cache. */
-	process_cache = slab_cache_create("process_cache", sizeof(process_t), 0,
-	                                  process_cache_ctor, NULL, NULL, 0,
-	                                  MM_BOOT);
+	process_cache = slab_cache_create("process_cache", SLAB_SIZE_ALIGN(process_t),
+	                                  process_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);

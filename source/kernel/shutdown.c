@@ -80,7 +80,6 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 /** Shut down the system.
  * @param action	Action to perform once the system has been shut down. */
 void system_shutdown(int action) {
-	WAITQ_DECLARE(shutdown_wait);
 	status_t ret;
 
 	if(!shutdown_in_progress) {
@@ -105,7 +104,7 @@ void system_shutdown(int action) {
 	if(curr_proc != kernel_proc) {
 		/* The process shutdown code will interrupt us when it wants to
 		 * kill this thread. */
-		waitq_sleep(&shutdown_wait, -1, SYNC_INTERRUPTIBLE);
+		thread_sleep(NULL, -1, "system_shutdown", SYNC_INTERRUPTIBLE);
 		thread_exit();
 	}
 }

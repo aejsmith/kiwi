@@ -82,7 +82,7 @@ static void lrm_thread_func(void *arg1, void *arg2) {
 	while(true) {
 		/* Wait either for the check interval, or until a call to
 		 * lrm_reclaim() requests that we run. */
-		condvar_wait_etc(&lrm_request_cvar, NULL, NULL, LRM_INTERVAL, 0);
+		condvar_wait_etc(&lrm_request_cvar, NULL, LRM_INTERVAL, 0);
 
 		/* Invoke handlers that can reclaim any resource types that are
 		 * not currently at an OK level. TODO: Should only move onto
@@ -214,7 +214,7 @@ void lrm_reclaim(uint32_t type) {
 	/* Wake the thread and wait for it to finish. */
 	mutex_lock(&lrm_response_lock);
 	condvar_broadcast(&lrm_request_cvar);
-	condvar_wait(&lrm_response_cvar, &lrm_response_lock, NULL);
+	condvar_wait(&lrm_response_cvar, &lrm_response_lock);
 	mutex_unlock(&lrm_response_lock);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,8 +16,10 @@
 
 /**
  * @file
- * @brief		Condition variable code.
+ * @brief		Condition variable implementation.
  */
+
+#include <proc/thread.h>
 
 #include <sync/condvar.h>
 
@@ -26,52 +28,45 @@
 /**
  * Wait for a condition to become true.
  *
- * Atomically unlocks a mutex or spinlock and then blocks until a condition
- * becomes true. The specified mutex/spinlock should be held by the calling
- * thread. When the function returns (upon both failure and success) the
- * mutex/spinlock will be held again by the calling thread. A condition becomes
- * true when either condvar_signal() or condvar_broadcast() is called on it.
- *
- * @note		You must not specify both a mutex and a spinlock. You
- *			can, however, specify neither.
+ * Atomically releases a mutex and then blocks until a condition becomes true.
+ * The specified mutex should be held by the calling thread. When the function
+ * returns (both for success and failure), the mutex will be held again by the
+ * calling thread. A condition becomes true when either condvar_signal() or
+ * condvar_broadcast() is called on it.
  *
  * @param cv		Condition variable to wait on.
- * @param mtx		Mutex to unlock/relock.
- * @param sl		Spinlock to unlock/relock.
- * @param timeout	Timeout in microseconds. If 0 is specified, then the
- *			function will return an error immediately. If -1, it
- *			will block indefinitely until the condition becomes
- *			true.
+ * @param mutex		Mutex to atomically release while waiting.
+ * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ *			will always be taken to be a system time at which the
+ *			sleep will time out. Otherwise, taken as the number of
+ *			microseconds in which the sleep will time out. If 0 is
+ *			specified, the function will return an error immediately
+ *			if the lock is currently held by another thread. If -1
+ *			is specified, the thread will sleep indefinitely until
+ *			woken or interrupted.
  * @param flags		Synchronization flags.
  *
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set.
  */
-status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_t timeout, int flags) {
+status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, useconds_t timeout, int flags) {
 	status_t ret;
-	bool state;
 
-	assert(!(mtx && sl));
+	spinlock_lock(&cv->lock);
 
-	/* Acquire the wait queue lock and disable interrupts, then release
-	 * the specified lock. */
-	state = waitq_sleep_prepare(&cv->queue);
-	if(mtx) {
-		mutex_unlock(mtx);
-	} else if(sl) {
-		assert(!state);
-		spinlock_unlock_ni(sl);
+	/* Release the specfied lock. */
+	if(mutex) {
+		mutex_unlock(mutex);
 	}
 
 	/* Go to sleep. */
-	ret = waitq_sleep_unsafe(&cv->queue, timeout, flags, state);
+	list_append(&cv->threads, &curr_thread->wait_link);
+	ret = thread_sleep(&cv->lock, timeout, cv->name, flags);
 
 	/* Re-acquire the lock. */
-	if(mtx) {
-		mutex_lock(mtx);
-	} else if(sl) {
-		spinlock_lock_ni(sl);
+	if(mutex) {
+		mutex_lock(mutex);
 	}
 
 	return ret;
@@ -80,19 +75,17 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_
 /**
  * Wait for a condition to become true.
  *
- * Atomically unlocks a mutex or spinlock and then blocks until a condition
- * becomes true. The specified mutex/spinlock should be held by the calling
- * thread. When the function returns the mutex/spinlock will be held again by
- * the calling thread. A condition becomes true when either condvar_signal()
- * or condvar_broadcast() is called on it.
+ * Atomically releases a mutex and then blocks until a condition becomes true.
+ * The specified mutex should be held by the calling thread. When the function
+ * returns the mutex will be held again by the calling thread. A condition
+ * becomes true when either condvar_signal() or condvar_broadcast() is called
+ * on it.
  *
  * @param cv		Condition variable to wait on.
- * @param mtx		Mutex to unlock/relock.
- * @param sl		Spinlock to unlock/relock. Must not specify both mutex
- *			and spinlock.
+ * @param mutex		Mutex to atomically release while waiting.
  */
-void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl) {
-	condvar_wait_etc(cv, mtx, sl, -1, 0);
+void condvar_wait(condvar_t *cv, mutex_t *mutex) {
+	condvar_wait_etc(cv, mutex, -1, 0);
 }
 
 /**
@@ -106,7 +99,19 @@ void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl) {
  * @return		Whether a thread was woken.
  */
 bool condvar_signal(condvar_t *cv) {
-	return waitq_wake(&cv->queue);
+	thread_t *thread;
+	bool ret = false;
+
+	spinlock_lock(&cv->lock);
+
+	ret = list_empty(&cv->threads);
+	if(ret) {
+		thread = list_first(&cv->threads, thread_t, wait_link);
+		thread_wake(thread);
+	}
+
+	spinlock_unlock(&cv->lock);
+	return ret;
 }
 
 /**
@@ -120,12 +125,29 @@ bool condvar_signal(condvar_t *cv) {
  * @return		Whether any threads were woken.
  */
 bool condvar_broadcast(condvar_t *cv) {
-	return waitq_wake_all(&cv->queue);
+	thread_t *thread;
+	bool ret = false;
+
+	spinlock_lock(&cv->lock);
+
+	if(!list_empty(&cv->threads)) {
+		ret = true;
+
+		while(!list_empty(&cv->threads)) {
+			thread = list_first(&cv->threads, thread_t, wait_link);
+			thread_wake(thread);
+		}
+	}
+
+	spinlock_unlock(&cv->lock);
+	return ret;
 }
 
 /** Initialize a condition variable.
  * @param cv		Condition variable to initialize.
  * @param name		Name to give the condition variable. */
 void condvar_init(condvar_t *cv, const char *name) {
-	waitq_init(&cv->queue, name);
+	spinlock_init(&cv->lock, "condvar_lock");
+	list_init(&cv->threads);
+	cv->name = name;
 }

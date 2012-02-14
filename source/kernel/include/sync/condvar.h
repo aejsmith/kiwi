@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,32 +16,36 @@
 
 /**
  * @file
- * @brief		Condition variable code.
+ * @brief		Condition variable implementation.
  */
 
 #ifndef __SYNC_CONDVAR_H
 #define __SYNC_CONDVAR_H
 
 #include <sync/mutex.h>
-#include <sync/waitq.h>
+#include <sync/spinlock.h>
 
 /** Structure containing a condition variable. */
 typedef struct condvar {
-	waitq_t queue;			/**< Wait queue implementing the condition variable. */
+	spinlock_t lock;		/**< Lock to protect the thread list. */
+	list_t threads;			/**< List of waiting threads. */
+	const char *name;		/**< Name of the condition variable. */
 } condvar_t;
 
 /** Initializes a statically declared condition variable. */
 #define CONDVAR_INITIALIZER(_var, _name)	\
 	{ \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
+		.lock = SPINLOCK_INITIALIZER("condvar_lock"), \
+		.threads = LIST_INITIALIZER(_var.threads), \
+		.name = _name, \
 	}
 
 /** Statically declares a new condition variable. */
 #define CONDVAR_DECLARE(_var)			\
 	condvar_t _var = CONDVAR_INITIALIZER(_var, #_var)
 
-extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *mtx, spinlock_t *sl, useconds_t timeout, int flags);
-extern void condvar_wait(condvar_t *cv, mutex_t *mtx, spinlock_t *sl);
+extern status_t condvar_wait_etc(condvar_t *cv, mutex_t *lock, useconds_t timeout, int flags);
+extern void condvar_wait(condvar_t *cv, mutex_t *mutex);
 extern bool condvar_signal(condvar_t *cv);
 extern bool condvar_broadcast(condvar_t *cv);
 

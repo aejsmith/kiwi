@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,13 +22,17 @@
 #ifndef __SYNC_RWLOCK_H
 #define __SYNC_RWLOCK_H
 
-#include <sync/waitq.h>
+#include <lib/list.h>
+
+#include <sync/spinlock.h>
 
 /** Structure containing a readers-writer lock. */
 typedef struct rwlock {
-	int held;			/**< Whether the lock is held. */
+	unsigned held;			/**< Whether the lock is held. */
 	size_t readers;			/**< Number of readers holding the lock. */
-	waitq_t queue;			/**< Queue to sleep on. */
+	spinlock_t lock;		/**< Lock to protect the thread list. */
+	list_t threads;			/**< List of waiting threads. */
+	const char *name;		/**< Name of the lock. */
 } rwlock_t;
 
 /** Initializes a statically declared readers-writer lock. */
@@ -36,7 +40,9 @@ typedef struct rwlock {
 	{ \
 		.held = 0, \
 		.readers = 0, \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
+		.lock = SPINLOCK_INITIALIZER("rwlock_lock"), \
+		.threads = LIST_INITIALIZER(_var.threads), \
+		.name = _name, \
 	}
 
 /** Statically declares a new readers-writer lock. */

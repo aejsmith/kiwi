@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,19 +22,25 @@
 #ifndef __SYNC_SEMAPHORE_H
 #define __SYNC_SEMAPHORE_H
 
-#include <sync/waitq.h>
+#include <lib/list.h>
+
+#include <sync/spinlock.h>
 
 /** Structure containing a semaphore. */
 typedef struct semaphore {
 	size_t count;			/**< Count of the semaphore. */
-	waitq_t queue;			/**< Queue for threads to wait on. */
+	spinlock_t lock;		/**< Lock to protect the thread list. */
+	list_t threads;			/**< List of waiting threads. */
+	const char *name;		/**< Name of the semaphore. */
 } semaphore_t;
 
 /** Initializes a statically declared semaphore. */
 #define SEMAPHORE_INITIALIZER(_var, _name, _initial)	\
 	{ \
 		.count = _initial, \
-		.queue = WAITQ_INITIALIZER(_var.queue, _name), \
+		.lock = SPINLOCK_INITIALIZER("semaphore_lock"), \
+		.threads = LIST_INITIALIZER(_var.threads), \
+		.name = _name, \
 	}
 
 /** Statically declares a new semaphore. */

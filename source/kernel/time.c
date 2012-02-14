@@ -29,8 +29,6 @@
 #include <proc/signal.h>
 #include <proc/thread.h>
 
-#include <sync/waitq.h>
-
 #include <assert.h>
 #include <cpu.h>
 #include <dpc.h>
@@ -363,14 +361,16 @@ void spin(useconds_t us) {
  * @param interruptible	Whether the sleep should be interruptible.
  * @return		Status code describing result of the operation. */
 status_t usleep_etc(useconds_t us, bool interruptible) {
-	waitq_t queue;
 	status_t ret;
 
 	assert(us >= 0);
 
-	waitq_init(&queue, "usleep");
-	ret = waitq_sleep(&queue, us, (interruptible) ? SYNC_INTERRUPTIBLE : 0);
-	return (ret == STATUS_WOULD_BLOCK || ret == STATUS_TIMED_OUT) ? 0 : ret;
+	ret = thread_sleep(NULL, us, "usleep", (interruptible) ? SYNC_INTERRUPTIBLE : 0);
+	if(likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK)) {
+		ret = STATUS_SUCCESS;
+	}
+
+	return ret;
 }
 
 /** Sleep for a certain amount of time.

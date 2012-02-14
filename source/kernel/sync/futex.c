@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,7 +44,6 @@
 
 #include <sync/futex.h>
 #include <sync/mutex.h>
-#include <sync/waitq.h>
 
 #include <assert.h>
 #include <kernel.h>
@@ -54,7 +53,8 @@
 typedef struct futex {
 	phys_ptr_t phys;		/**< Physical address of futex. */
 	refcount_t count;		/**< Number of processes referring to the futex. */
-	waitq_t queue;			/**< Queue for waiting on the futex. */
+	spinlock_t lock;		/**< Lock for the futex. */
+	list_t threads;			/**< List of threads waiting on the futex. */
 	avl_tree_node_t tree_link;	/**< Link to global futex tree. */
 } futex_t;
 
@@ -70,7 +70,9 @@ static MUTEX_DECLARE(futex_tree_lock, 0);
  * @param data		Unused. */
 static void futex_ctor(void *obj, void *data) {
 	futex_t *futex = obj;
-	waitq_init(&futex->queue, "futex_queue");
+
+	spinlock_init(&futex->lock, "futex_lock");
+	list_init(&futex->threads);
 }
 
 /** Clean up a process' futexes.
@@ -188,7 +190,6 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	int32_t *mapping;
 	futex_t *futex;
 	status_t ret;
-	bool state;
 
 	/* Find the futex. */
 	futex = futex_lookup(addr);
@@ -202,15 +203,15 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 	thread_wire(curr_thread);
 	mapping = phys_map(futex->phys, sizeof(*mapping), MM_WAIT);
 
-	/* Prepare to sleep on the queue. */
-	state = waitq_sleep_prepare(&futex->queue);
+	spinlock_lock(&futex->lock);
 
 	/* Now check the value to see if it has changed (see parameter
 	 * description above). */
 	if(*mapping == val) {
-		ret = waitq_sleep_unsafe(&futex->queue, timeout, SYNC_INTERRUPTIBLE, state);
+		list_append(&futex->threads, &curr_thread->wait_link);
+		ret = thread_sleep(&futex->lock, timeout, "futex", SYNC_INTERRUPTIBLE);
 	} else {
-		waitq_sleep_cancel(&futex->queue, state);
+		spinlock_unlock(&futex->lock);
 		ret = STATUS_TRY_AGAIN;
 	}
 
@@ -226,6 +227,7 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
  * @return		Status code describing result of the operation. */
 status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	size_t woken = 0;
+	thread_t *thread;
 	futex_t *futex;
 
 	if(!count) {
@@ -238,19 +240,25 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 		return STATUS_INVALID_ADDR;
 	}
 
+	spinlock_lock(&futex->lock);
+
 	/* Wake the threads. */
 	while(count--) {
-		if(!waitq_wake(&futex->queue)) {
+		if(list_empty(&futex->threads)) {
 			break;
 		}
+
+		thread = list_first(&futex->threads, thread_t, wait_link);
+		thread_wake(thread);
 		woken++;
 	}
 
 	/* Store the number of woken threads if requested. */
 	if(wokenp) {
 		return memcpy_to_user(wokenp, &woken, sizeof(*wokenp));
+	} else {
+		return STATUS_SUCCESS;
 	}
-	return STATUS_SUCCESS;
 }
 
 /** Initialize the futex cache. */

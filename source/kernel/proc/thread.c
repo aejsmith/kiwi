@@ -17,6 +17,34 @@
 /**
  * @file
  * @brief		Thread management code.
+ *
+ * Below is a brief description of the design for certain parts of the
+ * thread management code that require further explanation.
+ *
+ * Threads contain a reference count to determine when they can safely be
+ * freed. When a thread is started running, it is given a reference to indicate
+ * that it cannot be freed. Handles to threads and thread pointers in the
+ * kernel returned by thread_create() and thread_lookup() add additional
+ * references. When a thread exits, the scheduler queues it to its reaper
+ * thread, which calls thread_release() on the thread to drop the reference,
+ * and if it reaches 0 (i.e. there are no handles/pointers to it left), it will
+ * be immediately destroyed.
+ *
+ * Thread interruption is handled using the THREAD_INTERRUPTIBLE and
+ * THREAD_INTERRUPTED flags. When a thread goes into interruptible sleep, its
+ * THREAD_INTERRUPTIBLE flag is set. When thread_interrupt() is called on a
+ * thread, that flag is checked. If it is set, the sleep will be interrupted
+ * causing the thread's thread_sleep() call to return an error. Otherwise,
+ * the THREAD_INTERRUPTED flag will be set. This flag is checked by
+ * thread_sleep() when entering interruptible sleep. If it is set then the call
+ * returns error immediately. The flag is cleared at kernel exit. The result of
+ * all of this is that if a thread is interrupted while in the kernel but not
+ * in interruptible sleep, the interrupt will be handled as soon as the thread
+ * reaches a point where it can be interrupted.
+ *
+ * Threads are killed by setting the THREAD_KILLED flag and interrupting the
+ * thread. The THREAD_KILLED flag is checked upon exit from the kernel, and
+ * upon entry for a system call. If it is set, the thread will exit.
  */
 
 #include <arch/memory.h>
@@ -36,8 +64,6 @@
 #include <proc/thread.h>
 
 #include <sync/mutex.h>
-#include <sync/semaphore.h>
-#include <sync/waitq.h>
 
 #include <assert.h>
 #include <cpu.h>
@@ -57,7 +83,6 @@
 #define DEFAULT_THREAD_RIGHTS_OWNER	(THREAD_RIGHT_QUERY | THREAD_RIGHT_SIGNAL)
 #define DEFAULT_THREAD_RIGHTS_OTHERS	(THREAD_RIGHT_QUERY)
 
-extern void thread_wake(thread_t *thread);
 static bool thread_timeout(void *_thread);
 
 /** Tree of all threads. */
@@ -73,13 +98,13 @@ static slab_cache_t *thread_cache;
 /** Constructor for thread objects.
  * @param obj		Pointer to object.
  * @param data		Ignored. */
-static void thread_cache_ctor(void *obj, void *data) {
+static void thread_ctor(void *obj, void *data) {
 	thread_t *thread = (thread_t *)obj;
 
 	spinlock_init(&thread->lock, "thread_lock");
 	refcount_set(&thread->count, 0);
 	list_init(&thread->runq_link);
-	list_init(&thread->waitq_link);
+	list_init(&thread->wait_link);
 	list_init(&thread->owner_link);
 	timer_init(&thread->sleep_timer, thread_timeout, thread, 0);
 	notifier_init(&thread->death_notifier, thread);
@@ -104,7 +129,7 @@ static void thread_trampoline(void) {
 }
 
 /** Entry function for a userspace thread.
- * @param _args		Argument structure pointer.
+ * @param _args		Argument structure pointer (will be freed).
  * @param arg2		Unused. */
 void thread_uspace_trampoline(void *_args, void *arg2) {
 	thread_uspace_args_t *args = _args;
@@ -166,50 +191,6 @@ static object_type_t thread_object_type = {
 	.wait = thread_object_wait,
 	.unwait = thread_object_unwait,
 };
-
-/** Wake up a sleeping thread.
- * @note		Thread and its wait queue should be locked.
- * @param thread	Thread to wake up. */
-void thread_wake(thread_t *thread) {
-	assert(thread->state == THREAD_SLEEPING);
-	assert(spinlock_held(&thread->lock));
-	assert(spinlock_held(&thread->waitq->lock));
-
-	/* Stop the timer. */
-	timer_stop(&thread->sleep_timer);
-
-	/* Remove the thread from the queue and wake it up. */
-	list_remove(&thread->waitq_link);
-	thread->waitq = NULL;
-	thread->interruptible = false;
-
-	thread->state = THREAD_READY;
-	sched_insert_thread(thread);
-}
-
-/** Sleep timeout handler.
- * @param _thread	Pointer to thread to wake. */
-static bool thread_timeout(void *_thread) {
-	thread_t *thread = _thread;
-	waitq_t *queue;
-
-	spinlock_lock(&thread->lock);
-
-	/* The thread could have been woken up already by another CPU. */
-	if(thread->state == THREAD_SLEEPING) {
-		/* Set the wake reason. */
-		thread->sleep_status = STATUS_TIMED_OUT;
-
-		/* Remove the thread from the wait queue. */
-		queue = thread->waitq;
-		spinlock_lock(&queue->lock);
-		thread_wake(thread);
-		spinlock_unlock(&queue->lock);
-	}
-
-	spinlock_unlock(&thread->lock);
-	return false;
-}
 
 /**
  * Increase the reference count of a thread.
@@ -312,44 +293,136 @@ void thread_unwire(thread_t *thread) {
 	}
 }
 
-/** Internal part of thread_interrupt().
- * @param thread	Thread to interrupt (must be locked).
- * @return		Whether the thread was interrupted. */
-static bool thread_interrupt_unsafe(thread_t *thread) {
-	waitq_t *queue;
+/** Internal part of thread_wake().
+ * @param thread	Thread to wake up. */
+static void thread_wake_unsafe(thread_t *thread) {
+	assert(thread->state == THREAD_SLEEPING);
+	assert(!thread->wait_lock || spinlock_held(thread->wait_lock));
 
-	if(thread->state == THREAD_SLEEPING && thread->interruptible) {
-		thread->sleep_status = STATUS_INTERRUPTED;
+	/* Stop the timer. */
+	timer_stop(&thread->sleep_timer);
 
-		queue = thread->waitq;
-		spinlock_lock(&queue->lock);
-		thread_wake(thread);
-		spinlock_unlock(&queue->lock);
+	/* Remove the thread from the list and wake it up. */
+	list_remove(&thread->wait_link);
+	thread->flags &= ~THREAD_INTERRUPTIBLE;
+	thread->wait_lock = NULL;
 
-		return true;
-	} else {
-		return false;
+	thread->state = THREAD_READY;
+	sched_insert_thread(thread);
+}
+
+/** Sleep timeout handler.
+ * @param _thread	Pointer to thread to wake.
+ * @return		Whether to preempt. */
+static bool thread_timeout(void *_thread) {
+	thread_t *thread = _thread;
+	spinlock_t *lock;
+
+	/* To maintain the correct locking order and prevent deadlock, we must
+	 * take the wait lock before the thread lock. */
+	lock = thread->wait_lock;
+	if(lock) {
+		spinlock_lock(lock);
 	}
+
+	spinlock_lock(&thread->lock);
+
+	/* The thread could have been woken up already by another CPU. */
+	if(thread->state == THREAD_SLEEPING) {
+		thread->sleep_status = STATUS_TIMED_OUT;
+		thread_wake_unsafe(thread);
+	}
+
+	spinlock_unlock(&thread->lock);
+
+	if(lock) {
+		spinlock_unlock(lock);
+	}
+
+	return false;
 }
 
 /**
- * Interrupt a thread.
+ * Wake up a sleeping thread.
  *
- * If the specified thread is in interruptible sleep, causes it to be woken and
- * to return an error from the sleep call.
+ * Wakes up a thread that is currently asleep. This function is for use in the
+ * implementation of synchronization mechanisms, never call it manually. If you
+ * wish to interrupt a thread, use thread_interrupt() which will wake the
+ * thread only if it has specified that it can be interrupted. The lock that
+ * thread_sleep() was called with (if any) must be held. The thread will be
+ * removed from any wait list it is attached to.
+ *
+ * @param thread	Thread to wake up.
+ */
+void thread_wake(thread_t *thread) {
+	spinlock_lock(&thread->lock);
+	thread_wake_unsafe(thread);
+	spinlock_unlock(&thread->lock);
+}
+
+/** Internal part of thread_interrupt().
+ * @param thread	Thread to interrupt.
+ * @param flags		Extra flags to set.
+ * @return		Whether the thread was interrupted. */
+static bool thread_interrupt_internal(thread_t *thread, unsigned flags) {
+	spinlock_t *lock;
+	bool ret = false;
+
+	/* Correct locking order, see thread_timeout(). */
+	lock = thread->wait_lock;
+	if(lock) {
+		spinlock_lock(lock);
+	}
+
+	spinlock_lock(&thread->lock);
+	thread->flags |= flags;
+
+	if(thread->state == THREAD_SLEEPING && thread->flags & THREAD_INTERRUPTIBLE) {
+		thread->sleep_status = STATUS_INTERRUPTED;
+		thread_wake_unsafe(thread);
+		ret = true;
+	} else {
+		/* Thread is either not sleeping or not interruptible. Set the
+		 * interrupted flag which causes the next interruptible
+		 * thread_sleep() call to return an error immediately (the flag
+		 * is cleared at kernel entry and exit). */
+		thread->flags |= THREAD_INTERRUPTED;
+#if CONFIG_SMP
+		/* If the thread is running on a different CPU, interrupt it. */
+		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
+			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
+		}
+#endif
+	}
+
+	spinlock_unlock(&thread->lock);
+
+	if(lock) {
+		spinlock_unlock(lock);
+	}
+
+	return ret;
+}
+
+/**
+ * Interrupt a sleeping thread.
+ *
+ * If the thread is currently in an interruptible sleep, causes it to wake up
+ * and return an error from the thread_sleep() call. If the thread is not
+ * interruptible, its interrupted flag will be set which will cause an immediate
+ * error return on the next interruptible sleep.
  *
  * @param thread	Thread to interrupt.
  *
  * @return		Whether the thread was interrupted.
  */
 bool thread_interrupt(thread_t *thread) {
-	bool ret;
-
-	spinlock_lock(&thread->lock);
-	ret = thread_interrupt_unsafe(thread);
-	spinlock_unlock(&thread->lock);
-
-	return ret;
+	/* Can't kill kernel threads. */
+	if(thread->owner != kernel_proc) {
+		return thread_interrupt_internal(thread, 0);
+	} else {
+		return false;
+	}
 }
 
 /**
@@ -362,23 +435,9 @@ bool thread_interrupt(thread_t *thread) {
  * @param thread	Thread to kill.
  */
 void thread_kill(thread_t *thread) {
-	spinlock_lock(&thread->lock);
-
 	if(thread->owner != kernel_proc) {
-		thread->killed = true;
-
-		/* Interrupt the thread if it is in interruptible sleep. */
-		thread_interrupt_unsafe(thread);
-#if CONFIG_SMP
-		/* If the thread is on a different CPU, interrupt the CPU so
-		 * that it will check the thread killed state. */
-		if(thread->state == THREAD_RUNNING && thread->cpu != curr_cpu) {
-			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
-		}
-#endif
+		thread_interrupt_internal(thread, THREAD_KILLED);
 	}
-
-	spinlock_unlock(&thread->lock);
 }
 
 /** Rename a thread.
@@ -442,6 +501,96 @@ void thread_enable_preempt(void) {
 	local_irq_restore(state);
 }
 
+/**
+ * Send the current thread to sleep.
+ *
+ * Sends the current thread to sleep until it is either woken manually, the
+ * given timeout expires, or (if interruptible) it is interrupted. When the
+ * function returns, it will no longer be attached to any waiting list in all
+ * cases.
+ *
+ * @param lock		Lock protecting the list on which the thread is waiting,
+ *			if any. Must be locked with IRQ state saved. Will be
+ *			unlocked after the thread has been locked, and will not
+ *			be held when the function returns. Can be NULL.
+ * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ *			will always be taken to be a system time at which the
+ *			sleep will time out. Otherwise, taken as the number of
+ *			microseconds in which the sleep will time out. If 0 is
+ *			specified, the function will return an error immediately.
+ *			If -1 is specified, the thread will sleep indefinitely
+ *			until woken or interrupted.
+ * @param name		Name of the object the thread is waiting on, for
+ *			informational purposes.
+ * @param flags		Synchronization behaviour flags (see sync/sync.h).
+ *
+ * @return		STATUS_SUCCESS if woken normally.
+ *			STATUS_TIMED_OUT if timed out.
+ *			STATUS_INTERRUPTED if interrupted.
+ *			STATUS_WOULD_BLOCK if timeout is 0.
+ */
+status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, int flags) {
+	status_t ret;
+	bool state;
+
+	/* Convert an absolute target time to a relative time. */
+	if(flags & SYNC_ABSOLUTE && timeout > 0) {
+		timeout = timeout - system_time();
+		if(timeout < 0) {
+			timeout = 0;
+		}
+	}
+
+	/* If timeout is 0, we return an error immediately. */
+	if(!timeout) {
+		ret = STATUS_WOULD_BLOCK;
+		goto cancel;
+	}
+
+	/* If interruptible and the interrupted flag is set, we also return an
+	 * error immediately. */
+	if(flags & SYNC_INTERRUPTIBLE && curr_thread->flags & THREAD_INTERRUPTED) {
+		curr_thread->flags &= ~THREAD_INTERRUPTED;
+		ret = STATUS_INTERRUPTED;
+		goto cancel;
+	}
+
+	/* We're definitely going to sleep. Get the IRQ state to restore. */
+	state = (lock) ? lock->state : local_irq_disable();
+
+	spinlock_lock_ni(&curr_thread->lock);
+	curr_thread->sleep_status = STATUS_SUCCESS;
+	curr_thread->wait_lock = lock;
+	curr_thread->waiting_on = name;
+	if(flags & SYNC_INTERRUPTIBLE) {
+		curr_thread->flags |= THREAD_INTERRUPTIBLE;
+	}
+
+	/* Start off the timer if required. */
+	if(timeout > 0) {
+		timer_start(&curr_thread->sleep_timer, timeout, TIMER_ONESHOT);
+	}
+
+	/* Drop the specified lock. Do not want to restore IRQ state, we saved
+	 * it above and it will be restored once we're resumed by the
+	 * scheduler. */
+	if(lock) {
+		spinlock_unlock_ni(lock);
+	}
+
+	curr_thread->state = THREAD_SLEEPING;
+	sched_reschedule(state);
+	return curr_thread->sleep_status;
+cancel:
+	/* The thread must not be attached to the list upon return, nor must
+	 * the specified lock be held. */
+	list_remove(&curr_thread->wait_link);
+	if(lock) {
+		spinlock_unlock(lock);
+	}
+	return ret;
+}
+
 /** Yield remaining timeslice and switch to another thread. */
 void thread_yield(void) {
 	bool state = local_irq_disable();
@@ -470,9 +619,12 @@ void thread_at_kernel_exit(void) {
 	curr_thread->last_time = now;
 
 	/* Terminate the thread if killed. */
-	if(curr_thread->killed) {
+	if(curr_thread->flags & THREAD_KILLED) {
 		thread_exit();
 	}
+
+	/* Clear the interrupted flag. */
+	curr_thread->flags &= ~THREAD_INTERRUPTED;
 
 	/* Handle pending signals. */
 	if(curr_thread->pending_signals) {
@@ -613,9 +765,6 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 		return STATUS_THREAD_LIMIT;
 	}
 
-	strncpy(thread->name, name, THREAD_NAME_MAX);
-	thread->name[THREAD_NAME_MAX - 1] = 0;
-
 	/* Allocate a kernel stack and initialize the thread context. */
 	thread->kstack = kmem_alloc(KSTACK_SIZE, MM_WAIT);
 
@@ -632,28 +781,28 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	}
 
 	object_init(&thread->obj, &thread_object_type, &dsecurity, NULL);
+	thread->state = THREAD_CREATED;
 	thread->flags = flags;
 	thread->priority = THREAD_PRIORITY_NORMAL;
 	thread->wired = 0;
-	thread->killed = false;
-	thread->ustack = 0;
-	thread->ustack_size = 0;
+	thread->preempt_disabled = 0;
+	thread->missed_preempt = false;
 	thread->max_prio = -1;
 	thread->curr_prio = -1;
 	thread->timeslice = 0;
-	thread->preempt_disabled = 0;
-	thread->missed_preempt = false;
-	thread->waitq = NULL;
-	thread->interruptible = false;
+	thread->wait_lock = NULL;
 	thread->last_time = 0;
 	thread->kernel_time = 0;
 	thread->user_time = 0;
 	thread->pending_signals = 0;
 	thread->in_usermem = false;
-	thread->state = THREAD_CREATED;
 	thread->func = func;
 	thread->arg1 = arg1;
 	thread->arg2 = arg2;
+	strncpy(thread->name, name, THREAD_NAME_MAX);
+	thread->name[THREAD_NAME_MAX - 1] = 0;
+	thread->ustack = 0;
+	thread->ustack_size = 0;
 
 	/* Initialize signal handling state. */
 	thread->signal_mask = 0;
@@ -709,7 +858,7 @@ static inline void dump_thread(thread_t *thread) {
 	case THREAD_RUNNING:	kdb_printf("Running      "); break;
 	case THREAD_SLEEPING:
 		kdb_printf("Sleeping ");
-		if(thread->interruptible) {
+		if(thread->flags & THREAD_INTERRUPTIBLE) {
 			kdb_printf("(I) ");
 		} else {
 			kdb_printf("    ");
@@ -721,7 +870,8 @@ static inline void dump_thread(thread_t *thread) {
 
 	kdb_printf("%-4" PRIu32 " %-4zu %-4d %-6d %-5d %-20s %-5" PRId32 " %s\n",
 	           (thread->cpu) ? thread->cpu->id : 0, thread->wired, thread->priority,
-	           thread->curr_prio, thread->flags, (thread->waitq) ? thread->waitq->name : "None",
+	           thread->curr_prio, thread->flags,
+	           (thread->state == THREAD_SLEEPING) ? thread->waiting_on : "None",
 	           thread->owner->id, thread->name);
 }
 
@@ -808,8 +958,7 @@ __init_text void thread_init(void) {
 
 	/* Create the thread slab cache. */
 	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),
-	                                 thread_cache_ctor, NULL, NULL, 0,
-	                                 MM_BOOT);
+	                                 thread_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register our KDB commands. */
 	kdb_register_command("thread", "Print information about threads.", kdb_cmd_thread);

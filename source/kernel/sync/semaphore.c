@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,25 +60,29 @@ static RWLOCK_DECLARE(semaphore_tree_lock);
 
 /** Down a semaphore.
  * @param sem		Semaphore to down.
- * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
- *			forever until the count can be decreased, and a timeout
- *			of 0 will return an error immediately if unable to down
- *			the semaphore.
+ * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ *			will always be taken to be a system time at which the
+ *			sleep will time out. Otherwise, taken as the number of
+ *			microseconds in which the sleep will time out. If 0 is
+ *			specified, the function will return an error immediately
+ *			if the lock cannot be acquired immediately. If -1
+ *			is specified, the thread will sleep indefinitely until
+ *			the semaphore can be downed or it is interrupted.
  * @param flags		Synchronization flags.
  * @return		Status code describing result of the operation. Failure
  *			is only possible if the timeout is not -1, or if the
  *			SYNC_INTERRUPTIBLE flag is set. */
 status_t semaphore_down_etc(semaphore_t *sem, useconds_t timeout, int flags) {
-	bool state;
+	spinlock_lock(&sem->lock);
 
-	state = waitq_sleep_prepare(&sem->queue);
 	if(sem->count) {
 		--sem->count;
-		waitq_sleep_cancel(&sem->queue, state);
+		spinlock_unlock(&sem->lock);
 		return STATUS_SUCCESS;
 	}
 
-	return waitq_sleep_unsafe(&sem->queue, timeout, flags, state);
+	list_append(&sem->threads, &curr_thread->wait_link);
+	return thread_sleep(&sem->lock, timeout, sem->name, flags);
 }
 
 /** Down a semaphore.
@@ -91,15 +95,21 @@ void semaphore_down(semaphore_t *sem) {
  * @param sem		Semaphore to up.
  * @param count		Value to increment the count by. */
 void semaphore_up(semaphore_t *sem, size_t count) {
+	thread_t *thread;
 	size_t i;
 
-	spinlock_lock(&sem->queue.lock);
+	spinlock_lock(&sem->lock);
+
 	for(i = 0; i < count; i++) {
-		if(!waitq_wake_unsafe(&sem->queue)) {
+		if(list_empty(&sem->threads)) {
 			sem->count++;
+		} else {
+			thread = list_first(&sem->threads, thread_t, wait_link);
+			thread_wake(thread);
 		}
 	}
-	spinlock_unlock(&sem->queue.lock);
+
+	spinlock_unlock(&sem->lock);
 }
 
 /** Initialize a semaphore structure.
@@ -107,8 +117,10 @@ void semaphore_up(semaphore_t *sem, size_t count) {
  * @param name		Name of the semaphore, for debugging purposes.
  * @param initial	Initial value of the semaphore. */
 void semaphore_init(semaphore_t *sem, const char *name, size_t initial) {
-	waitq_init(&sem->queue, name);
+	spinlock_init(&sem->lock, "semaphore_lock");
+	list_init(&sem->threads);
 	sem->count = initial;
+	sem->name = name;
 }
 
 /** Release a user semaphore.

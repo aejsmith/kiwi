@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,46 +35,43 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 	symbol_t *sym;
 
 	sym = symbol_lookup_addr((ptr_t)lock->caller, &off);
-	fatal("Recursive locking of non-recursive mutex %p(%s)\n"
-	      "Locked by [%p] %s+0x%zx", lock, lock->queue.name, lock->caller,
+	fatal("Recursive locking of non-recursive mutex %s (%p)\n"
+	      "Locked by [%p] %s+0x%zx", lock->name, lock, lock->caller,
 	      (sym) ? sym->name : "<unknown>", off);
 #else
-	fatal("Recursive locking of non-recursive mutex %p(%s)",
-	      lock, lock->queue.name);
+	fatal("Recursive locking of non-recursive mutex %s (%p)", lock->name, lock);
 #endif
 }
 
 /** Internal mutex locking code.
- * @param lock		Mutex to lock.
+ * @param lock		Mutex to acquire.
  * @param timeout	Timeout in microseconds.
  * @param flags		Synchronization flags.
  * @return		Status code describing result of the operation. */
 static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, int flags) {
 	status_t ret;
-	bool state;
 
-	/* Try to take the lock. */
-	if(!atomic_cas(&lock->locked, 0, 1)) {
+	if(!atomic_cas(&lock->value, 0, 1)) {
 		if(lock->holder == curr_thread) {
-			/* Wrap this with likely because if held by the current
-			 * thread the MUTEX_RECURSIVE flag should be set. */
 			if(likely(lock->flags & MUTEX_RECURSIVE)) {
-				atomic_inc(&lock->locked);
+				atomic_inc(&lock->value);
 				return STATUS_SUCCESS;
 			} else {
 				mutex_recursive_error(lock);
 			}
-                } else {
-			state = waitq_sleep_prepare(&lock->queue);
+		} else {
+			spinlock_lock(&lock->lock);
 
-			/* Check again now that we have the wait queue lock,
-			 * in case mutex_unlock() was called on another CPU. */
-			if(atomic_cas(&lock->locked, 0, 1)) {
-				waitq_sleep_cancel(&lock->queue, state);
+			/* Check again now that we have the lock, in case
+			 * mutex_unlock() was called on another CPU. */
+			if(atomic_cas(&lock->value, 0, 1)) {
+				spinlock_unlock(&lock->lock);
 			} else {
+				list_append(&lock->threads, &curr_thread->wait_link);
+
 				/* If sleep is successful, lock ownership will
 				 * have been transferred to us. */
-				ret = waitq_sleep_unsafe(&lock->queue, timeout, flags, state);
+				ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
 				if(ret != STATUS_SUCCESS) {
 					return ret;
 				}
@@ -87,17 +84,23 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 }
 
 /**
- * Lock a mutex.
+ * Acquire a mutex.
  *
- * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
- * already holds the lock, then its recursion count will be increased and the
- * function will return immediately.
+ * Attempts to acquire a mutex. If the mutex has the MUTEX_RECURSIVE flag
+ * set, and the calling thread already holds it, the recursion count will be
+ * increased. Otherwise, the function will block until the mutex can be
+ * acquired, until the timeout expires, or until interrupted (only if
+ * SYNC_INTERRUPTIBLE) is specified.
  *
- * @param lock		Mutex to lock.
- * @param timeout	Timeout in microseconds. A timeout of -1 will sleep
- *			forever until the lock is acquired, and a timeout of 0
- *			will return an error immediately if unable to acquire
- *			the lock.
+ * @param lock		Mutex to acquire.
+ * @param timeout	Timeout in microseconds. If SYNC_ABSOLUTE is specified,
+ *			will always be taken to be a system time at which the
+ *			sleep will time out. Otherwise, taken as the number of
+ *			microseconds in which the sleep will time out. If 0 is
+ *			specified, the function will return an error immediately
+ *			if the lock is currently held by another thread. If -1
+ *			is specified, the thread will sleep indefinitely until
+ *			the lock can be acquired or it is interrupted.
  * @param flags		Synchronization flags.
  *
  * @return		Status code describing result of the operation. Failure
@@ -117,13 +120,13 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 }
 
 /**
- * Lock a mutex.
+ * Acquire a mutex.
  *
- * Attempts to lock a mutex. If the mutex is recursive, and the calling thread
- * already holds the lock, then its recursion count will be increased and the
- * function will return immediately.
+ * Acquires a mutex. If the mutex has the MUTEX_RECURSIVE flag set, and the
+ * calling thread already holds it, the recursion count will be increased.
+ * Otherwise, the function will block until the mutex can be acquired.
  *
- * @param lock		Mutex to lock.
+ * @param lock		Mutex to acquire.
  */
 void mutex_lock(mutex_t *lock) {
 #if CONFIG_DEBUG
@@ -138,47 +141,55 @@ void mutex_lock(mutex_t *lock) {
 }
 
 /**
- * Unlock a mutex.
+ * Release a mutex.
  *
- * Unlocks a mutex. Must be held by the current thread else a fatal error
- * will occur. It is also invalid to unlock an already unlocked mutex. If
- * the mutex is recursive, and the recursion count is greater than 1 at the
- * time this function is called, then the mutex will remain held.
+ * Releases a mutex. Must be held by the current thread, else a fatal error
+ * will occur. It is also invalid to release an already unheld mutex. If
+ * the mutex has the MUTEX_RECURSIVE flag set, there must be an equal number
+ * of calls to this function as there have been to mutex_acquire().
  *
  * @param lock		Mutex to unlock.
  */
 void mutex_unlock(mutex_t *lock) {
-	spinlock_lock(&lock->queue.lock);
+	thread_t *thread;
 
-	if(unlikely(!atomic_get(&lock->locked))) {
-		fatal("Unlock of unheld mutex %p(%s)", lock, lock->queue.name);
+	spinlock_lock(&lock->lock);
+
+	if(unlikely(!atomic_get(&lock->value))) {
+		fatal("Release of unheld mutex %s (%p)", lock->name, lock);
 	} else if(unlikely(lock->holder != curr_thread)) {
-		fatal("Unlock of mutex %p(%s) from incorrect thread (holder: %" PRIu32 ")",
-		      lock, lock->queue.name, (lock->holder) ? lock->holder->id : -1);
+		fatal("Release of mutex %s (%p) from incorrect thread, expected %" PRIu32,
+		      lock->name, lock, (lock->holder) ? lock->holder->id : -1);
 	}
 
 	/* If the current value is 1, the lock is being released. If there is
 	 * a thread waiting, we do not need to modify the count, as we transfer
 	 * ownership of the lock to it. Otherwise, decrement the count. */
-	if(atomic_get(&lock->locked) == 1) {
+	if(atomic_get(&lock->value) == 1) {
 		lock->holder = NULL;
-		if(!waitq_wake_unsafe(&lock->queue)) {
-			atomic_dec(&lock->locked);
+
+		if(!list_empty(&lock->threads)) {
+			thread = list_first(&lock->threads, thread_t, wait_link);
+			thread_wake(thread);
+		} else {
+			atomic_dec(&lock->value);
 		}
 	} else {
-		atomic_dec(&lock->locked);
+		atomic_dec(&lock->value);
 	}
 
-	spinlock_unlock(&lock->queue.lock);
+	spinlock_unlock(&lock->lock);
 }
 
 /** Initialize a mutex.
  * @param lock		Mutex to initialize.
  * @param name		Name to give the mutex.
  * @param flags		Behaviour flags for the mutex. */
-void mutex_init(mutex_t *lock, const char *name, int flags) {
-	atomic_set(&lock->locked, 0);
-	waitq_init(&lock->queue, name);
-	lock->holder = NULL;
+void mutex_init(mutex_t *lock, const char *name, unsigned flags) {
+	atomic_set(&lock->value, 0);
+	spinlock_init(&lock->lock, "mutex_lock");
+	list_init(&lock->threads);
 	lock->flags = flags;
+	lock->holder = NULL;
+	lock->name = name;
 }
