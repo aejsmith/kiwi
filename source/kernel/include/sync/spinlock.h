@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,12 +52,11 @@ static inline bool spinlock_held(spinlock_t *lock) {
 	return atomic_get(&lock->value) != 1;
 }
 
-extern status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags);
-extern status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags);
 extern void spinlock_lock(spinlock_t *lock);
-extern void spinlock_lock_ni(spinlock_t *lock);
+extern void spinlock_lock_noirq(spinlock_t *lock);
 extern void spinlock_unlock(spinlock_t *lock);
-extern void spinlock_unlock_ni(spinlock_t *lock);
+extern void spinlock_unlock_noirq(spinlock_t *lock);
+
 extern void spinlock_init(spinlock_t *lock, const char *name);
 
 #endif /* __SYNC_SPINLOCK_H */

@@ -456,10 +456,10 @@ void thread_preempt(void) {
 
 	curr_cpu->should_preempt = false;
 
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 	if(curr_thread->preempt_disabled > 0) {
 		curr_thread->missed_preempt = true;
-		spinlock_unlock_ni(&curr_thread->lock);
+		spinlock_unlock_noirq(&curr_thread->lock);
 		local_irq_restore(state);
 	} else {
 		sched_reschedule(state);
@@ -484,7 +484,7 @@ void thread_disable_preempt(void) {
 void thread_enable_preempt(void) {
 	bool state = local_irq_disable();
 
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 
 	assert(curr_thread->preempt_disabled > 0);
 
@@ -497,7 +497,7 @@ void thread_enable_preempt(void) {
 		}
 	}
 
-	spinlock_unlock_ni(&curr_thread->lock);
+	spinlock_unlock_noirq(&curr_thread->lock);
 	local_irq_restore(state);
 }
 
@@ -558,7 +558,7 @@ status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, in
 	/* We're definitely going to sleep. Get the IRQ state to restore. */
 	state = (lock) ? lock->state : local_irq_disable();
 
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 	curr_thread->sleep_status = STATUS_SUCCESS;
 	curr_thread->wait_lock = lock;
 	curr_thread->waiting_on = name;
@@ -575,7 +575,7 @@ status_t thread_sleep(spinlock_t *lock, useconds_t timeout, const char *name, in
 	 * it above and it will be restored once we're resumed by the
 	 * scheduler. */
 	if(lock) {
-		spinlock_unlock_ni(lock);
+		spinlock_unlock_noirq(lock);
 	}
 
 	curr_thread->state = THREAD_SLEEPING;
@@ -595,7 +595,7 @@ cancel:
 void thread_yield(void) {
 	bool state = local_irq_disable();
 
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 	sched_reschedule(state);
 }
 
@@ -649,7 +649,7 @@ void thread_exit(void) {
 	notifier_run(&curr_thread->death_notifier, NULL, true);
 
 	state = local_irq_disable();
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 
 	curr_thread->state = THREAD_DEAD;
 

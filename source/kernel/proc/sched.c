@@ -239,7 +239,7 @@ void sched_reschedule(bool state) {
 
 	assert(!atomic_get(&kdb_running));
 
-	spinlock_lock_ni(&cpu->lock);
+	spinlock_lock_noirq(&cpu->lock);
 
 	/* Stop the preemption timer if it is running. */
 	timer_stop(&cpu->timer);
@@ -273,7 +273,7 @@ void sched_reschedule(bool state) {
 	next = sched_pick_thread(cpu);
 	if(next) {
 		if(next != curr_thread) {
-			spinlock_lock_ni(&next->lock);
+			spinlock_lock_noirq(&next->lock);
 		}
 
 		next->timeslice = THREAD_TIMESLICE;
@@ -281,7 +281,7 @@ void sched_reschedule(bool state) {
 	} else {
 		next = cpu->idle_thread;
 		if(next != curr_thread) {
-			spinlock_lock_ni(&next->lock);
+			spinlock_lock_noirq(&next->lock);
 			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n", curr_cpu->id);
 		}
 
@@ -299,7 +299,7 @@ void sched_reschedule(bool state) {
 	curr_thread = next;
 
 	/* Finished with the scheduler queues, unlock. */
-	spinlock_unlock_ni(&cpu->lock);
+	spinlock_unlock_noirq(&cpu->lock);
 
 	/* Set off the timer if necessary. */
 	if(curr_thread->timeslice > 0) {
@@ -324,7 +324,7 @@ void sched_reschedule(bool state) {
 		 * below. */
 		sched_post_switch(state);
 	} else {
-		spinlock_unlock_ni(&curr_thread->lock);
+		spinlock_unlock_noirq(&curr_thread->lock);
 		local_irq_restore(state);
 	}
 }
@@ -332,7 +332,7 @@ void sched_reschedule(bool state) {
 /** Perform post-thread-switch tasks.
  * @param state		Interrupt state to restore. */
 void sched_post_switch(bool state) {
-	spinlock_unlock_ni(&curr_thread->lock);
+	spinlock_unlock_noirq(&curr_thread->lock);
 
 	/* The prev_thread pointer is set to NULL during sched_init(). It will
 	 * only ever be NULL once. */
@@ -340,7 +340,7 @@ void sched_post_switch(bool state) {
 		/* Unlock previous. This will not be the current thread, as a
 		 * switch is not performed if the new thread is the same as the
 		 * previous. */
-		spinlock_unlock_ni(&curr_cpu->sched->prev_thread->lock);
+		spinlock_unlock_noirq(&curr_cpu->sched->prev_thread->lock);
 
 		/* Deal with thread terminations. We cannot delete the thread
 		 * directly as all allocator functions are unsafe to call
@@ -484,7 +484,7 @@ static void sched_idle_thread(void *arg1, void *arg2) {
 	local_irq_disable();
 
 	while(true) {
-		spinlock_lock_ni(&curr_thread->lock);
+		spinlock_lock_noirq(&curr_thread->lock);
 		sched_reschedule(false);
 
 		cpu_idle();
@@ -547,7 +547,7 @@ __init_text void sched_init_percpu(void) {
 /** Begin executing other threads. */
 __init_text void sched_enter(void) {
 	/* Lock the idle thread - sched_post_switch() expects it to be locked. */
-	spinlock_lock_ni(&curr_thread->lock);
+	spinlock_lock_noirq(&curr_thread->lock);
 
 	/* Switch to the idle thread. */
 	arch_thread_switch(curr_thread, NULL);

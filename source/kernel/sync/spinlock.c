@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,11 +28,8 @@
 #include <status.h>
 
 /** Internal spinlock locking code.
- * @param lock		Spinlock to lock.
- * @param timeout	Timeout.
- * @param flags		Synchronization flags.
- * @return		Status code describing result of the operation. */
-static inline __always_inline status_t spinlock_lock_internal(spinlock_t *lock, useconds_t timeout, int flags) {
+ * @param lock		Spinlock to acquire. */
+static inline __always_inline void spinlock_lock_internal(spinlock_t *lock) {
 	/* Attempt to take the lock. Prefer the uncontended case. */
 	if(unlikely(atomic_dec(&lock->value) != 1)) {
 		/* When running on a single processor there is no need for us
@@ -40,10 +37,6 @@ static inline __always_inline status_t spinlock_lock_internal(spinlock_t *lock, 
 		 * one time, so just die. */
 #if CONFIG_SMP
 		if(cpu_count > 1) {
-			if(timeout == 0) {
-				return STATUS_WOULD_BLOCK;
-			}
-		
 			while(true) {
 				/* Wait for it to become unheld. */
 				while(atomic_get(&lock->value) != 1) {
@@ -62,94 +55,6 @@ static inline __always_inline status_t spinlock_lock_internal(spinlock_t *lock, 
 		}
 #endif
 	}
-
-	return STATUS_SUCCESS;
-}
-
-/**
- * Acquire a spinlock.
- *
- * Attempts to acquire the specified spinlock, and spins in a loop until it is
- * able to do so. If the call is made on a single-processor system, then
- * fatal() will be called if the lock is already held rather than spinning -
- * spinlocks disable interrupts while locked so nothing should attempt to
- * acquire an already held spinlock on a single-processor system.
- *
- * @todo		Timeouts are not implemented yet - only 0 and -1 work.
- *			Anything else is treated as -1.
- *
- * @param lock		Spinlock to acquire.
- * @param timeout	Timeout in microseconds. If 0 is specified, then the
- *			function will return an error if unable to acquire the
- *			lock immediately. If -1, it will spin indefinitely
- *			until able to acquire the lock.
- * @param flags		Synchronization flags (the SYNC_INTERRUPTIBLE flag is
- *			not supported).
- *
- * @return		Status code describing result of the operation. Failure
- *			is only possible if the timeout is not -1.
- */
-status_t spinlock_lock_etc(spinlock_t *lock, useconds_t timeout, int flags) {
-	status_t ret;
-	bool state;
-
-	/* Disable interrupts while locked to ensure that nothing else
-	 * will run on the current CPU for the duration of the lock. */
-	state = local_irq_disable();
-
-	/* Take the lock. */
-	ret = spinlock_lock_internal(lock, timeout, flags);
-	if(ret != STATUS_SUCCESS) {
-		local_irq_restore(state);
-		return ret;
-	}
-
-	lock->state = state;
-	enter_cs_barrier();
-	return STATUS_SUCCESS;
-}
-
-/**
- * Acquire a spinlock without changing interrupt state.
- *
- * Attempts to acquire the specified spinlock, and spins in a loop until it is
- * able to do so. If the call is made on a single-processor system, then
- * fatal() will be called if the lock is already held rather than spinning -
- * spinlocks disable interrupts while locked so nothing should attempt to
- * acquire an already held spinlock on a single-processor system. This function
- * does not modify the interrupt state so the caller must ensure that
- * interrupts are disabled (an assertion is made to ensure that this is the
- * case). The interrupt state field of the lock is not updated, therefore a
- * lock that was acquired with this function MUST be released with
- * spinlock_unlock_ni().
- *
- * @todo		Timeouts are not implemented yet - only 0 and -1 work.
- *			Anything else is treated as -1.
- *
- * @param lock		Spinlock to acquire.
- * @param timeout	Timeout in microseconds. If 0 is specified, then the
- *			function will return an error if unable to acquire the
- *			lock immediately. If -1, it will spin indefinitely
- *			until able to acquire the lock.
- * @param flags		Synchronization flags (the SYNC_INTERRUPTIBLE flag is
- *			not supported).
- *
- * @return		Status code describing result of the operation. Failure
- *			is only possible if the timeout is not -1.
- */
-status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
-	status_t ret;
-
-	assert(!local_irq_state());
-
-	/* Take the lock. */
-	ret = spinlock_lock_internal(lock, timeout, flags);
-	if(ret != STATUS_SUCCESS) {
-		return ret;
-	}
-
-	enter_cs_barrier();
-	return STATUS_SUCCESS;
 }
 
 /**
@@ -164,17 +69,13 @@ status_t spinlock_lock_ni_etc(spinlock_t *lock, useconds_t timeout, int flags) {
  * @param lock		Spinlock to acquire.
  */
 void spinlock_lock(spinlock_t *lock) {
-	status_t ret;
 	bool state;
 
 	/* Disable interrupts while locked to ensure that nothing else
 	 * will run on the current CPU for the duration of the lock. */
 	state = local_irq_disable();
 
-	/* Take the lock. */
-	ret = spinlock_lock_internal(lock, -1, 0);
-	assert(ret == STATUS_SUCCESS);
-
+	spinlock_lock_internal(lock);
 	lock->state = state;
 	enter_cs_barrier();
 }
@@ -191,28 +92,23 @@ void spinlock_lock(spinlock_t *lock) {
  * interrupts are disabled (an assertion is made to ensure that this is the
  * case). The interrupt state field of the lock is not updated, therefore a
  * lock that was acquired with this function MUST be released with
- * spinlock_unlock_ni().
+ * spinlock_unlock_noirq().
  *
  * @param lock		Spinlock to acquire.
  */
-void spinlock_lock_ni(spinlock_t *lock) {
-	status_t ret;
-
+void spinlock_lock_noirq(spinlock_t *lock) {
 	assert(!local_irq_state());
 
-	/* Take the lock. */
-	ret = spinlock_lock_internal(lock, -1, 0);
-	assert(ret == STATUS_SUCCESS);
-
+	spinlock_lock_internal(lock);
 	enter_cs_barrier();
 }
 
 /**
  * Release a spinlock.
  *
- * Unlocks the specified spinlock and restores the interrupt state to what it
+ * Releases the specified spinlock and restores the interrupt state to what it
  * was before the lock was acquired. This should only be used if the lock was
- * acquired using spinlock_lock() or spinlock_lock_etc().
+ * acquired using spinlock_lock().
  *
  * @param lock		Spinlock to release.
  */
@@ -234,7 +130,7 @@ void spinlock_unlock(spinlock_t *lock) {
 
 /** Release a spinlock without changing interrupt state.
  * @param lock		Spinlock to release. */
-void spinlock_unlock_ni(spinlock_t *lock) {
+void spinlock_unlock_noirq(spinlock_t *lock) {
 	if(unlikely(!spinlock_held(lock))) {
 		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 	}
@@ -243,7 +139,7 @@ void spinlock_unlock_ni(spinlock_t *lock) {
 	atomic_set(&lock->value, 1);
 }
 
-/** Initialize a spinlock structure.
+/** Initialize a spinlock.
  * @param lock		Spinlock to initialize.
  * @param name		Name of the spinlock, used for debugging purposes. */
 void spinlock_init(spinlock_t *lock, const char *name) {
