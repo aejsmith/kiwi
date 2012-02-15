@@ -38,8 +38,8 @@ extern "C" {
 #define TIMER_ONESHOT		1	/**< Fire the timer event only once. */
 #define TIMER_PERIODIC		2	/**< Fire the event at regular intervals until stopped. */
 
-extern status_t kern_timer_create(int flags, handle_t *handlep);
-extern status_t kern_timer_start(handle_t handle, useconds_t interval, int mode);
+extern status_t kern_timer_create(unsigned flags, handle_t *handlep);
+extern status_t kern_timer_start(handle_t handle, useconds_t interval, unsigned mode);
 extern status_t kern_timer_stop(handle_t handle, useconds_t *remp);
 
 extern status_t kern_system_time(useconds_t *usp);

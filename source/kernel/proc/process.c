@@ -828,7 +828,7 @@ void process_shutdown(void) {
 
 	/* Wait until everything has terminated. */
 	do {
-		usleep(1000);
+		delay(1000);
 		interval += 1000;
 
 		count = 0;

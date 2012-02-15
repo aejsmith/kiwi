@@ -52,14 +52,14 @@ static phys_ptr_t lapic_base = 0;
 /** Read from a register in the current CPU's local APIC.
  * @param reg		Register to read from.
  * @return		Value read from register. */
-static inline uint32_t lapic_read(int reg) {
+static inline uint32_t lapic_read(unsigned reg) {
 	return lapic_mapping[reg];
 }
 
 /** Write to a register in the current CPU's local APIC.
  * @param reg		Register to write to.
  * @param value		Value to write to register. */
-static inline void lapic_write(int reg, uint32_t value) {
+static inline void lapic_write(unsigned reg, uint32_t value) {
 	lapic_mapping[reg] = value;
 }
 
@@ -113,10 +113,7 @@ bool lapic_enabled(void) {
 /** Get the current local APIC ID.
  * @return		Local APIC ID. */
 uint32_t lapic_id(void) {
-	if(!lapic_mapping) {
-		return 0;
-	}
-	return (lapic_read(LAPIC_REG_APIC_ID) >> 24);
+	return (lapic_mapping) ? (lapic_read(LAPIC_REG_APIC_ID) >> 24) : 0;
 }
 
 /** Send an IPI.
@@ -146,7 +143,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 
 	/* Wait for the IPI to be sent (check Delivery Status bit). */
 	while(lapic_read(LAPIC_REG_ICR0) & (1<<12)) {
-		__asm__ volatile("pause");
+		cpu_spin_hint();
 	}
 
 	local_irq_restore(state);
@@ -269,7 +266,7 @@ __init_text void lapic_init(void) {
 	        curr_cpu->arch.lapic_freq / 1000000);
 
 	/* Accept all interrupts. */
-	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR & 0xFFFFFF00));
+	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR) & 0xFFFFFF00);
 
 	/* Enable the timer: interrupt vector, no extra bits = Unmasked/One-shot. */
 	lapic_write(LAPIC_REG_TIMER_INITIAL, 0);

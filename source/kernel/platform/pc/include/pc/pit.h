@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,12 @@
 
 /** Frequency that we run the PIT periodic timer at. */
 #define PIT_TIMER_FREQUENCY	1000
+
+/** PIT port definitions. */
+#define PIT_MODE		0x43
+#define PIT_CHAN0		0x40
+#define PIT_CHAN1		0x41
+#define PIT_CHAN2		0x42
 
 extern void pit_init(void);
 

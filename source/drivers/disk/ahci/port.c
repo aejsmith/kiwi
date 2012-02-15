@@ -379,7 +379,7 @@ status_t ahci_port_reset(ahci_port_t *port) {
 	/* Reset the device. */
 	port->regs->sctl = (port->regs->sctl & ~0xF) | 1;
 	ahci_port_flush(port);
-	usleep(1500);
+	delay(1500);
 	port->regs->sctl &= ~0xF;
 	ahci_port_flush(port);
 
@@ -402,7 +402,7 @@ status_t ahci_port_reset(ahci_port_t *port) {
 
 	/* Wait for the device to come back up. */
 	if((port->regs->tfd.status & 0xFF) == 0xFF) {
-		usleep(MSECS2USECS(500));
+		delay(MSECS2USECS(500));
 		if((port->regs->tfd.status & 0xFF) == 0xFF) {
 			kprintf(LOG_WARN, "ahci: device did not come back up after reset\n");
 			return STATUS_DEVICE_ERROR;

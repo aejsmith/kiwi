@@ -344,7 +344,7 @@ static inline bool wait_for_clear(volatile uint32_t *reg, uint32_t bits, bool an
 			return true;
 		}
 		i = (timeout < 1000) ? timeout : 1000;
-		usleep(i);
+		delay(i);
 		timeout -= i;
 	}
 	return false;
@@ -364,7 +364,7 @@ static inline bool wait_for_set(volatile uint32_t *reg, uint32_t bits, bool any,
 			return true;
 		}
 		i = (timeout < 1000) ? timeout : 1000;
-		usleep(i);
+		delay(i);
 		timeout -= i;
 	}
 	return false;

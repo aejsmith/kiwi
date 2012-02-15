@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 Alex Smith
+ * Copyright (C) 2010-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,7 +42,7 @@
 typedef struct user_timer {
 	object_t obj;			/**< Object header. */
 
-	int flags;			/**< Flags for the timer. */
+	unsigned flags;			/**< Flags for the timer. */
 	timer_t timer;			/**< Kernel timer. */
 	notifier_t notifier;		/**< Notifier for the timer event. */
 	bool fired;			/**< Whether the event has fired. */
@@ -78,32 +78,6 @@ static useconds_t boot_unix_time = 0;
 /** Hardware timer device. */
 static timer_device_t *timer_device = NULL;
 
-/** Prepares next timer tick.
- * @param timer		Timer to prepare for. */
-static void timer_device_prepare(timer_t *timer) {
-	useconds_t length = timer->target - system_time();
-	timer_device->prepare((length > 0) ? length : 1);
-}
-
-/** Ensure that the timer device is enabled. */
-static inline void timer_device_enable(void) {
-	/* The device may not be disabled when we expect it to be, if
-	 * timer_stop() is run from a different CPU to the one the timer is
-	 * running on. */
-	if(!curr_cpu->timer_enabled) {
-		timer_device->enable();
-		curr_cpu->timer_enabled = true;
-	}
-}
-
-/** Disable the timer device. */
-static inline void timer_device_disable(void) {
-	/* The timer device should always be enabled when we expect it to be. */
-	assert(curr_cpu->timer_enabled);
-	timer_device->disable();
-	curr_cpu->timer_enabled = false;
-}
-
 /** Convert a date/time to microseconds since the epoch.
  * @param year		Year.
  * @param month		Month (1-12).
@@ -112,9 +86,10 @@ static inline void timer_device_disable(void) {
  * @param min		Minute (0-59).
  * @param sec		Second (0-59).
  * @return		Number of microseconds since the epoch. */
-useconds_t time_to_unix(int year, int month, int day, int hour, int min, int sec) {
+useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
+                        unsigned min, unsigned sec) {
 	uint32_t seconds = 0;
-	int i;
+	unsigned i;
 
 	/* Start by adding the time of day and day of month together. */
 	seconds += sec;
@@ -151,6 +126,33 @@ useconds_t unix_time(void) {
 	return boot_unix_time + system_time();
 }
 
+/** Prepares next timer tick.
+ * @param timer		Timer to prepare for. */
+static void timer_device_prepare(timer_t *timer) {
+	useconds_t length = timer->target - system_time();
+	timer_device->prepare((length > 0) ? length : 1);
+}
+
+/** Ensure that the timer device is enabled. */
+static inline void timer_device_enable(void) {
+	/* The device may not be disabled when we expect it to be, if
+	 * timer_stop() is run from a different CPU to the one the timer is
+	 * running on. */
+	if(!curr_cpu->timer_enabled) {
+		timer_device->enable();
+		curr_cpu->timer_enabled = true;
+	}
+}
+
+/** Disable the timer device. */
+static inline void timer_device_disable(void) {
+	/* The timer device should always be enabled when we expect it to be. */
+	assert(curr_cpu->timer_enabled);
+
+	timer_device->disable();
+	curr_cpu->timer_enabled = false;
+}
+
 /**
  * Set the timer device.
  *
@@ -160,11 +162,12 @@ useconds_t unix_time(void) {
  * @param device	Device to set.
  */
 void timer_device_set(timer_device_t *device) {
-	if(timer_device) {
-		fatal("Multiple timer devices registered");
-	}
+	assert(!timer_device);
 
 	timer_device = device;
+	if(timer_device->type == TIMER_DEVICE_ONESHOT) {
+		curr_cpu->timer_enabled = true;
+	}
 
 	kprintf(LOG_NOTICE, "timer: activated timer device %s\n", device->name);
 }
@@ -210,6 +213,10 @@ bool timer_tick(void) {
 	timer_t *timer;
 
 	assert(timer_device);
+
+	if(!curr_cpu->timer_enabled) {
+		return false;
+	}
 
 	spinlock_lock(&curr_cpu->timer_lock);
 
@@ -263,22 +270,24 @@ bool timer_tick(void) {
 
 /** Initialize a timer structure.
  * @param timer		Timer to initialize.
+ * @param name		Name of the timer for debugging purposes.
  * @param func		Function to call when the timer expires.
  * @param data		Data argument to pass to timer.
  * @param flags		Behaviour flags for the timer. */
-void timer_init(timer_t *timer, timer_func_t func, void *data, int flags) {
+void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, unsigned flags) {
 	list_init(&timer->header);
 	timer->func = func;
 	timer->data = data;
 	timer->flags = flags;
+	timer->name = name;
 }
 
 /** Start a timer.
- * @param timer		Timer to start.
+ * @param timer		Timer to start. Must not already be running.
  * @param length	Microseconds to run the timer for. If 0 or negative
  *			the function will do nothing.
  * @param mode		Mode for the timer. */
-void timer_start(timer_t *timer, useconds_t length, int mode) {
+void timer_start(timer_t *timer, useconds_t length, unsigned mode) {
 	if(length <= 0) {
 		return;
 	}
@@ -297,7 +306,7 @@ void timer_start(timer_t *timer, useconds_t length, int mode) {
 		/* If the new timer is at the beginning of the list, then it
 		 * has the shortest remaining time, so we need to adjust the
 		 * device to tick for it. */
-		if(curr_cpu->timers.next == &timer->header) {
+		if(timer == list_first(&curr_cpu->timers, timer_t, header)) {
 			timer_device_prepare(timer);
 		}
 		break;
@@ -325,7 +334,7 @@ void timer_stop(timer_t *timer) {
 
 		/* If the timer is running on this CPU, adjust the tick length
 		 * or disable the device if required. If the timer is on another
-		 * CPU, it's no big deal: the rest of the code is able to handle
+		 * CPU, it's no big deal: the tick handler is able to handle
 		 * unexpected ticks. */
 		if(timer->cpu == curr_cpu) {
 			switch(timer_device->type) {
@@ -347,25 +356,19 @@ void timer_stop(timer_t *timer) {
 	}
 }
 
-/** Spin for a certain amount of time.
- * @param us		Microseconds to spin for. */
-void spin(useconds_t us) {
-	useconds_t target = system_time() + us;
-	while(system_time() < target) {
-		cpu_spin_hint();
-	}
-}
-
 /** Sleep for a certain amount of time.
- * @param us		Microseconds to sleep for.
- * @param interruptible	Whether the sleep should be interruptible.
- * @return		Status code describing result of the operation. */
-status_t usleep_etc(useconds_t us, bool interruptible) {
+ * @param us		Microseconds to sleep for (must be greater than or
+ *			equal to 0). If SYNC_ABSOLUTE is specified, this is
+ *			a target system time to sleep until.
+ * @param flags		Behaviour flags (see sync/sync.h).
+ * @return		STATUS_SUCCESS on success, STATUS_INTERRUPTED if
+ *			SYNC_INTERRUPTIBLE specified and sleep was interrupted. */
+status_t delay_etc(useconds_t us, int flags) {
 	status_t ret;
 
 	assert(us >= 0);
 
-	ret = thread_sleep(NULL, us, "usleep", (interruptible) ? SYNC_INTERRUPTIBLE : 0);
+	ret = thread_sleep(NULL, us, "usleep", flags);
 	if(likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK)) {
 		ret = STATUS_SUCCESS;
 	}
@@ -373,10 +376,11 @@ status_t usleep_etc(useconds_t us, bool interruptible) {
 	return ret;
 }
 
-/** Sleep for a certain amount of time.
- * @param us		Microseconds to sleep for. */
-void usleep(useconds_t us) {
-	usleep_etc(us, false);
+/** Delay for a period of time.
+ * @param us		Microseconds to sleep for (must be greater than or
+ *			equal to 0). */
+void delay(useconds_t us) {
+	delay_etc(us, 0);
 }
 
 /** Dump a list of timers.
@@ -412,12 +416,14 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
 		cpu = curr_cpu;
 	}
 
-	kdb_printf("Target           Function           Data\n");
-	kdb_printf("======           ========           ====\n");
+	kdb_printf("Name                 Target           Function           Data\n");
+	kdb_printf("====                 ======           ========           ====\n");
 
 	LIST_FOREACH(&cpu->timers, iter) {
 		timer = list_entry(iter, timer_t, header);
-		kdb_printf("%-16llu %-18p %p\n", timer->target, timer->func, timer->data);
+
+		kdb_printf("%-20s %-16llu %-18p %p\n", timer->name, timer->target,
+		           timer->func, timer->data);
 	}
 
 	return KDB_SUCCESS;
@@ -446,7 +452,7 @@ static kdb_status_t kdb_cmd_uptime(int argc, char **argv, kdb_filter_t *filter) 
 /** Initialize the timing system. */
 __init_text void time_init(void) {
 	/* Initialize the boot time. */
-	boot_unix_time = time_from_hardware() - system_time();
+	boot_unix_time = platform_time_from_hardware() - system_time();
 
 	/* Register debugger commands. */
 	kdb_register_command("timers", "Print a list of running timers.", kdb_cmd_timers);
@@ -530,7 +536,7 @@ static bool user_timer_func(void *_timer) {
  * @param flags		Flags for the timer.
  * @param handlep	Where to store handle to timer object.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_create(int flags, handle_t *handlep) {
+status_t kern_timer_create(unsigned flags, handle_t *handlep) {
 	object_acl_t acl;
 	object_security_t security = { -1, -1, &acl };
 	user_timer_t *timer;
@@ -544,7 +550,7 @@ status_t kern_timer_create(int flags, handle_t *handlep) {
 
 	timer = kmalloc(sizeof(*timer), MM_WAIT);
 	object_init(&timer->obj, &timer_object_type, &security, NULL);
-	timer_init(&timer->timer, user_timer_func, timer, TIMER_THREAD);
+	timer_init(&timer->timer, "user_timer", user_timer_func, timer, TIMER_THREAD);
 	notifier_init(&timer->notifier, timer);
 	timer->flags = flags;
 	timer->fired = false;
@@ -568,7 +574,7 @@ status_t kern_timer_create(int flags, handle_t *handlep) {
  *			If TIMER_PERIODIC, it will be fired periodically at the
  *			specified interval, until timer_stop() is called.
  * @return		Status code describing result of the operation. */
-status_t kern_timer_start(handle_t handle, useconds_t interval, int mode) {
+status_t kern_timer_start(handle_t handle, useconds_t interval, unsigned mode) {
 	object_handle_t *khandle;
 	user_timer_t *timer;
 	status_t ret;

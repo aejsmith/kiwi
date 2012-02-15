@@ -293,7 +293,7 @@ status_t ata_channel_wait(ata_channel_t *channel, uint8_t set, uint8_t clear, bo
 			spin(i);
 		} else {
 			i = (timeout < 1000) ? timeout : 1000;
-			usleep(i);
+			delay(i);
 		}
 		timeout -= i;
 		elapsed += i;

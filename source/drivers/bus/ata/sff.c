@@ -35,9 +35,9 @@ static status_t ata_sff_reset(ata_channel_t *channel) {
 	/* See 11.2 - Software reset protocol (in Volume 2). We wait for longer
 	 * than necessary to be sure it's done. */
 	channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_SRST | ATA_DEVCTRL_NIEN);
-	usleep(20);
+	delay(20);
 	channel->sops->write_ctrl(channel, ATA_CTRL_REG_DEVCTRL, ATA_DEVCTRL_NIEN);
-	usleep(MSECS2USECS(150));
+	delay(MSECS2USECS(150));
 	ata_channel_wait(channel, 0, 0, false, false, 1000);
 
 	/* Clear any pending interrupts. */

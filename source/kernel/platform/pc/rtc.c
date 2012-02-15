@@ -34,7 +34,7 @@ static SPINLOCK_DECLARE(rtc_lock);
 
 /** Get the number of microseconds since the Epoch from the RTC.
  * @return		Number of microseconds since Epoch. */
-useconds_t time_from_hardware(void) {
+useconds_t platform_time_from_hardware(void) {
 	uint32_t year, month, day, hour, min, sec;
 	uint8_t tmp;
 

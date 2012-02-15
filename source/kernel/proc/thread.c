@@ -106,7 +106,7 @@ static void thread_ctor(void *obj, void *data) {
 	list_init(&thread->runq_link);
 	list_init(&thread->wait_link);
 	list_init(&thread->owner_link);
-	timer_init(&thread->sleep_timer, thread_timeout, thread, 0);
+	timer_init(&thread->sleep_timer, "thread_sleep_timer", thread_timeout, thread, 0);
 	notifier_init(&thread->death_notifier, thread);
 }
 
@@ -1205,7 +1205,7 @@ status_t kern_thread_usleep(useconds_t us, useconds_t *remp) {
 
 	/* FIXME: The method getting remaining time isn't quite accurate. */
 	begin = system_time();
-	ret = usleep_etc(us, true);
+	ret = delay_etc(us, SYNC_INTERRUPTIBLE);
 	if(ret == STATUS_INTERRUPTED && remp) {
 		elapsed = system_time() - begin;
 		if(elapsed < us) {

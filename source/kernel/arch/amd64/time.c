@@ -43,6 +43,17 @@ useconds_t system_time(void) {
 	return (useconds_t)((x86_rdtsc() - curr_cpu->arch.system_time_offset) / curr_cpu->arch.cycles_per_us);
 }
 
+/** Spin for a certain amount of time.
+ * @param us		Microseconds to spin for. */
+void spin(useconds_t us) {
+        uint64_t target = x86_rdtsc() + (us * curr_cpu->arch.cycles_per_us);
+
+        /* Spin until we reach the target. */
+        while(x86_rdtsc() < target) {
+                cpu_spin_hint();
+        }
+}
+
 /** Set up the boot time offset. */
 __init_text void tsc_init_target(void) {
 	/* Calculate the offset to subtract from the TSC when calculating the

@@ -155,9 +155,9 @@ static void page_writer(void *arg1, void *arg2) {
 
 	while(true) {
 		if(lrm_level(RESOURCE_TYPE_MEMORY) >= RESOURCE_LEVEL_LOW) {
-			usleep(PAGE_WRITER_LOW_INTERVAL);
+			delay(PAGE_WRITER_LOW_INTERVAL);
 		} else {
-			usleep(PAGE_WRITER_INTERVAL);
+			delay(PAGE_WRITER_INTERVAL);
 		}
 
 		/* Place the marker at the beginning of the queue to begin with. */

@@ -533,7 +533,7 @@ __init_text void sched_init_percpu(void) {
 	curr_cpu->idle = true;
 
 	/* Create the preemption timer. */
-	timer_init(&curr_cpu->sched->timer, sched_timer_handler, NULL, 0);
+	timer_init(&curr_cpu->sched->timer, "sched_timer", sched_timer_handler, NULL, 0);
 
 	/* Initialize queues. */
 	for(i = 0; i < 2; i++) {

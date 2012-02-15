@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,18 +36,20 @@ static irq_status_t pit_handler(unsigned num, void *data) {
 static void pit_enable(void) {
 	uint16_t base;
 
-	/* Set frequency. */
+	/* Set channel 0 to mode 3 (square wave generator). */
 	base = PIT_BASE_FREQUENCY / PIT_TIMER_FREQUENCY;
-	out8(0x43, 0x36);
-	out8(0x40, base & 0xFF);
-	out8(0x40, base >> 8);
-
-	irq_register(0, pit_handler, NULL, NULL);
+	out8(PIT_MODE, 0x36);
+	out8(PIT_CHAN0, base & 0xFF);
+	out8(PIT_CHAN0, base >> 8);
 }
 
 /** Disable the PIT. */
 static void pit_disable(void) {
-	irq_unregister(0, pit_handler, NULL, NULL);
+	/* After this has been done, the PIT will generate one more IRQ. This
+	 * is ignored. */
+	out8(PIT_MODE, 0x30);
+	out8(PIT_CHAN0, 0);
+	out8(PIT_CHAN0, 0);
 }
 
 /** PIT clock source. */
@@ -61,4 +63,6 @@ static timer_device_t pit_timer_device = {
 /** Initialize the PIT timer. */
 __init_text void pit_init(void) {
 	timer_device_set(&pit_timer_device);
+	pit_disable();
+	irq_register(0, pit_handler, NULL, NULL);
 }

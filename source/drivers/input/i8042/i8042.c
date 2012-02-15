@@ -68,7 +68,7 @@ static inline void i8042_wait_write(void) {
 		if(!(in8(0x64) & (1<<1))) {
 			return;
 		}
-		usleep(1000);
+		delay(1000);
 	}
 
 	kprintf(LOG_DEBUG, "i8042: warning: timed out while waiting to write\n");
@@ -83,7 +83,7 @@ static inline void i8042_wait_data(void) {
 		if(in8(0x64) & (1<<0)) {
 			return;
 		}
-		usleep(1000);
+		delay(1000);
 	}
 
 	kprintf(LOG_DEBUG, "i8042: warning: timed out while waiting for data\n");
