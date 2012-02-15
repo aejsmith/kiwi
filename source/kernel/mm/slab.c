@@ -49,7 +49,6 @@
 #include <cpu.h>
 #include <kdb.h>
 #include <kernel.h>
-#include <lrm.h>
 #include <status.h>
 
 #if CONFIG_SLAB_DEBUG
@@ -381,7 +380,6 @@ static inline void slab_magazine_put_full(slab_cache_t *cache, slab_magazine_t *
  * @return		Pointer to magazine on success, NULL on failure. */
 static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 	slab_magazine_t *mag = NULL;
-	int level;
 
 	mutex_lock(&cache->depot_lock);
 
@@ -390,15 +388,12 @@ static inline slab_magazine_t *slab_magazine_get_empty(slab_cache_t *cache) {
 		list_remove(&mag->header);
 		assert(!mag->rounds);
 	} else {
-		/* Do not attempt to allocate a magazine if low on memory, we
-		 * will free directly to the slab layer. */
-		level = lrm_level(RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE);
-		if(likely(level == RESOURCE_LEVEL_OK)) {
-			mag = slab_cache_alloc(&slab_mag_cache, 0);
-			if(mag != NULL) {
-				list_init(&mag->header);
-				mag->rounds = 0;
-			}
+		/* TODO: If low on memory, should not attempt to allocate
+		 * a magazine, and instead free directly to the slab layer. */
+		mag = slab_cache_alloc(&slab_mag_cache, 0);
+		if(mag) {
+			list_init(&mag->header);
+			mag->rounds = 0;
 		}
 	}
 
@@ -530,43 +525,6 @@ static inline bool slab_cpu_obj_free(slab_cache_t *cache, void *obj) {
 	cc->loaded->objects[cc->loaded->rounds++] = obj;
 	local_irq_restore(state);
 	return true;
-}
-
-/** Reclaim memory from a slab cache.
- * @todo		Should we reclaim partial magazines too, somehow?
- * @param cache		Cache to reclaim from.
- * @param force		Whether to force reclaim of everything.
- * @return		Whether the resource level became OK. */
-static bool slab_cache_reclaim(slab_cache_t *cache, bool force) {
-	bool ret = false;
-
-	dprintf("slab: reclaiming from cache %p(%s)...\n", cache, cache->name);
-
-	mutex_lock(&cache->depot_lock);
-
-	/* Destroy empty magazines. */
-	LIST_FOREACH_SAFE(&cache->magazine_empty, iter) {
-		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-	}
-
-	/* Destroy full magazines until the slab count decreases. */
-	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
-		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-
-		/* Stop reclaiming if the resource level is now OK. TODO: Is
-		 * this the best thing to do? It may be better to try to
-		 * reclaim a bit more after the level becomes OK, to reduce the
-		 * frequency of reclaims. */
-		if(lrm_level(RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE) == RESOURCE_LEVEL_OK) {
-			ret = true;
-			if(!force) {
-				break;
-			}
-		}
-	}
-
-	mutex_unlock(&cache->depot_lock);
-	return ret;
 }
 
 /** Allocate a constructed object from a slab cache.
@@ -794,8 +752,19 @@ slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
 void slab_cache_destroy(slab_cache_t *cache) {
 	assert(cache);
 
-	/* Destroy all magazines. */
-	slab_cache_reclaim(cache, true);
+	mutex_lock(&cache->depot_lock);
+
+	/* Destroy empty magazines. */
+	LIST_FOREACH_SAFE(&cache->magazine_empty, iter) {
+		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
+	}
+
+	/* Destroy full magazines. */
+	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
+		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
+	}
+
+	mutex_unlock(&cache->depot_lock);
 
 	mutex_lock(&cache->slab_lock);
 	if(!list_empty(&cache->slab_partial) || !list_empty(&cache->slab_full)) {
@@ -851,28 +820,6 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 	return KDB_SUCCESS;
 }
 
-/** Slab low resource handler function.
- * @todo		This should take into effect which caches are hot, and
- *			reclaim from them less frequently.
- * @param level		Resource level. */
-static void slab_reclaim(int level) {
-	/* Loop through all caches and reclaim. */
-	mutex_lock(&slab_caches_lock);
-	LIST_FOREACH(&slab_caches, iter) {
-		if(slab_cache_reclaim(list_entry(iter, slab_cache_t, header), false)) {
-			break;
-		}
-	}
-	mutex_unlock(&slab_caches_lock);
-}
-
-/** Slab low resource handler. */
-static lrm_handler_t slab_lrm_handler = {
-	.types = RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE,
-	.priority = LRM_SLAB_PRIORITY,
-	.func = slab_reclaim,
-};
-
 /** Initialize the slab allocator. */
 __init_text void slab_init(void) {
 	/* Intialise the cache for cache structures. */
@@ -889,9 +836,6 @@ __init_text void slab_init(void) {
 	                NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_BOOT);
 	slab_cache_init(&slab_slab_cache, "slab_slab_cache", SLAB_SIZE_ALIGN(slab_t),
 	                NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_BOOT);
-
-	/* Register the LRM handler. */
-	lrm_handler_register(&slab_lrm_handler);
 
 	/* Register the KDB command. */
 	kdb_register_command("slab", "Display slab cache statistics.", kdb_cmd_slab);

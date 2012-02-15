@@ -39,7 +39,6 @@
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
-#include <lrm.h>
 #include <status.h>
 
 #if CONFIG_FS_DEBUG
@@ -311,7 +310,8 @@ static status_t fs_node_free(fs_node_t *node) {
 	return STATUS_SUCCESS;
 }
 
-/** Low resource handler for the FS node cache.
+#if 0
+/** Reclaim space from the FS node cache.
  * @param level		Current resource level. */
 static void fs_node_reclaim(int level) {
 	fs_mount_t *mount;
@@ -376,13 +376,7 @@ static void fs_node_reclaim(int level) {
 
 	mutex_unlock(&unused_nodes_lock);
 }
-
-/** FS low resource handler. */
-static lrm_handler_t fs_lrm_handler = {
-	.types = RESOURCE_TYPE_MEMORY | RESOURCE_TYPE_KASPACE,
-	.priority = LRM_FS_PRIORITY,
-	.func = fs_node_reclaim,
-};
+#endif
 
 /** Look up a node in the filesystem.
  * @param path		Path string to look up.
@@ -2598,9 +2592,6 @@ static kdb_status_t kdb_cmd_node(int argc, char **argv, kdb_filter_t *filter) {
 __init_text void fs_init(void) {
 	fs_node_cache = slab_cache_create("fs_node_cache", sizeof(fs_node_t), 0,
 	                                  NULL, NULL, NULL, 0, MM_BOOT);
-
-	/* Register the low resource handler. */
-	lrm_handler_register(&fs_lrm_handler);
 
 	/* Register the KDB commands. */
 	kdb_register_command("mount", "Print a list of mounted filesystems.", kdb_cmd_mount);

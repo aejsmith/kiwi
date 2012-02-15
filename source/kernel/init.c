@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 Alex Smith
+ * Copyright (C) 2009-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,7 +49,6 @@
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
-#include <lrm.h>
 #include <module.h>
 #include <object.h>
 #include <setjmp.h>
@@ -75,6 +74,7 @@ extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
 static void kmain_bsp_bottom(void);
+static void init_thread(void *arg1, void *arg2);
 
 /** New stack for the boot CPU. */
 static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
@@ -90,81 +90,135 @@ static int current_init_progress __init_data = 10;
 static LIST_DECLARE(boot_module_list);
 static LIST_DECLARE(boot_fsimage_list);
 
-/** Iterate over the KBoot tag list.
- * @param type		Type of tag to iterate.
- * @param current	Pointer to current tag.
- * @return		Virtual address of next tag, or NULL if no more tags
- *			found. This memory must be unmapped after it has been
- *			used. This will be done if it is passed as the current
- *			argument to this function, or if it is passed to
- *			kboot_tag_release(). */
-__init_text void *kboot_tag_iterate(uint32_t type, void *current) {
-	kboot_tag_t *header = current, *tmp;
-	phys_ptr_t next;
+/** Main entry point of the kernel.
+ * @param magic		KBoot magic number.
+ * @param tags		Physical address of KBoot tag list. */
+__init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
+	jmp_buf buf;
 
-	do {
-		/* Get the address of the next tag. */
-		if(header) {
-			next = header->next;
-			phys_unmap(header, header->size, true);
-		} else {
-			next = kboot_tag_list;
-		}
-		if(!next) {
-			return NULL;
-		}
+	/* Save the tag list address. */
+	kboot_tag_list = tags;
 
-		/* First map with only the header size in order to get the full
-		 * size of the tag data. */
-		tmp = phys_map(next, sizeof(kboot_tag_t), MM_BOOT);
-		header = phys_map(next, tmp->size, MM_BOOT);
-		phys_unmap(tmp, sizeof(kboot_tag_t), true);
-	} while(header->type != type);
+	/* Make the debugger available as soon as possible. */
+	kdb_init();
 
-	return header;
-}
+	/* Bring up the debug console. */
+	console_early_init();
 
-/** Unmap a KBoot tag.
- * @param current	Address of tag to unmap. */
-__init_text void kboot_tag_release(void *current) {
-	kboot_tag_t *header = current;
-	phys_unmap(header, header->size, true);
-}
-
-/** Look up a KBoot option tag.
- * @param name		Name to look up.
- * @param type		Required option type.
- * @return		Pointer to tag. Must be released. */
-static __init_text kboot_tag_option_t *lookup_option(const char *name, uint32_t type) {
-	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
-		if(strcmp(tag->name, name) == 0) {
-			if(tag->type != type) {
-				fatal("Boot option '%s' has incorrect type", name);
-			}
-			return tag;
-		}
+	/* Check the magic number. */
+	if(magic != KBOOT_MAGIC) {
+		kprintf(LOG_ERROR, "Not loaded by a KBoot-compliant loader\n");
+		cpu_halt();
 	}
 
-	fatal("Requested boot option '%s' not found", name);
+	/* Currently we are running on a stack set up for us by the loader.
+	 * This stack is most likely in a mapping that will go away once the
+	 * memory management subsystems are brought up. Therefore, the first
+	 * thing we do is move over to a new stack that is mapped along with
+	 * the kernel. */
+	initjmp(buf, kmain_bsp_bottom, boot_stack, KSTACK_SIZE);
+	longjmp(buf, 1);
 }
 
-/** Get the value of a KBoot boolean option.
- * @param name		Name of the option.
- * @return		Value of the option. */
-__init_text bool kboot_boolean_option(const char *name) {
-	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_BOOLEAN);
-	assert(tag->size == sizeof(bool));
-	return *(bool *)&tag[1];
+/** Initialization code for the boot CPU. */
+static __init_text void kmain_bsp_bottom(void) {
+	status_t ret;
+
+	/* Do early CPU subsystem and CPU initialization. */
+	cpu_early_init();
+	cpu_early_init_percpu(&boot_cpu);
+
+	/* Initialize the security subsystem. */
+	security_init();
+
+	/* Initialize kernel memory management subsystems. */
+	page_init();
+	mmu_init();
+	mmu_init_percpu();
+	kmem_init();
+	slab_init();
+	malloc_init();
+
+	/* Set up the console. */
+	console_init();
+	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
+
+	/* Perform more per-CPU initialization that can be done now the memory
+	 * management subsystems are up. */
+	cpu_init_percpu();
+
+	/* Initialize the platform. */
+	platform_init();
+
+	/* Get the time from the hardware. */
+	time_init();
+
+#if CONFIG_DEBUGGER_DELAY > 0
+	/* Delay to allow GDB to be connected. */
+	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
+	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
+#endif
+
+	/* Properly initialize the CPU subsystem, and detect other CPUs. */
+	cpu_init();
+#if CONFIG_SMP
+	smp_init();
+#endif
+	/* Initialize the slab per-CPU layer. */
+	slab_late_init();
+
+	/* Perform other initialization tasks. */
+	symbol_init();
+	handle_init();
+	session_init();
+	process_init();
+	thread_init();
+	sched_init_percpu();
+	sched_init();
+	dpc_init();
+
+	/* Bring up the VM system. */
+	vm_init();
+
+	/* Create the second stage initialization thread. */
+	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, NULL);
+	if(ret != STATUS_SUCCESS) {
+		fatal("Could not create second-stage initialization thread");
+	}
+
+	/* Finally begin executing other threads. */
+	sched_enter();
 }
 
-/** Get the value of a KBoot integer option.
- * @param name		Name of the option.
- * @return		Value of the option. */
-__init_text uint64_t kboot_integer_option(const char *name) {
-	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_INTEGER);
-	assert(tag->size == sizeof(uint64_t));
-	return *(uint64_t *)&tag[1];
+#if CONFIG_SMP
+/** Kernel entry point for a secondary CPU.
+ * @param cpu		Pointer to CPU structure for the CPU. */
+__init_text void kmain_ap(cpu_t *cpu) {
+	/* Indicate that we have reached the kernel. */
+	smp_boot_status = SMP_BOOT_ALIVE;
+
+	/* Switch to the kernel MMU context and perform CPU initialization. */
+	mmu_init_percpu();
+	cpu_early_init_percpu(cpu);
+	cpu_init_percpu();
+
+	/* Initialize the scheduler. */
+	sched_init_percpu();
+
+	/* Signal that we're up and add ourselves to the running CPU list. */
+	cpu->state = CPU_RUNNING;
+	list_append(&running_cpus, &curr_cpu->header);
+	smp_boot_status = SMP_BOOT_BOOTED;
+
+	/* Wait for remaining CPUs to be brought up. */
+	while(smp_boot_status != SMP_BOOT_COMPLETE) {
+		cpu_spin_hint();
+	}
+
+	/* Begin scheduling threads. */
+	sched_enter();
 }
+#endif
 
 /** Remove a module from the module list.
  * @param mod		Module to remove. */
@@ -346,133 +400,79 @@ static void init_thread(void *arg1, void *arg2) {
 	}
 }
 
-/** Main entry point of the kernel.
- * @param magic		KBoot magic number.
- * @param tags		Physical address of KBoot tag list. */
-__init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
-	jmp_buf buf;
+/** Iterate over the KBoot tag list.
+ * @param type		Type of tag to iterate.
+ * @param current	Pointer to current tag.
+ * @return		Virtual address of next tag, or NULL if no more tags
+ *			found. This memory must be unmapped after it has been
+ *			used. This will be done if it is passed as the current
+ *			argument to this function, or if it is passed to
+ *			kboot_tag_release(). */
+__init_text void *kboot_tag_iterate(uint32_t type, void *current) {
+	kboot_tag_t *header = current, *tmp;
+	phys_ptr_t next;
 
-	/* Save the tag list address. */
-	kboot_tag_list = tags;
+	do {
+		/* Get the address of the next tag. */
+		if(header) {
+			next = header->next;
+			phys_unmap(header, header->size, true);
+		} else {
+			next = kboot_tag_list;
+		}
+		if(!next) {
+			return NULL;
+		}
 
-	/* Make the debugger available as soon as possible. */
-	kdb_init();
+		/* First map with only the header size in order to get the full
+		 * size of the tag data. */
+		tmp = phys_map(next, sizeof(kboot_tag_t), MM_BOOT);
+		header = phys_map(next, tmp->size, MM_BOOT);
+		phys_unmap(tmp, sizeof(kboot_tag_t), true);
+	} while(header->type != type);
 
-	/* Bring up the debug console. */
-	console_early_init();
-
-	/* Check the magic number. */
-	if(magic != KBOOT_MAGIC) {
-		kprintf(LOG_ERROR, "Not loaded by a KBoot-compliant loader\n");
-		cpu_halt();
-	}
-
-	/* Currently we are running on a stack set up for us by the loader.
-	 * This stack is most likely in a mapping that will go away once the
-	 * memory management subsystems are brought up. Therefore, the first
-	 * thing we do is move over to a new stack that is mapped along with
-	 * the kernel. */
-	initjmp(buf, kmain_bsp_bottom, boot_stack, KSTACK_SIZE);
-	longjmp(buf, 1);
+	return header;
 }
 
-/** Initialization code for the boot CPU. */
-static __init_text void kmain_bsp_bottom(void) {
-	status_t ret;
-
-	/* Do early CPU subsystem and CPU initialization. */
-	cpu_early_init();
-	cpu_early_init_percpu(&boot_cpu);
-
-	/* Initialize the security subsystem. */
-	security_init();
-
-	/* Initialize kernel memory management subsystems. */
-	page_init();
-	mmu_init();
-	mmu_init_percpu();
-	kmem_init();
-	slab_init();
-	malloc_init();
-
-	/* Set up the console. */
-	console_init();
-	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
-
-	/* Perform more per-CPU initialization that can be done now the memory
-	 * management subsystems are up. */
-	cpu_init_percpu();
-
-	/* Initialize the platform. */
-	platform_init();
-
-	/* Get the time from the hardware. */
-	time_init();
-
-#if CONFIG_DEBUGGER_DELAY > 0
-	/* Delay to allow GDB to be connected. */
-	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
-	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
-#endif
-
-	/* Properly initialize the CPU subsystem, and detect other CPUs. */
-	cpu_init();
-#if CONFIG_SMP
-	smp_init();
-#endif
-	/* Initialize the slab per-CPU layer. */
-	slab_late_init();
-
-	/* Perform other initialization tasks. */
-	symbol_init();
-	handle_init();
-	session_init();
-	process_init();
-	thread_init();
-	sched_init_percpu();
-	sched_init();
-	dpc_init();
-	lrm_init();
-
-	/* Bring up the VM system. */
-	vm_init();
-
-	/* Create the second stage initialization thread. */
-	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
-		fatal("Could not create second-stage initialization thread");
-	}
-
-	/* Finally begin executing other threads. */
-	sched_enter();
+/** Unmap a KBoot tag.
+ * @param current	Address of tag to unmap. */
+__init_text void kboot_tag_release(void *current) {
+	kboot_tag_t *header = current;
+	phys_unmap(header, header->size, true);
 }
 
-#if CONFIG_SMP
-/** Kernel entry point for a secondary CPU.
- * @param cpu		Pointer to CPU structure for the CPU. */
-__init_text void kmain_ap(cpu_t *cpu) {
-	/* Indicate that we have reached the kernel. */
-	smp_boot_status = SMP_BOOT_ALIVE;
-
-	/* Switch to the kernel MMU context and perform CPU initialization. */
-	mmu_init_percpu();
-	cpu_early_init_percpu(cpu);
-	cpu_init_percpu();
-
-	/* Initialize the scheduler. */
-	sched_init_percpu();
-
-	/* Signal that we're up and add ourselves to the running CPU list. */
-	cpu->state = CPU_RUNNING;
-	list_append(&running_cpus, &curr_cpu->header);
-	smp_boot_status = SMP_BOOT_BOOTED;
-
-	/* Wait for remaining CPUs to be brought up. */
-	while(smp_boot_status != SMP_BOOT_COMPLETE) {
-		cpu_spin_hint();
+/** Look up a KBoot option tag.
+ * @param name		Name to look up.
+ * @param type		Required option type.
+ * @return		Pointer to tag. Must be released. */
+static __init_text kboot_tag_option_t *lookup_option(const char *name, uint32_t type) {
+	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
+		if(strcmp(tag->name, name) == 0) {
+			if(tag->type != type) {
+				fatal("Boot option '%s' has incorrect type", name);
+			}
+			return tag;
+		}
 	}
 
-	/* Begin scheduling threads. */
-	sched_enter();
+	fatal("Requested boot option '%s' not found", name);
 }
-#endif
+
+/** Get the value of a KBoot boolean option.
+ * @param name		Name of the option.
+ * @return		Value of the option. */
+__init_text bool kboot_boolean_option(const char *name) {
+	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_BOOLEAN);
+	assert(tag->size == sizeof(bool));
+	return *(bool *)&tag[1];
+}
+
+/** Get the value of a KBoot integer option.
+ * @param name		Name of the option.
+ * @return		Value of the option. */
+__init_text uint64_t kboot_integer_option(const char *name) {
+	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_INTEGER);
+	assert(tag->size == sizeof(uint64_t));
+	return *(uint64_t *)&tag[1];
+}
+

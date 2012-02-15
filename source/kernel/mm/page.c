@@ -87,7 +87,6 @@
 #include <kboot.h>
 #include <kdb.h>
 #include <kernel.h>
-#include <lrm.h>
 #include <status.h>
 #include <time.h>
 
@@ -121,7 +120,6 @@ typedef struct page_freelist {
 
 /** Page writer settings. */
 #define PAGE_WRITER_INTERVAL		SECS2USECS(4)
-#define PAGE_WRITER_LOW_INTERVAL	SECS2USECS(2)
 #define PAGE_WRITER_MAX_PER_RUN		128
 
 /** Number of page queues. */
@@ -154,11 +152,8 @@ static void page_writer(void *arg1, void *arg2) {
 	page_t *page;
 
 	while(true) {
-		if(lrm_level(RESOURCE_TYPE_MEMORY) >= RESOURCE_LEVEL_LOW) {
-			delay(PAGE_WRITER_LOW_INTERVAL);
-		} else {
-			delay(PAGE_WRITER_INTERVAL);
-		}
+		/* TODO: When low on memory, should write pages more often. */
+		delay(PAGE_WRITER_INTERVAL);
 
 		/* Place the marker at the beginning of the queue to begin with. */
 		written = 0;
@@ -187,8 +182,9 @@ static void page_writer(void *arg1, void *arg2) {
 		spinlock_unlock(&queue->lock);
 	}
 }
+
 #if 0
-/** Cache flush low resource handler function.
+/** Reclaim cached pages.
  * @param level		Resource level. */
 static void vm_cache_reclaim(int level) {
 	page_queue_t *queue = &page_queues[PAGE_QUEUE_CACHED];
@@ -220,13 +216,6 @@ static void vm_cache_reclaim(int level) {
 
 	spinlock_unlock(&queue->lock);
 }
-
-/** Slab low resource handler. */
-static lrm_handler_t vm_cache_lrm_handler = {
-	.types = RESOURCE_TYPE_MEMORY,
-	.priority = LRM_CACHE_PRIORITY,
-	.func = vm_cache_reclaim,
-};
 #endif
 
 /** Append page onto the end of a page queue.
@@ -352,7 +341,7 @@ page_t *page_alloc(int mmflag) {
 		fatal("Unable to satisfy boot page allocation");
 	} else if(mmflag & MM_WAIT) {
 		/* TODO: Try harder. */
-		fatal("Oh god help");
+		fatal("TODO: Reclaim/wait for memory");
 	}
 
 	mutex_unlock(&free_page_lock);
@@ -615,7 +604,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 		if(mmflag & MM_BOOT) {
 			fatal("Unable to satisfy boot allocation of %zu page(s)", count);
 		} else if(mmflag & MM_WAIT) {
-			fatal("Oh god help");
+			fatal("TODO: Reclaim/wait for memory");
 		}
 
 		mutex_unlock(&free_page_lock);

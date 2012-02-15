@@ -348,7 +348,7 @@ ptr_t kmem_raw_alloc(size_t size, int mmflag) {
 		if(mmflag & MM_BOOT) {
 			fatal("Exhausted kernel memory during boot");
 		} else if(mmflag & MM_WAIT) {
-			fatal("Oh god help");
+			fatal("TODO: Reclaim/wait for memory");
 		}
 
 		mutex_unlock(&kmem_lock);
