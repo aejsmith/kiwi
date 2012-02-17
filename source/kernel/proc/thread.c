@@ -209,8 +209,9 @@ void thread_retain(thread_t *thread) {
  * Decrease the reference count of a thread.
  *
  * Decreases the reference count of a thread. This should be called once you
- * no longer require a thread (that you previously called thread_retain() on).
- * Once the reference count reaches 0, the thread will be destroyed.
+ * no longer require a thread object (that was returned from thread_create() or
+ * thread_lookup(), or that you previously called thread_retain() on). Once the
+ * reference count reaches 0, the thread will be destroyed.
  *
  * @param thread	Thread to release.
  */
