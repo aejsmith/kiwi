@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,24 +16,26 @@
 
 /**
  * @file
- * @brief		ID allocator.
+ * @brief		Object ID allocator.
  */
 
-#ifndef __LIB_ID_ALLOC_H
-#define __LIB_ID_ALLOC_H
+#ifndef __LIB_ID_ALLOCATOR_H
+#define __LIB_ID_ALLOCATOR_H
 
 #include <lib/bitmap.h>
 #include <sync/mutex.h>
 
 /** ID allocator structure. */
-typedef struct id_alloc {
+typedef struct id_allocator {
 	mutex_t lock;			/**< Lock to protect the allocator. */
 	bitmap_t bitmap;		/**< Bitmap of IDs. */
-} id_alloc_t;
+} id_allocator_t;
 
-extern int32_t id_alloc_get(id_alloc_t *alloc);
-extern void id_alloc_release(id_alloc_t *alloc, int32_t id);
-extern void id_alloc_reserve(id_alloc_t *alloc, int32_t id);
-extern void id_alloc_init(id_alloc_t *alloc, int32_t max);
+extern int32_t id_allocator_alloc(id_allocator_t *alloc);
+extern void id_allocator_free(id_allocator_t *alloc, int32_t id);
+extern void id_allocator_reserve(id_allocator_t *alloc, int32_t id);
 
-#endif /* __LIB_ID_ALLOC_H */
+extern status_t id_allocator_init(id_allocator_t *alloc, int32_t max, int mmflag);
+extern void id_allocator_destroy(id_allocator_t *alloc);
+
+#endif /* __LIB_ID_ALLOCATOR_H */

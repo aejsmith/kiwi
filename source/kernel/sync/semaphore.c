@@ -25,7 +25,7 @@
 #include <kernel/semaphore.h>
 
 #include <lib/avl_tree.h>
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <lib/refcount.h>
 
 #include <mm/malloc.h>
@@ -52,7 +52,7 @@ typedef struct user_semaphore {
 } user_semaphore_t;
 
 /** User semaphore ID allocator. */
-static id_alloc_t semaphore_id_allocator;
+static id_allocator_t semaphore_id_allocator;
 
 /** Tree of user semaphores. */
 static AVL_TREE_DECLARE(semaphore_tree);
@@ -132,7 +132,7 @@ static void user_semaphore_release(user_semaphore_t *sem) {
 		rwlock_unlock(&semaphore_tree_lock);
 
 		object_destroy(&sem->obj);
-		id_alloc_release(&semaphore_id_allocator, sem->id);
+		id_allocator_free(&semaphore_id_allocator, sem->id);
 		kfree(sem);
 	}
 }
@@ -183,7 +183,7 @@ status_t kern_semaphore_create(const char *name, size_t count, const object_secu
 	}
 
 	sem = kmalloc(sizeof(user_semaphore_t), MM_WAIT);
-	sem->id = id_alloc_get(&semaphore_id_allocator);
+	sem->id = id_allocator_alloc(&semaphore_id_allocator);
 	if(sem->id < 0) {
 		kfree(sem);
 		object_security_destroy(&ksecurity);
@@ -192,7 +192,7 @@ status_t kern_semaphore_create(const char *name, size_t count, const object_secu
 	if(name) {
 		ret = strndup_from_user(name, SEMAPHORE_NAME_MAX, &sem->name);
 		if(ret != STATUS_SUCCESS) {
-			id_alloc_release(&semaphore_id_allocator, sem->id);
+			id_allocator_free(&semaphore_id_allocator, sem->id);
 			kfree(sem);
 			object_security_destroy(&ksecurity);
 			return ret;
@@ -326,6 +326,6 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 
 /** Initialize the semaphore ID allocator. */
 static __init_text void semaphore_id_init(void) {
-	id_alloc_init(&semaphore_id_allocator, 65535);
+	id_allocator_init(&semaphore_id_allocator, 65535, MM_BOOT);
 }
 INITCALL(semaphore_id_init);

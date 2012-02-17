@@ -19,7 +19,7 @@
  * @brief		Session management.
  */
 
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <mm/malloc.h>
 #include <proc/session.h>
 #include <kernel.h>
@@ -31,7 +31,7 @@
 #endif
 
 /** Session ID allocator. */
-static id_alloc_t session_id_allocator;
+static id_allocator_t session_id_allocator;
 
 /** Create a new session.
  * @return		Pointer to created session with 1 reference on, or NULL
@@ -41,7 +41,7 @@ session_t *session_create(void) {
 
 	session = kmalloc(sizeof(*session), MM_WAIT);
 	refcount_set(&session->count, 1);
-	session->id = id_alloc_get(&session_id_allocator);
+	session->id = id_allocator_alloc(&session_id_allocator);
 	if(session->id < 0) {
 		kfree(session);
 		return NULL;
@@ -62,12 +62,12 @@ void session_get(session_t *session) {
 void session_release(session_t *session) {
 	if(refcount_dec(&session->count) == 0) {
 		dprintf("session: destroyed session %d\n", session->id);
-		id_alloc_release(&session_id_allocator, session->id);
+		id_allocator_free(&session_id_allocator, session->id);
 		kfree(session);
 	}
 }
 
 /** Initialize the session ID allocator. */
 __init_text void session_init(void) {
-	id_alloc_init(&session_id_allocator, 4095);
+	id_allocator_init(&session_id_allocator, 4095, MM_BOOT);
 }

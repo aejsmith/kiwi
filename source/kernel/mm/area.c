@@ -27,7 +27,7 @@
 #include <kernel/area.h>
 
 #include <lib/avl_tree.h>
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <lib/refcount.h>
 
 #include <mm/malloc.h>
@@ -61,7 +61,7 @@ typedef struct area {
 } area_t;
 
 /** Memory area ID allocator. */
-static id_alloc_t area_id_allocator;
+static id_allocator_t area_id_allocator;
 
 /** Slab cache for memory area structures. */
 static slab_cache_t *area_cache;
@@ -101,7 +101,7 @@ static void area_release(area_t *area) {
 		if(area->source) {
 			object_handle_release(area->source);
 		}
-		id_alloc_release(&area_id_allocator, area->id);
+		id_allocator_free(&area_id_allocator, area->id);
 		object_destroy(&area->obj);
 		slab_cache_free(area_cache, area);
 	}
@@ -246,7 +246,7 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 	}
 
 	area = slab_cache_alloc(area_cache, MM_WAIT);
-	area->id = id_alloc_get(&area_id_allocator);
+	area->id = id_allocator_alloc(&area_id_allocator);
 	if(area->id < 0) {
 		slab_cache_free(area_cache, area);
 		object_security_destroy(&ksecurity);
@@ -372,7 +372,7 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 
 /** Initialize the memory area system. */
 static __init_text void area_init(void) {
-	id_alloc_init(&area_id_allocator, 65535);
+	id_allocator_init(&area_id_allocator, 65535, MM_BOOT);
 	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
 	                               NULL, NULL, 0, MM_BOOT);
 }

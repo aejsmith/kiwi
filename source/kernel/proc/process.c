@@ -21,7 +21,7 @@
 
 #include <arch/memory.h>
 
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <lib/string.h>
 
 #include <io/fs.h>
@@ -88,7 +88,7 @@ static AVL_TREE_DECLARE(process_tree);
 static RWLOCK_DECLARE(process_tree_lock);
 
 /** Process ID allocator. */
-static id_alloc_t process_id_allocator;
+static id_allocator_t process_id_allocator;
 
 /** Cache for process structures. */
 static slab_cache_t *process_cache;
@@ -145,7 +145,7 @@ static void process_destroy(process_t *process) {
 	session_release(process->session);
 	notifier_clear(&process->death_notifier);
 	object_destroy(&process->obj);
-	id_alloc_release(&process_id_allocator, process->id);
+	id_allocator_free(&process_id_allocator, process->id);
 	kfree(process->name);
 	slab_cache_free(process_cache, process);
 }
@@ -346,7 +346,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* Attempt to allocate a process ID. If creating the kernel process,
 	 * always give it an ID of 0. */
 	if(kernel_proc) {
-		process->id = id_alloc_get(&process_id_allocator);
+		process->id = id_allocator_alloc(&process_id_allocator);
 		if(process->id < 0) {
 			slab_cache_free(process_cache, process);
 			return STATUS_PROCESS_LIMIT;
@@ -360,7 +360,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 		ret = handle_table_create((parent) ? parent->handles : NULL, map, count, &table);
 		if(ret != STATUS_SUCCESS) {
 			if(kernel_proc) {
-				id_alloc_release(&process_id_allocator, process->id);
+				id_allocator_free(&process_id_allocator, process->id);
 			}
 			slab_cache_free(process_cache, process);
 			return ret;
@@ -784,8 +784,8 @@ __init_text void process_init(void) {
 
 	/* Create the process ID allocator. We reserve ID 0 as it is always
 	 * given to the kernel process. */
-	id_alloc_init(&process_id_allocator, 65535);
-	id_alloc_reserve(&process_id_allocator, 0);
+	id_allocator_init(&process_id_allocator, 65535, MM_BOOT);
+	id_allocator_reserve(&process_id_allocator, 0);
 
 	/* Create the process slab cache. */
 	process_cache = slab_cache_create("process_cache", SLAB_SIZE_ALIGN(process_t),

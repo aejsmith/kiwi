@@ -39,7 +39,7 @@ sources = FeatureSources(config, [
 	'lib/avl_tree.c',
 	'lib/bitmap.c',
 	'lib/fixed_heap.c',
-	'lib/id_alloc.c',
+	'lib/id_allocator.c',
 	'lib/notifier.c',
 	'lib/printf.c',
 	'lib/qsort.c',

@@ -37,7 +37,7 @@
 #include <ipc/ipc.h>
 
 #include <lib/avl_tree.h>
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <lib/notifier.h>
 #include <lib/refcount.h>
 
@@ -124,7 +124,7 @@ static slab_cache_t *ipc_port_cache;
 static slab_cache_t *ipc_connection_cache;
 
 /** Port ID allocator. */
-static id_alloc_t port_id_allocator;
+static id_allocator_t port_id_allocator;
 
 /** Tree of all open ports. */
 static AVL_TREE_DECLARE(port_tree);
@@ -205,7 +205,7 @@ static void ipc_port_release(ipc_port_t *port) {
 		mutex_unlock(&port->lock);
 
 		dprintf("ipc: destroyed port %d (%p)\n", port->id, port);
-		id_alloc_release(&port_id_allocator, port->id);
+		id_allocator_free(&port_id_allocator, port->id);
 		slab_cache_free(ipc_port_cache, port);
 	}
 }
@@ -459,7 +459,7 @@ status_t kern_port_create(const object_security_t *security, object_rights_t rig
 	}
 
 	port = slab_cache_alloc(ipc_port_cache, MM_WAIT);
-	port->id = id_alloc_get(&port_id_allocator);
+	port->id = id_allocator_alloc(&port_id_allocator);
 	if(port->id < 0) {
 		slab_cache_free(ipc_port_cache, port);
 		object_security_destroy(&ksecurity);
@@ -1157,7 +1157,7 @@ static kdb_status_t kdb_cmd_endpoint(int argc, char **argv, kdb_filter_t *filter
 /** Initialize the IPC slab caches. */
 static __init_text void ipc_init(void) {
 	/* Initialize the port ID allocator. */
-	id_alloc_init(&port_id_allocator, 65535);
+	id_allocator_init(&port_id_allocator, 65535, MM_BOOT);
 
 	/* Create the IPC structure caches. */
 	ipc_port_cache = slab_cache_create("ipc_port_cache", sizeof(ipc_port_t), 0,

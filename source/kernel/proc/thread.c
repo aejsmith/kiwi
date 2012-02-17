@@ -49,7 +49,7 @@
 
 #include <arch/memory.h>
 
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 #include <lib/string.h>
 
 #include <mm/kmem.h>
@@ -90,7 +90,7 @@ static AVL_TREE_DECLARE(thread_tree);
 static RWLOCK_DECLARE(thread_tree_lock);
 
 /** Thread ID allocator. */
-static id_alloc_t thread_id_allocator;
+static id_allocator_t thread_id_allocator;
 
 /** Thread structure cache. */
 static slab_cache_t *thread_cache;
@@ -240,7 +240,7 @@ void thread_release(thread_t *thread) {
 	object_destroy(&thread->obj);
 
 	/* Deallocate the thread ID. */
-	id_alloc_release(&thread_id_allocator, thread->id);
+	id_allocator_free(&thread_id_allocator, thread->id);
 
 	dprintf("thread: destroyed thread %" PRId32 " (%s) (thread: %p)\n", thread->id,
 	        thread->name, thread);
@@ -760,7 +760,7 @@ status_t thread_create(const char *name, process_t *owner, unsigned flags, threa
 	thread = slab_cache_alloc(thread_cache, MM_WAIT);
 
 	/* Allocate an ID for the thread. */
-	thread->id = id_alloc_get(&thread_id_allocator);
+	thread->id = id_allocator_alloc(&thread_id_allocator);
 	if(thread->id < 0) {
 		slab_cache_free(thread_cache, thread);
 		return STATUS_THREAD_LIMIT;
@@ -955,7 +955,7 @@ static kdb_status_t kdb_cmd_kill(int argc, char **argv, kdb_filter_t *filter) {
 /** Initialize the thread system. */
 __init_text void thread_init(void) {
 	/* Initialize the thread ID allocator. */
-	id_alloc_init(&thread_id_allocator, 65535);
+	id_allocator_init(&thread_id_allocator, 65535, MM_BOOT);
 
 	/* Create the thread slab cache. */
 	thread_cache = slab_cache_create("thread_cache", SLAB_SIZE_ALIGN(thread_t),

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2012 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,22 +16,22 @@
 
 /**
  * @file
- * @brief		ID allocator.
+ * @brief		Object ID allocator.
  */
 
-#include <lib/id_alloc.h>
+#include <lib/id_allocator.h>
 
 #include <assert.h>
+#include <status.h>
 
 /** Allocate a new ID.
  * @param alloc		Allocator to allocate from.
  * @return		New ID, or -1 if no IDs available. */
-int32_t id_alloc_get(id_alloc_t *alloc) {
+int32_t id_allocator_alloc(id_allocator_t *alloc) {
 	int id;
 
 	mutex_lock(&alloc->lock);
 
-	/* Find a handle ID in the table. */
 	id = bitmap_ffz(&alloc->bitmap);
 	if(id < 0) {
 		mutex_unlock(&alloc->lock);
@@ -39,6 +39,7 @@ int32_t id_alloc_get(id_alloc_t *alloc) {
 	}
 
 	bitmap_set(&alloc->bitmap, id);
+
 	mutex_unlock(&alloc->lock);
 	return id;
 }
@@ -46,7 +47,7 @@ int32_t id_alloc_get(id_alloc_t *alloc) {
 /** Free a previously allocated ID.
  * @param alloc		Allocator to free to.
  * @param id		ID to free. */
-void id_alloc_release(id_alloc_t *alloc, int32_t id) {
+void id_allocator_free(id_allocator_t *alloc, int32_t id) {
 	mutex_lock(&alloc->lock);
 
 	assert(bitmap_test(&alloc->bitmap, id));
@@ -58,7 +59,7 @@ void id_alloc_release(id_alloc_t *alloc, int32_t id) {
 /** Reserve an ID in the allocator.
  * @param alloc		Allocator to reserve in.
  * @param id		ID to reserve. */
-void id_alloc_reserve(id_alloc_t *alloc, int32_t id) {
+void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
 	mutex_lock(&alloc->lock);
 
 	assert(!bitmap_test(&alloc->bitmap, id));
@@ -67,10 +68,18 @@ void id_alloc_reserve(id_alloc_t *alloc, int32_t id) {
 	mutex_unlock(&alloc->lock);
 }
 
-/** Initialize an ID allocator.
- * @param alloc		Allocator to initialize.
- * @param max		Highest allowed ID. */
-void id_alloc_init(id_alloc_t *alloc, int32_t max) {
-	mutex_init(&alloc->lock, "id_alloc_lock", 0);
-	bitmap_init(&alloc->bitmap, max + 1, NULL, MM_WAIT);
+/** Initialise an ID allocator.
+ * @param alloc		Allocator to initialise.
+ * @param max		Highest allowed ID.
+ * @param mmflag	Allocation behaviour flags.
+ * @return		Status code describing the result of the operation. */
+status_t id_allocator_init(id_allocator_t *alloc, int32_t max, int mmflag) {
+	mutex_init(&alloc->lock, "id_allocator_lock", 0);
+	return bitmap_init(&alloc->bitmap, max + 1, NULL, mmflag);
+}
+
+/** Destroy an ID allocator.
+ * @param alloc		Allocator to destroy. */
+void id_allocator_destroy(id_allocator_t *alloc) {
+	bitmap_destroy(&alloc->bitmap);
 }
