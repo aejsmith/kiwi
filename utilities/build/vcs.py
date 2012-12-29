@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2011 Alex Smith
+# Copyright (C) 2011-2012 Alex Smith
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -14,16 +14,22 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-# Obtain the revision number from the Mercurial repository.
+# Obtain the revision number from the Git repository.
 def revision_id():
+	# FIXME: Code currently expects an integer so can't return hash.
+	return 0
+
+# Check whether submodules are up to date.
+def check_submodules():
+	# FIXME: If SHA does not match, should check if it is ahead or behind
+	# the one set in the repo. If it is ahead, that's acceptable.
 	try:
 		from subprocess import Popen, PIPE
-		hg = Popen(['hg', 'identify', '-n'], stdout = PIPE, stderr = PIPE)
-		rev = hg.communicate()[0].strip()
-		if hg.returncode != 0:
-			return 0
-		if rev[-1] == '+':
-			rev = rev[0:-1]
-		return int(rev)
+		git = Popen(['git', 'submodule', 'status'], stdout = PIPE, stderr = PIPE)
+		modules = git.communicate()[0].split('\n')
+		for module in modules:
+			if len(module) and module[0] != ' ':
+				return False
+		return True
 	except:
-		return 0
+		return True

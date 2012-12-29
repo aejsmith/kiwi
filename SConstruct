@@ -248,6 +248,10 @@ def RequireTarget(target, error):
 # Change the Decider to MD5-timestamp to speed up the build a bit.
 Decider('MD5-timestamp')
 
+# Check if Git submodules are up-to-date.
+if not vcs.check_submodules():
+	raise SCons.Errors.StopError("Submodules outdated. Please run 'git submodule update --init'.")
+
 # Set revision to the VCS revision number.
 version['KIWI_VER_REVISION'] = vcs.revision_id()
 
