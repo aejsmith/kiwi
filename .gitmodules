@@ -1,0 +1,3 @@
+[submodule "3rdparty/kboot"]
+	path = 3rdparty/kboot
+	url = git://git.alex-smith.me.uk/kiwi/kboot.git
