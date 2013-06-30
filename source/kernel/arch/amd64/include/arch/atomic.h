@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,7 +46,10 @@ static inline void atomic_set(atomic_t *var, int32_t val) {
  * @param val		Value to add.
  * @return		Previous value of variable. */
 static inline int32_t atomic_add(atomic_t *var, int32_t val) {
-	__asm__ volatile("lock xaddl %0, %1" : "+r"(val), "+m"(*var) :: "memory");
+	__asm__ volatile(
+		"lock xaddl %0, %1"
+		: "+r"(val), "+m"(*var)
+		:: "memory");
 	return val;
 }
 
@@ -56,6 +59,18 @@ static inline int32_t atomic_add(atomic_t *var, int32_t val) {
  * @return		Previous value of variable. */
 static inline int32_t atomic_sub(atomic_t *var, int32_t val) {
 	return atomic_add(var, -val);
+}
+
+/** Swap the value of an atomic variable.
+ * @param var		Pointer to atomic variable.
+ * @param val		Value to set to.
+ * @return		Previous value of the variable. */
+static inline int32_t atomic_swap(atomic_t *var, int32_t val) {
+	__asm__ volatile(
+		"lock xchgl %0, %1"
+		: "+r"(val), "+m"(*var)
+		:: "memory");
+	return val;
 }
 
 /**
@@ -68,18 +83,18 @@ static inline int32_t atomic_sub(atomic_t *var, int32_t val) {
  * @param cmp		Value to compare with.
  * @param val		Value to set to if equal.
  *
- * @return		True if were equal, false if not.
+ * @return		Previous value of variable. If this is equal to cmp,
+ *			the operation succeeded.
  */
-static inline bool atomic_cas(atomic_t *var, int32_t cmp, int32_t val) {
-	unsigned int r;
+static inline int32_t atomic_cas(atomic_t *var, int32_t cmp, int32_t val) {
+	int32_t r;
 
-	__asm__ volatile("lock\n\t"
-	                 "cmpxchgl	%3, %1\n\t"
-	                 "setz		%%al\n\t"
-	                 "movzx		%%al, %0"
-	                 : "=a"(r), "+m"(*var)
-	                 : "0"(cmp), "r"(val));
-        return r;
+	__asm__ volatile(
+		"lock\n\t"
+		"cmpxchgl	%3, %1\n\t"
+		: "=a"(r), "+m"(*var)
+		: "0"(cmp), "r"(val));
+	return r;
 }
 
 /** Atomic variable type (64-bit). */
@@ -104,7 +119,10 @@ static inline void atomic_set64(atomic64_t *var, int64_t val) {
  * @param val		Value to add.
  * @return		Previous value of variable. */
 static inline int64_t atomic_add64(atomic64_t *var, int64_t val) {
-	__asm__ volatile("lock xaddq %0, %1" : "+r"(val), "+m"(*var) :: "memory");
+	__asm__ volatile(
+		"lock xaddq %0, %1"
+		: "+r"(val), "+m"(*var)
+		:: "memory");
 	return val;
 }
 
@@ -114,6 +132,18 @@ static inline int64_t atomic_add64(atomic64_t *var, int64_t val) {
  * @return		Previous value of variable. */
 static inline int64_t atomic_sub64(atomic64_t *var, int64_t val) {
 	return atomic_add64(var, -val);
+}
+
+/** Swap the value of an atomic variable.
+ * @param var		Pointer to atomic variable.
+ * @param val		Value to set to.
+ * @return		Previous value of the variable. */
+static inline int64_t atomic_swap64(atomic64_t *var, int64_t val) {
+	__asm__ volatile(
+		"lock xchgq %0, %1"
+		: "+r"(val), "+m"(*var)
+		:: "memory");
+	return val;
 }
 
 /**
@@ -126,18 +156,18 @@ static inline int64_t atomic_sub64(atomic64_t *var, int64_t val) {
  * @param cmp		Value to compare with.
  * @param val		Value to set to if equal.
  *
- * @return		True if were equal, false if not.
+ * @return		Previous value of variable. If this is equal to cmp,
+ *			the operation succeeded.
  */
-static inline bool atomic_cas64(atomic64_t *var, int64_t cmp, int64_t val) {
-	unsigned int r;
+static inline int64_t atomic_cas64(atomic64_t *var, int64_t cmp, int64_t val) {
+	int64_t r;
 
-	__asm__ volatile("lock\n\t"
-	                 "cmpxchgq	%3, %1\n\t"
-	                 "setz		%%al\n\t"
-	                 "movzx		%%al, %0"
-	                 : "=a"(r), "+m"(*var)
-	                 : "0"(cmp), "r"(val));
-        return r;
+	__asm__ volatile(
+		"lock\n\t"
+		"cmpxchgq	%3, %1"
+		: "=a"(r), "+m"(*var)
+		: "0"(cmp), "r"(val));
+	return r;
 }
 
 #endif /* __ARCH_ATOMIC_H */

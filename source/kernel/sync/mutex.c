@@ -51,7 +51,7 @@ static inline void mutex_recursive_error(mutex_t *lock) {
 static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, int flags) {
 	status_t ret;
 
-	if(!atomic_cas(&lock->value, 0, 1)) {
+	if(atomic_cas(&lock->value, 0, 1) != 0) {
 		if(lock->holder == curr_thread) {
 			if(likely(lock->flags & MUTEX_RECURSIVE)) {
 				atomic_inc(&lock->value);
@@ -64,7 +64,7 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 
 			/* Check again now that we have the lock, in case
 			 * mutex_unlock() was called on another CPU. */
-			if(atomic_cas(&lock->value, 0, 1)) {
+			if(atomic_cas(&lock->value, 0, 1) == 0) {
 				spinlock_unlock(&lock->lock);
 			} else {
 				list_append(&lock->threads, &curr_thread->wait_link);

@@ -828,7 +828,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 	state = local_irq_disable();
 
 	/* Check if we're already running. If we are, something bad has happened. */
-	if(!atomic_cas(&kdb_running, 0, 1)) {
+	if(atomic_cas(&kdb_running, 0, 1) != 0) {
 		kdb_printf("Multiple entries to KDB.\n");
 		local_irq_restore(state);
 		return KDB_FAILURE;

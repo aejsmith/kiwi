@@ -70,7 +70,7 @@ static void input_device_destroy(device_t *_device) {
 static status_t input_device_open(device_t *_device, void **datap) {
 	input_device_t *device = _device->data;
 
-	if(!atomic_cas(&device->open, 0, 1)) {
+	if(atomic_cas(&device->open, 0, 1) != 0) {
 		return STATUS_IN_USE;
 	}
 
