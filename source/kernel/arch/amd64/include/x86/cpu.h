@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -97,7 +97,7 @@
 #define X86_MSR_FMASK		0xC0000084	/**< System Call Flag Mask. */
 #define X86_MSR_FS_BASE		0xC0000100	/**< FS segment base register. */
 #define X86_MSR_GS_BASE		0xC0000101	/**< GS segment base register. */
-#define X86_MSR_K_GS_BASE	0xC0000102	/**< GS base to switch to with SWAPGS. */
+#define X86_MSR_KERNEL_GS_BASE	0xC0000102	/**< GS base to switch to with SWAPGS. */
 
 /** EFER MSR flags. */
 #define X86_EFER_SCE		(1<<0)		/**< System Call Enable. */
@@ -132,8 +132,8 @@
 
 #include <types.h>
 
-/** Structure containing CPU feature information. */
-typedef struct cpu_features {
+/** Structure containing x86 CPU feature information. */
+typedef struct x86_features {
 	uint32_t highest_standard;		/**< Highest standard function. */
 	uint32_t highest_extended;		/**< Highest extended function. */
 
@@ -234,11 +234,10 @@ typedef struct cpu_features {
 		};
 		uint32_t extended_ecx;
 	};
-} cpu_features_t;
+} x86_features_t;
 
-extern cpu_features_t cpu_features;
+extern x86_features_t cpu_features;
 
-/** Macros to generate functions to access registers. */
 #define GEN_READ_REG(name, type)	\
 	static inline type x86_read_ ## name (void) { \
 		type r; \

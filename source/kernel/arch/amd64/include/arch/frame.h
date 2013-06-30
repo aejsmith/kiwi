@@ -51,7 +51,7 @@
 #include <types.h>
 
 /** Structure defining an interrupt stack frame. */
-typedef struct intr_frame {
+typedef struct __packed intr_frame {
 	unsigned long r15;		/**< R15. */
 	unsigned long r14;		/**< R14. */
 	unsigned long r13;		/**< R13. */
@@ -74,7 +74,7 @@ typedef struct intr_frame {
 	unsigned long flags;		/**< FLAGS. */
 	unsigned long sp;		/**< SP. */
 	unsigned long ss;		/**< SS. */
-} __packed intr_frame_t;
+} intr_frame_t;
 
 #endif /* __ASM__ */
 #endif /* __ARCH_FRAME_H */

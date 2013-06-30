@@ -42,12 +42,12 @@ typedef struct signal_frame {
 	void *retaddr;			/**< Return address. */
 	siginfo_t info;			/**< Signal information. */
 	ucontext_t context;		/**< Previous context. */
-} __aligned(sizeof(unsigned long)) signal_frame_t;
+} signal_frame_t;
 
 /** FLAGS values to restore. */
-#define RESTORE_FLAGS	(X86_FLAGS_CF | X86_FLAGS_PF | X86_FLAGS_AF | \
-			 X86_FLAGS_ZF | X86_FLAGS_SF | X86_FLAGS_TF | \
-			 X86_FLAGS_DF | X86_FLAGS_OF | X86_FLAGS_AC)
+#define RESTORE_FLAGS	(X86_FLAGS_CF | X86_FLAGS_PF | X86_FLAGS_AF \
+	| X86_FLAGS_ZF | X86_FLAGS_SF | X86_FLAGS_TF | X86_FLAGS_DF \
+	| X86_FLAGS_OF | X86_FLAGS_AC)
 
 /** Set up the user interrupt frame to execute a signal handler.
  * @param action	Signal action.
@@ -118,9 +118,8 @@ status_t arch_signal_setup_frame(sigaction_t *action, siginfo_t *info, sigset_t 
 
 	/* Copy across the frame. */
 	ret = memcpy_to_user((void *)dest, &frame, sizeof(frame));
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* We have definitely succeeded. We can now modify the interrupt frame
 	 * to return to the handler. */
@@ -155,9 +154,8 @@ status_t arch_signal_restore_frame(sigset_t *maskp) {
 	/* The stack pointer should point at frame + sizeof(void *) due to the
 	 * return address being popped. Copy it back. */
 	ret = memcpy_from_user(&frame, (void *)(iframe->sp - sizeof(void *)), sizeof(frame));
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Save the mask from the frame. */
 	*maskp = frame.context.uc_sigmask;

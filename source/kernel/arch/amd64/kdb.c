@@ -41,7 +41,7 @@ typedef struct stack_frame {
 
 /** Structure containing details of a breakpoint. */
 typedef struct breakpoint {
-	unsigned long dr7;			/**< Value to OR into DR7. */
+	unsigned long dr7;		/**< Value to OR into DR7. */
 	ptr_t addr;			/**< Address of the breakpoint. */
 } breakpoint_t;
 
@@ -120,9 +120,8 @@ void kdb_db_handler(intr_frame_t *frame) {
 
 	/* Set the resume flag if resuming from a breakpoint so that we do not
 	 * immediately break again. */
-	if(reason == KDB_REASON_BREAK) {
+	if(reason == KDB_REASON_BREAK)
 		frame->flags |= X86_FLAGS_RF;
-	}
 }
 
 /** Enter the kernel debugger.
@@ -148,9 +147,8 @@ int arch_kdb_install_breakpoint(ptr_t addr) {
 	size_t i;
 
 	for(i = 0; i < ARRAY_SIZE(kdb_breakpoints); i++) {
-		if(kdb_breakpoints[i].dr7) {
+		if(kdb_breakpoints[i].dr7)
 			continue;
-		}
 
 		kdb_breakpoints[i].dr7 = (1<<(1+(i*2)));
 		kdb_breakpoints[i].addr = addr;
@@ -172,18 +170,16 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
 	size_t i;
 
 	for(i = 0; i < ARRAY_SIZE(kdb_breakpoints); i++) {
-		if(kdb_breakpoints[i].dr7) {
+		if(kdb_breakpoints[i].dr7)
 			continue;
-		}
 
 		/* Set the global enable bit for the breakpoint. */
 		dr7 = (1<<(1+(i*2)));
 
 		/* Set the condition. */
 		dr7 |= (1<<(16+(i*4)));
-		if(rw) {
+		if(rw)
 			dr7 |= (1<<(17+(i*4)));
-		}
 
 		/* Set the size. */
 		switch(size) {
@@ -215,8 +211,9 @@ int arch_kdb_install_watchpoint(ptr_t addr, size_t size, bool rw) {
  * @param index		Index of breakpoint to remove.
  * @return		Whether the breakpoint existed. */
 bool arch_kdb_remove_breakpoint(unsigned index) {
-	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
-	   (kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
+	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7
+		|| (kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2)))))
+	{
 		kdb_printf("Breakpoint ID %u invalid.\n", index);
 		return false;
 	}
@@ -229,8 +226,9 @@ bool arch_kdb_remove_breakpoint(unsigned index) {
  * @param index		Index of watchpoint to remove.
  * @return		Whether the breakpoint existed. */
 bool arch_kdb_remove_watchpoint(unsigned index) {
-	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7 ||
-	   !(kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
+	if(index >= ARRAY_SIZE(kdb_breakpoints) || !kdb_breakpoints[index].dr7
+		|| !(kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2)))))
+	{
 		kdb_printf("Watchpoint ID %u invalid.\n", index);
 		return false;
 	}
@@ -244,9 +242,8 @@ bool arch_kdb_remove_watchpoint(unsigned index) {
  * @param addrp		Where to store address of breakpoint.
  * @return		Whether the breakpoint existed. */
 bool arch_kdb_get_breakpoint(unsigned index, ptr_t *addrp) {
-	if(!kdb_breakpoints[index].dr7 || (kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
+	if(!kdb_breakpoints[index].dr7 || (kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2)))))
 		return false;
-	}
 
 	*addrp = kdb_breakpoints[index].addr;
 	return true;
@@ -259,9 +256,8 @@ bool arch_kdb_get_breakpoint(unsigned index, ptr_t *addrp) {
  * @param rwp		Where to store read-write property.
  * @return		Whether the watchpoint existed. */
 bool arch_kdb_get_watchpoint(unsigned index, ptr_t *addrp, size_t *sizep, bool *rwp) {
-	if(!kdb_breakpoints[index].dr7 || !(kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2))))) {
+	if(!kdb_breakpoints[index].dr7 || !(kdb_breakpoints[index].dr7 & ~(1<<(1+(index*2)))))
 		return false;
-	}
 
 	/* Work out the size. */
 	switch((kdb_breakpoints[index].dr7 >> (18 + (index * 4))) & 0x3) {
@@ -309,7 +305,8 @@ static bool is_kstack_address(thread_t *thread, ptr_t addr) {
 		}
 	}
 
-	return (IS_IN_STACK(addr, thread->kstack) || IS_IN_STACK(addr, curr_cpu->arch.double_fault_stack));
+	return (IS_IN_STACK(addr, thread->kstack)
+		|| IS_IN_STACK(addr, curr_cpu->arch.double_fault_stack));
 }
 
 /** Perform a backtrace.
@@ -331,20 +328,12 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
 	while(bp && is_kstack_address(thread, bp)) {
 		frame = (stack_frame_t *)bp;
 
-		if(frame->addr) {
+		if(frame->addr)
 			cb(frame->addr);
-		}
 
 		bp = frame->next;
 	}
 }
-
-/** Helper macro for arch_kdb_register_value(). */
-#define KDB_REGISTER_CHECK(n, l, p, rn, rl, rv)	\
-	if((l) == (rl) && strncmp((n), (rn), (l)) == 0) { \
-		*(p) = (rv); \
-		return true; \
-	}
 
 /** Get the value of a register.
  * @param name		Name of register.
@@ -352,47 +341,54 @@ void arch_kdb_backtrace(thread_t *thread, kdb_backtrace_cb_t cb) {
  * @param regp		Location to store register value in.
  * @return		Whether the register name was valid. */
 bool arch_kdb_register_value(const char *name, size_t len, unsigned long *regp) {
-	KDB_REGISTER_CHECK(name, len, regp, "cs", 2, curr_kdb_frame->cs);
-	KDB_REGISTER_CHECK(name, len, regp, "num", 6, curr_kdb_frame->num);
-	KDB_REGISTER_CHECK(name, len, regp, "err_code", 8, curr_kdb_frame->err_code);
-	KDB_REGISTER_CHECK(name, len, regp, "r15", 3, curr_kdb_frame->r15);
-	KDB_REGISTER_CHECK(name, len, regp, "r14", 3, curr_kdb_frame->r14);
-	KDB_REGISTER_CHECK(name, len, regp, "r13", 3, curr_kdb_frame->r13);
-	KDB_REGISTER_CHECK(name, len, regp, "r12", 3, curr_kdb_frame->r12);
-	KDB_REGISTER_CHECK(name, len, regp, "r11", 3, curr_kdb_frame->r11);
-	KDB_REGISTER_CHECK(name, len, regp, "r10", 3, curr_kdb_frame->r10);
-	KDB_REGISTER_CHECK(name, len, regp, "r9", 2, curr_kdb_frame->r9);
-	KDB_REGISTER_CHECK(name, len, regp, "r8", 2, curr_kdb_frame->r8);
-	KDB_REGISTER_CHECK(name, len, regp, "rbp", 3, curr_kdb_frame->bp);
-	KDB_REGISTER_CHECK(name, len, regp, "rsi", 3, curr_kdb_frame->si);
-	KDB_REGISTER_CHECK(name, len, regp, "rdi", 3, curr_kdb_frame->di);
-	KDB_REGISTER_CHECK(name, len, regp, "rdx", 3, curr_kdb_frame->dx);
-	KDB_REGISTER_CHECK(name, len, regp, "rcx", 3, curr_kdb_frame->cx);
-	KDB_REGISTER_CHECK(name, len, regp, "rbx", 3, curr_kdb_frame->bx);
-	KDB_REGISTER_CHECK(name, len, regp, "rax", 3, curr_kdb_frame->ax);
-	KDB_REGISTER_CHECK(name, len, regp, "rip", 3, curr_kdb_frame->ip);
-	KDB_REGISTER_CHECK(name, len, regp, "rflags", 6, curr_kdb_frame->flags);
-	KDB_REGISTER_CHECK(name, len, regp, "rsp", 3, curr_kdb_frame->sp);
-	KDB_REGISTER_CHECK(name, len, regp, "ss", 2, curr_kdb_frame->ss);
+	#define KDB_REGISTER_CHECK(rn, rl, rv)	\
+		if(len == (rl) && strncasecmp(name, (rn), (rl)) == 0) { \
+			*regp = (rv); \
+			return true; \
+		}
+
+	KDB_REGISTER_CHECK("cs", 2, curr_kdb_frame->cs);
+	KDB_REGISTER_CHECK("num", 6, curr_kdb_frame->num);
+	KDB_REGISTER_CHECK("err_code", 8, curr_kdb_frame->err_code);
+	KDB_REGISTER_CHECK("r15", 3, curr_kdb_frame->r15);
+	KDB_REGISTER_CHECK("r14", 3, curr_kdb_frame->r14);
+	KDB_REGISTER_CHECK("r13", 3, curr_kdb_frame->r13);
+	KDB_REGISTER_CHECK("r12", 3, curr_kdb_frame->r12);
+	KDB_REGISTER_CHECK("r11", 3, curr_kdb_frame->r11);
+	KDB_REGISTER_CHECK("r10", 3, curr_kdb_frame->r10);
+	KDB_REGISTER_CHECK("r9", 2, curr_kdb_frame->r9);
+	KDB_REGISTER_CHECK("r8", 2, curr_kdb_frame->r8);
+	KDB_REGISTER_CHECK("rbp", 3, curr_kdb_frame->bp);
+	KDB_REGISTER_CHECK("rsi", 3, curr_kdb_frame->si);
+	KDB_REGISTER_CHECK("rdi", 3, curr_kdb_frame->di);
+	KDB_REGISTER_CHECK("rdx", 3, curr_kdb_frame->dx);
+	KDB_REGISTER_CHECK("rcx", 3, curr_kdb_frame->cx);
+	KDB_REGISTER_CHECK("rbx", 3, curr_kdb_frame->bx);
+	KDB_REGISTER_CHECK("rax", 3, curr_kdb_frame->ax);
+	KDB_REGISTER_CHECK("rip", 3, curr_kdb_frame->ip);
+	KDB_REGISTER_CHECK("rflags", 6, curr_kdb_frame->flags);
+	KDB_REGISTER_CHECK("rsp", 3, curr_kdb_frame->sp);
+	KDB_REGISTER_CHECK("ss", 2, curr_kdb_frame->ss);
 	return false;
 }
 
 /** Print out all registers. */
 void arch_kdb_dump_registers(void) {
-	kdb_printf("cs: 0x%04lx  ss: 0x%04lx\n", curr_kdb_frame->cs, curr_kdb_frame->ss);
-	kdb_printf("num: %lu  err_code: %lu  rflags: 0x%016lx\n",
-		curr_kdb_frame->num, curr_kdb_frame->err_code, curr_kdb_frame->flags);
-	kdb_printf("rax: 0x%016lx  rbx: 0x%016lx  rcx: 0x%016lx\n",
+	kdb_printf("RAX: 0x%016lx  RBX: 0x%016lx  RCX: 0x%016lx\n",
 		curr_kdb_frame->ax, curr_kdb_frame->bx, curr_kdb_frame->cx);
-	kdb_printf("rdx: 0x%016lx  rdi: 0x%016lx  rsi: 0x%016lx\n",
+	kdb_printf("RDX: 0x%016lx  RDI: 0x%016lx  RSI: 0x%016lx\n",
 		curr_kdb_frame->dx, curr_kdb_frame->di, curr_kdb_frame->si);
-	kdb_printf("rbp: 0x%016lx  r8:  0x%016lx  r9:  0x%016lx\n",
+	kdb_printf("RBP: 0x%016lx  R8:  0x%016lx  R9:  0x%016lx\n",
 		curr_kdb_frame->bp, curr_kdb_frame->r8, curr_kdb_frame->r9);
-	kdb_printf("r10: 0x%016lx  r11: 0x%016lx  r12: 0x%016lx\n",
+	kdb_printf("R10: 0x%016lx  R11: 0x%016lx  R12: 0x%016lx\n",
 		curr_kdb_frame->r10, curr_kdb_frame->r11, curr_kdb_frame->r12);
-	kdb_printf("r13: 0x%016lx  r14: 0x%016lx  r15: 0x%016lx\n",
+	kdb_printf("R13: 0x%016lx  R14: 0x%016lx  R15: 0x%016lx\n",
 		curr_kdb_frame->r13, curr_kdb_frame->r14, curr_kdb_frame->r15);
-	kdb_printf("rip: 0x%016lx  rsp: 0x%016lx\n", curr_kdb_frame->ip, curr_kdb_frame->sp);
+	kdb_printf("RIP: 0x%016lx  RSP: 0x%016lx  RFL: 0x%016lx\n",
+		curr_kdb_frame->ip, curr_kdb_frame->sp, curr_kdb_frame->flags);
+	kdb_printf("CS:  0x%04lx  SS: 0x%04lx  EC:  %lu\n",
+		curr_kdb_frame->cs, curr_kdb_frame->ss,
+		curr_kdb_frame->err_code);
 }
 
 #if CONFIG_SMP

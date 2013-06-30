@@ -40,20 +40,8 @@
 
 struct cpu;
 
-/** GDT pointer loaded into the GDTR register. */
-typedef struct gdt_pointer {
-	uint16_t limit;			/**< Total size of GDT. */
-	ptr_t base;			/**< Virtual address of GDT. */
-} __packed gdt_pointer_t;
-
-/** IDT pointer loaded into the IDTR register. */
-typedef struct idt_pointer {
-	uint16_t limit;			/**< Total size of IDT. */
-	ptr_t base;			/**< Virtual address of IDT. */
-} __packed idt_pointer_t;
-
 /** Task State Segment structure. */
-typedef struct tss {
+typedef struct __packed tss {
 	uint32_t _reserved1;		/**< Reserved. */
 	uint64_t rsp0;			/**< Ring 0 RSP. */
 	uint64_t rsp1;			/**< Ring 1 RSP. */
@@ -69,10 +57,10 @@ typedef struct tss {
 	uint64_t _reserved3;		/**< Reserved. */
 	uint16_t _reserved4;		/**< Reserved. */
 	uint16_t io_bitmap;		/**< I/O map base address. */
-} __packed tss_t;
+} tss_t;
 
 /** Structure of a GDT descriptor. */
-typedef struct gdt_entry {
+typedef struct __packed gdt_entry {
 	unsigned limit0 : 16;		/**< Low part of limit. */
 	unsigned base0 : 24;		/**< Low part of base. */
 	unsigned type : 4;		/**< Type flag. */
@@ -85,10 +73,10 @@ typedef struct gdt_entry {
 	unsigned special : 1;		/**< Special. */
 	unsigned granularity : 1;	/**< Granularity. */
 	unsigned base1 : 8;		/**< High part of base. */
-} __packed gdt_entry_t;
+} gdt_entry_t;
 
 /** Structure of a TSS GDT entry. */
-typedef struct gdt_tss_entry {
+typedef struct __packed gdt_tss_entry {
 	unsigned limit0 : 16;		/**< Low part of limit. */
 	unsigned base0 : 24;		/**< Part 1 of base. */
 	unsigned type : 4;		/**< Type flag. */
@@ -102,10 +90,10 @@ typedef struct gdt_tss_entry {
 	unsigned base1 : 8;		/**< Part 2 of base. */
 	unsigned base2 : 32;		/**< Part 3 of base. */
 	unsigned : 32;			/**< Unused. */
-} __packed gdt_tss_entry_t;
+} gdt_tss_entry_t;
 
 /** Structure of an IDT entry. */
-typedef struct idt_entry {
+typedef struct __packed idt_entry {
 	unsigned base0 : 16;		/**< Low part of handler address. */
 	unsigned sel : 16;		/**< Code segment selector. */
 	unsigned ist : 3;		/**< Interrupt Stack Table number. */
@@ -114,32 +102,38 @@ typedef struct idt_entry {
 	unsigned base1 : 16;		/**< Middle part of handler address. */
 	unsigned base2 : 32;		/**< High part of handler address. */
 	unsigned reserved : 32;		/**< Reserved. */
-} __packed idt_entry_t;
+} idt_entry_t;
 
 /** Load a value into TR (Task Register).
  * @param sel		Selector to load. */
-static inline void ltr(uint32_t sel) {
+static inline void x86_ltr(uint32_t sel) {
 	__asm__ volatile("ltr %%ax" :: "a"(sel));
 }
 
 /** Set the GDTR register.
  * @param base		Virtual address of GDT.
  * @param limit		Size of GDT. */
-static inline void lgdt(ptr_t base, uint16_t limit) {
-	gdt_pointer_t gdtp = { limit, base };
+static inline void x86_lgdt(gdt_entry_t *base, uint16_t limit) {
+	struct { uint16_t limit; ptr_t base; } __packed gdtp = {
+		limit, (ptr_t)base
+	};
+
 	__asm__ volatile("lgdt %0" :: "m"(gdtp));
 }
 
 /** Set the IDTR register.
  * @param base		Base address of IDT.
  * @param limit		Size of IDT. */
-static inline void lidt(ptr_t base, uint16_t limit) {
-	idt_pointer_t idtp = { limit, base };
+static inline void x86_lidt(idt_entry_t *base, uint16_t limit) {
+	struct { uint16_t limit; ptr_t base; } __packed idtp = {
+		limit, (ptr_t)base
+	};
+
 	__asm__ volatile("lidt %0" :: "m"(idtp));
 }
 
 extern void descriptor_init(struct cpu *cpu);
-extern void idt_init();
+extern void idt_init(void);
 
 #endif /* __ASM__ */
 #endif /* __X86_DESCRIPTOR_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013 Alex Smith
+ * Copyright (C) 2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,22 +16,14 @@
 
 /**
  * @file
- * @brief		AMD64 paging definitions.
+ * @brief		x86 SMP definitions.
  */
 
-#ifndef __ARCH_PAGE_H
-#define __ARCH_PAGE_H
+#ifndef __X86_SMP_H
+#define __X86_SMP_H
 
-/** Page size definitions. */
-#define PAGE_WIDTH		12		/**< Width of a page in bits. */
-#define PAGE_SIZE		0x1000		/**< Size of a page (4KB). */
-#define LARGE_PAGE_WIDTH	21		/**< Width of a large page in bits. */
-#define LARGE_PAGE_SIZE		0x200000	/**< Size of a large page (2MB). */
+/** x86-specific SMP boot status values. */
+#define SMP_BOOT_TSC_SYNC1	4	/**< Stage 1 of TSC synchronization. */
+#define SMP_BOOT_TSC_SYNC2	5	/**< Stage 2 of TSC synchronization. */
 
-/** Mask to clear page offset and unsupported bits from a virtual address. */
-#define PAGE_MASK		0x000FFFFFFFFFF000L
-
-/** Mask to clear page offset and unsupported bits from a physical address. */
-#define PHYS_PAGE_MASK		0x000000FFFFFFF000L
-
-#endif /* __ARCH_PAGE_H */
+#endif /* __X86_SMP_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -124,7 +124,7 @@ PRIVATE_FUNCTION_START(ap_boot)
 	/* Clear top 32 bits of our load address. */
 	movq	%rsi, %rsi
 
-        /* Load the stack address. */
+	/* Load the stack address. */
 	movq	kernel_sp(%rsi), %rsp
 
 	/* Clear the stack frame/RFLAGS. */

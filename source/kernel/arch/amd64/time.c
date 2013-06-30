@@ -23,6 +23,7 @@
  */
 
 #include <x86/cpu.h>
+#include <x86/smp.h>
 #include <x86/tsc.h>
 
 #include <cpu.h>
@@ -30,28 +31,24 @@
 #include <smp.h>
 #include <time.h>
 
-/** SMP boot status values used for synchronisation. */
-#define SMP_BOOT_TSC_SYNC1	4
-#define SMP_BOOT_TSC_SYNC2	5
-
 /** Boot CPU system_time() value. */
 static useconds_t system_time_sync __init_data;
 
 /** Get the system time (number of microseconds since boot).
  * @return		Number of microseconds since system was booted. */
 useconds_t system_time(void) {
-	return (useconds_t)((x86_rdtsc() - curr_cpu->arch.system_time_offset) / curr_cpu->arch.cycles_per_us);
+	return (useconds_t)((x86_rdtsc() - curr_cpu->arch.system_time_offset)
+		/ curr_cpu->arch.cycles_per_us);
 }
 
 /** Spin for a certain amount of time.
  * @param us		Microseconds to spin for. */
 void spin(useconds_t us) {
-        uint64_t target = x86_rdtsc() + (us * curr_cpu->arch.cycles_per_us);
+	uint64_t target = x86_rdtsc() + (us * curr_cpu->arch.cycles_per_us);
 
-        /* Spin until we reach the target. */
-        while(x86_rdtsc() < target) {
-                arch_cpu_spin_hint();
-        }
+	/* Spin until we reach the target. */
+	while(x86_rdtsc() < target)
+		arch_cpu_spin_hint();
 }
 
 /** Set up the boot time offset. */
@@ -61,33 +58,33 @@ __init_text void tsc_init_target(void) {
 	 * so the system time at this point is 0. For other CPUs, we need to
 	 * synchronise against the boot CPU so system_time() reads the same
 	 * value on all CPUs. */
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(curr_cpu == &boot_cpu) {
-#endif
+	#endif
 		curr_cpu->arch.system_time_offset = x86_rdtsc();
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	} else {
 		/* Tell the boot CPU that we're here. */
 		smp_boot_status = SMP_BOOT_TSC_SYNC1;
 
 		/* Wait for it to store its system_time() value. */
-		while(smp_boot_status != SMP_BOOT_TSC_SYNC2) {
+		while(smp_boot_status != SMP_BOOT_TSC_SYNC2)
 			arch_cpu_spin_hint();
-		}
 
 		/* Calculate the offset we need to use. */
-		curr_cpu->arch.system_time_offset = -((system_time_sync * curr_cpu->arch.cycles_per_us) - x86_rdtsc());
+		curr_cpu->arch.system_time_offset =
+			-((system_time_sync * curr_cpu->arch.cycles_per_us)
+				- x86_rdtsc());
 	}
-#endif
+	#endif
 }
 
 #if CONFIG_SMP
 /** Boot CPU side of TSC initialization. */
 __init_text void tsc_init_source(void) {
 	/* Wait for the AP to get into tsc_init_target(). */
-	while(smp_boot_status != SMP_BOOT_TSC_SYNC1) {
+	while(smp_boot_status != SMP_BOOT_TSC_SYNC1)
 		arch_cpu_spin_hint();
-	}
 
 	/* Save our system_time() value. */
 	system_time_sync = system_time();

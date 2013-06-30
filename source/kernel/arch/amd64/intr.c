@@ -85,7 +85,7 @@ static void kmode_except_handler(intr_frame_t *frame) {
 		kdb_except_handler(except_strings[frame->num], frame);
 	} else {
 		_fatal(frame, "Unhandled kernel-mode exception %lu (%s)",
-		       frame->num, except_strings[frame->num]);
+			frame->num, except_strings[frame->num]);
 	}
 }
 
@@ -121,15 +121,15 @@ static void de_fault(intr_frame_t *frame) {
 /** Handler for NMIs.
  * @param frame		Interrupt stack frame. */
 static void nmi_handler(intr_frame_t *frame) {
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(atomic_get(&kdb_running) > 0) {
-		while(atomic_get(&kdb_running) > 0) {
+		while(atomic_get(&kdb_running) > 0)
 			arch_cpu_spin_hint();
-		}
 
 		return;
 	}
-#endif
+	#endif
+
 	_fatal(frame, "Received unexpected NMI");
 }
 
@@ -201,13 +201,13 @@ static void page_fault(intr_frame_t *frame) {
 	}
 
 	/* Check if the fault was caused by instruction execution. */
-	if(cpu_features.xd && frame->err_code & (1<<4)) {
+	if(cpu_features.xd && frame->err_code & (1<<4))
 		access = VM_FAULT_EXEC;
-	}
 
 	/* Check if a reserved bit fault. This is always fatal. */
 	if(frame->err_code & (1<<3)) {
-		fatal("Reserved bit PF exception (%p) (0x%x)", addr, frame->err_code);
+		fatal("Reserved bit page-fault exception (%p) (0x%x)", addr,
+			frame->err_code);
 	}
 
 	/* Try the virtual memory manager if the fault occurred at a userspace
@@ -217,7 +217,8 @@ static void page_fault(intr_frame_t *frame) {
 		if(ret == VM_FAULT_SUCCESS) {
 			return;
 		} else if(curr_thread && curr_thread->in_usermem) {
-			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n", addr, frame->ip);
+			kprintf(LOG_DEBUG, "arch: pagefault in usermem at %p (ip: %p)\n",
+				addr, frame->ip);
 			kdb_enter(KDB_REASON_USER, frame);
 			longjmp(curr_thread->usermem_context, 1);
 		}
@@ -230,13 +231,14 @@ static void page_fault(intr_frame_t *frame) {
 	/* Nothing could handle this fault. If it happened in the kernel,
 	 * die, otherwise just kill the process. */
 	if(frame->err_code & (1<<2)) {
-		kprintf(LOG_DEBUG, "arch: unhandled pagefault in thread %" PRId32 " of process %" PRId32 " (%p)\n",
-		        curr_thread->id, curr_proc->id, addr);
+		kprintf(LOG_DEBUG, "arch: unhandled pagefault in thread %" PRId32
+			" of process %" PRId32 " (%p)\n", curr_thread->id,
+			curr_proc->id, addr);
 		kprintf(LOG_DEBUG, "arch:  %s | %s%s%s\n",
-		        (frame->err_code & (1<<0)) ? "protection" : "not-present",
-		        (frame->err_code & (1<<1)) ? "write" : "read",
-		        (frame->err_code & (1<<3)) ? " | reserved-bit" : "",
-		        (frame->err_code & (1<<4)) ? " | execute" : "");
+			(frame->err_code & (1<<0)) ? "protection" : "not-present",
+			(frame->err_code & (1<<1)) ? "write" : "read",
+			(frame->err_code & (1<<3)) ? " | reserved-bit" : "",
+			(frame->err_code & (1<<4)) ? " | execute" : "");
 		kdb_enter(KDB_REASON_USER, frame);
 
 		memset(&info, 0, sizeof(info));
@@ -263,12 +265,12 @@ static void page_fault(intr_frame_t *frame) {
 
 		signal_send(curr_thread, info.si_signo, &info, true);
 	} else {
-		_fatal(frame, "Unhandled kernel-mode pagefault exception (%p)\n"
-		              "%s | %s%s%s", addr,
-		       (frame->err_code & (1<<0)) ? "Protection" : "Not-present",
-		       (frame->err_code & (1<<1)) ? "Write" : "Read",
-		       (frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
-		       (frame->err_code & (1<<4)) ? " | Execute" : "");
+		_fatal(frame, "Unhandled kernel-mode page-fault exception (%p)\n"
+			"%s | %s%s%s", addr,
+			(frame->err_code & (1<<0)) ? "Protection" : "Not-present",
+			(frame->err_code & (1<<1)) ? "Write" : "Read",
+			(frame->err_code & (1<<3)) ? " | Reserved-bit" : "",
+			(frame->err_code & (1<<4)) ? " | Execute" : "");
 	}
 }
 
@@ -330,9 +332,8 @@ void intr_handler(intr_frame_t *frame) {
 	} else {
 		/* Preempt if required. When returning to userspace, this is
 		 * done by thread_at_kernel_exit(). */
-		if(curr_cpu->should_preempt) {
+		if(curr_cpu->should_preempt)
 			thread_preempt();
-		}
 	}
 }
 
@@ -342,15 +343,12 @@ __init_text void intr_init(void) {
 
 	/* Install default handlers. 0-31 are exceptions, 32-47 are IRQs, the
 	 * rest should be pointed to the unhandled interrupt function */
-	for(i = 0; i < 32; i++) {
+	for(i = 0; i < 32; i++)
 		intr_table[i] = except_handler;
-	}
-	for(i = 32; i < 48; i++) {
+	for(i = 32; i < 48; i++)
 		intr_table[i] = hardware_interrupt;
-	}
-	for(i = 48; i < ARRAY_SIZE(intr_table); i++) {
+	for(i = 48; i < ARRAY_SIZE(intr_table); i++)
 		intr_table[i] = unhandled_interrupt;
-	}
 
 	/* Set handlers for faults that require specific handling. */
 	intr_table[X86_EXCEPT_DE]  = de_fault;

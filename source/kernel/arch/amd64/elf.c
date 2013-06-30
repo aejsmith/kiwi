@@ -58,9 +58,8 @@ status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *ta
 
 	/* Obtain the symbol value. */
 	ret = elf_module_lookup_symbol(module, ELF64_R_SYM(rel->r_info), &val);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Perform the relocation. */
 	switch(ELF64_R_TYPE(rel->r_info)) {
@@ -79,7 +78,8 @@ status_t elf_module_apply_rela(module_t *module, elf_rela_t *rel, elf_shdr_t *ta
 		*where32 = val + rel->r_addend;
 		break;
 	default:
-		dprintf("elf: encountered unknown relocation type: %lu\n", ELF64_R_TYPE(rel->r_info));
+		dprintf("elf: encountered unknown relocation type: %lu\n",
+			ELF64_R_TYPE(rel->r_info));
 		return STATUS_MALFORMED_IMAGE;
 	}
 

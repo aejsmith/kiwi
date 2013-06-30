@@ -126,9 +126,8 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 
 	/* Must perform this check to prevent problems if fatal() is called
 	 * before we've initialized the LAPIC. */
-	if(!lapic_mapping) {
+	if(!lapic_mapping)
 		return;
-	}
 
 	state = local_irq_disable();
 
@@ -139,12 +138,12 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 	 * - Destination Mode: Physical.
 	 * - Level: Assert (bit 14).
 	 * - Trigger Mode: Edge. */
-	lapic_write(LAPIC_REG_ICR0, (1<<14) | (dest << 18) | (mode << 8) | vector);
+	lapic_write(LAPIC_REG_ICR0, (1<<14) | ((uint32_t)dest << 18)
+		| ((uint32_t)mode << 8) | (uint32_t)vector);
 
 	/* Wait for the IPI to be sent (check Delivery Status bit). */
-	while(lapic_read(LAPIC_REG_ICR0) & (1<<12)) {
+	while(lapic_read(LAPIC_REG_ICR0) & (1<<12))
 		arch_cpu_spin_hint();
-	}
 
 	local_irq_restore(state);
 }
@@ -194,9 +193,8 @@ __init_text void lapic_init(void) {
 
 	/* Don't do anything if we don't have LAPIC support or have been asked
 	 * not to use the LAPIC. */
-	if(!cpu_features.apic || kboot_boolean_option("lapic_disabled")) {
+	if(!cpu_features.apic || kboot_boolean_option("lapic_disabled"))
 		return;
-	}
 
 	/* Get the base address of the LAPIC mapping. If bit 11 is 0, the LAPIC
 	 * is disabled. */
@@ -206,23 +204,23 @@ __init_text void lapic_init(void) {
 	} else if(cpu_features.x2apic && base & (1<<10)) {
 		fatal("Cannot handle CPU %u in x2APIC mode", curr_cpu->id);
 	}
+
 	base &= 0xFFFFF000;
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(lapic_mapping) {
 		/* This is a secondary CPU. Ensure that the base address is
 		 * not different to the boot CPU's. */
-		if(base != lapic_base) {
+		if(base != lapic_base)
 			fatal("CPU %u has different LAPIC address to boot CPU", curr_cpu->id);
-		}
 	} else {
-#endif
+	#endif
 		/* This is the boot CPU. Map the LAPIC into virtual memory and
 		 * register interrupt vector handlers. */
 		lapic_base = base;
 		lapic_mapping = phys_map(base, PAGE_SIZE, MM_BOOT);
 		kprintf(LOG_NOTICE, "lapic: physical location 0x%" PRIxPHYS ", mapped to %p\n",
-		        base, lapic_mapping);
+			base, lapic_mapping);
 
 		/* Install the LAPIC timer device. */
 		timer_device_set(&lapic_timer_device);
@@ -230,10 +228,10 @@ __init_text void lapic_init(void) {
 		/* Install interrupt vectors. */
 		intr_table[LAPIC_VECT_SPURIOUS] = lapic_spurious_handler;
 		intr_table[LAPIC_VECT_TIMER] = lapic_timer_handler;
-#if CONFIG_SMP
+	#if CONFIG_SMP
 		intr_table[LAPIC_VECT_IPI] = lapic_ipi_handler;
 	}
-#endif
+	#endif
 
 	/* Enable the local APIC (bit 8) and set the spurious interrupt
 	 * vector in the Spurious Interrupt Vector Register. */
@@ -242,28 +240,27 @@ __init_text void lapic_init(void) {
 
 	/* Calculate LAPIC frequency. See comment about CPU frequency in QEMU
 	 * in arch_cpu_early_init_percpu(), same applies here. */
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(strncmp(curr_cpu->arch.model_name, "QEMU", 4) != 0 || curr_cpu == &boot_cpu) {
-#endif
+	#endif
 		curr_cpu->arch.lapic_freq = calculate_frequency(calculate_lapic_frequency);
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	} else {
 		curr_cpu->arch.lapic_freq = boot_cpu.arch.lapic_freq;
 	}
-#endif
+	#endif
 
 	/* Sanity check. */
 	if(curr_cpu != &boot_cpu) {
-		if(curr_cpu->id != lapic_id()) {
+		if(curr_cpu->id != lapic_id())
 			fatal("CPU ID mismatch (detected %u, LAPIC %u)", curr_cpu->id, lapic_id());
-		}
 	}
 
 	/* Figure out the timer conversion factor. */
 	curr_cpu->arch.lapic_timer_cv = ((curr_cpu->arch.lapic_freq / 8) << 32) / 1000000;
 	kprintf(LOG_NOTICE, "lapic: timer conversion factor for CPU %u is %u (freq: %" PRIu64 "MHz)\n",
-	        curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
-	        curr_cpu->arch.lapic_freq / 1000000);
+		curr_cpu->id, curr_cpu->arch.lapic_timer_cv,
+		curr_cpu->arch.lapic_freq / 1000000);
 
 	/* Accept all interrupts. */
 	lapic_write(LAPIC_REG_TPR, lapic_read(LAPIC_REG_TPR) & 0xFFFFFF00);

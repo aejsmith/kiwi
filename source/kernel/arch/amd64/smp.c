@@ -67,7 +67,8 @@ __init_text void arch_smp_boot_prepare(void) {
 	 * identity maps the bootstrap code at its physical location. */
 	ap_mmu_context = mmu_context_create(MM_BOOT);
 	mmu_context_lock(ap_mmu_context);
-	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page, true, true, MM_BOOT);
+	mmu_context_map(ap_mmu_context, (ptr_t)ap_bootstrap_page, ap_bootstrap_page,
+		true, true, MM_BOOT);
 	mmu_context_unlock(ap_mmu_context);
 }
 
@@ -92,17 +93,16 @@ static __init_text bool boot_cpu_and_wait(cpu_id_t id) {
 	spin(10000);
 
 	/* If the CPU is up, then return. */
-	if(smp_boot_status > SMP_BOOT_INIT) {
+	if(smp_boot_status > SMP_BOOT_INIT)
 		return true;
-	}
 
 	/* Send a second SIPI and then check in 10ms intervals to see if it
 	 * has booted. If it hasn't booted after 5 seconds, fail. */
 	lapic_ipi(LAPIC_IPI_DEST_SINGLE, id, LAPIC_IPI_SIPI, ap_bootstrap_page >> 12);
 	for(delay = 0; delay < 5000000; delay += 10000) {
-		if(smp_boot_status > SMP_BOOT_INIT) {
+		if(smp_boot_status > SMP_BOOT_INIT)
 			return true;
-		}
+
 		spin(10000);
 	}
 
@@ -132,17 +132,15 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 	phys_unmap(mapping, PAGE_SIZE, false);
 
 	/* Kick the CPU into life. */
-	if(!boot_cpu_and_wait(cpu->id)) {
+	if(!boot_cpu_and_wait(cpu->id))
 		fatal("CPU %" PRIu32 " timed out while booting", cpu->id);
-	}
 
 	/* The TSC of the AP must be synchronised against the boot CPU. */
 	tsc_init_source();
 
 	/* Finally, wait for the CPU to complete its initialization. */
-	while(smp_boot_status != SMP_BOOT_BOOTED) {
+	while(smp_boot_status != SMP_BOOT_BOOTED)
 		arch_cpu_spin_hint();
-	}
 }
 
 /** Clean up after secondary CPUs have been booted. */

@@ -117,7 +117,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 
 	/* Set up the TSS descriptor. */
 	base = (ptr_t)&cpu->arch.tss;
-	size = sizeof(tss_t);
+	size = sizeof(cpu->arch.tss);
 	desc = (gdt_tss_entry_t *)&cpu->arch.gdt[KERNEL_TSS / 0x08];
 	desc->base0 = base & 0xffffff;
 	desc->base1 = ((base) >> 24) & 0xff;
@@ -128,7 +128,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 	desc->type = 0x9;
 
 	/* Set the GDT pointer. */
-	lgdt((ptr_t)&cpu->arch.gdt, sizeof(cpu->arch.gdt) - 1);
+	x86_lgdt(cpu->arch.gdt, sizeof(cpu->arch.gdt) - 1);
 
 	/* Reload the segment registers. There is a 64-bit far jump instruction
 	 * but GAS doesn't like it... use LRETQ to reload CS instead. */
@@ -142,8 +142,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 		"mov	%2, %%es\n"
 		"mov	%2, %%fs\n"
 		"mov	%2, %%gs\n"
-		:: "i"(KERNEL_CS), "r"(KERNEL_DS), "r"(0)
-	);
+		:: "i"(KERNEL_CS), "r"(KERNEL_DS), "r"(0));
 
 	/* Although once the thread system is up the GS base is pointed at the
 	 * architecture thread data, we need curr_cpu to work before that. Our
@@ -151,7 +150,7 @@ static __init_text void gdt_init(cpu_t *cpu) {
 	 * GS base at that to begin with. */
 	cpu->arch.parent = cpu;
 	x86_write_msr(X86_MSR_GS_BASE, (ptr_t)&cpu->arch);
-	x86_write_msr(X86_MSR_K_GS_BASE, 0);
+	x86_write_msr(X86_MSR_KERNEL_GS_BASE, 0);
 }
 
 /** Set up the TSS for the current CPU.
@@ -159,12 +158,12 @@ static __init_text void gdt_init(cpu_t *cpu) {
 static __init_text void tss_init(cpu_t *cpu) {
 	/* Set up the contents of the TSS. Point the first IST entry at the
 	 * double fault stack. */
-	memset(&cpu->arch.tss, 0, sizeof(tss_t));
+	memset(&cpu->arch.tss, 0, sizeof(cpu->arch.tss));
 	cpu->arch.tss.ist1 = (ptr_t)cpu->arch.double_fault_stack + KSTACK_SIZE;
 	cpu->arch.tss.io_bitmap = 104;
 
 	/* Load the TSS segment into TR. */
-	ltr(KERNEL_TSS);
+	x86_ltr(KERNEL_TSS);
 }
 
 /** Initialize descriptor tables for the current CPU.
@@ -175,13 +174,13 @@ __init_text void descriptor_init(cpu_t *cpu) {
 	tss_init(cpu);
 
 	/* Point the CPU to the global IDT. */
-	lidt((ptr_t)&kernel_idt, (sizeof(kernel_idt) - 1));
+	x86_lidt(kernel_idt, (sizeof(kernel_idt) - 1));
 }
 
 /** Initialize the IDT shared by all CPUs. */
 __init_text void idt_init(void) {
-	unsigned long i;
 	ptr_t addr;
+	size_t i;
 
 	/* Fill out the handlers in the IDT. */
 	for(i = 0; i < IDT_ENTRY_COUNT; i++) {

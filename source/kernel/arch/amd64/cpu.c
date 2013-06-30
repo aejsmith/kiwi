@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Alex Smith
+ * Copyright (C) 2008-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,7 +47,7 @@ extern void syscall_entry(void);
 static uint8_t boot_doublefault_stack[KSTACK_SIZE] __aligned(PAGE_SIZE);
 
 /** Feature set present on all CPUs. */
-cpu_features_t cpu_features;
+x86_features_t cpu_features;
 
 /**
  * Get the current CPU ID.
@@ -69,9 +69,10 @@ void cpu_dump(cpu_t *cpu) {
 		cpu->id, cpu->arch.model_name, cpu->arch.family,
 		cpu->arch.model, cpu->arch.stepping);
 	kprintf(LOG_NOTICE, "  cpu_freq:    %" PRIu64 "MHz\n", cpu->arch.cpu_freq / 1000000);
-	if(lapic_enabled()) {
+
+	if(lapic_enabled())
 		kprintf(LOG_NOTICE, "  lapic_freq:  %" PRIu64 "MHz\n", cpu->arch.lapic_freq / 1000000);
-	}
+
 	kprintf(LOG_NOTICE, "  cache_align: %d\n", cpu->arch.cache_alignment);
 	kprintf(LOG_NOTICE, "  phys_bits:   %d\n", cpu->arch.max_phys_bits);
 	kprintf(LOG_NOTICE, "  virt_bits:   %d\n", cpu->arch.max_virt_bits);
@@ -100,9 +101,8 @@ __init_text uint64_t calculate_frequency(uint64_t (*func)()) {
 	size_t i;
 
 	/* Get the frequencies. */
-	for(i = 0; i < FREQUENCY_ATTEMPTS; i++) {
+	for(i = 0; i < FREQUENCY_ATTEMPTS; i++)
 		results[i] = func();
-	}
 
 	/* Sort them in ascending order. */
 	qsort(results, FREQUENCY_ATTEMPTS, sizeof(uint64_t), frequency_compare);
@@ -153,7 +153,7 @@ static __init_text uint64_t calculate_cpu_frequency(void) {
 /** Detect CPU features/information.
  * @param cpu		Pointer to CPU structure for this CPU.
  * @param features	Pointer to the features structure to fill in. */
-static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features) {
+static __init_text void detect_cpu_features(cpu_t *cpu, x86_features_t *features) {
 	uint32_t eax, ebx, ecx, edx;
 	uint32_t *ptr;
 	size_t i, j;
@@ -161,9 +161,8 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 
 	/* Get the highest supported standard level. */
 	x86_cpuid(X86_CPUID_VENDOR_ID, &features->highest_standard, &ebx, &ecx, &edx);
-	if(features->highest_standard < X86_CPUID_FEATURE_INFO) {
+	if(features->highest_standard < X86_CPUID_FEATURE_INFO)
 		return;
-	}
 
 	/* Get standard feature information. */
 	x86_cpuid(X86_CPUID_FEATURE_INFO, &eax, &ebx, &features->standard_ecx, &features->standard_edx);
@@ -175,9 +174,8 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 
 	/* If the CLFLUSH instruction is supported, get the cache line size.
 	 * If it is not, a sensible default will be chosen later. */
-	if(features->clfsh) {
+	if(features->clfsh)
 		cpu->arch.cache_alignment = ((ebx >> 8) & 0xFF) * 8;
-	}
 
 	/* Get the highest supported extended level. */
 	x86_cpuid(X86_CPUID_EXT_MAX, &features->highest_extended, &ebx, &ecx, &edx);
@@ -185,8 +183,8 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 		if(features->highest_extended >= X86_CPUID_EXT_FEATURE) {
 			/* Get extended feature information. */
 			x86_cpuid(X86_CPUID_EXT_FEATURE, &eax, &ebx,
-			          &features->extended_ecx,
-			          &features->extended_edx);
+				&features->extended_ecx,
+				&features->extended_edx);
 		}
 
 		if(features->highest_extended >= X86_CPUID_BRAND_STRING3) {
@@ -199,16 +197,13 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 			/* Some CPUs right-justify the string... */
 			str = cpu->arch.model_name;
 			i = 0; j = 0;
-			while(str[i] == ' ') {
+			while(str[i] == ' ')
 				i++;
-			}
 			if(i > 0) {
-				while(str[i]) {
+				while(str[i])
 					str[j++] = str[i++];
-				}
-				while(j < sizeof(cpu->arch.model_name)) {
+				while(j < sizeof(cpu->arch.model_name))
 					str[j++] = 0;
-				}
 			}
 		}
 
@@ -223,20 +218,16 @@ static __init_text void detect_cpu_features(cpu_t *cpu, cpu_features_t *features
 	}
 
 	/* Get a brand string if one wasn't found. */
-	if(!cpu->arch.model_name[0]) {
+	if(!cpu->arch.model_name[0])
 		strcpy(cpu->arch.model_name, "Unknown Model");
-	}
 
 	/* If the cache line/address sizes are not set, use a sane default. */
-	if(!cpu->arch.cache_alignment) {
+	if(!cpu->arch.cache_alignment)
 		cpu->arch.cache_alignment = 64;
-	}
-	if(!cpu->arch.max_phys_bits) {
+	if(!cpu->arch.max_phys_bits)
 		cpu->arch.max_phys_bits = 32;
-	}
-	if(!cpu->arch.max_virt_bits) {
+	if(!cpu->arch.max_virt_bits)
 		cpu->arch.max_virt_bits = 48;
-	}
 }
 
 /** Initialize SYSCALL/SYSRET MSRs. */
@@ -272,13 +263,12 @@ static __init_text void syscall_init(void) {
 /** Detect and set up the current CPU.
  * @param cpu		CPU structure for the current CPU. */
 __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
-	cpu_features_t features;
+	x86_features_t features;
 
 	/* If this is the boot CPU, a double fault stack will not have been
 	 * allocated. Use the pre-allocated one in this case. */
-	if(cpu == &boot_cpu) {
+	if(cpu == &boot_cpu)
 		cpu->arch.double_fault_stack = boot_doublefault_stack;
-	}
 
 	/* Initialize and load descriptor tables. */
 	descriptor_init(cpu);
@@ -290,49 +280,52 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	 * structure. Otherwise, check that the feature set matches the global
 	 * features. We do not allow SMP configurations with different features
 	 * on different CPUs. */
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(cpu == &boot_cpu) {
-#endif
+	#endif
 		memcpy(&cpu_features, &features, sizeof(cpu_features));
-#if CONFIG_SMP
+
+		/* Check for required features. It is almost certain that AMD64
+		 * CPUs will support these, however I cannot find anything in
+		 * the Intel/AMD manuals that state there is a guaranteed
+		 * minimum feature set when 64-bit mode is supported, so check
+		 * to be on the safe side. */
+		if(features.highest_standard < X86_CPUID_FEATURE_INFO) {
+			fatal("CPUID feature information is not supported");
+		} else if(!cpu_features.fpu || !cpu_features.fxsr) {
+			fatal("CPU does not support FPU/FXSR");
+		} else if(!cpu_features.tsc) {
+			fatal("CPU does not support TSC");
+		} else if(!cpu_features.pge) {
+			fatal("CPU does not support PGE");
+		}
+	#if CONFIG_SMP
 	} else {
-		if(cpu_features.highest_standard != features.highest_standard ||
-		   cpu_features.highest_extended != features.highest_extended ||
-		   cpu_features.standard_edx != features.standard_edx ||
-		   cpu_features.standard_ecx != features.standard_ecx ||
-		   cpu_features.extended_edx != features.extended_edx ||
-		   cpu_features.extended_ecx != features.extended_ecx) {
+		if(cpu_features.highest_standard != features.highest_standard
+			|| cpu_features.highest_extended != features.highest_extended
+			|| cpu_features.standard_edx != features.standard_edx
+			|| cpu_features.standard_ecx != features.standard_ecx
+			|| cpu_features.extended_edx != features.extended_edx
+			|| cpu_features.extended_ecx != features.extended_ecx)
+		{
 			fatal("CPU %u has different feature set to boot CPU", cpu->id);
 		}
 	}
-#endif
-
-	/* Check for required features. It is almost certain that AMD64 CPUs
-	 * will support these, however I cannot find anything in the Intel/AMD
-	 * manuals that state there is a guaranteed minimum feature set when
-	 * 64-bit mode is supported, so check to be on the safe side. */
-	if(features.highest_standard < X86_CPUID_FEATURE_INFO) {
-		fatal("CPUID feature information is not supported");
-	} else if(!cpu_features.fpu || !cpu_features.fxsr) {
-		fatal("CPU does not support FPU/FXSR");
-	} else if(!cpu_features.tsc) {
-		fatal("CPU does not support TSC");
-	} else if(!cpu_features.pge) {
-		fatal("CPU does not support PGE");
-	}
+	#endif
 
 	/* Find out the CPU frequency. When running under QEMU the boot CPU's
 	 * frequency is OK but the others will usually get rubbish, so as a
 	 * workaround use the boot CPU's frequency on all CPUs under QEMU. */
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(strncmp(cpu->arch.model_name, "QEMU", 4) != 0 || cpu == &boot_cpu) {
-#endif
+	#endif
 		cpu->arch.cpu_freq = calculate_frequency(calculate_cpu_frequency);
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	} else {
 		cpu->arch.cpu_freq = boot_cpu.arch.cpu_freq;
 	}
-#endif
+	#endif
+
 	/* Work out the cycles per µs. */
 	cpu->arch.cycles_per_us = cpu->arch.cpu_freq / 1000000;
 
@@ -342,12 +335,12 @@ __init_text void arch_cpu_early_init_percpu(cpu_t *cpu) {
 	/* Set WP/NE/MP/TS in CR0 (Write Protect, Numeric Error, Monitor
 	 * Coprocessor, Task Switch), and clear EM (Emulation). TS is set
 	 * because we do not want the FPU to be enabled initially. */
-	x86_write_cr0((x86_read_cr0() | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP | X86_CR0_TS) & ~X86_CR0_EM);
+	x86_write_cr0((x86_read_cr0() | X86_CR0_WP | X86_CR0_NE | X86_CR0_MP
+		| X86_CR0_TS) & ~X86_CR0_EM);
 
 	/* Enable NX/XD if supported. */
-	if(cpu_features.xd) {
+	if(cpu_features.xd)
 		x86_write_msr(X86_MSR_EFER, x86_read_msr(X86_MSR_EFER) | X86_EFER_NXE);
-	}
 
 	/* Set up SYSCALL/SYSRET MSRs. */
 	syscall_init();
@@ -374,14 +367,13 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 	kdb_printf("==   ========== ================ =========== ==========\n");
 
 	for(i = 0; i <= highest_cpu_id; i++) {
-		if(cpus[i] == NULL) {
+		if(!cpus[i])
 			continue;
-		}
 
 		kdb_printf("%-4" PRIu32 " %-10" PRIu64 " %-16" PRIu64 " %-11d %s\n",
-		           cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
-		           cpus[i]->arch.lapic_freq / 1000000, cpus[i]->arch.cache_alignment,
-		           (cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
+			cpus[i]->id, cpus[i]->arch.cpu_freq / 1000000,
+			cpus[i]->arch.lapic_freq / 1000000, cpus[i]->arch.cache_alignment,
+			(cpus[i]->arch.model_name[0]) ? cpus[i]->arch.model_name : "Unknown");
 	}
 
 	return KDB_SUCCESS;
@@ -389,7 +381,6 @@ static kdb_status_t kdb_cmd_cpus(int argc, char **argv, kdb_filter_t *filter) {
 
 /** Perform additional initialization of the current CPU. */
 __init_text void arch_cpu_init_percpu() {
-	/* Register the KDB command. */
 	kdb_register_command("cpus", "Display a list of CPUs.", kdb_cmd_cpus);
 
 	lapic_init();

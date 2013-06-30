@@ -35,7 +35,7 @@ struct intr_frame;
  *			data, and also to easily access per-thread data from
  *			assembly code. If changing the layout of this structure,
  *			be sure to updated the offset definitions below. */
-typedef struct arch_thread {
+typedef struct __packed arch_thread {
 	struct cpu *cpu;			/** Current CPU pointer, used by curr_cpu. */
 
 	/** SYSCALL/SYSRET data. */
@@ -54,7 +54,7 @@ typedef struct arch_thread {
 
 	/** FPU context save point. */
 	char fpu[512] __aligned(16);
-} __packed arch_thread_t;
+} arch_thread_t;
 
 #endif /* __ASM__ */
 

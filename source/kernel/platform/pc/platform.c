@@ -61,7 +61,7 @@ void platform_reboot(void) {
 	spin(5000);
 
 	/* Fall back on a triple fault. */
-	lidt(0, 0);
+	x86_lidt(NULL, 0);
 	__asm__ volatile("ud2");
 }
 
