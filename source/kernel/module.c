@@ -23,6 +23,8 @@
 
 #include <io/fs.h>
 
+#include <lib/utility.h>
+
 #include <mm/kmem.h>
 #include <mm/malloc.h>
 #include <mm/mmu.h>

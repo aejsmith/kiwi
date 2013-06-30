@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,13 +22,13 @@
 #ifndef __LIB_ID_ALLOCATOR_H
 #define __LIB_ID_ALLOCATOR_H
 
-#include <lib/bitmap.h>
 #include <sync/mutex.h>
 
 /** ID allocator structure. */
 typedef struct id_allocator {
 	mutex_t lock;			/**< Lock to protect the allocator. */
-	bitmap_t bitmap;		/**< Bitmap of IDs. */
+	unsigned long *bitmap;		/**< Bitmap of IDs. */
+	size_t nbits;			/**< Number of bits in the bitmap. */
 } id_allocator_t;
 
 extern int32_t id_allocator_alloc(id_allocator_t *alloc);

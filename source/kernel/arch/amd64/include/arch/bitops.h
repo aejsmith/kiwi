@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Alex Smith
+ * Copyright (C) 2011-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,32 +24,45 @@
 
 #include <types.h>
 
+/** Atomically set a bit in a bitmap.
+ * @param bitmap	Bitmap to set in.
+ * @param bit		Bit to set. */
+static inline void set_bit(volatile unsigned long *addr, unsigned long bit) {
+	__asm__ volatile ("lock bts %1, %0" : "+m"(*addr) : "r"(bit) : "memory");
+}
+
+/** Atomically clear a bit in a bitmap.
+ * @param bitmap	Bitmap to clear in.
+ * @param bit		Bit to clear. */
+static inline void clear_bit(volatile unsigned long *addr, unsigned long bit) {
+	__asm__ volatile ("lock btr %1, %0" : "+m"(addr) : "r"(bit) : "memory");
+}
+
 /** Find first set bit in a native-sized value.
- * @note		Does not check if value is zero, caller should do this.
+ * @note		Does not check if value is zero, caller should do so.
  * @param value		Value to test.
  * @return		Position of first set bit. */
-static inline int bitops_ffs(unsigned long value) {
+static inline unsigned long ffs(unsigned long value) {
 	__asm__ ("bsf %1, %0" : "=r"(value) : "rm"(value) : "cc");
-	return (int)value;
+	return value;
 }
 
 /** Find first zero bit in a native-sized value.
- * @note		Does not check if all bits are set, caller should do
- *			this.
+ * @note		Does not check if all bits are set, caller should do so.
  * @param value		Value to test.
  * @return		Position of first zero bit. */
-static inline int bitops_ffz(unsigned long value) {
+static inline unsigned long ffz(unsigned long value) {
 	__asm__ ("bsf %1, %0" : "=r"(value) : "r"(~value) : "cc");
-	return (int)value;
+	return value;
 }
 
 /** Find last set bit in a native-sized value.
- * @note		Does not check if value is zero, caller should do this.
+ * @note		Does not check if value is zero, caller should do so.
  * @param value		Value to test.
  * @return		Position of last set bit. */
-static inline int bitops_fls(unsigned long value) {
-        __asm__ ("bsr %1, %0" : "=r" (value) : "rm"(value) : "cc");
-      	return (int)value;
+static inline unsigned long fls(unsigned long value) {
+	__asm__ ("bsr %1, %0" : "=r" (value) : "rm"(value) : "cc");
+	return value;
 }
 
 #endif /* __ARCH_BITOPS_H */

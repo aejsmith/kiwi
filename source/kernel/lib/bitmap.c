@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,110 +30,84 @@
 #include <assert.h>
 #include <status.h>
 
-/**
- * Initialize a bitmap.
- *
- * Initializes the given bitmap structure. If the data argument is supplied,
- * then it should point to a preallocated memory area that's large enough to
- * store bits for each bit in the bitmap (see BITMAP_BYTES in bitmap.h).
- * Otherwise, memory for the bitmap will be dynamically allocated. If the
- * bitmap's data was not allocated by this function, then bitmap_destroy()
- * will not free it.
- *
- * @param bitmap	Bitmap to initialize.
- * @param bits		Number of bits the bitmap should be able to hold.
- * @param data		Pointer to preallocated memory (if any).
- * @param mmflag	Allocation flags to use if allocating memory.
- *
- * @return		Status code describing result of the operation. Always
- *			succeeds if using preallocated memory).
- */
-status_t bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int mmflag) {
-	assert(bits > 0);
+/** Get the array index containing a bit. */
+#define BIT_INDEX(bit)		(bit / BITS(unsigned long))
 
-	if(data) {
-		bitmap->allocated = false;
-		bitmap->data = data;
-	} else {
-		bitmap->allocated = true;
-		bitmap->data = kmalloc(BITMAP_BYTES(bits), mmflag);
-		if(bitmap->data == NULL) {
-			return STATUS_NO_MEMORY;
-		}
-
-		memset(bitmap->data, 0, BITMAP_BYTES(bits));
-	}
-
-	bitmap->count = bits;
-	return STATUS_SUCCESS;
-}
+/** Get the array entry offset of a bit. */
+#define BIT_OFFSET(bit)		(bit % BITS(unsigned long))
 
 /**
- * Destroy a bitmap.
+ * Allocate a new bitmap.
  *
- * Destroys the given bitmap. If the original call to bitmap_init() was given
- * a preallocated memory space, then this function will not free it: it is up
- * to the caller to free this data if required.
+ * Allocates enough space to store a bitmap of the specified size. The memory
+ * is allocated with kmalloc(), and therefore must be freed with kfree().
  *
- * @param bitmap	Bitmap to destroy.
+ * @param nbits		Required size of the bitmap.
+ * @param mmflag	Allocation behaviour flags (see mm/mm.h).
+ *
+ * @return		Pointer to allocated bitmap, or null on failure.
  */
-void bitmap_destroy(bitmap_t *bitmap) {
-	if(bitmap->allocated) {
-		kfree(bitmap->data);
-	}
+unsigned long *bitmap_alloc(size_t nbits, int mmflag) {
+	unsigned long *bitmap = kmalloc(BITMAP_BYTES(nbits), mmflag);
+
+	if(likely(bitmap))
+		bitmap_zero(bitmap, nbits);
+
+	return bitmap;
 }
 
-/** Set a bit in a bitmap.
+/** Zero a bitmap.
+ * @param bitmap	Bitmap to zero.
+ * @param nbits		Size of the bitmap. */
+void bitmap_zero(unsigned long *bitmap, size_t nbits) {
+	memset(bitmap, 0, BITMAP_BYTES(nbits));
+}
+
+/** Atomically set a bit in a bitmap.
  * @param bitmap	Bitmap to set in.
- * @param bit		Number of the bit to set. */
-void bitmap_set(bitmap_t *bitmap, int bit) {
-	assert(bit < bitmap->count);
-	bitmap->data[bit / 8] |= (1 << (bit % 8));
+ * @param bit		Index of the bit to set. */
+void bitmap_set(unsigned long *bitmap, unsigned long bit) {
+	set_bit(&bitmap[BIT_INDEX(bit)], BIT_OFFSET(bit));
 }
 
-/** Clear a bit in a bitmap.
+/** Atomically clear a bit in a bitmap.
  * @param bitmap	Bitmap to clear in.
- * @param bit		Number of the bit to clear. */
-void bitmap_clear(bitmap_t *bitmap, int bit) {
-	assert(bit < bitmap->count);
-	bitmap->data[bit / 8] &= ~(1 << (bit % 8));
+ * @param bit		Index of the bit to clear. */
+void bitmap_clear(unsigned long *bitmap, unsigned long bit) {
+	clear_bit(&bitmap[BIT_INDEX(bit)], BIT_OFFSET(bit));
 }
 
 /** Test whether a bit is set in a bitmap.
  * @param bitmap	Bitmap to test in.
- * @param bit		Number of the bit to test.
- * @return		True if bit set, false if not. */
-bool bitmap_test(bitmap_t *bitmap, int bit) {
-	assert(bit < bitmap->count);
-	return bitmap->data[bit / 8] & (1 << (bit % 8));
+ * @param bit		Index of the bit to test.
+ * @return		Whether the bit is set. */
+bool bitmap_test(const unsigned long *bitmap, unsigned long bit) {
+	return bitmap[BIT_INDEX(bit)] & (1UL << BIT_OFFSET(bit));
 }
 
 /** Find first set bit in a bitmap.
  * @param bitmap	Bitmap to test in.
+ * @param nbits		Size of the bitmap.
  * @return		Position of first set bit, -1 if none set. */
-int bitmap_ffs(bitmap_t *bitmap) {
-	size_t total = bitmap->count;
+long bitmap_ffs(const unsigned long *bitmap, size_t nbits) {
 	unsigned long value;
-	int result = 0;
+	long result = 0;
 
-	while(total >= BITS(unsigned long)) {
-		value = ((unsigned long *)bitmap->data)[result / BITS(unsigned long)];
-		if(value) {
-			return result + bitops_ffs(value);
-		}
+	while(nbits >= BITS(unsigned long)) {
+		value = *(bitmap++);
+		if(value)
+			return result + ffs(value);
 
-		total -= BITS(unsigned long);
+		nbits -= BITS(unsigned long);
 		result += BITS(unsigned long);
 	}
 
-	/* Probably could be done faster... */
-	while(total) {
-		if(bitmap_test(bitmap, result)) {
-			return result;
-		}
-
-		total--;
-		result++;
+	if(nbits) {
+		/* Must be on the last word here. Select only the bits that are
+		 * within the bitmap. */
+		value = (*bitmap) & (~0UL >> (BITS(unsigned long) - nbits));
+		if(value)
+			return result + ffs(value);
 	}
 
 	return -1;
@@ -141,30 +115,66 @@ int bitmap_ffs(bitmap_t *bitmap) {
 
 /** Find first zero bit in a bitmap.
  * @param bitmap	Bitmap to test in.
+ * @param nbits		Size of the bitmap.
  * @return		Position of first zero bit, -1 if all set. */
-int bitmap_ffz(bitmap_t *bitmap) {
-	size_t total = bitmap->count;
+long bitmap_ffz(const unsigned long *bitmap, size_t nbits) {
 	unsigned long value;
-	int result = 0;
+	long result = 0;
 
-	while(total >= BITS(unsigned long)) {
-		value = ((unsigned long *)bitmap->data)[result / BITS(unsigned long)];
-		if(value != ~((unsigned long)0)) {
-			return result + bitops_ffz(value);
-		}
+	while(nbits >= BITS(unsigned long)) {
+		value = *(bitmap++);
+		if(value != ~0UL)
+			return result + ffz(value);
 
-		total -= BITS(unsigned long);
+		nbits -= BITS(unsigned long);
 		result += BITS(unsigned long);
 	}
 
-	/* Probably could be done faster... */
-	while(total) {
-		if(!bitmap_test(bitmap, result)) {
-			return result;
+	if(nbits) {
+		/* Must be on the last word here. Select only the bits that are
+		 * within the bitmap. */
+		value = (*bitmap) | (~0UL << nbits);
+		if(value != ~0UL)
+			return result + ffz(value);
+	}
+
+	return -1;
+}
+
+/** Find next set bit in a bitmap.
+ * @param bitmap	Bitmap to test in.
+ * @param nbits		Size of the bitmap.
+ * @param current	Current bit.
+ * @return		Position of next bit set, -1 if no more set bits. */
+long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long current) {
+	unsigned long value;
+	long result = 0;
+
+	/* Want to start looking from the one after. */
+	current += 1;
+
+	while(nbits >= BITS(unsigned long)) {
+		value = *(bitmap++);
+		if(current < BITS(unsigned long)) {
+			value &= ~0UL << current;
+			if(value)
+				return result + ffs(value);
+
+			current = 0;
+		} else {
+			current -= BITS(unsigned long);
 		}
 
-		total--;
-		result++;
+		nbits -= BITS(unsigned long);
+		result += BITS(unsigned long);
+	}
+
+	if(nbits) {
+		/* Select only the bits that are within the bitmap. */
+		value = (*bitmap) & (~0UL >> (BITS(unsigned long) - nbits));
+		value &= ~0UL << current;
+		if(value)
+			return result + ffs(value);
 	}
 
 	return -1;

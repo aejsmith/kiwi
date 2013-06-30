@@ -26,7 +26,6 @@
 #include <kernel/security.h>
 
 #include <lib/avl_tree.h>
-#include <lib/bitmap.h>
 #include <lib/list.h>
 #include <lib/refcount.h>
 
@@ -139,7 +138,7 @@ typedef struct object_handle {
 typedef struct handle_table {
 	rwlock_t lock;			/**< Lock to protect table. */
 	avl_tree_t tree;		/**< Tree of ID to handle structure mappings. */
-	bitmap_t bitmap;		/**< Bitmap for tracking free handle IDs. */
+	unsigned long *bitmap;		/**< Bitmap for tracking free handle IDs. */
 } handle_table_t;
 
 /** Internally-used object rights. */

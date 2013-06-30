@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,10 +21,13 @@
  * The functions in this file implement a cache for file block numbers to raw
  * (i.e. on-disk) block numbers. Also provided are VM cache helper functions
  * that can use data in a file map to handle reading and writing of data pages.
+ *
+ * @todo		Is an AVL tree the best thing to use here...?
  */
 
 #include <io/file_map.h>
 
+#include <lib/bitmap.h>
 #include <lib/utility.h>
 
 #include <mm/malloc.h>
@@ -37,7 +40,7 @@
 /** Structure containing a single range in a file map. */
 typedef struct file_map_chunk {
 	uint64_t *blocks;		/**< Array of blocks in the chunk. */
-	bitmap_t bitmap;		/**< Bitmap indicating which blocks are cached. */
+	unsigned long *bitmap;		/**< Bitmap indicating which blocks are cached. */
 	avl_tree_node_t link;		/**< Link to the map. */
 } file_map_chunk_t;
 
@@ -88,8 +91,8 @@ void file_map_destroy(file_map_t *map) {
 		chunk = avl_tree_entry(iter, file_map_chunk_t);
 
 		avl_tree_remove(&map->chunks, &chunk->link);
+		kfree(chunk->bitmap);
 		kfree(chunk->blocks);
-		bitmap_destroy(&chunk->bitmap);
 		kfree(chunk);
 	}
 
@@ -116,15 +119,15 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 	 * else allocate a new chunk. */
 	chunk = avl_tree_lookup(&map->chunks, chunk_num);
 	if(chunk) {
-		if(bitmap_test(&chunk->bitmap, chunk_entry)) {
+		if(bitmap_test(chunk->bitmap, chunk_entry)) {
 			*rawp = chunk->blocks[chunk_entry];
 			mutex_unlock(&map->lock);
 			return STATUS_SUCCESS;
 		}
 	} else {
 		chunk = kmalloc(sizeof(file_map_chunk_t), MM_WAIT);
-		bitmap_init(&chunk->bitmap, map->blocks_per_chunk, NULL, MM_WAIT);
 		chunk->blocks = kmalloc(sizeof(uint64_t) * map->blocks_per_chunk, MM_WAIT);
+		chunk->bitmap = bitmap_alloc(map->blocks_per_chunk, MM_WAIT);
 		avl_tree_insert(&map->chunks, &chunk->link, chunk_num, chunk);
 	}
 
@@ -135,7 +138,7 @@ status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp) {
 		return ret;
 	}
 
-	bitmap_set(&chunk->bitmap, chunk_entry);
+	bitmap_set(chunk->bitmap, chunk_entry);
 	*rawp = chunk->blocks[chunk_entry];
 	mutex_unlock(&map->lock);
 	return STATUS_SUCCESS;
@@ -157,13 +160,13 @@ void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count) {
 			continue;
 		}
 
-		bitmap_clear(&chunk->bitmap, i % map->blocks_per_chunk);
+		bitmap_clear(chunk->bitmap, i % map->blocks_per_chunk);
 
 		/* Free the chunk if it is now empty. */
-		if(bitmap_ffs(&chunk->bitmap) < 0) {
+		if(bitmap_ffs(chunk->bitmap, map->blocks_per_chunk) < 0) {
 			avl_tree_remove(&map->chunks, &chunk->link);
+			kfree(chunk->bitmap);
 			kfree(chunk->blocks);
-			bitmap_destroy(&chunk->bitmap);
 			kfree(chunk);
 		}
 	}

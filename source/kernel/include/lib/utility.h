@@ -89,16 +89,16 @@ static inline int highbit(uint64_t val) {
 	}
 
 #if CONFIG_ARCH_64BIT
-	return bitops_fls(val) + 1;
+	return fls(val) + 1;
 #elif CONFIG_ARCH_32BIT
 	unsigned long high, low;
 
 	high = (unsigned long)((val >> 32) & 0xffffffff);
 	low = (unsigned long)(val & 0xffffffff);
 	if(high) {
-		return bitops_fls(high) + 32 + 1;
+		return fls(high) + 32 + 1;
 	} else {
-		return bitops_fls(low) + 1;
+		return fls(low) + 1;
 	}
 #else
 # error "Implement this."

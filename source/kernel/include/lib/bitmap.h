@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /**
  * @file
- * @brief		Bitmap data type.
+ * @brief		Bitmap implementation.
  */
 
 #ifndef __LIB_BITMAP_H
@@ -26,23 +26,16 @@
 
 #include <mm/mm.h>
 
-/** Structure containing a bitmap. */
-typedef struct bitmap {
-	uint8_t *data;		/**< Bitmap data. */
-	int count;		/**< Number of bits in the bitmap. */
-	bool allocated;		/**< Whether data was allocated by bitmap_init(). */
-} bitmap_t;
-
 /** Get the number of bytes required for a bitmap. */
-#define BITMAP_BYTES(bits)	(ROUND_UP(bits, 8) / 8)
+#define BITMAP_BYTES(nbits)	(ROUND_UP(nbits, 8) / 8)
 
-extern status_t bitmap_init(bitmap_t *bitmap, int bits, uint8_t *data, int mmflag);
-extern void bitmap_destroy(bitmap_t *bitmap);
-
-extern void bitmap_set(bitmap_t *bitmap, int bit);
-extern void bitmap_clear(bitmap_t *bitmap, int bit);
-extern bool bitmap_test(bitmap_t *bitmap, int bit);
-extern int bitmap_ffs(bitmap_t *bitmap);
-extern int bitmap_ffz(bitmap_t *bitmap);
+extern unsigned long *bitmap_alloc(size_t nbits, int mmflag);
+extern void bitmap_zero(unsigned long *bitmap, size_t nbits);
+extern void bitmap_set(unsigned long *bitmap, unsigned long bit);
+extern void bitmap_clear(unsigned long *bitmap, unsigned long bit);
+extern bool bitmap_test(const unsigned long *bitmap, unsigned long bit);
+extern long bitmap_ffs(const unsigned long *bitmap, size_t nbits);
+extern long bitmap_ffz(const unsigned long *bitmap, size_t nbits);
+extern long bitmap_next(const unsigned long *bitmap, size_t nbits, unsigned long current);
 
 #endif /* __LIB_BITMAP_H */

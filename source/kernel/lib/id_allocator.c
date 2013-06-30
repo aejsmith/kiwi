@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,10 @@
  * @brief		Object ID allocator.
  */
 
+#include <lib/bitmap.h>
 #include <lib/id_allocator.h>
+
+#include <mm/malloc.h>
 
 #include <assert.h>
 #include <status.h>
@@ -28,17 +31,17 @@
  * @param alloc		Allocator to allocate from.
  * @return		New ID, or -1 if no IDs available. */
 int32_t id_allocator_alloc(id_allocator_t *alloc) {
-	int id;
+	int32_t id;
 
 	mutex_lock(&alloc->lock);
 
-	id = bitmap_ffz(&alloc->bitmap);
+	id = bitmap_ffz(alloc->bitmap, alloc->nbits);
 	if(id < 0) {
 		mutex_unlock(&alloc->lock);
 		return -1;
 	}
 
-	bitmap_set(&alloc->bitmap, id);
+	bitmap_set(alloc->bitmap, id);
 
 	mutex_unlock(&alloc->lock);
 	return id;
@@ -50,8 +53,8 @@ int32_t id_allocator_alloc(id_allocator_t *alloc) {
 void id_allocator_free(id_allocator_t *alloc, int32_t id) {
 	mutex_lock(&alloc->lock);
 
-	assert(bitmap_test(&alloc->bitmap, id));
-	bitmap_clear(&alloc->bitmap, id);
+	assert(bitmap_test(alloc->bitmap, id));
+	bitmap_clear(alloc->bitmap, id);
 
 	mutex_unlock(&alloc->lock);
 }
@@ -62,8 +65,8 @@ void id_allocator_free(id_allocator_t *alloc, int32_t id) {
 void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
 	mutex_lock(&alloc->lock);
 
-	assert(!bitmap_test(&alloc->bitmap, id));
-	bitmap_set(&alloc->bitmap, id);
+	assert(!bitmap_test(alloc->bitmap, id));
+	bitmap_set(alloc->bitmap, id);
 
 	mutex_unlock(&alloc->lock);
 }
@@ -75,11 +78,13 @@ void id_allocator_reserve(id_allocator_t *alloc, int32_t id) {
  * @return		Status code describing the result of the operation. */
 status_t id_allocator_init(id_allocator_t *alloc, int32_t max, int mmflag) {
 	mutex_init(&alloc->lock, "id_allocator_lock", 0);
-	return bitmap_init(&alloc->bitmap, max + 1, NULL, mmflag);
+	alloc->nbits = max + 1;
+	alloc->bitmap = bitmap_alloc(alloc->nbits, mmflag);
+	return (alloc->bitmap) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
 }
 
 /** Destroy an ID allocator.
  * @param alloc		Allocator to destroy. */
 void id_allocator_destroy(id_allocator_t *alloc) {
-	bitmap_destroy(&alloc->bitmap);
+	kfree(alloc->bitmap);
 }

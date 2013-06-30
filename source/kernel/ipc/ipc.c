@@ -40,6 +40,7 @@
 #include <lib/id_allocator.h>
 #include <lib/notifier.h>
 #include <lib/refcount.h>
+#include <lib/utility.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>

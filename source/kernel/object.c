@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Alex Smith
+ * Copyright (C) 2010-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,8 @@
  *			this file.
  * @see			security/acl.c
  */
+
+#include <lib/bitmap.h>
 
 #include <mm/malloc.h>
 #include <mm/safe.h>
@@ -297,7 +299,7 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
 	link->handle = handle;
 	link->flags = flags;
 
-	bitmap_set(&table->bitmap, id);
+	bitmap_set(table->bitmap, id);
 	avl_tree_insert(&table->tree, &link->link, id, link);
 }
 
@@ -331,7 +333,7 @@ status_t object_handle_attach(object_handle_t *handle, process_t *process, int f
 	rwlock_write_lock(&process->handles->lock);
 
 	/* Find a handle ID in the table. */
-	id = bitmap_ffz(&process->handles->bitmap);
+	id = bitmap_ffz(process->handles->bitmap, CONFIG_HANDLE_MAX);
 	if(id < 0) {
 		rwlock_unlock(&process->handles->lock);
 		return STATUS_NO_HANDLES;
@@ -373,7 +375,7 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 
 	/* Remove from the tree and mark the ID as free. */
 	avl_tree_remove(&process->handles->tree, &link->link);
-	bitmap_clear(&process->handles->bitmap, id);
+	bitmap_clear(process->handles->bitmap, id);
 
 	/* Release the handle and free the link. */
 	object_handle_release(link->handle);
@@ -488,7 +490,7 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 	int i;
 
 	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
-	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_WAIT);
+	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_WAIT);
 
 	/* Inherit all inheritable handles in the parent table. */
 	if(parent && count != 0) {
@@ -549,7 +551,7 @@ handle_table_t *handle_table_clone(handle_table_t *src) {
 	handle_link_t *link;
 
 	table = slab_cache_alloc(handle_table_cache, MM_WAIT);
-	bitmap_init(&table->bitmap, CONFIG_HANDLE_MAX, NULL, MM_WAIT);
+	table->bitmap = bitmap_alloc(CONFIG_HANDLE_MAX, MM_WAIT);
 
 	rwlock_read_lock(&src->lock);
 
@@ -575,7 +577,7 @@ void handle_table_destroy(handle_table_t *table) {
 		kfree(link);
 	}
 
-	bitmap_destroy(&table->bitmap);
+	kfree(table->bitmap);
 	slab_cache_free(handle_table_cache, table);
 }
 
@@ -897,7 +899,7 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handl
 		object_handle_detach_unsafe(curr_proc, dest);
 	} else {
 		/* See previous FIXME. */
-		dest = bitmap_ffz(&curr_proc->handles->bitmap);
+		dest = bitmap_ffz(curr_proc->handles->bitmap, CONFIG_HANDLE_MAX);
 		if(dest < 0) {
 			rwlock_unlock(&curr_proc->handles->lock);
 			return STATUS_NO_HANDLES;
