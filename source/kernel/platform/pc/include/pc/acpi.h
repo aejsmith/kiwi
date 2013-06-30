@@ -44,7 +44,7 @@
 #define ACPI_MADT_IOAPIC	1		/**< I/O APIC. */
 
 /** Root System Description Pointer (RSDP) structure. */
-typedef struct acpi_rsdp {
+typedef struct __packed acpi_rsdp {
 	uint8_t signature[8];			/**< Signature (ACPI_RSDP_SIGNATURE). */
 	uint8_t checksum;			/**< Checksum of first 20 bytes. */
 	uint8_t oem_id[6];			/**< OEM ID string. */
@@ -54,10 +54,10 @@ typedef struct acpi_rsdp {
 	uint64_t xsdt_address;			/**< Address of XSDT. */
 	uint8_t ext_checksum;			/**< Checksum of entire table. */
 	uint8_t reserved[3];			/**< Reserved field. */
-} __packed acpi_rsdp_t;
+} acpi_rsdp_t;
 
 /** System Description Table Header (DESCRIPTION_HEADER). */
-typedef struct acpi_header {
+typedef struct __packed acpi_header {
 	uint8_t signature[4];			/**< Signature. */
 	uint32_t length;			/**< Length of header. */
 	uint8_t revision;			/**< ACPI revision number. */
@@ -67,36 +67,36 @@ typedef struct acpi_header {
 	uint32_t oem_revision;			/**< OEM Revision. */
 	uint32_t creator_id;			/**< Creator ID. */
 	uint32_t creator_revision;		/**< Creator Revision. */
-} __packed acpi_header_t;
+} acpi_header_t;
 
 /** Root System Description Table (RSDT) structure. */
-typedef struct acpi_rsdt {
+typedef struct __packed acpi_rsdt {
 	acpi_header_t header;			/**< ACPI Header. */
 	uint32_t entry[];			/**< Array of entries. */
-} __packed acpi_rsdt_t;
+} acpi_rsdt_t;
 
 /** Extended System Description Table (XSDT) structure. */
-typedef struct acpi_xsdt {
+typedef struct __packed acpi_xsdt {
 	acpi_header_t header;			/**< ACPI Header. */
 	uint64_t entry[];			/**< Array of entries. */
-} __packed acpi_xsdt_t;
+} acpi_xsdt_t;
 
 /** Multiple APIC Description Table (MADT) structure. */
-typedef struct acpi_madt {
+typedef struct __packed acpi_madt {
 	acpi_header_t header;			/**< ACPI Header. */
 	uint32_t lapic_addr;			/**< Local APIC address. */
 	uint32_t flags;				/**< Multiple APIC flags. */
 	uint8_t apic_structures[];		/**< Array of APIC structures. */
-} __packed acpi_madt_t;
+} acpi_madt_t;
 
 /** MADT Processor Local APIC structure. */
-typedef struct acpi_madt_lapic {
+typedef struct __packed acpi_madt_lapic {
 	uint8_t type;				/**< APIC type (0). */
 	uint8_t length;				/**< Structure length. */
 	uint8_t processor_id;			/**< ACPI Processor ID. */
 	uint8_t lapic_id;			/**< Processor's LAPIC ID. */
 	uint32_t flags;				/**< LAPIC flags. */
-} __packed acpi_madt_lapic_t;
+} acpi_madt_lapic_t;
 
 extern bool acpi_supported;
 
