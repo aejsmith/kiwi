@@ -59,30 +59,34 @@ typedef struct arch_cpu {
 
 /** Get the current CPU structure pointer.
  * @return		Pointer to current CPU structure. */
-static inline struct cpu *cpu_get_pointer(void) {
+static inline struct cpu *arch_cpu_pointer(void) {
 	ptr_t addr;
 	__asm__("mov %%gs:0, %0" : "=r"(addr));
 	return (struct cpu *)addr;
 }
 
 /** Halt the current CPU. */
-static inline __noreturn void cpu_halt(void) {
-	while(true) {
+static inline __noreturn void arch_cpu_halt(void) {
+	while(true)
 		__asm__ volatile("cli; hlt");
-	}
 }
 
 /** Place the CPU in an idle state until an interrupt occurs. */
-static inline void cpu_idle(void) {
+static inline void arch_cpu_idle(void) {
 	__asm__ volatile("sti; hlt; cli");
 }
 
 /** CPU-specific spin loop hint. */
-static inline void cpu_spin_hint(void) {
+static inline void arch_cpu_spin_hint(void) {
 	/* See PAUSE instruction in Intel 64 and IA-32 Architectures Software
 	 * Developer's Manual, Volume 2B: Instruction Set Reference N-Z for
 	 * more information as to what this does. */
 	__asm__ volatile("pause");
+}
+
+/** Invalidate CPU caches. */
+static inline void arch_cpu_invalidate_caches(void) {
+	__asm__ volatile("wbinvd");
 }
 
 #endif /* __ARCH_CPU_H */

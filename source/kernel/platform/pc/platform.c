@@ -68,5 +68,5 @@ void platform_reboot(void) {
 /** Power off the system. */
 void platform_poweroff(void) {
 	/* TODO. */
-	cpu_halt();
+	arch_cpu_halt();
 }

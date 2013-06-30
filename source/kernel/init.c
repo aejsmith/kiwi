@@ -108,7 +108,7 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 	/* Check the magic number. */
 	if(magic != KBOOT_MAGIC) {
 		kprintf(LOG_ERROR, "Not loaded by a KBoot-compliant loader\n");
-		cpu_halt();
+		arch_cpu_halt();
 	}
 
 	/* Currently we are running on a stack set up for us by the loader.
@@ -212,7 +212,7 @@ __init_text void kmain_ap(cpu_t *cpu) {
 
 	/* Wait for remaining CPUs to be brought up. */
 	while(smp_boot_status != SMP_BOOT_COMPLETE) {
-		cpu_spin_hint();
+		arch_cpu_spin_hint();
 	}
 
 	/* Begin scheduling threads. */

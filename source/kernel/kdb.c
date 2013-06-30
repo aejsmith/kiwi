@@ -261,7 +261,7 @@ void *kdb_malloc(size_t size) {
 		 * commands. */
 		if(atomic_get(&kdb_running)) {
 			kdb_printf("Exhausted KDB heap");
-			cpu_halt();
+			arch_cpu_halt();
 		} else {
 			fatal("Exhausted KDB heap");
 		}

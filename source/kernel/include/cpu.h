@@ -69,7 +69,7 @@ typedef struct cpu {
  * @note		We don't define this to &boot_cpu when compiling
  *			without SMP support to ensure that a module will work
  *			properly in any kernel when compiled without SMP. */
-#define curr_cpu	((cpu_t *)cpu_get_pointer())
+#define curr_cpu	((cpu_t *)arch_cpu_pointer())
 
 extern cpu_t boot_cpu;
 extern size_t highest_cpu_id;

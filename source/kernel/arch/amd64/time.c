@@ -50,7 +50,7 @@ void spin(useconds_t us) {
 
         /* Spin until we reach the target. */
         while(x86_rdtsc() < target) {
-                cpu_spin_hint();
+                arch_cpu_spin_hint();
         }
 }
 
@@ -72,7 +72,7 @@ __init_text void tsc_init_target(void) {
 
 		/* Wait for it to store its system_time() value. */
 		while(smp_boot_status != SMP_BOOT_TSC_SYNC2) {
-			cpu_spin_hint();
+			arch_cpu_spin_hint();
 		}
 
 		/* Calculate the offset we need to use. */
@@ -86,7 +86,7 @@ __init_text void tsc_init_target(void) {
 __init_text void tsc_init_source(void) {
 	/* Wait for the AP to get into tsc_init_target(). */
 	while(smp_boot_status != SMP_BOOT_TSC_SYNC1) {
-		cpu_spin_hint();
+		arch_cpu_spin_hint();
 	}
 
 	/* Save our system_time() value. */

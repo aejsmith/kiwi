@@ -143,7 +143,7 @@ void lapic_ipi(uint8_t dest, uint8_t id, uint8_t mode, uint8_t vector) {
 
 	/* Wait for the IPI to be sent (check Delivery Status bit). */
 	while(lapic_read(LAPIC_REG_ICR0) & (1<<12)) {
-		cpu_spin_hint();
+		arch_cpu_spin_hint();
 	}
 
 	local_irq_restore(state);

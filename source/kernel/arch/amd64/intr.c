@@ -124,7 +124,7 @@ static void nmi_handler(intr_frame_t *frame) {
 #if CONFIG_SMP
 	if(atomic_get(&kdb_running) > 0) {
 		while(atomic_get(&kdb_running) > 0) {
-			cpu_spin_hint();
+			arch_cpu_spin_hint();
 		}
 
 		return;
@@ -182,7 +182,7 @@ static void nm_fault(intr_frame_t *frame) {
  * @param frame		Interrupt stack frame. */
 static void double_fault(intr_frame_t *frame) {
 	_fatal(frame, "Double fault", frame->ip);
-	cpu_halt();
+	arch_cpu_halt();
 }
 
 /** Handler for page faults.

@@ -40,7 +40,7 @@ static inline __always_inline void spinlock_lock_internal(spinlock_t *lock) {
 			while(true) {
 				/* Wait for it to become unheld. */
 				while(atomic_get(&lock->value) != 1) {
-					cpu_spin_hint();
+					arch_cpu_spin_hint();
 				}
 
 				/* Try to acquire it. */

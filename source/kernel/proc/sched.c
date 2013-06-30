@@ -479,15 +479,15 @@ static void sched_reaper_thread(void *arg1, void *arg2) {
  * @param arg1		Unused.
  * @param arg2		Unused. */
 static void sched_idle_thread(void *arg1, void *arg2) {
-	/* We run the loop with interrupts disabled. The cpu_idle() function is
-	 * expected to re-enable interrupts as required. */
+	/* We run the loop with interrupts disabled. The arch_cpu_idle()
+	 * function is expected to re-enable interrupts as required. */
 	local_irq_disable();
 
 	while(true) {
 		spinlock_lock_noirq(&curr_thread->lock);
 		sched_reschedule(false);
 
-		cpu_idle();
+		arch_cpu_idle();
 	}
 }
 

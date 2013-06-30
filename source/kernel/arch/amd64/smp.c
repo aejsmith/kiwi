@@ -141,7 +141,7 @@ __init_text void arch_smp_boot(cpu_t *cpu) {
 
 	/* Finally, wait for the CPU to complete its initialization. */
 	while(smp_boot_status != SMP_BOOT_BOOTED) {
-		cpu_spin_hint();
+		arch_cpu_spin_hint();
 	}
 }
 

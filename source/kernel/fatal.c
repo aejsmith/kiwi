@@ -91,7 +91,7 @@ void _fatal(intr_frame_t *frame, const char *fmt, ...) {
 	}
 
 	/* Halt the current CPU. */
-	cpu_halt();
+	arch_cpu_halt();
 }
 
 /** Handle failure of an assertion.

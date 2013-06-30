@@ -43,7 +43,7 @@ useconds_t platform_time_from_hardware(void) {
 	/* Check if an update is in progress. */
 	out8(0x70, 0x0A);
 	while(in8(0x71) & 0x80) {
-		cpu_spin_hint();
+		arch_cpu_spin_hint();
 		out8(0x70, 0x0A);
 	}
 

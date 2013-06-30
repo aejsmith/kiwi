@@ -40,7 +40,7 @@ bool shutdown_in_progress = false;
 /** SMP call handler to halt a CPU. */
 static status_t shutdown_call_func(void *data) {
 	smp_call_acknowledge(STATUS_SUCCESS);
-	cpu_halt();
+	arch_cpu_halt();
 }
 #endif
 
@@ -74,7 +74,7 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	}
 
 	kprintf(LOG_NOTICE, "system: halted.\n");
-	cpu_halt();
+	arch_cpu_halt();
 }
 
 /** Shut down the system.
