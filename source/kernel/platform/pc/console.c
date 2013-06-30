@@ -120,9 +120,9 @@ static uint16_t i8042_console_getc(void) {
 
 		/* Check for an extended code. */
 		if(code >= 0xe0) {
-			if(code == 0xe0) {
+			if(code == 0xe0)
 				extended = true;
-			}
+
 			continue;
 		}
 
@@ -137,6 +137,7 @@ static uint16_t i8042_console_getc(void) {
 			} else if(code == LEFT_ALT || code == RIGHT_ALT) {
 				alt = false;
 			}
+
 			extended = false;
 			continue;
 		}
@@ -162,14 +163,13 @@ static uint16_t i8042_console_getc(void) {
 		/* Little hack so that pressing Enter won't result in an extra
 		 * newline being sent. */
 		if(ret == '\n') {
-			while((in8(0x64) & 1) == 0) {};
+			while((in8(0x64) & 1) == 0) {}
 			in8(0x60);
 		}
 
 		extended = false;
-		if(ret != 0) {
+		if(ret != 0)
 			return ret;
-		}
 	}
 }
 
@@ -182,9 +182,8 @@ static console_in_ops_t i8042_console_in_ops = {
 /** Write a character to the serial console.
  * @param ch		Character to print. */
 static void serial_console_putc(char ch) {
-	if(ch == '\n') {
+	if(ch == '\n')
 		serial_console_putc('\r');
-	}
 
 	out8(SERIAL_PORT, ch);
 	while(!(in8(SERIAL_PORT + 5) & 0x20));
@@ -214,9 +213,8 @@ static uint16_t serial_console_getc(void) {
 
 			/* Handle escape sequences. */
 			converted = ansi_parser_filter(&serial_ansi_parser, ch);
-			if(converted) {
+			if(converted)
 				return converted;
-			}
 		}
 	}
 
@@ -231,7 +229,7 @@ static console_in_ops_t serial_console_in_ops = {
 
 /** Set up the debug console. */
 __init_text void platform_console_early_init(void) {
-#ifdef SERIAL_PORT
+	#ifdef SERIAL_PORT
 	uint8_t status = in8(SERIAL_PORT + 6);
 
 	/* Only add the serial device when it is present. */
@@ -251,7 +249,8 @@ __init_text void platform_console_early_init(void) {
 		debug_console_ops = &serial_console_out_ops;
 		console_register_in_ops(&serial_console_in_ops);
 	}
-#endif
+	#endif
+
 	/* Register the i8042 input device. */
 	console_register_in_ops(&i8042_console_in_ops);
 }

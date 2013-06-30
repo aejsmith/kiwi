@@ -99,8 +99,8 @@ static inline acpi_rsdp_t *acpi_find_rsdp(phys_ptr_t start, size_t size) {
 			}
 		}
 
-		kprintf(LOG_NOTICE, "acpi: found ACPI RSDP at 0x%" PRIxPHYS " (revision: %" PRIu8 ")\n",
-		        start + i, rsdp->revision);
+		kprintf(LOG_NOTICE, "acpi: found ACPI RSDP at 0x%" PRIxPHYS " (revision: %"
+			PRIu8 ")\n", start + i, rsdp->revision);
 		return rsdp;
 	}
 
@@ -129,11 +129,12 @@ static inline bool acpi_parse_xsdt(uint32_t addr) {
 
 	/* Load each table. */
 	count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
-	for(i = 0; i < count; i++) {
+	for(i = 0; i < count; i++)
 		acpi_table_copy((phys_ptr_t)source->entry[i]);
-	}
 
 	phys_unmap(source, PAGE_SIZE, true);
+
+	acpi_supported = true;
 	return true;
 }
 
@@ -159,11 +160,12 @@ static inline bool acpi_parse_rsdt(uint32_t addr) {
 
 	/* Load each table. */
 	count = (source->header.length - sizeof(source->header)) / sizeof(source->entry[0]);
-	for(i = 0; i < count; i++) {
+	for(i = 0; i < count; i++)
 		acpi_table_copy((phys_ptr_t)source->entry[i]);
-	}
 
 	phys_unmap(source, PAGE_SIZE, true);
+
+	acpi_supported = true;
 	return true;
 }
 
@@ -174,9 +176,8 @@ acpi_header_t *acpi_table_find(const char *signature) {
 	size_t i;
 
 	for(i = 0; i < acpi_table_count; i++) {
-		if(strncmp((char *)acpi_tables[i]->signature, signature, 4) != 0) {
+		if(strncmp((char *)acpi_tables[i]->signature, signature, 4) != 0)
 			continue;
-		}
 
 		return acpi_tables[i];
 	}
@@ -197,28 +198,21 @@ __init_text void acpi_init(void) {
 
 	/* Search for the RSDP. */
 	if(!(rsdp = acpi_find_rsdp(ebda, 0x400))) {
-		if(!(rsdp = acpi_find_rsdp(0xE0000, 0x20000))) {
+		if(!(rsdp = acpi_find_rsdp(0xE0000, 0x20000)))
 			return;
-		}
 	}
 
 	/* Create a copy of all the tables using the XSDT where possible. */
 	if(rsdp->revision >= 2 && rsdp->xsdt_address != 0) {
 		if(!acpi_parse_xsdt(rsdp->xsdt_address)) {
-			if(rsdp->rsdt_address != 0 && !acpi_parse_rsdt(rsdp->rsdt_address)) {
-				goto out;
-			}
+			if(rsdp->rsdt_address != 0)
+				acpi_parse_rsdt(rsdp->rsdt_address);
 		}
 	} else if(rsdp->rsdt_address != 0) {
-		if(!acpi_parse_rsdt(rsdp->rsdt_address)) {
-			goto out;
-		}
+		acpi_parse_rsdt(rsdp->rsdt_address);
 	} else {
 		kprintf(LOG_WARN, "acpi: RSDP contains neither an XSDT or RSDT address, not using ACPI\n");
-		goto out;
 	}
 
-	acpi_supported = true;
-out:
 	phys_unmap(rsdp, sizeof(*rsdp), true);
 }

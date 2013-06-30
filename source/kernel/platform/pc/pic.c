@@ -38,9 +38,8 @@ static uint16_t pic_level_triggered = 0;
 /** Acknowledge a PIC interrupt.
  * @param num		IRQ number. */
 static void pic_eoi(unsigned num) {
-	if(num >= 8) {
+	if(num >= 8)
 		out8(PIC_SLAVE_COMMAND, PIC_COMMAND_EOI);
-	}
 
 	/* Must always send the EOI to the master controller. */
 	out8(PIC_MASTER_COMMAND, PIC_COMMAND_EOI);
@@ -70,9 +69,8 @@ static bool pic_pre_handle(unsigned num) {
 	}
 
 	/* Edge-triggered interrupts must be acked before we handle. */
-	if(!(pic_level_triggered & (1 << num))) {
+	if(!(pic_level_triggered & (1 << num)))
 		pic_eoi(num);
-	}
 
 	return true;
 }
@@ -82,9 +80,8 @@ static bool pic_pre_handle(unsigned num) {
 static void pic_post_handle(unsigned num) {
 	/* Level-triggered interrupts must be acked once all handlers have been
 	 * run. */
-	if(pic_level_triggered & (1 << num)) {
+	if(pic_level_triggered & (1 << num))
 		pic_eoi(num);
-	}
 }
 
 /** Get the trigger mode of an IRQ.

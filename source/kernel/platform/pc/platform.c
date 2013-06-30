@@ -41,9 +41,8 @@ __init_text void platform_init(void) {
 	acpi_init();
 
 	/* If the LAPIC is not available, we must use the PIT as the timer. */
-	if(!lapic_enabled()) {
+	if(!lapic_enabled())
 		pit_init();
-	}
 }
 
 /** Reboot the system. */
@@ -53,9 +52,8 @@ void platform_reboot(void) {
 	/* Try the keyboard controller. */
 	do {
 		val = in8(0x64);
-		if(val & (1<<0)) {
+		if(val & (1<<0))
 			in8(0x60);
-		}
 	} while(val & (1<<1));
 	out8(0x64, 0xfe);
 	spin(5000);
