@@ -117,7 +117,7 @@ if config['PLATFORM'] == 'pc':
 	Default(Alias('cdrom', dist.ISOImage('cdrom.iso', [])))
 
 	# Target to run in QEMU.
-	Alias('qtest', dist.Command('qtest', ['cdrom.iso'], Action(
+	Alias('qemu', dist.Command('qemu', ['cdrom.iso'], Action(
 		config['QEMU_BINARY'] + ' -cdrom $SOURCE -boot d ' + config['QEMU_OPTS'],
 		None
 	)))
