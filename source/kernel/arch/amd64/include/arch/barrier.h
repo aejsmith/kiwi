@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,22 +17,10 @@
 /**
  * @file
  * @brief		AMD64 memory barrier functions.
- *
- * @note		Critical section barriers are not required because the
- *			synchronization functions are based on atomic
- *			operations which use the LOCK prefix and LOCK forces
- *			serialization. However, we do prevent the compiler from
- *			reordering instructions.
  */
 
 #ifndef __ARCH_BARRIER_H
 #define __ARCH_BARRIER_H
-
-/** Barrier for entering a critical section. */
-#define enter_cs_barrier()	__asm__ volatile("" ::: "memory")
-
-/** Barrier for leaving a critical section. */
-#define leave_cs_barrier()	__asm__ volatile("" ::: "memory")
 
 #define memory_barrier()	__asm__ volatile("mfence" ::: "memory")
 #define read_barrier()		__asm__ volatile("lfence" ::: "memory")

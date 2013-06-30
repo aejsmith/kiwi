@@ -77,7 +77,6 @@ void spinlock_lock(spinlock_t *lock) {
 
 	spinlock_lock_internal(lock);
 	lock->state = state;
-	enter_cs_barrier();
 }
 
 /**
@@ -100,7 +99,6 @@ void spinlock_lock_noirq(spinlock_t *lock) {
 	assert(!local_irq_state());
 
 	spinlock_lock_internal(lock);
-	enter_cs_barrier();
 }
 
 /**
@@ -123,7 +121,6 @@ void spinlock_unlock(spinlock_t *lock) {
 	 * waiting CPU. */
 	state = lock->state;
 
-	leave_cs_barrier();
 	atomic_set(&lock->value, 1);
 	local_irq_restore(state);
 }
@@ -135,7 +132,6 @@ void spinlock_unlock_noirq(spinlock_t *lock) {
 		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
 	}
 
-	leave_cs_barrier();
 	atomic_set(&lock->value, 1);
 }
 
