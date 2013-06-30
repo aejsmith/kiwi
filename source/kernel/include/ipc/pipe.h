@@ -44,8 +44,10 @@ typedef struct pipe {
 	size_t end;			/**< End position of buffer. */
 } pipe_t;
 
-extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock, size_t *bytesp);
-extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock, size_t *bytesp);
+extern status_t pipe_read(pipe_t *pipe, char *buf, size_t count, bool nonblock,
+	size_t *bytesp);
+extern status_t pipe_write(pipe_t *pipe, const char *buf, size_t count, bool nonblock,
+	size_t *bytesp);
 extern void pipe_wait(pipe_t *pipe, bool write, void *sync);
 extern void pipe_unwait(pipe_t *pipe, bool write, void *sync);
 

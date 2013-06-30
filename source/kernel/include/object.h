@@ -105,13 +105,15 @@ typedef struct object_type {
 	 * @param offset	Offset into object to get page from.
 	 * @param physp		Where to store physical address of page.
 	 * @return		Status code describing result of the operation. */
-	status_t (*get_page)(struct object_handle *handle, offset_t offset, phys_ptr_t *physp);
+	status_t (*get_page)(struct object_handle *handle, offset_t offset,
+		phys_ptr_t *physp);
 
 	/** Release a page from the object.
 	 * @param handle	Handle to object to release page in.
 	 * @param offset	Offset of page in object.
 	 * @param phys		Physical address of page that was unmapped. */
-	void (*release_page)(struct object_handle *handle, offset_t offset, phys_ptr_t phys);
+	void (*release_page)(struct object_handle *handle, offset_t offset,
+		phys_ptr_t phys);
 } object_type_t;
 
 /** Structure defining a kernel object.
@@ -149,16 +151,18 @@ typedef struct handle_table {
 
 extern void object_acl_init(object_acl_t *acl);
 extern void object_acl_destroy(object_acl_t *acl);
-extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value, object_rights_t rights);
+extern void object_acl_add_entry(object_acl_t *acl, uint8_t type, int32_t value,
+	object_rights_t rights);
 extern void object_acl_canonicalise(object_acl_t *acl);
 
-extern status_t object_security_validate(object_security_t *security, struct process *process);
-extern status_t object_security_from_user(object_security_t *dest, const object_security_t *src,
-                                          bool validate);
+extern status_t object_security_validate(object_security_t *security,
+	struct process *process);
+extern status_t object_security_from_user(object_security_t *dest,
+	const object_security_t *src, bool validate);
 extern void object_security_destroy(object_security_t *security);
 
 extern void object_init(object_t *object, object_type_t *type, object_security_t *security,
-                        object_acl_t *sacl);
+	object_acl_t *sacl);
 extern void object_destroy(object_t *object);
 extern object_rights_t object_rights(object_t *object, struct process *process);
 extern status_t object_set_security(object_t *object, object_security_t *security);
@@ -175,23 +179,21 @@ static inline bool object_handle_rights(object_handle_t *handle, object_rights_t
 }
 
 extern status_t object_handle_create(object_t *object, void *data, object_rights_t rights,
-                                     struct process *process, int flags,
-                                     object_handle_t **handlep, handle_t *idp,
-                                     handle_t *uidp);
+	struct process *process, int flags, object_handle_t **handlep, handle_t *idp,
+	handle_t *uidp);
 extern status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
-                                   struct process *process, int flags,
-                                   object_handle_t **handlep, handle_t *idp,
-                                   handle_t *uidp);
+	struct process *process, int flags, object_handle_t **handlep, handle_t *idp,
+	handle_t *uidp);
 extern void object_handle_get(object_handle_t *handle);
 extern void object_handle_release(object_handle_t *handle);
 extern status_t object_handle_attach(object_handle_t *handle, struct process *process,
-                                     int flags, handle_t *idp, handle_t *uidp);
+	int flags, handle_t *idp, handle_t *uidp);
 extern status_t object_handle_detach(struct process *process, handle_t id);
 extern status_t object_handle_lookup(handle_t id, int type, object_rights_t rights,
-                                     object_handle_t **handlep);
+	object_handle_t **handlep);
 
 extern status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-                                    handle_table_t **tablep);
+	handle_table_t **tablep);
 extern handle_table_t *handle_table_clone(handle_table_t *src);
 extern void handle_table_destroy(handle_table_t *table);
 

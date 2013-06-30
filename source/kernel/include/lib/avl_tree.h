@@ -41,13 +41,14 @@ typedef struct avl_tree {
 
 /** Iterates over an AVL tree, setting iter to the node on each iteration. */
 #define AVL_TREE_FOREACH(tree, iter)		\
-	for(avl_tree_node_t *iter = avl_tree_first((tree)); iter != NULL; iter = avl_tree_node_next(iter))
+	for(avl_tree_node_t *iter = avl_tree_first((tree)); iter != NULL; \
+		iter = avl_tree_node_next(iter))
 
 /** Iterates over an AVL tree, setting iter to the node on each iteration.
  * @note		Safe to use when the loop may modify the list. */
 #define AVL_TREE_FOREACH_SAFE(tree, iter)		\
 	for(avl_tree_node_t *iter = avl_tree_first((tree)), *_##iter = avl_tree_node_next(iter); \
-	    iter != NULL; iter = _##iter, _##iter = avl_tree_node_next(iter))
+		iter != NULL; iter = _##iter, _##iter = avl_tree_node_next(iter))
 
 /** Initializes a statically declared AVL tree. */
 #define AVL_TREE_INITIALIZER()			\

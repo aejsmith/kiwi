@@ -48,7 +48,8 @@ typedef struct file_map_ops {
 	 * @param num		Raw block number.
 	 * @param nonblock	Whether the operation is required to not block.
 	 * @return		Status code describing result of the operation. */
-	status_t (*read_block)(struct file_map *map, void *buf, uint64_t num, bool nonblock);
+	status_t (*read_block)(struct file_map *map, void *buf, uint64_t num,
+		bool nonblock);
 
 	/** Write a block to the source device.
 	 * @param map		Map the write is for.
@@ -56,7 +57,8 @@ typedef struct file_map_ops {
 	 * @param num		Raw block number.
 	 * @param nonblock	Whether the operation is required to not block.
 	 * @return		Status code describing result of the operation. */
-	status_t (*write_block)(struct file_map *map, const void *buf, uint64_t num, bool nonblock);
+	status_t (*write_block)(struct file_map *map, const void *buf, uint64_t num,
+		bool nonblock);
 } file_map_ops_t;
 
 /** Structure containing a file map. */
@@ -77,7 +79,9 @@ extern void file_map_destroy(file_map_t *map);
 extern status_t file_map_lookup(file_map_t *map, uint64_t num, uint64_t *rawp);
 extern void file_map_invalidate(file_map_t *map, uint64_t start, uint64_t count);
 
-extern status_t file_map_read_page(struct vm_cache *cache, void *buf, offset_t offset, bool nonblock);
-extern status_t file_map_write_page(struct vm_cache *cache, const void *buf, offset_t offset, bool nonblock);
+extern status_t file_map_read_page(struct vm_cache *cache, void *buf,
+	offset_t offset, bool nonblock);
+extern status_t file_map_write_page(struct vm_cache *cache, const void *buf,
+	offset_t offset, bool nonblock);
 
 #endif /* __IO_FILE_MAP_H */

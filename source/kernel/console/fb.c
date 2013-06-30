@@ -90,9 +90,9 @@ static uint16_t splash_progress_y;
  * @param y		Y position.
  * @param rgb		RGB colour to draw. */
 static void fb_putpixel(uint16_t x, uint16_t y, uint32_t rgb) {
-	uint32_t value = (RED(rgb, fb_info.red_size) << fb_info.red_position) |
-	                 (GREEN(rgb, fb_info.green_size) << fb_info.green_position) |
-	                 (BLUE(rgb, fb_info.blue_size) << fb_info.blue_position);
+	uint32_t value = (RED(rgb, fb_info.red_size) << fb_info.red_position)
+		| (GREEN(rgb, fb_info.green_size) << fb_info.green_position)
+		| (BLUE(rgb, fb_info.blue_size) << fb_info.blue_position);
 	size_t offset = OFFSET(x, y);
 	void *fb_dest = fb_mapping + offset;
 	void *bb_dest = fb_backbuffer + offset;
@@ -132,9 +132,8 @@ static void fb_fillrect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
 		memset(fb_backbuffer + OFFSET(0, y), (uint8_t)rgb, width * height * fb_info.bytes_per_pixel);
 	} else {
 		for(i = 0; i < height; i++) {
-			for(j = 0; j < width; j++) {
+			for(j = 0; j < width; j++)
 				fb_putpixel(x + j, y + i, rgb);
-			}
 		}
 	}
 }
@@ -149,11 +148,11 @@ static void fb_copyrect(uint16_t dest_y, uint16_t src_y, uint16_t height) {
 
 	/* Copy everything on the backbuffer. */
 	memmove(fb_backbuffer + dest_offset, fb_backbuffer + src_offset,
-	        fb_info.width * height * fb_info.bytes_per_pixel);
+		fb_info.width * height * fb_info.bytes_per_pixel);
 
 	/* Copy the updated backbuffer onto the framebuffer. */
 	memcpy(fb_mapping + dest_offset, fb_backbuffer + dest_offset,
-	       fb_info.width * height * fb_info.bytes_per_pixel);
+		fb_info.width * height * fb_info.bytes_per_pixel);
 }
 
 /** Draw the glyph at the specified position the console.
@@ -229,9 +228,8 @@ static void fb_console_putc(char ch) {
 		break;
 	default:
 		/* If it is a non-printing character, ignore it. */
-		if(ch < ' ') {
+		if(ch < ' ')
 			break;
-		}
 
 		fb_console_glyphs[(fb_console_y * fb_console_cols) + fb_console_x] = ch;
 		fb_console_draw_glyph(fb_console_x, fb_console_y, FONT_FG, FONT_BG);
@@ -242,21 +240,20 @@ static void fb_console_putc(char ch) {
 	/* If we have reached the edge of the screen insert a new line. */
 	if(fb_console_x >= fb_console_cols) {
 		fb_console_x = 0;
-		if(++fb_console_y < fb_console_rows) {
+		if(++fb_console_y < fb_console_rows)
 			fb_fillrect(0, FONT_HEIGHT * fb_console_y, fb_info.width, FONT_HEIGHT, FONT_BG);
-		}
 	}
 
 	/* If we have reached the bottom of the screen, scroll. */
 	if(fb_console_y >= fb_console_rows) {
 		/* Move everything up and fill the last row with blanks. */
 		memmove(fb_console_glyphs, fb_console_glyphs + fb_console_cols,
-		        (fb_console_rows - 1) * fb_console_cols);
+			(fb_console_rows - 1) * fb_console_cols);
 		memset(fb_console_glyphs + ((fb_console_rows - 1) * fb_console_cols),
-		       ' ', fb_console_cols);
+			' ', fb_console_cols);
 		fb_copyrect(0, FONT_HEIGHT, (fb_console_rows - 1) * FONT_HEIGHT);
 		fb_fillrect(0, FONT_HEIGHT * (fb_console_rows - 1), fb_info.width,
-		            FONT_HEIGHT, FONT_BG);
+			FONT_HEIGHT, FONT_BG);
 
 		/* Update the cursor position. */
 		fb_console_y = fb_console_rows - 1;
@@ -298,9 +295,8 @@ static void fb_console_enable(void *arg1, void *arg2, void *arg3) {
  * @param arg2		Second notifier argument.
  * @param arg3		Third notifier argument. */
 static void fb_console_disable(void *arg1, void *arg2, void *arg3) {
-	if(screen_console_ops == &fb_console_out_ops) {
+	if(screen_console_ops == &fb_console_out_ops)
 		fb_console_acquired = fb_was_acquired;
-	}
 }
 
 /** Reconfigure the framebuffer console.
@@ -372,9 +368,8 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 		break;
 	case FB_CONSOLE_ACQUIRE:
 		/* Acquire the framebuffer for exclusive use. */
-		if(fb_console_acquired && !splash_enabled) {
+		if(fb_console_acquired && !splash_enabled)
 			fatal("Framebuffer console already acquired");
-		}
 
 		/* Prevent output to the console. */
 		fb_console_acquired = true;
@@ -382,9 +377,8 @@ void fb_console_control(unsigned op, fb_info_t *info) {
 		break;
 	case FB_CONSOLE_RELEASE:
 		/* Release the framebuffer. */
-		if(!fb_console_acquired) {
+		if(!fb_console_acquired)
 			fatal("Framebuffer console not acquired");
-		}
 
 		fb_console_acquired = false;
 		fb_console_reset();
@@ -397,14 +391,12 @@ void fb_console_control(unsigned op, fb_info_t *info) {
  * @return		Address of next non-whitespace byte. */
 static unsigned char *ppm_skip(unsigned char *buf) {
 	while(true) {
-		while(isspace(*buf)) {
+		while(isspace(*buf))
 			buf++;
-		}
 
 		if(*buf == '#') {
-			while(*buf != '\n' && *buf != '\r') {
+			while(*buf != '\n' && *buf != '\r')
 				buf++;
-			}
 		} else {
 			break;
 		}
@@ -423,6 +415,7 @@ static void ppm_size(unsigned char *ppm, uint16_t *widthp, uint16_t *heightp) {
 		*heightp = 0;
 		return;
 	}
+
 	ppm += 2;
 
 	ppm = ppm_skip(ppm);
@@ -439,9 +432,9 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 	uint32_t max_colour, coef, colour;
 	uint16_t width, height, i, j;
 
-	if((ppm[0] != 'P') || (ppm[1] != '6')) {
+	if((ppm[0] != 'P') || (ppm[1] != '6'))
 		return;
-	}
+
 	ppm += 2;
 
 	ppm = ppm_skip(ppm);
@@ -452,14 +445,12 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 	max_colour = strtoul((const char *)ppm, (char **)&ppm, 10);
 	ppm++;
 
-	if(!max_colour || max_colour > 255) {
+	if(!max_colour || max_colour > 255)
 		return;
-	}
 
 	coef = 255 / max_colour;
-	if((coef * max_colour) > 255) {
+	if((coef * max_colour) > 255)
 		coef -= 1;
-	}
 
 	/* Draw the image. */
 	for(i = 0; i < height; i++) {
@@ -481,9 +472,8 @@ __init_text void fb_console_init(void) {
 
 	/* Look up the framebuffer boot tag. */
 	lfb = kboot_tag_iterate(KBOOT_TAG_LFB, NULL);
-	if(!lfb) {
+	if(!lfb)
 		fatal("Expected LFB but no boot tag");
-	}
 
 	/* Copy the information from it. Currently guessing the size/position
 	 * values, see KBoot issue #8. */
@@ -541,7 +531,8 @@ __init_text void fb_console_init(void) {
 	if(splash_enabled) {
 		/* Draw copyright text. */
 		ppm_size(copyright_ppm, &width, &height);
-		ppm_draw(copyright_ppm, (fb_info.width / 2) - (width / 2), fb_info.height - height - 5);
+		ppm_draw(copyright_ppm, (fb_info.width / 2) - (width / 2),
+			fb_info.height - height - 5);
 
 		/* Get logo dimensions. */
 		ppm_size(logo_ppm, &width, &height);
@@ -551,7 +542,8 @@ __init_text void fb_console_init(void) {
 		splash_progress_y = (fb_info.height / 2) + (height / 2) + 20;
 
 		/* Draw logo. */
-		ppm_draw(logo_ppm, (fb_info.width / 2) - (width / 2), (fb_info.height / 2) - (height / 2) - 10);
+		ppm_draw(logo_ppm, (fb_info.width / 2) - (width / 2),
+			(fb_info.height / 2) - (height / 2) - 10);
 
 		/* Draw initial progress bar. */
 		update_boot_progress(0);
@@ -563,10 +555,10 @@ __init_text void fb_console_init(void) {
 void update_boot_progress(int percent) {
 	if(splash_enabled) {
 		fb_fillrect(splash_progress_x, splash_progress_y,
-		            SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
-		            SPLASH_PROGRESS_BG);
+			SPLASH_PROGRESS_WIDTH, SPLASH_PROGRESS_HEIGHT,
+			SPLASH_PROGRESS_BG);
 		fb_fillrect(splash_progress_x, splash_progress_y,
-		            (SPLASH_PROGRESS_WIDTH * percent) / 100,
-		            SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
+			(SPLASH_PROGRESS_WIDTH * percent) / 100,
+			SPLASH_PROGRESS_HEIGHT, SPLASH_PROGRESS_FG);
 	}
 }

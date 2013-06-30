@@ -59,7 +59,7 @@ typedef struct device_ops {
 	 * @param bytesp	Where to store number of bytes read.
 	 * @return		Status code describing result of operation. */
 	status_t (*read)(struct device *device, void *data, void *buf, size_t count,
-	                 offset_t offset, size_t *bytesp);
+		offset_t offset, size_t *bytesp);
 
 	/** Write to a device.
 	 * @param device	Device to write to.
@@ -70,8 +70,8 @@ typedef struct device_ops {
 	 *			device types).
 	 * @param bytesp	Where to store number of bytes written.
 	 * @return		Status code describing result of operation. */
-	status_t (*write)(struct device *device, void *data, const void *buf, size_t count,
-	                  offset_t offset, size_t *bytesp);
+	status_t (*write)(struct device *device, void *data, const void *buf,
+		size_t count, offset_t offset, size_t *bytesp);
 
 	/** Signal that a device event is being waited for.
 	 * @note		If the event being waited for has occurred
@@ -110,7 +110,8 @@ typedef struct device_ops {
 	 * @param offset	Offset into device of page to get.
 	 * @param physp		Where to store address of page to map.
 	 * @return		Status code describing result of operation. */
-	status_t (*get_page)(struct device *device, void *data, offset_t offset, phys_ptr_t *physp);
+	status_t (*get_page)(struct device *device, void *data, offset_t offset,
+		phys_ptr_t *physp);
 
 	/** Handler for device-specific requests.
 	 * @param device	Device request is being made on.
@@ -121,8 +122,8 @@ typedef struct device_ops {
 	 * @param outp		Where to store pointer to output buffer.
 	 * @param outszp	Where to store output buffer size.
 	 * @return		Status code describing result of operation. */
-	status_t (*request)(struct device *device, void *data, int request, const void *in,
-	                    size_t insz, void **outp, size_t *outszp);
+	status_t (*request)(struct device *device, void *data, int request,
+		const void *in, size_t insz, void **outp, size_t *outszp);
 } device_ops_t;
 
 /** Device attribute structure. */
@@ -201,10 +202,9 @@ static inline const char *device_name(object_handle_t *handle) {
 }
 
 extern status_t device_create(const char *name, device_t *parent, device_ops_t *ops,
-                              void *data, device_attr_t *attrs, size_t count,
-                              device_t **devicep);
+	void *data, device_attr_t *attrs, size_t count, device_t **devicep);
 extern status_t device_alias(const char *name, device_t *parent, device_t *dest,
-                             device_t **devicep);
+	device_t **devicep);
 extern status_t device_destroy(device_t *device);
 
 extern void device_iterate(device_t *start, device_iterate_t func, void *data);
@@ -213,12 +213,12 @@ extern char *device_path(device_t *device);
 
 extern status_t device_get(device_t *device, uint32_t rights, object_handle_t **handlep);
 extern status_t device_open(const char *path, uint32_t rights, object_handle_t **handlep);
-extern status_t device_read(object_handle_t *handle, void *buf, size_t count, offset_t offset,
-                            size_t *bytesp);
+extern status_t device_read(object_handle_t *handle, void *buf, size_t count,
+	offset_t offset, size_t *bytesp);
 extern status_t device_write(object_handle_t *handle, const void *buf, size_t count,
-                             offset_t offset, size_t *bytesp);
-extern status_t device_request(object_handle_t *handle, int request, const void *in, size_t insz,
-                               void **outp, size_t *outszp);
+	offset_t offset, size_t *bytesp);
+extern status_t device_request(object_handle_t *handle, int request, const void *in,
+	size_t insz, void **outp, size_t *outszp);
 
 extern void device_init(void);
 

@@ -56,13 +56,13 @@ typedef struct cpu {
 	bool timer_enabled;		/**< Whether the timer device is enabled. */
 	spinlock_t timer_lock;		/**< Timer list lock. */
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	/** SMP call information. */
 	list_t call_queue;		/**< List of calls queued to this CPU. */
 	bool ipi_sent;			/**< Whether an IPI has been sent to the CPU. */
 	struct smp_call *curr_call;	/**< SMP call currently being handled. */
 	spinlock_t call_lock;		/**< Lock to protect call queue. */
-#endif
+	#endif
 } cpu_t;
 
 /** Expands to a pointer to the CPU structure of the current CPU.

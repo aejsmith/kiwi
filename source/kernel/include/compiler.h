@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Alex Smith
+ * Copyright (C) 2009-2013 Alex Smith
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,6 +40,7 @@
 # define __cacheline_aligned	__aligned(CPU_CACHE_SIZE)
 # define likely(x)		__builtin_expect(!!(x), 1)
 # define unlikely(x)		__builtin_expect(!!(x), 0)
+# define compiler_barrier()	__asm__ volatile("" ::: "memory")
 #else
 # error "Kiwi does not currently support compilers other than GCC"
 #endif

@@ -25,10 +25,10 @@
 
 /** Structure defining a callback function on a notifier. */
 typedef struct notifier_func {
-	list_t header;				/**< Link to notifier. */
+	list_t header;			/**< Link to notifier. */
 
-	void (*func)(void *, void *, void *);	/**< Function to call. */
-	void *data;				/**< Third data argument for function. */
+	notifier_cb_t func;		/**< Function to call. */
+	void *data;			/**< Third data argument for function. */
 } notifier_func_t;
 
 /** Initialize a notifier.
@@ -109,7 +109,7 @@ bool notifier_run(notifier_t *notif, void *data, bool destroy) {
  * @param notif		Notifier to add to.
  * @param func		Function to add.
  * @param data		Pointer to pass as third argument to function. */
-void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), void *data) {
+void notifier_register(notifier_t *notif, notifier_cb_t func, void *data) {
 	notifier_func_t *nf = kmalloc(sizeof(notifier_func_t), MM_WAIT);
 
 	list_init(&nf->header);
@@ -125,7 +125,7 @@ void notifier_register(notifier_t *notif, void (*func)(void *, void *, void *), 
  * @param notif		Notifier to remove from.
  * @param func		Function to remove.
  * @param data		Data argument function was registered with. */
-void notifier_unregister(notifier_t *notif, void (*func)(void *, void *, void *), void *data) {
+void notifier_unregister(notifier_t *notif, notifier_cb_t func, void *data) {
 	notifier_func_t *nf;
 
 	mutex_lock(&notif->lock);

@@ -91,12 +91,10 @@ static void kvprintf_helper(char ch, void *data, int *total) {
 	}
 
 	/* Write to the console. */
-	if(debug_console_ops) {
+	if(debug_console_ops)
 		debug_console_ops->putc(ch);
-	}
-	if(level >= LOG_NOTICE && screen_console_ops) {
+	if(level >= LOG_NOTICE && screen_console_ops)
 		screen_console_ops->putc(ch);
-	}
 
 	*total = *total + 1;
 }
@@ -109,12 +107,12 @@ static void kvprintf_helper(char ch, void *data, int *total) {
 int kvprintf(int level, const char *fmt, va_list args) {
 	int ret;
 
-#if !CONFIG_DEBUG
+	#if !CONFIG_DEBUG
 	/* When debug output is disabled, do not do anything. */
-	if(level == LOG_DEBUG) {
+	if(level == LOG_DEBUG)
 		return 0;
-	}
-#endif
+	#endif
+
 	spinlock_lock(&console_lock);
 	ret = do_printf(kvprintf_helper, &level, fmt, args);
 	spinlock_unlock(&console_lock);
@@ -176,12 +174,11 @@ static kdb_status_t kdb_cmd_log(int argc, char **argv, kdb_filter_t *filter) {
 	}
 
 	for(i = 0, pos = klog_start; i < klog_length; i++) {
-		if(level == -1 || klog_buffer[pos].level >= level) {
+		if(level == -1 || klog_buffer[pos].level >= level)
 			kdb_printf("%c", klog_buffer[pos].ch);
-		}
-		if(++pos >= CONFIG_KLOG_SIZE) {
+
+		if(++pos >= CONFIG_KLOG_SIZE)
 			pos = 0;
-		}
 	}
 
 	return KDB_SUCCESS;
@@ -242,9 +239,9 @@ uint16_t ansi_parser_filter(ansi_parser_t *parser, unsigned char ch) {
 			}
 		}
 
-		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN) {
+		if(ret != 0 || parser->length == ANSI_PARSER_BUFFER_LEN)
 			parser->length = -1;
-		}
+
 		return ret;
 	}
 }
@@ -263,20 +260,21 @@ void ansi_parser_init(ansi_parser_t *parser) {
  * @param offset	Unused.
  * @param bytesp	Where to store number of bytes written.
  * @return		Status code describing result of the operation. */
-static status_t kconsole_device_write(device_t *device, void *data, const void *buf, size_t count,
-                                      offset_t offset, size_t *bytesp) {
+static status_t kconsole_device_write(device_t *device, void *data, const void *buf,
+	size_t count, offset_t offset, size_t *bytesp)
+{
 	const char *str = buf;
 	size_t i;
 
 	spinlock_lock(&console_lock);
+
 	for(i = 0; i < count; i++) {
-		if(debug_console_ops) {
+		if(debug_console_ops)
 			debug_console_ops->putc(str[i]);
-		}
-		if(screen_console_ops) {
+		if(screen_console_ops)
 			screen_console_ops->putc(str[i]);
-		}
 	}
+
 	spinlock_unlock(&console_lock);
 
 	*bytesp = count;
@@ -293,9 +291,9 @@ static __init_text void kconsole_device_init(void) {
 	status_t ret;
 
 	ret = device_create("kconsole", device_tree_root, &kconsole_device_ops,
-	                    NULL, NULL, 0, NULL);
-	if(ret != STATUS_SUCCESS) {
+		NULL, NULL, 0, NULL);
+	if(ret != STATUS_SUCCESS)
 		fatal("Failed to register kernel console device (%d)", ret);
-	}
 }
+
 INITCALL(kconsole_device_init);

@@ -93,15 +93,16 @@ typedef struct timer {
 /** Behaviour flags for timers. */
 #define TIMER_THREAD		(1<<0)	/**< Run the handler in thread (DPC) context. */
 
-extern useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
-                               unsigned min, unsigned sec);
+extern useconds_t time_to_unix(unsigned year, unsigned month, unsigned day,
+	unsigned hour, unsigned min, unsigned sec);
 
 extern useconds_t system_time(void);
 extern useconds_t unix_time(void);
 
 extern void timer_device_set(timer_device_t *device);
 extern bool timer_tick(void);
-extern void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data, unsigned flags);
+extern void timer_init(timer_t *timer, const char *name, timer_func_t func,
+	void *data, unsigned flags);
 extern void timer_start(timer_t *timer, useconds_t length, unsigned mode);
 extern void timer_stop(timer_t *timer);
 

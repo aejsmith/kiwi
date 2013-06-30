@@ -49,7 +49,7 @@ typedef struct list {
  * @param iter		Variable name to set to node pointer on each iteration. */
 #define LIST_FOREACH_SAFE(list, iter)		\
 	for(list_t *iter = (list)->next, *_##iter = iter->next; \
-	    iter != (list); iter = _##iter, _##iter = _##iter->next)
+		iter != (list); iter = _##iter, _##iter = _##iter->next)
 
 /** Iterate over a list in reverse.
  * @note		Safe to use when the loop may modify the list.
@@ -57,7 +57,7 @@ typedef struct list {
  * @param iter		Variable name to set to node pointer on each iteration. */
 #define LIST_FOREACH_REVERSE_SAFE(list, iter)	\
 	for(list_t *iter = (list)->prev, *_##iter = iter->prev; \
-	    iter != (list); iter = _##iter, _##iter = _##iter->prev)
+		iter != (list); iter = _##iter, _##iter = _##iter->prev)
 
 /** Initializes a statically declared linked list. */
 #define LIST_INITIALIZER(_var)			\

@@ -25,9 +25,9 @@
 #include <types.h>
 
 /** Structure describing a system call handler. */
-typedef struct syscall {
+typedef struct __packed syscall {
 	ptr_t addr;			/**< Address of handler. */
 	size_t count;			/**< Number of arguments. */
-} __packed syscall_t;
+} syscall_t;
 
 #endif /* __SYSCALL_H */

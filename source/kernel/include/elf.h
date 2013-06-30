@@ -30,12 +30,16 @@ struct module;
 struct vm_aspace;
 
 extern status_t elf_binary_reserve(struct object_handle *handle, struct vm_aspace *as);
-extern status_t elf_binary_load(struct object_handle *handle, struct vm_aspace *as, ptr_t dest, void **datap);
+extern status_t elf_binary_load(struct object_handle *handle, struct vm_aspace *as,
+	ptr_t dest, void **datap);
 extern ptr_t elf_binary_finish(void *data);
 
-extern status_t elf_module_apply_rel(struct module *module, elf_rel_t *rel, elf_shdr_t *target);
-extern status_t elf_module_apply_rela(struct module *module, elf_rela_t *rela, elf_shdr_t *target);
-extern status_t elf_module_lookup_symbol(struct module *module, size_t num, elf_addr_t *valp);
+extern status_t elf_module_apply_rel(struct module *module, elf_rel_t *rel,
+	elf_shdr_t *target);
+extern status_t elf_module_apply_rela(struct module *module, elf_rela_t *rela,
+	elf_shdr_t *target);
+extern status_t elf_module_lookup_symbol(struct module *module, size_t num,
+	elf_addr_t *valp);
 extern status_t elf_module_load(struct module *module);
 extern status_t elf_module_finish(struct module *module);
 

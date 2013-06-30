@@ -123,8 +123,8 @@ typedef struct fs_node_ops {
 	 *			created entry.
 	 * @return		Status code describing result of the operation. */
 	status_t (*create)(struct fs_node *parent, const char *name, file_type_t type,
-	                   const char *target, object_security_t *security,
-	                   struct fs_node **nodep);
+		const char *target, object_security_t *security,
+		struct fs_node **nodep);
 
 	/** Remove an entry from a directory.
 	 * @note		If the node's link count reaches 0, this
@@ -166,7 +166,7 @@ typedef struct fs_node_ops {
 	 * @param bytesp	Where to store number of bytes read.
 	 * @return		Status code describing result of the operation. */
 	status_t (*read)(struct fs_node *node, void *buf, size_t count, offset_t offset,
-	                 bool nonblock, size_t *bytesp);
+		bool nonblock, size_t *bytesp);
 
 	/** Write to a file.
 	 * @note		It is up to this function to resize the file
@@ -180,7 +180,7 @@ typedef struct fs_node_ops {
 	 * @param bytesp	Where to store number of bytes written.
 	 * @return		Status code describing result of the operation. */
 	status_t (*write)(struct fs_node *node, const void *buf, size_t count, offset_t offset,
-	                  bool nonblock, size_t *bytesp);
+		bool nonblock, size_t *bytesp);
 
 	/** Get the data cache for a file.
 	 * @param node		Node to get cache for.
@@ -283,8 +283,7 @@ extern status_t fs_type_register(fs_type_t *type);
 extern status_t fs_type_unregister(fs_type_t *type);
 
 extern fs_node_t *fs_node_alloc(fs_mount_t *mount, node_id_t id, file_type_t type,
-                                object_security_t *security, fs_node_ops_t *ops,
-                                void *data);
+	object_security_t *security, fs_node_ops_t *ops, void *data);
 extern void fs_node_release(fs_node_t *node);
 extern void fs_node_remove(fs_node_t *node);
 
@@ -295,18 +294,18 @@ extern void fs_node_remove(fs_node_t *node);
 
 extern object_handle_t *file_from_memory(const void *buf, size_t size);
 extern status_t file_open(const char *path, object_rights_t rights, int flags,
-                          int create, object_security_t *security,
-                          object_handle_t **handlep);
-extern status_t file_read(object_handle_t *handle, void *buf, size_t count, size_t *bytesp);
-extern status_t file_pread(object_handle_t *handle, void *buf, size_t count, offset_t offset,
-                           size_t *bytesp);
+	int create, object_security_t *security, object_handle_t **handlep);
+extern status_t file_read(object_handle_t *handle, void *buf, size_t count,
+	size_t *bytesp);
+extern status_t file_pread(object_handle_t *handle, void *buf, size_t count,
+	offset_t offset, size_t *bytesp);
 extern status_t file_write(object_handle_t *handle, const void *buf, size_t count,
-                           size_t *bytesp);
+	size_t *bytesp);
 extern status_t file_pwrite(object_handle_t *handle, const void *buf, size_t count,
-                            offset_t offset, size_t *bytesp);
+	offset_t offset, size_t *bytesp);
 extern status_t file_resize(object_handle_t *handle, offset_t size);
 extern status_t file_seek(object_handle_t *handle, int action, rel_offset_t offset,
-                          offset_t *newp);
+	offset_t *newp);
 extern status_t file_info(object_handle_t *handle, file_info_t *infop);
 extern status_t file_sync(object_handle_t *handle);
 
@@ -317,7 +316,8 @@ extern status_t symlink_create(const char *path, const char *target);
 extern status_t symlink_read(const char *path, char *buf, size_t size);
 
 extern void fs_probe(struct device *device);
-extern status_t fs_mount(const char *device, const char *path, const char *type, const char *opts);
+extern status_t fs_mount(const char *device, const char *path, const char *type,
+	const char *opts);
 extern status_t fs_unmount(const char *path);
 extern status_t fs_info(const char *path, bool follow, file_info_t *infop);
 //extern status_t fs_link(const char *source, const char *dest);

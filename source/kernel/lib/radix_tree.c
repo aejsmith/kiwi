@@ -78,9 +78,8 @@ static inline unsigned char *radix_tree_key_concat(unsigned char *key1, unsigned
 static inline unsigned char *radix_tree_key_common(unsigned char *key1, unsigned char *key2) {
 	size_t i = 0;
 
-	while(key1[i] == key2[i]) {
+	while(key1[i] == key2[i])
 		i++;
-	}
 
 	return radix_tree_key_dup(key1, i);
 }
@@ -92,9 +91,9 @@ static void radix_tree_node_add_child(radix_tree_node_t *parent, radix_tree_node
 	unsigned char high = (child->key[0] >> 4) & 0xF;
 	unsigned char low = child->key[0] & 0xF;
 
-	if(!parent->children[high]) {
+	if(!parent->children[high])
 		parent->children[high] = kcalloc(1, sizeof(radix_tree_node_ptr_t), MM_WAIT);
-	}
+
 	if(!parent->children[high]->nodes[low]) {
 		parent->children[high]->count++;
 		parent->child_count++;
@@ -142,13 +141,12 @@ static radix_tree_node_t *radix_tree_node_first_child(radix_tree_node_t *node) {
 
 	if(node->child_count) {
 		for(i = 0; i < ARRAY_SIZE(node->children); i++) {
-			if(!node->children[i] || !node->children[i]->count) {
+			if(!node->children[i] || !node->children[i]->count)
 				continue;
-			}
+
 			for(j = 0; j < ARRAY_SIZE(node->children[i]->nodes); j++) {
-				if(node->children[i]->nodes[j]) {
+				if(node->children[i]->nodes[j])
 					return node->children[i]->nodes[j];
-				}
 			}
 		}
 	}
@@ -165,13 +163,12 @@ static radix_tree_node_t *radix_tree_node_next_sibling(radix_tree_node_t *node) 
 	size_t i, j;
 
 	for(i = high; i < ARRAY_SIZE(parent->children); i++) {
-		if(!parent->children[i] || !parent->children[i]->count) {
+		if(!parent->children[i] || !parent->children[i]->count)
 			continue;
-		}
+
 		for(j = (i == high) ? (low + 1) : 0; j < ARRAY_SIZE(parent->children[i]->nodes); j++) {
-			if(parent->children[i]->nodes[j]) {
+			if(parent->children[i]->nodes[j])
 				return parent->children[i]->nodes[j];
-			}
 		}
 	}
 
@@ -214,18 +211,17 @@ static void radix_tree_node_clear(radix_tree_node_t *node, radix_tree_clear_help
 		 * automatically by radix_tree_node_remove_child() within the
 		 * loop. */
 		for(j = 0; node->children[i] && j < ARRAY_SIZE(node->children[i]->nodes); j++) {
-			if(!(child = node->children[i]->nodes[j])) {
+			if(!(child = node->children[i]->nodes[j]))
 				continue;
-			}
 
 			/* Recurse onto the child. */
 			radix_tree_node_clear(child, helper);
 
 			/* Detach from the tree and destroy it. */
 			radix_tree_node_remove_child(node, child);
-			if(helper && child->value != NULL) {
+			if(helper && child->value != NULL)
 				helper(child->value);
-			}
+
 			radix_tree_node_destroy(child);
 		}
 	}
