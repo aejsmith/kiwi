@@ -5,7 +5,7 @@
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED AS IS AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
@@ -116,6 +116,8 @@ typedef unsigned long uintmax_t;
 #define INT_FAST64_MIN		INT64_MIN
 #define INT_FAST64_MAX		INT64_MAX
 #define UINT_FAST64_MAX		UINT64_MIN
+
+#define SIZE_MAX		ULONG_MAX
 
 /* FIXME */
 //#include <arch/stdint.h>
