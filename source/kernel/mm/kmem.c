@@ -106,8 +106,8 @@ static kmem_range_t *kmem_range_get(int mmflag) {
 		 * area can be allocated using the fast path, and are not
 		 * allocated unless pages outside of it aren't available. */
 		ret = phys_alloc(PAGE_SIZE, 0, 0, KERNEL_PMAP_OFFSET,
-		                 KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE,
-		                 mmflag & MM_FLAG_MASK, &page);
+			KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE,
+			mmflag & MM_FLAG_MASK, &page);
 		if(unlikely(ret != STATUS_SUCCESS)) {
 			return NULL;
 		}
@@ -159,9 +159,8 @@ static inline void kmem_freelist_remove(kmem_range_t *range) {
 	unsigned list = highbit(range->size) - 1;
 
 	list_remove(&range->af_link);
-	if(list_empty(&kmem_freelists[list])) {
+	if(list_empty(&kmem_freelists[list]))
 		kmem_freemap &= ~((ptr_t)1 << list);
-	}
 }
 
 /** Find a free range large enough to satisfy an allocation.
@@ -176,25 +175,22 @@ static inline kmem_range_t *kmem_freelist_find(size_t size) {
 	 * the possibility that we have to iterate through multiple ranges on
 	 * the list to find one large enough. We only do this if there are
 	 * available ranges in higher lists. */
-	if((size & (size - 1)) != 0 && kmem_freemap >> (list + 1)) {
+	if((size & (size - 1)) != 0 && kmem_freemap >> (list + 1))
 		list++;
-	}
 
 	/* Search through all the lists large enough. */
 	for(i = list; i < KMEM_FREELISTS; i++) {
 		/* Check if there are any available ranges on this list. */
-		if(!(kmem_freemap & ((ptr_t)1 << i))) {
+		if(!(kmem_freemap & ((ptr_t)1 << i)))
 			continue;
-		}
 
 		assert(!list_empty(&kmem_freelists[i]));
 
 		LIST_FOREACH(&kmem_freelists[i], iter) {
 			range = list_entry(iter, kmem_range_t, af_link);
 
-			if(range->size >= size) {
+			if(range->size >= size)
 				return range;
-			}
 		}
 	}
 
@@ -238,7 +234,7 @@ static kmem_range_t *kmem_hash_find(ptr_t addr, size_t size) {
 		 * want to have to wait for the periodic rehash. */
 		if(i >= KMEM_REHASH_THRESHOLD && !kmem_rehash_requested) {
 			dprintf("kmem: saw %zu allocations in search on chain %u, triggering rehash\n",
-			        i, hash);
+				i, hash);
 			kmem_rehash_requested = true;
 			// TODO: trigger rehash
 		}
@@ -268,7 +264,7 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 		fatal("Invalid free of %p", addr);
 	} else if(unlikely(range->size != size)) {
 		fatal("Incorrect size for allocation %p (given: %zu, actual: %zu)",
-		      addr, size, range->size);
+			addr, size, range->size);
 	}
 
 	/* Remove it from the hash table. */
@@ -281,13 +277,11 @@ static void kmem_free_internal(ptr_t addr, size_t size, bool unmap, bool free, b
 		mmu_context_lock(&kernel_mmu_context);
 
 		for(i = 0; i < size; i += PAGE_SIZE) {
-			if(!mmu_context_unmap(&kernel_mmu_context, addr + i, shared, &page)) {
+			if(!mmu_context_unmap(&kernel_mmu_context, addr + i, shared, &page))
 				fatal("Address %p was not mapped while freeing", addr + i);
-			}
 
-			if(free) {
+			if(free)
 				phys_free(page, PAGE_SIZE);
-			}
 
 			dprintf("kmem: unmapped page 0x%" PRIxPHYS " from %p\n", page, addr + i);
 		}
@@ -420,9 +414,8 @@ void *kmem_alloc(size_t size, int mmflag) {
 
 	/* Allocate a range to map into. */
 	ret = kmem_raw_alloc(size, mmflag);
-	if(unlikely(!ret)) {
+	if(unlikely(!ret))
 		return NULL;
-	}
 
 	mmu_context_lock(&kernel_mmu_context);
 
@@ -436,9 +429,10 @@ void *kmem_alloc(size_t size, int mmflag) {
 
 		/* Map the page into the kernel address space. */
 		if(mmu_context_map(&kernel_mmu_context, ret + i, page->addr, true, true,
-		                   mmflag & MM_FLAG_MASK) != STATUS_SUCCESS) {
+			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
+		{
 			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-			        page->addr, ret + i);
+				page->addr, ret + i);
 			page_free(page);
 			goto fail;
 		}
@@ -447,9 +441,8 @@ void *kmem_alloc(size_t size, int mmflag) {
 	}
 
 	/* Zero the range if requested. */
-	if(mmflag & MM_ZERO) {
+	if(mmflag & MM_ZERO)
 		memset((void *)ret, 0, size);
-	}
 
 	mmu_context_unlock(&kernel_mmu_context);
 	return (void *)ret;
@@ -499,18 +492,18 @@ void *kmem_map(phys_ptr_t base, size_t size, int mmflag) {
 	assert(!(base % PAGE_SIZE));
 
 	ret = kmem_raw_alloc(size, mmflag);
-	if(unlikely(!ret)) {
+	if(unlikely(!ret))
 		return NULL;
-	}
 
 	mmu_context_lock(&kernel_mmu_context);
 
 	/* Back the allocation with the required page range. */
 	for(i = 0; i < size; i += PAGE_SIZE) {
 		if(mmu_context_map(&kernel_mmu_context, ret + i, base + i, true, true,
-		                   mmflag & MM_FLAG_MASK) != STATUS_SUCCESS) {
+			mmflag & MM_FLAG_MASK) != STATUS_SUCCESS)
+		{
 			kprintf(LOG_DEBUG, "kmem: failed to map page 0x%" PRIxPHYS " to %p\n",
-			        base + i, ret + i);
+				base + i, ret + i);
 			goto fail;
 		}
 
@@ -521,9 +514,9 @@ void *kmem_map(phys_ptr_t base, size_t size, int mmflag) {
 	return (void *)ret;
 fail:
 	/* Go back and reverse what we have done. */
-	for(; i; i -= PAGE_SIZE) {
+	for(; i; i -= PAGE_SIZE)
 		mmu_context_unmap(&kernel_mmu_context, ret + (i - PAGE_SIZE), true, NULL);
-	}
+
 	mmu_context_unlock(&kernel_mmu_context);
 	kmem_raw_free(ret, size);
 	return NULL;
@@ -554,12 +547,10 @@ __init_text void kmem_init(void) {
 	unsigned i;
 
 	/* Initialize lists. */
-	for(i = 0; i < KMEM_INITIAL_HASH_SIZE; i++) {
+	for(i = 0; i < KMEM_INITIAL_HASH_SIZE; i++)
 		list_init(&kmem_initial_hash[i]);
-	}
-	for(i = 0; i < KMEM_FREELISTS; i++) {
+	for(i = 0; i < KMEM_FREELISTS; i++)
 		list_init(&kmem_freelists[i]);
-	}
 
 	/* Create the initial free range. */
 	range = kmem_range_get(MM_BOOT);

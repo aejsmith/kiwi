@@ -53,18 +53,16 @@ void *fixed_heap_alloc(fixed_heap_t *heap, size_t size) {
 	fixed_heap_tag_t *tag, *other;
 	size_t total;
 
-	if(!size) {
+	if(!size)
 		return NULL;
-	}
 
 	/* Minimum size and alignment of 8 bytes. */
 	total = ROUND_UP(size, 8) + sizeof(fixed_heap_tag_t);
 
 	/* Search for a free segment. */
 	for(tag = heap->tags; tag; tag = tag->next) {
-		if(tag_allocated(tag) || tag_size(tag) < total) {
+		if(tag_allocated(tag) || tag_size(tag) < total)
 			continue;
-		}
 
 		/* Found a suitable segment, chop it up if necessary (and if
 		 * there's enough room to do so). */
@@ -90,15 +88,13 @@ void *fixed_heap_alloc(fixed_heap_t *heap, size_t size) {
 void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
 	fixed_heap_tag_t *tag, *prev;
 
-	if(!ptr) {
+	if(!ptr)
 		return;
-	}
 
 	tag = (fixed_heap_tag_t *)((ptr_t)ptr - sizeof(fixed_heap_tag_t));
 
-	if(unlikely(!tag_allocated(tag))) {
+	if(unlikely(!tag_allocated(tag)))
 		fatal("Freeing already free segment %p (tag: %p)", ptr, tag);
-	}
 
 	/* Mark as free. */
 	tag->data &= ~(1<<0);
@@ -112,9 +108,8 @@ void fixed_heap_free(fixed_heap_t *heap, void *ptr) {
 	/* Find the previous tag and see if we can merge with it. */
 	if(tag != heap->tags) {
 		for(prev = heap->tags; prev; prev = prev->next) {
-			if(prev->next != tag) {
+			if(prev->next != tag)
 				continue;
-			}
 
 			if(!tag_allocated(prev)) {
 				prev->data += tag->data;

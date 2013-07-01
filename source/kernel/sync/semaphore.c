@@ -158,21 +158,21 @@ static object_type_t semaphore_object_type = {
  * @param rights	Access rights for the handle.
  * @param handlep	Where to store handle to the semaphore.
  * @return		Status code describing result of the operation. */
-status_t kern_semaphore_create(const char *name, size_t count, const object_security_t *security,
-                               object_rights_t rights, handle_t *handlep) {
+status_t kern_semaphore_create(const char *name, size_t count,
+	const object_security_t *security, object_rights_t rights,
+	handle_t *handlep)
+{
 	object_security_t ksecurity = { -1, -1, NULL };
 	user_semaphore_t *sem;
 	status_t ret;
 
-	if(!handlep) {
+	if(!handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	if(security) {
 		ret = object_security_from_user(&ksecurity, security, true);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	/* Construct a default ACL if required. */
@@ -211,9 +211,9 @@ status_t kern_semaphore_create(const char *name, size_t count, const object_secu
 	rwlock_unlock(&semaphore_tree_lock);
 
 	ret = object_handle_create(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		user_semaphore_release(sem);
-	}
+
 	return ret;
 }
 
@@ -226,9 +226,8 @@ status_t kern_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t
 	user_semaphore_t *sem;
 	status_t ret;
 
-	if(!handlep) {
+	if(!handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	rwlock_read_lock(&semaphore_tree_lock);
 
@@ -242,9 +241,9 @@ status_t kern_semaphore_open(semaphore_id_t id, object_rights_t rights, handle_t
 	rwlock_unlock(&semaphore_tree_lock);
 
 	ret = object_handle_open(&sem->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		user_semaphore_release(sem);
-	}
+
 	return ret;
 }
 
@@ -256,9 +255,8 @@ semaphore_id_t kern_semaphore_id(handle_t handle) {
 	user_semaphore_t *sem;
 	semaphore_id_t ret;
 
-	if(object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, 0, &khandle) != STATUS_SUCCESS)
 		return -1;
-	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	ret = sem->id;
@@ -287,9 +285,8 @@ status_t kern_semaphore_down(handle_t handle, useconds_t timeout) {
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	ret = semaphore_down_etc(&sem->sem, timeout, SYNC_INTERRUPTIBLE);
@@ -314,9 +311,8 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_SEMAPHORE, SEMAPHORE_RIGHT_USAGE, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	sem = (user_semaphore_t *)khandle->object;
 	semaphore_up(&sem->sem, count);
@@ -328,4 +324,5 @@ status_t kern_semaphore_up(handle_t handle, size_t count) {
 static __init_text void semaphore_id_init(void) {
 	id_allocator_init(&semaphore_id_allocator, 65535, MM_BOOT);
 }
+
 INITCALL(semaphore_id_init);

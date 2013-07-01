@@ -130,9 +130,8 @@ static kdb_command_desc_t *lookup_command(const char *name) {
 	LIST_FOREACH(&kdb_commands, iter) {
 		cmd = list_entry(iter, kdb_command_desc_t, header);
 
-		if(strcmp(name, cmd->name) == 0) {
+		if(strcmp(name, cmd->name) == 0)
 			return cmd;
-		}
 	}
 
 	return NULL;
@@ -141,12 +140,10 @@ static kdb_command_desc_t *lookup_command(const char *name) {
 /** Print a character.
  * @param ch		Character to print. */
 static void kdb_putc(char ch) {
-	if(debug_console_ops) {
+	if(debug_console_ops)
 		debug_console_ops->putc(ch);
-	}
-	if(screen_console_ops) {
+	if(screen_console_ops)
 		screen_console_ops->putc(ch);
-	}
 }
 
 /** Helper for kdb_printf(). */
@@ -168,16 +165,14 @@ static void kdb_printf_helper(char ch, void *data, int *total) {
 			}
 
 			/* Output it. */
-			for(i = 0; i < current_output_pos; i++) {
+			for(i = 0; i < current_output_pos; i++)
 				kdb_putc(current_output_line[i]);
-			}
 
 			kdb_putc('\n');
 			current_output_pos = 0;
 		} else {
-			if(current_output_pos < (KDB_MAX_LINE_LEN - 1)) {
+			if(current_output_pos < (KDB_MAX_LINE_LEN - 1))
 				current_output_line[current_output_pos++] = ch;
-			}
 		}
 	} else {
 		kdb_putc(ch);
@@ -242,9 +237,8 @@ uint16_t kdb_getc(void) {
 			ops = list_entry(iter, console_in_ops_t, header);
 
 			ch = ops->getc();
-			if(ch) {
+			if(ch)
 				return ch;
-			}
 		}
 	}
 }
@@ -337,9 +331,8 @@ kdb_status_t kdb_parse_expression(char *exp, uint64_t *valp, char **strp) {
 
 		/* Find the length of the component. */
 		len = 0;
-		while(!isoperator(exp[len]) && exp[len] != 0) {
+		while(!isoperator(exp[len]) && exp[len] != 0)
 			len++;
-		}
 
 		if(exp[0] == '%') {
 			/* Register name. */
@@ -426,19 +419,17 @@ static void kdb_line_insert(kdb_read_line_t *state, char ch) {
 			state->position++;
 		} else {
 			memmove(&state->buffer[state->position + 1],
-			        &state->buffer[state->position],
-			        state->length - state->position + 1);
+				&state->buffer[state->position],
+				state->length - state->position + 1);
 			state->buffer[state->position++] = ch;
 			state->length++;
 
 			/* Reprint everything after the character, maintaining
 			 * the current cursor position. */
-			for(i = 0; i < (state->length - state->position); i++) {
+			for(i = 0; i < (state->length - state->position); i++)
 				kdb_putc(state->buffer[state->position + i]);
-			}
-			while(i--) {
+			while(i--)
 				kdb_putc('\b');
-			}
 		}
 	}
 }
@@ -451,9 +442,8 @@ static void kdb_line_erase(kdb_read_line_t *state, bool forward) {
 	size_t i;
 
 	if(forward) {
-		if(state->position == state->length) {
+		if(state->position == state->length)
 			return;
-		}
 	} else {
 		if(state->position == 0) {
 			return;
@@ -472,18 +462,16 @@ static void kdb_line_erase(kdb_read_line_t *state, bool forward) {
 	}
 
 	memmove(&state->buffer[state->position], &state->buffer[state->position + 1],
-	        state->length - state->position);
+		state->length - state->position);
 	state->length--;
 
 	/* Reprint everything, maintaining cursor position. */
-	for(i = 0; i < (state->length - state->position); i++) {
+	for(i = 0; i < (state->length - state->position); i++)
 		kdb_putc(state->buffer[state->position + i]);
-	}
 	kdb_putc(' ');
 	i++;
-	while(i--) {
+	while(i--)
 		kdb_putc('\b');
-	}
 }
 
 /** Replace the current line with another.
@@ -494,12 +482,10 @@ static void kdb_line_replace(kdb_read_line_t *state, const char *line) {
 
 	/* First need to clear the line off the screen. If we're in the middle
 	 * of a line clear to the end, then clear backwards. */
-	for(i = 0; i < (state->length - state->position); i++) {
+	for(i = 0; i < (state->length - state->position); i++)
 		kdb_putc(' ');
-	}
-	while(i--) {
+	while(i--)
 		kdb_putc('\b');
-	}
 	while(state->position--) {
 		kdb_putc('\b');
 		kdb_putc(' ');
@@ -528,15 +514,13 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
 	size_t matches, end, i, printed;
 
 	/* Laziness. Only support tab completion at end of buffer. */
-	if(state->position != state->length) {
+	if(state->position != state->length)
 		return false;
-	}
 
 	/* If there's a space we can't tab complete, can only complete command
 	 * names. */
-	if(strchr(state->buffer, ' ')) {
+	if(strchr(state->buffer, ' '))
 		return false;
-	}
 
 	/* First find all the matches. */
 	matches = 0;
@@ -546,9 +530,8 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
 		if(state->length >= strlen(cmd->name)) {
 			continue;
 		} else if(strncmp(state->buffer, cmd->name, state->length) == 0) {
-			if(++matches == 1) {
+			if(++matches == 1)
 				first = cmd;
-			}
 		}
 	}
 
@@ -557,11 +540,10 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
 	if(matches == 1) {
 		end = state->length + strlen(&first->name[state->length]);
 
-		for(i = state->length; i < end; i++) {
+		for(i = state->length; i < end; i++)
 			kdb_line_insert(state, first->name[i]);
-		}
-		kdb_line_insert(state, ' ');
 
+		kdb_line_insert(state, ' ');
 		return false;
 	} else if(matches > 1) {
 		kdb_putc('\n');
@@ -580,13 +562,14 @@ static bool kdb_line_complete(kdb_read_line_t *state) {
 				kdb_putc('\n');
 				printed = 0;
 			}
+
 			kdb_printf("%-12s ", cmd->name);
 			printed++;
 		}
 
-		if(printed) {
+		if(printed)
 			kdb_putc('\n');
-		}
+
 		return true;
 	}
 
@@ -639,9 +622,8 @@ static char *kdb_read_line(int count) {
 				state.position++;
 			}
 		} else if(ch == CONSOLE_KEY_UP) {
-			if(hist) {
+			if(hist)
 				kdb_line_replace(&state, kdb_history[--hist]);
-			}
 		} else if(ch == CONSOLE_KEY_DOWN) {
 			if(hist < kdb_history_len) {
 				next = ++hist;
@@ -659,9 +641,8 @@ static char *kdb_read_line(int count) {
 			}
 		} else {
 			/* Ignore non-printing characters. */
-			if(isprint(ch)) {
+			if(isprint(ch))
 				kdb_line_insert(&state, (char)ch);
-			}
 		}
 	}
 
@@ -716,9 +697,9 @@ static bool kdb_line_parse(char *line, kdb_line_t *data) {
 	/* First split up by pipe. */
 	while(line) {
 		subcmd = strsep(&line, "|");
-		while(isspace(*subcmd)) {
+		while(isspace(*subcmd))
 			subcmd++;
-		}
+
 		if(strlen(subcmd) == 0) {
 			kdb_printf("KDB: Error: Empty pipe command\n");
 			kdb_line_destroy(data);
@@ -740,9 +721,8 @@ static bool kdb_line_parse(char *line, kdb_line_t *data) {
 		/* Split into arguments. */
 		while(subcmd) {
 			arg = strsep(&subcmd, " ");
-			if(strlen(arg) == 0) {
+			if(strlen(arg) == 0)
 				continue;
-			}
 
 			if(call->count == KDB_ARGS_MAX) {
 				kdb_printf("KDB: Error: Maximum of %d arguments supported\n", KDB_ARGS_MAX);
@@ -848,10 +828,11 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 		}
 	}
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	/* Ask all other CPUs to pause execution. */
 	arch_kdb_trap_cpus();
-#endif
+	#endif
+
 	curr_kdb_frame = frame;
 
 	/* Run entry notifiers. */
@@ -874,7 +855,7 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 	kdb_putc('\n');
 
 	kdb_printf("Thread %" PRId32 " (%s) on CPU%u\n", (curr_thread) ? curr_thread->id : -1,
-	           (curr_thread) ? curr_thread->name : "<none>", cpu_id());
+		(curr_thread) ? curr_thread->name : "<none>", cpu_id());
 
 	if(reason == KDB_REASON_FATAL) {
 		kdb_printf("Backtrace:\n");
@@ -906,7 +887,8 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 			/* Call the command to set up the filter. */
 			filter = kdb_malloc(sizeof(kdb_filter_t));
 			if(perform_call(list_first(&data.filters, kdb_args_t, header),
-			                NULL, filter) != KDB_SUCCESS) {
+				NULL, filter) != KDB_SUCCESS)
+			{
 				kdb_free(filter);
 				continue;
 			}
@@ -917,9 +899,8 @@ kdb_status_t kdb_main(kdb_reason_t reason, intr_frame_t *frame, unsigned index) 
 		/* Perform the main call. */
 		ret = perform_call(&data.call, filter, NULL);
 		if(filter) {
-			if(current_output_pos) {
+			if(current_output_pos)
 				kdb_putc('\n');
-			}
 
 			filter->func(NULL, filter->data);
 			kdb_free(filter);
@@ -1125,9 +1106,8 @@ static kdb_status_t kdb_cmd_examine(int argc, char **argv, kdb_filter_t *filter)
 		exp = 2;
 
 		str = &argv[1][1];
-		while(isdigit(*str)) {
+		while(isdigit(*str))
 			count = (count * 10) + (*(str++) - '0');
-		}
 
 		/* Handle remaining format characters. */
 		while(*str) {
@@ -1150,14 +1130,12 @@ static kdb_status_t kdb_cmd_examine(int argc, char **argv, kdb_filter_t *filter)
 	}
 
 	/* Default value. */
-	if(count == 0) {
+	if(count == 0)
 		count = 1;
-	}
 
 	/* Parse the expression. */
-	if(kdb_parse_expression(argv[exp], &val, NULL) != KDB_SUCCESS) {
+	if(kdb_parse_expression(argv[exp], &val, NULL) != KDB_SUCCESS)
 		return KDB_FAILURE;
-	}
 	addr = (ptr_t)val;
 
 	/* Check overflow. */
@@ -1193,9 +1171,8 @@ static kdb_status_t kdb_cmd_examine(int argc, char **argv, kdb_filter_t *filter)
 	}
 
 	/* Print a newline if we've just printed a string. */
-	if(fmt == 's') {
+	if(fmt == 's')
 		kdb_printf("\n");
-	}
 
 	return KDB_SUCCESS;
 }
@@ -1247,9 +1224,8 @@ static kdb_status_t kdb_cmd_print(int argc, char **argv, kdb_filter_t *filter) {
 	}
 
 	/* Parse the expression and print it. */
-	if(kdb_parse_expression(argv[exp], &value, NULL) != KDB_SUCCESS) {
+	if(kdb_parse_expression(argv[exp], &value, NULL) != KDB_SUCCESS)
 		return KDB_FAILURE;
-	}
 
 	switch(fmt) {
 	case 'x': kdb_printf("0x%" PRIx64 "\n", value); break;
@@ -1340,9 +1316,8 @@ static bool wc_filter_func(const char *line, void *_data) {
 					data->count++;
 					len = 0;
 				}
-				if(!*line) {
+				if(!*line)
 					break;
-				}
 			} else {
 				len++;
 			}
@@ -1478,20 +1453,18 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
 		}
 
 		/* Get the address to add. */
-		if(kdb_parse_expression(argv[2], &value, NULL) != KDB_SUCCESS) {
+		if(kdb_parse_expression(argv[2], &value, NULL) != KDB_SUCCESS)
 			return KDB_FAILURE;
-		}
 		addr = (ptr_t)value;
 
 		/* Install the breakpoint. */
 		ret = arch_kdb_install_breakpoint(addr);
-		if(ret < 0) {
+		if(ret < 0)
 			return KDB_FAILURE;
-		}
 
 		sym = symbol_lookup_addr(addr, &off);
 		kdb_printf("Created breakpoint %d [%p] %s+0x%zx\n", ret, addr,
-		           (sym) ? sym->name : "<unknown>", off);
+			(sym) ? sym->name : "<unknown>", off);
 	} else if(strcmp(argv[1], "list") == 0) {
 		if(argc != 2) {
 			kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1499,9 +1472,8 @@ static kdb_status_t kdb_cmd_break(int argc, char **argv, kdb_filter_t *filter) {
 		}
 
 		for(i = 0; i < KDB_BREAKPOINT_COUNT; i++) {
-			if(!arch_kdb_get_breakpoint(i, &addr)) {
+			if(!arch_kdb_get_breakpoint(i, &addr))
 				continue;
-			}
 
 			sym = symbol_lookup_addr(addr, &off);
 			kdb_printf("%u: [%p] %s+0x%zx\n", i, addr, (sym) ? sym->name : "<unknown>", off);
@@ -1573,27 +1545,24 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
 		}
 
 		/* Get the address to add. */
-		if(kdb_parse_expression(argv[i++], &value, NULL) != KDB_SUCCESS) {
+		if(kdb_parse_expression(argv[i++], &value, NULL) != KDB_SUCCESS)
 			return KDB_FAILURE;
-		}
 		addr = (ptr_t)value;
 
 		/* Get the size. */
-		if(kdb_parse_expression(argv[i++], &value, NULL) != KDB_SUCCESS) {
+		if(kdb_parse_expression(argv[i++], &value, NULL) != KDB_SUCCESS)
 			return KDB_FAILURE;
-		}
 		size = (size_t)value;
 
 		/* Install the watchpoint. */
 		ret = arch_kdb_install_watchpoint(addr, size, rw);
-		if(ret < 0) {
+		if(ret < 0)
 			return KDB_FAILURE;
-		}
 
 		sym = symbol_lookup_addr(addr, &off);
 		kdb_printf("Created %zu byte %swrite watchpoint %d [%p] %s+0x%zx\n",
-		           size, (rw) ? "read-" : "", ret, addr,
-		           (sym) ? sym->name : "<unknown>", off);
+			size, (rw) ? "read-" : "", ret, addr,
+			(sym) ? sym->name : "<unknown>", off);
 	} else if(strcmp(argv[1], "list") == 0) {
 		if(argc != 2) {
 			kdb_printf("Incorrect number of arguments. See 'help %s' for more information.\n", argv[0]);
@@ -1601,9 +1570,8 @@ static kdb_status_t kdb_cmd_watch(int argc, char **argv, kdb_filter_t *filter) {
 		}
 
 		for(i = 0; i < KDB_WATCHPOINT_COUNT; i++) {
-			if(!arch_kdb_get_watchpoint(i, &addr, &size, &rw)) {
+			if(!arch_kdb_get_watchpoint(i, &addr, &size, &rw))
 				continue;
-			}
 
 			sym = symbol_lookup_addr(addr, &off);
 			kdb_printf("%u: %zu byte %swrite [%p] %s+0x%zx\n", i, size, (rw) ? "read-" : "",
@@ -1709,10 +1677,10 @@ __init_text void kdb_init(void) {
 	kdb_register_command("backtrace", "Print out a backtrace.", kdb_cmd_backtrace);
 	kdb_register_command("wc", "Count words or lines in the output of a command.", kdb_cmd_wc);
 	kdb_register_command("grep", "Search the output of commands.", kdb_cmd_grep);
-#if KDB_BREAKPOINT_COUNT
+	#if KDB_BREAKPOINT_COUNT
 	kdb_register_command("break", "Create, list and remove breakpoints.", kdb_cmd_break);
-#endif
-#if KDB_WATCHPOINT_COUNT
+	#endif
+	#if KDB_WATCHPOINT_COUNT
 	kdb_register_command("watch", "Create, list and remove watchpoints.", kdb_cmd_watch);
-#endif
+	#endif
 }

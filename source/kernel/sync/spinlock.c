@@ -35,25 +35,23 @@ static inline __always_inline void spinlock_lock_internal(spinlock_t *lock) {
 		/* When running on a single processor there is no need for us
 		 * to spin as there should only ever be one thing here at any
 		 * one time, so just die. */
-#if CONFIG_SMP
+		#if CONFIG_SMP
 		if(cpu_count > 1) {
 			while(true) {
 				/* Wait for it to become unheld. */
-				while(atomic_get(&lock->value) != 1) {
+				while(atomic_get(&lock->value) != 1)
 					arch_cpu_spin_hint();
-				}
 
 				/* Try to acquire it. */
-				if(atomic_dec(&lock->value) == 1) {
+				if(atomic_dec(&lock->value) == 1)
 					break;
-				}
 			}
 		} else {
-#endif
+		#endif
 			fatal("Nested locking of spinlock %p (%s)", lock, lock->name);
-#if CONFIG_SMP
+		#if CONFIG_SMP
 		}
-#endif
+		#endif
 	}
 }
 
@@ -113,9 +111,8 @@ void spinlock_lock_noirq(spinlock_t *lock) {
 void spinlock_unlock(spinlock_t *lock) {
 	bool state;
 
-	if(unlikely(!spinlock_held(lock))) {
+	if(unlikely(!spinlock_held(lock)))
 		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
-	}
 
 	/* Save state before unlocking in case it is overwritten by another
 	 * waiting CPU. */
@@ -128,9 +125,8 @@ void spinlock_unlock(spinlock_t *lock) {
 /** Release a spinlock without changing interrupt state.
  * @param lock		Spinlock to release. */
 void spinlock_unlock_noirq(spinlock_t *lock) {
-	if(unlikely(!spinlock_held(lock))) {
+	if(unlikely(!spinlock_held(lock)))
 		fatal("Release of already unlocked spinlock %p (%s)", lock, lock->name);
-	}
 
 	atomic_set(&lock->value, 1);
 }

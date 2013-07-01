@@ -30,17 +30,17 @@
 /** Handle a recursive locking error.
  * @param lock		Lock error occurred on. */
 static inline void mutex_recursive_error(mutex_t *lock) {
-#if CONFIG_DEBUG
+	#if CONFIG_DEBUG
 	size_t off = 0;
 	symbol_t *sym;
 
 	sym = symbol_lookup_addr((ptr_t)lock->caller, &off);
 	fatal("Recursive locking of non-recursive mutex %s (%p)\n"
-	      "Locked by [%p] %s+0x%zx", lock->name, lock, lock->caller,
-	      (sym) ? sym->name : "<unknown>", off);
-#else
+		"Locked by [%p] %s+0x%zx", lock->name, lock, lock->caller,
+		(sym) ? sym->name : "<unknown>", off);
+	#else
 	fatal("Recursive locking of non-recursive mutex %s (%p)", lock->name, lock);
-#endif
+	#endif
 }
 
 /** Internal mutex locking code.
@@ -72,9 +72,8 @@ static inline status_t mutex_lock_internal(mutex_t *lock, useconds_t timeout, in
 				/* If sleep is successful, lock ownership will
 				 * have been transferred to us. */
 				ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
-				if(ret != STATUS_SUCCESS) {
+				if(ret != STATUS_SUCCESS)
 					return ret;
-				}
 			}
 		}
 	}
@@ -111,11 +110,11 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
 	status_t ret;
 
 	ret = mutex_lock_internal(lock, timeout, flags);
-#if CONFIG_DEBUG
-	if(likely(ret == STATUS_SUCCESS)) {
+	#if CONFIG_DEBUG
+	if(likely(ret == STATUS_SUCCESS))
 		lock->caller = __builtin_return_address(0);
-	}
-#endif
+	#endif
+
 	return ret;
 }
 
@@ -129,15 +128,15 @@ status_t mutex_lock_etc(mutex_t *lock, useconds_t timeout, int flags) {
  * @param lock		Mutex to acquire.
  */
 void mutex_lock(mutex_t *lock) {
-#if CONFIG_DEBUG
+	#if CONFIG_DEBUG
 	status_t ret;
 
 	ret = mutex_lock_internal(lock, -1, 0);
 	assert(ret == STATUS_SUCCESS);
 	lock->caller = __builtin_return_address(0);
-#else
+	#else
 	mutex_lock_internal(lock, -1, 0);
-#endif
+	#endif
 }
 
 /**
@@ -159,7 +158,7 @@ void mutex_unlock(mutex_t *lock) {
 		fatal("Release of unheld mutex %s (%p)", lock->name, lock);
 	} else if(unlikely(lock->holder != curr_thread)) {
 		fatal("Release of mutex %s (%p) from incorrect thread, expected %" PRIu32,
-		      lock->name, lock, (lock->holder) ? lock->holder->id : -1);
+			lock->name, lock, (lock->holder) ? lock->holder->id : -1);
 	}
 
 	/* If the current value is 1, the lock is being released. If there is

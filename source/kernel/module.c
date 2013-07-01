@@ -60,16 +60,15 @@ static size_t remaining_module_size = KERNEL_MODULE_SIZE;
  * @param size		Size of the allocation.
  * @return		Address allocated or NULL if no available memory. */
 void *module_mem_alloc(size_t size) {
-#ifdef KERNEL_MODULE_BASE
+	#ifdef KERNEL_MODULE_BASE
 	page_t *page;
 	ptr_t addr;
 	size_t i;
 
 	size = ROUND_UP(size, PAGE_SIZE);
 
-	if(size > remaining_module_size) {
+	if(size > remaining_module_size)
 		return NULL;
-	}
 
 	addr = next_module_addr;
 
@@ -83,18 +82,18 @@ void *module_mem_alloc(size_t size) {
 	next_module_addr += size;
 	remaining_module_size -= size;
 	return (void *)addr;
-#else
+	#else
 	return kmem_alloc(ROUND_UP(size, PAGE_SIZE), 0);
-#endif
+	#endif
 }
 
 /** Free memory holding a module.
  * @param base		Base of the allocation.
  * @param size		Size of the allocation. */
 static void module_mem_free(void *base, size_t size) {
-#ifndef KERNEL_MODULE_BASE
+	#ifndef KERNEL_MODULE_BASE
 	kmem_free(base, ROUND_UP(size, PAGE_SIZE));
-#endif
+	#endif
 }
 
 /** Allocate a module structure.
@@ -118,12 +117,13 @@ static module_t *module_alloc(object_handle_t *handle) {
  * @param module	Module to destroy. */
 static void module_destroy(module_t *module) {
 	symbol_table_destroy(&module->symtab);
-	if(module->load_base) {
+
+	if(module->load_base)
 		module_mem_free(module->load_base, module->load_size);
-	}
-	if(module->shdrs) {
+
+	if(module->shdrs)
 		kfree(module->shdrs);
-	}
+
 	kfree(module);
 }
 
@@ -135,9 +135,8 @@ static module_t *module_find(const char *name) {
 
 	LIST_FOREACH(&module_list, iter) {
 		module = list_entry(iter, module_t, header);
-		if(strcmp(module->name, name) == 0) {
+		if(strcmp(module->name, name) == 0)
 			return module;
-		}
 	}
 
 	return NULL;
@@ -153,9 +152,8 @@ status_t module_name(object_handle_t *handle, char *namebuf) {
 	symbol_t *sym;
 	status_t ret;
 
-	if(!handle || !namebuf) {
+	if(!handle || !namebuf)
 		return STATUS_INVALID_ARG;
-	}
 
 	/* Take the module lock to serialise module loading. */
 	mutex_lock(&module_lock);
@@ -163,9 +161,8 @@ status_t module_name(object_handle_t *handle, char *namebuf) {
 	/* Perform first stage of loading the module. */
 	module = module_alloc(handle);
 	ret = elf_module_load(module);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto out;
-	}
 
 	/* Retrieve the name. */
 	sym = symbol_table_lookup_name(&module->symtab, "__module_name", false, false);
@@ -215,9 +212,9 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 		dep = module_find(module->deps[i]);
 		if(!dep) {
 			/* Unloaded dependency, store its name and return error. */
-			if(depbuf != NULL) {
+			if(depbuf != NULL)
 				strncpy(depbuf, module->deps[i], MODULE_NAME_MAX + 1);
-			}
+
 			return STATUS_MISSING_LIBRARY;
 		}
 	}
@@ -226,9 +223,8 @@ static status_t module_check_deps(module_t *module, char *depbuf) {
 	 * this here rather than in the previous loop so that if we have to
 	 * return error we don't have to go and remove the reference on
 	 * everything we've checked already. */
-	for(i = 0; module->deps[i] != NULL; i++) {
+	for(i = 0; module->deps[i] != NULL; i++)
 		refcount_inc(&(module_find(module->deps[i]))->count);
-	}
 
 	return STATUS_SUCCESS;
 }
@@ -255,14 +251,12 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 	symbol_t *sym;
 	status_t ret;
 
-	if(!handle || !depbuf) {
+	if(!handle || !depbuf)
 		return STATUS_INVALID_ARG;
-	}
 
 	/* Check if the current process can load modules. */
-	if(!cap_check(NULL, CAP_MODULE)) {
+	if(!cap_check(NULL, CAP_MODULE))
 		return STATUS_PERM_DENIED;
-	}
 
 	/* Take the module lock to serialise module loading. */
 	mutex_lock(&module_lock);
@@ -270,9 +264,8 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 	/* Perform first stage of loading the module. */
 	module = module_alloc(handle);
 	ret = elf_module_load(module);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Retrieve the module information. */
 	sym = symbol_table_lookup_name(&module->symtab, "__module_name", false, false);
@@ -307,17 +300,15 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 
 	/* Check whether the module's dependencies are loaded. */
 	ret = module_check_deps(module, depbuf);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Perform remaining relocations on the module. At this point all
 	 * dependencies are loaded, so assuming the module's dependencies are
 	 * correct, external symbol lookups can be done. */
 	ret = elf_module_finish(module);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Publish the symbol table. Do this before calling the initialization
 	 * function so backtraces will have the correct symbols if the call
@@ -337,7 +328,7 @@ status_t module_load(object_handle_t *handle, char *depbuf) {
 	list_append(&module_list, &module->header);
 	module->handle = NULL;
 	kprintf(LOG_NOTICE, "module: successfully loaded module %s (%s)\n",
-	        module->name, module->description);
+		module->name, module->description);
 	mutex_unlock(&module_lock);
 	return STATUS_SUCCESS;
 fail:
@@ -367,8 +358,8 @@ static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter)
 		module = list_entry(iter, module_t, header);
 
 		kdb_printf("%-16s %-5d %-8zu %s\n", module->name,
-		           refcount_get(&module->count), module->load_size,
-		           module->description);
+			refcount_get(&module->count), module->load_size,
+			module->description);
 	}
 
 	return KDB_SUCCESS;
@@ -376,8 +367,10 @@ static kdb_status_t kdb_cmd_modules(int argc, char **argv, kdb_filter_t *filter)
 
 /** Register the module KDB command. */
 static __init_text void module_init(void) {
-	kdb_register_command("modules", "Display information about loaded kernel modules.", kdb_cmd_modules);
+	kdb_register_command("modules", "Display information about loaded kernel modules.",
+		kdb_cmd_modules);
 }
+
 INITCALL(module_init);
 
 /**
@@ -404,9 +397,8 @@ status_t kern_module_load(const char *path, char *depbuf) {
 
 	/* Copy the path across. */
 	ret = strndup_from_user(path, FS_PATH_MAX, &kpath);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Open a handle to the file. */
 	ret = file_open(kpath, FILE_RIGHT_READ, 0, 0, NULL, &handle);
@@ -418,9 +410,8 @@ status_t kern_module_load(const char *path, char *depbuf) {
 	ret = module_load(handle, kdepbuf);
 	if(ret == STATUS_MISSING_LIBRARY) {
 		err = memcpy_to_user(depbuf, kdepbuf, MODULE_NAME_MAX + 1);
-		if(err != STATUS_SUCCESS) {
+		if(err != STATUS_SUCCESS)
 			ret = err;
-		}
 	}
 
 	object_handle_release(handle);
@@ -445,9 +436,8 @@ status_t kern_module_info(module_info_t *infop, size_t *countp) {
 	status_t ret;
 
 	/* Check if the current process can load modules. */
-	if(!cap_check(NULL, CAP_MODULE)) {
+	if(!cap_check(NULL, CAP_MODULE))
 		return STATUS_PERM_DENIED;
-	}
 
 	if(infop) {
 		ret = memcpy_from_user(&count, countp, sizeof(count));
@@ -475,9 +465,8 @@ status_t kern_module_info(module_info_t *infop, size_t *countp) {
 				return ret;
 			}
 
-			if(++i >= count) {
+			if(++i >= count)
 				break;
-			}
 		} else {
 			i++;
 		}

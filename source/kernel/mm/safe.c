@@ -160,9 +160,8 @@ status_t strdup_from_user(const void *src, char **destp) {
 	}
 
 	d = kmalloc(len + 1, 0);
-	if(!d) {
+	if(!d)
 		return STATUS_NO_MEMORY;
-	}
 
 	ret = memcpy_from_user(d, src, len);
 	if(ret != STATUS_SUCCESS) {
@@ -264,10 +263,11 @@ status_t arrcpy_from_user(const char *const src[], char ***arrayp) {
 	return STATUS_SUCCESS;
 fail:
 	if(array) {
-		for(i = 0; array[i] != NULL; i++) {
+		for(i = 0; array[i] != NULL; i++)
 			kfree(array[i]);
-		}
+
 		kfree(array);
 	}
+
 	return ret;
 }

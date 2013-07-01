@@ -63,9 +63,8 @@ static void symbol_tree_remove(symbol_t *symbol) {
 	}
 
 	list_remove(&symbol->header);
-	if(list_empty(list)) {
+	if(list_empty(list))
 		radix_tree_remove(symbol_tree, symbol->name, kfree);
-	}
 }
 
 /** Comparison function for symbol sorting.
@@ -94,10 +93,10 @@ void symbol_table_destroy(symbol_table_t *table) {
 		/* Only remove the symbols from the tree if the table has been
 		 * published. */
 		if(!list_empty(&table->header)) {
-			for(i = 0; i < table->count; i++) {
+			for(i = 0; i < table->count; i++)
 				symbol_tree_remove(&table->symbols[i]);
-			}
 		}
+
 		kfree(table->symbols);
 	}
 
@@ -111,8 +110,9 @@ void symbol_table_destroy(symbol_table_t *table) {
  * @param size		Size of the symbol.
  * @param global	Whether the symbol is a global symbol.
  * @param exported	Whether the symbol is exported to kernel modules. */
-void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr, size_t size,
-                         bool global, bool exported) {
+void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr,
+	size_t size, bool global, bool exported)
+{
 	size_t i;
 
 	/* Resize the symbol table so we can fit the symbol in. */
@@ -132,17 +132,15 @@ void symbol_table_insert(symbol_table_t *table, const char *name, ptr_t addr, si
 void symbol_table_publish(symbol_table_t *table) {
 	size_t i;
 
-	if(!table->count || !table->symbols) {
+	if(!table->count || !table->symbols)
 		fatal("Publishing empty symbol table");
-	}
 
 	/* Sort the table into symbol order. */
 	qsort(table->symbols, table->count, sizeof(symbol_t), symbol_table_qsort_compare);
 
 	/* Place all of the symbols into the global symbol tree. */
-	for(i = 0; i < table->count; i++) {
+	for(i = 0; i < table->count; i++)
 		symbol_tree_insert(&table->symbols[i]);
-	}
 
 	/* Add the table to the table list. */
 	list_append(&symbol_tables, &table->header);
@@ -166,24 +164,23 @@ symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *of
 
 	assert(table);
 
-	if(addr < table->symbols[0].addr) {
+	if(addr < table->symbols[0].addr)
 		return NULL;
-	}
 
 	for(i = 0; i < table->count; i++) {
 		end = table->symbols[i].addr + table->symbols[i].size;
 
 		if(addr >= table->symbols[i].addr && addr < end) {
-			if(offp != NULL) {
+			if(offp != NULL)
 				*offp = (size_t)(addr - table->symbols[i].addr);
-			}
+
 			return &table->symbols[i];
 		}
 	}
 
-	if(offp != NULL) {
+	if(offp != NULL)
 		*offp = 0;
-	}
+
 	return NULL;
 }
 
@@ -200,7 +197,9 @@ symbol_t *symbol_table_lookup_addr(symbol_table_t *table, ptr_t addr, size_t *of
  *
  * @return		Pointer to the symbol structure, or NULL if not found.
  */
-symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name, bool global, bool exported) {
+symbol_t *symbol_table_lookup_name(symbol_table_t *table, const char *name,
+	bool global, bool exported)
+{
 	size_t i;
 
 	assert(table);
@@ -241,9 +240,8 @@ symbol_t *symbol_lookup_addr(ptr_t addr, size_t *offp) {
 			table = list_entry(iter, symbol_table_t, header);
 
 			sym = symbol_table_lookup_addr(table, addr, offp);
-			if(sym) {
+			if(sym)
 				return sym;
-			}
 		}
 
 		return NULL;
@@ -269,9 +267,8 @@ symbol_t *symbol_lookup_name(const char *name, bool global, bool exported) {
 	list_t *list;
 
 	if(symbol_tree) {
-		if(!(list = radix_tree_lookup(symbol_tree, name))) {
+		if(!(list = radix_tree_lookup(symbol_tree, name)))
 			return NULL;
-		}
 
 		LIST_FOREACH(list, iter) {
 			sym = list_entry(iter, symbol_t, header);

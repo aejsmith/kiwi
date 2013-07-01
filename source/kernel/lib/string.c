@@ -78,9 +78,9 @@ void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
 	}
 
 	/* Write remaining bytes. */
-	while(count--) {
+	while(count--)
 		*d++ = *s++;
-	}
+
 	return dest;
 }
 
@@ -108,13 +108,14 @@ void *memset(void *dest, int val, size_t count) {
 		nd = (unsigned long *)d;
 
 		/* Compute the value we will write. */
-#if CONFIG_ARCH_64BIT
+		#if CONFIG_ARCH_64BIT
 		nval = c * 0x0101010101010101ul;
-#elif CONFIG_ARCH_32BIT
+		#elif CONFIG_ARCH_32BIT
 		nval = c * 0x01010101ul;
-#else
-# error "Unsupported"
-#endif
+		#else
+		# error "Unsupported"
+		#endif
+
 		/* Unroll the loop if possible. */
 		while(count >= (sizeof(unsigned long) * 4)) {
 			*nd++ = nval;
@@ -132,9 +133,9 @@ void *memset(void *dest, int val, size_t count) {
 	}
 
 	/* Write remaining bytes. */
-	while(count--) {
+	while(count--)
 		*d++ = val;
-	}
+
 	return dest;
 }
 
@@ -177,13 +178,13 @@ void *memmove(void *dest, const void *src, size_t count) {
  *			p1 is found, respectively, to be less than, to match,
  *			or to be greater than p2. */
 int memcmp(const void *p1, const void *p2, size_t count) {
-	unsigned char *s1 = (unsigned char *)p1;
-	unsigned char *s2 = (unsigned char *)p2;
+	const unsigned char *s1 = (const unsigned char *)p1;
+	const unsigned char *s2 = (const unsigned char *)p2;
 
 	while(count--) {
-		if(*s1 != *s2) {
+		if(*s1 != *s2)
 			return *s1 - *s2;
-		}
+
 		s1++;
 		s2++;
 	}
@@ -251,12 +252,11 @@ int strncmp(const char *s1, const char *s2, size_t count) {
 
 	while(a < fini) {
 		res = *a - *b;
-		if(res) {
+		if(res)
 			return res;
-		}
-		if(!*a) {
+		if(!*a)
 			return 0;
-		}
+
 		a++;
 		b++;
 	}
@@ -287,12 +287,11 @@ int strncasecmp(const char *s1, const char *s2, size_t count) {
 
 	while(a < fini) {
 		res = tolower(*a) - tolower(*b);
-		if(res) {
+		if(res)
 			return res;
-		}
-		if(!*a) {
+		if(!*a)
 			return 0;
-		}
+
 		a++;
 		b++;
 	}
@@ -319,9 +318,8 @@ char *strsep(char **stringp, const char *delim) {
 	char *tok, *s;
 	int c, sc;
 
-	if(!(s = *stringp)) {
+	if(!(s = *stringp))
 		return s;
-	}
 
 	for(tok = s;;) {
 		c = *s++;
@@ -369,12 +367,11 @@ char *strrchr(const char *s, int c) {
 	const char *l = NULL;
 
 	for(;;) {
-		if(*s == c) {
+		if(*s == c)
 			l = s;
-		}
-		if(!*s) {
+		if(!*s)
 			return (char *)l;
-		}
+
 		s++;
 	}
 
@@ -387,12 +384,14 @@ char *strrchr(const char *s, int c) {
  * @return		Pointer to start of match if found, null if not. */
 char *strstr(const char *s, const char *what) {
 	size_t len = strlen(what);
+
 	while(*s) {
-		if(strncmp(s, what, len) == 0) {
+		if(strncmp(s, what, len) == 0)
 			return (char *)s;
-		}
+
 		s++;
 	}
+
 	return NULL;
 }
 
@@ -410,16 +409,14 @@ char *strstrip(char *str) {
 	size_t len;
 
 	/* Strip from beginning. */
-	while(isspace(*str)) {
+	while(isspace(*str))
 		str++;
-	}
 
 	/* Strip from end. */
 	len = strlen(str);
 	while(len--) {
-		if(!isspace(str[len])) {
+		if(!isspace(str[len]))
 			break;
-		}
 	}
 	str[++len] = 0;
 	return str;
@@ -460,10 +457,10 @@ char *strncpy(char *restrict dest, const char *restrict src, size_t count) {
 
 	for(i = 0; i < count; i++) {
 		dest[i] = src[i];
-		if(!src[i]) {
+		if(!src[i])
 			break;
-		}
 	}
+
 	return dest;
 }
 
@@ -496,14 +493,12 @@ char *strcat(char *restrict dest, const char *restrict src) {
 void *kmemdup(const void *src, size_t count, int mmflag) {
 	char *dest;
 
-	if(count == 0) {
+	if(count == 0)
 		return NULL;
-	}
 
 	dest = kmalloc(count, mmflag);
-	if(dest) {
+	if(dest)
 		memcpy(dest, src, count);
-	}
 
 	return dest;
 }
@@ -524,9 +519,8 @@ char *kstrdup(const char *src, int mmflag) {
 	char *dup;
 
 	dup = kmalloc(len, mmflag);
-	if(dup) {
+	if(dup)
 		memcpy(dup, src, len);
-	}
 
 	return dup;
 }
@@ -583,15 +577,13 @@ char *kbasename(const char *path, int mmflag) {
 		return kstrdup("..", mmflag);
 	}
 
-	if(!(dup = kstrdup(path, mmflag))) {
+	if(!(dup = kstrdup(path, mmflag)))
 		return NULL;
-	}
 
 	/* Strip off trailing '/' characters. */
 	len = strlen(dup);
-	while(len && dup[len - 1] == '/') {
+	while(len && dup[len - 1] == '/')
 		dup[--len] = 0;
-	}
 
 	/* If length is now 0, the entire string was '/' characters. */
 	if(!len) {
@@ -602,9 +594,9 @@ char *kbasename(const char *path, int mmflag) {
 	if(!(ptr = strrchr(dup, '/'))) {
 		/* No '/' character in the string, that means what we have is
 		 * correct. Resize the allocation to the new length. */
-		if(!(ret = krealloc(dup, len + 1, mmflag))) {
+		if(!(ret = krealloc(dup, len + 1, mmflag)))
 			kfree(dup);
-		}
+
 		return ret;
 	} else {
 		ret = kstrdup(ptr + 1, mmflag);
@@ -636,15 +628,13 @@ char *kdirname(const char *path, int mmflag) {
 	}
 
 	/* Duplicate string to modify it. */
-	if(!(dup = kstrdup(path, mmflag))) {
+	if(!(dup = kstrdup(path, mmflag)))
 		return NULL;
-	}
 
 	/* Strip off trailing '/' characters. */
 	len = strlen(dup);
-	while(len && dup[len - 1] == '/') {
+	while(len && dup[len - 1] == '/')
 		dup[--len] = 0;
-	}
 
 	/* Look for last '/' character. */
 	if(!(ptr = strrchr(dup, '/'))) {
@@ -654,9 +644,8 @@ char *kdirname(const char *path, int mmflag) {
 
 	/* Strip off the character and any extras. */
 	len = (ptr - dup) + 1;
-	while(len && dup[len - 1] == '/') {
+	while(len && dup[len - 1] == '/')
 		dup[--len] = 0;
-	}
 
 	if(!len) {
 		kfree(dup);
@@ -664,6 +653,7 @@ char *kdirname(const char *path, int mmflag) {
 	} else if(!(ret = krealloc(dup, len + 1, mmflag))) {
 		kfree(dup);
 	}
+
 	return ret;
 }
 

@@ -67,14 +67,12 @@ static SPINLOCK_DECLARE(memory_types_lock);
 void *phys_map(phys_ptr_t addr, size_t size, int mmflag) {
 	phys_ptr_t base, end;
 
-	if(unlikely(!size)) {
+	if(unlikely(!size))
 		return NULL;
-	}
 
 	/* Use the physical map area if the range lies within it. */
-	if(PMAP_CONTAINS(addr, size)) {
+	if(PMAP_CONTAINS(addr, size))
 		return (void *)(KERNEL_PMAP_BASE + (addr - KERNEL_PMAP_OFFSET));
-	}
 
 	/* Outside the physical map area. Must instead allocate some kernel
 	 * memory space and map there. */
@@ -145,9 +143,8 @@ unsigned phys_memory_type(phys_ptr_t addr) {
 	 * spinlock acquisition for every memory mapping operation. Instead
 	 * we just take the current count and iterate up to that. */
 	for(count = memory_types_count, i = 0; i < count; i++) {
-		if(addr >= memory_types[i].start && addr < (memory_types[i].end)) {
+		if(addr >= memory_types[i].start && addr < (memory_types[i].end))
 			return memory_types[i].type;
-		}
 	}
 
 	return MEMORY_TYPE_NORMAL;
@@ -165,9 +162,8 @@ void phys_set_memory_type(phys_ptr_t addr, phys_size_t size, unsigned type) {
 
 	spinlock_lock(&memory_types_lock);
 
-	if(memory_types_count >= MEMORY_TYPE_RANGE_MAX) {
+	if(memory_types_count >= MEMORY_TYPE_RANGE_MAX)
 		fatal("Too many phys_set_memory_type() calls");
-	}
 
 	memory_types[memory_types_count].start = addr;
 	memory_types[memory_types_count].end = addr + size;

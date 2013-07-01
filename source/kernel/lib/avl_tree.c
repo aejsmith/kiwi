@@ -44,9 +44,8 @@
 static inline int avl_tree_subtree_height(avl_tree_node_t *node) {
 	int left, right;
 
-	if(!node) {
+	if(!node)
 		return 0;
-	}
 
 	/* Get the heights of the children and add 1 to account for the node
 	 * itself. */
@@ -109,9 +108,8 @@ static inline void avl_tree_rotate_right(avl_tree_t *tree, avl_tree_node_t *node
 	/* Node takes ownership of the child's right child as its left child
 	 * (replacing the existing left child). */
 	node->left = child->right;
-	if(node->left) {
+	if(node->left)
 		node->left->parent = node;
-	}
 
 	/* Reparent the child to node's parent. */
 	child->parent = node->parent;
@@ -212,9 +210,8 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *v
 		curr = *next;
 
 		/* Ensure that the key is unique. */
-		if(unlikely(key == curr->key)) {
+		if(unlikely(key == curr->key))
 			fatal("Attempted to insert duplicate key into AVL tree");
-		}
 
 		/* Get the next pointer. */
 		next = (key > curr->key) ? &curr->right : &curr->left;
@@ -227,9 +224,9 @@ void avl_tree_insert(avl_tree_t *tree, avl_tree_node_t *node, key_t key, void *v
 	/* Now go back up the tree and check its balance. */
 	while(curr) {
 		balance = avl_tree_balance_factor(curr);
-		if(balance < -1 || balance > 1) {
+		if(balance < -1 || balance > 1)
 			avl_tree_balance_node(tree, curr, balance);
-		}
+
 		curr = curr->parent;
 	}
 }
@@ -247,9 +244,8 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 		 * right-most node, which will replace the node that we're
 		 * removing. */
 		child = node->left;
-		while(child->right) {
+		while(child->right)
 			child = child->right;
-		}
 
 		if(child != node->left) {
 			if(child->left) {
@@ -274,12 +270,10 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 		/* Replace the node and fix up pointers. */
 		child->right = node->right;
 		child->parent = node->parent;
-		if(child->right) {
+		if(child->right)
 			child->right->parent = child;
-		}
-		if(child->left) {
+		if(child->left)
 			child->left->parent = child;
-		}
 		if(node->parent) {
 			if(node->parent->left == node) {
 				node->parent->left = child;
@@ -326,9 +320,9 @@ void avl_tree_remove(avl_tree_t *tree, avl_tree_node_t *node) {
 	/* Start now points to where we want to start rebalancing from. */
 	while(start) {
 		balance = avl_tree_balance_factor(start);
-		if(balance < -1 || balance > 1) {
+		if(balance < -1 || balance > 1)
 			avl_tree_balance_node(tree, start, balance);
-		}
+
 		start = start->parent;
 	}
 }
@@ -387,9 +381,8 @@ avl_tree_node_t *avl_tree_first(avl_tree_t *tree) {
 	if(node) {
 		/* Descend down the left-hand side of the tree to find the
 		 * smallest node. */
-		while(node->left) {
+		while(node->left)
 			node = node->left;
-		}
 
 		return node;
 	} else {
@@ -413,9 +406,8 @@ avl_tree_node_t *avl_tree_last(avl_tree_t *tree) {
 	if(node) {
 		/* Descend down the right-hand side of the tree to find the
 		 * largest node. */
-		while(node->right) {
+		while(node->right)
 			node = node->right;
-		}
 
 		return node;
 	} else {
@@ -427,25 +419,22 @@ avl_tree_node_t *avl_tree_last(avl_tree_t *tree) {
  * @param node		Node to get preceding node of.
  * @return		Preceding node or NULL if none found. */
 avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
-	if(!node) {
+	if(!node)
 		return NULL;
-	}
 
 	/* If there's a left-hand child, move onto it and then go as far
 	 * right as we can. */
 	if(node->left) {
 		node = node->left;
-		while(node->right) {
+		while(node->right)
 			node = node->right;
-		}
 
 		return node;
 	} else {
 		/* There's no left-hand children, go up until we find an
 		 * ancestor that is the right-hand child of its parent. */
-		while(node->parent && node == node->parent->left) {
+		while(node->parent && node == node->parent->left)
 			node = node->parent;
-		}
 
 		/* The parent will now point to the preceding node (or NULL,
 		 * if we reach the top of the tree). */
@@ -457,25 +446,22 @@ avl_tree_node_t *avl_tree_node_prev(avl_tree_node_t *node) {
  * @param node		Node to get following node of.
  * @return		Following node or NULL if none found. */
 avl_tree_node_t *avl_tree_node_next(avl_tree_node_t *node) {
-	if(!node) {
+	if(!node)
 		return NULL;
-	}
 
 	/* If there's a right-hand child, move onto it and then go as far
 	 * left as we can. */
 	if(node->right) {
 		node = node->right;
-		while(node->left) {
+		while(node->left)
 			node = node->left;
-		}
 
 		return node;
 	} else {
 		/* There's no right-hand children, go up until we find an
 		 * ancestor that is the left-hand child of its parent. */
-		while(node->parent && node == node->parent->right) {
+		while(node->parent && node == node->parent->right)
 			node = node->parent;
-		}
 
 		/* The parent will now point to the following node (or NULL,
 		 * if we reach the top of the tree). */

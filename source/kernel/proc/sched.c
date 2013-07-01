@@ -97,9 +97,6 @@
 /** Maximum penalty to CPU-bound threads. */
 #define MAX_PENALTY		5
 
-/** Set to 1 to enable a debug message for every thread switch. */
-#define SCHED_OVERKILL_DEBUG	0
-
 /** Run queue structure. */
 typedef struct sched_queue {
 	unsigned long bitmap;		/**< Bitmap of queues with data. */
@@ -143,9 +140,8 @@ static inline void sched_queue_insert(sched_queue_t *queue, thread_t *thread) {
  * @param thread	Thread to remove. */
 static inline void sched_queue_remove(sched_queue_t *queue, thread_t *thread) {
 	list_remove(&thread->runq_link);
-	if(list_empty(&queue->threads[thread->curr_prio])) {
+	if(list_empty(&queue->threads[thread->curr_prio]))
 		queue->bitmap &= ~(1 << thread->curr_prio);
-	}
 }
 
 /** Calculate the initial priority of a thread.
@@ -160,7 +156,7 @@ static inline void sched_calculate_priority(thread_t *thread) {
 	priority += (thread->priority - 1) * 2;
 
 	dprintf("sched: setting priority for thread %" PRId32 " to %d (proc: %d, thread: %d)\n",
-	        thread->id, priority, thread->owner->priority, thread->priority);
+		thread->id, priority, thread->owner->priority, thread->priority);
 	thread->max_prio = thread->curr_prio = priority;
 }
 
@@ -249,32 +245,29 @@ void sched_reschedule(bool state) {
 
 	/* Tweak the priority of the thread based on whether it used up its
 	 * timeslice. */
-	if(curr_thread != cpu->idle_thread) {
+	if(curr_thread != cpu->idle_thread)
 		sched_tweak_priority(cpu, curr_thread);
-	}
 
 	if(curr_thread->state == THREAD_RUNNING) {
 		/* The thread hasn't gone to sleep, re-queue it. */
 		curr_thread->state = THREAD_READY;
-		if(curr_thread != cpu->idle_thread) {
+		if(curr_thread != cpu->idle_thread)
 			sched_queue_insert(cpu->expired, curr_thread);
-		}
 	} else {
 		/* Thread is no longer running, decrease counts. */
 		assert(curr_thread != cpu->idle_thread);
 		cpu->total--;
-#if CONFIG_SMP
+		#if CONFIG_SMP
 		atomic_dec(&threads_running);
-#endif
+		#endif
 	}
 
 	/* Find a new thread to run. A NULL return value means no threads are
 	 * ready, so we schedule the idle thread in this case. */
 	next = sched_pick_thread(cpu);
 	if(next) {
-		if(next != curr_thread) {
+		if(next != curr_thread)
 			spinlock_lock_noirq(&next->lock);
-		}
 
 		next->timeslice = THREAD_TIMESLICE;
 		curr_cpu->idle = false;
@@ -282,7 +275,8 @@ void sched_reschedule(bool state) {
 		next = cpu->idle_thread;
 		if(next != curr_thread) {
 			spinlock_lock_noirq(&next->lock);
-			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n", curr_cpu->id);
+			dprintf("sched: cpu %" PRIu32 " has no runnable threads remaining, idling\n",
+				curr_cpu->id);
 		}
 
 		/* The idle thread runs indefinitely until an interrupt causes
@@ -302,16 +296,11 @@ void sched_reschedule(bool state) {
 	spinlock_unlock_noirq(&cpu->lock);
 
 	/* Set off the timer if necessary. */
-	if(curr_thread->timeslice > 0) {
+	if(curr_thread->timeslice > 0)
 		timer_start(&cpu->timer, curr_thread->timeslice, TIMER_ONESHOT);
-	}
 
 	/* Only need to continue if the new thread is different. */
 	if(curr_thread != cpu->prev_thread) {
-#if SCHED_OVERKILL_DEBUG
-		kprintf(LOG_DEBUG, "sched: switching to thread %" PRId32 "(%s) (process: %" PRId32 ", cpu: %" PRIu32 ")\n",
-			curr_thread->id, curr_thread->name, curr_proc->id, curr_cpu->id);
-#endif
 		/* Switch the address space. This function handles the case
 		 * where the new process' aspace pointer is NULL. */
 		vm_aspace_switch(curr_proc->aspace);
@@ -365,9 +354,8 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 	cpu_t *cpu, *other;
 
 	/* On uniprocessor systems, we only have one choice. */
-	if(cpu_count == 1) {
+	if(cpu_count == 1)
 		return curr_cpu;
-	}
 
 	/* Add 1 to the total number of threads to account for the thread we're
 	 * adding. */
@@ -385,9 +373,8 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 
 	/* If the CPU has less than or equal to the average, we're OK to keep
 	 * the thread on it. */
-	if(load <= average) {
+	if(load <= average)
 		return cpu;
-	}
 
 	/* We need to pick another CPU. Try to find one with a load less than
 	 * the average. If there isn't one, we just keep the thread on its
@@ -398,7 +385,7 @@ static inline cpu_t *sched_allocate_cpu(thread_t *thread) {
 		load = other->sched->total;
 		if(load < average) {
 			dprintf("sched: CPU %" PRIu32 " load %zu less than average %zu, giving it thread %" PRId32 "\n",
-			        other->id, load, average, thread->id);
+				other->id, load, average, thread->id);
 			cpu = other;
 			break;
 		}
@@ -422,34 +409,34 @@ void sched_insert_thread(thread_t *thread) {
 		sched_calculate_priority(thread);
 	}
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	if(!thread->wired) {
 		/* Pick a new CPU for the thread to run on. */
 		thread->cpu = sched_allocate_cpu(thread);
 	}
-#else
+	#else
 	thread->cpu = curr_cpu;
-#endif
+	#endif
+
 	sched = thread->cpu->sched;
 	spinlock_lock(&sched->lock);
 
 	sched_queue_insert(sched->active, thread);
 	sched->total++;
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	atomic_inc(&threads_running);
-#endif
+	#endif
 
 	/* If the thread has a higher priority than the currently running
 	 * thread on the CPU, or if the CPU is idle, preempt it. */
 	if(thread->cpu->idle || thread->curr_prio > thread->cpu->thread->curr_prio) {
-		if(!thread->cpu->idle) {
+		if(!thread->cpu->idle)
 			thread->cpu->should_preempt = true;
-		}
-#if CONFIG_SMP
-		if(thread->cpu != curr_cpu) {
+
+		#if CONFIG_SMP
+		if(thread->cpu != curr_cpu)
 			smp_call_single(thread->cpu->id, NULL, NULL, SMP_CALL_ASYNC);
-		}
-#endif
+		#endif
 	}
 
 	spinlock_unlock(&sched->lock);
@@ -497,9 +484,8 @@ __init_text void sched_init(void) {
 
 	/* Create the thread reaper. */
 	ret = thread_create("reaper", NULL, 0, sched_reaper_thread, NULL, NULL, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not create thread reaper (%d)", ret);
-	}
 }
 
 /** Initialize the scheduler for the current CPU. */
@@ -518,10 +504,9 @@ __init_text void sched_init_percpu(void) {
 	/* Create the idle thread. */
 	sprintf(name, "idle-%" PRIu32, curr_cpu->id);
 	ret = thread_create(name, NULL, 0, sched_idle_thread, NULL, NULL, NULL,
-	                    &curr_cpu->sched->idle_thread);
-	if(ret != STATUS_SUCCESS) {
+		&curr_cpu->sched->idle_thread);
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not create idle thread for %" PRIu32 " (%d)", curr_cpu->id, ret);
-	}
 	thread_wire(curr_cpu->sched->idle_thread);
 
 	/* Set the idle thread as the current thread. */
@@ -538,9 +523,8 @@ __init_text void sched_init_percpu(void) {
 	/* Initialize queues. */
 	for(i = 0; i < 2; i++) {
 		curr_cpu->sched->queues[i].bitmap = 0;
-		for(j = 0; j < PRIORITY_COUNT; j++) {
+		for(j = 0; j < PRIORITY_COUNT; j++)
 			list_init(&curr_cpu->sched->queues[i].threads[j]);
-		}
 	}
 }
 

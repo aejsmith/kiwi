@@ -68,9 +68,8 @@ static smp_call_t *smp_call_get(void) {
 		 * call may be made to this CPU. We must therefore handle
 		 * incoming calls in this loop to ensure that call structures
 		 * queued to us get freed up. */
-		while(!smp_call_pool) {
+		while(!smp_call_pool)
 			smp_ipi_handler();
-		}
 
 		spinlock_lock(&smp_call_lock);
 
@@ -239,9 +238,8 @@ status_t smp_call_single(cpu_id_t dest, smp_call_func_t func, void *arg, unsigne
 		ret = STATUS_SUCCESS;
 	} else {
 		/* Synchronous, wait for the message to be acknowledged. */
-		while(atomic_get(&acked) != 0) {
+		while(atomic_get(&acked) != 0)
 			smp_ipi_handler();
-		}
 
 		ret = call->status;
 	}
@@ -285,9 +283,8 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
 	/* Loop through all running CPUs, excluding ourselves. */
 	LIST_FOREACH(&running_cpus, iter) {
 		cpu = list_entry(iter, cpu_t, header);
-		if(cpu == curr_cpu) {
+		if(cpu == curr_cpu)
 			continue;
-		}
 
 		call = smp_call_get();
 		call->func = func;
@@ -311,9 +308,8 @@ void smp_call_broadcast(smp_call_func_t func, void *arg, unsigned flags) {
 	/* If calling synchronously, wait for all the sent messages to be
 	 * acknowledged. */
 	if(!(flags & SMP_CALL_ASYNC)) {
-		while(atomic_get(&acked) != 0) {
+		while(atomic_get(&acked) != 0)
 			smp_ipi_handler();
-		}
 	}
 
 	local_irq_restore(state);
@@ -351,17 +347,15 @@ __init_text void smp_init(void) {
 	size_t i, count;
 
 	/* If SMP is forced to be disabled, do not need to do anything. */
-	if(kboot_boolean_option("smp_disabled")) {
+	if(kboot_boolean_option("smp_disabled"))
 		return;
-	}
 
 	/* First we want to detect secondary CPUs. */
 	platform_smp_detect();
 
 	/* If we only have 1 CPU, there is no need to set up the call system. */
-	if(cpu_count == 1) {
+	if(cpu_count == 1)
 		return;
-	}
 
 	/* Allocate message structures based on the total CPU count. */
 	count = cpu_count * SMP_CALLS_PER_CPU;

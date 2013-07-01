@@ -153,9 +153,8 @@ static void process_destroy(process_t *process) {
 /** Decrease the reference count of a process and destroy it if necessary.
  * @param process	Process to decrease count of. */
 static void process_release(process_t *process) {
-	if(refcount_dec(&process->count) == 0) {
+	if(refcount_dec(&process->count) == 0)
 		process_destroy(process);
-	}
 }
 
 /** Validate process object security changes.
@@ -171,9 +170,8 @@ static status_t process_object_set_security(object_t *object, object_security_t 
 	 * and should not be granted to anyone else. */
 	if(security->acl) {
 		for(i = 0; i < security->acl->count; i++) {
-			if(security->acl->entries[i].rights & PROCESS_RIGHT_SECURITY) {
+			if(security->acl->entries[i].rights & PROCESS_RIGHT_SECURITY)
 				return STATUS_PERM_DENIED;
-			}
 		}
 	}
 
@@ -197,11 +195,13 @@ static status_t process_object_wait(object_handle_t *handle, int event, void *sy
 	switch(event) {
 	case PROCESS_EVENT_DEATH:
 		mutex_lock(&process->lock);
+
 		if(process->state == PROCESS_DEAD) {
 			object_wait_signal(sync);
 		} else {
 			notifier_register(&process->death_notifier, object_wait_notifier, sync);
 		}
+
 		mutex_unlock(&process->lock);
 		return STATUS_SUCCESS;
 	default:
@@ -269,11 +269,12 @@ static object_type_t process_object_type = {
  *			that on failure the supplied address space will NOT be
  *			destroyed.
  */
-static status_t process_alloc(const char *name, int flags, int priority, vm_aspace_t *aspace,
-                              handle_table_t *table, process_t *parent, int cflags,
-                              const security_context_t *sectx, handle_t map[][2],
-                              int count, object_security_t *security, process_t **procp,
-                              object_rights_t rights, handle_t *handlep, handle_t *uhandlep) {
+static status_t process_alloc(const char *name, int flags, int priority,
+	vm_aspace_t *aspace, handle_table_t *table, process_t *parent, int cflags,
+	const security_context_t *sectx, handle_t map[][2], int count,
+	object_security_t *security, process_t **procp, object_rights_t rights,
+	handle_t *handlep, handle_t *uhandlep)
+{
 	object_security_t dsecurity = { security->uid, security->gid, security->acl };
 	object_acl_t acl, sacl;
 	process_t *process;
@@ -284,32 +285,28 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	assert(procp);
 
 	ret = object_security_validate(security, NULL);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
+
 	ret = process_object_set_security(NULL, security);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* If creating a new session, check if the parent is allowed to do so. */
 	if(cflags & PROCESS_CREATE_SESSION && parent) {
-		if(!cap_check(parent, CAP_CREATE_SESSION)) {
+		if(!cap_check(parent, CAP_CREATE_SESSION))
 			return STATUS_PERM_DENIED;
-		}
 	}
 
 	/* Create a session for the process or inherit the parent's. */
 	if(!parent || cflags & PROCESS_CREATE_SESSION) {
 		/* Check if the parent is allowed to create sessions. */
-		if(parent && !cap_check(parent, CAP_CREATE_SESSION)) {
+		if(parent && !cap_check(parent, CAP_CREATE_SESSION))
 			return STATUS_PERM_DENIED;
-		}
 
 		session = session_create();
-		if(!session) {
+		if(!session)
 			return STATUS_PROCESS_LIMIT;
-		}
 	} else {
 		session_get(parent->session);
 		session = parent->session;
@@ -359,9 +356,9 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	if(!table) {
 		ret = handle_table_create((parent) ? parent->handles : NULL, map, count, &table);
 		if(ret != STATUS_SUCCESS) {
-			if(kernel_proc) {
+			if(kernel_proc)
 				id_allocator_free(&process_id_allocator, process->id);
-			}
+
 			slab_cache_free(process_cache, process);
 			return ret;
 		}
@@ -379,7 +376,7 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	 * security context to processes with CAP_SECURITY_AUTHORITY. */
 	object_acl_init(&sacl);
 	object_acl_add_entry(&sacl, ACL_ENTRY_CAPABILITY, CAP_SECURITY_AUTHORITY,
-	                     PROCESS_RIGHT_SECURITY);
+		PROCESS_RIGHT_SECURITY);
 
 	/* Initialize the remainder of the structure. */
 	object_init(&process->obj, &process_object_type, &dsecurity, &sacl);
@@ -415,7 +412,8 @@ static status_t process_alloc(const char *name, int flags, int priority, vm_aspa
 	/* Create a handle to the process if required. */
 	if(uhandlep) {
 		assert(parent);
-		ret = object_handle_create(&process->obj, NULL, rights, parent, 0, NULL, handlep, uhandlep);
+		ret = object_handle_create(&process->obj, NULL, rights, parent,
+			0, NULL, handlep, uhandlep);
 		if(ret != STATUS_SUCCESS) {
 			process->aspace = NULL;
 			process_release(process);
@@ -446,14 +444,13 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * for the arguments/stack don't end up placed where the binary wants
 	 * to be. */
 	ret = file_open(info->path, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE, 0, 0, NULL, &handle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
+
 	ret = elf_binary_reserve(handle, info->aspace);
 	object_handle_release(handle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* If the kernel library has not been opened, open it now. We keep a
 	 * handle to it open all the time so that if it gets replaced by a new
@@ -462,38 +459,38 @@ static status_t process_aspace_create(process_create_t *info) {
 	 * with the previous kernel. */
 	if(!kernel_library) {
 		ret = file_open(LIBKERNEL_PATH, FILE_RIGHT_READ | FILE_RIGHT_EXECUTE,
-		                0, 0, NULL, &kernel_library);
-		if(ret != STATUS_SUCCESS) {
+			0, 0, NULL, &kernel_library);
+		if(ret != STATUS_SUCCESS)
 			fatal("Could not open kernel library (%d)", ret);
-		}
 	}
 
 	/* Map the kernel library. */
 	ret = elf_binary_load(kernel_library, info->aspace, LIBKERNEL_BASE, &info->data);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Determine the size of the argument block. */
 	size = sizeof(process_args_t) + (sizeof(char *) * 2) + strlen(info->path);
-	for(info->argc = 0; info->args[info->argc]; size += (strlen(info->args[info->argc++]) + sizeof(char *)));
-	for(info->envc = 0; info->env[info->envc]; size += (strlen(info->env[info->envc++]) + sizeof(char *)));
+	for(info->argc = 0;
+		info->args[info->argc];
+		size += (strlen(info->args[info->argc++]) + sizeof(char *)));
+	for(info->envc = 0;
+		info->env[info->envc];
+		size += (strlen(info->env[info->envc++]) + sizeof(char *)));
 	size = ROUND_UP(size, PAGE_SIZE);
 
 	/* Create a mapping for it. */
 	ret = vm_map(info->aspace, 0, size, VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE,
-	             NULL, 0, &info->arg_block);
-	if(ret != STATUS_SUCCESS) {
+		NULL, 0, &info->arg_block);
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Create a stack mapping. */
 	ret = vm_map(info->aspace, 0, USTACK_SIZE,
-	             VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
-	             NULL, 0, &info->stack);
-	if(ret != STATUS_SUCCESS) {
+		VM_MAP_READ | VM_MAP_WRITE | VM_MAP_PRIVATE | VM_MAP_STACK,
+		NULL, 0, &info->stack);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	return STATUS_SUCCESS;
 fail:
@@ -508,7 +505,9 @@ fail:
  * @param count		Number of array entries.
  * @param base		Base address to copy to.
  * @return		Total size copied. */
-static size_t copy_argument_strings(char **dest, const char *const source[], size_t count, ptr_t base) {
+static size_t copy_argument_strings(char **dest, const char *const source[],
+	size_t count, ptr_t base)
+{
 	size_t i, len, total = 0;
 
 	for(i = 0; i < count; i++) {
@@ -560,13 +559,12 @@ static void process_entry_thread(void *arg1, void *arg2) {
 
 	/* If there the information structure pointer is NULL, process_replace()
 	 * is being used and we don't need to wait for the loader to complete. */
-	if(!curr_proc->create) {
+	if(!curr_proc->create)
 		semaphore_up(&info->sem, 1);
-	}
 
 	/* To userspace, and beyond! */
 	dprintf("process: entering userspace in new process (entry: %p, stack: %p, args: %p)\n",
-	        entry, stack, addr);
+		entry, stack, addr);
 	arch_thread_enter_userspace(entry, stack, addr);
 	fatal("Failed to enter userspace!");
 }
@@ -613,9 +611,8 @@ void process_detach(thread_t *thread) {
 		mutex_unlock(&process->lock);
 
 		/* Don't bother running callbacks during shutdown. */
-		if(!shutdown_in_progress) {
+		if(!shutdown_in_progress)
 			notifier_run(&process->death_notifier, NULL, true);
-		}
 	} else {
 		mutex_unlock(&process->lock);
 	}
@@ -662,16 +659,16 @@ process_t *process_lookup(process_id_t id) {
  * @return		Status code describing result of the operation.
  */
 status_t process_create(const char *const args[], const char *const env[], int flags,
-                        int priority, process_t *parent, process_t **procp) {
+	int priority, process_t *parent, process_t **procp)
+{
 	object_security_t security = { -1, -1, NULL };
 	process_create_t info;
 	process_t *process;
 	thread_t *thread;
 	status_t ret;
 
-	if(!args || !args[0] || !env || priority < 0 || priority > PRIORITY_CLASS_MAX) {
+	if(!args || !args[0] || !env || priority < 0 || priority > PRIORITY_CLASS_MAX)
 		return STATUS_INVALID_ARG;
-	}
 
 	info.path = args[0];
 	info.args = args;
@@ -684,8 +681,8 @@ status_t process_create(const char *const args[], const char *const env[], int f
 	}
 
 	/* Create the new process. */
-	ret = process_alloc(args[0], flags, priority, info.aspace, NULL, parent, 0, NULL,
-	                    NULL, 0, &security, &process, 0, NULL, NULL);
+	ret = process_alloc(args[0], flags, priority, info.aspace, NULL, parent,
+		0, NULL, NULL, 0, &security, &process, 0, NULL, NULL);
 	if(ret != STATUS_SUCCESS) {
 		vm_aspace_destroy(info.aspace);
 		return ret;
@@ -703,9 +700,9 @@ status_t process_create(const char *const args[], const char *const env[], int f
 
 	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
-	if(procp) {
+	if(procp)
 		*procp = process;
-	}
+
 	return info.status;
 }
 
@@ -727,9 +724,8 @@ void process_exit(int status, int reason) {
 	LIST_FOREACH_SAFE(&curr_proc->threads, iter) {
 		thread = list_entry(iter, thread_t, owner_link);
 
-		if(thread != curr_thread) {
+		if(thread != curr_thread)
 			thread_kill(thread);
-		}
 	}
 
 	curr_proc->status = status;
@@ -760,17 +756,19 @@ static kdb_status_t kdb_cmd_process(int argc, char **argv, kdb_filter_t *filter)
 		process = avl_tree_entry(iter, process_t);
 
 		kdb_printf("%-5" PRId32 "%s ", process->id,
-		           (process == curr_proc) ? "*" : " ");
+			(process == curr_proc) ? "*" : " ");
+
 		switch(process->state) {
 		case PROCESS_RUNNING:	kdb_printf("Running "); break;
 		case PROCESS_DEAD:	kdb_printf("Dead    "); break;
 		default:		kdb_printf("Bad     "); break;
 		}
+
 		kdb_printf("%-4d %-5d %-7d %-4d %-5d %-5d %-18p %s\n",
-		           process->security.uid, process->security.groups[0],
-		           process->session->id, process->priority, process->flags,
-		           refcount_get(&process->count), process->aspace,
-		           process->name);
+			process->security.uid, process->security.groups[0],
+			process->session->id, process->priority, process->flags,
+			refcount_get(&process->count), process->aspace,
+			process->name);
 	}
 
 	return KDB_SUCCESS;;
@@ -789,7 +787,7 @@ __init_text void process_init(void) {
 
 	/* Create the process slab cache. */
 	process_cache = slab_cache_create("process_cache", SLAB_SIZE_ALIGN(process_t),
-	                                  process_ctor, NULL, NULL, 0, MM_BOOT);
+		process_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("process", "Print a list of running processes.", kdb_cmd_process);
@@ -800,11 +798,10 @@ __init_text void process_init(void) {
 
 	/* Create the kernel process. */
 	ret = process_alloc("[kernel]", PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM,
-	                    NULL, NULL, NULL, 0, NULL, NULL, 0, &security,
-	                    &kernel_proc, 0, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
+		NULL, NULL, NULL, 0, NULL, NULL, 0, &security, &kernel_proc, 0,
+		NULL, NULL);
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not initialize kernel process (%d)", ret);
-	}
 }
 
 /** Terminate all running processes. */
@@ -815,6 +812,7 @@ void process_shutdown(void) {
 	int count;
 
 	rwlock_read_lock(&process_tree_lock);
+
 	AVL_TREE_FOREACH_SAFE(&process_tree, iter) {
 		process = avl_tree_entry(iter, process_t);
 		if(process != kernel_proc) {
@@ -824,6 +822,7 @@ void process_shutdown(void) {
 			}
 		}
 	}
+
 	rwlock_unlock(&process_tree_lock);
 
 	/* Wait until everything has terminated. */
@@ -839,7 +838,7 @@ void process_shutdown(void) {
 				count++;
 				if(!(interval % 2000000) && process->state == PROCESS_RUNNING) {
 					kprintf(LOG_NOTICE, "system: still waiting for %u(%s)...\n",
-					        process->id, process->name);
+						process->id, process->name);
 				}
 			}
 		}
@@ -856,24 +855,25 @@ void process_shutdown(void) {
 static void process_create_args_free(process_create_t *info) {
 	int i;
 
-	if(info->path) {
+	if(info->path)
 		kfree((void *)info->path);
-	}
+
 	if(info->args) {
-		for(i = 0; info->args[i]; i++) {
+		for(i = 0; info->args[i]; i++)
 			kfree((void *)info->args[i]);
-		}
+
 		kfree((void *)info->args);
 	}
+
 	if(info->env) {
-		for(i = 0; info->env[i]; i++) {
+		for(i = 0; info->env[i]; i++)
 			kfree((void *)info->env[i]);
-		}
+
 		kfree((void *)info->env);
 	}
-	if(info->map) {
+
+	if(info->map)
 		kfree(info->map);
-	}
 }
 
 /** Helper to copy process creation information from userspace.
@@ -885,14 +885,14 @@ static void process_create_args_free(process_create_t *info) {
  * @param info		Pointer to information structure to fill in.
  * @return		Status code describing result of the operation. */
 static status_t process_create_args_copy(const char *path, const char *const args[],
-                                         const char *const env[], handle_t map[][2],
-                                         int count, process_create_t *info) {
+	const char *const env[], handle_t map[][2],
+	int count, process_create_t *info)
+{
 	status_t ret;
 	size_t size;
 
-	if(!path || !args || !env || (count > 0 && !map)) {
+	if(!path || !args || !env || (count > 0 && !map))
 		return STATUS_INVALID_ARG;
-	}
 
 	info->path = NULL;
 	info->args = NULL;
@@ -901,20 +901,21 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 	info->aspace = NULL;
 
 	ret = strndup_from_user(path, FS_PATH_MAX, (char **)&info->path);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	ret = arrcpy_from_user(args, (char ***)&info->args);
 	if(ret != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
 	}
+
 	ret = arrcpy_from_user(env, (char ***)&info->env);
 	if(ret != STATUS_SUCCESS) {
 		process_create_args_free(info);
 		return ret;
 	}
+
 	if(count > 0) {
 		size = sizeof(handle_t) * 2 * count;
 		info->map = kmalloc(size, 0);
@@ -922,12 +923,14 @@ static status_t process_create_args_copy(const char *path, const char *const arg
 			process_create_args_free(info);
 			return STATUS_NO_MEMORY;
 		}
+
 		ret = memcpy_from_user(info->map, map, size);
 		if(ret != STATUS_SUCCESS) {
 			process_create_args_free(info);
 			return ret;
 		}
 	}
+
 	return STATUS_SUCCESS;
 }
 
@@ -967,10 +970,11 @@ static status_t process_create_args_copy(const char *path, const char *const arg
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_create(const char *path, const char *const args[], const char *const env[],
-                             int flags, const security_context_t *sectx, handle_t map[][2],
-                             int count, const object_security_t *security, object_rights_t rights,
-                             handle_t *handlep) {
+status_t kern_process_create(const char *path, const char *const args[],
+	const char *const env[], int flags, const security_context_t *sectx,
+	handle_t map[][2], int count, const object_security_t *security,
+	object_rights_t rights, handle_t *handlep)
+{
 	object_security_t ksecurity = { -1, -1, NULL };
 	process_t *process = NULL;
 	process_create_t info;
@@ -979,39 +983,37 @@ status_t kern_process_create(const char *path, const char *const args[], const c
 	status_t ret;
 
 	ret = process_create_args_copy(path, args, env, map, count, &info);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* If no security attributes are provided a default ACL is constructed
 	 * by process_alloc(). */
 	if(security) {
 		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto fail;
-		}
 	}
 
 	/* Create the address space for the process. */
 	ret = process_aspace_create(&info);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(info.path, 0, PRIORITY_CLASS_NORMAL, info.aspace, NULL,
-	                    curr_proc, flags, NULL, info.map, count, &ksecurity,
-	                    &process, rights, &handle, handlep);
-	if(ret != STATUS_SUCCESS) {
+		curr_proc, flags, NULL, info.map, count, &ksecurity,
+		&process, rights, &handle, handlep);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
+
 	process->create = &info;
 
 	/* Create and run the entry thread. */
-	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL, NULL, &thread);
-	if(ret != STATUS_SUCCESS) {
+	ret = thread_create("main", process, 0, process_entry_thread, &info, NULL,
+		NULL, &thread);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
+
 	process->create = &info;
 	thread_run(thread);
 	thread_release(thread);
@@ -1019,9 +1021,9 @@ status_t kern_process_create(const char *path, const char *const args[], const c
 	/* Wait for the process to finish loading. */
 	semaphore_down(&info.sem);
 	ret = info.status;
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
+
 	object_security_destroy(&ksecurity);
 	process_create_args_free(&info);
 	return ret;
@@ -1035,6 +1037,7 @@ fail:
 	} else if(info.aspace) {
 		vm_aspace_destroy(info.aspace);
 	}
+
 	object_security_destroy(&ksecurity);
 	process_create_args_free(&info);
 	return ret;
@@ -1070,8 +1073,10 @@ fail:
  * @return		Does not return on success, returns status code on
  *			failure.
  */
-status_t kern_process_replace(const char *path, const char *const args[], const char *const env[],
-                              const security_context_t *sectx, handle_t map[][2], int count) {
+status_t kern_process_replace(const char *path, const char *const args[],
+	const char *const env[], const security_context_t *sectx,
+	handle_t map[][2], int count)
+{
 	handle_table_t *table, *oldtable;
 	thread_t *thread = NULL;
 	process_create_t info;
@@ -1085,27 +1090,24 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	}
 
 	ret = process_create_args_copy(path, args, env, map, count, &info);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Create the new address space for the process. */
 	ret = process_aspace_create(&info);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Create the entry thread to finish loading the program. */
-	ret = thread_create("main", curr_proc, 0, process_entry_thread, &info, NULL, NULL, &thread);
-	if(ret != STATUS_SUCCESS) {
+	ret = thread_create("main", curr_proc, 0, process_entry_thread, &info,
+		NULL, NULL, &thread);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Create a new handle table for the process. */
 	ret = handle_table_create(curr_proc->handles, info.map, count, &table);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	mutex_lock(&curr_proc->lock);
 
@@ -1142,12 +1144,11 @@ status_t kern_process_replace(const char *path, const char *const args[], const 
 	process_create_args_free(&info);
 	thread_exit();
 fail:
-	if(thread) {
+	if(thread)
 		thread_release(thread);
-	}
-	if(info.aspace) {
+	if(info.aspace)
 		vm_aspace_destroy(info.aspace);
-	}
+
 	process_create_args_free(&info);
 	return ret;
 }
@@ -1179,8 +1180,10 @@ fail:
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const object_security_t *security,
-                            object_rights_t rights, handle_t *handlep) {
+status_t kern_process_clone(void (*func)(void *), void *arg, void *sp,
+	const object_security_t *security, object_rights_t rights,
+	handle_t *handlep)
+{
 	object_security_t ksecurity = { -1, -1, NULL };
 	thread_uspace_args_t *args;
 	process_t *process = NULL;
@@ -1190,17 +1193,15 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 	handle_t handle;
 	status_t ret;
 
-	if(validate_user_address(sp, 0) != STATUS_SUCCESS) {
+	if(validate_user_address(sp, 0) != STATUS_SUCCESS)
 		return STATUS_INVALID_ADDR;
-	}
 
 	/* If no security attributes are provided a default ACL is constructed
 	 * by process_alloc(). */
 	if(security) {
 		ret = object_security_from_user(&ksecurity, security, false);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	/* Create a clone of the process' address space and handle table. */
@@ -1209,21 +1210,20 @@ status_t kern_process_clone(void (*func)(void *), void *arg, void *sp, const obj
 
 	/* Create the new process and a handle to it. */
 	ret = process_alloc(curr_proc->name, 0, PRIORITY_CLASS_NORMAL, as, table,
-	                    curr_proc, PROCESS_CREATE_CLONE, NULL, NULL, 0,
-	                    &ksecurity, &process, rights, &handle, handlep);
-	if(ret != STATUS_SUCCESS) {
+		curr_proc, PROCESS_CREATE_CLONE, NULL, NULL, 0, &ksecurity,
+		&process, rights, &handle, handlep);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Create the entry thread. */
 	args = kmalloc(sizeof(*args), MM_WAIT);
 	args->entry = (ptr_t)func;
 	args->arg = (ptr_t)arg;
 	args->sp = (ptr_t)sp;
-	ret = thread_create("main", process, 0, thread_uspace_trampoline, args, NULL, NULL, &thread);
-	if(ret != STATUS_SUCCESS) {
+	ret = thread_create("main", process, 0, thread_uspace_trampoline, args,
+		NULL, NULL, &thread);
+	if(ret != STATUS_SUCCESS)
 		goto fail;
-	}
 
 	/* Inherit certain per-thread attributes such as the alternate signal
 	 * stack and TLS address from the thread that called us. */
@@ -1246,6 +1246,7 @@ fail:
 		handle_table_destroy(table);
 		vm_aspace_destroy(as);
 	}
+
 	object_security_destroy(&ksecurity);
 	return ret;
 }
@@ -1259,9 +1260,8 @@ status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *ha
 	process_t *process;
 	status_t ret;
 
-	if(!handlep) {
+	if(!handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	rwlock_read_lock(&process_tree_lock);
 
@@ -1278,9 +1278,9 @@ status_t kern_process_open(process_id_t id, object_rights_t rights, handle_t *ha
 	rwlock_unlock(&process_tree_lock);
 
 	ret = object_handle_open(&process->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		process_release(process);
-	}
+
 	return ret;
 }
 
@@ -1316,7 +1316,7 @@ session_id_t kern_process_session(handle_t handle) {
 	if(handle < 0) {
 		id = curr_proc->session->id;
 	} else if(object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY,
-	                               &khandle) == STATUS_SUCCESS) {
+			&khandle) == STATUS_SUCCESS) {
 		process = (process_t *)khandle->object;
 		id = process->session->id;
 		object_handle_release(khandle);
@@ -1342,9 +1342,8 @@ status_t kern_process_control(handle_t handle, int action, const void *in, void 
 		process = curr_proc;
 	} else {
 		ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, 0, &khandle);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		process = (process_t *)khandle->object;
 	}
@@ -1428,9 +1427,9 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_PROCESS, PROCESS_RIGHT_QUERY, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
+
 	process = (process_t *)khandle->object;
 
 	if(process->state != PROCESS_DEAD) {
@@ -1438,12 +1437,12 @@ status_t kern_process_status(handle_t handle, int *statusp, int *reasonp) {
 		return STATUS_STILL_RUNNING;
 	}
 
-	if(statusp) {
+	if(statusp)
 		ret = memcpy_to_user(statusp, &process->status, sizeof(*statusp));
-	}
-	if(reasonp) {
+
+	if(reasonp)
 		ret = memcpy_to_user(reasonp, &process->reason, sizeof(*reasonp));
-	}
+
 	object_handle_release(khandle);
 	return ret;
 }

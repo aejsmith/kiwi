@@ -72,23 +72,20 @@ void *kmalloc(size_t size, int mmflag) {
 		 * else we want the next size up. Remember that the highbit
 		 * function returns (log2(n) + 1). */
 		idx = (IS_POW2(total)) ? highbit(total) - 1 : highbit(total);
-		if(idx < KMALLOC_CACHE_MIN) {
+		if(idx < KMALLOC_CACHE_MIN)
 			idx = KMALLOC_CACHE_MIN;
-		}
 		idx -= KMALLOC_CACHE_MIN;
 
 		addr = slab_cache_alloc(kmalloc_caches[idx], mmflag);
-		if(unlikely(!addr)) {
+		if(unlikely(!addr))
 			return NULL;
-		}
 
 		addr->cache = kmalloc_caches[idx];
 	} else {
 		/* Fall back on kmem. */
 		addr = kmem_alloc(ROUND_UP(total, PAGE_SIZE), mmflag & MM_FLAG_MASK);
-		if(unlikely(!addr)) {
+		if(unlikely(!addr))
 			return NULL;
-		}
 
 		addr->cache = NULL;
 	}
@@ -96,9 +93,8 @@ void *kmalloc(size_t size, int mmflag) {
 	addr->size = size;
 
 	/* Zero the allocation if requested. */
-	if(mmflag & MM_ZERO) {
+	if(mmflag & MM_ZERO)
 		memset(&addr[1], 0, size);
-	}
 
 	return &addr[1];
 }
@@ -130,28 +126,24 @@ void *krealloc(void *addr, size_t size, int mmflag) {
 	alloc_tag_t *tag;
 	void *ret;
 
-	if(!addr) {
+	if(!addr)
 		return kmalloc(size, mmflag);
-	}
 
 	tag = (alloc_tag_t *)((char *)addr - sizeof(alloc_tag_t));
-	if(tag->size == size) {
+	if(tag->size == size)
 		return addr;
-	}
 
 	/* Make a new allocation. */
 	ret = kmalloc(size, mmflag & ~MM_ZERO);
-	if(!ret) {
+	if(!ret)
 		return ret;
-	}
 
 	/* Copy the block data using the smallest of the two sizes. */
 	memcpy(ret, addr, MIN(tag->size, size));
 
 	/* Zero any new space if requested. */
-	if(mmflag & MM_ZERO && size > tag->size) {
+	if(mmflag & MM_ZERO && size > tag->size)
 		memset((char *)addr + tag->size, 0, size - tag->size);
-	}
 
 	/* Free the old allocation. */
 	kfree(addr);
@@ -195,6 +187,6 @@ __init_text void malloc_init(void) {
 		name[SLAB_NAME_MAX - 1] = 0;
 
 		kmalloc_caches[i] = slab_cache_create(name, size, 0, NULL, NULL,
-		                                      NULL, 0, MM_BOOT);
+			NULL, 0, MM_BOOT);
 	}
 }

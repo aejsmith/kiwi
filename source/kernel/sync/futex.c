@@ -111,9 +111,8 @@ static futex_t *futex_lookup(int32_t *addr) {
 	/* Check if the address is 4 byte aligned. This will ensure that the
 	 * address does not cross a page boundary because page sizes are
 	 * powers of 2. */
-	if((ptr_t)addr % sizeof(int32_t)) {
+	if((ptr_t)addr % sizeof(int32_t))
 		return NULL;
-	}
 
 	/* Get the page containing the address and the offset within it. */
 	base = ROUND_DOWN((ptr_t)addr, PAGE_SIZE);
@@ -126,9 +125,8 @@ static futex_t *futex_lookup(int32_t *addr) {
 
 		/* The page may not be mapped in. Try to trigger a fault, then
 		 * check again. */
-		if(memcpy_from_user(&tmp, addr, sizeof(tmp)) != STATUS_SUCCESS) {
+		if(memcpy_from_user(&tmp, addr, sizeof(tmp)) != STATUS_SUCCESS)
 			return NULL;
-		}
 
 		mmu_context_lock(curr_aspace->mmu);
 
@@ -193,9 +191,8 @@ status_t kern_futex_wait(int32_t *addr, int32_t val, useconds_t timeout) {
 
 	/* Find the futex. */
 	futex = futex_lookup(addr);
-	if(!futex) {
+	if(!futex)
 		return STATUS_INVALID_ADDR;
-	}
 
 	/* Map the futex into memory so that we can check its value.
 	 * Wire ourself to the current CPU to make a remote TLB invalidation
@@ -230,23 +227,20 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 	thread_t *thread;
 	futex_t *futex;
 
-	if(!count) {
+	if(!count)
 		return STATUS_INVALID_ARG;
-	}
 
 	/* Find the futex. */
 	futex = futex_lookup(addr);
-	if(!futex) {
+	if(!futex)
 		return STATUS_INVALID_ADDR;
-	}
 
 	spinlock_lock(&futex->lock);
 
 	/* Wake the threads. */
 	while(count--) {
-		if(list_empty(&futex->threads)) {
+		if(list_empty(&futex->threads))
 			break;
-		}
 
 		thread = list_first(&futex->threads, thread_t, wait_link);
 		thread_wake(thread);
@@ -263,7 +257,8 @@ status_t kern_futex_wake(int32_t *addr, size_t count, size_t *wokenp) {
 
 /** Initialize the futex cache. */
 static __init_text void futex_init(void) {
-	futex_cache = slab_cache_create("futex_cache", sizeof(futex_t), 0, futex_ctor,
-	                                NULL, NULL, 0, MM_BOOT);
+	futex_cache = slab_cache_create("futex_cache", sizeof(futex_t), 0,
+		futex_ctor, NULL, NULL, 0, MM_BOOT);
 }
+
 INITCALL(futex_init);

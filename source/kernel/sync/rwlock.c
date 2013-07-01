@@ -41,9 +41,8 @@ static void rwlock_transfer_ownership(rwlock_t *lock) {
 		 * is interrupted while blocking in order to allow readers
 		 * queued behind it in), then we do not want to do anything.
 		 * Otherwise, release the lock. */
-		if(!lock->readers) {
+		if(!lock->readers)
 			lock->held = 0;
-		}
 	} else {
 		/* Go through all threads queued. */
 		LIST_FOREACH_SAFE(&lock->threads, iter) {
@@ -147,13 +146,13 @@ status_t rwlock_write_lock_etc(rwlock_t *lock, useconds_t timeout, int flags) {
 		list_append(&lock->threads, &curr_thread->wait_link);
 		ret = thread_sleep(&lock->lock, timeout, lock->name, flags);
 		curr_thread->flags &= ~THREAD_RWLOCK_WRITER;
+
 		if(ret != STATUS_SUCCESS) {
 			/* Failed to acquire the lock. In this case, there may
 			 * be a reader queued behind us that can be let in. */
 			spinlock_lock(&lock->lock);
-			if(lock->readers) {
+			if(lock->readers)
 				rwlock_transfer_ownership(lock);
-			}
 			spinlock_unlock(&lock->lock);
 		}
 	} else {

@@ -58,11 +58,11 @@ static void cpu_ctor(cpu_t *cpu, cpu_id_t id, int state) {
 	cpu->id = id;
 	cpu->state = state;
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	/* Initialize SMP call information. */
 	list_init(&cpu->call_queue);
 	spinlock_init(&cpu->call_lock, "ipi_lock");
-#endif
+	#endif
 
 	/* Initialize timer information. */
 	list_init(&cpu->timers);

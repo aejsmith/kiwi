@@ -68,9 +68,8 @@ static void signal_force(thread_t *thread, int num, int cause) {
 	/* If failed delivering the signal that we're sending now, force it to
 	 * run with the default action. This will usually result in the process
 	 * being killed. */
-	if(num == cause) {
+	if(num == cause)
 		thread->owner->signal_act[num].sa_handler = SIG_DFL;
-	}
 
 	signal_send(thread, num, NULL, true);
 }
@@ -86,9 +85,8 @@ static void signal_force(thread_t *thread, int num, int cause) {
 void signal_send(thread_t *thread, int num, siginfo_t *info, bool force) {
 	assert(VALID_SIGNAL_MASK & (1 << num));
 
-	if(info) {
+	if(info)
 		info->si_signo = num;
-	}
 
 	spinlock_lock(&thread->lock);
 
@@ -101,9 +99,8 @@ void signal_send(thread_t *thread, int num, siginfo_t *info, bool force) {
 	if(force) {
 		thread->signal_mask &= ~(1 << num);
 		thread->owner->signal_mask &= ~(1 << num);
-		if(thread->owner->signal_act[num].sa_handler == SIG_IGN) {
+		if(thread->owner->signal_act[num].sa_handler == SIG_IGN)
 			thread->owner->signal_act[num].sa_handler = SIG_DFL;
-		}
 	}
 
 	/* Store information on the signal and mark it as pending. */
@@ -129,9 +126,8 @@ void signal_handle_pending(void) {
 	int num;
 
 	/* Delay signal delivery during process loading. */
-	if(curr_proc->create) {
+	if(curr_proc->create)
 		return;
-	}
 
 	mutex_lock(&curr_proc->lock);
 	spinlock_lock(&curr_thread->lock);
@@ -146,17 +142,15 @@ retry:
 	}
 
 	for(num = 0; num < NSIG; num++) {
-		if(!(pending & (1 << num))) {
+		if(!(pending & (1 << num)))
 			continue;
-		}
 
 		curr_thread->pending_signals &= ~(1 << num);
 
 		/* Check if the signal is ignored. */
 		action = &curr_proc->signal_act[num];
-		if(action->sa_handler == SIG_IGN || (action->sa_handler == SIG_DFL && signal_dfl_ignore(num))) {
+		if(action->sa_handler == SIG_IGN || (action->sa_handler == SIG_DFL && signal_dfl_ignore(num)))
 			continue;
-		}
 
 		/* If not the default action, we must execute a user-mode
 		 * handler function. */
@@ -167,14 +161,12 @@ retry:
 			 * the signal. FIXME. */
 			mask = curr_proc->signal_mask;
 			curr_proc->signal_mask |= action->sa_mask;
-			if(!(action->sa_flags & SA_NODEFER)) {
+			if(!(action->sa_flags & SA_NODEFER))
 				curr_proc->signal_mask |= (1 << num);
-			}
 
 			/* Reset the signal if requested. */
-			if(action->sa_flags & SA_RESETHAND) {
+			if(action->sa_flags & SA_RESETHAND)
 				memset(action, 0, sizeof(*action));
-			}
 
 			/* Get the architecture code to set up the user-mode
 			 * context to run the handler. */
@@ -226,9 +218,8 @@ status_t kern_signal_send(handle_t handle, int num) {
 	siginfo_t info;
 	status_t ret;
 
-	if(!(VALID_SIGNAL_MASK & (1 << num))) {
+	if(!(VALID_SIGNAL_MASK & (1 << num)))
 		return STATUS_INVALID_ARG;
-	}
 
 	memset(&info, 0, sizeof(info));
 	info.si_code = SI_USER;
@@ -237,9 +228,8 @@ status_t kern_signal_send(handle_t handle, int num) {
 
 	if(handle > 0) {
 		ret = object_handle_lookup(handle, -1, 0, &khandle);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		switch(khandle->object->type->id) {
 		case OBJECT_TYPE_PROCESS:
@@ -264,15 +254,15 @@ status_t kern_signal_send(handle_t handle, int num) {
 			LIST_FOREACH(&process->threads, iter) {
 				thread = list_entry(iter, thread_t, owner_link);
 
-				if(!(thread->signal_mask & (1 << num))) {
+				if(!(thread->signal_mask & (1 << num)))
 					break;
-				}
 
 				thread = NULL;
 			}
-			if(!thread) {
+
+			if(!thread)
 				thread = list_first(&process->threads, thread_t, owner_link);
-			}
+
 			mutex_unlock(&process->lock);
 			break;
 		case OBJECT_TYPE_THREAD:
@@ -305,9 +295,8 @@ status_t kern_signal_action(int num, const sigaction_t *newp, sigaction_t *oldp)
 	sigaction_t kaction;
 	status_t ret;
 
-	if(!(VALID_SIGNAL_MASK & (1 << num))) {
+	if(!(VALID_SIGNAL_MASK & (1 << num)))
 		return STATUS_INVALID_ARG;
-	}
 
 	mutex_lock(&curr_proc->lock);
 
@@ -360,16 +349,14 @@ status_t kern_signal_mask(int flags, const sigset_t *newp, sigset_t *oldp) {
 
 	if(oldp) {
 		ret = memcpy_to_user(oldp, target, sizeof(*oldp));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	if(newp) {
 		ret = memcpy_from_user(&kset, newp, sizeof(kset));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		/* Attempts to mask SIGKILL and SIGSTOP are silently ignored. */
 		kset &= ~((1 << SIGKILL) | (1 << SIGSTOP));
@@ -411,26 +398,22 @@ status_t kern_signal_stack(const stack_t *newp, stack_t *oldp) {
 
 	if(oldp) {
 		ret = memcpy_to_user(oldp, &curr_thread->signal_stack, sizeof(*oldp));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	if(newp) {
 		ret = memcpy_from_user(&kstack, newp, sizeof(kstack));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
-		if(!kstack.ss_size || kstack.ss_flags & ~SS_DISABLE) {
+		if(!kstack.ss_size || kstack.ss_flags & ~SS_DISABLE)
 			return STATUS_INVALID_ARG;
-		}
 
 		/* Check whether the provided stack range is valid. */
 		ret = validate_user_address(kstack.ss_sp, kstack.ss_size);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 
 		memcpy(&curr_thread->signal_stack, &kstack, sizeof(kstack));
 	}

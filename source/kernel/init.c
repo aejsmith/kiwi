@@ -153,17 +153,18 @@ static __init_text void kmain_bsp_bottom(void) {
 	/* Get the time from the hardware. */
 	time_init();
 
-#if CONFIG_DEBUGGER_DELAY > 0
+	#if CONFIG_DEBUGGER_DELAY > 0
 	/* Delay to allow GDB to be connected. */
 	kprintf(LOG_NOTICE, "kernel: waiting %d seconds for a debugger...\n", CONFIG_DEBUGGER_DELAY);
 	spin(SECS2USECS(CONFIG_DEBUGGER_DELAY));
-#endif
+	#endif
 
 	/* Properly initialize the CPU subsystem, and detect other CPUs. */
 	cpu_init();
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	smp_init();
-#endif
+	#endif
+
 	/* Initialize the slab per-CPU layer. */
 	slab_late_init();
 
@@ -182,9 +183,8 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Create the second stage initialization thread. */
 	ret = thread_create("init", NULL, 0, init_thread, NULL, NULL, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not create second-stage initialization thread");
-	}
 
 	/* Finally begin executing other threads. */
 	sched_enter();
@@ -211,9 +211,8 @@ __init_text void kmain_ap(cpu_t *cpu) {
 	smp_boot_status = SMP_BOOT_BOOTED;
 
 	/* Wait for remaining CPUs to be brought up. */
-	while(smp_boot_status != SMP_BOOT_COMPLETE) {
+	while(smp_boot_status != SMP_BOOT_COMPLETE)
 		arch_cpu_spin_hint();
-	}
 
 	/* Begin scheduling threads. */
 	sched_enter();
@@ -224,9 +223,9 @@ __init_text void kmain_ap(cpu_t *cpu) {
  * @param mod		Module to remove. */
 static __init_text void boot_module_remove(boot_module_t *mod) {
 	list_remove(&mod->header);
-	if(mod->name) {
+	if(mod->name)
 		kfree(mod->name);
-	}
+
 	object_handle_release(mod->handle);
 	phys_unmap(mod->mapping, mod->size, true);
 	kfree(mod);
@@ -245,9 +244,8 @@ static __init_text boot_module_t *boot_module_lookup(const char *name) {
 	LIST_FOREACH(&boot_module_list, iter) {
 		mod = list_entry(iter, boot_module_t, header);
 
-		if(mod->name && strcmp(mod->name, name) == 0) {
+		if(mod->name && strcmp(mod->name, name) == 0)
 			return mod;
-		}
 	}
 
 	return NULL;
@@ -272,9 +270,9 @@ static __init_text void load_boot_kmod(boot_module_t *mod) {
 
 		/* Unloaded dependency, try to find it and load it. */
 		dep = boot_module_lookup(name);
-		if(!dep) {
+		if(!dep)
 			fatal("Dependency on '%s' which is not available", name);
-		}
+
 		load_boot_kmod(dep);
 	}
 }
@@ -312,9 +310,8 @@ static __init_text void load_modules(void) {
 		count++;
 	}
 
-	if(!count) {
+	if(!count)
 		fatal("No modules were provided, cannot do anything!");
-	}
 
 	/* Determine how much to increase the boot progress by for each
 	 * module loaded. */
@@ -337,22 +334,21 @@ static void init_thread(void *arg1, void *arg2) {
 	status_t ret;
 
 	/* Bring up all detected secondary CPUs. */
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	smp_boot();
-#endif
+	#endif
+
 	kprintf(LOG_NOTICE, "cpu: detected %zu CPU(s):\n", cpu_count);
-	LIST_FOREACH(&running_cpus, iter) {
+	LIST_FOREACH(&running_cpus, iter)
 		cpu_dump(list_entry(iter, cpu_t, header));
-	}
 
 	/* Bring up the filesystem manager and device manager. */
 	device_init();
 	fs_init();
 
 	/* Call other initialization functions. */
-	for(initcall = __initcall_start; initcall != __initcall_end; initcall++) {
+	for(initcall = __initcall_start; initcall != __initcall_end; initcall++)
 		(*initcall)();
-	}
 
 	update_boot_progress(10);
 
@@ -361,23 +357,20 @@ static void init_thread(void *arg1, void *arg2) {
 	 * boot filesystem could not be mounted. */
 	load_modules();
 	if(!root_mount) {
-		if(list_empty(&boot_fsimage_list)) {
+		if(list_empty(&boot_fsimage_list))
 			fatal("Could not find boot filesystem");
-		}
 
 		/* Mount a ramfs at the root to extract the images to. */
 		ret = fs_mount(NULL, "/", "ramfs", NULL);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			fatal("Could not mount ramfs for root (%d)", ret);
-		}
 
 		while(!list_empty(&boot_fsimage_list)) {
 			mod = list_first(&boot_fsimage_list, boot_module_t, header);
 
 			ret = tar_extract(mod->handle, "/");
-			if(ret != STATUS_SUCCESS) {
+			if(ret != STATUS_SUCCESS)
 				fatal("Failed to load FS image (%d)", ret);
-			}
 
 			boot_module_remove(mod);
 		}
@@ -394,10 +387,10 @@ static void init_thread(void *arg1, void *arg2) {
 	update_boot_progress(100);
 
 	/* Run the service manager. */
-	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM, kernel_proc, NULL);
-	if(ret != STATUS_SUCCESS) {
+	ret = process_create(pargs, penv, PROCESS_CRITICAL, PRIORITY_CLASS_SYSTEM,
+		kernel_proc, NULL);
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not start service manager (%d)", ret);
-	}
 }
 
 /** Iterate over the KBoot tag list.
@@ -448,9 +441,9 @@ __init_text void kboot_tag_release(void *current) {
 static __init_text kboot_tag_option_t *lookup_option(const char *name, uint32_t type) {
 	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
 		if(strcmp(tag->name, name) == 0) {
-			if(tag->type != type) {
+			if(tag->type != type)
 				fatal("Boot option '%s' has incorrect type", name);
-			}
+
 			return tag;
 		}
 	}
@@ -475,4 +468,3 @@ __init_text uint64_t kboot_integer_option(const char *name) {
 	assert(tag->size == sizeof(uint64_t));
 	return *(uint64_t *)&tag[1];
 }
-

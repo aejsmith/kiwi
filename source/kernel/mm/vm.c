@@ -97,9 +97,8 @@ static void vm_aspace_ctor(void *obj, void *data) {
 	avl_tree_init(&as->tree);
 	list_init(&as->regions);
 
-	for(i = 0; i < VM_FREELISTS; i++) {
+	for(i = 0; i < VM_FREELISTS; i++)
 		list_init(&as->free[i]);
-	}
 }
 
 /** Constructor for anonymous map objects.
@@ -145,9 +144,8 @@ static inline bool vm_region_used(const vm_region_t *region) {
  *			mergeable if unused. */
 static inline bool vm_region_mergeable(const vm_region_t *a, const vm_region_t *b) {
 	if(!vm_region_used(a) && !vm_region_used(b)) {
-		if((a->flags & VM_REGION_RESERVED) == (b->flags & VM_REGION_RESERVED)) {
+		if((a->flags & VM_REGION_RESERVED) == (b->flags & VM_REGION_RESERVED))
 			return true;
-		}
 	}
 	return false;
 }
@@ -170,9 +168,8 @@ static inline void vm_freelist_remove(vm_region_t *region) {
 
 	assert(!region->flags);
 	list_remove(&region->free_link);
-	if(list_empty(&region->as->free[list])) {
+	if(list_empty(&region->as->free[list]))
 		region->as->free_map &= ~((ptr_t)1 << list);
-	}
 }
 
 /** Check if a freelist is empty.
@@ -243,12 +240,13 @@ static status_t vm_amap_map(vm_amap_t *map, offset_t offset, size_t size) {
 			kprintf(LOG_DEBUG, "vm: anon object %p rref[%zu] is at maximum value!\n", map, i);
 
 			/* Go and undo what we've done. */
-			for(j = start; j < i; j++) {
+			for(j = start; j < i; j++)
 				map->rref[j]--;
-			}
+
 			mutex_unlock(&map->lock);
 			return STATUS_NO_MEMORY;
 		}
+
 		map->rref[i]++;
 	}
 
@@ -288,9 +286,8 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	vm_region_t *dest;
 
 	dest = vm_region_create(as, src->start, src->end, src->flags);
-	if(!vm_region_used(src)) {
+	if(!vm_region_used(src))
 		return dest;
-	}
 
 	/* Copy the object handle. */
 	if(src->handle) {
@@ -308,6 +305,7 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 			dest->amap = src->amap;
 			dest->amap_offset = src->amap_offset;
 		}
+
 		return dest;
 	}
 
@@ -328,11 +326,12 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 	dest->amap->pages = kcalloc(dest->amap->max_size, sizeof(page_t *), MM_WAIT);
 	dest->amap->rref = kcalloc(dest->amap->max_size, sizeof(uint16_t *), MM_WAIT);
 
-	/* Write-protect all mappings on the source region. */
 	mmu_context_lock(src->as->mmu);
-	for(i = src->start; i < src->end; i += PAGE_SIZE) {
+
+	/* Write-protect all mappings on the source region. */
+	for(i = src->start; i < src->end; i += PAGE_SIZE)
 		mmu_context_protect(src->as->mmu, i, false, src->flags & VM_REGION_EXEC);
-	}
+
 	mmu_context_unlock(src->as->mmu);
 
 	/* Point all of the pages in the new map to the pages from the source
@@ -344,12 +343,13 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
 			refcount_inc(&src->amap->pages[i]->count);
 			dest->amap->curr_size++;
 		}
+
 		dest->amap->pages[i - start] = src->amap->pages[i];
 		dest->amap->rref[i - start] = 1;
 	}
 
 	dprintf("vm: copied private region %p (map: %p) to %p (map: %p)\n",
-	        src, src->amap, dest, dest->amap);
+		src, src->amap, dest, dest->amap);
 	mutex_unlock(&src->amap->lock);
 	return dest;
 }
@@ -358,9 +358,8 @@ static vm_region_t *vm_region_clone(vm_region_t *src, vm_aspace_t *as) {
  * @param region	Region to get region before from.
  * @return		Pointer to previous region, or NULL if start of list. */
 static vm_region_t *vm_region_prev(vm_region_t *region) {
-	if(region == list_first(&region->as->regions, vm_region_t, header)) {
+	if(region == list_first(&region->as->regions, vm_region_t, header))
 		return NULL;
-	}
 
 	return list_prev(&region->header, vm_region_t, header);
 }
@@ -369,9 +368,8 @@ static vm_region_t *vm_region_prev(vm_region_t *region) {
  * @param region	Region to get region after from.
  * @return		Pointer to next region, or NULL if end of list. */
 static vm_region_t *vm_region_next(vm_region_t *region) {
-	if(region == list_last(&region->as->regions, vm_region_t, header)) {
+	if(region == list_last(&region->as->regions, vm_region_t, header))
 		return NULL;
-	}
 
 	return list_next(&region->header, vm_region_t, header);
 }
@@ -390,9 +388,8 @@ static vm_region_t *vm_region_find(vm_aspace_t *as, ptr_t addr, bool unused) {
 	/* Check if the cached pointer matches. Caching the last found region
 	 * helps mainly for page fault handling when code is hitting different
 	 * parts of a newly-mapped region in succession. */
-	if(as->find_cache && as->find_cache->start <= addr && as->find_cache->end > addr) {
+	if(as->find_cache && as->find_cache->start <= addr && as->find_cache->end > addr)
 		return as->find_cache;
-	}
 
 	/* Fall back on searching through the AVL tree. */
 	node = as->tree.root;
@@ -490,9 +487,8 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 	assert(region->handle || region->amap);
 
 	/* Acquire the anonymous map lock if there is one. */
-	if(region->amap) {
+	if(region->amap)
 		mutex_lock(&region->amap->lock);
-	}
 
 	mmu_context_lock(region->as->mmu);
 
@@ -500,9 +496,8 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 		offset = (offset_t)(addr - region->start);
 
 		/* Unmap the page and release it from its source. */
-		if(mmu_context_unmap(region->as->mmu, addr, true, &phys)) {
+		if(mmu_context_unmap(region->as->mmu, addr, true, &phys))
 			vm_region_release_page(region, offset, phys);
-		}
 
 		/* Update the region reference count on the anonymous map. */
 		if(region->amap) {
@@ -514,10 +509,11 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 
 			if(--region->amap->rref[i] == 0 && region->amap->pages[i]) {
 				dprintf("vm: anon object rref %zu reached 0, freeing 0x%" PRIxPHYS " (amap: %p)\n",
-				        i, region->amap->pages[i]->addr, region->amap);
-				if(refcount_dec(&region->amap->pages[i]->count) == 0) {
+					i, region->amap->pages[i]->addr, region->amap);
+
+				if(refcount_dec(&region->amap->pages[i]->count) == 0)
 					page_free(region->amap->pages[i]);
-				}
+
 				region->amap->pages[i] = NULL;
 				region->amap->curr_size--;
 			}
@@ -526,9 +522,8 @@ static void vm_region_unmap(vm_region_t *region, ptr_t start, ptr_t end) {
 
 	mmu_context_unlock(region->as->mmu);
 
-	if(region->amap) {
+	if(region->amap)
 		mutex_unlock(&region->amap->lock);
-	}
 }
 
 /** Shrink a region.
@@ -544,9 +539,9 @@ static void vm_region_shrink(vm_region_t *region, ptr_t start, ptr_t end) {
 
 	/* Unmap pages in the areas we're not going to cover any more. */
 	if(vm_region_used(region)) {
-		if(end < region->end) {
+		if(end < region->end)
 			vm_region_unmap(region, end, region->end);
-		}
+
 		if(start > region->start) {
 			vm_region_unmap(region, region->start, start);
 			if(region->amap) {
@@ -593,14 +588,13 @@ static void vm_region_split(vm_region_t *region, ptr_t end, ptr_t start) {
 
 	if(vm_region_used(region)) {
 		/* Unmap the gap between the regions if there is one. */
-		if(end != start) {
+		if(end != start)
 			vm_region_unmap(region, end, start);
-		}
 
 		/* Copy object details into the split. */
-		if((split->handle = region->handle)) {
+		if((split->handle = region->handle))
 			object_handle_get(split->handle);
-		}
+
 		if((split->amap = region->amap)) {
 			refcount_inc(&split->amap->count);
 			split->obj_offset = region->obj_offset;
@@ -633,12 +627,11 @@ static void vm_region_destroy(vm_region_t *region) {
 	 * and remove it from the tree or freelist. */
 	if(vm_region_used(region)) {
 		vm_region_unmap(region, region->start, region->end);
-		if(region->amap) {
+
+		if(region->amap)
 			vm_amap_release(region->amap);
-		}
-		if(region->handle) {
+		if(region->handle)
 			object_handle_release(region->handle);
-		}
 
 		avl_tree_remove(&region->as->tree, &region->tree_link);
 	} else if(!(region->flags & VM_REGION_RESERVED)) {
@@ -675,9 +668,8 @@ static vm_region_t *vm_region_insert_internal(vm_aspace_t *as, ptr_t start, ptr_
 			vm_region_shrink(region, region->start, start);
 
 			region = vm_region_next(region);
-			if(prev->end == end || !region) {
+			if(prev->end == end || !region)
 				return prev;
-			}
 		} else {
 			/* Split the region and finish. */
 			vm_region_split(region, start, end);
@@ -694,9 +686,8 @@ static vm_region_t *vm_region_insert_internal(vm_aspace_t *as, ptr_t start, ptr_
 			/* Completely overlap this region, remove. */
 			next = (region->end < end) ? vm_region_next(region) : NULL;
 			vm_region_destroy(region);
-			if(!(region = next)) {
+			if(!(region = next))
 				break;
-			}
 		} else {
 			/* Resize the existing region and finish. */
 			vm_region_shrink(region, end, region->end);
@@ -780,15 +771,13 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
 	 * large enough. The free bitmap check will ensure that list does not
 	 * go higher than the number of freelists. */
 	list = highbit(size) - PAGE_WIDTH - 1;
-	if((size & (size - 1)) != 0 && as->free_map >> (list + 1)) {
+	if((size & (size - 1)) != 0 && as->free_map >> (list + 1))
 		list++;
-	}
 
 	/* Find a free region. */
 	for(i = list; i < VM_FREELISTS; i++) {
-		if(vm_freelist_empty(as, i)) {
+		if(vm_freelist_empty(as, i))
 			continue;
-		}
 
 		LIST_FOREACH(&as->free[i], iter) {
 			region = list_entry(iter, vm_region_t, free_link);
@@ -806,8 +795,9 @@ static vm_region_t *vm_region_alloc(vm_aspace_t *as, size_t size, int flags) {
 			vm_freelist_remove(region);
 			avl_tree_insert(&as->tree, &region->tree_link, region->start, region);
 			region->flags = flags;
+
 			dprintf("vm: allocated region [%p,%p) from list %d (as: %p)\n",
-			        region->start, region->end, i, as);
+				region->start, region->end, i, as);
 			return region;
 		}
 	}
@@ -879,9 +869,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 				 * handle it going to 0 here, as another object
 				 * could have released the page while we were
 				 * copying. */
-				if(refcount_dec(&amap->pages[i]->count) == 0) {
+				if(refcount_dec(&amap->pages[i]->count) == 0)
 					page_free(amap->pages[i]);
-				}
 
 				amap->pages[i] = page;
 			}
@@ -894,9 +883,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			/* Find the page to copy. If handling a protection
 			 * fault, use the existing mapping address. */
 			if(reason == VM_FAULT_PROTECTION) {
-				if(unlikely(!mmu_context_query(region->as->mmu, addr, &paddr, NULL, NULL))) {
+				if(unlikely(!mmu_context_query(region->as->mmu, addr, &paddr, NULL, NULL)))
 					fatal("No mapping for %p, but protection fault on it", addr);
-				}
 			} else {
 				assert(handle->object->type->get_page);
 
@@ -909,7 +897,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			}
 
 			dprintf("vm:  anon write fault: copying page 0x%" PRIxPHYS " from %p\n",
-			        paddr, handle->object);
+				paddr, handle->object);
 
 			page = page_alloc(MM_WAIT);
 			phys_copy(page->addr, paddr, MM_WAIT);
@@ -917,9 +905,8 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			/* Add the page and release the old one. */
 			refcount_inc(&page->count);
 			amap->pages[i] = page;
-			if(handle->object->type->release_page) {
+			if(handle->object->type->release_page)
 				handle->object->type->release_page(handle, offset + region->obj_offset, paddr);
-			}
 
 			amap->curr_size++;
 			paddr = page->addr;
@@ -950,7 +937,7 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 			}
 
 			dprintf("vm:  anon read fault: mapping page 0x%" PRIxPHYS " from %p as read-only\n",
-			        paddr, handle->object);
+				paddr, handle->object);
 			write = false;
 		}
 	}
@@ -959,15 +946,15 @@ static int vm_anon_fault(vm_region_t *region, ptr_t addr, int reason, int access
 	 * set correctly. If this is a protection fault, remove existing
 	 * mappings. */
 	if(reason == VM_FAULT_PROTECTION) {
-		if(unlikely(!mmu_context_unmap(region->as->mmu, addr, true, NULL))) {
+		if(unlikely(!mmu_context_unmap(region->as->mmu, addr, true, NULL)))
 			fatal("Could not remove previous mapping for %p", addr);
-		}
 	}
 
 	/* Map the entry in. Should always succeed with MM_WAIT set. */
 	mmu_context_map(region->as->mmu, addr, paddr, write, region->flags & VM_REGION_EXEC, MM_WAIT);
+
 	dprintf("vm:  anon fault: mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d)\n",
-	        paddr, addr, region->as, write);
+		paddr, addr, region->as, write);
 	mutex_unlock(&amap->lock);
 	return VM_FAULT_SUCCESS;
 }
@@ -1001,10 +988,11 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	if(mmu_context_query(region->as->mmu, addr, &exist, NULL, NULL)) {
 		if(exist != phys) {
 			fatal("Incorrect existing mapping found (found %" PRIxPHYS", should be %" PRIxPHYS ")",
-			      exist, phys);
+				exist, phys);
 		} else if(region->handle->object->type->release_page) {
 			region->handle->object->type->release_page(region->handle, offset, phys);
 		}
+
 		return VM_FAULT_SUCCESS;
 	}
 
@@ -1015,7 +1003,7 @@ static int vm_generic_fault(vm_region_t *region, ptr_t addr, int reason, int acc
 	/* Map the entry in. Should always succeed with MM_WAIT set. */
 	mmu_context_map(region->as->mmu, addr, phys, write, exec, MM_WAIT);
 	dprintf("vm:  mapped 0x%" PRIxPHYS " at %p (as: %p, write: %d, exec: %d)\n",
-	        phys, addr, region->as, write, exec);
+		phys, addr, region->as, write, exec);
 	return VM_FAULT_SUCCESS;
 }
 
@@ -1030,9 +1018,8 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	int ret;
 
 	/* If we don't have an address space, don't do anything. */
-	if(unlikely(!as)) {
+	if(unlikely(!as))
 		return VM_FAULT_FAILURE;
-	}
 
 	dprintf("vm: page fault at %p (as: %p, reason: %d, access: %d)\n", addr, as, reason, access);
 
@@ -1070,7 +1057,7 @@ int vm_fault(ptr_t addr, int reason, int access) {
 	 * TODO: Stack direction. */
 	if(region->flags & VM_REGION_STACK && addr == region->start) {
 		kprintf(LOG_DEBUG, "vm: thread %" PRIu32 " hit stack guard page %p\n",
-		        curr_thread->id, addr);
+			curr_thread->id, addr);
 		mutex_unlock(&as->lock);
 		return VM_FAULT_NOREGION;
 	}
@@ -1108,9 +1095,8 @@ int vm_fault(ptr_t addr, int reason, int access) {
 status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
 	vm_region_t *region;
 
-	if(!size || start % PAGE_SIZE || size % PAGE_SIZE) {
+	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
-	}
 
 	mutex_lock(&as->lock);
 
@@ -1152,8 +1138,9 @@ status_t vm_reserve(vm_aspace_t *as, ptr_t start, size_t size) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_handle_t *handle,
-                offset_t offset, ptr_t *addrp) {
+status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags,
+	object_handle_t *handle, offset_t offset, ptr_t *addrp)
+{
 	vm_region_t *region;
 	status_t ret;
 	int rflags;
@@ -1165,34 +1152,30 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		return STATUS_INVALID_ARG;
 	}
 	if(flags & VM_MAP_FIXED) {
-		if(start % PAGE_SIZE) {
+		if(start % PAGE_SIZE)
 			return STATUS_INVALID_ARG;
-		}
 	} else if(!addrp) {
 		return STATUS_INVALID_ARG;
 	}
 	if(handle) {
 		/* Check for overflow. */
-		if((offset + size) < offset) {
+		if((offset + size) < offset)
 			return STATUS_INVALID_ARG;
-		}
 
 		/* Check if the object can be mapped in with the given flags. */
 		if(handle->object->type->mappable) {
 			assert(handle->object->type->get_page);
 			ret = handle->object->type->mappable(handle, flags);
-			if(ret != STATUS_SUCCESS) {
+			if(ret != STATUS_SUCCESS)
 				return ret;
-			}
 		} else if(!handle->object->type->get_page) {
 			return STATUS_NOT_SUPPORTED;
 		}
 	}
 
 	/* Cannot have a guard page on a 1-page stack. */
-	if(flags & VM_MAP_STACK && size == PAGE_SIZE) {
+	if(flags & VM_MAP_STACK && size == PAGE_SIZE)
 		flags &= ~VM_MAP_STACK;
-	}
 
 	/* Convert mapping flags to region flags. The flags with a region
 	 * equivalent have the same value. */
@@ -1228,16 +1211,16 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
 		region->amap = vm_amap_create(size);
 
 		/* Should not fail to reference since it is newly created. */
-		if(vm_amap_map(region->amap, 0, size) != STATUS_SUCCESS) {
+		if(vm_amap_map(region->amap, 0, size) != STATUS_SUCCESS)
 			fatal("Could not reference new anonymous map");
-		}
 	}
 
 	dprintf("vm: mapped region [%p,%p) (as: %p, handle: %p, flags(m/r): %d/%d)\n",
-	        region->start, region->end, as, handle, flags, rflags);
-	if(addrp) {
+		region->start, region->end, as, handle, flags, rflags);
+
+	if(addrp)
 		*addrp = region->start;
-	}
+
 	mutex_unlock(&as->lock);
 	return STATUS_SUCCESS;
 }
@@ -1255,9 +1238,8 @@ status_t vm_map(vm_aspace_t *as, ptr_t start, size_t size, int flags, object_han
  * @return		Status code describing result of the operation.
  */
 status_t vm_unmap(vm_aspace_t *as, ptr_t start, size_t size) {
-	if(!size || start % PAGE_SIZE || size % PAGE_SIZE) {
+	if(!size || start % PAGE_SIZE || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
-	}
 
 	mutex_lock(&as->lock);
 
@@ -1288,9 +1270,8 @@ void vm_aspace_switch(vm_aspace_t *as) {
 		state = local_irq_disable();
 
 		/* Decrease old address space's reference count, if there is one. */
-		if(curr_aspace) {
+		if(curr_aspace)
 			refcount_dec(&curr_aspace->count);
-		}
 
 		/* Switch to the new address space. */
 		refcount_inc(&as->count);
@@ -1394,9 +1375,8 @@ static status_t switch_aspace_call_func(void *_as) {
 	/* We may have switched address space between the check below and
 	 * receiving the interrupt. Avoid an unnecessary switch in this
 	 * case. */
-	if(as == curr_aspace) {
+	if(as == curr_aspace)
 		do_switch_aspace(as);
-	}
 
 	return STATUS_SUCCESS;
 }
@@ -1413,9 +1393,9 @@ static status_t switch_aspace_call_func(void *_as) {
  * @param as		Address space to destroy.
  */
 void vm_aspace_destroy(vm_aspace_t *as) {
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	cpu_t *cpu;
-#endif
+	#endif
 
 	assert(as);
 
@@ -1424,7 +1404,7 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 	 * (see the comment in vm_aspace_switch()). We need to go through
 	 * and prod any CPUs that are using it. */
 	if(refcount_get(&as->count) > 0) {
-#if CONFIG_SMP
+		#if CONFIG_SMP
 		LIST_FOREACH(&running_cpus, iter) {
 			cpu = list_entry(iter, cpu_t, header);
 			if(cpu->aspace == as) {
@@ -1435,17 +1415,17 @@ void vm_aspace_destroy(vm_aspace_t *as) {
 				}
 			}
 		}
-#else
+		#else
 		do_switch_aspace(as);
-#endif
+		#endif
+
 		/* The address space should no longer be in use. */
 		assert(refcount_get(&as->count) == 0);
 	}
 
 	/* Unmap and destroy each region. */
-	LIST_FOREACH_SAFE(&as->regions, iter) {
+	LIST_FOREACH_SAFE(&as->regions, iter)
 		vm_region_destroy(list_entry(iter, vm_region_t, header));
-	}
 
 	/* Destroy the MMU context. */
 	mmu_context_destroy(as->mmu);
@@ -1459,9 +1439,9 @@ void vm_aspace_destroy(vm_aspace_t *as) {
  * @param region	Region to display. */
 static void dump_region(vm_region_t *region) {
 	kdb_printf("%-18p %-18p %-5d %-18p %-10" PRIu64 " %-18p %" PRIu64 "\n",
-	           region->start, region->end, region->flags,
-	           region->handle, region->obj_offset, region->amap,
-	           region->amap_offset);
+		region->start, region->end, region->flags,
+		region->handle, region->obj_offset, region->amap,
+		region->amap_offset);
 }
 
 /** Dump an address space.
@@ -1507,33 +1487,30 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 	}
 
 	kdb_printf("%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
-	           "Base", "End", "Flags", "Handle", "Offset", "Amap", "Offset");
+		"Base", "End", "Flags", "Handle", "Offset", "Amap", "Offset");
 	kdb_printf("%-18s %-18s %-5s %-18s %-10s %-18s %s\n",
-	           "====", "===", "=====", "======", "======", "====", "======");
+		"====", "===", "=====", "======", "======", "====", "======");
 
-	LIST_FOREACH(&as->regions, iter) {
+	LIST_FOREACH(&as->regions, iter)
 		dump_region(list_entry(iter, vm_region_t, header));
-	}
 
 	kdb_printf("\nAllocated:\n\n");
 
-	AVL_TREE_FOREACH(&as->tree, iter) {
+	AVL_TREE_FOREACH(&as->tree, iter)
 		dump_region(avl_tree_entry(iter, vm_region_t));
-	}
 
 	for(i = 0; i < VM_FREELISTS; i++) {
 		if(!(as->free_map & ((ptr_t)1 << i))) {
-			if(list_empty(&as->free[i])) {
+			if(list_empty(&as->free[i]))
 				continue;
-			}
+
 			kdb_printf("\nFreelist %d (shouldn't have entries!):\n\n", i);
 		} else {
 			kdb_printf("\nFreelist %d:\n\n", i);
 		}
 
-		LIST_FOREACH(&as->free[i], iter) {
+		LIST_FOREACH(&as->free[i], iter)
 			dump_region(list_entry(iter, vm_region_t, free_link));
-		}
 	}
 
 	return KDB_SUCCESS;
@@ -1543,13 +1520,11 @@ static kdb_status_t kdb_cmd_aspace(int argc, char **argv, kdb_filter_t *filter) 
 __init_text void vm_init(void) {
 	/* Create the VM slab caches. */
 	vm_aspace_cache = slab_cache_create("vm_aspace_cache", sizeof(vm_aspace_t),
-	                                    0, vm_aspace_ctor, NULL, NULL, 0,
-	                                    MM_BOOT);
+		0, vm_aspace_ctor, NULL, NULL, 0, MM_BOOT);
 	vm_region_cache = slab_cache_create("vm_region_cache", sizeof(vm_region_t),
-	                                    0, NULL, NULL, NULL, 0, MM_BOOT);
+		0, NULL, NULL, NULL, 0, MM_BOOT);
 	vm_amap_cache = slab_cache_create("vm_amap_cache", sizeof(vm_amap_t),
-	                                  0, vm_amap_ctor, NULL, NULL, 0,
-	                                  MM_BOOT);
+		0, vm_amap_ctor, NULL, NULL, 0, MM_BOOT);
 
 	/* Bring up the page daemons. */
 	page_daemon_init();
@@ -1587,8 +1562,9 @@ __init_text void vm_init(void) {
  *
  * @return		Status code describing result of the operation.
  */
-status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle, offset_t offset,
-                     void **addrp) {
+status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle,
+	offset_t offset, void **addrp)
+{
 	object_handle_t *khandle = NULL;
 	status_t ret;
 	ptr_t addr;
@@ -1597,22 +1573,20 @@ status_t kern_vm_map(void *start, size_t size, int flags, handle_t handle, offse
 		return STATUS_INVALID_ARG;
 	} else if(handle >= 0) {
 		ret = object_handle_lookup(handle, -1, 0, &khandle);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	ret = vm_map(curr_proc->aspace, (ptr_t)start, size, flags, khandle, offset, &addr);
 	if(ret == STATUS_SUCCESS && addrp) {
 		ret = memcpy_to_user(addrp, &addr, sizeof(void *));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			vm_unmap(curr_proc->aspace, addr, size);
-		}
 	}
 
-	if(khandle) {
+	if(khandle)
 		object_handle_release(khandle);
-	}
+
 	return ret;
 }
 

@@ -56,18 +56,16 @@ status_t condvar_wait_etc(condvar_t *cv, mutex_t *mutex, useconds_t timeout, int
 	spinlock_lock(&cv->lock);
 
 	/* Release the specfied lock. */
-	if(mutex) {
+	if(mutex)
 		mutex_unlock(mutex);
-	}
 
 	/* Go to sleep. */
 	list_append(&cv->threads, &curr_thread->wait_link);
 	ret = thread_sleep(&cv->lock, timeout, cv->name, flags);
 
 	/* Re-acquire the lock. */
-	if(mutex) {
+	if(mutex)
 		mutex_lock(mutex);
-	}
 
 	return ret;
 }

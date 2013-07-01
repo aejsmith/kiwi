@@ -244,9 +244,8 @@ static inline void page_queue_remove(unsigned index, page_t *page) {
  * @param page		Page to remove (should not be free). */
 static void remove_page_from_current_queue(page_t *page) {
 	/* Check that we have a valid current state. */
-	if(unlikely(page->state >= PAGE_QUEUE_COUNT)) {
+	if(unlikely(page->state >= PAGE_QUEUE_COUNT))
 		fatal("Page 0x%" PRIxPHYS " has invalid state (%u)\n", page->addr, page->state);
-	}
 
 	page_queue_remove(page->state, page);
 }
@@ -259,9 +258,8 @@ void page_set_state(page_t *page, unsigned state) {
 	/* Remove from current queue. */
 	remove_page_from_current_queue(page);
 
-	if(unlikely(state >= PAGE_QUEUE_COUNT)) {
+	if(unlikely(state >= PAGE_QUEUE_COUNT))
 		fatal("Setting invalid state on 0x%" PRIxPHYS " (%u)\n", page->addr, state);
-	}
 
 	/* Set new state and push on the new queue. */
 	page->state = state;
@@ -277,9 +275,8 @@ page_t *page_lookup(phys_ptr_t addr) {
 	assert(!(addr % PAGE_SIZE));
 
 	for(i = 0; i < phys_range_count; i++) {
-		if(addr >= phys_ranges[i].start && addr < phys_ranges[i].end) {
+		if(addr >= phys_ranges[i].start && addr < phys_ranges[i].end)
 			return &phys_ranges[i].pages[(addr - phys_ranges[i].start) >> PAGE_WIDTH];
-		}
 	}
 
 	return NULL;
@@ -300,9 +297,8 @@ page_t *page_alloc(int mmflag) {
 
 	/* Attempt to allocate from each of the lists. */
 	for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
-		if(list_empty(&free_page_lists[i].pages)) {
+		if(list_empty(&free_page_lists[i].pages))
 			continue;
-		}
 
 		/* Get the page and mark it as allocated. */
 		page = list_first(&free_page_lists[i].pages, page_t, header);
@@ -367,9 +363,8 @@ static void page_free_internal(page_t *page) {
 /** Free a page.
  * @param page		Page to free. */
 void page_free(page_t *page) {
-	if(unlikely(page->state == PAGE_STATE_FREE)) {
+	if(unlikely(page->state == PAGE_STATE_FREE))
 		fatal("Attempting to free already free page 0x%" PRIxPHYS, page->addr);
-	}
 
 	/* Remove from current queue. */
 	remove_page_from_current_queue(page);
@@ -379,7 +374,7 @@ void page_free(page_t *page) {
 	mutex_unlock(&free_page_lock);
 
 	dprintf("page: freed page 0x%" PRIxPHYS " (list: %u)\n", page->addr,
-	        phys_ranges[page->phys_range].freelist);
+		phys_ranges[page->phys_range].freelist);
 }
 
 /** Create a copy of a page.
@@ -421,9 +416,8 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 	 * that are guaranteed to fit these constraints. */
 	for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
 		list = &free_page_lists[i];
-		if(!list->minaddr && !list->maxaddr) {
+		if(!list->minaddr && !list->maxaddr)
 			continue;
-		}
 
 		base = MAX(minaddr, list->minaddr);
 		end = MIN(maxaddr - 1, list->maxaddr - 1);
@@ -431,10 +425,9 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 		if(base == list->minaddr && end == (list->maxaddr - 1)) {
 			/* Exact fit. */
 			dprintf("page: free list %u can satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
-			        i, minaddr, maxaddr);
-			if(list_empty(&list->pages)) {
+				i, minaddr, maxaddr);
+			if(list_empty(&list->pages))
 				continue;
-			}
 
 			/* Get the page and mark it as allocated. */
 			page = list_first(&list->pages, page_t, header);
@@ -450,7 +443,7 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
 	/* Check any lists that were determined to be a partial fit. */
 	for(i = 0; i < partial_fit_count; i++) {
 		dprintf("page: free list %u can partially satisfy [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
-		        partial_fits[i], minaddr, maxaddr);
+			partial_fits[i], minaddr, maxaddr);
 
 		/* Check if there are any pages that can fit. */
 		list = &free_page_lists[partial_fits[i]];
@@ -475,21 +468,20 @@ static page_t *phys_alloc_fastpath(phys_ptr_t minaddr, phys_ptr_t maxaddr) {
  * @param minaddr	Minimum start address of the range.
  * @param maxaddr	Maximum end address of the range.
  * @return		Pointer to first page in range if found, null if not. */
-static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align, phys_ptr_t boundary,
-                                   phys_ptr_t minaddr, phys_ptr_t maxaddr) {
+static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align,
+	phys_ptr_t boundary, phys_ptr_t minaddr, phys_ptr_t maxaddr)
+{
 	phys_ptr_t match_start, match_end, start, end;
 	page_num_t index, total, j;
 	physical_range_t *range;
 	page_t *pages;
 	size_t i;
 
-	if(boundary != 0) {
+	if(boundary != 0)
 		fatal("TODO: Implement boundary constraint");
-	}
 
-	if(!align) {
+	if(!align)
 		align = PAGE_SIZE;
-	}
 
 	/* Lovely and slow! Scan each page in each physical range to try to
 	 * find a set of pages that satisfy the allocation. Because we hold
@@ -503,9 +495,8 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align, phys_ptr_
 		/* Check if this range contains pages in the requested range. */
 		match_start = MAX(minaddr, range->start);
 		match_end = MIN(maxaddr - 1, range->end - 1);
-		if(match_end <= match_start) {
+		if(match_end <= match_start)
 			continue;
-		}
 
 		/* Scan pages in the range. */
 		start = (match_start - range->start) / PAGE_SIZE;
@@ -513,9 +504,8 @@ static page_t *phys_alloc_slowpath(page_num_t count, phys_ptr_t align, phys_ptr_
 		for(j = start; j < end; j++) {
 			if(!total) {
 				/* Check if this is a suitable starting page. */
-				if(range->pages[j].addr & (align - 1)) {
+				if(range->pages[j].addr & (align - 1))
 					continue;
-				}
 
 				index = j;
 			}
@@ -569,8 +559,9 @@ found:
  * @return		Status code describing the result of the operation.
  */
 status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
-                    phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag,
-                    phys_ptr_t *basep) {
+	phys_ptr_t minaddr, phys_ptr_t maxaddr, int mmflag,
+	phys_ptr_t *basep)
+{
 	page_num_t count, i;
 	page_t *pages;
 	void *mapping;
@@ -617,9 +608,8 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 
 	/* Put the pages onto the allocated queue. Pages will have already been
 	 * marked as allocated. */
-	for(i = 0; i < count; i++) {
+	for(i = 0; i < count; i++)
 		page_queue_append(PAGE_STATE_ALLOCATED, &pages[i]);
-	}
 
 	/* If we require the range to be zero, clear it now. */
 	if(mmflag & MM_ZERO) {
@@ -637,7 +627,7 @@ status_t phys_alloc(phys_size_t size, phys_ptr_t align, phys_ptr_t boundary,
 	thread_unwire(curr_thread);
 
 	dprintf("page: allocated page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ")\n",
-	        pages->addr, pages->addr + size);
+		pages->addr, pages->addr + size);
 	*basep = pages->addr;
 	return STATUS_SUCCESS;
 }
@@ -655,36 +645,35 @@ void phys_free(phys_ptr_t base, phys_size_t size) {
 	assert((base + size) > base);
 
 	pages = page_lookup(base);
-	if(unlikely(!pages)) {
+	if(unlikely(!pages))
 		fatal("Invalid base address 0x%" PRIxPHYS, base);
-	}
 
 	/* Ranges allocated by phys_alloc() will not span across a physical
 	 * range boundary. Check that the caller is not trying to free across
 	 * one. */
-	if(unlikely((base + size) > phys_ranges[pages->phys_range].end)) {
+	if(unlikely((base + size) > phys_ranges[pages->phys_range].end))
 		fatal("Invalid free across range boundary");
-	}
 
 	/* Remove each page in the range from its current queue. */
 	for(i = 0; i < (size / PAGE_SIZE); i++) {
 		if(unlikely(pages[i].state == PAGE_STATE_FREE)) {
 			fatal("Page 0x%" PRIxPHYS " in range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") already free",
-			      pages[i].addr, base, base + size);
+				pages[i].addr, base, base + size);
 		}
 
 		remove_page_from_current_queue(&pages[i]);
 	}
 
-	/* Free each page. */
 	mutex_lock(&free_page_lock);
-	for(i = 0; i < (size / PAGE_SIZE); i++) {
+
+	/* Free each page. */
+	for(i = 0; i < (size / PAGE_SIZE); i++)
 		page_free_internal(&pages[i]);
-	}
+
 	mutex_unlock(&free_page_lock);
 
 	dprintf("page: freed page range [0x%" PRIxPHYS ",0x%" PRIxPHYS ") (list: %u)\n",
-	        base, base + size, phys_ranges[pages->phys_range].freelist);
+		base, base + size, phys_ranges[pages->phys_range].freelist);
 }
 
 /** Get physical memory usage statistics.
@@ -743,8 +732,8 @@ static kdb_status_t kdb_cmd_page(int argc, char **argv, kdb_filter_t *filter) {
 
 		for(i = 0; i < phys_range_count; i++) {
 			kdb_printf("0x%-16" PRIxPHYS " 0x%-16" PRIxPHYS " %-8u %p\n",
-			           phys_ranges[i].start, phys_ranges[i].end,
-			           phys_ranges[i].freelist, phys_ranges[i].pages);
+				phys_ranges[i].start, phys_ranges[i].end,
+				phys_ranges[i].freelist, phys_ranges[i].pages);
 		}
 
 		page_stats_get(&stats);
@@ -777,12 +766,10 @@ __init_text void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsig
 		list->minaddr = start;
 		list->maxaddr = end;
 	} else {
-		if(start < list->minaddr) {
+		if(start < list->minaddr)
 			list->minaddr = start;
-		}
-		if(end > list->maxaddr) {
+		if(end > list->maxaddr)
 			list->maxaddr = end;
-		}
 	}
 
 	/* If we're contiguous with the previously recorded range (if any) and
@@ -796,9 +783,8 @@ __init_text void page_add_physical_range(phys_ptr_t start, phys_ptr_t end, unsig
 		}
 	}
 
-	if(phys_range_count >= PHYS_RANGE_MAX) {
+	if(phys_range_count >= PHYS_RANGE_MAX)
 		fatal("Too many physical memory ranges");
-	}
 
 	range = &phys_ranges[phys_range_count++];
 	range->start = start;
@@ -834,13 +820,13 @@ __init_text void page_init(void) {
 	kprintf(LOG_DEBUG, "page: usable physical memory ranges:\n");
 	for(i = 0; i < phys_range_count; i++) {
 		kprintf(LOG_DEBUG, " 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS " (%u)\n",
-		        phys_ranges[i].start, phys_ranges[i].end,
-		        phys_ranges[i].freelist);
+			phys_ranges[i].start, phys_ranges[i].end,
+			phys_ranges[i].freelist);
 	}
 	kprintf(LOG_DEBUG, "page: free list coverage:\n");
 	for(i = 0; i < PAGE_FREE_LIST_COUNT; i++) {
 		kprintf(LOG_DEBUG, " %u: 0x%016" PRIxPHYS " - 0x%016" PRIxPHYS "\n",
-		        i, free_page_lists[i].minaddr, free_page_lists[i].maxaddr);
+			i, free_page_lists[i].minaddr, free_page_lists[i].maxaddr);
 	}
 
 	/* Now we need to find a suitable free range to store the page
@@ -848,17 +834,16 @@ __init_text void page_init(void) {
 	 * that is accessible through the physical map area, as we cannot
 	 * currently map in any new memory. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		if(range->type != KBOOT_MEMORY_FREE) {
+		if(range->type != KBOOT_MEMORY_FREE)
 			continue;
-		}
 
-#if KERNEL_PMAP_OFFSET > 0
+		#if KERNEL_PMAP_OFFSET > 0
 		if(range->start >= KERNEL_PMAP_OFFSET && range->start < (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE)) {
 			size = MIN((phys_ptr_t)(KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE), range->end) - range->start;
-#else
+		#else
 		if(range->start < KERNEL_PMAP_SIZE) {
 			size = MIN((phys_ptr_t)KERNEL_PMAP_SIZE, range->end) - range->start;
-#endif
+		#endif
 			if(size > pages_size) {
 				pages_base = range->start;
 				pages_size = size;
@@ -868,13 +853,13 @@ __init_text void page_init(void) {
 
 	/* Now check if we have enough memory in this range. */
 	size = ROUND_UP(sizeof(page_t) * total_page_count, PAGE_SIZE);
-	if(size > pages_size) {
+	if(size > pages_size)
 		fatal("Not enough contiguous memory for initialization");
-	}
+
 	pages_size = size;
 
 	kprintf(LOG_DEBUG, "page: have %zu pages, using %" PRIuPHYS "KiB for structures at 0x%" PRIxPHYS "\n",
-	        total_page_count, pages_size / 1024, pages_base);
+		total_page_count, pages_size / 1024, pages_base);
 
 	/* Now for each memory range we have, create page structures. */
 	for(i = 0; i < phys_range_count; i++) {
@@ -921,7 +906,7 @@ __init_text void page_init(void) {
 			} else {
 				page->state = PAGE_STATE_FREE;
 				list_append(&free_page_lists[phys_ranges[page->phys_range].freelist].pages,
-				            &page->header);
+					&page->header);
 			}
 		}
 	}
@@ -935,9 +920,8 @@ __init_text void page_daemon_init(void) {
 	status_t ret;
 
 	ret = thread_create("page_writer", NULL, 0, page_writer, NULL, NULL, NULL, NULL);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		fatal("Could not start page writer (%d)", ret);
-	}
 }
 
 /** Reclaim memory no longer in use after kernel initialization. */
@@ -961,18 +945,16 @@ __init_text void page_late_init(void) {
 			 * the KBoot range could be split across more than one
 			 * of our internal ranges, and frees across range
 			 * boundaries are not allowed. */
-			for(addr = range->start; addr < range->end; addr += PAGE_SIZE) {
+			for(addr = range->start; addr < range->end; addr += PAGE_SIZE)
 				phys_free(addr, PAGE_SIZE);
-			}
 
 			reclaimed += (range->end - range->start);
 		}
 	}
 
 	/* Free the initialization data. Same as above applies. */
-	for(addr = init_start; addr < init_end; addr += PAGE_SIZE) {
+	for(addr = init_start; addr < init_end; addr += PAGE_SIZE)
 		phys_free(addr, PAGE_SIZE);
-	}
 
 	reclaimed += (init_end - init_start);
 

@@ -199,8 +199,9 @@ void object_wait_signal(void *_sync) {
  * @return		Status code describing result of the operation.
  */
 status_t object_handle_create(object_t *object, void *data, object_rights_t rights,
-                              process_t *process, int flags, object_handle_t **handlep,
-                              handle_t *idp, handle_t *uidp) {
+	process_t *process, int flags, object_handle_t **handlep, handle_t *idp,
+	handle_t *uidp)
+{
 	object_handle_t *handle;
 	status_t ret;
 
@@ -242,11 +243,11 @@ status_t object_handle_create(object_t *object, void *data, object_rights_t righ
  *			rights on the object.
  * @see			object_handle_create(). */
 status_t object_handle_open(object_t *object, void *data, object_rights_t rights,
-                            process_t *process, int flags, object_handle_t **handlep,
-                            handle_t *idp, handle_t *uidp) {
-	if(rights && (object_rights(object, process) & rights) != rights) {
+	process_t *process, int flags, object_handle_t **handlep, handle_t *idp,
+	handle_t *uidp)
+{
+	if(rights && (object_rights(object, process) & rights) != rights)
 		return STATUS_ACCESS_DENIED;
-	}
 
 	return object_handle_create(object, data, rights, process, flags, handlep, idp, uidp);
 }
@@ -278,9 +279,9 @@ void object_handle_release(object_handle_t *handle) {
 
 	/* If there are no more references we can close it. */
 	if(refcount_dec(&handle->count) == 0) {
-		if(handle->object->type->close) {
+		if(handle->object->type->close)
 			handle->object->type->close(handle);
-		}
+
 		slab_cache_free(object_handle_cache, handle);
 	}
 }
@@ -319,16 +320,16 @@ static void handle_table_insert(handle_table_t *table, handle_t id, object_handl
  * @return		Status code describing result of the operation.
  */
 status_t object_handle_attach(object_handle_t *handle, process_t *process, int flags,
-                              handle_t *idp, handle_t *uidp) {
+	handle_t *idp, handle_t *uidp)
+{
 	status_t ret;
 	handle_t id;
 
 	assert(handle);
 	assert(idp || uidp);
 
-	if(!process) {
+	if(!process)
 		process = curr_proc;
-	}
 
 	rwlock_write_lock(&process->handles->lock);
 
@@ -353,10 +354,9 @@ status_t object_handle_attach(object_handle_t *handle, process_t *process, int f
 	rwlock_unlock(&process->handles->lock);
 
 	dprintf("object: allocated handle %d in process %" PRId32 " (object: %p, data: %p)\n",
-	        id, process->id, handle->object, handle->data);
-	if(idp) {
+		id, process->id, handle->object, handle->data);
+	if(idp)
 		*idp = id;
-	}
 	return STATUS_SUCCESS;
 }
 
@@ -369,9 +369,8 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 
 	/* Look up the handle in the tree. */
 	link = avl_tree_lookup(&process->handles->tree, id);
-	if(!link) {
+	if(!link)
 		return STATUS_INVALID_HANDLE;
-	}
 
 	/* Remove from the tree and mark the ID as free. */
 	avl_tree_remove(&process->handles->tree, &link->link);
@@ -382,7 +381,7 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 	kfree(link);
 
 	dprintf("object: detached handle %" PRId32 " from process %" PRId32 "\n",
-	        id, process->id);
+		id, process->id);
 	return STATUS_SUCCESS;
 }
 
@@ -401,9 +400,8 @@ static status_t object_handle_detach_unsafe(process_t *process, handle_t id) {
 status_t object_handle_detach(process_t *process, handle_t id) {
 	status_t ret;
 
-	if(!process) {
+	if(!process)
 		process = curr_proc;
-	}
 
 	rwlock_write_lock(&process->handles->lock);
 	ret = object_handle_detach_unsafe(process, id);
@@ -484,7 +482,8 @@ status_t object_handle_lookup(handle_t id, int type, object_rights_t rights, obj
  *			can only occur when handle mappings are specified.
  */
 status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int count,
-                             handle_table_t **tablep) {
+	handle_table_t **tablep)
+{
 	handle_table_t *table;
 	handle_link_t *link;
 	int i;
@@ -515,15 +514,16 @@ status_t handle_table_create(handle_table_t *parent, handle_t map[][2], int coun
 					return STATUS_ALREADY_EXISTS;
 				}
 
-				handle_table_insert(table, map[i][1], link->handle, link->flags);
+				handle_table_insert(table, map[i][1], link->handle,
+					link->flags);
 			}
 		} else {
 			AVL_TREE_FOREACH(&parent->tree, iter) {
 				link = avl_tree_entry(iter, handle_link_t);
 
 				if(link->flags & HANDLE_INHERITABLE) {
-					handle_table_insert(table, iter->key, link->handle,
-					                    link->flags);
+					handle_table_insert(table, iter->key,
+						link->handle, link->flags);
 				}
 			}
 		}
@@ -613,9 +613,9 @@ static kdb_status_t kdb_cmd_handles(int argc, char **argv, kdb_filter_t *filter)
 	AVL_TREE_FOREACH(&process->handles->tree, iter) {
 		link = avl_tree_entry(iter, handle_link_t);
 		kdb_printf("%-5" PRIu64 " %-18p %d(%-18p) %-6d %p\n",
-		           iter->key, link->handle->object, link->handle->object->type->id,
-		           link->handle->object->type, refcount_get(&link->handle->count),
-		           link->handle->data);
+			iter->key, link->handle->object, link->handle->object->type->id,
+			link->handle->object->type, refcount_get(&link->handle->count),
+			link->handle->data);
 	}
 
 	return KDB_SUCCESS;
@@ -667,9 +667,8 @@ static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) 
 		return KDB_FAILURE;
 	}
 
-	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS) {
+	if(kdb_parse_expression(argv[1], &addr, NULL) != KDB_SUCCESS)
 		return KDB_FAILURE;
-	}
 
 	object = (object_t *)((ptr_t)addr);
 
@@ -689,15 +688,18 @@ static kdb_status_t kdb_cmd_object(int argc, char **argv, kdb_filter_t *filter) 
 
 /** Initialize the handle caches. */
 __init_text void handle_init(void) {
-	object_handle_cache = slab_cache_create("object_handle_cache", sizeof(object_handle_t),
-	                                        0, NULL, NULL, NULL, 0, MM_BOOT);
-	handle_table_cache = slab_cache_create("handle_table_cache", sizeof(handle_table_t),
-	                                       0, handle_table_ctor, NULL, NULL, 0,
-	                                       MM_BOOT);
+	object_handle_cache = slab_cache_create("object_handle_cache",
+		sizeof(object_handle_t), 0, NULL, NULL, NULL, 0,
+		MM_BOOT);
+	handle_table_cache = slab_cache_create("handle_table_cache",
+		sizeof(handle_table_t), 0, handle_table_ctor, NULL, NULL, 0,
+		MM_BOOT);
 
 	/* Register the KDB commands. */
-	kdb_register_command("handles", "Inspect a process' handle table.", kdb_cmd_handles);
-	kdb_register_command("object", "Show information about a kernel object.", kdb_cmd_object);
+	kdb_register_command("handles", "Inspect a process' handle table.",
+		kdb_cmd_handles);
+	kdb_register_command("object", "Show information about a kernel object.",
+		kdb_cmd_object);
 }
 
 /** Get the type of an object referred to by a handle.
@@ -708,9 +710,8 @@ int kern_object_type(handle_t handle) {
 	object_handle_t *khandle;
 	int ret;
 
-	if(object_handle_lookup(handle, -1, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, -1, 0, &khandle) != STATUS_SUCCESS)
 		return -1;
-	}
 
 	ret = khandle->object->type->id;
 	object_handle_release(khandle);
@@ -734,22 +735,19 @@ status_t kern_object_wait(object_event_t *events, size_t count, useconds_t timeo
 	status_t ret, err;
 	size_t i = 0;
 
-	if(!count || count > 1024 || !events) {
+	if(!count || count > 1024 || !events)
 		return STATUS_INVALID_ARG;
-	}
 
 	/* Use of kcalloc() is important: the structures must be zeroed
 	 * initially for the cleanup code to work correctly. */
 	syncs = kcalloc(count, sizeof(*syncs), 0);
-	if(!syncs) {
+	if(!syncs)
 		return STATUS_NO_MEMORY;
-	}
 
 	for(i = 0; i < count; i++) {
 		ret = memcpy_from_user(&syncs[i].info, &events[i], sizeof(*events));
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto out;
-		}
 
 		syncs[i].sem = &sem;
 		syncs[i].info.signalled = false;
@@ -780,9 +778,8 @@ out:
 
 		if(ret == STATUS_SUCCESS) {
 			err = memcpy_to_user(&events[i], &syncs[i].info, sizeof(*events));
-			if(err != STATUS_SUCCESS) {
+			if(err != STATUS_SUCCESS)
 				ret = err;
-			}
 		}
 	}
 
@@ -811,6 +808,7 @@ status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
 		rwlock_unlock(&curr_proc->handles->lock);
 		return STATUS_INVALID_HANDLE;
 	}
+
 	khandle = link->handle;
 
 	/* Perform the action. Implementation of HANDLE_{G,S}ET_FLAGS is left
@@ -851,9 +849,9 @@ status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
 	}
 
 	rwlock_unlock(&curr_proc->handles->lock);
-	if(ret == STATUS_SUCCESS && outp) {
+	if(ret == STATUS_SUCCESS && outp)
 		ret = memcpy_to_user(outp, &kout, sizeof(int));
-	}
+
 	return ret;
 }
 
@@ -876,14 +874,12 @@ status_t kern_handle_control(handle_t handle, int action, int arg, int *outp) {
 status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handle_t *newp) {
 	handle_link_t *link;
 
-	if(handle >= CONFIG_HANDLE_MAX || dest >= CONFIG_HANDLE_MAX || !newp) {
+	if(handle >= CONFIG_HANDLE_MAX || dest >= CONFIG_HANDLE_MAX || !newp)
 		return STATUS_INVALID_ARG;
-	}
 
 	/* FIXME: Laziness! */
-	if(!force && dest > 0) {
+	if(!force && dest > 0)
 		return STATUS_NOT_IMPLEMENTED;
-	}
 
 	rwlock_write_lock(&curr_proc->handles->lock);
 
@@ -910,7 +906,7 @@ status_t kern_handle_duplicate(handle_t handle, handle_t dest, bool force, handl
 	handle_table_insert(curr_proc->handles, dest, link->handle, link->flags);
 
 	dprintf("object: duplicated handle %d to %d in process %" PRId32 " (object: %p, data: %p)\n",
-	        handle, dest, curr_proc->id, link->handle->object, link->handle->data);
+		handle, dest, curr_proc->id, link->handle->object, link->handle->data);
 	rwlock_unlock(&curr_proc->handles->lock);
 	return memcpy_to_user(newp, &dest, sizeof(*newp));
 }

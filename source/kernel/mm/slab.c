@@ -69,10 +69,10 @@ typedef struct slab_magazine {
 } slab_magazine_t;
 
 /** Slab per-CPU cache structure. */
-typedef struct slab_percpu {
+typedef struct __cacheline_aligned slab_percpu {
 	slab_magazine_t *loaded;		/**< Current (loaded) magazine. */
 	slab_magazine_t *previous;		/**< Previous magazine. */
-} __cacheline_aligned slab_percpu_t;
+} slab_percpu_t;
 
 /** Slab buffer control structure.
  * @note		The order of this structure is important: the pointer
@@ -211,9 +211,8 @@ static inline slab_t *slab_create(slab_cache_t *cache, int mmflag) {
 	/* Success - update the cache colour and return. Do not add to any
 	 * slab lists - the caller will do so. */
 	cache->colour_next += cache->align;
-	if(cache->colour_next > cache->colour_max) {
+	if(cache->colour_next > cache->colour_max)
 		cache->colour_next = 0;
-	}
 
 	return slab;
 }
@@ -234,9 +233,9 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 	if(cache->flags & SLAB_CACHE_LARGE) {
 		hash = fnv_hash_integer((ptr_t)obj) % SLAB_HASH_SIZE;
 		for(bufctl = cache->bufctl_hash[hash]; bufctl; bufctl = bufctl->next) {
-			if(bufctl->object == obj) {
+			if(bufctl->object == obj)
 				break;
-			}
+
 			prev = bufctl;
 		}
 
@@ -259,15 +258,13 @@ static inline void slab_obj_free(slab_cache_t *cache, void *obj) {
 		/* Find the slab corresponding to the object. The structure
 		 * will be at the end of the slab. */
 		slab = (slab_t *)(ROUND_DOWN((ptr_t)obj, cache->slab_size) + (cache->slab_size - sizeof(slab_t)));
-		if(unlikely(slab->parent != cache)) {
+		if(unlikely(slab->parent != cache))
 			fatal("Free (%s): slab structure for %p invalid (%p)", cache->name, obj, slab->parent);
-		}
 	}
 
 	/* Call the object destructor. */
-	if(cache->dtor) {
+	if(cache->dtor)
 		cache->dtor(obj, cache->data);
-	}
 
 	assert(slab->refcount);
 
@@ -340,9 +337,9 @@ static inline void *slab_obj_alloc(slab_cache_t *cache, int mmflag) {
 	/* Construct the object and return it. Unlock the cache before calling
 	 * the constructor as it may cause a reclaim. */
 	mutex_unlock(&cache->slab_lock);
-	if(cache->ctor) {
+	if(cache->ctor)
 		cache->ctor(obj, cache->data);
-	}
+
 	return obj;
 }
 
@@ -419,9 +416,8 @@ static inline void slab_magazine_destroy(slab_cache_t *cache, slab_magazine_t *m
 	size_t i;
 
 	/* Free all rounds within the magazine, if any. */
-	for(i = 0; i < mag->rounds; i++) {
+	for(i = 0; i < mag->rounds; i++)
 		slab_obj_free(cache, mag->objects[i]);
-	}
 
 	list_remove(&mag->header);
 	slab_cache_free(&slab_mag_cache, mag);
@@ -540,10 +536,10 @@ void *slab_cache_alloc(slab_cache_t *cache, int mmflag) {
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_cpu_obj_alloc(cache);
 		if(likely(ret)) {
-#if CONFIG_SLAB_STATS
+			#if CONFIG_SLAB_STATS
 			atomic_inc(&cache->alloc_total);
 			atomic_inc(&cache->alloc_current);
-#endif
+			#endif
 			dprintf("slab: allocated %p from cache %s (%p) (magazine)\n", ret, cache->name, cache);
 			return ret;
 		}
@@ -552,10 +548,10 @@ void *slab_cache_alloc(slab_cache_t *cache, int mmflag) {
 	/* Cannot allocate from magazine layer, allocate from slab layer. */
 	ret = slab_obj_alloc(cache, mmflag);
 	if(likely(ret)) {
-#if CONFIG_SLAB_STATS
+		#if CONFIG_SLAB_STATS
 		atomic_inc(&cache->alloc_total);
 		atomic_inc(&cache->alloc_current);
-#endif
+		#endif
 		dprintf("slab: allocated %p from cache %s (%p) (slab)\n", ret, cache->name, cache);
 	}
 
@@ -570,9 +566,9 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		if(likely(slab_cpu_obj_free(cache, obj))) {
-#if CONFIG_SLAB_STATS
+			#if CONFIG_SLAB_STATS
 			atomic_dec(&cache->alloc_current);
-#endif
+			#endif
 			dprintf("slab: freed %p to cache %s (%p) (magazine)\n", obj, cache->name, cache);
 			return;
 		}
@@ -580,9 +576,9 @@ void slab_cache_free(slab_cache_t *cache, void *obj) {
 
 	/* Cannot free to magazine layer, free to slab layer. */
 	slab_obj_free(cache, obj);
-#if CONFIG_SLAB_STATS
+	#if CONFIG_SLAB_STATS
 	atomic_dec(&cache->alloc_current);
-#endif
+	#endif
 	dprintf("slab: freed %p to cache %s (%p) (slab)\n", obj, cache->name, cache);
 }
 
@@ -594,9 +590,8 @@ static status_t slab_percpu_init(slab_cache_t *cache, int mmflag) {
 	assert(slab_percpu_cache);
 
 	cache->cpu_caches = slab_cache_alloc(slab_percpu_cache, mmflag);
-	if(!cache->cpu_caches) {
+	if(!cache->cpu_caches)
 		return STATUS_NO_MEMORY;
-	}
 
 	memset(cache->cpu_caches, 0, sizeof(slab_percpu_t) * (highest_cpu_id + 1));
 	return STATUS_SUCCESS;
@@ -617,9 +612,10 @@ static status_t slab_percpu_init(slab_cache_t *cache, int mmflag) {
  * @param flags		Flags to modify the behaviour of the cache.
  * @param mmflag	Allocation behaviour flags.
  * @return		Status code describing result of the operation. */
-static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t size, size_t align,
-				slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
-				int flags, int mmflag) {
+static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t size,
+	size_t align, slab_ctor_t ctor, slab_dtor_t dtor, void *data, int priority,
+	int flags, int mmflag)
+{
 	slab_cache_t *exist;
 	status_t ret;
 
@@ -634,10 +630,10 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 	list_init(&cache->slab_partial);
 	list_init(&cache->slab_full);
 	list_init(&cache->header);
-#if CONFIG_SLAB_STATS
+	#if CONFIG_SLAB_STATS
 	atomic_set(&cache->alloc_current, 0);
 	atomic_set(&cache->alloc_total, 0);
-#endif
+	#endif
 	cache->slab_count = 0;
 
 	memset(cache->bufctl_hash, 0, sizeof(cache->bufctl_hash));
@@ -665,9 +661,8 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 
 		/* Compute the appropriate slab size. */
 		cache->slab_size = ROUND_UP(cache->obj_size, PAGE_SIZE);
-		while((cache->slab_size % cache->obj_size) > (cache->slab_size / SLAB_WASTE_FRACTION)) {
+		while((cache->slab_size % cache->obj_size) > (cache->slab_size / SLAB_WASTE_FRACTION))
 			cache->slab_size += PAGE_SIZE;
-		}
 
 		cache->obj_count = cache->slab_size / cache->obj_size;
 		cache->colour_max = cache->slab_size - (cache->obj_count * cache->obj_size);
@@ -679,21 +674,20 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 
 	/* If we want the magazine layer to be enabled but the CPU count is
 	 * not known, disable it until it is known. */
-	if(!(cache->flags & SLAB_CACHE_NOMAG) && !slab_percpu_cache) {
+	if(!(cache->flags & SLAB_CACHE_NOMAG) && !slab_percpu_cache)
 		cache->flags |= (SLAB_CACHE_NOMAG | SLAB_CACHE_LATEMAG);
-	}
 
 	/* Initialize the CPU caches if required. */
 	if(!(cache->flags & SLAB_CACHE_NOMAG)) {
 		ret = slab_percpu_init(cache, mmflag);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
+
+	mutex_lock(&slab_caches_lock);
 
 	/* Add the cache to the global cache list, keeping it ordered by
 	 * priority. */
-	mutex_lock(&slab_caches_lock);
 	if(list_empty(&slab_caches)) {
 		list_append(&slab_caches, &cache->header);
 	} else {
@@ -709,6 +703,7 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
 			}
 		}
 	}
+
 	mutex_unlock(&slab_caches_lock);
 
 	dprintf("slab: created cache %s (%p) (obj_size: %u, slab_size: %u, align: %u)\n",
@@ -729,17 +724,18 @@ static status_t slab_cache_init(slab_cache_t *cache, const char *name, size_t si
  * @param mmflag	Allocation behaviour flags.
  * @return		Pointer to cache on success, NULL on failure. */
 slab_cache_t *slab_cache_create(const char *name, size_t size, size_t align,
-				slab_ctor_t ctor, slab_dtor_t dtor, void *data,
-				int flags, int mmflag) {
+	slab_ctor_t ctor, slab_dtor_t dtor, void *data, int flags,
+	int mmflag)
+{
 	slab_cache_t *cache;
 
 	cache = slab_cache_alloc(&slab_cache_cache, mmflag);
-	if(!cache) {
+	if(!cache)
 		return NULL;
-	}
 
-	if(slab_cache_init(cache, name, size, align, ctor, dtor, data, SLAB_DEFAULT_PRIORITY,
-			   flags, mmflag) != STATUS_SUCCESS) {
+	if(slab_cache_init(cache, name, size, align, ctor, dtor, data,
+		SLAB_DEFAULT_PRIORITY, flags, mmflag) != STATUS_SUCCESS)
+	{
 		slab_cache_free(&slab_cache_cache, cache);
 		return NULL;
 	}
@@ -755,21 +751,20 @@ void slab_cache_destroy(slab_cache_t *cache) {
 	mutex_lock(&cache->depot_lock);
 
 	/* Destroy empty magazines. */
-	LIST_FOREACH_SAFE(&cache->magazine_empty, iter) {
+	LIST_FOREACH_SAFE(&cache->magazine_empty, iter)
 		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-	}
 
 	/* Destroy full magazines. */
-	LIST_FOREACH_SAFE(&cache->magazine_full, iter) {
+	LIST_FOREACH_SAFE(&cache->magazine_full, iter)
 		slab_magazine_destroy(cache, list_entry(iter, slab_magazine_t, header));
-	}
 
 	mutex_unlock(&cache->depot_lock);
 
 	mutex_lock(&cache->slab_lock);
-	if(!list_empty(&cache->slab_partial) || !list_empty(&cache->slab_full)) {
+
+	if(!list_empty(&cache->slab_partial) || !list_empty(&cache->slab_full))
 		fatal("Cache %s still has allocations during destruction", cache->name);
-	}
+
 	mutex_unlock(&cache->slab_lock);
 
 	mutex_lock(&slab_caches_lock);
@@ -793,28 +788,28 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 		return KDB_SUCCESS;
 	}
 
-#if CONFIG_SLAB_STATS
+	#if CONFIG_SLAB_STATS
 	kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count Current Total\n");
 	kdb_printf("====                      =====  ======== ========= ===== ========== ======= =====\n");
-#else
+	#else
 	kdb_printf("Name                      Align  Obj Size Slab Size Flags Slab Count\n");
 	kdb_printf("====                      =====  ======== ========= ===== ==========\n");
-#endif
+	#endif
 
 	LIST_FOREACH(&slab_caches, iter) {
 		cache = list_entry(iter, slab_cache_t, header);
 
-#if CONFIG_SLAB_STATS
+		#if CONFIG_SLAB_STATS
 		kdb_printf("%-*s %-6zu %-8zu %-9zu %-5d %-10zu %-7d %d\n",
-			   SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-			   cache->slab_size, cache->flags, cache->slab_count,
-			   atomic_get(&cache->alloc_current),
-		           atomic_get(&cache->alloc_total));
-#else
+			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			cache->slab_size, cache->flags, cache->slab_count,
+			atomic_get(&cache->alloc_current),
+			atomic_get(&cache->alloc_total));
+		#else
 		kdb_printf("%-*s %-6zu %-8zu %-9zu %-5d %zu\n",
-			   SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
-			   cache->slab_size, cache->flags, cache->slab_count);
-#endif
+			SLAB_NAME_MAX, cache->name, cache->align, cache->obj_size,
+			cache->slab_size, cache->flags, cache->slab_count);
+		#endif
 	}
 
 	return KDB_SUCCESS;
@@ -823,19 +818,23 @@ static kdb_status_t kdb_cmd_slab(int argc, char **argv, kdb_filter_t *filter) {
 /** Initialize the slab allocator. */
 __init_text void slab_init(void) {
 	/* Intialise the cache for cache structures. */
-	slab_cache_init(&slab_cache_cache, "slab_cache_cache", SLAB_SIZE_ALIGN(slab_cache_t),
-	                NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_BOOT);
+	slab_cache_init(&slab_cache_cache, "slab_cache_cache",
+		SLAB_SIZE_ALIGN(slab_cache_t), NULL, NULL, NULL,
+		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
 
 	/* Initialize the magazine cache. This cannot have the magazine layer
 	 * enabled, for pretty obvious reasons. */
-	slab_cache_init(&slab_mag_cache, "slab_mag_cache", SLAB_SIZE_ALIGN(slab_magazine_t),
-	                NULL, NULL, NULL, SLAB_MAG_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
+	slab_cache_init(&slab_mag_cache, "slab_mag_cache",
+		SLAB_SIZE_ALIGN(slab_magazine_t), NULL, NULL, NULL,
+		SLAB_MAG_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
 
 	/* Create other internal caches. */
-	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache", SLAB_SIZE_ALIGN(slab_bufctl_t),
-	                NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_BOOT);
-	slab_cache_init(&slab_slab_cache, "slab_slab_cache", SLAB_SIZE_ALIGN(slab_t),
-	                NULL, NULL, NULL, SLAB_METADATA_PRIORITY, 0, MM_BOOT);
+	slab_cache_init(&slab_bufctl_cache, "slab_bufctl_cache",
+		SLAB_SIZE_ALIGN(slab_bufctl_t), NULL, NULL, NULL,
+		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
+	slab_cache_init(&slab_slab_cache, "slab_slab_cache",
+		SLAB_SIZE_ALIGN(slab_t), NULL, NULL, NULL,
+		SLAB_METADATA_PRIORITY, 0, MM_BOOT);
 
 	/* Register the KDB command. */
 	kdb_register_command("slab", "Display slab cache statistics.", kdb_cmd_slab);
@@ -849,8 +848,9 @@ __init_text void slab_late_init(void) {
 	/* Create the cache for per-CPU structures. */
 	size = sizeof(slab_percpu_t) * (highest_cpu_id + 1);
 	slab_percpu_cache = slab_cache_alloc(&slab_cache_cache, MM_BOOT);
-	slab_cache_init(slab_percpu_cache, "slab_percpu_cache", size, __alignof(slab_percpu_t),
-		NULL, NULL, NULL, SLAB_METADATA_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
+	slab_cache_init(slab_percpu_cache, "slab_percpu_cache", size,
+		__alignof(slab_percpu_t), NULL, NULL, NULL,
+		SLAB_METADATA_PRIORITY, SLAB_CACHE_NOMAG, MM_BOOT);
 
 	mutex_lock(&slab_caches_lock);
 

@@ -102,8 +102,8 @@ extern void process_detach(thread_t *thread);
 
 extern process_t *process_lookup_unsafe(process_id_t id);
 extern process_t *process_lookup(process_id_t id);
-extern status_t process_create(const char *const args[], const char *const env[], int flags,
-                               int priority, process_t *parent, process_t **procp);
+extern status_t process_create(const char *const args[], const char *const env[],
+	int flags, int priority, process_t *parent, process_t **procp);
 extern void process_exit(int status, int reason) __noreturn;
 
 extern void process_init(void);

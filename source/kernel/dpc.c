@@ -142,8 +142,8 @@ __init_text void dpc_init(void) {
 
 	/* Create the DPC thread */
 	ret = thread_create("dpc", NULL, 0, dpc_thread_func, NULL, NULL, NULL, &dpc_thread);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		fatal("Failed to create DPC thread: %d\n", ret);
-	}
+
 	thread_run(dpc_thread);
 }

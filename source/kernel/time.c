@@ -87,7 +87,8 @@ static timer_device_t *timer_device = NULL;
  * @param sec		Second (0-59).
  * @return		Number of microseconds since the epoch. */
 useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned hour,
-                        unsigned min, unsigned sec) {
+	unsigned min, unsigned sec)
+{
 	uint32_t seconds = 0;
 	unsigned i;
 
@@ -102,14 +103,12 @@ useconds_t time_to_unix(unsigned year, unsigned month, unsigned day, unsigned ho
 
 	/* If this year is a leap year, and we're past February, we need to
 	 * add another day. */
-	if(month > 2 && LEAPYR(year)) {
+	if(month > 2 && LEAPYR(year))
 		seconds += 24 * 60 * 60;
-	}
 
 	/* Add the days in each year before this year from 1970. */
-	for(i = 1970; i < year; i++) {
+	for(i = 1970; i < year; i++)
 		seconds += DAYS(i) * 24 * 60 * 60;
-	}
 
 	return SECS2USECS(seconds);
 }
@@ -165,9 +164,8 @@ void timer_device_set(timer_device_t *device) {
 	assert(!timer_device);
 
 	timer_device = device;
-	if(timer_device->type == TIMER_DEVICE_ONESHOT) {
+	if(timer_device->type == TIMER_DEVICE_ONESHOT)
 		curr_cpu->timer_enabled = true;
-	}
 
 	kprintf(LOG_NOTICE, "timer: activated timer device %s\n", device->name);
 }
@@ -188,9 +186,8 @@ static void timer_start_unsafe(timer_t *timer) {
 	pos = curr_cpu->timers.next;
 	while(pos != &curr_cpu->timers) {
 		exist = list_entry(pos, timer_t, header);
-		if(exist->target > timer->target) {
+		if(exist->target > timer->target)
 			break;
-		}
 
 		pos = pos->next;
 	}
@@ -214,9 +211,8 @@ bool timer_tick(void) {
 
 	assert(timer_device);
 
-	if(!curr_cpu->timer_enabled) {
+	if(!curr_cpu->timer_enabled)
 		return false;
-	}
 
 	spinlock_lock(&curr_cpu->timer_lock);
 
@@ -226,9 +222,8 @@ bool timer_tick(void) {
 
 		/* Since the list is ordered soonest expiry first, we can break
 		 * if the current timer has not expired. */
-		if(time < timer->target) {
+		if(time < timer->target)
 			break;
-		}
 
 		/* This timer has expired, remove it from the list. */
 		list_remove(&timer->header);
@@ -237,30 +232,28 @@ bool timer_tick(void) {
 		if(timer->flags & TIMER_THREAD) {
 			dpc_request(timer_dpc_request, timer);
 		} else {
-			if(timer->func(timer->data)) {
+			if(timer->func(timer->data))
 				preempt = true;
-			}
 		}
 
 		/* If the timer is periodic, restart it. */
-		if(timer->mode == TIMER_PERIODIC) {
+		if(timer->mode == TIMER_PERIODIC)
 			timer_start_unsafe(timer);
-		}
 	}
 
 	switch(timer_device->type) {
 	case TIMER_DEVICE_ONESHOT:
 		/* Prepare the next tick if there is still a timer in the list. */
-		if(!list_empty(&curr_cpu->timers)) {
+		if(!list_empty(&curr_cpu->timers))
 			timer_device_prepare(list_first(&curr_cpu->timers, timer_t, header));
-		}
+
 		break;
 	case TIMER_DEVICE_PERIODIC:
 		/* For periodic devices, if the list is empty disable the
 		 * device so the timer does not interrupt unnecessarily. */
-		if(list_empty(&curr_cpu->timers)) {
+		if(list_empty(&curr_cpu->timers))
 			timer_device_disable();
-		}
+
 		break;
 	}
 
@@ -288,9 +281,8 @@ void timer_init(timer_t *timer, const char *name, timer_func_t func, void *data,
  *			the function will do nothing.
  * @param mode		Mode for the timer. */
 void timer_start(timer_t *timer, useconds_t length, unsigned mode) {
-	if(length <= 0) {
+	if(length <= 0)
 		return;
-	}
 
 	timer->cpu = curr_cpu;
 	timer->mode = mode;
@@ -306,9 +298,9 @@ void timer_start(timer_t *timer, useconds_t length, unsigned mode) {
 		/* If the new timer is at the beginning of the list, then it
 		 * has the shortest remaining time, so we need to adjust the
 		 * device to tick for it. */
-		if(timer == list_first(&curr_cpu->timers, timer_t, header)) {
+		if(timer == list_first(&curr_cpu->timers, timer_t, header))
 			timer_device_prepare(timer);
-		}
+
 		break;
 	case TIMER_DEVICE_PERIODIC:
 		/* Enable the device. */
@@ -345,9 +337,9 @@ void timer_stop(timer_t *timer) {
 				}
 				break;
 			case TIMER_DEVICE_PERIODIC:
-				if(list_empty(&curr_cpu->timers)) {
+				if(list_empty(&curr_cpu->timers))
 					timer_device_disable();
-				}
+
 				break;
 			}
 		}
@@ -369,9 +361,8 @@ status_t delay_etc(useconds_t us, int flags) {
 	assert(us >= 0);
 
 	ret = thread_sleep(NULL, us, "usleep", flags);
-	if(likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK)) {
+	if(likely(ret == STATUS_TIMED_OUT || ret == STATUS_WOULD_BLOCK))
 		ret = STATUS_SUCCESS;
-	}
 
 	return ret;
 }
@@ -404,9 +395,8 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
 	}
 
 	if(argc == 2) {
-		if(kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS) {
+		if(kdb_parse_expression(argv[1], &id, NULL) != KDB_SUCCESS)
 			return KDB_FAILURE;
-		}
 
 		if(id > highest_cpu_id || !(cpu = cpus[id])) {
 			kdb_printf("Invalid CPU ID.\n");
@@ -423,7 +413,7 @@ static kdb_status_t kdb_cmd_timers(int argc, char **argv, kdb_filter_t *filter) 
 		timer = list_entry(iter, timer_t, header);
 
 		kdb_printf("%-20s %-16llu %-18p %p\n", timer->name, timer->target,
-		           timer->func, timer->data);
+			timer->func, timer->data);
 	}
 
 	return KDB_SUCCESS;
@@ -485,6 +475,7 @@ static status_t timer_object_wait(object_handle_t *handle, int event, void *sync
 		} else {
 			notifier_register(&timer->notifier, object_wait_notifier, sync);
 		}
+
 		return STATUS_SUCCESS;
 	default:
 		return STATUS_INVALID_EVENT;
@@ -520,14 +511,12 @@ static bool user_timer_func(void *_timer) {
 	user_timer_t *timer = _timer;
 
 	/* Send an alarm signal if required. */
-	if(timer->flags & TIMER_SIGNAL) {
+	if(timer->flags & TIMER_SIGNAL)
 		signal_send(timer->thread, SIGALRM, NULL, false);
-	}
 
 	/* Signal the event. */
-	if(!notifier_run(&timer->notifier, NULL, true)) {
+	if(!notifier_run(&timer->notifier, NULL, true))
 		timer->fired = true;
-	}
 
 	return false;
 }
@@ -579,14 +568,12 @@ status_t kern_timer_start(handle_t handle, useconds_t interval, unsigned mode) {
 	user_timer_t *timer;
 	status_t ret;
 
-	if(interval <= 0 || (mode != TIMER_ONESHOT && mode != TIMER_PERIODIC)) {
+	if(interval <= 0 || (mode != TIMER_ONESHOT && mode != TIMER_PERIODIC))
 		return STATUS_INVALID_ARG;
-	}
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	timer = (user_timer_t *)khandle->object;
 	timer_stop(&timer->timer);
@@ -606,9 +593,8 @@ status_t kern_timer_stop(handle_t handle, useconds_t *remp) {
 	status_t ret;
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_TIMER, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	timer = (user_timer_t *)khandle->object;
 	if(!list_empty(&timer->timer.header)) {

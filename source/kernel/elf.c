@@ -47,9 +47,10 @@ static bool elf_ehdr_check(elf_ehdr_t *ehdr) {
 	}
 
 	/* Check whether it matches the architecture we're running on. */
-	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS ||
-           ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN ||
-	   ehdr->e_machine != ELF_MACHINE) {
+	if(ehdr->e_ident[ELF_EI_CLASS] != ELF_CLASS
+		|| ehdr->e_ident[ELF_EI_DATA] != ELF_ENDIAN
+		|| ehdr->e_machine != ELF_MACHINE)
+	{
 		return false;
 	}
 
@@ -102,9 +103,8 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 	}
 
 	/* Check that program headers are the right size... */
-	if(ehdr.e_phentsize != sizeof(elf_phdr_t)) {
+	if(ehdr.e_phentsize != sizeof(elf_phdr_t))
 		return STATUS_MALFORMED_IMAGE;
-	}
 
 	/* Allocate some memory for the program headers and load them too. */
 	size = ehdr.e_phnum * ehdr.e_phentsize;
@@ -120,9 +120,8 @@ status_t elf_binary_reserve(object_handle_t *handle, vm_aspace_t *as) {
 
 	/* Reserve space for each LOAD header. */
 	for(i = 0; i < ehdr.e_phnum; i++) {
-		if(phdrs[i].p_type != ELF_PT_LOAD) {
+		if(phdrs[i].p_type != ELF_PT_LOAD)
 			continue;
-		}
 
 		start = ROUND_DOWN(phdrs[i].p_vaddr, PAGE_SIZE);
 		end = ROUND_UP(phdrs[i].p_vaddr + phdrs[i].p_memsz, PAGE_SIZE);
@@ -162,9 +161,8 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 
 	/* Set the fixed flag, and the private flag if mapping as writeable. */
 	flags |= VM_MAP_FIXED;
-	if(flags & VM_MAP_WRITE) {
+	if(flags & VM_MAP_WRITE)
 		flags |= VM_MAP_PRIVATE;
-	}
 
 	/* Map an anonymous region if memory size is greater than file size. */
 	if(phdr->p_memsz > phdr->p_filesz) {
@@ -183,15 +181,13 @@ static status_t elf_binary_phdr_load(elf_binary_t *binary, elf_phdr_t *phdr, siz
 
 		/* Create an anonymous memory region for it. */
 		ret = vm_map(binary->as, start, size, flags, NULL, 0, NULL);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	/* If file size is zero then this header is just uninitialized data. */
-	if(phdr->p_filesz == 0) {
+	if(phdr->p_filesz == 0)
 		return STATUS_SUCCESS;
-	}
 
 	/* Work out the address to map to and the offset in the file. */
 	start = binary->load_base + ROUND_DOWN(phdr->p_vaddr, PAGE_SIZE);
@@ -265,27 +261,24 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	 * map a chunk into the address space for it. */
 	if(binary->ehdr.e_type == ELF_ET_DYN) {
 		for(i = 0, binary->load_size = 0; i < binary->ehdr.e_phnum; i++) {
-			if(binary->phdrs[i].p_type != ELF_PT_LOAD) {
+			if(binary->phdrs[i].p_type != ELF_PT_LOAD)
 				continue;
-			}
+
 			if((binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz) > binary->load_size) {
 				binary->load_size = ROUND_UP(
 					binary->phdrs[i].p_vaddr + binary->phdrs[i].p_memsz,
-					PAGE_SIZE
-				);
+					PAGE_SIZE);
 			}
 		}
 
 		/* If a location is specified, force the binary to be there. */
 		flags = VM_MAP_READ | VM_MAP_PRIVATE;
-		if(dest) {
+		if(dest)
 			flags |= VM_MAP_FIXED;
-		}
 
 		ret = vm_map(binary->as, dest, binary->load_size, flags, NULL, 0, &binary->load_base);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto fail;
-		}
 	} else {
 		binary->load_base = 0;
 		binary->load_size = 0;
@@ -296,9 +289,9 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
 			ret = elf_binary_phdr_load(binary, &binary->phdrs[i], i);
-			if(ret != STATUS_SUCCESS) {
+			if(ret != STATUS_SUCCESS)
 				goto fail;
-			}
+
 			load_count++;
 			break;
 		case ELF_PT_TLS:
@@ -323,7 +316,7 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 			goto fail;
 		default:
 			kprintf(LOG_WARN, "elf: unhandled program header type %u\n",
-			        binary->phdrs[i].p_type);
+				binary->phdrs[i].p_type);
 			ret = STATUS_NOT_SUPPORTED;
 			goto fail;
 		}
@@ -339,9 +332,9 @@ status_t elf_binary_load(object_handle_t *handle, vm_aspace_t *as, ptr_t dest, v
 	*datap = binary;
 	return STATUS_SUCCESS;
 fail:
-	if(binary->phdrs) {
+	if(binary->phdrs)
 		kfree(binary->phdrs);
-	}
+
 	kfree(binary);
 	return ret;
 }
@@ -358,9 +351,8 @@ ptr_t elf_binary_finish(void *data) {
 	for(i = 0; i < binary->ehdr.e_phnum; i++) {
 		switch(binary->phdrs[i].p_type) {
 		case ELF_PT_LOAD:
-			if(binary->phdrs[i].p_filesz >= binary->phdrs[i].p_memsz) {
+			if(binary->phdrs[i].p_filesz >= binary->phdrs[i].p_memsz)
 				break;
-			}
 
 			base = binary->load_base + binary->phdrs[i].p_vaddr + binary->phdrs[i].p_filesz;
 			dprintf("elf: clearing BSS for program header %zu at %p\n", i, base);
@@ -402,9 +394,8 @@ static elf_shdr_t *elf_module_find_section(module_t *module, const char *name) {
 	strtab = (const char *)elf_module_get_section(module, module->ehdr.e_shstrndx)->sh_addr;
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
 		sect = elf_module_get_section(module, i);
-		if(strcmp(strtab + sect->sh_name, name) == 0) {
+		if(strcmp(strtab + sect->sh_name, name) == 0)
 			return sect;
-		}
 	}
 
 	return NULL;
@@ -465,9 +456,9 @@ static status_t elf_module_load_sections(module_t *module) {
 		case ELF_SHT_NOBITS:
 		case ELF_SHT_STRTAB:
 		case ELF_SHT_SYMTAB:
-			if(sect->sh_addralign) {
+			if(sect->sh_addralign)
 				module->load_size = ROUND_UP(module->load_size, sect->sh_addralign);
-			}
+
 			module->load_size += sect->sh_size;
 			break;
 		}
@@ -480,22 +471,21 @@ static status_t elf_module_load_sections(module_t *module) {
 
 	/* Allocate space to load the module into. */
 	module->load_base = dest = module_mem_alloc(module->load_size);
-	if(!module->load_base) {
+	if(!module->load_base)
 		return STATUS_NO_MEMORY;
-	}
 
 	/* For each section, read its data into the allocated area. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
 		sect = elf_module_get_section(module, i);
 		switch(sect->sh_type) {
 		case ELF_SHT_NOBITS:
-			if(sect->sh_addralign) {
+			if(sect->sh_addralign)
 				dest = (void *)ROUND_UP((ptr_t)dest, sect->sh_addralign);
-			}
+
 			sect->sh_addr = (elf_addr_t)dest;
 
 			dprintf("elf: clearing nobits section %u at %p (size: %u)\n",
-			        i, dest, sect->sh_size);
+				i, dest, sect->sh_size);
 
 			memset(dest, 0, sect->sh_size);
 			dest += sect->sh_size;
@@ -509,7 +499,7 @@ static status_t elf_module_load_sections(module_t *module) {
 			sect->sh_addr = (elf_addr_t)dest;
 
 			dprintf("elf: loading data for section %u to %p (size: %u, type: %u)\n",
-			        i, dest, sect->sh_size, sect->sh_type);
+				i, dest, sect->sh_size, sect->sh_type);
 
 			/* Read the section data in. */
 			ret = file_pread(module->handle, dest, sect->sh_size, sect->sh_offset, &bytes);
@@ -547,15 +537,13 @@ static status_t elf_module_load_symbols(module_t *module) {
 	strtab = (const char *)elf_module_get_section(module, symtab->sh_link)->sh_addr;
 	for(i = 0; i < symtab->sh_size / symtab->sh_entsize; i++) {
 		sym = (elf_sym_t *)(symtab->sh_addr + (symtab->sh_entsize * i));
-		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > module->ehdr.e_shnum) {
+		if(sym->st_shndx == ELF_SHN_UNDEF || sym->st_shndx > module->ehdr.e_shnum)
 			continue;
-		}
 
 		/* Get the section that the symbol corresponds to. */
 		sect = elf_module_get_section(module, sym->st_shndx);
-		if((sect->sh_flags & ELF_SHF_ALLOC) == 0) {
+		if((sect->sh_flags & ELF_SHF_ALLOC) == 0)
 			continue;
-		}
 
 		/* Fix up the symbol address. */
 		sym->st_value += sect->sh_addr;
@@ -570,8 +558,8 @@ static status_t elf_module_load_symbols(module_t *module) {
 
 		/* Don't mark as exported yet, we handle exports later. */
 		symbol_table_insert(&module->symtab, strtab + sym->st_name, sym->st_value,
-		                    sym->st_size, (ELF_ST_BIND(sym->st_info)) ? true : false,
-		                    false);
+			sym->st_size, (ELF_ST_BIND(sym->st_info)) ? true : false,
+			false);
 
 		dprintf("elf: added symbol %s to module %p (addr: %p, size: %p)\n",
 			strtab + sym->st_name, module, sym->st_value, sym->st_size);
@@ -604,9 +592,8 @@ static status_t elf_module_relocate_rel(module_t *module, elf_shdr_t *sect, elf_
 
 		/* Apply the relocation. */
 		ret = elf_module_apply_rel(module, &rel, target);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -636,9 +623,8 @@ static status_t elf_module_relocate_rela(module_t *module, elf_shdr_t *sect, elf
 
 		/* Apply the relocation. */
 		ret = elf_module_apply_rela(module, &rel, target);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -672,20 +658,17 @@ static status_t elf_module_relocate(module_t *module, bool info) {
 	/* Look for relocation sections in the module. */
 	for(i = 0; i < module->ehdr.e_shnum; i++) {
 		sect = elf_module_get_section(module, i);
-		if(sect->sh_type != ELF_SHT_REL && sect->sh_type != ELF_SHT_RELA) {
+		if(sect->sh_type != ELF_SHT_REL && sect->sh_type != ELF_SHT_RELA)
 			continue;
-		}
 
 		/* Check whether the target is a section we want to relocate. */
 		target = elf_module_get_section(module, sect->sh_info);
 		if(info) {
-			if(!is_info_section(strtab + target->sh_name)) {
+			if(!is_info_section(strtab + target->sh_name))
 				continue;
-			}
 		} else {
-			if(is_info_section(strtab + target->sh_name)) {
+			if(is_info_section(strtab + target->sh_name))
 				continue;
-			}
 		}
 
 		/* Perform the relocation. */
@@ -694,9 +677,8 @@ static status_t elf_module_relocate(module_t *module, bool info) {
 		} else {
 			ret = elf_module_relocate_rel(module, sect, target);
 		}
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -739,23 +721,20 @@ status_t elf_module_load(module_t *module) {
 
 	/* Load all loadable sections into memory. */
 	ret = elf_module_load_sections(module);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Populate the symbol table. */
 	ret = elf_module_load_symbols(module);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* Finally relocate the module information sections. We do not want to
 	 * fully relocate the module at this time as the module loader needs to
 	 * check its dependencies first. */
 	ret = elf_module_relocate(module, true);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	/* If there is an exports section, export all symbols defined in it. */
 	exports = elf_module_find_section(module, MODULE_EXPORT_SECTION);
@@ -767,7 +746,7 @@ status_t elf_module_load(module_t *module) {
 			sym = symbol_table_lookup_name(&module->symtab, export, true, false);
 			if(sym == NULL) {
 				dprintf("module: exported symbol %p in module %p cannot be found\n",
-				        export, module);
+					export, module);
 				return STATUS_MALFORMED_IMAGE;
 			}
 

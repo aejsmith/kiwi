@@ -56,7 +56,7 @@ typedef struct radix_tree {
 /** Iterates over all nodes with non-NULL values in a radix tree, setting iter
  *  to the node on each iteration. */
 #define RADIX_TREE_FOREACH(tree, iter)		\
-	for(radix_tree_node_t *iter = radix_tree_node_next(&(tree)->root);
+	for(radix_tree_node_t *iter = radix_tree_node_next(&(tree)->root); \
 		iter != NULL; iter = radix_tree_node_next(iter))
 
 /** Gets a radix tree node's data pointer and casts it to a certain type. */

@@ -57,10 +57,10 @@ static void shutdown_thread_entry(void *_action, void *arg2) {
 	process_shutdown();
 	kprintf(LOG_NOTICE, "system: unmounting filesystems...\n");
 	fs_shutdown();
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	kprintf(LOG_NOTICE, "system: shutting down other CPUs...\n");
 	smp_call_broadcast(shutdown_call_func, NULL, 0);
-#endif
+	#endif
 
 	switch(action) {
 	case SHUTDOWN_REBOOT:
@@ -91,8 +91,8 @@ void system_shutdown(int action) {
 		 * as it's possible that parts of the shutdown process will use
 		 * them, and if we're running in one, we'll block those DPCs
 		 * from executing. */
-		ret = thread_create("shutdown", NULL, 0, shutdown_thread_entry, (void *)((ptr_t)action),
-		                    NULL, NULL, NULL);
+		ret = thread_create("shutdown", NULL, 0, shutdown_thread_entry,
+			(void *)((ptr_t)action), NULL, NULL, NULL);
 		if(ret != STATUS_SUCCESS) {
 			/* FIXME: This shouldn't be able to fail, must reserve
 			 * a thread or something in case we've got too many
@@ -123,9 +123,8 @@ void system_shutdown(int action) {
  *			the CAP_SHUTDOWN capability.
  */
 status_t kern_shutdown(int action) {
-	if(!cap_check(NULL, CAP_SHUTDOWN)) {
+	if(!cap_check(NULL, CAP_SHUTDOWN))
 		return STATUS_PERM_DENIED;
-	}
 
 	system_shutdown(action);
 	fatal("Shouldn't get here");

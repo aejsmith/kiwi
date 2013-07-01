@@ -38,9 +38,9 @@ typedef struct mutex {
 	list_t threads;			/**< List of waiting threads. */
 	struct thread *holder;		/**< Thread holding the lock. */
 	const char *name;		/**< Name of the lock. */
-#if CONFIG_DEBUG
+	#if CONFIG_DEBUG
 	void *caller;			/**< Return address of lock call. */
-#endif
+	#endif
 } mutex_t;
 
 /** Initializes a statically declared mutex. */

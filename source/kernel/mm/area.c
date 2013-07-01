@@ -98,9 +98,9 @@ static void area_release(area_t *area) {
 		avl_tree_remove(&area_tree, &area->tree_link);
 		rwlock_unlock(&area_tree_lock);
 
-		if(area->source) {
+		if(area->source)
 			object_handle_release(area->source);
-		}
+
 		id_allocator_free(&area_id_allocator, area->id);
 		object_destroy(&area->obj);
 		slab_cache_free(area_cache, area);
@@ -122,20 +122,18 @@ static status_t area_object_mappable(object_handle_t *handle, int flags) {
 	area_t *area = (area_t *)handle->object;
 
 	if(flags & (VM_MAP_READ | VM_MAP_EXEC)) {
-		if(!object_handle_rights(handle, AREA_RIGHT_READ)) {
+		if(!object_handle_rights(handle, AREA_RIGHT_READ))
 			return STATUS_ACCESS_DENIED;
-		}
 	}
+
 	if(flags & VM_MAP_WRITE && !(flags & VM_MAP_PRIVATE)) {
-		if(!object_handle_rights(handle, AREA_RIGHT_WRITE)) {
+		if(!object_handle_rights(handle, AREA_RIGHT_WRITE))
 			return STATUS_ACCESS_DENIED;
-		}
 	}
 
 	/* If there is a source object, check whether we can map it. */
-	if(area->source && area->source->object->type->mappable) {
+	if(area->source && area->source->object->type->mappable)
 		return area->source->object->type->mappable(area->source, flags);
-	}
 
 	return STATUS_SUCCESS;
 }
@@ -185,10 +183,9 @@ static status_t area_object_get_page(object_handle_t *handle, offset_t offset, p
 static void area_object_release_page(object_handle_t *handle, offset_t offset, phys_ptr_t phys) {
 	area_t *area = (area_t *)handle->object;
 
-	if(area->source && area->source->object->type->release_page) {
-		/* Release the page in the source. */
+	/* Release the page in the source. */
+	if(area->source && area->source->object->type->release_page)
 		area->source->object->type->release_page(area->source, offset + area->offset, phys);
-	}
 }
 
 /** Memory area object type. */
@@ -211,16 +208,17 @@ static object_type_t area_object_type = {
  *			read/write access to the calling process' user.
  * @param rights	Access rights for the handle.
  * @return		Status code describing result of the operation. */
-status_t kern_area_create(size_t size, handle_t source, offset_t offset, const object_security_t *security,
-                          object_rights_t rights, handle_t *handlep) {
+status_t kern_area_create(size_t size, handle_t source, offset_t offset,
+	const object_security_t *security, object_rights_t rights,
+	handle_t *handlep)
+{
 	object_security_t ksecurity = { -1, -1, NULL };
 	object_handle_t *ksource = NULL;
 	status_t ret;
 	area_t *area;
 
-	if(size == 0 || size % PAGE_SIZE || !handlep) {
+	if(size == 0 || size % PAGE_SIZE || !handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	if(source >= 0) {
 		ret = object_handle_lookup(source, -1, 0, &ksource);
@@ -233,16 +231,16 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 
 	if(security) {
 		ret = object_security_from_user(&ksecurity, security, true);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			return ret;
-		}
 	}
 
 	/* Construct a default ACL if required. */
 	if(!ksecurity.acl) {
 		ksecurity.acl = kmalloc(sizeof(*ksecurity.acl), MM_WAIT);
 		object_acl_init(ksecurity.acl);
-		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1, AREA_RIGHT_READ | AREA_RIGHT_WRITE);
+		object_acl_add_entry(ksecurity.acl, ACL_ENTRY_USER, -1,
+			AREA_RIGHT_READ | AREA_RIGHT_WRITE);
 	}
 
 	area = slab_cache_alloc(area_cache, MM_WAIT);
@@ -250,11 +248,12 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 	if(area->id < 0) {
 		slab_cache_free(area_cache, area);
 		object_security_destroy(&ksecurity);
-		if(ksource) {
+		if(ksource)
 			object_handle_release(ksource);
-		}
+
 		return STATUS_NO_AREAS;
 	}
+
 	object_init(&area->obj, &area_object_type, &ksecurity, NULL);
 	object_security_destroy(&ksecurity);
 	refcount_set(&area->count, 1);
@@ -267,9 +266,9 @@ status_t kern_area_create(size_t size, handle_t source, offset_t offset, const o
 	rwlock_unlock(&area_tree_lock);
 
 	ret = object_handle_create(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		area_release(area);
-	}
+
 	return ret;
 }
 
@@ -282,9 +281,8 @@ status_t kern_area_open(area_id_t id, object_rights_t rights, handle_t *handlep)
 	status_t ret;
 	area_t *area;
 
-	if(!handlep) {
+	if(!handlep)
 		return STATUS_INVALID_ARG;
-	}
 
 	rwlock_read_lock(&area_tree_lock);
 
@@ -298,9 +296,9 @@ status_t kern_area_open(area_id_t id, object_rights_t rights, handle_t *handlep)
 	rwlock_unlock(&area_tree_lock);
 
 	ret = object_handle_open(&area->obj, NULL, rights, NULL, 0, NULL, NULL, handlep);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		area_release(area);
-	}
+
 	return ret;
 }
 
@@ -312,9 +310,8 @@ area_id_t kern_area_id(handle_t handle) {
 	area_id_t ret;
 	area_t *area;
 
-	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS)
 		return -1;
-	}
 
 	area = (area_t *)khandle->object;
 	ret = area->id;
@@ -330,9 +327,8 @@ size_t kern_area_size(handle_t handle) {
 	area_t *area;
 	size_t ret;
 
-	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS) {
+	if(object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle) != STATUS_SUCCESS)
 		return -1;
-	}
 
 	area = (area_t *)khandle->object;
 	ret = area->size;
@@ -350,14 +346,12 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 	status_t ret;
 	area_t *area;
 
-	if(size == 0 || size % PAGE_SIZE) {
+	if(size == 0 || size % PAGE_SIZE)
 		return STATUS_INVALID_ARG;
-	}
 
 	ret = object_handle_lookup(handle, OBJECT_TYPE_AREA, 0, &khandle);
-	if(ret != STATUS_SUCCESS) {
+	if(ret != STATUS_SUCCESS)
 		return ret;
-	}
 
 	area = (area_t *)khandle->object;
 	if(size < area->size) {
@@ -374,6 +368,7 @@ status_t kern_area_resize(handle_t handle, size_t size) {
 static __init_text void area_init(void) {
 	id_allocator_init(&area_id_allocator, 65535, MM_BOOT);
 	area_cache = slab_cache_create("area_cache", sizeof(area_t), 0, area_ctor,
-	                               NULL, NULL, 0, MM_BOOT);
+		NULL, NULL, 0, MM_BOOT);
 }
+
 INITCALL(area_init);

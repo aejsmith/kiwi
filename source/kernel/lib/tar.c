@@ -38,15 +38,13 @@
 static inline object_rights_t mode_to_rights(uint16_t mode) {
 	object_rights_t rights = 0;
 
-	if(mode & TOREAD) {
+	if(mode & TOREAD)
 		rights |= FILE_RIGHT_READ;
-	}
-	if(mode & TOWRITE) {
+	if(mode & TOWRITE)
 		rights |= FILE_RIGHT_WRITE;
-	}
-	if(mode & TOEXEC) {
+	if(mode & TOEXEC)
 		rights |= FILE_RIGHT_EXECUTE;
-	}
+
 	return rights;
 }
 
@@ -90,7 +88,8 @@ static status_t handle_tar_entry(tar_header_t *header, void *data, size_t size, 
 	switch(header->typeflag) {
 	case REGTYPE:
 	case AREGTYPE:
-		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS, &security, &handle);
+		ret = file_open(path, FILE_RIGHT_WRITE, 0, FILE_CREATE_ALWAYS,
+			&security, &handle);
 		if(ret != STATUS_SUCCESS) {
 			goto out;
 		}
@@ -159,9 +158,8 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 		}
 
 		/* Two NULL bytes in the name field indicates EOF. */
-		if(!header->name[0] && !header->name[1]) {
+		if(!header->name[0] && !header->name[1])
 			break;
-		}
 
 		/* Check validity of the header. */
 		if(bytes != sizeof(*header) || strncmp(header->magic, "ustar", 5) != 0) {
@@ -192,9 +190,8 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 
 		/* Process the entry. */
 		ret = handle_tar_entry(header, data, size, dest);
-		if(ret != STATUS_SUCCESS) {
+		if(ret != STATUS_SUCCESS)
 			goto fail;
-		}
 
 		if(data) {
 			kfree(data);
@@ -203,17 +200,15 @@ status_t tar_extract(object_handle_t *handle, const char *dest) {
 
 		/* 512 for the header, plus the file size if necessary. */
 		offset += 512;
-		if(size) {
+		if(size)
 			offset += ROUND_UP(size, 512);
-		}
 	}
 
 	kfree(header);
 	return STATUS_SUCCESS;
 fail:
-	if(data) {
+	if(data)
 		kfree(data);
-	}
 	kfree(header);
 	return ret;
 }
