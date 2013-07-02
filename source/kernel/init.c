@@ -51,11 +51,12 @@
 #include <kernel.h>
 #include <module.h>
 #include <object.h>
-#include <setjmp.h>
 #include <smp.h>
 #include <status.h>
 #include <symbol.h>
 #include <time.h>
+
+KBOOT_IMAGE();
 
 /** Structure describing a boot module. */
 typedef struct boot_module {
@@ -66,21 +67,17 @@ typedef struct boot_module {
 	char *name;			/**< Name of the module. */
 } boot_module_t;
 
-extern void kmain_bsp(uint32_t magic, phys_ptr_t tags);
+extern void kmain_bsp(uint32_t magic, kboot_tag_t *tags);
 #if CONFIG_SMP
 extern void kmain_ap(cpu_t *cpu);
 #endif
 extern initcall_t __initcall_start[], __initcall_end[];
 extern fs_mount_t *root_mount;
 
-static void kmain_bsp_bottom(void);
 static void init_thread(void *arg1, void *arg2);
 
-/** New stack for the boot CPU. */
-static uint8_t boot_stack[KSTACK_SIZE] __init_data __aligned(PAGE_SIZE);
-
 /** Address of the KBoot tag list. */
-static phys_ptr_t kboot_tag_list __init_data;
+static kboot_tag_t *kboot_tag_list __init_data;
 
 /** The amount to increment the boot progress for each module. */
 static int progress_per_module __init_data;
@@ -92,9 +89,9 @@ static LIST_DECLARE(boot_fsimage_list);
 
 /** Main entry point of the kernel.
  * @param magic		KBoot magic number.
- * @param tags		Physical address of KBoot tag list. */
-__init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
-	jmp_buf buf;
+ * @param tags		Tag list pointer. */
+__init_text void kmain_bsp(uint32_t magic, kboot_tag_t *tags) {
+	status_t ret;
 
 	/* Save the tag list address. */
 	kboot_tag_list = tags;
@@ -104,25 +101,13 @@ __init_text void kmain_bsp(uint32_t magic, phys_ptr_t tags) {
 
 	/* Bring up the debug console. */
 	console_early_init();
+	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
 
 	/* Check the magic number. */
 	if(magic != KBOOT_MAGIC) {
 		kprintf(LOG_ERROR, "Not loaded by a KBoot-compliant loader\n");
 		arch_cpu_halt();
 	}
-
-	/* Currently we are running on a stack set up for us by the loader.
-	 * This stack is most likely in a mapping that will go away once the
-	 * memory management subsystems are brought up. Therefore, the first
-	 * thing we do is move over to a new stack that is mapped along with
-	 * the kernel. */
-	initjmp(buf, kmain_bsp_bottom, boot_stack, KSTACK_SIZE);
-	longjmp(buf, 1);
-}
-
-/** Initialization code for the boot CPU. */
-static __init_text void kmain_bsp_bottom(void) {
-	status_t ret;
 
 	/* Do early CPU subsystem and CPU initialization. */
 	cpu_early_init();
@@ -141,7 +126,6 @@ static __init_text void kmain_bsp_bottom(void) {
 
 	/* Set up the console. */
 	console_init();
-	kprintf(LOG_NOTICE, "kernel: version %s booting...\n", kiwi_ver_string);
 
 	/* Perform more per-CPU initialization that can be done now the memory
 	 * management subsystems are up. */
@@ -383,6 +367,7 @@ static void init_thread(void *arg1, void *arg2) {
 
 	/* Reclaim memory taken up by initialization code/data. */
 	page_late_init();
+	kmem_late_init();
 
 	update_boot_progress(100);
 
@@ -395,76 +380,62 @@ static void init_thread(void *arg1, void *arg2) {
 
 /** Iterate over the KBoot tag list.
  * @param type		Type of tag to iterate.
- * @param current	Pointer to current tag.
+ * @param current	Pointer to current tag, NULL to start from beginning.
  * @return		Virtual address of next tag, or NULL if no more tags
- *			found. This memory must be unmapped after it has been
- *			used. This will be done if it is passed as the current
- *			argument to this function, or if it is passed to
- *			kboot_tag_release(). */
+ *			found. */
 __init_text void *kboot_tag_iterate(uint32_t type, void *current) {
-	kboot_tag_t *header = current, *tmp;
-	phys_ptr_t next;
+	kboot_tag_t *header = current;
 
 	do {
-		/* Get the address of the next tag. */
-		if(header) {
-			next = header->next;
-			phys_unmap(header, header->size, true);
-		} else {
-			next = kboot_tag_list;
-		}
-		if(!next) {
-			return NULL;
-		}
-
-		/* First map with only the header size in order to get the full
-		 * size of the tag data. */
-		tmp = phys_map(next, sizeof(kboot_tag_t), MM_BOOT);
-		header = phys_map(next, tmp->size, MM_BOOT);
-		phys_unmap(tmp, sizeof(kboot_tag_t), true);
-	} while(header->type != type);
+		header = (header)
+			? (kboot_tag_t *)ROUND_UP((ptr_t)header + header->size, 8)
+			: kboot_tag_list;
+		if(header->type == KBOOT_TAG_NONE)
+			header = NULL;
+	} while(header && type && header->type != type);
 
 	return header;
-}
-
-/** Unmap a KBoot tag.
- * @param current	Address of tag to unmap. */
-__init_text void kboot_tag_release(void *current) {
-	kboot_tag_t *header = current;
-	phys_unmap(header, header->size, true);
 }
 
 /** Look up a KBoot option tag.
  * @param name		Name to look up.
  * @param type		Required option type.
- * @return		Pointer to tag. Must be released. */
-static __init_text kboot_tag_option_t *lookup_option(const char *name, uint32_t type) {
-	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
-		if(strcmp(tag->name, name) == 0) {
-			if(tag->type != type)
-				fatal("Boot option '%s' has incorrect type", name);
+ * @return		Pointer to the option value. */
+static __init_text void *lookup_option(const char *name, uint32_t type) {
+	const char *found;
 
-			return tag;
+	KBOOT_ITERATE(KBOOT_TAG_OPTION, kboot_tag_option_t, tag) {
+		found = kboot_tag_data(tag, 0);
+		if(strcmp(found, name) == 0) {
+			if(tag->type != type)
+				fatal("Kernel option `%s' has incorrect type", name);
+
+			return kboot_tag_data(tag, ROUND_UP(tag->name_size, 8));
 		}
 	}
 
-	fatal("Requested boot option '%s' not found", name);
+	/* If an option is specified in an image, there should be a tag
+	 * passed to the kernel for it. */
+	fatal("Expected kernel option `%s' not found", name);
 }
 
 /** Get the value of a KBoot boolean option.
  * @param name		Name of the option.
  * @return		Value of the option. */
 __init_text bool kboot_boolean_option(const char *name) {
-	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_BOOLEAN);
-	assert(tag->size == sizeof(bool));
-	return *(bool *)&tag[1];
+	return *(bool *)lookup_option(name, KBOOT_OPTION_BOOLEAN);
 }
 
 /** Get the value of a KBoot integer option.
  * @param name		Name of the option.
  * @return		Value of the option. */
 __init_text uint64_t kboot_integer_option(const char *name) {
-	kboot_tag_option_t *tag = lookup_option(name, KBOOT_OPTION_INTEGER);
-	assert(tag->size == sizeof(uint64_t));
-	return *(uint64_t *)&tag[1];
+	return *(uint64_t *)lookup_option(name, KBOOT_OPTION_INTEGER);
+}
+
+/** Get the value of a KBoot string option.
+ * @param name		Name of the option.
+ * @return		Pointer to the option string. */
+__init_text const char *kboot_string_option(const char *name) {
+	return (const char  *)lookup_option(name, KBOOT_OPTION_STRING);
 }

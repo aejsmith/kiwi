@@ -39,6 +39,7 @@
 #include <mm/phys.h>
 
 #include <assert.h>
+#include <kboot.h>
 #include <kernel.h>
 #include <status.h>
 
@@ -544,6 +545,7 @@ void kmem_unmap(void *addr, size_t size, bool shared) {
 /** Initialize the kernel memory allocator. */
 __init_text void kmem_init(void) {
 	kmem_range_t *range;
+	ptr_t start, end, boot_end;
 	unsigned i;
 
 	/* Initialize lists. */
@@ -552,10 +554,66 @@ __init_text void kmem_init(void) {
 	for(i = 0; i < KMEM_FREELISTS; i++)
 		list_init(&kmem_freelists[i]);
 
+	/* We need to account for all of the boot allocations. To do this, we
+	 * just make a single chunk that covers all of the allocations (they
+	 * are contiguous). This gets freed later by kmem_late_init(). */
+	boot_end = KERNEL_KMEM_BASE;
+	KBOOT_ITERATE(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
+		start = range->start;
+		end = range->start + range->size;
+
+		/* Only want to include ranges in kmem space. */
+		if(start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_BASE + KERNEL_KMEM_SIZE)
+			continue;
+
+		if(start != boot_end)
+			fatal("Cannot handle non-contiguous KBoot virtual ranges");
+
+		boot_end = end;
+	}
+
+	if(boot_end != KERNEL_KMEM_BASE) {
+		range = kmem_range_get(MM_BOOT);
+		range->addr = KERNEL_KMEM_BASE;
+		range->size = boot_end - KERNEL_KMEM_BASE;
+		range->allocated = true;
+		list_append(&kmem_ranges, &range->range_link);
+
+		/* Put it on the hash table so we can just free it with a call
+		 * to kmem_free(). */
+		kmem_hash_insert(range);
+	}
+
 	/* Create the initial free range. */
 	range = kmem_range_get(MM_BOOT);
-	range->addr = KERNEL_KMEM_BASE;
-	range->size = KERNEL_KMEM_SIZE;
+	range->addr = boot_end;
+	range->size = KERNEL_KMEM_SIZE - (boot_end - KERNEL_KMEM_BASE);
 	list_append(&kmem_ranges, &range->range_link);
 	kmem_freelist_insert(range);
+}
+
+/** Free up space taken by boot mappings. */
+__init_text void kmem_late_init(void) {
+	ptr_t start, end, boot_end;
+
+	/* Find out the boot mapping end again. We're actually accessing free
+	 * pages here (we're called after page_late_init()), but nothing should
+	 * have touched them since freeing them. */
+	boot_end = KERNEL_KMEM_BASE;
+	KBOOT_ITERATE(KBOOT_TAG_VMEM, kboot_tag_vmem_t, range) {
+		start = range->start;
+		end = range->start + range->size;
+
+		/* Only want to include ranges in kmem space. */
+		if(start < KERNEL_KMEM_BASE || end > KERNEL_KMEM_BASE + KERNEL_KMEM_SIZE)
+			continue;
+
+		boot_end = end;
+	}
+
+	if(boot_end != KERNEL_KMEM_BASE) {
+		/* The pages have already been freed, so we don't want to free
+		 * them again, but do need to unmap them. */
+		kmem_unmap((void *)KERNEL_KMEM_BASE, boot_end - KERNEL_KMEM_BASE, true);
+	}
 }

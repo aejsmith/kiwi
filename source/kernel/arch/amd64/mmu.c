@@ -67,7 +67,10 @@
 # define CHECK_OPERATION(ctx, virt, phys)	
 #endif
 
-/** Define a boot mapping of the first 8GB of physical memory. */
+/* Align the kernel to 16MB to avoid ISA DMA region. */
+KBOOT_LOAD(0, 0x1000000, 0x200000, KERNEL_KMEM_BASE, KERNEL_KMEM_SIZE);
+
+/* Map in 8GB initially, arch_mmu_init() will map all available RAM. */
 KBOOT_MAPPING(KERNEL_PMAP_BASE, 0, 0x200000000);
 
 /** Table mapping memory types to page table flags. */
@@ -652,14 +655,14 @@ static __init_text void create_kernel_mapping(kboot_tag_core_t *core, ptr_t star
 
 /** Create the kernel MMU context. */
 __init_text void arch_mmu_init(void) {
-	phys_ptr_t i, j, highest_phys = 0;
+	phys_ptr_t i, j, end, highest_phys = 0;
 	kboot_tag_core_t *core;
 	uint64_t *pdir;
 
-#if CONFIG_SMP
+	#if CONFIG_SMP
 	/* Reserve a low memory page for the AP bootstrap code. */
 	phys_alloc(PAGE_SIZE, 0, 0, 0, 0x100000, MM_BOOT, &ap_bootstrap_page);
-#endif
+	#endif
 
 	/* Initialize the kernel MMU context structure. */
 	mutex_init(&kernel_mmu_context.lock, "mmu_context_lock", MUTEX_RECURSIVE);
@@ -682,19 +685,17 @@ __init_text void arch_mmu_init(void) {
 	create_kernel_mapping(core, (ptr_t)__rodata_start, (ptr_t)__rodata_end, false, false);
 	create_kernel_mapping(core, (ptr_t)__data_start, (ptr_t)__bss_end, true, false);
 
-	kboot_tag_release(core);
-
 	/* Search for the highest physical address we have in the memory map. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		if(range->end > highest_phys) {
-			highest_phys = range->end;
-		}
+		end = range->start + range->size;
+		if(end > highest_phys)
+			highest_phys = end;
 	}
 
 	/* We always map at least 8GB, and align to a 1GB boundary. */
 	highest_phys = ROUND_UP(MAX(0x200000000UL, highest_phys), 0x40000000UL);
 	kprintf(LOG_DEBUG, "mmu: mapping physical memory up to 0x%" PRIxPHYS "\n",
-	        highest_phys);
+		highest_phys);
 
 	/* Create the physical map area. */
 	for(i = 0; i < highest_phys; i += 0x40000000) {

@@ -33,8 +33,6 @@
 #include <kboot.h>
 #include <time.h>
 
-KBOOT_IMAGE(KBOOT_IMAGE_LFB);
-
 /** PC platform initialization. */
 __init_text void platform_init(void) {
 	pic_init();

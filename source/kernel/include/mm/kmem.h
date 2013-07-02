@@ -36,5 +36,6 @@ extern void *kmem_map(phys_ptr_t base, size_t size, int mmflag);
 extern void kmem_unmap(void *addr, size_t size, bool shared);
 
 extern void kmem_init(void);
+extern void kmem_late_init(void);
 
 #endif /* __MM_KMEM_H */

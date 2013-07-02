@@ -467,56 +467,26 @@ static void ppm_draw(unsigned char *ppm, uint16_t x, uint16_t y) {
 /** Initialize the framebuffer console. */
 __init_text void fb_console_init(void) {
 	uint16_t width, height;
-	kboot_tag_lfb_t *lfb;
+	kboot_tag_video_t *video;
 	fb_info_t info;
 
 	/* Look up the framebuffer boot tag. */
-	lfb = kboot_tag_iterate(KBOOT_TAG_LFB, NULL);
-	if(!lfb)
-		fatal("Expected LFB but no boot tag");
+	video = kboot_tag_iterate(KBOOT_TAG_VIDEO, NULL);
+	if(!video || video->type != KBOOT_VIDEO_LFB)
+		fatal("Expected LFB but no video mode set by loader");
 
-	/* Copy the information from it. Currently guessing the size/position
-	 * values, see KBoot issue #8. */
-	info.width = lfb->width;
-	info.height = lfb->height;
-	info.depth = lfb->depth;
-	info.bytes_per_pixel = ROUND_UP(lfb->depth, 8) / 8;
-	info.addr = lfb->addr;
-	switch(info.depth) {
-	case 15:
-		/* RGB 5:5:5. */
-		info.red_position = 10;
-		info.red_size = 5;
-		info.green_position = 5;
-		info.green_size = 5;
-		info.blue_position = 0;
-		info.blue_size = 5;
-		break;
-	case 16:
-		/* RGB 5:6:5. */
-		info.red_position = 11;
-		info.red_size = 5;
-		info.green_position = 5;
-		info.green_size = 6;
-		info.blue_position = 0;
-		info.blue_size = 5;
-		break;
-	case 24:
-		/* RGB 8:8:8. */
-	case 32:
-		/* ARGB 0:8:8:8. */
-		info.red_position = 16;
-		info.red_size = 8;
-		info.green_position = 8;
-		info.green_size = 8;
-		info.blue_position = 0;
-		info.blue_size = 8;
-		break;
-	default:
-		fatal("Unsupported framebuffer depth");
-	}
-
-	kboot_tag_release(lfb);
+	/* Copy the information from it. */
+	info.width = video->lfb.width;
+	info.height = video->lfb.height;
+	info.depth = video->lfb.bpp;
+	info.bytes_per_pixel = ROUND_UP(video->lfb.bpp, 8) / 8;
+	info.addr = video->lfb.fb_phys;
+	info.red_position = video->lfb.red_pos;
+	info.red_size = video->lfb.red_size;
+	info.green_position = video->lfb.green_pos;
+	info.green_size = video->lfb.green_size;
+	info.blue_position = video->lfb.blue_pos;
+	info.blue_size = video->lfb.blue_size;
 
 	/* If the splash is enabled, acquire the console so output is ignored. */
 	if(!kboot_boolean_option("splash_disabled")) {

@@ -798,7 +798,7 @@ __init_text void page_init(void) {
 	phys_size_t pages_size = 0, size;
 	page_num_t count, j;
 	page_t *page;
-	bool free;
+	bool allocated;
 	size_t i;
 
 	/* Initialize page queues and freelists. */
@@ -839,10 +839,10 @@ __init_text void page_init(void) {
 
 		#if KERNEL_PMAP_OFFSET > 0
 		if(range->start >= KERNEL_PMAP_OFFSET && range->start < (KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE)) {
-			size = MIN((phys_ptr_t)(KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE), range->end) - range->start;
+			size = MIN((phys_ptr_t)(KERNEL_PMAP_OFFSET + KERNEL_PMAP_SIZE), range->start + range->size) - range->start;
 		#else
 		if(range->start < KERNEL_PMAP_SIZE) {
-			size = MIN((phys_ptr_t)KERNEL_PMAP_SIZE, range->end) - range->start;
+			size = MIN((phys_ptr_t)KERNEL_PMAP_SIZE, range->start + range->size) - range->start;
 		#endif
 			if(size > pages_size) {
 				pages_base = range->start;
@@ -879,28 +879,17 @@ __init_text void page_init(void) {
 
 	/* Finally, set the state of each page. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		/* Determine what state to give pages in this range. */
-		switch(range->type) {
-		case KBOOT_MEMORY_FREE:
-			free = true;
-			break;
-		case KBOOT_MEMORY_ALLOCATED:
-		case KBOOT_MEMORY_RECLAIMABLE:
-			free = false;
-			break;
-		default:
-			continue;
-		}
-
 		/* We must individually look up each page because a single
 		 * KBoot range can be split over multiple physical ranges. */
-		for(addr = range->start; addr != range->end; addr += PAGE_SIZE) {
+		for(addr = range->start; addr != range->start + range->size; addr += PAGE_SIZE) {
 			page = page_lookup(addr);
 			assert(page);
 
 			/* If the page was used for the page structures, mark
 			 * it as allocated. */
-			if(!free || (addr >= pages_base && addr < (pages_base + pages_size))) {
+			allocated = range->type != KBOOT_MEMORY_FREE
+				|| (addr >= pages_base && addr < (pages_base + pages_size));
+			if(allocated) {
 				page->state = PAGE_STATE_ALLOCATED;
 				page_queue_append(PAGE_STATE_ALLOCATED, page);
 			} else {
@@ -940,15 +929,15 @@ __init_text void page_late_init(void) {
 	 * any allocations or write to reclaimed memory while this is
 	 * happening. */
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		if(range->type == KBOOT_MEMORY_RECLAIMABLE) {
+		if(range->type != KBOOT_MEMORY_FREE && range->type != KBOOT_MEMORY_ALLOCATED) {
 			/* Must individually free each page in the range, as
 			 * the KBoot range could be split across more than one
 			 * of our internal ranges, and frees across range
 			 * boundaries are not allowed. */
-			for(addr = range->start; addr < range->end; addr += PAGE_SIZE)
+			for(addr = range->start; addr < range->start + range->size; addr += PAGE_SIZE)
 				phys_free(addr, PAGE_SIZE);
 
-			reclaimed += (range->end - range->start);
+			reclaimed += range->size;
 		}
 	}
 

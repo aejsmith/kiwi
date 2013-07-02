@@ -249,7 +249,7 @@ def RequireTarget(target, error):
 Decider('MD5-timestamp')
 
 # Check if Git submodules are up-to-date.
-if not vcs.check_submodules():
+if ARGUMENTS.get('IGNORE_SUBMODULES') != '1' and not vcs.check_submodules():
 	raise SCons.Errors.StopError("Submodules outdated. Please run 'git submodule update --init'.")
 
 # Set revision to the VCS revision number.

@@ -24,6 +24,7 @@
 #include <pc/console.h>
 
 #include <console.h>
+#include <kboot.h>
 #include <kernel.h>
 
 /** Keyboard code definitions */
@@ -33,6 +34,9 @@
 #define RIGHT_ALT	0x38
 #define LEFT_SHIFT	0x2A
 #define RIGHT_SHIFT	0x36
+
+/* Support both VGA and framebuffer consoles, let KBoot choose a mode. */
+KBOOT_VIDEO(KBOOT_VIDEO_LFB, 0, 0, 0);
 
 #ifdef SERIAL_PORT
 /** Serial port ANSI escape parser. */

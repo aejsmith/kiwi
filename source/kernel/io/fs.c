@@ -2035,11 +2035,9 @@ void fs_probe(device_t *device) {
 	/* Only probe for the boot FS at the moment. TODO: Notifications for
 	 * filesystem detection. */
 	if(!root_mount && !kboot_boolean_option("force_fsimage")) {
-		/* If the root mount is not created, we're still OK to use
-		 * KBoot functions. Look for the boot device tag. */
 		bootdev = kboot_tag_iterate(KBOOT_TAG_BOOTDEV, NULL);
-		if(bootdev) {
-			type = fs_type_probe(handle, bootdev->uuid);
+		if(bootdev && bootdev->type == KBOOT_BOOTDEV_DISK) {
+			type = fs_type_probe(handle, (const char *)bootdev->disk.uuid);
 			if(type) {
 				path = device_path(device);
 				ret = fs_mount(path, "/", type->name, NULL);
@@ -2051,8 +2049,6 @@ void fs_probe(device_t *device) {
 				refcount_dec(&type->count);
 				kfree(path);
 			}
-
-			kboot_tag_release(bootdev);
 		}
 	}
 

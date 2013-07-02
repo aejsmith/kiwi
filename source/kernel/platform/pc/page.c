@@ -29,47 +29,43 @@
 
 /** Add memory ranges to the physical memory manager. */
 __init_text void platform_page_init(void) {
+	phys_ptr_t end;
+
 	KBOOT_ITERATE(KBOOT_TAG_MEMORY, kboot_tag_memory_t, range) {
-		switch(range->type) {
-		case KBOOT_MEMORY_FREE:
-		case KBOOT_MEMORY_ALLOCATED:
-		case KBOOT_MEMORY_RECLAIMABLE:
-			break;
-		default:
-			continue;
-		}
+		end = range->start + range->size;
 
 		/* Determine which free list pages in the range should be put
 		 * in. If necessary, split into multiple ranges. */
 		if(range->start < A16M) {
-			if(range->end <= A16M) {
-				page_add_physical_range(range->start, range->end,
+			if(end <= A16M) {
+				page_add_physical_range(range->start, end,
 					PAGE_FREE_LIST_BELOW16M);
-			} else if(range->end <= A4G) {
+			} else if(end <= A4G) {
 				page_add_physical_range(range->start, A16M,
 					PAGE_FREE_LIST_BELOW16M);
-				page_add_physical_range(A16M, range->end,
+				page_add_physical_range(A16M, end,
 					PAGE_FREE_LIST_BELOW4G);
 			} else {
 				page_add_physical_range(range->start, A16M,
 					PAGE_FREE_LIST_BELOW16M);
 				page_add_physical_range(A16M, A4G,
 					PAGE_FREE_LIST_BELOW4G);
-				page_add_physical_range(A4G, range->end,
+				page_add_physical_range(A4G, end,
 					PAGE_FREE_LIST_ABOVE4G);
 			}
 		} else if(range->start < A4G) {
-			if(range->end <= A4G) {
-				page_add_physical_range(range->start, range->end,
+			if(end <= A4G) {
+				page_add_physical_range(range->start, end,
 					PAGE_FREE_LIST_BELOW4G);
 			} else {
 				page_add_physical_range(range->start, A4G,
 					PAGE_FREE_LIST_BELOW4G);
-				page_add_physical_range(A4G, range->end,
+				page_add_physical_range(A4G, end,
 					PAGE_FREE_LIST_ABOVE4G);
 			}
 		} else {
-			page_add_physical_range(range->start, range->end, PAGE_FREE_LIST_ABOVE4G);
+			page_add_physical_range(range->start, end,
+				PAGE_FREE_LIST_ABOVE4G);
 		}
 	}
 }
